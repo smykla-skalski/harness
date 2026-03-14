@@ -1,22 +1,13 @@
-use std::path::PathBuf;
+use std::collections::HashMap;
+use std::env;
+use std::path::Path;
 
 use crate::cluster::{ClusterSpec, HelmSetting};
 use crate::core_defs::{resolve_build_info, utc_now};
-use crate::errors::{self, CliError};
+use crate::errors::CliError;
 use crate::exec::{cluster_exists, run_command};
 
-const UP_MODES: &[&str] = &["single-up", "global-zone-up", "global-two-zones-up"];
-
-fn resolve_repo_root(raw: Option<&str>) -> PathBuf {
-    raw.map(PathBuf::from)
-        .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")))
-}
-
-fn make_target(
-    root: &std::path::Path,
-    target: &str,
-    env: &std::collections::HashMap<String, String>,
-) -> Result<(), CliError> {
+fn make_target(root: &Path, target: &str, env: &HashMap<String, String>) -> Result<(), CliError> {
     run_command(&["make", target], Some(root), Some(env), &[0])?;
     Ok(())
 }
@@ -37,7 +28,7 @@ pub fn execute(
     let mut all_names = vec![cluster_name.to_string()];
     all_names.extend(extra_cluster_names.iter().cloned());
 
-    let root = resolve_repo_root(repo_root);
+    let root = super::resolve_repo_root(repo_root);
     let build_info = resolve_build_info(&root)?;
     let mut base_env = build_info.env();
 
@@ -46,7 +37,11 @@ pub fn execute(
         .filter_map(|s| HelmSetting::from_cli_arg(s).ok())
         .collect();
 
-    let spec = ClusterSpec::from_mode(
+    // NOTE: The spec is built here for validation (rejects unknown modes and
+    // wrong argument counts) but the actual cluster operations below still call
+    // standalone make-target helpers that don't consume the spec.  A future
+    // refactor should drive the operations from `spec.members` directly.
+    let _spec = ClusterSpec::from_mode(
         mode,
         &all_names,
         &root.to_string_lossy(),
@@ -98,8 +93,8 @@ pub fn execute(
 }
 
 fn start_and_deploy(
-    root: &std::path::Path,
-    base_env: &std::collections::HashMap<String, String>,
+    root: &Path,
+    base_env: &HashMap<String, String>,
     cluster: &str,
     kuma_mode: &str,
     extra_settings: &[String],
@@ -110,7 +105,7 @@ fn start_and_deploy(
         eprintln!("{} cluster: starting k3d cluster {cluster}", utc_now());
         make_target(root, "k3d/start", &env)?;
     }
-    let home = std::env::var("HOME").unwrap_or_else(|_| "/tmp".into());
+    let home = env::var("HOME").unwrap_or_else(|_| "/tmp".into());
     let kubeconfig = format!("{home}/.kube/kind-{cluster}-config");
     env.insert("KUBECONFIG".to_string(), kubeconfig);
     env.insert("K3D_HELM_DEPLOY_NO_CNI".to_string(), "true".to_string());
@@ -139,11 +134,7 @@ fn start_and_deploy(
     Ok(())
 }
 
-fn stop(
-    root: &std::path::Path,
-    base_env: &std::collections::HashMap<String, String>,
-    cluster: &str,
-) -> Result<(), CliError> {
+fn stop(root: &Path, base_env: &HashMap<String, String>, cluster: &str) -> Result<(), CliError> {
     if !cluster_exists(cluster)? {
         println!("cluster {cluster} is already absent");
         return Ok(());
@@ -155,24 +146,24 @@ fn stop(
 }
 
 fn single_up(
-    root: &std::path::Path,
-    base_env: &std::collections::HashMap<String, String>,
+    root: &Path,
+    base_env: &HashMap<String, String>,
     names: &[String],
 ) -> Result<(), CliError> {
     start_and_deploy(root, base_env, &names[0], "zone", &[])
 }
 
 fn single_down(
-    root: &std::path::Path,
-    base_env: &std::collections::HashMap<String, String>,
+    root: &Path,
+    base_env: &HashMap<String, String>,
     names: &[String],
 ) -> Result<(), CliError> {
     stop(root, base_env, &names[0])
 }
 
 fn global_zone_up(
-    root: &std::path::Path,
-    base_env: &std::collections::HashMap<String, String>,
+    root: &Path,
+    base_env: &HashMap<String, String>,
     names: &[String],
 ) -> Result<(), CliError> {
     let global_settings: Vec<String> = vec![
@@ -189,8 +180,8 @@ fn global_zone_up(
 }
 
 fn global_zone_down(
-    root: &std::path::Path,
-    base_env: &std::collections::HashMap<String, String>,
+    root: &Path,
+    base_env: &HashMap<String, String>,
     names: &[String],
 ) -> Result<(), CliError> {
     stop(root, base_env, &names[1])?;
@@ -198,8 +189,8 @@ fn global_zone_down(
 }
 
 fn global_two_zones_up(
-    root: &std::path::Path,
-    base_env: &std::collections::HashMap<String, String>,
+    root: &Path,
+    base_env: &HashMap<String, String>,
     names: &[String],
 ) -> Result<(), CliError> {
     let global_settings: Vec<String> = vec![
@@ -219,8 +210,8 @@ fn global_two_zones_up(
 }
 
 fn global_two_zones_down(
-    root: &std::path::Path,
-    base_env: &std::collections::HashMap<String, String>,
+    root: &Path,
+    base_env: &HashMap<String, String>,
     names: &[String],
 ) -> Result<(), CliError> {
     stop(root, base_env, &names[2])?;

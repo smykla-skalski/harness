@@ -1,5 +1,7 @@
 use std::path::{Path, PathBuf};
 
+use crate::errors::CliError;
+
 /// A manifest target for validation.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ManifestTarget {
@@ -17,7 +19,7 @@ pub struct ManifestTarget {
 pub fn authoring_validation_repo_root(
     raw_repo_root: Option<&str>,
     paths: &[&Path],
-) -> Result<PathBuf, crate::errors::CliError> {
+) -> Result<PathBuf, CliError> {
     if let Some(raw) = raw_repo_root {
         let p = PathBuf::from(raw);
         return Ok(p.canonicalize().unwrap_or(p));
@@ -30,7 +32,7 @@ pub fn authoring_validation_repo_root(
             }
         }
     }
-    Err(crate::errors::CliError {
+    Err(CliError {
         code: "KSRCLI014".to_string(),
         message: "unable to locate repo root for authoring validation".to_string(),
         exit_code: 5,
@@ -50,7 +52,7 @@ pub fn validate_suite_author_paths(
     paths: &[&Path],
     _repo_root: &Path,
     _allow_skip: bool,
-) -> Result<Vec<String>, crate::errors::CliError> {
+) -> Result<Vec<String>, CliError> {
     // Collect targets: yaml files are passed directly, markdown group
     // files would have their configure blocks extracted. For now, collect
     // the yaml files.
@@ -69,13 +71,15 @@ pub fn validate_suite_author_paths(
 
 #[cfg(test)]
 mod tests {
+    use std::fs;
+
     use super::*;
 
     #[test]
     fn repo_root_from_raw_path() {
         let dir = tempfile::tempdir().unwrap();
         let root = dir.path().join("repo");
-        std::fs::create_dir_all(&root).unwrap();
+        fs::create_dir_all(&root).unwrap();
 
         let result = authoring_validation_repo_root(Some(root.to_str().unwrap()), &[]);
         assert!(result.is_ok());
@@ -91,12 +95,12 @@ mod tests {
     fn repo_root_from_go_mod_ancestor() {
         let dir = tempfile::tempdir().unwrap();
         let root = dir.path().join("myrepo");
-        std::fs::create_dir_all(&root).unwrap();
-        std::fs::write(root.join("go.mod"), "module example.com/myrepo").unwrap();
+        fs::create_dir_all(&root).unwrap();
+        fs::write(root.join("go.mod"), "module example.com/myrepo").unwrap();
         let subdir = root.join("pkg").join("foo");
-        std::fs::create_dir_all(&subdir).unwrap();
+        fs::create_dir_all(&subdir).unwrap();
         let file = subdir.join("bar.go");
-        std::fs::write(&file, "package foo").unwrap();
+        fs::write(&file, "package foo").unwrap();
 
         let path = file.as_path();
         let result = authoring_validation_repo_root(None, &[path]);
@@ -112,7 +116,7 @@ mod tests {
     fn repo_root_errors_when_not_found() {
         let dir = tempfile::tempdir().unwrap();
         let file = dir.path().join("orphan.go");
-        std::fs::write(&file, "package orphan").unwrap();
+        fs::write(&file, "package orphan").unwrap();
 
         let path = file.as_path();
         let result = authoring_validation_repo_root(None, &[path]);
@@ -125,9 +129,9 @@ mod tests {
     fn validate_collects_yaml_files() {
         let dir = tempfile::tempdir().unwrap();
         let yaml = dir.path().join("test.yaml");
-        std::fs::write(&yaml, "apiVersion: v1").unwrap();
+        fs::write(&yaml, "apiVersion: v1").unwrap();
         let md = dir.path().join("readme.md");
-        std::fs::write(&md, "# Readme").unwrap();
+        fs::write(&md, "# Readme").unwrap();
 
         let paths: Vec<&Path> = vec![yaml.as_path(), md.as_path()];
         let result = validate_suite_author_paths(&paths, dir.path(), false);
@@ -141,7 +145,7 @@ mod tests {
     fn validate_returns_empty_for_no_yaml() {
         let dir = tempfile::tempdir().unwrap();
         let txt = dir.path().join("notes.txt");
-        std::fs::write(&txt, "notes").unwrap();
+        fs::write(&txt, "notes").unwrap();
 
         let paths: Vec<&Path> = vec![txt.as_path()];
         let result = validate_suite_author_paths(&paths, dir.path(), false);
@@ -166,7 +170,7 @@ mod tests {
     fn validate_handles_yml_extension() {
         let dir = tempfile::tempdir().unwrap();
         let yml = dir.path().join("test.yml");
-        std::fs::write(&yml, "apiVersion: v1").unwrap();
+        fs::write(&yml, "apiVersion: v1").unwrap();
 
         let paths: Vec<&Path> = vec![yml.as_path()];
         let result = validate_suite_author_paths(&paths, dir.path(), false);
@@ -178,11 +182,11 @@ mod tests {
     fn repo_root_prefers_raw_over_paths() {
         let dir = tempfile::tempdir().unwrap();
         let raw_root = dir.path().join("raw");
-        std::fs::create_dir_all(&raw_root).unwrap();
+        fs::create_dir_all(&raw_root).unwrap();
 
         let other = dir.path().join("other");
-        std::fs::create_dir_all(&other).unwrap();
-        std::fs::write(other.join("go.mod"), "module other").unwrap();
+        fs::create_dir_all(&other).unwrap();
+        fs::write(other.join("go.mod"), "module other").unwrap();
 
         let path = other.as_path();
         let result = authoring_validation_repo_root(Some(raw_root.to_str().unwrap()), &[path]);

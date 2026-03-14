@@ -3,7 +3,8 @@ use std::path::Path;
 use crate::errors::{self, CliError};
 use crate::hook::HookResult;
 use crate::hook_payloads::HookContext;
-use crate::rules::suite_runner as runner_rules;
+
+use super::{control_file_hint, is_command_owned_run_file};
 
 /// Execute the verify-write hook.
 ///
@@ -24,21 +25,21 @@ pub fn execute(ctx: &HookContext) -> Result<HookResult, CliError> {
         return Ok(HookResult::allow());
     }
     if ctx.skill == "suite-author" {
-        return verify_suite_author(&paths);
+        return Ok(verify_suite_author(&paths));
     }
-    verify_suite_runner(ctx, &paths)
+    Ok(verify_suite_runner(ctx, &paths))
 }
 
-fn verify_suite_author(_paths: &[String]) -> Result<HookResult, CliError> {
+fn verify_suite_author(_paths: &[String]) -> HookResult {
     // Full implementation:
     // - Parses suite.md / group .md files to verify structure
     // - Runs authoring validation
     // - Records write in author workflow state
     // Without that infrastructure, allow.
-    Ok(HookResult::allow())
+    HookResult::allow()
 }
 
-fn verify_suite_runner(ctx: &HookContext, paths: &[String]) -> Result<HookResult, CliError> {
+fn verify_suite_runner(ctx: &HookContext, paths: &[String]) -> HookResult {
     let run_dir = ctx.run_dir.as_ref();
     for raw_path in paths {
         let path = Path::new(raw_path);
@@ -48,7 +49,7 @@ fn verify_suite_runner(ctx: &HookContext, paths: &[String]) -> Result<HookResult
             && is_command_owned_run_file(path, rd)
         {
             let hint = control_file_hint(path);
-            return Ok(errors::hook_msg(
+            return errors::hook_msg(
                 &errors::DENY_RUNNER_FLOW_REQUIRED,
                 &[
                     ("action", "edit run control files"),
@@ -61,25 +62,10 @@ fn verify_suite_runner(ctx: &HookContext, paths: &[String]) -> Result<HookResult
                         ),
                     ),
                 ],
-            ));
+            );
         }
     }
     // Full implementation verifies run-report, run-status, suite.md, and
     // group spec structure, then records suite-fix writes in runner state.
-    Ok(HookResult::allow())
-}
-
-fn is_command_owned_run_file(path: &Path, run_dir: &Path) -> bool {
-    runner_rules::DIRECT_WRITE_DENIED_RUN_FILES
-        .iter()
-        .any(|rel| path == run_dir.join(rel))
-}
-
-fn control_file_hint(path: &Path) -> &'static str {
-    let name = path.file_name().map_or("", |n| n.to_str().unwrap_or(""));
-    if name == "command-log.md" {
-        runner_rules::COMMAND_LOG_HINT
-    } else {
-        runner_rules::HARNESS_MANAGED_RUN_CONTROL_HINT
-    }
+    HookResult::allow()
 }

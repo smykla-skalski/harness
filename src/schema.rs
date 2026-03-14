@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::fs;
 use std::path::{Path, PathBuf};
 
 use comrak::nodes::NodeValue;
@@ -6,13 +7,14 @@ use comrak::{Arena, Options, parse_document};
 use serde::{Deserialize, Serialize};
 
 use crate::errors::{self, CliError};
+use crate::rules;
 
 // ---------------------------------------------------------------------------
 // Internal helpers for frontmatter parsing and file I/O.
 // ---------------------------------------------------------------------------
 
 fn read_file(path: &Path) -> Result<String, CliError> {
-    std::fs::read_to_string(path).map_err(|_| {
+    fs::read_to_string(path).map_err(|_| {
         errors::cli_err(
             &errors::MISSING_FILE,
             &[("path", &path.display().to_string())],
@@ -22,7 +24,7 @@ fn read_file(path: &Path) -> Result<String, CliError> {
 
 fn write_file(path: &Path, text: &str) -> Result<(), CliError> {
     if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent).map_err(|e| CliError {
+        fs::create_dir_all(parent).map_err(|e| CliError {
             code: "IO".to_string(),
             message: e.to_string(),
             exit_code: 1,
@@ -30,7 +32,7 @@ fn write_file(path: &Path, text: &str) -> Result<(), CliError> {
             details: None,
         })?;
     }
-    std::fs::write(path, text).map_err(|e| CliError {
+    fs::write(path, text).map_err(|e| CliError {
         code: "IO".to_string(),
         message: e.to_string(),
         exit_code: 1,
@@ -39,7 +41,7 @@ fn write_file(path: &Path, text: &str) -> Result<(), CliError> {
     })
 }
 
-/// Split frontmatter from body using comrak for extraction and serde_yml for
+/// Split frontmatter from body using `comrak` for extraction and `serde_yml` for
 /// YAML parsing. Returns parsed YAML mapping and body text.
 fn split_frontmatter(text: &str) -> Result<(serde_yml::Mapping, String), CliError> {
     let mut options = Options::default();
@@ -120,7 +122,7 @@ fn yaml_int_list(map: &serde_yml::Mapping, key: &str) -> Vec<i64> {
         .unwrap_or_default()
 }
 
-/// Extract helm_values as a `HashMap<String, serde_json::Value>`.
+/// Extract `helm_values` as a `HashMap<String, serde_json::Value>`.
 fn yaml_helm_values(map: &serde_yml::Mapping, key: &str) -> HashMap<String, serde_json::Value> {
     let Some(val) = map.get(serde_yml::Value::String(key.to_string())) else {
         return HashMap::new();
@@ -326,7 +328,7 @@ impl GroupSpec {
         let map = &yaml;
 
         // Check required sections in body
-        let required = crate::rules::shared::GROUP_REQUIRED_SECTIONS;
+        let required = rules::shared::GROUP_REQUIRED_SECTIONS;
         let missing_sections: Vec<&str> = required
             .iter()
             .filter(|s| !body.contains(*s))
@@ -457,7 +459,7 @@ impl RunReport {
 
 /// Render a YAML list field in block style (one `- item` per line).
 /// Values that contain YAML-special characters are single-quoted so that
-/// serde_yml can parse them back without ambiguity.
+/// `serde_yml` can parse them back without ambiguity.
 fn render_frontmatter_list(key: &str, values: &[String]) -> Vec<String> {
     if values.is_empty() {
         return vec![format!("{key}: []")];
@@ -563,7 +565,7 @@ mod tests {
 
     fn write_temp_file(dir: &Path, name: &str, content: &str) -> PathBuf {
         let path = dir.join(name);
-        let mut f = std::fs::File::create(&path).unwrap();
+        let mut f = fs::File::create(&path).unwrap();
         f.write_all(content.as_bytes()).unwrap();
         path
     }
@@ -847,7 +849,7 @@ mod tests {
             report.frontmatter.debug_summary
         );
 
-        let rendered = std::fs::read_to_string(&path).unwrap();
+        let rendered = fs::read_to_string(&path).unwrap();
         assert!(
             rendered.contains(
                 "story_results:\n  - 'g02 PASS - story with commas, updates, and deletes"
@@ -876,7 +878,7 @@ mod tests {
             "last_state_capture": null,
             "notes": []
         });
-        std::fs::write(&path, serde_json::to_string_pretty(&json).unwrap()).unwrap();
+        fs::write(&path, serde_json::to_string_pretty(&json).unwrap()).unwrap();
 
         let status = RunStatus::load(&path).unwrap();
         assert_eq!(status.last_state_capture, None);
@@ -911,7 +913,7 @@ mod tests {
             "next_planned_group": "g03",
             "notes": []
         });
-        std::fs::write(&path, serde_json::to_string_pretty(&json).unwrap()).unwrap();
+        fs::write(&path, serde_json::to_string_pretty(&json).unwrap()).unwrap();
 
         let status = RunStatus::load(&path).unwrap();
         assert_eq!(

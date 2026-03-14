@@ -1,23 +1,25 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+use std::sync::LazyLock;
+use std::{env, fs};
+
+use regex::Regex;
 
 use crate::errors::{self, CliError};
-use crate::exec::kubectl;
+use crate::exec::{kubectl, run_command};
+use crate::io::ensure_dir;
 
-fn resolve_repo_root(raw: Option<&str>) -> PathBuf {
-    raw.map(PathBuf::from)
-        .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")))
-}
+static GATEWAY_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"sigs\.k8s\.io/gateway-api\s+v([^\s]+)").unwrap());
 
-fn detect_version(root: &std::path::Path) -> Result<String, CliError> {
+fn detect_version(root: &Path) -> Result<String, CliError> {
     let go_mod = root.join("go.mod");
-    let text = std::fs::read_to_string(&go_mod).map_err(|_| {
+    let text = fs::read_to_string(&go_mod).map_err(|_| {
         errors::cli_err(
             &errors::MISSING_FILE,
             &[("path", &go_mod.display().to_string())],
         )
     })?;
-    let re = regex::Regex::new(r"sigs\.k8s\.io/gateway-api\s+v([^\s]+)").unwrap();
-    let cap = re
+    let cap = GATEWAY_RE
         .captures(&text)
         .ok_or_else(|| errors::cli_err(&errors::GATEWAY_VERSION_MISSING, &[]))?;
     let version = cap[1].trim_start_matches('v');
@@ -33,7 +35,7 @@ pub fn execute(
     repo_root: Option<&str>,
     check_only: bool,
 ) -> Result<i32, CliError> {
-    let root = resolve_repo_root(repo_root);
+    let root = super::resolve_repo_root(repo_root);
     let version = detect_version(&root)?;
     let kc = kubeconfig.map(PathBuf::from);
 
@@ -53,13 +55,22 @@ pub fn execute(
     let url = format!(
         "https://github.com/kubernetes-sigs/gateway-api/releases/download/{version}/standard-install.yaml"
     );
-    // Download using curl since we don't have an HTTP library
-    let tmp_dir = root.join("tmp");
-    crate::io::ensure_dir(&tmp_dir).ok();
+    let tmp_dir = env::temp_dir().join("harness-gateway");
+    ensure_dir(&tmp_dir).ok();
     let temp_manifest = tmp_dir.join(format!("gateway-api-{version}.yaml"));
     let temp_str = temp_manifest.to_string_lossy().to_string();
 
-    crate::exec::run_command(&["curl", "-sL", "-o", &temp_str, &url], None, None, &[0])?;
+    run_command(&["curl", "-sL", "-o", &temp_str, &url], None, None, &[0])?;
+
+    // Verify the download produced a non-empty file before applying.
+    let metadata = fs::metadata(&temp_manifest)
+        .map_err(|_| errors::cli_err(&errors::GATEWAY_DOWNLOAD_EMPTY, &[("path", &temp_str)]))?;
+    if metadata.len() == 0 {
+        return Err(errors::cli_err(
+            &errors::GATEWAY_DOWNLOAD_EMPTY,
+            &[("path", &temp_str)],
+        ));
+    }
 
     kubectl(kc.as_deref(), &["apply", "-f", &temp_str], &[0])?;
     println!("{}", temp_manifest.display());

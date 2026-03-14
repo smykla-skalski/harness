@@ -1,5 +1,7 @@
+use std::collections::HashSet;
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
+use std::{env, fs, io};
 
 use crate::errors::{self, CliError};
 
@@ -85,7 +87,7 @@ pub fn choose_install_dir(path_env: &str) -> Result<(PathBuf, bool), CliError> {
 /// # Errors
 /// Returns `CliError` on IO failure.
 pub fn install_wrapper(target_dir: &Path) -> Result<PathBuf, CliError> {
-    std::fs::create_dir_all(target_dir).map_err(|e| errors::CliError {
+    fs::create_dir_all(target_dir).map_err(|e| errors::CliError {
         code: "IO".to_string(),
         message: format!("failed to create directory: {e}"),
         exit_code: 1,
@@ -96,19 +98,19 @@ pub fn install_wrapper(target_dir: &Path) -> Result<PathBuf, CliError> {
     let target = target_dir.join("harness");
 
     if target.exists()
-        && let Ok(existing) = std::fs::read_to_string(&target)
+        && let Ok(existing) = fs::read_to_string(&target)
         && existing == WRAPPER
     {
         // Just ensure executable
-        let meta = std::fs::metadata(&target).map_err(io_err)?;
+        let meta = fs::metadata(&target).map_err(io_err)?;
         let mut perms = meta.permissions();
         perms.set_mode(perms.mode() | 0o111);
-        std::fs::set_permissions(&target, perms).map_err(io_err)?;
+        fs::set_permissions(&target, perms).map_err(io_err)?;
         return Ok(target);
     }
 
-    std::fs::write(&target, WRAPPER).map_err(io_err)?;
-    std::fs::set_permissions(&target, std::fs::Permissions::from_mode(0o755)).map_err(io_err)?;
+    fs::write(&target, WRAPPER).map_err(io_err)?;
+    fs::set_permissions(&target, fs::Permissions::from_mode(0o755)).map_err(io_err)?;
     Ok(target)
 }
 
@@ -137,13 +139,11 @@ pub fn main(project_dir: &Path, path_env: &str) -> Result<i32, CliError> {
 }
 
 fn dirs_home() -> PathBuf {
-    std::env::var("HOME")
-        .map(PathBuf::from)
-        .unwrap_or_else(|_| PathBuf::from("/tmp"))
+    env::var("HOME").map_or_else(|_| PathBuf::from("/tmp"), PathBuf::from)
 }
 
 fn path_candidates(path_env: &str) -> Vec<PathBuf> {
-    let mut seen = std::collections::HashSet::new();
+    let mut seen = HashSet::new();
     let mut candidates = Vec::new();
     for raw in path_env.split(':') {
         if raw.is_empty() {
@@ -167,7 +167,7 @@ fn expand_path(raw: &str) -> PathBuf {
         }
         return home.join(stripped);
     }
-    std::fs::canonicalize(&path).unwrap_or(path)
+    fs::canonicalize(&path).unwrap_or(path)
 }
 
 fn is_installable(path: &Path) -> bool {
@@ -198,10 +198,11 @@ fn is_installable(path: &Path) -> bool {
 }
 
 fn canonical_or_same(path: &Path) -> PathBuf {
-    std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf())
+    fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf())
 }
 
-fn io_err(e: std::io::Error) -> CliError {
+#[allow(clippy::needless_pass_by_value)]
+fn io_err(e: io::Error) -> CliError {
     CliError {
         code: "IO".to_string(),
         message: format!("IO error: {e}"),
@@ -234,17 +235,17 @@ mod tests {
     fn choose_install_dir_prefers_local_bin_on_path() {
         let dir = tempfile::tempdir().unwrap();
         let local_bin = dir.path().join(".local").join("bin");
-        std::fs::create_dir_all(&local_bin).unwrap();
+        fs::create_dir_all(&local_bin).unwrap();
 
         // We need HOME set to our temp dir for dirs_home()
-        let original_home = std::env::var("HOME").ok();
-        unsafe { std::env::set_var("HOME", dir.path()) };
+        let original_home = env::var("HOME").ok();
+        unsafe { env::set_var("HOME", dir.path()) };
 
         let path_env = local_bin.to_string_lossy().to_string();
         let result = choose_install_dir(&path_env);
 
         if let Some(h) = original_home {
-            unsafe { std::env::set_var("HOME", h) };
+            unsafe { env::set_var("HOME", h) };
         }
 
         let (chosen, on_path) = result.unwrap();
@@ -264,8 +265,8 @@ mod tests {
         let path = install_wrapper(&target_dir).unwrap();
 
         assert!(path.exists());
-        assert_eq!(std::fs::read_to_string(&path).unwrap(), WRAPPER);
-        let mode = std::fs::metadata(&path).unwrap().permissions().mode();
+        assert_eq!(fs::read_to_string(&path).unwrap(), WRAPPER);
+        let mode = fs::metadata(&path).unwrap().permissions().mode();
         assert_ne!(mode & 0o111, 0, "should be executable");
     }
 
@@ -278,18 +279,18 @@ mod tests {
         let second = install_wrapper(&target_dir).unwrap();
 
         assert_eq!(first, second);
-        assert_eq!(std::fs::read_to_string(&first).unwrap(), WRAPPER);
+        assert_eq!(fs::read_to_string(&first).unwrap(), WRAPPER);
     }
 
     #[test]
     fn install_wrapper_overwrites_different_content() {
         let dir = tempfile::tempdir().unwrap();
         let target_dir = dir.path().join("bin");
-        std::fs::create_dir_all(&target_dir).unwrap();
-        std::fs::write(target_dir.join("harness"), "old content").unwrap();
+        fs::create_dir_all(&target_dir).unwrap();
+        fs::write(target_dir.join("harness"), "old content").unwrap();
 
         let path = install_wrapper(&target_dir).unwrap();
-        assert_eq!(std::fs::read_to_string(path).unwrap(), WRAPPER);
+        assert_eq!(fs::read_to_string(path).unwrap(), WRAPPER);
     }
 
     #[test]
@@ -303,20 +304,20 @@ mod tests {
     fn main_succeeds_with_valid_project() {
         let dir = tempfile::tempdir().unwrap();
         let source = dir.path().join(".claude").join("skills").join("harness");
-        std::fs::create_dir_all(source.parent().unwrap()).unwrap();
-        std::fs::write(&source, "#!/bin/sh\necho ok\n").unwrap();
+        fs::create_dir_all(source.parent().unwrap()).unwrap();
+        fs::write(&source, "#!/bin/sh\necho ok\n").unwrap();
 
         let bin_dir = dir.path().join(".local").join("bin");
-        std::fs::create_dir_all(&bin_dir).unwrap();
+        fs::create_dir_all(&bin_dir).unwrap();
 
-        let original_home = std::env::var("HOME").ok();
-        unsafe { std::env::set_var("HOME", dir.path()) };
+        let original_home = env::var("HOME").ok();
+        unsafe { env::set_var("HOME", dir.path()) };
 
         let path_env = bin_dir.to_string_lossy().to_string();
         let result = main(dir.path(), &path_env);
 
         if let Some(h) = original_home {
-            unsafe { std::env::set_var("HOME", h) };
+            unsafe { env::set_var("HOME", h) };
         }
 
         assert_eq!(result.unwrap(), 0);
@@ -327,7 +328,7 @@ mod tests {
     fn path_candidates_deduplicates() {
         let dir = tempfile::tempdir().unwrap();
         let bin = dir.path().join("bin");
-        std::fs::create_dir_all(&bin).unwrap();
+        fs::create_dir_all(&bin).unwrap();
         let path_str = format!("{}:{}", bin.display(), bin.display());
         let candidates = path_candidates(&path_str);
         assert_eq!(candidates.len(), 1);

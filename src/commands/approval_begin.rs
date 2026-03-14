@@ -1,5 +1,4 @@
-use std::path::PathBuf;
-
+use crate::core_defs::utc_now;
 use crate::errors::CliError;
 use crate::workflow::author::{
     ApprovalMode, AuthorDraftState, AuthorPhase, AuthorReviewState, AuthorSessionInfo,
@@ -51,7 +50,7 @@ pub fn execute(mode: &str, suite_dir: Option<&str>) -> Result<i32, CliError> {
             suite_tree_written: false,
             written_paths: vec![],
         },
-        updated_at: crate::core_defs::utc_now(),
+        updated_at: utc_now(),
         transition_count: 0,
         last_event: Some("ApprovalFlowStarted".to_string()),
     };

@@ -18,23 +18,23 @@ pub fn execute(ctx: &HookContext) -> Result<HookResult, CliError> {
         return Ok(HookResult::allow());
     }
     if ctx.skill == "suite-author" {
-        return guard_suite_author_stop();
+        return Ok(guard_suite_author_stop());
     }
-    guard_suite_runner_stop(ctx)
+    Ok(guard_suite_runner_stop(ctx))
 }
 
-fn guard_suite_author_stop() -> Result<HookResult, CliError> {
+fn guard_suite_author_stop() -> HookResult {
     // Full implementation checks:
     // - Author workflow state for can_stop()
     // - Suite spec completeness (groups, baseline files)
     // Without author state infrastructure, allow stop.
-    Ok(HookResult::allow())
+    HookResult::allow()
 }
 
-fn guard_suite_runner_stop(ctx: &HookContext) -> Result<HookResult, CliError> {
+fn guard_suite_runner_stop(ctx: &HookContext) -> HookResult {
     if ctx.run_dir.is_none() {
         // No active run - allow stop.
-        return Ok(HookResult::allow());
+        return HookResult::allow();
     }
     // Full implementation checks:
     // - RunReport parseable
@@ -44,8 +44,5 @@ fn guard_suite_runner_stop(ctx: &HookContext) -> Result<HookResult, CliError> {
     // The Python code denies stop if state capture is missing or verdict
     // is pending. Since we can't check those, allow by default and let
     // the full implementation handle it once RunContext is available.
-    Ok(errors::hook_msg(
-        &errors::INFO_RUN_VERDICT,
-        &[("verdict", "pending")],
-    ))
+    errors::hook_msg(&errors::INFO_RUN_VERDICT, &[("verdict", "pending")])
 }

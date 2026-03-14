@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::path::Path;
+use std::{fs, io};
 
 use comrak::nodes::NodeValue;
 use comrak::{Arena, Options, parse_document};
@@ -9,7 +10,7 @@ use tabled::settings::Style;
 
 use crate::errors::{
     self, CliError, MARKDOWN_SHAPE_MISMATCH, MISSING_FILE, MISSING_FRONTMATTER, NOT_A_LIST,
-    NOT_A_MAPPING, NOT_ALL_STRINGS, NOT_STRING_KEYS, PATH_NOT_FOUND, UNTERMINATED_FRONTMATTER,
+    NOT_A_MAPPING, NOT_ALL_STRINGS, PATH_NOT_FOUND, UNTERMINATED_FRONTMATTER,
 };
 
 /// Validate that a JSON value is an object with string keys.
@@ -49,8 +50,8 @@ pub fn ensure_str_list(value: &Value, label: &str) -> Result<Vec<String>, CliErr
 ///
 /// # Errors
 /// Returns an IO error if directory creation fails.
-pub fn ensure_dir(path: &Path) -> std::io::Result<()> {
-    std::fs::create_dir_all(path)
+pub fn ensure_dir(path: &Path) -> io::Result<()> {
+    fs::create_dir_all(path)
 }
 
 /// Read a file as UTF-8 text.
@@ -58,7 +59,7 @@ pub fn ensure_dir(path: &Path) -> std::io::Result<()> {
 /// # Errors
 /// Returns `CliError` if the file is missing.
 pub fn read_text(path: &Path) -> Result<String, CliError> {
-    std::fs::read_to_string(path)
+    fs::read_to_string(path)
         .map_err(|_| errors::cli_err(&MISSING_FILE, &[("path", &path.display().to_string())]))
 }
 
@@ -71,8 +72,7 @@ pub fn write_text(path: &Path, text: &str) -> Result<(), CliError> {
         ensure_dir(parent)
             .map_err(|e| errors::cli_err(&MISSING_FILE, &[("path", &e.to_string())]))?;
     }
-    std::fs::write(path, text)
-        .map_err(|e| errors::cli_err(&MISSING_FILE, &[("path", &e.to_string())]))
+    fs::write(path, text).map_err(|e| errors::cli_err(&MISSING_FILE, &[("path", &e.to_string())]))
 }
 
 /// Read and parse a JSON file into a `serde_json::Value`.
@@ -92,12 +92,15 @@ pub fn read_json(path: &Path) -> Result<Value, CliError> {
 ///
 /// # Errors
 /// Returns `CliError` on IO failure.
+///
+/// # Panics
+/// Panics if `payload` cannot be serialized (should not happen for valid JSON values).
 pub fn write_json(path: &Path, payload: &Value) -> Result<(), CliError> {
     let text = serde_json::to_string_pretty(payload).expect("serialization of valid JSON value");
     write_text(path, &format!("{text}\n"))
 }
 
-/// Parse markdown frontmatter using comrak for extraction and serde_yml for
+/// Parse markdown frontmatter using comrak for extraction and `serde_yml` for
 /// YAML parsing.
 ///
 /// # Errors
@@ -162,7 +165,7 @@ fn yaml_to_json_map(yaml: &serde_yml::Value) -> HashMap<String, Value> {
     result
 }
 
-/// YAML 1.1 boolean literals that serde_yml (YAML 1.2) treats as strings.
+/// YAML 1.1 boolean literals that `serde_yml` (YAML 1.2) treats as strings.
 fn yaml11_bool(s: &str) -> Option<bool> {
     match s.to_lowercase().as_str() {
         "yes" | "on" => Some(true),
@@ -182,9 +185,7 @@ fn yaml_to_json(yaml: &serde_yml::Value) -> Value {
             if let Some(i) = n.as_i64() {
                 Value::Number(i.into())
             } else if let Some(f) = n.as_f64() {
-                serde_json::Number::from_f64(f)
-                    .map(Value::Number)
-                    .unwrap_or(Value::Null)
+                serde_json::Number::from_f64(f).map_or(Value::Null, Value::Number)
             } else {
                 Value::Null
             }
@@ -315,7 +316,7 @@ mod tests {
         let tmp = TempDir::new().unwrap();
         let path = tmp.path().join("a").join("b").join("c.txt");
         write_text(&path, "hello").unwrap();
-        assert_eq!(std::fs::read_to_string(&path).unwrap(), "hello");
+        assert_eq!(fs::read_to_string(&path).unwrap(), "hello");
     }
 
     #[test]
@@ -458,7 +459,7 @@ mod tests {
         let tmp = TempDir::new().unwrap();
         let path = tmp.path().join("log.md");
         append_markdown_row(&path, &["a", "b"], &["1", "2"]).unwrap();
-        let content = std::fs::read_to_string(&path).unwrap();
+        let content = fs::read_to_string(&path).unwrap();
         assert!(content.contains("| a | b |"));
         assert!(content.contains("| 1 | 2 |"));
     }
@@ -469,7 +470,7 @@ mod tests {
         let path = tmp.path().join("log.md");
         append_markdown_row(&path, &["a"], &["1"]).unwrap();
         append_markdown_row(&path, &["a"], &["2"]).unwrap();
-        let content = std::fs::read_to_string(&path).unwrap();
+        let content = fs::read_to_string(&path).unwrap();
         assert_eq!(content.matches("| 1 |").count(), 1);
         assert_eq!(content.matches("| 2 |").count(), 1);
     }

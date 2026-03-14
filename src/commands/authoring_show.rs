@@ -2,11 +2,19 @@ use crate::authoring::{authoring_workspace_dir, require_authoring_session};
 use crate::errors::{self, CliError};
 use crate::io::read_text;
 
+fn is_safe_name(s: &str) -> bool {
+    !s.is_empty() && !s.contains('/') && !s.contains('\\') && !s.contains("..")
+}
+
 /// Show saved suite-author payloads.
 ///
 /// # Errors
 /// Returns `CliError` on failure.
 pub fn execute(kind: &str) -> Result<i32, CliError> {
+    if !is_safe_name(kind) {
+        return Err(errors::cli_err(&errors::UNSAFE_NAME, &[("name", kind)]));
+    }
+
     let _session = require_authoring_session()?;
     let workspace = authoring_workspace_dir();
     let path = workspace.join(format!("{kind}.json"));

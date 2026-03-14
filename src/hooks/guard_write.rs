@@ -3,7 +3,8 @@ use std::path::Path;
 use crate::errors::{self, CliError};
 use crate::hook::HookResult;
 use crate::hook_payloads::HookContext;
-use crate::rules::suite_runner as runner_rules;
+
+use super::{control_file_hint, is_command_owned_run_file};
 
 /// Execute the guard-write hook.
 ///
@@ -25,18 +26,18 @@ pub fn execute(ctx: &HookContext) -> Result<HookResult, CliError> {
         return Ok(HookResult::allow());
     }
     if ctx.skill == "suite-author" {
-        return guard_suite_author(&paths);
+        return Ok(guard_suite_author(&paths));
     }
-    guard_suite_runner(ctx, &paths)
+    Ok(guard_suite_runner(ctx, &paths))
 }
 
-fn guard_suite_author(_paths: &[String]) -> Result<HookResult, CliError> {
+fn guard_suite_author(_paths: &[String]) -> HookResult {
     // Full implementation validates paths against the author workflow state
     // and suite directory. Without that infrastructure, allow.
-    Ok(HookResult::allow())
+    HookResult::allow()
 }
 
-fn guard_suite_runner(ctx: &HookContext, paths: &[String]) -> Result<HookResult, CliError> {
+fn guard_suite_runner(ctx: &HookContext, paths: &[String]) -> HookResult {
     let run_dir = ctx.run_dir.as_ref();
     for raw_path in paths {
         let path = Path::new(raw_path);
@@ -45,7 +46,7 @@ fn guard_suite_runner(ctx: &HookContext, paths: &[String]) -> Result<HookResult,
             && is_command_owned_run_file(path, rd)
         {
             let hint = control_file_hint(path);
-            return Ok(errors::hook_msg(
+            return errors::hook_msg(
                 &errors::DENY_RUNNER_FLOW_REQUIRED,
                 &[
                     ("action", "edit run control files"),
@@ -58,25 +59,10 @@ fn guard_suite_runner(ctx: &HookContext, paths: &[String]) -> Result<HookResult,
                         ),
                     ),
                 ],
-            ));
+            );
         }
     }
     // Full run-surface and suite-fix validation needs RunContext and
     // runner workflow state. Allow remaining writes for now.
-    Ok(HookResult::allow())
-}
-
-fn is_command_owned_run_file(path: &Path, run_dir: &Path) -> bool {
-    runner_rules::DIRECT_WRITE_DENIED_RUN_FILES
-        .iter()
-        .any(|rel| path == run_dir.join(rel))
-}
-
-fn control_file_hint(path: &Path) -> &'static str {
-    let name = path.file_name().map_or("", |n| n.to_str().unwrap_or(""));
-    if name == "command-log.md" {
-        runner_rules::COMMAND_LOG_HINT
-    } else {
-        runner_rules::HARNESS_MANAGED_RUN_CONTROL_HINT
-    }
+    HookResult::allow()
 }

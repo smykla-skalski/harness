@@ -1,7 +1,10 @@
 use std::path::{Path, PathBuf};
+use std::time::UNIX_EPOCH;
+use std::{fs, result};
 
 use serde::{Deserialize, Serialize};
 
+use crate::core_defs::{project_context_dir, session_scope_key, utc_now};
 use crate::errors::CliError;
 use crate::rules::compact as rules;
 
@@ -34,11 +37,11 @@ impl FileFingerprint {
                 sha256: None,
             };
         }
-        let meta = std::fs::metadata(&resolved).ok();
-        let size = meta.as_ref().map(std::fs::Metadata::len);
+        let meta = fs::metadata(&resolved).ok();
+        let size = meta.as_ref().map(fs::Metadata::len);
         let mtime_ns = meta.as_ref().and_then(|m| {
             m.modified().ok().and_then(|t| {
-                t.duration_since(std::time::UNIX_EPOCH)
+                t.duration_since(UNIX_EPOCH)
                     .ok()
                     .and_then(|d| u64::try_from(d.as_nanos()).ok())
             })
@@ -152,7 +155,7 @@ impl CompactHandoff {
 /// Compact directory for a project.
 #[must_use]
 pub fn compact_project_dir(project_dir: &Path) -> PathBuf {
-    crate::core_defs::project_context_dir(project_dir).join("compact")
+    project_context_dir(project_dir).join("compact")
 }
 
 /// Path to the latest compact handoff file.
@@ -178,9 +181,9 @@ pub fn build_compact_handoff(project_dir: &Path) -> Result<CompactHandoff, CliEr
     Ok(CompactHandoff {
         version: rules::HANDOFF_VERSION,
         project_dir: project_dir.to_string_lossy().to_string(),
-        created_at: crate::core_defs::utc_now(),
+        created_at: utc_now(),
         status: rules::STATUS_PENDING.to_string(),
-        source_session_scope: Some(crate::core_defs::session_scope_key()),
+        source_session_scope: Some(session_scope_key()),
         source_session_id: None,
         transcript_path: None,
         cwd: None,
@@ -224,17 +227,20 @@ pub fn load_latest_compact_handoff(project_dir: &Path) -> Result<Option<CompactH
     if !path.exists() {
         return Ok(None);
     }
-    let text = std::fs::read_to_string(&path).map_err(|e| CliError {
+    let text = fs::read_to_string(&path).map_err(|e| CliError {
         code: "IO".to_string(),
         message: format!("failed to read {}: {e}", path.display()),
         exit_code: 1,
         hint: None,
         details: None,
     })?;
-    match serde_json::from_str(&text) {
-        Ok(handoff) => Ok(Some(handoff)),
-        Err(_) => Ok(None),
-    }
+    serde_json::from_str(&text).map(Some).map_err(|e| CliError {
+        code: "PARSE".to_string(),
+        message: format!("corrupt compact handoff at {}: {e}", path.display()),
+        exit_code: 1,
+        hint: None,
+        details: None,
+    })
 }
 
 /// Load a pending (unconsumed) compact handoff, if any.
@@ -256,7 +262,7 @@ pub fn consume_compact_handoff(
 ) -> Result<CompactHandoff, CliError> {
     let consumed = CompactHandoff {
         status: rules::STATUS_CONSUMED.to_string(),
-        consumed_at: Some(crate::core_defs::utc_now()),
+        consumed_at: Some(utc_now()),
         ..handoff.clone()
     };
     write_json_atomic(&compact_latest_path(project_dir), &consumed)?;
@@ -298,7 +304,7 @@ pub fn render_hydration_context(handoff: &CompactHandoff, diverged_paths: &[Stri
         let paths = diverged_paths
             .iter()
             .take(5)
-            .cloned()
+            .map(String::as_str)
             .collect::<Vec<_>>()
             .join(", ");
         lines.push(format!(
@@ -488,7 +494,7 @@ fn render_authoring_section(handoff: &AuthoringHandoff) -> String {
                 .state_paths
                 .iter()
                 .take(5)
-                .cloned()
+                .map(String::as_str)
                 .collect::<Vec<_>>()
                 .join(", ")
         ),
@@ -533,7 +539,7 @@ fn truncate_lines(lines: &[String], char_limit: usize, line_limit: usize) -> Str
             break;
         }
         let truncated = if line.len() > remaining {
-            &line[..remaining]
+            &line[..line.floor_char_boundary(remaining)]
         } else {
             line.as_str()
         };
@@ -551,7 +557,7 @@ fn truncate_lines(lines: &[String], char_limit: usize, line_limit: usize) -> Str
 
 fn write_json_atomic(path: &Path, payload: &CompactHandoff) -> Result<(), CliError> {
     if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent).map_err(|e| CliError {
+        fs::create_dir_all(parent).map_err(|e| CliError {
             code: "IO".to_string(),
             message: format!("failed to create directory: {e}"),
             exit_code: 1,
@@ -567,14 +573,14 @@ fn write_json_atomic(path: &Path, payload: &CompactHandoff) -> Result<(), CliErr
         hint: None,
         details: None,
     })?;
-    std::fs::write(&tmp, &text).map_err(|e| CliError {
+    fs::write(&tmp, &text).map_err(|e| CliError {
         code: "IO".to_string(),
         message: format!("failed to write {}: {e}", tmp.display()),
         exit_code: 1,
         hint: None,
         details: None,
     })?;
-    std::fs::rename(&tmp, path).map_err(|e| CliError {
+    fs::rename(&tmp, path).map_err(|e| CliError {
         code: "IO".to_string(),
         message: format!(
             "failed to rename {} to {}: {e}",
@@ -593,24 +599,29 @@ fn trim_history(project_dir: &Path) {
     if !history_dir.exists() {
         return;
     }
-    let Ok(entries) = std::fs::read_dir(&history_dir) else {
+    let Ok(entries) = fs::read_dir(&history_dir) else {
         return;
     };
     let mut files: Vec<PathBuf> = entries
-        .filter_map(std::result::Result::ok)
+        .filter_map(result::Result::ok)
         .map(|e| e.path())
         .filter(|p| p.is_file())
         .collect();
     files.sort();
     let excess = files.len().saturating_sub(rules::HISTORY_LIMIT);
     for path in files.into_iter().take(excess) {
-        let _ = std::fs::remove_file(path);
+        if let Err(e) = fs::remove_file(&path) {
+            eprintln!(
+                "warning: failed to remove history file {}: {e}",
+                path.display()
+            );
+        }
     }
 }
 
 fn file_sha256(path: &Path) -> Option<String> {
     use sha2::{Digest, Sha256};
-    let data = std::fs::read(path).ok()?;
+    let data = fs::read(path).ok()?;
     let hash = Sha256::digest(&data);
     Some(format!("{hash:x}"))
 }
@@ -641,15 +652,15 @@ mod tests {
     /// Write a handoff directly to a path (bypasses `project_context_dir`).
     fn write_handoff_to(path: &Path, handoff: &CompactHandoff) {
         if let Some(parent) = path.parent() {
-            std::fs::create_dir_all(parent).unwrap();
+            fs::create_dir_all(parent).unwrap();
         }
         let text = serde_json::to_string_pretty(handoff).unwrap();
-        std::fs::write(path, text).unwrap();
+        fs::write(path, text).unwrap();
     }
 
     /// Read a handoff directly from a path.
     fn read_handoff_from(path: &Path) -> Option<CompactHandoff> {
-        let text = std::fs::read_to_string(path).ok()?;
+        let text = fs::read_to_string(path).ok()?;
         serde_json::from_str(&text).ok()
     }
 
@@ -676,7 +687,7 @@ mod tests {
         write_json_atomic(&path, &handoff).unwrap();
 
         let loaded: CompactHandoff =
-            serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
+            serde_json::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
         assert_eq!(loaded.project_dir, "/p");
     }
 
@@ -722,7 +733,7 @@ mod tests {
     fn file_fingerprint_existing_file() {
         let dir = tempfile::tempdir().unwrap();
         let file = dir.path().join("test.txt");
-        std::fs::write(&file, "hello").unwrap();
+        fs::write(&file, "hello").unwrap();
 
         let fp = FileFingerprint::from_path("test", &file);
         assert!(fp.exists);
@@ -743,7 +754,7 @@ mod tests {
     fn file_fingerprint_matches_disk_when_unchanged() {
         let dir = tempfile::tempdir().unwrap();
         let file = dir.path().join("stable.txt");
-        std::fs::write(&file, "content").unwrap();
+        fs::write(&file, "content").unwrap();
 
         let fp = FileFingerprint::from_path("stable", &file);
         assert!(fp.matches_disk());
@@ -753,10 +764,10 @@ mod tests {
     fn file_fingerprint_diverges_after_write() {
         let dir = tempfile::tempdir().unwrap();
         let file = dir.path().join("changing.txt");
-        std::fs::write(&file, "before").unwrap();
+        fs::write(&file, "before").unwrap();
 
         let fp = FileFingerprint::from_path("changing", &file);
-        std::fs::write(&file, "after").unwrap();
+        fs::write(&file, "after").unwrap();
 
         assert!(!fp.matches_disk());
     }
@@ -765,10 +776,10 @@ mod tests {
     fn verify_fingerprints_detects_changes() {
         let dir = tempfile::tempdir().unwrap();
         let file = dir.path().join("f.txt");
-        std::fs::write(&file, "v1").unwrap();
+        fs::write(&file, "v1").unwrap();
         let fp = FileFingerprint::from_path("f", &file);
 
-        std::fs::write(&file, "v2").unwrap();
+        fs::write(&file, "v2").unwrap();
 
         let mut handoff = test_handoff("/p");
         handoff.fingerprints = vec![fp];
@@ -1067,35 +1078,35 @@ mod tests {
         // Test the trimming logic directly without project_context_dir
         let dir = tempfile::tempdir().unwrap();
         let history = dir.path().join("history");
-        std::fs::create_dir_all(&history).unwrap();
+        fs::create_dir_all(&history).unwrap();
 
         for i in 0..15 {
             let name = format!("{i:04}.json");
-            std::fs::write(history.join(name), "{}").unwrap();
+            fs::write(history.join(name), "{}").unwrap();
         }
 
         // Directly test the trim logic
-        let entries_before: Vec<_> = std::fs::read_dir(&history)
+        let entries_before: Vec<_> = fs::read_dir(&history)
             .unwrap()
-            .filter_map(|e| e.ok())
+            .filter_map(result::Result::ok)
             .collect();
         assert_eq!(entries_before.len(), 15);
 
-        let mut files: Vec<PathBuf> = std::fs::read_dir(&history)
+        let mut files: Vec<PathBuf> = fs::read_dir(&history)
             .unwrap()
-            .filter_map(|e| e.ok())
+            .filter_map(result::Result::ok)
             .map(|e| e.path())
             .filter(|p| p.is_file())
             .collect();
         files.sort();
         let excess = files.len().saturating_sub(rules::HISTORY_LIMIT);
         for path in files.into_iter().take(excess) {
-            std::fs::remove_file(path).unwrap();
+            fs::remove_file(path).unwrap();
         }
 
-        let remaining: Vec<_> = std::fs::read_dir(&history)
+        let remaining: Vec<_> = fs::read_dir(&history)
             .unwrap()
-            .filter_map(|e| e.ok())
+            .filter_map(result::Result::ok)
             .collect();
         assert_eq!(remaining.len(), rules::HISTORY_LIMIT);
     }

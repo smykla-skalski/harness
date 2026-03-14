@@ -1,9 +1,19 @@
 use serde::Serialize;
 
+/// The decision a hook emits: allow, deny, warn, or info.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Decision {
+    Allow,
+    Deny,
+    Warn,
+    Info,
+}
+
 /// Result of a hook evaluation, emitted as JSON on stdout.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct HookResult {
-    pub decision: String,
+    pub decision: Decision,
     pub code: String,
     pub message: String,
 }
@@ -12,7 +22,7 @@ impl HookResult {
     #[must_use]
     pub fn allow() -> Self {
         Self {
-            decision: "allow".to_string(),
+            decision: Decision::Allow,
             code: String::new(),
             message: String::new(),
         }
@@ -21,7 +31,7 @@ impl HookResult {
     #[must_use]
     pub fn deny(code: &str, message: &str) -> Self {
         Self {
-            decision: "deny".to_string(),
+            decision: Decision::Deny,
             code: code.to_string(),
             message: message.to_string(),
         }
@@ -30,7 +40,7 @@ impl HookResult {
     #[must_use]
     pub fn warn(code: &str, message: &str) -> Self {
         Self {
-            decision: "warn".to_string(),
+            decision: Decision::Warn,
             code: code.to_string(),
             message: message.to_string(),
         }
@@ -39,7 +49,7 @@ impl HookResult {
     #[must_use]
     pub fn info(code: &str, message: &str) -> Self {
         Self {
-            decision: "info".to_string(),
+            decision: Decision::Info,
             code: code.to_string(),
             message: message.to_string(),
         }
@@ -50,7 +60,7 @@ impl HookResult {
     /// # Errors
     /// Returns an error if JSON serialization fails.
     pub fn emit(&self) -> Result<i32, serde_json::Error> {
-        if self.decision == "allow" && self.code.is_empty() {
+        if self.decision == Decision::Allow && self.code.is_empty() {
             return Ok(0);
         }
         let json = serde_json::to_string(self)?;
@@ -66,7 +76,7 @@ mod tests {
     #[test]
     fn allow_has_empty_code_and_message() {
         let r = HookResult::allow();
-        assert_eq!(r.decision, "allow");
+        assert_eq!(r.decision, Decision::Allow);
         assert!(r.code.is_empty());
         assert!(r.message.is_empty());
     }
@@ -74,7 +84,7 @@ mod tests {
     #[test]
     fn deny_has_correct_decision() {
         let r = HookResult::deny("KSR005", "bad");
-        assert_eq!(r.decision, "deny");
+        assert_eq!(r.decision, Decision::Deny);
         assert_eq!(r.code, "KSR005");
         assert_eq!(r.message, "bad");
     }
@@ -82,7 +92,7 @@ mod tests {
     #[test]
     fn warn_has_correct_decision() {
         let r = HookResult::warn("KSR006", "watch out");
-        assert_eq!(r.decision, "warn");
+        assert_eq!(r.decision, Decision::Warn);
         assert_eq!(r.code, "KSR006");
         assert_eq!(r.message, "watch out");
     }
@@ -90,7 +100,7 @@ mod tests {
     #[test]
     fn info_has_correct_decision() {
         let r = HookResult::info("KSR012", "verdict: pass");
-        assert_eq!(r.decision, "info");
+        assert_eq!(r.decision, Decision::Info);
         assert_eq!(r.code, "KSR012");
         assert_eq!(r.message, "verdict: pass");
     }

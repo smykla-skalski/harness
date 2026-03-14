@@ -1,14 +1,15 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use crate::errors::{self, CliError};
 use crate::exec::kubectl;
 use crate::io::{read_text, write_text};
 use crate::manifests::default_validation_output;
 
-fn extract_resources(manifest: &std::path::Path) -> Result<Vec<(String, String)>, CliError> {
+fn extract_resources(manifest: &Path) -> Result<Vec<(String, String)>, CliError> {
     let text = read_text(manifest)?;
+    let normalized = format!("\n{text}");
     let mut resources = Vec::new();
-    for doc in text.split("\n---\n") {
+    for doc in normalized.split("\n---\n") {
         let mut api_version: Option<String> = None;
         let mut kind: Option<String> = None;
         for line in doc.lines() {
@@ -21,7 +22,11 @@ fn extract_resources(manifest: &std::path::Path) -> Result<Vec<(String, String)>
                 continue;
             }
             if let Some((key, value)) = trimmed.split_once(':') {
-                let v = value.trim().to_string();
+                let v = value
+                    .trim()
+                    .trim_matches('"')
+                    .trim_matches('\'')
+                    .to_string();
                 match key {
                     "apiVersion" => api_version = Some(v),
                     "kind" => kind = Some(v),
@@ -54,9 +59,8 @@ pub fn execute(
 ) -> Result<i32, CliError> {
     let manifest_path = PathBuf::from(manifest);
     let kc = kubeconfig.map(PathBuf::from);
-    let output_path = output
-        .map(PathBuf::from)
-        .unwrap_or_else(|| default_validation_output(&manifest_path));
+    let output_path =
+        output.map_or_else(|| default_validation_output(&manifest_path), PathBuf::from);
 
     let resources = extract_resources(&manifest_path)?;
     let mut log_lines: Vec<String> = Vec::new();

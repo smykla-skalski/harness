@@ -1,4 +1,5 @@
 use std::collections::{HashMap, HashSet};
+use std::env;
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -14,7 +15,7 @@ pub const VALID_MODES: &[&str] = &[
 ];
 
 fn kubeconfig_for_cluster(cluster: &str) -> String {
-    let home = std::env::var("HOME").unwrap_or_else(|_| "/tmp".into());
+    let home = env::var("HOME").unwrap_or_else(|_| "/tmp".into());
     format!("{home}/.kube/kind-{cluster}-config")
 }
 
@@ -250,6 +251,10 @@ impl ClusterSpec {
 
     #[must_use]
     pub fn primary_member(&self) -> &ClusterMember {
+        debug_assert!(
+            !self.members.is_empty(),
+            "primary_member called on ClusterSpec with no members"
+        );
         &self.members[0]
     }
 
@@ -298,14 +303,17 @@ impl ClusterSpec {
 }
 
 /// Cluster record payload for serialization (handles legacy compat).
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct ClusterRecordPayload {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub mode: Option<String>,
     pub mode_args: Vec<String>,
     pub members: Vec<ClusterMember>,
     pub clusters: Vec<String>,
     pub kubeconfigs: HashMap<String, String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub primary_kubeconfig: Option<String>,
+    pub helm_values: HashMap<String, String>,
     pub helm_settings: Vec<HelmSetting>,
     pub restart_namespaces: Vec<String>,
     pub repo_root: String,
@@ -344,6 +352,10 @@ impl ClusterRecordPayload {
             .and_then(Value::as_str)
             .map(String::from);
         let helm_settings = parse_helm_settings(obj);
+        let helm_values = helm_settings
+            .iter()
+            .map(|s| (s.key.clone(), s.value.clone()))
+            .collect();
         let restart_namespaces = parse_string_vec(obj.get("restart_namespaces"));
         let repo_root = obj
             .get("repo_root")
@@ -357,6 +369,7 @@ impl ClusterRecordPayload {
             clusters,
             kubeconfigs,
             primary_kubeconfig,
+            helm_values,
             helm_settings,
             restart_namespaces,
             repo_root,
@@ -365,13 +378,25 @@ impl ClusterRecordPayload {
 
     #[must_use]
     pub fn from_spec(spec: &ClusterSpec) -> Self {
+        let members = spec.members.clone();
+        let clusters = members.iter().map(|m| m.name.clone()).collect();
+        let kubeconfigs = members
+            .iter()
+            .map(|m| (m.name.clone(), m.kubeconfig.clone()))
+            .collect();
+        let helm_values = spec
+            .helm_settings
+            .iter()
+            .map(|s| (s.key.clone(), s.value.clone()))
+            .collect();
         Self {
             mode: Some(spec.mode.clone()),
             mode_args: spec.mode_args.clone(),
-            members: spec.members.clone(),
-            clusters: spec.cluster_names(),
-            kubeconfigs: spec.kubeconfigs(),
+            members,
+            clusters,
+            kubeconfigs,
             primary_kubeconfig: Some(spec.primary_kubeconfig().to_string()),
+            helm_values,
             helm_settings: spec.helm_settings.clone(),
             restart_namespaces: spec.restart_namespaces.clone(),
             repo_root: spec.repo_root.clone(),
@@ -446,62 +471,7 @@ impl ClusterRecordPayload {
 
     #[must_use]
     pub fn to_json_dict(&self) -> Value {
-        let mut map = serde_json::Map::new();
-        if let Some(mode) = &self.mode {
-            map.insert("mode".into(), Value::String(mode.clone()));
-        }
-        map.insert(
-            "mode_args".into(),
-            Value::Array(
-                self.mode_args
-                    .iter()
-                    .map(|s| Value::String(s.clone()))
-                    .collect(),
-            ),
-        );
-        map.insert(
-            "members".into(),
-            serde_json::to_value(&self.members).unwrap_or(Value::Array(vec![])),
-        );
-        map.insert(
-            "clusters".into(),
-            Value::Array(
-                self.clusters
-                    .iter()
-                    .map(|s| Value::String(s.clone()))
-                    .collect(),
-            ),
-        );
-        let kc_map: serde_json::Map<String, Value> = self
-            .kubeconfigs
-            .iter()
-            .map(|(k, v)| (k.clone(), Value::String(v.clone())))
-            .collect();
-        map.insert("kubeconfigs".into(), Value::Object(kc_map));
-        if let Some(pk) = &self.primary_kubeconfig {
-            map.insert("primary_kubeconfig".into(), Value::String(pk.clone()));
-        }
-        let hv: serde_json::Map<String, Value> = self
-            .helm_settings
-            .iter()
-            .map(|s| (s.key.clone(), Value::String(s.value.clone())))
-            .collect();
-        map.insert("helm_values".into(), Value::Object(hv));
-        map.insert(
-            "helm_settings".into(),
-            serde_json::to_value(&self.helm_settings).unwrap_or(Value::Array(vec![])),
-        );
-        map.insert(
-            "restart_namespaces".into(),
-            Value::Array(
-                self.restart_namespaces
-                    .iter()
-                    .map(|s| Value::String(s.clone()))
-                    .collect(),
-            ),
-        );
-        map.insert("repo_root".into(), Value::String(self.repo_root.clone()));
-        Value::Object(map)
+        serde_json::to_value(self).unwrap_or_else(|_| Value::Object(serde_json::Map::new()))
     }
 }
 

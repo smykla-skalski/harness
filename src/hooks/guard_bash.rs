@@ -27,57 +27,49 @@ pub fn execute(ctx: &HookContext) -> Result<HookResult, CliError> {
     }
     let heads = command_heads(&words);
     if ctx.skill == "suite-author" {
-        return guard_suite_author(ctx, &words, &heads);
+        return Ok(guard_suite_author(ctx, &words, &heads));
     }
-    guard_suite_runner(ctx, &words, &heads)
+    Ok(guard_suite_runner(ctx, &words, &heads))
 }
 
-fn guard_suite_author(
-    _ctx: &HookContext,
-    words: &[String],
-    heads: &[String],
-) -> Result<HookResult, CliError> {
-    if has_denied_cluster_binary(heads) {
-        return Ok(errors::hook_msg(&errors::DENY_CLUSTER_BINARY, &[]));
+fn guard_suite_author(_ctx: &HookContext, words: &[String], heads: &[String]) -> HookResult {
+    if has_denied_cluster_binary(heads) || has_denied_cluster_binary_anywhere(words) {
+        return errors::hook_msg(&errors::DENY_CLUSTER_BINARY, &[]);
     }
     if !is_harness_head(heads) && has_admin_endpoint_hint(words) {
-        return Ok(errors::hook_msg(&errors::DENY_ADMIN_ENDPOINT, &[]));
+        return errors::hook_msg(&errors::DENY_ADMIN_ENDPOINT, &[]);
     }
-    Ok(HookResult::allow())
+    HookResult::allow()
 }
 
-fn guard_suite_runner(
-    _ctx: &HookContext,
-    words: &[String],
-    heads: &[String],
-) -> Result<HookResult, CliError> {
+fn guard_suite_runner(_ctx: &HookContext, words: &[String], heads: &[String]) -> HookResult {
     // Runner phase guard needs workflow state - deferred.
     if has_denied_runner_binary(heads) {
-        return Ok(deny_runner_flow(
+        return deny_runner_flow(
             "suite runs must stay on the tracked run; \
              do not switch into CI or GitHub workflows",
-        ));
+        );
     }
     if let Some(target) = make_target(words)
         && rules::DENIED_MAKE_TARGET_PREFIXES
             .iter()
             .any(|pfx| target.starts_with(pfx))
     {
-        return Ok(errors::hook_msg(&errors::DENY_CLUSTER_BINARY, &[]));
+        return errors::hook_msg(&errors::DENY_CLUSTER_BINARY, &[]);
     }
     if has_denied_legacy_script(words) {
-        return Ok(errors::hook_msg(&errors::DENY_CLUSTER_BINARY, &[]));
+        return errors::hook_msg(&errors::DENY_CLUSTER_BINARY, &[]);
     }
-    if has_denied_cluster_binary(heads) {
-        return Ok(errors::hook_msg(&errors::DENY_CLUSTER_BINARY, &[]));
+    if has_denied_cluster_binary(heads) || has_denied_cluster_binary_anywhere(words) {
+        return errors::hook_msg(&errors::DENY_CLUSTER_BINARY, &[]);
     }
     if has_admin_endpoint_hint(words) {
         if is_harness_head(heads) || allows_wrapped_envoy_admin(words) {
-            return Ok(HookResult::allow());
+            return HookResult::allow();
         }
-        return Ok(errors::hook_msg(&errors::DENY_ADMIN_ENDPOINT, &[]));
+        return errors::hook_msg(&errors::DENY_ADMIN_ENDPOINT, &[]);
     }
-    Ok(HookResult::allow())
+    HookResult::allow()
 }
 
 fn deny_runner_flow(details: &str) -> HookResult {
@@ -109,8 +101,8 @@ fn command_heads(words: &[String]) -> Vec<String> {
 
 fn normalized_binary_name(raw: &str) -> String {
     let mut s = raw.trim().to_string();
-    if s.starts_with("${") && s.ends_with('}') {
-        s = s[2..s.len() - 1].to_string();
+    if let Some(inner) = s.strip_prefix("${").and_then(|rest| rest.strip_suffix('}')) {
+        s = inner.to_string();
     } else if let Some(stripped) = s.strip_prefix('$') {
         s = stripped.to_string();
     }
@@ -147,6 +139,16 @@ fn has_denied_cluster_binary(heads: &[String]) -> bool {
         .any(|h| rules::DENIED_CLUSTER_BINARIES.contains(&h.as_str()))
 }
 
+/// Check ALL words (not just heads) for denied cluster binaries.
+/// Catches bypass patterns like `bash -c kubectl`, `xargs kubectl`,
+/// `env kubectl`, `command kubectl`.
+fn has_denied_cluster_binary_anywhere(words: &[String]) -> bool {
+    words.iter().any(|w| {
+        let name = normalized_binary_name(w);
+        rules::DENIED_CLUSTER_BINARIES.contains(&name.as_str())
+    })
+}
+
 fn has_denied_runner_binary(heads: &[String]) -> bool {
     heads
         .iter()
@@ -170,7 +172,7 @@ fn has_denied_legacy_script(words: &[String]) -> bool {
     })
 }
 
-fn make_target(words: &[String]) -> Option<String> {
+fn make_target(words: &[String]) -> Option<&str> {
     let mut seen_make = false;
     for word in words {
         let name = Path::new(word)
@@ -183,7 +185,7 @@ fn make_target(words: &[String]) -> Option<String> {
         if !seen_make || word.starts_with('-') || word.contains('=') {
             continue;
         }
-        return Some(word.clone());
+        return Some(word);
     }
     None
 }

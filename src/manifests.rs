@@ -1,6 +1,6 @@
 use std::path::{Path, PathBuf};
 
-/// Resolve a manifest path, joining with run_dir if relative.
+/// Resolve a manifest path, joining with `run_dir` if relative.
 #[must_use]
 pub fn resolve_manifest_path(raw: &str, run_dir: Option<&Path>) -> PathBuf {
     let path = PathBuf::from(raw);

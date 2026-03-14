@@ -1,3 +1,4 @@
+use std::fs;
 use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
@@ -143,7 +144,7 @@ pub fn load_authoring_session() -> Result<Option<AuthoringSession>, CliError> {
     if !path.exists() {
         return Ok(None);
     }
-    let text = std::fs::read_to_string(&path).map_err(|e| {
+    let text = fs::read_to_string(&path).map_err(|e| {
         errors::cli_err_with_details(
             &errors::AUTHORING_PAYLOAD_INVALID,
             &[("kind", "session"), ("details", "read failed")],
@@ -167,7 +168,7 @@ pub fn load_authoring_session() -> Result<Option<AuthoringSession>, CliError> {
 pub fn save_authoring_session(session: &AuthoringSession) -> Result<AuthoringSession, CliError> {
     let path = session_file_path();
     if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent).map_err(|e| {
+        fs::create_dir_all(parent).map_err(|e| {
             errors::cli_err_with_details(
                 &errors::AUTHORING_PAYLOAD_INVALID,
                 &[("kind", "session"), ("details", "cannot create directory")],
@@ -182,7 +183,7 @@ pub fn save_authoring_session(session: &AuthoringSession) -> Result<AuthoringSes
             &e.to_string(),
         )
     })?;
-    std::fs::write(&path, json).map_err(|e| {
+    fs::write(&path, json).map_err(|e| {
         errors::cli_err_with_details(
             &errors::AUTHORING_PAYLOAD_INVALID,
             &[("kind", "session"), ("details", "write failed")],
@@ -239,6 +240,8 @@ pub fn authoring_workspace_dir() -> PathBuf {
 
 #[cfg(test)]
 mod tests {
+    use std::env;
+
     use super::*;
 
     #[test]
@@ -314,19 +317,19 @@ mod tests {
     unsafe fn with_env_vars(vars: &[(&str, Option<&str>)], f: impl FnOnce()) {
         let saved: Vec<(&str, Option<String>)> = vars
             .iter()
-            .map(|(name, _)| (*name, std::env::var(name).ok()))
+            .map(|(name, _)| (*name, env::var(name).ok()))
             .collect();
         for (name, value) in vars {
             match value {
-                Some(v) => unsafe { std::env::set_var(name, v) },
-                None => unsafe { std::env::remove_var(name) },
+                Some(v) => unsafe { env::set_var(name, v) },
+                None => unsafe { env::remove_var(name) },
             }
         }
         f();
         for (name, prev) in saved {
             match prev {
-                Some(v) => unsafe { std::env::set_var(name, v) },
-                None => unsafe { std::env::remove_var(name) },
+                Some(v) => unsafe { env::set_var(name, v) },
+                None => unsafe { env::remove_var(name) },
             }
         }
     }
@@ -398,9 +401,9 @@ mod tests {
                     ],
                     || {
                         let repo = dir.path().join("repo");
-                        std::fs::create_dir_all(&repo).unwrap();
+                        fs::create_dir_all(&repo).unwrap();
                         let suite_dir = dir.path().join("suite");
-                        std::fs::create_dir_all(&suite_dir).unwrap();
+                        fs::create_dir_all(&suite_dir).unwrap();
 
                         let session = begin_authoring_session(
                             &repo,

@@ -1,6 +1,8 @@
+use std::env;
 use std::path::{Path, PathBuf};
 
 use crate::context::RunLookup;
+use crate::core_defs;
 use crate::errors::{self, CliError};
 
 /// Resolved run directory.
@@ -55,7 +57,7 @@ pub fn resolve_run_directory(lookup: &RunLookup) -> Result<ResolvedRun, CliError
 /// # Errors
 /// Returns `CliError` if not found.
 pub fn resolve_suite_path(raw: &str) -> Result<PathBuf, CliError> {
-    let suite_root = crate::core_defs::suite_root();
+    let suite_root = core_defs::suite_root();
     let candidates = suite_path_candidates(raw, &suite_root);
 
     for candidate in &candidates {
@@ -95,7 +97,7 @@ fn suite_path_candidates(raw: &str, suite_root: &Path) -> Vec<PathBuf> {
     let direct = if raw_path.is_absolute() {
         raw_path.clone()
     } else {
-        std::env::current_dir().unwrap_or_default().join(&raw_path)
+        env::current_dir().unwrap_or_default().join(&raw_path)
     };
 
     let mut items = vec![direct];
@@ -119,7 +121,7 @@ fn manifest_path_candidates(raw: &str, run_dir: Option<&Path>) -> Vec<PathBuf> {
         return vec![raw_path];
     }
 
-    let mut items = vec![std::env::current_dir().unwrap_or_default().join(&raw_path)];
+    let mut items = vec![env::current_dir().unwrap_or_default().join(&raw_path)];
 
     if let Some(active) = run_dir {
         items.push(
@@ -144,6 +146,8 @@ fn manifest_path_candidates(raw: &str, run_dir: Option<&Path>) -> Vec<PathBuf> {
 
 #[cfg(test)]
 mod tests {
+    use std::fs;
+
     use super::*;
 
     #[test]
@@ -162,7 +166,7 @@ mod tests {
     fn resolve_run_directory_with_root_and_id() {
         let dir = tempfile::tempdir().unwrap();
         let run_dir = dir.path().join("my-run");
-        std::fs::create_dir(&run_dir).unwrap();
+        fs::create_dir(&run_dir).unwrap();
         let lookup = RunLookup {
             run_dir: None,
             run_id: Some("my-run".to_string()),
@@ -205,7 +209,7 @@ mod tests {
     fn resolve_manifest_path_absolute_existing() {
         let dir = tempfile::tempdir().unwrap();
         let manifest = dir.path().join("test.yaml");
-        std::fs::write(&manifest, "content").unwrap();
+        fs::write(&manifest, "content").unwrap();
         let result = resolve_manifest_path(&manifest.to_string_lossy(), None).unwrap();
         assert_eq!(result, manifest);
     }
@@ -214,9 +218,9 @@ mod tests {
     fn resolve_manifest_path_in_run_dir() {
         let dir = tempfile::tempdir().unwrap();
         let groups_dir = dir.path().join("manifests").join("prepared").join("groups");
-        std::fs::create_dir_all(&groups_dir).unwrap();
+        fs::create_dir_all(&groups_dir).unwrap();
         let manifest = groups_dir.join("g01.yaml");
-        std::fs::write(&manifest, "content").unwrap();
+        fs::write(&manifest, "content").unwrap();
 
         let result = resolve_manifest_path("g01.yaml", Some(dir.path())).unwrap();
         assert_eq!(result, manifest);

@@ -1,23 +1,10 @@
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::process;
 
 use serde_json::Value;
 
 use crate::errors::CliError;
-
-/// A workflow event with a timestamp.
-pub trait WorkflowEvent: std::fmt::Debug {
-    fn occurred_at(&self) -> &str;
-    fn label(&self) -> &str;
-}
-
-/// A transition rule in a state machine.
-#[derive(Debug)]
-pub struct TransitionRule<Phase: Clone> {
-    pub source: Phase,
-    pub targets: Vec<Phase>,
-    pub event_name: String,
-}
 
 /// Error for invalid state transitions.
 #[derive(Debug, thiserror::Error)]
@@ -98,7 +85,8 @@ impl VersionedJsonRepository {
                 details: None,
             })?;
         }
-        let tmp_path = self.path.with_extension("json.tmp");
+        let tmp_name = format!("json.{}.tmp", process::id());
+        let tmp_path = self.path.with_extension(tmp_name);
         let json = serde_json::to_string_pretty(state).map_err(|e| CliError {
             code: "WORKFLOW_SERIALIZE".to_string(),
             message: format!("failed to serialize state: {e}"),
@@ -181,7 +169,8 @@ mod tests {
         let loaded = repo.load().unwrap().unwrap();
         assert_eq!(loaded["data"], "second");
         // tmp file should not remain
-        assert!(!dir.path().join("state.json.tmp").exists());
+        let tmp_name = format!("state.json.{}.tmp", process::id());
+        assert!(!dir.path().join(tmp_name).exists());
     }
 
     #[test]
