@@ -1,10 +1,13 @@
 use std::collections::HashMap;
 use std::io;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
+use crate::context::RunContext;
 use crate::errors::CliError;
+use crate::workflow::author::{self as author_workflow, AuthorWorkflowState};
+use crate::workflow::runner::{self as runner_workflow, RunnerWorkflowState};
 
 /// A write request from a hook envelope.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -110,7 +113,7 @@ impl HookEnvelopePayload {
     /// expected envelope shape.
     pub fn from_json_text(text: &str) -> Result<Self, CliError> {
         serde_json::from_str(text).map_err(|e| CliError {
-            code: "KSH001".to_string(),
+            code: "KSH001".into(),
             message: format!("invalid hook payload: {e}"),
             exit_code: 1,
             hint: None,
@@ -128,7 +131,7 @@ impl HookEnvelopePayload {
         io::stdin()
             .read_to_string(&mut text)
             .map_err(|e| CliError {
-                code: "KSH001".to_string(),
+                code: "KSH001".into(),
                 message: format!("failed to read stdin: {e}"),
                 exit_code: 1,
                 hint: None,
@@ -164,27 +167,34 @@ pub struct HookContext {
     pub skill_active: bool,
     pub active_skill: Option<String>,
     pub inactive_reason: Option<String>,
+    pub run: Option<RunContext>,
+    pub runner_state: Option<RunnerWorkflowState>,
+    pub author_state: Option<AuthorWorkflowState>,
 }
 
 impl HookContext {
     /// Build hook context from stdin for a given skill.
     ///
-    /// Reads the hook envelope from stdin and resolves run context and
-    /// skill-active state. Skill-active detection is simplified here; full
-    /// transcript-based detection requires the workflow module.
+    /// Reads the hook envelope from stdin and resolves run context,
+    /// runner workflow state, and author workflow state from disk.
     ///
     /// # Errors
     /// Returns `CliError` if stdin cannot be read or the payload is invalid.
     pub fn from_stdin(skill: &str) -> Result<Self, CliError> {
         let event = HookEvent::from_stdin()?;
-        Ok(Self {
+        let mut ctx = Self {
             skill: skill.to_string(),
             event,
             run_dir: None,
             skill_active: true,
             active_skill: Some(skill.to_string()),
             inactive_reason: None,
-        })
+            run: None,
+            runner_state: None,
+            author_state: None,
+        };
+        ctx.load_context_from_disk();
+        Ok(ctx)
     }
 
     /// Build hook context from a pre-parsed envelope payload.
@@ -192,14 +202,58 @@ impl HookContext {
     /// Used when the envelope has already been read (e.g. from a test).
     #[must_use]
     pub fn from_envelope(skill: &str, payload: HookEnvelopePayload) -> Self {
-        Self {
+        let mut ctx = Self {
             skill: skill.to_string(),
             event: HookEvent { payload },
             run_dir: None,
             skill_active: true,
             active_skill: Some(skill.to_string()),
             inactive_reason: None,
+            run: None,
+            runner_state: None,
+            author_state: None,
+        };
+        ctx.load_context_from_disk();
+        ctx
+    }
+
+    /// Attempt to load `RunContext`, runner state, and author state from disk.
+    fn load_context_from_disk(&mut self) {
+        // Try loading RunContext from run_dir or by inferring from write paths.
+        if let Some(ref rd) = self.run_dir {
+            self.run = RunContext::from_run_dir(rd).ok();
         }
+        // If we have a RunContext, load runner state from its directory.
+        if let Some(ref run) = self.run {
+            self.runner_state = runner_workflow::read_runner_state(&run.layout.run_dir())
+                .ok()
+                .flatten();
+        } else if let Some(ref rd) = self.run_dir {
+            self.runner_state = runner_workflow::read_runner_state(rd).ok().flatten();
+        }
+        // Load author state when skill is suite-author.
+        if self.skill == "suite-author" {
+            self.author_state = author_workflow::read_author_state().ok().flatten();
+        }
+    }
+
+    /// Get the run directory, either from explicit `run_dir` or from `RunContext`.
+    #[must_use]
+    pub fn effective_run_dir(&self) -> Option<PathBuf> {
+        if let Some(ref rd) = self.run_dir {
+            return Some(rd.clone());
+        }
+        self.run.as_ref().map(|r| r.layout.run_dir())
+    }
+
+    /// Get the suite directory from the run context metadata.
+    #[must_use]
+    pub fn suite_dir(&self) -> Option<PathBuf> {
+        self.run.as_ref().map(|r| {
+            Path::new(&r.metadata.suite_dir)
+                .canonicalize()
+                .unwrap_or_else(|_| PathBuf::from(&r.metadata.suite_dir))
+        })
     }
 
     /// The raw command string from the input payload, if any.
@@ -228,17 +282,15 @@ impl HookContext {
     }
 
     /// Write target paths from the input payload.
-    // Improvement: return `Vec<&str>` to avoid cloning, but callers in
-    // guard_write.rs and verify_write.rs pass `&[String]` downstream.
     #[must_use]
-    pub fn write_paths(&self) -> Vec<String> {
+    pub fn write_paths(&self) -> Vec<&str> {
         let mut paths = Vec::new();
         if let Some(p) = &self.event.payload.input_payload {
             if let Some(fp) = &p.file_path {
-                paths.push(fp.clone());
+                paths.push(fp.as_str());
             }
             for w in &p.writes {
-                paths.push(w.file_path.clone());
+                paths.push(w.file_path.as_str());
             }
         }
         paths

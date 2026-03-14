@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::sync::LazyLock;
 
 use regex::Regex;
@@ -6,6 +7,7 @@ use crate::errors::{self, CliError};
 use crate::hook::HookResult;
 use crate::hook_payloads::HookContext;
 use crate::rules::suite_runner as runner_rules;
+use crate::workflow::runner::{self as runner_wf, PreflightStatus, RunnerPhase};
 
 static CODE_BLOCK_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?s)```.*?```").unwrap());
 
@@ -17,19 +19,10 @@ static PREFLIGHT_RE: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(&pattern).unwrap()
 });
 
-/// Required sections in a suite-author worker reply acknowledgement.
 const REQUIRED_READER_SECTIONS: &[&str] = &["saved"];
-
-/// Max lines in a code block before it is considered oversized.
 const CODE_BLOCK_LINE_LIMIT: usize = 60;
 
 /// Execute the validate-agent hook.
-///
-/// For suite-author: validates worker reply format (must end with
-/// required section keywords, code blocks must not be oversized).
-/// For suite-runner: validates preflight worker reply format and
-/// artifacts. Full artifact validation needs `RunContext` and runner
-/// workflow state.
 ///
 /// # Errors
 /// Returns `CliError` on failure.
@@ -64,7 +57,6 @@ fn validate_suite_author(ctx: &HookContext) -> HookResult {
             &[("sections", &joined)],
         );
     }
-    // Check for oversized code blocks.
     for block in CODE_BLOCK_RE.find_iter(&message) {
         if block.as_str().matches('\n').count() > CODE_BLOCK_LINE_LIMIT {
             return errors::hook_msg(&errors::WARN_READER_OVERSIZED_BLOCK, &[]);
@@ -74,7 +66,7 @@ fn validate_suite_author(ctx: &HookContext) -> HookResult {
 }
 
 fn validate_suite_runner(ctx: &HookContext) -> HookResult {
-    if ctx.run_dir.is_none() {
+    if ctx.run.is_none() {
         return errors::hook_msg(
             &errors::DENY_RUNNER_STATE_INVALID,
             &[(
@@ -87,23 +79,68 @@ fn validate_suite_runner(ctx: &HookContext) -> HookResult {
     if message.is_empty() {
         return HookResult::allow();
     }
-    // Validate the preflight reply format.
-    match parse_preflight_reply(message) {
-        Ok(reply) => {
-            if reply.status == runner_rules::PREFLIGHT_REPLY_FAIL {
-                // Full implementation updates runner state to
-                // request_preflight_failed. Without state, allow.
-                return HookResult::allow();
-            }
-            // Pass reply - full implementation validates artifacts and
-            // updates runner state. Without RunContext, allow.
-            HookResult::allow()
+    let reply = match parse_preflight_reply(message) {
+        Ok(r) => r,
+        Err(detail) => {
+            return errors::hook_msg(
+                &errors::DENY_PREFLIGHT_REPLY_INVALID,
+                &[("details", &detail)],
+            );
         }
-        Err(detail) => errors::hook_msg(
-            &errors::DENY_PREFLIGHT_REPLY_INVALID,
-            &[("details", &detail)],
-        ),
+    };
+    let state = ctx.runner_state.as_ref();
+    if reply.status == runner_rules::PREFLIGHT_REPLY_FAIL {
+        if let Some(s) = state
+            && s.phase == RunnerPhase::Preflight
+        {
+            let mut new_state = s.clone();
+            new_state.preflight.status = PreflightStatus::Pending;
+            new_state.transition_count += 1;
+            new_state.last_event = Some("PreflightFailed".to_string());
+            new_state.updated_at = chrono::Utc::now().to_rfc3339();
+            if let Some(ref rd) = ctx.effective_run_dir() {
+                let _ = runner_wf::write_runner_state(rd, &new_state);
+            }
+            return HookResult::allow();
+        }
+        return errors::hook_msg(&errors::WARN_PREFLIGHT_MISSING, &[]);
     }
+    // Pass reply - validate artifacts exist.
+    if let Some(ref run) = ctx.run {
+        if run.prepared_suite.is_none() || run.preflight.is_none() {
+            return errors::hook_msg(
+                &errors::DENY_PREFLIGHT_REPLY_INVALID,
+                &[("details", "preflight artifacts were not saved")],
+            );
+        }
+        if !run.layout.prepared_suite_path().exists() {
+            return errors::hook_msg(
+                &errors::DENY_PREFLIGHT_REPLY_INVALID,
+                &[(
+                    "details",
+                    "prepared-suite artifact is missing or incomplete",
+                )],
+            );
+        }
+    }
+    // Transition to preflight captured.
+    if let Some(s) = state {
+        if s.phase == RunnerPhase::Preflight {
+            let mut new_state = s.clone();
+            new_state.preflight.status = PreflightStatus::Complete;
+            new_state.transition_count += 1;
+            new_state.last_event = Some("PreflightCaptured".to_string());
+            new_state.updated_at = chrono::Utc::now().to_rfc3339();
+            if let Some(ref rd) = ctx.effective_run_dir() {
+                let _ = runner_wf::write_runner_state(rd, &new_state);
+            }
+            return HookResult::allow();
+        }
+        if s.phase == RunnerPhase::Execution {
+            return HookResult::allow();
+        }
+    }
+    errors::hook_msg(&errors::WARN_PREFLIGHT_MISSING, &[])
 }
 
 struct PreflightReply {
@@ -126,5 +163,24 @@ fn parse_preflight_reply(message: &str) -> Result<PreflightReply, String> {
         .captures(lines[0])
         .ok_or_else(|| format!("first line must be `{head} {pass}` or `{head} {fail}`"))?;
     let status = caps[1].to_string();
+    let data: HashMap<String, String> = lines[1..]
+        .iter()
+        .filter_map(|line| {
+            let (key, value) = line.split_once(':')?;
+            Some((key.trim().to_lowercase(), value.trim().to_string()))
+        })
+        .collect();
+    if status == pass {
+        if !data.contains_key("prepared suite") || !data.contains_key("state capture") {
+            return Err(
+                "pass replies must include `Prepared suite:` and `State capture:`".to_string(),
+            );
+        }
+        if !data.contains_key("warnings") {
+            return Err("pass replies must include a `Warnings:` line".to_string());
+        }
+    } else if !data.contains_key("blocker") {
+        return Err("fail replies must include a `Blocker:` line".to_string());
+    }
     Ok(PreflightReply { status })
 }
