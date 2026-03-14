@@ -543,4 +543,292 @@ pub static DENY_VALIDATOR_GATE_UNEXPECTED: HookDef = HookDef {
 };
 
 #[cfg(test)]
-mod tests {}
+mod tests {
+    use super::*;
+
+    // --- CliErr (cli_err) ---
+
+    #[test]
+    fn cli_err_basic_fields() {
+        let err = cli_err(&NOT_A_MAPPING, &[("label", "foo")]);
+        assert_eq!(err.code, "KSRCLI010");
+        assert_eq!(err.message, "foo must be a mapping");
+        assert_eq!(err.exit_code, 5);
+        assert!(err.hint.is_none());
+    }
+
+    #[test]
+    fn cli_err_with_hint() {
+        let err = cli_err(&MISSING_RUN_POINTER, &[]);
+        assert_eq!(err.code, "KSRCLI005");
+        assert_eq!(err.message, "missing current run pointer");
+        assert_eq!(err.hint.as_deref(), Some("Run init first."));
+    }
+
+    #[test]
+    fn cli_err_with_details_field() {
+        let err = cli_err_with_details(&COMMAND_FAILED, &[("command", "ls -la")], "exit 1");
+        assert_eq!(err.code, "KSRCLI004");
+        assert_eq!(err.message, "command failed: ls -la");
+        assert_eq!(err.exit_code, 4);
+        assert_eq!(err.details.as_deref(), Some("exit 1"));
+    }
+
+    #[test]
+    fn cli_err_formats_template() {
+        let err = cli_err(&MISSING_FILE, &[("path", "/tmp/gone.txt")]);
+        assert_eq!(err.message, "missing file: /tmp/gone.txt");
+    }
+
+    #[test]
+    fn cli_err_all_codes_unique() {
+        let all_defs: &[&ErrorDef] = &[
+            &MISSING_TOOLS,
+            &COMMAND_FAILED,
+            &MISSING_RUN_POINTER,
+            &MISSING_CLOSEOUT_ARTIFACT,
+            &MISSING_STATE_CAPTURE,
+            &VERDICT_PENDING,
+            &MISSING_RUN_CONTEXT_VALUE,
+            &MISSING_RUN_LOCATION,
+            &NOT_A_MAPPING,
+            &NOT_STRING_KEYS,
+            &NOT_A_LIST,
+            &NOT_ALL_STRINGS,
+            &MISSING_FILE,
+            &MISSING_FRONTMATTER,
+            &UNTERMINATED_FRONTMATTER,
+            &PATH_NOT_FOUND,
+            &MISSING_FIELDS,
+            &FIELD_TYPE_MISMATCH,
+            &MISSING_SECTIONS,
+            &NO_RESOURCE_KINDS,
+            &ROUTE_NOT_FOUND,
+            &GATEWAY_VERSION_MISSING,
+            &GATEWAY_CRDS_MISSING,
+            &KUMACTL_NOT_FOUND,
+            &REPORT_LINE_LIMIT,
+            &REPORT_CODE_BLOCK_LIMIT,
+            &AUTHORING_SESSION_MISSING,
+            &AUTHORING_PAYLOAD_MISSING,
+            &AUTHORING_PAYLOAD_INVALID,
+            &AUTHORING_SHOW_KIND_MISSING,
+            &AUTHORING_VALIDATE_FAILED,
+            &KUBECTL_VALIDATE_DECISION_REQUIRED,
+            &KUBECTL_VALIDATE_UNAVAILABLE,
+            &TRACKED_KUBECTL_REQUIRED,
+            &KUBECTL_TARGET_OVERRIDE_FORBIDDEN,
+            &UNKNOWN_TRACKED_CLUSTER,
+            &NON_LOCAL_KUBECONFIG,
+            &RUN_GROUP_ALREADY_RECORDED,
+            &RUN_GROUP_NOT_FOUND,
+            &ENVOY_CONFIG_TYPE_NOT_FOUND,
+            &ENVOY_CAPTURE_ARGS_REQUIRED,
+            &EVIDENCE_LABEL_NOT_FOUND,
+            &REPORT_GROUP_EVIDENCE_REQUIRED,
+            &AMENDMENTS_REQUIRED,
+            &RUN_DIR_EXISTS,
+            &MARKDOWN_SHAPE_MISMATCH,
+        ];
+        let codes: Vec<&str> = all_defs.iter().map(|d| d.code).collect();
+        let unique: std::collections::HashSet<&str> = codes.iter().copied().collect();
+        assert_eq!(codes.len(), unique.len(), "duplicate codes found");
+    }
+
+    #[test]
+    fn cli_err_no_kwargs_skips_format() {
+        let err = cli_err(&MISSING_FRONTMATTER, &[]);
+        assert_eq!(err.message, "missing YAML frontmatter");
+    }
+
+    #[test]
+    fn cli_err_hint_formats_with_kwargs() {
+        let err = cli_err(&KUMACTL_NOT_FOUND, &[]);
+        assert_eq!(err.hint.as_deref(), Some("Build kumactl first."));
+    }
+
+    #[test]
+    fn cli_err_report_line_limit() {
+        let err = cli_err(&REPORT_LINE_LIMIT, &[("count", "500"), ("limit", "400")]);
+        assert_eq!(err.message, "report exceeds line limit: 500>400");
+        assert_eq!(err.exit_code, 1);
+    }
+
+    #[test]
+    fn cli_err_closeout_codes_are_distinct() {
+        let codes: std::collections::HashSet<&str> = [
+            MISSING_CLOSEOUT_ARTIFACT.code,
+            MISSING_STATE_CAPTURE.code,
+            VERDICT_PENDING.code,
+        ]
+        .into_iter()
+        .collect();
+        assert_eq!(codes.len(), 3);
+    }
+
+    #[test]
+    fn cli_err_missing_kwarg_uses_safe_fallback() {
+        // template needs {path} but none given
+        let err = cli_err(&MISSING_FILE, &[]);
+        assert!(err.message.contains('?'));
+        assert!(!err.message.contains("{path}"));
+    }
+
+    #[test]
+    fn cli_err_partial_kwarg_fills_known_marks_unknown() {
+        // AUTHORING_PAYLOAD_INVALID needs {kind} and {details}
+        let err = cli_err(&AUTHORING_PAYLOAD_INVALID, &[("kind", "schema")]);
+        assert!(err.message.contains("schema"));
+        assert!(err.message.contains('?'));
+        assert!(!err.message.contains("{details}"));
+    }
+
+    #[test]
+    fn cli_err_markdown_shape_mismatch() {
+        let err = cli_err(&MARKDOWN_SHAPE_MISMATCH, &[]);
+        assert_eq!(err.code, "KSRCLI999");
+        assert_eq!(err.exit_code, 6);
+    }
+
+    #[test]
+    fn cli_err_display_trait() {
+        let err = cli_err(&MISSING_TOOLS, &[("tools", "kubectl")]);
+        let displayed = format!("{err}");
+        assert_eq!(displayed, "[KSRCLI002] missing required tools: kubectl");
+    }
+
+    #[test]
+    fn render_error_includes_hint_and_details() {
+        let err = CliError {
+            code: "X".into(),
+            message: "bad".into(),
+            exit_code: 1,
+            hint: Some("fix it".into()),
+            details: Some("stack".into()),
+        };
+        let rendered = render_error(&err);
+        assert!(rendered.contains("ERROR [X] bad"));
+        assert!(rendered.contains("Hint: fix it"));
+        assert!(rendered.contains("stack"));
+    }
+
+    #[test]
+    fn render_error_without_hint_or_details() {
+        let err = CliError {
+            code: "Y".into(),
+            message: "oops".into(),
+            exit_code: 1,
+            hint: None,
+            details: None,
+        };
+        let rendered = render_error(&err);
+        assert!(rendered.contains("ERROR [Y] oops"));
+        assert!(!rendered.contains("Hint:"));
+        assert!(!rendered.contains("Details:"));
+    }
+
+    // --- HookMsg (hook_msg) ---
+
+    #[test]
+    fn hook_msg_deny_result() {
+        let result = hook_msg(&DENY_CLUSTER_BINARY, &[]);
+        assert_eq!(result.decision, "deny");
+        assert_eq!(result.code, "KSR005");
+        assert!(result.message.contains("`harness run`"));
+    }
+
+    #[test]
+    fn hook_msg_warn_result() {
+        let result = hook_msg(
+            &WARN_MISSING_ARTIFACT,
+            &[("script", "preflight.py"), ("target", "/tmp/x")],
+        );
+        assert_eq!(result.decision, "warn");
+        assert_eq!(result.code, "KSR006");
+        assert!(result.message.contains("preflight.py"));
+        assert!(result.message.contains("/tmp/x"));
+    }
+
+    #[test]
+    fn hook_msg_info_result() {
+        let result = hook_msg(&INFO_RUN_VERDICT, &[("verdict", "pass")]);
+        assert_eq!(result.decision, "info");
+        assert_eq!(result.code, "KSR012");
+        assert!(result.message.contains("pass"));
+    }
+
+    #[test]
+    fn hook_msg_deny_with_kwargs() {
+        let result = hook_msg(&DENY_WRITE_OUTSIDE_RUN, &[("path", "/bad/path")]);
+        assert_eq!(result.decision, "deny");
+        assert!(result.message.contains("/bad/path"));
+    }
+
+    #[test]
+    fn hook_msg_no_kwargs_skips_format() {
+        let result = hook_msg(&DENY_GROUPS_NOT_LIST, &[]);
+        assert_eq!(result.message, "suite groups must be a list");
+    }
+
+    #[test]
+    fn hook_msg_all_decisions_valid() {
+        let all_hook_defs: &[&HookDef] = &[
+            &DENY_CLUSTER_BINARY,
+            &DENY_ADMIN_ENDPOINT,
+            &DENY_MISSING_STATE_CAPTURE,
+            &DENY_VERDICT_PENDING,
+            &DENY_WRITE_OUTSIDE_RUN,
+            &DENY_WRITE_OUTSIDE_SUITE,
+            &DENY_APPROVAL_STATE_INVALID,
+            &DENY_APPROVAL_REQUIRED,
+            &DENY_GROUPS_NOT_LIST,
+            &DENY_BASELINES_NOT_LIST,
+            &DENY_SUITE_INCOMPLETE,
+            &WARN_MISSING_ARTIFACT,
+            &WARN_RUN_PREFLIGHT,
+            &WARN_PREFLIGHT_MISSING,
+            &INFO_SUITE_RUNNER_TRACKED,
+            &INFO_RUN_VERDICT,
+            &WARN_CODE_READER_FORMAT,
+            &WARN_READER_MISSING_SECTIONS,
+            &WARN_READER_OVERSIZED_BLOCK,
+            &INFO_SUITE_AUTHOR_TRACKED,
+            &DENY_VALIDATOR_GATE_REQUIRED,
+            &DENY_VALIDATOR_INSTALL_FAILED,
+            &DENY_VALIDATOR_GATE_UNEXPECTED,
+            &DENY_RUNNER_STATE_INVALID,
+            &DENY_RUNNER_FLOW_REQUIRED,
+            &DENY_PREFLIGHT_REPLY_INVALID,
+        ];
+        let valid = ["deny", "warn", "info"];
+        for def in all_hook_defs {
+            assert!(
+                valid.contains(&def.decision),
+                "{} has invalid decision: {}",
+                def.code,
+                def.decision
+            );
+        }
+    }
+
+    // --- render_template edge cases ---
+
+    #[test]
+    fn render_template_no_placeholders() {
+        let map = HashMap::new();
+        assert_eq!(render_template("hello world", &map), "hello world");
+    }
+
+    #[test]
+    fn render_template_all_missing() {
+        let map = HashMap::new();
+        assert_eq!(render_template("{a} and {b}", &map), "? and ?");
+    }
+
+    #[test]
+    fn render_template_mixed() {
+        let mut map = HashMap::new();
+        map.insert("a", "yes");
+        assert_eq!(render_template("{a} and {b}", &map), "yes and ?");
+    }
+}
