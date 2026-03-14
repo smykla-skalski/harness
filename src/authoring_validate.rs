@@ -23,9 +23,7 @@ pub fn authoring_validation_repo_root(
         return Ok(p.canonicalize().unwrap_or(p));
     }
     for path in paths {
-        let resolved = path
-            .canonicalize()
-            .unwrap_or_else(|_| path.to_path_buf());
+        let resolved = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
         for ancestor in resolved.ancestors() {
             if ancestor.join("go.mod").is_file() {
                 return Ok(ancestor.to_path_buf());
@@ -58,9 +56,7 @@ pub fn validate_suite_author_paths(
     // the yaml files.
     let mut validated = Vec::new();
     for path in paths {
-        let resolved = path
-            .canonicalize()
-            .unwrap_or_else(|_| path.to_path_buf());
+        let resolved = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
         if let Some(ext) = resolved.extension() {
             let ext_str = ext.to_string_lossy();
             if ext_str == "yaml" || ext_str == "yml" {
@@ -81,10 +77,7 @@ mod tests {
         let root = dir.path().join("repo");
         std::fs::create_dir_all(&root).unwrap();
 
-        let result = authoring_validation_repo_root(
-            Some(root.to_str().unwrap()),
-            &[],
-        );
+        let result = authoring_validation_repo_root(Some(root.to_str().unwrap()), &[]);
         assert!(result.is_ok());
         // The resolved path should match the canonical form
         let resolved = result.unwrap();
@@ -192,10 +185,7 @@ mod tests {
         std::fs::write(other.join("go.mod"), "module other").unwrap();
 
         let path = other.as_path();
-        let result = authoring_validation_repo_root(
-            Some(raw_root.to_str().unwrap()),
-            &[path],
-        );
+        let result = authoring_validation_repo_root(Some(raw_root.to_str().unwrap()), &[path]);
         assert!(result.is_ok());
         let resolved = result.unwrap();
         assert_eq!(

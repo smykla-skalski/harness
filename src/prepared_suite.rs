@@ -164,27 +164,24 @@ fn extract_section(body: &str, heading: &str) -> Option<String> {
     let pattern = format!("## {heading}");
     let mut start = None;
     for (i, line) in body.lines().enumerate() {
-        if start.is_none() {
+        if let Some(s) = start {
+            if line.starts_with("## ") {
+                let content: String = body
+                    .lines()
+                    .skip(s)
+                    .take(i - s)
+                    .collect::<Vec<_>>()
+                    .join("\n");
+                return Some(content);
+            }
+        } else {
             let trimmed = line.trim_end();
             if trimmed == pattern || trimmed.starts_with(&format!("{pattern} ")) {
                 start = Some(i + 1);
             }
-        } else if line.starts_with("## ") {
-            let content: String = body
-                .lines()
-                .skip(start.unwrap())
-                .take(i - start.unwrap())
-                .collect::<Vec<_>>()
-                .join("\n");
-            return Some(content);
         }
     }
-    start.map(|s| {
-        body.lines()
-            .skip(s)
-            .collect::<Vec<_>>()
-            .join("\n")
-    })
+    start.map(|s| body.lines().skip(s).collect::<Vec<_>>().join("\n"))
 }
 
 /// Extract the Configure section from a group body.
@@ -285,7 +282,8 @@ mod tests {
 
     #[test]
     fn consume_section_extracts_content() {
-        let body = "## Configure\nyaml stuff\n## Consume\nkubectl apply -f 01.yaml\n## Debug\ncheck\n";
+        let body =
+            "## Configure\nyaml stuff\n## Consume\nkubectl apply -f 01.yaml\n## Debug\ncheck\n";
         let section = consume_section(body).unwrap();
         assert!(section.contains("kubectl apply"));
         assert!(!section.contains("yaml stuff"));
@@ -396,8 +394,7 @@ mod tests {
                 source_path: "baseline/namespace.yaml".to_string(),
                 validation: Some(ManifestValidation {
                     output_path: Some(
-                        "manifests/prepared/baseline/baseline/namespace.validate.txt"
-                            .to_string(),
+                        "manifests/prepared/baseline/baseline/namespace.validate.txt".to_string(),
                     ),
                     status: "pending".to_string(),
                     checked_at: None,
@@ -433,9 +430,7 @@ mod tests {
                         checked_at: None,
                         resource_kinds: vec![],
                     }),
-                    prepared_path: Some(
-                        "manifests/prepared/groups/g01/01.yaml".to_string(),
-                    ),
+                    prepared_path: Some("manifests/prepared/groups/g01/01.yaml".to_string()),
                     digest: Some("group-sha".to_string()),
                     order: Some(1),
                     applied: false,
@@ -557,9 +552,7 @@ mod tests {
                     source_path: "groups/g01.md".to_string(),
                     group_id: Some("g01".to_string()),
                     validation: None,
-                    prepared_path: Some(
-                        "manifests/prepared/groups/g01/01.yaml".to_string(),
-                    ),
+                    prepared_path: Some("manifests/prepared/groups/g01/01.yaml".to_string()),
                     digest: Some("group-sha".to_string()),
                     order: Some(1),
                     applied: false,
