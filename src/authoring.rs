@@ -198,9 +198,7 @@ pub fn save_authoring_session(session: &AuthoringSession) -> Result<AuthoringSes
 /// Returns `CliError` if no session is active.
 pub fn require_authoring_session() -> Result<AuthoringSession, CliError> {
     let session = load_authoring_session()?;
-    session.ok_or_else(|| {
-        errors::cli_err(&errors::AUTHORING_SESSION_MISSING, &[])
-    })
+    session.ok_or_else(|| errors::cli_err(&errors::AUTHORING_SESSION_MISSING, &[]))
 }
 
 /// Begin a new authoring session.
@@ -312,94 +310,128 @@ mod tests {
         assert_eq!(req, deserialized);
     }
 
-    #[test]
-    fn save_and_load_session_round_trip() {
-        let dir = tempfile::tempdir().unwrap();
-        // Use env vars to control workspace location
-        unsafe { std::env::set_var("XDG_DATA_HOME", dir.path().join("xdg").to_str().unwrap());
-        unsafe { std::env::set_var("CLAUDE_SESSION_ID", "authoring-unit-test");
-
-        let session = AuthoringSession {
-            repo_root: "/repo".to_string(),
-            feature: "mesh".to_string(),
-            mode: "interactive".to_string(),
-            suite_name: "install".to_string(),
-            suite_dir: "/repo/suites/install".to_string(),
-            updated_at: "2026-03-13T10:00:00Z".to_string(),
-        };
-
-        let saved = save_authoring_session(&session).unwrap();
-        assert_eq!(saved, session);
-
-        let loaded = load_authoring_session().unwrap();
-        assert!(loaded.is_some());
-        assert_eq!(loaded.unwrap(), session);
-
-        // Clean up env
-        unsafe { std::env::remove_var("CLAUDE_SESSION_ID");
+    /// Helper to set env vars, run a closure, then restore the previous values.
+    unsafe fn with_env_vars(vars: &[(&str, Option<&str>)], f: impl FnOnce()) {
+        let saved: Vec<(&str, Option<String>)> = vars
+            .iter()
+            .map(|(name, _)| (*name, std::env::var(name).ok()))
+            .collect();
+        for (name, value) in vars {
+            match value {
+                Some(v) => unsafe { std::env::set_var(name, v) },
+                None => unsafe { std::env::remove_var(name) },
+            }
+        }
+        f();
+        for (name, prev) in saved {
+            match prev {
+                Some(v) => unsafe { std::env::set_var(name, v) },
+                None => unsafe { std::env::remove_var(name) },
+            }
+        }
     }
 
+    // All env-dependent authoring tests are combined into one test to avoid
+    // races on global env vars when cargo runs tests in parallel.
     #[test]
-    fn require_session_errors_when_missing() {
-        let dir = tempfile::tempdir().unwrap();
-        unsafe { std::env::set_var(
-            "XDG_DATA_HOME",
-            dir.path().join("empty-xdg").to_str().unwrap(),
-        );
-        unsafe { std::env::set_var("CLAUDE_SESSION_ID", "authoring-require-test");
+    fn env_dependent_authoring_tests() {
+        // -- save_and_load_session_round_trip --
+        {
+            let dir = tempfile::tempdir().unwrap();
+            let xdg = dir.path().join("xdg");
+            unsafe {
+                with_env_vars(
+                    &[
+                        ("XDG_DATA_HOME", Some(xdg.to_str().unwrap())),
+                        ("CLAUDE_SESSION_ID", Some("authoring-unit-test")),
+                    ],
+                    || {
+                        let session = AuthoringSession {
+                            repo_root: "/repo".to_string(),
+                            feature: "mesh".to_string(),
+                            mode: "interactive".to_string(),
+                            suite_name: "install".to_string(),
+                            suite_dir: "/repo/suites/install".to_string(),
+                            updated_at: "2026-03-13T10:00:00Z".to_string(),
+                        };
 
-        let result = require_authoring_session();
-        assert!(result.is_err());
-        let err = result.unwrap_err();
-        assert_eq!(err.code, "KSRCLI040");
+                        let saved = save_authoring_session(&session).unwrap();
+                        assert_eq!(saved, session);
 
-        unsafe { std::env::remove_var("CLAUDE_SESSION_ID");
-    }
+                        let loaded = load_authoring_session().unwrap();
+                        assert!(loaded.is_some());
+                        assert_eq!(loaded.unwrap(), session);
+                    },
+                );
+            }
+        }
 
-    #[test]
-    fn begin_session_creates_and_persists() {
-        let dir = tempfile::tempdir().unwrap();
-        unsafe { std::env::set_var(
-            "XDG_DATA_HOME",
-            dir.path().join("begin-xdg").to_str().unwrap(),
-        );
-        unsafe { std::env::set_var("CLAUDE_SESSION_ID", "authoring-begin-test");
+        // -- require_session_errors_when_missing --
+        {
+            let dir = tempfile::tempdir().unwrap();
+            let xdg = dir.path().join("empty-xdg");
+            unsafe {
+                with_env_vars(
+                    &[
+                        ("XDG_DATA_HOME", Some(xdg.to_str().unwrap())),
+                        ("CLAUDE_SESSION_ID", Some("authoring-require-test")),
+                    ],
+                    || {
+                        let result = require_authoring_session();
+                        assert!(result.is_err());
+                        let err = result.unwrap_err();
+                        assert_eq!(err.code, "KSRCLI040");
+                    },
+                );
+            }
+        }
 
-        let repo = dir.path().join("repo");
-        std::fs::create_dir_all(&repo).unwrap();
-        let suite_dir = dir.path().join("suite");
-        std::fs::create_dir_all(&suite_dir).unwrap();
+        // -- begin_session_creates_and_persists --
+        {
+            let dir = tempfile::tempdir().unwrap();
+            let xdg = dir.path().join("begin-xdg");
+            unsafe {
+                with_env_vars(
+                    &[
+                        ("XDG_DATA_HOME", Some(xdg.to_str().unwrap())),
+                        ("CLAUDE_SESSION_ID", Some("authoring-begin-test")),
+                    ],
+                    || {
+                        let repo = dir.path().join("repo");
+                        std::fs::create_dir_all(&repo).unwrap();
+                        let suite_dir = dir.path().join("suite");
+                        std::fs::create_dir_all(&suite_dir).unwrap();
 
-        let session = begin_authoring_session(
-            &repo,
-            "mesh",
-            "interactive",
-            &suite_dir,
-            "install",
-        )
-        .unwrap();
+                        let session = begin_authoring_session(
+                            &repo,
+                            "mesh",
+                            "interactive",
+                            &suite_dir,
+                            "install",
+                        )
+                        .unwrap();
 
-        assert_eq!(session.feature, "mesh");
-        assert_eq!(session.mode, "interactive");
-        assert_eq!(session.suite_name, "install");
+                        assert_eq!(session.feature, "mesh");
+                        assert_eq!(session.mode, "interactive");
+                        assert_eq!(session.suite_name, "install");
 
-        let loaded = load_authoring_session().unwrap().unwrap();
-        assert_eq!(loaded.feature, "mesh");
+                        let loaded = load_authoring_session().unwrap().unwrap();
+                        assert_eq!(loaded.feature, "mesh");
+                    },
+                );
+            }
+        }
 
-        unsafe { std::env::remove_var("CLAUDE_SESSION_ID");
-    }
-
-    #[test]
-    fn authoring_workspace_dir_under_context() {
-        unsafe { std::env::set_var("CLAUDE_SESSION_ID", "workspace-dir-test");
-        let workspace = authoring_workspace_dir();
-        let name = workspace
-            .file_name()
-            .unwrap()
-            .to_string_lossy()
-            .to_string();
-        assert_eq!(name, "suite-author");
-        unsafe { std::env::remove_var("CLAUDE_SESSION_ID");
+        // -- authoring_workspace_dir_under_context --
+        {
+            unsafe {
+                with_env_vars(&[("CLAUDE_SESSION_ID", Some("workspace-dir-test"))], || {
+                    let workspace = authoring_workspace_dir();
+                    let name = workspace.file_name().unwrap().to_string_lossy().to_string();
+                    assert_eq!(name, "suite-author");
+                });
+            }
+        }
     }
 
     #[test]
