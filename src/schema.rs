@@ -1,13 +1,14 @@
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
+use comrak::nodes::NodeValue;
+use comrak::{Arena, Options, parse_document};
 use serde::{Deserialize, Serialize};
 
 use crate::errors::{self, CliError};
 
 // ---------------------------------------------------------------------------
 // Internal helpers for frontmatter parsing and file I/O.
-// These exist because the io module stubs are not yet implemented.
 // ---------------------------------------------------------------------------
 
 fn read_file(path: &Path) -> Result<String, CliError> {
@@ -38,208 +39,46 @@ fn write_file(path: &Path, text: &str) -> Result<(), CliError> {
     })
 }
 
-/// Split `---\n...\n---\n` frontmatter from body. Returns parsed YAML map and body text.
+/// Split frontmatter from body using comrak for extraction and serde_yml for
+/// YAML parsing. Returns parsed YAML mapping and body text.
 fn split_frontmatter(text: &str) -> Result<(serde_yml::Mapping, String), CliError> {
-    if !text.starts_with("---\n") {
-        return Err(errors::cli_err(&errors::MISSING_FRONTMATTER, &[]));
-    }
-    let rest = &text[4..];
-    let end = rest.find("\n---\n").or_else(|| {
-        rest.find("\n---")
-            .filter(|&pos| pos + 4 >= rest.len() || rest.as_bytes().get(pos + 4) == Some(&b'\n'))
-    });
-    let Some(end) = end else {
-        return Err(errors::cli_err(&errors::UNTERMINATED_FRONTMATTER, &[]));
-    };
-    let yaml_text = &rest[..end];
-    let body_start = end + 4; // skip \n---
-    let body = if body_start < rest.len() {
-        rest[body_start..].trim_start_matches('\n').to_string()
-    } else {
-        String::new()
-    };
-    let map = parse_frontmatter(yaml_text);
-    Ok((map, body))
-}
+    let mut options = Options::default();
+    options.extension.front_matter_delimiter = Some("---".to_owned());
 
-/// Custom frontmatter parser matching the Python `parse_frontmatter_text` behavior.
-/// Handles scalars, inline lists `[a, b]`, block lists `- item`, empty dicts `{}`,
-/// and block mappings (one level deep). Treats block list items as literal strings.
-fn parse_frontmatter(text: &str) -> serde_yml::Mapping {
-    let lines: Vec<&str> = text.lines().collect();
-    let mut result = serde_yml::Mapping::new();
-    let mut i = 0;
-    while i < lines.len() {
-        let line = lines[i];
-        let trimmed = line.trim();
-        if trimmed.is_empty() || trimmed.starts_with('#') {
-            i += 1;
-            continue;
-        }
-        // Match top-level key: value
-        let Some(colon_pos) = line.find(':') else {
-            i += 1;
-            continue;
-        };
-        let key = line[..colon_pos].trim();
-        if key.is_empty() || key.contains(' ') {
-            i += 1;
-            continue;
-        }
-        let value_part = line[colon_pos + 1..].trim();
+    let arena = Arena::new();
+    let root = parse_document(&arena, text, &options);
 
-        // Inline list [a, b, c]
-        if value_part.starts_with('[') && value_part.ends_with(']') {
-            let inner = &value_part[1..value_part.len() - 1];
-            let items = parse_inline_list(inner);
-            result.insert(
-                serde_yml::Value::String(key.to_string()),
-                serde_yml::Value::Sequence(items),
-            );
-            i += 1;
-            continue;
-        }
-
-        // Empty dict {}
-        if value_part == "{}" {
-            result.insert(
-                serde_yml::Value::String(key.to_string()),
-                serde_yml::Value::Mapping(serde_yml::Mapping::new()),
-            );
-            i += 1;
-            continue;
-        }
-
-        // No value after colon - check for block list or block mapping
-        if value_part.is_empty() {
-            let (block_val, new_i) = parse_block(lines.as_slice(), i + 1);
-            result.insert(serde_yml::Value::String(key.to_string()), block_val);
-            i = new_i;
-            continue;
-        }
-
-        // Scalar value
-        result.insert(
-            serde_yml::Value::String(key.to_string()),
-            parse_scalar(value_part),
-        );
-        i += 1;
-    }
-    result
-}
-
-/// Parse a block list or block mapping starting at `start`. Returns the parsed value
-/// and the next line index to process.
-fn parse_block(lines: &[&str], start: usize) -> (serde_yml::Value, usize) {
-    let mut i = start;
-    // Check if block list (lines starting with `  - `)
-    if i < lines.len() && lines[i].trim_start().starts_with("- ") {
-        let mut items = Vec::new();
-        while i < lines.len() {
-            let line = lines[i];
-            let stripped = line.trim_start();
-            if !stripped.starts_with("- ") {
-                break;
-            }
-            let item_text = stripped[2..].trim();
-            items.push(parse_scalar(item_text));
-            i += 1;
-        }
-        return (serde_yml::Value::Sequence(items), i);
-    }
-    // Check if block mapping (indented key: value)
-    if i < lines.len() {
-        let line = lines[i];
-        if line.starts_with(' ') && line.contains(':') {
-            let mut mapping = serde_yml::Mapping::new();
-            while i < lines.len() {
-                let line = lines[i];
-                if !line.starts_with(' ') || line.trim().is_empty() {
-                    break;
-                }
-                let trimmed = line.trim();
-                if let Some(cp) = trimmed.find(':') {
-                    let k = trimmed[..cp].trim();
-                    let v = trimmed[cp + 1..].trim();
-                    mapping.insert(serde_yml::Value::String(k.to_string()), parse_scalar(v));
-                }
-                i += 1;
-            }
-            return (serde_yml::Value::Mapping(mapping), i);
-        }
-    }
-    // Empty value -> null
-    (serde_yml::Value::Null, start)
-}
-
-/// Parse a single inline list (content between `[` and `]`).
-fn parse_inline_list(inner: &str) -> Vec<serde_yml::Value> {
-    let trimmed = inner.trim();
-    if trimmed.is_empty() {
-        return Vec::new();
-    }
-    // Simple CSV-like split respecting quotes
-    split_csv(trimmed)
-        .iter()
-        .map(|s| parse_scalar(s.trim()))
-        .collect()
-}
-
-/// Simple CSV split that respects quoted strings.
-fn split_csv(input: &str) -> Vec<String> {
-    let mut result = Vec::new();
-    let mut current = String::new();
-    let mut in_quotes = false;
-    let mut quote_char = '"';
-    for ch in input.chars() {
-        if in_quotes {
-            if ch == quote_char {
-                in_quotes = false;
-            }
-            current.push(ch);
-        } else if ch == '"' || ch == '\'' {
-            in_quotes = true;
-            quote_char = ch;
-            current.push(ch);
-        } else if ch == ',' {
-            result.push(current.trim().to_string());
-            current = String::new();
+    let fm_content = root.descendants().find_map(|node| {
+        let data = node.data.borrow();
+        if let NodeValue::FrontMatter(ref content) = data.value {
+            Some(content.clone())
         } else {
-            current.push(ch);
+            None
         }
-    }
-    let last = current.trim().to_string();
-    if !last.is_empty() {
-        result.push(last);
-    }
-    result
-}
+    });
 
-/// Parse a scalar YAML value (bool, null, int, float, quoted string, or plain string).
-fn parse_scalar(raw: &str) -> serde_yml::Value {
-    let s = raw.trim();
-    match s.to_lowercase().as_str() {
-        "true" | "yes" | "on" => return serde_yml::Value::Bool(true),
-        "false" | "no" | "off" => return serde_yml::Value::Bool(false),
-        "null" | "~" | "" => return serde_yml::Value::Null,
-        _ => {}
-    }
-    // Quoted string
-    if s.len() >= 2
-        && (s.starts_with('"') && s.ends_with('"') || s.starts_with('\'') && s.ends_with('\''))
-    {
-        return serde_yml::Value::String(s[1..s.len() - 1].to_string());
-    }
-    // Integer
-    if let Ok(n) = s.parse::<i64>() {
-        return serde_yml::Value::Number(n.into());
-    }
-    // Float
-    if let Ok(f) = s.parse::<f64>() {
-        return serde_yml::Value::Number(serde_yml::Number::from(f));
-    }
-    // Plain string
-    serde_yml::Value::String(s.to_string())
+    let Some(raw_fm) = fm_content else {
+        return if text.starts_with("---\n") {
+            Err(errors::cli_err(&errors::UNTERMINATED_FRONTMATTER, &[]))
+        } else {
+            Err(errors::cli_err(&errors::MISSING_FRONTMATTER, &[]))
+        };
+    };
+
+    // Strip the `---\n ... \n---\n` delimiters to get bare YAML.
+    let yaml_text = raw_fm.strip_prefix("---\n").unwrap_or(&raw_fm);
+    let yaml_text = if let Some(pos) = yaml_text.rfind("\n---") {
+        &yaml_text[..pos]
+    } else {
+        yaml_text
+    };
+
+    // The body is everything after the frontmatter block.
+    let body = &text[raw_fm.len()..];
+    let body = body.trim_start_matches('\n');
+
+    let map: serde_yml::Mapping = serde_yml::from_str(yaml_text).unwrap_or_default();
+    Ok((map, body.to_string()))
 }
 
 /// Extract a string field from a YAML mapping, returning None if missing or not a string.
@@ -617,18 +456,31 @@ impl RunReport {
 }
 
 /// Render a YAML list field in block style (one `- item` per line).
-/// Values that contain characters special to YAML are not quoted because
-/// the custom frontmatter parser (matching Python's `split_frontmatter`)
-/// treats block-list items as literal strings after the `- ` prefix.
+/// Values that contain YAML-special characters are single-quoted so that
+/// serde_yml can parse them back without ambiguity.
 fn render_frontmatter_list(key: &str, values: &[String]) -> Vec<String> {
     if values.is_empty() {
         return vec![format!("{key}: []")];
     }
     let mut out = vec![format!("{key}:")];
     for v in values {
-        out.push(format!("  - {v}"));
+        out.push(format!("  - {}", yaml_quote_if_needed(v)));
     }
     out
+}
+
+/// Single-quote a string value if it contains characters that are special in
+/// YAML (colon-space, hash, backtick, brackets, braces, ampersand, asterisk,
+/// exclamation, percent). Inside single quotes, only `'` needs escaping (as
+/// `''`).
+fn yaml_quote_if_needed(s: &str) -> String {
+    const SPECIAL: &[char] = &[':', '#', '`', '[', ']', '{', '}', '&', '*', '!', '%'];
+    if s.contains(SPECIAL) {
+        let escaped = s.replace('\'', "''");
+        format!("'{escaped}'")
+    } else {
+        s.to_string()
+    }
 }
 
 /// Counts of passed/failed/skipped groups in a run.
@@ -997,8 +849,9 @@ mod tests {
 
         let rendered = std::fs::read_to_string(&path).unwrap();
         assert!(
-            rendered
-                .contains("story_results:\n  - g02 PASS - story with commas, updates, and deletes"),
+            rendered.contains(
+                "story_results:\n  - 'g02 PASS - story with commas, updates, and deletes"
+            ),
             "rendered: {rendered}"
         );
         assert!(
