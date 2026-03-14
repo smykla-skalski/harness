@@ -12,8 +12,7 @@ use crate::hooks;
 // ---------------------------------------------------------------------------
 
 const PRE_TOOL_USE_HOOKS: &[&str] = &["guard-bash", "guard-question", "guard-write"];
-const POST_TOOL_USE_HOOKS: &[&str] =
-    &["verify-bash", "verify-question", "verify-write", "audit"];
+const POST_TOOL_USE_HOOKS: &[&str] = &["verify-bash", "verify-question", "verify-write", "audit"];
 const POST_TOOL_USE_FAILURE_HOOKS: &[&str] = &["enrich-failure"];
 const SUBAGENT_START_HOOKS: &[&str] = &["context-agent"];
 const SUBAGENT_STOP_HOOKS: &[&str] = &["validate-agent"];
@@ -662,8 +661,7 @@ fn render_blocking_hook_output(result: &HookResult) -> String {
     }
     let message = render_hook_message(result);
     if result.decision == "deny" {
-        serde_json::to_string(&json!({"decision": "block", "reason": message}))
-            .unwrap_or_default()
+        serde_json::to_string(&json!({"decision": "block", "reason": message})).unwrap_or_default()
     } else {
         serde_json::to_string(&json!({"systemMessage": message})).unwrap_or_default()
     }
@@ -739,10 +737,7 @@ pub fn render_hook_output(hook_name: &str, result: &HookResult) -> String {
 // ---------------------------------------------------------------------------
 
 /// Dispatch to the correct hook module based on the hook command variant.
-fn dispatch_hook(
-    hook: &HookCommand,
-    ctx: &HookContext,
-) -> Result<HookResult, CliError> {
+fn dispatch_hook(hook: &HookCommand, ctx: &HookContext) -> Result<HookResult, CliError> {
     match hook {
         HookCommand::GuardBash => hooks::guard_bash::execute(ctx),
         HookCommand::GuardWrite => hooks::guard_write::execute(ctx),
@@ -787,8 +782,7 @@ fn run_hook_command(skill: &str, hook: &HookCommand) -> Result<i32, CliError> {
     let ctx = match HookContext::from_stdin(skill) {
         Ok(ctx) => ctx,
         Err(e) => {
-            let message =
-                format!("`{hook_name}` received invalid hook payload: {e}");
+            let message = format!("`{hook_name}` received invalid hook payload: {e}");
             let result = hook_runtime_result(hook_name, "KSH001", &message);
             let output = render_hook_output(hook_name, &result);
             if !output.is_empty() {
@@ -882,8 +876,7 @@ mod tests {
     #[test]
     fn all_expected_subcommands_registered() {
         let cmd = Cli::command();
-        let names: Vec<&str> =
-            cmd.get_subcommands().map(clap::Command::get_name).collect();
+        let names: Vec<&str> = cmd.get_subcommands().map(clap::Command::get_name).collect();
         for expected in [
             "apply",
             "approval-begin",
@@ -911,10 +904,7 @@ mod tests {
             "session-stop",
             "validate",
         ] {
-            assert!(
-                names.contains(&expected),
-                "missing subcommand: {expected}"
-            );
+            assert!(names.contains(&expected), "missing subcommand: {expected}");
         }
     }
 
@@ -942,19 +932,13 @@ mod tests {
             "context-agent",
             "validate-agent",
         ] {
-            assert!(
-                hook_names.contains(&expected),
-                "missing hook: {expected}"
-            );
+            assert!(hook_names.contains(&expected), "missing hook: {expected}");
         }
     }
 
     #[test]
     fn parse_hook_command() {
-        let cli = Cli::try_parse_from([
-            "harness", "hook", "suite-runner", "guard-bash",
-        ])
-        .unwrap();
+        let cli = Cli::try_parse_from(["harness", "hook", "suite-runner", "guard-bash"]).unwrap();
         match cli.command {
             Command::Hook { skill, hook } => {
                 assert_eq!(skill, "suite-runner");
@@ -966,9 +950,7 @@ mod tests {
 
     #[test]
     fn parse_hook_rejects_invalid_skill() {
-        let result = Cli::try_parse_from([
-            "harness", "hook", "bad-skill", "guard-bash",
-        ]);
+        let result = Cli::try_parse_from(["harness", "hook", "bad-skill", "guard-bash"]);
         assert!(result.is_err());
     }
 
@@ -1022,19 +1004,22 @@ mod tests {
     #[test]
     fn parse_record_with_trailing_command() {
         let cli = Cli::try_parse_from([
-            "harness", "record", "--label", "test", "--", "kubectl", "get",
-            "pods", "-n", "kuma-system",
+            "harness",
+            "record",
+            "--label",
+            "test",
+            "--",
+            "kubectl",
+            "get",
+            "pods",
+            "-n",
+            "kuma-system",
         ])
         .unwrap();
         match cli.command {
-            Command::Record {
-                label, command, ..
-            } => {
+            Command::Record { label, command, .. } => {
                 assert_eq!(label.as_deref(), Some("test"));
-                assert_eq!(
-                    command,
-                    vec!["kubectl", "get", "pods", "-n", "kuma-system"]
-                );
+                assert_eq!(command, vec!["kubectl", "get", "pods", "-n", "kuma-system"]);
             }
             _ => panic!("expected Record command"),
         }
@@ -1042,10 +1027,7 @@ mod tests {
 
     #[test]
     fn parse_run_alias_for_record() {
-        let cli = Cli::try_parse_from([
-            "harness", "run", "--label", "foo", "--", "ls",
-        ])
-        .unwrap();
+        let cli = Cli::try_parse_from(["harness", "run", "--label", "foo", "--", "ls"]).unwrap();
         assert!(matches!(cli.command, Command::Record { .. }));
     }
 
@@ -1116,7 +1098,13 @@ mod tests {
         .unwrap();
         match cli.command {
             Command::Envoy {
-                cmd: EnvoyCommand::Capture { namespace, workload, label, .. },
+                cmd:
+                    EnvoyCommand::Capture {
+                        namespace,
+                        workload,
+                        label,
+                        ..
+                    },
             } => {
                 assert_eq!(namespace, "kuma-demo");
                 assert_eq!(workload, "deploy/demo-client");
@@ -1140,7 +1128,10 @@ mod tests {
         .unwrap();
         match cli.command {
             Command::Report {
-                cmd: ReportCommand::Group { group_id, status, .. },
+                cmd:
+                    ReportCommand::Group {
+                        group_id, status, ..
+                    },
             } => {
                 assert_eq!(group_id, "g01");
                 assert_eq!(status, "pass");
@@ -1162,13 +1153,7 @@ mod tests {
 
     #[test]
     fn parse_runner_state_with_event() {
-        let cli = Cli::try_parse_from([
-            "harness",
-            "runner-state",
-            "--event",
-            "abort",
-        ])
-        .unwrap();
+        let cli = Cli::try_parse_from(["harness", "runner-state", "--event", "abort"]).unwrap();
         match cli.command {
             Command::RunnerState { event, .. } => {
                 assert_eq!(event.as_deref(), Some("abort"));
@@ -1213,8 +1198,7 @@ mod tests {
 
     #[test]
     fn parse_kumactl_find() {
-        let cli =
-            Cli::try_parse_from(["harness", "kumactl", "find"]).unwrap();
+        let cli = Cli::try_parse_from(["harness", "kumactl", "find"]).unwrap();
         assert!(matches!(
             cli.command,
             Command::Kumactl {
@@ -1225,10 +1209,8 @@ mod tests {
 
     #[test]
     fn parse_diff() {
-        let cli = Cli::try_parse_from([
-            "harness", "diff", "--left", "a.json", "--right", "b.json",
-        ])
-        .unwrap();
+        let cli = Cli::try_parse_from(["harness", "diff", "--left", "a.json", "--right", "b.json"])
+            .unwrap();
         match cli.command {
             Command::Diff {
                 left, right, path, ..
@@ -1343,25 +1325,19 @@ mod tests {
         let r = HookResult::deny("KSR005", "blocked");
         let output = render_pre_tool_use_output(&r);
         let v: serde_json::Value = serde_json::from_str(&output).unwrap();
-        assert_eq!(
-            v["hookSpecificOutput"]["hookEventName"],
-            "PreToolUse"
+        assert_eq!(v["hookSpecificOutput"]["hookEventName"], "PreToolUse");
+        assert_eq!(v["hookSpecificOutput"]["permissionDecision"], "deny");
+        assert!(
+            v["hookSpecificOutput"]["permissionDecisionReason"]
+                .as_str()
+                .unwrap()
+                .contains("KSR005")
         );
-        assert_eq!(
-            v["hookSpecificOutput"]["permissionDecision"],
-            "deny"
-        );
-        assert!(v["hookSpecificOutput"]["permissionDecisionReason"]
-            .as_str()
-            .unwrap()
-            .contains("KSR005"));
     }
 
     #[test]
     fn blocking_allow_is_empty() {
-        assert!(
-            render_blocking_hook_output(&HookResult::allow()).is_empty()
-        );
+        assert!(render_blocking_hook_output(&HookResult::allow()).is_empty());
     }
 
     #[test]
@@ -1384,11 +1360,7 @@ mod tests {
 
     #[test]
     fn post_tool_use_allow_is_empty() {
-        assert!(render_post_tool_use_output(
-            &HookResult::allow(),
-            "PostToolUse"
-        )
-        .is_empty());
+        assert!(render_post_tool_use_output(&HookResult::allow(), "PostToolUse").is_empty());
     }
 
     #[test]
@@ -1397,14 +1369,13 @@ mod tests {
         let output = render_post_tool_use_output(&r, "PostToolUse");
         let v: serde_json::Value = serde_json::from_str(&output).unwrap();
         assert_eq!(v["decision"], "block");
-        assert_eq!(
-            v["hookSpecificOutput"]["hookEventName"],
-            "PostToolUse"
+        assert_eq!(v["hookSpecificOutput"]["hookEventName"], "PostToolUse");
+        assert!(
+            v["hookSpecificOutput"]["additionalContext"]
+                .as_str()
+                .unwrap()
+                .contains("KSR014")
         );
-        assert!(v["hookSpecificOutput"]["additionalContext"]
-            .as_str()
-            .unwrap()
-            .contains("KSR014"));
     }
 
     #[test]
@@ -1413,31 +1384,20 @@ mod tests {
         let output = render_post_tool_use_output(&r, "PostToolUse");
         let v: serde_json::Value = serde_json::from_str(&output).unwrap();
         assert!(v.get("decision").is_none());
-        assert_eq!(
-            v["hookSpecificOutput"]["hookEventName"],
-            "PostToolUse"
-        );
+        assert_eq!(v["hookSpecificOutput"]["hookEventName"], "PostToolUse");
     }
 
     #[test]
     fn additional_context_allow_is_empty() {
-        assert!(render_additional_context_output(
-            &HookResult::allow(),
-            "SubagentStart"
-        )
-        .is_empty());
+        assert!(render_additional_context_output(&HookResult::allow(), "SubagentStart").is_empty());
     }
 
     #[test]
     fn additional_context_warn_has_event_name() {
         let r = HookResult::warn("KSA006", "format");
-        let output =
-            render_additional_context_output(&r, "SubagentStart");
+        let output = render_additional_context_output(&r, "SubagentStart");
         let v: serde_json::Value = serde_json::from_str(&output).unwrap();
-        assert_eq!(
-            v["hookSpecificOutput"]["hookEventName"],
-            "SubagentStart"
-        );
+        assert_eq!(v["hookSpecificOutput"]["hookEventName"], "SubagentStart");
     }
 
     // --- render_hook_output routing tests ---
@@ -1447,10 +1407,7 @@ mod tests {
         let r = HookResult::deny("KSR005", "blocked");
         let output = render_hook_output("guard-bash", &r);
         let v: serde_json::Value = serde_json::from_str(&output).unwrap();
-        assert_eq!(
-            v["hookSpecificOutput"]["hookEventName"],
-            "PreToolUse"
-        );
+        assert_eq!(v["hookSpecificOutput"]["hookEventName"], "PreToolUse");
     }
 
     #[test]
@@ -1458,10 +1415,7 @@ mod tests {
         let r = HookResult::warn("KSR006", "missing");
         let output = render_hook_output("verify-bash", &r);
         let v: serde_json::Value = serde_json::from_str(&output).unwrap();
-        assert_eq!(
-            v["hookSpecificOutput"]["hookEventName"],
-            "PostToolUse"
-        );
+        assert_eq!(v["hookSpecificOutput"]["hookEventName"], "PostToolUse");
     }
 
     #[test]
@@ -1488,10 +1442,7 @@ mod tests {
         let r = HookResult::warn("KSA006", "format");
         let output = render_hook_output("context-agent", &r);
         let v: serde_json::Value = serde_json::from_str(&output).unwrap();
-        assert_eq!(
-            v["hookSpecificOutput"]["hookEventName"],
-            "SubagentStart"
-        );
+        assert_eq!(v["hookSpecificOutput"]["hookEventName"], "SubagentStart");
     }
 
     #[test]
@@ -1499,10 +1450,7 @@ mod tests {
         let r = HookResult::deny("KSA007", "reply");
         let output = render_hook_output("validate-agent", &r);
         let v: serde_json::Value = serde_json::from_str(&output).unwrap();
-        assert_eq!(
-            v["hookSpecificOutput"]["hookEventName"],
-            "SubagentStop"
-        );
+        assert_eq!(v["hookSpecificOutput"]["hookEventName"], "SubagentStop");
     }
 
     #[test]
@@ -1535,10 +1483,7 @@ mod tests {
         let r = HookResult::warn("X002", "noted");
         let output = render_hook_output("unknown-hook", &r);
         let v: serde_json::Value = serde_json::from_str(&output).unwrap();
-        assert_eq!(
-            v["hookSpecificOutput"]["hookEventName"],
-            "Notification"
-        );
+        assert_eq!(v["hookSpecificOutput"]["hookEventName"], "Notification");
     }
 
     // --- Hook wrapping tests ---
@@ -1609,13 +1554,11 @@ mod tests {
         ];
         assert_eq!(all.len(), 11);
         for hook in &all {
+            assert!(!hook.name().is_empty(), "hook name must not be empty");
             assert!(
-                !hook.name().is_empty(),
-                "hook name must not be empty"
-            );
-            assert!(
-                hook.name().chars().all(|c| c.is_ascii_lowercase()
-                    || c == '-'),
+                hook.name()
+                    .chars()
+                    .all(|c| c.is_ascii_lowercase() || c == '-'),
                 "hook name must be kebab-case: {}",
                 hook.name()
             );
