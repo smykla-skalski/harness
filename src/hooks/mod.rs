@@ -53,3 +53,86 @@ pub(crate) fn control_file_hint(path: &Path) -> &'static str {
         runner_rules::HARNESS_MANAGED_RUN_CONTROL_HINT
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn normalize_path_resolves_dot_dot() {
+        let path = Path::new("/a/b/../c");
+        assert_eq!(normalize_path(path), PathBuf::from("/a/c"));
+    }
+
+    #[test]
+    fn normalize_path_resolves_dot() {
+        let path = Path::new("/a/./b/./c");
+        assert_eq!(normalize_path(path), PathBuf::from("/a/b/c"));
+    }
+
+    #[test]
+    fn normalize_path_preserves_absolute() {
+        let path = Path::new("/a/b/c");
+        assert_eq!(normalize_path(path), PathBuf::from("/a/b/c"));
+    }
+
+    #[test]
+    fn is_command_owned_run_report() {
+        assert!(is_command_owned_run_file(
+            Path::new("/runs/run-1/run-report.md"),
+            Path::new("/runs/run-1")
+        ));
+    }
+
+    #[test]
+    fn is_command_owned_run_status() {
+        assert!(is_command_owned_run_file(
+            Path::new("/runs/run-1/run-status.json"),
+            Path::new("/runs/run-1")
+        ));
+    }
+
+    #[test]
+    fn is_command_owned_runner_state() {
+        assert!(is_command_owned_run_file(
+            Path::new("/runs/run-1/suite-runner-state.json"),
+            Path::new("/runs/run-1")
+        ));
+    }
+
+    #[test]
+    fn is_command_owned_command_log() {
+        assert!(is_command_owned_run_file(
+            Path::new("/runs/run-1/commands/command-log.md"),
+            Path::new("/runs/run-1")
+        ));
+    }
+
+    #[test]
+    fn is_not_command_owned_artifact() {
+        assert!(!is_command_owned_run_file(
+            Path::new("/runs/run-1/artifacts/state.json"),
+            Path::new("/runs/run-1")
+        ));
+    }
+
+    #[test]
+    fn is_not_command_owned_different_run() {
+        assert!(!is_command_owned_run_file(
+            Path::new("/runs/run-2/run-report.md"),
+            Path::new("/runs/run-1")
+        ));
+    }
+
+    #[test]
+    fn control_file_hint_command_log() {
+        let hint = control_file_hint(Path::new("commands/command-log.md"));
+        assert!(hint.contains("harness record"));
+    }
+
+    #[test]
+    fn control_file_hint_other() {
+        let hint = control_file_hint(Path::new("run-report.md"));
+        assert!(hint.contains("harness report group"));
+    }
+}
