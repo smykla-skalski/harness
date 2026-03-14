@@ -3,7 +3,334 @@ use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
-use crate::errors::CliError;
+use crate::errors::{self, CliError};
+
+// ---------------------------------------------------------------------------
+// Internal helpers for frontmatter parsing and file I/O.
+// These exist because the io module stubs are not yet implemented.
+// ---------------------------------------------------------------------------
+
+fn read_file(path: &Path) -> Result<String, CliError> {
+    std::fs::read_to_string(path).map_err(|_| {
+        errors::cli_err(
+            &errors::MISSING_FILE,
+            &[("path", &path.display().to_string())],
+        )
+    })
+}
+
+fn write_file(path: &Path, text: &str) -> Result<(), CliError> {
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent).map_err(|e| CliError {
+            code: "IO".to_string(),
+            message: e.to_string(),
+            exit_code: 1,
+            hint: None,
+            details: None,
+        })?;
+    }
+    std::fs::write(path, text).map_err(|e| CliError {
+        code: "IO".to_string(),
+        message: e.to_string(),
+        exit_code: 1,
+        hint: None,
+        details: None,
+    })
+}
+
+/// Split `---\n...\n---\n` frontmatter from body. Returns parsed YAML map and body text.
+fn split_frontmatter(text: &str) -> Result<(serde_yml::Mapping, String), CliError> {
+    if !text.starts_with("---\n") {
+        return Err(errors::cli_err(&errors::MISSING_FRONTMATTER, &[]));
+    }
+    let rest = &text[4..];
+    let end = rest.find("\n---\n").or_else(|| {
+        rest.find("\n---")
+            .filter(|&pos| pos + 4 >= rest.len() || rest.as_bytes().get(pos + 4) == Some(&b'\n'))
+    });
+    let Some(end) = end else {
+        return Err(errors::cli_err(&errors::UNTERMINATED_FRONTMATTER, &[]));
+    };
+    let yaml_text = &rest[..end];
+    let body_start = end + 4; // skip \n---
+    let body = if body_start < rest.len() {
+        rest[body_start..].trim_start_matches('\n').to_string()
+    } else {
+        String::new()
+    };
+    let map = parse_frontmatter(yaml_text);
+    Ok((map, body))
+}
+
+/// Custom frontmatter parser matching the Python `parse_frontmatter_text` behavior.
+/// Handles scalars, inline lists `[a, b]`, block lists `- item`, empty dicts `{}`,
+/// and block mappings (one level deep). Treats block list items as literal strings.
+fn parse_frontmatter(text: &str) -> serde_yml::Mapping {
+    let lines: Vec<&str> = text.lines().collect();
+    let mut result = serde_yml::Mapping::new();
+    let mut i = 0;
+    while i < lines.len() {
+        let line = lines[i];
+        let trimmed = line.trim();
+        if trimmed.is_empty() || trimmed.starts_with('#') {
+            i += 1;
+            continue;
+        }
+        // Match top-level key: value
+        let Some(colon_pos) = line.find(':') else {
+            i += 1;
+            continue;
+        };
+        let key = line[..colon_pos].trim();
+        if key.is_empty() || key.contains(' ') {
+            i += 1;
+            continue;
+        }
+        let value_part = line[colon_pos + 1..].trim();
+
+        // Inline list [a, b, c]
+        if value_part.starts_with('[') && value_part.ends_with(']') {
+            let inner = &value_part[1..value_part.len() - 1];
+            let items = parse_inline_list(inner);
+            result.insert(
+                serde_yml::Value::String(key.to_string()),
+                serde_yml::Value::Sequence(items),
+            );
+            i += 1;
+            continue;
+        }
+
+        // Empty dict {}
+        if value_part == "{}" {
+            result.insert(
+                serde_yml::Value::String(key.to_string()),
+                serde_yml::Value::Mapping(serde_yml::Mapping::new()),
+            );
+            i += 1;
+            continue;
+        }
+
+        // No value after colon - check for block list or block mapping
+        if value_part.is_empty() {
+            let (block_val, new_i) = parse_block(lines.as_slice(), i + 1);
+            result.insert(serde_yml::Value::String(key.to_string()), block_val);
+            i = new_i;
+            continue;
+        }
+
+        // Scalar value
+        result.insert(
+            serde_yml::Value::String(key.to_string()),
+            parse_scalar(value_part),
+        );
+        i += 1;
+    }
+    result
+}
+
+/// Parse a block list or block mapping starting at `start`. Returns the parsed value
+/// and the next line index to process.
+fn parse_block(lines: &[&str], start: usize) -> (serde_yml::Value, usize) {
+    let mut i = start;
+    // Check if block list (lines starting with `  - `)
+    if i < lines.len() && lines[i].trim_start().starts_with("- ") {
+        let mut items = Vec::new();
+        while i < lines.len() {
+            let line = lines[i];
+            let stripped = line.trim_start();
+            if !stripped.starts_with("- ") {
+                break;
+            }
+            let item_text = stripped[2..].trim();
+            items.push(parse_scalar(item_text));
+            i += 1;
+        }
+        return (serde_yml::Value::Sequence(items), i);
+    }
+    // Check if block mapping (indented key: value)
+    if i < lines.len() {
+        let line = lines[i];
+        if line.starts_with(' ') && line.contains(':') {
+            let mut mapping = serde_yml::Mapping::new();
+            while i < lines.len() {
+                let line = lines[i];
+                if !line.starts_with(' ') || line.trim().is_empty() {
+                    break;
+                }
+                let trimmed = line.trim();
+                if let Some(cp) = trimmed.find(':') {
+                    let k = trimmed[..cp].trim();
+                    let v = trimmed[cp + 1..].trim();
+                    mapping.insert(serde_yml::Value::String(k.to_string()), parse_scalar(v));
+                }
+                i += 1;
+            }
+            return (serde_yml::Value::Mapping(mapping), i);
+        }
+    }
+    // Empty value -> null
+    (serde_yml::Value::Null, start)
+}
+
+/// Parse a single inline list (content between `[` and `]`).
+fn parse_inline_list(inner: &str) -> Vec<serde_yml::Value> {
+    let trimmed = inner.trim();
+    if trimmed.is_empty() {
+        return Vec::new();
+    }
+    // Simple CSV-like split respecting quotes
+    split_csv(trimmed)
+        .iter()
+        .map(|s| parse_scalar(s.trim()))
+        .collect()
+}
+
+/// Simple CSV split that respects quoted strings.
+fn split_csv(input: &str) -> Vec<String> {
+    let mut result = Vec::new();
+    let mut current = String::new();
+    let mut in_quotes = false;
+    let mut quote_char = '"';
+    for ch in input.chars() {
+        if in_quotes {
+            if ch == quote_char {
+                in_quotes = false;
+            }
+            current.push(ch);
+        } else if ch == '"' || ch == '\'' {
+            in_quotes = true;
+            quote_char = ch;
+            current.push(ch);
+        } else if ch == ',' {
+            result.push(current.trim().to_string());
+            current = String::new();
+        } else {
+            current.push(ch);
+        }
+    }
+    let last = current.trim().to_string();
+    if !last.is_empty() {
+        result.push(last);
+    }
+    result
+}
+
+/// Parse a scalar YAML value (bool, null, int, float, quoted string, or plain string).
+fn parse_scalar(raw: &str) -> serde_yml::Value {
+    let s = raw.trim();
+    match s.to_lowercase().as_str() {
+        "true" | "yes" | "on" => return serde_yml::Value::Bool(true),
+        "false" | "no" | "off" => return serde_yml::Value::Bool(false),
+        "null" | "~" | "" => return serde_yml::Value::Null,
+        _ => {}
+    }
+    // Quoted string
+    if s.len() >= 2
+        && (s.starts_with('"') && s.ends_with('"') || s.starts_with('\'') && s.ends_with('\''))
+    {
+        return serde_yml::Value::String(s[1..s.len() - 1].to_string());
+    }
+    // Integer
+    if let Ok(n) = s.parse::<i64>() {
+        return serde_yml::Value::Number(n.into());
+    }
+    // Float
+    if let Ok(f) = s.parse::<f64>() {
+        return serde_yml::Value::Number(serde_yml::Number::from(f));
+    }
+    // Plain string
+    serde_yml::Value::String(s.to_string())
+}
+
+/// Extract a string field from a YAML mapping, returning None if missing or not a string.
+fn yaml_str(map: &serde_yml::Mapping, key: &str) -> Option<String> {
+    map.get(serde_yml::Value::String(key.to_string()))
+        .and_then(serde_yml::Value::as_str)
+        .map(String::from)
+}
+
+/// Extract a bool field, defaulting to false.
+fn yaml_bool(map: &serde_yml::Mapping, key: &str) -> bool {
+    map.get(serde_yml::Value::String(key.to_string()))
+        .and_then(serde_yml::Value::as_bool)
+        .unwrap_or(false)
+}
+
+/// Extract a list-of-strings field, defaulting to empty vec.
+fn yaml_str_list(map: &serde_yml::Mapping, key: &str) -> Vec<String> {
+    map.get(serde_yml::Value::String(key.to_string()))
+        .and_then(serde_yml::Value::as_sequence)
+        .map(|seq| {
+            seq.iter()
+                .filter_map(|v| v.as_str().map(String::from))
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+/// Extract a list-of-integers field, defaulting to empty vec.
+#[allow(clippy::cast_possible_truncation)]
+fn yaml_int_list(map: &serde_yml::Mapping, key: &str) -> Vec<i64> {
+    map.get(serde_yml::Value::String(key.to_string()))
+        .and_then(serde_yml::Value::as_sequence)
+        .map(|seq| {
+            seq.iter()
+                .filter_map(|v| v.as_i64().or_else(|| v.as_f64().map(|f| f as i64)))
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+/// Extract helm_values as a `HashMap<String, serde_json::Value>`.
+fn yaml_helm_values(map: &serde_yml::Mapping, key: &str) -> HashMap<String, serde_json::Value> {
+    let Some(val) = map.get(serde_yml::Value::String(key.to_string())) else {
+        return HashMap::new();
+    };
+    let Some(mapping) = val.as_mapping() else {
+        return HashMap::new();
+    };
+    mapping
+        .iter()
+        .filter_map(|(k, v)| {
+            let key_str = k.as_str()?;
+            let json_val = yml_to_json(v);
+            Some((key_str.to_string(), json_val))
+        })
+        .collect()
+}
+
+/// Convert a `serde_yml::Value` to `serde_json::Value`.
+fn yml_to_json(v: &serde_yml::Value) -> serde_json::Value {
+    match v {
+        serde_yml::Value::Null => serde_json::Value::Null,
+        serde_yml::Value::Bool(b) => serde_json::Value::Bool(*b),
+        serde_yml::Value::Number(n) => {
+            if let Some(i) = n.as_i64() {
+                serde_json::Value::Number(i.into())
+            } else if let Some(f) = n.as_f64() {
+                serde_json::json!(f)
+            } else {
+                serde_json::Value::Null
+            }
+        }
+        serde_yml::Value::String(s) => serde_json::Value::String(s.clone()),
+        serde_yml::Value::Sequence(seq) => {
+            serde_json::Value::Array(seq.iter().map(yml_to_json).collect())
+        }
+        serde_yml::Value::Mapping(m) => {
+            let obj: serde_json::Map<String, serde_json::Value> = m
+                .iter()
+                .filter_map(|(k, v)| Some((k.as_str()?.to_string(), yml_to_json(v))))
+                .collect();
+            serde_json::Value::Object(obj)
+        }
+        serde_yml::Value::Tagged(t) => yml_to_json(&t.value),
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Public types
+// ---------------------------------------------------------------------------
 
 /// A single helm value entry (key=value).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -51,8 +378,60 @@ impl SuiteSpec {
     ///
     /// # Errors
     /// Returns `CliError` if the file is missing or frontmatter is invalid.
-    pub fn from_markdown(_path: &Path) -> Result<Self, CliError> {
-        todo!()
+    pub fn from_markdown(path: &Path) -> Result<Self, CliError> {
+        let text = read_file(path)?;
+        let (yaml, _body) = split_frontmatter(&text)?;
+        let map = &yaml;
+
+        let suite_id = yaml_str(map, "suite_id");
+        let feature = yaml_str(map, "feature");
+
+        // Require both suite_id and feature
+        let mut missing = Vec::new();
+        if suite_id.is_none() {
+            missing.push("suite_id");
+        }
+        if feature.is_none() {
+            missing.push("feature");
+        }
+        // scope and keep_clusters are also required in the Python version
+        if yaml_str(map, "scope").is_none()
+            && !map.contains_key(serde_yml::Value::String("scope".to_string()))
+        {
+            missing.push("scope");
+        }
+        if !map.contains_key(serde_yml::Value::String("keep_clusters".to_string())) {
+            missing.push("keep_clusters");
+        }
+        if !missing.is_empty() {
+            return Err(errors::cli_err(
+                &errors::MISSING_FIELDS,
+                &[
+                    ("label", "suite frontmatter"),
+                    ("fields", &missing.join(", ")),
+                ],
+            ));
+        }
+
+        let frontmatter = SuiteFrontmatter {
+            suite_id: suite_id.unwrap_or_default(),
+            feature: feature.unwrap_or_default(),
+            scope: yaml_str(map, "scope"),
+            profiles: yaml_str_list(map, "profiles"),
+            required_dependencies: yaml_str_list(map, "required_dependencies"),
+            user_stories: yaml_str_list(map, "user_stories"),
+            variant_decisions: yaml_str_list(map, "variant_decisions"),
+            coverage_expectations: yaml_str_list(map, "coverage_expectations"),
+            baseline_files: yaml_str_list(map, "baseline_files"),
+            groups: yaml_str_list(map, "groups"),
+            skipped_groups: yaml_str_list(map, "skipped_groups"),
+            keep_clusters: yaml_bool(map, "keep_clusters"),
+        };
+
+        Ok(Self {
+            frontmatter,
+            path: path.to_path_buf(),
+        })
     }
 
     #[must_use]
@@ -102,8 +481,48 @@ impl GroupSpec {
     /// # Errors
     /// Returns `CliError` if the file is missing, frontmatter is invalid,
     /// or required sections are missing.
-    pub fn from_markdown(_path: &Path) -> Result<Self, CliError> {
-        todo!()
+    pub fn from_markdown(path: &Path) -> Result<Self, CliError> {
+        let text = read_file(path)?;
+        let (yaml, body) = split_frontmatter(&text)?;
+        let map = &yaml;
+
+        // Check required sections in body
+        let required = crate::rules::shared::GROUP_REQUIRED_SECTIONS;
+        let missing_sections: Vec<&str> = required
+            .iter()
+            .filter(|s| !body.contains(*s))
+            .copied()
+            .collect();
+        if !missing_sections.is_empty() {
+            return Err(errors::cli_err(
+                &errors::MISSING_SECTIONS,
+                &[
+                    ("label", "group body"),
+                    ("sections", &missing_sections.join(", ")),
+                ],
+            ));
+        }
+
+        let frontmatter = GroupFrontmatter {
+            group_id: yaml_str(map, "group_id").unwrap_or_default(),
+            story: yaml_str(map, "story").unwrap_or_default(),
+            capability: yaml_str(map, "capability"),
+            profiles: yaml_str_list(map, "profiles"),
+            preconditions: yaml_str_list(map, "preconditions"),
+            success_criteria: yaml_str_list(map, "success_criteria"),
+            debug_checks: yaml_str_list(map, "debug_checks"),
+            artifacts: yaml_str_list(map, "artifacts"),
+            variant_source: yaml_str(map, "variant_source"),
+            helm_values: yaml_helm_values(map, "helm_values"),
+            restart_namespaces: yaml_str_list(map, "restart_namespaces"),
+            expected_rejection_orders: yaml_int_list(map, "expected_rejection_orders"),
+        };
+
+        Ok(Self {
+            frontmatter,
+            path: path.to_path_buf(),
+            body,
+        })
     }
 }
 
@@ -117,7 +536,7 @@ pub struct RunReportFrontmatter {
     #[serde(default)]
     pub story_results: Vec<String>,
     #[serde(default)]
-    pub debug_summary: Option<String>,
+    pub debug_summary: Vec<String>,
 }
 
 /// A loaded run report.
@@ -133,8 +552,59 @@ impl RunReport {
     ///
     /// # Errors
     /// Returns `CliError` on failure.
-    pub fn from_markdown(_path: &Path) -> Result<Self, CliError> {
-        todo!()
+    pub fn from_markdown(path: &Path) -> Result<Self, CliError> {
+        let text = read_file(path)?;
+        let (yaml, body) = split_frontmatter(&text)?;
+        let map = &yaml;
+
+        // debug_summary can be a list of strings or an empty list []
+        // In the Python test, debug_summary: [] is passed but it parses as empty tuple
+        let debug_summary = yaml_str_list(map, "debug_summary");
+
+        let frontmatter = RunReportFrontmatter {
+            run_id: yaml_str(map, "run_id").unwrap_or_default(),
+            suite_id: yaml_str(map, "suite_id").unwrap_or_default(),
+            profile: yaml_str(map, "profile").unwrap_or_default(),
+            overall_verdict: yaml_str(map, "overall_verdict").unwrap_or_default(),
+            story_results: yaml_str_list(map, "story_results"),
+            debug_summary,
+        };
+
+        Ok(Self {
+            frontmatter,
+            path: path.to_path_buf(),
+            body,
+        })
+    }
+
+    /// Create a new report that can be saved.
+    #[must_use]
+    pub fn new(path: PathBuf, frontmatter: RunReportFrontmatter, body: String) -> Self {
+        Self {
+            frontmatter,
+            path,
+            body,
+        }
+    }
+
+    /// Render the report as markdown text.
+    #[must_use]
+    pub fn to_markdown(&self) -> String {
+        let fm = &self.frontmatter;
+        let mut lines = vec![
+            "---".to_string(),
+            format!("run_id: {}", fm.run_id),
+            format!("suite_id: {}", fm.suite_id),
+            format!("profile: {}", fm.profile),
+            format!("overall_verdict: {}", fm.overall_verdict),
+        ];
+        lines.extend(render_frontmatter_list("story_results", &fm.story_results));
+        lines.extend(render_frontmatter_list("debug_summary", &fm.debug_summary));
+        lines.push("---".to_string());
+        lines.push(String::new());
+        lines.push(self.body.trim_end().to_string());
+        lines.push(String::new());
+        lines.join("\n")
     }
 
     /// Save the report to disk.
@@ -142,15 +612,33 @@ impl RunReport {
     /// # Errors
     /// Returns `CliError` on IO failure.
     pub fn save(&self) -> Result<(), CliError> {
-        todo!()
+        write_file(&self.path, &self.to_markdown())
     }
+}
+
+/// Render a YAML list field in block style (one `- item` per line).
+/// Values that contain characters special to YAML are not quoted because
+/// the custom frontmatter parser (matching Python's `split_frontmatter`)
+/// treats block-list items as literal strings after the `- ` prefix.
+fn render_frontmatter_list(key: &str, values: &[String]) -> Vec<String> {
+    if values.is_empty() {
+        return vec![format!("{key}: []")];
+    }
+    let mut out = vec![format!("{key}:")];
+    for v in values {
+        out.push(format!("  - {v}"));
+    }
+    out
 }
 
 /// Counts of passed/failed/skipped groups in a run.
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub struct RunCounts {
+    #[serde(default)]
     pub passed: u32,
+    #[serde(default)]
     pub failed: u32,
+    #[serde(default)]
     pub skipped: u32,
 }
 
@@ -182,5 +670,426 @@ pub struct RunStatus {
     pub notes: Vec<String>,
 }
 
+impl RunStatus {
+    /// Load run status from a JSON file.
+    ///
+    /// # Errors
+    /// Returns `CliError` if the file is missing or contains invalid JSON.
+    pub fn load(path: &Path) -> Result<Self, CliError> {
+        let text = read_file(path)?;
+        serde_json::from_str(&text).map_err(|e| CliError {
+            code: "JSON".to_string(),
+            message: e.to_string(),
+            exit_code: 5,
+            hint: None,
+            details: None,
+        })
+    }
+
+    /// Extract group IDs from `executed_groups`, handling both string entries
+    /// and structured objects with a `group_id` field.
+    #[must_use]
+    pub fn executed_group_ids(&self) -> Vec<String> {
+        self.executed_groups
+            .iter()
+            .filter_map(|v| match v {
+                serde_json::Value::String(s) => Some(s.clone()),
+                serde_json::Value::Object(obj) => obj
+                    .get("group_id")
+                    .and_then(|g| g.as_str())
+                    .map(String::from),
+                _ => None,
+            })
+            .collect()
+    }
+}
+
 #[cfg(test)]
-mod tests {}
+mod tests {
+    use super::*;
+    use std::io::Write as _;
+
+    fn write_temp_file(dir: &Path, name: &str, content: &str) -> PathBuf {
+        let path = dir.join(name);
+        let mut f = std::fs::File::create(&path).unwrap();
+        f.write_all(content.as_bytes()).unwrap();
+        path
+    }
+
+    #[test]
+    fn test_load_suite() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = write_temp_file(
+            dir.path(),
+            "suite.md",
+            "---\n\
+             suite_id: example.suite\n\
+             feature: example\n\
+             scope: unit\n\
+             profiles: [single-zone]\n\
+             required_dependencies: []\n\
+             user_stories: []\n\
+             variant_decisions: []\n\
+             coverage_expectations: [configure, consume, debug]\n\
+             baseline_files: []\n\
+             groups: [groups/g01.md]\n\
+             skipped_groups: []\n\
+             keep_clusters: false\n\
+             ---\n\n\
+             # Test suite\n",
+        );
+        let suite = SuiteSpec::from_markdown(&path).unwrap();
+        assert_eq!(suite.frontmatter.suite_id, "example.suite");
+        assert_eq!(suite.frontmatter.groups, vec!["groups/g01.md"]);
+        assert!(!suite.frontmatter.keep_clusters);
+        assert_eq!(suite.frontmatter.feature, "example");
+        assert_eq!(suite.frontmatter.scope.as_deref(), Some("unit"));
+        assert_eq!(suite.frontmatter.profiles, vec!["single-zone"]);
+        assert!(suite.frontmatter.required_dependencies.is_empty());
+        assert!(suite.frontmatter.user_stories.is_empty());
+        assert!(suite.frontmatter.variant_decisions.is_empty());
+        assert_eq!(
+            suite.frontmatter.coverage_expectations,
+            vec!["configure", "consume", "debug"]
+        );
+        assert!(suite.frontmatter.baseline_files.is_empty());
+        assert!(suite.frontmatter.skipped_groups.is_empty());
+    }
+
+    #[test]
+    fn test_load_suite_missing_fields() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = write_temp_file(dir.path(), "suite.md", "---\nsuite_id: x\n---\n\nBody.\n");
+        let err = SuiteSpec::from_markdown(&path).unwrap_err();
+        assert!(
+            err.message.contains("missing required fields"),
+            "expected 'missing required fields' in: {}",
+            err.message
+        );
+    }
+
+    #[test]
+    fn test_load_group_requires_sections() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = write_temp_file(
+            dir.path(),
+            "g01.md",
+            "---\n\
+             group_id: g01\n\
+             story: test\n\
+             capability: test\n\
+             profiles: [single-zone]\n\
+             preconditions: []\n\
+             success_criteria: [done]\n\
+             debug_checks: [logs]\n\
+             artifacts: []\n\
+             variant_source: code\n\
+             helm_values: {}\n\
+             restart_namespaces: []\n\
+             ---\n\n\
+             ## Configure\n\nDo config.\n",
+        );
+        let err = GroupSpec::from_markdown(&path).unwrap_err();
+        assert!(
+            err.message.contains("missing sections"),
+            "expected 'missing sections' in: {}",
+            err.message
+        );
+    }
+
+    #[test]
+    fn test_load_group_valid() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = write_temp_file(
+            dir.path(),
+            "g01.md",
+            "---\n\
+             group_id: g01\n\
+             story: test\n\
+             capability: test\n\
+             profiles: [single-zone]\n\
+             preconditions: []\n\
+             success_criteria: [done]\n\
+             debug_checks: [logs]\n\
+             artifacts: []\n\
+             variant_source: code\n\
+             helm_values:\n\
+             \x20 dataPlane.features.unifiedResourceNaming: true\n\
+             restart_namespaces:\n\
+             \x20 - kuma-demo\n\
+             ---\n\n\
+             ## Configure\n\nDo config.\n\n\
+             ## Consume\n\nDo consume.\n\n\
+             ## Debug\n\nDo debug.\n",
+        );
+        let group = GroupSpec::from_markdown(&path).unwrap();
+        assert_eq!(group.frontmatter.group_id, "g01");
+        assert_eq!(
+            group
+                .frontmatter
+                .helm_values
+                .get("dataPlane.features.unifiedResourceNaming"),
+            Some(&serde_json::Value::Bool(true))
+        );
+        assert_eq!(group.frontmatter.restart_namespaces, vec!["kuma-demo"]);
+        assert!(group.body.contains("## Configure"));
+    }
+
+    #[test]
+    fn test_load_group_with_expected_rejection_orders() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = write_temp_file(
+            dir.path(),
+            "g02.md",
+            "---\n\
+             group_id: g02\n\
+             story: validation rejects\n\
+             capability: validation\n\
+             profiles: [single-zone]\n\
+             preconditions: []\n\
+             success_criteria: [rejected]\n\
+             debug_checks: []\n\
+             artifacts: []\n\
+             variant_source: code\n\
+             helm_values: {}\n\
+             expected_rejection_orders: [2, 4]\n\
+             restart_namespaces: []\n\
+             ---\n\n\
+             ## Configure\n\nDo config.\n\n\
+             ## Consume\n\nDo consume.\n\n\
+             ## Debug\n\nDo debug.\n",
+        );
+        let group = GroupSpec::from_markdown(&path).unwrap();
+        assert_eq!(group.frontmatter.expected_rejection_orders, vec![2, 4]);
+    }
+
+    #[test]
+    fn test_load_documented_example_suite() {
+        let path = Path::new(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../kumahq/kuma/.claude/worktrees/kuma-claude-plugins/.claude/skills/suite-author/examples/example-motb-core-suite.md"
+        ));
+        // Skip if the example file doesn't exist (CI environments)
+        if !path.exists() {
+            // Try the absolute path from the Python test
+            let alt = Path::new(
+                "/Users/bart.smykla@konghq.com/Projects/github.com/kumahq/kuma/.claude/worktrees/kuma-claude-plugins/.claude/skills/suite-author/examples/example-motb-core-suite.md",
+            );
+            if !alt.exists() {
+                eprintln!("Skipping: example suite file not found");
+                return;
+            }
+            let suite = SuiteSpec::from_markdown(alt).unwrap();
+            assert_eq!(suite.frontmatter.suite_id, "motb-core");
+            assert_eq!(
+                suite.frontmatter.groups,
+                vec!["groups/g01-crud.md", "groups/g02-validation.md"]
+            );
+            return;
+        }
+        let suite = SuiteSpec::from_markdown(path).unwrap();
+        assert_eq!(suite.frontmatter.suite_id, "motb-core");
+        assert_eq!(
+            suite.frontmatter.groups,
+            vec!["groups/g01-crud.md", "groups/g02-validation.md"]
+        );
+    }
+
+    #[test]
+    fn test_load_documented_example_group() {
+        let alt = Path::new(
+            "/Users/bart.smykla@konghq.com/Projects/github.com/kumahq/kuma/.claude/worktrees/kuma-claude-plugins/.claude/skills/suite-author/examples/example-motb-core-group.md",
+        );
+        if !alt.exists() {
+            eprintln!("Skipping: example group file not found");
+            return;
+        }
+        let group = GroupSpec::from_markdown(alt).unwrap();
+        assert_eq!(group.frontmatter.group_id, "g01");
+        assert_eq!(
+            group
+                .frontmatter
+                .helm_values
+                .get("dataPlane.features.unifiedResourceNaming"),
+            Some(&serde_json::Value::Bool(true))
+        );
+        assert_eq!(group.frontmatter.restart_namespaces, vec!["kuma-demo"]);
+        assert!(group.body.contains("## Debug"));
+    }
+
+    #[test]
+    fn test_load_suite_rejects_legacy_prose_contract() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = write_temp_file(
+            dir.path(),
+            "suite.md",
+            "# Legacy suite\n\n\
+             - suite id: example.suite\n\
+             - session_id: old-contract\n\
+             - target environments: single-zone\n",
+        );
+        let err = SuiteSpec::from_markdown(&path).unwrap_err();
+        assert!(
+            err.message.contains("missing YAML frontmatter"),
+            "expected 'missing YAML frontmatter' in: {}",
+            err.message
+        );
+    }
+
+    #[test]
+    fn test_load_report() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = write_temp_file(
+            dir.path(),
+            "report.md",
+            "---\n\
+             run_id: r1\n\
+             suite_id: s1\n\
+             profile: single-zone\n\
+             overall_verdict: pass\n\
+             story_results: []\n\
+             debug_summary: []\n\
+             ---\n\n\
+             # Report\n",
+        );
+        let report = RunReport::from_markdown(&path).unwrap();
+        assert_eq!(report.frontmatter.overall_verdict, "pass");
+        assert_eq!(report.frontmatter.run_id, "r1");
+        assert_eq!(report.frontmatter.suite_id, "s1");
+        assert_eq!(report.frontmatter.profile, "single-zone");
+        assert!(report.frontmatter.story_results.is_empty());
+        assert!(report.frontmatter.debug_summary.is_empty());
+    }
+
+    #[test]
+    fn test_run_report_round_trips_story_results_with_commas() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("report.md");
+
+        let report = RunReport::new(
+            path.clone(),
+            RunReportFrontmatter {
+                run_id: "r1".to_string(),
+                suite_id: "s1".to_string(),
+                profile: "single-zone".to_string(),
+                overall_verdict: "pending".to_string(),
+                story_results: vec![
+                    "g02 PASS - story with commas, updates, and deletes | evidence: `commands/g02.txt`".to_string(),
+                ],
+                debug_summary: vec![
+                    "checked config, output, and cleanup".to_string(),
+                ],
+            },
+            "# Report\n".to_string(),
+        );
+
+        report.save().unwrap();
+
+        let reloaded = RunReport::from_markdown(&path).unwrap();
+        assert_eq!(
+            reloaded.frontmatter.story_results,
+            report.frontmatter.story_results
+        );
+        assert_eq!(
+            reloaded.frontmatter.debug_summary,
+            report.frontmatter.debug_summary
+        );
+
+        let rendered = std::fs::read_to_string(&path).unwrap();
+        assert!(
+            rendered
+                .contains("story_results:\n  - g02 PASS - story with commas, updates, and deletes"),
+            "rendered: {rendered}"
+        );
+        assert!(
+            rendered.contains("debug_summary:\n  - checked config, output, and cleanup"),
+            "rendered: {rendered}"
+        );
+    }
+
+    #[test]
+    fn test_load_run_status() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("run-status.json");
+        let json = serde_json::json!({
+            "run_id": "t",
+            "suite_id": "s",
+            "profile": "single-zone",
+            "started_at": "now",
+            "completed_at": null,
+            "executed_groups": [],
+            "skipped_groups": [],
+            "overall_verdict": "pending",
+            "last_state_capture": null,
+            "notes": []
+        });
+        std::fs::write(&path, serde_json::to_string_pretty(&json).unwrap()).unwrap();
+
+        let status = RunStatus::load(&path).unwrap();
+        assert_eq!(status.last_state_capture, None);
+        assert_eq!(status.counts, RunCounts::default());
+        assert_eq!(status.last_completed_group, None);
+        assert_eq!(status.next_planned_group, None);
+    }
+
+    #[test]
+    fn test_load_run_status_accepts_structured_group_entries() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("run-status.json");
+        let json = serde_json::json!({
+            "run_id": "t",
+            "suite_id": "s",
+            "profile": "single-zone",
+            "started_at": "now",
+            "completed_at": null,
+            "counts": {"passed": 1, "failed": 0, "skipped": 0},
+            "executed_groups": [
+                {
+                    "group_id": "g02",
+                    "verdict": "pass",
+                    "completed_at": "2026-03-14T07:57:19Z"
+                }
+            ],
+            "skipped_groups": [],
+            "last_completed_group": "g02",
+            "overall_verdict": "pending",
+            "last_state_capture": "state/after-g02.json",
+            "last_updated_utc": "2026-03-14T07:57:19Z",
+            "next_planned_group": "g03",
+            "notes": []
+        });
+        std::fs::write(&path, serde_json::to_string_pretty(&json).unwrap()).unwrap();
+
+        let status = RunStatus::load(&path).unwrap();
+        assert_eq!(
+            status.counts,
+            RunCounts {
+                passed: 1,
+                failed: 0,
+                skipped: 0
+            }
+        );
+        assert_eq!(status.executed_group_ids(), vec!["g02"]);
+        assert_eq!(status.last_completed_group.as_deref(), Some("g02"));
+        assert_eq!(status.next_planned_group.as_deref(), Some("g03"));
+    }
+
+    #[test]
+    fn test_suite_dir() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = write_temp_file(
+            dir.path(),
+            "suite.md",
+            "---\n\
+             suite_id: example.suite\n\
+             feature: example\n\
+             scope: unit\n\
+             profiles: []\n\
+             keep_clusters: false\n\
+             ---\n\n\
+             # Test\n",
+        );
+        let suite = SuiteSpec::from_markdown(&path).unwrap();
+        assert_eq!(suite.suite_dir(), dir.path());
+    }
+}
