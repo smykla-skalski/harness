@@ -389,6 +389,7 @@ dependencies = [
  "clap",
  "comrak",
  "insta",
+ "libc",
  "predicates",
  "serde",
  "serde_json",
