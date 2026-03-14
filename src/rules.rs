@@ -130,4 +130,169 @@ pub mod compact {
 }
 
 #[cfg(test)]
-mod tests {}
+mod tests {
+    use super::*;
+
+    // --- Shared ---
+
+    #[test]
+    fn group_required_sections_has_three_entries() {
+        assert_eq!(shared::GROUP_REQUIRED_SECTIONS.len(), 3);
+        assert!(shared::GROUP_REQUIRED_SECTIONS.contains(&"## Configure"));
+        assert!(shared::GROUP_REQUIRED_SECTIONS.contains(&"## Consume"));
+        assert!(shared::GROUP_REQUIRED_SECTIONS.contains(&"## Debug"));
+    }
+
+    // --- SuiteRunner ---
+
+    #[test]
+    fn denied_cluster_binaries_has_expected_entries() {
+        let bins = suite_runner::DENIED_CLUSTER_BINARIES;
+        assert!(bins.contains(&"kubectl"));
+        assert!(bins.contains(&"kumactl"));
+        assert!(bins.contains(&"helm"));
+        assert!(bins.contains(&"docker"));
+        assert!(bins.contains(&"k3d"));
+        assert_eq!(bins.len(), 5);
+    }
+
+    #[test]
+    fn denied_legacy_script_names_has_expected_entries() {
+        let scripts = suite_runner::DENIED_LEGACY_SCRIPT_NAMES;
+        assert!(scripts.contains(&"preflight.py"));
+        assert!(scripts.contains(&"capture_state.py"));
+        assert!(scripts.contains(&"validate_manifest.py"));
+        assert_eq!(scripts.len(), 7);
+    }
+
+    #[test]
+    fn denied_admin_endpoint_hints_has_expected_entries() {
+        let hints = suite_runner::DENIED_ADMIN_ENDPOINT_HINTS;
+        assert!(hints.contains(&"localhost:9901"));
+        assert!(hints.contains(&"/config_dump"));
+        assert_eq!(hints.len(), 5);
+    }
+
+    #[test]
+    fn allowed_run_files_has_expected_entries() {
+        let files = suite_runner::ALLOWED_RUN_FILES;
+        assert!(files.contains(&"run-report.md"));
+        assert!(files.contains(&"run-status.json"));
+        assert!(files.contains(&"commands/command-log.md"));
+        assert_eq!(files.len(), 6);
+    }
+
+    #[test]
+    fn direct_write_denied_run_files_has_expected_entries() {
+        let files = suite_runner::DIRECT_WRITE_DENIED_RUN_FILES;
+        assert!(files.contains(&"run-report.md"));
+        assert!(files.contains(&"run-status.json"));
+        assert!(files.contains(&"suite-runner-state.json"));
+        assert!(files.contains(&"commands/command-log.md"));
+        assert_eq!(files.len(), 4);
+    }
+
+    #[test]
+    fn allowed_run_dirs_has_expected_entries() {
+        let dirs = suite_runner::ALLOWED_RUN_DIRS;
+        assert!(dirs.contains(&"artifacts"));
+        assert!(dirs.contains(&"commands"));
+        assert!(dirs.contains(&"manifests"));
+        assert!(dirs.contains(&"state"));
+        assert_eq!(dirs.len(), 4);
+    }
+
+    #[test]
+    fn report_limits_are_positive() {
+        assert!(suite_runner::REPORT_LINE_LIMIT > 0);
+        assert!(suite_runner::REPORT_CODE_BLOCK_LIMIT > 0);
+        assert_eq!(suite_runner::REPORT_LINE_LIMIT, 220);
+        assert_eq!(suite_runner::REPORT_CODE_BLOCK_LIMIT, 4);
+    }
+
+    #[test]
+    fn harness_managed_run_control_files() {
+        let files = suite_runner::HARNESS_MANAGED_RUN_CONTROL_FILES;
+        assert!(files.contains(&"run-report.md"));
+        assert!(files.contains(&"run-status.json"));
+        assert!(files.contains(&"suite-runner-state.json"));
+        assert_eq!(files.len(), 3);
+    }
+
+    #[test]
+    fn manifest_fix_gate_options_has_four_entries() {
+        assert_eq!(suite_runner::MANIFEST_FIX_GATE_OPTIONS.len(), 4);
+        assert!(suite_runner::MANIFEST_FIX_GATE_OPTIONS.contains(&"Fix for this run only"));
+        assert!(suite_runner::MANIFEST_FIX_GATE_OPTIONS.contains(&"Stop run"));
+    }
+
+    #[test]
+    fn denied_runner_binaries_has_gh() {
+        assert!(suite_runner::DENIED_RUNNER_BINARIES.contains(&"gh"));
+    }
+
+    #[test]
+    fn denied_make_target_prefixes() {
+        let prefixes = suite_runner::DENIED_MAKE_TARGET_PREFIXES;
+        assert!(prefixes.contains(&"k3d/"));
+        assert!(prefixes.contains(&"kind/"));
+    }
+
+    // --- SuiteAuthor ---
+
+    #[test]
+    fn suite_author_write_prefixes() {
+        assert_eq!(suite_author::GROUP_WRITE_PREFIX, "groups/");
+        assert_eq!(suite_author::BASELINE_WRITE_PREFIX, "baseline/");
+    }
+
+    #[test]
+    fn suite_author_allowed_write_files() {
+        assert!(suite_author::ALLOWED_WRITE_FILES.contains(&"suite.md"));
+        assert_eq!(suite_author::ALLOWED_WRITE_FILES.len(), 1);
+    }
+
+    #[test]
+    fn suite_author_modes() {
+        assert_eq!(suite_author::MODE_INTERACTIVE, "interactive");
+        assert_eq!(suite_author::MODE_BYPASS, "bypass");
+    }
+
+    #[test]
+    fn suite_author_result_kinds_count() {
+        assert_eq!(suite_author::RESULT_KINDS.len(), 6);
+        assert!(suite_author::RESULT_KINDS.contains(&"inventory"));
+        assert!(suite_author::RESULT_KINDS.contains(&"coverage"));
+        assert!(suite_author::RESULT_KINDS.contains(&"variants"));
+        assert!(suite_author::RESULT_KINDS.contains(&"schema"));
+        assert!(suite_author::RESULT_KINDS.contains(&"proposal"));
+        assert!(suite_author::RESULT_KINDS.contains(&"edit-request"));
+    }
+
+    #[test]
+    fn suite_author_gate_questions() {
+        assert!(suite_author::PREWRITE_GATE_QUESTION.contains("prewrite"));
+        assert!(suite_author::POSTWRITE_GATE_QUESTION.contains("postwrite"));
+        assert!(suite_author::COPY_GATE_QUESTION.contains("copy"));
+    }
+
+    #[test]
+    fn suite_author_gate_options() {
+        assert_eq!(suite_author::PREWRITE_GATE_OPTIONS.len(), 3);
+        assert_eq!(suite_author::POSTWRITE_GATE_OPTIONS.len(), 3);
+        assert_eq!(suite_author::COPY_GATE_OPTIONS.len(), 2);
+    }
+
+    // --- Compact ---
+
+    #[test]
+    fn compact_constants() {
+        assert_eq!(compact::HANDOFF_VERSION, 1);
+        assert_eq!(compact::STATUS_PENDING, "pending");
+        assert_eq!(compact::STATUS_CONSUMED, "consumed");
+        assert_eq!(compact::HISTORY_LIMIT, 10);
+        assert_eq!(compact::CHAR_LIMIT, 3500);
+        assert_eq!(compact::SECTION_CHAR_LIMIT, 1600);
+        assert_eq!(compact::SECTION_LINE_LIMIT, 25);
+    }
+}

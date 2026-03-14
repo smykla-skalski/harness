@@ -60,4 +60,80 @@ impl HookResult {
 }
 
 #[cfg(test)]
-mod tests {}
+mod tests {
+    use super::*;
+
+    #[test]
+    fn allow_has_empty_code_and_message() {
+        let r = HookResult::allow();
+        assert_eq!(r.decision, "allow");
+        assert!(r.code.is_empty());
+        assert!(r.message.is_empty());
+    }
+
+    #[test]
+    fn deny_has_correct_decision() {
+        let r = HookResult::deny("KSR005", "bad");
+        assert_eq!(r.decision, "deny");
+        assert_eq!(r.code, "KSR005");
+        assert_eq!(r.message, "bad");
+    }
+
+    #[test]
+    fn warn_has_correct_decision() {
+        let r = HookResult::warn("KSR006", "watch out");
+        assert_eq!(r.decision, "warn");
+        assert_eq!(r.code, "KSR006");
+        assert_eq!(r.message, "watch out");
+    }
+
+    #[test]
+    fn info_has_correct_decision() {
+        let r = HookResult::info("KSR012", "verdict: pass");
+        assert_eq!(r.decision, "info");
+        assert_eq!(r.code, "KSR012");
+        assert_eq!(r.message, "verdict: pass");
+    }
+
+    #[test]
+    fn emit_allow_returns_zero() {
+        let r = HookResult::allow();
+        assert_eq!(r.emit().unwrap(), 0);
+    }
+
+    #[test]
+    fn emit_deny_returns_zero() {
+        let r = HookResult::deny("X", "msg");
+        assert_eq!(r.emit().unwrap(), 0);
+    }
+
+    #[test]
+    fn serialize_to_json() {
+        let r = HookResult::deny("KSR005", "test message");
+        let json = serde_json::to_value(&r).unwrap();
+        assert_eq!(json["decision"], "deny");
+        assert_eq!(json["code"], "KSR005");
+        assert_eq!(json["message"], "test message");
+    }
+
+    #[test]
+    fn equality() {
+        let a = HookResult::deny("X", "msg");
+        let b = HookResult::deny("X", "msg");
+        assert_eq!(a, b);
+    }
+
+    #[test]
+    fn inequality_different_decision() {
+        let a = HookResult::deny("X", "msg");
+        let b = HookResult::warn("X", "msg");
+        assert_ne!(a, b);
+    }
+
+    #[test]
+    fn clone_is_equal() {
+        let a = HookResult::info("KSR012", "test");
+        let b = a.clone();
+        assert_eq!(a, b);
+    }
+}
