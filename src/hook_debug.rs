@@ -69,6 +69,7 @@ impl HookOutcome {
     }
 
     /// Log the outcome and return the exit code.
+    #[must_use]
     pub fn log_and_exit(self, _hook_name: &str, _event: &HookEvent) -> i32 {
         // In the Rust version we skip the JSONL debug logging
         // (the Python version writes to a session-scoped file).
@@ -79,6 +80,8 @@ impl HookOutcome {
 
 #[cfg(test)]
 mod tests {
+    use crate::hook_payloads::HookEnvelopePayload;
+
     use super::*;
 
     #[test]
@@ -126,7 +129,7 @@ mod tests {
     #[test]
     fn log_and_exit_returns_exit_code() {
         let event = HookEvent {
-            payload: crate::hook_payloads::HookEnvelopePayload {
+            payload: HookEnvelopePayload {
                 root: None,
                 input_payload: None,
                 tool_input: None,
@@ -144,7 +147,7 @@ mod tests {
     #[test]
     fn log_and_exit_returns_zero_for_allow() {
         let event = HookEvent {
-            payload: crate::hook_payloads::HookEnvelopePayload {
+            payload: HookEnvelopePayload {
                 root: None,
                 input_payload: None,
                 tool_input: None,

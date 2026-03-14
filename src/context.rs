@@ -1,6 +1,8 @@
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
+use std::{fs, io};
 
+use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 
 use crate::cluster::ClusterSpec;
@@ -65,7 +67,7 @@ impl RunLayout {
     ///
     /// # Errors
     /// Returns IO error on failure.
-    pub fn ensure_dirs(&self) -> std::io::Result<()> {
+    pub fn ensure_dirs(&self) -> io::Result<()> {
         for dir in [
             self.run_dir(),
             self.artifacts_dir(),
@@ -73,7 +75,7 @@ impl RunLayout {
             self.manifests_dir(),
             self.state_dir(),
         ] {
-            std::fs::create_dir_all(dir)?;
+            fs::create_dir_all(dir)?;
         }
         Ok(())
     }
@@ -222,19 +224,19 @@ pub struct RunContext {
     pub preflight: Option<PreflightArtifact>,
 }
 
-fn read_json_file<T: serde::de::DeserializeOwned>(path: &Path) -> Result<T, CliError> {
-    let content = std::fs::read_to_string(path).map_err(|_| {
+fn read_json_file<T: DeserializeOwned>(path: &Path) -> Result<T, CliError> {
+    let content = fs::read_to_string(path).map_err(|_| {
         errors::cli_err(
             &errors::MISSING_FILE,
             &[("path", &path.display().to_string())],
         )
     })?;
-    serde_json::from_str(&content).map_err(|e| CliError {
-        code: "KSRCLI010".into(),
-        message: format!("invalid JSON in {}: {e}", path.display()),
-        exit_code: 5,
-        hint: None,
-        details: None,
+    serde_json::from_str(&content).map_err(|e| {
+        errors::cli_err_with_details(
+            &errors::INVALID_JSON,
+            &[("path", &path.display().to_string())],
+            &e.to_string(),
+        )
     })
 }
 
@@ -538,9 +540,9 @@ mod tests {
             "last_state_capture": null,
             "notes": []
         });
-        std::fs::write(&path, serde_json::to_string(&data).unwrap()).unwrap();
+        fs::write(&path, serde_json::to_string(&data).unwrap()).unwrap();
 
-        let content = std::fs::read_to_string(&path).unwrap();
+        let content = fs::read_to_string(&path).unwrap();
         let status: RunStatus = serde_json::from_str(&content).unwrap();
 
         assert_eq!(status.last_state_capture, None);
@@ -636,7 +638,7 @@ mod tests {
 
         let metadata = sample_metadata();
         let meta_json = serde_json::to_string_pretty(&metadata).unwrap();
-        std::fs::write(layout.metadata_path(), &meta_json).unwrap();
+        fs::write(layout.metadata_path(), &meta_json).unwrap();
 
         let status_data = serde_json::json!({
             "run_id": "run-1",
@@ -646,7 +648,7 @@ mod tests {
             "overall_verdict": "pending",
             "notes": []
         });
-        std::fs::write(
+        fs::write(
             layout.status_path(),
             serde_json::to_string_pretty(&status_data).unwrap(),
         )
@@ -668,7 +670,7 @@ mod tests {
     fn run_context_from_run_dir_fails_on_missing_metadata() {
         let tmp = tempfile::tempdir().unwrap();
         let run_dir = tmp.path().join("run-missing");
-        std::fs::create_dir_all(&run_dir).unwrap();
+        fs::create_dir_all(&run_dir).unwrap();
 
         let result = RunContext::from_run_dir(&run_dir);
         assert!(result.is_err());

@@ -1,4 +1,6 @@
 use std::collections::HashMap;
+use std::io;
+use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
@@ -10,7 +12,7 @@ pub struct HookWriteRequest {
     pub file_path: String,
 }
 
-/// An option in an AskUserQuestion prompt.
+/// An option in an `AskUserQuestion` prompt.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AskUserQuestionOption {
     pub label: String,
@@ -18,7 +20,7 @@ pub struct AskUserQuestionOption {
     pub description: String,
 }
 
-/// An AskUserQuestion prompt with header, options, multi-select.
+/// An `AskUserQuestion` prompt with header, options, multi-select.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AskUserQuestionPrompt {
     pub question: String,
@@ -31,10 +33,10 @@ pub struct AskUserQuestionPrompt {
 }
 
 impl AskUserQuestionPrompt {
-    /// Option labels as a tuple of strings.
+    /// Option labels as borrowed string slices.
     #[must_use]
-    pub fn option_labels(&self) -> Vec<String> {
-        self.options.iter().map(|o| o.label.clone()).collect()
+    pub fn option_labels(&self) -> Vec<&str> {
+        self.options.iter().map(|o| o.label.as_str()).collect()
     }
 
     /// First line of the question text.
@@ -48,7 +50,7 @@ impl AskUserQuestionPrompt {
     }
 }
 
-/// Answer to an AskUserQuestion.
+/// Answer to an `AskUserQuestion`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AskUserAnswer {
     pub question: String,
@@ -121,9 +123,9 @@ impl HookEnvelopePayload {
     /// # Errors
     /// Returns `CliError` if stdin cannot be read or the payload is invalid.
     pub fn from_stdin() -> Result<Self, CliError> {
-        use std::io::Read;
+        use io::Read;
         let mut text = String::new();
-        std::io::stdin()
+        io::stdin()
             .read_to_string(&mut text)
             .map_err(|e| CliError {
                 code: "KSH001".to_string(),
@@ -158,7 +160,7 @@ impl HookEvent {
 pub struct HookContext {
     pub skill: String,
     pub event: HookEvent,
-    pub run_dir: Option<std::path::PathBuf>,
+    pub run_dir: Option<PathBuf>,
     pub skill_active: bool,
     pub active_skill: Option<String>,
     pub inactive_reason: Option<String>,
@@ -214,11 +216,20 @@ impl HookContext {
     #[must_use]
     pub fn command_words(&self) -> Vec<String> {
         self.command_text().map_or_else(Vec::new, |cmd| {
-            shell_words::split(cmd).unwrap_or_else(|_| vec![cmd.to_string()])
+            shell_words::split(cmd).unwrap_or_else(|e| {
+                eprintln!(
+                    "warning: shell_words::split failed ({e}), \
+                     treating entire command as one word - \
+                     per-word security checks may be bypassed"
+                );
+                vec![cmd.to_string()]
+            })
         })
     }
 
     /// Write target paths from the input payload.
+    // Improvement: return `Vec<&str>` to avoid cloning, but callers in
+    // guard_write.rs and verify_write.rs pass `&[String]` downstream.
     #[must_use]
     pub fn write_paths(&self) -> Vec<String> {
         let mut paths = Vec::new();
@@ -253,15 +264,14 @@ impl HookContext {
             .map_or(&[], |p| &p.answers)
     }
 
-    /// Last assistant message from the envelope, lowercased.
+    /// Last assistant message from the envelope.
     #[must_use]
-    pub fn last_assistant_message(&self) -> String {
+    pub fn last_assistant_message(&self) -> &str {
         self.event
             .payload
             .last_assistant_message
             .as_deref()
             .unwrap_or("")
-            .to_string()
     }
 
     /// Whether the stop hook is active in the envelope.

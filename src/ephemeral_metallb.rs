@@ -1,21 +1,36 @@
 use std::path::{Path, PathBuf};
+use std::{fs, io};
 
+use crate::core_defs::utc_now;
 use crate::errors::{self, CliError};
 
 const STATE_FILE: &str = "ephemeral-metallb-templates.json";
 const DEFAULT_TEMPLATE_BASENAME: &str = "metallb-k3d-kuma.yaml";
 
-/// State path for ephemeral MetalLB config.
+/// State path for ephemeral `MetalLB` config.
 #[must_use]
 pub fn state_path(run_dir: &Path) -> PathBuf {
     run_dir.join("state").join(STATE_FILE)
 }
 
+fn is_safe_name(s: &str) -> bool {
+    !s.is_empty() && !s.contains('/') && !s.contains('\\') && !s.contains("..")
+}
+
 /// Template path for a cluster.
-#[must_use]
-pub fn template_path(root: &Path, cluster_name: &str) -> PathBuf {
-    root.join("mk")
-        .join(format!("metallb-k3d-{cluster_name}.yaml"))
+///
+/// # Errors
+/// Returns `CliError` if `cluster_name` contains path separators or `..`.
+pub fn template_path(root: &Path, cluster_name: &str) -> Result<PathBuf, CliError> {
+    if !is_safe_name(cluster_name) {
+        return Err(errors::cli_err(
+            &errors::UNSAFE_NAME,
+            &[("name", cluster_name)],
+        ));
+    }
+    Ok(root
+        .join("mk")
+        .join(format!("metallb-k3d-{cluster_name}.yaml")))
 }
 
 /// Default source template path.
@@ -27,15 +42,15 @@ fn default_source_template(root: &Path) -> Result<PathBuf, CliError> {
     // Try any metallb-k3d-*.yaml in mk/
     let mk_dir = root.join("mk");
     if mk_dir.is_dir() {
-        let mut templates: Vec<PathBuf> = std::fs::read_dir(&mk_dir)
+        let mut templates: Vec<PathBuf> = fs::read_dir(&mk_dir)
             .into_iter()
             .flatten()
-            .filter_map(std::result::Result::ok)
+            .filter_map(Result::ok)
             .map(|e| e.path())
             .filter(|p| {
                 p.file_name().and_then(|n| n.to_str()).is_some_and(|n| {
                     n.starts_with("metallb-k3d-")
-                        && std::path::Path::new(n)
+                        && Path::new(n)
                             .extension()
                             .is_some_and(|ext| ext.eq_ignore_ascii_case("yaml"))
                 })
@@ -52,7 +67,7 @@ fn default_source_template(root: &Path) -> Result<PathBuf, CliError> {
     ))
 }
 
-/// Ensure MetalLB templates exist for the given clusters.
+/// Ensure `MetalLB` templates exist for the given clusters.
 ///
 /// Copies the default template for each missing cluster-specific template.
 /// Records created entries in the run state file.
@@ -69,19 +84,19 @@ pub fn ensure_templates(
     let source = default_source_template(root)?;
 
     for cluster_name in cluster_names {
-        let target = template_path(root, cluster_name);
+        let target = template_path(root, cluster_name)?;
         if target.exists() {
             continue;
         }
         if let Some(parent) = target.parent() {
-            std::fs::create_dir_all(parent).map_err(io_err)?;
+            fs::create_dir_all(parent).map_err(io_err)?;
         }
-        std::fs::copy(&source, &target).map_err(io_err)?;
+        fs::copy(&source, &target).map_err(io_err)?;
         created.push(target.clone());
 
         let entry = serde_json::json!({
             "cluster_name": cluster_name,
-            "created_at": crate::core_defs::utc_now(),
+            "created_at": utc_now(),
             "source_path": source.to_string_lossy(),
             "template_path": target.to_string_lossy(),
         });
@@ -97,7 +112,7 @@ pub fn ensure_templates(
     Ok(created)
 }
 
-/// Cleanup MetalLB templates that were created by `ensure_templates`.
+/// Cleanup `MetalLB` templates that were created by `ensure_templates`.
 ///
 /// Removes the template files and optionally removes the state file.
 ///
@@ -114,7 +129,7 @@ pub fn cleanup_templates(run_dir: &Path) -> Result<Vec<PathBuf>, CliError> {
         if let Some(tp) = entry.get("template_path").and_then(|v| v.as_str()) {
             let template = PathBuf::from(tp);
             if template.exists() {
-                std::fs::remove_file(&template).map_err(io_err)?;
+                fs::remove_file(&template).map_err(io_err)?;
                 removed.push(template);
             }
         }
@@ -123,7 +138,7 @@ pub fn cleanup_templates(run_dir: &Path) -> Result<Vec<PathBuf>, CliError> {
     Ok(removed)
 }
 
-/// Restore MetalLB templates from state for a pending run.
+/// Restore `MetalLB` templates from state for a pending run.
 ///
 /// # Errors
 /// Returns `CliError` on IO failure or missing source.
@@ -159,9 +174,9 @@ pub fn restore_templates(run_dir: &Path) -> Result<Vec<PathBuf>, CliError> {
             ));
         }
         if let Some(parent) = target.parent() {
-            std::fs::create_dir_all(parent).map_err(io_err)?;
+            fs::create_dir_all(parent).map_err(io_err)?;
         }
-        std::fs::copy(&source, &target).map_err(io_err)?;
+        fs::copy(&source, &target).map_err(io_err)?;
         restored.push(target);
     }
 
@@ -176,7 +191,7 @@ fn load_entries(run_dir: Option<&Path>) -> Vec<serde_json::Value> {
     if !path.is_file() {
         return vec![];
     }
-    let Ok(text) = std::fs::read_to_string(&path) else {
+    let Ok(text) = fs::read_to_string(&path) else {
         return vec![];
     };
     let Ok(payload) = serde_json::from_str::<serde_json::Value>(&text) else {
@@ -192,7 +207,7 @@ fn load_entries(run_dir: Option<&Path>) -> Vec<serde_json::Value> {
 fn save_entries(run_dir: &Path, entries: &[serde_json::Value]) -> Result<(), CliError> {
     let path = state_path(run_dir);
     if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent).map_err(io_err)?;
+        fs::create_dir_all(parent).map_err(io_err)?;
     }
     let payload = serde_json::json!({
         "schema_version": 1,
@@ -205,11 +220,12 @@ fn save_entries(run_dir: &Path, entries: &[serde_json::Value]) -> Result<(), Cli
         hint: None,
         details: None,
     })?;
-    std::fs::write(&path, text).map_err(io_err)?;
+    fs::write(&path, text).map_err(io_err)?;
     Ok(())
 }
 
-fn io_err(e: std::io::Error) -> CliError {
+#[allow(clippy::needless_pass_by_value)]
+fn io_err(e: io::Error) -> CliError {
     CliError {
         code: "IO".to_string(),
         message: format!("IO error: {e}"),
@@ -234,8 +250,20 @@ mod tests {
 
     #[test]
     fn template_path_formats_cluster_name() {
-        let path = template_path(Path::new("/repo"), "kuma-1");
+        let path = template_path(Path::new("/repo"), "kuma-1").unwrap();
         assert_eq!(path, PathBuf::from("/repo/mk/metallb-k3d-kuma-1.yaml"));
+    }
+
+    #[test]
+    fn template_path_rejects_traversal() {
+        let err = template_path(Path::new("/repo"), "../evil").unwrap_err();
+        assert_eq!(err.code, "KSRCLI059");
+    }
+
+    #[test]
+    fn template_path_rejects_slash() {
+        let err = template_path(Path::new("/repo"), "a/b").unwrap_err();
+        assert_eq!(err.code, "KSRCLI059");
     }
 
     #[test]
@@ -243,18 +271,18 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let root = dir.path();
         let mk = root.join("mk");
-        std::fs::create_dir_all(&mk).unwrap();
-        std::fs::write(mk.join(DEFAULT_TEMPLATE_BASENAME), "template content").unwrap();
+        fs::create_dir_all(&mk).unwrap();
+        fs::write(mk.join(DEFAULT_TEMPLATE_BASENAME), "template content").unwrap();
 
         let run_dir = dir.path().join("run");
-        std::fs::create_dir_all(&run_dir).unwrap();
+        fs::create_dir_all(&run_dir).unwrap();
 
         let created = ensure_templates(root, &["c1", "c2"], Some(&run_dir)).unwrap();
 
         assert_eq!(created.len(), 2);
         for path in &created {
             assert!(path.exists());
-            assert_eq!(std::fs::read_to_string(path).unwrap(), "template content");
+            assert_eq!(fs::read_to_string(path).unwrap(), "template content");
         }
     }
 
@@ -263,9 +291,9 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let root = dir.path();
         let mk = root.join("mk");
-        std::fs::create_dir_all(&mk).unwrap();
-        std::fs::write(mk.join(DEFAULT_TEMPLATE_BASENAME), "base").unwrap();
-        std::fs::write(mk.join("metallb-k3d-existing.yaml"), "already here").unwrap();
+        fs::create_dir_all(&mk).unwrap();
+        fs::write(mk.join(DEFAULT_TEMPLATE_BASENAME), "base").unwrap();
+        fs::write(mk.join("metallb-k3d-existing.yaml"), "already here").unwrap();
 
         let created = ensure_templates(root, &["existing"], None).unwrap();
         assert!(created.is_empty());
@@ -276,11 +304,11 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let root = dir.path();
         let mk = root.join("mk");
-        std::fs::create_dir_all(&mk).unwrap();
-        std::fs::write(mk.join(DEFAULT_TEMPLATE_BASENAME), "base").unwrap();
+        fs::create_dir_all(&mk).unwrap();
+        fs::write(mk.join(DEFAULT_TEMPLATE_BASENAME), "base").unwrap();
 
         let run_dir = dir.path().join("run");
-        std::fs::create_dir_all(&run_dir).unwrap();
+        fs::create_dir_all(&run_dir).unwrap();
 
         ensure_templates(root, &["c1"], Some(&run_dir)).unwrap();
         assert!(state_path(&run_dir).exists());
@@ -291,11 +319,11 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let root = dir.path();
         let mk = root.join("mk");
-        std::fs::create_dir_all(&mk).unwrap();
-        std::fs::write(mk.join(DEFAULT_TEMPLATE_BASENAME), "base").unwrap();
+        fs::create_dir_all(&mk).unwrap();
+        fs::write(mk.join(DEFAULT_TEMPLATE_BASENAME), "base").unwrap();
 
         let run_dir = dir.path().join("run");
-        std::fs::create_dir_all(&run_dir).unwrap();
+        fs::create_dir_all(&run_dir).unwrap();
 
         let created = ensure_templates(root, &["local"], Some(&run_dir)).unwrap();
         assert_eq!(created.len(), 1);
@@ -318,17 +346,17 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let root = dir.path();
         let mk = root.join("mk");
-        std::fs::create_dir_all(&mk).unwrap();
-        std::fs::write(mk.join(DEFAULT_TEMPLATE_BASENAME), "base").unwrap();
+        fs::create_dir_all(&mk).unwrap();
+        fs::write(mk.join(DEFAULT_TEMPLATE_BASENAME), "base").unwrap();
 
         let run_dir = dir.path().join("run");
-        std::fs::create_dir_all(&run_dir).unwrap();
+        fs::create_dir_all(&run_dir).unwrap();
 
         let created = ensure_templates(root, &["restore-test"], Some(&run_dir)).unwrap();
         assert_eq!(created.len(), 1);
 
         // Remove the template but keep the state
-        std::fs::remove_file(&created[0]).unwrap();
+        fs::remove_file(&created[0]).unwrap();
         assert!(!created[0].exists());
 
         let restored = restore_templates(&run_dir).unwrap();
@@ -341,11 +369,11 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let root = dir.path();
         let mk = root.join("mk");
-        std::fs::create_dir_all(&mk).unwrap();
-        std::fs::write(mk.join(DEFAULT_TEMPLATE_BASENAME), "base").unwrap();
+        fs::create_dir_all(&mk).unwrap();
+        fs::write(mk.join(DEFAULT_TEMPLATE_BASENAME), "base").unwrap();
 
         let run_dir = dir.path().join("run");
-        std::fs::create_dir_all(&run_dir).unwrap();
+        fs::create_dir_all(&run_dir).unwrap();
 
         ensure_templates(root, &["skip-test"], Some(&run_dir)).unwrap();
 
@@ -366,8 +394,8 @@ mod tests {
     fn default_source_template_finds_fallback() {
         let dir = tempfile::tempdir().unwrap();
         let mk = dir.path().join("mk");
-        std::fs::create_dir_all(&mk).unwrap();
-        std::fs::write(mk.join("metallb-k3d-custom.yaml"), "custom").unwrap();
+        fs::create_dir_all(&mk).unwrap();
+        fs::write(mk.join("metallb-k3d-custom.yaml"), "custom").unwrap();
 
         let source = default_source_template(dir.path()).unwrap();
         assert!(source.to_string_lossy().contains("metallb-k3d-custom.yaml"));

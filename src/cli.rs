@@ -3,7 +3,7 @@ use serde_json::json;
 
 use crate::commands;
 use crate::errors::CliError;
-use crate::hook::HookResult;
+use crate::hook::{Decision, HookResult};
 use crate::hook_payloads::HookContext;
 use crate::hooks;
 
@@ -47,7 +47,7 @@ pub enum HookCommand {
     GuardBash,
     /// Guard file write operations.
     GuardWrite,
-    /// Guard AskUserQuestion prompts.
+    /// Guard `AskUserQuestion` prompts.
     GuardQuestion,
     /// Guard stop and session end.
     GuardStop,
@@ -626,10 +626,10 @@ fn render_hook_message(result: &HookResult) -> String {
     if result.code.is_empty() {
         return result.message.clone();
     }
-    let level = match result.decision.as_str() {
-        "warn" => "WARNING",
-        "info" => "INFO",
-        _ => "ERROR",
+    let level = match result.decision {
+        Decision::Warn => "WARNING",
+        Decision::Info => "INFO",
+        Decision::Allow | Decision::Deny => "ERROR",
     };
     if result.message.is_empty() {
         format!("{level} [{}]", result.code)
@@ -640,7 +640,7 @@ fn render_hook_message(result: &HookResult) -> String {
 
 /// Render a `PreToolUse` hook output (guard-bash, guard-write, guard-question).
 fn render_pre_tool_use_output(result: &HookResult) -> String {
-    if result.decision == "allow" {
+    if result.decision == Decision::Allow {
         return String::new();
     }
     let message = render_hook_message(result);
@@ -656,11 +656,11 @@ fn render_pre_tool_use_output(result: &HookResult) -> String {
 
 /// Render a blocking hook output (guard-stop, or any deny from unknown hooks).
 fn render_blocking_hook_output(result: &HookResult) -> String {
-    if result.decision == "allow" {
+    if result.decision == Decision::Allow {
         return String::new();
     }
     let message = render_hook_message(result);
-    if result.decision == "deny" {
+    if result.decision == Decision::Deny {
         serde_json::to_string(&json!({"decision": "block", "reason": message})).unwrap_or_default()
     } else {
         serde_json::to_string(&json!({"systemMessage": message})).unwrap_or_default()
@@ -670,7 +670,7 @@ fn render_blocking_hook_output(result: &HookResult) -> String {
 /// Render a `PostToolUse`-family hook output (verify-*, audit, enrich-failure,
 /// validate-agent).
 fn render_post_tool_use_output(result: &HookResult, event_name: &str) -> String {
-    if result.decision == "allow" {
+    if result.decision == Decision::Allow {
         return String::new();
     }
     let message = render_hook_message(result);
@@ -680,7 +680,7 @@ fn render_post_tool_use_output(result: &HookResult, event_name: &str) -> String 
             "additionalContext": message,
         }
     });
-    if result.decision == "deny" {
+    if result.decision == Decision::Deny {
         payload["decision"] = json!("block");
         payload["reason"] = json!(message);
     }
@@ -689,7 +689,7 @@ fn render_post_tool_use_output(result: &HookResult, event_name: &str) -> String 
 
 /// Render an additional-context hook output (context-agent, notification).
 fn render_additional_context_output(result: &HookResult, event_name: &str) -> String {
-    if result.decision == "allow" {
+    if result.decision == Decision::Allow {
         return String::new();
     }
     serde_json::to_string(&json!({
@@ -705,7 +705,7 @@ fn render_additional_context_output(result: &HookResult, event_name: &str) -> St
 /// the given hook name.
 #[must_use]
 pub fn render_hook_output(hook_name: &str, result: &HookResult) -> String {
-    if result.decision == "allow" && result.code.is_empty() {
+    if result.decision == Decision::Allow && result.code.is_empty() {
         return String::new();
     }
     if PRE_TOOL_USE_HOOKS.contains(&hook_name) {
@@ -726,7 +726,7 @@ pub fn render_hook_output(hook_name: &str, result: &HookResult) -> String {
     if BLOCKING_HOOKS.contains(&hook_name) {
         return render_blocking_hook_output(result);
     }
-    if result.decision == "deny" {
+    if result.decision == Decision::Deny {
         return render_blocking_hook_output(result);
     }
     render_additional_context_output(result, "Notification")
@@ -776,7 +776,7 @@ fn format_hook_error_detail(hook_name: &str, error: &CliError) -> String {
 }
 
 /// Execute a hook command: build context, dispatch, render output.
-fn run_hook_command(skill: &str, hook: &HookCommand) -> Result<i32, CliError> {
+fn run_hook_command(skill: &str, hook: &HookCommand) -> i32 {
     let hook_name = hook.name();
 
     let ctx = match HookContext::from_stdin(skill) {
@@ -788,7 +788,7 @@ fn run_hook_command(skill: &str, hook: &HookCommand) -> Result<i32, CliError> {
             if !output.is_empty() {
                 print!("{output}");
             }
-            return Ok(0);
+            return 0;
         }
     };
 
@@ -804,7 +804,7 @@ fn run_hook_command(skill: &str, hook: &HookCommand) -> Result<i32, CliError> {
     if !output.is_empty() {
         print!("{output}");
     }
-    Ok(0)
+    0
 }
 
 // ---------------------------------------------------------------------------
@@ -812,6 +812,7 @@ fn run_hook_command(skill: &str, hook: &HookCommand) -> Result<i32, CliError> {
 // ---------------------------------------------------------------------------
 
 /// Dispatch a non-hook command to its module.
+#[allow(clippy::too_many_lines)]
 fn dispatch_command(command: Command) -> Result<i32, CliError> {
     match command {
         Command::Hook { .. } => unreachable!("hooks are handled separately"),
@@ -965,7 +966,7 @@ pub fn run() -> Result<i32, CliError> {
         Command::Hook {
             ref skill,
             ref hook,
-        } => run_hook_command(skill, hook),
+        } => Ok(run_hook_command(skill, hook)),
         other => dispatch_command(other),
     }
 }
@@ -1346,7 +1347,7 @@ mod tests {
             .expect("manifest arg missing");
         let help = manifest_arg
             .get_help()
-            .map(|h| h.to_string())
+            .map(ToString::to_string)
             .unwrap_or_default();
         assert!(
             help.contains("explicit batch order"),
@@ -1406,7 +1407,7 @@ mod tests {
     #[test]
     fn render_hook_message_empty_code() {
         let r = HookResult {
-            decision: "warn".to_string(),
+            decision: Decision::Warn,
             code: String::new(),
             message: "just a message".to_string(),
         };
@@ -1416,7 +1417,7 @@ mod tests {
     #[test]
     fn render_hook_message_empty_message() {
         let r = HookResult {
-            decision: "deny".to_string(),
+            decision: Decision::Deny,
             code: "KSR005".to_string(),
             message: String::new(),
         };
@@ -1599,19 +1600,19 @@ mod tests {
     #[test]
     fn hook_runtime_result_guard_is_deny() {
         let r = hook_runtime_result("guard-bash", "KSH002", "error");
-        assert_eq!(r.decision, "deny");
+        assert_eq!(r.decision, Decision::Deny);
     }
 
     #[test]
     fn hook_runtime_result_verify_is_warn() {
         let r = hook_runtime_result("verify-bash", "KSH002", "error");
-        assert_eq!(r.decision, "warn");
+        assert_eq!(r.decision, Decision::Warn);
     }
 
     #[test]
     fn hook_runtime_result_other_is_warn() {
         let r = hook_runtime_result("audit", "KSH002", "error");
-        assert_eq!(r.decision, "warn");
+        assert_eq!(r.decision, Decision::Warn);
     }
 
     #[test]

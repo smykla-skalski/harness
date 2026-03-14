@@ -1,6 +1,6 @@
-use crate::errors::{self, CliError};
+use crate::errors::CliError;
 use crate::hook::HookResult;
-use crate::hook_payloads::HookContext;
+use crate::hook_payloads::{AskUserQuestionPrompt, HookContext};
 use crate::rules::suite_runner as runner_rules;
 
 /// Execute the guard-question hook.
@@ -24,38 +24,34 @@ pub fn execute(ctx: &HookContext) -> Result<HookResult, CliError> {
         return Ok(HookResult::allow());
     }
     if ctx.skill == "suite-runner" {
-        return guard_suite_runner(prompts);
+        return Ok(guard_suite_runner(prompts));
     }
-    guard_suite_author(prompts)
+    Ok(guard_suite_author(prompts))
 }
 
-fn guard_suite_runner(
-    prompts: &[crate::hook_payloads::AskUserQuestionPrompt],
-) -> Result<HookResult, CliError> {
+fn guard_suite_runner(prompts: &[AskUserQuestionPrompt]) -> HookResult {
     // Check for manifest-fix gate prompts.
     for prompt in prompts {
         if is_manifest_fix_prompt(prompt) {
             // Full validation checks runner workflow state for triage phase.
             // Without state, allow the prompt since the format is correct.
-            return Ok(HookResult::allow());
+            return HookResult::allow();
         }
     }
-    Ok(HookResult::allow())
+    HookResult::allow()
 }
 
-fn guard_suite_author(
-    _prompts: &[crate::hook_payloads::AskUserQuestionPrompt],
-) -> Result<HookResult, CliError> {
+fn guard_suite_author(_prompts: &[AskUserQuestionPrompt]) -> HookResult {
     // Full implementation checks:
     // - kubectl-validate install gate
     // - canonical review gates (prewrite/postwrite/copy)
     // - author workflow state
     // Without that infrastructure, allow.
-    Ok(HookResult::allow())
+    HookResult::allow()
 }
 
 /// Check if a prompt matches the manifest-fix gate format.
-fn is_manifest_fix_prompt(prompt: &crate::hook_payloads::AskUserQuestionPrompt) -> bool {
+fn is_manifest_fix_prompt(prompt: &AskUserQuestionPrompt) -> bool {
     let head = prompt.question_head();
     if head != runner_rules::MANIFEST_FIX_GATE_QUESTION {
         return false;

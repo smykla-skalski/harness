@@ -1,4 +1,4 @@
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
@@ -72,9 +72,9 @@ impl SessionStartHookOutput {
 
 /// Resolve the effective cwd from the hook payload or project dir fallback.
 #[must_use]
-pub fn resolve_cwd(payload_cwd: &str, project_dir: &Path) -> std::path::PathBuf {
+pub fn resolve_cwd(payload_cwd: &str, project_dir: &Path) -> PathBuf {
     if !payload_cwd.is_empty() {
-        return std::path::PathBuf::from(payload_cwd);
+        return PathBuf::from(payload_cwd);
     }
     project_dir.to_path_buf()
 }
@@ -144,12 +144,12 @@ mod tests {
     #[test]
     fn resolve_cwd_uses_payload_when_present() {
         let result = resolve_cwd("/from/payload", Path::new("/fallback"));
-        assert_eq!(result, std::path::PathBuf::from("/from/payload"));
+        assert_eq!(result, PathBuf::from("/from/payload"));
     }
 
     #[test]
     fn resolve_cwd_falls_back_to_project_dir() {
         let result = resolve_cwd("", Path::new("/project"));
-        assert_eq!(result, std::path::PathBuf::from("/project"));
+        assert_eq!(result, PathBuf::from("/project"));
     }
 }

@@ -1,30 +1,22 @@
-use std::path::PathBuf;
+use std::env;
 use std::process::Command;
+use std::sync::LazyLock;
+
+use regex::Regex;
 
 use crate::cli::RunDirArgs;
 use crate::core_defs::utc_now;
 use crate::errors::{self, CliError};
-use crate::io::{append_markdown_row, write_text};
-use crate::resolve::resolve_run_directory;
+use crate::io::{append_markdown_row, ensure_dir, write_text};
+
+static SLUGIFY_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"[^A-Za-z0-9_.-]+").expect("invalid slugify regex"));
 
 fn slugify(raw: &str) -> String {
-    regex::Regex::new(r"[^A-Za-z0-9_.-]+")
-        .unwrap()
+    SLUGIFY_RE
         .replace_all(raw, "-")
         .trim_matches('-')
         .to_string()
-}
-
-fn resolve_run_dir(args: &RunDirArgs) -> Result<Option<PathBuf>, CliError> {
-    let lookup = crate::context::RunLookup {
-        run_dir: args.run_dir.clone(),
-        run_id: args.run_id.clone(),
-        run_root: args.run_root.clone(),
-    };
-    match resolve_run_directory(&lookup) {
-        Ok(r) => Ok(Some(r.run_dir)),
-        Err(_) => Ok(None),
-    }
 }
 
 /// Record a tracked command and save its output.
@@ -53,7 +45,7 @@ pub fn execute(
         });
     }
 
-    let run_dir = resolve_run_dir(run_dir_args)?;
+    let run_dir = super::resolve_run_dir(run_dir_args).ok();
 
     let output = Command::new(command[0]).args(&command[1..]).output();
 
@@ -78,13 +70,13 @@ pub fn execute(
 
     let (artifact, command_log) = if let Some(ref rd) = run_dir {
         let commands_dir = rd.join("commands");
-        crate::io::ensure_dir(&commands_dir).ok();
+        ensure_dir(&commands_dir).ok();
         let artifact = commands_dir.join(format!("{artifact_name}.txt"));
         let log = commands_dir.join("command-log.md");
         (artifact, Some(log))
     } else {
-        let tmp = std::env::temp_dir().join("harness").join("run");
-        crate::io::ensure_dir(&tmp).ok();
+        let tmp = env::temp_dir().join("harness").join("run");
+        ensure_dir(&tmp).ok();
         (tmp.join(format!("{artifact_name}.txt")), None)
     };
 
@@ -93,10 +85,10 @@ pub fn execute(
 
     if let Some(ref log_path) = command_log {
         let artifact_rel = if let Some(ref rd) = run_dir {
-            artifact
-                .strip_prefix(rd)
-                .map(|p| p.display().to_string())
-                .unwrap_or_else(|_| artifact.display().to_string())
+            artifact.strip_prefix(rd).map_or_else(
+                |_| artifact.display().to_string(),
+                |p| p.display().to_string(),
+            )
         } else {
             artifact.display().to_string()
         };

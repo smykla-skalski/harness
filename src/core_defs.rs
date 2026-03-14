@@ -1,10 +1,11 @@
 use std::collections::HashMap;
+use std::env;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use sha2::{Digest, Sha256};
 
-use crate::errors::{self, COMMAND_FAILED, CliError};
+use crate::errors::{COMMAND_FAILED, CliError};
 
 /// Build information resolved from the repo.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -39,7 +40,7 @@ pub fn utc_now() -> String {
 /// XDG data root (`XDG_DATA_HOME` or `~/.local/share`).
 #[must_use]
 pub fn data_root() -> PathBuf {
-    if let Ok(xdg) = std::env::var("XDG_DATA_HOME")
+    if let Ok(xdg) = env::var("XDG_DATA_HOME")
         && !xdg.is_empty()
     {
         return PathBuf::from(xdg);
@@ -61,7 +62,7 @@ pub fn suite_root() -> PathBuf {
 
 /// Read an env var, returning `None` if empty or an unexpanded shell variable.
 fn context_scope_value(name: &str) -> Option<String> {
-    let value = std::env::var(name).unwrap_or_default();
+    let value = env::var(name).unwrap_or_default();
     let trimmed = value.trim();
     if trimmed.is_empty() {
         return None;
@@ -106,7 +107,7 @@ pub fn session_scope_key() -> String {
         let scope = format!("project:{}", resolved.display());
         return format!("project-{}", scope_digest(&scope));
     }
-    let cwd = std::env::current_dir().unwrap_or_default();
+    let cwd = env::current_dir().unwrap_or_default();
     let resolved = cwd.canonicalize().unwrap_or(cwd);
     let scope = format!("cwd:{}", resolved.display());
     format!("cwd-{}", scope_digest(&scope))
@@ -144,8 +145,9 @@ pub fn project_context_dir(project_dir: &Path) -> PathBuf {
 
 /// Merge current env with extra key-value pairs.
 #[must_use]
+#[allow(clippy::implicit_hasher)]
 pub fn merge_env(extra: Option<&HashMap<String, String>>) -> HashMap<String, String> {
-    let mut env: HashMap<String, String> = std::env::vars().collect();
+    let mut env: HashMap<String, String> = env::vars().collect();
     if let Some(extra) = extra {
         env.extend(extra.iter().map(|(k, v)| (k.clone(), v.clone())));
     }
@@ -211,20 +213,14 @@ pub fn resolve_build_info(repo: &Path) -> Result<BuildInfo, CliError> {
     })
 }
 
-/// Render an error for display to stderr.
-#[must_use]
-pub fn render_error(error: &CliError) -> String {
-    errors::render_error(error)
-}
-
 fn dirs_home() -> PathBuf {
-    std::env::var("HOME")
-        .map(PathBuf::from)
-        .unwrap_or_else(|_| PathBuf::from("/tmp"))
+    env::var("HOME").map_or_else(|_| PathBuf::from("/tmp"), PathBuf::from)
 }
 
 #[cfg(test)]
 mod tests {
+    use crate::errors::render_error;
+
     use super::*;
 
     #[test]
@@ -283,12 +279,12 @@ mod tests {
 
     /// # Safety helper - wraps unsafe env manipulation for tests.
     unsafe fn with_env_var(name: &str, value: &str, f: impl FnOnce()) {
-        let saved = std::env::var(name).ok();
-        unsafe { std::env::set_var(name, value) };
+        let saved = env::var(name).ok();
+        unsafe { env::set_var(name, value) };
         f();
         match saved {
-            Some(v) => unsafe { std::env::set_var(name, v) },
-            None => unsafe { std::env::remove_var(name) },
+            Some(v) => unsafe { env::set_var(name, v) },
+            None => unsafe { env::remove_var(name) },
         }
     }
 
@@ -335,14 +331,14 @@ mod tests {
 
     #[test]
     fn resolve_build_info_in_current_repo() {
-        let repo = std::env::current_dir().unwrap();
+        let repo = env::current_dir().unwrap();
         let info = resolve_build_info(&repo);
         // Skip if git is not available in this environment
-        if let Err(ref e) = info {
-            if e.message.contains("No such file or directory") {
-                eprintln!("Skipping: git not available in subprocess PATH");
-                return;
-            }
+        if let Err(ref e) = info
+            && e.message.contains("No such file or directory")
+        {
+            eprintln!("Skipping: git not available in subprocess PATH");
+            return;
         }
         assert!(info.is_ok(), "expected Ok, got: {info:?}");
         let info = info.unwrap();

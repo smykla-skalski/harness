@@ -1,7 +1,6 @@
 use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 
 use crate::errors::CliError;
 use crate::workflow::engine::VersionedJsonRepository;
@@ -133,10 +132,7 @@ fn make_initial_state(occurred_at: &str) -> RunnerWorkflowState {
     }
 }
 
-fn save_state(
-    run_dir: &Path,
-    state: &RunnerWorkflowState,
-) -> Result<RunnerWorkflowState, CliError> {
+fn save_state(run_dir: &Path, state: &RunnerWorkflowState) -> Result<(), CliError> {
     let repo = runner_repository(run_dir);
     let value = serde_json::to_value(state).map_err(|e| CliError {
         code: "WORKFLOW_SERIALIZE".to_string(),
@@ -146,7 +142,7 @@ fn save_state(
         details: None,
     })?;
     repo.save(&value)?;
-    Ok(state.clone())
+    Ok(())
 }
 
 /// Initialize runner state for a new run.
@@ -155,7 +151,8 @@ fn save_state(
 /// Returns `CliError` on IO failure.
 pub fn initialize_runner_state(run_dir: &Path) -> Result<RunnerWorkflowState, CliError> {
     let state = make_initial_state(&now_utc());
-    save_state(run_dir, &state)
+    save_state(run_dir, &state)?;
+    Ok(state)
 }
 
 /// Read runner state from disk.
@@ -184,10 +181,7 @@ pub fn read_runner_state(run_dir: &Path) -> Result<Option<RunnerWorkflowState>, 
 ///
 /// # Errors
 /// Returns `CliError` on IO failure.
-pub fn write_runner_state(
-    run_dir: &Path,
-    state: &RunnerWorkflowState,
-) -> Result<RunnerWorkflowState, CliError> {
+pub fn write_runner_state(run_dir: &Path, state: &RunnerWorkflowState) -> Result<(), CliError> {
     save_state(run_dir, state)
 }
 

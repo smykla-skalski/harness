@@ -1,8 +1,10 @@
 use std::path::PathBuf;
 
-use crate::cli::ReportCommand;
+use crate::cli::{ReportCommand, RunDirArgs};
+use crate::context::{RunContext, RunLookup};
 use crate::errors::{self, CliError};
 use crate::resolve::resolve_run_directory;
+use crate::rules::suite_runner::{REPORT_CODE_BLOCK_LIMIT, REPORT_LINE_LIMIT};
 use crate::schema::RunReport;
 
 /// Report validation and group finalization.
@@ -42,27 +44,21 @@ fn run_check(report_path: Option<&str>) -> Result<i32, CliError> {
     let line_count = body.lines().count();
     let code_blocks = body.matches("```").count() / 2;
 
-    if line_count > crate::rules::suite_runner::REPORT_LINE_LIMIT {
+    if line_count > REPORT_LINE_LIMIT {
         return Err(errors::cli_err(
             &errors::REPORT_LINE_LIMIT,
             &[
                 ("count", &line_count.to_string()),
-                (
-                    "limit",
-                    &crate::rules::suite_runner::REPORT_LINE_LIMIT.to_string(),
-                ),
+                ("limit", &REPORT_LINE_LIMIT.to_string()),
             ],
         ));
     }
-    if code_blocks > crate::rules::suite_runner::REPORT_CODE_BLOCK_LIMIT {
+    if code_blocks > REPORT_CODE_BLOCK_LIMIT {
         return Err(errors::cli_err(
             &errors::REPORT_CODE_BLOCK_LIMIT,
             &[
                 ("count", &code_blocks.to_string()),
-                (
-                    "limit",
-                    &crate::rules::suite_runner::REPORT_CODE_BLOCK_LIMIT.to_string(),
-                ),
+                ("limit", &REPORT_CODE_BLOCK_LIMIT.to_string()),
             ],
         ));
     }
@@ -72,15 +68,15 @@ fn run_check(report_path: Option<&str>) -> Result<i32, CliError> {
 }
 
 fn run_group(
-    group_id: &str,
-    status: &str,
+    _group_id: &str,
+    _status: &str,
     evidence: &[String],
     evidence_label: &[String],
     capture_label: Option<&str>,
-    note: Option<&str>,
-    run_dir_args: &crate::cli::RunDirArgs,
+    _note: Option<&str>,
+    run_dir_args: &RunDirArgs,
 ) -> Result<i32, CliError> {
-    let lookup = crate::context::RunLookup {
+    let lookup = RunLookup {
         run_dir: run_dir_args.run_dir.clone(),
         run_id: run_dir_args.run_id.clone(),
         run_root: run_dir_args.run_root.clone(),
@@ -94,14 +90,15 @@ fn run_group(
         ));
     }
 
-    let ctx = crate::context::RunContext::from_run_dir(&run_dir)?;
+    let ctx = RunContext::from_run_dir(&run_dir)?;
+    // TODO: implement actual report update
     eprintln!(
-        "updated {} and {}",
+        "stub: would update {} and {}",
         ctx.layout.status_path().display(),
         ctx.layout.report_path().display()
     );
     println!(
-        "updated {} and {}",
+        "stub: would update {} and {}",
         ctx.layout.status_path().display(),
         ctx.layout.report_path().display()
     );

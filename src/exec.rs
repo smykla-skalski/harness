@@ -3,19 +3,22 @@ use std::path::Path;
 use std::process::Command;
 
 use crate::core_defs::{CommandResult, merge_env};
-use crate::errors::{self, COMMAND_FAILED, CliError};
+use crate::errors::{self, COMMAND_FAILED, CliError, EMPTY_COMMAND_ARGS};
 
 /// Run a command via `std::process::Command`, capturing stdout/stderr.
 ///
 /// # Errors
 /// Returns `CliError` if the exit code is not in `ok_exit_codes`.
+#[allow(clippy::implicit_hasher)]
 pub fn run_command(
     args: &[&str],
     cwd: Option<&Path>,
     env: Option<&HashMap<String, String>>,
     ok_exit_codes: &[i32],
 ) -> Result<CommandResult, CliError> {
-    let (program, cmd_args) = args.split_first().expect("args must not be empty");
+    let (program, cmd_args) = args
+        .split_first()
+        .ok_or_else(|| errors::cli_err(&EMPTY_COMMAND_ARGS, &[]))?;
     let merged = merge_env(env);
     let mut cmd = Command::new(program);
     cmd.args(cmd_args).envs(&merged);

@@ -1,5 +1,8 @@
+use std::path::Path;
+
 use crate::cli::EnvoyCommand;
 use crate::errors::{self, CliError};
+use crate::io::read_text;
 
 /// Envoy admin operations.
 ///
@@ -30,7 +33,7 @@ pub fn execute(cmd: &EnvoyCommand) -> Result<i32, CliError> {
             file, route_match, ..
         } => {
             if let Some(file_path) = file {
-                let text = crate::io::read_text(std::path::Path::new(file_path))?;
+                let text = read_text(Path::new(file_path))?;
                 let payload: serde_json::Value =
                     serde_json::from_str(&text).map_err(|e| CliError {
                         code: "JSON".to_string(),
@@ -61,7 +64,7 @@ pub fn execute(cmd: &EnvoyCommand) -> Result<i32, CliError> {
         }
         EnvoyCommand::Bootstrap { file, grep, .. } => {
             if let Some(file_path) = file {
-                let text = crate::io::read_text(std::path::Path::new(file_path))?;
+                let text = read_text(Path::new(file_path))?;
                 let output = if let Some(needle) = grep {
                     text.lines()
                         .filter(|l| l.contains(needle.as_str()))
@@ -88,7 +91,9 @@ fn find_route<'a>(
 ) -> Option<&'a serde_json::Value> {
     let configs = payload.get("configs")?.as_array()?;
     for config in configs {
-        let config_obj = config.as_object()?;
+        let Some(config_obj) = config.as_object() else {
+            continue;
+        };
         for key in &["dynamic_route_configs", "static_route_configs"] {
             if let Some(entries) = config_obj.get(*key).and_then(|v| v.as_array()) {
                 for entry in entries {

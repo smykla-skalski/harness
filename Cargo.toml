@@ -27,3 +27,4 @@ insta = "1.46.3"
 
 [lints.clippy]
 pedantic = { level = "deny", priority = 1 }
+absolute_paths = { level = "deny", priority = 2 }

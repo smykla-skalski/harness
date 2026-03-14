@@ -1,3 +1,5 @@
+use std::env;
+use std::fs;
 use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
@@ -127,14 +129,17 @@ impl AuthorWorkflowState {
 
 /// Path to the author state file.
 ///
-/// # Panics
-/// Panics if the current directory cannot be determined.
-#[must_use]
-pub fn author_state_path() -> PathBuf {
-    std::env::current_dir()
-        .expect("current directory should be accessible")
-        .join(".harness")
-        .join("suite-author-state.json")
+/// # Errors
+/// Returns `CliError` if the current directory cannot be determined.
+pub fn author_state_path() -> Result<PathBuf, CliError> {
+    let cwd = env::current_dir().map_err(|e| CliError {
+        code: "WORKFLOW_IO".to_string(),
+        message: format!("failed to determine current directory: {e}"),
+        exit_code: 5,
+        hint: None,
+        details: None,
+    })?;
+    Ok(cwd.join(".harness").join("suite-author-state.json"))
 }
 
 /// Read author state from disk.
@@ -142,11 +147,11 @@ pub fn author_state_path() -> PathBuf {
 /// # Errors
 /// Returns `CliError` on parse failure.
 pub fn read_author_state() -> Result<Option<AuthorWorkflowState>, CliError> {
-    let path = author_state_path();
+    let path = author_state_path()?;
     if !path.exists() {
         return Ok(None);
     }
-    let contents = std::fs::read_to_string(&path).map_err(|e| CliError {
+    let contents = fs::read_to_string(&path).map_err(|e| CliError {
         code: "WORKFLOW_IO".to_string(),
         message: format!("failed to read {}: {e}", path.display()),
         exit_code: 5,
@@ -167,10 +172,10 @@ pub fn read_author_state() -> Result<Option<AuthorWorkflowState>, CliError> {
 ///
 /// # Errors
 /// Returns `CliError` on IO failure.
-pub fn write_author_state(state: &AuthorWorkflowState) -> Result<AuthorWorkflowState, CliError> {
-    let path = author_state_path();
+pub fn write_author_state(state: &AuthorWorkflowState) -> Result<(), CliError> {
+    let path = author_state_path()?;
     if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent).map_err(|e| CliError {
+        fs::create_dir_all(parent).map_err(|e| CliError {
             code: "WORKFLOW_IO".to_string(),
             message: format!("failed to create directory {}: {e}", parent.display()),
             exit_code: 5,
@@ -186,21 +191,21 @@ pub fn write_author_state(state: &AuthorWorkflowState) -> Result<AuthorWorkflowS
         details: None,
     })?;
     let tmp_path = path.with_extension("json.tmp");
-    std::fs::write(&tmp_path, &json).map_err(|e| CliError {
+    fs::write(&tmp_path, &json).map_err(|e| CliError {
         code: "WORKFLOW_IO".to_string(),
         message: format!("failed to write {}: {e}", tmp_path.display()),
         exit_code: 5,
         hint: None,
         details: None,
     })?;
-    std::fs::rename(&tmp_path, &path).map_err(|e| CliError {
+    fs::rename(&tmp_path, &path).map_err(|e| CliError {
         code: "WORKFLOW_IO".to_string(),
         message: format!("failed to rename to {}: {e}", path.display()),
         exit_code: 5,
         hint: None,
         details: None,
     })?;
-    Ok(state.clone())
+    Ok(())
 }
 
 /// Check if writing is allowed in the current state.

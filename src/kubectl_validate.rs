@@ -1,8 +1,10 @@
 use std::path::{Path, PathBuf};
+use std::{env, fs};
 
 use serde::{Deserialize, Serialize};
 
 use crate::core_defs::harness_data_root;
+use crate::errors::CliError;
 
 /// Decision about kubectl-validate installation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -36,27 +38,25 @@ pub fn kubectl_validate_state_path() -> PathBuf {
 ///
 /// # Errors
 /// Returns `CliError` on parse failure.
-pub fn read_kubectl_validate_state() -> Result<Option<KubectlValidateState>, crate::errors::CliError>
-{
+pub fn read_kubectl_validate_state() -> Result<Option<KubectlValidateState>, CliError> {
     let path = kubectl_validate_state_path();
     if !path.exists() {
         return Ok(None);
     }
-    let text = std::fs::read_to_string(&path).map_err(|e| crate::errors::CliError {
+    let text = fs::read_to_string(&path).map_err(|e| CliError {
         code: "IO".to_string(),
         message: format!("failed to read {}: {e}", path.display()),
         exit_code: 1,
         hint: None,
         details: None,
     })?;
-    let state: KubectlValidateState =
-        serde_json::from_str(&text).map_err(|e| crate::errors::CliError {
-            code: "PARSE".to_string(),
-            message: format!("failed to parse {}: {e}", path.display()),
-            exit_code: 1,
-            hint: None,
-            details: None,
-        })?;
+    let state: KubectlValidateState = serde_json::from_str(&text).map_err(|e| CliError {
+        code: "PARSE".to_string(),
+        message: format!("failed to parse {}: {e}", path.display()),
+        exit_code: 1,
+        hint: None,
+        details: None,
+    })?;
     Ok(Some(state))
 }
 
@@ -78,7 +78,7 @@ pub fn kubectl_validate_prompt_required() -> bool {
 #[must_use]
 pub fn resolve_kubectl_validate_binary() -> Option<PathBuf> {
     // 1. Environment override
-    if let Ok(val) = std::env::var("HARNESS_KUBECTL_VALIDATE_BIN") {
+    if let Ok(val) = env::var("HARNESS_KUBECTL_VALIDATE_BIN") {
         let trimmed = val.trim();
         if !trimmed.is_empty() {
             let candidate = PathBuf::from(trimmed);
@@ -110,9 +110,7 @@ pub fn resolve_kubectl_validate_binary() -> Option<PathBuf> {
 }
 
 fn default_install_candidates() -> Vec<PathBuf> {
-    let home = std::env::var("HOME")
-        .map(PathBuf::from)
-        .unwrap_or_else(|_| PathBuf::from("/tmp"));
+    let home = env::var("HOME").map_or_else(|_| PathBuf::from("/tmp"), PathBuf::from);
     vec![
         home.join(".local").join("bin").join("kubectl-validate"),
         home.join("bin").join("kubectl-validate"),
@@ -129,7 +127,7 @@ fn is_executable(path: &Path) -> bool {
 }
 
 fn which_kubectl_validate() -> Option<PathBuf> {
-    let path_env = std::env::var("PATH").unwrap_or_default();
+    let path_env = env::var("PATH").unwrap_or_default();
     for dir in path_env.split(':') {
         if dir.is_empty() {
             continue;
@@ -224,9 +222,9 @@ mod tests {
     fn read_state_returns_none_when_file_missing() {
         // Point harness_data_root to a temp dir via XDG_DATA_HOME
         let dir = tempfile::tempdir().unwrap();
-        unsafe { std::env::set_var("XDG_DATA_HOME", dir.path()) };
+        unsafe { env::set_var("XDG_DATA_HOME", dir.path()) };
         let result = read_kubectl_validate_state().unwrap();
-        unsafe { std::env::remove_var("XDG_DATA_HOME") };
+        unsafe { env::remove_var("XDG_DATA_HOME") };
         assert!(result.is_none());
     }
 
@@ -234,17 +232,17 @@ mod tests {
     fn read_state_returns_parsed_when_file_exists() {
         let dir = tempfile::tempdir().unwrap();
         let tooling = dir.path().join("kuma").join("tooling");
-        std::fs::create_dir_all(&tooling).unwrap();
+        fs::create_dir_all(&tooling).unwrap();
         let state_file = tooling.join("kubectl-validate.json");
-        std::fs::write(
+        fs::write(
             &state_file,
             r#"{"schema_version":1,"decision":"installed","decided_at":"2026-01-01T00:00:00Z","binary_path":"/bin/kv"}"#,
         )
         .unwrap();
 
-        unsafe { std::env::set_var("XDG_DATA_HOME", dir.path()) };
+        unsafe { env::set_var("XDG_DATA_HOME", dir.path()) };
         let result = read_kubectl_validate_state().unwrap();
-        unsafe { std::env::remove_var("XDG_DATA_HOME") };
+        unsafe { env::remove_var("XDG_DATA_HOME") };
 
         let state = result.unwrap();
         assert_eq!(state.decision, KubectlValidateDecision::Installed);
@@ -256,10 +254,10 @@ mod tests {
         // With a fake HOME and no HARNESS_KUBECTL_VALIDATE_BIN
         let dir = tempfile::tempdir().unwrap();
         unsafe {
-            std::env::set_var("HOME", dir.path());
-            std::env::remove_var("HARNESS_KUBECTL_VALIDATE_BIN");
-            std::env::set_var("XDG_DATA_HOME", dir.path().join("xdg"));
-            std::env::set_var("PATH", dir.path().join("empty-bin"));
+            env::set_var("HOME", dir.path());
+            env::remove_var("HARNESS_KUBECTL_VALIDATE_BIN");
+            env::set_var("XDG_DATA_HOME", dir.path().join("xdg"));
+            env::set_var("PATH", dir.path().join("empty-bin"));
         }
         let result = resolve_kubectl_validate_binary();
         assert!(result.is_none());
@@ -269,12 +267,12 @@ mod tests {
     fn resolve_binary_uses_env_override() {
         let dir = tempfile::tempdir().unwrap();
         let bin = dir.path().join("kubectl-validate");
-        std::fs::write(&bin, "#!/bin/sh\n").unwrap();
-        std::fs::set_permissions(&bin, std::fs::Permissions::from_mode(0o755)).unwrap();
+        fs::write(&bin, "#!/bin/sh\n").unwrap();
+        fs::set_permissions(&bin, fs::Permissions::from_mode(0o755)).unwrap();
 
-        unsafe { std::env::set_var("HARNESS_KUBECTL_VALIDATE_BIN", &bin) };
+        unsafe { env::set_var("HARNESS_KUBECTL_VALIDATE_BIN", &bin) };
         let result = resolve_kubectl_validate_binary();
-        unsafe { std::env::remove_var("HARNESS_KUBECTL_VALIDATE_BIN") };
+        unsafe { env::remove_var("HARNESS_KUBECTL_VALIDATE_BIN") };
 
         assert_eq!(result, Some(bin));
     }
@@ -290,8 +288,8 @@ mod tests {
     fn is_executable_returns_true_for_executable_file() {
         let dir = tempfile::tempdir().unwrap();
         let bin = dir.path().join("test-bin");
-        std::fs::write(&bin, "#!/bin/sh\n").unwrap();
-        std::fs::set_permissions(&bin, std::fs::Permissions::from_mode(0o755)).unwrap();
+        fs::write(&bin, "#!/bin/sh\n").unwrap();
+        fs::set_permissions(&bin, fs::Permissions::from_mode(0o755)).unwrap();
         assert!(is_executable(&bin));
     }
 
@@ -299,8 +297,8 @@ mod tests {
     fn is_executable_returns_false_for_non_executable_file() {
         let dir = tempfile::tempdir().unwrap();
         let bin = dir.path().join("test-bin");
-        std::fs::write(&bin, "data").unwrap();
-        std::fs::set_permissions(&bin, std::fs::Permissions::from_mode(0o644)).unwrap();
+        fs::write(&bin, "data").unwrap();
+        fs::set_permissions(&bin, fs::Permissions::from_mode(0o644)).unwrap();
         assert!(!is_executable(&bin));
     }
 }

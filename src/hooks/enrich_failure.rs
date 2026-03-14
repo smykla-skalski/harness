@@ -12,10 +12,10 @@ use crate::hook_payloads::HookContext;
 /// # Errors
 /// Returns `CliError` on failure.
 pub fn execute(ctx: &HookContext) -> Result<HookResult, CliError> {
-    if ctx.skill != "suite-runner" {
+    if !ctx.skill_active {
         return Ok(HookResult::allow());
     }
-    if !ctx.skill_active {
+    if ctx.skill != "suite-runner" {
         return Ok(HookResult::allow());
     }
     // Full implementation needs RunContext to read run status and runner

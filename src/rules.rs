@@ -204,8 +204,8 @@ mod tests {
 
     #[test]
     fn report_limits_are_positive() {
-        assert!(suite_runner::REPORT_LINE_LIMIT > 0);
-        assert!(suite_runner::REPORT_CODE_BLOCK_LIMIT > 0);
+        const { assert!(suite_runner::REPORT_LINE_LIMIT > 0) }
+        const { assert!(suite_runner::REPORT_CODE_BLOCK_LIMIT > 0) }
         assert_eq!(suite_runner::REPORT_LINE_LIMIT, 220);
         assert_eq!(suite_runner::REPORT_CODE_BLOCK_LIMIT, 4);
     }
