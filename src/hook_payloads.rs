@@ -199,6 +199,76 @@ impl HookContext {
             inactive_reason: None,
         }
     }
+
+    /// The raw command string from the input payload, if any.
+    #[must_use]
+    pub fn command_text(&self) -> Option<&str> {
+        self.event
+            .payload
+            .input_payload
+            .as_ref()
+            .and_then(|p| p.command.as_deref())
+    }
+
+    /// Shell-split command words from the input payload.
+    #[must_use]
+    pub fn command_words(&self) -> Vec<String> {
+        self.command_text().map_or_else(Vec::new, |cmd| {
+            shell_words::split(cmd).unwrap_or_else(|_| vec![cmd.to_string()])
+        })
+    }
+
+    /// Write target paths from the input payload.
+    #[must_use]
+    pub fn write_paths(&self) -> Vec<String> {
+        let mut paths = Vec::new();
+        if let Some(p) = &self.event.payload.input_payload {
+            if let Some(fp) = &p.file_path {
+                paths.push(fp.clone());
+            }
+            for w in &p.writes {
+                paths.push(w.file_path.clone());
+            }
+        }
+        paths
+    }
+
+    /// `AskUserQuestion` prompts from the input payload.
+    #[must_use]
+    pub fn question_prompts(&self) -> &[AskUserQuestionPrompt] {
+        self.event
+            .payload
+            .input_payload
+            .as_ref()
+            .map_or(&[], |p| &p.questions)
+    }
+
+    /// `AskUserQuestion` answers from the input payload.
+    #[must_use]
+    pub fn question_answers(&self) -> &[AskUserAnswer] {
+        self.event
+            .payload
+            .input_payload
+            .as_ref()
+            .map_or(&[], |p| &p.answers)
+    }
+
+    /// Last assistant message from the envelope, lowercased.
+    #[must_use]
+    pub fn last_assistant_message(&self) -> String {
+        self.event
+            .payload
+            .last_assistant_message
+            .as_deref()
+            .unwrap_or("")
+            .to_string()
+    }
+
+    /// Whether the stop hook is active in the envelope.
+    #[must_use]
+    pub fn stop_hook_active(&self) -> bool {
+        self.event.payload.stop_hook_active
+    }
 }
 
 /// Extra types used in hook payload extraction.

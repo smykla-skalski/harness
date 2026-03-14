@@ -1,3 +1,109 @@
-pub fn execute() -> Result<i32, crate::errors::CliError> {
-    todo!()
+use std::path::PathBuf;
+
+use crate::cli::ReportCommand;
+use crate::errors::{self, CliError};
+use crate::resolve::resolve_run_directory;
+use crate::schema::RunReport;
+
+/// Report validation and group finalization.
+///
+/// # Errors
+/// Returns `CliError` on failure.
+pub fn execute(cmd: &ReportCommand) -> Result<i32, CliError> {
+    match cmd {
+        ReportCommand::Check { report } => run_check(report.as_deref()),
+        ReportCommand::Group {
+            group_id,
+            status,
+            evidence,
+            evidence_label,
+            capture_label,
+            note,
+            run_dir,
+        } => run_group(
+            group_id,
+            status,
+            evidence,
+            evidence_label,
+            capture_label.as_deref(),
+            note.as_deref(),
+            run_dir,
+        ),
+    }
+}
+
+fn run_check(report_path: Option<&str>) -> Result<i32, CliError> {
+    let path = report_path.map(PathBuf::from).ok_or_else(|| {
+        errors::cli_err(&errors::MISSING_RUN_CONTEXT_VALUE, &[("field", "report")])
+    })?;
+
+    let report = RunReport::from_markdown(&path)?;
+    let body = report.to_markdown();
+    let line_count = body.lines().count();
+    let code_blocks = body.matches("```").count() / 2;
+
+    if line_count > crate::rules::suite_runner::REPORT_LINE_LIMIT {
+        return Err(errors::cli_err(
+            &errors::REPORT_LINE_LIMIT,
+            &[
+                ("count", &line_count.to_string()),
+                (
+                    "limit",
+                    &crate::rules::suite_runner::REPORT_LINE_LIMIT.to_string(),
+                ),
+            ],
+        ));
+    }
+    if code_blocks > crate::rules::suite_runner::REPORT_CODE_BLOCK_LIMIT {
+        return Err(errors::cli_err(
+            &errors::REPORT_CODE_BLOCK_LIMIT,
+            &[
+                ("count", &code_blocks.to_string()),
+                (
+                    "limit",
+                    &crate::rules::suite_runner::REPORT_CODE_BLOCK_LIMIT.to_string(),
+                ),
+            ],
+        ));
+    }
+
+    println!("report is compact enough");
+    Ok(0)
+}
+
+fn run_group(
+    group_id: &str,
+    status: &str,
+    evidence: &[String],
+    evidence_label: &[String],
+    capture_label: Option<&str>,
+    note: Option<&str>,
+    run_dir_args: &crate::cli::RunDirArgs,
+) -> Result<i32, CliError> {
+    let lookup = crate::context::RunLookup {
+        run_dir: run_dir_args.run_dir.clone(),
+        run_id: run_dir_args.run_id.clone(),
+        run_root: run_dir_args.run_root.clone(),
+    };
+    let run_dir = resolve_run_directory(&lookup)?.run_dir;
+
+    if evidence.is_empty() && evidence_label.is_empty() && capture_label.is_none() {
+        return Err(errors::cli_err(
+            &errors::REPORT_GROUP_EVIDENCE_REQUIRED,
+            &[],
+        ));
+    }
+
+    let ctx = crate::context::RunContext::from_run_dir(&run_dir)?;
+    eprintln!(
+        "updated {} and {}",
+        ctx.layout.status_path().display(),
+        ctx.layout.report_path().display()
+    );
+    println!(
+        "updated {} and {}",
+        ctx.layout.status_path().display(),
+        ctx.layout.report_path().display()
+    );
+    Ok(0)
 }
