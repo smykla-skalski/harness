@@ -133,7 +133,7 @@ impl AuthorWorkflowState {
 /// Returns `CliError` if the current directory cannot be determined.
 pub fn author_state_path() -> Result<PathBuf, CliError> {
     let cwd = env::current_dir().map_err(|e| CliError {
-        code: "WORKFLOW_IO".to_string(),
+        code: "WORKFLOW_IO".into(),
         message: format!("failed to determine current directory: {e}"),
         exit_code: 5,
         hint: None,
@@ -152,14 +152,14 @@ pub fn read_author_state() -> Result<Option<AuthorWorkflowState>, CliError> {
         return Ok(None);
     }
     let contents = fs::read_to_string(&path).map_err(|e| CliError {
-        code: "WORKFLOW_IO".to_string(),
+        code: "WORKFLOW_IO".into(),
         message: format!("failed to read {}: {e}", path.display()),
         exit_code: 5,
         hint: None,
         details: None,
     })?;
     let state: AuthorWorkflowState = serde_json::from_str(&contents).map_err(|e| CliError {
-        code: "WORKFLOW_PARSE".to_string(),
+        code: "WORKFLOW_PARSE".into(),
         message: format!("failed to parse author state: {e}"),
         exit_code: 5,
         hint: None,
@@ -176,7 +176,7 @@ pub fn write_author_state(state: &AuthorWorkflowState) -> Result<(), CliError> {
     let path = author_state_path()?;
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent).map_err(|e| CliError {
-            code: "WORKFLOW_IO".to_string(),
+            code: "WORKFLOW_IO".into(),
             message: format!("failed to create directory {}: {e}", parent.display()),
             exit_code: 5,
             hint: None,
@@ -184,7 +184,7 @@ pub fn write_author_state(state: &AuthorWorkflowState) -> Result<(), CliError> {
         })?;
     }
     let json = serde_json::to_string_pretty(state).map_err(|e| CliError {
-        code: "WORKFLOW_SERIALIZE".to_string(),
+        code: "WORKFLOW_SERIALIZE".into(),
         message: format!("failed to serialize author state: {e}"),
         exit_code: 5,
         hint: None,
@@ -192,14 +192,14 @@ pub fn write_author_state(state: &AuthorWorkflowState) -> Result<(), CliError> {
     })?;
     let tmp_path = path.with_extension("json.tmp");
     fs::write(&tmp_path, &json).map_err(|e| CliError {
-        code: "WORKFLOW_IO".to_string(),
+        code: "WORKFLOW_IO".into(),
         message: format!("failed to write {}: {e}", tmp_path.display()),
         exit_code: 5,
         hint: None,
         details: None,
     })?;
     fs::rename(&tmp_path, &path).map_err(|e| CliError {
-        code: "WORKFLOW_IO".to_string(),
+        code: "WORKFLOW_IO".into(),
         message: format!("failed to rename to {}: {e}", path.display()),
         exit_code: 5,
         hint: None,

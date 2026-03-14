@@ -6,7 +6,7 @@ use crate::core_defs::utc_now;
 use crate::errors::{self, CliError};
 use crate::exec::kubectl;
 use crate::io::append_markdown_row;
-use crate::manifests::resolve_manifest_path;
+use crate::resolve::resolve_manifest_path;
 
 fn resolve_kubeconfig(
     ctx: &RunContext,
@@ -50,13 +50,7 @@ pub fn execute(
     let _kc_str = kc.to_string_lossy().to_string();
 
     for manifest_raw in manifests {
-        let manifest = resolve_manifest_path(manifest_raw, Some(&run_dir));
-        if !manifest.exists() {
-            return Err(errors::cli_err(
-                &errors::MISSING_FILE,
-                &[("path", &manifest.display().to_string())],
-            ));
-        }
+        let manifest = resolve_manifest_path(manifest_raw, Some(&run_dir))?;
         let manifest_str = manifest.to_string_lossy().to_string();
         kubectl(Some(&kc), &["apply", "-f", &manifest_str], &[0])?;
 

@@ -48,7 +48,7 @@ pub fn execute(kind: &str, payload: Option<&str>, input: Option<&str>) -> Result
 
     let workspace = authoring_workspace_dir();
     ensure_dir(&workspace).map_err(|e| CliError {
-        code: "IO".to_string(),
+        code: "IO".into(),
         message: format!("failed to create directory: {e}"),
         exit_code: 1,
         hint: None,

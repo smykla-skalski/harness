@@ -126,7 +126,7 @@ fn deserialize_with_errors<T: DeserializeOwned>(
 
                 // Unknown serde error - wrap it.
                 return Err(CliError {
-                    code: "KSRCLI022".to_string(),
+                    code: "KSRCLI022".into(),
                     message: format!("deserialization error in {label}: {msg}"),
                     exit_code: 5,
                     hint: None,
@@ -145,7 +145,7 @@ fn deserialize_with_errors<T: DeserializeOwned>(
         ));
     }
     Err(CliError {
-        code: "KSRCLI022".to_string(),
+        code: "KSRCLI022".into(),
         message: format!("deserialization failed for {label}: probe loop exhausted"),
         exit_code: 5,
         hint: None,

@@ -15,7 +15,7 @@ pub fn execute(mode: &str, suite_dir: Option<&str>) -> Result<i32, CliError> {
         "bypass" => ApprovalMode::Bypass,
         _ => {
             return Err(CliError {
-                code: "USAGE".to_string(),
+                code: "USAGE".into(),
                 message: format!("invalid approval mode: {mode}"),
                 exit_code: 1,
                 hint: None,
