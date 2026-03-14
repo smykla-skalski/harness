@@ -1,15 +1,9 @@
 use crate::errors::{self, CliError};
 use crate::hook::HookResult;
 use crate::hook_payloads::HookContext;
+use crate::workflow::author::can_stop;
 
 /// Execute the guard-stop hook.
-///
-/// Checks whether the current harness skill session may stop.
-/// For suite-runner: verifies closeout is complete (state capture present,
-/// verdict not pending, report valid). Full validation needs `RunContext`;
-/// this version allows when no run dir is set.
-/// For suite-author: verifies approval state allows stopping and the
-/// written suite is valid. Full validation needs author workflow state.
 ///
 /// # Errors
 /// Returns `CliError` on failure.
@@ -18,31 +12,43 @@ pub fn execute(ctx: &HookContext) -> Result<HookResult, CliError> {
         return Ok(HookResult::allow());
     }
     if ctx.skill == "suite-author" {
-        return Ok(guard_suite_author_stop());
+        return Ok(guard_suite_author_stop(ctx));
     }
     Ok(guard_suite_runner_stop(ctx))
 }
 
-fn guard_suite_author_stop() -> HookResult {
-    // Full implementation checks:
-    // - Author workflow state for can_stop()
-    // - Suite spec completeness (groups, baseline files)
-    // Without author state infrastructure, allow stop.
+fn guard_suite_author_stop(ctx: &HookContext) -> HookResult {
+    let Some(state) = &ctx.author_state else {
+        return HookResult::allow();
+    };
+    let (allowed, reason) = can_stop(state);
+    if !allowed {
+        return errors::hook_msg(
+            &errors::DENY_APPROVAL_REQUIRED,
+            &[
+                ("action", "stop suite-author"),
+                (
+                    "details",
+                    reason.unwrap_or("suite-author is not ready to stop yet"),
+                ),
+            ],
+        );
+    }
     HookResult::allow()
 }
 
 fn guard_suite_runner_stop(ctx: &HookContext) -> HookResult {
-    if ctx.run_dir.is_none() {
-        // No active run - allow stop.
+    let Some(run) = &ctx.run else {
         return HookResult::allow();
+    };
+    let Some(status) = &run.status else {
+        return HookResult::allow();
+    };
+    if status.last_state_capture.is_none() {
+        return errors::hook_msg(&errors::DENY_MISSING_STATE_CAPTURE, &[]);
     }
-    // Full implementation checks:
-    // - RunReport parseable
-    // - last_state_capture present
-    // - overall_verdict != "pending"
-    // Without RunContext, emit warnings for the checks we can't do.
-    // The Python code denies stop if state capture is missing or verdict
-    // is pending. Since we can't check those, allow by default and let
-    // the full implementation handle it once RunContext is available.
-    errors::hook_msg(&errors::INFO_RUN_VERDICT, &[("verdict", "pending")])
+    if status.overall_verdict == "pending" {
+        return errors::hook_msg(&errors::DENY_VERDICT_PENDING, &[]);
+    }
+    HookResult::allow()
 }
