@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::error::Error;
 use std::fmt;
 
 use crate::hook::HookResult;
@@ -36,7 +37,7 @@ impl fmt::Display for CliError {
     }
 }
 
-impl std::error::Error for CliError {}
+impl Error for CliError {}
 
 /// Construct a `CliError` from a definition and template arguments.
 /// Missing placeholders fall back to "?".
@@ -66,11 +67,7 @@ pub fn cli_err_with_details(def: &ErrorDef, args: &[(&str, &str)], details: &str
 #[must_use]
 pub fn hook_msg(def: &HookDef, args: &[(&str, &str)]) -> HookResult {
     let map: HashMap<&str, &str> = args.iter().copied().collect();
-    let message = if args.is_empty() {
-        def.template.to_string()
-    } else {
-        render_template(def.template, &map)
-    };
+    let message = render_template(def.template, &map);
     match def.decision {
         "deny" => HookResult::deny(def.code, &message),
         "warn" => HookResult::warn(def.code, &message),
@@ -85,16 +82,23 @@ fn render_template(template: &str, args: &HashMap<&str, &str>) -> String {
     while let Some(ch) = chars.next() {
         if ch == '{' {
             let mut key = String::new();
+            let mut closed = false;
             for inner in chars.by_ref() {
                 if inner == '}' {
+                    closed = true;
                     break;
                 }
                 key.push(inner);
             }
-            if let Some(value) = args.get(key.as_str()) {
-                result.push_str(value);
+            if closed {
+                if let Some(value) = args.get(key.as_str()) {
+                    result.push_str(value);
+                } else {
+                    result.push('?');
+                }
             } else {
-                result.push('?');
+                result.push('{');
+                result.push_str(&key);
             }
         } else {
             result.push(ch);
@@ -119,6 +123,12 @@ pub fn render_error(error: &CliError) -> String {
 
 // --- Error definitions ---
 
+pub static EMPTY_COMMAND_ARGS: ErrorDef = ErrorDef {
+    code: "KSRCLI001",
+    template: "command args must not be empty",
+    exit_code: 3,
+    hint: None,
+};
 pub static MISSING_TOOLS: ErrorDef = ErrorDef {
     code: "KSRCLI002",
     template: "missing required tools: {tools}",
@@ -166,6 +176,12 @@ pub static MISSING_RUN_LOCATION: ErrorDef = ErrorDef {
     template: "missing explicit run location for run id: {run_id}",
     exit_code: 5,
     hint: Some("Pass `--run-root` or `--run-dir`, or run `harness init` first."),
+};
+pub static INVALID_JSON: ErrorDef = ErrorDef {
+    code: "KSRCLI019",
+    template: "invalid JSON in {path}",
+    exit_code: 5,
+    hint: None,
 };
 pub static NOT_A_MAPPING: ErrorDef = ErrorDef {
     code: "KSRCLI010",
@@ -256,6 +272,12 @@ pub static GATEWAY_CRDS_MISSING: ErrorDef = ErrorDef {
     template: "Gateway API CRDs are not installed",
     exit_code: 1,
     hint: None,
+};
+pub static GATEWAY_DOWNLOAD_EMPTY: ErrorDef = ErrorDef {
+    code: "KSRCLI061",
+    template: "downloaded Gateway API manifest is empty: {path}",
+    exit_code: 5,
+    hint: Some("Check the URL and network connectivity."),
 };
 pub static KUMACTL_NOT_FOUND: ErrorDef = ErrorDef {
     code: "KSRCLI034",
@@ -396,6 +418,20 @@ pub static RUN_DIR_EXISTS: ErrorDef = ErrorDef {
     template: "run directory already exists: {run_dir}",
     exit_code: 5,
     hint: Some("Use a new run id or resume the existing run instead of re-running `harness init`."),
+};
+pub static UNSAFE_NAME: ErrorDef = ErrorDef {
+    code: "KSRCLI059",
+    template: "unsafe name: {name} (must not contain path separators or \"..\")",
+    exit_code: 3,
+    hint: None,
+};
+pub static MISSING_RUN_STATUS: ErrorDef = ErrorDef {
+    code: "KSRCLI060",
+    template: "run has no recorded status",
+    exit_code: 5,
+    hint: Some(
+        "The run-status.json file could not be loaded. Re-run `harness init` or check the run directory.",
+    ),
 };
 pub static MARKDOWN_SHAPE_MISMATCH: ErrorDef = ErrorDef {
     code: "KSRCLI999",
@@ -544,7 +580,10 @@ pub static DENY_VALIDATOR_GATE_UNEXPECTED: HookDef = HookDef {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashSet;
+
     use super::*;
+    use crate::hook::Decision;
 
     // --- CliErr (cli_err) ---
 
@@ -583,6 +622,7 @@ mod tests {
     #[test]
     fn cli_err_all_codes_unique() {
         let all_defs: &[&ErrorDef] = &[
+            &EMPTY_COMMAND_ARGS,
             &MISSING_TOOLS,
             &COMMAND_FAILED,
             &MISSING_RUN_POINTER,
@@ -591,6 +631,7 @@ mod tests {
             &VERDICT_PENDING,
             &MISSING_RUN_CONTEXT_VALUE,
             &MISSING_RUN_LOCATION,
+            &INVALID_JSON,
             &NOT_A_MAPPING,
             &NOT_STRING_KEYS,
             &NOT_A_LIST,
@@ -606,6 +647,7 @@ mod tests {
             &ROUTE_NOT_FOUND,
             &GATEWAY_VERSION_MISSING,
             &GATEWAY_CRDS_MISSING,
+            &GATEWAY_DOWNLOAD_EMPTY,
             &KUMACTL_NOT_FOUND,
             &REPORT_LINE_LIMIT,
             &REPORT_CODE_BLOCK_LIMIT,
@@ -628,10 +670,12 @@ mod tests {
             &REPORT_GROUP_EVIDENCE_REQUIRED,
             &AMENDMENTS_REQUIRED,
             &RUN_DIR_EXISTS,
+            &UNSAFE_NAME,
+            &MISSING_RUN_STATUS,
             &MARKDOWN_SHAPE_MISMATCH,
         ];
         let codes: Vec<&str> = all_defs.iter().map(|d| d.code).collect();
-        let unique: std::collections::HashSet<&str> = codes.iter().copied().collect();
+        let unique: HashSet<&str> = codes.iter().copied().collect();
         assert_eq!(codes.len(), unique.len(), "duplicate codes found");
     }
 
@@ -656,7 +700,7 @@ mod tests {
 
     #[test]
     fn cli_err_closeout_codes_are_distinct() {
-        let codes: std::collections::HashSet<&str> = [
+        let codes: HashSet<&str> = [
             MISSING_CLOSEOUT_ARTIFACT.code,
             MISSING_STATE_CAPTURE.code,
             VERDICT_PENDING.code,
@@ -732,7 +776,7 @@ mod tests {
     #[test]
     fn hook_msg_deny_result() {
         let result = hook_msg(&DENY_CLUSTER_BINARY, &[]);
-        assert_eq!(result.decision, "deny");
+        assert_eq!(result.decision, Decision::Deny);
         assert_eq!(result.code, "KSR005");
         assert!(result.message.contains("`harness run`"));
     }
@@ -743,7 +787,7 @@ mod tests {
             &WARN_MISSING_ARTIFACT,
             &[("script", "preflight.py"), ("target", "/tmp/x")],
         );
-        assert_eq!(result.decision, "warn");
+        assert_eq!(result.decision, Decision::Warn);
         assert_eq!(result.code, "KSR006");
         assert!(result.message.contains("preflight.py"));
         assert!(result.message.contains("/tmp/x"));
@@ -752,7 +796,7 @@ mod tests {
     #[test]
     fn hook_msg_info_result() {
         let result = hook_msg(&INFO_RUN_VERDICT, &[("verdict", "pass")]);
-        assert_eq!(result.decision, "info");
+        assert_eq!(result.decision, Decision::Info);
         assert_eq!(result.code, "KSR012");
         assert!(result.message.contains("pass"));
     }
@@ -760,7 +804,7 @@ mod tests {
     #[test]
     fn hook_msg_deny_with_kwargs() {
         let result = hook_msg(&DENY_WRITE_OUTSIDE_RUN, &[("path", "/bad/path")]);
-        assert_eq!(result.decision, "deny");
+        assert_eq!(result.decision, Decision::Deny);
         assert!(result.message.contains("/bad/path"));
     }
 

@@ -1,13 +1,13 @@
+use std::env;
+use std::fs;
 use std::path::{Path, PathBuf};
 
-use serde_json::json;
-
 use crate::context::{RunLayout, RunMetadata};
-use crate::core_defs::utc_now;
+use crate::core_defs::{harness_data_root, utc_now};
 use crate::errors::{self, CliError};
-use crate::io::write_text;
+use crate::io::append_markdown_row;
 use crate::resolve::resolve_suite_path;
-use crate::schema::{RunReport, RunReportFrontmatter, RunStatus, SuiteSpec};
+use crate::schema::{RunCounts, RunReport, RunReportFrontmatter, RunStatus, SuiteSpec};
 use crate::suite_defaults::default_repo_root_for_suite;
 use crate::workflow::runner::initialize_runner_state;
 
@@ -20,20 +20,23 @@ fn resolve_repo_root(raw: Option<&str>, suite_dir: &Path) -> PathBuf {
     if let Some(default) = default_repo_root_for_suite(suite_dir) {
         return default;
     }
-    std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."))
+    env::current_dir().unwrap_or_else(|_| PathBuf::from("."))
 }
 
 fn resolve_run_root(raw: Option<&str>) -> PathBuf {
     if let Some(r) = raw {
         return PathBuf::from(r);
     }
-    crate::core_defs::harness_data_root().join("runs")
+    harness_data_root().join("runs")
 }
 
 /// Initialize a new test run directory.
 ///
 /// # Errors
 /// Returns `CliError` on failure.
+///
+/// # Panics
+/// Panics if metadata or status structs fail to serialize (should never happen).
 pub fn execute(
     suite: &str,
     run_id: &str,
@@ -81,8 +84,8 @@ pub fn execute(
         required_dependencies: spec.frontmatter.required_dependencies.clone(),
     };
 
-    let meta_json = serde_json::to_string_pretty(&metadata).unwrap_or_default();
-    std::fs::write(layout.metadata_path(), format!("{meta_json}\n")).map_err(|e| CliError {
+    let meta_json = serde_json::to_string_pretty(&metadata).expect("serialization of valid JSON");
+    fs::write(layout.metadata_path(), format!("{meta_json}\n")).map_err(|e| CliError {
         code: "IO".to_string(),
         message: format!("failed to write metadata: {e}"),
         exit_code: 1,
@@ -97,7 +100,7 @@ pub fn execute(
         started_at: created_at,
         overall_verdict: "pending".to_string(),
         completed_at: None,
-        counts: crate::schema::RunCounts::default(),
+        counts: RunCounts::default(),
         executed_groups: vec![],
         skipped_groups: vec![],
         last_completed_group: None,
@@ -106,8 +109,8 @@ pub fn execute(
         next_planned_group: None,
         notes: vec![],
     };
-    let status_json = serde_json::to_string_pretty(&status).unwrap_or_default();
-    std::fs::write(layout.status_path(), format!("{status_json}\n")).map_err(|e| CliError {
+    let status_json = serde_json::to_string_pretty(&status).expect("serialization of valid JSON");
+    fs::write(layout.status_path(), format!("{status_json}\n")).map_err(|e| CliError {
         code: "IO".to_string(),
         message: format!("failed to write status: {e}"),
         exit_code: 1,
@@ -118,14 +121,14 @@ pub fn execute(
     initialize_runner_state(&layout.run_dir())?;
 
     let command_log = layout.commands_dir().join("command-log.md");
-    crate::io::append_markdown_row(
+    append_markdown_row(
         &command_log,
         &["ran_at", "command", "exit_code", "artifact"],
         &["(init)", "harness init", "0", "-"],
     )?;
 
     let manifest_index = layout.manifests_dir().join("manifest-index.md");
-    crate::io::append_markdown_row(
+    append_markdown_row(
         &manifest_index,
         &["copied_at", "manifest", "validated", "applied", "notes"],
         &["(init)", "-", "-", "-", "index created"],

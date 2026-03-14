@@ -1,10 +1,13 @@
 use std::process::ExitCode;
 
+use harness::cli;
+use harness::errors;
+
 fn main() -> ExitCode {
-    match harness::cli::run() {
+    match cli::run() {
         Ok(code) => ExitCode::from(u8::try_from(code).unwrap_or(1)),
         Err(error) => {
-            eprintln!("{}", harness::errors::render_error(&error));
+            eprintln!("{}", errors::render_error(&error));
             ExitCode::from(u8::try_from(error.exit_code).unwrap_or(1))
         }
     }

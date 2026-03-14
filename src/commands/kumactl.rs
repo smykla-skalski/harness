@@ -1,14 +1,10 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use crate::cli::KumactlCommand;
 use crate::errors::{self, CliError};
+use crate::exec::run_command;
 
-fn resolve_repo_root(raw: Option<&str>) -> PathBuf {
-    raw.map(PathBuf::from)
-        .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")))
-}
-
-fn host_platform() -> (String, String) {
+fn host_platform() -> (&'static str, &'static str) {
     let os_name = if cfg!(target_os = "macos") {
         "darwin"
     } else {
@@ -19,10 +15,10 @@ fn host_platform() -> (String, String) {
     } else {
         "amd64"
     };
-    (os_name.to_string(), arch.to_string())
+    (os_name, arch)
 }
 
-fn candidates(root: &std::path::Path) -> Vec<PathBuf> {
+fn candidates(root: &Path) -> Vec<PathBuf> {
     let (os_name, arch) = host_platform();
     let mut result = vec![
         root.join("build")
@@ -44,7 +40,7 @@ fn candidates(root: &std::path::Path) -> Vec<PathBuf> {
     result
 }
 
-fn find_binary(root: &std::path::Path) -> Result<PathBuf, CliError> {
+fn find_binary(root: &Path) -> Result<PathBuf, CliError> {
     for candidate in candidates(root) {
         if candidate.is_file() {
             return Ok(candidate);
@@ -53,8 +49,8 @@ fn find_binary(root: &std::path::Path) -> Result<PathBuf, CliError> {
     Err(errors::cli_err(&errors::KUMACTL_NOT_FOUND, &[]))
 }
 
-fn build_kumactl(root: &std::path::Path) -> Result<(), CliError> {
-    crate::exec::run_command(&["make", "build/kumactl"], Some(root), None, &[0])?;
+fn build_kumactl(root: &Path) -> Result<(), CliError> {
+    run_command(&["make", "build/kumactl"], Some(root), None, &[0])?;
     Ok(())
 }
 
@@ -65,13 +61,13 @@ fn build_kumactl(root: &std::path::Path) -> Result<(), CliError> {
 pub fn execute(cmd: &KumactlCommand) -> Result<i32, CliError> {
     match cmd {
         KumactlCommand::Find { repo_root } => {
-            let root = resolve_repo_root(repo_root.as_deref());
+            let root = super::resolve_repo_root(repo_root.as_deref());
             let binary = find_binary(&root)?;
             println!("{}", binary.display());
             Ok(0)
         }
         KumactlCommand::Build { repo_root } => {
-            let root = resolve_repo_root(repo_root.as_deref());
+            let root = super::resolve_repo_root(repo_root.as_deref());
             build_kumactl(&root)?;
             let binary = find_binary(&root)?;
             println!("{}", binary.display());

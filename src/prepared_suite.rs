@@ -1,3 +1,4 @@
+use std::fs;
 use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
@@ -101,9 +102,9 @@ impl PreparedSuiteArtifact {
         if !path.exists() {
             return Ok(None);
         }
-        let text = std::fs::read_to_string(path).map_err(|e| CliError {
+        let text = fs::read_to_string(path).map_err(|e| CliError {
             code: "KSRCLI014".to_string(),
-            message: format!("missing file: {}", path.display()),
+            message: format!("cannot read file: {}: {e}", path.display()),
             exit_code: 5,
             hint: None,
             details: Some(e.to_string()),
@@ -127,7 +128,7 @@ impl PreparedSuiteArtifact {
     /// Returns `CliError` on IO failure.
     pub fn save(&self, path: &Path) -> Result<(), CliError> {
         if let Some(parent) = path.parent() {
-            std::fs::create_dir_all(parent).map_err(|e| CliError {
+            fs::create_dir_all(parent).map_err(|e| CliError {
                 code: "KSRCLI014".to_string(),
                 message: format!("cannot create directory: {}", parent.display()),
                 exit_code: 5,
@@ -142,7 +143,7 @@ impl PreparedSuiteArtifact {
             hint: None,
             details: Some(e.to_string()),
         })?;
-        std::fs::write(path, json).map_err(|e| CliError {
+        fs::write(path, json).map_err(|e| CliError {
             code: "KSRCLI014".to_string(),
             message: format!("cannot write file: {}", path.display()),
             exit_code: 5,
@@ -198,28 +199,28 @@ pub fn consume_section(body: &str) -> Option<String> {
 
 fn extract_fenced_blocks(text: &str, lang_prefixes: &[&str]) -> Vec<String> {
     let mut blocks = Vec::new();
-    let mut in_block = false;
+    let mut fence_backticks: usize = 0;
     let mut current_block = Vec::new();
 
     for line in text.lines() {
-        if in_block {
-            if line.starts_with("```") && line.trim_start_matches('`').trim().is_empty()
-                || line == "```"
-            {
+        if fence_backticks > 0 {
+            let closing_len = line.len() - line.trim_start_matches('`').len();
+            if closing_len >= fence_backticks && line.trim_start_matches('`').trim().is_empty() {
                 let content = current_block.join("\n").trim().to_string();
                 if !content.is_empty() {
                     blocks.push(format!("{content}\n"));
                 }
                 current_block.clear();
-                in_block = false;
+                fence_backticks = 0;
             } else {
                 current_block.push(line);
             }
         } else if line.starts_with("```") {
-            let tag = line.trim_start_matches('`');
+            let backtick_len = line.len() - line.trim_start_matches('`').len();
+            let tag = &line[backtick_len..];
             let lang = tag.split_whitespace().next().unwrap_or("");
             if lang_prefixes.iter().any(|p| lang.eq_ignore_ascii_case(p)) {
-                in_block = true;
+                fence_backticks = backtick_len;
                 current_block.clear();
             }
         }
@@ -455,7 +456,7 @@ mod tests {
             "profile": "single-zone",
             "prepared_at": "unknown"
         });
-        std::fs::write(&path, serde_json::to_string(&json).unwrap()).unwrap();
+        fs::write(&path, serde_json::to_string(&json).unwrap()).unwrap();
 
         let artifact = PreparedSuiteArtifact::load(&path).unwrap().unwrap();
         assert_eq!(artifact.suite_path, "/tmp/suite.md");
@@ -507,7 +508,7 @@ mod tests {
                 }]
             }]
         });
-        std::fs::write(&path, serde_json::to_string_pretty(&json).unwrap()).unwrap();
+        fs::write(&path, serde_json::to_string_pretty(&json).unwrap()).unwrap();
 
         let artifact = PreparedSuiteArtifact::load(&path).unwrap().unwrap();
         assert_eq!(artifact.source_digests.len(), 1);

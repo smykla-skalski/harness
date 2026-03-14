@@ -25,6 +25,28 @@ fn render(value: &serde_json::Value) -> String {
     }
 }
 
+/// Compute the longest common subsequence table for two slices of lines.
+fn lcs_table<'a>(left: &[&'a str], right: &[&'a str]) -> Vec<Vec<usize>> {
+    let m = left.len();
+    let n = right.len();
+    let mut table = vec![vec![0_usize; n + 1]; m + 1];
+    for i in 1..=m {
+        for j in 1..=n {
+            table[i][j] = if left[i - 1] == right[j - 1] {
+                table[i - 1][j - 1] + 1
+            } else {
+                table[i - 1][j].max(table[i][j - 1])
+            };
+        }
+    }
+    table
+}
+
+/// Produce a simple unified-style diff between two text blocks.
+///
+/// Uses a longest-common-subsequence algorithm so that duplicate lines,
+/// reordered lines, and positional changes are all represented correctly.
+/// The output is meant for human consumption, not machine parsing.
 fn simple_unified_diff(
     left: &str,
     right: &str,
@@ -36,17 +58,31 @@ fn simple_unified_diff(
     if left_lines == right_lines {
         return Vec::new();
     }
+
+    let table = lcs_table(&left_lines, &right_lines);
+    let mut hunks: Vec<String> = Vec::new();
+
+    // Back-trace through the LCS table to emit diff hunks.
+    let mut i = left_lines.len();
+    let mut j = right_lines.len();
+    while i > 0 || j > 0 {
+        if i > 0 && j > 0 && left_lines[i - 1] == right_lines[j - 1] {
+            hunks.push(format!(" {}", left_lines[i - 1]));
+            i -= 1;
+            j -= 1;
+        } else if j > 0 && (i == 0 || table[i][j - 1] >= table[i - 1][j]) {
+            hunks.push(format!("+{}", right_lines[j - 1]));
+            j -= 1;
+        } else {
+            hunks.push(format!("-{}", left_lines[i - 1]));
+            i -= 1;
+        }
+    }
+
+    hunks.reverse();
+
     let mut output = vec![format!("--- {left_label}"), format!("+++ {right_label}")];
-    for line in &left_lines {
-        if !right_lines.contains(line) {
-            output.push(format!("-{line}"));
-        }
-    }
-    for line in &right_lines {
-        if !left_lines.contains(line) {
-            output.push(format!("+{line}"));
-        }
-    }
+    output.append(&mut hunks);
     output
 }
 

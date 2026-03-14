@@ -1,25 +1,13 @@
-use std::path::PathBuf;
-
 use crate::cli::RunDirArgs;
 use crate::context::RunContext;
 use crate::errors::{self, CliError};
-use crate::resolve::resolve_run_directory;
-
-fn resolve_run_dir(args: &RunDirArgs) -> Result<PathBuf, CliError> {
-    let lookup = crate::context::RunLookup {
-        run_dir: args.run_dir.clone(),
-        run_id: args.run_id.clone(),
-        run_root: args.run_root.clone(),
-    };
-    Ok(resolve_run_directory(&lookup)?.run_dir)
-}
 
 /// Close out a run by verifying required artifacts.
 ///
 /// # Errors
 /// Returns `CliError` on failure.
 pub fn execute(run_dir_args: &RunDirArgs) -> Result<i32, CliError> {
-    let run_dir = resolve_run_dir(run_dir_args)?;
+    let run_dir = super::resolve_run_dir(run_dir_args)?;
     let ctx = RunContext::from_run_dir(&run_dir)?;
 
     let required = [
@@ -38,14 +26,15 @@ pub fn execute(run_dir_args: &RunDirArgs) -> Result<i32, CliError> {
         }
     }
 
-    let status = ctx.status.as_ref();
-    if let Some(s) = status {
-        if s.last_state_capture.is_none() {
-            return Err(errors::cli_err(&errors::MISSING_STATE_CAPTURE, &[]));
-        }
-        if s.overall_verdict == "pending" {
-            return Err(errors::cli_err(&errors::VERDICT_PENDING, &[]));
-        }
+    let status = ctx
+        .status
+        .as_ref()
+        .ok_or_else(|| errors::cli_err(&errors::MISSING_RUN_STATUS, &[]))?;
+    if status.last_state_capture.is_none() {
+        return Err(errors::cli_err(&errors::MISSING_STATE_CAPTURE, &[]));
+    }
+    if status.overall_verdict == "pending" {
+        return Err(errors::cli_err(&errors::VERDICT_PENDING, &[]));
     }
 
     println!("run closeout is complete; start a new run id for any further bootstrap or execution");
