@@ -21,7 +21,7 @@ pub fn write_suite_defaults(
     repo_root: Option<&Path>,
 ) -> Result<PathBuf, CliError> {
     io::ensure_dir(suite_dir).map_err(|e| CliError {
-        code: "KSRCLI014".to_string(),
+        code: "KSRCLI014".into(),
         message: format!("missing file: {e}"),
         exit_code: 5,
         hint: None,

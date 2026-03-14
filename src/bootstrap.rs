@@ -88,7 +88,7 @@ pub fn choose_install_dir(path_env: &str) -> Result<(PathBuf, bool), CliError> {
 /// Returns `CliError` on IO failure.
 pub fn install_wrapper(target_dir: &Path) -> Result<PathBuf, CliError> {
     fs::create_dir_all(target_dir).map_err(|e| errors::CliError {
-        code: "IO".to_string(),
+        code: "IO".into(),
         message: format!("failed to create directory: {e}"),
         exit_code: 1,
         hint: None,
@@ -125,7 +125,7 @@ pub fn main(project_dir: &Path, path_env: &str) -> Result<i32, CliError> {
     let harness = project_dir.join(".claude").join("skills").join("harness");
     if !harness.exists() {
         return Err(errors::CliError {
-            code: "BOOTSTRAP".to_string(),
+            code: "BOOTSTRAP".into(),
             message: format!("missing source wrapper: {}", harness.display()),
             exit_code: 1,
             hint: None,
@@ -139,7 +139,10 @@ pub fn main(project_dir: &Path, path_env: &str) -> Result<i32, CliError> {
 }
 
 fn dirs_home() -> PathBuf {
-    env::var("HOME").map_or_else(|_| PathBuf::from("/tmp"), PathBuf::from)
+    env::var("HOME").map_or_else(
+        |_| env::temp_dir().join(format!("harness-{}", unsafe { libc::getuid() })),
+        PathBuf::from,
+    )
 }
 
 fn path_candidates(path_env: &str) -> Vec<PathBuf> {
@@ -204,7 +207,7 @@ fn canonical_or_same(path: &Path) -> PathBuf {
 #[allow(clippy::needless_pass_by_value)]
 fn io_err(e: io::Error) -> CliError {
     CliError {
-        code: "IO".to_string(),
+        code: "IO".into(),
         message: format!("IO error: {e}"),
         exit_code: 1,
         hint: None,

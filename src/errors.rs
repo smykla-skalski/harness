@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::collections::HashMap;
 use std::error::Error;
 use std::fmt;
@@ -24,7 +25,7 @@ pub struct HookDef {
 /// The unified CLI error type.
 #[derive(Debug)]
 pub struct CliError {
-    pub code: String,
+    pub code: Cow<'static, str>,
     pub message: String,
     pub exit_code: i32,
     pub hint: Option<String>,
@@ -47,7 +48,7 @@ pub fn cli_err(def: &ErrorDef, args: &[(&str, &str)]) -> CliError {
     let message = render_template(def.template, &map);
     let hint = def.hint.map(|h| render_template(h, &map));
     CliError {
-        code: def.code.to_string(),
+        code: Cow::Borrowed(def.code),
         message,
         exit_code: def.exit_code,
         hint,

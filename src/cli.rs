@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use clap::{Args, Parser, Subcommand};
 use serde_json::json;
 
@@ -27,13 +29,13 @@ const BLOCKING_HOOKS: &[&str] = &["guard-stop"];
 pub struct RunDirArgs {
     /// Run directory path.
     #[arg(long)]
-    pub run_dir: Option<String>,
+    pub run_dir: Option<PathBuf>,
     /// Run ID to resolve from session context.
     #[arg(long)]
     pub run_id: Option<String>,
     /// Parent directory containing run directories.
     #[arg(long)]
-    pub run_root: Option<String>,
+    pub run_root: Option<PathBuf>,
 }
 
 // ---------------------------------------------------------------------------
@@ -1618,7 +1620,7 @@ mod tests {
     #[test]
     fn format_error_detail_includes_code_and_message() {
         let error = CliError {
-            code: "KSRCLI005".to_string(),
+            code: "KSRCLI005".into(),
             message: "missing run pointer".to_string(),
             exit_code: 5,
             hint: Some("Run init first.".to_string()),
@@ -1634,7 +1636,7 @@ mod tests {
     #[test]
     fn format_error_detail_includes_details() {
         let error = CliError {
-            code: "KSRCLI004".to_string(),
+            code: "KSRCLI004".into(),
             message: "command failed".to_string(),
             exit_code: 4,
             hint: None,

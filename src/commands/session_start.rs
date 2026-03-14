@@ -24,9 +24,9 @@ pub fn execute(project_dir: Option<&str>) -> Result<i32, CliError> {
 
     // Check for a pending compact handoff to restore
     let handoff = compact::pending_compact_handoff(&dir);
-    if let Some(ref h) = handoff {
-        let diverged = compact::verify_fingerprints(h);
-        let context = compact::render_hydration_context(h, &diverged);
+    if let Some(h) = handoff {
+        let diverged = compact::verify_fingerprints(&h);
+        let context = compact::render_hydration_context(&h, &diverged);
         if let Err(e) = compact::consume_compact_handoff(&dir, h) {
             eprintln!("warning: compact handoff consume failed: {e}");
         }

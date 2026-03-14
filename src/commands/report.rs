@@ -81,6 +81,7 @@ fn run_group(
         run_id: run_dir_args.run_id.clone(),
         run_root: run_dir_args.run_root.clone(),
     };
+
     let run_dir = resolve_run_directory(&lookup)?.run_dir;
 
     if evidence.is_empty() && evidence_label.is_empty() && capture_label.is_none() {

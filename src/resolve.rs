@@ -20,15 +20,20 @@ pub struct ResolvedRun {
 /// Returns `CliError` if the run directory cannot be determined.
 pub fn resolve_run_directory(lookup: &RunLookup) -> Result<ResolvedRun, CliError> {
     if let Some(run_dir) = &lookup.run_dir {
-        let path = PathBuf::from(run_dir);
-        if path.exists() {
-            return Ok(ResolvedRun { run_dir: path });
+        if run_dir.exists() {
+            return Ok(ResolvedRun {
+                run_dir: run_dir.clone(),
+            });
         }
-        return Err(errors::cli_err(&errors::MISSING_FILE, &[("path", run_dir)]));
+        let display = run_dir.display().to_string();
+        return Err(errors::cli_err(
+            &errors::MISSING_FILE,
+            &[("path", &display)],
+        ));
     }
 
     if let (Some(run_root), Some(run_id)) = (&lookup.run_root, &lookup.run_id) {
-        let path = PathBuf::from(run_root).join(run_id);
+        let path = run_root.join(run_id);
         if path.exists() {
             return Ok(ResolvedRun { run_dir: path });
         }
@@ -154,7 +159,7 @@ mod tests {
     fn resolve_run_directory_with_existing_dir() {
         let dir = tempfile::tempdir().unwrap();
         let lookup = RunLookup {
-            run_dir: Some(dir.path().to_string_lossy().to_string()),
+            run_dir: Some(dir.path().to_path_buf()),
             run_id: None,
             run_root: None,
         };
@@ -170,7 +175,7 @@ mod tests {
         let lookup = RunLookup {
             run_dir: None,
             run_id: Some("my-run".to_string()),
-            run_root: Some(dir.path().to_string_lossy().to_string()),
+            run_root: Some(dir.path().to_path_buf()),
         };
         let resolved = resolve_run_directory(&lookup).unwrap();
         assert_eq!(resolved.run_dir, run_dir);
@@ -181,7 +186,7 @@ mod tests {
         let lookup = RunLookup {
             run_dir: None,
             run_id: Some("ghost".to_string()),
-            run_root: Some("/nonexistent".to_string()),
+            run_root: Some(PathBuf::from("/nonexistent")),
         };
         let err = resolve_run_directory(&lookup).unwrap_err();
         assert_eq!(err.code, "KSRCLI018");

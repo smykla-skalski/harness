@@ -7,7 +7,7 @@ fn load_payload(path: &Path) -> Result<serde_json::Value, CliError> {
     let text = read_text(path)?;
     if path.extension().and_then(|e| e.to_str()) == Some("json") {
         serde_json::from_str(&text).map_err(|e| CliError {
-            code: "JSON".to_string(),
+            code: "JSON".into(),
             message: format!("invalid JSON in {}: {e}", path.display()),
             exit_code: 5,
             hint: None,

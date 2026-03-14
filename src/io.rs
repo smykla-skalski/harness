@@ -100,12 +100,13 @@ pub fn write_json(path: &Path, payload: &Value) -> Result<(), CliError> {
     write_text(path, &format!("{text}\n"))
 }
 
-/// Parse markdown frontmatter using comrak for extraction and `serde_yml` for
-/// YAML parsing.
+/// Parse markdown frontmatter into generic JSON values using comrak for
+/// extraction and `serde_yml` for YAML parsing. Returns key-value pairs as
+/// `HashMap<String, serde_json::Value>` and the body text.
 ///
 /// # Errors
 /// Returns `CliError` if frontmatter is missing or malformed.
-pub fn split_frontmatter(text: &str) -> Result<(HashMap<String, Value>, String), CliError> {
+pub fn parse_frontmatter_values(text: &str) -> Result<(HashMap<String, Value>, String), CliError> {
     let mut options = Options::default();
     options.extension.front_matter_delimiter = Some("---".to_owned());
 
@@ -336,7 +337,7 @@ mod tests {
     #[test]
     fn parse_frontmatter_scalars() {
         let text = "---\nname: hello\ncount: 42\nrate: 3.15\n---\n\nbody";
-        let (payload, _body) = split_frontmatter(text).unwrap();
+        let (payload, _body) = parse_frontmatter_values(text).unwrap();
         assert_eq!(payload["name"], json!("hello"));
         assert_eq!(payload["count"], json!(42));
         assert_eq!(payload["rate"], json!(3.15));
@@ -345,7 +346,7 @@ mod tests {
     #[test]
     fn parse_frontmatter_booleans() {
         let text = "---\nenabled: true\ndisabled: false\nalso_yes: yes\nalso_no: no\n---\n\nbody";
-        let (payload, _) = split_frontmatter(text).unwrap();
+        let (payload, _) = parse_frontmatter_values(text).unwrap();
         assert_eq!(payload["enabled"], json!(true));
         assert_eq!(payload["disabled"], json!(false));
         // serde_yml treats yes/no as booleans
@@ -356,7 +357,7 @@ mod tests {
     #[test]
     fn parse_frontmatter_null() {
         let text = "---\nempty: null\ntilde: ~\nbare:\n---\n\nbody";
-        let (payload, _) = split_frontmatter(text).unwrap();
+        let (payload, _) = parse_frontmatter_values(text).unwrap();
         assert_eq!(payload["empty"], Value::Null);
         assert_eq!(payload["tilde"], Value::Null);
         assert_eq!(payload["bare"], Value::Null);
@@ -365,57 +366,57 @@ mod tests {
     #[test]
     fn parse_frontmatter_inline_list() {
         let text = "---\nitems: [a, b, c]\n---\n\nbody";
-        let (payload, _) = split_frontmatter(text).unwrap();
+        let (payload, _) = parse_frontmatter_values(text).unwrap();
         assert_eq!(payload["items"], json!(["a", "b", "c"]));
     }
 
     #[test]
     fn parse_frontmatter_empty_inline_list() {
         let text = "---\nitems: []\n---\n\nbody";
-        let (payload, _) = split_frontmatter(text).unwrap();
+        let (payload, _) = parse_frontmatter_values(text).unwrap();
         assert_eq!(payload["items"], json!([]));
     }
 
     #[test]
     fn parse_frontmatter_empty_dict() {
         let text = "---\nmeta: {}\n---\n\nbody";
-        let (payload, _) = split_frontmatter(text).unwrap();
+        let (payload, _) = parse_frontmatter_values(text).unwrap();
         assert_eq!(payload["meta"], json!({}));
     }
 
     #[test]
     fn parse_frontmatter_block_list() {
         let text = "---\nitems:\n  - alpha\n  - beta\n  - gamma\n---\n\nbody";
-        let (payload, _) = split_frontmatter(text).unwrap();
+        let (payload, _) = parse_frontmatter_values(text).unwrap();
         assert_eq!(payload["items"], json!(["alpha", "beta", "gamma"]));
     }
 
     #[test]
     fn parse_frontmatter_quoted_strings() {
         let text = "---\nname: \"hello world\"\nsingle: 'test'\n---\n\nbody";
-        let (payload, _) = split_frontmatter(text).unwrap();
+        let (payload, _) = parse_frontmatter_values(text).unwrap();
         assert_eq!(payload["name"], json!("hello world"));
         assert_eq!(payload["single"], json!("test"));
     }
 
     #[test]
-    fn split_frontmatter_valid() {
+    fn parse_frontmatter_values_valid() {
         let text = "---\nname: test\ncount: 3\n---\n\nBody content here.";
-        let (payload, body) = split_frontmatter(text).unwrap();
+        let (payload, body) = parse_frontmatter_values(text).unwrap();
         assert_eq!(payload["name"], json!("test"));
         assert_eq!(payload["count"], json!(3));
         assert!(body.contains("Body content here."));
     }
 
     #[test]
-    fn split_frontmatter_missing_start() {
-        let err = split_frontmatter("no frontmatter").unwrap_err();
+    fn parse_frontmatter_values_missing_start() {
+        let err = parse_frontmatter_values("no frontmatter").unwrap_err();
         assert!(err.message.contains("missing YAML frontmatter"));
     }
 
     #[test]
-    fn split_frontmatter_unterminated() {
-        let err = split_frontmatter("---\nname: test\n").unwrap_err();
+    fn parse_frontmatter_values_unterminated() {
+        let err = parse_frontmatter_values("---\nname: test\n").unwrap_err();
         assert!(err.message.contains("unterminated"));
     }
 
