@@ -1,7 +1,11 @@
 use std::collections::HashMap;
 use std::path::Path;
 
+use comrak::nodes::NodeValue;
+use comrak::{Arena, Options, parse_document};
 use serde_json::Value;
+use tabled::builder::Builder;
+use tabled::settings::Style;
 
 use crate::errors::{
     self, CliError, MARKDOWN_SHAPE_MISMATCH, MISSING_FILE, MISSING_FRONTMATTER, NOT_A_LIST,
@@ -89,28 +93,59 @@ pub fn read_json(path: &Path) -> Result<Value, CliError> {
 /// # Errors
 /// Returns `CliError` on IO failure.
 pub fn write_json(path: &Path, payload: &Value) -> Result<(), CliError> {
-    let text = serde_json::to_string_pretty(payload).unwrap_or_default();
+    let text = serde_json::to_string_pretty(payload).expect("serialization of valid JSON value");
     write_text(path, &format!("{text}\n"))
 }
 
-/// Parse markdown frontmatter using serde_yml.
+/// Parse markdown frontmatter using comrak for extraction and serde_yml for
+/// YAML parsing.
 ///
 /// # Errors
 /// Returns `CliError` if frontmatter is missing or malformed.
 pub fn split_frontmatter(text: &str) -> Result<(HashMap<String, Value>, String), CliError> {
-    if !text.starts_with("---\n") {
-        return Err(errors::cli_err(&MISSING_FRONTMATTER, &[]));
-    }
-    let marker = "\n---\n";
-    let end = text[4..]
-        .find(marker)
-        .ok_or_else(|| errors::cli_err(&UNTERMINATED_FRONTMATTER, &[]))?;
-    let yaml_text = &text[4..4 + end];
-    let body = &text[4 + end + marker.len()..];
+    let mut options = Options::default();
+    options.extension.front_matter_delimiter = Some("---".to_owned());
+
+    let arena = Arena::new();
+    let root = parse_document(&arena, text, &options);
+
+    let fm_content = root.descendants().find_map(|node| {
+        let data = node.data.borrow();
+        if let NodeValue::FrontMatter(ref content) = data.value {
+            Some(content.clone())
+        } else {
+            None
+        }
+    });
+
+    let Some(raw_fm) = fm_content else {
+        return if text.starts_with("---\n") {
+            Err(errors::cli_err(&UNTERMINATED_FRONTMATTER, &[]))
+        } else {
+            Err(errors::cli_err(&MISSING_FRONTMATTER, &[]))
+        };
+    };
+
+    // Strip the `---\n ... \n---\n` delimiters to get bare YAML.
+    let yaml_text = raw_fm.strip_prefix("---\n").unwrap_or(&raw_fm);
+    // Find the closing delimiter and take everything before it.
+    let yaml_text = if let Some(pos) = yaml_text.rfind("\n---") {
+        &yaml_text[..pos]
+    } else {
+        yaml_text
+    };
+
+    // The body is everything after the frontmatter block.
+    let body = &text[raw_fm.len()..];
     let body = body.trim_start_matches('\n');
 
-    let yaml_value: serde_yml::Value = serde_yml::from_str(yaml_text)
-        .unwrap_or(serde_yml::Value::Mapping(serde_yml::Mapping::new()));
+    let yaml_value: serde_yml::Value = serde_yml::from_str(yaml_text).map_err(|e| {
+        errors::cli_err_with_details(
+            &UNTERMINATED_FRONTMATTER,
+            &[],
+            &format!("YAML parse error: {e}"),
+        )
+    })?;
     let map = yaml_to_json_map(&yaml_value);
     Ok((map, body.to_string()))
 }
@@ -178,14 +213,21 @@ pub fn append_markdown_row(path: &Path, headers: &[&str], values: &[&str]) -> Re
         return Err(errors::cli_err(&MARKDOWN_SHAPE_MISMATCH, &[]));
     }
     let current = if path.exists() {
-        read_text(path)?
+        let text = read_text(path)?;
+        // Verify that the caller's headers match the existing table.
+        if let Some(header_line) = text.lines().find(|l| l.starts_with('|')) {
+            let existing: Vec<&str> = header_line
+                .split('|')
+                .filter(|s| !s.trim().is_empty())
+                .map(str::trim)
+                .collect();
+            debug_assert!(
+                existing == headers,
+                "append_markdown_row: caller headers {headers:?} do not match existing {existing:?}"
+            );
+        }
+        text
     } else {
-        let head = headers.join(" | ");
-        let divider = headers
-            .iter()
-            .map(|_| "---")
-            .collect::<Vec<_>>()
-            .join(" | ");
         let stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or("table");
         let title = stem.replace('-', " ");
         // Title-case each word
@@ -203,7 +245,11 @@ pub fn append_markdown_row(path: &Path, headers: &[&str], values: &[&str]) -> Re
             })
             .collect::<Vec<_>>()
             .join(" ");
-        format!("# {title}\n\n| {head} |\n| {divider} |\n")
+        let mut builder = Builder::default();
+        builder.push_record(headers.iter().copied());
+        let mut table = builder.build();
+        table.with(Style::markdown());
+        format!("# {title}\n\n{table}\n")
     };
     let escaped: Vec<String> = values
         .iter()
@@ -288,11 +334,11 @@ mod tests {
 
     #[test]
     fn parse_frontmatter_scalars() {
-        let text = "---\nname: hello\ncount: 42\nrate: 3.14\n---\n\nbody";
+        let text = "---\nname: hello\ncount: 42\nrate: 3.15\n---\n\nbody";
         let (payload, _body) = split_frontmatter(text).unwrap();
         assert_eq!(payload["name"], json!("hello"));
         assert_eq!(payload["count"], json!(42));
-        assert_eq!(payload["rate"], json!(3.14));
+        assert_eq!(payload["rate"], json!(3.15));
     }
 
     #[test]
