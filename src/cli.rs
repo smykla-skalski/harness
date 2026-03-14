@@ -811,36 +811,141 @@ fn run_hook_command(skill: &str, hook: &HookCommand) -> Result<i32, CliError> {
 // Command dispatch
 // ---------------------------------------------------------------------------
 
-/// Dispatch a non-hook command to its module. All command modules currently
-/// contain `todo!()` stubs - they will be implemented by their respective
-/// units.
-fn dispatch_command(command: &Command) -> Result<i32, CliError> {
+/// Dispatch a non-hook command to its module.
+fn dispatch_command(command: Command) -> Result<i32, CliError> {
     match command {
         Command::Hook { .. } => unreachable!("hooks are handled separately"),
-        Command::Init { .. } => commands::init_run::execute(),
-        Command::Bootstrap { .. } => commands::bootstrap::execute(),
-        Command::Cluster { .. } => commands::cluster::execute(),
-        Command::Preflight { .. } => commands::preflight::execute(),
-        Command::Capture { .. } => commands::capture::execute(),
-        Command::Record { .. } => commands::record::execute(),
-        Command::Apply { .. } => commands::apply::execute(),
-        Command::Validate { .. } => commands::validate::execute(),
-        Command::RunnerState { .. } => commands::runner_state::execute(),
-        Command::Closeout { .. } => commands::closeout::execute(),
-        Command::Report { .. } => commands::report::execute(),
-        Command::Diff { .. } => commands::diff::execute(),
-        Command::Envoy { .. } => commands::envoy::execute(),
-        Command::Gateway { .. } => commands::gateway::execute(),
-        Command::Kumactl { .. } => commands::kumactl::execute(),
-        Command::SessionStart { .. } => commands::session_start::execute(),
-        Command::SessionStop { .. } => commands::session_stop::execute(),
-        Command::PreCompact { .. } => commands::pre_compact::execute(),
-        Command::AuthoringBegin { .. } => commands::authoring_begin::execute(),
-        Command::AuthoringSave { .. } => commands::authoring_save::execute(),
-        Command::AuthoringShow { .. } => commands::authoring_show::execute(),
-        Command::AuthoringReset { .. } => commands::authoring_reset::execute(),
-        Command::AuthoringValidate { .. } => commands::authoring_validate::execute(),
-        Command::ApprovalBegin { .. } => commands::approval_begin::execute(),
+        Command::Init {
+            suite,
+            run_id,
+            profile,
+            repo_root,
+            run_root,
+        } => commands::init_run::execute(
+            &suite,
+            &run_id,
+            &profile,
+            repo_root.as_deref(),
+            run_root.as_deref(),
+        ),
+        Command::Bootstrap { project_dir } => commands::bootstrap::execute(project_dir.as_deref()),
+        Command::Cluster {
+            mode,
+            cluster_name,
+            extra_cluster_names,
+            repo_root,
+            run_dir,
+            helm_setting,
+            restart_namespace,
+        } => commands::cluster::execute(
+            &mode,
+            &cluster_name,
+            &extra_cluster_names,
+            repo_root.as_deref(),
+            run_dir.as_deref(),
+            &helm_setting,
+            &restart_namespace,
+        ),
+        Command::Preflight {
+            kubeconfig,
+            repo_root,
+            run_dir,
+        } => commands::preflight::execute(kubeconfig.as_deref(), repo_root.as_deref(), &run_dir),
+        Command::Capture {
+            kubeconfig,
+            label,
+            run_dir,
+        } => commands::capture::execute(kubeconfig.as_deref(), &label, &run_dir),
+        Command::Record {
+            repo_root,
+            phase,
+            label,
+            cluster,
+            command,
+            run_dir,
+        } => commands::record::execute(
+            repo_root.as_deref(),
+            phase.as_deref(),
+            label.as_deref(),
+            cluster.as_deref(),
+            &command,
+            &run_dir,
+        ),
+        Command::Apply {
+            kubeconfig,
+            cluster,
+            manifest,
+            step,
+            run_dir,
+        } => commands::apply::execute(
+            kubeconfig.as_deref(),
+            cluster.as_deref(),
+            &manifest,
+            step.as_deref(),
+            &run_dir,
+        ),
+        Command::Validate {
+            kubeconfig,
+            manifest,
+            output,
+        } => commands::validate::execute(kubeconfig.as_deref(), &manifest, output.as_deref()),
+        Command::RunnerState {
+            event,
+            suite_target,
+            message,
+            run_dir,
+        } => commands::runner_state::execute(
+            event.as_deref(),
+            suite_target.as_deref(),
+            message.as_deref(),
+            &run_dir,
+        ),
+        Command::Closeout { run_dir } => commands::closeout::execute(&run_dir),
+        Command::Report { cmd } => commands::report::execute(&cmd),
+        Command::Diff { left, right, path } => {
+            commands::diff::execute(&left, &right, path.as_deref())
+        }
+        Command::Envoy { cmd } => commands::envoy::execute(&cmd),
+        Command::Gateway {
+            kubeconfig,
+            repo_root,
+            check_only,
+        } => commands::gateway::execute(kubeconfig.as_deref(), repo_root.as_deref(), check_only),
+        Command::Kumactl { cmd } => commands::kumactl::execute(&cmd),
+        Command::SessionStart { project_dir } => {
+            commands::session_start::execute(project_dir.as_deref())
+        }
+        Command::SessionStop { project_dir } => {
+            commands::session_stop::execute(project_dir.as_deref())
+        }
+        Command::PreCompact { project_dir } => {
+            commands::pre_compact::execute(project_dir.as_deref())
+        }
+        Command::AuthoringBegin {
+            skill: _,
+            repo_root,
+            feature,
+            mode,
+            suite_dir,
+            suite_name,
+        } => {
+            commands::authoring_begin::execute(&repo_root, &feature, &mode, &suite_dir, &suite_name)
+        }
+        Command::AuthoringSave {
+            kind,
+            payload,
+            input,
+        } => commands::authoring_save::execute(&kind, payload.as_deref(), input.as_deref()),
+        Command::AuthoringShow { kind } => commands::authoring_show::execute(&kind),
+        Command::AuthoringReset { skill: _ } => commands::authoring_reset::execute(),
+        Command::AuthoringValidate { path, repo_root } => {
+            commands::authoring_validate::execute(&path, repo_root.as_deref())
+        }
+        Command::ApprovalBegin {
+            skill: _,
+            mode,
+            suite_dir,
+        } => commands::approval_begin::execute(&mode, suite_dir.as_deref()),
     }
 }
 
@@ -856,8 +961,11 @@ fn dispatch_command(command: &Command) -> Result<i32, CliError> {
 /// stdout and the function returns `Ok(0)`.
 pub fn run() -> Result<i32, CliError> {
     let cli = Cli::parse();
-    match &cli.command {
-        Command::Hook { skill, hook } => run_hook_command(skill, hook),
+    match cli.command {
+        Command::Hook {
+            ref skill,
+            ref hook,
+        } => run_hook_command(skill, hook),
         other => dispatch_command(other),
     }
 }
