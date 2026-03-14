@@ -114,9 +114,9 @@ pub struct RunMetadata {
 /// Lookup key for resolving a run directory.
 #[derive(Debug, Clone, Default)]
 pub struct RunLookup {
-    pub run_dir: Option<String>,
+    pub run_dir: Option<PathBuf>,
     pub run_id: Option<String>,
-    pub run_root: Option<String>,
+    pub run_root: Option<PathBuf>,
 }
 
 /// Environment variables for command execution within a run.
@@ -136,6 +136,11 @@ pub struct CommandEnv {
 
 impl CommandEnv {
     /// Convert to a map of environment variable names to values.
+    ///
+    /// Returns owned strings because `Command::envs()` needs `AsRef<OsStr>`
+    /// values that outlive the iterator. A `HashMap<&str, &str>` would work
+    /// if callers only read the map, but the primary use case is feeding
+    /// env vars to child processes, so owned strings are the right fit.
     #[must_use]
     pub fn to_env_dict(&self) -> HashMap<String, String> {
         let mut map = HashMap::with_capacity(9);

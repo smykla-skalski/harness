@@ -64,7 +64,7 @@ pub fn execute(
     }
 
     layout.ensure_dirs().map_err(|e| CliError {
-        code: "IO".to_string(),
+        code: "IO".into(),
         message: format!("failed to create run directories: {e}"),
         exit_code: 1,
         hint: None,
@@ -86,7 +86,7 @@ pub fn execute(
 
     let meta_json = serde_json::to_string_pretty(&metadata).expect("serialization of valid JSON");
     fs::write(layout.metadata_path(), format!("{meta_json}\n")).map_err(|e| CliError {
-        code: "IO".to_string(),
+        code: "IO".into(),
         message: format!("failed to write metadata: {e}"),
         exit_code: 1,
         hint: None,
@@ -111,7 +111,7 @@ pub fn execute(
     };
     let status_json = serde_json::to_string_pretty(&status).expect("serialization of valid JSON");
     fs::write(layout.status_path(), format!("{status_json}\n")).map_err(|e| CliError {
-        code: "IO".to_string(),
+        code: "IO".into(),
         message: format!("failed to write status: {e}"),
         exit_code: 1,
         hint: None,

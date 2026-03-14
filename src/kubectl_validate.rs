@@ -44,14 +44,14 @@ pub fn read_kubectl_validate_state() -> Result<Option<KubectlValidateState>, Cli
         return Ok(None);
     }
     let text = fs::read_to_string(&path).map_err(|e| CliError {
-        code: "IO".to_string(),
+        code: "IO".into(),
         message: format!("failed to read {}: {e}", path.display()),
         exit_code: 1,
         hint: None,
         details: None,
     })?;
     let state: KubectlValidateState = serde_json::from_str(&text).map_err(|e| CliError {
-        code: "PARSE".to_string(),
+        code: "PARSE".into(),
         message: format!("failed to parse {}: {e}", path.display()),
         exit_code: 1,
         hint: None,
@@ -110,7 +110,10 @@ pub fn resolve_kubectl_validate_binary() -> Option<PathBuf> {
 }
 
 fn default_install_candidates() -> Vec<PathBuf> {
-    let home = env::var("HOME").map_or_else(|_| PathBuf::from("/tmp"), PathBuf::from);
+    let home = env::var("HOME").map_or_else(
+        |_| env::temp_dir().join(format!("harness-{}", unsafe { libc::getuid() })),
+        PathBuf::from,
+    );
     vec![
         home.join(".local").join("bin").join("kubectl-validate"),
         home.join("bin").join("kubectl-validate"),

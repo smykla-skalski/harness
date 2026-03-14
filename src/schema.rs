@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::fs;
 use std::path::{Path, PathBuf};
 
 use comrak::nodes::NodeValue;
@@ -7,39 +6,12 @@ use comrak::{Arena, Options, parse_document};
 use serde::{Deserialize, Serialize};
 
 use crate::errors::{self, CliError};
+use crate::io;
 use crate::rules;
 
 // ---------------------------------------------------------------------------
-// Internal helpers for frontmatter parsing and file I/O.
+// Internal helpers for frontmatter parsing.
 // ---------------------------------------------------------------------------
-
-fn read_file(path: &Path) -> Result<String, CliError> {
-    fs::read_to_string(path).map_err(|_| {
-        errors::cli_err(
-            &errors::MISSING_FILE,
-            &[("path", &path.display().to_string())],
-        )
-    })
-}
-
-fn write_file(path: &Path, text: &str) -> Result<(), CliError> {
-    if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent).map_err(|e| CliError {
-            code: "IO".to_string(),
-            message: e.to_string(),
-            exit_code: 1,
-            hint: None,
-            details: None,
-        })?;
-    }
-    fs::write(path, text).map_err(|e| CliError {
-        code: "IO".to_string(),
-        message: e.to_string(),
-        exit_code: 1,
-        hint: None,
-        details: None,
-    })
-}
 
 /// Split frontmatter from body using `comrak` for extraction and `serde_yml` for
 /// YAML parsing. Returns parsed YAML mapping and body text.
@@ -220,7 +192,7 @@ impl SuiteSpec {
     /// # Errors
     /// Returns `CliError` if the file is missing or frontmatter is invalid.
     pub fn from_markdown(path: &Path) -> Result<Self, CliError> {
-        let text = read_file(path)?;
+        let text = io::read_text(path)?;
         let (yaml, _body) = split_frontmatter(&text)?;
         let map = &yaml;
 
@@ -323,7 +295,7 @@ impl GroupSpec {
     /// Returns `CliError` if the file is missing, frontmatter is invalid,
     /// or required sections are missing.
     pub fn from_markdown(path: &Path) -> Result<Self, CliError> {
-        let text = read_file(path)?;
+        let text = io::read_text(path)?;
         let (yaml, body) = split_frontmatter(&text)?;
         let map = &yaml;
 
@@ -394,7 +366,7 @@ impl RunReport {
     /// # Errors
     /// Returns `CliError` on failure.
     pub fn from_markdown(path: &Path) -> Result<Self, CliError> {
-        let text = read_file(path)?;
+        let text = io::read_text(path)?;
         let (yaml, body) = split_frontmatter(&text)?;
         let map = &yaml;
 
@@ -453,7 +425,7 @@ impl RunReport {
     /// # Errors
     /// Returns `CliError` on IO failure.
     pub fn save(&self) -> Result<(), CliError> {
-        write_file(&self.path, &self.to_markdown())
+        io::write_text(&self.path, &self.to_markdown())
     }
 }
 
@@ -530,9 +502,9 @@ impl RunStatus {
     /// # Errors
     /// Returns `CliError` if the file is missing or contains invalid JSON.
     pub fn load(path: &Path) -> Result<Self, CliError> {
-        let text = read_file(path)?;
+        let text = io::read_text(path)?;
         serde_json::from_str(&text).map_err(|e| CliError {
-            code: "JSON".to_string(),
+            code: "JSON".into(),
             message: e.to_string(),
             exit_code: 5,
             hint: None,
@@ -561,6 +533,7 @@ impl RunStatus {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fs;
     use std::io::Write as _;
 
     fn write_temp_file(dir: &Path, name: &str, content: &str) -> PathBuf {

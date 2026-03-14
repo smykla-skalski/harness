@@ -228,14 +228,14 @@ pub fn load_latest_compact_handoff(project_dir: &Path) -> Result<Option<CompactH
         return Ok(None);
     }
     let text = fs::read_to_string(&path).map_err(|e| CliError {
-        code: "IO".to_string(),
+        code: "IO".into(),
         message: format!("failed to read {}: {e}", path.display()),
         exit_code: 1,
         hint: None,
         details: None,
     })?;
     serde_json::from_str(&text).map(Some).map_err(|e| CliError {
-        code: "PARSE".to_string(),
+        code: "PARSE".into(),
         message: format!("corrupt compact handoff at {}: {e}", path.display()),
         exit_code: 1,
         hint: None,
@@ -254,16 +254,19 @@ pub fn pending_compact_handoff(project_dir: &Path) -> Option<CompactHandoff> {
 
 /// Mark a handoff as consumed.
 ///
+/// Takes ownership of the handoff to avoid cloning the entire struct.
+/// Callers that need the handoff afterwards should clone before passing.
+///
 /// # Errors
 /// Returns `CliError` on IO failure.
 pub fn consume_compact_handoff(
     project_dir: &Path,
-    handoff: &CompactHandoff,
+    handoff: CompactHandoff,
 ) -> Result<CompactHandoff, CliError> {
     let consumed = CompactHandoff {
         status: rules::STATUS_CONSUMED.to_string(),
         consumed_at: Some(utc_now()),
-        ..handoff.clone()
+        ..handoff
     };
     write_json_atomic(&compact_latest_path(project_dir), &consumed)?;
     Ok(consumed)
@@ -558,7 +561,7 @@ fn truncate_lines(lines: &[String], char_limit: usize, line_limit: usize) -> Str
 fn write_json_atomic(path: &Path, payload: &CompactHandoff) -> Result<(), CliError> {
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent).map_err(|e| CliError {
-            code: "IO".to_string(),
+            code: "IO".into(),
             message: format!("failed to create directory: {e}"),
             exit_code: 1,
             hint: None,
@@ -567,21 +570,21 @@ fn write_json_atomic(path: &Path, payload: &CompactHandoff) -> Result<(), CliErr
     }
     let tmp = path.with_extension("json.tmp");
     let text = serde_json::to_string_pretty(payload).map_err(|e| CliError {
-        code: "SERIALIZE".to_string(),
+        code: "SERIALIZE".into(),
         message: format!("failed to serialize: {e}"),
         exit_code: 1,
         hint: None,
         details: None,
     })?;
     fs::write(&tmp, &text).map_err(|e| CliError {
-        code: "IO".to_string(),
+        code: "IO".into(),
         message: format!("failed to write {}: {e}", tmp.display()),
         exit_code: 1,
         hint: None,
         details: None,
     })?;
     fs::rename(&tmp, path).map_err(|e| CliError {
-        code: "IO".to_string(),
+        code: "IO".into(),
         message: format!(
             "failed to rename {} to {}: {e}",
             tmp.display(),

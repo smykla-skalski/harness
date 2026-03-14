@@ -36,7 +36,7 @@ pub fn execute(cmd: &EnvoyCommand) -> Result<i32, CliError> {
                 let text = read_text(Path::new(file_path))?;
                 let payload: serde_json::Value =
                     serde_json::from_str(&text).map_err(|e| CliError {
-                        code: "JSON".to_string(),
+                        code: "JSON".into(),
                         message: format!("invalid JSON: {e}"),
                         exit_code: 5,
                         hint: None,

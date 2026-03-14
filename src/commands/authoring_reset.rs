@@ -11,7 +11,7 @@ pub fn execute() -> Result<i32, CliError> {
     let workspace = authoring_workspace_dir();
     if workspace.exists() {
         fs::remove_dir_all(&workspace).map_err(|e| CliError {
-            code: "IO".to_string(),
+            code: "IO".into(),
             message: format!("failed to remove workspace: {e}"),
             exit_code: 1,
             hint: None,

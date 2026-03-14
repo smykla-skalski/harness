@@ -175,7 +175,7 @@ pub fn resolve_build_info(repo: &Path) -> Result<BuildInfo, CliError> {
         .current_dir(repo)
         .output()
         .map_err(|e| CliError {
-            code: COMMAND_FAILED.code.to_string(),
+            code: COMMAND_FAILED.code.into(),
             message: format!("command failed: git status: {e}"),
             exit_code: COMMAND_FAILED.exit_code,
             hint: None,
@@ -197,7 +197,7 @@ pub fn resolve_build_info(repo: &Path) -> Result<BuildInfo, CliError> {
         .current_dir(repo)
         .output()
         .map_err(|e| CliError {
-            code: COMMAND_FAILED.code.to_string(),
+            code: COMMAND_FAILED.code.into(),
             message: format!("command failed: git rev-parse: {e}"),
             exit_code: COMMAND_FAILED.exit_code,
             hint: None,
@@ -214,7 +214,10 @@ pub fn resolve_build_info(repo: &Path) -> Result<BuildInfo, CliError> {
 }
 
 fn dirs_home() -> PathBuf {
-    env::var("HOME").map_or_else(|_| PathBuf::from("/tmp"), PathBuf::from)
+    env::var("HOME").map_or_else(
+        |_| env::temp_dir().join(format!("harness-{}", unsafe { libc::getuid() })),
+        PathBuf::from,
+    )
 }
 
 #[cfg(test)]

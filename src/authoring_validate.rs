@@ -33,7 +33,7 @@ pub fn authoring_validation_repo_root(
         }
     }
     Err(CliError {
-        code: "KSRCLI014".to_string(),
+        code: "KSRCLI014".into(),
         message: "unable to locate repo root for authoring validation".to_string(),
         exit_code: 5,
         hint: None,

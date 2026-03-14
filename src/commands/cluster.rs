@@ -37,11 +37,7 @@ pub fn execute(
         .filter_map(|s| HelmSetting::from_cli_arg(s).ok())
         .collect();
 
-    // NOTE: The spec is built here for validation (rejects unknown modes and
-    // wrong argument counts) but the actual cluster operations below still call
-    // standalone make-target helpers that don't consume the spec.  A future
-    // refactor should drive the operations from `spec.members` directly.
-    let _spec = ClusterSpec::from_mode(
+    let spec = ClusterSpec::from_mode(
         mode,
         &all_names,
         &root.to_string_lossy(),
@@ -49,12 +45,13 @@ pub fn execute(
         restart_namespace.to_vec(),
     )
     .map_err(|e| CliError {
-        code: "CLUSTER".to_string(),
+        code: "CLUSTER".into(),
         message: e,
         exit_code: 1,
         hint: None,
         details: None,
     })?;
+    let validated_args = &spec.mode_args;
 
     if !helm_settings.is_empty() {
         let settings_str: Vec<String> = helm_settings.iter().map(HelmSetting::to_cli_arg).collect();
@@ -67,19 +64,19 @@ pub fn execute(
     eprintln!(
         "{} cluster: starting {mode} for {}",
         utc_now(),
-        all_names.join(" ")
+        validated_args.join(" ")
     );
 
     match mode {
-        "single-up" => single_up(&root, &base_env, &all_names)?,
-        "single-down" => single_down(&root, &base_env, &all_names)?,
-        "global-zone-up" => global_zone_up(&root, &base_env, &all_names)?,
-        "global-zone-down" => global_zone_down(&root, &base_env, &all_names)?,
-        "global-two-zones-up" => global_two_zones_up(&root, &base_env, &all_names)?,
-        "global-two-zones-down" => global_two_zones_down(&root, &base_env, &all_names)?,
+        "single-up" => single_up(&root, &base_env, validated_args)?,
+        "single-down" => single_down(&root, &base_env, validated_args)?,
+        "global-zone-up" => global_zone_up(&root, &base_env, validated_args)?,
+        "global-zone-down" => global_zone_down(&root, &base_env, validated_args)?,
+        "global-two-zones-up" => global_two_zones_up(&root, &base_env, validated_args)?,
+        "global-two-zones-down" => global_two_zones_down(&root, &base_env, validated_args)?,
         _ => {
             return Err(CliError {
-                code: "CLUSTER".to_string(),
+                code: "CLUSTER".into(),
                 message: format!("unsupported cluster mode: {mode}"),
                 exit_code: 1,
                 hint: None,

@@ -214,7 +214,7 @@ fn save_entries(run_dir: &Path, entries: &[serde_json::Value]) -> Result<(), Cli
         "entries": entries,
     });
     let text = serde_json::to_string_pretty(&payload).map_err(|e| CliError {
-        code: "SERIALIZE".to_string(),
+        code: "SERIALIZE".into(),
         message: format!("failed to serialize: {e}"),
         exit_code: 1,
         hint: None,
@@ -227,7 +227,7 @@ fn save_entries(run_dir: &Path, entries: &[serde_json::Value]) -> Result<(), Cli
 #[allow(clippy::needless_pass_by_value)]
 fn io_err(e: io::Error) -> CliError {
     CliError {
-        code: "IO".to_string(),
+        code: "IO".into(),
         message: format!("IO error: {e}"),
         exit_code: 1,
         hint: None,

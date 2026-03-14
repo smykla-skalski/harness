@@ -103,14 +103,14 @@ impl PreparedSuiteArtifact {
             return Ok(None);
         }
         let text = fs::read_to_string(path).map_err(|e| CliError {
-            code: "KSRCLI014".to_string(),
+            code: "KSRCLI014".into(),
             message: format!("cannot read file: {}: {e}", path.display()),
             exit_code: 5,
             hint: None,
             details: Some(e.to_string()),
         })?;
         let artifact: Self = serde_json::from_str(&text).map_err(|e| CliError {
-            code: "KSRCLI042".to_string(),
+            code: "KSRCLI042".into(),
             message: format!(
                 "invalid suite-author prepared suite payload: {}",
                 path.display()
@@ -129,7 +129,7 @@ impl PreparedSuiteArtifact {
     pub fn save(&self, path: &Path) -> Result<(), CliError> {
         if let Some(parent) = path.parent() {
             fs::create_dir_all(parent).map_err(|e| CliError {
-                code: "KSRCLI014".to_string(),
+                code: "KSRCLI014".into(),
                 message: format!("cannot create directory: {}", parent.display()),
                 exit_code: 5,
                 hint: None,
@@ -137,14 +137,14 @@ impl PreparedSuiteArtifact {
             })?;
         }
         let json = serde_json::to_string_pretty(self).map_err(|e| CliError {
-            code: "KSRCLI042".to_string(),
+            code: "KSRCLI042".into(),
             message: "failed to serialize prepared suite artifact".to_string(),
             exit_code: 5,
             hint: None,
             details: Some(e.to_string()),
         })?;
         fs::write(path, json).map_err(|e| CliError {
-            code: "KSRCLI014".to_string(),
+            code: "KSRCLI014".into(),
             message: format!("cannot write file: {}", path.display()),
             exit_code: 5,
             hint: None,
