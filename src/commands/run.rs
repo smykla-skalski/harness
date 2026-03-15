@@ -154,7 +154,7 @@ pub fn init_run(
         user_stories: spec.frontmatter.user_stories.clone(),
         required_dependencies: spec.frontmatter.required_dependencies.clone(),
     };
-    let ctx_path = current_run_context_path();
+    let ctx_path = current_run_context_path()?;
     if let Some(parent) = ctx_path.parent() {
         fs::create_dir_all(parent)?;
     }

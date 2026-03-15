@@ -56,7 +56,7 @@ pub fn find_suite_dir(path: &Path) -> Option<PathBuf> {
     let resolved = if path.is_absolute() {
         path.to_path_buf()
     } else {
-        env::current_dir().unwrap_or_default().join(path)
+        env::current_dir().ok()?.join(path)
     };
 
     // If the path is literally suite.md and it exists, return its parent.
