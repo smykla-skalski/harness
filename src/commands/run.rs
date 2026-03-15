@@ -65,7 +65,7 @@ pub fn init_run(
     let created_at = utc_now();
 
     let layout = RunLayout {
-        run_root: resolved_run_root.to_string_lossy().to_string(),
+        run_root: resolved_run_root.to_string_lossy().into_owned(),
         run_id: run_id.to_string(),
     };
 
@@ -78,10 +78,10 @@ pub fn init_run(
     let metadata = RunMetadata {
         run_id: run_id.to_string(),
         suite_id: spec.frontmatter.suite_id.clone(),
-        suite_path: suite_path.to_string_lossy().to_string(),
-        suite_dir: suite_dir.to_string_lossy().to_string(),
+        suite_path: suite_path.to_string_lossy().into_owned(),
+        suite_dir: suite_dir.to_string_lossy().into_owned(),
         profile: profile.to_string(),
-        repo_root: resolved_repo_root.to_string_lossy().to_string(),
+        repo_root: resolved_repo_root.to_string_lossy().into_owned(),
         keep_clusters: spec.frontmatter.keep_clusters,
         created_at: created_at.clone(),
         user_stories: spec.frontmatter.user_stories.clone(),
@@ -143,10 +143,10 @@ pub fn init_run(
     let record = CurrentRunRecord {
         layout: layout.clone(),
         profile: Some(profile.to_string()),
-        repo_root: Some(resolved_repo_root.to_string_lossy().to_string()),
-        suite_dir: Some(suite_dir.to_string_lossy().to_string()),
+        repo_root: Some(resolved_repo_root.to_string_lossy().into_owned()),
+        suite_dir: Some(suite_dir.to_string_lossy().into_owned()),
         suite_id: Some(spec.frontmatter.suite_id.clone()),
-        suite_path: Some(suite_path.to_string_lossy().to_string()),
+        suite_path: Some(suite_path.to_string_lossy().into_owned()),
         cluster: None,
         keep_clusters: spec.frontmatter.keep_clusters,
         user_stories: spec.frontmatter.user_stories.clone(),
@@ -247,11 +247,11 @@ pub fn apply(
     let run_dir = super::resolve_run_dir(run_dir_args)?;
     let ctx = RunContext::from_run_dir(&run_dir)?;
     let kc = super::resolve_kubeconfig(&ctx, kubeconfig, cluster_arg)?;
-    let _kc_str = kc.to_string_lossy().to_string();
+    let _kc_str = kc.to_string_lossy().into_owned();
 
     for manifest_raw in manifests {
         let manifest = resolve_manifest_path(manifest_raw, Some(&run_dir))?;
-        let manifest_str = manifest.to_string_lossy().to_string();
+        let manifest_str = manifest.to_string_lossy().into_owned();
         kubectl(Some(&kc), &["apply", "-f", &manifest_str], &[0])?;
 
         let manifest_index = ctx.layout.manifests_dir().join("manifest-index.md");
@@ -540,11 +540,7 @@ fn report_group(
         return Err(CliErrorKind::MissingRunStatus.into());
     };
 
-    if run_status
-        .executed_group_ids()
-        .iter()
-        .any(|id| id == group_id)
-    {
+    if run_status.executed_group_ids().contains(&group_id) {
         return Err(CliErrorKind::run_group_already_recorded(group_id.to_string()).into());
     }
 

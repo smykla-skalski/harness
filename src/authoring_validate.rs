@@ -56,7 +56,7 @@ pub fn validate_suite_author_paths(
         if let Some(ext) = resolved.extension() {
             let ext_str = ext.to_string_lossy();
             if ext_str == "yaml" || ext_str == "yml" {
-                validated.push(resolved.to_string_lossy().to_string());
+                validated.push(resolved.to_string_lossy().into_owned());
             }
         }
     }

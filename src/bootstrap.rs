@@ -231,7 +231,7 @@ mod tests {
         let local_bin = dir.path().join(".local").join("bin");
         fs::create_dir_all(&local_bin).unwrap();
 
-        let path_env = local_bin.to_string_lossy().to_string();
+        let path_env = local_bin.to_string_lossy().into_owned();
         let (chosen, on_path) = choose_install_dir_with_home(&path_env, dir.path()).unwrap();
         // Canonicalize both to handle macOS /private/var vs /var symlink
         assert_eq!(
@@ -294,7 +294,7 @@ mod tests {
         let bin_dir = dir.path().join(".local").join("bin");
         fs::create_dir_all(&bin_dir).unwrap();
 
-        let path_env = bin_dir.to_string_lossy().to_string();
+        let path_env = bin_dir.to_string_lossy().into_owned();
         let result = main_with_home(dir.path(), &path_env, dir.path());
 
         assert_eq!(result.unwrap(), 0);

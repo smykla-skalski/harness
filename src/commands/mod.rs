@@ -198,7 +198,7 @@ pub(crate) fn resolve_kubeconfig(
     {
         let configs = spec.kubeconfigs();
         if let Some(kc) = configs.get(cluster_name) {
-            return Ok(PathBuf::from(kc));
+            return Ok(PathBuf::from(*kc));
         }
     }
     if let Some(ref spec) = ctx.cluster {

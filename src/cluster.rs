@@ -319,23 +319,23 @@ impl ClusterSpec {
     }
 
     #[must_use]
-    pub fn cluster_names(&self) -> Vec<String> {
-        self.members.iter().map(|m| m.name.clone()).collect()
+    pub fn cluster_names(&self) -> Vec<&str> {
+        self.members.iter().map(|m| m.name.as_str()).collect()
     }
 
     #[must_use]
-    pub fn kubeconfigs(&self) -> HashMap<String, String> {
+    pub fn kubeconfigs(&self) -> HashMap<&str, &str> {
         self.members
             .iter()
-            .map(|m| (m.name.clone(), m.kubeconfig.clone()))
+            .map(|m| (m.name.as_str(), m.kubeconfig.as_str()))
             .collect()
     }
 
     #[must_use]
-    pub fn helm_values(&self) -> HashMap<String, String> {
+    pub fn helm_values(&self) -> HashMap<&str, &str> {
         self.helm_settings
             .iter()
-            .map(|s| (s.key.clone(), s.value.clone()))
+            .map(|s| (s.key.as_str(), s.value.as_str()))
             .collect()
     }
 
