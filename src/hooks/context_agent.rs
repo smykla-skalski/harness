@@ -16,7 +16,7 @@ pub fn execute(ctx: &HookContext) -> Result<HookResult, CliError> {
     if !ctx.skill_active {
         return Ok(HookResult::allow());
     }
-    if ctx.skill == "suite-author" {
+    if ctx.is_suite_author() {
         return Ok(errors::hook_msg(&errors::WARN_CODE_READER_FORMAT, &[]));
     }
     // suite-runner: validate preflight worker can start.

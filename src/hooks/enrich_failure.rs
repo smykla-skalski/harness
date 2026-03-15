@@ -13,7 +13,7 @@ use crate::workflow::runner::{
 /// # Errors
 /// Returns `CliError` on failure.
 pub fn execute(ctx: &HookContext) -> Result<HookResult, CliError> {
-    if !ctx.skill_active || ctx.skill != "suite-runner" {
+    if !ctx.skill_active || !ctx.is_suite_runner() {
         return Ok(HookResult::allow());
     }
     let Some(run) = &ctx.run else {

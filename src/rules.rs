@@ -64,6 +64,8 @@ pub mod suite_runner {
         "use `harness record`, `harness run`, or recorded command artifacts instead";
 
     pub const DENIED_RUNNER_BINARIES: &[&str] = &["gh"];
+    pub const UP_CLUSTER_MODES: &[&str] = &["single-up", "global-zone-up", "global-two-zones-up"];
+
     pub const DENIED_MAKE_TARGET_PREFIXES: &[&str] = &["k3d/", "kind/"];
 
     pub const MANIFEST_FIX_GATE_QUESTION: &str =

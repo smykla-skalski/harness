@@ -53,7 +53,7 @@ pub fn execute(ctx: &HookContext) -> Result<HookResult, CliError> {
         return Ok(HookResult::allow());
     }
     let heads = command_heads(&words);
-    if ctx.skill == "suite-author" {
+    if ctx.is_suite_author() {
         return Ok(guard_suite_author(ctx, &words, &heads));
     }
     Ok(guard_suite_runner(ctx, &words, &heads))
