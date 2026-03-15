@@ -3,6 +3,7 @@
 // oversized report detection, and group finalization.
 
 use std::fs;
+use std::path::Path;
 
 use harness::cli::{Command, ReportCommand, RunDirArgs};
 use harness::commands::Execute;
@@ -88,7 +89,7 @@ fn report_check_fails_for_large_report() {
     // (actual check requires CLI binary)
 }
 
-fn create_initial_report(run_dir: &std::path::Path) {
+fn create_initial_report(run_dir: &Path) {
     let report_path = run_dir.join("run-report.md");
     let rpt = RunReport::new(
         report_path,

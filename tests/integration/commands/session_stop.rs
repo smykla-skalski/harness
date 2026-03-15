@@ -6,6 +6,7 @@ use std::fs;
 use harness::cli::Command;
 use harness::commands::Execute;
 use harness::context::{CurrentRunRecord, RunLayout};
+use harness::core_defs::current_run_context_path;
 use harness::ephemeral_metallb;
 
 use super::super::helpers::*;
@@ -44,7 +45,7 @@ fn session_stop_cleans_up_templates_and_removes_pointer() {
             ("CLAUDE_SESSION_ID", Some("stop-test")),
         ],
         || {
-            let ctx_path = harness::core_defs::current_run_context_path();
+            let ctx_path = current_run_context_path().unwrap();
             if let Some(parent) = ctx_path.parent() {
                 fs::create_dir_all(parent).unwrap();
             }
