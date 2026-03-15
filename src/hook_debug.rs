@@ -1,6 +1,49 @@
 use std::fmt;
+use std::fs::{self, OpenOptions};
+use std::io::Write;
 
+use serde::Serialize;
+
+use crate::core_defs::{session_context_dir, utc_now};
 use crate::hook_payloads::HookEvent;
+
+/// A single JSONL debug log entry.
+#[derive(Serialize)]
+struct DebugLine {
+    hook_name: String,
+    timestamp: String,
+    exit_code: i32,
+    outcome: String,
+    message: Option<String>,
+    gate: Option<String>,
+}
+
+/// Append a JSON debug line to the session-scoped hooks-debug.jsonl file.
+/// Silently returns on any error - debug logging must not crash hooks.
+fn write_debug_line(hook_name: &str, outcome: &HookOutcome) {
+    let ctx_dir = session_context_dir();
+    let _ = fs::create_dir_all(&ctx_dir);
+    let debug_path = ctx_dir.join("hooks-debug.jsonl");
+    let line = DebugLine {
+        hook_name: hook_name.to_string(),
+        timestamp: utc_now(),
+        exit_code: outcome.exit_code,
+        outcome: outcome.outcome.to_string(),
+        message: outcome.message.clone(),
+        gate: outcome.gate.clone(),
+    };
+    let Ok(json) = serde_json::to_string(&line) else {
+        return;
+    };
+    let Ok(mut file) = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&debug_path)
+    else {
+        return;
+    };
+    let _ = writeln!(file, "{json}");
+}
 
 /// Kind of outcome from a hook evaluation.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -91,12 +134,10 @@ impl HookOutcome {
         self
     }
 
-    /// Log the outcome and return the exit code.
+    /// Log the outcome to the session debug file and return the exit code.
     #[must_use]
-    pub fn log_and_exit(self, _hook_name: &str, _event: &HookEvent) -> i32 {
-        // In the Rust version we skip the JSONL debug logging
-        // (the Python version writes to a session-scoped file).
-        // The important contract is returning the exit code.
+    pub fn log_and_exit(self, hook_name: &str, _event: &HookEvent) -> i32 {
+        write_debug_line(hook_name, &self);
         self.exit_code
     }
 }
@@ -173,5 +214,40 @@ mod tests {
         };
         let outcome = HookOutcome::allow();
         assert_eq!(outcome.log_and_exit("test-hook", &event), 0);
+    }
+
+    #[test]
+    fn log_and_exit_writes_jsonl_debug_file() {
+        let tmp = tempfile::tempdir().unwrap();
+        let xdg = tmp.path().join("xdg");
+        temp_env::with_vars(
+            [
+                ("XDG_DATA_HOME", Some(xdg.to_str().unwrap())),
+                ("CLAUDE_SESSION_ID", Some("debug-test-session")),
+            ],
+            || {
+                let event = HookEvent {
+                    payload: HookEnvelopePayload::default(),
+                };
+                let outcome = HookOutcome::error(2)
+                    .with_message("blocked")
+                    .with_gate("prebash");
+                let code = outcome.log_and_exit("guard-bash", &event);
+                assert_eq!(code, 2);
+
+                let ctx_dir = crate::core_defs::session_context_dir();
+                let debug_path = ctx_dir.join("hooks-debug.jsonl");
+                assert!(debug_path.exists(), "debug file should exist");
+
+                let content = std::fs::read_to_string(&debug_path).unwrap();
+                let line: serde_json::Value = serde_json::from_str(content.trim()).unwrap();
+                assert_eq!(line["hook_name"], "guard-bash");
+                assert_eq!(line["exit_code"], 2);
+                assert_eq!(line["outcome"], "error");
+                assert_eq!(line["message"], "blocked");
+                assert_eq!(line["gate"], "prebash");
+                assert!(line["timestamp"].as_str().unwrap().ends_with('Z'));
+            },
+        );
     }
 }
