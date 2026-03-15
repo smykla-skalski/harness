@@ -469,6 +469,32 @@ mod tests {
     // --- Markdown row tests ---
 
     #[test]
+    fn is_safe_name_accepts_normal_names() {
+        assert!(is_safe_name("my-suite"));
+        assert!(is_safe_name("g01.md"));
+    }
+
+    #[test]
+    fn is_safe_name_rejects_unsafe() {
+        assert!(!is_safe_name(""));
+        assert!(!is_safe_name("a/b"));
+        assert!(!is_safe_name("a\\b"));
+        assert!(!is_safe_name("a..b"));
+    }
+
+    #[test]
+    fn append_markdown_row_rejects_shape_mismatch() {
+        let tmp = TempDir::new().unwrap();
+        let path = tmp.path().join("log.md");
+        let err = append_markdown_row(&path, &["a", "b"], &["1"]).unwrap_err();
+        assert!(
+            err.message().contains("shape mismatch"),
+            "expected shape mismatch error, got: {}",
+            err.message()
+        );
+    }
+
+    #[test]
     fn append_markdown_row_creates_table() {
         let tmp = TempDir::new().unwrap();
         let path = tmp.path().join("log.md");
