@@ -705,6 +705,17 @@ mod tests {
     }
 
     #[test]
+    fn from_value_rejects_corrupt_member() {
+        let result = ClusterRecordPayload::from_value(&json!({
+            "mode": "single-up",
+            "mode_args": ["kuma-1"],
+            "members": [{"not_a_name": "bad"}],
+            "repo_root": "/r",
+        }));
+        assert!(result.is_err(), "expected Err for corrupt member, got Ok");
+    }
+
+    #[test]
     fn from_mode_single_up() {
         let spec = ClusterSpec::from_mode("single-up", &["kuma-1".into()], "/repo", vec![], vec![])
             .unwrap();
