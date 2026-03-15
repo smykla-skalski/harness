@@ -146,6 +146,9 @@ impl HookOutcome {
 
 #[cfg(test)]
 mod tests {
+    use std::fs as stdfs;
+
+    use crate::core_defs::session_context_dir;
     use crate::hook_payloads::HookEnvelopePayload;
 
     use super::*;
@@ -237,11 +240,11 @@ mod tests {
                 let code = outcome.log_and_exit("guard-bash", &event);
                 assert_eq!(code, 2);
 
-                let ctx_dir = crate::core_defs::session_context_dir().unwrap();
+                let ctx_dir = session_context_dir().unwrap();
                 let debug_path = ctx_dir.join("hooks-debug.jsonl");
                 assert!(debug_path.exists(), "debug file should exist");
 
-                let content = std::fs::read_to_string(&debug_path).unwrap();
+                let content = stdfs::read_to_string(&debug_path).unwrap();
                 let line: serde_json::Value = serde_json::from_str(content.trim()).unwrap();
                 assert_eq!(line["hook_name"], "guard-bash");
                 assert_eq!(line["exit_code"], 2);

@@ -258,7 +258,7 @@ mod tests {
                 ),
                 ("PATH", Some(dir.path().join("empty-bin").to_str().unwrap())),
             ],
-            || resolve_kubectl_validate_binary(),
+            resolve_kubectl_validate_binary,
         );
         assert!(result.is_none());
     }

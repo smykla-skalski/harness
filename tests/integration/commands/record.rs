@@ -905,7 +905,7 @@ fn check_record_isolates_run_context_by_session_id() {
             ("CLAUDE_SESSION_ID", Some("session-alpha")),
         ],
         || {
-            *da.lock().unwrap() = core_defs::session_context_dir();
+            *da.lock().unwrap() = core_defs::session_context_dir().unwrap();
         },
     );
     let db = &dir_b;
@@ -915,7 +915,7 @@ fn check_record_isolates_run_context_by_session_id() {
             ("CLAUDE_SESSION_ID", Some("session-beta")),
         ],
         || {
-            *db.lock().unwrap() = core_defs::session_context_dir();
+            *db.lock().unwrap() = core_defs::session_context_dir().unwrap();
         },
     );
 
@@ -996,7 +996,7 @@ fn check_authoring_save_accepts_inline_payload() {
                 "save with inline payload should succeed: {result:?}"
             );
 
-            let workspace = authoring::authoring_workspace_dir();
+            let workspace = authoring::authoring_workspace_dir().unwrap();
             let saved = workspace.join("inventory.json");
             assert!(saved.exists(), "inventory.json should be saved");
         },
