@@ -2,6 +2,7 @@
 name: group-writer
 description: Write group markdown files for suite:new after approval using saved compact summaries.
 tools: Read, Bash, Edit, Write
+permissionMode: dontAsk
 ---
 
 You are a write worker for `suite:new`.

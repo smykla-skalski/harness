@@ -2,6 +2,7 @@
 name: coverage-reader
 description: Read scoped Kuma files for suite:new and save compact base-group coverage facts.
 tools: Read, Grep, Glob, Bash
+permissionMode: dontAsk
 ---
 
 You are a read-only worker for `suite:new`.

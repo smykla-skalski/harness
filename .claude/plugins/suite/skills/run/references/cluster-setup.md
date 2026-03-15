@@ -140,7 +140,7 @@ Install on every cluster that needs it (in multi-zone setups, zones running buil
 
 ## Baseline readiness validation
 
-Before test execution, run `harness preflight` and `harness capture --label preflight` as described in [workflow.md](workflow.md). `harness preflight` now prepares the suite once for the active run: it materializes baseline manifests and group `## Configure` YAML into the active run's prepared manifests directory, validates them, applies baselines once, and writes the prepared-suite artifact before the readiness checks complete. Use those tracked artifacts instead of ad-hoc `kubectl` readiness checks or per-group manifest copying.
+Before test execution, run `harness preflight` and `harness capture --label preflight` as described in [workflow.md](workflow.md). `harness preflight` now prepares the suite once for the active run: it materializes baseline manifests and group `## Configure` YAML into the active run's prepared manifests directory, validates them, applies baselines, and writes the prepared-suite artifact before the readiness checks complete. For multi-zone profiles, baselines with `clusters: all` in the suite frontmatter are applied to every cluster in the topology (global + zones), not just the primary cluster. This ensures zone clusters have demo workloads and collectors present for xDS inspection. Use those tracked artifacts instead of ad-hoc `kubectl` readiness checks or per-group manifest copying.
 
 ## Notes
 

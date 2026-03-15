@@ -72,6 +72,9 @@ coverage_expectations:
   - debug
 baseline_files:
   - baseline/namespace.yaml
+  # For multi-zone suites, use the object form with clusters:
+  # - path: baseline/namespace.yaml
+  #   clusters: all
 groups:
   - groups/g01-crud.md
 skipped_groups:
@@ -82,6 +85,8 @@ keep_clusters: false
 
 ### Baseline manifests table
 
+For single-zone-only suites:
+
 ```markdown
 ## Baseline manifests
 
@@ -90,6 +95,18 @@ keep_clusters: false
 | baseline/namespace.yaml | test namespace with mesh label |
 | baseline/otel-collector.yaml | otel collector deployment |
 | baseline/demo-workload.yaml | echo server + client pods |
+```
+
+For suites with multi-zone profiles, add a Clusters column:
+
+```markdown
+## Baseline manifests
+
+| File | Purpose | Clusters |
+| --- | --- | --- |
+| baseline/namespace.yaml | test namespace with mesh label | all |
+| baseline/otel-collector.yaml | otel collector deployment | all |
+| baseline/demo-workload.yaml | echo server + client pods | all |
 ```
 
 ### Test groups table
@@ -115,6 +132,34 @@ Short section telling the runner to stop on the first unexpected failure, captur
 ## Baseline directory
 
 One `.yaml` file per shared resource applied once during `harness preflight`. These are manifests that multiple groups depend on (namespace setup, otel collector, demo workloads). Extract them from group steps to avoid duplication. The runner materializes them into the active run's `manifests/prepared/baseline/` directory and applies them before Phase 4 begins.
+
+### Baseline cluster distribution
+
+By default, baselines are applied to the primary cluster only (the global CP cluster in multi-zone, or the single cluster in single-zone). When the suite includes `multi-zone` in its `profiles` list, baselines that create workloads must also be present on zone clusters so that xDS configuration can be inspected on zone dataplanes.
+
+Each baseline entry in the `baseline_files` frontmatter list can optionally use the object form with a `clusters` field:
+
+```yaml
+baseline_files:
+  - path: baseline/namespace.yaml
+    clusters: all
+  - path: baseline/otel-collector.yaml
+    clusters: all
+  - path: baseline/demo-workload.yaml
+    clusters: all
+```
+
+Allowed values for `clusters`:
+
+| Value | Meaning |
+| --- | --- |
+| `global` | Apply to the global cluster only (default when `clusters` is omitted) |
+| `all` | Apply to every cluster in the topology (global + all zones) |
+| list of roles | Apply to the listed cluster roles only, e.g. `[global, zone-1]` |
+
+For backward compatibility, a plain string entry like `- baseline/namespace.yaml` is equivalent to `- path: baseline/namespace.yaml` with no `clusters` field (global only).
+
+When `profiles` includes `multi-zone`, baselines that deploy workloads (demo apps, collectors, test namespaces) should use `clusters: all` so zone clusters have the pods needed for xDS inspection and traffic testing. Infrastructure-only baselines that only make sense on the global CP (like mesh-wide policies) can keep the default.
 
 ## Groups directory
 
@@ -225,6 +270,10 @@ Amendments are permanent fixes to the suite. Future runs use the corrected manif
 - `mesh`: required for mesh-scoped resources (top-level field, not in metadata)
 - `name`: resource name (top-level field)
 - `spec`: same field names as Kubernetes format (from Go struct JSON tags)
+
+### Kubernetes Services
+
+- Services with multiple ports must name every port. Kubernetes rejects unnamed ports when count > 1.
 
 ### General
 
@@ -340,7 +389,7 @@ harness run --phase debug --label control-plane-logs \
 
 Every suite must include this checklist in suite.md:
 
-- `harness preflight` materializes baseline manifests and group `## Configure` YAML once, validates them, applies baselines once, and writes the prepared-suite artifact for the active run
+- `harness preflight` materializes baseline manifests and group `## Configure` YAML once, validates them, applies baselines once (to all clusters specified by each baseline's `clusters` field), and writes the prepared-suite artifact for the active run
 - all manifests applied through `harness apply`
 - all commands (inspect, curl, delete, kubectl get, etc.) recorded via `harness record`
 - cluster state captured after each completed group via `harness capture`

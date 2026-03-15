@@ -61,48 +61,80 @@ fn guard_suite_author(ctx: &HookContext, paths: &[&Path]) -> HookResult {
 fn guard_suite_runner(ctx: &HookContext, paths: &[&Path]) -> HookResult {
     let run_dir = ctx.effective_run_dir();
     let suite_dir = ctx.suite_dir();
-    let sd_norm = suite_dir.as_ref().map(|sd| normalize_path(sd));
+    let suite_dir_norm = suite_dir.as_ref().map(|sd| normalize_path(sd));
+
     for raw_path in paths {
-        let path = normalize_path(raw_path);
-        // Deny direct writes to harness-managed control files.
-        if let Some(ref rd) = run_dir {
-            if is_command_owned_run_file(&path, rd) {
-                let hint = control_file_hint(&path);
-                return HookMessage::runner_flow_required(
-                    "edit run control files",
-                    format!(
-                        "{} is harness-managed; {hint}",
-                        path.file_name()
-                            .map_or("file", |n| n.to_str().unwrap_or("file"))
-                    ),
-                )
-                .into_result();
-            }
-            if allowed_suite_runner_path(&path, rd) {
-                continue;
-            }
+        if let Some(result) = evaluate_runner_path(
+            ctx,
+            raw_path,
+            run_dir.as_deref(),
+            suite_dir.as_deref(),
+            suite_dir_norm.as_deref(),
+        ) {
+            return result;
         }
-        // Check if path is within suite dir (suite-fix writes).
-        if let Some(ref sdn) = sd_norm
-            && path.starts_with(sdn)
-        {
-            if let Some(ref state) = ctx.runner_state
-                && state.suite_fix.is_none()
-            {
-                return HookMessage::runner_flow_required(
+    }
+
+    HookResult::allow()
+}
+
+fn file_label(path: &Path) -> &str {
+    path.file_name().and_then(|n| n.to_str()).unwrap_or("file")
+}
+
+fn deny_control_file(path: &Path) -> HookResult {
+    let hint = control_file_hint(path);
+    HookMessage::runner_flow_required(
+        "edit run control files",
+        format!("{} is harness-managed; {hint}", file_label(path)),
+    )
+    .into_result()
+}
+
+fn suite_fix_required(ctx: &HookContext) -> bool {
+    ctx.runner_state
+        .as_ref()
+        .is_some_and(|state| state.suite_fix.is_none())
+}
+
+fn evaluate_runner_path(
+    ctx: &HookContext,
+    raw_path: &Path,
+    run_dir: Option<&Path>,
+    suite_dir: Option<&Path>,
+    suite_dir_norm: Option<&Path>,
+) -> Option<HookResult> {
+    let path = normalize_path(raw_path);
+
+    if let Some(rd) = run_dir {
+        if is_command_owned_run_file(&path, rd) {
+            return Some(deny_control_file(&path));
+        }
+        if allowed_suite_runner_path(&path, rd) {
+            return None;
+        }
+    }
+
+    if let Some(sdn) = suite_dir_norm
+        && path.starts_with(sdn)
+    {
+        if suite_fix_required(ctx) {
+            return Some(
+                HookMessage::runner_flow_required(
                     "edit suite files",
                     "approved suite repair is required before editing suite files",
                 )
-                .into_result();
-            }
-            continue;
+                .into_result(),
+            );
         }
-        // Path outside run surface.
-        if run_dir.is_some() || suite_dir.is_some() {
-            return HookMessage::write_outside_run(raw_path.display().to_string()).into_result();
-        }
+        return None;
     }
-    HookResult::allow()
+
+    if run_dir.is_some() || suite_dir.is_some() {
+        return Some(HookMessage::write_outside_run(raw_path.display().to_string()).into_result());
+    }
+
+    None
 }
 
 fn allowed_suite_runner_path(path: &Path, run_dir: &Path) -> bool {

@@ -18,7 +18,8 @@ use crate::ephemeral_metallb;
 use crate::errors::{CliError, CliErrorKind, cow};
 use crate::exec::{
     cluster_exists, compose_down, compose_up, docker_inspect_ip, docker_network_create,
-    docker_network_rm, docker_rm, docker_run_detached, kubectl, run_command, wait_for_http,
+    docker_network_rm, docker_rm, docker_run_detached, kubectl, run_command, run_command_streaming,
+    wait_for_http,
 };
 use crate::io::ensure_dir;
 use crate::session_hook::SessionStartHookOutput;
@@ -43,6 +44,15 @@ pub fn bootstrap(project_dir: Option<&str>) -> Result<i32, CliError> {
 
 fn make_target(root: &Path, target: &str, env: &HashMap<String, String>) -> Result<(), CliError> {
     run_command(&["make", target], Some(root), Some(env), &[0])?;
+    Ok(())
+}
+
+fn make_target_live(
+    root: &Path,
+    target: &str,
+    env: &HashMap<String, String>,
+) -> Result<(), CliError> {
+    run_command_streaming(&["make", target], Some(root), Some(env), &[0])?;
     Ok(())
 }
 
@@ -221,7 +231,8 @@ fn start_and_deploy(
     env.insert("KIND_CLUSTER_NAME".to_string(), cluster_name.to_string());
     if !cluster_exists(cluster_name)? {
         eprintln!("{} cluster: starting k3d cluster {cluster_name}", utc_now());
-        make_target(root, "k3d/start", &env)?;
+        make_target_live(root, "k3d/start", &env)?;
+        eprintln!("{} cluster: k3d cluster {cluster_name} ready", utc_now());
     }
     let home = env::var("HOME").unwrap_or_else(|_| "/tmp".into());
     let kubeconfig = format!("{home}/.kube/kind-{cluster_name}-config");
@@ -248,7 +259,8 @@ fn start_and_deploy(
         "{} cluster: deploying Kuma to {cluster_name} ({kuma_mode})",
         utc_now()
     );
-    make_target(root, "k3d/deploy/helm", &env)?;
+    make_target_live(root, "k3d/deploy/helm", &env)?;
+    eprintln!("{} cluster: Kuma deployed to {cluster_name}", utc_now());
     Ok(())
 }
 
@@ -320,6 +332,10 @@ fn global_two_zones_up(
         "controlPlane.globalZoneSyncService.type=NodePort".into(),
     ];
     start_and_deploy(root, base_env, &names[0], "global", &global_settings)?;
+    eprintln!(
+        "{} cluster: global CP deployed, starting zone clusters",
+        utc_now()
+    );
     for (zone_cluster, zone_name) in [(&names[1], &names[3]), (&names[2], &names[4])] {
         let zone_settings = vec![
             "controlPlane.mode=zone".into(),

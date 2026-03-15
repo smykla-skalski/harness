@@ -917,12 +917,7 @@ fn validate_universal(manifest_path: &Path, output_path: &Path) -> Result<i32, C
             errors.push(format!("missing 'name' field in resource: {label}"));
         }
         // mesh is required for most types except ZoneIngress/ZoneEgress
-        if mesh.is_none()
-            && !matches!(
-                resource_type,
-                Some("ZoneIngress" | "ZoneEgress" | "Zone")
-            )
-        {
+        if mesh.is_none() && !matches!(resource_type, Some("ZoneIngress" | "ZoneEgress" | "Zone")) {
             errors.push(format!("missing 'mesh' field in resource: {label}"));
         }
 

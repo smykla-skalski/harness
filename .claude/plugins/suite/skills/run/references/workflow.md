@@ -128,7 +128,11 @@ harness capture \
   --label "preflight"
 ```
 
-The worker must return only the canonical summary documented in `SKILL.md`. It must not inspect harness internals, CI, GitHub state, or raw context files. `harness preflight` prepares the suite once for this run. It materializes baseline manifests and group `## Configure` YAML into the active run's prepared manifests directory, validates every prepared manifest, applies baselines once, writes the prepared-suite artifact, and then runs readiness checks. Do not start tests until preflight is green and the prepared-suite artifact exists.
+The worker must return only the canonical summary documented in `SKILL.md`. It must not inspect harness internals, CI, GitHub state, or raw context files. `harness preflight` prepares the suite once for this run. It materializes baseline manifests and group `## Configure` YAML into the active run's prepared manifests directory, validates every prepared manifest, applies baselines, writes the prepared-suite artifact, and then runs readiness checks.
+
+For multi-zone profiles, `harness preflight` reads each baseline's `clusters` field from the suite frontmatter. Baselines with `clusters: all` are applied to every cluster in the topology (global + all zones) using `harness apply --cluster <name>` for each non-primary cluster. Baselines without a `clusters` field or with `clusters: global` are applied to the primary cluster only. This ensures zone clusters have the workloads (demo apps, collectors, test namespaces) needed for xDS inspection during Phase 4.
+
+Do not start tests until preflight is green and the prepared-suite artifact exists.
 
 **Gate**: preflight exits 0, the prepared-suite artifact exists, and the preflight state snapshot is saved.
 

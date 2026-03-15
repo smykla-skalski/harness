@@ -11,6 +11,10 @@ pub const WRAPPER: &str = r#"#!/bin/sh
 set -eu
 
 if [ "${CLAUDE_PROJECT_DIR:-}" ]; then
+  candidate="${CLAUDE_PROJECT_DIR}/.claude/plugins/suite/harness"
+  if [ -x "${candidate}" ]; then
+    exec "${candidate}" "$@"
+  fi
   candidate="${CLAUDE_PROJECT_DIR}/.claude/skills/harness"
   if [ -x "${candidate}" ]; then
     exec "${candidate}" "$@"
@@ -19,6 +23,10 @@ fi
 
 if command -v git >/dev/null 2>&1; then
   if repo_root=$(git rev-parse --show-toplevel 2>/dev/null); then
+    candidate="${repo_root}/.claude/plugins/suite/harness"
+    if [ -x "${candidate}" ]; then
+      exec "${candidate}" "$@"
+    fi
     candidate="${repo_root}/.claude/skills/harness"
     if [ -x "${candidate}" ]; then
       exec "${candidate}" "$@"
@@ -26,8 +34,8 @@ if command -v git >/dev/null 2>&1; then
   fi
 fi
 
-echo "harness: unable to resolve .claude/skills/harness" >&2
-echo "from CLAUDE_PROJECT_DIR or the current git repo" >&2
+echo "harness: unable to resolve .claude/plugins/suite/harness" >&2
+echo "or .claude/skills/harness from CLAUDE_PROJECT_DIR or git repo" >&2
 exit 1
 "#;
 
@@ -134,11 +142,18 @@ pub fn main(project_dir: &Path, path_env: &str) -> Result<i32, CliError> {
 /// # Errors
 /// Returns `CliError` on failure.
 pub fn main_with_home(project_dir: &Path, path_env: &str, home: &Path) -> Result<i32, CliError> {
-    let harness = project_dir.join(".claude").join("skills").join("harness");
-    if !harness.exists() {
+    let plugin_path = project_dir
+        .join(".claude")
+        .join("plugins")
+        .join("suite")
+        .join("harness");
+    let legacy_path = project_dir.join(".claude").join("skills").join("harness");
+
+    if !plugin_path.exists() && !legacy_path.exists() {
         return Err(CliErrorKind::missing_file(cow!(
-            "missing source wrapper: {}",
-            harness.display()
+            "missing source wrapper: {} or {}",
+            plugin_path.display(),
+            legacy_path.display()
         ))
         .into());
     }
@@ -221,6 +236,16 @@ mod tests {
     }
 
     #[test]
+    fn wrapper_content_references_plugin_path() {
+        assert!(WRAPPER.contains(".claude/plugins/suite/harness"));
+    }
+
+    #[test]
+    fn wrapper_content_references_legacy_path() {
+        assert!(WRAPPER.contains(".claude/skills/harness"));
+    }
+
+    #[test]
     fn wrapper_content_references_git_rev_parse() {
         assert!(WRAPPER.contains("git rev-parse --show-toplevel"));
     }
@@ -285,7 +310,29 @@ mod tests {
     }
 
     #[test]
-    fn main_succeeds_with_valid_project() {
+    fn main_succeeds_with_plugin_path() {
+        let dir = tempfile::tempdir().unwrap();
+        let source = dir
+            .path()
+            .join(".claude")
+            .join("plugins")
+            .join("suite")
+            .join("harness");
+        fs::create_dir_all(source.parent().unwrap()).unwrap();
+        fs::write(&source, "#!/bin/sh\necho ok\n").unwrap();
+
+        let bin_dir = dir.path().join(".local").join("bin");
+        fs::create_dir_all(&bin_dir).unwrap();
+
+        let path_env = bin_dir.to_string_lossy().into_owned();
+        let result = main_with_home(dir.path(), &path_env, dir.path());
+
+        assert_eq!(result.unwrap(), 0);
+        assert!(bin_dir.join("harness").exists());
+    }
+
+    #[test]
+    fn main_succeeds_with_legacy_path() {
         let dir = tempfile::tempdir().unwrap();
         let source = dir.path().join(".claude").join("skills").join("harness");
         fs::create_dir_all(source.parent().unwrap()).unwrap();
