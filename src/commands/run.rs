@@ -10,7 +10,7 @@ use regex::Regex;
 use crate::cli::{EnvoyCommand, KumactlCommand, ReportCommand, RunDirArgs};
 use crate::context::{CurrentRunRecord, RunContext, RunLayout, RunMetadata};
 use crate::core_defs::{current_run_context_path, harness_data_root, utc_now};
-use crate::errors::{CliError, CliErrorKind};
+use crate::errors::{CliError, CliErrorKind, cow};
 use crate::exec::{kubectl, run_command};
 use crate::io::{append_markdown_row, drill, ensure_dir, read_text, write_text};
 use crate::manifests::default_validation_output;
@@ -88,7 +88,8 @@ pub fn init_run(
         required_dependencies: spec.frontmatter.required_dependencies.clone(),
     };
 
-    let meta_json = serde_json::to_string_pretty(&metadata).expect("serialization of valid JSON");
+    let meta_json = serde_json::to_string_pretty(&metadata)
+        .map_err(|e| CliErrorKind::serialize(cow!("run metadata: {e}")))?;
     fs::write(layout.metadata_path(), format!("{meta_json}\n"))?;
 
     let status = RunStatus {
@@ -107,7 +108,8 @@ pub fn init_run(
         next_planned_group: None,
         notes: vec![],
     };
-    let status_json = serde_json::to_string_pretty(&status).expect("serialization of valid JSON");
+    let status_json = serde_json::to_string_pretty(&status)
+        .map_err(|e| CliErrorKind::serialize(cow!("run status: {e}")))?;
     fs::write(layout.status_path(), format!("{status_json}\n"))?;
 
     initialize_runner_state(&layout.run_dir())?;
@@ -156,7 +158,8 @@ pub fn init_run(
     if let Some(parent) = ctx_path.parent() {
         fs::create_dir_all(parent)?;
     }
-    let record_json = serde_json::to_string_pretty(&record).expect("serialization of valid JSON");
+    let record_json = serde_json::to_string_pretty(&record)
+        .map_err(|e| CliErrorKind::serialize(cow!("run context record: {e}")))?;
     fs::write(&ctx_path, format!("{record_json}\n"))?;
 
     println!("{}", layout.run_dir().display());
@@ -559,8 +562,8 @@ fn report_group(
         run_status.notes.push(n.to_string());
     }
 
-    let status_json =
-        serde_json::to_string_pretty(&run_status).expect("serialization of valid JSON");
+    let status_json = serde_json::to_string_pretty(&run_status)
+        .map_err(|e| CliErrorKind::serialize(cow!("group status update: {e}")))?;
     fs::write(ctx.layout.status_path(), format!("{status_json}\n"))?;
 
     let mut report = RunReport::from_markdown(&ctx.layout.report_path())?;
@@ -700,37 +703,25 @@ pub fn diff(left: &str, right: &str, path: Option<&str>) -> Result<i32, CliError
 // =========================================================================
 
 fn extract_resources(manifest: &Path) -> Result<Vec<(String, String)>, CliError> {
+    use serde::Deserialize;
+
     let text = read_text(manifest)?;
-    let normalized = format!("\n{text}");
     let mut resources = Vec::new();
-    for doc in normalized.split("\n---\n") {
-        let mut api_version: Option<String> = None;
-        let mut kind: Option<String> = None;
-        for line in doc.lines() {
-            let trimmed = line.trim();
-            if trimmed.is_empty()
-                || trimmed.starts_with('#')
-                || line.starts_with(' ')
-                || line.starts_with('\t')
-            {
-                continue;
-            }
-            if let Some((key, value)) = trimmed.split_once(':') {
-                let v = value
-                    .trim()
-                    .trim_matches('"')
-                    .trim_matches('\'')
-                    .to_string();
-                match key {
-                    "apiVersion" => api_version = Some(v),
-                    "kind" => kind = Some(v),
-                    _ => {}
-                }
-            }
-            if api_version.is_some() && kind.is_some() {
-                resources.push((kind.take().unwrap(), api_version.take().unwrap()));
-                break;
-            }
+    for document in serde_yml::Deserializer::from_str(&text) {
+        let parsed: serde_yml::Value = match serde_yml::Value::deserialize(document) {
+            Ok(v) => v,
+            Err(_) => continue,
+        };
+        let kind = parsed
+            .get("kind")
+            .and_then(|v| v.as_str())
+            .map(String::from);
+        let api_version = parsed
+            .get("apiVersion")
+            .and_then(|v| v.as_str())
+            .map(String::from);
+        if let (Some(k), Some(av)) = (kind, api_version) {
+            resources.push((k, av));
         }
     }
     if resources.is_empty() {
