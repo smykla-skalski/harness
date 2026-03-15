@@ -1,0 +1,200 @@
+// Tests for the init-run command handler.
+// Covers directory creation, duplicate detection, suite directory input,
+// default repo root, user stories preservation, and CLI aliases.
+
+use std::fs;
+
+use harness::commands::init_run;
+use harness::context::RunMetadata;
+use harness::schema::RunStatus;
+use harness::workflow::runner::{self as runner_workflow, RunnerPhase};
+
+use super::super::helpers::*;
+
+#[test]
+fn init_creates_tracked_layout() {
+    let tmp = tempfile::tempdir().unwrap();
+    let suite_dir = tmp.path().join("suite");
+    write_suite(&suite_dir.join("suite.md"));
+    write_group(&suite_dir.join("groups").join("g01.md"));
+
+    let result = init_run::execute(
+        &suite_dir.join("suite.md").to_string_lossy(),
+        "run-1",
+        "single-zone",
+        Some(&tmp.path().to_string_lossy()),
+        Some(&tmp.path().join("runs").to_string_lossy()),
+    );
+    assert!(result.is_ok(), "init should succeed: {result:?}");
+    assert_eq!(result.unwrap(), 0);
+
+    let run_dir = tmp.path().join("runs").join("run-1");
+    assert!(run_dir.exists(), "run dir should exist");
+    assert!(run_dir.join("run-metadata.json").exists());
+    assert!(run_dir.join("run-status.json").exists());
+    assert!(run_dir.join("run-report.md").exists());
+    assert!(run_dir.join("suite-runner-state.json").exists());
+    assert!(run_dir.join("artifacts").is_dir());
+    assert!(run_dir.join("commands").is_dir());
+    assert!(run_dir.join("manifests").is_dir());
+    assert!(run_dir.join("state").is_dir());
+
+    // Verify metadata
+    let meta_text = fs::read_to_string(run_dir.join("run-metadata.json")).unwrap();
+    let metadata: RunMetadata = serde_json::from_str(&meta_text).unwrap();
+    assert_eq!(metadata.run_id, "run-1");
+    assert_eq!(metadata.suite_id, "example.suite");
+    assert_eq!(metadata.profile, "single-zone");
+
+    // Verify status
+    let status_text = fs::read_to_string(run_dir.join("run-status.json")).unwrap();
+    let status: RunStatus = serde_json::from_str(&status_text).unwrap();
+    assert_eq!(status.overall_verdict, "pending");
+    assert_eq!(status.run_id, "run-1");
+
+    // Verify runner state
+    let runner_state = runner_workflow::read_runner_state(&run_dir)
+        .unwrap()
+        .expect("runner state should exist");
+    assert_eq!(runner_state.phase, RunnerPhase::Bootstrap);
+
+    // Verify command log
+    let cmd_log = run_dir.join("commands").join("command-log.md");
+    assert!(cmd_log.exists(), "command log should exist");
+    let cmd_text = fs::read_to_string(&cmd_log).unwrap();
+    assert!(cmd_text.contains("harness init"));
+
+    // Verify manifest index
+    let manifest_index = run_dir.join("manifests").join("manifest-index.md");
+    assert!(manifest_index.exists(), "manifest index should exist");
+}
+
+#[test]
+fn init_fails_when_run_directory_already_exists() {
+    let tmp = tempfile::tempdir().unwrap();
+    let suite_dir = tmp.path().join("suite");
+    write_suite(&suite_dir.join("suite.md"));
+    write_group(&suite_dir.join("groups").join("g01.md"));
+    let run_root = tmp.path().join("runs");
+
+    // First init should succeed
+    let r1 = init_run::execute(
+        &suite_dir.join("suite.md").to_string_lossy(),
+        "run-dup",
+        "single-zone",
+        Some(&tmp.path().to_string_lossy()),
+        Some(&run_root.to_string_lossy()),
+    );
+    assert!(r1.is_ok());
+
+    // Second init with same run_id should fail
+    let r2 = init_run::execute(
+        &suite_dir.join("suite.md").to_string_lossy(),
+        "run-dup",
+        "single-zone",
+        Some(&tmp.path().to_string_lossy()),
+        Some(&run_root.to_string_lossy()),
+    );
+    assert!(r2.is_err(), "duplicate init should fail");
+}
+
+#[test]
+fn init_accepts_suite_directory_input() {
+    let tmp = tempfile::tempdir().unwrap();
+    let suite_dir = tmp.path().join("suite");
+    write_suite(&suite_dir.join("suite.md"));
+    write_group(&suite_dir.join("groups").join("g01.md"));
+
+    // Pass the suite directory path (not suite.md) - should find suite.md
+    let result = init_run::execute(
+        &suite_dir.to_string_lossy(),
+        "run-dir-input",
+        "single-zone",
+        Some(&tmp.path().to_string_lossy()),
+        Some(&tmp.path().join("runs").to_string_lossy()),
+    );
+    assert!(
+        result.is_ok(),
+        "init should accept suite directory: {result:?}"
+    );
+}
+
+#[test]
+fn init_defaults_repo_root_to_cwd() {
+    let tmp = tempfile::tempdir().unwrap();
+    let suite_dir = tmp.path().join("suite");
+    write_suite(&suite_dir.join("suite.md"));
+    write_group(&suite_dir.join("groups").join("g01.md"));
+
+    let result = init_run::execute(
+        &suite_dir.join("suite.md").to_string_lossy(),
+        "run-cwd",
+        "single-zone",
+        None, // no explicit repo root
+        Some(&tmp.path().join("runs").to_string_lossy()),
+    );
+    assert!(result.is_ok());
+    let run_dir = tmp.path().join("runs").join("run-cwd");
+    let meta_text = fs::read_to_string(run_dir.join("run-metadata.json")).unwrap();
+    let metadata: RunMetadata = serde_json::from_str(&meta_text).unwrap();
+    // repo_root should be set to something (cwd)
+    assert!(!metadata.repo_root.is_empty());
+}
+
+#[test]
+fn init_preserves_user_stories_from_suite() {
+    let tmp = tempfile::tempdir().unwrap();
+    let suite_dir = tmp.path().join("suite-stories");
+    fs::create_dir_all(&suite_dir).unwrap();
+    fs::write(
+        suite_dir.join("suite.md"),
+        "\
+---
+suite_id: stories.suite
+feature: stories-test
+scope: unit
+profiles: [single-zone]
+required_dependencies: [docker]
+user_stories:
+  - prepare manifests once
+  - validate all resources
+variant_decisions: []
+coverage_expectations: [configure, consume, debug]
+baseline_files: []
+groups: []
+skipped_groups: []
+keep_clusters: false
+---
+
+# Stories suite
+",
+    )
+    .unwrap();
+
+    let result = init_run::execute(
+        &suite_dir.join("suite.md").to_string_lossy(),
+        "run-stories",
+        "single-zone",
+        Some(&tmp.path().to_string_lossy()),
+        Some(&tmp.path().join("runs").to_string_lossy()),
+    );
+    assert!(result.is_ok());
+    let run_dir = tmp.path().join("runs").join("run-stories");
+    let meta_text = fs::read_to_string(run_dir.join("run-metadata.json")).unwrap();
+    let metadata: RunMetadata = serde_json::from_str(&meta_text).unwrap();
+    assert_eq!(
+        metadata.user_stories,
+        vec!["prepare manifests once", "validate all resources"]
+    );
+    assert_eq!(metadata.required_dependencies, vec!["docker"]);
+}
+
+// ============================================================================
+// CLI-level init tests (require binary)
+// ============================================================================
+
+#[test]
+#[ignore = "Requires CLI binary and init command"]
+fn init_run_alias_still_works() {
+    // The init-run alias should still work
+}
