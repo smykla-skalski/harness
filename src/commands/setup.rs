@@ -61,10 +61,20 @@ pub fn cluster(
     let build_info = resolve_build_info(&root)?;
     let mut base_env = build_info.env();
 
+    let mut bad_settings = Vec::new();
     let helm_settings: Vec<HelmSetting> = helm_setting
         .iter()
-        .filter_map(|s| HelmSetting::from_cli_arg(s).ok())
+        .filter_map(|s| match HelmSetting::from_cli_arg(s) {
+            Ok(h) => Some(h),
+            Err(e) => {
+                bad_settings.push(e);
+                None
+            }
+        })
         .collect();
+    if !bad_settings.is_empty() {
+        return Err(CliErrorKind::usage_error(bad_settings.join("; ")).into());
+    }
 
     let spec = ClusterSpec::from_mode(
         mode,
