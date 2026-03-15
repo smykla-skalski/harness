@@ -52,10 +52,7 @@ fn validate_suite_author(ctx: &HookContext) -> HookResult {
         .collect();
     if !missing.is_empty() {
         let joined = missing.join(", ");
-        return HookMessage::ReaderMissingSections {
-            sections: joined.into(),
-        }
-        .into_result();
+        return HookMessage::reader_missing_sections(joined).into_result();
     }
     for block in CODE_BLOCK_RE.find_iter(&message) {
         if block.as_str().matches('\n').count() > CODE_BLOCK_LINE_LIMIT {
@@ -67,9 +64,9 @@ fn validate_suite_author(ctx: &HookContext) -> HookResult {
 
 fn validate_suite_runner(ctx: &HookContext) -> HookResult {
     if ctx.run.is_none() {
-        return HookMessage::RunnerStateInvalid {
-            details: "run context is missing; initialize the suite run first".into(),
-        }
+        return HookMessage::runner_state_invalid(
+            "run context is missing; initialize the suite run first",
+        )
         .into_result();
     }
     let message = ctx.last_assistant_message();
@@ -79,10 +76,7 @@ fn validate_suite_runner(ctx: &HookContext) -> HookResult {
     let reply = match parse_preflight_reply(message) {
         Ok(r) => r,
         Err(detail) => {
-            return HookMessage::PreflightReplyInvalid {
-                details: detail.into(),
-            }
-            .into_result();
+            return HookMessage::preflight_reply_invalid(detail).into_result();
         }
     };
     let state = ctx.runner_state.as_ref();
@@ -105,15 +99,13 @@ fn validate_suite_runner(ctx: &HookContext) -> HookResult {
     // Pass reply - validate artifacts exist.
     if let Some(ref run) = ctx.run {
         if run.prepared_suite.is_none() || run.preflight.is_none() {
-            return HookMessage::PreflightReplyInvalid {
-                details: "preflight artifacts were not saved".into(),
-            }
-            .into_result();
+            return HookMessage::preflight_reply_invalid("preflight artifacts were not saved")
+                .into_result();
         }
         if !run.layout.prepared_suite_path().exists() {
-            return HookMessage::PreflightReplyInvalid {
-                details: "prepared-suite artifact is missing or incomplete".into(),
-            }
+            return HookMessage::preflight_reply_invalid(
+                "prepared-suite artifact is missing or incomplete",
+            )
             .into_result();
         }
     }

@@ -73,10 +73,7 @@ pub fn choose_install_dir(path_env: &str) -> Result<(PathBuf, bool), CliError> {
         return Ok((fallback.clone(), on_path));
     }
 
-    Err(CliErrorKind::MissingFile {
-        path: "no writable user PATH directory found".into(),
-    }
-    .into())
+    Err(CliErrorKind::missing_file("no writable user PATH directory found").into())
 }
 
 /// Install the harness wrapper script into the target directory.
@@ -119,9 +116,10 @@ pub fn install_wrapper(target_dir: &Path) -> Result<PathBuf, CliError> {
 pub fn main(project_dir: &Path, path_env: &str) -> Result<i32, CliError> {
     let harness = project_dir.join(".claude").join("skills").join("harness");
     if !harness.exists() {
-        return Err(CliErrorKind::MissingFile {
-            path: cow!("missing source wrapper: {}", harness.display()),
-        }
+        return Err(CliErrorKind::missing_file(cow!(
+            "missing source wrapper: {}",
+            harness.display()
+        ))
         .into());
     }
 

@@ -34,11 +34,8 @@ pub fn execute(cmd: &EnvoyCommand) -> Result<i32, CliError> {
         } => {
             if let Some(file_path) = file {
                 let text = read_text(Path::new(file_path))?;
-                let payload: serde_json::Value = serde_json::from_str(&text).map_err(|_| {
-                    CliError::from(CliErrorKind::InvalidJson {
-                        path: file_path.clone().into(),
-                    })
-                })?;
+                let payload: serde_json::Value = serde_json::from_str(&text)
+                    .map_err(|_| CliError::from(CliErrorKind::invalid_json(file_path.clone())))?;
                 match find_route(&payload, route_match) {
                     Some(route) => {
                         println!(
@@ -47,16 +44,13 @@ pub fn execute(cmd: &EnvoyCommand) -> Result<i32, CliError> {
                         );
                         Ok(0)
                     }
-                    None => Err(CliErrorKind::RouteNotFound {
-                        route_match: route_match.clone().into(),
-                    }
-                    .into()),
+                    None => Err(CliErrorKind::route_not_found(route_match.clone()).into()),
                 }
             } else {
-                Err(CliErrorKind::EnvoyCaptureArgsRequired {
-                    fields: "--file or --namespace/--workload".into(),
-                }
-                .into())
+                Err(
+                    CliErrorKind::envoy_capture_args_required("--file or --namespace/--workload")
+                        .into(),
+                )
             }
         }
         EnvoyCommand::Bootstrap { file, grep, .. } => {
@@ -73,10 +67,10 @@ pub fn execute(cmd: &EnvoyCommand) -> Result<i32, CliError> {
                 println!("{output}");
                 Ok(0)
             } else {
-                Err(CliErrorKind::EnvoyCaptureArgsRequired {
-                    fields: "--file or --namespace/--workload".into(),
-                }
-                .into())
+                Err(
+                    CliErrorKind::envoy_capture_args_required("--file or --namespace/--workload")
+                        .into(),
+                )
             }
         }
     }

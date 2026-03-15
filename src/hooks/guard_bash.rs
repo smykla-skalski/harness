@@ -541,11 +541,7 @@ fn tracked_kubectl_delete_words(words: &[String]) -> Option<Vec<String>> {
 }
 
 fn deny_runner_flow(details: &str) -> HookResult {
-    HookMessage::RunnerFlowRequired {
-        action: "run this command".into(),
-        details: details.to_string().into(),
-    }
-    .into_result()
+    HookMessage::runner_flow_required("run this command", details.to_string()).into_result()
 }
 
 fn command_heads(words: &[String]) -> Vec<String> {

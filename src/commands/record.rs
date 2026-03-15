@@ -36,10 +36,7 @@ pub fn execute(
         command.remove(0);
     }
     if command.is_empty() {
-        return Err(CliErrorKind::UsageError {
-            detail: "missing command".into(),
-        }
-        .into());
+        return Err(CliErrorKind::usage_error("missing command").into());
     }
 
     let run_dir = super::resolve_run_dir(run_dir_args).ok();
@@ -108,8 +105,6 @@ pub fn execute(
         return Ok(returncode);
     }
 
-    Err(CliErrorKind::CommandFailed {
-        command: shell_words::join(&command).into(),
-    }
-    .with_details(format!("Recorded command output: {}", artifact.display())))
+    Err(CliErrorKind::command_failed(shell_words::join(&command))
+        .with_details(format!("Recorded command output: {}", artifact.display())))
 }

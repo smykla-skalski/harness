@@ -148,11 +148,9 @@ impl SuiteSpec {
             missing.push("keep_clusters");
         }
         if !missing.is_empty() {
-            return Err(CliErrorKind::MissingFields {
-                label: "suite frontmatter".into(),
-                fields: missing.join(", ").into(),
-            }
-            .into());
+            return Err(
+                CliErrorKind::missing_fields("suite frontmatter", missing.join(", ")).into(),
+            );
         }
 
         let frontmatter = SuiteFrontmatter {
@@ -236,11 +234,9 @@ impl GroupSpec {
             .copied()
             .collect();
         if !missing_sections.is_empty() {
-            return Err(CliErrorKind::MissingSections {
-                label: "group body".into(),
-                sections: missing_sections.join(", ").into(),
-            }
-            .into());
+            return Err(
+                CliErrorKind::missing_sections("group body", missing_sections.join(", ")).into(),
+            );
         }
 
         let frontmatter = GroupFrontmatter {
@@ -460,12 +456,8 @@ impl RunStatus {
     /// Returns `CliError` if the file is missing or contains invalid JSON.
     pub fn load(path: &Path) -> Result<Self, CliError> {
         let text = io::read_text(path)?;
-        serde_json::from_str(&text).map_err(|e| -> CliError {
-            CliErrorKind::JsonParse {
-                detail: e.to_string().into(),
-            }
-            .into()
-        })
+        serde_json::from_str(&text)
+            .map_err(|e| -> CliError { CliErrorKind::json_parse(e.to_string()).into() })
     }
 
     /// Extract group IDs from `executed_groups`, handling both string entries

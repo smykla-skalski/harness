@@ -39,10 +39,10 @@ fn handle_suite_runner(ctx: &HookContext) -> HookResult {
     if let Some(ref state) = ctx.runner_state
         && state.phase != RunnerPhase::Triage
     {
-        return HookMessage::RunnerFlowRequired {
-            action: "apply the suite-fix answer".into(),
-            details: "manifest-fix answers are only valid during failure triage".into(),
-        }
+        return HookMessage::runner_flow_required(
+            "apply the suite-fix answer",
+            "manifest-fix answers are only valid during failure triage",
+        )
         .into_result();
     }
     HookResult::allow()
@@ -57,9 +57,9 @@ fn handle_suite_author(ctx: &HookContext) -> HookResult {
         return HookResult::allow();
     }
     if ctx.author_state.is_none() {
-        return HookMessage::ApprovalStateInvalid {
-            details: "author state is missing; cannot apply gate answer".into(),
-        }
+        return HookMessage::approval_state_invalid(
+            "author state is missing; cannot apply gate answer",
+        )
         .into_result();
     }
     HookResult::allow()

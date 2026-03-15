@@ -30,10 +30,7 @@ pub fn ensure_mapping<'a>(
     value.as_object().ok_or_else(|| {
         // JSON objects always have string keys, so we only need to check
         // that the value is actually an object.
-        CliErrorKind::NotAMapping {
-            label: label.to_string().into(),
-        }
-        .into()
+        CliErrorKind::not_a_mapping(label.to_string()).into()
     })
 }
 
@@ -42,18 +39,14 @@ pub fn ensure_mapping<'a>(
 /// # Errors
 /// Returns `CliError` if value is not a list or contains non-strings.
 pub fn ensure_str_list(value: &Value, label: &str) -> Result<Vec<String>, CliError> {
-    let arr = value.as_array().ok_or_else(|| {
-        CliError::from(CliErrorKind::NotAList {
-            label: label.to_string().into(),
-        })
-    })?;
+    let arr = value
+        .as_array()
+        .ok_or_else(|| CliError::from(CliErrorKind::not_a_list(label.to_string())))?;
     let mut result = Vec::with_capacity(arr.len());
     for item in arr {
-        let s = item.as_str().ok_or_else(|| {
-            CliError::from(CliErrorKind::NotAllStrings {
-                label: label.to_string().into(),
-            })
-        })?;
+        let s = item
+            .as_str()
+            .ok_or_else(|| CliError::from(CliErrorKind::not_all_strings(label.to_string())))?;
         result.push(s.to_string());
     }
     Ok(result)
@@ -72,12 +65,8 @@ pub fn ensure_dir(path: &Path) -> io::Result<()> {
 /// # Errors
 /// Returns `CliError` if the file is missing.
 pub fn read_text(path: &Path) -> Result<String, CliError> {
-    fs::read_to_string(path).map_err(|_| {
-        CliErrorKind::MissingFile {
-            path: path.display().to_string().into(),
-        }
-        .into()
-    })
+    fs::read_to_string(path)
+        .map_err(|_| CliErrorKind::missing_file(path.display().to_string()).into())
 }
 
 /// Write UTF-8 text to a file, creating parent directories.
@@ -86,18 +75,10 @@ pub fn read_text(path: &Path) -> Result<String, CliError> {
 /// Returns `CliError` on IO failure.
 pub fn write_text(path: &Path, text: &str) -> Result<(), CliError> {
     if let Some(parent) = path.parent() {
-        ensure_dir(parent).map_err(|e| {
-            CliError::from(CliErrorKind::MissingFile {
-                path: e.to_string().into(),
-            })
-        })?;
+        ensure_dir(parent)
+            .map_err(|e| CliError::from(CliErrorKind::missing_file(e.to_string())))?;
     }
-    fs::write(path, text).map_err(|e| {
-        CliErrorKind::MissingFile {
-            path: e.to_string().into(),
-        }
-        .into()
-    })
+    fs::write(path, text).map_err(|e| CliErrorKind::missing_file(e.to_string()).into())
 }
 
 /// Read and parse a JSON file into a `serde_json::Value`.
@@ -106,11 +87,8 @@ pub fn write_text(path: &Path, text: &str) -> Result<(), CliError> {
 /// Returns `CliError` if the file is missing or contains invalid JSON.
 pub fn read_json(path: &Path) -> Result<Value, CliError> {
     let text = read_text(path)?;
-    let value: Value = serde_json::from_str(&text).map_err(|e| {
-        CliError::from(CliErrorKind::MissingFile {
-            path: e.to_string().into(),
-        })
-    })?;
+    let value: Value = serde_json::from_str(&text)
+        .map_err(|e| CliError::from(CliErrorKind::missing_file(e.to_string())))?;
     // Ensure top-level is an object
     let _ = ensure_mapping(&value, &format!("JSON document {}", path.display()))?;
     Ok(value)
@@ -303,11 +281,9 @@ pub fn append_markdown_row(path: &Path, headers: &[&str], values: &[&str]) -> Re
 pub fn drill<'a>(payload: &'a Value, dotted_path: &str) -> Result<&'a Value, CliError> {
     let mut current = payload;
     for part in dotted_path.split('.') {
-        current = current.get(part).ok_or_else(|| {
-            CliError::from(CliErrorKind::PathNotFound {
-                dotted_path: dotted_path.to_string().into(),
-            })
-        })?;
+        current = current
+            .get(part)
+            .ok_or_else(|| CliError::from(CliErrorKind::path_not_found(dotted_path.to_string())))?;
     }
     Ok(current)
 }

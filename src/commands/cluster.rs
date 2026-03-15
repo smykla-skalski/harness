@@ -44,7 +44,7 @@ pub fn execute(
         helm_settings.clone(),
         restart_namespace.to_vec(),
     )
-    .map_err(|e| CliError::from(CliErrorKind::ClusterError { detail: e.into() }))?;
+    .map_err(|e| CliError::from(CliErrorKind::cluster_error(e)))?;
     let validated_args = &spec.mode_args;
 
     if !helm_settings.is_empty() {
@@ -69,10 +69,9 @@ pub fn execute(
         "global-two-zones-up" => global_two_zones_up(&root, &base_env, validated_args)?,
         "global-two-zones-down" => global_two_zones_down(&root, &base_env, validated_args)?,
         _ => {
-            return Err(CliErrorKind::ClusterError {
-                detail: cow!("unsupported cluster mode: {mode}"),
-            }
-            .into());
+            return Err(
+                CliErrorKind::cluster_error(cow!("unsupported cluster mode: {mode}")).into(),
+            );
         }
     }
 

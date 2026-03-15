@@ -269,18 +269,12 @@ pub fn load_latest_compact_handoff(project_dir: &Path) -> Result<Option<CompactH
         return Ok(None);
     }
     let text = fs::read_to_string(&path).map_err(|e| -> CliError {
-        CliErrorKind::Io {
-            detail: cow!("failed to read {}: {e}", path.display()),
-        }
-        .into()
+        CliErrorKind::io(cow!("failed to read {}: {e}", path.display())).into()
     })?;
     serde_json::from_str(&text)
         .map(Some)
         .map_err(|e| -> CliError {
-            CliErrorKind::Io {
-                detail: cow!("corrupt compact handoff at {}: {e}", path.display()),
-            }
-            .into()
+            CliErrorKind::io(cow!("corrupt compact handoff at {}: {e}", path.display())).into()
         })
 }
 
@@ -597,33 +591,21 @@ fn truncate_lines(lines: &[String], char_limit: usize, line_limit: usize) -> Str
 fn write_json_atomic(path: &Path, payload: &CompactHandoff) -> Result<(), CliError> {
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent).map_err(|e| -> CliError {
-            CliErrorKind::Io {
-                detail: cow!("failed to create directory: {e}"),
-            }
-            .into()
+            CliErrorKind::io(cow!("failed to create directory: {e}")).into()
         })?;
     }
     let tmp = path.with_extension("json.tmp");
-    let text = serde_json::to_string_pretty(payload).map_err(|e| -> CliError {
-        CliErrorKind::Serialize {
-            detail: cow!("{e}"),
-        }
-        .into()
-    })?;
+    let text = serde_json::to_string_pretty(payload)
+        .map_err(|e| -> CliError { CliErrorKind::serialize(cow!("{e}")).into() })?;
     fs::write(&tmp, &text).map_err(|e| -> CliError {
-        CliErrorKind::Io {
-            detail: cow!("failed to write {}: {e}", tmp.display()),
-        }
-        .into()
+        CliErrorKind::io(cow!("failed to write {}: {e}", tmp.display())).into()
     })?;
     fs::rename(&tmp, path).map_err(|e| -> CliError {
-        CliErrorKind::Io {
-            detail: cow!(
-                "failed to rename {} to {}: {e}",
-                tmp.display(),
-                path.display()
-            ),
-        }
+        CliErrorKind::io(cow!(
+            "failed to rename {} to {}: {e}",
+            tmp.display(),
+            path.display()
+        ))
         .into()
     })?;
     Ok(())

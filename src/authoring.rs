@@ -145,18 +145,12 @@ pub fn load_authoring_session() -> Result<Option<AuthoringSession>, CliError> {
         return Ok(None);
     }
     let text = fs::read_to_string(&path).map_err(|e| {
-        CliErrorKind::AuthoringPayloadInvalid {
-            kind: "session".into(),
-            details: "read failed".into(),
-        }
-        .with_details(e.to_string())
+        CliErrorKind::authoring_payload_invalid("session", "read failed")
+            .with_details(e.to_string())
     })?;
     let session: AuthoringSession = serde_json::from_str(&text).map_err(|e| {
-        CliErrorKind::AuthoringPayloadInvalid {
-            kind: "session".into(),
-            details: "parse failed".into(),
-        }
-        .with_details(e.to_string())
+        CliErrorKind::authoring_payload_invalid("session", "parse failed")
+            .with_details(e.to_string())
     })?;
     Ok(Some(session))
 }
@@ -169,26 +163,17 @@ pub fn save_authoring_session(session: &AuthoringSession) -> Result<AuthoringSes
     let path = session_file_path();
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent).map_err(|e| {
-            CliErrorKind::AuthoringPayloadInvalid {
-                kind: "session".into(),
-                details: "cannot create directory".into(),
-            }
-            .with_details(e.to_string())
+            CliErrorKind::authoring_payload_invalid("session", "cannot create directory")
+                .with_details(e.to_string())
         })?;
     }
     let json = serde_json::to_string_pretty(session).map_err(|e| {
-        CliErrorKind::AuthoringPayloadInvalid {
-            kind: "session".into(),
-            details: "serialize failed".into(),
-        }
-        .with_details(e.to_string())
+        CliErrorKind::authoring_payload_invalid("session", "serialize failed")
+            .with_details(e.to_string())
     })?;
     fs::write(&path, json).map_err(|e| {
-        CliErrorKind::AuthoringPayloadInvalid {
-            kind: "session".into(),
-            details: "write failed".into(),
-        }
-        .with_details(e.to_string())
+        CliErrorKind::authoring_payload_invalid("session", "write failed")
+            .with_details(e.to_string())
     })?;
     Ok(session.clone())
 }

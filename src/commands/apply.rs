@@ -27,10 +27,7 @@ fn resolve_kubeconfig(
     if let Some(ref spec) = ctx.cluster {
         return Ok(PathBuf::from(spec.primary_kubeconfig()));
     }
-    Err(CliErrorKind::MissingRunContextValue {
-        field: "kubeconfig".into(),
-    }
-    .into())
+    Err(CliErrorKind::missing_run_context_value("kubeconfig").into())
 }
 
 /// Apply manifests to the cluster.
