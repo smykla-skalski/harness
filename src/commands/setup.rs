@@ -180,7 +180,6 @@ fn cluster_universal(
     all_names.extend(extra_cluster_names.iter().cloned());
 
     let root = super::resolve_repo_root(repo_root);
-    let cp_image = resolve_cp_image(&root, image)?;
 
     let spec = ClusterSpec::from_mode_with_platform(
         mode,
@@ -193,6 +192,14 @@ fn cluster_universal(
     .map_err(|e| CliError::from(CliErrorKind::cluster_error(e)))?;
 
     let network_name = spec.docker_network.as_deref().unwrap_or("harness-default");
+    let is_up = spec.mode.is_up();
+
+    // Only resolve image for up commands
+    let cp_image = if is_up {
+        resolve_cp_image(&root, image)?
+    } else {
+        String::new()
+    };
 
     eprintln!(
         "{} cluster: starting universal {mode} for {}",
