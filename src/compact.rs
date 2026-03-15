@@ -6,7 +6,7 @@ use std::{fs, result};
 use serde::{Deserialize, Serialize};
 
 use crate::core_defs::{project_context_dir, session_scope_key, utc_now};
-use crate::errors::{CliError, CliErrorKind};
+use crate::errors::{CliError, CliErrorKind, cow};
 use crate::rules::compact as rules;
 
 /// SHA256 fingerprint of a file.
@@ -270,7 +270,7 @@ pub fn load_latest_compact_handoff(project_dir: &Path) -> Result<Option<CompactH
     }
     let text = fs::read_to_string(&path).map_err(|e| -> CliError {
         CliErrorKind::Io {
-            detail: format!("failed to read {}: {e}", path.display()).into(),
+            detail: cow!("failed to read {}: {e}", path.display()),
         }
         .into()
     })?;
@@ -278,7 +278,7 @@ pub fn load_latest_compact_handoff(project_dir: &Path) -> Result<Option<CompactH
         .map(Some)
         .map_err(|e| -> CliError {
             CliErrorKind::Io {
-                detail: format!("corrupt compact handoff at {}: {e}", path.display()).into(),
+                detail: cow!("corrupt compact handoff at {}: {e}", path.display()),
             }
             .into()
         })
@@ -598,7 +598,7 @@ fn write_json_atomic(path: &Path, payload: &CompactHandoff) -> Result<(), CliErr
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent).map_err(|e| -> CliError {
             CliErrorKind::Io {
-                detail: format!("failed to create directory: {e}").into(),
+                detail: cow!("failed to create directory: {e}"),
             }
             .into()
         })?;
@@ -606,24 +606,23 @@ fn write_json_atomic(path: &Path, payload: &CompactHandoff) -> Result<(), CliErr
     let tmp = path.with_extension("json.tmp");
     let text = serde_json::to_string_pretty(payload).map_err(|e| -> CliError {
         CliErrorKind::Serialize {
-            detail: format!("{e}").into(),
+            detail: cow!("{e}"),
         }
         .into()
     })?;
     fs::write(&tmp, &text).map_err(|e| -> CliError {
         CliErrorKind::Io {
-            detail: format!("failed to write {}: {e}", tmp.display()).into(),
+            detail: cow!("failed to write {}: {e}", tmp.display()),
         }
         .into()
     })?;
     fs::rename(&tmp, path).map_err(|e| -> CliError {
         CliErrorKind::Io {
-            detail: format!(
+            detail: cow!(
                 "failed to rename {} to {}: {e}",
                 tmp.display(),
                 path.display()
-            )
-            .into(),
+            ),
         }
         .into()
     })?;

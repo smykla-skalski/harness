@@ -1,5 +1,5 @@
 use crate::core_defs::utc_now;
-use crate::errors::{CliError, CliErrorKind};
+use crate::errors::{CliError, CliErrorKind, cow};
 use crate::workflow::author::{
     ApprovalMode, AuthorDraftState, AuthorPhase, AuthorReviewState, AuthorSessionInfo,
     AuthorWorkflowState, write_author_state,
@@ -15,7 +15,7 @@ pub fn execute(mode: &str, suite_dir: Option<&str>) -> Result<i32, CliError> {
         "bypass" => ApprovalMode::Bypass,
         _ => {
             return Err(CliErrorKind::UsageError {
-                detail: format!("invalid approval mode: {mode}").into(),
+                detail: cow!("invalid approval mode: {mode}"),
             }
             .into());
         }

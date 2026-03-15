@@ -4,7 +4,7 @@ use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 
 use crate::core_defs::dirs_home;
-use crate::errors::{CliError, CliErrorKind};
+use crate::errors::{CliError, CliErrorKind, cow};
 
 /// Shell wrapper script that delegates to the project-local harness binary.
 pub const WRAPPER: &str = r#"#!/bin/sh
@@ -120,7 +120,7 @@ pub fn main(project_dir: &Path, path_env: &str) -> Result<i32, CliError> {
     let harness = project_dir.join(".claude").join("skills").join("harness");
     if !harness.exists() {
         return Err(CliErrorKind::MissingFile {
-            path: format!("missing source wrapper: {}", harness.display()).into(),
+            path: cow!("missing source wrapper: {}", harness.display()),
         }
         .into());
     }
