@@ -360,7 +360,7 @@ pub fn session_start(project_dir: Option<&str>) -> Result<i32, CliError> {
 /// # Errors
 /// Returns `CliError` on failure.
 pub fn session_stop(_project_dir: Option<&str>) -> Result<i32, CliError> {
-    let ctx_path = current_run_context_path();
+    let ctx_path = current_run_context_path()?;
     let Ok(text) = fs::read_to_string(&ctx_path) else {
         return Ok(0);
     };

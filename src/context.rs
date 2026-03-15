@@ -273,7 +273,7 @@ impl RunContext {
     /// # Errors
     /// Returns `CliError` on failure.
     pub fn from_current() -> Result<Option<Self>, CliError> {
-        let pointer_path = current_run_context_path();
+        let pointer_path = current_run_context_path()?;
         let Ok(text) = fs::read_to_string(&pointer_path) else {
             return Ok(None);
         };

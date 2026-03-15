@@ -21,7 +21,9 @@ struct DebugLine {
 /// Append a JSON debug line to the session-scoped hooks-debug.jsonl file.
 /// Silently returns on any error - debug logging must not crash hooks.
 fn write_debug_line(hook_name: &str, outcome: &HookOutcome) {
-    let ctx_dir = session_context_dir();
+    let Ok(ctx_dir) = session_context_dir() else {
+        return;
+    };
     let _ = fs::create_dir_all(&ctx_dir);
     let debug_path = ctx_dir.join("hooks-debug.jsonl");
     let line = DebugLine {
@@ -235,7 +237,7 @@ mod tests {
                 let code = outcome.log_and_exit("guard-bash", &event);
                 assert_eq!(code, 2);
 
-                let ctx_dir = crate::core_defs::session_context_dir();
+                let ctx_dir = crate::core_defs::session_context_dir().unwrap();
                 let debug_path = ctx_dir.join("hooks-debug.jsonl");
                 assert!(debug_path.exists(), "debug file should exist");
 

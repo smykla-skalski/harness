@@ -77,7 +77,7 @@ pub fn save(kind: &str, payload: Option<&str>, input: Option<&str>) -> Result<i3
     let text = read_input(input, payload)?;
     let value = parse_payload(&text, kind)?;
 
-    let workspace = authoring_workspace_dir();
+    let workspace = authoring_workspace_dir()?;
     ensure_dir(&workspace)?;
     let path = workspace.join(format!("{kind}.json"));
     let json = serde_json::to_string_pretty(&value).unwrap_or_default();
@@ -100,7 +100,7 @@ pub fn show(kind: &str) -> Result<i32, CliError> {
     }
 
     let _session = require_authoring_session()?;
-    let workspace = authoring_workspace_dir();
+    let workspace = authoring_workspace_dir()?;
     let path = workspace.join(format!("{kind}.json"));
 
     if !path.exists() {
@@ -131,7 +131,7 @@ pub fn show(kind: &str) -> Result<i32, CliError> {
 /// # Errors
 /// Returns `CliError` on failure.
 pub fn reset() -> Result<i32, CliError> {
-    let workspace = authoring_workspace_dir();
+    let workspace = authoring_workspace_dir()?;
     if workspace.exists() {
         fs::remove_dir_all(&workspace)?;
     }

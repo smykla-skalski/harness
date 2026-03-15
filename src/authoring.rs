@@ -132,8 +132,8 @@ pub struct DraftEditRequest {
     pub targets: Vec<String>,
 }
 
-fn session_file_path() -> PathBuf {
-    authoring_workspace_dir().join("session.json")
+fn session_file_path() -> Result<PathBuf, CliError> {
+    Ok(authoring_workspace_dir()?.join("session.json"))
 }
 
 /// Load the current authoring session from disk.
@@ -141,7 +141,7 @@ fn session_file_path() -> PathBuf {
 /// # Errors
 /// Returns `CliError` on parse failure.
 pub fn load_authoring_session() -> Result<Option<AuthoringSession>, CliError> {
-    let path = session_file_path();
+    let path = session_file_path()?;
     if !path.exists() {
         return Ok(None);
     }
@@ -161,7 +161,7 @@ pub fn load_authoring_session() -> Result<Option<AuthoringSession>, CliError> {
 /// # Errors
 /// Returns `CliError` on IO failure.
 pub fn save_authoring_session(session: &AuthoringSession) -> Result<AuthoringSession, CliError> {
-    let path = session_file_path();
+    let path = session_file_path()?;
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent).map_err(|e| {
             CliErrorKind::authoring_payload_invalid("session", "cannot create directory")
@@ -219,9 +219,11 @@ pub fn begin_authoring_session(
 }
 
 /// Workspace directory for authoring artifacts.
-#[must_use]
-pub fn authoring_workspace_dir() -> PathBuf {
-    session_context_dir().join(skill_dirs::NEW_WORKSPACE)
+///
+/// # Errors
+/// Returns `CliError` if the session context directory cannot be determined.
+pub fn authoring_workspace_dir() -> Result<PathBuf, CliError> {
+    Ok(session_context_dir()?.join(skill_dirs::NEW_WORKSPACE))
 }
 
 #[cfg(test)]
@@ -385,7 +387,7 @@ mod tests {
         // -- authoring_workspace_dir_under_context --
         {
             temp_env::with_vars([("CLAUDE_SESSION_ID", Some("workspace-dir-test"))], || {
-                let workspace = authoring_workspace_dir();
+                let workspace = authoring_workspace_dir().unwrap();
                 let name = workspace
                     .file_name()
                     .unwrap()
