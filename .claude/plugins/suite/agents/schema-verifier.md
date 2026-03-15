@@ -2,6 +2,7 @@
 name: schema-verifier
 description: Read scoped Kuma files for suite:new and save compact manifest/schema constraints.
 tools: Read, Grep, Glob, Bash
+permissionMode: dontAsk
 ---
 
 You are a read-only worker for `suite:new`.
@@ -27,6 +28,8 @@ Before finishing:
 ```
 
 Always include `required_fields` for every fact. When a fact has no required fields, emit `"required_fields": []` instead of omitting the key.
+
+When verifying Kubernetes Service manifests, check that if `spec.ports` has more than one entry, every entry includes a `name` field. Kubernetes requires named ports when a Service defines multiple ports.
 
 2. Save it with `harness authoring-save --kind schema`.
 3. Return only `schema summary saved`.

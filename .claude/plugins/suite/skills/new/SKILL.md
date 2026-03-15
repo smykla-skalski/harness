@@ -244,6 +244,7 @@ Build the proposal from the saved worker outputs:
 - Use variant signals to propose G8+ groups and to decide which signals are strong, moderate, or weak.
 - Use schema facts to constrain manifests from the start, but treat them as planning input only.
 - If the local validator was installed, validate authored manifests locally with `harness authoring-validate` before stopping. That command runs `kubectl validate --local-crds deployments/charts/kuma/crds` against the checked-in CRDs from this repo, so do not defer first validation to a live cluster.
+- When `profiles` includes `multi-zone`, set `clusters: all` on every baseline that deploys workloads (namespace, demo-workload, otel-collector). Zone clusters need these resources present for xDS inspection. Use the object form in `baseline_files` frontmatter (`- path: baseline/foo.yaml` with `clusters: all`) and add a Clusters column to the baseline manifests table. Infrastructure-only baselines that only apply to the global CP can omit the field or use `clusters: global`.
 - Save the merged proposal with `harness authoring-save --kind proposal`.
 
 Variant review rules:
@@ -297,6 +298,7 @@ Writer contract:
 - Keep writer fan-out bounded. Do not start more than four writer workers at once.
 - Launch all writer agents with `mode: "auto"` so they can write files without interactive approval. Background agents cannot prompt the user, so writes are denied without this mode.
 - If the local validator was installed, require every writer that emits manifests to run `harness authoring-validate` on its owned outputs before it stops. Use the current repo checkout as the schema source of truth; all required schemas, including CRDs, are already in this repo. If the validator was explicitly skipped, do not substitute a live-cluster check here.
+- When the proposal includes multi-zone profiles, pass the baseline cluster distribution from the proposal to the baseline-writer and suite-writer so they emit the object form (`- path:` with `clusters:`) in `baseline_files` frontmatter and include the Clusters column in the baseline manifests table.
 - Follow [references/agent-output-format.md](references/agent-output-format.md) for `authoring-show` usage and acknowledgement rules, and [references/suite-structure.md](references/suite-structure.md) for file content requirements.
 
 ### Step 9: Post-write review gate
