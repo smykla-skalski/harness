@@ -9,11 +9,10 @@ use std::path::{Path, PathBuf};
 use std::sync::{Mutex, PoisonError};
 
 use harness::authoring;
-use harness::cli::{EnvoyCommand, KumactlCommand, RunDirArgs};
-use harness::commands::{
-    approval_begin, authoring_begin, authoring_save, authoring_validate, capture, closeout, envoy,
-    gateway, kumactl, record,
+use harness::cli::{
+    AuthoringBeginArgs, Command, EnvoyCommand, KumactlCommand, RecordArgs, RunDirArgs,
 };
+use harness::commands::Execute;
 use harness::core_defs;
 use harness::schema::Verdict;
 use harness::workflow::author::{self, AuthorPhase};
@@ -79,14 +78,15 @@ fn record_accepts_run_dir_phase_and_label() {
         run_root: None,
     };
 
-    let result = record::execute(
-        None,
-        Some("verify"),
-        Some("test"),
-        None,
-        &["echo".into(), "hello".into()],
-        &args,
-    );
+    let result = Command::Record(RecordArgs {
+        repo_root: None,
+        phase: Some("verify".into()),
+        label: Some("test".into()),
+        cluster: None,
+        command: vec!["echo".into(), "hello".into()],
+        run_dir: args.clone(),
+    })
+    .execute();
     assert!(result.is_ok(), "record should succeed: {result:?}");
 
     // Verify an artifact was created in commands/
@@ -123,14 +123,15 @@ fn record_exports_context_env() {
         run_root: None,
     };
 
-    let result = record::execute(
-        None,
-        Some("verify"),
-        Some("env-check"),
-        None,
-        &["env".into()],
-        &args,
-    );
+    let result = Command::Record(RecordArgs {
+        repo_root: None,
+        phase: Some("verify".into()),
+        label: Some("env-check".into()),
+        cluster: None,
+        command: vec!["env".into()],
+        run_dir: args.clone(),
+    })
+    .execute();
     assert!(result.is_ok(), "record env should succeed: {result:?}");
 
     let artifacts: Vec<_> = fs::read_dir(run_dir.join("commands"))
@@ -159,14 +160,15 @@ fn run_can_target_another_tracked_cluster_member() {
         run_root: None,
     };
 
-    let result = record::execute(
-        None,
-        Some("verify"),
-        Some("zone-check"),
-        Some("zone-1"),
-        &["echo".into(), "cluster-test".into()],
-        &args,
-    );
+    let result = Command::Record(RecordArgs {
+        repo_root: None,
+        phase: Some("verify".into()),
+        label: Some("zone-check".into()),
+        cluster: Some("zone-1".into()),
+        command: vec!["echo".into(), "cluster-test".into()],
+        run_dir: args.clone(),
+    })
+    .execute();
     assert!(
         result.is_ok(),
         "record with cluster arg should succeed: {result:?}"
@@ -183,14 +185,15 @@ fn record_creates_artifact_even_when_binary_not_found() {
         run_root: None,
     };
 
-    let result = record::execute(
-        None,
-        Some("verify"),
-        Some("missing"),
-        None,
-        &["nonexistent-binary-xyz-12345".into()],
-        &args,
-    );
+    let result = Command::Record(RecordArgs {
+        repo_root: None,
+        phase: Some("verify".into()),
+        label: Some("missing".into()),
+        cluster: None,
+        command: vec!["nonexistent-binary-xyz-12345".into()],
+        run_dir: args.clone(),
+    })
+    .execute();
     // The command fails with exit code 127, which triggers an error
     assert!(result.is_err(), "missing binary should return error");
 
@@ -221,14 +224,15 @@ fn record_run_dir_refreshes_current_session_context() {
         run_root: None,
     };
 
-    let result = record::execute(
-        None,
-        Some("verify"),
-        Some("refresh"),
-        None,
-        &["echo".into(), "refresh-test".into()],
-        &args,
-    );
+    let result = Command::Record(RecordArgs {
+        repo_root: None,
+        phase: Some("verify".into()),
+        label: Some("refresh".into()),
+        cluster: None,
+        command: vec!["echo".into(), "refresh-test".into()],
+        run_dir: args.clone(),
+    })
+    .execute();
     assert!(
         result.is_ok(),
         "record with --run-dir should succeed: {result:?}"
@@ -244,14 +248,15 @@ fn run_uses_active_project_run_without_explicit_run_id() {
         run_root: None,
     };
 
-    let result = record::execute(
-        None,
-        Some("verify"),
-        Some("no-id"),
-        None,
-        &["echo".into(), "no-run-id".into()],
-        &args,
-    );
+    let result = Command::Record(RecordArgs {
+        repo_root: None,
+        phase: Some("verify".into()),
+        label: Some("no-id".into()),
+        cluster: None,
+        command: vec!["echo".into(), "no-run-id".into()],
+        run_dir: args.clone(),
+    })
+    .execute();
     assert!(
         result.is_ok(),
         "record without run-dir should succeed: {result:?}"
@@ -283,7 +288,7 @@ fn envoy_capture_records_admin_artifact() {
             run_root: None,
         },
     };
-    let result = envoy::execute(&cmd);
+    let result = Command::Envoy { cmd }.execute();
     assert!(result.is_ok(), "envoy capture should succeed: {result:?}");
     assert_eq!(result.unwrap(), 0);
 }
@@ -309,7 +314,7 @@ fn envoy_capture_can_filter_config_type() {
             run_root: None,
         },
     };
-    let result = envoy::execute(&cmd);
+    let result = Command::Envoy { cmd }.execute();
     assert!(result.is_ok());
 }
 
@@ -354,7 +359,7 @@ fn envoy_route_body_can_capture_live_payload() {
             run_root: None,
         },
     };
-    let result = envoy::execute(&cmd);
+    let result = Command::Envoy { cmd }.execute();
     assert!(
         result.is_ok(),
         "route-body should find /stats route: {result:?}"
@@ -382,7 +387,7 @@ fn envoy_capture_rejects_without_tracked_cluster() {
             run_root: None,
         },
     };
-    let result = envoy::execute(&cmd);
+    let result = Command::Envoy { cmd }.execute();
     assert!(result.is_err(), "should fail without --file");
 }
 
@@ -424,7 +429,7 @@ fn kumactl_find_returns_first_existing() {
     let cmd = KumactlCommand::Find {
         repo_root: Some(repo_root.to_string_lossy().to_string()),
     };
-    let result = kumactl::execute(&cmd);
+    let result = Command::Kumactl { cmd }.execute();
     assert!(result.is_ok(), "kumactl find should succeed: {result:?}");
 }
 
@@ -463,7 +468,11 @@ fn authoring_validate_accepts_valid_meshmetric_group() {
     .unwrap();
 
     let paths = vec![yaml.to_string_lossy().to_string()];
-    let result = authoring_validate::execute(&paths, Some(&repo_root.to_string_lossy()));
+    let result = Command::AuthoringValidate {
+        path: paths.clone(),
+        repo_root: Some(repo_root.to_string_lossy().to_string()),
+    }
+    .execute();
     assert!(result.is_ok(), "valid yaml should pass: {result:?}");
 }
 
@@ -477,7 +486,11 @@ fn authoring_validate_rejects_invalid_meshmetric_group() {
     fs::write(&md, "# Not yaml").unwrap();
 
     let paths = vec![md.to_string_lossy().to_string()];
-    let result = authoring_validate::execute(&paths, Some(&repo_root.to_string_lossy()));
+    let result = Command::AuthoringValidate {
+        path: paths.clone(),
+        repo_root: Some(repo_root.to_string_lossy().to_string()),
+    }
+    .execute();
     // Non-yaml files are skipped, so result is Ok with empty list
     assert!(result.is_ok());
 }
@@ -492,7 +505,11 @@ fn authoring_validate_ignores_universal_format() {
     fs::write(&txt, "universal format block").unwrap();
 
     let paths = vec![txt.to_string_lossy().to_string()];
-    let result = authoring_validate::execute(&paths, Some(&repo_root.to_string_lossy()));
+    let result = Command::AuthoringValidate {
+        path: paths.clone(),
+        repo_root: Some(repo_root.to_string_lossy().to_string()),
+    }
+    .execute();
     assert!(result.is_ok(), "universal format should be skipped");
 }
 
@@ -510,7 +527,11 @@ fn authoring_validate_skips_expected_rejection_manifests() {
     .unwrap();
 
     let paths = vec![yaml.to_string_lossy().to_string()];
-    let result = authoring_validate::execute(&paths, Some(&repo_root.to_string_lossy()));
+    let result = Command::AuthoringValidate {
+        path: paths.clone(),
+        repo_root: Some(repo_root.to_string_lossy().to_string()),
+    }
+    .execute();
     assert!(result.is_ok());
 }
 
@@ -527,7 +548,12 @@ fn approval_begin_initializes_interactive_state() {
     let prev_dir = env::current_dir().unwrap();
     env::set_current_dir(&work_dir).unwrap();
 
-    let result = approval_begin::execute("interactive", None);
+    let result = Command::ApprovalBegin {
+        skill: "suite-author".to_string(),
+        mode: "interactive".to_string(),
+        suite_dir: None,
+    }
+    .execute();
     assert!(result.is_ok(), "approval_begin should succeed: {result:?}");
 
     let state = author::read_author_state().unwrap().unwrap();
@@ -562,7 +588,10 @@ fn closeout_sets_completed_phase() {
         run_root: None,
     };
 
-    let result = closeout::execute(&args);
+    let result = Command::Closeout {
+        run_dir: args.clone(),
+    }
+    .execute();
     assert!(result.is_ok(), "closeout should succeed: {result:?}");
     assert_eq!(result.unwrap(), 0);
 }
@@ -589,14 +618,15 @@ fn check_run_records_kubectl_with_active_run_kubeconfig() {
     };
 
     temp_env::with_vars([("PATH", Some(&new_path))], || {
-        let result = record::execute(
-            None,
-            Some("verify"),
-            Some("check"),
-            None,
-            &["kubectl".into(), "get".into(), "pods".into()],
-            &args,
-        );
+        let result = Command::Record(RecordArgs {
+            repo_root: None,
+            phase: Some("verify".into()),
+            label: Some("check".into()),
+            cluster: None,
+            command: vec!["kubectl".into(), "get".into(), "pods".into()],
+            run_dir: args.clone(),
+        })
+        .execute();
         assert!(result.is_ok(), "record kubectl should succeed: {result:?}");
     });
 
@@ -629,14 +659,15 @@ fn check_record_rewrites_kubectl_to_tracked_kubeconfig() {
     };
 
     temp_env::with_vars([("PATH", Some(&new_path))], || {
-        let result = record::execute(
-            None,
-            None,
-            None,
-            None,
-            &["kubectl".into(), "get".into(), "pods".into()],
-            &args,
-        );
+        let result = Command::Record(RecordArgs {
+            repo_root: None,
+            phase: None,
+            label: None,
+            cluster: None,
+            command: vec!["kubectl".into(), "get".into(), "pods".into()],
+            run_dir: args.clone(),
+        })
+        .execute();
         assert!(result.is_ok());
     });
 
@@ -669,20 +700,21 @@ fn check_record_rejects_kubectl_target_override() {
     };
 
     temp_env::with_vars([("PATH", Some(&new_path))], || {
-        let result = record::execute(
-            None,
-            None,
-            None,
-            None,
-            &[
+        let result = Command::Record(RecordArgs {
+            repo_root: None,
+            phase: None,
+            label: None,
+            cluster: None,
+            command: vec![
                 "kubectl".into(),
                 "--kubeconfig".into(),
                 "/tmp/custom.conf".into(),
                 "get".into(),
                 "pods".into(),
             ],
-            &args,
-        );
+            run_dir: args.clone(),
+        })
+        .execute();
         // record just runs the command - it doesn't reject overrides
         assert!(result.is_ok());
     });
@@ -704,14 +736,15 @@ fn check_record_rejects_kubectl_without_tracked_cluster() {
     };
 
     temp_env::with_vars([("PATH", Some(&new_path))], || {
-        let result = record::execute(
-            None,
-            None,
-            None,
-            None,
-            &["kubectl".into(), "get".into(), "pods".into()],
-            &args,
-        );
+        let result = Command::Record(RecordArgs {
+            repo_root: None,
+            phase: None,
+            label: None,
+            cluster: None,
+            command: vec!["kubectl".into(), "get".into(), "pods".into()],
+            run_dir: args.clone(),
+        })
+        .execute();
         assert!(result.is_ok());
     });
 }
@@ -732,14 +765,15 @@ fn check_record_kubectl_without_tracked_kubeconfig_fails_closed() {
     };
 
     temp_env::with_vars([("PATH", Some(&new_path))], || {
-        let result = record::execute(
-            None,
-            None,
-            None,
-            None,
-            &["kubectl".into(), "get".into(), "namespaces".into()],
-            &args,
-        );
+        let result = Command::Record(RecordArgs {
+            repo_root: None,
+            phase: None,
+            label: None,
+            cluster: None,
+            command: vec!["kubectl".into(), "get".into(), "namespaces".into()],
+            run_dir: args.clone(),
+        })
+        .execute();
         assert!(result.is_ok());
     });
 }
@@ -786,7 +820,7 @@ fn check_kumactl_build_runs_make_and_prints_binary() {
     };
 
     temp_env::with_vars([("PATH", Some(&new_path))], || {
-        let result = kumactl::execute(&cmd);
+        let result = Command::Kumactl { cmd: cmd.clone() }.execute();
         assert!(result.is_ok(), "kumactl build should succeed: {result:?}");
     });
 }
@@ -809,11 +843,12 @@ fn check_bootstrap_command_runs_gateway_api_crd_install() {
     let new_path = tc.path_with_prepend(&orig_path);
 
     temp_env::with_vars([("PATH", Some(&new_path))], || {
-        let result = gateway::execute(
-            None,
-            Some(&repo_root.to_string_lossy()),
-            true, // check_only
-        );
+        let result = Command::Gateway {
+            kubeconfig: None,
+            repo_root: Some(repo_root.to_string_lossy().to_string()),
+            check_only: true,
+        }
+        .execute();
         assert!(result.is_ok(), "gateway check should succeed: {result:?}");
     });
 }
@@ -835,7 +870,12 @@ fn check_capture_uses_current_run_context() {
     };
 
     temp_env::with_vars([("PATH", Some(&new_path))], || {
-        let result = capture::execute(Some("/tmp/fake-kubeconfig"), "pod-state", &args);
+        let result = Command::Capture {
+            kubeconfig: Some("/tmp/fake-kubeconfig".to_string()),
+            label: "pod-state".to_string(),
+            run_dir: args.clone(),
+        }
+        .execute();
         assert!(result.is_ok(), "capture should succeed: {result:?}");
     });
 
@@ -902,13 +942,15 @@ fn check_authoring_begin_persists_suite_default_repo_root() {
             ("CLAUDE_SESSION_ID", Some("authoring-begin-integ")),
         ],
         || {
-            let result = authoring_begin::execute(
-                &repo_root.to_string_lossy(),
-                "mesh",
-                "interactive",
-                &suite_dir.to_string_lossy(),
-                "install",
-            );
+            let result = Command::AuthoringBegin(AuthoringBeginArgs {
+                skill: "suite-author".to_string(),
+                repo_root: repo_root.to_string_lossy().to_string(),
+                feature: "mesh".to_string(),
+                mode: "interactive".to_string(),
+                suite_dir: suite_dir.to_string_lossy().to_string(),
+                suite_name: "install".to_string(),
+            })
+            .execute();
             assert!(result.is_ok(), "authoring_begin should succeed: {result:?}");
 
             let session = authoring::load_authoring_session().unwrap().unwrap();
@@ -933,15 +975,22 @@ fn check_authoring_save_accepts_inline_payload() {
             ("CLAUDE_SESSION_ID", Some("authoring-save-inline")),
         ],
         || {
-            let _ = authoring_begin::execute(
-                &repo_root.to_string_lossy(),
-                "mesh",
-                "interactive",
-                &suite_dir.to_string_lossy(),
-                "install",
-            );
+            let _ = Command::AuthoringBegin(AuthoringBeginArgs {
+                skill: "suite-author".to_string(),
+                repo_root: repo_root.to_string_lossy().to_string(),
+                feature: "mesh".to_string(),
+                mode: "interactive".to_string(),
+                suite_dir: suite_dir.to_string_lossy().to_string(),
+                suite_name: "install".to_string(),
+            })
+            .execute();
 
-            let result = authoring_save::execute("inventory", Some(r#"{"files":[]}"#), None);
+            let result = Command::AuthoringSave {
+                kind: "inventory".to_string(),
+                payload: Some(r#"{"files":[]}"#.to_string()),
+                input: None,
+            }
+            .execute();
             assert!(
                 result.is_ok(),
                 "save with inline payload should succeed: {result:?}"
@@ -970,16 +1019,22 @@ fn check_authoring_save_accepts_stdin() {
             ("CLAUDE_SESSION_ID", Some("authoring-save-stdin")),
         ],
         || {
-            let _ = authoring_begin::execute(
-                &repo_root.to_string_lossy(),
-                "mesh",
-                "interactive",
-                &suite_dir.to_string_lossy(),
-                "install",
-            );
+            let _ = Command::AuthoringBegin(AuthoringBeginArgs {
+                skill: "suite-author".to_string(),
+                repo_root: repo_root.to_string_lossy().to_string(),
+                feature: "mesh".to_string(),
+                mode: "interactive".to_string(),
+                suite_dir: suite_dir.to_string_lossy().to_string(),
+                suite_name: "install".to_string(),
+            })
+            .execute();
 
-            let result =
-                authoring_save::execute("inventory", None, Some(input_file.to_str().unwrap()));
+            let result = Command::AuthoringSave {
+                kind: "inventory".to_string(),
+                payload: None,
+                input: Some(input_file.to_str().unwrap().to_string()),
+            }
+            .execute();
             assert!(result.is_ok(), "save from file should succeed: {result:?}");
         },
     );
@@ -999,15 +1054,22 @@ fn check_authoring_save_rejects_schema_missing_fields() {
             ("CLAUDE_SESSION_ID", Some("authoring-save-reject")),
         ],
         || {
-            let _ = authoring_begin::execute(
-                &repo_root.to_string_lossy(),
-                "mesh",
-                "interactive",
-                &suite_dir.to_string_lossy(),
-                "install",
-            );
+            let _ = Command::AuthoringBegin(AuthoringBeginArgs {
+                skill: "suite-author".to_string(),
+                repo_root: repo_root.to_string_lossy().to_string(),
+                feature: "mesh".to_string(),
+                mode: "interactive".to_string(),
+                suite_dir: suite_dir.to_string_lossy().to_string(),
+                suite_name: "install".to_string(),
+            })
+            .execute();
 
-            let result = authoring_save::execute("schema", Some(""), None);
+            let result = Command::AuthoringSave {
+                kind: "schema".to_string(),
+                payload: Some(String::new()),
+                input: None,
+            }
+            .execute();
             assert!(result.is_err(), "empty payload should be rejected");
         },
     );

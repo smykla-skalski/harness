@@ -193,7 +193,10 @@ pub fn yaml_to_json(yaml: &serde_yml::Value) -> Value {
     match yaml {
         serde_yml::Value::Null => Value::Null,
         serde_yml::Value::Bool(b) => Value::Bool(*b),
-        serde_yml::Value::String(s) if let Some(b) = yaml11_bool(s) => Value::Bool(b),
+        serde_yml::Value::String(s) => match yaml11_bool(s) {
+            Some(b) => Value::Bool(b),
+            None => Value::String(s.clone()),
+        },
         serde_yml::Value::Number(n) => {
             if let Some(i) = n.as_i64() {
                 Value::Number(i.into())
@@ -203,7 +206,6 @@ pub fn yaml_to_json(yaml: &serde_yml::Value) -> Value {
                 Value::Null
             }
         }
-        serde_yml::Value::String(s) => Value::String(s.clone()),
         serde_yml::Value::Sequence(seq) => Value::Array(seq.iter().map(yaml_to_json).collect()),
         serde_yml::Value::Mapping(m) => {
             let mut map = serde_json::Map::new();

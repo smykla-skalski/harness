@@ -7,8 +7,8 @@ use std::env;
 use std::fs;
 use std::sync::PoisonError;
 
-use harness::cli::RunDirArgs;
-use harness::commands::{apply, capture, preflight, validate};
+use harness::cli::{ApplyArgs, Command, RunDirArgs};
+use harness::commands::Execute;
 use harness::kubectl_validate::{KubectlValidateDecision, KubectlValidateState};
 use harness::schema::GroupSpec;
 use harness::workflow::runner::{RunnerPhase, read_runner_state};
@@ -249,7 +249,12 @@ fn preflight_prepares_and_caches() {
             run_id: None,
             run_root: None,
         };
-        let result = preflight::execute(None, None, &rda);
+        let result = Command::Preflight {
+            kubeconfig: None,
+            repo_root: None,
+            run_dir: rda.clone(),
+        }
+        .execute();
         assert!(
             result.is_ok(),
             "first preflight call should succeed: {result:?}"
@@ -257,7 +262,12 @@ fn preflight_prepares_and_caches() {
         assert_eq!(result.unwrap(), 0);
 
         // Second call should also succeed (idempotent)
-        let result2 = preflight::execute(None, None, &rda);
+        let result2 = Command::Preflight {
+            kubeconfig: None,
+            repo_root: None,
+            run_dir: rda,
+        }
+        .execute();
         assert!(
             result2.is_ok(),
             "second preflight call should succeed: {result2:?}"
@@ -299,7 +309,12 @@ fn preflight_skips_rejections() {
             run_id: None,
             run_root: None,
         };
-        let result = preflight::execute(None, None, &rda);
+        let result = Command::Preflight {
+            kubeconfig: None,
+            repo_root: None,
+            run_dir: rda,
+        }
+        .execute();
         assert!(
             result.is_ok(),
             "preflight with rejections should succeed: {result:?}"
@@ -341,7 +356,12 @@ fn preflight_skips_inline_rejections() {
             run_id: None,
             run_root: None,
         };
-        let result = preflight::execute(None, None, &rda);
+        let result = Command::Preflight {
+            kubeconfig: None,
+            repo_root: None,
+            run_dir: rda,
+        }
+        .execute();
         assert!(
             result.is_ok(),
             "preflight with inline rejections should succeed: {result:?}"
@@ -383,7 +403,12 @@ fn preflight_skips_frontmatter_rejections() {
             run_id: None,
             run_root: None,
         };
-        let result = preflight::execute(None, None, &rda);
+        let result = Command::Preflight {
+            kubeconfig: None,
+            repo_root: None,
+            run_dir: rda,
+        }
+        .execute();
         assert!(
             result.is_ok(),
             "preflight with frontmatter rejections should succeed: {result:?}"
@@ -417,7 +442,12 @@ fn preflight_applies_baselines() {
             run_id: None,
             run_root: None,
         };
-        let result = preflight::execute(None, None, &rda);
+        let result = Command::Preflight {
+            kubeconfig: None,
+            repo_root: None,
+            run_dir: rda,
+        }
+        .execute();
         assert!(
             result.is_ok(),
             "preflight with baselines should succeed: {result:?}"
@@ -451,7 +481,12 @@ fn preflight_namespace_baseline() {
             run_id: None,
             run_root: None,
         };
-        let result = preflight::execute(None, None, &rda);
+        let result = Command::Preflight {
+            kubeconfig: None,
+            repo_root: None,
+            run_dir: rda,
+        }
+        .execute();
         assert!(
             result.is_ok(),
             "preflight with namespace baseline should succeed: {result:?}"
@@ -480,7 +515,12 @@ fn capture_uses_run_context() {
             run_id: None,
             run_root: None,
         };
-        let result = capture::execute(Some(&kc_path.to_string_lossy()), "post-deploy", &rda);
+        let result = Command::Capture {
+            kubeconfig: Some(kc_path.to_string_lossy().to_string()),
+            label: "post-deploy".to_string(),
+            run_dir: rda,
+        }
+        .execute();
         assert!(result.is_ok(), "capture should succeed: {result:?}");
         assert_eq!(result.unwrap(), 0);
 
@@ -540,13 +580,14 @@ fn apply_reuses_prepared() {
             run_root: None,
         };
         let manifests = vec![manifest_path.to_string_lossy().to_string()];
-        let result = apply::execute(
-            Some(&kc_path.to_string_lossy()),
-            None,
-            &manifests,
-            Some("configure"),
-            &rda,
-        );
+        let result = Command::Apply(ApplyArgs {
+            kubeconfig: Some(kc_path.to_string_lossy().to_string()),
+            cluster: None,
+            manifest: manifests,
+            step: Some("configure".to_string()),
+            run_dir: rda,
+        })
+        .execute();
         assert!(result.is_ok(), "apply should succeed: {result:?}");
         assert_eq!(result.unwrap(), 0);
 
@@ -589,13 +630,14 @@ fn apply_validate_shorthand() {
         };
         // Use the shorthand name (not full path) - resolve_manifest_path should find it
         let manifests = vec!["g01-configure.yaml".to_string()];
-        let result = apply::execute(
-            Some(&kc_path.to_string_lossy()),
-            None,
-            &manifests,
-            None,
-            &rda,
-        );
+        let result = Command::Apply(ApplyArgs {
+            kubeconfig: Some(kc_path.to_string_lossy().to_string()),
+            cluster: None,
+            manifest: manifests,
+            step: None,
+            run_dir: rda,
+        })
+        .execute();
         assert!(
             result.is_ok(),
             "apply with shorthand should succeed: {result:?}"
@@ -625,11 +667,12 @@ fn validate_uses_api_version() {
     let orig_path = env::var("PATH").unwrap_or_default();
 
     temp_env::with_vars([("PATH", Some(&tc.path_with_prepend(&orig_path)))], || {
-        let result = validate::execute(
-            Some(&kc_path.to_string_lossy()),
-            &manifest_path.to_string_lossy(),
-            None,
-        );
+        let result = Command::Validate {
+            kubeconfig: Some(kc_path.to_string_lossy().to_string()),
+            manifest: manifest_path.to_string_lossy().to_string(),
+            output: None,
+        }
+        .execute();
         assert!(result.is_ok(), "validate should succeed: {result:?}");
         assert_eq!(result.unwrap(), 0);
 
@@ -679,7 +722,12 @@ fn preflight_failure_resets() {
             run_id: None,
             run_root: None,
         };
-        let result = preflight::execute(None, None, &rda);
+        let result = Command::Preflight {
+            kubeconfig: None,
+            repo_root: None,
+            run_dir: rda,
+        }
+        .execute();
         assert!(result.is_ok(), "preflight should succeed: {result:?}");
 
         // Since preflight is minimal, runner state should remain at Bootstrap
@@ -713,11 +761,21 @@ fn capture_marks_preflight_complete() {
         };
 
         // Run preflight first
-        let pf_result = preflight::execute(None, None, &rda);
+        let pf_result = Command::Preflight {
+            kubeconfig: None,
+            repo_root: None,
+            run_dir: rda.clone(),
+        }
+        .execute();
         assert!(pf_result.is_ok(), "preflight should succeed: {pf_result:?}");
 
         // Then run capture
-        let cap_result = capture::execute(Some(&kc_path.to_string_lossy()), "post-preflight", &rda);
+        let cap_result = Command::Capture {
+            kubeconfig: Some(kc_path.to_string_lossy().to_string()),
+            label: "post-preflight".to_string(),
+            run_dir: rda,
+        }
+        .execute();
         assert!(cap_result.is_ok(), "capture should succeed: {cap_result:?}");
         assert_eq!(cap_result.unwrap(), 0);
 
@@ -769,7 +827,12 @@ fn preflight_dependent_baselines() {
             run_id: None,
             run_root: None,
         };
-        let result = preflight::execute(None, None, &rda);
+        let result = Command::Preflight {
+            kubeconfig: None,
+            repo_root: None,
+            run_dir: rda,
+        }
+        .execute();
         assert!(
             result.is_ok(),
             "preflight with dependent baselines should succeed: {result:?}"
