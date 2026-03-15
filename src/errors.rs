@@ -298,6 +298,48 @@ define_cli_errors! {
         msg: "suite:new local validator is unavailable"
     },
 
+    // --- Universal/container errors (exit 4) ---
+    ContainerStartFailed { name: Cow<'static, str> } => {
+        code: "KSRCLI070",
+        msg: "container start failed: {name}",
+        exit: 4
+    },
+    ContainerNotFound { name: Cow<'static, str> } => {
+        code: "KSRCLI071",
+        msg: "container not found: {name}",
+        exit: 4
+    },
+    CpApiUnreachable { url: Cow<'static, str> } => {
+        code: "KSRCLI072",
+        msg: "control plane API unreachable: {url}",
+        exit: 4
+    },
+    TokenGenerationFailed { details: Cow<'static, str> } => {
+        code: "KSRCLI073",
+        msg: "dataplane token generation failed: {details}",
+        exit: 4
+    },
+    DockerNetworkFailed { name: Cow<'static, str> } => {
+        code: "KSRCLI074",
+        msg: "docker network operation failed: {name}",
+        exit: 4
+    },
+    ComposeFileFailed { path: Cow<'static, str> } => {
+        code: "KSRCLI075",
+        msg: "docker compose operation failed: {path}",
+        exit: 4
+    },
+    ImageBuildFailed { target: Cow<'static, str> } => {
+        code: "KSRCLI076",
+        msg: "image build failed: {target}",
+        exit: 4
+    },
+    TemplateRender { detail: Cow<'static, str> } => {
+        code: "KSRCLI077",
+        msg: "template render failed: {detail}",
+        exit: 4
+    },
+
     // --- IO/serialization (exit 1) ---
     Io { detail: Cow<'static, str> } => {
         code: "IO001",
@@ -425,6 +467,14 @@ impl CliErrorKind {
     cli_constructor!(authoring_show_kind_missing, AuthoringShowKindMissing, kind);
     cli_constructor!(amendments_required, AmendmentsRequired, path);
     cli_constructor!(authoring_validate_failed, AuthoringValidateFailed, targets);
+    cli_constructor!(container_start_failed, ContainerStartFailed, name);
+    cli_constructor!(container_not_found, ContainerNotFound, name);
+    cli_constructor!(cp_api_unreachable, CpApiUnreachable, url);
+    cli_constructor!(token_generation_failed, TokenGenerationFailed, details);
+    cli_constructor!(docker_network_failed, DockerNetworkFailed, name);
+    cli_constructor!(compose_file_failed, ComposeFileFailed, path);
+    cli_constructor!(image_build_failed, ImageBuildFailed, target);
+    cli_constructor!(template_render, TemplateRender, detail);
     cli_constructor!(io, Io, detail);
     cli_constructor!(serialize, Serialize, detail);
     cli_constructor!(hook_payload_invalid, HookPayloadInvalid, detail);
@@ -959,6 +1009,14 @@ mod tests {
             CliErrorKind::unsafe_name(""),
             CliErrorKind::MissingRunStatus,
             CliErrorKind::MarkdownShapeMismatch,
+            CliErrorKind::container_start_failed(""),
+            CliErrorKind::container_not_found(""),
+            CliErrorKind::cp_api_unreachable(""),
+            CliErrorKind::token_generation_failed(""),
+            CliErrorKind::docker_network_failed(""),
+            CliErrorKind::compose_file_failed(""),
+            CliErrorKind::image_build_failed(""),
+            CliErrorKind::template_render(""),
             CliErrorKind::io(""),
             CliErrorKind::serialize(""),
             CliErrorKind::hook_payload_invalid(""),
