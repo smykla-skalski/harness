@@ -12,17 +12,6 @@ use crate::hook_payloads::HookContext;
 use crate::hooks;
 
 // ---------------------------------------------------------------------------
-// Hook classification
-// ---------------------------------------------------------------------------
-
-const PRE_TOOL_USE_HOOKS: &[&str] = &["guard-bash", "guard-question", "guard-write"];
-const POST_TOOL_USE_HOOKS: &[&str] = &["verify-bash", "verify-question", "verify-write", "audit"];
-const POST_TOOL_USE_FAILURE_HOOKS: &[&str] = &["enrich-failure"];
-const SUBAGENT_START_HOOKS: &[&str] = &["context-agent"];
-const SUBAGENT_STOP_HOOKS: &[&str] = &["validate-agent"];
-const BLOCKING_HOOKS: &[&str] = &["guard-stop"];
-
-// ---------------------------------------------------------------------------
 // Shared argument groups
 // ---------------------------------------------------------------------------
 
@@ -213,7 +202,7 @@ pub enum HookCommand {
 impl HookCommand {
     /// CLI name of this hook (kebab-case).
     #[must_use]
-    pub fn name(&self) -> &'static str {
+    pub const fn name(&self) -> &'static str {
         match self {
             Self::GuardBash => "guard-bash",
             Self::GuardWrite => "guard-write",
@@ -227,6 +216,57 @@ impl HookCommand {
             Self::ContextAgent => "context-agent",
             Self::ValidateAgent => "validate-agent",
         }
+    }
+
+    /// Pre-tool-use guard hook.
+    #[must_use]
+    pub const fn is_pre_tool_use(&self) -> bool {
+        matches!(
+            self,
+            Self::GuardBash | Self::GuardQuestion | Self::GuardWrite
+        )
+    }
+
+    /// Post-tool-use verification hook.
+    #[must_use]
+    pub const fn is_post_tool_use(&self) -> bool {
+        matches!(
+            self,
+            Self::VerifyBash | Self::VerifyQuestion | Self::VerifyWrite | Self::Audit
+        )
+    }
+
+    /// Post-tool-use failure enrichment hook.
+    #[must_use]
+    pub const fn is_post_tool_use_failure(&self) -> bool {
+        matches!(self, Self::EnrichFailure)
+    }
+
+    /// Subagent start hook.
+    #[must_use]
+    pub const fn is_subagent_start(&self) -> bool {
+        matches!(self, Self::ContextAgent)
+    }
+
+    /// Subagent stop hook.
+    #[must_use]
+    pub const fn is_subagent_stop(&self) -> bool {
+        matches!(self, Self::ValidateAgent)
+    }
+
+    /// Blocking stop-guard hook.
+    #[must_use]
+    pub const fn is_blocking(&self) -> bool {
+        matches!(self, Self::GuardStop)
+    }
+
+    /// Any guard variant (pre-tool-use or blocking).
+    #[must_use]
+    pub const fn is_guard(&self) -> bool {
+        matches!(
+            self,
+            Self::GuardBash | Self::GuardWrite | Self::GuardQuestion | Self::GuardStop
+        )
     }
 }
 
@@ -737,29 +777,26 @@ fn render_additional_context_output(result: &HookResult, event_name: &str) -> St
 /// Transform a `HookResult` into the native Claude Code hook output format for
 /// the given hook name.
 #[must_use]
-pub fn render_hook_output(hook_name: &str, result: &HookResult) -> String {
+pub fn render_hook_output(hook: &HookCommand, result: &HookResult) -> String {
     if result.decision == Decision::Allow && result.code.is_empty() {
         return String::new();
     }
-    if PRE_TOOL_USE_HOOKS.contains(&hook_name) {
+    if hook.is_pre_tool_use() {
         return render_pre_tool_use_output(result);
     }
-    if POST_TOOL_USE_HOOKS.contains(&hook_name) {
+    if hook.is_post_tool_use() {
         return render_post_tool_use_output(result, "PostToolUse");
     }
-    if POST_TOOL_USE_FAILURE_HOOKS.contains(&hook_name) {
+    if hook.is_post_tool_use_failure() {
         return render_post_tool_use_output(result, "PostToolUseFailure");
     }
-    if SUBAGENT_START_HOOKS.contains(&hook_name) {
+    if hook.is_subagent_start() {
         return render_additional_context_output(result, "SubagentStart");
     }
-    if SUBAGENT_STOP_HOOKS.contains(&hook_name) {
+    if hook.is_subagent_stop() {
         return render_post_tool_use_output(result, "SubagentStop");
     }
-    if BLOCKING_HOOKS.contains(&hook_name) {
-        return render_blocking_hook_output(result);
-    }
-    if result.decision == Decision::Deny {
+    if hook.is_blocking() {
         return render_blocking_hook_output(result);
     }
     render_additional_context_output(result, "Notification")
@@ -788,8 +825,8 @@ fn dispatch_hook(hook: &HookCommand, ctx: &HookContext) -> Result<HookResult, Cl
 
 /// Build a runtime `HookResult` for an error during hook execution.
 /// Guard hooks produce deny; verify/other hooks produce warn.
-fn hook_runtime_result(hook_name: &str, code: &str, message: &str) -> HookResult {
-    if hook_name.starts_with("guard-") {
+fn hook_runtime_result(hook: &HookCommand, code: &str, message: &str) -> HookResult {
+    if hook.is_guard() {
         HookResult::deny(code, message)
     } else {
         HookResult::warn(code, message)
@@ -797,7 +834,8 @@ fn hook_runtime_result(hook_name: &str, code: &str, message: &str) -> HookResult
 }
 
 /// Format a `CliError` as a detail string for hook error wrapping.
-fn format_hook_error_detail(hook_name: &str, error: &CliError) -> String {
+fn format_hook_error_detail(hook: &HookCommand, error: &CliError) -> String {
+    let hook_name = hook.name();
     let mut parts = vec![format!("`{hook_name}` failed internally: {error}")];
     if let Some(hint) = error.hint() {
         parts.push(format!("Hint: {hint}"));
@@ -816,8 +854,8 @@ fn run_hook_command(skill: &str, hook: &HookCommand) -> i32 {
         Ok(ctx) => ctx,
         Err(e) => {
             let message = format!("`{hook_name}` received invalid hook payload: {e}");
-            let result = hook_runtime_result(hook_name, "KSH001", &message);
-            let output = render_hook_output(hook_name, &result);
+            let result = hook_runtime_result(hook, "KSH001", &message);
+            let output = render_hook_output(hook, &result);
             if !output.is_empty() {
                 print!("{output}");
             }
@@ -828,12 +866,12 @@ fn run_hook_command(skill: &str, hook: &HookCommand) -> i32 {
     let result = match dispatch_hook(hook, &ctx) {
         Ok(result) => result,
         Err(e) => {
-            let detail = format_hook_error_detail(hook_name, &e);
-            hook_runtime_result(hook_name, "KSH002", &detail)
+            let detail = format_hook_error_detail(hook, &e);
+            hook_runtime_result(hook, "KSH002", &detail)
         }
     };
 
-    let output = render_hook_output(hook_name, &result);
+    let output = render_hook_output(hook, &result);
     if !output.is_empty() {
         print!("{output}");
     }
@@ -1404,7 +1442,7 @@ mod tests {
     #[test]
     fn hook_output_guard_bash_routes_to_pre_tool_use() {
         let r = HookResult::deny("KSR005", "blocked");
-        let output = render_hook_output("guard-bash", &r);
+        let output = render_hook_output(&HookCommand::GuardBash, &r);
         let v: serde_json::Value = serde_json::from_str(&output).unwrap();
         assert_eq!(v["hookSpecificOutput"]["hookEventName"], "PreToolUse");
     }
@@ -1412,7 +1450,7 @@ mod tests {
     #[test]
     fn hook_output_verify_bash_routes_to_post_tool_use() {
         let r = HookResult::warn("KSR006", "missing");
-        let output = render_hook_output("verify-bash", &r);
+        let output = render_hook_output(&HookCommand::VerifyBash, &r);
         let v: serde_json::Value = serde_json::from_str(&output).unwrap();
         assert_eq!(v["hookSpecificOutput"]["hookEventName"], "PostToolUse");
     }
@@ -1420,7 +1458,7 @@ mod tests {
     #[test]
     fn hook_output_guard_stop_routes_to_blocking() {
         let r = HookResult::deny("KSR007", "incomplete");
-        let output = render_hook_output("guard-stop", &r);
+        let output = render_hook_output(&HookCommand::GuardStop, &r);
         let v: serde_json::Value = serde_json::from_str(&output).unwrap();
         assert_eq!(v["decision"], "block");
     }
@@ -1428,7 +1466,7 @@ mod tests {
     #[test]
     fn hook_output_enrich_failure_routes_to_post_tool_use_failure() {
         let r = HookResult::warn("KSR012", "verdict");
-        let output = render_hook_output("enrich-failure", &r);
+        let output = render_hook_output(&HookCommand::EnrichFailure, &r);
         let v: serde_json::Value = serde_json::from_str(&output).unwrap();
         assert_eq!(
             v["hookSpecificOutput"]["hookEventName"],
@@ -1439,7 +1477,7 @@ mod tests {
     #[test]
     fn hook_output_context_agent_routes_to_subagent_start() {
         let r = HookResult::warn("KSA006", "format");
-        let output = render_hook_output("context-agent", &r);
+        let output = render_hook_output(&HookCommand::ContextAgent, &r);
         let v: serde_json::Value = serde_json::from_str(&output).unwrap();
         assert_eq!(v["hookSpecificOutput"]["hookEventName"], "SubagentStart");
     }
@@ -1447,7 +1485,7 @@ mod tests {
     #[test]
     fn hook_output_validate_agent_routes_to_subagent_stop() {
         let r = HookResult::deny("KSA007", "reply");
-        let output = render_hook_output("validate-agent", &r);
+        let output = render_hook_output(&HookCommand::ValidateAgent, &r);
         let v: serde_json::Value = serde_json::from_str(&output).unwrap();
         assert_eq!(v["hookSpecificOutput"]["hookEventName"], "SubagentStop");
     }
@@ -1455,60 +1493,45 @@ mod tests {
     #[test]
     fn hook_output_allow_is_always_empty() {
         for hook in [
-            "guard-bash",
-            "guard-stop",
-            "verify-bash",
-            "enrich-failure",
-            "context-agent",
-            "validate-agent",
+            HookCommand::GuardBash,
+            HookCommand::GuardStop,
+            HookCommand::VerifyBash,
+            HookCommand::EnrichFailure,
+            HookCommand::ContextAgent,
+            HookCommand::ValidateAgent,
         ] {
             assert!(
-                render_hook_output(hook, &HookResult::allow()).is_empty(),
-                "allow should be empty for {hook}"
+                render_hook_output(&hook, &HookResult::allow()).is_empty(),
+                "allow should be empty for {}",
+                hook.name()
             );
         }
-    }
-
-    #[test]
-    fn hook_output_unknown_deny_routes_to_blocking() {
-        let r = HookResult::deny("X001", "denied");
-        let output = render_hook_output("unknown-hook", &r);
-        let v: serde_json::Value = serde_json::from_str(&output).unwrap();
-        assert_eq!(v["decision"], "block");
-    }
-
-    #[test]
-    fn hook_output_unknown_warn_routes_to_notification() {
-        let r = HookResult::warn("X002", "noted");
-        let output = render_hook_output("unknown-hook", &r);
-        let v: serde_json::Value = serde_json::from_str(&output).unwrap();
-        assert_eq!(v["hookSpecificOutput"]["hookEventName"], "Notification");
     }
 
     // --- Hook wrapping tests ---
 
     #[test]
     fn hook_runtime_result_guard_is_deny() {
-        let r = hook_runtime_result("guard-bash", "KSH002", "error");
+        let r = hook_runtime_result(&HookCommand::GuardBash, "KSH002", "error");
         assert_eq!(r.decision, Decision::Deny);
     }
 
     #[test]
     fn hook_runtime_result_verify_is_warn() {
-        let r = hook_runtime_result("verify-bash", "KSH002", "error");
+        let r = hook_runtime_result(&HookCommand::VerifyBash, "KSH002", "error");
         assert_eq!(r.decision, Decision::Warn);
     }
 
     #[test]
     fn hook_runtime_result_other_is_warn() {
-        let r = hook_runtime_result("audit", "KSH002", "error");
+        let r = hook_runtime_result(&HookCommand::Audit, "KSH002", "error");
         assert_eq!(r.decision, Decision::Warn);
     }
 
     #[test]
     fn format_error_detail_includes_code_and_message() {
         let error: CliError = CliErrorKind::MissingRunPointer.into();
-        let detail = format_hook_error_detail("guard-bash", &error);
+        let detail = format_hook_error_detail(&HookCommand::GuardBash, &error);
         assert!(detail.contains("guard-bash"));
         assert!(detail.contains("KSRCLI005"));
         assert!(detail.contains("missing current run pointer"));
@@ -1518,8 +1541,45 @@ mod tests {
     #[test]
     fn format_error_detail_includes_details() {
         let error = CliErrorKind::command_failed("command failed").with_details("exit code 1");
-        let detail = format_hook_error_detail("verify-write", &error);
+        let detail = format_hook_error_detail(&HookCommand::VerifyWrite, &error);
         assert!(detail.contains("Details: exit code 1"));
+    }
+
+    #[test]
+    fn hook_command_classification_is_exhaustive() {
+        let all = [
+            HookCommand::GuardBash,
+            HookCommand::GuardWrite,
+            HookCommand::GuardQuestion,
+            HookCommand::GuardStop,
+            HookCommand::VerifyBash,
+            HookCommand::VerifyWrite,
+            HookCommand::VerifyQuestion,
+            HookCommand::Audit,
+            HookCommand::EnrichFailure,
+            HookCommand::ContextAgent,
+            HookCommand::ValidateAgent,
+        ];
+        for hook in &all {
+            let count = [
+                hook.is_pre_tool_use(),
+                hook.is_post_tool_use(),
+                hook.is_post_tool_use_failure(),
+                hook.is_subagent_start(),
+                hook.is_subagent_stop(),
+                hook.is_blocking(),
+            ]
+            .iter()
+            .filter(|&&v| v)
+            .count();
+            assert_eq!(
+                count,
+                1,
+                "{} falls into {} categories, expected 1",
+                hook.name(),
+                count
+            );
+        }
     }
 
     // --- HookCommand name tests ---
