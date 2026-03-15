@@ -23,8 +23,8 @@ fn read_input(input: Option<&str>, payload: Option<&str>) -> Result<String, CliE
 fn parse_payload(text: &str, kind: &str) -> Result<serde_json::Value, CliError> {
     serde_json::from_str(text).map_err(|e| {
         CliErrorKind::AuthoringPayloadInvalid {
-            kind: kind.into(),
-            details: e.to_string(),
+            kind: kind.to_string().into(),
+            details: e.to_string().into(),
         }
         .into()
     })
@@ -36,7 +36,10 @@ fn parse_payload(text: &str, kind: &str) -> Result<serde_json::Value, CliError> 
 /// Returns `CliError` on failure.
 pub fn execute(kind: &str, payload: Option<&str>, input: Option<&str>) -> Result<i32, CliError> {
     if !is_safe_name(kind) {
-        return Err(CliErrorKind::UnsafeName { name: kind.into() }.into());
+        return Err(CliErrorKind::UnsafeName {
+            name: kind.to_string().into(),
+        }
+        .into());
     }
 
     let _session = require_authoring_session()?;

@@ -17,7 +17,7 @@ fn detect_version(root: &Path) -> Result<String, CliError> {
     let go_mod = root.join("go.mod");
     let text = fs::read_to_string(&go_mod).map_err(|_| {
         CliError::from(CliErrorKind::MissingFile {
-            path: go_mod.display().to_string(),
+            path: go_mod.display().to_string().into(),
         })
     })?;
     // The capture group excludes the leading `v`, so cap[1] is e.g. "0.8.0".
@@ -58,7 +58,7 @@ pub fn execute(
 
     let tmp_dir = env::temp_dir().join("harness-gateway");
     ensure_dir(&tmp_dir).map_err(|e| CliErrorKind::Io {
-        detail: format!("could not create temp dir {}: {e}", tmp_dir.display()),
+        detail: format!("could not create temp dir {}: {e}", tmp_dir.display()).into(),
     })?;
 
     let temp_manifest = tmp_dir.join(format!("gateway-api-{version}.yaml"));
@@ -71,12 +71,15 @@ pub fn execute(
     let file_len = fs::metadata(&temp_manifest)
         .map_err(|_| {
             CliError::from(CliErrorKind::MissingFile {
-                path: temp_str.clone(),
+                path: temp_str.clone().into(),
             })
         })?
         .len();
     if file_len == 0 {
-        return Err(CliErrorKind::GatewayDownloadEmpty { path: temp_str }.into());
+        return Err(CliErrorKind::GatewayDownloadEmpty {
+            path: temp_str.into(),
+        }
+        .into());
     }
 
     kubectl(kc, &["apply", "-f", &temp_str], &[0])?;

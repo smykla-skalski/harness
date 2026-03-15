@@ -120,7 +120,7 @@ pub fn main(project_dir: &Path, path_env: &str) -> Result<i32, CliError> {
     let harness = project_dir.join(".claude").join("skills").join("harness");
     if !harness.exists() {
         return Err(CliErrorKind::MissingFile {
-            path: format!("missing source wrapper: {}", harness.display()),
+            path: format!("missing source wrapper: {}", harness.display()).into(),
         }
         .into());
     }

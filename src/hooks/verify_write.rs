@@ -37,7 +37,8 @@ fn verify_suite_author(paths: &[&Path]) -> HookResult {
                 details: format!(
                     "suite amendments entry is missing or empty: {}",
                     raw_path.display()
-                ),
+                )
+                .into(),
             }
             .into_result();
         }
@@ -61,7 +62,8 @@ fn verify_suite_runner(ctx: &HookContext, paths: &[&Path]) -> HookResult {
                     "{} is harness-managed; {hint}",
                     path.file_name()
                         .map_or("file", |n| n.to_str().unwrap_or("file"))
-                ),
+                )
+                .into(),
             }
             .into_result();
         }
@@ -74,7 +76,8 @@ fn verify_suite_runner(ctx: &HookContext, paths: &[&Path]) -> HookResult {
                 details: format!(
                     "suite amendments entry is missing or empty: {}",
                     raw_path.display()
-                ),
+                )
+                .into(),
             }
             .into_result();
         }

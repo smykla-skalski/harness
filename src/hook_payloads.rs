@@ -123,7 +123,7 @@ impl HookEnvelopePayload {
     pub fn from_json_text(text: &str) -> Result<Self, CliError> {
         serde_json::from_str(text).map_err(|e| {
             CliErrorKind::HookPayloadInvalid {
-                detail: format!("invalid hook payload: {e}"),
+                detail: format!("invalid hook payload: {e}").into(),
             }
             .into()
         })
@@ -138,7 +138,7 @@ impl HookEnvelopePayload {
         let mut text = String::new();
         io::stdin().read_to_string(&mut text).map_err(|e| {
             CliError::from(CliErrorKind::HookPayloadInvalid {
-                detail: format!("failed to read stdin: {e}"),
+                detail: format!("failed to read stdin: {e}").into(),
             })
         })?;
         Self::from_json_text(&text)

@@ -155,7 +155,7 @@ fn save_state(run_dir: &Path, state: &RunnerWorkflowState) -> Result<(), CliErro
     let repo = runner_repository(run_dir);
     let value = serde_json::to_value(state).map_err(|e| -> CliError {
         CliErrorKind::WorkflowSerialize {
-            detail: format!("failed to serialize runner state: {e}"),
+            detail: format!("failed to serialize runner state: {e}").into(),
         }
         .into()
     })?;
@@ -184,7 +184,7 @@ pub fn read_runner_state(run_dir: &Path) -> Result<Option<RunnerWorkflowState>, 
             let state: RunnerWorkflowState =
                 serde_json::from_value(value).map_err(|e| -> CliError {
                     CliErrorKind::WorkflowParse {
-                        detail: format!("failed to parse runner state: {e}"),
+                        detail: format!("failed to parse runner state: {e}").into(),
                     }
                     .into()
                 })?;

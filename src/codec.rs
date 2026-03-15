@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 use serde_json::{Map, Value};
@@ -19,7 +21,7 @@ const MAX_PROBE_ITERATIONS: usize = 100;
 pub fn from_mapping<T: DeserializeOwned>(value: &Value, label: &str) -> Result<T, CliError> {
     let Some(obj) = value.as_object() else {
         return Err(CliErrorKind::NotAMapping {
-            label: label.into(),
+            label: label.to_string().into(),
         }
         .into());
     };
@@ -41,7 +43,7 @@ pub fn from_mapping_with_injected<T: DeserializeOwned>(
 ) -> Result<T, CliError> {
     let Some(obj) = value.as_object() else {
         return Err(CliErrorKind::NotAMapping {
-            label: label.into(),
+            label: label.to_string().into(),
         }
         .into());
     };
@@ -85,8 +87,8 @@ fn deserialize_with_errors<T: DeserializeOwned>(
             Ok(_) => {
                 let fields = missing.join(", ");
                 return Err(CliErrorKind::MissingFields {
-                    label: label.into(),
-                    fields,
+                    label: label.to_string().into(),
+                    fields: fields.into(),
                 }
                 .into());
             }
@@ -118,8 +120,8 @@ fn deserialize_with_errors<T: DeserializeOwned>(
                 if !missing.is_empty() {
                     let fields = missing.join(", ");
                     return Err(CliErrorKind::MissingFields {
-                        label: label.into(),
-                        fields,
+                        label: label.to_string().into(),
+                        fields: fields.into(),
                     }
                     .into());
                 }
@@ -127,18 +129,18 @@ fn deserialize_with_errors<T: DeserializeOwned>(
                 // Type mismatch on a field that was present in the input.
                 if let Some(expected) = parse_expected_type(&msg) {
                     return Err(CliErrorKind::FieldTypeMismatch {
-                        label: label.into(),
-                        field: String::new(),
-                        expected,
+                        label: label.to_string().into(),
+                        field: Cow::default(),
+                        expected: expected.into(),
                     }
                     .into());
                 }
 
                 // Unknown serde error - wrap it.
                 return Err(CliErrorKind::FieldTypeMismatch {
-                    label: label.into(),
-                    field: String::new(),
-                    expected: msg,
+                    label: label.to_string().into(),
+                    field: Cow::default(),
+                    expected: msg.into(),
                 }
                 .into());
             }
@@ -149,14 +151,14 @@ fn deserialize_with_errors<T: DeserializeOwned>(
     if !missing.is_empty() {
         let fields = missing.join(", ");
         return Err(CliErrorKind::MissingFields {
-            label: label.into(),
-            fields,
+            label: label.to_string().into(),
+            fields: fields.into(),
         }
         .into());
     }
     Err(CliErrorKind::FieldTypeMismatch {
-        label: label.into(),
-        field: String::new(),
+        label: label.to_string().into(),
+        field: Cow::default(),
         expected: "probe loop exhausted".into(),
     }
     .into())

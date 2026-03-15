@@ -58,7 +58,7 @@ pub fn execute(
 
     if layout.run_dir().exists() {
         return Err(CliErrorKind::RunDirExists {
-            run_dir: layout.run_dir().display().to_string(),
+            run_dir: layout.run_dir().display().to_string().into(),
         }
         .into());
     }
