@@ -18,41 +18,63 @@ pub(crate) fn run_command(
     let (program, cmd_args) = args
         .split_first()
         .ok_or_else(|| CliError::from(CliErrorKind::EmptyCommandArgs))?;
+    let output = build_command(program, cmd_args, cwd, env)
+        .output()
+        .map_err(|e| {
+            CliErrorKind::CommandFailed {
+                command: command_string(args).into(),
+            }
+            .with_details(e.to_string())
+        })?;
+    let result = build_result(args, output);
+    if ok_exit_codes.contains(&result.returncode) {
+        return Ok(result);
+    }
+    Err(CliErrorKind::CommandFailed {
+        command: command_string(args).into(),
+    }
+    .with_details(failure_details(&result)))
+}
+
+fn build_command(
+    program: &str,
+    cmd_args: &[&str],
+    cwd: Option<&Path>,
+    env: Option<&HashMap<String, String>>,
+) -> Command {
     let merged = merge_env(env);
     let mut cmd = Command::new(program);
     cmd.args(cmd_args).envs(&merged);
     if let Some(dir) = cwd {
         cmd.current_dir(dir);
     }
-    let output = cmd.output().map_err(|e| {
-        CliErrorKind::CommandFailed {
-            command: args.join(" ").into(),
-        }
-        .with_details(e.to_string())
-    })?;
-    let returncode = output.status.code().unwrap_or(-1);
-    let result = CommandResult {
+    cmd
+}
+
+fn build_result(args: &[&str], output: std::process::Output) -> CommandResult {
+    CommandResult {
         args: args.iter().map(|s| (*s).to_string()).collect(),
-        returncode,
+        returncode: output.status.code().unwrap_or(-1),
         stdout: String::from_utf8_lossy(&output.stdout).into_owned(),
         stderr: String::from_utf8_lossy(&output.stderr).into_owned(),
-    };
-    if ok_exit_codes.contains(&returncode) {
-        return Ok(result);
     }
-    let details = if result.stderr.trim().is_empty() {
-        if result.stdout.trim().is_empty() {
-            "external command failed".to_string()
-        } else {
-            result.stdout.trim().to_string()
-        }
+}
+
+fn failure_details(result: &CommandResult) -> String {
+    let stderr = result.stderr.trim();
+    if !stderr.is_empty() {
+        return stderr.to_string();
+    }
+    let stdout = result.stdout.trim();
+    if stdout.is_empty() {
+        "external command failed".to_string()
     } else {
-        result.stderr.trim().to_string()
-    };
-    Err(CliErrorKind::CommandFailed {
-        command: args.join(" ").into(),
+        stdout.to_string()
     }
-    .with_details(details))
+}
+
+fn command_string(args: &[&str]) -> String {
+    args.join(" ")
 }
 
 /// Run kubectl with optional kubeconfig.
