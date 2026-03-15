@@ -1388,8 +1388,8 @@ impl RunDirBuilder {
 /// Builds `HookEnvelopePayload` for hook tests.
 pub struct HookPayloadBuilder {
     command: Option<String>,
-    file_path: Option<String>,
-    writes: Vec<String>,
+    file_path: Option<PathBuf>,
+    writes: Vec<PathBuf>,
     questions: Vec<AskUserQuestionPrompt>,
     response: Option<serde_json::Value>,
     last_assistant_message: Option<String>,
@@ -1418,13 +1418,13 @@ impl HookPayloadBuilder {
 
     #[must_use]
     pub fn write_path(mut self, path: &str) -> Self {
-        self.file_path = Some(path.to_string());
+        self.file_path = Some(PathBuf::from(path));
         self
     }
 
     #[must_use]
     pub fn write_paths(mut self, paths: &[&str]) -> Self {
-        self.writes = paths.iter().map(|s| (*s).to_string()).collect();
+        self.writes = paths.iter().map(|s| PathBuf::from(*s)).collect();
         self
     }
 

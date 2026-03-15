@@ -25,15 +25,19 @@ pub fn execute(ctx: &HookContext) -> Result<HookResult, CliError> {
     Ok(verify_suite_runner(ctx, &paths))
 }
 
-fn verify_suite_author(paths: &[&str]) -> HookResult {
+fn verify_suite_author(paths: &[&Path]) -> HookResult {
     for raw_path in paths {
-        let path = Path::new(raw_path);
-        let name = path.file_name().map_or("", |n| n.to_str().unwrap_or(""));
+        let name = raw_path
+            .file_name()
+            .map_or("", |n| n.to_str().unwrap_or(""));
         if name == "amendments.md"
-            && fs::read_to_string(path).is_ok_and(|content| content.trim().is_empty())
+            && fs::read_to_string(raw_path).is_ok_and(|content| content.trim().is_empty())
         {
             return HookMessage::SuiteIncomplete {
-                details: format!("suite amendments entry is missing or empty: {raw_path}"),
+                details: format!(
+                    "suite amendments entry is missing or empty: {}",
+                    raw_path.display()
+                ),
             }
             .into_result();
         }
@@ -41,12 +45,12 @@ fn verify_suite_author(paths: &[&str]) -> HookResult {
     HookResult::allow()
 }
 
-fn verify_suite_runner(ctx: &HookContext, paths: &[&str]) -> HookResult {
+fn verify_suite_runner(ctx: &HookContext, paths: &[&Path]) -> HookResult {
     let run_dir = ctx.effective_run_dir();
     // Suite-fix write tracking would use ctx.suite_dir() here once
     // record_suite_fix_write is available in the workflow module.
     for raw_path in paths {
-        let path = normalize_path(Path::new(raw_path));
+        let path = normalize_path(raw_path);
         if let Some(ref rd) = run_dir
             && is_command_owned_run_file(&path, rd)
         {
@@ -67,7 +71,10 @@ fn verify_suite_runner(ctx: &HookContext, paths: &[&str]) -> HookResult {
             && fs::read_to_string(&path).is_ok_and(|content| content.trim().is_empty())
         {
             return HookMessage::SuiteIncomplete {
-                details: format!("suite amendments entry is missing or empty: {raw_path}"),
+                details: format!(
+                    "suite amendments entry is missing or empty: {}",
+                    raw_path.display()
+                ),
             }
             .into_result();
         }

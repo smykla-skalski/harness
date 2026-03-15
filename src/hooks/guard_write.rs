@@ -26,30 +26,28 @@ pub fn execute(ctx: &HookContext) -> Result<HookResult, CliError> {
     Ok(guard_suite_runner(ctx, &paths))
 }
 
-fn guard_suite_author(ctx: &HookContext, paths: &[&str]) -> HookResult {
+fn guard_suite_author(ctx: &HookContext, paths: &[&Path]) -> HookResult {
     let Some(state) = &ctx.author_state else {
         return HookResult::allow();
     };
     let suite_dir = state.suite_path();
     let sd_norm = suite_dir.as_ref().map(|sd| normalize_path(sd));
-    let has_suite_output = sd_norm.as_ref().is_some_and(|sdn| {
-        paths
-            .iter()
-            .any(|p| normalize_path(Path::new(p)).starts_with(sdn))
-    });
+    let has_suite_output = sd_norm
+        .as_ref()
+        .is_some_and(|sdn| paths.iter().any(|p| normalize_path(p).starts_with(sdn)));
     if !has_suite_output {
         return HookResult::allow();
     }
     // Validate paths are within the suite-author surface.
     if let Some(ref sdn) = sd_norm {
         for raw_path in paths {
-            let norm = normalize_path(Path::new(raw_path));
+            let norm = normalize_path(raw_path);
             if !norm.starts_with(sdn) {
                 continue;
             }
             if !author::suite_author_path_allowed(&norm, sdn) {
                 return HookMessage::WriteOutsideSuite {
-                    path: (*raw_path).into(),
+                    path: raw_path.display().to_string(),
                 }
                 .into_result();
             }
@@ -66,12 +64,12 @@ fn guard_suite_author(ctx: &HookContext, paths: &[&str]) -> HookResult {
     HookResult::allow()
 }
 
-fn guard_suite_runner(ctx: &HookContext, paths: &[&str]) -> HookResult {
+fn guard_suite_runner(ctx: &HookContext, paths: &[&Path]) -> HookResult {
     let run_dir = ctx.effective_run_dir();
     let suite_dir = ctx.suite_dir();
     let sd_norm = suite_dir.as_ref().map(|sd| normalize_path(sd));
     for raw_path in paths {
-        let path = normalize_path(Path::new(raw_path));
+        let path = normalize_path(raw_path);
         // Deny direct writes to harness-managed control files.
         if let Some(ref rd) = run_dir {
             if is_command_owned_run_file(&path, rd) {
@@ -108,7 +106,7 @@ fn guard_suite_runner(ctx: &HookContext, paths: &[&str]) -> HookResult {
         // Path outside run surface.
         if run_dir.is_some() || suite_dir.is_some() {
             return HookMessage::WriteOutsideRun {
-                path: (*raw_path).into(),
+                path: raw_path.display().to_string(),
             }
             .into_result();
         }
