@@ -135,6 +135,17 @@ impl Execute for Command {
                 mode,
                 suite_dir,
             } => authoring::approval_begin(&mode, suite_dir.as_deref()),
+
+            // --- universal ---
+            Command::Token(args) => run::token(
+                &args.kind,
+                &args.name,
+                &args.mesh,
+                args.cp_addr.as_deref(),
+                &args.valid_for,
+                &args.run_dir,
+            ),
+            Command::Service(args) => run::service(&args),
         }
     }
 }
