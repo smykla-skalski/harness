@@ -617,16 +617,13 @@ fn is_tracked_harness_command(words: &[String]) -> bool {
 }
 
 fn has_denied_cluster_binary(heads: &[String]) -> bool {
-    heads
-        .iter()
-        .any(|h| rules::DENIED_CLUSTER_BINARIES.contains(&h.as_str()))
+    heads.iter().any(|h| rules::ClusterBinary::is_denied(h))
 }
 
 fn has_denied_cluster_binary_anywhere(words: &[String]) -> bool {
-    words.iter().any(|w| {
-        let name = normalized_binary_name(w);
-        rules::DENIED_CLUSTER_BINARIES.contains(&name.as_str())
-    })
+    words
+        .iter()
+        .any(|w| rules::ClusterBinary::is_denied(&normalized_binary_name(w)))
 }
 
 fn has_denied_runner_binary(heads: &[String]) -> bool {

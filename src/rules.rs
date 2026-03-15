@@ -5,6 +5,9 @@ pub mod shared {
 
 /// Suite-runner constants and phase definitions.
 pub mod suite_runner {
+    use std::fmt;
+    use std::str::FromStr;
+
     pub const AGENT_PREFLIGHT: &str = "preflight-worker";
     pub const PREFLIGHT_REPLY_HEAD: &str = "suite-runner/preflight:";
     pub const PREFLIGHT_REPLY_PASS: &str = "pass";
@@ -22,6 +25,51 @@ pub mod suite_runner {
         "record_command.py",
         "validate_manifest.py",
     ];
+
+    /// Cluster binaries that must not be invoked directly.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+    pub enum ClusterBinary {
+        Kubectl,
+        Kumactl,
+        Helm,
+        Docker,
+        K3d,
+    }
+
+    impl fmt::Display for ClusterBinary {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            f.write_str(match self {
+                Self::Kubectl => "kubectl",
+                Self::Kumactl => "kumactl",
+                Self::Helm => "helm",
+                Self::Docker => "docker",
+                Self::K3d => "k3d",
+            })
+        }
+    }
+
+    impl FromStr for ClusterBinary {
+        type Err = ();
+
+        fn from_str(s: &str) -> Result<Self, Self::Err> {
+            match s {
+                "kubectl" => Ok(Self::Kubectl),
+                "kumactl" => Ok(Self::Kumactl),
+                "helm" => Ok(Self::Helm),
+                "docker" => Ok(Self::Docker),
+                "k3d" => Ok(Self::K3d),
+                _ => Err(()),
+            }
+        }
+    }
+
+    impl ClusterBinary {
+        /// Check if a binary name is a denied cluster binary.
+        #[must_use]
+        pub fn is_denied(name: &str) -> bool {
+            name.parse::<Self>().is_ok()
+        }
+    }
 
     pub const DENIED_CLUSTER_BINARIES: &[&str] = &["kubectl", "kumactl", "helm", "docker", "k3d"];
 
@@ -153,6 +201,37 @@ mod tests {
         assert!(bins.contains(&"docker"));
         assert!(bins.contains(&"k3d"));
         assert_eq!(bins.len(), 5);
+    }
+
+    #[test]
+    fn cluster_binary_from_str_roundtrip() {
+        use suite_runner::ClusterBinary;
+        let variants = [
+            (ClusterBinary::Kubectl, "kubectl"),
+            (ClusterBinary::Kumactl, "kumactl"),
+            (ClusterBinary::Helm, "helm"),
+            (ClusterBinary::Docker, "docker"),
+            (ClusterBinary::K3d, "k3d"),
+        ];
+        for (variant, name) in variants {
+            assert_eq!(variant.to_string(), name);
+            assert_eq!(name.parse::<ClusterBinary>(), Ok(variant));
+        }
+    }
+
+    #[test]
+    fn cluster_binary_from_str_unknown() {
+        use suite_runner::ClusterBinary;
+        assert!("cargo".parse::<ClusterBinary>().is_err());
+    }
+
+    #[test]
+    fn cluster_binary_is_denied() {
+        use suite_runner::ClusterBinary;
+        assert!(ClusterBinary::is_denied("kubectl"));
+        assert!(ClusterBinary::is_denied("helm"));
+        assert!(!ClusterBinary::is_denied("cargo"));
+        assert!(!ClusterBinary::is_denied(""));
     }
 
     #[test]
