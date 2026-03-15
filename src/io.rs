@@ -187,6 +187,7 @@ fn yaml11_bool(s: &str) -> Option<bool> {
     }
 }
 
+#[must_use]
 pub fn yaml_to_json(yaml: &serde_yml::Value) -> Value {
     match yaml {
         serde_yml::Value::Null => Value::Null,
