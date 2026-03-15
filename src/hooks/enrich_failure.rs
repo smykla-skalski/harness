@@ -7,7 +7,7 @@ use crate::workflow::runner::{
 
 /// Execute the enrich-failure hook.
 ///
-/// For suite-runner, emits run verdict info after a tool failure and
+/// For suite:run, emits run verdict info after a tool failure and
 /// triggers triage transitions when appropriate.
 ///
 /// # Errors
@@ -31,12 +31,12 @@ pub fn execute(ctx: &HookContext) -> Result<HookResult, CliError> {
         if matches!(sub, "apply" | "validate") && state.phase == RunnerPhase::Execution {
             let new_state = request_failure_triage(state, FailureKind::Manifest);
             if let Some(ref rd) = ctx.effective_run_dir() {
-                let _ = runner_wf::write_runner_state(rd, &new_state);
+                runner_wf::write_runner_state(rd, &new_state)?;
             }
         } else if state.phase == RunnerPhase::Preflight && matches!(sub, "preflight" | "capture") {
             let new_state = request_preflight_failed(state);
             if let Some(ref rd) = ctx.effective_run_dir() {
-                let _ = runner_wf::write_runner_state(rd, &new_state);
+                runner_wf::write_runner_state(rd, &new_state)?;
             }
         }
     }
