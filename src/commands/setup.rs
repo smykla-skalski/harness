@@ -425,10 +425,9 @@ fn universal_single_up(
     Ok(())
 }
 
-#[allow(clippy::unnecessary_wraps)]
 fn universal_single_down(network: &str, cp_name: &str) -> Result<(), CliError> {
-    let _ = docker_rm(cp_name);
-    let _ = docker_network_rm(network);
+    docker_rm(cp_name)?;
+    docker_network_rm(network)?;
     Ok(())
 }
 
@@ -475,7 +474,6 @@ fn universal_global_zone_up(
 
 fn universal_global_zone_down(network: &str, names: &[String]) -> Result<(), CliError> {
     let global_name = &names[0];
-    // Try compose down first with a temp compose file
     let compose_file = compose::global_zone(
         "unused",
         network,
@@ -488,12 +486,11 @@ fn universal_global_zone_down(network: &str, names: &[String]) -> Result<(), Cli
     let tmp_dir = tempfile::tempdir().map_err(|e| CliErrorKind::io(cow!("temp dir: {e}")))?;
     let compose_path = tmp_dir.path().join("docker-compose.yaml");
     compose_file.write_to(&compose_path)?;
-    let _ = compose_down(&compose_path, &format!("harness-{global_name}"));
-    // Also try direct container removal as fallback
+    compose_down(&compose_path, &format!("harness-{global_name}"))?;
     for name in names {
-        let _ = docker_rm(name);
+        docker_rm(name)?;
     }
-    let _ = docker_network_rm(network);
+    docker_network_rm(network)?;
     Ok(())
 }
 
@@ -558,11 +555,11 @@ fn universal_global_two_zones_down(network: &str, names: &[String]) -> Result<()
     let tmp_dir = tempfile::tempdir().map_err(|e| CliErrorKind::io(cow!("temp dir: {e}")))?;
     let compose_path = tmp_dir.path().join("docker-compose.yaml");
     compose_file.write_to(&compose_path)?;
-    let _ = compose_down(&compose_path, &format!("harness-{global_name}"));
+    compose_down(&compose_path, &format!("harness-{global_name}"))?;
     for name in names {
-        let _ = docker_rm(name);
+        docker_rm(name)?;
     }
-    let _ = docker_network_rm(network);
+    docker_network_rm(network)?;
     Ok(())
 }
 
