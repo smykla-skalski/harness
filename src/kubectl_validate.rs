@@ -56,12 +56,15 @@ pub fn read_kubectl_validate_state() -> Result<Option<KubectlValidateState>, Cli
 /// Check if the install prompt is needed.
 ///
 /// Returns true when no binary is found and no decision has been recorded.
-#[must_use]
-pub fn kubectl_validate_prompt_required() -> bool {
+///
+/// # Errors
+/// Returns `CliError` if the state file exists but cannot be read or parsed.
+pub fn kubectl_validate_prompt_required() -> Result<bool, CliError> {
     if resolve_kubectl_validate_binary().is_some() {
-        return false;
+        return Ok(false);
     }
-    read_kubectl_validate_state().ok().flatten().is_none()
+    let state = read_kubectl_validate_state()?;
+    Ok(state.is_none())
 }
 
 /// Resolve the kubectl-validate binary path.

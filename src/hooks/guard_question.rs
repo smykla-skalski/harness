@@ -21,7 +21,7 @@ pub fn execute(ctx: &HookContext) -> Result<HookResult, CliError> {
     if ctx.is_suite_runner() {
         return Ok(guard_suite_runner(ctx, prompts));
     }
-    Ok(guard_suite_author(ctx, prompts))
+    guard_suite_author(ctx, prompts)
 }
 
 fn guard_suite_runner(ctx: &HookContext, prompts: &[AskUserQuestionPrompt]) -> HookResult {
@@ -44,42 +44,47 @@ fn guard_suite_runner(ctx: &HookContext, prompts: &[AskUserQuestionPrompt]) -> H
     HookResult::allow()
 }
 
-fn guard_suite_author(ctx: &HookContext, prompts: &[AskUserQuestionPrompt]) -> HookResult {
+fn guard_suite_author(
+    ctx: &HookContext,
+    prompts: &[AskUserQuestionPrompt],
+) -> Result<HookResult, CliError> {
     // Check kubectl-validate install gate.
     if is_install_prompt(prompts) {
-        if kubectl_validate_prompt_required() {
-            return HookResult::allow();
+        if kubectl_validate_prompt_required()? {
+            return Ok(HookResult::allow());
         }
-        return HookMessage::validator_gate_unexpected(
+        return Ok(HookMessage::validator_gate_unexpected(
             "The local validator is already installed or a prior decision is already saved. \
                       Do not ask the install gate again.",
         )
-        .into_result();
+        .into_result());
     }
     // Block non-install prompts if install gate is pending.
-    if kubectl_validate_prompt_required() {
-        return HookMessage::validator_gate_required(
+    if kubectl_validate_prompt_required()? {
+        return Ok(HookMessage::validator_gate_required(
             "Complete the local validator install decision first.",
         )
-        .into_result();
+        .into_result());
     }
     // Check canonical review gate prompts.
     if let Some(gate) = classify_canonical_gate(prompts) {
         let Some(state) = &ctx.author_state else {
-            return HookMessage::approval_state_invalid("author state is missing").into_result();
+            return Ok(
+                HookMessage::approval_state_invalid("author state is missing").into_result(),
+            );
         };
         if state.mode == ApprovalMode::Bypass {
-            return HookMessage::approval_state_invalid(
+            return Ok(HookMessage::approval_state_invalid(
                 "bypass mode forbids canonical review prompts",
             )
-            .into_result();
+            .into_result());
         }
         if let Err(reason) = can_request_gate(state, gate) {
-            return HookMessage::approval_state_invalid(reason).into_result();
+            return Ok(HookMessage::approval_state_invalid(reason).into_result());
         }
-        return HookResult::allow();
+        return Ok(HookResult::allow());
     }
-    HookResult::allow()
+    Ok(HookResult::allow())
 }
 
 fn is_manifest_fix_prompt(prompt: &AskUserQuestionPrompt) -> bool {
