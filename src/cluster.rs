@@ -85,34 +85,21 @@ fn parse_string_vec(value: Option<&Value>) -> Vec<String> {
 }
 
 fn parse_helm_settings(obj: &serde_json::Map<String, Value>) -> Vec<HelmSetting> {
-    if let Some(arr) = obj.get("helm_settings").and_then(Value::as_array) {
-        let mut settings: Vec<HelmSetting> = arr
-            .iter()
-            .filter_map(|v| {
-                let o = v.as_object()?;
-                Some(HelmSetting {
-                    key: o.get("key")?.as_str()?.into(),
-                    value: o.get("value")?.as_str()?.into(),
-                })
+    let Some(arr) = obj.get("helm_settings").and_then(Value::as_array) else {
+        return Vec::new();
+    };
+    let mut settings: Vec<HelmSetting> = arr
+        .iter()
+        .filter_map(|v| {
+            let o = v.as_object()?;
+            Some(HelmSetting {
+                key: o.get("key")?.as_str()?.into(),
+                value: o.get("value")?.as_str()?.into(),
             })
-            .collect();
-        settings.sort_by(|a, b| a.key.cmp(&b.key));
-        return settings;
-    }
-    if let Some(map) = obj.get("helm_values").and_then(Value::as_object) {
-        let mut settings: Vec<HelmSetting> = map
-            .iter()
-            .filter_map(|(k, v)| {
-                Some(HelmSetting {
-                    key: k.clone(),
-                    value: v.as_str()?.into(),
-                })
-            })
-            .collect();
-        settings.sort_by(|a, b| a.key.cmp(&b.key));
-        return settings;
-    }
-    Vec::new()
+        })
+        .collect();
+    settings.sort_by(|a, b| a.key.cmp(&b.key));
+    settings
 }
 
 fn dedup_preserving_order(items: Vec<String>) -> Vec<String> {
@@ -273,7 +260,7 @@ pub struct ClusterSpec {
 }
 
 impl ClusterSpec {
-    /// Parse from a JSON value, handling both legacy and modern formats.
+    /// Parse from a JSON value.
     ///
     /// # Errors
     /// Returns an error if the value cannot be parsed.
@@ -334,14 +321,6 @@ impl ClusterSpec {
     }
 
     #[must_use]
-    pub fn helm_values(&self) -> HashMap<&str, &str> {
-        self.helm_settings
-            .iter()
-            .map(|s| (s.key.as_str(), s.value.as_str()))
-            .collect()
-    }
-
-    #[must_use]
     pub fn to_json_dict(&self) -> Value {
         ClusterRecordPayload::from_spec(self).to_json_dict()
     }
@@ -357,18 +336,12 @@ impl ClusterSpec {
     }
 }
 
-/// Cluster record payload for serialization (handles legacy compat).
+/// Cluster record payload for serialization.
 #[derive(Debug, Clone, Serialize)]
 pub struct ClusterRecordPayload {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub mode: Option<ClusterMode>,
+    pub mode: ClusterMode,
     pub mode_args: Vec<String>,
     pub members: Vec<ClusterMember>,
-    pub clusters: Vec<String>,
-    pub kubeconfigs: HashMap<String, String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub primary_kubeconfig: Option<String>,
-    pub helm_values: HashMap<String, String>,
     pub helm_settings: Vec<HelmSetting>,
     pub restart_namespaces: Vec<String>,
     pub repo_root: String,
@@ -378,14 +351,14 @@ impl ClusterRecordPayload {
     /// Parse from a JSON value.
     ///
     /// # Errors
-    /// Returns an error if the value is not an object.
+    /// Returns an error if the value is not a valid cluster record.
     pub fn from_value(value: &Value) -> Result<Self, String> {
         let obj = value.as_object().ok_or("expected object")?;
-        let mode = obj
+        let mode: ClusterMode = obj
             .get("mode")
             .and_then(Value::as_str)
-            .map(str::parse)
-            .transpose()?;
+            .ok_or("missing mode")?
+            .parse()?;
         let mode_args = parse_string_vec(obj.get("mode_args"));
         let members: Vec<ClusterMember> = obj
             .get("members")
@@ -397,25 +370,7 @@ impl ClusterRecordPayload {
             })
             .transpose()?
             .unwrap_or_default();
-        let clusters = parse_string_vec(obj.get("clusters"));
-        let kubeconfigs: HashMap<String, String> = obj
-            .get("kubeconfigs")
-            .and_then(Value::as_object)
-            .map(|m| {
-                m.iter()
-                    .filter_map(|(k, v)| Some((k.clone(), v.as_str()?.into())))
-                    .collect()
-            })
-            .unwrap_or_default();
-        let primary_kubeconfig = obj
-            .get("primary_kubeconfig")
-            .and_then(Value::as_str)
-            .map(String::from);
         let helm_settings = parse_helm_settings(obj);
-        let helm_values = helm_settings
-            .iter()
-            .map(|s| (s.key.clone(), s.value.clone()))
-            .collect();
         let restart_namespaces = parse_string_vec(obj.get("restart_namespaces"));
         let repo_root = obj
             .get("repo_root")
@@ -426,10 +381,6 @@ impl ClusterRecordPayload {
             mode,
             mode_args,
             members,
-            clusters,
-            kubeconfigs,
-            primary_kubeconfig,
-            helm_values,
             helm_settings,
             restart_namespaces,
             repo_root,
@@ -438,54 +389,14 @@ impl ClusterRecordPayload {
 
     #[must_use]
     pub fn from_spec(spec: &ClusterSpec) -> Self {
-        let members = spec.members.clone();
-        let clusters = members.iter().map(|m| m.name.clone()).collect();
-        let kubeconfigs = members
-            .iter()
-            .map(|m| (m.name.clone(), m.kubeconfig.clone()))
-            .collect();
-        let helm_values = spec
-            .helm_settings
-            .iter()
-            .map(|s| (s.key.clone(), s.value.clone()))
-            .collect();
         Self {
-            mode: Some(spec.mode),
+            mode: spec.mode,
             mode_args: spec.mode_args.clone(),
-            members,
-            clusters,
-            kubeconfigs,
-            primary_kubeconfig: Some(spec.primary_kubeconfig().to_string()),
-            helm_values,
+            members: spec.members.clone(),
             helm_settings: spec.helm_settings.clone(),
             restart_namespaces: spec.restart_namespaces.clone(),
             repo_root: spec.repo_root.clone(),
         }
-    }
-
-    fn legacy_members(&self) -> Vec<ClusterMember> {
-        let Some(mode) = &self.mode else {
-            return Vec::new();
-        };
-        self.clusters
-            .iter()
-            .enumerate()
-            .map(|(i, cluster)| {
-                let role = if i == 0 && mode.is_global() {
-                    "global"
-                } else if mode.is_global() {
-                    "zone"
-                } else {
-                    "primary"
-                };
-                let kc = self
-                    .kubeconfigs
-                    .get(cluster)
-                    .cloned()
-                    .unwrap_or_else(|| kubeconfig_for_cluster(cluster));
-                ClusterMember::named(cluster, role, Some(&kc), None)
-            })
-            .collect()
     }
 
     /// Convert to a `ClusterSpec`.
@@ -493,40 +404,17 @@ impl ClusterRecordPayload {
     /// # Errors
     /// Returns an error if the record is invalid.
     pub fn to_spec(&self) -> Result<ClusterSpec, String> {
-        match &self.mode {
-            None => {
-                let kc = self
-                    .primary_kubeconfig
-                    .as_deref()
-                    .ok_or("cluster mode must be a string")?;
-                Ok(ClusterSpec {
-                    mode: ClusterMode::SingleUp,
-                    mode_args: vec!["current".into()],
-                    members: vec![ClusterMember::named("current", "primary", Some(kc), None)],
-                    helm_settings: Vec::new(),
-                    restart_namespaces: Vec::new(),
-                    repo_root: self.repo_root.clone(),
-                })
-            }
-            Some(mode) => {
-                let members = if self.members.is_empty() {
-                    self.legacy_members()
-                } else {
-                    self.members.clone()
-                };
-                if members.is_empty() {
-                    return Err("cluster members must be non-empty".into());
-                }
-                Ok(ClusterSpec {
-                    mode: *mode,
-                    mode_args: self.mode_args.clone(),
-                    members,
-                    helm_settings: self.helm_settings.clone(),
-                    restart_namespaces: self.restart_namespaces.clone(),
-                    repo_root: self.repo_root.clone(),
-                })
-            }
+        if self.members.is_empty() {
+            return Err("cluster members must be non-empty".into());
         }
+        Ok(ClusterSpec {
+            mode: self.mode,
+            mode_args: self.mode_args.clone(),
+            members: self.members.clone(),
+            helm_settings: self.helm_settings.clone(),
+            restart_namespaces: self.restart_namespaces.clone(),
+            repo_root: self.repo_root.clone(),
+        })
     }
 
     /// # Panics
@@ -608,12 +496,17 @@ impl CurrentDeployPayload {
                     .collect(),
             ),
         );
-        let hv: serde_json::Map<String, Value> = self
+        let hs: Vec<Value> = self
             .helm_settings
             .iter()
-            .map(|s| (s.key.clone(), Value::String(s.value.clone())))
+            .map(|s| {
+                serde_json::json!({
+                    "key": s.key,
+                    "value": s.value,
+                })
+            })
             .collect();
-        map.insert("helm_values".into(), Value::Object(hv));
+        map.insert("helm_settings".into(), Value::Array(hs));
         map.insert(
             "restart_namespaces".into(),
             Value::Array(
@@ -633,43 +526,9 @@ mod tests {
     use serde_json::json;
 
     #[test]
-    fn loads_legacy_clusters_and_helm_values() {
-        let spec = ClusterSpec::from_object(&json!({
-            "mode": "global-zone-up",
-            "mode_args": ["kuma-global", "kuma-zone", "zone-1"],
-            "clusters": ["kuma-global", "kuma-zone"],
-            "kubeconfigs": {"kuma-zone": "/tmp/kuma-zone-config"},
-            "helm_values": {"controlPlane.mode": "global"},
-            "restart_namespaces": ["kuma-system"],
-            "repo_root": "/repo",
-        }))
-        .unwrap();
-
-        assert_eq!(spec.cluster_names(), vec!["kuma-global", "kuma-zone"]);
-        assert!(
-            spec.primary_kubeconfig()
-                .ends_with("kind-kuma-global-config")
-        );
-        assert_eq!(spec.kubeconfigs()["kuma-zone"], "/tmp/kuma-zone-config");
-        assert_eq!(
-            spec.helm_settings,
-            vec![HelmSetting {
-                key: "controlPlane.mode".into(),
-                value: "global".into()
-            }]
-        );
-        let record = ClusterRecordPayload::from_spec(&spec);
-        assert_eq!(record.kubeconfigs["kuma-global"], spec.primary_kubeconfig());
-        assert_eq!(record.kubeconfigs["kuma-zone"], "/tmp/kuma-zone-config");
-    }
-
-    #[test]
-    fn legacy_primary_kubeconfig_fallback() {
-        let spec = ClusterSpec::from_object(&json!({"primary_kubeconfig": "/tmp/current-config"}))
-            .unwrap();
-        assert_eq!(spec.mode, ClusterMode::SingleUp);
-        assert_eq!(spec.mode_args, vec!["current"]);
-        assert_eq!(spec.primary_kubeconfig(), "/tmp/current-config");
+    fn from_object_requires_mode() {
+        let result = ClusterSpec::from_object(&json!({"repo_root": "/r"}));
+        assert!(result.is_err());
     }
 
     #[test]
@@ -685,8 +544,9 @@ mod tests {
         .unwrap();
 
         let payload = spec.to_current_deploy_dict("now");
-        let hv = payload["helm_values"].as_object().unwrap();
-        assert_eq!(hv["cp.mode"].as_str().unwrap(), "standalone");
+        let hs = payload["helm_settings"].as_array().unwrap();
+        assert_eq!(hs[0]["key"].as_str().unwrap(), "cp.mode");
+        assert_eq!(hs[0]["value"].as_str().unwrap(), "standalone");
         assert!(spec.matches_deploy_dict(&payload));
     }
 
