@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::context::RunContext;
 use crate::errors::{CliError, CliErrorKind, cow};
+use crate::rules;
 use crate::workflow::author::{self as author_workflow, AuthorWorkflowState};
 use crate::workflow::runner::{self as runner_workflow, RunnerWorkflowState};
 
@@ -234,7 +235,7 @@ impl HookContext {
         } else if let Some(ref rd) = self.run_dir {
             self.runner_state = runner_workflow::read_runner_state(rd).ok().flatten();
         }
-        // Load author state when skill is suite-author.
+        // Load author state when skill is suite:new.
         if self.is_suite_author() {
             self.author_state = author_workflow::read_author_state().ok().flatten();
         }
@@ -335,16 +336,16 @@ impl HookContext {
         self.event.payload.stop_hook_active
     }
 
-    /// Whether this context is for the suite-runner skill.
+    /// Whether this context is for the suite:run skill.
     #[must_use]
     pub fn is_suite_runner(&self) -> bool {
-        self.skill == "suite-runner"
+        self.skill == rules::SKILL_RUN
     }
 
-    /// Whether this context is for the suite-author skill.
+    /// Whether this context is for the suite:new skill.
     #[must_use]
     pub fn is_suite_author(&self) -> bool {
-        self.skill == "suite-author"
+        self.skill == rules::SKILL_NEW
     }
 }
 
@@ -451,10 +452,10 @@ mod tests {
     #[test]
     fn context_from_envelope_sets_skill() {
         let payload = HookEnvelopePayload::from_json_text("{}").unwrap();
-        let ctx = HookContext::from_envelope("suite-runner", payload);
-        assert_eq!(ctx.skill, "suite-runner");
+        let ctx = HookContext::from_envelope("suite:run", payload);
+        assert_eq!(ctx.skill, "suite:run");
         assert!(ctx.skill_active);
-        assert_eq!(ctx.active_skill.as_deref(), Some("suite-runner"));
+        assert_eq!(ctx.active_skill.as_deref(), Some("suite:run"));
     }
 
     #[test]

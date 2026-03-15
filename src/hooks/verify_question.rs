@@ -7,8 +7,8 @@ use crate::workflow::runner::RunnerPhase;
 /// Execute the verify-question hook.
 ///
 /// Processes `AskUserQuestion` answers and validates them against workflow
-/// state. For suite-runner, validates manifest-fix decisions. For
-/// suite-author, validates kubectl-validate install and canonical gate
+/// state. For suite:run, validates manifest-fix decisions. For
+/// suite:new, validates kubectl-validate install and canonical gate
 /// answers.
 ///
 /// # Errors

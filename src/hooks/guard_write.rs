@@ -38,7 +38,7 @@ fn guard_suite_author(ctx: &HookContext, paths: &[&Path]) -> HookResult {
     if !has_suite_output {
         return HookResult::allow();
     }
-    // Validate paths are within the suite-author surface.
+    // Validate paths are within the suite:new surface.
     if let Some(ref sdn) = sd_norm {
         for raw_path in paths {
             let norm = normalize_path(raw_path);

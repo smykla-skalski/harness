@@ -1,6 +1,40 @@
 use std::fmt;
 use std::str::FromStr;
 
+// ── Skill identity (single source of truth) ──────────────────────────
+//
+// Change the literal inside each macro to rename a skill everywhere.
+// The macro approach lets `concat!()` work in const position without
+// pulling in `const_format`.
+
+/// Expands to the `suite:run` skill name literal.
+macro_rules! skill_run {
+    () => {
+        "suite:run"
+    };
+}
+
+/// Expands to the `suite:new` skill name literal.
+macro_rules! skill_new {
+    () => {
+        "suite:new"
+    };
+}
+
+/// Skill identity for the test runner.
+pub const SKILL_RUN: &str = skill_run!();
+/// Skill identity for the suite author.
+pub const SKILL_NEW: &str = skill_new!();
+/// All recognized skill names (for CLI value parsers).
+pub const SKILL_NAMES: &[&str] = &[SKILL_RUN, SKILL_NEW];
+
+/// Filesystem-safe names (no colons) derived from skill identity.
+pub mod skill_dirs {
+    pub const RUN_STATE_FILE: &str = concat!("suite-run", "-state.json");
+    pub const NEW_WORKSPACE: &str = "suite-new";
+    pub const NEW_STATE_FILE: &str = concat!("suite-new", "-state.json");
+}
+
 /// A gated question with fixed options presented to the user.
 pub struct Gate {
     pub question: &'static str,
@@ -20,7 +54,7 @@ impl Gate {
     }
 }
 
-/// Constants shared between suite-runner and suite-author.
+/// Constants shared between suite:run and suite:new.
 pub mod shared {
     use super::{FromStr, fmt};
 
@@ -77,12 +111,13 @@ pub mod shared {
     }
 }
 
-/// Suite-runner constants and type definitions.
+/// Suite:run constants and type definitions.
 pub mod suite_runner {
     use super::{FromStr, Gate, fmt};
 
+    pub const SKILL_NAME: &str = super::SKILL_RUN;
     pub const AGENT_PREFLIGHT: &str = "preflight-worker";
-    pub const PREFLIGHT_REPLY_HEAD: &str = "suite-runner/preflight:";
+    pub const PREFLIGHT_REPLY_HEAD: &str = concat!(skill_run!(), "/preflight:");
 
     pub const REPORT_LINE_LIMIT: usize = 220;
     pub const REPORT_CODE_BLOCK_LIMIT: usize = 4;
@@ -90,7 +125,10 @@ pub mod suite_runner {
     pub const MANIFEST_FIX_TARGET_PREFIX: &str = "Suite target: ";
 
     pub const MANIFEST_FIX_GATE: Gate = Gate {
-        question: "suite-runner/manifest-fix: how should this failure be handled?",
+        question: concat!(
+            skill_run!(),
+            "/manifest-fix: how should this failure be handled?"
+        ),
         options: &[
             "Fix for this run only",
             "Fix in suite and this run",
@@ -202,7 +240,7 @@ pub mod suite_runner {
                 Self::CurrentDeploy => "current-deploy.json",
                 Self::CommandLog => "commands/command-log.md",
                 Self::ManifestIndex => "manifests/manifest-index.md",
-                Self::RunnerState => "suite-runner-state.json",
+                Self::RunnerState => super::skill_dirs::RUN_STATE_FILE,
             })
         }
     }
@@ -218,7 +256,7 @@ pub mod suite_runner {
                 "current-deploy.json" => Ok(Self::CurrentDeploy),
                 "commands/command-log.md" => Ok(Self::CommandLog),
                 "manifests/manifest-index.md" => Ok(Self::ManifestIndex),
-                "suite-runner-state.json" => Ok(Self::RunnerState),
+                _ if s == super::skill_dirs::RUN_STATE_FILE => Ok(Self::RunnerState),
                 _ => Err(()),
             }
         }
@@ -529,26 +567,28 @@ pub mod suite_runner {
     }
 }
 
-/// Suite-author constants and type definitions.
+/// Suite:new constants and type definitions.
 pub mod suite_author {
     use super::{FromStr, Gate, fmt};
 
+    pub const SKILL_NAME: &str = super::SKILL_NEW;
+
     pub const PREWRITE_GATE: Gate = Gate {
-        question: "suite-author/prewrite: approve current proposal?",
+        question: concat!(skill_new!(), "/prewrite: approve current proposal?"),
         options: &["Approve proposal", "Request changes", "Cancel"],
     };
 
     pub const POSTWRITE_GATE: Gate = Gate {
-        question: "suite-author/postwrite: approve saved suite?",
+        question: concat!(skill_new!(), "/postwrite: approve saved suite?"),
         options: &["Approve suite", "Request changes", "Cancel"],
     };
 
     pub const COPY_GATE: Gate = Gate {
-        question: "suite-author/copy: copy run command?",
+        question: concat!(skill_new!(), "/copy: copy run command?"),
         options: &["Copy command", "Skip"],
     };
 
-    /// Kind of result artifact produced by the suite-author pipeline.
+    /// Kind of result artifact produced by the suite:new pipeline.
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
     #[non_exhaustive]
     pub enum ResultKind {
@@ -600,7 +640,7 @@ pub mod suite_author {
         }
     }
 
-    /// Named worker agents in the suite-author pipeline.
+    /// Named worker agents in the suite:new pipeline.
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
     #[non_exhaustive]
     pub enum Worker {
@@ -1048,7 +1088,7 @@ mod tests {
         assert!("unknown-worker".parse::<suite_author::Worker>().is_err());
     }
 
-    // -- Suite-author gates --
+    // -- Suite:new gates --
 
     #[test]
     fn suite_author_gate_questions() {

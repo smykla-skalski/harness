@@ -13,7 +13,7 @@ use super::super::helpers::*;
 #[test]
 fn guard_question_ignores_inactive_skill() {
     let payload = make_question_payload("Some question?", &["Yes", "No"]);
-    let mut ctx = make_hook_context("suite-author", payload);
+    let mut ctx = make_hook_context("suite:new", payload);
     ctx.skill_active = false;
     let r = guard_question::execute(&ctx).unwrap();
     assert_allow(&r);
@@ -21,7 +21,7 @@ fn guard_question_ignores_inactive_skill() {
 
 #[test]
 fn guard_question_allows_empty_prompts() {
-    let ctx = make_hook_context("suite-runner", make_empty_payload());
+    let ctx = make_hook_context("suite:run", make_empty_payload());
     let r = guard_question::execute(&ctx).unwrap();
     assert_allow(&r);
 }
@@ -30,7 +30,7 @@ fn guard_question_allows_empty_prompts() {
 fn guard_question_requires_triage() {
     let tmp = tempfile::tempdir().unwrap();
     let run_dir = init_run(tmp.path(), "run-1", "single-zone");
-    let question = "suite-runner/manifest-fix: how should this failure be handled?";
+    let question = "suite:run/manifest-fix: how should this failure be handled?";
     let options = &[
         "Fix for this run only",
         "Fix in suite and this run",
@@ -38,7 +38,7 @@ fn guard_question_requires_triage() {
         "Stop run",
     ];
     let payload = make_question_payload(question, options);
-    let ctx = make_hook_context_with_run("suite-runner", payload, &run_dir);
+    let ctx = make_hook_context_with_run("suite:run", payload, &run_dir);
     let r = guard_question::execute(&ctx).unwrap();
     // Not in triage phase, so should deny
     assert_deny(&r);
@@ -66,7 +66,7 @@ fn guard_question_allows_manifest_fix_in_triage() {
         last_event: Some("FailureRecorded".to_string()),
     };
     runner_workflow::write_runner_state(&run_dir, &state).unwrap();
-    let question = "suite-runner/manifest-fix: how should this failure be handled?";
+    let question = "suite:run/manifest-fix: how should this failure be handled?";
     let options = &[
         "Fix for this run only",
         "Fix in suite and this run",
@@ -74,7 +74,7 @@ fn guard_question_allows_manifest_fix_in_triage() {
         "Stop run",
     ];
     let payload = make_question_payload(question, options);
-    let ctx = make_hook_context_with_run("suite-runner", payload, &run_dir);
+    let ctx = make_hook_context_with_run("suite:run", payload, &run_dir);
     let r = guard_question::execute(&ctx).unwrap();
     assert_allow(&r);
 }

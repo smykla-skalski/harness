@@ -1,0 +1,148 @@
+# Contents
+
+1. [Prerequisites](#prerequisites)
+2. [Kubeconfig mapping](#kubeconfig-mapping)
+3. [Profiles](#profiles)
+4. [Build and deploy local code changes](#build-and-deploy-local-code-changes)
+5. [CRD updates](#crd-updates)
+6. [Baseline readiness validation](#baseline-readiness-validation)
+
+---
+
+# Cluster setup
+
+Cluster lifecycle commands for local manual testing with k3d.
+
+## Prerequisites
+
+- Docker daemon running
+- `k3d`, `kubectl`, `helm`, `make` installed
+- `REPO_ROOT` resolved (via `--repo` flag or auto-detected from cwd)
+
+## Kubeconfig mapping
+
+| Cluster | Role | Kubeconfig file |
+| ------- | ---- | --------------- |
+| `kuma-1` | single-zone or global | `${HOME}/.kube/kind-kuma-1-config` |
+| `kuma-2` | zone-1 | `${HOME}/.kube/kind-kuma-2-config` |
+| `kuma-3` | zone-2 | `${HOME}/.kube/kind-kuma-3-config` |
+
+After `harness init`, rely on the active run context for repo root and the primary kubeconfig. Use explicit kubeconfig paths only for manual checks that target a non-primary cluster.
+
+## Profiles
+
+### Single-zone
+
+```bash
+harness cluster single-up kuma-1
+```
+
+Manual equivalent:
+
+```bash
+KIND_CLUSTER_NAME=kuma-1 make k3d/start
+K3D_HELM_DEPLOY_NO_CNI=true KIND_CLUSTER_NAME=kuma-1 make k3d/deploy/helm
+```
+
+Stop:
+
+```bash
+KIND_CLUSTER_NAME=kuma-1 make k3d/stop
+```
+
+### Global + one zone
+
+```bash
+harness cluster global-zone-up kuma-1 kuma-2 zone-1
+```
+
+Manual equivalent for global:
+
+```bash
+KIND_CLUSTER_NAME=kuma-1 make k3d/start
+KUBECONFIG="${HOME}/.kube/kind-kuma-1-config" \
+  K3D_HELM_DEPLOY_NO_CNI=true \
+  KIND_CLUSTER_NAME=kuma-1 \
+  KUMA_MODE=global \
+  K3D_HELM_DEPLOY_ADDITIONAL_SETTINGS="controlPlane.mode=global controlPlane.globalZoneSyncService.type=NodePort" \
+  make k3d/deploy/helm
+```
+
+Manual equivalent for zone:
+
+```bash
+GLOBAL_NODE_IP=$(docker inspect k3d-kuma-1-server-0 \
+  -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}')
+
+GLOBAL_KDS_PORT=$(KUBECONFIG="${HOME}/.kube/kind-kuma-1-config" kubectl get svc \
+  -n kuma-system kuma-global-zone-sync \
+  -o jsonpath='{.spec.ports[?(@.name=="global-zone-sync")].nodePort}')
+
+GLOBAL_KDS="grpcs://${GLOBAL_NODE_IP}:${GLOBAL_KDS_PORT}"
+
+KIND_CLUSTER_NAME=kuma-2 make k3d/start
+KUBECONFIG="${HOME}/.kube/kind-kuma-2-config" \
+  K3D_HELM_DEPLOY_NO_CNI=true \
+  KIND_CLUSTER_NAME=kuma-2 \
+  KUMA_MODE=zone \
+  K3D_HELM_DEPLOY_ADDITIONAL_SETTINGS="controlPlane.mode=zone controlPlane.zone=zone-1 controlPlane.kdsGlobalAddress=${GLOBAL_KDS} controlPlane.tls.kdsZoneClient.skipVerify=true" \
+  make k3d/deploy/helm
+```
+
+### Global + two zones
+
+```bash
+harness cluster global-two-zones-up kuma-1 kuma-2 kuma-3 zone-1 zone-2
+```
+
+Stop all:
+
+```bash
+KIND_CLUSTER_NAME=kuma-1 make k3d/stop
+KIND_CLUSTER_NAME=kuma-2 make k3d/stop
+KIND_CLUSTER_NAME=kuma-3 make k3d/stop
+```
+
+## Build and deploy local code changes
+
+The lifecycle script handles build, image load, and helm deploy in one step.
+
+For manual control:
+
+```bash
+make build
+K3D_HELM_DEPLOY_NO_CNI=true KIND_CLUSTER_NAME=kuma-1 make k3d/deploy/helm
+```
+
+## CRD updates
+
+After CRD/schema changes, force-update CRDs:
+
+Do not refresh CRDs with a bare `kubectl apply` during a tracked run. If CRDs changed, recreate the affected cluster profile with `harness cluster` and rerun `harness preflight`.
+
+## Gateway API CRDs
+
+Suites that test builtin gateways (MeshGateway, GatewayClass, HTTPRoute) or compare builtin vs delegated gateways need the Kubernetes Gateway API CRDs installed. These are not included in Kuma's CRD bundle - they come from the upstream `gateway-api` project.
+
+Check and install:
+
+```bash
+# Check if installed
+harness gateway --check-only
+
+# Install (idempotent - skips if already present)
+harness gateway
+```
+
+The script extracts the version from `go.mod` (`sigs.k8s.io/gateway-api`) to stay in sync with the Kuma codebase. It installs the standard CRDs: GatewayClass, Gateway, HTTPRoute, ReferenceGrant.
+
+Install on every cluster that needs it (in multi-zone setups, zones running builtin gateways need the CRDs).
+
+## Baseline readiness validation
+
+Before test execution, run `harness preflight` and `harness capture --label preflight` as described in [workflow.md](workflow.md). `harness preflight` now prepares the suite once for the active run: it materializes baseline manifests and group `## Configure` YAML into the active run's prepared manifests directory, validates them, applies baselines once, and writes the prepared-suite artifact before the readiness checks complete. Use those tracked artifacts instead of ad-hoc `kubectl` readiness checks or per-group manifest copying.
+
+## Notes
+
+- `harness cluster` auto-generates a temporary `mk/metallb-k3d-kuma-<n>.yaml` when missing for numeric cluster names like `kuma-3`.
+- Performance toggles are documented in [workflow.md](workflow.md) (performance toggles section).

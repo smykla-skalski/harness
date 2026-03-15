@@ -35,7 +35,7 @@ fn test_runner() -> RunnerHandoff<'static> {
         remaining_groups: vec!["g02".into(), "g03".into()],
         state_paths: vec![
             "/runs/r1/run-status.json".into(),
-            "/runs/r1/suite-runner-state.json".into(),
+            "/runs/r1/suite-run-state.json".into(),
         ],
     }
 }
@@ -323,10 +323,7 @@ fn check_session_start_compact_restores_author(project: &Path) {
 
     let pending = compact::pending_compact_handoff(project).expect("should be pending");
     let ctx = compact::render_hydration_context(&pending, &[]);
-    assert!(
-        ctx.contains("suite-author:"),
-        "should have authoring section"
-    );
+    assert!(ctx.contains("suite:new:"), "should have authoring section");
     assert!(ctx.contains("motb-core"), "should mention suite name");
 
     let result = Command::SessionStart {
