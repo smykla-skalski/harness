@@ -588,19 +588,17 @@ fn check_run_records_kubectl_with_active_run_kubeconfig() {
         run_root: None,
     };
 
-    unsafe {
-        harness_testkit::with_env_vars(&[("PATH", Some(&new_path))], || {
-            let result = record::execute(
-                None,
-                Some("verify"),
-                Some("check"),
-                None,
-                &["kubectl".into(), "get".into(), "pods".into()],
-                &args,
-            );
-            assert!(result.is_ok(), "record kubectl should succeed: {result:?}");
-        });
-    }
+    temp_env::with_vars([("PATH", Some(&new_path))], || {
+        let result = record::execute(
+            None,
+            Some("verify"),
+            Some("check"),
+            None,
+            &["kubectl".into(), "get".into(), "pods".into()],
+            &args,
+        );
+        assert!(result.is_ok(), "record kubectl should succeed: {result:?}");
+    });
 
     let artifacts: Vec<_> = fs::read_dir(run_dir.join("commands"))
         .unwrap()
@@ -630,19 +628,17 @@ fn check_record_rewrites_kubectl_to_tracked_kubeconfig() {
         run_root: None,
     };
 
-    unsafe {
-        harness_testkit::with_env_vars(&[("PATH", Some(&new_path))], || {
-            let result = record::execute(
-                None,
-                None,
-                None,
-                None,
-                &["kubectl".into(), "get".into(), "pods".into()],
-                &args,
-            );
-            assert!(result.is_ok());
-        });
-    }
+    temp_env::with_vars([("PATH", Some(&new_path))], || {
+        let result = record::execute(
+            None,
+            None,
+            None,
+            None,
+            &["kubectl".into(), "get".into(), "pods".into()],
+            &args,
+        );
+        assert!(result.is_ok());
+    });
 
     let artifacts: Vec<_> = fs::read_dir(run_dir.join("commands"))
         .unwrap()
@@ -672,26 +668,24 @@ fn check_record_rejects_kubectl_target_override() {
         run_root: None,
     };
 
-    unsafe {
-        harness_testkit::with_env_vars(&[("PATH", Some(&new_path))], || {
-            let result = record::execute(
-                None,
-                None,
-                None,
-                None,
-                &[
-                    "kubectl".into(),
-                    "--kubeconfig".into(),
-                    "/tmp/custom.conf".into(),
-                    "get".into(),
-                    "pods".into(),
-                ],
-                &args,
-            );
-            // record just runs the command - it doesn't reject overrides
-            assert!(result.is_ok());
-        });
-    }
+    temp_env::with_vars([("PATH", Some(&new_path))], || {
+        let result = record::execute(
+            None,
+            None,
+            None,
+            None,
+            &[
+                "kubectl".into(),
+                "--kubeconfig".into(),
+                "/tmp/custom.conf".into(),
+                "get".into(),
+                "pods".into(),
+            ],
+            &args,
+        );
+        // record just runs the command - it doesn't reject overrides
+        assert!(result.is_ok());
+    });
 }
 
 fn check_record_rejects_kubectl_without_tracked_cluster() {
@@ -709,19 +703,17 @@ fn check_record_rejects_kubectl_without_tracked_cluster() {
         run_root: None,
     };
 
-    unsafe {
-        harness_testkit::with_env_vars(&[("PATH", Some(&new_path))], || {
-            let result = record::execute(
-                None,
-                None,
-                None,
-                None,
-                &["kubectl".into(), "get".into(), "pods".into()],
-                &args,
-            );
-            assert!(result.is_ok());
-        });
-    }
+    temp_env::with_vars([("PATH", Some(&new_path))], || {
+        let result = record::execute(
+            None,
+            None,
+            None,
+            None,
+            &["kubectl".into(), "get".into(), "pods".into()],
+            &args,
+        );
+        assert!(result.is_ok());
+    });
 }
 
 fn check_record_kubectl_without_tracked_kubeconfig_fails_closed() {
@@ -739,19 +731,17 @@ fn check_record_kubectl_without_tracked_kubeconfig_fails_closed() {
         run_root: None,
     };
 
-    unsafe {
-        harness_testkit::with_env_vars(&[("PATH", Some(&new_path))], || {
-            let result = record::execute(
-                None,
-                None,
-                None,
-                None,
-                &["kubectl".into(), "get".into(), "namespaces".into()],
-                &args,
-            );
-            assert!(result.is_ok());
-        });
-    }
+    temp_env::with_vars([("PATH", Some(&new_path))], || {
+        let result = record::execute(
+            None,
+            None,
+            None,
+            None,
+            &["kubectl".into(), "get".into(), "namespaces".into()],
+            &args,
+        );
+        assert!(result.is_ok());
+    });
 }
 
 fn check_kumactl_build_runs_make_and_prints_binary() {
@@ -795,12 +785,10 @@ fn check_kumactl_build_runs_make_and_prints_binary() {
         repo_root: Some(repo_root.to_string_lossy().to_string()),
     };
 
-    unsafe {
-        harness_testkit::with_env_vars(&[("PATH", Some(&new_path))], || {
-            let result = kumactl::execute(&cmd);
-            assert!(result.is_ok(), "kumactl build should succeed: {result:?}");
-        });
-    }
+    temp_env::with_vars([("PATH", Some(&new_path))], || {
+        let result = kumactl::execute(&cmd);
+        assert!(result.is_ok(), "kumactl build should succeed: {result:?}");
+    });
 }
 
 fn check_bootstrap_command_runs_gateway_api_crd_install() {
@@ -820,16 +808,14 @@ fn check_bootstrap_command_runs_gateway_api_crd_install() {
     let orig_path = env::var("PATH").unwrap_or_default();
     let new_path = tc.path_with_prepend(&orig_path);
 
-    unsafe {
-        harness_testkit::with_env_vars(&[("PATH", Some(&new_path))], || {
-            let result = gateway::execute(
-                None,
-                Some(&repo_root.to_string_lossy()),
-                true, // check_only
-            );
-            assert!(result.is_ok(), "gateway check should succeed: {result:?}");
-        });
-    }
+    temp_env::with_vars([("PATH", Some(&new_path))], || {
+        let result = gateway::execute(
+            None,
+            Some(&repo_root.to_string_lossy()),
+            true, // check_only
+        );
+        assert!(result.is_ok(), "gateway check should succeed: {result:?}");
+    });
 }
 
 fn check_capture_uses_current_run_context() {
@@ -848,12 +834,10 @@ fn check_capture_uses_current_run_context() {
         run_root: None,
     };
 
-    unsafe {
-        harness_testkit::with_env_vars(&[("PATH", Some(&new_path))], || {
-            let result = capture::execute(Some("/tmp/fake-kubeconfig"), "pod-state", &args);
-            assert!(result.is_ok(), "capture should succeed: {result:?}");
-        });
-    }
+    temp_env::with_vars([("PATH", Some(&new_path))], || {
+        let result = capture::execute(Some("/tmp/fake-kubeconfig"), "pod-state", &args);
+        assert!(result.is_ok(), "capture should succeed: {result:?}");
+    });
 
     let state_dir = run_dir.join("state");
     let captures: Vec<_> = fs::read_dir(&state_dir)
@@ -874,28 +858,26 @@ fn check_record_isolates_run_context_by_session_id() {
     let dir_a = Mutex::new(PathBuf::new());
     let dir_b = Mutex::new(PathBuf::new());
 
-    unsafe {
-        let da = &dir_a;
-        harness_testkit::with_env_vars(
-            &[
-                ("XDG_DATA_HOME", Some(xdg.to_str().unwrap())),
-                ("CLAUDE_SESSION_ID", Some("session-alpha")),
-            ],
-            || {
-                *da.lock().unwrap() = core_defs::session_context_dir();
-            },
-        );
-        let db = &dir_b;
-        harness_testkit::with_env_vars(
-            &[
-                ("XDG_DATA_HOME", Some(xdg.to_str().unwrap())),
-                ("CLAUDE_SESSION_ID", Some("session-beta")),
-            ],
-            || {
-                *db.lock().unwrap() = core_defs::session_context_dir();
-            },
-        );
-    }
+    let da = &dir_a;
+    temp_env::with_vars(
+        [
+            ("XDG_DATA_HOME", Some(xdg.to_str().unwrap())),
+            ("CLAUDE_SESSION_ID", Some("session-alpha")),
+        ],
+        || {
+            *da.lock().unwrap() = core_defs::session_context_dir();
+        },
+    );
+    let db = &dir_b;
+    temp_env::with_vars(
+        [
+            ("XDG_DATA_HOME", Some(xdg.to_str().unwrap())),
+            ("CLAUDE_SESSION_ID", Some("session-beta")),
+        ],
+        || {
+            *db.lock().unwrap() = core_defs::session_context_dir();
+        },
+    );
 
     let a = dir_a.lock().unwrap().clone();
     let b = dir_b.lock().unwrap().clone();
@@ -914,29 +896,27 @@ fn check_authoring_begin_persists_suite_default_repo_root() {
 
     let xdg = tmp.path().join("xdg-begin");
 
-    unsafe {
-        harness_testkit::with_env_vars(
-            &[
-                ("XDG_DATA_HOME", Some(xdg.to_str().unwrap())),
-                ("CLAUDE_SESSION_ID", Some("authoring-begin-integ")),
-            ],
-            || {
-                let result = authoring_begin::execute(
-                    &repo_root.to_string_lossy(),
-                    "mesh",
-                    "interactive",
-                    &suite_dir.to_string_lossy(),
-                    "install",
-                );
-                assert!(result.is_ok(), "authoring_begin should succeed: {result:?}");
+    temp_env::with_vars(
+        [
+            ("XDG_DATA_HOME", Some(xdg.to_str().unwrap())),
+            ("CLAUDE_SESSION_ID", Some("authoring-begin-integ")),
+        ],
+        || {
+            let result = authoring_begin::execute(
+                &repo_root.to_string_lossy(),
+                "mesh",
+                "interactive",
+                &suite_dir.to_string_lossy(),
+                "install",
+            );
+            assert!(result.is_ok(), "authoring_begin should succeed: {result:?}");
 
-                let session = authoring::load_authoring_session().unwrap().unwrap();
-                assert_eq!(session.feature, "mesh");
-                assert_eq!(session.suite_name, "install");
-                assert!(!session.repo_root.is_empty());
-            },
-        );
-    }
+            let session = authoring::load_authoring_session().unwrap().unwrap();
+            assert_eq!(session.feature, "mesh");
+            assert_eq!(session.suite_name, "install");
+            assert!(!session.repo_root.is_empty());
+        },
+    );
 }
 
 fn check_authoring_save_accepts_inline_payload() {
@@ -947,33 +927,31 @@ fn check_authoring_save_accepts_inline_payload() {
     let suite_dir = tmp.path().join("suite");
     fs::create_dir_all(&suite_dir).unwrap();
 
-    unsafe {
-        harness_testkit::with_env_vars(
-            &[
-                ("XDG_DATA_HOME", Some(xdg.to_str().unwrap())),
-                ("CLAUDE_SESSION_ID", Some("authoring-save-inline")),
-            ],
-            || {
-                let _ = authoring_begin::execute(
-                    &repo_root.to_string_lossy(),
-                    "mesh",
-                    "interactive",
-                    &suite_dir.to_string_lossy(),
-                    "install",
-                );
+    temp_env::with_vars(
+        [
+            ("XDG_DATA_HOME", Some(xdg.to_str().unwrap())),
+            ("CLAUDE_SESSION_ID", Some("authoring-save-inline")),
+        ],
+        || {
+            let _ = authoring_begin::execute(
+                &repo_root.to_string_lossy(),
+                "mesh",
+                "interactive",
+                &suite_dir.to_string_lossy(),
+                "install",
+            );
 
-                let result = authoring_save::execute("inventory", Some(r#"{"files":[]}"#), None);
-                assert!(
-                    result.is_ok(),
-                    "save with inline payload should succeed: {result:?}"
-                );
+            let result = authoring_save::execute("inventory", Some(r#"{"files":[]}"#), None);
+            assert!(
+                result.is_ok(),
+                "save with inline payload should succeed: {result:?}"
+            );
 
-                let workspace = authoring::authoring_workspace_dir();
-                let saved = workspace.join("inventory.json");
-                assert!(saved.exists(), "inventory.json should be saved");
-            },
-        );
-    }
+            let workspace = authoring::authoring_workspace_dir();
+            let saved = workspace.join("inventory.json");
+            assert!(saved.exists(), "inventory.json should be saved");
+        },
+    );
 }
 
 fn check_authoring_save_accepts_stdin() {
@@ -986,27 +964,25 @@ fn check_authoring_save_accepts_stdin() {
     let input_file = tmp.path().join("input.json");
     fs::write(&input_file, r#"{"files":["a.yaml"]}"#).unwrap();
 
-    unsafe {
-        harness_testkit::with_env_vars(
-            &[
-                ("XDG_DATA_HOME", Some(xdg.to_str().unwrap())),
-                ("CLAUDE_SESSION_ID", Some("authoring-save-stdin")),
-            ],
-            || {
-                let _ = authoring_begin::execute(
-                    &repo_root.to_string_lossy(),
-                    "mesh",
-                    "interactive",
-                    &suite_dir.to_string_lossy(),
-                    "install",
-                );
+    temp_env::with_vars(
+        [
+            ("XDG_DATA_HOME", Some(xdg.to_str().unwrap())),
+            ("CLAUDE_SESSION_ID", Some("authoring-save-stdin")),
+        ],
+        || {
+            let _ = authoring_begin::execute(
+                &repo_root.to_string_lossy(),
+                "mesh",
+                "interactive",
+                &suite_dir.to_string_lossy(),
+                "install",
+            );
 
-                let result =
-                    authoring_save::execute("inventory", None, Some(input_file.to_str().unwrap()));
-                assert!(result.is_ok(), "save from file should succeed: {result:?}");
-            },
-        );
-    }
+            let result =
+                authoring_save::execute("inventory", None, Some(input_file.to_str().unwrap()));
+            assert!(result.is_ok(), "save from file should succeed: {result:?}");
+        },
+    );
 }
 
 fn check_authoring_save_rejects_schema_missing_fields() {
@@ -1017,26 +993,24 @@ fn check_authoring_save_rejects_schema_missing_fields() {
     let suite_dir = tmp.path().join("suite");
     fs::create_dir_all(&suite_dir).unwrap();
 
-    unsafe {
-        harness_testkit::with_env_vars(
-            &[
-                ("XDG_DATA_HOME", Some(xdg.to_str().unwrap())),
-                ("CLAUDE_SESSION_ID", Some("authoring-save-reject")),
-            ],
-            || {
-                let _ = authoring_begin::execute(
-                    &repo_root.to_string_lossy(),
-                    "mesh",
-                    "interactive",
-                    &suite_dir.to_string_lossy(),
-                    "install",
-                );
+    temp_env::with_vars(
+        [
+            ("XDG_DATA_HOME", Some(xdg.to_str().unwrap())),
+            ("CLAUDE_SESSION_ID", Some("authoring-save-reject")),
+        ],
+        || {
+            let _ = authoring_begin::execute(
+                &repo_root.to_string_lossy(),
+                "mesh",
+                "interactive",
+                &suite_dir.to_string_lossy(),
+                "install",
+            );
 
-                let result = authoring_save::execute("schema", Some(""), None);
-                assert!(result.is_err(), "empty payload should be rejected");
-            },
-        );
-    }
+            let result = authoring_save::execute("schema", Some(""), None);
+            assert!(result.is_err(), "empty payload should be rejected");
+        },
+    );
 }
 
 #[test]

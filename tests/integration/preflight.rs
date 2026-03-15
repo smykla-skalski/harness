@@ -13,7 +13,7 @@ use harness::kubectl_validate::{KubectlValidateDecision, KubectlValidateState};
 use harness::schema::GroupSpec;
 use harness::workflow::runner::{RunnerPhase, read_runner_state};
 use harness_testkit::{
-    FakeToolchain, GroupBuilder, RunDirBuilder, SuiteBuilder, init_run_with_suite, with_env_vars,
+    FakeToolchain, GroupBuilder, RunDirBuilder, SuiteBuilder, init_run_with_suite,
 };
 
 use super::helpers::*;
@@ -243,29 +243,27 @@ fn preflight_prepares_and_caches() {
     tc.add_kubectl("{}");
     let orig_path = env::var("PATH").unwrap_or_default();
 
-    unsafe {
-        with_env_vars(&[("PATH", Some(&tc.path_with_prepend(&orig_path)))], || {
-            let rda = RunDirArgs {
-                run_dir: Some(run_dir.clone()),
-                run_id: None,
-                run_root: None,
-            };
-            let result = preflight::execute(None, None, &rda);
-            assert!(
-                result.is_ok(),
-                "first preflight call should succeed: {result:?}"
-            );
-            assert_eq!(result.unwrap(), 0);
+    temp_env::with_vars([("PATH", Some(&tc.path_with_prepend(&orig_path)))], || {
+        let rda = RunDirArgs {
+            run_dir: Some(run_dir.clone()),
+            run_id: None,
+            run_root: None,
+        };
+        let result = preflight::execute(None, None, &rda);
+        assert!(
+            result.is_ok(),
+            "first preflight call should succeed: {result:?}"
+        );
+        assert_eq!(result.unwrap(), 0);
 
-            // Second call should also succeed (idempotent)
-            let result2 = preflight::execute(None, None, &rda);
-            assert!(
-                result2.is_ok(),
-                "second preflight call should succeed: {result2:?}"
-            );
-            assert_eq!(result2.unwrap(), 0);
-        });
-    }
+        // Second call should also succeed (idempotent)
+        let result2 = preflight::execute(None, None, &rda);
+        assert!(
+            result2.is_ok(),
+            "second preflight call should succeed: {result2:?}"
+        );
+        assert_eq!(result2.unwrap(), 0);
+    });
 }
 
 #[test]
@@ -295,21 +293,19 @@ fn preflight_skips_rejections() {
     tc.add_kubectl("{}");
     let orig_path = env::var("PATH").unwrap_or_default();
 
-    unsafe {
-        with_env_vars(&[("PATH", Some(&tc.path_with_prepend(&orig_path)))], || {
-            let rda = RunDirArgs {
-                run_dir: Some(run_dir.clone()),
-                run_id: None,
-                run_root: None,
-            };
-            let result = preflight::execute(None, None, &rda);
-            assert!(
-                result.is_ok(),
-                "preflight with rejections should succeed: {result:?}"
-            );
-            assert_eq!(result.unwrap(), 0);
-        });
-    }
+    temp_env::with_vars([("PATH", Some(&tc.path_with_prepend(&orig_path)))], || {
+        let rda = RunDirArgs {
+            run_dir: Some(run_dir.clone()),
+            run_id: None,
+            run_root: None,
+        };
+        let result = preflight::execute(None, None, &rda);
+        assert!(
+            result.is_ok(),
+            "preflight with rejections should succeed: {result:?}"
+        );
+        assert_eq!(result.unwrap(), 0);
+    });
 }
 
 #[test]
@@ -339,21 +335,19 @@ fn preflight_skips_inline_rejections() {
     tc.add_kubectl("{}");
     let orig_path = env::var("PATH").unwrap_or_default();
 
-    unsafe {
-        with_env_vars(&[("PATH", Some(&tc.path_with_prepend(&orig_path)))], || {
-            let rda = RunDirArgs {
-                run_dir: Some(run_dir.clone()),
-                run_id: None,
-                run_root: None,
-            };
-            let result = preflight::execute(None, None, &rda);
-            assert!(
-                result.is_ok(),
-                "preflight with inline rejections should succeed: {result:?}"
-            );
-            assert_eq!(result.unwrap(), 0);
-        });
-    }
+    temp_env::with_vars([("PATH", Some(&tc.path_with_prepend(&orig_path)))], || {
+        let rda = RunDirArgs {
+            run_dir: Some(run_dir.clone()),
+            run_id: None,
+            run_root: None,
+        };
+        let result = preflight::execute(None, None, &rda);
+        assert!(
+            result.is_ok(),
+            "preflight with inline rejections should succeed: {result:?}"
+        );
+        assert_eq!(result.unwrap(), 0);
+    });
 }
 
 #[test]
@@ -383,21 +377,19 @@ fn preflight_skips_frontmatter_rejections() {
     tc.add_kubectl("{}");
     let orig_path = env::var("PATH").unwrap_or_default();
 
-    unsafe {
-        with_env_vars(&[("PATH", Some(&tc.path_with_prepend(&orig_path)))], || {
-            let rda = RunDirArgs {
-                run_dir: Some(run_dir.clone()),
-                run_id: None,
-                run_root: None,
-            };
-            let result = preflight::execute(None, None, &rda);
-            assert!(
-                result.is_ok(),
-                "preflight with frontmatter rejections should succeed: {result:?}"
-            );
-            assert_eq!(result.unwrap(), 0);
-        });
-    }
+    temp_env::with_vars([("PATH", Some(&tc.path_with_prepend(&orig_path)))], || {
+        let rda = RunDirArgs {
+            run_dir: Some(run_dir.clone()),
+            run_id: None,
+            run_root: None,
+        };
+        let result = preflight::execute(None, None, &rda);
+        assert!(
+            result.is_ok(),
+            "preflight with frontmatter rejections should succeed: {result:?}"
+        );
+        assert_eq!(result.unwrap(), 0);
+    });
 }
 
 #[test]
@@ -419,21 +411,19 @@ fn preflight_applies_baselines() {
     tc.add_kubectl("{}");
     let orig_path = env::var("PATH").unwrap_or_default();
 
-    unsafe {
-        with_env_vars(&[("PATH", Some(&tc.path_with_prepend(&orig_path)))], || {
-            let rda = RunDirArgs {
-                run_dir: Some(run_dir.clone()),
-                run_id: None,
-                run_root: None,
-            };
-            let result = preflight::execute(None, None, &rda);
-            assert!(
-                result.is_ok(),
-                "preflight with baselines should succeed: {result:?}"
-            );
-            assert_eq!(result.unwrap(), 0);
-        });
-    }
+    temp_env::with_vars([("PATH", Some(&tc.path_with_prepend(&orig_path)))], || {
+        let rda = RunDirArgs {
+            run_dir: Some(run_dir.clone()),
+            run_id: None,
+            run_root: None,
+        };
+        let result = preflight::execute(None, None, &rda);
+        assert!(
+            result.is_ok(),
+            "preflight with baselines should succeed: {result:?}"
+        );
+        assert_eq!(result.unwrap(), 0);
+    });
 }
 
 #[test]
@@ -455,21 +445,19 @@ fn preflight_namespace_baseline() {
     tc.add_kubectl("{}");
     let orig_path = env::var("PATH").unwrap_or_default();
 
-    unsafe {
-        with_env_vars(&[("PATH", Some(&tc.path_with_prepend(&orig_path)))], || {
-            let rda = RunDirArgs {
-                run_dir: Some(run_dir.clone()),
-                run_id: None,
-                run_root: None,
-            };
-            let result = preflight::execute(None, None, &rda);
-            assert!(
-                result.is_ok(),
-                "preflight with namespace baseline should succeed: {result:?}"
-            );
-            assert_eq!(result.unwrap(), 0);
-        });
-    }
+    temp_env::with_vars([("PATH", Some(&tc.path_with_prepend(&orig_path)))], || {
+        let rda = RunDirArgs {
+            run_dir: Some(run_dir.clone()),
+            run_id: None,
+            run_root: None,
+        };
+        let result = preflight::execute(None, None, &rda);
+        assert!(
+            result.is_ok(),
+            "preflight with namespace baseline should succeed: {result:?}"
+        );
+        assert_eq!(result.unwrap(), 0);
+    });
 }
 
 #[test]
@@ -486,43 +474,41 @@ fn capture_uses_run_context() {
     let kc_path = tmp.path().join("kubeconfig");
     fs::write(&kc_path, "apiVersion: v1\nkind: Config\n").unwrap();
 
-    unsafe {
-        with_env_vars(&[("PATH", Some(&tc.path_with_prepend(&orig_path)))], || {
-            let rda = RunDirArgs {
-                run_dir: Some(run_dir.clone()),
-                run_id: None,
-                run_root: None,
-            };
-            let result = capture::execute(Some(&kc_path.to_string_lossy()), "post-deploy", &rda);
-            assert!(result.is_ok(), "capture should succeed: {result:?}");
-            assert_eq!(result.unwrap(), 0);
+    temp_env::with_vars([("PATH", Some(&tc.path_with_prepend(&orig_path)))], || {
+        let rda = RunDirArgs {
+            run_dir: Some(run_dir.clone()),
+            run_id: None,
+            run_root: None,
+        };
+        let result = capture::execute(Some(&kc_path.to_string_lossy()), "post-deploy", &rda);
+        assert!(result.is_ok(), "capture should succeed: {result:?}");
+        assert_eq!(result.unwrap(), 0);
 
-            // Verify kubectl was invoked
-            let invocations = tc.invocations("kubectl");
-            assert!(!invocations.is_empty(), "kubectl should have been invoked");
-            let invoc = invocations[0].to_lowercase();
-            assert!(
-                invoc.contains("get"),
-                "kubectl should have run get: {invoc}"
-            );
-            assert!(
-                invoc.contains("pods"),
-                "kubectl should have queried pods: {invoc}"
-            );
+        // Verify kubectl was invoked
+        let invocations = tc.invocations("kubectl");
+        assert!(!invocations.is_empty(), "kubectl should have been invoked");
+        let invoc = invocations[0].to_lowercase();
+        assert!(
+            invoc.contains("get"),
+            "kubectl should have run get: {invoc}"
+        );
+        assert!(
+            invoc.contains("pods"),
+            "kubectl should have queried pods: {invoc}"
+        );
 
-            // Verify state file was created
-            let state_dir = run_dir.join("state");
-            let entries: Vec<_> = fs::read_dir(&state_dir)
-                .unwrap()
-                .filter_map(Result::ok)
-                .filter(|e| e.file_name().to_string_lossy().starts_with("post-deploy-"))
-                .collect();
-            assert!(
-                !entries.is_empty(),
-                "capture should create a state file in {state_dir:?}"
-            );
-        });
-    }
+        // Verify state file was created
+        let state_dir = run_dir.join("state");
+        let entries: Vec<_> = fs::read_dir(&state_dir)
+            .unwrap()
+            .filter_map(Result::ok)
+            .filter(|e| e.file_name().to_string_lossy().starts_with("post-deploy-"))
+            .collect();
+        assert!(
+            !entries.is_empty(),
+            "capture should create a state file in {state_dir:?}"
+        );
+    });
 }
 
 #[test]
@@ -547,32 +533,30 @@ fn apply_reuses_prepared() {
     tc.add_kubectl("configmap/test configured");
     let orig_path = env::var("PATH").unwrap_or_default();
 
-    unsafe {
-        with_env_vars(&[("PATH", Some(&tc.path_with_prepend(&orig_path)))], || {
-            let rda = RunDirArgs {
-                run_dir: Some(run_dir.clone()),
-                run_id: None,
-                run_root: None,
-            };
-            let manifests = vec![manifest_path.to_string_lossy().to_string()];
-            let result = apply::execute(
-                Some(&kc_path.to_string_lossy()),
-                None,
-                &manifests,
-                Some("configure"),
-                &rda,
-            );
-            assert!(result.is_ok(), "apply should succeed: {result:?}");
-            assert_eq!(result.unwrap(), 0);
+    temp_env::with_vars([("PATH", Some(&tc.path_with_prepend(&orig_path)))], || {
+        let rda = RunDirArgs {
+            run_dir: Some(run_dir.clone()),
+            run_id: None,
+            run_root: None,
+        };
+        let manifests = vec![manifest_path.to_string_lossy().to_string()];
+        let result = apply::execute(
+            Some(&kc_path.to_string_lossy()),
+            None,
+            &manifests,
+            Some("configure"),
+            &rda,
+        );
+        assert!(result.is_ok(), "apply should succeed: {result:?}");
+        assert_eq!(result.unwrap(), 0);
 
-            // Verify kubectl was invoked with apply -f
-            let invocations = tc.invocations("kubectl");
-            assert!(!invocations.is_empty(), "kubectl should have been invoked");
-            let invoc = &invocations[0];
-            assert!(invoc.contains("apply"), "kubectl should run apply: {invoc}");
-            assert!(invoc.contains("-f"), "kubectl should use -f flag: {invoc}");
-        });
-    }
+        // Verify kubectl was invoked with apply -f
+        let invocations = tc.invocations("kubectl");
+        assert!(!invocations.is_empty(), "kubectl should have been invoked");
+        let invoc = &invocations[0];
+        assert!(invoc.contains("apply"), "kubectl should run apply: {invoc}");
+        assert!(invoc.contains("-f"), "kubectl should use -f flag: {invoc}");
+    });
 }
 
 #[test]
@@ -597,29 +581,27 @@ fn apply_validate_shorthand() {
     tc.add_kubectl("configmap/shorthand configured");
     let orig_path = env::var("PATH").unwrap_or_default();
 
-    unsafe {
-        with_env_vars(&[("PATH", Some(&tc.path_with_prepend(&orig_path)))], || {
-            let rda = RunDirArgs {
-                run_dir: Some(run_dir.clone()),
-                run_id: None,
-                run_root: None,
-            };
-            // Use the shorthand name (not full path) - resolve_manifest_path should find it
-            let manifests = vec!["g01-configure.yaml".to_string()];
-            let result = apply::execute(
-                Some(&kc_path.to_string_lossy()),
-                None,
-                &manifests,
-                None,
-                &rda,
-            );
-            assert!(
-                result.is_ok(),
-                "apply with shorthand should succeed: {result:?}"
-            );
-            assert_eq!(result.unwrap(), 0);
-        });
-    }
+    temp_env::with_vars([("PATH", Some(&tc.path_with_prepend(&orig_path)))], || {
+        let rda = RunDirArgs {
+            run_dir: Some(run_dir.clone()),
+            run_id: None,
+            run_root: None,
+        };
+        // Use the shorthand name (not full path) - resolve_manifest_path should find it
+        let manifests = vec!["g01-configure.yaml".to_string()];
+        let result = apply::execute(
+            Some(&kc_path.to_string_lossy()),
+            None,
+            &manifests,
+            None,
+            &rda,
+        );
+        assert!(
+            result.is_ok(),
+            "apply with shorthand should succeed: {result:?}"
+        );
+        assert_eq!(result.unwrap(), 0);
+    });
 }
 
 #[test]
@@ -642,41 +624,39 @@ fn validate_uses_api_version() {
     tc.add_kubectl("");
     let orig_path = env::var("PATH").unwrap_or_default();
 
-    unsafe {
-        with_env_vars(&[("PATH", Some(&tc.path_with_prepend(&orig_path)))], || {
-            let result = validate::execute(
-                Some(&kc_path.to_string_lossy()),
-                &manifest_path.to_string_lossy(),
-                None,
-            );
-            assert!(result.is_ok(), "validate should succeed: {result:?}");
-            assert_eq!(result.unwrap(), 0);
+    temp_env::with_vars([("PATH", Some(&tc.path_with_prepend(&orig_path)))], || {
+        let result = validate::execute(
+            Some(&kc_path.to_string_lossy()),
+            &manifest_path.to_string_lossy(),
+            None,
+        );
+        assert!(result.is_ok(), "validate should succeed: {result:?}");
+        assert_eq!(result.unwrap(), 0);
 
-            // Verify kubectl was invoked with explain and the api-version
-            let invocations = tc.invocations("kubectl");
-            assert!(
-                invocations.len() >= 2,
-                "kubectl should be invoked multiple times (explain + dry-run + diff): got {}",
-                invocations.len()
-            );
-            let explain_invoc = &invocations[0];
-            assert!(
-                explain_invoc.contains("explain"),
-                "first kubectl call should be explain: {explain_invoc}"
-            );
-            assert!(
-                explain_invoc.contains("kuma.io/v1alpha1"),
-                "explain should use the manifest's apiVersion: {explain_invoc}"
-            );
+        // Verify kubectl was invoked with explain and the api-version
+        let invocations = tc.invocations("kubectl");
+        assert!(
+            invocations.len() >= 2,
+            "kubectl should be invoked multiple times (explain + dry-run + diff): got {}",
+            invocations.len()
+        );
+        let explain_invoc = &invocations[0];
+        assert!(
+            explain_invoc.contains("explain"),
+            "first kubectl call should be explain: {explain_invoc}"
+        );
+        assert!(
+            explain_invoc.contains("kuma.io/v1alpha1"),
+            "explain should use the manifest's apiVersion: {explain_invoc}"
+        );
 
-            // Verify validation output file was created
-            let output_path = manifest_path.with_extension("validation.json");
-            assert!(
-                output_path.exists(),
-                "validation output should be written to {output_path:?}"
-            );
-        });
-    }
+        // Verify validation output file was created
+        let output_path = manifest_path.with_extension("validation.json");
+        assert!(
+            output_path.exists(),
+            "validation output should be written to {output_path:?}"
+        );
+    });
 }
 
 #[test]
@@ -693,25 +673,23 @@ fn preflight_failure_resets() {
     tc.add_kubectl("{}");
     let orig_path = env::var("PATH").unwrap_or_default();
 
-    unsafe {
-        with_env_vars(&[("PATH", Some(&tc.path_with_prepend(&orig_path)))], || {
-            let rda = RunDirArgs {
-                run_dir: Some(run_dir.clone()),
-                run_id: None,
-                run_root: None,
-            };
-            let result = preflight::execute(None, None, &rda);
-            assert!(result.is_ok(), "preflight should succeed: {result:?}");
+    temp_env::with_vars([("PATH", Some(&tc.path_with_prepend(&orig_path)))], || {
+        let rda = RunDirArgs {
+            run_dir: Some(run_dir.clone()),
+            run_id: None,
+            run_root: None,
+        };
+        let result = preflight::execute(None, None, &rda);
+        assert!(result.is_ok(), "preflight should succeed: {result:?}");
 
-            // Since preflight is minimal, runner state should remain at Bootstrap
-            let state_after = read_runner_state(&run_dir).unwrap().unwrap();
-            assert_eq!(
-                state_after.phase,
-                RunnerPhase::Bootstrap,
-                "runner phase should remain at Bootstrap since preflight is minimal"
-            );
-        });
-    }
+        // Since preflight is minimal, runner state should remain at Bootstrap
+        let state_after = read_runner_state(&run_dir).unwrap().unwrap();
+        assert_eq!(
+            state_after.phase,
+            RunnerPhase::Bootstrap,
+            "runner phase should remain at Bootstrap since preflight is minimal"
+        );
+    });
 }
 
 #[test]
@@ -727,41 +705,38 @@ fn capture_marks_preflight_complete() {
     tc.add_kubectl("{\"items\": []}");
     let orig_path = env::var("PATH").unwrap_or_default();
 
-    unsafe {
-        with_env_vars(&[("PATH", Some(&tc.path_with_prepend(&orig_path)))], || {
-            let rda = RunDirArgs {
-                run_dir: Some(run_dir.clone()),
-                run_id: None,
-                run_root: None,
-            };
+    temp_env::with_vars([("PATH", Some(&tc.path_with_prepend(&orig_path)))], || {
+        let rda = RunDirArgs {
+            run_dir: Some(run_dir.clone()),
+            run_id: None,
+            run_root: None,
+        };
 
-            // Run preflight first
-            let pf_result = preflight::execute(None, None, &rda);
-            assert!(pf_result.is_ok(), "preflight should succeed: {pf_result:?}");
+        // Run preflight first
+        let pf_result = preflight::execute(None, None, &rda);
+        assert!(pf_result.is_ok(), "preflight should succeed: {pf_result:?}");
 
-            // Then run capture
-            let cap_result =
-                capture::execute(Some(&kc_path.to_string_lossy()), "post-preflight", &rda);
-            assert!(cap_result.is_ok(), "capture should succeed: {cap_result:?}");
-            assert_eq!(cap_result.unwrap(), 0);
+        // Then run capture
+        let cap_result = capture::execute(Some(&kc_path.to_string_lossy()), "post-preflight", &rda);
+        assert!(cap_result.is_ok(), "capture should succeed: {cap_result:?}");
+        assert_eq!(cap_result.unwrap(), 0);
 
-            // Verify state file was created
-            let state_dir = run_dir.join("state");
-            let entries: Vec<_> = fs::read_dir(&state_dir)
-                .unwrap()
-                .filter_map(Result::ok)
-                .filter(|e| {
-                    e.file_name()
-                        .to_string_lossy()
-                        .starts_with("post-preflight-")
-                })
-                .collect();
-            assert!(
-                !entries.is_empty(),
-                "capture after preflight should create state file"
-            );
-        });
-    }
+        // Verify state file was created
+        let state_dir = run_dir.join("state");
+        let entries: Vec<_> = fs::read_dir(&state_dir)
+            .unwrap()
+            .filter_map(Result::ok)
+            .filter(|e| {
+                e.file_name()
+                    .to_string_lossy()
+                    .starts_with("post-preflight-")
+            })
+            .collect();
+        assert!(
+            !entries.is_empty(),
+            "capture after preflight should create state file"
+        );
+    });
 }
 
 #[test]
@@ -788,19 +763,17 @@ fn preflight_dependent_baselines() {
     tc.add_kubectl("{}");
     let orig_path = env::var("PATH").unwrap_or_default();
 
-    unsafe {
-        with_env_vars(&[("PATH", Some(&tc.path_with_prepend(&orig_path)))], || {
-            let rda = RunDirArgs {
-                run_dir: Some(run_dir.clone()),
-                run_id: None,
-                run_root: None,
-            };
-            let result = preflight::execute(None, None, &rda);
-            assert!(
-                result.is_ok(),
-                "preflight with dependent baselines should succeed: {result:?}"
-            );
-            assert_eq!(result.unwrap(), 0);
-        });
-    }
+    temp_env::with_vars([("PATH", Some(&tc.path_with_prepend(&orig_path)))], || {
+        let rda = RunDirArgs {
+            run_dir: Some(run_dir.clone()),
+            run_id: None,
+            run_root: None,
+        };
+        let result = preflight::execute(None, None, &rda);
+        assert!(
+            result.is_ok(),
+            "preflight with dependent baselines should succeed: {result:?}"
+        );
+        assert_eq!(result.unwrap(), 0);
+    });
 }

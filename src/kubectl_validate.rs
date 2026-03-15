@@ -220,9 +220,9 @@ mod tests {
     fn read_state_returns_none_when_file_missing() {
         // Point harness_data_root to a temp dir via XDG_DATA_HOME
         let dir = tempfile::tempdir().unwrap();
-        unsafe { env::set_var("XDG_DATA_HOME", dir.path()) };
-        let result = read_kubectl_validate_state().unwrap();
-        unsafe { env::remove_var("XDG_DATA_HOME") };
+        let result = temp_env::with_var("XDG_DATA_HOME", Some(dir.path()), || {
+            read_kubectl_validate_state().unwrap()
+        });
         assert!(result.is_none());
     }
 
@@ -238,9 +238,9 @@ mod tests {
         )
         .unwrap();
 
-        unsafe { env::set_var("XDG_DATA_HOME", dir.path()) };
-        let result = read_kubectl_validate_state().unwrap();
-        unsafe { env::remove_var("XDG_DATA_HOME") };
+        let result = temp_env::with_var("XDG_DATA_HOME", Some(dir.path()), || {
+            read_kubectl_validate_state().unwrap()
+        });
 
         let state = result.unwrap();
         assert_eq!(state.decision, KubectlValidateDecision::Installed);
@@ -251,13 +251,18 @@ mod tests {
     fn resolve_binary_returns_none_when_nothing_available() {
         // With a fake HOME and no HARNESS_KUBECTL_VALIDATE_BIN
         let dir = tempfile::tempdir().unwrap();
-        unsafe {
-            env::set_var("HOME", dir.path());
-            env::remove_var("HARNESS_KUBECTL_VALIDATE_BIN");
-            env::set_var("XDG_DATA_HOME", dir.path().join("xdg"));
-            env::set_var("PATH", dir.path().join("empty-bin"));
-        }
-        let result = resolve_kubectl_validate_binary();
+        let result = temp_env::with_vars(
+            [
+                ("HOME", Some(dir.path().to_str().unwrap())),
+                ("HARNESS_KUBECTL_VALIDATE_BIN", None::<&str>),
+                (
+                    "XDG_DATA_HOME",
+                    Some(dir.path().join("xdg").to_str().unwrap()),
+                ),
+                ("PATH", Some(dir.path().join("empty-bin").to_str().unwrap())),
+            ],
+            || resolve_kubectl_validate_binary(),
+        );
         assert!(result.is_none());
     }
 
@@ -268,9 +273,9 @@ mod tests {
         fs::write(&bin, "#!/bin/sh\n").unwrap();
         fs::set_permissions(&bin, fs::Permissions::from_mode(0o755)).unwrap();
 
-        unsafe { env::set_var("HARNESS_KUBECTL_VALIDATE_BIN", &bin) };
-        let result = resolve_kubectl_validate_binary();
-        unsafe { env::remove_var("HARNESS_KUBECTL_VALIDATE_BIN") };
+        let result = temp_env::with_var("HARNESS_KUBECTL_VALIDATE_BIN", Some(&bin), || {
+            resolve_kubectl_validate_binary()
+        });
 
         assert_eq!(result, Some(bin));
     }
