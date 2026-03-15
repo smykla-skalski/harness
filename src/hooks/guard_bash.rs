@@ -68,8 +68,10 @@ fn is_tracked_harness_subcommand(s: &str) -> bool {
             | "report"
             | "run"
             | "runner-state"
+            | "service"
             | "session-start"
             | "session-stop"
+            | "token"
             | "validate"
     )
 }
@@ -1017,5 +1019,35 @@ mod tests {
 
         let words: Vec<String> = vec!["ls", "-la"].into_iter().map(String::from).collect();
         assert!(!is_tracked_harness_command(&words));
+    }
+
+    #[test]
+    fn is_tracked_harness_subcommand_includes_token() {
+        assert!(is_tracked_harness_subcommand("token"));
+    }
+
+    #[test]
+    fn is_tracked_harness_subcommand_includes_service() {
+        assert!(is_tracked_harness_subcommand("service"));
+    }
+
+    #[test]
+    fn allows_harness_token_command() {
+        let c = ctx(
+            "suite:run",
+            "harness token dataplane --name demo --mesh default",
+        );
+        let r = execute(&c).unwrap();
+        assert_eq!(r.decision, Decision::Allow);
+    }
+
+    #[test]
+    fn allows_harness_service_command() {
+        let c = ctx(
+            "suite:run",
+            "harness service up demo --image kuma-dp:latest --port 5050",
+        );
+        let r = execute(&c).unwrap();
+        assert_eq!(r.decision, Decision::Allow);
     }
 }

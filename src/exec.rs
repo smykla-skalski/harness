@@ -1,9 +1,11 @@
 use std::collections::HashMap;
+use std::io::{self, BufRead, Read as _};
 use std::path::Path;
-use std::process::{Command, Output};
+use std::process::{Command, Output, Stdio};
+use std::thread;
 use std::time::Duration;
 
-use crate::core_defs::{CommandResult, merge_env};
+use crate::core_defs::{CommandResult, merge_env, utc_now};
 use crate::errors::{CliError, CliErrorKind};
 
 /// Run a command via `std::process::Command`, capturing stdout/stderr.
@@ -29,6 +31,141 @@ pub(crate) fn run_command(
         return Ok(result);
     }
     Err(CliErrorKind::command_failed(command_string(args)).with_details(failure_details(&result)))
+}
+
+/// Run a command that filters stderr for meaningful progress lines.
+///
+/// Pipes both stdout and stderr. Stderr is read line-by-line, filtered
+/// through [`is_progress_line`], and matching lines are printed to stderr
+/// with a timestamp prefix. The full stderr is captured in the result for
+/// error diagnostics.
+///
+/// # Errors
+/// Returns `CliError` if the exit code is not in `ok_exit_codes`.
+pub(crate) fn run_command_streaming(
+    args: &[&str],
+    cwd: Option<&Path>,
+    env: Option<&HashMap<String, String>>,
+    ok_exit_codes: &[i32],
+) -> Result<CommandResult, CliError> {
+    let (program, cmd_args) = args
+        .split_first()
+        .ok_or_else(|| CliError::from(CliErrorKind::EmptyCommandArgs))?;
+    let mut cmd = build_command(program, cmd_args, cwd, env);
+    cmd.stdout(Stdio::piped()).stderr(Stdio::piped());
+    let mut child = cmd.spawn().map_err(|e| {
+        CliErrorKind::command_failed(command_string(args)).with_details(e.to_string())
+    })?;
+
+    // Read stderr in a thread so we don't deadlock if both pipes fill.
+    let stderr_handle = child.stderr.take();
+    let stderr_thread = thread::spawn(move || {
+        let mut captured = String::new();
+        if let Some(pipe) = stderr_handle {
+            let reader = io::BufReader::new(pipe);
+            #[allow(clippy::lines_filter_map_ok)]
+            for line in reader.lines() {
+                let Ok(line) = line else { break };
+                if let Some(msg) = filter_progress_line(&line) {
+                    let ts = utc_now();
+                    eprintln!("    {ts} {msg}");
+                }
+                captured.push_str(&line);
+                captured.push('\n');
+            }
+        }
+        captured
+    });
+
+    let stdout = {
+        let mut buf = Vec::new();
+        if let Some(mut pipe) = child.stdout.take() {
+            pipe.read_to_end(&mut buf).ok();
+        }
+        String::from_utf8_lossy(&buf).into_owned()
+    };
+
+    let status = child.wait().map_err(|e| {
+        CliErrorKind::command_failed(command_string(args)).with_details(e.to_string())
+    })?;
+    let stderr = stderr_thread.join().unwrap_or_default();
+
+    let result = CommandResult {
+        args: args.iter().map(|s| (*s).to_string()).collect(),
+        returncode: status.code().unwrap_or(-1),
+        stdout,
+        stderr,
+    };
+    if ok_exit_codes.contains(&result.returncode) {
+        return Ok(result);
+    }
+    Err(CliErrorKind::command_failed(command_string(args)).with_details(failure_details(&result)))
+}
+
+/// Decide if a stderr line from a subprocess is worth showing as progress.
+///
+/// Returns a short cleaned-up message for important lines, `None` for noise.
+fn filter_progress_line(line: &str) -> Option<String> {
+    let trimmed = line.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+    let lower = trimmed.to_lowercase();
+
+    // k3d lifecycle
+    if lower.contains("creating cluster")
+        || lower.contains("cluster created")
+        || lower.contains("deleting cluster")
+        || lower.contains("cluster deleted")
+        || lower.contains("starting cluster")
+        || lower.contains("cluster started")
+        || lower.contains("preparing nodes")
+        || lower.contains("creating node")
+        || lower.contains("pulling image")
+        || lower.contains("importing image")
+        || lower.contains("starting helpers")
+        || lower.contains("injecting records")
+        || lower.contains("kubeconfig")
+        || lower.contains("successfully created")
+    {
+        return Some(trimmed.to_string());
+    }
+
+    // helm lifecycle
+    if lower.contains("installing")
+        || lower.contains("deployed")
+        || lower.contains("status: ")
+        || lower.contains("name: ")
+        || lower.contains("upgrading")
+        || lower.contains("release")
+        || lower.contains("waiting for")
+        || lower.contains("ready")
+        || lower.contains("timed out")
+        || lower.contains("rollback")
+    {
+        return Some(trimmed.to_string());
+    }
+
+    // kubectl apply / wait
+    if lower.contains("configured")
+        || lower.contains("created")
+        || lower.contains("unchanged")
+        || lower.contains("condition met")
+    {
+        return Some(trimmed.to_string());
+    }
+
+    // errors and warnings always pass through
+    if lower.starts_with("error")
+        || lower.starts_with("warning")
+        || lower.starts_with("fatal")
+        || lower.contains("failed")
+        || lower.contains("err:")
+    {
+        return Some(trimmed.to_string());
+    }
+
+    None
 }
 
 fn build_command(
