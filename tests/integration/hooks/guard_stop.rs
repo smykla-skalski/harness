@@ -10,7 +10,7 @@ use super::super::helpers::*;
 
 #[test]
 fn guard_stop_retires_active_skill() {
-    let mut ctx = make_hook_context("suite-runner", make_stop_payload());
+    let mut ctx = make_hook_context("suite:run", make_stop_payload());
     ctx.skill_active = false;
     let r = guard_stop::execute(&ctx).unwrap();
     assert_allow(&r);
@@ -21,7 +21,7 @@ fn guard_stop_denies_pending_closeout() {
     let tmp = tempfile::tempdir().unwrap();
     let run_dir = init_run(tmp.path(), "run-1", "single-zone");
     let payload = make_stop_payload();
-    let ctx = make_hook_context_with_run("suite-runner", payload, &run_dir);
+    let ctx = make_hook_context_with_run("suite:run", payload, &run_dir);
     let r = guard_stop::execute(&ctx).unwrap();
     // Pending verdict should be denied
     assert_deny(&r);
@@ -37,7 +37,7 @@ fn guard_stop_allows_aborted() {
     status.last_state_capture = Some("state/capture.json".to_string());
     write_run_status(&run_dir, &status);
     let payload = make_stop_payload();
-    let ctx = make_hook_context_with_run("suite-runner", payload, &run_dir);
+    let ctx = make_hook_context_with_run("suite:run", payload, &run_dir);
     let r = guard_stop::execute(&ctx).unwrap();
     assert_allow(&r);
 }
@@ -52,7 +52,7 @@ fn guard_stop_denies_no_state_capture() {
     status.last_state_capture = None;
     write_run_status(&run_dir, &status);
     let payload = make_stop_payload();
-    let ctx = make_hook_context_with_run("suite-runner", payload, &run_dir);
+    let ctx = make_hook_context_with_run("suite:run", payload, &run_dir);
     let r = guard_stop::execute(&ctx).unwrap();
     assert_deny(&r);
 }
@@ -66,14 +66,14 @@ fn guard_stop_allows_with_verdict_and_capture() {
     status.last_state_capture = Some("state/capture.json".to_string());
     write_run_status(&run_dir, &status);
     let payload = make_stop_payload();
-    let ctx = make_hook_context_with_run("suite-runner", payload, &run_dir);
+    let ctx = make_hook_context_with_run("suite:run", payload, &run_dir);
     let r = guard_stop::execute(&ctx).unwrap();
     assert_allow(&r);
 }
 
 #[test]
 fn guard_stop_allows_inactive() {
-    let ctx = make_hook_context("suite-runner", make_stop_payload());
+    let ctx = make_hook_context("suite:run", make_stop_payload());
     // Without a run context, guard-stop allows (no run to protect)
     let r = guard_stop::execute(&ctx).unwrap();
     assert_allow(&r);

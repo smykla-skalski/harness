@@ -18,7 +18,7 @@ use super::super::helpers::*;
 // validate-agent tests
 // ============================================================================
 
-// validate-agent for suite-author checks last_assistant_message ends with "saved"
+// validate-agent for suite:new checks last_assistant_message ends with "saved"
 #[test]
 fn validate_agent_rejects_not_at_end() {
     let payload = HookEnvelopePayload {
@@ -33,7 +33,7 @@ fn validate_agent_rejects_not_at_end() {
         stop_hook_active: false,
         raw_keys: vec![],
     };
-    let ctx = make_hook_context("suite-author", payload);
+    let ctx = make_hook_context("suite:new", payload);
     let r = validate_agent::execute(&ctx).unwrap();
     // "saved" is not at the end, so should warn
     assert_warn(&r);
@@ -51,7 +51,7 @@ fn validate_agent_accepts_at_end() {
         stop_hook_active: false,
         raw_keys: vec![],
     };
-    let ctx = make_hook_context("suite-author", payload);
+    let ctx = make_hook_context("suite:new", payload);
     let r = validate_agent::execute(&ctx).unwrap();
     assert_allow(&r);
 }
@@ -68,7 +68,7 @@ fn validate_agent_trailing_period() {
         stop_hook_active: false,
         raw_keys: vec![],
     };
-    let ctx = make_hook_context("suite-author", payload);
+    let ctx = make_hook_context("suite:new", payload);
     let r = validate_agent::execute(&ctx).unwrap();
     assert_allow(&r);
 }
@@ -82,7 +82,7 @@ fn context_agent_requires_preflight() {
     let tmp = tempfile::tempdir().unwrap();
     let run_dir = init_run(tmp.path(), "run-1", "single-zone");
     let payload = make_empty_payload();
-    let ctx = make_hook_context_with_run("suite-runner", payload, &run_dir);
+    let ctx = make_hook_context_with_run("suite:run", payload, &run_dir);
     let r = context_agent::execute(&ctx).unwrap();
     // Context agent should check preflight state - it should deny if not ready
     assert!(
@@ -110,7 +110,7 @@ fn context_agent_preflight_ready() {
     };
     runner_workflow::write_runner_state(&run_dir, &state).unwrap();
     let payload = make_empty_payload();
-    let ctx = make_hook_context_with_run("suite-runner", payload, &run_dir);
+    let ctx = make_hook_context_with_run("suite:run", payload, &run_dir);
     let r = context_agent::execute(&ctx).unwrap();
     assert!(r.decision == Decision::Allow || r.decision == Decision::Info);
 }
@@ -121,7 +121,7 @@ fn context_agent_preflight_ready() {
 
 #[test]
 fn enrich_failure_no_run() {
-    let ctx = make_hook_context("suite-runner", make_empty_payload());
+    let ctx = make_hook_context("suite:run", make_empty_payload());
     let r = enrich_failure::execute(&ctx).unwrap();
     assert_allow(&r);
 }
@@ -132,49 +132,49 @@ fn enrich_failure_no_run() {
 
 #[test]
 fn hook_context_command_words_empty() {
-    let ctx = make_hook_context("suite-runner", make_empty_payload());
+    let ctx = make_hook_context("suite:run", make_empty_payload());
     assert!(ctx.command_words().is_empty());
 }
 
 #[test]
 fn hook_context_command_words_splits() {
-    let ctx = make_hook_context("suite-runner", make_bash_payload("echo hello world"));
+    let ctx = make_hook_context("suite:run", make_bash_payload("echo hello world"));
     assert_eq!(ctx.command_words(), vec!["echo", "hello", "world"]);
 }
 
 #[test]
 fn hook_context_write_paths_empty() {
-    let ctx = make_hook_context("suite-runner", make_empty_payload());
+    let ctx = make_hook_context("suite:run", make_empty_payload());
     assert!(ctx.write_paths().is_empty());
 }
 
 #[test]
 fn hook_context_write_paths_single() {
-    let ctx = make_hook_context("suite-runner", make_write_payload("/tmp/test.txt"));
+    let ctx = make_hook_context("suite:run", make_write_payload("/tmp/test.txt"));
     assert_eq!(ctx.write_paths(), vec![Path::new("/tmp/test.txt")]);
 }
 
 #[test]
 fn hook_context_question_prompts_empty() {
-    let ctx = make_hook_context("suite-runner", make_empty_payload());
+    let ctx = make_hook_context("suite:run", make_empty_payload());
     assert!(ctx.question_prompts().is_empty());
 }
 
 #[test]
 fn hook_context_last_assistant_message_default() {
-    let ctx = make_hook_context("suite-runner", make_empty_payload());
+    let ctx = make_hook_context("suite:run", make_empty_payload());
     assert_eq!(ctx.last_assistant_message(), "");
 }
 
 #[test]
 fn hook_context_stop_hook_active() {
-    let ctx = make_hook_context("suite-runner", make_stop_payload());
+    let ctx = make_hook_context("suite:run", make_stop_payload());
     assert!(ctx.stop_hook_active());
 }
 
 #[test]
 fn hook_context_skill_active_default() {
-    let ctx = make_hook_context("suite-runner", make_empty_payload());
+    let ctx = make_hook_context("suite:run", make_empty_payload());
     assert!(ctx.skill_active);
-    assert_eq!(ctx.active_skill.as_deref(), Some("suite-runner"));
+    assert_eq!(ctx.active_skill.as_deref(), Some("suite:run"));
 }

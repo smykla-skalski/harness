@@ -6,6 +6,7 @@ use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
 
 use crate::errors::{CliError, CliErrorKind, cow};
+use crate::rules::skill_dirs;
 
 /// Author approval mode.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -152,7 +153,7 @@ pub fn author_state_path() -> Result<PathBuf, CliError> {
     let cwd = env::current_dir().map_err(|e| -> CliError {
         CliErrorKind::workflow_io(cow!("failed to determine current directory: {e}")).into()
     })?;
-    Ok(cwd.join(".harness").join("suite-author-state.json"))
+    Ok(cwd.join(".harness").join(skill_dirs::NEW_STATE_FILE))
 }
 
 /// Read author state from disk.
@@ -218,10 +219,10 @@ pub fn can_write(state: &AuthorWorkflowState) -> Result<(), &'static str> {
             Err("the saved suite is already approved; request changes before editing it again")
         }
         AuthorPhase::Cancelled => {
-            Err("the suite-author flow was cancelled; restart authoring before writing again")
+            Err("the suite:new flow was cancelled; restart authoring before writing again")
         }
         AuthorPhase::Discovery => {
-            Err("suite-author is still collecting context before the first review gate")
+            Err("suite:new is still collecting context before the first review gate")
         }
     }
 }
@@ -297,10 +298,10 @@ impl fmt::Display for AuthorNextAction {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(match self {
             Self::ReloadState => {
-                "Reload the saved suite-author state before continuing."
+                "Reload the saved suite:new state before continuing."
             }
             Self::ContinueBypass => {
-                "Continue suite-author in bypass mode using the saved authoring payloads."
+                "Continue suite:new in bypass mode using the saved authoring payloads."
             }
             Self::ResumeDiscovery => {
                 "Resume discovery and proposal preparation before reopening review."
@@ -318,7 +319,7 @@ impl fmt::Display for AuthorNextAction {
                 "Resume the post-write review loop and ask the post-write gate question before stopping."
             }
             Self::Stopped => {
-                "The suite-author flow was cancelled. Do not write more files unless restarted."
+                "The suite:new flow was cancelled. Do not write more files unless restarted."
             }
             Self::OfferCopyGate => {
                 "The suite is approved. Offer the copy gate or stop the skill."
@@ -352,7 +353,7 @@ pub fn next_action(state: Option<&AuthorWorkflowState>) -> AuthorNextAction {
     }
 }
 
-/// Check if a path is allowed for suite-author writes.
+/// Check if a path is allowed for suite:new writes.
 #[must_use]
 pub fn suite_author_path_allowed(path: &Path, suite_dir: &Path) -> bool {
     if path == suite_dir.join("suite.md") {

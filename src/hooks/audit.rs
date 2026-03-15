@@ -4,8 +4,8 @@ use crate::hook_payloads::HookContext;
 
 /// Execute the audit hook.
 ///
-/// Logs suite-author hook debug info without affecting the main hook decision.
-/// For suite-runner or inactive contexts, allow unconditionally.
+/// Logs suite:new hook debug info without affecting the main hook decision.
+/// For suite:run or inactive contexts, allow unconditionally.
 ///
 /// # Errors
 /// Returns `CliError` on failure.
@@ -46,7 +46,7 @@ mod tests {
     // -- Python: test_audit_is_silent_suite_runner --
     #[test]
     fn is_silent_suite_runner() {
-        let c = ctx_audit("suite-runner");
+        let c = ctx_audit("suite:run");
         let result = execute(&c).unwrap();
         assert_eq!(result.decision, Decision::Allow);
         assert!(result.code.is_empty());
@@ -55,7 +55,7 @@ mod tests {
     // -- Python: test_audit_is_silent_suite_author --
     #[test]
     fn is_silent_suite_author() {
-        let c = ctx_audit("suite-author");
+        let c = ctx_audit("suite:new");
         let result = execute(&c).unwrap();
         assert_eq!(result.decision, Decision::Allow);
         assert!(result.code.is_empty());
@@ -63,7 +63,7 @@ mod tests {
 
     #[test]
     fn allows_inactive_skill() {
-        let mut c = ctx_audit("suite-runner");
+        let mut c = ctx_audit("suite:run");
         c.skill_active = false;
         let result = execute(&c).unwrap();
         assert_eq!(result.decision, Decision::Allow);

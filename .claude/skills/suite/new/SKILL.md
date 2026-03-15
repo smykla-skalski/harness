@@ -1,0 +1,438 @@
+---
+name: new
+description: >-
+  Generate test suites for suite:run by reading Kuma source code.
+  Produces ready-to-run suites with manifests, validation steps, and expected outcomes.
+  Use when creating a new test suite for a Kuma feature, converting a PR into a test plan,
+  building regression tests from source code, or when the user asks for test coverage,
+  a test plan, or wants to write tests for any Kuma policy or feature.
+argument-hint: "<feature-name> [--repo /path/to/kuma] [--mode generate|wizard] [--from-pr PR_URL] [--from-branch BRANCH] [--suite-name NAME] [--yes|-y]"
+allowed-tools: AskUserQuestion, Bash, Edit, Glob, Grep, Read, Task, Write
+user-invocable: true
+disable-model-invocation: true
+hooks:
+  PreToolUse:
+    - matcher: "AskUserQuestion"
+      hooks:
+        - type: command
+          command: "harness hook --skill suite:new guard-question"
+    - matcher: "Bash"
+      hooks:
+        - type: command
+          command: "harness hook --skill suite:new guard-bash"
+    - matcher: "Edit"
+      hooks:
+        - type: command
+          command: "harness hook --skill suite:new guard-write"
+    - matcher: "Write"
+      hooks:
+        - type: command
+          command: "harness hook --skill suite:new guard-write"
+  PostToolUse:
+    - matcher: "AskUserQuestion"
+      hooks:
+        - type: command
+          command: "harness hook --skill suite:new verify-question"
+        - type: command
+          command: "harness hook --skill suite:new audit"
+    - matcher: "Bash"
+      hooks:
+        - type: command
+          command: "harness hook --skill suite:new audit"
+    - matcher: "Edit"
+      hooks:
+        - type: command
+          command: "harness hook --skill suite:new verify-write"
+        - type: command
+          command: "harness hook --skill suite:new audit"
+    - matcher: "Write"
+      hooks:
+        - type: command
+          command: "harness hook --skill suite:new verify-write"
+        - type: command
+          command: "harness hook --skill suite:new audit"
+  PostToolUseFailure:
+    - matcher: "Bash"
+      hooks:
+        - type: command
+          command: "harness hook --skill suite:new audit"
+  Stop:
+    - hooks:
+        - type: command
+          command: "harness hook --skill suite:new guard-stop"
+---
+
+<!-- justify: I23 harness is installed on PATH by project SessionStart hooks, not bundled as a script -->
+<!-- justify: HK-stdin harness reads hook stdin internally via its Python hook dispatcher -->
+<!-- justify: HK-loop harness has internal re-entry guards in its hook dispatcher -->
+<!-- justify: HK-resolve harness is installed on PATH by SessionStart hooks at runtime, not bundled as a script -->
+
+# Kuma suite author
+
+Generate test suites for `suite:run` by reading Kuma source code and emitting ready-to-run manifests, commands, and variant coverage.
+
+Not designed for running suites (use `/suite:run`), editing existing suites, or generating non-Kuma test plans, because authoring and execution need different guardrails.
+
+This repo-local skill routes every hook through `harness hook --skill suite:new <hook-name>`, using the bare `harness` command installed by project `SessionStart` hooks.
+
+## Compact recovery
+
+If Claude Code resumes this skill after compaction, trust the injected `SessionStart(compact)` handoff as the authoritative summary of the saved authoring workspace, approval phase, and cached worker outputs. Resume the exact review gate or writer/edit round described there. Do not rerun discovery or reinitialize approval unless the handoff explicitly says the saved state diverged and names the files that must be reloaded first.
+
+## Arguments
+
+Parse from `$ARGUMENTS`:
+
+| Argument | Default | Purpose |
+| --- | --- | --- |
+| (positional) | - | Feature or policy name (e.g., `meshretry`, `meshtrace`) |
+| `--repo` | auto-detect cwd | Path to Kuma repo checkout |
+| `--mode` | `generate` | `generate` (full AI) or `wizard` (interactive step-by-step) |
+| `--from-pr` | - | GitHub PR URL to scope the feature from |
+| `--from-branch` | - | Git branch to diff against master for scope |
+| `--suite-name` | derived from feature | Override suite name (must follow `{feature}-{scope}` pattern) |
+| `--yes`, `-y` | false | Run approval state in bypass mode, skip all AskUserQuestion review loops, and skip the final copy prompt |
+
+## Preprocessed context
+
+- Data directory: !`echo "${XDG_DATA_HOME:-$HOME/.local/share}/kuma/suites"`
+- Current repo root: !`git rev-parse --show-toplevel 2>/dev/null || echo "not in a git repo"`
+- Existing suites: !`ls -1 "${XDG_DATA_HOME:-$HOME/.local/share}/kuma/suites" 2>/dev/null | head -20 || echo "none yet"`
+
+## Workflow - generate mode (default, `--mode generate`)
+
+### Step 0: Local validator gate
+
+Before any Bash commands, writes, or canonical review prompts, check whether the suite:new local validator decision is still unresolved.
+
+If unresolved, ask exactly one AskUserQuestion using:
+
+- Header: `Validation`
+- Question head: `suite:new/kubectl-validate: install local validator?`
+- Options: `Install kubectl-validate` and `Skip local validator`
+
+The prompt body must explain the tradeoff clearly:
+
+- Installing the `kubectl-validate` plugin enables `kubectl validate --local-crds deployments/charts/kuma/crds` against the checked-in CRDs in this repo.
+- Skipping it means suite:new falls back to Markdown and shape checks only, so CRD/schema mistakes can survive until later runner or cluster feedback.
+
+If the user approves installation, let the hook install it automatically. If the user skips it, continue authoring with the weaker safety bar and do not try to replace that local CRD validation with a live cluster. This gate is not bypassed by `--yes` or `-y`.
+
+### Step 1: Resolve paths
+
+Use the pre-resolved data directory and repo root from the preprocessed context above. Do not eagerly create `DATA_DIR` here; `harness authoring-begin` creates the concrete suite directory when authoring starts.
+
+Resolve `REPO_ROOT`: `--repo` flag > pre-resolved repo root (if in a git repo) > check if cwd has `go.mod` with `kumahq/kuma` > fail with message.
+
+### Step 2: Check worktree and branch
+
+Run `git rev-parse --show-toplevel` and `git branch --show-current` in `REPO_ROOT`.
+
+Use AskUserQuestion showing the detected path and branch in the description (e.g., `~/Projects/kuma on feat/meshretry`). Options:
+
+- "Yes, correct"
+- "Switch to a different worktree or branch"
+
+If wrong location: run `git worktree list` and `git branch --list`, then present available worktrees and branches via AskUserQuestion. After selection, update `REPO_ROOT` or run `git checkout` accordingly.
+
+### Step 3: Scope the feature
+
+Identify what code to read based on the input:
+
+- **From feature name** (default): use Glob to find `pkg/plugins/policies/*<name>*/` directories. Read the API spec, plugin.go, validator.go, and test fixtures. Use Grep to search for the feature name in non-policy paths if no policy dir matches.
+- **From PR URL** (`--from-pr`): run `gh pr diff <number> --repo kumahq/kuma` to identify changed files.
+- **From branch** (`--from-branch`): run `git diff master...<branch> --name-only` to identify changed files.
+
+Handle ambiguity with AskUserQuestion:
+
+- Multiple policy dirs match the feature name - ask which one to use.
+- Feature type unclear (policy vs non-policy) - ask the user.
+- PR diff touches files outside the expected scope - ask whether to include them.
+
+**Error cases**: if the feature name matches no policy dir and Grep finds nothing, ask for the exact path or a more specific name. If a PR URL returns a 404 or `gh` fails, fall back to a branch name or feature name.
+
+### Step 4: Derive suite identity and initialize authoring state
+
+Read [references/suite-structure.md](references/suite-structure.md) before deriving the suite name.
+
+Derive the suite name following the `{feature}-{scope}` pattern before any workers run:
+
+- Full-surface suites use `{feature}-core`; focused suites use `{feature}-{aspect}`.
+- For PRs, branches, or bugfixes, derive from the affected feature area rather than the branch name.
+
+Reject generic names like `test-suite-1`, `full`, `feature-branch`, `my-test`. The `--suite-name` flag overrides derivation.
+
+```bash
+SUITE_NAME="${SUITE_NAME:-<derived-per-rules-above>}"
+SUITE_DIR="${DATA_DIR}/${SUITE_NAME}"
+APPROVAL_MODE="${APPROVAL_MODE:-interactive}"
+```
+
+If `--yes` or `-y` is set, change `APPROVAL_MODE` to `bypass` before calling `authoring-begin` and `approval-begin`.
+
+Immediately initialize the internal authoring workspace:
+
+```bash
+harness authoring-begin \
+  --skill suite:new \
+  --repo-root "${REPO_ROOT}" \
+  --feature "${FEATURE}" \
+  --mode "${APPROVAL_MODE}" \
+  --suite-dir "${SUITE_DIR}" \
+  --suite-name "${SUITE_NAME}"
+```
+
+Then save the scoped file inventory from step 3 with `harness authoring-save --kind inventory` using this exact payload shape:
+
+```json
+{
+  "scoped_files": [
+    "/abs/path/to/file.go",
+    "/abs/path/to/validator.go"
+  ]
+}
+```
+
+If the suite name or directory changes later, rerun `authoring-begin` and then resave the inventory before any workers continue.
+
+### Step 5: Launch parallel discovery workers
+
+Read [references/code-reading-guide.md](references/code-reading-guide.md), [references/variant-detection.md](references/variant-detection.md), and [references/agent-output-format.md](references/agent-output-format.md) before constructing worker prompts.
+
+Launch these project subagents in parallel:
+
+- [../../agents/coverage-reader.md](../../agents/coverage-reader.md) for G1-G7 group material and evidence coverage
+- [../../agents/variant-analyzer.md](../../agents/variant-analyzer.md) for S1-S7 variant signals
+- [../../agents/schema-verifier.md](../../agents/schema-verifier.md) for manifest and validation constraints
+
+Worker contract:
+
+- Pass `REPO_ROOT`, the scoped file list from step 3, the feature name, and only the references needed for that worker.
+- Follow [references/agent-output-format.md](references/agent-output-format.md) for the exact payload schema, save path, and acknowledgement contract for each worker kind.
+
+After all workers finish, load the saved payloads with `harness authoring-show --kind inventory|coverage|variants|schema`.
+
+If any worker result is missing, malformed, or clearly incomplete, rerun only that worker instead of continuing with gaps.
+
+### Step 6: Build the proposal from saved worker outputs
+
+Read [references/suite-structure.md](references/suite-structure.md) for the format spec.
+Read [examples/example-motb-core-suite.md](examples/example-motb-core-suite.md) for a worked example of the suite format.
+Read [examples/example-motb-core-group.md](examples/example-motb-core-group.md) for the expected group file structure.
+
+Build the proposal from the saved worker outputs:
+
+- Use coverage data to decide which base groups G1-G7 have enough evidence.
+- Use variant signals to propose G8+ groups and to decide which signals are strong, moderate, or weak.
+- Use schema facts to constrain manifests from the start, but treat them as planning input only.
+- If the local validator was installed, validate authored manifests locally with `harness authoring-validate` before stopping. That command runs `kubectl validate --local-crds deployments/charts/kuma/crds` against the checked-in CRDs from this repo, so do not defer first validation to a live cluster.
+- Save the merged proposal with `harness authoring-save --kind proposal`.
+
+Variant review rules:
+
+- Present strong signals pre-selected.
+- Present moderate signals as selectable `[uncertain]` entries with evidence.
+- Mention weak signals in the description only.
+
+If no variants survive review, continue with G1-G7 only.
+
+Proposal rules:
+
+- Default every cluster-interacting command to full `harness` invocations. Only keep raw `kubectl`, `kumactl`, `curl`, or similar commands when the user explicitly asked for raw commands.
+- Follow [references/suite-structure.md](references/suite-structure.md) for file ownership, naming, and manifest conventions.
+- Add `gateway-api-crds` when proposed groups touch `MeshGateway`, `GatewayClass`, `Gateway`, or `HTTPRoute`.
+
+### Step 7: Pre-write review gate
+
+Build the full proposed suite in memory and, unless `--yes` or `-y` is set, run a mandatory AskUserQuestion review loop before creating `${SUITE_DIR}` or writing any files.
+
+Use the same AskUserQuestion header as step 7 so the suite path and runner command stay visible in every review round.
+
+Review loop rules:
+
+- Present **all suggested groups** with multiSelect. If one prompt is too small, split it across multiple AskUserQuestion passes. Every page must still include an `All suggested groups` option for the complete inventory.
+- Each group option must include a one-line description and enough context to decide whether it belongs in the suite.
+- After selection, gather one comment per selected group and one general suite-level comment, save them with `harness authoring-save --kind edit-request`, and rebuild the proposal from cached worker outputs.
+- Re-run only the affected discovery worker when feedback invalidates earlier coverage, variant, or schema assumptions, then resave the proposal and show the loop again until approval.
+- Immediately initialize the approval state with `harness approval-begin --skill suite:new --mode interactive --suite-dir "${SUITE_DIR}"`. If `--yes` or `-y` is set, use `--mode bypass` instead. If the suite name or directory changes during the pre-write review loop, rerun `approval-begin` with the updated `SUITE_DIR` before asking the canonical pre-write approval question.
+- The approval gate question must be exactly `suite:new/prewrite: approve current proposal?` with options `Approve proposal`, `Request changes`, and `Cancel`. `Approve proposal` is the only answer that unlocks writes to `${SUITE_DIR}`.
+- No suite files are written before this loop ends. `--yes` and `-y` are the only bypass.
+
+### Step 8: Save suite through dedicated writing workers
+
+After the pre-write review gate approves the proposal, create the suite directory:
+
+```bash
+mkdir -p "${SUITE_DIR}/baseline" "${SUITE_DIR}/groups"
+```
+
+Launch these project subagents after approval:
+
+- [../../agents/suite-writer.md](../../agents/suite-writer.md) for `${SUITE_DIR}/suite.md`
+- [../../agents/baseline-writer.md](../../agents/baseline-writer.md) for `${SUITE_DIR}/baseline/*.yaml`
+- [../../agents/group-writer.md](../../agents/group-writer.md) for `${SUITE_DIR}/groups/g{NN}-*.md`
+
+Writer contract:
+
+- Pass only the saved proposal, schema facts, and the exact file ownership for that worker.
+- Keep writer fan-out bounded. Do not start more than four writer workers at once.
+- If the local validator was installed, require every writer that emits manifests to run `harness authoring-validate` on its owned outputs before it stops. Use the current repo checkout as the schema source of truth; all required schemas, including CRDs, are already in this repo. If the validator was explicitly skipped, do not substitute a live-cluster check here.
+- Follow [references/agent-output-format.md](references/agent-output-format.md) for `authoring-show` usage and acknowledgement rules, and [references/suite-structure.md](references/suite-structure.md) for file content requirements.
+
+### Step 9: Post-write review gate
+
+Unless `--yes` or `-y` is set, immediately re-open AskUserQuestion after the suite is saved.
+
+Every AskUserQuestion in this loop must include the suite path and runner command in the description:
+
+- `Suite path: ${SUITE_DIR}/`
+- `Run command: /suite:run ${SUITE_NAME}`
+
+Post-write loop rules:
+
+- Show the saved suite summary with metadata, groups, dependencies, and current files on disk.
+- Ask whether anything should change, be added, or is already correct.
+- If the user requests changes, collect targeted comments plus one general suite-level comment, save them with `harness authoring-save --kind edit-request`, and rerun only the affected writer workers. Rerun a discovery worker only if the requested change invalidates the cached evidence.
+- Apply tiny deterministic single-file fixes directly with `Edit` instead of respawning a writer worker. Keep broader or multi-file changes in the writer-worker path.
+- Reuse the saved authoring payloads for edit rounds. Do not reread the whole repo when the existing cached summaries are still valid.
+- Re-open the same AskUserQuestion flow after every edit round until the user explicitly approves the suite.
+- The approval gate question must be exactly `suite:new/postwrite: approve saved suite?` with options `Approve suite`, `Request changes`, and `Cancel`. `Approve suite` is the only answer that unlocks a successful stop after suite files were written.
+- After final approval, show one last AskUserQuestion with the exact question `suite:new/copy: copy run command?` and the exact options `Copy command` and `Skip`. Do not offer the suite path as a copy target because the prompt already exposes it for manual copying.
+
+### Step 10: Report
+
+Print the saved path and suggest how to run it:
+
+```
+Suite saved to: ${SUITE_DIR}/
+Run with: /suite:run ${SUITE_NAME}
+```
+
+## Workflow - wizard mode
+
+Interactive step-by-step suite generation. It uses the same authoring state, workers, approval gates, and final report as generate mode. The only differences are:
+
+1. After step 2, ask for feature name, target environment (`kubernetes`, `universal`, `both`), and scope (`full surface`, `focused aspect`) with AskUserQuestion.
+2. Run the same discovery workers as generate step 5, but review variant signals one by one with AskUserQuestion options such as `Include`, `Exclude`, and `Need more evidence` instead of the batch multiSelect.
+3. Present G1-G7 as a selectable list, then review each selected group in order with its cached worker evidence.
+4. For each group, use AskUserQuestion with `Approve`, `Edit manifests`, `Edit validation commands`, and `Skip this group`. Save every edit round with `harness authoring-save --kind edit-request` and rerun only the affected writer or discovery worker.
+5. After individual group review completes, run the same pre-write gate, writing workers, post-write gate, and final report as generate mode.
+
+## Bundled resources
+
+- [references/code-reading-guide.md](references/code-reading-guide.md) - code-reading paths and manifest verification
+- [references/agent-output-format.md](references/agent-output-format.md) - worker payload and acknowledgement contract
+- [references/variant-detection.md](references/variant-detection.md) - variant signals
+- [references/suite-structure.md](references/suite-structure.md) - suite format and manifest conventions
+- [examples/example-motb-core-suite.md](examples/example-motb-core-suite.md) - worked suite
+- [examples/example-motb-core-group.md](examples/example-motb-core-group.md) - worked group
+- [../../agents/coverage-reader.md](../../agents/coverage-reader.md) - saves compact G1-G7 coverage facts
+- [../../agents/variant-analyzer.md](../../agents/variant-analyzer.md) - saves compact variant signals
+- [../../agents/schema-verifier.md](../../agents/schema-verifier.md) - saves compact schema facts
+- [../../agents/suite-writer.md](../../agents/suite-writer.md) - writes `suite.md`
+- [../../agents/baseline-writer.md](../../agents/baseline-writer.md) - writes `baseline/*.yaml`
+- [../../agents/group-writer.md](../../agents/group-writer.md) - writes `groups/*.md`
+- `harness authoring-begin` - resets and seeds the session-scoped authoring workspace
+- `harness authoring-save` - validates and persists compact worker payloads
+- `harness authoring-show` - loads saved session and worker payloads
+- `harness authoring-reset` - removes stale authoring state for the current session
+
+## Hook messages
+
+Hooks emit these codes during suite authoring:
+
+| Code | Hook | Meaning |
+| --- | --- | --- |
+| KSA001 | guard-write | Write path is outside the suite:new surface |
+| KSA002 | guard-question / verify-question / guard-write / verify-write / guard-stop | Approval state is missing, malformed, or the canonical approval prompt shape is wrong |
+| KSA003 | guard-write / guard-stop | Approval is required before writing suite files or stopping after saved-suite edits |
+| KSA004 | verify-write / guard-stop | Suite validation: authored manifests must pass local repo-backed validation, groups/baselines must be lists, and the suite must be complete |
+| KSA006 | worker contract | Worker agents must save structured payloads through `harness authoring-save` |
+| KSA007 | worker contract | Worker reply must stay short and acknowledge the saved result |
+| KSA008 | audit | Suites must stay user-story-first with concrete variant evidence |
+| KSA009 | guard-question / verify-question / guard-bash / guard-write | The suite:new local validator decision must be resolved before real work starts |
+| KSA010 | verify-question | Automatic `kubectl-validate` installation failed |
+
+## Error handling
+
+- If repo resolution is ambiguous, stop and re-ask before reading code because a suite authored from the wrong worktree or branch is misleading.
+- If the local-validator question is still unresolved, ask it before doing Bash work, writing files, or opening the canonical approval gates because the hooks fail closed until that one-time decision is recorded.
+- If `authoring-begin` was not run after deriving `SUITE_DIR`, stop and run `harness authoring-begin --skill suite:new --repo-root "${REPO_ROOT}" --feature "${FEATURE}" --mode interactive|bypass --suite-dir "${SUITE_DIR}" --suite-name "${SUITE_NAME}"` before launching workers because the compact worker state must exist before caching results.
+- If `approval-begin` was not run after deriving `SUITE_DIR`, stop and run `harness approval-begin --skill suite:new --mode interactive|bypass --suite-dir "${SUITE_DIR}"` before the canonical approval gates because the hooks fail closed on missing approval state.
+- If a worker payload fails validation or is missing after a run, rerun only that worker and re-save its compact result instead of rereading the whole repo.
+- If a worker returns raw file dumps or long prose, stop and rerun it with the compact-output contract because returning the heavy transcript defeats the architecture.
+- If local manifest verification keeps failing, go back to the checked-in CRD or Go struct before saving because a broken suite wastes runner time and hides whether the bug is in Kuma or in the suite.
+- If a write would land outside `${DATA_DIR}/${SUITE_NAME}`, stop and fix the target path because `suite:new` must only mutate the selected suite surface.
+
+## Example invocations
+
+<example>
+Generate a full test suite for the MeshRetry policy from a local repo checkout:
+```bash
+/suite:new meshretry --repo ~/Projects/kuma
+```
+Produces `meshretry-core/` with G1-G7 plus retry backend variants.
+</example>
+
+<example>
+Scope test coverage from a PR diff:
+```bash
+/suite:new meshexternalservice --from-pr https://github.com/kumahq/kuma/pull/15571
+```
+Reads the PR diff, then generates groups only for affected code paths.
+</example>
+
+<example>
+Generate from a feature branch:
+```bash
+/suite:new motb --from-branch feat/implement-motb --repo ~/Projects/kuma
+```
+Diffs the branch against master, then detects variant signals from the changed code.
+</example>
+
+<example>
+Interactive wizard for step-by-step review:
+```bash
+/suite:new meshtrace --mode wizard --repo ~/Projects/kuma
+```
+Walks through each group interactively before moving to the next.
+</example>
+
+<example>
+Override the derived suite name:
+```bash
+/suite:new meshretry --suite-name meshretry-timeout-edge-cases
+```
+Uses the custom name instead of deriving it from the feature. Must follow `{feature}-{scope}`.
+</example>
+
+<example>
+Generate non-interactively for scripted use:
+```bash
+/suite:new motb --repo ~/Projects/kuma --yes
+```
+Skips the interactive review loops and the final copy prompt.
+</example>
+
+<example>
+Input: `/suite:new meshtrace --repo ~/Projects/kuma`
+
+Output structure:
+```
+~/.local/share/kuma/suites/meshtrace-core/
+├── suite.md
+├── baseline/
+│   ├── namespace.yaml
+│   └── demo-app.yaml
+└── groups/
+    ├── g01-crud.md
+    ├── g02-validation.md
+    ├── g03-runtime.md
+    ├── g04-e2e.md
+    ├── g05-edge.md
+    ├── g06-multizone.md
+    ├── g07-compat.md
+    ├── g08-zipkin.md
+    └── g09-otel.md
+```
+</example>

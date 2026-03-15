@@ -1,5 +1,6 @@
 use std::path::PathBuf;
 
+use clap::builder::PossibleValuesParser;
 use clap::{Args, Parser, Subcommand};
 use serde_json::json;
 
@@ -10,6 +11,7 @@ use crate::errors::CliErrorKind;
 use crate::hook::{Decision, HookResult};
 use crate::hook_payloads::HookContext;
 use crate::hooks;
+use crate::rules;
 
 // ---------------------------------------------------------------------------
 // Shared argument groups
@@ -148,7 +150,7 @@ pub struct RunnerStateArgs {
 #[derive(Debug, Clone, Args)]
 pub struct AuthoringBeginArgs {
     /// Managed skill to initialize.
-    #[arg(long, value_parser = ["suite-author"])]
+    #[arg(long, value_parser = PossibleValuesParser::new([rules::SKILL_NEW]))]
     pub skill: String,
     /// Kuma worktree for source discovery and validation.
     #[arg(long)]
@@ -487,8 +489,8 @@ pub struct Cli {
 pub enum Command {
     /// Run a harness hook for a skill.
     Hook {
-        /// Skill name (suite-runner or suite-author).
-        #[arg(value_parser = ["suite-runner", "suite-author"])]
+        /// Skill name (suite:run or suite:new).
+        #[arg(value_parser = PossibleValuesParser::new(rules::SKILL_NAMES))]
         skill: String,
         /// Hook to run.
         #[command(subcommand)]
@@ -633,12 +635,12 @@ pub enum Command {
         project_dir: Option<String>,
     },
 
-    /// Begin a suite-author workspace session.
+    /// Begin a suite:new workspace session.
     AuthoringBegin(AuthoringBeginArgs),
 
-    /// Save a suite-author payload.
+    /// Save a suite:new payload.
     AuthoringSave {
-        /// Suite-author payload kind.
+        /// Suite:new payload kind.
         #[arg(long, value_parser = [
             "inventory", "coverage", "variants", "schema",
             "proposal", "edit-request",
@@ -652,17 +654,17 @@ pub enum Command {
         input: Option<String>,
     },
 
-    /// Show saved suite-author payloads.
+    /// Show saved suite:new payloads.
     AuthoringShow {
-        /// Saved suite-author payload kind.
+        /// Saved suite:new payload kind.
         #[arg(long)]
         kind: String,
     },
 
-    /// Reset suite-author workspace.
+    /// Reset suite:new workspace.
     AuthoringReset {
         /// Managed skill whose saved workspace should be cleared.
-        #[arg(long, value_parser = ["suite-author"])]
+        #[arg(long, value_parser = PossibleValuesParser::new([rules::SKILL_NEW]))]
         skill: String,
     },
 
@@ -676,10 +678,10 @@ pub enum Command {
         repo_root: Option<String>,
     },
 
-    /// Begin suite-author approval flow.
+    /// Begin suite:new approval flow.
     ApprovalBegin {
         /// Managed skill to initialize.
-        #[arg(long, value_parser = ["suite-author"])]
+        #[arg(long, value_parser = PossibleValuesParser::new([rules::SKILL_NEW]))]
         skill: String,
         /// Approval mode.
         #[arg(long, value_parser = ["interactive", "bypass"])]
@@ -975,10 +977,10 @@ mod tests {
 
     #[test]
     fn parse_hook_command() {
-        let cli = Cli::try_parse_from(["harness", "hook", "suite-runner", "guard-bash"]).unwrap();
+        let cli = Cli::try_parse_from(["harness", "hook", "suite:run", "guard-bash"]).unwrap();
         match cli.command {
             Command::Hook { skill, hook } => {
-                assert_eq!(skill, "suite-runner");
+                assert_eq!(skill, "suite:run");
                 assert_eq!(hook.name(), "guard-bash");
             }
             _ => panic!("expected Hook command"),
@@ -1205,7 +1207,7 @@ mod tests {
             "harness",
             "authoring-begin",
             "--skill",
-            "suite-author",
+            "suite:new",
             "--repo-root",
             "/repo",
             "--feature",
@@ -1225,7 +1227,7 @@ mod tests {
                 mode,
                 ..
             }) => {
-                assert_eq!(skill, "suite-author");
+                assert_eq!(skill, "suite:new");
                 assert_eq!(feature, "mesh-traffic");
                 assert_eq!(mode, "interactive");
             }

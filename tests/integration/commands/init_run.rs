@@ -35,7 +35,7 @@ fn init_creates_tracked_layout() {
     assert!(run_dir.join("run-metadata.json").exists());
     assert!(run_dir.join("run-status.json").exists());
     assert!(run_dir.join("run-report.md").exists());
-    assert!(run_dir.join("suite-runner-state.json").exists());
+    assert!(run_dir.join("suite-run-state.json").exists());
     assert!(run_dir.join("artifacts").is_dir());
     assert!(run_dir.join("commands").is_dir());
     assert!(run_dir.join("manifests").is_dir());

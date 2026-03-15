@@ -96,7 +96,7 @@ mod tests {
     #[test]
     fn is_command_owned_runner_state() {
         assert!(is_command_owned_run_file(
-            Path::new("/runs/run-1/suite-runner-state.json"),
+            Path::new("/runs/run-1/suite-run-state.json"),
             Path::new("/runs/run-1")
         ));
     }

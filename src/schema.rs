@@ -615,13 +615,13 @@ Do config.
     fn test_load_documented_example_suite() {
         let path = Path::new(concat!(
             env!("CARGO_MANIFEST_DIR"),
-            "/../kumahq/kuma/.claude/worktrees/kuma-claude-plugins/.claude/skills/suite-author/examples/example-motb-core-suite.md"
+            "/../kumahq/kuma/.claude/worktrees/kuma-claude-plugins/.claude/skills/suite/new/examples/example-motb-core-suite.md"
         ));
         // Skip if the example file doesn't exist (CI environments)
         if !path.exists() {
             // Try the absolute path from the Python test
             let alt = Path::new(
-                "/Users/bart.smykla@konghq.com/Projects/github.com/kumahq/kuma/.claude/worktrees/kuma-claude-plugins/.claude/skills/suite-author/examples/example-motb-core-suite.md",
+                "/Users/bart.smykla@konghq.com/Projects/github.com/kumahq/kuma/.claude/worktrees/kuma-claude-plugins/.claude/skills/suite/new/examples/example-motb-core-suite.md",
             );
             if !alt.exists() {
                 eprintln!("Skipping: example suite file not found");
@@ -646,7 +646,7 @@ Do config.
     #[test]
     fn test_load_documented_example_group() {
         let alt = Path::new(
-            "/Users/bart.smykla@konghq.com/Projects/github.com/kumahq/kuma/.claude/worktrees/kuma-claude-plugins/.claude/skills/suite-author/examples/example-motb-core-group.md",
+            "/Users/bart.smykla@konghq.com/Projects/github.com/kumahq/kuma/.claude/worktrees/kuma-claude-plugins/.claude/skills/suite/new/examples/example-motb-core-group.md",
         );
         if !alt.exists() {
             eprintln!("Skipping: example group file not found");

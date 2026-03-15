@@ -5,9 +5,9 @@ use crate::workflow::runner::{PreflightStatus, RunnerPhase, RunnerWorkflowState}
 
 /// Execute the context-agent hook.
 ///
-/// For suite-author, emits a format warning reminding workers to save
+/// For suite:new, emits a format warning reminding workers to save
 /// structured results through `harness authoring-save`.
-/// For suite-runner, validates that the preflight worker can start by
+/// For suite:run, validates that the preflight worker can start by
 /// checking runner workflow state.
 ///
 /// # Errors
@@ -19,7 +19,7 @@ pub fn execute(ctx: &HookContext) -> Result<HookResult, CliError> {
     if ctx.is_suite_author() {
         return Ok(HookMessage::CodeReaderFormat.into_result());
     }
-    // suite-runner: validate preflight worker can start.
+    // suite:run: validate preflight worker can start.
     let Some(state) = &ctx.runner_state else {
         return Ok(HookMessage::runner_state_invalid(
             "runner state is missing; initialize the suite run first",

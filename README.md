@@ -58,7 +58,7 @@ run-report.md       human-readable summary
 Harness has an interactive authoring flow for writing new suites:
 
 ```bash
-harness authoring-begin --skill suite-author --repo-root /path --feature my-feature --suite-dir /path/suites
+harness authoring-begin --skill suite:new --repo-root /path --feature my-feature --suite-dir /path/suites
 ```
 
 Authoring moves through `discovery` -> `prewrite_review` -> `writing` -> `postwrite_review` -> `complete`, with approval gates at each review step.
