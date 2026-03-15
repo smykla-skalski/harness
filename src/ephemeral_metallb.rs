@@ -71,7 +71,7 @@ pub fn ensure_templates(
     run_dir: Option<&Path>,
 ) -> Result<Vec<PathBuf>, CliError> {
     let mut created = Vec::new();
-    let mut entries = load_entries(run_dir);
+    let mut entries = load_entries(run_dir)?;
     let source = default_source_template(root)?;
 
     for cluster_name in cluster_names {
@@ -110,7 +110,7 @@ pub fn ensure_templates(
 /// # Errors
 /// Returns `CliError` on IO failure.
 pub fn cleanup_templates(run_dir: &Path) -> Result<Vec<PathBuf>, CliError> {
-    let entries = load_entries(Some(run_dir));
+    let entries = load_entries(Some(run_dir))?;
     if entries.is_empty() {
         return Ok(vec![]);
     }
@@ -134,7 +134,7 @@ pub fn cleanup_templates(run_dir: &Path) -> Result<Vec<PathBuf>, CliError> {
 /// # Errors
 /// Returns `CliError` on IO failure or missing source.
 pub fn restore_templates(run_dir: &Path) -> Result<Vec<PathBuf>, CliError> {
-    let entries = load_entries(Some(run_dir));
+    let entries = load_entries(Some(run_dir))?;
     if entries.is_empty() {
         return Ok(vec![]);
     }
@@ -171,25 +171,24 @@ pub fn restore_templates(run_dir: &Path) -> Result<Vec<PathBuf>, CliError> {
     Ok(restored)
 }
 
-fn load_entries(run_dir: Option<&Path>) -> Vec<serde_json::Value> {
+fn load_entries(run_dir: Option<&Path>) -> Result<Vec<serde_json::Value>, CliError> {
     let Some(rd) = run_dir else {
-        return vec![];
+        return Ok(vec![]);
     };
     let path = state_path(rd);
     if !path.is_file() {
-        return vec![];
+        return Ok(vec![]);
     }
-    let Ok(text) = fs::read_to_string(&path) else {
-        return vec![];
-    };
-    let Ok(payload) = serde_json::from_str::<serde_json::Value>(&text) else {
-        return vec![];
-    };
-    payload
+    let text = fs::read_to_string(&path)
+        .map_err(|e| CliErrorKind::io(format!("{}: {e}", path.display())))?;
+    let payload: serde_json::Value = serde_json::from_str(&text).map_err(|e| {
+        CliErrorKind::invalid_json(path.display().to_string()).with_details(e.to_string())
+    })?;
+    Ok(payload
         .get("entries")
         .and_then(|v| v.as_array())
         .cloned()
-        .unwrap_or_default()
+        .unwrap_or_default())
 }
 
 fn save_entries(run_dir: &Path, entries: &[serde_json::Value]) -> Result<(), CliError> {
@@ -352,6 +351,17 @@ mod tests {
         // Don't remove - template still exists
         let restored = restore_templates(&run_dir).unwrap();
         assert!(restored.is_empty());
+    }
+
+    #[test]
+    fn load_entries_propagates_corrupt_state() {
+        let dir = tempfile::tempdir().unwrap();
+        let run_dir = dir.path().join("run");
+        let state_dir = run_dir.join("state");
+        fs::create_dir_all(&state_dir).unwrap();
+        fs::write(state_dir.join(STATE_FILE), "not json {").unwrap();
+        let err = load_entries(Some(&run_dir)).unwrap_err();
+        assert_eq!(err.code(), "KSRCLI019");
     }
 
     #[test]
