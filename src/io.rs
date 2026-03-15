@@ -8,7 +8,7 @@ use serde_json::Value;
 use tabled::builder::Builder;
 use tabled::settings::Style;
 
-use crate::errors::{CliError, CliErrorKind};
+use crate::errors::{CliError, CliErrorKind, cow};
 
 /// Check whether a name is safe to use as a path component.
 ///
@@ -90,19 +90,17 @@ pub fn read_json(path: &Path) -> Result<Value, CliError> {
     let value: Value = serde_json::from_str(&text)
         .map_err(|e| CliError::from(CliErrorKind::missing_file(e.to_string())))?;
     // Ensure top-level is an object
-    let _ = ensure_mapping(&value, &format!("JSON document {}", path.display()))?;
+    ensure_mapping(&value, &format!("JSON document {}", path.display()))?;
     Ok(value)
 }
 
 /// Write a JSON value to a file with pretty-printing.
 ///
 /// # Errors
-/// Returns `CliError` on IO failure.
-///
-/// # Panics
-/// Panics if `payload` cannot be serialized (should not happen for valid JSON values).
+/// Returns `CliError` on IO or serialization failure.
 pub fn write_json(path: &Path, payload: &Value) -> Result<(), CliError> {
-    let text = serde_json::to_string_pretty(payload).expect("serialization of valid JSON value");
+    let text = serde_json::to_string_pretty(payload)
+        .map_err(|e| CliErrorKind::serialize(cow!("JSON value: {e}")))?;
     write_text(path, &format!("{text}\n"))
 }
 
