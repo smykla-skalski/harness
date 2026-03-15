@@ -605,7 +605,7 @@ fn load_diff_payload(path: &Path) -> Result<serde_json::Value, CliError> {
 fn render_diff_value(value: &serde_json::Value) -> String {
     match value {
         serde_json::Value::String(s) => s.clone(),
-        other => serde_json::to_string_pretty(other).unwrap_or_default(),
+        other => serde_json::to_string_pretty(other).expect("Value serializes"),
     }
 }
 
@@ -792,6 +792,9 @@ pub fn validate(
 ///
 /// # Errors
 /// Returns `CliError` on failure.
+///
+/// # Panics
+/// Panics if a `serde_json::Value` fails to serialize (should never happen).
 pub fn envoy(cmd: &EnvoyCommand) -> Result<i32, CliError> {
     match cmd {
         EnvoyCommand::Capture {
@@ -824,7 +827,7 @@ pub fn envoy(cmd: &EnvoyCommand) -> Result<i32, CliError> {
                     Some(route) => {
                         println!(
                             "{}",
-                            serde_json::to_string_pretty(&route).unwrap_or_default()
+                            serde_json::to_string_pretty(&route).expect("Value serializes")
                         );
                         Ok(0)
                     }

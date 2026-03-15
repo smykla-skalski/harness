@@ -68,6 +68,9 @@ fn parse_payload(text: &str, kind: &str) -> Result<serde_json::Value, CliError> 
 ///
 /// # Errors
 /// Returns `CliError` on failure.
+///
+/// # Panics
+/// Panics if a parsed JSON value fails to re-serialize (should never happen).
 pub fn save(kind: &str, payload: Option<&str>, input: Option<&str>) -> Result<i32, CliError> {
     if !is_safe_name(kind) {
         return Err(CliErrorKind::unsafe_name(kind.to_string()).into());
@@ -80,7 +83,7 @@ pub fn save(kind: &str, payload: Option<&str>, input: Option<&str>) -> Result<i3
     let workspace = authoring_workspace_dir()?;
     ensure_dir(&workspace)?;
     let path = workspace.join(format!("{kind}.json"));
-    let json = serde_json::to_string_pretty(&value).unwrap_or_default();
+    let json = serde_json::to_string_pretty(&value).expect("parsed JSON re-serializes");
     write_text(&path, &json)?;
 
     Ok(0)
@@ -94,6 +97,9 @@ pub fn save(kind: &str, payload: Option<&str>, input: Option<&str>) -> Result<i3
 ///
 /// # Errors
 /// Returns `CliError` on failure.
+///
+/// # Panics
+/// Panics if a parsed JSON value fails to re-serialize (should never happen).
 pub fn show(kind: &str) -> Result<i32, CliError> {
     if !is_safe_name(kind) {
         return Err(CliErrorKind::unsafe_name(kind.to_string()).into());
@@ -117,7 +123,7 @@ pub fn show(kind: &str) -> Result<i32, CliError> {
     })?;
     println!(
         "{}",
-        serde_json::to_string_pretty(&value).unwrap_or_default()
+        serde_json::to_string_pretty(&value).expect("parsed JSON re-serializes")
     );
     Ok(0)
 }
