@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::io;
 use std::path::{Path, PathBuf};
+use std::str::FromStr;
 
 use serde::{Deserialize, Serialize};
 
@@ -103,6 +104,14 @@ pub struct HookEnvelopePayload {
     pub stop_hook_active: bool,
     #[serde(default)]
     pub raw_keys: Vec<String>,
+}
+
+impl FromStr for HookEnvelopePayload {
+    type Err = CliError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Self::from_json_text(s)
+    }
 }
 
 impl HookEnvelopePayload {
@@ -350,6 +359,19 @@ pub struct ToolTracking {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn envelope_from_str_parses() {
+        let json = r#"{"root": "/workspace"}"#;
+        let envelope: HookEnvelopePayload = json.parse().unwrap();
+        assert_eq!(envelope.root.as_deref(), Some("/workspace"));
+    }
+
+    #[test]
+    fn envelope_from_str_invalid() {
+        let result = "not json".parse::<HookEnvelopePayload>();
+        assert!(result.is_err());
+    }
 
     #[test]
     fn envelope_from_json_empty_object() {
