@@ -2,6 +2,7 @@ use std::borrow::Cow;
 use std::collections::HashMap;
 use std::error::Error;
 use std::fmt;
+use std::io;
 
 use crate::hook::HookResult;
 
@@ -62,6 +63,15 @@ pub fn cli_err_with_details(def: &ErrorDef, args: &[(&str, &str)], details: &str
     let mut err = cli_err(def, args);
     err.details = Some(details.to_string());
     err
+}
+
+/// Convert an `io::Error` into a `CliError` using the `IO_ERROR` definition.
+///
+/// Accepts `io::Error` by value so it can be used directly with `.map_err(io_err)`.
+#[must_use]
+#[allow(clippy::needless_pass_by_value)]
+pub fn io_err(e: io::Error) -> CliError {
+    cli_err(&IO_ERROR, &[("detail", &format!("IO error: {e}"))])
 }
 
 /// Construct a `HookResult` from a hook definition and template arguments.

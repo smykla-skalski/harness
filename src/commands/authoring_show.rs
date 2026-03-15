@@ -1,10 +1,6 @@
 use crate::authoring::{authoring_workspace_dir, require_authoring_session};
 use crate::errors::{self, CliError};
-use crate::io::read_text;
-
-fn is_safe_name(s: &str) -> bool {
-    !s.is_empty() && !s.contains('/') && !s.contains('\\') && !s.contains("..")
-}
+use crate::io::{is_safe_name, read_text};
 
 /// Show saved suite-author payloads.
 ///

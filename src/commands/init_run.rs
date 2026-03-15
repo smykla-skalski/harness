@@ -63,13 +63,7 @@ pub fn execute(
         ));
     }
 
-    layout.ensure_dirs().map_err(|e| CliError {
-        code: "IO".into(),
-        message: format!("failed to create run directories: {e}"),
-        exit_code: 1,
-        hint: None,
-        details: None,
-    })?;
+    layout.ensure_dirs().map_err(errors::io_err)?;
 
     let metadata = RunMetadata {
         run_id: run_id.to_string(),
@@ -85,13 +79,7 @@ pub fn execute(
     };
 
     let meta_json = serde_json::to_string_pretty(&metadata).expect("serialization of valid JSON");
-    fs::write(layout.metadata_path(), format!("{meta_json}\n")).map_err(|e| CliError {
-        code: "IO".into(),
-        message: format!("failed to write metadata: {e}"),
-        exit_code: 1,
-        hint: None,
-        details: None,
-    })?;
+    fs::write(layout.metadata_path(), format!("{meta_json}\n")).map_err(errors::io_err)?;
 
     let status = RunStatus {
         run_id: run_id.to_string(),
@@ -110,13 +98,7 @@ pub fn execute(
         notes: vec![],
     };
     let status_json = serde_json::to_string_pretty(&status).expect("serialization of valid JSON");
-    fs::write(layout.status_path(), format!("{status_json}\n")).map_err(|e| CliError {
-        code: "IO".into(),
-        message: format!("failed to write status: {e}"),
-        exit_code: 1,
-        hint: None,
-        details: None,
-    })?;
+    fs::write(layout.status_path(), format!("{status_json}\n")).map_err(errors::io_err)?;
 
     initialize_runner_state(&layout.run_dir())?;
 

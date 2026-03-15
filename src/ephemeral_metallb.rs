@@ -1,8 +1,9 @@
+use std::fs;
 use std::path::{Path, PathBuf};
-use std::{fs, io};
 
 use crate::core_defs::utc_now;
 use crate::errors::{self, CliError};
+use crate::io::is_safe_name;
 
 const STATE_FILE: &str = "ephemeral-metallb-templates.json";
 const DEFAULT_TEMPLATE_BASENAME: &str = "metallb-k3d-kuma.yaml";
@@ -11,10 +12,6 @@ const DEFAULT_TEMPLATE_BASENAME: &str = "metallb-k3d-kuma.yaml";
 #[must_use]
 pub fn state_path(run_dir: &Path) -> PathBuf {
     run_dir.join("state").join(STATE_FILE)
-}
-
-fn is_safe_name(s: &str) -> bool {
-    !s.is_empty() && !s.contains('/') && !s.contains('\\') && !s.contains("..")
 }
 
 /// Template path for a cluster.
@@ -89,9 +86,9 @@ pub fn ensure_templates(
             continue;
         }
         if let Some(parent) = target.parent() {
-            fs::create_dir_all(parent).map_err(io_err)?;
+            fs::create_dir_all(parent).map_err(errors::io_err)?;
         }
-        fs::copy(&source, &target).map_err(io_err)?;
+        fs::copy(&source, &target).map_err(errors::io_err)?;
         created.push(target.clone());
 
         let entry = serde_json::json!({
@@ -129,7 +126,7 @@ pub fn cleanup_templates(run_dir: &Path) -> Result<Vec<PathBuf>, CliError> {
         if let Some(tp) = entry.get("template_path").and_then(|v| v.as_str()) {
             let template = PathBuf::from(tp);
             if template.exists() {
-                fs::remove_file(&template).map_err(io_err)?;
+                fs::remove_file(&template).map_err(errors::io_err)?;
                 removed.push(template);
             }
         }
@@ -174,9 +171,9 @@ pub fn restore_templates(run_dir: &Path) -> Result<Vec<PathBuf>, CliError> {
             ));
         }
         if let Some(parent) = target.parent() {
-            fs::create_dir_all(parent).map_err(io_err)?;
+            fs::create_dir_all(parent).map_err(errors::io_err)?;
         }
-        fs::copy(&source, &target).map_err(io_err)?;
+        fs::copy(&source, &target).map_err(errors::io_err)?;
         restored.push(target);
     }
 
@@ -207,32 +204,16 @@ fn load_entries(run_dir: Option<&Path>) -> Vec<serde_json::Value> {
 fn save_entries(run_dir: &Path, entries: &[serde_json::Value]) -> Result<(), CliError> {
     let path = state_path(run_dir);
     if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent).map_err(io_err)?;
+        fs::create_dir_all(parent).map_err(errors::io_err)?;
     }
     let payload = serde_json::json!({
         "schema_version": 1,
         "entries": entries,
     });
-    let text = serde_json::to_string_pretty(&payload).map_err(|e| CliError {
-        code: "SERIALIZE".into(),
-        message: format!("failed to serialize: {e}"),
-        exit_code: 1,
-        hint: None,
-        details: None,
-    })?;
-    fs::write(&path, text).map_err(io_err)?;
+    let text = serde_json::to_string_pretty(&payload)
+        .map_err(|e| errors::cli_err(&errors::SERIALIZE_ERROR, &[("detail", &e.to_string())]))?;
+    fs::write(&path, text).map_err(errors::io_err)?;
     Ok(())
-}
-
-#[allow(clippy::needless_pass_by_value)]
-fn io_err(e: io::Error) -> CliError {
-    CliError {
-        code: "IO".into(),
-        message: format!("IO error: {e}"),
-        exit_code: 1,
-        hint: None,
-        details: None,
-    }
 }
 
 #[cfg(test)]
