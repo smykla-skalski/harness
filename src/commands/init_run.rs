@@ -2,8 +2,8 @@ use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use crate::context::{RunLayout, RunMetadata};
-use crate::core_defs::{harness_data_root, utc_now};
+use crate::context::{CurrentRunRecord, RunLayout, RunMetadata};
+use crate::core_defs::{current_run_context_path, harness_data_root, utc_now};
 use crate::errors::{CliError, CliErrorKind};
 use crate::io::append_markdown_row;
 use crate::resolve::resolve_suite_path;
@@ -126,6 +126,25 @@ pub fn execute(
         "# Run Report\n".to_string(),
     );
     report.save()?;
+
+    let record = CurrentRunRecord {
+        layout: layout.clone(),
+        profile: Some(profile.to_string()),
+        repo_root: Some(resolved_repo_root.to_string_lossy().to_string()),
+        suite_dir: Some(suite_dir.to_string_lossy().to_string()),
+        suite_id: Some(spec.frontmatter.suite_id.clone()),
+        suite_path: Some(suite_path.to_string_lossy().to_string()),
+        cluster: None,
+        keep_clusters: spec.frontmatter.keep_clusters,
+        user_stories: spec.frontmatter.user_stories.clone(),
+        required_dependencies: spec.frontmatter.required_dependencies.clone(),
+    };
+    let ctx_path = current_run_context_path();
+    if let Some(parent) = ctx_path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    let record_json = serde_json::to_string_pretty(&record).expect("serialization of valid JSON");
+    fs::write(&ctx_path, format!("{record_json}\n"))?;
 
     println!("{}", layout.run_dir().display());
     Ok(0)
