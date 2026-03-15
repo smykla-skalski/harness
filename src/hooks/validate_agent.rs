@@ -22,7 +22,6 @@ static PREFLIGHT_RE: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(&pattern).unwrap()
 });
 
-const REQUIRED_READER_SECTIONS: &[&str] = &["saved"];
 const CODE_BLOCK_LINE_LIMIT: usize = 60;
 
 /// Execute the validate-agent hook.
@@ -48,14 +47,8 @@ fn validate_suite_author(ctx: &HookContext) -> HookResult {
         return HookResult::allow();
     }
     let stripped = message.trim_end_matches('.');
-    let missing: Vec<&str> = REQUIRED_READER_SECTIONS
-        .iter()
-        .filter(|section| !stripped.ends_with(*section))
-        .copied()
-        .collect();
-    if !missing.is_empty() {
-        let joined = missing.join(", ");
-        return HookMessage::reader_missing_sections(joined).into_result();
+    if !stripped.ends_with("saved") {
+        return HookMessage::reader_missing_sections("saved").into_result();
     }
     for block in CODE_BLOCK_RE.find_iter(&message) {
         if block.as_str().matches('\n').count() > CODE_BLOCK_LINE_LIMIT {
