@@ -8,39 +8,71 @@ use crate::rules::suite_runner::{
 };
 use crate::workflow::runner::{RunnerPhase, RunnerWorkflowState};
 
-/// Shell control operators that separate command pipelines.
-const SHELL_CONTROL_OPS: &[&str] = &["&&", "||", ";", "|", "&"];
-const SHELL_REDIRECT_OPS: &[&str] = &[">", ">>", "1>", "1>>"];
-const SHELL_FLOW_WORDS: &[&str] = &[
-    "case", "do", "done", "esac", "fi", "for", "if", "then", "until", "while",
-];
-const RUN_SCOPE_FLAGS: &[&str] = &["--run-dir", "--run-id", "--run-root"];
-const RUNNER_CONTROL_FILE_MUTATION_BINS: &[&str] = &["cp", "install", "mv", "tee"];
-const RUNNER_CONTROL_FILE_READ_BINS: &[&str] = &["cat", "head", "tail", "less", "more"];
-const RUNNER_CONTROL_FILE_INTERPRETER_PREFIXES: &[&str] = &["node", "perl", "python", "ruby"];
-const RUNNER_SUITE_MUTATION_BINS: &[&str] =
-    &["cp", "install", "ln", "mkdir", "mv", "rm", "rmdir", "touch"];
-const TRACKED_HARNESS_SUBCOMMANDS: &[&str] = &[
-    "apply",
-    "bootstrap",
-    "capture",
-    "closeout",
-    "cluster",
-    "diff",
-    "envoy",
-    "gateway",
-    "init",
-    "init-run",
-    "kumactl",
-    "preflight",
-    "record",
-    "report",
-    "run",
-    "runner-state",
-    "session-start",
-    "session-stop",
-    "validate",
-];
+fn is_shell_control_op(s: &str) -> bool {
+    matches!(s, "&&" | "||" | ";" | "|" | "&")
+}
+
+fn is_shell_chain_op(s: &str) -> bool {
+    matches!(s, "&&" | "||" | ";" | "&")
+}
+
+fn is_shell_redirect_op(s: &str) -> bool {
+    matches!(s, ">" | ">>" | "1>" | "1>>")
+}
+
+fn is_shell_flow_word(s: &str) -> bool {
+    matches!(
+        s,
+        "case" | "do" | "done" | "esac" | "fi" | "for" | "if" | "then" | "until" | "while"
+    )
+}
+
+fn is_run_scope_flag(s: &str) -> bool {
+    matches!(s, "--run-dir" | "--run-id" | "--run-root")
+        || s.starts_with("--run-dir=")
+        || s.starts_with("--run-id=")
+        || s.starts_with("--run-root=")
+}
+
+fn is_control_file_mutation_bin(s: &str) -> bool {
+    matches!(s, "cp" | "install" | "mv" | "tee")
+}
+
+fn is_control_file_read_bin(s: &str) -> bool {
+    matches!(s, "cat" | "head" | "tail" | "less" | "more")
+}
+
+fn is_suite_mutation_bin(s: &str) -> bool {
+    matches!(
+        s,
+        "cp" | "install" | "ln" | "mkdir" | "mv" | "rm" | "rmdir" | "touch"
+    )
+}
+
+fn is_tracked_harness_subcommand(s: &str) -> bool {
+    matches!(
+        s,
+        "apply"
+            | "bootstrap"
+            | "capture"
+            | "closeout"
+            | "cluster"
+            | "diff"
+            | "envoy"
+            | "gateway"
+            | "init"
+            | "init-run"
+            | "kumactl"
+            | "preflight"
+            | "record"
+            | "report"
+            | "run"
+            | "runner-state"
+            | "session-start"
+            | "session-stop"
+            | "validate"
+    )
+}
 
 /// Execute the guard-bash hook.
 ///
@@ -213,12 +245,7 @@ fn completed_run_reuse_reason(words: &[String]) -> Option<&'static str> {
 
 fn has_explicit_run_scope(words: &[String]) -> bool {
     let sig = significant_words(words);
-    sig.iter().any(|w| {
-        RUN_SCOPE_FLAGS.contains(&w.as_str())
-            || RUN_SCOPE_FLAGS
-                .iter()
-                .any(|f| w.starts_with(&format!("{f}=")))
-    })
+    sig.iter().any(|w| is_run_scope_flag(w))
 }
 
 fn allowed_command(state: &RunnerWorkflowState, words: &[String]) -> (bool, Option<&'static str>) {
@@ -265,14 +292,9 @@ fn deny_batched_tracked_harness_commands(words: &[String]) -> HookResult {
              do not batch multiple tracked harness steps together",
         );
     }
-    let chain_ops: Vec<&str> = SHELL_CONTROL_OPS
-        .iter()
-        .filter(|op| **op != "|")
-        .copied()
-        .collect();
     if words
         .iter()
-        .any(|w| chain_ops.contains(&w.as_str()) || SHELL_FLOW_WORDS.contains(&w.as_str()))
+        .any(|w| is_shell_chain_op(w) || is_shell_flow_word(w))
     {
         return deny_runner_flow(&format!(
             "do not wrap tracked `harness {}` commands in shell chains or loops; \
@@ -297,7 +319,7 @@ fn tracked_harness_subcommands(words: &[String]) -> Vec<String> {
             continue;
         }
         let sub = &sig[i + 1];
-        if !sub.starts_with('-') && TRACKED_HARNESS_SUBCOMMANDS.contains(&sub.as_str()) {
+        if !sub.starts_with('-') && is_tracked_harness_subcommand(sub) {
             subs.push(sub.clone());
         }
     }
@@ -323,7 +345,7 @@ fn deny_harness_managed_run_control_mutation(ctx: &HookContext, words: &[String]
         if i + 1 >= words.len() {
             break;
         }
-        if SHELL_REDIRECT_OPS.contains(&word.as_str()) {
+        if is_shell_redirect_op(word) {
             let target = &words[i + 1];
             if RunFile::ALL
                 .iter()
@@ -337,19 +359,13 @@ fn deny_harness_managed_run_control_mutation(ctx: &HookContext, words: &[String]
             }
         }
     }
-    if heads
-        .iter()
-        .any(|h| RUNNER_CONTROL_FILE_MUTATION_BINS.contains(&h.as_str()))
-    {
+    if heads.iter().any(|h| is_control_file_mutation_bin(h)) {
         return deny_runner_flow(&format!(
             "do not mutate harness-managed run control files directly; {}",
             RunFile::CONTROL_HINT
         ));
     }
-    if heads
-        .iter()
-        .any(|h| RUNNER_CONTROL_FILE_READ_BINS.contains(&h.as_str()))
-    {
+    if heads.iter().any(|h| is_control_file_read_bin(h)) {
         return deny_runner_flow(&format!(
             "do not inspect harness-managed run control files directly; {}",
             RunFile::CONTROL_HINT
@@ -374,9 +390,10 @@ fn is_raw_control_file_interpreter(binary: &str) -> bool {
     if matches!(binary, "bash" | "sh" | "zsh") {
         return true;
     }
-    RUNNER_CONTROL_FILE_INTERPRETER_PREFIXES
-        .iter()
-        .any(|pfx| binary.starts_with(pfx))
+    binary.starts_with("node")
+        || binary.starts_with("perl")
+        || binary.starts_with("python")
+        || binary.starts_with("ruby")
 }
 
 fn deny_direct_command_log_access(ctx: &HookContext, words: &[String]) -> HookResult {
@@ -405,7 +422,7 @@ fn deny_raw_manifest_write(words: &[String], command_text: Option<&str>) -> Hook
         if i + 1 >= words.len() {
             break;
         }
-        if SHELL_REDIRECT_OPS.contains(&word.as_str()) {
+        if is_shell_redirect_op(word) {
             let target = &words[i + 1];
             if hints.iter().any(|h| target.contains(h)) {
                 return deny_runner_flow(
@@ -422,7 +439,7 @@ fn deny_suite_storage_mutation(words: &[String]) -> HookResult {
     let heads = command_heads(words);
     if !heads
         .iter()
-        .any(|h| RUNNER_SUITE_MUTATION_BINS.contains(&normalized_binary_name(h).as_str()))
+        .any(|h| is_suite_mutation_bin(&normalized_binary_name(h)))
     {
         return HookResult::allow();
     }
@@ -442,7 +459,7 @@ fn path_like_words(words: &[String]) -> Vec<&str> {
     words
         .iter()
         .filter(|w| {
-            !SHELL_CONTROL_OPS.contains(&w.as_str())
+            !is_shell_control_op(w.as_str())
                 && !is_env_assignment(w)
                 && !w.starts_with('-')
                 && (w.contains('/') || w.starts_with('~') || w.starts_with('.'))
@@ -552,7 +569,7 @@ fn command_heads(words: &[String]) -> Vec<String> {
     let mut heads = Vec::new();
     let mut expect = true;
     for word in words {
-        if SHELL_CONTROL_OPS.contains(&word.as_str()) {
+        if is_shell_control_op(word) {
             expect = true;
             continue;
         }
@@ -600,7 +617,7 @@ fn is_env_assignment(word: &str) -> bool {
 fn significant_words(words: &[String]) -> Vec<String> {
     words
         .iter()
-        .filter(|w| !SHELL_CONTROL_OPS.contains(&w.as_str()) && !is_env_assignment(w))
+        .filter(|w| !is_shell_control_op(w) && !is_env_assignment(w))
         .cloned()
         .collect()
 }
@@ -613,7 +630,7 @@ fn is_tracked_harness_command(words: &[String]) -> bool {
     let sig = significant_words(words);
     sig.len() >= 2
         && normalized_binary_name(&sig[0]) == "harness"
-        && TRACKED_HARNESS_SUBCOMMANDS.contains(&sig[1].as_str())
+        && is_tracked_harness_subcommand(&sig[1])
 }
 
 fn has_denied_cluster_binary(heads: &[String]) -> bool {
@@ -664,7 +681,7 @@ fn make_target(words: &[String]) -> Option<&str> {
 fn allows_wrapped_envoy_admin(words: &[String]) -> bool {
     let sig: Vec<&str> = words
         .iter()
-        .filter(|w| !SHELL_CONTROL_OPS.contains(&w.as_str()) && !is_env_assignment(w))
+        .filter(|w| !is_shell_control_op(w) && !is_env_assignment(w))
         .map(String::as_str)
         .collect();
     if sig.len() < 2 {
