@@ -737,9 +737,7 @@ mod tests {
         assert_eq!(r.decision, Decision::Deny);
     }
 
-    // Python: test_guard_bash_allows_listing_kumactl_path
-    // The Rust implementation catches kumactl anywhere in the command words,
-    // even in path-like arguments. This is stricter than the Python version.
+    // Catches kumactl anywhere in command words, including path-like arguments.
     #[test]
     fn denies_kumactl_in_path_arg() {
         let c = ctx("suite-runner", "ls -la /tmp/kumactl");

@@ -66,12 +66,11 @@ fn guard_bash_denies_kumactl_variable() {
     assert_deny(&r);
 }
 
-// Rust implementation catches kumactl anywhere in command words (stricter than Python)
+// kumactl is denied even when it appears in a path argument
 #[test]
 fn guard_bash_kumactl_listing() {
     let ctx = make_hook_context("suite-runner", make_bash_payload("ls -la /tmp/kumactl"));
     let r = guard_bash::execute(&ctx).unwrap();
-    // Rust implementation denies kumactl even in path arguments
     assert_deny(&r);
 }
 

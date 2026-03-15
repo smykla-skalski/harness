@@ -47,11 +47,7 @@ fn session_stop_cleans_up_templates_and_removes_pointer() {
             if let Some(parent) = ctx_path.parent() {
                 fs::create_dir_all(parent).unwrap();
             }
-            fs::write(
-                &ctx_path,
-                serde_json::to_string_pretty(&record).unwrap(),
-            )
-            .unwrap();
+            fs::write(&ctx_path, serde_json::to_string_pretty(&record).unwrap()).unwrap();
             assert!(ctx_path.exists());
 
             let code = session_stop::execute(None).unwrap();

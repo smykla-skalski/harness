@@ -138,7 +138,6 @@ impl SuiteSpec {
         if feature.is_none() {
             missing.push("feature");
         }
-        // scope and keep_clusters are also required in the Python version
         if yaml_str(map, "scope").is_none()
             && !map.contains_key(serde_yml::Value::String("scope".to_string()))
         {
