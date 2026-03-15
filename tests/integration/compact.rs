@@ -140,7 +140,7 @@ fn check_build_compact_includes_runner(project: &Path) {
     assert!(handoff.runner.is_none(), "default build has no runner");
 
     handoff.runner = Some(test_runner());
-    let _ = compact::save_compact_handoff(project, &handoff).expect("save should succeed");
+    compact::save_compact_handoff(project, &handoff).expect("save should succeed");
 
     let loaded = compact::load_latest_compact_handoff(project)
         .expect("load should succeed")
@@ -156,7 +156,7 @@ fn check_build_compact_includes_runner(project: &Path) {
 fn check_build_compact_worktree_project(project: &Path) {
     let mut handoff = compact::build_compact_handoff(project).expect("build");
     handoff.runner = Some(test_runner());
-    let _ = compact::save_compact_handoff(project, &handoff).expect("save");
+    compact::save_compact_handoff(project, &handoff).expect("save");
 
     let latest = compact::compact_latest_path(project);
     assert!(
@@ -175,7 +175,7 @@ fn check_build_compact_worktree_project(project: &Path) {
 fn check_build_compact_includes_author(project: &Path) {
     let mut handoff = compact::build_compact_handoff(project).expect("build");
     handoff.authoring = Some(test_authoring());
-    let _ = compact::save_compact_handoff(project, &handoff).expect("save");
+    compact::save_compact_handoff(project, &handoff).expect("save");
 
     let loaded = compact::load_latest_compact_handoff(project)
         .expect("load")
@@ -193,7 +193,7 @@ fn check_build_compact_author_fallback(project: &Path) {
     auth.mode = Some("bypass".into());
     auth.feature = Some("fallback-feature".into());
     handoff.authoring = Some(auth);
-    let _ = compact::save_compact_handoff(project, &handoff).expect("save");
+    compact::save_compact_handoff(project, &handoff).expect("save");
 
     let loaded = compact::load_latest_compact_handoff(project)
         .expect("load")
@@ -206,7 +206,7 @@ fn check_build_compact_author_fallback(project: &Path) {
 // Save writes latest + history. Consume marks consumed.
 fn check_save_consume_compact_handoff(project: &Path) {
     let handoff = compact::build_compact_handoff(project).expect("build");
-    let _ = compact::save_compact_handoff(project, &handoff).expect("save");
+    compact::save_compact_handoff(project, &handoff).expect("save");
 
     let latest = compact::compact_latest_path(project);
     assert!(latest.exists(), "latest.json should exist");
@@ -255,7 +255,7 @@ fn check_pre_compact_persists(project: &Path) {
 fn check_session_start_compact_hydrates(project: &Path) {
     let mut handoff = compact::build_compact_handoff(project).expect("build");
     handoff.runner = Some(test_runner());
-    let _ = compact::save_compact_handoff(project, &handoff).expect("save");
+    compact::save_compact_handoff(project, &handoff).expect("save");
 
     let result = Command::SessionStart {
         project_dir: Some(project.to_string_lossy().to_string()),
@@ -274,7 +274,7 @@ fn check_session_start_compact_hydrates(project: &Path) {
 fn check_session_start_compact_worktree(project: &Path) {
     let mut handoff = compact::build_compact_handoff(project).expect("build");
     handoff.runner = Some(test_runner());
-    let _ = compact::save_compact_handoff(project, &handoff).expect("save");
+    compact::save_compact_handoff(project, &handoff).expect("save");
 
     let result = Command::SessionStart {
         project_dir: Some(project.to_string_lossy().to_string()),
@@ -294,7 +294,7 @@ fn check_session_start_compact_aborted_resume(project: &Path) {
     runner.runner_phase = Some("aborted".into());
     runner.verdict = Some("aborted".into());
     handoff.runner = Some(runner);
-    let _ = compact::save_compact_handoff(project, &handoff).expect("save");
+    compact::save_compact_handoff(project, &handoff).expect("save");
 
     let pending = compact::pending_compact_handoff(project).expect("should be pending");
     let diverged = compact::verify_fingerprints(&pending);
@@ -319,7 +319,7 @@ fn check_session_start_compact_aborted_resume(project: &Path) {
 fn check_session_start_compact_restores_author(project: &Path) {
     let mut handoff = compact::build_compact_handoff(project).expect("build");
     handoff.authoring = Some(test_authoring());
-    let _ = compact::save_compact_handoff(project, &handoff).expect("save");
+    compact::save_compact_handoff(project, &handoff).expect("save");
 
     let pending = compact::pending_compact_handoff(project).expect("should be pending");
     let ctx = compact::render_hydration_context(&pending, &[]);
@@ -346,7 +346,7 @@ fn check_session_start_compact_divergence_warning(project: &Path) {
 
     let mut handoff = compact::build_compact_handoff(project).expect("build");
     handoff.fingerprints = vec![fp];
-    let _ = compact::save_compact_handoff(project, &handoff).expect("save");
+    compact::save_compact_handoff(project, &handoff).expect("save");
 
     fs::write(&tracked_file, "modified content").unwrap();
 
@@ -357,8 +357,8 @@ fn check_session_start_compact_divergence_warning(project: &Path) {
     assert_eq!(diverged.len(), 1, "should detect 1 diverged file");
     assert!(
         diverged[0].ends_with("tracked.txt"),
-        "diverged path should reference tracked.txt: {:?}",
-        diverged[0]
+        "diverged path should reference tracked.txt: {}",
+        diverged[0].display()
     );
 
     let ctx = compact::render_hydration_context(&loaded, &diverged);
@@ -372,7 +372,7 @@ fn check_session_start_compact_divergence_warning(project: &Path) {
 fn check_session_start_restores_project(project: &Path) {
     let mut handoff = compact::build_compact_handoff(project).expect("build");
     handoff.runner = Some(test_runner());
-    let _ = compact::save_compact_handoff(project, &handoff).expect("save");
+    compact::save_compact_handoff(project, &handoff).expect("save");
 
     let result = Command::SessionStart {
         project_dir: Some(project.to_string_lossy().to_string()),
@@ -392,7 +392,7 @@ fn check_session_start_restores_worktree(project: &Path) {
     let mut handoff = compact::build_compact_handoff(project).expect("build");
     handoff.runner = Some(test_runner());
     handoff.trigger = Some("worktree-switch".into());
-    let _ = compact::save_compact_handoff(project, &handoff).expect("save");
+    compact::save_compact_handoff(project, &handoff).expect("save");
 
     let result = Command::SessionStart {
         project_dir: Some(project.to_string_lossy().to_string()),
@@ -412,7 +412,7 @@ fn check_session_start_restores_worktree(project: &Path) {
 fn check_session_start_cross_project(project: &Path) {
     let mut handoff = compact::build_compact_handoff(project).expect("build");
     handoff.runner = Some(test_runner());
-    let _ = compact::save_compact_handoff(project, &handoff).expect("save");
+    compact::save_compact_handoff(project, &handoff).expect("save");
 
     let pending = compact::pending_compact_handoff(project);
     assert!(
@@ -461,7 +461,7 @@ fn check_session_stop_metallb_cleanup(project: &Path) {
 //and session-start does not replay it.
 fn check_session_start_no_replay(project: &Path) {
     let handoff = compact::build_compact_handoff(project).expect("build");
-    let _ = compact::save_compact_handoff(project, &handoff).expect("save");
+    compact::save_compact_handoff(project, &handoff).expect("save");
 
     let pending = compact::pending_compact_handoff(project).expect("should be pending");
     let _ = compact::consume_compact_handoff(project, pending).expect("consume");
