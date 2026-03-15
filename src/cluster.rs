@@ -179,7 +179,9 @@ fn members_for_mode(mode: ClusterMode, args: &[String]) -> Result<Vec<ClusterMem
                 ClusterMember::named(&args[2], "zone", None, None),
             ])
         }
-        ClusterMode::SingleUp | ClusterMode::SingleDown => unreachable!(),
+        ClusterMode::SingleUp | ClusterMode::SingleDown => {
+            unreachable!("single modes return early above")
+        }
     }
 }
 
