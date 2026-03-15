@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use clap::{Args, Parser, Subcommand};
 use serde_json::json;
 
-use crate::commands;
+use crate::commands::Execute;
 use crate::errors::CliError;
 #[cfg(test)]
 use crate::errors::CliErrorKind;
@@ -38,6 +38,144 @@ pub struct RunDirArgs {
     /// Parent directory containing run directories.
     #[arg(long)]
     pub run_root: Option<PathBuf>,
+}
+
+/// Arguments for `harness init`.
+#[derive(Debug, Clone, Args)]
+pub struct InitArgs {
+    /// Suite Markdown path or name.
+    #[arg(long)]
+    pub suite: String,
+    /// Run ID to create under the run root.
+    #[arg(long)]
+    pub run_id: String,
+    /// Suite profile to run (e.g. single-zone or multi-zone).
+    #[arg(long)]
+    pub profile: String,
+    /// Repo root to record in run metadata.
+    #[arg(long)]
+    pub repo_root: Option<String>,
+    /// Parent directory to create the run in.
+    #[arg(long)]
+    pub run_root: Option<String>,
+}
+
+/// Arguments for `harness cluster`.
+#[derive(Debug, Clone, Args)]
+pub struct ClusterArgs {
+    /// Cluster lifecycle mode.
+    #[arg(value_parser = [
+        "single-up", "single-down",
+        "global-zone-up", "global-zone-down",
+        "global-two-zones-up", "global-two-zones-down",
+    ])]
+    pub mode: String,
+    /// Primary cluster name.
+    pub cluster_name: String,
+    /// Additional cluster or zone names required by the mode.
+    pub extra_cluster_names: Vec<String>,
+    /// Repo root to run local Kuma build and deploy targets.
+    #[arg(long)]
+    pub repo_root: Option<String>,
+    /// Run directory to update deployment state for.
+    #[arg(long)]
+    pub run_dir: Option<String>,
+    /// Extra Helm setting for Kuma deployment; repeat as needed.
+    #[arg(long)]
+    pub helm_setting: Vec<String>,
+    /// Namespace whose workloads to restart after deployment; repeat as needed.
+    #[arg(long)]
+    pub restart_namespace: Vec<String>,
+}
+
+/// Arguments for `harness record`.
+#[derive(Debug, Clone, Args)]
+pub struct RecordArgs {
+    /// Repo root for local command resolution.
+    #[arg(long)]
+    pub repo_root: Option<String>,
+    /// Optional phase tag for the command artifact name.
+    #[arg(long)]
+    pub phase: Option<String>,
+    /// Optional label tag for the command artifact name.
+    #[arg(long)]
+    pub label: Option<String>,
+    /// Tracked cluster member name for kubectl commands.
+    #[arg(long)]
+    pub cluster: Option<String>,
+    /// Command to execute; prefix with -- to stop flag parsing.
+    #[arg(allow_hyphen_values = true)]
+    pub command: Vec<String>,
+    /// Run-directory resolution.
+    #[command(flatten)]
+    pub run_dir: RunDirArgs,
+}
+
+/// Arguments for `harness apply`.
+#[derive(Debug, Clone, Args)]
+pub struct ApplyArgs {
+    /// Use this kubeconfig instead of the tracked run cluster.
+    #[arg(long)]
+    pub kubeconfig: Option<String>,
+    /// Target cluster name (uses its kubeconfig instead of primary).
+    #[arg(long)]
+    pub cluster: Option<String>,
+    /// Manifest file or directory path. Repeat to preserve explicit batch order.
+    #[arg(long, required = true)]
+    pub manifest: Vec<String>,
+    /// Optional step label for manifest index notes.
+    #[arg(long)]
+    pub step: Option<String>,
+    /// Run-directory resolution.
+    #[command(flatten)]
+    pub run_dir: RunDirArgs,
+}
+
+/// Arguments for `harness runner-state`.
+#[derive(Debug, Clone, Args)]
+pub struct RunnerStateArgs {
+    /// Workflow event to apply; omit to print the current phase.
+    #[arg(long, value_parser = [
+        "cluster-prepared", "preflight-started", "preflight-captured",
+        "preflight-failed", "failure-manifest",
+        "manifest-fix-run-only", "manifest-fix-suite-and-run",
+        "manifest-fix-skip-step", "manifest-fix-stop-run",
+        "suite-fix-resumed", "abort", "suspend", "resume-run",
+        "closeout-started", "run-completed",
+    ])]
+    pub event: Option<String>,
+    /// Suite-relative manifest path for manifest-fix events.
+    #[arg(long)]
+    pub suite_target: Option<String>,
+    /// Optional message to record on the event.
+    #[arg(long)]
+    pub message: Option<String>,
+    /// Run-directory resolution.
+    #[command(flatten)]
+    pub run_dir: RunDirArgs,
+}
+
+/// Arguments for `harness authoring-begin`.
+#[derive(Debug, Clone, Args)]
+pub struct AuthoringBeginArgs {
+    /// Managed skill to initialize.
+    #[arg(long, value_parser = ["suite-author"])]
+    pub skill: String,
+    /// Kuma worktree for source discovery and validation.
+    #[arg(long)]
+    pub repo_root: String,
+    /// Feature or capability being authored.
+    #[arg(long)]
+    pub feature: String,
+    /// Authoring mode.
+    #[arg(long, value_parser = ["interactive", "bypass"])]
+    pub mode: String,
+    /// Suite directory for this session.
+    #[arg(long)]
+    pub suite_dir: String,
+    /// Suite name recorded in state and defaults.
+    #[arg(long)]
+    pub suite_name: String,
 }
 
 // ---------------------------------------------------------------------------
@@ -319,23 +457,7 @@ pub enum Command {
 
     /// Initialize a new test run.
     #[command(alias = "init-run")]
-    Init {
-        /// Suite Markdown path or name.
-        #[arg(long)]
-        suite: String,
-        /// Run ID to create under the run root.
-        #[arg(long)]
-        run_id: String,
-        /// Suite profile to run (e.g. single-zone or multi-zone).
-        #[arg(long)]
-        profile: String,
-        /// Repo root to record in run metadata.
-        #[arg(long)]
-        repo_root: Option<String>,
-        /// Parent directory to create the run in.
-        #[arg(long)]
-        run_root: Option<String>,
-    },
+    Init(InitArgs),
 
     /// Install or refresh the repo-aware harness wrapper.
     Bootstrap {
@@ -345,31 +467,7 @@ pub enum Command {
     },
 
     /// Manage disposable local k3d clusters.
-    Cluster {
-        /// Cluster lifecycle mode.
-        #[arg(value_parser = [
-            "single-up", "single-down",
-            "global-zone-up", "global-zone-down",
-            "global-two-zones-up", "global-two-zones-down",
-        ])]
-        mode: String,
-        /// Primary cluster name.
-        cluster_name: String,
-        /// Additional cluster or zone names required by the mode.
-        extra_cluster_names: Vec<String>,
-        /// Repo root to run local Kuma build and deploy targets.
-        #[arg(long)]
-        repo_root: Option<String>,
-        /// Run directory to update deployment state for.
-        #[arg(long)]
-        run_dir: Option<String>,
-        /// Extra Helm setting for Kuma deployment; repeat as needed.
-        #[arg(long)]
-        helm_setting: Vec<String>,
-        /// Namespace whose workloads to restart after deployment; repeat as needed.
-        #[arg(long)]
-        restart_namespace: Vec<String>,
-    },
+    Cluster(ClusterArgs),
 
     /// Run preflight checks and prepare suite manifests.
     Preflight {
@@ -399,45 +497,10 @@ pub enum Command {
 
     /// Record a tracked command.
     #[command(alias = "run", trailing_var_arg = true)]
-    Record {
-        /// Repo root for local command resolution.
-        #[arg(long)]
-        repo_root: Option<String>,
-        /// Optional phase tag for the command artifact name.
-        #[arg(long)]
-        phase: Option<String>,
-        /// Optional label tag for the command artifact name.
-        #[arg(long)]
-        label: Option<String>,
-        /// Tracked cluster member name for kubectl commands.
-        #[arg(long)]
-        cluster: Option<String>,
-        /// Command to execute; prefix with -- to stop flag parsing.
-        #[arg(allow_hyphen_values = true)]
-        command: Vec<String>,
-        /// Run-directory resolution.
-        #[command(flatten)]
-        run_dir: RunDirArgs,
-    },
+    Record(RecordArgs),
 
     /// Apply manifests to the cluster.
-    Apply {
-        /// Use this kubeconfig instead of the tracked run cluster.
-        #[arg(long)]
-        kubeconfig: Option<String>,
-        /// Target cluster name (uses its kubeconfig instead of primary).
-        #[arg(long)]
-        cluster: Option<String>,
-        /// Manifest file or directory path. Repeat to preserve explicit batch order.
-        #[arg(long, required = true)]
-        manifest: Vec<String>,
-        /// Optional step label for manifest index notes.
-        #[arg(long)]
-        step: Option<String>,
-        /// Run-directory resolution.
-        #[command(flatten)]
-        run_dir: RunDirArgs,
-    },
+    Apply(ApplyArgs),
 
     /// Validate manifests against the cluster.
     Validate {
@@ -453,27 +516,7 @@ pub enum Command {
     },
 
     /// Manage runner workflow state.
-    RunnerState {
-        /// Workflow event to apply; omit to print the current phase.
-        #[arg(long, value_parser = [
-            "cluster-prepared", "preflight-started", "preflight-captured",
-            "preflight-failed", "failure-manifest",
-            "manifest-fix-run-only", "manifest-fix-suite-and-run",
-            "manifest-fix-skip-step", "manifest-fix-stop-run",
-            "suite-fix-resumed", "abort", "suspend", "resume-run",
-            "closeout-started", "run-completed",
-        ])]
-        event: Option<String>,
-        /// Suite-relative manifest path for manifest-fix events.
-        #[arg(long)]
-        suite_target: Option<String>,
-        /// Optional message to record on the event.
-        #[arg(long)]
-        message: Option<String>,
-        /// Run-directory resolution.
-        #[command(flatten)]
-        run_dir: RunDirArgs,
-    },
+    RunnerState(RunnerStateArgs),
 
     /// Close out a run.
     Closeout {
@@ -551,26 +594,7 @@ pub enum Command {
     },
 
     /// Begin a suite-author workspace session.
-    AuthoringBegin {
-        /// Managed skill to initialize.
-        #[arg(long, value_parser = ["suite-author"])]
-        skill: String,
-        /// Kuma worktree for source discovery and validation.
-        #[arg(long)]
-        repo_root: String,
-        /// Feature or capability being authored.
-        #[arg(long)]
-        feature: String,
-        /// Authoring mode.
-        #[arg(long, value_parser = ["interactive", "bypass"])]
-        mode: String,
-        /// Suite directory for this session.
-        #[arg(long)]
-        suite_dir: String,
-        /// Suite name recorded in state and defaults.
-        #[arg(long)]
-        suite_name: String,
-    },
+    AuthoringBegin(AuthoringBeginArgs),
 
     /// Save a suite-author payload.
     AuthoringSave {
@@ -817,190 +841,6 @@ fn run_hook_command(skill: &str, hook: &HookCommand) -> i32 {
 }
 
 // ---------------------------------------------------------------------------
-// Command dispatch
-// ---------------------------------------------------------------------------
-
-/// Dispatch a non-hook command to its module.
-fn dispatch_command(command: Command) -> Result<i32, CliError> {
-    match command {
-        Command::Hook { .. } => unreachable!("hooks are handled separately"),
-        Command::Init { .. }
-        | Command::Bootstrap { .. }
-        | Command::Cluster { .. }
-        | Command::Preflight { .. }
-        | Command::Gateway { .. }
-        | Command::SessionStart { .. }
-        | Command::SessionStop { .. }
-        | Command::PreCompact { .. } => dispatch_setup(command),
-        Command::Capture { .. }
-        | Command::Record { .. }
-        | Command::Apply { .. }
-        | Command::Validate { .. }
-        | Command::RunnerState { .. }
-        | Command::Closeout { .. }
-        | Command::Report { .. }
-        | Command::Diff { .. }
-        | Command::Envoy { .. }
-        | Command::Kumactl { .. } => dispatch_run(command),
-        Command::AuthoringBegin { .. }
-        | Command::AuthoringSave { .. }
-        | Command::AuthoringShow { .. }
-        | Command::AuthoringReset { .. }
-        | Command::AuthoringValidate { .. }
-        | Command::ApprovalBegin { .. } => dispatch_authoring(command),
-    }
-}
-
-fn dispatch_setup(command: Command) -> Result<i32, CliError> {
-    match command {
-        Command::Init {
-            suite,
-            run_id,
-            profile,
-            repo_root,
-            run_root,
-        } => commands::init_run::execute(
-            &suite,
-            &run_id,
-            &profile,
-            repo_root.as_deref(),
-            run_root.as_deref(),
-        ),
-        Command::Bootstrap { project_dir } => commands::bootstrap::execute(project_dir.as_deref()),
-        Command::Cluster {
-            mode,
-            cluster_name,
-            extra_cluster_names,
-            repo_root,
-            run_dir,
-            helm_setting,
-            restart_namespace,
-        } => commands::cluster::execute(
-            &mode,
-            &cluster_name,
-            &extra_cluster_names,
-            repo_root.as_deref(),
-            run_dir.as_deref(),
-            &helm_setting,
-            &restart_namespace,
-        ),
-        Command::Preflight {
-            kubeconfig,
-            repo_root,
-            run_dir,
-        } => commands::preflight::execute(kubeconfig.as_deref(), repo_root.as_deref(), &run_dir),
-        Command::Gateway {
-            kubeconfig,
-            repo_root,
-            check_only,
-        } => commands::gateway::execute(kubeconfig.as_deref(), repo_root.as_deref(), check_only),
-        Command::SessionStart { project_dir } => {
-            commands::session_start::execute(project_dir.as_deref())
-        }
-        Command::SessionStop { project_dir } => {
-            commands::session_stop::execute(project_dir.as_deref())
-        }
-        Command::PreCompact { project_dir } => {
-            commands::pre_compact::execute(project_dir.as_deref())
-        }
-        _ => unreachable!(),
-    }
-}
-
-fn dispatch_run(command: Command) -> Result<i32, CliError> {
-    match command {
-        Command::Capture {
-            kubeconfig,
-            label,
-            run_dir,
-        } => commands::capture::execute(kubeconfig.as_deref(), &label, &run_dir),
-        Command::Record {
-            repo_root,
-            phase,
-            label,
-            cluster,
-            command,
-            run_dir,
-        } => commands::record::execute(
-            repo_root.as_deref(),
-            phase.as_deref(),
-            label.as_deref(),
-            cluster.as_deref(),
-            &command,
-            &run_dir,
-        ),
-        Command::Apply {
-            kubeconfig,
-            cluster,
-            manifest,
-            step,
-            run_dir,
-        } => commands::apply::execute(
-            kubeconfig.as_deref(),
-            cluster.as_deref(),
-            &manifest,
-            step.as_deref(),
-            &run_dir,
-        ),
-        Command::Validate {
-            kubeconfig,
-            manifest,
-            output,
-        } => commands::validate::execute(kubeconfig.as_deref(), &manifest, output.as_deref()),
-        Command::RunnerState {
-            event,
-            suite_target,
-            message,
-            run_dir,
-        } => commands::runner_state::execute(
-            event.as_deref(),
-            suite_target.as_deref(),
-            message.as_deref(),
-            &run_dir,
-        ),
-        Command::Closeout { run_dir } => commands::closeout::execute(&run_dir),
-        Command::Report { cmd } => commands::report::execute(&cmd),
-        Command::Diff { left, right, path } => {
-            commands::diff::execute(&left, &right, path.as_deref())
-        }
-        Command::Envoy { cmd } => commands::envoy::execute(&cmd),
-        Command::Kumactl { cmd } => commands::kumactl::execute(&cmd),
-        _ => unreachable!(),
-    }
-}
-
-fn dispatch_authoring(command: Command) -> Result<i32, CliError> {
-    match command {
-        Command::AuthoringBegin {
-            skill: _,
-            repo_root,
-            feature,
-            mode,
-            suite_dir,
-            suite_name,
-        } => {
-            commands::authoring_begin::execute(&repo_root, &feature, &mode, &suite_dir, &suite_name)
-        }
-        Command::AuthoringSave {
-            kind,
-            payload,
-            input,
-        } => commands::authoring_save::execute(&kind, payload.as_deref(), input.as_deref()),
-        Command::AuthoringShow { kind } => commands::authoring_show::execute(&kind),
-        Command::AuthoringReset { skill: _ } => commands::authoring_reset::execute(),
-        Command::AuthoringValidate { path, repo_root } => {
-            commands::authoring_validate::execute(&path, repo_root.as_deref())
-        }
-        Command::ApprovalBegin {
-            skill: _,
-            mode,
-            suite_dir,
-        } => commands::approval_begin::execute(&mode, suite_dir.as_deref()),
-        _ => unreachable!(),
-    }
-}
-
-// ---------------------------------------------------------------------------
 // Entry point
 // ---------------------------------------------------------------------------
 
@@ -1017,7 +857,7 @@ pub fn run() -> Result<i32, CliError> {
             ref skill,
             ref hook,
         } => Ok(run_hook_command(skill, hook)),
-        other => dispatch_command(other),
+        other => other.execute(),
     }
 }
 
@@ -1127,13 +967,13 @@ mod tests {
         ])
         .unwrap();
         match cli.command {
-            Command::Init {
+            Command::Init(InitArgs {
                 suite,
                 run_id,
                 profile,
                 repo_root,
                 run_root,
-            } => {
+            }) => {
                 assert_eq!(suite, "suite.md");
                 assert_eq!(run_id, "r01");
                 assert_eq!(profile, "single-zone");
@@ -1157,7 +997,7 @@ mod tests {
             "p",
         ])
         .unwrap();
-        assert!(matches!(cli.command, Command::Init { .. }));
+        assert!(matches!(cli.command, Command::Init(..)));
     }
 
     #[test]
@@ -1176,7 +1016,7 @@ mod tests {
         ])
         .unwrap();
         match cli.command {
-            Command::Record { label, command, .. } => {
+            Command::Record(RecordArgs { label, command, .. }) => {
                 assert_eq!(label.as_deref(), Some("test"));
                 assert_eq!(command, vec!["kubectl", "get", "pods", "-n", "kuma-system"]);
             }
@@ -1187,7 +1027,7 @@ mod tests {
     #[test]
     fn parse_run_alias_for_record() {
         let cli = Cli::try_parse_from(["harness", "run", "--label", "foo", "--", "ls"]).unwrap();
-        assert!(matches!(cli.command, Command::Record { .. }));
+        assert!(matches!(cli.command, Command::Record(..)));
     }
 
     #[test]
@@ -1202,12 +1042,12 @@ mod tests {
         ])
         .unwrap();
         match cli.command {
-            Command::Cluster {
+            Command::Cluster(ClusterArgs {
                 mode,
                 cluster_name,
                 extra_cluster_names,
                 ..
-            } => {
+            }) => {
                 assert_eq!(mode, "global-zone-up");
                 assert_eq!(cluster_name, "global");
                 assert_eq!(extra_cluster_names, vec!["zone1", "zone2"]);
@@ -1234,7 +1074,7 @@ mod tests {
         ])
         .unwrap();
         match cli.command {
-            Command::Apply { manifest, .. } => {
+            Command::Apply(ApplyArgs { manifest, .. }) => {
                 assert_eq!(manifest, vec!["g14/02.yaml", "g14/01.yaml"]);
             }
             _ => panic!("expected Apply command"),
@@ -1303,7 +1143,7 @@ mod tests {
     fn parse_runner_state_without_event() {
         let cli = Cli::try_parse_from(["harness", "runner-state"]).unwrap();
         match cli.command {
-            Command::RunnerState { event, .. } => {
+            Command::RunnerState(RunnerStateArgs { event, .. }) => {
                 assert!(event.is_none());
             }
             _ => panic!("expected RunnerState command"),
@@ -1314,7 +1154,7 @@ mod tests {
     fn parse_runner_state_with_event() {
         let cli = Cli::try_parse_from(["harness", "runner-state", "--event", "abort"]).unwrap();
         match cli.command {
-            Command::RunnerState { event, .. } => {
+            Command::RunnerState(RunnerStateArgs { event, .. }) => {
                 assert_eq!(event.as_deref(), Some("abort"));
             }
             _ => panic!("expected RunnerState command"),
@@ -1341,12 +1181,12 @@ mod tests {
         ])
         .unwrap();
         match cli.command {
-            Command::AuthoringBegin {
+            Command::AuthoringBegin(AuthoringBeginArgs {
                 skill,
                 feature,
                 mode,
                 ..
-            } => {
+            }) => {
                 assert_eq!(skill, "suite-author");
                 assert_eq!(feature, "mesh-traffic");
                 assert_eq!(mode, "interactive");
