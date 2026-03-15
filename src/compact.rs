@@ -226,7 +226,7 @@ pub fn build_compact_handoff(project_dir: &Path) -> Result<CompactHandoff<'stati
         project_dir: Cow::Owned(project_dir.to_string_lossy().into_owned()),
         created_at: Cow::Owned(utc_now()),
         status: HandoffStatus::Pending,
-        source_session_scope: Some(Cow::Owned(session_scope_key())),
+        source_session_scope: session_scope_key().ok().map(Cow::Owned),
         source_session_id: None,
         transcript_path: None,
         cwd: None,
