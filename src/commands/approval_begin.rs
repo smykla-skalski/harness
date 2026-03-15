@@ -1,7 +1,7 @@
 use crate::core_defs::utc_now;
 use crate::errors::CliError;
 use crate::workflow::author::{
-    ApprovalMode, AuthorDraftState, AuthorPhase, AuthorReviewState, AuthorSessionInfo,
+    ApprovalMode, AuthorDraftState, AuthorEvent, AuthorPhase, AuthorSessionInfo,
     AuthorWorkflowState, write_author_state,
 };
 
@@ -25,13 +25,18 @@ pub fn execute(mode: &str, suite_dir: Option<&str>) -> Result<i32, CliError> {
     };
 
     let initial_phase = if approval_mode == ApprovalMode::Bypass {
-        AuthorPhase::Writing
+        AuthorPhase::Writing {
+            draft: AuthorDraftState {
+                suite_tree_written: false,
+                written_paths: vec![],
+            },
+        }
     } else {
         AuthorPhase::Discovery
     };
 
     let state = AuthorWorkflowState {
-        schema_version: 1,
+        schema_version: 2,
         mode: approval_mode,
         phase: initial_phase,
         session: AuthorSessionInfo {
@@ -40,19 +45,9 @@ pub fn execute(mode: &str, suite_dir: Option<&str>) -> Result<i32, CliError> {
             suite_name: None,
             suite_dir: suite_dir.map(String::from),
         },
-        review: AuthorReviewState {
-            gate: None,
-            awaiting_answer: false,
-            round: 0,
-            last_answer: None,
-        },
-        draft: AuthorDraftState {
-            suite_tree_written: false,
-            written_paths: vec![],
-        },
         updated_at: utc_now(),
         transition_count: 0,
-        last_event: Some("ApprovalFlowStarted".to_string()),
+        last_event: Some(AuthorEvent::ApprovalFlowStarted),
     };
 
     write_author_state(&state)?;

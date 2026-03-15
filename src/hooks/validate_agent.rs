@@ -7,7 +7,7 @@ use crate::errors::{self, CliError};
 use crate::hook::HookResult;
 use crate::hook_payloads::HookContext;
 use crate::rules::suite_runner as runner_rules;
-use crate::workflow::runner::{self as runner_wf, PreflightStatus, RunnerPhase};
+use crate::workflow::runner::{self as runner_wf, PreflightStatus, RunnerEvent, RunnerPhase};
 
 static CODE_BLOCK_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?s)```.*?```").unwrap());
 
@@ -91,13 +91,16 @@ fn validate_suite_runner(ctx: &HookContext) -> HookResult {
     let state = ctx.runner_state.as_ref();
     if reply.status == runner_rules::PREFLIGHT_REPLY_FAIL {
         if let Some(s) = state
-            && s.phase == RunnerPhase::Preflight
+            && matches!(&s.phase, RunnerPhase::Preflight { .. })
         {
-            let mut new_state = s.clone();
-            new_state.preflight.status = PreflightStatus::Pending;
-            new_state.transition_count += 1;
-            new_state.last_event = Some("PreflightFailed".to_string());
-            new_state.updated_at = chrono::Utc::now().to_rfc3339();
+            let new_state = s
+                .transition(
+                    RunnerEvent::PreflightFailed,
+                    RunnerPhase::Preflight {
+                        status: PreflightStatus::Pending,
+                    },
+                )
+                .unwrap_or_else(|_| s.clone());
             if let Some(ref rd) = ctx.effective_run_dir() {
                 let _ = runner_wf::write_runner_state(rd, &new_state);
             }
@@ -125,12 +128,15 @@ fn validate_suite_runner(ctx: &HookContext) -> HookResult {
     }
     // Transition to preflight captured.
     if let Some(s) = state {
-        if s.phase == RunnerPhase::Preflight {
-            let mut new_state = s.clone();
-            new_state.preflight.status = PreflightStatus::Complete;
-            new_state.transition_count += 1;
-            new_state.last_event = Some("PreflightCaptured".to_string());
-            new_state.updated_at = chrono::Utc::now().to_rfc3339();
+        if matches!(&s.phase, RunnerPhase::Preflight { .. }) {
+            let new_state = s
+                .transition(
+                    RunnerEvent::PreflightCaptured,
+                    RunnerPhase::Preflight {
+                        status: PreflightStatus::Complete,
+                    },
+                )
+                .unwrap_or_else(|_| s.clone());
             if let Some(ref rd) = ctx.effective_run_dir() {
                 let _ = runner_wf::write_runner_state(rd, &new_state);
             }

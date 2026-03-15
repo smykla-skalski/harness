@@ -296,9 +296,7 @@ impl ClusterSpec {
 
     #[must_use]
     pub fn matches_deploy_dict(&self, payload: &Value) -> bool {
-        CurrentDeployPayload::from_value(payload)
-            .map(|d| d.matches(self))
-            .unwrap_or(false)
+        CurrentDeployPayload::from_value(payload).is_ok_and(|d| d.matches(self))
     }
 }
 
