@@ -1,7 +1,12 @@
 // Tests for run report handling.
 // Covers report round-trip serialization, comma preservation in story results,
-// and oversized report detection.
+// oversized report detection, and group finalization.
 
+use std::fs;
+
+use harness::cli::{ReportCommand, RunDirArgs};
+use harness::commands::report;
+use harness::context::RunContext;
 use harness::schema::{RunReport, RunReportFrontmatter, Verdict};
 
 use super::super::helpers::*;
@@ -81,4 +86,92 @@ fn report_check_fails_for_large_report() {
     report.save().unwrap();
     // The report check command would flag this as too large
     // (actual check requires CLI binary)
+}
+
+fn create_initial_report(run_dir: &std::path::Path) {
+    let report_path = run_dir.join("run-report.md");
+    let rpt = RunReport::new(
+        report_path,
+        RunReportFrontmatter {
+            run_id: "test".to_string(),
+            suite_id: "example.suite".to_string(),
+            profile: "single-zone".to_string(),
+            overall_verdict: Verdict::Pending,
+            story_results: vec![],
+            debug_summary: vec![],
+        },
+        "# Run Report\n".to_string(),
+    );
+    rpt.save().unwrap();
+}
+
+#[test]
+fn run_group_updates_status_and_report() {
+    let tmp = tempfile::tempdir().unwrap();
+    let run_dir = init_run(tmp.path(), "run-group-test", "single-zone");
+    create_initial_report(&run_dir);
+
+    let cmd = ReportCommand::Group {
+        group_id: "g01".to_string(),
+        status: "pass".to_string(),
+        evidence: vec!["commands/g01.txt".to_string()],
+        evidence_label: vec![],
+        capture_label: None,
+        note: Some("all checks passed".to_string()),
+        run_dir: RunDirArgs {
+            run_dir: Some(run_dir.clone()),
+            run_id: None,
+            run_root: None,
+        },
+    };
+    let exit_code = report::execute(&cmd).unwrap();
+    assert_eq!(exit_code, 0);
+
+    let ctx = RunContext::from_run_dir(&run_dir).unwrap();
+    let status = ctx.status.unwrap();
+    assert_eq!(status.executed_group_ids(), vec!["g01"]);
+    assert_eq!(status.counts.passed, 1);
+    assert_eq!(status.counts.failed, 0);
+    assert_eq!(status.last_completed_group.as_deref(), Some("g01"));
+    assert!(status.last_updated_utc.is_some());
+    assert_eq!(status.notes, vec!["all checks passed"]);
+
+    let report_text = fs::read_to_string(ctx.layout.report_path()).unwrap();
+    assert!(
+        report_text.contains("## Group: g01"),
+        "report should contain group section"
+    );
+    assert!(
+        report_text.contains("**Verdict:** pass"),
+        "report should contain verdict"
+    );
+    assert!(
+        report_text.contains("commands/g01.txt"),
+        "report should contain evidence"
+    );
+}
+
+#[test]
+fn run_group_rejects_duplicate() {
+    let tmp = tempfile::tempdir().unwrap();
+    let run_dir = init_run(tmp.path(), "run-group-dup", "single-zone");
+    create_initial_report(&run_dir);
+
+    let cmd = ReportCommand::Group {
+        group_id: "g01".to_string(),
+        status: "pass".to_string(),
+        evidence: vec!["evidence.txt".to_string()],
+        evidence_label: vec![],
+        capture_label: None,
+        note: None,
+        run_dir: RunDirArgs {
+            run_dir: Some(run_dir.clone()),
+            run_id: None,
+            run_root: None,
+        },
+    };
+    report::execute(&cmd).unwrap();
+
+    let err = report::execute(&cmd).unwrap_err();
+    assert_eq!(err.code(), "KSRCLI053");
 }
