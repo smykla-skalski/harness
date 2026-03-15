@@ -83,8 +83,6 @@ pub mod suite_runner {
 
     pub const MANIFEST_FIX_TARGET_PREFIX: &str = "Suite target: ";
 
-    pub const UP_CLUSTER_MODES: &[&str] = &["single-up", "global-zone-up", "global-two-zones-up"];
-
     pub const MANIFEST_FIX_GATE: Gate = Gate {
         question: "suite-runner/manifest-fix: how should this failure be handled?",
         options: &[
@@ -287,7 +285,7 @@ pub mod suite_runner {
         /// Returns `true` when `name` matches a denied cluster binary.
         #[must_use]
         pub fn is_denied(name: &str) -> bool {
-            Self::ALL.iter().any(|b| b.to_string() == name)
+            Self::from_str(name).is_ok()
         }
     }
 
@@ -345,7 +343,7 @@ pub mod suite_runner {
         /// Returns `true` when `name` matches a denied legacy script filename.
         #[must_use]
         pub fn is_denied(name: &str) -> bool {
-            Self::ALL.iter().any(|s| s.to_string() == name)
+            Self::from_str(name).is_ok()
         }
     }
 
@@ -393,7 +391,7 @@ pub mod suite_runner {
         /// Returns `true` when `name` matches a denied runner binary.
         #[must_use]
         pub fn is_denied(name: &str) -> bool {
-            Self::ALL.iter().any(|b| b.to_string() == name)
+            Self::from_str(name).is_ok()
         }
     }
 
@@ -430,7 +428,13 @@ pub mod suite_runner {
         /// Returns `true` when `target` starts with a denied prefix.
         #[must_use]
         pub fn is_denied_target(target: &str) -> bool {
-            Self::ALL.iter().any(|p| target.starts_with(&p.to_string()))
+            Self::ALL.iter().any(|p| {
+                let prefix = match p {
+                    Self::K3d => "k3d/",
+                    Self::Kind => "kind/",
+                };
+                target.starts_with(prefix)
+            })
         }
     }
 
@@ -478,7 +482,16 @@ pub mod suite_runner {
         /// Returns `true` when `word` contains any admin endpoint hint.
         #[must_use]
         pub fn contains_hint(word: &str) -> bool {
-            Self::ALL.iter().any(|h| word.contains(&h.to_string()))
+            Self::ALL.iter().any(|h| {
+                let hint = match h {
+                    Self::LocalhostEnvoy => "localhost:9901",
+                    Self::ConfigDump => "/config_dump",
+                    Self::Clusters => "/clusters",
+                    Self::Listeners => "/listeners",
+                    Self::Routes => "/routes",
+                };
+                word.contains(hint)
+            })
         }
     }
 
