@@ -88,7 +88,14 @@ pub fn find_suite_dir(path: &Path) -> Option<PathBuf> {
 /// Reads the `.harness.json` file and returns the `repo_root` value if present.
 #[must_use]
 pub fn default_repo_root_for_suite(suite_dir: &Path) -> Option<PathBuf> {
-    let payload = load_suite_defaults(suite_dir).ok()??;
+    let payload = match load_suite_defaults(suite_dir) {
+        Ok(Some(v)) => v,
+        Ok(None) => return None,
+        Err(e) => {
+            eprintln!("warning: {}: {e}", suite_defaults_path(suite_dir).display());
+            return None;
+        }
+    };
     let raw = payload.get("repo_root")?.as_str()?;
     let trimmed = raw.trim();
     if trimmed.is_empty() {

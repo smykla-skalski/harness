@@ -1,5 +1,5 @@
-use std::fs;
 use std::path::Path;
+use std::{fs, io};
 
 use crate::cluster::ClusterMode;
 use crate::context::RunContext;
@@ -85,7 +85,14 @@ fn artifact_ready(subcommand: &str, run: &RunContext) -> bool {
 }
 
 fn has_table_rows(path: &Path) -> bool {
-    fs::read_to_string(path).is_ok_and(|content| content.matches("\n|").count() > 2)
+    match fs::read_to_string(path) {
+        Ok(content) => content.matches("\n|").count() > 2,
+        Err(e) if e.kind() == io::ErrorKind::NotFound => false,
+        Err(e) => {
+            eprintln!("warning: cannot read {}: {e}", path.display());
+            false
+        }
+    }
 }
 
 fn missing_target(subcommand: &str, run: &RunContext) -> String {
