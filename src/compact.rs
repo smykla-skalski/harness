@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::fmt;
 use std::path::{Path, PathBuf};
 use std::time::UNIX_EPOCH;
@@ -11,8 +12,8 @@ use crate::rules::compact as rules;
 
 /// SHA256 fingerprint of a file.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct FileFingerprint {
-    pub label: String,
+pub struct FileFingerprint<'a> {
+    pub label: Cow<'a, str>,
     pub path: PathBuf,
     pub exists: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -20,17 +21,17 @@ pub struct FileFingerprint {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub mtime_ns: Option<u64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub sha256: Option<String>,
+    pub sha256: Option<Cow<'a, str>>,
 }
 
-impl FileFingerprint {
+impl FileFingerprint<'_> {
     /// Build a fingerprint from a file path on disk.
     #[must_use]
-    pub fn from_path(label: &str, path: &Path) -> Self {
+    pub fn from_path(label: &str, path: &Path) -> FileFingerprint<'static> {
         let resolved = path.to_path_buf();
         if !resolved.exists() {
-            return Self {
-                label: label.to_string(),
+            return FileFingerprint {
+                label: Cow::Owned(label.to_string()),
                 path: resolved,
                 exists: false,
                 size: None,
@@ -49,13 +50,13 @@ impl FileFingerprint {
         });
         let sha256 = file_sha256(&resolved);
 
-        Self {
-            label: label.to_string(),
+        FileFingerprint {
+            label: Cow::Owned(label.to_string()),
             path: resolved,
             exists: true,
             size,
             mtime_ns,
-            sha256,
+            sha256: sha256.map(Cow::Owned),
         }
     }
 
@@ -85,57 +86,57 @@ impl FileFingerprint {
         }
         // mtime + size match - compute SHA256 only as final check.
         let sha256 = file_sha256(&self.path);
-        sha256 == self.sha256
+        sha256.as_deref() == self.sha256.as_deref()
     }
 }
 
 /// Runner handoff state for compaction.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct RunnerHandoff {
-    pub run_dir: String,
-    pub run_id: String,
+pub struct RunnerHandoff<'a> {
+    pub run_dir: Cow<'a, str>,
+    pub run_id: Cow<'a, str>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub suite_id: Option<String>,
+    pub suite_id: Option<Cow<'a, str>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub profile: Option<String>,
+    pub profile: Option<Cow<'a, str>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub suite_path: Option<String>,
+    pub suite_path: Option<Cow<'a, str>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub runner_phase: Option<String>,
+    pub runner_phase: Option<Cow<'a, str>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub verdict: Option<String>,
+    pub verdict: Option<Cow<'a, str>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub completed_at: Option<String>,
+    pub completed_at: Option<Cow<'a, str>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub last_state_capture: Option<String>,
-    pub next_action: String,
+    pub last_state_capture: Option<Cow<'a, str>>,
+    pub next_action: Cow<'a, str>,
     #[serde(default)]
-    pub executed_groups: Vec<String>,
+    pub executed_groups: Vec<Cow<'a, str>>,
     #[serde(default)]
-    pub remaining_groups: Vec<String>,
+    pub remaining_groups: Vec<Cow<'a, str>>,
     #[serde(default)]
-    pub state_paths: Vec<String>,
+    pub state_paths: Vec<Cow<'a, str>>,
 }
 
 /// Authoring handoff state for compaction.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct AuthoringHandoff {
-    pub suite_dir: String,
-    pub next_action: String,
+pub struct AuthoringHandoff<'a> {
+    pub suite_dir: Cow<'a, str>,
+    pub next_action: Cow<'a, str>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub author_phase: Option<String>,
+    pub author_phase: Option<Cow<'a, str>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub suite_name: Option<String>,
+    pub suite_name: Option<Cow<'a, str>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub feature: Option<String>,
+    pub feature: Option<Cow<'a, str>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub mode: Option<String>,
+    pub mode: Option<Cow<'a, str>>,
     #[serde(default)]
-    pub saved_payloads: Vec<String>,
+    pub saved_payloads: Vec<Cow<'a, str>>,
     #[serde(default)]
-    pub suite_files: Vec<String>,
+    pub suite_files: Vec<Cow<'a, str>>,
     #[serde(default)]
-    pub state_paths: Vec<String>,
+    pub state_paths: Vec<Cow<'a, str>>,
 }
 
 /// Status of a compact handoff.
@@ -158,34 +159,34 @@ impl fmt::Display for HandoffStatus {
 
 /// Full compact handoff payload.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct CompactHandoff {
+pub struct CompactHandoff<'a> {
     pub version: u32,
-    pub project_dir: String,
-    pub created_at: String,
+    pub project_dir: Cow<'a, str>,
+    pub created_at: Cow<'a, str>,
     pub status: HandoffStatus,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub source_session_scope: Option<String>,
+    pub source_session_scope: Option<Cow<'a, str>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub source_session_id: Option<String>,
+    pub source_session_id: Option<Cow<'a, str>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub transcript_path: Option<String>,
+    pub transcript_path: Option<Cow<'a, str>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub cwd: Option<String>,
+    pub cwd: Option<Cow<'a, str>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub trigger: Option<String>,
+    pub trigger: Option<Cow<'a, str>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub custom_instructions: Option<String>,
+    pub custom_instructions: Option<Cow<'a, str>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub consumed_at: Option<String>,
+    pub consumed_at: Option<Cow<'a, str>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub runner: Option<RunnerHandoff>,
+    pub runner: Option<RunnerHandoff<'a>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub authoring: Option<AuthoringHandoff>,
+    pub authoring: Option<AuthoringHandoff<'a>>,
     #[serde(default)]
-    pub fingerprints: Vec<FileFingerprint>,
+    pub fingerprints: Vec<FileFingerprint<'a>>,
 }
 
-impl CompactHandoff {
+impl CompactHandoff<'_> {
     /// Whether the handoff has any active section.
     #[must_use]
     pub fn has_sections(&self) -> bool {
@@ -218,13 +219,13 @@ pub fn compact_history_dir(project_dir: &Path) -> PathBuf {
 ///
 /// # Errors
 /// Returns `CliError` on failure.
-pub fn build_compact_handoff(project_dir: &Path) -> Result<CompactHandoff, CliError> {
+pub fn build_compact_handoff(project_dir: &Path) -> Result<CompactHandoff<'static>, CliError> {
     Ok(CompactHandoff {
         version: rules::HANDOFF_VERSION,
-        project_dir: project_dir.to_string_lossy().into_owned(),
-        created_at: utc_now(),
+        project_dir: Cow::Owned(project_dir.to_string_lossy().into_owned()),
+        created_at: Cow::Owned(utc_now()),
         status: HandoffStatus::Pending,
-        source_session_scope: Some(session_scope_key()),
+        source_session_scope: Some(Cow::Owned(session_scope_key())),
         source_session_id: None,
         transcript_path: None,
         cwd: None,
@@ -243,7 +244,10 @@ pub fn build_compact_handoff(project_dir: &Path) -> Result<CompactHandoff, CliEr
 ///
 /// # Errors
 /// Returns `CliError` on IO failure.
-pub fn save_compact_handoff(project_dir: &Path, handoff: &CompactHandoff) -> Result<(), CliError> {
+pub fn save_compact_handoff(
+    project_dir: &Path,
+    handoff: &CompactHandoff<'_>,
+) -> Result<(), CliError> {
     let latest_path = compact_latest_path(project_dir);
     let history_dir = compact_history_dir(project_dir);
     let history_name = handoff.created_at.replace([':', '.'], "") + ".json";
@@ -260,7 +264,9 @@ pub fn save_compact_handoff(project_dir: &Path, handoff: &CompactHandoff) -> Res
 ///
 /// # Errors
 /// Returns `CliError` on parse failure.
-pub fn load_latest_compact_handoff(project_dir: &Path) -> Result<Option<CompactHandoff>, CliError> {
+pub fn load_latest_compact_handoff(
+    project_dir: &Path,
+) -> Result<Option<CompactHandoff<'static>>, CliError> {
     let path = compact_latest_path(project_dir);
     if !path.exists() {
         return Ok(None);
@@ -275,9 +281,18 @@ pub fn load_latest_compact_handoff(project_dir: &Path) -> Result<Option<CompactH
         })
 }
 
+/// Parse a compact handoff from JSON text.
+///
+/// # Errors
+/// Returns `CliError` on parse failure.
+pub fn parse_compact_handoff(text: &str) -> Result<CompactHandoff<'static>, CliError> {
+    serde_json::from_str(text)
+        .map_err(|e| -> CliError { CliErrorKind::io(cow!("corrupt compact handoff: {e}")).into() })
+}
+
 /// Load a pending (unconsumed) compact handoff, if any.
 #[must_use]
-pub fn pending_compact_handoff(project_dir: &Path) -> Option<CompactHandoff> {
+pub fn pending_compact_handoff(project_dir: &Path) -> Option<CompactHandoff<'static>> {
     load_latest_compact_handoff(project_dir)
         .ok()
         .flatten()
@@ -291,13 +306,13 @@ pub fn pending_compact_handoff(project_dir: &Path) -> Option<CompactHandoff> {
 ///
 /// # Errors
 /// Returns `CliError` on IO failure.
-pub fn consume_compact_handoff(
+pub fn consume_compact_handoff<'a>(
     project_dir: &Path,
-    handoff: CompactHandoff,
-) -> Result<CompactHandoff, CliError> {
+    handoff: CompactHandoff<'a>,
+) -> Result<CompactHandoff<'a>, CliError> {
     let consumed = CompactHandoff {
         status: HandoffStatus::Consumed,
-        consumed_at: Some(utc_now()),
+        consumed_at: Some(Cow::Owned(utc_now())),
         ..handoff
     };
     write_json_atomic(&compact_latest_path(project_dir), &consumed)?;
@@ -306,7 +321,7 @@ pub fn consume_compact_handoff(
 
 /// Check which fingerprints have diverged from disk.
 #[must_use]
-pub fn verify_fingerprints(handoff: &CompactHandoff) -> Vec<&Path> {
+pub fn verify_fingerprints<'a>(handoff: &'a CompactHandoff<'_>) -> Vec<&'a Path> {
     handoff
         .fingerprints
         .iter()
@@ -317,7 +332,7 @@ pub fn verify_fingerprints(handoff: &CompactHandoff) -> Vec<&Path> {
 
 /// Render the hydration context for a compact handoff.
 #[must_use]
-pub fn render_hydration_context(handoff: &CompactHandoff, diverged_paths: &[&Path]) -> String {
+pub fn render_hydration_context(handoff: &CompactHandoff<'_>, diverged_paths: &[&Path]) -> String {
     let mut lines = vec![
         "Kuma compaction handoff restored from saved harness state.".to_string(),
         "Continue immediately from the saved state below. Do not ask the user to restate context."
@@ -371,7 +386,7 @@ pub fn render_hydration_context(handoff: &CompactHandoff, diverged_paths: &[&Pat
 
 /// Render a runner restore context (for session-start without compact).
 #[must_use]
-pub fn render_runner_restore_context(project_dir: &Path, runner: &RunnerHandoff) -> String {
+pub fn render_runner_restore_context(project_dir: &Path, runner: &RunnerHandoff<'_>) -> String {
     let mut lines = vec![
         "Kuma harness active run restored from saved project state.".to_string(),
         format!("Project: {}", project_dir.to_string_lossy()),
@@ -382,7 +397,7 @@ pub fn render_runner_restore_context(project_dir: &Path, runner: &RunnerHandoff)
          Read `{}` and continue from its next planned group instead of rerunning \
          `harness init`.",
         runner.run_id,
-        PathBuf::from(&runner.run_dir)
+        PathBuf::from(&*runner.run_dir)
             .join("run-status.json")
             .display()
     ));
@@ -417,7 +432,7 @@ pub fn render_runner_restore_context(project_dir: &Path, runner: &RunnerHandoff)
     truncate_lines(&lines, rules::CHAR_LIMIT, rules::SECTION_LINE_LIMIT * 2)
 }
 
-fn render_runner_section(handoff: &RunnerHandoff) -> String {
+fn render_runner_section(handoff: &RunnerHandoff<'_>) -> String {
     let mut lines = vec![
         "suite-runner:".to_string(),
         format!("- Run: {}", handoff.run_id),
@@ -490,7 +505,7 @@ fn render_runner_section(handoff: &RunnerHandoff) -> String {
         .state_paths
         .iter()
         .take(4)
-        .map(String::as_str)
+        .map(AsRef::as_ref)
         .collect();
     lines.push(format!("- Key state files: {}", state_preview.join(", ")));
     lines.push(format!("- Next action: {}", handoff.next_action));
@@ -498,7 +513,7 @@ fn render_runner_section(handoff: &RunnerHandoff) -> String {
     truncate_lines(&lines, rules::SECTION_CHAR_LIMIT, rules::SECTION_LINE_LIMIT)
 }
 
-fn render_authoring_section(handoff: &AuthoringHandoff) -> String {
+fn render_authoring_section(handoff: &AuthoringHandoff<'_>) -> String {
     let lines = vec![
         "suite-author:".to_string(),
         format!("- Suite dir: {}", handoff.suite_dir),
@@ -529,8 +544,8 @@ fn render_authoring_section(handoff: &AuthoringHandoff) -> String {
                 .state_paths
                 .iter()
                 .take(5)
-                .map(String::as_str)
-                .collect::<Vec<_>>()
+                .map(AsRef::as_ref)
+                .collect::<Vec<&str>>()
                 .join(", ")
         ),
         format!("- Next action: {}", handoff.next_action),
@@ -539,7 +554,7 @@ fn render_authoring_section(handoff: &AuthoringHandoff) -> String {
     truncate_lines(&lines, rules::SECTION_CHAR_LIMIT, rules::SECTION_LINE_LIMIT)
 }
 
-fn ordered_sections(handoff: &CompactHandoff) -> Vec<&str> {
+fn ordered_sections<'a>(handoff: &'a CompactHandoff<'_>) -> Vec<&'a str> {
     let mut sections: Vec<(&str, bool)> = Vec::new();
     if let Some(ref a) = handoff.authoring {
         let unfinished = !matches!(a.author_phase.as_deref(), Some("complete" | "cancelled"));
@@ -585,7 +600,7 @@ fn truncate_lines(lines: &[String], char_limit: usize, line_limit: usize) -> Str
     result
 }
 
-fn write_json_atomic(path: &Path, payload: &CompactHandoff) -> Result<(), CliError> {
+fn write_json_atomic(path: &Path, payload: &CompactHandoff<'_>) -> Result<(), CliError> {
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent).map_err(|e| -> CliError {
             CliErrorKind::io(cow!("failed to create directory: {e}")).into()
@@ -644,11 +659,11 @@ fn file_sha256(path: &Path) -> Option<String> {
 mod tests {
     use super::*;
 
-    fn test_handoff(project_dir: &str) -> CompactHandoff {
+    fn test_handoff(project_dir: &str) -> CompactHandoff<'static> {
         CompactHandoff {
             version: rules::HANDOFF_VERSION,
-            project_dir: project_dir.to_string(),
-            created_at: "2026-01-01T000000Z".to_string(),
+            project_dir: Cow::Owned(project_dir.to_string()),
+            created_at: "2026-01-01T000000Z".into(),
             status: HandoffStatus::Pending,
             source_session_scope: None,
             source_session_id: None,
@@ -664,7 +679,7 @@ mod tests {
     }
 
     /// Write a handoff directly to a path (bypasses `project_context_dir`).
-    fn write_handoff_to(path: &Path, handoff: &CompactHandoff) {
+    fn write_handoff_to(path: &Path, handoff: &CompactHandoff<'_>) {
         if let Some(parent) = path.parent() {
             fs::create_dir_all(parent).unwrap();
         }
@@ -673,7 +688,7 @@ mod tests {
     }
 
     /// Read a handoff directly from a path.
-    fn read_handoff_from(path: &Path) -> Option<CompactHandoff> {
+    fn read_handoff_from(path: &Path) -> Option<CompactHandoff<'static>> {
         let text = fs::read_to_string(path).ok()?;
         serde_json::from_str(&text).ok()
     }
@@ -700,7 +715,7 @@ mod tests {
 
         write_json_atomic(&path, &handoff).unwrap();
 
-        let loaded: CompactHandoff =
+        let loaded: CompactHandoff<'_> =
             serde_json::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
         assert_eq!(loaded.project_dir, "/p");
     }
@@ -715,7 +730,7 @@ mod tests {
         // Manually consume
         let consumed = CompactHandoff {
             status: HandoffStatus::Consumed,
-            consumed_at: Some("2026-01-01T01:00:00Z".to_string()),
+            consumed_at: Some("2026-01-01T01:00:00Z".into()),
             ..handoff
         };
         write_handoff_to(&latest, &consumed);
@@ -806,8 +821,8 @@ mod tests {
     fn render_hydration_context_includes_header() {
         let handoff = CompactHandoff {
             version: 1,
-            project_dir: "/project".to_string(),
-            created_at: "2026-01-01T00:00:00Z".to_string(),
+            project_dir: "/project".into(),
+            created_at: "2026-01-01T00:00:00Z".into(),
             status: HandoffStatus::Pending,
             source_session_scope: None,
             source_session_id: None,
@@ -830,8 +845,8 @@ mod tests {
     fn render_hydration_context_includes_divergence_warning() {
         let handoff = CompactHandoff {
             version: 1,
-            project_dir: "/p".to_string(),
-            created_at: "2026-01-01T00:00:00Z".to_string(),
+            project_dir: "/p".into(),
+            created_at: "2026-01-01T00:00:00Z".into(),
             status: HandoffStatus::Pending,
             source_session_scope: None,
             source_session_id: None,
@@ -853,24 +868,24 @@ mod tests {
     #[test]
     fn render_hydration_context_includes_runner_section() {
         let runner = RunnerHandoff {
-            run_dir: "/runs/r1".to_string(),
-            run_id: "r1".to_string(),
+            run_dir: "/runs/r1".into(),
+            run_id: "r1".into(),
             suite_id: None,
-            profile: Some("single-zone".to_string()),
-            suite_path: Some("/suites/s1/suite.md".to_string()),
-            runner_phase: Some("execution".to_string()),
-            verdict: Some("pending".to_string()),
+            profile: Some("single-zone".into()),
+            suite_path: Some("/suites/s1/suite.md".into()),
+            runner_phase: Some("execution".into()),
+            verdict: Some("pending".into()),
             completed_at: None,
             last_state_capture: None,
-            next_action: "run next group".to_string(),
-            executed_groups: vec!["g01".to_string()],
-            remaining_groups: vec!["g02".to_string()],
+            next_action: "run next group".into(),
+            executed_groups: vec!["g01".into()],
+            remaining_groups: vec!["g02".into()],
             state_paths: vec![],
         };
         let handoff = CompactHandoff {
             version: 1,
-            project_dir: "/p".to_string(),
-            created_at: "2026-01-01T00:00:00Z".to_string(),
+            project_dir: "/p".into(),
+            created_at: "2026-01-01T00:00:00Z".into(),
             status: HandoffStatus::Pending,
             source_session_scope: None,
             source_session_id: None,
@@ -892,20 +907,20 @@ mod tests {
     #[test]
     fn render_hydration_context_includes_authoring_section() {
         let authoring = AuthoringHandoff {
-            suite_dir: "/suites/s1".to_string(),
-            next_action: "pre-write review loop".to_string(),
-            author_phase: Some("prewrite_review".to_string()),
-            suite_name: Some("motb-core".to_string()),
-            feature: Some("motb".to_string()),
-            mode: Some("interactive".to_string()),
-            saved_payloads: vec!["inventory".to_string(), "proposal".to_string()],
+            suite_dir: "/suites/s1".into(),
+            next_action: "pre-write review loop".into(),
+            author_phase: Some("prewrite_review".into()),
+            suite_name: Some("motb-core".into()),
+            feature: Some("motb".into()),
+            mode: Some("interactive".into()),
+            saved_payloads: vec!["inventory".into(), "proposal".into()],
             suite_files: vec![],
             state_paths: vec![],
         };
         let handoff = CompactHandoff {
             version: 1,
-            project_dir: "/p".to_string(),
-            created_at: "2026-01-01T00:00:00Z".to_string(),
+            project_dir: "/p".into(),
+            created_at: "2026-01-01T00:00:00Z".into(),
             status: HandoffStatus::Pending,
             source_session_scope: None,
             source_session_id: None,
@@ -927,16 +942,16 @@ mod tests {
     #[test]
     fn render_runner_restore_context_includes_resume_guidance() {
         let runner = RunnerHandoff {
-            run_dir: "/runs/r1".to_string(),
-            run_id: "r1".to_string(),
+            run_dir: "/runs/r1".into(),
+            run_id: "r1".into(),
             suite_id: None,
-            profile: Some("single-zone".to_string()),
-            suite_path: Some("/s/suite.md".to_string()),
-            runner_phase: Some("execution".to_string()),
-            verdict: Some("pending".to_string()),
+            profile: Some("single-zone".into()),
+            suite_path: Some("/s/suite.md".into()),
+            runner_phase: Some("execution".into()),
+            verdict: Some("pending".into()),
             completed_at: None,
             last_state_capture: None,
-            next_action: "continue".to_string(),
+            next_action: "continue".into(),
             executed_groups: vec![],
             remaining_groups: vec![],
             state_paths: vec![],
@@ -950,18 +965,18 @@ mod tests {
     #[test]
     fn render_runner_restore_context_aborted_with_remaining_groups() {
         let runner = RunnerHandoff {
-            run_dir: "/runs/r1".to_string(),
-            run_id: "r1".to_string(),
+            run_dir: "/runs/r1".into(),
+            run_id: "r1".into(),
             suite_id: None,
             profile: None,
             suite_path: None,
-            runner_phase: Some("aborted".to_string()),
-            verdict: Some("aborted".to_string()),
+            runner_phase: Some("aborted".into()),
+            verdict: Some("aborted".into()),
             completed_at: None,
             last_state_capture: None,
-            next_action: "resume".to_string(),
-            executed_groups: vec!["g01".to_string()],
-            remaining_groups: vec!["g02".to_string()],
+            next_action: "resume".into(),
+            executed_groups: vec!["g01".into()],
+            remaining_groups: vec!["g02".into()],
             state_paths: vec![],
         };
         let ctx = render_runner_restore_context(Path::new("/p"), &runner);
@@ -972,16 +987,16 @@ mod tests {
     #[test]
     fn render_runner_section_aborted_no_remaining() {
         let runner = RunnerHandoff {
-            run_dir: "/runs/r1".to_string(),
-            run_id: "r1".to_string(),
+            run_dir: "/runs/r1".into(),
+            run_id: "r1".into(),
             suite_id: None,
             profile: None,
             suite_path: None,
-            runner_phase: Some("aborted".to_string()),
-            verdict: Some("aborted".to_string()),
+            runner_phase: Some("aborted".into()),
+            verdict: Some("aborted".into()),
             completed_at: None,
             last_state_capture: None,
-            next_action: "done".to_string(),
+            next_action: "done".into(),
             executed_groups: vec![],
             remaining_groups: vec![],
             state_paths: vec![],
@@ -1010,8 +1025,8 @@ mod tests {
     fn has_sections_false_when_empty() {
         let handoff = CompactHandoff {
             version: 1,
-            project_dir: "/p".to_string(),
-            created_at: "2026-01-01T00:00:00Z".to_string(),
+            project_dir: "/p".into(),
+            created_at: "2026-01-01T00:00:00Z".into(),
             status: HandoffStatus::Pending,
             source_session_scope: None,
             source_session_id: None,
@@ -1031,8 +1046,8 @@ mod tests {
     fn has_sections_true_with_runner() {
         let handoff = CompactHandoff {
             version: 1,
-            project_dir: "/p".to_string(),
-            created_at: "2026-01-01T00:00:00Z".to_string(),
+            project_dir: "/p".into(),
+            created_at: "2026-01-01T00:00:00Z".into(),
             status: HandoffStatus::Pending,
             source_session_scope: None,
             source_session_id: None,
@@ -1042,8 +1057,8 @@ mod tests {
             custom_instructions: None,
             consumed_at: None,
             runner: Some(RunnerHandoff {
-                run_dir: "/r".to_string(),
-                run_id: "r1".to_string(),
+                run_dir: "/r".into(),
+                run_id: "r1".into(),
                 suite_id: None,
                 profile: None,
                 suite_path: None,
@@ -1051,7 +1066,7 @@ mod tests {
                 verdict: None,
                 completed_at: None,
                 last_state_capture: None,
-                next_action: "x".to_string(),
+                next_action: "x".into(),
                 executed_groups: vec![],
                 remaining_groups: vec![],
                 state_paths: vec![],
@@ -1066,14 +1081,14 @@ mod tests {
     fn compact_handoff_serialization_roundtrip() {
         let handoff = CompactHandoff {
             version: 1,
-            project_dir: "/project".to_string(),
-            created_at: "2026-01-01T00:00:00Z".to_string(),
+            project_dir: "/project".into(),
+            created_at: "2026-01-01T00:00:00Z".into(),
             status: HandoffStatus::Pending,
-            source_session_scope: Some("session-abc".to_string()),
-            source_session_id: Some("abc".to_string()),
+            source_session_scope: Some("session-abc".into()),
+            source_session_id: Some("abc".into()),
             transcript_path: None,
-            cwd: Some("/cwd".to_string()),
-            trigger: Some("manual".to_string()),
+            cwd: Some("/cwd".into()),
+            trigger: Some("manual".into()),
             custom_instructions: None,
             consumed_at: None,
             runner: None,
@@ -1081,7 +1096,7 @@ mod tests {
             fingerprints: vec![],
         };
         let json = serde_json::to_string(&handoff).unwrap();
-        let parsed: CompactHandoff = serde_json::from_str(&json).unwrap();
+        let parsed: CompactHandoff<'_> = serde_json::from_str(&json).unwrap();
         assert_eq!(parsed.version, handoff.version);
         assert_eq!(parsed.status, handoff.status);
         assert_eq!(parsed.trigger, handoff.trigger);
@@ -1129,8 +1144,8 @@ mod tests {
     fn ordered_sections_unfinished_first() {
         let handoff = CompactHandoff {
             version: 1,
-            project_dir: "/p".to_string(),
-            created_at: "2026-01-01T00:00:00Z".to_string(),
+            project_dir: "/p".into(),
+            created_at: "2026-01-01T00:00:00Z".into(),
             status: HandoffStatus::Pending,
             source_session_scope: None,
             source_session_id: None,
@@ -1140,24 +1155,24 @@ mod tests {
             custom_instructions: None,
             consumed_at: None,
             runner: Some(RunnerHandoff {
-                run_dir: "/r".to_string(),
-                run_id: "r1".to_string(),
+                run_dir: "/r".into(),
+                run_id: "r1".into(),
                 suite_id: None,
                 profile: None,
                 suite_path: None,
-                runner_phase: Some("completed".to_string()),
-                verdict: Some("pass".to_string()),
-                completed_at: Some("2026-01-01T00:00:00Z".to_string()),
+                runner_phase: Some("completed".into()),
+                verdict: Some("pass".into()),
+                completed_at: Some("2026-01-01T00:00:00Z".into()),
                 last_state_capture: None,
-                next_action: "done".to_string(),
+                next_action: "done".into(),
                 executed_groups: vec![],
                 remaining_groups: vec![],
                 state_paths: vec![],
             }),
             authoring: Some(AuthoringHandoff {
-                suite_dir: "/s".to_string(),
-                next_action: "write".to_string(),
-                author_phase: Some("writing".to_string()),
+                suite_dir: "/s".into(),
+                next_action: "write".into(),
+                author_phase: Some("writing".into()),
                 suite_name: None,
                 feature: None,
                 mode: None,
