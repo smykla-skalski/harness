@@ -5,7 +5,7 @@ use std::process::Command;
 
 use sha2::{Digest, Sha256};
 
-use crate::errors::{CliError, CliErrorKind};
+use crate::errors::{CliError, CliErrorKind, cow};
 
 /// Build information resolved from the repo.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -175,7 +175,7 @@ pub fn resolve_build_info(repo: &Path) -> Result<BuildInfo, CliError> {
         .output()
         .map_err(|e| {
             CliError::from(CliErrorKind::CommandFailed {
-                command: format!("git status: {e}").into(),
+                command: cow!("git status: {e}"),
             })
         })?;
 
@@ -195,7 +195,7 @@ pub fn resolve_build_info(repo: &Path) -> Result<BuildInfo, CliError> {
         .output()
         .map_err(|e| {
             CliError::from(CliErrorKind::CommandFailed {
-                command: format!("git rev-parse: {e}").into(),
+                command: cow!("git rev-parse: {e}"),
             })
         })?;
 

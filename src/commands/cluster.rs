@@ -4,7 +4,7 @@ use std::path::Path;
 
 use crate::cluster::{ClusterSpec, HelmSetting};
 use crate::core_defs::{resolve_build_info, utc_now};
-use crate::errors::{CliError, CliErrorKind};
+use crate::errors::{CliError, CliErrorKind, cow};
 use crate::exec::{cluster_exists, run_command};
 
 fn make_target(root: &Path, target: &str, env: &HashMap<String, String>) -> Result<(), CliError> {
@@ -70,7 +70,7 @@ pub fn execute(
         "global-two-zones-down" => global_two_zones_down(&root, &base_env, validated_args)?,
         _ => {
             return Err(CliErrorKind::ClusterError {
-                detail: format!("unsupported cluster mode: {mode}").into(),
+                detail: cow!("unsupported cluster mode: {mode}"),
             }
             .into());
         }

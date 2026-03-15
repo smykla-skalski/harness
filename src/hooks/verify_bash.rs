@@ -3,7 +3,7 @@ use std::path::Path;
 
 use crate::cluster::ClusterMode;
 use crate::context::RunContext;
-use crate::errors::{CliError, HookMessage};
+use crate::errors::{CliError, HookMessage, cow};
 use crate::hook::HookResult;
 use crate::hook_payloads::HookContext;
 use crate::workflow::runner::{RunnerPhase, RunnerWorkflowState, SuiteFixState};
@@ -59,7 +59,7 @@ pub fn execute(ctx: &HookContext) -> Result<HookResult, CliError> {
     }
     let target = missing_target(subcommand, run);
     Ok(HookMessage::MissingArtifact {
-        script: format!("harness {subcommand}").into(),
+        script: cow!("harness {subcommand}"),
         target: target.into(),
     }
     .into_result())
@@ -127,7 +127,7 @@ fn check_cluster(words: &[String], run: &RunContext) -> HookResult {
         return HookResult::allow();
     }
     HookMessage::MissingArtifact {
-        script: format!("harness cluster {mode}").into(),
+        script: cow!("harness cluster {mode}"),
         target: target.display().to_string().into(),
     }
     .into_result()

@@ -4,7 +4,7 @@ use std::{env, fs};
 
 use regex::Regex;
 
-use crate::errors::{CliError, CliErrorKind};
+use crate::errors::{CliError, CliErrorKind, cow};
 use crate::exec::{kubectl, run_command};
 use crate::io::ensure_dir;
 
@@ -58,7 +58,7 @@ pub fn execute(
 
     let tmp_dir = env::temp_dir().join("harness-gateway");
     ensure_dir(&tmp_dir).map_err(|e| CliErrorKind::Io {
-        detail: format!("could not create temp dir {}: {e}", tmp_dir.display()).into(),
+        detail: cow!("could not create temp dir {}: {e}", tmp_dir.display()),
     })?;
 
     let temp_manifest = tmp_dir.join(format!("gateway-api-{version}.yaml"));

@@ -5,6 +5,18 @@ use std::io;
 
 use crate::hook::{Decision, HookResult};
 
+/// Build a `Cow<'static, str>` from a `format!`-style expression.
+///
+/// Produces `Cow::Owned(format!(...))` so the caller never needs a
+/// trailing `.into()`.
+macro_rules! cow {
+    ($($arg:tt)*) => {
+        ::std::borrow::Cow::Owned(format!($($arg)*))
+    };
+}
+
+pub(crate) use cow;
+
 /// Enum of all CLI error kinds, following the `io::ErrorKind` pattern.
 ///
 /// Each variant carries its data as fields - no runtime template rendering.
@@ -455,7 +467,7 @@ impl From<CliErrorKind> for CliError {
 impl From<io::Error> for CliError {
     fn from(e: io::Error) -> Self {
         CliErrorKind::Io {
-            detail: format!("IO error: {e}").into(),
+            detail: cow!("IO error: {e}"),
         }
         .into()
     }
