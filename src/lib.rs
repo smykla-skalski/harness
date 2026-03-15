@@ -8,6 +8,7 @@ pub mod cluster;
 pub mod codec;
 pub mod commands;
 pub mod compact;
+pub mod compose;
 pub mod context;
 pub mod core_defs;
 pub mod ephemeral_metallb;
