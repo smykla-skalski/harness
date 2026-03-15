@@ -7,10 +7,11 @@ use std::sync::LazyLock;
 
 use regex::Regex;
 
-use crate::cli::{EnvoyCommand, KumactlCommand, ReportCommand, RunDirArgs};
+use crate::cli::{EnvoyCommand, KumactlCommand, ReportCommand, RunDirArgs, ServiceArgs};
 use crate::context::{CurrentRunRecord, RunContext, RunLayout, RunMetadata};
 use crate::core_defs::{current_run_context_path, harness_data_root, utc_now};
 use crate::errors::{CliError, CliErrorKind, cow};
+use crate::exec;
 use crate::exec::{kubectl, run_command};
 use crate::io::{append_markdown_row, drill, ensure_dir, read_text, write_text};
 use crate::manifests::default_validation_output;
@@ -964,4 +965,190 @@ pub fn kumactl(cmd: &KumactlCommand) -> Result<i32, CliError> {
             Ok(0)
         }
     }
+}
+
+// =========================================================================
+// token (universal mode)
+// =========================================================================
+
+/// Generate a dataplane token from the control plane.
+///
+/// Tries the REST API first, falls back to kumactl.
+///
+/// # Errors
+/// Returns `CliError` on failure.
+pub fn token(
+    kind: &str,
+    name: &str,
+    mesh: &str,
+    cp_addr: Option<&str>,
+    valid_for: &str,
+    run_dir_args: &RunDirArgs,
+) -> Result<i32, CliError> {
+    let addr = if let Some(a) = cp_addr {
+        a.to_string()
+    } else {
+        let ctx = super::resolve_run_context(run_dir_args)?;
+        super::resolve_cp_addr(&ctx)?
+    };
+
+    // Try REST API first
+    match token_via_api(&addr, kind, name, mesh, valid_for) {
+        Ok(tok) => {
+            println!("{tok}");
+            return Ok(0);
+        }
+        Err(api_err) => {
+            eprintln!("token: API failed ({api_err}), trying kumactl");
+        }
+    }
+
+    // Fallback to kumactl
+    let ctx = super::resolve_run_context(run_dir_args)?;
+    let root = PathBuf::from(&ctx.metadata.repo_root);
+    let binary = find_kumactl_binary(&root)?;
+
+    let mut args = vec!["generate", "dataplane-token"];
+    args.extend_from_slice(&["--name", name]);
+    args.extend_from_slice(&["--mesh", mesh]);
+    args.extend_from_slice(&["--type", kind]);
+    args.extend_from_slice(&["--valid-for", valid_for]);
+
+    let result = exec::kumactl_run(&binary, &addr, &args, &[0])?;
+    let tok = result.stdout.trim();
+    println!("{tok}");
+    Ok(0)
+}
+
+fn token_via_api(
+    addr: &str,
+    kind: &str,
+    name: &str,
+    mesh: &str,
+    valid_for: &str,
+) -> Result<String, CliError> {
+    let body = serde_json::json!({
+        "name": name,
+        "mesh": mesh,
+        "type": kind,
+        "validFor": valid_for,
+    });
+    let resp = exec::cp_api_post(addr, "/tokens/dataplane", &body)?;
+    resp.as_str()
+        .map(String::from)
+        .ok_or_else(|| CliErrorKind::token_generation_failed("unexpected response format").into())
+}
+
+// =========================================================================
+// service (universal mode)
+// =========================================================================
+
+/// Manage universal mode test service containers.
+///
+/// # Errors
+/// Returns `CliError` on failure.
+pub fn service(args: &ServiceArgs) -> Result<i32, CliError> {
+    match args.action.as_str() {
+        "up" => service_up(
+            args.name.as_deref(),
+            args.image.as_deref(),
+            args.port,
+            &args.mesh,
+            args.transparent_proxy,
+            &args.run_dir,
+        ),
+        "down" => service_down(args.name.as_deref(), &args.run_dir),
+        "list" => service_list(&args.run_dir),
+        _ => Err(
+            CliErrorKind::usage_error(format!("unknown service action: {}", args.action)).into(),
+        ),
+    }
+}
+
+fn service_up(
+    name: Option<&str>,
+    image: Option<&str>,
+    port: Option<u16>,
+    mesh: &str,
+    transparent_proxy: bool,
+    run_dir_args: &RunDirArgs,
+) -> Result<i32, CliError> {
+    let svc_name = name.ok_or_else(|| CliErrorKind::usage_error("service name is required"))?;
+    let svc_image = image.ok_or_else(|| CliErrorKind::usage_error("service image is required"))?;
+    let svc_port = port.ok_or_else(|| CliErrorKind::usage_error("service port is required"))?;
+
+    let ctx = super::resolve_run_context(run_dir_args)?;
+    let cp_addr = super::resolve_cp_addr(&ctx)?;
+    let spec = ctx
+        .cluster
+        .as_ref()
+        .ok_or_else(|| CliErrorKind::missing_run_context_value("cluster"))?;
+    let network = spec
+        .docker_network
+        .as_deref()
+        .ok_or_else(|| CliErrorKind::missing_run_context_value("docker_network"))?;
+
+    // Generate token
+    let token_result = token_via_api(&cp_addr, "dataplane", svc_name, mesh, "24h")?;
+    let token_str = token_result.trim();
+
+    // Start service container
+    let port_pair = [(svc_port, svc_port)];
+    exec::docker_run_detached(
+        svc_image,
+        svc_name,
+        network,
+        &[],
+        &port_pair,
+        &[],
+        &["sleep", "infinity"],
+    )?;
+
+    // Write token into container
+    let token_path = format!("/tmp/{svc_name}-token");
+    exec::docker_exec_cmd(
+        svc_name,
+        &["sh", "-c", &format!("echo '{token_str}' > {token_path}")],
+    )?;
+
+    // Install transparent proxy if requested
+    if transparent_proxy {
+        exec::docker_exec_cmd(
+            svc_name,
+            &["kumactl", "install", "transparent-proxy", "--redirect-dns"],
+        )?;
+    }
+
+    // Start kuma-dp inside the container
+    let dp_args = format!(
+        "kuma-dp run --cp-address={cp_addr} \
+         --dataplane-token-file={token_path} \
+         --name={svc_name} --mesh={mesh}"
+    );
+    exec::docker_exec_cmd(svc_name, &["sh", "-c", &format!("{dp_args} &")])?;
+
+    println!("{svc_name}");
+    Ok(0)
+}
+
+fn service_down(name: Option<&str>, _run_dir_args: &RunDirArgs) -> Result<i32, CliError> {
+    let svc_name = name.ok_or_else(|| CliErrorKind::usage_error("service name is required"))?;
+    exec::docker_rm(svc_name)?;
+    println!("{svc_name} removed");
+    Ok(0)
+}
+
+fn service_list(_run_dir_args: &RunDirArgs) -> Result<i32, CliError> {
+    let result = exec::docker(
+        &[
+            "ps",
+            "--filter",
+            "label=io.harness.service=true",
+            "--format",
+            "{{.Names}}\t{{.Status}}",
+        ],
+        &[0],
+    )?;
+    print!("{}", result.stdout);
+    Ok(0)
 }
