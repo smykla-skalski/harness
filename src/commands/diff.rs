@@ -1,16 +1,16 @@
 use std::path::Path;
 
-use crate::errors::{self, CliError};
+use crate::errors::{CliError, CliErrorKind};
 use crate::io::{drill, read_text};
 
 fn load_payload(path: &Path) -> Result<serde_json::Value, CliError> {
     let text = read_text(path)?;
     if path.extension().and_then(|e| e.to_str()) == Some("json") {
         serde_json::from_str(&text).map_err(|_| {
-            errors::cli_err(
-                &errors::INVALID_JSON,
-                &[("path", &path.display().to_string())],
-            )
+            CliErrorKind::InvalidJson {
+                path: path.display().to_string(),
+            }
+            .into()
         })
     } else {
         Ok(serde_json::Value::String(text))

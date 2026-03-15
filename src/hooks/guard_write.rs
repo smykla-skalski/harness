@@ -1,11 +1,10 @@
 use std::path::Path;
 
-use crate::errors::{self, CliError};
+use crate::errors::{CliError, HookMessage};
 use crate::hook::HookResult;
 use crate::hook_payloads::HookContext;
 use crate::rules::suite_runner as rules;
 use crate::workflow::author::{self, can_write};
-use crate::workflow::runner::RunnerPhase;
 
 use super::{control_file_hint, is_command_owned_run_file, normalize_path};
 
@@ -49,23 +48,20 @@ fn guard_suite_author(ctx: &HookContext, paths: &[&str]) -> HookResult {
                 continue;
             }
             if !author::suite_author_path_allowed(&norm, sdn) {
-                return errors::hook_msg(&errors::DENY_WRITE_OUTSIDE_SUITE, &[("path", raw_path)]);
+                return HookMessage::WriteOutsideSuite {
+                    path: (*raw_path).into(),
+                }
+                .into_result();
             }
         }
     }
     // Check if writing is allowed in the current phase.
-    let (allowed, reason) = can_write(state);
-    if !allowed {
-        return errors::hook_msg(
-            &errors::DENY_APPROVAL_REQUIRED,
-            &[
-                ("action", "write suite files"),
-                (
-                    "details",
-                    reason.unwrap_or("suite-author is not in a writable phase"),
-                ),
-            ],
-        );
+    if let Err(reason) = can_write(state) {
+        return HookMessage::ApprovalRequired {
+            action: "write suite files".into(),
+            details: reason.into(),
+        }
+        .into_result();
     }
     HookResult::allow()
 }
@@ -80,20 +76,15 @@ fn guard_suite_runner(ctx: &HookContext, paths: &[&str]) -> HookResult {
         if let Some(ref rd) = run_dir {
             if is_command_owned_run_file(&path, rd) {
                 let hint = control_file_hint(&path);
-                return errors::hook_msg(
-                    &errors::DENY_RUNNER_FLOW_REQUIRED,
-                    &[
-                        ("action", "edit run control files"),
-                        (
-                            "details",
-                            &format!(
-                                "{} is harness-managed; {hint}",
-                                path.file_name()
-                                    .map_or("file", |n| n.to_str().unwrap_or("file"))
-                            ),
-                        ),
-                    ],
-                );
+                return HookMessage::RunnerFlowRequired {
+                    action: "edit run control files".into(),
+                    details: format!(
+                        "{} is harness-managed; {hint}",
+                        path.file_name()
+                            .map_or("file", |n| n.to_str().unwrap_or("file"))
+                    ),
+                }
+                .into_result();
             }
             if allowed_suite_runner_path(&path, rd) {
                 continue;
@@ -104,30 +95,22 @@ fn guard_suite_runner(ctx: &HookContext, paths: &[&str]) -> HookResult {
             && path.starts_with(sdn)
         {
             if let Some(ref state) = ctx.runner_state
-                && !matches!(
-                    &state.phase,
-                    RunnerPhase::Triage {
-                        suite_fix: Some(_),
-                        ..
-                    }
-                )
+                && state.suite_fix.is_none()
             {
-                return errors::hook_msg(
-                    &errors::DENY_RUNNER_FLOW_REQUIRED,
-                    &[
-                        ("action", "edit suite files"),
-                        (
-                            "details",
-                            "approved suite repair is required before editing suite files",
-                        ),
-                    ],
-                );
+                return HookMessage::RunnerFlowRequired {
+                    action: "edit suite files".into(),
+                    details: "approved suite repair is required before editing suite files".into(),
+                }
+                .into_result();
             }
             continue;
         }
         // Path outside run surface.
         if run_dir.is_some() || suite_dir.is_some() {
-            return errors::hook_msg(&errors::DENY_WRITE_OUTSIDE_RUN, &[("path", raw_path)]);
+            return HookMessage::WriteOutsideRun {
+                path: (*raw_path).into(),
+            }
+            .into_result();
         }
     }
     HookResult::allow()

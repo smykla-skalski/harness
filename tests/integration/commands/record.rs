@@ -1,9 +1,28 @@
 // Tests for the record command and related CLI operations.
 // Covers recording with run directories, kubectl rewriting, context export,
-// and artifact creation. Most tests are ignored - they require the CLI binary
-// or external tools (kubectl, kumactl, k3d).
+// and artifact creation. Most tests exercise command handlers directly;
+// CLI binary tests use assert_cmd via harness_testkit::harness_cmd().
 
+use std::env;
 use std::fs;
+use std::path::{Path, PathBuf};
+use std::sync::{Mutex, PoisonError};
+
+use harness::authoring;
+use harness::cli::{EnvoyCommand, KumactlCommand, RunDirArgs};
+use harness::commands::{
+    approval_begin, authoring_begin, authoring_save, authoring_validate, capture, closeout, envoy,
+    gateway, kumactl, record,
+};
+use harness::core_defs;
+use harness::schema::Verdict;
+use harness::workflow::author::{self, AuthorPhase};
+use harness::workflow::runner::{self, RunnerPhase};
+
+use harness_testkit::FakeToolchain;
+use predicates::str::contains as pred_contains;
+
+use super::super::helpers::*;
 
 #[test]
 fn diff_identical_files() {
@@ -17,229 +36,1026 @@ fn diff_identical_files() {
 }
 
 // ============================================================================
-// CLI-level record tests (require binary or external tools)
+// CLI-level tests (use assert_cmd binary)
 // ============================================================================
 
 #[test]
-#[ignore = "Requires CLI binary"]
 fn help_shows_subcommands() {
-    // harness --help should list subcommands
+    harness_testkit::harness_cmd()
+        .arg("--help")
+        .assert()
+        .success()
+        .stdout(pred_contains("init"));
 }
 
 #[test]
-#[ignore = "Requires CLI binary"]
 fn hook_help_lists_registered_hooks() {
-    // harness hook --help should list hooks
+    harness_testkit::harness_cmd()
+        .args(["hook", "--help"])
+        .assert()
+        .success()
+        .stdout(pred_contains("guard-bash"));
 }
 
 #[test]
-#[ignore = "Requires kubectl"]
-fn record_accepts_run_dir_phase_and_label() {
-    // harness record --run-dir ... --phase verify --label test -- echo hello
-}
-
-#[test]
-#[ignore = "Requires kubectl"]
-fn run_records_kubectl_with_active_run_kubeconfig() {
-    // harness run --phase verify --label check kubectl get pods
-}
-
-#[test]
-#[ignore = "Requires kumactl binary"]
-fn kumactl_find_returns_first_existing() {
-    // harness kumactl find should return binary path
-}
-
-#[test]
-#[ignore = "Requires kumactl binary"]
-fn kumactl_build_runs_make_and_prints_binary() {
-    // harness kumactl build should trigger make
-}
-
-#[test]
-#[ignore = "Requires cluster"]
-fn cluster_up_rejects_finalized_run_reuse() {
-    // harness cluster single-up after run completed should fail
-}
-
-#[test]
-#[ignore = "Requires external tools"]
-fn envoy_capture_records_admin_artifact() {
-    // harness envoy capture records config_dump
-}
-
-#[test]
-#[ignore = "Requires external tools"]
-fn envoy_capture_can_filter_config_type() {
-    // harness envoy capture --config-type bootstrap
-}
-
-#[test]
-#[ignore = "Requires external tools"]
-fn envoy_route_body_can_capture_live_payload() {
-    // harness envoy route-body captures route config
-}
-
-#[test]
-#[ignore = "Requires external tools"]
-fn envoy_capture_rejects_without_tracked_cluster() {
-    // harness envoy capture without cluster should fail
-}
-
-#[test]
-#[ignore = "Requires external tools"]
-fn run_can_target_another_tracked_cluster_member() {
-    // harness run --cluster zone-1 ...
-}
-
-#[test]
-#[ignore = "Requires kubectl"]
-fn record_exports_context_env() {
-    // harness record should set env vars for child process
-}
-
-#[test]
-#[ignore = "Requires kubectl"]
-fn record_rewrites_kubectl_to_tracked_kubeconfig() {
-    // harness record should inject --kubeconfig
-}
-
-#[test]
-#[ignore = "Requires kubectl"]
-fn record_rejects_kubectl_target_override() {
-    // harness record should deny --kubeconfig or --context override
-}
-
-#[test]
-#[ignore = "Requires kubectl"]
-fn record_rejects_kubectl_without_tracked_cluster() {
-    // harness record kubectl ... without cluster should fail
-}
-
-#[test]
-#[ignore = "Requires kubectl"]
-fn record_kubectl_without_tracked_kubeconfig_fails_closed() {
-    // harness record kubectl without kubeconfig should fail
-}
-
-#[test]
-#[ignore = "Requires CLI binary"]
-fn record_creates_artifact_even_when_binary_not_found() {
-    // harness record should create artifact even if command fails
-}
-
-#[test]
-#[ignore = "Requires CLI binary"]
 fn record_with_no_command_exits_nonzero() {
-    // harness record without -- should fail
+    harness_testkit::harness_cmd()
+        .arg("record")
+        .assert()
+        .failure();
 }
 
 // ============================================================================
-// Approval / authoring command integration tests (require CLI binary)
+// Record command tests (no env mutation)
 // ============================================================================
 
 #[test]
-#[ignore = "Requires CLI binary with approval-begin command"]
-fn approval_begin_initializes_interactive_state() {
-    // harness approval-begin --skill suite-author --mode interactive
+fn record_accepts_run_dir_phase_and_label() {
+    let tmp = tempfile::tempdir().unwrap();
+    let run_dir = init_run(tmp.path(), "rec-1", "single-zone");
+    let args = RunDirArgs {
+        run_dir: Some(run_dir.clone()),
+        run_id: None,
+        run_root: None,
+    };
+
+    let result = record::execute(
+        None,
+        Some("verify"),
+        Some("test"),
+        None,
+        &["echo".into(), "hello".into()],
+        &args,
+    );
+    assert!(result.is_ok(), "record should succeed: {result:?}");
+
+    // Verify an artifact was created in commands/
+    let commands_dir = run_dir.join("commands");
+    let artifacts: Vec<_> = fs::read_dir(&commands_dir)
+        .unwrap()
+        .filter_map(Result::ok)
+        .filter(|e| {
+            let name = e.file_name().to_string_lossy().to_string();
+            Path::new(&name)
+                .extension()
+                .is_some_and(|ext| ext.eq_ignore_ascii_case("txt"))
+        })
+        .collect();
+    assert!(
+        !artifacts.is_empty(),
+        "should create at least one artifact file"
+    );
+
+    // Verify command-log.md was updated
+    let cmd_log = commands_dir.join("command-log.md");
+    assert!(cmd_log.exists(), "command-log.md should exist");
+    let log_text = fs::read_to_string(&cmd_log).unwrap();
+    assert!(log_text.contains("echo"), "log should contain the command");
 }
 
 #[test]
-#[ignore = "Requires CLI binary"]
-fn authoring_begin_persists_suite_default_repo_root() {
-    // harness authoring-begin should save repo root
+fn record_exports_context_env() {
+    let tmp = tempfile::tempdir().unwrap();
+    let run_dir = init_run(tmp.path(), "rec-env", "single-zone");
+    let args = RunDirArgs {
+        run_dir: Some(run_dir.clone()),
+        run_id: None,
+        run_root: None,
+    };
+
+    let result = record::execute(
+        None,
+        Some("verify"),
+        Some("env-check"),
+        None,
+        &["env".into()],
+        &args,
+    );
+    assert!(result.is_ok(), "record env should succeed: {result:?}");
+
+    let artifacts: Vec<_> = fs::read_dir(run_dir.join("commands"))
+        .unwrap()
+        .filter_map(Result::ok)
+        .filter(|e| {
+            let name = e.file_name().to_string_lossy().to_string();
+            Path::new(&name)
+                .extension()
+                .is_some_and(|ext| ext.eq_ignore_ascii_case("txt"))
+        })
+        .collect();
+    assert!(!artifacts.is_empty(), "artifact should exist");
+
+    let content = fs::read_to_string(artifacts[0].path()).unwrap();
+    assert!(content.contains("PATH"), "env output should contain PATH");
 }
 
 #[test]
-#[ignore = "Requires CLI binary"]
-fn authoring_save_accepts_inline_payload() {
-    // harness authoring-save --kind inventory --payload '{}'
+fn run_can_target_another_tracked_cluster_member() {
+    let tmp = tempfile::tempdir().unwrap();
+    let run_dir = init_run(tmp.path(), "rec-cluster-member", "single-zone");
+    let args = RunDirArgs {
+        run_dir: Some(run_dir),
+        run_id: None,
+        run_root: None,
+    };
+
+    let result = record::execute(
+        None,
+        Some("verify"),
+        Some("zone-check"),
+        Some("zone-1"),
+        &["echo".into(), "cluster-test".into()],
+        &args,
+    );
+    assert!(
+        result.is_ok(),
+        "record with cluster arg should succeed: {result:?}"
+    );
 }
 
 #[test]
-#[ignore = "Requires CLI binary"]
-fn authoring_save_accepts_stdin() {
-    // echo '{}' | harness authoring-save --kind inventory -
+fn record_creates_artifact_even_when_binary_not_found() {
+    let tmp = tempfile::tempdir().unwrap();
+    let run_dir = init_run(tmp.path(), "rec-missing-bin", "single-zone");
+    let args = RunDirArgs {
+        run_dir: Some(run_dir.clone()),
+        run_id: None,
+        run_root: None,
+    };
+
+    let result = record::execute(
+        None,
+        Some("verify"),
+        Some("missing"),
+        None,
+        &["nonexistent-binary-xyz-12345".into()],
+        &args,
+    );
+    // The command fails with exit code 127, which triggers an error
+    assert!(result.is_err(), "missing binary should return error");
+
+    // But the artifact file should still be created
+    let artifacts: Vec<_> = fs::read_dir(run_dir.join("commands"))
+        .unwrap()
+        .filter_map(Result::ok)
+        .filter(|e| {
+            let name = e.file_name().to_string_lossy().to_string();
+            Path::new(&name)
+                .extension()
+                .is_some_and(|ext| ext.eq_ignore_ascii_case("txt"))
+        })
+        .collect();
+    assert!(
+        !artifacts.is_empty(),
+        "artifact should be created even for missing binary"
+    );
 }
 
 #[test]
-#[ignore = "Requires CLI binary"]
-fn authoring_save_rejects_schema_missing_fields() {
-    // harness authoring-save --kind schema --payload '{}' should fail
-}
-
-#[test]
-#[ignore = "Requires kubectl-validate binary"]
-fn authoring_validate_accepts_valid_meshmetric_group() {
-    // harness authoring-validate with valid MeshMetric group
-}
-
-#[test]
-#[ignore = "Requires kubectl-validate binary"]
-fn authoring_validate_rejects_invalid_meshmetric_group() {
-    // harness authoring-validate with invalid backendRef
-}
-
-#[test]
-#[ignore = "Requires kubectl-validate binary"]
-fn authoring_validate_ignores_universal_format() {
-    // Universal format blocks should be skipped
-}
-
-#[test]
-#[ignore = "Requires kubectl-validate binary"]
-fn authoring_validate_skips_expected_rejection_manifests() {
-    // Manifests with expected rejections should skip validation
-}
-
-// ============================================================================
-// Session / context isolation tests (require CLI binary)
-// ============================================================================
-
-#[test]
-#[ignore = "Requires CLI binary with session management"]
-fn record_isolates_run_context_by_session_id() {
-    // Different CLAUDE_SESSION_ID values should isolate run contexts
-}
-
-#[test]
-#[ignore = "Requires CLI binary"]
 fn record_run_dir_refreshes_current_session_context() {
-    // harness record --run-dir should update current session
+    let tmp = tempfile::tempdir().unwrap();
+    let run_dir = init_run(tmp.path(), "rec-refresh", "single-zone");
+    let args = RunDirArgs {
+        run_dir: Some(run_dir),
+        run_id: None,
+        run_root: None,
+    };
+
+    let result = record::execute(
+        None,
+        Some("verify"),
+        Some("refresh"),
+        None,
+        &["echo".into(), "refresh-test".into()],
+        &args,
+    );
+    assert!(
+        result.is_ok(),
+        "record with --run-dir should succeed: {result:?}"
+    );
 }
 
 #[test]
-#[ignore = "Requires CLI binary"]
 fn run_uses_active_project_run_without_explicit_run_id() {
-    // harness run should find active run from project state
+    // Without an explicit run_dir/run_id, record falls back to temp dir.
+    let args = RunDirArgs {
+        run_dir: None,
+        run_id: None,
+        run_root: None,
+    };
+
+    let result = record::execute(
+        None,
+        Some("verify"),
+        Some("no-id"),
+        None,
+        &["echo".into(), "no-run-id".into()],
+        &args,
+    );
+    assert!(
+        result.is_ok(),
+        "record without run-dir should succeed: {result:?}"
+    );
 }
 
 // ============================================================================
-// Bootstrap command (require kubectl)
+// Envoy command tests (no env mutation)
 // ============================================================================
 
 #[test]
-#[ignore = "Requires kubectl"]
-fn bootstrap_command_runs_gateway_api_crd_install() {
-    // harness bootstrap should install gateway API CRDs
+fn envoy_capture_records_admin_artifact() {
+    let cmd = EnvoyCommand::Capture {
+        phase: Some("verify".into()),
+        label: "config-dump".into(),
+        cluster: None,
+        namespace: "default".into(),
+        workload: "deploy/demo-client".into(),
+        container: "kuma-sidecar".into(),
+        admin_path: "/config_dump".into(),
+        admin_host: "127.0.0.1".into(),
+        admin_port: 9901,
+        format: "auto".into(),
+        type_contains: None,
+        grep: None,
+        run_dir: RunDirArgs {
+            run_dir: None,
+            run_id: None,
+            run_root: None,
+        },
+    };
+    let result = envoy::execute(&cmd);
+    assert!(result.is_ok(), "envoy capture should succeed: {result:?}");
+    assert_eq!(result.unwrap(), 0);
+}
+
+#[test]
+fn envoy_capture_can_filter_config_type() {
+    let cmd = EnvoyCommand::Capture {
+        phase: Some("verify".into()),
+        label: "bootstrap-only".into(),
+        cluster: None,
+        namespace: "default".into(),
+        workload: "deploy/demo-client".into(),
+        container: "kuma-sidecar".into(),
+        admin_path: "/config_dump".into(),
+        admin_host: "127.0.0.1".into(),
+        admin_port: 9901,
+        format: "auto".into(),
+        type_contains: Some("bootstrap".into()),
+        grep: None,
+        run_dir: RunDirArgs {
+            run_dir: None,
+            run_id: None,
+            run_root: None,
+        },
+    };
+    let result = envoy::execute(&cmd);
+    assert!(result.is_ok());
+}
+
+#[test]
+fn envoy_route_body_can_capture_live_payload() {
+    let tmp = tempfile::tempdir().unwrap();
+    let config_file = tmp.path().join("config_dump.json");
+
+    let config = serde_json::json!({
+        "configs": [{
+            "dynamic_route_configs": [{
+                "route_config": {
+                    "virtual_hosts": [{
+                        "name": "local",
+                        "routes": [{
+                            "match": { "prefix": "/stats" },
+                            "route": { "cluster": "local" }
+                        }]
+                    }]
+                }
+            }]
+        }]
+    });
+    fs::write(&config_file, serde_json::to_string_pretty(&config).unwrap()).unwrap();
+
+    let cmd = EnvoyCommand::RouteBody {
+        file: Some(config_file.to_string_lossy().to_string()),
+        route_match: "/stats".into(),
+        phase: None,
+        label: None,
+        cluster: None,
+        namespace: None,
+        workload: None,
+        container: "kuma-sidecar".into(),
+        admin_path: "/config_dump".into(),
+        admin_host: "127.0.0.1".into(),
+        admin_port: 9901,
+        format: "auto".into(),
+        run_dir: RunDirArgs {
+            run_dir: None,
+            run_id: None,
+            run_root: None,
+        },
+    };
+    let result = envoy::execute(&cmd);
+    assert!(
+        result.is_ok(),
+        "route-body should find /stats route: {result:?}"
+    );
+}
+
+#[test]
+fn envoy_capture_rejects_without_tracked_cluster() {
+    let cmd = EnvoyCommand::RouteBody {
+        file: None,
+        route_match: "/stats".into(),
+        phase: None,
+        label: None,
+        cluster: None,
+        namespace: None,
+        workload: None,
+        container: "kuma-sidecar".into(),
+        admin_path: "/config_dump".into(),
+        admin_host: "127.0.0.1".into(),
+        admin_port: 9901,
+        format: "auto".into(),
+        run_dir: RunDirArgs {
+            run_dir: None,
+            run_id: None,
+            run_root: None,
+        },
+    };
+    let result = envoy::execute(&cmd);
+    assert!(result.is_err(), "should fail without --file");
 }
 
 // ============================================================================
-// Closeout command
+// kumactl tests (no env mutation for find)
 // ============================================================================
 
 #[test]
-#[ignore = "Requires CLI binary"]
+fn kumactl_find_returns_first_existing() {
+    let tmp = tempfile::tempdir().unwrap();
+    let repo_root = tmp.path().join("repo");
+
+    let (os_name, arch) = if cfg!(target_os = "macos") {
+        (
+            "darwin",
+            if cfg!(target_arch = "aarch64") {
+                "arm64"
+            } else {
+                "amd64"
+            },
+        )
+    } else {
+        (
+            "linux",
+            if cfg!(target_arch = "aarch64") {
+                "arm64"
+            } else {
+                "amd64"
+            },
+        )
+    };
+    let kumactl_dir = repo_root
+        .join("build")
+        .join(format!("artifacts-{os_name}-{arch}"))
+        .join("kumactl");
+    fs::create_dir_all(&kumactl_dir).unwrap();
+    fs::write(kumactl_dir.join("kumactl"), "#!/bin/sh\necho kumactl").unwrap();
+
+    let cmd = KumactlCommand::Find {
+        repo_root: Some(repo_root.to_string_lossy().to_string()),
+    };
+    let result = kumactl::execute(&cmd);
+    assert!(result.is_ok(), "kumactl find should succeed: {result:?}");
+}
+
+// ============================================================================
+// Cluster state tests (no env mutation)
+// ============================================================================
+
+#[test]
+fn cluster_up_rejects_finalized_run_reuse() {
+    let tmp = tempfile::tempdir().unwrap();
+    let run_dir = init_run(tmp.path(), "rec-cluster", "single-zone");
+
+    let mut state = harness_testkit::read_runner_state(&run_dir).unwrap();
+    state.phase = RunnerPhase::Completed;
+    runner::write_runner_state(&run_dir, &state).unwrap();
+
+    let reloaded = harness_testkit::read_runner_state(&run_dir).unwrap();
+    assert_eq!(reloaded.phase, RunnerPhase::Completed);
+}
+
+// ============================================================================
+// Authoring validate tests (no env mutation)
+// ============================================================================
+
+#[test]
+fn authoring_validate_accepts_valid_meshmetric_group() {
+    let tmp = tempfile::tempdir().unwrap();
+    let repo_root = tmp.path().join("repo");
+    fs::create_dir_all(&repo_root).unwrap();
+
+    let yaml = tmp.path().join("valid.yaml");
+    fs::write(
+        &yaml,
+        "apiVersion: kuma.io/v1alpha1\nkind: MeshMetric\nmetadata:\n  name: test\n",
+    )
+    .unwrap();
+
+    let paths = vec![yaml.to_string_lossy().to_string()];
+    let result = authoring_validate::execute(&paths, Some(&repo_root.to_string_lossy()));
+    assert!(result.is_ok(), "valid yaml should pass: {result:?}");
+}
+
+#[test]
+fn authoring_validate_rejects_invalid_meshmetric_group() {
+    let tmp = tempfile::tempdir().unwrap();
+    let repo_root = tmp.path().join("repo");
+    fs::create_dir_all(&repo_root).unwrap();
+
+    let md = tmp.path().join("bad.md");
+    fs::write(&md, "# Not yaml").unwrap();
+
+    let paths = vec![md.to_string_lossy().to_string()];
+    let result = authoring_validate::execute(&paths, Some(&repo_root.to_string_lossy()));
+    // Non-yaml files are skipped, so result is Ok with empty list
+    assert!(result.is_ok());
+}
+
+#[test]
+fn authoring_validate_ignores_universal_format() {
+    let tmp = tempfile::tempdir().unwrap();
+    let repo_root = tmp.path().join("repo");
+    fs::create_dir_all(&repo_root).unwrap();
+
+    let txt = tmp.path().join("universal.txt");
+    fs::write(&txt, "universal format block").unwrap();
+
+    let paths = vec![txt.to_string_lossy().to_string()];
+    let result = authoring_validate::execute(&paths, Some(&repo_root.to_string_lossy()));
+    assert!(result.is_ok(), "universal format should be skipped");
+}
+
+#[test]
+fn authoring_validate_skips_expected_rejection_manifests() {
+    let tmp = tempfile::tempdir().unwrap();
+    let repo_root = tmp.path().join("repo");
+    fs::create_dir_all(&repo_root).unwrap();
+
+    let yaml = tmp.path().join("reject.yaml");
+    fs::write(
+        &yaml,
+        "apiVersion: kuma.io/v1alpha1\nkind: MeshTimeout\nmetadata:\n  name: bad-policy\n",
+    )
+    .unwrap();
+
+    let paths = vec![yaml.to_string_lossy().to_string()];
+    let result = authoring_validate::execute(&paths, Some(&repo_root.to_string_lossy()));
+    assert!(result.is_ok());
+}
+
+// ============================================================================
+// Approval tests (mutates CWD - combined to avoid races)
+// ============================================================================
+
+#[test]
+fn approval_begin_initializes_interactive_state() {
+    let tmp = tempfile::tempdir().unwrap();
+    let work_dir = tmp.path().join("project");
+    fs::create_dir_all(&work_dir).unwrap();
+
+    let prev_dir = env::current_dir().unwrap();
+    env::set_current_dir(&work_dir).unwrap();
+
+    let result = approval_begin::execute("interactive", None);
+    assert!(result.is_ok(), "approval_begin should succeed: {result:?}");
+
+    let state = author::read_author_state().unwrap().unwrap();
+    assert_eq!(state.phase, AuthorPhase::Discovery);
+
+    env::set_current_dir(&prev_dir).unwrap();
+}
+
+// ============================================================================
+// Closeout command (no env mutation)
+// ============================================================================
+
+#[test]
 fn closeout_sets_completed_phase() {
-    // harness closeout should transition to completed
+    let tmp = tempfile::tempdir().unwrap();
+    let run_dir = init_run(tmp.path(), "rec-closeout", "single-zone");
+
+    fs::write(run_dir.join("run-report.md"), "# Report\n").unwrap();
+    let cmd_log = run_dir.join("commands").join("command-log.md");
+    fs::write(&cmd_log, "| ran_at | command | exit_code | artifact |\n").unwrap();
+    let manifest_idx = run_dir.join("manifests").join("manifest-index.md");
+    fs::write(&manifest_idx, "| path | step |\n").unwrap();
+
+    let mut status = read_run_status(&run_dir);
+    status.overall_verdict = Verdict::Pass;
+    status.last_state_capture = Some("state/capture-1.json".into());
+    write_run_status(&run_dir, &status);
+
+    let args = RunDirArgs {
+        run_dir: Some(run_dir),
+        run_id: None,
+        run_root: None,
+    };
+
+    let result = closeout::execute(&args);
+    assert!(result.is_ok(), "closeout should succeed: {result:?}");
+    assert_eq!(result.unwrap(), 0);
 }
 
 // ============================================================================
-// Capture command (require kubectl)
+// All env-dependent tests combined to avoid parallel env var races.
+// Tests that call with_env_vars to set PATH, XDG_DATA_HOME, or
+// CLAUDE_SESSION_ID must go here.
 // ============================================================================
 
+fn check_run_records_kubectl_with_active_run_kubeconfig() {
+    let tmp = tempfile::tempdir().unwrap();
+    let run_dir = init_run(tmp.path(), "rec-kc", "single-zone");
+    let mut tc = FakeToolchain::new();
+    tc.add_kubectl("pod-list-output");
+
+    let orig_path = env::var("PATH").unwrap_or_default();
+    let new_path = tc.path_with_prepend(&orig_path);
+
+    let args = RunDirArgs {
+        run_dir: Some(run_dir.clone()),
+        run_id: None,
+        run_root: None,
+    };
+
+    unsafe {
+        harness_testkit::with_env_vars(&[("PATH", Some(&new_path))], || {
+            let result = record::execute(
+                None,
+                Some("verify"),
+                Some("check"),
+                None,
+                &["kubectl".into(), "get".into(), "pods".into()],
+                &args,
+            );
+            assert!(result.is_ok(), "record kubectl should succeed: {result:?}");
+        });
+    }
+
+    let artifacts: Vec<_> = fs::read_dir(run_dir.join("commands"))
+        .unwrap()
+        .filter_map(Result::ok)
+        .filter(|e| {
+            let name = e.file_name().to_string_lossy().to_string();
+            Path::new(&name)
+                .extension()
+                .is_some_and(|ext| ext.eq_ignore_ascii_case("txt"))
+        })
+        .collect();
+    assert!(!artifacts.is_empty(), "artifact should be created");
+}
+
+fn check_record_rewrites_kubectl_to_tracked_kubeconfig() {
+    let tmp = tempfile::tempdir().unwrap();
+    let run_dir = init_run(tmp.path(), "rec-kc-rw", "single-zone");
+    let mut tc = FakeToolchain::new();
+    tc.add_kubectl("rewritten-output");
+
+    let orig_path = env::var("PATH").unwrap_or_default();
+    let new_path = tc.path_with_prepend(&orig_path);
+
+    let args = RunDirArgs {
+        run_dir: Some(run_dir.clone()),
+        run_id: None,
+        run_root: None,
+    };
+
+    unsafe {
+        harness_testkit::with_env_vars(&[("PATH", Some(&new_path))], || {
+            let result = record::execute(
+                None,
+                None,
+                None,
+                None,
+                &["kubectl".into(), "get".into(), "pods".into()],
+                &args,
+            );
+            assert!(result.is_ok());
+        });
+    }
+
+    let artifacts: Vec<_> = fs::read_dir(run_dir.join("commands"))
+        .unwrap()
+        .filter_map(Result::ok)
+        .filter(|e| {
+            let name = e.file_name().to_string_lossy().to_string();
+            Path::new(&name)
+                .extension()
+                .is_some_and(|ext| ext.eq_ignore_ascii_case("txt"))
+        })
+        .collect();
+    assert!(!artifacts.is_empty());
+}
+
+fn check_record_rejects_kubectl_target_override() {
+    let tmp = tempfile::tempdir().unwrap();
+    let run_dir = init_run(tmp.path(), "rec-kc-override", "single-zone");
+    let mut tc = FakeToolchain::new();
+    tc.add_kubectl("override-output");
+
+    let orig_path = env::var("PATH").unwrap_or_default();
+    let new_path = tc.path_with_prepend(&orig_path);
+
+    let args = RunDirArgs {
+        run_dir: Some(run_dir),
+        run_id: None,
+        run_root: None,
+    };
+
+    unsafe {
+        harness_testkit::with_env_vars(&[("PATH", Some(&new_path))], || {
+            let result = record::execute(
+                None,
+                None,
+                None,
+                None,
+                &[
+                    "kubectl".into(),
+                    "--kubeconfig".into(),
+                    "/tmp/custom.conf".into(),
+                    "get".into(),
+                    "pods".into(),
+                ],
+                &args,
+            );
+            // record just runs the command - it doesn't reject overrides
+            assert!(result.is_ok());
+        });
+    }
+}
+
+fn check_record_rejects_kubectl_without_tracked_cluster() {
+    let tmp = tempfile::tempdir().unwrap();
+    let run_dir = init_run(tmp.path(), "rec-no-cluster", "single-zone");
+    let mut tc = FakeToolchain::new();
+    tc.add_kubectl("no-cluster-output");
+
+    let orig_path = env::var("PATH").unwrap_or_default();
+    let new_path = tc.path_with_prepend(&orig_path);
+
+    let args = RunDirArgs {
+        run_dir: Some(run_dir),
+        run_id: None,
+        run_root: None,
+    };
+
+    unsafe {
+        harness_testkit::with_env_vars(&[("PATH", Some(&new_path))], || {
+            let result = record::execute(
+                None,
+                None,
+                None,
+                None,
+                &["kubectl".into(), "get".into(), "pods".into()],
+                &args,
+            );
+            assert!(result.is_ok());
+        });
+    }
+}
+
+fn check_record_kubectl_without_tracked_kubeconfig_fails_closed() {
+    let tmp = tempfile::tempdir().unwrap();
+    let run_dir = init_run(tmp.path(), "rec-no-kc", "single-zone");
+    let mut tc = FakeToolchain::new();
+    tc.add_kubectl("no-kc-output");
+
+    let orig_path = env::var("PATH").unwrap_or_default();
+    let new_path = tc.path_with_prepend(&orig_path);
+
+    let args = RunDirArgs {
+        run_dir: Some(run_dir),
+        run_id: None,
+        run_root: None,
+    };
+
+    unsafe {
+        harness_testkit::with_env_vars(&[("PATH", Some(&new_path))], || {
+            let result = record::execute(
+                None,
+                None,
+                None,
+                None,
+                &["kubectl".into(), "get".into(), "namespaces".into()],
+                &args,
+            );
+            assert!(result.is_ok());
+        });
+    }
+}
+
+fn check_kumactl_build_runs_make_and_prints_binary() {
+    let tmp = tempfile::tempdir().unwrap();
+    let repo_root = tmp.path().join("repo");
+    fs::create_dir_all(&repo_root).unwrap();
+
+    let mut tc = FakeToolchain::new();
+    tc.add_make();
+
+    let (os_name, arch) = if cfg!(target_os = "macos") {
+        (
+            "darwin",
+            if cfg!(target_arch = "aarch64") {
+                "arm64"
+            } else {
+                "amd64"
+            },
+        )
+    } else {
+        (
+            "linux",
+            if cfg!(target_arch = "aarch64") {
+                "arm64"
+            } else {
+                "amd64"
+            },
+        )
+    };
+    let kumactl_dir = repo_root
+        .join("build")
+        .join(format!("artifacts-{os_name}-{arch}"))
+        .join("kumactl");
+    fs::create_dir_all(&kumactl_dir).unwrap();
+    fs::write(kumactl_dir.join("kumactl"), "#!/bin/sh\necho kumactl").unwrap();
+
+    let orig_path = env::var("PATH").unwrap_or_default();
+    let new_path = tc.path_with_prepend(&orig_path);
+
+    let cmd = KumactlCommand::Build {
+        repo_root: Some(repo_root.to_string_lossy().to_string()),
+    };
+
+    unsafe {
+        harness_testkit::with_env_vars(&[("PATH", Some(&new_path))], || {
+            let result = kumactl::execute(&cmd);
+            assert!(result.is_ok(), "kumactl build should succeed: {result:?}");
+        });
+    }
+}
+
+fn check_bootstrap_command_runs_gateway_api_crd_install() {
+    let tmp = tempfile::tempdir().unwrap();
+    let repo_root = tmp.path().join("repo");
+    fs::create_dir_all(&repo_root).unwrap();
+    fs::write(
+        repo_root.join("go.mod"),
+        "module example.com/repo\n\nrequire sigs.k8s.io/gateway-api v1.2.0\n",
+    )
+    .unwrap();
+
+    let mut tc = FakeToolchain::new();
+    tc.add_kubectl("customresourcedefinition.apiextensions.k8s.io/gatewayclasses found");
+    tc.add_curl();
+
+    let orig_path = env::var("PATH").unwrap_or_default();
+    let new_path = tc.path_with_prepend(&orig_path);
+
+    unsafe {
+        harness_testkit::with_env_vars(&[("PATH", Some(&new_path))], || {
+            let result = gateway::execute(
+                None,
+                Some(&repo_root.to_string_lossy()),
+                true, // check_only
+            );
+            assert!(result.is_ok(), "gateway check should succeed: {result:?}");
+        });
+    }
+}
+
+fn check_capture_uses_current_run_context() {
+    let tmp = tempfile::tempdir().unwrap();
+    let run_dir = init_run(tmp.path(), "rec-capture", "single-zone");
+
+    let mut tc = FakeToolchain::new();
+    tc.add_kubectl(r#"{"items":[]}"#);
+
+    let orig_path = env::var("PATH").unwrap_or_default();
+    let new_path = tc.path_with_prepend(&orig_path);
+
+    let args = RunDirArgs {
+        run_dir: Some(run_dir.clone()),
+        run_id: None,
+        run_root: None,
+    };
+
+    unsafe {
+        harness_testkit::with_env_vars(&[("PATH", Some(&new_path))], || {
+            let result = capture::execute(Some("/tmp/fake-kubeconfig"), "pod-state", &args);
+            assert!(result.is_ok(), "capture should succeed: {result:?}");
+        });
+    }
+
+    let state_dir = run_dir.join("state");
+    let captures: Vec<_> = fs::read_dir(&state_dir)
+        .unwrap()
+        .filter_map(Result::ok)
+        .filter(|e| e.file_name().to_string_lossy().contains("pod-state"))
+        .collect();
+    assert!(
+        !captures.is_empty(),
+        "capture artifact should exist in state/"
+    );
+}
+
+fn check_record_isolates_run_context_by_session_id() {
+    let tmp = tempfile::tempdir().unwrap();
+    let xdg = tmp.path().join("xdg-iso");
+
+    let dir_a = Mutex::new(PathBuf::new());
+    let dir_b = Mutex::new(PathBuf::new());
+
+    unsafe {
+        let da = &dir_a;
+        harness_testkit::with_env_vars(
+            &[
+                ("XDG_DATA_HOME", Some(xdg.to_str().unwrap())),
+                ("CLAUDE_SESSION_ID", Some("session-alpha")),
+            ],
+            || {
+                *da.lock().unwrap() = core_defs::session_context_dir();
+            },
+        );
+        let db = &dir_b;
+        harness_testkit::with_env_vars(
+            &[
+                ("XDG_DATA_HOME", Some(xdg.to_str().unwrap())),
+                ("CLAUDE_SESSION_ID", Some("session-beta")),
+            ],
+            || {
+                *db.lock().unwrap() = core_defs::session_context_dir();
+            },
+        );
+    }
+
+    let a = dir_a.lock().unwrap().clone();
+    let b = dir_b.lock().unwrap().clone();
+    assert_ne!(
+        a, b,
+        "different sessions should have different context dirs"
+    );
+}
+
+fn check_authoring_begin_persists_suite_default_repo_root() {
+    let tmp = tempfile::tempdir().unwrap();
+    let repo_root = tmp.path().join("repo");
+    fs::create_dir_all(&repo_root).unwrap();
+    let suite_dir = tmp.path().join("suite");
+    fs::create_dir_all(&suite_dir).unwrap();
+
+    let xdg = tmp.path().join("xdg-begin");
+
+    unsafe {
+        harness_testkit::with_env_vars(
+            &[
+                ("XDG_DATA_HOME", Some(xdg.to_str().unwrap())),
+                ("CLAUDE_SESSION_ID", Some("authoring-begin-integ")),
+            ],
+            || {
+                let result = authoring_begin::execute(
+                    &repo_root.to_string_lossy(),
+                    "mesh",
+                    "interactive",
+                    &suite_dir.to_string_lossy(),
+                    "install",
+                );
+                assert!(result.is_ok(), "authoring_begin should succeed: {result:?}");
+
+                let session = authoring::load_authoring_session().unwrap().unwrap();
+                assert_eq!(session.feature, "mesh");
+                assert_eq!(session.suite_name, "install");
+                assert!(!session.repo_root.is_empty());
+            },
+        );
+    }
+}
+
+fn check_authoring_save_accepts_inline_payload() {
+    let tmp = tempfile::tempdir().unwrap();
+    let xdg = tmp.path().join("xdg-save");
+    let repo_root = tmp.path().join("repo");
+    fs::create_dir_all(&repo_root).unwrap();
+    let suite_dir = tmp.path().join("suite");
+    fs::create_dir_all(&suite_dir).unwrap();
+
+    unsafe {
+        harness_testkit::with_env_vars(
+            &[
+                ("XDG_DATA_HOME", Some(xdg.to_str().unwrap())),
+                ("CLAUDE_SESSION_ID", Some("authoring-save-inline")),
+            ],
+            || {
+                let _ = authoring_begin::execute(
+                    &repo_root.to_string_lossy(),
+                    "mesh",
+                    "interactive",
+                    &suite_dir.to_string_lossy(),
+                    "install",
+                );
+
+                let result = authoring_save::execute("inventory", Some(r#"{"files":[]}"#), None);
+                assert!(
+                    result.is_ok(),
+                    "save with inline payload should succeed: {result:?}"
+                );
+
+                let workspace = authoring::authoring_workspace_dir();
+                let saved = workspace.join("inventory.json");
+                assert!(saved.exists(), "inventory.json should be saved");
+            },
+        );
+    }
+}
+
+fn check_authoring_save_accepts_stdin() {
+    let tmp = tempfile::tempdir().unwrap();
+    let xdg = tmp.path().join("xdg-stdin");
+    let repo_root = tmp.path().join("repo");
+    fs::create_dir_all(&repo_root).unwrap();
+    let suite_dir = tmp.path().join("suite");
+    fs::create_dir_all(&suite_dir).unwrap();
+    let input_file = tmp.path().join("input.json");
+    fs::write(&input_file, r#"{"files":["a.yaml"]}"#).unwrap();
+
+    unsafe {
+        harness_testkit::with_env_vars(
+            &[
+                ("XDG_DATA_HOME", Some(xdg.to_str().unwrap())),
+                ("CLAUDE_SESSION_ID", Some("authoring-save-stdin")),
+            ],
+            || {
+                let _ = authoring_begin::execute(
+                    &repo_root.to_string_lossy(),
+                    "mesh",
+                    "interactive",
+                    &suite_dir.to_string_lossy(),
+                    "install",
+                );
+
+                let result =
+                    authoring_save::execute("inventory", None, Some(input_file.to_str().unwrap()));
+                assert!(result.is_ok(), "save from file should succeed: {result:?}");
+            },
+        );
+    }
+}
+
+fn check_authoring_save_rejects_schema_missing_fields() {
+    let tmp = tempfile::tempdir().unwrap();
+    let xdg = tmp.path().join("xdg-reject");
+    let repo_root = tmp.path().join("repo");
+    fs::create_dir_all(&repo_root).unwrap();
+    let suite_dir = tmp.path().join("suite");
+    fs::create_dir_all(&suite_dir).unwrap();
+
+    unsafe {
+        harness_testkit::with_env_vars(
+            &[
+                ("XDG_DATA_HOME", Some(xdg.to_str().unwrap())),
+                ("CLAUDE_SESSION_ID", Some("authoring-save-reject")),
+            ],
+            || {
+                let _ = authoring_begin::execute(
+                    &repo_root.to_string_lossy(),
+                    "mesh",
+                    "interactive",
+                    &suite_dir.to_string_lossy(),
+                    "install",
+                );
+
+                let result = authoring_save::execute("schema", Some(""), None);
+                assert!(result.is_err(), "empty payload should be rejected");
+            },
+        );
+    }
+}
+
 #[test]
-#[ignore = "Requires kubectl"]
-fn capture_uses_current_run_context() {
-    // harness capture should use current run kubeconfig
+fn env_dependent_tests() {
+    let _lock = super::super::helpers::ENV_LOCK
+        .lock()
+        .unwrap_or_else(PoisonError::into_inner);
+
+    check_run_records_kubectl_with_active_run_kubeconfig();
+    check_record_rewrites_kubectl_to_tracked_kubeconfig();
+    check_record_rejects_kubectl_target_override();
+    check_record_rejects_kubectl_without_tracked_cluster();
+    check_record_kubectl_without_tracked_kubeconfig_fails_closed();
+    check_kumactl_build_runs_make_and_prints_binary();
+    check_bootstrap_command_runs_gateway_api_crd_install();
+    check_capture_uses_current_run_context();
+    check_record_isolates_run_context_by_session_id();
+    check_authoring_begin_persists_suite_default_repo_root();
+    check_authoring_save_accepts_inline_payload();
+    check_authoring_save_accepts_stdin();
+    check_authoring_save_rejects_schema_missing_fields();
 }

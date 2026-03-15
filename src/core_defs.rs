@@ -5,7 +5,7 @@ use std::process::Command;
 
 use sha2::{Digest, Sha256};
 
-use crate::errors::{COMMAND_FAILED, CliError};
+use crate::errors::{CliError, CliErrorKind};
 
 /// Build information resolved from the repo.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -145,8 +145,7 @@ pub fn project_context_dir(project_dir: &Path) -> PathBuf {
 
 /// Merge current env with extra key-value pairs.
 #[must_use]
-#[allow(clippy::implicit_hasher)]
-pub fn merge_env(extra: Option<&HashMap<String, String>>) -> HashMap<String, String> {
+pub(crate) fn merge_env(extra: Option<&HashMap<String, String>>) -> HashMap<String, String> {
     let mut env: HashMap<String, String> = env::vars().collect();
     if let Some(extra) = extra {
         env.extend(extra.iter().map(|(k, v)| (k.clone(), v.clone())));
@@ -174,12 +173,10 @@ pub fn resolve_build_info(repo: &Path) -> Result<BuildInfo, CliError> {
         .args(["status", "--porcelain", "--untracked-files=no"])
         .current_dir(repo)
         .output()
-        .map_err(|e| CliError {
-            code: COMMAND_FAILED.code.into(),
-            message: format!("command failed: git status: {e}"),
-            exit_code: COMMAND_FAILED.exit_code,
-            hint: None,
-            details: None,
+        .map_err(|e| {
+            CliError::from(CliErrorKind::CommandFailed {
+                command: format!("git status: {e}"),
+            })
         })?;
 
     let dirty = String::from_utf8_lossy(&dirty_output.stdout)
@@ -196,12 +193,10 @@ pub fn resolve_build_info(repo: &Path) -> Result<BuildInfo, CliError> {
         .args(["rev-parse", "--short=10", "HEAD"])
         .current_dir(repo)
         .output()
-        .map_err(|e| CliError {
-            code: COMMAND_FAILED.code.into(),
-            message: format!("command failed: git rev-parse: {e}"),
-            exit_code: COMMAND_FAILED.exit_code,
-            hint: None,
-            details: None,
+        .map_err(|e| {
+            CliError::from(CliErrorKind::CommandFailed {
+                command: format!("git rev-parse: {e}"),
+            })
         })?;
 
     let short_sha = String::from_utf8_lossy(&sha_output.stdout)
@@ -213,7 +208,7 @@ pub fn resolve_build_info(repo: &Path) -> Result<BuildInfo, CliError> {
     })
 }
 
-fn dirs_home() -> PathBuf {
+pub fn dirs_home() -> PathBuf {
     env::var("HOME").map_or_else(
         |_| env::temp_dir().join(format!("harness-{}", unsafe { libc::getuid() })),
         PathBuf::from,
@@ -222,7 +217,7 @@ fn dirs_home() -> PathBuf {
 
 #[cfg(test)]
 mod tests {
-    use crate::errors::render_error;
+    use crate::errors::{CliErrorKind, render_error};
 
     use super::*;
 
@@ -235,36 +230,26 @@ mod tests {
 
     #[test]
     fn cli_error_has_all_fields() {
-        let err = CliError {
-            code: "CODE1".into(),
-            message: "msg".into(),
-            exit_code: 3,
-            hint: Some("try this".into()),
-            details: Some("more".into()),
-        };
-        assert_eq!(err.code, "CODE1");
-        assert_eq!(err.message, "msg");
-        assert_eq!(err.exit_code, 3);
-        assert_eq!(err.hint.as_deref(), Some("try this"));
-        assert_eq!(err.details.as_deref(), Some("more"));
+        let err = CliErrorKind::CommandFailed {
+            command: "msg".into(),
+        }
+        .with_details("more");
+        assert_eq!(err.code(), "KSRCLI004");
+        assert_eq!(err.message(), "command failed: msg");
+        assert_eq!(err.exit_code(), 4);
+        assert_eq!(err.details(), Some("more"));
     }
 
     #[test]
     fn render_error_includes_hint_and_details() {
-        let err = CliError {
-            code: "X".into(),
-            message: "bad".into(),
-            exit_code: 1,
-            hint: Some("fix it".into()),
-            details: Some("stack".into()),
-        };
+        let err = CliErrorKind::MissingRunPointer.with_details("stack");
         let rendered = render_error(&err);
         assert!(
-            rendered.contains("ERROR [X] bad"),
+            rendered.contains("ERROR [KSRCLI005]"),
             "missing header: {rendered}"
         );
         assert!(
-            rendered.contains("Hint: fix it"),
+            rendered.contains("Hint: Run init first."),
             "missing hint: {rendered}"
         );
         assert!(rendered.contains("stack"), "missing details: {rendered}");
@@ -280,55 +265,47 @@ mod tests {
         assert_eq!(env.get("BUILD_INFO_VERSION").unwrap(), "1.2.3");
     }
 
-    /// # Safety helper - wraps unsafe env manipulation for tests.
-    unsafe fn with_env_var(name: &str, value: &str, f: impl FnOnce()) {
-        let saved = env::var(name).ok();
-        unsafe { env::set_var(name, value) };
-        f();
-        match saved {
-            Some(v) => unsafe { env::set_var(name, v) },
-            None => unsafe { env::remove_var(name) },
-        }
-    }
-
     // All env-dependent tests are combined into one test to avoid races
     // from parallel test execution mutating the same env var.
     #[test]
     fn session_scope_and_context_path() {
         unsafe {
-            with_env_var("CLAUDE_SESSION_ID", "combined-scope-test", || {
-                // session_scope_key uses session prefix
-                let key = session_scope_key();
-                assert!(
-                    key.starts_with("session-"),
-                    "expected session- prefix: {key}"
-                );
-                assert_eq!(
-                    key.len(),
-                    "session-".len() + 16,
-                    "digest should be 16 hex chars"
-                );
+            harness_testkit::with_env_vars(
+                &[("CLAUDE_SESSION_ID", Some("combined-scope-test"))],
+                || {
+                    // session_scope_key uses session prefix
+                    let key = session_scope_key();
+                    assert!(
+                        key.starts_with("session-"),
+                        "expected session- prefix: {key}"
+                    );
+                    assert_eq!(
+                        key.len(),
+                        "session-".len() + 16,
+                        "digest should be 16 hex chars"
+                    );
 
-                // deterministic: calling twice gives same result
-                let key2 = session_scope_key();
-                assert_eq!(key, key2);
+                    // deterministic: calling twice gives same result
+                    let key2 = session_scope_key();
+                    assert_eq!(key, key2);
 
-                // current_run_context_path is under session context dir
-                let path = current_run_context_path();
-                assert!(
-                    path.ends_with("current-run.json"),
-                    "expected current-run.json suffix: {path:?}"
-                );
-                let parent_name = path
-                    .parent()
-                    .and_then(|p| p.file_name())
-                    .unwrap()
-                    .to_string_lossy();
-                assert!(
-                    parent_name.starts_with("session-"),
-                    "expected session- prefix: {parent_name}"
-                );
-            });
+                    // current_run_context_path is under session context dir
+                    let path = current_run_context_path();
+                    assert!(
+                        path.ends_with("current-run.json"),
+                        "expected current-run.json suffix: {path:?}"
+                    );
+                    let parent_name = path
+                        .parent()
+                        .and_then(|p| p.file_name())
+                        .unwrap()
+                        .to_string_lossy();
+                    assert!(
+                        parent_name.starts_with("session-"),
+                        "expected session- prefix: {parent_name}"
+                    );
+                },
+            );
         }
     }
 
@@ -338,7 +315,7 @@ mod tests {
         let info = resolve_build_info(&repo);
         // Skip if git is not available in this environment
         if let Err(ref e) = info
-            && e.message.contains("No such file or directory")
+            && e.message().contains("No such file or directory")
         {
             eprintln!("Skipping: git not available in subprocess PATH");
             return;

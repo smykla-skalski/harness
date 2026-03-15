@@ -1,18 +1,71 @@
 use std::collections::{HashMap, HashSet};
 use std::env;
+use std::fmt;
+use std::str::FromStr;
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-/// Valid cluster deployment modes.
-pub const VALID_MODES: &[&str] = &[
-    "single-up",
-    "single-down",
-    "global-zone-up",
-    "global-zone-down",
-    "global-two-zones-up",
-    "global-two-zones-down",
-];
+/// Cluster deployment mode describing the topology and lifecycle direction.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+#[non_exhaustive]
+pub enum ClusterMode {
+    SingleUp,
+    SingleDown,
+    GlobalZoneUp,
+    GlobalZoneDown,
+    GlobalTwoZonesUp,
+    GlobalTwoZonesDown,
+}
+
+impl ClusterMode {
+    #[must_use]
+    pub fn is_up(self) -> bool {
+        matches!(
+            self,
+            Self::SingleUp | Self::GlobalZoneUp | Self::GlobalTwoZonesUp
+        )
+    }
+
+    #[must_use]
+    pub fn is_single(self) -> bool {
+        matches!(self, Self::SingleUp | Self::SingleDown)
+    }
+
+    #[must_use]
+    pub fn is_global(self) -> bool {
+        !self.is_single()
+    }
+}
+
+impl fmt::Display for ClusterMode {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::SingleUp => f.write_str("single-up"),
+            Self::SingleDown => f.write_str("single-down"),
+            Self::GlobalZoneUp => f.write_str("global-zone-up"),
+            Self::GlobalZoneDown => f.write_str("global-zone-down"),
+            Self::GlobalTwoZonesUp => f.write_str("global-two-zones-up"),
+            Self::GlobalTwoZonesDown => f.write_str("global-two-zones-down"),
+        }
+    }
+}
+
+impl FromStr for ClusterMode {
+    type Err = String;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "single-up" => Ok(Self::SingleUp),
+            "single-down" => Ok(Self::SingleDown),
+            "global-zone-up" => Ok(Self::GlobalZoneUp),
+            "global-zone-down" => Ok(Self::GlobalZoneDown),
+            "global-two-zones-up" => Ok(Self::GlobalTwoZonesUp),
+            "global-two-zones-down" => Ok(Self::GlobalTwoZonesDown),
+            _ => Err(format!("unsupported cluster mode: {s}")),
+        }
+    }
+}
 
 fn kubeconfig_for_cluster(cluster: &str) -> String {
     let home = env::var("HOME").unwrap_or_else(|_| "/tmp".into());
@@ -70,8 +123,8 @@ fn dedup_preserving_order(items: Vec<String>) -> Vec<String> {
         .collect()
 }
 
-fn members_for_mode(mode: &str, args: &[String]) -> Result<Vec<ClusterMember>, String> {
-    if mode.starts_with("single-") {
+fn members_for_mode(mode: ClusterMode, args: &[String]) -> Result<Vec<ClusterMember>, String> {
+    if mode.is_single() {
         if args.len() != 1 {
             return Err(format!(
                 "{mode} expects exactly 1 cluster name, got {args:?}"
@@ -79,51 +132,55 @@ fn members_for_mode(mode: &str, args: &[String]) -> Result<Vec<ClusterMember>, S
         }
         return Ok(vec![ClusterMember::named(&args[0], "primary", None, None)]);
     }
-    if mode.starts_with("global-zone-") {
-        if mode.ends_with("-up") {
+    match mode {
+        ClusterMode::GlobalZoneUp => {
             if args.len() != 3 {
                 return Err(format!(
                     "{mode} expects global, zone, and zone name, got {args:?}"
                 ));
             }
-            return Ok(vec![
+            Ok(vec![
                 ClusterMember::named(&args[0], "global", None, None),
                 ClusterMember::named(&args[1], "zone", None, Some(&args[2])),
-            ]);
+            ])
         }
-        if args.len() != 2 {
-            return Err(format!(
-                "{mode} expects global and zone cluster names, got {args:?}"
-            ));
+        ClusterMode::GlobalZoneDown => {
+            if args.len() != 2 {
+                return Err(format!(
+                    "{mode} expects global and zone cluster names, got {args:?}"
+                ));
+            }
+            Ok(vec![
+                ClusterMember::named(&args[0], "global", None, None),
+                ClusterMember::named(&args[1], "zone", None, None),
+            ])
         }
-        return Ok(vec![
-            ClusterMember::named(&args[0], "global", None, None),
-            ClusterMember::named(&args[1], "zone", None, None),
-        ]);
-    }
-    // global-two-zones-*
-    if mode.ends_with("-up") {
-        if args.len() != 5 {
-            return Err(format!(
-                "{mode} expects global, two zones, and two zone names, got {args:?}"
-            ));
+        ClusterMode::GlobalTwoZonesUp => {
+            if args.len() != 5 {
+                return Err(format!(
+                    "{mode} expects global, two zones, and two zone names, got {args:?}"
+                ));
+            }
+            Ok(vec![
+                ClusterMember::named(&args[0], "global", None, None),
+                ClusterMember::named(&args[1], "zone", None, Some(&args[3])),
+                ClusterMember::named(&args[2], "zone", None, Some(&args[4])),
+            ])
         }
-        return Ok(vec![
-            ClusterMember::named(&args[0], "global", None, None),
-            ClusterMember::named(&args[1], "zone", None, Some(&args[3])),
-            ClusterMember::named(&args[2], "zone", None, Some(&args[4])),
-        ]);
+        ClusterMode::GlobalTwoZonesDown => {
+            if args.len() != 3 {
+                return Err(format!(
+                    "{mode} expects global and two zone cluster names, got {args:?}"
+                ));
+            }
+            Ok(vec![
+                ClusterMember::named(&args[0], "global", None, None),
+                ClusterMember::named(&args[1], "zone", None, None),
+                ClusterMember::named(&args[2], "zone", None, None),
+            ])
+        }
+        ClusterMode::SingleUp | ClusterMode::SingleDown => unreachable!(),
     }
-    if args.len() != 3 {
-        return Err(format!(
-            "{mode} expects global and two zone cluster names, got {args:?}"
-        ));
-    }
-    Ok(vec![
-        ClusterMember::named(&args[0], "global", None, None),
-        ClusterMember::named(&args[1], "zone", None, None),
-        ClusterMember::named(&args[2], "zone", None, None),
-    ])
 }
 
 // ---------------------------------------------------------------------------
@@ -205,7 +262,7 @@ impl HelmSetting {
 /// Full cluster specification describing a deployment topology.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ClusterSpec {
-    pub mode: String,
+    pub mode: ClusterMode,
     pub members: Vec<ClusterMember>,
     pub mode_args: Vec<String>,
     pub helm_settings: Vec<HelmSetting>,
@@ -233,14 +290,12 @@ impl ClusterSpec {
         helm_settings: Vec<HelmSetting>,
         restart_namespaces: Vec<String>,
     ) -> Result<Self, String> {
-        if !VALID_MODES.contains(&mode) {
-            return Err(format!("unsupported cluster mode: {mode}"));
-        }
+        let mode: ClusterMode = mode.parse()?;
         let members = members_for_mode(mode, mode_args)?;
         let mut sorted_helm = helm_settings;
         sorted_helm.sort_by(|a, b| a.key.cmp(&b.key));
         Ok(Self {
-            mode: mode.into(),
+            mode,
             members,
             mode_args: mode_args.to_vec(),
             helm_settings: sorted_helm,
@@ -304,7 +359,7 @@ impl ClusterSpec {
 #[derive(Debug, Clone, Serialize)]
 pub struct ClusterRecordPayload {
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub mode: Option<String>,
+    pub mode: Option<ClusterMode>,
     pub mode_args: Vec<String>,
     pub members: Vec<ClusterMember>,
     pub clusters: Vec<String>,
@@ -324,7 +379,11 @@ impl ClusterRecordPayload {
     /// Returns an error if the value is not an object.
     pub fn from_value(value: &Value) -> Result<Self, String> {
         let obj = value.as_object().ok_or("expected object")?;
-        let mode = obj.get("mode").and_then(Value::as_str).map(String::from);
+        let mode = obj
+            .get("mode")
+            .and_then(Value::as_str)
+            .map(str::parse)
+            .transpose()?;
         let mode_args = parse_string_vec(obj.get("mode_args"));
         let members: Vec<ClusterMember> = obj
             .get("members")
@@ -388,7 +447,7 @@ impl ClusterRecordPayload {
             .map(|s| (s.key.clone(), s.value.clone()))
             .collect();
         Self {
-            mode: Some(spec.mode.clone()),
+            mode: Some(spec.mode),
             mode_args: spec.mode_args.clone(),
             members,
             clusters,
@@ -409,9 +468,9 @@ impl ClusterRecordPayload {
             .iter()
             .enumerate()
             .map(|(i, cluster)| {
-                let role = if i == 0 && mode.starts_with("global-") {
+                let role = if i == 0 && mode.is_global() {
                     "global"
-                } else if mode.starts_with("global-") {
+                } else if mode.is_global() {
                     "zone"
                 } else {
                     "primary"
@@ -438,7 +497,7 @@ impl ClusterRecordPayload {
                     .as_deref()
                     .ok_or("cluster mode must be a string")?;
                 Ok(ClusterSpec {
-                    mode: "single-up".into(),
+                    mode: ClusterMode::SingleUp,
                     mode_args: vec!["current".into()],
                     members: vec![ClusterMember::named("current", "primary", Some(kc), None)],
                     helm_settings: Vec::new(),
@@ -456,7 +515,7 @@ impl ClusterRecordPayload {
                     return Err("cluster members must be non-empty".into());
                 }
                 Ok(ClusterSpec {
-                    mode: mode.clone(),
+                    mode: *mode,
                     mode_args: self.mode_args.clone(),
                     members,
                     helm_settings: self.helm_settings.clone(),
@@ -476,7 +535,7 @@ impl ClusterRecordPayload {
 /// Current deploy state, written to current-deploy.json.
 #[derive(Debug, Clone, PartialEq)]
 pub struct CurrentDeployPayload {
-    pub mode: String,
+    pub mode: ClusterMode,
     pub updated_at: String,
     pub mode_args: Vec<String>,
     pub helm_settings: Vec<HelmSetting>,
@@ -487,7 +546,7 @@ impl CurrentDeployPayload {
     #[must_use]
     pub fn from_spec(spec: &ClusterSpec, updated_at: &str) -> Self {
         Self {
-            mode: spec.mode.clone(),
+            mode: spec.mode,
             updated_at: updated_at.into(),
             mode_args: spec.mode_args.clone(),
             helm_settings: spec.helm_settings.clone(),
@@ -501,10 +560,11 @@ impl CurrentDeployPayload {
     /// Returns an error if the value is not a valid deploy payload.
     pub fn from_value(value: &Value) -> Result<Self, String> {
         let obj = value.as_object().ok_or("expected object")?;
-        let mode = obj
+        let mode: ClusterMode = obj
             .get("mode")
             .and_then(Value::as_str)
-            .ok_or("missing mode")?;
+            .ok_or("missing mode")?
+            .parse()?;
         let updated_at = obj
             .get("updated_at")
             .and_then(Value::as_str)
@@ -514,7 +574,7 @@ impl CurrentDeployPayload {
         let helm_settings = parse_helm_settings(obj);
         let restart_namespaces = parse_string_vec(obj.get("restart_namespaces"));
         Ok(Self {
-            mode: mode.into(),
+            mode,
             updated_at,
             mode_args,
             helm_settings,
@@ -532,7 +592,7 @@ impl CurrentDeployPayload {
     #[must_use]
     pub fn to_json_dict(&self) -> Value {
         let mut map = serde_json::Map::new();
-        map.insert("mode".into(), Value::String(self.mode.clone()));
+        map.insert("mode".into(), Value::String(self.mode.to_string()));
         map.insert("updated_at".into(), Value::String(self.updated_at.clone()));
         map.insert(
             "mode_args".into(),
@@ -602,7 +662,7 @@ mod tests {
     fn legacy_primary_kubeconfig_fallback() {
         let spec = ClusterSpec::from_object(&json!({"primary_kubeconfig": "/tmp/current-config"}))
             .unwrap();
-        assert_eq!(spec.mode, "single-up");
+        assert_eq!(spec.mode, ClusterMode::SingleUp);
         assert_eq!(spec.mode_args, vec!["current"]);
         assert_eq!(spec.primary_kubeconfig(), "/tmp/current-config");
     }

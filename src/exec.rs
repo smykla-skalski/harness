@@ -3,14 +3,13 @@ use std::path::Path;
 use std::process::Command;
 
 use crate::core_defs::{CommandResult, merge_env};
-use crate::errors::{self, COMMAND_FAILED, CliError, EMPTY_COMMAND_ARGS};
+use crate::errors::{CliError, CliErrorKind};
 
 /// Run a command via `std::process::Command`, capturing stdout/stderr.
 ///
 /// # Errors
 /// Returns `CliError` if the exit code is not in `ok_exit_codes`.
-#[allow(clippy::implicit_hasher)]
-pub fn run_command(
+pub(crate) fn run_command(
     args: &[&str],
     cwd: Option<&Path>,
     env: Option<&HashMap<String, String>>,
@@ -18,7 +17,7 @@ pub fn run_command(
 ) -> Result<CommandResult, CliError> {
     let (program, cmd_args) = args
         .split_first()
-        .ok_or_else(|| errors::cli_err(&EMPTY_COMMAND_ARGS, &[]))?;
+        .ok_or_else(|| CliError::from(CliErrorKind::EmptyCommandArgs))?;
     let merged = merge_env(env);
     let mut cmd = Command::new(program);
     cmd.args(cmd_args).envs(&merged);
@@ -26,11 +25,10 @@ pub fn run_command(
         cmd.current_dir(dir);
     }
     let output = cmd.output().map_err(|e| {
-        errors::cli_err_with_details(
-            &COMMAND_FAILED,
-            &[("command", &args.join(" "))],
-            &e.to_string(),
-        )
+        CliErrorKind::CommandFailed {
+            command: args.join(" "),
+        }
+        .with_details(e.to_string())
     })?;
     let returncode = output.status.code().unwrap_or(-1);
     let result = CommandResult {
@@ -51,11 +49,10 @@ pub fn run_command(
     } else {
         result.stderr.trim().to_string()
     };
-    Err(errors::cli_err_with_details(
-        &COMMAND_FAILED,
-        &[("command", &args.join(" "))],
-        &details,
-    ))
+    Err(CliErrorKind::CommandFailed {
+        command: args.join(" "),
+    }
+    .with_details(details))
 }
 
 /// Run kubectl with optional kubeconfig.
@@ -124,7 +121,7 @@ mod tests {
     #[test]
     fn run_command_rejects_bad_exit_code() {
         let err = run_command(&["false"], None, None, &[0]).unwrap_err();
-        assert!(err.message.contains("command failed"));
+        assert!(err.message().contains("command failed"));
     }
 
     #[test]

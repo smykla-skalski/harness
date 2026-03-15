@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use crate::cli::RunDirArgs;
 use crate::context::RunContext;
 use crate::core_defs::utc_now;
-use crate::errors::{self, CliError};
+use crate::errors::{CliError, CliErrorKind};
 use crate::exec::kubectl;
 use crate::io::append_markdown_row;
 use crate::resolve::resolve_manifest_path;
@@ -27,10 +27,10 @@ fn resolve_kubeconfig(
     if let Some(ref spec) = ctx.cluster {
         return Ok(PathBuf::from(spec.primary_kubeconfig()));
     }
-    Err(errors::cli_err(
-        &errors::MISSING_RUN_CONTEXT_VALUE,
-        &[("field", "kubeconfig")],
-    ))
+    Err(CliErrorKind::MissingRunContextValue {
+        field: "kubeconfig".into(),
+    }
+    .into())
 }
 
 /// Apply manifests to the cluster.

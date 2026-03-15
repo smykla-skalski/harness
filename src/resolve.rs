@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 
 use crate::context::RunLookup;
 use crate::core_defs;
-use crate::errors::{self, CliError};
+use crate::errors::{CliError, CliErrorKind};
 
 /// Resolved run directory.
 #[derive(Debug, Clone)]
@@ -25,11 +25,10 @@ pub fn resolve_run_directory(lookup: &RunLookup) -> Result<ResolvedRun, CliError
                 run_dir: run_dir.clone(),
             });
         }
-        let display = run_dir.display().to_string();
-        return Err(errors::cli_err(
-            &errors::MISSING_FILE,
-            &[("path", &display)],
-        ));
+        return Err(CliErrorKind::MissingFile {
+            path: run_dir.display().to_string(),
+        }
+        .into());
     }
 
     if let (Some(run_root), Some(run_id)) = (&lookup.run_root, &lookup.run_id) {
@@ -37,20 +36,20 @@ pub fn resolve_run_directory(lookup: &RunLookup) -> Result<ResolvedRun, CliError
         if path.exists() {
             return Ok(ResolvedRun { run_dir: path });
         }
-        return Err(errors::cli_err(
-            &errors::MISSING_RUN_LOCATION,
-            &[("run_id", run_id)],
-        ));
+        return Err(CliErrorKind::MissingRunLocation {
+            run_id: run_id.clone(),
+        }
+        .into());
     }
 
     if let Some(run_id) = &lookup.run_id {
-        return Err(errors::cli_err(
-            &errors::MISSING_RUN_LOCATION,
-            &[("run_id", run_id)],
-        ));
+        return Err(CliErrorKind::MissingRunLocation {
+            run_id: run_id.clone(),
+        }
+        .into());
     }
 
-    Err(errors::cli_err(&errors::MISSING_RUN_POINTER, &[]))
+    Err(CliErrorKind::MissingRunPointer.into())
 }
 
 /// Resolve a suite path from raw input.
@@ -77,7 +76,7 @@ pub fn resolve_suite_path(raw: &str) -> Result<PathBuf, CliError> {
         return Ok(normalize_suite_candidate(first));
     }
 
-    Err(errors::cli_err(&errors::MISSING_FILE, &[("path", raw)]))
+    Err(CliErrorKind::MissingFile { path: raw.into() }.into())
 }
 
 /// Resolve a manifest path, searching the run directory's manifest tree.
@@ -94,7 +93,7 @@ pub fn resolve_manifest_path(raw: &str, run_dir: Option<&Path>) -> Result<PathBu
         }
     }
 
-    Err(errors::cli_err(&errors::MISSING_FILE, &[("path", raw)]))
+    Err(CliErrorKind::MissingFile { path: raw.into() }.into())
 }
 
 fn suite_path_candidates(raw: &str, suite_root: &Path) -> Vec<PathBuf> {
@@ -189,14 +188,14 @@ mod tests {
             run_root: Some(PathBuf::from("/nonexistent")),
         };
         let err = resolve_run_directory(&lookup).unwrap_err();
-        assert_eq!(err.code, "KSRCLI018");
+        assert_eq!(err.code(), "KSRCLI018");
     }
 
     #[test]
     fn resolve_run_directory_no_fields_returns_pointer_error() {
         let lookup = RunLookup::default();
         let err = resolve_run_directory(&lookup).unwrap_err();
-        assert_eq!(err.code, "KSRCLI005");
+        assert_eq!(err.code(), "KSRCLI005");
     }
 
     #[test]
@@ -207,7 +206,7 @@ mod tests {
             run_root: None,
         };
         let err = resolve_run_directory(&lookup).unwrap_err();
-        assert_eq!(err.code, "KSRCLI018");
+        assert_eq!(err.code(), "KSRCLI018");
     }
 
     #[test]
@@ -234,7 +233,7 @@ mod tests {
     #[test]
     fn resolve_manifest_path_not_found_returns_error() {
         let err = resolve_manifest_path("ghost.yaml", None).unwrap_err();
-        assert_eq!(err.code, "KSRCLI014");
+        assert_eq!(err.code(), "KSRCLI014");
     }
 
     #[test]
