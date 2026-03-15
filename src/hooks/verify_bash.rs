@@ -8,14 +8,15 @@ use crate::hook::HookResult;
 use crate::hook_payloads::HookContext;
 use crate::workflow::runner::{RunnerPhase, RunnerWorkflowState, SuiteFixState};
 
-/// Tracked subcommands and their expected artifact paths.
-const TRACKED_SUBCOMMAND_ARTIFACTS: &[(&str, &[&str])] = &[
-    ("apply", &["manifests", "manifest-index.md"]),
-    ("capture", &["state"]),
-    ("preflight", &["artifacts", "preflight.json"]),
-    ("record", &["commands", "command-log.md"]),
-    ("run", &["commands", "command-log.md"]),
-];
+fn subcommand_artifacts(subcommand: &str) -> Option<&'static [&'static str]> {
+    match subcommand {
+        "apply" => Some(&["manifests", "manifest-index.md"]),
+        "capture" => Some(&["state"]),
+        "preflight" => Some(&["artifacts", "preflight.json"]),
+        "record" | "run" => Some(&["commands", "command-log.md"]),
+        _ => None,
+    }
+}
 
 /// Execute the verify-bash hook.
 ///
@@ -46,10 +47,7 @@ pub fn execute(ctx: &HookContext) -> Result<HookResult, CliError> {
         }
         return Ok(result);
     }
-    let tracked = TRACKED_SUBCOMMAND_ARTIFACTS
-        .iter()
-        .any(|(name, _)| *name == subcommand);
-    if !tracked {
+    if subcommand_artifacts(subcommand).is_none() {
         maybe_resume_suite_fix(ctx, &words);
         return Ok(HookResult::allow());
     }
@@ -95,12 +93,9 @@ fn missing_target(subcommand: &str, run: &RunContext) -> String {
     if subcommand == "preflight" && run_dir.join("artifacts").join("preflight.json").exists() {
         return run.layout.prepared_suite_path().display().to_string();
     }
-    if let Some((_, parts)) = TRACKED_SUBCOMMAND_ARTIFACTS
-        .iter()
-        .find(|(name, _)| *name == subcommand)
-    {
+    if let Some(parts) = subcommand_artifacts(subcommand) {
         let mut target = run_dir;
-        for part in *parts {
+        for part in parts {
             target = target.join(part);
         }
         return target.display().to_string();
