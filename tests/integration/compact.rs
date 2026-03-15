@@ -8,13 +8,12 @@
 
 use std::env;
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::PoisonError;
 
 use harness::commands::{pre_compact, session_start, session_stop};
 use harness::compact::{self, AuthoringHandoff, FileFingerprint, HandoffStatus, RunnerHandoff};
 use harness::ephemeral_metallb;
-use harness_testkit::with_env_vars;
 
 use super::helpers::ENV_LOCK;
 
@@ -103,7 +102,7 @@ fn file_fingerprint_from_missing_file() {
 fn file_fingerprint_serialization_roundtrip() {
     let fp = FileFingerprint {
         label: "test".to_string(),
-        path: "/tmp/test.txt".to_string(),
+        path: PathBuf::from("/tmp/test.txt"),
         exists: true,
         size: Some(42),
         mtime_ns: Some(1_000_000_000),
@@ -344,7 +343,7 @@ fn check_session_start_compact_divergence_warning(project: &Path) {
     let diverged = compact::verify_fingerprints(&loaded);
     assert_eq!(diverged.len(), 1, "should detect 1 diverged file");
     assert!(
-        diverged[0].contains("tracked.txt"),
+        diverged[0].ends_with("tracked.txt"),
         "diverged path should reference tracked.txt: {:?}",
         diverged[0]
     );
@@ -458,34 +457,33 @@ fn compact_handoff_lifecycle() {
     let (xdg, project) = setup_env();
     let orig_path = env::var("PATH").unwrap_or_default();
     let path_with_bin = format!("{}:{orig_path}", xdg.path().join("bin").display());
+    let xdg_str = xdg.path().to_str().unwrap();
 
-    unsafe {
-        with_env_vars(
-            &[
-                ("XDG_DATA_HOME", Some(&xdg.path().to_string_lossy())),
-                ("CLAUDE_SESSION_ID", Some("compact-lifecycle")),
-                ("HOME", Some(&xdg.path().to_string_lossy())),
-                ("PATH", Some(&path_with_bin)),
-            ],
-            || {
-                check_build_compact_includes_runner(project.path());
-                check_build_compact_worktree_project(project.path());
-                check_build_compact_includes_author(project.path());
-                check_build_compact_author_fallback(project.path());
-                check_save_consume_compact_handoff(project.path());
-                check_pre_compact_persists(project.path());
-                check_session_start_compact_hydrates(project.path());
-                check_session_start_compact_worktree(project.path());
-                check_session_start_compact_aborted_resume(project.path());
-                check_session_start_compact_restores_author(project.path());
-                check_session_start_compact_divergence_warning(project.path());
-                check_session_start_restores_project(project.path());
-                check_session_start_restores_worktree(project.path());
-                check_session_start_cross_project(project.path());
-                check_session_start_metallb_templates(project.path());
-                check_session_stop_metallb_cleanup(project.path());
-                check_session_start_no_replay(project.path());
-            },
-        );
-    }
+    temp_env::with_vars(
+        [
+            ("XDG_DATA_HOME", Some(xdg_str)),
+            ("CLAUDE_SESSION_ID", Some("compact-lifecycle")),
+            ("HOME", Some(xdg_str)),
+            ("PATH", Some(path_with_bin.as_str())),
+        ],
+        || {
+            check_build_compact_includes_runner(project.path());
+            check_build_compact_worktree_project(project.path());
+            check_build_compact_includes_author(project.path());
+            check_build_compact_author_fallback(project.path());
+            check_save_consume_compact_handoff(project.path());
+            check_pre_compact_persists(project.path());
+            check_session_start_compact_hydrates(project.path());
+            check_session_start_compact_worktree(project.path());
+            check_session_start_compact_aborted_resume(project.path());
+            check_session_start_compact_restores_author(project.path());
+            check_session_start_compact_divergence_warning(project.path());
+            check_session_start_restores_project(project.path());
+            check_session_start_restores_worktree(project.path());
+            check_session_start_cross_project(project.path());
+            check_session_start_metallb_templates(project.path());
+            check_session_stop_metallb_cleanup(project.path());
+            check_session_start_no_replay(project.path());
+        },
+    );
 }

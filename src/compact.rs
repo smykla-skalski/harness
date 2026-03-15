@@ -13,7 +13,7 @@ use crate::rules::compact as rules;
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FileFingerprint {
     pub label: String,
-    pub path: String,
+    pub path: PathBuf,
     pub exists: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub size: Option<u64>,
@@ -31,7 +31,7 @@ impl FileFingerprint {
         if !resolved.exists() {
             return Self {
                 label: label.to_string(),
-                path: resolved.to_string_lossy().to_string(),
+                path: resolved,
                 exists: false,
                 size: None,
                 mtime_ns: None,
@@ -51,7 +51,7 @@ impl FileFingerprint {
 
         Self {
             label: label.to_string(),
-            path: resolved.to_string_lossy().to_string(),
+            path: resolved,
             exists: true,
             size,
             mtime_ns,
@@ -62,8 +62,7 @@ impl FileFingerprint {
     /// Check if the fingerprint matches the current state on disk.
     #[must_use]
     pub fn matches_disk(&self) -> bool {
-        let path = Path::new(&self.path);
-        let meta = fs::metadata(path).ok();
+        let meta = fs::metadata(&self.path).ok();
         let exists = meta.is_some();
         if exists != self.exists {
             return false;
@@ -85,7 +84,7 @@ impl FileFingerprint {
             return false;
         }
         // mtime + size match - compute SHA256 only as final check.
-        let sha256 = file_sha256(path);
+        let sha256 = file_sha256(&self.path);
         sha256 == self.sha256
     }
 }
@@ -316,7 +315,7 @@ pub fn consume_compact_handoff(
 
 /// Check which fingerprints have diverged from disk.
 #[must_use]
-pub fn verify_fingerprints(handoff: &CompactHandoff) -> Vec<String> {
+pub fn verify_fingerprints(handoff: &CompactHandoff) -> Vec<PathBuf> {
     handoff
         .fingerprints
         .iter()
@@ -327,7 +326,7 @@ pub fn verify_fingerprints(handoff: &CompactHandoff) -> Vec<String> {
 
 /// Render the hydration context for a compact handoff.
 #[must_use]
-pub fn render_hydration_context(handoff: &CompactHandoff, diverged_paths: &[String]) -> String {
+pub fn render_hydration_context(handoff: &CompactHandoff, diverged_paths: &[PathBuf]) -> String {
     let mut lines = vec![
         "Kuma compaction handoff restored from saved harness state.".to_string(),
         "Continue immediately from the saved state below. Do not ask the user to restate context."
@@ -349,7 +348,7 @@ pub fn render_hydration_context(handoff: &CompactHandoff, diverged_paths: &[Stri
         let paths = diverged_paths
             .iter()
             .take(5)
-            .map(String::as_str)
+            .map(|p| p.display().to_string())
             .collect::<Vec<_>>()
             .join(", ");
         lines.push(format!(
@@ -866,7 +865,7 @@ mod tests {
             authoring: None,
             fingerprints: vec![],
         };
-        let diverged = vec!["/some/file.json".to_string()];
+        let diverged = vec![PathBuf::from("/some/file.json")];
         let ctx = render_hydration_context(&handoff, &diverged);
         assert!(ctx.contains("WARNING: the saved handoff diverged"));
         assert!(ctx.contains("/some/file.json"));

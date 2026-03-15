@@ -3,6 +3,8 @@
 // validate-agent checks subagent stop conditions (last_assistant_message
 // ending with "saved", preflight pass/fail canonicals).
 
+use std::path::Path;
+
 use harness::hook::Decision;
 use harness::hook_payloads::HookEnvelopePayload;
 use harness::hooks::{context_agent, enrich_failure, validate_agent};
@@ -149,7 +151,7 @@ fn hook_context_write_paths_empty() {
 #[test]
 fn hook_context_write_paths_single() {
     let ctx = make_hook_context("suite-runner", make_write_payload("/tmp/test.txt"));
-    assert_eq!(ctx.write_paths(), vec!["/tmp/test.txt"]);
+    assert_eq!(ctx.write_paths(), vec![Path::new("/tmp/test.txt")]);
 }
 
 #[test]
