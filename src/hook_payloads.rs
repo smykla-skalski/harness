@@ -12,7 +12,7 @@ use crate::workflow::runner::{self as runner_workflow, RunnerWorkflowState};
 /// A write request from a hook envelope.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct HookWriteRequest {
-    pub file_path: String,
+    pub file_path: PathBuf,
 }
 
 /// An option in an `AskUserQuestion` prompt.
@@ -73,7 +73,7 @@ pub struct HookMessagePayload {
     #[serde(default)]
     pub command: Option<String>,
     #[serde(default)]
-    pub file_path: Option<String>,
+    pub file_path: Option<PathBuf>,
     #[serde(default)]
     pub writes: Vec<HookWriteRequest>,
     #[serde(default)]
@@ -98,7 +98,7 @@ pub struct HookEnvelopePayload {
     #[serde(default)]
     pub last_assistant_message: Option<String>,
     #[serde(default)]
-    pub transcript_path: Option<String>,
+    pub transcript_path: Option<PathBuf>,
     #[serde(default)]
     pub stop_hook_active: bool,
     #[serde(default)]
@@ -278,14 +278,14 @@ impl HookContext {
 
     /// Write target paths from the input payload.
     #[must_use]
-    pub fn write_paths(&self) -> Vec<&str> {
+    pub fn write_paths(&self) -> Vec<&Path> {
         let mut paths = Vec::new();
         if let Some(p) = &self.event.payload.input_payload {
             if let Some(fp) = &p.file_path {
-                paths.push(fp.as_str());
+                paths.push(fp.as_path());
             }
             for w in &p.writes {
-                paths.push(w.file_path.as_str());
+                paths.push(w.file_path.as_path());
             }
         }
         paths
@@ -375,7 +375,7 @@ mod tests {
         let envelope = HookEnvelopePayload::from_json_text(json).unwrap();
         let payload = envelope.input_payload.unwrap();
         assert_eq!(payload.writes.len(), 1);
-        assert_eq!(payload.writes[0].file_path, "/tmp/test.txt");
+        assert_eq!(payload.writes[0].file_path, PathBuf::from("/tmp/test.txt"));
     }
 
     #[test]
@@ -421,7 +421,7 @@ mod tests {
         assert_eq!(envelope.root.as_deref(), Some("/workspace"));
         assert_eq!(
             envelope.transcript_path.as_deref(),
-            Some("/tmp/transcript.json")
+            Some(Path::new("/tmp/transcript.json"))
         );
         assert!(envelope.stop_hook_active);
         assert_eq!(envelope.raw_keys, vec!["key1", "key2"]);
