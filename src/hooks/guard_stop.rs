@@ -23,7 +23,7 @@ fn guard_suite_author_stop(ctx: &HookContext) -> HookResult {
         return HookResult::allow();
     };
     if let Err(reason) = can_stop(state) {
-        return HookMessage::approval_required("stop suite-author", reason).into_result();
+        return HookMessage::approval_required("stop suite:new", reason).into_result();
     }
     HookResult::allow()
 }

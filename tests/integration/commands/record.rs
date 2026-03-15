@@ -549,7 +549,7 @@ fn approval_begin_initializes_interactive_state() {
     env::set_current_dir(&work_dir).unwrap();
 
     let result = Command::ApprovalBegin {
-        skill: "suite-author".to_string(),
+        skill: "suite:new".to_string(),
         mode: "interactive".to_string(),
         suite_dir: None,
     }
@@ -943,7 +943,7 @@ fn check_authoring_begin_persists_suite_default_repo_root() {
         ],
         || {
             let result = Command::AuthoringBegin(AuthoringBeginArgs {
-                skill: "suite-author".to_string(),
+                skill: "suite:new".to_string(),
                 repo_root: repo_root.to_string_lossy().to_string(),
                 feature: "mesh".to_string(),
                 mode: "interactive".to_string(),
@@ -976,7 +976,7 @@ fn check_authoring_save_accepts_inline_payload() {
         ],
         || {
             let _ = Command::AuthoringBegin(AuthoringBeginArgs {
-                skill: "suite-author".to_string(),
+                skill: "suite:new".to_string(),
                 repo_root: repo_root.to_string_lossy().to_string(),
                 feature: "mesh".to_string(),
                 mode: "interactive".to_string(),
@@ -1020,7 +1020,7 @@ fn check_authoring_save_accepts_stdin() {
         ],
         || {
             let _ = Command::AuthoringBegin(AuthoringBeginArgs {
-                skill: "suite-author".to_string(),
+                skill: "suite:new".to_string(),
                 repo_root: repo_root.to_string_lossy().to_string(),
                 feature: "mesh".to_string(),
                 mode: "interactive".to_string(),
@@ -1055,7 +1055,7 @@ fn check_authoring_save_rejects_schema_missing_fields() {
         ],
         || {
             let _ = Command::AuthoringBegin(AuthoringBeginArgs {
-                skill: "suite-author".to_string(),
+                skill: "suite:new".to_string(),
                 repo_root: repo_root.to_string_lossy().to_string(),
                 feature: "mesh".to_string(),
                 mode: "interactive".to_string(),

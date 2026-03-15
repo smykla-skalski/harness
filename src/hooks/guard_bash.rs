@@ -447,7 +447,7 @@ fn deny_suite_storage_mutation(words: &[String]) -> HookResult {
     for word in &path_words {
         if word.contains("/suites/") || word.starts_with("suites/") {
             return deny_runner_flow(
-                "do not create or mutate suite storage from suite-runner; \
+                "do not create or mutate suite storage from suite:run; \
                  use an existing suite path",
             );
         }
@@ -729,17 +729,14 @@ mod tests {
 
     #[test]
     fn denies_direct_kubectl() {
-        let c = ctx("suite-runner", "kubectl get pods");
+        let c = ctx("suite:run", "kubectl get pods");
         let r = execute(&c).unwrap();
         assert_eq!(r.decision, Decision::Deny);
     }
 
     #[test]
     fn denies_legacy_script_via_python() {
-        let c = ctx(
-            "suite-runner",
-            "python3 tools/record_command.py -- echo hello",
-        );
+        let c = ctx("suite:run", "python3 tools/record_command.py -- echo hello");
         let r = execute(&c).unwrap();
         assert_eq!(r.decision, Decision::Deny);
     }
@@ -747,7 +744,7 @@ mod tests {
     #[test]
     fn denies_kumactl_path_after_shell_op() {
         let c = ctx(
-            "suite-runner",
+            "suite:run",
             "ls -la /tmp/kumactl && /tmp/kumactl version 2>&1",
         );
         let r = execute(&c).unwrap();
@@ -757,7 +754,7 @@ mod tests {
     // Catches kumactl anywhere in command words, including path-like arguments.
     #[test]
     fn denies_kumactl_in_path_arg() {
-        let c = ctx("suite-runner", "ls -la /tmp/kumactl");
+        let c = ctx("suite:run", "ls -la /tmp/kumactl");
         let r = execute(&c).unwrap();
         assert_eq!(r.decision, Decision::Deny);
     }
@@ -765,7 +762,7 @@ mod tests {
     #[test]
     fn allows_kumactl_in_harness_run() {
         let c = ctx(
-            "suite-runner",
+            "suite:run",
             "harness run --phase setup --label kumactl-version kumactl version",
         );
         let r = execute(&c).unwrap();
@@ -775,7 +772,7 @@ mod tests {
     #[test]
     fn allows_harness_envoy_capture() {
         let c = ctx(
-            "suite-runner",
+            "suite:run",
             "harness envoy capture --phase verify --label config-dump --namespace kuma-demo \
              --workload deploy/demo-client --admin-path /config_dump",
         );
@@ -785,49 +782,49 @@ mod tests {
 
     #[test]
     fn denies_github_sidequest() {
-        let c = ctx("suite-runner", "gh run view 12345");
+        let c = ctx("suite:run", "gh run view 12345");
         let r = execute(&c).unwrap();
         assert_eq!(r.decision, Decision::Deny);
     }
 
     #[test]
     fn denies_direct_kubectl_for_suite_author() {
-        let c = ctx("suite-author", "kubectl get pods");
+        let c = ctx("suite:new", "kubectl get pods");
         let r = execute(&c).unwrap();
         assert_eq!(r.decision, Decision::Deny);
     }
 
     #[test]
     fn allows_harness_wrapper_for_suite_author() {
-        let c = ctx("suite-author", "harness authoring-show --kind session");
+        let c = ctx("suite:new", "harness authoring-show --kind session");
         let r = execute(&c).unwrap();
         assert_eq!(r.decision, Decision::Allow);
     }
 
     #[test]
     fn allows_empty_command() {
-        let c = ctx("suite-runner", "");
+        let c = ctx("suite:run", "");
         let r = execute(&c).unwrap();
         assert_eq!(r.decision, Decision::Allow);
     }
 
     #[test]
     fn denies_helm_direct() {
-        let c = ctx("suite-runner", "helm install kuma kuma/kuma");
+        let c = ctx("suite:run", "helm install kuma kuma/kuma");
         let r = execute(&c).unwrap();
         assert_eq!(r.decision, Decision::Deny);
     }
 
     #[test]
     fn denies_docker_direct() {
-        let c = ctx("suite-runner", "docker ps");
+        let c = ctx("suite:run", "docker ps");
         let r = execute(&c).unwrap();
         assert_eq!(r.decision, Decision::Deny);
     }
 
     #[test]
     fn denies_k3d_direct() {
-        let c = ctx("suite-runner", "k3d cluster list");
+        let c = ctx("suite:run", "k3d cluster list");
         let r = execute(&c).unwrap();
         assert_eq!(r.decision, Decision::Deny);
     }
@@ -835,7 +832,7 @@ mod tests {
     #[test]
     fn allows_harness_record() {
         let c = ctx(
-            "suite-runner",
+            "suite:run",
             "harness record --phase verify --label test -- echo hello",
         );
         let r = execute(&c).unwrap();
@@ -844,7 +841,7 @@ mod tests {
 
     #[test]
     fn allows_inactive_skill() {
-        let mut c = ctx("suite-runner", "kubectl get pods");
+        let mut c = ctx("suite:run", "kubectl get pods");
         c.skill_active = false;
         let r = execute(&c).unwrap();
         assert_eq!(r.decision, Decision::Allow);
@@ -852,7 +849,7 @@ mod tests {
 
     #[test]
     fn denies_admin_endpoint_direct() {
-        let c = ctx("suite-runner", "wget -qO- localhost:9901/config_dump");
+        let c = ctx("suite:run", "wget -qO- localhost:9901/config_dump");
         let r = execute(&c).unwrap();
         assert_eq!(r.decision, Decision::Deny);
     }
@@ -860,7 +857,7 @@ mod tests {
     #[test]
     fn denies_mixed_kuma_resource_delete() {
         let c = ctx(
-            "suite-runner",
+            "suite:run",
             "harness record --phase cleanup --label cleanup-g04 -- \
              kubectl delete meshopentelemetrybackend otel-runtime \
              meshmetric metrics-runtime -n kuma-system",
@@ -876,7 +873,7 @@ mod tests {
     #[test]
     fn allows_single_kuma_resource_delete_via_harness_record() {
         let c = ctx(
-            "suite-runner",
+            "suite:run",
             "harness record --phase cleanup --label cleanup-g05 -- \
              kubectl delete meshopentelemetrybackend otel-e2e -n kuma-system",
         );
@@ -887,7 +884,7 @@ mod tests {
     #[test]
     fn denies_tracked_harness_in_loop() {
         let c = ctx(
-            "suite-runner",
+            "suite:run",
             "for i in 01 02 03; do \
              harness apply --manifest \"g10/${i}.yaml\" --step \"g10-manifest-${i}\" || break; \
              done",
@@ -900,7 +897,7 @@ mod tests {
     #[test]
     fn denies_chained_tracked_harness() {
         let c = ctx(
-            "suite-runner",
+            "suite:run",
             "sleep 5 && harness run --phase verify --label ctx kubectl config current-context",
         );
         let r = execute(&c).unwrap();
@@ -911,7 +908,7 @@ mod tests {
     #[test]
     fn allows_kubectl_in_harness_record_pipe() {
         let c = ctx(
-            "suite-runner",
+            "suite:run",
             "harness record --phase verify --label pods \
              kubectl get pods -o json | jq '.items[].metadata.name'",
         );

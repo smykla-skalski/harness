@@ -17,7 +17,7 @@ use crate::workflow::author::{
 // begin
 // =========================================================================
 
-/// Begin a suite-author workspace session.
+/// Begin a suite:new workspace session.
 ///
 /// # Errors
 /// Returns `CliError` on failure.
@@ -64,7 +64,7 @@ fn parse_payload(text: &str, kind: &str) -> Result<serde_json::Value, CliError> 
     })
 }
 
-/// Save a suite-author payload.
+/// Save a suite:new payload.
 ///
 /// # Errors
 /// Returns `CliError` on failure.
@@ -90,7 +90,7 @@ pub fn save(kind: &str, payload: Option<&str>, input: Option<&str>) -> Result<i3
 // show
 // =========================================================================
 
-/// Show saved suite-author payloads.
+/// Show saved suite:new payloads.
 ///
 /// # Errors
 /// Returns `CliError` on failure.
@@ -126,7 +126,7 @@ pub fn show(kind: &str) -> Result<i32, CliError> {
 // reset
 // =========================================================================
 
-/// Reset suite-author workspace.
+/// Reset suite:new workspace.
 ///
 /// # Errors
 /// Returns `CliError` on failure.
@@ -164,7 +164,7 @@ pub fn validate(paths: &[String], repo_root: Option<&str>) -> Result<i32, CliErr
 // approval_begin
 // =========================================================================
 
-/// Begin suite-author approval flow.
+/// Begin suite:new approval flow.
 ///
 /// # Errors
 /// Returns `CliError` on failure.

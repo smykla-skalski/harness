@@ -4,6 +4,7 @@ use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
 
 use crate::errors::{CliError, CliErrorKind, cow};
+use crate::rules::skill_dirs;
 use crate::workflow::engine::VersionedJsonRepository;
 
 /// Runner workflow phases.
@@ -125,7 +126,7 @@ const RUNNER_STATE_SCHEMA_VERSION: u32 = 1;
 /// Path to the runner state file.
 #[must_use]
 pub fn runner_state_path(run_dir: &Path) -> PathBuf {
-    run_dir.join("suite-runner-state.json")
+    run_dir.join(skill_dirs::RUN_STATE_FILE)
 }
 
 fn runner_repository(run_dir: &Path) -> VersionedJsonRepository {
@@ -216,7 +217,7 @@ impl fmt::Display for RunnerNextAction {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(match self {
             Self::ReloadState => {
-                "Reload the saved suite-runner state before continuing."
+                "Reload the saved suite:run state before continuing."
             }
             Self::FinishBootstrap => {
                 "Resume the run by finishing cluster bootstrap before preflight."
@@ -477,7 +478,7 @@ mod tests {
     #[test]
     fn runner_state_path_builds_correctly() {
         let path = runner_state_path(Path::new("/runs/r1"));
-        assert_eq!(path, PathBuf::from("/runs/r1/suite-runner-state.json"));
+        assert_eq!(path, PathBuf::from("/runs/r1/suite-run-state.json"));
     }
 
     #[test]

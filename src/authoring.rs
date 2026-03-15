@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::core_defs::{session_context_dir, utc_now};
 use crate::errors::{CliError, CliErrorKind};
+use crate::rules::skill_dirs;
 
 /// Active authoring session state.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -220,7 +221,7 @@ pub fn begin_authoring_session(
 /// Workspace directory for authoring artifacts.
 #[must_use]
 pub fn authoring_workspace_dir() -> PathBuf {
-    session_context_dir().join("suite-author")
+    session_context_dir().join(skill_dirs::NEW_WORKSPACE)
 }
 
 #[cfg(test)]
@@ -390,7 +391,7 @@ mod tests {
                     .unwrap()
                     .to_string_lossy()
                     .into_owned();
-                assert_eq!(name, "suite-author");
+                assert_eq!(name, "suite-new");
             });
         }
     }

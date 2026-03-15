@@ -8,7 +8,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::core_defs::{project_context_dir, session_scope_key, utc_now};
 use crate::errors::{CliError, CliErrorKind, cow};
-use crate::rules::compact as rules;
+use crate::rules;
+use crate::rules::compact as compact_rules;
 
 /// SHA256 fingerprint of a file.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -221,7 +222,7 @@ pub fn compact_history_dir(project_dir: &Path) -> PathBuf {
 /// Returns `CliError` on failure.
 pub fn build_compact_handoff(project_dir: &Path) -> Result<CompactHandoff<'static>, CliError> {
     Ok(CompactHandoff {
-        version: rules::HANDOFF_VERSION,
+        version: compact_rules::HANDOFF_VERSION,
         project_dir: Cow::Owned(project_dir.to_string_lossy().into_owned()),
         created_at: Cow::Owned(utc_now()),
         status: HandoffStatus::Pending,
@@ -381,7 +382,11 @@ pub fn render_hydration_context(handoff: &CompactHandoff<'_>, diverged_paths: &[
         }
     }
 
-    truncate_lines(&lines, rules::CHAR_LIMIT, rules::SECTION_LINE_LIMIT * 2)
+    truncate_lines(
+        &lines,
+        compact_rules::CHAR_LIMIT,
+        compact_rules::SECTION_LINE_LIMIT * 2,
+    )
 }
 
 /// Render a runner restore context (for session-start without compact).
@@ -429,12 +434,16 @@ pub fn render_runner_restore_context(project_dir: &Path, runner: &RunnerHandoff<
             .to_string(),
     );
 
-    truncate_lines(&lines, rules::CHAR_LIMIT, rules::SECTION_LINE_LIMIT * 2)
+    truncate_lines(
+        &lines,
+        compact_rules::CHAR_LIMIT,
+        compact_rules::SECTION_LINE_LIMIT * 2,
+    )
 }
 
 fn render_runner_section(handoff: &RunnerHandoff<'_>) -> String {
     let mut lines = vec![
-        "suite-runner:".to_string(),
+        format!("{}:", rules::SKILL_RUN),
         format!("- Run: {}", handoff.run_id),
         format!("- Run dir: {}", handoff.run_dir),
         format!(
@@ -510,12 +519,16 @@ fn render_runner_section(handoff: &RunnerHandoff<'_>) -> String {
     lines.push(format!("- Key state files: {}", state_preview.join(", ")));
     lines.push(format!("- Next action: {}", handoff.next_action));
 
-    truncate_lines(&lines, rules::SECTION_CHAR_LIMIT, rules::SECTION_LINE_LIMIT)
+    truncate_lines(
+        &lines,
+        compact_rules::SECTION_CHAR_LIMIT,
+        compact_rules::SECTION_LINE_LIMIT,
+    )
 }
 
 fn render_authoring_section(handoff: &AuthoringHandoff<'_>) -> String {
     let lines = vec![
-        "suite-author:".to_string(),
+        format!("{}:", rules::SKILL_NEW),
         format!("- Suite dir: {}", handoff.suite_dir),
         format!(
             "- Suite name: {}",
@@ -551,7 +564,11 @@ fn render_authoring_section(handoff: &AuthoringHandoff<'_>) -> String {
         format!("- Next action: {}", handoff.next_action),
     ];
 
-    truncate_lines(&lines, rules::SECTION_CHAR_LIMIT, rules::SECTION_LINE_LIMIT)
+    truncate_lines(
+        &lines,
+        compact_rules::SECTION_CHAR_LIMIT,
+        compact_rules::SECTION_LINE_LIMIT,
+    )
 }
 
 fn ordered_sections<'a>(handoff: &'a CompactHandoff<'_>) -> Vec<&'a str> {
@@ -637,7 +654,7 @@ fn trim_history(project_dir: &Path) {
         .filter(|p| p.is_file())
         .collect();
     files.sort();
-    let excess = files.len().saturating_sub(rules::HISTORY_LIMIT);
+    let excess = files.len().saturating_sub(compact_rules::HISTORY_LIMIT);
     for path in files.into_iter().take(excess) {
         if let Err(e) = fs::remove_file(&path) {
             eprintln!(
@@ -661,7 +678,7 @@ mod tests {
 
     fn test_handoff(project_dir: &str) -> CompactHandoff<'static> {
         CompactHandoff {
-            version: rules::HANDOFF_VERSION,
+            version: compact_rules::HANDOFF_VERSION,
             project_dir: Cow::Owned(project_dir.to_string()),
             created_at: "2026-01-01T000000Z".into(),
             status: HandoffStatus::Pending,
@@ -899,7 +916,7 @@ mod tests {
             fingerprints: vec![],
         };
         let ctx = render_hydration_context(&handoff, &[]);
-        assert!(ctx.contains("suite-runner:"));
+        assert!(ctx.contains("suite:run:"));
         assert!(ctx.contains("Run: r1"));
         assert!(ctx.contains("never raw `kubectl`"));
     }
@@ -934,7 +951,7 @@ mod tests {
             fingerprints: vec![],
         };
         let ctx = render_hydration_context(&handoff, &[]);
-        assert!(ctx.contains("suite-author:"));
+        assert!(ctx.contains("suite:new:"));
         assert!(ctx.contains("Suite name: motb-core"));
         assert!(ctx.contains("Saved payloads: inventory, proposal"));
     }
@@ -1128,7 +1145,7 @@ mod tests {
             .filter(|p| p.is_file())
             .collect();
         files.sort();
-        let excess = files.len().saturating_sub(rules::HISTORY_LIMIT);
+        let excess = files.len().saturating_sub(compact_rules::HISTORY_LIMIT);
         for path in files.into_iter().take(excess) {
             fs::remove_file(path).unwrap();
         }
@@ -1137,7 +1154,7 @@ mod tests {
             .unwrap()
             .filter_map(result::Result::ok)
             .collect();
-        assert_eq!(remaining.len(), rules::HISTORY_LIMIT);
+        assert_eq!(remaining.len(), compact_rules::HISTORY_LIMIT);
     }
 
     #[test]

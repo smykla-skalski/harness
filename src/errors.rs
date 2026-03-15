@@ -17,229 +17,335 @@ macro_rules! cow {
 
 pub(crate) use cow;
 
-/// Enum of all CLI error kinds, following the `io::ErrorKind` pattern.
-///
-/// Each variant carries its data as fields - no runtime template rendering.
-/// `Display` is derived by thiserror from the `#[error("...")]` attributes.
-#[derive(Debug, thiserror::Error)]
-#[non_exhaustive]
-pub enum CliErrorKind {
+/// Macro that co-locates each `CliErrorKind` variant with its error code,
+/// display message, and optional exit code. Generates the enum, `code()`,
+/// and `exit_code()` in one place.
+macro_rules! define_cli_errors {
+    (
+        $(
+            $variant:ident $({ $($field:ident : $type:ty),* $(,)? })?
+            => {
+                code: $code:literal,
+                msg: $msg:literal
+                $(, exit: $exit:expr)?
+            }
+        ),* $(,)?
+    ) => {
+        #[derive(Debug, thiserror::Error)]
+        #[non_exhaustive]
+        pub enum CliErrorKind {
+            $(
+                #[error($msg)]
+                $variant $({ $($field: $type),* })?,
+            )*
+        }
+
+        impl CliErrorKind {
+            #[must_use]
+            pub fn code(&self) -> &'static str {
+                match self {
+                    $(Self::$variant { .. } => $code,)*
+                }
+            }
+
+            #[must_use]
+            pub fn exit_code(&self) -> i32 {
+                match self {
+                    $(Self::$variant { .. } => define_cli_errors!(@exit $($exit)?),)*
+                }
+            }
+        }
+    };
+
+    (@exit) => { 5 };
+    (@exit $exit:expr) => { $exit };
+}
+
+define_cli_errors! {
     // --- Input validation (exit 3) ---
-    #[error("command args must not be empty")]
-    EmptyCommandArgs,
-
-    #[error("missing required tools: {tools}")]
-    MissingTools { tools: Cow<'static, str> },
-
-    #[error("unsafe name: {name} (must not contain path separators or \"..\")")]
-    UnsafeName { name: Cow<'static, str> },
-
-    // --- Command execution (exit 4) ---
-    #[error("command failed: {command}")]
-    CommandFailed { command: Cow<'static, str> },
-
-    // --- Run lifecycle (exit 5) ---
-    #[error("missing current run pointer")]
-    MissingRunPointer,
-
-    #[error("missing required closeout artifact: {rel}")]
-    MissingCloseoutArtifact { rel: Cow<'static, str> },
-
-    #[error("run is missing a final state capture")]
-    MissingStateCapture,
-
-    #[error("run overall verdict is still pending")]
-    VerdictPending,
-
-    #[error("missing run context value: {field}")]
-    MissingRunContextValue { field: Cow<'static, str> },
-
-    #[error("missing explicit run location for run id: {run_id}")]
-    MissingRunLocation { run_id: Cow<'static, str> },
-
-    #[error("run directory already exists: {run_dir}")]
-    RunDirExists { run_dir: Cow<'static, str> },
-
-    #[error("run has no recorded status")]
-    MissingRunStatus,
-
-    #[error("run group is already recorded: {group_id}")]
-    RunGroupAlreadyRecorded { group_id: Cow<'static, str> },
-
-    #[error("group is not present in the run plan: {group_id}")]
-    RunGroupNotFound { group_id: Cow<'static, str> },
-
-    // --- File/path errors (exit 5) ---
-    #[error("missing file: {path}")]
-    MissingFile { path: Cow<'static, str> },
-
-    #[error("invalid JSON in {path}")]
-    InvalidJson { path: Cow<'static, str> },
-
-    #[error("path not found: {dotted_path}")]
-    PathNotFound { dotted_path: Cow<'static, str> },
-
-    // --- Schema/structure validation (exit 5) ---
-    #[error("{label} must be a mapping")]
-    NotAMapping { label: Cow<'static, str> },
-
-    #[error("{label} must use string keys")]
-    NotStringKeys { label: Cow<'static, str> },
-
-    #[error("{label} must be a list")]
-    NotAList { label: Cow<'static, str> },
-
-    #[error("{label} must contain only strings")]
-    NotAllStrings { label: Cow<'static, str> },
-
-    #[error("missing YAML frontmatter")]
-    MissingFrontmatter,
-
-    #[error("unterminated YAML frontmatter")]
-    UnterminatedFrontmatter,
-
-    #[error("missing required fields: {label}: {fields}")]
-    MissingFields {
-        label: Cow<'static, str>,
-        fields: Cow<'static, str>,
+    EmptyCommandArgs => {
+        code: "KSRCLI001",
+        msg: "command args must not be empty",
+        exit: 3
+    },
+    MissingTools { tools: Cow<'static, str> } => {
+        code: "KSRCLI002",
+        msg: "missing required tools: {tools}",
+        exit: 3
+    },
+    UnsafeName { name: Cow<'static, str> } => {
+        code: "KSRCLI059",
+        msg: "unsafe name: {name} (must not contain path separators or \"..\")",
+        exit: 3
     },
 
-    #[error("field type mismatch in {label}: {field} (expected {expected})")]
+    // --- Command execution (exit 4) ---
+    CommandFailed { command: Cow<'static, str> } => {
+        code: "KSRCLI004",
+        msg: "command failed: {command}",
+        exit: 4
+    },
+
+    // --- Run lifecycle (exit 5 = default) ---
+    MissingRunPointer => {
+        code: "KSRCLI005",
+        msg: "missing current run pointer"
+    },
+    MissingCloseoutArtifact { rel: Cow<'static, str> } => {
+        code: "KSRCLI006",
+        msg: "missing required closeout artifact: {rel}"
+    },
+    MissingStateCapture => {
+        code: "KSRCLI007",
+        msg: "run is missing a final state capture"
+    },
+    VerdictPending => {
+        code: "KSRCLI008",
+        msg: "run overall verdict is still pending"
+    },
+    MissingRunContextValue { field: Cow<'static, str> } => {
+        code: "KSRCLI009",
+        msg: "missing run context value: {field}"
+    },
+    MissingRunLocation { run_id: Cow<'static, str> } => {
+        code: "KSRCLI018",
+        msg: "missing explicit run location for run id: {run_id}"
+    },
+    RunDirExists { run_dir: Cow<'static, str> } => {
+        code: "KSRCLI044",
+        msg: "run directory already exists: {run_dir}"
+    },
+    MissingRunStatus => {
+        code: "KSRCLI060",
+        msg: "run has no recorded status"
+    },
+    RunGroupAlreadyRecorded { group_id: Cow<'static, str> } => {
+        code: "KSRCLI053",
+        msg: "run group is already recorded: {group_id}"
+    },
+    RunGroupNotFound { group_id: Cow<'static, str> } => {
+        code: "KSRCLI054",
+        msg: "group is not present in the run plan: {group_id}"
+    },
+
+    // --- File/path errors (exit 5 = default) ---
+    MissingFile { path: Cow<'static, str> } => {
+        code: "KSRCLI014",
+        msg: "missing file: {path}"
+    },
+    InvalidJson { path: Cow<'static, str> } => {
+        code: "KSRCLI019",
+        msg: "invalid JSON in {path}"
+    },
+    PathNotFound { dotted_path: Cow<'static, str> } => {
+        code: "KSRCLI017",
+        msg: "path not found: {dotted_path}"
+    },
+
+    // --- Schema/structure validation (exit 5 = default) ---
+    NotAMapping { label: Cow<'static, str> } => {
+        code: "KSRCLI010",
+        msg: "{label} must be a mapping"
+    },
+    NotStringKeys { label: Cow<'static, str> } => {
+        code: "KSRCLI011",
+        msg: "{label} must use string keys"
+    },
+    NotAList { label: Cow<'static, str> } => {
+        code: "KSRCLI012",
+        msg: "{label} must be a list"
+    },
+    NotAllStrings { label: Cow<'static, str> } => {
+        code: "KSRCLI013",
+        msg: "{label} must contain only strings"
+    },
+    MissingFrontmatter => {
+        code: "KSRCLI015",
+        msg: "missing YAML frontmatter"
+    },
+    UnterminatedFrontmatter => {
+        code: "KSRCLI016",
+        msg: "unterminated YAML frontmatter"
+    },
+    MissingFields { label: Cow<'static, str>, fields: Cow<'static, str> } => {
+        code: "KSRCLI020",
+        msg: "missing required fields: {label}: {fields}"
+    },
     FieldTypeMismatch {
         label: Cow<'static, str>,
         field: Cow<'static, str>,
         expected: Cow<'static, str>,
+    } => {
+        code: "KSRCLI022",
+        msg: "field type mismatch in {label}: {field} (expected {expected})"
     },
-
-    #[error("missing sections: {label}: {sections}")]
-    MissingSections {
-        label: Cow<'static, str>,
-        sections: Cow<'static, str>,
+    MissingSections { label: Cow<'static, str>, sections: Cow<'static, str> } => {
+        code: "KSRCLI021",
+        msg: "missing sections: {label}: {sections}"
     },
-
-    #[error("markdown row shape mismatch")]
-    MarkdownShapeMismatch,
+    MarkdownShapeMismatch => {
+        code: "KSRCLI999",
+        msg: "markdown row shape mismatch",
+        exit: 6
+    },
 
     // --- Gateway ---
-    #[error("unable to resolve Gateway API version from go.mod")]
-    GatewayVersionMissing,
-
-    #[error("Gateway API CRDs are not installed")]
-    GatewayCrdsMissing,
-
-    #[error("downloaded Gateway API manifest is empty: {path}")]
-    GatewayDownloadEmpty { path: Cow<'static, str> },
+    GatewayVersionMissing => {
+        code: "KSRCLI032",
+        msg: "unable to resolve Gateway API version from go.mod"
+    },
+    GatewayCrdsMissing => {
+        code: "KSRCLI033",
+        msg: "Gateway API CRDs are not installed",
+        exit: 1
+    },
+    GatewayDownloadEmpty { path: Cow<'static, str> } => {
+        code: "KSRCLI061",
+        msg: "downloaded Gateway API manifest is empty: {path}"
+    },
 
     // --- Kubernetes/cluster ---
-    #[error("no resource kinds found in {manifest}")]
-    NoResourceKinds { manifest: Cow<'static, str> },
-
-    #[error("route {route_match} not found")]
-    RouteNotFound { route_match: Cow<'static, str> },
-
-    #[error("unable to find local kumactl")]
-    KumactlNotFound,
-
-    #[error("tracked kubectl command requires an active local cluster kubeconfig")]
-    TrackedKubectlRequired,
-
-    #[error("kubectl target override is not allowed in tracked runs: {flag}")]
-    KubectlTargetOverrideForbidden { flag: Cow<'static, str> },
-
-    #[error("unknown tracked cluster member: {cluster}")]
-    UnknownTrackedCluster {
-        cluster: Cow<'static, str>,
-        choices: Cow<'static, str>,
+    NoResourceKinds { manifest: Cow<'static, str> } => {
+        code: "KSRCLI030",
+        msg: "no resource kinds found in {manifest}"
     },
-
-    #[error("tracked kubeconfig is not a local harness cluster: {path}")]
-    NonLocalKubeconfig { path: Cow<'static, str> },
+    RouteNotFound { route_match: Cow<'static, str> } => {
+        code: "KSRCLI031",
+        msg: "route {route_match} not found"
+    },
+    KumactlNotFound => {
+        code: "KSRCLI034",
+        msg: "unable to find local kumactl"
+    },
+    TrackedKubectlRequired => {
+        code: "KSRCLI049",
+        msg: "tracked kubectl command requires an active local cluster kubeconfig"
+    },
+    KubectlTargetOverrideForbidden { flag: Cow<'static, str> } => {
+        code: "KSRCLI050",
+        msg: "kubectl target override is not allowed in tracked runs: {flag}"
+    },
+    UnknownTrackedCluster { cluster: Cow<'static, str>, choices: Cow<'static, str> } => {
+        code: "KSRCLI051",
+        msg: "unknown tracked cluster member: {cluster}"
+    },
+    NonLocalKubeconfig { path: Cow<'static, str> } => {
+        code: "KSRCLI052",
+        msg: "tracked kubeconfig is not a local harness cluster: {path}"
+    },
 
     // --- Envoy ---
-    #[error("envoy config type not found: {type_name}")]
-    EnvoyConfigTypeNotFound { type_name: Cow<'static, str> },
-
-    #[error("envoy live capture requires: {fields}")]
-    EnvoyCaptureArgsRequired { fields: Cow<'static, str> },
+    EnvoyConfigTypeNotFound { type_name: Cow<'static, str> } => {
+        code: "KSRCLI055",
+        msg: "envoy config type not found: {type_name}"
+    },
+    EnvoyCaptureArgsRequired { fields: Cow<'static, str> } => {
+        code: "KSRCLI056",
+        msg: "envoy live capture requires: {fields}"
+    },
 
     // --- Report (exit 1) ---
-    #[error("report exceeds line limit: {count}>{limit}")]
-    ReportLineLimit {
-        count: Cow<'static, str>,
-        limit: Cow<'static, str>,
+    ReportLineLimit { count: Cow<'static, str>, limit: Cow<'static, str> } => {
+        code: "KSRCLI035",
+        msg: "report exceeds line limit: {count}>{limit}",
+        exit: 1
     },
-
-    #[error("report exceeds code block limit: {count}>{limit}")]
-    ReportCodeBlockLimit {
-        count: Cow<'static, str>,
-        limit: Cow<'static, str>,
+    ReportCodeBlockLimit { count: Cow<'static, str>, limit: Cow<'static, str> } => {
+        code: "KSRCLI036",
+        msg: "report exceeds code block limit: {count}>{limit}",
+        exit: 1
     },
-
-    #[error("no recorded artifact found for evidence label: {label}")]
-    EvidenceLabelNotFound { label: Cow<'static, str> },
-
-    #[error("group report requires at least one evidence input")]
-    ReportGroupEvidenceRequired,
+    EvidenceLabelNotFound { label: Cow<'static, str> } => {
+        code: "KSRCLI057",
+        msg: "no recorded artifact found for evidence label: {label}"
+    },
+    ReportGroupEvidenceRequired => {
+        code: "KSRCLI058",
+        msg: "group report requires at least one evidence input"
+    },
 
     // --- Authoring ---
-    #[error("missing active suite-author authoring session")]
-    AuthoringSessionMissing,
-
-    #[error("missing suite-author payload input")]
-    AuthoringPayloadMissing,
-
-    #[error("invalid suite-author {kind} payload: {details}")]
-    AuthoringPayloadInvalid {
-        kind: Cow<'static, str>,
-        details: Cow<'static, str>,
+    AuthoringSessionMissing => {
+        code: "KSRCLI040",
+        msg: "missing active suite:new authoring session"
+    },
+    AuthoringPayloadMissing => {
+        code: "KSRCLI041",
+        msg: "missing suite:new payload input"
+    },
+    AuthoringPayloadInvalid { kind: Cow<'static, str>, details: Cow<'static, str> } => {
+        code: "KSRCLI042",
+        msg: "invalid suite:new {kind} payload: {details}"
+    },
+    AuthoringShowKindMissing { kind: Cow<'static, str> } => {
+        code: "KSRCLI043",
+        msg: "missing saved suite:new payload: {kind}"
+    },
+    AmendmentsRequired { path: Cow<'static, str> } => {
+        code: "KSRCLI045",
+        msg: "suite amendments entry is missing or empty: {path}"
+    },
+    AuthoringValidateFailed { targets: Cow<'static, str> } => {
+        code: "KSRCLI046",
+        msg: "suite:new manifest validation failed: {targets}"
+    },
+    KubectlValidateDecisionRequired => {
+        code: "KSRCLI047",
+        msg: "suite:new local validator decision is still required"
+    },
+    KubectlValidateUnavailable => {
+        code: "KSRCLI048",
+        msg: "suite:new local validator is unavailable"
     },
 
-    #[error("missing saved suite-author payload: {kind}")]
-    AuthoringShowKindMissing { kind: Cow<'static, str> },
-
-    #[error("suite amendments entry is missing or empty: {path}")]
-    AmendmentsRequired { path: Cow<'static, str> },
-
-    #[error("suite-author manifest validation failed: {targets}")]
-    AuthoringValidateFailed { targets: Cow<'static, str> },
-
-    #[error("suite-author local validator decision is still required")]
-    KubectlValidateDecisionRequired,
-
-    #[error("suite-author local validator is unavailable")]
-    KubectlValidateUnavailable,
-
     // --- IO/serialization (exit 1) ---
-    #[error("{detail}")]
-    Io { detail: Cow<'static, str> },
+    Io { detail: Cow<'static, str> } => {
+        code: "IO001",
+        msg: "{detail}",
+        exit: 1
+    },
+    Serialize { detail: Cow<'static, str> } => {
+        code: "IO002",
+        msg: "serialization failed: {detail}",
+        exit: 1
+    },
+    HookPayloadInvalid { detail: Cow<'static, str> } => {
+        code: "KSH001",
+        msg: "{detail}",
+        exit: 1
+    },
+    ClusterError { detail: Cow<'static, str> } => {
+        code: "CLUSTER",
+        msg: "{detail}",
+        exit: 1
+    },
+    UsageError { detail: Cow<'static, str> } => {
+        code: "USAGE",
+        msg: "{detail}",
+        exit: 1
+    },
 
-    #[error("serialization failed: {detail}")]
-    Serialize { detail: Cow<'static, str> },
-
-    #[error("{detail}")]
-    HookPayloadInvalid { detail: Cow<'static, str> },
-
-    #[error("{detail}")]
-    ClusterError { detail: Cow<'static, str> },
-
-    #[error("{detail}")]
-    UsageError { detail: Cow<'static, str> },
-
-    // --- Workflow (exit 5) ---
-    #[error("{detail}")]
-    WorkflowIo { detail: Cow<'static, str> },
-
-    #[error("{detail}")]
-    WorkflowParse { detail: Cow<'static, str> },
-
-    #[error("unsupported workflow schema version: {detail}")]
-    WorkflowVersion { detail: Cow<'static, str> },
-
-    #[error("serialization failed: {detail}")]
-    WorkflowSerialize { detail: Cow<'static, str> },
-
-    #[error("{detail}")]
-    JsonParse { detail: Cow<'static, str> },
+    // --- Workflow (exit 5 = default) ---
+    WorkflowIo { detail: Cow<'static, str> } => {
+        code: "WORKFLOW_IO",
+        msg: "{detail}"
+    },
+    WorkflowParse { detail: Cow<'static, str> } => {
+        code: "WORKFLOW_PARSE",
+        msg: "{detail}"
+    },
+    WorkflowVersion { detail: Cow<'static, str> } => {
+        code: "WORKFLOW_VERSION",
+        msg: "unsupported workflow schema version: {detail}"
+    },
+    WorkflowSerialize { detail: Cow<'static, str> } => {
+        code: "WORKFLOW_SERIALIZE",
+        msg: "serialization failed: {detail}"
+    },
+    JsonParse { detail: Cow<'static, str> } => {
+        code: "JSON",
+        msg: "{detail}"
+    },
 }
 
 // --- CliErrorKind constructors ---
@@ -588,7 +694,7 @@ impl CliErrorKind {
             }
             Self::KumactlNotFound => Some("Build kumactl first.".into()),
             Self::AuthoringSessionMissing => Some(
-                "Run `harness authoring-begin --skill suite-author \
+                "Run `harness authoring-begin --skill suite:new \
                  --repo-root <path> --feature <name> --mode <interactive|bypass> \
                  --suite-dir <path> --suite-name <name>` first."
                     .into(),
@@ -742,10 +848,10 @@ pub enum HookMessage {
     #[error("Write path is outside the tracked run surface: {path}")]
     WriteOutsideRun { path: Cow<'static, str> },
 
-    #[error("Suite-runner state is missing or invalid: {details}")]
+    #[error("Suite:run state is missing or invalid: {details}")]
     RunnerStateInvalid { details: Cow<'static, str> },
 
-    #[error("Suite-runner phase or approval is required before {action}: {details}")]
+    #[error("Suite:run phase or approval is required before {action}: {details}")]
     RunnerFlowRequired {
         action: Cow<'static, str>,
         details: Cow<'static, str>,
@@ -754,13 +860,13 @@ pub enum HookMessage {
     #[error("Preflight worker reply is invalid: {details}")]
     PreflightReplyInvalid { details: Cow<'static, str> },
 
-    #[error("Write path is outside the suite-author surface: {path}")]
+    #[error("Write path is outside the suite:new surface: {path}")]
     WriteOutsideSuite { path: Cow<'static, str> },
 
-    #[error("Suite-author approval state is missing or invalid: {details}")]
+    #[error("Suite:new approval state is missing or invalid: {details}")]
     ApprovalStateInvalid { details: Cow<'static, str> },
 
-    #[error("Suite-author approval is required before {action}: {details}")]
+    #[error("Suite:new approval is required before {action}: {details}")]
     ApprovalRequired {
         action: Cow<'static, str>,
         details: Cow<'static, str>,
@@ -775,13 +881,13 @@ pub enum HookMessage {
     #[error("Suite is incomplete or invalid: {details}")]
     SuiteIncomplete { details: Cow<'static, str> },
 
-    #[error("Suite-author local validator decision is required first: {details}")]
+    #[error("Suite:new local validator decision is required first: {details}")]
     ValidatorGateRequired { details: Cow<'static, str> },
 
-    #[error("Suite-author local validator install failed: {details}")]
+    #[error("Suite:new local validator install failed: {details}")]
     ValidatorInstallFailed { details: Cow<'static, str> },
 
-    #[error("Suite-author local validator gate is not allowed here: {details}")]
+    #[error("Suite:new local validator gate is not allowed here: {details}")]
     ValidatorGateUnexpected { details: Cow<'static, str> },
 
     // --- Warn ---
@@ -798,22 +904,22 @@ pub enum HookMessage {
     PreflightMissing,
 
     #[error(
-        "Suite-author workers must save structured results through \
+        "Suite:new workers must save structured results through \
          `harness authoring-save` and return only a short acknowledgement."
     )]
     CodeReaderFormat,
 
-    #[error("Suite-author worker reply is missing the expected acknowledgement for `{sections}`.")]
+    #[error("Suite:new worker reply is missing the expected acknowledgement for `{sections}`.")]
     ReaderMissingSections { sections: Cow<'static, str> },
 
     #[error(
-        "Suite-author worker reply is oversized; save the structured payload \
+        "Suite:new worker reply is oversized; save the structured payload \
          and return a short acknowledgement only."
     )]
     ReaderOversizedBlock,
 
     // --- Info ---
-    #[error("Suite-runner runs must stay user-story-first and tracked.")]
+    #[error("Suite:run runs must stay user-story-first and tracked.")]
     SuiteRunnerTracked,
 
     #[error("Current run verdict: {verdict}")]

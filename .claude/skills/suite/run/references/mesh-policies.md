@@ -1,0 +1,203 @@
+# Contents
+
+1. [Authoring model](#1-authoring-model)
+1b. [Policy spec nesting](#1b-policy-spec-nesting)
+1c. [targetRef constraints](#1c-targetref-constraints)
+2. [Policy role checks](#2-policy-role-checks)
+3. [targetRef guardrails](#3-targetref-guardrails)
+4. [Safe apply flow](#4-safe-apply-flow)
+5. [Debug flow](#5-debug-flow-when-policy-is-not-effective)
+6. [Edge-case matrix](#6-edge-case-matrix-for-every-mesh-feature-test-plan)
+7. [Common commands](#7-common-command-set-for-policy-focused-runs)
+
+---
+
+# Mesh\* policies: authoring, apply, debug
+
+Use this reference when a test run includes any `Mesh*` policy.
+
+After `harness init` and `harness cluster`, the `harness` examples below rely on the active `current-run.json` shim for run path, repo root, and kubeconfig defaults. Use `harness run --cluster <name> kubectl ...` when a multi-zone check must target a non-primary tracked cluster member. Do not pass kubeconfig or cluster-target override flags through tracked `kubectl` commands.
+
+This file is based on Kuma docs `2.13.x` pages. Check kuma.io/docs/ for newer versions - if a newer release exists, substitute the version in the URLs below:
+
+- https://kuma.io/docs/2.13.x/policies/introduction/
+- https://kuma.io/docs/2.13.x/explore/inspect-api/
+- https://kuma.io/docs/2.13.x/guides/consumer-producer-policies/
+- https://kuma.io/docs/2.13.x/guides/targeting-meshhttproutes-in-supported-policies/
+- https://kuma.io/docs/2.13.x/policies/meshaccesslog/
+- https://kuma.io/docs/2.13.x/policies/meshmetric/
+- https://kuma.io/docs/2.13.x/policies/meshtrace/
+
+## 1) Authoring model
+
+- Use only new `Mesh*` policies for a given feature area.
+- Do not combine old and new policy families for the same feature in one test.
+  - Example: avoid `MeshTrace` + `TrafficTrace` in one scenario.
+- On Kubernetes, use `apiVersion: kuma.io/v1alpha1`.
+- Namespace is part of policy behavior.
+- Always set `metadata.labels["kuma.io/mesh"]` explicitly.
+
+## 1b) Policy spec nesting
+
+`Mesh*` policies use three nesting patterns. The pattern determines where config fields live:
+
+| Pattern | Config location | Example policies |
+| --- | --- | --- |
+| from-based | `spec.from[].default.<conf>` | MeshTrafficPermission, MeshAccessLog, MeshTrace |
+| to-based | `spec.to[].default.<conf>` | MeshRetry, MeshTimeout, MeshCircuitBreaker |
+| rules-based | `spec.rules[].default.<conf>` | MeshProxyPatch |
+
+There is NO `spec.default` at the top level for from/to policies. Each `from[]` or `to[]` entry has its own `targetRef` and `default`.
+
+## 1c) targetRef constraints
+
+- `targetRef.name` and `targetRef.labels` are mutually exclusive. Use `name` to target one resource, `labels` to target a group. Never combine both.
+- `targetRef.kind: Dataplane` with labels targets sidecars and delegated gateways.
+- `targetRef.kind: MeshGateway` targets builtin gateways only.
+
+## 2) Policy role checks
+
+Kuma policy role affects priority and multi-zone sync.
+
+| Role | Typical shape | Namespace and intent |
+| ---- | ------------- | -------------------- |
+| producer | has `spec.to` and targets service in same namespace | backend owner sets defaults for callers |
+| consumer | has `spec.to` and targets service in other namespace (or label set) | caller owner overrides how caller reaches upstream |
+| workload-owner | has `spec.rules`, or only `spec.targetRef/default` | owner configures own dataplane proxy behavior |
+| system | policy created in system namespace (`kuma-system`) | operator-managed mesh-wide behavior |
+
+Verify labels after apply:
+
+```bash
+harness record --phase verify --label get-policy-role -- \
+  kubectl get <policy-kind> <name> -n <namespace> -o jsonpath='{.metadata.labels.kuma\.io/policy-role}'
+harness record --phase verify --label get-policy-origin -- \
+  kubectl get <policy-kind> <name> -n <namespace> -o jsonpath='{.metadata.labels.kuma\.io/origin}'
+```
+
+## 3) `targetRef` guardrails
+
+- `targetRef.kind` must be valid for that policy and field.
+- Use `name` + `namespace` for one target.
+- Use `labels` only when intentionally targeting a set.
+- If `namespace` is omitted in `targetRef`, Kuma uses policy namespace.
+- `sectionName` can target a named section or a numeric port.
+- For system policies, use label-based targeting.
+- `MeshHTTPRoute` targeting is only valid for policies that support it.
+
+Before writing test manifests, confirm supported kinds on the policy page in docs.
+
+## 4) Safe apply flow
+
+```bash
+harness validate \
+  --manifest "<manifest-file>"
+
+harness apply \
+  --manifest "<manifest-file>" \
+  --step "<step-name>"
+```
+
+Do not run raw `kubectl apply` for test manifests.
+
+## 5) Debug flow when policy is not effective
+
+1. Check object acceptance and stored shape.
+
+```bash
+harness record --phase verify --label get-policy-yaml -- \
+  kubectl get <policy-kind> <name> -n <namespace> -o yaml
+```
+
+2. Check impacted dataplanes from policy side.
+
+```bash
+harness run --phase verify --label inspect-policy \
+  kumactl inspect <policy-resource-name> <name> --mesh <mesh>
+```
+
+`<policy-resource-name>` is the CLI resource form, for example `meshretry`.
+
+3. Check matched policies from dataplane side.
+
+```bash
+harness run --phase verify --label inspect-dataplane \
+  kumactl inspect dataplane <dataplane-name> --mesh <mesh>
+```
+
+Look at all four attachment points:
+
+- `Dataplane`
+- `Inbound`
+- `Outbound`
+- `Service`
+
+4. Check generated Envoy config.
+
+```bash
+harness run --phase verify --label inspect-config-dump \
+  kumactl inspect dataplane <dataplane-name> --mesh <mesh> --type=config-dump
+```
+
+In multi-zone, run `inspect --type=config-dump` against a zone control plane,
+not global.
+
+5. Check runtime logs.
+
+```bash
+harness record --phase verify --label sidecar-logs -- \
+  kubectl logs -n <ns> <pod-name> -c kuma-sidecar --tail=300
+harness record --phase verify --label cp-logs -- \
+  kubectl logs -n kuma-system deploy/kuma-control-plane --tail=400
+```
+
+6. Check protocol assumptions.
+
+- HTTP policies need HTTP listeners, not TCP proxy listeners.
+- Confirm service protocol markers and `appProtocol` where used.
+- For tracing, confirm protocol support on targeted traffic paths.
+
+7. In multi-zone, check sync.
+
+```bash
+harness record --phase verify --label get-zones -- \
+  kubectl get zones
+harness record --phase verify --label get-zoneinsights -- \
+  kubectl get zoneinsights -o yaml
+```
+
+## 6) Edge-case matrix for every Mesh\* feature test plan
+
+Add these groups to the suite unless out of scope:
+
+| Case | What to verify | Artifacts |
+| ---- | -------------- | --------- |
+| baseline mesh-level policy | expected default behavior | apply log + runtime output |
+| specificity overrides | mesh vs dataplane labels vs dataplane name/section | `inspect dataplane` + config-dump |
+| producer vs consumer | consumer override precedence in caller namespace | policy labels + request behavior |
+| route-level targeting | `MeshHTTPRoute` override on one route only | route manifest + route-specific behavior |
+| sectionName targeting | named section and numeric section behavior | config-dump listener/cluster match |
+| selector fan-out | one label selector applying to many dataplanes | `inspect <policy>` affected list |
+| invalid schema | admission rejects wrong enum or shape | validation log |
+| dangling reference | accept/reject behavior and runtime effect | apply + control-plane logs |
+| update and rollback | config changes and restore behavior | before/after artifacts |
+| delete semantics | effective cleanup after delete | post-delete inspect/config-dump |
+| multi-zone propagation | origin/sync and zone runtime behavior | `zones`, `zoneinsights`, zone logs |
+| protocol mismatch | expected non-application when listener type mismatches | config-dump + negative result |
+
+## 7) Common command set for policy-focused runs
+
+```bash
+harness record --phase verify --label api-resources -- \
+  kubectl api-resources --api-group kuma.io
+harness record --phase verify --label get-meshes -- \
+  kubectl get mesh -A
+harness record --phase verify --label get-dataplanes -- \
+  kubectl get dataplanes -A
+harness run --phase verify --label inspect-dataplane \
+  kumactl inspect dataplane <dp-name> --mesh <mesh>
+harness run --phase verify --label inspect-config-dump \
+  kumactl inspect dataplane <dp-name> --mesh <mesh> --type=config-dump
+harness run --phase verify --label inspect-policy \
+  kumactl inspect <policy-resource-name> <policy-name> --mesh <mesh>
+```
