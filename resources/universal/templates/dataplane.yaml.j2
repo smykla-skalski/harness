@@ -1,0 +1,16 @@
+type: Dataplane
+mesh: {{ mesh }}
+name: {{ name }}
+labels:
+  app: {{ name }}
+  kuma.io/workload: {{ name }}
+networking:
+  address: {{ address }}
+  inbound:
+    - port: {{ port }}
+      tags:
+        kuma.io/service: {{ name }}
+        kuma.io/protocol: {{ protocol }}
+  transparentProxying:
+    redirectPortInbound: 15006
+    redirectPortOutbound: 15001

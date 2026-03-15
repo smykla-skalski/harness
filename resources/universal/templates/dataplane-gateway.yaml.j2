@@ -1,0 +1,12 @@
+type: Dataplane
+mesh: {{ mesh }}
+name: {{ name }}
+labels:
+  app: {{ name }}
+  kuma.io/workload: {{ name }}
+networking:
+  address: {{ address }}
+  gateway:
+    type: BUILTIN
+    tags:
+      kuma.io/service: {{ name }}
