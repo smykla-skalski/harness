@@ -299,46 +299,76 @@ pub fn can_stop(state: &AuthorWorkflowState) -> Result<(), &'static str> {
     }
 }
 
+/// Next action for an author workflow state.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AuthorNextAction {
+    ReloadState,
+    ContinueBypass,
+    ResumeDiscovery,
+    ResumePrewriteReview,
+    ApplyEditRound,
+    ContinueInitialWrite,
+    ResumePostwriteReview,
+    Stopped,
+    OfferCopyGate,
+}
+
+impl fmt::Display for AuthorNextAction {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(match self {
+            Self::ReloadState => {
+                "Reload the saved suite-author state before continuing."
+            }
+            Self::ContinueBypass => {
+                "Continue suite-author in bypass mode using the saved authoring payloads."
+            }
+            Self::ResumeDiscovery => {
+                "Resume discovery and proposal preparation before reopening review."
+            }
+            Self::ResumePrewriteReview => {
+                "Resume the pre-write review loop and ask the pre-write gate question before writing suite files."
+            }
+            Self::ApplyEditRound => {
+                "Apply the current edit round, then reopen the post-write review gate."
+            }
+            Self::ContinueInitialWrite => {
+                "Continue the initial suite write phase from the saved proposal."
+            }
+            Self::ResumePostwriteReview => {
+                "Resume the post-write review loop and ask the post-write gate question before stopping."
+            }
+            Self::Stopped => {
+                "The suite-author flow was cancelled. Do not write more files unless restarted."
+            }
+            Self::OfferCopyGate => {
+                "The suite is approved. Offer the copy gate or stop the skill."
+            }
+        })
+    }
+}
+
 /// Get the next action hint based on author state.
 #[must_use]
-pub fn next_action(state: Option<&AuthorWorkflowState>) -> String {
+pub fn next_action(state: Option<&AuthorWorkflowState>) -> AuthorNextAction {
     let Some(state) = state else {
-        return "Reload the saved suite-author state before continuing.".to_string();
+        return AuthorNextAction::ReloadState;
     };
     if state.mode == ApprovalMode::Bypass {
-        return "Continue suite-author in bypass mode using the saved authoring payloads."
-            .to_string();
+        return AuthorNextAction::ContinueBypass;
     }
     match state.phase {
-        AuthorPhase::Discovery => {
-            "Resume discovery and proposal preparation before reopening review."
-                .to_string()
-        }
-        AuthorPhase::PrewriteReview => {
-            "Resume the pre-write review loop and ask the pre-write gate question before writing suite files."
-                .to_string()
-        }
+        AuthorPhase::Discovery => AuthorNextAction::ResumeDiscovery,
+        AuthorPhase::PrewriteReview => AuthorNextAction::ResumePrewriteReview,
         AuthorPhase::Writing => {
             if state.has_written_suite() {
-                "Apply the current edit round, then reopen the post-write review gate."
-                    .to_string()
+                AuthorNextAction::ApplyEditRound
             } else {
-                "Continue the initial suite write phase from the saved proposal."
-                    .to_string()
+                AuthorNextAction::ContinueInitialWrite
             }
         }
-        AuthorPhase::PostwriteReview => {
-            "Resume the post-write review loop and ask the post-write gate question before stopping."
-                .to_string()
-        }
-        AuthorPhase::Cancelled => {
-            "The suite-author flow was cancelled. Do not write more files unless restarted."
-                .to_string()
-        }
-        AuthorPhase::Complete => {
-            "The suite is approved. Offer the copy gate or stop the skill."
-                .to_string()
-        }
+        AuthorPhase::PostwriteReview => AuthorNextAction::ResumePostwriteReview,
+        AuthorPhase::Cancelled => AuthorNextAction::Stopped,
+        AuthorPhase::Complete => AuthorNextAction::OfferCopyGate,
     }
 }
 
@@ -575,15 +605,15 @@ mod tests {
 
     #[test]
     fn next_action_none() {
-        let action = next_action(None);
-        assert!(action.contains("Reload"));
+        assert_eq!(next_action(None), AuthorNextAction::ReloadState);
+        assert!(next_action(None).to_string().contains("Reload"));
     }
 
     #[test]
     fn next_action_bypass() {
         let state = make_state(AuthorPhase::Discovery, ApprovalMode::Bypass);
-        let action = next_action(Some(&state));
-        assert!(action.contains("bypass"));
+        assert_eq!(next_action(Some(&state)), AuthorNextAction::ContinueBypass);
+        assert!(next_action(Some(&state)).to_string().contains("bypass"));
     }
 
     #[test]
@@ -599,7 +629,7 @@ mod tests {
             let state = make_state(phase, ApprovalMode::Interactive);
             let action = next_action(Some(&state));
             assert!(
-                action.to_lowercase().contains(expected_substr),
+                action.to_string().to_lowercase().contains(expected_substr),
                 "phase {phase:?} action should contain '{expected_substr}': {action}"
             );
         }
@@ -609,15 +639,18 @@ mod tests {
     fn next_action_writing_with_suite_written() {
         let mut state = make_state(AuthorPhase::Writing, ApprovalMode::Interactive);
         state.draft.suite_tree_written = true;
-        let action = next_action(Some(&state));
-        assert!(action.contains("edit round"));
+        assert_eq!(next_action(Some(&state)), AuthorNextAction::ApplyEditRound);
+        assert!(next_action(Some(&state)).to_string().contains("edit round"));
     }
 
     #[test]
     fn next_action_writing_without_suite_written() {
         let state = make_state(AuthorPhase::Writing, ApprovalMode::Interactive);
-        let action = next_action(Some(&state));
-        assert!(action.contains("initial"));
+        assert_eq!(
+            next_action(Some(&state)),
+            AuthorNextAction::ContinueInitialWrite
+        );
+        assert!(next_action(Some(&state)).to_string().contains("initial"));
     }
 
     #[test]

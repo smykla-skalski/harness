@@ -202,45 +202,91 @@ pub fn write_runner_state(run_dir: &Path, state: &RunnerWorkflowState) -> Result
     save_state(run_dir, state)
 }
 
-/// Get the next action hint based on runner state.
-#[must_use]
-pub fn next_action(state: Option<&RunnerWorkflowState>) -> &'static str {
-    let Some(state) = state else {
-        return "Reload the saved suite-runner state before continuing.";
-    };
-    match state.phase {
-        RunnerPhase::Bootstrap => "Resume the run by finishing cluster bootstrap before preflight.",
-        RunnerPhase::Preflight => {
-            if state.preflight.status == PreflightStatus::Running {
+/// Next action for a runner workflow state.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RunnerNextAction {
+    ReloadState,
+    FinishBootstrap,
+    FinishPreflightWorker,
+    ExecutePreflight,
+    ContinueExecution,
+    FinishSuiteRepair,
+    ResolveTriage,
+    FinishCloseout,
+    ReviewReport,
+    ResumeRun,
+    HandleAbort,
+}
+
+impl fmt::Display for RunnerNextAction {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(match self {
+            Self::ReloadState => {
+                "Reload the saved suite-runner state before continuing."
+            }
+            Self::FinishBootstrap => {
+                "Resume the run by finishing cluster bootstrap before preflight."
+            }
+            Self::FinishPreflightWorker => {
                 "Finish the guarded preflight worker flow, then validate the saved artifacts."
-            } else {
+            }
+            Self::ExecutePreflight => {
                 "Resume the run by executing `harness preflight` before starting group execution."
             }
-        }
-        RunnerPhase::Triage => {
-            if state.suite_fix.is_some() {
+            Self::ContinueExecution => "Continue the run from the saved execution context.",
+            Self::FinishSuiteRepair => {
                 "Finish the approved suite repair and `amendments.md`, then continue the run."
-            } else {
+            }
+            Self::ResolveTriage => {
                 "Resolve the current failure triage decision before continuing the run."
             }
+            Self::FinishCloseout => {
+                "Finish closeout and report verification from the saved run context."
+            }
+            Self::ReviewReport => {
+                "The run already reached a final verdict. Review the saved report and closeout artifacts."
+            }
+            Self::ResumeRun => {
+                "Run is suspended. Resume with `harness runner-state --event resume-run` \
+                 and continue from the saved `next_planned_group`."
+            }
+            Self::HandleAbort => {
+                "Do not blame the user for `guard-stop` feedback. If the stop was unexpected, \
+                 run `harness runner-state --event resume-run`, do not edit `run-status.json` \
+                 or `run-report.md`, and continue from the saved `next_planned_group`. \
+                 If the run was intentionally halted, keep the aborted report as-is."
+            }
+        })
+    }
+}
+
+/// Get the next action hint based on runner state.
+#[must_use]
+pub fn next_action(state: Option<&RunnerWorkflowState>) -> RunnerNextAction {
+    let Some(state) = state else {
+        return RunnerNextAction::ReloadState;
+    };
+    match state.phase {
+        RunnerPhase::Bootstrap => RunnerNextAction::FinishBootstrap,
+        RunnerPhase::Preflight => {
+            if state.preflight.status == PreflightStatus::Running {
+                RunnerNextAction::FinishPreflightWorker
+            } else {
+                RunnerNextAction::ExecutePreflight
+            }
         }
-        RunnerPhase::Closeout => {
-            "Finish closeout and report verification from the saved run context."
+        RunnerPhase::Execution => RunnerNextAction::ContinueExecution,
+        RunnerPhase::Triage => {
+            if state.suite_fix.is_some() {
+                RunnerNextAction::FinishSuiteRepair
+            } else {
+                RunnerNextAction::ResolveTriage
+            }
         }
-        RunnerPhase::Completed => {
-            "The run already reached a final verdict. Review the saved report and closeout artifacts."
-        }
-        RunnerPhase::Suspended => {
-            "Run is suspended. Resume with `harness runner-state --event resume-run` \
-             and continue from the saved `next_planned_group`."
-        }
-        RunnerPhase::Aborted => {
-            "Do not blame the user for `guard-stop` feedback. If the stop was unexpected, \
-             run `harness runner-state --event resume-run`, do not edit `run-status.json` \
-             or `run-report.md`, and continue from the saved `next_planned_group`. \
-             If the run was intentionally halted, keep the aborted report as-is."
-        }
-        RunnerPhase::Execution => "Continue the run from the saved execution context.",
+        RunnerPhase::Closeout => RunnerNextAction::FinishCloseout,
+        RunnerPhase::Completed => RunnerNextAction::ReviewReport,
+        RunnerPhase::Suspended => RunnerNextAction::ResumeRun,
+        RunnerPhase::Aborted => RunnerNextAction::HandleAbort,
     }
 }
 
@@ -353,38 +399,64 @@ mod tests {
 
     #[test]
     fn next_action_none_state() {
-        let action = next_action(None);
-        assert!(action.contains("Reload"));
+        assert_eq!(next_action(None), RunnerNextAction::ReloadState);
+        assert!(next_action(None).to_string().contains("Reload"));
     }
 
     #[test]
     fn next_action_each_phase() {
         let mut state = bootstrap_state();
-        assert!(next_action(Some(&state)).contains("bootstrap"));
+        assert_eq!(next_action(Some(&state)), RunnerNextAction::FinishBootstrap);
+        assert!(next_action(Some(&state)).to_string().contains("bootstrap"));
 
         state.phase = RunnerPhase::Preflight;
-        assert!(next_action(Some(&state)).contains("preflight"));
+        assert_eq!(
+            next_action(Some(&state)),
+            RunnerNextAction::ExecutePreflight
+        );
+        assert!(next_action(Some(&state)).to_string().contains("preflight"));
 
         state.preflight.status = PreflightStatus::Running;
-        assert!(next_action(Some(&state)).contains("preflight worker"));
+        assert_eq!(
+            next_action(Some(&state)),
+            RunnerNextAction::FinishPreflightWorker
+        );
+        assert!(
+            next_action(Some(&state))
+                .to_string()
+                .contains("preflight worker")
+        );
 
         state.phase = RunnerPhase::Execution;
-        assert!(next_action(Some(&state)).contains("execution"));
+        assert_eq!(
+            next_action(Some(&state)),
+            RunnerNextAction::ContinueExecution
+        );
+        assert!(next_action(Some(&state)).to_string().contains("execution"));
 
         state.phase = RunnerPhase::Triage;
-        assert!(next_action(Some(&state)).contains("triage"));
+        assert_eq!(next_action(Some(&state)), RunnerNextAction::ResolveTriage);
+        assert!(next_action(Some(&state)).to_string().contains("triage"));
 
         state.phase = RunnerPhase::Closeout;
-        assert!(next_action(Some(&state)).contains("closeout"));
+        assert_eq!(next_action(Some(&state)), RunnerNextAction::FinishCloseout);
+        assert!(next_action(Some(&state)).to_string().contains("closeout"));
 
         state.phase = RunnerPhase::Completed;
-        assert!(next_action(Some(&state)).contains("final verdict"));
+        assert_eq!(next_action(Some(&state)), RunnerNextAction::ReviewReport);
+        assert!(
+            next_action(Some(&state))
+                .to_string()
+                .contains("final verdict")
+        );
 
         state.phase = RunnerPhase::Aborted;
-        assert!(next_action(Some(&state)).contains("guard-stop"));
+        assert_eq!(next_action(Some(&state)), RunnerNextAction::HandleAbort);
+        assert!(next_action(Some(&state)).to_string().contains("guard-stop"));
 
         state.phase = RunnerPhase::Suspended;
-        assert!(next_action(Some(&state)).contains("suspended"));
+        assert_eq!(next_action(Some(&state)), RunnerNextAction::ResumeRun);
+        assert!(next_action(Some(&state)).to_string().contains("suspended"));
     }
 
     #[test]
@@ -397,7 +469,15 @@ mod tests {
             amendments_written: false,
             decision: ManifestFixDecision::SuiteAndRun,
         });
-        assert!(next_action(Some(&state)).contains("suite repair"));
+        assert_eq!(
+            next_action(Some(&state)),
+            RunnerNextAction::FinishSuiteRepair
+        );
+        assert!(
+            next_action(Some(&state))
+                .to_string()
+                .contains("suite repair")
+        );
     }
 
     #[test]
