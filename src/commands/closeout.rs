@@ -20,7 +20,7 @@ pub fn execute(run_dir_args: &RunDirArgs) -> Result<i32, CliError> {
 
     for rel in &required {
         if !run_dir.join(rel).exists() {
-            return Err(CliErrorKind::MissingCloseoutArtifact { rel: (*rel).into() }.into());
+            return Err(CliErrorKind::missing_closeout_artifact(*rel).into());
         }
     }
 

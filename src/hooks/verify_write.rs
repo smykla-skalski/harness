@@ -33,13 +33,10 @@ fn verify_suite_author(paths: &[&Path]) -> HookResult {
         if name == "amendments.md"
             && fs::read_to_string(raw_path).is_ok_and(|content| content.trim().is_empty())
         {
-            return HookMessage::SuiteIncomplete {
-                details: format!(
-                    "suite amendments entry is missing or empty: {}",
-                    raw_path.display()
-                )
-                .into(),
-            }
+            return HookMessage::suite_incomplete(format!(
+                "suite amendments entry is missing or empty: {}",
+                raw_path.display()
+            ))
             .into_result();
         }
     }
@@ -56,15 +53,14 @@ fn verify_suite_runner(ctx: &HookContext, paths: &[&Path]) -> HookResult {
             && is_command_owned_run_file(&path, rd)
         {
             let hint = control_file_hint(&path);
-            return HookMessage::RunnerFlowRequired {
-                action: "edit run control files".into(),
-                details: format!(
+            return HookMessage::runner_flow_required(
+                "edit run control files",
+                format!(
                     "{} is harness-managed; {hint}",
                     path.file_name()
                         .map_or("file", |n| n.to_str().unwrap_or("file"))
-                )
-                .into(),
-            }
+                ),
+            )
             .into_result();
         }
         let name = path.file_name().map_or("", |n| n.to_str().unwrap_or(""));
@@ -72,13 +68,10 @@ fn verify_suite_runner(ctx: &HookContext, paths: &[&Path]) -> HookResult {
             && path.exists()
             && fs::read_to_string(&path).is_ok_and(|content| content.trim().is_empty())
         {
-            return HookMessage::SuiteIncomplete {
-                details: format!(
-                    "suite amendments entry is missing or empty: {}",
-                    raw_path.display()
-                )
-                .into(),
-            }
+            return HookMessage::suite_incomplete(format!(
+                "suite amendments entry is missing or empty: {}",
+                raw_path.display()
+            ))
             .into_result();
         }
         // Track suite-fix writes when in triage with an active suite fix.

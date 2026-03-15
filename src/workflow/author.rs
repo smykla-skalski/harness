@@ -150,10 +150,7 @@ impl AuthorWorkflowState {
 /// Returns `CliError` if the current directory cannot be determined.
 pub fn author_state_path() -> Result<PathBuf, CliError> {
     let cwd = env::current_dir().map_err(|e| -> CliError {
-        CliErrorKind::WorkflowIo {
-            detail: cow!("failed to determine current directory: {e}"),
-        }
-        .into()
+        CliErrorKind::workflow_io(cow!("failed to determine current directory: {e}")).into()
     })?;
     Ok(cwd.join(".harness").join("suite-author-state.json"))
 }
@@ -168,16 +165,10 @@ pub fn read_author_state() -> Result<Option<AuthorWorkflowState>, CliError> {
         return Ok(None);
     }
     let contents = fs::read_to_string(&path).map_err(|e| -> CliError {
-        CliErrorKind::WorkflowIo {
-            detail: cow!("failed to read {}: {e}", path.display()),
-        }
-        .into()
+        CliErrorKind::workflow_io(cow!("failed to read {}: {e}", path.display())).into()
     })?;
     let state: AuthorWorkflowState = serde_json::from_str(&contents).map_err(|e| -> CliError {
-        CliErrorKind::WorkflowParse {
-            detail: cow!("failed to parse author state: {e}"),
-        }
-        .into()
+        CliErrorKind::workflow_parse(cow!("failed to parse author state: {e}")).into()
     })?;
     Ok(Some(state))
 }
@@ -190,30 +181,19 @@ pub fn write_author_state(state: &AuthorWorkflowState) -> Result<(), CliError> {
     let path = author_state_path()?;
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent).map_err(|e| -> CliError {
-            CliErrorKind::WorkflowIo {
-                detail: cow!("failed to create directory {}: {e}", parent.display()),
-            }
-            .into()
+            CliErrorKind::workflow_io(cow!("failed to create directory {}: {e}", parent.display()))
+                .into()
         })?;
     }
     let json = serde_json::to_string_pretty(state).map_err(|e| -> CliError {
-        CliErrorKind::WorkflowSerialize {
-            detail: cow!("failed to serialize author state: {e}"),
-        }
-        .into()
+        CliErrorKind::workflow_serialize(cow!("failed to serialize author state: {e}")).into()
     })?;
     let tmp_path = path.with_extension("json.tmp");
     fs::write(&tmp_path, &json).map_err(|e| -> CliError {
-        CliErrorKind::WorkflowIo {
-            detail: cow!("failed to write {}: {e}", tmp_path.display()),
-        }
-        .into()
+        CliErrorKind::workflow_io(cow!("failed to write {}: {e}", tmp_path.display())).into()
     })?;
     fs::rename(&tmp_path, &path).map_err(|e| -> CliError {
-        CliErrorKind::WorkflowIo {
-            detail: cow!("failed to rename to {}: {e}", path.display()),
-        }
-        .into()
+        CliErrorKind::workflow_io(cow!("failed to rename to {}: {e}", path.display())).into()
     })?;
     Ok(())
 }

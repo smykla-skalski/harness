@@ -40,10 +40,7 @@ fn extract_resources(manifest: &Path) -> Result<Vec<(String, String)>, CliError>
         }
     }
     if resources.is_empty() {
-        return Err(CliErrorKind::NoResourceKinds {
-            manifest: manifest.display().to_string().into(),
-        }
-        .into());
+        return Err(CliErrorKind::no_resource_kinds(manifest.display().to_string()).into());
     }
     Ok(resources)
 }

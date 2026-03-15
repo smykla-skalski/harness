@@ -45,23 +45,15 @@ impl VersionedJsonRepository {
             return Ok(None);
         }
         let contents = fs::read_to_string(&self.path).map_err(|e| -> CliError {
-            CliErrorKind::WorkflowIo {
-                detail: cow!("failed to read {}: {e}", self.path.display()),
-            }
-            .into()
+            CliErrorKind::workflow_io(cow!("failed to read {}: {e}", self.path.display())).into()
         })?;
         let value: Value = serde_json::from_str(&contents).map_err(|e| -> CliError {
-            CliErrorKind::WorkflowParse {
-                detail: cow!("failed to parse {}: {e}", self.path.display()),
-            }
-            .into()
+            CliErrorKind::workflow_parse(cow!("failed to parse {}: {e}", self.path.display()))
+                .into()
         })?;
         let version = value.get("schema_version").and_then(Value::as_u64);
         if version != Some(u64::from(self.current_version)) {
-            return Err(CliErrorKind::WorkflowVersion {
-                detail: cow!("{version:?}"),
-            }
-            .into());
+            return Err(CliErrorKind::workflow_version(cow!("{version:?}")).into());
         }
         Ok(Some(value))
     }
@@ -73,31 +65,24 @@ impl VersionedJsonRepository {
     pub fn save(&self, state: &Value) -> Result<(), CliError> {
         if let Some(parent) = self.path.parent() {
             fs::create_dir_all(parent).map_err(|e| -> CliError {
-                CliErrorKind::WorkflowIo {
-                    detail: cow!("failed to create directory {}: {e}", parent.display()),
-                }
+                CliErrorKind::workflow_io(cow!(
+                    "failed to create directory {}: {e}",
+                    parent.display()
+                ))
                 .into()
             })?;
         }
         let tmp_name = format!("json.{}.tmp", process::id());
         let tmp_path = self.path.with_extension(tmp_name);
         let json = serde_json::to_string_pretty(state).map_err(|e| -> CliError {
-            CliErrorKind::WorkflowSerialize {
-                detail: cow!("failed to serialize state: {e}"),
-            }
-            .into()
+            CliErrorKind::workflow_serialize(cow!("failed to serialize state: {e}")).into()
         })?;
         fs::write(&tmp_path, &json).map_err(|e| -> CliError {
-            CliErrorKind::WorkflowIo {
-                detail: cow!("failed to write {}: {e}", tmp_path.display()),
-            }
-            .into()
+            CliErrorKind::workflow_io(cow!("failed to write {}: {e}", tmp_path.display())).into()
         })?;
         fs::rename(&tmp_path, &self.path).map_err(|e| -> CliError {
-            CliErrorKind::WorkflowIo {
-                detail: cow!("failed to rename to {}: {e}", self.path.display()),
-            }
-            .into()
+            CliErrorKind::workflow_io(cow!("failed to rename to {}: {e}", self.path.display()))
+                .into()
         })?;
         Ok(())
     }

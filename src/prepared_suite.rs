@@ -124,17 +124,11 @@ impl PreparedSuiteArtifact {
             return Ok(None);
         }
         let text = fs::read_to_string(path).map_err(|e| {
-            CliErrorKind::MissingFile {
-                path: path.display().to_string().into(),
-            }
-            .with_details(e.to_string())
+            CliErrorKind::missing_file(path.display().to_string()).with_details(e.to_string())
         })?;
         let artifact: Self = serde_json::from_str(&text).map_err(|e| {
-            CliErrorKind::AuthoringPayloadInvalid {
-                kind: "prepared suite".into(),
-                details: path.display().to_string().into(),
-            }
-            .with_details(e.to_string())
+            CliErrorKind::authoring_payload_invalid("prepared suite", path.display().to_string())
+                .with_details(e.to_string())
         })?;
         Ok(Some(artifact))
     }
@@ -146,24 +140,15 @@ impl PreparedSuiteArtifact {
     pub fn save(&self, path: &Path) -> Result<(), CliError> {
         if let Some(parent) = path.parent() {
             fs::create_dir_all(parent).map_err(|e| {
-                CliErrorKind::MissingFile {
-                    path: parent.display().to_string().into(),
-                }
-                .with_details(e.to_string())
+                CliErrorKind::missing_file(parent.display().to_string()).with_details(e.to_string())
             })?;
         }
         let json = serde_json::to_string_pretty(self).map_err(|e| {
-            CliErrorKind::AuthoringPayloadInvalid {
-                kind: "prepared suite".into(),
-                details: "serialization".into(),
-            }
-            .with_details(e.to_string())
+            CliErrorKind::authoring_payload_invalid("prepared suite", "serialization")
+                .with_details(e.to_string())
         })?;
         fs::write(path, json).map_err(|e| {
-            CliErrorKind::MissingFile {
-                path: path.display().to_string().into(),
-            }
-            .with_details(e.to_string())
+            CliErrorKind::missing_file(path.display().to_string()).with_details(e.to_string())
         })
     }
 }

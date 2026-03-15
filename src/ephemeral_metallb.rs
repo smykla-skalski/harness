@@ -20,10 +20,7 @@ pub fn state_path(run_dir: &Path) -> PathBuf {
 /// Returns `CliError` if `cluster_name` contains path separators or `..`.
 pub fn template_path(root: &Path, cluster_name: &str) -> Result<PathBuf, CliError> {
     if !is_safe_name(cluster_name) {
-        return Err(CliErrorKind::UnsafeName {
-            name: cluster_name.to_string().into(),
-        }
-        .into());
+        return Err(CliErrorKind::unsafe_name(cluster_name.to_string()).into());
     }
     Ok(root
         .join("mk")
@@ -58,10 +55,7 @@ fn default_source_template(root: &Path) -> Result<PathBuf, CliError> {
             return Ok(first);
         }
     }
-    Err(CliErrorKind::MissingFile {
-        path: default.to_string_lossy().into_owned().into(),
-    }
-    .into())
+    Err(CliErrorKind::missing_file(default.to_string_lossy().into_owned()).into())
 }
 
 /// Ensure `MetalLB` templates exist for the given clusters.
@@ -165,10 +159,7 @@ pub fn restore_templates(run_dir: &Path) -> Result<Vec<PathBuf>, CliError> {
             continue;
         }
         if !source.is_file() {
-            return Err(CliErrorKind::MissingFile {
-                path: source_str.to_string().into(),
-            }
-            .into());
+            return Err(CliErrorKind::missing_file(source_str.to_string()).into());
         }
         if let Some(parent) = target.parent() {
             fs::create_dir_all(parent)?;
@@ -210,12 +201,8 @@ fn save_entries(run_dir: &Path, entries: &[serde_json::Value]) -> Result<(), Cli
         "schema_version": 1,
         "entries": entries,
     });
-    let text = serde_json::to_string_pretty(&payload).map_err(|e| -> CliError {
-        CliErrorKind::Serialize {
-            detail: e.to_string().into(),
-        }
-        .into()
-    })?;
+    let text = serde_json::to_string_pretty(&payload)
+        .map_err(|e| -> CliError { CliErrorKind::serialize(e.to_string()).into() })?;
     fs::write(&path, text)?;
     Ok(())
 }

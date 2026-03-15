@@ -35,12 +35,9 @@ pub fn execute(cmd: &ReportCommand) -> Result<i32, CliError> {
 }
 
 fn run_check(report_path: Option<&str>) -> Result<i32, CliError> {
-    let path = report_path.map(PathBuf::from).ok_or_else(|| -> CliError {
-        CliErrorKind::MissingRunContextValue {
-            field: "report".into(),
-        }
-        .into()
-    })?;
+    let path = report_path
+        .map(PathBuf::from)
+        .ok_or_else(|| -> CliError { CliErrorKind::missing_run_context_value("report").into() })?;
 
     let report = RunReport::from_markdown(&path)?;
     let body = report.to_markdown();
@@ -48,17 +45,17 @@ fn run_check(report_path: Option<&str>) -> Result<i32, CliError> {
     let code_blocks = body.matches("```").count() / 2;
 
     if line_count > REPORT_LINE_LIMIT {
-        return Err(CliErrorKind::ReportLineLimit {
-            count: line_count.to_string().into(),
-            limit: REPORT_LINE_LIMIT.to_string().into(),
-        }
+        return Err(CliErrorKind::report_line_limit(
+            line_count.to_string(),
+            REPORT_LINE_LIMIT.to_string(),
+        )
         .into());
     }
     if code_blocks > REPORT_CODE_BLOCK_LIMIT {
-        return Err(CliErrorKind::ReportCodeBlockLimit {
-            count: code_blocks.to_string().into(),
-            limit: REPORT_CODE_BLOCK_LIMIT.to_string().into(),
-        }
+        return Err(CliErrorKind::report_code_block_limit(
+            code_blocks.to_string(),
+            REPORT_CODE_BLOCK_LIMIT.to_string(),
+        )
         .into());
     }
 
