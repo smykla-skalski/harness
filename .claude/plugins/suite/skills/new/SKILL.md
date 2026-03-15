@@ -259,6 +259,7 @@ Proposal rules:
 - Default every cluster-interacting command to full `harness` invocations. Only keep raw `kubectl`, `kumactl`, `curl`, or similar commands when the user explicitly asked for raw commands.
 - Follow [references/suite-structure.md](references/suite-structure.md) for file ownership, naming, and manifest conventions.
 - Add `gateway-api-crds` when proposed groups touch `MeshGateway`, `GatewayClass`, `Gateway`, or `HTTPRoute`.
+- For universal mode suites (`--profile single-zone-universal`), use REST API format manifests (type/name/mesh instead of apiVersion/kind/metadata). Use `harness apply` for manifest application (it dispatches to `kumactl apply` in universal mode). Use `harness token` and `harness service` for dataplane token generation and service container management.
 
 ### Step 7: Pre-write review gate
 
