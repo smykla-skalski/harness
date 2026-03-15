@@ -13,7 +13,7 @@ pub fn execute(ctx: &HookContext) -> Result<HookResult, CliError> {
     if !ctx.skill_active {
         return Ok(HookResult::allow());
     }
-    if ctx.skill == "suite-author" {
+    if ctx.is_suite_author() {
         // In the full implementation this would append debug info to the
         // authoring debug log. For now, just allow.
         return Ok(HookResult::allow());

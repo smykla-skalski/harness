@@ -18,7 +18,7 @@ pub fn execute(ctx: &HookContext) -> Result<HookResult, CliError> {
     if prompts.is_empty() {
         return Ok(HookResult::allow());
     }
-    if ctx.skill == "suite-runner" {
+    if ctx.is_suite_runner() {
         return Ok(guard_suite_runner(ctx, prompts));
     }
     Ok(guard_suite_author(ctx, prompts))

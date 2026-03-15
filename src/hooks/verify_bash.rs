@@ -5,6 +5,7 @@ use crate::context::RunContext;
 use crate::errors::{self, CliError};
 use crate::hook::HookResult;
 use crate::hook_payloads::HookContext;
+use crate::rules::suite_runner as rules;
 use crate::workflow::runner::{RunnerPhase, RunnerWorkflowState, SuiteFixState};
 
 /// Tracked subcommands and their expected artifact paths.
@@ -16,14 +17,12 @@ const TRACKED_SUBCOMMAND_ARTIFACTS: &[(&str, &[&str])] = &[
     ("run", &["commands", "command-log.md"]),
 ];
 
-const UP_CLUSTER_MODES: &[&str] = &["single-up", "global-zone-up", "global-two-zones-up"];
-
 /// Execute the verify-bash hook.
 ///
 /// # Errors
 /// Returns `CliError` on failure.
 pub fn execute(ctx: &HookContext) -> Result<HookResult, CliError> {
-    if !ctx.skill_active || ctx.skill != "suite-runner" {
+    if !ctx.skill_active || !ctx.is_suite_runner() {
         return Ok(HookResult::allow());
     }
     let words = ctx.command_words();
@@ -78,18 +77,17 @@ fn artifact_ready(subcommand: &str, run: &RunContext) -> bool {
         }
         "capture" => {
             let state_dir = run.layout.state_dir();
-            state_dir.exists()
-                && state_dir
-                    .read_dir()
-                    .is_ok_and(|mut entries| entries.next().is_some())
+            state_dir
+                .read_dir()
+                .is_ok_and(|mut entries| entries.next().is_some())
         }
         "apply" => {
             let index_path = run_dir.join("manifests").join("manifest-index.md");
-            index_path.exists() && has_table_rows(&index_path)
+            has_table_rows(&index_path)
         }
         _ => {
             let log_path = run_dir.join("commands").join("command-log.md");
-            log_path.exists() && has_table_rows(&log_path)
+            has_table_rows(&log_path)
         }
     }
 }
@@ -143,7 +141,7 @@ fn cluster_mode(words: &[String]) -> Option<&str> {
     words
         .get(2..)?
         .iter()
-        .find(|w| UP_CLUSTER_MODES.contains(&w.as_str()))
+        .find(|w| rules::UP_CLUSTER_MODES.contains(&w.as_str()))
         .map(String::as_str)
 }
 

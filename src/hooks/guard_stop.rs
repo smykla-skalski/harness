@@ -11,7 +11,7 @@ pub fn execute(ctx: &HookContext) -> Result<HookResult, CliError> {
     if !ctx.skill_active {
         return Ok(HookResult::allow());
     }
-    if ctx.skill == "suite-author" {
+    if ctx.is_suite_author() {
         return Ok(guard_suite_author_stop(ctx));
     }
     Ok(guard_suite_runner_stop(ctx))

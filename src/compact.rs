@@ -5,7 +5,7 @@ use std::{fs, result};
 use serde::{Deserialize, Serialize};
 
 use crate::core_defs::{project_context_dir, session_scope_key, utc_now};
-use crate::errors::CliError;
+use crate::errors::{self, CliError};
 use crate::rules::compact as rules;
 
 /// SHA256 fingerprint of a file.
@@ -61,8 +61,31 @@ impl FileFingerprint {
     /// Check if the fingerprint matches the current state on disk.
     #[must_use]
     pub fn matches_disk(&self) -> bool {
-        let current = Self::from_path(&self.label, Path::new(&self.path));
-        current == *self
+        let path = Path::new(&self.path);
+        let meta = fs::metadata(path).ok();
+        let exists = meta.is_some();
+        if exists != self.exists {
+            return false;
+        }
+        let Some(ref meta) = meta else {
+            // Both don't exist - match.
+            return true;
+        };
+        let size = Some(meta.len());
+        if size != self.size {
+            return false;
+        }
+        let mtime_ns = meta.modified().ok().and_then(|t| {
+            t.duration_since(UNIX_EPOCH)
+                .ok()
+                .and_then(|d| u64::try_from(d.as_nanos()).ok())
+        });
+        if mtime_ns != self.mtime_ns {
+            return false;
+        }
+        // mtime + size match - compute SHA256 only as final check.
+        let sha256 = file_sha256(path);
+        sha256 == self.sha256
     }
 }
 
@@ -227,19 +250,20 @@ pub fn load_latest_compact_handoff(project_dir: &Path) -> Result<Option<CompactH
     if !path.exists() {
         return Ok(None);
     }
-    let text = fs::read_to_string(&path).map_err(|e| CliError {
-        code: "IO".into(),
-        message: format!("failed to read {}: {e}", path.display()),
-        exit_code: 1,
-        hint: None,
-        details: None,
+    let text = fs::read_to_string(&path).map_err(|e| {
+        errors::cli_err(
+            &errors::IO_ERROR,
+            &[("detail", &format!("failed to read {}: {e}", path.display()))],
+        )
     })?;
-    serde_json::from_str(&text).map(Some).map_err(|e| CliError {
-        code: "PARSE".into(),
-        message: format!("corrupt compact handoff at {}: {e}", path.display()),
-        exit_code: 1,
-        hint: None,
-        details: None,
+    serde_json::from_str(&text).map(Some).map_err(|e| {
+        errors::cli_err(
+            &errors::IO_ERROR,
+            &[(
+                "detail",
+                &format!("corrupt compact handoff at {}: {e}", path.display()),
+            )],
+        )
     })
 }
 
@@ -560,39 +584,34 @@ fn truncate_lines(lines: &[String], char_limit: usize, line_limit: usize) -> Str
 
 fn write_json_atomic(path: &Path, payload: &CompactHandoff) -> Result<(), CliError> {
     if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent).map_err(|e| CliError {
-            code: "IO".into(),
-            message: format!("failed to create directory: {e}"),
-            exit_code: 1,
-            hint: None,
-            details: None,
+        fs::create_dir_all(parent).map_err(|e| {
+            errors::cli_err(
+                &errors::IO_ERROR,
+                &[("detail", &format!("failed to create directory: {e}"))],
+            )
         })?;
     }
     let tmp = path.with_extension("json.tmp");
-    let text = serde_json::to_string_pretty(payload).map_err(|e| CliError {
-        code: "SERIALIZE".into(),
-        message: format!("failed to serialize: {e}"),
-        exit_code: 1,
-        hint: None,
-        details: None,
+    let text = serde_json::to_string_pretty(payload)
+        .map_err(|e| errors::cli_err(&errors::SERIALIZE_ERROR, &[("detail", &format!("{e}"))]))?;
+    fs::write(&tmp, &text).map_err(|e| {
+        errors::cli_err(
+            &errors::IO_ERROR,
+            &[("detail", &format!("failed to write {}: {e}", tmp.display()))],
+        )
     })?;
-    fs::write(&tmp, &text).map_err(|e| CliError {
-        code: "IO".into(),
-        message: format!("failed to write {}: {e}", tmp.display()),
-        exit_code: 1,
-        hint: None,
-        details: None,
-    })?;
-    fs::rename(&tmp, path).map_err(|e| CliError {
-        code: "IO".into(),
-        message: format!(
-            "failed to rename {} to {}: {e}",
-            tmp.display(),
-            path.display()
-        ),
-        exit_code: 1,
-        hint: None,
-        details: None,
+    fs::rename(&tmp, path).map_err(|e| {
+        errors::cli_err(
+            &errors::IO_ERROR,
+            &[(
+                "detail",
+                &format!(
+                    "failed to rename {} to {}: {e}",
+                    tmp.display(),
+                    path.display()
+                ),
+            )],
+        )
     })?;
     Ok(())
 }

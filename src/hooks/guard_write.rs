@@ -20,7 +20,7 @@ pub fn execute(ctx: &HookContext) -> Result<HookResult, CliError> {
     if paths.is_empty() {
         return Ok(HookResult::allow());
     }
-    if ctx.skill == "suite-author" {
+    if ctx.is_suite_author() {
         return Ok(guard_suite_author(ctx, &paths));
     }
     Ok(guard_suite_runner(ctx, &paths))
@@ -31,27 +31,23 @@ fn guard_suite_author(ctx: &HookContext, paths: &[&str]) -> HookResult {
         return HookResult::allow();
     };
     let suite_dir = state.suite_path();
-    let has_suite_output = paths.iter().any(|p| {
-        if let Some(ref sd) = suite_dir {
-            let norm = normalize_path(Path::new(p));
-            let sd_norm = normalize_path(sd);
-            norm.starts_with(&sd_norm)
-        } else {
-            false
-        }
+    let sd_norm = suite_dir.as_ref().map(|sd| normalize_path(sd));
+    let has_suite_output = sd_norm.as_ref().is_some_and(|sdn| {
+        paths
+            .iter()
+            .any(|p| normalize_path(Path::new(p)).starts_with(sdn))
     });
     if !has_suite_output {
         return HookResult::allow();
     }
     // Validate paths are within the suite-author surface.
-    if let Some(ref sd) = suite_dir {
+    if let Some(ref sdn) = sd_norm {
         for raw_path in paths {
             let norm = normalize_path(Path::new(raw_path));
-            let sd_norm = normalize_path(sd);
-            if !norm.starts_with(&sd_norm) {
+            if !norm.starts_with(sdn) {
                 continue;
             }
-            if !author::suite_author_path_allowed(&norm, &sd_norm) {
+            if !author::suite_author_path_allowed(&norm, sdn) {
                 return errors::hook_msg(&errors::DENY_WRITE_OUTSIDE_SUITE, &[("path", raw_path)]);
             }
         }
@@ -76,6 +72,7 @@ fn guard_suite_author(ctx: &HookContext, paths: &[&str]) -> HookResult {
 fn guard_suite_runner(ctx: &HookContext, paths: &[&str]) -> HookResult {
     let run_dir = ctx.effective_run_dir();
     let suite_dir = ctx.suite_dir();
+    let sd_norm = suite_dir.as_ref().map(|sd| normalize_path(sd));
     for raw_path in paths {
         let path = normalize_path(Path::new(raw_path));
         // Deny direct writes to harness-managed control files.
@@ -102,25 +99,24 @@ fn guard_suite_runner(ctx: &HookContext, paths: &[&str]) -> HookResult {
             }
         }
         // Check if path is within suite dir (suite-fix writes).
-        if let Some(ref sd) = suite_dir {
-            let sd_norm = normalize_path(sd);
-            if path.starts_with(&sd_norm) {
-                if let Some(ref state) = ctx.runner_state
-                    && state.suite_fix.is_none()
-                {
-                    return errors::hook_msg(
-                        &errors::DENY_RUNNER_FLOW_REQUIRED,
-                        &[
-                            ("action", "edit suite files"),
-                            (
-                                "details",
-                                "approved suite repair is required before editing suite files",
-                            ),
-                        ],
-                    );
-                }
-                continue;
+        if let Some(ref sdn) = sd_norm
+            && path.starts_with(sdn)
+        {
+            if let Some(ref state) = ctx.runner_state
+                && state.suite_fix.is_none()
+            {
+                return errors::hook_msg(
+                    &errors::DENY_RUNNER_FLOW_REQUIRED,
+                    &[
+                        ("action", "edit suite files"),
+                        (
+                            "details",
+                            "approved suite repair is required before editing suite files",
+                        ),
+                    ],
+                );
             }
+            continue;
         }
         // Path outside run surface.
         if run_dir.is_some() || suite_dir.is_some() {
@@ -133,15 +129,13 @@ fn guard_suite_runner(ctx: &HookContext, paths: &[&str]) -> HookResult {
 fn allowed_suite_runner_path(path: &Path, run_dir: &Path) -> bool {
     let norm = normalize_path(path);
     let rd_norm = normalize_path(run_dir);
-    for rel in rules::ALLOWED_RUN_FILES {
-        if norm == normalize_path(&rd_norm.join(rel)) {
-            return true;
-        }
+    if rules::ALLOWED_RUN_FILES
+        .iter()
+        .any(|rel| norm == normalize_path(&rd_norm.join(rel)))
+    {
+        return true;
     }
-    for rel in rules::ALLOWED_RUN_DIRS {
-        if norm.starts_with(normalize_path(&rd_norm.join(rel))) {
-            return true;
-        }
-    }
-    false
+    rules::ALLOWED_RUN_DIRS
+        .iter()
+        .any(|rel| norm.starts_with(normalize_path(&rd_norm.join(rel))))
 }

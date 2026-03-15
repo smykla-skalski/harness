@@ -232,7 +232,7 @@ impl HookContext {
             self.runner_state = runner_workflow::read_runner_state(rd).ok().flatten();
         }
         // Load author state when skill is suite-author.
-        if self.skill == "suite-author" {
+        if self.is_suite_author() {
             self.author_state = author_workflow::read_author_state().ok().flatten();
         }
     }
@@ -330,6 +330,18 @@ impl HookContext {
     #[must_use]
     pub fn stop_hook_active(&self) -> bool {
         self.event.payload.stop_hook_active
+    }
+
+    /// Whether this context is for the suite-runner skill.
+    #[must_use]
+    pub fn is_suite_runner(&self) -> bool {
+        self.skill == "suite-runner"
+    }
+
+    /// Whether this context is for the suite-author skill.
+    #[must_use]
+    pub fn is_suite_author(&self) -> bool {
+        self.skill == "suite-author"
     }
 }
 

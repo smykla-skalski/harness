@@ -19,7 +19,7 @@ pub fn execute(ctx: &HookContext) -> Result<HookResult, CliError> {
     if paths.is_empty() {
         return Ok(HookResult::allow());
     }
-    if ctx.skill == "suite-author" {
+    if ctx.is_suite_author() {
         return Ok(verify_suite_author(&paths));
     }
     Ok(verify_suite_runner(ctx, &paths))
