@@ -241,14 +241,14 @@ impl RunContext {
         let status: RunStatus = read_json_file(&layout.status_path())?;
 
         let prepared_suite = if layout.prepared_suite_path().exists() {
-            read_json_file(&layout.prepared_suite_path()).ok()
+            Some(read_json_file(&layout.prepared_suite_path())?)
         } else {
             None
         };
 
         let preflight_path = layout.artifacts_dir().join("preflight.json");
         let preflight = if preflight_path.exists() {
-            read_json_file(&preflight_path).ok()
+            Some(read_json_file(&preflight_path)?)
         } else {
             None
         };
