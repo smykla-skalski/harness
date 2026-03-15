@@ -309,7 +309,7 @@ pub fn docker_rm(name: &str) -> Result<CommandResult, CliError> {
 /// # Errors
 /// Returns `CliError` on command failure or if the IP cannot be extracted.
 pub fn docker_inspect_ip(container: &str, network: &str) -> Result<String, CliError> {
-    let format_str = format!("{{{{.NetworkSettings.Networks.{network}.IPAddress}}}}");
+    let format_str = format!("{{{{(index .NetworkSettings.Networks \"{network}\").IPAddress}}}}");
     let result = docker(&["inspect", "-f", &format_str, container], &[0])?;
     let ip = result.stdout.trim().to_string();
     if ip.is_empty() {
