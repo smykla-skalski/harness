@@ -528,9 +528,11 @@ impl ClusterRecordPayload {
         }
     }
 
+    /// # Panics
+    /// Panics if the derived `Serialize` impl produces invalid JSON (should never happen).
     #[must_use]
     pub fn to_json_dict(&self) -> Value {
-        serde_json::to_value(self).unwrap_or_else(|_| Value::Object(serde_json::Map::new()))
+        serde_json::to_value(self).expect("derived Serialize impl")
     }
 }
 
