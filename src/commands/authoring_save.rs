@@ -2,7 +2,7 @@ use std::path::Path;
 
 use crate::authoring::{authoring_workspace_dir, require_authoring_session};
 use crate::errors::{self, CliError};
-use crate::io::{ensure_dir, read_text, write_text};
+use crate::io::{ensure_dir, is_safe_name, read_text, write_text};
 
 fn read_input(input: Option<&str>, payload: Option<&str>) -> Result<String, CliError> {
     if let Some(text) = payload {
@@ -29,10 +29,6 @@ fn parse_payload(text: &str, kind: &str) -> Result<serde_json::Value, CliError> 
     })
 }
 
-fn is_safe_name(s: &str) -> bool {
-    !s.is_empty() && !s.contains('/') && !s.contains('\\') && !s.contains("..")
-}
-
 /// Save a suite-author payload.
 ///
 /// # Errors
@@ -47,13 +43,7 @@ pub fn execute(kind: &str, payload: Option<&str>, input: Option<&str>) -> Result
     let value = parse_payload(&text, kind)?;
 
     let workspace = authoring_workspace_dir();
-    ensure_dir(&workspace).map_err(|e| CliError {
-        code: "IO".into(),
-        message: format!("failed to create directory: {e}"),
-        exit_code: 1,
-        hint: None,
-        details: None,
-    })?;
+    ensure_dir(&workspace).map_err(errors::io_err)?;
     let path = workspace.join(format!("{kind}.json"));
     let json = serde_json::to_string_pretty(&value).unwrap_or_default();
     write_text(&path, &json)?;

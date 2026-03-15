@@ -70,25 +70,13 @@ pub fn execute(
 
     let (artifact, command_log) = if let Some(ref rd) = run_dir {
         let commands_dir = rd.join("commands");
-        ensure_dir(&commands_dir).map_err(|e| CliError {
-            code: "IO".into(),
-            message: format!("failed to create directory {}: {e}", commands_dir.display()),
-            exit_code: 1,
-            hint: None,
-            details: None,
-        })?;
+        ensure_dir(&commands_dir).map_err(errors::io_err)?;
         let artifact = commands_dir.join(format!("{artifact_name}.txt"));
         let log = commands_dir.join("command-log.md");
         (artifact, Some(log))
     } else {
         let tmp = env::temp_dir().join("harness").join("run");
-        ensure_dir(&tmp).map_err(|e| CliError {
-            code: "IO".into(),
-            message: format!("failed to create directory {}: {e}", tmp.display()),
-            exit_code: 1,
-            hint: None,
-            details: None,
-        })?;
+        ensure_dir(&tmp).map_err(errors::io_err)?;
         (tmp.join(format!("{artifact_name}.txt")), None)
     };
 

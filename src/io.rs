@@ -13,6 +13,15 @@ use crate::errors::{
     NOT_A_MAPPING, NOT_ALL_STRINGS, PATH_NOT_FOUND, UNTERMINATED_FRONTMATTER,
 };
 
+/// Check whether a name is safe to use as a path component.
+///
+/// Returns `false` if the string is empty, contains path separators, or
+/// contains `..`.
+#[must_use]
+pub fn is_safe_name(s: &str) -> bool {
+    !s.is_empty() && !s.contains('/') && !s.contains('\\') && !s.contains("..")
+}
+
 /// Validate that a JSON value is an object with string keys.
 ///
 /// # Errors

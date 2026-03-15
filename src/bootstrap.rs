@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
-use std::{env, fs, io};
+use std::{env, fs};
 
 use crate::errors::{self, CliError};
 
@@ -87,13 +87,7 @@ pub fn choose_install_dir(path_env: &str) -> Result<(PathBuf, bool), CliError> {
 /// # Errors
 /// Returns `CliError` on IO failure.
 pub fn install_wrapper(target_dir: &Path) -> Result<PathBuf, CliError> {
-    fs::create_dir_all(target_dir).map_err(|e| errors::CliError {
-        code: "IO".into(),
-        message: format!("failed to create directory: {e}"),
-        exit_code: 1,
-        hint: None,
-        details: None,
-    })?;
+    fs::create_dir_all(target_dir).map_err(errors::io_err)?;
 
     let target = target_dir.join("harness");
 
@@ -102,15 +96,15 @@ pub fn install_wrapper(target_dir: &Path) -> Result<PathBuf, CliError> {
         && existing == WRAPPER
     {
         // Just ensure executable
-        let meta = fs::metadata(&target).map_err(io_err)?;
+        let meta = fs::metadata(&target).map_err(errors::io_err)?;
         let mut perms = meta.permissions();
         perms.set_mode(perms.mode() | 0o111);
-        fs::set_permissions(&target, perms).map_err(io_err)?;
+        fs::set_permissions(&target, perms).map_err(errors::io_err)?;
         return Ok(target);
     }
 
-    fs::write(&target, WRAPPER).map_err(io_err)?;
-    fs::set_permissions(&target, fs::Permissions::from_mode(0o755)).map_err(io_err)?;
+    fs::write(&target, WRAPPER).map_err(errors::io_err)?;
+    fs::set_permissions(&target, fs::Permissions::from_mode(0o755)).map_err(errors::io_err)?;
     Ok(target)
 }
 
@@ -124,13 +118,13 @@ pub fn install_wrapper(target_dir: &Path) -> Result<PathBuf, CliError> {
 pub fn main(project_dir: &Path, path_env: &str) -> Result<i32, CliError> {
     let harness = project_dir.join(".claude").join("skills").join("harness");
     if !harness.exists() {
-        return Err(errors::CliError {
-            code: "BOOTSTRAP".into(),
-            message: format!("missing source wrapper: {}", harness.display()),
-            exit_code: 1,
-            hint: None,
-            details: None,
-        });
+        return Err(errors::cli_err(
+            &errors::MISSING_FILE,
+            &[(
+                "path",
+                &format!("missing source wrapper: {}", harness.display()),
+            )],
+        ));
     }
 
     let (target_dir, _already_on_path) = choose_install_dir(path_env)?;
@@ -202,17 +196,6 @@ fn is_installable(path: &Path) -> bool {
 
 fn canonical_or_same(path: &Path) -> PathBuf {
     fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf())
-}
-
-#[allow(clippy::needless_pass_by_value)]
-fn io_err(e: io::Error) -> CliError {
-    CliError {
-        code: "IO".into(),
-        message: format!("IO error: {e}"),
-        exit_code: 1,
-        hint: None,
-        details: None,
-    }
 }
 
 #[cfg(test)]
