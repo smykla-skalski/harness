@@ -6,6 +6,7 @@ use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 
 use crate::cluster::ClusterSpec;
+use crate::core_defs::current_run_context_path;
 use crate::errors::{CliError, CliErrorKind};
 use crate::prepared_suite::PreparedSuiteArtifact;
 use crate::schema::RunStatus;
@@ -272,12 +273,29 @@ impl RunContext {
 
     /// Load from the current session context.
     ///
-    /// No active session tracking in the Rust implementation yet.
+    /// Reads `current-run.json` from the session context directory and
+    /// loads the full `RunContext` from the referenced run directory.
+    /// Returns `None` when the pointer file is missing, unparseable,
+    /// or the referenced run directory no longer exists.
     ///
     /// # Errors
     /// Returns `CliError` on failure.
     pub fn from_current() -> Result<Option<Self>, CliError> {
-        Ok(None)
+        let pointer_path = current_run_context_path();
+        let Ok(text) = fs::read_to_string(&pointer_path) else {
+            return Ok(None);
+        };
+        let Ok(record) = serde_json::from_str::<CurrentRunRecord>(&text) else {
+            return Ok(None);
+        };
+        let run_dir = record.layout.run_dir();
+        if !run_dir.is_dir() {
+            return Ok(None);
+        }
+        match Self::from_run_dir(&run_dir) {
+            Ok(ctx) => Ok(Some(ctx)),
+            Err(_) => Ok(None),
+        }
     }
 }
 
@@ -676,9 +694,90 @@ mod tests {
     }
 
     #[test]
-    fn run_context_from_current_returns_none() {
+    fn run_context_from_current_returns_none_when_no_pointer() {
         let result = RunContext::from_current().unwrap();
         assert!(result.is_none());
+    }
+
+    #[test]
+    fn run_context_from_current_loads_valid_pointer() {
+        let tmp = tempfile::tempdir().unwrap();
+
+        // Set up a valid run directory
+        let run_dir = tmp.path().join("runs").join("run-ptr");
+        let layout = RunLayout::from_run_dir(&run_dir);
+        layout.ensure_dirs().unwrap();
+        let metadata = RunMetadata {
+            run_id: "run-ptr".into(),
+            ..sample_metadata()
+        };
+        fs::write(
+            layout.metadata_path(),
+            serde_json::to_string_pretty(&metadata).unwrap(),
+        )
+        .unwrap();
+        let status_data = serde_json::json!({
+            "run_id": "run-ptr",
+            "suite_id": "suite-a",
+            "profile": "single-zone",
+            "started_at": "2026-03-14T00:00:00Z",
+            "overall_verdict": "pending",
+            "notes": []
+        });
+        fs::write(
+            layout.status_path(),
+            serde_json::to_string_pretty(&status_data).unwrap(),
+        )
+        .unwrap();
+
+        // Write pointer file and verify deserialization path
+        let record = CurrentRunRecord {
+            layout: layout.clone(),
+            profile: Some("single-zone".into()),
+            repo_root: None,
+            suite_dir: None,
+            suite_id: Some("suite-a".into()),
+            suite_path: None,
+            cluster: None,
+            keep_clusters: false,
+            user_stories: vec![],
+            required_dependencies: vec![],
+        };
+        let ctx_dir = tmp.path().join("ctx");
+        fs::create_dir_all(&ctx_dir).unwrap();
+        fs::write(
+            ctx_dir.join("current-run.json"),
+            serde_json::to_string_pretty(&record).unwrap(),
+        )
+        .unwrap();
+
+        // Verify the record deserializes and from_run_dir works
+        let text = fs::read_to_string(ctx_dir.join("current-run.json")).unwrap();
+        let parsed: CurrentRunRecord = serde_json::from_str(&text).unwrap();
+        assert_eq!(parsed.layout.run_id, "run-ptr");
+
+        let ctx = RunContext::from_run_dir(&parsed.layout.run_dir()).unwrap();
+        assert_eq!(ctx.layout.run_id, "run-ptr");
+    }
+
+    #[test]
+    fn run_context_stale_pointer_returns_none_for_missing_dir() {
+        let record = CurrentRunRecord {
+            layout: RunLayout {
+                run_root: "/nonexistent/path".into(),
+                run_id: "vanished".into(),
+            },
+            profile: None,
+            repo_root: None,
+            suite_dir: None,
+            suite_id: None,
+            suite_path: None,
+            cluster: None,
+            keep_clusters: false,
+            user_stories: vec![],
+            required_dependencies: vec![],
+        };
+        assert!(!record.layout.run_dir().is_dir());
     }
 
     // -- CurrentRunRecord tests --
