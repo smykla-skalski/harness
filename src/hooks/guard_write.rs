@@ -5,6 +5,7 @@ use crate::hook::HookResult;
 use crate::hook_payloads::HookContext;
 use crate::rules::suite_runner as rules;
 use crate::workflow::author::{self, can_write};
+use crate::workflow::runner::RunnerPhase;
 
 use super::{control_file_hint, is_command_owned_run_file, normalize_path};
 
@@ -103,7 +104,13 @@ fn guard_suite_runner(ctx: &HookContext, paths: &[&str]) -> HookResult {
             && path.starts_with(sdn)
         {
             if let Some(ref state) = ctx.runner_state
-                && state.suite_fix.is_none()
+                && !matches!(
+                    &state.phase,
+                    RunnerPhase::Triage {
+                        suite_fix: Some(_),
+                        ..
+                    }
+                )
             {
                 return errors::hook_msg(
                     &errors::DENY_RUNNER_FLOW_REQUIRED,

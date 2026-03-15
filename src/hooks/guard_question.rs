@@ -142,14 +142,12 @@ fn classify_canonical_gate(prompts: &[AskUserQuestionPrompt]) -> Option<ReviewGa
 }
 
 fn can_ask_manifest_fix(state: &RunnerWorkflowState) -> (bool, Option<&'static str>) {
-    if state.phase != RunnerPhase::Triage {
-        return (
+    if matches!(&state.phase, RunnerPhase::Triage { .. }) {
+        (true, None)
+    } else {
+        (
             false,
             Some("enter failure triage before asking how to repair the suite"),
-        );
+        )
     }
-    if state.failure.is_none() {
-        return (false, Some("no failure recorded for triage"));
-    }
-    (true, None)
 }

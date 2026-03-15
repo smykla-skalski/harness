@@ -37,7 +37,7 @@ fn handle_suite_runner(ctx: &HookContext) -> HookResult {
         return HookResult::allow();
     }
     if let Some(ref state) = ctx.runner_state
-        && state.phase != RunnerPhase::Triage
+        && !matches!(&state.phase, RunnerPhase::Triage { .. })
     {
         return errors::hook_msg(
             &errors::DENY_RUNNER_FLOW_REQUIRED,

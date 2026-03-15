@@ -166,11 +166,10 @@ fn maybe_resume_suite_fix(ctx: &HookContext, words: &[String]) {
 }
 
 fn ready_to_resume(state: &RunnerWorkflowState) -> bool {
-    if state.phase != RunnerPhase::Triage {
-        return false;
+    match &state.phase {
+        RunnerPhase::Triage { suite_fix, .. } => suite_fix
+            .as_ref()
+            .is_some_and(SuiteFixState::ready_to_resume),
+        _ => false,
     }
-    state
-        .suite_fix
-        .as_ref()
-        .is_some_and(SuiteFixState::ready_to_resume)
 }

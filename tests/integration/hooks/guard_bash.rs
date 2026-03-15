@@ -6,7 +6,7 @@
 
 use harness::hooks::guard_bash;
 use harness::workflow::runner::{
-    self as runner_workflow, PreflightState, PreflightStatus, RunnerPhase, RunnerWorkflowState,
+    self as runner_workflow, RunnerEvent, RunnerPhase, RunnerWorkflowState,
 };
 
 use super::super::helpers::*;
@@ -462,16 +462,11 @@ fn guard_bash_completed_state_blocks_commands() {
     let tmp = tempfile::tempdir().unwrap();
     let run_dir = init_run(tmp.path(), "run-1", "single-zone");
     let state = RunnerWorkflowState {
-        schema_version: 1,
+        schema_version: 2,
         phase: RunnerPhase::Completed,
-        preflight: PreflightState {
-            status: PreflightStatus::Complete,
-        },
-        failure: None,
-        suite_fix: None,
         updated_at: "2026-03-14T00:00:00Z".to_string(),
         transition_count: 5,
-        last_event: Some("RunCompleted".to_string()),
+        last_event: Some(RunnerEvent::RunCompleted),
     };
     runner_workflow::write_runner_state(&run_dir, &state).unwrap();
     let payload = make_bash_payload("harness apply --manifest test.yaml");
@@ -485,16 +480,11 @@ fn guard_bash_completed_allows_closeout() {
     let tmp = tempfile::tempdir().unwrap();
     let run_dir = init_run(tmp.path(), "run-1", "single-zone");
     let state = RunnerWorkflowState {
-        schema_version: 1,
+        schema_version: 2,
         phase: RunnerPhase::Completed,
-        preflight: PreflightState {
-            status: PreflightStatus::Complete,
-        },
-        failure: None,
-        suite_fix: None,
         updated_at: "2026-03-14T00:00:00Z".to_string(),
         transition_count: 5,
-        last_event: Some("RunCompleted".to_string()),
+        last_event: Some(RunnerEvent::RunCompleted),
     };
     runner_workflow::write_runner_state(&run_dir, &state).unwrap();
     let payload = make_bash_payload("harness closeout");
