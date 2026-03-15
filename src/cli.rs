@@ -44,6 +44,7 @@ pub struct RunDirArgs {
 
 /// Available hooks.
 #[derive(Debug, Clone, Subcommand)]
+#[non_exhaustive]
 pub enum HookCommand {
     /// Guard Bash tool usage.
     GuardBash,
@@ -94,6 +95,7 @@ impl HookCommand {
 // ---------------------------------------------------------------------------
 
 /// Envoy admin operations.
+#[non_exhaustive]
 #[derive(Debug, Clone, Subcommand)]
 pub enum EnvoyCommand {
     /// Capture a live Envoy admin payload.
@@ -228,6 +230,7 @@ pub enum EnvoyCommand {
 // Report subcommands
 // ---------------------------------------------------------------------------
 
+#[non_exhaustive]
 /// Report validation and group finalization.
 #[derive(Debug, Clone, Subcommand)]
 pub enum ReportCommand {
@@ -269,6 +272,7 @@ pub enum ReportCommand {
 
 /// Find or build kumactl.
 #[derive(Debug, Clone, Subcommand)]
+#[non_exhaustive]
 pub enum KumactlCommand {
     /// Find an existing kumactl binary.
     Find {
@@ -299,6 +303,7 @@ pub struct Cli {
 
 /// Top-level commands.
 #[derive(Debug, Subcommand)]
+#[non_exhaustive]
 pub enum Command {
     /// Run a harness hook for a skill.
     Hook {
