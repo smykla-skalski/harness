@@ -3,7 +3,8 @@
 
 use std::fs;
 
-use harness::commands::session_stop;
+use harness::cli::Command;
+use harness::commands::Execute;
 use harness::context::{CurrentRunRecord, RunLayout};
 use harness::ephemeral_metallb;
 
@@ -50,7 +51,9 @@ fn session_stop_cleans_up_templates_and_removes_pointer() {
             fs::write(&ctx_path, serde_json::to_string_pretty(&record).unwrap()).unwrap();
             assert!(ctx_path.exists());
 
-            let code = session_stop::execute(None).unwrap();
+            let code = Command::SessionStop { project_dir: None }
+                .execute()
+                .unwrap();
             assert_eq!(code, 0);
 
             // Template should be cleaned up
@@ -72,7 +75,9 @@ fn session_stop_returns_ok_with_no_pointer() {
             ("CLAUDE_SESSION_ID", Some("no-pointer-test")),
         ],
         || {
-            let code = session_stop::execute(None).unwrap();
+            let code = Command::SessionStop { project_dir: None }
+                .execute()
+                .unwrap();
             assert_eq!(code, 0);
         },
     );
