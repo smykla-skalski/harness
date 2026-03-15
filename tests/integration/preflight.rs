@@ -1,46 +1,14 @@
-// Integration tests for kubectl-validate decision and preflight logic.
-// Ported from Python test_preflight.py (16 tests).
-//
-// Python test name -> Rust test name mapping:
-//   test_preflight_prepares_suite_once_and_reuses_cached_outputs
-//     -> preflight_prepares_and_caches [#ignore]
-//   test_build_prepared_suite_plan_filters_configure_blocks_by_profile
-//     -> prepared_suite_plan_filters_profile
-//   test_preflight_skips_expected_rejection_manifests
-//     -> preflight_skips_rejections [#ignore]
-//   test_preflight_skips_expected_rejection_manifests_defined_inline_in_consume
-//     -> preflight_skips_inline_rejections [#ignore]
-//   test_preflight_skips_expected_rejection_manifests_declared_in_frontmatter
-//     -> preflight_skips_frontmatter_rejections [#ignore]
-//   test_preflight_applies_baselines_before_validating_group_manifests
-//     -> preflight_applies_baselines [#ignore]
-//   test_preflight_applies_namespace_baseline_before_validating_later_baselines
-//     -> preflight_namespace_baseline [#ignore]
-//   test_capture_uses_current_run_context_and_cluster_kubeconfig
-//     -> capture_uses_run_context [#ignore]
-//   test_apply_reuses_prepared_manifest_without_copy_or_revalidation
-//     -> apply_reuses_prepared [#ignore]
-//   test_apply_and_validate_accept_prepared_manifest_shorthand
-//     -> apply_validate_shorthand [#ignore]
-//   test_validate_manifest_uses_manifest_api_version_for_explain
-//     -> validate_uses_api_version [#ignore]
-//   test_extract_resources_reads_multi_document_yaml -> extract_resources_multi_doc
-//   test_extract_kinds_reads_grouped_resources_from_manifest_headers -> extract_kinds
-//   test_preflight_failure_resets_runner_state_and_logs_stage
-//     -> preflight_failure_resets [#ignore]
-//   test_capture_marks_preflight_complete_for_manual_cli_flow
-//     -> capture_marks_preflight_complete [#ignore]
-//   test_preflight_applies_baselines_before_validating_dependent_baselines
-//     -> preflight_dependent_baselines [#ignore]
-
-mod helpers;
+// Preflight and kubectl-validate integration tests.
+// Tests kubectl-validate state serialization, prepared suite plan filtering,
+// YAML resource extraction, group spec rejection orders, and preflight
+// command flows (ignored - requires kubectl/kubectl-validate).
 
 use std::fs;
 
 use harness::kubectl_validate::{KubectlValidateDecision, KubectlValidateState};
 use harness::schema::GroupSpec;
 
-use helpers::*;
+use super::helpers::*;
 
 // ============================================================================
 // kubectl-validate state tests
@@ -322,79 +290,79 @@ Do debug.
 // ============================================================================
 
 #[test]
-#[ignore] // Requires kubectl and kubectl-validate
+#[ignore = "Requires kubectl and kubectl-validate"]
 fn preflight_prepares_and_caches() {
     // Preflight should prepare suite once and reuse cached outputs
 }
 
 #[test]
-#[ignore] // Requires kubectl-validate
+#[ignore = "Requires kubectl-validate"]
 fn preflight_skips_rejections() {
     // Expected rejection manifests should be skipped during validation
 }
 
 #[test]
-#[ignore] // Requires kubectl-validate
+#[ignore = "Requires kubectl-validate"]
 fn preflight_skips_inline_rejections() {
     // Rejection manifests defined inline in consume should be skipped
 }
 
 #[test]
-#[ignore] // Requires kubectl-validate
+#[ignore = "Requires kubectl-validate"]
 fn preflight_skips_frontmatter_rejections() {
     // Rejection manifests declared in frontmatter should be skipped
 }
 
 #[test]
-#[ignore] // Requires kubectl
+#[ignore = "Requires kubectl"]
 fn preflight_applies_baselines() {
     // Baselines should be applied before validating group manifests
 }
 
 #[test]
-#[ignore] // Requires kubectl
+#[ignore = "Requires kubectl"]
 fn preflight_namespace_baseline() {
     // Namespace baseline should be applied before other baselines
 }
 
 #[test]
-#[ignore] // Requires kubectl
+#[ignore = "Requires kubectl"]
 fn capture_uses_run_context() {
     // Capture should use kubeconfig from current run context
 }
 
 #[test]
-#[ignore] // Requires kubectl-validate
+#[ignore = "Requires kubectl-validate"]
 fn apply_reuses_prepared() {
     // Apply should reuse prepared manifest without re-copy or re-validation
 }
 
 #[test]
-#[ignore] // Requires kubectl-validate
+#[ignore = "Requires kubectl-validate"]
 fn apply_validate_shorthand() {
     // Apply and validate should accept prepared manifest shorthand
 }
 
 #[test]
-#[ignore] // Requires kubectl-validate
+#[ignore = "Requires kubectl-validate"]
 fn validate_uses_api_version() {
     // Validate should use manifest apiVersion for explain
 }
 
 #[test]
-#[ignore] // Requires kubectl
+#[ignore = "Requires kubectl"]
 fn preflight_failure_resets() {
     // Preflight failure should reset runner state and log stage
 }
 
 #[test]
-#[ignore] // Requires kubectl
+#[ignore = "Requires kubectl"]
 fn capture_marks_preflight_complete() {
     // Capture should mark preflight complete for manual CLI flow
 }
 
 #[test]
-#[ignore] // Requires kubectl
+#[ignore = "Requires kubectl"]
 fn preflight_dependent_baselines() {
     // Baselines should be applied before validating dependent baselines
 }

@@ -1,12 +1,6 @@
-// Test helper utilities for integration tests.
-// Equivalent to Python's tests/helpers.py.
-//
-// Provides:
-//   - write_suite() / write_group() - create suite/group markdown files in temp dirs
-//   - write_meshmetric_group() - group with MeshMetric YAML
-//   - init_run() - set up a complete run directory with metadata, status, runner state
-//   - make_hook_payload() / make_hook_context() - build hook envelope payloads
-//   - seed_kubectl_validate_state() - write kubectl-validate decision state
+// Shared test helper utilities for integration tests.
+// Provides suite/group file writers, run initialization, hook payload builders,
+// kubectl-validate state seeding, and assertion helpers.
 
 #![allow(dead_code)]
 
@@ -215,7 +209,7 @@ pub fn init_run(tmp_path: &Path, run_id: &str, profile: &str) -> PathBuf {
     layout.run_dir()
 }
 
-/// Initialize a run and return (run_dir, suite_dir) for tests that need both.
+/// Initialize a run and return `(run_dir, suite_dir)` for tests that need both.
 pub fn init_run_with_suite(tmp_path: &Path, run_id: &str, profile: &str) -> (PathBuf, PathBuf) {
     let run_dir = init_run(tmp_path, run_id, profile);
     let suite_dir = tmp_path.join("suite");
@@ -389,21 +383,23 @@ pub fn make_empty_payload() -> HookEnvelopePayload {
     }
 }
 
-/// Build a HookContext for a given skill and envelope.
+/// Build a `HookContext` for a given skill and envelope.
 pub fn make_hook_context(skill: &str, payload: HookEnvelopePayload) -> HookContext {
     HookContext::from_envelope(skill, payload)
 }
 
-/// Build a HookContext with an associated run directory.
+/// Build a `HookContext` with an associated run directory.
 pub fn make_hook_context_with_run(
     skill: &str,
     payload: HookEnvelopePayload,
     run_dir: &Path,
 ) -> HookContext {
+    use harness::context::RunContext;
+
     let mut ctx = HookContext::from_envelope(skill, payload);
     ctx.run_dir = Some(run_dir.to_path_buf());
     // Reload context from disk now that run_dir is set.
-    if let Ok(run_ctx) = harness::context::RunContext::from_run_dir(run_dir) {
+    if let Ok(run_ctx) = RunContext::from_run_dir(run_dir) {
         ctx.runner_state = runner_workflow::read_runner_state(&run_ctx.layout.run_dir())
             .ok()
             .flatten();
@@ -444,24 +440,24 @@ pub fn seed_kubectl_validate_state(
 // Assertion helpers
 // ---------------------------------------------------------------------------
 
-pub fn assert_decision(result: &HookResult, expected: Decision) {
+pub fn assert_decision(result: &HookResult, expected: &Decision) {
     assert_eq!(
-        result.decision, expected,
+        &result.decision, expected,
         "expected {expected:?}, got {:?} (code={}, message={})",
         result.decision, result.code, result.message
     );
 }
 
 pub fn assert_allow(result: &HookResult) {
-    assert_decision(result, Decision::Allow);
+    assert_decision(result, &Decision::Allow);
 }
 
 pub fn assert_deny(result: &HookResult) {
-    assert_decision(result, Decision::Deny);
+    assert_decision(result, &Decision::Deny);
 }
 
 pub fn assert_warn(result: &HookResult) {
-    assert_decision(result, Decision::Warn);
+    assert_decision(result, &Decision::Warn);
 }
 
 // ---------------------------------------------------------------------------

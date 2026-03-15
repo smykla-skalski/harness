@@ -1,38 +1,16 @@
-// Integration tests for cluster module.
-// Ported from Python test_cluster.py (4 tests), test_cluster_payloads.py (4 tests),
-// and test_cluster_context.py (4 tests).
-//
-// Python test name -> Rust test name mapping:
-//
-// test_cluster.py:
-//   test_global_zone_up_orchestration -> global_zone_up_orchestration [#ignore]
-//   test_single_up_logs_stage_updates -> single_up_logs_stage_updates [#ignore]
-//   test_single_up_creates_temporary_metallb_template_for_missing_cluster_name
-//     -> single_up_metallb_template [#ignore]
-//   test_matching_single_up_restores_cluster_context -> single_up_restores_context [#ignore]
-//
-// test_cluster_payloads.py:
-//   test_cluster_spec_loads_legacy_clusters_and_helm_values -> cluster_spec_legacy_clusters
-//   test_cluster_spec_legacy_primary_kubeconfig_fallback -> cluster_spec_legacy_fallback
-//   test_cluster_spec_current_deploy_payload_round_trip -> cluster_spec_deploy_roundtrip
-//   test_current_run_payload_emits_compatibility_fields -> current_run_payload_compat
-//
-// test_cluster_context.py:
-//   test_cluster_up_persists_context_and_matching_down_clears_it -> cluster_context_up_down [#ignore]
-//   test_cluster_uses_repo_root_saved_from_suite_defaults -> cluster_uses_saved_repo_root [#ignore]
-//   test_kumactl_find_uses_repo_root_from_current_run_context -> kumactl_find_repo_root [#ignore]
-//   test_from_run_dir_recovers_cluster_from_current_deploy -> run_dir_recovers_cluster
-
-mod helpers;
+// Cluster module integration tests.
+// Tests ClusterSpec payload parsing, serialization round-trips, valid modes,
+// cluster context recovery from current-deploy.json, and cluster orchestration
+// (ignored - requires external tools).
 
 use std::fs;
 
 use harness::cluster::{ClusterSpec, HelmSetting, VALID_MODES};
 
-use helpers::*;
+use super::helpers::*;
 
 // ============================================================================
-// ClusterSpec payload tests (from test_cluster_payloads.py)
+// ClusterSpec payload tests
 // ============================================================================
 
 #[test]
@@ -164,7 +142,7 @@ fn run_dir_recovers_cluster() {
 // ============================================================================
 
 #[test]
-#[ignore] // Requires k3d, kubectl, and cluster management
+#[ignore = "Requires k3d, kubectl, and cluster management"]
 fn global_zone_up_orchestration() {
     // This test verifies the full global-zone-up flow:
     // 1. Start global cluster
@@ -174,37 +152,37 @@ fn global_zone_up_orchestration() {
 }
 
 #[test]
-#[ignore] // Requires cluster tools
+#[ignore = "Requires cluster tools"]
 fn single_up_logs_stage_updates() {
     // Verify stage progress messages during single-up
 }
 
 #[test]
-#[ignore] // Requires cluster tools and metallb templates
+#[ignore = "Requires cluster tools and metallb templates"]
 fn single_up_metallb_template() {
     // Verify temporary metallb template creation for missing cluster name
 }
 
 #[test]
-#[ignore] // Requires cluster tools
+#[ignore = "Requires cluster tools"]
 fn single_up_restores_context() {
     // Verify context restoration when matching deploy exists
 }
 
 #[test]
-#[ignore] // Requires cluster tools
+#[ignore = "Requires cluster tools"]
 fn cluster_context_up_down() {
     // Test cluster-up persists context and matching down clears it
 }
 
 #[test]
-#[ignore] // Requires cluster tools and suite defaults
+#[ignore = "Requires cluster tools and suite defaults"]
 fn cluster_uses_saved_repo_root() {
     // Cluster should use repo_root saved from suite defaults
 }
 
 #[test]
-#[ignore] // Requires kumactl binary
+#[ignore = "Requires kumactl binary"]
 fn kumactl_find_repo_root() {
     // kumactl find should use repo_root from current run context
 }
