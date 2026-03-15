@@ -266,7 +266,11 @@ fn detect_gateway_version(root: &Path) -> Result<String, CliError> {
     let cap = GATEWAY_RE
         .captures(&text)
         .ok_or(CliErrorKind::GatewayVersionMissing)?;
-    Ok(format!("v{}", &cap[1]))
+    let version = cap
+        .get(1)
+        .map(|m| m.as_str())
+        .ok_or(CliErrorKind::GatewayVersionMissing)?;
+    Ok(format!("v{version}"))
 }
 
 fn gateway_install_url(version: &str) -> String {
