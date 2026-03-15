@@ -17,9 +17,12 @@ coverage_expectations:
   - consume
   - debug
 baseline_files:
-  - baseline/namespace.yaml
-  - baseline/otel-collector.yaml
-  - baseline/demo-workload.yaml
+  - path: baseline/namespace.yaml
+    clusters: all
+  - path: baseline/otel-collector.yaml
+    clusters: all
+  - path: baseline/demo-workload.yaml
+    clusters: all
 groups:
   - groups/g01-crud.md
   - groups/g02-validation.md
@@ -36,11 +39,11 @@ keep_clusters: false
 
 ## Baseline manifests
 
-| File | Purpose |
-| --- | --- |
-| baseline/namespace.yaml | Create the `kuma-demo` namespace with sidecar injection enabled. |
-| baseline/otel-collector.yaml | Deploy the shared OTel collector used by the suite. |
-| baseline/demo-workload.yaml | Deploy the demo client and echo server used by runtime checks. |
+| File | Purpose | Clusters |
+| --- | --- | --- |
+| baseline/namespace.yaml | Create the `kuma-demo` namespace with sidecar injection enabled. | all |
+| baseline/otel-collector.yaml | Deploy the shared OTel collector used by the suite. | all |
+| baseline/demo-workload.yaml | Deploy the demo client and echo server used by runtime checks. | all |
 
 ## Test groups
 
@@ -51,7 +54,7 @@ keep_clusters: false
 
 ## Execution contract
 
-- `harness preflight` materializes baseline manifests and group `## Configure` YAML once, validates them, applies baselines once, and writes the prepared-suite artifact for the active run.
+- `harness preflight` materializes baseline manifests and group `## Configure` YAML once, validates them, applies baselines to all clusters declared in each baseline's `clusters` field, and writes the prepared-suite artifact for the active run.
 - All manifests are applied through `harness apply`.
 - All cluster-interacting commands are executed through tracked harness wrappers such as `harness run ... kubectl ...`, `harness run ... kumactl ...`, or `harness record`.
 - Group files stay authoritative for `## Consume`, `## Debug`, and expected outcomes.

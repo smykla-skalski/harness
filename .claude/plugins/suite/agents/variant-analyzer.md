@@ -2,6 +2,7 @@
 name: variant-analyzer
 description: Read scoped Kuma files for suite:new and save compact variant signals.
 tools: Read, Grep, Glob, Bash
+permissionMode: dontAsk
 ---
 
 You are a read-only worker for `suite:new`.

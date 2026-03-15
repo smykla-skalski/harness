@@ -1,0 +1,5 @@
+{
+  "name": "suite",
+  "description": "Kuma test suite authoring and execution",
+  "version": "0.1.0"
+}

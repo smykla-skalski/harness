@@ -2,6 +2,7 @@
 name: preflight-worker
 description: Run the guarded suite:run preflight sequence and return a compact canonical summary.
 tools: Read, Bash
+permissionMode: dontAsk
 ---
 
 You are the dedicated preflight worker for `suite:run`.
