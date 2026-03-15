@@ -4,7 +4,7 @@ use std::{env, fs};
 
 use regex::Regex;
 
-use crate::errors::{self, CliError};
+use crate::errors::{CliError, CliErrorKind};
 use crate::exec::{kubectl, run_command};
 use crate::io::ensure_dir;
 
@@ -14,14 +14,13 @@ static GATEWAY_RE: LazyLock<Regex> =
 fn detect_version(root: &Path) -> Result<String, CliError> {
     let go_mod = root.join("go.mod");
     let text = fs::read_to_string(&go_mod).map_err(|_| {
-        errors::cli_err(
-            &errors::MISSING_FILE,
-            &[("path", &go_mod.display().to_string())],
-        )
+        CliError::from(CliErrorKind::MissingFile {
+            path: go_mod.display().to_string(),
+        })
     })?;
     let cap = GATEWAY_RE
         .captures(&text)
-        .ok_or_else(|| errors::cli_err(&errors::GATEWAY_VERSION_MISSING, &[]))?;
+        .ok_or_else(|| -> CliError { CliErrorKind::GatewayVersionMissing.into() })?;
     let version = cap[1].trim_start_matches('v');
     Ok(format!("v{version}"))
 }
@@ -46,7 +45,7 @@ pub fn execute(
             &[0, 1],
         )?;
         if result.returncode != 0 {
-            return Err(errors::cli_err(&errors::GATEWAY_CRDS_MISSING, &[]));
+            return Err(CliErrorKind::GatewayCrdsMissing.into());
         }
         println!("Gateway API CRDs are installed");
         return Ok(0);
@@ -63,13 +62,13 @@ pub fn execute(
     run_command(&["curl", "-sL", "-o", &temp_str, &url], None, None, &[0])?;
 
     // Verify the download produced a non-empty file before applying.
-    let metadata = fs::metadata(&temp_manifest)
-        .map_err(|_| errors::cli_err(&errors::GATEWAY_DOWNLOAD_EMPTY, &[("path", &temp_str)]))?;
+    let metadata = fs::metadata(&temp_manifest).map_err(|_| {
+        CliError::from(CliErrorKind::GatewayDownloadEmpty {
+            path: temp_str.clone(),
+        })
+    })?;
     if metadata.len() == 0 {
-        return Err(errors::cli_err(
-            &errors::GATEWAY_DOWNLOAD_EMPTY,
-            &[("path", &temp_str)],
-        ));
+        return Err(CliErrorKind::GatewayDownloadEmpty { path: temp_str }.into());
     }
 
     kubectl(kc.as_deref(), &["apply", "-f", &temp_str], &[0])?;

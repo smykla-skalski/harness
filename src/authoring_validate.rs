@@ -1,6 +1,6 @@
 use std::path::{Path, PathBuf};
 
-use crate::errors::{self, CliError};
+use crate::errors::{CliError, CliErrorKind};
 
 /// A manifest target for validation.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -32,13 +32,10 @@ pub fn authoring_validation_repo_root(
             }
         }
     }
-    Err(errors::cli_err(
-        &errors::MISSING_FILE,
-        &[(
-            "path",
-            "unable to locate repo root for authoring validation",
-        )],
-    ))
+    Err(CliErrorKind::MissingFile {
+        path: "unable to locate repo root for authoring validation".into(),
+    }
+    .into())
 }
 
 /// Validate suite author paths.
@@ -122,7 +119,7 @@ mod tests {
         let result = authoring_validation_repo_root(None, &[path]);
         assert!(result.is_err());
         let err = result.unwrap_err();
-        assert!(err.message.contains("unable to locate repo root"));
+        assert!(err.message().contains("unable to locate repo root"));
     }
 
     #[test]

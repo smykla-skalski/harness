@@ -1,11 +1,11 @@
 use std::fs;
 use std::path::Path;
 
+use crate::cluster::ClusterMode;
 use crate::context::RunContext;
-use crate::errors::{self, CliError};
+use crate::errors::{CliError, HookMessage};
 use crate::hook::HookResult;
 use crate::hook_payloads::HookContext;
-use crate::rules::suite_runner as rules;
 use crate::workflow::runner::{RunnerPhase, RunnerWorkflowState, SuiteFixState};
 
 /// Tracked subcommands and their expected artifact paths.
@@ -58,13 +58,11 @@ pub fn execute(ctx: &HookContext) -> Result<HookResult, CliError> {
         return Ok(HookResult::allow());
     }
     let target = missing_target(subcommand, run);
-    Ok(errors::hook_msg(
-        &errors::WARN_MISSING_ARTIFACT,
-        &[
-            ("script", &format!("harness {subcommand}")),
-            ("target", &target),
-        ],
-    ))
+    Ok(HookMessage::MissingArtifact {
+        script: format!("harness {subcommand}"),
+        target,
+    }
+    .into_result())
 }
 
 fn artifact_ready(subcommand: &str, run: &RunContext) -> bool {
@@ -128,21 +126,18 @@ fn check_cluster(words: &[String], run: &RunContext) -> HookResult {
     if target.exists() {
         return HookResult::allow();
     }
-    errors::hook_msg(
-        &errors::WARN_MISSING_ARTIFACT,
-        &[
-            ("script", &format!("harness cluster {mode}")),
-            ("target", &target.display().to_string()),
-        ],
-    )
+    HookMessage::MissingArtifact {
+        script: format!("harness cluster {mode}"),
+        target: target.display().to_string(),
+    }
+    .into_result()
 }
 
 fn cluster_mode(words: &[String]) -> Option<&str> {
-    words
-        .get(2..)?
-        .iter()
-        .find(|w| rules::UP_CLUSTER_MODES.contains(&w.as_str()))
-        .map(String::as_str)
+    words.get(2..)?.iter().find_map(|w| {
+        let mode: ClusterMode = w.parse().ok()?;
+        mode.is_up().then_some(w.as_str())
+    })
 }
 
 fn maybe_resume_suite_fix(ctx: &HookContext, words: &[String]) {
@@ -166,10 +161,11 @@ fn maybe_resume_suite_fix(ctx: &HookContext, words: &[String]) {
 }
 
 fn ready_to_resume(state: &RunnerWorkflowState) -> bool {
-    match &state.phase {
-        RunnerPhase::Triage { suite_fix, .. } => suite_fix
-            .as_ref()
-            .is_some_and(SuiteFixState::ready_to_resume),
-        _ => false,
+    if state.phase != RunnerPhase::Triage {
+        return false;
     }
+    state
+        .suite_fix
+        .as_ref()
+        .is_some_and(SuiteFixState::ready_to_resume)
 }

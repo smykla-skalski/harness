@@ -6,7 +6,7 @@ use std::fs;
 
 use harness::commands::init_run;
 use harness::context::RunMetadata;
-use harness::schema::RunStatus;
+use harness::schema::{RunStatus, Verdict};
 use harness::workflow::runner::{self as runner_workflow, RunnerPhase};
 
 use super::super::helpers::*;
@@ -49,7 +49,7 @@ fn init_creates_tracked_layout() {
     // Verify status
     let status_text = fs::read_to_string(run_dir.join("run-status.json")).unwrap();
     let status: RunStatus = serde_json::from_str(&status_text).unwrap();
-    assert_eq!(status.overall_verdict, "pending");
+    assert_eq!(status.overall_verdict, Verdict::Pending);
     assert_eq!(status.run_id, "run-1");
 
     // Verify runner state
@@ -143,33 +143,20 @@ fn init_defaults_repo_root_to_cwd() {
 
 #[test]
 fn init_preserves_user_stories_from_suite() {
+    use harness_testkit::SuiteBuilder;
+
     let tmp = tempfile::tempdir().unwrap();
     let suite_dir = tmp.path().join("suite-stories");
-    fs::create_dir_all(&suite_dir).unwrap();
-    fs::write(
-        suite_dir.join("suite.md"),
-        "\
----
-suite_id: stories.suite
-feature: stories-test
-scope: unit
-profiles: [single-zone]
-required_dependencies: [docker]
-user_stories:
-  - prepare manifests once
-  - validate all resources
-variant_decisions: []
-coverage_expectations: [configure, consume, debug]
-baseline_files: []
-groups: []
-skipped_groups: []
-keep_clusters: false
----
-
-# Stories suite
-",
-    )
-    .unwrap();
+    let _ = SuiteBuilder::new("stories.suite")
+        .feature("stories-test")
+        .scope("unit")
+        .profile("single-zone")
+        .required_dependency("docker")
+        .user_story("prepare manifests once")
+        .user_story("validate all resources")
+        .keep_clusters(false)
+        .body("# Stories suite\n")
+        .write_to(&suite_dir.join("suite.md"));
 
     let result = init_run::execute(
         &suite_dir.join("suite.md").to_string_lossy(),
@@ -194,7 +181,18 @@ keep_clusters: false
 // ============================================================================
 
 #[test]
-#[ignore = "Requires CLI binary and init command"]
 fn init_run_alias_still_works() {
-    // The init-run alias should still work
+    // harness init-run (with hyphen) should be recognized as a valid subcommand
+    // It will fail because no suite is provided, but it should not say "unrecognized subcommand"
+    let output = harness_testkit::harness_cmd()
+        .arg("init-run")
+        .output()
+        .expect("run harness init-run");
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    // Should NOT contain "unrecognized" - the alias should be recognized
+    // It may fail with a usage error (missing args), but that's expected
+    assert!(
+        !stderr.contains("unrecognized"),
+        "init-run should be a recognized alias: {stderr}"
+    );
 }

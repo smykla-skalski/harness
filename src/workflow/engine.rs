@@ -4,7 +4,7 @@ use std::process;
 
 use serde_json::Value;
 
-use crate::errors::CliError;
+use crate::errors::{CliError, CliErrorKind};
 
 /// Error for invalid state transitions.
 #[derive(Debug, thiserror::Error)]
@@ -44,29 +44,24 @@ impl VersionedJsonRepository {
         if !self.path.exists() {
             return Ok(None);
         }
-        let contents = fs::read_to_string(&self.path).map_err(|e| CliError {
-            code: "WORKFLOW_IO".into(),
-            message: format!("failed to read {}: {e}", self.path.display()),
-            exit_code: 5,
-            hint: None,
-            details: None,
+        let contents = fs::read_to_string(&self.path).map_err(|e| -> CliError {
+            CliErrorKind::WorkflowIo {
+                detail: format!("failed to read {}: {e}", self.path.display()),
+            }
+            .into()
         })?;
-        let value: Value = serde_json::from_str(&contents).map_err(|e| CliError {
-            code: "WORKFLOW_PARSE".into(),
-            message: format!("failed to parse {}: {e}", self.path.display()),
-            exit_code: 5,
-            hint: None,
-            details: None,
+        let value: Value = serde_json::from_str(&contents).map_err(|e| -> CliError {
+            CliErrorKind::WorkflowParse {
+                detail: format!("failed to parse {}: {e}", self.path.display()),
+            }
+            .into()
         })?;
         let version = value.get("schema_version").and_then(Value::as_u64);
         if version != Some(u64::from(self.current_version)) {
-            return Err(CliError {
-                code: "WORKFLOW_VERSION".into(),
-                message: format!("unsupported workflow schema version: {version:?}"),
-                exit_code: 5,
-                hint: None,
-                details: None,
-            });
+            return Err(CliErrorKind::WorkflowVersion {
+                detail: format!("{version:?}"),
+            }
+            .into());
         }
         Ok(Some(value))
     }
@@ -77,36 +72,32 @@ impl VersionedJsonRepository {
     /// Returns `CliError` on IO failure.
     pub fn save(&self, state: &Value) -> Result<(), CliError> {
         if let Some(parent) = self.path.parent() {
-            fs::create_dir_all(parent).map_err(|e| CliError {
-                code: "WORKFLOW_IO".into(),
-                message: format!("failed to create directory {}: {e}", parent.display()),
-                exit_code: 5,
-                hint: None,
-                details: None,
+            fs::create_dir_all(parent).map_err(|e| -> CliError {
+                CliErrorKind::WorkflowIo {
+                    detail: format!("failed to create directory {}: {e}", parent.display()),
+                }
+                .into()
             })?;
         }
         let tmp_name = format!("json.{}.tmp", process::id());
         let tmp_path = self.path.with_extension(tmp_name);
-        let json = serde_json::to_string_pretty(state).map_err(|e| CliError {
-            code: "WORKFLOW_SERIALIZE".into(),
-            message: format!("failed to serialize state: {e}"),
-            exit_code: 5,
-            hint: None,
-            details: None,
+        let json = serde_json::to_string_pretty(state).map_err(|e| -> CliError {
+            CliErrorKind::WorkflowSerialize {
+                detail: format!("failed to serialize state: {e}"),
+            }
+            .into()
         })?;
-        fs::write(&tmp_path, &json).map_err(|e| CliError {
-            code: "WORKFLOW_IO".into(),
-            message: format!("failed to write {}: {e}", tmp_path.display()),
-            exit_code: 5,
-            hint: None,
-            details: None,
+        fs::write(&tmp_path, &json).map_err(|e| -> CliError {
+            CliErrorKind::WorkflowIo {
+                detail: format!("failed to write {}: {e}", tmp_path.display()),
+            }
+            .into()
         })?;
-        fs::rename(&tmp_path, &self.path).map_err(|e| CliError {
-            code: "WORKFLOW_IO".into(),
-            message: format!("failed to rename to {}: {e}", self.path.display()),
-            exit_code: 5,
-            hint: None,
-            details: None,
+        fs::rename(&tmp_path, &self.path).map_err(|e| -> CliError {
+            CliErrorKind::WorkflowIo {
+                detail: format!("failed to rename to {}: {e}", self.path.display()),
+            }
+            .into()
         })?;
         Ok(())
     }
@@ -144,7 +135,7 @@ mod tests {
         let state = json!({"schema_version": 1, "phase": "bootstrap"});
         fs::write(&path, serde_json::to_string(&state).unwrap()).unwrap();
         let err = repo.load().unwrap_err();
-        assert!(err.message.contains("unsupported"));
+        assert!(err.message().contains("unsupported"));
     }
 
     #[test]

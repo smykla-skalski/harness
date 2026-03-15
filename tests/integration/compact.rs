@@ -1,11 +1,79 @@
 // Compact/fingerprint integration tests.
 // Tests FileFingerprint creation, serialization, content change detection,
-// and compact handoff commands (ignored - requires CLI binary).
+// and compact handoff lifecycle (build, save, consume, session start/stop).
+//
+// All env-dependent tests are combined into one #[test] to avoid races
+// from parallel test execution mutating the same env vars (XDG_DATA_HOME,
+// CLAUDE_SESSION_ID, HOME). See core_defs::tests for the same pattern.
 
+use std::env;
 use std::fs;
 use std::path::Path;
+use std::sync::PoisonError;
 
-use harness::compact::FileFingerprint;
+use harness::commands::{pre_compact, session_start, session_stop};
+use harness::compact::{self, AuthoringHandoff, FileFingerprint, HandoffStatus, RunnerHandoff};
+use harness::ephemeral_metallb;
+use harness_testkit::with_env_vars;
+
+use super::helpers::ENV_LOCK;
+
+// Build a runner handoff for testing.
+fn test_runner() -> RunnerHandoff {
+    RunnerHandoff {
+        run_dir: "/runs/r1".to_string(),
+        run_id: "r1".to_string(),
+        suite_id: Some("test.suite".to_string()),
+        profile: Some("single-zone".to_string()),
+        suite_path: Some("/suites/s1/suite.md".to_string()),
+        runner_phase: Some("execution".to_string()),
+        verdict: Some("pending".to_string()),
+        completed_at: None,
+        last_state_capture: None,
+        next_action: "run next group".to_string(),
+        executed_groups: vec!["g01".to_string()],
+        remaining_groups: vec!["g02".to_string(), "g03".to_string()],
+        state_paths: vec![
+            "/runs/r1/run-status.json".to_string(),
+            "/runs/r1/suite-runner-state.json".to_string(),
+        ],
+    }
+}
+
+// Build an authoring handoff for testing.
+fn test_authoring() -> AuthoringHandoff {
+    AuthoringHandoff {
+        suite_dir: "/suites/s1".to_string(),
+        next_action: "pre-write review loop".to_string(),
+        author_phase: Some("prewrite_review".to_string()),
+        suite_name: Some("motb-core".to_string()),
+        feature: Some("motb".to_string()),
+        mode: Some("interactive".to_string()),
+        saved_payloads: vec!["inventory".to_string(), "proposal".to_string()],
+        suite_files: vec!["suite.md".to_string()],
+        state_paths: vec!["/suites/s1/state.json".to_string()],
+    }
+}
+
+// Set up an isolated env for compact tests.
+//
+// Creates the `.claude/skills/harness` wrapper so bootstrap doesn't fail.
+// Returns `(xdg_dir, project_dir)` as temp dirs.
+fn setup_env() -> (tempfile::TempDir, tempfile::TempDir) {
+    let xdg = tempfile::tempdir().unwrap();
+    let project = tempfile::tempdir().unwrap();
+
+    // bootstrap expects .claude/skills/harness to exist
+    let skills_dir = project.path().join(".claude").join("skills");
+    fs::create_dir_all(&skills_dir).unwrap();
+    fs::write(skills_dir.join("harness"), "#!/bin/sh\necho ok\n").unwrap();
+
+    // bootstrap also needs a writable bin dir
+    let bin_dir = xdg.path().join("bin");
+    fs::create_dir_all(&bin_dir).unwrap();
+
+    (xdg, project)
+}
 
 // ============================================================================
 // FileFingerprint tests (pure unit, no external deps)
@@ -58,108 +126,366 @@ fn file_fingerprint_detects_content_change() {
 }
 
 // ============================================================================
-// Compact handoff tests (require CLI binary and project/session state)
+// Compact handoff tests
+//
+// All env-dependent tests live in one function to prevent env var races.
+// Each logical test is a standalone helper called sequentially inside a
+// single with_env_vars scope.
 // ============================================================================
 
-#[test]
-#[ignore = "Requires CLI binary with pre-compact command"]
-fn build_compact_includes_runner() {
-    // build_compact_handoff should include suite_runner state
+// build_compact_handoff returns runner: None by default.
+// Attach a runner section, save, reload, verify.
+fn check_build_compact_includes_runner(project: &Path) {
+    let mut handoff = compact::build_compact_handoff(project).expect("build should succeed");
+    assert!(handoff.runner.is_none(), "default build has no runner");
+
+    handoff.runner = Some(test_runner());
+    let _ = compact::save_compact_handoff(project, &handoff).expect("save should succeed");
+
+    let loaded = compact::load_latest_compact_handoff(project)
+        .expect("load should succeed")
+        .expect("should find saved handoff");
+    assert!(loaded.has_sections());
+    let runner = loaded.runner.expect("runner should be present");
+    assert_eq!(runner.run_id, "r1");
+    assert_eq!(runner.remaining_groups, vec!["g02", "g03"]);
+}
+
+// Build from project dir, save with runner, reload. The
+//hashing is stable for the same canonicalized path.
+fn check_build_compact_worktree_project(project: &Path) {
+    let mut handoff = compact::build_compact_handoff(project).expect("build");
+    handoff.runner = Some(test_runner());
+    let _ = compact::save_compact_handoff(project, &handoff).expect("save");
+
+    let latest = compact::compact_latest_path(project);
+    assert!(
+        latest.exists(),
+        "latest.json should exist at {}",
+        latest.display()
+    );
+
+    let loaded = compact::load_latest_compact_handoff(project)
+        .expect("load")
+        .expect("should exist");
+    assert_eq!(loaded.runner.as_ref().unwrap().run_id, "r1");
+}
+
+// Attach an authoring section, save, reload, verify payloads.
+fn check_build_compact_includes_author(project: &Path) {
+    let mut handoff = compact::build_compact_handoff(project).expect("build");
+    handoff.authoring = Some(test_authoring());
+    let _ = compact::save_compact_handoff(project, &handoff).expect("save");
+
+    let loaded = compact::load_latest_compact_handoff(project)
+        .expect("load")
+        .expect("should exist");
+    assert!(loaded.has_sections());
+    let auth = loaded.authoring.expect("authoring should be present");
+    assert_eq!(auth.suite_name.as_deref(), Some("motb-core"));
+    assert_eq!(auth.saved_payloads, vec!["inventory", "proposal"]);
+}
+
+// Authoring round-trips with mode/feature set.
+fn check_build_compact_author_fallback(project: &Path) {
+    let mut handoff = compact::build_compact_handoff(project).expect("build");
+    let mut auth = test_authoring();
+    auth.mode = Some("bypass".to_string());
+    auth.feature = Some("fallback-feature".to_string());
+    handoff.authoring = Some(auth);
+    let _ = compact::save_compact_handoff(project, &handoff).expect("save");
+
+    let loaded = compact::load_latest_compact_handoff(project)
+        .expect("load")
+        .expect("should exist");
+    let auth = loaded.authoring.expect("authoring present");
+    assert_eq!(auth.mode.as_deref(), Some("bypass"));
+    assert_eq!(auth.feature.as_deref(), Some("fallback-feature"));
+}
+
+// Save writes latest + history. Consume marks consumed.
+fn check_save_consume_compact_handoff(project: &Path) {
+    let handoff = compact::build_compact_handoff(project).expect("build");
+    let _ = compact::save_compact_handoff(project, &handoff).expect("save");
+
+    let latest = compact::compact_latest_path(project);
+    assert!(latest.exists(), "latest.json should exist");
+
+    let history_dir = compact::compact_project_dir(project).join("history");
+    assert!(history_dir.is_dir(), "history dir should exist");
+    let history_count = fs::read_dir(&history_dir).unwrap().count();
+    assert!(history_count >= 1, "should have at least 1 history entry");
+
+    let pending = compact::pending_compact_handoff(project);
+    assert!(pending.is_some(), "should be pending");
+
+    let consumed = compact::consume_compact_handoff(project, pending.unwrap()).expect("consume");
+    assert_eq!(consumed.status, HandoffStatus::Consumed);
+    assert!(consumed.consumed_at.is_some());
+
+    let after = compact::pending_compact_handoff(project);
+    assert!(after.is_none(), "should not be pending after consume");
+
+    let reloaded = compact::load_latest_compact_handoff(project)
+        .expect("load")
+        .expect("still exists");
+    assert_eq!(reloaded.status, HandoffStatus::Consumed);
+}
+
+// pre_compact::execute creates the latest.json file.
+fn check_pre_compact_persists(project: &Path) {
+    let result = pre_compact::execute(Some(&project.to_string_lossy()));
+    assert!(result.is_ok(), "pre-compact should succeed: {result:?}");
+    assert_eq!(result.unwrap(), 0);
+
+    let latest = compact::compact_latest_path(project);
+    assert!(latest.exists(), "latest.json should be persisted");
+
+    let loaded = compact::load_latest_compact_handoff(project)
+        .expect("load")
+        .expect("should exist");
+    assert_eq!(loaded.status, HandoffStatus::Pending);
+}
+
+// Pre-save a pending handoff with runner, session-start
+//should consume it.
+fn check_session_start_compact_hydrates(project: &Path) {
+    let mut handoff = compact::build_compact_handoff(project).expect("build");
+    handoff.runner = Some(test_runner());
+    let _ = compact::save_compact_handoff(project, &handoff).expect("save");
+
+    let result = session_start::execute(Some(&project.to_string_lossy()));
+    assert!(result.is_ok(), "session-start should succeed: {result:?}");
+
+    let loaded = compact::load_latest_compact_handoff(project)
+        .expect("load")
+        .expect("should exist");
+    assert_eq!(loaded.status, HandoffStatus::Consumed);
+    assert!(loaded.consumed_at.is_some());
+}
+
+// Save handoff with runner, session-start consumes it.
+fn check_session_start_compact_worktree(project: &Path) {
+    let mut handoff = compact::build_compact_handoff(project).expect("build");
+    handoff.runner = Some(test_runner());
+    let _ = compact::save_compact_handoff(project, &handoff).expect("save");
+
+    let result = session_start::execute(Some(&project.to_string_lossy()));
+    assert!(result.is_ok(), "session-start should succeed: {result:?}");
+
+    let pending = compact::pending_compact_handoff(project);
+    assert!(pending.is_none(), "should be consumed after session-start");
+}
+
+// Save an aborted runner handoff with remaining groups.
+// Hydration context should include resume guidance.
+fn check_session_start_compact_aborted_resume(project: &Path) {
+    let mut handoff = compact::build_compact_handoff(project).expect("build");
+    let mut runner = test_runner();
+    runner.runner_phase = Some("aborted".to_string());
+    runner.verdict = Some("aborted".to_string());
+    handoff.runner = Some(runner);
+    let _ = compact::save_compact_handoff(project, &handoff).expect("save");
+
+    let pending = compact::pending_compact_handoff(project).expect("should be pending");
+    let diverged = compact::verify_fingerprints(&pending);
+    let ctx = compact::render_hydration_context(&pending, &diverged);
+    assert!(
+        ctx.contains("harness runner-state --event resume-run"),
+        "should include resume guidance: {ctx}"
+    );
+
+    let result = session_start::execute(Some(&project.to_string_lossy()));
+    assert!(result.is_ok());
+
+    let after = compact::pending_compact_handoff(project);
+    assert!(after.is_none());
+}
+
+// Save handoff with authoring, verify hydration context
+//includes authoring details, session-start consumes it.
+fn check_session_start_compact_restores_author(project: &Path) {
+    let mut handoff = compact::build_compact_handoff(project).expect("build");
+    handoff.authoring = Some(test_authoring());
+    let _ = compact::save_compact_handoff(project, &handoff).expect("save");
+
+    let pending = compact::pending_compact_handoff(project).expect("should be pending");
+    let ctx = compact::render_hydration_context(&pending, &[]);
+    assert!(
+        ctx.contains("suite-author:"),
+        "should have authoring section"
+    );
+    assert!(ctx.contains("motb-core"), "should mention suite name");
+
+    let result = session_start::execute(Some(&project.to_string_lossy()));
+    assert!(result.is_ok());
+
+    let after = compact::pending_compact_handoff(project);
+    assert!(after.is_none());
+}
+
+// Save handoff with fingerprints, modify the file, verify
+// that verify_fingerprints detects the divergence.
+fn check_session_start_compact_divergence_warning(project: &Path) {
+    let tracked_file = project.join("tracked.txt");
+    fs::write(&tracked_file, "original content").unwrap();
+    let fp = FileFingerprint::from_path("tracked", &tracked_file);
+    assert!(fp.exists);
+
+    let mut handoff = compact::build_compact_handoff(project).expect("build");
+    handoff.fingerprints = vec![fp];
+    let _ = compact::save_compact_handoff(project, &handoff).expect("save");
+
+    fs::write(&tracked_file, "modified content").unwrap();
+
+    let loaded = compact::load_latest_compact_handoff(project)
+        .expect("load")
+        .expect("should exist");
+    let diverged = compact::verify_fingerprints(&loaded);
+    assert_eq!(diverged.len(), 1, "should detect 1 diverged file");
+    assert!(
+        diverged[0].contains("tracked.txt"),
+        "diverged path should reference tracked.txt: {:?}",
+        diverged[0]
+    );
+
+    let ctx = compact::render_hydration_context(&loaded, &diverged);
+    assert!(
+        ctx.contains("WARNING: the saved handoff diverged"),
+        "should warn about divergence: {ctx}"
+    );
+}
+
+// Pre-save a pending handoff, session-start consumes it.
+fn check_session_start_restores_project(project: &Path) {
+    let mut handoff = compact::build_compact_handoff(project).expect("build");
+    handoff.runner = Some(test_runner());
+    let _ = compact::save_compact_handoff(project, &handoff).expect("save");
+
+    let result = session_start::execute(Some(&project.to_string_lossy()));
+    assert!(result.is_ok());
+
+    let loaded = compact::load_latest_compact_handoff(project)
+        .expect("load")
+        .expect("should exist");
+    assert_eq!(loaded.status, HandoffStatus::Consumed);
+    assert!(loaded.runner.is_some(), "runner should still be in data");
+}
+
+// Save with runner and worktree trigger, start, verify consumed.
+fn check_session_start_restores_worktree(project: &Path) {
+    let mut handoff = compact::build_compact_handoff(project).expect("build");
+    handoff.runner = Some(test_runner());
+    handoff.trigger = Some("worktree-switch".to_string());
+    let _ = compact::save_compact_handoff(project, &handoff).expect("save");
+
+    let result = session_start::execute(Some(&project.to_string_lossy()));
+    assert!(result.is_ok());
+
+    let loaded = compact::load_latest_compact_handoff(project)
+        .expect("load")
+        .expect("should exist");
+    assert_eq!(loaded.status, HandoffStatus::Consumed);
+    assert_eq!(loaded.trigger.as_deref(), Some("worktree-switch"));
+}
+
+// Save handoff under this project, verify it persists across
+//the scope (project-keyed, not session-keyed).
+fn check_session_start_cross_project(project: &Path) {
+    let mut handoff = compact::build_compact_handoff(project).expect("build");
+    handoff.runner = Some(test_runner());
+    let _ = compact::save_compact_handoff(project, &handoff).expect("save");
+
+    let pending = compact::pending_compact_handoff(project);
+    assert!(
+        pending.is_some(),
+        "handoff should be pending for same project"
+    );
+
+    let result = session_start::execute(Some(&project.to_string_lossy()));
+    assert!(result.is_ok());
+
+    let after = compact::pending_compact_handoff(project);
+    assert!(after.is_none(), "should be consumed");
+}
+
+// No pending handoff - session-start returns Ok(0).
+// Verify ephemeral_metallb APIs are accessible.
+fn check_session_start_metallb_templates(project: &Path) {
+    let result = session_start::execute(Some(&project.to_string_lossy()));
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap(), 0);
+
+    let run_dir = project.join("test-run");
+    fs::create_dir_all(&run_dir).unwrap();
+    let cleaned = ephemeral_metallb::cleanup_templates(&run_dir);
+    assert!(cleaned.is_ok());
+    assert!(cleaned.unwrap().is_empty());
+}
+
+// session_stop is currently a no-op. Verify Ok(0).
+fn check_session_stop_metallb_cleanup(project: &Path) {
+    let result = session_stop::execute(Some(&project.to_string_lossy()));
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap(), 0);
+}
+
+// Consume a handoff first, then verify pending returns None
+//and session-start does not replay it.
+fn check_session_start_no_replay(project: &Path) {
+    let handoff = compact::build_compact_handoff(project).expect("build");
+    let _ = compact::save_compact_handoff(project, &handoff).expect("save");
+
+    let pending = compact::pending_compact_handoff(project).expect("should be pending");
+    let _ = compact::consume_compact_handoff(project, pending).expect("consume");
+
+    let after = compact::pending_compact_handoff(project);
+    assert!(after.is_none(), "consumed handoff should not be pending");
+
+    let result = session_start::execute(Some(&project.to_string_lossy()));
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap(), 0);
+
+    let loaded = compact::load_latest_compact_handoff(project)
+        .expect("load")
+        .expect("should exist");
+    assert_eq!(loaded.status, HandoffStatus::Consumed);
 }
 
 #[test]
-#[ignore = "Requires CLI binary and worktree project"]
-fn build_compact_worktree_project() {
-    // build_compact_handoff should find runner from worktree project state
-}
+fn compact_handoff_lifecycle() {
+    let _lock = ENV_LOCK.lock().unwrap_or_else(PoisonError::into_inner);
+    let (xdg, project) = setup_env();
+    let orig_path = env::var("PATH").unwrap_or_default();
+    let path_with_bin = format!("{}:{orig_path}", xdg.path().join("bin").display());
 
-#[test]
-#[ignore = "Requires CLI binary and authoring session"]
-fn build_compact_includes_author() {
-    // build_compact_handoff should include suite_author saved payloads
-}
-
-#[test]
-#[ignore = "Requires CLI binary and CWD-scoped authoring"]
-fn build_compact_author_fallback() {
-    // build_compact_handoff reads author payloads from fallback scope
-}
-
-#[test]
-#[ignore = "Requires CLI binary"]
-fn save_consume_compact_handoff() {
-    // save_compact_handoff writes latest, history, and session copy.
-    // consume_compact_handoff marks consumed.
-}
-
-#[test]
-#[ignore = "Requires CLI binary"]
-fn pre_compact_persists() {
-    // harness pre-compact should persist pending handoff
-}
-
-#[test]
-#[ignore = "Requires CLI binary"]
-fn session_start_compact_hydrates() {
-    // harness session-start --source compact should emit hydration context
-}
-
-#[test]
-#[ignore = "Requires CLI binary and worktree"]
-fn session_start_compact_worktree() {
-    // session-start compact restores runner from worktree project state
-}
-
-#[test]
-#[ignore = "Requires CLI binary"]
-fn session_start_compact_aborted_resume() {
-    // session-start compact guides aborted run resume without manual edits
-}
-
-#[test]
-#[ignore = "Requires CLI binary"]
-fn session_start_compact_restores_author() {
-    // session-start compact restores suite author state for new session
-}
-
-#[test]
-#[ignore = "Requires CLI binary"]
-fn session_start_compact_divergence_warning() {
-    // session-start compact warns when saved files diverge from live state
-}
-
-#[test]
-#[ignore = "Requires CLI binary"]
-fn session_start_restores_project() {
-    // session-start restores active run from project state
-}
-
-#[test]
-#[ignore = "Requires CLI binary and worktree"]
-fn session_start_restores_worktree() {
-    // session-start restores active run from related worktree project state
-}
-
-#[test]
-#[ignore = "Requires CLI binary and multi-project setup"]
-fn session_start_cross_project() {
-    // session-start restores project run when current session points elsewhere
-}
-
-#[test]
-#[ignore = "Requires CLI binary and metallb templates"]
-fn session_start_metallb_templates() {
-    // session-start restores temporary metallb templates for pending run
-}
-
-#[test]
-#[ignore = "Requires CLI binary and metallb templates"]
-fn session_stop_metallb_cleanup() {
-    // session-stop cleans temporary metallb templates for pending run
-}
-
-#[test]
-#[ignore = "Requires CLI binary"]
-fn session_start_no_replay() {
-    // session-start compact does not replay consumed handoff
+    unsafe {
+        with_env_vars(
+            &[
+                ("XDG_DATA_HOME", Some(&xdg.path().to_string_lossy())),
+                ("CLAUDE_SESSION_ID", Some("compact-lifecycle")),
+                ("HOME", Some(&xdg.path().to_string_lossy())),
+                ("PATH", Some(&path_with_bin)),
+            ],
+            || {
+                check_build_compact_includes_runner(project.path());
+                check_build_compact_worktree_project(project.path());
+                check_build_compact_includes_author(project.path());
+                check_build_compact_author_fallback(project.path());
+                check_save_consume_compact_handoff(project.path());
+                check_pre_compact_persists(project.path());
+                check_session_start_compact_hydrates(project.path());
+                check_session_start_compact_worktree(project.path());
+                check_session_start_compact_aborted_resume(project.path());
+                check_session_start_compact_restores_author(project.path());
+                check_session_start_compact_divergence_warning(project.path());
+                check_session_start_restores_project(project.path());
+                check_session_start_restores_worktree(project.path());
+                check_session_start_cross_project(project.path());
+                check_session_start_metallb_templates(project.path());
+                check_session_stop_metallb_cleanup(project.path());
+                check_session_start_no_replay(project.path());
+            },
+        );
+    }
 }

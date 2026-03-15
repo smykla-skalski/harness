@@ -1,3 +1,6 @@
+[workspace]
+members = [".", "testkit"]
+
 [package]
 name = "harness"
 version = "0.1.0"
@@ -24,6 +27,7 @@ assert_cmd = "2.2.0"
 predicates = "3.1.4"
 tempfile = "3.27.0"
 insta = "1.46.3"
+harness-testkit = { path = "testkit" }
 
 [lints.clippy]
 pedantic = { level = "deny", priority = 1 }

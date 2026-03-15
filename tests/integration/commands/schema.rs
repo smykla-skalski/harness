@@ -4,7 +4,7 @@
 
 use std::fs;
 
-use harness::schema::{GroupSpec, RunCounts, RunStatus, SuiteSpec};
+use harness::schema::{GroupSpec, RunCounts, RunStatus, SuiteSpec, Verdict};
 
 use super::super::helpers::*;
 
@@ -31,9 +31,9 @@ fn suite_spec_rejects_missing_frontmatter() {
     fs::write(&path, "# Just a heading\n\nSome body.\n").unwrap();
     let err = SuiteSpec::from_markdown(&path).unwrap_err();
     assert!(
-        err.message.contains("frontmatter"),
+        err.message().contains("frontmatter"),
         "error: {}",
-        err.message
+        err.message()
     );
 }
 
@@ -41,9 +41,14 @@ fn suite_spec_rejects_missing_frontmatter() {
 fn suite_spec_rejects_missing_fields() {
     let tmp = tempfile::tempdir().unwrap();
     let path = tmp.path().join("partial.md");
+    // Minimal suite with only suite_id - missing feature, scope, keep_clusters
     fs::write(&path, "---\nsuite_id: x\n---\n\nBody.\n").unwrap();
     let err = SuiteSpec::from_markdown(&path).unwrap_err();
-    assert!(err.message.contains("missing"), "error: {}", err.message);
+    assert!(
+        err.message().contains("missing"),
+        "error: {}",
+        err.message()
+    );
 }
 
 // ============================================================================
@@ -67,13 +72,18 @@ fn group_spec_loads_from_valid_markdown() {
 fn group_spec_rejects_missing_sections() {
     let tmp = tempfile::tempdir().unwrap();
     let path = tmp.path().join("bad-group.md");
+    // Group with only Configure - missing Consume and Debug sections
     fs::write(
         &path,
         "---\ngroup_id: g01\nstory: test\n---\n\n## Configure\n\nOnly one section.\n",
     )
     .unwrap();
     let err = GroupSpec::from_markdown(&path).unwrap_err();
-    assert!(err.message.contains("missing"), "error: {}", err.message);
+    assert!(
+        err.message().contains("missing"),
+        "error: {}",
+        err.message()
+    );
 }
 
 // ============================================================================
@@ -109,7 +119,7 @@ fn run_status_load_and_parse() {
     let tmp = tempfile::tempdir().unwrap();
     let run_dir = init_run(tmp.path(), "run-status-test", "single-zone");
     let status = read_run_status(&run_dir);
-    assert_eq!(status.overall_verdict, "pending");
+    assert_eq!(status.overall_verdict, Verdict::Pending);
     assert_eq!(status.run_id, "run-status-test");
     assert!(status.notes.is_empty());
 }
@@ -119,11 +129,11 @@ fn run_status_write_and_reload() {
     let tmp = tempfile::tempdir().unwrap();
     let run_dir = init_run(tmp.path(), "run-status-rw", "single-zone");
     let mut status = read_run_status(&run_dir);
-    status.overall_verdict = "pass".to_string();
+    status.overall_verdict = Verdict::Pass;
     status.notes.push("test note".to_string());
     write_run_status(&run_dir, &status);
     let reloaded = read_run_status(&run_dir);
-    assert_eq!(reloaded.overall_verdict, "pass");
+    assert_eq!(reloaded.overall_verdict, Verdict::Pass);
     assert_eq!(reloaded.notes, vec!["test note"]);
 }
 
@@ -134,7 +144,7 @@ fn run_status_executed_group_ids() {
         suite_id: "s".to_string(),
         profile: "single-zone".to_string(),
         started_at: "now".to_string(),
-        overall_verdict: "pending".to_string(),
+        overall_verdict: Verdict::Pending,
         completed_at: None,
         counts: RunCounts::default(),
         executed_groups: vec![

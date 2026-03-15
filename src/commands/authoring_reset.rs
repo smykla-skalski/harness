@@ -1,7 +1,7 @@
 use std::fs;
 
 use crate::authoring::authoring_workspace_dir;
-use crate::errors::{self, CliError};
+use crate::errors::CliError;
 
 /// Reset suite-author workspace.
 ///
@@ -10,7 +10,7 @@ use crate::errors::{self, CliError};
 pub fn execute() -> Result<i32, CliError> {
     let workspace = authoring_workspace_dir();
     if workspace.exists() {
-        fs::remove_dir_all(&workspace).map_err(errors::io_err)?;
+        fs::remove_dir_all(&workspace)?;
     }
     Ok(0)
 }

@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use crate::cli::{ReportCommand, RunDirArgs};
 use crate::context::{RunContext, RunLookup};
-use crate::errors::{self, CliError};
+use crate::errors::{CliError, CliErrorKind};
 use crate::resolve::resolve_run_directory;
 use crate::rules::suite_runner::{REPORT_CODE_BLOCK_LIMIT, REPORT_LINE_LIMIT};
 use crate::schema::RunReport;
@@ -35,8 +35,11 @@ pub fn execute(cmd: &ReportCommand) -> Result<i32, CliError> {
 }
 
 fn run_check(report_path: Option<&str>) -> Result<i32, CliError> {
-    let path = report_path.map(PathBuf::from).ok_or_else(|| {
-        errors::cli_err(&errors::MISSING_RUN_CONTEXT_VALUE, &[("field", "report")])
+    let path = report_path.map(PathBuf::from).ok_or_else(|| -> CliError {
+        CliErrorKind::MissingRunContextValue {
+            field: "report".into(),
+        }
+        .into()
     })?;
 
     let report = RunReport::from_markdown(&path)?;
@@ -45,22 +48,18 @@ fn run_check(report_path: Option<&str>) -> Result<i32, CliError> {
     let code_blocks = body.matches("```").count() / 2;
 
     if line_count > REPORT_LINE_LIMIT {
-        return Err(errors::cli_err(
-            &errors::REPORT_LINE_LIMIT,
-            &[
-                ("count", &line_count.to_string()),
-                ("limit", &REPORT_LINE_LIMIT.to_string()),
-            ],
-        ));
+        return Err(CliErrorKind::ReportLineLimit {
+            count: line_count.to_string(),
+            limit: REPORT_LINE_LIMIT.to_string(),
+        }
+        .into());
     }
     if code_blocks > REPORT_CODE_BLOCK_LIMIT {
-        return Err(errors::cli_err(
-            &errors::REPORT_CODE_BLOCK_LIMIT,
-            &[
-                ("count", &code_blocks.to_string()),
-                ("limit", &REPORT_CODE_BLOCK_LIMIT.to_string()),
-            ],
-        ));
+        return Err(CliErrorKind::ReportCodeBlockLimit {
+            count: code_blocks.to_string(),
+            limit: REPORT_CODE_BLOCK_LIMIT.to_string(),
+        }
+        .into());
     }
 
     println!("report is compact enough");
@@ -85,10 +84,7 @@ fn run_group(
     let run_dir = resolve_run_directory(&lookup)?.run_dir;
 
     if evidence.is_empty() && evidence_label.is_empty() && capture_label.is_none() {
-        return Err(errors::cli_err(
-            &errors::REPORT_GROUP_EVIDENCE_REQUIRED,
-            &[],
-        ));
+        return Err(CliErrorKind::ReportGroupEvidenceRequired.into());
     }
 
     let ctx = RunContext::from_run_dir(&run_dir)?;

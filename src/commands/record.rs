@@ -6,7 +6,7 @@ use regex::Regex;
 
 use crate::cli::RunDirArgs;
 use crate::core_defs::utc_now;
-use crate::errors::{self, CliError};
+use crate::errors::{CliError, CliErrorKind};
 use crate::io::{append_markdown_row, ensure_dir, write_text};
 
 static SLUGIFY_RE: LazyLock<Regex> =
@@ -36,13 +36,10 @@ pub fn execute(
         command.remove(0);
     }
     if command.is_empty() {
-        return Err(CliError {
-            code: "USAGE".into(),
-            message: "missing command".to_string(),
-            exit_code: 1,
-            hint: None,
-            details: None,
-        });
+        return Err(CliErrorKind::UsageError {
+            detail: "missing command".into(),
+        }
+        .into());
     }
 
     let run_dir = super::resolve_run_dir(run_dir_args).ok();
@@ -70,13 +67,13 @@ pub fn execute(
 
     let (artifact, command_log) = if let Some(ref rd) = run_dir {
         let commands_dir = rd.join("commands");
-        ensure_dir(&commands_dir).map_err(errors::io_err)?;
+        ensure_dir(&commands_dir)?;
         let artifact = commands_dir.join(format!("{artifact_name}.txt"));
         let log = commands_dir.join("command-log.md");
         (artifact, Some(log))
     } else {
         let tmp = env::temp_dir().join("harness").join("run");
-        ensure_dir(&tmp).map_err(errors::io_err)?;
+        ensure_dir(&tmp)?;
         (tmp.join(format!("{artifact_name}.txt")), None)
     };
 
@@ -111,9 +108,8 @@ pub fn execute(
         return Ok(returncode);
     }
 
-    Err(errors::cli_err_with_details(
-        &errors::COMMAND_FAILED,
-        &[("command", &shell_words::join(&command))],
-        &format!("Recorded command output: {}", artifact.display()),
-    ))
+    Err(CliErrorKind::CommandFailed {
+        command: shell_words::join(&command),
+    }
+    .with_details(format!("Recorded command output: {}", artifact.display())))
 }

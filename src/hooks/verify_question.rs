@@ -1,4 +1,4 @@
-use crate::errors::{self, CliError};
+use crate::errors::{CliError, HookMessage};
 use crate::hook::HookResult;
 use crate::hook_payloads::HookContext;
 use crate::rules::suite_runner as runner_rules;
@@ -37,18 +37,13 @@ fn handle_suite_runner(ctx: &HookContext) -> HookResult {
         return HookResult::allow();
     }
     if let Some(ref state) = ctx.runner_state
-        && !matches!(&state.phase, RunnerPhase::Triage { .. })
+        && state.phase != RunnerPhase::Triage
     {
-        return errors::hook_msg(
-            &errors::DENY_RUNNER_FLOW_REQUIRED,
-            &[
-                ("action", "apply the suite-fix answer"),
-                (
-                    "details",
-                    "manifest-fix answers are only valid during failure triage",
-                ),
-            ],
-        );
+        return HookMessage::RunnerFlowRequired {
+            action: "apply the suite-fix answer".into(),
+            details: "manifest-fix answers are only valid during failure triage".into(),
+        }
+        .into_result();
     }
     HookResult::allow()
 }
@@ -62,13 +57,10 @@ fn handle_suite_author(ctx: &HookContext) -> HookResult {
         return HookResult::allow();
     }
     if ctx.author_state.is_none() {
-        return errors::hook_msg(
-            &errors::DENY_APPROVAL_STATE_INVALID,
-            &[(
-                "details",
-                "author state is missing; cannot apply gate answer",
-            )],
-        );
+        return HookMessage::ApprovalStateInvalid {
+            details: "author state is missing; cannot apply gate answer".into(),
+        }
+        .into_result();
     }
     HookResult::allow()
 }

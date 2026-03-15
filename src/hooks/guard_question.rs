@@ -1,4 +1,4 @@
-use crate::errors::{self, CliError};
+use crate::errors::{CliError, HookMessage};
 use crate::hook::HookResult;
 use crate::hook_payloads::{AskUserQuestionPrompt, HookContext};
 use crate::kubectl_validate::kubectl_validate_prompt_required;
@@ -32,18 +32,13 @@ fn guard_suite_runner(ctx: &HookContext, prompts: &[AskUserQuestionPrompt]) -> H
         if let Some(ref state) = ctx.runner_state {
             let (allowed, reason) = can_ask_manifest_fix(state);
             if !allowed {
-                return errors::hook_msg(
-                    &errors::DENY_RUNNER_FLOW_REQUIRED,
-                    &[
-                        ("action", "ask the suite-fix gate"),
-                        (
-                            "details",
-                            reason.unwrap_or(
-                                "enter failure triage before asking how to repair the suite",
-                            ),
-                        ),
-                    ],
-                );
+                return HookMessage::RunnerFlowRequired {
+                    action: "ask the suite-fix gate".into(),
+                    details: reason
+                        .unwrap_or("enter failure triage before asking how to repair the suite")
+                        .into(),
+                }
+                .into_result();
             }
         }
         return HookResult::allow();
@@ -57,48 +52,40 @@ fn guard_suite_author(ctx: &HookContext, prompts: &[AskUserQuestionPrompt]) -> H
         if kubectl_validate_prompt_required() {
             return HookResult::allow();
         }
-        return errors::hook_msg(
-            &errors::DENY_VALIDATOR_GATE_UNEXPECTED,
-            &[(
-                "details",
+        return HookMessage::ValidatorGateUnexpected {
+            details:
                 "The local validator is already installed or a prior decision is already saved. \
-                 Do not ask the install gate again.",
-            )],
-        );
+                      Do not ask the install gate again."
+                    .into(),
+        }
+        .into_result();
     }
     // Block non-install prompts if install gate is pending.
     if kubectl_validate_prompt_required() {
-        return errors::hook_msg(
-            &errors::DENY_VALIDATOR_GATE_REQUIRED,
-            &[(
-                "details",
-                "Complete the local validator install decision first.",
-            )],
-        );
+        return HookMessage::ValidatorGateRequired {
+            details: "Complete the local validator install decision first.".into(),
+        }
+        .into_result();
     }
     // Check canonical review gate prompts.
     if let Some(gate) = classify_canonical_gate(prompts) {
         let Some(state) = &ctx.author_state else {
-            return errors::hook_msg(
-                &errors::DENY_APPROVAL_STATE_INVALID,
-                &[("details", "author state is missing")],
-            );
+            return HookMessage::ApprovalStateInvalid {
+                details: "author state is missing".into(),
+            }
+            .into_result();
         };
         if state.mode == ApprovalMode::Bypass {
-            return errors::hook_msg(
-                &errors::DENY_APPROVAL_STATE_INVALID,
-                &[("details", "bypass mode forbids canonical review prompts")],
-            );
+            return HookMessage::ApprovalStateInvalid {
+                details: "bypass mode forbids canonical review prompts".into(),
+            }
+            .into_result();
         }
-        let (allowed, reason) = can_request_gate(state, gate);
-        if !allowed {
-            return errors::hook_msg(
-                &errors::DENY_APPROVAL_STATE_INVALID,
-                &[(
-                    "details",
-                    reason.unwrap_or("suite-author is not ready for that review gate"),
-                )],
-            );
+        if let Err(reason) = can_request_gate(state, gate) {
+            return HookMessage::ApprovalStateInvalid {
+                details: reason.into(),
+            }
+            .into_result();
         }
         return HookResult::allow();
     }
@@ -142,12 +129,14 @@ fn classify_canonical_gate(prompts: &[AskUserQuestionPrompt]) -> Option<ReviewGa
 }
 
 fn can_ask_manifest_fix(state: &RunnerWorkflowState) -> (bool, Option<&'static str>) {
-    if matches!(&state.phase, RunnerPhase::Triage { .. }) {
-        (true, None)
-    } else {
-        (
+    if state.phase != RunnerPhase::Triage {
+        return (
             false,
             Some("enter failure triage before asking how to repair the suite"),
-        )
+        );
     }
+    if state.failure.is_none() {
+        return (false, Some("no failure recorded for triage"));
+    }
+    (true, None)
 }

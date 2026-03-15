@@ -7,8 +7,8 @@
 use harness::hook::Decision;
 use harness::hooks::guard_write;
 use harness::workflow::runner::{
-    self as runner_workflow, FailureKind, FailureState, ManifestFixDecision, RunnerEvent,
-    RunnerPhase, RunnerWorkflowState, SuiteFixState,
+    self as runner_workflow, FailureKind, FailureState, ManifestFixDecision, PreflightState,
+    PreflightStatus, RunnerPhase, RunnerWorkflowState, SuiteFixState,
 };
 
 use super::super::helpers::*;
@@ -127,23 +127,25 @@ fn guard_write_suite_fix_allows_approved_path() {
     let suite_dir = tmp.path().join("suite");
     let group_path = suite_dir.join("groups").join("g01.md");
     let state = RunnerWorkflowState {
-        schema_version: 2,
-        phase: RunnerPhase::Triage {
-            failure: FailureState {
-                kind: FailureKind::Manifest,
-                suite_target: Some("groups/g01.md".to_string()),
-                message: Some("validation failed".to_string()),
-            },
-            suite_fix: Some(SuiteFixState {
-                approved_paths: vec![group_path.to_string_lossy().to_string()],
-                suite_written: false,
-                amendments_written: false,
-                decision: ManifestFixDecision::SuiteAndRun,
-            }),
+        schema_version: 1,
+        phase: RunnerPhase::Triage,
+        preflight: PreflightState {
+            status: PreflightStatus::Complete,
         },
+        failure: Some(FailureState {
+            kind: FailureKind::Manifest,
+            suite_target: Some("groups/g01.md".to_string()),
+            message: Some("validation failed".to_string()),
+        }),
+        suite_fix: Some(SuiteFixState {
+            approved_paths: vec![group_path.to_string_lossy().to_string()],
+            suite_written: false,
+            amendments_written: false,
+            decision: ManifestFixDecision::SuiteAndRun,
+        }),
         updated_at: "2026-03-14T00:00:00Z".to_string(),
         transition_count: 4,
-        last_event: Some(RunnerEvent::SuiteFixApproved),
+        last_event: Some("SuiteFixApproved".to_string()),
     };
     runner_workflow::write_runner_state(&run_dir, &state).unwrap();
     let payload = make_write_payload(&group_path.to_string_lossy());
@@ -165,11 +167,16 @@ fn guard_write_denies_suite_edit_without_fix() {
     let group_path = suite_dir.join("groups").join("g01.md");
     // Runner state without suite_fix
     let state = RunnerWorkflowState {
-        schema_version: 2,
+        schema_version: 1,
         phase: RunnerPhase::Execution,
+        preflight: PreflightState {
+            status: PreflightStatus::Complete,
+        },
+        failure: None,
+        suite_fix: None,
         updated_at: "2026-03-14T00:00:00Z".to_string(),
         transition_count: 3,
-        last_event: Some(RunnerEvent::RunStarted),
+        last_event: Some("RunStarted".to_string()),
     };
     runner_workflow::write_runner_state(&run_dir, &state).unwrap();
     let payload = make_write_payload(&group_path.to_string_lossy());

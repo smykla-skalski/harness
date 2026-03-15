@@ -1,3 +1,4 @@
+use std::fmt;
 use std::path::{Path, PathBuf};
 use std::time::UNIX_EPOCH;
 use std::{fs, result};
@@ -5,7 +6,7 @@ use std::{fs, result};
 use serde::{Deserialize, Serialize};
 
 use crate::core_defs::{project_context_dir, session_scope_key, utc_now};
-use crate::errors::{self, CliError};
+use crate::errors::{CliError, CliErrorKind};
 use crate::rules::compact as rules;
 
 /// SHA256 fingerprint of a file.
@@ -138,13 +139,31 @@ pub struct AuthoringHandoff {
     pub state_paths: Vec<String>,
 }
 
+/// Status of a compact handoff.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[non_exhaustive]
+pub enum HandoffStatus {
+    Pending,
+    Consumed,
+}
+
+impl fmt::Display for HandoffStatus {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Pending => f.write_str("pending"),
+            Self::Consumed => f.write_str("consumed"),
+        }
+    }
+}
+
 /// Full compact handoff payload.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CompactHandoff {
     pub version: u32,
     pub project_dir: String,
     pub created_at: String,
-    pub status: String,
+    pub status: HandoffStatus,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub source_session_scope: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -205,7 +224,7 @@ pub fn build_compact_handoff(project_dir: &Path) -> Result<CompactHandoff, CliEr
         version: rules::HANDOFF_VERSION,
         project_dir: project_dir.to_string_lossy().to_string(),
         created_at: utc_now(),
-        status: rules::STATUS_PENDING.to_string(),
+        status: HandoffStatus::Pending,
         source_session_scope: Some(session_scope_key()),
         source_session_id: None,
         transcript_path: None,
@@ -250,21 +269,20 @@ pub fn load_latest_compact_handoff(project_dir: &Path) -> Result<Option<CompactH
     if !path.exists() {
         return Ok(None);
     }
-    let text = fs::read_to_string(&path).map_err(|e| {
-        errors::cli_err(
-            &errors::IO_ERROR,
-            &[("detail", &format!("failed to read {}: {e}", path.display()))],
-        )
+    let text = fs::read_to_string(&path).map_err(|e| -> CliError {
+        CliErrorKind::Io {
+            detail: format!("failed to read {}: {e}", path.display()),
+        }
+        .into()
     })?;
-    serde_json::from_str(&text).map(Some).map_err(|e| {
-        errors::cli_err(
-            &errors::IO_ERROR,
-            &[(
-                "detail",
-                &format!("corrupt compact handoff at {}: {e}", path.display()),
-            )],
-        )
-    })
+    serde_json::from_str(&text)
+        .map(Some)
+        .map_err(|e| -> CliError {
+            CliErrorKind::Io {
+                detail: format!("corrupt compact handoff at {}: {e}", path.display()),
+            }
+            .into()
+        })
 }
 
 /// Load a pending (unconsumed) compact handoff, if any.
@@ -273,7 +291,7 @@ pub fn pending_compact_handoff(project_dir: &Path) -> Option<CompactHandoff> {
     load_latest_compact_handoff(project_dir)
         .ok()
         .flatten()
-        .filter(|h| h.status == rules::STATUS_PENDING)
+        .filter(|h| h.status == HandoffStatus::Pending)
 }
 
 /// Mark a handoff as consumed.
@@ -288,7 +306,7 @@ pub fn consume_compact_handoff(
     handoff: CompactHandoff,
 ) -> Result<CompactHandoff, CliError> {
     let consumed = CompactHandoff {
-        status: rules::STATUS_CONSUMED.to_string(),
+        status: HandoffStatus::Consumed,
         consumed_at: Some(utc_now()),
         ..handoff
     };
@@ -533,19 +551,14 @@ fn render_authoring_section(handoff: &AuthoringHandoff) -> String {
 
 fn ordered_sections(handoff: &CompactHandoff) -> Vec<String> {
     let mut sections: Vec<(&str, bool)> = Vec::new();
-    if handoff.authoring.is_some() {
-        let unfinished = handoff
-            .authoring
-            .as_ref()
-            .is_some_and(|a| !matches!(a.author_phase.as_deref(), Some("complete" | "cancelled")));
+    if let Some(ref a) = handoff.authoring {
+        let unfinished = !matches!(a.author_phase.as_deref(), Some("complete" | "cancelled"));
         sections.push(("authoring", unfinished));
     }
-    if handoff.runner.is_some() {
-        let unfinished = handoff.runner.as_ref().is_some_and(|r| {
-            r.verdict.as_deref().is_none()
-                || r.verdict.as_deref() == Some("pending")
-                || r.completed_at.is_none()
-        });
+    if let Some(ref r) = handoff.runner {
+        let unfinished = r.verdict.as_deref().is_none()
+            || r.verdict.as_deref() == Some("pending")
+            || r.completed_at.is_none();
         sections.push(("runner", unfinished));
     }
 
@@ -584,34 +597,35 @@ fn truncate_lines(lines: &[String], char_limit: usize, line_limit: usize) -> Str
 
 fn write_json_atomic(path: &Path, payload: &CompactHandoff) -> Result<(), CliError> {
     if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent).map_err(|e| {
-            errors::cli_err(
-                &errors::IO_ERROR,
-                &[("detail", &format!("failed to create directory: {e}"))],
-            )
+        fs::create_dir_all(parent).map_err(|e| -> CliError {
+            CliErrorKind::Io {
+                detail: format!("failed to create directory: {e}"),
+            }
+            .into()
         })?;
     }
     let tmp = path.with_extension("json.tmp");
-    let text = serde_json::to_string_pretty(payload)
-        .map_err(|e| errors::cli_err(&errors::SERIALIZE_ERROR, &[("detail", &format!("{e}"))]))?;
-    fs::write(&tmp, &text).map_err(|e| {
-        errors::cli_err(
-            &errors::IO_ERROR,
-            &[("detail", &format!("failed to write {}: {e}", tmp.display()))],
-        )
+    let text = serde_json::to_string_pretty(payload).map_err(|e| -> CliError {
+        CliErrorKind::Serialize {
+            detail: format!("{e}"),
+        }
+        .into()
     })?;
-    fs::rename(&tmp, path).map_err(|e| {
-        errors::cli_err(
-            &errors::IO_ERROR,
-            &[(
-                "detail",
-                &format!(
-                    "failed to rename {} to {}: {e}",
-                    tmp.display(),
-                    path.display()
-                ),
-            )],
-        )
+    fs::write(&tmp, &text).map_err(|e| -> CliError {
+        CliErrorKind::Io {
+            detail: format!("failed to write {}: {e}", tmp.display()),
+        }
+        .into()
+    })?;
+    fs::rename(&tmp, path).map_err(|e| -> CliError {
+        CliErrorKind::Io {
+            detail: format!(
+                "failed to rename {} to {}: {e}",
+                tmp.display(),
+                path.display()
+            ),
+        }
+        .into()
     })?;
     Ok(())
 }
@@ -657,7 +671,7 @@ mod tests {
             version: rules::HANDOFF_VERSION,
             project_dir: project_dir.to_string(),
             created_at: "2026-01-01T000000Z".to_string(),
-            status: rules::STATUS_PENDING.to_string(),
+            status: HandoffStatus::Pending,
             source_session_scope: None,
             source_session_id: None,
             transcript_path: None,
@@ -696,7 +710,7 @@ mod tests {
         let loaded = read_handoff_from(&latest).unwrap();
 
         assert_eq!(loaded.version, handoff.version);
-        assert_eq!(loaded.status, rules::STATUS_PENDING);
+        assert_eq!(loaded.status, HandoffStatus::Pending);
         assert_eq!(loaded.project_dir, "/project");
     }
 
@@ -722,27 +736,27 @@ mod tests {
 
         // Manually consume
         let consumed = CompactHandoff {
-            status: rules::STATUS_CONSUMED.to_string(),
+            status: HandoffStatus::Consumed,
             consumed_at: Some("2026-01-01T01:00:00Z".to_string()),
             ..handoff
         };
         write_handoff_to(&latest, &consumed);
 
         let loaded = read_handoff_from(&latest).unwrap();
-        assert_eq!(loaded.status, rules::STATUS_CONSUMED);
+        assert_eq!(loaded.status, HandoffStatus::Consumed);
         assert!(loaded.consumed_at.is_some());
     }
 
     #[test]
     fn pending_filter_works() {
         let pending = test_handoff("/p");
-        assert_eq!(pending.status, rules::STATUS_PENDING);
+        assert_eq!(pending.status, HandoffStatus::Pending);
 
         let consumed = CompactHandoff {
-            status: rules::STATUS_CONSUMED.to_string(),
+            status: HandoffStatus::Consumed,
             ..test_handoff("/p")
         };
-        assert_ne!(consumed.status, rules::STATUS_PENDING);
+        assert_ne!(consumed.status, HandoffStatus::Pending);
     }
 
     #[test]
@@ -816,7 +830,7 @@ mod tests {
             version: 1,
             project_dir: "/project".to_string(),
             created_at: "2026-01-01T00:00:00Z".to_string(),
-            status: "pending".to_string(),
+            status: HandoffStatus::Pending,
             source_session_scope: None,
             source_session_id: None,
             transcript_path: None,
@@ -840,7 +854,7 @@ mod tests {
             version: 1,
             project_dir: "/p".to_string(),
             created_at: "2026-01-01T00:00:00Z".to_string(),
-            status: "pending".to_string(),
+            status: HandoffStatus::Pending,
             source_session_scope: None,
             source_session_id: None,
             transcript_path: None,
@@ -879,7 +893,7 @@ mod tests {
             version: 1,
             project_dir: "/p".to_string(),
             created_at: "2026-01-01T00:00:00Z".to_string(),
-            status: "pending".to_string(),
+            status: HandoffStatus::Pending,
             source_session_scope: None,
             source_session_id: None,
             transcript_path: None,
@@ -914,7 +928,7 @@ mod tests {
             version: 1,
             project_dir: "/p".to_string(),
             created_at: "2026-01-01T00:00:00Z".to_string(),
-            status: "pending".to_string(),
+            status: HandoffStatus::Pending,
             source_session_scope: None,
             source_session_id: None,
             transcript_path: None,
@@ -1020,7 +1034,7 @@ mod tests {
             version: 1,
             project_dir: "/p".to_string(),
             created_at: "2026-01-01T00:00:00Z".to_string(),
-            status: "pending".to_string(),
+            status: HandoffStatus::Pending,
             source_session_scope: None,
             source_session_id: None,
             transcript_path: None,
@@ -1041,7 +1055,7 @@ mod tests {
             version: 1,
             project_dir: "/p".to_string(),
             created_at: "2026-01-01T00:00:00Z".to_string(),
-            status: "pending".to_string(),
+            status: HandoffStatus::Pending,
             source_session_scope: None,
             source_session_id: None,
             transcript_path: None,
@@ -1076,7 +1090,7 @@ mod tests {
             version: 1,
             project_dir: "/project".to_string(),
             created_at: "2026-01-01T00:00:00Z".to_string(),
-            status: "pending".to_string(),
+            status: HandoffStatus::Pending,
             source_session_scope: Some("session-abc".to_string()),
             source_session_id: Some("abc".to_string()),
             transcript_path: None,
@@ -1139,7 +1153,7 @@ mod tests {
             version: 1,
             project_dir: "/p".to_string(),
             created_at: "2026-01-01T00:00:00Z".to_string(),
-            status: "pending".to_string(),
+            status: HandoffStatus::Pending,
             source_session_scope: None,
             source_session_id: None,
             transcript_path: None,

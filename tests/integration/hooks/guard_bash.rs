@@ -5,8 +5,9 @@
 // and phase-gated command restrictions after run completion.
 
 use harness::hooks::guard_bash;
+use harness::schema::Verdict;
 use harness::workflow::runner::{
-    self as runner_workflow, RunnerEvent, RunnerPhase, RunnerWorkflowState,
+    self as runner_workflow, PreflightState, PreflightStatus, RunnerPhase, RunnerWorkflowState,
 };
 
 use super::super::helpers::*;
@@ -74,7 +75,6 @@ fn guard_bash_kumactl_listing() {
     assert_deny(&r);
 }
 
-// Rust implementation is stricter: kumactl detected even in harness run
 #[test]
 fn guard_bash_harness_run_kumactl() {
     let ctx = make_hook_context(
@@ -82,8 +82,8 @@ fn guard_bash_harness_run_kumactl() {
         make_bash_payload("harness run --phase setup --label kumactl-version kumactl version"),
     );
     let r = guard_bash::execute(&ctx).unwrap();
-    // Rust implementation catches kumactl as a word even in harness run
-    assert_deny(&r);
+    // Tracked harness commands allow wrapped cluster binaries
+    assert_allow(&r);
 }
 
 #[test]
@@ -144,7 +144,6 @@ fn guard_bash_denies_mixed_kuma_delete_harness_run() {
     assert_deny(&r);
 }
 
-// Rust implementation catches kubectl in has_denied_cluster_binary_anywhere
 #[test]
 fn guard_bash_single_kuma_delete() {
     let ctx = make_hook_context(
@@ -155,8 +154,8 @@ fn guard_bash_single_kuma_delete() {
         ),
     );
     let r = guard_bash::execute(&ctx).unwrap();
-    // Rust implementation catches kubectl in all words
-    assert_deny(&r);
+    // Tracked harness commands allow wrapped cluster binaries
+    assert_allow(&r);
 }
 
 // ============================================================================
@@ -276,7 +275,6 @@ fn guard_bash_denies_chained_harness() {
     assert_deny(&r);
 }
 
-// Rust implementation catches kubectl in all words
 #[test]
 fn guard_bash_harness_record_pipe_jq() {
     let ctx = make_hook_context(
@@ -287,8 +285,8 @@ fn guard_bash_harness_record_pipe_jq() {
         ),
     );
     let r = guard_bash::execute(&ctx).unwrap();
-    // Rust catches kubectl even inside harness record
-    assert_deny(&r);
+    // Tracked harness commands allow wrapped cluster binaries
+    assert_allow(&r);
 }
 
 // ============================================================================
@@ -410,7 +408,7 @@ fn guard_bash_denies_rebootstrap_after_completed() {
     let tmp = tempfile::tempdir().unwrap();
     let run_dir = init_run(tmp.path(), "run-1", "single-zone");
     let mut status = read_run_status(&run_dir);
-    status.overall_verdict = "pass".to_string();
+    status.overall_verdict = Verdict::Pass;
     write_run_status(&run_dir, &status);
     let payload = make_bash_payload("harness cluster single-up kuma-1");
     let ctx = make_hook_context_with_run("suite-runner", payload, &run_dir);
@@ -423,7 +421,7 @@ fn guard_bash_denies_continuation_after_completed() {
     let tmp = tempfile::tempdir().unwrap();
     let run_dir = init_run(tmp.path(), "run-1", "single-zone");
     let mut status = read_run_status(&run_dir);
-    status.overall_verdict = "pass".to_string();
+    status.overall_verdict = Verdict::Pass;
     write_run_status(&run_dir, &status);
     let payload = make_bash_payload("harness preflight");
     let ctx = make_hook_context_with_run("suite-runner", payload, &run_dir);
@@ -436,7 +434,7 @@ fn guard_bash_allows_cluster_down_after_completed() {
     let tmp = tempfile::tempdir().unwrap();
     let run_dir = init_run(tmp.path(), "run-1", "single-zone");
     let mut status = read_run_status(&run_dir);
-    status.overall_verdict = "pass".to_string();
+    status.overall_verdict = Verdict::Pass;
     write_run_status(&run_dir, &status);
     let payload = make_bash_payload("harness cluster single-down kuma-1");
     let ctx = make_hook_context_with_run("suite-runner", payload, &run_dir);
@@ -449,7 +447,7 @@ fn guard_bash_allows_report_check_after_completed() {
     let tmp = tempfile::tempdir().unwrap();
     let run_dir = init_run(tmp.path(), "run-1", "single-zone");
     let mut status = read_run_status(&run_dir);
-    status.overall_verdict = "pass".to_string();
+    status.overall_verdict = Verdict::Pass;
     write_run_status(&run_dir, &status);
     let payload = make_bash_payload("harness report check");
     let ctx = make_hook_context_with_run("suite-runner", payload, &run_dir);
@@ -462,11 +460,16 @@ fn guard_bash_completed_state_blocks_commands() {
     let tmp = tempfile::tempdir().unwrap();
     let run_dir = init_run(tmp.path(), "run-1", "single-zone");
     let state = RunnerWorkflowState {
-        schema_version: 2,
+        schema_version: 1,
         phase: RunnerPhase::Completed,
+        preflight: PreflightState {
+            status: PreflightStatus::Complete,
+        },
+        failure: None,
+        suite_fix: None,
         updated_at: "2026-03-14T00:00:00Z".to_string(),
         transition_count: 5,
-        last_event: Some(RunnerEvent::RunCompleted),
+        last_event: Some("RunCompleted".to_string()),
     };
     runner_workflow::write_runner_state(&run_dir, &state).unwrap();
     let payload = make_bash_payload("harness apply --manifest test.yaml");
@@ -480,11 +483,16 @@ fn guard_bash_completed_allows_closeout() {
     let tmp = tempfile::tempdir().unwrap();
     let run_dir = init_run(tmp.path(), "run-1", "single-zone");
     let state = RunnerWorkflowState {
-        schema_version: 2,
+        schema_version: 1,
         phase: RunnerPhase::Completed,
+        preflight: PreflightState {
+            status: PreflightStatus::Complete,
+        },
+        failure: None,
+        suite_fix: None,
         updated_at: "2026-03-14T00:00:00Z".to_string(),
         transition_count: 5,
-        last_event: Some(RunnerEvent::RunCompleted),
+        last_event: Some("RunCompleted".to_string()),
     };
     runner_workflow::write_runner_state(&run_dir, &state).unwrap();
     let payload = make_bash_payload("harness closeout");

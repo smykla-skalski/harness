@@ -4,6 +4,7 @@
 // skill bypass.
 
 use harness::hooks::guard_stop;
+use harness::schema::Verdict;
 
 use super::super::helpers::*;
 
@@ -32,7 +33,7 @@ fn guard_stop_allows_aborted() {
     let run_dir = init_run(tmp.path(), "run-1", "single-zone");
     // Update status to aborted with state capture
     let mut status = read_run_status(&run_dir);
-    status.overall_verdict = "aborted".to_string();
+    status.overall_verdict = Verdict::Aborted;
     status.last_state_capture = Some("state/capture.json".to_string());
     write_run_status(&run_dir, &status);
     let payload = make_stop_payload();
@@ -47,7 +48,7 @@ fn guard_stop_denies_no_state_capture() {
     let run_dir = init_run(tmp.path(), "run-1", "single-zone");
     // Set verdict but no state capture
     let mut status = read_run_status(&run_dir);
-    status.overall_verdict = "pass".to_string();
+    status.overall_verdict = Verdict::Pass;
     status.last_state_capture = None;
     write_run_status(&run_dir, &status);
     let payload = make_stop_payload();
@@ -61,7 +62,7 @@ fn guard_stop_allows_with_verdict_and_capture() {
     let tmp = tempfile::tempdir().unwrap();
     let run_dir = init_run(tmp.path(), "run-1", "single-zone");
     let mut status = read_run_status(&run_dir);
-    status.overall_verdict = "pass".to_string();
+    status.overall_verdict = Verdict::Pass;
     status.last_state_capture = Some("state/capture.json".to_string());
     write_run_status(&run_dir, &status);
     let payload = make_stop_payload();

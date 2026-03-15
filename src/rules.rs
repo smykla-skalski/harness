@@ -64,7 +64,6 @@ pub mod suite_runner {
         "use `harness record`, `harness run`, or recorded command artifacts instead";
 
     pub const DENIED_RUNNER_BINARIES: &[&str] = &["gh"];
-    pub const UP_CLUSTER_MODES: &[&str] = &["single-up", "global-zone-up", "global-two-zones-up"];
 
     pub const DENIED_MAKE_TARGET_PREFIXES: &[&str] = &["k3d/", "kind/"];
 
@@ -123,8 +122,6 @@ pub mod suite_author {
 /// Compact/handoff constants.
 pub mod compact {
     pub const HANDOFF_VERSION: u32 = 1;
-    pub const STATUS_PENDING: &str = "pending";
-    pub const STATUS_CONSUMED: &str = "consumed";
     pub const HISTORY_LIMIT: usize = 10;
     pub const CHAR_LIMIT: usize = 3500;
     pub const SECTION_CHAR_LIMIT: usize = 1600;
@@ -290,8 +287,6 @@ mod tests {
     #[test]
     fn compact_constants() {
         assert_eq!(compact::HANDOFF_VERSION, 1);
-        assert_eq!(compact::STATUS_PENDING, "pending");
-        assert_eq!(compact::STATUS_CONSUMED, "consumed");
         assert_eq!(compact::HISTORY_LIMIT, 10);
         assert_eq!(compact::CHAR_LIMIT, 3500);
         assert_eq!(compact::SECTION_CHAR_LIMIT, 1600);

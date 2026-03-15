@@ -1,4 +1,4 @@
-use crate::errors::{self, CliError};
+use crate::errors::{CliError, HookMessage};
 use crate::hook::HookResult;
 use crate::hook_payloads::HookContext;
 use crate::workflow::runner::{PreflightStatus, RunnerPhase, RunnerWorkflowState};
@@ -17,50 +17,42 @@ pub fn execute(ctx: &HookContext) -> Result<HookResult, CliError> {
         return Ok(HookResult::allow());
     }
     if ctx.is_suite_author() {
-        return Ok(errors::hook_msg(&errors::WARN_CODE_READER_FORMAT, &[]));
+        return Ok(HookMessage::CodeReaderFormat.into_result());
     }
     // suite-runner: validate preflight worker can start.
     let Some(state) = &ctx.runner_state else {
-        return Ok(errors::hook_msg(
-            &errors::DENY_RUNNER_STATE_INVALID,
-            &[(
-                "details",
-                "runner state is missing; initialize the suite run first",
-            )],
-        ));
+        return Ok(HookMessage::RunnerStateInvalid {
+            details: "runner state is missing; initialize the suite run first".into(),
+        }
+        .into_result());
     };
     let (allowed, reason) = can_start_preflight_worker(state);
     if !allowed {
-        return Ok(errors::hook_msg(
-            &errors::DENY_RUNNER_FLOW_REQUIRED,
-            &[
-                ("action", "start the preflight worker"),
-                (
-                    "details",
-                    reason
-                        .unwrap_or("enter the guarded preflight phase before spawning the worker"),
-                ),
-            ],
-        ));
+        return Ok(HookMessage::RunnerFlowRequired {
+            action: "start the preflight worker".into(),
+            details: reason
+                .unwrap_or("enter the guarded preflight phase before spawning the worker")
+                .into(),
+        }
+        .into_result());
     }
     Ok(HookResult::allow())
 }
 
 fn can_start_preflight_worker(state: &RunnerWorkflowState) -> (bool, Option<&'static str>) {
-    match &state.phase {
-        RunnerPhase::Preflight { status } => {
-            if *status != PreflightStatus::Pending && *status != PreflightStatus::Running {
-                (
-                    false,
-                    Some("preflight is already complete; do not restart the worker"),
-                )
-            } else {
-                (true, None)
-            }
-        }
-        _ => (
+    if state.phase != RunnerPhase::Preflight {
+        return (
             false,
             Some("enter the guarded preflight phase before spawning the worker"),
-        ),
+        );
     }
+    if state.preflight.status != PreflightStatus::Pending
+        && state.preflight.status != PreflightStatus::Running
+    {
+        return (
+            false,
+            Some("preflight is already complete; do not restart the worker"),
+        );
+    }
+    (true, None)
 }

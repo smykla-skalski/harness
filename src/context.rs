@@ -6,7 +6,7 @@ use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 
 use crate::cluster::ClusterSpec;
-use crate::errors::{self, CliError};
+use crate::errors::{CliError, CliErrorKind};
 use crate::prepared_suite::PreparedSuiteArtifact;
 use crate::schema::RunStatus;
 
@@ -231,17 +231,15 @@ pub struct RunContext {
 
 fn read_json_file<T: DeserializeOwned>(path: &Path) -> Result<T, CliError> {
     let content = fs::read_to_string(path).map_err(|_| {
-        errors::cli_err(
-            &errors::MISSING_FILE,
-            &[("path", &path.display().to_string())],
-        )
+        CliError::from(CliErrorKind::MissingFile {
+            path: path.display().to_string(),
+        })
     })?;
     serde_json::from_str(&content).map_err(|e| {
-        errors::cli_err_with_details(
-            &errors::INVALID_JSON,
-            &[("path", &path.display().to_string())],
-            &e.to_string(),
-        )
+        CliErrorKind::InvalidJson {
+            path: path.display().to_string(),
+        }
+        .with_details(e.to_string())
     })
 }
 
@@ -310,7 +308,7 @@ pub fn extract_group_ids(values: &[serde_json::Value]) -> Vec<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::schema::RunCounts;
+    use crate::schema::{RunCounts, Verdict};
 
     fn sample_layout() -> RunLayout {
         RunLayout {
@@ -664,7 +662,7 @@ mod tests {
         assert_eq!(ctx.metadata.suite_id, "suite-a");
         assert_eq!(ctx.metadata.profile, "single-zone");
         let status = ctx.status.unwrap();
-        assert_eq!(status.overall_verdict, "pending");
+        assert_eq!(status.overall_verdict, Verdict::Pending);
         assert_eq!(status.run_id, "run-1");
         assert!(ctx.cluster.is_none());
         assert!(ctx.prepared_suite.is_none());
@@ -680,7 +678,7 @@ mod tests {
         let result = RunContext::from_run_dir(&run_dir);
         assert!(result.is_err());
         let err = result.unwrap_err();
-        assert_eq!(err.code, "KSRCLI014");
+        assert_eq!(err.code(), "KSRCLI014");
     }
 
     #[test]

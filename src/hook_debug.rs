@@ -1,10 +1,33 @@
+use std::fmt;
+
 use crate::hook_payloads::HookEvent;
+
+/// Kind of outcome from a hook evaluation.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum OutcomeKind {
+    Allowed,
+    Error,
+    Ignored,
+    Skipped,
+}
+
+impl fmt::Display for OutcomeKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Allowed => f.write_str("allowed"),
+            Self::Error => f.write_str("error"),
+            Self::Ignored => f.write_str("ignored"),
+            Self::Skipped => f.write_str("skipped"),
+        }
+    }
+}
 
 /// Outcome of a hook evaluation for debug logging.
 #[derive(Debug)]
 pub struct HookOutcome {
     pub exit_code: i32,
-    pub outcome: String,
+    pub outcome: OutcomeKind,
     pub message: Option<String>,
     pub gate: Option<String>,
 }
@@ -15,18 +38,18 @@ impl HookOutcome {
     pub fn allow() -> Self {
         Self {
             exit_code: 0,
-            outcome: "allowed".to_string(),
+            outcome: OutcomeKind::Allowed,
             message: None,
             gate: None,
         }
     }
 
-    /// Create an "allowed" outcome with a custom outcome label.
+    /// Create an "allowed" outcome with a custom outcome kind.
     #[must_use]
-    pub fn allow_with(outcome: &str) -> Self {
+    pub fn allow_with(outcome: OutcomeKind) -> Self {
         Self {
             exit_code: 0,
-            outcome: outcome.to_string(),
+            outcome,
             message: None,
             gate: None,
         }
@@ -37,7 +60,7 @@ impl HookOutcome {
     pub fn error(exit_code: i32) -> Self {
         Self {
             exit_code,
-            outcome: "error".to_string(),
+            outcome: OutcomeKind::Error,
             message: None,
             gate: None,
         }
@@ -48,7 +71,7 @@ impl HookOutcome {
     pub fn ignored() -> Self {
         Self {
             exit_code: 0,
-            outcome: "ignored".to_string(),
+            outcome: OutcomeKind::Ignored,
             message: None,
             gate: None,
         }
@@ -88,30 +111,38 @@ mod tests {
     fn allow_returns_zero_exit_code() {
         let outcome = HookOutcome::allow();
         assert_eq!(outcome.exit_code, 0);
-        assert_eq!(outcome.outcome, "allowed");
+        assert_eq!(outcome.outcome, OutcomeKind::Allowed);
         assert!(outcome.message.is_none());
         assert!(outcome.gate.is_none());
     }
 
     #[test]
     fn allow_with_sets_custom_outcome() {
-        let outcome = HookOutcome::allow_with("skipped");
+        let outcome = HookOutcome::allow_with(OutcomeKind::Skipped);
         assert_eq!(outcome.exit_code, 0);
-        assert_eq!(outcome.outcome, "skipped");
+        assert_eq!(outcome.outcome, OutcomeKind::Skipped);
     }
 
     #[test]
     fn error_sets_exit_code_and_outcome() {
         let outcome = HookOutcome::error(2);
         assert_eq!(outcome.exit_code, 2);
-        assert_eq!(outcome.outcome, "error");
+        assert_eq!(outcome.outcome, OutcomeKind::Error);
     }
 
     #[test]
     fn ignored_returns_zero_exit_code() {
         let outcome = HookOutcome::ignored();
         assert_eq!(outcome.exit_code, 0);
-        assert_eq!(outcome.outcome, "ignored");
+        assert_eq!(outcome.outcome, OutcomeKind::Ignored);
+    }
+
+    #[test]
+    fn outcome_kind_display() {
+        assert_eq!(OutcomeKind::Allowed.to_string(), "allowed");
+        assert_eq!(OutcomeKind::Error.to_string(), "error");
+        assert_eq!(OutcomeKind::Ignored.to_string(), "ignored");
+        assert_eq!(OutcomeKind::Skipped.to_string(), "skipped");
     }
 
     #[test]
@@ -129,16 +160,7 @@ mod tests {
     #[test]
     fn log_and_exit_returns_exit_code() {
         let event = HookEvent {
-            payload: HookEnvelopePayload {
-                root: None,
-                input_payload: None,
-                tool_input: None,
-                response: None,
-                last_assistant_message: None,
-                transcript_path: None,
-                stop_hook_active: false,
-                raw_keys: vec![],
-            },
+            payload: HookEnvelopePayload::default(),
         };
         let outcome = HookOutcome::error(3).with_message("fail");
         assert_eq!(outcome.log_and_exit("test-hook", &event), 3);
@@ -147,16 +169,7 @@ mod tests {
     #[test]
     fn log_and_exit_returns_zero_for_allow() {
         let event = HookEvent {
-            payload: HookEnvelopePayload {
-                root: None,
-                input_payload: None,
-                tool_input: None,
-                response: None,
-                last_assistant_message: None,
-                transcript_path: None,
-                stop_hook_active: false,
-                raw_keys: vec![],
-            },
+            payload: HookEnvelopePayload::default(),
         };
         let outcome = HookOutcome::allow();
         assert_eq!(outcome.log_and_exit("test-hook", &event), 0);

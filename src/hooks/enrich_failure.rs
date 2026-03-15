@@ -1,9 +1,8 @@
-use crate::errors::{self, CliError};
+use crate::errors::{CliError, HookMessage};
 use crate::hook::HookResult;
 use crate::hook_payloads::HookContext;
 use crate::workflow::runner::{
-    self as runner_wf, FailureKind, FailureState, PreflightStatus, RunnerEvent, RunnerPhase,
-    RunnerWorkflowState,
+    self as runner_wf, FailureKind, FailureState, PreflightStatus, RunnerPhase, RunnerWorkflowState,
 };
 
 /// Execute the enrich-failure hook.
@@ -21,16 +20,16 @@ pub fn execute(ctx: &HookContext) -> Result<HookResult, CliError> {
         return Ok(HookResult::allow());
     };
     let Some(status) = &run.status else {
-        return Ok(errors::hook_msg(
-            &errors::INFO_RUN_VERDICT,
-            &[("verdict", "pending")],
-        ));
+        return Ok(HookMessage::RunVerdict {
+            verdict: "pending".into(),
+        }
+        .into_result());
     };
     let Some(state) = &ctx.runner_state else {
-        return Ok(errors::hook_msg(
-            &errors::INFO_RUN_VERDICT,
-            &[("verdict", &status.overall_verdict)],
-        ));
+        return Ok(HookMessage::RunVerdict {
+            verdict: status.overall_verdict.to_string(),
+        }
+        .into_result());
     };
     let words = ctx.command_words();
     if words.len() >= 2 && words[0] == "harness" {
@@ -40,44 +39,38 @@ pub fn execute(ctx: &HookContext) -> Result<HookResult, CliError> {
             if let Some(ref rd) = ctx.effective_run_dir() {
                 let _ = runner_wf::write_runner_state(rd, &new_state);
             }
-        } else if matches!(&state.phase, RunnerPhase::Preflight { .. })
-            && matches!(sub, "preflight" | "capture")
-        {
+        } else if state.phase == RunnerPhase::Preflight && matches!(sub, "preflight" | "capture") {
             let new_state = request_preflight_failed(state);
             if let Some(ref rd) = ctx.effective_run_dir() {
                 let _ = runner_wf::write_runner_state(rd, &new_state);
             }
         }
     }
-    Ok(errors::hook_msg(
-        &errors::INFO_RUN_VERDICT,
-        &[("verdict", &status.overall_verdict)],
-    ))
+    Ok(HookMessage::RunVerdict {
+        verdict: status.overall_verdict.to_string(),
+    }
+    .into_result())
 }
 
 fn request_failure_triage(state: &RunnerWorkflowState, kind: FailureKind) -> RunnerWorkflowState {
-    state
-        .transition(
-            RunnerEvent::FailureTriageRequested,
-            RunnerPhase::Triage {
-                failure: FailureState {
-                    kind,
-                    suite_target: None,
-                    message: None,
-                },
-                suite_fix: None,
-            },
-        )
-        .unwrap_or_else(|_| state.clone())
+    let mut new_state = state.clone();
+    new_state.phase = RunnerPhase::Triage;
+    new_state.failure = Some(FailureState {
+        kind,
+        suite_target: None,
+        message: None,
+    });
+    new_state.transition_count += 1;
+    new_state.last_event = Some("FailureTriageRequested".to_string());
+    new_state.updated_at = chrono::Utc::now().to_rfc3339();
+    new_state
 }
 
 fn request_preflight_failed(state: &RunnerWorkflowState) -> RunnerWorkflowState {
-    state
-        .transition(
-            RunnerEvent::PreflightFailed,
-            RunnerPhase::Preflight {
-                status: PreflightStatus::Pending,
-            },
-        )
-        .unwrap_or_else(|_| state.clone())
+    let mut new_state = state.clone();
+    new_state.preflight.status = PreflightStatus::Pending;
+    new_state.transition_count += 1;
+    new_state.last_event = Some("PreflightFailed".to_string());
+    new_state.updated_at = chrono::Utc::now().to_rfc3339();
+    new_state
 }
