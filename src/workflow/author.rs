@@ -1,10 +1,10 @@
 use std::env;
-use std::fs;
 use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
 use crate::errors::CliError;
+use crate::workflow::engine::{TransitionError, VersionedJsonRepository};
 
 /// Author approval mode.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -15,17 +15,61 @@ pub enum ApprovalMode {
     Bypass,
 }
 
-/// Author workflow phases.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
+/// Author workflow phases with associated state data.
+///
+/// Review data only exists in review phases. Draft data only exists
+/// once writing has started. Invalid combinations are unrepresentable.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "name", rename_all = "snake_case")]
 #[non_exhaustive]
 pub enum AuthorPhase {
     Discovery,
-    PrewriteReview,
-    Writing,
-    PostwriteReview,
-    Complete,
+    PrewriteReview {
+        review: AuthorReviewState,
+    },
+    Writing {
+        draft: AuthorDraftState,
+    },
+    PostwriteReview {
+        review: AuthorReviewState,
+        draft: AuthorDraftState,
+    },
+    Complete {
+        draft: AuthorDraftState,
+    },
     Cancelled,
+}
+
+impl AuthorPhase {
+    /// Short lowercase name for display and CLI output.
+    #[must_use]
+    pub fn name(&self) -> &'static str {
+        match self {
+            Self::Discovery => "discovery",
+            Self::PrewriteReview { .. } => "prewrite_review",
+            Self::Writing { .. } => "writing",
+            Self::PostwriteReview { .. } => "postwrite_review",
+            Self::Complete { .. } => "complete",
+            Self::Cancelled => "cancelled",
+        }
+    }
+}
+
+/// Typed events for author state transitions.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[non_exhaustive]
+pub enum AuthorEvent {
+    ApprovalFlowStarted,
+    ProposalReady,
+    PrewriteApproved,
+    PrewriteChangesRequested,
+    WritingStarted,
+    SuiteWritten,
+    PostwriteApproved,
+    PostwriteChangesRequested,
+    FlowCompleted,
+    FlowCancelled,
 }
 
 /// Review gate type.
@@ -105,18 +149,73 @@ pub struct AuthorWorkflowState {
     pub mode: ApprovalMode,
     pub phase: AuthorPhase,
     pub session: AuthorSessionInfo,
-    pub review: AuthorReviewState,
-    pub draft: AuthorDraftState,
     pub updated_at: String,
     pub transition_count: u32,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub last_event: Option<String>,
+    pub last_event: Option<AuthorEvent>,
 }
 
+const AUTHOR_STATE_SCHEMA_VERSION: u32 = 2;
+
 impl AuthorWorkflowState {
+    /// Apply a state transition, returning the new state.
+    ///
+    /// # Errors
+    /// Returns `TransitionError` if the transition is not allowed.
+    pub fn transition(
+        &self,
+        event: AuthorEvent,
+        new_phase: AuthorPhase,
+    ) -> Result<Self, TransitionError> {
+        if !self.can_transition(&new_phase) {
+            return Err(TransitionError(format!(
+                "invalid transition from {} to {}",
+                self.phase.name(),
+                new_phase.name(),
+            )));
+        }
+        Ok(Self {
+            schema_version: self.schema_version,
+            mode: self.mode,
+            phase: new_phase,
+            session: self.session.clone(),
+            updated_at: now_utc(),
+            transition_count: self.transition_count + 1,
+            last_event: Some(event),
+        })
+    }
+
+    /// Check whether a transition to `target` is allowed.
+    #[must_use]
+    pub fn can_transition(&self, target: &AuthorPhase) -> bool {
+        matches!(
+            (&self.phase, target),
+            (
+                AuthorPhase::Discovery,
+                AuthorPhase::PrewriteReview { .. } | AuthorPhase::Writing { .. },
+            ) | (
+                AuthorPhase::PrewriteReview { .. },
+                AuthorPhase::PrewriteReview { .. } | AuthorPhase::Writing { .. },
+            ) | (
+                AuthorPhase::Writing { .. },
+                AuthorPhase::PostwriteReview { .. } | AuthorPhase::Complete { .. },
+            ) | (
+                AuthorPhase::PostwriteReview { .. },
+                AuthorPhase::PostwriteReview { .. }
+                    | AuthorPhase::Writing { .. }
+                    | AuthorPhase::Complete { .. },
+            ) | (_, AuthorPhase::Cancelled)
+        )
+    }
+
     #[must_use]
     pub fn has_written_suite(&self) -> bool {
-        self.draft.suite_tree_written
+        match &self.phase {
+            AuthorPhase::Writing { draft }
+            | AuthorPhase::PostwriteReview { draft, .. }
+            | AuthorPhase::Complete { draft } => draft.suite_tree_written,
+            _ => false,
+        }
     }
 
     #[must_use]
@@ -128,6 +227,10 @@ impl AuthorWorkflowState {
     pub fn suite_path(&self) -> Option<PathBuf> {
         self.session.suite_path()
     }
+}
+
+fn now_utc() -> String {
+    chrono::Utc::now().to_rfc3339()
 }
 
 /// Path to the author state file.
@@ -145,30 +248,34 @@ pub fn author_state_path() -> Result<PathBuf, CliError> {
     Ok(cwd.join(".harness").join("suite-author-state.json"))
 }
 
+fn author_repository() -> Result<VersionedJsonRepository, CliError> {
+    let path = author_state_path()?;
+    Ok(VersionedJsonRepository::new(
+        path,
+        AUTHOR_STATE_SCHEMA_VERSION,
+    ))
+}
+
 /// Read author state from disk.
 ///
 /// # Errors
 /// Returns `CliError` on parse failure.
 pub fn read_author_state() -> Result<Option<AuthorWorkflowState>, CliError> {
-    let path = author_state_path()?;
-    if !path.exists() {
-        return Ok(None);
+    let repo = author_repository()?;
+    match repo.load()? {
+        Some(value) => {
+            let state: AuthorWorkflowState =
+                serde_json::from_value(value).map_err(|e| CliError {
+                    code: "WORKFLOW_PARSE".into(),
+                    message: format!("failed to parse author state: {e}"),
+                    exit_code: 5,
+                    hint: None,
+                    details: None,
+                })?;
+            Ok(Some(state))
+        }
+        None => Ok(None),
     }
-    let contents = fs::read_to_string(&path).map_err(|e| CliError {
-        code: "WORKFLOW_IO".into(),
-        message: format!("failed to read {}: {e}", path.display()),
-        exit_code: 5,
-        hint: None,
-        details: None,
-    })?;
-    let state: AuthorWorkflowState = serde_json::from_str(&contents).map_err(|e| CliError {
-        code: "WORKFLOW_PARSE".into(),
-        message: format!("failed to parse author state: {e}"),
-        exit_code: 5,
-        hint: None,
-        details: None,
-    })?;
-    Ok(Some(state))
 }
 
 /// Write author state to disk.
@@ -176,38 +283,15 @@ pub fn read_author_state() -> Result<Option<AuthorWorkflowState>, CliError> {
 /// # Errors
 /// Returns `CliError` on IO failure.
 pub fn write_author_state(state: &AuthorWorkflowState) -> Result<(), CliError> {
-    let path = author_state_path()?;
-    if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent).map_err(|e| CliError {
-            code: "WORKFLOW_IO".into(),
-            message: format!("failed to create directory {}: {e}", parent.display()),
-            exit_code: 5,
-            hint: None,
-            details: None,
-        })?;
-    }
-    let json = serde_json::to_string_pretty(state).map_err(|e| CliError {
+    let repo = author_repository()?;
+    let value = serde_json::to_value(state).map_err(|e| CliError {
         code: "WORKFLOW_SERIALIZE".into(),
         message: format!("failed to serialize author state: {e}"),
         exit_code: 5,
         hint: None,
         details: None,
     })?;
-    let tmp_path = path.with_extension("json.tmp");
-    fs::write(&tmp_path, &json).map_err(|e| CliError {
-        code: "WORKFLOW_IO".into(),
-        message: format!("failed to write {}: {e}", tmp_path.display()),
-        exit_code: 5,
-        hint: None,
-        details: None,
-    })?;
-    fs::rename(&tmp_path, &path).map_err(|e| CliError {
-        code: "WORKFLOW_IO".into(),
-        message: format!("failed to rename to {}: {e}", path.display()),
-        exit_code: 5,
-        hint: None,
-        details: None,
-    })?;
+    repo.save(&value)?;
     Ok(())
 }
 
@@ -217,17 +301,17 @@ pub fn can_write(state: &AuthorWorkflowState) -> (bool, Option<&'static str>) {
     if state.mode == ApprovalMode::Bypass {
         return (true, None);
     }
-    match state.phase {
-        AuthorPhase::Writing => (true, None),
-        AuthorPhase::PrewriteReview => (
+    match &state.phase {
+        AuthorPhase::Writing { .. } => (true, None),
+        AuthorPhase::PrewriteReview { .. } => (
             false,
             Some("wait for the current pre-write approval answer before writing suite files"),
         ),
-        AuthorPhase::PostwriteReview => (
+        AuthorPhase::PostwriteReview { .. } => (
             false,
             Some("wait for the current post-write approval answer before editing the saved suite"),
         ),
-        AuthorPhase::Complete => (
+        AuthorPhase::Complete { .. } => (
             false,
             Some("the saved suite is already approved; request changes before editing it again"),
         ),
@@ -253,7 +337,7 @@ pub fn can_request_gate(
     }
     match gate {
         ReviewGate::Prewrite => {
-            if state.phase == AuthorPhase::PrewriteReview {
+            if matches!(&state.phase, AuthorPhase::PrewriteReview { .. }) {
                 (true, None)
             } else {
                 (
@@ -269,7 +353,7 @@ pub fn can_request_gate(
                     Some("ask post-write approval before stopping after suite writes"),
                 );
             }
-            if state.phase == AuthorPhase::Writing {
+            if matches!(&state.phase, AuthorPhase::Writing { .. }) {
                 (true, None)
             } else {
                 (
@@ -279,7 +363,7 @@ pub fn can_request_gate(
             }
         }
         ReviewGate::Copy => {
-            if state.phase == AuthorPhase::Complete {
+            if matches!(&state.phase, AuthorPhase::Complete { .. }) {
                 (true, None)
             } else {
                 (
@@ -297,12 +381,12 @@ pub fn can_stop(state: &AuthorWorkflowState) -> (bool, Option<&'static str>) {
     if state.mode == ApprovalMode::Bypass {
         return (true, None);
     }
-    match state.phase {
-        AuthorPhase::Writing => (
+    match &state.phase {
+        AuthorPhase::Writing { .. } => (
             false,
             Some("ask the post-write approval gate before stopping"),
         ),
-        AuthorPhase::PostwriteReview => (
+        AuthorPhase::PostwriteReview { .. } => (
             false,
             Some("wait for the current post-write approval answer before stopping"),
         ),
@@ -320,17 +404,17 @@ pub fn next_action(state: Option<&AuthorWorkflowState>) -> String {
         return "Continue suite-author in bypass mode using the saved authoring payloads."
             .to_string();
     }
-    match state.phase {
+    match &state.phase {
         AuthorPhase::Discovery => {
             "Resume discovery and proposal preparation before reopening review."
                 .to_string()
         }
-        AuthorPhase::PrewriteReview => {
+        AuthorPhase::PrewriteReview { .. } => {
             "Resume the pre-write review loop and ask the pre-write gate question before writing suite files."
                 .to_string()
         }
-        AuthorPhase::Writing => {
-            if state.has_written_suite() {
+        AuthorPhase::Writing { draft } => {
+            if draft.suite_tree_written {
                 "Apply the current edit round, then reopen the post-write review gate."
                     .to_string()
             } else {
@@ -338,7 +422,7 @@ pub fn next_action(state: Option<&AuthorWorkflowState>) -> String {
                     .to_string()
             }
         }
-        AuthorPhase::PostwriteReview => {
+        AuthorPhase::PostwriteReview { .. } => {
             "Resume the post-write review loop and ask the post-write gate question before stopping."
                 .to_string()
         }
@@ -346,7 +430,7 @@ pub fn next_action(state: Option<&AuthorWorkflowState>) -> String {
             "The suite-author flow was cancelled. Do not write more files unless restarted."
                 .to_string()
         }
-        AuthorPhase::Complete => {
+        AuthorPhase::Complete { .. } => {
             "The suite is approved. Offer the copy gate or stop the skill."
                 .to_string()
         }
@@ -371,7 +455,7 @@ mod tests {
 
     fn make_state(phase: AuthorPhase, mode: ApprovalMode) -> AuthorWorkflowState {
         AuthorWorkflowState {
-            schema_version: 1,
+            schema_version: 2,
             mode,
             phase,
             session: AuthorSessionInfo {
@@ -380,19 +464,25 @@ mod tests {
                 suite_name: None,
                 suite_dir: Some("/tmp/suite".to_string()),
             },
-            review: AuthorReviewState {
-                gate: None,
-                awaiting_answer: false,
-                round: 0,
-                last_answer: None,
-            },
-            draft: AuthorDraftState {
-                suite_tree_written: false,
-                written_paths: vec![],
-            },
             updated_at: "2025-01-01T00:00:00Z".to_string(),
             transition_count: 0,
             last_event: None,
+        }
+    }
+
+    fn default_review() -> AuthorReviewState {
+        AuthorReviewState {
+            gate: None,
+            awaiting_answer: false,
+            round: 0,
+            last_answer: None,
+        }
+    }
+
+    fn default_draft() -> AuthorDraftState {
+        AuthorDraftState {
+            suite_tree_written: false,
+            written_paths: vec![],
         }
     }
 
@@ -406,18 +496,52 @@ mod tests {
 
     #[test]
     fn author_phase_serialization() {
-        let cases = [
+        let cases: Vec<(AuthorPhase, &str)> = vec![
             (AuthorPhase::Discovery, "discovery"),
-            (AuthorPhase::PrewriteReview, "prewrite_review"),
-            (AuthorPhase::Writing, "writing"),
-            (AuthorPhase::PostwriteReview, "postwrite_review"),
-            (AuthorPhase::Complete, "complete"),
+            (
+                AuthorPhase::PrewriteReview {
+                    review: default_review(),
+                },
+                "prewrite_review",
+            ),
+            (
+                AuthorPhase::Writing {
+                    draft: default_draft(),
+                },
+                "writing",
+            ),
+            (
+                AuthorPhase::PostwriteReview {
+                    review: default_review(),
+                    draft: default_draft(),
+                },
+                "postwrite_review",
+            ),
+            (
+                AuthorPhase::Complete {
+                    draft: default_draft(),
+                },
+                "complete",
+            ),
             (AuthorPhase::Cancelled, "cancelled"),
         ];
         for (variant, expected) in cases {
-            let json = serde_json::to_value(variant).unwrap();
-            assert_eq!(json, expected);
+            let json = serde_json::to_value(&variant).unwrap();
+            assert_eq!(json["name"], expected);
         }
+    }
+
+    #[test]
+    fn author_phase_round_trip() {
+        let phase = AuthorPhase::Writing {
+            draft: AuthorDraftState {
+                suite_tree_written: true,
+                written_paths: vec!["a.md".to_string()],
+            },
+        };
+        let json = serde_json::to_value(&phase).unwrap();
+        let loaded: AuthorPhase = serde_json::from_value(json).unwrap();
+        assert_eq!(loaded, phase);
     }
 
     #[test]
@@ -449,8 +573,21 @@ mod tests {
     }
 
     #[test]
+    fn author_event_serialization() {
+        let json = serde_json::to_value(AuthorEvent::ApprovalFlowStarted).unwrap();
+        assert_eq!(json, "approval_flow_started");
+        let loaded: AuthorEvent = serde_json::from_value(json).unwrap();
+        assert_eq!(loaded, AuthorEvent::ApprovalFlowStarted);
+    }
+
+    #[test]
     fn full_state_serialization_round_trip() {
-        let state = make_state(AuthorPhase::Writing, ApprovalMode::Interactive);
+        let state = make_state(
+            AuthorPhase::Writing {
+                draft: default_draft(),
+            },
+            ApprovalMode::Interactive,
+        );
         let json = serde_json::to_value(&state).unwrap();
         let loaded: AuthorWorkflowState = serde_json::from_value(json).unwrap();
         assert_eq!(loaded, state);
@@ -466,7 +603,12 @@ mod tests {
 
     #[test]
     fn can_write_writing_phase_allows() {
-        let state = make_state(AuthorPhase::Writing, ApprovalMode::Interactive);
+        let state = make_state(
+            AuthorPhase::Writing {
+                draft: default_draft(),
+            },
+            ApprovalMode::Interactive,
+        );
         let (allowed, _) = can_write(&state);
         assert!(allowed);
     }
@@ -481,7 +623,12 @@ mod tests {
 
     #[test]
     fn can_write_prewrite_review_denies() {
-        let state = make_state(AuthorPhase::PrewriteReview, ApprovalMode::Interactive);
+        let state = make_state(
+            AuthorPhase::PrewriteReview {
+                review: default_review(),
+            },
+            ApprovalMode::Interactive,
+        );
         let (allowed, reason) = can_write(&state);
         assert!(!allowed);
         assert!(reason.unwrap().contains("pre-write"));
@@ -489,7 +636,13 @@ mod tests {
 
     #[test]
     fn can_write_postwrite_review_denies() {
-        let state = make_state(AuthorPhase::PostwriteReview, ApprovalMode::Interactive);
+        let state = make_state(
+            AuthorPhase::PostwriteReview {
+                review: default_review(),
+                draft: default_draft(),
+            },
+            ApprovalMode::Interactive,
+        );
         let (allowed, reason) = can_write(&state);
         assert!(!allowed);
         assert!(reason.unwrap().contains("post-write"));
@@ -497,7 +650,12 @@ mod tests {
 
     #[test]
     fn can_write_complete_denies() {
-        let state = make_state(AuthorPhase::Complete, ApprovalMode::Interactive);
+        let state = make_state(
+            AuthorPhase::Complete {
+                draft: default_draft(),
+            },
+            ApprovalMode::Interactive,
+        );
         let (allowed, reason) = can_write(&state);
         assert!(!allowed);
         assert!(reason.unwrap().contains("approved"));
@@ -513,7 +671,12 @@ mod tests {
 
     #[test]
     fn can_request_gate_bypass_denies() {
-        let state = make_state(AuthorPhase::Writing, ApprovalMode::Bypass);
+        let state = make_state(
+            AuthorPhase::Writing {
+                draft: default_draft(),
+            },
+            ApprovalMode::Bypass,
+        );
         let (allowed, reason) = can_request_gate(&state, ReviewGate::Postwrite);
         assert!(!allowed);
         assert!(reason.unwrap().contains("bypass"));
@@ -521,50 +684,87 @@ mod tests {
 
     #[test]
     fn can_request_prewrite_gate_in_prewrite_review() {
-        let state = make_state(AuthorPhase::PrewriteReview, ApprovalMode::Interactive);
+        let state = make_state(
+            AuthorPhase::PrewriteReview {
+                review: default_review(),
+            },
+            ApprovalMode::Interactive,
+        );
         let (allowed, _) = can_request_gate(&state, ReviewGate::Prewrite);
         assert!(allowed);
     }
 
     #[test]
     fn can_request_prewrite_gate_wrong_phase() {
-        let state = make_state(AuthorPhase::Writing, ApprovalMode::Interactive);
+        let state = make_state(
+            AuthorPhase::Writing {
+                draft: default_draft(),
+            },
+            ApprovalMode::Interactive,
+        );
         let (allowed, _) = can_request_gate(&state, ReviewGate::Prewrite);
         assert!(!allowed);
     }
 
     #[test]
     fn can_request_postwrite_gate_after_writing() {
-        let mut state = make_state(AuthorPhase::Writing, ApprovalMode::Interactive);
-        state.draft.suite_tree_written = true;
+        let state = make_state(
+            AuthorPhase::Writing {
+                draft: AuthorDraftState {
+                    suite_tree_written: true,
+                    written_paths: vec![],
+                },
+            },
+            ApprovalMode::Interactive,
+        );
         let (allowed, _) = can_request_gate(&state, ReviewGate::Postwrite);
         assert!(allowed);
     }
 
     #[test]
     fn can_request_postwrite_gate_without_writes_denies() {
-        let state = make_state(AuthorPhase::Writing, ApprovalMode::Interactive);
+        let state = make_state(
+            AuthorPhase::Writing {
+                draft: default_draft(),
+            },
+            ApprovalMode::Interactive,
+        );
         let (allowed, _) = can_request_gate(&state, ReviewGate::Postwrite);
         assert!(!allowed);
     }
 
     #[test]
     fn can_request_copy_gate_in_complete() {
-        let state = make_state(AuthorPhase::Complete, ApprovalMode::Interactive);
+        let state = make_state(
+            AuthorPhase::Complete {
+                draft: default_draft(),
+            },
+            ApprovalMode::Interactive,
+        );
         let (allowed, _) = can_request_gate(&state, ReviewGate::Copy);
         assert!(allowed);
     }
 
     #[test]
     fn can_request_copy_gate_wrong_phase() {
-        let state = make_state(AuthorPhase::Writing, ApprovalMode::Interactive);
+        let state = make_state(
+            AuthorPhase::Writing {
+                draft: default_draft(),
+            },
+            ApprovalMode::Interactive,
+        );
         let (allowed, _) = can_request_gate(&state, ReviewGate::Copy);
         assert!(!allowed);
     }
 
     #[test]
     fn can_stop_bypass_allows() {
-        let state = make_state(AuthorPhase::Writing, ApprovalMode::Bypass);
+        let state = make_state(
+            AuthorPhase::Writing {
+                draft: default_draft(),
+            },
+            ApprovalMode::Bypass,
+        );
         let (allowed, _) = can_stop(&state);
         assert!(allowed);
     }
@@ -578,7 +778,12 @@ mod tests {
 
     #[test]
     fn can_stop_writing_denies() {
-        let state = make_state(AuthorPhase::Writing, ApprovalMode::Interactive);
+        let state = make_state(
+            AuthorPhase::Writing {
+                draft: default_draft(),
+            },
+            ApprovalMode::Interactive,
+        );
         let (allowed, reason) = can_stop(&state);
         assert!(!allowed);
         assert!(reason.unwrap().contains("post-write"));
@@ -586,7 +791,13 @@ mod tests {
 
     #[test]
     fn can_stop_postwrite_review_denies() {
-        let state = make_state(AuthorPhase::PostwriteReview, ApprovalMode::Interactive);
+        let state = make_state(
+            AuthorPhase::PostwriteReview {
+                review: default_review(),
+                draft: default_draft(),
+            },
+            ApprovalMode::Interactive,
+        );
         let (allowed, reason) = can_stop(&state);
         assert!(!allowed);
         assert!(reason.unwrap().contains("post-write"));
@@ -607,34 +818,63 @@ mod tests {
 
     #[test]
     fn next_action_each_phase() {
-        let phases = [
+        let phases: Vec<(AuthorPhase, &str)> = vec![
             (AuthorPhase::Discovery, "discovery"),
-            (AuthorPhase::PrewriteReview, "pre-write"),
-            (AuthorPhase::PostwriteReview, "post-write"),
+            (
+                AuthorPhase::PrewriteReview {
+                    review: default_review(),
+                },
+                "pre-write",
+            ),
+            (
+                AuthorPhase::PostwriteReview {
+                    review: default_review(),
+                    draft: default_draft(),
+                },
+                "post-write",
+            ),
             (AuthorPhase::Cancelled, "cancelled"),
-            (AuthorPhase::Complete, "approved"),
+            (
+                AuthorPhase::Complete {
+                    draft: default_draft(),
+                },
+                "approved",
+            ),
         ];
         for (phase, expected_substr) in phases {
-            let state = make_state(phase, ApprovalMode::Interactive);
+            let state = make_state(phase.clone(), ApprovalMode::Interactive);
             let action = next_action(Some(&state));
             assert!(
                 action.to_lowercase().contains(expected_substr),
-                "phase {phase:?} action should contain '{expected_substr}': {action}"
+                "phase {} action should contain '{expected_substr}': {action}",
+                phase.name()
             );
         }
     }
 
     #[test]
     fn next_action_writing_with_suite_written() {
-        let mut state = make_state(AuthorPhase::Writing, ApprovalMode::Interactive);
-        state.draft.suite_tree_written = true;
+        let state = make_state(
+            AuthorPhase::Writing {
+                draft: AuthorDraftState {
+                    suite_tree_written: true,
+                    written_paths: vec![],
+                },
+            },
+            ApprovalMode::Interactive,
+        );
         let action = next_action(Some(&state));
         assert!(action.contains("edit round"));
     }
 
     #[test]
     fn next_action_writing_without_suite_written() {
-        let state = make_state(AuthorPhase::Writing, ApprovalMode::Interactive);
+        let state = make_state(
+            AuthorPhase::Writing {
+                draft: default_draft(),
+            },
+            ApprovalMode::Interactive,
+        );
         let action = next_action(Some(&state));
         assert!(action.contains("initial"));
     }
@@ -679,11 +919,23 @@ mod tests {
     }
 
     #[test]
-    fn has_written_suite_delegates_to_draft() {
-        let mut state = make_state(AuthorPhase::Writing, ApprovalMode::Interactive);
-        assert!(!state.has_written_suite());
-        state.draft.suite_tree_written = true;
+    fn has_written_suite_from_writing_phase() {
+        let state = make_state(
+            AuthorPhase::Writing {
+                draft: AuthorDraftState {
+                    suite_tree_written: true,
+                    written_paths: vec![],
+                },
+            },
+            ApprovalMode::Interactive,
+        );
         assert!(state.has_written_suite());
+    }
+
+    #[test]
+    fn has_written_suite_false_in_discovery() {
+        let state = make_state(AuthorPhase::Discovery, ApprovalMode::Interactive);
+        assert!(!state.has_written_suite());
     }
 
     #[test]
@@ -703,5 +955,76 @@ mod tests {
             suite_dir: None,
         };
         assert_eq!(info_none.suite_path(), None);
+    }
+
+    // Transition tests
+    #[test]
+    fn transition_discovery_to_prewrite() {
+        let state = make_state(AuthorPhase::Discovery, ApprovalMode::Interactive);
+        let result = state.transition(
+            AuthorEvent::ProposalReady,
+            AuthorPhase::PrewriteReview {
+                review: default_review(),
+            },
+        );
+        assert!(result.is_ok());
+        let new = result.unwrap();
+        assert_eq!(new.transition_count, 1);
+        assert_eq!(new.last_event, Some(AuthorEvent::ProposalReady));
+    }
+
+    #[test]
+    fn transition_discovery_to_writing_bypass() {
+        let state = make_state(AuthorPhase::Discovery, ApprovalMode::Bypass);
+        let result = state.transition(
+            AuthorEvent::WritingStarted,
+            AuthorPhase::Writing {
+                draft: default_draft(),
+            },
+        );
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn transition_rejects_discovery_to_complete() {
+        let state = make_state(AuthorPhase::Discovery, ApprovalMode::Interactive);
+        let result = state.transition(
+            AuthorEvent::FlowCompleted,
+            AuthorPhase::Complete {
+                draft: default_draft(),
+            },
+        );
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn transition_any_to_cancelled() {
+        let state = make_state(
+            AuthorPhase::Writing {
+                draft: default_draft(),
+            },
+            ApprovalMode::Interactive,
+        );
+        let result = state.transition(AuthorEvent::FlowCancelled, AuthorPhase::Cancelled);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn phase_name_returns_correct_string() {
+        assert_eq!(AuthorPhase::Discovery.name(), "discovery");
+        assert_eq!(
+            AuthorPhase::PrewriteReview {
+                review: default_review()
+            }
+            .name(),
+            "prewrite_review"
+        );
+        assert_eq!(
+            AuthorPhase::Writing {
+                draft: default_draft()
+            }
+            .name(),
+            "writing"
+        );
     }
 }

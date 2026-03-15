@@ -235,7 +235,7 @@ fn allowed_command(state: &RunnerWorkflowState, words: &[String]) -> (bool, Opti
         return (true, None);
     }
     let sub = sig[1].as_str();
-    match state.phase {
+    match &state.phase {
         RunnerPhase::Completed | RunnerPhase::Aborted => match sub {
             "closeout" | "runner-state" | "report" | "session-stop" => (true, None),
             _ => (
@@ -243,11 +243,11 @@ fn allowed_command(state: &RunnerWorkflowState, words: &[String]) -> (bool, Opti
                 Some("the run has reached a final state; only closeout commands are allowed"),
             ),
         },
-        RunnerPhase::Triage => {
+        RunnerPhase::Triage { suite_fix, .. } => {
             if matches!(sub, "runner-state" | "report" | "closeout") {
                 return (true, None);
             }
-            if state.suite_fix.is_some() {
+            if suite_fix.is_some() {
                 return (true, None);
             }
             (true, None)
