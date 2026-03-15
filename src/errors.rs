@@ -349,335 +349,95 @@ define_cli_errors! {
 }
 
 // --- CliErrorKind constructors ---
-//
-// Each variant with fields gets a constructor that accepts
-// `impl Into<Cow<'static, str>>`. Callers pass `&'static str` (zero-alloc),
-// `String` (wraps existing allocation), or `cow!(...)` (format + wrap).
 
-#[allow(clippy::too_many_arguments)]
-impl CliErrorKind {
-    pub fn missing_tools(tools: impl Into<Cow<'static, str>>) -> Self {
-        Self::MissingTools {
-            tools: tools.into(),
+macro_rules! cli_constructor {
+    ($fn_name:ident, $Variant:ident, $($field:ident),+) => {
+        pub fn $fn_name($($field: impl Into<Cow<'static, str>>),+) -> Self {
+            Self::$Variant { $($field: $field.into()),+ }
         }
-    }
-    pub fn unsafe_name(name: impl Into<Cow<'static, str>>) -> Self {
-        Self::UnsafeName { name: name.into() }
-    }
-    pub fn command_failed(command: impl Into<Cow<'static, str>>) -> Self {
-        Self::CommandFailed {
-            command: command.into(),
-        }
-    }
-    pub fn missing_closeout_artifact(rel: impl Into<Cow<'static, str>>) -> Self {
-        Self::MissingCloseoutArtifact { rel: rel.into() }
-    }
-    pub fn missing_run_context_value(field: impl Into<Cow<'static, str>>) -> Self {
-        Self::MissingRunContextValue {
-            field: field.into(),
-        }
-    }
-    pub fn missing_run_location(run_id: impl Into<Cow<'static, str>>) -> Self {
-        Self::MissingRunLocation {
-            run_id: run_id.into(),
-        }
-    }
-    pub fn run_dir_exists(run_dir: impl Into<Cow<'static, str>>) -> Self {
-        Self::RunDirExists {
-            run_dir: run_dir.into(),
-        }
-    }
-    pub fn run_group_already_recorded(group_id: impl Into<Cow<'static, str>>) -> Self {
-        Self::RunGroupAlreadyRecorded {
-            group_id: group_id.into(),
-        }
-    }
-    pub fn run_group_not_found(group_id: impl Into<Cow<'static, str>>) -> Self {
-        Self::RunGroupNotFound {
-            group_id: group_id.into(),
-        }
-    }
-    pub fn missing_file(path: impl Into<Cow<'static, str>>) -> Self {
-        Self::MissingFile { path: path.into() }
-    }
-    pub fn invalid_json(path: impl Into<Cow<'static, str>>) -> Self {
-        Self::InvalidJson { path: path.into() }
-    }
-    pub fn path_not_found(dotted_path: impl Into<Cow<'static, str>>) -> Self {
-        Self::PathNotFound {
-            dotted_path: dotted_path.into(),
-        }
-    }
-    pub fn not_a_mapping(label: impl Into<Cow<'static, str>>) -> Self {
-        Self::NotAMapping {
-            label: label.into(),
-        }
-    }
-    pub fn not_string_keys(label: impl Into<Cow<'static, str>>) -> Self {
-        Self::NotStringKeys {
-            label: label.into(),
-        }
-    }
-    pub fn not_a_list(label: impl Into<Cow<'static, str>>) -> Self {
-        Self::NotAList {
-            label: label.into(),
-        }
-    }
-    pub fn not_all_strings(label: impl Into<Cow<'static, str>>) -> Self {
-        Self::NotAllStrings {
-            label: label.into(),
-        }
-    }
-    pub fn missing_fields(
-        label: impl Into<Cow<'static, str>>,
-        fields: impl Into<Cow<'static, str>>,
-    ) -> Self {
-        Self::MissingFields {
-            label: label.into(),
-            fields: fields.into(),
-        }
-    }
-    pub fn field_type_mismatch(
-        label: impl Into<Cow<'static, str>>,
-        field: impl Into<Cow<'static, str>>,
-        expected: impl Into<Cow<'static, str>>,
-    ) -> Self {
-        Self::FieldTypeMismatch {
-            label: label.into(),
-            field: field.into(),
-            expected: expected.into(),
-        }
-    }
-    pub fn missing_sections(
-        label: impl Into<Cow<'static, str>>,
-        sections: impl Into<Cow<'static, str>>,
-    ) -> Self {
-        Self::MissingSections {
-            label: label.into(),
-            sections: sections.into(),
-        }
-    }
-    pub fn gateway_download_empty(path: impl Into<Cow<'static, str>>) -> Self {
-        Self::GatewayDownloadEmpty { path: path.into() }
-    }
-    pub fn no_resource_kinds(manifest: impl Into<Cow<'static, str>>) -> Self {
-        Self::NoResourceKinds {
-            manifest: manifest.into(),
-        }
-    }
-    pub fn route_not_found(route_match: impl Into<Cow<'static, str>>) -> Self {
-        Self::RouteNotFound {
-            route_match: route_match.into(),
-        }
-    }
-    pub fn kubectl_target_override_forbidden(flag: impl Into<Cow<'static, str>>) -> Self {
-        Self::KubectlTargetOverrideForbidden { flag: flag.into() }
-    }
-    pub fn unknown_tracked_cluster(
-        cluster: impl Into<Cow<'static, str>>,
-        choices: impl Into<Cow<'static, str>>,
-    ) -> Self {
-        Self::UnknownTrackedCluster {
-            cluster: cluster.into(),
-            choices: choices.into(),
-        }
-    }
-    pub fn non_local_kubeconfig(path: impl Into<Cow<'static, str>>) -> Self {
-        Self::NonLocalKubeconfig { path: path.into() }
-    }
-    pub fn envoy_config_type_not_found(type_name: impl Into<Cow<'static, str>>) -> Self {
-        Self::EnvoyConfigTypeNotFound {
-            type_name: type_name.into(),
-        }
-    }
-    pub fn envoy_capture_args_required(fields: impl Into<Cow<'static, str>>) -> Self {
-        Self::EnvoyCaptureArgsRequired {
-            fields: fields.into(),
-        }
-    }
-    pub fn report_line_limit(
-        count: impl Into<Cow<'static, str>>,
-        limit: impl Into<Cow<'static, str>>,
-    ) -> Self {
-        Self::ReportLineLimit {
-            count: count.into(),
-            limit: limit.into(),
-        }
-    }
-    pub fn report_code_block_limit(
-        count: impl Into<Cow<'static, str>>,
-        limit: impl Into<Cow<'static, str>>,
-    ) -> Self {
-        Self::ReportCodeBlockLimit {
-            count: count.into(),
-            limit: limit.into(),
-        }
-    }
-    pub fn evidence_label_not_found(label: impl Into<Cow<'static, str>>) -> Self {
-        Self::EvidenceLabelNotFound {
-            label: label.into(),
-        }
-    }
-    pub fn authoring_payload_invalid(
-        kind: impl Into<Cow<'static, str>>,
-        details: impl Into<Cow<'static, str>>,
-    ) -> Self {
-        Self::AuthoringPayloadInvalid {
-            kind: kind.into(),
-            details: details.into(),
-        }
-    }
-    pub fn authoring_show_kind_missing(kind: impl Into<Cow<'static, str>>) -> Self {
-        Self::AuthoringShowKindMissing { kind: kind.into() }
-    }
-    pub fn amendments_required(path: impl Into<Cow<'static, str>>) -> Self {
-        Self::AmendmentsRequired { path: path.into() }
-    }
-    pub fn authoring_validate_failed(targets: impl Into<Cow<'static, str>>) -> Self {
-        Self::AuthoringValidateFailed {
-            targets: targets.into(),
-        }
-    }
-    pub fn io(detail: impl Into<Cow<'static, str>>) -> Self {
-        Self::Io {
-            detail: detail.into(),
-        }
-    }
-    pub fn serialize(detail: impl Into<Cow<'static, str>>) -> Self {
-        Self::Serialize {
-            detail: detail.into(),
-        }
-    }
-    pub fn hook_payload_invalid(detail: impl Into<Cow<'static, str>>) -> Self {
-        Self::HookPayloadInvalid {
-            detail: detail.into(),
-        }
-    }
-    pub fn cluster_error(detail: impl Into<Cow<'static, str>>) -> Self {
-        Self::ClusterError {
-            detail: detail.into(),
-        }
-    }
-    pub fn usage_error(detail: impl Into<Cow<'static, str>>) -> Self {
-        Self::UsageError {
-            detail: detail.into(),
-        }
-    }
-    pub fn workflow_io(detail: impl Into<Cow<'static, str>>) -> Self {
-        Self::WorkflowIo {
-            detail: detail.into(),
-        }
-    }
-    pub fn workflow_parse(detail: impl Into<Cow<'static, str>>) -> Self {
-        Self::WorkflowParse {
-            detail: detail.into(),
-        }
-    }
-    pub fn workflow_version(detail: impl Into<Cow<'static, str>>) -> Self {
-        Self::WorkflowVersion {
-            detail: detail.into(),
-        }
-    }
-    pub fn workflow_serialize(detail: impl Into<Cow<'static, str>>) -> Self {
-        Self::WorkflowSerialize {
-            detail: detail.into(),
-        }
-    }
-    pub fn json_parse(detail: impl Into<Cow<'static, str>>) -> Self {
-        Self::JsonParse {
-            detail: detail.into(),
-        }
-    }
+    };
 }
 
 impl CliErrorKind {
-    /// Error code identifying this error kind.
-    #[must_use]
-    pub fn code(&self) -> &'static str {
-        match self {
-            Self::EmptyCommandArgs => "KSRCLI001",
-            Self::MissingTools { .. } => "KSRCLI002",
-            Self::CommandFailed { .. } => "KSRCLI004",
-            Self::MissingRunPointer => "KSRCLI005",
-            Self::MissingCloseoutArtifact { .. } => "KSRCLI006",
-            Self::MissingStateCapture => "KSRCLI007",
-            Self::VerdictPending => "KSRCLI008",
-            Self::MissingRunContextValue { .. } => "KSRCLI009",
-            Self::NotAMapping { .. } => "KSRCLI010",
-            Self::NotStringKeys { .. } => "KSRCLI011",
-            Self::NotAList { .. } => "KSRCLI012",
-            Self::NotAllStrings { .. } => "KSRCLI013",
-            Self::MissingFile { .. } => "KSRCLI014",
-            Self::MissingFrontmatter => "KSRCLI015",
-            Self::UnterminatedFrontmatter => "KSRCLI016",
-            Self::PathNotFound { .. } => "KSRCLI017",
-            Self::MissingRunLocation { .. } => "KSRCLI018",
-            Self::InvalidJson { .. } => "KSRCLI019",
-            Self::MissingFields { .. } => "KSRCLI020",
-            Self::MissingSections { .. } => "KSRCLI021",
-            Self::FieldTypeMismatch { .. } => "KSRCLI022",
-            Self::NoResourceKinds { .. } => "KSRCLI030",
-            Self::RouteNotFound { .. } => "KSRCLI031",
-            Self::GatewayVersionMissing => "KSRCLI032",
-            Self::GatewayCrdsMissing => "KSRCLI033",
-            Self::KumactlNotFound => "KSRCLI034",
-            Self::ReportLineLimit { .. } => "KSRCLI035",
-            Self::ReportCodeBlockLimit { .. } => "KSRCLI036",
-            Self::AuthoringSessionMissing => "KSRCLI040",
-            Self::AuthoringPayloadMissing => "KSRCLI041",
-            Self::AuthoringPayloadInvalid { .. } => "KSRCLI042",
-            Self::AuthoringShowKindMissing { .. } => "KSRCLI043",
-            Self::RunDirExists { .. } => "KSRCLI044",
-            Self::AmendmentsRequired { .. } => "KSRCLI045",
-            Self::AuthoringValidateFailed { .. } => "KSRCLI046",
-            Self::KubectlValidateDecisionRequired => "KSRCLI047",
-            Self::KubectlValidateUnavailable => "KSRCLI048",
-            Self::TrackedKubectlRequired => "KSRCLI049",
-            Self::KubectlTargetOverrideForbidden { .. } => "KSRCLI050",
-            Self::UnknownTrackedCluster { .. } => "KSRCLI051",
-            Self::NonLocalKubeconfig { .. } => "KSRCLI052",
-            Self::RunGroupAlreadyRecorded { .. } => "KSRCLI053",
-            Self::RunGroupNotFound { .. } => "KSRCLI054",
-            Self::EnvoyConfigTypeNotFound { .. } => "KSRCLI055",
-            Self::EnvoyCaptureArgsRequired { .. } => "KSRCLI056",
-            Self::EvidenceLabelNotFound { .. } => "KSRCLI057",
-            Self::ReportGroupEvidenceRequired => "KSRCLI058",
-            Self::UnsafeName { .. } => "KSRCLI059",
-            Self::MissingRunStatus => "KSRCLI060",
-            Self::GatewayDownloadEmpty { .. } => "KSRCLI061",
-            Self::MarkdownShapeMismatch => "KSRCLI999",
-            Self::Io { .. } => "IO001",
-            Self::Serialize { .. } => "IO002",
-            Self::HookPayloadInvalid { .. } => "KSH001",
-            Self::WorkflowIo { .. } => "WORKFLOW_IO",
-            Self::WorkflowParse { .. } => "WORKFLOW_PARSE",
-            Self::WorkflowVersion { .. } => "WORKFLOW_VERSION",
-            Self::WorkflowSerialize { .. } => "WORKFLOW_SERIALIZE",
-            Self::JsonParse { .. } => "JSON",
-            Self::ClusterError { .. } => "CLUSTER",
-            Self::UsageError { .. } => "USAGE",
-        }
-    }
+    cli_constructor!(missing_tools, MissingTools, tools);
+    cli_constructor!(unsafe_name, UnsafeName, name);
+    cli_constructor!(command_failed, CommandFailed, command);
+    cli_constructor!(missing_closeout_artifact, MissingCloseoutArtifact, rel);
+    cli_constructor!(missing_run_context_value, MissingRunContextValue, field);
+    cli_constructor!(missing_run_location, MissingRunLocation, run_id);
+    cli_constructor!(run_dir_exists, RunDirExists, run_dir);
+    cli_constructor!(
+        run_group_already_recorded,
+        RunGroupAlreadyRecorded,
+        group_id
+    );
+    cli_constructor!(run_group_not_found, RunGroupNotFound, group_id);
+    cli_constructor!(missing_file, MissingFile, path);
+    cli_constructor!(invalid_json, InvalidJson, path);
+    cli_constructor!(path_not_found, PathNotFound, dotted_path);
+    cli_constructor!(not_a_mapping, NotAMapping, label);
+    cli_constructor!(not_string_keys, NotStringKeys, label);
+    cli_constructor!(not_a_list, NotAList, label);
+    cli_constructor!(not_all_strings, NotAllStrings, label);
+    cli_constructor!(missing_fields, MissingFields, label, fields);
+    cli_constructor!(
+        field_type_mismatch,
+        FieldTypeMismatch,
+        label,
+        field,
+        expected
+    );
+    cli_constructor!(missing_sections, MissingSections, label, sections);
+    cli_constructor!(gateway_download_empty, GatewayDownloadEmpty, path);
+    cli_constructor!(no_resource_kinds, NoResourceKinds, manifest);
+    cli_constructor!(route_not_found, RouteNotFound, route_match);
+    cli_constructor!(
+        kubectl_target_override_forbidden,
+        KubectlTargetOverrideForbidden,
+        flag
+    );
+    cli_constructor!(
+        unknown_tracked_cluster,
+        UnknownTrackedCluster,
+        cluster,
+        choices
+    );
+    cli_constructor!(non_local_kubeconfig, NonLocalKubeconfig, path);
+    cli_constructor!(
+        envoy_config_type_not_found,
+        EnvoyConfigTypeNotFound,
+        type_name
+    );
+    cli_constructor!(
+        envoy_capture_args_required,
+        EnvoyCaptureArgsRequired,
+        fields
+    );
+    cli_constructor!(report_line_limit, ReportLineLimit, count, limit);
+    cli_constructor!(report_code_block_limit, ReportCodeBlockLimit, count, limit);
+    cli_constructor!(evidence_label_not_found, EvidenceLabelNotFound, label);
+    cli_constructor!(
+        authoring_payload_invalid,
+        AuthoringPayloadInvalid,
+        kind,
+        details
+    );
+    cli_constructor!(authoring_show_kind_missing, AuthoringShowKindMissing, kind);
+    cli_constructor!(amendments_required, AmendmentsRequired, path);
+    cli_constructor!(authoring_validate_failed, AuthoringValidateFailed, targets);
+    cli_constructor!(io, Io, detail);
+    cli_constructor!(serialize, Serialize, detail);
+    cli_constructor!(hook_payload_invalid, HookPayloadInvalid, detail);
+    cli_constructor!(cluster_error, ClusterError, detail);
+    cli_constructor!(usage_error, UsageError, detail);
+    cli_constructor!(workflow_io, WorkflowIo, detail);
+    cli_constructor!(workflow_parse, WorkflowParse, detail);
+    cli_constructor!(workflow_version, WorkflowVersion, detail);
+    cli_constructor!(workflow_serialize, WorkflowSerialize, detail);
+    cli_constructor!(json_parse, JsonParse, detail);
+}
 
-    /// Process exit code for this error kind.
-    #[must_use]
-    pub fn exit_code(&self) -> i32 {
-        match self {
-            Self::EmptyCommandArgs | Self::MissingTools { .. } | Self::UnsafeName { .. } => 3,
-            Self::CommandFailed { .. } => 4,
-            Self::MarkdownShapeMismatch => 6,
-            Self::Io { .. }
-            | Self::Serialize { .. }
-            | Self::HookPayloadInvalid { .. }
-            | Self::GatewayCrdsMissing
-            | Self::ReportLineLimit { .. }
-            | Self::ReportCodeBlockLimit { .. }
-            | Self::ClusterError { .. }
-            | Self::UsageError { .. } => 1,
-            _ => 5,
-        }
-    }
-
+impl CliErrorKind {
     /// Optional hint for this error kind.
     #[must_use]
     pub fn hint(&self) -> Option<String> {
