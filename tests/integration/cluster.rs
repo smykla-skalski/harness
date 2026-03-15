@@ -182,36 +182,35 @@ fn global_zone_up_orchestration() {
     let mut tc = FakeToolchain::new();
     tc.add_make().add_k3d_cluster_list(&[]);
     let orig_path = env::var("PATH").unwrap_or_default();
-    unsafe {
-        with_env_vars(
-            &[
-                ("PATH", Some(&tc.path_with_prepend(&orig_path))),
-                ("HOME", Some(tmp.path().to_str().unwrap())),
-            ],
-            || {
-                let result = cluster::execute(
-                    "global-zone-up",
-                    "kuma-global",
-                    &["kuma-zone".into(), "zone-1".into()],
-                    Some(repo.to_str().unwrap()),
-                    None,
-                    &[],
-                    &[],
-                );
-                assert!(result.is_ok(), "global-zone-up failed: {result:?}");
-                assert_eq!(result.unwrap(), 0);
+    let new_path = tc.path_with_prepend(&orig_path);
+    temp_env::with_vars(
+        [
+            ("PATH", Some(new_path.as_str())),
+            ("HOME", Some(tmp.path().to_str().unwrap())),
+        ],
+        || {
+            let result = cluster::execute(
+                "global-zone-up",
+                "kuma-global",
+                &["kuma-zone".into(), "zone-1".into()],
+                Some(repo.to_str().unwrap()),
+                None,
+                &[],
+                &[],
+            );
+            assert!(result.is_ok(), "global-zone-up failed: {result:?}");
+            assert_eq!(result.unwrap(), 0);
 
-                // global-zone-up calls start_and_deploy twice (global + zone),
-                // each calling make k3d/start and make k3d/deploy/helm = 4 make calls
-                let make_calls = tc.invocations("make");
-                assert!(
-                    make_calls.len() >= 2,
-                    "expected multiple make invocations, got {}",
-                    make_calls.len()
-                );
-            },
-        );
-    }
+            // global-zone-up calls start_and_deploy twice (global + zone),
+            // each calling make k3d/start and make k3d/deploy/helm = 4 make calls
+            let make_calls = tc.invocations("make");
+            assert!(
+                make_calls.len() >= 2,
+                "expected multiple make invocations, got {}",
+                make_calls.len()
+            );
+        },
+    );
 }
 
 #[test]
@@ -233,27 +232,26 @@ fn single_up_logs_stage_updates() {
     let mut tc = FakeToolchain::new();
     tc.add_make().add_k3d_cluster_list(&[]);
     let orig_path = env::var("PATH").unwrap_or_default();
-    unsafe {
-        with_env_vars(
-            &[
-                ("PATH", Some(&tc.path_with_prepend(&orig_path))),
-                ("HOME", Some(tmp.path().to_str().unwrap())),
-            ],
-            || {
-                let result = cluster::execute(
-                    "single-up",
-                    "kuma-test",
-                    &[],
-                    Some(repo.to_str().unwrap()),
-                    None,
-                    &[],
-                    &[],
-                );
-                assert!(result.is_ok(), "single-up failed: {result:?}");
-                assert_eq!(result.unwrap(), 0);
-            },
-        );
-    }
+    let new_path = tc.path_with_prepend(&orig_path);
+    temp_env::with_vars(
+        [
+            ("PATH", Some(new_path.as_str())),
+            ("HOME", Some(tmp.path().to_str().unwrap())),
+        ],
+        || {
+            let result = cluster::execute(
+                "single-up",
+                "kuma-test",
+                &[],
+                Some(repo.to_str().unwrap()),
+                None,
+                &[],
+                &[],
+            );
+            assert!(result.is_ok(), "single-up failed: {result:?}");
+            assert_eq!(result.unwrap(), 0);
+        },
+    );
 }
 
 #[test]
@@ -275,27 +273,26 @@ fn single_up_metallb_template() {
     let mut tc = FakeToolchain::new();
     tc.add_make().add_k3d_cluster_list(&[]);
     let orig_path = env::var("PATH").unwrap_or_default();
-    unsafe {
-        with_env_vars(
-            &[
-                ("PATH", Some(&tc.path_with_prepend(&orig_path))),
-                ("HOME", Some(tmp.path().to_str().unwrap())),
-            ],
-            || {
-                let result = cluster::execute(
-                    "single-up",
-                    "kuma-metallb",
-                    &[],
-                    Some(repo.to_str().unwrap()),
-                    None,
-                    &[],
-                    &[],
-                );
-                assert!(result.is_ok(), "single-up metallb failed: {result:?}");
-                assert_eq!(result.unwrap(), 0);
-            },
-        );
-    }
+    let new_path = tc.path_with_prepend(&orig_path);
+    temp_env::with_vars(
+        [
+            ("PATH", Some(new_path.as_str())),
+            ("HOME", Some(tmp.path().to_str().unwrap())),
+        ],
+        || {
+            let result = cluster::execute(
+                "single-up",
+                "kuma-metallb",
+                &[],
+                Some(repo.to_str().unwrap()),
+                None,
+                &[],
+                &[],
+            );
+            assert!(result.is_ok(), "single-up metallb failed: {result:?}");
+            assert_eq!(result.unwrap(), 0);
+        },
+    );
 }
 
 #[test]
@@ -333,27 +330,26 @@ fn single_up_restores_context() {
     let mut tc = FakeToolchain::new();
     tc.add_make().add_k3d_cluster_list(&[]);
     let orig_path = env::var("PATH").unwrap_or_default();
-    unsafe {
-        with_env_vars(
-            &[
-                ("PATH", Some(&tc.path_with_prepend(&orig_path))),
-                ("HOME", Some(tmp.path().to_str().unwrap())),
-            ],
-            || {
-                let result = cluster::execute(
-                    "single-up",
-                    "kuma-ctx",
-                    &[],
-                    Some(repo.to_str().unwrap()),
-                    Some(run_dir.to_str().unwrap()),
-                    &[],
-                    &[],
-                );
-                assert!(result.is_ok(), "single-up with context failed: {result:?}");
-                assert_eq!(result.unwrap(), 0);
-            },
-        );
-    }
+    let new_path = tc.path_with_prepend(&orig_path);
+    temp_env::with_vars(
+        [
+            ("PATH", Some(new_path.as_str())),
+            ("HOME", Some(tmp.path().to_str().unwrap())),
+        ],
+        || {
+            let result = cluster::execute(
+                "single-up",
+                "kuma-ctx",
+                &[],
+                Some(repo.to_str().unwrap()),
+                Some(run_dir.to_str().unwrap()),
+                &[],
+                &[],
+            );
+            assert!(result.is_ok(), "single-up with context failed: {result:?}");
+            assert_eq!(result.unwrap(), 0);
+        },
+    );
 }
 
 #[test]
@@ -376,59 +372,57 @@ fn cluster_context_up_down() {
     let mut tc = FakeToolchain::new();
     tc.add_make().add_k3d_cluster_list(&[]);
     let orig_path = env::var("PATH").unwrap_or_default();
-    unsafe {
-        with_env_vars(
-            &[
-                ("PATH", Some(&tc.path_with_prepend(&orig_path))),
-                ("HOME", Some(tmp.path().to_str().unwrap())),
-            ],
-            || {
-                let up_result = cluster::execute(
-                    "single-up",
-                    "kuma-updown",
-                    &[],
-                    Some(repo.to_str().unwrap()),
-                    None,
-                    &[],
-                    &[],
-                );
-                assert!(up_result.is_ok(), "single-up failed: {up_result:?}");
-                assert_eq!(up_result.unwrap(), 0);
-            },
-        );
-    }
+    let new_path = tc.path_with_prepend(&orig_path);
+    temp_env::with_vars(
+        [
+            ("PATH", Some(new_path.as_str())),
+            ("HOME", Some(tmp.path().to_str().unwrap())),
+        ],
+        || {
+            let up_result = cluster::execute(
+                "single-up",
+                "kuma-updown",
+                &[],
+                Some(repo.to_str().unwrap()),
+                None,
+                &[],
+                &[],
+            );
+            assert!(up_result.is_ok(), "single-up failed: {up_result:?}");
+            assert_eq!(up_result.unwrap(), 0);
+        },
+    );
 
     // Second: single-down with the cluster present in k3d list
     let mut tc2 = FakeToolchain::new();
     tc2.add_make().add_k3d_cluster_list(&["kuma-updown"]);
-    unsafe {
-        with_env_vars(
-            &[
-                ("PATH", Some(&tc2.path_with_prepend(&orig_path))),
-                ("HOME", Some(tmp.path().to_str().unwrap())),
-            ],
-            || {
-                let down_result = cluster::execute(
-                    "single-down",
-                    "kuma-updown",
-                    &[],
-                    Some(repo.to_str().unwrap()),
-                    None,
-                    &[],
-                    &[],
-                );
-                assert!(down_result.is_ok(), "single-down failed: {down_result:?}");
-                assert_eq!(down_result.unwrap(), 0);
+    let new_path2 = tc2.path_with_prepend(&orig_path);
+    temp_env::with_vars(
+        [
+            ("PATH", Some(new_path2.as_str())),
+            ("HOME", Some(tmp.path().to_str().unwrap())),
+        ],
+        || {
+            let down_result = cluster::execute(
+                "single-down",
+                "kuma-updown",
+                &[],
+                Some(repo.to_str().unwrap()),
+                None,
+                &[],
+                &[],
+            );
+            assert!(down_result.is_ok(), "single-down failed: {down_result:?}");
+            assert_eq!(down_result.unwrap(), 0);
 
-                // single-down should have called make k3d/stop
-                let make_calls = tc2.invocations("make");
-                assert!(
-                    make_calls.iter().any(|c| c.contains("k3d/stop")),
-                    "expected make k3d/stop invocation, got: {make_calls:?}"
-                );
-            },
-        );
-    }
+            // single-down should have called make k3d/stop
+            let make_calls = tc2.invocations("make");
+            assert!(
+                make_calls.iter().any(|c| c.contains("k3d/stop")),
+                "expected make k3d/stop invocation, got: {make_calls:?}"
+            );
+        },
+    );
 }
 
 #[test]
@@ -450,30 +444,29 @@ fn cluster_uses_saved_repo_root() {
     let mut tc = FakeToolchain::new();
     tc.add_make().add_k3d_cluster_list(&[]);
     let orig_path = env::var("PATH").unwrap_or_default();
-    unsafe {
-        with_env_vars(
-            &[
-                ("PATH", Some(&tc.path_with_prepend(&orig_path))),
-                ("HOME", Some(tmp.path().to_str().unwrap())),
-            ],
-            || {
-                let result = cluster::execute(
-                    "single-up",
-                    "kuma-saved",
-                    &[],
-                    Some(repo.to_str().unwrap()),
-                    None,
-                    &[],
-                    &[],
-                );
-                assert!(
-                    result.is_ok(),
-                    "cluster with saved repo root failed: {result:?}"
-                );
-                assert_eq!(result.unwrap(), 0);
-            },
-        );
-    }
+    let new_path = tc.path_with_prepend(&orig_path);
+    temp_env::with_vars(
+        [
+            ("PATH", Some(new_path.as_str())),
+            ("HOME", Some(tmp.path().to_str().unwrap())),
+        ],
+        || {
+            let result = cluster::execute(
+                "single-up",
+                "kuma-saved",
+                &[],
+                Some(repo.to_str().unwrap()),
+                None,
+                &[],
+                &[],
+            );
+            assert!(
+                result.is_ok(),
+                "cluster with saved repo root failed: {result:?}"
+            );
+            assert_eq!(result.unwrap(), 0);
+        },
+    );
 }
 
 #[test]

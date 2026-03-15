@@ -168,8 +168,7 @@ fn is_installable(path: &Path) -> bool {
         // Check writable + executable
         if let Ok(meta) = path.metadata() {
             let mode = meta.mode();
-            let uid = unsafe { libc::getuid() };
-            if meta.uid() == uid {
+            if meta.uid() == uzers::get_current_uid() {
                 return mode & 0o300 == 0o300;
             }
             // Fallback: try to check group/other
@@ -191,8 +190,6 @@ fn canonical_or_same(path: &Path) -> PathBuf {
 
 #[cfg(test)]
 mod tests {
-    use std::env;
-
     use super::*;
 
     #[test]
@@ -216,17 +213,8 @@ mod tests {
         let local_bin = dir.path().join(".local").join("bin");
         fs::create_dir_all(&local_bin).unwrap();
 
-        // We need HOME set to our temp dir for dirs_home()
-        let original_home = env::var("HOME").ok();
-        unsafe { env::set_var("HOME", dir.path()) };
-
         let path_env = local_bin.to_string_lossy().to_string();
-        let result = choose_install_dir(&path_env);
-
-        if let Some(h) = original_home {
-            unsafe { env::set_var("HOME", h) };
-        }
-
+        let result = temp_env::with_var("HOME", Some(dir.path()), || choose_install_dir(&path_env));
         let (chosen, on_path) = result.unwrap();
         // Canonicalize both to handle macOS /private/var vs /var symlink
         assert_eq!(
@@ -289,15 +277,8 @@ mod tests {
         let bin_dir = dir.path().join(".local").join("bin");
         fs::create_dir_all(&bin_dir).unwrap();
 
-        let original_home = env::var("HOME").ok();
-        unsafe { env::set_var("HOME", dir.path()) };
-
         let path_env = bin_dir.to_string_lossy().to_string();
-        let result = main(dir.path(), &path_env);
-
-        if let Some(h) = original_home {
-            unsafe { env::set_var("HOME", h) };
-        }
+        let result = temp_env::with_var("HOME", Some(dir.path()), || main(dir.path(), &path_env));
 
         assert_eq!(result.unwrap(), 0);
         assert!(bin_dir.join("harness").exists());
