@@ -170,6 +170,17 @@ pub fn default_suite() -> SuiteBuilder {
         .keep_clusters(false)
 }
 
+/// Default universal suite: `example.universal.suite` with single-zone-universal profile.
+#[must_use]
+pub fn default_universal_suite() -> SuiteBuilder {
+    SuiteBuilder::new("example.universal.suite")
+        .feature("example-universal")
+        .scope("unit")
+        .profile("single-zone-universal")
+        .group("groups/g01.md")
+        .keep_clusters(false)
+}
+
 // ---------------------------------------------------------------------------
 // GroupBuilder
 // ---------------------------------------------------------------------------
@@ -1617,6 +1628,22 @@ pub fn init_run(tmp_path: &Path, run_id: &str, profile: &str) -> PathBuf {
 pub fn init_run_with_suite(tmp_path: &Path, run_id: &str, profile: &str) -> (PathBuf, PathBuf) {
     RunDirBuilder::new(tmp_path, run_id)
         .profile(profile)
+        .build()
+}
+
+/// Initialize a universal mode run directory.
+#[must_use]
+pub fn init_universal_run(tmp_path: &Path, run_id: &str) -> PathBuf {
+    RunDirBuilder::new(tmp_path, run_id)
+        .profile("single-zone-universal")
+        .build_run_dir()
+}
+
+/// Initialize a universal mode run with suite.
+#[must_use]
+pub fn init_universal_run_with_suite(tmp_path: &Path, run_id: &str) -> (PathBuf, PathBuf) {
+    RunDirBuilder::new(tmp_path, run_id)
+        .profile("single-zone-universal")
         .build()
 }
 

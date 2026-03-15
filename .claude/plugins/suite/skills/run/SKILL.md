@@ -222,11 +222,26 @@ Read [references/cluster-setup.md](references/cluster-setup.md) before starting 
 Select the cluster topology based on the `--profile` flag (default: `single-zone`):
 
 ```bash
-# Single-zone (--profile single-zone):
+# Kubernetes single-zone (--profile single-zone):
 harness cluster single-up kuma-1
 
-# Multi-zone (--profile multi-zone):
+# Kubernetes multi-zone (--profile multi-zone):
 harness cluster global-two-zones-up kuma-1 kuma-2 kuma-3 zone-1 zone-2
+
+# Universal single-zone (--profile single-zone-universal):
+harness cluster --platform universal single-up test-cp
+
+# Universal multi-zone (--profile multi-zone-universal):
+harness cluster --platform universal global-zone-up global-cp zone-cp zone-1
+```
+
+Universal mode uses Docker containers instead of k3d. Policies use REST API format (type/name/mesh). See [references/universal-setup.md](references/universal-setup.md) for the full lifecycle.
+
+For universal mode service containers use `harness token` and `harness service`:
+```bash
+harness token dataplane --name demo-app --mesh default
+harness service up demo-app --image kuma-dp:latest --port 5050
+harness service down demo-app
 ```
 
 If changes modify CRDs, re-run Phase 2 bootstrap for the affected cluster profile and then rerun Phase 3 preflight. Do not use a bare `kubectl apply` during a tracked run.
@@ -368,11 +383,17 @@ After all gates pass, tear down the clusters. This is the default - always clean
 After `harness closeout`, that run is final. Do not reuse it for another cluster bootstrap or execution step. Start a new run with a new `RUN_ID` instead.
 
 ```bash
-# Single-zone
+# Kubernetes single-zone
 harness cluster single-down kuma-1
 
-# Multi-zone (global + 2 zones)
+# Kubernetes multi-zone (global + 2 zones)
 harness cluster global-two-zones-down kuma-1 kuma-2 kuma-3
+
+# Universal single-zone
+harness cluster --platform universal single-down test-cp
+
+# Universal multi-zone
+harness cluster --platform universal global-zone-down global-cp zone-cp
 ```
 
 ## Performance toggles
