@@ -686,7 +686,6 @@ dependencies = [
  "comrak",
  "harness-testkit",
  "insta",
- "libc",
  "predicates",
  "regex",
  "serde",
@@ -695,8 +694,10 @@ dependencies = [
  "sha2",
  "shell-words",
  "tabled",
+ "temp-env",
  "tempfile",
  "thiserror 2.0.18",
+ "uzers",
 ]
 
 [[package]]
@@ -708,6 +709,7 @@ dependencies = [
  "jsonschema",
  "serde_json",
  "serde_yml",
+ "temp-env",
  "tempfile",
 ]
 
@@ -1944,6 +1946,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "temp-env"
+version = "0.3.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "96374855068f47402c3121c6eed88d29cb1de8f3ab27090e273e420bdabcf050"
+dependencies = [
+ "parking_lot",
+]
+
+[[package]]
 name = "tempfile"
 version = "3.27.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2226,6 +2237,15 @@ checksum = "23b082222b4f6619906941c17eb2297fff4c2fb96cb60164170522942a200bd8"
 dependencies = [
  "outref",
  "vsimd",
+]
+
+[[package]]
+name = "uzers"
+version = "0.12.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0b8275fb1afee25b4111d2dc8b5c505dbbc4afd0b990cb96deb2d88bff8be18d"
+dependencies = [
+ "libc",
 ]
 
 [[package]]

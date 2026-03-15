@@ -319,101 +319,90 @@ mod tests {
         {
             let dir = tempfile::tempdir().unwrap();
             let xdg = dir.path().join("xdg");
-            unsafe {
-                harness_testkit::with_env_vars(
-                    &[
-                        ("XDG_DATA_HOME", Some(xdg.to_str().unwrap())),
-                        ("CLAUDE_SESSION_ID", Some("authoring-unit-test")),
-                    ],
-                    || {
-                        let session = AuthoringSession {
-                            repo_root: "/repo".to_string(),
-                            feature: "mesh".to_string(),
-                            mode: "interactive".to_string(),
-                            suite_name: "install".to_string(),
-                            suite_dir: "/repo/suites/install".to_string(),
-                            updated_at: "2026-03-13T10:00:00Z".to_string(),
-                        };
+            temp_env::with_vars(
+                [
+                    ("XDG_DATA_HOME", Some(xdg.to_str().unwrap())),
+                    ("CLAUDE_SESSION_ID", Some("authoring-unit-test")),
+                ],
+                || {
+                    let session = AuthoringSession {
+                        repo_root: "/repo".to_string(),
+                        feature: "mesh".to_string(),
+                        mode: "interactive".to_string(),
+                        suite_name: "install".to_string(),
+                        suite_dir: "/repo/suites/install".to_string(),
+                        updated_at: "2026-03-13T10:00:00Z".to_string(),
+                    };
 
-                        let saved = save_authoring_session(&session).unwrap();
-                        assert_eq!(saved, session);
+                    let saved = save_authoring_session(&session).unwrap();
+                    assert_eq!(saved, session);
 
-                        let loaded = load_authoring_session().unwrap();
-                        assert!(loaded.is_some());
-                        assert_eq!(loaded.unwrap(), session);
-                    },
-                );
-            }
+                    let loaded = load_authoring_session().unwrap();
+                    assert!(loaded.is_some());
+                    assert_eq!(loaded.unwrap(), session);
+                },
+            );
         }
 
         // -- require_session_errors_when_missing --
         {
             let dir = tempfile::tempdir().unwrap();
             let xdg = dir.path().join("empty-xdg");
-            unsafe {
-                harness_testkit::with_env_vars(
-                    &[
-                        ("XDG_DATA_HOME", Some(xdg.to_str().unwrap())),
-                        ("CLAUDE_SESSION_ID", Some("authoring-require-test")),
-                    ],
-                    || {
-                        let result = require_authoring_session();
-                        assert!(result.is_err());
-                        let err = result.unwrap_err();
-                        assert_eq!(err.code(), "KSRCLI040");
-                    },
-                );
-            }
+            temp_env::with_vars(
+                [
+                    ("XDG_DATA_HOME", Some(xdg.to_str().unwrap())),
+                    ("CLAUDE_SESSION_ID", Some("authoring-require-test")),
+                ],
+                || {
+                    let result = require_authoring_session();
+                    assert!(result.is_err());
+                    let err = result.unwrap_err();
+                    assert_eq!(err.code(), "KSRCLI040");
+                },
+            );
         }
 
         // -- begin_session_creates_and_persists --
         {
             let dir = tempfile::tempdir().unwrap();
             let xdg = dir.path().join("begin-xdg");
-            unsafe {
-                harness_testkit::with_env_vars(
-                    &[
-                        ("XDG_DATA_HOME", Some(xdg.to_str().unwrap())),
-                        ("CLAUDE_SESSION_ID", Some("authoring-begin-test")),
-                    ],
-                    || {
-                        let repo = dir.path().join("repo");
-                        fs::create_dir_all(&repo).unwrap();
-                        let suite_dir = dir.path().join("suite");
-                        fs::create_dir_all(&suite_dir).unwrap();
+            temp_env::with_vars(
+                [
+                    ("XDG_DATA_HOME", Some(xdg.to_str().unwrap())),
+                    ("CLAUDE_SESSION_ID", Some("authoring-begin-test")),
+                ],
+                || {
+                    let repo = dir.path().join("repo");
+                    fs::create_dir_all(&repo).unwrap();
+                    let suite_dir = dir.path().join("suite");
+                    fs::create_dir_all(&suite_dir).unwrap();
 
-                        let session = begin_authoring_session(
-                            &repo,
-                            "mesh",
-                            "interactive",
-                            &suite_dir,
-                            "install",
-                        )
-                        .unwrap();
+                    let session = begin_authoring_session(
+                        &repo,
+                        "mesh",
+                        "interactive",
+                        &suite_dir,
+                        "install",
+                    )
+                    .unwrap();
 
-                        assert_eq!(session.feature, "mesh");
-                        assert_eq!(session.mode, "interactive");
-                        assert_eq!(session.suite_name, "install");
+                    assert_eq!(session.feature, "mesh");
+                    assert_eq!(session.mode, "interactive");
+                    assert_eq!(session.suite_name, "install");
 
-                        let loaded = load_authoring_session().unwrap().unwrap();
-                        assert_eq!(loaded.feature, "mesh");
-                    },
-                );
-            }
+                    let loaded = load_authoring_session().unwrap().unwrap();
+                    assert_eq!(loaded.feature, "mesh");
+                },
+            );
         }
 
         // -- authoring_workspace_dir_under_context --
         {
-            unsafe {
-                harness_testkit::with_env_vars(
-                    &[("CLAUDE_SESSION_ID", Some("workspace-dir-test"))],
-                    || {
-                        let workspace = authoring_workspace_dir();
-                        let name = workspace.file_name().unwrap().to_string_lossy().to_string();
-                        assert_eq!(name, "suite-author");
-                    },
-                );
-            }
+            temp_env::with_vars([("CLAUDE_SESSION_ID", Some("workspace-dir-test"))], || {
+                let workspace = authoring_workspace_dir();
+                let name = workspace.file_name().unwrap().to_string_lossy().to_string();
+                assert_eq!(name, "suite-author");
+            });
         }
     }
 

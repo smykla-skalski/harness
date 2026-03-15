@@ -1,3 +1,5 @@
+#![deny(unsafe_code)]
+
 pub mod authoring;
 pub mod authoring_validate;
 pub mod bootstrap;

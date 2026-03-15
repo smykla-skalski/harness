@@ -210,7 +210,7 @@ pub fn resolve_build_info(repo: &Path) -> Result<BuildInfo, CliError> {
 
 pub fn dirs_home() -> PathBuf {
     env::var("HOME").map_or_else(
-        |_| env::temp_dir().join(format!("harness-{}", unsafe { libc::getuid() })),
+        |_| env::temp_dir().join(format!("harness-{}", uzers::get_current_uid())),
         PathBuf::from,
     )
 }
@@ -269,44 +269,39 @@ mod tests {
     // from parallel test execution mutating the same env var.
     #[test]
     fn session_scope_and_context_path() {
-        unsafe {
-            harness_testkit::with_env_vars(
-                &[("CLAUDE_SESSION_ID", Some("combined-scope-test"))],
-                || {
-                    // session_scope_key uses session prefix
-                    let key = session_scope_key();
-                    assert!(
-                        key.starts_with("session-"),
-                        "expected session- prefix: {key}"
-                    );
-                    assert_eq!(
-                        key.len(),
-                        "session-".len() + 16,
-                        "digest should be 16 hex chars"
-                    );
-
-                    // deterministic: calling twice gives same result
-                    let key2 = session_scope_key();
-                    assert_eq!(key, key2);
-
-                    // current_run_context_path is under session context dir
-                    let path = current_run_context_path();
-                    assert!(
-                        path.ends_with("current-run.json"),
-                        "expected current-run.json suffix: {path:?}"
-                    );
-                    let parent_name = path
-                        .parent()
-                        .and_then(|p| p.file_name())
-                        .unwrap()
-                        .to_string_lossy();
-                    assert!(
-                        parent_name.starts_with("session-"),
-                        "expected session- prefix: {parent_name}"
-                    );
-                },
+        temp_env::with_vars([("CLAUDE_SESSION_ID", Some("combined-scope-test"))], || {
+            // session_scope_key uses session prefix
+            let key = session_scope_key();
+            assert!(
+                key.starts_with("session-"),
+                "expected session- prefix: {key}"
             );
-        }
+            assert_eq!(
+                key.len(),
+                "session-".len() + 16,
+                "digest should be 16 hex chars"
+            );
+
+            // deterministic: calling twice gives same result
+            let key2 = session_scope_key();
+            assert_eq!(key, key2);
+
+            // current_run_context_path is under session context dir
+            let path = current_run_context_path();
+            assert!(
+                path.ends_with("current-run.json"),
+                "expected current-run.json suffix: {path:?}"
+            );
+            let parent_name = path
+                .parent()
+                .and_then(|p| p.file_name())
+                .unwrap()
+                .to_string_lossy();
+            assert!(
+                parent_name.starts_with("session-"),
+                "expected session- prefix: {parent_name}"
+            );
+        });
     }
 
     #[test]
