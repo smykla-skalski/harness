@@ -23,6 +23,7 @@ pub enum RunnerPhase {
 /// Preflight status within the runner workflow.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[non_exhaustive]
 pub enum PreflightStatus {
     Pending,
     Running,
@@ -31,6 +32,7 @@ pub enum PreflightStatus {
 
 /// Kind of failure in the runner workflow.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[non_exhaustive]
 #[serde(rename_all = "snake_case")]
 pub enum FailureKind {
     Manifest,
@@ -38,6 +40,7 @@ pub enum FailureKind {
     Product,
 }
 
+#[non_exhaustive]
 /// Manifest fix decision from the user.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ManifestFixDecision {

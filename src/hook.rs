@@ -3,6 +3,7 @@ use serde::Serialize;
 /// The decision a hook emits: allow, deny, warn, or info.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "lowercase")]
+#[non_exhaustive]
 pub enum Decision {
     Allow,
     Deny,

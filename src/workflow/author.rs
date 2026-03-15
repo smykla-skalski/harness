@@ -9,6 +9,7 @@ use crate::errors::CliError;
 /// Author approval mode.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[non_exhaustive]
 pub enum ApprovalMode {
     Interactive,
     Bypass,
@@ -29,6 +30,7 @@ pub enum AuthorPhase {
 
 /// Review gate type.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[non_exhaustive]
 #[serde(rename_all = "snake_case")]
 pub enum ReviewGate {
     Prewrite,
@@ -36,6 +38,7 @@ pub enum ReviewGate {
     Copy,
 }
 
+#[non_exhaustive]
 /// Answer to a review gate prompt.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum AuthorAnswer {
