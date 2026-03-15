@@ -164,7 +164,7 @@ pub fn docker_run_detached(
 /// # Errors
 /// Returns `CliError` on command failure.
 pub fn docker_rm(name: &str) -> Result<CommandResult, CliError> {
-    docker(&["rm", "-f", name], &[0])
+    docker(&["rm", "-f", name], &[0, 1])
 }
 
 /// Get the IP address of a container on a given Docker network.
