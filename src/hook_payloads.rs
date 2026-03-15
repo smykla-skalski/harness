@@ -6,7 +6,7 @@ use std::str::FromStr;
 use serde::{Deserialize, Serialize};
 
 use crate::context::RunContext;
-use crate::errors::{CliError, CliErrorKind};
+use crate::errors::{CliError, CliErrorKind, cow};
 use crate::workflow::author::{self as author_workflow, AuthorWorkflowState};
 use crate::workflow::runner::{self as runner_workflow, RunnerWorkflowState};
 
@@ -123,7 +123,7 @@ impl HookEnvelopePayload {
     pub fn from_json_text(text: &str) -> Result<Self, CliError> {
         serde_json::from_str(text).map_err(|e| {
             CliErrorKind::HookPayloadInvalid {
-                detail: format!("invalid hook payload: {e}").into(),
+                detail: cow!("invalid hook payload: {e}"),
             }
             .into()
         })
@@ -138,7 +138,7 @@ impl HookEnvelopePayload {
         let mut text = String::new();
         io::stdin().read_to_string(&mut text).map_err(|e| {
             CliError::from(CliErrorKind::HookPayloadInvalid {
-                detail: format!("failed to read stdin: {e}").into(),
+                detail: cow!("failed to read stdin: {e}"),
             })
         })?;
         Self::from_json_text(&text)
