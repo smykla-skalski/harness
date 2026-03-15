@@ -2,7 +2,7 @@ use std::env;
 use std::path::PathBuf;
 
 use crate::cli::{Command, RunDirArgs};
-use crate::context::{RunContext, RunLookup};
+use crate::context::RunContext;
 use crate::errors::{CliError, CliErrorKind};
 use crate::resolve::resolve_run_directory;
 
@@ -153,11 +153,11 @@ pub(crate) fn resolve_repo_root(raw: Option<&str>) -> PathBuf {
 /// # Errors
 /// Returns `CliError` when the run directory cannot be resolved.
 pub(crate) fn resolve_run_dir(args: &RunDirArgs) -> Result<PathBuf, CliError> {
-    resolve_run_directory(&RunLookup {
-        run_dir: args.run_dir.clone(),
-        run_id: args.run_id.clone(),
-        run_root: args.run_root.clone(),
-    })
+    resolve_run_directory(
+        args.run_dir.as_deref(),
+        args.run_id.as_deref(),
+        args.run_root.as_deref(),
+    )
     .map(|r| r.run_dir)
 }
 
