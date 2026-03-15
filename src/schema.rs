@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::collections::HashMap;
 use std::fmt;
 use std::path::{Path, PathBuf};
@@ -228,7 +229,7 @@ impl GroupSpec {
         // Check required sections in body
         let missing = rules::shared::GroupSection::missing_from(&body);
         if !missing.is_empty() {
-            let labels: Vec<String> = missing.iter().map(ToString::to_string).collect();
+            let labels: Vec<&str> = missing.iter().map(|s| s.as_str()).collect();
             return Err(CliErrorKind::missing_sections("group body", labels.join(", ")).into());
         }
 
@@ -349,21 +350,20 @@ impl RunReport {
     /// Render the report as markdown text.
     #[must_use]
     pub fn to_markdown(&self) -> String {
+        use std::fmt::Write;
         let fm = &self.frontmatter;
-        let mut lines = vec![
-            "---".to_string(),
-            format!("run_id: {}", fm.run_id),
-            format!("suite_id: {}", fm.suite_id),
-            format!("profile: {}", fm.profile),
-            format!("overall_verdict: {}", fm.overall_verdict),
-        ];
-        lines.extend(render_frontmatter_list("story_results", &fm.story_results));
-        lines.extend(render_frontmatter_list("debug_summary", &fm.debug_summary));
-        lines.push("---".to_string());
-        lines.push(String::new());
-        lines.push(self.body.trim_end().to_string());
-        lines.push(String::new());
-        lines.join("\n")
+        let mut out = String::new();
+        writeln!(out, "---").unwrap();
+        writeln!(out, "run_id: {}", fm.run_id).unwrap();
+        writeln!(out, "suite_id: {}", fm.suite_id).unwrap();
+        writeln!(out, "profile: {}", fm.profile).unwrap();
+        writeln!(out, "overall_verdict: {}", fm.overall_verdict).unwrap();
+        render_frontmatter_list_into(&mut out, "story_results", &fm.story_results);
+        render_frontmatter_list_into(&mut out, "debug_summary", &fm.debug_summary);
+        writeln!(out, "---").unwrap();
+        writeln!(out).unwrap();
+        writeln!(out, "{}", self.body.trim_end()).unwrap();
+        out
     }
 
     /// Save the report to disk.
@@ -375,31 +375,32 @@ impl RunReport {
     }
 }
 
-/// Render a YAML list field in block style (one `- item` per line).
-/// Values that contain YAML-special characters are single-quoted so that
-/// `serde_yml` can parse them back without ambiguity.
-fn render_frontmatter_list(key: &str, values: &[String]) -> Vec<String> {
+/// Write a YAML list field in block style (one `- item` per line) into a
+/// String buffer. Values that contain YAML-special characters are
+/// single-quoted so that `serde_yml` can parse them back without ambiguity.
+fn render_frontmatter_list_into(out: &mut String, key: &str, values: &[String]) {
+    use std::fmt::Write;
     if values.is_empty() {
-        return vec![format!("{key}: []")];
+        writeln!(out, "{key}: []").unwrap();
+        return;
     }
-    let mut out = vec![format!("{key}:")];
+    writeln!(out, "{key}:").unwrap();
     for v in values {
-        out.push(format!("  - {}", yaml_quote_if_needed(v)));
+        writeln!(out, "  - {}", yaml_quote_if_needed(v)).unwrap();
     }
-    out
 }
 
 /// Single-quote a string value if it contains characters that are special in
 /// YAML (colon-space, hash, backtick, brackets, braces, ampersand, asterisk,
 /// exclamation, percent). Inside single quotes, only `'` needs escaping (as
 /// `''`).
-fn yaml_quote_if_needed(s: &str) -> String {
+fn yaml_quote_if_needed(s: &str) -> Cow<'_, str> {
     const SPECIAL: &[char] = &[':', '#', '`', '[', ']', '{', '}', '&', '*', '!', '%'];
     if s.contains(SPECIAL) {
         let escaped = s.replace('\'', "''");
-        format!("'{escaped}'")
+        Cow::Owned(format!("'{escaped}'"))
     } else {
-        s.to_string()
+        Cow::Borrowed(s)
     }
 }
 
@@ -456,15 +457,12 @@ impl RunStatus {
     /// Extract group IDs from `executed_groups`, handling both string entries
     /// and structured objects with a `group_id` field.
     #[must_use]
-    pub fn executed_group_ids(&self) -> Vec<String> {
+    pub fn executed_group_ids(&self) -> Vec<&str> {
         self.executed_groups
             .iter()
             .filter_map(|v| match v {
-                serde_json::Value::String(s) => Some(s.clone()),
-                serde_json::Value::Object(obj) => obj
-                    .get("group_id")
-                    .and_then(|g| g.as_str())
-                    .map(String::from),
+                serde_json::Value::String(s) => Some(s.as_str()),
+                serde_json::Value::Object(obj) => obj.get("group_id").and_then(|g| g.as_str()),
                 _ => None,
             })
             .collect()

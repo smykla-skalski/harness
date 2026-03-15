@@ -86,10 +86,10 @@ impl RunLayout {
     pub fn from_run_dir(run_dir: &Path) -> Self {
         let run_id = run_dir
             .file_name()
-            .map_or_else(String::new, |n| n.to_string_lossy().to_string());
+            .map_or_else(String::new, |n| n.to_string_lossy().into_owned());
         let run_root = run_dir
             .parent()
-            .map_or_else(|| ".".to_string(), |p| p.to_string_lossy().to_string());
+            .map_or_else(|| ".".to_string(), |p| p.to_string_lossy().into_owned());
         Self { run_root, run_id }
     }
 }
@@ -303,15 +303,14 @@ impl RunContext {
 ///
 /// Each element can be a plain string or an object with a `group_id` field.
 #[must_use]
-pub fn extract_group_ids(values: &[serde_json::Value]) -> Vec<String> {
+pub fn extract_group_ids(values: &[serde_json::Value]) -> Vec<&str> {
     values
         .iter()
         .filter_map(|v| match v {
-            serde_json::Value::String(s) => Some(s.clone()),
-            serde_json::Value::Object(map) => map
-                .get("group_id")
-                .and_then(serde_json::Value::as_str)
-                .map(String::from),
+            serde_json::Value::String(s) => Some(s.as_str()),
+            serde_json::Value::Object(map) => {
+                map.get("group_id").and_then(serde_json::Value::as_str)
+            }
             _ => None,
         })
         .collect()
@@ -433,7 +432,7 @@ mod tests {
     fn run_layout_ensure_dirs_creates_subdirs() {
         let tmp = tempfile::tempdir().unwrap();
         let layout = RunLayout {
-            run_root: tmp.path().to_string_lossy().to_string(),
+            run_root: tmp.path().to_string_lossy().into_owned(),
             run_id: "test-run".into(),
         };
         layout.ensure_dirs().unwrap();
@@ -448,7 +447,7 @@ mod tests {
     fn run_layout_ensure_dirs_is_idempotent() {
         let tmp = tempfile::tempdir().unwrap();
         let layout = RunLayout {
-            run_root: tmp.path().to_string_lossy().to_string(),
+            run_root: tmp.path().to_string_lossy().into_owned(),
             run_id: "test-run".into(),
         };
         layout.ensure_dirs().unwrap();

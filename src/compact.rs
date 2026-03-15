@@ -221,7 +221,7 @@ pub fn compact_history_dir(project_dir: &Path) -> PathBuf {
 pub fn build_compact_handoff(project_dir: &Path) -> Result<CompactHandoff, CliError> {
     Ok(CompactHandoff {
         version: rules::HANDOFF_VERSION,
-        project_dir: project_dir.to_string_lossy().to_string(),
+        project_dir: project_dir.to_string_lossy().into_owned(),
         created_at: utc_now(),
         status: HandoffStatus::Pending,
         source_session_scope: Some(session_scope_key()),
@@ -243,10 +243,7 @@ pub fn build_compact_handoff(project_dir: &Path) -> Result<CompactHandoff, CliEr
 ///
 /// # Errors
 /// Returns `CliError` on IO failure.
-pub fn save_compact_handoff(
-    project_dir: &Path,
-    handoff: &CompactHandoff,
-) -> Result<CompactHandoff, CliError> {
+pub fn save_compact_handoff(project_dir: &Path, handoff: &CompactHandoff) -> Result<(), CliError> {
     let latest_path = compact_latest_path(project_dir);
     let history_dir = compact_history_dir(project_dir);
     let history_name = handoff.created_at.replace([':', '.'], "") + ".json";
@@ -256,7 +253,7 @@ pub fn save_compact_handoff(
     write_json_atomic(&history_path, handoff)?;
     trim_history(project_dir);
 
-    Ok(handoff.clone())
+    Ok(())
 }
 
 /// Load the latest compact handoff.
@@ -309,18 +306,18 @@ pub fn consume_compact_handoff(
 
 /// Check which fingerprints have diverged from disk.
 #[must_use]
-pub fn verify_fingerprints(handoff: &CompactHandoff) -> Vec<PathBuf> {
+pub fn verify_fingerprints(handoff: &CompactHandoff) -> Vec<&Path> {
     handoff
         .fingerprints
         .iter()
         .filter(|fp| !fp.matches_disk())
-        .map(|fp| fp.path.clone())
+        .map(|fp| fp.path.as_path())
         .collect()
 }
 
 /// Render the hydration context for a compact handoff.
 #[must_use]
-pub fn render_hydration_context(handoff: &CompactHandoff, diverged_paths: &[PathBuf]) -> String {
+pub fn render_hydration_context(handoff: &CompactHandoff, diverged_paths: &[&Path]) -> String {
     let mut lines = vec![
         "Kuma compaction handoff restored from saved harness state.".to_string(),
         "Continue immediately from the saved state below. Do not ask the user to restate context."
@@ -354,7 +351,7 @@ pub fn render_hydration_context(handoff: &CompactHandoff, diverged_paths: &[Path
     // Render sections, prioritizing unfinished work
     let sections = ordered_sections(handoff);
     for section in &sections {
-        match section.as_str() {
+        match *section {
             "authoring" => {
                 if let Some(ref auth) = handoff.authoring {
                     lines.extend(render_authoring_section(auth).lines().map(String::from));
@@ -542,7 +539,7 @@ fn render_authoring_section(handoff: &AuthoringHandoff) -> String {
     truncate_lines(&lines, rules::SECTION_CHAR_LIMIT, rules::SECTION_LINE_LIMIT)
 }
 
-fn ordered_sections(handoff: &CompactHandoff) -> Vec<String> {
+fn ordered_sections(handoff: &CompactHandoff) -> Vec<&str> {
     let mut sections: Vec<(&str, bool)> = Vec::new();
     if let Some(ref a) = handoff.authoring {
         let unfinished = !matches!(a.author_phase.as_deref(), Some("complete" | "cancelled"));
@@ -557,14 +554,11 @@ fn ordered_sections(handoff: &CompactHandoff) -> Vec<String> {
 
     // Unfinished sections first
     sections.sort_by_key(|(name, unfinished)| (!unfinished, *name));
-    sections
-        .into_iter()
-        .map(|(name, _)| name.to_string())
-        .collect()
+    sections.into_iter().map(|(name, _)| name).collect()
 }
 
 fn truncate_lines(lines: &[String], char_limit: usize, line_limit: usize) -> String {
-    let mut rendered = Vec::new();
+    let mut result = String::new();
     let mut total = 0;
     for line in lines.iter().take(line_limit) {
         let remaining = char_limit.saturating_sub(total);
@@ -579,13 +573,16 @@ fn truncate_lines(lines: &[String], char_limit: usize, line_limit: usize) -> Str
         if truncated.is_empty() {
             break;
         }
-        rendered.push(truncated.to_string());
+        if !result.is_empty() {
+            result.push('\n');
+        }
+        result.push_str(truncated);
         total += truncated.len() + 1;
         if total >= char_limit {
             break;
         }
     }
-    rendered.join("\n")
+    result
 }
 
 fn write_json_atomic(path: &Path, payload: &CompactHandoff) -> Result<(), CliError> {
@@ -847,7 +844,7 @@ mod tests {
             authoring: None,
             fingerprints: vec![],
         };
-        let diverged = vec![PathBuf::from("/some/file.json")];
+        let diverged: Vec<&Path> = vec![Path::new("/some/file.json")];
         let ctx = render_hydration_context(&handoff, &diverged);
         assert!(ctx.contains("WARNING: the saved handoff diverged"));
         assert!(ctx.contains("/some/file.json"));

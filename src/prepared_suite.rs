@@ -201,9 +201,10 @@ fn extract_fenced_blocks(text: &str, lang_prefixes: &[&str]) -> Vec<String> {
         if fence_backticks > 0 {
             let closing_len = line.len() - line.trim_start_matches('`').len();
             if closing_len >= fence_backticks && line.trim_start_matches('`').trim().is_empty() {
-                let content = current_block.join("\n").trim().to_string();
-                if !content.is_empty() {
-                    blocks.push(format!("{content}\n"));
+                let joined = current_block.join("\n");
+                let trimmed = joined.trim();
+                if !trimmed.is_empty() {
+                    blocks.push(format!("{trimmed}\n"));
                 }
                 current_block.clear();
                 fence_backticks = 0;
