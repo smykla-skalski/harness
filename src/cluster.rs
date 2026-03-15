@@ -392,9 +392,10 @@ impl ClusterRecordPayload {
             .and_then(Value::as_array)
             .map(|arr| {
                 arr.iter()
-                    .filter_map(|v| ClusterMember::from_value(v).ok())
-                    .collect()
+                    .map(ClusterMember::from_value)
+                    .collect::<Result<Vec<_>, _>>()
             })
+            .transpose()?
             .unwrap_or_default();
         let clusters = parse_string_vec(obj.get("clusters"));
         let kubeconfigs: HashMap<String, String> = obj
