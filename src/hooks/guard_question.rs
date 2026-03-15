@@ -83,16 +83,7 @@ fn guard_suite_author(ctx: &HookContext, prompts: &[AskUserQuestionPrompt]) -> H
 }
 
 fn is_manifest_fix_prompt(prompt: &AskUserQuestionPrompt) -> bool {
-    let head = prompt.question_head();
-    if head != runner_rules::MANIFEST_FIX_GATE_QUESTION {
-        return false;
-    }
-    let labels = prompt.option_labels();
-    labels.len() == runner_rules::MANIFEST_FIX_GATE_OPTIONS.len()
-        && labels
-            .iter()
-            .zip(runner_rules::MANIFEST_FIX_GATE_OPTIONS.iter())
-            .all(|(a, b)| a == b)
+    runner_rules::MANIFEST_FIX_GATE.matches(prompt.question_head(), &prompt.option_labels())
 }
 
 fn is_install_prompt(prompts: &[AskUserQuestionPrompt]) -> bool {
@@ -105,13 +96,13 @@ fn classify_canonical_gate(prompts: &[AskUserQuestionPrompt]) -> Option<ReviewGa
     use crate::rules::suite_author as author_rules;
     for prompt in prompts {
         let head = prompt.question_head();
-        if head == author_rules::PREWRITE_GATE_QUESTION {
+        if head == author_rules::PREWRITE_GATE.question {
             return Some(ReviewGate::Prewrite);
         }
-        if head == author_rules::POSTWRITE_GATE_QUESTION {
+        if head == author_rules::POSTWRITE_GATE.question {
             return Some(ReviewGate::Postwrite);
         }
-        if head == author_rules::COPY_GATE_QUESTION {
+        if head == author_rules::COPY_GATE.question {
             return Some(ReviewGate::Copy);
         }
     }

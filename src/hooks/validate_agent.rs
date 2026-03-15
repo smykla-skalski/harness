@@ -6,16 +6,19 @@ use regex::Regex;
 use crate::errors::{CliError, HookMessage};
 use crate::hook::HookResult;
 use crate::hook_payloads::HookContext;
-use crate::rules::suite_runner as runner_rules;
+use crate::rules::suite_runner::{self as runner_rules, PreflightReply};
 use crate::workflow::runner::{self as runner_wf, PreflightStatus, RunnerPhase};
 
 static CODE_BLOCK_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?s)```.*?```").unwrap());
 
 static PREFLIGHT_RE: LazyLock<Regex> = LazyLock::new(|| {
     let head = runner_rules::PREFLIGHT_REPLY_HEAD;
-    let pass = runner_rules::PREFLIGHT_REPLY_PASS;
-    let fail = runner_rules::PREFLIGHT_REPLY_FAIL;
-    let pattern = format!(r"^{}\s*({pass}|{fail})$", regex::escape(head));
+    let pattern = format!(
+        r"^{}\s*({}|{})$",
+        regex::escape(head),
+        PreflightReply::Pass,
+        PreflightReply::Fail,
+    );
     Regex::new(&pattern).unwrap()
 });
 
@@ -80,7 +83,7 @@ fn validate_suite_runner(ctx: &HookContext) -> HookResult {
         }
     };
     let state = ctx.runner_state.as_ref();
-    if reply.status == runner_rules::PREFLIGHT_REPLY_FAIL {
+    if reply.status == PreflightReply::Fail {
         if let Some(s) = state
             && s.phase == RunnerPhase::Preflight
         {
@@ -129,11 +132,11 @@ fn validate_suite_runner(ctx: &HookContext) -> HookResult {
     HookMessage::PreflightMissing.into_result()
 }
 
-struct PreflightReply {
-    status: String,
+struct ParsedPreflight {
+    status: PreflightReply,
 }
 
-fn parse_preflight_reply(message: &str) -> Result<PreflightReply, String> {
+fn parse_preflight_reply(message: &str) -> Result<ParsedPreflight, String> {
     let lines: Vec<&str> = message
         .lines()
         .map(str::trim)
@@ -143,12 +146,14 @@ fn parse_preflight_reply(message: &str) -> Result<PreflightReply, String> {
         return Err("return the canonical preflight summary".to_string());
     }
     let head = runner_rules::PREFLIGHT_REPLY_HEAD;
-    let pass = runner_rules::PREFLIGHT_REPLY_PASS;
-    let fail = runner_rules::PREFLIGHT_REPLY_FAIL;
+    let pass = PreflightReply::Pass;
+    let fail = PreflightReply::Fail;
     let caps = PREFLIGHT_RE
         .captures(lines[0])
         .ok_or_else(|| format!("first line must be `{head} {pass}` or `{head} {fail}`"))?;
-    let status = caps[1].to_string();
+    let status: PreflightReply = caps[1]
+        .parse()
+        .map_err(|()| format!("first line must be `{head} {pass}` or `{head} {fail}`"))?;
     let data: HashMap<String, String> = lines[1..]
         .iter()
         .filter_map(|line| {
@@ -168,5 +173,5 @@ fn parse_preflight_reply(message: &str) -> Result<PreflightReply, String> {
     } else if !data.contains_key("blocker") {
         return Err("fail replies must include a `Blocker:` line".to_string());
     }
-    Ok(PreflightReply { status })
+    Ok(ParsedPreflight { status })
 }

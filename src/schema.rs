@@ -227,16 +227,10 @@ impl GroupSpec {
         let map = &yaml;
 
         // Check required sections in body
-        let required = rules::shared::GROUP_REQUIRED_SECTIONS;
-        let missing_sections: Vec<&str> = required
-            .iter()
-            .filter(|s| !body.contains(*s))
-            .copied()
-            .collect();
-        if !missing_sections.is_empty() {
-            return Err(
-                CliErrorKind::missing_sections("group body", missing_sections.join(", ")).into(),
-            );
+        let missing = rules::shared::GroupSection::missing_from(&body);
+        if !missing.is_empty() {
+            let labels: Vec<String> = missing.iter().map(ToString::to_string).collect();
+            return Err(CliErrorKind::missing_sections("group body", labels.join(", ")).into());
         }
 
         let frontmatter = GroupFrontmatter {

@@ -31,7 +31,7 @@ fn handle_suite_runner(ctx: &HookContext) -> HookResult {
     let answers = ctx.question_answers();
     let is_manifest_fix = answers.iter().any(|a| {
         a.question
-            .contains(runner_rules::MANIFEST_FIX_GATE_QUESTION)
+            .contains(runner_rules::MANIFEST_FIX_GATE.question)
     });
     if !is_manifest_fix {
         return HookResult::allow();

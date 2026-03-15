@@ -3,7 +3,9 @@ use std::path::Path;
 use crate::errors::{CliError, HookMessage};
 use crate::hook::HookResult;
 use crate::hook_payloads::HookContext;
-use crate::rules::suite_runner as rules;
+use crate::rules::suite_runner::{
+    AdminEndpointHint, ClusterBinary, LegacyScript, MakeTargetPrefix, RunFile, RunnerBinary,
+};
 use crate::workflow::runner::{RunnerPhase, RunnerWorkflowState};
 
 /// Shell control operators that separate command pipelines.
@@ -82,9 +84,7 @@ fn guard_suite_runner(ctx: &HookContext, words: &[String], heads: &[String]) -> 
         );
     }
     if let Some(target) = make_target(words)
-        && rules::DENIED_MAKE_TARGET_PREFIXES
-            .iter()
-            .any(|pfx| target.starts_with(pfx))
+        && MakeTargetPrefix::is_denied_target(target)
     {
         return HookMessage::ClusterBinary.into_result();
     }
@@ -316,7 +316,7 @@ fn deny_harness_managed_run_control_mutation(ctx: &HookContext, words: &[String]
     if heads.iter().any(|h| is_raw_control_file_interpreter(h)) {
         return deny_runner_flow(&format!(
             "do not use raw interpreters for run control files; {}",
-            rules::HARNESS_MANAGED_RUN_CONTROL_HINT
+            RunFile::CONTROL_HINT
         ));
     }
     for (i, word) in words.iter().enumerate() {
@@ -325,13 +325,14 @@ fn deny_harness_managed_run_control_mutation(ctx: &HookContext, words: &[String]
         }
         if SHELL_REDIRECT_OPS.contains(&word.as_str()) {
             let target = &words[i + 1];
-            if rules::HARNESS_MANAGED_RUN_CONTROL_FILES
+            if RunFile::ALL
                 .iter()
-                .any(|name| target.contains(name))
+                .filter(|f| f.is_harness_managed())
+                .any(|f| target.contains(&f.to_string()))
             {
                 return deny_runner_flow(&format!(
                     "do not redirect shell output into harness-managed run control files; {}",
-                    rules::HARNESS_MANAGED_RUN_CONTROL_HINT
+                    RunFile::CONTROL_HINT
                 ));
             }
         }
@@ -342,7 +343,7 @@ fn deny_harness_managed_run_control_mutation(ctx: &HookContext, words: &[String]
     {
         return deny_runner_flow(&format!(
             "do not mutate harness-managed run control files directly; {}",
-            rules::HARNESS_MANAGED_RUN_CONTROL_HINT
+            RunFile::CONTROL_HINT
         ));
     }
     if heads
@@ -351,18 +352,21 @@ fn deny_harness_managed_run_control_mutation(ctx: &HookContext, words: &[String]
     {
         return deny_runner_flow(&format!(
             "do not inspect harness-managed run control files directly; {}",
-            rules::HARNESS_MANAGED_RUN_CONTROL_HINT
+            RunFile::CONTROL_HINT
         ));
     }
     HookResult::allow()
 }
 
-fn run_control_files_mentioned(words: &[String], command_text: Option<&str>) -> Vec<&'static str> {
+fn run_control_files_mentioned(words: &[String], command_text: Option<&str>) -> Vec<String> {
     let cmd_text = command_text.unwrap_or("");
-    rules::HARNESS_MANAGED_RUN_CONTROL_FILES
+    RunFile::ALL
         .iter()
-        .filter(|name| words.iter().any(|w| w.contains(*name)) || cmd_text.contains(*name))
-        .copied()
+        .filter(|f| f.is_harness_managed())
+        .map(ToString::to_string)
+        .filter(|name| {
+            words.iter().any(|w| w.contains(name.as_str())) || cmd_text.contains(name.as_str())
+        })
         .collect()
 }
 
@@ -385,7 +389,7 @@ fn deny_direct_command_log_access(ctx: &HookContext, words: &[String]) -> HookRe
     }
     deny_runner_flow(&format!(
         "do not inspect or mutate command-owned run logs directly; {}",
-        rules::COMMAND_LOG_HINT
+        RunFile::COMMAND_LOG_HINT
     ))
 }
 
@@ -613,27 +617,21 @@ fn is_tracked_harness_command(words: &[String]) -> bool {
 }
 
 fn has_denied_cluster_binary(heads: &[String]) -> bool {
-    heads.iter().any(|h| rules::ClusterBinary::is_denied(h))
+    heads.iter().any(|h| ClusterBinary::is_denied(h))
 }
 
 fn has_denied_cluster_binary_anywhere(words: &[String]) -> bool {
     words
         .iter()
-        .any(|w| rules::ClusterBinary::is_denied(&normalized_binary_name(w)))
+        .any(|w| ClusterBinary::is_denied(&normalized_binary_name(w)))
 }
 
 fn has_denied_runner_binary(heads: &[String]) -> bool {
-    heads
-        .iter()
-        .any(|h| rules::DENIED_RUNNER_BINARIES.contains(&h.as_str()))
+    heads.iter().any(|h| RunnerBinary::is_denied(h))
 }
 
 fn has_admin_endpoint_hint(words: &[String]) -> bool {
-    words.iter().any(|w| {
-        rules::DENIED_ADMIN_ENDPOINT_HINTS
-            .iter()
-            .any(|hint| w.contains(hint))
-    })
+    words.iter().any(|w| AdminEndpointHint::contains_hint(w))
 }
 
 fn has_denied_legacy_script(words: &[String]) -> bool {
@@ -641,7 +639,7 @@ fn has_denied_legacy_script(words: &[String]) -> bool {
         let name = Path::new(w)
             .file_name()
             .map_or("", |n| n.to_str().unwrap_or(""));
-        rules::DENIED_LEGACY_SCRIPT_NAMES.contains(&name)
+        LegacyScript::is_denied(name)
     })
 }
 

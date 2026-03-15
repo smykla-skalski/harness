@@ -3,7 +3,7 @@ use std::path::Path;
 use crate::errors::{CliError, HookMessage};
 use crate::hook::HookResult;
 use crate::hook_payloads::HookContext;
-use crate::rules::suite_runner as rules;
+use crate::rules::suite_runner::{RunDir, RunFile};
 use crate::workflow::author::{self, can_write};
 
 use super::{control_file_hint, is_command_owned_run_file, normalize_path};
@@ -108,13 +108,14 @@ fn guard_suite_runner(ctx: &HookContext, paths: &[&Path]) -> HookResult {
 fn allowed_suite_runner_path(path: &Path, run_dir: &Path) -> bool {
     let norm = normalize_path(path);
     let rd_norm = normalize_path(run_dir);
-    if rules::ALLOWED_RUN_FILES
+    if RunFile::ALL
         .iter()
-        .any(|rel| norm == normalize_path(&rd_norm.join(rel)))
+        .filter(|f| f.is_allowed())
+        .any(|f| norm == normalize_path(&rd_norm.join(f.to_string())))
     {
         return true;
     }
-    rules::ALLOWED_RUN_DIRS
+    RunDir::ALL
         .iter()
-        .any(|rel| norm.starts_with(normalize_path(&rd_norm.join(rel))))
+        .any(|d| norm.starts_with(normalize_path(&rd_norm.join(d.to_string()))))
 }
