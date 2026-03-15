@@ -1,6 +1,6 @@
 use std::path::{Component, Path, PathBuf};
 
-use crate::rules::suite_runner as runner_rules;
+use crate::rules::suite_runner::RunFile;
 
 pub mod audit;
 pub mod context_agent;
@@ -39,18 +39,19 @@ pub(crate) fn normalize_path(path: &Path) -> PathBuf {
 /// inside `run_dir`.
 pub(crate) fn is_command_owned_run_file(path: &Path, run_dir: &Path) -> bool {
     let norm = normalize_path(path);
-    runner_rules::DIRECT_WRITE_DENIED_RUN_FILES
+    RunFile::ALL
         .iter()
-        .any(|rel| norm == normalize_path(&run_dir.join(rel)))
+        .filter(|f| f.is_direct_write_denied())
+        .any(|f| norm == normalize_path(&run_dir.join(f.to_string())))
 }
 
 /// Provides a user-facing hint for a denied control-file write.
 pub(crate) fn control_file_hint(path: &Path) -> &'static str {
     let name = path.file_name().map_or("", |n| n.to_str().unwrap_or(""));
     if name == "command-log.md" {
-        runner_rules::COMMAND_LOG_HINT
+        RunFile::COMMAND_LOG_HINT
     } else {
-        runner_rules::HARNESS_MANAGED_RUN_CONTROL_HINT
+        RunFile::CONTROL_HINT
     }
 }
 
