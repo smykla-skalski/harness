@@ -3,18 +3,23 @@ use std::env;
 use std::fs;
 use std::path::Path;
 use std::sync::LazyLock;
+use std::time::Duration;
 
 use regex::Regex;
 
 use crate::bootstrap;
-use crate::cluster::{ClusterSpec, HelmSetting};
+use crate::cluster::{ClusterSpec, HelmSetting, Platform};
 use crate::compact;
 use crate::compact::{build_compact_handoff, save_compact_handoff};
+use crate::compose;
 use crate::context::CurrentRunRecord;
 use crate::core_defs::{current_run_context_path, resolve_build_info, utc_now};
 use crate::ephemeral_metallb;
 use crate::errors::{CliError, CliErrorKind, cow};
-use crate::exec::{cluster_exists, kubectl, run_command};
+use crate::exec::{
+    cluster_exists, compose_down, compose_up, docker_inspect_ip, docker_network_create,
+    docker_network_rm, docker_rm, docker_run_detached, kubectl, run_command, wait_for_http,
+};
 use crate::io::ensure_dir;
 use crate::session_hook::SessionStartHookOutput;
 
@@ -41,16 +46,51 @@ fn make_target(root: &Path, target: &str, env: &HashMap<String, String>) -> Resu
     Ok(())
 }
 
-/// Manage disposable local k3d clusters.
+/// Manage disposable local clusters (k3d or universal Docker).
 ///
 /// # Errors
 /// Returns `CliError` on failure.
+#[allow(clippy::too_many_arguments)]
 pub fn cluster(
     mode: &str,
     cluster_name: &str,
     extra_cluster_names: &[String],
+    platform_str: &str,
     repo_root: Option<&str>,
     _run_dir: Option<&str>,
+    helm_setting: &[String],
+    restart_namespace: &[String],
+    store: &str,
+    image: Option<&str>,
+) -> Result<i32, CliError> {
+    let platform: Platform = platform_str
+        .parse()
+        .map_err(|e: String| CliError::from(CliErrorKind::usage_error(e)))?;
+    match platform {
+        Platform::Kubernetes => cluster_k8s(
+            mode,
+            cluster_name,
+            extra_cluster_names,
+            repo_root,
+            helm_setting,
+            restart_namespace,
+        ),
+        Platform::Universal => cluster_universal(
+            mode,
+            cluster_name,
+            extra_cluster_names,
+            repo_root,
+            store,
+            image,
+        ),
+    }
+}
+
+fn cluster_k8s(
+    mode: &str,
+    cluster_name: &str,
+    extra_cluster_names: &[String],
+    repo_root: Option<&str>,
     helm_setting: &[String],
     restart_namespace: &[String],
 ) -> Result<i32, CliError> {
@@ -107,6 +147,58 @@ pub fn cluster(
         "global-zone-down" => global_zone_down(&root, &base_env, validated_args)?,
         "global-two-zones-up" => global_two_zones_up(&root, &base_env, validated_args)?,
         "global-two-zones-down" => global_two_zones_down(&root, &base_env, validated_args)?,
+        _ => {
+            return Err(
+                CliErrorKind::cluster_error(cow!("unsupported cluster mode: {mode}")).into(),
+            );
+        }
+    }
+
+    println!("{mode} completed");
+    Ok(0)
+}
+
+fn cluster_universal(
+    mode: &str,
+    cluster_name: &str,
+    extra_cluster_names: &[String],
+    repo_root: Option<&str>,
+    store: &str,
+    image: Option<&str>,
+) -> Result<i32, CliError> {
+    let mut all_names = vec![cluster_name.to_string()];
+    all_names.extend(extra_cluster_names.iter().cloned());
+
+    let root = super::resolve_repo_root(repo_root);
+    let cp_image = resolve_cp_image(&root, image)?;
+
+    let spec = ClusterSpec::from_mode_with_platform(
+        mode,
+        &all_names,
+        &root.to_string_lossy(),
+        vec![],
+        vec![],
+        Platform::Universal,
+    )
+    .map_err(|e| CliError::from(CliErrorKind::cluster_error(e)))?;
+
+    let network_name = spec.docker_network.as_deref().unwrap_or("harness-default");
+
+    eprintln!(
+        "{} cluster: starting universal {mode} for {}",
+        utc_now(),
+        all_names.join(" ")
+    );
+
+    match mode {
+        "single-up" => universal_single_up(&cp_image, network_name, store, &all_names[0])?,
+        "single-down" => universal_single_down(network_name, &all_names[0])?,
+        "global-zone-up" => universal_global_zone_up(&cp_image, network_name, store, &all_names)?,
+        "global-zone-down" => universal_global_zone_down(network_name, &all_names)?,
+        "global-two-zones-up" => {
+            universal_global_two_zones_up(&cp_image, network_name, store, &all_names)?;
+        }
+        "global-two-zones-down" => universal_global_two_zones_down(network_name, &all_names)?,
         _ => {
             return Err(
                 CliErrorKind::cluster_error(cow!("unsupported cluster mode: {mode}")).into(),
@@ -247,6 +339,231 @@ fn global_two_zones_down(
     cluster_stop(root, base_env, &names[2])?;
     cluster_stop(root, base_env, &names[1])?;
     cluster_stop(root, base_env, &names[0])
+}
+
+// =========================================================================
+// universal lifecycle helpers
+// =========================================================================
+
+const UNIVERSAL_SUBNET: &str = "172.57.0.0/16";
+
+fn resolve_cp_image(root: &Path, explicit: Option<&str>) -> Result<String, CliError> {
+    if let Some(img) = explicit {
+        return Ok(img.to_string());
+    }
+    // Check for locally-built kuma-cp image
+    let check = run_command(
+        &[
+            "docker",
+            "images",
+            "--format",
+            "{{.Repository}}:{{.Tag}}",
+            "--filter",
+            "reference=kuma-cp",
+        ],
+        None,
+        None,
+        &[0],
+    )?;
+    let first_line = check.stdout.lines().next().unwrap_or("").trim();
+    if !first_line.is_empty() && first_line != "<none>:<none>" {
+        return Ok(first_line.to_string());
+    }
+    // Build images from repo
+    eprintln!("{} cluster: building kuma images", utc_now());
+    run_command(&["make", "images"], Some(root), None, &[0])
+        .map_err(|e| CliErrorKind::image_build_failed("make images").with_details(e.message()))?;
+    // Re-check
+    let recheck = run_command(
+        &[
+            "docker",
+            "images",
+            "--format",
+            "{{.Repository}}:{{.Tag}}",
+            "--filter",
+            "reference=kuma-cp",
+        ],
+        None,
+        None,
+        &[0],
+    )?;
+    let img = recheck.stdout.lines().next().unwrap_or("").trim();
+    if img.is_empty() || img == "<none>:<none>" {
+        return Err(CliErrorKind::image_build_failed("kuma-cp image not found after build").into());
+    }
+    Ok(img.to_string())
+}
+
+fn universal_single_up(
+    image: &str,
+    network: &str,
+    store: &str,
+    cp_name: &str,
+) -> Result<(), CliError> {
+    docker_network_create(network, UNIVERSAL_SUBNET)?;
+
+    let env = [
+        ("KUMA_ENVIRONMENT", "universal"),
+        ("KUMA_MODE", "zone"),
+        ("KUMA_STORE_TYPE", store),
+    ];
+    docker_run_detached(
+        image,
+        cp_name,
+        network,
+        &env,
+        &[(5681, 5681), (5678, 5678)],
+        &[],
+        &[],
+    )?;
+
+    let ip = docker_inspect_ip(cp_name, network)?;
+    let health_url = format!("http://{ip}:5681");
+    eprintln!("{} cluster: waiting for CP at {health_url}", utc_now());
+    wait_for_http(&health_url, Duration::from_secs(30))?;
+    eprintln!("{} cluster: CP ready at {health_url}", utc_now());
+    Ok(())
+}
+
+#[allow(clippy::unnecessary_wraps)]
+fn universal_single_down(network: &str, cp_name: &str) -> Result<(), CliError> {
+    let _ = docker_rm(cp_name);
+    let _ = docker_network_rm(network);
+    Ok(())
+}
+
+fn universal_global_zone_up(
+    image: &str,
+    network: &str,
+    store: &str,
+    names: &[String],
+) -> Result<(), CliError> {
+    let global_name = &names[0];
+    let zone_name = &names[1];
+    let zone_label = &names[2];
+
+    docker_network_create(network, UNIVERSAL_SUBNET)?;
+
+    let compose_file = compose::global_zone(
+        image,
+        network,
+        UNIVERSAL_SUBNET,
+        store,
+        global_name,
+        zone_name,
+        zone_label,
+    );
+    let tmp_dir = tempfile::tempdir().map_err(|e| CliErrorKind::io(cow!("temp dir: {e}")))?;
+    let compose_path = tmp_dir.path().join("docker-compose.yaml");
+    compose_file.write_to(&compose_path)?;
+
+    compose_up(&compose_path, &format!("harness-{global_name}"))?;
+
+    let global_ip = docker_inspect_ip(&format!("harness-{global_name}-{global_name}-1"), network)
+        .or_else(|_| docker_inspect_ip(global_name, network))?;
+
+    let global_url = format!("http://{global_ip}:5681");
+    eprintln!(
+        "{} cluster: waiting for global CP at {global_url}",
+        utc_now()
+    );
+    wait_for_http(&global_url, Duration::from_secs(30))?;
+    eprintln!("{} cluster: global CP ready", utc_now());
+
+    Ok(())
+}
+
+fn universal_global_zone_down(network: &str, names: &[String]) -> Result<(), CliError> {
+    let global_name = &names[0];
+    // Try compose down first with a temp compose file
+    let compose_file = compose::global_zone(
+        "unused",
+        network,
+        UNIVERSAL_SUBNET,
+        "memory",
+        global_name,
+        "zone",
+        "zone-1",
+    );
+    let tmp_dir = tempfile::tempdir().map_err(|e| CliErrorKind::io(cow!("temp dir: {e}")))?;
+    let compose_path = tmp_dir.path().join("docker-compose.yaml");
+    compose_file.write_to(&compose_path)?;
+    let _ = compose_down(&compose_path, &format!("harness-{global_name}"));
+    // Also try direct container removal as fallback
+    for name in names {
+        let _ = docker_rm(name);
+    }
+    let _ = docker_network_rm(network);
+    Ok(())
+}
+
+fn universal_global_two_zones_up(
+    image: &str,
+    network: &str,
+    store: &str,
+    names: &[String],
+) -> Result<(), CliError> {
+    let global_name = &names[0];
+    let zone1_name = &names[1];
+    let zone2_name = &names[2];
+    let zone1_label = &names[3];
+    let zone2_label = &names[4];
+
+    docker_network_create(network, UNIVERSAL_SUBNET)?;
+
+    let compose_file = compose::global_two_zones(
+        image,
+        network,
+        UNIVERSAL_SUBNET,
+        store,
+        global_name,
+        zone1_name,
+        zone1_label,
+        zone2_name,
+        zone2_label,
+    );
+    let tmp_dir = tempfile::tempdir().map_err(|e| CliErrorKind::io(cow!("temp dir: {e}")))?;
+    let compose_path = tmp_dir.path().join("docker-compose.yaml");
+    compose_file.write_to(&compose_path)?;
+
+    compose_up(&compose_path, &format!("harness-{global_name}"))?;
+
+    let global_ip = docker_inspect_ip(&format!("harness-{global_name}-{global_name}-1"), network)
+        .or_else(|_| docker_inspect_ip(global_name, network))?;
+
+    let global_url = format!("http://{global_ip}:5681");
+    eprintln!(
+        "{} cluster: waiting for global CP at {global_url}",
+        utc_now()
+    );
+    wait_for_http(&global_url, Duration::from_secs(30))?;
+    eprintln!("{} cluster: global CP ready", utc_now());
+
+    Ok(())
+}
+
+fn universal_global_two_zones_down(network: &str, names: &[String]) -> Result<(), CliError> {
+    let global_name = &names[0];
+    let compose_file = compose::global_two_zones(
+        "unused",
+        network,
+        UNIVERSAL_SUBNET,
+        "memory",
+        global_name,
+        "z1",
+        "z1",
+        "z2",
+        "z2",
+    );
+    let tmp_dir = tempfile::tempdir().map_err(|e| CliErrorKind::io(cow!("temp dir: {e}")))?;
+    let compose_path = tmp_dir.path().join("docker-compose.yaml");
+    compose_file.write_to(&compose_path)?;
+    let _ = compose_down(&compose_path, &format!("harness-{global_name}"));
+    for name in names {
+        let _ = docker_rm(name);
+    }
+    let _ = docker_network_rm(network);
+    Ok(())
 }
 
 // =========================================================================
