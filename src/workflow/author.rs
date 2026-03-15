@@ -1,4 +1,5 @@
 use std::env;
+use std::fmt;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -26,6 +27,19 @@ pub enum AuthorPhase {
     PostwriteReview,
     Complete,
     Cancelled,
+}
+
+impl fmt::Display for AuthorPhase {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(match self {
+            Self::Discovery => "discovery",
+            Self::PrewriteReview => "prewrite_review",
+            Self::Writing => "writing",
+            Self::PostwriteReview => "postwrite_review",
+            Self::Complete => "complete",
+            Self::Cancelled => "cancelled",
+        })
+    }
 }
 
 /// Review gate type.
@@ -368,6 +382,21 @@ mod tests {
             updated_at: "2025-01-01T00:00:00Z".to_string(),
             transition_count: 0,
             last_event: None,
+        }
+    }
+
+    #[test]
+    fn author_phase_display() {
+        let cases = [
+            (AuthorPhase::Discovery, "discovery"),
+            (AuthorPhase::PrewriteReview, "prewrite_review"),
+            (AuthorPhase::Writing, "writing"),
+            (AuthorPhase::PostwriteReview, "postwrite_review"),
+            (AuthorPhase::Complete, "complete"),
+            (AuthorPhase::Cancelled, "cancelled"),
+        ];
+        for (variant, expected) in cases {
+            assert_eq!(variant.to_string(), expected);
         }
     }
 
