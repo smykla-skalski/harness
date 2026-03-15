@@ -35,7 +35,7 @@ pub fn execute(ctx: &HookContext) -> Result<HookResult, CliError> {
     if ctx.is_suite_author() {
         return Ok(validate_suite_author(ctx));
     }
-    Ok(validate_suite_runner(ctx))
+    validate_suite_runner(ctx)
 }
 
 fn validate_suite_author(ctx: &HookContext) -> HookResult {
@@ -58,21 +58,21 @@ fn validate_suite_author(ctx: &HookContext) -> HookResult {
     HookResult::allow()
 }
 
-fn validate_suite_runner(ctx: &HookContext) -> HookResult {
+fn validate_suite_runner(ctx: &HookContext) -> Result<HookResult, CliError> {
     if ctx.run.is_none() {
-        return HookMessage::runner_state_invalid(
+        return Ok(HookMessage::runner_state_invalid(
             "run context is missing; initialize the suite run first",
         )
-        .into_result();
+        .into_result());
     }
     let message = ctx.last_assistant_message();
     if message.is_empty() {
-        return HookResult::allow();
+        return Ok(HookResult::allow());
     }
     let reply = match parse_preflight_reply(message) {
         Ok(r) => r,
         Err(detail) => {
-            return HookMessage::preflight_reply_invalid(detail).into_result();
+            return Ok(HookMessage::preflight_reply_invalid(detail).into_result());
         }
     };
     let state = ctx.runner_state.as_ref();
@@ -86,23 +86,25 @@ fn validate_suite_runner(ctx: &HookContext) -> HookResult {
             new_state.last_event = Some("PreflightFailed".to_string());
             new_state.updated_at = chrono::Utc::now().to_rfc3339();
             if let Some(ref rd) = ctx.effective_run_dir() {
-                let _ = runner_wf::write_runner_state(rd, &new_state);
+                runner_wf::write_runner_state(rd, &new_state)?;
             }
-            return HookResult::allow();
+            return Ok(HookResult::allow());
         }
-        return HookMessage::PreflightMissing.into_result();
+        return Ok(HookMessage::PreflightMissing.into_result());
     }
     // Pass reply - validate artifacts exist.
     if let Some(ref run) = ctx.run {
         if run.prepared_suite.is_none() || run.preflight.is_none() {
-            return HookMessage::preflight_reply_invalid("preflight artifacts were not saved")
-                .into_result();
+            return Ok(
+                HookMessage::preflight_reply_invalid("preflight artifacts were not saved")
+                    .into_result(),
+            );
         }
         if !run.layout.prepared_suite_path().exists() {
-            return HookMessage::preflight_reply_invalid(
+            return Ok(HookMessage::preflight_reply_invalid(
                 "prepared-suite artifact is missing or incomplete",
             )
-            .into_result();
+            .into_result());
         }
     }
     // Transition to preflight captured.
@@ -114,15 +116,15 @@ fn validate_suite_runner(ctx: &HookContext) -> HookResult {
             new_state.last_event = Some("PreflightCaptured".to_string());
             new_state.updated_at = chrono::Utc::now().to_rfc3339();
             if let Some(ref rd) = ctx.effective_run_dir() {
-                let _ = runner_wf::write_runner_state(rd, &new_state);
+                runner_wf::write_runner_state(rd, &new_state)?;
             }
-            return HookResult::allow();
+            return Ok(HookResult::allow());
         }
         if s.phase == RunnerPhase::Execution {
-            return HookResult::allow();
+            return Ok(HookResult::allow());
         }
     }
-    HookMessage::PreflightMissing.into_result()
+    Ok(HookMessage::PreflightMissing.into_result())
 }
 
 struct ParsedPreflight {
