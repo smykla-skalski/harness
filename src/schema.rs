@@ -825,6 +825,18 @@ debug_summary: []
     }
 
     #[test]
+    fn test_load_suite_rejects_broken_yaml() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = write_temp_file(dir.path(), "suite.md", "---\n: [\n---\n\nBody.\n");
+        let err = SuiteSpec::from_markdown(&path).unwrap_err();
+        assert!(
+            err.message().contains("frontmatter YAML"),
+            "expected YAML parse error, got: {}",
+            err.message()
+        );
+    }
+
+    #[test]
     fn test_suite_dir() {
         let dir = tempfile::tempdir().unwrap();
         let path = SuiteBuilder::new("example.suite")
