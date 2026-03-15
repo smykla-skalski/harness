@@ -440,6 +440,18 @@ pub static MARKDOWN_SHAPE_MISMATCH: ErrorDef = ErrorDef {
     exit_code: 6,
     hint: None,
 };
+pub static IO_ERROR: ErrorDef = ErrorDef {
+    code: "IO001",
+    template: "{detail}",
+    exit_code: 1,
+    hint: None,
+};
+pub static SERIALIZE_ERROR: ErrorDef = ErrorDef {
+    code: "IO002",
+    template: "serialization failed: {detail}",
+    exit_code: 1,
+    hint: None,
+};
 
 // --- Hook definitions ---
 
@@ -674,6 +686,8 @@ mod tests {
             &UNSAFE_NAME,
             &MISSING_RUN_STATUS,
             &MARKDOWN_SHAPE_MISMATCH,
+            &IO_ERROR,
+            &SERIALIZE_ERROR,
         ];
         let codes: Vec<&str> = all_defs.iter().map(|d| d.code).collect();
         let unique: HashSet<&str> = codes.iter().copied().collect();

@@ -21,7 +21,7 @@ pub fn execute(ctx: &HookContext) -> Result<HookResult, CliError> {
     if answers.is_empty() {
         return Ok(HookResult::allow());
     }
-    if ctx.skill == "suite-runner" {
+    if ctx.is_suite_runner() {
         return Ok(handle_suite_runner(ctx));
     }
     Ok(handle_suite_author(ctx))
