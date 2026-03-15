@@ -87,8 +87,9 @@ pub fn write_text(path: &Path, text: &str) -> Result<(), CliError> {
 /// Returns `CliError` if the file is missing or contains invalid JSON.
 pub fn read_json(path: &Path) -> Result<Value, CliError> {
     let text = read_text(path)?;
-    let value: Value = serde_json::from_str(&text)
-        .map_err(|e| CliError::from(CliErrorKind::missing_file(e.to_string())))?;
+    let value: Value = serde_json::from_str(&text).map_err(|e| {
+        CliErrorKind::invalid_json(path.display().to_string()).with_details(e.to_string())
+    })?;
     // Ensure top-level is an object
     ensure_mapping(&value, &format!("JSON document {}", path.display()))?;
     Ok(value)
@@ -316,6 +317,15 @@ mod tests {
         let data = read_json(&path).unwrap();
         assert_eq!(data["key"], "value");
         assert_eq!(data["num"], 42);
+    }
+
+    #[test]
+    fn read_json_rejects_corrupt_json() {
+        let tmp = TempDir::new().unwrap();
+        let path = tmp.path().join("bad.json");
+        fs::write(&path, "not json {").unwrap();
+        let err = read_json(&path).unwrap_err();
+        assert_eq!(err.code(), "KSRCLI019");
     }
 
     #[test]
