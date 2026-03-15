@@ -51,10 +51,13 @@ impl Execute for Command {
                 &args.mode,
                 &args.cluster_name,
                 &args.extra_cluster_names,
+                &args.platform,
                 args.repo_root.as_deref(),
                 args.run_dir.as_deref(),
                 &args.helm_setting,
                 &args.restart_namespace,
+                &args.store,
+                args.image.as_deref(),
             ),
             Command::Preflight {
                 kubeconfig,

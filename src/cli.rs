@@ -65,6 +65,9 @@ pub struct ClusterArgs {
     pub cluster_name: String,
     /// Additional cluster or zone names required by the mode.
     pub extra_cluster_names: Vec<String>,
+    /// Deployment platform: kubernetes or universal.
+    #[arg(long, default_value = "kubernetes")]
+    pub platform: String,
     /// Repo root to run local Kuma build and deploy targets.
     #[arg(long)]
     pub repo_root: Option<String>,
@@ -77,6 +80,12 @@ pub struct ClusterArgs {
     /// Namespace whose workloads to restart after deployment; repeat as needed.
     #[arg(long)]
     pub restart_namespace: Vec<String>,
+    /// Store backend for universal mode: memory or postgres.
+    #[arg(long, default_value = "memory")]
+    pub store: String,
+    /// CP container image override for universal mode.
+    #[arg(long)]
+    pub image: Option<String>,
 }
 
 /// Arguments for `harness record`.
