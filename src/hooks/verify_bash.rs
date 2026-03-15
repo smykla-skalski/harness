@@ -59,8 +59,8 @@ pub fn execute(ctx: &HookContext) -> Result<HookResult, CliError> {
     }
     let target = missing_target(subcommand, run);
     Ok(HookMessage::MissingArtifact {
-        script: format!("harness {subcommand}"),
-        target,
+        script: format!("harness {subcommand}").into(),
+        target: target.into(),
     }
     .into_result())
 }
@@ -127,8 +127,8 @@ fn check_cluster(words: &[String], run: &RunContext) -> HookResult {
         return HookResult::allow();
     }
     HookMessage::MissingArtifact {
-        script: format!("harness cluster {mode}"),
-        target: target.display().to_string(),
+        script: format!("harness cluster {mode}").into(),
+        target: target.display().to_string().into(),
     }
     .into_result()
 }

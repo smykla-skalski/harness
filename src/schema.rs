@@ -150,7 +150,7 @@ impl SuiteSpec {
         if !missing.is_empty() {
             return Err(CliErrorKind::MissingFields {
                 label: "suite frontmatter".into(),
-                fields: missing.join(", "),
+                fields: missing.join(", ").into(),
             }
             .into());
         }
@@ -238,7 +238,7 @@ impl GroupSpec {
         if !missing_sections.is_empty() {
             return Err(CliErrorKind::MissingSections {
                 label: "group body".into(),
-                sections: missing_sections.join(", "),
+                sections: missing_sections.join(", ").into(),
             }
             .into());
         }
@@ -462,7 +462,7 @@ impl RunStatus {
         let text = io::read_text(path)?;
         serde_json::from_str(&text).map_err(|e| -> CliError {
             CliErrorKind::JsonParse {
-                detail: e.to_string(),
+                detail: e.to_string().into(),
             }
             .into()
         })

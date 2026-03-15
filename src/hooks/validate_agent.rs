@@ -52,7 +52,10 @@ fn validate_suite_author(ctx: &HookContext) -> HookResult {
         .collect();
     if !missing.is_empty() {
         let joined = missing.join(", ");
-        return HookMessage::ReaderMissingSections { sections: joined }.into_result();
+        return HookMessage::ReaderMissingSections {
+            sections: joined.into(),
+        }
+        .into_result();
     }
     for block in CODE_BLOCK_RE.find_iter(&message) {
         if block.as_str().matches('\n').count() > CODE_BLOCK_LINE_LIMIT {
@@ -76,7 +79,10 @@ fn validate_suite_runner(ctx: &HookContext) -> HookResult {
     let reply = match parse_preflight_reply(message) {
         Ok(r) => r,
         Err(detail) => {
-            return HookMessage::PreflightReplyInvalid { details: detail }.into_result();
+            return HookMessage::PreflightReplyInvalid {
+                details: detail.into(),
+            }
+            .into_result();
         }
     };
     let state = ctx.runner_state.as_ref();

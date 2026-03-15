@@ -31,7 +31,7 @@ pub fn ensure_mapping<'a>(
         // JSON objects always have string keys, so we only need to check
         // that the value is actually an object.
         CliErrorKind::NotAMapping {
-            label: label.into(),
+            label: label.to_string().into(),
         }
         .into()
     })
@@ -44,14 +44,14 @@ pub fn ensure_mapping<'a>(
 pub fn ensure_str_list(value: &Value, label: &str) -> Result<Vec<String>, CliError> {
     let arr = value.as_array().ok_or_else(|| {
         CliError::from(CliErrorKind::NotAList {
-            label: label.into(),
+            label: label.to_string().into(),
         })
     })?;
     let mut result = Vec::with_capacity(arr.len());
     for item in arr {
         let s = item.as_str().ok_or_else(|| {
             CliError::from(CliErrorKind::NotAllStrings {
-                label: label.into(),
+                label: label.to_string().into(),
             })
         })?;
         result.push(s.to_string());
@@ -74,7 +74,7 @@ pub fn ensure_dir(path: &Path) -> io::Result<()> {
 pub fn read_text(path: &Path) -> Result<String, CliError> {
     fs::read_to_string(path).map_err(|_| {
         CliErrorKind::MissingFile {
-            path: path.display().to_string(),
+            path: path.display().to_string().into(),
         }
         .into()
     })
@@ -88,13 +88,13 @@ pub fn write_text(path: &Path, text: &str) -> Result<(), CliError> {
     if let Some(parent) = path.parent() {
         ensure_dir(parent).map_err(|e| {
             CliError::from(CliErrorKind::MissingFile {
-                path: e.to_string(),
+                path: e.to_string().into(),
             })
         })?;
     }
     fs::write(path, text).map_err(|e| {
         CliErrorKind::MissingFile {
-            path: e.to_string(),
+            path: e.to_string().into(),
         }
         .into()
     })
@@ -108,7 +108,7 @@ pub fn read_json(path: &Path) -> Result<Value, CliError> {
     let text = read_text(path)?;
     let value: Value = serde_json::from_str(&text).map_err(|e| {
         CliError::from(CliErrorKind::MissingFile {
-            path: e.to_string(),
+            path: e.to_string().into(),
         })
     })?;
     // Ensure top-level is an object
@@ -305,7 +305,7 @@ pub fn drill<'a>(payload: &'a Value, dotted_path: &str) -> Result<&'a Value, Cli
     for part in dotted_path.split('.') {
         current = current.get(part).ok_or_else(|| {
             CliError::from(CliErrorKind::PathNotFound {
-                dotted_path: dotted_path.into(),
+                dotted_path: dotted_path.to_string().into(),
             })
         })?;
     }

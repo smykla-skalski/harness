@@ -47,7 +47,7 @@ fn guard_suite_author(ctx: &HookContext, paths: &[&Path]) -> HookResult {
             }
             if !author::suite_author_path_allowed(&norm, sdn) {
                 return HookMessage::WriteOutsideSuite {
-                    path: raw_path.display().to_string(),
+                    path: raw_path.display().to_string().into(),
                 }
                 .into_result();
             }
@@ -80,7 +80,8 @@ fn guard_suite_runner(ctx: &HookContext, paths: &[&Path]) -> HookResult {
                         "{} is harness-managed; {hint}",
                         path.file_name()
                             .map_or("file", |n| n.to_str().unwrap_or("file"))
-                    ),
+                    )
+                    .into(),
                 }
                 .into_result();
             }
@@ -106,7 +107,7 @@ fn guard_suite_runner(ctx: &HookContext, paths: &[&Path]) -> HookResult {
         // Path outside run surface.
         if run_dir.is_some() || suite_dir.is_some() {
             return HookMessage::WriteOutsideRun {
-                path: raw_path.display().to_string(),
+                path: raw_path.display().to_string().into(),
             }
             .into_result();
         }

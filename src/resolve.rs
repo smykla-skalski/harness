@@ -26,7 +26,7 @@ pub fn resolve_run_directory(lookup: &RunLookup) -> Result<ResolvedRun, CliError
             });
         }
         return Err(CliErrorKind::MissingFile {
-            path: run_dir.display().to_string(),
+            path: run_dir.display().to_string().into(),
         }
         .into());
     }
@@ -37,14 +37,14 @@ pub fn resolve_run_directory(lookup: &RunLookup) -> Result<ResolvedRun, CliError
             return Ok(ResolvedRun { run_dir: path });
         }
         return Err(CliErrorKind::MissingRunLocation {
-            run_id: run_id.clone(),
+            run_id: run_id.clone().into(),
         }
         .into());
     }
 
     if let Some(run_id) = &lookup.run_id {
         return Err(CliErrorKind::MissingRunLocation {
-            run_id: run_id.clone(),
+            run_id: run_id.clone().into(),
         }
         .into());
     }
@@ -76,7 +76,10 @@ pub fn resolve_suite_path(raw: &str) -> Result<PathBuf, CliError> {
         return Ok(normalize_suite_candidate(first));
     }
 
-    Err(CliErrorKind::MissingFile { path: raw.into() }.into())
+    Err(CliErrorKind::MissingFile {
+        path: raw.to_string().into(),
+    }
+    .into())
 }
 
 /// Resolve a manifest path, searching the run directory's manifest tree.
@@ -93,7 +96,10 @@ pub fn resolve_manifest_path(raw: &str, run_dir: Option<&Path>) -> Result<PathBu
         }
     }
 
-    Err(CliErrorKind::MissingFile { path: raw.into() }.into())
+    Err(CliErrorKind::MissingFile {
+        path: raw.to_string().into(),
+    }
+    .into())
 }
 
 fn suite_path_candidates(raw: &str, suite_root: &Path) -> Vec<PathBuf> {

@@ -27,7 +27,7 @@ pub fn execute(ctx: &HookContext) -> Result<HookResult, CliError> {
     };
     let Some(state) = &ctx.runner_state else {
         return Ok(HookMessage::RunVerdict {
-            verdict: status.overall_verdict.to_string(),
+            verdict: status.overall_verdict.to_string().into(),
         }
         .into_result());
     };
@@ -47,7 +47,7 @@ pub fn execute(ctx: &HookContext) -> Result<HookResult, CliError> {
         }
     }
     Ok(HookMessage::RunVerdict {
-        verdict: status.overall_verdict.to_string(),
+        verdict: status.overall_verdict.to_string().into(),
     }
     .into_result())
 }

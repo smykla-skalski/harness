@@ -22,7 +22,7 @@ pub fn write_suite_defaults(
 ) -> Result<PathBuf, CliError> {
     io::ensure_dir(suite_dir).map_err(|e| {
         CliError::from(CliErrorKind::MissingFile {
-            path: e.to_string(),
+            path: e.to_string().into(),
         })
     })?;
     let mut payload = serde_json::Map::new();

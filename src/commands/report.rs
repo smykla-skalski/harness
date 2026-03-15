@@ -49,15 +49,15 @@ fn run_check(report_path: Option<&str>) -> Result<i32, CliError> {
 
     if line_count > REPORT_LINE_LIMIT {
         return Err(CliErrorKind::ReportLineLimit {
-            count: line_count.to_string(),
-            limit: REPORT_LINE_LIMIT.to_string(),
+            count: line_count.to_string().into(),
+            limit: REPORT_LINE_LIMIT.to_string().into(),
         }
         .into());
     }
     if code_blocks > REPORT_CODE_BLOCK_LIMIT {
         return Err(CliErrorKind::ReportCodeBlockLimit {
-            count: code_blocks.to_string(),
-            limit: REPORT_CODE_BLOCK_LIMIT.to_string(),
+            count: code_blocks.to_string().into(),
+            limit: REPORT_CODE_BLOCK_LIMIT.to_string().into(),
         }
         .into());
     }
