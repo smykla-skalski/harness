@@ -32,10 +32,7 @@ pub fn authoring_validation_repo_root(
             }
         }
     }
-    Err(CliErrorKind::MissingFile {
-        path: "unable to locate repo root for authoring validation".into(),
-    }
-    .into())
+    Err(CliErrorKind::missing_file("unable to locate repo root for authoring validation").into())
 }
 
 /// Validate suite author paths.

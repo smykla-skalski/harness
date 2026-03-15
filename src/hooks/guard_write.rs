@@ -46,20 +46,14 @@ fn guard_suite_author(ctx: &HookContext, paths: &[&Path]) -> HookResult {
                 continue;
             }
             if !author::suite_author_path_allowed(&norm, sdn) {
-                return HookMessage::WriteOutsideSuite {
-                    path: raw_path.display().to_string().into(),
-                }
-                .into_result();
+                return HookMessage::write_outside_suite(raw_path.display().to_string())
+                    .into_result();
             }
         }
     }
     // Check if writing is allowed in the current phase.
     if let Err(reason) = can_write(state) {
-        return HookMessage::ApprovalRequired {
-            action: "write suite files".into(),
-            details: reason.into(),
-        }
-        .into_result();
+        return HookMessage::approval_required("write suite files", reason).into_result();
     }
     HookResult::allow()
 }
@@ -74,15 +68,14 @@ fn guard_suite_runner(ctx: &HookContext, paths: &[&Path]) -> HookResult {
         if let Some(ref rd) = run_dir {
             if is_command_owned_run_file(&path, rd) {
                 let hint = control_file_hint(&path);
-                return HookMessage::RunnerFlowRequired {
-                    action: "edit run control files".into(),
-                    details: format!(
+                return HookMessage::runner_flow_required(
+                    "edit run control files",
+                    format!(
                         "{} is harness-managed; {hint}",
                         path.file_name()
                             .map_or("file", |n| n.to_str().unwrap_or("file"))
-                    )
-                    .into(),
-                }
+                    ),
+                )
                 .into_result();
             }
             if allowed_suite_runner_path(&path, rd) {
@@ -96,20 +89,17 @@ fn guard_suite_runner(ctx: &HookContext, paths: &[&Path]) -> HookResult {
             if let Some(ref state) = ctx.runner_state
                 && state.suite_fix.is_none()
             {
-                return HookMessage::RunnerFlowRequired {
-                    action: "edit suite files".into(),
-                    details: "approved suite repair is required before editing suite files".into(),
-                }
+                return HookMessage::runner_flow_required(
+                    "edit suite files",
+                    "approved suite repair is required before editing suite files",
+                )
                 .into_result();
             }
             continue;
         }
         // Path outside run surface.
         if run_dir.is_some() || suite_dir.is_some() {
-            return HookMessage::WriteOutsideRun {
-                path: raw_path.display().to_string().into(),
-            }
-            .into_result();
+            return HookMessage::write_outside_run(raw_path.display().to_string()).into_result();
         }
     }
     HookResult::allow()

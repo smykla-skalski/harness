@@ -32,12 +32,10 @@ fn guard_suite_runner(ctx: &HookContext, prompts: &[AskUserQuestionPrompt]) -> H
         if let Some(ref state) = ctx.runner_state {
             let (allowed, reason) = can_ask_manifest_fix(state);
             if !allowed {
-                return HookMessage::RunnerFlowRequired {
-                    action: "ask the suite-fix gate".into(),
-                    details: reason
-                        .unwrap_or("enter failure triage before asking how to repair the suite")
-                        .into(),
-                }
+                return HookMessage::runner_flow_required(
+                    "ask the suite-fix gate",
+                    reason.unwrap_or("enter failure triage before asking how to repair the suite"),
+                )
                 .into_result();
             }
         }
@@ -52,40 +50,32 @@ fn guard_suite_author(ctx: &HookContext, prompts: &[AskUserQuestionPrompt]) -> H
         if kubectl_validate_prompt_required() {
             return HookResult::allow();
         }
-        return HookMessage::ValidatorGateUnexpected {
-            details:
-                "The local validator is already installed or a prior decision is already saved. \
-                      Do not ask the install gate again."
-                    .into(),
-        }
+        return HookMessage::validator_gate_unexpected(
+            "The local validator is already installed or a prior decision is already saved. \
+                      Do not ask the install gate again.",
+        )
         .into_result();
     }
     // Block non-install prompts if install gate is pending.
     if kubectl_validate_prompt_required() {
-        return HookMessage::ValidatorGateRequired {
-            details: "Complete the local validator install decision first.".into(),
-        }
+        return HookMessage::validator_gate_required(
+            "Complete the local validator install decision first.",
+        )
         .into_result();
     }
     // Check canonical review gate prompts.
     if let Some(gate) = classify_canonical_gate(prompts) {
         let Some(state) = &ctx.author_state else {
-            return HookMessage::ApprovalStateInvalid {
-                details: "author state is missing".into(),
-            }
-            .into_result();
+            return HookMessage::approval_state_invalid("author state is missing").into_result();
         };
         if state.mode == ApprovalMode::Bypass {
-            return HookMessage::ApprovalStateInvalid {
-                details: "bypass mode forbids canonical review prompts".into(),
-            }
+            return HookMessage::approval_state_invalid(
+                "bypass mode forbids canonical review prompts",
+            )
             .into_result();
         }
         if let Err(reason) = can_request_gate(state, gate) {
-            return HookMessage::ApprovalStateInvalid {
-                details: reason.into(),
-            }
-            .into_result();
+            return HookMessage::approval_state_invalid(reason).into_result();
         }
         return HookResult::allow();
     }

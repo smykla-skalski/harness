@@ -173,11 +173,7 @@ pub fn resolve_build_info(repo: &Path) -> Result<BuildInfo, CliError> {
         .args(["status", "--porcelain", "--untracked-files=no"])
         .current_dir(repo)
         .output()
-        .map_err(|e| {
-            CliError::from(CliErrorKind::CommandFailed {
-                command: cow!("git status: {e}"),
-            })
-        })?;
+        .map_err(|e| CliError::from(CliErrorKind::command_failed(cow!("git status: {e}"))))?;
 
     let dirty = String::from_utf8_lossy(&dirty_output.stdout)
         .trim()
@@ -193,11 +189,7 @@ pub fn resolve_build_info(repo: &Path) -> Result<BuildInfo, CliError> {
         .args(["rev-parse", "--short=10", "HEAD"])
         .current_dir(repo)
         .output()
-        .map_err(|e| {
-            CliError::from(CliErrorKind::CommandFailed {
-                command: cow!("git rev-parse: {e}"),
-            })
-        })?;
+        .map_err(|e| CliError::from(CliErrorKind::command_failed(cow!("git rev-parse: {e}"))))?;
 
     let short_sha = String::from_utf8_lossy(&sha_output.stdout)
         .trim()
@@ -230,10 +222,7 @@ mod tests {
 
     #[test]
     fn cli_error_has_all_fields() {
-        let err = CliErrorKind::CommandFailed {
-            command: "msg".into(),
-        }
-        .with_details("more");
+        let err = CliErrorKind::command_failed("msg").with_details("more");
         assert_eq!(err.code(), "KSRCLI004");
         assert_eq!(err.message(), "command failed: msg");
         assert_eq!(err.exit_code(), 4);

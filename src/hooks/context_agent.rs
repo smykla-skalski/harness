@@ -21,19 +21,17 @@ pub fn execute(ctx: &HookContext) -> Result<HookResult, CliError> {
     }
     // suite-runner: validate preflight worker can start.
     let Some(state) = &ctx.runner_state else {
-        return Ok(HookMessage::RunnerStateInvalid {
-            details: "runner state is missing; initialize the suite run first".into(),
-        }
+        return Ok(HookMessage::runner_state_invalid(
+            "runner state is missing; initialize the suite run first",
+        )
         .into_result());
     };
     let (allowed, reason) = can_start_preflight_worker(state);
     if !allowed {
-        return Ok(HookMessage::RunnerFlowRequired {
-            action: "start the preflight worker".into(),
-            details: reason
-                .unwrap_or("enter the guarded preflight phase before spawning the worker")
-                .into(),
-        }
+        return Ok(HookMessage::runner_flow_required(
+            "start the preflight worker",
+            reason.unwrap_or("enter the guarded preflight phase before spawning the worker"),
+        )
         .into_result());
     }
     Ok(HookResult::allow())

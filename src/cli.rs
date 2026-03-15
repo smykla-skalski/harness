@@ -1677,10 +1677,7 @@ mod tests {
 
     #[test]
     fn format_error_detail_includes_details() {
-        let error = CliErrorKind::CommandFailed {
-            command: "command failed".into(),
-        }
-        .with_details("exit code 1");
+        let error = CliErrorKind::command_failed("command failed").with_details("exit code 1");
         let detail = format_hook_error_detail("verify-write", &error);
         assert!(detail.contains("Details: exit code 1"));
     }

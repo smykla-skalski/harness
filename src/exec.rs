@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::path::Path;
-use std::process::Command;
+use std::process::{Command, Output};
 
 use crate::core_defs::{CommandResult, merge_env};
 use crate::errors::{CliError, CliErrorKind};
@@ -21,19 +21,13 @@ pub(crate) fn run_command(
     let output = build_command(program, cmd_args, cwd, env)
         .output()
         .map_err(|e| {
-            CliErrorKind::CommandFailed {
-                command: command_string(args).into(),
-            }
-            .with_details(e.to_string())
+            CliErrorKind::command_failed(command_string(args)).with_details(e.to_string())
         })?;
     let result = build_result(args, output);
     if ok_exit_codes.contains(&result.returncode) {
         return Ok(result);
     }
-    Err(CliErrorKind::CommandFailed {
-        command: command_string(args).into(),
-    }
-    .with_details(failure_details(&result)))
+    Err(CliErrorKind::command_failed(command_string(args)).with_details(failure_details(&result)))
 }
 
 fn build_command(
@@ -51,7 +45,8 @@ fn build_command(
     cmd
 }
 
-fn build_result(args: &[&str], output: std::process::Output) -> CommandResult {
+#[allow(clippy::needless_pass_by_value)] // consumes owned stdout/stderr vecs
+fn build_result(args: &[&str], output: Output) -> CommandResult {
     CommandResult {
         args: args.iter().map(|s| (*s).to_string()).collect(),
         returncode: output.status.code().unwrap_or(-1),

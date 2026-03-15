@@ -1,5 +1,3 @@
-use std::borrow::Cow;
-
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 use serde_json::{Map, Value};
@@ -20,10 +18,7 @@ const MAX_PROBE_ITERATIONS: usize = 100;
 /// missing, or field types don't match the target struct.
 pub fn from_mapping<T: DeserializeOwned>(value: &Value, label: &str) -> Result<T, CliError> {
     let Some(obj) = value.as_object() else {
-        return Err(CliErrorKind::NotAMapping {
-            label: label.to_string().into(),
-        }
-        .into());
+        return Err(CliErrorKind::not_a_mapping(label.to_string()).into());
     };
     deserialize_with_errors::<T>(obj, label)
 }
@@ -42,10 +37,7 @@ pub fn from_mapping_with_injected<T: DeserializeOwned>(
     label: &str,
 ) -> Result<T, CliError> {
     let Some(obj) = value.as_object() else {
-        return Err(CliErrorKind::NotAMapping {
-            label: label.to_string().into(),
-        }
-        .into());
+        return Err(CliErrorKind::not_a_mapping(label.to_string()).into());
     };
     let mut merged = obj.clone();
     for (k, v) in injected {
@@ -86,11 +78,7 @@ fn deserialize_with_errors<T: DeserializeOwned>(
             Ok(v) if missing.is_empty() => return Ok(v),
             Ok(_) => {
                 let fields = missing.join(", ");
-                return Err(CliErrorKind::MissingFields {
-                    label: label.to_string().into(),
-                    fields: fields.into(),
-                }
-                .into());
+                return Err(CliErrorKind::missing_fields(label.to_string(), fields).into());
             }
             Err(e) => {
                 let msg = e.to_string();
@@ -119,30 +107,18 @@ fn deserialize_with_errors<T: DeserializeOwned>(
                 // We have collected some missing fields but hit a different error.
                 if !missing.is_empty() {
                     let fields = missing.join(", ");
-                    return Err(CliErrorKind::MissingFields {
-                        label: label.to_string().into(),
-                        fields: fields.into(),
-                    }
-                    .into());
+                    return Err(CliErrorKind::missing_fields(label.to_string(), fields).into());
                 }
 
                 // Type mismatch on a field that was present in the input.
                 if let Some(expected) = parse_expected_type(&msg) {
-                    return Err(CliErrorKind::FieldTypeMismatch {
-                        label: label.to_string().into(),
-                        field: Cow::default(),
-                        expected: expected.into(),
-                    }
-                    .into());
+                    return Err(
+                        CliErrorKind::field_type_mismatch(label.to_string(), "", expected).into(),
+                    );
                 }
 
                 // Unknown serde error - wrap it.
-                return Err(CliErrorKind::FieldTypeMismatch {
-                    label: label.to_string().into(),
-                    field: Cow::default(),
-                    expected: msg.into(),
-                }
-                .into());
+                return Err(CliErrorKind::field_type_mismatch(label.to_string(), "", msg).into());
             }
         }
     }
@@ -150,18 +126,9 @@ fn deserialize_with_errors<T: DeserializeOwned>(
     // Exhausted iterations - report whatever we found.
     if !missing.is_empty() {
         let fields = missing.join(", ");
-        return Err(CliErrorKind::MissingFields {
-            label: label.to_string().into(),
-            fields: fields.into(),
-        }
-        .into());
+        return Err(CliErrorKind::missing_fields(label.to_string(), fields).into());
     }
-    Err(CliErrorKind::FieldTypeMismatch {
-        label: label.to_string().into(),
-        field: Cow::default(),
-        expected: "probe loop exhausted".into(),
-    }
-    .into())
+    Err(CliErrorKind::field_type_mismatch(label.to_string(), "", "probe loop exhausted").into())
 }
 
 /// Extract field name from serde's "missing field `X`" error message.

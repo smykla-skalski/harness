@@ -14,10 +14,7 @@ pub fn execute(mode: &str, suite_dir: Option<&str>) -> Result<i32, CliError> {
         "interactive" => ApprovalMode::Interactive,
         "bypass" => ApprovalMode::Bypass,
         _ => {
-            return Err(CliErrorKind::UsageError {
-                detail: cow!("invalid approval mode: {mode}"),
-            }
-            .into());
+            return Err(CliErrorKind::usage_error(cow!("invalid approval mode: {mode}")).into());
         }
     };
 

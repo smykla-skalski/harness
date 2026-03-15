@@ -20,11 +20,8 @@ pub fn write_suite_defaults(
     suite_dir: &Path,
     repo_root: Option<&Path>,
 ) -> Result<PathBuf, CliError> {
-    io::ensure_dir(suite_dir).map_err(|e| {
-        CliError::from(CliErrorKind::MissingFile {
-            path: e.to_string().into(),
-        })
-    })?;
+    io::ensure_dir(suite_dir)
+        .map_err(|e| CliError::from(CliErrorKind::missing_file(e.to_string())))?;
     let mut payload = serde_json::Map::new();
     if let Some(root) = repo_root {
         payload.insert(

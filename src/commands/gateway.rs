@@ -15,11 +15,8 @@ static GATEWAY_RE: LazyLock<Regex> =
 
 fn detect_version(root: &Path) -> Result<String, CliError> {
     let go_mod = root.join("go.mod");
-    let text = fs::read_to_string(&go_mod).map_err(|_| {
-        CliError::from(CliErrorKind::MissingFile {
-            path: go_mod.display().to_string().into(),
-        })
-    })?;
+    let text = fs::read_to_string(&go_mod)
+        .map_err(|_| CliError::from(CliErrorKind::missing_file(go_mod.display().to_string())))?;
     // The capture group excludes the leading `v`, so cap[1] is e.g. "0.8.0".
     let cap = GATEWAY_RE
         .captures(&text)
@@ -57,8 +54,8 @@ pub fn execute(
     }
 
     let tmp_dir = env::temp_dir().join("harness-gateway");
-    ensure_dir(&tmp_dir).map_err(|e| CliErrorKind::Io {
-        detail: cow!("could not create temp dir {}: {e}", tmp_dir.display()),
+    ensure_dir(&tmp_dir).map_err(|e| {
+        CliErrorKind::io(cow!("could not create temp dir {}: {e}", tmp_dir.display()))
     })?;
 
     let temp_manifest = tmp_dir.join(format!("gateway-api-{version}.yaml"));
@@ -69,17 +66,10 @@ pub fn execute(
 
     // Distinguish "file missing after download" from "download produced an empty file".
     let file_len = fs::metadata(&temp_manifest)
-        .map_err(|_| {
-            CliError::from(CliErrorKind::MissingFile {
-                path: temp_str.clone().into(),
-            })
-        })?
+        .map_err(|_| CliError::from(CliErrorKind::missing_file(temp_str.clone())))?
         .len();
     if file_len == 0 {
-        return Err(CliErrorKind::GatewayDownloadEmpty {
-            path: temp_str.into(),
-        }
-        .into());
+        return Err(CliErrorKind::gateway_download_empty(temp_str).into());
     }
 
     kubectl(kc, &["apply", "-f", &temp_str], &[0])?;

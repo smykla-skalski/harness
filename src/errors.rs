@@ -242,6 +242,248 @@ pub enum CliErrorKind {
     JsonParse { detail: Cow<'static, str> },
 }
 
+// --- CliErrorKind constructors ---
+//
+// Each variant with fields gets a constructor that accepts
+// `impl Into<Cow<'static, str>>`. Callers pass `&'static str` (zero-alloc),
+// `String` (wraps existing allocation), or `cow!(...)` (format + wrap).
+
+#[allow(clippy::too_many_arguments)]
+impl CliErrorKind {
+    pub fn missing_tools(tools: impl Into<Cow<'static, str>>) -> Self {
+        Self::MissingTools {
+            tools: tools.into(),
+        }
+    }
+    pub fn unsafe_name(name: impl Into<Cow<'static, str>>) -> Self {
+        Self::UnsafeName { name: name.into() }
+    }
+    pub fn command_failed(command: impl Into<Cow<'static, str>>) -> Self {
+        Self::CommandFailed {
+            command: command.into(),
+        }
+    }
+    pub fn missing_closeout_artifact(rel: impl Into<Cow<'static, str>>) -> Self {
+        Self::MissingCloseoutArtifact { rel: rel.into() }
+    }
+    pub fn missing_run_context_value(field: impl Into<Cow<'static, str>>) -> Self {
+        Self::MissingRunContextValue {
+            field: field.into(),
+        }
+    }
+    pub fn missing_run_location(run_id: impl Into<Cow<'static, str>>) -> Self {
+        Self::MissingRunLocation {
+            run_id: run_id.into(),
+        }
+    }
+    pub fn run_dir_exists(run_dir: impl Into<Cow<'static, str>>) -> Self {
+        Self::RunDirExists {
+            run_dir: run_dir.into(),
+        }
+    }
+    pub fn run_group_already_recorded(group_id: impl Into<Cow<'static, str>>) -> Self {
+        Self::RunGroupAlreadyRecorded {
+            group_id: group_id.into(),
+        }
+    }
+    pub fn run_group_not_found(group_id: impl Into<Cow<'static, str>>) -> Self {
+        Self::RunGroupNotFound {
+            group_id: group_id.into(),
+        }
+    }
+    pub fn missing_file(path: impl Into<Cow<'static, str>>) -> Self {
+        Self::MissingFile { path: path.into() }
+    }
+    pub fn invalid_json(path: impl Into<Cow<'static, str>>) -> Self {
+        Self::InvalidJson { path: path.into() }
+    }
+    pub fn path_not_found(dotted_path: impl Into<Cow<'static, str>>) -> Self {
+        Self::PathNotFound {
+            dotted_path: dotted_path.into(),
+        }
+    }
+    pub fn not_a_mapping(label: impl Into<Cow<'static, str>>) -> Self {
+        Self::NotAMapping {
+            label: label.into(),
+        }
+    }
+    pub fn not_string_keys(label: impl Into<Cow<'static, str>>) -> Self {
+        Self::NotStringKeys {
+            label: label.into(),
+        }
+    }
+    pub fn not_a_list(label: impl Into<Cow<'static, str>>) -> Self {
+        Self::NotAList {
+            label: label.into(),
+        }
+    }
+    pub fn not_all_strings(label: impl Into<Cow<'static, str>>) -> Self {
+        Self::NotAllStrings {
+            label: label.into(),
+        }
+    }
+    pub fn missing_fields(
+        label: impl Into<Cow<'static, str>>,
+        fields: impl Into<Cow<'static, str>>,
+    ) -> Self {
+        Self::MissingFields {
+            label: label.into(),
+            fields: fields.into(),
+        }
+    }
+    pub fn field_type_mismatch(
+        label: impl Into<Cow<'static, str>>,
+        field: impl Into<Cow<'static, str>>,
+        expected: impl Into<Cow<'static, str>>,
+    ) -> Self {
+        Self::FieldTypeMismatch {
+            label: label.into(),
+            field: field.into(),
+            expected: expected.into(),
+        }
+    }
+    pub fn missing_sections(
+        label: impl Into<Cow<'static, str>>,
+        sections: impl Into<Cow<'static, str>>,
+    ) -> Self {
+        Self::MissingSections {
+            label: label.into(),
+            sections: sections.into(),
+        }
+    }
+    pub fn gateway_download_empty(path: impl Into<Cow<'static, str>>) -> Self {
+        Self::GatewayDownloadEmpty { path: path.into() }
+    }
+    pub fn no_resource_kinds(manifest: impl Into<Cow<'static, str>>) -> Self {
+        Self::NoResourceKinds {
+            manifest: manifest.into(),
+        }
+    }
+    pub fn route_not_found(route_match: impl Into<Cow<'static, str>>) -> Self {
+        Self::RouteNotFound {
+            route_match: route_match.into(),
+        }
+    }
+    pub fn kubectl_target_override_forbidden(flag: impl Into<Cow<'static, str>>) -> Self {
+        Self::KubectlTargetOverrideForbidden { flag: flag.into() }
+    }
+    pub fn unknown_tracked_cluster(
+        cluster: impl Into<Cow<'static, str>>,
+        choices: impl Into<Cow<'static, str>>,
+    ) -> Self {
+        Self::UnknownTrackedCluster {
+            cluster: cluster.into(),
+            choices: choices.into(),
+        }
+    }
+    pub fn non_local_kubeconfig(path: impl Into<Cow<'static, str>>) -> Self {
+        Self::NonLocalKubeconfig { path: path.into() }
+    }
+    pub fn envoy_config_type_not_found(type_name: impl Into<Cow<'static, str>>) -> Self {
+        Self::EnvoyConfigTypeNotFound {
+            type_name: type_name.into(),
+        }
+    }
+    pub fn envoy_capture_args_required(fields: impl Into<Cow<'static, str>>) -> Self {
+        Self::EnvoyCaptureArgsRequired {
+            fields: fields.into(),
+        }
+    }
+    pub fn report_line_limit(
+        count: impl Into<Cow<'static, str>>,
+        limit: impl Into<Cow<'static, str>>,
+    ) -> Self {
+        Self::ReportLineLimit {
+            count: count.into(),
+            limit: limit.into(),
+        }
+    }
+    pub fn report_code_block_limit(
+        count: impl Into<Cow<'static, str>>,
+        limit: impl Into<Cow<'static, str>>,
+    ) -> Self {
+        Self::ReportCodeBlockLimit {
+            count: count.into(),
+            limit: limit.into(),
+        }
+    }
+    pub fn evidence_label_not_found(label: impl Into<Cow<'static, str>>) -> Self {
+        Self::EvidenceLabelNotFound {
+            label: label.into(),
+        }
+    }
+    pub fn authoring_payload_invalid(
+        kind: impl Into<Cow<'static, str>>,
+        details: impl Into<Cow<'static, str>>,
+    ) -> Self {
+        Self::AuthoringPayloadInvalid {
+            kind: kind.into(),
+            details: details.into(),
+        }
+    }
+    pub fn authoring_show_kind_missing(kind: impl Into<Cow<'static, str>>) -> Self {
+        Self::AuthoringShowKindMissing { kind: kind.into() }
+    }
+    pub fn amendments_required(path: impl Into<Cow<'static, str>>) -> Self {
+        Self::AmendmentsRequired { path: path.into() }
+    }
+    pub fn authoring_validate_failed(targets: impl Into<Cow<'static, str>>) -> Self {
+        Self::AuthoringValidateFailed {
+            targets: targets.into(),
+        }
+    }
+    pub fn io(detail: impl Into<Cow<'static, str>>) -> Self {
+        Self::Io {
+            detail: detail.into(),
+        }
+    }
+    pub fn serialize(detail: impl Into<Cow<'static, str>>) -> Self {
+        Self::Serialize {
+            detail: detail.into(),
+        }
+    }
+    pub fn hook_payload_invalid(detail: impl Into<Cow<'static, str>>) -> Self {
+        Self::HookPayloadInvalid {
+            detail: detail.into(),
+        }
+    }
+    pub fn cluster_error(detail: impl Into<Cow<'static, str>>) -> Self {
+        Self::ClusterError {
+            detail: detail.into(),
+        }
+    }
+    pub fn usage_error(detail: impl Into<Cow<'static, str>>) -> Self {
+        Self::UsageError {
+            detail: detail.into(),
+        }
+    }
+    pub fn workflow_io(detail: impl Into<Cow<'static, str>>) -> Self {
+        Self::WorkflowIo {
+            detail: detail.into(),
+        }
+    }
+    pub fn workflow_parse(detail: impl Into<Cow<'static, str>>) -> Self {
+        Self::WorkflowParse {
+            detail: detail.into(),
+        }
+    }
+    pub fn workflow_version(detail: impl Into<Cow<'static, str>>) -> Self {
+        Self::WorkflowVersion {
+            detail: detail.into(),
+        }
+    }
+    pub fn workflow_serialize(detail: impl Into<Cow<'static, str>>) -> Self {
+        Self::WorkflowSerialize {
+            detail: detail.into(),
+        }
+    }
+    pub fn json_parse(detail: impl Into<Cow<'static, str>>) -> Self {
+        Self::JsonParse {
+            detail: detail.into(),
+        }
+    }
+}
+
 impl CliErrorKind {
     /// Error code identifying this error kind.
     #[must_use]
@@ -466,10 +708,7 @@ impl From<CliErrorKind> for CliError {
 
 impl From<io::Error> for CliError {
     fn from(e: io::Error) -> Self {
-        CliErrorKind::Io {
-            detail: cow!("IO error: {e}"),
-        }
-        .into()
+        CliErrorKind::io(cow!("IO error: {e}")).into()
     }
 }
 
@@ -584,6 +823,89 @@ pub enum HookMessage {
     SuiteAuthorTracked,
 }
 
+// --- HookMessage constructors ---
+
+impl HookMessage {
+    pub fn write_outside_run(path: impl Into<Cow<'static, str>>) -> Self {
+        Self::WriteOutsideRun { path: path.into() }
+    }
+    pub fn runner_state_invalid(details: impl Into<Cow<'static, str>>) -> Self {
+        Self::RunnerStateInvalid {
+            details: details.into(),
+        }
+    }
+    pub fn runner_flow_required(
+        action: impl Into<Cow<'static, str>>,
+        details: impl Into<Cow<'static, str>>,
+    ) -> Self {
+        Self::RunnerFlowRequired {
+            action: action.into(),
+            details: details.into(),
+        }
+    }
+    pub fn preflight_reply_invalid(details: impl Into<Cow<'static, str>>) -> Self {
+        Self::PreflightReplyInvalid {
+            details: details.into(),
+        }
+    }
+    pub fn write_outside_suite(path: impl Into<Cow<'static, str>>) -> Self {
+        Self::WriteOutsideSuite { path: path.into() }
+    }
+    pub fn approval_state_invalid(details: impl Into<Cow<'static, str>>) -> Self {
+        Self::ApprovalStateInvalid {
+            details: details.into(),
+        }
+    }
+    pub fn approval_required(
+        action: impl Into<Cow<'static, str>>,
+        details: impl Into<Cow<'static, str>>,
+    ) -> Self {
+        Self::ApprovalRequired {
+            action: action.into(),
+            details: details.into(),
+        }
+    }
+    pub fn suite_incomplete(details: impl Into<Cow<'static, str>>) -> Self {
+        Self::SuiteIncomplete {
+            details: details.into(),
+        }
+    }
+    pub fn validator_gate_required(details: impl Into<Cow<'static, str>>) -> Self {
+        Self::ValidatorGateRequired {
+            details: details.into(),
+        }
+    }
+    pub fn validator_install_failed(details: impl Into<Cow<'static, str>>) -> Self {
+        Self::ValidatorInstallFailed {
+            details: details.into(),
+        }
+    }
+    pub fn validator_gate_unexpected(details: impl Into<Cow<'static, str>>) -> Self {
+        Self::ValidatorGateUnexpected {
+            details: details.into(),
+        }
+    }
+    pub fn missing_artifact(
+        script: impl Into<Cow<'static, str>>,
+        target: impl Into<Cow<'static, str>>,
+    ) -> Self {
+        Self::MissingArtifact {
+            script: script.into(),
+            target: target.into(),
+        }
+    }
+    pub fn reader_missing_sections(sections: impl Into<Cow<'static, str>>) -> Self {
+        Self::ReaderMissingSections {
+            sections: sections.into(),
+        }
+    }
+    pub fn run_verdict(verdict: impl Into<Cow<'static, str>>) -> Self {
+        Self::RunVerdict {
+            verdict: verdict.into(),
+        }
+    }
+}
+
 impl HookMessage {
     /// Hook code identifying this message.
     #[must_use]
@@ -683,10 +1005,7 @@ mod tests {
 
     #[test]
     fn cli_err_basic_fields() {
-        let err: CliError = CliErrorKind::NotAMapping {
-            label: "foo".into(),
-        }
-        .into();
+        let err: CliError = CliErrorKind::not_a_mapping("foo").into();
         assert_eq!(err.code(), "KSRCLI010");
         assert_eq!(err.message(), "foo must be a mapping");
         assert_eq!(err.exit_code(), 5);
@@ -703,10 +1022,7 @@ mod tests {
 
     #[test]
     fn cli_err_with_details_field() {
-        let err = CliErrorKind::CommandFailed {
-            command: "ls -la".into(),
-        }
-        .with_details("exit 1");
+        let err = CliErrorKind::command_failed("ls -la").with_details("exit 1");
         assert_eq!(err.code(), "KSRCLI004");
         assert_eq!(err.message(), "command failed: ls -la");
         assert_eq!(err.exit_code(), 4);
@@ -715,177 +1031,78 @@ mod tests {
 
     #[test]
     fn cli_err_formats_message() {
-        let err: CliError = CliErrorKind::MissingFile {
-            path: "/tmp/gone.txt".into(),
-        }
-        .into();
+        let err: CliError = CliErrorKind::missing_file("/tmp/gone.txt").into();
         assert_eq!(err.message(), "missing file: /tmp/gone.txt");
     }
 
     fn core_error_kinds() -> Vec<CliErrorKind> {
         vec![
             CliErrorKind::EmptyCommandArgs,
-            CliErrorKind::MissingTools {
-                tools: Cow::default(),
-            },
-            CliErrorKind::CommandFailed {
-                command: Cow::default(),
-            },
+            CliErrorKind::missing_tools(""),
+            CliErrorKind::command_failed(""),
             CliErrorKind::MissingRunPointer,
-            CliErrorKind::MissingCloseoutArtifact {
-                rel: Cow::default(),
-            },
+            CliErrorKind::missing_closeout_artifact(""),
             CliErrorKind::MissingStateCapture,
             CliErrorKind::VerdictPending,
-            CliErrorKind::MissingRunContextValue {
-                field: Cow::default(),
-            },
-            CliErrorKind::MissingRunLocation {
-                run_id: Cow::default(),
-            },
-            CliErrorKind::InvalidJson {
-                path: Cow::default(),
-            },
-            CliErrorKind::NotAMapping {
-                label: Cow::default(),
-            },
-            CliErrorKind::NotStringKeys {
-                label: Cow::default(),
-            },
-            CliErrorKind::NotAList {
-                label: Cow::default(),
-            },
-            CliErrorKind::NotAllStrings {
-                label: Cow::default(),
-            },
-            CliErrorKind::MissingFile {
-                path: Cow::default(),
-            },
+            CliErrorKind::missing_run_context_value(""),
+            CliErrorKind::missing_run_location(""),
+            CliErrorKind::invalid_json(""),
+            CliErrorKind::not_a_mapping(""),
+            CliErrorKind::not_string_keys(""),
+            CliErrorKind::not_a_list(""),
+            CliErrorKind::not_all_strings(""),
+            CliErrorKind::missing_file(""),
             CliErrorKind::MissingFrontmatter,
             CliErrorKind::UnterminatedFrontmatter,
-            CliErrorKind::PathNotFound {
-                dotted_path: Cow::default(),
-            },
-            CliErrorKind::MissingFields {
-                label: Cow::default(),
-                fields: Cow::default(),
-            },
-            CliErrorKind::FieldTypeMismatch {
-                label: Cow::default(),
-                field: Cow::default(),
-                expected: Cow::default(),
-            },
-            CliErrorKind::MissingSections {
-                label: Cow::default(),
-                sections: Cow::default(),
-            },
-            CliErrorKind::NoResourceKinds {
-                manifest: Cow::default(),
-            },
-            CliErrorKind::RouteNotFound {
-                route_match: Cow::default(),
-            },
+            CliErrorKind::path_not_found(""),
+            CliErrorKind::missing_fields("", ""),
+            CliErrorKind::field_type_mismatch("", "", ""),
+            CliErrorKind::missing_sections("", ""),
+            CliErrorKind::no_resource_kinds(""),
+            CliErrorKind::route_not_found(""),
             CliErrorKind::GatewayVersionMissing,
             CliErrorKind::GatewayCrdsMissing,
-            CliErrorKind::GatewayDownloadEmpty {
-                path: Cow::default(),
-            },
+            CliErrorKind::gateway_download_empty(""),
             CliErrorKind::KumactlNotFound,
         ]
     }
 
     fn extended_error_kinds() -> Vec<CliErrorKind> {
         vec![
-            CliErrorKind::ReportLineLimit {
-                count: Cow::default(),
-                limit: Cow::default(),
-            },
-            CliErrorKind::ReportCodeBlockLimit {
-                count: Cow::default(),
-                limit: Cow::default(),
-            },
+            CliErrorKind::report_line_limit("", ""),
+            CliErrorKind::report_code_block_limit("", ""),
             CliErrorKind::AuthoringSessionMissing,
             CliErrorKind::AuthoringPayloadMissing,
-            CliErrorKind::AuthoringPayloadInvalid {
-                kind: Cow::default(),
-                details: Cow::default(),
-            },
-            CliErrorKind::AuthoringShowKindMissing {
-                kind: Cow::default(),
-            },
-            CliErrorKind::AuthoringValidateFailed {
-                targets: Cow::default(),
-            },
+            CliErrorKind::authoring_payload_invalid("", ""),
+            CliErrorKind::authoring_show_kind_missing(""),
+            CliErrorKind::authoring_validate_failed(""),
             CliErrorKind::KubectlValidateDecisionRequired,
             CliErrorKind::KubectlValidateUnavailable,
             CliErrorKind::TrackedKubectlRequired,
-            CliErrorKind::KubectlTargetOverrideForbidden {
-                flag: Cow::default(),
-            },
-            CliErrorKind::UnknownTrackedCluster {
-                cluster: Cow::default(),
-                choices: Cow::default(),
-            },
-            CliErrorKind::NonLocalKubeconfig {
-                path: Cow::default(),
-            },
-            CliErrorKind::RunGroupAlreadyRecorded {
-                group_id: Cow::default(),
-            },
-            CliErrorKind::RunGroupNotFound {
-                group_id: Cow::default(),
-            },
-            CliErrorKind::EnvoyConfigTypeNotFound {
-                type_name: Cow::default(),
-            },
-            CliErrorKind::EnvoyCaptureArgsRequired {
-                fields: Cow::default(),
-            },
-            CliErrorKind::EvidenceLabelNotFound {
-                label: Cow::default(),
-            },
+            CliErrorKind::kubectl_target_override_forbidden(""),
+            CliErrorKind::unknown_tracked_cluster("", ""),
+            CliErrorKind::non_local_kubeconfig(""),
+            CliErrorKind::run_group_already_recorded(""),
+            CliErrorKind::run_group_not_found(""),
+            CliErrorKind::envoy_config_type_not_found(""),
+            CliErrorKind::envoy_capture_args_required(""),
+            CliErrorKind::evidence_label_not_found(""),
             CliErrorKind::ReportGroupEvidenceRequired,
-            CliErrorKind::AmendmentsRequired {
-                path: Cow::default(),
-            },
-            CliErrorKind::RunDirExists {
-                run_dir: Cow::default(),
-            },
-            CliErrorKind::UnsafeName {
-                name: Cow::default(),
-            },
+            CliErrorKind::amendments_required(""),
+            CliErrorKind::run_dir_exists(""),
+            CliErrorKind::unsafe_name(""),
             CliErrorKind::MissingRunStatus,
             CliErrorKind::MarkdownShapeMismatch,
-            CliErrorKind::Io {
-                detail: Cow::default(),
-            },
-            CliErrorKind::Serialize {
-                detail: Cow::default(),
-            },
-            CliErrorKind::HookPayloadInvalid {
-                detail: Cow::default(),
-            },
-            CliErrorKind::WorkflowIo {
-                detail: Cow::default(),
-            },
-            CliErrorKind::WorkflowParse {
-                detail: Cow::default(),
-            },
-            CliErrorKind::WorkflowVersion {
-                detail: Cow::default(),
-            },
-            CliErrorKind::WorkflowSerialize {
-                detail: Cow::default(),
-            },
-            CliErrorKind::JsonParse {
-                detail: Cow::default(),
-            },
-            CliErrorKind::ClusterError {
-                detail: Cow::default(),
-            },
-            CliErrorKind::UsageError {
-                detail: Cow::default(),
-            },
+            CliErrorKind::io(""),
+            CliErrorKind::serialize(""),
+            CliErrorKind::hook_payload_invalid(""),
+            CliErrorKind::workflow_io(""),
+            CliErrorKind::workflow_parse(""),
+            CliErrorKind::workflow_version(""),
+            CliErrorKind::workflow_serialize(""),
+            CliErrorKind::json_parse(""),
+            CliErrorKind::cluster_error(""),
+            CliErrorKind::usage_error(""),
         ]
     }
 
@@ -912,11 +1129,7 @@ mod tests {
 
     #[test]
     fn cli_err_report_line_limit() {
-        let err: CliError = CliErrorKind::ReportLineLimit {
-            count: "500".into(),
-            limit: "400".into(),
-        }
-        .into();
+        let err: CliError = CliErrorKind::report_line_limit("500", "400").into();
         assert_eq!(err.message(), "report exceeds line limit: 500>400");
         assert_eq!(err.exit_code(), 1);
     }
@@ -924,10 +1137,7 @@ mod tests {
     #[test]
     fn cli_err_closeout_codes_are_distinct() {
         let codes: HashSet<&str> = [
-            CliErrorKind::MissingCloseoutArtifact {
-                rel: Cow::default(),
-            }
-            .code(),
+            CliErrorKind::missing_closeout_artifact("").code(),
             CliErrorKind::MissingStateCapture.code(),
             CliErrorKind::VerdictPending.code(),
         ]
@@ -945,10 +1155,7 @@ mod tests {
 
     #[test]
     fn cli_err_display_trait() {
-        let err: CliError = CliErrorKind::MissingTools {
-            tools: "kubectl".into(),
-        }
-        .into();
+        let err: CliError = CliErrorKind::missing_tools("kubectl").into();
         let displayed = format!("{err}");
         assert_eq!(displayed, "[KSRCLI002] missing required tools: kubectl");
     }
@@ -964,10 +1171,7 @@ mod tests {
 
     #[test]
     fn render_error_without_hint_or_details() {
-        let err: CliError = CliErrorKind::Io {
-            detail: "oops".into(),
-        }
-        .into();
+        let err: CliError = CliErrorKind::io("oops").into();
         let rendered = render_error(&err);
         assert!(rendered.contains("ERROR [IO001] oops"));
         assert!(!rendered.contains("Hint:"));
@@ -986,11 +1190,7 @@ mod tests {
 
     #[test]
     fn hook_msg_warn_result() {
-        let result = HookMessage::MissingArtifact {
-            script: "preflight.py".into(),
-            target: "/tmp/x".into(),
-        }
-        .into_result();
+        let result = HookMessage::missing_artifact("preflight.py", "/tmp/x").into_result();
         assert_eq!(result.decision, Decision::Warn);
         assert_eq!(result.code, "KSR006");
         assert!(result.message.contains("preflight.py"));
@@ -999,10 +1199,7 @@ mod tests {
 
     #[test]
     fn hook_msg_info_result() {
-        let result = HookMessage::RunVerdict {
-            verdict: "pass".into(),
-        }
-        .into_result();
+        let result = HookMessage::run_verdict("pass").into_result();
         assert_eq!(result.decision, Decision::Info);
         assert_eq!(result.code, "KSR012");
         assert!(result.message.contains("pass"));
@@ -1010,10 +1207,7 @@ mod tests {
 
     #[test]
     fn hook_msg_deny_with_fields() {
-        let result = HookMessage::WriteOutsideRun {
-            path: "/bad/path".into(),
-        }
-        .into_result();
+        let result = HookMessage::write_outside_run("/bad/path").into_result();
         assert_eq!(result.decision, Decision::Deny);
         assert!(result.message.contains("/bad/path"));
     }
@@ -1031,58 +1225,27 @@ mod tests {
             HookMessage::AdminEndpoint,
             HookMessage::MissingStateCapture,
             HookMessage::VerdictPending,
-            HookMessage::WriteOutsideRun {
-                path: Cow::default(),
-            },
-            HookMessage::RunnerStateInvalid {
-                details: Cow::default(),
-            },
-            HookMessage::RunnerFlowRequired {
-                action: Cow::default(),
-                details: Cow::default(),
-            },
-            HookMessage::PreflightReplyInvalid {
-                details: Cow::default(),
-            },
-            HookMessage::WriteOutsideSuite {
-                path: Cow::default(),
-            },
-            HookMessage::ApprovalStateInvalid {
-                details: Cow::default(),
-            },
-            HookMessage::ApprovalRequired {
-                action: Cow::default(),
-                details: Cow::default(),
-            },
+            HookMessage::write_outside_run(""),
+            HookMessage::runner_state_invalid(""),
+            HookMessage::runner_flow_required("", ""),
+            HookMessage::preflight_reply_invalid(""),
+            HookMessage::write_outside_suite(""),
+            HookMessage::approval_state_invalid(""),
+            HookMessage::approval_required("", ""),
             HookMessage::GroupsNotList,
             HookMessage::BaselinesNotList,
-            HookMessage::SuiteIncomplete {
-                details: Cow::default(),
-            },
-            HookMessage::ValidatorGateRequired {
-                details: Cow::default(),
-            },
-            HookMessage::ValidatorInstallFailed {
-                details: Cow::default(),
-            },
-            HookMessage::ValidatorGateUnexpected {
-                details: Cow::default(),
-            },
-            HookMessage::MissingArtifact {
-                script: Cow::default(),
-                target: Cow::default(),
-            },
+            HookMessage::suite_incomplete(""),
+            HookMessage::validator_gate_required(""),
+            HookMessage::validator_install_failed(""),
+            HookMessage::validator_gate_unexpected(""),
+            HookMessage::missing_artifact("", ""),
             HookMessage::RunPreflight,
             HookMessage::PreflightMissing,
             HookMessage::CodeReaderFormat,
-            HookMessage::ReaderMissingSections {
-                sections: Cow::default(),
-            },
+            HookMessage::reader_missing_sections(""),
             HookMessage::ReaderOversizedBlock,
             HookMessage::SuiteRunnerTracked,
-            HookMessage::RunVerdict {
-                verdict: Cow::default(),
-            },
+            HookMessage::run_verdict(""),
             HookMessage::SuiteAuthorTracked,
         ];
         assert_eq!(all_hooks.len(), 26);

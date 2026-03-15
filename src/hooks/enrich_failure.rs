@@ -20,16 +20,10 @@ pub fn execute(ctx: &HookContext) -> Result<HookResult, CliError> {
         return Ok(HookResult::allow());
     };
     let Some(status) = &run.status else {
-        return Ok(HookMessage::RunVerdict {
-            verdict: "pending".into(),
-        }
-        .into_result());
+        return Ok(HookMessage::run_verdict("pending").into_result());
     };
     let Some(state) = &ctx.runner_state else {
-        return Ok(HookMessage::RunVerdict {
-            verdict: status.overall_verdict.to_string().into(),
-        }
-        .into_result());
+        return Ok(HookMessage::run_verdict(status.overall_verdict.to_string()).into_result());
     };
     let words = ctx.command_words();
     if words.len() >= 2 && words[0] == "harness" {
@@ -46,10 +40,7 @@ pub fn execute(ctx: &HookContext) -> Result<HookResult, CliError> {
             }
         }
     }
-    Ok(HookMessage::RunVerdict {
-        verdict: status.overall_verdict.to_string().into(),
-    }
-    .into_result())
+    Ok(HookMessage::run_verdict(status.overall_verdict.to_string()).into_result())
 }
 
 fn request_failure_triage(state: &RunnerWorkflowState, kind: FailureKind) -> RunnerWorkflowState {
