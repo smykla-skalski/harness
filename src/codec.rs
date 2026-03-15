@@ -125,13 +125,10 @@ fn deserialize_with_errors<T: DeserializeOwned>(
                 }
 
                 // Unknown serde error - wrap it.
-                return Err(CliError {
-                    code: "KSRCLI022".into(),
-                    message: format!("deserialization error in {label}: {msg}"),
-                    exit_code: 5,
-                    hint: None,
-                    details: None,
-                });
+                return Err(cli_err(
+                    &FIELD_TYPE_MISMATCH,
+                    &[("label", label), ("field", ""), ("expected", &msg)],
+                ));
             }
         }
     }
@@ -144,13 +141,14 @@ fn deserialize_with_errors<T: DeserializeOwned>(
             &[("label", label), ("fields", &fields)],
         ));
     }
-    Err(CliError {
-        code: "KSRCLI022".into(),
-        message: format!("deserialization failed for {label}: probe loop exhausted"),
-        exit_code: 5,
-        hint: None,
-        details: None,
-    })
+    Err(cli_err(
+        &FIELD_TYPE_MISMATCH,
+        &[
+            ("label", label),
+            ("field", ""),
+            ("expected", "probe loop exhausted"),
+        ],
+    ))
 }
 
 /// Extract field name from serde's "missing field `X`" error message.

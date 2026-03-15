@@ -1,6 +1,6 @@
 use std::path::{Path, PathBuf};
 
-use crate::errors::CliError;
+use crate::errors::{self, CliError};
 
 /// A manifest target for validation.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -32,13 +32,13 @@ pub fn authoring_validation_repo_root(
             }
         }
     }
-    Err(CliError {
-        code: "KSRCLI014".into(),
-        message: "unable to locate repo root for authoring validation".to_string(),
-        exit_code: 5,
-        hint: None,
-        details: None,
-    })
+    Err(errors::cli_err(
+        &errors::MISSING_FILE,
+        &[(
+            "path",
+            "unable to locate repo root for authoring validation",
+        )],
+    ))
 }
 
 /// Validate suite author paths.
