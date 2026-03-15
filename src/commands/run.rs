@@ -250,7 +250,6 @@ pub fn apply(
     let run_dir = super::resolve_run_dir(run_dir_args)?;
     let ctx = RunContext::from_run_dir(&run_dir)?;
     let kc = super::resolve_kubeconfig(&ctx, kubeconfig, cluster_arg)?;
-    let _kc_str = kc.to_string_lossy().into_owned();
 
     for manifest_raw in manifests {
         let manifest = resolve_manifest_path(manifest_raw, Some(&run_dir))?;
