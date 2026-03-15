@@ -1,0 +1,22 @@
+[tools]
+rust = "nightly"
+
+[tasks."test:unit"]
+description = "Run unit tests"
+run = "cargo test --lib"
+
+[tasks."test:integration"]
+description = "Run integration tests"
+run = "cargo test --test integration"
+
+[tasks.test]
+description = "Run all tests"
+depends = ["test:unit", "test:integration"]
+
+[tasks.check]
+description = "Type-check without building"
+run = "cargo check"
+
+[tasks."lint:fix"]
+description = "Format and apply clippy fixes"
+run = ["cargo fmt", "cargo clippy --fix --allow-dirty --allow-staged"]
