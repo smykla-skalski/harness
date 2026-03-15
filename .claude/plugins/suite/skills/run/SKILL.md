@@ -1,11 +1,12 @@
 ---
 name: run
 description: >-
-  Execute reproducible suite runs on local k3d infrastructure for Kuma service mesh features.
-  Use when running manual verification, testing policy changes on real clusters, validating xDS
-  config generation, or doing tracked k3d verification runs for any Kuma feature area.
+  Execute reproducible suite runs on local k3d or universal Docker infrastructure for Kuma
+  service mesh features. Use when running manual verification, testing policy changes on real
+  clusters or universal mode containers, validating xDS config generation, or doing tracked
+  verification runs for any Kuma feature area.
 argument-hint: "[suite-path] [--profile single-zone|multi-zone] [--repo /path/to/kuma] [--run-id ID] [--resume RUN_ID]"
-allowed-tools: Agent, AskUserQuestion, Bash, Edit, Glob, Read, Task, Write
+allowed-tools: Agent, AskUserQuestion, Bash, Edit, Glob, Read, Write
 user-invocable: true
 hooks:
   PreToolUse:
@@ -138,7 +139,7 @@ Read [references/workflow.md](references/workflow.md) for the authoritative deta
 
 ### Phase 0: Environment check
 
-1. Set `DATA_DIR` to the pre-resolved suites directory from "Preprocessed context". Do not create it from `suite:run`; if it is missing, stop and ask whether the suite should be authored first or a different suite path should be used:
+1. Set `DATA_DIR` to the pre-resolved suites directory from "Preprocessed context". Do not create it from `suite:run`; if it is missing, stop and use AskUserQuestion with options `Author suite with /suite:new` and `Provide a different suite path` (no recommendation markers or promotional labels):
 
 ```bash
 DATA_DIR="<suites directory from Preprocessed context>"
@@ -208,7 +209,7 @@ Suite resolution for bare names (no `/`):
 1. Directory suite: check `${DATA_DIR}/${name}/suite.md`
 2. Literal path
 
-**Error cases**: if the suite path does not exist, use Glob to search `${DATA_DIR}/` for partial matches (e.g., `*retry*`). Present matches via AskUserQuestion. If no matches exist, ask the user for the correct path or whether to create a new suite from the template.
+**Error cases**: if the suite path does not exist, use Glob to search `${DATA_DIR}/` for partial matches (e.g., `*retry*`). Present matches via AskUserQuestion. If no matches exist, use AskUserQuestion with options `Provide suite path` and `Author new suite with /suite:new`. Do not add recommendation markers, promotional labels, or structured option descriptions.
 
 Fill `run-metadata.json` with profile, feature scope, and the recorded `kumactl` version before touching the cluster.
 

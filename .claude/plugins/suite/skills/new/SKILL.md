@@ -2,12 +2,13 @@
 name: new
 description: >-
   Generate test suites for suite:run by reading Kuma source code.
-  Produces ready-to-run suites with manifests, validation steps, and expected outcomes.
+  Produces ready-to-run suites with manifests, validation steps, and expected outcomes
+  for both Kubernetes and universal mode deployments.
   Use when creating a new test suite for a Kuma feature, converting a PR into a test plan,
   building regression tests from source code, or when the user asks for test coverage,
   a test plan, or wants to write tests for any Kuma policy or feature.
 argument-hint: "<feature-name> [--repo /path/to/kuma] [--mode generate|wizard] [--from-pr PR_URL] [--from-branch BRANCH] [--suite-name NAME] [--yes|-y]"
-allowed-tools: AskUserQuestion, Bash, Edit, Glob, Grep, Read, Task, Write
+allowed-tools: AskUserQuestion, Bash, Edit, Glob, Grep, Read, Write
 user-invocable: true
 disable-model-invocation: true
 hooks:
@@ -105,7 +106,15 @@ Parse from `$ARGUMENTS`:
 
 Before any Bash commands, writes, or canonical review prompts, check whether the suite:new local validator decision is still unresolved.
 
-If unresolved, ask exactly one AskUserQuestion using:
+First, check if `kubectl-validate` is already installed:
+
+```bash
+which kubectl-validate 2>/dev/null
+```
+
+If the binary is found, the decision is resolved - record that it exists and continue to Step 1. Do not ask the user anything. The harness guard hook will also block the install prompt when the binary is already present.
+
+If the binary is **not** found and no prior decision is recorded, ask exactly one AskUserQuestion using:
 
 - Header: `Validation`
 - Question head: `suite:new/kubectl-validate: install local validator?`
@@ -119,6 +128,14 @@ The prompt body must explain the tradeoff clearly:
 If the user approves installation, let the hook install it automatically. If the user skips it, continue authoring with the weaker safety bar and do not try to replace that local CRD validation with a live cluster. This gate is not bypassed by `--yes` or `-y`.
 
 ### Step 1: Resolve paths
+
+Before resolving paths, check for stale authoring state from a previous session:
+
+```bash
+harness authoring-show --kind session 2>/dev/null
+```
+
+If state exists from a different feature or a previous day, run `harness authoring-reset --skill suite:new` to clear it before proceeding. If state exists for the same feature being authored, continue without reset.
 
 Use the pre-resolved data directory and repo root from the preprocessed context above. Do not eagerly create `DATA_DIR` here; `harness authoring-begin` creates the concrete suite directory when authoring starts.
 
@@ -208,6 +225,7 @@ Launch these project subagents in parallel:
 Worker contract:
 
 - Pass `REPO_ROOT`, the scoped file list from step 3, the feature name, and only the references needed for that worker.
+- Launch all discovery agents with `mode: "auto"` so they can run `harness authoring-save` via Bash without interactive approval. Background agents cannot prompt the user for tool permissions.
 - Follow [references/agent-output-format.md](references/agent-output-format.md) for the exact payload schema, save path, and acknowledgement contract for each worker kind.
 
 After all workers finish, load the saved payloads with `harness authoring-show --kind inventory|coverage|variants|schema`.
@@ -276,6 +294,7 @@ Writer contract:
 
 - Pass only the saved proposal, schema facts, and the exact file ownership for that worker.
 - Keep writer fan-out bounded. Do not start more than four writer workers at once.
+- Launch all writer agents with `mode: "auto"` so they can write files without interactive approval. Background agents cannot prompt the user, so writes are denied without this mode.
 - If the local validator was installed, require every writer that emits manifests to run `harness authoring-validate` on its owned outputs before it stops. Use the current repo checkout as the schema source of truth; all required schemas, including CRDs, are already in this repo. If the validator was explicitly skipped, do not substitute a live-cluster check here.
 - Follow [references/agent-output-format.md](references/agent-output-format.md) for `authoring-show` usage and acknowledgement rules, and [references/suite-structure.md](references/suite-structure.md) for file content requirements.
 
