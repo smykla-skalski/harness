@@ -36,12 +36,22 @@ pub mod shared {
     impl GroupSection {
         pub const ALL: &[Self] = &[Self::Configure, Self::Consume, Self::Debug];
 
+        /// The heading string for this section.
+        #[must_use]
+        pub const fn as_str(self) -> &'static str {
+            match self {
+                Self::Configure => "## Configure",
+                Self::Consume => "## Consume",
+                Self::Debug => "## Debug",
+            }
+        }
+
         /// Returns which required sections are absent from `text`.
         #[must_use]
         pub fn missing_from(text: &str) -> Vec<Self> {
             Self::ALL
                 .iter()
-                .filter(|s| !text.contains(&s.to_string()))
+                .filter(|s| !text.contains(s.as_str()))
                 .copied()
                 .collect()
         }
@@ -49,11 +59,7 @@ pub mod shared {
 
     impl fmt::Display for GroupSection {
         fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-            f.write_str(match self {
-                Self::Configure => "## Configure",
-                Self::Consume => "## Consume",
-                Self::Debug => "## Debug",
-            })
+            f.write_str(self.as_str())
         }
     }
 

@@ -183,12 +183,13 @@ impl HookContext {
     /// Returns `CliError` if stdin cannot be read or the payload is invalid.
     pub fn from_stdin(skill: &str) -> Result<Self, CliError> {
         let event = HookEvent::from_stdin()?;
+        let skill_owned = skill.to_string();
         let mut ctx = Self {
-            skill: skill.to_string(),
+            skill: skill_owned.clone(),
             event,
             run_dir: None,
             skill_active: true,
-            active_skill: Some(skill.to_string()),
+            active_skill: Some(skill_owned),
             inactive_reason: None,
             run: None,
             runner_state: None,
@@ -203,12 +204,13 @@ impl HookContext {
     /// Used when the envelope has already been read (e.g. from a test).
     #[must_use]
     pub fn from_envelope(skill: &str, payload: HookEnvelopePayload) -> Self {
+        let skill_owned = skill.to_string();
         let mut ctx = Self {
-            skill: skill.to_string(),
+            skill: skill_owned.clone(),
             event: HookEvent { payload },
             run_dir: None,
             skill_active: true,
-            active_skill: Some(skill.to_string()),
+            active_skill: Some(skill_owned),
             inactive_reason: None,
             run: None,
             runner_state: None,

@@ -385,7 +385,11 @@ mod tests {
         {
             temp_env::with_vars([("CLAUDE_SESSION_ID", Some("workspace-dir-test"))], || {
                 let workspace = authoring_workspace_dir();
-                let name = workspace.file_name().unwrap().to_string_lossy().to_string();
+                let name = workspace
+                    .file_name()
+                    .unwrap()
+                    .to_string_lossy()
+                    .into_owned();
                 assert_eq!(name, "suite-author");
             });
         }
