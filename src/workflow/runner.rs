@@ -1,3 +1,4 @@
+use std::fmt;
 use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
@@ -18,6 +19,21 @@ pub enum RunnerPhase {
     Completed,
     Aborted,
     Suspended,
+}
+
+impl fmt::Display for RunnerPhase {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(match self {
+            Self::Bootstrap => "bootstrap",
+            Self::Preflight => "preflight",
+            Self::Execution => "execution",
+            Self::Triage => "triage",
+            Self::Closeout => "closeout",
+            Self::Completed => "completed",
+            Self::Aborted => "aborted",
+            Self::Suspended => "suspended",
+        })
+    }
 }
 
 /// Preflight status within the runner workflow.
@@ -235,6 +251,23 @@ mod tests {
 
     fn bootstrap_state() -> RunnerWorkflowState {
         make_initial_state("2025-01-01T00:00:00Z")
+    }
+
+    #[test]
+    fn runner_phase_display() {
+        let cases = [
+            (RunnerPhase::Bootstrap, "bootstrap"),
+            (RunnerPhase::Preflight, "preflight"),
+            (RunnerPhase::Execution, "execution"),
+            (RunnerPhase::Triage, "triage"),
+            (RunnerPhase::Closeout, "closeout"),
+            (RunnerPhase::Completed, "completed"),
+            (RunnerPhase::Aborted, "aborted"),
+            (RunnerPhase::Suspended, "suspended"),
+        ];
+        for (variant, expected) in cases {
+            assert_eq!(variant.to_string(), expected);
+        }
     }
 
     #[test]
