@@ -112,14 +112,6 @@ pub struct RunMetadata {
     pub required_dependencies: Vec<String>,
 }
 
-/// Lookup key for resolving a run directory.
-#[derive(Debug, Clone, Default)]
-pub struct RunLookup {
-    pub run_dir: Option<PathBuf>,
-    pub run_id: Option<String>,
-    pub run_root: Option<PathBuf>,
-}
-
 /// Environment variables for command execution within a run.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CommandEnv {

@@ -8,13 +8,13 @@ use std::sync::LazyLock;
 use regex::Regex;
 
 use crate::cli::{EnvoyCommand, KumactlCommand, ReportCommand, RunDirArgs};
-use crate::context::{CurrentRunRecord, RunContext, RunLayout, RunLookup, RunMetadata};
+use crate::context::{CurrentRunRecord, RunContext, RunLayout, RunMetadata};
 use crate::core_defs::{current_run_context_path, harness_data_root, utc_now};
 use crate::errors::{CliError, CliErrorKind};
 use crate::exec::{kubectl, run_command};
 use crate::io::{append_markdown_row, drill, ensure_dir, read_text, write_text};
 use crate::manifests::default_validation_output;
-use crate::resolve::{resolve_manifest_path, resolve_run_directory, resolve_suite_path};
+use crate::resolve::{resolve_manifest_path, resolve_suite_path};
 use crate::rules::suite_runner::{REPORT_CODE_BLOCK_LIMIT, REPORT_LINE_LIMIT};
 use crate::schema::{RunCounts, RunReport, RunReportFrontmatter, RunStatus, SuiteSpec, Verdict};
 use crate::suite_defaults::default_repo_root_for_suite;
@@ -522,13 +522,7 @@ fn report_group(
     note: Option<&str>,
     run_dir_args: &RunDirArgs,
 ) -> Result<i32, CliError> {
-    let lookup = RunLookup {
-        run_dir: run_dir_args.run_dir.clone(),
-        run_id: run_dir_args.run_id.clone(),
-        run_root: run_dir_args.run_root.clone(),
-    };
-
-    let run_dir = resolve_run_directory(&lookup)?.run_dir;
+    let run_dir = super::resolve_run_dir(run_dir_args)?;
 
     if evidence.is_empty() && evidence_label.is_empty() && capture_label.is_none() {
         return Err(CliErrorKind::ReportGroupEvidenceRequired.into());
