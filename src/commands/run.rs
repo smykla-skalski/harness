@@ -874,38 +874,27 @@ fn find_route<'a>(
     match_path: &str,
 ) -> Option<&'a serde_json::Value> {
     let configs = payload.get("configs")?.as_array()?;
-    for config in configs {
-        let Some(config_obj) = config.as_object() else {
-            continue;
-        };
-        for key in &["dynamic_route_configs", "static_route_configs"] {
-            if let Some(entries) = config_obj.get(*key).and_then(|v| v.as_array()) {
-                for entry in entries {
-                    if let Some(route_config) =
-                        entry.get("route_config").and_then(|v| v.as_object())
-                        && let Some(vhosts) =
-                            route_config.get("virtual_hosts").and_then(|v| v.as_array())
-                    {
-                        for vh in vhosts {
-                            if let Some(routes) = vh.get("routes").and_then(|v| v.as_array()) {
-                                for route in routes {
-                                    if let Some(m) = route.get("match").and_then(|v| v.as_object())
-                                    {
-                                        let path = m.get("path").and_then(|v| v.as_str());
-                                        let prefix = m.get("prefix").and_then(|v| v.as_str());
-                                        if path == Some(match_path) || prefix == Some(match_path) {
-                                            return Some(route);
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-    None
+    let keys = ["dynamic_route_configs", "static_route_configs"];
+
+    configs
+        .iter()
+        .filter_map(|c| c.as_object())
+        .flat_map(|obj| keys.iter().filter_map(move |k| obj.get(*k)?.as_array()))
+        .flatten()
+        .filter_map(|entry| entry.get("route_config")?.as_object())
+        .filter_map(|rc| rc.get("virtual_hosts")?.as_array())
+        .flatten()
+        .filter_map(|vh| vh.get("routes")?.as_array())
+        .flatten()
+        .find(|route| {
+            route
+                .get("match")
+                .and_then(|v| v.as_object())
+                .is_some_and(|m| {
+                    m.get("path").and_then(|v| v.as_str()) == Some(match_path)
+                        || m.get("prefix").and_then(|v| v.as_str()) == Some(match_path)
+                })
+        })
 }
 
 // =========================================================================
