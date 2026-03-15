@@ -42,7 +42,19 @@ exit 1
 /// # Errors
 /// Returns `CliError` if no suitable directory is found.
 pub fn choose_install_dir(path_env: &str) -> Result<(PathBuf, bool), CliError> {
-    let home = canonical_or_same(&dirs_home());
+    choose_install_dir_with_home(path_env, &dirs_home())
+}
+
+/// Like [`choose_install_dir`] but accepts an explicit `home` directory so
+/// callers (and tests) don't depend on the ambient `HOME` env var.
+///
+/// # Errors
+/// Returns `CliError` if no suitable directory is found.
+pub fn choose_install_dir_with_home(
+    path_env: &str,
+    home: &Path,
+) -> Result<(PathBuf, bool), CliError> {
+    let home = canonical_or_same(home);
     let path_dirs = path_candidates(path_env);
     let preferred = [home.join(".local").join("bin"), home.join("bin")];
 
@@ -114,6 +126,14 @@ pub fn install_wrapper(target_dir: &Path) -> Result<PathBuf, CliError> {
 /// # Errors
 /// Returns `CliError` on failure.
 pub fn main(project_dir: &Path, path_env: &str) -> Result<i32, CliError> {
+    main_with_home(project_dir, path_env, &dirs_home())
+}
+
+/// Like [`main`] but accepts an explicit `home` directory for testability.
+///
+/// # Errors
+/// Returns `CliError` on failure.
+pub fn main_with_home(project_dir: &Path, path_env: &str, home: &Path) -> Result<i32, CliError> {
     let harness = project_dir.join(".claude").join("skills").join("harness");
     if !harness.exists() {
         return Err(CliErrorKind::missing_file(cow!(
@@ -123,7 +143,7 @@ pub fn main(project_dir: &Path, path_env: &str) -> Result<i32, CliError> {
         .into());
     }
 
-    let (target_dir, _already_on_path) = choose_install_dir(path_env)?;
+    let (target_dir, _already_on_path) = choose_install_dir_with_home(path_env, home)?;
     install_wrapper(&target_dir)?;
     Ok(0)
 }
@@ -212,8 +232,7 @@ mod tests {
         fs::create_dir_all(&local_bin).unwrap();
 
         let path_env = local_bin.to_string_lossy().to_string();
-        let result = temp_env::with_var("HOME", Some(dir.path()), || choose_install_dir(&path_env));
-        let (chosen, on_path) = result.unwrap();
+        let (chosen, on_path) = choose_install_dir_with_home(&path_env, dir.path()).unwrap();
         // Canonicalize both to handle macOS /private/var vs /var symlink
         assert_eq!(
             chosen.canonicalize().unwrap_or(chosen),
@@ -276,7 +295,7 @@ mod tests {
         fs::create_dir_all(&bin_dir).unwrap();
 
         let path_env = bin_dir.to_string_lossy().to_string();
-        let result = temp_env::with_var("HOME", Some(dir.path()), || main(dir.path(), &path_env));
+        let result = main_with_home(dir.path(), &path_env, dir.path());
 
         assert_eq!(result.unwrap(), 0);
         assert!(bin_dir.join("harness").exists());
