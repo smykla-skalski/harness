@@ -19,39 +19,39 @@ use harness::ephemeral_metallb;
 use super::helpers::ENV_LOCK;
 
 // Build a runner handoff for testing.
-fn test_runner() -> RunnerHandoff {
+fn test_runner() -> RunnerHandoff<'static> {
     RunnerHandoff {
-        run_dir: "/runs/r1".to_string(),
-        run_id: "r1".to_string(),
-        suite_id: Some("test.suite".to_string()),
-        profile: Some("single-zone".to_string()),
-        suite_path: Some("/suites/s1/suite.md".to_string()),
-        runner_phase: Some("execution".to_string()),
-        verdict: Some("pending".to_string()),
+        run_dir: "/runs/r1".into(),
+        run_id: "r1".into(),
+        suite_id: Some("test.suite".into()),
+        profile: Some("single-zone".into()),
+        suite_path: Some("/suites/s1/suite.md".into()),
+        runner_phase: Some("execution".into()),
+        verdict: Some("pending".into()),
         completed_at: None,
         last_state_capture: None,
-        next_action: "run next group".to_string(),
-        executed_groups: vec!["g01".to_string()],
-        remaining_groups: vec!["g02".to_string(), "g03".to_string()],
+        next_action: "run next group".into(),
+        executed_groups: vec!["g01".into()],
+        remaining_groups: vec!["g02".into(), "g03".into()],
         state_paths: vec![
-            "/runs/r1/run-status.json".to_string(),
-            "/runs/r1/suite-runner-state.json".to_string(),
+            "/runs/r1/run-status.json".into(),
+            "/runs/r1/suite-runner-state.json".into(),
         ],
     }
 }
 
 // Build an authoring handoff for testing.
-fn test_authoring() -> AuthoringHandoff {
+fn test_authoring() -> AuthoringHandoff<'static> {
     AuthoringHandoff {
-        suite_dir: "/suites/s1".to_string(),
-        next_action: "pre-write review loop".to_string(),
-        author_phase: Some("prewrite_review".to_string()),
-        suite_name: Some("motb-core".to_string()),
-        feature: Some("motb".to_string()),
-        mode: Some("interactive".to_string()),
-        saved_payloads: vec!["inventory".to_string(), "proposal".to_string()],
-        suite_files: vec!["suite.md".to_string()],
-        state_paths: vec!["/suites/s1/state.json".to_string()],
+        suite_dir: "/suites/s1".into(),
+        next_action: "pre-write review loop".into(),
+        author_phase: Some("prewrite_review".into()),
+        suite_name: Some("motb-core".into()),
+        feature: Some("motb".into()),
+        mode: Some("interactive".into()),
+        saved_payloads: vec!["inventory".into(), "proposal".into()],
+        suite_files: vec!["suite.md".into()],
+        state_paths: vec!["/suites/s1/state.json".into()],
     }
 }
 
@@ -102,15 +102,15 @@ fn file_fingerprint_from_missing_file() {
 #[test]
 fn file_fingerprint_serialization_roundtrip() {
     let fp = FileFingerprint {
-        label: "test".to_string(),
+        label: "test".into(),
         path: PathBuf::from("/tmp/test.txt"),
         exists: true,
         size: Some(42),
         mtime_ns: Some(1_000_000_000),
-        sha256: Some("abc123".to_string()),
+        sha256: Some("abc123".into()),
     };
     let json = serde_json::to_string(&fp).unwrap();
-    let back: FileFingerprint = serde_json::from_str(&json).unwrap();
+    let back: FileFingerprint<'_> = serde_json::from_str(&json).unwrap();
     assert_eq!(fp, back);
 }
 
@@ -190,8 +190,8 @@ fn check_build_compact_includes_author(project: &Path) {
 fn check_build_compact_author_fallback(project: &Path) {
     let mut handoff = compact::build_compact_handoff(project).expect("build");
     let mut auth = test_authoring();
-    auth.mode = Some("bypass".to_string());
-    auth.feature = Some("fallback-feature".to_string());
+    auth.mode = Some("bypass".into());
+    auth.feature = Some("fallback-feature".into());
     handoff.authoring = Some(auth);
     let _ = compact::save_compact_handoff(project, &handoff).expect("save");
 
@@ -291,8 +291,8 @@ fn check_session_start_compact_worktree(project: &Path) {
 fn check_session_start_compact_aborted_resume(project: &Path) {
     let mut handoff = compact::build_compact_handoff(project).expect("build");
     let mut runner = test_runner();
-    runner.runner_phase = Some("aborted".to_string());
-    runner.verdict = Some("aborted".to_string());
+    runner.runner_phase = Some("aborted".into());
+    runner.verdict = Some("aborted".into());
     handoff.runner = Some(runner);
     let _ = compact::save_compact_handoff(project, &handoff).expect("save");
 
@@ -394,7 +394,7 @@ fn check_session_start_restores_project(project: &Path) {
 fn check_session_start_restores_worktree(project: &Path) {
     let mut handoff = compact::build_compact_handoff(project).expect("build");
     handoff.runner = Some(test_runner());
-    handoff.trigger = Some("worktree-switch".to_string());
+    handoff.trigger = Some("worktree-switch".into());
     let _ = compact::save_compact_handoff(project, &handoff).expect("save");
 
     let result = Command::SessionStart {
