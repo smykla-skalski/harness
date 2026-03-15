@@ -726,7 +726,7 @@ fn render_pre_tool_use_output(result: &HookResult) -> String {
             "permissionDecisionReason": message,
         }
     }))
-    .unwrap_or_default()
+    .expect("hand-built JSON serializes")
 }
 
 /// Render a blocking hook output (guard-stop, or any deny from unknown hooks).
@@ -736,9 +736,11 @@ fn render_blocking_hook_output(result: &HookResult) -> String {
     }
     let message = render_hook_message(result);
     if result.decision == Decision::Deny {
-        serde_json::to_string(&json!({"decision": "block", "reason": message})).unwrap_or_default()
+        serde_json::to_string(&json!({"decision": "block", "reason": message}))
+            .expect("hand-built JSON serializes")
     } else {
-        serde_json::to_string(&json!({"systemMessage": message})).unwrap_or_default()
+        serde_json::to_string(&json!({"systemMessage": message}))
+            .expect("hand-built JSON serializes")
     }
 }
 
@@ -759,7 +761,7 @@ fn render_post_tool_use_output(result: &HookResult, event_name: &str) -> String 
         payload["decision"] = json!("block");
         payload["reason"] = json!(message);
     }
-    serde_json::to_string(&payload).unwrap_or_default()
+    serde_json::to_string(&payload).expect("hand-built JSON serializes")
 }
 
 /// Render an additional-context hook output (context-agent, notification).
@@ -773,7 +775,7 @@ fn render_additional_context_output(result: &HookResult, event_name: &str) -> St
             "additionalContext": render_hook_message(result),
         }
     }))
-    .unwrap_or_default()
+    .expect("hand-built JSON serializes")
 }
 
 /// Transform a `HookResult` into the native Claude Code hook output format for
