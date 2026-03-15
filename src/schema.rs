@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
-use crate::errors::{CliError, CliErrorKind};
+use crate::errors::{CliError, CliErrorKind, cow};
 use crate::io;
 use crate::rules;
 
@@ -17,7 +17,8 @@ use crate::rules;
 /// helper. Returns parsed YAML mapping and body text.
 fn split_frontmatter(text: &str) -> Result<(serde_yml::Mapping, String), CliError> {
     let (yaml_text, body) = io::extract_raw_frontmatter(text)?;
-    let map: serde_yml::Mapping = serde_yml::from_str(&yaml_text).unwrap_or_default();
+    let map: serde_yml::Mapping = serde_yml::from_str(&yaml_text)
+        .map_err(|e| CliErrorKind::workflow_parse(cow!("frontmatter YAML: {e}")))?;
     Ok((map, body))
 }
 
