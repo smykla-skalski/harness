@@ -178,6 +178,57 @@ pub struct AuthoringBeginArgs {
     pub suite_name: String,
 }
 
+/// Arguments for `harness token`.
+#[derive(Debug, Clone, Args)]
+pub struct TokenArgs {
+    /// Token kind: dataplane, ingress, or egress.
+    #[arg(value_parser = ["dataplane", "ingress", "egress"])]
+    pub kind: String,
+    /// Dataplane name.
+    #[arg(long)]
+    pub name: String,
+    /// Mesh name.
+    #[arg(long, default_value = "default")]
+    pub mesh: String,
+    /// CP API address (auto-detected from run context if omitted).
+    #[arg(long)]
+    pub cp_addr: Option<String>,
+    /// Token validity duration.
+    #[arg(long, default_value = "24h")]
+    pub valid_for: String,
+    /// Run-directory resolution.
+    #[command(flatten)]
+    pub run_dir: RunDirArgs,
+}
+
+/// Arguments for `harness service`.
+#[derive(Debug, Clone, Args)]
+pub struct ServiceArgs {
+    /// Service action.
+    #[arg(value_parser = ["up", "down", "list"])]
+    pub action: String,
+    /// Service name.
+    pub name: Option<String>,
+    /// Service image.
+    #[arg(long)]
+    pub image: Option<String>,
+    /// Service port.
+    #[arg(long)]
+    pub port: Option<u16>,
+    /// Mesh name.
+    #[arg(long, default_value = "default")]
+    pub mesh: String,
+    /// Enable transparent proxy.
+    #[arg(long)]
+    pub transparent_proxy: bool,
+    /// Custom dataplane template path.
+    #[arg(long)]
+    pub dataplane_template: Option<String>,
+    /// Run-directory resolution.
+    #[command(flatten)]
+    pub run_dir: RunDirArgs,
+}
+
 // ---------------------------------------------------------------------------
 // Hook subcommands
 // ---------------------------------------------------------------------------
@@ -699,6 +750,12 @@ pub enum Command {
         #[arg(long)]
         suite_dir: Option<String>,
     },
+
+    /// Generate a dataplane token from the control plane (universal mode).
+    Token(TokenArgs),
+
+    /// Manage universal mode test service containers.
+    Service(ServiceArgs),
 }
 
 // ---------------------------------------------------------------------------
