@@ -4,7 +4,7 @@ use std::path::Path;
 
 use crate::cluster::{ClusterSpec, HelmSetting};
 use crate::core_defs::{resolve_build_info, utc_now};
-use crate::errors::CliError;
+use crate::errors::{CliError, CliErrorKind};
 use crate::exec::{cluster_exists, run_command};
 
 fn make_target(root: &Path, target: &str, env: &HashMap<String, String>) -> Result<(), CliError> {
@@ -44,13 +44,7 @@ pub fn execute(
         helm_settings.clone(),
         restart_namespace.to_vec(),
     )
-    .map_err(|e| CliError {
-        code: "CLUSTER".into(),
-        message: e,
-        exit_code: 1,
-        hint: None,
-        details: None,
-    })?;
+    .map_err(|e| CliError::from(CliErrorKind::ClusterError { detail: e }))?;
     let validated_args = &spec.mode_args;
 
     if !helm_settings.is_empty() {
@@ -75,13 +69,10 @@ pub fn execute(
         "global-two-zones-up" => global_two_zones_up(&root, &base_env, validated_args)?,
         "global-two-zones-down" => global_two_zones_down(&root, &base_env, validated_args)?,
         _ => {
-            return Err(CliError {
-                code: "CLUSTER".into(),
-                message: format!("unsupported cluster mode: {mode}"),
-                exit_code: 1,
-                hint: None,
-                details: None,
-            });
+            return Err(CliErrorKind::ClusterError {
+                detail: format!("unsupported cluster mode: {mode}"),
+            }
+            .into());
         }
     }
 

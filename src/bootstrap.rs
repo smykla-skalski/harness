@@ -1,9 +1,10 @@
 use std::collections::HashSet;
+use std::fs;
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
-use std::{env, fs};
 
-use crate::errors::{self, CliError};
+use crate::core_defs::dirs_home;
+use crate::errors::{CliError, CliErrorKind};
 
 /// Shell wrapper script that delegates to the project-local harness binary.
 pub const WRAPPER: &str = r#"#!/bin/sh
@@ -72,10 +73,10 @@ pub fn choose_install_dir(path_env: &str) -> Result<(PathBuf, bool), CliError> {
         return Ok((fallback.clone(), on_path));
     }
 
-    Err(errors::cli_err(
-        &errors::MISSING_FILE,
-        &[("path", "no writable user PATH directory found")],
-    ))
+    Err(CliErrorKind::MissingFile {
+        path: "no writable user PATH directory found".into(),
+    }
+    .into())
 }
 
 /// Install the harness wrapper script into the target directory.
@@ -87,7 +88,7 @@ pub fn choose_install_dir(path_env: &str) -> Result<(PathBuf, bool), CliError> {
 /// # Errors
 /// Returns `CliError` on IO failure.
 pub fn install_wrapper(target_dir: &Path) -> Result<PathBuf, CliError> {
-    fs::create_dir_all(target_dir).map_err(errors::io_err)?;
+    fs::create_dir_all(target_dir)?;
 
     let target = target_dir.join("harness");
 
@@ -96,15 +97,15 @@ pub fn install_wrapper(target_dir: &Path) -> Result<PathBuf, CliError> {
         && existing == WRAPPER
     {
         // Just ensure executable
-        let meta = fs::metadata(&target).map_err(errors::io_err)?;
+        let meta = fs::metadata(&target)?;
         let mut perms = meta.permissions();
         perms.set_mode(perms.mode() | 0o111);
-        fs::set_permissions(&target, perms).map_err(errors::io_err)?;
+        fs::set_permissions(&target, perms)?;
         return Ok(target);
     }
 
-    fs::write(&target, WRAPPER).map_err(errors::io_err)?;
-    fs::set_permissions(&target, fs::Permissions::from_mode(0o755)).map_err(errors::io_err)?;
+    fs::write(&target, WRAPPER)?;
+    fs::set_permissions(&target, fs::Permissions::from_mode(0o755))?;
     Ok(target)
 }
 
@@ -118,25 +119,15 @@ pub fn install_wrapper(target_dir: &Path) -> Result<PathBuf, CliError> {
 pub fn main(project_dir: &Path, path_env: &str) -> Result<i32, CliError> {
     let harness = project_dir.join(".claude").join("skills").join("harness");
     if !harness.exists() {
-        return Err(errors::cli_err(
-            &errors::MISSING_FILE,
-            &[(
-                "path",
-                &format!("missing source wrapper: {}", harness.display()),
-            )],
-        ));
+        return Err(CliErrorKind::MissingFile {
+            path: format!("missing source wrapper: {}", harness.display()),
+        }
+        .into());
     }
 
     let (target_dir, _already_on_path) = choose_install_dir(path_env)?;
     install_wrapper(&target_dir)?;
     Ok(0)
-}
-
-fn dirs_home() -> PathBuf {
-    env::var("HOME").map_or_else(
-        |_| env::temp_dir().join(format!("harness-{}", unsafe { libc::getuid() })),
-        PathBuf::from,
-    )
 }
 
 fn path_candidates(path_env: &str) -> Vec<PathBuf> {
@@ -200,6 +191,8 @@ fn canonical_or_same(path: &Path) -> PathBuf {
 
 #[cfg(test)]
 mod tests {
+    use std::env;
+
     use super::*;
 
     #[test]
@@ -283,7 +276,7 @@ mod tests {
     fn main_fails_when_source_wrapper_missing() {
         let dir = tempfile::tempdir().unwrap();
         let err = main(dir.path(), "").unwrap_err();
-        assert!(err.message.contains("missing source wrapper"));
+        assert!(err.message().contains("missing source wrapper"));
     }
 
     #[test]

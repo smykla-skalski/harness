@@ -20,7 +20,11 @@ pub fn execute(
     };
 
     if event.is_none() {
-        println!("{}", state.phase.name());
+        let phase = serde_json::to_value(state.phase)
+            .ok()
+            .and_then(|v| v.as_str().map(String::from))
+            .unwrap_or_else(|| format!("{:?}", state.phase).to_lowercase());
+        println!("{phase}");
         return Ok(0);
     }
 

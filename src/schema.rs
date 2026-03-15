@@ -1,11 +1,10 @@
 use std::collections::HashMap;
+use std::fmt;
 use std::path::{Path, PathBuf};
 
-use comrak::nodes::NodeValue;
-use comrak::{Arena, Options, parse_document};
 use serde::{Deserialize, Serialize};
 
-use crate::errors::{self, CliError};
+use crate::errors::{CliError, CliErrorKind};
 use crate::io;
 use crate::rules;
 
@@ -13,46 +12,12 @@ use crate::rules;
 // Internal helpers for frontmatter parsing.
 // ---------------------------------------------------------------------------
 
-/// Split frontmatter from body using `comrak` for extraction and `serde_yml` for
-/// YAML parsing. Returns parsed YAML mapping and body text.
+/// Split frontmatter from body using the shared `io::extract_raw_frontmatter`
+/// helper. Returns parsed YAML mapping and body text.
 fn split_frontmatter(text: &str) -> Result<(serde_yml::Mapping, String), CliError> {
-    let mut options = Options::default();
-    options.extension.front_matter_delimiter = Some("---".to_owned());
-
-    let arena = Arena::new();
-    let root = parse_document(&arena, text, &options);
-
-    let fm_content = root.descendants().find_map(|node| {
-        let data = node.data.borrow();
-        if let NodeValue::FrontMatter(ref content) = data.value {
-            Some(content.clone())
-        } else {
-            None
-        }
-    });
-
-    let Some(raw_fm) = fm_content else {
-        return if text.starts_with("---\n") {
-            Err(errors::cli_err(&errors::UNTERMINATED_FRONTMATTER, &[]))
-        } else {
-            Err(errors::cli_err(&errors::MISSING_FRONTMATTER, &[]))
-        };
-    };
-
-    // Strip the `---\n ... \n---\n` delimiters to get bare YAML.
-    let yaml_text = raw_fm.strip_prefix("---\n").unwrap_or(&raw_fm);
-    let yaml_text = if let Some(pos) = yaml_text.rfind("\n---") {
-        &yaml_text[..pos]
-    } else {
-        yaml_text
-    };
-
-    // The body is everything after the frontmatter block.
-    let body = &text[raw_fm.len()..];
-    let body = body.trim_start_matches('\n');
-
-    let map: serde_yml::Mapping = serde_yml::from_str(yaml_text).unwrap_or_default();
-    Ok((map, body.to_string()))
+    let (yaml_text, body) = io::extract_raw_frontmatter(text)?;
+    let map: serde_yml::Mapping = serde_yml::from_str(&yaml_text).unwrap_or_default();
+    Ok((map, body))
 }
 
 /// Extract a string field from a YAML mapping, returning None if missing or not a string.
@@ -82,15 +47,10 @@ fn yaml_str_list(map: &serde_yml::Mapping, key: &str) -> Vec<String> {
 }
 
 /// Extract a list-of-integers field, defaulting to empty vec.
-#[allow(clippy::cast_possible_truncation)]
 fn yaml_int_list(map: &serde_yml::Mapping, key: &str) -> Vec<i64> {
     map.get(serde_yml::Value::String(key.to_string()))
         .and_then(serde_yml::Value::as_sequence)
-        .map(|seq| {
-            seq.iter()
-                .filter_map(|v| v.as_i64().or_else(|| v.as_f64().map(|f| f as i64)))
-                .collect()
-        })
+        .map(|seq| seq.iter().filter_map(serde_yml::Value::as_i64).collect())
         .unwrap_or_default()
 }
 
@@ -106,39 +66,10 @@ fn yaml_helm_values(map: &serde_yml::Mapping, key: &str) -> HashMap<String, serd
         .iter()
         .filter_map(|(k, v)| {
             let key_str = k.as_str()?;
-            let json_val = yml_to_json(v);
+            let json_val = io::yaml_to_json(v);
             Some((key_str.to_string(), json_val))
         })
         .collect()
-}
-
-/// Convert a `serde_yml::Value` to `serde_json::Value`.
-fn yml_to_json(v: &serde_yml::Value) -> serde_json::Value {
-    match v {
-        serde_yml::Value::Null => serde_json::Value::Null,
-        serde_yml::Value::Bool(b) => serde_json::Value::Bool(*b),
-        serde_yml::Value::Number(n) => {
-            if let Some(i) = n.as_i64() {
-                serde_json::Value::Number(i.into())
-            } else if let Some(f) = n.as_f64() {
-                serde_json::json!(f)
-            } else {
-                serde_json::Value::Null
-            }
-        }
-        serde_yml::Value::String(s) => serde_json::Value::String(s.clone()),
-        serde_yml::Value::Sequence(seq) => {
-            serde_json::Value::Array(seq.iter().map(yml_to_json).collect())
-        }
-        serde_yml::Value::Mapping(m) => {
-            let obj: serde_json::Map<String, serde_json::Value> = m
-                .iter()
-                .filter_map(|(k, v)| Some((k.as_str()?.to_string(), yml_to_json(v))))
-                .collect();
-            serde_json::Value::Object(obj)
-        }
-        serde_yml::Value::Tagged(t) => yml_to_json(&t.value),
-    }
 }
 
 // ---------------------------------------------------------------------------
@@ -217,13 +148,11 @@ impl SuiteSpec {
             missing.push("keep_clusters");
         }
         if !missing.is_empty() {
-            return Err(errors::cli_err(
-                &errors::MISSING_FIELDS,
-                &[
-                    ("label", "suite frontmatter"),
-                    ("fields", &missing.join(", ")),
-                ],
-            ));
+            return Err(CliErrorKind::MissingFields {
+                label: "suite frontmatter".into(),
+                fields: missing.join(", "),
+            }
+            .into());
         }
 
         let frontmatter = SuiteFrontmatter {
@@ -307,13 +236,11 @@ impl GroupSpec {
             .copied()
             .collect();
         if !missing_sections.is_empty() {
-            return Err(errors::cli_err(
-                &errors::MISSING_SECTIONS,
-                &[
-                    ("label", "group body"),
-                    ("sections", &missing_sections.join(", ")),
-                ],
-            ));
+            return Err(CliErrorKind::MissingSections {
+                label: "group body".into(),
+                sections: missing_sections.join(", "),
+            }
+            .into());
         }
 
         let frontmatter = GroupFrontmatter {
@@ -339,13 +266,41 @@ impl GroupSpec {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[non_exhaustive]
+pub enum Verdict {
+    Pending,
+    Pass,
+    Fail,
+    Aborted,
+}
+
+impl Verdict {
+    #[must_use]
+    pub fn is_finalized(self) -> bool {
+        matches!(self, Self::Pass | Self::Fail | Self::Aborted)
+    }
+}
+
+impl fmt::Display for Verdict {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Pending => f.write_str("pending"),
+            Self::Pass => f.write_str("pass"),
+            Self::Fail => f.write_str("fail"),
+            Self::Aborted => f.write_str("aborted"),
+        }
+    }
+}
+
 /// Run report frontmatter.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct RunReportFrontmatter {
     pub run_id: String,
     pub suite_id: String,
     pub profile: String,
-    pub overall_verdict: String,
+    pub overall_verdict: Verdict,
     #[serde(default)]
     pub story_results: Vec<String>,
     #[serde(default)]
@@ -378,7 +333,9 @@ impl RunReport {
             run_id: yaml_str(map, "run_id").unwrap_or_default(),
             suite_id: yaml_str(map, "suite_id").unwrap_or_default(),
             profile: yaml_str(map, "profile").unwrap_or_default(),
-            overall_verdict: yaml_str(map, "overall_verdict").unwrap_or_default(),
+            overall_verdict: yaml_str(map, "overall_verdict")
+                .and_then(|s| serde_json::from_value(serde_json::Value::String(s)).ok())
+                .unwrap_or(Verdict::Pending),
             story_results: yaml_str_list(map, "story_results"),
             debug_summary,
         };
@@ -475,7 +432,7 @@ pub struct RunStatus {
     pub suite_id: String,
     pub profile: String,
     pub started_at: String,
-    pub overall_verdict: String,
+    pub overall_verdict: Verdict,
     #[serde(default)]
     pub completed_at: Option<String>,
     #[serde(default)]
@@ -503,12 +460,11 @@ impl RunStatus {
     /// Returns `CliError` if the file is missing or contains invalid JSON.
     pub fn load(path: &Path) -> Result<Self, CliError> {
         let text = io::read_text(path)?;
-        serde_json::from_str(&text).map_err(|e| CliError {
-            code: "JSON".into(),
-            message: e.to_string(),
-            exit_code: 5,
-            hint: None,
-            details: None,
+        serde_json::from_str(&text).map_err(|e| -> CliError {
+            CliErrorKind::JsonParse {
+                detail: e.to_string(),
+            }
+            .into()
         })
     }
 
@@ -536,6 +492,8 @@ mod tests {
     use std::fs;
     use std::io::Write as _;
 
+    use harness_testkit::{GroupBuilder, SuiteBuilder, default_suite};
+
     fn write_temp_file(dir: &Path, name: &str, content: &str) -> PathBuf {
         let path = dir.join(name);
         let mut f = fs::File::create(&path).unwrap();
@@ -546,25 +504,7 @@ mod tests {
     #[test]
     fn test_load_suite() {
         let dir = tempfile::tempdir().unwrap();
-        let path = write_temp_file(
-            dir.path(),
-            "suite.md",
-            "---\n\
-             suite_id: example.suite\n\
-             feature: example\n\
-             scope: unit\n\
-             profiles: [single-zone]\n\
-             required_dependencies: []\n\
-             user_stories: []\n\
-             variant_decisions: []\n\
-             coverage_expectations: [configure, consume, debug]\n\
-             baseline_files: []\n\
-             groups: [groups/g01.md]\n\
-             skipped_groups: []\n\
-             keep_clusters: false\n\
-             ---\n\n\
-             # Test suite\n",
-        );
+        let path = default_suite().write_to(&dir.path().join("suite.md"));
         let suite = SuiteSpec::from_markdown(&path).unwrap();
         assert_eq!(suite.frontmatter.suite_id, "example.suite");
         assert_eq!(suite.frontmatter.groups, vec!["groups/g01.md"]);
@@ -586,69 +526,77 @@ mod tests {
     #[test]
     fn test_load_suite_missing_fields() {
         let dir = tempfile::tempdir().unwrap();
+        // Minimal suite with only suite_id - missing feature, scope, keep_clusters
         let path = write_temp_file(dir.path(), "suite.md", "---\nsuite_id: x\n---\n\nBody.\n");
         let err = SuiteSpec::from_markdown(&path).unwrap_err();
         assert!(
-            err.message.contains("missing required fields"),
+            err.message().contains("missing required fields"),
             "expected 'missing required fields' in: {}",
-            err.message
+            err.message()
         );
     }
 
     #[test]
     fn test_load_group_requires_sections() {
         let dir = tempfile::tempdir().unwrap();
-        let path = write_temp_file(
-            dir.path(),
-            "g01.md",
-            "---\n\
-             group_id: g01\n\
-             story: test\n\
-             capability: test\n\
-             profiles: [single-zone]\n\
-             preconditions: []\n\
-             success_criteria: [done]\n\
-             debug_checks: [logs]\n\
-             artifacts: []\n\
-             variant_source: code\n\
-             helm_values: {}\n\
-             restart_namespaces: []\n\
-             ---\n\n\
-             ## Configure\n\nDo config.\n",
-        );
+        // Group with only Configure section - missing Consume and Debug
+        let path = GroupBuilder::new("g01")
+            .story("test")
+            .capability("test")
+            .profile("single-zone")
+            .success_criteria("done")
+            .debug_check("logs")
+            .variant_source("code")
+            .configure_section("Do config.")
+            .consume_section("")
+            .debug_section("")
+            .write_to(&dir.path().join("g01.md"));
+        // We need the raw format without ## Consume and ## Debug sections,
+        // so use write_temp_file for this negative test case.
+        let raw = "\
+---
+group_id: g01
+story: test
+capability: test
+profiles: [single-zone]
+preconditions: []
+success_criteria: [done]
+debug_checks: [logs]
+artifacts: []
+variant_source: code
+helm_values: {}
+restart_namespaces: []
+---
+
+## Configure
+
+Do config.
+";
+        fs::write(&path, raw).unwrap();
         let err = GroupSpec::from_markdown(&path).unwrap_err();
         assert!(
-            err.message.contains("missing sections"),
+            err.message().contains("missing sections"),
             "expected 'missing sections' in: {}",
-            err.message
+            err.message()
         );
     }
 
     #[test]
     fn test_load_group_valid() {
         let dir = tempfile::tempdir().unwrap();
-        let path = write_temp_file(
-            dir.path(),
-            "g01.md",
-            "---\n\
-             group_id: g01\n\
-             story: test\n\
-             capability: test\n\
-             profiles: [single-zone]\n\
-             preconditions: []\n\
-             success_criteria: [done]\n\
-             debug_checks: [logs]\n\
-             artifacts: []\n\
-             variant_source: code\n\
-             helm_values:\n\
-             \x20 dataPlane.features.unifiedResourceNaming: true\n\
-             restart_namespaces:\n\
-             \x20 - kuma-demo\n\
-             ---\n\n\
-             ## Configure\n\nDo config.\n\n\
-             ## Consume\n\nDo consume.\n\n\
-             ## Debug\n\nDo debug.\n",
-        );
+        let path = GroupBuilder::new("g01")
+            .story("test")
+            .capability("test")
+            .profile("single-zone")
+            .success_criteria("done")
+            .debug_check("logs")
+            .variant_source("code")
+            .helm_value("dataPlane.features.unifiedResourceNaming", "true")
+            .restart_namespace("kuma-demo")
+            .configure_section("Do config.")
+            .consume_section("Do consume.")
+            .debug_section("Do debug.")
+            .write_to(&dir.path().join("g01.md"));
         let group = GroupSpec::from_markdown(&path).unwrap();
         assert_eq!(group.frontmatter.group_id, "g01");
         assert_eq!(
@@ -665,27 +613,17 @@ mod tests {
     #[test]
     fn test_load_group_with_expected_rejection_orders() {
         let dir = tempfile::tempdir().unwrap();
-        let path = write_temp_file(
-            dir.path(),
-            "g02.md",
-            "---\n\
-             group_id: g02\n\
-             story: validation rejects\n\
-             capability: validation\n\
-             profiles: [single-zone]\n\
-             preconditions: []\n\
-             success_criteria: [rejected]\n\
-             debug_checks: []\n\
-             artifacts: []\n\
-             variant_source: code\n\
-             helm_values: {}\n\
-             expected_rejection_orders: [2, 4]\n\
-             restart_namespaces: []\n\
-             ---\n\n\
-             ## Configure\n\nDo config.\n\n\
-             ## Consume\n\nDo consume.\n\n\
-             ## Debug\n\nDo debug.\n",
-        );
+        let path = GroupBuilder::new("g02")
+            .story("validation rejects")
+            .capability("validation")
+            .profile("single-zone")
+            .success_criteria("rejected")
+            .variant_source("code")
+            .expected_rejection_orders(&[2, 4])
+            .configure_section("Do config.")
+            .consume_section("Do consume.")
+            .debug_section("Do debug.")
+            .write_to(&dir.path().join("g02.md"));
         let group = GroupSpec::from_markdown(&path).unwrap();
         assert_eq!(group.frontmatter.expected_rejection_orders, vec![2, 4]);
     }
@@ -757,30 +695,30 @@ mod tests {
         );
         let err = SuiteSpec::from_markdown(&path).unwrap_err();
         assert!(
-            err.message.contains("missing YAML frontmatter"),
+            err.message().contains("missing YAML frontmatter"),
             "expected 'missing YAML frontmatter' in: {}",
-            err.message
+            err.message()
         );
     }
 
     #[test]
     fn test_load_report() {
         let dir = tempfile::tempdir().unwrap();
-        let path = write_temp_file(
-            dir.path(),
-            "report.md",
-            "---\n\
-             run_id: r1\n\
-             suite_id: s1\n\
-             profile: single-zone\n\
-             overall_verdict: pass\n\
-             story_results: []\n\
-             debug_summary: []\n\
-             ---\n\n\
-             # Report\n",
-        );
+        let report_md = "\
+---
+run_id: r1
+suite_id: s1
+profile: single-zone
+overall_verdict: pass
+story_results: []
+debug_summary: []
+---
+
+# Report
+";
+        let path = write_temp_file(dir.path(), "report.md", report_md);
         let report = RunReport::from_markdown(&path).unwrap();
-        assert_eq!(report.frontmatter.overall_verdict, "pass");
+        assert_eq!(report.frontmatter.overall_verdict, Verdict::Pass);
         assert_eq!(report.frontmatter.run_id, "r1");
         assert_eq!(report.frontmatter.suite_id, "s1");
         assert_eq!(report.frontmatter.profile, "single-zone");
@@ -799,7 +737,7 @@ mod tests {
                 run_id: "r1".to_string(),
                 suite_id: "s1".to_string(),
                 profile: "single-zone".to_string(),
-                overall_verdict: "pending".to_string(),
+                overall_verdict: Verdict::Pending,
                 story_results: vec![
                     "g02 PASS - story with commas, updates, and deletes | evidence: `commands/g02.txt`".to_string(),
                 ],
@@ -905,18 +843,12 @@ mod tests {
     #[test]
     fn test_suite_dir() {
         let dir = tempfile::tempdir().unwrap();
-        let path = write_temp_file(
-            dir.path(),
-            "suite.md",
-            "---\n\
-             suite_id: example.suite\n\
-             feature: example\n\
-             scope: unit\n\
-             profiles: []\n\
-             keep_clusters: false\n\
-             ---\n\n\
-             # Test\n",
-        );
+        let path = SuiteBuilder::new("example.suite")
+            .feature("example")
+            .scope("unit")
+            .keep_clusters(false)
+            .body("# Test\n")
+            .write_to(&dir.path().join("suite.md"));
         let suite = SuiteSpec::from_markdown(&path).unwrap();
         assert_eq!(suite.suite_dir(), dir.path());
     }

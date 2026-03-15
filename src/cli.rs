@@ -5,6 +5,8 @@ use serde_json::json;
 
 use crate::commands;
 use crate::errors::CliError;
+#[cfg(test)]
+use crate::errors::CliErrorKind;
 use crate::hook::{Decision, HookResult};
 use crate::hook_payloads::HookContext;
 use crate::hooks;
@@ -773,10 +775,10 @@ fn hook_runtime_result(hook_name: &str, code: &str, message: &str) -> HookResult
 /// Format a `CliError` as a detail string for hook error wrapping.
 fn format_hook_error_detail(hook_name: &str, error: &CliError) -> String {
     let mut parts = vec![format!("`{hook_name}` failed internally: {error}")];
-    if let Some(hint) = &error.hint {
+    if let Some(hint) = error.hint() {
         parts.push(format!("Hint: {hint}"));
     }
-    if let Some(details) = &error.details {
+    if let Some(details) = error.details() {
         parts.push(format!("Details: {details}"));
     }
     parts.join(" ")
@@ -819,10 +821,38 @@ fn run_hook_command(skill: &str, hook: &HookCommand) -> i32 {
 // ---------------------------------------------------------------------------
 
 /// Dispatch a non-hook command to its module.
-#[allow(clippy::too_many_lines)]
 fn dispatch_command(command: Command) -> Result<i32, CliError> {
     match command {
         Command::Hook { .. } => unreachable!("hooks are handled separately"),
+        Command::Init { .. }
+        | Command::Bootstrap { .. }
+        | Command::Cluster { .. }
+        | Command::Preflight { .. }
+        | Command::Gateway { .. }
+        | Command::SessionStart { .. }
+        | Command::SessionStop { .. }
+        | Command::PreCompact { .. } => dispatch_setup(command),
+        Command::Capture { .. }
+        | Command::Record { .. }
+        | Command::Apply { .. }
+        | Command::Validate { .. }
+        | Command::RunnerState { .. }
+        | Command::Closeout { .. }
+        | Command::Report { .. }
+        | Command::Diff { .. }
+        | Command::Envoy { .. }
+        | Command::Kumactl { .. } => dispatch_run(command),
+        Command::AuthoringBegin { .. }
+        | Command::AuthoringSave { .. }
+        | Command::AuthoringShow { .. }
+        | Command::AuthoringReset { .. }
+        | Command::AuthoringValidate { .. }
+        | Command::ApprovalBegin { .. } => dispatch_authoring(command),
+    }
+}
+
+fn dispatch_setup(command: Command) -> Result<i32, CliError> {
+    match command {
         Command::Init {
             suite,
             run_id,
@@ -859,6 +889,26 @@ fn dispatch_command(command: Command) -> Result<i32, CliError> {
             repo_root,
             run_dir,
         } => commands::preflight::execute(kubeconfig.as_deref(), repo_root.as_deref(), &run_dir),
+        Command::Gateway {
+            kubeconfig,
+            repo_root,
+            check_only,
+        } => commands::gateway::execute(kubeconfig.as_deref(), repo_root.as_deref(), check_only),
+        Command::SessionStart { project_dir } => {
+            commands::session_start::execute(project_dir.as_deref())
+        }
+        Command::SessionStop { project_dir } => {
+            commands::session_stop::execute(project_dir.as_deref())
+        }
+        Command::PreCompact { project_dir } => {
+            commands::pre_compact::execute(project_dir.as_deref())
+        }
+        _ => unreachable!(),
+    }
+}
+
+fn dispatch_run(command: Command) -> Result<i32, CliError> {
+    match command {
         Command::Capture {
             kubeconfig,
             label,
@@ -914,21 +964,13 @@ fn dispatch_command(command: Command) -> Result<i32, CliError> {
             commands::diff::execute(&left, &right, path.as_deref())
         }
         Command::Envoy { cmd } => commands::envoy::execute(&cmd),
-        Command::Gateway {
-            kubeconfig,
-            repo_root,
-            check_only,
-        } => commands::gateway::execute(kubeconfig.as_deref(), repo_root.as_deref(), check_only),
         Command::Kumactl { cmd } => commands::kumactl::execute(&cmd),
-        Command::SessionStart { project_dir } => {
-            commands::session_start::execute(project_dir.as_deref())
-        }
-        Command::SessionStop { project_dir } => {
-            commands::session_stop::execute(project_dir.as_deref())
-        }
-        Command::PreCompact { project_dir } => {
-            commands::pre_compact::execute(project_dir.as_deref())
-        }
+        _ => unreachable!(),
+    }
+}
+
+fn dispatch_authoring(command: Command) -> Result<i32, CliError> {
+    match command {
         Command::AuthoringBegin {
             skill: _,
             repo_root,
@@ -954,6 +996,7 @@ fn dispatch_command(command: Command) -> Result<i32, CliError> {
             mode,
             suite_dir,
         } => commands::approval_begin::execute(&mode, suite_dir.as_deref()),
+        _ => unreachable!(),
     }
 }
 
@@ -1624,29 +1667,20 @@ mod tests {
 
     #[test]
     fn format_error_detail_includes_code_and_message() {
-        let error = CliError {
-            code: "KSRCLI005".into(),
-            message: "missing run pointer".to_string(),
-            exit_code: 5,
-            hint: Some("Run init first.".to_string()),
-            details: None,
-        };
+        let error: CliError = CliErrorKind::MissingRunPointer.into();
         let detail = format_hook_error_detail("guard-bash", &error);
         assert!(detail.contains("guard-bash"));
         assert!(detail.contains("KSRCLI005"));
-        assert!(detail.contains("missing run pointer"));
+        assert!(detail.contains("missing current run pointer"));
         assert!(detail.contains("Hint: Run init first."));
     }
 
     #[test]
     fn format_error_detail_includes_details() {
-        let error = CliError {
-            code: "KSRCLI004".into(),
-            message: "command failed".to_string(),
-            exit_code: 4,
-            hint: None,
-            details: Some("exit code 1".to_string()),
-        };
+        let error = CliErrorKind::CommandFailed {
+            command: "command failed".into(),
+        }
+        .with_details("exit code 1");
         let detail = format_hook_error_detail("verify-write", &error);
         assert!(detail.contains("Details: exit code 1"));
     }

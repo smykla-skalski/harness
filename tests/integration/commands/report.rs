@@ -2,7 +2,7 @@
 // Covers report round-trip serialization, comma preservation in story results,
 // and oversized report detection.
 
-use harness::schema::{RunReport, RunReportFrontmatter};
+use harness::schema::{RunReport, RunReportFrontmatter, Verdict};
 
 use super::super::helpers::*;
 
@@ -16,7 +16,7 @@ fn run_report_round_trip() {
             run_id: "r1".to_string(),
             suite_id: "s1".to_string(),
             profile: "single-zone".to_string(),
-            overall_verdict: "pending".to_string(),
+            overall_verdict: Verdict::Pending,
             story_results: vec![],
             debug_summary: vec![],
         },
@@ -25,7 +25,7 @@ fn run_report_round_trip() {
     report.save().unwrap();
     let reloaded = RunReport::from_markdown(&report_path).unwrap();
     assert_eq!(reloaded.frontmatter.run_id, "r1");
-    assert_eq!(reloaded.frontmatter.overall_verdict, "pending");
+    assert_eq!(reloaded.frontmatter.overall_verdict, Verdict::Pending);
 }
 
 #[test]
@@ -38,7 +38,7 @@ fn run_report_preserves_comma_in_story_results() {
             run_id: "r1".to_string(),
             suite_id: "s1".to_string(),
             profile: "single-zone".to_string(),
-            overall_verdict: "pending".to_string(),
+            overall_verdict: Verdict::Pending,
             story_results: vec![
                 "g02 PASS - story with commas, updates, and deletes | evidence: `commands/g02.txt`"
                     .to_string(),
@@ -72,7 +72,7 @@ fn report_check_fails_for_large_report() {
             run_id: "run-report-large".to_string(),
             suite_id: "example.suite".to_string(),
             profile: "single-zone".to_string(),
-            overall_verdict: "pending".to_string(),
+            overall_verdict: Verdict::Pending,
             story_results: vec![],
             debug_summary: vec![],
         },

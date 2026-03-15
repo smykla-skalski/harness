@@ -1,9 +1,10 @@
+use std::fmt;
 use std::fs;
 use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
-use crate::errors::CliError;
+use crate::errors::{CliError, CliErrorKind};
 
 /// A file to copy from source to prepared location.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -26,12 +27,32 @@ pub struct SourceDigest {
     pub digest: String,
 }
 
+/// Status of a manifest validation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[non_exhaustive]
+pub enum ValidationStatus {
+    Pending,
+    Passed,
+    Failed,
+}
+
+impl fmt::Display for ValidationStatus {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Pending => f.write_str("pending"),
+            Self::Passed => f.write_str("passed"),
+            Self::Failed => f.write_str("failed"),
+        }
+    }
+}
+
 /// Validation result for a manifest.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ManifestValidation {
     #[serde(default)]
     pub output_path: Option<String>,
-    pub status: String,
+    pub status: ValidationStatus,
     #[serde(default)]
     pub checked_at: Option<String>,
     #[serde(default)]
@@ -102,22 +123,18 @@ impl PreparedSuiteArtifact {
         if !path.exists() {
             return Ok(None);
         }
-        let text = fs::read_to_string(path).map_err(|e| CliError {
-            code: "KSRCLI014".into(),
-            message: format!("cannot read file: {}: {e}", path.display()),
-            exit_code: 5,
-            hint: None,
-            details: Some(e.to_string()),
+        let text = fs::read_to_string(path).map_err(|e| {
+            CliErrorKind::MissingFile {
+                path: path.display().to_string(),
+            }
+            .with_details(e.to_string())
         })?;
-        let artifact: Self = serde_json::from_str(&text).map_err(|e| CliError {
-            code: "KSRCLI042".into(),
-            message: format!(
-                "invalid suite-author prepared suite payload: {}",
-                path.display()
-            ),
-            exit_code: 5,
-            hint: None,
-            details: Some(e.to_string()),
+        let artifact: Self = serde_json::from_str(&text).map_err(|e| {
+            CliErrorKind::AuthoringPayloadInvalid {
+                kind: "prepared suite".into(),
+                details: path.display().to_string(),
+            }
+            .with_details(e.to_string())
         })?;
         Ok(Some(artifact))
     }
@@ -128,27 +145,25 @@ impl PreparedSuiteArtifact {
     /// Returns `CliError` on IO failure.
     pub fn save(&self, path: &Path) -> Result<(), CliError> {
         if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent).map_err(|e| CliError {
-                code: "KSRCLI014".into(),
-                message: format!("cannot create directory: {}", parent.display()),
-                exit_code: 5,
-                hint: None,
-                details: Some(e.to_string()),
+            fs::create_dir_all(parent).map_err(|e| {
+                CliErrorKind::MissingFile {
+                    path: parent.display().to_string(),
+                }
+                .with_details(e.to_string())
             })?;
         }
-        let json = serde_json::to_string_pretty(self).map_err(|e| CliError {
-            code: "KSRCLI042".into(),
-            message: "failed to serialize prepared suite artifact".to_string(),
-            exit_code: 5,
-            hint: None,
-            details: Some(e.to_string()),
+        let json = serde_json::to_string_pretty(self).map_err(|e| {
+            CliErrorKind::AuthoringPayloadInvalid {
+                kind: "prepared suite".into(),
+                details: "serialization".into(),
+            }
+            .with_details(e.to_string())
         })?;
-        fs::write(path, json).map_err(|e| CliError {
-            code: "KSRCLI014".into(),
-            message: format!("cannot write file: {}", path.display()),
-            exit_code: 5,
-            hint: None,
-            details: Some(e.to_string()),
+        fs::write(path, json).map_err(|e| {
+            CliErrorKind::MissingFile {
+                path: path.display().to_string(),
+            }
+            .with_details(e.to_string())
         })
     }
 }
@@ -163,17 +178,12 @@ pub struct PreparedSuitePlan {
 
 fn extract_section(body: &str, heading: &str) -> Option<String> {
     let pattern = format!("## {heading}");
+    let lines: Vec<&str> = body.lines().collect();
     let mut start = None;
-    for (i, line) in body.lines().enumerate() {
+    for (i, line) in lines.iter().enumerate() {
         if let Some(s) = start {
             if line.starts_with("## ") {
-                let content: String = body
-                    .lines()
-                    .skip(s)
-                    .take(i - s)
-                    .collect::<Vec<_>>()
-                    .join("\n");
-                return Some(content);
+                return Some(lines[s..i].join("\n"));
             }
         } else {
             let trimmed = line.trim_end();
@@ -182,7 +192,7 @@ fn extract_section(body: &str, heading: &str) -> Option<String> {
             }
         }
     }
-    start.map(|s| body.lines().skip(s).collect::<Vec<_>>().join("\n"))
+    start.map(|s| lines[s..].join("\n"))
 }
 
 /// Extract the Configure section from a group body.
@@ -397,7 +407,7 @@ mod tests {
                     output_path: Some(
                         "manifests/prepared/baseline/baseline/namespace.validate.txt".to_string(),
                     ),
-                    status: "pending".to_string(),
+                    status: ValidationStatus::Pending,
                     checked_at: None,
                     resource_kinds: vec![],
                 }),
@@ -427,7 +437,7 @@ mod tests {
                         output_path: Some(
                             "manifests/prepared/groups/g01/01.validate.txt".to_string(),
                         ),
-                        status: "pending".to_string(),
+                        status: ValidationStatus::Pending,
                         checked_at: None,
                         resource_kinds: vec![],
                     }),
@@ -517,7 +527,7 @@ mod tests {
         assert_eq!(artifact.baselines[0].scope, "baseline");
         assert_eq!(
             artifact.baselines[0].validation.as_ref().unwrap().status,
-            "passed"
+            ValidationStatus::Passed
         );
         assert_eq!(artifact.groups.len(), 1);
         assert_eq!(artifact.groups[0].group_id, "g01");

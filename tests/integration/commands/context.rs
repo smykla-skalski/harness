@@ -6,6 +6,7 @@ use std::fs;
 use std::path::Path;
 
 use harness::context::{RunContext, RunLayout};
+use harness::schema::Verdict;
 
 use super::super::helpers::*;
 
@@ -23,7 +24,7 @@ fn run_context_from_run_dir_loads_all_fields() {
     assert_eq!(ctx.metadata.profile, "single-zone");
     assert!(ctx.status.is_some());
     let status = ctx.status.unwrap();
-    assert_eq!(status.overall_verdict, "pending");
+    assert_eq!(status.overall_verdict, Verdict::Pending);
 }
 
 #[test]

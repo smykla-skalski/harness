@@ -4,10 +4,10 @@ use std::path::{Path, PathBuf};
 
 use crate::context::{RunLayout, RunMetadata};
 use crate::core_defs::{harness_data_root, utc_now};
-use crate::errors::{self, CliError};
+use crate::errors::{CliError, CliErrorKind};
 use crate::io::append_markdown_row;
 use crate::resolve::resolve_suite_path;
-use crate::schema::{RunCounts, RunReport, RunReportFrontmatter, RunStatus, SuiteSpec};
+use crate::schema::{RunCounts, RunReport, RunReportFrontmatter, RunStatus, SuiteSpec, Verdict};
 use crate::suite_defaults::default_repo_root_for_suite;
 use crate::workflow::runner::initialize_runner_state;
 
@@ -57,13 +57,13 @@ pub fn execute(
     };
 
     if layout.run_dir().exists() {
-        return Err(errors::cli_err(
-            &errors::RUN_DIR_EXISTS,
-            &[("run_dir", &layout.run_dir().display().to_string())],
-        ));
+        return Err(CliErrorKind::RunDirExists {
+            run_dir: layout.run_dir().display().to_string(),
+        }
+        .into());
     }
 
-    layout.ensure_dirs().map_err(errors::io_err)?;
+    layout.ensure_dirs()?;
 
     let metadata = RunMetadata {
         run_id: run_id.to_string(),
@@ -79,14 +79,14 @@ pub fn execute(
     };
 
     let meta_json = serde_json::to_string_pretty(&metadata).expect("serialization of valid JSON");
-    fs::write(layout.metadata_path(), format!("{meta_json}\n")).map_err(errors::io_err)?;
+    fs::write(layout.metadata_path(), format!("{meta_json}\n"))?;
 
     let status = RunStatus {
         run_id: run_id.to_string(),
         suite_id: spec.frontmatter.suite_id.clone(),
         profile: profile.to_string(),
         started_at: created_at,
-        overall_verdict: "pending".to_string(),
+        overall_verdict: Verdict::Pending,
         completed_at: None,
         counts: RunCounts::default(),
         executed_groups: vec![],
@@ -98,7 +98,7 @@ pub fn execute(
         notes: vec![],
     };
     let status_json = serde_json::to_string_pretty(&status).expect("serialization of valid JSON");
-    fs::write(layout.status_path(), format!("{status_json}\n")).map_err(errors::io_err)?;
+    fs::write(layout.status_path(), format!("{status_json}\n"))?;
 
     initialize_runner_state(&layout.run_dir())?;
 
@@ -122,7 +122,7 @@ pub fn execute(
             run_id: run_id.to_string(),
             suite_id: spec.frontmatter.suite_id.clone(),
             profile: profile.to_string(),
-            overall_verdict: "pending".to_string(),
+            overall_verdict: Verdict::Pending,
             story_results: vec![],
             debug_summary: vec![],
         },

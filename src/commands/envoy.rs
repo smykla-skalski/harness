@@ -1,7 +1,7 @@
 use std::path::Path;
 
 use crate::cli::EnvoyCommand;
-use crate::errors::{self, CliError, INVALID_JSON};
+use crate::errors::{CliError, CliErrorKind};
 use crate::io::read_text;
 
 /// Envoy admin operations.
@@ -34,8 +34,11 @@ pub fn execute(cmd: &EnvoyCommand) -> Result<i32, CliError> {
         } => {
             if let Some(file_path) = file {
                 let text = read_text(Path::new(file_path))?;
-                let payload: serde_json::Value = serde_json::from_str(&text)
-                    .map_err(|_| errors::cli_err(&INVALID_JSON, &[("path", file_path)]))?;
+                let payload: serde_json::Value = serde_json::from_str(&text).map_err(|_| {
+                    CliError::from(CliErrorKind::InvalidJson {
+                        path: file_path.clone(),
+                    })
+                })?;
                 match find_route(&payload, route_match) {
                     Some(route) => {
                         println!(
@@ -44,16 +47,16 @@ pub fn execute(cmd: &EnvoyCommand) -> Result<i32, CliError> {
                         );
                         Ok(0)
                     }
-                    None => Err(errors::cli_err(
-                        &errors::ROUTE_NOT_FOUND,
-                        &[("match", route_match)],
-                    )),
+                    None => Err(CliErrorKind::RouteNotFound {
+                        route_match: route_match.clone(),
+                    }
+                    .into()),
                 }
             } else {
-                Err(errors::cli_err(
-                    &errors::ENVOY_CAPTURE_ARGS_REQUIRED,
-                    &[("fields", "--file or --namespace/--workload")],
-                ))
+                Err(CliErrorKind::EnvoyCaptureArgsRequired {
+                    fields: "--file or --namespace/--workload".into(),
+                }
+                .into())
             }
         }
         EnvoyCommand::Bootstrap { file, grep, .. } => {
@@ -70,10 +73,10 @@ pub fn execute(cmd: &EnvoyCommand) -> Result<i32, CliError> {
                 println!("{output}");
                 Ok(0)
             } else {
-                Err(errors::cli_err(
-                    &errors::ENVOY_CAPTURE_ARGS_REQUIRED,
-                    &[("fields", "--file or --namespace/--workload")],
-                ))
+                Err(CliErrorKind::EnvoyCaptureArgsRequired {
+                    fields: "--file or --namespace/--workload".into(),
+                }
+                .into())
             }
         }
     }

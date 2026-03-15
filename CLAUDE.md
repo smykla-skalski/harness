@@ -15,9 +15,9 @@ cargo fmt --check              # check formatting
 cargo fmt                      # auto-format
 ```
 
-All tests are in-crate `#[test]` blocks. No integration tests, Makefile, or CI pipeline.
+Unit tests are in-crate `#[test]` blocks. Integration tests live in `tests/integration/` and cover hooks, commands, and workflows end-to-end. No Makefile or CI pipeline.
 
-Pre-commit checklist: `cargo fmt --check && cargo clippy --lib && cargo test --lib`
+Pre-commit checklist: `cargo fmt --check && cargo clippy --lib && cargo test`
 
 ## Architecture
 
@@ -60,12 +60,10 @@ Hooks intercept Claude Code tool usage. Classified in `cli.rs` as constants:
 
 - Rust 2024 edition, requires rustc 1.94+
 - Clippy pedantic is set to `deny` - all new code must pass pedantic lints
-- `lib.rs` has broad `#[allow(...)]` suppressions marked as temporary ("workers will remove these allows when implementing real code")
-- Error construction uses `cli_err()` / `cli_err_with_details()` with static `ErrorDef` definitions, not ad-hoc error strings
-- Hook results use `HookResult` and `HookDef` with the same template system
+- Errors use `CliErrorKind` enum variants with typed fields via thiserror
+- Hook messages use `HookMessage` enum with `into_result()` conversion
 
 ## Gotchas
 
 - `guard-bash` denies direct use of `kubectl`, `kumactl`, `helm`, `docker`, `k3d` - all cluster access must go through harness commands (see `rules.rs:26`)
-- Template placeholders in `ErrorDef`/`HookDef` silently fall back to `?` for missing keys - a typo in a placeholder name won't cause an error, just a `?` in the output (see `errors.rs:82`)
 - `VersionedJsonRepository` saves atomically via tmp-file rename - don't read state files by path while a save is in progress, use the repository's `load()` method

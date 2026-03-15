@@ -1,7 +1,7 @@
 use std::path::{Path, PathBuf};
 
 use crate::cli::KumactlCommand;
-use crate::errors::{self, CliError};
+use crate::errors::{CliError, CliErrorKind};
 use crate::exec::run_command;
 
 fn host_platform() -> (&'static str, &'static str) {
@@ -46,7 +46,7 @@ fn find_binary(root: &Path) -> Result<PathBuf, CliError> {
             return Ok(candidate);
         }
     }
-    Err(errors::cli_err(&errors::KUMACTL_NOT_FOUND, &[]))
+    Err(CliErrorKind::KumactlNotFound.into())
 }
 
 fn build_kumactl(root: &Path) -> Result<(), CliError> {

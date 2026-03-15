@@ -1,7 +1,7 @@
 use std::fs;
 use std::path::Path;
 
-use crate::errors::{self, CliError};
+use crate::errors::{CliError, HookMessage};
 use crate::hook::HookResult;
 use crate::hook_payloads::HookContext;
 
@@ -32,13 +32,10 @@ fn verify_suite_author(paths: &[&str]) -> HookResult {
         if name == "amendments.md"
             && fs::read_to_string(path).is_ok_and(|content| content.trim().is_empty())
         {
-            return errors::hook_msg(
-                &errors::DENY_SUITE_INCOMPLETE,
-                &[(
-                    "details",
-                    &format!("suite amendments entry is missing or empty: {raw_path}"),
-                )],
-            );
+            return HookMessage::SuiteIncomplete {
+                details: format!("suite amendments entry is missing or empty: {raw_path}"),
+            }
+            .into_result();
         }
     }
     HookResult::allow()
@@ -54,33 +51,25 @@ fn verify_suite_runner(ctx: &HookContext, paths: &[&str]) -> HookResult {
             && is_command_owned_run_file(&path, rd)
         {
             let hint = control_file_hint(&path);
-            return errors::hook_msg(
-                &errors::DENY_RUNNER_FLOW_REQUIRED,
-                &[
-                    ("action", "edit run control files"),
-                    (
-                        "details",
-                        &format!(
-                            "{} is harness-managed; {hint}",
-                            path.file_name()
-                                .map_or("file", |n| n.to_str().unwrap_or("file"))
-                        ),
-                    ),
-                ],
-            );
+            return HookMessage::RunnerFlowRequired {
+                action: "edit run control files".into(),
+                details: format!(
+                    "{} is harness-managed; {hint}",
+                    path.file_name()
+                        .map_or("file", |n| n.to_str().unwrap_or("file"))
+                ),
+            }
+            .into_result();
         }
         let name = path.file_name().map_or("", |n| n.to_str().unwrap_or(""));
         if name == "amendments.md"
             && path.exists()
             && fs::read_to_string(&path).is_ok_and(|content| content.trim().is_empty())
         {
-            return errors::hook_msg(
-                &errors::DENY_SUITE_INCOMPLETE,
-                &[(
-                    "details",
-                    &format!("suite amendments entry is missing or empty: {raw_path}"),
-                )],
-            );
+            return HookMessage::SuiteIncomplete {
+                details: format!("suite amendments entry is missing or empty: {raw_path}"),
+            }
+            .into_result();
         }
         // Track suite-fix writes when in triage with an active suite fix.
         // If the path is inside the suite dir and suite_fix is active,

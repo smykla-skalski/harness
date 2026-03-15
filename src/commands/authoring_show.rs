@@ -1,5 +1,5 @@
 use crate::authoring::{authoring_workspace_dir, require_authoring_session};
-use crate::errors::{self, CliError};
+use crate::errors::{CliError, CliErrorKind};
 use crate::io::{is_safe_name, read_text};
 
 /// Show saved suite-author payloads.
@@ -8,7 +8,7 @@ use crate::io::{is_safe_name, read_text};
 /// Returns `CliError` on failure.
 pub fn execute(kind: &str) -> Result<i32, CliError> {
     if !is_safe_name(kind) {
-        return Err(errors::cli_err(&errors::UNSAFE_NAME, &[("name", kind)]));
+        return Err(CliErrorKind::UnsafeName { name: kind.into() }.into());
     }
 
     let _session = require_authoring_session()?;
@@ -16,19 +16,16 @@ pub fn execute(kind: &str) -> Result<i32, CliError> {
     let path = workspace.join(format!("{kind}.json"));
 
     if !path.exists() {
-        return Err(errors::cli_err(
-            &errors::AUTHORING_SHOW_KIND_MISSING,
-            &[("kind", kind)],
-        ));
+        return Err(CliErrorKind::AuthoringShowKindMissing { kind: kind.into() }.into());
     }
 
     let text = read_text(&path)?;
     // Parse and re-serialize for consistent pretty-printed output
     let value: serde_json::Value = serde_json::from_str(&text).map_err(|e| {
-        errors::cli_err(
-            &errors::AUTHORING_PAYLOAD_INVALID,
-            &[("kind", kind), ("details", &e.to_string())],
-        )
+        CliError::from(CliErrorKind::AuthoringPayloadInvalid {
+            kind: kind.into(),
+            details: e.to_string(),
+        })
     })?;
     println!(
         "{}",

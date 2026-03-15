@@ -7,7 +7,7 @@ use harness::hook::Decision;
 use harness::hook_payloads::HookEnvelopePayload;
 use harness::hooks::{context_agent, enrich_failure, validate_agent};
 use harness::workflow::runner::{
-    self as runner_workflow, PreflightStatus, RunnerEvent, RunnerPhase, RunnerWorkflowState,
+    self as runner_workflow, PreflightState, PreflightStatus, RunnerPhase, RunnerWorkflowState,
 };
 
 use super::super::helpers::*;
@@ -95,13 +95,16 @@ fn context_agent_preflight_ready() {
     let tmp = tempfile::tempdir().unwrap();
     let run_dir = init_run(tmp.path(), "run-1", "single-zone");
     let state = RunnerWorkflowState {
-        schema_version: 2,
-        phase: RunnerPhase::Preflight {
+        schema_version: 1,
+        phase: RunnerPhase::Preflight,
+        preflight: PreflightState {
             status: PreflightStatus::Running,
         },
+        failure: None,
+        suite_fix: None,
         updated_at: "2026-03-14T00:00:00Z".to_string(),
         transition_count: 2,
-        last_event: Some(RunnerEvent::PreflightStarted),
+        last_event: Some("PreflightStarted".to_string()),
     };
     runner_workflow::write_runner_state(&run_dir, &state).unwrap();
     let payload = make_empty_payload();

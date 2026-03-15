@@ -30,29 +30,29 @@ impl HookResult {
     }
 
     #[must_use]
-    pub fn deny(code: &str, message: &str) -> Self {
+    pub fn deny(code: impl Into<String>, message: impl Into<String>) -> Self {
         Self {
             decision: Decision::Deny,
-            code: code.to_string(),
-            message: message.to_string(),
+            code: code.into(),
+            message: message.into(),
         }
     }
 
     #[must_use]
-    pub fn warn(code: &str, message: &str) -> Self {
+    pub fn warn(code: impl Into<String>, message: impl Into<String>) -> Self {
         Self {
             decision: Decision::Warn,
-            code: code.to_string(),
-            message: message.to_string(),
+            code: code.into(),
+            message: message.into(),
         }
     }
 
     #[must_use]
-    pub fn info(code: &str, message: &str) -> Self {
+    pub fn info(code: impl Into<String>, message: impl Into<String>) -> Self {
         Self {
             decision: Decision::Info,
-            code: code.to_string(),
-            message: message.to_string(),
+            code: code.into(),
+            message: message.into(),
         }
     }
 

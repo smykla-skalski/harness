@@ -4,8 +4,8 @@
 
 use harness::hooks::guard_question;
 use harness::workflow::runner::{
-    self as runner_workflow, FailureKind, FailureState, RunnerEvent, RunnerPhase,
-    RunnerWorkflowState,
+    self as runner_workflow, FailureKind, FailureState, PreflightState, PreflightStatus,
+    RunnerPhase, RunnerWorkflowState,
 };
 
 use super::super::helpers::*;
@@ -50,18 +50,20 @@ fn guard_question_allows_manifest_fix_in_triage() {
     let run_dir = init_run(tmp.path(), "run-1", "single-zone");
     // Set runner state to triage with a failure
     let state = RunnerWorkflowState {
-        schema_version: 2,
-        phase: RunnerPhase::Triage {
-            failure: FailureState {
-                kind: FailureKind::Manifest,
-                suite_target: Some("groups/g01.md".to_string()),
-                message: Some("validation failed".to_string()),
-            },
-            suite_fix: None,
+        schema_version: 1,
+        phase: RunnerPhase::Triage,
+        preflight: PreflightState {
+            status: PreflightStatus::Complete,
         },
+        failure: Some(FailureState {
+            kind: FailureKind::Manifest,
+            suite_target: Some("groups/g01.md".to_string()),
+            message: Some("validation failed".to_string()),
+        }),
+        suite_fix: None,
         updated_at: "2026-03-14T00:00:00Z".to_string(),
         transition_count: 3,
-        last_event: Some(RunnerEvent::FailureRecorded),
+        last_event: Some("FailureRecorded".to_string()),
     };
     runner_workflow::write_runner_state(&run_dir, &state).unwrap();
     let question = "suite-runner/manifest-fix: how should this failure be handled?";

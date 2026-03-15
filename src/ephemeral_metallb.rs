@@ -2,7 +2,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use crate::core_defs::utc_now;
-use crate::errors::{self, CliError};
+use crate::errors::{CliError, CliErrorKind};
 use crate::io::is_safe_name;
 
 const STATE_FILE: &str = "ephemeral-metallb-templates.json";
@@ -20,10 +20,10 @@ pub fn state_path(run_dir: &Path) -> PathBuf {
 /// Returns `CliError` if `cluster_name` contains path separators or `..`.
 pub fn template_path(root: &Path, cluster_name: &str) -> Result<PathBuf, CliError> {
     if !is_safe_name(cluster_name) {
-        return Err(errors::cli_err(
-            &errors::UNSAFE_NAME,
-            &[("name", cluster_name)],
-        ));
+        return Err(CliErrorKind::UnsafeName {
+            name: cluster_name.into(),
+        }
+        .into());
     }
     Ok(root
         .join("mk")
@@ -58,10 +58,10 @@ fn default_source_template(root: &Path) -> Result<PathBuf, CliError> {
             return Ok(first);
         }
     }
-    Err(errors::cli_err(
-        &errors::MISSING_FILE,
-        &[("path", &default.to_string_lossy())],
-    ))
+    Err(CliErrorKind::MissingFile {
+        path: default.to_string_lossy().into(),
+    }
+    .into())
 }
 
 /// Ensure `MetalLB` templates exist for the given clusters.
@@ -86,9 +86,9 @@ pub fn ensure_templates(
             continue;
         }
         if let Some(parent) = target.parent() {
-            fs::create_dir_all(parent).map_err(errors::io_err)?;
+            fs::create_dir_all(parent)?;
         }
-        fs::copy(&source, &target).map_err(errors::io_err)?;
+        fs::copy(&source, &target)?;
         created.push(target.clone());
 
         let entry = serde_json::json!({
@@ -126,7 +126,7 @@ pub fn cleanup_templates(run_dir: &Path) -> Result<Vec<PathBuf>, CliError> {
         if let Some(tp) = entry.get("template_path").and_then(|v| v.as_str()) {
             let template = PathBuf::from(tp);
             if template.exists() {
-                fs::remove_file(&template).map_err(errors::io_err)?;
+                fs::remove_file(&template)?;
                 removed.push(template);
             }
         }
@@ -165,15 +165,15 @@ pub fn restore_templates(run_dir: &Path) -> Result<Vec<PathBuf>, CliError> {
             continue;
         }
         if !source.is_file() {
-            return Err(errors::cli_err(
-                &errors::MISSING_FILE,
-                &[("path", source_str)],
-            ));
+            return Err(CliErrorKind::MissingFile {
+                path: source_str.into(),
+            }
+            .into());
         }
         if let Some(parent) = target.parent() {
-            fs::create_dir_all(parent).map_err(errors::io_err)?;
+            fs::create_dir_all(parent)?;
         }
-        fs::copy(&source, &target).map_err(errors::io_err)?;
+        fs::copy(&source, &target)?;
         restored.push(target);
     }
 
@@ -204,15 +204,19 @@ fn load_entries(run_dir: Option<&Path>) -> Vec<serde_json::Value> {
 fn save_entries(run_dir: &Path, entries: &[serde_json::Value]) -> Result<(), CliError> {
     let path = state_path(run_dir);
     if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent).map_err(errors::io_err)?;
+        fs::create_dir_all(parent)?;
     }
     let payload = serde_json::json!({
         "schema_version": 1,
         "entries": entries,
     });
-    let text = serde_json::to_string_pretty(&payload)
-        .map_err(|e| errors::cli_err(&errors::SERIALIZE_ERROR, &[("detail", &e.to_string())]))?;
-    fs::write(&path, text).map_err(errors::io_err)?;
+    let text = serde_json::to_string_pretty(&payload).map_err(|e| -> CliError {
+        CliErrorKind::Serialize {
+            detail: e.to_string(),
+        }
+        .into()
+    })?;
+    fs::write(&path, text)?;
     Ok(())
 }
 
@@ -238,13 +242,13 @@ mod tests {
     #[test]
     fn template_path_rejects_traversal() {
         let err = template_path(Path::new("/repo"), "../evil").unwrap_err();
-        assert_eq!(err.code, "KSRCLI059");
+        assert_eq!(err.code(), "KSRCLI059");
     }
 
     #[test]
     fn template_path_rejects_slash() {
         let err = template_path(Path::new("/repo"), "a/b").unwrap_err();
-        assert_eq!(err.code, "KSRCLI059");
+        assert_eq!(err.code(), "KSRCLI059");
     }
 
     #[test]
@@ -368,7 +372,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let root = dir.path();
         let err = ensure_templates(root, &["c1"], None).unwrap_err();
-        assert_eq!(err.code, "KSRCLI014");
+        assert_eq!(err.code(), "KSRCLI014");
     }
 
     #[test]

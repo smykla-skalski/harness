@@ -1,6 +1,6 @@
 use std::path::{Path, PathBuf};
 
-use crate::errors::{self, CliError};
+use crate::errors::{CliError, CliErrorKind};
 use crate::exec::kubectl;
 use crate::io::{read_text, write_text};
 use crate::manifests::default_validation_output;
@@ -40,10 +40,10 @@ fn extract_resources(manifest: &Path) -> Result<Vec<(String, String)>, CliError>
         }
     }
     if resources.is_empty() {
-        return Err(errors::cli_err(
-            &errors::NO_RESOURCE_KINDS,
-            &[("manifest", &manifest.display().to_string())],
-        ));
+        return Err(CliErrorKind::NoResourceKinds {
+            manifest: manifest.display().to_string(),
+        }
+        .into());
     }
     Ok(resources)
 }

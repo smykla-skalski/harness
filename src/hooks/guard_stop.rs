@@ -1,6 +1,7 @@
-use crate::errors::{self, CliError};
+use crate::errors::{CliError, HookMessage};
 use crate::hook::HookResult;
 use crate::hook_payloads::HookContext;
+use crate::schema::Verdict;
 use crate::workflow::author::can_stop;
 
 /// Execute the guard-stop hook.
@@ -21,18 +22,12 @@ fn guard_suite_author_stop(ctx: &HookContext) -> HookResult {
     let Some(state) = &ctx.author_state else {
         return HookResult::allow();
     };
-    let (allowed, reason) = can_stop(state);
-    if !allowed {
-        return errors::hook_msg(
-            &errors::DENY_APPROVAL_REQUIRED,
-            &[
-                ("action", "stop suite-author"),
-                (
-                    "details",
-                    reason.unwrap_or("suite-author is not ready to stop yet"),
-                ),
-            ],
-        );
+    if let Err(reason) = can_stop(state) {
+        return HookMessage::ApprovalRequired {
+            action: "stop suite-author".into(),
+            details: reason.into(),
+        }
+        .into_result();
     }
     HookResult::allow()
 }
@@ -45,10 +40,10 @@ fn guard_suite_runner_stop(ctx: &HookContext) -> HookResult {
         return HookResult::allow();
     };
     if status.last_state_capture.is_none() {
-        return errors::hook_msg(&errors::DENY_MISSING_STATE_CAPTURE, &[]);
+        return HookMessage::MissingStateCapture.into_result();
     }
-    if status.overall_verdict == "pending" {
-        return errors::hook_msg(&errors::DENY_VERDICT_PENDING, &[]);
+    if status.overall_verdict == Verdict::Pending {
+        return HookMessage::VerdictPending.into_result();
     }
     HookResult::allow()
 }

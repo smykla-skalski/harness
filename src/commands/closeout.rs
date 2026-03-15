@@ -1,6 +1,7 @@
 use crate::cli::RunDirArgs;
 use crate::context::RunContext;
-use crate::errors::{self, CliError};
+use crate::errors::{CliError, CliErrorKind};
+use crate::schema::Verdict;
 
 /// Close out a run by verifying required artifacts.
 ///
@@ -19,22 +20,19 @@ pub fn execute(run_dir_args: &RunDirArgs) -> Result<i32, CliError> {
 
     for rel in &required {
         if !run_dir.join(rel).exists() {
-            return Err(errors::cli_err(
-                &errors::MISSING_CLOSEOUT_ARTIFACT,
-                &[("rel", rel)],
-            ));
+            return Err(CliErrorKind::MissingCloseoutArtifact { rel: (*rel).into() }.into());
         }
     }
 
     let status = ctx
         .status
         .as_ref()
-        .ok_or_else(|| errors::cli_err(&errors::MISSING_RUN_STATUS, &[]))?;
+        .ok_or_else(|| -> CliError { CliErrorKind::MissingRunStatus.into() })?;
     if status.last_state_capture.is_none() {
-        return Err(errors::cli_err(&errors::MISSING_STATE_CAPTURE, &[]));
+        return Err(CliErrorKind::MissingStateCapture.into());
     }
-    if status.overall_verdict == "pending" {
-        return Err(errors::cli_err(&errors::VERDICT_PENDING, &[]));
+    if status.overall_verdict == Verdict::Pending {
+        return Err(CliErrorKind::VerdictPending.into());
     }
 
     println!("run closeout is complete; start a new run id for any further bootstrap or execution");

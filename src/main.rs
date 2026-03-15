@@ -8,7 +8,7 @@ fn main() -> ExitCode {
         Ok(code) => ExitCode::from(u8::try_from(code).unwrap_or(1)),
         Err(error) => {
             eprintln!("{}", errors::render_error(&error));
-            ExitCode::from(u8::try_from(error.exit_code).unwrap_or(1))
+            ExitCode::from(u8::try_from(error.exit_code()).unwrap_or(1))
         }
     }
 }

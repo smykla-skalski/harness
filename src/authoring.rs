@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
 
 use crate::core_defs::{session_context_dir, utc_now};
-use crate::errors::{self, CliError};
+use crate::errors::{CliError, CliErrorKind};
 
 /// Active authoring session state.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -145,18 +145,18 @@ pub fn load_authoring_session() -> Result<Option<AuthoringSession>, CliError> {
         return Ok(None);
     }
     let text = fs::read_to_string(&path).map_err(|e| {
-        errors::cli_err_with_details(
-            &errors::AUTHORING_PAYLOAD_INVALID,
-            &[("kind", "session"), ("details", "read failed")],
-            &e.to_string(),
-        )
+        CliErrorKind::AuthoringPayloadInvalid {
+            kind: "session".into(),
+            details: "read failed".into(),
+        }
+        .with_details(e.to_string())
     })?;
     let session: AuthoringSession = serde_json::from_str(&text).map_err(|e| {
-        errors::cli_err_with_details(
-            &errors::AUTHORING_PAYLOAD_INVALID,
-            &[("kind", "session"), ("details", "parse failed")],
-            &e.to_string(),
-        )
+        CliErrorKind::AuthoringPayloadInvalid {
+            kind: "session".into(),
+            details: "parse failed".into(),
+        }
+        .with_details(e.to_string())
     })?;
     Ok(Some(session))
 }
@@ -169,26 +169,26 @@ pub fn save_authoring_session(session: &AuthoringSession) -> Result<AuthoringSes
     let path = session_file_path();
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent).map_err(|e| {
-            errors::cli_err_with_details(
-                &errors::AUTHORING_PAYLOAD_INVALID,
-                &[("kind", "session"), ("details", "cannot create directory")],
-                &e.to_string(),
-            )
+            CliErrorKind::AuthoringPayloadInvalid {
+                kind: "session".into(),
+                details: "cannot create directory".into(),
+            }
+            .with_details(e.to_string())
         })?;
     }
     let json = serde_json::to_string_pretty(session).map_err(|e| {
-        errors::cli_err_with_details(
-            &errors::AUTHORING_PAYLOAD_INVALID,
-            &[("kind", "session"), ("details", "serialize failed")],
-            &e.to_string(),
-        )
+        CliErrorKind::AuthoringPayloadInvalid {
+            kind: "session".into(),
+            details: "serialize failed".into(),
+        }
+        .with_details(e.to_string())
     })?;
     fs::write(&path, json).map_err(|e| {
-        errors::cli_err_with_details(
-            &errors::AUTHORING_PAYLOAD_INVALID,
-            &[("kind", "session"), ("details", "write failed")],
-            &e.to_string(),
-        )
+        CliErrorKind::AuthoringPayloadInvalid {
+            kind: "session".into(),
+            details: "write failed".into(),
+        }
+        .with_details(e.to_string())
     })?;
     Ok(session.clone())
 }
@@ -199,7 +199,7 @@ pub fn save_authoring_session(session: &AuthoringSession) -> Result<AuthoringSes
 /// Returns `CliError` if no session is active.
 pub fn require_authoring_session() -> Result<AuthoringSession, CliError> {
     let session = load_authoring_session()?;
-    session.ok_or_else(|| errors::cli_err(&errors::AUTHORING_SESSION_MISSING, &[]))
+    session.ok_or_else(|| CliErrorKind::AuthoringSessionMissing.into())
 }
 
 /// Begin a new authoring session.
@@ -240,8 +240,6 @@ pub fn authoring_workspace_dir() -> PathBuf {
 
 #[cfg(test)]
 mod tests {
-    use std::env;
-
     use super::*;
 
     #[test]
@@ -313,27 +311,6 @@ mod tests {
         assert_eq!(req, deserialized);
     }
 
-    /// Helper to set env vars, run a closure, then restore the previous values.
-    unsafe fn with_env_vars(vars: &[(&str, Option<&str>)], f: impl FnOnce()) {
-        let saved: Vec<(&str, Option<String>)> = vars
-            .iter()
-            .map(|(name, _)| (*name, env::var(name).ok()))
-            .collect();
-        for (name, value) in vars {
-            match value {
-                Some(v) => unsafe { env::set_var(name, v) },
-                None => unsafe { env::remove_var(name) },
-            }
-        }
-        f();
-        for (name, prev) in saved {
-            match prev {
-                Some(v) => unsafe { env::set_var(name, v) },
-                None => unsafe { env::remove_var(name) },
-            }
-        }
-    }
-
     // All env-dependent authoring tests are combined into one test to avoid
     // races on global env vars when cargo runs tests in parallel.
     #[test]
@@ -343,7 +320,7 @@ mod tests {
             let dir = tempfile::tempdir().unwrap();
             let xdg = dir.path().join("xdg");
             unsafe {
-                with_env_vars(
+                harness_testkit::with_env_vars(
                     &[
                         ("XDG_DATA_HOME", Some(xdg.to_str().unwrap())),
                         ("CLAUDE_SESSION_ID", Some("authoring-unit-test")),
@@ -374,7 +351,7 @@ mod tests {
             let dir = tempfile::tempdir().unwrap();
             let xdg = dir.path().join("empty-xdg");
             unsafe {
-                with_env_vars(
+                harness_testkit::with_env_vars(
                     &[
                         ("XDG_DATA_HOME", Some(xdg.to_str().unwrap())),
                         ("CLAUDE_SESSION_ID", Some("authoring-require-test")),
@@ -383,7 +360,7 @@ mod tests {
                         let result = require_authoring_session();
                         assert!(result.is_err());
                         let err = result.unwrap_err();
-                        assert_eq!(err.code, "KSRCLI040");
+                        assert_eq!(err.code(), "KSRCLI040");
                     },
                 );
             }
@@ -394,7 +371,7 @@ mod tests {
             let dir = tempfile::tempdir().unwrap();
             let xdg = dir.path().join("begin-xdg");
             unsafe {
-                with_env_vars(
+                harness_testkit::with_env_vars(
                     &[
                         ("XDG_DATA_HOME", Some(xdg.to_str().unwrap())),
                         ("CLAUDE_SESSION_ID", Some("authoring-begin-test")),
@@ -428,11 +405,14 @@ mod tests {
         // -- authoring_workspace_dir_under_context --
         {
             unsafe {
-                with_env_vars(&[("CLAUDE_SESSION_ID", Some("workspace-dir-test"))], || {
-                    let workspace = authoring_workspace_dir();
-                    let name = workspace.file_name().unwrap().to_string_lossy().to_string();
-                    assert_eq!(name, "suite-author");
-                });
+                harness_testkit::with_env_vars(
+                    &[("CLAUDE_SESSION_ID", Some("workspace-dir-test"))],
+                    || {
+                        let workspace = authoring_workspace_dir();
+                        let name = workspace.file_name().unwrap().to_string_lossy().to_string();
+                        assert_eq!(name, "suite-author");
+                    },
+                );
             }
         }
     }

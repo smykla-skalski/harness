@@ -8,10 +8,7 @@ use serde_json::Value;
 use tabled::builder::Builder;
 use tabled::settings::Style;
 
-use crate::errors::{
-    self, CliError, MARKDOWN_SHAPE_MISMATCH, MISSING_FILE, MISSING_FRONTMATTER, NOT_A_LIST,
-    NOT_A_MAPPING, NOT_ALL_STRINGS, PATH_NOT_FOUND, UNTERMINATED_FRONTMATTER,
-};
+use crate::errors::{CliError, CliErrorKind};
 
 /// Check whether a name is safe to use as a path component.
 ///
@@ -33,7 +30,10 @@ pub fn ensure_mapping<'a>(
     value.as_object().ok_or_else(|| {
         // JSON objects always have string keys, so we only need to check
         // that the value is actually an object.
-        errors::cli_err(&NOT_A_MAPPING, &[("label", label)])
+        CliErrorKind::NotAMapping {
+            label: label.into(),
+        }
+        .into()
     })
 }
 
@@ -42,14 +42,18 @@ pub fn ensure_mapping<'a>(
 /// # Errors
 /// Returns `CliError` if value is not a list or contains non-strings.
 pub fn ensure_str_list(value: &Value, label: &str) -> Result<Vec<String>, CliError> {
-    let arr = value
-        .as_array()
-        .ok_or_else(|| errors::cli_err(&NOT_A_LIST, &[("label", label)]))?;
+    let arr = value.as_array().ok_or_else(|| {
+        CliError::from(CliErrorKind::NotAList {
+            label: label.into(),
+        })
+    })?;
     let mut result = Vec::with_capacity(arr.len());
     for item in arr {
-        let s = item
-            .as_str()
-            .ok_or_else(|| errors::cli_err(&NOT_ALL_STRINGS, &[("label", label)]))?;
+        let s = item.as_str().ok_or_else(|| {
+            CliError::from(CliErrorKind::NotAllStrings {
+                label: label.into(),
+            })
+        })?;
         result.push(s.to_string());
     }
     Ok(result)
@@ -68,8 +72,12 @@ pub fn ensure_dir(path: &Path) -> io::Result<()> {
 /// # Errors
 /// Returns `CliError` if the file is missing.
 pub fn read_text(path: &Path) -> Result<String, CliError> {
-    fs::read_to_string(path)
-        .map_err(|_| errors::cli_err(&MISSING_FILE, &[("path", &path.display().to_string())]))
+    fs::read_to_string(path).map_err(|_| {
+        CliErrorKind::MissingFile {
+            path: path.display().to_string(),
+        }
+        .into()
+    })
 }
 
 /// Write UTF-8 text to a file, creating parent directories.
@@ -78,10 +86,18 @@ pub fn read_text(path: &Path) -> Result<String, CliError> {
 /// Returns `CliError` on IO failure.
 pub fn write_text(path: &Path, text: &str) -> Result<(), CliError> {
     if let Some(parent) = path.parent() {
-        ensure_dir(parent)
-            .map_err(|e| errors::cli_err(&MISSING_FILE, &[("path", &e.to_string())]))?;
+        ensure_dir(parent).map_err(|e| {
+            CliError::from(CliErrorKind::MissingFile {
+                path: e.to_string(),
+            })
+        })?;
     }
-    fs::write(path, text).map_err(|e| errors::cli_err(&MISSING_FILE, &[("path", &e.to_string())]))
+    fs::write(path, text).map_err(|e| {
+        CliErrorKind::MissingFile {
+            path: e.to_string(),
+        }
+        .into()
+    })
 }
 
 /// Read and parse a JSON file into a `serde_json::Value`.
@@ -90,8 +106,11 @@ pub fn write_text(path: &Path, text: &str) -> Result<(), CliError> {
 /// Returns `CliError` if the file is missing or contains invalid JSON.
 pub fn read_json(path: &Path) -> Result<Value, CliError> {
     let text = read_text(path)?;
-    let value: Value = serde_json::from_str(&text)
-        .map_err(|e| errors::cli_err(&MISSING_FILE, &[("path", &e.to_string())]))?;
+    let value: Value = serde_json::from_str(&text).map_err(|e| {
+        CliError::from(CliErrorKind::MissingFile {
+            path: e.to_string(),
+        })
+    })?;
     // Ensure top-level is an object
     let _ = ensure_mapping(&value, &format!("JSON document {}", path.display()))?;
     Ok(value)
@@ -109,13 +128,14 @@ pub fn write_json(path: &Path, payload: &Value) -> Result<(), CliError> {
     write_text(path, &format!("{text}\n"))
 }
 
-/// Parse markdown frontmatter into generic JSON values using comrak for
-/// extraction and `serde_yml` for YAML parsing. Returns key-value pairs as
-/// `HashMap<String, serde_json::Value>` and the body text.
+/// Extract raw frontmatter YAML text and body from a markdown document.
+///
+/// Uses comrak to locate the frontmatter block, then strips delimiters.
+/// Returns `(yaml_text, body)`.
 ///
 /// # Errors
-/// Returns `CliError` if frontmatter is missing or malformed.
-pub fn parse_frontmatter_values(text: &str) -> Result<(HashMap<String, Value>, String), CliError> {
+/// Returns `CliError` if frontmatter is missing or unterminated.
+pub fn extract_raw_frontmatter(text: &str) -> Result<(String, String), CliError> {
     let mut options = Options::default();
     options.extension.front_matter_delimiter = Some("---".to_owned());
 
@@ -133,15 +153,14 @@ pub fn parse_frontmatter_values(text: &str) -> Result<(HashMap<String, Value>, S
 
     let Some(raw_fm) = fm_content else {
         return if text.starts_with("---\n") {
-            Err(errors::cli_err(&UNTERMINATED_FRONTMATTER, &[]))
+            Err(CliErrorKind::UnterminatedFrontmatter.into())
         } else {
-            Err(errors::cli_err(&MISSING_FRONTMATTER, &[]))
+            Err(CliErrorKind::MissingFrontmatter.into())
         };
     };
 
     // Strip the `---\n ... \n---\n` delimiters to get bare YAML.
     let yaml_text = raw_fm.strip_prefix("---\n").unwrap_or(&raw_fm);
-    // Find the closing delimiter and take everything before it.
     let yaml_text = if let Some(pos) = yaml_text.rfind("\n---") {
         &yaml_text[..pos]
     } else {
@@ -152,15 +171,23 @@ pub fn parse_frontmatter_values(text: &str) -> Result<(HashMap<String, Value>, S
     let body = &text[raw_fm.len()..];
     let body = body.trim_start_matches('\n');
 
-    let yaml_value: serde_yml::Value = serde_yml::from_str(yaml_text).map_err(|e| {
-        errors::cli_err_with_details(
-            &UNTERMINATED_FRONTMATTER,
-            &[],
-            &format!("YAML parse error: {e}"),
-        )
+    Ok((yaml_text.to_string(), body.to_string()))
+}
+
+/// Parse markdown frontmatter into generic JSON values using comrak for
+/// extraction and `serde_yml` for YAML parsing. Returns key-value pairs as
+/// `HashMap<String, serde_json::Value>` and the body text.
+///
+/// # Errors
+/// Returns `CliError` if frontmatter is missing or malformed.
+pub fn parse_frontmatter_values(text: &str) -> Result<(HashMap<String, Value>, String), CliError> {
+    let (yaml_text, body) = extract_raw_frontmatter(text)?;
+
+    let yaml_value: serde_yml::Value = serde_yml::from_str(&yaml_text).map_err(|e| {
+        CliErrorKind::UnterminatedFrontmatter.with_details(format!("YAML parse error: {e}"))
     })?;
     let map = yaml_to_json_map(&yaml_value);
-    Ok((map, body.to_string()))
+    Ok((map, body))
 }
 
 fn yaml_to_json_map(yaml: &serde_yml::Value) -> HashMap<String, Value> {
@@ -184,13 +211,11 @@ fn yaml11_bool(s: &str) -> Option<bool> {
     }
 }
 
-fn yaml_to_json(yaml: &serde_yml::Value) -> Value {
+pub fn yaml_to_json(yaml: &serde_yml::Value) -> Value {
     match yaml {
         serde_yml::Value::Null => Value::Null,
         serde_yml::Value::Bool(b) => Value::Bool(*b),
-        serde_yml::Value::String(s) if yaml11_bool(s).is_some() => {
-            Value::Bool(yaml11_bool(s).unwrap())
-        }
+        serde_yml::Value::String(s) if let Some(b) = yaml11_bool(s) => Value::Bool(b),
         serde_yml::Value::Number(n) => {
             if let Some(i) = n.as_i64() {
                 Value::Number(i.into())
@@ -221,7 +246,7 @@ fn yaml_to_json(yaml: &serde_yml::Value) -> Value {
 /// Returns `CliError` on shape mismatch or IO failure.
 pub fn append_markdown_row(path: &Path, headers: &[&str], values: &[&str]) -> Result<(), CliError> {
     if headers.len() != values.len() {
-        return Err(errors::cli_err(&MARKDOWN_SHAPE_MISMATCH, &[]));
+        return Err(CliErrorKind::MarkdownShapeMismatch.into());
     }
     let current = if path.exists() {
         let text = read_text(path)?;
@@ -278,9 +303,11 @@ pub fn append_markdown_row(path: &Path, headers: &[&str], values: &[&str]) -> Re
 pub fn drill<'a>(payload: &'a Value, dotted_path: &str) -> Result<&'a Value, CliError> {
     let mut current = payload;
     for part in dotted_path.split('.') {
-        current = current
-            .get(part)
-            .ok_or_else(|| errors::cli_err(&PATH_NOT_FOUND, &[("dotted_path", dotted_path)]))?;
+        current = current.get(part).ok_or_else(|| {
+            CliError::from(CliErrorKind::PathNotFound {
+                dotted_path: dotted_path.into(),
+            })
+        })?;
     }
     Ok(current)
 }
@@ -318,7 +345,7 @@ mod tests {
     fn read_text_missing_file() {
         let tmp = TempDir::new().unwrap();
         let err = read_text(&tmp.path().join("nope.txt")).unwrap_err();
-        assert!(err.message.contains("missing file"));
+        assert!(err.message().contains("missing file"));
     }
 
     #[test]
@@ -420,13 +447,13 @@ mod tests {
     #[test]
     fn parse_frontmatter_values_missing_start() {
         let err = parse_frontmatter_values("no frontmatter").unwrap_err();
-        assert!(err.message.contains("missing YAML frontmatter"));
+        assert!(err.message().contains("missing YAML frontmatter"));
     }
 
     #[test]
     fn parse_frontmatter_values_unterminated() {
         let err = parse_frontmatter_values("---\nname: test\n").unwrap_err();
-        assert!(err.message.contains("unterminated"));
+        assert!(err.message().contains("unterminated"));
     }
 
     // --- JSON navigation tests ---
@@ -459,7 +486,7 @@ mod tests {
     fn drill_raises_on_missing_path() {
         let data = json!({"a": 1});
         let err = drill(&data, "a.b.c").unwrap_err();
-        assert!(err.message.contains("path not found"));
+        assert!(err.message().contains("path not found"));
     }
 
     // --- Markdown row tests ---

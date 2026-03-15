@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use crate::errors::{self, CliError};
+use crate::errors::{CliError, HookMessage};
 use crate::hook::HookResult;
 use crate::hook_payloads::HookContext;
 use crate::rules::suite_runner as rules;
@@ -61,10 +61,10 @@ pub fn execute(ctx: &HookContext) -> Result<HookResult, CliError> {
 
 fn guard_suite_author(_ctx: &HookContext, words: &[String], heads: &[String]) -> HookResult {
     if has_denied_cluster_binary(heads) || has_denied_cluster_binary_anywhere(words) {
-        return errors::hook_msg(&errors::DENY_CLUSTER_BINARY, &[]);
+        return HookMessage::ClusterBinary.into_result();
     }
     if !is_harness_head(heads) && has_admin_endpoint_hint(words) {
-        return errors::hook_msg(&errors::DENY_ADMIN_ENDPOINT, &[]);
+        return HookMessage::AdminEndpoint.into_result();
     }
     HookResult::allow()
 }
@@ -86,7 +86,7 @@ fn guard_suite_runner(ctx: &HookContext, words: &[String], heads: &[String]) -> 
             .iter()
             .any(|pfx| target.starts_with(pfx))
     {
-        return errors::hook_msg(&errors::DENY_CLUSTER_BINARY, &[]);
+        return HookMessage::ClusterBinary.into_result();
     }
 
     let batched = deny_batched_tracked_harness_commands(words);
@@ -120,18 +120,20 @@ fn guard_suite_runner(ctx: &HookContext, words: &[String], heads: &[String]) -> 
     }
 
     if has_denied_legacy_script(words) {
-        return errors::hook_msg(&errors::DENY_CLUSTER_BINARY, &[]);
+        return HookMessage::ClusterBinary.into_result();
     }
 
-    if has_denied_cluster_binary(heads) || has_denied_cluster_binary_anywhere(words) {
-        return errors::hook_msg(&errors::DENY_CLUSTER_BINARY, &[]);
+    if has_denied_cluster_binary(heads)
+        || (!is_tracked_harness_command(words) && has_denied_cluster_binary_anywhere(words))
+    {
+        return HookMessage::ClusterBinary.into_result();
     }
 
     if has_admin_endpoint_hint(words) {
         if is_harness_head(heads) || allows_wrapped_envoy_admin(words) {
             return HookResult::allow();
         }
-        return errors::hook_msg(&errors::DENY_ADMIN_ENDPOINT, &[]);
+        return HookMessage::AdminEndpoint.into_result();
     }
     HookResult::allow()
 }
@@ -140,7 +142,7 @@ fn guard_runner_phase(ctx: &HookContext, words: &[String]) -> HookResult {
     if let Some(ref run) = ctx.run
         && let Some(reason) = completed_run_reuse_reason(words)
         && let Some(ref status) = run.status
-        && is_finalized_verdict(&status.overall_verdict)
+        && status.overall_verdict.is_finalized()
     {
         return deny_runner_flow(&format!(
             "{reason}. Start a new run with \
@@ -154,10 +156,6 @@ fn guard_runner_phase(ctx: &HookContext, words: &[String]) -> HookResult {
         }
     }
     HookResult::allow()
-}
-
-fn is_finalized_verdict(verdict: &str) -> bool {
-    matches!(verdict, "pass" | "fail" | "aborted")
 }
 
 fn completed_run_reuse_reason(words: &[String]) -> Option<&'static str> {
@@ -235,7 +233,7 @@ fn allowed_command(state: &RunnerWorkflowState, words: &[String]) -> (bool, Opti
         return (true, None);
     }
     let sub = sig[1].as_str();
-    match &state.phase {
+    match state.phase {
         RunnerPhase::Completed | RunnerPhase::Aborted => match sub {
             "closeout" | "runner-state" | "report" | "session-stop" => (true, None),
             _ => (
@@ -243,11 +241,11 @@ fn allowed_command(state: &RunnerWorkflowState, words: &[String]) -> (bool, Opti
                 Some("the run has reached a final state; only closeout commands are allowed"),
             ),
         },
-        RunnerPhase::Triage { suite_fix, .. } => {
+        RunnerPhase::Triage => {
             if matches!(sub, "runner-state" | "report" | "closeout") {
                 return (true, None);
             }
-            if suite_fix.is_some() {
+            if state.suite_fix.is_some() {
                 return (true, None);
             }
             (true, None)
@@ -543,10 +541,11 @@ fn tracked_kubectl_delete_words(words: &[String]) -> Option<Vec<String>> {
 }
 
 fn deny_runner_flow(details: &str) -> HookResult {
-    errors::hook_msg(
-        &errors::DENY_RUNNER_FLOW_REQUIRED,
-        &[("action", "run this command"), ("details", details)],
-    )
+    HookMessage::RunnerFlowRequired {
+        action: "run this command".into(),
+        details: details.into(),
+    }
+    .into_result()
 }
 
 fn command_heads(words: &[String]) -> Vec<String> {
@@ -608,6 +607,13 @@ fn significant_words(words: &[String]) -> Vec<String> {
 
 fn is_harness_head(heads: &[String]) -> bool {
     !heads.is_empty() && heads.iter().all(|h| h == "harness")
+}
+
+fn is_tracked_harness_command(words: &[String]) -> bool {
+    let sig = significant_words(words);
+    sig.len() >= 2
+        && normalized_binary_name(&sig[0]) == "harness"
+        && TRACKED_HARNESS_SUBCOMMANDS.contains(&sig[1].as_str())
 }
 
 fn has_denied_cluster_binary(heads: &[String]) -> bool {
@@ -750,17 +756,14 @@ mod tests {
         assert_eq!(r.decision, Decision::Deny);
     }
 
-    // Python: test_guard_bash_allows_harness_run_with_kumactl
-    // The Rust implementation checks all words for cluster binaries.
-    // harness run with kumactl is denied because kumactl appears as a word.
     #[test]
-    fn denies_kumactl_even_in_harness_run() {
+    fn allows_kumactl_in_harness_run() {
         let c = ctx(
             "suite-runner",
             "harness run --phase setup --label kumactl-version kumactl version",
         );
         let r = execute(&c).unwrap();
-        assert_eq!(r.decision, Decision::Deny);
+        assert_eq!(r.decision, Decision::Allow);
     }
 
     #[test]
@@ -864,17 +867,15 @@ mod tests {
         );
     }
 
-    // Python: test_guard_bash_allows_single_kuma_resource_delete
-    // The Rust implementation catches kubectl in has_denied_cluster_binary_anywhere.
     #[test]
-    fn denies_kubectl_in_harness_record_delete() {
+    fn allows_single_kuma_resource_delete_via_harness_record() {
         let c = ctx(
             "suite-runner",
             "harness record --phase cleanup --label cleanup-g05 -- \
              kubectl delete meshopentelemetrybackend otel-e2e -n kuma-system",
         );
         let r = execute(&c).unwrap();
-        assert_eq!(r.decision, Decision::Deny);
+        assert_eq!(r.decision, Decision::Allow);
     }
 
     #[test]
@@ -901,18 +902,15 @@ mod tests {
         assert!(r.message.contains("run the tracked harness step directly"));
     }
 
-    // Python: test_guard_bash_allows_harness_record_piped_through_jq
-    // The Rust implementation checks all words for cluster binaries.
-    // kubectl is detected even inside harness record.
     #[test]
-    fn denies_kubectl_even_in_harness_record_pipe() {
+    fn allows_kubectl_in_harness_record_pipe() {
         let c = ctx(
             "suite-runner",
             "harness record --phase verify --label pods \
              kubectl get pods -o json | jq '.items[].metadata.name'",
         );
         let r = execute(&c).unwrap();
-        assert_eq!(r.decision, Decision::Deny);
+        assert_eq!(r.decision, Decision::Allow);
     }
 
     #[test]
@@ -981,5 +979,40 @@ mod tests {
             .map(String::from)
             .collect();
         assert_eq!(make_target(&words), None);
+    }
+
+    #[test]
+    fn is_tracked_harness_command_positive() {
+        let words: Vec<String> = vec![
+            "harness", "record", "--phase", "verify", "--", "kubectl", "get", "pods",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect();
+        assert!(is_tracked_harness_command(&words));
+
+        let words: Vec<String> = vec!["harness", "run", "--phase", "setup", "kumactl", "version"]
+            .into_iter()
+            .map(String::from)
+            .collect();
+        assert!(is_tracked_harness_command(&words));
+    }
+
+    #[test]
+    fn is_tracked_harness_command_negative() {
+        let words: Vec<String> = vec!["kubectl", "get", "pods"]
+            .into_iter()
+            .map(String::from)
+            .collect();
+        assert!(!is_tracked_harness_command(&words));
+
+        let words: Vec<String> = vec!["harness", "authoring-show", "--kind", "session"]
+            .into_iter()
+            .map(String::from)
+            .collect();
+        assert!(!is_tracked_harness_command(&words));
+
+        let words: Vec<String> = vec!["ls", "-la"].into_iter().map(String::from).collect();
+        assert!(!is_tracked_harness_command(&words));
     }
 }

@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
 
 use crate::context::RunContext;
-use crate::errors::CliError;
+use crate::errors::{CliError, CliErrorKind};
 use crate::workflow::author::{self as author_workflow, AuthorWorkflowState};
 use crate::workflow::runner::{self as runner_workflow, RunnerWorkflowState};
 
@@ -68,7 +68,7 @@ pub struct AskUserAnnotation {
 }
 
 /// Hook message payload extracted from tool input.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct HookMessagePayload {
     #[serde(default)]
     pub command: Option<String>,
@@ -85,7 +85,7 @@ pub struct HookMessagePayload {
 }
 
 /// The full hook envelope payload from Claude Code.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct HookEnvelopePayload {
     #[serde(default)]
     pub root: Option<String>,
@@ -112,12 +112,11 @@ impl HookEnvelopePayload {
     /// Returns `CliError` if the text is not valid JSON or does not match the
     /// expected envelope shape.
     pub fn from_json_text(text: &str) -> Result<Self, CliError> {
-        serde_json::from_str(text).map_err(|e| CliError {
-            code: "KSH001".into(),
-            message: format!("invalid hook payload: {e}"),
-            exit_code: 1,
-            hint: None,
-            details: None,
+        serde_json::from_str(text).map_err(|e| {
+            CliErrorKind::HookPayloadInvalid {
+                detail: format!("invalid hook payload: {e}"),
+            }
+            .into()
         })
     }
 
@@ -128,15 +127,11 @@ impl HookEnvelopePayload {
     pub fn from_stdin() -> Result<Self, CliError> {
         use io::Read;
         let mut text = String::new();
-        io::stdin()
-            .read_to_string(&mut text)
-            .map_err(|e| CliError {
-                code: "KSH001".into(),
-                message: format!("failed to read stdin: {e}"),
-                exit_code: 1,
-                hint: None,
-                details: None,
-            })?;
+        io::stdin().read_to_string(&mut text).map_err(|e| {
+            CliError::from(CliErrorKind::HookPayloadInvalid {
+                detail: format!("failed to read stdin: {e}"),
+            })
+        })?;
         Self::from_json_text(&text)
     }
 }
@@ -410,8 +405,8 @@ mod tests {
         let result = HookEnvelopePayload::from_json_text("not json");
         assert!(result.is_err());
         let err = result.unwrap_err();
-        assert_eq!(err.code, "KSH001");
-        assert!(err.message.contains("invalid hook payload"));
+        assert_eq!(err.code(), "KSH001");
+        assert!(err.message().contains("invalid hook payload"));
     }
 
     #[test]
