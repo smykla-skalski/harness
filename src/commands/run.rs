@@ -8,6 +8,7 @@ use std::sync::LazyLock;
 use regex::Regex;
 
 use crate::cli::{EnvoyCommand, KumactlCommand, ReportCommand, RunDirArgs, ServiceArgs};
+use crate::cluster::Platform;
 use crate::context::{CurrentRunRecord, RunContext, RunLayout, RunMetadata};
 use crate::core_defs::{current_run_context_path, harness_data_root, utc_now};
 use crate::errors::{CliError, CliErrorKind, cow};
@@ -168,6 +169,21 @@ pub fn init_run(
 }
 
 // =========================================================================
+// platform detection
+// =========================================================================
+
+/// Detect platform from cluster spec or profile name heuristic.
+fn detect_platform(ctx: &RunContext) -> Platform {
+    if let Some(ref spec) = ctx.cluster {
+        return spec.platform;
+    }
+    if ctx.metadata.profile.contains("universal") {
+        return Platform::Universal;
+    }
+    Platform::Kubernetes
+}
+
+// =========================================================================
 // preflight
 // =========================================================================
 
@@ -201,12 +217,7 @@ pub fn capture(
     run_dir_args: &RunDirArgs,
 ) -> Result<i32, CliError> {
     let ctx = super::resolve_run_context(run_dir_args)?;
-
-    let kc = kubeconfig.map(PathBuf::from).or_else(|| {
-        ctx.cluster
-            .as_ref()
-            .map(|c| PathBuf::from(c.primary_kubeconfig()))
-    });
+    let platform = detect_platform(&ctx);
 
     let timestamp = chrono::Utc::now()
         .format("%Y-%m-%dT%H%M%S.%6fZ")
@@ -216,13 +227,10 @@ pub fn capture(
         .state_dir()
         .join(format!("{label}-{timestamp}.json"));
 
-    let result = kubectl(
-        kc.as_deref(),
-        &["get", "pods", "--all-namespaces", "-o", "json"],
-        &[0],
-    )?;
-
-    write_text(&capture_path, &result.stdout)?;
+    match platform {
+        Platform::Kubernetes => capture_kubernetes(&ctx, kubeconfig, &capture_path)?,
+        Platform::Universal => capture_universal(&ctx, &capture_path)?,
+    }
 
     let rel = capture_path.strip_prefix(ctx.layout.run_dir()).map_or_else(
         |_| capture_path.display().to_string(),
@@ -231,6 +239,65 @@ pub fn capture(
 
     println!("{rel}");
     Ok(0)
+}
+
+fn capture_kubernetes(
+    ctx: &RunContext,
+    kubeconfig: Option<&str>,
+    capture_path: &Path,
+) -> Result<(), CliError> {
+    let kc = kubeconfig.map(PathBuf::from).or_else(|| {
+        ctx.cluster
+            .as_ref()
+            .map(|c| PathBuf::from(c.primary_kubeconfig()))
+    });
+
+    let result = kubectl(
+        kc.as_deref(),
+        &["get", "pods", "--all-namespaces", "-o", "json"],
+        &[0],
+    )?;
+    write_text(capture_path, &result.stdout)?;
+    Ok(())
+}
+
+fn capture_universal(ctx: &RunContext, capture_path: &Path) -> Result<(), CliError> {
+    let spec = ctx
+        .cluster
+        .as_ref()
+        .ok_or_else(|| CliErrorKind::missing_run_context_value("cluster"))?;
+    let network = spec.docker_network.as_deref().unwrap_or("harness-default");
+
+    // Collect container state
+    let containers = exec::docker(
+        &[
+            "ps",
+            "--filter",
+            &format!("network={network}"),
+            "--format",
+            "{{json .}}",
+        ],
+        &[0],
+    )?;
+
+    // Collect dataplane state from CP if available
+    let dataplanes = if let Some(url) = spec.primary_api_url() {
+        exec::cp_api_get(&url, "/meshes/default/dataplanes")
+            .ok()
+            .unwrap_or(serde_json::json!({"items": []}))
+    } else {
+        serde_json::json!({"items": []})
+    };
+
+    let capture = serde_json::json!({
+        "platform": "universal",
+        "containers": containers.stdout.trim(),
+        "dataplanes": dataplanes,
+    });
+    let json_str = serde_json::to_string_pretty(&capture)
+        .map_err(|e| CliErrorKind::serialize(cow!("capture: {e}")))?;
+    write_text(capture_path, &json_str)?;
+    Ok(())
 }
 
 // =========================================================================
@@ -250,12 +317,21 @@ pub fn apply(
 ) -> Result<i32, CliError> {
     let run_dir = super::resolve_run_dir(run_dir_args)?;
     let ctx = RunContext::from_run_dir(&run_dir)?;
-    let kc = super::resolve_kubeconfig(&ctx, kubeconfig, cluster_arg)?;
+    let platform = detect_platform(&ctx);
 
     for manifest_raw in manifests {
         let manifest = resolve_manifest_path(manifest_raw, Some(&run_dir))?;
         let manifest_str = manifest.to_string_lossy().into_owned();
-        kubectl(Some(&kc), &["apply", "-f", &manifest_str], &[0])?;
+
+        match platform {
+            Platform::Kubernetes => {
+                let kc = super::resolve_kubeconfig(&ctx, kubeconfig, cluster_arg)?;
+                kubectl(Some(&kc), &["apply", "-f", &manifest_str], &[0])?;
+            }
+            Platform::Universal => {
+                apply_universal(&ctx, &manifest_str)?;
+            }
+        }
 
         let manifest_index = ctx.layout.manifests_dir().join("manifest-index.md");
         let rel = manifest.strip_prefix(ctx.layout.run_dir()).map_or_else(
@@ -271,6 +347,14 @@ pub fn apply(
         println!("{}", manifest.display());
     }
     Ok(0)
+}
+
+fn apply_universal(ctx: &RunContext, manifest: &str) -> Result<(), CliError> {
+    let cp_addr = super::resolve_cp_addr(ctx)?;
+    let root = PathBuf::from(&ctx.metadata.repo_root);
+    let binary = find_kumactl_binary(&root)?;
+    exec::kumactl_run(&binary, &cp_addr, &["apply", "-f", manifest], &[0])?;
+    Ok(())
 }
 
 // =========================================================================
@@ -740,46 +824,120 @@ pub fn validate(
     output: Option<&str>,
 ) -> Result<i32, CliError> {
     let manifest_path = PathBuf::from(manifest);
-    let kc = kubeconfig.map(PathBuf::from);
     let output_path =
         output.map_or_else(|| default_validation_output(&manifest_path), PathBuf::from);
 
-    let resources = extract_resources(&manifest_path)?;
+    // Detect platform from manifest content: universal uses type/name, K8s uses apiVersion/kind
+    if is_universal_manifest(&manifest_path) {
+        return validate_universal(&manifest_path, &output_path);
+    }
+
+    let kc = kubeconfig.map(PathBuf::from);
+    validate_kubernetes(kc.as_deref(), manifest, &manifest_path, &output_path)
+}
+
+fn validate_kubernetes(
+    kc: Option<&Path>,
+    manifest: &str,
+    manifest_path: &Path,
+    output_path: &Path,
+) -> Result<i32, CliError> {
+    let resources = extract_resources(manifest_path)?;
     let mut log_lines: Vec<String> = Vec::new();
 
     for (kind, api_version) in &resources {
         let label = format!("{kind} ({api_version})");
         log_lines.push(format!("explain {label}: running"));
-        write_text(&output_path, &format!("{}\n", log_lines.join("\n")))?;
+        write_text(output_path, &format!("{}\n", log_lines.join("\n")))?;
 
-        kubectl(
-            kc.as_deref(),
-            &["explain", kind, "--api-version", api_version],
-            &[0],
-        )?;
+        kubectl(kc, &["explain", kind, "--api-version", api_version], &[0])?;
         if let Some(last) = log_lines.last_mut() {
             *last = format!("explain {label}: ok");
         }
-        write_text(&output_path, &format!("{}\n", log_lines.join("\n")))?;
+        write_text(output_path, &format!("{}\n", log_lines.join("\n")))?;
     }
 
     log_lines.push("dry-run: running".to_string());
-    write_text(&output_path, &format!("{}\n", log_lines.join("\n")))?;
+    write_text(output_path, &format!("{}\n", log_lines.join("\n")))?;
 
     kubectl(
-        kc.as_deref(),
+        kc,
         &["apply", "--server-side", "--dry-run=server", "-f", manifest],
         &[0],
     )?;
     if let Some(last) = log_lines.last_mut() {
         *last = "dry-run: ok".to_string();
     }
-    write_text(&output_path, &format!("{}\n", log_lines.join("\n")))?;
+    write_text(output_path, &format!("{}\n", log_lines.join("\n")))?;
 
-    let diff_result = kubectl(kc.as_deref(), &["diff", "-f", manifest], &[0, 1])?;
+    let diff_result = kubectl(kc, &["diff", "-f", manifest], &[0, 1])?;
     log_lines.push(format!("diff exit code: {}", diff_result.returncode));
-    write_text(&output_path, &format!("{}\n", log_lines.join("\n")))?;
+    write_text(output_path, &format!("{}\n", log_lines.join("\n")))?;
 
+    println!("{}", output_path.display());
+    Ok(0)
+}
+
+fn is_universal_manifest(manifest_path: &Path) -> bool {
+    let Ok(text) = read_text(manifest_path) else {
+        return false;
+    };
+    // Universal manifests use `type:` instead of `apiVersion:`
+    text.lines()
+        .any(|line| line.starts_with("type:") && !line.contains("apiVersion"))
+}
+
+fn validate_universal(manifest_path: &Path, output_path: &Path) -> Result<i32, CliError> {
+    use serde::Deserialize;
+
+    let text = read_text(manifest_path)?;
+    let mut log_lines: Vec<String> = Vec::new();
+    let mut errors: Vec<String> = Vec::new();
+
+    for document in serde_yml::Deserializer::from_str(&text) {
+        let parsed: serde_yml::Value = match serde_yml::Value::deserialize(document) {
+            Ok(v) => v,
+            Err(e) => {
+                errors.push(format!("YAML parse error: {e}"));
+                continue;
+            }
+        };
+
+        let resource_type = parsed.get("type").and_then(|v| v.as_str());
+        let name = parsed.get("name").and_then(|v| v.as_str());
+        let mesh = parsed.get("mesh").and_then(|v| v.as_str());
+
+        let label = resource_type.unwrap_or("unknown");
+        log_lines.push(format!("validate {label}: checking structure"));
+
+        if resource_type.is_none() {
+            errors.push(format!("missing 'type' field in resource: {label}"));
+        }
+        if name.is_none() {
+            errors.push(format!("missing 'name' field in resource: {label}"));
+        }
+        // mesh is required for most types except ZoneIngress/ZoneEgress
+        if mesh.is_none()
+            && !matches!(
+                resource_type,
+                Some("ZoneIngress" | "ZoneEgress" | "Zone")
+            )
+        {
+            errors.push(format!("missing 'mesh' field in resource: {label}"));
+        }
+
+        if errors.is_empty() {
+            log_lines.push(format!("validate {label}: ok"));
+        }
+    }
+
+    if !errors.is_empty() {
+        log_lines.extend(errors.iter().map(|e| format!("ERROR: {e}")));
+        write_text(output_path, &format!("{}\n", log_lines.join("\n")))?;
+        return Err(CliErrorKind::no_resource_kinds(manifest_path.display().to_string()).into());
+    }
+
+    write_text(output_path, &format!("{}\n", log_lines.join("\n")))?;
     println!("{}", output_path.display());
     Ok(0)
 }
@@ -968,6 +1126,35 @@ pub fn kumactl(cmd: &KumactlCommand) -> Result<i32, CliError> {
 }
 
 // =========================================================================
+// template rendering (universal mode)
+// =========================================================================
+
+const TEMPLATE_DIR: &str = "resources/universal/templates";
+
+/// Render a universal mode template from the repo's template directory.
+///
+/// # Errors
+/// Returns `CliError` if the template cannot be found or rendered.
+fn render_template(
+    repo_root: &Path,
+    template_name: &str,
+    ctx: &serde_json::Value,
+) -> Result<String, CliError> {
+    let template_path = repo_root.join(TEMPLATE_DIR).join(template_name);
+    let template_str = fs::read_to_string(&template_path)
+        .map_err(|_| CliErrorKind::missing_file(template_path.display().to_string()))?;
+    let env = minijinja::Environment::new();
+    let tmpl = env
+        .template_from_str(&template_str)
+        .map_err(|e| CliErrorKind::template_render(format!("parse {template_name}: {e}")))?;
+    tmpl.render(ctx).map_err(|e| {
+        CliError::from(CliErrorKind::template_render(format!(
+            "render {template_name}: {e}"
+        )))
+    })
+}
+
+// =========================================================================
 // token (universal mode)
 // =========================================================================
 
@@ -1092,6 +1279,25 @@ fn service_up(
     let token_result = token_via_api(&cp_addr, "dataplane", svc_name, mesh, "24h")?;
     let token_str = token_result.trim();
 
+    // Render dataplane YAML from template
+    let repo_root = PathBuf::from(&ctx.metadata.repo_root);
+    let template_name = if transparent_proxy {
+        "transparent-proxy.yaml.j2"
+    } else {
+        "dataplane.yaml.j2"
+    };
+    let dp_yaml = render_template(
+        &repo_root,
+        template_name,
+        &serde_json::json!({
+            "name": svc_name,
+            "mesh": mesh,
+            "address": "{{ address }}",
+            "port": svc_port,
+            "protocol": "http",
+        }),
+    )?;
+
     // Start service container
     let port_pair = [(svc_port, svc_port)];
     exec::docker_run_detached(
@@ -1104,11 +1310,20 @@ fn service_up(
         &["sleep", "infinity"],
     )?;
 
-    // Write token into container
+    // Write token and dataplane YAML into container
     let token_path = format!("/tmp/{svc_name}-token");
+    let dp_path = format!("/tmp/{svc_name}-dp.yaml");
     exec::docker_exec_cmd(
         svc_name,
         &["sh", "-c", &format!("echo '{token_str}' > {token_path}")],
+    )?;
+    exec::docker_exec_cmd(
+        svc_name,
+        &[
+            "sh",
+            "-c",
+            &format!("cat > {dp_path} << 'DPEOF'\n{dp_yaml}\nDPEOF"),
+        ],
     )?;
 
     // Install transparent proxy if requested
@@ -1123,7 +1338,7 @@ fn service_up(
     let dp_args = format!(
         "kuma-dp run --cp-address={cp_addr} \
          --dataplane-token-file={token_path} \
-         --name={svc_name} --mesh={mesh}"
+         --dataplane-file={dp_path}"
     );
     exec::docker_exec_cmd(svc_name, &["sh", "-c", &format!("{dp_args} &")])?;
 
