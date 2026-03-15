@@ -56,7 +56,7 @@ pub fn resolve_run_directory(
 /// Returns `CliError` if not found.
 pub fn resolve_suite_path(raw: &str) -> Result<PathBuf, CliError> {
     let suite_root = core_defs::suite_root();
-    let candidates = suite_path_candidates(raw, &suite_root);
+    let candidates = suite_path_candidates(raw, &suite_root)?;
 
     for candidate in &candidates {
         let normalized = normalize_suite_candidate(candidate);
@@ -78,7 +78,7 @@ pub fn resolve_suite_path(raw: &str) -> Result<PathBuf, CliError> {
 /// # Errors
 /// Returns `CliError` if not found.
 pub fn resolve_manifest_path(raw: &str, run_dir: Option<&Path>) -> Result<PathBuf, CliError> {
-    let candidates = manifest_path_candidates(raw, run_dir);
+    let candidates = manifest_path_candidates(raw, run_dir)?;
 
     for candidate in &candidates {
         let normalized = candidate.clone();
@@ -90,19 +90,19 @@ pub fn resolve_manifest_path(raw: &str, run_dir: Option<&Path>) -> Result<PathBu
     Err(CliErrorKind::missing_file(raw.to_string()).into())
 }
 
-fn suite_path_candidates(raw: &str, suite_root: &Path) -> Vec<PathBuf> {
+fn suite_path_candidates(raw: &str, suite_root: &Path) -> Result<Vec<PathBuf>, CliError> {
     let raw_path = PathBuf::from(raw);
     let direct = if raw_path.is_absolute() {
         raw_path.clone()
     } else {
-        env::current_dir().unwrap_or_default().join(&raw_path)
+        env::current_dir()?.join(&raw_path)
     };
 
     let mut items = vec![direct];
     if !raw.contains('/') && !raw.contains('\\') {
         items.push(suite_root.join(raw).join("suite.md"));
     }
-    items
+    Ok(items)
 }
 
 fn normalize_suite_candidate(candidate: &Path) -> PathBuf {
@@ -113,13 +113,13 @@ fn normalize_suite_candidate(candidate: &Path) -> PathBuf {
     }
 }
 
-fn manifest_path_candidates(raw: &str, run_dir: Option<&Path>) -> Vec<PathBuf> {
+fn manifest_path_candidates(raw: &str, run_dir: Option<&Path>) -> Result<Vec<PathBuf>, CliError> {
     let raw_path = PathBuf::from(raw);
     if raw_path.is_absolute() {
-        return vec![raw_path];
+        return Ok(vec![raw_path]);
     }
 
-    let mut items = vec![env::current_dir().unwrap_or_default().join(&raw_path)];
+    let mut items = vec![env::current_dir()?.join(&raw_path)];
 
     if let Some(active) = run_dir {
         items.push(
@@ -139,7 +139,7 @@ fn manifest_path_candidates(raw: &str, run_dir: Option<&Path>) -> Vec<PathBuf> {
         items.push(active.join("manifests").join(&raw_path));
     }
 
-    items
+    Ok(items)
 }
 
 #[cfg(test)]
@@ -213,7 +213,7 @@ mod tests {
     #[test]
     fn suite_path_candidates_bare_name_includes_suite_root() {
         let suite_root = PathBuf::from("/suites");
-        let candidates = suite_path_candidates("my-suite", &suite_root);
+        let candidates = suite_path_candidates("my-suite", &suite_root).unwrap();
         assert!(candidates.len() >= 2);
         assert_eq!(candidates[1], PathBuf::from("/suites/my-suite/suite.md"));
     }
@@ -221,7 +221,7 @@ mod tests {
     #[test]
     fn suite_path_candidates_with_slash_skips_suite_root() {
         let suite_root = PathBuf::from("/suites");
-        let candidates = suite_path_candidates("path/to/suite.md", &suite_root);
+        let candidates = suite_path_candidates("path/to/suite.md", &suite_root).unwrap();
         assert_eq!(candidates.len(), 1);
     }
 
