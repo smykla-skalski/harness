@@ -812,6 +812,43 @@ mod tests {
     // -- PreflightArtifact tests --
 
     #[test]
+    fn run_context_from_run_dir_fails_on_corrupt_prepared_suite() {
+        let tmp = tempfile::tempdir().unwrap();
+        let run_dir = tmp.path().join("run-corrupt");
+        let layout = RunLayout::from_run_dir(&run_dir);
+        layout.ensure_dirs().unwrap();
+
+        let metadata = sample_metadata();
+        fs::write(
+            layout.metadata_path(),
+            serde_json::to_string_pretty(&metadata).unwrap(),
+        )
+        .unwrap();
+        let status_data = serde_json::json!({
+            "run_id": "run-1",
+            "suite_id": "suite-a",
+            "profile": "single-zone",
+            "started_at": "2026-03-14T00:00:00Z",
+            "overall_verdict": "pending",
+            "notes": []
+        });
+        fs::write(
+            layout.status_path(),
+            serde_json::to_string_pretty(&status_data).unwrap(),
+        )
+        .unwrap();
+
+        // Write corrupt prepared-suite.json
+        fs::write(layout.prepared_suite_path(), "NOT VALID JSON").unwrap();
+
+        let result = RunContext::from_run_dir(&run_dir);
+        assert!(
+            result.is_err(),
+            "expected Err for corrupt prepared-suite, got Ok"
+        );
+    }
+
+    #[test]
     fn preflight_artifact_deserialization_with_defaults() {
         let data = serde_json::json!({"checked_at": "2026-03-14T00:00:00Z"});
         let pf: PreflightArtifact = serde_json::from_value(data).unwrap();
