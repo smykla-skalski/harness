@@ -125,6 +125,15 @@ pub struct CommandEnv {
     pub suite_path: String,
     #[serde(default)]
     pub kubeconfig: Option<String>,
+    /// "kubernetes" or "universal".
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub platform: Option<String>,
+    /// CP REST API URL (universal mode only).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cp_api_url: Option<String>,
+    /// Docker network name (universal mode only).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub docker_network: Option<String>,
 }
 
 impl CommandEnv {
@@ -136,7 +145,7 @@ impl CommandEnv {
     /// env vars to child processes, so owned strings are the right fit.
     #[must_use]
     pub fn to_env_dict(&self) -> HashMap<String, String> {
-        let mut map = HashMap::with_capacity(9);
+        let mut map = HashMap::with_capacity(12);
         map.insert("PROFILE".into(), self.profile.clone());
         map.insert("REPO_ROOT".into(), self.repo_root.clone());
         map.insert("RUN_DIR".into(), self.run_dir.clone());
@@ -147,6 +156,15 @@ impl CommandEnv {
         map.insert("SUITE_PATH".into(), self.suite_path.clone());
         if let Some(ref kc) = self.kubeconfig {
             map.insert("KUBECONFIG".into(), kc.clone());
+        }
+        if let Some(ref p) = self.platform {
+            map.insert("PLATFORM".into(), p.clone());
+        }
+        if let Some(ref url) = self.cp_api_url {
+            map.insert("CP_API_URL".into(), url.clone());
+        }
+        if let Some(ref net) = self.docker_network {
+            map.insert("DOCKER_NETWORK".into(), net.clone());
         }
         map
     }
@@ -469,6 +487,9 @@ mod tests {
             suite_id: "s".into(),
             suite_path: "/suites/s/suite.md".into(),
             kubeconfig: None,
+            platform: None,
+            cp_api_url: None,
+            docker_network: None,
         };
         let dict = env.to_env_dict();
         assert_eq!(dict.get("PROFILE").unwrap(), "single-zone");
@@ -495,10 +516,36 @@ mod tests {
             suite_id: "si".into(),
             suite_path: "/sp".into(),
             kubeconfig: Some("/kube/config".into()),
+            platform: None,
+            cp_api_url: None,
+            docker_network: None,
         };
         let dict = env.to_env_dict();
         assert_eq!(dict.get("KUBECONFIG").unwrap(), "/kube/config");
         assert_eq!(dict.len(), 9);
+    }
+
+    #[test]
+    fn command_env_to_env_dict_with_universal_fields() {
+        let env = CommandEnv {
+            profile: "p".into(),
+            repo_root: "/r".into(),
+            run_dir: "/d".into(),
+            run_id: "i".into(),
+            run_root: "/rr".into(),
+            suite_dir: "/sd".into(),
+            suite_id: "si".into(),
+            suite_path: "/sp".into(),
+            kubeconfig: None,
+            platform: Some("universal".into()),
+            cp_api_url: Some("http://172.57.0.2:5681".into()),
+            docker_network: Some("harness-net".into()),
+        };
+        let dict = env.to_env_dict();
+        assert_eq!(dict.get("PLATFORM").unwrap(), "universal");
+        assert_eq!(dict.get("CP_API_URL").unwrap(), "http://172.57.0.2:5681");
+        assert_eq!(dict.get("DOCKER_NETWORK").unwrap(), "harness-net");
+        assert_eq!(dict.len(), 11);
     }
 
     // -- RunMetadata tests --

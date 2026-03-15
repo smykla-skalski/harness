@@ -2,6 +2,7 @@ use std::env;
 use std::path::PathBuf;
 
 use crate::cli::{Command, RunDirArgs};
+use crate::cluster::Platform;
 use crate::context::RunContext;
 use crate::errors::{CliError, CliErrorKind};
 use crate::resolve::resolve_run_directory;
@@ -196,6 +197,14 @@ pub(crate) fn resolve_kubeconfig(
     if let Some(kc) = explicit {
         return Ok(PathBuf::from(kc));
     }
+    if let Some(ref spec) = ctx.cluster
+        && spec.platform == Platform::Universal
+    {
+        return Err(CliErrorKind::missing_run_context_value(
+            "kubeconfig (universal mode does not use kubeconfig - use CP API instead)",
+        )
+        .into());
+    }
     if let Some(cluster_name) = cluster
         && let Some(ref spec) = ctx.cluster
     {
@@ -208,4 +217,17 @@ pub(crate) fn resolve_kubeconfig(
         return Ok(PathBuf::from(spec.primary_kubeconfig()));
     }
     Err(CliErrorKind::missing_run_context_value("kubeconfig").into())
+}
+
+/// Resolve CP API URL from run context cluster spec.
+///
+/// # Errors
+/// Returns `CliError` when no CP API URL is available.
+pub(crate) fn resolve_cp_addr(ctx: &RunContext) -> Result<String, CliError> {
+    if let Some(ref spec) = ctx.cluster
+        && let Some(url) = spec.primary_api_url()
+    {
+        return Ok(url);
+    }
+    Err(CliErrorKind::missing_run_context_value("cp_api_url").into())
 }
