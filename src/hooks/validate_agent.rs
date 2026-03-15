@@ -127,6 +127,7 @@ fn validate_suite_runner(ctx: &HookContext) -> Result<HookResult, CliError> {
     Ok(HookMessage::PreflightMissing.into_result())
 }
 
+#[derive(Debug)]
 struct ParsedPreflight {
     status: PreflightReply,
 }
@@ -146,7 +147,11 @@ fn parse_preflight_reply(message: &str) -> Result<ParsedPreflight, String> {
     let caps = PREFLIGHT_RE
         .captures(lines[0])
         .ok_or_else(|| format!("first line must be `{head} {pass}` or `{head} {fail}`"))?;
-    let status: PreflightReply = caps[1]
+    let raw = caps
+        .get(1)
+        .map(|m| m.as_str())
+        .ok_or_else(|| format!("first line must be `{head} {pass}` or `{head} {fail}`"))?;
+    let status: PreflightReply = raw
         .parse()
         .map_err(|()| format!("first line must be `{head} {pass}` or `{head} {fail}`"))?;
     let data: HashMap<String, String> = lines[1..]
@@ -169,4 +174,49 @@ fn parse_preflight_reply(message: &str) -> Result<ParsedPreflight, String> {
         return Err("fail replies must include a `Blocker:` line".to_string());
     }
     Ok(ParsedPreflight { status })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn head() -> &'static str {
+        runner_rules::PREFLIGHT_REPLY_HEAD
+    }
+
+    #[test]
+    fn parse_preflight_reply_pass() {
+        let msg = format!(
+            "{} pass\nPrepared suite: path/to/suite\nState capture: path/to/state\nWarnings: none",
+            head()
+        );
+        let parsed = parse_preflight_reply(&msg).unwrap();
+        assert_eq!(parsed.status, PreflightReply::Pass);
+    }
+
+    #[test]
+    fn parse_preflight_reply_fail() {
+        let msg = format!("{} fail\nBlocker: cluster unreachable", head());
+        let parsed = parse_preflight_reply(&msg).unwrap();
+        assert_eq!(parsed.status, PreflightReply::Fail);
+    }
+
+    #[test]
+    fn parse_preflight_reply_rejects_empty() {
+        let err = parse_preflight_reply("").unwrap_err();
+        assert!(err.contains("preflight summary"), "got: {err}");
+    }
+
+    #[test]
+    fn parse_preflight_reply_rejects_garbage() {
+        let err = parse_preflight_reply("hello world").unwrap_err();
+        assert!(err.contains("first line must be"), "got: {err}");
+    }
+
+    #[test]
+    fn parse_preflight_reply_pass_requires_fields() {
+        let msg = format!("{} pass", head());
+        let err = parse_preflight_reply(&msg).unwrap_err();
+        assert!(err.contains("Prepared suite"), "got: {err}");
+    }
 }
