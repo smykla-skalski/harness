@@ -46,13 +46,13 @@ pub fn read_kubectl_validate_state() -> Result<Option<KubectlValidateState>, Cli
     }
     let text = fs::read_to_string(&path).map_err(|e| -> CliError {
         CliErrorKind::Io {
-            detail: format!("failed to read {}: {e}", path.display()),
+            detail: format!("failed to read {}: {e}", path.display()).into(),
         }
         .into()
     })?;
     let state: KubectlValidateState = serde_json::from_str(&text).map_err(|e| -> CliError {
         CliErrorKind::WorkflowParse {
-            detail: format!("failed to parse {}: {e}", path.display()),
+            detail: format!("failed to parse {}: {e}", path.display()).into(),
         }
         .into()
     })?;

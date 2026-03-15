@@ -26,7 +26,7 @@ pub(crate) fn run_command(
     }
     let output = cmd.output().map_err(|e| {
         CliErrorKind::CommandFailed {
-            command: args.join(" "),
+            command: args.join(" ").into(),
         }
         .with_details(e.to_string())
     })?;
@@ -50,7 +50,7 @@ pub(crate) fn run_command(
         result.stderr.trim().to_string()
     };
     Err(CliErrorKind::CommandFailed {
-        command: args.join(" "),
+        command: args.join(" ").into(),
     }
     .with_details(details))
 }

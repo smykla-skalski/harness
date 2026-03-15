@@ -46,20 +46,20 @@ impl VersionedJsonRepository {
         }
         let contents = fs::read_to_string(&self.path).map_err(|e| -> CliError {
             CliErrorKind::WorkflowIo {
-                detail: format!("failed to read {}: {e}", self.path.display()),
+                detail: format!("failed to read {}: {e}", self.path.display()).into(),
             }
             .into()
         })?;
         let value: Value = serde_json::from_str(&contents).map_err(|e| -> CliError {
             CliErrorKind::WorkflowParse {
-                detail: format!("failed to parse {}: {e}", self.path.display()),
+                detail: format!("failed to parse {}: {e}", self.path.display()).into(),
             }
             .into()
         })?;
         let version = value.get("schema_version").and_then(Value::as_u64);
         if version != Some(u64::from(self.current_version)) {
             return Err(CliErrorKind::WorkflowVersion {
-                detail: format!("{version:?}"),
+                detail: format!("{version:?}").into(),
             }
             .into());
         }
@@ -74,7 +74,7 @@ impl VersionedJsonRepository {
         if let Some(parent) = self.path.parent() {
             fs::create_dir_all(parent).map_err(|e| -> CliError {
                 CliErrorKind::WorkflowIo {
-                    detail: format!("failed to create directory {}: {e}", parent.display()),
+                    detail: format!("failed to create directory {}: {e}", parent.display()).into(),
                 }
                 .into()
             })?;
@@ -83,19 +83,19 @@ impl VersionedJsonRepository {
         let tmp_path = self.path.with_extension(tmp_name);
         let json = serde_json::to_string_pretty(state).map_err(|e| -> CliError {
             CliErrorKind::WorkflowSerialize {
-                detail: format!("failed to serialize state: {e}"),
+                detail: format!("failed to serialize state: {e}").into(),
             }
             .into()
         })?;
         fs::write(&tmp_path, &json).map_err(|e| -> CliError {
             CliErrorKind::WorkflowIo {
-                detail: format!("failed to write {}: {e}", tmp_path.display()),
+                detail: format!("failed to write {}: {e}", tmp_path.display()).into(),
             }
             .into()
         })?;
         fs::rename(&tmp_path, &self.path).map_err(|e| -> CliError {
             CliErrorKind::WorkflowIo {
-                detail: format!("failed to rename to {}: {e}", self.path.display()),
+                detail: format!("failed to rename to {}: {e}", self.path.display()).into(),
             }
             .into()
         })?;

@@ -36,7 +36,7 @@ pub fn execute(cmd: &EnvoyCommand) -> Result<i32, CliError> {
                 let text = read_text(Path::new(file_path))?;
                 let payload: serde_json::Value = serde_json::from_str(&text).map_err(|_| {
                     CliError::from(CliErrorKind::InvalidJson {
-                        path: file_path.clone(),
+                        path: file_path.clone().into(),
                     })
                 })?;
                 match find_route(&payload, route_match) {
@@ -48,7 +48,7 @@ pub fn execute(cmd: &EnvoyCommand) -> Result<i32, CliError> {
                         Ok(0)
                     }
                     None => Err(CliErrorKind::RouteNotFound {
-                        route_match: route_match.clone(),
+                        route_match: route_match.clone().into(),
                     }
                     .into()),
                 }

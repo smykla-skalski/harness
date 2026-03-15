@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::error::Error;
 use std::fmt;
 use std::io;
@@ -16,21 +17,21 @@ pub enum CliErrorKind {
     EmptyCommandArgs,
 
     #[error("missing required tools: {tools}")]
-    MissingTools { tools: String },
+    MissingTools { tools: Cow<'static, str> },
 
     #[error("unsafe name: {name} (must not contain path separators or \"..\")")]
-    UnsafeName { name: String },
+    UnsafeName { name: Cow<'static, str> },
 
     // --- Command execution (exit 4) ---
     #[error("command failed: {command}")]
-    CommandFailed { command: String },
+    CommandFailed { command: Cow<'static, str> },
 
     // --- Run lifecycle (exit 5) ---
     #[error("missing current run pointer")]
     MissingRunPointer,
 
     #[error("missing required closeout artifact: {rel}")]
-    MissingCloseoutArtifact { rel: String },
+    MissingCloseoutArtifact { rel: Cow<'static, str> },
 
     #[error("run is missing a final state capture")]
     MissingStateCapture,
@@ -39,45 +40,45 @@ pub enum CliErrorKind {
     VerdictPending,
 
     #[error("missing run context value: {field}")]
-    MissingRunContextValue { field: String },
+    MissingRunContextValue { field: Cow<'static, str> },
 
     #[error("missing explicit run location for run id: {run_id}")]
-    MissingRunLocation { run_id: String },
+    MissingRunLocation { run_id: Cow<'static, str> },
 
     #[error("run directory already exists: {run_dir}")]
-    RunDirExists { run_dir: String },
+    RunDirExists { run_dir: Cow<'static, str> },
 
     #[error("run has no recorded status")]
     MissingRunStatus,
 
     #[error("run group is already recorded: {group_id}")]
-    RunGroupAlreadyRecorded { group_id: String },
+    RunGroupAlreadyRecorded { group_id: Cow<'static, str> },
 
     #[error("group is not present in the run plan: {group_id}")]
-    RunGroupNotFound { group_id: String },
+    RunGroupNotFound { group_id: Cow<'static, str> },
 
     // --- File/path errors (exit 5) ---
     #[error("missing file: {path}")]
-    MissingFile { path: String },
+    MissingFile { path: Cow<'static, str> },
 
     #[error("invalid JSON in {path}")]
-    InvalidJson { path: String },
+    InvalidJson { path: Cow<'static, str> },
 
     #[error("path not found: {dotted_path}")]
-    PathNotFound { dotted_path: String },
+    PathNotFound { dotted_path: Cow<'static, str> },
 
     // --- Schema/structure validation (exit 5) ---
     #[error("{label} must be a mapping")]
-    NotAMapping { label: String },
+    NotAMapping { label: Cow<'static, str> },
 
     #[error("{label} must use string keys")]
-    NotStringKeys { label: String },
+    NotStringKeys { label: Cow<'static, str> },
 
     #[error("{label} must be a list")]
-    NotAList { label: String },
+    NotAList { label: Cow<'static, str> },
 
     #[error("{label} must contain only strings")]
-    NotAllStrings { label: String },
+    NotAllStrings { label: Cow<'static, str> },
 
     #[error("missing YAML frontmatter")]
     MissingFrontmatter,
@@ -86,17 +87,23 @@ pub enum CliErrorKind {
     UnterminatedFrontmatter,
 
     #[error("missing required fields: {label}: {fields}")]
-    MissingFields { label: String, fields: String },
+    MissingFields {
+        label: Cow<'static, str>,
+        fields: Cow<'static, str>,
+    },
 
     #[error("field type mismatch in {label}: {field} (expected {expected})")]
     FieldTypeMismatch {
-        label: String,
-        field: String,
-        expected: String,
+        label: Cow<'static, str>,
+        field: Cow<'static, str>,
+        expected: Cow<'static, str>,
     },
 
     #[error("missing sections: {label}: {sections}")]
-    MissingSections { label: String, sections: String },
+    MissingSections {
+        label: Cow<'static, str>,
+        sections: Cow<'static, str>,
+    },
 
     #[error("markdown row shape mismatch")]
     MarkdownShapeMismatch,
@@ -109,14 +116,14 @@ pub enum CliErrorKind {
     GatewayCrdsMissing,
 
     #[error("downloaded Gateway API manifest is empty: {path}")]
-    GatewayDownloadEmpty { path: String },
+    GatewayDownloadEmpty { path: Cow<'static, str> },
 
     // --- Kubernetes/cluster ---
     #[error("no resource kinds found in {manifest}")]
-    NoResourceKinds { manifest: String },
+    NoResourceKinds { manifest: Cow<'static, str> },
 
     #[error("route {route_match} not found")]
-    RouteNotFound { route_match: String },
+    RouteNotFound { route_match: Cow<'static, str> },
 
     #[error("unable to find local kumactl")]
     KumactlNotFound,
@@ -125,30 +132,39 @@ pub enum CliErrorKind {
     TrackedKubectlRequired,
 
     #[error("kubectl target override is not allowed in tracked runs: {flag}")]
-    KubectlTargetOverrideForbidden { flag: String },
+    KubectlTargetOverrideForbidden { flag: Cow<'static, str> },
 
     #[error("unknown tracked cluster member: {cluster}")]
-    UnknownTrackedCluster { cluster: String, choices: String },
+    UnknownTrackedCluster {
+        cluster: Cow<'static, str>,
+        choices: Cow<'static, str>,
+    },
 
     #[error("tracked kubeconfig is not a local harness cluster: {path}")]
-    NonLocalKubeconfig { path: String },
+    NonLocalKubeconfig { path: Cow<'static, str> },
 
     // --- Envoy ---
     #[error("envoy config type not found: {type_name}")]
-    EnvoyConfigTypeNotFound { type_name: String },
+    EnvoyConfigTypeNotFound { type_name: Cow<'static, str> },
 
     #[error("envoy live capture requires: {fields}")]
-    EnvoyCaptureArgsRequired { fields: String },
+    EnvoyCaptureArgsRequired { fields: Cow<'static, str> },
 
     // --- Report (exit 1) ---
     #[error("report exceeds line limit: {count}>{limit}")]
-    ReportLineLimit { count: String, limit: String },
+    ReportLineLimit {
+        count: Cow<'static, str>,
+        limit: Cow<'static, str>,
+    },
 
     #[error("report exceeds code block limit: {count}>{limit}")]
-    ReportCodeBlockLimit { count: String, limit: String },
+    ReportCodeBlockLimit {
+        count: Cow<'static, str>,
+        limit: Cow<'static, str>,
+    },
 
     #[error("no recorded artifact found for evidence label: {label}")]
-    EvidenceLabelNotFound { label: String },
+    EvidenceLabelNotFound { label: Cow<'static, str> },
 
     #[error("group report requires at least one evidence input")]
     ReportGroupEvidenceRequired,
@@ -161,16 +177,19 @@ pub enum CliErrorKind {
     AuthoringPayloadMissing,
 
     #[error("invalid suite-author {kind} payload: {details}")]
-    AuthoringPayloadInvalid { kind: String, details: String },
+    AuthoringPayloadInvalid {
+        kind: Cow<'static, str>,
+        details: Cow<'static, str>,
+    },
 
     #[error("missing saved suite-author payload: {kind}")]
-    AuthoringShowKindMissing { kind: String },
+    AuthoringShowKindMissing { kind: Cow<'static, str> },
 
     #[error("suite amendments entry is missing or empty: {path}")]
-    AmendmentsRequired { path: String },
+    AmendmentsRequired { path: Cow<'static, str> },
 
     #[error("suite-author manifest validation failed: {targets}")]
-    AuthoringValidateFailed { targets: String },
+    AuthoringValidateFailed { targets: Cow<'static, str> },
 
     #[error("suite-author local validator decision is still required")]
     KubectlValidateDecisionRequired,
@@ -180,35 +199,35 @@ pub enum CliErrorKind {
 
     // --- IO/serialization (exit 1) ---
     #[error("{detail}")]
-    Io { detail: String },
+    Io { detail: Cow<'static, str> },
 
     #[error("serialization failed: {detail}")]
-    Serialize { detail: String },
+    Serialize { detail: Cow<'static, str> },
 
     #[error("{detail}")]
-    HookPayloadInvalid { detail: String },
+    HookPayloadInvalid { detail: Cow<'static, str> },
 
     #[error("{detail}")]
-    ClusterError { detail: String },
+    ClusterError { detail: Cow<'static, str> },
 
     #[error("{detail}")]
-    UsageError { detail: String },
+    UsageError { detail: Cow<'static, str> },
 
     // --- Workflow (exit 5) ---
     #[error("{detail}")]
-    WorkflowIo { detail: String },
+    WorkflowIo { detail: Cow<'static, str> },
 
     #[error("{detail}")]
-    WorkflowParse { detail: String },
+    WorkflowParse { detail: Cow<'static, str> },
 
     #[error("unsupported workflow schema version: {detail}")]
-    WorkflowVersion { detail: String },
+    WorkflowVersion { detail: Cow<'static, str> },
 
     #[error("serialization failed: {detail}")]
-    WorkflowSerialize { detail: String },
+    WorkflowSerialize { detail: Cow<'static, str> },
 
     #[error("{detail}")]
-    JsonParse { detail: String },
+    JsonParse { detail: Cow<'static, str> },
 }
 
 impl CliErrorKind {
@@ -436,7 +455,7 @@ impl From<CliErrorKind> for CliError {
 impl From<io::Error> for CliError {
     fn from(e: io::Error) -> Self {
         CliErrorKind::Io {
-            detail: format!("IO error: {e}"),
+            detail: format!("IO error: {e}").into(),
         }
         .into()
     }
@@ -470,25 +489,31 @@ pub enum HookMessage {
     VerdictPending,
 
     #[error("Write path is outside the tracked run surface: {path}")]
-    WriteOutsideRun { path: String },
+    WriteOutsideRun { path: Cow<'static, str> },
 
     #[error("Suite-runner state is missing or invalid: {details}")]
-    RunnerStateInvalid { details: String },
+    RunnerStateInvalid { details: Cow<'static, str> },
 
     #[error("Suite-runner phase or approval is required before {action}: {details}")]
-    RunnerFlowRequired { action: String, details: String },
+    RunnerFlowRequired {
+        action: Cow<'static, str>,
+        details: Cow<'static, str>,
+    },
 
     #[error("Preflight worker reply is invalid: {details}")]
-    PreflightReplyInvalid { details: String },
+    PreflightReplyInvalid { details: Cow<'static, str> },
 
     #[error("Write path is outside the suite-author surface: {path}")]
-    WriteOutsideSuite { path: String },
+    WriteOutsideSuite { path: Cow<'static, str> },
 
     #[error("Suite-author approval state is missing or invalid: {details}")]
-    ApprovalStateInvalid { details: String },
+    ApprovalStateInvalid { details: Cow<'static, str> },
 
     #[error("Suite-author approval is required before {action}: {details}")]
-    ApprovalRequired { action: String, details: String },
+    ApprovalRequired {
+        action: Cow<'static, str>,
+        details: Cow<'static, str>,
+    },
 
     #[error("suite groups must be a list")]
     GroupsNotList,
@@ -497,20 +522,23 @@ pub enum HookMessage {
     BaselinesNotList,
 
     #[error("Suite is incomplete or invalid: {details}")]
-    SuiteIncomplete { details: String },
+    SuiteIncomplete { details: Cow<'static, str> },
 
     #[error("Suite-author local validator decision is required first: {details}")]
-    ValidatorGateRequired { details: String },
+    ValidatorGateRequired { details: Cow<'static, str> },
 
     #[error("Suite-author local validator install failed: {details}")]
-    ValidatorInstallFailed { details: String },
+    ValidatorInstallFailed { details: Cow<'static, str> },
 
     #[error("Suite-author local validator gate is not allowed here: {details}")]
-    ValidatorGateUnexpected { details: String },
+    ValidatorGateUnexpected { details: Cow<'static, str> },
 
     // --- Warn ---
     #[error("Expected artifact missing after {script}: {target}")]
-    MissingArtifact { script: String, target: String },
+    MissingArtifact {
+        script: Cow<'static, str>,
+        target: Cow<'static, str>,
+    },
 
     #[error("Run `harness preflight` before the first cluster mutation.")]
     RunPreflight,
@@ -525,7 +553,7 @@ pub enum HookMessage {
     CodeReaderFormat,
 
     #[error("Suite-author worker reply is missing the expected acknowledgement for `{sections}`.")]
-    ReaderMissingSections { sections: String },
+    ReaderMissingSections { sections: Cow<'static, str> },
 
     #[error(
         "Suite-author worker reply is oversized; save the structured payload \
@@ -538,7 +566,7 @@ pub enum HookMessage {
     SuiteRunnerTracked,
 
     #[error("Current run verdict: {verdict}")]
-    RunVerdict { verdict: String },
+    RunVerdict { verdict: Cow<'static, str> },
 
     #[error("Suites must stay user-story-first with concrete variant evidence.")]
     SuiteAuthorTracked,
@@ -686,67 +714,69 @@ mod tests {
         vec![
             CliErrorKind::EmptyCommandArgs,
             CliErrorKind::MissingTools {
-                tools: String::new(),
+                tools: Cow::default(),
             },
             CliErrorKind::CommandFailed {
-                command: String::new(),
+                command: Cow::default(),
             },
             CliErrorKind::MissingRunPointer,
-            CliErrorKind::MissingCloseoutArtifact { rel: String::new() },
+            CliErrorKind::MissingCloseoutArtifact {
+                rel: Cow::default(),
+            },
             CliErrorKind::MissingStateCapture,
             CliErrorKind::VerdictPending,
             CliErrorKind::MissingRunContextValue {
-                field: String::new(),
+                field: Cow::default(),
             },
             CliErrorKind::MissingRunLocation {
-                run_id: String::new(),
+                run_id: Cow::default(),
             },
             CliErrorKind::InvalidJson {
-                path: String::new(),
+                path: Cow::default(),
             },
             CliErrorKind::NotAMapping {
-                label: String::new(),
+                label: Cow::default(),
             },
             CliErrorKind::NotStringKeys {
-                label: String::new(),
+                label: Cow::default(),
             },
             CliErrorKind::NotAList {
-                label: String::new(),
+                label: Cow::default(),
             },
             CliErrorKind::NotAllStrings {
-                label: String::new(),
+                label: Cow::default(),
             },
             CliErrorKind::MissingFile {
-                path: String::new(),
+                path: Cow::default(),
             },
             CliErrorKind::MissingFrontmatter,
             CliErrorKind::UnterminatedFrontmatter,
             CliErrorKind::PathNotFound {
-                dotted_path: String::new(),
+                dotted_path: Cow::default(),
             },
             CliErrorKind::MissingFields {
-                label: String::new(),
-                fields: String::new(),
+                label: Cow::default(),
+                fields: Cow::default(),
             },
             CliErrorKind::FieldTypeMismatch {
-                label: String::new(),
-                field: String::new(),
-                expected: String::new(),
+                label: Cow::default(),
+                field: Cow::default(),
+                expected: Cow::default(),
             },
             CliErrorKind::MissingSections {
-                label: String::new(),
-                sections: String::new(),
+                label: Cow::default(),
+                sections: Cow::default(),
             },
             CliErrorKind::NoResourceKinds {
-                manifest: String::new(),
+                manifest: Cow::default(),
             },
             CliErrorKind::RouteNotFound {
-                route_match: String::new(),
+                route_match: Cow::default(),
             },
             CliErrorKind::GatewayVersionMissing,
             CliErrorKind::GatewayCrdsMissing,
             CliErrorKind::GatewayDownloadEmpty {
-                path: String::new(),
+                path: Cow::default(),
             },
             CliErrorKind::KumactlNotFound,
         ]
@@ -755,94 +785,94 @@ mod tests {
     fn extended_error_kinds() -> Vec<CliErrorKind> {
         vec![
             CliErrorKind::ReportLineLimit {
-                count: String::new(),
-                limit: String::new(),
+                count: Cow::default(),
+                limit: Cow::default(),
             },
             CliErrorKind::ReportCodeBlockLimit {
-                count: String::new(),
-                limit: String::new(),
+                count: Cow::default(),
+                limit: Cow::default(),
             },
             CliErrorKind::AuthoringSessionMissing,
             CliErrorKind::AuthoringPayloadMissing,
             CliErrorKind::AuthoringPayloadInvalid {
-                kind: String::new(),
-                details: String::new(),
+                kind: Cow::default(),
+                details: Cow::default(),
             },
             CliErrorKind::AuthoringShowKindMissing {
-                kind: String::new(),
+                kind: Cow::default(),
             },
             CliErrorKind::AuthoringValidateFailed {
-                targets: String::new(),
+                targets: Cow::default(),
             },
             CliErrorKind::KubectlValidateDecisionRequired,
             CliErrorKind::KubectlValidateUnavailable,
             CliErrorKind::TrackedKubectlRequired,
             CliErrorKind::KubectlTargetOverrideForbidden {
-                flag: String::new(),
+                flag: Cow::default(),
             },
             CliErrorKind::UnknownTrackedCluster {
-                cluster: String::new(),
-                choices: String::new(),
+                cluster: Cow::default(),
+                choices: Cow::default(),
             },
             CliErrorKind::NonLocalKubeconfig {
-                path: String::new(),
+                path: Cow::default(),
             },
             CliErrorKind::RunGroupAlreadyRecorded {
-                group_id: String::new(),
+                group_id: Cow::default(),
             },
             CliErrorKind::RunGroupNotFound {
-                group_id: String::new(),
+                group_id: Cow::default(),
             },
             CliErrorKind::EnvoyConfigTypeNotFound {
-                type_name: String::new(),
+                type_name: Cow::default(),
             },
             CliErrorKind::EnvoyCaptureArgsRequired {
-                fields: String::new(),
+                fields: Cow::default(),
             },
             CliErrorKind::EvidenceLabelNotFound {
-                label: String::new(),
+                label: Cow::default(),
             },
             CliErrorKind::ReportGroupEvidenceRequired,
             CliErrorKind::AmendmentsRequired {
-                path: String::new(),
+                path: Cow::default(),
             },
             CliErrorKind::RunDirExists {
-                run_dir: String::new(),
+                run_dir: Cow::default(),
             },
             CliErrorKind::UnsafeName {
-                name: String::new(),
+                name: Cow::default(),
             },
             CliErrorKind::MissingRunStatus,
             CliErrorKind::MarkdownShapeMismatch,
             CliErrorKind::Io {
-                detail: String::new(),
+                detail: Cow::default(),
             },
             CliErrorKind::Serialize {
-                detail: String::new(),
+                detail: Cow::default(),
             },
             CliErrorKind::HookPayloadInvalid {
-                detail: String::new(),
+                detail: Cow::default(),
             },
             CliErrorKind::WorkflowIo {
-                detail: String::new(),
+                detail: Cow::default(),
             },
             CliErrorKind::WorkflowParse {
-                detail: String::new(),
+                detail: Cow::default(),
             },
             CliErrorKind::WorkflowVersion {
-                detail: String::new(),
+                detail: Cow::default(),
             },
             CliErrorKind::WorkflowSerialize {
-                detail: String::new(),
+                detail: Cow::default(),
             },
             CliErrorKind::JsonParse {
-                detail: String::new(),
+                detail: Cow::default(),
             },
             CliErrorKind::ClusterError {
-                detail: String::new(),
+                detail: Cow::default(),
             },
             CliErrorKind::UsageError {
-                detail: String::new(),
+                detail: Cow::default(),
             },
         ]
     }
@@ -882,7 +912,10 @@ mod tests {
     #[test]
     fn cli_err_closeout_codes_are_distinct() {
         let codes: HashSet<&str> = [
-            CliErrorKind::MissingCloseoutArtifact { rel: String::new() }.code(),
+            CliErrorKind::MissingCloseoutArtifact {
+                rel: Cow::default(),
+            }
+            .code(),
             CliErrorKind::MissingStateCapture.code(),
             CliErrorKind::VerdictPending.code(),
         ]
@@ -987,56 +1020,56 @@ mod tests {
             HookMessage::MissingStateCapture,
             HookMessage::VerdictPending,
             HookMessage::WriteOutsideRun {
-                path: String::new(),
+                path: Cow::default(),
             },
             HookMessage::RunnerStateInvalid {
-                details: String::new(),
+                details: Cow::default(),
             },
             HookMessage::RunnerFlowRequired {
-                action: String::new(),
-                details: String::new(),
+                action: Cow::default(),
+                details: Cow::default(),
             },
             HookMessage::PreflightReplyInvalid {
-                details: String::new(),
+                details: Cow::default(),
             },
             HookMessage::WriteOutsideSuite {
-                path: String::new(),
+                path: Cow::default(),
             },
             HookMessage::ApprovalStateInvalid {
-                details: String::new(),
+                details: Cow::default(),
             },
             HookMessage::ApprovalRequired {
-                action: String::new(),
-                details: String::new(),
+                action: Cow::default(),
+                details: Cow::default(),
             },
             HookMessage::GroupsNotList,
             HookMessage::BaselinesNotList,
             HookMessage::SuiteIncomplete {
-                details: String::new(),
+                details: Cow::default(),
             },
             HookMessage::ValidatorGateRequired {
-                details: String::new(),
+                details: Cow::default(),
             },
             HookMessage::ValidatorInstallFailed {
-                details: String::new(),
+                details: Cow::default(),
             },
             HookMessage::ValidatorGateUnexpected {
-                details: String::new(),
+                details: Cow::default(),
             },
             HookMessage::MissingArtifact {
-                script: String::new(),
-                target: String::new(),
+                script: Cow::default(),
+                target: Cow::default(),
             },
             HookMessage::RunPreflight,
             HookMessage::PreflightMissing,
             HookMessage::CodeReaderFormat,
             HookMessage::ReaderMissingSections {
-                sections: String::new(),
+                sections: Cow::default(),
             },
             HookMessage::ReaderOversizedBlock,
             HookMessage::SuiteRunnerTracked,
             HookMessage::RunVerdict {
-                verdict: String::new(),
+                verdict: Cow::default(),
             },
             HookMessage::SuiteAuthorTracked,
         ];

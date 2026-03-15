@@ -125,14 +125,14 @@ impl PreparedSuiteArtifact {
         }
         let text = fs::read_to_string(path).map_err(|e| {
             CliErrorKind::MissingFile {
-                path: path.display().to_string(),
+                path: path.display().to_string().into(),
             }
             .with_details(e.to_string())
         })?;
         let artifact: Self = serde_json::from_str(&text).map_err(|e| {
             CliErrorKind::AuthoringPayloadInvalid {
                 kind: "prepared suite".into(),
-                details: path.display().to_string(),
+                details: path.display().to_string().into(),
             }
             .with_details(e.to_string())
         })?;
@@ -147,7 +147,7 @@ impl PreparedSuiteArtifact {
         if let Some(parent) = path.parent() {
             fs::create_dir_all(parent).map_err(|e| {
                 CliErrorKind::MissingFile {
-                    path: parent.display().to_string(),
+                    path: parent.display().to_string().into(),
                 }
                 .with_details(e.to_string())
             })?;
@@ -161,7 +161,7 @@ impl PreparedSuiteArtifact {
         })?;
         fs::write(path, json).map_err(|e| {
             CliErrorKind::MissingFile {
-                path: path.display().to_string(),
+                path: path.display().to_string().into(),
             }
             .with_details(e.to_string())
         })

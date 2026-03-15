@@ -21,7 +21,7 @@ pub fn state_path(run_dir: &Path) -> PathBuf {
 pub fn template_path(root: &Path, cluster_name: &str) -> Result<PathBuf, CliError> {
     if !is_safe_name(cluster_name) {
         return Err(CliErrorKind::UnsafeName {
-            name: cluster_name.into(),
+            name: cluster_name.to_string().into(),
         }
         .into());
     }
@@ -59,7 +59,7 @@ fn default_source_template(root: &Path) -> Result<PathBuf, CliError> {
         }
     }
     Err(CliErrorKind::MissingFile {
-        path: default.to_string_lossy().into(),
+        path: default.to_string_lossy().into_owned().into(),
     }
     .into())
 }
@@ -166,7 +166,7 @@ pub fn restore_templates(run_dir: &Path) -> Result<Vec<PathBuf>, CliError> {
         }
         if !source.is_file() {
             return Err(CliErrorKind::MissingFile {
-                path: source_str.into(),
+                path: source_str.to_string().into(),
             }
             .into());
         }
@@ -212,7 +212,7 @@ fn save_entries(run_dir: &Path, entries: &[serde_json::Value]) -> Result<(), Cli
     });
     let text = serde_json::to_string_pretty(&payload).map_err(|e| -> CliError {
         CliErrorKind::Serialize {
-            detail: e.to_string(),
+            detail: e.to_string().into(),
         }
         .into()
     })?;

@@ -109,7 +109,7 @@ pub fn execute(
     }
 
     Err(CliErrorKind::CommandFailed {
-        command: shell_words::join(&command),
+        command: shell_words::join(&command).into(),
     }
     .with_details(format!("Recorded command output: {}", artifact.display())))
 }

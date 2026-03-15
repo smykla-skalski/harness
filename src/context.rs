@@ -232,12 +232,12 @@ pub struct RunContext {
 fn read_json_file<T: DeserializeOwned>(path: &Path) -> Result<T, CliError> {
     let content = fs::read_to_string(path).map_err(|_| {
         CliError::from(CliErrorKind::MissingFile {
-            path: path.display().to_string(),
+            path: path.display().to_string().into(),
         })
     })?;
     serde_json::from_str(&content).map_err(|e| {
         CliErrorKind::InvalidJson {
-            path: path.display().to_string(),
+            path: path.display().to_string().into(),
         }
         .with_details(e.to_string())
     })

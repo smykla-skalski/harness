@@ -175,7 +175,7 @@ pub fn resolve_build_info(repo: &Path) -> Result<BuildInfo, CliError> {
         .output()
         .map_err(|e| {
             CliError::from(CliErrorKind::CommandFailed {
-                command: format!("git status: {e}"),
+                command: format!("git status: {e}").into(),
             })
         })?;
 
@@ -195,7 +195,7 @@ pub fn resolve_build_info(repo: &Path) -> Result<BuildInfo, CliError> {
         .output()
         .map_err(|e| {
             CliError::from(CliErrorKind::CommandFailed {
-                command: format!("git rev-parse: {e}"),
+                command: format!("git rev-parse: {e}").into(),
             })
         })?;
 
