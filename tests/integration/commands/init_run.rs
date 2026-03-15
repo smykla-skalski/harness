@@ -4,7 +4,8 @@
 
 use std::fs;
 
-use harness::commands::init_run;
+use harness::cli::{Command, InitArgs};
+use harness::commands::Execute;
 use harness::context::RunMetadata;
 use harness::schema::{RunStatus, Verdict};
 use harness::workflow::runner::{self as runner_workflow, RunnerPhase};
@@ -18,13 +19,14 @@ fn init_creates_tracked_layout() {
     write_suite(&suite_dir.join("suite.md"));
     write_group(&suite_dir.join("groups").join("g01.md"));
 
-    let result = init_run::execute(
-        &suite_dir.join("suite.md").to_string_lossy(),
-        "run-1",
-        "single-zone",
-        Some(&tmp.path().to_string_lossy()),
-        Some(&tmp.path().join("runs").to_string_lossy()),
-    );
+    let result = Command::Init(InitArgs {
+        suite: suite_dir.join("suite.md").to_string_lossy().to_string(),
+        run_id: "run-1".to_string(),
+        profile: "single-zone".to_string(),
+        repo_root: Some(tmp.path().to_string_lossy().to_string()),
+        run_root: Some(tmp.path().join("runs").to_string_lossy().to_string()),
+    })
+    .execute();
     assert!(result.is_ok(), "init should succeed: {result:?}");
     assert_eq!(result.unwrap(), 0);
 
@@ -78,23 +80,25 @@ fn init_fails_when_run_directory_already_exists() {
     let run_root = tmp.path().join("runs");
 
     // First init should succeed
-    let r1 = init_run::execute(
-        &suite_dir.join("suite.md").to_string_lossy(),
-        "run-dup",
-        "single-zone",
-        Some(&tmp.path().to_string_lossy()),
-        Some(&run_root.to_string_lossy()),
-    );
+    let r1 = Command::Init(InitArgs {
+        suite: suite_dir.join("suite.md").to_string_lossy().to_string(),
+        run_id: "run-dup".to_string(),
+        profile: "single-zone".to_string(),
+        repo_root: Some(tmp.path().to_string_lossy().to_string()),
+        run_root: Some(run_root.to_string_lossy().to_string()),
+    })
+    .execute();
     assert!(r1.is_ok());
 
     // Second init with same run_id should fail
-    let r2 = init_run::execute(
-        &suite_dir.join("suite.md").to_string_lossy(),
-        "run-dup",
-        "single-zone",
-        Some(&tmp.path().to_string_lossy()),
-        Some(&run_root.to_string_lossy()),
-    );
+    let r2 = Command::Init(InitArgs {
+        suite: suite_dir.join("suite.md").to_string_lossy().to_string(),
+        run_id: "run-dup".to_string(),
+        profile: "single-zone".to_string(),
+        repo_root: Some(tmp.path().to_string_lossy().to_string()),
+        run_root: Some(run_root.to_string_lossy().to_string()),
+    })
+    .execute();
     assert!(r2.is_err(), "duplicate init should fail");
 }
 
@@ -106,13 +110,14 @@ fn init_accepts_suite_directory_input() {
     write_group(&suite_dir.join("groups").join("g01.md"));
 
     // Pass the suite directory path (not suite.md) - should find suite.md
-    let result = init_run::execute(
-        &suite_dir.to_string_lossy(),
-        "run-dir-input",
-        "single-zone",
-        Some(&tmp.path().to_string_lossy()),
-        Some(&tmp.path().join("runs").to_string_lossy()),
-    );
+    let result = Command::Init(InitArgs {
+        suite: suite_dir.to_string_lossy().to_string(),
+        run_id: "run-dir-input".to_string(),
+        profile: "single-zone".to_string(),
+        repo_root: Some(tmp.path().to_string_lossy().to_string()),
+        run_root: Some(tmp.path().join("runs").to_string_lossy().to_string()),
+    })
+    .execute();
     assert!(
         result.is_ok(),
         "init should accept suite directory: {result:?}"
@@ -126,13 +131,14 @@ fn init_defaults_repo_root_to_cwd() {
     write_suite(&suite_dir.join("suite.md"));
     write_group(&suite_dir.join("groups").join("g01.md"));
 
-    let result = init_run::execute(
-        &suite_dir.join("suite.md").to_string_lossy(),
-        "run-cwd",
-        "single-zone",
-        None, // no explicit repo root
-        Some(&tmp.path().join("runs").to_string_lossy()),
-    );
+    let result = Command::Init(InitArgs {
+        suite: suite_dir.join("suite.md").to_string_lossy().to_string(),
+        run_id: "run-cwd".to_string(),
+        profile: "single-zone".to_string(),
+        repo_root: None, // no explicit repo root
+        run_root: Some(tmp.path().join("runs").to_string_lossy().to_string()),
+    })
+    .execute();
     assert!(result.is_ok());
     let run_dir = tmp.path().join("runs").join("run-cwd");
     let meta_text = fs::read_to_string(run_dir.join("run-metadata.json")).unwrap();
@@ -158,13 +164,14 @@ fn init_preserves_user_stories_from_suite() {
         .body("# Stories suite\n")
         .write_to(&suite_dir.join("suite.md"));
 
-    let result = init_run::execute(
-        &suite_dir.join("suite.md").to_string_lossy(),
-        "run-stories",
-        "single-zone",
-        Some(&tmp.path().to_string_lossy()),
-        Some(&tmp.path().join("runs").to_string_lossy()),
-    );
+    let result = Command::Init(InitArgs {
+        suite: suite_dir.join("suite.md").to_string_lossy().to_string(),
+        run_id: "run-stories".to_string(),
+        profile: "single-zone".to_string(),
+        repo_root: Some(tmp.path().to_string_lossy().to_string()),
+        run_root: Some(tmp.path().join("runs").to_string_lossy().to_string()),
+    })
+    .execute();
     assert!(result.is_ok());
     let run_dir = tmp.path().join("runs").join("run-stories");
     let meta_text = fs::read_to_string(run_dir.join("run-metadata.json")).unwrap();

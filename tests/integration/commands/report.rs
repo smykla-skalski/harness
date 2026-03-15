@@ -4,8 +4,8 @@
 
 use std::fs;
 
-use harness::cli::{ReportCommand, RunDirArgs};
-use harness::commands::report;
+use harness::cli::{Command, ReportCommand, RunDirArgs};
+use harness::commands::Execute;
 use harness::context::RunContext;
 use harness::schema::{RunReport, RunReportFrontmatter, Verdict};
 
@@ -124,7 +124,7 @@ fn run_group_updates_status_and_report() {
             run_root: None,
         },
     };
-    let exit_code = report::execute(&cmd).unwrap();
+    let exit_code = Command::Report { cmd }.execute().unwrap();
     assert_eq!(exit_code, 0);
 
     let ctx = RunContext::from_run_dir(&run_dir).unwrap();
@@ -170,8 +170,8 @@ fn run_group_rejects_duplicate() {
             run_root: None,
         },
     };
-    report::execute(&cmd).unwrap();
+    Command::Report { cmd: cmd.clone() }.execute().unwrap();
 
-    let err = report::execute(&cmd).unwrap_err();
+    let err = Command::Report { cmd }.execute().unwrap_err();
     assert_eq!(err.code(), "KSRCLI053");
 }
