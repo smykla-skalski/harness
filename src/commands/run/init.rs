@@ -4,7 +4,7 @@ use std::path::Path;
 use crate::context::{CurrentRunRecord, RunLayout, RunMetadata};
 use crate::core_defs::{current_run_context_path, shorten_path, utc_now};
 use crate::errors::{CliError, CliErrorKind, cow};
-use crate::io::append_markdown_row;
+use crate::io::{append_markdown_row, validate_safe_segment};
 use crate::resolve::resolve_suite_path;
 use crate::schema::{RunCounts, RunReport, RunReportFrontmatter, RunStatus, SuiteSpec, Verdict};
 use crate::workflow::runner::initialize_runner_state;
@@ -25,6 +25,7 @@ pub fn init_run(
     repo_root: Option<&str>,
     run_root: Option<&str>,
 ) -> Result<i32, CliError> {
+    validate_safe_segment(run_id)?;
     let suite_path = resolve_suite_path(suite)?;
     let spec = SuiteSpec::from_markdown(&suite_path)?;
     let suite_dir = spec.suite_dir().to_path_buf();

@@ -705,12 +705,9 @@ fn detects_harness_bug_phrase() {
         None,
         &mut state,
     );
-    assert!(
-        issues
-            .iter()
-            .any(|i| i.category == IssueCategory::WorkflowError
-                && i.severity == IssueSeverity::Critical)
-    );
+    assert!(issues.iter().any(
+        |i| i.category == IssueCategory::WorkflowError && i.severity == IssueSeverity::Critical
+    ));
 }
 
 #[test]
@@ -723,12 +720,9 @@ fn detects_harness_bootstrap_didnt_configure() {
         None,
         &mut state,
     );
-    assert!(
-        issues
-            .iter()
-            .any(|i| i.category == IssueCategory::WorkflowError
-                && i.severity == IssueSeverity::Critical)
-    );
+    assert!(issues.iter().any(
+        |i| i.category == IssueCategory::WorkflowError && i.severity == IssueSeverity::Critical
+    ));
 }
 
 #[test]
@@ -741,12 +735,9 @@ fn detects_harness_cluster_missing() {
         None,
         &mut state,
     );
-    assert!(
-        issues
-            .iter()
-            .any(|i| i.category == IssueCategory::WorkflowError
-                && i.severity == IssueSeverity::Critical)
-    );
+    assert!(issues.iter().any(
+        |i| i.category == IssueCategory::WorkflowError && i.severity == IssueSeverity::Critical
+    ));
 }
 
 #[test]
@@ -759,12 +750,9 @@ fn detects_harness_setup_failed() {
         None,
         &mut state,
     );
-    assert!(
-        issues
-            .iter()
-            .any(|i| i.category == IssueCategory::WorkflowError
-                && i.severity == IssueSeverity::Critical)
-    );
+    assert!(issues.iter().any(
+        |i| i.category == IssueCategory::WorkflowError && i.severity == IssueSeverity::Critical
+    ));
 }
 
 #[test]

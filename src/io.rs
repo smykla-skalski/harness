@@ -19,6 +19,18 @@ pub fn is_safe_name(s: &str) -> bool {
     !s.is_empty() && !s.contains('/') && !s.contains('\\') && !s.contains("..")
 }
 
+/// Validate that `segment` is safe to use as a single path component.
+///
+/// # Errors
+/// Returns `CliError` if the segment contains path separators, `..`, or is empty.
+pub fn validate_safe_segment(segment: &str) -> Result<(), CliError> {
+    if is_safe_name(segment) {
+        Ok(())
+    } else {
+        Err(CliErrorKind::unsafe_name(segment.to_string()).into())
+    }
+}
+
 /// Validate that a JSON value is an object with string keys.
 ///
 /// # Errors
@@ -500,6 +512,23 @@ mod tests {
         assert!(!is_safe_name("a/b"));
         assert!(!is_safe_name("a\\b"));
         assert!(!is_safe_name("a..b"));
+    }
+
+    #[test]
+    fn validate_safe_segment_accepts_valid() {
+        assert!(validate_safe_segment("my-run").is_ok());
+        assert!(validate_safe_segment("g01.md").is_ok());
+    }
+
+    #[test]
+    fn validate_safe_segment_rejects_traversal() {
+        let err = validate_safe_segment("../../etc/passwd").unwrap_err();
+        assert_eq!(err.code(), "KSRCLI059");
+    }
+
+    #[test]
+    fn validate_safe_segment_rejects_empty() {
+        assert!(validate_safe_segment("").is_err());
     }
 
     #[test]
