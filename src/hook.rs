@@ -56,6 +56,19 @@ impl HookResult {
         }
     }
 
+    /// Returns `true` when this result is a denial (non-empty code).
+    #[must_use]
+    pub fn is_denial(&self) -> bool {
+        !self.code.is_empty()
+    }
+
+    /// Converts this result into `Some(self)` when it is a denial, `None`
+    /// otherwise. Useful for short-circuiting a sequence of guard checks.
+    #[must_use]
+    pub fn into_denial(self) -> Option<Self> {
+        if self.is_denial() { Some(self) } else { None }
+    }
+
     /// Emit the hook result as JSON to stdout. Returns 0 (exit code).
     ///
     /// # Errors

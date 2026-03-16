@@ -91,74 +91,66 @@ fn deny_author_suite_storage_mutation(words: &[String]) -> HookResult {
 }
 
 fn guard_suite_runner(ctx: &HookContext, words: &[String], heads: &[String]) -> HookResult {
-    let phase_result = guard_runner_phase(ctx, words);
-    if !phase_result.code.is_empty() {
-        return phase_result;
+    if let Some(denied) = guard_runner_phase(ctx, words).into_denial() {
+        return denied;
     }
+    if let Some(denied) = runner_binary_and_pattern_guards(ctx, words, heads) {
+        return denied;
+    }
+    let structural_guards: &[fn(&HookContext, &[String]) -> HookResult] = &[
+        |_, w| deny_batched_tracked_harness_commands(w),
+        deny_direct_command_log_access,
+        deny_harness_managed_run_control_mutation,
+        |ctx, w| deny_raw_manifest_write(w, ctx.command_text()),
+        |_, w| deny_suite_storage_mutation(w),
+        |_, w| deny_mixed_kuma_delete(w),
+    ];
+    for guard in structural_guards {
+        if let Some(denied) = guard(ctx, words).into_denial() {
+            return denied;
+        }
+    }
+    runner_tail_guards(words, heads)
+}
 
+fn runner_binary_and_pattern_guards(
+    ctx: &HookContext,
+    words: &[String],
+    heads: &[String],
+) -> Option<HookResult> {
     if has_task_output_access(words, ctx.command_text()) {
-        return deny_runner_flow(TaskOutputPattern::DENY_MESSAGE);
+        return Some(deny_runner_flow(TaskOutputPattern::DENY_MESSAGE));
     }
-
     if has_denied_runner_binary(heads) {
-        return deny_runner_flow(
+        return Some(deny_runner_flow(
             "suite runs must stay on the tracked run; \
              do not switch into CI or GitHub workflows",
-        );
+        ));
     }
     if has_python_inline(words) {
-        return deny_python();
+        return Some(deny_python());
     }
     if let Some(target) = make_target(words)
         && MakeTargetPrefix::is_denied_target(target)
     {
-        return HookMessage::ClusterBinary.into_result();
+        return Some(HookMessage::ClusterBinary.into_result());
     }
+    None
+}
 
-    let batched = deny_batched_tracked_harness_commands(words);
-    if !batched.code.is_empty() {
-        return batched;
-    }
-
-    let log_access = deny_direct_command_log_access(ctx, words);
-    if !log_access.code.is_empty() {
-        return log_access;
-    }
-
-    let control_mut = deny_harness_managed_run_control_mutation(ctx, words);
-    if !control_mut.code.is_empty() {
-        return control_mut;
-    }
-
-    let raw_manifest = deny_raw_manifest_write(words, ctx.command_text());
-    if !raw_manifest.code.is_empty() {
-        return raw_manifest;
-    }
-
-    let suite_mutation = deny_suite_storage_mutation(words);
-    if !suite_mutation.code.is_empty() {
-        return suite_mutation;
-    }
-
-    let mixed_delete = deny_mixed_kuma_delete(words);
-    if !mixed_delete.code.is_empty() {
-        return mixed_delete;
-    }
-
+fn runner_tail_guards(words: &[String], heads: &[String]) -> HookResult {
     if has_denied_legacy_script(words) {
         return HookMessage::ClusterBinary.into_result();
     }
-
     if has_denied_cluster_binary(heads)
         || (!is_tracked_harness_command(words) && has_denied_cluster_binary_anywhere(words))
     {
         return HookMessage::ClusterBinary.into_result();
     }
-
-    if has_admin_endpoint_hint(words) {
-        if is_harness_head(heads) || allows_wrapped_envoy_admin(words) {
-            return HookResult::allow();
-        }
+    if has_admin_endpoint_hint(words)
+        && !is_harness_head(heads)
+        && !allows_wrapped_envoy_admin(words)
+    {
         return HookMessage::AdminEndpoint.into_result();
     }
     HookResult::allow()
@@ -198,35 +190,27 @@ fn completed_run_reuse_reason(words: &[String]) -> Option<&'static str> {
     if head != "harness" {
         return None;
     }
-    let sub = sig[1].as_str();
-    match sub {
-        "cluster" => {
-            let mode = if sig.len() >= 3 { sig[2].as_str() } else { "" };
-            if mode.ends_with("-down") {
-                None
-            } else {
-                Some(
-                    "the active run is already final; do not start or \
-                     redeploy clusters on it",
-                )
-            }
-        }
-        "report" => {
-            if sig.len() >= 3 && sig[2] == "check" {
-                None
-            } else {
-                Some("the active run is already final; do not mutate the finalized report")
-            }
-        }
-        "runner-state" => {
-            let has_event = sig
+    completed_run_reuse_for_subcommand(sig[1].as_str(), &sig)
+}
+
+fn completed_run_reuse_for_subcommand(
+    subcommand: &str,
+    significant: &[String],
+) -> Option<&'static str> {
+    match subcommand {
+        "cluster" if cluster_mode_is_teardown(significant) => None,
+        "cluster" => Some(
+            "the active run is already final; do not start or \
+             redeploy clusters on it",
+        ),
+        "report" if significant.len() >= 3 && significant[2] == "check" => None,
+        "report" => Some("the active run is already final; do not mutate the finalized report"),
+        "runner-state"
+            if significant
                 .iter()
-                .any(|w| w == "--event" || w.starts_with("--event="));
-            if has_event {
-                Some("the active run is already final; do not reopen or advance it")
-            } else {
-                None
-            }
+                .any(|w| w == "--event" || w.starts_with("--event=")) =>
+        {
+            Some("the active run is already final; do not reopen or advance it")
         }
         "apply" | "bootstrap" | "capture" | "diff" | "envoy" | "gateway" | "kumactl"
         | "preflight" | "record" | "run" | "validate" => Some(
@@ -235,6 +219,12 @@ fn completed_run_reuse_reason(words: &[String]) -> Option<&'static str> {
         ),
         _ => None,
     }
+}
+
+fn cluster_mode_is_teardown(significant: &[String]) -> bool {
+    significant
+        .get(2)
+        .is_some_and(|mode| mode.ends_with("-down"))
 }
 
 fn has_explicit_run_scope(words: &[String]) -> bool {
