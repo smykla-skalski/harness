@@ -8,13 +8,15 @@
 6. [Phase 4 - execute tests](#phase-4---execute-tests)
 7. [Phase 5 - failure handling](#phase-5---failure-handling)
 8. [Phase 6 - closeout](#phase-6---closeout)
-9. [Performance toggles](#performance-toggles)
+9. [Phase 7 - retrospective](#phase-7---retrospective)
+10. [Phase 8 - cluster teardown](#phase-8---cluster-teardown)
+11. [Performance toggles](#performance-toggles)
 
 ---
 
 # Workflow
 
-Supplementary detail for the seven-phase execution flow in `SKILL.md`. Each phase includes its code blocks so this file is self-contained when loaded independently.
+Supplementary detail for the nine-phase execution flow in `SKILL.md`. Each phase includes its code blocks so this file is self-contained when loaded independently.
 
 ## Resuming a partial run
 
@@ -312,16 +314,63 @@ harness closeout
 - State captures exist for preflight, each completed group, and postrun
 - Report compactness check passes
 
-After all gates pass, tear down the clusters. This is the default - always clean up unless the user explicitly asks to keep clusters running or the suite metadata includes `keep_clusters: true`.
+After all gates pass, proceed to Phase 7 (retrospective) before tearing down clusters.
 
 After `harness closeout`, that run is final. Do not reuse it for another cluster bootstrap or execution step. Start a new run with a new run ID instead.
 
+## Phase 7 - retrospective
+
+After closeout, spawn parallel subagents to analyze the completed run from multiple angles. Each agent reads the run artifacts independently and produces a section of the retrospective report. The full report is presented to the user for review before saving.
+
+**Spawn these agents in parallel (all background, mode: auto):**
+
+1. **Skill compliance auditor** - Read the run report, command log, and run-status.json. Check whether the runner followed the skill contract: were all groups executed or properly approved for skip? Were AskUserQuestion gates respected? Were env vars or python used? Were harness wrappers used for all cluster access? Score compliance 0-100 with specific violations listed.
+
+2. **Manifest quality reviewer** - Read all manifests in the suite (baseline + groups). Check for: missing fields that CRDs require (appProtocol, labels, namespace), resources that should have defaults but don't, manifests that duplicate baseline without changes, overly broad targetRef (kind: Mesh when more specific would work). Rate each group's manifest quality.
+
+3. **Test coverage analyzer** - Read suite.md, all group files, and the run report. Identify: which user stories are fully covered vs partially tested, which edge cases were tested (error paths, deletion, reapply), which combinations of features were tested together, gaps where a group exists but verification was shallow (just "apply and check pod ready" without deeper validation).
+
+4. **Product findings summarizer** - Read the run report, command log artifacts, and any bug-found entries. Compile: confirmed product bugs with reproduction steps, CRD vs Go validator mismatches, behavioral differences from spec/MADR expectations, performance observations. Each finding should reference the exact group and step where it was discovered.
+
+5. **Process improvement advisor** - Read command log, run timing data, and any failure/retry sequences. Identify: steps that took disproportionately long, unnecessary retries, places where a harness command could replace manual work, suite:new authoring improvements that would prevent issues seen during this run, skill definition changes that would improve future runs.
+
+**After all agents complete:**
+
+1. Assemble their outputs into a single retrospective document with sections matching the agent roles above
+2. Save as a draft: `{run_dir}/retrospective-draft.md`
+3. Present the FULL retrospective to the user via AskUserQuestion with options:
+   - `Save as-is` - save to `{run_dir}/retrospective.md`
+   - `Request changes` - user provides feedback, regenerate specific sections
+   - `Discard` - do not save
+4. If the user requests changes, apply them and re-present. Allow at most 3 revision iterations. After the third revision, save the current draft as final.
+5. After saving, also copy improvement suggestions to `{suite_dir}/improvements.md` (append, not overwrite) so they accumulate across runs.
+
+**Gate**: retrospective saved or explicitly discarded by user before proceeding to cluster teardown.
+
+## Phase 8 - cluster teardown
+
+Tear down the clusters created in Phase 2. This is the default - always clean up unless the user explicitly asks to keep clusters running or the suite metadata includes `keep_clusters: true`.
+
+Use AskUserQuestion if the teardown situation is unclear:
+
+- `Tear down now` - proceed with teardown
+- `Keep clusters running` - skip teardown, user wants to inspect
+- `Stop run` - abort without teardown
+
+Use the matching teardown command for the active profile:
+
 ```bash
-# Single-zone
+# Kubernetes single-zone
 harness cluster single-down kuma-1
 
-# Multi-zone (global + 2 zones)
+# Kubernetes multi-zone (global + 2 zones)
 harness cluster global-two-zones-down kuma-1 kuma-2 kuma-3
+
+# Universal single-zone
+harness cluster --platform universal single-down test-cp
+
+# Universal multi-zone
+harness cluster --platform universal global-zone-down global-cp zone-cp
 ```
 
 ## Performance toggles
