@@ -7,7 +7,7 @@ use regex::Regex;
 
 use crate::cli::RunDirArgs;
 use crate::commands::resolve_run_dir;
-use crate::core_defs::utc_now;
+use crate::core_defs::{shorten_path, utc_now};
 use crate::errors::{CliError, CliErrorKind};
 use crate::io::{append_markdown_row, ensure_dir, write_text};
 
@@ -107,6 +107,10 @@ pub fn record(
         return Ok(returncode);
     }
 
-    Err(CliErrorKind::command_failed(shell_words::join(&command))
-        .with_details(format!("Recorded command output: {}", artifact.display())))
+    Err(
+        CliErrorKind::command_failed(shell_words::join(&command)).with_details(format!(
+            "Recorded command output: {}",
+            shorten_path(&artifact)
+        )),
+    )
 }

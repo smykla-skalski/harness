@@ -1,7 +1,7 @@
 use std::fs;
 
 use crate::context::{CurrentRunRecord, RunLayout, RunMetadata};
-use crate::core_defs::{current_run_context_path, utc_now};
+use crate::core_defs::{current_run_context_path, shorten_path, utc_now};
 use crate::errors::{CliError, CliErrorKind, cow};
 use crate::io::append_markdown_row;
 use crate::resolve::resolve_suite_path;
@@ -129,6 +129,6 @@ pub fn init_run(
         .map_err(|e| CliErrorKind::serialize(cow!("run context record: {e}")))?;
     fs::write(&ctx_path, format!("{record_json}\n"))?;
 
-    println!("{}", layout.run_dir().display());
+    println!("{}", shorten_path(&layout.run_dir()));
     Ok(0)
 }
