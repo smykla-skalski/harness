@@ -127,10 +127,7 @@ fn report_group(
         run_status.notes.push(n.to_string());
     }
 
-    let status_json = serde_json::to_string_pretty(&run_status)
-        .map_err(|e| CliErrorKind::serialize(cow!("group status update: {e}")))?;
-    fs::write(ctx.layout.status_path(), format!("{status_json}\n"))?;
-
+    // Write report section first so status is never updated if report fails.
     let mut report = RunReport::from_markdown(&ctx.layout.report_path())?;
 
     let mut section = format!("\n## Group: {group_id}\n\n**Verdict:** {status}\n");
@@ -149,6 +146,10 @@ fn report_group(
 
     report.body.push_str(&section);
     report.save()?;
+
+    let status_json = serde_json::to_string_pretty(&run_status)
+        .map_err(|e| CliErrorKind::serialize(cow!("group status update: {e}")))?;
+    fs::write(ctx.layout.status_path(), format!("{status_json}\n"))?;
 
     Ok(0)
 }
