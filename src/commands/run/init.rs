@@ -42,17 +42,21 @@ pub fn init_run(
 
     layout.ensure_dirs()?;
 
+    let suite_id = spec.frontmatter.suite_id.clone();
+    let user_stories = spec.frontmatter.user_stories.clone();
+    let required_dependencies = spec.frontmatter.required_dependencies.clone();
+
     let metadata = RunMetadata {
         run_id: run_id.to_string(),
-        suite_id: spec.frontmatter.suite_id.clone(),
+        suite_id: suite_id.clone(),
         suite_path: suite_path.to_string_lossy().into_owned(),
         suite_dir: suite_dir.to_string_lossy().into_owned(),
         profile: profile.to_string(),
         repo_root: resolved_repo_root.to_string_lossy().into_owned(),
         keep_clusters: spec.frontmatter.keep_clusters,
         created_at: created_at.clone(),
-        user_stories: spec.frontmatter.user_stories.clone(),
-        required_dependencies: spec.frontmatter.required_dependencies.clone(),
+        user_stories: user_stories.clone(),
+        required_dependencies: required_dependencies.clone(),
     };
 
     let meta_json = serde_json::to_string_pretty(&metadata)
@@ -61,7 +65,7 @@ pub fn init_run(
 
     let status = RunStatus {
         run_id: run_id.to_string(),
-        suite_id: spec.frontmatter.suite_id.clone(),
+        suite_id: suite_id.clone(),
         profile: profile.to_string(),
         started_at: created_at,
         overall_verdict: Verdict::Pending,
@@ -99,7 +103,7 @@ pub fn init_run(
         layout.report_path(),
         RunReportFrontmatter {
             run_id: run_id.to_string(),
-            suite_id: spec.frontmatter.suite_id.clone(),
+            suite_id: suite_id.clone(),
             profile: profile.to_string(),
             overall_verdict: Verdict::Pending,
             story_results: vec![],
@@ -114,12 +118,12 @@ pub fn init_run(
         profile: Some(profile.to_string()),
         repo_root: Some(resolved_repo_root.to_string_lossy().into_owned()),
         suite_dir: Some(suite_dir.to_string_lossy().into_owned()),
-        suite_id: Some(spec.frontmatter.suite_id.clone()),
+        suite_id: Some(suite_id),
         suite_path: Some(suite_path.to_string_lossy().into_owned()),
         cluster: None,
         keep_clusters: spec.frontmatter.keep_clusters,
-        user_stories: spec.frontmatter.user_stories.clone(),
-        required_dependencies: spec.frontmatter.required_dependencies.clone(),
+        user_stories,
+        required_dependencies,
     };
     let ctx_path = current_run_context_path()?;
     if let Some(parent) = ctx_path.parent() {
