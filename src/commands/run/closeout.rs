@@ -1,8 +1,8 @@
+use crate::audit_log::write_run_status_with_audit;
 use crate::cli::RunDirArgs;
 use crate::commands::resolve_run_context;
 use crate::core_defs::utc_now;
-use crate::errors::{CliError, CliErrorKind, cow};
-use crate::io::write_text;
+use crate::errors::{CliError, CliErrorKind};
 use crate::schema::Verdict;
 use crate::workflow::runner::{apply_event, ensure_execution_phase, read_runner_state};
 
@@ -49,9 +49,13 @@ pub fn closeout(run_dir_args: &RunDirArgs) -> Result<i32, CliError> {
         if let Some(verdict) = computed {
             status.overall_verdict = verdict;
             status.completed_at = Some(utc_now());
-            let status_json = serde_json::to_string_pretty(&status)
-                .map_err(|e| CliErrorKind::serialize(cow!("closeout status update: {e}")))?;
-            write_text(&ctx.layout.status_path(), &format!("{status_json}\n"))?;
+            write_run_status_with_audit(
+                &ctx.layout.run_dir(),
+                &status,
+                None,
+                Some("closeout"),
+                None,
+            )?;
             eprintln!(
                 "auto-computed verdict from counts: {verdict} (passed={}, failed={}, skipped={})",
                 status.counts.passed, status.counts.failed, status.counts.skipped
@@ -62,14 +66,14 @@ pub fn closeout(run_dir_args: &RunDirArgs) -> Result<i32, CliError> {
     }
 
     // Advance runner state to closeout then completed.
-    let _ = ensure_execution_phase(&run_dir);
+    ensure_execution_phase(&run_dir)?;
     if let Some(runner) = read_runner_state(&run_dir)? {
         let phase_str = runner.phase.to_string();
         if phase_str == "execution" {
-            let _ = apply_event(&run_dir, "closeout-started", None, None);
-            let _ = apply_event(&run_dir, "run-completed", None, None);
+            apply_event(&run_dir, "closeout-started", None, None)?;
+            apply_event(&run_dir, "run-completed", None, None)?;
         } else if phase_str == "closeout" {
-            let _ = apply_event(&run_dir, "run-completed", None, None);
+            apply_event(&run_dir, "run-completed", None, None)?;
         }
     }
 

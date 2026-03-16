@@ -1,6 +1,7 @@
 use std::fs;
 use std::path::Path;
 
+use crate::audit_log::write_run_status_with_audit;
 use crate::context::{CurrentRunRecord, RunLayout, RunMetadata};
 use crate::core_defs::{current_run_context_path, shorten_path, utc_now};
 use crate::errors::{CliError, CliErrorKind, cow};
@@ -118,9 +119,7 @@ fn populate_run_dir(
         next_planned_group: None,
         notes: vec![],
     };
-    let status_json = serde_json::to_string_pretty(&status)
-        .map_err(|e| CliErrorKind::serialize(cow!("run status: {e}")))?;
-    fs::write(layout.status_path(), format!("{status_json}\n"))?;
+    write_run_status_with_audit(&layout.run_dir(), &status, None, Some("bootstrap"), None)?;
 
     initialize_runner_state(&layout.run_dir())?;
 
