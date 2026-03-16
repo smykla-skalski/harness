@@ -9,6 +9,7 @@ use crate::errors::{CliError, CliErrorKind, cow};
 use crate::io::write_text;
 use crate::rules::suite_runner::{REPORT_CODE_BLOCK_LIMIT, REPORT_LINE_LIMIT};
 use crate::schema::{RunCounts, RunReport};
+use crate::workflow::runner::ensure_execution_phase;
 
 /// Report validation and group finalization.
 ///
@@ -167,6 +168,10 @@ fn report_group(
     let status_json = serde_json::to_string_pretty(&run_status)
         .map_err(|e| CliErrorKind::serialize(cow!("group status update: {e}")))?;
     write_text(&ctx.layout.status_path(), &format!("{status_json}\n"))?;
+
+    // Auto-advance runner state from bootstrap/preflight to execution when
+    // a group result is recorded.
+    let _ = ensure_execution_phase(&run_dir);
 
     Ok(0)
 }
