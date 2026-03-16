@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use crate::errors::{CliError, CliErrorKind};
+use crate::errors::{CliError, CliErrorKind, cow};
 use crate::io::{drill, read_text};
 
 fn load_diff_payload(path: &Path) -> Result<serde_json::Value, CliError> {
@@ -13,10 +13,11 @@ fn load_diff_payload(path: &Path) -> Result<serde_json::Value, CliError> {
     }
 }
 
-fn render_diff_value(value: &serde_json::Value) -> String {
+fn render_diff_value(value: &serde_json::Value) -> Result<String, CliError> {
     match value {
-        serde_json::Value::String(s) => s.clone(),
-        other => serde_json::to_string_pretty(other).expect("Value serializes"),
+        serde_json::Value::String(s) => Ok(s.clone()),
+        other => serde_json::to_string_pretty(other)
+            .map_err(|e| CliErrorKind::serialize(cow!("render diff value: {e}")).into()),
     }
 }
 
@@ -94,8 +95,8 @@ pub fn diff(left: &str, right: &str, path: Option<&str>) -> Result<i32, CliError
         right_val = drill(&right_val, dotted)?.clone();
     }
 
-    let left_text = render_diff_value(&left_val);
-    let right_text = render_diff_value(&right_val);
+    let left_text = render_diff_value(&left_val)?;
+    let right_text = render_diff_value(&right_val)?;
 
     let diff_lines = simple_unified_diff(&left_text, &right_text, left, right);
 

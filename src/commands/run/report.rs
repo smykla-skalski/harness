@@ -105,7 +105,12 @@ fn report_group(
         "pass" => run_status.counts.passed += 1,
         "fail" => run_status.counts.failed += 1,
         "skip" => run_status.counts.skipped += 1,
-        _ => {}
+        _ => {
+            return Err(CliErrorKind::usage_error(format!(
+                "unknown group status '{status}': must be pass, fail, or skip"
+            ))
+            .into());
+        }
     }
 
     if let Some(n) = note {

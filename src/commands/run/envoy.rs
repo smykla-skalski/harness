@@ -8,9 +8,6 @@ use crate::io::read_text;
 ///
 /// # Errors
 /// Returns `CliError` on failure.
-///
-/// # Panics
-/// Panics if a `serde_json::Value` fails to serialize (should never happen).
 pub fn envoy(cmd: &EnvoyCommand) -> Result<i32, CliError> {
     match cmd {
         EnvoyCommand::Capture {
@@ -41,10 +38,10 @@ pub fn envoy(cmd: &EnvoyCommand) -> Result<i32, CliError> {
                     .map_err(|_| CliError::from(CliErrorKind::invalid_json(file_path.clone())))?;
                 match find_route(&payload, route_match) {
                     Some(route) => {
-                        println!(
-                            "{}",
-                            serde_json::to_string_pretty(&route).expect("Value serializes")
-                        );
+                        let body = serde_json::to_string_pretty(route).map_err(|e| {
+                            CliError::from(CliErrorKind::serialize(format!("route body: {e}")))
+                        })?;
+                        println!("{body}");
                         Ok(0)
                     }
                     None => Err(CliErrorKind::route_not_found(route_match.clone()).into()),
