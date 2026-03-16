@@ -711,7 +711,14 @@ fn execute_dump(
     options: &DumpOptions<'_>,
     project_hint: Option<&str>,
 ) -> Result<i32, CliError> {
-    let DumpOptions { from_line, to_line, text_filter, roles, tool_name, raw_json } = *options;
+    let DumpOptions {
+        from_line,
+        to_line,
+        text_filter,
+        roles,
+        tool_name,
+        raw_json,
+    } = *options;
     let path = session::find_session(session_id, project_hint)?;
     let file = fs::File::open(&path)
         .map_err(|e| CliErrorKind::session_parse_error(format!("cannot open session file: {e}")))?;
@@ -1290,7 +1297,6 @@ fn execute_mute(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::io::Write as _;
 
     fn write_session_file(dir: &Path, lines: &[&str]) -> PathBuf {
         let path = dir.join("test-session.jsonl");

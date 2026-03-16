@@ -23,6 +23,7 @@ fn default_filter() -> ObserveFilterArgs {
         since_timestamp: None,
         until_timestamp: None,
         format: None,
+        overrides: None,
         top_causes: None,
         output: None,
         output_details: None,
@@ -62,6 +63,7 @@ fn dump_missing_session_returns_error() {
             filter: None,
             role: None,
             tool_name: None,
+            raw_json: false,
             project_hint: None,
         },
     };
@@ -310,6 +312,7 @@ fn dump_returns_ok_with_session() {
             filter: None,
             role: Some("user".into()),
             tool_name: None,
+            raw_json: false,
             project_hint: None,
         },
     };
