@@ -311,6 +311,31 @@ pub(super) fn check_missing_connection_or_env_var(
     }
 }
 
+/// Check for jq errors in Bash command output.
+/// Caller guarantees: `source_tool` == Bash.
+pub(super) fn check_jq_errors(context: &mut TextCheckContext<'_>, issues: &mut Vec<Issue>) {
+    let has_jq_error = context.lower.contains("jq: error")
+        || (context.lower.contains("parse error") && context.lower.contains("jq"));
+
+    let has_null_iteration = context.lower.contains("cannot iterate over null")
+        || context.lower.contains("null is not iterable");
+
+    if has_jq_error || has_null_iteration {
+        let blueprint = IssueBlueprint::new(
+            IssueCode::JqErrorInCommandOutput,
+            IssueCategory::DataIntegrity,
+            IssueSeverity::Medium,
+            "jq parse/iteration error in command output",
+        )
+        .with_fingerprint("jq_error_in_output")
+        .with_guidance(Guidance::advisory(
+            "Check that the upstream command produces valid JSON before piping to jq. \
+             Use harness diff or harness envoy for structured comparisons.",
+        ));
+        context.emit_current(issues, blueprint);
+    }
+}
+
 /// Check for user frustration signals in human text.
 /// Caller guarantees: role == User, `source_tool` == None.
 pub(super) fn check_user_frustration(context: &mut TextCheckContext<'_>, issues: &mut Vec<Issue>) {
