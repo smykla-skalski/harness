@@ -6,13 +6,14 @@ use std::sync::LazyLock;
 use regex::Regex;
 
 use crate::cli::RunDirArgs;
-use crate::cluster::Platform;
-use crate::commands::{resolve_kubeconfig, resolve_run_dir};
-use crate::context::{RunContext, RunLayout};
-use crate::core_defs::{host_platform, shorten_path, utc_now};
+use crate::commands::resolve_run_dir;
+use crate::context::RunLayout;
+use crate::core_defs::{shorten_path, utc_now};
 use crate::errors::{CliError, CliErrorKind};
 use crate::io::{ensure_dir, write_text};
 use crate::workflow::runner::{RunnerPhase, read_runner_state};
+
+use super::shared::inject_run_env;
 
 static SLUGIFY_RE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"[^A-Za-z0-9_.-]+").expect("invalid slugify regex"));
@@ -22,44 +23,6 @@ fn slugify(raw: &str) -> String {
         .replace_all(raw, "-")
         .trim_matches('-')
         .to_string()
-}
-
-/// Inject `KUBECONFIG` and `REPO_ROOT` from the persisted run context so
-/// kubectl hits the local k3d cluster and kumactl resolves to the
-/// worktree build, not whatever is on the default PATH.
-///
-/// Best-effort: logs warnings on failure instead of propagating errors
-/// because record works in detached mode without a full run context.
-fn inject_run_env(cmd: &mut Command, run_dir: &Path, cluster: Option<&str>) {
-    let ctx = match RunContext::from_run_dir(run_dir) {
-        Ok(c) => c,
-        Err(e) => {
-            eprintln!("warning: failed to load run context: {e}");
-            return;
-        }
-    };
-    let is_universal = ctx
-        .cluster
-        .as_ref()
-        .is_some_and(|spec| spec.platform == Platform::Universal);
-    if !is_universal {
-        match resolve_kubeconfig(&ctx, None, cluster) {
-            Ok(kubeconfig) => {
-                cmd.env("KUBECONFIG", kubeconfig);
-            }
-            Err(e) => eprintln!("warning: failed to resolve kubeconfig: {e}"),
-        }
-    }
-    let repo_root = &ctx.metadata.repo_root;
-    if !repo_root.is_empty() {
-        cmd.env("REPO_ROOT", repo_root);
-        let (os_name, arch) = host_platform();
-        let kumactl_dir = format!("{repo_root}/build/artifacts-{os_name}-{arch}/kumactl");
-        if Path::new(&kumactl_dir).is_dir() {
-            let current_path = env::var("PATH").unwrap_or_default();
-            cmd.env("PATH", format!("{kumactl_dir}:{current_path}"));
-        }
-    }
 }
 
 /// Record a tracked command and save its output.
