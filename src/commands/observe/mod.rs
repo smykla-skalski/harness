@@ -4,10 +4,12 @@ pub mod patterns;
 pub mod session;
 pub mod types;
 
+use std::collections::HashMap;
 use std::env;
 use std::fs;
 use std::io::{self, BufRead, BufReader, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
+use std::process;
 use std::thread;
 use std::time::{Duration, Instant};
 
@@ -47,7 +49,7 @@ pub(crate) fn truncate_details(text: &str) -> String {
 
 /// Redact absolute paths and env var values from details text.
 #[must_use]
-fn redact_details(text: &str) -> String {
+pub(crate) fn redact_details(text: &str) -> String {
     use std::sync::LazyLock;
     static HOME_PATH_RE: LazyLock<regex::Regex> =
         LazyLock::new(|| regex::Regex::new(r"/(?:Users|home)/[^/\s]+/").expect("valid regex"));
@@ -223,6 +225,15 @@ fn execute_cycle(session_id: &str, project_hint: Option<&str>) -> Result<i32, Cl
         resolved: 0,
     });
 
+    // Save baseline on first clean scan
+    if issues.is_empty() && observer_state.baseline_issue_ids.is_empty() {
+        observer_state.baseline_issue_ids = observer_state
+            .open_issues
+            .iter()
+            .map(|oi| oi.issue_id.clone())
+            .collect();
+    }
+
     save_observer_state(session_id, &observer_state)?;
 
     if issues.is_empty() {
@@ -249,6 +260,15 @@ fn execute_cycle(session_id: &str, project_hint: Option<&str>) -> Result<i32, Cl
 
 /// One-shot scan returning all classified issues.
 fn scan(path: &Path, from_line: usize) -> Result<(Vec<Issue>, usize), CliError> {
+    scan_with_limit(path, from_line, None)
+}
+
+/// One-shot scan with optional upper line bound.
+fn scan_with_limit(
+    path: &Path,
+    from_line: usize,
+    until_line: Option<usize>,
+) -> Result<(Vec<Issue>, usize), CliError> {
     let file = fs::File::open(path)
         .map_err(|e| CliErrorKind::session_parse_error(format!("cannot open session file: {e}")))?;
     let reader = BufReader::new(file);
@@ -259,6 +279,9 @@ fn scan(path: &Path, from_line: usize) -> Result<(Vec<Issue>, usize), CliError> 
     for (index, line_result) in reader.lines().enumerate() {
         if index < from_line {
             continue;
+        }
+        if until_line.is_some_and(|ul| index > ul) {
+            break;
         }
         let line = line_result.map_err(|e| {
             CliErrorKind::session_parse_error(format!("read error at line {index}: {e}"))
@@ -425,7 +448,21 @@ fn execute_scan(session_id: &str, filter: &ObserveFilterArgs) -> Result<i32, Cli
         println!("{status}");
     }
 
-    let (issues, last_line) = scan(&path, from_line)?;
+    // Resolve timestamp bounds to line numbers if provided
+    let effective_from = if let Some(ref ts) = filter.since_timestamp {
+        let resolved = resolve_from(&path, ts)?;
+        resolved.max(from_line)
+    } else {
+        from_line
+    };
+    let effective_until = if let Some(ref ts) = filter.until_timestamp {
+        let resolved = resolve_from(&path, ts)?;
+        Some(filter.until_line.map_or(resolved, |ul| ul.min(resolved)))
+    } else {
+        filter.until_line
+    };
+
+    let (issues, last_line) = scan_with_limit(&path, effective_from, effective_until)?;
     let filtered = apply_filters(issues, filter)?;
 
     if let Some(ref details_path) = filter.output_details {
@@ -853,7 +890,52 @@ fn execute_context(
 ) -> Result<i32, CliError> {
     let start = target_line.saturating_sub(window);
     let end = target_line + window;
-    execute_dump(session_id, start, Some(end), None, None, None, project_hint)
+    let path = session::find_session(session_id, project_hint)?;
+    let file = fs::File::open(&path)
+        .map_err(|e| CliErrorKind::session_parse_error(format!("cannot open session file: {e}")))?;
+    let reader = BufReader::new(file);
+
+    for (index, line_result) in reader.lines().enumerate() {
+        if index < start {
+            continue;
+        }
+        if index > end {
+            break;
+        }
+        let Ok(line) = line_result else { continue };
+        let Ok(obj) = serde_json::from_str::<serde_json::Value>(line.trim()) else {
+            continue;
+        };
+        let message = &obj["message"];
+        if !message.is_object() {
+            continue;
+        }
+        let role = message["role"].as_str().unwrap_or("");
+        let timestamp = obj["timestamp"].as_str().unwrap_or("");
+        let prefix = if index == target_line { ">>> " } else { "    " };
+        let ts_part = if timestamp.is_empty() {
+            String::new()
+        } else {
+            format!(" {timestamp}")
+        };
+
+        if let Some(blocks) = message["content"].as_array() {
+            for block in blocks {
+                let db = format_dump_block(index, role, block);
+                if db.text.len() <= MIN_DUMP_TEXT_LENGTH {
+                    continue;
+                }
+                let truncated = truncate_at(&db.text, DUMP_TRUNCATE_LENGTH);
+                println!("{prefix}{}{ts_part}: {truncated}", db.label);
+            }
+        } else if let Some(text) = message["content"].as_str() {
+            if text.len() > MIN_DUMP_TEXT_LENGTH {
+                let truncated = truncate_at(text, DUMP_TRUNCATE_LENGTH);
+                println!("{prefix}L{index} [{role}]{ts_part}: {truncated}");
+            }
+        }
+    }
+    Ok(0)
 }
 
 /// Write full untruncated issue details to a file.
@@ -886,29 +968,69 @@ fn load_observer_state(session_id: &str) -> Result<ObserverState, CliError> {
     }
 }
 
-/// Save observer state atomically.
+/// Save observer state atomically via tmp-file rename.
 fn save_observer_state(session_id: &str, state: &ObserverState) -> Result<(), CliError> {
     let state_path = state_file_path(session_id);
+    if let Some(parent) = state_path.parent() {
+        let _ = fs::create_dir_all(parent);
+    }
     let json = serde_json::to_string_pretty(state)
         .map_err(|e| CliErrorKind::session_parse_error(format!("cannot serialize state: {e}")))?;
-    fs::write(&state_path, json)
-        .map_err(|e| CliErrorKind::session_parse_error(format!("cannot write state file: {e}")))?;
+    let tmp_name = format!("state.{}.tmp", process::id());
+    let tmp_path = state_path.with_extension(tmp_name);
+    fs::write(&tmp_path, &json)
+        .map_err(|e| CliErrorKind::session_parse_error(format!("cannot write temp file: {e}")))?;
+    fs::rename(&tmp_path, &state_path)
+        .map_err(|e| CliErrorKind::session_parse_error(format!("cannot rename state file: {e}")))?;
     Ok(())
 }
 
 /// Show observer state for a session.
 fn execute_status(session_id: &str, _project_hint: Option<&str>) -> Result<i32, CliError> {
     let state = load_observer_state(session_id)?;
+
+    // Group open issues by severity for the summary
+    let by_severity: HashMap<String, usize> = {
+        let mut map = HashMap::new();
+        for issue in &state.open_issues {
+            *map.entry(issue.severity.to_string()).or_default() += 1;
+        }
+        map
+    };
+
+    // Recent cycle trend
+    let recent_cycles: Vec<serde_json::Value> = state
+        .cycle_history
+        .iter()
+        .rev()
+        .take(5)
+        .map(|c| {
+            json!({
+                "from": c.from_line,
+                "to": c.to_line,
+                "new_issues": c.new_issues,
+                "resolved": c.resolved,
+            })
+        })
+        .collect();
+
     let status = json!({
         "session_id": state.session_id,
         "cursor": state.cursor,
         "last_scan_time": state.last_scan_time,
         "open_issues": state.open_issues.len(),
+        "open_issues_by_severity": by_severity,
         "resolved_issues": state.resolved_issue_ids.len(),
         "muted_codes": state.muted_codes.iter().map(ToString::to_string).collect::<Vec<_>>(),
+        "has_baseline": state.has_baseline(),
+        "handoff_safe": state.handoff_safe(),
         "cycles": state.cycle_history.len(),
+        "recent_cycles": recent_cycles,
     });
-    println!("{status}");
+    println!(
+        "{}",
+        serde_json::to_string_pretty(&status).expect("valid JSON")
+    );
     Ok(0)
 }
 
@@ -1183,6 +1305,9 @@ mod tests {
             format: None,
             top_causes: None,
             output_details: None,
+            since_timestamp: None,
+            until_line: None,
+            until_timestamp: None,
         };
         let result = apply_filters(Vec::new(), &filter);
         assert!(result.is_err());
@@ -1208,6 +1333,9 @@ mod tests {
             top_causes: None,
             output: None,
             output_details: None,
+            since_timestamp: None,
+            until_line: None,
+            until_timestamp: None,
         };
         let result = apply_filters(Vec::new(), &filter);
         assert!(result.is_err());
@@ -1248,6 +1376,9 @@ mod tests {
             top_causes: None,
             output: None,
             output_details: None,
+            since_timestamp: None,
+            until_line: None,
+            until_timestamp: None,
         };
         let result = apply_filters(vec![issue], &filter).unwrap();
         assert!(result.is_empty());
