@@ -5,9 +5,7 @@ use std::path::{Path, PathBuf};
 use clap::Args;
 
 use crate::cluster::Platform;
-use crate::commands::{
-    RunDirArgs, resolve_admin_token, resolve_cp_addr, resolve_kubeconfig, resolve_run_dir,
-};
+use crate::commands::{RunDirArgs, resolve_run_dir};
 use crate::context::RunContext;
 use crate::core_defs::{shorten_path, utc_now};
 use crate::errors::{CliError, CliErrorKind, cow};
@@ -15,10 +13,9 @@ use crate::exec;
 use crate::exec::kubectl;
 use crate::io::{ensure_dir, validate_safe_segment, write_text};
 use crate::resolve::resolve_manifest_path;
+use crate::runtime::ClusterRuntime;
 
 use super::kumactl::find_kumactl_binary;
-use super::shared::detect_platform;
-
 /// Arguments for `harness apply`.
 #[derive(Debug, Clone, Args)]
 pub struct ApplyArgs {
@@ -52,7 +49,7 @@ pub fn apply(
 ) -> Result<i32, CliError> {
     let run_dir = resolve_run_dir(run_dir_args)?;
     let ctx = RunContext::from_run_dir(&run_dir)?;
-    let platform = detect_platform(&ctx);
+    let runtime = ctx.cluster_runtime()?;
 
     for manifest_raw in manifests {
         let manifest = if manifest_raw == "-" {
@@ -62,13 +59,13 @@ pub fn apply(
         };
         let manifest_str = manifest.to_string_lossy().into_owned();
 
-        match platform {
+        match runtime.platform() {
             Platform::Kubernetes => {
-                let kc = resolve_kubeconfig(&ctx, kubeconfig, cluster_arg)?;
+                let kc = runtime.resolve_kubeconfig(kubeconfig, cluster_arg)?;
                 kubectl(Some(&kc), &["apply", "-f", &manifest_str], &[0])?;
             }
             Platform::Universal => {
-                apply_universal(&ctx, &manifest_str)?;
+                apply_universal(&ctx, &runtime, &manifest_str)?;
             }
         }
 
@@ -119,9 +116,12 @@ fn kuma_api_path(resource_type: &str, name: &str, mesh: Option<&str>) -> String 
     format!("/meshes/{mesh_name}/{collection}s/{name}")
 }
 
-fn apply_universal(ctx: &RunContext, manifest: &str) -> Result<(), CliError> {
-    let cp_addr = resolve_cp_addr(ctx)?;
-    let admin_token = resolve_admin_token(ctx)?;
+fn apply_universal(
+    ctx: &RunContext,
+    runtime: &ClusterRuntime,
+    manifest: &str,
+) -> Result<(), CliError> {
+    let access = runtime.control_plane_access()?;
 
     // Try REST API first - parse manifest YAML and PUT to CP
     let content = fs::read_to_string(manifest)
@@ -135,11 +135,11 @@ fn apply_universal(ctx: &RunContext, manifest: &str) -> Result<(), CliError> {
         let mesh = resource["mesh"].as_str();
         let path = kuma_api_path(resource_type, name, mesh);
         match exec::cp_api_json(
-            &cp_addr,
+            &access.addr,
             &path,
             exec::HttpMethod::Put,
             Some(&resource),
-            admin_token.as_deref(),
+            access.admin_token.as_deref(),
         ) {
             Ok(_) => return Ok(()),
             Err(e) => eprintln!("apply: REST API failed ({e}), falling back to kumactl"),
@@ -149,7 +149,7 @@ fn apply_universal(ctx: &RunContext, manifest: &str) -> Result<(), CliError> {
     // Fallback to kumactl
     let root = PathBuf::from(&ctx.metadata.repo_root);
     let binary = find_kumactl_binary(&root)?;
-    exec::kumactl_run(&binary, &cp_addr, &["apply", "-f", manifest], &[0])?;
+    exec::kumactl_run(&binary, &access.addr, &["apply", "-f", manifest], &[0])?;
     Ok(())
 }
 
