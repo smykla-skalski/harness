@@ -123,9 +123,7 @@ fn check_bash_tool_use(line_num: usize, input: &Value, issues: &mut Vec<Issue>) 
             source_role: MessageRole::Assistant,
             fixable: true,
             fix_target: None,
-            fix_hint: Some(
-                "Use harness cluster instead of raw make targets".into(),
-            ),
+            fix_hint: Some("Use harness cluster instead of raw make targets".into()),
         });
     }
 
@@ -144,6 +142,91 @@ fn check_bash_tool_use(line_num: usize, input: &Value, issues: &mut Vec<Issue>) 
             ),
         });
     }
+
+    check_env_var_construction(line_num, command, issues);
+}
+
+/// Detect env var prefixes and export statements in Bash commands.
+///
+/// The guard-bash hook strips `VAR=value` prefixes to find the real command
+/// head, but the observer needs to flag these patterns too - agents should
+/// not be constructing environment manually since harness handles it.
+fn check_env_var_construction(line_num: usize, command: &str, issues: &mut Vec<Issue>) {
+    // KUBECONFIG= is a specific, higher-signal pattern
+    if command.contains("KUBECONFIG=") {
+        issues.push(Issue {
+            line: line_num,
+            category: IssueCategory::UnexpectedBehavior,
+            severity: IssueSeverity::Medium,
+            summary: "Agent manually setting KUBECONFIG".into(),
+            details: format!("Command: {command}"),
+            source_role: MessageRole::Assistant,
+            fixable: true,
+            fix_target: None,
+            fix_hint: Some(
+                "Agent manually setting KUBECONFIG. Harness injects it automatically.".into(),
+            ),
+        });
+        return;
+    }
+
+    // Generic: `export FOO=bar` or `FOO=bar command` prefix patterns
+    if command.starts_with("export ") && command.contains('=') {
+        issues.push(Issue {
+            line: line_num,
+            category: IssueCategory::UnexpectedBehavior,
+            severity: IssueSeverity::Medium,
+            summary: "Agent constructing env vars via export".into(),
+            details: format!("Command: {command}"),
+            source_role: MessageRole::Assistant,
+            fixable: true,
+            fix_target: None,
+            fix_hint: Some(
+                "Agent constructing env vars. Harness handles environment automatically.".into(),
+            ),
+        });
+        return;
+    }
+
+    // `VAR=value command` prefix: first token looks like an env assignment
+    // and there is at least one more token after it.
+    if let Some(first_space) = command.find(' ') {
+        let first_token = &command[..first_space];
+        if is_env_assignment(first_token) {
+            issues.push(Issue {
+                line: line_num,
+                category: IssueCategory::UnexpectedBehavior,
+                severity: IssueSeverity::Medium,
+                summary: "Agent constructing env var prefix".into(),
+                details: format!("Command: {command}"),
+                source_role: MessageRole::Assistant,
+                fixable: true,
+                fix_target: None,
+                fix_hint: Some(
+                    "Agent constructing env vars. Harness handles environment automatically."
+                        .into(),
+                ),
+            });
+        }
+    }
+}
+
+/// Check if a token is a `VAR=value` env assignment.
+fn is_env_assignment(token: &str) -> bool {
+    let Some(eq_pos) = token.find('=') else {
+        return false;
+    };
+    if eq_pos == 0 {
+        return false;
+    }
+    let prefix = &token[..eq_pos];
+    prefix
+        .chars()
+        .all(|c| c.is_ascii_alphanumeric() || c == '_')
+        && prefix
+            .chars()
+            .next()
+            .is_some_and(|c| c.is_ascii_alphabetic() || c == '_')
 }
 
 /// Check `AskUserQuestion` `tool_use` for issue patterns.

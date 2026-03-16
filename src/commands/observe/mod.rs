@@ -141,8 +141,9 @@ fn execute_cycle(session_id: &str, project_hint: Option<&str>) -> Result<i32, Cl
         .iter()
         .filter(|i| i.severity == IssueSeverity::Critical)
         .count();
+    let display_end = if last_line > 0 { last_line - 1 } else { 0 };
     println!(
-        "Cycle: lines {from_line}-{last_line}, {} new issues ({critical_count} critical)",
+        "Cycle: lines {from_line}-{display_end}, {} new issues ({critical_count} critical)",
         issues.len()
     );
     for issue in &issues {
@@ -169,7 +170,7 @@ fn scan(path: &Path, from_line: usize) -> Result<(Vec<Issue>, usize), CliError> 
         let line = line_result.map_err(|e| {
             CliErrorKind::session_parse_error(format!("read error at line {index}: {e}"))
         })?;
-        last_line = index;
+        last_line = index + 1;
         issues.extend(classifier::classify_line(index, &line, &mut state));
     }
 
