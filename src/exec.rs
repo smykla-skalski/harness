@@ -660,6 +660,51 @@ pub fn cp_api_delete_with_token(
     Ok(resp_body)
 }
 
+/// PUT JSON to the CP API with optional auth token, returning the response as
+/// a raw string.
+///
+/// # Errors
+/// Returns `CliError` on HTTP failure.
+pub fn cp_api_put_text_with_token(
+    base_url: &str,
+    path: &str,
+    body: &serde_json::Value,
+    token: Option<&str>,
+) -> Result<String, CliError> {
+    let url = format!("{base_url}{path}");
+    let mut req = ureq::put(&url).header("Content-Type", "application/json");
+    if let Some(tok) = token {
+        req = req.header("Authorization", &format!("Bearer {tok}"));
+    }
+    req.send_json(body)
+        .map_err(|e| CliErrorKind::cp_api_unreachable(url.clone()).with_details(e.to_string()))?
+        .body_mut()
+        .read_to_string()
+        .map_err(|e| CliErrorKind::cp_api_unreachable(url).with_details(e.to_string()))
+}
+
+/// DELETE from the CP API with optional auth token, returning the response as
+/// a raw string.
+///
+/// # Errors
+/// Returns `CliError` on HTTP failure.
+pub fn cp_api_delete_text_with_token(
+    base_url: &str,
+    path: &str,
+    token: Option<&str>,
+) -> Result<String, CliError> {
+    let url = format!("{base_url}{path}");
+    let mut req = ureq::delete(&url);
+    if let Some(tok) = token {
+        req = req.header("Authorization", &format!("Bearer {tok}"));
+    }
+    req.call()
+        .map_err(|e| CliErrorKind::cp_api_unreachable(url.clone()).with_details(e.to_string()))?
+        .body_mut()
+        .read_to_string()
+        .map_err(|e| CliErrorKind::cp_api_unreachable(url).with_details(e.to_string()))
+}
+
 /// GET a plain text response from the CP API with optional auth token.
 ///
 /// Used for endpoints that return non-JSON content.

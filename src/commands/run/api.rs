@@ -19,34 +19,25 @@ pub fn api(method: &ApiMethod) -> Result<i32, CliError> {
     let admin_token = resolve_admin_token(&ctx)?;
     let token = admin_token.as_deref();
 
+    // All methods read the response as raw text since the CP API sometimes
+    // returns plain text (e.g., token endpoints) rather than JSON.
     let response_text = match method {
         ApiMethod::Get { .. } => exec::cp_api_get_text_with_token(&cp_addr, path, token)?,
         ApiMethod::Post { body, .. } => {
             let parsed = parse_json_body(body)?;
-            let value = exec::cp_api_post_with_token(&cp_addr, path, &parsed, token)?;
-            serde_json::to_string_pretty(&value).unwrap_or_else(|_| value.to_string())
+            exec::cp_api_post_text_with_token(&cp_addr, path, &parsed, token)?
         }
         ApiMethod::Put { body, .. } => {
             let parsed = parse_json_body(body)?;
-            let value = exec::cp_api_put_with_token(&cp_addr, path, &parsed, token)?;
-            serde_json::to_string_pretty(&value).unwrap_or_else(|_| value.to_string())
+            exec::cp_api_put_text_with_token(&cp_addr, path, &parsed, token)?
         }
-        ApiMethod::Delete { .. } => {
-            let value = exec::cp_api_delete_with_token(&cp_addr, path, token)?;
-            serde_json::to_string_pretty(&value).unwrap_or_else(|_| value.to_string())
-        }
+        ApiMethod::Delete { .. } => exec::cp_api_delete_text_with_token(&cp_addr, path, token)?,
     };
 
-    // For GET we got raw text - try to pretty-print as JSON, fall back to raw.
-    let output = if matches!(method, ApiMethod::Get { .. }) {
-        match serde_json::from_str::<serde_json::Value>(&response_text) {
-            Ok(value) => {
-                serde_json::to_string_pretty(&value).unwrap_or_else(|_| response_text.clone())
-            }
-            Err(_) => response_text,
-        }
-    } else {
-        response_text
+    // Try to pretty-print as JSON, fall back to raw text.
+    let output = match serde_json::from_str::<serde_json::Value>(&response_text) {
+        Ok(value) => serde_json::to_string_pretty(&value).unwrap_or_else(|_| response_text.clone()),
+        Err(_) => response_text,
     };
 
     println!("{output}");
