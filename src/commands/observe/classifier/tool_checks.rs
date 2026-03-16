@@ -9,6 +9,7 @@ use crate::commands::observe::types::{
     Confidence, FixSafety, Issue, IssueCategory, IssueCode, IssueSeverity, MessageRole, ScanState,
     SourceTool, ToolUseRecord,
 };
+use crate::shell_parse::is_env_assignment;
 
 /// Check a `tool_use` block for issues.
 pub fn check_tool_use_for_issues(
@@ -370,24 +371,6 @@ fn check_env_var_construction(
             );
         }
     }
-}
-
-/// Check if a token is a `VAR=value` env assignment.
-fn is_env_assignment(token: &str) -> bool {
-    let Some(eq_pos) = token.find('=') else {
-        return false;
-    };
-    if eq_pos == 0 {
-        return false;
-    }
-    let prefix = &token[..eq_pos];
-    prefix
-        .chars()
-        .all(|c| c.is_ascii_alphanumeric() || c == '_')
-        && prefix
-            .chars()
-            .next()
-            .is_some_and(|c| c.is_ascii_alphabetic() || c == '_')
 }
 
 /// Detect `sleep <N> && harness` or `sleep <N>; harness` command patterns.
