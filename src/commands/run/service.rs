@@ -1,6 +1,7 @@
 use std::time::Duration;
 
 use crate::cli::{RunDirArgs, ServiceArgs};
+use crate::cluster::ClusterSpec;
 use crate::commands::{resolve_admin_token, resolve_cp_addr, resolve_run_context};
 use crate::errors::{CliError, CliErrorKind};
 use crate::exec;
@@ -55,6 +56,34 @@ pub fn service(args: &ServiceArgs) -> Result<i32, CliError> {
     }
 }
 
+/// Derive a service image name from the CP image by replacing kuma-cp with kuma-universal.
+fn derive_service_image(cp_image: &str) -> Option<String> {
+    if cp_image.contains("kuma-cp") {
+        Some(cp_image.replace("kuma-cp", "kuma-universal"))
+    } else {
+        None
+    }
+}
+
+/// Resolve the service image from explicit flag or auto-derive from cluster spec.
+fn resolve_service_image(explicit: Option<&str>, spec: &ClusterSpec) -> Result<String, CliError> {
+    if let Some(img) = explicit {
+        return Ok(img.to_string());
+    }
+    if let Some(ref cp_img) = spec.cp_image {
+        return derive_service_image(cp_img).ok_or_else(|| {
+            CliErrorKind::usage_error(format!(
+                "cannot derive service image from cp_image '{cp_img}' - pass --image explicitly"
+            ))
+            .into()
+        });
+    }
+    Err(CliErrorKind::usage_error(
+        "service image is required (pass --image or ensure cluster has cp_image set)",
+    )
+    .into())
+}
+
 fn service_up(
     name: Option<&str>,
     image: Option<&str>,
@@ -64,11 +93,6 @@ fn service_up(
     run_dir_args: &RunDirArgs,
 ) -> Result<i32, CliError> {
     let svc_name = name.ok_or_else(|| CliErrorKind::usage_error("service name is required"))?;
-    let svc_image = image.ok_or_else(|| {
-        CliErrorKind::usage_error(
-            "service image is required (should contain kuma-dp, e.g. kuma-universal)",
-        )
-    })?;
     let svc_port = port.ok_or_else(|| CliErrorKind::usage_error("service port is required"))?;
 
     let ctx = resolve_run_context(run_dir_args)?;
@@ -82,6 +106,8 @@ fn service_up(
         .docker_network
         .as_deref()
         .ok_or_else(|| CliErrorKind::missing_run_context_value("docker_network"))?;
+
+    let svc_image = resolve_service_image(image, spec)?;
 
     // Generate token
     let token_result = token_via_api(
@@ -97,7 +123,7 @@ fn service_up(
     // Start service container first so we can inspect its IP address
     let port_pair = [(svc_port, svc_port)];
     exec::docker_run_detached(
-        svc_image,
+        &svc_image,
         svc_name,
         network,
         &[],
