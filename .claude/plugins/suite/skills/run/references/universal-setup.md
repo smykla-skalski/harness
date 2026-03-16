@@ -1,5 +1,20 @@
 # Universal mode setup
 
+# Contents
+
+1. [Topologies](#topologies)
+2. [Cluster lifecycle](#cluster-lifecycle)
+3. [Store backend](#store-backend)
+4. [Image override](#image-override)
+5. [Token generation](#token-generation)
+6. [Service containers](#service-containers)
+7. [Manifest format](#manifest-format)
+8. [Capture](#capture)
+9. [Docker network](#docker-network)
+10. [Templates](#templates)
+
+---
+
 Universal mode runs Kuma components as Docker containers instead of Kubernetes pods.
 Policies use REST API format (type/name/mesh) instead of K8s resources (apiVersion/kind/metadata).
 
