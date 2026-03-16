@@ -361,6 +361,14 @@ pub enum ObserveMode {
         #[arg(long)]
         project_hint: Option<String>,
     },
+    /// Run one observer cycle: read cursor, scan, update cursor, report.
+    Cycle {
+        /// Session ID to observe.
+        session_id: String,
+        /// Narrow session search to this project directory name.
+        #[arg(long)]
+        project_hint: Option<String>,
+    },
     /// Show events around a specific line.
     Context {
         /// Session ID to observe.

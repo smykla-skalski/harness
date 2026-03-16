@@ -4,9 +4,10 @@ pub mod patterns;
 pub mod session;
 pub mod types;
 
+use std::env;
 use std::fs;
 use std::io::{BufRead, BufReader, Seek, SeekFrom, Write};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::thread;
 use std::time::{Duration, Instant};
 
@@ -90,6 +91,10 @@ pub fn execute(mode: ObserveMode) -> Result<i32, CliError> {
             role.as_deref(),
             project_hint.as_deref(),
         ),
+        ObserveMode::Cycle {
+            session_id,
+            project_hint,
+        } => execute_cycle(&session_id, project_hint.as_deref()),
         ObserveMode::Context {
             session_id,
             line,
@@ -97,6 +102,56 @@ pub fn execute(mode: ObserveMode) -> Result<i32, CliError> {
             project_hint,
         } => execute_context(&session_id, line, window, project_hint.as_deref()),
     }
+}
+
+/// State file path for a session observer.
+fn state_file_path(session_id: &str) -> PathBuf {
+    env::temp_dir().join(format!("observe-{session_id}.state"))
+}
+
+/// Execute one observer cycle: read cursor, scan, update cursor, report.
+fn execute_cycle(session_id: &str, project_hint: Option<&str>) -> Result<i32, CliError> {
+    let state_path = state_file_path(session_id);
+    let from_line = if state_path.exists() {
+        let content = fs::read_to_string(&state_path).map_err(|e| {
+            CliErrorKind::session_parse_error(format!("cannot read state file: {e}"))
+        })?;
+        let parsed: serde_json::Value = serde_json::from_str(&content).map_err(|e| {
+            CliErrorKind::session_parse_error(format!("invalid state file JSON: {e}"))
+        })?;
+        usize::try_from(parsed["cursor"].as_u64().unwrap_or(0)).unwrap_or(0)
+    } else {
+        0
+    };
+
+    let path = session::find_session(session_id, project_hint)?;
+    let (issues, last_line) = scan(&path, from_line)?;
+
+    // Update cursor
+    let state = json!({"cursor": last_line, "session_id": session_id});
+    fs::write(&state_path, state.to_string()).map_err(|e| {
+        CliErrorKind::session_parse_error(format!("cannot write state file: {e}"))
+    })?;
+
+    if issues.is_empty() {
+        return Ok(0);
+    }
+
+    // Report
+    let critical_count = issues
+        .iter()
+        .filter(|i| i.severity == IssueSeverity::Critical)
+        .count();
+    println!(
+        "Cycle: lines {from_line}-{last_line}, {} new issues ({critical_count} critical)",
+        issues.len()
+    );
+    for issue in &issues {
+        println!("{}", output::render_json(issue));
+    }
+    println!("{}", output::render_summary(&issues, last_line));
+
+    Ok(0)
 }
 
 /// One-shot scan returning all classified issues.
