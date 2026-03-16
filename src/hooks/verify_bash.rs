@@ -164,3 +164,110 @@ fn ready_to_resume(state: &RunnerWorkflowState) -> bool {
         .as_ref()
         .is_some_and(SuiteFixState::ready_to_resume)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::workflow::runner::{
+        ManifestFixDecision, PreflightState, PreflightStatus, RunnerWorkflowState,
+    };
+
+    fn base_state(phase: RunnerPhase) -> RunnerWorkflowState {
+        RunnerWorkflowState {
+            schema_version: 1,
+            phase,
+            preflight: PreflightState {
+                status: PreflightStatus::Pending,
+            },
+            failure: None,
+            suite_fix: None,
+            updated_at: String::new(),
+            transition_count: 0,
+            last_event: None,
+        }
+    }
+
+    // -- subcommand_artifacts --
+
+    #[test]
+    fn subcommand_artifacts_apply() {
+        let arts = subcommand_artifacts("apply").unwrap();
+        assert!(arts.contains(&"manifests"));
+    }
+
+    #[test]
+    fn subcommand_artifacts_capture() {
+        let arts = subcommand_artifacts("capture").unwrap();
+        assert!(arts.contains(&"state"));
+    }
+
+    #[test]
+    fn subcommand_artifacts_record() {
+        let arts = subcommand_artifacts("record").unwrap();
+        assert!(arts.contains(&"commands"));
+    }
+
+    #[test]
+    fn subcommand_artifacts_unknown() {
+        assert!(subcommand_artifacts("unknown").is_none());
+    }
+
+    // -- has_table_rows --
+
+    #[test]
+    fn has_table_rows_with_enough_rows() {
+        let tmp = tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(tmp.path(), "| h1 | h2 |\n|---|---|\n| a | b |\n| c | d |\n").unwrap();
+        assert!(has_table_rows(tmp.path()));
+    }
+
+    #[test]
+    fn has_table_rows_with_too_few() {
+        let tmp = tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(tmp.path(), "| h1 | h2 |\n|---|---|\n").unwrap();
+        assert!(!has_table_rows(tmp.path()));
+    }
+
+    #[test]
+    fn has_table_rows_missing_file() {
+        assert!(!has_table_rows(Path::new("/nonexistent/path/file.md")));
+    }
+
+    // -- ready_to_resume --
+
+    #[test]
+    fn ready_to_resume_triage_with_suite_fix_ready() {
+        let mut state = base_state(RunnerPhase::Triage);
+        state.suite_fix = Some(SuiteFixState {
+            approved_paths: vec![],
+            suite_written: true,
+            amendments_written: true,
+            decision: ManifestFixDecision::SuiteAndRun,
+        });
+        assert!(ready_to_resume(&state));
+    }
+
+    #[test]
+    fn ready_to_resume_wrong_phase() {
+        let state = base_state(RunnerPhase::Execution);
+        assert!(!ready_to_resume(&state));
+    }
+
+    #[test]
+    fn ready_to_resume_no_suite_fix() {
+        let state = base_state(RunnerPhase::Triage);
+        assert!(!ready_to_resume(&state));
+    }
+
+    #[test]
+    fn ready_to_resume_suite_fix_incomplete() {
+        let mut state = base_state(RunnerPhase::Triage);
+        state.suite_fix = Some(SuiteFixState {
+            approved_paths: vec![],
+            suite_written: true,
+            amendments_written: false,
+            decision: ManifestFixDecision::SuiteAndRun,
+        });
+        assert!(!ready_to_resume(&state));
+    }
+}
