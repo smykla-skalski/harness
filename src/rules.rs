@@ -571,6 +571,65 @@ pub mod suite_runner {
                 .ok_or(())
         }
     }
+
+    /// Patterns that indicate direct access to Claude's internal task output
+    /// files. These must never be read by the runner - use the `TaskOutput` tool
+    /// instead.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+    #[non_exhaustive]
+    pub enum TaskOutputPattern {
+        PrivateTmpClaude,
+        TasksOutputGlob,
+        TasksB8mPrefix,
+    }
+
+    impl TaskOutputPattern {
+        pub const ALL: &[Self] = &[
+            Self::PrivateTmpClaude,
+            Self::TasksOutputGlob,
+            Self::TasksB8mPrefix,
+        ];
+
+        /// The substring to search for in a command.
+        #[must_use]
+        pub const fn as_str(&self) -> &'static str {
+            match self {
+                Self::PrivateTmpClaude => "/private/tmp/claude-",
+                Self::TasksOutputGlob => "tasks/*.output",
+                Self::TasksB8mPrefix => "tasks/b8m",
+            }
+        }
+
+        /// Returns `true` when `text` contains any task output pattern.
+        #[must_use]
+        pub fn matches_any(text: &str) -> bool {
+            Self::ALL
+                .iter()
+                .any(|pattern| text.contains(pattern.as_str()))
+        }
+
+        pub const DENY_MESSAGE: &str = "do not read task output files directly. \
+             Use the TaskOutput tool to check background task results, \
+             or wait for the completion notification";
+    }
+
+    impl fmt::Display for TaskOutputPattern {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            f.write_str(self.as_str())
+        }
+    }
+
+    impl FromStr for TaskOutputPattern {
+        type Err = ();
+
+        fn from_str(s: &str) -> Result<Self, Self::Err> {
+            Self::ALL
+                .iter()
+                .find(|pattern| pattern.as_str() == s)
+                .copied()
+                .ok_or(())
+        }
+    }
 }
 
 /// Suite:new constants and type definitions.
@@ -1037,6 +1096,59 @@ mod tests {
         ));
         assert!(!suite_runner::AdminEndpointHint::contains_hint(
             "google.com"
+        ));
+    }
+
+    // -- TaskOutputPattern --
+
+    #[test]
+    fn task_output_pattern_all_count() {
+        assert_eq!(suite_runner::TaskOutputPattern::ALL.len(), 3);
+    }
+
+    #[test]
+    fn task_output_pattern_display_roundtrip() {
+        for pattern in suite_runner::TaskOutputPattern::ALL {
+            let s = pattern.to_string();
+            let parsed: suite_runner::TaskOutputPattern = s.parse().unwrap();
+            assert_eq!(*pattern, parsed);
+        }
+    }
+
+    #[test]
+    fn task_output_pattern_from_str_rejects_unknown() {
+        assert!(
+            "/some/other/path"
+                .parse::<suite_runner::TaskOutputPattern>()
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn task_output_pattern_matches_private_tmp() {
+        assert!(suite_runner::TaskOutputPattern::matches_any(
+            "cat /private/tmp/claude-501/sessions/abc/tasks/xyz.output"
+        ));
+    }
+
+    #[test]
+    fn task_output_pattern_matches_glob() {
+        assert!(suite_runner::TaskOutputPattern::matches_any(
+            "cat tasks/*.output"
+        ));
+    }
+
+    #[test]
+    fn task_output_pattern_matches_b8m() {
+        assert!(suite_runner::TaskOutputPattern::matches_any(
+            "cat tasks/b8m-something"
+        ));
+    }
+
+    #[test]
+    fn task_output_pattern_rejects_unrelated() {
+        assert!(!suite_runner::TaskOutputPattern::matches_any(
+            "cat /tmp/normal-file.txt"
         ));
     }
 
