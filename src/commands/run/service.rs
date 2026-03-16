@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use crate::cli::{RunDirArgs, ServiceArgs};
 use crate::commands::{resolve_admin_token, resolve_cp_addr, resolve_run_context};
 use crate::errors::{CliError, CliErrorKind};
@@ -163,6 +165,15 @@ fn service_up(
          2>&1 &"
     );
     exec::docker_exec_cmd(svc_name, &["sh", "-c", &dp_args])?;
+
+    // Wait for kuma-dp to become ready
+    let readiness_url = format!("http://{container_address}:9902/ready");
+    eprintln!("service: waiting for {svc_name} readiness at {readiness_url}");
+    exec::wait_for_http(&readiness_url, Duration::from_secs(60)).map_err(|_| {
+        CliError::from(CliErrorKind::service_readiness_timeout(
+            svc_name.to_string(),
+        ))
+    })?;
 
     println!("{svc_name}");
     Ok(0)
