@@ -93,30 +93,42 @@ fn capture_universal(ctx: &RunContext, capture_path: &Path) -> Result<(), CliErr
         &[0],
     )?;
 
+    // Parse newline-delimited JSON rows from docker ps into a JSON array
+    let container_rows: Vec<serde_json::Value> = containers
+        .stdout
+        .lines()
+        .filter(|line| !line.trim().is_empty())
+        .filter_map(|line| serde_json::from_str(line).ok())
+        .collect();
+
     // Collect dataplane state from CP if available
     let admin_token = spec.admin_token();
-    let dataplanes = if let Some(url) = spec.primary_api_url() {
-        exec::cp_api_json(
+    let (dataplanes, dataplanes_error) = if let Some(url) = spec.primary_api_url() {
+        match exec::cp_api_json(
             &url,
             "/meshes/default/dataplanes",
             exec::HttpMethod::Get,
             None,
             admin_token,
-        )
-        .map_err(|e| {
-            eprintln!("warning: CP API dataplanes query failed: {e}");
-            e
-        })
-        .ok()
-        .unwrap_or(serde_json::json!({"items": []}))
+        ) {
+            Ok(val) => (val, serde_json::Value::Null),
+            Err(e) => {
+                eprintln!("warning: CP API dataplanes query failed: {e}");
+                (
+                    serde_json::json!({"items": []}),
+                    serde_json::Value::String(e.to_string()),
+                )
+            }
+        }
     } else {
-        serde_json::json!({"items": []})
+        (serde_json::json!({"items": []}), serde_json::Value::Null)
     };
 
     let capture = serde_json::json!({
         "platform": "universal",
-        "containers": containers.stdout.trim(),
+        "containers": container_rows,
         "dataplanes": dataplanes,
+        "dataplanes_error": dataplanes_error,
     });
     let json_str = serde_json::to_string_pretty(&capture)
         .map_err(|e| CliErrorKind::serialize(cow!("capture: {e}")))?;
