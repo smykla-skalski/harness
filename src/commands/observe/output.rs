@@ -12,9 +12,10 @@ const DETAIL_TRUNCATE_LENGTH: usize = 500;
 #[must_use]
 pub fn render_human(issue: &Issue) -> String {
     let severity = issue.severity.to_string().to_uppercase();
+    let confidence = issue.confidence.to_string();
     let mut rendered = format!(
-        "[{severity}] L{} ({}): {}",
-        issue.line, issue.category, issue.summary
+        "[{severity}/{confidence}] L{} ({}/{}): {}",
+        issue.line, issue.category, issue.code, issue.summary
     );
     if let Some(ref target) = issue.fix_target {
         let _ = write!(rendered, "\n  fix: {target}");
@@ -42,19 +43,30 @@ pub fn render_json(issue: &Issue) -> String {
     };
 
     let mut obj = json!({
+        "issue_id": &issue.issue_id,
         "line": issue.line,
+        "code": issue.code.to_string(),
         "category": issue.category.to_string(),
         "severity": issue.severity.to_string(),
+        "confidence": issue.confidence.to_string(),
+        "fix_safety": issue.fix_safety.to_string(),
         "summary": &issue.summary,
         "details": details,
+        "fingerprint": &issue.fingerprint,
         "source_role": &issue.source_role,
-        "fixable": issue.fixable,
+        "fixable": issue.fix_safety.is_fixable(),
     });
+    if let Some(ref tool) = issue.source_tool {
+        obj["source_tool"] = json!(tool.to_string());
+    }
     if let Some(ref target) = issue.fix_target {
         obj["fix_target"] = json!(target);
     }
     if let Some(ref hint) = issue.fix_hint {
         obj["fix_hint"] = json!(hint);
+    }
+    if let Some(ref excerpt) = issue.evidence_excerpt {
+        obj["evidence_excerpt"] = json!(excerpt);
     }
     // json!() values built from valid data always serialize successfully.
     serde_json::to_string(&obj).expect("valid JSON serialization")
@@ -89,26 +101,34 @@ pub fn render_summary(issues: &[Issue], last_line: usize) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::commands::observe::types::{IssueCategory, IssueSeverity, MessageRole};
+    use crate::commands::observe::types::{
+        Confidence, FixSafety, IssueCategory, IssueCode, IssueSeverity, MessageRole,
+    };
 
     fn sample_issue() -> Issue {
         Issue {
+            issue_id: "abc123def456".into(),
             line: 42,
+            code: IssueCode::BuildOrLintFailure,
             category: IssueCategory::BuildError,
             severity: IssueSeverity::Critical,
+            confidence: Confidence::High,
+            fix_safety: FixSafety::AutoFixSafe,
             summary: "Build failed".into(),
             details: "error[E0308]: mismatched types".into(),
+            fingerprint: "build_or_lint_failure".into(),
             source_role: MessageRole::Assistant,
-            fixable: true,
+            source_tool: None,
             fix_target: Some("src/main.rs".into()),
             fix_hint: Some("Fix the type mismatch".into()),
+            evidence_excerpt: None,
         }
     }
 
     #[test]
     fn human_output_format() {
         let rendered = render_human(&sample_issue());
-        assert!(rendered.starts_with("[CRITICAL] L42 (build_error): Build failed"));
+        assert!(rendered.starts_with("[CRITICAL/high] L42 (build_error/build_or_lint_failure):"));
         assert!(rendered.contains("fix: src/main.rs"));
         assert!(rendered.contains("hint: Fix the type mismatch"));
     }
@@ -140,6 +160,42 @@ mod tests {
         assert_eq!(parsed["line"], 42);
         assert_eq!(parsed["category"], "build_error");
         assert_eq!(parsed["severity"], "critical");
+        assert_eq!(parsed["issue_id"], "abc123def456");
+        assert_eq!(parsed["code"], "build_or_lint_failure");
+        assert_eq!(parsed["confidence"], "high");
+        assert_eq!(parsed["fix_safety"], "auto_fix_safe");
+        assert_eq!(parsed["fingerprint"], "build_or_lint_failure");
+        assert_eq!(parsed["fixable"], true);
+    }
+
+    #[test]
+    fn json_output_fixable_backward_compat() {
+        let mut issue = sample_issue();
+        issue.fix_safety = FixSafety::TriageRequired;
+        let rendered = render_json(&issue);
+        let parsed: serde_json::Value = serde_json::from_str(&rendered).unwrap();
+        assert_eq!(parsed["fixable"], false);
+
+        issue.fix_safety = FixSafety::AutoFixGuarded;
+        let rendered = render_json(&issue);
+        let parsed: serde_json::Value = serde_json::from_str(&rendered).unwrap();
+        assert_eq!(parsed["fixable"], true);
+    }
+
+    #[test]
+    fn json_output_source_tool() {
+        let mut issue = sample_issue();
+        issue.source_tool = Some(crate::commands::observe::types::SourceTool::Bash);
+        let rendered = render_json(&issue);
+        let parsed: serde_json::Value = serde_json::from_str(&rendered).unwrap();
+        assert_eq!(parsed["source_tool"], "Bash");
+    }
+
+    #[test]
+    fn json_output_no_source_tool() {
+        let rendered = render_json(&sample_issue());
+        let parsed: serde_json::Value = serde_json::from_str(&rendered).unwrap();
+        assert!(parsed.get("source_tool").is_none());
     }
 
     #[test]

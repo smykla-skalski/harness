@@ -208,7 +208,7 @@ fn apply_filters(issues: Vec<Issue>, filter: &ObserveFilterArgs) -> Vec<Issue> {
     }
 
     if filter.fixable {
-        filtered.retain(|issue| issue.fixable);
+        filtered.retain(|issue| issue.fix_safety.is_fixable());
     }
 
     filtered

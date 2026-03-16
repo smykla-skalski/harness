@@ -1,6 +1,7 @@
 use crate::commands::observe::truncate_details;
 use crate::commands::observe::types::{
-    Issue, IssueCategory, IssueCode, IssueSeverity, MessageRole, ScanState,
+    Confidence, FixSafety, Issue, IssueCategory, IssueCode, IssueSeverity, MessageRole,
+    OccurrenceTracker, ScanState, SourceTool, compute_issue_id,
 };
 
 /// Internal guidance shape for classifier authors.
@@ -60,11 +61,11 @@ impl Guidance {
         }
     }
 
-    fn materialize(self) -> (bool, Option<String>, Option<String>) {
+    fn materialize(self) -> (FixSafety, Option<String>, Option<String>) {
         match self {
-            Self::None => (false, None, None),
-            Self::Advisory { target, hint } => (false, target, Some(hint)),
-            Self::Fix { target, hint } => (true, target, hint),
+            Self::None => (FixSafety::AdvisoryOnly, None, None),
+            Self::Advisory { target, hint } => (FixSafety::AdvisoryOnly, target, Some(hint)),
+            Self::Fix { target, hint } => (FixSafety::AutoFixSafe, target, hint),
         }
     }
 }
@@ -78,6 +79,9 @@ pub(super) struct IssueBlueprint {
     summary: String,
     fingerprint: String,
     guidance: Guidance,
+    confidence: Confidence,
+    fix_safety: Option<FixSafety>,
+    source_tool: Option<SourceTool>,
 }
 
 impl IssueBlueprint {
@@ -95,6 +99,9 @@ impl IssueBlueprint {
             fingerprint: summary.clone(),
             summary,
             guidance: Guidance::None,
+            confidence: Confidence::High,
+            fix_safety: None,
+            source_tool: None,
         }
     }
 
@@ -105,6 +112,21 @@ impl IssueBlueprint {
 
     pub(super) fn with_guidance(mut self, guidance: Guidance) -> Self {
         self.guidance = guidance;
+        self
+    }
+
+    pub(super) fn with_confidence(mut self, confidence: Confidence) -> Self {
+        self.confidence = confidence;
+        self
+    }
+
+    pub(super) fn with_fix_safety(mut self, fix_safety: FixSafety) -> Self {
+        self.fix_safety = Some(fix_safety);
+        self
+    }
+
+    pub(super) fn with_source_tool(mut self, source_tool: Option<SourceTool>) -> Self {
+        self.source_tool = source_tool;
         self
     }
 }
@@ -127,25 +149,45 @@ impl<'a> IssueEmitter<'a> {
         blueprint: IssueBlueprint,
         details: &str,
     ) -> bool {
-        if !self
+        let dedup_key = (blueprint.code, blueprint.fingerprint.clone());
+
+        // Track occurrences even for duplicates
+        let tracker = self
             .state
-            .seen_issues
-            .insert((blueprint.code, blueprint.fingerprint.clone()))
-        {
+            .issue_occurrences
+            .entry(dedup_key.clone())
+            .or_insert_with(|| OccurrenceTracker {
+                count: 0,
+                first_seen_line: self.line,
+                last_seen_line: self.line,
+            });
+        tracker.count += 1;
+        tracker.last_seen_line = self.line;
+
+        if !self.state.seen_issues.insert(dedup_key) {
             return false;
         }
 
-        let (fixable, fix_target, fix_hint) = blueprint.guidance.materialize();
+        let (guidance_fix_safety, fix_target, fix_hint) = blueprint.guidance.materialize();
+        let fix_safety = blueprint.fix_safety.unwrap_or(guidance_fix_safety);
+        let issue_id = compute_issue_id(&blueprint.code, &blueprint.fingerprint);
+
         issues.push(Issue {
+            issue_id,
             line: self.line,
+            code: blueprint.code,
             category: blueprint.category,
             severity: blueprint.severity,
+            confidence: blueprint.confidence,
+            fix_safety,
             summary: blueprint.summary,
             details: truncate_details(details),
+            fingerprint: blueprint.fingerprint,
             source_role: self.role,
-            fixable,
+            source_tool: blueprint.source_tool,
             fix_target,
             fix_hint,
+            evidence_excerpt: None,
         });
         true
     }

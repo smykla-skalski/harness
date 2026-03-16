@@ -364,6 +364,11 @@ define_cli_errors! {
         msg: "session parse error: {detail}",
         exit: 1
     },
+    SessionAmbiguous { detail: Cow<'static, str> } => {
+        code: "KSRCLI085",
+        msg: "ambiguous session: {detail}",
+        exit: 1
+    },
 
     // --- IO/serialization (exit 1) ---
     Io { detail: Cow<'static, str> } => {
@@ -515,6 +520,7 @@ impl CliErrorKind {
     cli_constructor!(service_readiness_timeout, ServiceReadinessTimeout, name);
     cli_constructor!(session_not_found, SessionNotFound, session_id);
     cli_constructor!(session_parse_error, SessionParseError, detail);
+    cli_constructor!(session_ambiguous, SessionAmbiguous, detail);
     cli_constructor!(invalid_transition, InvalidTransition, detail);
     cli_constructor!(io, Io, detail);
     cli_constructor!(serialize, Serialize, detail);
@@ -589,6 +595,9 @@ impl CliErrorKind {
                 "Check the session ID and ensure ~/.claude/projects/ contains the session file."
                     .into(),
             ),
+            Self::SessionAmbiguous { .. } => {
+                Some("Use --project-hint to narrow the search.".into())
+            }
             Self::ServiceReadinessTimeout { name } => Some(format!(
                 "Run `harness service down {name}` to clean up the container."
             )),
@@ -1097,6 +1106,7 @@ mod tests {
             CliErrorKind::usage_error(""),
             CliErrorKind::session_not_found(""),
             CliErrorKind::session_parse_error(""),
+            CliErrorKind::session_ambiguous(""),
             CliErrorKind::universal_validation_failed(""),
             CliErrorKind::invalid_transition(""),
         ]
