@@ -614,7 +614,7 @@ fn rule_output_shape_is_preserved() {
     );
     assert_eq!(issues.len(), 1);
     let issue = &issues[0];
-    assert!(issue.fixable);
+    assert!(issue.fix_safety.is_fixable());
     assert_eq!(issue.fix_target.as_deref(), Some("cli.rs"));
     assert!(issue.fix_hint.is_none());
 
@@ -622,8 +622,11 @@ fn rule_output_shape_is_preserved() {
     let parsed: serde_json::Value = serde_json::from_str(&rendered).unwrap();
     assert_eq!(parsed["fixable"], true);
     assert_eq!(parsed["fix_target"], "cli.rs");
-    assert!(parsed.get("code").is_none());
-    assert!(parsed.get("fingerprint").is_none());
+    assert!(parsed.get("code").is_some());
+    assert!(parsed.get("fingerprint").is_some());
+    assert!(parsed.get("issue_id").is_some());
+    assert!(parsed.get("confidence").is_some());
+    assert!(parsed.get("fix_safety").is_some());
 }
 
 #[test]
@@ -894,7 +897,7 @@ fn harness_infrastructure_output_shape() {
     );
     assert_eq!(issues.len(), 1);
     let issue = &issues[0];
-    assert!(issue.fixable);
+    assert!(issue.fix_safety.is_fixable());
     assert!(issue.fix_target.is_none());
     assert!(
         issue
@@ -916,7 +919,7 @@ fn missing_connection_output_shape() {
     );
     assert_eq!(issues.len(), 1);
     let issue = &issues[0];
-    assert!(!issue.fixable);
+    assert!(!issue.fix_safety.is_fixable());
     assert!(
         issue
             .fix_hint
@@ -937,7 +940,7 @@ fn text_check_output_shape_is_preserved() {
     );
     assert_eq!(issues.len(), 1);
     let issue = &issues[0];
-    assert!(issue.fixable);
+    assert!(issue.fix_safety.is_fixable());
     assert_eq!(issue.fix_target.as_deref(), Some("src/context.rs"));
     assert!(
         issue
@@ -956,7 +959,7 @@ fn text_check_output_shape_is_preserved() {
             .unwrap()
             .contains("context directory")
     );
-    assert!(parsed.get("code").is_none());
+    assert!(parsed.get("code").is_some());
 }
 
 #[test]
@@ -971,7 +974,7 @@ fn tool_check_output_shape_is_preserved() {
     let issues = check_tool_use_for_issues(10, &block, &mut state);
     assert_eq!(issues.len(), 1);
     let issue = &issues[0];
-    assert!(!issue.fixable);
+    assert!(!issue.fix_safety.is_fixable());
     assert!(issue.fix_target.is_none());
     assert!(
         issue
@@ -990,7 +993,7 @@ fn tool_check_output_shape_is_preserved() {
             .unwrap()
             .contains("verify target")
     );
-    assert!(parsed.get("code").is_none());
+    assert!(parsed.get("code").is_some());
 }
 
 #[test]
@@ -1063,7 +1066,7 @@ fn absolute_manifest_path_output_shape() {
     let issues = check_tool_use_for_issues(10, &block, &mut state);
     assert_eq!(issues.len(), 1);
     let issue = &issues[0];
-    assert!(issue.fixable);
+    assert!(issue.fix_safety.is_fixable());
     assert!(issue.fix_target.is_none());
     assert!(
         issue
@@ -1136,7 +1139,7 @@ fn sleep_prefix_output_shape() {
     let issues = check_tool_use_for_issues(10, &block, &mut state);
     assert_eq!(issues.len(), 1);
     let issue = &issues[0];
-    assert!(issue.fixable);
+    assert!(issue.fix_safety.is_fixable());
     assert!(issue.fix_target.is_none());
     assert!(
         issue
@@ -1245,7 +1248,7 @@ fn manifest_created_during_run_output_shape() {
     let issues = check_tool_use_for_issues(10, &block, &mut state);
     assert_eq!(issues.len(), 1);
     let issue = &issues[0];
-    assert!(issue.fixable);
+    assert!(issue.fix_safety.is_fixable());
     assert_eq!(issue.fix_target.as_deref(), Some("skills/new/SKILL.md"));
     assert!(
         issue
@@ -1429,7 +1432,7 @@ fn closeout_verdict_pending_output_shape() {
     );
     assert_eq!(issues.len(), 1);
     let issue = &issues[0];
-    assert!(issue.fixable);
+    assert!(issue.fix_safety.is_fixable());
     assert!(issue.fix_target.is_none());
     assert!(
         issue
@@ -1449,13 +1452,9 @@ fn detects_runner_state_event_transition_error() {
         Some(SourceTool::Bash),
         &mut state,
     );
-    assert!(
-        issues
-            .iter()
-            .any(|i| i.category == IssueCategory::CliError
-                && i.severity == IssueSeverity::Medium
-                && i.summary.contains("runner-state event transition"))
-    );
+    assert!(issues.iter().any(|i| i.category == IssueCategory::CliError
+        && i.severity == IssueSeverity::Medium
+        && i.summary.contains("runner-state event transition")));
 }
 
 #[test]
@@ -1468,12 +1467,8 @@ fn detects_runner_state_query_only_error() {
         Some(SourceTool::Bash),
         &mut state,
     );
-    assert!(
-        issues
-            .iter()
-            .any(|i| i.category == IssueCategory::CliError
-                && i.summary.contains("runner-state event transition"))
-    );
+    assert!(issues.iter().any(|i| i.category == IssueCategory::CliError
+        && i.summary.contains("runner-state event transition")));
 }
 
 #[test]
@@ -1526,7 +1521,7 @@ fn runner_state_event_error_output_shape() {
     );
     assert_eq!(issues.len(), 1);
     let issue = &issues[0];
-    assert!(issue.fixable);
+    assert!(issue.fix_safety.is_fixable());
     assert!(issue.fix_target.is_none());
     assert!(
         issue
@@ -1565,12 +1560,9 @@ fn detects_stale_state_machine_bootstrap_phase() {
         Some(SourceTool::Bash),
         &mut state,
     );
-    assert!(
-        issues
-            .iter()
-            .any(|i| i.category == IssueCategory::WorkflowError
-                && i.summary.contains("never advanced"))
-    );
+    assert!(issues.iter().any(
+        |i| i.category == IssueCategory::WorkflowError && i.summary.contains("never advanced")
+    ));
 }
 
 #[test]
@@ -1604,11 +1596,7 @@ fn skips_stale_state_without_group_evidence() {
         Some(SourceTool::Bash),
         &mut state,
     );
-    assert!(
-        !issues
-            .iter()
-            .any(|i| i.summary.contains("never advanced"))
-    );
+    assert!(!issues.iter().any(|i| i.summary.contains("never advanced")));
 }
 
 #[test]
@@ -1621,11 +1609,7 @@ fn skips_stale_state_without_bash_source() {
         None,
         &mut state,
     );
-    assert!(
-        !issues
-            .iter()
-            .any(|i| i.summary.contains("never advanced"))
-    );
+    assert!(!issues.iter().any(|i| i.summary.contains("never advanced")));
 }
 
 #[test]
@@ -1640,7 +1624,7 @@ fn stale_state_machine_output_shape() {
     );
     assert_eq!(issues.len(), 1);
     let issue = &issues[0];
-    assert!(issue.fixable);
+    assert!(issue.fix_safety.is_fixable());
     assert!(issue.fix_target.is_none());
     assert!(
         issue
@@ -1662,7 +1646,7 @@ fn jq_error_output_shape() {
     );
     assert_eq!(issues.len(), 1);
     let issue = &issues[0];
-    assert!(!issue.fixable);
+    assert!(!issue.fix_safety.is_fixable());
     assert!(issue.fix_target.is_none());
     assert!(
         issue
