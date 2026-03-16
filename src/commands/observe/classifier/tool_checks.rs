@@ -9,7 +9,200 @@ use crate::commands::observe::types::{
     Confidence, FixSafety, Issue, IssueCategory, IssueCode, IssueSeverity, MessageRole, ScanState,
     SourceTool, ToolUseRecord,
 };
-use crate::shell_parse::is_env_assignment;
+use crate::shell_parse::{self, ParsedCommand, is_env_assignment};
+
+struct ObservedCommand {
+    raw: String,
+    lower: String,
+    words: Vec<String>,
+    significant_words: Vec<String>,
+}
+
+impl ObservedCommand {
+    fn parse(command: &str) -> Self {
+        if let Ok(parsed) = ParsedCommand::parse(command) {
+            return Self::from_parsed(&parsed);
+        }
+
+        let words = command
+            .split_whitespace()
+            .map(ToString::to_string)
+            .collect::<Vec<_>>();
+        let significant_words = shell_parse::significant_words(&words);
+        Self {
+            raw: command.to_string(),
+            lower: command.to_lowercase(),
+            words,
+            significant_words,
+        }
+    }
+
+    fn from_parsed(parsed: &ParsedCommand) -> Self {
+        Self {
+            raw: parsed.raw().to_string(),
+            lower: parsed.raw().to_lowercase(),
+            words: parsed.words().to_vec(),
+            significant_words: parsed.significant_words().to_vec(),
+        }
+    }
+
+    fn is_harness_command(&self) -> bool {
+        self.harness_spans().next().is_some()
+    }
+
+    fn has_harness_subcommand(&self, subcommand: &str) -> bool {
+        self.harness_spans()
+            .any(|span| span.first().is_some_and(|word| word == subcommand))
+    }
+
+    fn harness_has_flag(&self, flag: &str) -> bool {
+        self.harness_spans().any(|span| {
+            span.iter()
+                .any(|word| word == flag || word.starts_with(&format!("{flag}=")))
+        })
+    }
+
+    fn manifest_paths(&self) -> Vec<String> {
+        let mut manifests = Vec::new();
+        for span in self.harness_spans() {
+            let mut index = 0;
+            while index < span.len() {
+                if span[index] == "--manifest" {
+                    if let Some(path) = span.get(index + 1) {
+                        manifests.push(path.clone());
+                    }
+                    index += 2;
+                    continue;
+                }
+                if let Some(value) = span[index].strip_prefix("--manifest=") {
+                    manifests.push(value.to_string());
+                }
+                index += 1;
+            }
+        }
+        manifests
+    }
+
+    fn kubectl_query_target(&self) -> Option<String> {
+        let kubectl_position = self.words.iter().position(|word| {
+            Path::new(word)
+                .file_name()
+                .and_then(|name| name.to_str())
+                .is_some_and(|head| head == "kubectl")
+        })?;
+        let remaining = &self.words[kubectl_position + 1..];
+        let (verb_index, verb) = remaining.iter().enumerate().find_map(|(index, token)| {
+            if matches!(token.as_str(), "get" | "describe") {
+                Some((index, token.as_str()))
+            } else {
+                None
+            }
+        })?;
+        let after_verb = &remaining[verb_index + 1..];
+
+        let mut positional = Vec::new();
+        let mut skip_next = false;
+        for token in after_verb {
+            if skip_next {
+                skip_next = false;
+                continue;
+            }
+            if shell_parse::is_shell_control_op(token) {
+                break;
+            }
+            if token.starts_with('-') {
+                if matches!(
+                    token.as_str(),
+                    "-o" | "-n"
+                        | "--namespace"
+                        | "--output"
+                        | "-l"
+                        | "--selector"
+                        | "--field-selector"
+                ) {
+                    skip_next = true;
+                }
+                continue;
+            }
+            positional.push(token.clone());
+            if positional.len() >= 2 {
+                break;
+            }
+        }
+
+        if positional.is_empty() {
+            return None;
+        }
+
+        Some(format!("{verb} {}", positional.join(" ")))
+    }
+
+    fn has_env_prefix_assignment(&self) -> bool {
+        self.words
+            .first()
+            .is_some_and(|word| is_env_assignment(word))
+    }
+
+    fn starts_with_export(&self) -> bool {
+        self.words.first().is_some_and(|word| word == "export")
+    }
+
+    fn starts_with_sleep(&self) -> bool {
+        self.words.first().is_some_and(|word| word == "sleep")
+    }
+
+    fn has_harness_after_chain(&self) -> bool {
+        let mut seen_chain = false;
+        let mut expect_head = true;
+        for word in &self.words {
+            if shell_parse::is_shell_control_op(word) {
+                seen_chain = true;
+                expect_head = true;
+                continue;
+            }
+            if expect_head && is_env_assignment(word) {
+                continue;
+            }
+            if expect_head {
+                if seen_chain
+                    && Path::new(word)
+                        .file_name()
+                        .and_then(|name| name.to_str())
+                        .is_some_and(|head| head == "harness")
+                {
+                    return true;
+                }
+                expect_head = false;
+            }
+        }
+        false
+    }
+
+    fn harness_spans(&self) -> impl Iterator<Item = &[String]> {
+        let mut spans = Vec::new();
+        let len = self.significant_words.len();
+        for (index, word) in self.significant_words.iter().enumerate() {
+            let head = Path::new(word)
+                .file_name()
+                .and_then(|name| name.to_str())
+                .unwrap_or(word.as_str());
+            if head != "harness" {
+                continue;
+            }
+            let search_end = self.significant_words[index + 1..]
+                .iter()
+                .position(|candidate| {
+                    Path::new(candidate)
+                        .file_name()
+                        .and_then(|name| name.to_str())
+                        == Some("harness")
+                })
+                .map_or(len, |offset| index + 1 + offset);
+            spans.push(&self.significant_words[index + 1..search_end]);
+        }
+        spans.into_iter()
+    }
+}
 
 /// Check a `tool_use` block for issues.
 pub fn check_tool_use_for_issues(
@@ -45,7 +238,6 @@ pub fn check_tool_use_for_issues(
     if let Some(tool_id) = block["id"].as_str()
         && !tool_id.is_empty()
     {
-        state.tool_use_serial += 1;
         state.last_tool_uses.insert(
             tool_id.to_string(),
             ToolUseRecord {
@@ -53,16 +245,6 @@ pub fn check_tool_use_for_issues(
                 input: input.clone(),
             },
         );
-
-        // Prune old entries to cap memory usage
-        if state.last_tool_uses.len() > 100 {
-            let cutoff = state.last_tool_uses.len() - 100;
-            let keys_to_remove: Vec<String> =
-                state.last_tool_uses.keys().take(cutoff).cloned().collect();
-            for key in keys_to_remove {
-                state.last_tool_uses.remove(&key);
-            }
-        }
     }
 
     issues
@@ -79,6 +261,7 @@ fn check_bash_tool_use(
 ) {
     let command = input["command"].as_str().unwrap_or("");
     let details = format!("Command: {command}");
+    let observed = ObservedCommand::parse(command);
 
     {
         let mut emitter = IssueEmitter::new(line_num, MessageRole::Assistant, state);
@@ -102,20 +285,20 @@ fn check_bash_tool_use(
             );
         }
 
-        check_harness_command_patterns(command, &details, &mut emitter, issues);
+        check_harness_command_patterns(&observed, &details, &mut emitter, issues);
         check_destructive_patterns(command, &details, &mut emitter, issues);
-        check_absolute_manifest_path(command, &details, &mut emitter, issues);
+        check_absolute_manifest_path(&observed, &details, &mut emitter, issues);
         check_direct_task_output_read(command, &details, &mut emitter, issues);
-        check_env_var_construction(command, &details, &mut emitter, issues);
-        check_sleep_prefix_before_harness(command, &details, &mut emitter, issues);
+        check_env_var_construction(&observed, &details, &mut emitter, issues);
+        check_sleep_prefix_before_harness(&observed, &details, &mut emitter, issues);
         check_truncated_verification_output(command, &details, &mut emitter, issues);
     }
 
     // Resource and capture tracking run outside the emitter scope so we can
     // mutably borrow state again for the tracking sets.
-    track_resource_lifecycle(line_num, command, state, issues);
-    track_capture_between_groups(line_num, command, state, issues);
-    check_repeated_kubectl_queries(line_num, command, state, issues);
+    track_resource_lifecycle(line_num, &observed, state, issues);
+    track_capture_between_groups(line_num, &observed, state, issues);
+    check_repeated_kubectl_queries(line_num, &observed, state, issues);
 }
 
 /// Track resource create/delete lifecycle across a test group.
@@ -127,16 +310,16 @@ fn check_bash_tool_use(
 /// cleared for the next group.
 fn track_resource_lifecycle(
     line_num: usize,
-    command: &str,
+    command: &ObservedCommand,
     state: &mut ScanState,
     issues: &mut Vec<Issue>,
 ) {
-    if !command.contains("harness") {
+    if !command.is_harness_command() {
         return;
     }
 
     // Track creates from `harness apply --manifest <path>`
-    if command.contains("apply") && command.contains("--manifest") {
+    if command.has_harness_subcommand("apply") {
         for manifest_name in extract_manifest_stems(command) {
             state.pending_resource_creates.insert(manifest_name);
         }
@@ -144,7 +327,7 @@ fn track_resource_lifecycle(
     }
 
     // Track deletes from `harness delete --manifest <path>`
-    if command.contains("delete") && command.contains("--manifest") {
+    if command.has_harness_subcommand("delete") {
         for manifest_name in extract_manifest_stems(command) {
             state.pending_resource_creates.remove(&manifest_name);
         }
@@ -152,7 +335,12 @@ fn track_resource_lifecycle(
     }
 
     // On `harness report group`, check for leftover creates
-    if command.contains("report") && command.contains("group") {
+    if command.has_harness_subcommand("report")
+        && command.harness_spans().any(|span| {
+            span.first().is_some_and(|word| word == "report")
+                && span.get(1).is_some_and(|word| word == "group")
+        })
+    {
         if state.pending_resource_creates.is_empty() {
             return;
         }
@@ -197,23 +385,28 @@ fn track_resource_lifecycle(
 /// warning.
 fn track_capture_between_groups(
     line_num: usize,
-    command: &str,
+    command: &ObservedCommand,
     state: &mut ScanState,
     issues: &mut Vec<Issue>,
 ) {
-    if !command.contains("harness") {
+    if !command.is_harness_command() {
         return;
     }
 
     // `harness capture` sets the flag
-    if command.contains("capture") && !command.contains("report") {
+    if command.has_harness_subcommand("capture") && !command.has_harness_subcommand("report") {
         state.seen_capture_since_last_group_report = true;
         return;
     }
 
     // `harness report group` checks the flag
-    if command.contains("report") && command.contains("group") {
-        let has_capture_label = command.contains("--capture-label");
+    if command.has_harness_subcommand("report")
+        && command.harness_spans().any(|span| {
+            span.first().is_some_and(|word| word == "report")
+                && span.get(1).is_some_and(|word| word == "group")
+        })
+    {
+        let has_capture_label = command.harness_has_flag("--capture-label");
 
         // Only warn when this is not the first group, no standalone capture
         // was seen, and the command does not include --capture-label.
@@ -221,7 +414,7 @@ fn track_capture_between_groups(
             && !state.seen_capture_since_last_group_report
             && !has_capture_label
         {
-            let details = format!("Command: {command}");
+            let details = format!("Command: {}", command.raw);
             IssueEmitter::new(line_num, MessageRole::Assistant, state).emit(
                 issues,
                 IssueBlueprint::new(
@@ -252,27 +445,26 @@ fn track_capture_between_groups(
 ///
 /// Given `harness apply --manifest g13/01-meshtrace.yaml --manifest g13/02-patch.yaml`,
 /// returns `["01-meshtrace", "02-patch"]`.
-fn extract_manifest_stems(command: &str) -> Vec<String> {
-    let mut stems = Vec::new();
-    let mut tokens = command.split_whitespace();
-    while let Some(token) = tokens.next() {
-        if token == "--manifest"
-            && let Some(path) = tokens.next()
-            && let Some(stem) = Path::new(path).file_stem().and_then(|s| s.to_str())
-        {
-            stems.push(stem.to_string());
-        }
-    }
-    stems
+fn extract_manifest_stems(command: &ObservedCommand) -> Vec<String> {
+    command
+        .manifest_paths()
+        .into_iter()
+        .filter_map(|path| {
+            Path::new(&path)
+                .file_stem()
+                .and_then(|stem| stem.to_str())
+                .map(ToString::to_string)
+        })
+        .collect()
 }
 
 fn check_harness_command_patterns(
-    command: &str,
+    command: &ObservedCommand,
     details: &str,
     emitter: &mut IssueEmitter<'_>,
     issues: &mut Vec<Issue>,
 ) {
-    if command.contains("harness") && command.contains("validator-decision") {
+    if command.has_harness_subcommand("validator-decision") {
         emitter.emit(
             issues,
             IssueBlueprint::new(
@@ -291,10 +483,9 @@ fn check_harness_command_patterns(
         );
     }
 
-    let command_lower = command.to_lowercase();
     if patterns::PYTHON_USAGE_SIGNALS
         .iter()
-        .any(|signal| command_lower.contains(signal))
+        .any(|signal| command.lower.contains(signal))
     {
         emitter.emit(
             issues,
@@ -385,42 +576,37 @@ fn check_destructive_patterns(
 /// Using absolute paths is unnecessary and fragile - relative paths like
 /// `g13/01.yaml` are the expected convention.
 fn check_absolute_manifest_path(
-    command: &str,
+    command: &ObservedCommand,
     details: &str,
     emitter: &mut IssueEmitter<'_>,
     issues: &mut Vec<Issue>,
 ) {
-    if !command.contains("harness") || !command.contains("apply") {
+    if !command.has_harness_subcommand("apply") {
         return;
     }
 
-    // Look for `--manifest /...` anywhere in the command. The path token
-    // immediately after `--manifest` starts with `/` when absolute.
-    let mut tokens = command.split_whitespace().peekable();
-    while let Some(token) = tokens.next() {
-        if token == "--manifest"
-            && let Some(path) = tokens.peek()
-            && path.starts_with('/')
-        {
-            emitter.emit(
-                issues,
-                IssueBlueprint::new(
-                    IssueCode::AbsoluteManifestPathUsed,
-                    IssueCategory::UnexpectedBehavior,
-                    IssueSeverity::Medium,
-                    "Absolute path used with harness apply",
-                )
-                .with_guidance(Guidance::fix_hint(
-                    "Use relative manifest paths (e.g. g13/01.yaml). \
-                     Harness resolves them from the suite directory.",
-                ))
-                .with_confidence(Confidence::High)
-                .with_fix_safety(FixSafety::AutoFixSafe)
-                .with_source_tool(Some(SourceTool::Bash)),
-                details,
-            );
-            return;
-        }
+    if command
+        .manifest_paths()
+        .iter()
+        .any(|path| Path::new(path).is_absolute())
+    {
+        emitter.emit(
+            issues,
+            IssueBlueprint::new(
+                IssueCode::AbsoluteManifestPathUsed,
+                IssueCategory::UnexpectedBehavior,
+                IssueSeverity::Medium,
+                "Absolute path used with harness apply",
+            )
+            .with_guidance(Guidance::fix_hint(
+                "Use relative manifest paths (e.g. g13/01.yaml). \
+                 Harness resolves them from the suite directory.",
+            ))
+            .with_confidence(Confidence::High)
+            .with_fix_safety(FixSafety::AutoFixSafe)
+            .with_source_tool(Some(SourceTool::Bash)),
+            details,
+        );
     }
 }
 
@@ -465,13 +651,17 @@ fn check_direct_task_output_read(
 /// head, but the observer needs to flag these patterns too - agents should
 /// not be constructing environment manually since harness handles it.
 fn check_env_var_construction(
-    command: &str,
+    command: &ObservedCommand,
     details: &str,
     emitter: &mut IssueEmitter<'_>,
     issues: &mut Vec<Issue>,
 ) {
     // KUBECONFIG= is a specific, higher-signal pattern
-    if command.contains("KUBECONFIG=") {
+    if command
+        .words
+        .iter()
+        .any(|word| word.starts_with("KUBECONFIG="))
+    {
         emitter.emit(
             issues,
             IssueBlueprint::new(
@@ -492,7 +682,7 @@ fn check_env_var_construction(
     }
 
     // Generic: `export FOO=bar` or `FOO=bar command` prefix patterns
-    if command.starts_with("export ") && command.contains('=') {
+    if command.starts_with_export() && command.raw.contains('=') {
         emitter.emit(
             issues,
             IssueBlueprint::new(
@@ -514,26 +704,23 @@ fn check_env_var_construction(
 
     // `VAR=value command` prefix: first token looks like an env assignment
     // and there is at least one more token after it.
-    if let Some(first_space) = command.find(' ') {
-        let first_token = &command[..first_space];
-        if is_env_assignment(first_token) {
-            emitter.emit(
-                issues,
-                IssueBlueprint::new(
-                    IssueCode::ManualEnvPrefixConstruction,
-                    IssueCategory::UnexpectedBehavior,
-                    IssueSeverity::Medium,
-                    "Agent constructing env var prefix",
-                )
-                .with_guidance(Guidance::fix_hint(
-                    "Agent constructing env vars. Harness handles environment automatically.",
-                ))
-                .with_confidence(Confidence::High)
-                .with_fix_safety(FixSafety::AutoFixSafe)
-                .with_source_tool(Some(SourceTool::Bash)),
-                details,
-            );
-        }
+    if command.has_env_prefix_assignment() && command.words.len() > 1 {
+        emitter.emit(
+            issues,
+            IssueBlueprint::new(
+                IssueCode::ManualEnvPrefixConstruction,
+                IssueCategory::UnexpectedBehavior,
+                IssueSeverity::Medium,
+                "Agent constructing env var prefix",
+            )
+            .with_guidance(Guidance::fix_hint(
+                "Agent constructing env vars. Harness handles environment automatically.",
+            ))
+            .with_confidence(Confidence::High)
+            .with_fix_safety(FixSafety::AutoFixSafe)
+            .with_source_tool(Some(SourceTool::Bash)),
+            details,
+        );
     }
 }
 
@@ -542,18 +729,18 @@ fn check_env_var_construction(
 /// Agents sometimes prefix harness commands with `sleep` to wait for resources
 /// to settle. Harness has a built-in `--delay` flag for this purpose.
 fn check_sleep_prefix_before_harness(
-    command: &str,
+    command: &ObservedCommand,
     details: &str,
     emitter: &mut IssueEmitter<'_>,
     issues: &mut Vec<Issue>,
 ) {
-    let trimmed = command.trim_start();
-    if !trimmed.starts_with("sleep ") {
+    if !command.starts_with_sleep() {
         return;
     }
-    let has_harness_continuation = trimmed.contains("&& harness")
-        || trimmed.contains("; harness")
-        || trimmed.contains("&& /") && trimmed.contains("harness");
+    let has_harness_continuation = command.has_harness_after_chain()
+        || command.raw.contains("&& harness")
+        || command.raw.contains("; harness")
+        || (command.raw.contains("&& /") && command.raw.contains("harness"));
     if has_harness_continuation {
         emitter.emit(
             issues,
@@ -647,18 +834,17 @@ const KUBECTL_QUERY_THRESHOLD: usize = 3;
 /// and flags when the same target appears 3+ times within a 20-line window.
 fn check_repeated_kubectl_queries(
     line_num: usize,
-    command: &str,
+    command: &ObservedCommand,
     state: &mut ScanState,
     issues: &mut Vec<Issue>,
 ) {
     // Skip harness-wrapped commands - those are already going through the
     // harness record/capture path and their output is being tracked.
-    let trimmed = command.trim_start();
-    if trimmed.starts_with("harness ") {
+    if command.is_harness_command() {
         return;
     }
 
-    let Some(target) = extract_kubectl_query_target(command) else {
+    let Some(target) = command.kubectl_query_target() else {
         return;
     };
 
@@ -708,65 +894,9 @@ fn check_repeated_kubectl_queries(
 /// Returns `Some("get <resource> [name]")` or `Some("describe <resource> [name]")`
 /// for kubectl commands, stripping any jq filter, output format flags, and
 /// namespace flags to normalize the target for comparison.
+#[cfg_attr(not(test), allow(dead_code))]
 pub(super) fn extract_kubectl_query_target(command: &str) -> Option<String> {
-    // Find `kubectl` followed by `get` or `describe` anywhere in the command.
-    // Commands may be piped (kubectl ... | jq ...) or chained.
-    let kubectl_part = command
-        .split('|')
-        .next()
-        .unwrap_or(command)
-        .split("&&")
-        .find(|segment| segment.contains("kubectl"))?;
-
-    let tokens: Vec<&str> = kubectl_part.split_whitespace().collect();
-    let kubectl_position = tokens.iter().position(|token| *token == "kubectl")?;
-    let remaining = &tokens[kubectl_position + 1..];
-
-    // Find the verb (get or describe)
-    let (verb_index, verb) = remaining.iter().enumerate().find_map(|(index, token)| {
-        if *token == "get" || *token == "describe" {
-            Some((index, *token))
-        } else {
-            None
-        }
-    })?;
-
-    let after_verb = &remaining[verb_index + 1..];
-
-    // Collect positional arguments (resource type and optional name),
-    // skipping flags and their values.
-    let mut positional = Vec::new();
-    let mut skip_next = false;
-    for token in after_verb {
-        if skip_next {
-            skip_next = false;
-            continue;
-        }
-        if token.starts_with('-') {
-            // Flags that take a value argument
-            if *token == "-o"
-                || *token == "-n"
-                || *token == "--namespace"
-                || *token == "--output"
-                || *token == "-l"
-                || *token == "--selector"
-                || *token == "--field-selector"
-            {
-                skip_next = true;
-            }
-            continue;
-        }
-        positional.push(*token);
-        if positional.len() >= 2 {
-            break;
-        }
-    }
-
-    if positional.is_empty() {
-        return None;
-    }
-
-    Some(format!("{verb} {}", positional.join(" ")))
+    ObservedCommand::parse(command).kubectl_query_target()
 }
 
 /// Check `AskUserQuestion` `tool_use` for issue patterns.
