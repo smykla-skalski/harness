@@ -162,16 +162,7 @@ fn cluster_universal(
     let network_name = spec.docker_network.as_deref().unwrap_or("harness-default");
     let is_up = spec.mode.is_up();
 
-    // For down operations, resolve store type from persisted spec first,
-    // falling back to CLI arg. Fixes the case where `single-down` without
-    // `--store postgres` uses the wrong teardown path.
-    let effective_store = if is_up {
-        store.to_string()
-    } else {
-        load_persisted_cluster_spec()
-            .and_then(|s| s.store_type)
-            .unwrap_or_else(|| store.to_string())
-    };
+    let effective_store = resolve_effective_store(is_up, store);
 
     // Only resolve image for up commands
     let cp_image = if is_up {
@@ -252,6 +243,19 @@ fn cluster_universal(
 
     println!("{mode} completed");
     Ok(0)
+}
+
+/// Resolve the effective store type for a cluster operation.
+///
+/// For `up` operations, uses the CLI-supplied store directly.
+/// For `down` operations, checks the persisted spec first and falls back to CLI.
+fn resolve_effective_store(is_up: bool, cli_store: &str) -> String {
+    if is_up {
+        return cli_store.to_string();
+    }
+    load_persisted_cluster_spec()
+        .and_then(|s| s.store_type)
+        .unwrap_or_else(|| cli_store.to_string())
 }
 
 /// Load persisted cluster spec from the session context file.
@@ -763,6 +767,68 @@ mod tests {
         fs::create_dir_all(&ctx_dir).unwrap();
         fs::write(ctx_dir.join("current-run.json"), content).unwrap();
     }
+
+    // --- resolve_effective_store tests ---
+
+    #[test]
+    fn effective_store_uses_cli_arg_for_up() {
+        let tmp = tempfile::tempdir().unwrap();
+        let result = temp_env::with_vars(
+            [
+                ("XDG_DATA_HOME", Some(tmp.path().to_str().unwrap())),
+                ("CLAUDE_SESSION_ID", Some("eff-store-up")),
+            ],
+            || resolve_effective_store(true, "postgres"),
+        );
+        assert_eq!(result, "postgres");
+    }
+
+    #[test]
+    fn effective_store_uses_persisted_for_down() {
+        let tmp = tempfile::tempdir().unwrap();
+        let session_id = "eff-store-down";
+        let record = serde_json::json!({
+            "layout": { "run_root": "/tmp/runs", "run_id": "r1" },
+            "cluster": {
+                "mode": "single-up",
+                "platform": "universal",
+                "mode_args": ["cp"],
+                "members": [{"name": "cp", "role": "cp", "kubeconfig": ""}],
+                "helm_settings": [],
+                "restart_namespaces": [],
+                "repo_root": "/r",
+                "store_type": "postgres"
+            }
+        });
+        write_context_file(
+            tmp.path(),
+            session_id,
+            &serde_json::to_string(&record).unwrap(),
+        );
+        let result = temp_env::with_vars(
+            [
+                ("XDG_DATA_HOME", Some(tmp.path().to_str().unwrap())),
+                ("CLAUDE_SESSION_ID", Some(session_id)),
+            ],
+            || resolve_effective_store(false, "memory"),
+        );
+        assert_eq!(result, "postgres");
+    }
+
+    #[test]
+    fn effective_store_falls_back_to_cli_for_down() {
+        let tmp = tempfile::tempdir().unwrap();
+        let result = temp_env::with_vars(
+            [
+                ("XDG_DATA_HOME", Some(tmp.path().to_str().unwrap())),
+                ("CLAUDE_SESSION_ID", Some("eff-store-fallback")),
+            ],
+            || resolve_effective_store(false, "memory"),
+        );
+        assert_eq!(result, "memory");
+    }
+
+    // --- load_persisted_cluster_spec tests ---
 
     #[test]
     fn load_persisted_spec_none_when_missing() {
