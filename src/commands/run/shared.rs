@@ -20,8 +20,16 @@ pub(crate) fn resolve_init_repo_root(raw: Option<&str>, suite_dir: &Path) -> Pat
 }
 
 /// Resolve the run root for `init` when not explicitly provided.
-pub(crate) fn resolve_run_root(raw: Option<&str>) -> PathBuf {
-    raw.map_or_else(|| harness_data_root().join("runs"), PathBuf::from)
+///
+/// Priority: explicit `--run-root` flag > `suite_dir/runs` > XDG runs directory.
+pub(crate) fn resolve_run_root(raw: Option<&str>, suite_dir: Option<&Path>) -> PathBuf {
+    if let Some(explicit) = raw {
+        return PathBuf::from(explicit);
+    }
+    if let Some(directory) = suite_dir {
+        return directory.join("runs");
+    }
+    harness_data_root().join("runs")
 }
 
 /// Detect the runtime platform from the run context.
