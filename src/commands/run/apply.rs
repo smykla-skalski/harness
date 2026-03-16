@@ -60,6 +60,26 @@ pub fn apply(
     Ok(0)
 }
 
+/// Build the Kuma REST API path for a resource.
+///
+/// Kuma endpoints use lowercased type names without separators as the
+/// collection segment. For example, `MeshTrafficPermission` maps to
+/// `/meshes/{mesh}/meshtrafficpermissions/{name}`.
+///
+/// The `Mesh` type itself is a special case - it lives at `/meshes/{name}`
+/// since it has no mesh scope.
+fn kuma_api_path(resource_type: &str, name: &str, mesh: Option<&str>) -> String {
+    let collection = resource_type.to_lowercase();
+
+    // The Mesh resource lives at the top level
+    if collection == "mesh" {
+        return format!("/meshes/{name}");
+    }
+
+    let mesh_name = mesh.unwrap_or("default");
+    format!("/meshes/{mesh_name}/{collection}s/{name}")
+}
+
 fn apply_universal(ctx: &RunContext, manifest: &str) -> Result<(), CliError> {
     let cp_addr = resolve_cp_addr(ctx)?;
     let admin_token = resolve_admin_token(ctx)?;
@@ -70,15 +90,11 @@ fn apply_universal(ctx: &RunContext, manifest: &str) -> Result<(), CliError> {
     let resource: serde_json::Value = serde_yml::from_str(&content)
         .map_err(|e| CliErrorKind::io(cow!("parse manifest {manifest}: {e}")))?;
 
-    if let (Some(resource_type), Some(name), Some(mesh)) = (
-        resource["type"].as_str(),
-        resource["name"].as_str(),
-        resource["mesh"].as_str(),
-    ) {
-        let path = format!(
-            "/meshes/{mesh}/{resource_type}s/{name}",
-            resource_type = resource_type.to_lowercase()
-        );
+    if let (Some(resource_type), Some(name)) =
+        (resource["type"].as_str(), resource["name"].as_str())
+    {
+        let mesh = resource["mesh"].as_str();
+        let path = kuma_api_path(resource_type, name, mesh);
         let result =
             exec::cp_api_put_with_token(&cp_addr, &path, &resource, admin_token.as_deref());
         if result.is_ok() {
@@ -92,4 +108,42 @@ fn apply_universal(ctx: &RunContext, manifest: &str) -> Result<(), CliError> {
     let binary = find_kumactl_binary(&root)?;
     exec::kumactl_run(&binary, &cp_addr, &["apply", "-f", manifest], &[0])?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn kuma_api_path_mesh_resource() {
+        assert_eq!(kuma_api_path("Mesh", "my-mesh", None), "/meshes/my-mesh");
+        assert_eq!(
+            kuma_api_path("Mesh", "default", Some("ignored")),
+            "/meshes/default"
+        );
+    }
+
+    #[test]
+    fn kuma_api_path_mesh_scoped_policy() {
+        assert_eq!(
+            kuma_api_path("MeshTrafficPermission", "allow-all", Some("default")),
+            "/meshes/default/meshtrafficpermissions/allow-all"
+        );
+    }
+
+    #[test]
+    fn kuma_api_path_simple_type() {
+        assert_eq!(
+            kuma_api_path("Dataplane", "dp-1", Some("default")),
+            "/meshes/default/dataplanes/dp-1"
+        );
+    }
+
+    #[test]
+    fn kuma_api_path_defaults_to_default_mesh() {
+        assert_eq!(
+            kuma_api_path("MeshTimeout", "mt-1", None),
+            "/meshes/default/meshtimeouts/mt-1"
+        );
+    }
 }

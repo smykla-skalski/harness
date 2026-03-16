@@ -382,7 +382,7 @@ mod tests {
         let path = tmp.path().join("docker-compose.yaml");
         let compose = single_zone("img", "net", "172.57.0.0/16", "memory", "cp");
         compose.write_to(&path).unwrap();
-        let content = std::fs::read_to_string(&path).unwrap();
+        let content = fs::read_to_string(&path).unwrap();
         assert!(content.contains("img"));
     }
 

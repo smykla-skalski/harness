@@ -9,4 +9,5 @@ mod integration {
     mod compact;
     mod hooks;
     mod preflight;
+    mod universal;
 }
