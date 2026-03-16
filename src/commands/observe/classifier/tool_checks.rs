@@ -151,15 +151,16 @@ fn check_manifest_fix_prompt(
     {
         issues.push(Issue {
             line: line_num,
-            category: IssueCategory::SkillBehavior,
-            severity: IssueSeverity::Critical,
-            summary: "Manifest fix needed at runtime - authored suite has broken manifest".into(),
+            category: IssueCategory::DataIntegrity,
+            severity: IssueSeverity::Medium,
+            summary: "Manifest rejected by cluster - possible product bug".into(),
             details: format!("Question: {question_text}"),
             source_role: MessageRole::Assistant,
             fixable: true,
-            fix_target: Some("skills/new/SKILL.md".into()),
+            fix_target: None,
             fix_hint: Some(
-                "suite:new produced a manifest that fails at runtime and requires manual correction"
+                "CRD or webhook rejected a manifest. Could be a suite error OR a product bug. \
+                 Investigate whether the Go validator accepts what the CRD rejects."
                     .into(),
             ),
         });
