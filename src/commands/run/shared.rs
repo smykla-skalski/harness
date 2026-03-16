@@ -4,19 +4,26 @@ use std::path::{Path, PathBuf};
 use crate::cluster::Platform;
 use crate::context::RunContext;
 use crate::core_defs::harness_data_root;
+use crate::errors::{CliError, CliErrorKind, cow};
 use crate::suite_defaults::default_repo_root_for_suite;
 
 /// Resolve the repo root for `init` when not explicitly provided.
-pub(crate) fn resolve_init_repo_root(raw: Option<&str>, suite_dir: &Path) -> PathBuf {
+///
+/// # Errors
+/// Returns `CliError` if an explicit path is given but cannot be canonicalized.
+pub(crate) fn resolve_init_repo_root(
+    raw: Option<&str>,
+    suite_dir: &Path,
+) -> Result<PathBuf, CliError> {
     if let Some(r) = raw {
         return PathBuf::from(r)
             .canonicalize()
-            .unwrap_or_else(|_| PathBuf::from(r));
+            .map_err(|e| CliErrorKind::io(cow!("canonicalize repo root {r}: {e}")).into());
     }
     if let Some(default) = default_repo_root_for_suite(suite_dir) {
-        return default;
+        return Ok(default);
     }
-    env::current_dir().unwrap_or_else(|_| PathBuf::from("."))
+    Ok(env::current_dir().unwrap_or_else(|_| PathBuf::from(".")))
 }
 
 /// Resolve the run root for `init` when not explicitly provided.
@@ -37,7 +44,8 @@ pub(crate) fn detect_platform(ctx: &RunContext) -> Platform {
     if let Some(ref spec) = ctx.cluster {
         return spec.platform;
     }
-    if ctx.metadata.profile.contains("universal") {
+    let profile = &ctx.metadata.profile;
+    if profile == "universal" || profile.starts_with("universal-") {
         return Platform::Universal;
     }
     Platform::Kubernetes

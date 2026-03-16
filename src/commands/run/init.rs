@@ -29,7 +29,7 @@ pub fn init_run(
     let suite_path = resolve_suite_path(suite)?;
     let spec = SuiteSpec::from_markdown(&suite_path)?;
     let suite_dir = spec.suite_dir().to_path_buf();
-    let resolved_repo_root = resolve_init_repo_root(repo_root, &suite_dir);
+    let resolved_repo_root = resolve_init_repo_root(repo_root, &suite_dir)?;
     let resolved_run_root = resolve_run_root(run_root, Some(&suite_dir));
     let created_at = utc_now();
 
