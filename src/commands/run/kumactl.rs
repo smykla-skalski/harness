@@ -1,6 +1,8 @@
 use std::path::{Path, PathBuf};
 
 use crate::cli::KumactlCommand;
+use crate::commands::resolve_repo_root;
+use crate::core_defs::shorten_path;
 use crate::errors::{CliError, CliErrorKind};
 use crate::exec::run_command;
 
@@ -61,16 +63,16 @@ fn build_kumactl(root: &Path) -> Result<(), CliError> {
 pub fn kumactl(cmd: &KumactlCommand) -> Result<i32, CliError> {
     match cmd {
         KumactlCommand::Find { repo_root } => {
-            let root = super::resolve_repo_root(repo_root.as_deref());
+            let root = resolve_repo_root(repo_root.as_deref());
             let binary = find_kumactl_binary(&root)?;
-            println!("{}", binary.display());
+            println!("{}", shorten_path(&binary));
             Ok(0)
         }
         KumactlCommand::Build { repo_root } => {
-            let root = super::resolve_repo_root(repo_root.as_deref());
+            let root = resolve_repo_root(repo_root.as_deref());
             build_kumactl(&root)?;
             let binary = find_kumactl_binary(&root)?;
-            println!("{}", binary.display());
+            println!("{}", shorten_path(&binary));
             Ok(0)
         }
     }
