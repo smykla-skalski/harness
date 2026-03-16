@@ -29,8 +29,9 @@ pub fn execute(ctx: &HookContext) -> Result<HookResult, CliError> {
     if !ctx.skill_active {
         return Ok(HookResult::allow());
     }
-    let words = match ctx.command_words() {
-        Ok(w) => w,
+    let command = match ctx.parsed_command() {
+        Ok(Some(command)) => command,
+        Ok(None) => return Ok(HookResult::allow()),
         Err(e) => {
             return Ok(HookMessage::runner_flow_required(
                 "parse command",
@@ -39,14 +40,15 @@ pub fn execute(ctx: &HookContext) -> Result<HookResult, CliError> {
             .into_result());
         }
     };
+    let words = command.words();
     if words.is_empty() {
         return Ok(HookResult::allow());
     }
-    let heads = command_heads(&words);
+    let heads = command.heads();
     if ctx.is_suite_author() {
-        return Ok(guard_suite_author(ctx, &words, &heads));
+        return Ok(guard_suite_author(ctx, words, heads));
     }
-    Ok(guard_suite_runner(ctx, &words, &heads))
+    Ok(guard_suite_runner(ctx, words, heads))
 }
 
 fn guard_suite_author(_ctx: &HookContext, words: &[String], heads: &[String]) -> HookResult {

@@ -34,19 +34,15 @@ pub fn execute(ctx: &HookContext) -> Result<HookResult, CliError> {
     if !ctx.skill_active || !ctx.is_suite_runner() {
         return Ok(HookResult::allow());
     }
-    let Ok(words) = ctx.command_words() else {
+    let Some(command) = ctx.parsed_command()? else {
         return Ok(HookResult::allow());
     };
-    if words.len() < 2 {
+    let Some(invocation) = command.first_harness_invocation() else {
         return Ok(HookResult::allow());
-    }
-    let head_name = Path::new(&words[0])
-        .file_name()
-        .map_or("", |n| n.to_str().unwrap_or(""));
-    if head_name != "harness" {
+    };
+    let Some(subcommand) = invocation.subcommand.as_deref() else {
         return Ok(HookResult::allow());
-    }
-    let subcommand = words[1].as_str();
+    };
     let Some(run) = &ctx.run else {
         return Ok(HookResult::allow());
     };
@@ -62,18 +58,18 @@ pub fn execute(ctx: &HookContext) -> Result<HookResult, CliError> {
     }
 
     if subcommand == "cluster" {
-        let result = check_cluster(&words, run);
+        let result = check_cluster(command.words(), run);
         if result.code.is_empty() {
-            maybe_resume_suite_fix(ctx, &words);
+            maybe_resume_suite_fix(ctx, command.words());
         }
         return Ok(result);
     }
     if subcommand_artifacts(subcommand).is_none() {
-        maybe_resume_suite_fix(ctx, &words);
+        maybe_resume_suite_fix(ctx, command.words());
         return Ok(HookResult::allow());
     }
     if artifact_ready(subcommand, run) {
-        maybe_resume_suite_fix(ctx, &words);
+        maybe_resume_suite_fix(ctx, command.words());
         return Ok(HookResult::allow());
     }
     let target = missing_target(subcommand, run);

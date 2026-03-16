@@ -7,7 +7,7 @@ use crate::audit_log::write_run_status_with_audit;
 use crate::context::{CurrentRunRecord, RunLayout, RunMetadata};
 use crate::core_defs::{current_run_context_path, shorten_path, utc_now};
 use crate::errors::{CliError, CliErrorKind, cow};
-use crate::io::validate_safe_segment;
+use crate::io::{validate_safe_segment, write_json_pretty};
 use crate::resolve::resolve_suite_path;
 use crate::schema::{RunCounts, RunReport, RunReportFrontmatter, RunStatus, SuiteSpec, Verdict};
 use crate::workflow::runner::initialize_runner_state;
@@ -121,9 +121,8 @@ fn populate_run_dir(
         required_dependencies: required_dependencies.clone(),
     };
 
-    let meta_json = serde_json::to_string_pretty(&metadata)
+    write_json_pretty(&layout.metadata_path(), &metadata)
         .map_err(|e| CliErrorKind::serialize(cow!("run metadata: {e}")))?;
-    fs::write(layout.metadata_path(), format!("{meta_json}\n"))?;
 
     let status = RunStatus {
         run_id: run_id.to_string(),
@@ -178,9 +177,8 @@ fn populate_run_dir(
     if let Some(parent) = ctx_path.parent() {
         fs::create_dir_all(parent)?;
     }
-    let record_json = serde_json::to_string_pretty(&record)
+    write_json_pretty(&ctx_path, &record)
         .map_err(|e| CliErrorKind::serialize(cow!("run context record: {e}")))?;
-    fs::write(&ctx_path, format!("{record_json}\n"))?;
 
     println!("{}", shorten_path(&layout.run_dir()));
     Ok(0)

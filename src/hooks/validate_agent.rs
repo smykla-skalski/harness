@@ -7,7 +7,9 @@ use crate::errors::{CliError, HookMessage};
 use crate::hook::HookResult;
 use crate::hook_payloads::HookContext;
 use crate::rules::suite_runner::{self as runner_rules, PreflightReply};
-use crate::workflow::runner::{self as runner_wf, RunnerPhase};
+use crate::workflow::runner::RunnerPhase;
+
+use super::effects;
 
 static CODE_BLOCK_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?s)```.*?```").unwrap());
 
@@ -29,13 +31,9 @@ const CODE_BLOCK_LINE_LIMIT: usize = 60;
 /// # Errors
 /// Returns `CliError` on failure.
 pub fn execute(ctx: &HookContext) -> Result<HookResult, CliError> {
-    if !ctx.skill_active {
-        return Ok(HookResult::allow());
-    }
-    if ctx.is_suite_author() {
-        return Ok(validate_suite_author(ctx));
-    }
-    validate_suite_runner(ctx)
+    super::dispatch_by_skill(ctx, validate_suite_runner, |ctx| {
+        Ok(validate_suite_author(ctx))
+    })
 }
 
 fn validate_suite_author(ctx: &HookContext) -> HookResult {
@@ -80,10 +78,10 @@ fn validate_suite_runner(ctx: &HookContext) -> Result<HookResult, CliError> {
         if let Some(s) = state
             && s.phase() == RunnerPhase::Preflight
         {
-            let new_state = s.request_preflight_failed("PreflightFailed");
-            if let Some(ref rd) = ctx.effective_run_dir() {
-                runner_wf::write_runner_state(rd, &new_state)?;
-            }
+            let _ = effects::transition_runner_state(ctx, |state| {
+                (state.phase() == RunnerPhase::Preflight)
+                    .then(|| state.request_preflight_failed("PreflightFailed"))
+            })?;
             return Ok(HookResult::allow());
         }
         return Ok(HookMessage::PreflightMissing.into_result());
@@ -106,10 +104,10 @@ fn validate_suite_runner(ctx: &HookContext) -> Result<HookResult, CliError> {
     // Transition to preflight captured.
     if let Some(s) = state {
         if s.phase() == RunnerPhase::Preflight {
-            let new_state = s.record_preflight_captured("PreflightCaptured");
-            if let Some(ref rd) = ctx.effective_run_dir() {
-                runner_wf::write_runner_state(rd, &new_state)?;
-            }
+            let _ = effects::transition_runner_state(ctx, |state| {
+                (state.phase() == RunnerPhase::Preflight)
+                    .then(|| state.record_preflight_captured("PreflightCaptured"))
+            })?;
             return Ok(HookResult::allow());
         }
         if s.phase() == RunnerPhase::Execution {

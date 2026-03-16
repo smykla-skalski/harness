@@ -9,7 +9,7 @@ use crate::context::RunContext;
 use crate::core_defs::utc_now;
 use crate::errors::{CliError, CliErrorKind};
 use crate::rules::suite_runner::{REPORT_CODE_BLOCK_LIMIT, REPORT_LINE_LIMIT};
-use crate::schema::{RunCounts, RunReport, RunStatus};
+use crate::schema::{ExecutedGroupChange, GroupVerdict, RunReport, RunStatus};
 use crate::workflow::runner::ensure_execution_phase;
 
 #[non_exhaustive]
@@ -143,28 +143,23 @@ fn report_group(
         return Err(CliErrorKind::MissingRunStatus.into());
     };
 
-    // Validate status before doing any mutation.
-    match status {
-        "pass" | "fail" | "skip" => {}
-        _ => {
-            return Err(CliErrorKind::usage_error(format!(
-                "unknown group status '{status}': must be pass, fail, or skip"
-            ))
-            .into());
-        }
-    }
+    let verdict: GroupVerdict = status.parse().map_err(|()| {
+        CliErrorKind::usage_error(format!(
+            "unknown group status '{status}': must be pass, fail, or skip"
+        ))
+    })?;
 
-    let existing_verdict = find_group_verdict(&run_status.executed_groups, group_id);
+    let now = utc_now();
+    let existing_verdict = run_status.group_verdict(group_id);
+    let state_capture_at_report = run_status.last_state_capture.clone();
 
-    if let Some(previous) = &existing_verdict {
-        if previous == status {
+    if let Some(previous) = existing_verdict {
+        if previous == verdict {
             // Same status reported again - silently succeed for idempotency.
             return Ok(0);
         }
         // Different status - update the entry and adjust counts.
-        eprintln!("group {group_id} status updated from {previous} to {status}");
-        decrement_count(&mut run_status.counts, previous);
-        update_group_verdict(&mut run_status.executed_groups, group_id, status);
+        eprintln!("group {group_id} status updated from {previous} to {verdict}");
     } else {
         // Warn if no state capture happened since the last group report.
         // The capture_label flag on this command triggers an inline capture,
@@ -172,27 +167,11 @@ fn report_group(
         if capture_label.is_none() {
             warn_if_capture_missing(&run_status);
         }
-
-        let now = utc_now();
-        let group_entry = serde_json::json!({
-            "group_id": group_id,
-            "verdict": status,
-            "completed_at": now,
-            "state_capture_at_report": run_status.last_state_capture,
-        });
-        run_status.executed_groups.push(group_entry);
     }
-
-    let now = utc_now();
+    let change = run_status.record_group_result(group_id, verdict, &now, state_capture_at_report);
     run_status.last_completed_group = Some(group_id.to_string());
     run_status.last_updated_utc = Some(now.clone());
-
-    match status {
-        "pass" => run_status.counts.passed += 1,
-        "fail" => run_status.counts.failed += 1,
-        "skip" => run_status.counts.skipped += 1,
-        _ => unreachable!(),
-    }
+    debug_assert_ne!(change, ExecutedGroupChange::Noop);
 
     if let Some(n) = note {
         run_status.notes.push(n.to_string());
@@ -201,7 +180,7 @@ fn report_group(
     // Write report section first so status is never updated if report fails.
     let mut report = RunReport::from_markdown(&ctx.layout.report_path())?;
 
-    let mut section = format!("\n## Group: {group_id}\n\n**Verdict:** {status}\n");
+    let mut section = format!("\n## Group: {group_id}\n\n**Verdict:** {verdict}\n");
     let all_refs: Vec<&str> = evidence
         .iter()
         .map(String::as_str)
@@ -233,54 +212,6 @@ fn report_group(
     Ok(0)
 }
 
-/// Find the verdict string for a group that was already recorded.
-/// Returns `None` if the group is not in the list.
-fn find_group_verdict(executed_groups: &[serde_json::Value], group_id: &str) -> Option<String> {
-    for entry in executed_groups {
-        match entry {
-            serde_json::Value::String(s) if s == group_id => {
-                // Legacy string-only entries have no verdict field.
-                return Some(String::new());
-            }
-            serde_json::Value::Object(object) => {
-                if object.get("group_id").and_then(|v| v.as_str()) == Some(group_id) {
-                    return object
-                        .get("verdict")
-                        .and_then(|v| v.as_str())
-                        .map(str::to_string);
-                }
-            }
-            _ => {}
-        }
-    }
-    None
-}
-
-/// Overwrite the verdict field on an existing executed-group entry.
-fn update_group_verdict(executed_groups: &mut [serde_json::Value], group_id: &str, verdict: &str) {
-    for entry in executed_groups.iter_mut() {
-        if let serde_json::Value::Object(object) = entry
-            && object.get("group_id").and_then(|v| v.as_str()) == Some(group_id)
-        {
-            object.insert(
-                "verdict".to_string(),
-                serde_json::Value::String(verdict.to_string()),
-            );
-            return;
-        }
-    }
-}
-
-/// Decrement the count for a given status string. Saturates at zero.
-fn decrement_count(counts: &mut RunCounts, status: &str) {
-    match status {
-        "pass" => counts.passed = counts.passed.saturating_sub(1),
-        "fail" => counts.failed = counts.failed.saturating_sub(1),
-        "skip" => counts.skipped = counts.skipped.saturating_sub(1),
-        _ => {}
-    }
-}
-
 /// Emit a warning when no state capture happened between the previous group
 /// report and the current one. Compares `last_state_capture` against the
 /// capture value recorded at the time of the most recent group entry.
@@ -291,7 +222,7 @@ fn warn_if_capture_missing(run_status: &RunStatus) {
         return;
     }
 
-    let previous_capture = last_group_capture_value(&run_status.executed_groups);
+    let previous_capture = run_status.last_group_capture_value();
     let current_capture = run_status.last_state_capture.as_deref();
 
     // If the capture value is the same as when the previous group was
@@ -308,20 +239,10 @@ fn warn_if_capture_missing(run_status: &RunStatus) {
     }
 }
 
-/// Extract the `state_capture_at_report` value from the most recently
-/// appended executed group entry. Returns `None` when no entries exist
-/// or the field was not recorded.
-fn last_group_capture_value(executed_groups: &[serde_json::Value]) -> Option<&str> {
-    executed_groups
-        .last()
-        .and_then(|entry| entry.get("state_capture_at_report"))
-        .and_then(serde_json::Value::as_str)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::schema::Verdict;
+    use crate::schema::{ExecutedGroupRecord, RunCounts, Verdict};
 
     fn make_status() -> RunStatus {
         RunStatus {
@@ -344,31 +265,35 @@ mod tests {
 
     #[test]
     fn last_group_capture_value_empty_groups() {
-        let groups: Vec<serde_json::Value> = vec![];
-        assert_eq!(last_group_capture_value(&groups), None);
+        let status = make_status();
+        assert_eq!(status.last_group_capture_value(), None);
     }
 
     #[test]
     fn last_group_capture_value_with_capture() {
-        let groups = vec![serde_json::json!({
-            "group_id": "g01",
-            "verdict": "pass",
-            "state_capture_at_report": "state/after-g01.json",
-        })];
+        let mut status = make_status();
+        status.executed_groups = vec![ExecutedGroupRecord {
+            group_id: "g01".to_string(),
+            verdict: GroupVerdict::Pass,
+            completed_at: "2026-03-16T00:00:00Z".to_string(),
+            state_capture_at_report: Some("state/after-g01.json".to_string()),
+        }];
         assert_eq!(
-            last_group_capture_value(&groups),
+            status.last_group_capture_value(),
             Some("state/after-g01.json")
         );
     }
 
     #[test]
     fn last_group_capture_value_null_capture() {
-        let groups = vec![serde_json::json!({
-            "group_id": "g01",
-            "verdict": "pass",
-            "state_capture_at_report": null,
-        })];
-        assert_eq!(last_group_capture_value(&groups), None);
+        let mut status = make_status();
+        status.executed_groups = vec![ExecutedGroupRecord {
+            group_id: "g01".to_string(),
+            verdict: GroupVerdict::Pass,
+            completed_at: "2026-03-16T00:00:00Z".to_string(),
+            state_capture_at_report: None,
+        }];
+        assert_eq!(status.last_group_capture_value(), None);
     }
 
     #[test]
@@ -383,11 +308,12 @@ mod tests {
         let mut status = make_status();
         status.last_completed_group = Some("g01".to_string());
         status.last_state_capture = Some("state/capture-1.json".to_string());
-        status.executed_groups = vec![serde_json::json!({
-            "group_id": "g01",
-            "verdict": "pass",
-            "state_capture_at_report": "state/capture-1.json",
-        })];
+        status.executed_groups = vec![ExecutedGroupRecord {
+            group_id: "g01".to_string(),
+            verdict: GroupVerdict::Pass,
+            completed_at: "2026-03-16T00:00:00Z".to_string(),
+            state_capture_at_report: Some("state/capture-1.json".to_string()),
+        }];
         // Capture unchanged since g01 - should warn (captured in stderr).
         warn_if_capture_missing(&status);
     }
@@ -397,11 +323,12 @@ mod tests {
         let mut status = make_status();
         status.last_completed_group = Some("g01".to_string());
         status.last_state_capture = Some("state/capture-2.json".to_string());
-        status.executed_groups = vec![serde_json::json!({
-            "group_id": "g01",
-            "verdict": "pass",
-            "state_capture_at_report": "state/capture-1.json",
-        })];
+        status.executed_groups = vec![ExecutedGroupRecord {
+            group_id: "g01".to_string(),
+            verdict: GroupVerdict::Pass,
+            completed_at: "2026-03-16T00:00:00Z".to_string(),
+            state_capture_at_report: Some("state/capture-1.json".to_string()),
+        }];
         // Capture changed since g01 - should not warn.
         warn_if_capture_missing(&status);
     }

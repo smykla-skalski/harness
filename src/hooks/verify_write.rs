@@ -4,7 +4,8 @@ use std::path::Path;
 use crate::errors::{CliError, HookMessage};
 use crate::hook::HookResult;
 use crate::hook_payloads::HookContext;
-use crate::workflow::runner as runner_wf;
+
+use super::effects;
 
 use super::{control_file_hint, is_command_owned_run_file, normalize_path};
 
@@ -13,17 +14,15 @@ use super::{control_file_hint, is_command_owned_run_file, normalize_path};
 /// # Errors
 /// Returns `CliError` on failure.
 pub fn execute(ctx: &HookContext) -> Result<HookResult, CliError> {
-    if !ctx.skill_active {
-        return Ok(HookResult::allow());
-    }
     let paths = ctx.write_paths();
     if paths.is_empty() {
         return Ok(HookResult::allow());
     }
-    if ctx.is_suite_author() {
-        return Ok(verify_suite_author(&paths));
-    }
-    verify_suite_runner(ctx, &paths)
+    super::dispatch_by_skill(
+        ctx,
+        |ctx| verify_suite_runner(ctx, &paths),
+        |_ctx| Ok(verify_suite_author(&paths)),
+    )
 }
 
 fn verify_suite_author(paths: &[&Path]) -> HookResult {
@@ -74,13 +73,10 @@ fn verify_suite_runner(ctx: &HookContext, paths: &[&Path]) -> Result<HookResult,
             ))
             .into_result());
         }
-        if let (Some(state), Some(suite_root), Some(run_root)) = (
-            ctx.runner_state.as_ref(),
-            suite_dir.as_deref(),
-            run_dir.as_deref(),
-        ) && let Some(new_state) = state.record_suite_fix_write(&path, suite_root)
-        {
-            runner_wf::write_runner_state(run_root, &new_state)?;
+        if let Some(suite_root) = suite_dir.as_deref() {
+            let _ = effects::transition_runner_state(ctx, |state| {
+                state.record_suite_fix_write(&path, suite_root)
+            })?;
         }
     }
     Ok(HookResult::allow())

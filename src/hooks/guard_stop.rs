@@ -9,13 +9,11 @@ use crate::workflow::author::can_stop;
 /// # Errors
 /// Returns `CliError` on failure.
 pub fn execute(ctx: &HookContext) -> Result<HookResult, CliError> {
-    if !ctx.skill_active {
-        return Ok(HookResult::allow());
-    }
-    if ctx.is_suite_author() {
-        return Ok(guard_suite_author_stop(ctx));
-    }
-    Ok(guard_suite_runner_stop(ctx))
+    super::dispatch_by_skill(
+        ctx,
+        |ctx| Ok(guard_suite_runner_stop(ctx)),
+        |ctx| Ok(guard_suite_author_stop(ctx)),
+    )
 }
 
 fn guard_suite_author_stop(ctx: &HookContext) -> HookResult {

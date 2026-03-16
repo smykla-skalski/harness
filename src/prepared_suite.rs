@@ -1,10 +1,10 @@
 use std::fmt;
-use std::fs;
 use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
 use crate::errors::{CliError, CliErrorKind};
+use crate::io::{read_json_typed, write_json_pretty};
 
 /// A file to copy from source to prepared location.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -123,10 +123,7 @@ impl PreparedSuiteArtifact {
         if !path.exists() {
             return Ok(None);
         }
-        let text = fs::read_to_string(path).map_err(|e| {
-            CliErrorKind::missing_file(path.display().to_string()).with_details(e.to_string())
-        })?;
-        let artifact: Self = serde_json::from_str(&text).map_err(|e| {
+        let artifact: Self = read_json_typed(path).map_err(|e| {
             CliErrorKind::authoring_payload_invalid("prepared suite", path.display().to_string())
                 .with_details(e.to_string())
         })?;
@@ -138,16 +135,7 @@ impl PreparedSuiteArtifact {
     /// # Errors
     /// Returns `CliError` on IO failure.
     pub fn save(&self, path: &Path) -> Result<(), CliError> {
-        if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent).map_err(|e| {
-                CliErrorKind::missing_file(parent.display().to_string()).with_details(e.to_string())
-            })?;
-        }
-        let json = serde_json::to_string_pretty(self).map_err(|e| {
-            CliErrorKind::authoring_payload_invalid("prepared suite", "serialization")
-                .with_details(e.to_string())
-        })?;
-        fs::write(path, json).map_err(|e| {
+        write_json_pretty(path, self).map_err(|e| {
             CliErrorKind::missing_file(path.display().to_string()).with_details(e.to_string())
         })
     }
@@ -239,6 +227,7 @@ pub fn shell_blocks(text: &str) -> Vec<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fs;
 
     // -- configure_section tests --
 

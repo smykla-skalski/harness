@@ -9,6 +9,7 @@ use crate::rules::suite_runner::RunFile;
 
 pub mod audit;
 pub mod context_agent;
+mod effects;
 pub mod enrich_failure;
 pub mod guard_bash;
 pub mod guard_question;
@@ -184,6 +185,24 @@ fn hook_runtime_result(spec: &HookSpec, code: &str, message: &str) -> HookResult
     } else {
         HookResult::warn(code, message)
     }
+}
+
+pub(crate) fn dispatch_by_skill<RunnerFn, AuthorFn>(
+    ctx: &HookContext,
+    runner: RunnerFn,
+    author: AuthorFn,
+) -> Result<HookResult, CliError>
+where
+    RunnerFn: FnOnce(&HookContext) -> Result<HookResult, CliError>,
+    AuthorFn: FnOnce(&HookContext) -> Result<HookResult, CliError>,
+{
+    if !ctx.skill_active {
+        return Ok(HookResult::allow());
+    }
+    if ctx.is_suite_author() {
+        return author(ctx);
+    }
+    runner(ctx)
 }
 
 fn format_hook_error_detail(spec: &HookSpec, error: &CliError) -> String {
