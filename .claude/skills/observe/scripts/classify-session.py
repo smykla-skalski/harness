@@ -269,7 +269,8 @@ def check_text_for_issues(
             exit_match = re.search(r"exit: (\d+)", lower)
         if exit_match:
             code = int(exit_match.group(1))
-            if code not in (0, 1) and "build_error" not in matched_categories and "cli_error" not in matched_categories:
+            if code != 0 and "build_error" not in matched_categories and "cli_error" not in matched_categories:
+                is_harness_cmd = "harness" in lower and "authoring" in lower
                 if is_harness_op:
                     issues.append(Issue(
                         line=line_num, category="skill_behavior", severity="medium",
@@ -278,7 +279,14 @@ def check_text_for_issues(
                         fix_target="skills/new/SKILL.md",
                         fix_hint="suite:new produced manifests that fail preflight/apply/validate - check authoring validation",
                     ))
-                else:
+                elif is_harness_cmd:
+                    issues.append(Issue(
+                        line=line_num, category="workflow_error", severity="medium",
+                        summary=f"Harness authoring command failed (exit {code})",
+                        details=text, source_role=role, fixable=True,
+                        fix_hint="Harness authoring command returned non-zero - check payload or arguments",
+                    ))
+                elif code != 1:
                     issues.append(Issue(
                         line=line_num, category="subagent_issue", severity="low",
                         summary=f"Non-zero exit code {code}",
@@ -302,6 +310,32 @@ def check_text_for_issues(
                 fix_hint="suite:new produced a manifest with outdated or invalid config",
             ))
 
+    # --- OAuth/auth flow triggered (cluster access attempt) ---
+    if source_tool == "Bash":
+        auth_signals = [
+            "if browser window does not open automatically",
+            "opening browser for authentication",
+            "oauth2", "oidc", "gcloud auth",
+            "az login", "aws sso login",
+        ]
+        if any(sig in lower for sig in auth_signals):
+            issues.append(Issue(
+                line=line_num, category="unexpected_behavior", severity="critical",
+                summary="OAuth/auth flow triggered - command tried to reach a real cluster",
+                details=text, source_role=role, fixable=True,
+                fix_hint="Command attempted cluster auth. Block the binary in guard-bash or use local-only validation",
+            ))
+
+    # --- kubectl-validate usage (should use harness authoring-validate) ---
+    if source_tool == "Bash" and "kubectl-validate" in lower:
+        issues.append(Issue(
+            line=line_num, category="skill_behavior", severity="critical",
+            summary="kubectl-validate used directly instead of harness authoring-validate",
+            details=text, source_role=role, fixable=True,
+            fix_target="skills/new/SKILL.md",
+            fix_hint="Use harness authoring-validate, not kubectl-validate. kubectl-validate can reach real clusters.",
+        ))
+
     # --- Alias interference (cp -> rsync) ---
     if source_tool == "Bash" and "rsync" in lower:
         issues.append(Issue(
@@ -309,6 +343,75 @@ def check_text_for_issues(
             summary="Shell alias interference - rsync in cp output",
             details=text, source_role=role, fixable=False,
             fix_hint="Shell alias resolved cp to rsync - use /bin/cp",
+        ))
+
+    # --- Subagent permission failures (from task-notification results) ---
+    if role == "user" and source_tool is None:
+        permission_signals = [
+            "i need bash permission", "i don't have bash permission",
+            "i need write permission", "i don't have write permission",
+            "permission to run", "could you grant",
+            "need you to run this command",
+        ]
+        if any(sig in lower for sig in permission_signals):
+            # Extract agent name from task-notification for unique dedup
+            agent_match = re.search(r'Agent "([^"]+)"', text)
+            agent_name = agent_match.group(1) if agent_match else "unknown"
+            issues.append(Issue(
+                line=line_num, category="subagent_issue", severity="medium",
+                summary=f"Subagent '{agent_name}' blocked by missing permissions",
+                details=text, source_role=role, fixable=True,
+                fix_hint="Subagent needs permissionMode dontAsk or mode auto for Bash/Write",
+            ))
+
+    # --- Subagent save failures (assistant describing manual recovery) ---
+    if role == "assistant" and source_tool is None:
+        save_failure_signals = [
+            "couldn't save", "could not save", "failed to save",
+            "save it manually", "grab its payload", "save manually",
+            "couldn't persist", "failed to persist",
+            "completed but couldn't", "completed but could not",
+            "couldn't write", "could not write",
+            "let me save its payload", "let me extract and save",
+        ]
+        if any(sig in lower for sig in save_failure_signals):
+            # Use first 40 chars of text for unique dedup per occurrence
+            context = text[:40].replace("\n", " ").strip()
+            issues.append(Issue(
+                line=line_num, category="subagent_issue", severity="medium",
+                summary=f"Subagent manual recovery: {context}",
+                details=text, source_role=role, fixable=True,
+                fix_hint="Subagent lacks write permissions or hit a harness CLI error during save",
+            ))
+
+    # --- Manual payload recovery (assistant grepping subagent output files) ---
+    if role == "assistant" and source_tool is None:
+        if "grep" in lower and ("output" in lower or "transcript" in lower or "payload" in lower):
+            if any(kw in lower for kw in ["found the full payload", "extract and save", "grab its"]):
+                issues.append(Issue(
+                    line=line_num, category="subagent_issue", severity="medium",
+                    summary="Manual payload recovery from subagent output",
+                    details=text, source_role=role, fixable=True,
+                    fix_hint="Subagent should save its own payload - manual grep recovery is a workflow failure",
+                ))
+
+    # --- Payload corruption (data wrapped in tags or escaped) ---
+    if source_tool == "Bash":
+        if "<json>" in lower or "</json>" in lower:
+            issues.append(Issue(
+                line=line_num, category="data_integrity", severity="medium",
+                summary="Payload wrapped in <json> tags - data corruption from subagent",
+                details=text, source_role=role, fixable=True,
+                fix_hint="Subagent output contains XML-style tags around JSON - strip before parsing",
+            ))
+
+    # --- Python tracebacks in Bash output ---
+    if source_tool == "Bash" and "traceback (most recent call last)" in lower:
+        issues.append(Issue(
+            line=line_num, category="build_error", severity="medium",
+            summary="Python traceback in command output",
+            details=text, source_role=role, fixable=True,
+            fix_hint="Python script failed - check input data or script logic",
         ))
 
     # --- Suite deviation signals (assistant describing gaps in authored suite) ---
@@ -412,8 +515,15 @@ def check_tool_use_for_issues(
                     fix_hint="Step 0 should check if binary exists first",
                 ))
             # Runtime deviations from authored suite - means suite:new missed something
+            # Skip deviation detection for suite:new authoring workflow questions -
+            # these are normal interactive steps, not runtime deviations
             header = q.get("header", "")
             q_lower = question.lower()
+            authoring_indicators = [
+                "approve current proposal", "confirm", "select which groups",
+                "suite:new/prewrite", "suite:new/postwrite",
+            ]
+            is_authoring_question = any(ind in q_lower for ind in authoring_indicators)
             opt_parts = []
             for o in options:
                 if isinstance(o, dict):
@@ -422,7 +532,7 @@ def check_tool_use_for_issues(
                 else:
                     opt_parts.append(str(o))
             all_text = " ".join([header.lower(), q_lower] + [p.lower() for p in opt_parts])
-            if any(sig in all_text for sig in [
+            if not is_authoring_question and any(sig in all_text for sig in [
                 "deviation", "only exist on", "should i apply",
                 "not found on", "missing on", "baselines to zone",
                 "missing from", "not installed", "not applied",
