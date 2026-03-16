@@ -142,13 +142,16 @@ pub(super) static TEXT_RULES: &[TextRule] = &[
         extra_guard: None,
         patterns: patterns::POD_FAILURE_SIGNALS,
         match_mode: MatchMode::Any,
-        category: IssueCategory::SkillBehavior,
-        severity: IssueSeverity::Critical,
-        summary: "Authored manifest caused runtime failure",
+        category: IssueCategory::DataIntegrity,
+        severity: IssueSeverity::Medium,
+        summary: "Pod or container failure at runtime - possible product bug",
         include_pattern: false,
         fixable: true,
-        fix_target: Some("skills/new/SKILL.md"),
-        fix_hint: Some("suite:new produced a manifest with outdated or invalid config"),
+        fix_target: None,
+        fix_hint: Some(
+            "Runtime pod/container failure. Could be a suite error OR a product bug. \
+             Investigate whether the CRD, webhook, or controller is rejecting valid config.",
+        ),
         skip_if_matched: &[],
     },
     // Auth flow triggered
