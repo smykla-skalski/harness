@@ -6,13 +6,14 @@ mod tool_checks;
 #[cfg(test)]
 mod tests;
 
+use std::collections::HashSet;
 use std::sync::LazyLock;
 
 use regex::Regex;
 use serde_json::Value;
 
 use super::tool_result_text;
-use super::types::{Issue, MessageRole, ScanState, SourceTool};
+use super::types::{Issue, IssueCategory, MessageRole, ScanState, SourceTool};
 
 pub use tool_checks::check_tool_use_for_issues;
 
@@ -91,6 +92,18 @@ fn dedup_issue(issue: &Issue, state: &mut ScanState) -> bool {
     false
 }
 
+// ─── Context struct ────────────────────────────────────────────────
+
+/// Shared context passed to all text classification functions.
+pub(super) struct TextCheckContext<'a> {
+    pub line_number: usize,
+    pub role: MessageRole,
+    pub text: &'a str,
+    pub lower: &'a str,
+    pub source_tool: Option<SourceTool>,
+    pub matched_categories: HashSet<IssueCategory>,
+}
+
 // ─── Public API ────────────────────────────────────────────────────
 
 /// Classify text content for issues.
@@ -117,23 +130,24 @@ pub fn check_text_for_issues(
     let (mut issues, matched_categories) =
         rules::apply_text_rules(line_num, role, text, &lower, source_tool);
 
-    // Complex standalone checks that need regex, multi-branch, or dynamic formatting.
-    text_checks::check_ksa_codes(line_num, role, text, &lower, source_tool, &mut issues);
-    text_checks::check_exit_code_issues(
-        line_num,
+    let context = TextCheckContext {
+        line_number: line_num,
         role,
         text,
-        &lower,
+        lower: &lower,
         source_tool,
-        &mut issues,
-        &matched_categories,
-    );
-    text_checks::check_permission_failures(line_num, role, text, &lower, source_tool, &mut issues);
-    text_checks::check_save_failures(line_num, role, text, &lower, source_tool, &mut issues);
-    text_checks::check_payload_recovery(line_num, role, text, &lower, source_tool, &mut issues);
-    text_checks::check_env_misconfiguration(line_num, role, text, &lower, source_tool, &mut issues);
-    text_checks::check_incomplete_writer(line_num, role, text, &lower, source_tool, &mut issues);
-    text_checks::check_user_frustration(line_num, role, text, &lower, source_tool, &mut issues);
+        matched_categories,
+    };
+
+    // Complex standalone checks that need regex, multi-branch, or dynamic formatting.
+    text_checks::check_ksa_codes(&context, &mut issues);
+    text_checks::check_exit_code_issues(&context, &mut issues);
+    text_checks::check_permission_failures(&context, &mut issues);
+    text_checks::check_save_failures(&context, &mut issues);
+    text_checks::check_payload_recovery(&context, &mut issues);
+    text_checks::check_env_misconfiguration(&context, &mut issues);
+    text_checks::check_incomplete_writer(&context, &mut issues);
+    text_checks::check_user_frustration(&context, &mut issues);
 
     issues
 }
