@@ -1254,3 +1254,112 @@ fn manifest_created_during_run_output_shape() {
             .is_some_and(|hint| hint.contains("suite:new"))
     );
 }
+
+#[test]
+fn detects_jq_error_in_bash_output() {
+    let mut state = make_state();
+    let issues = check_text_for_issues(
+        10,
+        MessageRole::User,
+        "jq: error (at <stdin>:1): Cannot iterate over null (null)",
+        Some(SourceTool::Bash),
+        &mut state,
+    );
+    assert!(
+        issues
+            .iter()
+            .any(|i| i.category == IssueCategory::DataIntegrity
+                && i.severity == IssueSeverity::Medium
+                && i.summary.contains("jq"))
+    );
+}
+
+#[test]
+fn detects_jq_null_iteration_without_jq_prefix() {
+    let mut state = make_state();
+    let issues = check_text_for_issues(
+        10,
+        MessageRole::User,
+        "Cannot iterate over null (null)\nnull is not iterable",
+        Some(SourceTool::Bash),
+        &mut state,
+    );
+    assert!(
+        issues
+            .iter()
+            .any(|i| i.category == IssueCategory::DataIntegrity && i.summary.contains("jq"))
+    );
+}
+
+#[test]
+fn detects_jq_parse_error() {
+    let mut state = make_state();
+    let issues = check_text_for_issues(
+        10,
+        MessageRole::User,
+        "parse error (Invalid numeric literal at line 1, column 5) from jq",
+        Some(SourceTool::Bash),
+        &mut state,
+    );
+    assert!(
+        issues
+            .iter()
+            .any(|i| i.category == IssueCategory::DataIntegrity && i.summary.contains("jq"))
+    );
+}
+
+#[test]
+fn skips_jq_error_without_bash_source() {
+    let mut state = make_state();
+    let issues = check_text_for_issues(
+        10,
+        MessageRole::User,
+        "jq: error (at <stdin>:1): Cannot iterate over null (null)",
+        None,
+        &mut state,
+    );
+    assert!(!issues.iter().any(|i| i.summary.contains("jq")));
+}
+
+#[test]
+fn jq_error_deduplicates() {
+    let mut state = make_state();
+    let first = check_text_for_issues(
+        10,
+        MessageRole::User,
+        "jq: error (at <stdin>:1): Cannot iterate over null (null)",
+        Some(SourceTool::Bash),
+        &mut state,
+    );
+    let second = check_text_for_issues(
+        11,
+        MessageRole::User,
+        "jq: error (at <stdin>:2): null is not iterable",
+        Some(SourceTool::Bash),
+        &mut state,
+    );
+    assert_eq!(first.len(), 1);
+    assert!(second.is_empty());
+}
+
+#[test]
+fn jq_error_output_shape() {
+    let mut state = make_state();
+    let issues = check_text_for_issues(
+        10,
+        MessageRole::User,
+        "jq: error (at <stdin>:1): Cannot iterate over null (null)",
+        Some(SourceTool::Bash),
+        &mut state,
+    );
+    assert_eq!(issues.len(), 1);
+    let issue = &issues[0];
+    assert!(!issue.fixable);
+    assert!(issue.fix_target.is_none());
+    assert!(
+        issue
+            .fix_hint
+            .as_deref()
+            .is_some_and(|hint| hint.contains("valid JSON"))
+    );
+}
