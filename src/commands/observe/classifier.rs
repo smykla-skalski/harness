@@ -770,6 +770,90 @@ fn check_managed_file_writes(
     }
 }
 
+/// Check for misconfigured environment variables in Bash output.
+fn check_env_misconfiguration(
+    line_num: usize,
+    role: &str,
+    text: &str,
+    lower: &str,
+    source_tool: Option<&str>,
+    issues: &mut Vec<Issue>,
+) {
+    if source_tool != Some("Bash") {
+        return;
+    }
+    if lower.contains("claude_session_id=unset") || lower.contains("claude_session_id=\n") {
+        issues.push(Issue {
+            line: line_num,
+            category: IssueCategory::DataIntegrity,
+            severity: IssueSeverity::Critical,
+            summary: "CLAUDE_SESSION_ID is unset - harness cannot resolve session context".into(),
+            details: text.to_string(),
+            source_role: role.to_string(),
+            fixable: true,
+            fix_target: Some("src/context.rs".into()),
+            fix_hint: Some(
+                "Session ID env var not set. Harness init and runner-state \
+                 cannot find the context directory without it."
+                    .into(),
+            ),
+        });
+    }
+    // Empty KUBECONFIG when a cluster should be up
+    if lower.contains("kubeconfig=\n") || lower.contains("kubeconfig=\r") {
+        issues.push(Issue {
+            line: line_num,
+            category: IssueCategory::SkillBehavior,
+            severity: IssueSeverity::Critical,
+            summary: "KUBECONFIG is empty - cluster commands will hit default context".into(),
+            details: text.to_string(),
+            source_role: role.to_string(),
+            fixable: true,
+            fix_target: Some("skills/run/SKILL.md".into()),
+            fix_hint: Some(
+                "harness cluster should set KUBECONFIG to the k3d cluster config. \
+                 Without it, kubectl defaults to ~/.kube/config which may point \
+                 to a corporate cluster."
+                    .into(),
+            ),
+        });
+    }
+}
+
+/// Check for corporate/remote cluster context in output.
+fn check_corporate_cluster(
+    line_num: usize,
+    role: &str,
+    text: &str,
+    lower: &str,
+    source_tool: Option<&str>,
+    issues: &mut Vec<Issue>,
+) {
+    if source_tool != Some("Bash") {
+        return;
+    }
+    for signal in patterns::CORPORATE_CLUSTER_SIGNALS {
+        if lower.contains(signal) {
+            issues.push(Issue {
+                line: line_num,
+                category: IssueCategory::UnexpectedBehavior,
+                severity: IssueSeverity::Critical,
+                summary: "Corporate/remote cluster context detected - should use local k3d".into(),
+                details: text.to_string(),
+                source_role: role.to_string(),
+                fixable: true,
+                fix_target: Some("skills/run/SKILL.md".into()),
+                fix_hint: Some(
+                    "Commands are hitting a remote cluster. Set KUBECONFIG to \
+                     the local k3d config before running kubectl/harness commands."
+                        .into(),
+                ),
+            });
+            break;
+        }
+    }
+}
+
 /// Check for user frustration signals in human text.
 fn check_user_frustration(
     line_num: usize,
@@ -874,6 +958,10 @@ pub fn check_text_for_issues(
     check_python_tracebacks(line_num, role, text, &lower, source_tool, &mut issues);
     check_deviation_signals(line_num, role, text, &lower, source_tool, &mut issues);
     check_release_kumactl_version(line_num, role, text, &lower, source_tool, &mut issues);
+    check_python_usage(line_num, role, text, &lower, source_tool, &mut issues);
+    check_stale_run_pointer(line_num, role, text, &lower, source_tool, &mut issues);
+    check_env_misconfiguration(line_num, role, text, &lower, source_tool, &mut issues);
+    check_corporate_cluster(line_num, role, text, &lower, source_tool, &mut issues);
     check_user_frustration(line_num, role, text, &lower, source_tool, &mut issues);
 
     issues
@@ -899,6 +987,7 @@ pub fn check_tool_use_for_issues(
 
     if name == "Write" || name == "Edit" {
         check_write_edit_tool_use(line_num, name, input, state, &mut issues);
+        check_managed_file_writes(line_num, name, input, &mut issues);
     }
 
     // Record `tool_use` for correlating with `tool_result`

@@ -151,6 +151,22 @@ pub static MANAGED_CONTEXT_FILES: &[&str] = &[
     "run-report.md",
 ];
 
+/// Signals that session environment is misconfigured.
+pub static ENV_MISCONFIGURATION_SIGNALS: &[&str] = &[
+    "claude_session_id=unset",
+    "claude_session_id=\n",
+    "kubeconfig=\n",
+];
+
+/// Signals that kubeconfig points to a corporate/remote cluster.
+pub static CORPORATE_CLUSTER_SIGNALS: &[&str] = &[
+    "teleport.sh",
+    "konghq.teleport",
+    "eks.amazonaws.com",
+    "azmk8s.io",
+    "gke_",
+];
+
 /// Harness operation keywords for detecting manifest failures.
 pub static HARNESS_OPERATION_KEYWORDS: &[&str] = &[
     "preflight:",
