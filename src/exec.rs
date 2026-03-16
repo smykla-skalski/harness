@@ -789,6 +789,67 @@ mod tests {
         assert!(result.is_err());
     }
 
+    // --- filter_progress_line tests ---
+
+    #[test]
+    fn filter_progress_empty_string() {
+        assert!(filter_progress_line("").is_none());
+    }
+
+    #[test]
+    fn filter_progress_whitespace_only() {
+        assert!(filter_progress_line("   ").is_none());
+    }
+
+    #[test]
+    fn filter_progress_creating_cluster() {
+        assert!(filter_progress_line("Creating cluster 'kuma-1'").is_some());
+    }
+
+    #[test]
+    fn filter_progress_cluster_created() {
+        assert!(filter_progress_line("cluster created successfully").is_some());
+    }
+
+    #[test]
+    fn filter_progress_installing_release() {
+        assert!(filter_progress_line("Installing release kuma...").is_some());
+    }
+
+    #[test]
+    fn filter_progress_status_deployed() {
+        assert!(filter_progress_line("status: deployed").is_some());
+    }
+
+    #[test]
+    fn filter_progress_configured() {
+        assert!(filter_progress_line("deployment.apps/kuma-control-plane configured").is_some());
+    }
+
+    #[test]
+    fn filter_progress_error_line() {
+        assert!(filter_progress_line("Error: something went wrong").is_some());
+    }
+
+    #[test]
+    fn filter_progress_warning_line() {
+        assert!(filter_progress_line("WARNING: deprecated feature").is_some());
+    }
+
+    #[test]
+    fn filter_progress_random_noise() {
+        assert!(filter_progress_line("some random debug output").is_none());
+    }
+
+    // --- docker_rm_by_label test ---
+
+    #[test]
+    fn docker_rm_by_label_fails_without_docker() {
+        let result = docker_rm_by_label("io.harness.test=true");
+        // docker binary may not exist in test env
+        assert!(result.is_err());
+    }
+
     #[test]
     fn wait_for_http_fails_on_invalid_url() {
         let result = wait_for_http("http://127.0.0.1:1", Duration::from_millis(500));
