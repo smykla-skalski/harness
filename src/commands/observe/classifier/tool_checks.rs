@@ -21,6 +21,12 @@ pub fn check_tool_use_for_issues(
     let name = block["name"].as_str().unwrap_or("");
     let input = &block["input"];
 
+    // Uncommitted source code detection runs for Write/Edit and Bash to track
+    // the edit-then-act-without-commit pattern across tool boundaries.
+    if name == "Write" || name == "Edit" || name == "Bash" {
+        check_uncommitted_source_code_edit(line_num, name, input, state, &mut issues);
+    }
+
     if name == "Bash" {
         check_bash_tool_use(line_num, input, state, &mut issues);
     }
@@ -73,33 +79,191 @@ fn check_bash_tool_use(
 ) {
     let command = input["command"].as_str().unwrap_or("");
     let details = format!("Command: {command}");
-    let mut emitter = IssueEmitter::new(line_num, MessageRole::Assistant, state);
 
-    if OLD_SKILL_REGEX.is_match(command) {
-        emitter.emit(
+    {
+        let mut emitter = IssueEmitter::new(line_num, MessageRole::Assistant, state);
+
+        if OLD_SKILL_REGEX.is_match(command) {
+            emitter.emit(
+                issues,
+                IssueBlueprint::new(
+                    IssueCode::OldSkillNameUsedInCommand,
+                    IssueCategory::NamingError,
+                    IssueSeverity::Medium,
+                    "Old skill name used in harness command",
+                )
+                .with_guidance(Guidance::fix_hint(
+                    "SKILL.md or model still references old skill names",
+                ))
+                .with_confidence(Confidence::High)
+                .with_fix_safety(FixSafety::AutoFixSafe)
+                .with_source_tool(Some(SourceTool::Bash)),
+                &details,
+            );
+        }
+
+        check_harness_command_patterns(command, &details, &mut emitter, issues);
+        check_destructive_patterns(command, &details, &mut emitter, issues);
+        check_absolute_manifest_path(command, &details, &mut emitter, issues);
+        check_direct_task_output_read(command, &details, &mut emitter, issues);
+        check_env_var_construction(command, &details, &mut emitter, issues);
+        check_sleep_prefix_before_harness(command, &details, &mut emitter, issues);
+        check_truncated_verification_output(command, &details, &mut emitter, issues);
+    }
+
+    // Resource and capture tracking run outside the emitter scope so we can
+    // mutably borrow state again for the tracking sets.
+    track_resource_lifecycle(line_num, command, state, issues);
+    track_capture_between_groups(line_num, command, state, issues);
+    check_repeated_kubectl_queries(line_num, command, state, issues);
+}
+
+/// Track resource create/delete lifecycle across a test group.
+///
+/// When `harness apply` is called, we extract the manifest filename stem
+/// and add it to `pending_resource_creates`. When `harness delete` is called,
+/// we remove matching entries. When `harness report group` is called, any
+/// remaining entries are flagged as uncleaned resources, and the set is
+/// cleared for the next group.
+fn track_resource_lifecycle(
+    line_num: usize,
+    command: &str,
+    state: &mut ScanState,
+    issues: &mut Vec<Issue>,
+) {
+    if !command.contains("harness") {
+        return;
+    }
+
+    // Track creates from `harness apply --manifest <path>`
+    if command.contains("apply") && command.contains("--manifest") {
+        for manifest_name in extract_manifest_stems(command) {
+            state.pending_resource_creates.insert(manifest_name);
+        }
+        return;
+    }
+
+    // Track deletes from `harness delete --manifest <path>`
+    if command.contains("delete") && command.contains("--manifest") {
+        for manifest_name in extract_manifest_stems(command) {
+            state.pending_resource_creates.remove(&manifest_name);
+        }
+        return;
+    }
+
+    // On `harness report group`, check for leftover creates
+    if command.contains("report") && command.contains("group") {
+        if state.pending_resource_creates.is_empty() {
+            return;
+        }
+
+        let mut leftover: Vec<&str> = state
+            .pending_resource_creates
+            .iter()
+            .map(String::as_str)
+            .collect();
+        leftover.sort_unstable();
+        let resource_list = leftover.join(", ");
+        let details = format!("Uncleaned resources: {resource_list}");
+
+        IssueEmitter::new(line_num, MessageRole::Assistant, state).emit(
             issues,
             IssueBlueprint::new(
-                IssueCode::OldSkillNameUsedInCommand,
-                IssueCategory::NamingError,
-                IssueSeverity::Medium,
-                "Old skill name used in harness command",
+                IssueCode::ResourceNotCleanedUpBeforeGroupEnd,
+                IssueCategory::SkillBehavior,
+                IssueSeverity::Low,
+                "Resources created but not cleaned up before group end",
             )
-            .with_guidance(Guidance::fix_hint(
-                "SKILL.md or model still references old skill names",
+            .with_fingerprint(resource_list)
+            .with_guidance(Guidance::advisory(
+                "Delete test resources after verification to avoid contaminating later groups",
             ))
             .with_confidence(Confidence::High)
-            .with_fix_safety(FixSafety::AutoFixSafe)
+            .with_fix_safety(FixSafety::AdvisoryOnly)
             .with_source_tool(Some(SourceTool::Bash)),
             &details,
         );
+
+        state.pending_resource_creates.clear();
+    }
+}
+
+/// Track state capture calls between test group reports.
+///
+/// When `harness capture` is seen, `seen_capture_since_last_group_report` is
+/// set to `true`. When `harness report group` is seen, we check whether a
+/// capture happened since the previous group report. The `--capture-label` flag
+/// on report group triggers an inline capture, so its presence suppresses the
+/// warning.
+fn track_capture_between_groups(
+    line_num: usize,
+    command: &str,
+    state: &mut ScanState,
+    issues: &mut Vec<Issue>,
+) {
+    if !command.contains("harness") {
+        return;
     }
 
-    check_harness_command_patterns(command, &details, &mut emitter, issues);
-    check_destructive_patterns(command, &details, &mut emitter, issues);
-    check_absolute_manifest_path(command, &details, &mut emitter, issues);
-    check_direct_task_output_read(command, &details, &mut emitter, issues);
-    check_env_var_construction(command, &details, &mut emitter, issues);
-    check_sleep_prefix_before_harness(command, &details, &mut emitter, issues);
+    // `harness capture` sets the flag
+    if command.contains("capture") && !command.contains("report") {
+        state.seen_capture_since_last_group_report = true;
+        return;
+    }
+
+    // `harness report group` checks the flag
+    if command.contains("report") && command.contains("group") {
+        let has_capture_label = command.contains("--capture-label");
+
+        // Only warn when this is not the first group, no standalone capture
+        // was seen, and the command does not include --capture-label.
+        if state.seen_any_group_report
+            && !state.seen_capture_since_last_group_report
+            && !has_capture_label
+        {
+            let details = format!("Command: {command}");
+            IssueEmitter::new(line_num, MessageRole::Assistant, state).emit(
+                issues,
+                IssueBlueprint::new(
+                    IssueCode::GroupReportedWithoutCapture,
+                    IssueCategory::SkillBehavior,
+                    IssueSeverity::Medium,
+                    "Group reported without a preceding state capture",
+                )
+                .with_fingerprint("group_reported_without_capture")
+                .with_guidance(Guidance::advisory(
+                    "Run 'harness capture' between groups or pass --capture-label \
+                     to preserve state snapshots before and after each group",
+                ))
+                .with_confidence(Confidence::High)
+                .with_fix_safety(FixSafety::AdvisoryOnly)
+                .with_source_tool(Some(SourceTool::Bash)),
+                &details,
+            );
+        }
+
+        // Reset for the next inter-group window
+        state.seen_capture_since_last_group_report = false;
+        state.seen_any_group_report = true;
+    }
+}
+
+/// Extract manifest filename stems from a command string.
+///
+/// Given `harness apply --manifest g13/01-meshtrace.yaml --manifest g13/02-patch.yaml`,
+/// returns `["01-meshtrace", "02-patch"]`.
+fn extract_manifest_stems(command: &str) -> Vec<String> {
+    let mut stems = Vec::new();
+    let mut tokens = command.split_whitespace();
+    while let Some(token) = tokens.next() {
+        if token == "--manifest"
+            && let Some(path) = tokens.next()
+            && let Some(stem) = Path::new(path).file_stem().and_then(|s| s.to_str())
+        {
+            stems.push(stem.to_string());
+        }
+    }
+    stems
 }
 
 fn check_harness_command_patterns(
@@ -200,15 +364,15 @@ fn check_destructive_patterns(
             issues,
             IssueBlueprint::new(
                 IssueCode::UnauthorizedGitCommitDuringRun,
-                IssueCategory::UnexpectedBehavior,
-                IssueSeverity::Critical,
-                "Unauthorized git commit during active run",
+                IssueCategory::SkillBehavior,
+                IssueSeverity::Low,
+                "Git commit during active run",
             )
             .with_guidance(Guidance::fix_hint(
-                "Agent committed code without asking the user via bug-found gate",
+                "Commits during runs are tracked. Ensure code fixes are committed per contract rule 15.",
             ))
             .with_confidence(Confidence::High)
-            .with_fix_safety(FixSafety::TriageRequired)
+            .with_fix_safety(FixSafety::AdvisoryOnly)
             .with_source_tool(Some(SourceTool::Bash)),
             details,
         );
@@ -409,6 +573,200 @@ fn check_sleep_prefix_before_harness(
             details,
         );
     }
+}
+
+/// Verification keywords that indicate a command whose output should not
+/// be truncated. Matched case-insensitively against the command text.
+const VERIFICATION_KEYWORDS: &[&str] =
+    &["test", "check", "make", "verify", "lint", "clippy", "cargo"];
+
+/// Detect verification commands piped through `tail` or `head`.
+///
+/// When an agent runs `make test | tail -10` or `cargo clippy | head -5`,
+/// the truncated output can hide actual pass/fail markers. This is a
+/// reliability risk because the agent may conclude "all tests pass" from
+/// output where failures are not visible.
+///
+/// Only the portion of the command before the first `| tail` or `| head`
+/// is checked for verification keywords, to avoid false positives from
+/// flag values like `--label verify`.
+fn check_truncated_verification_output(
+    command: &str,
+    details: &str,
+    emitter: &mut IssueEmitter<'_>,
+    issues: &mut Vec<Issue>,
+) {
+    // Find the pipe-to-truncation point. Check both `| tail` and `| head`.
+    let truncation_index = [command.find("| tail"), command.find("| head")]
+        .iter()
+        .filter_map(|position| *position)
+        .min();
+
+    let Some(pipe_position) = truncation_index else {
+        return;
+    };
+
+    let before_pipe = command[..pipe_position].to_lowercase();
+    let has_verification_keyword = VERIFICATION_KEYWORDS
+        .iter()
+        .any(|keyword| before_pipe.contains(keyword));
+
+    if has_verification_keyword {
+        emitter.emit(
+            issues,
+            IssueBlueprint::new(
+                IssueCode::VerificationOutputTruncated,
+                IssueCategory::SkillBehavior,
+                IssueSeverity::Low,
+                "Verification output truncated by tail/head",
+            )
+            .with_guidance(Guidance::advisory(
+                "Never truncate verification output. Use full output or \
+                 grep for specific pass/fail markers (e.g. grep FAIL).",
+            ))
+            .with_confidence(Confidence::High)
+            .with_fix_safety(FixSafety::AdvisoryOnly)
+            .with_source_tool(Some(SourceTool::Bash)),
+            details,
+        );
+    }
+}
+
+/// Maximum line distance between kubectl queries to consider them part of
+/// the same piecemeal sequence.
+const KUBECTL_QUERY_WINDOW: usize = 20;
+
+/// Number of repeated queries for the same resource that triggers a flag.
+const KUBECTL_QUERY_THRESHOLD: usize = 3;
+
+/// Detect piecemeal kubectl get/describe queries against the same resource.
+///
+/// When the agent runs `kubectl get crd meshretries.kuma.io` 4 times with
+/// different jq filters instead of dumping the full output once, that is
+/// wasteful and error-prone. This check tracks recent kubectl query targets
+/// and flags when the same target appears 3+ times within a 20-line window.
+fn check_repeated_kubectl_queries(
+    line_num: usize,
+    command: &str,
+    state: &mut ScanState,
+    issues: &mut Vec<Issue>,
+) {
+    // Skip harness-wrapped commands - those are already going through the
+    // harness record/capture path and their output is being tracked.
+    let trimmed = command.trim_start();
+    if trimmed.starts_with("harness ") {
+        return;
+    }
+
+    let Some(target) = extract_kubectl_query_target(command) else {
+        return;
+    };
+
+    // Evict entries outside the rolling window before counting.
+    while state
+        .kubectl_query_targets
+        .front()
+        .is_some_and(|(_, line)| line_num.saturating_sub(*line) > KUBECTL_QUERY_WINDOW)
+    {
+        state.kubectl_query_targets.pop_front();
+    }
+
+    state
+        .kubectl_query_targets
+        .push_back((target.clone(), line_num));
+
+    let count = state
+        .kubectl_query_targets
+        .iter()
+        .filter(|(existing_target, _)| *existing_target == target)
+        .count();
+
+    if count >= KUBECTL_QUERY_THRESHOLD {
+        let details = format!("Resource: {target}, queries in window: {count}");
+        IssueEmitter::new(line_num, MessageRole::Assistant, state).emit(
+            issues,
+            IssueBlueprint::new(
+                IssueCode::RepeatedKubectlQueryForSameResource,
+                IssueCategory::UnexpectedBehavior,
+                IssueSeverity::Low,
+                "Repeated kubectl queries for same resource - dump once and read the file",
+            )
+            .with_fingerprint(target)
+            .with_guidance(Guidance::advisory(
+                "Dump the full resource once with harness record, then read the file",
+            ))
+            .with_confidence(Confidence::Medium)
+            .with_fix_safety(FixSafety::AdvisoryOnly)
+            .with_source_tool(Some(SourceTool::Bash)),
+            &details,
+        );
+    }
+}
+
+/// Extract the normalized query target from a kubectl get/describe command.
+///
+/// Returns `Some("get <resource> [name]")` or `Some("describe <resource> [name]")`
+/// for kubectl commands, stripping any jq filter, output format flags, and
+/// namespace flags to normalize the target for comparison.
+pub(super) fn extract_kubectl_query_target(command: &str) -> Option<String> {
+    // Find `kubectl` followed by `get` or `describe` anywhere in the command.
+    // Commands may be piped (kubectl ... | jq ...) or chained.
+    let kubectl_part = command
+        .split('|')
+        .next()
+        .unwrap_or(command)
+        .split("&&")
+        .find(|segment| segment.contains("kubectl"))?;
+
+    let tokens: Vec<&str> = kubectl_part.split_whitespace().collect();
+    let kubectl_position = tokens.iter().position(|token| *token == "kubectl")?;
+    let remaining = &tokens[kubectl_position + 1..];
+
+    // Find the verb (get or describe)
+    let (verb_index, verb) = remaining.iter().enumerate().find_map(|(index, token)| {
+        if *token == "get" || *token == "describe" {
+            Some((index, *token))
+        } else {
+            None
+        }
+    })?;
+
+    let after_verb = &remaining[verb_index + 1..];
+
+    // Collect positional arguments (resource type and optional name),
+    // skipping flags and their values.
+    let mut positional = Vec::new();
+    let mut skip_next = false;
+    for token in after_verb {
+        if skip_next {
+            skip_next = false;
+            continue;
+        }
+        if token.starts_with('-') {
+            // Flags that take a value argument
+            if *token == "-o"
+                || *token == "-n"
+                || *token == "--namespace"
+                || *token == "--output"
+                || *token == "-l"
+                || *token == "--selector"
+                || *token == "--field-selector"
+            {
+                skip_next = true;
+            }
+            continue;
+        }
+        positional.push(*token);
+        if positional.len() >= 2 {
+            break;
+        }
+    }
+
+    if positional.is_empty() {
+        return None;
+    }
+
+    Some(format!("{verb} {}", positional.join(" ")))
 }
 
 /// Check `AskUserQuestion` `tool_use` for issue patterns.
@@ -718,6 +1076,96 @@ fn check_manifest_created_during_run(
         .with_source_tool(Some(SourceTool::Write)),
         &details,
     );
+}
+
+/// Source code file extensions that require a commit before continuing.
+const SOURCE_CODE_EXTENSIONS: &[&str] = &[
+    "go", "rs", "py", "js", "ts", "java", "c", "cpp", "h", "hpp", "rb", "sh",
+];
+
+/// Returns true if the path looks like a source code file based on extension.
+fn is_source_code_file(path: &str) -> bool {
+    let extension = Path::new(path)
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("");
+    SOURCE_CODE_EXTENSIONS
+        .iter()
+        .any(|ext| extension.eq_ignore_ascii_case(ext))
+}
+
+/// Detect source code edits without an intervening git commit.
+///
+/// Contract rule 15 says "commit code fixes before continuing." When Write/Edit
+/// targets a source code file, track it. If the next Write/Edit or harness
+/// command arrives without a `git commit` in between, emit an issue.
+fn check_uncommitted_source_code_edit(
+    line_num: usize,
+    tool_name: &str,
+    input: &Value,
+    state: &mut ScanState,
+    issues: &mut Vec<Issue>,
+) {
+    if tool_name == "Write" || tool_name == "Edit" {
+        let path = input["file_path"].as_str().unwrap_or("");
+        if is_source_code_file(path) {
+            if state.source_code_edited_without_commit {
+                // Second source code edit (or harness action) without commit
+                let details = format!("Path: {path}");
+                IssueEmitter::new(line_num, MessageRole::Assistant, state).emit(
+                    issues,
+                    IssueBlueprint::new(
+                        IssueCode::UncommittedSourceCodeEdit,
+                        IssueCategory::SkillBehavior,
+                        IssueSeverity::Medium,
+                        "Source code edited without committing previous changes",
+                    )
+                    .with_fingerprint("uncommitted_source_code_edit")
+                    .with_guidance(Guidance::fix_target_hint(
+                        "skills/run/SKILL.md",
+                        "Commit code fixes before re-deploying or re-testing. \
+                         Use git add <files> && git commit -m 'fix: description'.",
+                    ))
+                    .with_confidence(Confidence::High)
+                    .with_fix_safety(FixSafety::TriageRequired)
+                    .with_source_tool(Some(if tool_name == "Write" {
+                        SourceTool::Write
+                    } else {
+                        SourceTool::Edit
+                    })),
+                    &details,
+                );
+            }
+            // Mark that source code was edited (whether or not we emitted)
+            state.source_code_edited_without_commit = true;
+        }
+    } else if tool_name == "Bash" {
+        let command = input["command"].as_str().unwrap_or("");
+        if command.contains("git commit") {
+            state.source_code_edited_without_commit = false;
+        } else if state.source_code_edited_without_commit && command.contains("harness") {
+            let details = format!("Command: {command}");
+            IssueEmitter::new(line_num, MessageRole::Assistant, state).emit(
+                issues,
+                IssueBlueprint::new(
+                    IssueCode::UncommittedSourceCodeEdit,
+                    IssueCategory::SkillBehavior,
+                    IssueSeverity::Medium,
+                    "Harness command run with uncommitted source code changes",
+                )
+                .with_fingerprint("uncommitted_source_before_harness")
+                .with_guidance(Guidance::fix_target_hint(
+                    "skills/run/SKILL.md",
+                    "Commit code fixes before re-deploying or re-testing. \
+                     Use git add <files> && git commit -m 'fix: description'.",
+                ))
+                .with_confidence(Confidence::High)
+                .with_fix_safety(FixSafety::TriageRequired)
+                .with_source_tool(Some(SourceTool::Bash)),
+                &details,
+            );
+        }
+    }
 }
 
 /// Check for direct writes to harness-managed files via Write/Edit tools.
