@@ -129,9 +129,8 @@ fn execute_cycle(session_id: &str, project_hint: Option<&str>) -> Result<i32, Cl
 
     // Update cursor
     let state = json!({"cursor": last_line, "session_id": session_id});
-    fs::write(&state_path, state.to_string()).map_err(|e| {
-        CliErrorKind::session_parse_error(format!("cannot write state file: {e}"))
-    })?;
+    fs::write(&state_path, state.to_string())
+        .map_err(|e| CliErrorKind::session_parse_error(format!("cannot write state file: {e}")))?;
 
     if issues.is_empty() {
         return Ok(0);
