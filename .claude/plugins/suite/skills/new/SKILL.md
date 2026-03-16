@@ -8,7 +8,7 @@ description: >-
   building regression tests from source code, or when the user asks for test coverage,
   a test plan, or wants to write tests for any Kuma policy or feature.
 argument-hint: "<feature-name> [--repo /path/to/kuma] [--mode generate|wizard] [--from-pr PR_URL] [--from-branch BRANCH] [--suite-name NAME] [--yes|-y]"
-allowed-tools: AskUserQuestion, Bash, Edit, Glob, Grep, Read, Write
+allowed-tools: Agent, AskUserQuestion, Bash, Edit, Glob, Grep, Read, Write
 user-invocable: true
 disable-model-invocation: true
 hooks:
@@ -119,30 +119,9 @@ Parse the JSON output and keep it as the `CAPABILITIES` context for all later st
 
 If `harness capabilities` fails (binary too old, not installed), fall back to the hardcoded default assumption: both platforms available, all features available.
 
-### Step 1: Local validator gate
+### Step 1: Local validation
 
-Before any Bash commands, writes, or canonical review prompts, check whether the suite:new local validator decision is still unresolved.
-
-First, check if `kubectl-validate` is already installed:
-
-```bash
-which kubectl-validate 2>/dev/null
-```
-
-If the binary is found, record that it exists and continue to Step 2. Do not ask the user anything. The harness guard hook will also block the install prompt when the binary is already present.
-
-If the binary is **not** found and no prior decision is recorded, ask exactly one AskUserQuestion using:
-
-- Header: `Validation`
-- Question head: `suite:new/kubectl-validate: install local validator?`
-- Options: `Install kubectl-validate` and `Skip local validator`
-
-Explain the tradeoff in the prompt body:
-
-- Installing the `kubectl-validate` plugin enables `kubectl validate --local-crds deployments/charts/kuma/crds` against the checked-in CRDs in this repo.
-- Skipping it means suite:new falls back to Markdown and shape checks only, so CRD/schema mistakes can survive until later runner or cluster feedback.
-
-If the user approves installation, let the hook install it automatically. If the user skips it, continue authoring with Markdown and shape checks only instead of CRD validation. This gate is not bypassed by `--yes` or `-y`.
+Manifest validation uses `harness authoring-validate --path <file>`, which does local-only CRD validation without cluster access. No external binary install is needed. Continue to Step 2.
 
 ### Step 2: Resolve paths
 
@@ -251,7 +230,7 @@ Build the proposal from the saved worker outputs:
 - Use coverage data to decide which base groups G1-G7 have enough evidence.
 - Use variant signals to propose G8+ groups and to decide which signals are strong, moderate, or weak.
 - Use schema facts to constrain manifests from the start, but treat them as planning input only.
-- If the local validator was installed, run `harness authoring-validate` on authored manifests before stopping. Do not defer to a live cluster.
+- Run `harness authoring-validate --path <file>` on authored manifests before stopping. Do not defer to a live cluster.
 - When `profiles` includes `multi-zone`, set `clusters: all` on workload-deploying baselines per [references/suite-structure.md](references/suite-structure.md).
 - Save the merged proposal with `harness authoring-save --kind proposal`.
 
@@ -305,7 +284,7 @@ Writer contract:
 - Pass only the saved proposal, schema facts, and the exact file ownership for that worker.
 - Keep writer fan-out bounded. Do not start more than four writer workers at once.
 - Launch all writer workers with `mode: "auto"` so they can write files without interactive approval. Background workers cannot prompt the user, so writes are denied without this mode.
-- If the local validator was installed, require every writer that emits manifests to run `harness authoring-validate` on its owned outputs before it stops. Use the current repo checkout as the schema source of truth; all required schemas, including CRDs, are already in this repo. If the validator was explicitly skipped, do not substitute a live-cluster check here.
+- Require every writer that emits manifests to run `harness authoring-validate --path <file>` on its owned outputs before it stops. Use the current repo checkout as the schema source of truth; all required schemas, including CRDs, are already in this repo. Do not substitute a live-cluster check.
 - When the proposal includes multi-zone profiles, pass the baseline cluster distribution from the proposal to the baseline-writer and suite-writer so they emit the object form (`- path:` with `clusters:`) in `baseline_files` frontmatter and include the Clusters column in the baseline manifests table.
 - Follow [references/agent-output-format.md](references/agent-output-format.md) for `authoring-show` usage and acknowledgement rules, and [references/suite-structure.md](references/suite-structure.md) for file content requirements.
 
