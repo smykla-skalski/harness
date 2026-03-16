@@ -519,215 +519,109 @@ pub fn wait_for_http(url: &str, timeout: Duration) -> Result<(), CliError> {
 // CP API client helpers (ureq)
 // ---------------------------------------------------------------------------
 
-/// GET a JSON response from the CP API.
+/// HTTP method for CP API requests.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum HttpMethod {
+    Get,
+    Post,
+    Put,
+    Delete,
+}
+
+/// Call the CP API and parse the response as JSON.
 ///
 /// # Errors
 /// Returns `CliError` on HTTP or parse failure.
-pub fn cp_api_get(base_url: &str, path: &str) -> Result<serde_json::Value, CliError> {
-    cp_api_get_with_token(base_url, path, None)
-}
-
-/// GET a JSON response from the CP API with optional auth token.
-///
-/// # Errors
-/// Returns `CliError` on HTTP or parse failure.
-pub fn cp_api_get_with_token(
+pub fn cp_api_json(
     base_url: &str,
     path: &str,
+    method: HttpMethod,
+    body: Option<&serde_json::Value>,
     token: Option<&str>,
 ) -> Result<serde_json::Value, CliError> {
     let url = format!("{base_url}{path}");
-    let mut req = ureq::get(&url);
-    if let Some(tok) = token {
-        req = req.header("Authorization", &format!("Bearer {tok}"));
-    }
-    let body: serde_json::Value = req
-        .call()
-        .map_err(|e| CliErrorKind::cp_api_unreachable(url.clone()).with_details(e.to_string()))?
-        .body_mut()
-        .read_json()
-        .map_err(|e| CliErrorKind::cp_api_unreachable(url).with_details(e.to_string()))?;
-    Ok(body)
-}
-
-/// POST JSON to the CP API.
-///
-/// # Errors
-/// Returns `CliError` on HTTP or parse failure.
-pub fn cp_api_post(
-    base_url: &str,
-    path: &str,
-    body: &serde_json::Value,
-) -> Result<serde_json::Value, CliError> {
-    cp_api_post_with_token(base_url, path, body, None)
-}
-
-/// POST JSON to the CP API with optional auth token.
-///
-/// # Errors
-/// Returns `CliError` on HTTP or parse failure.
-pub fn cp_api_post_with_token(
-    base_url: &str,
-    path: &str,
-    body: &serde_json::Value,
-    token: Option<&str>,
-) -> Result<serde_json::Value, CliError> {
-    let url = format!("{base_url}{path}");
-    let mut req = ureq::post(&url).header("Content-Type", "application/json");
-    if let Some(tok) = token {
-        req = req.header("Authorization", &format!("Bearer {tok}"));
-    }
-    let resp_body: serde_json::Value = req
-        .send_json(body)
-        .map_err(|e| CliErrorKind::cp_api_unreachable(url.clone()).with_details(e.to_string()))?
-        .body_mut()
-        .read_json()
-        .map_err(|e| CliErrorKind::cp_api_unreachable(url).with_details(e.to_string()))?;
-    Ok(resp_body)
-}
-
-/// POST JSON to the CP API with optional auth token, returning the response as
-/// a raw string. Used for endpoints that return plain text (e.g., token generation).
-///
-/// # Errors
-/// Returns `CliError` on HTTP failure.
-pub fn cp_api_post_text_with_token(
-    base_url: &str,
-    path: &str,
-    body: &serde_json::Value,
-    token: Option<&str>,
-) -> Result<String, CliError> {
-    let url = format!("{base_url}{path}");
-    let mut req = ureq::post(&url).header("Content-Type", "application/json");
-    if let Some(tok) = token {
-        req = req.header("Authorization", &format!("Bearer {tok}"));
-    }
-    let text = req
-        .send_json(body)
-        .map_err(|e| CliErrorKind::cp_api_unreachable(url.clone()).with_details(e.to_string()))?
-        .body_mut()
-        .read_to_string()
-        .map_err(|e| CliErrorKind::cp_api_unreachable(url).with_details(e.to_string()))?;
-    Ok(text)
-}
-
-/// PUT JSON to the CP API with optional auth token.
-///
-/// Used for creating/updating resources via the REST API.
-///
-/// # Errors
-/// Returns `CliError` on HTTP or parse failure.
-pub fn cp_api_put_with_token(
-    base_url: &str,
-    path: &str,
-    body: &serde_json::Value,
-    token: Option<&str>,
-) -> Result<serde_json::Value, CliError> {
-    let url = format!("{base_url}{path}");
-    let mut req = ureq::put(&url).header("Content-Type", "application/json");
-    if let Some(tok) = token {
-        req = req.header("Authorization", &format!("Bearer {tok}"));
-    }
-    let resp_body: serde_json::Value = req
-        .send_json(body)
-        .map_err(|e| CliErrorKind::cp_api_unreachable(url.clone()).with_details(e.to_string()))?
-        .body_mut()
-        .read_json()
-        .map_err(|e| CliErrorKind::cp_api_unreachable(url).with_details(e.to_string()))?;
-    Ok(resp_body)
-}
-
-/// DELETE a resource via the CP API with optional auth token.
-///
-/// # Errors
-/// Returns `CliError` on HTTP failure.
-pub fn cp_api_delete_with_token(
-    base_url: &str,
-    path: &str,
-    token: Option<&str>,
-) -> Result<serde_json::Value, CliError> {
-    let url = format!("{base_url}{path}");
-    let mut req = ureq::delete(&url);
-    if let Some(tok) = token {
-        req = req.header("Authorization", &format!("Bearer {tok}"));
-    }
-    let resp_body: serde_json::Value = req
-        .call()
-        .map_err(|e| CliErrorKind::cp_api_unreachable(url.clone()).with_details(e.to_string()))?
-        .body_mut()
-        .read_json()
-        .map_err(|e| CliErrorKind::cp_api_unreachable(url).with_details(e.to_string()))?;
-    Ok(resp_body)
-}
-
-/// PUT JSON to the CP API with optional auth token, returning the response as
-/// a raw string.
-///
-/// # Errors
-/// Returns `CliError` on HTTP failure.
-pub fn cp_api_put_text_with_token(
-    base_url: &str,
-    path: &str,
-    body: &serde_json::Value,
-    token: Option<&str>,
-) -> Result<String, CliError> {
-    let url = format!("{base_url}{path}");
-    let mut req = ureq::put(&url).header("Content-Type", "application/json");
-    if let Some(tok) = token {
-        req = req.header("Authorization", &format!("Bearer {tok}"));
-    }
-    req.send_json(body)
-        .map_err(|e| CliErrorKind::cp_api_unreachable(url.clone()).with_details(e.to_string()))?
-        .body_mut()
-        .read_to_string()
+    let text = cp_api_send(&url, method, body, token)?;
+    serde_json::from_str(&text)
         .map_err(|e| CliErrorKind::cp_api_unreachable(url).with_details(e.to_string()))
 }
 
-/// DELETE from the CP API with optional auth token, returning the response as
-/// a raw string.
+/// Call the CP API and return the response as a raw string.
+///
+/// Used for endpoints that return plain text (e.g., token generation).
 ///
 /// # Errors
 /// Returns `CliError` on HTTP failure.
-pub fn cp_api_delete_text_with_token(
+pub fn cp_api_text(
     base_url: &str,
     path: &str,
+    method: HttpMethod,
+    body: Option<&serde_json::Value>,
     token: Option<&str>,
 ) -> Result<String, CliError> {
     let url = format!("{base_url}{path}");
-    let mut req = ureq::delete(&url);
-    if let Some(tok) = token {
-        req = req.header("Authorization", &format!("Bearer {tok}"));
-    }
-    req.call()
-        .map_err(|e| CliErrorKind::cp_api_unreachable(url.clone()).with_details(e.to_string()))?
-        .body_mut()
-        .read_to_string()
-        .map_err(|e| CliErrorKind::cp_api_unreachable(url).with_details(e.to_string()))
+    cp_api_send(&url, method, body, token)
 }
 
-/// GET a plain text response from the CP API with optional auth token.
-///
-/// Used for endpoints that return non-JSON content.
-///
-/// # Errors
-/// Returns `CliError` on HTTP failure.
-pub fn cp_api_get_text_with_token(
-    base_url: &str,
-    path: &str,
+/// Build, send, and read the full response body as a string from the CP API.
+fn cp_api_send(
+    url: &str,
+    method: HttpMethod,
+    body: Option<&serde_json::Value>,
     token: Option<&str>,
 ) -> Result<String, CliError> {
-    let url = format!("{base_url}{path}");
-    let mut req = ureq::get(&url);
-    if let Some(tok) = token {
-        req = req.header("Authorization", &format!("Bearer {tok}"));
-    }
-    let text = req
-        .call()
-        .map_err(|e| CliErrorKind::cp_api_unreachable(url.clone()).with_details(e.to_string()))?
+    let auth_header = token.map(|tok| format!("Bearer {tok}"));
+    let map_err = |e: ureq::Error| {
+        CliErrorKind::cp_api_unreachable(url.to_string()).with_details(e.to_string())
+    };
+    let mut response = match (method, body) {
+        (HttpMethod::Get, _) => {
+            let mut req = ureq::get(url);
+            if let Some(ref auth) = auth_header {
+                req = req.header("Authorization", auth);
+            }
+            req.call().map_err(map_err)?
+        }
+        (HttpMethod::Delete, _) => {
+            let mut req = ureq::delete(url);
+            if let Some(ref auth) = auth_header {
+                req = req.header("Authorization", auth);
+            }
+            req.call().map_err(map_err)?
+        }
+        (HttpMethod::Post, Some(b)) => {
+            let mut req = ureq::post(url).header("Content-Type", "application/json");
+            if let Some(ref auth) = auth_header {
+                req = req.header("Authorization", auth);
+            }
+            req.send_json(b).map_err(map_err)?
+        }
+        (HttpMethod::Post, None) => {
+            let mut req = ureq::post(url);
+            if let Some(ref auth) = auth_header {
+                req = req.header("Authorization", auth);
+            }
+            req.send_empty().map_err(map_err)?
+        }
+        (HttpMethod::Put, Some(b)) => {
+            let mut req = ureq::put(url).header("Content-Type", "application/json");
+            if let Some(ref auth) = auth_header {
+                req = req.header("Authorization", auth);
+            }
+            req.send_json(b).map_err(map_err)?
+        }
+        (HttpMethod::Put, None) => {
+            let mut req = ureq::put(url);
+            if let Some(ref auth) = auth_header {
+                req = req.header("Authorization", auth);
+            }
+            req.send_empty().map_err(map_err)?
+        }
+    };
+
+    response
         .body_mut()
         .read_to_string()
-        .map_err(|e| CliErrorKind::cp_api_unreachable(url).with_details(e.to_string()))?;
-    Ok(text)
+        .map_err(|e| CliErrorKind::cp_api_unreachable(url.to_string()).with_details(e.to_string()))
 }
 
 /// Extract the admin user token from a running CP container.

@@ -95,8 +95,13 @@ fn apply_universal(ctx: &RunContext, manifest: &str) -> Result<(), CliError> {
     {
         let mesh = resource["mesh"].as_str();
         let path = kuma_api_path(resource_type, name, mesh);
-        let result =
-            exec::cp_api_put_with_token(&cp_addr, &path, &resource, admin_token.as_deref());
+        let result = exec::cp_api_json(
+            &cp_addr,
+            &path,
+            exec::HttpMethod::Put,
+            Some(&resource),
+            admin_token.as_deref(),
+        );
         if result.is_ok() {
             return Ok(());
         }

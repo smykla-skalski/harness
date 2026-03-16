@@ -1,7 +1,7 @@
 use crate::cli::{ApiMethod, RunDirArgs};
 use crate::commands::{resolve_admin_token, resolve_cp_addr, resolve_run_context};
 use crate::errors::{CliError, CliErrorKind};
-use crate::exec;
+use crate::exec::{self, HttpMethod};
 
 /// Call the Kuma control plane REST API directly.
 ///
@@ -22,16 +22,18 @@ pub fn api(method: &ApiMethod) -> Result<i32, CliError> {
     // All methods read the response as raw text since the CP API sometimes
     // returns plain text (e.g., token endpoints) rather than JSON.
     let response_text = match method {
-        ApiMethod::Get { .. } => exec::cp_api_get_text_with_token(&cp_addr, path, token)?,
+        ApiMethod::Get { .. } => exec::cp_api_text(&cp_addr, path, HttpMethod::Get, None, token)?,
         ApiMethod::Post { body, .. } => {
             let parsed = parse_json_body(body)?;
-            exec::cp_api_post_text_with_token(&cp_addr, path, &parsed, token)?
+            exec::cp_api_text(&cp_addr, path, HttpMethod::Post, Some(&parsed), token)?
         }
         ApiMethod::Put { body, .. } => {
             let parsed = parse_json_body(body)?;
-            exec::cp_api_put_text_with_token(&cp_addr, path, &parsed, token)?
+            exec::cp_api_text(&cp_addr, path, HttpMethod::Put, Some(&parsed), token)?
         }
-        ApiMethod::Delete { .. } => exec::cp_api_delete_text_with_token(&cp_addr, path, token)?,
+        ApiMethod::Delete { .. } => {
+            exec::cp_api_text(&cp_addr, path, HttpMethod::Delete, None, token)?
+        }
     };
 
     // Try to pretty-print as JSON, fall back to raw text.
