@@ -148,27 +148,7 @@ fn validate_universal(manifest_path: &Path, output_path: &Path) -> Result<i32, C
             }
         };
 
-        let resource_type = parsed.get("type").and_then(|v| v.as_str());
-        let name = parsed.get("name").and_then(|v| v.as_str());
-        let mesh = parsed.get("mesh").and_then(|v| v.as_str());
-
-        let label = resource_type.unwrap_or("unknown");
-        log_lines.push(format!("validate {label}: checking structure"));
-
-        if resource_type.is_none() {
-            errors.push(format!("missing 'type' field in resource: {label}"));
-        }
-        if name.is_none() {
-            errors.push(format!("missing 'name' field in resource: {label}"));
-        }
-        // mesh is required for most types except ZoneIngress/ZoneEgress
-        if mesh.is_none() && !matches!(resource_type, Some("ZoneIngress" | "ZoneEgress" | "Zone")) {
-            errors.push(format!("missing 'mesh' field in resource: {label}"));
-        }
-
-        if errors.is_empty() {
-            log_lines.push(format!("validate {label}: ok"));
-        }
+        validate_universal_document(&parsed, &mut log_lines, &mut errors);
     }
 
     if !errors.is_empty() {
@@ -182,4 +162,33 @@ fn validate_universal(manifest_path: &Path, output_path: &Path) -> Result<i32, C
     write_text(output_path, &format!("{}\n", log_lines.join("\n")))?;
     println!("{}", shorten_path(output_path));
     Ok(0)
+}
+
+/// Validate a single universal YAML document for required fields.
+fn validate_universal_document(
+    parsed: &serde_yml::Value,
+    log_lines: &mut Vec<String>,
+    errors: &mut Vec<String>,
+) {
+    let resource_type = parsed.get("type").and_then(|v| v.as_str());
+    let name = parsed.get("name").and_then(|v| v.as_str());
+    let mesh = parsed.get("mesh").and_then(|v| v.as_str());
+
+    let label = resource_type.unwrap_or("unknown");
+    log_lines.push(format!("validate {label}: checking structure"));
+
+    if resource_type.is_none() {
+        errors.push(format!("missing 'type' field in resource: {label}"));
+    }
+    if name.is_none() {
+        errors.push(format!("missing 'name' field in resource: {label}"));
+    }
+    // mesh is required for most types except ZoneIngress/ZoneEgress
+    if mesh.is_none() && !matches!(resource_type, Some("ZoneIngress" | "ZoneEgress" | "Zone")) {
+        errors.push(format!("missing 'mesh' field in resource: {label}"));
+    }
+
+    if errors.is_empty() {
+        log_lines.push(format!("validate {label}: ok"));
+    }
 }
