@@ -2,11 +2,17 @@ use std::collections::HashMap;
 use std::io::{self, BufRead, Read as _, Write as _};
 use std::path::Path;
 use std::process::{Command, Output, Stdio};
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use crate::core_defs::{CommandResult, merge_env, utc_now};
 use crate::errors::{CliError, CliErrorKind};
+
+/// How long a subprocess can run without emitting a progress line before
+/// we print a heartbeat message.
+const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(30);
 
 /// Run a command via `std::process::Command`, capturing stdout/stderr.
 ///
@@ -57,6 +63,23 @@ pub(crate) fn run_command_streaming(
         CliErrorKind::command_failed(command_string(args)).with_details(e.to_string())
     })?;
 
+    // Shared flag so the heartbeat thread knows when to stop.
+    let heartbeat_active = Arc::new(AtomicBool::new(true));
+
+    // Heartbeat thread: emits a periodic "still running" message if no
+    // progress line has been printed in HEARTBEAT_INTERVAL.
+    let heartbeat_flag = heartbeat_active.clone();
+    let heartbeat_label = describe_command(args);
+    let heartbeat_thread = thread::spawn(move || {
+        while heartbeat_flag.load(Ordering::Relaxed) {
+            thread::sleep(HEARTBEAT_INTERVAL);
+            if heartbeat_flag.load(Ordering::Relaxed) {
+                let ts = utc_now();
+                eprintln!("    {ts} cluster: {heartbeat_label} still running...");
+            }
+        }
+    });
+
     // Read stderr in a thread so we don't deadlock if both pipes fill.
     let stderr_handle = child.stderr.take();
     let stderr_thread = thread::spawn(move || {
@@ -93,6 +116,8 @@ pub(crate) fn run_command_streaming(
     let status = child.wait().map_err(|e| {
         CliErrorKind::command_failed(command_string(args)).with_details(e.to_string())
     })?;
+    heartbeat_active.store(false, Ordering::Relaxed);
+    heartbeat_thread.join().ok();
     let stderr = stderr_thread.join().unwrap_or_default();
 
     let result = CommandResult {
@@ -143,6 +168,9 @@ fn filter_progress_line(line: &str) -> Option<String> {
     if lower.contains("importing image") {
         return Some("k3d: importing images".into());
     }
+    if lower.contains("loading images") || lower.contains("importing images into") {
+        return Some("k3d: loading images into cluster".into());
+    }
     if lower.contains("successfully created") || lower.contains("cluster created") {
         return Some("k3d: cluster created".into());
     }
@@ -154,10 +182,72 @@ fn filter_progress_line(line: &str) -> Option<String> {
     if lower.contains("rollback") {
         return Some("helm: rollback triggered".into());
     }
+    if (lower.contains("install") || lower.contains("upgrade"))
+        && lower.contains("helm")
+        && !lower.contains("coalesce")
+    {
+        return Some("helm: installing release".into());
+    }
+    if lower.contains("manifest") && lower.contains("render") {
+        return Some("helm: rendering manifests".into());
+    }
+
+    // kubectl checkpoints -> our own messages
+    if lower.contains("condition met") {
+        return Some("kubectl: condition met".into());
+    }
+    if lower.contains("rollout") && lower.contains("complete") {
+        return Some("kubectl: rollout complete".into());
+    }
+    if lower.contains("waiting for") && lower.contains("rollout") {
+        return Some("kubectl: waiting for rollout".into());
+    }
+    if lower.contains("waiting for") && lower.contains("condition") {
+        return Some(filter_kubectl_wait_detail(trimmed));
+    }
+    if lower.contains("deployment") && lower.contains("successfully rolled out") {
+        return Some("kubectl: deployment rolled out".into());
+    }
+    if lower.contains("pod/") && lower.contains("running") {
+        return Some("kubectl: pod running".into());
+    }
+
+    // docker compose progress
+    if lower.contains("container") && lower.contains("started") {
+        return Some("compose: container started".into());
+    }
+    if lower.contains("container") && lower.contains("healthy") {
+        return Some("compose: container healthy".into());
+    }
+    if lower.contains("container") && lower.contains("waiting") {
+        return Some("compose: waiting for container health".into());
+    }
+    if lower.contains("container") && lower.contains("created") {
+        return Some("compose: container created".into());
+    }
 
     // everything else (Docker BuildKit layers, verbose helm output,
     // kubectl apply lines, etc.) is captured but not printed
     None
+}
+
+/// Extract a readable detail from kubectl wait lines.
+///
+/// Lines like "Waiting for condition=Ready on pod/kuma-cp-xyz" become
+/// "kubectl: waiting for condition=Ready on pod/kuma-cp-xyz".
+fn filter_kubectl_wait_detail(line: &str) -> String {
+    let lower = line.to_lowercase();
+    // Try to extract "condition=X" and the resource name
+    if let Some(condition_start) = lower.find("condition") {
+        let remainder = &line[condition_start..];
+        let detail = remainder
+            .split_whitespace()
+            .take(3) // "condition=Ready on pod/name"
+            .collect::<Vec<_>>()
+            .join(" ");
+        return format!("kubectl: waiting for {detail}");
+    }
+    "kubectl: waiting for condition".into()
 }
 
 fn build_command(
@@ -204,6 +294,28 @@ fn failure_details(result: &CommandResult) -> String {
 
 fn command_string(args: &[&str]) -> String {
     args.join(" ")
+}
+
+/// Build a short human-readable label for a command, used in heartbeat messages.
+///
+/// For make targets, returns the target name (e.g., "k3d/deploy/helm").
+/// For docker compose, returns "compose up" or similar.
+/// For other commands, returns the first two args.
+fn describe_command(args: &[&str]) -> String {
+    if args.first() == Some(&"make")
+        && let Some(target) = args.get(1)
+    {
+        return (*target).to_string();
+    }
+    if args.len() >= 2 && args[0] == "docker" && args[1] == "compose" {
+        let compose_subcommands = ["up", "down", "start", "stop", "build", "pull", "logs"];
+        let subcommand = args
+            .iter()
+            .skip(2)
+            .find(|a| compose_subcommands.contains(a));
+        return format!("compose {}", subcommand.unwrap_or(&"operation"));
+    }
+    args.iter().take(2).copied().collect::<Vec<_>>().join(" ")
 }
 
 /// Run kubectl with optional kubeconfig.
@@ -424,6 +536,9 @@ pub fn docker_write_file(
 
 /// Start services from a compose file with a wait timeout.
 ///
+/// Uses streaming mode so that progress lines (container created, healthy,
+/// etc.) are surfaced to the user during long waits.
+///
 /// # Errors
 /// Returns `CliError` on command failure.
 pub fn compose_up(
@@ -433,7 +548,7 @@ pub fn compose_up(
 ) -> Result<CommandResult, CliError> {
     let file_str = file.to_string_lossy();
     let timeout_str = timeout_seconds.to_string();
-    run_command(
+    run_command_streaming(
         &[
             "docker",
             "compose",
@@ -526,6 +641,7 @@ pub fn kumactl_run(
 ///
 /// Uses `ureq` for sync HTTP and `backoff` for retry logic.
 /// Default: starts at 500ms, caps at the given timeout.
+/// Emits a progress message every 10 seconds while waiting.
 ///
 /// # Errors
 /// Returns `CpApiUnreachable` if the endpoint does not respond within the timeout.
@@ -536,7 +652,18 @@ pub fn wait_for_http(url: &str, timeout: Duration) -> Result<(), CliError> {
         max_elapsed_time: Some(timeout),
         ..ExponentialBackoff::default()
     };
+    let start = Instant::now();
+    let mut last_progress = Instant::now();
     backoff::retry(backoff_config, || {
+        let elapsed = start.elapsed();
+        if last_progress.elapsed() >= Duration::from_secs(10) {
+            let ts = utc_now();
+            eprintln!(
+                "    {ts} cluster: waiting for health check ({:.0}s elapsed)",
+                elapsed.as_secs_f64()
+            );
+            last_progress = Instant::now();
+        }
         ureq::get(url)
             .call()
             .map(|_| ())
@@ -828,6 +955,115 @@ mod tests {
     #[test]
     fn filter_progress_random_noise() {
         assert!(filter_progress_line("some random debug output").is_none());
+    }
+
+    // --- new helm/kubectl/compose filter tests ---
+
+    #[test]
+    fn filter_progress_helm_install() {
+        let msg = filter_progress_line("beginning helm install for release kuma");
+        assert_eq!(msg.as_deref(), Some("helm: installing release"));
+    }
+
+    #[test]
+    fn filter_progress_helm_upgrade() {
+        let msg = filter_progress_line("performing helm upgrade on release kuma");
+        assert_eq!(msg.as_deref(), Some("helm: installing release"));
+    }
+
+    #[test]
+    fn filter_progress_kubectl_condition_met() {
+        let msg = filter_progress_line("pod/kuma-cp-xyz condition met");
+        assert_eq!(msg.as_deref(), Some("kubectl: condition met"));
+    }
+
+    #[test]
+    fn filter_progress_kubectl_rollout_complete() {
+        let msg = filter_progress_line("deployment rollout complete");
+        assert_eq!(msg.as_deref(), Some("kubectl: rollout complete"));
+    }
+
+    #[test]
+    fn filter_progress_kubectl_waiting_for_rollout() {
+        let msg = filter_progress_line("Waiting for deployment/kuma-cp rollout to finish");
+        assert_eq!(msg.as_deref(), Some("kubectl: waiting for rollout"));
+    }
+
+    #[test]
+    fn filter_progress_kubectl_waiting_for_condition() {
+        let msg = filter_progress_line("Waiting for condition=Ready on pod/kuma-cp-abc123");
+        assert!(msg.is_some());
+        let text = msg.unwrap();
+        assert!(text.starts_with("kubectl: waiting for condition"));
+    }
+
+    #[test]
+    fn filter_progress_kubectl_rolled_out() {
+        let msg = filter_progress_line("deployment \"kuma-cp\" successfully rolled out");
+        assert_eq!(msg.as_deref(), Some("kubectl: deployment rolled out"));
+    }
+
+    #[test]
+    fn filter_progress_compose_container_started() {
+        let msg = filter_progress_line("Container harness-global-1 Started");
+        assert_eq!(msg.as_deref(), Some("compose: container started"));
+    }
+
+    #[test]
+    fn filter_progress_compose_container_healthy() {
+        let msg = filter_progress_line("Container harness-global-1 Healthy");
+        assert_eq!(msg.as_deref(), Some("compose: container healthy"));
+    }
+
+    #[test]
+    fn filter_progress_compose_container_waiting() {
+        let msg = filter_progress_line("Container harness-zone1-1 Waiting");
+        assert_eq!(
+            msg.as_deref(),
+            Some("compose: waiting for container health")
+        );
+    }
+
+    #[test]
+    fn filter_progress_compose_container_created() {
+        let msg = filter_progress_line("Container harness-global-1 Created");
+        assert_eq!(msg.as_deref(), Some("compose: container created"));
+    }
+
+    #[test]
+    fn filter_progress_k3d_loading_images() {
+        let msg = filter_progress_line("INFO: Loading images into k3d cluster");
+        assert_eq!(msg.as_deref(), Some("k3d: loading images into cluster"));
+    }
+
+    // --- describe_command tests ---
+
+    #[test]
+    fn describe_command_make_target() {
+        assert_eq!(
+            describe_command(&["make", "k3d/deploy/helm"]),
+            "k3d/deploy/helm"
+        );
+    }
+
+    #[test]
+    fn describe_command_compose() {
+        let args = [
+            "docker",
+            "compose",
+            "-f",
+            "/tmp/compose.yaml",
+            "-p",
+            "harness",
+            "up",
+            "-d",
+        ];
+        assert_eq!(describe_command(&args), "compose up");
+    }
+
+    #[test]
+    fn describe_command_generic() {
+        assert_eq!(describe_command(&["kubectl", "apply"]), "kubectl apply");
     }
 
     #[test]

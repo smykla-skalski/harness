@@ -464,12 +464,20 @@ fn global_two_zones_up(
         utc_now()
     );
     for (zone_cluster, zone_name) in [(&names[1], &names[3]), (&names[2], &names[4])] {
+        eprintln!(
+            "{} cluster: deploying zone {zone_name} on {zone_cluster}",
+            utc_now()
+        );
         let zone_settings = vec![
             "controlPlane.mode=zone".into(),
             format!("controlPlane.zone={zone_name}"),
             "controlPlane.tls.kdsZoneClient.skipVerify=true".into(),
         ];
         start_and_deploy(root, base_env, zone_cluster, "zone", &zone_settings)?;
+        eprintln!(
+            "{} cluster: zone {zone_name} on {zone_cluster} ready",
+            utc_now()
+        );
     }
     Ok(())
 }
@@ -571,6 +579,7 @@ fn universal_single_up(
     eprintln!("{} cluster: waiting for CP at {health_url}", utc_now());
     wait_for_http(&health_url, Duration::from_mins(1))?;
 
+    eprintln!("{} cluster: extracting admin token", utc_now());
     let admin_token = extract_admin_token(cp_name)?;
     eprintln!(
         "{} cluster: CP ready at {health_url} (admin token extracted)",
@@ -594,7 +603,15 @@ fn universal_single_up_compose(
     compose_file.write_to(&compose_path)?;
 
     let project = format!("harness-{cp_name}");
+    eprintln!(
+        "{} cluster: starting compose services for {cp_name}",
+        utc_now()
+    );
     compose_up(&compose_path, &project, 180)?;
+    eprintln!(
+        "{} cluster: compose services for {cp_name} started",
+        utc_now()
+    );
 
     let compose_network = format!("{project}_{network}");
     let container = format!("{project}-{cp_name}-1");
@@ -604,6 +621,7 @@ fn universal_single_up_compose(
     eprintln!("{} cluster: waiting for CP at {health_url}", utc_now());
     wait_for_http(&health_url, Duration::from_mins(1))?;
 
+    eprintln!("{} cluster: extracting admin token", utc_now());
     let admin_token = extract_admin_token(&container)?;
     eprintln!(
         "{} cluster: CP ready at {health_url} (admin token extracted)",
@@ -652,7 +670,12 @@ fn universal_global_zone_up(
     compose_file.write_to(&compose_path)?;
 
     let project = format!("harness-{global_name}");
+    eprintln!(
+        "{} cluster: starting compose services for global + zone",
+        utc_now()
+    );
     compose_up(&compose_path, &project, 180)?;
+    eprintln!("{} cluster: compose services started", utc_now());
 
     let compose_network = format!("{project}_{network}");
     let global_container = format!("{project}-{global_name}-1");
@@ -665,6 +688,7 @@ fn universal_global_zone_up(
     );
     wait_for_http(&global_url, Duration::from_mins(1))?;
 
+    eprintln!("{} cluster: extracting admin token", utc_now());
     let admin_token = extract_admin_token(&global_container)?;
     eprintln!(
         "{} cluster: global CP ready (admin token extracted)",
@@ -727,7 +751,12 @@ fn universal_global_two_zones_up(
     compose_file.write_to(&compose_path)?;
 
     let project = format!("harness-{global_name}");
+    eprintln!(
+        "{} cluster: starting compose services for global + two zones",
+        utc_now()
+    );
     compose_up(&compose_path, &project, 180)?;
+    eprintln!("{} cluster: compose services started", utc_now());
 
     let compose_network = format!("{project}_{network}");
     let global_container = format!("{project}-{global_name}-1");
@@ -740,6 +769,7 @@ fn universal_global_two_zones_up(
     );
     wait_for_http(&global_url, Duration::from_mins(1))?;
 
+    eprintln!("{} cluster: extracting admin token", utc_now());
     let admin_token = extract_admin_token(&global_container)?;
     eprintln!(
         "{} cluster: global CP ready (admin token extracted)",
