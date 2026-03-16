@@ -123,11 +123,18 @@ fn populate_run_dir(
 
     initialize_runner_state(&layout.run_dir())?;
 
-    let command_log = layout.commands_dir().join("command-log.md");
+    let command_log = layout.command_log_path();
     append_markdown_row(
         &command_log,
-        &["ran_at", "command", "exit_code", "artifact"],
-        &["(init)", "harness init", "0", "-"],
+        &[
+            "ran_at",
+            "phase",
+            "group_id",
+            "command",
+            "exit_code",
+            "artifact",
+        ],
+        &["(init)", "bootstrap", "-", "harness init", "0", "-"],
     )?;
 
     let manifest_index = layout.manifests_dir().join("manifest-index.md");

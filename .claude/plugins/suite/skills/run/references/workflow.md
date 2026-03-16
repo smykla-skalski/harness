@@ -26,7 +26,7 @@ If SessionStart already restored the matching active run for `--resume <run-id>`
 
 Only unfinished runs can resume. If the saved run already has a final `pass` or `fail` verdict, start a new run ID instead of reattaching it.
 
-After restore, do not treat a remembered kubeconfig path as permission to run raw `kubectl` or `kubectl --kubeconfig ...`. Keep using `harness run --phase <phase> --label <label> kubectl <args>` or `harness record --phase <phase> --label <label> -- kubectl <args>`.
+After restore, do not treat a remembered kubeconfig path as permission to run raw `kubectl` or `kubectl --kubeconfig ...`. Keep using `harness run --phase <phase> --label <label> --gid <group-id> kubectl <args>` or `harness record --phase <phase> --label <label> --gid <group-id> -- kubectl <args>` during execution groups.
 
 ## Phase 0 - environment check
 
@@ -86,7 +86,7 @@ harness run \
 
 Suite resolution uses the two-step order (managed directory suite, literal path). Set `SUITE_DIR` and `SUITE_FILE` accordingly.
 
-After fresh `harness init` or the explicit resume reattach command, rely on the active `current-run.json` shim for run path, suite path, profile, and later cluster context. The harness also saves that active run in project state, so fresh sessions can restore it automatically. The remaining commands must omit repeated `--run-dir`, `--run-root`, `--repo-root`, and `--kubeconfig` flags unless debugging a broken run context. Do not switch to raw `kubectl --kubeconfig ...`; the canonical tracked forms remain `harness run --phase <phase> --label <label> kubectl <args>` and `harness record --phase <phase> --label <label> -- kubectl <args>`.
+After fresh `harness init` or the explicit resume reattach command, rely on the active `current-run.json` shim for run path, suite path, profile, and later cluster context. The harness also saves that active run in project state, so fresh sessions can restore it automatically. The remaining commands must omit repeated `--run-dir`, `--run-root`, `--repo-root`, and `--kubeconfig` flags unless debugging a broken run context. Do not switch to raw `kubectl --kubeconfig ...`; the canonical tracked forms remain `harness run --phase <phase> --label <label> --gid <group-id> kubectl <args>` and `harness record --phase <phase> --label <label> --gid <group-id> -- kubectl <args>` during execution groups.
 
 **Gate**: the `Client:` line in the recorded `kumactl version` output matches the repo HEAD. A server connection warning on stderr is expected until the control plane exists.
 
@@ -166,7 +166,7 @@ For each test step:
 
 1. Use prepared manifest entries from the active run's prepared-suite artifact whenever the suite already defines the manifest. Only write a new manifest to the active run's `manifests/` directory when the suite does not already provide one or the user explicitly approved a deviation. Never use `/tmp`.
 2. Apply through `harness apply`. Prepared manifests reuse the preflight validation/cache; non-prepared manifests are copied, validated, and applied by the command. When a step needs more than one manifest, prefer one batched `harness apply` call over shell loops: repeat `--manifest` in the exact apply order, or pass the manifest directory to apply its immediate `.json/.yaml/.yml` files in lexicographic filename order.
-3. Run kubectl verification commands through `harness run ... kubectl ...`, kumactl verification commands through `harness run ... kumactl ...`, Envoy admin captures through `harness envoy capture`, and other cluster-touching commands such as `curl` through `harness record`. Do not run these bare. These wrappers are part of the tracked run, not post-hoc loggers. For raw `kubectl`, `harness run` and `harness record` inject the tracked local `--kubeconfig`, fail closed if the active run has no tracked local kubeconfig yet, and reject kubeconfig or cluster-target override flags. Even after resume or compaction, do not replace them with raw `kubectl --kubeconfig ...`. Prefer `harness envoy route-body` or `harness envoy bootstrap` when you want the inspected Envoy output directly; omit `--file` to capture live first. Save output to `artifacts/`.
+3. Run kubectl verification commands through `harness run ... kubectl ...`, kumactl verification commands through `harness run ... kumactl ...`, Envoy admin captures through `harness envoy capture`, and other cluster-touching commands such as `curl` through `harness record`. During Phase 4 execution, every `harness run` and `harness record` command must include `--gid <group-id>`. Do not run these bare. These wrappers are part of the tracked run, not post-hoc loggers. For raw `kubectl`, `harness run` and `harness record` inject the tracked local `--kubeconfig`, fail closed if the active run has no tracked local kubeconfig yet, and reject kubeconfig or cluster-target override flags. Even after resume or compaction, do not replace them with raw `kubectl --kubeconfig ...`. Prefer `harness envoy route-body` or `harness envoy bootstrap` when you want the inspected Envoy output directly; omit `--file` to capture live first. Save output to `artifacts/`.
 4. Run kubectl cleanup commands through `harness run ... kubectl ...`. Prefer `kubectl delete -f` against the prepared manifest files for the current group, one recorded command per manifest or resource kind. Never mix resource kinds in one `kubectl delete` command such as `kubectl delete kind-a name-a kind-b name-b`; kubectl interprets the later kinds as names of the first kind. If the suite doesn't specify the cleanup, confirm with AskUserQuestion (options: run as proposed, skip, stop). Every command that touches the cluster goes through a tracked harness wrapper.
 5. Write result into the report. Every artifact path referenced must point to an existing file.
 
@@ -186,18 +186,21 @@ harness apply \
 harness record \
   --phase "test" \
   --label "<step-label>" \
+  --gid "<group-id>" \
   -- kubectl <kubectl-args>
 
 # Preferred cleanup for suite-defined resources
 harness record \
   --phase "cleanup" \
   --label "cleanup-<group-id>-01" \
+  --gid "<group-id>" \
   -- kubectl delete -f manifests/prepared/groups/<group-id>/01.yaml
 
 # Record other cluster-touching commands
 harness record \
   --phase "test" \
   --label "<step-label>" \
+  --gid "<group-id>" \
   -- <command>
 ```
 

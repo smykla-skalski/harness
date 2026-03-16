@@ -255,7 +255,7 @@ Key principles (workflow.md has the details):
    - `Stop run`
 2. **Prepared-suite artifact** from Phase 3 is the runtime source of truth for manifest paths and cluster deltas. Do not re-parse group frontmatter.
 3. **Group files remain authoritative** for `## Consume`, `## Debug`, and expected outcomes. Read before executing, drop after completing.
-4. **Apply through `harness apply`**, verify/cleanup through `harness record`. Batch manifests with repeated `--manifest` or pass the group directory. Use `harness envoy` for Envoy admin. Never mix resource kinds in one `kubectl delete` command. If the suite does not specify cleanup, use AskUserQuestion with options:
+4. **Apply through `harness apply`**, verify/cleanup through `harness record`. During Phase 4 execution, every `harness run` or `harness record` command must include `--gid <group-id>` so the command log and audit trail stay group-scoped. Batch manifests with repeated `--manifest` or pass the group directory. Use `harness envoy` for Envoy admin. Never mix resource kinds in one `kubectl delete` command. If the suite does not specify cleanup, use AskUserQuestion with options:
    - `Run proposed cleanup`
    - `Skip cleanup`
    - `Stop run`

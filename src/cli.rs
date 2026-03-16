@@ -108,6 +108,9 @@ pub struct RecordArgs {
     /// Optional label tag for the command artifact name.
     #[arg(long)]
     pub label: Option<String>,
+    /// Execution-phase group ID for tracked commands.
+    #[arg(long)]
+    pub gid: Option<String>,
     /// Tracked cluster member name for kubectl commands.
     #[arg(long)]
     pub cluster: Option<String>,
@@ -1469,8 +1472,17 @@ mod tests {
 
     #[test]
     fn parse_run_alias_for_record() {
-        let cli = Cli::try_parse_from(["harness", "run", "--label", "foo", "--", "ls"]).unwrap();
-        assert!(matches!(cli.command, Command::Record(..)));
+        let cli = Cli::try_parse_from([
+            "harness", "run", "--gid", "g03", "--label", "foo", "--", "ls",
+        ])
+        .unwrap();
+        match cli.command {
+            Command::Record(RecordArgs { gid, label, .. }) => {
+                assert_eq!(gid.as_deref(), Some("g03"));
+                assert_eq!(label.as_deref(), Some("foo"));
+            }
+            _ => panic!("expected Record command"),
+        }
     }
 
     #[test]

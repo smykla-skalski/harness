@@ -12,6 +12,7 @@ use crate::context::RunContext;
 use crate::core_defs::{host_platform, shorten_path, utc_now};
 use crate::errors::{CliError, CliErrorKind};
 use crate::io::{append_markdown_row, ensure_dir, write_text};
+use crate::workflow::runner::{RunnerPhase, read_runner_state};
 
 static SLUGIFY_RE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"[^A-Za-z0-9_.-]+").expect("invalid slugify regex"));
@@ -69,6 +70,7 @@ pub fn record(
     _repo_root: Option<&str>,
     phase: Option<&str>,
     label: Option<&str>,
+    gid: Option<&str>,
     cluster: Option<&str>,
     command_args: &[String],
     run_dir_args: &RunDirArgs,
@@ -91,6 +93,8 @@ pub fn record(
             }
         }
     };
+    let workflow_phase = resolve_workflow_phase(run_dir.as_deref())?;
+    validate_gid_usage(&workflow_phase, gid, run_dir.is_some())?;
 
     let mut cmd = Command::new(command[0]);
     cmd.args(&command[1..]);
@@ -130,7 +134,8 @@ pub fn record(
         (tmp.join(format!("{artifact_name}.txt")), None)
     };
 
-    let content = format!("{stdout}{stderr}");
+    let content =
+        format!("exit code: {returncode}\n--- STDOUT ---\n{stdout}\n--- STDERR ---\n{stderr}");
     write_text(&artifact, &content)?;
 
     if let Some(ref log_path) = command_log {
@@ -143,10 +148,25 @@ pub fn record(
             artifact.display().to_string()
         };
         let cmd_str = shell_words::join(&command);
+        let group_id = log_group_id(&workflow_phase, gid);
         append_markdown_row(
             log_path,
-            &["ran_at", "command", "exit_code", "artifact"],
-            &[&utc_now(), &cmd_str, &returncode.to_string(), &artifact_rel],
+            &[
+                "ran_at",
+                "phase",
+                "group_id",
+                "command",
+                "exit_code",
+                "artifact",
+            ],
+            &[
+                &utc_now(),
+                &workflow_phase,
+                group_id,
+                &cmd_str,
+                &returncode.to_string(),
+                &artifact_rel,
+            ],
         )?;
     }
 
@@ -167,4 +187,79 @@ pub fn record(
             shorten_path(&artifact)
         )),
     )
+}
+
+fn resolve_workflow_phase(run_dir: Option<&Path>) -> Result<String, CliError> {
+    let Some(run_dir) = run_dir else {
+        return Ok("-".to_string());
+    };
+    Ok(read_runner_state(run_dir)?
+        .map(|state| state.phase.to_string())
+        .unwrap_or_else(|| "-".to_string()))
+}
+
+fn validate_gid_usage(
+    workflow_phase: &str,
+    gid: Option<&str>,
+    has_run_dir: bool,
+) -> Result<(), CliError> {
+    if gid.is_some() && !has_run_dir {
+        return Err(
+            CliErrorKind::usage_error("--gid requires an active run context".to_string()).into(),
+        );
+    }
+
+    if workflow_phase == RunnerPhase::Execution.to_string() {
+        if gid.is_none() {
+            return Err(CliErrorKind::usage_error(
+                "--gid is required when recording commands during the execution phase".to_string(),
+            )
+            .into());
+        }
+        return Ok(());
+    }
+
+    if gid.is_some() {
+        return Err(CliErrorKind::usage_error(
+            "--gid is only allowed when the active run is in the execution phase".to_string(),
+        )
+        .into());
+    }
+
+    Ok(())
+}
+
+fn log_group_id<'a>(workflow_phase: &str, gid: Option<&'a str>) -> &'a str {
+    if workflow_phase == RunnerPhase::Execution.to_string() {
+        gid.unwrap_or("-")
+    } else {
+        "-"
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn validate_gid_usage_requires_gid_for_execution_phase() {
+        let error = validate_gid_usage("execution", None, true).unwrap_err();
+        assert!(error.message().contains("--gid is required"));
+    }
+
+    #[test]
+    fn validate_gid_usage_rejects_gid_outside_execution_phase() {
+        let error = validate_gid_usage("bootstrap", Some("g01"), true).unwrap_err();
+        assert!(error.message().contains("only allowed"));
+    }
+
+    #[test]
+    fn validate_gid_usage_allows_execution_with_gid() {
+        validate_gid_usage("execution", Some("g01"), true).unwrap();
+    }
+
+    #[test]
+    fn log_group_id_uses_dash_outside_execution_phase() {
+        assert_eq!(log_group_id("closeout", Some("g01")), "-");
+    }
 }

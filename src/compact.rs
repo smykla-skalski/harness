@@ -349,8 +349,8 @@ pub fn render_hydration_context(handoff: &CompactHandoff<'_>, diverged_paths: &[
     if handoff.runner.is_some() {
         lines.push(
             "Tracked cluster commands stay on \
-             `harness run --phase <phase> --label <label> kubectl <args>` or \
-             `harness record --phase <phase> --label <label> -- kubectl <args>`."
+             `harness run --phase <phase> --label <label> --gid <group-id> kubectl <args>` or \
+             `harness record --phase <phase> --label <label> --gid <group-id> -- kubectl <args>`."
                 .to_string(),
         );
     }
@@ -412,8 +412,8 @@ pub fn render_runner_restore_context(project_dir: &Path, runner: &RunnerHandoff<
     ));
     lines.push(
         "Do not run raw `kubectl` or `kubectl --kubeconfig ...` after restore. Use \
-         `harness run --phase <phase> --label <label> kubectl <args>` or \
-         `harness record --phase <phase> --label <label> -- kubectl <args>`."
+         `harness run --phase <phase> --label <label> --gid <group-id> kubectl <args>` or \
+         `harness record --phase <phase> --label <label> --gid <group-id> -- kubectl <args>`."
             .to_string(),
     );
     lines.push(
@@ -487,8 +487,8 @@ fn render_runner_section(handoff: &RunnerHandoff<'_>) -> String {
             handoff.last_state_capture.as_deref().unwrap_or("missing")
         ),
         "- Cluster commands: \
-         `harness run --phase <phase> --label <label> kubectl <args>` or \
-         `harness record --phase <phase> --label <label> -- kubectl <args>`; \
+         `harness run --phase <phase> --label <label> --gid <group-id> kubectl <args>` or \
+         `harness record --phase <phase> --label <label> --gid <group-id> -- kubectl <args>`; \
          never raw `kubectl`."
             .to_string(),
     ];
