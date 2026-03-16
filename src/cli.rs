@@ -201,6 +201,50 @@ pub struct TokenArgs {
     pub run_dir: RunDirArgs,
 }
 
+/// HTTP method for `harness api` requests.
+#[derive(Debug, Clone, Subcommand)]
+#[non_exhaustive]
+pub enum ApiMethod {
+    /// Send a GET request.
+    Get {
+        /// API path (e.g. /meshes or /zones).
+        path: String,
+        /// Run-directory resolution.
+        #[command(flatten)]
+        run_dir: RunDirArgs,
+    },
+    /// Send a POST request with a JSON body.
+    Post {
+        /// API path (e.g. /tokens/dataplane).
+        path: String,
+        /// JSON request body.
+        #[arg(long)]
+        body: String,
+        /// Run-directory resolution.
+        #[command(flatten)]
+        run_dir: RunDirArgs,
+    },
+    /// Send a PUT request with a JSON body.
+    Put {
+        /// API path (e.g. /meshes/default/meshtrafficpermissions/allow-all).
+        path: String,
+        /// JSON request body.
+        #[arg(long)]
+        body: String,
+        /// Run-directory resolution.
+        #[command(flatten)]
+        run_dir: RunDirArgs,
+    },
+    /// Send a DELETE request.
+    Delete {
+        /// API path (e.g. /meshes/default/meshtrafficpermissions/allow-all).
+        path: String,
+        /// Run-directory resolution.
+        #[command(flatten)]
+        run_dir: RunDirArgs,
+    },
+}
+
 /// Arguments for `harness service`.
 #[derive(Debug, Clone, Args)]
 pub struct ServiceArgs {
@@ -749,6 +793,13 @@ pub enum Command {
         /// Optional suite directory for the approval state.
         #[arg(long)]
         suite_dir: Option<String>,
+    },
+
+    /// Call the Kuma control plane REST API directly.
+    Api {
+        /// HTTP method and path.
+        #[command(subcommand)]
+        method: ApiMethod,
     },
 
     /// Generate a dataplane token from the control plane (universal mode).
@@ -1653,6 +1704,115 @@ mod tests {
                 count
             );
         }
+    }
+
+    // --- API command parsing tests ---
+
+    #[test]
+    fn parse_api_get() {
+        let cli = Cli::try_parse_from(["harness", "api", "get", "/zones"]).unwrap();
+        match cli.command {
+            Command::Api {
+                method: ApiMethod::Get { path, .. },
+            } => {
+                assert_eq!(path, "/zones");
+            }
+            _ => panic!("expected Api Get command"),
+        }
+    }
+
+    #[test]
+    fn parse_api_post_with_body() {
+        let cli = Cli::try_parse_from([
+            "harness",
+            "api",
+            "post",
+            "/tokens/dataplane",
+            "--body",
+            r#"{"name":"svc"}"#,
+        ])
+        .unwrap();
+        match cli.command {
+            Command::Api {
+                method: ApiMethod::Post { path, body, .. },
+            } => {
+                assert_eq!(path, "/tokens/dataplane");
+                assert_eq!(body, r#"{"name":"svc"}"#);
+            }
+            _ => panic!("expected Api Post command"),
+        }
+    }
+
+    #[test]
+    fn parse_api_put_with_body() {
+        let cli = Cli::try_parse_from([
+            "harness",
+            "api",
+            "put",
+            "/meshes/default",
+            "--body",
+            r#"{"type":"Mesh"}"#,
+        ])
+        .unwrap();
+        match cli.command {
+            Command::Api {
+                method: ApiMethod::Put { path, body, .. },
+            } => {
+                assert_eq!(path, "/meshes/default");
+                assert_eq!(body, r#"{"type":"Mesh"}"#);
+            }
+            _ => panic!("expected Api Put command"),
+        }
+    }
+
+    #[test]
+    fn parse_api_delete() {
+        let cli = Cli::try_parse_from([
+            "harness",
+            "api",
+            "delete",
+            "/meshes/default/meshtrafficpermissions/allow-all",
+        ])
+        .unwrap();
+        match cli.command {
+            Command::Api {
+                method: ApiMethod::Delete { path, .. },
+            } => {
+                assert_eq!(path, "/meshes/default/meshtrafficpermissions/allow-all");
+            }
+            _ => panic!("expected Api Delete command"),
+        }
+    }
+
+    #[test]
+    fn parse_api_get_with_run_dir() {
+        let cli = Cli::try_parse_from([
+            "harness",
+            "api",
+            "get",
+            "/zones",
+            "--run-dir",
+            "/tmp/my-run",
+        ])
+        .unwrap();
+        match cli.command {
+            Command::Api {
+                method: ApiMethod::Get { path, run_dir },
+            } => {
+                assert_eq!(path, "/zones");
+                assert_eq!(
+                    run_dir.run_dir,
+                    Some(std::path::PathBuf::from("/tmp/my-run"))
+                );
+            }
+            _ => panic!("expected Api Get command"),
+        }
+    }
+
+    #[test]
+    fn parse_api_post_requires_body() {
+        let result = Cli::try_parse_from(["harness", "api", "post", "/tokens"]);
+        assert!(result.is_err());
     }
 
     // --- HookCommand name tests ---
