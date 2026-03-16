@@ -438,6 +438,71 @@ fn detects_git_add_alone() {
 }
 
 #[test]
+fn detects_kubeconfig_env_prefix() {
+    let mut state = make_state();
+    let block = serde_json::json!({
+        "type": "tool_use",
+        "id": "t1",
+        "name": "Bash",
+        "input": { "command": "KUBECONFIG=/path/to/config kubectl wait --for=condition=Ready pods" }
+    });
+    let issues = check_tool_use_for_issues(10, &block, &mut state);
+    assert!(issues.iter().any(
+        |i| i.category == IssueCategory::UnexpectedBehavior && i.summary.contains("KUBECONFIG")
+    ));
+}
+
+#[test]
+fn detects_export_env_var() {
+    let mut state = make_state();
+    let block = serde_json::json!({
+        "type": "tool_use",
+        "id": "t1",
+        "name": "Bash",
+        "input": { "command": "export KUBECONFIG=/tmp/k3d-kubeconfig.yaml" }
+    });
+    let issues = check_tool_use_for_issues(10, &block, &mut state);
+    assert!(issues.iter().any(
+        |i| i.category == IssueCategory::UnexpectedBehavior && i.summary.contains("KUBECONFIG")
+    ));
+}
+
+#[test]
+fn detects_generic_env_prefix() {
+    let mut state = make_state();
+    let block = serde_json::json!({
+        "type": "tool_use",
+        "id": "t1",
+        "name": "Bash",
+        "input": { "command": "K3D_HELM_DEPLOY_NO_CNI=true helm install kuma" }
+    });
+    let issues = check_tool_use_for_issues(10, &block, &mut state);
+    assert!(
+        issues
+            .iter()
+            .any(|i| i.category == IssueCategory::UnexpectedBehavior
+                && i.summary.contains("env var"))
+    );
+}
+
+#[test]
+fn skips_env_detection_for_plain_commands() {
+    let mut state = make_state();
+    let block = serde_json::json!({
+        "type": "tool_use",
+        "id": "t1",
+        "name": "Bash",
+        "input": { "command": "ls -la /tmp" }
+    });
+    let issues = check_tool_use_for_issues(10, &block, &mut state);
+    assert!(
+        !issues
+            .iter()
+            .any(|i| i.summary.contains("env var") || i.summary.contains("KUBECONFIG"))
+    );
+}
+
+#[test]
 fn rule_table_has_expected_count() {
     assert_eq!(rules::TEXT_RULES.len(), 15);
 }
