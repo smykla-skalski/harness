@@ -27,5 +27,6 @@ pub mod resolve;
 pub mod rules;
 pub mod schema;
 pub mod session_hook;
+pub mod shell_parse;
 pub mod suite_defaults;
 pub mod workflow;
