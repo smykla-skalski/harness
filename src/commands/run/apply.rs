@@ -1,4 +1,5 @@
 use std::fs;
+use std::io::{self, Read as _};
 use std::path::PathBuf;
 
 use crate::cli::RunDirArgs;
@@ -9,7 +10,7 @@ use crate::core_defs::{shorten_path, utc_now};
 use crate::errors::{CliError, CliErrorKind, cow};
 use crate::exec;
 use crate::exec::kubectl;
-use crate::io::append_markdown_row;
+use crate::io::{append_markdown_row, ensure_dir, write_text};
 use crate::resolve::resolve_manifest_path;
 
 use super::kumactl::find_kumactl_binary;
@@ -31,7 +32,11 @@ pub fn apply(
     let platform = detect_platform(&ctx);
 
     for manifest_raw in manifests {
-        let manifest = resolve_manifest_path(manifest_raw, Some(&run_dir))?;
+        let manifest = if manifest_raw == "-" {
+            materialize_stdin(&run_dir, step)?
+        } else {
+            resolve_manifest_path(manifest_raw, Some(&run_dir))?
+        };
         let manifest_str = manifest.to_string_lossy().into_owned();
 
         match platform {
@@ -58,6 +63,23 @@ pub fn apply(
         println!("{}", shorten_path(&manifest));
     }
     Ok(0)
+}
+
+/// Read stdin and write to a temporary manifest file in the run's manifests dir.
+fn materialize_stdin(run_dir: &PathBuf, step: Option<&str>) -> Result<PathBuf, CliError> {
+    let mut content = String::new();
+    io::stdin()
+        .read_to_string(&mut content)
+        .map_err(|e| CliErrorKind::io(cow!("read stdin: {e}")))?;
+    if content.trim().is_empty() {
+        return Err(CliErrorKind::usage_error("stdin manifest is empty").into());
+    }
+    let manifests_dir = run_dir.join("manifests");
+    ensure_dir(&manifests_dir)?;
+    let name = step.unwrap_or("stdin");
+    let path = manifests_dir.join(format!("{name}.yaml"));
+    write_text(&path, &content)?;
+    Ok(path)
 }
 
 /// Build the Kuma REST API path for a resource.
