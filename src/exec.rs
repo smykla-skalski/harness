@@ -807,11 +807,22 @@ pub fn cp_api_text(
     cp_api_send(&url, method, body, token)
 }
 
-/// Build, send, and read the full response body as a string from the CP API.
+/// Apply an optional bearer token to any ureq `RequestBuilder` type.
 ///
-/// Each match arm repeats the auth header insertion because ureq v3 returns
-/// different builder types for body vs no-body methods (`WithBody` vs request
-/// builder), preventing a shared builder chain.
+/// ureq v3 uses distinct typestates (`WithBody` / `WithoutBody`) so we cannot
+/// pass the builder through a single generic helper. A macro keeps the auth
+/// logic in one place without duplicating the `if let` across every match arm.
+macro_rules! with_bearer_auth {
+    ($request:expr, $auth_header:expr) => {{
+        let mut request = $request;
+        if let Some(ref auth) = $auth_header {
+            request = request.header("Authorization", auth);
+        }
+        request
+    }};
+}
+
+/// Build, send, and read the full response body as a string from the CP API.
 fn cp_api_send(
     url: &str,
     method: HttpMethod,
@@ -822,49 +833,30 @@ fn cp_api_send(
     let map_err = |e: ureq::Error| {
         CliErrorKind::cp_api_unreachable(url.to_string()).with_details(e.to_string())
     };
+
     let mut response = match (method, body) {
-        (HttpMethod::Get, _) => {
-            let mut req = ureq::get(url);
-            if let Some(ref auth) = auth_header {
-                req = req.header("Authorization", auth);
-            }
-            req.call().map_err(map_err)?
+        (HttpMethod::Get, _) => with_bearer_auth!(ureq::get(url), auth_header)
+            .call()
+            .map_err(map_err)?,
+        (HttpMethod::Delete, _) => with_bearer_auth!(ureq::delete(url), auth_header)
+            .call()
+            .map_err(map_err)?,
+        (HttpMethod::Post, Some(json)) => {
+            with_bearer_auth!(ureq::post(url).header("Content-Type", "application/json"), auth_header)
+                .send_json(json)
+                .map_err(map_err)?
         }
-        (HttpMethod::Delete, _) => {
-            let mut req = ureq::delete(url);
-            if let Some(ref auth) = auth_header {
-                req = req.header("Authorization", auth);
-            }
-            req.call().map_err(map_err)?
+        (HttpMethod::Post, None) => with_bearer_auth!(ureq::post(url), auth_header)
+            .send_empty()
+            .map_err(map_err)?,
+        (HttpMethod::Put, Some(json)) => {
+            with_bearer_auth!(ureq::put(url).header("Content-Type", "application/json"), auth_header)
+                .send_json(json)
+                .map_err(map_err)?
         }
-        (HttpMethod::Post, Some(b)) => {
-            let mut req = ureq::post(url).header("Content-Type", "application/json");
-            if let Some(ref auth) = auth_header {
-                req = req.header("Authorization", auth);
-            }
-            req.send_json(b).map_err(map_err)?
-        }
-        (HttpMethod::Post, None) => {
-            let mut req = ureq::post(url);
-            if let Some(ref auth) = auth_header {
-                req = req.header("Authorization", auth);
-            }
-            req.send_empty().map_err(map_err)?
-        }
-        (HttpMethod::Put, Some(b)) => {
-            let mut req = ureq::put(url).header("Content-Type", "application/json");
-            if let Some(ref auth) = auth_header {
-                req = req.header("Authorization", auth);
-            }
-            req.send_json(b).map_err(map_err)?
-        }
-        (HttpMethod::Put, None) => {
-            let mut req = ureq::put(url);
-            if let Some(ref auth) = auth_header {
-                req = req.header("Authorization", auth);
-            }
-            req.send_empty().map_err(map_err)?
-        }
+        (HttpMethod::Put, None) => with_bearer_auth!(ureq::put(url), auth_header)
+            .send_empty()
+            .map_err(map_err)?,
     };
 
     response
