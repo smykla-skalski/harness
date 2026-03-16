@@ -38,9 +38,19 @@ pub fn report(cmd: &ReportCommand) -> Result<i32, CliError> {
 }
 
 fn report_check(report_path: Option<&str>) -> Result<i32, CliError> {
-    let path = report_path
-        .map(PathBuf::from)
-        .ok_or_else(|| -> CliError { CliErrorKind::missing_run_context_value("report").into() })?;
+    let path = if let Some(p) = report_path {
+        PathBuf::from(p)
+    } else {
+        let context = RunContext::from_current()?.ok_or_else(|| -> CliError {
+            CliErrorKind::missing_run_context_value("report").into()
+        })?;
+        context.layout.report_path()
+    };
+
+    if !path.exists() {
+        println!("no report generated yet");
+        return Ok(0);
+    }
 
     let rpt = RunReport::from_markdown(&path)?;
     let body = rpt.to_markdown();
