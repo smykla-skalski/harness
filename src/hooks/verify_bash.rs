@@ -6,7 +6,7 @@ use crate::context::RunContext;
 use crate::errors::{CliError, HookMessage, cow};
 use crate::hook::HookResult;
 use crate::hook_payloads::HookContext;
-use crate::workflow::runner::{RunnerPhase, RunnerWorkflowState, SuiteFixState};
+use crate::workflow::runner::{PreflightStatus, RunnerPhase, RunnerWorkflowState, SuiteFixState};
 
 fn subcommand_artifacts(subcommand: &str) -> Option<&'static [&'static str]> {
     match subcommand {
@@ -53,6 +53,11 @@ pub fn execute(ctx: &HookContext) -> Result<HookResult, CliError> {
 
     // Check for command failures that require the bug-found gate.
     if let Some(result) = check_bug_found_gate(ctx, subcommand) {
+        return Ok(result);
+    }
+
+    // Block `harness apply` when preflight has not completed yet.
+    if let Some(result) = check_preflight_gate(ctx, subcommand) {
         return Ok(result);
     }
 
@@ -105,6 +110,34 @@ fn check_bug_found_gate(ctx: &HookContext, subcommand: &str) -> Option<HookResul
     }
 
     Some(HookMessage::bug_found_gate_required(cow!("harness {subcommand}")).into_result())
+}
+
+/// Block `harness apply` when the runner has not completed preflight.
+///
+/// Returns `Some(HookResult)` with a deny when `harness apply` is called
+/// while the runner phase is Bootstrap or Preflight with a non-complete
+/// status. Returns `None` when no gate is needed.
+fn check_preflight_gate(ctx: &HookContext, subcommand: &str) -> Option<HookResult> {
+    if subcommand != "apply" {
+        return None;
+    }
+    let state = ctx.runner_state.as_ref()?;
+    let blocked = match state.phase {
+        RunnerPhase::Bootstrap => true,
+        RunnerPhase::Preflight => state.preflight.status != PreflightStatus::Complete,
+        _ => false,
+    };
+    if !blocked {
+        return None;
+    }
+    Some(
+        HookMessage::runner_flow_required(
+            "harness apply",
+            "Run harness preflight before applying manifests. \
+             Preflight materializes baselines and group YAML into prepared manifests.",
+        )
+        .into_result(),
+    )
 }
 
 /// Returns `true` when the response text contains any known failure indicator.
@@ -478,6 +511,73 @@ mod tests {
         let state = base_state(RunnerPhase::Execution);
         let ctx = stub_context_with_state_and_response(Some(state), None);
         assert!(check_bug_found_gate(&ctx, "apply").is_none());
+    }
+
+    // -- check_preflight_gate --
+
+    #[test]
+    fn preflight_gate_blocks_apply_during_bootstrap() {
+        let state = base_state(RunnerPhase::Bootstrap);
+        let ctx = stub_context_with_state_and_response(Some(state), None);
+        let result = check_preflight_gate(&ctx, "apply");
+        assert!(result.is_some());
+        let hook_result = result.unwrap();
+        assert_eq!(hook_result.code, "KSR014");
+        assert!(hook_result.message.contains("preflight"));
+    }
+
+    #[test]
+    fn preflight_gate_blocks_apply_during_preflight_pending() {
+        let state = base_state(RunnerPhase::Preflight);
+        let ctx = stub_context_with_state_and_response(Some(state), None);
+        let result = check_preflight_gate(&ctx, "apply");
+        assert!(result.is_some());
+    }
+
+    #[test]
+    fn preflight_gate_blocks_apply_during_preflight_running() {
+        let mut state = base_state(RunnerPhase::Preflight);
+        state.preflight.status = PreflightStatus::Running;
+        let ctx = stub_context_with_state_and_response(Some(state), None);
+        let result = check_preflight_gate(&ctx, "apply");
+        assert!(result.is_some());
+    }
+
+    #[test]
+    fn preflight_gate_allows_apply_after_preflight_complete() {
+        let mut state = base_state(RunnerPhase::Preflight);
+        state.preflight.status = PreflightStatus::Complete;
+        let ctx = stub_context_with_state_and_response(Some(state), None);
+        assert!(check_preflight_gate(&ctx, "apply").is_none());
+    }
+
+    #[test]
+    fn preflight_gate_allows_apply_during_execution() {
+        let state = base_state(RunnerPhase::Execution);
+        let ctx = stub_context_with_state_and_response(Some(state), None);
+        assert!(check_preflight_gate(&ctx, "apply").is_none());
+    }
+
+    #[test]
+    fn preflight_gate_allows_apply_during_triage() {
+        let state = base_state(RunnerPhase::Triage);
+        let ctx = stub_context_with_state_and_response(Some(state), None);
+        assert!(check_preflight_gate(&ctx, "apply").is_none());
+    }
+
+    #[test]
+    fn preflight_gate_skips_non_apply_subcommands() {
+        let state = base_state(RunnerPhase::Bootstrap);
+        let ctx = stub_context_with_state_and_response(Some(state), None);
+        assert!(check_preflight_gate(&ctx, "cluster").is_none());
+        assert!(check_preflight_gate(&ctx, "preflight").is_none());
+        assert!(check_preflight_gate(&ctx, "capture").is_none());
+    }
+
+    #[test]
+    fn preflight_gate_skips_when_no_state() {
+        let ctx = stub_context_with_state_and_response(None, None);
+        assert!(check_preflight_gate(&ctx, "apply").is_none());
     }
 
     /// Build a minimal `HookContext` with the given runner state and response.
