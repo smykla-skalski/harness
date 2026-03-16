@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::context::RunContext;
-use crate::errors::{CliError, CliErrorKind, cow};
+use crate::errors::{cow, CliError, CliErrorKind};
 use crate::rules;
 use crate::workflow::author::{self as author_workflow, AuthorWorkflowState};
 use crate::workflow::runner::{self as runner_workflow, RunnerWorkflowState};
@@ -197,39 +197,56 @@ impl HookContext {
 
     /// Attempt to load `RunContext`, runner state, and author state from disk.
     fn load_context_from_disk(&mut self) {
+        self.load_run_context();
+        self.load_runner_state();
+        self.load_author_state();
+    }
+
+    /// Resolve run context from an explicit `run_dir` or by detecting the current run.
+    fn load_run_context(&mut self) {
         if let Some(run_directory) = &self.run_dir {
             match RunContext::from_run_dir(run_directory) {
                 Ok(run_context) => self.run = Some(run_context),
                 Err(error) => eprintln!("warning: failed to load run context: {error}"),
             }
-        } else {
-            match RunContext::from_current() {
-                Ok(Some(run_context)) => {
-                    self.run_dir = Some(run_context.layout.run_dir());
-                    self.run = Some(run_context);
-                }
-                Ok(None) => {}
-                Err(error) => eprintln!("warning: failed to load current run context: {error}"),
-            }
+            return;
         }
-
-        if let Some(run_context) = &self.run {
-            match runner_workflow::read_runner_state(&run_context.layout.run_dir()) {
-                Ok(runner_state) => self.runner_state = runner_state,
-                Err(error) => eprintln!("warning: failed to load runner state: {error}"),
+        match RunContext::from_current() {
+            Ok(Some(run_context)) => {
+                self.run_dir = Some(run_context.layout.run_dir());
+                self.run = Some(run_context);
             }
-        } else if let Some(run_directory) = &self.run_dir {
-            match runner_workflow::read_runner_state(run_directory) {
-                Ok(runner_state) => self.runner_state = runner_state,
-                Err(error) => eprintln!("warning: failed to load runner state: {error}"),
-            }
+            Ok(None) => {}
+            Err(error) => eprintln!("warning: failed to load current run context: {error}"),
         }
+    }
 
-        if self.is_suite_author() {
-            match author_workflow::read_author_state() {
-                Ok(author_state) => self.author_state = author_state,
-                Err(error) => eprintln!("warning: failed to load author state: {error}"),
-            }
+    /// Load runner workflow state from the run directory (via context or fallback).
+    fn load_runner_state(&mut self) {
+        let run_directory = self
+            .run
+            .as_ref()
+            .map(|run_context| run_context.layout.run_dir())
+            .or_else(|| self.run_dir.clone());
+
+        let Some(run_directory) = run_directory else {
+            return;
+        };
+
+        match runner_workflow::read_runner_state(&run_directory) {
+            Ok(runner_state) => self.runner_state = runner_state,
+            Err(error) => eprintln!("warning: failed to load runner state: {error}"),
+        }
+    }
+
+    /// Load author workflow state when a suite authoring session is active.
+    fn load_author_state(&mut self) {
+        if !self.is_suite_author() {
+            return;
+        }
+        match author_workflow::read_author_state() {
+            Ok(author_state) => self.author_state = author_state,
+            Err(error) => eprintln!("warning: failed to load author state: {error}"),
         }
     }
 
