@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::context::RunContext;
-use crate::errors::{cow, CliError, CliErrorKind};
+use crate::errors::{CliError, CliErrorKind, cow};
 use crate::rules;
 use crate::workflow::author::{self as author_workflow, AuthorWorkflowState};
 use crate::workflow::runner::{self as runner_workflow, RunnerWorkflowState};

@@ -4,11 +4,11 @@ use std::path::PathBuf;
 use clap::{Args, Subcommand};
 
 use crate::audit_log::write_run_status_with_audit;
-use crate::commands::{RunDirArgs, resolve_run_dir};
-use crate::context::RunContext;
+use crate::commands::{RunDirArgs, resolve_run_services};
 use crate::core_defs::utc_now;
 use crate::errors::{CliError, CliErrorKind};
 use crate::rules::suite_runner::{REPORT_CODE_BLOCK_LIMIT, REPORT_LINE_LIMIT};
+use crate::run_services::RunServices;
 use crate::schema::{ExecutedGroupChange, GroupVerdict, RunReport, RunStatus};
 use crate::workflow::runner::ensure_execution_phase;
 
@@ -87,10 +87,10 @@ fn report_check(report_path: Option<&str>) -> Result<i32, CliError> {
     let path = if let Some(p) = report_path {
         PathBuf::from(p)
     } else {
-        let context = RunContext::from_current()?.ok_or_else(|| -> CliError {
+        let services = RunServices::from_current()?.ok_or_else(|| -> CliError {
             CliErrorKind::missing_run_context_value("report").into()
         })?;
-        context.layout.report_path()
+        services.layout().report_path()
     };
 
     if !path.exists() {
@@ -131,15 +131,15 @@ fn report_group(
     note: Option<&str>,
     run_dir_args: &RunDirArgs,
 ) -> Result<i32, CliError> {
-    let run_dir = resolve_run_dir(run_dir_args)?;
-
     if evidence.is_empty() && evidence_label.is_empty() && capture_label.is_none() {
         return Err(CliErrorKind::ReportGroupEvidenceRequired.into());
     }
 
-    let ctx = RunContext::from_run_dir(&run_dir)?;
+    let services = resolve_run_services(run_dir_args)?;
+    let run_dir = services.layout().run_dir();
+    let ctx = services.context();
 
-    let Some(mut run_status) = ctx.status else {
+    let Some(mut run_status) = ctx.status.clone() else {
         return Err(CliErrorKind::MissingRunStatus.into());
     };
 

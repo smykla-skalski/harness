@@ -3,10 +3,9 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use crate::cluster::Platform;
-use crate::commands::resolve_kubeconfig;
-use crate::context::RunContext;
 use crate::core_defs::{harness_data_root, host_platform};
 use crate::errors::{CliError, CliErrorKind, cow};
+use crate::run_services::RunServices;
 use crate::suite_defaults::default_repo_root_for_suite;
 
 /// Resolve the repo root for `init` when not explicitly provided.
@@ -48,19 +47,21 @@ pub(crate) fn resolve_run_root(raw: Option<&str>, suite_dir: Option<&Path>) -> P
 /// Best-effort: logs warnings on failure instead of propagating errors
 /// because record works in detached mode without a full run context.
 pub(crate) fn inject_run_env(cmd: &mut Command, run_dir: &Path, cluster: Option<&str>) {
-    let ctx = match RunContext::from_run_dir(run_dir) {
-        Ok(c) => c,
+    let services = match RunServices::from_run_dir(run_dir) {
+        Ok(s) => s,
         Err(e) => {
             eprintln!("warning: failed to load run context: {e}");
             return;
         }
     };
+    let ctx = services.context();
     let is_universal = ctx
-        .cluster_runtime()
-        .map(|runtime| runtime.platform())
-        .is_ok_and(|platform| platform == Platform::Universal);
+        .cluster
+        .as_ref()
+        .map(|spec| spec.platform)
+        .is_some_and(|platform| platform == Platform::Universal);
     if !is_universal {
-        match resolve_kubeconfig(&ctx, None, cluster) {
+        match services.resolve_kubeconfig(None, cluster) {
             Ok(kubeconfig) => {
                 cmd.env("KUBECONFIG", kubeconfig);
             }

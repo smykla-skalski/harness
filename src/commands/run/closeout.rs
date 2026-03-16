@@ -1,7 +1,7 @@
 use clap::Args;
 
 use crate::audit_log::write_run_status_with_audit;
-use crate::commands::{RunDirArgs, resolve_run_context};
+use crate::commands::{RunDirArgs, resolve_run_services};
 use crate::core_defs::utc_now;
 use crate::errors::{CliError, CliErrorKind};
 use crate::schema::Verdict;
@@ -26,8 +26,9 @@ pub struct CloseoutArgs {
 /// # Errors
 /// Returns `CliError` on failure.
 pub fn closeout(run_dir_args: &RunDirArgs) -> Result<i32, CliError> {
-    let ctx = resolve_run_context(run_dir_args)?;
-    let run_dir = ctx.layout.run_dir();
+    let services = resolve_run_services(run_dir_args)?;
+    let ctx = services.context();
+    let run_dir = services.layout().run_dir();
 
     let required = [
         "commands/command-log.md",
@@ -44,6 +45,7 @@ pub fn closeout(run_dir_args: &RunDirArgs) -> Result<i32, CliError> {
 
     let mut status = ctx
         .status
+        .clone()
         .ok_or_else(|| -> CliError { CliErrorKind::MissingRunStatus.into() })?;
 
     if status.last_state_capture.is_none() {

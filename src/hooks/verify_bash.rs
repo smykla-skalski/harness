@@ -66,7 +66,11 @@ fn extract_harness_context(
     let Some(run) = &ctx.run else {
         return Ok(None);
     };
-    Ok(Some((subcommand.to_string(), command.words().to_vec(), run)))
+    Ok(Some((
+        subcommand.to_string(),
+        command.words().to_vec(),
+        run,
+    )))
 }
 
 fn verify_artifacts(

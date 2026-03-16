@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::path::{Path, PathBuf};
 use std::{fs, io};
 
@@ -79,6 +79,21 @@ impl RunLayout {
     #[must_use]
     pub fn prepared_suite_path(&self) -> PathBuf {
         self.run_dir().join("prepared-suite.json")
+    }
+
+    #[must_use]
+    pub fn preflight_artifact_path(&self) -> PathBuf {
+        self.artifacts_dir().join("preflight.json")
+    }
+
+    #[must_use]
+    pub fn prepared_baseline_dir(&self) -> PathBuf {
+        self.manifests_dir().join("prepared").join("baseline")
+    }
+
+    #[must_use]
+    pub fn prepared_groups_dir(&self) -> PathBuf {
+        self.manifests_dir().join("prepared").join("groups")
     }
 
     /// Create required subdirectories.
@@ -255,6 +270,48 @@ pub struct ArtifactSnapshot {
     pub files: Vec<String>,
 }
 
+/// Snapshot of tool availability during preflight.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ToolCheckRecord {
+    pub name: String,
+    #[serde(default)]
+    pub available: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub path: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub detail: Option<String>,
+}
+
+/// Snapshot of node or cluster-member reachability during preflight.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct NodeCheckRecord {
+    pub name: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub role: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reachable: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub detail: Option<String>,
+}
+
+/// Typed wrapper for tool check results with a bounded escape hatch.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct ToolCheckSnapshot {
+    #[serde(default)]
+    pub items: Vec<ToolCheckRecord>,
+    #[serde(default, flatten)]
+    pub extra: BTreeMap<String, serde_json::Value>,
+}
+
+/// Typed wrapper for node check results with a bounded escape hatch.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct NodeCheckSnapshot {
+    #[serde(default)]
+    pub items: Vec<NodeCheckRecord>,
+    #[serde(default, flatten)]
+    pub extra: BTreeMap<String, serde_json::Value>,
+}
+
 /// Preflight artifact containing tool/node check results.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct PreflightArtifact {
@@ -264,9 +321,9 @@ pub struct PreflightArtifact {
     #[serde(default)]
     pub repo_root: Option<String>,
     #[serde(default)]
-    pub tools: serde_json::Value,
+    pub tools: ToolCheckSnapshot,
     #[serde(default)]
-    pub nodes: serde_json::Value,
+    pub nodes: NodeCheckSnapshot,
 }
 
 /// Update fields for the current run context.
@@ -350,7 +407,7 @@ impl RunRepository {
         let metadata: RunMetadata = read_json_typed(&layout.metadata_path())?;
         let status: RunStatus = read_json_typed(&layout.status_path())?;
         let prepared_suite = Self::load_optional(&layout.prepared_suite_path())?;
-        let preflight = Self::load_optional(&layout.artifacts_dir().join("preflight.json"))?;
+        let preflight = Self::load_optional(&layout.preflight_artifact_path())?;
         let cluster = Self::load_optional(&layout.state_dir().join("cluster.json"))?;
 
         Ok(RunAggregate {
@@ -452,6 +509,24 @@ impl RunRepository {
             );
         }
         self.load_from_pointer(pointer).map(Some)
+    }
+
+    /// Resolve the current run directory from the persisted session pointer.
+    ///
+    /// Missing pointers return `Ok(None)`. Stale pointers surface as explicit
+    /// missing-file errors instead of being treated as absent.
+    ///
+    /// # Errors
+    /// Returns `CliError` if the pointer is corrupt or points at a missing run.
+    pub fn current_run_dir(&self) -> Result<Option<PathBuf>, CliError> {
+        let Some(pointer) = self.load_current_pointer()? else {
+            return Ok(None);
+        };
+        let run_dir = pointer.layout.run_dir();
+        if !run_dir.is_dir() {
+            return Err(CliErrorKind::missing_file(run_dir.display().to_string()).into());
+        }
+        Ok(Some(run_dir))
     }
 }
 
@@ -1080,8 +1155,8 @@ mod tests {
         assert_eq!(pf.checked_at, "2026-03-14T00:00:00Z");
         assert!(pf.prepared_suite_path.is_none());
         assert!(pf.repo_root.is_none());
-        assert_eq!(pf.tools, serde_json::Value::Null);
-        assert_eq!(pf.nodes, serde_json::Value::Null);
+        assert!(pf.tools.items.is_empty());
+        assert!(pf.nodes.items.is_empty());
     }
 
     #[test]
