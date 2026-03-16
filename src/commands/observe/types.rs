@@ -227,6 +227,7 @@ pub enum IssueCode {
     DirectTaskOutputFileRead,
     HarnessInfrastructureMisconfiguration,
     MissingConnectionOrEnvVar,
+    SleepPrefixBeforeHarnessCommand,
 }
 
 /// Record of a `tool_use` block, for correlating with `tool_result`.
