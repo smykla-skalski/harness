@@ -1,29 +1,20 @@
-use std::collections::HashSet;
-
 use super::issue_builder::issue;
-use super::{AGENT_NAME_REGEX, EXIT_CODE_REGEX};
+use super::{AGENT_NAME_REGEX, EXIT_CODE_REGEX, TextCheckContext};
 use crate::commands::observe::patterns;
 use crate::commands::observe::types::{Issue, IssueCategory, MessageRole, SourceTool};
 
 /// Check for KSA hook codes in Bash output.
-pub(super) fn check_ksa_codes(
-    line_num: usize,
-    role: MessageRole,
-    text: &str,
-    lower: &str,
-    source_tool: Option<SourceTool>,
-    issues: &mut Vec<Issue>,
-) {
-    if source_tool != Some(SourceTool::Bash) {
+pub(super) fn check_ksa_codes(context: &TextCheckContext<'_>, issues: &mut Vec<Issue>) {
+    if context.source_tool != Some(SourceTool::Bash) {
         return;
     }
     for code in patterns::KSA_CODES {
-        if lower.contains(code) {
+        if context.lower.contains(code) {
             let display_code = code.to_uppercase();
             issues.push(issue!(
-                line_num,
-                role,
-                text,
+                context.line_number,
+                context.role,
+                context.text,
                 HookFailure,
                 Medium,
                 format!("Harness hook code {display_code} triggered"),
@@ -36,24 +27,16 @@ pub(super) fn check_ksa_codes(
 }
 
 /// Check for harness command failures with non-zero exit codes.
-pub(super) fn check_exit_code_issues(
-    line_num: usize,
-    role: MessageRole,
-    text: &str,
-    lower: &str,
-    source_tool: Option<SourceTool>,
-    issues: &mut Vec<Issue>,
-    matched_categories: &HashSet<IssueCategory>,
-) {
-    if source_tool != Some(SourceTool::Bash) {
+pub(super) fn check_exit_code_issues(context: &TextCheckContext<'_>, issues: &mut Vec<Issue>) {
+    if context.source_tool != Some(SourceTool::Bash) {
         return;
     }
 
     let is_harness_operation = patterns::HARNESS_OPERATION_KEYWORDS
         .iter()
-        .any(|keyword| lower.contains(keyword));
+        .any(|keyword| context.lower.contains(keyword));
 
-    let Some(captures) = EXIT_CODE_REGEX.captures(lower) else {
+    let Some(captures) = EXIT_CODE_REGEX.captures(context.lower) else {
         return;
     };
 
@@ -64,19 +47,24 @@ pub(super) fn check_exit_code_issues(
     let exit_code: u32 = code_str.parse().unwrap_or(0);
 
     if exit_code == 0
-        || matched_categories.contains(&IssueCategory::BuildError)
-        || matched_categories.contains(&IssueCategory::CliError)
+        || context
+            .matched_categories
+            .contains(&IssueCategory::BuildError)
+        || context
+            .matched_categories
+            .contains(&IssueCategory::CliError)
     {
         return;
     }
 
-    let is_harness_authoring = lower.contains("harness") && lower.contains("authoring");
+    let is_harness_authoring =
+        context.lower.contains("harness") && context.lower.contains("authoring");
 
     if is_harness_operation {
         issues.push(issue!(
-            line_num,
-            role,
-            text,
+            context.line_number,
+            context.role,
+            context.text,
             SkillBehavior,
             Medium,
             format!("Authored manifest failed at runtime (exit {exit_code})"),
@@ -86,9 +74,9 @@ pub(super) fn check_exit_code_issues(
         ));
     } else if is_harness_authoring {
         issues.push(issue!(
-            line_num,
-            role,
-            text,
+            context.line_number,
+            context.role,
+            context.text,
             WorkflowError,
             Medium,
             format!("Harness authoring command failed (exit {exit_code})"),
@@ -98,9 +86,9 @@ pub(super) fn check_exit_code_issues(
         ));
     } else if exit_code != 1 {
         issues.push(issue!(
-            line_num,
-            role,
-            text,
+            context.line_number,
+            context.role,
+            context.text,
             SubagentIssue,
             Low,
             format!("Non-zero exit code {exit_code}"),
@@ -110,31 +98,24 @@ pub(super) fn check_exit_code_issues(
 }
 
 /// Check for subagent permission failures in user-role text.
-pub(super) fn check_permission_failures(
-    line_num: usize,
-    role: MessageRole,
-    text: &str,
-    lower: &str,
-    source_tool: Option<SourceTool>,
-    issues: &mut Vec<Issue>,
-) {
-    if role != MessageRole::User || source_tool.is_some() {
+pub(super) fn check_permission_failures(context: &TextCheckContext<'_>, issues: &mut Vec<Issue>) {
+    if context.role != MessageRole::User || context.source_tool.is_some() {
         return;
     }
     if !patterns::PERMISSION_SIGNALS
         .iter()
-        .any(|signal| lower.contains(signal))
+        .any(|signal| context.lower.contains(signal))
     {
         return;
     }
     let agent_name = AGENT_NAME_REGEX
-        .captures(text)
+        .captures(context.text)
         .and_then(|c| c.get(1))
         .map_or("unknown", |m| m.as_str());
     issues.push(issue!(
-        line_num,
-        role,
-        text,
+        context.line_number,
+        context.role,
+        context.text,
         SubagentIssue,
         Medium,
         format!("Subagent '{agent_name}' blocked by missing permissions"),
@@ -144,60 +125,47 @@ pub(super) fn check_permission_failures(
 }
 
 /// Check for subagent save failures in assistant text.
-pub(super) fn check_save_failures(
-    line_num: usize,
-    role: MessageRole,
-    text: &str,
-    lower: &str,
-    source_tool: Option<SourceTool>,
-    issues: &mut Vec<Issue>,
-) {
-    if role != MessageRole::Assistant || source_tool.is_some() {
+pub(super) fn check_save_failures(context: &TextCheckContext<'_>, issues: &mut Vec<Issue>) {
+    if context.role != MessageRole::Assistant || context.source_tool.is_some() {
         return;
     }
     if !patterns::SAVE_FAILURE_SIGNALS
         .iter()
-        .any(|signal| lower.contains(signal))
+        .any(|signal| context.lower.contains(signal))
     {
         return;
     }
-    let context: String = text.chars().take(40).collect();
-    let context = context.replace('\n', " ");
+    let text_context: String = context.text.chars().take(40).collect();
+    let text_context = text_context.replace('\n', " ");
     issues.push(issue!(
-        line_num,
-        role,
-        text,
+        context.line_number,
+        context.role,
+        context.text,
         SubagentIssue,
         Medium,
-        format!("Subagent manual recovery: {context}"),
+        format!("Subagent manual recovery: {text_context}"),
         fixable: true,
         fix_hint: "Subagent lacks write permissions or hit a harness CLI error during save",
     ));
 }
 
 /// Check for manual payload recovery patterns.
-pub(super) fn check_payload_recovery(
-    line_num: usize,
-    role: MessageRole,
-    text: &str,
-    lower: &str,
-    source_tool: Option<SourceTool>,
-    issues: &mut Vec<Issue>,
-) {
-    if role != MessageRole::Assistant || source_tool.is_some() {
+pub(super) fn check_payload_recovery(context: &TextCheckContext<'_>, issues: &mut Vec<Issue>) {
+    if context.role != MessageRole::Assistant || context.source_tool.is_some() {
         return;
     }
-    let has_grep = lower.contains("grep");
-    let has_target =
-        lower.contains("output") || lower.contains("transcript") || lower.contains("payload");
-    let has_recovery = lower.contains("found the full payload")
-        || lower.contains("extract and save")
-        || lower.contains("grab its");
+    let has_grep = context.lower.contains("grep");
+    let has_target = context.lower.contains("output")
+        || context.lower.contains("transcript")
+        || context.lower.contains("payload");
+    let has_recovery = context.lower.contains("found the full payload")
+        || context.lower.contains("extract and save")
+        || context.lower.contains("grab its");
     if has_grep && has_target && has_recovery {
         issues.push(issue!(
-            line_num,
-            role,
-            text,
+            context.line_number,
+            context.role,
+            context.text,
             SubagentIssue,
             Medium,
             "Manual payload recovery from subagent output",
@@ -209,27 +177,19 @@ pub(super) fn check_payload_recovery(
 }
 
 /// Check for misconfigured environment variables in Bash output.
-/// Uses the `ENV_MISCONFIGURATION_SIGNALS` pattern array from patterns.rs.
-pub(super) fn check_env_misconfiguration(
-    line_num: usize,
-    role: MessageRole,
-    text: &str,
-    lower: &str,
-    source_tool: Option<SourceTool>,
-    issues: &mut Vec<Issue>,
-) {
-    if source_tool != Some(SourceTool::Bash) {
+pub(super) fn check_env_misconfiguration(context: &TextCheckContext<'_>, issues: &mut Vec<Issue>) {
+    if context.source_tool != Some(SourceTool::Bash) {
         return;
     }
     for signal in patterns::ENV_MISCONFIGURATION_SIGNALS {
-        if !lower.contains(signal) {
+        if !context.lower.contains(signal) {
             continue;
         }
         if signal.contains("claude_session_id") {
             issues.push(issue!(
-                line_num,
-                role,
-                text,
+                context.line_number,
+                context.role,
+                context.text,
                 DataIntegrity,
                 Critical,
                 "CLAUDE_SESSION_ID is unset - harness cannot resolve session context",
@@ -240,9 +200,9 @@ pub(super) fn check_env_misconfiguration(
             ));
         } else if signal.contains("kubeconfig") {
             issues.push(issue!(
-                line_num,
-                role,
-                text,
+                context.line_number,
+                context.role,
+                context.text,
                 SkillBehavior,
                 Critical,
                 "KUBECONFIG is empty - cluster commands will hit default context",
@@ -257,27 +217,20 @@ pub(super) fn check_env_misconfiguration(
 }
 
 /// Check for incomplete writer agent output in assistant text.
-pub(super) fn check_incomplete_writer(
-    line_num: usize,
-    role: MessageRole,
-    text: &str,
-    lower: &str,
-    source_tool: Option<SourceTool>,
-    issues: &mut Vec<Issue>,
-) {
-    if role != MessageRole::Assistant || source_tool.is_some() {
+pub(super) fn check_incomplete_writer(context: &TextCheckContext<'_>, issues: &mut Vec<Issue>) {
+    if context.role != MessageRole::Assistant || context.source_tool.is_some() {
         return;
     }
     if !patterns::INCOMPLETE_WRITER_SIGNALS
         .iter()
-        .any(|signal| lower.contains(signal))
+        .any(|signal| context.lower.contains(signal))
     {
         return;
     }
     issues.push(issue!(
-        line_num,
-        role,
-        text,
+        context.line_number,
+        context.role,
+        context.text,
         SubagentIssue,
         Medium,
         "Writer subagent produced incomplete output",
@@ -287,27 +240,23 @@ pub(super) fn check_incomplete_writer(
 }
 
 /// Check for user frustration signals in human text.
-pub(super) fn check_user_frustration(
-    line_num: usize,
-    role: MessageRole,
-    text: &str,
-    lower: &str,
-    source_tool: Option<SourceTool>,
-    issues: &mut Vec<Issue>,
-) {
-    if role != MessageRole::User || source_tool.is_some() || text.len() >= 2000 {
+pub(super) fn check_user_frustration(context: &TextCheckContext<'_>, issues: &mut Vec<Issue>) {
+    if context.role != MessageRole::User
+        || context.source_tool.is_some()
+        || context.text.len() >= 2000
+    {
         return;
     }
-    let exclamation_count = text.chars().filter(|&c| c == '!').count();
+    let exclamation_count = context.text.chars().filter(|&c| c == '!').count();
     let has_signal = patterns::USER_FRUSTRATION_SIGNALS
         .iter()
-        .any(|signal| lower.contains(signal));
+        .any(|signal| context.lower.contains(signal));
 
     if exclamation_count >= 4 || has_signal {
         issues.push(issue!(
-            line_num,
-            role,
-            text,
+            context.line_number,
+            context.role,
+            context.text,
             UserFrustration,
             Medium,
             "User frustration signal detected",
