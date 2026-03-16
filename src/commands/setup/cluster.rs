@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::env;
+use std::fs;
 use std::path::Path;
 use std::time::Duration;
 
@@ -7,7 +8,8 @@ use crate::cli::ClusterArgs;
 use crate::cluster::{ClusterSpec, HelmSetting, Platform};
 use crate::commands::resolve_repo_root;
 use crate::compose;
-use crate::core_defs::{resolve_build_info, utc_now};
+use crate::context::CurrentRunRecord;
+use crate::core_defs::{current_run_context_path, resolve_build_info, utc_now};
 use crate::errors::{CliError, CliErrorKind, cow};
 use crate::exec::{
     cluster_exists, compose_down_project, compose_up, docker_inspect_ip, docker_network_create,
@@ -143,7 +145,7 @@ fn cluster_universal(
 
     let root = resolve_repo_root(repo_root);
 
-    let spec = ClusterSpec::from_mode_with_platform(
+    let mut spec = ClusterSpec::from_mode_with_platform(
         mode,
         &all_names,
         &root.to_string_lossy(),
@@ -170,12 +172,30 @@ fn cluster_universal(
     );
 
     match mode {
-        "single-up" => universal_single_up(&cp_image, network_name, store, &all_names[0])?,
+        "single-up" => {
+            let result = universal_single_up(&cp_image, network_name, store, &all_names[0])?;
+            spec.cp_image = Some(cp_image);
+            spec.store_type = Some(store.to_string());
+            spec.admin_token = Some(result.admin_token);
+            spec.members[0].container_ip = Some(result.cp_ip);
+        }
         "single-down" => universal_single_down(network_name, &all_names[0])?,
-        "global-zone-up" => universal_global_zone_up(&cp_image, network_name, store, &all_names)?,
+        "global-zone-up" => {
+            let result =
+                universal_global_zone_up(&cp_image, network_name, store, &all_names)?;
+            spec.cp_image = Some(cp_image);
+            spec.store_type = Some(store.to_string());
+            spec.admin_token = Some(result.admin_token);
+            spec.members[0].container_ip = Some(result.cp_ip);
+        }
         "global-zone-down" => universal_global_zone_down(network_name, &all_names)?,
         "global-two-zones-up" => {
-            universal_global_two_zones_up(&cp_image, network_name, store, &all_names)?;
+            let result =
+                universal_global_two_zones_up(&cp_image, network_name, store, &all_names)?;
+            spec.cp_image = Some(cp_image);
+            spec.store_type = Some(store.to_string());
+            spec.admin_token = Some(result.admin_token);
+            spec.members[0].container_ip = Some(result.cp_ip);
         }
         "global-two-zones-down" => universal_global_two_zones_down(network_name, &all_names)?,
         _ => {
@@ -185,8 +205,52 @@ fn cluster_universal(
         }
     }
 
+    if is_up {
+        persist_cluster_spec(&spec)?;
+    }
+
     println!("{mode} completed");
     Ok(0)
+}
+
+/// Result from a universal cluster up operation.
+struct UniversalUpResult {
+    admin_token: String,
+    cp_ip: String,
+}
+
+/// Persist cluster spec to the session context and run directory if available.
+fn persist_cluster_spec(spec: &ClusterSpec) -> Result<(), CliError> {
+    // Update session context (current-run.json) if it exists
+    let ctx_path = current_run_context_path()?;
+    if let Ok(text) = fs::read_to_string(&ctx_path) {
+        if let Ok(mut record) = serde_json::from_str::<CurrentRunRecord>(&text) {
+            record.cluster = Some(spec.clone());
+            let json = serde_json::to_string_pretty(&record)
+                .map_err(|e| CliErrorKind::serialize(cow!("cluster spec: {e}")))?;
+            fs::write(&ctx_path, format!("{json}\n"))
+                .map_err(|e| CliErrorKind::io(cow!("write session context: {e}")))?;
+
+            // Also write to run dir state/cluster.json
+            let run_dir = record.layout.run_dir();
+            let state_dir = run_dir.join("state");
+            if state_dir.is_dir() {
+                let cluster_path = state_dir.join("cluster.json");
+                let cluster_json = serde_json::to_string_pretty(spec)
+                    .map_err(|e| CliErrorKind::serialize(cow!("cluster spec: {e}")))?;
+                fs::write(&cluster_path, format!("{cluster_json}\n"))
+                    .map_err(|e| CliErrorKind::io(cow!("write cluster spec: {e}")))?;
+                eprintln!("{} cluster: spec saved to state/cluster.json", utc_now());
+            }
+        }
+    }
+
+    // Always output spec JSON to stdout for scripting
+    let spec_json = serde_json::to_string_pretty(&spec.to_json_dict())
+        .map_err(|e| CliErrorKind::serialize(cow!("cluster spec json: {e}")))?;
+    eprintln!("{spec_json}");
+
+    Ok(())
 }
 
 fn start_and_deploy(
@@ -414,7 +478,7 @@ fn universal_single_up(
     network: &str,
     store: &str,
     cp_name: &str,
-) -> Result<(), CliError> {
+) -> Result<UniversalUpResult, CliError> {
     docker_network_create(network, UNIVERSAL_SUBNET)?;
 
     let env = [
@@ -442,8 +506,10 @@ fn universal_single_up(
         "{} cluster: CP ready at {health_url} (admin token extracted)",
         utc_now()
     );
-    eprintln!("admin-token={admin_token}");
-    Ok(())
+    Ok(UniversalUpResult {
+        admin_token,
+        cp_ip: ip,
+    })
 }
 
 fn universal_single_down(network: &str, cp_name: &str) -> Result<(), CliError> {
@@ -457,7 +523,7 @@ fn universal_global_zone_up(
     network: &str,
     store: &str,
     names: &[String],
-) -> Result<(), CliError> {
+) -> Result<UniversalUpResult, CliError> {
     if names.len() < 3 {
         return Err(CliErrorKind::usage_error(
             "global-zone-up requires names: <global> <zone-container> <zone-label>",
@@ -501,9 +567,11 @@ fn universal_global_zone_up(
         "{} cluster: global CP ready (admin token extracted)",
         utc_now()
     );
-    eprintln!("admin-token={admin_token}");
 
-    Ok(())
+    Ok(UniversalUpResult {
+        admin_token,
+        cp_ip: global_ip,
+    })
 }
 
 fn universal_global_zone_down(_network: &str, names: &[String]) -> Result<(), CliError> {
