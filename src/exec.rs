@@ -435,15 +435,30 @@ pub fn docker_write_file(
 // Docker Compose (multi-zone universal)
 // ---------------------------------------------------------------------------
 
-/// Start services from a compose file.
+/// Start services from a compose file with a wait timeout.
 ///
 /// # Errors
 /// Returns `CliError` on command failure.
-pub fn compose_up(file: &Path, project: &str) -> Result<CommandResult, CliError> {
+pub fn compose_up(
+    file: &Path,
+    project: &str,
+    timeout_seconds: u32,
+) -> Result<CommandResult, CliError> {
     let file_str = file.to_string_lossy();
+    let timeout_str = timeout_seconds.to_string();
     run_command(
         &[
-            "docker", "compose", "-f", &file_str, "-p", project, "up", "-d",
+            "docker",
+            "compose",
+            "-f",
+            &file_str,
+            "-p",
+            project,
+            "up",
+            "-d",
+            "--wait",
+            "--wait-timeout",
+            &timeout_str,
         ],
         None,
         None,
