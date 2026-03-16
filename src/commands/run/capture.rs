@@ -1,4 +1,3 @@
-use std::fs;
 use std::path::{Path, PathBuf};
 
 use chrono::Utc;
@@ -47,7 +46,7 @@ pub fn capture(
         status.last_state_capture = Some(rel.clone());
         let status_json = serde_json::to_string_pretty(&status)
             .map_err(|e| CliErrorKind::serialize(cow!("capture status update: {e}")))?;
-        fs::write(ctx.layout.status_path(), format!("{status_json}\n"))?;
+        write_text(&ctx.layout.status_path(), &format!("{status_json}\n"))?;
     }
 
     println!("{rel}");
