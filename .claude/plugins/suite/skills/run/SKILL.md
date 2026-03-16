@@ -97,7 +97,7 @@ Parse from `$ARGUMENTS`:
 | Argument | Default | Purpose |
 | --- | --- | --- |
 | (positional) | - | Suite path or bare name. Bare names (no `/`) are looked up in `${DATA_DIR}/` first. Prompt with AskUserQuestion if omitted |
-| `--profile` | `single-zone` | Cluster profile: `single-zone`, `multi-zone` |
+| `--profile` | `all` | Cluster profile: `single-zone`, `multi-zone`, `single-zone-universal`, `multi-zone-universal`, or `all`. When `all` (the default), the runner scans the suite's group files for profile requirements and executes one full run per required profile, tearing down and rebuilding clusters between profiles. Each profile run gets its own run ID (e.g. `20260316-motb-sz`, `20260316-motb-mz`). Groups that don't specify a profile run under every profile. |
 | `--repo` | auto-detect cwd | Path to Kuma repo checkout |
 | `--run-id` | timestamp-based | Override run identifier |
 | `--resume` | - | Resume a partial run by its run ID |
@@ -236,7 +236,9 @@ Fill `run-metadata.json` with profile, feature scope, and the recorded `kumactl`
 
 Read [references/cluster-setup.md](references/cluster-setup.md) before starting this phase.
 
-Select the cluster topology based on the `--profile` flag (default: `single-zone`):
+When `--profile all` (the default), read all group files and collect the set of required profiles. For each profile, execute a full run (Phase 1-6) with only the groups matching that profile. Present the execution plan to the user via AskUserQuestion before starting: "Suite requires profiles: [list]. Execute all? [Yes - run all profiles, Select profiles, Single profile only]".
+
+Select the cluster topology based on the profile being executed:
 
 ```bash
 # Kubernetes single-zone (--profile single-zone):
