@@ -43,91 +43,29 @@ When the value is prose, resolve it to a line number by scanning the session JSO
 - Project dir: !`echo "$CLAUDE_PROJECT_DIR"`
 - Session search path: !`echo "$HOME/.claude/projects/"`
 
-## Classifier script reference
+## Harness observe command reference
 
-The classifier at `scripts/classify-session.py` is the primary data source. Call it directly from Bash any time data is needed - not only through the observer agent loop. All output is structured for programmatic parsing.
+The `harness observe` command is the primary data source. All subcommands use `--project-hint` to narrow session search.
 
 ### Invocation patterns
 
-**Full scan** (initial triage):
-```bash
-"${CLAUDE_SKILL_DIR}/scripts/classify-session.py" \
-  <session-id> --from-line <N> --json --summary
-```
+**Full scan**: `harness observe scan <session-id> --project-hint <hint> --json --summary`
+**Filtered**: `harness observe scan <session-id> --project-hint <hint> --from-line 2000 --json --summary`
+**One-shot cycle**: `harness observe cycle <session-id> --project-hint <hint>` (reads/updates cursor from state file)
+**Raw dump**: `harness observe dump <session-id> --project-hint <hint> --from-line 3800 --to-line 3900`
+**Filtered dump**: `harness observe dump <session-id> --project-hint <hint> --filter "crashloop" --from-line 4000`
+**Context**: `harness observe context <session-id> --project-hint <hint> --line 4122 --window 20`
+**Watch mode**: `harness observe watch <session-id> --project-hint <hint> --from-line <N>`
 
-**Filtered scan** (targeted investigation):
-```bash
-"${CLAUDE_SKILL_DIR}/scripts/classify-session.py" \
-  <session-id> --severity critical --json --summary
+### Subcommands
 
-"${CLAUDE_SKILL_DIR}/scripts/classify-session.py" \
-  <session-id> --category cli_error,naming_error --json
-
-"${CLAUDE_SKILL_DIR}/scripts/classify-session.py" \
-  <session-id> --fixable --exclude tool_error,subagent_issue --summary
-
-"${CLAUDE_SKILL_DIR}/scripts/classify-session.py" \
-  <session-id> --from-line 2000 --category build_error --json
-```
-
-**Watch mode** (continuous polling for new events):
-```bash
-"${CLAUDE_SKILL_DIR}/scripts/classify-session.py" \
-  <session-id> --watch --from-line <N> --poll-interval 3 --timeout 90 --json --summary
-```
-
-**Raw event dump** (inspect session content without classification):
-```bash
-"${CLAUDE_SKILL_DIR}/scripts/classify-session.py" \
-  <session-id> --dump --from-line 3800 --to-line 3900
-
-"${CLAUDE_SKILL_DIR}/scripts/classify-session.py" \
-  <session-id> --dump --filter "crashloop" --from-line 4000
-
-"${CLAUDE_SKILL_DIR}/scripts/classify-session.py" \
-  <session-id> --dump --role assistant --filter "deviation"
-
-"${CLAUDE_SKILL_DIR}/scripts/classify-session.py" \
-  <session-id> --dump --filter "otel-collector" --from-line 4100 --to-line 4250
-```
-
-**Context around a flagged line** (investigate what happened before/after an issue):
-```bash
-"${CLAUDE_SKILL_DIR}/scripts/classify-session.py" \
-  <session-id> --context 4122
-
-"${CLAUDE_SKILL_DIR}/scripts/classify-session.py" \
-  <session-id> --context 4122 --window 20
-```
-
-**Human-readable** (quick glance, no --json):
-```bash
-"${CLAUDE_SKILL_DIR}/scripts/classify-session.py" \
-  <session-id> --severity medium --summary
-```
-
-### All CLI options
-
-| Flag | Type | Default | Purpose |
-| --- | --- | --- | --- |
-| `--from-line N` | int | 0 | Start from this JSONL line |
-| `--to-line N` | int | none | Stop at this line (dump/context modes) |
-| `--watch` | flag | off | Poll for new events instead of one-shot |
-| `--poll-interval S` | float | 3.0 | Seconds between polls in watch mode |
-| `--timeout S` | float | 90.0 | Exit watch after S seconds of no new events |
-| `--json` | flag | off | Output issues as JSON lines (one object per line) |
-| `--summary` | flag | off | Print a JSON summary object at the end |
-| `--category X,Y` | str | all | Only include these categories (comma-separated) |
-| `--severity LEVEL` | str | all | Minimum severity: `low`, `medium`, `critical` |
-| `--fixable` | flag | off | Only show issues with `fixable: true` |
-| `--exclude X,Y` | str | none | Exclude these categories (comma-separated) |
-| `--project-hint DIR` | str | none | Narrow session search to project dir containing this string |
-| `--dump` | flag | off | Raw event dump (no classification). Use with `--filter` and `--role` |
-| `--context LINE` | int | none | Show events around LINE. Use `--window` to adjust range |
-| `--window N` | int | 10 | Lines before/after for `--context` |
-| `--filter TEXT` | str | none | Case-insensitive substring filter for `--dump` mode |
-| `--role X,Y` | str | all | Role filter for `--dump` (comma-separated: `user`, `assistant`) |
-| `--details-file PATH` | str | none | Write full untruncated issues here. Main output stays truncated |
+| Subcommand | Purpose |
+| --- | --- |
+| `scan` | One-shot scan with `--json --summary`, `--from-line`, `--severity`, `--category` filters |
+| `cycle` | Read cursor from state file, scan new events, update cursor, report. Used by the automated cron. |
+| `dump` | Raw event dump with `--from-line`, `--to-line`, `--filter`, `--role` |
+| `context` | Show events around a specific `--line` with `--window` |
+| `watch` | Continuous polling with `--poll-interval` and `--timeout` |
 
 ### Output format
 
@@ -214,16 +152,17 @@ Write initial cursor state to a temp file:
 echo '{"cursor": <CURSOR>, "session_id": "<SESSION_ID>"}' > /tmp/observe-<SESSION_ID>.state
 ```
 
-Call `CronCreate` with:
-- cron: `*/2 * * * *` (every 2 minutes)
-- prompt: the observer cron prompt (see section below) with the actual session ID, classifier path, and state file path baked in
+Create two cron jobs:
 
-Store the returned task ID. Print to user:
+1. **Automated cron** (`*/2 * * * *`) - runs `harness observe cycle` for fast heuristic scanning. See "Automated cron" section below.
+2. **Deep analysis cron** (`*/5 * * * *`) - spawns a subagent that reads recent activity holistically and flags subtle issues automated heuristics miss. See "Deep analysis cron" section below.
+
+Store both cron IDs. Print to user:
 ```
-Observer started (task <TASK_ID>). Checking every 2 minutes from line <CURSOR>.
+Observer started. Automated scan every 2min (task <ID1>), deep analysis every 5min (task <ID2>). From line <CURSOR>.
 ```
 
-Then stay available for ad-hoc queries and fix worker results. No manual relaunch needed.
+Then stay available for ad-hoc queries and fix worker results.
 
 **Ad-hoc queries** between cron cycles - call the classifier directly:
 
@@ -231,28 +170,79 @@ Then stay available for ad-hoc queries and fix worker results. No manual relaunc
 - "Show me only critical fixable issues" → run with `--severity critical --fixable --json`
 - "Any new CLI errors?" → run with `--from-line <cursor> --category cli_error --json`
 
-## Observer cron prompt
+## Automated cron (every 2 minutes)
 
-The cron prompt below is parameterized - bake in the actual `SESSION_ID`, classifier path (`${CLAUDE_SKILL_DIR}/scripts/classify-session.py`), and state file path (`/tmp/observe-SESSION_ID.state`) when calling `CronCreate`.
+Bake in the actual `SESSION_ID` and state file path when calling `CronCreate`.
 
 ```
-Read /tmp/observe-<SESSION_ID>.state and parse the cursor value.
+Run: harness observe cycle <SESSION_ID> --project-hint <PROJECT_HINT>
 
-Run:
-  "<CLASSIFIER_PATH>" \
-    <SESSION_ID> --from-line <CURSOR> --json --summary
+If the output is empty (no issues), do nothing.
 
-Parse each JSON line. The last line with "status": "done" is the summary - extract
-last_line as the new cursor.
+If issues were found, parse each JSON line and apply this policy:
 
-Write the updated cursor back:
-  echo '{"cursor": <NEW_CURSOR>, "session_id": "<SESSION_ID>"}' > /tmp/observe-<SESSION_ID>.state
+**Critical or medium severity + fixable**: Immediately spawn a background fix worker agent
+with mode: "auto" and run_in_background: true. Include the issue summary, details,
+fix_target, and fix_hint. Instruct the worker to run cargo clippy --lib && cargo test --lib
+after Rust changes.
 
-If any issues were found:
-- Report: "Cycle: lines OLD_CURSOR-NEW_CURSOR, N new issues (X critical)"
-- For each fixable critical/medium issue, dispatch a fix worker (see Fix worker template)
-If no issues: print nothing (silent cycles reduce noise).
+**Low severity or not fixable**: Use AskUserQuestion to ask the user:
+"Observer found: [summary] at L[line] ([category]). Fix now?" with options
+"Fix it", "Skip", "Investigate first". Only dispatch a fix worker if the user selects "Fix it".
 ```
+
+## Deep analysis cron (every 5 minutes)
+
+Create a second cron that spawns a subagent for holistic analysis of recent session activity. This catches subtle issues that automated heuristics miss - wrong assumptions, questionable decisions, suboptimal approaches, schema misunderstandings, missing validations, and anything that smells off.
+
+Call `CronCreate` with `*/5 * * * *` and this prompt (bake in session ID and project hint):
+
+```
+Spawn a general-purpose Agent with mode: "auto" and this prompt:
+
+"You are a deep session analyst. Dump the last 5 minutes of session activity:
+
+harness observe dump <SESSION_ID> --project-hint <PROJECT_HINT> --from-line <CURSOR_FROM_STATE_FILE>
+
+Read the full dump carefully. You are looking for ANYTHING wrong, questionable, or suboptimal
+that automated heuristics would miss. Think holistically about what the runner is doing.
+
+Flag issues in these categories:
+
+1. **Wrong assumptions** - runner assumes something about the API, CRD schema, or behavior
+   that isn't verified. Example: assuming ContainerPatch value is a YAML object when it's
+   actually a JSON string field.
+
+2. **Skipped verification** - runner applies a manifest and moves on without checking it
+   actually took effect. Example: applying a policy without verifying xDS config changed.
+
+3. **Questionable decisions** - runner makes a choice that seems wrong for the context.
+   Example: skipping a group without asking, continuing after a failure without triage.
+
+4. **Schema/API misuse** - using wrong field names, wrong resource versions, deprecated
+   fields, or fields that don't exist in the CRD.
+
+5. **Missing cleanup** - resources created but never deleted, leftover state from previous
+   groups that could contaminate later tests.
+
+6. **Inefficiency** - doing the same thing multiple times, using sleep when --delay exists,
+   absolute paths when relative would work, manual commands when harness wraps them.
+
+7. **Anything else that smells wrong** - trust your instincts. If something looks off,
+   flag it.
+
+For each finding, report:
+- Line number(s)
+- What you found
+- Why it's wrong
+- Suggested fix
+
+If you find nothing: say 'Deep analysis: clean' and stop.
+If you find issues: present them via AskUserQuestion with the header 'Deep analysis'
+and options 'Fix all', 'Review individually', 'Skip'."
+```
+
+Store both cron IDs. When stopping the observer, delete both.
 
 ### Handling session compaction
 
@@ -337,7 +327,7 @@ If the build_error at L612 no longer appears in new output, the fix is confirmed
 ## Stopping
 
 When the user says to stop:
-1. Call `CronDelete(<TASK_ID>)` to cancel the loop
+1. Call `CronDelete` on both cron IDs (automated + deep analysis)
 2. Remove `/tmp/observe-<SESSION_ID>.state`
-3. Let any running fix workers complete
-4. Print final summary: total issues found, fixes applied, issues remaining
+3. Let any running fix workers or deep analysis agents complete
+4. Print final summary: total issues found, fixes applied, deep analysis findings, issues remaining
