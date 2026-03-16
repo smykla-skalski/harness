@@ -230,6 +230,9 @@ pub enum IssueCode {
     MissingConnectionOrEnvVar,
     SleepPrefixBeforeHarnessCommand,
     JqErrorInCommandOutput,
+    CloseoutVerdictPending,
+    RunnerStateEventNotSupported,
+    RunnerStateMachineStale,
 }
 
 /// Record of a `tool_use` block, for correlating with `tool_result`.
