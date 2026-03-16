@@ -49,6 +49,10 @@ pub fn status(run_dir_args: &RunDirArgs) -> Result<i32, CliError> {
         ],
         &[0, 1],
     )
+    .map_err(|e| {
+        eprintln!("warning: docker ps failed: {e}");
+        e
+    })
     .ok()
     .map(|r| {
         r.stdout
@@ -74,6 +78,10 @@ pub fn status(run_dir_args: &RunDirArgs) -> Result<i32, CliError> {
             None,
             spec.admin_token(),
         )
+        .map_err(|e| {
+            eprintln!("warning: CP API dataplanes query failed: {e}");
+            e
+        })
         .ok()
     } else {
         None

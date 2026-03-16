@@ -278,7 +278,10 @@ fn poll_session_lines(
     let Ok(mut file) = fs::File::open(path) else {
         return Vec::new();
     };
-    let _ = file.seek(SeekFrom::Start(*byte_offset));
+    if let Err(e) = file.seek(SeekFrom::Start(*byte_offset)) {
+        eprintln!("warning: seek failed on session file: {e}");
+        return Vec::new();
+    }
     let reader = BufReader::new(file);
     let mut issues = Vec::new();
     for line_result in reader.lines() {
@@ -301,8 +304,12 @@ fn emit_watch_issue(
     if let Some(detail_out) = details_writer
         && let Ok(json_str) = serde_json::to_string(issue)
     {
-        let _ = writeln!(detail_out, "{json_str}");
-        let _ = detail_out.flush();
+        if let Err(e) = writeln!(detail_out, "{json_str}") {
+            eprintln!("warning: failed to write issue details: {e}");
+        }
+        if let Err(e) = detail_out.flush() {
+            eprintln!("warning: failed to flush issue details: {e}");
+        }
     }
     let rendered = if json_mode {
         output::render_json(issue)
@@ -310,8 +317,12 @@ fn emit_watch_issue(
         output::render_human(issue)
     };
     if let Some(file_out) = output_writer {
-        let _ = writeln!(file_out, "{rendered}");
-        let _ = file_out.flush();
+        if let Err(e) = writeln!(file_out, "{rendered}") {
+            eprintln!("warning: failed to write issue output: {e}");
+        }
+        if let Err(e) = file_out.flush() {
+            eprintln!("warning: failed to flush issue output: {e}");
+        }
     } else {
         println!("{rendered}");
     }
