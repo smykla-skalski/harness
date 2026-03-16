@@ -38,3 +38,4 @@ temp-env = "0.3.6"
 [lints.clippy]
 pedantic = { level = "deny", priority = 1 }
 absolute_paths = { level = "deny", priority = 2 }
+cognitive_complexity = { level = "deny", priority = 2 }
