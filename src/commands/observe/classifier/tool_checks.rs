@@ -1,9 +1,10 @@
 use serde_json::Value;
 
+use super::emitter::{Guidance, IssueBlueprint, IssueEmitter};
 use super::{OLD_SKILL_REGEX, RM_RECURSIVE_REGEX, SKILL_NAME_REGEX};
 use crate::commands::observe::patterns;
 use crate::commands::observe::types::{
-    Issue, IssueCategory, IssueSeverity, MessageRole, ScanState, ToolUseRecord,
+    Issue, IssueCategory, IssueCode, IssueSeverity, MessageRole, ScanState, ToolUseRecord,
 };
 
 /// Check a `tool_use` block for issues.
@@ -17,16 +18,16 @@ pub fn check_tool_use_for_issues(
     let input = &block["input"];
 
     if name == "Bash" {
-        check_bash_tool_use(line_num, input, &mut issues);
+        check_bash_tool_use(line_num, input, state, &mut issues);
     }
 
     if name == "AskUserQuestion" {
-        check_ask_user_question(line_num, input, &mut issues);
+        check_ask_user_question(line_num, input, state, &mut issues);
     }
 
     if name == "Write" || name == "Edit" {
         check_write_edit_tool_use(line_num, name, input, state, &mut issues);
-        check_managed_file_writes(line_num, input, &mut issues);
+        check_managed_file_writes(line_num, input, state, &mut issues);
     }
 
     // Record tool_use for correlating with tool_result.
@@ -48,35 +49,46 @@ pub fn check_tool_use_for_issues(
 // ─── tool_use sub-checks ───────────────────────────────────────────
 
 /// Check Bash `tool_use` for specific patterns.
-fn check_bash_tool_use(line_num: usize, input: &Value, issues: &mut Vec<Issue>) {
+fn check_bash_tool_use(
+    line_num: usize,
+    input: &Value,
+    state: &mut ScanState,
+    issues: &mut Vec<Issue>,
+) {
     let command = input["command"].as_str().unwrap_or("");
+    let details = format!("Command: {command}");
+    let mut emitter = IssueEmitter::new(line_num, MessageRole::Assistant, state);
 
     if OLD_SKILL_REGEX.is_match(command) {
-        issues.push(Issue {
-            line: line_num,
-            category: IssueCategory::NamingError,
-            severity: IssueSeverity::Medium,
-            summary: "Old skill name used in harness command".into(),
-            details: format!("Command: {command}"),
-            source_role: MessageRole::Assistant,
-            fixable: true,
-            fix_target: None,
-            fix_hint: Some("SKILL.md or model still references old skill names".into()),
-        });
+        emitter.emit(
+            issues,
+            IssueBlueprint::new(
+                IssueCode::OldSkillNameUsedInCommand,
+                IssueCategory::NamingError,
+                IssueSeverity::Medium,
+                "Old skill name used in harness command",
+            )
+            .with_guidance(Guidance::fix_hint(
+                "SKILL.md or model still references old skill names",
+            )),
+            &details,
+        );
     }
 
     if command.contains("harness") && command.contains("validator-decision") {
-        issues.push(Issue {
-            line: line_num,
-            category: IssueCategory::CliError,
-            severity: IssueSeverity::Medium,
-            summary: "Invalid harness subcommand/argument used".into(),
-            details: format!("Command: {command}"),
-            source_role: MessageRole::Assistant,
-            fixable: true,
-            fix_target: None,
-            fix_hint: Some("SKILL.md references a non-existent harness kind".into()),
-        });
+        emitter.emit(
+            issues,
+            IssueBlueprint::new(
+                IssueCode::InvalidHarnessSubcommandUsed,
+                IssueCategory::CliError,
+                IssueSeverity::Medium,
+                "Invalid harness subcommand/argument used",
+            )
+            .with_guidance(Guidance::fix_hint(
+                "SKILL.md references a non-existent harness kind",
+            )),
+            &details,
+        );
     }
 
     let command_lower = command.to_lowercase();
@@ -84,66 +96,70 @@ fn check_bash_tool_use(line_num: usize, input: &Value, issues: &mut Vec<Issue>) 
         .iter()
         .any(|signal| command_lower.contains(signal))
     {
-        issues.push(Issue {
-            line: line_num,
-            category: IssueCategory::UnexpectedBehavior,
-            severity: IssueSeverity::Medium,
-            summary: "Python used in Bash command - agents should never need python".into(),
-            details: format!("Command: {command}"),
-            source_role: MessageRole::Assistant,
-            fixable: true,
-            fix_target: None,
-            fix_hint: Some(
-                "Use harness commands or shell builtins instead of python one-liners".into(),
-            ),
-        });
+        emitter.emit(
+            issues,
+            IssueBlueprint::new(
+                IssueCode::PythonUsedInBashToolUse,
+                IssueCategory::UnexpectedBehavior,
+                IssueSeverity::Medium,
+                "Python used in Bash command - agents should never need python",
+            )
+            .with_guidance(Guidance::fix_hint(
+                "Use harness commands or shell builtins instead of python one-liners",
+            )),
+            &details,
+        );
     }
 
     if RM_RECURSIVE_REGEX.is_match(command) && !command.contains("&&") {
-        issues.push(Issue {
-            line: line_num,
-            category: IssueCategory::UnexpectedBehavior,
-            severity: IssueSeverity::Medium,
-            summary: "Destructive rm -r without chained verification".into(),
-            details: format!("Command: {command}"),
-            source_role: MessageRole::Assistant,
-            fixable: false,
-            fix_target: None,
-            fix_hint: Some("Should verify target exists and is correct before deleting".into()),
-        });
+        emitter.emit(
+            issues,
+            IssueBlueprint::new(
+                IssueCode::UnverifiedRecursiveRemove,
+                IssueCategory::UnexpectedBehavior,
+                IssueSeverity::Medium,
+                "Destructive rm -r without chained verification",
+            )
+            .with_guidance(Guidance::advisory(
+                "Should verify target exists and is correct before deleting",
+            )),
+            &details,
+        );
     }
 
     if command.contains("make k3d/") || command.contains("make kind/") {
-        issues.push(Issue {
-            line: line_num,
-            category: IssueCategory::UnexpectedBehavior,
-            severity: IssueSeverity::Critical,
-            summary: "Raw make target used for cluster operation".into(),
-            details: format!("Command: {command}"),
-            source_role: MessageRole::Assistant,
-            fixable: true,
-            fix_target: None,
-            fix_hint: Some("Use harness cluster instead of raw make targets".into()),
-        });
+        emitter.emit(
+            issues,
+            IssueBlueprint::new(
+                IssueCode::RawClusterMakeTargetUsed,
+                IssueCategory::UnexpectedBehavior,
+                IssueSeverity::Critical,
+                "Raw make target used for cluster operation",
+            )
+            .with_guidance(Guidance::fix_hint(
+                "Use harness cluster instead of raw make targets",
+            )),
+            &details,
+        );
     }
 
     if command.contains("git commit") || command.contains("git add") {
-        issues.push(Issue {
-            line: line_num,
-            category: IssueCategory::UnexpectedBehavior,
-            severity: IssueSeverity::Critical,
-            summary: "Unauthorized git commit during active run".into(),
-            details: format!("Command: {command}"),
-            source_role: MessageRole::Assistant,
-            fixable: true,
-            fix_target: None,
-            fix_hint: Some(
-                "Agent committed code without asking the user via bug-found gate".into(),
-            ),
-        });
+        emitter.emit(
+            issues,
+            IssueBlueprint::new(
+                IssueCode::UnauthorizedGitCommitDuringRun,
+                IssueCategory::UnexpectedBehavior,
+                IssueSeverity::Critical,
+                "Unauthorized git commit during active run",
+            )
+            .with_guidance(Guidance::fix_hint(
+                "Agent committed code without asking the user via bug-found gate",
+            )),
+            &details,
+        );
     }
 
-    check_env_var_construction(line_num, command, issues);
+    check_env_var_construction(command, &details, &mut emitter, issues);
 }
 
 /// Detect env var prefixes and export statements in Bash commands.
@@ -151,40 +167,45 @@ fn check_bash_tool_use(line_num: usize, input: &Value, issues: &mut Vec<Issue>) 
 /// The guard-bash hook strips `VAR=value` prefixes to find the real command
 /// head, but the observer needs to flag these patterns too - agents should
 /// not be constructing environment manually since harness handles it.
-fn check_env_var_construction(line_num: usize, command: &str, issues: &mut Vec<Issue>) {
+fn check_env_var_construction(
+    command: &str,
+    details: &str,
+    emitter: &mut IssueEmitter<'_>,
+    issues: &mut Vec<Issue>,
+) {
     // KUBECONFIG= is a specific, higher-signal pattern
     if command.contains("KUBECONFIG=") {
-        issues.push(Issue {
-            line: line_num,
-            category: IssueCategory::UnexpectedBehavior,
-            severity: IssueSeverity::Medium,
-            summary: "Agent manually setting KUBECONFIG".into(),
-            details: format!("Command: {command}"),
-            source_role: MessageRole::Assistant,
-            fixable: true,
-            fix_target: None,
-            fix_hint: Some(
-                "Agent manually setting KUBECONFIG. Harness injects it automatically.".into(),
-            ),
-        });
+        emitter.emit(
+            issues,
+            IssueBlueprint::new(
+                IssueCode::ManualKubeconfigConstruction,
+                IssueCategory::UnexpectedBehavior,
+                IssueSeverity::Medium,
+                "Agent manually setting KUBECONFIG",
+            )
+            .with_guidance(Guidance::fix_hint(
+                "Agent manually setting KUBECONFIG. Harness injects it automatically.",
+            )),
+            details,
+        );
         return;
     }
 
     // Generic: `export FOO=bar` or `FOO=bar command` prefix patterns
     if command.starts_with("export ") && command.contains('=') {
-        issues.push(Issue {
-            line: line_num,
-            category: IssueCategory::UnexpectedBehavior,
-            severity: IssueSeverity::Medium,
-            summary: "Agent constructing env vars via export".into(),
-            details: format!("Command: {command}"),
-            source_role: MessageRole::Assistant,
-            fixable: true,
-            fix_target: None,
-            fix_hint: Some(
-                "Agent constructing env vars. Harness handles environment automatically.".into(),
-            ),
-        });
+        emitter.emit(
+            issues,
+            IssueBlueprint::new(
+                IssueCode::ManualExportConstruction,
+                IssueCategory::UnexpectedBehavior,
+                IssueSeverity::Medium,
+                "Agent constructing env vars via export",
+            )
+            .with_guidance(Guidance::fix_hint(
+                "Agent constructing env vars. Harness handles environment automatically.",
+            )),
+            details,
+        );
         return;
     }
 
@@ -193,20 +214,19 @@ fn check_env_var_construction(line_num: usize, command: &str, issues: &mut Vec<I
     if let Some(first_space) = command.find(' ') {
         let first_token = &command[..first_space];
         if is_env_assignment(first_token) {
-            issues.push(Issue {
-                line: line_num,
-                category: IssueCategory::UnexpectedBehavior,
-                severity: IssueSeverity::Medium,
-                summary: "Agent constructing env var prefix".into(),
-                details: format!("Command: {command}"),
-                source_role: MessageRole::Assistant,
-                fixable: true,
-                fix_target: None,
-                fix_hint: Some(
-                    "Agent constructing env vars. Harness handles environment automatically."
-                        .into(),
-                ),
-            });
+            emitter.emit(
+                issues,
+                IssueBlueprint::new(
+                    IssueCode::ManualEnvPrefixConstruction,
+                    IssueCategory::UnexpectedBehavior,
+                    IssueSeverity::Medium,
+                    "Agent constructing env var prefix",
+                )
+                .with_guidance(Guidance::fix_hint(
+                    "Agent constructing env vars. Harness handles environment automatically.",
+                )),
+                details,
+            );
         }
     }
 }
@@ -230,10 +250,16 @@ fn is_env_assignment(token: &str) -> bool {
 }
 
 /// Check `AskUserQuestion` `tool_use` for issue patterns.
-fn check_ask_user_question(line_num: usize, input: &Value, issues: &mut Vec<Issue>) {
+fn check_ask_user_question(
+    line_num: usize,
+    input: &Value,
+    state: &mut ScanState,
+    issues: &mut Vec<Issue>,
+) {
     let Some(questions) = input["questions"].as_array() else {
         return;
     };
+    let mut emitter = IssueEmitter::new(line_num, MessageRole::Assistant, state);
 
     for question_block in questions {
         let question_text = question_block["question"].as_str().unwrap_or("");
@@ -241,77 +267,87 @@ fn check_ask_user_question(line_num: usize, input: &Value, issues: &mut Vec<Issu
         let options = question_block["options"].as_array();
         let header = question_block["header"].as_str().unwrap_or("");
 
-        check_manifest_fix_prompt(line_num, question_text, &question_lower, issues);
-        check_validator_install_prompt(line_num, question_text, &question_lower, issues);
+        check_manifest_fix_prompt(question_text, &question_lower, &mut emitter, issues);
+        check_validator_install_prompt(question_text, &question_lower, &mut emitter, issues);
         check_question_deviations(
-            line_num,
             question_text,
             &question_lower,
             header,
             options,
+            &mut emitter,
             issues,
         );
-        check_wrong_skill_crossref(line_num, question_text, &question_lower, options, issues);
+        check_wrong_skill_crossref(
+            question_text,
+            &question_lower,
+            options,
+            &mut emitter,
+            issues,
+        );
     }
 }
 
 /// Check for manifest-fix prompt in a question.
 fn check_manifest_fix_prompt(
-    line_num: usize,
     question_text: &str,
     question_lower: &str,
+    emitter: &mut IssueEmitter<'_>,
     issues: &mut Vec<Issue>,
 ) {
     if question_text.contains("manifest-fix") && question_lower.contains("how should this failure")
     {
-        issues.push(Issue {
-            line: line_num,
-            category: IssueCategory::DataIntegrity,
-            severity: IssueSeverity::Medium,
-            summary: "Manifest rejected by cluster - possible product bug".into(),
-            details: format!("Question: {question_text}"),
-            source_role: MessageRole::Assistant,
-            fixable: true,
-            fix_target: None,
-            fix_hint: Some(
+        let details = format!("Question: {question_text}");
+        emitter.emit(
+            issues,
+            IssueBlueprint::new(
+                IssueCode::ManifestFixPromptShown,
+                IssueCategory::DataIntegrity,
+                IssueSeverity::Medium,
+                "Manifest rejected by cluster - possible product bug",
+            )
+            .with_guidance(Guidance::fix_hint(
                 "CRD or webhook rejected a manifest. Could be a suite error OR a product bug. \
-                 Investigate whether the Go validator accepts what the CRD rejects."
-                    .into(),
-            ),
-        });
+                 Investigate whether the Go validator accepts what the CRD rejects.",
+            )),
+            &details,
+        );
     }
 }
 
 /// Check for `kubectl-validate` install prompt.
 fn check_validator_install_prompt(
-    line_num: usize,
     question_text: &str,
     question_lower: &str,
+    emitter: &mut IssueEmitter<'_>,
     issues: &mut Vec<Issue>,
 ) {
     if question_text.contains("kubectl-validate") && question_lower.contains("install") {
-        issues.push(Issue {
-            line: line_num,
-            category: IssueCategory::SkillBehavior,
-            severity: IssueSeverity::Medium,
-            summary: "Validator install prompt when binary may already exist".into(),
-            details: format!("Question: {question_text}"),
-            source_role: MessageRole::Assistant,
-            fixable: true,
-            fix_target: Some("skills/new/SKILL.md".into()),
-            fix_hint: Some("Step 0 should check if binary exists first".into()),
-        });
+        let details = format!("Question: {question_text}");
+        emitter.emit(
+            issues,
+            IssueBlueprint::new(
+                IssueCode::ValidatorInstallPromptShown,
+                IssueCategory::SkillBehavior,
+                IssueSeverity::Medium,
+                "Validator install prompt when binary may already exist",
+            )
+            .with_guidance(Guidance::fix_target_hint(
+                "skills/new/SKILL.md",
+                "Step 0 should check if binary exists first",
+            )),
+            &details,
+        );
     }
 }
 
 /// Check for runtime deviation signals in a question's full text.
 /// Short-circuits per part rather than joining into one big string.
 fn check_question_deviations(
-    line_num: usize,
     question_text: &str,
     question_lower: &str,
     header: &str,
     options: Option<&Vec<Value>>,
+    emitter: &mut IssueEmitter<'_>,
     issues: &mut Vec<Issue>,
 ) {
     let has_signal = |text: &str| -> bool {
@@ -336,28 +372,30 @@ fn check_question_deviations(
         });
 
     if found {
-        issues.push(Issue {
-            line: line_num,
-            category: IssueCategory::SkillBehavior,
-            severity: IssueSeverity::Critical,
-            summary: "Runtime deviation - authored suite needs runtime correction".into(),
-            details: format!("Header: {header}, Question: {question_text}"),
-            source_role: MessageRole::Assistant,
-            fixable: true,
-            fix_target: Some("skills/new/SKILL.md".into()),
-            fix_hint: Some(
-                "suite:new should produce suites that don't require runtime deviations".into(),
-            ),
-        });
+        let details = format!("Header: {header}, Question: {question_text}");
+        emitter.emit(
+            issues,
+            IssueBlueprint::new(
+                IssueCode::RuntimeDeviationPromptShown,
+                IssueCategory::SkillBehavior,
+                IssueSeverity::Critical,
+                "Runtime deviation - authored suite needs runtime correction",
+            )
+            .with_guidance(Guidance::fix_target_hint(
+                "skills/new/SKILL.md",
+                "suite:new should produce suites that don't require runtime deviations",
+            )),
+            &details,
+        );
     }
 }
 
 /// Check for wrong skill cross-references in question options.
 fn check_wrong_skill_crossref(
-    line_num: usize,
     question_text: &str,
     question_lower: &str,
     options: Option<&Vec<Value>>,
+    emitter: &mut IssueEmitter<'_>,
     issues: &mut Vec<Issue>,
 ) {
     let Some(opts) = options else {
@@ -366,19 +404,21 @@ fn check_wrong_skill_crossref(
     for opt in opts {
         let label = opt["label"].as_str().or_else(|| opt.as_str()).unwrap_or("");
         if label.to_lowercase().contains("suite:new") && question_lower.contains("suite:run") {
-            issues.push(Issue {
-                line: line_num,
-                category: IssueCategory::SkillBehavior,
-                severity: IssueSeverity::Medium,
-                summary: "suite:run offering suite:new as structured choice".into(),
-                details: format!("Question: {question_text}, Option: {label}"),
-                source_role: MessageRole::Assistant,
-                fixable: true,
-                fix_target: Some("skills/run/SKILL.md".into()),
-                fix_hint: Some(
-                    "suite:run should not offer suite:new as a structured option".into(),
-                ),
-            });
+            let details = format!("Question: {question_text}, Option: {label}");
+            emitter.emit(
+                issues,
+                IssueBlueprint::new(
+                    IssueCode::WrongSkillCrossReference,
+                    IssueCategory::SkillBehavior,
+                    IssueSeverity::Medium,
+                    "suite:run offering suite:new as structured choice",
+                )
+                .with_guidance(Guidance::fix_target_hint(
+                    "skills/run/SKILL.md",
+                    "suite:run should not offer suite:new as a structured option",
+                )),
+                &details,
+            );
         }
     }
 }
@@ -393,21 +433,28 @@ fn check_write_edit_tool_use(
 ) {
     let path = input["file_path"].as_str().unwrap_or("");
 
-    let count = state.edit_counts.entry(path.to_string()).or_insert(0);
-    *count += 1;
+    let current_count = {
+        let count = state.edit_counts.entry(path.to_string()).or_insert(0);
+        *count += 1;
+        *count
+    };
 
-    if *count == 10 || *count == 20 {
-        issues.push(Issue {
-            line: line_num,
-            category: IssueCategory::UnexpectedBehavior,
-            severity: IssueSeverity::Medium,
-            summary: format!("File modified {} times - possible churn", *count),
-            details: format!("Path: {path}"),
-            source_role: MessageRole::Assistant,
-            fixable: false,
-            fix_target: None,
-            fix_hint: Some("Repeated modifications suggest trial-and-error".into()),
-        });
+    if current_count == 10 || current_count == 20 {
+        let details = format!("Path: {path}");
+        IssueEmitter::new(line_num, MessageRole::Assistant, state).emit(
+            issues,
+            IssueBlueprint::new(
+                IssueCode::FileEditChurn,
+                IssueCategory::UnexpectedBehavior,
+                IssueSeverity::Medium,
+                format!("File modified {current_count} times - possible churn"),
+            )
+            .with_fingerprint(format!("{path}:{current_count}"))
+            .with_guidance(Guidance::advisory(
+                "Repeated modifications suggest trial-and-error",
+            )),
+            &details,
+        );
     }
 
     if path.contains("SKILL.md") {
@@ -419,45 +466,56 @@ fn check_write_edit_tool_use(
         if let Some(captures) = SKILL_NAME_REGEX.captures(content) {
             let skill_name = captures.get(1).map_or("", |m| m.as_str());
             if matches!(skill_name, "new" | "run" | "observe") && !skill_name.contains(':') {
-                issues.push(Issue {
-                    line: line_num,
-                    category: IssueCategory::SkillBehavior,
-                    severity: IssueSeverity::Critical,
-                    summary: format!(
-                        "SKILL.md name field uses short name '{skill_name}' instead of fully qualified"
-                    ),
-                    details: format!("Path: {path}, name: {skill_name}"),
-                    source_role: MessageRole::Assistant,
-                    fixable: true,
-                    fix_target: Some(path.to_string()),
-                    fix_hint: Some(
-                        "Name should be fully qualified like 'suite:new' or 'suite:run'".into(),
-                    ),
-                });
+                let details = format!("Path: {path}, name: {skill_name}");
+                IssueEmitter::new(line_num, MessageRole::Assistant, state).emit(
+                    issues,
+                    IssueBlueprint::new(
+                        IssueCode::ShortSkillNameInSkillFile,
+                        IssueCategory::SkillBehavior,
+                        IssueSeverity::Critical,
+                        format!(
+                            "SKILL.md name field uses short name '{skill_name}' instead of fully qualified"
+                        ),
+                    )
+                    .with_fingerprint(format!("{path}:{skill_name}"))
+                    .with_guidance(Guidance::fix_target_hint(
+                        path.to_string(),
+                        "Name should be fully qualified like 'suite:new' or 'suite:run'",
+                    )),
+                    &details,
+                );
             }
         }
     }
 }
 
 /// Check for direct writes to harness-managed files via Write/Edit tools.
-fn check_managed_file_writes(line_num: usize, input: &Value, issues: &mut Vec<Issue>) {
+fn check_managed_file_writes(
+    line_num: usize,
+    input: &Value,
+    state: &mut ScanState,
+    issues: &mut Vec<Issue>,
+) {
     let path = input["file_path"].as_str().unwrap_or("");
     let path_lower = path.to_lowercase();
     for managed in patterns::MANAGED_CONTEXT_FILES {
         if path_lower.contains(managed) {
-            issues.push(Issue {
-                line: line_num,
-                category: IssueCategory::UnexpectedBehavior,
-                severity: IssueSeverity::Critical,
-                summary: format!("Direct write to harness-managed file: {managed}"),
-                details: format!("Path: {path}"),
-                source_role: MessageRole::Assistant,
-                fixable: true,
-                fix_target: Some("skills/run/SKILL.md".into()),
-                fix_hint: Some(
-                    "Use harness commands to update managed files, not direct Write/Edit".into(),
-                ),
-            });
+            let details = format!("Path: {path}");
+            IssueEmitter::new(line_num, MessageRole::Assistant, state).emit(
+                issues,
+                IssueBlueprint::new(
+                    IssueCode::DirectManagedFileWrite,
+                    IssueCategory::UnexpectedBehavior,
+                    IssueSeverity::Critical,
+                    format!("Direct write to harness-managed file: {managed}"),
+                )
+                .with_fingerprint(path.to_string())
+                .with_guidance(Guidance::fix_target_hint(
+                    "skills/run/SKILL.md",
+                    "Use harness commands to update managed files, not direct Write/Edit",
+                )),
+                &details,
+            );
             break;
         }
     }

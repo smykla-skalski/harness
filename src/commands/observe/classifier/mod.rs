@@ -1,4 +1,4 @@
-mod issue_builder;
+mod emitter;
 mod rules;
 mod text_checks;
 mod tool_checks;
@@ -12,6 +12,7 @@ use std::sync::LazyLock;
 use regex::Regex;
 use serde_json::Value;
 
+use self::emitter::{IssueBlueprint, IssueEmitter};
 use super::tool_result_text;
 use super::types::{Issue, IssueCategory, MessageRole, ScanState, SourceTool};
 
@@ -77,22 +78,6 @@ fn resolve_source_tool(block: &Value, state: &ScanState) -> Option<SourceTool> {
     SourceTool::from_label(&record.name)
 }
 
-// ─── Dedup ─────────────────────────────────────────────────────────
-
-/// Regex that replaces all digit sequences with `#` for dedup normalization.
-/// This makes "exit code 1" and "exit code 137" produce the same key.
-static DEDUP_NORMALIZE: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"\d+").expect("valid regex"));
-
-/// Check whether an issue with the given category and summary should be
-/// emitted, and record it in the dedup set if so. Returns true if the
-/// issue is new (should be emitted), false if it's a duplicate.
-pub(super) fn should_emit(category: IssueCategory, summary: &str, state: &mut ScanState) -> bool {
-    let normalized = DEDUP_NORMALIZE.replace_all(summary, "#");
-    let key = (category, normalized.into_owned());
-    state.seen_issues.insert(key)
-}
-
 // ─── Context struct ────────────────────────────────────────────────
 
 /// Shared context passed to all text classification functions.
@@ -103,6 +88,21 @@ pub(super) struct TextCheckContext<'a> {
     pub lower: &'a str,
     pub matched_categories: HashSet<IssueCategory>,
     pub state: &'a mut ScanState,
+}
+
+impl TextCheckContext<'_> {
+    fn emit_current(&mut self, issues: &mut Vec<Issue>, blueprint: IssueBlueprint) -> bool {
+        self.emit_details(issues, blueprint, self.text)
+    }
+
+    fn emit_details(
+        &mut self,
+        issues: &mut Vec<Issue>,
+        blueprint: IssueBlueprint,
+        details: &str,
+    ) -> bool {
+        IssueEmitter::new(self.line_number, self.role, self.state).emit(issues, blueprint, details)
+    }
 }
 
 // ─── Public API ────────────────────────────────────────────────────
