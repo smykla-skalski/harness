@@ -14,11 +14,57 @@ pub struct ComposeService {
     pub environment: BTreeMap<String, String>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub ports: Vec<String>,
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    pub depends_on: Vec<String>,
+    #[serde(skip_serializing_if = "ComposeDependsOn::is_empty")]
+    pub depends_on: ComposeDependsOn,
     pub networks: Vec<String>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub command: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub entrypoint: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub restart: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub healthcheck: Option<ComposeHealthcheck>,
+}
+
+/// Compose `depends_on` - either a simple list or a map with conditions.
+#[derive(Debug, Clone)]
+pub enum ComposeDependsOn {
+    Simple(Vec<String>),
+    Conditional(BTreeMap<String, ComposeDependsOnEntry>),
+}
+
+impl ComposeDependsOn {
+    fn is_empty(&self) -> bool {
+        match self {
+            Self::Simple(v) => v.is_empty(),
+            Self::Conditional(m) => m.is_empty(),
+        }
+    }
+}
+
+impl Serialize for ComposeDependsOn {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        match self {
+            Self::Simple(v) => v.serialize(serializer),
+            Self::Conditional(m) => m.serialize(serializer),
+        }
+    }
+}
+
+/// Condition entry for conditional `depends_on`.
+#[derive(Debug, Clone, Serialize)]
+pub struct ComposeDependsOnEntry {
+    pub condition: String,
+}
+
+/// Compose healthcheck definition.
+#[derive(Debug, Clone, Serialize)]
+pub struct ComposeHealthcheck {
+    pub test: Vec<String>,
+    pub interval: String,
+    pub timeout: String,
+    pub retries: u32,
 }
 
 /// A Docker Compose network definition.
@@ -107,11 +153,22 @@ pub fn single_zone(
         env.insert("KUMA_STORE_POSTGRES_DB_NAME".into(), "kuma".into());
     }
 
-    let mut depends_on = Vec::new();
-    if store_type == "postgres" {
-        depends_on.push("postgres".into());
+    let (depends_on, restart) = if store_type == "postgres" {
         services.insert("postgres".into(), postgres_service(network_name));
-    }
+        let mut deps = BTreeMap::new();
+        deps.insert(
+            "postgres".into(),
+            ComposeDependsOnEntry {
+                condition: "service_healthy".into(),
+            },
+        );
+        (
+            ComposeDependsOn::Conditional(deps),
+            Some("on-failure".into()),
+        )
+    } else {
+        (ComposeDependsOn::Simple(vec![]), None)
+    };
 
     services.insert(
         cp_name.into(),
@@ -121,7 +178,10 @@ pub fn single_zone(
             ports: vec!["5681:5681".into(), "5678:5678".into()],
             depends_on,
             networks: vec![network_name.into()],
-            command: vec!["run".into()],
+            command: cp_command(store_type),
+            entrypoint: cp_entrypoint(store_type),
+            restart,
+            healthcheck: None,
         },
     );
 
@@ -144,15 +204,15 @@ pub fn global_zone(
     let mut services = BTreeMap::new();
 
     let mut global_env = cp_env("global", store_type);
-    let mut global_depends = Vec::new();
+    let (global_depends, global_restart) =
+        postgres_depends(store_type, network_name, &mut services);
+
     if store_type == "postgres" {
         global_env.insert("KUMA_STORE_POSTGRES_HOST".into(), "postgres".into());
         global_env.insert("KUMA_STORE_POSTGRES_PORT".into(), "5432".into());
         global_env.insert("KUMA_STORE_POSTGRES_USER".into(), "kuma".into());
         global_env.insert("KUMA_STORE_POSTGRES_PASSWORD".into(), "kuma".into());
         global_env.insert("KUMA_STORE_POSTGRES_DB_NAME".into(), "kuma".into());
-        global_depends.push("postgres".into());
-        services.insert("postgres".into(), postgres_service(network_name));
     }
 
     services.insert(
@@ -163,7 +223,10 @@ pub fn global_zone(
             ports: vec!["5681:5681".into(), "5685:5685".into()],
             depends_on: global_depends,
             networks: vec![network_name.into()],
-            command: vec!["run".into()],
+            command: cp_command(store_type),
+            entrypoint: cp_entrypoint(store_type),
+            restart: global_restart,
+            healthcheck: None,
         },
     );
 
@@ -184,9 +247,12 @@ pub fn global_zone(
             image: image.into(),
             environment: zone_env,
             ports: vec!["15681:5681".into(), "15678:5678".into()],
-            depends_on: vec![global_name.into()],
+            depends_on: ComposeDependsOn::Simple(vec![global_name.into()]),
             networks: vec![network_name.into()],
             command: vec!["run".into()],
+            entrypoint: None,
+            restart: None,
+            healthcheck: None,
         },
     );
 
@@ -220,15 +286,15 @@ pub fn global_two_zones(config: GlobalTwoZonesConfig<'_>) -> ComposeFile {
     let mut services = BTreeMap::new();
 
     let mut global_env = cp_env("global", config.store_type);
-    let mut global_depends = Vec::new();
+    let (global_depends, global_restart) =
+        postgres_depends(config.store_type, config.network_name, &mut services);
+
     if config.store_type == "postgres" {
         global_env.insert("KUMA_STORE_POSTGRES_HOST".into(), "postgres".into());
         global_env.insert("KUMA_STORE_POSTGRES_PORT".into(), "5432".into());
         global_env.insert("KUMA_STORE_POSTGRES_USER".into(), "kuma".into());
         global_env.insert("KUMA_STORE_POSTGRES_PASSWORD".into(), "kuma".into());
         global_env.insert("KUMA_STORE_POSTGRES_DB_NAME".into(), "kuma".into());
-        global_depends.push("postgres".into());
-        services.insert("postgres".into(), postgres_service(config.network_name));
     }
 
     services.insert(
@@ -239,7 +305,10 @@ pub fn global_two_zones(config: GlobalTwoZonesConfig<'_>) -> ComposeFile {
             ports: vec!["5681:5681".into(), "5685:5685".into()],
             depends_on: global_depends,
             networks: vec![config.network_name.into()],
-            command: vec!["run".into()],
+            command: cp_command(config.store_type),
+            entrypoint: cp_entrypoint(config.store_type),
+            restart: global_restart,
+            healthcheck: None,
         },
     );
 
@@ -264,9 +333,12 @@ pub fn global_two_zones(config: GlobalTwoZonesConfig<'_>) -> ComposeFile {
                 image: config.image.into(),
                 environment: zone_env,
                 ports: vec![format!("{port_offset}:5681"), format!("{xds_offset}:5678")],
-                depends_on: vec![config.global_name.into()],
+                depends_on: ComposeDependsOn::Simple(vec![config.global_name.into()]),
                 networks: vec![config.network_name.into()],
                 command: vec!["run".into()],
+                entrypoint: None,
+                restart: None,
+                healthcheck: None,
             },
         );
     }
@@ -274,6 +346,47 @@ pub fn global_two_zones(config: GlobalTwoZonesConfig<'_>) -> ComposeFile {
     let mut networks = BTreeMap::new();
     networks.insert(config.network_name.into(), bridge_network(config.subnet));
     ComposeFile { services, networks }
+}
+
+/// Command args for a CP service. Postgres needs migration before run.
+fn cp_command(store_type: &str) -> Vec<String> {
+    if store_type == "postgres" {
+        vec!["kuma-cp migrate up && kuma-cp run".into()]
+    } else {
+        vec!["run".into()]
+    }
+}
+
+/// Entrypoint override for CP services. Postgres needs sh to chain commands.
+fn cp_entrypoint(store_type: &str) -> Option<Vec<String>> {
+    if store_type == "postgres" {
+        Some(vec!["sh".into(), "-c".into()])
+    } else {
+        None
+    }
+}
+
+/// Build `depends_on` and restart policy for postgres-backed CP services.
+fn postgres_depends(
+    store_type: &str,
+    network_name: &str,
+    services: &mut BTreeMap<String, ComposeService>,
+) -> (ComposeDependsOn, Option<String>) {
+    if store_type != "postgres" {
+        return (ComposeDependsOn::Simple(vec![]), None);
+    }
+    services.insert("postgres".into(), postgres_service(network_name));
+    let mut deps = BTreeMap::new();
+    deps.insert(
+        "postgres".into(),
+        ComposeDependsOnEntry {
+            condition: "service_healthy".into(),
+        },
+    );
+    (
+        ComposeDependsOn::Conditional(deps),
+        Some("on-failure".into()),
+    )
 }
 
 fn postgres_service(network_name: &str) -> ComposeService {
@@ -285,9 +398,17 @@ fn postgres_service(network_name: &str) -> ComposeService {
         image: "postgres:16-alpine".into(),
         environment: env,
         ports: vec!["5432:5432".into()],
-        depends_on: vec![],
+        depends_on: ComposeDependsOn::Simple(vec![]),
         networks: vec![network_name.into()],
         command: vec![],
+        entrypoint: None,
+        restart: None,
+        healthcheck: Some(ComposeHealthcheck {
+            test: vec!["CMD-SHELL".into(), "pg_isready -U kuma -d kuma".into()],
+            interval: "2s".into(),
+            timeout: "5s".into(),
+            retries: 10,
+        }),
     }
 }
 
