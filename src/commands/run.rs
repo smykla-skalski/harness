@@ -9,164 +9,33 @@ use regex::Regex;
 
 use crate::cli::{EnvoyCommand, KumactlCommand, ReportCommand, RunDirArgs, ServiceArgs};
 use crate::cluster::Platform;
-use crate::context::{CurrentRunRecord, RunContext, RunLayout, RunMetadata};
-use crate::core_defs::{current_run_context_path, harness_data_root, utc_now};
+use crate::context::RunContext;
+use crate::core_defs::utc_now;
 use crate::errors::{CliError, CliErrorKind, cow};
 use crate::exec;
 use crate::exec::{kubectl, run_command};
 use crate::io::{append_markdown_row, drill, ensure_dir, read_text, write_text};
 use crate::manifests::default_validation_output;
-use crate::resolve::{resolve_manifest_path, resolve_suite_path};
+use crate::resolve::resolve_manifest_path;
 use crate::rules::suite_runner::{REPORT_CODE_BLOCK_LIMIT, REPORT_LINE_LIMIT};
-use crate::schema::{RunCounts, RunReport, RunReportFrontmatter, RunStatus, SuiteSpec, Verdict};
-use crate::suite_defaults::default_repo_root_for_suite;
+use crate::schema::{RunReport, Verdict};
+
 use crate::workflow::runner::initialize_runner_state;
+
+mod init;
+mod preflight;
+mod shared;
+
+pub use init::init_run;
+pub use preflight::preflight;
 
 // =========================================================================
 // init_run
 // =========================================================================
 
-fn resolve_init_repo_root(raw: Option<&str>, suite_dir: &Path) -> PathBuf {
-    if let Some(r) = raw {
-        return PathBuf::from(r)
-            .canonicalize()
-            .unwrap_or_else(|_| PathBuf::from(r));
-    }
-    if let Some(default) = default_repo_root_for_suite(suite_dir) {
-        return default;
-    }
-    env::current_dir().unwrap_or_else(|_| PathBuf::from("."))
-}
+// moved to run::shared
 
-fn resolve_run_root(raw: Option<&str>) -> PathBuf {
-    if let Some(r) = raw {
-        return PathBuf::from(r);
-    }
-    harness_data_root().join("runs")
-}
-
-/// Initialize a new test run directory.
-///
-/// # Errors
-/// Returns `CliError` on failure.
-///
-/// # Panics
-/// Panics if metadata or status structs fail to serialize (should never happen).
-pub fn init_run(
-    suite: &str,
-    run_id: &str,
-    profile: &str,
-    repo_root: Option<&str>,
-    run_root: Option<&str>,
-) -> Result<i32, CliError> {
-    let suite_path = resolve_suite_path(suite)?;
-    let spec = SuiteSpec::from_markdown(&suite_path)?;
-    let suite_dir = spec.suite_dir().to_path_buf();
-    let resolved_repo_root = resolve_init_repo_root(repo_root, &suite_dir);
-    let resolved_run_root = resolve_run_root(run_root);
-    let created_at = utc_now();
-
-    let layout = RunLayout {
-        run_root: resolved_run_root.to_string_lossy().into_owned(),
-        run_id: run_id.to_string(),
-    };
-
-    if layout.run_dir().exists() {
-        return Err(CliErrorKind::run_dir_exists(layout.run_dir().display().to_string()).into());
-    }
-
-    layout.ensure_dirs()?;
-
-    let metadata = RunMetadata {
-        run_id: run_id.to_string(),
-        suite_id: spec.frontmatter.suite_id.clone(),
-        suite_path: suite_path.to_string_lossy().into_owned(),
-        suite_dir: suite_dir.to_string_lossy().into_owned(),
-        profile: profile.to_string(),
-        repo_root: resolved_repo_root.to_string_lossy().into_owned(),
-        keep_clusters: spec.frontmatter.keep_clusters,
-        created_at: created_at.clone(),
-        user_stories: spec.frontmatter.user_stories.clone(),
-        required_dependencies: spec.frontmatter.required_dependencies.clone(),
-    };
-
-    let meta_json = serde_json::to_string_pretty(&metadata)
-        .map_err(|e| CliErrorKind::serialize(cow!("run metadata: {e}")))?;
-    fs::write(layout.metadata_path(), format!("{meta_json}\n"))?;
-
-    let status = RunStatus {
-        run_id: run_id.to_string(),
-        suite_id: spec.frontmatter.suite_id.clone(),
-        profile: profile.to_string(),
-        started_at: created_at,
-        overall_verdict: Verdict::Pending,
-        completed_at: None,
-        counts: RunCounts::default(),
-        executed_groups: vec![],
-        skipped_groups: vec![],
-        last_completed_group: None,
-        last_state_capture: None,
-        last_updated_utc: None,
-        next_planned_group: None,
-        notes: vec![],
-    };
-    let status_json = serde_json::to_string_pretty(&status)
-        .map_err(|e| CliErrorKind::serialize(cow!("run status: {e}")))?;
-    fs::write(layout.status_path(), format!("{status_json}\n"))?;
-
-    initialize_runner_state(&layout.run_dir())?;
-
-    let command_log = layout.commands_dir().join("command-log.md");
-    append_markdown_row(
-        &command_log,
-        &["ran_at", "command", "exit_code", "artifact"],
-        &["(init)", "harness init", "0", "-"],
-    )?;
-
-    let manifest_index = layout.manifests_dir().join("manifest-index.md");
-    append_markdown_row(
-        &manifest_index,
-        &["copied_at", "manifest", "validated", "applied", "notes"],
-        &["(init)", "-", "-", "-", "index created"],
-    )?;
-
-    let report = RunReport::new(
-        layout.report_path(),
-        RunReportFrontmatter {
-            run_id: run_id.to_string(),
-            suite_id: spec.frontmatter.suite_id.clone(),
-            profile: profile.to_string(),
-            overall_verdict: Verdict::Pending,
-            story_results: vec![],
-            debug_summary: vec![],
-        },
-        "# Run Report\n".to_string(),
-    );
-    report.save()?;
-
-    let record = CurrentRunRecord {
-        layout: layout.clone(),
-        profile: Some(profile.to_string()),
-        repo_root: Some(resolved_repo_root.to_string_lossy().into_owned()),
-        suite_dir: Some(suite_dir.to_string_lossy().into_owned()),
-        suite_id: Some(spec.frontmatter.suite_id.clone()),
-        suite_path: Some(suite_path.to_string_lossy().into_owned()),
-        cluster: None,
-        keep_clusters: spec.frontmatter.keep_clusters,
-        user_stories: spec.frontmatter.user_stories.clone(),
-        required_dependencies: spec.frontmatter.required_dependencies.clone(),
-    };
-    let ctx_path = current_run_context_path()?;
-    if let Some(parent) = ctx_path.parent() {
-        fs::create_dir_all(parent)?;
-    }
-    let record_json = serde_json::to_string_pretty(&record)
-        .map_err(|e| CliErrorKind::serialize(cow!("run context record: {e}")))?;
-    fs::write(&ctx_path, format!("{record_json}\n"))?;
-
-    println!("{}", layout.run_dir().display());
-    Ok(0)
-}
+// moved to run::shared
 
 // =========================================================================
 // platform detection
@@ -174,34 +43,14 @@ pub fn init_run(
 
 /// Detect platform from cluster spec or profile name heuristic.
 fn detect_platform(ctx: &RunContext) -> Platform {
-    if let Some(ref spec) = ctx.cluster {
-        return spec.platform;
-    }
-    if ctx.metadata.profile.contains("universal") {
-        return Platform::Universal;
-    }
-    Platform::Kubernetes
+    shared::detect_platform(ctx)
 }
 
 // =========================================================================
 // preflight
 // =========================================================================
 
-/// Run preflight checks and prepare suite manifests.
-///
-/// # Errors
-/// Returns `CliError` on failure.
-pub fn preflight(
-    _kubeconfig: Option<&str>,
-    _repo_root: Option<&str>,
-    run_dir_args: &RunDirArgs,
-) -> Result<i32, CliError> {
-    let ctx = super::resolve_run_context(run_dir_args)?;
-
-    eprintln!("{} preflight: complete", utc_now());
-    println!("{}", ctx.layout.artifacts_dir().display());
-    Ok(0)
-}
+// moved to run::preflight
 
 // =========================================================================
 // capture
