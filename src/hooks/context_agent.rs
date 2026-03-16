@@ -54,3 +54,56 @@ fn can_start_preflight_worker(state: &RunnerWorkflowState) -> (bool, Option<&'st
     }
     (true, None)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::workflow::runner::PreflightState;
+
+    fn base_state(phase: RunnerPhase, preflight_status: PreflightStatus) -> RunnerWorkflowState {
+        RunnerWorkflowState {
+            schema_version: 1,
+            phase,
+            preflight: PreflightState {
+                status: preflight_status,
+            },
+            failure: None,
+            suite_fix: None,
+            updated_at: String::new(),
+            transition_count: 0,
+            last_event: None,
+        }
+    }
+
+    #[test]
+    fn preflight_pending_allows_start() {
+        let state = base_state(RunnerPhase::Preflight, PreflightStatus::Pending);
+        let (allowed, reason) = can_start_preflight_worker(&state);
+        assert!(allowed);
+        assert!(reason.is_none());
+    }
+
+    #[test]
+    fn preflight_running_allows_start() {
+        let state = base_state(RunnerPhase::Preflight, PreflightStatus::Running);
+        let (allowed, reason) = can_start_preflight_worker(&state);
+        assert!(allowed);
+        assert!(reason.is_none());
+    }
+
+    #[test]
+    fn bootstrap_phase_denies_start() {
+        let state = base_state(RunnerPhase::Bootstrap, PreflightStatus::Pending);
+        let (allowed, reason) = can_start_preflight_worker(&state);
+        assert!(!allowed);
+        assert!(reason.is_some());
+    }
+
+    #[test]
+    fn preflight_complete_denies_start() {
+        let state = base_state(RunnerPhase::Preflight, PreflightStatus::Complete);
+        let (allowed, reason) = can_start_preflight_worker(&state);
+        assert!(!allowed);
+        assert!(reason.unwrap().contains("already complete"));
+    }
+}

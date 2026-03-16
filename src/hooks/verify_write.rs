@@ -81,3 +81,32 @@ fn verify_suite_runner(ctx: &HookContext, paths: &[&Path]) -> HookResult {
     }
     HookResult::allow()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::hook::Decision;
+
+    #[test]
+    fn verify_suite_author_empty_amendments_denies() {
+        let tmp = tempfile::NamedTempFile::new().unwrap();
+        let path = tmp.path().parent().unwrap().join("amendments.md");
+        fs::write(&path, "   \n").unwrap();
+        let result = verify_suite_author(&[path.as_path()]);
+        assert_eq!(result.decision, Decision::Deny);
+        let _ = fs::remove_file(&path);
+    }
+
+    #[test]
+    fn verify_suite_author_nonempty_amendments_allows() {
+        let tmp = tempfile::NamedTempFile::new().unwrap();
+        let path = tmp.path().parent().unwrap().join("amendments-ok.md");
+        // Use a different name to avoid collision - verify_suite_author checks filename
+        // Actually we need the exact name "amendments.md" so let's use a temp dir
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("amendments.md");
+        fs::write(&path, "real content here\n").unwrap();
+        let result = verify_suite_author(&[path.as_path()]);
+        assert_eq!(result.decision, Decision::Allow);
+    }
+}
