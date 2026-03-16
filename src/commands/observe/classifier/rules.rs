@@ -3,7 +3,7 @@ use std::collections::HashSet;
 use crate::commands::observe::patterns;
 use crate::commands::observe::truncate_details;
 use crate::commands::observe::types::{
-    Issue, IssueCategory, IssueSeverity, MessageRole, SourceTool,
+    Issue, IssueCategory, IssueSeverity, MessageRole, ScanState, SourceTool,
 };
 
 /// Filter on message role.
@@ -319,6 +319,7 @@ pub(super) fn apply_text_rules(
     text: &str,
     lower: &str,
     source_tool: Option<SourceTool>,
+    state: &mut ScanState,
 ) -> (Vec<Issue>, HashSet<IssueCategory>) {
     let mut issues = Vec::new();
     let mut matched_categories = HashSet::new();
@@ -378,6 +379,12 @@ pub(super) fn apply_text_rules(
             } else {
                 rule.summary.to_string()
             };
+
+            if !super::should_emit(rule.category, &summary, state) {
+                matched_categories.insert(rule.category);
+                continue;
+            }
+
             issues.push(Issue {
                 line: line_num,
                 category: rule.category,
