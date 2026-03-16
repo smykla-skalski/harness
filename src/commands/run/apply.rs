@@ -58,7 +58,7 @@ pub fn apply(
         append_markdown_row(
             &manifest_index,
             &["copied_at", "manifest", "validated", "applied", "notes"],
-            &[&utc_now(), &rel, "PASS", "PASS", &notes],
+            &[&utc_now(), &rel, "-", "PASS", &notes],
         )?;
         println!("{}", shorten_path(&manifest));
     }
@@ -118,17 +118,16 @@ fn apply_universal(ctx: &RunContext, manifest: &str) -> Result<(), CliError> {
     {
         let mesh = resource["mesh"].as_str();
         let path = kuma_api_path(resource_type, name, mesh);
-        let result = exec::cp_api_json(
+        match exec::cp_api_json(
             &cp_addr,
             &path,
             exec::HttpMethod::Put,
             Some(&resource),
             admin_token.as_deref(),
-        );
-        if result.is_ok() {
-            return Ok(());
+        ) {
+            Ok(_) => return Ok(()),
+            Err(e) => eprintln!("apply: REST API failed ({e}), falling back to kumactl"),
         }
-        eprintln!("apply: REST API failed, falling back to kumactl");
     }
 
     // Fallback to kumactl
