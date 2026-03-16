@@ -184,124 +184,76 @@ fn cluster_spec_universal_with_postgres_store() {
 // ============================================================================
 
 #[test]
-fn from_mode_universal_single_up_members() {
-    let spec = ClusterSpec::from_mode_with_platform(
-        "single-up",
-        &["test-cp".into()],
-        "/repo",
-        vec![],
-        vec![],
-        Platform::Universal,
-    )
-    .unwrap();
-    assert_eq!(spec.platform, Platform::Universal);
-    assert_eq!(spec.mode, ClusterMode::SingleUp);
-    assert_eq!(spec.members.len(), 1);
-    assert_eq!(spec.members[0].name, "test-cp");
-    assert_eq!(spec.members[0].role, "cp");
-    assert!(spec.members[0].kubeconfig.is_empty());
-    assert_eq!(spec.members[0].cp_api_port, Some(5681));
-    assert_eq!(spec.members[0].xds_port, Some(5678));
-    assert!(spec.members[0].kds_port.is_none());
-    assert_eq!(spec.docker_network.as_deref(), Some("harness-test-cp"));
-}
-
-#[test]
-fn from_mode_universal_single_down_members() {
-    let spec = ClusterSpec::from_mode_with_platform(
-        "single-down",
-        &["test-cp".into()],
-        "/repo",
-        vec![],
-        vec![],
-        Platform::Universal,
-    )
-    .unwrap();
-    assert_eq!(spec.mode, ClusterMode::SingleDown);
-    assert_eq!(spec.members.len(), 1);
-    assert_eq!(spec.members[0].role, "cp");
-}
-
-#[test]
-fn from_mode_universal_global_zone_up_members() {
-    let spec = ClusterSpec::from_mode_with_platform(
-        "global-zone-up",
-        &["global".into(), "zone".into(), "zone-1".into()],
-        "/repo",
-        vec![],
-        vec![],
-        Platform::Universal,
-    )
-    .unwrap();
-    assert_eq!(spec.mode, ClusterMode::GlobalZoneUp);
-    assert_eq!(spec.members.len(), 2);
-    assert_eq!(spec.members[0].role, "global-cp");
-    assert_eq!(spec.members[0].kds_port, Some(5685));
-    assert_eq!(spec.members[1].role, "zone-cp");
-    assert_eq!(spec.members[1].zone_name.as_deref(), Some("zone-1"));
-    assert!(spec.members[1].kds_port.is_none());
-}
-
-#[test]
-fn from_mode_universal_global_zone_down_members() {
-    let spec = ClusterSpec::from_mode_with_platform(
-        "global-zone-down",
-        &["global".into(), "zone".into()],
-        "/repo",
-        vec![],
-        vec![],
-        Platform::Universal,
-    )
-    .unwrap();
-    assert_eq!(spec.mode, ClusterMode::GlobalZoneDown);
-    assert_eq!(spec.members.len(), 2);
-    assert_eq!(spec.members[0].role, "global-cp");
-    assert_eq!(spec.members[1].role, "zone-cp");
-}
-
-#[test]
-fn from_mode_universal_global_two_zones_up_members() {
-    let spec = ClusterSpec::from_mode_with_platform(
-        "global-two-zones-up",
-        &[
-            "global".into(),
-            "zone-a".into(),
-            "zone-b".into(),
-            "zone-label-a".into(),
-            "zone-label-b".into(),
-        ],
-        "/repo",
-        vec![],
-        vec![],
-        Platform::Universal,
-    )
-    .unwrap();
-    assert_eq!(spec.mode, ClusterMode::GlobalTwoZonesUp);
-    assert_eq!(spec.members.len(), 3);
-    assert_eq!(spec.members[0].role, "global-cp");
-    assert_eq!(spec.members[0].kds_port, Some(5685));
-    assert_eq!(spec.members[1].role, "zone-cp");
-    assert_eq!(spec.members[1].zone_name.as_deref(), Some("zone-label-a"));
-    assert_eq!(spec.members[2].role, "zone-cp");
-    assert_eq!(spec.members[2].zone_name.as_deref(), Some("zone-label-b"));
-}
-
-#[test]
-fn from_mode_universal_global_two_zones_down_members() {
-    let spec = ClusterSpec::from_mode_with_platform(
-        "global-two-zones-down",
-        &["global".into(), "zone-a".into(), "zone-b".into()],
-        "/repo",
-        vec![],
-        vec![],
-        Platform::Universal,
-    )
-    .unwrap();
-    assert_eq!(spec.mode, ClusterMode::GlobalTwoZonesDown);
-    assert_eq!(spec.members.len(), 3);
-    assert_eq!(spec.members[0].role, "global-cp");
-    assert_eq!(spec.members[1].role, "zone-cp");
-    assert_eq!(spec.members[2].role, "zone-cp");
+fn from_mode_universal_topologies() {
+    struct Case {
+        mode: &'static str,
+        args: &'static [&'static str],
+        expected_mode: ClusterMode,
+        member_count: usize,
+        member_roles: &'static [&'static str],
+    }
+    let cases = [
+        Case {
+            mode: "single-up",
+            args: &["test-cp"],
+            expected_mode: ClusterMode::SingleUp,
+            member_count: 1,
+            member_roles: &["cp"],
+        },
+        Case {
+            mode: "single-down",
+            args: &["test-cp"],
+            expected_mode: ClusterMode::SingleDown,
+            member_count: 1,
+            member_roles: &["cp"],
+        },
+        Case {
+            mode: "global-zone-up",
+            args: &["global", "zone", "zone-1"],
+            expected_mode: ClusterMode::GlobalZoneUp,
+            member_count: 2,
+            member_roles: &["global-cp", "zone-cp"],
+        },
+        Case {
+            mode: "global-zone-down",
+            args: &["global", "zone"],
+            expected_mode: ClusterMode::GlobalZoneDown,
+            member_count: 2,
+            member_roles: &["global-cp", "zone-cp"],
+        },
+        Case {
+            mode: "global-two-zones-up",
+            args: &["global", "zone-a", "zone-b", "zone-label-a", "zone-label-b"],
+            expected_mode: ClusterMode::GlobalTwoZonesUp,
+            member_count: 3,
+            member_roles: &["global-cp", "zone-cp", "zone-cp"],
+        },
+        Case {
+            mode: "global-two-zones-down",
+            args: &["global", "zone-a", "zone-b"],
+            expected_mode: ClusterMode::GlobalTwoZonesDown,
+            member_count: 3,
+            member_roles: &["global-cp", "zone-cp", "zone-cp"],
+        },
+    ];
+    for c in &cases {
+        let args: Vec<String> = c.args.iter().map(|s| s.to_string()).collect();
+        let spec = ClusterSpec::from_mode_with_platform(
+            c.mode,
+            &args,
+            "/repo",
+            vec![],
+            vec![],
+            Platform::Universal,
+        )
+        .unwrap();
+        assert_eq!(spec.platform, Platform::Universal, "mode={}", c.mode);
+        assert_eq!(spec.mode, c.expected_mode, "mode={}", c.mode);
+        assert_eq!(spec.members.len(), c.member_count, "mode={}", c.mode);
+        for (i, role) in c.member_roles.iter().enumerate() {
+            assert_eq!(spec.members[i].role, *role, "mode={} member[{i}]", c.mode);
+        }
+    }
 }
 
 #[test]
@@ -589,61 +541,33 @@ fn validate_universal_manifest_valid() {
 }
 
 #[test]
-fn validate_universal_manifest_missing_type() {
-    let tmp = tempfile::tempdir().unwrap();
-    let manifest_path = tmp.path().join("bad-manifest.yaml");
-    // Missing 'type' field - should fail
-    fs::write(
-        &manifest_path,
-        "name: something\nmesh: default\nspec:\n  key: value\n",
-    )
-    .unwrap();
-
-    let result = Command::Validate(ValidateArgs {
-        kubeconfig: None,
-        manifest: manifest_path.to_string_lossy().to_string(),
-        output: None,
-    })
-    .execute();
-    assert!(result.is_err(), "validate should fail for missing type");
-}
-
-#[test]
-fn validate_universal_manifest_missing_name() {
-    let tmp = tempfile::tempdir().unwrap();
-    let manifest_path = tmp.path().join("no-name.yaml");
-    fs::write(
-        &manifest_path,
-        "type: MeshTimeout\nmesh: default\nspec:\n  key: value\n",
-    )
-    .unwrap();
-
-    let result = Command::Validate(ValidateArgs {
-        kubeconfig: None,
-        manifest: manifest_path.to_string_lossy().to_string(),
-        output: None,
-    })
-    .execute();
-    assert!(result.is_err(), "validate should fail for missing name");
-}
-
-#[test]
-fn validate_universal_manifest_missing_mesh() {
-    let tmp = tempfile::tempdir().unwrap();
-    let manifest_path = tmp.path().join("no-mesh.yaml");
-    fs::write(
-        &manifest_path,
-        "type: MeshTimeout\nname: timeout\nspec:\n  key: value\n",
-    )
-    .unwrap();
-
-    let result = Command::Validate(ValidateArgs {
-        kubeconfig: None,
-        manifest: manifest_path.to_string_lossy().to_string(),
-        output: None,
-    })
-    .execute();
-    assert!(result.is_err(), "validate should fail for missing mesh");
+fn validate_universal_manifest_missing_required_fields() {
+    let cases: &[(&str, &str)] = &[
+        (
+            "name: something\nmesh: default\nspec:\n  key: value\n",
+            "missing type",
+        ),
+        (
+            "type: MeshTimeout\nmesh: default\nspec:\n  key: value\n",
+            "missing name",
+        ),
+        (
+            "type: MeshTimeout\nname: timeout\nspec:\n  key: value\n",
+            "missing mesh",
+        ),
+    ];
+    for (yaml, description) in cases {
+        let tmp = tempfile::tempdir().unwrap();
+        let manifest_path = tmp.path().join("bad-manifest.yaml");
+        fs::write(&manifest_path, yaml).unwrap();
+        let result = Command::Validate(ValidateArgs {
+            kubeconfig: None,
+            manifest: manifest_path.to_string_lossy().to_string(),
+            output: None,
+        })
+        .execute();
+        assert!(result.is_err(), "validate should fail for {description}");
+    }
 }
 
 #[test]

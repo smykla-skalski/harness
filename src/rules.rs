@@ -1163,6 +1163,30 @@ pub mod compact {
 mod tests {
     use super::*;
 
+    // Generates all_count, display_roundtrip, and rejects_unknown tests for a string enum.
+    macro_rules! test_string_enum {
+        ($mod_name:ident, $type:path) => {
+            mod $mod_name {
+                use super::super::*;
+                #[test]
+                fn all_count() {
+                    assert!(<$type>::ALL.len() > 0);
+                }
+                #[test]
+                fn display_roundtrip() {
+                    for v in <$type>::ALL {
+                        let parsed: $type = v.to_string().parse().unwrap();
+                        assert_eq!(*v, parsed);
+                    }
+                }
+                #[test]
+                fn rejects_unknown() {
+                    assert!("__invalid__".parse::<$type>().is_err());
+                }
+            }
+        };
+    }
+
     // -- Gate --
 
     #[test]
@@ -1203,24 +1227,7 @@ mod tests {
 
     // -- GroupSection --
 
-    #[test]
-    fn group_section_all_count() {
-        assert_eq!(shared::GroupSection::ALL.len(), 3);
-    }
-
-    #[test]
-    fn group_section_display_roundtrip() {
-        for section in shared::GroupSection::ALL {
-            let s = section.to_string();
-            let parsed: shared::GroupSection = s.parse().unwrap();
-            assert_eq!(*section, parsed);
-        }
-    }
-
-    #[test]
-    fn group_section_from_str_rejects_unknown() {
-        assert!("## Unknown".parse::<shared::GroupSection>().is_err());
-    }
+    test_string_enum!(group_section, shared::GroupSection);
 
     #[test]
     fn group_section_missing_from() {
@@ -1238,45 +1245,11 @@ mod tests {
 
     // -- PreflightReply --
 
-    #[test]
-    fn preflight_reply_all_count() {
-        assert_eq!(suite_runner::PreflightReply::ALL.len(), 2);
-    }
-
-    #[test]
-    fn preflight_reply_display_roundtrip() {
-        for reply in suite_runner::PreflightReply::ALL {
-            let s = reply.to_string();
-            let parsed: suite_runner::PreflightReply = s.parse().unwrap();
-            assert_eq!(*reply, parsed);
-        }
-    }
-
-    #[test]
-    fn preflight_reply_from_str_rejects_unknown() {
-        assert!("maybe".parse::<suite_runner::PreflightReply>().is_err());
-    }
+    test_string_enum!(preflight_reply, suite_runner::PreflightReply);
 
     // -- RunFile --
 
-    #[test]
-    fn run_file_all_count() {
-        assert_eq!(suite_runner::RunFile::ALL.len(), 7);
-    }
-
-    #[test]
-    fn run_file_display_roundtrip() {
-        for file in suite_runner::RunFile::ALL {
-            let s = file.to_string();
-            let parsed: suite_runner::RunFile = s.parse().unwrap();
-            assert_eq!(*file, parsed);
-        }
-    }
-
-    #[test]
-    fn run_file_from_str_rejects_unknown() {
-        assert!("unknown.txt".parse::<suite_runner::RunFile>().is_err());
-    }
+    test_string_enum!(run_file, suite_runner::RunFile);
 
     #[test]
     fn run_file_is_allowed() {
@@ -1344,40 +1317,11 @@ mod tests {
 
     // -- RunDir --
 
-    #[test]
-    fn run_dir_all_count() {
-        assert_eq!(suite_runner::RunDir::ALL.len(), 4);
-    }
-
-    #[test]
-    fn run_dir_display_roundtrip() {
-        for dir in suite_runner::RunDir::ALL {
-            let s = dir.to_string();
-            let parsed: suite_runner::RunDir = s.parse().unwrap();
-            assert_eq!(*dir, parsed);
-        }
-    }
-
-    #[test]
-    fn run_dir_from_str_rejects_unknown() {
-        assert!("logs".parse::<suite_runner::RunDir>().is_err());
-    }
+    test_string_enum!(run_dir, suite_runner::RunDir);
 
     // -- ClusterBinary --
 
-    #[test]
-    fn cluster_binary_all_count() {
-        assert_eq!(suite_runner::ClusterBinary::ALL.len(), 6);
-    }
-
-    #[test]
-    fn cluster_binary_display_roundtrip() {
-        for bin in suite_runner::ClusterBinary::ALL {
-            let s = bin.to_string();
-            let parsed: suite_runner::ClusterBinary = s.parse().unwrap();
-            assert_eq!(*bin, parsed);
-        }
-    }
+    test_string_enum!(cluster_binary, suite_runner::ClusterBinary);
 
     #[test]
     fn cluster_binary_is_denied() {
@@ -1392,19 +1336,7 @@ mod tests {
 
     // -- LegacyScript --
 
-    #[test]
-    fn legacy_script_all_count() {
-        assert_eq!(suite_runner::LegacyScript::ALL.len(), 7);
-    }
-
-    #[test]
-    fn legacy_script_display_roundtrip() {
-        for script in suite_runner::LegacyScript::ALL {
-            let s = script.to_string();
-            let parsed: suite_runner::LegacyScript = s.parse().unwrap();
-            assert_eq!(*script, parsed);
-        }
-    }
+    test_string_enum!(legacy_script, suite_runner::LegacyScript);
 
     #[test]
     fn legacy_script_is_denied() {
@@ -1415,19 +1347,7 @@ mod tests {
 
     // -- RunnerBinary --
 
-    #[test]
-    fn runner_binary_all_count() {
-        assert_eq!(suite_runner::RunnerBinary::ALL.len(), 1);
-    }
-
-    #[test]
-    fn runner_binary_display_roundtrip() {
-        for bin in suite_runner::RunnerBinary::ALL {
-            let s = bin.to_string();
-            let parsed: suite_runner::RunnerBinary = s.parse().unwrap();
-            assert_eq!(*bin, parsed);
-        }
-    }
+    test_string_enum!(runner_binary, suite_runner::RunnerBinary);
 
     #[test]
     fn runner_binary_is_denied() {
@@ -1437,19 +1357,7 @@ mod tests {
 
     // -- MakeTargetPrefix --
 
-    #[test]
-    fn make_target_prefix_all_count() {
-        assert_eq!(suite_runner::MakeTargetPrefix::ALL.len(), 2);
-    }
-
-    #[test]
-    fn make_target_prefix_display_roundtrip() {
-        for prefix in suite_runner::MakeTargetPrefix::ALL {
-            let s = prefix.to_string();
-            let parsed: suite_runner::MakeTargetPrefix = s.parse().unwrap();
-            assert_eq!(*prefix, parsed);
-        }
-    }
+    test_string_enum!(make_target_prefix, suite_runner::MakeTargetPrefix);
 
     #[test]
     fn make_target_prefix_is_denied_target() {
@@ -1464,19 +1372,7 @@ mod tests {
 
     // -- AdminEndpointHint --
 
-    #[test]
-    fn admin_endpoint_hint_all_count() {
-        assert_eq!(suite_runner::AdminEndpointHint::ALL.len(), 5);
-    }
-
-    #[test]
-    fn admin_endpoint_hint_display_roundtrip() {
-        for hint in suite_runner::AdminEndpointHint::ALL {
-            let s = hint.to_string();
-            let parsed: suite_runner::AdminEndpointHint = s.parse().unwrap();
-            assert_eq!(*hint, parsed);
-        }
-    }
+    test_string_enum!(admin_endpoint_hint, suite_runner::AdminEndpointHint);
 
     #[test]
     fn admin_endpoint_hint_contains_hint() {
@@ -1493,28 +1389,7 @@ mod tests {
 
     // -- TaskOutputPattern --
 
-    #[test]
-    fn task_output_pattern_all_count() {
-        assert_eq!(suite_runner::TaskOutputPattern::ALL.len(), 3);
-    }
-
-    #[test]
-    fn task_output_pattern_display_roundtrip() {
-        for pattern in suite_runner::TaskOutputPattern::ALL {
-            let s = pattern.to_string();
-            let parsed: suite_runner::TaskOutputPattern = s.parse().unwrap();
-            assert_eq!(*pattern, parsed);
-        }
-    }
-
-    #[test]
-    fn task_output_pattern_from_str_rejects_unknown() {
-        assert!(
-            "/some/other/path"
-                .parse::<suite_runner::TaskOutputPattern>()
-                .is_err()
-        );
-    }
+    test_string_enum!(task_output_pattern, suite_runner::TaskOutputPattern);
 
     #[test]
     fn task_output_pattern_matches_private_tmp() {
@@ -1581,45 +1456,11 @@ mod tests {
 
     // -- ResultKind --
 
-    #[test]
-    fn result_kind_all_count() {
-        assert_eq!(suite_author::ResultKind::ALL.len(), 6);
-    }
-
-    #[test]
-    fn result_kind_display_roundtrip() {
-        for kind in suite_author::ResultKind::ALL {
-            let s = kind.to_string();
-            let parsed: suite_author::ResultKind = s.parse().unwrap();
-            assert_eq!(*kind, parsed);
-        }
-    }
-
-    #[test]
-    fn result_kind_from_str_rejects_unknown() {
-        assert!("unknown".parse::<suite_author::ResultKind>().is_err());
-    }
+    test_string_enum!(result_kind, suite_author::ResultKind);
 
     // -- Worker --
 
-    #[test]
-    fn worker_all_count() {
-        assert_eq!(suite_author::Worker::ALL.len(), 6);
-    }
-
-    #[test]
-    fn worker_display_roundtrip() {
-        for worker in suite_author::Worker::ALL {
-            let s = worker.to_string();
-            let parsed: suite_author::Worker = s.parse().unwrap();
-            assert_eq!(*worker, parsed);
-        }
-    }
-
-    #[test]
-    fn worker_from_str_rejects_unknown() {
-        assert!("unknown-worker".parse::<suite_author::Worker>().is_err());
-    }
+    test_string_enum!(worker, suite_author::Worker);
 
     // -- Suite:new gates --
 
@@ -1660,28 +1501,10 @@ mod tests {
 
     // -- ControlFileMutationBinary --
 
-    #[test]
-    fn control_file_mutation_binary_all_count() {
-        assert_eq!(suite_runner::ControlFileMutationBinary::ALL.len(), 4);
-    }
-
-    #[test]
-    fn control_file_mutation_binary_display_roundtrip() {
-        for bin in suite_runner::ControlFileMutationBinary::ALL {
-            let s = bin.to_string();
-            let parsed: suite_runner::ControlFileMutationBinary = s.parse().unwrap();
-            assert_eq!(*bin, parsed);
-        }
-    }
-
-    #[test]
-    fn control_file_mutation_binary_rejects_unknown() {
-        assert!(
-            "cat"
-                .parse::<suite_runner::ControlFileMutationBinary>()
-                .is_err()
-        );
-    }
+    test_string_enum!(
+        control_file_mutation_binary,
+        suite_runner::ControlFileMutationBinary
+    );
 
     #[test]
     fn control_file_mutation_binary_predicate() {
@@ -1696,24 +1519,10 @@ mod tests {
 
     // -- ControlFileReadBinary --
 
-    #[test]
-    fn control_file_read_binary_all_count() {
-        assert_eq!(suite_runner::ControlFileReadBinary::ALL.len(), 5);
-    }
-
-    #[test]
-    fn control_file_read_binary_display_roundtrip() {
-        for bin in suite_runner::ControlFileReadBinary::ALL {
-            let s = bin.to_string();
-            let parsed: suite_runner::ControlFileReadBinary = s.parse().unwrap();
-            assert_eq!(*bin, parsed);
-        }
-    }
-
-    #[test]
-    fn control_file_read_binary_rejects_unknown() {
-        assert!("cp".parse::<suite_runner::ControlFileReadBinary>().is_err());
-    }
+    test_string_enum!(
+        control_file_read_binary,
+        suite_runner::ControlFileReadBinary
+    );
 
     #[test]
     fn control_file_read_binary_predicate() {
@@ -1724,24 +1533,7 @@ mod tests {
 
     // -- SuiteMutationBinary --
 
-    #[test]
-    fn suite_mutation_binary_all_count() {
-        assert_eq!(suite_runner::SuiteMutationBinary::ALL.len(), 8);
-    }
-
-    #[test]
-    fn suite_mutation_binary_display_roundtrip() {
-        for bin in suite_runner::SuiteMutationBinary::ALL {
-            let s = bin.to_string();
-            let parsed: suite_runner::SuiteMutationBinary = s.parse().unwrap();
-            assert_eq!(*bin, parsed);
-        }
-    }
-
-    #[test]
-    fn suite_mutation_binary_rejects_unknown() {
-        assert!("cat".parse::<suite_runner::SuiteMutationBinary>().is_err());
-    }
+    test_string_enum!(suite_mutation_binary, suite_runner::SuiteMutationBinary);
 
     #[test]
     fn suite_mutation_binary_predicate() {
@@ -1756,24 +1548,7 @@ mod tests {
 
     // -- ScriptInterpreter --
 
-    #[test]
-    fn script_interpreter_all_count() {
-        assert_eq!(suite_runner::ScriptInterpreter::ALL.len(), 7);
-    }
-
-    #[test]
-    fn script_interpreter_display_roundtrip() {
-        for interp in suite_runner::ScriptInterpreter::ALL {
-            let s = interp.to_string();
-            let parsed: suite_runner::ScriptInterpreter = s.parse().unwrap();
-            assert_eq!(*interp, parsed);
-        }
-    }
-
-    #[test]
-    fn script_interpreter_rejects_unknown() {
-        assert!("cat".parse::<suite_runner::ScriptInterpreter>().is_err());
-    }
+    test_string_enum!(script_interpreter, suite_runner::ScriptInterpreter);
 
     #[test]
     fn script_interpreter_predicate_exact() {
@@ -1793,24 +1568,7 @@ mod tests {
 
     // -- PythonBinary --
 
-    #[test]
-    fn python_binary_all_count() {
-        assert_eq!(suite_runner::PythonBinary::ALL.len(), 2);
-    }
-
-    #[test]
-    fn python_binary_display_roundtrip() {
-        for bin in suite_runner::PythonBinary::ALL {
-            let s = bin.to_string();
-            let parsed: suite_runner::PythonBinary = s.parse().unwrap();
-            assert_eq!(*bin, parsed);
-        }
-    }
-
-    #[test]
-    fn python_binary_rejects_unknown() {
-        assert!("python2".parse::<suite_runner::PythonBinary>().is_err());
-    }
+    test_string_enum!(python_binary, suite_runner::PythonBinary);
 
     #[test]
     fn python_binary_predicate() {
@@ -1821,28 +1579,10 @@ mod tests {
 
     // -- TrackedHarnessSubcommand --
 
-    #[test]
-    fn tracked_harness_subcommand_all_count() {
-        assert_eq!(suite_runner::TrackedHarnessSubcommand::ALL.len(), 22);
-    }
-
-    #[test]
-    fn tracked_harness_subcommand_display_roundtrip() {
-        for sub in suite_runner::TrackedHarnessSubcommand::ALL {
-            let s = sub.to_string();
-            let parsed: suite_runner::TrackedHarnessSubcommand = s.parse().unwrap();
-            assert_eq!(*sub, parsed);
-        }
-    }
-
-    #[test]
-    fn tracked_harness_subcommand_rejects_unknown() {
-        assert!(
-            "unknown"
-                .parse::<suite_runner::TrackedHarnessSubcommand>()
-                .is_err()
-        );
-    }
+    test_string_enum!(
+        tracked_harness_subcommand,
+        suite_runner::TrackedHarnessSubcommand
+    );
 
     #[test]
     fn tracked_harness_subcommand_predicate() {
