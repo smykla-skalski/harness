@@ -337,6 +337,34 @@ pub fn container_running(name: &str) -> Result<bool, CliError> {
     Ok(result.returncode == 0 && result.stdout.trim() == "true")
 }
 
+/// Remove all containers matching a label. Returns the list of removed names.
+///
+/// # Errors
+/// Returns `CliError` on command failure.
+pub fn docker_rm_by_label(label: &str) -> Result<Vec<String>, CliError> {
+    let result = docker(
+        &[
+            "ps",
+            "-a",
+            "--filter",
+            &format!("label={label}"),
+            "--format",
+            "{{.Names}}",
+        ],
+        &[0],
+    )?;
+    let names: Vec<String> = result
+        .stdout
+        .lines()
+        .filter(|l| !l.trim().is_empty())
+        .map(|l| l.trim().to_string())
+        .collect();
+    for name in &names {
+        docker_rm(name)?;
+    }
+    Ok(names)
+}
+
 /// Create a Docker network if it does not already exist.
 ///
 /// # Errors

@@ -13,8 +13,8 @@ use crate::core_defs::{current_run_context_path, resolve_build_info, utc_now};
 use crate::errors::{CliError, CliErrorKind, cow};
 use crate::exec::{
     cluster_exists, compose_down_project, compose_up, docker_inspect_ip, docker_network_create,
-    docker_network_rm, docker_rm, docker_run_detached, extract_admin_token, run_command,
-    run_command_streaming, wait_for_http,
+    docker_network_rm, docker_rm, docker_rm_by_label, docker_run_detached, extract_admin_token,
+    run_command, run_command_streaming, wait_for_http,
 };
 
 fn make_target(root: &Path, target: &str, env: &HashMap<String, String>) -> Result<(), CliError> {
@@ -201,6 +201,10 @@ fn cluster_universal(
             spec.members[0].container_ip = Some(result.cp_ip);
         }
         "single-down" => {
+            let removed = docker_rm_by_label("io.harness.service=true")?;
+            for name in &removed {
+                eprintln!("{} cluster: removed service container {name}", utc_now());
+            }
             if effective_store == "postgres" {
                 // Compose-managed single-zone
                 let project = format!("harness-{}", all_names[0]);
@@ -649,6 +653,10 @@ fn universal_global_zone_up(
 }
 
 fn universal_global_zone_down(_network: &str, names: &[String]) -> Result<(), CliError> {
+    let removed = docker_rm_by_label("io.harness.service=true")?;
+    for name in &removed {
+        eprintln!("{} cluster: removed service container {name}", utc_now());
+    }
     let global_name = &names[0];
     let project = format!("harness-{global_name}");
     compose_down_project(&project)?;
@@ -720,6 +728,10 @@ fn universal_global_two_zones_up(
 }
 
 fn universal_global_two_zones_down(_network: &str, names: &[String]) -> Result<(), CliError> {
+    let removed = docker_rm_by_label("io.harness.service=true")?;
+    for name in &removed {
+        eprintln!("{} cluster: removed service container {name}", utc_now());
+    }
     let global_name = &names[0];
     let project = format!("harness-{global_name}");
     compose_down_project(&project)?;
