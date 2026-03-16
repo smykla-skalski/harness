@@ -1,4 +1,4 @@
-use std::fs::{self, OpenOptions};
+use std::fs::OpenOptions;
 use std::io::Write as _;
 use std::path::{Path, PathBuf};
 use std::sync::LazyLock;
@@ -12,9 +12,12 @@ use crate::context::RunLayout;
 use crate::core_defs::utc_now;
 use crate::errors::{CliError, CliErrorKind, cow};
 use crate::hook_payloads::HookContext;
-use crate::io::ensure_dir;
+use crate::io::{ensure_dir, write_text};
 use crate::schema::RunStatus;
 use crate::workflow::runner::{RunnerPhase, RunnerWorkflowState};
+
+#[cfg(test)]
+use std::fs;
 
 static SANITIZE_NAME_RE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"[^A-Za-z0-9_.-]+").expect("invalid sanitize regex"));
@@ -99,8 +102,7 @@ pub fn append_audit_entry(request: AuditAppendRequest) -> Result<AuditEntry, Cli
     let timestamp = utc_now();
     let content_hash = hash_text(&request.full_output);
     let artifact_path = unique_artifact_path(&layout, &timestamp, &request.tool_name);
-    fs::write(&artifact_path, &request.full_output)
-        .map_err(|error| CliErrorKind::io(cow!("write {}: {error}", artifact_path.display())))?;
+    write_text(&artifact_path, &request.full_output)?;
 
     let artifact_path = relativize_path(&artifact_path, &request.run_dir);
     let entry = AuditEntry {

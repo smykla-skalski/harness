@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 
 use crate::core_defs::utc_now;
 use crate::errors::{CliError, CliErrorKind};
-use crate::io::is_safe_name;
+use crate::io::{is_safe_name, write_json_pretty};
 
 const STATE_FILE: &str = "ephemeral-metallb-templates.json";
 const DEFAULT_TEMPLATE_BASENAME: &str = "metallb-k3d-kuma.yaml";
@@ -193,17 +193,11 @@ fn load_entries(run_dir: Option<&Path>) -> Result<Vec<serde_json::Value>, CliErr
 
 fn save_entries(run_dir: &Path, entries: &[serde_json::Value]) -> Result<(), CliError> {
     let path = state_path(run_dir);
-    if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent)?;
-    }
     let payload = serde_json::json!({
         "schema_version": 1,
         "entries": entries,
     });
-    let text = serde_json::to_string_pretty(&payload)
-        .map_err(|e| -> CliError { CliErrorKind::serialize(e.to_string()).into() })?;
-    fs::write(&path, text)?;
-    Ok(())
+    write_json_pretty(&path, &payload)
 }
 
 #[cfg(test)]
