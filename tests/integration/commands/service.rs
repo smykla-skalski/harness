@@ -1,0 +1,116 @@
+// Integration tests for the `harness service` command.
+// Tests error paths for missing args and missing cluster spec.
+
+use harness::cli::{Command, RunDirArgs, ServiceArgs};
+use harness::commands::Execute;
+
+use super::super::helpers::*;
+
+fn service_args(action: &str, name: Option<&str>, run_dir: RunDirArgs) -> ServiceArgs {
+    ServiceArgs {
+        action: action.to_string(),
+        name: name.map(String::from),
+        image: None,
+        port: None,
+        mesh: "default".to_string(),
+        transparent_proxy: false,
+        dataplane_template: None,
+        run_dir,
+    }
+}
+
+fn missing_run_dir() -> RunDirArgs {
+    RunDirArgs {
+        run_dir: Some("/nonexistent/run-dir".into()),
+        run_id: None,
+        run_root: None,
+    }
+}
+
+#[test]
+fn service_up_missing_name() {
+    let tmp = tempfile::tempdir().unwrap();
+    let run_dir = init_run(tmp.path(), "svc-no-name", "single-zone");
+    let args = service_args(
+        "up",
+        None,
+        RunDirArgs {
+            run_dir: Some(run_dir),
+            run_id: None,
+            run_root: None,
+        },
+    );
+    let result = Command::Service(args).execute();
+    assert!(result.is_err());
+    let err = result.unwrap_err();
+    assert!(err.message().contains("service name is required"));
+}
+
+#[test]
+fn service_up_missing_port() {
+    let tmp = tempfile::tempdir().unwrap();
+    let run_dir = init_run(tmp.path(), "svc-no-port", "single-zone");
+    let args = service_args(
+        "up",
+        Some("demo"),
+        RunDirArgs {
+            run_dir: Some(run_dir),
+            run_id: None,
+            run_root: None,
+        },
+    );
+    let result = Command::Service(args).execute();
+    assert!(result.is_err());
+    let err = result.unwrap_err();
+    assert!(err.message().contains("service port is required"));
+}
+
+#[test]
+fn service_unknown_action() {
+    let tmp = tempfile::tempdir().unwrap();
+    let run_dir = init_run(tmp.path(), "svc-bad-action", "single-zone");
+    let args = service_args(
+        "restart",
+        Some("demo"),
+        RunDirArgs {
+            run_dir: Some(run_dir),
+            run_id: None,
+            run_root: None,
+        },
+    );
+    let result = Command::Service(args).execute();
+    assert!(result.is_err());
+    let err = result.unwrap_err();
+    assert!(err.message().contains("unknown service action"));
+}
+
+#[test]
+fn service_up_missing_cluster_spec() {
+    let tmp = tempfile::tempdir().unwrap();
+    let run_dir = init_run(tmp.path(), "svc-no-cluster", "single-zone");
+    let mut args = service_args(
+        "up",
+        Some("demo"),
+        RunDirArgs {
+            run_dir: Some(run_dir),
+            run_id: None,
+            run_root: None,
+        },
+    );
+    args.port = Some(8080);
+    args.image = Some("kuma-universal:latest".into());
+    let result = Command::Service(args).execute();
+    assert!(result.is_err());
+    let err = result.unwrap_err();
+    // Missing cluster spec means no CP address
+    assert_eq!(err.code(), "KSRCLI009");
+}
+
+#[test]
+fn service_down_missing_name() {
+    let args = service_args("down", None, missing_run_dir());
+    let result = Command::Service(args).execute();
+    assert!(result.is_err());
+    let err = result.unwrap_err();
+    assert!(err.message().contains("service name is required"));
+}
