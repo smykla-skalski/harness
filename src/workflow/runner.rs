@@ -197,6 +197,182 @@ pub fn write_runner_state(run_dir: &Path, state: &RunnerWorkflowState) -> Result
     save_state(run_dir, state)
 }
 
+/// Apply a named event to the runner state, advancing the phase when valid.
+///
+/// Returns the updated state after persisting to disk. Invalid transitions
+/// produce `CliErrorKind::InvalidTransition`.
+///
+/// # Errors
+/// Returns `CliError` on invalid transition or IO failure.
+pub fn apply_event(
+    run_dir: &Path,
+    event: &str,
+    suite_target: Option<&str>,
+    message: Option<&str>,
+) -> Result<RunnerWorkflowState, CliError> {
+    let mut state = read_runner_state(run_dir)?.unwrap_or_else(|| make_initial_state(&now_utc()));
+
+    let new_phase = resolve_transition(&state, event, suite_target, message)?;
+    state.phase = new_phase;
+    state.transition_count += 1;
+    state.updated_at = now_utc();
+    state.last_event = Some(event_label(event));
+
+    // Clear failure/suite_fix on forward movement out of triage.
+    if new_phase != RunnerPhase::Triage {
+        if state.failure.is_some() && !matches!(new_phase, RunnerPhase::Aborted) {
+            state.failure = None;
+        }
+        if state.suite_fix.is_some() {
+            state.suite_fix = None;
+        }
+    }
+
+    // Set preflight sub-state on preflight events.
+    match event {
+        "preflight-started" => state.preflight.status = PreflightStatus::Running,
+        "preflight-captured" => state.preflight.status = PreflightStatus::Complete,
+        _ => {}
+    }
+
+    // Set failure on failure-manifest.
+    if event == "failure-manifest" {
+        state.failure = Some(FailureState {
+            kind: FailureKind::Manifest,
+            suite_target: suite_target.map(str::to_string),
+            message: message.map(str::to_string),
+        });
+    }
+
+    // Set suite_fix on manifest-fix decisions that enter triage.
+    if event.starts_with("manifest-fix-") && new_phase == RunnerPhase::Triage {
+        let decision = match event {
+            "manifest-fix-suite-and-run" => ManifestFixDecision::SuiteAndRun,
+            "manifest-fix-skip-step" => ManifestFixDecision::SkipStep,
+            "manifest-fix-stop-run" => ManifestFixDecision::StopRun,
+            // manifest-fix-run-only and any other prefix match.
+            _ => ManifestFixDecision::RunOnly,
+        };
+        state.suite_fix = Some(SuiteFixState {
+            approved_paths: suite_target.map_or_else(Vec::new, |s| vec![s.to_string()]),
+            suite_written: false,
+            amendments_written: false,
+            decision,
+        });
+    }
+
+    save_state(run_dir, &state)?;
+    Ok(state)
+}
+
+/// Advance the runner phase to the execution phase if it is still in
+/// bootstrap or preflight. Called automatically when commands like
+/// `report group` or `apply` indicate the run is actively executing.
+///
+/// Returns `true` if the phase was advanced, `false` if already past those
+/// early phases.
+///
+/// # Errors
+/// Returns `CliError` on IO failure.
+pub fn ensure_execution_phase(run_dir: &Path) -> Result<bool, CliError> {
+    let Some(mut state) = read_runner_state(run_dir)? else {
+        return Ok(false);
+    };
+    if matches!(state.phase, RunnerPhase::Bootstrap | RunnerPhase::Preflight) {
+        state.phase = RunnerPhase::Execution;
+        state.transition_count += 1;
+        state.updated_at = now_utc();
+        state.last_event = Some("AutoAdvanceToExecution".to_string());
+        save_state(run_dir, &state)?;
+        return Ok(true);
+    }
+    Ok(false)
+}
+
+/// Map an event name to the target phase, validating that the transition
+/// is legal from the current phase.
+fn resolve_transition(
+    state: &RunnerWorkflowState,
+    event: &str,
+    _suite_target: Option<&str>,
+    _message: Option<&str>,
+) -> Result<RunnerPhase, CliError> {
+    let current = state.phase;
+    let target = match event {
+        "cluster-prepared" | "preflight-started" => RunnerPhase::Preflight,
+        "preflight-captured" | "suite-fix-resumed" | "resume-run" => RunnerPhase::Execution,
+        "preflight-failed"
+        | "failure-manifest"
+        | "manifest-fix-run-only"
+        | "manifest-fix-suite-and-run"
+        | "manifest-fix-skip-step" => RunnerPhase::Triage,
+        "manifest-fix-stop-run" | "abort" => RunnerPhase::Aborted,
+        "suspend" => RunnerPhase::Suspended,
+        "closeout-started" => RunnerPhase::Closeout,
+        "run-completed" => RunnerPhase::Completed,
+        other => {
+            return Err(CliErrorKind::invalid_transition(format!("unknown event: {other}")).into());
+        }
+    };
+
+    // Validate the transition is legal.
+    if !is_valid_transition(current, target, event) {
+        return Err(CliErrorKind::invalid_transition(format!(
+            "cannot apply '{event}' in phase {current} (target: {target})"
+        ))
+        .into());
+    }
+
+    Ok(target)
+}
+
+/// Check whether a phase transition is allowed.
+fn is_valid_transition(from: RunnerPhase, to: RunnerPhase, event: &str) -> bool {
+    // Abort and suspend are allowed from any non-terminal phase.
+    if matches!(to, RunnerPhase::Aborted | RunnerPhase::Suspended) {
+        return !matches!(from, RunnerPhase::Completed);
+    }
+    // Resume is only valid from suspended or aborted.
+    if event == "resume-run" {
+        return matches!(from, RunnerPhase::Suspended | RunnerPhase::Aborted);
+    }
+    match from {
+        RunnerPhase::Bootstrap => matches!(
+            to,
+            RunnerPhase::Preflight | RunnerPhase::Execution | RunnerPhase::Triage
+        ),
+        RunnerPhase::Preflight => matches!(
+            to,
+            RunnerPhase::Execution | RunnerPhase::Triage | RunnerPhase::Preflight
+        ),
+        RunnerPhase::Execution => matches!(
+            to,
+            RunnerPhase::Triage | RunnerPhase::Closeout | RunnerPhase::Execution
+        ),
+        RunnerPhase::Triage => matches!(to, RunnerPhase::Execution | RunnerPhase::Triage),
+        RunnerPhase::Closeout => matches!(to, RunnerPhase::Completed),
+        RunnerPhase::Completed | RunnerPhase::Aborted | RunnerPhase::Suspended => false,
+    }
+}
+
+/// Produce a human-readable label for a workflow event.
+fn event_label(event: &str) -> String {
+    event
+        .split('-')
+        .map(|segment| {
+            let mut characters = segment.chars();
+            match characters.next() {
+                None => String::new(),
+                Some(first) => {
+                    let mut result = first.to_uppercase().to_string();
+                    result.push_str(characters.as_str());
+                    result
+                }
+            }
+        })
+        .collect::<String>()
+}
+
 /// Next action for a runner workflow state.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RunnerNextAction {
@@ -548,5 +724,307 @@ mod tests {
             let json = serde_json::to_value(variant).unwrap();
             assert_eq!(json, expected);
         }
+    }
+
+    // --- apply_event tests ---
+
+    #[test]
+    fn apply_event_cluster_prepared_advances_to_preflight() {
+        let dir = TempDir::new().unwrap();
+        initialize_runner_state(dir.path()).unwrap();
+        let state = apply_event(dir.path(), "cluster-prepared", None, None).unwrap();
+        assert_eq!(state.phase, RunnerPhase::Preflight);
+        assert_eq!(state.transition_count, 1);
+        assert_eq!(state.last_event.as_deref(), Some("ClusterPrepared"));
+    }
+
+    #[test]
+    fn apply_event_full_happy_path() {
+        let dir = TempDir::new().unwrap();
+        initialize_runner_state(dir.path()).unwrap();
+
+        let state = apply_event(dir.path(), "cluster-prepared", None, None).unwrap();
+        assert_eq!(state.phase, RunnerPhase::Preflight);
+
+        let state = apply_event(dir.path(), "preflight-started", None, None).unwrap();
+        assert_eq!(state.phase, RunnerPhase::Preflight);
+        assert_eq!(state.preflight.status, PreflightStatus::Running);
+
+        let state = apply_event(dir.path(), "preflight-captured", None, None).unwrap();
+        assert_eq!(state.phase, RunnerPhase::Execution);
+        assert_eq!(state.preflight.status, PreflightStatus::Complete);
+
+        let state = apply_event(dir.path(), "closeout-started", None, None).unwrap();
+        assert_eq!(state.phase, RunnerPhase::Closeout);
+
+        let state = apply_event(dir.path(), "run-completed", None, None).unwrap();
+        assert_eq!(state.phase, RunnerPhase::Completed);
+        assert_eq!(state.transition_count, 5);
+    }
+
+    #[test]
+    fn apply_event_abort_from_execution() {
+        let dir = TempDir::new().unwrap();
+        initialize_runner_state(dir.path()).unwrap();
+        apply_event(dir.path(), "cluster-prepared", None, None).unwrap();
+        apply_event(dir.path(), "preflight-captured", None, None).unwrap();
+
+        let state = apply_event(dir.path(), "abort", None, None).unwrap();
+        assert_eq!(state.phase, RunnerPhase::Aborted);
+    }
+
+    #[test]
+    fn apply_event_suspend_and_resume() {
+        let dir = TempDir::new().unwrap();
+        initialize_runner_state(dir.path()).unwrap();
+        apply_event(dir.path(), "cluster-prepared", None, None).unwrap();
+        apply_event(dir.path(), "preflight-captured", None, None).unwrap();
+
+        let state = apply_event(dir.path(), "suspend", None, None).unwrap();
+        assert_eq!(state.phase, RunnerPhase::Suspended);
+
+        let state = apply_event(dir.path(), "resume-run", None, None).unwrap();
+        assert_eq!(state.phase, RunnerPhase::Execution);
+    }
+
+    #[test]
+    fn apply_event_resume_from_aborted() {
+        let dir = TempDir::new().unwrap();
+        initialize_runner_state(dir.path()).unwrap();
+        apply_event(dir.path(), "abort", None, None).unwrap();
+
+        let state = apply_event(dir.path(), "resume-run", None, None).unwrap();
+        assert_eq!(state.phase, RunnerPhase::Execution);
+    }
+
+    #[test]
+    fn apply_event_invalid_transition_rejected() {
+        let dir = TempDir::new().unwrap();
+        initialize_runner_state(dir.path()).unwrap();
+
+        // Cannot go to closeout from bootstrap.
+        let result = apply_event(dir.path(), "closeout-started", None, None);
+        assert!(result.is_err());
+        let error = result.unwrap_err();
+        assert_eq!(error.code(), "KSRCLI084");
+    }
+
+    #[test]
+    fn apply_event_unknown_event_rejected() {
+        let dir = TempDir::new().unwrap();
+        initialize_runner_state(dir.path()).unwrap();
+
+        let result = apply_event(dir.path(), "made-up-event", None, None);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().message().contains("unknown event"));
+    }
+
+    #[test]
+    fn apply_event_failure_manifest_sets_triage() {
+        let dir = TempDir::new().unwrap();
+        initialize_runner_state(dir.path()).unwrap();
+
+        let state = apply_event(
+            dir.path(),
+            "failure-manifest",
+            Some("groups/g1.md"),
+            Some("parse error"),
+        )
+        .unwrap();
+        assert_eq!(state.phase, RunnerPhase::Triage);
+        assert!(state.failure.is_some());
+        let failure = state.failure.unwrap();
+        assert_eq!(failure.kind, FailureKind::Manifest);
+        assert_eq!(failure.suite_target.as_deref(), Some("groups/g1.md"));
+        assert_eq!(failure.message.as_deref(), Some("parse error"));
+    }
+
+    #[test]
+    fn apply_event_manifest_fix_suite_and_run_sets_suite_fix() {
+        let dir = TempDir::new().unwrap();
+        initialize_runner_state(dir.path()).unwrap();
+        apply_event(dir.path(), "failure-manifest", Some("groups/g1.md"), None).unwrap();
+
+        let state = apply_event(
+            dir.path(),
+            "manifest-fix-suite-and-run",
+            Some("groups/g1.md"),
+            None,
+        )
+        .unwrap();
+        assert_eq!(state.phase, RunnerPhase::Triage);
+        let fix = state.suite_fix.unwrap();
+        assert_eq!(fix.decision, ManifestFixDecision::SuiteAndRun);
+        assert_eq!(fix.approved_paths, vec!["groups/g1.md"]);
+        assert!(!fix.suite_written);
+        assert!(!fix.amendments_written);
+    }
+
+    #[test]
+    fn apply_event_manifest_fix_stop_run_aborts() {
+        let dir = TempDir::new().unwrap();
+        initialize_runner_state(dir.path()).unwrap();
+        apply_event(dir.path(), "failure-manifest", None, None).unwrap();
+
+        let state = apply_event(dir.path(), "manifest-fix-stop-run", None, None).unwrap();
+        assert_eq!(state.phase, RunnerPhase::Aborted);
+    }
+
+    #[test]
+    fn apply_event_suite_fix_resumed_returns_to_execution() {
+        let dir = TempDir::new().unwrap();
+        initialize_runner_state(dir.path()).unwrap();
+        apply_event(dir.path(), "failure-manifest", None, None).unwrap();
+        apply_event(dir.path(), "manifest-fix-run-only", None, None).unwrap();
+
+        let state = apply_event(dir.path(), "suite-fix-resumed", None, None).unwrap();
+        assert_eq!(state.phase, RunnerPhase::Execution);
+        // suite_fix should be cleared when leaving triage.
+        assert!(state.suite_fix.is_none());
+    }
+
+    #[test]
+    fn apply_event_cannot_transition_from_completed() {
+        let dir = TempDir::new().unwrap();
+        initialize_runner_state(dir.path()).unwrap();
+        apply_event(dir.path(), "cluster-prepared", None, None).unwrap();
+        apply_event(dir.path(), "preflight-captured", None, None).unwrap();
+        apply_event(dir.path(), "closeout-started", None, None).unwrap();
+        apply_event(dir.path(), "run-completed", None, None).unwrap();
+
+        // Even abort should be rejected from completed.
+        let result = apply_event(dir.path(), "abort", None, None);
+        assert!(result.is_err());
+    }
+
+    // --- ensure_execution_phase tests ---
+
+    #[test]
+    fn ensure_execution_phase_from_bootstrap() {
+        let dir = TempDir::new().unwrap();
+        initialize_runner_state(dir.path()).unwrap();
+
+        let advanced = ensure_execution_phase(dir.path()).unwrap();
+        assert!(advanced);
+
+        let state = read_runner_state(dir.path()).unwrap().unwrap();
+        assert_eq!(state.phase, RunnerPhase::Execution);
+        assert_eq!(state.last_event.as_deref(), Some("AutoAdvanceToExecution"));
+    }
+
+    #[test]
+    fn ensure_execution_phase_from_preflight() {
+        let dir = TempDir::new().unwrap();
+        initialize_runner_state(dir.path()).unwrap();
+        apply_event(dir.path(), "cluster-prepared", None, None).unwrap();
+
+        let advanced = ensure_execution_phase(dir.path()).unwrap();
+        assert!(advanced);
+
+        let state = read_runner_state(dir.path()).unwrap().unwrap();
+        assert_eq!(state.phase, RunnerPhase::Execution);
+    }
+
+    #[test]
+    fn ensure_execution_phase_noop_when_already_executing() {
+        let dir = TempDir::new().unwrap();
+        initialize_runner_state(dir.path()).unwrap();
+        apply_event(dir.path(), "cluster-prepared", None, None).unwrap();
+        apply_event(dir.path(), "preflight-captured", None, None).unwrap();
+
+        let advanced = ensure_execution_phase(dir.path()).unwrap();
+        assert!(!advanced);
+
+        let state = read_runner_state(dir.path()).unwrap().unwrap();
+        assert_eq!(state.phase, RunnerPhase::Execution);
+    }
+
+    #[test]
+    fn ensure_execution_phase_noop_when_no_state() {
+        let dir = TempDir::new().unwrap();
+        let advanced = ensure_execution_phase(dir.path()).unwrap();
+        assert!(!advanced);
+    }
+
+    // --- event_label tests ---
+
+    #[test]
+    fn event_label_camel_cases_dashed_name() {
+        assert_eq!(event_label("cluster-prepared"), "ClusterPrepared");
+        assert_eq!(event_label("preflight-started"), "PreflightStarted");
+        assert_eq!(event_label("abort"), "Abort");
+        assert_eq!(
+            event_label("manifest-fix-suite-and-run"),
+            "ManifestFixSuiteAndRun"
+        );
+    }
+
+    // --- is_valid_transition tests ---
+
+    #[test]
+    fn valid_transitions_from_bootstrap() {
+        assert!(is_valid_transition(
+            RunnerPhase::Bootstrap,
+            RunnerPhase::Preflight,
+            "cluster-prepared"
+        ));
+        assert!(is_valid_transition(
+            RunnerPhase::Bootstrap,
+            RunnerPhase::Execution,
+            "preflight-captured"
+        ));
+        assert!(is_valid_transition(
+            RunnerPhase::Bootstrap,
+            RunnerPhase::Aborted,
+            "abort"
+        ));
+        assert!(!is_valid_transition(
+            RunnerPhase::Bootstrap,
+            RunnerPhase::Closeout,
+            "closeout-started"
+        ));
+    }
+
+    #[test]
+    fn valid_transitions_from_execution() {
+        assert!(is_valid_transition(
+            RunnerPhase::Execution,
+            RunnerPhase::Closeout,
+            "closeout-started"
+        ));
+        assert!(is_valid_transition(
+            RunnerPhase::Execution,
+            RunnerPhase::Triage,
+            "failure-manifest"
+        ));
+        assert!(is_valid_transition(
+            RunnerPhase::Execution,
+            RunnerPhase::Suspended,
+            "suspend"
+        ));
+        assert!(!is_valid_transition(
+            RunnerPhase::Execution,
+            RunnerPhase::Preflight,
+            "preflight-started"
+        ));
+    }
+
+    #[test]
+    fn resume_only_from_suspended_or_aborted() {
+        assert!(is_valid_transition(
+            RunnerPhase::Suspended,
+            RunnerPhase::Execution,
+            "resume-run"
+        ));
+        assert!(is_valid_transition(
+            RunnerPhase::Aborted,
+            RunnerPhase::Execution,
+            "resume-run"
+        ));
+        assert!(!is_valid_transition(
+            RunnerPhase::Execution,
+            RunnerPhase::Execution,
+            "resume-run"
+        ));
     }
 }
