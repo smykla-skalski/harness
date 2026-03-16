@@ -229,6 +229,7 @@ pub enum IssueCode {
     HarnessInfrastructureMisconfiguration,
     MissingConnectionOrEnvVar,
     SleepPrefixBeforeHarnessCommand,
+    JqErrorInCommandOutput,
 }
 
 /// Record of a `tool_use` block, for correlating with `tool_result`.
