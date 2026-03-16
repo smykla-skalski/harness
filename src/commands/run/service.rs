@@ -221,18 +221,20 @@ fn service_up_inner(setup: &ServiceSetup<'_>) -> Result<(), CliError> {
     let ca_path = format!("/tmp/{svc_name}-ca.crt");
     exec::docker_write_file(svc_name, &ca_path, &ca_cert)?;
 
-    // Start kuma-dp inside the container.
+    // Start kuma-dp inside the container in detached mode.
     // kuma-dp connects to the XDS port (5678), not the API port (5681).
     let xds_addr = format!("https://{cp_ip}:{xds_port}");
-    let dp_args = format!(
-        "kuma-dp run \
-         --cp-address={xds_addr} \
-         --dataplane-token-file={token_path} \
-         --dataplane-file={dp_path} \
-         --ca-cert-file={ca_path} \
-         2>&1 &"
-    );
-    exec::docker_exec_cmd(svc_name, &["sh", "-c", &dp_args])?;
+    exec::docker_exec_detached(
+        svc_name,
+        &[
+            "kuma-dp",
+            "run",
+            &format!("--cp-address={xds_addr}"),
+            &format!("--dataplane-token-file={token_path}"),
+            &format!("--dataplane-file={dp_path}"),
+            &format!("--ca-cert-file={ca_path}"),
+        ],
+    )?;
 
     // Wait for kuma-dp to become ready
     let readiness_url = format!("http://{container_address}:9902/ready");
@@ -248,31 +250,50 @@ fn service_up_inner(setup: &ServiceSetup<'_>) -> Result<(), CliError> {
 
 /// Extract the CA certificate from the CP's XDS TLS endpoint.
 ///
-/// Uses `openssl s_client` to connect and extract the PEM certificate.
+/// Runs `openssl s_client` to fetch TLS certificates, then extracts PEM
+/// blocks with Rust string operations instead of piping through sed.
 fn extract_cp_ca_cert(cp_ip: &str, xds_port: u16) -> Result<String, CliError> {
     let connect_arg = format!("{cp_ip}:{xds_port}");
-    // echo | openssl s_client -connect host:port -showcerts 2>/dev/null
     let result = exec::run_command(
         &[
-            "sh",
-            "-c",
-            &format!(
-                "echo | openssl s_client -connect {connect_arg} -showcerts 2>/dev/null | \
-                 sed -n '/BEGIN CERTIFICATE/,/END CERTIFICATE/p'"
-            ),
+            "openssl",
+            "s_client",
+            "-connect",
+            &connect_arg,
+            "-showcerts",
         ],
         None,
         None,
-        &[0],
+        &[0, 1],
     )?;
-    let cert = result.stdout.trim().to_string();
-    if cert.is_empty() || !cert.contains("BEGIN CERTIFICATE") {
+    // Extract PEM certificate blocks from the openssl output
+    let cert = extract_pem_certificates(&result.stdout);
+    if cert.is_empty() {
         return Err(CliErrorKind::cp_api_unreachable(format!(
             "could not extract CA cert from {connect_arg}"
         ))
         .into());
     }
     Ok(cert)
+}
+
+/// Extract all PEM certificate blocks from raw openssl output.
+fn extract_pem_certificates(output: &str) -> String {
+    let mut result = String::new();
+    let mut in_cert = false;
+    for line in output.lines() {
+        if line.contains("BEGIN CERTIFICATE") {
+            in_cert = true;
+        }
+        if in_cert {
+            result.push_str(line);
+            result.push('\n');
+        }
+        if line.contains("END CERTIFICATE") {
+            in_cert = false;
+        }
+    }
+    result.trim().to_string()
 }
 
 fn service_down(name: Option<&str>, _run_dir_args: &RunDirArgs) -> Result<i32, CliError> {
@@ -423,6 +444,28 @@ mod tests {
         spec.cp_image = Some("kuma-cp:dev".into());
         let result = resolve_service_image(None, &spec).unwrap();
         assert_eq!(result, "kuma-universal:dev");
+    }
+
+    #[test]
+    fn extract_pem_certificates_finds_certs() {
+        let raw = "CONNECTED\n\
+            depth=0 CN=kuma-cp\n\
+            ---\n\
+            -----BEGIN CERTIFICATE-----\n\
+            MIIB1234==\n\
+            -----END CERTIFICATE-----\n\
+            ---\n\
+            other noise\n";
+        let cert = extract_pem_certificates(raw);
+        assert!(cert.contains("BEGIN CERTIFICATE"));
+        assert!(cert.contains("MIIB1234=="));
+        assert!(!cert.contains("CONNECTED"));
+    }
+
+    #[test]
+    fn extract_pem_certificates_empty_on_no_cert() {
+        let raw = "CONNECTED\nno cert here\n";
+        assert!(extract_pem_certificates(raw).is_empty());
     }
 
     #[test]
