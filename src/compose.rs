@@ -121,7 +121,7 @@ pub fn single_zone(
             ports: vec!["5681:5681".into(), "5678:5678".into()],
             depends_on,
             networks: vec![network_name.into()],
-            command: vec![],
+            command: vec!["run".into()],
         },
     );
 
@@ -163,7 +163,7 @@ pub fn global_zone(
             ports: vec!["5681:5681".into(), "5685:5685".into()],
             depends_on: global_depends,
             networks: vec![network_name.into()],
-            command: vec![],
+            command: vec!["run".into()],
         },
     );
 
@@ -186,7 +186,7 @@ pub fn global_zone(
             ports: vec!["15681:5681".into(), "15678:5678".into()],
             depends_on: vec![global_name.into()],
             networks: vec![network_name.into()],
-            command: vec![],
+            command: vec!["run".into()],
         },
     );
 
@@ -195,58 +195,63 @@ pub fn global_zone(
     ComposeFile { services, networks }
 }
 
+/// Zone settings for multi-zone compose generation.
+#[derive(Debug, Clone, Copy)]
+pub struct ZoneConfig<'a> {
+    pub name: &'a str,
+    pub label: &'a str,
+}
+
+/// Config for global+two-zones universal topology.
+#[derive(Debug, Clone, Copy)]
+pub struct GlobalTwoZonesConfig<'a> {
+    pub image: &'a str,
+    pub network_name: &'a str,
+    pub subnet: &'a str,
+    pub store_type: &'a str,
+    pub global_name: &'a str,
+    pub zone1: ZoneConfig<'a>,
+    pub zone2: ZoneConfig<'a>,
+}
+
 /// Generate a compose file for global+two-zones universal topology.
 #[must_use]
-#[allow(clippy::too_many_arguments)]
-pub fn global_two_zones(
-    image: &str,
-    network_name: &str,
-    subnet: &str,
-    store_type: &str,
-    global_name: &str,
-    zone1_name: &str,
-    zone1_label: &str,
-    zone2_name: &str,
-    zone2_label: &str,
-) -> ComposeFile {
+pub fn global_two_zones(config: GlobalTwoZonesConfig<'_>) -> ComposeFile {
     let mut services = BTreeMap::new();
 
-    let mut global_env = cp_env("global", store_type);
+    let mut global_env = cp_env("global", config.store_type);
     let mut global_depends = Vec::new();
-    if store_type == "postgres" {
+    if config.store_type == "postgres" {
         global_env.insert("KUMA_STORE_POSTGRES_HOST".into(), "postgres".into());
         global_env.insert("KUMA_STORE_POSTGRES_PORT".into(), "5432".into());
         global_env.insert("KUMA_STORE_POSTGRES_USER".into(), "kuma".into());
         global_env.insert("KUMA_STORE_POSTGRES_PASSWORD".into(), "kuma".into());
         global_env.insert("KUMA_STORE_POSTGRES_DB_NAME".into(), "kuma".into());
         global_depends.push("postgres".into());
-        services.insert("postgres".into(), postgres_service(network_name));
+        services.insert("postgres".into(), postgres_service(config.network_name));
     }
 
     services.insert(
-        global_name.into(),
+        config.global_name.into(),
         ComposeService {
-            image: image.into(),
+            image: config.image.into(),
             environment: global_env,
             ports: vec!["5681:5681".into(), "5685:5685".into()],
             depends_on: global_depends,
-            networks: vec![network_name.into()],
-            command: vec![],
+            networks: vec![config.network_name.into()],
+            command: vec!["run".into()],
         },
     );
 
-    for (i, (zone_name, zone_label)) in [(zone1_name, zone1_label), (zone2_name, zone2_label)]
-        .iter()
-        .enumerate()
-    {
+    for (i, zone) in [config.zone1, config.zone2].iter().enumerate() {
         let port_offset = u16::try_from(i).unwrap_or(0) * 10000 + 15681;
         let xds_offset = u16::try_from(i).unwrap_or(0) * 10000 + 15678;
 
         let mut zone_env = cp_env("zone", "memory");
-        zone_env.insert("KUMA_MULTIZONE_ZONE_NAME".into(), (*zone_label).into());
+        zone_env.insert("KUMA_MULTIZONE_ZONE_NAME".into(), zone.label.into());
         zone_env.insert(
             "KUMA_MULTIZONE_ZONE_GLOBAL_ADDRESS".into(),
-            format!("grpcs://{global_name}:5685"),
+            format!("grpcs://{}:5685", config.global_name),
         );
         zone_env.insert(
             "KUMA_MULTIZONE_ZONE_KDS_TLS_SKIP_VERIFY".into(),
@@ -254,20 +259,20 @@ pub fn global_two_zones(
         );
 
         services.insert(
-            (*zone_name).into(),
+            zone.name.into(),
             ComposeService {
-                image: image.into(),
+                image: config.image.into(),
                 environment: zone_env,
                 ports: vec![format!("{port_offset}:5681"), format!("{xds_offset}:5678")],
-                depends_on: vec![global_name.into()],
-                networks: vec![network_name.into()],
-                command: vec![],
+                depends_on: vec![config.global_name.into()],
+                networks: vec![config.network_name.into()],
+                command: vec!["run".into()],
             },
         );
     }
 
     let mut networks = BTreeMap::new();
-    networks.insert(network_name.into(), bridge_network(subnet));
+    networks.insert(config.network_name.into(), bridge_network(config.subnet));
     ComposeFile { services, networks }
 }
 
@@ -339,17 +344,21 @@ mod tests {
 
     #[test]
     fn global_two_zones_produces_three_services() {
-        let compose = global_two_zones(
-            "kuma-cp:latest",
-            "net",
-            "172.57.0.0/16",
-            "memory",
-            "global-cp",
-            "zone-1-cp",
-            "zone-1",
-            "zone-2-cp",
-            "zone-2",
-        );
+        let compose = global_two_zones(GlobalTwoZonesConfig {
+            image: "kuma-cp:latest",
+            network_name: "net",
+            subnet: "172.57.0.0/16",
+            store_type: "memory",
+            global_name: "global-cp",
+            zone1: ZoneConfig {
+                name: "zone-1-cp",
+                label: "zone-1",
+            },
+            zone2: ZoneConfig {
+                name: "zone-2-cp",
+                label: "zone-2",
+            },
+        });
         assert!(compose.services.contains_key("global-cp"));
         assert!(compose.services.contains_key("zone-1-cp"));
         assert!(compose.services.contains_key("zone-2-cp"));

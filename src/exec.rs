@@ -62,16 +62,21 @@ pub(crate) fn run_command_streaming(
     let stderr_thread = thread::spawn(move || {
         let mut captured = String::new();
         if let Some(pipe) = stderr_handle {
-            let reader = io::BufReader::new(pipe);
-            #[allow(clippy::lines_filter_map_ok)]
-            for line in reader.lines() {
-                let Ok(line) = line else { break };
-                if let Some(msg) = filter_progress_line(&line) {
+            let mut reader = io::BufReader::new(pipe);
+            let mut line = String::new();
+            loop {
+                let bytes = reader.read_line(&mut line).unwrap_or(0);
+                if bytes == 0 {
+                    break;
+                }
+                let trimmed = line.trim_end_matches(['\n', '\r']);
+                if let Some(msg) = filter_progress_line(trimmed) {
                     let ts = utc_now();
                     eprintln!("    {ts} {msg}");
                 }
-                captured.push_str(&line);
+                captured.push_str(trimmed);
                 captured.push('\n');
+                line.clear();
             }
         }
         captured
@@ -183,13 +188,17 @@ fn build_command(
     cmd
 }
 
-#[allow(clippy::needless_pass_by_value)] // consumes owned stdout/stderr vecs
 fn build_result(args: &[&str], output: Output) -> CommandResult {
+    let Output {
+        status,
+        stdout,
+        stderr,
+    } = output;
     CommandResult {
         args: args.iter().map(|s| (*s).to_string()).collect(),
-        returncode: output.status.code().unwrap_or(-1),
-        stdout: String::from_utf8_lossy(&output.stdout).into_owned(),
-        stderr: String::from_utf8_lossy(&output.stderr).into_owned(),
+        returncode: status.code().unwrap_or(-1),
+        stdout: String::from_utf8_lossy(&stdout).into_owned(),
+        stderr: String::from_utf8_lossy(&stderr).into_owned(),
     }
 }
 
@@ -463,8 +472,24 @@ pub fn wait_for_http(url: &str, timeout: Duration) -> Result<(), CliError> {
 /// # Errors
 /// Returns `CliError` on HTTP or parse failure.
 pub fn cp_api_get(base_url: &str, path: &str) -> Result<serde_json::Value, CliError> {
+    cp_api_get_with_token(base_url, path, None)
+}
+
+/// GET a JSON response from the CP API with optional auth token.
+///
+/// # Errors
+/// Returns `CliError` on HTTP or parse failure.
+pub fn cp_api_get_with_token(
+    base_url: &str,
+    path: &str,
+    token: Option<&str>,
+) -> Result<serde_json::Value, CliError> {
     let url = format!("{base_url}{path}");
-    let body: serde_json::Value = ureq::get(&url)
+    let mut req = ureq::get(&url);
+    if let Some(tok) = token {
+        req = req.header("Authorization", &format!("Bearer {tok}"));
+    }
+    let body: serde_json::Value = req
         .call()
         .map_err(|e| CliErrorKind::cp_api_unreachable(url.clone()).with_details(e.to_string()))?
         .body_mut()
@@ -482,15 +507,57 @@ pub fn cp_api_post(
     path: &str,
     body: &serde_json::Value,
 ) -> Result<serde_json::Value, CliError> {
+    cp_api_post_with_token(base_url, path, body, None)
+}
+
+/// POST JSON to the CP API with optional auth token.
+///
+/// # Errors
+/// Returns `CliError` on HTTP or parse failure.
+pub fn cp_api_post_with_token(
+    base_url: &str,
+    path: &str,
+    body: &serde_json::Value,
+    token: Option<&str>,
+) -> Result<serde_json::Value, CliError> {
     let url = format!("{base_url}{path}");
-    let resp_body: serde_json::Value = ureq::post(&url)
-        .header("Content-Type", "application/json")
+    let mut req = ureq::post(&url).header("Content-Type", "application/json");
+    if let Some(tok) = token {
+        req = req.header("Authorization", &format!("Bearer {tok}"));
+    }
+    let resp_body: serde_json::Value = req
         .send_json(body)
         .map_err(|e| CliErrorKind::cp_api_unreachable(url.clone()).with_details(e.to_string()))?
         .body_mut()
         .read_json()
         .map_err(|e| CliErrorKind::cp_api_unreachable(url).with_details(e.to_string()))?;
     Ok(resp_body)
+}
+
+/// Extract the admin user token from a running CP container.
+///
+/// The CP stores the admin token in the global-secrets endpoint.
+/// Since `localhostIsAdmin` is true, we exec into the container to fetch it.
+///
+/// # Errors
+/// Returns `CliError` if the token cannot be extracted.
+pub fn extract_admin_token(cp_container: &str) -> Result<String, CliError> {
+    let result = docker_exec_cmd(
+        cp_container,
+        &[
+            "sh",
+            "-c",
+            "curl -s http://localhost:5681/global-secrets/admin-user-token | \
+             sed 's/.*\"data\":\"\\([^\"]*\\)\".*/\\1/' | base64 -d",
+        ],
+    )?;
+    let token = result.stdout.trim().to_string();
+    if token.is_empty() {
+        return Err(
+            CliErrorKind::token_generation_failed("could not extract admin token from CP").into(),
+        );
+    }
+    Ok(token)
 }
 
 #[cfg(test)]
