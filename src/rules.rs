@@ -137,6 +137,14 @@ pub mod suite_runner {
         ],
     };
 
+    pub const BUG_FOUND_GATE: Gate = Gate {
+        question: concat!(
+            skill_run!(),
+            "/bug-found: bug or failure detected during test execution"
+        ),
+        options: &["Fix now", "Continue and fix later", "Stop run"],
+    };
+
     /// Preflight reply status.
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
     #[non_exhaustive]
@@ -1043,6 +1051,28 @@ mod tests {
     fn manifest_fix_gate_matches() {
         let gate = &suite_runner::MANIFEST_FIX_GATE;
         assert!(gate.matches(gate.question, gate.options));
+    }
+
+    // -- BUG_FOUND_GATE --
+
+    #[test]
+    fn bug_found_gate_options_count() {
+        assert_eq!(suite_runner::BUG_FOUND_GATE.options.len(), 3);
+    }
+
+    #[test]
+    fn bug_found_gate_matches() {
+        let gate = &suite_runner::BUG_FOUND_GATE;
+        assert!(gate.matches(gate.question, gate.options));
+    }
+
+    #[test]
+    fn bug_found_gate_question_contains_prefix() {
+        assert!(
+            suite_runner::BUG_FOUND_GATE
+                .question
+                .starts_with("suite:run/")
+        );
     }
 
     // -- ResultKind --
