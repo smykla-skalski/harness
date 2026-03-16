@@ -153,9 +153,9 @@ fn run_group_updates_status_and_report() {
 }
 
 #[test]
-fn run_group_rejects_duplicate() {
+fn run_group_idempotent_same_status() {
     let tmp = tempfile::tempdir().unwrap();
-    let run_dir = init_run(tmp.path(), "run-group-dup", "single-zone");
+    let run_dir = init_run(tmp.path(), "run-group-idem", "single-zone");
     create_initial_report(&run_dir);
 
     let cmd = ReportCommand::Group {
@@ -173,6 +173,58 @@ fn run_group_rejects_duplicate() {
     };
     Command::Report { cmd: cmd.clone() }.execute().unwrap();
 
-    let err = Command::Report { cmd }.execute().unwrap_err();
-    assert_eq!(err.code(), "KSRCLI053");
+    // Reporting the same group with the same status should silently succeed.
+    let exit_code = Command::Report { cmd }.execute().unwrap();
+    assert_eq!(exit_code, 0);
+
+    // Counts should not be doubled.
+    let ctx = RunContext::from_run_dir(&run_dir).unwrap();
+    let status = ctx.status.unwrap();
+    assert_eq!(status.counts.passed, 1);
+    assert_eq!(status.executed_group_ids(), vec!["g01"]);
+}
+
+#[test]
+fn run_group_idempotent_different_status() {
+    let tmp = tempfile::tempdir().unwrap();
+    let run_dir = init_run(tmp.path(), "run-group-update", "single-zone");
+    create_initial_report(&run_dir);
+
+    let first = ReportCommand::Group {
+        group_id: "g01".to_string(),
+        status: "fail".to_string(),
+        evidence: vec!["evidence.txt".to_string()],
+        evidence_label: vec![],
+        capture_label: None,
+        note: None,
+        run_dir: RunDirArgs {
+            run_dir: Some(run_dir.clone()),
+            run_id: None,
+            run_root: None,
+        },
+    };
+    Command::Report { cmd: first }.execute().unwrap();
+
+    let second = ReportCommand::Group {
+        group_id: "g01".to_string(),
+        status: "pass".to_string(),
+        evidence: vec!["evidence2.txt".to_string()],
+        evidence_label: vec![],
+        capture_label: None,
+        note: None,
+        run_dir: RunDirArgs {
+            run_dir: Some(run_dir.clone()),
+            run_id: None,
+            run_root: None,
+        },
+    };
+    let exit_code = Command::Report { cmd: second }.execute().unwrap();
+    assert_eq!(exit_code, 0);
+
+    // Old fail count should be decremented, new pass count incremented.
+    let ctx = RunContext::from_run_dir(&run_dir).unwrap();
+    let status = ctx.status.unwrap();
+    assert_eq!(status.counts.passed, 1);
+    assert_eq!(status.counts.failed, 0);
+    assert_eq!(status.executed_group_ids(), vec!["g01"]);
 }

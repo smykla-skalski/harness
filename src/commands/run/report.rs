@@ -1,5 +1,4 @@
 use std::fmt::Write as _;
-use std::fs;
 use std::path::PathBuf;
 
 use crate::cli::{ReportCommand, RunDirArgs};
@@ -7,8 +6,9 @@ use crate::commands::resolve_run_dir;
 use crate::context::RunContext;
 use crate::core_defs::utc_now;
 use crate::errors::{CliError, CliErrorKind, cow};
+use crate::io::write_text;
 use crate::rules::suite_runner::{REPORT_CODE_BLOCK_LIMIT, REPORT_LINE_LIMIT};
-use crate::schema::RunReport;
+use crate::schema::{RunCounts, RunReport};
 
 /// Report validation and group finalization.
 ///
@@ -97,17 +97,39 @@ fn report_group(
         return Err(CliErrorKind::MissingRunStatus.into());
     };
 
-    if run_status.executed_group_ids().contains(&group_id) {
-        return Err(CliErrorKind::run_group_already_recorded(group_id.to_string()).into());
+    // Validate status before doing any mutation.
+    match status {
+        "pass" | "fail" | "skip" => {}
+        _ => {
+            return Err(CliErrorKind::usage_error(format!(
+                "unknown group status '{status}': must be pass, fail, or skip"
+            ))
+            .into());
+        }
+    }
+
+    let existing_verdict = find_group_verdict(&run_status.executed_groups, group_id);
+
+    if let Some(previous) = &existing_verdict {
+        if previous == status {
+            // Same status reported again - silently succeed for idempotency.
+            return Ok(0);
+        }
+        // Different status - update the entry and adjust counts.
+        eprintln!("group {group_id} status updated from {previous} to {status}");
+        decrement_count(&mut run_status.counts, previous);
+        update_group_verdict(&mut run_status.executed_groups, group_id, status);
+    } else {
+        let now = utc_now();
+        let group_entry = serde_json::json!({
+            "group_id": group_id,
+            "verdict": status,
+            "completed_at": now,
+        });
+        run_status.executed_groups.push(group_entry);
     }
 
     let now = utc_now();
-    let group_entry = serde_json::json!({
-        "group_id": group_id,
-        "verdict": status,
-        "completed_at": now,
-    });
-    run_status.executed_groups.push(group_entry);
     run_status.last_completed_group = Some(group_id.to_string());
     run_status.last_updated_utc = Some(now.clone());
 
@@ -115,12 +137,7 @@ fn report_group(
         "pass" => run_status.counts.passed += 1,
         "fail" => run_status.counts.failed += 1,
         "skip" => run_status.counts.skipped += 1,
-        _ => {
-            return Err(CliErrorKind::usage_error(format!(
-                "unknown group status '{status}': must be pass, fail, or skip"
-            ))
-            .into());
-        }
+        _ => unreachable!(),
     }
 
     if let Some(n) = note {
@@ -149,7 +166,55 @@ fn report_group(
 
     let status_json = serde_json::to_string_pretty(&run_status)
         .map_err(|e| CliErrorKind::serialize(cow!("group status update: {e}")))?;
-    fs::write(ctx.layout.status_path(), format!("{status_json}\n"))?;
+    write_text(&ctx.layout.status_path(), &format!("{status_json}\n"))?;
 
     Ok(0)
+}
+
+/// Find the verdict string for a group that was already recorded.
+/// Returns `None` if the group is not in the list.
+fn find_group_verdict(executed_groups: &[serde_json::Value], group_id: &str) -> Option<String> {
+    for entry in executed_groups {
+        match entry {
+            serde_json::Value::String(s) if s == group_id => {
+                // Legacy string-only entries have no verdict field.
+                return Some(String::new());
+            }
+            serde_json::Value::Object(object) => {
+                if object.get("group_id").and_then(|v| v.as_str()) == Some(group_id) {
+                    return object
+                        .get("verdict")
+                        .and_then(|v| v.as_str())
+                        .map(str::to_string);
+                }
+            }
+            _ => {}
+        }
+    }
+    None
+}
+
+/// Overwrite the verdict field on an existing executed-group entry.
+fn update_group_verdict(executed_groups: &mut [serde_json::Value], group_id: &str, verdict: &str) {
+    for entry in executed_groups.iter_mut() {
+        if let serde_json::Value::Object(object) = entry
+            && object.get("group_id").and_then(|v| v.as_str()) == Some(group_id)
+        {
+            object.insert(
+                "verdict".to_string(),
+                serde_json::Value::String(verdict.to_string()),
+            );
+            return;
+        }
+    }
+}
+
+/// Decrement the count for a given status string. Saturates at zero.
+fn decrement_count(counts: &mut RunCounts, status: &str) {
+    match status {
+        "pass" => counts.passed = counts.passed.saturating_sub(1),
+        "fail" => counts.failed = counts.failed.saturating_sub(1),
+        "skip" => counts.skipped = counts.skipped.saturating_sub(1),
+        _ => {}
+    }
 }
