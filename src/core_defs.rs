@@ -211,6 +211,24 @@ pub fn dirs_home() -> PathBuf {
     )
 }
 
+/// Shorten an absolute path for human-readable terminal output.
+///
+/// Paths under the harness data root become `~kuma/<rest>`.
+/// Other paths under `$HOME` get the home prefix replaced with `~`.
+/// Everything else is returned unchanged.
+#[must_use]
+pub fn shorten_path(path: &Path) -> String {
+    let hdr = harness_data_root();
+    if let Ok(rel) = path.strip_prefix(&hdr) {
+        return format!("~kuma/{}", rel.display());
+    }
+    let home = dirs_home();
+    if let Ok(rel) = path.strip_prefix(&home) {
+        return format!("~/{}", rel.display());
+    }
+    path.display().to_string()
+}
+
 #[cfg(test)]
 mod tests {
     use crate::errors::{CliErrorKind, render_error};
