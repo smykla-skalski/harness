@@ -528,43 +528,32 @@ fn scan_with_limit(
     Ok((issues, last_line))
 }
 
-/// Apply filters to a list of issues, validating filter values.
-fn apply_filters(issues: Vec<Issue>, filter: &ObserveFilterArgs) -> Result<Vec<Issue>, CliError> {
-    let mut filtered = issues;
-
-    if let Some(ref severity) = filter.severity {
-        let Some(min_severity) = IssueSeverity::from_label(severity) else {
-            return Err(CliErrorKind::session_parse_error(format!(
-                "unknown severity '{severity}'. Valid: low, medium, critical"
-            ))
-            .into());
-        };
-        filtered.retain(|issue| issue.severity >= min_severity);
-    }
-
-    // Focus preset applies category filter if no explicit --category is set
+/// Apply focus/category filters, returning an error for invalid values.
+fn apply_category_filter(
+    filtered: &mut Vec<Issue>,
+    filter: &ObserveFilterArgs,
+) -> Result<(), CliError> {
     if let Some(ref focus) = filter.focus {
-        if let Some(preset) = FocusPreset::from_label(focus) {
-            if let Some(focus_categories) = preset.categories() {
-                if let Some(ref category) = filter.category {
-                    // Intersect focus categories with explicit categories
-                    let explicit: Vec<IssueCategory> = category
-                        .split(',')
-                        .filter_map(|c| IssueCategory::from_label(c.trim()))
-                        .collect();
-                    filtered.retain(|issue| {
-                        focus_categories.contains(&issue.category)
-                            && explicit.contains(&issue.category)
-                    });
-                } else {
-                    filtered.retain(|issue| focus_categories.contains(&issue.category));
-                }
-            }
-        } else {
+        let Some(preset) = FocusPreset::from_label(focus) else {
             return Err(CliErrorKind::session_parse_error(format!(
                 "unknown focus preset '{focus}'. Valid: harness, skills, all"
             ))
             .into());
+        };
+        let Some(focus_categories) = preset.categories() else {
+            return Ok(());
+        };
+        if let Some(ref category) = filter.category {
+            let explicit: Vec<IssueCategory> = category
+                .split(',')
+                .filter_map(|c| IssueCategory::from_label(c.trim()))
+                .collect();
+            filtered.retain(|issue| {
+                focus_categories.contains(&issue.category)
+                    && explicit.contains(&issue.category)
+            });
+        } else {
+            filtered.retain(|issue| focus_categories.contains(&issue.category));
         }
     } else if let Some(ref category) = filter.category {
         let categories: Vec<IssueCategory> = category
@@ -584,6 +573,59 @@ fn apply_filters(issues: Vec<Issue>, filter: &ObserveFilterArgs) -> Result<Vec<I
         }
         filtered.retain(|issue| categories.contains(&issue.category));
     }
+    Ok(())
+}
+
+/// Apply a YAML overrides file (mute list and severity overrides).
+fn apply_overrides_file(
+    filtered: &mut Vec<Issue>,
+    overrides_path: &str,
+) -> Result<(), CliError> {
+    let content = fs::read_to_string(overrides_path).map_err(|e| {
+        CliErrorKind::session_parse_error(format!("cannot read overrides file: {e}"))
+    })?;
+    let overrides: serde_json::Value = serde_yml::from_str(&content).map_err(|e| {
+        CliErrorKind::session_parse_error(format!("invalid overrides YAML: {e}"))
+    })?;
+
+    if let Some(mute_list) = overrides["mute"].as_array() {
+        let muted: Vec<IssueCode> = mute_list
+            .iter()
+            .filter_map(|v| v.as_str().and_then(IssueCode::from_label))
+            .collect();
+        filtered.retain(|issue| !muted.contains(&issue.code));
+    }
+
+    if let Some(overrides_map) = overrides["severity_overrides"].as_object() {
+        for issue in filtered.iter_mut() {
+            let code_str = issue.code.to_string();
+            if let Some(new_sev) = overrides_map
+                .get(&code_str)
+                .and_then(|v| v.as_str())
+                .and_then(IssueSeverity::from_label)
+            {
+                issue.severity = new_sev;
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Apply filters to a list of issues, validating filter values.
+fn apply_filters(issues: Vec<Issue>, filter: &ObserveFilterArgs) -> Result<Vec<Issue>, CliError> {
+    let mut filtered = issues;
+
+    if let Some(ref severity) = filter.severity {
+        let Some(min_severity) = IssueSeverity::from_label(severity) else {
+            return Err(CliErrorKind::session_parse_error(format!(
+                "unknown severity '{severity}'. Valid: low, medium, critical"
+            ))
+            .into());
+        };
+        filtered.retain(|issue| issue.severity >= min_severity);
+    }
+
+    apply_category_filter(&mut filtered, filter)?;
 
     if let Some(ref exclude) = filter.exclude {
         let excluded: Vec<IssueCategory> = exclude
@@ -597,7 +639,6 @@ fn apply_filters(issues: Vec<Issue>, filter: &ObserveFilterArgs) -> Result<Vec<I
         filtered.retain(|issue| issue.fix_safety.is_fixable());
     }
 
-    // Mute list
     if let Some(ref mute) = filter.mute {
         let muted: Vec<IssueCode> = mute
             .split(',')
@@ -606,37 +647,8 @@ fn apply_filters(issues: Vec<Issue>, filter: &ObserveFilterArgs) -> Result<Vec<I
         filtered.retain(|issue| !muted.contains(&issue.code));
     }
 
-    // Apply YAML overrides file if provided
     if let Some(ref overrides_path) = filter.overrides {
-        let content = fs::read_to_string(overrides_path).map_err(|e| {
-            CliErrorKind::session_parse_error(format!("cannot read overrides file: {e}"))
-        })?;
-        let overrides: serde_json::Value = serde_yml::from_str(&content).map_err(|e| {
-            CliErrorKind::session_parse_error(format!("invalid overrides YAML: {e}"))
-        })?;
-
-        // Mute list from overrides
-        if let Some(mute_list) = overrides["mute"].as_array() {
-            let muted: Vec<IssueCode> = mute_list
-                .iter()
-                .filter_map(|v| v.as_str().and_then(IssueCode::from_label))
-                .collect();
-            filtered.retain(|issue| !muted.contains(&issue.code));
-        }
-
-        // Severity overrides: downgrade matching issues
-        if let Some(overrides_map) = overrides["severity_overrides"].as_object() {
-            for issue in &mut filtered {
-                let code_str = issue.code.to_string();
-                if let Some(new_sev) = overrides_map
-                    .get(&code_str)
-                    .and_then(|v| v.as_str())
-                    .and_then(IssueSeverity::from_label)
-                {
-                    issue.severity = new_sev;
-                }
-            }
-        }
+        apply_overrides_file(&mut filtered, overrides_path)?;
     }
 
     Ok(filtered)
