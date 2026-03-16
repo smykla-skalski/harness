@@ -22,10 +22,9 @@ use super::super::helpers::*;
 #[test]
 fn validate_agent_rejects_not_at_end() {
     let payload = HookEnvelopePayload {
-        root: None,
-        input_payload: None,
-        tool_input: None,
-        response: None,
+        tool_name: String::new(),
+        tool_input: serde_json::Value::Null,
+        tool_response: serde_json::Value::Null,
         last_assistant_message: Some(
             "I have saved the output and will continue working.".to_string(),
         ),
@@ -42,10 +41,9 @@ fn validate_agent_rejects_not_at_end() {
 #[test]
 fn validate_agent_accepts_at_end() {
     let payload = HookEnvelopePayload {
-        root: None,
-        input_payload: None,
-        tool_input: None,
-        response: None,
+        tool_name: String::new(),
+        tool_input: serde_json::Value::Null,
+        tool_response: serde_json::Value::Null,
         last_assistant_message: Some("The output has been saved".to_string()),
         transcript_path: None,
         stop_hook_active: false,
@@ -59,10 +57,9 @@ fn validate_agent_accepts_at_end() {
 #[test]
 fn validate_agent_trailing_period() {
     let payload = HookEnvelopePayload {
-        root: None,
-        input_payload: None,
-        tool_input: None,
-        response: None,
+        tool_name: String::new(),
+        tool_input: serde_json::Value::Null,
+        tool_response: serde_json::Value::Null,
         last_assistant_message: Some("The output has been saved.".to_string()),
         transcript_path: None,
         stop_hook_active: false,
