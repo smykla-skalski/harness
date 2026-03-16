@@ -372,6 +372,17 @@ fn persist_cluster_spec(spec: &ClusterSpec) -> Result<(), CliError> {
     Ok(())
 }
 
+/// Helm settings that fix init container CPU throttling on k3d clusters.
+///
+/// Without these, `kuma-init` containers get CPU-throttled by k3d's default
+/// cgroup limits, causing pods to sit at `Init:0/1` for 2-4 minutes. Setting
+/// the CPU limit to `0` removes the limit entirely; a small request is kept
+/// so the scheduler has a baseline.
+const INIT_CONTAINER_THROTTLE_FIX: &[&str] = &[
+    "runtime.kubernetes.injector.initContainer.resources.limits.cpu=0",
+    "runtime.kubernetes.injector.initContainer.resources.requests.cpu=10m",
+];
+
 fn start_and_deploy(
     root: &Path,
     base_env: &HashMap<String, String>,
@@ -391,22 +402,24 @@ fn start_and_deploy(
     env.insert("KUBECONFIG".to_string(), kubeconfig);
     env.insert("K3D_HELM_DEPLOY_NO_CNI".to_string(), "true".to_string());
     env.insert("KUMA_MODE".to_string(), kuma_mode.to_string());
-    if !extra_settings.is_empty() {
-        let existing = env
-            .get("K3D_HELM_DEPLOY_ADDITIONAL_SETTINGS")
-            .cloned()
-            .unwrap_or_default();
-        let mut all: Vec<String> = if existing.is_empty() {
-            vec![]
-        } else {
-            existing.split_whitespace().map(String::from).collect()
-        };
-        all.extend(extra_settings.iter().cloned());
-        env.insert(
-            "K3D_HELM_DEPLOY_ADDITIONAL_SETTINGS".to_string(),
-            all.join(" "),
-        );
-    }
+
+    // Merge existing settings, init container throttle fix, and caller extras.
+    let existing = env
+        .get("K3D_HELM_DEPLOY_ADDITIONAL_SETTINGS")
+        .cloned()
+        .unwrap_or_default();
+    let mut all: Vec<String> = if existing.is_empty() {
+        vec![]
+    } else {
+        existing.split_whitespace().map(String::from).collect()
+    };
+    all.extend(INIT_CONTAINER_THROTTLE_FIX.iter().map(|s| (*s).to_string()));
+    all.extend(extra_settings.iter().cloned());
+    env.insert(
+        "K3D_HELM_DEPLOY_ADDITIONAL_SETTINGS".to_string(),
+        all.join(" "),
+    );
+
     eprintln!(
         "{} cluster: deploying Kuma to {cluster_name} ({kuma_mode})",
         utc_now()

@@ -14,6 +14,7 @@
 12. [Prepared manifest stale after suite-fix](#12-prepared-manifest-stale-after-suite-fix)
 13. [Failure triage checklist](#failure-triage-checklist)
 14. [ContainerPatch value must be JSON string](#14-containerpatch-value-must-be-json-string)
+15. [Init container CPU throttling on k3d](#15-init-container-cpu-throttling-on-k3d-auto-fixed)
 
 ---
 
@@ -175,6 +176,29 @@ Correct:
 ```
 
 This applies to all Kuma resources that use JSON patch operations (ContainerPatch, ProxyTemplate). The CRD enforces strict decoding - nested YAML objects under `value` produce "unknown field" errors even though the intent is clear.
+
+## 15) Init container CPU throttling on k3d (auto-fixed)
+
+Symptoms: pods stuck at `Init:0/1` for 2-4 minutes, `kuma-init` container shows high CPU throttle count in `kubectl describe pod`.
+
+Root cause: k3d clusters inherit tight cgroup CPU limits. Kuma's default init container resource limits (`100m` CPU) get throttled by the container runtime, stalling iptables setup.
+
+Fix: harness injects these helm values automatically during every k8s cluster bootstrap (`single-up`, `global-zone-up`, `global-two-zones-up`):
+
+```
+runtime.kubernetes.injector.initContainer.resources.limits.cpu=0
+runtime.kubernetes.injector.initContainer.resources.requests.cpu=10m
+```
+
+Setting the CPU limit to `0` removes it entirely. No manual action needed - `harness cluster` handles this for all k3d deployments.
+
+If you are deploying outside harness and hit this, pass the settings via `K3D_HELM_DEPLOY_ADDITIONAL_SETTINGS` or `--helm-setting`:
+
+```bash
+harness cluster single-up kuma-1 \
+  --helm-setting "runtime.kubernetes.injector.initContainer.resources.limits.cpu=0" \
+  --helm-setting "runtime.kubernetes.injector.initContainer.resources.requests.cpu=10m"
+```
 
 ## Failure triage checklist
 
