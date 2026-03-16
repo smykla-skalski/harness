@@ -60,7 +60,8 @@ pub fn suite_root() -> PathBuf {
     harness_data_root().join("suites")
 }
 
-/// Read an env var, returning `None` if empty or an unexpanded shell variable.
+/// Read an env var, returning `None` if empty, an unexpanded shell variable,
+/// or a known sentinel value like "UNSET".
 fn context_scope_value(name: &str) -> Option<String> {
     let value = env::var(name).unwrap_or_default();
     let trimmed = value.trim();
@@ -68,6 +69,9 @@ fn context_scope_value(name: &str) -> Option<String> {
         return None;
     }
     if trimmed.starts_with("${") && trimmed.ends_with('}') {
+        return None;
+    }
+    if trimmed.eq_ignore_ascii_case("unset") {
         return None;
     }
     Some(trimmed.to_string())
@@ -313,6 +317,23 @@ mod tests {
                 "expected session- prefix: {parent_name}"
             );
         });
+    }
+
+    #[test]
+    fn session_scope_ignores_unset_sentinel() {
+        temp_env::with_vars(
+            [
+                ("CLAUDE_SESSION_ID", Some("UNSET")),
+                ("CLAUDE_PROJECT_DIR", None::<&str>),
+            ],
+            || {
+                let key = session_scope_key().unwrap();
+                assert!(
+                    !key.starts_with("session-"),
+                    "UNSET should not produce a session scope: {key}"
+                );
+            },
+        );
     }
 
     #[test]
