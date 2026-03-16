@@ -72,56 +72,15 @@ pub fn record(
         return Err(CliErrorKind::usage_error("missing command").into());
     }
 
-    let run_dir = match resolve_run_dir(run_dir_args) {
-        Ok(rd) => Some(rd),
-        Err(e) => {
-            if matches!(e.kind(), CliErrorKind::MissingRunPointer) {
-                None
-            } else {
-                return Err(e);
-            }
-        }
-    };
+    let run_dir = resolve_optional_run_dir(run_dir_args)?;
     let workflow_phase = resolve_workflow_phase(run_dir.as_deref())?;
     validate_gid_usage(&workflow_phase, gid, run_dir.is_some())?;
 
-    let mut cmd = Command::new(command[0]);
-    cmd.args(&command[1..]);
-    if let Some(ref rd) = run_dir {
-        inject_run_env(&mut cmd, rd, cluster);
-    }
-    let output = cmd.output();
+    let (stdout, stderr, returncode) = execute_command(&command, run_dir.as_deref(), cluster);
 
-    let (stdout, stderr, returncode) = match output {
-        Ok(o) => (
-            String::from_utf8_lossy(&o.stdout).to_string(),
-            String::from_utf8_lossy(&o.stderr).to_string(),
-            o.status.code().unwrap_or(127),
-        ),
-        Err(e) => (String::new(), e.to_string(), 127),
-    };
-
-    let mut artifact_name = utc_now().replace(':', "");
-    let tags: Vec<String> = [phase, label]
-        .iter()
-        .filter_map(|t| t.map(slugify))
-        .filter(|s| !s.is_empty())
-        .collect();
-    if !tags.is_empty() {
-        artifact_name = format!("{artifact_name}-{}", tags.join("-"));
-    }
-
+    let artifact_name = build_artifact_name(phase, label);
     let layout = run_dir.as_deref().map(RunLayout::from_run_dir);
-
-    let artifact: PathBuf = if let Some(ref layout) = layout {
-        let commands_dir = layout.commands_dir();
-        ensure_dir(&commands_dir)?;
-        commands_dir.join(format!("{artifact_name}.txt"))
-    } else {
-        let tmp = env::temp_dir().join("harness").join("run");
-        ensure_dir(&tmp)?;
-        tmp.join(format!("{artifact_name}.txt"))
-    };
+    let artifact = resolve_artifact_path(layout.as_ref(), &artifact_name)?;
 
     let content =
         format!("exit code: {returncode}\n--- STDOUT ---\n{stdout}\n--- STDERR ---\n{stderr}");
@@ -158,6 +117,67 @@ pub fn record(
             shorten_path(&artifact)
         )),
     )
+}
+
+/// Resolve the run directory, treating `MissingRunPointer` as `None`.
+fn resolve_optional_run_dir(run_dir_args: &RunDirArgs) -> Result<Option<PathBuf>, CliError> {
+    match resolve_run_dir(run_dir_args) {
+        Ok(rd) => Ok(Some(rd)),
+        Err(e) if matches!(e.kind(), CliErrorKind::MissingRunPointer) => Ok(None),
+        Err(e) => Err(e),
+    }
+}
+
+/// Run the command and return (stdout, stderr, exit code).
+fn execute_command(
+    command: &[&str],
+    run_dir: Option<&Path>,
+    cluster: Option<&str>,
+) -> (String, String, i32) {
+    let mut process = Command::new(command[0]);
+    process.args(&command[1..]);
+    if let Some(rd) = run_dir {
+        inject_run_env(&mut process, rd, cluster);
+    }
+    match process.output() {
+        Ok(o) => (
+            String::from_utf8_lossy(&o.stdout).to_string(),
+            String::from_utf8_lossy(&o.stderr).to_string(),
+            o.status.code().unwrap_or(127),
+        ),
+        Err(e) => (String::new(), e.to_string(), 127),
+    }
+}
+
+/// Build the artifact file name from timestamp and optional tags.
+fn build_artifact_name(phase: Option<&str>, label: Option<&str>) -> String {
+    let mut name = utc_now().replace(':', "");
+    let tags: Vec<String> = [phase, label]
+        .iter()
+        .filter_map(|t| t.map(slugify))
+        .filter(|s| !s.is_empty())
+        .collect();
+    if !tags.is_empty() {
+        name = format!("{name}-{}", tags.join("-"));
+    }
+    name
+}
+
+/// Resolve the artifact file path, creating the parent directory.
+fn resolve_artifact_path(
+    layout: Option<&RunLayout>,
+    artifact_name: &str,
+) -> Result<PathBuf, CliError> {
+    let (dir, file) = if let Some(layout) = layout {
+        (layout.commands_dir(), format!("{artifact_name}.txt"))
+    } else {
+        (
+            env::temp_dir().join("harness").join("run"),
+            format!("{artifact_name}.txt"),
+        )
+    };
+    ensure_dir(&dir)?;
+    Ok(dir.join(file))
 }
 
 fn resolve_workflow_phase(run_dir: Option<&Path>) -> Result<String, CliError> {
