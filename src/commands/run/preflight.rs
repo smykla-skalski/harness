@@ -1,6 +1,6 @@
 use crate::cli::RunDirArgs;
 use crate::commands::resolve_run_context;
-use crate::core_defs::utc_now;
+use crate::core_defs::{shorten_path, utc_now};
 use crate::errors::CliError;
 
 /// Run preflight checks and prepare suite manifests.
@@ -15,6 +15,6 @@ pub fn preflight(
     let ctx = resolve_run_context(run_dir_args)?;
 
     eprintln!("{} preflight: complete", utc_now());
-    println!("{}", ctx.layout.artifacts_dir().display());
+    println!("{}", shorten_path(&ctx.layout.artifacts_dir()));
     Ok(0)
 }
