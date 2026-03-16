@@ -158,6 +158,8 @@ For single-file suites: read the entire suite file, but require the same frontma
 
 **Deviation rule**: if any step requires diverging from the suite definition (different values, skipped step, reordered steps, extra steps, changed expected outcome), use AskUserQuestion for approval before making the change. Record every deviation in the report with what changed, why, and whether user-approved or suite-allowed.
 
+All manifest paths passed to `harness apply` are relative - harness resolves them from the suite and run directories automatically. Never construct shell variables (`SD=`, `SUITE_DIR=`, etc.) to build manifest paths. Use `harness apply --manifest g02/04.yaml`, not `SD=... && harness apply --manifest ${SD}/g02/04.yaml`.
+
 For each test step:
 
 1. Use prepared manifest entries from the active run's prepared-suite artifact whenever the suite already defines the manifest. Only write a new manifest to the active run's `manifests/` directory when the suite does not already provide one or the user explicitly approved a deviation. Never use `/tmp`.
