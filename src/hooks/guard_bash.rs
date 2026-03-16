@@ -100,6 +100,9 @@ fn guard_suite_author(_ctx: &HookContext, words: &[String], heads: &[String]) ->
     if has_denied_cluster_binary(heads) || has_denied_cluster_binary_anywhere(words) {
         return HookMessage::ClusterBinary.into_result();
     }
+    if has_python_inline(words) {
+        return deny_python();
+    }
     if !is_harness_head(heads) && has_admin_endpoint_hint(words) {
         return HookMessage::AdminEndpoint.into_result();
     }
@@ -143,6 +146,9 @@ fn guard_suite_runner(ctx: &HookContext, words: &[String], heads: &[String]) -> 
             "suite runs must stay on the tracked run; \
              do not switch into CI or GitHub workflows",
         );
+    }
+    if has_python_inline(words) {
+        return deny_python();
     }
     if let Some(target) = make_target(words)
         && MakeTargetPrefix::is_denied_target(target)
@@ -680,6 +686,32 @@ fn has_admin_endpoint_hint(words: &[String]) -> bool {
     words.iter().any(|w| AdminEndpointHint::contains_hint(w))
 }
 
+fn is_python_binary(name: &str) -> bool {
+    matches!(name, "python" | "python3")
+}
+
+fn has_python_inline(words: &[String]) -> bool {
+    for (i, word) in words.iter().enumerate() {
+        let name = normalized_binary_name(word);
+        if !is_python_binary(&name) {
+            continue;
+        }
+        if i + 1 < words.len() && matches!(words[i + 1].as_str(), "-c" | "-") {
+            return true;
+        }
+    }
+    false
+}
+
+fn deny_python() -> HookResult {
+    HookMessage::approval_required(
+        "use python",
+        "do not use python for JSON parsing; \
+         use jq for JSON filtering or harness envoy capture for Envoy admin data",
+    )
+    .into_result()
+}
+
 fn has_denied_legacy_script(words: &[String]) -> bool {
     words.iter().any(|w| {
         let name = Path::new(w)
@@ -1085,6 +1117,64 @@ mod tests {
             "suite:run",
             "harness service up demo --image kuma-dp:latest --port 5050",
         );
+        let r = execute(&c).unwrap();
+        assert_eq!(r.decision, Decision::Allow);
+    }
+
+    #[test]
+    fn denies_python_inline_in_suite_new() {
+        let c = ctx(
+            "suite:new",
+            "harness authoring-show --kind coverage | python3 -c \"import json, sys; print(json.load(sys.stdin))\"",
+        );
+        let r = execute(&c).unwrap();
+        assert_eq!(r.decision, Decision::Deny);
+        assert!(r.message.contains("do not use python"));
+    }
+
+    #[test]
+    fn denies_python_inline_in_suite_run() {
+        let c = ctx(
+            "suite:run",
+            "kubectl get pods -o json | python3 -c \"import json, sys; print(json.load(sys.stdin))\"",
+        );
+        let r = execute(&c).unwrap();
+        assert_eq!(r.decision, Decision::Deny);
+        assert!(r.message.contains("do not use python"));
+    }
+
+    #[test]
+    fn denies_python_stdin_pipe() {
+        let c = ctx(
+            "suite:run",
+            "cat data.json | python3 -",
+        );
+        let r = execute(&c).unwrap();
+        assert_eq!(r.decision, Decision::Deny);
+        assert!(r.message.contains("do not use python"));
+    }
+
+    #[test]
+    fn denies_python_without_version_suffix() {
+        let c = ctx(
+            "suite:new",
+            "echo '{}' | python -c \"import json\"",
+        );
+        let r = execute(&c).unwrap();
+        assert_eq!(r.decision, Decision::Deny);
+        assert!(r.message.contains("do not use python"));
+    }
+
+    #[test]
+    fn allows_python_version_check() {
+        let c = ctx("suite:run", "python3 --version");
+        let r = execute(&c).unwrap();
+        assert_eq!(r.decision, Decision::Allow);
+    }
+
+    #[test]
+    fn allows_python_script_file() {
+        let c = ctx("suite:new", "python3 script.py");
         let r = execute(&c).unwrap();
         assert_eq!(r.decision, Decision::Allow);
     }
