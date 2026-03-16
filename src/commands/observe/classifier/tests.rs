@@ -1,4 +1,5 @@
 use super::*;
+use crate::commands::observe::output;
 use crate::commands::observe::types::{
     IssueCategory, IssueSeverity, MessageRole, ScanState, SourceTool,
 };
@@ -505,4 +506,190 @@ fn skips_env_detection_for_plain_commands() {
 #[test]
 fn rule_table_has_expected_count() {
     assert_eq!(rules::TEXT_RULES.len(), 15);
+}
+
+#[test]
+fn deduplicates_same_ksa_code_across_repeats() {
+    let mut state = make_state();
+    let first = check_text_for_issues(
+        10,
+        MessageRole::User,
+        "ERROR [KSA001] Write path is outside the suite:new surface",
+        Some(SourceTool::Bash),
+        &mut state,
+    );
+    let second = check_text_for_issues(
+        11,
+        MessageRole::User,
+        "ERROR [KSA001] Write path is outside the suite:new surface",
+        Some(SourceTool::Bash),
+        &mut state,
+    );
+    assert_eq!(first.len(), 1);
+    assert!(second.is_empty());
+}
+
+#[test]
+fn keeps_distinct_ksa_codes_separate() {
+    let mut state = make_state();
+    let first = check_text_for_issues(
+        10,
+        MessageRole::User,
+        "ERROR [KSA001] Write path is outside the suite:new surface",
+        Some(SourceTool::Bash),
+        &mut state,
+    );
+    let second = check_text_for_issues(
+        11,
+        MessageRole::User,
+        "ERROR [KSA002] Guard question denied an invalid prompt",
+        Some(SourceTool::Bash),
+        &mut state,
+    );
+    assert_eq!(first.len(), 1);
+    assert_eq!(second.len(), 1);
+    assert!(second[0].summary.contains("KSA002"));
+}
+
+#[test]
+fn manifest_runtime_failure_dedups_across_exit_codes() {
+    let mut state = make_state();
+    let first = check_text_for_issues(
+        10,
+        MessageRole::User,
+        "harness apply failed with exit code 2",
+        Some(SourceTool::Bash),
+        &mut state,
+    );
+    let second = check_text_for_issues(
+        11,
+        MessageRole::User,
+        "harness apply failed with exit code 137",
+        Some(SourceTool::Bash),
+        &mut state,
+    );
+    assert_eq!(first.len(), 1);
+    assert!(second.is_empty());
+}
+
+#[test]
+fn permission_failures_dedup_per_agent() {
+    let mut state = make_state();
+    let first = check_text_for_issues(
+        10,
+        MessageRole::User,
+        "Agent \"alpha\" says I need Bash permission to continue",
+        None,
+        &mut state,
+    );
+    let second = check_text_for_issues(
+        11,
+        MessageRole::User,
+        "Agent \"alpha\" says I need Bash permission to continue",
+        None,
+        &mut state,
+    );
+    let third = check_text_for_issues(
+        12,
+        MessageRole::User,
+        "Agent \"beta\" says I need Bash permission to continue",
+        None,
+        &mut state,
+    );
+    assert_eq!(first.len(), 1);
+    assert!(second.is_empty());
+    assert_eq!(third.len(), 1);
+    assert!(third[0].summary.contains("beta"));
+}
+
+#[test]
+fn rule_output_shape_is_preserved() {
+    let mut state = make_state();
+    let issues = check_text_for_issues(
+        10,
+        MessageRole::User,
+        "harness: error: unrecognized arguments --bad-flag",
+        Some(SourceTool::Bash),
+        &mut state,
+    );
+    assert_eq!(issues.len(), 1);
+    let issue = &issues[0];
+    assert!(issue.fixable);
+    assert_eq!(issue.fix_target.as_deref(), Some("cli.rs"));
+    assert!(issue.fix_hint.is_none());
+
+    let rendered = output::render_json(issue);
+    let parsed: serde_json::Value = serde_json::from_str(&rendered).unwrap();
+    assert_eq!(parsed["fixable"], true);
+    assert_eq!(parsed["fix_target"], "cli.rs");
+    assert!(parsed.get("code").is_none());
+    assert!(parsed.get("fingerprint").is_none());
+}
+
+#[test]
+fn text_check_output_shape_is_preserved() {
+    let mut state = make_state();
+    let issues = check_text_for_issues(
+        10,
+        MessageRole::User,
+        "CLAUDE_SESSION_ID=unset",
+        Some(SourceTool::Bash),
+        &mut state,
+    );
+    assert_eq!(issues.len(), 1);
+    let issue = &issues[0];
+    assert!(issue.fixable);
+    assert_eq!(issue.fix_target.as_deref(), Some("src/context.rs"));
+    assert!(
+        issue
+            .fix_hint
+            .as_deref()
+            .is_some_and(|hint| hint.contains("context directory"))
+    );
+
+    let rendered = output::render_json(issue);
+    let parsed: serde_json::Value = serde_json::from_str(&rendered).unwrap();
+    assert_eq!(parsed["fixable"], true);
+    assert_eq!(parsed["fix_target"], "src/context.rs");
+    assert!(
+        parsed["fix_hint"]
+            .as_str()
+            .unwrap()
+            .contains("context directory")
+    );
+    assert!(parsed.get("code").is_none());
+}
+
+#[test]
+fn tool_check_output_shape_is_preserved() {
+    let mut state = make_state();
+    let block = serde_json::json!({
+        "type": "tool_use",
+        "id": "t1",
+        "name": "Bash",
+        "input": { "command": "rm -rf tmp/output" }
+    });
+    let issues = check_tool_use_for_issues(10, &block, &mut state);
+    assert_eq!(issues.len(), 1);
+    let issue = &issues[0];
+    assert!(!issue.fixable);
+    assert!(issue.fix_target.is_none());
+    assert!(
+        issue
+            .fix_hint
+            .as_deref()
+            .is_some_and(|hint| hint.contains("verify target"))
+    );
+
+    let rendered = output::render_json(issue);
+    let parsed: serde_json::Value = serde_json::from_str(&rendered).unwrap();
+    assert_eq!(parsed["fixable"], false);
+    assert!(parsed.get("fix_target").is_none());
+    assert!(
+        parsed["fix_hint"]
+            .as_str()
+            .unwrap()
+            .contains("verify target")
+    );
+    assert!(parsed.get("code").is_none());
 }
