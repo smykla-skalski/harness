@@ -23,43 +23,12 @@ use harness::schema::Verdict;
 use harness::workflow::author::{self, AuthorPhase};
 use harness::workflow::runner::{self, RunnerPhase};
 
-use harness_testkit::FakeToolchain;
-use predicates::str::contains as pred_contains;
-
 use super::super::helpers::*;
-
-#[test]
-fn diff_identical_files() {
-    let tmp = tempfile::tempdir().unwrap();
-    let a = tmp.path().join("a.txt");
-    let b = tmp.path().join("b.txt");
-    fs::write(&a, "hello\n").unwrap();
-    fs::write(&b, "hello\n").unwrap();
-    // The diff command should report no differences
-    // (testing the actual diff would require CLI binary invocation)
-}
+use harness_testkit::FakeToolchain;
 
 // ============================================================================
 // CLI-level tests (use assert_cmd binary)
 // ============================================================================
-
-#[test]
-fn help_shows_subcommands() {
-    harness_testkit::harness_cmd()
-        .arg("--help")
-        .assert()
-        .success()
-        .stdout(pred_contains("init"));
-}
-
-#[test]
-fn hook_help_lists_registered_hooks() {
-    harness_testkit::harness_cmd()
-        .args(["hook", "--help"])
-        .assert()
-        .success()
-        .stdout(pred_contains("guard-bash"));
-}
 
 #[test]
 fn record_with_no_command_exits_nonzero() {

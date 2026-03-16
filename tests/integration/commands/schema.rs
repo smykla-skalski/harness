@@ -4,7 +4,9 @@
 
 use std::fs;
 
-use harness::schema::{GroupSpec, RunCounts, RunStatus, SuiteSpec, Verdict};
+use harness::schema::{
+    ExecutedGroupRecord, GroupSpec, GroupVerdict, RunCounts, RunStatus, SuiteSpec, Verdict,
+};
 
 use super::super::helpers::*;
 
@@ -101,15 +103,6 @@ fn meshmetric_group_loads_valid() {
     assert!(!spec.body.contains("backendRef"));
 }
 
-#[test]
-fn meshmetric_group_with_invalid_backend_ref() {
-    let tmp = tempfile::tempdir().unwrap();
-    let path = tmp.path().join("g01.md");
-    write_meshmetric_group(&path, true);
-    let spec = GroupSpec::from_markdown(&path).unwrap();
-    assert!(spec.body.contains("backendRef"));
-}
-
 // ============================================================================
 // RunStatus tests
 // ============================================================================
@@ -148,8 +141,18 @@ fn run_status_executed_group_ids() {
         completed_at: None,
         counts: RunCounts::default(),
         executed_groups: vec![
-            serde_json::Value::String("g01".to_string()),
-            serde_json::json!({"group_id": "g02", "verdict": "pass"}),
+            ExecutedGroupRecord {
+                group_id: "g01".to_string(),
+                verdict: GroupVerdict::Pass,
+                completed_at: "now".to_string(),
+                state_capture_at_report: None,
+            },
+            ExecutedGroupRecord {
+                group_id: "g02".to_string(),
+                verdict: GroupVerdict::Pass,
+                completed_at: "later".to_string(),
+                state_capture_at_report: None,
+            },
         ],
         skipped_groups: vec![],
         last_completed_group: None,

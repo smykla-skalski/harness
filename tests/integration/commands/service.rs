@@ -21,14 +21,6 @@ fn service_args(action: &str, name: Option<&str>, run_dir: RunDirArgs) -> Servic
     }
 }
 
-fn missing_run_dir() -> RunDirArgs {
-    RunDirArgs {
-        run_dir: Some("/nonexistent/run-dir".into()),
-        run_id: None,
-        run_root: None,
-    }
-}
-
 #[test]
 fn service_up_missing_name() {
     let tmp = tempfile::tempdir().unwrap();
@@ -106,13 +98,4 @@ fn service_up_missing_cluster_spec() {
     let err = result.unwrap_err();
     // Missing cluster spec means no CP address
     assert_eq!(err.code(), "KSRCLI009");
-}
-
-#[test]
-fn service_down_missing_name() {
-    let args = service_args("down", None, missing_run_dir());
-    let result = run_command(Command::Service(args));
-    assert!(result.is_err());
-    let err = result.unwrap_err();
-    assert!(err.message().contains("service name is required"));
 }

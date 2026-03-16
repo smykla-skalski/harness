@@ -13,15 +13,128 @@ use harness::workflow::runner::{
 use super::super::helpers::*;
 
 // ============================================================================
-// Basic denied binary tests
+// Simple allow/deny payloads (table-driven)
 // ============================================================================
 
 #[test]
-fn guard_bash_denies_direct_kubectl() {
-    let ctx = make_hook_context("suite:run", make_bash_payload("kubectl get pods"));
-    let r = guard_bash::execute(&ctx).unwrap();
-    assert_deny(&r);
+fn guard_bash_payloads() {
+    // (skill, command, should_allow)
+    let cases: &[(&str, &str, bool)] = &[
+        // suite:run denied binaries
+        ("suite:run", "kubectl get pods", false),
+        (
+            "suite:run",
+            "python3 tools/record_command.py -- echo hello",
+            false,
+        ),
+        (
+            "suite:run",
+            "ls -la /tmp/kumactl && /tmp/kumactl version 2>&1",
+            false,
+        ),
+        ("suite:run", "$KUMACTL version", false),
+        ("suite:run", "ls -la /tmp/kumactl", false),
+        // suite:run wrapped harness commands
+        (
+            "suite:run",
+            "harness run --phase setup --label kumactl-version kumactl version",
+            true,
+        ),
+        (
+            "suite:run",
+            "harness run --phase verify --label admin-check curl localhost:9901/config_dump",
+            true,
+        ),
+        (
+            "suite:run",
+            "harness envoy capture --phase verify --label config-dump \
+             --namespace kuma-demo --workload deploy/demo-client --admin-path /config_dump",
+            true,
+        ),
+        // mixed kuma resource delete
+        (
+            "suite:run",
+            "harness record --phase cleanup --label cleanup-g04 -- \
+             kubectl delete meshopentelemetrybackend otel-runtime \
+             meshmetric metrics-runtime -n kuma-system",
+            false,
+        ),
+        (
+            "suite:run",
+            "harness run --phase cleanup --label cleanup-g04 \
+             kubectl delete meshopentelemetrybackend otel-runtime \
+             meshmetric metrics-runtime -n kuma-system",
+            false,
+        ),
+        (
+            "suite:run",
+            "harness record --phase cleanup --label cleanup-g05 -- \
+             kubectl delete meshopentelemetrybackend otel-e2e -n kuma-system",
+            true,
+        ),
+        // allow/deny patterns
+        ("suite:run", "ls -la /tmp", true),
+        (
+            "suite:run",
+            "mkdir -p /tmp/suites/my-new-suite/groups",
+            false,
+        ),
+        ("suite:run", "make k3d/stop", false),
+        ("suite:run", "gh run view 12345", false),
+        (
+            "suite:run",
+            "python3 -c 'import json; ...' run-status.json",
+            false,
+        ),
+        ("suite:run", "echo '# report' > run-report.md", false),
+        ("suite:run", "cat suite-run-state.json", false),
+        ("suite:run", "cat commands/command-log.md", false),
+        ("suite:run", "echo row >> commands/command-log.md", false),
+        // shell chain and loop
+        (
+            "suite:run",
+            "sleep 5 && harness run --phase verify --label ctx kubectl config current-context",
+            false,
+        ),
+        (
+            "suite:run",
+            "harness record --phase verify --label pods \
+             kubectl get pods -o json | jq '.items[].metadata.name'",
+            true,
+        ),
+        // direct binary denials
+        ("suite:run", "helm install kuma kuma/kuma", false),
+        ("suite:run", "docker ps", false),
+        ("suite:run", "k3d cluster list", false),
+        (
+            "suite:run",
+            "harness record --phase verify --label test -- echo hello",
+            true,
+        ),
+        ("suite:run", "", true),
+        ("suite:run", "wget -qO- localhost:9901/config_dump", false),
+        // suite:new skill
+        ("suite:new", "kubectl get pods", false),
+        ("suite:new", "harness authoring-show --kind session", true),
+        ("suite:new", "curl localhost:9901/config_dump", false),
+        ("suite:new", "helm install kuma kuma/kuma", false),
+        ("suite:new", "docker ps", false),
+        ("suite:new", "k3d cluster list", false),
+    ];
+    for &(skill, command, should_allow) in cases {
+        let ctx = make_hook_context(skill, make_bash_payload(command));
+        let r = guard_bash::execute(&ctx).unwrap();
+        if should_allow {
+            assert_allow(&r);
+        } else {
+            assert_deny(&r);
+        }
+    }
 }
+
+// ============================================================================
+// Tests with specific message assertions or special setup
+// ============================================================================
 
 #[test]
 fn guard_bash_ignores_inactive_skill() {
@@ -40,211 +153,6 @@ fn guard_hook_structured_denial_invalid_payload() {
 }
 
 #[test]
-fn guard_bash_denies_legacy_script() {
-    let ctx = make_hook_context(
-        "suite:run",
-        make_bash_payload("python3 tools/record_command.py -- echo hello"),
-    );
-    let r = guard_bash::execute(&ctx).unwrap();
-    assert_deny(&r);
-}
-
-#[test]
-fn guard_bash_denies_kumactl_after_shell_op() {
-    let ctx = make_hook_context(
-        "suite:run",
-        make_bash_payload("ls -la /tmp/kumactl && /tmp/kumactl version 2>&1"),
-    );
-    let r = guard_bash::execute(&ctx).unwrap();
-    assert_deny(&r);
-}
-
-#[test]
-fn guard_bash_denies_kumactl_variable() {
-    let ctx = make_hook_context("suite:run", make_bash_payload("$KUMACTL version"));
-    let r = guard_bash::execute(&ctx).unwrap();
-    assert_deny(&r);
-}
-
-// kumactl is denied even when it appears in a path argument
-#[test]
-fn guard_bash_kumactl_listing() {
-    let ctx = make_hook_context("suite:run", make_bash_payload("ls -la /tmp/kumactl"));
-    let r = guard_bash::execute(&ctx).unwrap();
-    assert_deny(&r);
-}
-
-#[test]
-fn guard_bash_harness_run_kumactl() {
-    let ctx = make_hook_context(
-        "suite:run",
-        make_bash_payload("harness run --phase setup --label kumactl-version kumactl version"),
-    );
-    let r = guard_bash::execute(&ctx).unwrap();
-    // Tracked harness commands allow wrapped cluster binaries
-    assert_allow(&r);
-}
-
-#[test]
-fn guard_bash_allows_harness_run_envoy_admin() {
-    let ctx = make_hook_context(
-        "suite:run",
-        make_bash_payload(
-            "harness run --phase verify --label admin-check curl localhost:9901/config_dump",
-        ),
-    );
-    let r = guard_bash::execute(&ctx).unwrap();
-    assert_allow(&r);
-}
-
-#[test]
-fn guard_bash_allows_harness_envoy_capture() {
-    let ctx = make_hook_context(
-        "suite:run",
-        make_bash_payload(
-            "harness envoy capture --phase verify --label config-dump \
-             --namespace kuma-demo --workload deploy/demo-client \
-             --admin-path /config_dump",
-        ),
-    );
-    let r = guard_bash::execute(&ctx).unwrap();
-    assert_allow(&r);
-}
-
-// ============================================================================
-// Mixed kuma resource delete tests
-// ============================================================================
-
-#[test]
-fn guard_bash_denies_mixed_kuma_delete() {
-    let ctx = make_hook_context(
-        "suite:run",
-        make_bash_payload(
-            "harness record --phase cleanup --label cleanup-g04 -- \
-             kubectl delete meshopentelemetrybackend otel-runtime \
-             meshmetric metrics-runtime -n kuma-system",
-        ),
-    );
-    let r = guard_bash::execute(&ctx).unwrap();
-    assert_deny(&r);
-}
-
-#[test]
-fn guard_bash_denies_mixed_kuma_delete_harness_run() {
-    let ctx = make_hook_context(
-        "suite:run",
-        make_bash_payload(
-            "harness run --phase cleanup --label cleanup-g04 \
-             kubectl delete meshopentelemetrybackend otel-runtime \
-             meshmetric metrics-runtime -n kuma-system",
-        ),
-    );
-    let r = guard_bash::execute(&ctx).unwrap();
-    assert_deny(&r);
-}
-
-#[test]
-fn guard_bash_single_kuma_delete() {
-    let ctx = make_hook_context(
-        "suite:run",
-        make_bash_payload(
-            "harness record --phase cleanup --label cleanup-g05 -- \
-             kubectl delete meshopentelemetrybackend otel-e2e -n kuma-system",
-        ),
-    );
-    let r = guard_bash::execute(&ctx).unwrap();
-    // Tracked harness commands allow wrapped cluster binaries
-    assert_allow(&r);
-}
-
-// ============================================================================
-// Allow/deny pattern tests
-// ============================================================================
-
-#[test]
-fn guard_bash_allows_ls_without_cluster_binary() {
-    // ls is allowed because it's not a denied binary
-    let ctx = make_hook_context("suite:run", make_bash_payload("ls -la /tmp"));
-    let r = guard_bash::execute(&ctx).unwrap();
-    assert_allow(&r);
-}
-
-#[test]
-fn guard_bash_denies_suite_root_creation() {
-    let ctx = make_hook_context(
-        "suite:run",
-        make_bash_payload("mkdir -p /tmp/suites/my-new-suite/groups"),
-    );
-    let r = guard_bash::execute(&ctx).unwrap();
-    assert_deny(&r);
-}
-
-#[test]
-fn guard_bash_denies_make_k3d() {
-    let ctx = make_hook_context("suite:run", make_bash_payload("make k3d/stop"));
-    let r = guard_bash::execute(&ctx).unwrap();
-    assert_deny(&r);
-}
-
-#[test]
-fn guard_bash_denies_github_sidequest() {
-    let ctx = make_hook_context("suite:run", make_bash_payload("gh run view 12345"));
-    let r = guard_bash::execute(&ctx).unwrap();
-    assert_deny(&r);
-}
-
-#[test]
-fn guard_bash_denies_python_control_file() {
-    let ctx = make_hook_context(
-        "suite:run",
-        make_bash_payload("python3 -c 'import json; ...' run-status.json"),
-    );
-    let r = guard_bash::execute(&ctx).unwrap();
-    assert_deny(&r);
-}
-
-#[test]
-fn guard_bash_denies_redirect_run_report() {
-    let ctx = make_hook_context(
-        "suite:run",
-        make_bash_payload("echo '# report' > run-report.md"),
-    );
-    let r = guard_bash::execute(&ctx).unwrap();
-    assert_deny(&r);
-}
-
-#[test]
-fn guard_bash_denies_read_runner_state() {
-    let ctx = make_hook_context("suite:run", make_bash_payload("cat suite-run-state.json"));
-    let r = guard_bash::execute(&ctx).unwrap();
-    assert_deny(&r);
-}
-
-#[test]
-fn guard_bash_denies_read_command_log() {
-    let ctx = make_hook_context(
-        "suite:run",
-        make_bash_payload("cat commands/command-log.md"),
-    );
-    let r = guard_bash::execute(&ctx).unwrap();
-    assert_deny(&r);
-}
-
-#[test]
-fn guard_bash_denies_redirect_command_log() {
-    let ctx = make_hook_context(
-        "suite:run",
-        make_bash_payload("echo row >> commands/command-log.md"),
-    );
-    let r = guard_bash::execute(&ctx).unwrap();
-    assert_deny(&r);
-}
-
-// ============================================================================
-// Shell chain and loop denial tests
-// ============================================================================
-
-#[test]
 fn guard_bash_denies_harness_in_loop() {
     let ctx = make_hook_context(
         "suite:run",
@@ -257,142 +165,6 @@ fn guard_bash_denies_harness_in_loop() {
     let r = guard_bash::execute(&ctx).unwrap();
     assert_deny(&r);
     assert!(r.message.contains("shell chains or loops"));
-}
-
-#[test]
-fn guard_bash_denies_chained_harness() {
-    let ctx = make_hook_context(
-        "suite:run",
-        make_bash_payload(
-            "sleep 5 && harness run --phase verify --label ctx kubectl config current-context",
-        ),
-    );
-    let r = guard_bash::execute(&ctx).unwrap();
-    assert_deny(&r);
-}
-
-#[test]
-fn guard_bash_harness_record_pipe_jq() {
-    let ctx = make_hook_context(
-        "suite:run",
-        make_bash_payload(
-            "harness record --phase verify --label pods \
-             kubectl get pods -o json | jq '.items[].metadata.name'",
-        ),
-    );
-    let r = guard_bash::execute(&ctx).unwrap();
-    // Tracked harness commands allow wrapped cluster binaries
-    assert_allow(&r);
-}
-
-// ============================================================================
-// Direct binary denial tests
-// ============================================================================
-
-#[test]
-fn guard_bash_denies_helm_direct() {
-    let ctx = make_hook_context(
-        "suite:run",
-        make_bash_payload("helm install kuma kuma/kuma"),
-    );
-    let r = guard_bash::execute(&ctx).unwrap();
-    assert_deny(&r);
-}
-
-#[test]
-fn guard_bash_denies_docker_direct() {
-    let ctx = make_hook_context("suite:run", make_bash_payload("docker ps"));
-    let r = guard_bash::execute(&ctx).unwrap();
-    assert_deny(&r);
-}
-
-#[test]
-fn guard_bash_denies_k3d_direct() {
-    let ctx = make_hook_context("suite:run", make_bash_payload("k3d cluster list"));
-    let r = guard_bash::execute(&ctx).unwrap();
-    assert_deny(&r);
-}
-
-#[test]
-fn guard_bash_allows_harness_record() {
-    let ctx = make_hook_context(
-        "suite:run",
-        make_bash_payload("harness record --phase verify --label test -- echo hello"),
-    );
-    let r = guard_bash::execute(&ctx).unwrap();
-    assert_allow(&r);
-}
-
-#[test]
-fn guard_bash_allows_empty_command() {
-    let ctx = make_hook_context("suite:run", make_bash_payload(""));
-    let r = guard_bash::execute(&ctx).unwrap();
-    assert_allow(&r);
-}
-
-#[test]
-fn guard_bash_denies_admin_endpoint_direct() {
-    let ctx = make_hook_context(
-        "suite:run",
-        make_bash_payload("wget -qO- localhost:9901/config_dump"),
-    );
-    let r = guard_bash::execute(&ctx).unwrap();
-    assert_deny(&r);
-}
-
-// ============================================================================
-// suite:new skill tests
-// ============================================================================
-
-#[test]
-fn guard_bash_author_denies_kubectl() {
-    let ctx = make_hook_context("suite:new", make_bash_payload("kubectl get pods"));
-    let r = guard_bash::execute(&ctx).unwrap();
-    assert_deny(&r);
-}
-
-#[test]
-fn guard_bash_author_allows_harness() {
-    let ctx = make_hook_context(
-        "suite:new",
-        make_bash_payload("harness authoring-show --kind session"),
-    );
-    let r = guard_bash::execute(&ctx).unwrap();
-    assert_allow(&r);
-}
-
-#[test]
-fn guard_bash_author_denies_admin_endpoint() {
-    let ctx = make_hook_context(
-        "suite:new",
-        make_bash_payload("curl localhost:9901/config_dump"),
-    );
-    let r = guard_bash::execute(&ctx).unwrap();
-    assert_deny(&r);
-}
-
-#[test]
-fn guard_bash_author_denies_helm() {
-    let ctx = make_hook_context(
-        "suite:new",
-        make_bash_payload("helm install kuma kuma/kuma"),
-    );
-    let r = guard_bash::execute(&ctx).unwrap();
-    assert_deny(&r);
-}
-
-#[test]
-fn guard_bash_author_denies_docker() {
-    let ctx = make_hook_context("suite:new", make_bash_payload("docker ps"));
-    let r = guard_bash::execute(&ctx).unwrap();
-    assert_deny(&r);
-}
-
-#[test]
-fn guard_bash_author_denies_k3d() {
-    let ctx = make_hook_context("suite:new", make_bash_payload("k3d cluster list"));
-    let r = guard_bash::execute(&ctx).unwrap();
-    assert_deny(&r);
 }
 
 // ============================================================================
