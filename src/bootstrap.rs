@@ -1,5 +1,6 @@
 use std::collections::HashSet;
 use std::fs;
+use std::io;
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 
@@ -142,11 +143,11 @@ pub fn main(project_dir: &Path, path_env: &str) -> Result<i32, CliError> {
 /// # Errors
 /// Returns `CliError` on failure.
 pub fn main_with_home(project_dir: &Path, path_env: &str, home: &Path) -> Result<i32, CliError> {
-    let plugin_path = project_dir
+    let plugin_dir = project_dir
         .join(".claude")
         .join("plugins")
-        .join("suite")
-        .join("harness");
+        .join("suite");
+    let plugin_path = plugin_dir.join("harness");
     let legacy_path = project_dir.join(".claude").join("skills").join("harness");
 
     if !plugin_path.exists() && !legacy_path.exists() {
@@ -160,7 +161,81 @@ pub fn main_with_home(project_dir: &Path, path_env: &str, home: &Path) -> Result
 
     let (target_dir, _already_on_path) = choose_install_dir_with_home(path_env, home)?;
     install_wrapper(&target_dir)?;
+
+    // Sync plugin source files to Claude Code's plugin cache so agent
+    // definitions, hooks, and skills stay up to date between sessions.
+    if plugin_dir.is_dir() {
+        sync_plugin_cache(&plugin_dir, home);
+    }
+
     Ok(0)
+}
+
+/// Read the plugin version from `.claude-plugin/plugin.json`.
+///
+/// Returns `None` if the file is missing or unparseable.
+fn read_plugin_version(plugin_dir: &Path) -> Option<String> {
+    let json_path = plugin_dir.join(".claude-plugin").join("plugin.json");
+    let text = fs::read_to_string(json_path).ok()?;
+    let value: serde_json::Value = serde_json::from_str(&text).ok()?;
+    value.get("version")?.as_str().map(String::from)
+}
+
+/// Sync plugin source directories to the Claude Code plugin cache.
+///
+/// Copies `agents/`, `hooks/`, and `skills/` from the project source
+/// into `~/.claude/plugins/cache/harness/suite/{version}/`, creating
+/// or overwriting files as needed. Skips the binary (`harness`) since
+/// it is already current. Degrades silently on any IO error.
+fn sync_plugin_cache(plugin_dir: &Path, home: &Path) {
+    let Some(version) = read_plugin_version(plugin_dir) else {
+        return;
+    };
+
+    let cache_dir = home
+        .join(".claude")
+        .join("plugins")
+        .join("cache")
+        .join("harness")
+        .join("suite")
+        .join(&version);
+
+    if !cache_dir.is_dir() {
+        return;
+    }
+
+    for subdir in &["agents", "hooks", "skills"] {
+        let source = plugin_dir.join(subdir);
+        if source.is_dir() {
+            let target = cache_dir.join(subdir);
+            let _ = sync_directory(&source, &target);
+        }
+    }
+}
+
+/// Recursively copy all files from `source` into `target`, overwriting
+/// any file whose content differs. Creates subdirectories as needed.
+fn sync_directory(source: &Path, target: &Path) -> io::Result<()> {
+    fs::create_dir_all(target)?;
+    for entry in fs::read_dir(source)? {
+        let entry = entry?;
+        let file_type = entry.file_type()?;
+        let dest = target.join(entry.file_name());
+        if file_type.is_dir() {
+            sync_directory(&entry.path(), &dest)?;
+        } else if file_type.is_file() {
+            let source_content = fs::read(entry.path())?;
+            let needs_write = if let Ok(existing) = fs::read(&dest) {
+                existing != source_content
+            } else {
+                true
+            };
+            if needs_write {
+                fs::write(&dest, &source_content)?;
+            }
+        }
+    }
+    Ok(())
 }
 
 fn path_candidates(path_env: &str) -> Vec<PathBuf> {
@@ -364,5 +439,163 @@ mod tests {
         // Only /usr/bin should appear
         assert!(!candidates.is_empty());
         assert!(candidates.iter().all(|p| !p.as_os_str().is_empty()));
+    }
+
+    #[test]
+    fn read_plugin_version_parses_json() {
+        let dir = tempfile::tempdir().unwrap();
+        let plugin_json_dir = dir.path().join(".claude-plugin");
+        fs::create_dir_all(&plugin_json_dir).unwrap();
+        fs::write(
+            plugin_json_dir.join("plugin.json"),
+            r#"{"name":"suite","version":"0.1.0"}"#,
+        )
+        .unwrap();
+
+        assert_eq!(
+            read_plugin_version(dir.path()),
+            Some("0.1.0".to_string())
+        );
+    }
+
+    #[test]
+    fn read_plugin_version_returns_none_when_missing() {
+        let dir = tempfile::tempdir().unwrap();
+        assert_eq!(read_plugin_version(dir.path()), None);
+    }
+
+    #[test]
+    fn sync_directory_copies_files() {
+        let dir = tempfile::tempdir().unwrap();
+        let source = dir.path().join("source");
+        let target = dir.path().join("target");
+
+        fs::create_dir_all(&source).unwrap();
+        fs::write(source.join("a.md"), "content a").unwrap();
+        fs::write(source.join("b.md"), "content b").unwrap();
+
+        sync_directory(&source, &target).unwrap();
+
+        assert_eq!(fs::read_to_string(target.join("a.md")).unwrap(), "content a");
+        assert_eq!(fs::read_to_string(target.join("b.md")).unwrap(), "content b");
+    }
+
+    #[test]
+    fn sync_directory_overwrites_stale_files() {
+        let dir = tempfile::tempdir().unwrap();
+        let source = dir.path().join("source");
+        let target = dir.path().join("target");
+
+        fs::create_dir_all(&source).unwrap();
+        fs::create_dir_all(&target).unwrap();
+        fs::write(source.join("a.md"), "new content").unwrap();
+        fs::write(target.join("a.md"), "old content").unwrap();
+
+        sync_directory(&source, &target).unwrap();
+
+        assert_eq!(
+            fs::read_to_string(target.join("a.md")).unwrap(),
+            "new content"
+        );
+    }
+
+    #[test]
+    fn sync_directory_skips_identical_files() {
+        let dir = tempfile::tempdir().unwrap();
+        let source = dir.path().join("source");
+        let target = dir.path().join("target");
+
+        fs::create_dir_all(&source).unwrap();
+        fs::create_dir_all(&target).unwrap();
+        fs::write(source.join("a.md"), "same").unwrap();
+        fs::write(target.join("a.md"), "same").unwrap();
+
+        let before = fs::metadata(target.join("a.md")).unwrap().modified().unwrap();
+        // Small delay so mtime would differ if rewritten
+        std::thread::sleep(std::time::Duration::from_millis(50));
+        sync_directory(&source, &target).unwrap();
+        let after = fs::metadata(target.join("a.md")).unwrap().modified().unwrap();
+
+        assert_eq!(before, after, "identical file should not be rewritten");
+    }
+
+    #[test]
+    fn sync_directory_handles_subdirectories() {
+        let dir = tempfile::tempdir().unwrap();
+        let source = dir.path().join("source");
+        let target = dir.path().join("target");
+
+        let sub = source.join("nested");
+        fs::create_dir_all(&sub).unwrap();
+        fs::write(sub.join("deep.md"), "deep content").unwrap();
+
+        sync_directory(&source, &target).unwrap();
+
+        assert_eq!(
+            fs::read_to_string(target.join("nested").join("deep.md")).unwrap(),
+            "deep content"
+        );
+    }
+
+    #[test]
+    fn sync_plugin_cache_updates_agents_in_cache() {
+        let dir = tempfile::tempdir().unwrap();
+        let home = dir.path().join("home");
+
+        // Set up plugin source
+        let plugin_dir = dir.path().join("project").join(".claude").join("plugins").join("suite");
+        let source_agents = plugin_dir.join("agents");
+        fs::create_dir_all(&source_agents).unwrap();
+        fs::write(source_agents.join("writer.md"), "new agent def").unwrap();
+
+        // Set up plugin.json
+        let plugin_json_dir = plugin_dir.join(".claude-plugin");
+        fs::create_dir_all(&plugin_json_dir).unwrap();
+        fs::write(
+            plugin_json_dir.join("plugin.json"),
+            r#"{"name":"suite","version":"0.1.0"}"#,
+        )
+        .unwrap();
+
+        // Set up stale cache
+        let cache_agents = home
+            .join(".claude")
+            .join("plugins")
+            .join("cache")
+            .join("harness")
+            .join("suite")
+            .join("0.1.0")
+            .join("agents");
+        fs::create_dir_all(&cache_agents).unwrap();
+        fs::write(cache_agents.join("writer.md"), "old agent def").unwrap();
+
+        sync_plugin_cache(&plugin_dir, &home);
+
+        assert_eq!(
+            fs::read_to_string(cache_agents.join("writer.md")).unwrap(),
+            "new agent def"
+        );
+    }
+
+    #[test]
+    fn sync_plugin_cache_skips_when_no_cache_dir() {
+        let dir = tempfile::tempdir().unwrap();
+        let home = dir.path().join("home");
+
+        let plugin_dir = dir.path().join("project").join(".claude").join("plugins").join("suite");
+        let source_agents = plugin_dir.join("agents");
+        fs::create_dir_all(&source_agents).unwrap();
+        fs::write(source_agents.join("a.md"), "content").unwrap();
+
+        let plugin_json_dir = plugin_dir.join(".claude-plugin");
+        fs::create_dir_all(&plugin_json_dir).unwrap();
+        fs::write(
+            plugin_json_dir.join("plugin.json"),
+            r#"{"name":"suite","version":"0.1.0"}"#,
+        )
+        .unwrap();
+
+        // No cache directory exists - should not panic
+        sync_plugin_cache(&plugin_dir, &home);
     }
 }
