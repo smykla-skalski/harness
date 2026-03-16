@@ -1,4 +1,5 @@
 use std::fs;
+use std::path::Path;
 
 use crate::context::{CurrentRunRecord, RunLayout, RunMetadata};
 use crate::core_defs::{current_run_context_path, shorten_path, utc_now};
@@ -42,6 +43,32 @@ pub fn init_run(
 
     layout.ensure_dirs()?;
 
+    let result = populate_run_dir(
+        &layout,
+        &spec,
+        &suite_path,
+        &suite_dir,
+        &resolved_repo_root,
+        run_id,
+        profile,
+        &created_at,
+    );
+    if result.is_err() {
+        let _ = fs::remove_dir_all(layout.run_dir());
+    }
+    result
+}
+
+fn populate_run_dir(
+    layout: &RunLayout,
+    spec: &SuiteSpec,
+    suite_path: &Path,
+    suite_dir: &Path,
+    resolved_repo_root: &Path,
+    run_id: &str,
+    profile: &str,
+    created_at: &str,
+) -> Result<i32, CliError> {
     let suite_id = spec.frontmatter.suite_id.clone();
     let user_stories = spec.frontmatter.user_stories.clone();
     let required_dependencies = spec.frontmatter.required_dependencies.clone();
@@ -54,7 +81,7 @@ pub fn init_run(
         profile: profile.to_string(),
         repo_root: resolved_repo_root.to_string_lossy().into_owned(),
         keep_clusters: spec.frontmatter.keep_clusters,
-        created_at: created_at.clone(),
+        created_at: created_at.to_string(),
         user_stories: user_stories.clone(),
         required_dependencies: required_dependencies.clone(),
     };
@@ -67,7 +94,7 @@ pub fn init_run(
         run_id: run_id.to_string(),
         suite_id: suite_id.clone(),
         profile: profile.to_string(),
-        started_at: created_at,
+        started_at: created_at.to_string(),
         overall_verdict: Verdict::Pending,
         completed_at: None,
         counts: RunCounts::default(),
