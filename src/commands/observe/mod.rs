@@ -4,7 +4,6 @@ pub mod patterns;
 pub mod session;
 pub mod types;
 
-use std::env;
 use std::fs;
 use std::io::{BufRead, BufReader, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
@@ -14,6 +13,7 @@ use std::time::{Duration, Instant};
 use serde_json::json;
 
 use crate::cli::{ObserveFilterArgs, ObserveMode};
+use crate::core_defs::harness_data_root;
 use crate::errors::{CliError, CliErrorKind};
 
 use self::types::{Issue, IssueCategory, IssueSeverity, ScanState};
@@ -106,7 +106,9 @@ pub fn execute(mode: ObserveMode) -> Result<i32, CliError> {
 
 /// State file path for a session observer.
 fn state_file_path(session_id: &str) -> PathBuf {
-    env::temp_dir().join(format!("observe-{session_id}.state"))
+    let observe_dir = harness_data_root().join("observe");
+    let _ = fs::create_dir_all(&observe_dir);
+    observe_dir.join(format!("{session_id}.state"))
 }
 
 /// Execute one observer cycle: read cursor, scan, update cursor, report.
