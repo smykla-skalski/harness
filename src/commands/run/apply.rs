@@ -1,6 +1,6 @@
 use std::fs;
 use std::io::{self, Read as _};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use crate::cli::RunDirArgs;
 use crate::cluster::Platform;
@@ -66,7 +66,7 @@ pub fn apply(
 }
 
 /// Read stdin and write to a temporary manifest file in the run's manifests dir.
-fn materialize_stdin(run_dir: &PathBuf, step: Option<&str>) -> Result<PathBuf, CliError> {
+fn materialize_stdin(run_dir: &Path, step: Option<&str>) -> Result<PathBuf, CliError> {
     let mut content = String::new();
     io::stdin()
         .read_to_string(&mut content)
