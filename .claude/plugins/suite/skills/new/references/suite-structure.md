@@ -171,7 +171,7 @@ When `profiles` includes `multi-zone`, baselines that deploy workloads (demo app
 
 One markdown file per group plus a manifest directory with the same group ID prefix. Naming convention: `g{NN}-{slug}.md` for the markdown, `g{NN}/` for the manifest directory where NN is zero-padded and slug is kebab-case. Range groups use: `g17-g26-pipe-mode.md` with `g17-g26/` for manifests.
 
-Each manifest directory contains the YAML files from the group's `## Configure` section, named in apply order: `01-{descriptive-slug}.yaml`, `02-{descriptive-slug}.yaml`, etc. These files are identical to the inline fenced blocks in the markdown and give `suite:run` pre-written manifests ready for `harness apply --manifest g{NN}` without depending on preflight extraction.
+Each manifest directory contains the group's YAML manifests, named in apply order: `01-{descriptive-slug}.yaml`, `02-{descriptive-slug}.yaml`, etc. The group markdown's `## Configure` section references these files with `harness apply` commands (e.g., `harness apply --manifest g{NN}`) but does not duplicate the YAML inline. The YAML lives only in the `groups/g{NN}/` directory.
 
 ## Group file structure
 
@@ -209,9 +209,9 @@ restart_namespaces:
 
 ## Configure
 
-Each manifest block is preceded by a `File:` reference line pointing to the corresponding pre-written YAML file in the group's manifest directory (e.g., `File: g01/01-create.yaml`). The inline YAML blocks remain authoritative - `harness preflight` extracts them verbatim into the active run's `manifests/prepared/groups/<group_id>/01.yaml`, `02.yaml`, and so on. The pre-written files in `groups/<group_id>/` contain identical content and allow `harness apply --manifest <group-id>` to work without preflight extraction.
+This section contains `harness apply` commands that reference the pre-written YAML files in the group's manifest directory (`groups/g{NN}/`). Do not embed inline YAML blocks here. Use `harness apply --manifest g{NN}` to apply the whole directory, or `harness apply --manifest g{NN}/01-name.yaml` for a specific file.
 
-Use `expected_rejection_orders` when a prepared manifest is intentionally invalid and a later execution step must prove the API rejects it. The list is 1-based and follows the profile-specific `## Configure` manifest order. `harness preflight` and `authoring-validate` still materialize those manifests, but they skip up-front schema validation for the listed ordinals so the rejection path can run in Phase 4.
+Use `expected_rejection_orders` when a prepared manifest is intentionally invalid and a later execution step must prove the API rejects it. The list is 1-based and follows the manifest file order in the `groups/g{NN}/` directory. `harness authoring-validate` still validates those manifests but skips up-front schema validation for the listed ordinals so the rejection path can run in Phase 4.
 
 ## Consume
 
@@ -406,7 +406,7 @@ harness run --phase debug --label control-plane-logs \
 
 Every suite must include this checklist in suite.md:
 
-- `harness preflight` materializes baseline manifests and group `## Configure` YAML once, validates them, applies baselines once (to all clusters specified by each baseline's `clusters` field), and writes the prepared-suite artifact for the active run
+- `harness preflight` validates baseline manifests and per-group manifest directories, applies baselines once (to all clusters specified by each baseline's `clusters` field), and writes the prepared-suite artifact for the active run
 - all manifests applied through `harness apply`
 - all commands (inspect, curl, delete, kubectl get, etc.) recorded via `harness record`
 - cluster state captured after each completed group via `harness capture`
@@ -415,7 +415,7 @@ Every suite must include this checklist in suite.md:
 - all pass/fail decisions include artifact pointers to existing files
 - deviations from suite definitions require user approval and are recorded in the report
 - manifest errors trigger user choice: fix for run only, fix in suite (with `amendments.md` entry), or skip
-- inline manifests in group files are authoritative - `harness preflight` must materialize them verbatim and the runner must reuse the prepared paths during Phase 4
+- manifests in per-group directories (`groups/g{NN}/`) are authoritative - the runner applies them via `harness apply --manifest g{NN}` during Phase 4
 - Mesh\* policy suites include the edge cases from [Mesh\* policy suite requirements](#mesh-policy-suite-requirements)
 
 ## Reference

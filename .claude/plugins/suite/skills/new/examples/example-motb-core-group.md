@@ -26,32 +26,19 @@ restart_namespaces:
 
 ## Configure
 
-File: g01/01-demo-metrics.yaml
+Apply the whole group manifest directory:
 
-```yaml
-apiVersion: kuma.io/v1alpha1
-kind: MeshMetric
-metadata:
-  name: demo-metrics
-  namespace: kuma-system
-  labels:
-    kuma.io/mesh: default
-spec:
-  targetRef:
-    kind: Mesh
-  default:
-    applications:
-      - path: /metrics
-        port: 8080
-    backends:
-      - type: Prometheus
-        prometheus:
-          clientId: demo-prom
-          path: /metrics
-          port: 5670
+```bash
+harness apply --manifest g01
 ```
 
-The same manifest is pre-written at `g01/01-demo-metrics.yaml`. Phase 4 applies it via `harness apply --manifest g01` (whole directory) or `harness apply --manifest "g01/01-demo-metrics.yaml"` (single file). `harness preflight` also extracts the inline block above as a fallback.
+Or apply a specific file:
+
+```bash
+harness apply --manifest g01/01-demo-metrics.yaml
+```
+
+The YAML manifests live in the `groups/g01/` directory (e.g., `g01/01-demo-metrics.yaml`). Do not duplicate them inline here.
 
 ## Consume
 
