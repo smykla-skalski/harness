@@ -16,6 +16,7 @@ mod report;
 mod runner_state;
 mod service;
 mod status;
+mod task;
 mod token;
 mod validate;
 
@@ -35,5 +36,6 @@ pub use report::report;
 pub use runner_state::runner_state;
 pub use service::service;
 pub use status::status;
+pub use task::task;
 pub use token::token;
 pub use validate::validate;

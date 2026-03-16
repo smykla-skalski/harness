@@ -62,7 +62,8 @@ impl Execute for Command {
             | Command::Service(..)
             | Command::Status { .. }
             | Command::Logs { .. }
-            | Command::ClusterCheck { .. } => dispatch_run(self),
+            | Command::ClusterCheck { .. }
+            | Command::Task { .. } => dispatch_run(self),
             Command::AuthoringBegin(..)
             | Command::AuthoringSave { .. }
             | Command::AuthoringShow { .. }
@@ -159,6 +160,7 @@ fn dispatch_run(cmd: Command) -> Result<i32, CliError> {
             run_dir,
         } => run::logs(&name, tail, follow, &run_dir),
         Command::ClusterCheck { run_dir } => run::cluster_check(&run_dir),
+        Command::Task { command } => run::task(&command),
         _ => unreachable!(),
     }
 }
