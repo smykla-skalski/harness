@@ -87,13 +87,39 @@ pub fn cluster_check(run_dir_args: &RunDirArgs) -> Result<i32, CliError> {
         }
     }
 
-    let output = json!({
+    let mut output = json!({
         "healthy": all_healthy,
         "members": member_statuses,
     });
+    if !all_healthy {
+        output["hint"] =
+            json!("use 'harness logs <name>' to inspect, or re-run 'harness cluster' to recreate");
+    }
     let pretty = serde_json::to_string_pretty(&output)
         .map_err(|e| CliErrorKind::serialize(format!("cluster-check: {e}")))?;
     println!("{pretty}");
 
     if all_healthy { Ok(0) } else { Ok(1) }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::PathBuf;
+
+    #[test]
+    fn cluster_check_errors_on_nonexistent_run_dir() {
+        let args = RunDirArgs {
+            run_dir: Some(PathBuf::from("/tmp/harness-test-nonexistent-xyz")),
+            run_id: None,
+            run_root: None,
+        };
+        let err = cluster_check(&args).unwrap_err();
+        // Should fail when trying to read run metadata from missing dir
+        assert!(
+            err.code() == "KSRCLI014" || err.code() == "KSRCLI009",
+            "unexpected error code: {}",
+            err.code()
+        );
+    }
 }
