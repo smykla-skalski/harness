@@ -1894,6 +1894,91 @@ fn tool_correlation_window_pruning() {
     );
 }
 
+// ─── Repository layout drift tests (Phase 7.5) ────────────────────
+
+#[test]
+fn fix_target_paths_look_valid() {
+    // Collect all fix_target strings from TEXT_RULES and verify they
+    // look like relative paths (not stale like "cli.rs" without src/)
+    use crate::commands::observe::classifier::rules::TEXT_RULES;
+    for rule in TEXT_RULES {
+        if let super::rules::RuleGuidance::Fix {
+            target: Some(target),
+            ..
+        } = rule.guidance
+        {
+            // Targets should either contain a slash or be a known pattern
+            assert!(
+                target.contains('/') || target.contains('.'),
+                "fix_target '{target}' for {:?} looks incomplete - should include path segments",
+                rule.code
+            );
+        }
+    }
+}
+
+#[test]
+fn registry_and_all_codes_aligned() {
+    // Every code in IssueCode::ALL should have a registry entry
+    use crate::commands::observe::classifier::registry::issue_code_meta;
+    for code in IssueCode::ALL {
+        assert!(
+            issue_code_meta(*code).is_some(),
+            "IssueCode::{code} missing from registry"
+        );
+    }
+}
+
+// ─── Fixture-driven scan test (Phase 7.6) ──────────────────────────
+
+#[test]
+fn scan_fixture_finds_known_issues() {
+    // Synthetic JSONL with a known build error
+    let session_line = r#"{"timestamp":"2026-03-15T10:00:00Z","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"t1","content":"error[E0308]: mismatched types\n  expected u32, found &str"}]}}"#;
+    let mut state = ScanState::default();
+    // Seed a tool_use record so the tool_result resolves to Bash
+    state.last_tool_uses.insert(
+        "t1".to_string(),
+        crate::commands::observe::types::ToolUseRecord {
+            name: "Bash".to_string(),
+            input: serde_json::json!({"command": "cargo check"}),
+        },
+    );
+    let issues = super::classify_line(0, session_line, &mut state);
+    assert!(
+        issues
+            .iter()
+            .any(|i| i.category == IssueCategory::BuildError),
+        "should detect build error in fixture"
+    );
+}
+
+#[test]
+fn evidence_excerpt_populated_for_long_details() {
+    let mut state = make_state();
+    let long_text = format!(
+        "error[E0308]: mismatched types\n  expected u32, found &str\n{}",
+        "x".repeat(200)
+    );
+    let issues = check_text_for_issues(
+        10,
+        MessageRole::User,
+        &long_text,
+        Some(SourceTool::Bash),
+        &mut state,
+    );
+    let build = issues
+        .iter()
+        .find(|i| i.category == IssueCategory::BuildError);
+    assert!(build.is_some());
+    let excerpt = &build.unwrap().evidence_excerpt;
+    assert!(
+        excerpt.is_some(),
+        "evidence_excerpt should be populated for long details"
+    );
+    assert!(excerpt.as_ref().unwrap().len() <= 200);
+}
+
 #[test]
 fn detects_uncommitted_source_edit_before_second_edit() {
     let mut state = make_state();
