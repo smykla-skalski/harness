@@ -112,13 +112,22 @@ fn deserialize_with_errors<T: DeserializeOwned>(
 
                 // Type mismatch on a field that was present in the input.
                 if let Some(expected) = parse_expected_type(&msg) {
-                    return Err(
-                        CliErrorKind::field_type_mismatch(label.to_string(), "", expected).into(),
-                    );
+                    let field = identify_mismatched_field::<T>(&working, &expected);
+                    return Err(CliErrorKind::field_type_mismatch(
+                        label.to_string(),
+                        field,
+                        expected,
+                    )
+                    .into());
                 }
 
                 // Unknown serde error - wrap it.
-                return Err(CliErrorKind::field_type_mismatch(label.to_string(), "", msg).into());
+                return Err(CliErrorKind::field_type_mismatch(
+                    label.to_string(),
+                    "(unknown field)",
+                    msg,
+                )
+                .into());
             }
         }
     }
@@ -129,6 +138,26 @@ fn deserialize_with_errors<T: DeserializeOwned>(
         return Err(CliErrorKind::missing_fields(label.to_string(), fields).into());
     }
     Err(CliErrorKind::field_type_mismatch(label.to_string(), "", "probe loop exhausted").into())
+}
+
+/// Identify which field in `obj` causes a type mismatch by probing each key.
+///
+/// Replaces each key's value with a typed placeholder and attempts deserialization.
+/// If replacing a key makes deserialization succeed (or changes the error), that
+/// key was the mismatched field.
+fn identify_mismatched_field<T: DeserializeOwned>(
+    obj: &Map<String, Value>,
+    expected: &str,
+) -> String {
+    let placeholder = typed_placeholder(expected);
+    for key in obj.keys() {
+        let mut probe = obj.clone();
+        probe.insert(key.clone(), placeholder.clone());
+        if serde_json::from_value::<T>(Value::Object(probe)).is_ok() {
+            return key.clone();
+        }
+    }
+    "(unknown field)".to_string()
 }
 
 /// Extract field name from serde's "missing field `X`" error message.

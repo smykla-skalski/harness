@@ -63,10 +63,15 @@ pub fn ensure_dir(path: &Path) -> io::Result<()> {
 /// Read a file as UTF-8 text.
 ///
 /// # Errors
-/// Returns `CliError` if the file is missing.
+/// Returns `CliError` if the file is missing or unreadable.
 pub fn read_text(path: &Path) -> Result<String, CliError> {
-    fs::read_to_string(path)
-        .map_err(|_| CliErrorKind::missing_file(path.display().to_string()).into())
+    fs::read_to_string(path).map_err(|e| {
+        if e.kind() == io::ErrorKind::NotFound {
+            CliErrorKind::missing_file(path.display().to_string()).into()
+        } else {
+            CliErrorKind::io(cow!("read {}: {e}", path.display())).into()
+        }
+    })
 }
 
 /// Write UTF-8 text to a file, creating parent directories.
@@ -75,10 +80,15 @@ pub fn read_text(path: &Path) -> Result<String, CliError> {
 /// Returns `CliError` on IO failure.
 pub fn write_text(path: &Path, text: &str) -> Result<(), CliError> {
     if let Some(parent) = path.parent() {
-        ensure_dir(parent)
-            .map_err(|e| CliError::from(CliErrorKind::missing_file(e.to_string())))?;
+        ensure_dir(parent).map_err(|e| {
+            CliError::from(CliErrorKind::io(cow!(
+                "create dir {}: {e}",
+                parent.display()
+            )))
+        })?;
     }
-    fs::write(path, text).map_err(|e| CliErrorKind::missing_file(e.to_string()).into())
+    fs::write(path, text)
+        .map_err(|e| CliErrorKind::io(cow!("write {}: {e}", path.display())).into())
 }
 
 /// Read and parse a JSON file into a `serde_json::Value`.
