@@ -345,6 +345,18 @@ define_cli_errors! {
         exit: 4
     },
 
+    // --- Observe (exit 1) ---
+    SessionNotFound { session_id: Cow<'static, str> } => {
+        code: "KSRCLI080",
+        msg: "session not found: {session_id}",
+        exit: 1
+    },
+    SessionParseError { detail: Cow<'static, str> } => {
+        code: "KSRCLI081",
+        msg: "session parse error: {detail}",
+        exit: 1
+    },
+
     // --- IO/serialization (exit 1) ---
     Io { detail: Cow<'static, str> } => {
         code: "IO001",
@@ -481,6 +493,8 @@ impl CliErrorKind {
     cli_constructor!(image_build_failed, ImageBuildFailed, target);
     cli_constructor!(template_render, TemplateRender, detail);
     cli_constructor!(service_readiness_timeout, ServiceReadinessTimeout, name);
+    cli_constructor!(session_not_found, SessionNotFound, session_id);
+    cli_constructor!(session_parse_error, SessionParseError, detail);
     cli_constructor!(io, Io, detail);
     cli_constructor!(serialize, Serialize, detail);
     cli_constructor!(hook_payload_invalid, HookPayloadInvalid, detail);
@@ -544,6 +558,10 @@ impl CliErrorKind {
             Self::MissingRunStatus => Some(
                 "The run-status.json file could not be loaded. Re-run `harness init` or \
                  check the run directory."
+                    .into(),
+            ),
+            Self::SessionNotFound { .. } => Some(
+                "Check the session ID and ensure ~/.claude/projects/ contains the session file."
                     .into(),
             ),
             _ => None,
@@ -1034,6 +1052,8 @@ mod tests {
             CliErrorKind::json_parse(""),
             CliErrorKind::cluster_error(""),
             CliErrorKind::usage_error(""),
+            CliErrorKind::session_not_found(""),
+            CliErrorKind::session_parse_error(""),
         ]
     }
 

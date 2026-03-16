@@ -8,6 +8,7 @@ use crate::errors::{CliError, CliErrorKind};
 use crate::resolve::resolve_run_directory;
 
 pub mod authoring;
+pub mod observe;
 pub mod run;
 pub mod setup;
 
@@ -43,7 +44,8 @@ impl Execute for Command {
             | Command::SessionStart { .. }
             | Command::SessionStop { .. }
             | Command::PreCompact { .. }
-            | Command::Capabilities => dispatch_setup(self),
+            | Command::Capabilities
+            | Command::Observe { .. } => dispatch_setup(self),
             Command::Capture { .. }
             | Command::Record(..)
             | Command::Apply(..)
@@ -91,6 +93,7 @@ fn dispatch_setup(cmd: Command) -> Result<i32, CliError> {
         Command::SessionStop { project_dir } => setup::session_stop(project_dir.as_deref()),
         Command::PreCompact { project_dir } => setup::pre_compact(project_dir.as_deref()),
         Command::Capabilities => setup::capabilities(),
+        Command::Observe { mode } => observe::execute(mode),
         _ => unreachable!(),
     }
 }
