@@ -6,7 +6,8 @@ use std::sync::LazyLock;
 use regex::Regex;
 
 use crate::cli::RunDirArgs;
-use crate::commands::resolve_run_dir;
+use crate::commands::{resolve_kubeconfig, resolve_run_dir};
+use crate::context::RunContext;
 use crate::core_defs::{shorten_path, utc_now};
 use crate::errors::{CliError, CliErrorKind};
 use crate::io::{append_markdown_row, ensure_dir, write_text};
@@ -29,7 +30,7 @@ pub fn record(
     _repo_root: Option<&str>,
     phase: Option<&str>,
     label: Option<&str>,
-    _cluster: Option<&str>,
+    cluster: Option<&str>,
     command_args: &[String],
     run_dir_args: &RunDirArgs,
 ) -> Result<i32, CliError> {
@@ -43,7 +44,19 @@ pub fn record(
 
     let run_dir = resolve_run_dir(run_dir_args).ok();
 
-    let output = Command::new(command[0]).args(&command[1..]).output();
+    // Inject KUBECONFIG from the persisted cluster spec so kubectl commands
+    // hit the local k3d cluster, not whatever is in ~/.kube/config.
+    let mut cmd = Command::new(command[0]);
+    cmd.args(&command[1..]);
+    if let Some(ref rd) = run_dir {
+        let ctx = RunContext::from_run_dir(rd).ok();
+        if let Some(ref c) = ctx {
+            if let Ok(kc) = resolve_kubeconfig(c, None, cluster) {
+                cmd.env("KUBECONFIG", kc);
+            }
+        }
+    }
+    let output = cmd.output();
 
     let (stdout, stderr, returncode) = match output {
         Ok(o) => (
