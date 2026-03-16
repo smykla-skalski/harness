@@ -46,6 +46,7 @@ pub fn service(args: &ServiceArgs) -> Result<i32, CliError> {
             args.port,
             &args.mesh,
             args.transparent_proxy,
+            args.timeout,
             &args.run_dir,
         ),
         "down" => service_down(args.name.as_deref(), &args.run_dir),
