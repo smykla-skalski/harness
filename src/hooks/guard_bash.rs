@@ -785,23 +785,17 @@ fn allows_wrapped_envoy_admin(words: &[String]) -> bool {
 mod tests {
     use super::*;
     use crate::hook::Decision;
-    use crate::hook_payloads::{HookContext, HookEnvelopePayload, HookMessagePayload};
+    use crate::hook_payloads::{HookContext, HookEnvelopePayload};
 
     fn ctx(skill: &str, command: &str) -> HookContext {
         HookContext::from_envelope(
             skill,
             HookEnvelopePayload {
-                root: None,
-                input_payload: Some(HookMessagePayload {
-                    command: Some(command.to_string()),
-                    file_path: None,
-                    writes: vec![],
-                    questions: vec![],
-                    answers: vec![],
-                    annotations: vec![],
+                tool_name: "Bash".to_string(),
+                tool_input: serde_json::json!({
+                    "command": command,
                 }),
-                tool_input: None,
-                response: None,
+                tool_response: serde_json::Value::Null,
                 last_assistant_message: None,
                 transcript_path: None,
                 stop_hook_active: false,

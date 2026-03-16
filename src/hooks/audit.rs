@@ -31,10 +31,9 @@ mod tests {
         HookContext::from_envelope(
             skill,
             HookEnvelopePayload {
-                root: None,
-                input_payload: None,
-                tool_input: None,
-                response: None,
+                tool_name: String::new(),
+                tool_input: serde_json::Value::Null,
+                tool_response: serde_json::Value::Null,
                 last_assistant_message: None,
                 transcript_path: None,
                 stop_hook_active: false,
