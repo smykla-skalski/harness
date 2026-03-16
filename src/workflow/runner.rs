@@ -1,7 +1,8 @@
 use std::fmt;
 use std::path::{Path, PathBuf};
 
-use serde::{Deserialize, Serialize};
+use clap::ValueEnum;
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::audit_log::append_runner_state_audit;
 use crate::errors::{CliError, CliErrorKind, cow};
@@ -106,23 +107,327 @@ impl SuiteFixState {
     }
 }
 
-/// Full runner workflow state.
+/// Typed runner workflow events.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, ValueEnum)]
+#[non_exhaustive]
+pub enum RunnerEvent {
+    #[value(name = "cluster-prepared")]
+    ClusterPrepared,
+    #[value(name = "preflight-started")]
+    PreflightStarted,
+    #[value(name = "preflight-captured")]
+    PreflightCaptured,
+    #[value(name = "preflight-failed")]
+    PreflightFailed,
+    #[value(name = "failure-manifest")]
+    FailureManifest,
+    #[value(name = "manifest-fix-run-only")]
+    ManifestFixRunOnly,
+    #[value(name = "manifest-fix-suite-and-run")]
+    ManifestFixSuiteAndRun,
+    #[value(name = "manifest-fix-skip-step")]
+    ManifestFixSkipStep,
+    #[value(name = "manifest-fix-stop-run")]
+    ManifestFixStopRun,
+    #[value(name = "suite-fix-resumed")]
+    SuiteFixResumed,
+    #[value(name = "abort")]
+    Abort,
+    #[value(name = "suspend")]
+    Suspend,
+    #[value(name = "resume-run")]
+    ResumeRun,
+    #[value(name = "closeout-started")]
+    CloseoutStarted,
+    #[value(name = "run-completed")]
+    RunCompleted,
+}
+
+impl RunnerEvent {
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::ClusterPrepared => "cluster-prepared",
+            Self::PreflightStarted => "preflight-started",
+            Self::PreflightCaptured => "preflight-captured",
+            Self::PreflightFailed => "preflight-failed",
+            Self::FailureManifest => "failure-manifest",
+            Self::ManifestFixRunOnly => "manifest-fix-run-only",
+            Self::ManifestFixSuiteAndRun => "manifest-fix-suite-and-run",
+            Self::ManifestFixSkipStep => "manifest-fix-skip-step",
+            Self::ManifestFixStopRun => "manifest-fix-stop-run",
+            Self::SuiteFixResumed => "suite-fix-resumed",
+            Self::Abort => "abort",
+            Self::Suspend => "suspend",
+            Self::ResumeRun => "resume-run",
+            Self::CloseoutStarted => "closeout-started",
+            Self::RunCompleted => "run-completed",
+        }
+    }
+
+    #[must_use]
+    pub const fn label(self) -> &'static str {
+        match self {
+            Self::ClusterPrepared => "ClusterPrepared",
+            Self::PreflightStarted => "PreflightStarted",
+            Self::PreflightCaptured => "PreflightCaptured",
+            Self::PreflightFailed => "PreflightFailed",
+            Self::FailureManifest => "FailureManifest",
+            Self::ManifestFixRunOnly => "ManifestFixRunOnly",
+            Self::ManifestFixSuiteAndRun => "ManifestFixSuiteAndRun",
+            Self::ManifestFixSkipStep => "ManifestFixSkipStep",
+            Self::ManifestFixStopRun => "ManifestFixStopRun",
+            Self::SuiteFixResumed => "SuiteFixResumed",
+            Self::Abort => "Abort",
+            Self::Suspend => "Suspend",
+            Self::ResumeRun => "ResumeRun",
+            Self::CloseoutStarted => "CloseoutStarted",
+            Self::RunCompleted => "RunCompleted",
+        }
+    }
+
+    #[must_use]
+    pub const fn target_phase(self) -> RunnerPhase {
+        match self {
+            Self::ClusterPrepared | Self::PreflightStarted => RunnerPhase::Preflight,
+            Self::PreflightCaptured | Self::SuiteFixResumed | Self::ResumeRun => {
+                RunnerPhase::Execution
+            }
+            Self::PreflightFailed
+            | Self::FailureManifest
+            | Self::ManifestFixRunOnly
+            | Self::ManifestFixSuiteAndRun
+            | Self::ManifestFixSkipStep => RunnerPhase::Triage,
+            Self::ManifestFixStopRun | Self::Abort => RunnerPhase::Aborted,
+            Self::Suspend => RunnerPhase::Suspended,
+            Self::CloseoutStarted => RunnerPhase::Closeout,
+            Self::RunCompleted => RunnerPhase::Completed,
+        }
+    }
+
+    #[must_use]
+    pub const fn manifest_fix_decision(self) -> Option<ManifestFixDecision> {
+        match self {
+            Self::ManifestFixRunOnly => Some(ManifestFixDecision::RunOnly),
+            Self::ManifestFixSuiteAndRun => Some(ManifestFixDecision::SuiteAndRun),
+            Self::ManifestFixSkipStep => Some(ManifestFixDecision::SkipStep),
+            Self::ManifestFixStopRun => Some(ManifestFixDecision::StopRun),
+            _ => None,
+        }
+    }
+}
+
+impl fmt::Display for RunnerEvent {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+impl TryFrom<&str> for RunnerEvent {
+    type Error = String;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        match value {
+            "cluster-prepared" => Ok(Self::ClusterPrepared),
+            "preflight-started" => Ok(Self::PreflightStarted),
+            "preflight-captured" => Ok(Self::PreflightCaptured),
+            "preflight-failed" => Ok(Self::PreflightFailed),
+            "failure-manifest" => Ok(Self::FailureManifest),
+            "manifest-fix-run-only" => Ok(Self::ManifestFixRunOnly),
+            "manifest-fix-suite-and-run" => Ok(Self::ManifestFixSuiteAndRun),
+            "manifest-fix-skip-step" => Ok(Self::ManifestFixSkipStep),
+            "manifest-fix-stop-run" => Ok(Self::ManifestFixStopRun),
+            "suite-fix-resumed" => Ok(Self::SuiteFixResumed),
+            "abort" => Ok(Self::Abort),
+            "suspend" => Ok(Self::Suspend),
+            "resume-run" => Ok(Self::ResumeRun),
+            "closeout-started" => Ok(Self::CloseoutStarted),
+            "run-completed" => Ok(Self::RunCompleted),
+            other => Err(other.to_string()),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct RunnerWorkflowState {
-    pub schema_version: u32,
+struct RunnerWorkflowPayload {
     pub phase: RunnerPhase,
     pub preflight: PreflightState,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub failure: Option<FailureState>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub suite_fix: Option<SuiteFixState>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+struct RunnerWorkflowStateRecord {
+    pub schema_version: u32,
+    pub state: RunnerWorkflowPayload,
     pub updated_at: String,
     pub transition_count: u32,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub last_event: Option<String>,
 }
 
-const RUNNER_STATE_SCHEMA_VERSION: u32 = 1;
+/// Full runner workflow state.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RunnerWorkflowState {
+    pub schema_version: u32,
+    pub phase: RunnerPhase,
+    pub preflight: PreflightState,
+    pub failure: Option<FailureState>,
+    pub suite_fix: Option<SuiteFixState>,
+    pub updated_at: String,
+    pub transition_count: u32,
+    pub last_event: Option<String>,
+}
+
+impl RunnerWorkflowState {
+    #[must_use]
+    pub fn phase(&self) -> RunnerPhase {
+        self.phase
+    }
+
+    #[must_use]
+    pub fn preflight_status(&self) -> PreflightStatus {
+        self.preflight.status
+    }
+
+    #[must_use]
+    pub fn failure(&self) -> Option<&FailureState> {
+        self.failure.as_ref()
+    }
+
+    #[must_use]
+    pub fn suite_fix(&self) -> Option<&SuiteFixState> {
+        self.suite_fix.as_ref()
+    }
+
+    fn touch(&mut self, label: &str) {
+        self.transition_count += 1;
+        self.updated_at = now_utc();
+        self.last_event = Some(label.to_string());
+    }
+
+    #[must_use]
+    pub fn request_failure_triage(
+        &self,
+        kind: FailureKind,
+        suite_target: Option<&str>,
+        message: Option<&str>,
+        event_label: &str,
+    ) -> Self {
+        let mut next = self.clone();
+        next.phase = RunnerPhase::Triage;
+        next.failure = Some(FailureState {
+            kind,
+            suite_target: suite_target.map(str::to_string),
+            message: message.map(str::to_string),
+        });
+        next.suite_fix = None;
+        next.touch(event_label);
+        next
+    }
+
+    #[must_use]
+    pub fn request_preflight_failed(&self, event_label: &str) -> Self {
+        let mut next = self.clone();
+        next.preflight.status = PreflightStatus::Pending;
+        next.touch(event_label);
+        next
+    }
+
+    #[must_use]
+    pub fn record_preflight_captured(&self, event_label: &str) -> Self {
+        let mut next = self.clone();
+        next.phase = RunnerPhase::Execution;
+        next.preflight.status = PreflightStatus::Complete;
+        next.failure = None;
+        next.suite_fix = None;
+        next.touch(event_label);
+        next
+    }
+
+    #[must_use]
+    pub fn record_suite_fix_write(&self, path: &Path, suite_dir: &Path) -> Option<Self> {
+        let mut next = self.clone();
+        let suite_fix = next.suite_fix.as_mut()?;
+        if !path.starts_with(suite_dir) {
+            return None;
+        }
+
+        let mut changed = false;
+        let amendments_path = suite_dir.join("amendments.md");
+        let suite_manifest = suite_dir.join("suite.md");
+        let groups_dir = suite_dir.join("groups");
+        let baseline_dir = suite_dir.join("baseline");
+
+        if path == amendments_path {
+            changed = !suite_fix.amendments_written;
+            suite_fix.amendments_written = true;
+        } else if path == suite_manifest
+            || path.starts_with(groups_dir)
+            || path.starts_with(baseline_dir)
+        {
+            changed = !suite_fix.suite_written;
+            suite_fix.suite_written = true;
+        }
+
+        if !changed {
+            return None;
+        }
+
+        next.touch("SuiteFixWriteTracked");
+        Some(next)
+    }
+
+    fn to_record(&self) -> RunnerWorkflowStateRecord {
+        RunnerWorkflowStateRecord {
+            schema_version: self.schema_version,
+            state: RunnerWorkflowPayload {
+                phase: self.phase,
+                preflight: self.preflight.clone(),
+                failure: self.failure.clone(),
+                suite_fix: self.suite_fix.clone(),
+            },
+            updated_at: self.updated_at.clone(),
+            transition_count: self.transition_count,
+            last_event: self.last_event.clone(),
+        }
+    }
+
+    fn from_record(record: RunnerWorkflowStateRecord) -> Self {
+        Self {
+            schema_version: record.schema_version,
+            phase: record.state.phase,
+            preflight: record.state.preflight,
+            failure: record.state.failure,
+            suite_fix: record.state.suite_fix,
+            updated_at: record.updated_at,
+            transition_count: record.transition_count,
+            last_event: record.last_event,
+        }
+    }
+}
+
+impl Serialize for RunnerWorkflowState {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        self.to_record().serialize(serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for RunnerWorkflowState {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        RunnerWorkflowStateRecord::deserialize(deserializer).map(Self::from_record)
+    }
+}
+
+const RUNNER_STATE_SCHEMA_VERSION: u32 = 2;
 
 /// Path to the runner state file.
 #[must_use]
@@ -179,7 +484,20 @@ pub fn initialize_runner_state(run_dir: &Path) -> Result<RunnerWorkflowState, Cl
 /// Returns `CliError` on parse failure.
 pub fn read_runner_state(run_dir: &Path) -> Result<Option<RunnerWorkflowState>, CliError> {
     let repo = runner_repository(run_dir);
-    match repo.load()? {
+    let loaded = match repo.load() {
+        Ok(loaded) => loaded,
+        Err(error) if error.code() == "WORKFLOW_VERSION" => {
+            return Err(CliErrorKind::workflow_version(cow!(
+                "runner state requires schema version 2"
+            ))
+            .with_details(format!(
+                "Delete {} or re-run `harness init` to regenerate the runner state.",
+                runner_state_path(run_dir).display()
+            )));
+        }
+        Err(error) => return Err(error),
+    };
+    match loaded {
         Some(value) => {
             let state: RunnerWorkflowState =
                 serde_json::from_value(value).map_err(|e| -> CliError {
@@ -206,19 +524,24 @@ pub fn write_runner_state(run_dir: &Path, state: &RunnerWorkflowState) -> Result
 ///
 /// # Errors
 /// Returns `CliError` on invalid transition or IO failure.
-pub fn apply_event(
+pub fn apply_event<E>(
     run_dir: &Path,
-    event: &str,
+    event: E,
     suite_target: Option<&str>,
     message: Option<&str>,
-) -> Result<RunnerWorkflowState, CliError> {
+) -> Result<RunnerWorkflowState, CliError>
+where
+    E: TryInto<RunnerEvent>,
+    E::Error: fmt::Display,
+{
+    let event = event
+        .try_into()
+        .map_err(|error| CliErrorKind::invalid_transition(format!("unknown event: {error}")))?;
     let mut state = read_runner_state(run_dir)?.unwrap_or_else(|| make_initial_state(&now_utc()));
 
-    let new_phase = resolve_transition(&state, event, suite_target, message)?;
+    let new_phase = resolve_transition(&state, event)?;
     state.phase = new_phase;
-    state.transition_count += 1;
-    state.updated_at = now_utc();
-    state.last_event = Some(event_label(event));
+    state.touch(event.label());
 
     // Clear failure/suite_fix on forward movement out of triage.
     if new_phase != RunnerPhase::Triage {
@@ -232,13 +555,13 @@ pub fn apply_event(
 
     // Set preflight sub-state on preflight events.
     match event {
-        "preflight-started" => state.preflight.status = PreflightStatus::Running,
-        "preflight-captured" => state.preflight.status = PreflightStatus::Complete,
+        RunnerEvent::PreflightStarted => state.preflight.status = PreflightStatus::Running,
+        RunnerEvent::PreflightCaptured => state.preflight.status = PreflightStatus::Complete,
         _ => {}
     }
 
     // Set failure on failure-manifest.
-    if event == "failure-manifest" {
+    if event == RunnerEvent::FailureManifest {
         state.failure = Some(FailureState {
             kind: FailureKind::Manifest,
             suite_target: suite_target.map(str::to_string),
@@ -247,14 +570,9 @@ pub fn apply_event(
     }
 
     // Set suite_fix on manifest-fix decisions that enter triage.
-    if event.starts_with("manifest-fix-") && new_phase == RunnerPhase::Triage {
-        let decision = match event {
-            "manifest-fix-suite-and-run" => ManifestFixDecision::SuiteAndRun,
-            "manifest-fix-skip-step" => ManifestFixDecision::SkipStep,
-            "manifest-fix-stop-run" => ManifestFixDecision::StopRun,
-            // manifest-fix-run-only and any other prefix match.
-            _ => ManifestFixDecision::RunOnly,
-        };
+    if let Some(decision) = event.manifest_fix_decision()
+        && new_phase == RunnerPhase::Triage
+    {
         state.suite_fix = Some(SuiteFixState {
             approved_paths: suite_target.map_or_else(Vec::new, |s| vec![s.to_string()]),
             suite_written: false,
@@ -282,9 +600,7 @@ pub fn ensure_execution_phase(run_dir: &Path) -> Result<bool, CliError> {
     };
     if matches!(state.phase, RunnerPhase::Bootstrap | RunnerPhase::Preflight) {
         state.phase = RunnerPhase::Execution;
-        state.transition_count += 1;
-        state.updated_at = now_utc();
-        state.last_event = Some("AutoAdvanceToExecution".to_string());
+        state.touch("AutoAdvanceToExecution");
         save_state(run_dir, &state)?;
         return Ok(true);
     }
@@ -295,32 +611,16 @@ pub fn ensure_execution_phase(run_dir: &Path) -> Result<bool, CliError> {
 /// is legal from the current phase.
 fn resolve_transition(
     state: &RunnerWorkflowState,
-    event: &str,
-    _suite_target: Option<&str>,
-    _message: Option<&str>,
+    event: RunnerEvent,
 ) -> Result<RunnerPhase, CliError> {
     let current = state.phase;
-    let target = match event {
-        "cluster-prepared" | "preflight-started" => RunnerPhase::Preflight,
-        "preflight-captured" | "suite-fix-resumed" | "resume-run" => RunnerPhase::Execution,
-        "preflight-failed"
-        | "failure-manifest"
-        | "manifest-fix-run-only"
-        | "manifest-fix-suite-and-run"
-        | "manifest-fix-skip-step" => RunnerPhase::Triage,
-        "manifest-fix-stop-run" | "abort" => RunnerPhase::Aborted,
-        "suspend" => RunnerPhase::Suspended,
-        "closeout-started" => RunnerPhase::Closeout,
-        "run-completed" => RunnerPhase::Completed,
-        other => {
-            return Err(CliErrorKind::invalid_transition(format!("unknown event: {other}")).into());
-        }
-    };
+    let target = event.target_phase();
 
     // Validate the transition is legal.
     if !is_valid_transition(current, target, event) {
         return Err(CliErrorKind::invalid_transition(format!(
-            "cannot apply '{event}' in phase {current} (target: {target})"
+            "cannot apply '{}' in phase {current} (target: {target})",
+            event.as_str()
         ))
         .into());
     }
@@ -329,13 +629,19 @@ fn resolve_transition(
 }
 
 /// Check whether a phase transition is allowed.
-fn is_valid_transition(from: RunnerPhase, to: RunnerPhase, event: &str) -> bool {
+fn is_valid_transition<E>(from: RunnerPhase, to: RunnerPhase, event: E) -> bool
+where
+    E: TryInto<RunnerEvent>,
+{
+    let Ok(event) = event.try_into() else {
+        return false;
+    };
     // Abort and suspend are allowed from any non-terminal phase.
     if matches!(to, RunnerPhase::Aborted | RunnerPhase::Suspended) {
         return !matches!(from, RunnerPhase::Completed);
     }
     // Resume is only valid from suspended or aborted.
-    if event == "resume-run" {
+    if event == RunnerEvent::ResumeRun {
         return matches!(from, RunnerPhase::Suspended | RunnerPhase::Aborted);
     }
     match from {
@@ -358,21 +664,27 @@ fn is_valid_transition(from: RunnerPhase, to: RunnerPhase, event: &str) -> bool 
 }
 
 /// Produce a human-readable label for a workflow event.
+#[cfg(test)]
 fn event_label(event: &str) -> String {
-    event
-        .split('-')
-        .map(|segment| {
-            let mut characters = segment.chars();
-            match characters.next() {
-                None => String::new(),
-                Some(first) => {
-                    let mut result = first.to_uppercase().to_string();
-                    result.push_str(characters.as_str());
-                    result
-                }
-            }
-        })
-        .collect::<String>()
+    RunnerEvent::try_from(event).map_or_else(
+        |_| {
+            event
+                .split('-')
+                .map(|segment| {
+                    let mut characters = segment.chars();
+                    match characters.next() {
+                        None => String::new(),
+                        Some(first) => {
+                            let mut result = first.to_uppercase().to_string();
+                            result.push_str(characters.as_str());
+                            result
+                        }
+                    }
+                })
+                .collect::<String>()
+        },
+        |parsed| parsed.label().to_string(),
+    )
 }
 
 /// Next action for a runner workflow state.
@@ -493,8 +805,8 @@ mod tests {
     fn runner_phase_serialization_round_trip() {
         let state = bootstrap_state();
         let json = serde_json::to_value(&state).unwrap();
-        assert_eq!(json["phase"], "bootstrap");
-        assert_eq!(json["preflight"]["status"], "pending");
+        assert_eq!(json["state"]["phase"], "bootstrap");
+        assert_eq!(json["state"]["preflight"]["status"], "pending");
         let loaded: RunnerWorkflowState = serde_json::from_value(json).unwrap();
         assert_eq!(loaded.phase, RunnerPhase::Bootstrap);
     }

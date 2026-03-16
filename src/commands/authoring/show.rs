@@ -1,6 +1,16 @@
+use clap::Args;
+
 use crate::authoring::{authoring_workspace_dir, load_authoring_session};
 use crate::errors::{CliError, CliErrorKind};
 use crate::io::{is_safe_name, read_text};
+
+/// Arguments for `harness authoring-show`.
+#[derive(Debug, Clone, Args)]
+pub struct AuthoringShowArgs {
+    /// Saved suite:new payload kind.
+    #[arg(long)]
+    pub kind: String,
+}
 
 /// Show saved suite:new payloads.
 ///

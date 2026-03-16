@@ -11,7 +11,7 @@ use std::path::Path;
 
 use harness::cli::Command;
 use harness::cluster::{ClusterMember, ClusterMode, ClusterSpec, HelmSetting, Platform};
-use harness::commands::Execute;
+use harness::commands::run::ValidateArgs;
 use harness::compose::{self, GlobalTwoZonesConfig, ZoneConfig};
 use harness::context::{CommandEnv, RunContext, RunLayout};
 
@@ -568,11 +568,11 @@ fn validate_universal_manifest_valid() {
     )
     .unwrap();
 
-    let result = Command::Validate {
+    let result = Command::Validate(ValidateArgs {
         kubeconfig: None,
         manifest: manifest_path.to_string_lossy().to_string(),
         output: None,
-    }
+    })
     .execute();
     assert!(
         result.is_ok(),
@@ -599,11 +599,11 @@ fn validate_universal_manifest_missing_type() {
     )
     .unwrap();
 
-    let result = Command::Validate {
+    let result = Command::Validate(ValidateArgs {
         kubeconfig: None,
         manifest: manifest_path.to_string_lossy().to_string(),
         output: None,
-    }
+    })
     .execute();
     assert!(result.is_err(), "validate should fail for missing type");
 }
@@ -618,11 +618,11 @@ fn validate_universal_manifest_missing_name() {
     )
     .unwrap();
 
-    let result = Command::Validate {
+    let result = Command::Validate(ValidateArgs {
         kubeconfig: None,
         manifest: manifest_path.to_string_lossy().to_string(),
         output: None,
-    }
+    })
     .execute();
     assert!(result.is_err(), "validate should fail for missing name");
 }
@@ -637,11 +637,11 @@ fn validate_universal_manifest_missing_mesh() {
     )
     .unwrap();
 
-    let result = Command::Validate {
+    let result = Command::Validate(ValidateArgs {
         kubeconfig: None,
         manifest: manifest_path.to_string_lossy().to_string(),
         output: None,
-    }
+    })
     .execute();
     assert!(result.is_err(), "validate should fail for missing mesh");
 }
@@ -657,11 +657,11 @@ fn validate_universal_manifest_zone_ingress_no_mesh_ok() {
     )
     .unwrap();
 
-    let result = Command::Validate {
+    let result = Command::Validate(ValidateArgs {
         kubeconfig: None,
         manifest: manifest_path.to_string_lossy().to_string(),
         output: None,
-    }
+    })
     .execute();
     assert!(
         result.is_ok(),
@@ -679,11 +679,11 @@ fn validate_universal_manifest_zone_egress_no_mesh_ok() {
     )
     .unwrap();
 
-    let result = Command::Validate {
+    let result = Command::Validate(ValidateArgs {
         kubeconfig: None,
         manifest: manifest_path.to_string_lossy().to_string(),
         output: None,
-    }
+    })
     .execute();
     assert!(
         result.is_ok(),
@@ -701,11 +701,11 @@ fn validate_universal_manifest_zone_no_mesh_ok() {
     )
     .unwrap();
 
-    let result = Command::Validate {
+    let result = Command::Validate(ValidateArgs {
         kubeconfig: None,
         manifest: manifest_path.to_string_lossy().to_string(),
         output: None,
-    }
+    })
     .execute();
     assert!(
         result.is_ok(),
@@ -724,11 +724,11 @@ fn validate_universal_manifest_custom_output_path() {
     )
     .unwrap();
 
-    let result = Command::Validate {
+    let result = Command::Validate(ValidateArgs {
         kubeconfig: None,
         manifest: manifest_path.to_string_lossy().to_string(),
         output: Some(output_path.to_string_lossy().to_string()),
-    }
+    })
     .execute();
     assert!(result.is_ok(), "validate with custom output: {result:?}");
     assert!(output_path.exists(), "custom output path should exist");

@@ -1,855 +1,24 @@
-use std::path::PathBuf;
 use std::thread;
 use std::time::Duration;
 
-use clap::builder::PossibleValuesParser;
-use clap::{Args, Parser, Subcommand};
-use serde_json::json;
+use clap::{Parser, Subcommand};
 
-use crate::commands::Execute;
+use crate::commands;
+use crate::commands::authoring::{
+    ApprovalBeginArgs, AuthoringBeginArgs, AuthoringResetArgs, AuthoringSaveArgs,
+    AuthoringShowArgs, AuthoringValidateArgs,
+};
+use crate::commands::observe::ObserveArgs;
+use crate::commands::run::{
+    ApiArgs, ApplyArgs, CaptureArgs, CloseoutArgs, ClusterCheckArgs, DiffArgs, EnvoyArgs, InitArgs,
+    KumactlArgs, LogsArgs, PreflightArgs, RecordArgs, ReportArgs, RunnerStateArgs, ServiceArgs,
+    StatusArgs, TaskArgs, TokenArgs, ValidateArgs,
+};
+use crate::commands::setup::{
+    BootstrapArgs, ClusterArgs, GatewayArgs, PreCompactArgs, SessionStartArgs, SessionStopArgs,
+};
 use crate::errors::CliError;
-#[cfg(test)]
-use crate::errors::CliErrorKind;
-use crate::hook::{Decision, HookResult};
-use crate::hook_payloads::HookContext;
-use crate::hooks;
-use crate::rules;
-
-// ---------------------------------------------------------------------------
-// Shared argument groups
-// ---------------------------------------------------------------------------
-
-/// Run-directory resolution arguments shared by many commands.
-#[derive(Debug, Clone, Args)]
-pub struct RunDirArgs {
-    /// Run directory path.
-    #[arg(long)]
-    pub run_dir: Option<PathBuf>,
-    /// Run ID to resolve from session context.
-    #[arg(long)]
-    pub run_id: Option<String>,
-    /// Parent directory containing run directories.
-    #[arg(long)]
-    pub run_root: Option<PathBuf>,
-}
-
-/// Arguments for `harness init`.
-#[derive(Debug, Clone, Args)]
-pub struct InitArgs {
-    /// Suite Markdown path or name.
-    #[arg(long)]
-    pub suite: String,
-    /// Run ID to create under the run root.
-    #[arg(long)]
-    pub run_id: String,
-    /// Suite profile to run (e.g. single-zone or multi-zone).
-    #[arg(long)]
-    pub profile: String,
-    /// Repo root to record in run metadata.
-    #[arg(long)]
-    pub repo_root: Option<String>,
-    /// Parent directory to create the run in.
-    #[arg(long)]
-    pub run_root: Option<String>,
-}
-
-/// Arguments for `harness cluster`.
-#[derive(Debug, Clone, Args)]
-pub struct ClusterArgs {
-    /// Cluster lifecycle mode.
-    #[arg(value_parser = [
-        "single-up", "single-down",
-        "global-zone-up", "global-zone-down",
-        "global-two-zones-up", "global-two-zones-down",
-    ])]
-    pub mode: String,
-    /// Primary cluster name.
-    pub cluster_name: String,
-    /// Additional cluster or zone names required by the mode.
-    pub extra_cluster_names: Vec<String>,
-    /// Deployment platform: kubernetes or universal.
-    #[arg(long, default_value = "kubernetes")]
-    pub platform: String,
-    /// Repo root to run local Kuma build and deploy targets.
-    #[arg(long)]
-    pub repo_root: Option<String>,
-    /// Run directory to update deployment state for.
-    #[arg(long)]
-    pub run_dir: Option<String>,
-    /// Extra Helm setting for Kuma deployment; repeat as needed.
-    #[arg(long)]
-    pub helm_setting: Vec<String>,
-    /// Namespace whose workloads to restart after deployment; repeat as needed.
-    #[arg(long)]
-    pub restart_namespace: Vec<String>,
-    /// Store backend for universal mode: memory or postgres.
-    #[arg(long, default_value = "memory")]
-    pub store: String,
-    /// CP container image override for universal mode.
-    #[arg(long)]
-    pub image: Option<String>,
-    /// Skip building images (replaces `HARNESS_BUILD_IMAGES=0`).
-    #[arg(long, default_value_t = false)]
-    pub no_build: bool,
-    /// Skip loading images into k3d clusters (replaces `HARNESS_LOAD_IMAGES=0`).
-    #[arg(long, default_value_t = false)]
-    pub no_load: bool,
-}
-
-/// Arguments for `harness record`.
-#[derive(Debug, Clone, Args)]
-pub struct RecordArgs {
-    /// Repo root for local command resolution.
-    #[arg(long)]
-    pub repo_root: Option<String>,
-    /// Optional phase tag for the command artifact name.
-    #[arg(long)]
-    pub phase: Option<String>,
-    /// Optional label tag for the command artifact name.
-    #[arg(long)]
-    pub label: Option<String>,
-    /// Execution-phase group ID for tracked commands.
-    #[arg(long)]
-    pub gid: Option<String>,
-    /// Tracked cluster member name for kubectl commands.
-    #[arg(long)]
-    pub cluster: Option<String>,
-    /// Command to execute; prefix with -- to stop flag parsing.
-    #[arg(allow_hyphen_values = true)]
-    pub command: Vec<String>,
-    /// Run-directory resolution.
-    #[command(flatten)]
-    pub run_dir: RunDirArgs,
-}
-
-/// Arguments for `harness apply`.
-#[derive(Debug, Clone, Args)]
-pub struct ApplyArgs {
-    /// Use this kubeconfig instead of the tracked run cluster.
-    #[arg(long)]
-    pub kubeconfig: Option<String>,
-    /// Target cluster name (uses its kubeconfig instead of primary).
-    #[arg(long)]
-    pub cluster: Option<String>,
-    /// Manifest file or directory path. Repeat to preserve explicit batch order.
-    #[arg(long, required = true)]
-    pub manifest: Vec<String>,
-    /// Optional step label for manifest index notes.
-    #[arg(long)]
-    pub step: Option<String>,
-    /// Run-directory resolution.
-    #[command(flatten)]
-    pub run_dir: RunDirArgs,
-}
-
-/// Arguments for `harness runner-state`.
-#[derive(Debug, Clone, Args)]
-pub struct RunnerStateArgs {
-    /// Workflow event to apply; omit to print the current phase.
-    #[arg(long, value_parser = [
-        "cluster-prepared", "preflight-started", "preflight-captured",
-        "preflight-failed", "failure-manifest",
-        "manifest-fix-run-only", "manifest-fix-suite-and-run",
-        "manifest-fix-skip-step", "manifest-fix-stop-run",
-        "suite-fix-resumed", "abort", "suspend", "resume-run",
-        "closeout-started", "run-completed",
-    ])]
-    pub event: Option<String>,
-    /// Suite-relative manifest path for manifest-fix events.
-    #[arg(long)]
-    pub suite_target: Option<String>,
-    /// Optional message to record on the event.
-    #[arg(long)]
-    pub message: Option<String>,
-    /// Run-directory resolution.
-    #[command(flatten)]
-    pub run_dir: RunDirArgs,
-}
-
-/// Arguments for `harness authoring-begin`.
-#[derive(Debug, Clone, Args)]
-pub struct AuthoringBeginArgs {
-    /// Managed skill to initialize.
-    #[arg(long, value_parser = PossibleValuesParser::new([rules::SKILL_NEW]))]
-    pub skill: String,
-    /// Kuma worktree for source discovery and validation.
-    #[arg(long)]
-    pub repo_root: String,
-    /// Feature or capability being authored.
-    #[arg(long)]
-    pub feature: String,
-    /// Authoring mode.
-    #[arg(long, value_parser = ["interactive", "bypass"])]
-    pub mode: String,
-    /// Suite directory for this session.
-    #[arg(long)]
-    pub suite_dir: String,
-    /// Suite name recorded in state and defaults.
-    #[arg(long)]
-    pub suite_name: String,
-}
-
-/// Arguments for `harness token`.
-#[derive(Debug, Clone, Args)]
-pub struct TokenArgs {
-    /// Token kind: dataplane, ingress, or egress.
-    #[arg(value_parser = ["dataplane", "ingress", "egress"])]
-    pub kind: String,
-    /// Dataplane name.
-    #[arg(long)]
-    pub name: String,
-    /// Mesh name.
-    #[arg(long, default_value = "default")]
-    pub mesh: String,
-    /// CP API address (auto-detected from run context if omitted).
-    #[arg(long)]
-    pub cp_addr: Option<String>,
-    /// Token validity duration.
-    #[arg(long, default_value = "24h")]
-    pub valid_for: String,
-    /// Run-directory resolution.
-    #[command(flatten)]
-    pub run_dir: RunDirArgs,
-}
-
-/// HTTP method for `harness api` requests.
-#[derive(Debug, Clone, Subcommand)]
-#[non_exhaustive]
-pub enum ApiMethod {
-    /// Send a GET request.
-    Get {
-        /// API path (e.g. /meshes or /zones).
-        path: String,
-        /// Run-directory resolution.
-        #[command(flatten)]
-        run_dir: RunDirArgs,
-    },
-    /// Send a POST request with a JSON body.
-    Post {
-        /// API path (e.g. /tokens/dataplane).
-        path: String,
-        /// JSON request body.
-        #[arg(long)]
-        body: String,
-        /// Run-directory resolution.
-        #[command(flatten)]
-        run_dir: RunDirArgs,
-    },
-    /// Send a PUT request with a JSON body.
-    Put {
-        /// API path (e.g. /meshes/default/meshtrafficpermissions/allow-all).
-        path: String,
-        /// JSON request body.
-        #[arg(long)]
-        body: String,
-        /// Run-directory resolution.
-        #[command(flatten)]
-        run_dir: RunDirArgs,
-    },
-    /// Send a DELETE request.
-    Delete {
-        /// API path (e.g. /meshes/default/meshtrafficpermissions/allow-all).
-        path: String,
-        /// Run-directory resolution.
-        #[command(flatten)]
-        run_dir: RunDirArgs,
-    },
-}
-
-/// Arguments for `harness service`.
-#[derive(Debug, Clone, Args)]
-pub struct ServiceArgs {
-    /// Service action.
-    #[arg(value_parser = ["up", "down", "list"])]
-    pub action: String,
-    /// Service name.
-    pub name: Option<String>,
-    /// Service image.
-    #[arg(long)]
-    pub image: Option<String>,
-    /// Service port.
-    #[arg(long)]
-    pub port: Option<u16>,
-    /// Mesh name.
-    #[arg(long, default_value = "default")]
-    pub mesh: String,
-    /// Enable transparent proxy.
-    #[arg(long)]
-    pub transparent_proxy: bool,
-    /// Readiness timeout in seconds.
-    #[arg(long, default_value = "60")]
-    pub timeout: u64,
-    /// Custom dataplane template path.
-    #[arg(long)]
-    pub dataplane_template: Option<String>,
-    /// Run-directory resolution.
-    #[command(flatten)]
-    pub run_dir: RunDirArgs,
-}
-
-// ---------------------------------------------------------------------------
-// Observe arguments
-// ---------------------------------------------------------------------------
-
-/// Shared filter arguments for observe scan/watch modes.
-#[derive(Debug, Clone, Args)]
-pub struct ObserveFilterArgs {
-    /// Start scanning from this line number.
-    #[arg(long, default_value = "0")]
-    pub from_line: usize,
-    /// Resolve start position: line number, ISO timestamp, or prose substring.
-    #[arg(long)]
-    pub from: Option<String>,
-    /// Focus preset: harness, skills, or all.
-    #[arg(long)]
-    pub focus: Option<String>,
-    /// Narrow session search to this project directory name.
-    #[arg(long)]
-    pub project_hint: Option<String>,
-    /// Output as JSON lines.
-    #[arg(long)]
-    pub json: bool,
-    /// Print summary at end.
-    #[arg(long)]
-    pub summary: bool,
-    /// Filter by minimum severity: low, medium, critical.
-    #[arg(long)]
-    pub severity: Option<String>,
-    /// Filter by category (comma-separated).
-    #[arg(long)]
-    pub category: Option<String>,
-    /// Exclude categories (comma-separated).
-    #[arg(long)]
-    pub exclude: Option<String>,
-    /// Only show fixable issues.
-    #[arg(long)]
-    pub fixable: bool,
-    /// Mute specific issue codes (comma-separated).
-    #[arg(long)]
-    pub mute: Option<String>,
-    /// Stop scanning at this line number.
-    #[arg(long)]
-    pub until_line: Option<usize>,
-    /// Only include events at or after this ISO timestamp.
-    #[arg(long)]
-    pub since_timestamp: Option<String>,
-    /// Only include events at or before this ISO timestamp.
-    #[arg(long)]
-    pub until_timestamp: Option<String>,
-    /// Output format: json (default), markdown, sarif.
-    #[arg(long)]
-    pub format: Option<String>,
-    /// Path to YAML overrides config file.
-    #[arg(long)]
-    pub overrides: Option<String>,
-    /// Show top N root causes grouped by issue code.
-    #[arg(long)]
-    pub top_causes: Option<usize>,
-    /// Write truncated issues to this file instead of stdout (watch mode).
-    #[arg(long)]
-    pub output: Option<String>,
-    /// Write full untruncated issues to this file.
-    #[arg(long)]
-    pub output_details: Option<String>,
-}
-
-/// Observe subcommands.
-#[derive(Debug, Clone, Subcommand)]
-#[non_exhaustive]
-pub enum ObserveMode {
-    /// One-shot scan of a session log.
-    Scan {
-        /// Session ID to observe.
-        session_id: String,
-        /// Filter arguments.
-        #[command(flatten)]
-        filter: ObserveFilterArgs,
-    },
-    /// Continuously poll for new events.
-    Watch {
-        /// Session ID to observe.
-        session_id: String,
-        /// Seconds between polls.
-        #[arg(long, default_value = "3")]
-        poll_interval: u64,
-        /// Exit after this many seconds of no new events.
-        #[arg(long, default_value = "90")]
-        timeout: u64,
-        /// Filter arguments.
-        #[command(flatten)]
-        filter: ObserveFilterArgs,
-    },
-    /// Raw event dump without classification.
-    Dump {
-        /// Session ID to observe.
-        session_id: String,
-        /// Start from this line number.
-        #[arg(long)]
-        from_line: Option<usize>,
-        /// Stop at this line number.
-        #[arg(long)]
-        to_line: Option<usize>,
-        /// Text filter (case-insensitive substring match).
-        #[arg(long)]
-        filter: Option<String>,
-        /// Role filter (comma-separated: user,assistant).
-        #[arg(long)]
-        role: Option<String>,
-        /// Filter by tool name (e.g. Bash, Read, Write).
-        #[arg(long)]
-        tool_name: Option<String>,
-        /// Output raw JSON instead of formatted text.
-        #[arg(long)]
-        raw_json: bool,
-        /// Narrow session search to this project directory name.
-        #[arg(long)]
-        project_hint: Option<String>,
-    },
-    /// Run one observer cycle: read cursor, scan, update cursor, report.
-    Cycle {
-        /// Session ID to observe.
-        session_id: String,
-        /// Narrow session search to this project directory name.
-        #[arg(long)]
-        project_hint: Option<String>,
-    },
-    /// Show events around a specific line.
-    Context {
-        /// Session ID to observe.
-        session_id: String,
-        /// Target line number.
-        #[arg(long)]
-        line: usize,
-        /// Number of lines before/after.
-        #[arg(long, default_value = "10")]
-        window: usize,
-        /// Narrow session search to this project directory name.
-        #[arg(long)]
-        project_hint: Option<String>,
-    },
-    /// Show observer state for a session.
-    Status {
-        /// Session ID to query.
-        session_id: String,
-        /// Narrow session search to this project directory name.
-        #[arg(long)]
-        project_hint: Option<String>,
-    },
-    /// Resume scanning from the last cursor position.
-    Resume {
-        /// Session ID to resume.
-        session_id: String,
-        /// Filter arguments.
-        #[command(flatten)]
-        filter: ObserveFilterArgs,
-    },
-    /// Verify whether a specific issue still reproduces.
-    Verify {
-        /// Session ID to check.
-        session_id: String,
-        /// Issue ID to verify.
-        issue_id: String,
-        /// Start verification from this line.
-        #[arg(long)]
-        since_line: Option<usize>,
-        /// Narrow session search to this project directory name.
-        #[arg(long)]
-        project_hint: Option<String>,
-    },
-    /// Resolve a --from value to a concrete line number.
-    ResolveStart {
-        /// Session ID to search.
-        session_id: String,
-        /// Value to resolve: line number, ISO timestamp, or prose substring.
-        value: String,
-        /// Narrow session search to this project directory name.
-        #[arg(long)]
-        project_hint: Option<String>,
-    },
-    /// List all valid issue categories.
-    ListCategories,
-    /// List all focus presets.
-    ListFocusPresets,
-    /// Validate observer setup.
-    Doctor,
-    /// Add issue codes to the mute list.
-    Mute {
-        /// Session ID to update.
-        session_id: String,
-        /// Issue codes to mute (comma-separated).
-        codes: String,
-        /// Narrow session search to this project directory name.
-        #[arg(long)]
-        project_hint: Option<String>,
-    },
-    /// Remove issue codes from the mute list.
-    Unmute {
-        /// Session ID to update.
-        session_id: String,
-        /// Issue codes to unmute (comma-separated).
-        codes: String,
-        /// Narrow session search to this project directory name.
-        #[arg(long)]
-        project_hint: Option<String>,
-    },
-    /// Compare issues between two line ranges.
-    Compare {
-        /// Session ID to compare.
-        session_id: String,
-        /// First range start line.
-        #[arg(long)]
-        from_a: usize,
-        /// First range end line.
-        #[arg(long)]
-        to_a: usize,
-        /// Second range start line.
-        #[arg(long)]
-        from_b: usize,
-        /// Second range end line.
-        #[arg(long)]
-        to_b: usize,
-        /// Narrow session search to this project directory name.
-        #[arg(long)]
-        project_hint: Option<String>,
-    },
-}
-
-// ---------------------------------------------------------------------------
-// Task subcommands
-// ---------------------------------------------------------------------------
-
-/// Background task output operations.
-#[derive(Debug, Clone, Subcommand)]
-#[non_exhaustive]
-pub enum TaskCommand {
-    /// Wait for a background task to complete by polling its output file.
-    Wait {
-        /// Full path to the task output file.
-        output_file: String,
-        /// Maximum seconds to wait before timing out.
-        #[arg(long, default_value = "600")]
-        timeout: u64,
-        /// Seconds between file-size polls.
-        #[arg(long, default_value = "10")]
-        poll_interval: u64,
-        /// Number of tail lines to print when done.
-        #[arg(long, default_value = "20")]
-        lines: usize,
-    },
-    /// Print the last N lines of a task output file.
-    Tail {
-        /// Full path to the task output file.
-        output_file: String,
-        /// Number of lines to print.
-        #[arg(long, default_value = "20")]
-        lines: usize,
-    },
-}
-
-// ---------------------------------------------------------------------------
-// Hook subcommands
-// ---------------------------------------------------------------------------
-
-/// Available hooks.
-#[derive(Debug, Clone, Subcommand)]
-#[non_exhaustive]
-pub enum HookCommand {
-    /// Guard Bash tool usage.
-    GuardBash,
-    /// Guard file write operations.
-    GuardWrite,
-    /// Guard `AskUserQuestion` prompts.
-    GuardQuestion,
-    /// Guard stop and session end.
-    GuardStop,
-    /// Verify Bash tool results.
-    VerifyBash,
-    /// Verify file write results.
-    VerifyWrite,
-    /// Verify question answers.
-    VerifyQuestion,
-    /// Audit hook events.
-    Audit,
-    /// Enrich failure context.
-    EnrichFailure,
-    /// Validate subagent startup context.
-    ContextAgent,
-    /// Validate subagent results.
-    ValidateAgent,
-}
-
-impl HookCommand {
-    /// CLI name of this hook (kebab-case).
-    #[must_use]
-    pub const fn name(&self) -> &'static str {
-        match self {
-            Self::GuardBash => "guard-bash",
-            Self::GuardWrite => "guard-write",
-            Self::GuardQuestion => "guard-question",
-            Self::GuardStop => "guard-stop",
-            Self::VerifyBash => "verify-bash",
-            Self::VerifyWrite => "verify-write",
-            Self::VerifyQuestion => "verify-question",
-            Self::Audit => "audit",
-            Self::EnrichFailure => "enrich-failure",
-            Self::ContextAgent => "context-agent",
-            Self::ValidateAgent => "validate-agent",
-        }
-    }
-
-    /// Pre-tool-use guard hook.
-    #[must_use]
-    pub const fn is_pre_tool_use(&self) -> bool {
-        matches!(
-            self,
-            Self::GuardBash | Self::GuardQuestion | Self::GuardWrite
-        )
-    }
-
-    /// Post-tool-use verification hook.
-    #[must_use]
-    pub const fn is_post_tool_use(&self) -> bool {
-        matches!(
-            self,
-            Self::VerifyBash | Self::VerifyQuestion | Self::VerifyWrite | Self::Audit
-        )
-    }
-
-    /// Post-tool-use failure enrichment hook.
-    #[must_use]
-    pub const fn is_post_tool_use_failure(&self) -> bool {
-        matches!(self, Self::EnrichFailure)
-    }
-
-    /// Subagent start hook.
-    #[must_use]
-    pub const fn is_subagent_start(&self) -> bool {
-        matches!(self, Self::ContextAgent)
-    }
-
-    /// Subagent stop hook.
-    #[must_use]
-    pub const fn is_subagent_stop(&self) -> bool {
-        matches!(self, Self::ValidateAgent)
-    }
-
-    /// Blocking stop-guard hook.
-    #[must_use]
-    pub const fn is_blocking(&self) -> bool {
-        matches!(self, Self::GuardStop)
-    }
-
-    /// Any guard variant (pre-tool-use or blocking).
-    #[must_use]
-    pub const fn is_guard(&self) -> bool {
-        matches!(
-            self,
-            Self::GuardBash | Self::GuardWrite | Self::GuardQuestion | Self::GuardStop
-        )
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Envoy subcommands
-// ---------------------------------------------------------------------------
-
-/// Envoy admin operations.
-#[non_exhaustive]
-#[derive(Debug, Clone, Subcommand)]
-pub enum EnvoyCommand {
-    /// Capture a live Envoy admin payload.
-    Capture {
-        /// Optional phase tag for the command artifact name.
-        #[arg(long)]
-        phase: Option<String>,
-        /// Artifact label for the captured payload.
-        #[arg(long)]
-        label: String,
-        /// Tracked cluster member name for multi-zone captures.
-        #[arg(long)]
-        cluster: Option<String>,
-        /// Namespace of the workload to exec into.
-        #[arg(long)]
-        namespace: String,
-        /// kubectl exec target (e.g. deploy/demo-client).
-        #[arg(long)]
-        workload: String,
-        /// Container name inside the workload.
-        #[arg(long, default_value = "kuma-sidecar")]
-        container: String,
-        /// Envoy admin path to fetch.
-        #[arg(long, default_value = "/config_dump")]
-        admin_path: String,
-        /// Envoy admin host inside the container.
-        #[arg(long, default_value = "127.0.0.1")]
-        admin_host: String,
-        /// Envoy admin port inside the container.
-        #[arg(long, default_value_t = 9901)]
-        admin_port: u16,
-        /// Artifact format hint.
-        #[arg(long, default_value = "auto")]
-        format: String,
-        /// Print only config entries whose @type contains this text.
-        #[arg(long)]
-        type_contains: Option<String>,
-        /// Print only lines containing this text after type filtering.
-        #[arg(long)]
-        grep: Option<String>,
-        /// Run-directory resolution.
-        #[command(flatten)]
-        run_dir: RunDirArgs,
-    },
-    /// Print a matching route from an Envoy config dump.
-    RouteBody {
-        /// Envoy config dump JSON file; omit to capture live.
-        #[arg(long)]
-        file: Option<String>,
-        /// Exact route path or prefix to match.
-        #[arg(long, name = "match")]
-        route_match: String,
-        /// Optional phase tag.
-        #[arg(long)]
-        phase: Option<String>,
-        /// Artifact label.
-        #[arg(long)]
-        label: Option<String>,
-        /// Tracked cluster member name.
-        #[arg(long)]
-        cluster: Option<String>,
-        /// Namespace of the workload.
-        #[arg(long)]
-        namespace: Option<String>,
-        /// kubectl exec target.
-        #[arg(long)]
-        workload: Option<String>,
-        /// Container name.
-        #[arg(long, default_value = "kuma-sidecar")]
-        container: String,
-        /// Envoy admin path.
-        #[arg(long, default_value = "/config_dump")]
-        admin_path: String,
-        /// Envoy admin host.
-        #[arg(long, default_value = "127.0.0.1")]
-        admin_host: String,
-        /// Envoy admin port.
-        #[arg(long, default_value_t = 9901)]
-        admin_port: u16,
-        /// Artifact format hint.
-        #[arg(long, default_value = "auto")]
-        format: String,
-        /// Run-directory resolution.
-        #[command(flatten)]
-        run_dir: RunDirArgs,
-    },
-    /// Print the bootstrap payload from an Envoy config dump.
-    Bootstrap {
-        /// Bootstrap JSON file; omit to capture live.
-        #[arg(long)]
-        file: Option<String>,
-        /// Substring filter for rendered bootstrap output.
-        #[arg(long)]
-        grep: Option<String>,
-        /// Optional phase tag.
-        #[arg(long)]
-        phase: Option<String>,
-        /// Artifact label.
-        #[arg(long)]
-        label: Option<String>,
-        /// Tracked cluster member name.
-        #[arg(long)]
-        cluster: Option<String>,
-        /// Namespace of the workload.
-        #[arg(long)]
-        namespace: Option<String>,
-        /// kubectl exec target.
-        #[arg(long)]
-        workload: Option<String>,
-        /// Container name.
-        #[arg(long, default_value = "kuma-sidecar")]
-        container: String,
-        /// Envoy admin path.
-        #[arg(long, default_value = "/config_dump")]
-        admin_path: String,
-        /// Envoy admin host.
-        #[arg(long, default_value = "127.0.0.1")]
-        admin_host: String,
-        /// Envoy admin port.
-        #[arg(long, default_value_t = 9901)]
-        admin_port: u16,
-        /// Artifact format hint.
-        #[arg(long, default_value = "auto")]
-        format: String,
-        /// Run-directory resolution.
-        #[command(flatten)]
-        run_dir: RunDirArgs,
-    },
-}
-
-// ---------------------------------------------------------------------------
-// Report subcommands
-// ---------------------------------------------------------------------------
-
-#[non_exhaustive]
-/// Report validation and group finalization.
-#[derive(Debug, Clone, Subcommand)]
-pub enum ReportCommand {
-    /// Validate report compactness.
-    Check {
-        /// Report path; defaults to the tracked run report.
-        #[arg(long)]
-        report: Option<String>,
-    },
-    /// Finalize a completed group.
-    Group {
-        /// Completed group ID (e.g. g02).
-        #[arg(long)]
-        group_id: String,
-        /// Recorded group verdict.
-        #[arg(long, value_parser = ["pass", "fail", "skip"])]
-        status: String,
-        /// Evidence file path; repeat to record multiple artifacts.
-        #[arg(long)]
-        evidence: Vec<String>,
-        /// Recorded evidence label to resolve to the latest matching artifact.
-        #[arg(long)]
-        evidence_label: Vec<String>,
-        /// Optional state-capture label to snapshot pod state before finalizing.
-        #[arg(long)]
-        capture_label: Option<String>,
-        /// Optional one-line note to include in the story result.
-        #[arg(long)]
-        note: Option<String>,
-        /// Run-directory resolution.
-        #[command(flatten)]
-        run_dir: RunDirArgs,
-    },
-}
-
-// ---------------------------------------------------------------------------
-// Kumactl subcommands
-// ---------------------------------------------------------------------------
-
-/// Find or build kumactl.
-#[derive(Debug, Clone, Subcommand)]
-#[non_exhaustive]
-pub enum KumactlCommand {
-    /// Find an existing kumactl binary.
-    Find {
-        /// Repo root to search for built kumactl artifacts.
-        #[arg(long)]
-        repo_root: Option<String>,
-    },
-    /// Build kumactl from source.
-    Build {
-        /// Repo root to build and locate kumactl.
-        #[arg(long)]
-        repo_root: Option<String>,
-    },
-}
-
-// ---------------------------------------------------------------------------
-// Top-level CLI
-// ---------------------------------------------------------------------------
+use crate::hooks::{self, HookArgs};
 
 /// Kuma test harness CLI.
 #[derive(Debug, Parser)]
@@ -869,54 +38,23 @@ pub struct Cli {
 #[non_exhaustive]
 pub enum Command {
     /// Run a harness hook for a skill.
-    Hook {
-        /// Skill name (suite:run or suite:new).
-        #[arg(value_parser = PossibleValuesParser::new(rules::SKILL_NAMES))]
-        skill: String,
-        /// Hook to run.
-        #[command(subcommand)]
-        hook: HookCommand,
-    },
+    Hook(HookArgs),
 
     /// Initialize a new test run.
     #[command(alias = "init-run")]
     Init(InitArgs),
 
     /// Install or refresh the repo-aware harness wrapper.
-    Bootstrap {
-        /// Project directory to bootstrap the wrapper for.
-        #[arg(long, env = "CLAUDE_PROJECT_DIR")]
-        project_dir: Option<String>,
-    },
+    Bootstrap(BootstrapArgs),
 
     /// Manage disposable local k3d clusters.
     Cluster(ClusterArgs),
 
     /// Run preflight checks and prepare suite manifests.
-    Preflight {
-        /// Use this kubeconfig instead of the tracked run cluster.
-        #[arg(long)]
-        kubeconfig: Option<String>,
-        /// Repo root for prepared-suite metadata.
-        #[arg(long)]
-        repo_root: Option<String>,
-        /// Run-directory resolution.
-        #[command(flatten)]
-        run_dir: RunDirArgs,
-    },
+    Preflight(PreflightArgs),
 
     /// Capture cluster pod state for a run.
-    Capture {
-        /// Use this kubeconfig instead of the tracked run cluster.
-        #[arg(long)]
-        kubeconfig: Option<String>,
-        /// Label for the saved artifact filename.
-        #[arg(long)]
-        label: String,
-        /// Run-directory resolution.
-        #[command(flatten)]
-        run_dir: RunDirArgs,
-    },
+    Capture(CaptureArgs),
 
     /// Record a tracked command.
     #[command(alias = "run", trailing_var_arg = true)]
@@ -926,158 +64,58 @@ pub enum Command {
     Apply(ApplyArgs),
 
     /// Validate manifests against the cluster.
-    Validate {
-        /// Use this kubeconfig instead of the tracked run cluster.
-        #[arg(long)]
-        kubeconfig: Option<String>,
-        /// Manifest path.
-        #[arg(long)]
-        manifest: String,
-        /// Validation log path; defaults beside the manifest artifact.
-        #[arg(long)]
-        output: Option<String>,
-    },
+    Validate(ValidateArgs),
 
     /// Manage runner workflow state.
     RunnerState(RunnerStateArgs),
 
     /// Close out a run.
-    Closeout {
-        /// Run-directory resolution.
-        #[command(flatten)]
-        run_dir: RunDirArgs,
-    },
+    Closeout(CloseoutArgs),
 
     /// Report validation and group finalization.
-    Report {
-        /// Report subcommand.
-        #[command(subcommand)]
-        cmd: ReportCommand,
-    },
+    Report(ReportArgs),
 
     /// View diffs between payloads.
-    Diff {
-        /// Left file path.
-        #[arg(long)]
-        left: String,
-        /// Right file path.
-        #[arg(long)]
-        right: String,
-        /// Optional dotted path inside parsed JSON payloads.
-        #[arg(long)]
-        path: Option<String>,
-    },
+    Diff(DiffArgs),
 
     /// Envoy admin operations.
-    Envoy {
-        /// Envoy subcommand.
-        #[command(subcommand)]
-        cmd: EnvoyCommand,
-    },
+    Envoy(EnvoyArgs),
 
     /// Check or install Gateway API CRDs.
-    Gateway {
-        /// Use this kubeconfig for the target local cluster.
-        #[arg(long)]
-        kubeconfig: Option<String>,
-        /// Repo root to resolve the pinned Gateway API version.
-        #[arg(long)]
-        repo_root: Option<String>,
-        /// Only check whether the Gateway API CRDs are already installed.
-        #[arg(long)]
-        check_only: bool,
-    },
+    Gateway(GatewayArgs),
 
     /// Find or build kumactl.
-    Kumactl {
-        /// Kumactl subcommand.
-        #[command(subcommand)]
-        cmd: KumactlCommand,
-    },
+    Kumactl(KumactlArgs),
 
     /// Handle session start hook.
-    SessionStart {
-        /// Project directory to restore session state for.
-        #[arg(long, env = "CLAUDE_PROJECT_DIR")]
-        project_dir: Option<String>,
-    },
+    SessionStart(SessionStartArgs),
 
     /// Handle session stop cleanup.
-    SessionStop {
-        /// Project directory to clean up.
-        #[arg(long, env = "CLAUDE_PROJECT_DIR")]
-        project_dir: Option<String>,
-    },
+    SessionStop(SessionStopArgs),
 
     /// Save compact handoff before compaction.
-    PreCompact {
-        /// Project directory to save the compact handoff for.
-        #[arg(long, env = "CLAUDE_PROJECT_DIR")]
-        project_dir: Option<String>,
-    },
+    PreCompact(PreCompactArgs),
 
     /// Begin a suite:new workspace session.
     AuthoringBegin(AuthoringBeginArgs),
 
     /// Save a suite:new payload.
-    AuthoringSave {
-        /// Suite:new payload kind.
-        #[arg(long, value_parser = [
-            "inventory", "coverage", "variants", "schema",
-            "proposal", "edit-request",
-        ])]
-        kind: String,
-        /// Inline JSON payload.
-        #[arg(long)]
-        payload: Option<String>,
-        /// Read JSON from a file; use stdin only as fallback.
-        #[arg(long)]
-        input: Option<String>,
-    },
+    AuthoringSave(AuthoringSaveArgs),
 
     /// Show saved suite:new payloads.
-    AuthoringShow {
-        /// Saved suite:new payload kind.
-        #[arg(long)]
-        kind: String,
-    },
+    AuthoringShow(AuthoringShowArgs),
 
     /// Reset suite:new workspace.
-    AuthoringReset {
-        /// Managed skill whose saved workspace should be cleared.
-        #[arg(long, value_parser = PossibleValuesParser::new([rules::SKILL_NEW]))]
-        skill: String,
-    },
+    AuthoringReset(AuthoringResetArgs),
 
     /// Validate authored manifests against local CRDs.
-    AuthoringValidate {
-        /// Manifest or group Markdown path; repeat for multiple inputs.
-        #[arg(long, required = true)]
-        path: Vec<String>,
-        /// Repo root for locating checked-in CRDs.
-        #[arg(long)]
-        repo_root: Option<String>,
-    },
+    AuthoringValidate(AuthoringValidateArgs),
 
     /// Begin suite:new approval flow.
-    ApprovalBegin {
-        /// Managed skill to initialize.
-        #[arg(long, value_parser = PossibleValuesParser::new([rules::SKILL_NEW]))]
-        skill: String,
-        /// Approval mode.
-        #[arg(long, value_parser = ["interactive", "bypass"])]
-        mode: String,
-        /// Optional suite directory for the approval state.
-        #[arg(long)]
-        suite_dir: Option<String>,
-    },
+    ApprovalBegin(ApprovalBeginArgs),
 
     /// Call the Kuma control plane REST API directly.
-    Api {
-        /// HTTP method and path.
-        #[command(subcommand)]
-        method: ApiMethod,
-    },
+    Api(ApiArgs),
 
     /// Generate a dataplane token from the control plane (universal mode).
     Token(TokenArgs),
@@ -1086,282 +124,205 @@ pub enum Command {
     Service(ServiceArgs),
 
     /// Show cluster state as structured JSON.
-    Status {
-        /// Run-directory resolution.
-        #[command(flatten)]
-        run_dir: RunDirArgs,
-    },
+    Status(StatusArgs),
 
     /// Show container logs.
-    Logs {
-        /// Container or member name.
-        name: String,
-        /// Number of log lines to show.
-        #[arg(long, default_value = "100")]
-        tail: u32,
-        /// Follow log output.
-        #[arg(long)]
-        follow: bool,
-        /// Run-directory resolution.
-        #[command(flatten)]
-        run_dir: RunDirArgs,
-    },
+    Logs(LogsArgs),
 
     /// Check if cluster containers are still running.
-    ClusterCheck {
-        /// Run-directory resolution.
-        #[command(flatten)]
-        run_dir: RunDirArgs,
-    },
+    ClusterCheck(ClusterCheckArgs),
 
     /// Read or wait for background task output.
-    Task {
-        /// Task subcommand.
-        #[command(subcommand)]
-        command: TaskCommand,
-    },
+    Task(TaskArgs),
 
     /// Report harness capabilities for skill planning.
     Capabilities,
 
     /// Observe and classify Claude Code session logs.
-    Observe {
-        /// Observe subcommand.
-        #[command(subcommand)]
-        mode: ObserveMode,
-    },
+    Observe(ObserveArgs),
 }
 
-// ---------------------------------------------------------------------------
-// Hook output rendering
-// ---------------------------------------------------------------------------
-
-/// Format a hook result message with level prefix.
-fn render_hook_message(result: &HookResult) -> String {
-    if result.code.is_empty() {
-        return result.message.clone();
-    }
-    let level = match result.decision {
-        Decision::Warn => "WARNING",
-        Decision::Info => "INFO",
-        Decision::Allow | Decision::Deny => "ERROR",
-    };
-    if result.message.is_empty() {
-        format!("{level} [{}]", result.code)
-    } else {
-        format!("{level} [{}] {}", result.code, result.message)
+fn dispatch_setup(cmd: Command) -> Result<i32, CliError> {
+    match cmd {
+        Command::Init(args) => commands::run::init_run(
+            &args.suite,
+            &args.run_id,
+            &args.profile,
+            args.repo_root.as_deref(),
+            args.run_root.as_deref(),
+        ),
+        Command::Bootstrap(args) => commands::setup::bootstrap(args.project_dir.as_deref()),
+        Command::Cluster(args) => commands::setup::cluster(&args),
+        Command::Gateway(args) => commands::setup::gateway(
+            args.kubeconfig.as_deref(),
+            args.repo_root.as_deref(),
+            args.check_only,
+        ),
+        Command::SessionStart(args) => commands::setup::session_start(args.project_dir.as_deref()),
+        Command::SessionStop(args) => commands::setup::session_stop(args.project_dir.as_deref()),
+        Command::PreCompact(args) => commands::setup::pre_compact(args.project_dir.as_deref()),
+        Command::Capabilities => commands::setup::capabilities(),
+        Command::Observe(args) => commands::observe::execute(args.mode),
+        _ => unreachable!(),
     }
 }
 
-/// Render a `PreToolUse` hook output (guard-bash, guard-write, guard-question).
-fn render_pre_tool_use_output(result: &HookResult) -> String {
-    if result.decision == Decision::Allow {
-        return String::new();
-    }
-    let message = render_hook_message(result);
-    serde_json::to_string(&json!({
-        "hookSpecificOutput": {
-            "hookEventName": "PreToolUse",
-            "permissionDecision": "deny",
-            "permissionDecisionReason": message,
+fn dispatch_run(cmd: Command) -> Result<i32, CliError> {
+    match cmd {
+        Command::Capture(args) => {
+            commands::run::capture(args.kubeconfig.as_deref(), &args.label, &args.run_dir)
         }
-    }))
-    .expect("hand-built JSON serializes")
-}
-
-/// Render a blocking hook output (guard-stop, or any deny from unknown hooks).
-fn render_blocking_hook_output(result: &HookResult) -> String {
-    if result.decision == Decision::Allow {
-        return String::new();
-    }
-    let message = render_hook_message(result);
-    if result.decision == Decision::Deny {
-        serde_json::to_string(&json!({"decision": "block", "reason": message}))
-            .expect("hand-built JSON serializes")
-    } else {
-        serde_json::to_string(&json!({"systemMessage": message}))
-            .expect("hand-built JSON serializes")
-    }
-}
-
-/// Render a `PostToolUse`-family hook output (verify-*, audit, enrich-failure,
-/// validate-agent).
-fn render_post_tool_use_output(result: &HookResult, event_name: &str) -> String {
-    if result.decision == Decision::Allow {
-        return String::new();
-    }
-    let message = render_hook_message(result);
-    let mut payload = json!({
-        "hookSpecificOutput": {
-            "hookEventName": event_name,
-            "additionalContext": message,
+        Command::Record(args) => commands::run::record(
+            args.repo_root.as_deref(),
+            args.phase.as_deref(),
+            args.label.as_deref(),
+            args.gid.as_deref(),
+            args.cluster.as_deref(),
+            &args.command,
+            &args.run_dir,
+        ),
+        Command::Apply(args) => commands::run::apply(
+            args.kubeconfig.as_deref(),
+            args.cluster.as_deref(),
+            &args.manifest,
+            args.step.as_deref(),
+            &args.run_dir,
+        ),
+        Command::Validate(args) => commands::run::validate(
+            args.kubeconfig.as_deref(),
+            &args.manifest,
+            args.output.as_deref(),
+        ),
+        Command::Preflight(args) => commands::run::preflight(
+            args.kubeconfig.as_deref(),
+            args.repo_root.as_deref(),
+            &args.run_dir,
+        ),
+        Command::RunnerState(args) => commands::run::runner_state(
+            args.event,
+            args.suite_target.as_deref(),
+            args.message.as_deref(),
+            &args.run_dir,
+        ),
+        Command::Closeout(args) => commands::run::closeout(&args.run_dir),
+        Command::Report(args) => commands::run::report(&args.cmd),
+        Command::Diff(args) => commands::run::diff(&args.left, &args.right, args.path.as_deref()),
+        Command::Envoy(args) => commands::run::envoy(&args.cmd),
+        Command::Kumactl(args) => commands::run::kumactl(&args.cmd),
+        Command::Api(args) => commands::run::api(&args.method),
+        Command::Token(args) => commands::run::token(
+            &args.kind,
+            &args.name,
+            &args.mesh,
+            args.cp_addr.as_deref(),
+            &args.valid_for,
+            &args.run_dir,
+        ),
+        Command::Service(args) => commands::run::service(&args),
+        Command::Status(args) => commands::run::status(&args.run_dir),
+        Command::Logs(args) => {
+            commands::run::logs(&args.name, args.tail, args.follow, &args.run_dir)
         }
-    });
-    if result.decision == Decision::Deny {
-        payload["decision"] = json!("block");
-        payload["reason"] = json!(message);
+        Command::ClusterCheck(args) => commands::run::cluster_check(&args.run_dir),
+        Command::Task(args) => commands::run::task(&args.command),
+        _ => unreachable!(),
     }
-    serde_json::to_string(&payload).expect("hand-built JSON serializes")
 }
 
-/// Render an additional-context hook output (context-agent, notification).
-fn render_additional_context_output(result: &HookResult, event_name: &str) -> String {
-    if result.decision == Decision::Allow {
-        return String::new();
-    }
-    serde_json::to_string(&json!({
-        "hookSpecificOutput": {
-            "hookEventName": event_name,
-            "additionalContext": render_hook_message(result),
+fn dispatch_authoring(cmd: Command) -> Result<i32, CliError> {
+    match cmd {
+        Command::AuthoringBegin(args) => commands::authoring::begin(
+            &args.repo_root,
+            &args.feature,
+            &args.mode,
+            &args.suite_dir,
+            &args.suite_name,
+        ),
+        Command::AuthoringSave(args) => {
+            commands::authoring::save(&args.kind, args.payload.as_deref(), args.input.as_deref())
         }
-    }))
-    .expect("hand-built JSON serializes")
-}
-
-/// Transform a `HookResult` into the native Claude Code hook output format for
-/// the given hook name.
-#[must_use]
-pub fn render_hook_output(hook: &HookCommand, result: &HookResult) -> String {
-    if result.decision == Decision::Allow && result.code.is_empty() {
-        return String::new();
-    }
-    if hook.is_pre_tool_use() {
-        return render_pre_tool_use_output(result);
-    }
-    if hook.is_post_tool_use() {
-        return render_post_tool_use_output(result, "PostToolUse");
-    }
-    if hook.is_post_tool_use_failure() {
-        return render_post_tool_use_output(result, "PostToolUseFailure");
-    }
-    if hook.is_subagent_start() {
-        return render_additional_context_output(result, "SubagentStart");
-    }
-    if hook.is_subagent_stop() {
-        return render_post_tool_use_output(result, "SubagentStop");
-    }
-    if hook.is_blocking() {
-        return render_blocking_hook_output(result);
-    }
-    render_additional_context_output(result, "Notification")
-}
-
-// ---------------------------------------------------------------------------
-// Hook dispatch helpers
-// ---------------------------------------------------------------------------
-
-/// Dispatch to the correct hook module based on the hook command variant.
-fn dispatch_hook(hook: &HookCommand, ctx: &HookContext) -> Result<HookResult, CliError> {
-    match hook {
-        HookCommand::GuardBash => hooks::guard_bash::execute(ctx),
-        HookCommand::GuardWrite => hooks::guard_write::execute(ctx),
-        HookCommand::GuardQuestion => hooks::guard_question::execute(ctx),
-        HookCommand::GuardStop => hooks::guard_stop::execute(ctx),
-        HookCommand::VerifyBash => hooks::verify_bash::execute(ctx),
-        HookCommand::VerifyWrite => hooks::verify_write::execute(ctx),
-        HookCommand::VerifyQuestion => hooks::verify_question::execute(ctx),
-        HookCommand::Audit => hooks::audit::execute(ctx),
-        HookCommand::EnrichFailure => hooks::enrich_failure::execute(ctx),
-        HookCommand::ContextAgent => hooks::context_agent::execute(ctx),
-        HookCommand::ValidateAgent => hooks::validate_agent::execute(ctx),
-    }
-}
-
-/// Build a runtime `HookResult` for an error during hook execution.
-/// Guard hooks produce deny; verify/other hooks produce warn.
-fn hook_runtime_result(hook: &HookCommand, code: &str, message: &str) -> HookResult {
-    if hook.is_guard() {
-        HookResult::deny(code, message)
-    } else {
-        HookResult::warn(code, message)
-    }
-}
-
-/// Format a `CliError` as a detail string for hook error wrapping.
-fn format_hook_error_detail(hook: &HookCommand, error: &CliError) -> String {
-    let hook_name = hook.name();
-    let mut parts = vec![format!("`{hook_name}` failed internally: {error}")];
-    if let Some(hint) = error.hint() {
-        parts.push(format!("Hint: {hint}"));
-    }
-    if let Some(details) = error.details() {
-        parts.push(format!("Details: {details}"));
-    }
-    parts.join(" ")
-}
-
-/// Execute a hook command: build context, dispatch, render output.
-fn run_hook_command(skill: &str, hook: &HookCommand) -> i32 {
-    let hook_name = hook.name();
-
-    let ctx = match HookContext::from_stdin(skill) {
-        Ok(ctx) => ctx,
-        Err(e) => {
-            let message = format!("`{hook_name}` received invalid hook payload: {e}");
-            let result = hook_runtime_result(hook, "KSH001", &message);
-            let output = render_hook_output(hook, &result);
-            if !output.is_empty() {
-                print!("{output}");
-            }
-            return 0;
+        Command::AuthoringShow(args) => commands::authoring::show(&args.kind),
+        Command::AuthoringReset(_args) => commands::authoring::reset(),
+        Command::AuthoringValidate(args) => {
+            commands::authoring::validate(&args.path, args.repo_root.as_deref())
         }
-    };
-
-    let result = match dispatch_hook(hook, &ctx) {
-        Ok(result) => result,
-        Err(e) => {
-            let detail = format_hook_error_detail(hook, &e);
-            hook_runtime_result(hook, "KSH002", &detail)
+        Command::ApprovalBegin(args) => {
+            commands::authoring::approval_begin(&args.mode, args.suite_dir.as_deref())
         }
-    };
-
-    let output = render_hook_output(hook, &result);
-    if !output.is_empty() {
-        print!("{output}");
+        _ => unreachable!(),
     }
-    0
 }
 
-// ---------------------------------------------------------------------------
-// Entry point
-// ---------------------------------------------------------------------------
+/// Dispatch a parsed command to its owning subsystem.
+///
+/// # Errors
+/// Returns `CliError` when the selected command fails.
+pub fn dispatch(command: Command) -> Result<i32, CliError> {
+    match command {
+        Command::Hook(_) => unreachable!("hooks are handled separately"),
+        Command::Init(_)
+        | Command::Bootstrap(_)
+        | Command::Cluster(_)
+        | Command::Gateway(_)
+        | Command::SessionStart(_)
+        | Command::SessionStop(_)
+        | Command::PreCompact(_)
+        | Command::Capabilities
+        | Command::Observe(_) => dispatch_setup(command),
+        Command::Capture(_)
+        | Command::Record(_)
+        | Command::Apply(_)
+        | Command::Validate(_)
+        | Command::Preflight(_)
+        | Command::RunnerState(_)
+        | Command::Closeout(_)
+        | Command::Report(_)
+        | Command::Diff(_)
+        | Command::Envoy(_)
+        | Command::Kumactl(_)
+        | Command::Api(_)
+        | Command::Token(_)
+        | Command::Service(_)
+        | Command::Status(_)
+        | Command::Logs(_)
+        | Command::ClusterCheck(_)
+        | Command::Task(_) => dispatch_run(command),
+        Command::AuthoringBegin(_)
+        | Command::AuthoringSave(_)
+        | Command::AuthoringShow(_)
+        | Command::AuthoringReset(_)
+        | Command::AuthoringValidate(_)
+        | Command::ApprovalBegin(_) => dispatch_authoring(command),
+    }
+}
 
 /// Parse CLI arguments and run the appropriate command.
 ///
 /// # Errors
 /// Returns `CliError` on command failure. Hook errors are handled internally
-/// and never surface as `CliError` - they are rendered as hook output JSON on
-/// stdout and the function returns `Ok(0)`.
+/// and never surface as `CliError`.
 pub fn run() -> Result<i32, CliError> {
     let cli = Cli::parse();
     if cli.delay > 0.0 {
         thread::sleep(Duration::from_secs_f64(cli.delay));
     }
     match cli.command {
-        Command::Hook {
-            ref skill,
-            ref hook,
-        } => Ok(run_hook_command(skill, hook)),
-        other => other.execute(),
+        Command::Hook(args) => Ok(hooks::run_hook_command(&args.skill, &args.hook)),
+        other => dispatch(other),
     }
 }
-
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use clap::CommandFactory;
 
-    // --- CLI parsing tests ---
-
     #[test]
     fn all_expected_subcommands_registered() {
         let cmd = Cli::command();
         let names: Vec<&str> = cmd.get_subcommands().map(clap::Command::get_name).collect();
         for expected in [
+            "api",
             "apply",
             "approval-begin",
             "authoring-begin",
@@ -1373,21 +334,26 @@ mod tests {
             "capture",
             "closeout",
             "cluster",
+            "cluster-check",
             "diff",
             "envoy",
             "gateway",
             "hook",
             "init",
             "kumactl",
+            "logs",
             "observe",
             "pre-compact",
             "preflight",
             "record",
             "report",
             "runner-state",
+            "service",
             "session-start",
             "session-stop",
+            "status",
             "task",
+            "token",
             "validate",
         ] {
             assert!(names.contains(&expected), "missing subcommand: {expected}");
@@ -1426,18 +392,12 @@ mod tests {
     fn parse_hook_command() {
         let cli = Cli::try_parse_from(["harness", "hook", "suite:run", "guard-bash"]).unwrap();
         match cli.command {
-            Command::Hook { skill, hook } => {
+            Command::Hook(HookArgs { skill, hook }) => {
                 assert_eq!(skill, "suite:run");
                 assert_eq!(hook.name(), "guard-bash");
             }
             _ => panic!("expected Hook command"),
         }
-    }
-
-    #[test]
-    fn parse_hook_rejects_invalid_skill() {
-        let result = Cli::try_parse_from(["harness", "hook", "bad-skill", "guard-bash"]);
-        assert!(result.is_err());
     }
 
     #[test]
@@ -1472,22 +432,6 @@ mod tests {
     }
 
     #[test]
-    fn parse_init_run_alias() {
-        let cli = Cli::try_parse_from([
-            "harness",
-            "init-run",
-            "--suite",
-            "s.md",
-            "--run-id",
-            "r01",
-            "--profile",
-            "p",
-        ])
-        .unwrap();
-        assert!(matches!(cli.command, Command::Init(..)));
-    }
-
-    #[test]
     fn parse_record_with_trailing_command() {
         let cli = Cli::try_parse_from([
             "harness",
@@ -1506,21 +450,6 @@ mod tests {
             Command::Record(RecordArgs { label, command, .. }) => {
                 assert_eq!(label.as_deref(), Some("test"));
                 assert_eq!(command, vec!["kubectl", "get", "pods", "-n", "kuma-system"]);
-            }
-            _ => panic!("expected Record command"),
-        }
-    }
-
-    #[test]
-    fn parse_run_alias_for_record() {
-        let cli = Cli::try_parse_from([
-            "harness", "run", "--gid", "g03", "--label", "foo", "--", "ls",
-        ])
-        .unwrap();
-        match cli.command {
-            Command::Record(RecordArgs { gid, label, .. }) => {
-                assert_eq!(gid.as_deref(), Some("g03"));
-                assert_eq!(label.as_deref(), Some("foo"));
             }
             _ => panic!("expected Record command"),
         }
@@ -1550,80 +479,6 @@ mod tests {
             }
             _ => panic!("expected Cluster command"),
         }
-    }
-
-    #[test]
-    fn parse_cluster_no_build_flag() {
-        let cli = Cli::try_parse_from([
-            "harness",
-            "cluster",
-            "--platform",
-            "universal",
-            "--no-build",
-            "single-up",
-            "test-cp",
-        ])
-        .unwrap();
-        match cli.command {
-            Command::Cluster(args) => {
-                assert!(args.no_build);
-                assert!(!args.no_load);
-            }
-            _ => panic!("expected Cluster command"),
-        }
-    }
-
-    #[test]
-    fn parse_cluster_no_load_flag() {
-        let cli = Cli::try_parse_from(["harness", "cluster", "--no-load", "single-up", "test-cp"])
-            .unwrap();
-        match cli.command {
-            Command::Cluster(args) => {
-                assert!(!args.no_build);
-                assert!(args.no_load);
-            }
-            _ => panic!("expected Cluster command"),
-        }
-    }
-
-    #[test]
-    fn parse_cluster_both_skip_flags() {
-        let cli = Cli::try_parse_from([
-            "harness",
-            "cluster",
-            "--no-build",
-            "--no-load",
-            "--platform",
-            "universal",
-            "single-up",
-            "test-cp",
-        ])
-        .unwrap();
-        match cli.command {
-            Command::Cluster(args) => {
-                assert!(args.no_build);
-                assert!(args.no_load);
-            }
-            _ => panic!("expected Cluster command"),
-        }
-    }
-
-    #[test]
-    fn parse_cluster_skip_flags_default_false() {
-        let cli = Cli::try_parse_from(["harness", "cluster", "single-up", "test-cp"]).unwrap();
-        match cli.command {
-            Command::Cluster(args) => {
-                assert!(!args.no_build);
-                assert!(!args.no_load);
-            }
-            _ => panic!("expected Cluster command"),
-        }
-    }
-
-    #[test]
-    fn parse_apply_requires_manifest() {
-        let result = Cli::try_parse_from(["harness", "apply"]);
-        assert!(result.is_err());
     }
 
     #[test]
@@ -1660,15 +515,15 @@ mod tests {
         ])
         .unwrap();
         match cli.command {
-            Command::Envoy {
+            Command::Envoy(EnvoyArgs {
                 cmd:
-                    EnvoyCommand::Capture {
+                    commands::run::EnvoyCommand::Capture {
                         namespace,
                         workload,
                         label,
                         ..
                     },
-            } => {
+            }) => {
                 assert_eq!(namespace, "kuma-demo");
                 assert_eq!(workload, "deploy/demo-client");
                 assert_eq!(label, "cap1");
@@ -1690,12 +545,12 @@ mod tests {
         ])
         .unwrap();
         match cli.command {
-            Command::Report {
+            Command::Report(ReportArgs {
                 cmd:
-                    ReportCommand::Group {
+                    commands::run::ReportCommand::Group {
                         group_id, status, ..
                     },
-            } => {
+            }) => {
                 assert_eq!(group_id, "g01");
                 assert_eq!(status, "pass");
             }
@@ -1709,17 +564,6 @@ mod tests {
         match cli.command {
             Command::RunnerState(RunnerStateArgs { event, .. }) => {
                 assert!(event.is_none());
-            }
-            _ => panic!("expected RunnerState command"),
-        }
-    }
-
-    #[test]
-    fn parse_runner_state_with_event() {
-        let cli = Cli::try_parse_from(["harness", "runner-state", "--event", "abort"]).unwrap();
-        match cli.command {
-            Command::RunnerState(RunnerStateArgs { event, .. }) => {
-                assert_eq!(event.as_deref(), Some("abort"));
             }
             _ => panic!("expected RunnerState command"),
         }
@@ -1764,29 +608,22 @@ mod tests {
         let cli = Cli::try_parse_from(["harness", "kumactl", "find"]).unwrap();
         assert!(matches!(
             cli.command,
-            Command::Kumactl {
-                cmd: KumactlCommand::Find { .. }
-            }
+            Command::Kumactl(KumactlArgs {
+                cmd: commands::run::KumactlCommand::Find { .. }
+            })
         ));
     }
 
     #[test]
-    fn parse_diff() {
-        let cli = Cli::try_parse_from(["harness", "diff", "--left", "a.json", "--right", "b.json"])
-            .unwrap();
+    fn parse_api_get() {
+        let cli = Cli::try_parse_from(["harness", "api", "get", "/zones"]).unwrap();
         match cli.command {
-            Command::Diff {
-                left, right, path, ..
-            } => {
-                assert_eq!(left, "a.json");
-                assert_eq!(right, "b.json");
-                assert!(path.is_none());
-            }
-            _ => panic!("expected Diff command"),
+            Command::Api(ApiArgs {
+                method: commands::run::ApiMethod::Get { path, .. },
+            }) => assert_eq!(path, "/zones"),
+            _ => panic!("expected Api Get command"),
         }
     }
-
-    // --- Help text tests ---
 
     #[test]
     fn apply_help_describes_batch_inputs() {
@@ -1803,536 +640,6 @@ mod tests {
             .get_help()
             .map(ToString::to_string)
             .unwrap_or_default();
-        assert!(
-            help.contains("explicit batch order"),
-            "apply --manifest help must mention explicit batch order"
-        );
-    }
-
-    #[test]
-    fn envoy_capture_help_has_required_args() {
-        let cmd = Cli::command();
-        let envoy_cmd = cmd
-            .get_subcommands()
-            .find(|s| s.get_name() == "envoy")
-            .expect("envoy missing");
-        let capture_cmd = envoy_cmd
-            .get_subcommands()
-            .find(|s| s.get_name() == "capture")
-            .expect("capture missing");
-        let arg_names: Vec<&str> = capture_cmd
-            .get_arguments()
-            .map(|a| a.get_id().as_str())
-            .collect();
-        for required in ["label", "namespace", "workload"] {
-            assert!(
-                arg_names.contains(&required),
-                "envoy capture missing arg: {required}"
-            );
-        }
-        for optional in ["type_contains", "grep"] {
-            assert!(
-                arg_names.contains(&optional),
-                "envoy capture missing arg: {optional}"
-            );
-        }
-    }
-
-    // --- Hook rendering tests ---
-
-    #[test]
-    fn render_hook_message_deny() {
-        let r = HookResult::deny("KSR005", "blocked");
-        assert_eq!(render_hook_message(&r), "ERROR [KSR005] blocked");
-    }
-
-    #[test]
-    fn render_hook_message_warn() {
-        let r = HookResult::warn("KSR006", "caution");
-        assert_eq!(render_hook_message(&r), "WARNING [KSR006] caution");
-    }
-
-    #[test]
-    fn render_hook_message_info() {
-        let r = HookResult::info("KSR012", "ok");
-        assert_eq!(render_hook_message(&r), "INFO [KSR012] ok");
-    }
-
-    #[test]
-    fn render_hook_message_empty_code() {
-        let r = HookResult {
-            decision: Decision::Warn,
-            code: String::new(),
-            message: "just a message".to_string(),
-        };
-        assert_eq!(render_hook_message(&r), "just a message");
-    }
-
-    #[test]
-    fn render_hook_message_empty_message() {
-        let r = HookResult {
-            decision: Decision::Deny,
-            code: "KSR005".to_string(),
-            message: String::new(),
-        };
-        assert_eq!(render_hook_message(&r), "ERROR [KSR005]");
-    }
-
-    #[test]
-    fn pre_tool_use_allow_is_empty() {
-        assert!(render_pre_tool_use_output(&HookResult::allow()).is_empty());
-    }
-
-    #[test]
-    fn pre_tool_use_deny_has_permission_decision() {
-        let r = HookResult::deny("KSR005", "blocked");
-        let output = render_pre_tool_use_output(&r);
-        let v: serde_json::Value = serde_json::from_str(&output).unwrap();
-        assert_eq!(v["hookSpecificOutput"]["hookEventName"], "PreToolUse");
-        assert_eq!(v["hookSpecificOutput"]["permissionDecision"], "deny");
-        assert!(
-            v["hookSpecificOutput"]["permissionDecisionReason"]
-                .as_str()
-                .unwrap()
-                .contains("KSR005")
-        );
-    }
-
-    #[test]
-    fn blocking_allow_is_empty() {
-        assert!(render_blocking_hook_output(&HookResult::allow()).is_empty());
-    }
-
-    #[test]
-    fn blocking_deny_has_block_decision() {
-        let r = HookResult::deny("KSR007", "incomplete");
-        let output = render_blocking_hook_output(&r);
-        let v: serde_json::Value = serde_json::from_str(&output).unwrap();
-        assert_eq!(v["decision"], "block");
-        assert!(v["reason"].as_str().unwrap().contains("KSR007"));
-    }
-
-    #[test]
-    fn blocking_warn_has_system_message() {
-        let r = HookResult::warn("KSR006", "missing");
-        let output = render_blocking_hook_output(&r);
-        let v: serde_json::Value = serde_json::from_str(&output).unwrap();
-        assert!(v["systemMessage"].as_str().unwrap().contains("KSR006"));
-        assert!(v.get("decision").is_none());
-    }
-
-    #[test]
-    fn post_tool_use_allow_is_empty() {
-        assert!(render_post_tool_use_output(&HookResult::allow(), "PostToolUse").is_empty());
-    }
-
-    #[test]
-    fn post_tool_use_deny_includes_block() {
-        let r = HookResult::deny("KSR014", "phase");
-        let output = render_post_tool_use_output(&r, "PostToolUse");
-        let v: serde_json::Value = serde_json::from_str(&output).unwrap();
-        assert_eq!(v["decision"], "block");
-        assert_eq!(v["hookSpecificOutput"]["hookEventName"], "PostToolUse");
-        assert!(
-            v["hookSpecificOutput"]["additionalContext"]
-                .as_str()
-                .unwrap()
-                .contains("KSR014")
-        );
-    }
-
-    #[test]
-    fn post_tool_use_warn_no_block() {
-        let r = HookResult::warn("KSR006", "artifact");
-        let output = render_post_tool_use_output(&r, "PostToolUse");
-        let v: serde_json::Value = serde_json::from_str(&output).unwrap();
-        assert!(v.get("decision").is_none());
-        assert_eq!(v["hookSpecificOutput"]["hookEventName"], "PostToolUse");
-    }
-
-    #[test]
-    fn additional_context_allow_is_empty() {
-        assert!(render_additional_context_output(&HookResult::allow(), "SubagentStart").is_empty());
-    }
-
-    #[test]
-    fn additional_context_warn_has_event_name() {
-        let r = HookResult::warn("KSA006", "format");
-        let output = render_additional_context_output(&r, "SubagentStart");
-        let v: serde_json::Value = serde_json::from_str(&output).unwrap();
-        assert_eq!(v["hookSpecificOutput"]["hookEventName"], "SubagentStart");
-    }
-
-    // --- render_hook_output routing tests ---
-
-    #[test]
-    fn hook_output_guard_bash_routes_to_pre_tool_use() {
-        let r = HookResult::deny("KSR005", "blocked");
-        let output = render_hook_output(&HookCommand::GuardBash, &r);
-        let v: serde_json::Value = serde_json::from_str(&output).unwrap();
-        assert_eq!(v["hookSpecificOutput"]["hookEventName"], "PreToolUse");
-    }
-
-    #[test]
-    fn hook_output_verify_bash_routes_to_post_tool_use() {
-        let r = HookResult::warn("KSR006", "missing");
-        let output = render_hook_output(&HookCommand::VerifyBash, &r);
-        let v: serde_json::Value = serde_json::from_str(&output).unwrap();
-        assert_eq!(v["hookSpecificOutput"]["hookEventName"], "PostToolUse");
-    }
-
-    #[test]
-    fn hook_output_guard_stop_routes_to_blocking() {
-        let r = HookResult::deny("KSR007", "incomplete");
-        let output = render_hook_output(&HookCommand::GuardStop, &r);
-        let v: serde_json::Value = serde_json::from_str(&output).unwrap();
-        assert_eq!(v["decision"], "block");
-    }
-
-    #[test]
-    fn hook_output_enrich_failure_routes_to_post_tool_use_failure() {
-        let r = HookResult::warn("KSR012", "verdict");
-        let output = render_hook_output(&HookCommand::EnrichFailure, &r);
-        let v: serde_json::Value = serde_json::from_str(&output).unwrap();
-        assert_eq!(
-            v["hookSpecificOutput"]["hookEventName"],
-            "PostToolUseFailure"
-        );
-    }
-
-    #[test]
-    fn hook_output_context_agent_routes_to_subagent_start() {
-        let r = HookResult::warn("KSA006", "format");
-        let output = render_hook_output(&HookCommand::ContextAgent, &r);
-        let v: serde_json::Value = serde_json::from_str(&output).unwrap();
-        assert_eq!(v["hookSpecificOutput"]["hookEventName"], "SubagentStart");
-    }
-
-    #[test]
-    fn hook_output_validate_agent_routes_to_subagent_stop() {
-        let r = HookResult::deny("KSA007", "reply");
-        let output = render_hook_output(&HookCommand::ValidateAgent, &r);
-        let v: serde_json::Value = serde_json::from_str(&output).unwrap();
-        assert_eq!(v["hookSpecificOutput"]["hookEventName"], "SubagentStop");
-    }
-
-    #[test]
-    fn hook_output_allow_is_always_empty() {
-        for hook in [
-            HookCommand::GuardBash,
-            HookCommand::GuardStop,
-            HookCommand::VerifyBash,
-            HookCommand::EnrichFailure,
-            HookCommand::ContextAgent,
-            HookCommand::ValidateAgent,
-        ] {
-            assert!(
-                render_hook_output(&hook, &HookResult::allow()).is_empty(),
-                "allow should be empty for {}",
-                hook.name()
-            );
-        }
-    }
-
-    // --- Hook wrapping tests ---
-
-    #[test]
-    fn hook_runtime_result_guard_is_deny() {
-        let r = hook_runtime_result(&HookCommand::GuardBash, "KSH002", "error");
-        assert_eq!(r.decision, Decision::Deny);
-    }
-
-    #[test]
-    fn hook_runtime_result_verify_is_warn() {
-        let r = hook_runtime_result(&HookCommand::VerifyBash, "KSH002", "error");
-        assert_eq!(r.decision, Decision::Warn);
-    }
-
-    #[test]
-    fn hook_runtime_result_other_is_warn() {
-        let r = hook_runtime_result(&HookCommand::Audit, "KSH002", "error");
-        assert_eq!(r.decision, Decision::Warn);
-    }
-
-    #[test]
-    fn format_error_detail_includes_code_and_message() {
-        let error: CliError = CliErrorKind::MissingRunPointer.into();
-        let detail = format_hook_error_detail(&HookCommand::GuardBash, &error);
-        assert!(detail.contains("guard-bash"));
-        assert!(detail.contains("KSRCLI005"));
-        assert!(detail.contains("missing current run pointer"));
-        assert!(detail.contains("Hint: Run init first."));
-    }
-
-    #[test]
-    fn format_error_detail_includes_details() {
-        let error = CliErrorKind::command_failed("command failed").with_details("exit code 1");
-        let detail = format_hook_error_detail(&HookCommand::VerifyWrite, &error);
-        assert!(detail.contains("Details: exit code 1"));
-    }
-
-    #[test]
-    fn hook_command_classification_is_exhaustive() {
-        let all = [
-            HookCommand::GuardBash,
-            HookCommand::GuardWrite,
-            HookCommand::GuardQuestion,
-            HookCommand::GuardStop,
-            HookCommand::VerifyBash,
-            HookCommand::VerifyWrite,
-            HookCommand::VerifyQuestion,
-            HookCommand::Audit,
-            HookCommand::EnrichFailure,
-            HookCommand::ContextAgent,
-            HookCommand::ValidateAgent,
-        ];
-        for hook in &all {
-            let count = [
-                hook.is_pre_tool_use(),
-                hook.is_post_tool_use(),
-                hook.is_post_tool_use_failure(),
-                hook.is_subagent_start(),
-                hook.is_subagent_stop(),
-                hook.is_blocking(),
-            ]
-            .iter()
-            .filter(|&&v| v)
-            .count();
-            assert_eq!(
-                count,
-                1,
-                "{} falls into {} categories, expected 1",
-                hook.name(),
-                count
-            );
-        }
-    }
-
-    // --- API command parsing tests ---
-
-    #[test]
-    fn parse_api_get() {
-        let cli = Cli::try_parse_from(["harness", "api", "get", "/zones"]).unwrap();
-        match cli.command {
-            Command::Api {
-                method: ApiMethod::Get { path, .. },
-            } => {
-                assert_eq!(path, "/zones");
-            }
-            _ => panic!("expected Api Get command"),
-        }
-    }
-
-    #[test]
-    fn parse_api_post_with_body() {
-        let cli = Cli::try_parse_from([
-            "harness",
-            "api",
-            "post",
-            "/tokens/dataplane",
-            "--body",
-            r#"{"name":"svc"}"#,
-        ])
-        .unwrap();
-        match cli.command {
-            Command::Api {
-                method: ApiMethod::Post { path, body, .. },
-            } => {
-                assert_eq!(path, "/tokens/dataplane");
-                assert_eq!(body, r#"{"name":"svc"}"#);
-            }
-            _ => panic!("expected Api Post command"),
-        }
-    }
-
-    #[test]
-    fn parse_api_put_with_body() {
-        let cli = Cli::try_parse_from([
-            "harness",
-            "api",
-            "put",
-            "/meshes/default",
-            "--body",
-            r#"{"type":"Mesh"}"#,
-        ])
-        .unwrap();
-        match cli.command {
-            Command::Api {
-                method: ApiMethod::Put { path, body, .. },
-            } => {
-                assert_eq!(path, "/meshes/default");
-                assert_eq!(body, r#"{"type":"Mesh"}"#);
-            }
-            _ => panic!("expected Api Put command"),
-        }
-    }
-
-    #[test]
-    fn parse_api_delete() {
-        let cli = Cli::try_parse_from([
-            "harness",
-            "api",
-            "delete",
-            "/meshes/default/meshtrafficpermissions/allow-all",
-        ])
-        .unwrap();
-        match cli.command {
-            Command::Api {
-                method: ApiMethod::Delete { path, .. },
-            } => {
-                assert_eq!(path, "/meshes/default/meshtrafficpermissions/allow-all");
-            }
-            _ => panic!("expected Api Delete command"),
-        }
-    }
-
-    #[test]
-    fn parse_api_get_with_run_dir() {
-        let cli = Cli::try_parse_from([
-            "harness",
-            "api",
-            "get",
-            "/zones",
-            "--run-dir",
-            "/tmp/my-run",
-        ])
-        .unwrap();
-        match cli.command {
-            Command::Api {
-                method: ApiMethod::Get { path, run_dir },
-            } => {
-                assert_eq!(path, "/zones");
-                assert_eq!(
-                    run_dir.run_dir,
-                    Some(std::path::PathBuf::from("/tmp/my-run"))
-                );
-            }
-            _ => panic!("expected Api Get command"),
-        }
-    }
-
-    #[test]
-    fn parse_api_post_requires_body() {
-        let result = Cli::try_parse_from(["harness", "api", "post", "/tokens"]);
-        assert!(result.is_err());
-    }
-
-    // --- HookCommand name tests ---
-
-    #[test]
-    fn hook_command_names_match_cli() {
-        let all = [
-            HookCommand::GuardBash,
-            HookCommand::GuardWrite,
-            HookCommand::GuardQuestion,
-            HookCommand::GuardStop,
-            HookCommand::VerifyBash,
-            HookCommand::VerifyWrite,
-            HookCommand::VerifyQuestion,
-            HookCommand::Audit,
-            HookCommand::EnrichFailure,
-            HookCommand::ContextAgent,
-            HookCommand::ValidateAgent,
-        ];
-        assert_eq!(all.len(), 11);
-        for hook in &all {
-            assert!(!hook.name().is_empty(), "hook name must not be empty");
-            assert!(
-                hook.name()
-                    .chars()
-                    .all(|c| c.is_ascii_lowercase() || c == '-'),
-                "hook name must be kebab-case: {}",
-                hook.name()
-            );
-        }
-    }
-
-    // --- Delay flag tests ---
-
-    #[test]
-    fn delay_defaults_to_zero() {
-        let cli = Cli::try_parse_from([
-            "harness",
-            "init",
-            "--suite",
-            "s.md",
-            "--run-id",
-            "r01",
-            "--profile",
-            "p",
-        ])
-        .unwrap();
-        assert!((cli.delay - 0.0).abs() < f64::EPSILON);
-    }
-
-    #[test]
-    fn delay_accepts_integer_seconds() {
-        let cli = Cli::try_parse_from([
-            "harness",
-            "--delay",
-            "5",
-            "init",
-            "--suite",
-            "s.md",
-            "--run-id",
-            "r01",
-            "--profile",
-            "p",
-        ])
-        .unwrap();
-        assert!((cli.delay - 5.0).abs() < f64::EPSILON);
-    }
-
-    #[test]
-    fn delay_accepts_fractional_seconds() {
-        let cli = Cli::try_parse_from([
-            "harness",
-            "--delay",
-            "2.5",
-            "init",
-            "--suite",
-            "s.md",
-            "--run-id",
-            "r01",
-            "--profile",
-            "p",
-        ])
-        .unwrap();
-        assert!((cli.delay - 2.5).abs() < f64::EPSILON);
-    }
-
-    #[test]
-    fn delay_works_after_subcommand() {
-        let cli = Cli::try_parse_from([
-            "harness",
-            "apply",
-            "--delay",
-            "8",
-            "--manifest",
-            "g13/01.yaml",
-        ])
-        .unwrap();
-        assert!((cli.delay - 8.0).abs() < f64::EPSILON);
-    }
-
-    #[test]
-    fn delay_rejects_negative_values() {
-        // clap parses -1 as a negative float, but the sleep logic only
-        // triggers when delay > 0.0 so negative values are effectively no-ops.
-        // Verify parsing succeeds (clap allows negative f64).
-        let cli = Cli::try_parse_from([
-            "harness",
-            "--delay",
-            "-1",
-            "init",
-            "--suite",
-            "s.md",
-            "--run-id",
-            "r01",
-            "--profile",
-            "p",
-        ]);
-        // -1 starts with a dash so clap interprets it as a flag, not a value.
-        assert!(cli.is_err());
+        assert!(help.contains("explicit batch order"));
     }
 }

@@ -1,6 +1,8 @@
 use std::fs;
 use std::path::Path;
 
+use clap::Args;
+
 use crate::audit_log::write_run_status_with_audit;
 use crate::context::{CurrentRunRecord, RunLayout, RunMetadata};
 use crate::core_defs::{current_run_context_path, shorten_path, utc_now};
@@ -11,6 +13,26 @@ use crate::schema::{RunCounts, RunReport, RunReportFrontmatter, RunStatus, Suite
 use crate::workflow::runner::initialize_runner_state;
 
 use super::shared::{resolve_init_repo_root, resolve_run_root};
+
+/// Arguments for `harness init`.
+#[derive(Debug, Clone, Args)]
+pub struct InitArgs {
+    /// Suite Markdown path or name.
+    #[arg(long)]
+    pub suite: String,
+    /// Run ID to create under the run root.
+    #[arg(long)]
+    pub run_id: String,
+    /// Suite profile to run (e.g. single-zone or multi-zone).
+    #[arg(long)]
+    pub profile: String,
+    /// Repo root to record in run metadata.
+    #[arg(long)]
+    pub repo_root: Option<String>,
+    /// Parent directory to create the run in.
+    #[arg(long)]
+    pub run_root: Option<String>,
+}
 
 /// Parameters that identify the run being initialized.
 struct RunParams<'a> {

@@ -456,7 +456,7 @@ fn guard_bash_completed_state_blocks_commands() {
     let tmp = tempfile::tempdir().unwrap();
     let run_dir = init_run(tmp.path(), "run-1", "single-zone");
     let state = RunnerWorkflowState {
-        schema_version: 1,
+        schema_version: 2,
         phase: RunnerPhase::Completed,
         preflight: PreflightState {
             status: PreflightStatus::Complete,
@@ -479,7 +479,7 @@ fn guard_bash_completed_allows_closeout() {
     let tmp = tempfile::tempdir().unwrap();
     let run_dir = init_run(tmp.path(), "run-1", "single-zone");
     let state = RunnerWorkflowState {
-        schema_version: 1,
+        schema_version: 2,
         phase: RunnerPhase::Completed,
         preflight: PreflightState {
             status: PreflightStatus::Complete,

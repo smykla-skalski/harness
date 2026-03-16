@@ -73,7 +73,7 @@ fn guard_suite_author(
                 HookMessage::approval_state_invalid("author state is missing").into_result(),
             );
         };
-        if state.mode == ApprovalMode::Bypass {
+        if state.mode() == ApprovalMode::Bypass {
             return Ok(HookMessage::approval_state_invalid(
                 "bypass mode forbids canonical review prompts",
             )
@@ -115,13 +115,13 @@ fn classify_canonical_gate(prompts: &[AskUserQuestionPrompt]) -> Option<ReviewGa
 }
 
 fn can_ask_manifest_fix(state: &RunnerWorkflowState) -> (bool, Option<&'static str>) {
-    if state.phase != RunnerPhase::Triage {
+    if state.phase() != RunnerPhase::Triage {
         return (
             false,
             Some("enter failure triage before asking how to repair the suite"),
         );
     }
-    if state.failure.is_none() {
+    if state.failure().is_none() {
         return (false, Some("no failure recorded for triage"));
     }
     (true, None)

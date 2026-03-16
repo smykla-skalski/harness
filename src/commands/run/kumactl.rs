@@ -1,10 +1,37 @@
 use std::path::{Path, PathBuf};
 
-use crate::cli::KumactlCommand;
+use clap::{Args, Subcommand};
+
 use crate::commands::resolve_repo_root;
 use crate::core_defs::{host_platform, shorten_path};
 use crate::errors::{CliError, CliErrorKind};
 use crate::exec::run_command;
+
+/// Find or build kumactl.
+#[derive(Debug, Clone, Subcommand)]
+#[non_exhaustive]
+pub enum KumactlCommand {
+    /// Find an existing kumactl binary.
+    Find {
+        /// Repo root to search for built kumactl artifacts.
+        #[arg(long)]
+        repo_root: Option<String>,
+    },
+    /// Build kumactl from source.
+    Build {
+        /// Repo root to build and locate kumactl.
+        #[arg(long)]
+        repo_root: Option<String>,
+    },
+}
+
+/// Arguments for `harness kumactl`.
+#[derive(Debug, Clone, Args)]
+pub struct KumactlArgs {
+    /// Kumactl subcommand.
+    #[command(subcommand)]
+    pub cmd: KumactlCommand,
+}
 
 fn kumactl_candidates(root: &Path) -> Vec<PathBuf> {
     let (os_name, arch) = host_platform();

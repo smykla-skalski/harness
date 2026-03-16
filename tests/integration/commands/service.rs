@@ -1,8 +1,9 @@
 // Integration tests for the `harness service` command.
 // Tests error paths for missing args and missing cluster spec.
 
-use harness::cli::{Command, RunDirArgs, ServiceArgs};
-use harness::commands::Execute;
+use harness::cli::Command;
+use harness::commands::RunDirArgs;
+use harness::commands::run::ServiceArgs;
 
 use super::super::helpers::*;
 
@@ -41,7 +42,7 @@ fn service_up_missing_name() {
             run_root: None,
         },
     );
-    let result = Command::Service(args).execute();
+    let result = run_command(Command::Service(args));
     assert!(result.is_err());
     let err = result.unwrap_err();
     assert!(err.message().contains("service name is required"));
@@ -60,7 +61,7 @@ fn service_up_missing_port() {
             run_root: None,
         },
     );
-    let result = Command::Service(args).execute();
+    let result = run_command(Command::Service(args));
     assert!(result.is_err());
     let err = result.unwrap_err();
     assert!(err.message().contains("service port is required"));
@@ -79,7 +80,7 @@ fn service_unknown_action() {
             run_root: None,
         },
     );
-    let result = Command::Service(args).execute();
+    let result = run_command(Command::Service(args));
     assert!(result.is_err());
     let err = result.unwrap_err();
     assert!(err.message().contains("unknown service action"));
@@ -100,7 +101,7 @@ fn service_up_missing_cluster_spec() {
     );
     args.port = Some(8080);
     args.image = Some("kuma-universal:latest".into());
-    let result = Command::Service(args).execute();
+    let result = run_command(Command::Service(args));
     assert!(result.is_err());
     let err = result.unwrap_err();
     // Missing cluster spec means no CP address
@@ -110,7 +111,7 @@ fn service_up_missing_cluster_spec() {
 #[test]
 fn service_down_missing_name() {
     let args = service_args("down", None, missing_run_dir());
-    let result = Command::Service(args).execute();
+    let result = run_command(Command::Service(args));
     assert!(result.is_err());
     let err = result.unwrap_err();
     assert!(err.message().contains("service name is required"));

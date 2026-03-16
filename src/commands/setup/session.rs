@@ -1,6 +1,8 @@
 use std::env;
 use std::fs;
 
+use clap::Args;
+
 use crate::bootstrap;
 use crate::commands::resolve_project_dir;
 use crate::compact;
@@ -9,6 +11,22 @@ use crate::core_defs::current_run_context_path;
 use crate::ephemeral_metallb;
 use crate::errors::CliError;
 use crate::session_hook::SessionStartHookOutput;
+
+/// Arguments for `harness session-start`.
+#[derive(Debug, Clone, Args)]
+pub struct SessionStartArgs {
+    /// Project directory to restore session state for.
+    #[arg(long, env = "CLAUDE_PROJECT_DIR")]
+    pub project_dir: Option<String>,
+}
+
+/// Arguments for `harness session-stop`.
+#[derive(Debug, Clone, Args)]
+pub struct SessionStopArgs {
+    /// Project directory to clean up.
+    #[arg(long, env = "CLAUDE_PROJECT_DIR")]
+    pub project_dir: Option<String>,
+}
 
 /// Handle session start hook.
 ///

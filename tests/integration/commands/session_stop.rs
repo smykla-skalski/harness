@@ -4,7 +4,7 @@
 use std::fs;
 
 use harness::cli::Command;
-use harness::commands::Execute;
+use harness::commands::setup::SessionStopArgs;
 use harness::context::{CurrentRunRecord, RunLayout};
 use harness::core_defs::current_run_context_path;
 use harness::ephemeral_metallb;
@@ -52,9 +52,8 @@ fn session_stop_cleans_up_templates_and_removes_pointer() {
             fs::write(&ctx_path, serde_json::to_string_pretty(&record).unwrap()).unwrap();
             assert!(ctx_path.exists());
 
-            let code = Command::SessionStop { project_dir: None }
-                .execute()
-                .unwrap();
+            let code =
+                run_command(Command::SessionStop(SessionStopArgs { project_dir: None })).unwrap();
             assert_eq!(code, 0);
 
             // Template should be cleaned up
@@ -76,9 +75,8 @@ fn session_stop_returns_ok_with_no_pointer() {
             ("CLAUDE_SESSION_ID", Some("no-pointer-test")),
         ],
         || {
-            let code = Command::SessionStop { project_dir: None }
-                .execute()
-                .unwrap();
+            let code =
+                run_command(Command::SessionStop(SessionStopArgs { project_dir: None })).unwrap();
             assert_eq!(code, 0);
         },
     );
@@ -102,9 +100,8 @@ fn session_stop_handles_corrupt_pointer_json() {
             fs::write(&ctx_path, "not valid json {{{{").unwrap();
             assert!(ctx_path.exists());
 
-            let code = Command::SessionStop { project_dir: None }
-                .execute()
-                .unwrap();
+            let code =
+                run_command(Command::SessionStop(SessionStopArgs { project_dir: None })).unwrap();
             assert_eq!(code, 0);
 
             // Corrupt pointer should be removed

@@ -1,7 +1,60 @@
-use crate::cli::{ApiMethod, RunDirArgs};
-use crate::commands::{resolve_admin_token, resolve_cp_addr, resolve_run_context};
+use clap::{Args, Subcommand};
+
+use crate::commands::{RunDirArgs, resolve_admin_token, resolve_cp_addr, resolve_run_context};
 use crate::errors::{CliError, CliErrorKind};
 use crate::exec::{self, HttpMethod};
+
+/// HTTP method for `harness api` requests.
+#[derive(Debug, Clone, Subcommand)]
+#[non_exhaustive]
+pub enum ApiMethod {
+    /// Send a GET request.
+    Get {
+        /// API path (e.g. /meshes or /zones).
+        path: String,
+        /// Run-directory resolution.
+        #[command(flatten)]
+        run_dir: RunDirArgs,
+    },
+    /// Send a POST request with a JSON body.
+    Post {
+        /// API path (e.g. /tokens/dataplane).
+        path: String,
+        /// JSON request body.
+        #[arg(long)]
+        body: String,
+        /// Run-directory resolution.
+        #[command(flatten)]
+        run_dir: RunDirArgs,
+    },
+    /// Send a PUT request with a JSON body.
+    Put {
+        /// API path (e.g. /meshes/default/meshtrafficpermissions/allow-all).
+        path: String,
+        /// JSON request body.
+        #[arg(long)]
+        body: String,
+        /// Run-directory resolution.
+        #[command(flatten)]
+        run_dir: RunDirArgs,
+    },
+    /// Send a DELETE request.
+    Delete {
+        /// API path (e.g. /meshes/default/meshtrafficpermissions/allow-all).
+        path: String,
+        /// Run-directory resolution.
+        #[command(flatten)]
+        run_dir: RunDirArgs,
+    },
+}
+
+/// Arguments for `harness api`.
+#[derive(Debug, Clone, Args)]
+pub struct ApiArgs {
+    /// HTTP method and path.
+    #[command(subcommand)]
+    pub method: ApiMethod,
+}
 
 /// Call the Kuma control plane REST API directly.
 ///

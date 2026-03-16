@@ -69,7 +69,7 @@ pub fn resolve_phase_context(
         || {
             runner_state.map_or_else(
                 || RunnerPhase::Bootstrap.to_string(),
-                |state| state.phase.to_string(),
+                |state| state.phase().to_string(),
             )
         },
         str::to_string,
@@ -162,7 +162,7 @@ pub fn append_runner_state_audit(
     state: &RunnerWorkflowState,
 ) -> Result<(), CliError> {
     let serialized = serialize_json(state, "runner state")?;
-    let phase_name = state.phase.to_string();
+    let phase_name = state.phase().to_string();
     let run_status = load_run_status(run_dir)?;
     let phase_context =
         resolve_phase_context(Some(state), run_status.as_ref(), Some(&phase_name), None);
@@ -239,7 +239,7 @@ pub fn normalize_tool_output(tool_name: &str, tool_response: &Value) -> String {
 
 #[must_use]
 fn hook_group_id(ctx: &HookContext) -> Option<String> {
-    if ctx.runner_state.as_ref().map(|state| state.phase) != Some(RunnerPhase::Execution) {
+    if ctx.runner_state.as_ref().map(RunnerWorkflowState::phase) != Some(RunnerPhase::Execution) {
         return None;
     }
 

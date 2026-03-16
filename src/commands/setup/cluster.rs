@@ -5,7 +5,8 @@ use std::io;
 use std::path::Path;
 use std::time::Duration;
 
-use crate::cli::ClusterArgs;
+use clap::Args;
+
 use crate::cluster::{ClusterSpec, HelmSetting, Platform};
 use crate::commands::resolve_repo_root;
 use crate::compose;
@@ -17,6 +18,49 @@ use crate::exec::{
     docker_network_create, docker_network_rm, docker_rm, docker_rm_by_label, docker_run_detached,
     extract_admin_token, kubectl, run_command, run_command_streaming, wait_for_http,
 };
+
+/// Arguments for `harness cluster`.
+#[derive(Debug, Clone, Args)]
+pub struct ClusterArgs {
+    /// Cluster lifecycle mode.
+    #[arg(value_parser = [
+        "single-up", "single-down",
+        "global-zone-up", "global-zone-down",
+        "global-two-zones-up", "global-two-zones-down",
+    ])]
+    pub mode: String,
+    /// Primary cluster name.
+    pub cluster_name: String,
+    /// Additional cluster or zone names required by the mode.
+    pub extra_cluster_names: Vec<String>,
+    /// Deployment platform: kubernetes or universal.
+    #[arg(long, default_value = "kubernetes")]
+    pub platform: String,
+    /// Repo root to run local Kuma build and deploy targets.
+    #[arg(long)]
+    pub repo_root: Option<String>,
+    /// Run directory to update deployment state for.
+    #[arg(long)]
+    pub run_dir: Option<String>,
+    /// Extra Helm setting for Kuma deployment; repeat as needed.
+    #[arg(long)]
+    pub helm_setting: Vec<String>,
+    /// Namespace whose workloads to restart after deployment; repeat as needed.
+    #[arg(long)]
+    pub restart_namespace: Vec<String>,
+    /// Store backend for universal mode: memory or postgres.
+    #[arg(long, default_value = "memory")]
+    pub store: String,
+    /// CP container image override for universal mode.
+    #[arg(long)]
+    pub image: Option<String>,
+    /// Skip building images (replaces `HARNESS_BUILD_IMAGES=0`).
+    #[arg(long, default_value_t = false)]
+    pub no_build: bool,
+    /// Skip loading images into k3d clusters (replaces `HARNESS_LOAD_IMAGES=0`).
+    #[arg(long, default_value_t = false)]
+    pub no_load: bool,
+}
 
 fn make_target(root: &Path, target: &str, env: &HashMap<String, String>) -> Result<(), CliError> {
     run_command(&["make", target], Some(root), Some(env), &[0])?;

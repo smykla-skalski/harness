@@ -5,8 +5,9 @@
 use std::fs;
 use std::path::Path;
 
-use harness::cli::{Command, ReportCommand, RunDirArgs};
-use harness::commands::Execute;
+use harness::cli::Command;
+use harness::commands::RunDirArgs;
+use harness::commands::run::{ReportArgs, ReportCommand};
 use harness::context::RunContext;
 use harness::schema::{RunReport, RunReportFrontmatter, Verdict};
 
@@ -125,7 +126,7 @@ fn run_group_updates_status_and_report() {
             run_root: None,
         },
     };
-    let exit_code = Command::Report { cmd }.execute().unwrap();
+    let exit_code = Command::Report(ReportArgs { cmd }).execute().unwrap();
     assert_eq!(exit_code, 0);
 
     let ctx = RunContext::from_run_dir(&run_dir).unwrap();
@@ -171,10 +172,12 @@ fn run_group_idempotent_same_status() {
             run_root: None,
         },
     };
-    Command::Report { cmd: cmd.clone() }.execute().unwrap();
+    Command::Report(ReportArgs { cmd: cmd.clone() })
+        .execute()
+        .unwrap();
 
     // Reporting the same group with the same status should silently succeed.
-    let exit_code = Command::Report { cmd }.execute().unwrap();
+    let exit_code = Command::Report(ReportArgs { cmd }).execute().unwrap();
     assert_eq!(exit_code, 0);
 
     // Counts should not be doubled.
@@ -203,7 +206,9 @@ fn run_group_idempotent_different_status() {
             run_root: None,
         },
     };
-    Command::Report { cmd: first }.execute().unwrap();
+    Command::Report(ReportArgs { cmd: first })
+        .execute()
+        .unwrap();
 
     let second = ReportCommand::Group {
         group_id: "g01".to_string(),
@@ -218,7 +223,9 @@ fn run_group_idempotent_different_status() {
             run_root: None,
         },
     };
-    let exit_code = Command::Report { cmd: second }.execute().unwrap();
+    let exit_code = Command::Report(ReportArgs { cmd: second })
+        .execute()
+        .unwrap();
     assert_eq!(exit_code, 0);
 
     // Old fail count should be decremented, new pass count incremented.
