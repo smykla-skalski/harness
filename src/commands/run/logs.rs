@@ -54,12 +54,20 @@ pub fn logs(
     }
     args.push(&container);
 
-    let result = exec::docker(&args, &[0])?;
-    print!("{}", result.stdout);
-    if !result.stderr.is_empty() {
-        eprint!("{}", result.stderr);
+    if follow {
+        // Stream directly to terminal so the user sees output in real time.
+        let mut docker_args: Vec<&str> = vec!["docker"];
+        docker_args.extend_from_slice(&args);
+        exec::run_command_inherited(&docker_args, &[0])?;
+        Ok(0)
+    } else {
+        let result = exec::docker(&args, &[0])?;
+        print!("{}", result.stdout);
+        if !result.stderr.is_empty() {
+            eprint!("{}", result.stderr);
+        }
+        Ok(0)
     }
-    Ok(0)
 }
 
 #[cfg(test)]
