@@ -4,8 +4,9 @@ use crate::errors::{CliError, HookMessage};
 use crate::hook::HookResult;
 use crate::hook_payloads::HookContext;
 use crate::rules::suite_runner::{
-    AdminEndpointHint, ClusterBinary, LegacyScript, MakeTargetPrefix, RunFile, RunnerBinary,
-    TaskOutputPattern,
+    AdminEndpointHint, ClusterBinary, ControlFileMutationBinary, ControlFileReadBinary,
+    LegacyScript, MakeTargetPrefix, PythonBinary, RunFile, RunnerBinary, ScriptInterpreter,
+    SuiteMutationBinary, TaskOutputPattern, TrackedHarnessSubcommand,
 };
 use crate::shell_parse::{
     command_heads, is_env_assignment, is_shell_chain_op, is_shell_control_op, is_shell_flow_word,
@@ -18,49 +19,6 @@ fn is_run_scope_flag(s: &str) -> bool {
         || s.starts_with("--run-dir=")
         || s.starts_with("--run-id=")
         || s.starts_with("--run-root=")
-}
-
-fn is_control_file_mutation_bin(s: &str) -> bool {
-    matches!(s, "cp" | "install" | "mv" | "tee")
-}
-
-fn is_control_file_read_bin(s: &str) -> bool {
-    matches!(s, "cat" | "head" | "tail" | "less" | "more")
-}
-
-fn is_suite_mutation_bin(s: &str) -> bool {
-    matches!(
-        s,
-        "cp" | "install" | "ln" | "mkdir" | "mv" | "rm" | "rmdir" | "touch"
-    )
-}
-
-fn is_tracked_harness_subcommand(s: &str) -> bool {
-    matches!(
-        s,
-        "api"
-            | "apply"
-            | "bootstrap"
-            | "capture"
-            | "closeout"
-            | "cluster"
-            | "diff"
-            | "envoy"
-            | "gateway"
-            | "init"
-            | "init-run"
-            | "kumactl"
-            | "preflight"
-            | "record"
-            | "report"
-            | "run"
-            | "runner-state"
-            | "service"
-            | "session-start"
-            | "session-stop"
-            | "token"
-            | "validate"
-    )
 }
 
 /// Execute the guard-bash hook.
@@ -112,7 +70,7 @@ fn deny_author_suite_storage_mutation(words: &[String]) -> HookResult {
     let heads = command_heads(words);
     if !heads
         .iter()
-        .any(|h| is_suite_mutation_bin(&normalized_binary_name(h)))
+        .any(|h| SuiteMutationBinary::is_mutation_binary(&normalized_binary_name(h)))
     {
         return HookResult::allow();
     }
@@ -353,7 +311,7 @@ fn tracked_harness_subcommands(words: &[String]) -> Vec<String> {
             continue;
         }
         let sub = &sig[i + 1];
-        if !sub.starts_with('-') && is_tracked_harness_subcommand(sub) {
+        if !sub.starts_with('-') && TrackedHarnessSubcommand::is_tracked(sub) {
             subs.push(sub.clone());
         }
     }
@@ -369,7 +327,7 @@ fn deny_harness_managed_run_control_mutation(ctx: &HookContext, words: &[String]
         .into_iter()
         .map(|h| normalized_binary_name(&h))
         .collect();
-    if heads.iter().any(|h| is_raw_control_file_interpreter(h)) {
+    if heads.iter().any(|h| ScriptInterpreter::is_interpreter(h)) {
         return deny_runner_flow(&format!(
             "do not use raw interpreters for run control files; {}",
             RunFile::CONTROL_HINT
@@ -393,13 +351,19 @@ fn deny_harness_managed_run_control_mutation(ctx: &HookContext, words: &[String]
             }
         }
     }
-    if heads.iter().any(|h| is_control_file_mutation_bin(h)) {
+    if heads
+        .iter()
+        .any(|h| ControlFileMutationBinary::is_mutation_binary(h))
+    {
         return deny_runner_flow(&format!(
             "do not mutate harness-managed run control files directly; {}",
             RunFile::CONTROL_HINT
         ));
     }
-    if heads.iter().any(|h| is_control_file_read_bin(h)) {
+    if heads
+        .iter()
+        .any(|h| ControlFileReadBinary::is_read_binary(h))
+    {
         return deny_runner_flow(&format!(
             "do not inspect harness-managed run control files directly; {}",
             RunFile::CONTROL_HINT
@@ -418,16 +382,6 @@ fn run_control_files_mentioned(words: &[String], command_text: Option<&str>) -> 
             words.iter().any(|w| w.contains(name.as_str())) || cmd_text.contains(name.as_str())
         })
         .collect()
-}
-
-fn is_raw_control_file_interpreter(binary: &str) -> bool {
-    if matches!(binary, "bash" | "sh" | "zsh") {
-        return true;
-    }
-    binary.starts_with("node")
-        || binary.starts_with("perl")
-        || binary.starts_with("python")
-        || binary.starts_with("ruby")
 }
 
 fn deny_direct_command_log_access(ctx: &HookContext, words: &[String]) -> HookResult {
@@ -473,7 +427,7 @@ fn deny_suite_storage_mutation(words: &[String]) -> HookResult {
     let heads = command_heads(words);
     if !heads
         .iter()
-        .any(|h| is_suite_mutation_bin(&normalized_binary_name(h)))
+        .any(|h| SuiteMutationBinary::is_mutation_binary(&normalized_binary_name(h)))
     {
         return HookResult::allow();
     }
@@ -594,7 +548,7 @@ fn is_tracked_harness_command(words: &[String]) -> bool {
     let sig = significant_words(words);
     sig.len() >= 2
         && normalized_binary_name(&sig[0]) == "harness"
-        && is_tracked_harness_subcommand(&sig[1])
+        && TrackedHarnessSubcommand::is_tracked(&sig[1])
 }
 
 fn has_denied_cluster_binary(heads: &[String]) -> bool {
@@ -623,14 +577,10 @@ fn has_admin_endpoint_hint(words: &[String]) -> bool {
     words.iter().any(|w| AdminEndpointHint::contains_hint(w))
 }
 
-fn is_python_binary(name: &str) -> bool {
-    matches!(name, "python" | "python3")
-}
-
 fn has_python_inline(words: &[String]) -> bool {
     for (i, word) in words.iter().enumerate() {
         let name = normalized_binary_name(word);
-        if !is_python_binary(&name) {
+        if !PythonBinary::is_python(&name) {
             continue;
         }
         if i + 1 < words.len() && matches!(words[i + 1].as_str(), "-c" | "-") {
@@ -974,12 +924,12 @@ mod tests {
 
     #[test]
     fn is_tracked_harness_subcommand_includes_token() {
-        assert!(is_tracked_harness_subcommand("token"));
+        assert!(TrackedHarnessSubcommand::is_tracked("token"));
     }
 
     #[test]
     fn is_tracked_harness_subcommand_includes_service() {
-        assert!(is_tracked_harness_subcommand("service"));
+        assert!(TrackedHarnessSubcommand::is_tracked("service"));
     }
 
     #[test]

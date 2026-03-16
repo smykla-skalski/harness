@@ -9,6 +9,7 @@ use serde_json::Value;
 use crate::context::RunContext;
 use crate::errors::{CliError, CliErrorKind, cow};
 use crate::rules;
+use crate::shell_parse;
 use crate::workflow::author::{self as author_workflow, AuthorWorkflowState};
 use crate::workflow::runner::{self as runner_workflow, RunnerWorkflowState};
 
@@ -372,6 +373,22 @@ impl HookContext {
     #[must_use]
     pub fn is_suite_author(&self) -> bool {
         self.skill == rules::SKILL_NEW
+    }
+
+    /// Shell-split significant words (no control operators or env assignments).
+    ///
+    /// # Errors
+    /// Returns `CliError` if shell tokenization fails.
+    pub fn significant_words(&self) -> Result<Vec<String>, CliError> {
+        Ok(shell_parse::significant_words(&self.command_words()?))
+    }
+
+    /// Binary heads from each pipeline segment of the command.
+    ///
+    /// # Errors
+    /// Returns `CliError` if shell tokenization fails.
+    pub fn command_heads(&self) -> Result<Vec<String>, CliError> {
+        Ok(shell_parse::command_heads(&self.command_words()?))
     }
 }
 
