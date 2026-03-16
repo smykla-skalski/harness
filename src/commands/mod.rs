@@ -33,109 +33,145 @@ pub trait Execute {
 }
 
 impl Execute for Command {
-    #[allow(clippy::too_many_lines)]
     fn execute(self) -> Result<i32, CliError> {
         match self {
-            // Hooks are handled before reaching Execute.
             Command::Hook { .. } => unreachable!("hooks are handled separately"),
-
-            // --- setup ---
-            Command::Init(args) => run::init_run(
-                &args.suite,
-                &args.run_id,
-                &args.profile,
-                args.repo_root.as_deref(),
-                args.run_root.as_deref(),
-            ),
-            Command::Bootstrap { project_dir } => setup::bootstrap(project_dir.as_deref()),
-            Command::Cluster(ref args) => setup::cluster(args),
-            Command::Preflight {
-                kubeconfig,
-                repo_root,
-                run_dir,
-            } => run::preflight(kubeconfig.as_deref(), repo_root.as_deref(), &run_dir),
-            Command::Gateway {
-                kubeconfig,
-                repo_root,
-                check_only,
-            } => setup::gateway(kubeconfig.as_deref(), repo_root.as_deref(), check_only),
-            Command::SessionStart { project_dir } => setup::session_start(project_dir.as_deref()),
-            Command::SessionStop { project_dir } => setup::session_stop(project_dir.as_deref()),
-            Command::PreCompact { project_dir } => setup::pre_compact(project_dir.as_deref()),
-
-            // --- run ---
-            Command::Capture {
-                kubeconfig,
-                label,
-                run_dir,
-            } => run::capture(kubeconfig.as_deref(), &label, &run_dir),
-            Command::Record(args) => run::record(
-                args.repo_root.as_deref(),
-                args.phase.as_deref(),
-                args.label.as_deref(),
-                args.cluster.as_deref(),
-                &args.command,
-                &args.run_dir,
-            ),
-            Command::Apply(args) => run::apply(
-                args.kubeconfig.as_deref(),
-                args.cluster.as_deref(),
-                &args.manifest,
-                args.step.as_deref(),
-                &args.run_dir,
-            ),
-            Command::Validate {
-                kubeconfig,
-                manifest,
-                output,
-            } => run::validate(kubeconfig.as_deref(), &manifest, output.as_deref()),
-            Command::RunnerState(args) => run::runner_state(
-                args.event.as_deref(),
-                args.suite_target.as_deref(),
-                args.message.as_deref(),
-                &args.run_dir,
-            ),
-            Command::Closeout { run_dir } => run::closeout(&run_dir),
-            Command::Report { cmd } => run::report(&cmd),
-            Command::Diff { left, right, path } => run::diff(&left, &right, path.as_deref()),
-            Command::Envoy { cmd } => run::envoy(&cmd),
-            Command::Kumactl { cmd } => run::kumactl(&cmd),
-
-            // --- authoring ---
-            Command::AuthoringBegin(args) => authoring::begin(
-                &args.repo_root,
-                &args.feature,
-                &args.mode,
-                &args.suite_dir,
-                &args.suite_name,
-            ),
-            Command::AuthoringSave {
-                kind,
-                payload,
-                input,
-            } => authoring::save(&kind, payload.as_deref(), input.as_deref()),
-            Command::AuthoringShow { kind } => authoring::show(&kind),
-            Command::AuthoringReset { skill: _ } => authoring::reset(),
-            Command::AuthoringValidate { path, repo_root } => {
-                authoring::validate(&path, repo_root.as_deref())
-            }
-            Command::ApprovalBegin {
-                skill: _,
-                mode,
-                suite_dir,
-            } => authoring::approval_begin(&mode, suite_dir.as_deref()),
-
-            // --- universal ---
-            Command::Token(args) => run::token(
-                &args.kind,
-                &args.name,
-                &args.mesh,
-                args.cp_addr.as_deref(),
-                &args.valid_for,
-                &args.run_dir,
-            ),
-            Command::Service(args) => run::service(&args),
+            Command::Init(..)
+            | Command::Bootstrap { .. }
+            | Command::Cluster(..)
+            | Command::Gateway { .. }
+            | Command::SessionStart { .. }
+            | Command::SessionStop { .. }
+            | Command::PreCompact { .. }
+            | Command::Capabilities => dispatch_setup(self),
+            Command::Capture { .. }
+            | Command::Record(..)
+            | Command::Apply(..)
+            | Command::Validate { .. }
+            | Command::Preflight { .. }
+            | Command::RunnerState(..)
+            | Command::Closeout { .. }
+            | Command::Report { .. }
+            | Command::Diff { .. }
+            | Command::Envoy { .. }
+            | Command::Kumactl { .. }
+            | Command::Token(..)
+            | Command::Service(..) => dispatch_run(self),
+            Command::AuthoringBegin(..)
+            | Command::AuthoringSave { .. }
+            | Command::AuthoringShow { .. }
+            | Command::AuthoringReset { .. }
+            | Command::AuthoringValidate { .. }
+            | Command::ApprovalBegin { .. } => dispatch_authoring(self),
         }
+    }
+}
+
+fn dispatch_setup(cmd: Command) -> Result<i32, CliError> {
+    match cmd {
+        Command::Init(args) => run::init_run(
+            &args.suite,
+            &args.run_id,
+            &args.profile,
+            args.repo_root.as_deref(),
+            args.run_root.as_deref(),
+        ),
+        Command::Bootstrap { project_dir } => setup::bootstrap(project_dir.as_deref()),
+        Command::Cluster(ref args) => setup::cluster(args),
+        Command::Gateway {
+            kubeconfig,
+            repo_root,
+            check_only,
+        } => setup::gateway(kubeconfig.as_deref(), repo_root.as_deref(), check_only),
+        Command::SessionStart { project_dir } => setup::session_start(project_dir.as_deref()),
+        Command::SessionStop { project_dir } => setup::session_stop(project_dir.as_deref()),
+        Command::PreCompact { project_dir } => setup::pre_compact(project_dir.as_deref()),
+        Command::Capabilities => setup::capabilities(),
+        _ => unreachable!(),
+    }
+}
+
+fn dispatch_run(cmd: Command) -> Result<i32, CliError> {
+    match cmd {
+        Command::Capture {
+            kubeconfig,
+            label,
+            run_dir,
+        } => run::capture(kubeconfig.as_deref(), &label, &run_dir),
+        Command::Record(args) => run::record(
+            args.repo_root.as_deref(),
+            args.phase.as_deref(),
+            args.label.as_deref(),
+            args.cluster.as_deref(),
+            &args.command,
+            &args.run_dir,
+        ),
+        Command::Apply(args) => run::apply(
+            args.kubeconfig.as_deref(),
+            args.cluster.as_deref(),
+            &args.manifest,
+            args.step.as_deref(),
+            &args.run_dir,
+        ),
+        Command::Validate {
+            kubeconfig,
+            manifest,
+            output,
+        } => run::validate(kubeconfig.as_deref(), &manifest, output.as_deref()),
+        Command::Preflight {
+            kubeconfig,
+            repo_root,
+            run_dir,
+        } => run::preflight(kubeconfig.as_deref(), repo_root.as_deref(), &run_dir),
+        Command::RunnerState(args) => run::runner_state(
+            args.event.as_deref(),
+            args.suite_target.as_deref(),
+            args.message.as_deref(),
+            &args.run_dir,
+        ),
+        Command::Closeout { run_dir } => run::closeout(&run_dir),
+        Command::Report { cmd } => run::report(&cmd),
+        Command::Diff { left, right, path } => run::diff(&left, &right, path.as_deref()),
+        Command::Envoy { cmd } => run::envoy(&cmd),
+        Command::Kumactl { cmd } => run::kumactl(&cmd),
+        Command::Token(args) => run::token(
+            &args.kind,
+            &args.name,
+            &args.mesh,
+            args.cp_addr.as_deref(),
+            &args.valid_for,
+            &args.run_dir,
+        ),
+        Command::Service(args) => run::service(&args),
+        _ => unreachable!(),
+    }
+}
+
+fn dispatch_authoring(cmd: Command) -> Result<i32, CliError> {
+    match cmd {
+        Command::AuthoringBegin(args) => authoring::begin(
+            &args.repo_root,
+            &args.feature,
+            &args.mode,
+            &args.suite_dir,
+            &args.suite_name,
+        ),
+        Command::AuthoringSave {
+            kind,
+            payload,
+            input,
+        } => authoring::save(&kind, payload.as_deref(), input.as_deref()),
+        Command::AuthoringShow { kind } => authoring::show(&kind),
+        Command::AuthoringReset { skill: _ } => authoring::reset(),
+        Command::AuthoringValidate { path, repo_root } => {
+            authoring::validate(&path, repo_root.as_deref())
+        }
+        Command::ApprovalBegin {
+            skill: _,
+            mode,
+            suite_dir,
+        } => authoring::approval_begin(&mode, suite_dir.as_deref()),
+        _ => unreachable!(),
     }
 }
 
