@@ -12,7 +12,7 @@ use regex::Regex;
 use serde_json::Value;
 
 use super::tool_result_text;
-use super::types::{Issue, ScanState};
+use super::types::{Issue, MessageRole, ScanState, SourceTool};
 
 pub use tool_checks::check_tool_use_for_issues;
 
@@ -71,12 +71,10 @@ fn is_skill_injection(text: &str) -> bool {
 }
 
 /// Figure out which tool produced a `tool_result` block.
-fn resolve_source_tool(block: &Value, state: &ScanState) -> Option<String> {
+fn resolve_source_tool(block: &Value, state: &ScanState) -> Option<SourceTool> {
     let tool_id = block["tool_use_id"].as_str()?;
-    state
-        .last_tool_uses
-        .get(tool_id)
-        .map(|record| record.name.clone())
+    let record = state.last_tool_uses.get(tool_id)?;
+    SourceTool::from_label(&record.name)
 }
 
 /// Return true if this issue is a duplicate that should be skipped.
@@ -97,16 +95,16 @@ fn dedup_issue(issue: &Issue, state: &mut ScanState) -> bool {
 
 /// Classify text content for issues.
 ///
-/// `source_tool` is the tool that produced this text (e.g. "Bash", "Read") -
-/// `None` for assistant/human text blocks.
+/// `source_tool` is the tool that produced this text - `None` for
+/// assistant/human text blocks.
 #[must_use]
 pub fn check_text_for_issues(
     line_num: usize,
-    role: &str,
+    role: MessageRole,
     text: &str,
-    source_tool: Option<&str>,
+    source_tool: Option<SourceTool>,
 ) -> Vec<Issue> {
-    if source_tool == Some("Read") || is_file_content(text) {
+    if source_tool == Some(SourceTool::Read) || is_file_content(text) {
         return Vec::new();
     }
     if is_help_output(text) || is_compaction_summary(text) || is_skill_injection(text) {
@@ -160,7 +158,11 @@ pub fn classify_line(line_num: usize, raw: &str, state: &mut ScanState) -> Vec<I
         return Vec::new();
     }
 
-    let role = message["role"].as_str().unwrap_or("");
+    let role_str = message["role"].as_str().unwrap_or("");
+    let Some(role) = MessageRole::from_label(role_str) else {
+        return Vec::new();
+    };
+
     let content = &message["content"];
     let mut issues = Vec::new();
 
@@ -179,7 +181,7 @@ pub fn classify_line(line_num: usize, raw: &str, state: &mut ScanState) -> Vec<I
 /// Process content blocks from a message.
 fn classify_content_blocks(
     line_num: usize,
-    role: &str,
+    role: MessageRole,
     blocks: &[Value],
     state: &mut ScanState,
     issues: &mut Vec<Issue>,
@@ -200,12 +202,7 @@ fn classify_content_blocks(
                 let text = tool_result_text(block);
                 if text.len() > MIN_TEXT_LENGTH {
                     let source = resolve_source_tool(block, state);
-                    issues.extend(check_text_for_issues(
-                        line_num,
-                        role,
-                        &text,
-                        source.as_deref(),
-                    ));
+                    issues.extend(check_text_for_issues(line_num, role, &text, source));
                 }
             }
             _ => {}

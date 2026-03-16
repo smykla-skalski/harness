@@ -1,5 +1,5 @@
 use super::*;
-use crate::commands::observe::types::{IssueCategory, IssueSeverity, ScanState};
+use crate::commands::observe::types::{IssueCategory, MessageRole, ScanState, SourceTool};
 
 fn make_state() -> ScanState {
     ScanState::default()
@@ -9,7 +9,7 @@ fn make_state() -> ScanState {
 fn detects_hook_denial() {
     let issues = check_text_for_issues(
         10,
-        "user",
+        MessageRole::User,
         "The system denied this tool call because it violates policy",
         None,
     );
@@ -21,9 +21,9 @@ fn detects_hook_denial() {
 fn detects_ksa_code_in_bash() {
     let issues = check_text_for_issues(
         20,
-        "user",
+        MessageRole::User,
         "ERROR [KSA001] Write path is outside the suite:new surface",
-        Some("Bash"),
+        Some(SourceTool::Bash),
     );
     assert!(
         issues
@@ -34,7 +34,12 @@ fn detects_ksa_code_in_bash() {
 
 #[test]
 fn skips_ksa_code_not_bash() {
-    let issues = check_text_for_issues(20, "user", "ERROR [KSA001] Write path is outside", None);
+    let issues = check_text_for_issues(
+        20,
+        MessageRole::User,
+        "ERROR [KSA001] Write path is outside",
+        None,
+    );
     assert!(!issues.iter().any(|i| i.summary.contains("KSA001")));
 }
 
@@ -42,9 +47,9 @@ fn skips_ksa_code_not_bash() {
 fn detects_cli_error() {
     let issues = check_text_for_issues(
         30,
-        "user",
+        MessageRole::User,
         "harness: error: unrecognized arguments --bad-flag",
-        Some("Bash"),
+        Some(SourceTool::Bash),
     );
     assert!(issues.iter().any(|i| i.category == IssueCategory::CliError));
 }
@@ -53,7 +58,7 @@ fn detects_cli_error() {
 fn detects_tool_error() {
     let issues = check_text_for_issues(
         40,
-        "user",
+        MessageRole::User,
         "Error: file has not been read yet. Read the file first.",
         None,
     );
@@ -68,9 +73,9 @@ fn detects_tool_error() {
 fn detects_build_error() {
     let issues = check_text_for_issues(
         50,
-        "user",
+        MessageRole::User,
         "error[E0308]: mismatched types\n  expected u32, found &str",
-        Some("Bash"),
+        Some(SourceTool::Bash),
     );
     assert!(
         issues
@@ -81,7 +86,12 @@ fn detects_build_error() {
 
 #[test]
 fn detects_user_frustration() {
-    let issues = check_text_for_issues(60, "user", "stop guessing and read it again!", None);
+    let issues = check_text_for_issues(
+        60,
+        MessageRole::User,
+        "stop guessing and read it again!",
+        None,
+    );
     assert!(
         issues
             .iter()
@@ -93,7 +103,7 @@ fn detects_user_frustration() {
 fn skips_file_content() {
     let text =
         "     1\u{2192}fn main() {\n     2\u{2192}    println!(\"error[E0308]\");\n     3\u{2192}}";
-    let issues = check_text_for_issues(70, "user", text, None);
+    let issues = check_text_for_issues(70, MessageRole::User, text, None);
     assert!(issues.is_empty());
 }
 
@@ -101,9 +111,9 @@ fn skips_file_content() {
 fn skips_help_output() {
     let issues = check_text_for_issues(
         80,
-        "user",
+        MessageRole::User,
         "Kuma test harness\n\nUsage: harness [COMMAND]",
-        Some("Bash"),
+        Some(SourceTool::Bash),
     );
     assert!(issues.is_empty());
 }
@@ -112,7 +122,7 @@ fn skips_help_output() {
 fn skips_compaction_summary() {
     let issues = check_text_for_issues(
         90,
-        "user",
+        MessageRole::User,
         "This session is being continued from a previous conversation. Here is context.",
         None,
     );
@@ -123,9 +133,9 @@ fn skips_compaction_summary() {
 fn detects_auth_flow() {
     let issues = check_text_for_issues(
         100,
-        "user",
+        MessageRole::User,
         "Opening browser for authentication to your cluster",
-        Some("Bash"),
+        Some(SourceTool::Bash),
     );
     assert!(
         issues
@@ -281,13 +291,11 @@ fn classify_line_string_content() {
 
 #[test]
 fn build_error_skipped_when_cli_error_matched() {
-    // Text that matches both CLI error and build error patterns.
-    // Build error should be suppressed because CLI error comes first.
     let issues = check_text_for_issues(
         10,
-        "user",
+        MessageRole::User,
         "harness: error: unresolved import cannot find value",
-        Some("Bash"),
+        Some(SourceTool::Bash),
     );
     assert!(issues.iter().any(|i| i.category == IssueCategory::CliError));
     assert!(
@@ -299,9 +307,12 @@ fn build_error_skipped_when_cli_error_matched() {
 
 #[test]
 fn env_misconfiguration_uses_pattern_array() {
-    // Verify that env misconfiguration check responds to signals from
-    // the patterns::ENV_MISCONFIGURATION_SIGNALS array.
-    let issues = check_text_for_issues(10, "user", "CLAUDE_SESSION_ID=unset", Some("Bash"));
+    let issues = check_text_for_issues(
+        10,
+        MessageRole::User,
+        "CLAUDE_SESSION_ID=unset",
+        Some(SourceTool::Bash),
+    );
     assert!(
         issues
             .iter()
@@ -313,9 +324,8 @@ fn env_misconfiguration_uses_pattern_array() {
 fn details_truncated_at_construction() {
     let long_text = "x".repeat(5000);
     let input = format!("harness: error: {long_text}");
-    let issues = check_text_for_issues(10, "user", &input, Some("Bash"));
+    let issues = check_text_for_issues(10, MessageRole::User, &input, Some(SourceTool::Bash));
     assert!(!issues.is_empty());
-    // Details should be capped by truncate_details (2000 chars).
     assert!(issues[0].details.len() <= 2001);
 }
 
