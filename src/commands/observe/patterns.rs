@@ -158,6 +158,18 @@ pub(super) static ENV_MISCONFIGURATION_SIGNALS: &[&str] = &[
     "kubeconfig=\n",
 ];
 
+/// Signals that writer agents produced incomplete output.
+pub(super) static INCOMPLETE_WRITER_SIGNALS: &[&str] = &[
+    "group files are missing",
+    "missing entirely",
+    "let me write the remaining",
+    "writers failed",
+    "writer failed",
+    "write them in batches",
+    "write everything directly",
+    "write the remaining group",
+];
+
 /// Signals that kubeconfig points to a corporate/remote cluster.
 pub(super) static CORPORATE_CLUSTER_SIGNALS: &[&str] = &[
     "teleport.sh",

@@ -50,10 +50,10 @@ pub fn record(
     cmd.args(&command[1..]);
     if let Some(ref rd) = run_dir {
         let ctx = RunContext::from_run_dir(rd).ok();
-        if let Some(ref c) = ctx {
-            if let Ok(kc) = resolve_kubeconfig(c, None, cluster) {
-                cmd.env("KUBECONFIG", kc);
-            }
+        if let Some(ref c) = ctx
+            && let Ok(kc) = resolve_kubeconfig(c, None, cluster)
+        {
+            cmd.env("KUBECONFIG", kc);
         }
     }
     let output = cmd.output();
