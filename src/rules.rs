@@ -527,31 +527,28 @@ pub mod suite_runner {
             Self::Routes,
         ];
 
-        /// Returns `true` when `word` contains any admin endpoint hint.
+        /// The string representation of this hint.
         #[must_use]
-        pub fn contains_hint(word: &str) -> bool {
-            Self::ALL.iter().any(|h| {
-                let hint = match h {
-                    Self::LocalhostEnvoy => "localhost:9901",
-                    Self::ConfigDump => "/config_dump",
-                    Self::Clusters => "/clusters",
-                    Self::Listeners => "/listeners",
-                    Self::Routes => "/routes",
-                };
-                word.contains(hint)
-            })
-        }
-    }
-
-    impl fmt::Display for AdminEndpointHint {
-        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-            f.write_str(match self {
+        pub const fn as_str(&self) -> &'static str {
+            match self {
                 Self::LocalhostEnvoy => "localhost:9901",
                 Self::ConfigDump => "/config_dump",
                 Self::Clusters => "/clusters",
                 Self::Listeners => "/listeners",
                 Self::Routes => "/routes",
-            })
+            }
+        }
+
+        /// Returns `true` when `word` contains any admin endpoint hint.
+        #[must_use]
+        pub fn contains_hint(word: &str) -> bool {
+            Self::ALL.iter().any(|h| word.contains(h.as_str()))
+        }
+    }
+
+    impl fmt::Display for AdminEndpointHint {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            f.write_str(self.as_str())
         }
     }
 
@@ -559,14 +556,11 @@ pub mod suite_runner {
         type Err = ();
 
         fn from_str(s: &str) -> Result<Self, Self::Err> {
-            match s {
-                "localhost:9901" => Ok(Self::LocalhostEnvoy),
-                "/config_dump" => Ok(Self::ConfigDump),
-                "/clusters" => Ok(Self::Clusters),
-                "/listeners" => Ok(Self::Listeners),
-                "/routes" => Ok(Self::Routes),
-                _ => Err(()),
-            }
+            Self::ALL
+                .iter()
+                .find(|h| h.as_str() == s)
+                .copied()
+                .ok_or(())
         }
     }
 }
