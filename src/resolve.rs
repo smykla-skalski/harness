@@ -129,7 +129,17 @@ fn normalize_suite_candidate(candidate: &Path) -> PathBuf {
 fn manifest_path_candidates(raw: &str, run_dir: Option<&Path>) -> Result<Vec<PathBuf>, CliError> {
     let raw_path = PathBuf::from(raw);
     if raw_path.is_absolute() {
-        return Ok(vec![raw_path]);
+        if raw_path.exists() {
+            return Ok(vec![raw_path]);
+        }
+        // The absolute path doesn't exist. If stripping the leading slash
+        // yields a plausible relative path, fall through and try it as
+        // relative instead of failing immediately.
+        let stripped = raw.trim_start_matches('/');
+        if stripped.is_empty() {
+            return Ok(vec![raw_path]);
+        }
+        return manifest_path_candidates(stripped, run_dir);
     }
 
     let mut items = vec![env::current_dir()?.join(&raw_path)];
@@ -288,6 +298,19 @@ mod tests {
     fn resolve_manifest_path_not_found_returns_error() {
         let err = resolve_manifest_path("ghost.yaml", None).unwrap_err();
         assert_eq!(err.code(), "KSRCLI014");
+    }
+
+    #[test]
+    fn resolve_manifest_path_leading_slash_treated_as_relative() {
+        let dir = tempfile::tempdir().unwrap();
+        let groups_dir = dir.path().join("manifests").join("prepared").join("groups");
+        let nested = groups_dir.join("g09");
+        fs::create_dir_all(&nested).unwrap();
+        let manifest = nested.join("01.yaml");
+        fs::write(&manifest, "content").unwrap();
+
+        let result = resolve_manifest_path("/g09/01.yaml", Some(dir.path())).unwrap();
+        assert_eq!(result, manifest);
     }
 
     #[test]
