@@ -808,6 +808,35 @@ pub enum Command {
     /// Manage universal mode test service containers.
     Service(ServiceArgs),
 
+    /// Show cluster state as structured JSON.
+    Status {
+        /// Run-directory resolution.
+        #[command(flatten)]
+        run_dir: RunDirArgs,
+    },
+
+    /// Show container logs.
+    Logs {
+        /// Container or member name.
+        name: String,
+        /// Number of log lines to show.
+        #[arg(long, default_value = "100")]
+        tail: u32,
+        /// Follow log output.
+        #[arg(long)]
+        follow: bool,
+        /// Run-directory resolution.
+        #[command(flatten)]
+        run_dir: RunDirArgs,
+    },
+
+    /// Check if cluster containers are still running.
+    ClusterCheck {
+        /// Run-directory resolution.
+        #[command(flatten)]
+        run_dir: RunDirArgs,
+    },
+
     /// Report harness capabilities for skill planning.
     Capabilities,
 }
