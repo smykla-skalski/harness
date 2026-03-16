@@ -55,6 +55,7 @@ impl Execute for Command {
             | Command::Diff { .. }
             | Command::Envoy { .. }
             | Command::Kumactl { .. }
+            | Command::Api { .. }
             | Command::Token(..)
             | Command::Service(..) => dispatch_run(self),
             Command::AuthoringBegin(..)
@@ -134,6 +135,7 @@ fn dispatch_run(cmd: Command) -> Result<i32, CliError> {
         Command::Diff { left, right, path } => run::diff(&left, &right, path.as_deref()),
         Command::Envoy { cmd } => run::envoy(&cmd),
         Command::Kumactl { cmd } => run::kumactl(&cmd),
+        Command::Api { method } => run::api(&method),
         Command::Token(args) => run::token(
             &args.kind,
             &args.name,

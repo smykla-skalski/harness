@@ -52,7 +52,8 @@ fn is_suite_mutation_bin(s: &str) -> bool {
 fn is_tracked_harness_subcommand(s: &str) -> bool {
     matches!(
         s,
-        "apply"
+        "api"
+            | "apply"
             | "bootstrap"
             | "capture"
             | "closeout"

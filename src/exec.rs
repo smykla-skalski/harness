@@ -637,6 +637,54 @@ pub fn cp_api_put_with_token(
     Ok(resp_body)
 }
 
+/// DELETE a resource via the CP API with optional auth token.
+///
+/// # Errors
+/// Returns `CliError` on HTTP failure.
+pub fn cp_api_delete_with_token(
+    base_url: &str,
+    path: &str,
+    token: Option<&str>,
+) -> Result<serde_json::Value, CliError> {
+    let url = format!("{base_url}{path}");
+    let mut req = ureq::delete(&url);
+    if let Some(tok) = token {
+        req = req.header("Authorization", &format!("Bearer {tok}"));
+    }
+    let resp_body: serde_json::Value = req
+        .call()
+        .map_err(|e| CliErrorKind::cp_api_unreachable(url.clone()).with_details(e.to_string()))?
+        .body_mut()
+        .read_json()
+        .map_err(|e| CliErrorKind::cp_api_unreachable(url).with_details(e.to_string()))?;
+    Ok(resp_body)
+}
+
+/// GET a plain text response from the CP API with optional auth token.
+///
+/// Used for endpoints that return non-JSON content.
+///
+/// # Errors
+/// Returns `CliError` on HTTP failure.
+pub fn cp_api_get_text_with_token(
+    base_url: &str,
+    path: &str,
+    token: Option<&str>,
+) -> Result<String, CliError> {
+    let url = format!("{base_url}{path}");
+    let mut req = ureq::get(&url);
+    if let Some(tok) = token {
+        req = req.header("Authorization", &format!("Bearer {tok}"));
+    }
+    let text = req
+        .call()
+        .map_err(|e| CliErrorKind::cp_api_unreachable(url.clone()).with_details(e.to_string()))?
+        .body_mut()
+        .read_to_string()
+        .map_err(|e| CliErrorKind::cp_api_unreachable(url).with_details(e.to_string()))?;
+    Ok(text)
+}
+
 /// Extract the admin user token from a running CP container.
 ///
 /// The CP stores the admin token in the global-secrets endpoint.

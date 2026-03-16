@@ -2,6 +2,7 @@ mod init;
 mod preflight;
 mod shared;
 
+mod api;
 mod apply;
 mod capture;
 mod closeout;
@@ -15,6 +16,7 @@ mod service;
 mod token;
 mod validate;
 
+pub use api::api;
 pub use apply::apply;
 pub use capture::capture;
 pub use closeout::closeout;

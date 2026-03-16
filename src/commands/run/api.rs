@@ -1,0 +1,158 @@
+use crate::cli::{ApiMethod, RunDirArgs};
+use crate::commands::{resolve_admin_token, resolve_cp_addr, resolve_run_context};
+use crate::errors::{CliError, CliErrorKind};
+use crate::exec;
+
+/// Call the Kuma control plane REST API directly.
+///
+/// Resolves the CP address and admin token from the run context, makes the
+/// requested HTTP call, and prints the response body to stdout. JSON responses
+/// are pretty-printed; plain text is printed as-is.
+///
+/// # Errors
+/// Returns `CliError` when the run context cannot be loaded, the request
+/// fails, or the response body cannot be read.
+pub fn api(method: &ApiMethod) -> Result<i32, CliError> {
+    let (run_dir_args, path) = method_run_dir_and_path(method);
+    let ctx = resolve_run_context(run_dir_args)?;
+    let cp_addr = resolve_cp_addr(&ctx)?;
+    let admin_token = resolve_admin_token(&ctx)?;
+    let token = admin_token.as_deref();
+
+    let response_text = match method {
+        ApiMethod::Get { .. } => exec::cp_api_get_text_with_token(&cp_addr, path, token)?,
+        ApiMethod::Post { body, .. } => {
+            let parsed = parse_json_body(body)?;
+            let value = exec::cp_api_post_with_token(&cp_addr, path, &parsed, token)?;
+            serde_json::to_string_pretty(&value).unwrap_or_else(|_| value.to_string())
+        }
+        ApiMethod::Put { body, .. } => {
+            let parsed = parse_json_body(body)?;
+            let value = exec::cp_api_put_with_token(&cp_addr, path, &parsed, token)?;
+            serde_json::to_string_pretty(&value).unwrap_or_else(|_| value.to_string())
+        }
+        ApiMethod::Delete { .. } => {
+            let value = exec::cp_api_delete_with_token(&cp_addr, path, token)?;
+            serde_json::to_string_pretty(&value).unwrap_or_else(|_| value.to_string())
+        }
+    };
+
+    // For GET we got raw text - try to pretty-print as JSON, fall back to raw.
+    let output = if matches!(method, ApiMethod::Get { .. }) {
+        match serde_json::from_str::<serde_json::Value>(&response_text) {
+            Ok(value) => {
+                serde_json::to_string_pretty(&value).unwrap_or_else(|_| response_text.clone())
+            }
+            Err(_) => response_text,
+        }
+    } else {
+        response_text
+    };
+
+    println!("{output}");
+    Ok(0)
+}
+
+/// Extract run-dir arguments and the API path from any method variant.
+fn method_run_dir_and_path(method: &ApiMethod) -> (&RunDirArgs, &str) {
+    match method {
+        ApiMethod::Get { path, run_dir, .. }
+        | ApiMethod::Post { path, run_dir, .. }
+        | ApiMethod::Put { path, run_dir, .. }
+        | ApiMethod::Delete { path, run_dir, .. } => (run_dir, path),
+    }
+}
+
+/// Parse a JSON string into a `serde_json::Value`.
+///
+/// # Errors
+/// Returns `CliError` when the string is not valid JSON.
+fn parse_json_body(raw: &str) -> Result<serde_json::Value, CliError> {
+    serde_json::from_str(raw).map_err(|e| {
+        CliError::from(CliErrorKind::usage_error(format!(
+            "invalid JSON in --body: {e}"
+        )))
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_json_body_valid() {
+        let value = parse_json_body(r#"{"name":"test","mesh":"default"}"#).unwrap();
+        assert_eq!(value["name"], "test");
+        assert_eq!(value["mesh"], "default");
+    }
+
+    #[test]
+    fn parse_json_body_invalid() {
+        let result = parse_json_body("not json");
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(err.message().contains("invalid JSON in --body"));
+    }
+
+    #[test]
+    fn method_run_dir_and_path_get() {
+        let run_dir = RunDirArgs {
+            run_dir: None,
+            run_id: None,
+            run_root: None,
+        };
+        let method = ApiMethod::Get {
+            path: "/zones".to_string(),
+            run_dir,
+        };
+        let (_, path) = method_run_dir_and_path(&method);
+        assert_eq!(path, "/zones");
+    }
+
+    #[test]
+    fn method_run_dir_and_path_post() {
+        let run_dir = RunDirArgs {
+            run_dir: None,
+            run_id: None,
+            run_root: None,
+        };
+        let method = ApiMethod::Post {
+            path: "/tokens/dataplane".to_string(),
+            body: "{}".to_string(),
+            run_dir,
+        };
+        let (_, path) = method_run_dir_and_path(&method);
+        assert_eq!(path, "/tokens/dataplane");
+    }
+
+    #[test]
+    fn method_run_dir_and_path_put() {
+        let run_dir = RunDirArgs {
+            run_dir: None,
+            run_id: None,
+            run_root: None,
+        };
+        let method = ApiMethod::Put {
+            path: "/meshes/default".to_string(),
+            body: "{}".to_string(),
+            run_dir,
+        };
+        let (_, path) = method_run_dir_and_path(&method);
+        assert_eq!(path, "/meshes/default");
+    }
+
+    #[test]
+    fn method_run_dir_and_path_delete() {
+        let run_dir = RunDirArgs {
+            run_dir: None,
+            run_id: None,
+            run_root: None,
+        };
+        let method = ApiMethod::Delete {
+            path: "/meshes/default/meshtrafficpermissions/allow-all".to_string(),
+            run_dir,
+        };
+        let (_, path) = method_run_dir_and_path(&method);
+        assert_eq!(path, "/meshes/default/meshtrafficpermissions/allow-all");
+    }
+}
