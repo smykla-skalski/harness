@@ -5,8 +5,7 @@ use std::path::{Path, PathBuf};
 use clap::Args;
 
 use crate::cluster::Platform;
-use crate::commands::{RunDirArgs, resolve_run_dir};
-use crate::context::RunContext;
+use crate::commands::{RunDirArgs, resolve_run_services};
 use crate::core_defs::{shorten_path, utc_now};
 use crate::errors::{CliError, CliErrorKind, cow};
 use crate::exec;
@@ -47,9 +46,9 @@ pub fn apply(
     step: Option<&str>,
     run_dir_args: &RunDirArgs,
 ) -> Result<i32, CliError> {
-    let run_dir = resolve_run_dir(run_dir_args)?;
-    let ctx = RunContext::from_run_dir(&run_dir)?;
-    let runtime = ctx.cluster_runtime()?;
+    let services = resolve_run_services(run_dir_args)?;
+    let run_dir = services.layout().run_dir();
+    let runtime = services.cluster_runtime()?;
 
     for manifest_raw in manifests {
         let manifest = if manifest_raw == "-" {
@@ -61,18 +60,21 @@ pub fn apply(
 
         match runtime.platform() {
             Platform::Kubernetes => {
-                let kc = runtime.resolve_kubeconfig(kubeconfig, cluster_arg)?;
+                let kc = services.resolve_kubeconfig(kubeconfig, cluster_arg)?;
                 kubectl(Some(&kc), &["apply", "-f", &manifest_str], &[0])?;
             }
             Platform::Universal => {
-                apply_universal(&ctx, &runtime, &manifest_str)?;
+                apply_universal(&services.metadata().repo_root, runtime, &manifest_str)?;
             }
         }
 
-        let rel = ctx.layout.relative_path(&manifest);
+        let applied_at = utc_now();
+        let rel = services.layout().relative_path(&manifest);
         let notes = step.map_or_else(String::new, |s| format!("{s}: "));
-        ctx.layout
-            .append_manifest_index(&utc_now(), &rel, "-", "PASS", &notes)?;
+        services
+            .layout()
+            .append_manifest_index(&applied_at, &rel, "-", "PASS", &notes)?;
+        services.mark_manifest_applied(&manifest, &applied_at, step)?;
         println!("{}", shorten_path(&manifest));
     }
     Ok(0)
@@ -117,7 +119,7 @@ fn kuma_api_path(resource_type: &str, name: &str, mesh: Option<&str>) -> String 
 }
 
 fn apply_universal(
-    ctx: &RunContext,
+    repo_root: &str,
     runtime: &ClusterRuntime,
     manifest: &str,
 ) -> Result<(), CliError> {
@@ -147,7 +149,7 @@ fn apply_universal(
     }
 
     // Fallback to kumactl
-    let root = PathBuf::from(&ctx.metadata.repo_root);
+    let root = PathBuf::from(repo_root);
     let binary = find_kumactl_binary(&root)?;
     exec::kumactl_run(&binary, &access.addr, &["apply", "-f", manifest], &[0])?;
     Ok(())

@@ -2,7 +2,7 @@ use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use crate::context::CurrentRunRecord;
+use crate::context::RunRepository;
 use crate::core_defs;
 use crate::errors::{CliError, CliErrorKind};
 
@@ -46,14 +46,9 @@ pub fn resolve_run_directory(
     }
 
     // Fall back to the current-run pointer in the session context directory.
-    if let Ok(pointer_path) = core_defs::current_run_context_path()
-        && let Ok(text) = fs::read_to_string(&pointer_path)
-        && let Ok(record) = serde_json::from_str::<CurrentRunRecord>(&text)
-    {
-        let run_dir = record.layout.run_dir();
-        if run_dir.is_dir() {
-            return Ok(ResolvedRun { run_dir });
-        }
+    let repo = RunRepository;
+    if let Some(run_dir) = repo.current_run_dir()? {
+        return Ok(ResolvedRun { run_dir });
     }
 
     Err(CliErrorKind::MissingRunPointer.into())

@@ -1,7 +1,7 @@
 use clap::Args;
 
 use crate::commands::RunDirArgs;
-use crate::commands::resolve_run_context;
+use crate::commands::resolve_run_services;
 use crate::core_defs::{shorten_path, utc_now};
 use crate::errors::CliError;
 
@@ -28,9 +28,12 @@ pub fn preflight(
     _repo_root: Option<&str>,
     run_dir_args: &RunDirArgs,
 ) -> Result<i32, CliError> {
-    let ctx = resolve_run_context(run_dir_args)?;
+    let checked_at = utc_now();
+    let services = resolve_run_services(run_dir_args)?;
+    let _ = services.save_preflight_outputs(&checked_at)?;
+    services.record_preflight_complete()?;
 
-    eprintln!("{} preflight: complete", utc_now());
-    println!("{}", shorten_path(&ctx.layout.artifacts_dir()));
+    eprintln!("{checked_at} preflight: complete");
+    println!("{}", shorten_path(&services.layout().artifacts_dir()));
     Ok(0)
 }

@@ -664,7 +664,10 @@ fn is_special_transition(from: RunnerPhase, to: RunnerPhase, event: RunnerEvent)
         return Some(!matches!(from, RunnerPhase::Completed));
     }
     if event == RunnerEvent::ResumeRun {
-        return Some(matches!(from, RunnerPhase::Suspended | RunnerPhase::Aborted));
+        return Some(matches!(
+            from,
+            RunnerPhase::Suspended | RunnerPhase::Aborted
+        ));
     }
     None
 }

@@ -1,8 +1,8 @@
 use clap::{Args, Subcommand};
 
-use crate::commands::{RunDirArgs, resolve_run_context};
+use crate::commands::{RunDirArgs, resolve_run_services};
 use crate::errors::{CliError, CliErrorKind};
-use crate::exec::{self, HttpMethod};
+use crate::exec::HttpMethod;
 
 /// HTTP method for `harness api` requests.
 #[derive(Debug, Clone, Subcommand)]
@@ -67,27 +67,22 @@ pub struct ApiArgs {
 /// fails, or the response body cannot be read.
 pub fn api(method: &ApiMethod) -> Result<i32, CliError> {
     let (run_dir_args, path) = method_run_dir_and_path(method);
-    let ctx = resolve_run_context(run_dir_args)?;
-    let runtime = ctx.cluster_runtime()?;
-    let access = runtime.control_plane_access()?;
-    let token = access.admin_token.as_deref();
+    let services = resolve_run_services(run_dir_args)?;
 
     // All methods read the response as raw text since the CP API sometimes
     // returns plain text (e.g., token endpoints) rather than JSON.
     let response_text = match method {
-        ApiMethod::Get { .. } => {
-            exec::cp_api_text(&access.addr, path, HttpMethod::Get, None, token)?
-        }
+        ApiMethod::Get { .. } => services.call_control_plane_text(path, HttpMethod::Get, None)?,
         ApiMethod::Post { body, .. } => {
             let parsed = parse_json_body(body)?;
-            exec::cp_api_text(&access.addr, path, HttpMethod::Post, Some(&parsed), token)?
+            services.call_control_plane_text(path, HttpMethod::Post, Some(&parsed))?
         }
         ApiMethod::Put { body, .. } => {
             let parsed = parse_json_body(body)?;
-            exec::cp_api_text(&access.addr, path, HttpMethod::Put, Some(&parsed), token)?
+            services.call_control_plane_text(path, HttpMethod::Put, Some(&parsed))?
         }
         ApiMethod::Delete { .. } => {
-            exec::cp_api_text(&access.addr, path, HttpMethod::Delete, None, token)?
+            services.call_control_plane_text(path, HttpMethod::Delete, None)?
         }
     };
 

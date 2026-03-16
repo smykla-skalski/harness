@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use clap::Args;
 
-use crate::commands::{RunDirArgs, resolve_run_context};
+use crate::commands::{RunDirArgs, resolve_run_services};
 use crate::errors::{CliError, CliErrorKind};
 use crate::exec;
 use crate::runtime::XdsAccess;
@@ -101,11 +101,10 @@ fn service_up(
     let svc_name = name.ok_or_else(|| CliErrorKind::usage_error("service name is required"))?;
     let svc_port = port.ok_or_else(|| CliErrorKind::usage_error("service port is required"))?;
 
-    let ctx = resolve_run_context(run_dir_args)?;
-    let runtime = ctx.cluster_runtime()?;
-    let access = runtime.control_plane_access()?;
-    let network = runtime.docker_network()?;
-    let svc_image = runtime.service_image(image)?;
+    let services = resolve_run_services(run_dir_args)?;
+    let access = services.control_plane_access()?;
+    let network = services.docker_network()?;
+    let svc_image = services.service_image(image)?;
 
     // Generate token
     let token_result = token_via_api(
@@ -120,7 +119,7 @@ fn service_up(
 
     // Start service container first so we can inspect its IP address
     let port_pair = [(svc_port, svc_port)];
-    let run_id_label = format!("io.harness.run-id={}", ctx.layout.run_id);
+    let run_id_label = format!("io.harness.run-id={}", services.layout().run_id);
     exec::docker_run_detached(
         &svc_image,
         svc_name,
@@ -145,7 +144,7 @@ fn service_up(
         token: token_str,
         transparent_proxy,
         timeout,
-        xds: runtime.xds_access()?,
+        xds: services.xds_access()?,
     }) {
         let _ = exec::docker_rm(svc_name);
         return Err(err);
@@ -299,15 +298,18 @@ fn service_down(name: Option<&str>, _run_dir_args: &RunDirArgs) -> Result<i32, C
 }
 
 fn service_list(run_dir_args: &RunDirArgs) -> Result<i32, CliError> {
-    let filter = match resolve_run_context(run_dir_args) {
-        Ok(ctx) => format!("label=io.harness.run-id={}", ctx.layout.run_id),
-        Err(_) => "label=io.harness.service=true".to_string(),
-    };
+    if let Ok(services) = resolve_run_services(run_dir_args) {
+        for row in services.list_service_containers()? {
+            println!("{}\t{}", row.name, row.status);
+        }
+        return Ok(0);
+    }
+
     let result = exec::docker(
         &[
             "ps",
             "--filter",
-            &filter,
+            "label=io.harness.service=true",
             "--format",
             "{{.Names}}\t{{.Status}}",
         ],
