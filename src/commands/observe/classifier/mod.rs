@@ -87,6 +87,7 @@ pub(super) struct TextCheckContext<'a> {
     pub text: &'a str,
     pub lower: &'a str,
     pub matched_categories: HashSet<IssueCategory>,
+    pub source_tool: Option<SourceTool>,
     pub state: &'a mut ScanState,
 }
 
@@ -137,6 +138,7 @@ pub fn check_text_for_issues(
         text,
         lower: &lower,
         matched_categories,
+        source_tool,
         state,
     };
 
@@ -151,10 +153,12 @@ pub fn check_text_for_issues(
         text_checks::check_runner_state_event_error(&mut context, &mut issues);
         text_checks::check_runner_state_machine_stale(&mut context, &mut issues);
     }
+
     if role == MessageRole::User && source_tool.is_none() {
         text_checks::check_permission_failures(&mut context, &mut issues);
         text_checks::check_user_frustration(&mut context, &mut issues);
     }
+
     if role == MessageRole::Assistant && source_tool.is_none() {
         text_checks::check_save_failures(&mut context, &mut issues);
         text_checks::check_payload_recovery(&mut context, &mut issues);

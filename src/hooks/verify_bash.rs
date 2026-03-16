@@ -100,7 +100,7 @@ fn check_bug_found_gate(ctx: &HookContext, subcommand: &str) -> Option<HookResul
         return None;
     }
 
-    if !response_contains_failure(response) {
+    if !response_contains_failure(&response) {
         return None;
     }
 

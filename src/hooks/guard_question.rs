@@ -19,9 +19,9 @@ pub fn execute(ctx: &HookContext) -> Result<HookResult, CliError> {
         return Ok(HookResult::allow());
     }
     if ctx.is_suite_runner() {
-        return Ok(guard_suite_runner(ctx, prompts));
+        return Ok(guard_suite_runner(ctx, &prompts));
     }
-    guard_suite_author(ctx, prompts)
+    guard_suite_author(ctx, &prompts)
 }
 
 fn guard_suite_runner(ctx: &HookContext, prompts: &[AskUserQuestionPrompt]) -> HookResult {

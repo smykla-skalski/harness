@@ -1,7 +1,9 @@
 use super::emitter::{Guidance, IssueBlueprint};
 use super::{AGENT_NAME_REGEX, EXIT_CODE_REGEX, TextCheckContext};
 use crate::commands::observe::patterns;
-use crate::commands::observe::types::{Issue, IssueCategory, IssueCode, IssueSeverity};
+use crate::commands::observe::types::{
+    Confidence, FixSafety, Issue, IssueCategory, IssueCode, IssueSeverity,
+};
 
 /// Check for KSA hook codes in Bash output.
 /// Caller guarantees: `source_tool` == Bash.
@@ -19,7 +21,10 @@ pub(super) fn check_ksa_codes(context: &mut TextCheckContext<'_>, issues: &mut V
             .with_fingerprint(display_code.clone())
             .with_guidance(Guidance::fix_hint(format!(
                 "Check hook logic for {display_code}"
-            )));
+            )))
+            .with_confidence(Confidence::High)
+            .with_fix_safety(FixSafety::AutoFixSafe)
+            .with_source_tool(context.source_tool);
             context.emit_current(issues, blueprint);
             break;
         }
@@ -71,7 +76,10 @@ pub(super) fn check_exit_code_issues(context: &mut TextCheckContext<'_>, issues:
         .with_guidance(Guidance::fix_hint(
             "Manifest preflight/apply/validate failed. Could be a suite error OR a product bug. \
              Investigate whether the Go validator accepts what the CRD rejects.",
-        ));
+        ))
+        .with_confidence(Confidence::High)
+        .with_fix_safety(FixSafety::TriageRequired)
+        .with_source_tool(context.source_tool);
         context.emit_current(issues, blueprint);
     } else if is_harness_authoring {
         let summary = format!("Harness authoring command failed (exit {exit_code})");
@@ -84,7 +92,10 @@ pub(super) fn check_exit_code_issues(context: &mut TextCheckContext<'_>, issues:
         .with_fingerprint("harness_authoring_failure")
         .with_guidance(Guidance::fix_hint(
             "Harness authoring command returned non-zero - check payload or arguments",
-        ));
+        ))
+        .with_confidence(Confidence::High)
+        .with_fix_safety(FixSafety::AutoFixGuarded)
+        .with_source_tool(context.source_tool);
         context.emit_current(issues, blueprint);
     } else if exit_code != 1 {
         let summary = format!("Non-zero exit code {exit_code}");
@@ -97,7 +108,10 @@ pub(super) fn check_exit_code_issues(context: &mut TextCheckContext<'_>, issues:
         .with_fingerprint("non_zero_exit_code")
         .with_guidance(Guidance::advisory(format!(
             "Command exited with code {exit_code}"
-        )));
+        )))
+        .with_confidence(Confidence::Medium)
+        .with_fix_safety(FixSafety::AdvisoryOnly)
+        .with_source_tool(context.source_tool);
         context.emit_current(issues, blueprint);
     }
 }
@@ -128,7 +142,10 @@ pub(super) fn check_permission_failures(
     .with_fingerprint(agent_name)
     .with_guidance(Guidance::fix_hint(
         "Subagent needs permissionMode dontAsk or mode auto for Bash/Write",
-    ));
+    ))
+    .with_confidence(Confidence::High)
+    .with_fix_safety(FixSafety::AutoFixSafe)
+    .with_source_tool(context.source_tool);
     context.emit_current(issues, blueprint);
 }
 
@@ -152,7 +169,10 @@ pub(super) fn check_save_failures(context: &mut TextCheckContext<'_>, issues: &m
     )
     .with_guidance(Guidance::fix_hint(
         "Subagent lacks write permissions or hit a harness CLI error during save",
-    ));
+    ))
+    .with_confidence(Confidence::Medium)
+    .with_fix_safety(FixSafety::AutoFixGuarded)
+    .with_source_tool(context.source_tool);
     context.emit_current(issues, blueprint);
 }
 
@@ -175,7 +195,10 @@ pub(super) fn check_payload_recovery(context: &mut TextCheckContext<'_>, issues:
         )
         .with_guidance(Guidance::fix_hint(
             "Subagent should save its own payload - manual grep recovery is a workflow failure",
-        ));
+        ))
+        .with_confidence(Confidence::Low)
+        .with_fix_safety(FixSafety::AdvisoryOnly)
+        .with_source_tool(context.source_tool);
         context.emit_current(issues, blueprint);
     }
 }
@@ -201,7 +224,10 @@ pub(super) fn check_env_misconfiguration(
                 "src/context.rs",
                 "Session ID env var not set. Harness init and runner-state \
                  cannot find the context directory without it.",
-            ));
+            ))
+            .with_confidence(Confidence::High)
+            .with_fix_safety(FixSafety::AutoFixSafe)
+            .with_source_tool(context.source_tool);
             context.emit_current(issues, blueprint);
         } else if signal.contains("kubeconfig") {
             let blueprint = IssueBlueprint::new(
@@ -215,7 +241,10 @@ pub(super) fn check_env_misconfiguration(
                 "harness cluster should set KUBECONFIG to the k3d cluster config. \
                  Without it, kubectl defaults to ~/.kube/config which may point \
                  to a corporate cluster.",
-            ));
+            ))
+            .with_confidence(Confidence::High)
+            .with_fix_safety(FixSafety::AutoFixSafe)
+            .with_source_tool(context.source_tool);
             context.emit_current(issues, blueprint);
         }
     }
@@ -238,7 +267,10 @@ pub(super) fn check_incomplete_writer(context: &mut TextCheckContext<'_>, issues
     )
     .with_guidance(Guidance::fix_hint(
         "Writer agent failed to save all files - check permissions and payload size",
-    ));
+    ))
+    .with_confidence(Confidence::Medium)
+    .with_fix_safety(FixSafety::AutoFixGuarded)
+    .with_source_tool(context.source_tool);
     context.emit_current(issues, blueprint);
 }
 
@@ -262,6 +294,11 @@ pub(super) fn check_harness_infrastructure(
             .any(|word| context.lower.contains(word));
 
     if direct_match || subsystem_match {
+        let confidence = if direct_match {
+            Confidence::High
+        } else {
+            Confidence::Medium
+        };
         let blueprint = IssueBlueprint::new(
             IssueCode::HarnessInfrastructureMisconfiguration,
             IssueCategory::WorkflowError,
@@ -271,7 +308,10 @@ pub(super) fn check_harness_infrastructure(
         .with_fingerprint("harness_infrastructure_misconfiguration")
         .with_guidance(Guidance::fix_hint(
             "Fix the harness bootstrap/cluster command to handle this automatically",
-        ));
+        ))
+        .with_confidence(confidence)
+        .with_fix_safety(FixSafety::TriageRequired)
+        .with_source_tool(context.source_tool);
         context.emit_current(issues, blueprint);
     }
 }
@@ -306,7 +346,10 @@ pub(super) fn check_missing_connection_or_env_var(
         .with_fingerprint("missing_connection_or_env_var")
         .with_guidance(Guidance::advisory(
             "Could be a harness bootstrap gap or a product bug - investigate which layer dropped it",
-        ));
+        ))
+        .with_confidence(Confidence::Medium)
+        .with_fix_safety(FixSafety::AdvisoryOnly)
+        .with_source_tool(context.source_tool);
         context.emit_current(issues, blueprint);
     }
 }
@@ -331,7 +374,10 @@ pub(super) fn check_jq_errors(context: &mut TextCheckContext<'_>, issues: &mut V
         .with_guidance(Guidance::advisory(
             "Check that the upstream command produces valid JSON before piping to jq. \
              Use harness diff or harness envoy for structured comparisons.",
-        ));
+        ))
+        .with_confidence(Confidence::High)
+        .with_fix_safety(FixSafety::AdvisoryOnly)
+        .with_source_tool(context.source_tool);
         context.emit_current(issues, blueprint);
     }
 }
@@ -354,7 +400,10 @@ pub(super) fn check_closeout_verdict_pending(
     .with_fingerprint("closeout_verdict_pending")
     .with_guidance(Guidance::fix_hint(
         "harness closeout should auto-compute verdict from run-status.json counts",
-    ));
+    ))
+    .with_confidence(Confidence::High)
+    .with_fix_safety(FixSafety::AutoFixSafe)
+    .with_source_tool(context.source_tool);
     context.emit_current(issues, blueprint);
 }
 
@@ -382,7 +431,10 @@ pub(super) fn check_runner_state_event_error(
     .with_fingerprint("runner_state_event_not_supported")
     .with_guidance(Guidance::fix_hint(
         "Use the workflow module's request functions or fix the CLI to support transitions",
-    ));
+    ))
+    .with_confidence(Confidence::High)
+    .with_fix_safety(FixSafety::AutoFixSafe)
+    .with_source_tool(context.source_tool);
     context.emit_current(issues, blueprint);
 }
 
@@ -421,7 +473,10 @@ pub(super) fn check_runner_state_machine_stale(
         .with_fingerprint("runner_state_machine_stale")
         .with_guidance(Guidance::fix_hint(
             "State should advance automatically during harness commands",
-        ));
+        ))
+        .with_confidence(Confidence::Medium)
+        .with_fix_safety(FixSafety::AutoFixGuarded)
+        .with_source_tool(context.source_tool);
         context.emit_current(issues, blueprint);
     }
 }
@@ -446,7 +501,10 @@ pub(super) fn check_user_frustration(context: &mut TextCheckContext<'_>, issues:
         )
         .with_guidance(Guidance::advisory(
             "Review what happened before this - likely a UX issue",
-        ));
+        ))
+        .with_confidence(Confidence::Low)
+        .with_fix_safety(FixSafety::AdvisoryOnly)
+        .with_source_tool(context.source_tool);
         context.emit_current(issues, blueprint);
     }
 }
