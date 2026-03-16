@@ -360,7 +360,7 @@ fn operational_features() -> BTreeMap<Feature, FeatureInfo> {
         (
             Feature::HookSystem,
             FeatureInfo::new(
-                "12 hook types intercepting tool usage: guard-bash, guard-write, guard-question, \
+                "11 hook types intercepting tool usage: guard-bash, guard-write, guard-question, \
                  guard-stop, verify-bash, verify-write, verify-question, audit, enrich-failure, \
                  context-agent, validate-agent",
             )
