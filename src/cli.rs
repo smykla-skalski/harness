@@ -386,6 +386,38 @@ pub enum ObserveMode {
 }
 
 // ---------------------------------------------------------------------------
+// Task subcommands
+// ---------------------------------------------------------------------------
+
+/// Background task output operations.
+#[derive(Debug, Clone, Subcommand)]
+#[non_exhaustive]
+pub enum TaskCommand {
+    /// Wait for a background task to complete by polling its output file.
+    Wait {
+        /// Full path to the task output file.
+        output_file: String,
+        /// Maximum seconds to wait before timing out.
+        #[arg(long, default_value = "600")]
+        timeout: u64,
+        /// Seconds between file-size polls.
+        #[arg(long, default_value = "10")]
+        poll_interval: u64,
+        /// Number of tail lines to print when done.
+        #[arg(long, default_value = "20")]
+        lines: usize,
+    },
+    /// Print the last N lines of a task output file.
+    Tail {
+        /// Full path to the task output file.
+        output_file: String,
+        /// Number of lines to print.
+        #[arg(long, default_value = "20")]
+        lines: usize,
+    },
+}
+
+// ---------------------------------------------------------------------------
 // Hook subcommands
 // ---------------------------------------------------------------------------
 
@@ -949,6 +981,13 @@ pub enum Command {
         run_dir: RunDirArgs,
     },
 
+    /// Read or wait for background task output.
+    Task {
+        /// Task subcommand.
+        #[command(subcommand)]
+        command: TaskCommand,
+    },
+
     /// Report harness capabilities for skill planning.
     Capabilities,
 
@@ -1212,6 +1251,7 @@ mod tests {
             "runner-state",
             "session-start",
             "session-stop",
+            "task",
             "validate",
         ] {
             assert!(names.contains(&expected), "missing subcommand: {expected}");
