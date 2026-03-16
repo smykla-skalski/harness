@@ -13,9 +13,10 @@ use crate::context::CurrentRunRecord;
 use crate::core_defs::{HARNESS_PREFIX, current_run_context_path, resolve_build_info, utc_now};
 use crate::errors::{CliError, CliErrorKind, cow};
 use crate::exec::{
-    cluster_exists, compose_down_project, compose_up, docker_inspect_ip, docker_network_create,
-    docker_network_rm, docker_rm, docker_rm_by_label, docker_run_detached, extract_admin_token,
-    run_command, run_command_streaming, wait_for_http,
+    cluster_exists, compose_down_project, compose_up, docker, docker_inspect_ip,
+    docker_network_create, docker_network_rm, docker_rm, docker_rm_by_label,
+    docker_run_detached, extract_admin_token, kubectl, run_command, run_command_streaming,
+    wait_for_http,
 };
 
 fn make_target(root: &Path, target: &str, env: &HashMap<String, String>) -> Result<(), CliError> {
@@ -30,6 +31,55 @@ fn make_target_live(
 ) -> Result<(), CliError> {
     run_command_streaming(&["make", target], Some(root), Some(env), &[0])?;
     Ok(())
+}
+
+/// Resolve the KDS address for a global CP running in a k3d cluster.
+///
+/// Discovers the k3d server node IP via `docker inspect` and the
+/// `kuma-global-zone-sync` service `NodePort` via `kubectl`, then
+/// returns `grpcs://<node-ip>:<node-port>`.
+fn resolve_kds_address(global_cluster: &str) -> Result<String, CliError> {
+    let node_container = format!("k3d-{global_cluster}-server-0");
+    let format_string = "{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}";
+    let ip_result = docker(&["inspect", "-f", format_string, &node_container], &[0])?;
+    let node_ip = ip_result.stdout.trim().to_string();
+    if node_ip.is_empty() {
+        return Err(CliErrorKind::cluster_error(cow!(
+            "could not resolve IP for k3d node {node_container}"
+        ))
+        .into());
+    }
+
+    let home = env::var("HOME").unwrap_or_else(|_| "/tmp".into());
+    let kubeconfig = format!("{home}/.kube/kind-{global_cluster}-config");
+    let kubeconfig_path = Path::new(&kubeconfig);
+    let port_result = kubectl(
+        Some(kubeconfig_path),
+        &[
+            "get",
+            "svc",
+            "-n",
+            "kuma-system",
+            "kuma-global-zone-sync",
+            "-o",
+            "jsonpath={.spec.ports[?(@.name==\"global-zone-sync\")].nodePort}",
+        ],
+        &[0],
+    )?;
+    let node_port = port_result.stdout.trim().to_string();
+    if node_port.is_empty() {
+        return Err(CliErrorKind::cluster_error(cow!(
+            "could not resolve KDS NodePort for global cluster {global_cluster}"
+        ))
+        .into());
+    }
+
+    let address = format!("grpcs://{node_ip}:{node_port}");
+    eprintln!(
+        "{} cluster: resolved global KDS address: {address}",
+        utc_now()
+    );
+    Ok(address)
 }
 
 /// Manage disposable local clusters (k3d or universal Docker).
@@ -420,9 +470,11 @@ fn global_zone_up(
         "controlPlane.globalZoneSyncService.type=NodePort".into(),
     ];
     start_and_deploy(root, base_env, &names[0], "global", &global_settings)?;
+    let kds_address = resolve_kds_address(&names[0])?;
     let zone_settings = vec![
         "controlPlane.mode=zone".into(),
         format!("controlPlane.zone={}", names[2]),
+        format!("controlPlane.kdsGlobalAddress={kds_address}"),
         "controlPlane.tls.kdsZoneClient.skipVerify=true".into(),
     ];
     start_and_deploy(root, base_env, &names[1], "zone", &zone_settings)
@@ -459,6 +511,7 @@ fn global_two_zones_up(
         "controlPlane.globalZoneSyncService.type=NodePort".into(),
     ];
     start_and_deploy(root, base_env, &names[0], "global", &global_settings)?;
+    let kds_address = resolve_kds_address(&names[0])?;
     eprintln!(
         "{} cluster: global CP deployed, starting zone clusters",
         utc_now()
@@ -471,6 +524,7 @@ fn global_two_zones_up(
         let zone_settings = vec![
             "controlPlane.mode=zone".into(),
             format!("controlPlane.zone={zone_name}"),
+            format!("controlPlane.kdsGlobalAddress={kds_address}"),
             "controlPlane.tls.kdsZoneClient.skipVerify=true".into(),
         ];
         start_and_deploy(root, base_env, zone_cluster, "zone", &zone_settings)?;
