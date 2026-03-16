@@ -1,11 +1,35 @@
 use std::path::PathBuf;
 
-use crate::cli::RunDirArgs;
-use crate::commands::{resolve_admin_token, resolve_cp_addr, resolve_run_context};
+use clap::Args;
+
+use crate::commands::{RunDirArgs, resolve_admin_token, resolve_cp_addr, resolve_run_context};
 use crate::errors::{CliError, CliErrorKind};
 use crate::exec;
 
 use super::kumactl::find_kumactl_binary;
+
+/// Arguments for `harness token`.
+#[derive(Debug, Clone, Args)]
+pub struct TokenArgs {
+    /// Token kind: dataplane, ingress, or egress.
+    #[arg(value_parser = ["dataplane", "ingress", "egress"])]
+    pub kind: String,
+    /// Dataplane name.
+    #[arg(long)]
+    pub name: String,
+    /// Mesh name.
+    #[arg(long, default_value = "default")]
+    pub mesh: String,
+    /// CP API address (auto-detected from run context if omitted).
+    #[arg(long)]
+    pub cp_addr: Option<String>,
+    /// Token validity duration.
+    #[arg(long, default_value = "24h")]
+    pub valid_for: String,
+    /// Run-directory resolution.
+    #[command(flatten)]
+    pub run_dir: RunDirArgs,
+}
 
 /// Generate a dataplane token from the control plane.
 ///

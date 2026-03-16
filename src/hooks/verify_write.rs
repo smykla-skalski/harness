@@ -4,6 +4,7 @@ use std::path::Path;
 use crate::errors::{CliError, HookMessage};
 use crate::hook::HookResult;
 use crate::hook_payloads::HookContext;
+use crate::workflow::runner as runner_wf;
 
 use super::{control_file_hint, is_command_owned_run_file, normalize_path};
 
@@ -22,7 +23,7 @@ pub fn execute(ctx: &HookContext) -> Result<HookResult, CliError> {
     if ctx.is_suite_author() {
         return Ok(verify_suite_author(&paths));
     }
-    Ok(verify_suite_runner(ctx, &paths))
+    verify_suite_runner(ctx, &paths)
 }
 
 fn verify_suite_author(paths: &[&Path]) -> HookResult {
@@ -43,17 +44,16 @@ fn verify_suite_author(paths: &[&Path]) -> HookResult {
     HookResult::allow()
 }
 
-fn verify_suite_runner(ctx: &HookContext, paths: &[&Path]) -> HookResult {
+fn verify_suite_runner(ctx: &HookContext, paths: &[&Path]) -> Result<HookResult, CliError> {
     let run_dir = ctx.effective_run_dir();
-    // Suite-fix write tracking would use ctx.suite_dir() here once
-    // record_suite_fix_write is available in the workflow module.
+    let suite_dir = ctx.suite_dir();
     for raw_path in paths {
         let path = normalize_path(raw_path);
         if let Some(ref rd) = run_dir
             && is_command_owned_run_file(&path, rd)
         {
             let hint = control_file_hint(&path);
-            return HookMessage::runner_flow_required(
+            return Ok(HookMessage::runner_flow_required(
                 "edit run control files",
                 format!(
                     "{} is harness-managed; {hint}",
@@ -61,25 +61,29 @@ fn verify_suite_runner(ctx: &HookContext, paths: &[&Path]) -> HookResult {
                         .map_or("file", |n| n.to_str().unwrap_or("file"))
                 ),
             )
-            .into_result();
+            .into_result());
         }
         let name = path.file_name().map_or("", |n| n.to_str().unwrap_or(""));
         if name == "amendments.md"
             && path.exists()
             && fs::read_to_string(&path).is_ok_and(|content| content.trim().is_empty())
         {
-            return HookMessage::suite_incomplete(format!(
+            return Ok(HookMessage::suite_incomplete(format!(
                 "suite amendments entry is missing or empty: {}",
                 raw_path.display()
             ))
-            .into_result();
+            .into_result());
         }
-        // Track suite-fix writes when in triage with an active suite fix.
-        // If the path is inside the suite dir and suite_fix is active,
-        // the write is tracked; state update happens in the workflow module.
-        // No additional checks needed for this path.
+        if let (Some(state), Some(suite_root), Some(run_root)) = (
+            ctx.runner_state.as_ref(),
+            suite_dir.as_deref(),
+            run_dir.as_deref(),
+        ) && let Some(new_state) = state.record_suite_fix_write(&path, suite_root)
+        {
+            runner_wf::write_runner_state(run_root, &new_state)?;
+        }
     }
-    HookResult::allow()
+    Ok(HookResult::allow())
 }
 
 #[cfg(test)]

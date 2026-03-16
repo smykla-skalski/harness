@@ -50,7 +50,7 @@ fn guard_question_allows_manifest_fix_in_triage() {
     let run_dir = init_run(tmp.path(), "run-1", "single-zone");
     // Set runner state to triage with a failure
     let state = RunnerWorkflowState {
-        schema_version: 1,
+        schema_version: 2,
         phase: RunnerPhase::Triage,
         preflight: PreflightState {
             status: PreflightStatus::Complete,

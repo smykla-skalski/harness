@@ -38,14 +38,14 @@ pub fn execute(ctx: &HookContext) -> Result<HookResult, CliError> {
 }
 
 fn can_start_preflight_worker(state: &RunnerWorkflowState) -> (bool, Option<&'static str>) {
-    if state.phase != RunnerPhase::Preflight {
+    if state.phase() != RunnerPhase::Preflight {
         return (
             false,
             Some("enter the guarded preflight phase before spawning the worker"),
         );
     }
-    if state.preflight.status != PreflightStatus::Pending
-        && state.preflight.status != PreflightStatus::Running
+    if state.preflight_status() != PreflightStatus::Pending
+        && state.preflight_status() != PreflightStatus::Running
     {
         return (
             false,

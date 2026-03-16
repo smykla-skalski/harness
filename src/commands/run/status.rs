@@ -1,9 +1,19 @@
 use serde_json::json;
 
-use crate::cli::RunDirArgs;
+use clap::Args;
+
+use crate::commands::RunDirArgs;
 use crate::commands::resolve_run_context;
 use crate::errors::{CliError, CliErrorKind};
 use crate::exec;
+
+/// Arguments for `harness status`.
+#[derive(Debug, Clone, Args)]
+pub struct StatusArgs {
+    /// Run-directory resolution.
+    #[command(flatten)]
+    pub run_dir: RunDirArgs,
+}
 
 /// Mask an admin token: show first 4 and last 4 chars.
 fn mask_token(token: &str) -> String {

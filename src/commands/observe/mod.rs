@@ -13,9 +13,9 @@ use std::process;
 use std::thread;
 use std::time::{Duration, Instant};
 
+use clap::{Args, Subcommand};
 use serde_json::json;
 
-use crate::cli::{ObserveFilterArgs, ObserveMode};
 use crate::core_defs::harness_data_root;
 use crate::errors::{CliError, CliErrorKind};
 
@@ -32,6 +32,237 @@ const DUMP_TRUNCATE_LENGTH: usize = 500;
 
 /// Maximum characters stored in issue detail fields.
 const MAX_DETAIL_LENGTH: usize = 2000;
+
+/// Shared filter arguments for observe scan/watch modes.
+#[derive(Debug, Clone, Args)]
+pub struct ObserveFilterArgs {
+    /// Start scanning from this line number.
+    #[arg(long, default_value = "0")]
+    pub from_line: usize,
+    /// Resolve start position: line number, ISO timestamp, or prose substring.
+    #[arg(long)]
+    pub from: Option<String>,
+    /// Focus preset: harness, skills, or all.
+    #[arg(long)]
+    pub focus: Option<String>,
+    /// Narrow session search to this project directory name.
+    #[arg(long)]
+    pub project_hint: Option<String>,
+    /// Output as JSON lines.
+    #[arg(long)]
+    pub json: bool,
+    /// Print summary at end.
+    #[arg(long)]
+    pub summary: bool,
+    /// Filter by minimum severity: low, medium, critical.
+    #[arg(long)]
+    pub severity: Option<String>,
+    /// Filter by category (comma-separated).
+    #[arg(long)]
+    pub category: Option<String>,
+    /// Exclude categories (comma-separated).
+    #[arg(long)]
+    pub exclude: Option<String>,
+    /// Only show fixable issues.
+    #[arg(long)]
+    pub fixable: bool,
+    /// Mute specific issue codes (comma-separated).
+    #[arg(long)]
+    pub mute: Option<String>,
+    /// Stop scanning at this line number.
+    #[arg(long)]
+    pub until_line: Option<usize>,
+    /// Only include events at or after this ISO timestamp.
+    #[arg(long)]
+    pub since_timestamp: Option<String>,
+    /// Only include events at or before this ISO timestamp.
+    #[arg(long)]
+    pub until_timestamp: Option<String>,
+    /// Output format: json (default), markdown, sarif.
+    #[arg(long)]
+    pub format: Option<String>,
+    /// Path to YAML overrides config file.
+    #[arg(long)]
+    pub overrides: Option<String>,
+    /// Show top N root causes grouped by issue code.
+    #[arg(long)]
+    pub top_causes: Option<usize>,
+    /// Write truncated issues to this file instead of stdout (watch mode).
+    #[arg(long)]
+    pub output: Option<String>,
+    /// Write full untruncated issues to this file.
+    #[arg(long)]
+    pub output_details: Option<String>,
+}
+
+/// Observe subcommands.
+#[derive(Debug, Clone, Subcommand)]
+#[non_exhaustive]
+pub enum ObserveMode {
+    /// One-shot scan of a session log.
+    Scan {
+        /// Session ID to observe.
+        session_id: String,
+        /// Filter arguments.
+        #[command(flatten)]
+        filter: ObserveFilterArgs,
+    },
+    /// Continuously poll for new events.
+    Watch {
+        /// Session ID to observe.
+        session_id: String,
+        /// Seconds between polls.
+        #[arg(long, default_value = "3")]
+        poll_interval: u64,
+        /// Exit after this many seconds of no new events.
+        #[arg(long, default_value = "90")]
+        timeout: u64,
+        /// Filter arguments.
+        #[command(flatten)]
+        filter: ObserveFilterArgs,
+    },
+    /// Raw event dump without classification.
+    Dump {
+        /// Session ID to observe.
+        session_id: String,
+        /// Start from this line number.
+        #[arg(long)]
+        from_line: Option<usize>,
+        /// Stop at this line number.
+        #[arg(long)]
+        to_line: Option<usize>,
+        /// Text filter (case-insensitive substring match).
+        #[arg(long)]
+        filter: Option<String>,
+        /// Role filter (comma-separated: user,assistant).
+        #[arg(long)]
+        role: Option<String>,
+        /// Filter by tool name (e.g. Bash, Read, Write).
+        #[arg(long)]
+        tool_name: Option<String>,
+        /// Output raw JSON instead of formatted text.
+        #[arg(long)]
+        raw_json: bool,
+        /// Narrow session search to this project directory name.
+        #[arg(long)]
+        project_hint: Option<String>,
+    },
+    /// Run one observer cycle: read cursor, scan, update cursor, report.
+    Cycle {
+        /// Session ID to observe.
+        session_id: String,
+        /// Narrow session search to this project directory name.
+        #[arg(long)]
+        project_hint: Option<String>,
+    },
+    /// Show events around a specific line.
+    Context {
+        /// Session ID to observe.
+        session_id: String,
+        /// Target line number.
+        #[arg(long)]
+        line: usize,
+        /// Number of lines before/after.
+        #[arg(long, default_value = "10")]
+        window: usize,
+        /// Narrow session search to this project directory name.
+        #[arg(long)]
+        project_hint: Option<String>,
+    },
+    /// Show observer state for a session.
+    Status {
+        /// Session ID to query.
+        session_id: String,
+        /// Narrow session search to this project directory name.
+        #[arg(long)]
+        project_hint: Option<String>,
+    },
+    /// Resume scanning from the last cursor position.
+    Resume {
+        /// Session ID to resume.
+        session_id: String,
+        /// Filter arguments.
+        #[command(flatten)]
+        filter: ObserveFilterArgs,
+    },
+    /// Verify whether a specific issue still reproduces.
+    Verify {
+        /// Session ID to check.
+        session_id: String,
+        /// Issue ID to verify.
+        issue_id: String,
+        /// Start verification from this line.
+        #[arg(long)]
+        since_line: Option<usize>,
+        /// Narrow session search to this project directory name.
+        #[arg(long)]
+        project_hint: Option<String>,
+    },
+    /// Resolve a --from value to a concrete line number.
+    ResolveStart {
+        /// Session ID to search.
+        session_id: String,
+        /// Value to resolve: line number, ISO timestamp, or prose substring.
+        value: String,
+        /// Narrow session search to this project directory name.
+        #[arg(long)]
+        project_hint: Option<String>,
+    },
+    /// List all valid issue categories.
+    ListCategories,
+    /// List all focus presets.
+    ListFocusPresets,
+    /// Validate observer setup.
+    Doctor,
+    /// Add issue codes to the mute list.
+    Mute {
+        /// Session ID to update.
+        session_id: String,
+        /// Issue codes to mute (comma-separated).
+        codes: String,
+        /// Narrow session search to this project directory name.
+        #[arg(long)]
+        project_hint: Option<String>,
+    },
+    /// Remove issue codes from the mute list.
+    Unmute {
+        /// Session ID to update.
+        session_id: String,
+        /// Issue codes to unmute (comma-separated).
+        codes: String,
+        /// Narrow session search to this project directory name.
+        #[arg(long)]
+        project_hint: Option<String>,
+    },
+    /// Compare issues between two line ranges.
+    Compare {
+        /// Session ID to compare.
+        session_id: String,
+        /// First range start line.
+        #[arg(long)]
+        from_a: usize,
+        /// First range end line.
+        #[arg(long)]
+        to_a: usize,
+        /// Second range start line.
+        #[arg(long)]
+        from_b: usize,
+        /// Second range end line.
+        #[arg(long)]
+        to_b: usize,
+        /// Narrow session search to this project directory name.
+        #[arg(long)]
+        project_hint: Option<String>,
+    },
+}
+
+/// Arguments for `harness observe`.
+#[derive(Debug, Clone, Args)]
+pub struct ObserveArgs {
+    /// Observe subcommand.
+    #[command(subcommand)]
+    pub mode: ObserveMode,
+}
 
 /// Truncate text to at most `max_len` bytes at a valid UTF-8 char boundary.
 fn truncate_at(text: &str, max_len: usize) -> &str {

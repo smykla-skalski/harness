@@ -1,8 +1,9 @@
 use std::time::Duration;
 
-use crate::cli::{RunDirArgs, ServiceArgs};
 use crate::cluster::ClusterSpec;
-use crate::commands::{resolve_admin_token, resolve_cp_addr, resolve_run_context};
+use clap::Args;
+
+use crate::commands::{RunDirArgs, resolve_admin_token, resolve_cp_addr, resolve_run_context};
 use crate::errors::{CliError, CliErrorKind};
 use crate::exec;
 
@@ -13,6 +14,37 @@ const TEMPLATE_DATAPLANE: &str =
     include_str!("../../../resources/universal/templates/dataplane.yaml.j2");
 const TEMPLATE_TRANSPARENT_PROXY: &str =
     include_str!("../../../resources/universal/templates/transparent-proxy.yaml.j2");
+
+/// Arguments for `harness service`.
+#[derive(Debug, Clone, Args)]
+pub struct ServiceArgs {
+    /// Service action.
+    #[arg(value_parser = ["up", "down", "list"])]
+    pub action: String,
+    /// Service name.
+    pub name: Option<String>,
+    /// Service image.
+    #[arg(long)]
+    pub image: Option<String>,
+    /// Service port.
+    #[arg(long)]
+    pub port: Option<u16>,
+    /// Mesh name.
+    #[arg(long, default_value = "default")]
+    pub mesh: String,
+    /// Enable transparent proxy.
+    #[arg(long)]
+    pub transparent_proxy: bool,
+    /// Readiness timeout in seconds.
+    #[arg(long, default_value = "60")]
+    pub timeout: u64,
+    /// Custom dataplane template path.
+    #[arg(long)]
+    pub dataplane_template: Option<String>,
+    /// Run-directory resolution.
+    #[command(flatten)]
+    pub run_dir: RunDirArgs,
+}
 
 /// Render an embedded universal mode template.
 ///

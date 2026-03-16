@@ -37,7 +37,7 @@ fn handle_suite_runner(ctx: &HookContext) -> HookResult {
         return HookResult::allow();
     }
     if let Some(ref state) = ctx.runner_state
-        && state.phase != RunnerPhase::Triage
+        && state.phase() != RunnerPhase::Triage
     {
         return HookMessage::runner_flow_required(
             "apply the suite-fix answer",

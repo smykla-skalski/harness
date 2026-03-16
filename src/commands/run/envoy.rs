@@ -1,8 +1,150 @@
 use std::path::Path;
 
-use crate::cli::EnvoyCommand;
+use clap::{Args, Subcommand};
+
+use crate::commands::RunDirArgs;
 use crate::errors::{CliError, CliErrorKind};
 use crate::io::read_text;
+
+/// Envoy admin operations.
+#[non_exhaustive]
+#[derive(Debug, Clone, Subcommand)]
+pub enum EnvoyCommand {
+    /// Capture a live Envoy admin payload.
+    Capture {
+        /// Optional phase tag for the command artifact name.
+        #[arg(long)]
+        phase: Option<String>,
+        /// Artifact label for the captured payload.
+        #[arg(long)]
+        label: String,
+        /// Tracked cluster member name for multi-zone captures.
+        #[arg(long)]
+        cluster: Option<String>,
+        /// Namespace of the workload to exec into.
+        #[arg(long)]
+        namespace: String,
+        /// kubectl exec target (e.g. deploy/demo-client).
+        #[arg(long)]
+        workload: String,
+        /// Container name inside the workload.
+        #[arg(long, default_value = "kuma-sidecar")]
+        container: String,
+        /// Envoy admin path to fetch.
+        #[arg(long, default_value = "/config_dump")]
+        admin_path: String,
+        /// Envoy admin host inside the container.
+        #[arg(long, default_value = "127.0.0.1")]
+        admin_host: String,
+        /// Envoy admin port inside the container.
+        #[arg(long, default_value_t = 9901)]
+        admin_port: u16,
+        /// Artifact format hint.
+        #[arg(long, default_value = "auto")]
+        format: String,
+        /// Print only config entries whose @type contains this text.
+        #[arg(long)]
+        type_contains: Option<String>,
+        /// Print only lines containing this text after type filtering.
+        #[arg(long)]
+        grep: Option<String>,
+        /// Run-directory resolution.
+        #[command(flatten)]
+        run_dir: RunDirArgs,
+    },
+    /// Print a matching route from an Envoy config dump.
+    RouteBody {
+        /// Envoy config dump JSON file; omit to capture live.
+        #[arg(long)]
+        file: Option<String>,
+        /// Exact route path or prefix to match.
+        #[arg(long, name = "match")]
+        route_match: String,
+        /// Optional phase tag.
+        #[arg(long)]
+        phase: Option<String>,
+        /// Artifact label.
+        #[arg(long)]
+        label: Option<String>,
+        /// Tracked cluster member name.
+        #[arg(long)]
+        cluster: Option<String>,
+        /// Namespace of the workload.
+        #[arg(long)]
+        namespace: Option<String>,
+        /// kubectl exec target.
+        #[arg(long)]
+        workload: Option<String>,
+        /// Container name.
+        #[arg(long, default_value = "kuma-sidecar")]
+        container: String,
+        /// Envoy admin path.
+        #[arg(long, default_value = "/config_dump")]
+        admin_path: String,
+        /// Envoy admin host.
+        #[arg(long, default_value = "127.0.0.1")]
+        admin_host: String,
+        /// Envoy admin port.
+        #[arg(long, default_value_t = 9901)]
+        admin_port: u16,
+        /// Artifact format hint.
+        #[arg(long, default_value = "auto")]
+        format: String,
+        /// Run-directory resolution.
+        #[command(flatten)]
+        run_dir: RunDirArgs,
+    },
+    /// Print the bootstrap payload from an Envoy config dump.
+    Bootstrap {
+        /// Bootstrap JSON file; omit to capture live.
+        #[arg(long)]
+        file: Option<String>,
+        /// Substring filter for rendered bootstrap output.
+        #[arg(long)]
+        grep: Option<String>,
+        /// Optional phase tag.
+        #[arg(long)]
+        phase: Option<String>,
+        /// Artifact label.
+        #[arg(long)]
+        label: Option<String>,
+        /// Tracked cluster member name.
+        #[arg(long)]
+        cluster: Option<String>,
+        /// Namespace of the workload.
+        #[arg(long)]
+        namespace: Option<String>,
+        /// kubectl exec target.
+        #[arg(long)]
+        workload: Option<String>,
+        /// Container name.
+        #[arg(long, default_value = "kuma-sidecar")]
+        container: String,
+        /// Envoy admin path.
+        #[arg(long, default_value = "/config_dump")]
+        admin_path: String,
+        /// Envoy admin host.
+        #[arg(long, default_value = "127.0.0.1")]
+        admin_host: String,
+        /// Envoy admin port.
+        #[arg(long, default_value_t = 9901)]
+        admin_port: u16,
+        /// Artifact format hint.
+        #[arg(long, default_value = "auto")]
+        format: String,
+        /// Run-directory resolution.
+        #[command(flatten)]
+        run_dir: RunDirArgs,
+    },
+}
+
+/// Arguments for `harness envoy`.
+#[derive(Debug, Clone, Args)]
+pub struct EnvoyArgs {
+    /// Envoy subcommand.
+    #[command(subcommand)]
+    pub cmd: EnvoyCommand,
+}
 
 /// Envoy admin operations.
 ///

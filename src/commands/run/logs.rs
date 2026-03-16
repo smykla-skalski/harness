@@ -1,8 +1,26 @@
-use crate::cli::RunDirArgs;
+use clap::Args;
+
 use crate::cluster::ClusterSpec;
+use crate::commands::RunDirArgs;
 use crate::commands::resolve_run_context;
 use crate::errors::{CliError, CliErrorKind};
 use crate::exec;
+
+/// Arguments for `harness logs`.
+#[derive(Debug, Clone, Args)]
+pub struct LogsArgs {
+    /// Container or member name.
+    pub name: String,
+    /// Number of log lines to show.
+    #[arg(long, default_value = "100")]
+    pub tail: u32,
+    /// Follow log output.
+    #[arg(long)]
+    pub follow: bool,
+    /// Run-directory resolution.
+    #[command(flatten)]
+    pub run_dir: RunDirArgs,
+}
 
 /// Resolve a container name from the cluster spec.
 ///

@@ -94,7 +94,7 @@ fn deny_control_file(path: &Path) -> HookResult {
 fn suite_fix_required(ctx: &HookContext) -> bool {
     ctx.runner_state
         .as_ref()
-        .is_some_and(|state| state.suite_fix.is_none())
+        .is_some_and(|state| state.suite_fix().is_none())
 }
 
 fn evaluate_runner_path(

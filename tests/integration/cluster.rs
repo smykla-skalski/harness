@@ -12,9 +12,10 @@ use std::sync::PoisonError;
 // modify PATH serialize against each other (not just within this module).
 use super::helpers::ENV_LOCK;
 
-use harness::cli::{ClusterArgs, Command, KumactlCommand};
+use harness::cli::Command;
 use harness::cluster::{ClusterMode, ClusterSpec, HelmSetting, Platform};
-use harness::commands::Execute;
+use harness::commands::run::{KumactlArgs, KumactlCommand};
+use harness::commands::setup::ClusterArgs;
 
 use super::helpers::*;
 
@@ -537,7 +538,7 @@ fn kumactl_find_repo_root() {
     let cmd = KumactlCommand::Find {
         repo_root: Some(repo.to_str().unwrap().to_string()),
     };
-    let result = Command::Kumactl { cmd }.execute();
+    let result = Command::Kumactl(KumactlArgs { cmd }).execute();
     assert!(result.is_ok(), "kumactl find failed: {result:?}");
     assert_eq!(result.unwrap(), 0);
 }

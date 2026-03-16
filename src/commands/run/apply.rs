@@ -2,9 +2,12 @@ use std::fs;
 use std::io::{self, Read as _};
 use std::path::{Path, PathBuf};
 
-use crate::cli::RunDirArgs;
+use clap::Args;
+
 use crate::cluster::Platform;
-use crate::commands::{resolve_admin_token, resolve_cp_addr, resolve_kubeconfig, resolve_run_dir};
+use crate::commands::{
+    RunDirArgs, resolve_admin_token, resolve_cp_addr, resolve_kubeconfig, resolve_run_dir,
+};
 use crate::context::RunContext;
 use crate::core_defs::{shorten_path, utc_now};
 use crate::errors::{CliError, CliErrorKind, cow};
@@ -15,6 +18,26 @@ use crate::resolve::resolve_manifest_path;
 
 use super::kumactl::find_kumactl_binary;
 use super::shared::detect_platform;
+
+/// Arguments for `harness apply`.
+#[derive(Debug, Clone, Args)]
+pub struct ApplyArgs {
+    /// Use this kubeconfig instead of the tracked run cluster.
+    #[arg(long)]
+    pub kubeconfig: Option<String>,
+    /// Target cluster name (uses its kubeconfig instead of primary).
+    #[arg(long)]
+    pub cluster: Option<String>,
+    /// Manifest file or directory path. Repeat to preserve explicit batch order.
+    #[arg(long, required = true)]
+    pub manifest: Vec<String>,
+    /// Optional step label for manifest index notes.
+    #[arg(long)]
+    pub step: Option<String>,
+    /// Run-directory resolution.
+    #[command(flatten)]
+    pub run_dir: RunDirArgs,
+}
 
 /// Apply manifests to the cluster.
 ///
