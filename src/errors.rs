@@ -392,6 +392,12 @@ define_cli_errors! {
         exit: 1
     },
 
+    // --- Runner state machine (exit 5 = default) ---
+    InvalidTransition { detail: Cow<'static, str> } => {
+        code: "KSRCLI084",
+        msg: "invalid runner state transition: {detail}"
+    },
+
     // --- Workflow (exit 5 = default) ---
     WorkflowIo { detail: Cow<'static, str> } => {
         code: "WORKFLOW_IO",
@@ -509,6 +515,7 @@ impl CliErrorKind {
     cli_constructor!(service_readiness_timeout, ServiceReadinessTimeout, name);
     cli_constructor!(session_not_found, SessionNotFound, session_id);
     cli_constructor!(session_parse_error, SessionParseError, detail);
+    cli_constructor!(invalid_transition, InvalidTransition, detail);
     cli_constructor!(io, Io, detail);
     cli_constructor!(serialize, Serialize, detail);
     cli_constructor!(hook_payload_invalid, HookPayloadInvalid, detail);
@@ -1091,6 +1098,7 @@ mod tests {
             CliErrorKind::session_not_found(""),
             CliErrorKind::session_parse_error(""),
             CliErrorKind::universal_validation_failed(""),
+            CliErrorKind::invalid_transition(""),
         ]
     }
 
