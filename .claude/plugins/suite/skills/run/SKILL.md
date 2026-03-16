@@ -323,6 +323,7 @@ Read [examples/suite-template.md](examples/suite-template.md) when creating a ne
 Key principles (workflow.md has the details):
 
 1. **The test groups table is authoritative.** Execute every listed group. If a group requires a different cluster profile, tear down and rebuild - do not silently skip. If impractical, use AskUserQuestion (options: switch profile, skip group, stop run).
+   - **BLOCKING REQUIREMENT: NEVER mark a group as skip without first calling AskUserQuestion.** Present options: [Switch cluster profile, Fix prerequisites, Skip group, Stop run]. Record the user's choice as a deviation. If a group needs a different profile than the current one, this is NOT a valid reason to auto-skip. Ask the user. Autonomous group skipping invalidates the entire run.
 2. **Use the prepared-suite artifact** from Phase 3 as the runtime source of truth for manifest paths and cluster deltas (`helm_values`, `restart_namespaces`). Do not re-parse group frontmatter or re-copy baselines.
 3. **Group files remain authoritative** for `## Consume`, `## Debug`, expected outcomes, and artifact expectations. Read each group file before executing it, drop it from context after completing it.
 4. **Apply through `harness apply`**, verify and clean up through `harness record`. When a step needs more than one manifest, prefer one batched `harness apply` call over shell loops: either repeat `--manifest` in the exact apply order or pass the group directory (for example `<group-id>`) to apply that directory's immediate `.json/.yaml/.yml` files in lexicographic filename order. Use `harness envoy` for Envoy admin work. `harness envoy capture` can save a full artifact, and `harness envoy capture --type-contains ...`, `harness envoy capture --grep ...`, `harness envoy route-body`, and `harness envoy bootstrap` can capture and inspect in one command. Prefer those one-command inspect forms when you want the filtered Envoy output directly instead of reading a saved file afterward. For cleanup, prefer `kubectl delete -f` against the prepared manifest files for that group, one recorded command per manifest or resource kind. Never mix resource kinds in one `kubectl delete` command such as `kubectl delete kind-a name-a kind-b name-b`; kubectl treats the later kinds as names of the first kind.
@@ -426,9 +427,40 @@ harness closeout
 
 **Gate**: command log complete (every command has an entry), manifest index complete, all tests have pass/fail, every artifact path in the report resolves to an existing file, `run-status.json` has correct final counts, state captures exist for preflight + each completed group + postrun, compactness check passes.
 
-After all gates pass, tear down the clusters. This is the default - always clean up unless the user explicitly asks to keep clusters running or the suite metadata includes `keep_clusters: true`.
+After all gates pass, proceed to Phase 7 (retrospective) before tearing down clusters.
 
 After `harness closeout`, that run is final. Do not reuse it for another cluster bootstrap or execution step. Start a new run with a new `RUN_ID` instead.
+
+### Phase 7: Retrospective
+
+After closeout, spawn parallel subagents to analyze the completed run from multiple angles. Each agent reads the run artifacts independently and produces a section of the retrospective report. The full report is presented to the user for review before saving.
+
+**Spawn these agents in parallel (all background, mode: auto):**
+
+1. **Skill compliance auditor** - Read the run report, command log, and run-status.json. Check whether the runner followed the skill contract: were all groups executed or properly approved for skip? Were AskUserQuestion gates respected? Were env vars or python used? Were harness wrappers used for all cluster access? Score compliance 0-100 with specific violations listed.
+
+2. **Manifest quality reviewer** - Read all manifests in the suite (baseline + groups). Check for: missing fields that CRDs require (appProtocol, labels, namespace), resources that should have defaults but don't, manifests that duplicate baseline without changes, overly broad targetRef (kind: Mesh when more specific would work). Rate each group's manifest quality.
+
+3. **Test coverage analyzer** - Read suite.md, all group files, and the run report. Identify: which user stories are fully covered vs partially tested, which edge cases were tested (error paths, deletion, reapply), which combinations of features were tested together, gaps where a group exists but verification was shallow (just "apply and check pod ready" without deeper validation).
+
+4. **Product findings summarizer** - Read the run report, command log artifacts, and any bug-found entries. Compile: confirmed product bugs with reproduction steps, CRD vs Go validator mismatches, behavioral differences from spec/MADR expectations, performance observations. Each finding should reference the exact group and step where it was discovered.
+
+5. **Process improvement advisor** - Read command log, run timing data, and any failure/retry sequences. Identify: steps that took disproportionately long, unnecessary retries, places where a harness command could replace manual work, suite:new authoring improvements that would prevent issues seen during this run, skill definition changes that would improve future runs.
+
+**After all agents complete:**
+
+1. Assemble their outputs into a single retrospective document with sections matching the agent roles above
+2. Save as a draft: `{run_dir}/retrospective-draft.md`
+3. Present the FULL retrospective to the user via AskUserQuestion with options:
+   - `Save as-is` - save to `{run_dir}/retrospective.md`
+   - `Request changes` - user provides feedback, regenerate specific sections
+   - `Discard` - do not save
+4. If the user requests changes, apply them and re-present. Iterate until the user approves or discards.
+5. After saving, also copy key improvement suggestions to `{suite_dir}/improvements.md` (append, not overwrite) so they accumulate across runs.
+
+**Gate**: retrospective saved or explicitly discarded by user before proceeding to cluster teardown.
+
+### Phase 8: Cluster teardown
 
 ```bash
 # Kubernetes single-zone
