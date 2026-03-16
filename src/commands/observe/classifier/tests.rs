@@ -1,5 +1,7 @@
 use super::*;
-use crate::commands::observe::types::{IssueCategory, MessageRole, ScanState, SourceTool};
+use crate::commands::observe::types::{
+    IssueCategory, IssueSeverity, MessageRole, ScanState, SourceTool,
+};
 
 fn make_state() -> ScanState {
     ScanState::default()
@@ -359,6 +361,80 @@ fn details_truncated_at_construction() {
     );
     assert!(!issues.is_empty());
     assert!(issues[0].details.len() <= 2001);
+}
+
+#[test]
+fn detects_raw_make_k3d_target() {
+    let mut state = make_state();
+    let block = serde_json::json!({
+        "type": "tool_use",
+        "id": "t1",
+        "name": "Bash",
+        "input": { "command": "K3D_HELM_DEPLOY_NO_CNI=true KIND_CLUSTER_NAME=kuma-1 make k3d/deploy/helm" }
+    });
+    let issues = check_tool_use_for_issues(10, &block, &mut state);
+    assert!(
+        issues
+            .iter()
+            .any(|i| i.category == IssueCategory::UnexpectedBehavior
+                && i.severity == IssueSeverity::Critical
+                && i.summary.contains("make target"))
+    );
+}
+
+#[test]
+fn detects_raw_make_kind_target() {
+    let mut state = make_state();
+    let block = serde_json::json!({
+        "type": "tool_use",
+        "id": "t1",
+        "name": "Bash",
+        "input": { "command": "make kind/create" }
+    });
+    let issues = check_tool_use_for_issues(10, &block, &mut state);
+    assert!(
+        issues
+            .iter()
+            .any(|i| i.category == IssueCategory::UnexpectedBehavior
+                && i.severity == IssueSeverity::Critical)
+    );
+}
+
+#[test]
+fn detects_git_commit_during_run() {
+    let mut state = make_state();
+    let block = serde_json::json!({
+        "type": "tool_use",
+        "id": "t1",
+        "name": "Bash",
+        "input": { "command": "git add src/xds.go && git commit -sS -m \"fix(xds): correct route\"" }
+    });
+    let issues = check_tool_use_for_issues(10, &block, &mut state);
+    assert!(
+        issues
+            .iter()
+            .any(|i| i.category == IssueCategory::UnexpectedBehavior
+                && i.severity == IssueSeverity::Critical
+                && i.summary.contains("git commit"))
+    );
+}
+
+#[test]
+fn detects_git_add_alone() {
+    let mut state = make_state();
+    let block = serde_json::json!({
+        "type": "tool_use",
+        "id": "t1",
+        "name": "Bash",
+        "input": { "command": "git add -A" }
+    });
+    let issues = check_tool_use_for_issues(10, &block, &mut state);
+    assert!(
+        issues
+            .iter()
+            .any(|i| i.category == IssueCategory::UnexpectedBehavior
+                && i.severity == IssueSeverity::Critical)
+    );
 }
 
 #[test]
