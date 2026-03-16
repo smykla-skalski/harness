@@ -8,6 +8,7 @@ use std::time::Duration;
 use regex::Regex;
 
 use crate::bootstrap;
+use crate::cli::ClusterArgs;
 use crate::cluster::{ClusterSpec, HelmSetting, Platform};
 use crate::compact;
 use crate::compact::{build_compact_handoff, save_compact_handoff};
@@ -18,8 +19,8 @@ use crate::ephemeral_metallb;
 use crate::errors::{CliError, CliErrorKind, cow};
 use crate::exec::{
     cluster_exists, compose_down, compose_up, docker_inspect_ip, docker_network_create,
-    docker_network_rm, docker_rm, docker_run_detached, kubectl, run_command, run_command_streaming,
-    wait_for_http,
+    docker_network_rm, docker_rm, docker_run_detached, extract_admin_token, kubectl, run_command,
+    run_command_streaming, wait_for_http,
 };
 use crate::io::ensure_dir;
 use crate::session_hook::SessionStartHookOutput;
@@ -60,38 +61,27 @@ fn make_target_live(
 ///
 /// # Errors
 /// Returns `CliError` on failure.
-#[allow(clippy::too_many_arguments)]
-pub fn cluster(
-    mode: &str,
-    cluster_name: &str,
-    extra_cluster_names: &[String],
-    platform_str: &str,
-    repo_root: Option<&str>,
-    _run_dir: Option<&str>,
-    helm_setting: &[String],
-    restart_namespace: &[String],
-    store: &str,
-    image: Option<&str>,
-) -> Result<i32, CliError> {
-    let platform: Platform = platform_str
+pub fn cluster(args: &ClusterArgs) -> Result<i32, CliError> {
+    let platform: Platform = args
+        .platform
         .parse()
         .map_err(|e: String| CliError::from(CliErrorKind::usage_error(e)))?;
     match platform {
         Platform::Kubernetes => cluster_k8s(
-            mode,
-            cluster_name,
-            extra_cluster_names,
-            repo_root,
-            helm_setting,
-            restart_namespace,
+            &args.mode,
+            &args.cluster_name,
+            &args.extra_cluster_names,
+            args.repo_root.as_deref(),
+            &args.helm_setting,
+            &args.restart_namespace,
         ),
         Platform::Universal => cluster_universal(
-            mode,
-            cluster_name,
-            extra_cluster_names,
-            repo_root,
-            store,
-            image,
+            &args.mode,
+            &args.cluster_name,
+            &args.extra_cluster_names,
+            args.repo_root.as_deref(),
+            &args.store,
+            args.image.as_deref(),
         ),
     }
 }
@@ -437,14 +427,20 @@ fn universal_single_up(
         &env,
         &[(5681, 5681), (5678, 5678)],
         &[],
-        &[],
+        &["run"],
     )?;
 
     let ip = docker_inspect_ip(cp_name, network)?;
     let health_url = format!("http://{ip}:5681");
     eprintln!("{} cluster: waiting for CP at {health_url}", utc_now());
-    wait_for_http(&health_url, Duration::from_secs(30))?;
-    eprintln!("{} cluster: CP ready at {health_url}", utc_now());
+    wait_for_http(&health_url, Duration::from_secs(60))?;
+
+    let admin_token = extract_admin_token(cp_name)?;
+    eprintln!(
+        "{} cluster: CP ready at {health_url} (admin token extracted)",
+        utc_now()
+    );
+    eprintln!("admin-token={admin_token}");
     Ok(())
 }
 
@@ -531,17 +527,21 @@ fn universal_global_two_zones_up(
 
     docker_network_create(network, UNIVERSAL_SUBNET)?;
 
-    let compose_file = compose::global_two_zones(
+    let compose_file = compose::global_two_zones(compose::GlobalTwoZonesConfig {
         image,
-        network,
-        UNIVERSAL_SUBNET,
-        store,
+        network_name: network,
+        subnet: UNIVERSAL_SUBNET,
+        store_type: store,
         global_name,
-        zone1_name,
-        zone1_label,
-        zone2_name,
-        zone2_label,
-    );
+        zone1: compose::ZoneConfig {
+            name: zone1_name,
+            label: zone1_label,
+        },
+        zone2: compose::ZoneConfig {
+            name: zone2_name,
+            label: zone2_label,
+        },
+    });
     let tmp_dir = tempfile::tempdir().map_err(|e| CliErrorKind::io(cow!("temp dir: {e}")))?;
     let compose_path = tmp_dir.path().join("docker-compose.yaml");
     compose_file.write_to(&compose_path)?;
@@ -564,17 +564,21 @@ fn universal_global_two_zones_up(
 
 fn universal_global_two_zones_down(network: &str, names: &[String]) -> Result<(), CliError> {
     let global_name = &names[0];
-    let compose_file = compose::global_two_zones(
-        "unused",
-        network,
-        UNIVERSAL_SUBNET,
-        "memory",
+    let compose_file = compose::global_two_zones(compose::GlobalTwoZonesConfig {
+        image: "unused",
+        network_name: network,
+        subnet: UNIVERSAL_SUBNET,
+        store_type: "memory",
         global_name,
-        "z1",
-        "z1",
-        "z2",
-        "z2",
-    );
+        zone1: compose::ZoneConfig {
+            name: "z1",
+            label: "z1",
+        },
+        zone2: compose::ZoneConfig {
+            name: "z2",
+            label: "z2",
+        },
+    });
     let tmp_dir = tempfile::tempdir().map_err(|e| CliErrorKind::io(cow!("temp dir: {e}")))?;
     let compose_path = tmp_dir.path().join("docker-compose.yaml");
     compose_file.write_to(&compose_path)?;
