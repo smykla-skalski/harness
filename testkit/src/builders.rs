@@ -1522,7 +1522,10 @@ impl HookPayloadBuilder {
         HookEnvelopePayload {
             tool_name: self.tool_name.clone().unwrap_or_default(),
             tool_input,
-            tool_response: self.tool_response.clone().unwrap_or(serde_json::Value::Null),
+            tool_response: self
+                .tool_response
+                .clone()
+                .unwrap_or(serde_json::Value::Null),
             last_assistant_message: self.last_assistant_message.clone(),
             transcript_path: None,
             stop_hook_active: self.stop_hook_active,

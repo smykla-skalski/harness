@@ -37,6 +37,8 @@ hooks:
       hooks:
         - type: command
           command: "harness hook --skill suite:run verify-question"
+        - type: command
+          command: "harness hook --skill suite:run audit"
     - matcher: "Write"
       hooks:
         - type: command
@@ -47,6 +49,18 @@ hooks:
       hooks:
         - type: command
           command: "harness hook --skill suite:run verify-write"
+        - type: command
+          command: "harness hook --skill suite:run audit"
+    - matcher: "Read"
+      hooks:
+        - type: command
+          command: "harness hook --skill suite:run audit"
+    - matcher: "Glob"
+      hooks:
+        - type: command
+          command: "harness hook --skill suite:run audit"
+    - matcher: "Agent"
+      hooks:
         - type: command
           command: "harness hook --skill suite:run audit"
   PostToolUseFailure:

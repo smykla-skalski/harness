@@ -296,13 +296,12 @@ impl HookContext {
         if let Some(path) = self.tool_input().get("file_path").and_then(Value::as_str) {
             paths.push(Path::new(path));
         }
-        if let Some(extra_paths) = self.tool_input().get("file_paths").and_then(Value::as_array) {
-            paths.extend(
-                extra_paths
-                    .iter()
-                    .filter_map(Value::as_str)
-                    .map(Path::new),
-            );
+        if let Some(extra_paths) = self
+            .tool_input()
+            .get("file_paths")
+            .and_then(Value::as_array)
+        {
+            paths.extend(extra_paths.iter().filter_map(Value::as_str).map(Path::new));
         }
         paths
     }
