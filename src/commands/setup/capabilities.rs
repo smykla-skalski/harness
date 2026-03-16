@@ -25,7 +25,10 @@ pub enum TopologyMode {
 #[serde(rename_all = "snake_case")]
 #[non_exhaustive]
 pub enum Feature {
+    ApiAccess,
+    Bootstrap,
     ClusterCheck,
+    ClusterManagement,
     ContainerLogs,
     DataplaneTokens,
     EnvoyAdmin,
@@ -154,9 +157,29 @@ fn core_features() -> BTreeMap<Feature, FeatureInfo> {
     let kubernetes = &[Platform::Kubernetes];
     BTreeMap::from([
         (
+            Feature::ApiAccess,
+            FeatureInfo::new("send HTTP requests to CP REST API endpoints")
+                .commands(&[
+                    "harness api get",
+                    "harness api post",
+                    "harness api put",
+                    "harness api delete",
+                ]),
+        ),
+        (
+            Feature::Bootstrap,
+            FeatureInfo::new("initialize a test run with cluster and session context")
+                .command("harness bootstrap"),
+        ),
+        (
             Feature::ClusterCheck,
             FeatureInfo::new("verify cluster containers and networks are still running")
                 .command("harness cluster-check"),
+        ),
+        (
+            Feature::ClusterManagement,
+            FeatureInfo::new("create and tear down local k3d or universal Docker clusters")
+                .command("harness cluster"),
         ),
         (
             Feature::ContainerLogs,
@@ -348,6 +371,14 @@ mod tests {
         let json = serde_json::to_string(&caps).unwrap();
         let deserialized: CapabilitiesReport = serde_json::from_str(&json).unwrap();
         assert_eq!(caps, deserialized);
+    }
+
+    #[test]
+    fn features_include_api_cluster_bootstrap() {
+        let f = features();
+        assert!(f.contains_key(&Feature::ApiAccess));
+        assert!(f.contains_key(&Feature::Bootstrap));
+        assert!(f.contains_key(&Feature::ClusterManagement));
     }
 
     #[test]
