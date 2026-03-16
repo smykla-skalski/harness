@@ -238,6 +238,16 @@ Build the proposal from the saved worker outputs:
 - When `profiles` includes `multi-zone`, set `clusters: all` on workload-deploying baselines per [references/suite-structure.md](references/suite-structure.md).
 - Save the merged proposal with `harness authoring-save --kind proposal`.
 
+Group ordering rule - groups MUST be ordered by infrastructure complexity to avoid unnecessary cluster rebuilds:
+
+1. Standalone/unit tests that need no cluster (if any)
+2. Single-zone Kubernetes groups (all together)
+3. Single-zone universal groups (all together)
+4. Multi-zone Kubernetes groups (all together)
+5. Multi-zone universal groups (all together)
+
+Never interleave profiles - all groups for one profile must be contiguous. Within each tier, mark standalone tests that can run in parallel as parallelizable.
+
 Variant review rules:
 
 - Present strong signals pre-selected.
