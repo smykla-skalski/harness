@@ -344,6 +344,10 @@ mod tests {
     use super::*;
     use crate::schema::{RunCounts, Verdict};
     use std::fs;
+    use std::sync::Mutex;
+
+    /// Mutex for tests that modify environment variables (XDG_DATA_HOME, CLAUDE_SESSION_ID).
+    static ENV_MUTEX: Mutex<()> = Mutex::new(());
 
     fn sample_layout() -> RunLayout {
         RunLayout {
@@ -747,6 +751,7 @@ mod tests {
 
     #[test]
     fn run_context_from_current_returns_none_when_no_pointer() {
+        let _guard = ENV_MUTEX.lock().unwrap_or_else(|e| e.into_inner());
         let tmp = tempfile::tempdir().unwrap();
         temp_env::with_vars(
             [
