@@ -122,7 +122,7 @@ impl MessageRole {
     }
 }
 
-/// Tool that produced a piece of text (resolved from tool_use correlation).
+/// Tool that produced a piece of text (resolved from `tool_use` correlation).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum SourceTool {
     Bash,
