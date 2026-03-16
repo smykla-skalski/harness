@@ -483,6 +483,7 @@ fn check_session_start_no_replay(project: &Path) {
 }
 
 #[test]
+#[ignore = "slow: spawns fake toolchain processes"]
 fn compact_handoff_lifecycle() {
     let _lock = ENV_LOCK.lock().unwrap_or_else(PoisonError::into_inner);
     let (xdg, project) = setup_env();

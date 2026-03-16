@@ -1076,6 +1076,7 @@ fn check_authoring_save_rejects_schema_missing_fields() {
 }
 
 #[test]
+#[ignore = "slow: spawns fake toolchain processes"]
 fn env_dependent_tests() {
     let _lock = super::super::helpers::ENV_LOCK
         .lock()

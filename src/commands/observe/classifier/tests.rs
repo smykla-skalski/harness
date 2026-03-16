@@ -1072,3 +1072,76 @@ fn absolute_manifest_path_output_shape() {
             .is_some_and(|hint| hint.contains("relative manifest paths"))
     );
 }
+
+#[test]
+fn detects_sleep_and_ampersand_harness() {
+    let mut state = make_state();
+    let block = serde_json::json!({
+        "type": "tool_use",
+        "id": "t1",
+        "name": "Bash",
+        "input": { "command": "sleep 8 && harness apply --manifest g13/01.yaml" }
+    });
+    let issues = check_tool_use_for_issues(10, &block, &mut state);
+    assert!(
+        issues
+            .iter()
+            .any(|i| i.category == IssueCategory::UnexpectedBehavior
+                && i.severity == IssueSeverity::Low
+                && i.summary.contains("Sleep prefix"))
+    );
+}
+
+#[test]
+fn detects_sleep_and_semicolon_harness() {
+    let mut state = make_state();
+    let block = serde_json::json!({
+        "type": "tool_use",
+        "id": "t1",
+        "name": "Bash",
+        "input": { "command": "sleep 5; harness record --label test -- kubectl get pods" }
+    });
+    let issues = check_tool_use_for_issues(10, &block, &mut state);
+    assert!(
+        issues
+            .iter()
+            .any(|i| i.category == IssueCategory::UnexpectedBehavior
+                && i.severity == IssueSeverity::Low
+                && i.summary.contains("Sleep prefix"))
+    );
+}
+
+#[test]
+fn skips_sleep_without_harness_continuation() {
+    let mut state = make_state();
+    let block = serde_json::json!({
+        "type": "tool_use",
+        "id": "t1",
+        "name": "Bash",
+        "input": { "command": "sleep 5 && echo done" }
+    });
+    let issues = check_tool_use_for_issues(10, &block, &mut state);
+    assert!(!issues.iter().any(|i| i.summary.contains("Sleep prefix")));
+}
+
+#[test]
+fn sleep_prefix_output_shape() {
+    let mut state = make_state();
+    let block = serde_json::json!({
+        "type": "tool_use",
+        "id": "t1",
+        "name": "Bash",
+        "input": { "command": "sleep 10 && harness capture --label post-apply" }
+    });
+    let issues = check_tool_use_for_issues(10, &block, &mut state);
+    assert_eq!(issues.len(), 1);
+    let issue = &issues[0];
+    assert!(issue.fixable);
+    assert!(issue.fix_target.is_none());
+    assert!(
+        issue
+            .fix_hint
+            .as_deref()
+            .is_some_and(|hint| hint.contains("--delay"))
+    );
+}

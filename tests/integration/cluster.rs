@@ -167,6 +167,7 @@ fn run_dir_recovers_cluster() {
 // ============================================================================
 
 #[test]
+#[ignore = "slow: spawns fake toolchain processes"]
 fn global_zone_up_orchestration() {
     let _lock = ENV_LOCK.lock().unwrap_or_else(PoisonError::into_inner);
     let tmp = tempfile::tempdir().unwrap();
@@ -221,6 +222,7 @@ fn global_zone_up_orchestration() {
 }
 
 #[test]
+#[ignore = "slow: spawns fake toolchain processes"]
 fn single_up_logs_stage_updates() {
     let _lock = ENV_LOCK.lock().unwrap_or_else(PoisonError::into_inner);
     let tmp = tempfile::tempdir().unwrap();
@@ -266,6 +268,7 @@ fn single_up_logs_stage_updates() {
 }
 
 #[test]
+#[ignore = "slow: spawns fake toolchain processes"]
 fn single_up_metallb_template() {
     let _lock = ENV_LOCK.lock().unwrap_or_else(PoisonError::into_inner);
     let tmp = tempfile::tempdir().unwrap();
@@ -311,6 +314,7 @@ fn single_up_metallb_template() {
 }
 
 #[test]
+#[ignore = "slow: spawns fake toolchain processes"]
 fn single_up_restores_context() {
     let _lock = ENV_LOCK.lock().unwrap_or_else(PoisonError::into_inner);
     let tmp = tempfile::tempdir().unwrap();
@@ -372,6 +376,7 @@ fn single_up_restores_context() {
 }
 
 #[test]
+#[ignore = "slow: spawns fake toolchain processes"]
 fn cluster_context_up_down() {
     let _lock = ENV_LOCK.lock().unwrap_or_else(PoisonError::into_inner);
     let tmp = tempfile::tempdir().unwrap();
@@ -453,6 +458,7 @@ fn cluster_context_up_down() {
 }
 
 #[test]
+#[ignore = "slow: spawns fake toolchain processes"]
 fn cluster_uses_saved_repo_root() {
     let _lock = ENV_LOCK.lock().unwrap_or_else(PoisonError::into_inner);
     let tmp = tempfile::tempdir().unwrap();
@@ -501,6 +507,7 @@ fn cluster_uses_saved_repo_root() {
 }
 
 #[test]
+#[ignore = "slow: spawns fake toolchain processes"]
 fn kumactl_find_repo_root() {
     let _lock = ENV_LOCK.lock().unwrap_or_else(PoisonError::into_inner);
     let tmp = tempfile::tempdir().unwrap();

@@ -6,11 +6,15 @@ description = "Run unit tests"
 run = "cargo test --lib"
 
 [tasks."test:integration"]
-description = "Run integration tests"
-run = "cargo test --test integration"
+description = "Run integration tests (fast only, single-threaded for env safety)"
+run = "cargo test --test integration -- --test-threads=1"
+
+[tasks."test:slow"]
+description = "Run ignored slow tests (fake toolchain, ENV_LOCK)"
+run = "cargo test --test integration -- --ignored --test-threads=1"
 
 [tasks.test]
-description = "Run all tests"
+description = "Run all fast tests"
 depends = ["test:unit", "test:integration"]
 
 [tasks.check]

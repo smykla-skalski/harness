@@ -129,15 +129,13 @@ Parse from `$ARGUMENTS`:
 
 Read [references/agent-contract.md](references/agent-contract.md) in full before starting any run. Top-level summary:
 
-- **No shell variables for paths.** Use `harness apply --manifest g02/04.yaml`, not `SD=... && harness apply --manifest ${SD}/g02/04.yaml`. Exception: Phase 0/1 init flags.
-- **All cluster commands through harness wrappers.** `harness run` for kubectl/kumactl, `harness record` for curl and others. Never raw binaries. Never `python3 -c` for JSON - use `jq` or `harness envoy`.
-- **All manifests through `harness apply`.** Always use relative paths with `--manifest` (e.g. `g13/01.yaml`, not `/full/path/to/g13/01.yaml`). Harness resolves them from the suite and run directories. Never `/tmp`, never `--validate=false`.
-- **Hard gate after each group** via `harness report group`. Use `--evidence-label` for tracked artifacts.
-- **No autonomous deviations.** Use AskUserQuestion before any change not in the suite, with options:
-  - `Approve deviation`
-  - `Reject`
-  - `Stop run`
-- **Stop and triage on first unexpected failure.** Every artifact path must resolve to an existing file.
+- **No shell variables.** `harness apply --manifest g02/04.yaml`, not `SD=...`. Exception: Phase 0/1 init.
+- **Harness wrappers only.** `harness run` for kubectl, `harness record` for others. No raw binaries, no `python3 -c`.
+- **`--delay` not `sleep`.** `harness apply --delay 8 --manifest ...` not `sleep 8 && harness apply`.
+- **Relative paths only.** `g13/01.yaml` not `/full/path/...`. No `/tmp`, no `--validate=false`.
+- **Hard gate after each group** via `harness report group`.
+- **No autonomous deviations.** AskUserQuestion before any unplanned change.
+- **STOP AND TRIAGE EVERY FAILURE.** On ANY unexpected result, failure, or mismatch - STOP. Classify as suite bug, product bug, harness bug, or environment issue. Present classification to user via AskUserQuestion BEFORE continuing. Never say "known bug" and move on. See bug-found gate in Phase 4.
 
 ## Workflow
 
@@ -250,13 +248,17 @@ Key principles (workflow.md has the details):
 
 ### Bug-found gate (mandatory)
 
-When any test check reveals actual behavior differs from suite expectations ("Finding:", "expected X actual Y", CRD vs Go validator mismatch), the runner MUST pause. Enter triage with `harness runner-state --event failure-manifest`, then present AskUserQuestion with first line `suite:run/bug-found: actual behavior differs from suite expectations`. Include the specific finding. Options:
+**BLOCKING REQUIREMENT**: On ANY unexpected result or failure, the runner MUST stop and triage. No exceptions.
 
-- `Fix now` - pause run, investigate and fix product code, then resume
-- `Continue and fix later` - record finding as known bug, mark group failed, continue
-- `Stop run` - stop the tracked run
+**Step 1 - Classify** as: **suite bug** (wrong manifest/expectations), **product bug** (Kuma vs spec), **harness bug** (infra misconfiguration), or **environment issue** (timing/resources).
 
-On first unexpected failure, go to Phase 5.
+**Step 2 - Report.** `harness runner-state --event failure-manifest`, then AskUserQuestion with `suite:run/bug-found: [classification] - [description]`. Options:
+
+- `Fix now` - pause run, fix based on classification, resume
+- `Continue and fix later` - record with classification, mark group failed, continue
+- `Stop run`
+
+Never say "known bug" and continue without asking. On first failure, go to Phase 5.
 
 **Gate**: all planned tests have pass/fail entries in the report. Every artifact path in the report resolves to an existing file. `run-status.json` reflects final counts.
 
@@ -341,7 +343,7 @@ Hook codes:
 - [references/validation.md](references/validation.md) - pre-apply checklist, safe apply flow
 - [references/troubleshooting.md](references/troubleshooting.md) - known failure modes and fixes
 
-**harness commands** (context-aware after `init`): `capabilities`, `init`, `preflight`, `cluster`, `validate`, `apply`, `capture`, `record`, `envoy`, `diff`, `gateway`, `kumactl find`/`build`, `report check`, `hook`. Run `harness --help` for details.
+**harness commands** (context-aware after `init`): `capabilities`, `init`, `preflight`, `cluster`, `validate`, `apply`, `capture`, `record`, `envoy`, `diff`, `gateway`, `kumactl find`/`build`, `report check`, `hook`. All commands accept `--delay <seconds>` to wait before executing. Run `harness --help` for details.
 
 **Templates** (in `assets/`): `run-metadata.template.json`, `run-status.template.json`, `command-log.template.md`, `manifest-index.template.md`, `run-report.template.md`
 
