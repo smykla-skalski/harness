@@ -60,7 +60,9 @@ pub(super) fn check_exit_code_issues(context: &mut TextCheckContext<'_>, issues:
         context.lower.contains("harness") && context.lower.contains("authoring");
 
     if is_harness_operation {
-        let summary = format!("Manifest operation failed at runtime (exit {exit_code}) - possible product bug");
+        let summary = format!(
+            "Manifest operation failed at runtime (exit {exit_code}) - possible product bug"
+        );
         if should_emit(IssueCategory::DataIntegrity, &summary, context.state) {
             issues.push(issue!(
                 context.line_number,

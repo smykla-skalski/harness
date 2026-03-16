@@ -1145,10 +1145,7 @@ mod tests {
 
     #[test]
     fn denies_python_stdin_pipe() {
-        let c = ctx(
-            "suite:run",
-            "cat data.json | python3 -",
-        );
+        let c = ctx("suite:run", "cat data.json | python3 -");
         let r = execute(&c).unwrap();
         assert_eq!(r.decision, Decision::Deny);
         assert!(r.message.contains("do not use python"));
@@ -1156,10 +1153,7 @@ mod tests {
 
     #[test]
     fn denies_python_without_version_suffix() {
-        let c = ctx(
-            "suite:new",
-            "echo '{}' | python -c \"import json\"",
-        );
+        let c = ctx("suite:new", "echo '{}' | python -c \"import json\"");
         let r = execute(&c).unwrap();
         assert_eq!(r.decision, Decision::Deny);
         assert!(r.message.contains("do not use python"));
