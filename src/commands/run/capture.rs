@@ -10,7 +10,7 @@ use crate::context::RunContext;
 use crate::errors::{CliError, CliErrorKind, cow};
 use crate::exec;
 use crate::exec::kubectl;
-use crate::io::write_text;
+use crate::io::{validate_safe_segment, write_text};
 
 use super::shared::detect_platform;
 
@@ -23,6 +23,7 @@ pub fn capture(
     label: &str,
     run_dir_args: &RunDirArgs,
 ) -> Result<i32, CliError> {
+    validate_safe_segment(label)?;
     let ctx = resolve_run_context(run_dir_args)?;
     let platform = detect_platform(&ctx);
 
