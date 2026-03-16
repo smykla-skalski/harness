@@ -147,6 +147,9 @@ pub fn check_text_for_issues(
         text_checks::check_exit_code_issues(&mut context, &mut issues);
         text_checks::check_env_misconfiguration(&mut context, &mut issues);
         text_checks::check_jq_errors(&mut context, &mut issues);
+        text_checks::check_closeout_verdict_pending(&mut context, &mut issues);
+        text_checks::check_runner_state_event_error(&mut context, &mut issues);
+        text_checks::check_runner_state_machine_stale(&mut context, &mut issues);
     }
     if role == MessageRole::User && source_tool.is_none() {
         text_checks::check_permission_failures(&mut context, &mut issues);
