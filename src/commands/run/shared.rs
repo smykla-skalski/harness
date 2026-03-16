@@ -1,9 +1,11 @@
 use std::env;
 use std::path::{Path, PathBuf};
+use std::process::Command;
 
 use crate::cluster::Platform;
+use crate::commands::resolve_kubeconfig;
 use crate::context::RunContext;
-use crate::core_defs::harness_data_root;
+use crate::core_defs::{harness_data_root, host_platform};
 use crate::errors::{CliError, CliErrorKind, cow};
 use crate::suite_defaults::default_repo_root_for_suite;
 
@@ -37,6 +39,44 @@ pub(crate) fn resolve_run_root(raw: Option<&str>, suite_dir: Option<&Path>) -> P
         return directory.join("runs");
     }
     harness_data_root().join("runs")
+}
+
+/// Inject `KUBECONFIG` and `REPO_ROOT` from the persisted run context so
+/// kubectl hits the local k3d cluster and kumactl resolves to the
+/// worktree build, not whatever is on the default PATH.
+///
+/// Best-effort: logs warnings on failure instead of propagating errors
+/// because record works in detached mode without a full run context.
+pub(crate) fn inject_run_env(cmd: &mut Command, run_dir: &Path, cluster: Option<&str>) {
+    let ctx = match RunContext::from_run_dir(run_dir) {
+        Ok(c) => c,
+        Err(e) => {
+            eprintln!("warning: failed to load run context: {e}");
+            return;
+        }
+    };
+    let is_universal = ctx
+        .cluster
+        .as_ref()
+        .is_some_and(|spec| spec.platform == Platform::Universal);
+    if !is_universal {
+        match resolve_kubeconfig(&ctx, None, cluster) {
+            Ok(kubeconfig) => {
+                cmd.env("KUBECONFIG", kubeconfig);
+            }
+            Err(e) => eprintln!("warning: failed to resolve kubeconfig: {e}"),
+        }
+    }
+    let repo_root = &ctx.metadata.repo_root;
+    if !repo_root.is_empty() {
+        cmd.env("REPO_ROOT", repo_root);
+        let (os_name, arch) = host_platform();
+        let kumactl_dir = format!("{repo_root}/build/artifacts-{os_name}-{arch}/kumactl");
+        if Path::new(&kumactl_dir).is_dir() {
+            let current_path = env::var("PATH").unwrap_or_default();
+            cmd.env("PATH", format!("{kumactl_dir}:{current_path}"));
+        }
+    }
 }
 
 /// Detect the runtime platform from the run context.
