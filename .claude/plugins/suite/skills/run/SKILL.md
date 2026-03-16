@@ -181,7 +181,9 @@ After init or reattach, use only context-driven `harness` commands. Do not pass 
 
 Read [references/cluster-setup.md](references/cluster-setup.md) before starting this phase.
 
-When `--profile all` (the default), read all group files and collect the set of required profiles. For each profile, execute a full run (Phase 1-8) with only the groups matching that profile. Present the execution plan to the user via AskUserQuestion with options:
+When `--profile all` (the default), read all group files and collect the set of required profiles. Sort groups by profile tier: standalone, single-zone Kubernetes, single-zone universal, multi-zone Kubernetes, multi-zone universal. Execute all groups for one profile before tearing down and moving to the next. Parallelizable groups within a profile can run concurrently. If suite profile ordering is non-contiguous, warn and propose a reorder.
+
+For each profile, execute a full run (Phase 1-8) with only the groups matching that profile. Present the execution plan via AskUserQuestion with options:
 
 - `Run all profiles` - execute every required profile sequentially
 - `Select profiles` - user picks which profiles to run
