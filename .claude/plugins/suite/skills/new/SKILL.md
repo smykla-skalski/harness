@@ -257,8 +257,8 @@ Use the same AskUserQuestion header as step 8 so the suite path and runner comma
 
 Review loop rules:
 
-- Present **all suggested groups** with multiSelect. If one prompt is too small, split it across multiple AskUserQuestion passes. Every page must still include an `All suggested groups` option for the complete inventory.
-- Each group option must include a one-line description and enough context to decide whether it belongs in the suite.
+- Present **every single group** as a structured AskUserQuestion option with multiSelect. Each option must use the `label` + `description` form so the user sees the group ID and title on the left, with profiles, preconditions, and success criteria in the description preview on the right. Do NOT summarize groups in prose text. If one prompt is too small, split across multiple AskUserQuestion passes. Every page must include an `All suggested groups` option.
+- Never present the proposal as a text block followed by an approval question. The group list IS the approval question - each option is a group the user can include or exclude.
 - After selection, gather one comment per selected group and one general suite-level comment, save them with `harness authoring-save --kind edit-request`, and rebuild the proposal from cached worker outputs.
 - Re-run only the affected discovery worker when feedback invalidates earlier coverage, variant, or schema assumptions, then resave the proposal and show the loop again until approval.
 - Immediately initialize the approval state with `harness approval-begin --skill suite:new --mode interactive --suite-dir "${SUITE_DIR}"`. If `--yes` or `-y` is set, use `--mode bypass` instead. If the suite name or directory changes during the pre-write review loop, rerun `approval-begin` with the updated `SUITE_DIR` before asking the canonical pre-write approval question.
