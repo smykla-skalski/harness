@@ -1,7 +1,7 @@
-use super::issue_builder::issue;
-use super::{AGENT_NAME_REGEX, EXIT_CODE_REGEX, TextCheckContext, should_emit};
+use super::emitter::{Guidance, IssueBlueprint};
+use super::{AGENT_NAME_REGEX, EXIT_CODE_REGEX, TextCheckContext};
 use crate::commands::observe::patterns;
-use crate::commands::observe::types::{Issue, IssueCategory};
+use crate::commands::observe::types::{Issue, IssueCategory, IssueCode, IssueSeverity};
 
 /// Check for KSA hook codes in Bash output.
 /// Caller guarantees: `source_tool` == Bash.
@@ -10,19 +10,17 @@ pub(super) fn check_ksa_codes(context: &mut TextCheckContext<'_>, issues: &mut V
         if context.lower.contains(code) {
             let display_code = code.to_uppercase();
             let summary = format!("Harness hook code {display_code} triggered");
-            if !should_emit(IssueCategory::HookFailure, &summary, context.state) {
-                break;
-            }
-            issues.push(issue!(
-                context.line_number,
-                context.role,
-                context.text,
-                HookFailure,
-                Medium,
+            let blueprint = IssueBlueprint::new(
+                IssueCode::HarnessHookCodeTriggered,
+                IssueCategory::HookFailure,
+                IssueSeverity::Medium,
                 summary,
-                fixable: true,
-                fix_hint: format!("Check hook logic for {display_code}"),
-            ));
+            )
+            .with_fingerprint(display_code.clone())
+            .with_guidance(Guidance::fix_hint(format!(
+                "Check hook logic for {display_code}"
+            )));
+            context.emit_current(issues, blueprint);
             break;
         }
     }
@@ -63,47 +61,44 @@ pub(super) fn check_exit_code_issues(context: &mut TextCheckContext<'_>, issues:
         let summary = format!(
             "Manifest operation failed at runtime (exit {exit_code}) - possible product bug"
         );
-        if should_emit(IssueCategory::DataIntegrity, &summary, context.state) {
-            issues.push(issue!(
-                context.line_number,
-                context.role,
-                context.text,
-                DataIntegrity,
-                Medium,
-                summary,
-                fixable: true,
-                fix_hint: "Manifest preflight/apply/validate failed. Could be a suite error OR a product bug. \
-                           Investigate whether the Go validator accepts what the CRD rejects.",
-            ));
-        }
+        let blueprint = IssueBlueprint::new(
+            IssueCode::ManifestRuntimeFailure,
+            IssueCategory::DataIntegrity,
+            IssueSeverity::Medium,
+            summary,
+        )
+        .with_fingerprint("manifest_runtime_failure")
+        .with_guidance(Guidance::fix_hint(
+            "Manifest preflight/apply/validate failed. Could be a suite error OR a product bug. \
+             Investigate whether the Go validator accepts what the CRD rejects.",
+        ));
+        context.emit_current(issues, blueprint);
     } else if is_harness_authoring {
         let summary = format!("Harness authoring command failed (exit {exit_code})");
-        if should_emit(IssueCategory::WorkflowError, &summary, context.state) {
-            issues.push(issue!(
-                context.line_number,
-                context.role,
-                context.text,
-                WorkflowError,
-                Medium,
-                summary,
-                fixable: true,
-                fix_hint:
-                    "Harness authoring command returned non-zero - check payload or arguments",
-            ));
-        }
+        let blueprint = IssueBlueprint::new(
+            IssueCode::HarnessAuthoringCommandFailure,
+            IssueCategory::WorkflowError,
+            IssueSeverity::Medium,
+            summary,
+        )
+        .with_fingerprint("harness_authoring_failure")
+        .with_guidance(Guidance::fix_hint(
+            "Harness authoring command returned non-zero - check payload or arguments",
+        ));
+        context.emit_current(issues, blueprint);
     } else if exit_code != 1 {
         let summary = format!("Non-zero exit code {exit_code}");
-        if should_emit(IssueCategory::SubagentIssue, &summary, context.state) {
-            issues.push(issue!(
-                context.line_number,
-                context.role,
-                context.text,
-                SubagentIssue,
-                Low,
-                summary,
-                fix_hint: format!("Command exited with code {exit_code}"),
-            ));
-        }
+        let blueprint = IssueBlueprint::new(
+            IssueCode::NonZeroExitCode,
+            IssueCategory::SubagentIssue,
+            IssueSeverity::Low,
+            summary,
+        )
+        .with_fingerprint("non_zero_exit_code")
+        .with_guidance(Guidance::advisory(format!(
+            "Command exited with code {exit_code}"
+        )));
+        context.emit_current(issues, blueprint);
     }
 }
 
@@ -124,19 +119,17 @@ pub(super) fn check_permission_failures(
         .and_then(|c| c.get(1))
         .map_or("unknown", |m| m.as_str());
     let summary = format!("Subagent '{agent_name}' blocked by missing permissions");
-    if !should_emit(IssueCategory::SubagentIssue, &summary, context.state) {
-        return;
-    }
-    issues.push(issue!(
-        context.line_number,
-        context.role,
-        context.text,
-        SubagentIssue,
-        Medium,
+    let blueprint = IssueBlueprint::new(
+        IssueCode::SubagentPermissionFailure,
+        IssueCategory::SubagentIssue,
+        IssueSeverity::Medium,
         summary,
-        fixable: true,
-        fix_hint: "Subagent needs permissionMode dontAsk or mode auto for Bash/Write",
+    )
+    .with_fingerprint(agent_name)
+    .with_guidance(Guidance::fix_hint(
+        "Subagent needs permissionMode dontAsk or mode auto for Bash/Write",
     ));
+    context.emit_current(issues, blueprint);
 }
 
 /// Check for subagent save failures in assistant text.
@@ -151,19 +144,16 @@ pub(super) fn check_save_failures(context: &mut TextCheckContext<'_>, issues: &m
     let text_context: String = context.text.chars().take(40).collect();
     let text_context = text_context.replace('\n', " ");
     let summary = format!("Subagent manual recovery: {text_context}");
-    if !should_emit(IssueCategory::SubagentIssue, &summary, context.state) {
-        return;
-    }
-    issues.push(issue!(
-        context.line_number,
-        context.role,
-        context.text,
-        SubagentIssue,
-        Medium,
+    let blueprint = IssueBlueprint::new(
+        IssueCode::SubagentManualRecovery,
+        IssueCategory::SubagentIssue,
+        IssueSeverity::Medium,
         summary,
-        fixable: true,
-        fix_hint: "Subagent lacks write permissions or hit a harness CLI error during save",
+    )
+    .with_guidance(Guidance::fix_hint(
+        "Subagent lacks write permissions or hit a harness CLI error during save",
     ));
+    context.emit_current(issues, blueprint);
 }
 
 /// Check for manual payload recovery patterns.
@@ -177,21 +167,16 @@ pub(super) fn check_payload_recovery(context: &mut TextCheckContext<'_>, issues:
         || context.lower.contains("extract and save")
         || context.lower.contains("grab its");
     if has_grep && has_target && has_recovery {
-        let summary = "Manual payload recovery from subagent output";
-        if !should_emit(IssueCategory::SubagentIssue, summary, context.state) {
-            return;
-        }
-        issues.push(issue!(
-            context.line_number,
-            context.role,
-            context.text,
-            SubagentIssue,
-            Medium,
-            summary,
-            fixable: true,
-            fix_hint:
-                "Subagent should save its own payload - manual grep recovery is a workflow failure",
+        let blueprint = IssueBlueprint::new(
+            IssueCode::ManualPayloadRecovery,
+            IssueCategory::SubagentIssue,
+            IssueSeverity::Medium,
+            "Manual payload recovery from subagent output",
+        )
+        .with_guidance(Guidance::fix_hint(
+            "Subagent should save its own payload - manual grep recovery is a workflow failure",
         ));
+        context.emit_current(issues, blueprint);
     }
 }
 
@@ -206,40 +191,32 @@ pub(super) fn check_env_misconfiguration(
             continue;
         }
         if signal.contains("claude_session_id") {
-            let summary = "CLAUDE_SESSION_ID is unset - harness cannot resolve session context";
-            if !should_emit(IssueCategory::DataIntegrity, summary, context.state) {
-                continue;
-            }
-            issues.push(issue!(
-                context.line_number,
-                context.role,
-                context.text,
-                DataIntegrity,
-                Critical,
-                summary,
-                fixable: true,
-                fix_target: "src/context.rs",
-                fix_hint: "Session ID env var not set. Harness init and runner-state \
-                           cannot find the context directory without it.",
+            let blueprint = IssueBlueprint::new(
+                IssueCode::MissingClaudeSessionId,
+                IssueCategory::DataIntegrity,
+                IssueSeverity::Critical,
+                "CLAUDE_SESSION_ID is unset - harness cannot resolve session context",
+            )
+            .with_guidance(Guidance::fix_target_hint(
+                "src/context.rs",
+                "Session ID env var not set. Harness init and runner-state \
+                 cannot find the context directory without it.",
             ));
+            context.emit_current(issues, blueprint);
         } else if signal.contains("kubeconfig") {
-            let summary = "KUBECONFIG is empty - cluster commands will hit default context";
-            if !should_emit(IssueCategory::SkillBehavior, summary, context.state) {
-                continue;
-            }
-            issues.push(issue!(
-                context.line_number,
-                context.role,
-                context.text,
-                SkillBehavior,
-                Critical,
-                summary,
-                fixable: true,
-                fix_target: "skills/run/SKILL.md",
-                fix_hint: "harness cluster should set KUBECONFIG to the k3d cluster config. \
-                           Without it, kubectl defaults to ~/.kube/config which may point \
-                           to a corporate cluster.",
+            let blueprint = IssueBlueprint::new(
+                IssueCode::EmptyKubeconfig,
+                IssueCategory::SkillBehavior,
+                IssueSeverity::Critical,
+                "KUBECONFIG is empty - cluster commands will hit default context",
+            )
+            .with_guidance(Guidance::fix_target_hint(
+                "skills/run/SKILL.md",
+                "harness cluster should set KUBECONFIG to the k3d cluster config. \
+                 Without it, kubectl defaults to ~/.kube/config which may point \
+                 to a corporate cluster.",
             ));
+            context.emit_current(issues, blueprint);
         }
     }
 }
@@ -253,20 +230,16 @@ pub(super) fn check_incomplete_writer(context: &mut TextCheckContext<'_>, issues
     {
         return;
     }
-    let summary = "Writer subagent produced incomplete output";
-    if !should_emit(IssueCategory::SubagentIssue, summary, context.state) {
-        return;
-    }
-    issues.push(issue!(
-        context.line_number,
-        context.role,
-        context.text,
-        SubagentIssue,
-        Medium,
-        summary,
-        fixable: true,
-        fix_hint: "Writer agent failed to save all files - check permissions and payload size",
+    let blueprint = IssueBlueprint::new(
+        IssueCode::IncompleteWriterOutput,
+        IssueCategory::SubagentIssue,
+        IssueSeverity::Medium,
+        "Writer subagent produced incomplete output",
+    )
+    .with_guidance(Guidance::fix_hint(
+        "Writer agent failed to save all files - check permissions and payload size",
     ));
+    context.emit_current(issues, blueprint);
 }
 
 /// Check for user frustration signals in human text.
@@ -281,18 +254,15 @@ pub(super) fn check_user_frustration(context: &mut TextCheckContext<'_>, issues:
         .any(|signal| context.lower.contains(signal));
 
     if exclamation_count >= 4 || has_signal {
-        let summary = "User frustration signal detected";
-        if !should_emit(IssueCategory::UserFrustration, summary, context.state) {
-            return;
-        }
-        issues.push(issue!(
-            context.line_number,
-            context.role,
-            context.text,
-            UserFrustration,
-            Medium,
-            summary,
-            fix_hint: "Review what happened before this - likely a UX issue",
+        let blueprint = IssueBlueprint::new(
+            IssueCode::UserFrustrationDetected,
+            IssueCategory::UserFrustration,
+            IssueSeverity::Medium,
+            "User frustration signal detected",
+        )
+        .with_guidance(Guidance::advisory(
+            "Review what happened before this - likely a UX issue",
         ));
+        context.emit_current(issues, blueprint);
     }
 }

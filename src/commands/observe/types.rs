@@ -178,6 +178,53 @@ pub struct Issue {
     pub fix_hint: Option<String>,
 }
 
+/// Stable internal identity for a classified issue family.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum IssueCode {
+    HookDeniedToolCall,
+    HarnessCliErrorOutput,
+    ToolUsageErrorOutput,
+    BuildOrLintFailure,
+    WorkflowStateErrorOutput,
+    PodContainerRuntimeFailure,
+    AuthFlowTriggered,
+    DirectKubectlValidateUsage,
+    ShellAliasInterference,
+    PayloadWrappedInJsonTags,
+    PythonTracebackOutput,
+    SuiteDeviationDetected,
+    ReleaseKumactlBinaryUsed,
+    PythonUsedInBashOutput,
+    CorporateClusterContextDetected,
+    HarnessHookCodeTriggered,
+    ManifestRuntimeFailure,
+    HarnessAuthoringCommandFailure,
+    NonZeroExitCode,
+    SubagentPermissionFailure,
+    SubagentManualRecovery,
+    ManualPayloadRecovery,
+    MissingClaudeSessionId,
+    EmptyKubeconfig,
+    IncompleteWriterOutput,
+    UserFrustrationDetected,
+    OldSkillNameUsedInCommand,
+    InvalidHarnessSubcommandUsed,
+    PythonUsedInBashToolUse,
+    UnverifiedRecursiveRemove,
+    RawClusterMakeTargetUsed,
+    UnauthorizedGitCommitDuringRun,
+    ManualKubeconfigConstruction,
+    ManualExportConstruction,
+    ManualEnvPrefixConstruction,
+    ManifestFixPromptShown,
+    ValidatorInstallPromptShown,
+    RuntimeDeviationPromptShown,
+    WrongSkillCrossReference,
+    FileEditChurn,
+    ShortSkillNameInSkillFile,
+    DirectManagedFileWrite,
+}
+
 /// Record of a `tool_use` block, for correlating with `tool_result`.
 #[derive(Debug, Clone)]
 pub struct ToolUseRecord {
@@ -192,8 +239,8 @@ pub struct ScanState {
     pub last_tool_uses: HashMap<String, ToolUseRecord>,
     /// Track file edit churn: path -> edit count.
     pub edit_counts: HashMap<String, usize>,
-    /// Dedup key: (category, number-normalized summary).
-    pub seen_issues: HashSet<(IssueCategory, String)>,
+    /// Dedup key: (stable issue family, semantic fingerprint).
+    pub seen_issues: HashSet<(IssueCode, String)>,
     /// Session start timestamp from the first event.
     pub session_start_timestamp: Option<String>,
 }
