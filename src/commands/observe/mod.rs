@@ -1042,6 +1042,147 @@ fn execute_mute(
     Ok(0)
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Write as _;
+
+    fn write_session_file(dir: &Path, lines: &[&str]) -> PathBuf {
+        let path = dir.join("test-session.jsonl");
+        let mut file = fs::File::create(&path).unwrap();
+        for line in lines {
+            writeln!(file, "{line}").unwrap();
+        }
+        path
+    }
+
+    #[test]
+    fn resolve_from_numeric() {
+        let tmp = tempfile::tempdir().unwrap();
+        let path = write_session_file(tmp.path(), &["{}", "{}"]);
+        let result = resolve_from(&path, "500");
+        assert_eq!(result.unwrap(), 500);
+    }
+
+    #[test]
+    fn resolve_from_timestamp() {
+        let tmp = tempfile::tempdir().unwrap();
+        let lines = [
+            r#"{"timestamp":"2026-03-15T10:00:00Z","message":{"role":"user","content":"hello"}}"#,
+            r#"{"timestamp":"2026-03-15T11:00:00Z","message":{"role":"user","content":"world"}}"#,
+            r#"{"timestamp":"2026-03-15T12:00:00Z","message":{"role":"user","content":"end"}}"#,
+        ];
+        let path = write_session_file(tmp.path(), &lines);
+        let result = resolve_from(&path, "2026-03-15T11:00:00Z");
+        assert_eq!(result.unwrap(), 1);
+    }
+
+    #[test]
+    fn resolve_from_prose() {
+        let tmp = tempfile::tempdir().unwrap();
+        let lines = [
+            r#"{"message":{"role":"user","content":"starting bootstrap"}}"#,
+            r#"{"message":{"role":"user","content":"running tests now"}}"#,
+        ];
+        let path = write_session_file(tmp.path(), &lines);
+        let result = resolve_from(&path, "running tests");
+        assert_eq!(result.unwrap(), 1);
+    }
+
+    #[test]
+    fn resolve_from_no_match() {
+        let tmp = tempfile::tempdir().unwrap();
+        let path = write_session_file(
+            tmp.path(),
+            &[r#"{"message":{"role":"user","content":"hello"}}"#],
+        );
+        let result = resolve_from(&path, "nonexistent phrase");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn filter_validation_unknown_severity() {
+        let filter = ObserveFilterArgs {
+            from_line: 0,
+            from: None,
+            focus: None,
+            project_hint: None,
+            json: false,
+            summary: false,
+            severity: Some("extreme".into()),
+            category: None,
+            exclude: None,
+            fixable: false,
+            mute: None,
+            output: None,
+            output_details: None,
+        };
+        let result = apply_filters(Vec::new(), &filter);
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(err.to_string().contains("unknown severity"));
+    }
+
+    #[test]
+    fn filter_validation_unknown_focus() {
+        let filter = ObserveFilterArgs {
+            from_line: 0,
+            from: None,
+            focus: Some("invalid_preset".into()),
+            project_hint: None,
+            json: false,
+            summary: false,
+            severity: None,
+            category: None,
+            exclude: None,
+            fixable: false,
+            mute: None,
+            output: None,
+            output_details: None,
+        };
+        let result = apply_filters(Vec::new(), &filter);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn filter_mute_suppresses_issues() {
+        let issue = Issue {
+            issue_id: "abc123".into(),
+            line: 1,
+            code: IssueCode::BuildOrLintFailure,
+            category: IssueCategory::BuildError,
+            severity: IssueSeverity::Critical,
+            confidence: types::Confidence::High,
+            fix_safety: types::FixSafety::AutoFixSafe,
+            summary: "test".into(),
+            details: String::new(),
+            fingerprint: "test".into(),
+            source_role: types::MessageRole::Assistant,
+            source_tool: None,
+            fix_target: None,
+            fix_hint: None,
+            evidence_excerpt: None,
+        };
+        let filter = ObserveFilterArgs {
+            from_line: 0,
+            from: None,
+            focus: None,
+            project_hint: None,
+            json: false,
+            summary: false,
+            severity: None,
+            category: None,
+            exclude: None,
+            fixable: false,
+            mute: Some("build_or_lint_failure".into()),
+            output: None,
+            output_details: None,
+        };
+        let result = apply_filters(vec![issue], &filter).unwrap();
+        assert!(result.is_empty());
+    }
+}
+
 /// Remove issue codes from the mute list.
 fn execute_unmute(
     session_id: &str,
