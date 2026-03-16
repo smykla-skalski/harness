@@ -264,14 +264,26 @@ fn extended_features() -> BTreeMap<Feature, FeatureInfo> {
         ),
         (
             Feature::Observation,
-            FeatureInfo::new("session monitoring with scan, cycle, dump, context, and watch modes")
-                .commands(&[
-                    "harness observe scan",
-                    "harness observe cycle",
-                    "harness observe dump",
-                    "harness observe context",
-                    "harness observe watch",
-                ]),
+            FeatureInfo::new(
+                "session monitoring with scan, watch, cycle, verify, compare, and doctor modes",
+            )
+            .commands(&[
+                "harness observe scan",
+                "harness observe watch",
+                "harness observe cycle",
+                "harness observe dump",
+                "harness observe context",
+                "harness observe status",
+                "harness observe resume",
+                "harness observe verify",
+                "harness observe resolve-start",
+                "harness observe compare",
+                "harness observe doctor",
+                "harness observe mute",
+                "harness observe unmute",
+                "harness observe list-categories",
+                "harness observe list-focus-presets",
+            ]),
         ),
         (
             Feature::PreCompactHandoff,
