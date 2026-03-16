@@ -111,19 +111,16 @@ pub fn install_wrapper(target_dir: &Path) -> Result<PathBuf, CliError> {
     let target = target_dir.join("harness");
 
     if target.exists() {
-        if let Ok(existing) = fs::read_to_string(&target) {
-            if existing == WRAPPER {
-                // Wrapper already installed - just ensure executable
-                let meta = fs::metadata(&target)?;
-                let mut perms = meta.permissions();
-                perms.set_mode(perms.mode() | 0o111);
-                fs::set_permissions(&target, perms)?;
-                return Ok(target);
-            }
-        } else {
-            // Cannot read as text - likely a compiled binary. Do not overwrite.
-            return Ok(target);
-        }
+        // Never overwrite an existing executable. The file could be:
+        // - The compiled Rust binary
+        // - A user-installed shim
+        // - A previous version of the wrapper
+        // In all cases, leave it alone.
+        let meta = fs::metadata(&target)?;
+        let mut perms = meta.permissions();
+        perms.set_mode(perms.mode() | 0o111);
+        fs::set_permissions(&target, perms)?;
+        return Ok(target);
     }
 
     fs::write(&target, WRAPPER)?;
@@ -368,14 +365,15 @@ mod tests {
     }
 
     #[test]
-    fn install_wrapper_overwrites_different_content() {
+    fn install_wrapper_preserves_existing_file() {
         let dir = tempfile::tempdir().unwrap();
         let target_dir = dir.path().join("bin");
         fs::create_dir_all(&target_dir).unwrap();
-        fs::write(target_dir.join("harness"), "old content").unwrap();
+        fs::write(target_dir.join("harness"), "existing content").unwrap();
 
         let path = install_wrapper(&target_dir).unwrap();
-        assert_eq!(fs::read_to_string(path).unwrap(), WRAPPER);
+        // Must NOT overwrite - existing file is preserved
+        assert_eq!(fs::read_to_string(path).unwrap(), "existing content");
     }
 
     #[test]
