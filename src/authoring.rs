@@ -1,5 +1,6 @@
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::process;
 
 use serde::{Deserialize, Serialize};
 
@@ -172,8 +173,13 @@ pub fn save_authoring_session(session: &AuthoringSession) -> Result<AuthoringSes
         CliErrorKind::authoring_payload_invalid("session", "serialize failed")
             .with_details(e.to_string())
     })?;
-    fs::write(&path, json).map_err(|e| {
+    let tmp_path = path.with_extension(format!("{}.json.tmp", process::id()));
+    fs::write(&tmp_path, json).map_err(|e| {
         CliErrorKind::authoring_payload_invalid("session", "write failed")
+            .with_details(e.to_string())
+    })?;
+    fs::rename(&tmp_path, &path).map_err(|e| {
+        CliErrorKind::authoring_payload_invalid("session", "rename failed")
             .with_details(e.to_string())
     })?;
     Ok(session.clone())

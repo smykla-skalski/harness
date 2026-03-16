@@ -1,6 +1,7 @@
 use std::borrow::Cow;
 use std::fmt;
 use std::path::{Path, PathBuf};
+use std::process;
 use std::time::UNIX_EPOCH;
 use std::{fs, result};
 
@@ -294,10 +295,13 @@ pub fn parse_compact_handoff(text: &str) -> Result<CompactHandoff<'static>, CliE
 /// Load a pending (unconsumed) compact handoff, if any.
 #[must_use]
 pub fn pending_compact_handoff(project_dir: &Path) -> Option<CompactHandoff<'static>> {
-    load_latest_compact_handoff(project_dir)
-        .ok()
-        .flatten()
-        .filter(|h| h.status == HandoffStatus::Pending)
+    match load_latest_compact_handoff(project_dir) {
+        Ok(opt) => opt.filter(|h| h.status == HandoffStatus::Pending),
+        Err(e) => {
+            eprintln!("warning: compact handoff load failed: {e}");
+            None
+        }
+    }
 }
 
 /// Mark a handoff as consumed.
@@ -623,7 +627,7 @@ fn write_json_atomic(path: &Path, payload: &CompactHandoff<'_>) -> Result<(), Cl
             CliErrorKind::io(cow!("failed to create directory: {e}")).into()
         })?;
     }
-    let tmp = path.with_extension("json.tmp");
+    let tmp = path.with_extension(format!("{}.json.tmp", process::id()));
     let text = serde_json::to_string_pretty(payload)
         .map_err(|e| -> CliError { CliErrorKind::serialize(cow!("{e}")).into() })?;
     fs::write(&tmp, &text).map_err(|e| -> CliError {
