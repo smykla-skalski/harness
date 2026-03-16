@@ -343,6 +343,7 @@ pub fn extract_group_ids(values: &[serde_json::Value]) -> Vec<&str> {
 mod tests {
     use super::*;
     use crate::schema::{RunCounts, Verdict};
+    use std::fs;
 
     fn sample_layout() -> RunLayout {
         RunLayout {
@@ -746,8 +747,17 @@ mod tests {
 
     #[test]
     fn run_context_from_current_returns_none_when_no_pointer() {
-        let result = RunContext::from_current().unwrap();
-        assert!(result.is_none());
+        let tmp = tempfile::tempdir().unwrap();
+        temp_env::with_vars(
+            [
+                ("XDG_DATA_HOME", Some(tmp.path().to_str().unwrap())),
+                ("CLAUDE_SESSION_ID", Some("ctx-no-pointer-test")),
+            ],
+            || {
+                let result = RunContext::from_current().unwrap();
+                assert!(result.is_none());
+            },
+        );
     }
 
     #[test]
