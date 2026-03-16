@@ -507,6 +507,19 @@ pub fn docker_exec_cmd(container: &str, cmd: &[&str]) -> Result<CommandResult, C
     docker(&args, &[0])
 }
 
+/// Run a command inside a running container in detached mode.
+///
+/// Uses `docker exec -d` so the process runs in the background inside
+/// the container without a shell wrapper.
+///
+/// # Errors
+/// Returns `CliError` on command failure.
+pub fn docker_exec_detached(container: &str, cmd: &[&str]) -> Result<CommandResult, CliError> {
+    let mut args: Vec<&str> = vec!["exec", "-d", container];
+    args.extend_from_slice(cmd);
+    docker(&args, &[0])
+}
+
 /// Write `content` to `container_path` inside a running container using `docker cp`.
 ///
 /// Writes to a local temp file then copies it in, avoiding shell interpretation
