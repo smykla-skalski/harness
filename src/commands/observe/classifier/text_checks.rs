@@ -336,6 +336,96 @@ pub(super) fn check_jq_errors(context: &mut TextCheckContext<'_>, issues: &mut V
     }
 }
 
+/// Check for KSRCLI008 verdict-pending errors during closeout.
+/// Caller guarantees: `source_tool` == Bash.
+pub(super) fn check_closeout_verdict_pending(
+    context: &mut TextCheckContext<'_>,
+    issues: &mut Vec<Issue>,
+) {
+    if !context.lower.contains("ksrcli008") && !context.lower.contains("verdict is still pending") {
+        return;
+    }
+    let blueprint = IssueBlueprint::new(
+        IssueCode::CloseoutVerdictPending,
+        IssueCategory::WorkflowError,
+        IssueSeverity::Critical,
+        "Closeout blocked - no final verdict set",
+    )
+    .with_fingerprint("closeout_verdict_pending")
+    .with_guidance(Guidance::fix_hint(
+        "harness closeout should auto-compute verdict from run-status.json counts",
+    ));
+    context.emit_current(issues, blueprint);
+}
+
+/// Check for runner-state CLI event transition errors.
+/// Caller guarantees: `source_tool` == Bash.
+pub(super) fn check_runner_state_event_error(
+    context: &mut TextCheckContext<'_>,
+    issues: &mut Vec<Issue>,
+) {
+    let has_event_transition = context
+        .lower
+        .contains("event-based transitions are handled by the workflow module");
+    let has_state_query_only = context
+        .lower
+        .contains("this cli path only supports state queries");
+    if !has_event_transition && !has_state_query_only {
+        return;
+    }
+    let blueprint = IssueBlueprint::new(
+        IssueCode::RunnerStateEventNotSupported,
+        IssueCategory::CliError,
+        IssueSeverity::Medium,
+        "runner-state event transition not supported via CLI",
+    )
+    .with_fingerprint("runner_state_event_not_supported")
+    .with_guidance(Guidance::fix_hint(
+        "Use the workflow module's request functions or fix the CLI to support transitions",
+    ));
+    context.emit_current(issues, blueprint);
+}
+
+/// Check for a stale runner state machine in Bash output.
+///
+/// When `suite-run-state.json` content shows `transition_count: 0` or
+/// `phase: bootstrap` while group execution output has already appeared,
+/// the state machine never advanced.
+/// Caller guarantees: `source_tool` == Bash.
+pub(super) fn check_runner_state_machine_stale(
+    context: &mut TextCheckContext<'_>,
+    issues: &mut Vec<Issue>,
+) {
+    // Only trigger when the output looks like suite-run-state.json content
+    if !context.lower.contains("suite-run-state") && !context.lower.contains("transition_count") {
+        return;
+    }
+
+    let has_zero_transitions = context.lower.contains("transition_count: 0")
+        || context.lower.contains("\"transition_count\": 0")
+        || context.lower.contains("\"transition_count\":0");
+    let has_bootstrap_phase = context.lower.contains("\"phase\": \"bootstrap\"")
+        || context.lower.contains("\"phase\":\"bootstrap\"")
+        || context.lower.contains("phase: bootstrap");
+
+    // Need at least one stale signal and evidence of group execution
+    let has_group_evidence = context.lower.contains("group") || context.lower.contains("passed");
+
+    if (has_zero_transitions || has_bootstrap_phase) && has_group_evidence {
+        let blueprint = IssueBlueprint::new(
+            IssueCode::RunnerStateMachineStale,
+            IssueCategory::WorkflowError,
+            IssueSeverity::Critical,
+            "Runner state machine never advanced",
+        )
+        .with_fingerprint("runner_state_machine_stale")
+        .with_guidance(Guidance::fix_hint(
+            "State should advance automatically during harness commands",
+        ));
+        context.emit_current(issues, blueprint);
+    }
+}
+
 /// Check for user frustration signals in human text.
 /// Caller guarantees: role == User, `source_tool` == None.
 pub(super) fn check_user_frustration(context: &mut TextCheckContext<'_>, issues: &mut Vec<Issue>) {
