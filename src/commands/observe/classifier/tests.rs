@@ -207,7 +207,7 @@ fn detects_file_churn() {
         "type": "tool_use",
         "id": "t1",
         "name": "Edit",
-        "input": { "file_path": "test.rs", "old_string": "a", "new_string": "b" }
+        "input": { "file_path": "test.txt", "old_string": "a", "new_string": "b" }
     });
     for _ in 0..9 {
         let issues = check_tool_use_for_issues(10, &block, &mut state);
@@ -415,9 +415,9 @@ fn detects_git_commit_during_run() {
     assert!(
         issues
             .iter()
-            .any(|i| i.category == IssueCategory::UnexpectedBehavior
-                && i.severity == IssueSeverity::Critical
-                && i.summary.contains("git commit"))
+            .any(|i| i.category == IssueCategory::SkillBehavior
+                && i.severity == IssueSeverity::Low
+                && i.summary.contains("Git commit during active run"))
     );
 }
 
@@ -434,8 +434,8 @@ fn detects_git_add_alone() {
     assert!(
         issues
             .iter()
-            .any(|i| i.category == IssueCategory::UnexpectedBehavior
-                && i.severity == IssueSeverity::Critical)
+            .any(|i| i.category == IssueCategory::SkillBehavior
+                && i.severity == IssueSeverity::Low)
     );
 }
 
@@ -1892,4 +1892,886 @@ fn tool_correlation_window_pruning() {
         "tool uses should be pruned to ~100, got {}",
         state.last_tool_uses.len()
     );
+}
+
+#[test]
+fn detects_uncommitted_source_edit_before_second_edit() {
+    let mut state = make_state();
+    // First edit: sets the flag
+    let edit1 = serde_json::json!({
+        "type": "tool_use",
+        "id": "t1",
+        "name": "Edit",
+        "input": { "file_path": "/repo/pkg/xds/proxy.go", "old_string": "a", "new_string": "b" }
+    });
+    let issues = check_tool_use_for_issues(10, &edit1, &mut state);
+    assert!(
+        !issues
+            .iter()
+            .any(|i| i.code == IssueCode::UncommittedSourceCodeEdit),
+        "first edit should not trigger"
+    );
+    assert!(state.source_code_edited_without_commit);
+
+    // Second edit without commit: should fire
+    let edit2 = serde_json::json!({
+        "type": "tool_use",
+        "id": "t2",
+        "name": "Write",
+        "input": { "file_path": "/repo/pkg/xds/proxy.go", "content": "new content" }
+    });
+    let issues = check_tool_use_for_issues(20, &edit2, &mut state);
+    assert!(
+        issues
+            .iter()
+            .any(|i| i.code == IssueCode::UncommittedSourceCodeEdit
+                && i.category == IssueCategory::SkillBehavior
+                && i.severity == IssueSeverity::Medium)
+    );
+}
+
+#[test]
+fn detects_uncommitted_source_edit_before_harness_command() {
+    let mut state = make_state();
+    let edit = serde_json::json!({
+        "type": "tool_use",
+        "id": "t1",
+        "name": "Edit",
+        "input": { "file_path": "/repo/pkg/xds/proxy.go", "old_string": "a", "new_string": "b" }
+    });
+    check_tool_use_for_issues(10, &edit, &mut state);
+
+    let bash = serde_json::json!({
+        "type": "tool_use",
+        "id": "t2",
+        "name": "Bash",
+        "input": { "command": "harness apply --manifest g01/01.yaml" }
+    });
+    let issues = check_tool_use_for_issues(20, &bash, &mut state);
+    assert!(issues.iter().any(
+        |i| i.code == IssueCode::UncommittedSourceCodeEdit && i.summary.contains("uncommitted")
+    ));
+}
+
+#[test]
+fn git_commit_clears_uncommitted_source_flag() {
+    let mut state = make_state();
+    let edit = serde_json::json!({
+        "type": "tool_use",
+        "id": "t1",
+        "name": "Edit",
+        "input": { "file_path": "/repo/pkg/xds/proxy.go", "old_string": "a", "new_string": "b" }
+    });
+    check_tool_use_for_issues(10, &edit, &mut state);
+    assert!(state.source_code_edited_without_commit);
+
+    let commit = serde_json::json!({
+        "type": "tool_use",
+        "id": "t2",
+        "name": "Bash",
+        "input": { "command": "git add pkg/xds/proxy.go && git commit -m 'fix: proxy config'" }
+    });
+    let issues = check_tool_use_for_issues(20, &commit, &mut state);
+    assert!(
+        !issues
+            .iter()
+            .any(|i| i.code == IssueCode::UncommittedSourceCodeEdit),
+        "git commit should not trigger uncommitted edit issue"
+    );
+    assert!(!state.source_code_edited_without_commit);
+}
+
+#[test]
+fn skips_uncommitted_detection_for_non_source_files() {
+    let mut state = make_state();
+    let edit = serde_json::json!({
+        "type": "tool_use",
+        "id": "t1",
+        "name": "Write",
+        "input": { "file_path": "/repo/docs/README.md", "content": "# docs" }
+    });
+    check_tool_use_for_issues(10, &edit, &mut state);
+    assert!(!state.source_code_edited_without_commit);
+}
+
+#[test]
+fn uncommitted_edit_detects_various_source_extensions() {
+    for extension in &["go", "rs", "py", "ts", "java", "c", "cpp", "rb", "sh"] {
+        let mut state = make_state();
+        let path = format!("/repo/src/main.{extension}");
+        let edit = serde_json::json!({
+            "type": "tool_use",
+            "id": "t1",
+            "name": "Edit",
+            "input": { "file_path": path, "old_string": "a", "new_string": "b" }
+        });
+        check_tool_use_for_issues(10, &edit, &mut state);
+        assert!(
+            state.source_code_edited_without_commit,
+            "should track .{extension} files"
+        );
+    }
+}
+
+// ─── Repeated kubectl query tests ──────────────────────────────────
+
+#[test]
+fn detects_repeated_kubectl_get_for_same_resource() {
+    let mut state = make_state();
+    let commands = [
+        "kubectl get crd meshretries.kuma.io -o json | jq '.spec.versions'",
+        "kubectl get crd meshretries.kuma.io -o json | jq '.spec.names'",
+        "kubectl get crd meshretries.kuma.io -o json | jq '.status'",
+    ];
+    for (index, command) in commands.iter().enumerate() {
+        let block = serde_json::json!({
+            "type": "tool_use",
+            "id": format!("t{index}"),
+            "name": "Bash",
+            "input": { "command": command }
+        });
+        let issues = check_tool_use_for_issues(10 + index, &block, &mut state);
+        if index < 2 {
+            assert!(
+                !issues
+                    .iter()
+                    .any(|i| i.code == IssueCode::RepeatedKubectlQueryForSameResource),
+                "should not flag on query {index}"
+            );
+        } else {
+            assert!(
+                issues
+                    .iter()
+                    .any(|i| i.code == IssueCode::RepeatedKubectlQueryForSameResource),
+                "should flag on third query"
+            );
+        }
+    }
+}
+
+#[test]
+fn no_flag_for_different_kubectl_resources() {
+    let mut state = make_state();
+    let commands = [
+        "kubectl get crd meshretries.kuma.io -o json",
+        "kubectl get crd meshtimeouts.kuma.io -o json",
+        "kubectl get crd meshcircuitbreakers.kuma.io -o json",
+    ];
+    for (index, command) in commands.iter().enumerate() {
+        let block = serde_json::json!({
+            "type": "tool_use",
+            "id": format!("t{index}"),
+            "name": "Bash",
+            "input": { "command": command }
+        });
+        let issues = check_tool_use_for_issues(10 + index, &block, &mut state);
+        assert!(
+            !issues
+                .iter()
+                .any(|i| i.code == IssueCode::RepeatedKubectlQueryForSameResource),
+            "different resources should not trigger flag"
+        );
+    }
+}
+
+#[test]
+fn kubectl_queries_outside_window_do_not_trigger() {
+    let mut state = make_state();
+    // Space queries far apart so they fall outside the 20-line window
+    let lines = [10, 40, 70];
+    for (index, line) in lines.iter().enumerate() {
+        let block = serde_json::json!({
+            "type": "tool_use",
+            "id": format!("t{index}"),
+            "name": "Bash",
+            "input": { "command": "kubectl get crd meshretries.kuma.io -o json" }
+        });
+        let issues = check_tool_use_for_issues(*line, &block, &mut state);
+        assert!(
+            !issues
+                .iter()
+                .any(|i| i.code == IssueCode::RepeatedKubectlQueryForSameResource),
+            "queries outside window should not trigger flag"
+        );
+    }
+}
+
+#[test]
+fn kubectl_describe_also_tracked() {
+    let mut state = make_state();
+    for index in 0..3 {
+        let block = serde_json::json!({
+            "type": "tool_use",
+            "id": format!("t{index}"),
+            "name": "Bash",
+            "input": { "command": "kubectl describe pod my-pod -n kuma-system" }
+        });
+        let issues = check_tool_use_for_issues(10 + index, &block, &mut state);
+        if index == 2 {
+            assert!(
+                issues
+                    .iter()
+                    .any(|i| i.code == IssueCode::RepeatedKubectlQueryForSameResource),
+                "describe should be tracked too"
+            );
+        }
+    }
+}
+
+#[test]
+fn non_kubectl_commands_ignored_by_query_tracker() {
+    let mut state = make_state();
+    for index in 0..5 {
+        let block = serde_json::json!({
+            "type": "tool_use",
+            "id": format!("t{index}"),
+            "name": "Bash",
+            "input": { "command": "harness record --label test -- kubectl get pods" }
+        });
+        let issues = check_tool_use_for_issues(10 + index, &block, &mut state);
+        assert!(
+            !issues
+                .iter()
+                .any(|i| i.code == IssueCode::RepeatedKubectlQueryForSameResource),
+            "harness record wrapper should not produce false positives"
+        );
+    }
+}
+
+#[test]
+fn repeated_kubectl_query_output_shape() {
+    let mut state = make_state();
+    for index in 0..3 {
+        let block = serde_json::json!({
+            "type": "tool_use",
+            "id": format!("t{index}"),
+            "name": "Bash",
+            "input": { "command": "kubectl get crd meshretries.kuma.io -o json | jq '.spec'" }
+        });
+        check_tool_use_for_issues(10 + index, &block, &mut state);
+    }
+    // Re-run to get issues on the 3rd (dedup means the first emit sticks)
+    let mut fresh_state = make_state();
+    let mut all_issues = Vec::new();
+    for index in 0..3 {
+        let block = serde_json::json!({
+            "type": "tool_use",
+            "id": format!("t{index}"),
+            "name": "Bash",
+            "input": { "command": "kubectl get crd meshretries.kuma.io -o json | jq '.spec'" }
+        });
+        all_issues.extend(check_tool_use_for_issues(
+            10 + index,
+            &block,
+            &mut fresh_state,
+        ));
+    }
+    let issue = all_issues
+        .iter()
+        .find(|i| i.code == IssueCode::RepeatedKubectlQueryForSameResource)
+        .expect("should have emitted issue");
+    assert_eq!(issue.category, IssueCategory::UnexpectedBehavior);
+    assert_eq!(issue.severity, IssueSeverity::Low);
+    assert!(!issue.fix_safety.is_fixable());
+    assert!(issue.summary.contains("dump once"));
+    assert!(issue.details.contains("meshretries"));
+}
+
+#[test]
+fn extract_kubectl_target_strips_namespace_and_output_flags() {
+    use super::tool_checks::extract_kubectl_query_target;
+    let target = extract_kubectl_query_target(
+        "kubectl get pod my-pod -n kuma-system -o json | jq '.status'",
+    );
+    assert_eq!(target.as_deref(), Some("get pod my-pod"));
+}
+
+#[test]
+fn extract_kubectl_target_returns_none_for_non_query() {
+    use super::tool_checks::extract_kubectl_query_target;
+    assert!(extract_kubectl_query_target("kubectl apply -f manifest.yaml").is_none());
+    assert!(extract_kubectl_query_target("ls -la /tmp").is_none());
+}
+
+// ─── Resource cleanup tracking tests ───────────────────────────────
+
+#[test]
+fn resource_cleanup_tracks_apply_commands() {
+    let mut state = make_state();
+    let block = serde_json::json!({
+        "type": "tool_use",
+        "id": "t1",
+        "name": "Bash",
+        "input": { "command": "harness apply --manifest g13/01-meshtrace.yaml" }
+    });
+    check_tool_use_for_issues(10, &block, &mut state);
+    assert!(state.pending_resource_creates.contains("01-meshtrace"));
+}
+
+#[test]
+fn resource_cleanup_tracks_multiple_manifests() {
+    let mut state = make_state();
+    let block = serde_json::json!({
+        "type": "tool_use",
+        "id": "t1",
+        "name": "Bash",
+        "input": { "command": "harness apply --manifest g13/01-meshtrace.yaml --manifest g13/02-containerpatch.yaml" }
+    });
+    check_tool_use_for_issues(10, &block, &mut state);
+    assert_eq!(state.pending_resource_creates.len(), 2);
+    assert!(state.pending_resource_creates.contains("01-meshtrace"));
+    assert!(state.pending_resource_creates.contains("02-containerpatch"));
+}
+
+#[test]
+fn resource_cleanup_delete_removes_from_tracking() {
+    let mut state = make_state();
+    let apply = serde_json::json!({
+        "type": "tool_use",
+        "id": "t1",
+        "name": "Bash",
+        "input": { "command": "harness apply --manifest g13/01-meshtrace.yaml" }
+    });
+    check_tool_use_for_issues(10, &apply, &mut state);
+    assert_eq!(state.pending_resource_creates.len(), 1);
+
+    let delete = serde_json::json!({
+        "type": "tool_use",
+        "id": "t2",
+        "name": "Bash",
+        "input": { "command": "harness delete --manifest g13/01-meshtrace.yaml" }
+    });
+    check_tool_use_for_issues(20, &delete, &mut state);
+    assert!(state.pending_resource_creates.is_empty());
+}
+
+#[test]
+fn resource_cleanup_flags_uncleaned_on_group_report() {
+    let mut state = make_state();
+    let apply = serde_json::json!({
+        "type": "tool_use",
+        "id": "t1",
+        "name": "Bash",
+        "input": { "command": "harness apply --manifest g13/01-meshtrace.yaml --manifest g13/02-motb.yaml" }
+    });
+    check_tool_use_for_issues(10, &apply, &mut state);
+
+    let report = serde_json::json!({
+        "type": "tool_use",
+        "id": "t2",
+        "name": "Bash",
+        "input": { "command": "harness report group --group g13 --verdict pass" }
+    });
+    let issues = check_tool_use_for_issues(20, &report, &mut state);
+    assert!(
+        issues
+            .iter()
+            .any(|i| i.code == IssueCode::ResourceNotCleanedUpBeforeGroupEnd
+                && i.category == IssueCategory::SkillBehavior
+                && i.severity == IssueSeverity::Low)
+    );
+}
+
+#[test]
+fn resource_cleanup_no_issue_when_all_deleted() {
+    let mut state = make_state();
+    let apply = serde_json::json!({
+        "type": "tool_use",
+        "id": "t1",
+        "name": "Bash",
+        "input": { "command": "harness apply --manifest g13/01-meshtrace.yaml" }
+    });
+    check_tool_use_for_issues(10, &apply, &mut state);
+
+    let delete = serde_json::json!({
+        "type": "tool_use",
+        "id": "t2",
+        "name": "Bash",
+        "input": { "command": "harness delete --manifest g13/01-meshtrace.yaml" }
+    });
+    check_tool_use_for_issues(20, &delete, &mut state);
+
+    let report = serde_json::json!({
+        "type": "tool_use",
+        "id": "t3",
+        "name": "Bash",
+        "input": { "command": "harness report group --group g13 --verdict pass" }
+    });
+    let issues = check_tool_use_for_issues(30, &report, &mut state);
+    assert!(
+        !issues
+            .iter()
+            .any(|i| i.code == IssueCode::ResourceNotCleanedUpBeforeGroupEnd)
+    );
+}
+
+#[test]
+fn resource_cleanup_resets_after_group_report() {
+    let mut state = make_state();
+    let apply = serde_json::json!({
+        "type": "tool_use",
+        "id": "t1",
+        "name": "Bash",
+        "input": { "command": "harness apply --manifest g13/01-meshtrace.yaml" }
+    });
+    check_tool_use_for_issues(10, &apply, &mut state);
+
+    let report = serde_json::json!({
+        "type": "tool_use",
+        "id": "t2",
+        "name": "Bash",
+        "input": { "command": "harness report group --group g13 --verdict pass" }
+    });
+    check_tool_use_for_issues(20, &report, &mut state);
+    assert!(
+        state.pending_resource_creates.is_empty(),
+        "should be cleared after group report"
+    );
+
+    // Second group report without any new applies should not fire
+    let report2 = serde_json::json!({
+        "type": "tool_use",
+        "id": "t3",
+        "name": "Bash",
+        "input": { "command": "harness report group --group g14 --verdict pass" }
+    });
+    let issues = check_tool_use_for_issues(30, &report2, &mut state);
+    assert!(
+        !issues
+            .iter()
+            .any(|i| i.code == IssueCode::ResourceNotCleanedUpBeforeGroupEnd)
+    );
+}
+
+#[test]
+fn resource_cleanup_partial_delete_flags_remaining() {
+    let mut state = make_state();
+    let apply = serde_json::json!({
+        "type": "tool_use",
+        "id": "t1",
+        "name": "Bash",
+        "input": { "command": "harness apply --manifest g13/01-meshtrace.yaml --manifest g13/02-containerpatch.yaml" }
+    });
+    check_tool_use_for_issues(10, &apply, &mut state);
+
+    // Only delete one of the two
+    let delete = serde_json::json!({
+        "type": "tool_use",
+        "id": "t2",
+        "name": "Bash",
+        "input": { "command": "harness delete --manifest g13/01-meshtrace.yaml" }
+    });
+    check_tool_use_for_issues(20, &delete, &mut state);
+
+    let report = serde_json::json!({
+        "type": "tool_use",
+        "id": "t3",
+        "name": "Bash",
+        "input": { "command": "harness report group --group g13 --verdict pass" }
+    });
+    let issues = check_tool_use_for_issues(30, &report, &mut state);
+    assert!(
+        issues
+            .iter()
+            .any(|i| i.code == IssueCode::ResourceNotCleanedUpBeforeGroupEnd)
+    );
+    let cleanup_issue = issues
+        .iter()
+        .find(|i| i.code == IssueCode::ResourceNotCleanedUpBeforeGroupEnd)
+        .unwrap();
+    assert!(cleanup_issue.details.contains("02-containerpatch"));
+}
+
+#[test]
+fn resource_cleanup_output_shape() {
+    let mut state = make_state();
+    let apply = serde_json::json!({
+        "type": "tool_use",
+        "id": "t1",
+        "name": "Bash",
+        "input": { "command": "harness apply --manifest g13/01-meshtrace.yaml" }
+    });
+    check_tool_use_for_issues(10, &apply, &mut state);
+
+    let report = serde_json::json!({
+        "type": "tool_use",
+        "id": "t2",
+        "name": "Bash",
+        "input": { "command": "harness report group --group g13 --verdict pass" }
+    });
+    let issues = check_tool_use_for_issues(20, &report, &mut state);
+    assert_eq!(
+        issues
+            .iter()
+            .filter(|i| i.code == IssueCode::ResourceNotCleanedUpBeforeGroupEnd)
+            .count(),
+        1
+    );
+    let issue = issues
+        .iter()
+        .find(|i| i.code == IssueCode::ResourceNotCleanedUpBeforeGroupEnd)
+        .unwrap();
+    assert!(!issue.fix_safety.is_fixable());
+    assert!(issue.fix_target.is_none());
+    assert!(
+        issue
+            .fix_hint
+            .as_deref()
+            .is_some_and(|hint| hint.contains("Delete test resources"))
+    );
+    assert_eq!(issue.source_tool, Some(SourceTool::Bash));
+}
+
+#[test]
+fn resource_cleanup_ignores_non_harness_commands() {
+    let mut state = make_state();
+    let block = serde_json::json!({
+        "type": "tool_use",
+        "id": "t1",
+        "name": "Bash",
+        "input": { "command": "kubectl apply -f manifest.yaml" }
+    });
+    check_tool_use_for_issues(10, &block, &mut state);
+    assert!(state.pending_resource_creates.is_empty());
+}
+
+#[test]
+fn resource_cleanup_deduplicates_across_groups() {
+    let mut state = make_state();
+
+    // First group with uncleaned resources
+    let apply1 = serde_json::json!({
+        "type": "tool_use",
+        "id": "t1",
+        "name": "Bash",
+        "input": { "command": "harness apply --manifest g13/01-meshtrace.yaml" }
+    });
+    check_tool_use_for_issues(10, &apply1, &mut state);
+
+    let report1 = serde_json::json!({
+        "type": "tool_use",
+        "id": "t2",
+        "name": "Bash",
+        "input": { "command": "harness report group --group g13 --verdict pass" }
+    });
+    let issues1 = check_tool_use_for_issues(20, &report1, &mut state);
+    assert_eq!(
+        issues1
+            .iter()
+            .filter(|i| i.code == IssueCode::ResourceNotCleanedUpBeforeGroupEnd)
+            .count(),
+        1
+    );
+
+    // Second group with the same uncleaned resource name - deduplicates
+    let apply2 = serde_json::json!({
+        "type": "tool_use",
+        "id": "t3",
+        "name": "Bash",
+        "input": { "command": "harness apply --manifest g14/01-meshtrace.yaml" }
+    });
+    check_tool_use_for_issues(30, &apply2, &mut state);
+
+    let report2 = serde_json::json!({
+        "type": "tool_use",
+        "id": "t4",
+        "name": "Bash",
+        "input": { "command": "harness report group --group g14 --verdict pass" }
+    });
+    let issues2 = check_tool_use_for_issues(40, &report2, &mut state);
+    // Same fingerprint ("01-meshtrace") so it deduplicates
+    assert!(
+        !issues2
+            .iter()
+            .any(|i| i.code == IssueCode::ResourceNotCleanedUpBeforeGroupEnd),
+        "same fingerprint should be deduplicated"
+    );
+}
+
+// ─── Capture between groups tracking tests ────────────────────────
+
+#[test]
+fn first_group_report_does_not_flag_missing_capture() {
+    let mut state = make_state();
+    let report = serde_json::json!({
+        "type": "tool_use",
+        "id": "t1",
+        "name": "Bash",
+        "input": { "command": "harness report group --group-id g01 --status pass --evidence-label e1" }
+    });
+    let issues = check_tool_use_for_issues(10, &report, &mut state);
+    assert!(
+        !issues
+            .iter()
+            .any(|i| i.code == IssueCode::GroupReportedWithoutCapture),
+        "first group should not flag missing capture"
+    );
+    assert!(state.seen_any_group_report);
+    assert!(!state.seen_capture_since_last_group_report);
+}
+
+#[test]
+fn second_group_without_capture_flags_issue() {
+    let mut state = make_state();
+
+    // First group report
+    let report1 = serde_json::json!({
+        "type": "tool_use",
+        "id": "t1",
+        "name": "Bash",
+        "input": { "command": "harness report group --group-id g01 --status pass --evidence-label e1" }
+    });
+    check_tool_use_for_issues(10, &report1, &mut state);
+
+    // Second group report without capture in between
+    let report2 = serde_json::json!({
+        "type": "tool_use",
+        "id": "t2",
+        "name": "Bash",
+        "input": { "command": "harness report group --group-id g02 --status pass --evidence-label e2" }
+    });
+    let issues = check_tool_use_for_issues(20, &report2, &mut state);
+    assert!(
+        issues
+            .iter()
+            .any(|i| i.code == IssueCode::GroupReportedWithoutCapture
+                && i.category == IssueCategory::SkillBehavior
+                && i.severity == IssueSeverity::Medium),
+        "second group without capture should flag issue"
+    );
+}
+
+#[test]
+fn capture_between_groups_prevents_flag() {
+    let mut state = make_state();
+
+    // First group
+    let report1 = serde_json::json!({
+        "type": "tool_use",
+        "id": "t1",
+        "name": "Bash",
+        "input": { "command": "harness report group --group-id g01 --status pass --evidence-label e1" }
+    });
+    check_tool_use_for_issues(10, &report1, &mut state);
+
+    // Capture between groups
+    let capture = serde_json::json!({
+        "type": "tool_use",
+        "id": "t2",
+        "name": "Bash",
+        "input": { "command": "harness capture --label after-g01" }
+    });
+    check_tool_use_for_issues(15, &capture, &mut state);
+
+    // Second group
+    let report2 = serde_json::json!({
+        "type": "tool_use",
+        "id": "t3",
+        "name": "Bash",
+        "input": { "command": "harness report group --group-id g02 --status pass --evidence-label e2" }
+    });
+    let issues = check_tool_use_for_issues(20, &report2, &mut state);
+    assert!(
+        !issues
+            .iter()
+            .any(|i| i.code == IssueCode::GroupReportedWithoutCapture),
+        "capture between groups should prevent flag"
+    );
+}
+
+#[test]
+fn capture_label_on_report_prevents_flag() {
+    let mut state = make_state();
+
+    // First group
+    let report1 = serde_json::json!({
+        "type": "tool_use",
+        "id": "t1",
+        "name": "Bash",
+        "input": { "command": "harness report group --group-id g01 --status pass --evidence-label e1" }
+    });
+    check_tool_use_for_issues(10, &report1, &mut state);
+
+    // Second group with --capture-label (inline capture)
+    let report2 = serde_json::json!({
+        "type": "tool_use",
+        "id": "t2",
+        "name": "Bash",
+        "input": { "command": "harness report group --group-id g02 --status pass --capture-label after-g02" }
+    });
+    let issues = check_tool_use_for_issues(20, &report2, &mut state);
+    assert!(
+        !issues
+            .iter()
+            .any(|i| i.code == IssueCode::GroupReportedWithoutCapture),
+        "--capture-label should prevent flag"
+    );
+}
+
+// ─── Truncated verification output tests ───────────────────────────
+
+#[test]
+fn detects_make_test_piped_through_tail() {
+    let mut state = make_state();
+    let block = serde_json::json!({
+        "type": "tool_use",
+        "id": "t1",
+        "name": "Bash",
+        "input": { "command": "make test | tail -10" }
+    });
+    let issues = check_tool_use_for_issues(10, &block, &mut state);
+    assert!(
+        issues
+            .iter()
+            .any(|i| i.code == IssueCode::VerificationOutputTruncated
+                && i.category == IssueCategory::SkillBehavior
+                && i.severity == IssueSeverity::Low)
+    );
+}
+
+#[test]
+fn detects_cargo_clippy_piped_through_head() {
+    let mut state = make_state();
+    let block = serde_json::json!({
+        "type": "tool_use",
+        "id": "t1",
+        "name": "Bash",
+        "input": { "command": "cargo clippy --lib 2>&1 | head -20" }
+    });
+    let issues = check_tool_use_for_issues(10, &block, &mut state);
+    assert!(
+        issues
+            .iter()
+            .any(|i| i.code == IssueCode::VerificationOutputTruncated)
+    );
+}
+
+#[test]
+fn detects_cargo_test_piped_through_tail() {
+    let mut state = make_state();
+    let block = serde_json::json!({
+        "type": "tool_use",
+        "id": "t1",
+        "name": "Bash",
+        "input": { "command": "cargo test --lib 2>&1 | tail -15" }
+    });
+    let issues = check_tool_use_for_issues(10, &block, &mut state);
+    assert!(
+        issues
+            .iter()
+            .any(|i| i.code == IssueCode::VerificationOutputTruncated)
+    );
+}
+
+#[test]
+fn detects_make_check_piped_through_tail() {
+    let mut state = make_state();
+    let block = serde_json::json!({
+        "type": "tool_use",
+        "id": "t1",
+        "name": "Bash",
+        "input": { "command": "make check 2>&1 | tail -5" }
+    });
+    let issues = check_tool_use_for_issues(10, &block, &mut state);
+    assert!(
+        issues
+            .iter()
+            .any(|i| i.code == IssueCode::VerificationOutputTruncated)
+    );
+}
+
+#[test]
+fn detects_lint_command_piped_through_head() {
+    let mut state = make_state();
+    let block = serde_json::json!({
+        "type": "tool_use",
+        "id": "t1",
+        "name": "Bash",
+        "input": { "command": "golangci-lint run ./... | head -20" }
+    });
+    let issues = check_tool_use_for_issues(10, &block, &mut state);
+    assert!(
+        issues
+            .iter()
+            .any(|i| i.code == IssueCode::VerificationOutputTruncated),
+        "lint command piped through head should fire"
+    );
+}
+
+#[test]
+fn skips_tail_without_verification_keyword() {
+    let mut state = make_state();
+    let block = serde_json::json!({
+        "type": "tool_use",
+        "id": "t1",
+        "name": "Bash",
+        "input": { "command": "ls -la /tmp | tail -5" }
+    });
+    let issues = check_tool_use_for_issues(10, &block, &mut state);
+    assert!(
+        !issues
+            .iter()
+            .any(|i| i.code == IssueCode::VerificationOutputTruncated),
+        "non-verification commands should not trigger"
+    );
+}
+
+#[test]
+fn skips_head_without_verification_keyword() {
+    let mut state = make_state();
+    let block = serde_json::json!({
+        "type": "tool_use",
+        "id": "t1",
+        "name": "Bash",
+        "input": { "command": "cat output.log | head -50" }
+    });
+    let issues = check_tool_use_for_issues(10, &block, &mut state);
+    assert!(
+        !issues
+            .iter()
+            .any(|i| i.code == IssueCode::VerificationOutputTruncated)
+    );
+}
+
+#[test]
+fn skips_verification_keyword_without_pipe() {
+    let mut state = make_state();
+    let block = serde_json::json!({
+        "type": "tool_use",
+        "id": "t1",
+        "name": "Bash",
+        "input": { "command": "make test" }
+    });
+    let issues = check_tool_use_for_issues(10, &block, &mut state);
+    assert!(
+        !issues
+            .iter()
+            .any(|i| i.code == IssueCode::VerificationOutputTruncated),
+        "no pipe means no truncation"
+    );
+}
+
+#[test]
+fn truncated_verification_output_shape() {
+    let mut state = make_state();
+    let block = serde_json::json!({
+        "type": "tool_use",
+        "id": "t1",
+        "name": "Bash",
+        "input": { "command": "make test 2>&1 | tail -10" }
+    });
+    let issues = check_tool_use_for_issues(10, &block, &mut state);
+    let issue = issues
+        .iter()
+        .find(|i| i.code == IssueCode::VerificationOutputTruncated)
+        .expect("should detect truncated verification output");
+    assert!(!issue.fix_safety.is_fixable());
+    assert!(issue.fix_target.is_none());
+    assert!(
+        issue
+            .fix_hint
+            .as_deref()
+            .is_some_and(|hint| hint.contains("grep"))
+    );
+    assert_eq!(issue.source_tool, Some(SourceTool::Bash));
 }
