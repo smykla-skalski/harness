@@ -20,3 +20,7 @@ run = "cargo check"
 [tasks."lint:fix"]
 description = "Format and apply clippy fixes"
 run = ["cargo fmt", "cargo clippy --fix --allow-dirty --allow-staged"]
+
+[tasks.install]
+description = "Build release binary and install to ~/.local/bin"
+run = ["cargo build --release", "cp target/release/harness ~/.local/bin/harness"]
