@@ -56,9 +56,9 @@ pub(crate) fn inject_run_env(cmd: &mut Command, run_dir: &Path, cluster: Option<
         }
     };
     let is_universal = ctx
-        .cluster
-        .as_ref()
-        .is_some_and(|spec| spec.platform == Platform::Universal);
+        .cluster_runtime()
+        .map(|runtime| runtime.platform())
+        .is_ok_and(|platform| platform == Platform::Universal);
     if !is_universal {
         match resolve_kubeconfig(&ctx, None, cluster) {
             Ok(kubeconfig) => {
@@ -77,16 +77,4 @@ pub(crate) fn inject_run_env(cmd: &mut Command, run_dir: &Path, cluster: Option<
             cmd.env("PATH", format!("{kumactl_dir}:{current_path}"));
         }
     }
-}
-
-/// Detect the runtime platform from the run context.
-pub(crate) fn detect_platform(ctx: &RunContext) -> Platform {
-    if let Some(ref spec) = ctx.cluster {
-        return spec.platform;
-    }
-    let profile = &ctx.metadata.profile;
-    if profile == "universal" || profile.starts_with("universal-") {
-        return Platform::Universal;
-    }
-    Platform::Kubernetes
 }

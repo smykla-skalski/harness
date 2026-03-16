@@ -25,6 +25,7 @@ pub mod manifests;
 pub mod prepared_suite;
 pub mod resolve;
 pub mod rules;
+pub mod runtime;
 pub mod schema;
 pub mod session_hook;
 pub mod shell_parse;

@@ -29,6 +29,7 @@ fn mask_token(token: &str) -> String {
 /// Returns `CliError` on failure.
 pub fn status(run_dir_args: &RunDirArgs) -> Result<i32, CliError> {
     let ctx = resolve_run_context(run_dir_args)?;
+    let runtime = ctx.cluster_runtime()?;
     let spec = ctx
         .cluster
         .as_ref()
@@ -80,13 +81,13 @@ pub fn status(run_dir_args: &RunDirArgs) -> Result<i32, CliError> {
     .unwrap_or_default();
 
     // Registered dataplanes from CP API (non-fatal)
-    let dataplanes = if let Some(url) = spec.primary_api_url() {
+    let dataplanes = if let Ok(access) = runtime.control_plane_access() {
         exec::cp_api_json(
-            &url,
+            &access.addr,
             "/meshes/default/dataplanes",
             exec::HttpMethod::Get,
             None,
-            spec.admin_token(),
+            access.admin_token.as_deref(),
         )
         .map_err(|e| {
             eprintln!("warning: CP API dataplanes query failed: {e}");
@@ -104,9 +105,9 @@ pub fn status(run_dir_args: &RunDirArgs) -> Result<i32, CliError> {
         .unwrap_or_default();
 
     let output = json!({
-        "platform": spec.platform,
+        "platform": runtime.platform(),
         "mode": spec.mode,
-        "cp_address": spec.primary_api_url(),
+        "cp_address": runtime.control_plane_access().ok().map(|access| access.addr.clone()),
         "admin_token": masked_token,
         "store_type": spec.store_type,
         "docker_network": spec.docker_network,

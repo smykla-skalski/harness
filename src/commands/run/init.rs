@@ -4,8 +4,8 @@ use std::path::Path;
 use clap::Args;
 
 use crate::audit_log::write_run_status_with_audit;
-use crate::context::{CurrentRunRecord, RunLayout, RunMetadata};
-use crate::core_defs::{current_run_context_path, shorten_path, utc_now};
+use crate::context::{CurrentRunPointer, RunLayout, RunMetadata, RunRepository};
+use crate::core_defs::{shorten_path, utc_now};
 use crate::errors::{CliError, CliErrorKind, cow};
 use crate::io::{validate_safe_segment, write_json_pretty};
 use crate::resolve::resolve_suite_path;
@@ -161,23 +161,9 @@ fn populate_run_dir(
     );
     report.save()?;
 
-    let record = CurrentRunRecord {
-        layout: layout.clone(),
-        profile: Some(profile.to_string()),
-        repo_root: Some(resolved_repo_root.to_string_lossy().into_owned()),
-        suite_dir: Some(suite_dir.to_string_lossy().into_owned()),
-        suite_id: Some(suite_id),
-        suite_path: Some(suite_path.to_string_lossy().into_owned()),
-        cluster: None,
-        keep_clusters: spec.frontmatter.keep_clusters,
-        user_stories,
-        required_dependencies,
-    };
-    let ctx_path = current_run_context_path()?;
-    if let Some(parent) = ctx_path.parent() {
-        fs::create_dir_all(parent)?;
-    }
-    write_json_pretty(&ctx_path, &record)
+    let pointer = CurrentRunPointer::from_metadata(layout.clone(), &metadata, None);
+    let repo = RunRepository;
+    repo.save_current_pointer(&pointer)
         .map_err(|e| CliErrorKind::serialize(cow!("run context record: {e}")))?;
 
     println!("{}", shorten_path(&layout.run_dir()));

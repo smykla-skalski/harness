@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use clap::Args;
 
-use crate::commands::{RunDirArgs, resolve_admin_token, resolve_cp_addr, resolve_run_context};
+use crate::commands::{RunDirArgs, resolve_run_context};
 use crate::errors::{CliError, CliErrorKind};
 use crate::exec;
 
@@ -46,12 +46,14 @@ pub fn token(
     run_dir_args: &RunDirArgs,
 ) -> Result<i32, CliError> {
     let ctx = resolve_run_context(run_dir_args)?;
+    let runtime = ctx.cluster_runtime()?;
+    let access = runtime.control_plane_access()?;
     let addr = if let Some(a) = cp_addr {
         a.to_string()
     } else {
-        resolve_cp_addr(&ctx)?
+        access.addr.clone()
     };
-    let admin_token = resolve_admin_token(&ctx)?;
+    let admin_token = access.admin_token.clone();
 
     // Try REST API first
     match token_via_api(&addr, kind, name, mesh, valid_for, admin_token.as_deref()) {
