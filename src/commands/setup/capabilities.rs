@@ -158,13 +158,12 @@ fn core_features() -> BTreeMap<Feature, FeatureInfo> {
     BTreeMap::from([
         (
             Feature::ApiAccess,
-            FeatureInfo::new("send HTTP requests to CP REST API endpoints")
-                .commands(&[
-                    "harness api get",
-                    "harness api post",
-                    "harness api put",
-                    "harness api delete",
-                ]),
+            FeatureInfo::new("send HTTP requests to CP REST API endpoints").commands(&[
+                "harness api get",
+                "harness api post",
+                "harness api put",
+                "harness api delete",
+            ]),
         ),
         (
             Feature::Bootstrap,
