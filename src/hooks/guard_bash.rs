@@ -85,7 +85,16 @@ pub fn execute(ctx: &HookContext) -> Result<HookResult, CliError> {
     if !ctx.skill_active {
         return Ok(HookResult::allow());
     }
-    let words = ctx.command_words();
+    let words = match ctx.command_words() {
+        Ok(w) => w,
+        Err(e) => {
+            return Ok(HookMessage::runner_flow_required(
+                "parse command",
+                format!("shell tokenization failed: {e}"),
+            )
+            .into_result());
+        }
+    };
     if words.is_empty() {
         return Ok(HookResult::allow());
     }

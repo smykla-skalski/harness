@@ -133,13 +133,13 @@ fn enrich_failure_no_run() {
 #[test]
 fn hook_context_command_words_empty() {
     let ctx = make_hook_context("suite:run", make_empty_payload());
-    assert!(ctx.command_words().is_empty());
+    assert!(ctx.command_words().unwrap().is_empty());
 }
 
 #[test]
 fn hook_context_command_words_splits() {
     let ctx = make_hook_context("suite:run", make_bash_payload("echo hello world"));
-    assert_eq!(ctx.command_words(), vec!["echo", "hello", "world"]);
+    assert_eq!(ctx.command_words().unwrap(), vec!["echo", "hello", "world"]);
 }
 
 #[test]

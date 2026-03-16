@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::env;
 use std::fs;
+use std::io;
 use std::path::Path;
 use std::time::Duration;
 
@@ -253,17 +254,33 @@ fn resolve_effective_store(is_up: bool, cli_store: &str) -> String {
     if is_up {
         return cli_store.to_string();
     }
-    load_persisted_cluster_spec()
-        .and_then(|s| s.store_type)
-        .unwrap_or_else(|| cli_store.to_string())
+    match load_persisted_cluster_spec() {
+        Ok(Some(spec)) => spec.store_type.unwrap_or_else(|| cli_store.to_string()),
+        Ok(None) => cli_store.to_string(),
+        Err(e) => {
+            eprintln!("warning: failed to load persisted cluster spec: {e}");
+            cli_store.to_string()
+        }
+    }
 }
 
 /// Load persisted cluster spec from the session context file.
-fn load_persisted_cluster_spec() -> Option<ClusterSpec> {
-    let ctx_path = current_run_context_path().ok()?;
-    let text = fs::read_to_string(&ctx_path).ok()?;
-    let record: CurrentRunRecord = serde_json::from_str(&text).ok()?;
-    record.cluster
+///
+/// # Errors
+/// Returns `CliError` on corrupt JSON or parse failures. Returns `Ok(None)` when
+/// the context file is missing.
+fn load_persisted_cluster_spec() -> Result<Option<ClusterSpec>, CliError> {
+    let ctx_path = current_run_context_path()?;
+    let text = match fs::read_to_string(&ctx_path) {
+        Ok(t) => t,
+        Err(e) if e.kind() == io::ErrorKind::NotFound => return Ok(None),
+        Err(e) => {
+            return Err(CliErrorKind::io(cow!("read {}: {e}", ctx_path.display())).into());
+        }
+    };
+    let record: CurrentRunRecord = serde_json::from_str(&text)
+        .map_err(|e| CliErrorKind::io(cow!("parse {}: {e}", ctx_path.display())))?;
+    Ok(record.cluster)
 }
 
 /// Result from a universal cluster up operation.
@@ -840,11 +857,11 @@ mod tests {
             ],
             load_persisted_cluster_spec,
         );
-        assert!(result.is_none());
+        assert!(result.unwrap().is_none());
     }
 
     #[test]
-    fn load_persisted_spec_none_when_corrupt() {
+    fn load_persisted_spec_err_when_corrupt() {
         let tmp = tempfile::tempdir().unwrap();
         let session_id = "load-test-corrupt";
         write_context_file(tmp.path(), session_id, "not valid json {{{{");
@@ -855,7 +872,7 @@ mod tests {
             ],
             load_persisted_cluster_spec,
         );
-        assert!(result.is_none());
+        assert!(result.is_err());
     }
 
     #[test]
@@ -887,7 +904,7 @@ mod tests {
             ],
             load_persisted_cluster_spec,
         );
-        let spec = result.expect("should load cluster spec");
+        let spec = result.unwrap().expect("should load cluster spec");
         assert_eq!(spec.store_type.as_deref(), Some("postgres"));
     }
 }

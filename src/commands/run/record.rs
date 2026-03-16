@@ -22,6 +22,34 @@ fn slugify(raw: &str) -> String {
         .to_string()
 }
 
+/// Inject `KUBECONFIG` and `REPO_ROOT` from the persisted run context so
+/// kubectl hits the local k3d cluster and kumactl resolves to the
+/// worktree build, not whatever is on the default PATH.
+fn inject_run_env(cmd: &mut Command, run_dir: &Path, cluster: Option<&str>) {
+    let ctx = match RunContext::from_run_dir(run_dir) {
+        Ok(c) => c,
+        Err(e) => {
+            eprintln!("warning: failed to load run context: {e}");
+            return;
+        }
+    };
+    if let Ok(kc) = resolve_kubeconfig(&ctx, None, cluster) {
+        cmd.env("KUBECONFIG", kc);
+    } else {
+        eprintln!("warning: failed to resolve kubeconfig");
+    }
+    let repo_root = &ctx.metadata.repo_root;
+    if !repo_root.is_empty() {
+        cmd.env("REPO_ROOT", repo_root);
+        let (os_name, arch) = host_platform();
+        let kumactl_dir = format!("{repo_root}/build/artifacts-{os_name}-{arch}/kumactl");
+        if Path::new(&kumactl_dir).is_dir() {
+            let current_path = env::var("PATH").unwrap_or_default();
+            cmd.env("PATH", format!("{kumactl_dir}:{current_path}"));
+        }
+    }
+}
+
 /// Record a tracked command and save its output.
 ///
 /// # Errors
@@ -42,31 +70,20 @@ pub fn record(
         return Err(CliErrorKind::usage_error("missing command").into());
     }
 
-    let run_dir = resolve_run_dir(run_dir_args).ok();
+    let run_dir = match resolve_run_dir(run_dir_args) {
+        Ok(rd) => Some(rd),
+        Err(e) => {
+            if !matches!(e.kind(), CliErrorKind::MissingRunPointer) {
+                eprintln!("warning: failed to resolve run dir: {e}");
+            }
+            None
+        }
+    };
 
-    // Inject KUBECONFIG and REPO_ROOT from the persisted run context so
-    // kubectl hits the local k3d cluster and kumactl resolves to the
-    // worktree build, not whatever is on the default PATH.
     let mut cmd = Command::new(command[0]);
     cmd.args(&command[1..]);
     if let Some(ref rd) = run_dir {
-        let ctx = RunContext::from_run_dir(rd).ok();
-        if let Some(ref c) = ctx {
-            if let Ok(kc) = resolve_kubeconfig(c, None, cluster) {
-                cmd.env("KUBECONFIG", kc);
-            }
-            let repo_root = &c.metadata.repo_root;
-            if !repo_root.is_empty() {
-                cmd.env("REPO_ROOT", repo_root);
-                // Prepend kumactl build artifacts to PATH
-                let (os_name, arch) = host_platform();
-                let kumactl_dir = format!("{repo_root}/build/artifacts-{os_name}-{arch}/kumactl");
-                if Path::new(&kumactl_dir).is_dir() {
-                    let current_path = env::var("PATH").unwrap_or_default();
-                    cmd.env("PATH", format!("{kumactl_dir}:{current_path}"));
-                }
-            }
-        }
+        inject_run_env(&mut cmd, rd, cluster);
     }
     let output = cmd.output();
 

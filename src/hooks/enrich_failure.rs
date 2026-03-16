@@ -25,7 +25,7 @@ pub fn execute(ctx: &HookContext) -> Result<HookResult, CliError> {
     let Some(state) = &ctx.runner_state else {
         return Ok(HookMessage::run_verdict(status.overall_verdict.to_string()).into_result());
     };
-    let words = ctx.command_words();
+    let words = ctx.command_words().unwrap_or_default();
     if words.len() >= 2 && words[0] == "harness" {
         let sub = words[1].as_str();
         if matches!(sub, "apply" | "validate") && state.phase == RunnerPhase::Execution {

@@ -26,7 +26,9 @@ pub fn execute(ctx: &HookContext) -> Result<HookResult, CliError> {
     if !ctx.skill_active || !ctx.is_suite_runner() {
         return Ok(HookResult::allow());
     }
-    let words = ctx.command_words();
+    let Ok(words) = ctx.command_words() else {
+        return Ok(HookResult::allow());
+    };
     if words.len() < 2 {
         return Ok(HookResult::allow());
     }
