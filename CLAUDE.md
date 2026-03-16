@@ -48,7 +48,7 @@ Hooks intercept Claude Code tool usage. Classified in `cli.rs` as constants:
 - `compact.rs` - file fingerprinting (SHA256 + mtime) for change tracking
 - `core_defs.rs` - build info, timestamps, XDG paths, session scope (SHA256-hashed)
 - `rules.rs` - declarative denied-binary lists, make targets, etc.
-- `commands/` - 24 command handlers dispatched from CLI
+- `commands/` - 33 command handlers dispatched from CLI
 
 ### Data directories (XDG)
 
