@@ -250,6 +250,35 @@ fn filter_kubectl_wait_detail(line: &str) -> String {
     "kubectl: waiting for condition".into()
 }
 
+/// Run a command with stdout and stderr inherited by the terminal.
+///
+/// Used for interactive/streaming commands like `docker logs -f` where
+/// output should flow directly to the user's terminal.
+///
+/// # Errors
+/// Returns `CliError` if the command fails to start or exits with a bad code.
+pub(crate) fn run_command_inherited(args: &[&str], ok_exit_codes: &[i32]) -> Result<i32, CliError> {
+    let (program, cmd_args) = args
+        .split_first()
+        .ok_or_else(|| CliError::from(CliErrorKind::EmptyCommandArgs))?;
+    let merged = merge_env(None);
+    let status = Command::new(program)
+        .args(cmd_args)
+        .envs(&merged)
+        .stdout(Stdio::inherit())
+        .stderr(Stdio::inherit())
+        .status()
+        .map_err(|e| {
+            CliErrorKind::command_failed(command_string(args)).with_details(e.to_string())
+        })?;
+    let code = status.code().unwrap_or(-1);
+    if ok_exit_codes.contains(&code) {
+        return Ok(code);
+    }
+    Err(CliErrorKind::command_failed(command_string(args))
+        .with_details(format!("exit code {code}")))
+}
+
 fn build_command(
     program: &str,
     cmd_args: &[&str],
