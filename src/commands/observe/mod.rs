@@ -154,7 +154,7 @@ fn execute_scan(session_id: &str, filter: &ObserveFilterArgs) -> Result<i32, Cli
     let (issues, last_line) = scan(&path, filter.from_line)?;
     let filtered = apply_filters(issues, filter);
 
-    if let Some(ref details_path) = filter.details_file {
+    if let Some(ref details_path) = filter.output_details {
         write_details_file(details_path, &filtered)?;
     }
 
@@ -202,18 +202,27 @@ fn execute_watch(
     let poll_duration = Duration::from_secs(poll_interval);
     let timeout_duration = Duration::from_secs(timeout);
 
+    let open_append = |path: &str, label: &str| -> Result<fs::File, CliError> {
+        fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(path)
+            .map_err(|e| {
+                CliError::from(CliErrorKind::session_parse_error(format!(
+                    "cannot open {label} file: {e}"
+                )))
+            })
+    };
+
+    let mut output_writer: Option<fs::File> = filter
+        .output
+        .as_deref()
+        .map(|p| open_append(p, "output"))
+        .transpose()?;
     let mut details_writer: Option<fs::File> = filter
-        .details_file
-        .as_ref()
-        .map(|p| {
-            fs::OpenOptions::new()
-                .create(true)
-                .append(true)
-                .open(p)
-                .map_err(|e| {
-                    CliErrorKind::session_parse_error(format!("cannot open details file: {e}"))
-                })
-        })
+        .output_details
+        .as_deref()
+        .map(|p| open_append(p, "details"))
         .transpose()?;
 
     // Skip to from_line on first read by reading through the initial lines
@@ -246,16 +255,22 @@ fn execute_watch(
 
                 let new_issues = classifier::classify_line(index, &line, &mut state);
                 for issue in &new_issues {
-                    if let Some(ref mut writer) = details_writer
+                    if let Some(ref mut detail_out) = details_writer
                         && let Ok(json_str) = serde_json::to_string(issue)
                     {
-                        let _ = writeln!(writer, "{json_str}");
-                        let _ = writer.flush();
+                        let _ = writeln!(detail_out, "{json_str}");
+                        let _ = detail_out.flush();
                     }
-                    if filter.json {
-                        println!("{}", output::render_json(issue));
+                    let rendered = if filter.json {
+                        output::render_json(issue)
                     } else {
-                        println!("{}", output::render_human(issue));
+                        output::render_human(issue)
+                    };
+                    if let Some(ref mut file_out) = output_writer {
+                        let _ = writeln!(file_out, "{rendered}");
+                        let _ = file_out.flush();
+                    } else {
+                        println!("{rendered}");
                     }
                 }
                 if !new_issues.is_empty() {
