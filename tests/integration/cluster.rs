@@ -204,6 +204,8 @@ fn global_zone_up_orchestration() {
                 restart_namespace: vec![],
                 store: "memory".into(),
                 image: None,
+                no_build: false,
+                no_load: false,
             })
             .execute();
             assert!(result.is_ok(), "global-zone-up failed: {result:?}");
@@ -259,6 +261,8 @@ fn single_up_logs_stage_updates() {
                 restart_namespace: vec![],
                 store: "memory".into(),
                 image: None,
+                no_build: false,
+                no_load: false,
             })
             .execute();
             assert!(result.is_ok(), "single-up failed: {result:?}");
@@ -305,6 +309,8 @@ fn single_up_metallb_template() {
                 restart_namespace: vec![],
                 store: "memory".into(),
                 image: None,
+                no_build: false,
+                no_load: false,
             })
             .execute();
             assert!(result.is_ok(), "single-up metallb failed: {result:?}");
@@ -367,6 +373,8 @@ fn single_up_restores_context() {
                 restart_namespace: vec![],
                 store: "memory".into(),
                 image: None,
+                no_build: false,
+                no_load: false,
             })
             .execute();
             assert!(result.is_ok(), "single-up with context failed: {result:?}");
@@ -414,6 +422,8 @@ fn cluster_context_up_down() {
                 restart_namespace: vec![],
                 store: "memory".into(),
                 image: None,
+                no_build: false,
+                no_load: false,
             })
             .execute();
             assert!(up_result.is_ok(), "single-up failed: {up_result:?}");
@@ -442,6 +452,8 @@ fn cluster_context_up_down() {
                 restart_namespace: vec![],
                 store: "memory".into(),
                 image: None,
+                no_build: false,
+                no_load: false,
             })
             .execute();
             assert!(down_result.is_ok(), "single-down failed: {down_result:?}");
@@ -495,6 +507,8 @@ fn cluster_uses_saved_repo_root() {
                 restart_namespace: vec![],
                 store: "memory".into(),
                 image: None,
+                no_build: false,
+                no_load: false,
             })
             .execute();
             assert!(

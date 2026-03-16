@@ -9,6 +9,8 @@ use harness::commands::Execute;
 fn default_filter() -> ObserveFilterArgs {
     ObserveFilterArgs {
         from_line: 0,
+        from: None,
+        focus: None,
         project_hint: None,
         json: false,
         summary: false,
@@ -16,6 +18,12 @@ fn default_filter() -> ObserveFilterArgs {
         category: None,
         exclude: None,
         fixable: false,
+        mute: None,
+        until_line: None,
+        since_timestamp: None,
+        until_timestamp: None,
+        format: None,
+        top_causes: None,
         output: None,
         output_details: None,
     }
@@ -53,6 +61,7 @@ fn dump_missing_session_returns_error() {
             to_line: None,
             filter: None,
             role: None,
+            tool_name: None,
             project_hint: None,
         },
     };
@@ -300,6 +309,7 @@ fn dump_returns_ok_with_session() {
             to_line: Some(10),
             filter: None,
             role: Some("user".into()),
+            tool_name: None,
             project_hint: None,
         },
     };
