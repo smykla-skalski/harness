@@ -25,6 +25,8 @@ pub enum TopologyMode {
 #[serde(rename_all = "snake_case")]
 #[non_exhaustive]
 pub enum Feature {
+    ClusterCheck,
+    ContainerLogs,
     DataplaneTokens,
     EnvoyAdmin,
     GatewayApi,
@@ -37,6 +39,7 @@ pub enum Feature {
     RunLifecycle,
     ServiceContainers,
     StateCapture,
+    StatusReport,
     TrackedRecording,
     TransparentProxy,
 }
@@ -141,9 +144,25 @@ fn cluster_topologies() -> Vec<ClusterTopology> {
 }
 
 fn features() -> BTreeMap<Feature, FeatureInfo> {
+    let mut map = core_features();
+    map.extend(extended_features());
+    map
+}
+
+fn core_features() -> BTreeMap<Feature, FeatureInfo> {
     let universal = &[Platform::Universal];
     let kubernetes = &[Platform::Kubernetes];
     BTreeMap::from([
+        (
+            Feature::ClusterCheck,
+            FeatureInfo::new("verify cluster containers and networks are still running")
+                .command("harness cluster-check"),
+        ),
+        (
+            Feature::ContainerLogs,
+            FeatureInfo::new("view logs from cluster or service containers")
+                .command("harness logs"),
+        ),
         (
             Feature::DataplaneTokens,
             FeatureInfo::new(
@@ -192,6 +211,13 @@ fn features() -> BTreeMap<Feature, FeatureInfo> {
             FeatureInfo::new("server-side dry-run validation before apply")
                 .command("harness validate"),
         ),
+    ])
+}
+
+fn extended_features() -> BTreeMap<Feature, FeatureInfo> {
+    let universal = &[Platform::Universal];
+    let kubernetes = &[Platform::Kubernetes];
+    BTreeMap::from([
         (
             Feature::NamespaceRestart,
             FeatureInfo::new("restart workloads in specified namespaces after deployment changes")
@@ -219,6 +245,11 @@ fn features() -> BTreeMap<Feature, FeatureInfo> {
             Feature::StateCapture,
             FeatureInfo::new("snapshot cluster pod state as timestamped artifacts")
                 .command("harness capture"),
+        ),
+        (
+            Feature::StatusReport,
+            FeatureInfo::new("show cluster state, members, services, and dataplanes as JSON")
+                .command("harness status"),
         ),
         (
             Feature::TrackedRecording,
