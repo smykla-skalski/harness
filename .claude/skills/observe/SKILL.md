@@ -43,6 +43,31 @@ When the value is prose, resolve it to a line number by scanning the session JSO
 - Project dir: !`echo "$CLAUDE_PROJECT_DIR"`
 - Session search path: !`echo "$HOME/.claude/projects/"`
 
+## Deriving --project-hint
+
+The `--project-hint` narrows session search to a specific project directory. Derive it from `CLAUDE_PROJECT_DIR`:
+
+```bash
+# Extract the directory name (last path segment, hyphenated)
+PROJECT_HINT=$(basename "$CLAUDE_PROJECT_DIR")
+```
+
+If `CLAUDE_PROJECT_DIR` is unset, omit `--project-hint` and let harness search all project directories.
+
+## Observation modes
+
+The observer supports these operational modes:
+
+- **scan-once**: One-shot `harness observe scan` with filters. Report results and exit.
+- **watch-only**: Continuous `harness observe watch` polling. Report issues as they arrive, no fix dispatch.
+- **triage**: Scan + present issues to user for classification. User decides what to fix.
+- **auto-fix-critical**: Scan + auto-dispatch fix workers for critical/fixable issues. Report the rest.
+- **status**: Check observer state with `harness observe status`. Shows cursor, open issues, cycle history.
+- **resume**: Pick up from last cursor with `harness observe resume`.
+- **stop**: Delete crons, preserve state file for later resume.
+
+The default workflow (Phase 1-3 below) uses auto-fix-critical mode.
+
 ## Harness observe command reference
 
 The `harness observe` command is the primary data source. All subcommands use `--project-hint` to narrow session search.
@@ -205,9 +230,8 @@ with mode: "auto" and run_in_background: true. Include the issue summary, detail
 fix_target, and fix_hint. Instruct the worker to run cargo clippy --lib && cargo test --lib
 after Rust changes.
 
-**Low severity or not fixable**: Use AskUserQuestion to ask the user:
-"Observer found: [summary] at L[line] ([category]). Fix now?" with options
-"Fix it", "Skip", "Investigate first". Only dispatch a fix worker if the user selects "Fix it".
+**Low severity or not fixable**: Log to state file only. The foreground manager
+owns all user prompts - background crons never use AskUserQuestion.
 ```
 
 ## Deep analysis cron (every 5 minutes)
