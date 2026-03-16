@@ -10,7 +10,7 @@ use crate::core_defs::{shorten_path, utc_now};
 use crate::errors::{CliError, CliErrorKind, cow};
 use crate::exec;
 use crate::exec::kubectl;
-use crate::io::{append_markdown_row, ensure_dir, write_text};
+use crate::io::{append_markdown_row, ensure_dir, validate_safe_segment, write_text};
 use crate::resolve::resolve_manifest_path;
 
 use super::kumactl::find_kumactl_binary;
@@ -77,6 +77,7 @@ fn materialize_stdin(run_dir: &Path, step: Option<&str>) -> Result<PathBuf, CliE
     let manifests_dir = run_dir.join("manifests");
     ensure_dir(&manifests_dir)?;
     let name = step.unwrap_or("stdin");
+    validate_safe_segment(name)?;
     let path = manifests_dir.join(format!("{name}.yaml"));
     write_text(&path, &content)?;
     Ok(path)

@@ -14,9 +14,8 @@ use crate::core_defs::{HARNESS_PREFIX, current_run_context_path, resolve_build_i
 use crate::errors::{CliError, CliErrorKind, cow};
 use crate::exec::{
     cluster_exists, compose_down_project, compose_up, docker, docker_inspect_ip,
-    docker_network_create, docker_network_rm, docker_rm, docker_rm_by_label,
-    docker_run_detached, extract_admin_token, kubectl, run_command, run_command_streaming,
-    wait_for_http,
+    docker_network_create, docker_network_rm, docker_rm, docker_rm_by_label, docker_run_detached,
+    extract_admin_token, kubectl, run_command, run_command_streaming, wait_for_http,
 };
 
 fn make_target(root: &Path, target: &str, env: &HashMap<String, String>) -> Result<(), CliError> {
