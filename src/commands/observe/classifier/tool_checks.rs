@@ -75,6 +75,20 @@ fn check_bash_tool_use(
         );
     }
 
+    check_harness_command_patterns(command, &details, &mut emitter, issues);
+    check_destructive_patterns(command, &details, &mut emitter, issues);
+    check_absolute_manifest_path(command, &details, &mut emitter, issues);
+    check_direct_task_output_read(command, &details, &mut emitter, issues);
+    check_env_var_construction(command, &details, &mut emitter, issues);
+    check_sleep_prefix_before_harness(command, &details, &mut emitter, issues);
+}
+
+fn check_harness_command_patterns(
+    command: &str,
+    details: &str,
+    emitter: &mut IssueEmitter<'_>,
+    issues: &mut Vec<Issue>,
+) {
     if command.contains("harness") && command.contains("validator-decision") {
         emitter.emit(
             issues,
@@ -87,7 +101,7 @@ fn check_bash_tool_use(
             .with_guidance(Guidance::fix_hint(
                 "SKILL.md references a non-existent harness kind",
             )),
-            &details,
+            details,
         );
     }
 
@@ -107,10 +121,17 @@ fn check_bash_tool_use(
             .with_guidance(Guidance::fix_hint(
                 "Use harness commands or shell builtins instead of python one-liners",
             )),
-            &details,
+            details,
         );
     }
+}
 
+fn check_destructive_patterns(
+    command: &str,
+    details: &str,
+    emitter: &mut IssueEmitter<'_>,
+    issues: &mut Vec<Issue>,
+) {
     if RM_RECURSIVE_REGEX.is_match(command) && !command.contains("&&") {
         emitter.emit(
             issues,
@@ -123,7 +144,7 @@ fn check_bash_tool_use(
             .with_guidance(Guidance::advisory(
                 "Should verify target exists and is correct before deleting",
             )),
-            &details,
+            details,
         );
     }
 
@@ -139,7 +160,7 @@ fn check_bash_tool_use(
             .with_guidance(Guidance::fix_hint(
                 "Use harness cluster instead of raw make targets",
             )),
-            &details,
+            details,
         );
     }
 
@@ -155,13 +176,9 @@ fn check_bash_tool_use(
             .with_guidance(Guidance::fix_hint(
                 "Agent committed code without asking the user via bug-found gate",
             )),
-            &details,
+            details,
         );
     }
-
-    check_absolute_manifest_path(command, &details, &mut emitter, issues);
-    check_direct_task_output_read(command, &details, &mut emitter, issues);
-    check_env_var_construction(command, &details, &mut emitter, issues);
 }
 
 /// Detect `harness apply --manifest /absolute/path` usage.
@@ -323,6 +340,41 @@ fn is_env_assignment(token: &str) -> bool {
             .chars()
             .next()
             .is_some_and(|c| c.is_ascii_alphabetic() || c == '_')
+}
+
+/// Detect `sleep <N> && harness` or `sleep <N>; harness` command patterns.
+///
+/// Agents sometimes prefix harness commands with `sleep` to wait for resources
+/// to settle. Harness has a built-in `--delay` flag for this purpose.
+fn check_sleep_prefix_before_harness(
+    command: &str,
+    details: &str,
+    emitter: &mut IssueEmitter<'_>,
+    issues: &mut Vec<Issue>,
+) {
+    let trimmed = command.trim_start();
+    if !trimmed.starts_with("sleep ") {
+        return;
+    }
+    let has_harness_continuation = trimmed.contains("&& harness")
+        || trimmed.contains("; harness")
+        || trimmed.contains("&& /") && trimmed.contains("harness");
+    if has_harness_continuation {
+        emitter.emit(
+            issues,
+            IssueBlueprint::new(
+                IssueCode::SleepPrefixBeforeHarnessCommand,
+                IssueCategory::UnexpectedBehavior,
+                IssueSeverity::Low,
+                "Sleep prefix before harness command",
+            )
+            .with_guidance(Guidance::fix_hint(
+                "Use --delay flag instead of sleep prefix \
+                 (e.g. harness apply --delay 8 --manifest ...)",
+            )),
+            details,
+        );
+    }
 }
 
 /// Check `AskUserQuestion` `tool_use` for issue patterns.

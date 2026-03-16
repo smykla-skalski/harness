@@ -2,6 +2,8 @@
 // Covers state initialization, read/write round-trips, phase transitions
 // (preflight, abort, completed), and event tracking.
 
+use harness::cli::RunDirArgs;
+use harness::commands::run::runner_state;
 use harness::workflow::runner::{self as runner_workflow, PreflightStatus, RunnerPhase};
 
 use super::super::helpers::*;
@@ -84,4 +86,19 @@ fn runner_state_completed_sets_phase() {
         .unwrap()
         .unwrap();
     assert_eq!(reloaded.phase, RunnerPhase::Completed);
+}
+
+#[test]
+fn runner_state_event_returns_error() {
+    let tmp = tempfile::tempdir().unwrap();
+    let run_dir = init_run(tmp.path(), "run-evt-err", "single-zone");
+    let args = RunDirArgs {
+        run_dir: Some(run_dir.clone()),
+        run_id: None,
+        run_root: None,
+    };
+    let result = runner_state(Some("some-event"), None, None, &args);
+    assert!(result.is_err(), "event-based transitions should return Err");
+    let err = result.unwrap_err();
+    assert_eq!(err.code(), "USAGE");
 }

@@ -83,3 +83,35 @@ fn session_stop_returns_ok_with_no_pointer() {
         },
     );
 }
+
+#[test]
+fn session_stop_handles_corrupt_pointer_json() {
+    let tmp = tempfile::tempdir().unwrap();
+    let xdg = tmp.path().join("xdg");
+
+    temp_env::with_vars(
+        [
+            ("XDG_DATA_HOME", Some(xdg.to_str().unwrap())),
+            ("CLAUDE_SESSION_ID", Some("corrupt-json-test")),
+        ],
+        || {
+            let ctx_path = current_run_context_path().unwrap();
+            if let Some(parent) = ctx_path.parent() {
+                fs::create_dir_all(parent).unwrap();
+            }
+            fs::write(&ctx_path, "not valid json {{{{").unwrap();
+            assert!(ctx_path.exists());
+
+            let code = Command::SessionStop { project_dir: None }
+                .execute()
+                .unwrap();
+            assert_eq!(code, 0);
+
+            // Corrupt pointer should be removed
+            assert!(
+                !ctx_path.exists(),
+                "corrupt pointer should have been removed"
+            );
+        },
+    );
+}

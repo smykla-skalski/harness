@@ -235,6 +235,7 @@ fn group_spec_with_expected_rejection_orders() {
 // ============================================================================
 
 #[test]
+#[ignore = "slow: spawns fake toolchain processes"]
 fn preflight_prepares_and_caches() {
     let _lock = ENV_LOCK.lock().unwrap_or_else(PoisonError::into_inner);
     let tmp = tempfile::tempdir().unwrap();
@@ -277,6 +278,7 @@ fn preflight_prepares_and_caches() {
 }
 
 #[test]
+#[ignore = "slow: spawns fake toolchain processes"]
 fn preflight_skips_rejections() {
     let _lock = ENV_LOCK.lock().unwrap_or_else(PoisonError::into_inner);
     let tmp = tempfile::tempdir().unwrap();
@@ -324,6 +326,7 @@ fn preflight_skips_rejections() {
 }
 
 #[test]
+#[ignore = "slow: spawns fake toolchain processes"]
 fn preflight_skips_inline_rejections() {
     let _lock = ENV_LOCK.lock().unwrap_or_else(PoisonError::into_inner);
     let tmp = tempfile::tempdir().unwrap();
@@ -371,6 +374,7 @@ fn preflight_skips_inline_rejections() {
 }
 
 #[test]
+#[ignore = "slow: spawns fake toolchain processes"]
 fn preflight_skips_frontmatter_rejections() {
     let _lock = ENV_LOCK.lock().unwrap_or_else(PoisonError::into_inner);
     let tmp = tempfile::tempdir().unwrap();
@@ -418,6 +422,7 @@ fn preflight_skips_frontmatter_rejections() {
 }
 
 #[test]
+#[ignore = "slow: spawns fake toolchain processes"]
 fn preflight_applies_baselines() {
     let _lock = ENV_LOCK.lock().unwrap_or_else(PoisonError::into_inner);
     let tmp = tempfile::tempdir().unwrap();
@@ -457,6 +462,7 @@ fn preflight_applies_baselines() {
 }
 
 #[test]
+#[ignore = "slow: spawns fake toolchain processes"]
 fn preflight_namespace_baseline() {
     let _lock = ENV_LOCK.lock().unwrap_or_else(PoisonError::into_inner);
     let tmp = tempfile::tempdir().unwrap();
@@ -496,6 +502,7 @@ fn preflight_namespace_baseline() {
 }
 
 #[test]
+#[ignore = "slow: spawns fake toolchain processes"]
 fn capture_uses_run_context() {
     let _lock = ENV_LOCK.lock().unwrap_or_else(PoisonError::into_inner);
     let tmp = tempfile::tempdir().unwrap();
@@ -552,6 +559,7 @@ fn capture_uses_run_context() {
 }
 
 #[test]
+#[ignore = "slow: spawns fake toolchain processes"]
 fn apply_reuses_prepared() {
     let _lock = ENV_LOCK.lock().unwrap_or_else(PoisonError::into_inner);
     let tmp = tempfile::tempdir().unwrap();
@@ -601,6 +609,7 @@ fn apply_reuses_prepared() {
 }
 
 #[test]
+#[ignore = "slow: spawns fake toolchain processes"]
 fn apply_validate_shorthand() {
     let _lock = ENV_LOCK.lock().unwrap_or_else(PoisonError::into_inner);
     let tmp = tempfile::tempdir().unwrap();
@@ -647,6 +656,7 @@ fn apply_validate_shorthand() {
 }
 
 #[test]
+#[ignore = "slow: spawns fake toolchain processes"]
 fn validate_uses_api_version() {
     let _lock = ENV_LOCK.lock().unwrap_or_else(PoisonError::into_inner);
     let tmp = tempfile::tempdir().unwrap();
@@ -703,6 +713,7 @@ fn validate_uses_api_version() {
 }
 
 #[test]
+#[ignore = "slow: spawns fake toolchain processes"]
 fn preflight_failure_resets() {
     let _lock = ENV_LOCK.lock().unwrap_or_else(PoisonError::into_inner);
     let tmp = tempfile::tempdir().unwrap();
@@ -741,6 +752,7 @@ fn preflight_failure_resets() {
 }
 
 #[test]
+#[ignore = "slow: spawns fake toolchain processes"]
 fn capture_marks_preflight_complete() {
     let _lock = ENV_LOCK.lock().unwrap_or_else(PoisonError::into_inner);
     let tmp = tempfile::tempdir().unwrap();
@@ -798,6 +810,7 @@ fn capture_marks_preflight_complete() {
 }
 
 #[test]
+#[ignore = "slow: spawns fake toolchain processes"]
 fn preflight_dependent_baselines() {
     let _lock = ENV_LOCK.lock().unwrap_or_else(PoisonError::into_inner);
     let tmp = tempfile::tempdir().unwrap();

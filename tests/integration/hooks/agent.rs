@@ -178,3 +178,12 @@ fn hook_context_skill_active_default() {
     assert!(ctx.skill_active);
     assert_eq!(ctx.active_skill.as_deref(), Some("suite:run"));
 }
+
+#[test]
+fn hook_context_command_words_malformed_quote() {
+    let ctx = make_hook_context("suite:run", make_bash_payload("echo 'unterminated"));
+    let result = ctx.command_words();
+    assert!(result.is_err(), "malformed shell quoting should return Err");
+    let err = result.unwrap_err();
+    assert_eq!(err.code(), "KSH001");
+}
