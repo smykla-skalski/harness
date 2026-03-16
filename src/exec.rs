@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::io::{self, BufRead, Read as _};
+use std::io::{self, BufRead, Read as _, Write as _};
 use std::path::Path;
 use std::process::{Command, Output, Stdio};
 use std::thread;
@@ -378,6 +378,29 @@ pub fn docker_exec_cmd(container: &str, cmd: &[&str]) -> Result<CommandResult, C
     let mut args: Vec<&str> = vec!["exec", container];
     args.extend_from_slice(cmd);
     docker(&args, &[0])
+}
+
+/// Write `content` to `container_path` inside a running container using `docker cp`.
+///
+/// Writes to a local temp file then copies it in, avoiding shell interpretation
+/// of the content.
+///
+/// # Errors
+/// Returns `CliError` on I/O or `docker cp` failure.
+pub fn docker_write_file(
+    container: &str,
+    container_path: &str,
+    content: &str,
+) -> Result<(), CliError> {
+    use crate::errors::cow;
+    let mut tmp =
+        tempfile::NamedTempFile::new().map_err(|e| CliErrorKind::io(cow!("temp file: {e}")))?;
+    tmp.write_all(content.as_bytes())
+        .map_err(|e| CliErrorKind::io(cow!("write temp file: {e}")))?;
+    let src = tmp.path().to_string_lossy();
+    let dest = format!("{container}:{container_path}");
+    docker(&["cp", &src, &dest], &[0])?;
+    Ok(())
 }
 
 // ---------------------------------------------------------------------------

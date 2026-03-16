@@ -116,18 +116,8 @@ fn service_up(
     // Write token and dataplane YAML into container
     let token_path = format!("/tmp/{svc_name}-token");
     let dp_path = format!("/tmp/{svc_name}-dp.yaml");
-    exec::docker_exec_cmd(
-        svc_name,
-        &["sh", "-c", &format!("echo '{token_str}' > {token_path}")],
-    )?;
-    exec::docker_exec_cmd(
-        svc_name,
-        &[
-            "sh",
-            "-c",
-            &format!("cat > {dp_path} << 'DPEOF'\n{dp_yaml}\nDPEOF"),
-        ],
-    )?;
+    exec::docker_write_file(svc_name, &token_path, token_str)?;
+    exec::docker_write_file(svc_name, &dp_path, &dp_yaml)?;
 
     // Install transparent proxy if requested
     if transparent_proxy {
