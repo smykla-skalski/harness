@@ -1,9 +1,12 @@
 use std::collections::HashMap;
+use std::io::Write as _;
 use std::path::Path;
 use std::{fs, io};
 
 use comrak::nodes::NodeValue;
 use comrak::{Arena, Options, parse_document};
+use serde::Serialize;
+use serde::de::DeserializeOwned;
 use serde_json::Value;
 use tabled::builder::Builder;
 use tabled::settings::Style;
@@ -91,16 +94,22 @@ pub fn read_text(path: &Path) -> Result<String, CliError> {
 /// # Errors
 /// Returns `CliError` on IO failure.
 pub fn write_text(path: &Path, text: &str) -> Result<(), CliError> {
-    if let Some(parent) = path.parent() {
-        ensure_dir(parent).map_err(|e| {
-            CliError::from(CliErrorKind::io(cow!(
-                "create dir {}: {e}",
-                parent.display()
-            )))
-        })?;
-    }
-    fs::write(path, text)
-        .map_err(|e| CliErrorKind::io(cow!("write {}: {e}", path.display())).into())
+    let parent = path.parent().unwrap_or_else(|| Path::new("."));
+    ensure_dir(parent).map_err(|e| {
+        CliError::from(CliErrorKind::io(cow!(
+            "create dir {}: {e}",
+            parent.display()
+        )))
+    })?;
+    let mut tmp = tempfile::NamedTempFile::new_in(parent)
+        .map_err(|e| CliErrorKind::io(cow!("create temp file in {}: {e}", parent.display())))?;
+    tmp.write_all(text.as_bytes())
+        .map_err(|e| CliErrorKind::io(cow!("write temp file for {}: {e}", path.display())))?;
+    tmp.flush()
+        .map_err(|e| CliErrorKind::io(cow!("flush temp file for {}: {e}", path.display())))?;
+    tmp.persist(path)
+        .map(|_| ())
+        .map_err(|e| CliErrorKind::io(cow!("persist {}: {}", path.display(), e.error)).into())
 }
 
 /// Read and parse a JSON file into a `serde_json::Value`.
@@ -108,13 +117,24 @@ pub fn write_text(path: &Path, text: &str) -> Result<(), CliError> {
 /// # Errors
 /// Returns `CliError` if the file is missing or contains invalid JSON.
 pub fn read_json(path: &Path) -> Result<Value, CliError> {
-    let text = read_text(path)?;
-    let value: Value = serde_json::from_str(&text).map_err(|e| {
-        CliErrorKind::invalid_json(path.display().to_string()).with_details(e.to_string())
-    })?;
+    let value: Value = read_json_typed(path)?;
     // Ensure top-level is an object
     ensure_mapping(&value, &format!("JSON document {}", path.display()))?;
     Ok(value)
+}
+
+/// Read and parse a JSON file into a typed value.
+///
+/// # Errors
+/// Returns `CliError` if the file is missing or contains invalid JSON.
+pub fn read_json_typed<T>(path: &Path) -> Result<T, CliError>
+where
+    T: DeserializeOwned,
+{
+    let text = read_text(path)?;
+    serde_json::from_str(&text).map_err(|e| {
+        CliErrorKind::invalid_json(path.display().to_string()).with_details(e.to_string())
+    })
 }
 
 /// Write a JSON value to a file with pretty-printing.
@@ -122,6 +142,17 @@ pub fn read_json(path: &Path) -> Result<Value, CliError> {
 /// # Errors
 /// Returns `CliError` on IO or serialization failure.
 pub fn write_json(path: &Path, payload: &Value) -> Result<(), CliError> {
+    write_json_pretty(path, payload)
+}
+
+/// Write a serializable value to a file as pretty-printed JSON.
+///
+/// # Errors
+/// Returns `CliError` on IO or serialization failure.
+pub fn write_json_pretty<T>(path: &Path, payload: &T) -> Result<(), CliError>
+where
+    T: Serialize,
+{
     let text = serde_json::to_string_pretty(payload)
         .map_err(|e| CliErrorKind::serialize(cow!("JSON value: {e}")))?;
     write_text(path, &format!("{text}\n"))

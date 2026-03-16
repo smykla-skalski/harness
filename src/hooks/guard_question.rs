@@ -11,17 +11,15 @@ use crate::workflow::runner::{RunnerPhase, RunnerWorkflowState};
 /// # Errors
 /// Returns `CliError` on failure.
 pub fn execute(ctx: &HookContext) -> Result<HookResult, CliError> {
-    if !ctx.skill_active {
-        return Ok(HookResult::allow());
-    }
     let prompts = ctx.question_prompts();
     if prompts.is_empty() {
         return Ok(HookResult::allow());
     }
-    if ctx.is_suite_runner() {
-        return Ok(guard_suite_runner(ctx, &prompts));
-    }
-    guard_suite_author(ctx, &prompts)
+    super::dispatch_by_skill(
+        ctx,
+        |ctx| Ok(guard_suite_runner(ctx, &prompts)),
+        |ctx| guard_suite_author(ctx, &prompts),
+    )
 }
 
 fn guard_suite_runner(ctx: &HookContext, prompts: &[AskUserQuestionPrompt]) -> HookResult {

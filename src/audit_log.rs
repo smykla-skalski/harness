@@ -12,7 +12,7 @@ use crate::context::RunLayout;
 use crate::core_defs::utc_now;
 use crate::errors::{CliError, CliErrorKind, cow};
 use crate::hook_payloads::HookContext;
-use crate::io::{ensure_dir, write_text};
+use crate::io::ensure_dir;
 use crate::schema::RunStatus;
 use crate::workflow::runner::{RunnerPhase, RunnerWorkflowState};
 
@@ -134,7 +134,7 @@ pub fn write_run_status_with_audit(
     let layout = RunLayout::from_run_dir(run_dir);
     let serialized = serialize_json(status, "run status")?;
     let content = format!("{serialized}\n");
-    write_text(&layout.status_path(), &content)?;
+    status.save(&layout.status_path())?;
 
     let phase_context = resolve_phase_context(
         runner_state,
@@ -243,14 +243,12 @@ fn hook_group_id(ctx: &HookContext) -> Option<String> {
         return None;
     }
 
-    let words = ctx.command_words().ok()?;
-    for (index, word) in words.iter().enumerate() {
-        if word == "--gid" {
-            return words.get(index + 1).cloned();
-        }
-        if let Some(value) = word.strip_prefix("--gid=") {
-            return Some(value.to_string());
-        }
+    if let Some(gid) = ctx.parsed_command().ok().flatten().and_then(|command| {
+        command
+            .first_harness_invocation()
+            .and_then(|invocation| invocation.gid.clone())
+    }) {
+        return Some(gid);
     }
 
     ctx.run

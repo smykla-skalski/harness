@@ -1,11 +1,10 @@
-use std::fs;
 use std::path::{Path, PathBuf};
-use std::process;
 
 use serde::{Deserialize, Serialize};
 
 use crate::core_defs::{session_context_dir, utc_now};
 use crate::errors::{CliError, CliErrorKind};
+use crate::io::{read_json_typed, write_json_pretty};
 use crate::rules::skill_dirs;
 
 /// Active authoring session state.
@@ -146,11 +145,7 @@ pub fn load_authoring_session() -> Result<Option<AuthoringSession>, CliError> {
     if !path.exists() {
         return Ok(None);
     }
-    let text = fs::read_to_string(&path).map_err(|e| {
-        CliErrorKind::authoring_payload_invalid("session", "read failed")
-            .with_details(e.to_string())
-    })?;
-    let session: AuthoringSession = serde_json::from_str(&text).map_err(|e| {
+    let session: AuthoringSession = read_json_typed(&path).map_err(|e| {
         CliErrorKind::authoring_payload_invalid("session", "parse failed")
             .with_details(e.to_string())
     })?;
@@ -163,23 +158,8 @@ pub fn load_authoring_session() -> Result<Option<AuthoringSession>, CliError> {
 /// Returns `CliError` on IO failure.
 pub fn save_authoring_session(session: &AuthoringSession) -> Result<AuthoringSession, CliError> {
     let path = session_file_path()?;
-    if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent).map_err(|e| {
-            CliErrorKind::authoring_payload_invalid("session", "cannot create directory")
-                .with_details(e.to_string())
-        })?;
-    }
-    let json = serde_json::to_string_pretty(session).map_err(|e| {
-        CliErrorKind::authoring_payload_invalid("session", "serialize failed")
-            .with_details(e.to_string())
-    })?;
-    let tmp_path = path.with_extension(format!("{}.json.tmp", process::id()));
-    fs::write(&tmp_path, json).map_err(|e| {
+    write_json_pretty(&path, session).map_err(|e| {
         CliErrorKind::authoring_payload_invalid("session", "write failed")
-            .with_details(e.to_string())
-    })?;
-    fs::rename(&tmp_path, &path).map_err(|e| {
-        CliErrorKind::authoring_payload_invalid("session", "rename failed")
             .with_details(e.to_string())
     })?;
     Ok(session.clone())
@@ -240,6 +220,7 @@ pub fn authoring_workspace_dir() -> Result<PathBuf, CliError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fs;
 
     #[test]
     fn suite_path_joins_suite_md() {

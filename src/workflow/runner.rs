@@ -435,7 +435,7 @@ pub fn runner_state_path(run_dir: &Path) -> PathBuf {
     run_dir.join(skill_dirs::RUN_STATE_FILE)
 }
 
-fn runner_repository(run_dir: &Path) -> VersionedJsonRepository {
+fn runner_repository(run_dir: &Path) -> VersionedJsonRepository<RunnerWorkflowState> {
     VersionedJsonRepository::new(runner_state_path(run_dir), RUNNER_STATE_SCHEMA_VERSION)
 }
 
@@ -460,10 +460,7 @@ fn make_initial_state(occurred_at: &str) -> RunnerWorkflowState {
 
 fn save_state(run_dir: &Path, state: &RunnerWorkflowState) -> Result<(), CliError> {
     let repo = runner_repository(run_dir);
-    let value = serde_json::to_value(state).map_err(|e| -> CliError {
-        CliErrorKind::workflow_serialize(cow!("failed to serialize runner state: {e}")).into()
-    })?;
-    repo.save(&value)?;
+    repo.save(state)?;
     append_runner_state_audit(run_dir, state)?;
     Ok(())
 }
@@ -498,13 +495,7 @@ pub fn read_runner_state(run_dir: &Path) -> Result<Option<RunnerWorkflowState>, 
         Err(error) => return Err(error),
     };
     match loaded {
-        Some(value) => {
-            let state: RunnerWorkflowState =
-                serde_json::from_value(value).map_err(|e| -> CliError {
-                    CliErrorKind::workflow_parse(cow!("failed to parse runner state: {e}")).into()
-                })?;
-            Ok(Some(state))
-        }
+        Some(state) => Ok(Some(state)),
         None => Ok(None),
     }
 }
@@ -782,6 +773,14 @@ mod tests {
 
     fn bootstrap_state() -> RunnerWorkflowState {
         make_initial_state("2025-01-01T00:00:00Z")
+    }
+
+    fn setup_execution_phase() -> TempDir {
+        let dir = TempDir::new().unwrap();
+        initialize_runner_state(dir.path()).unwrap();
+        apply_event(dir.path(), "cluster-prepared", None, None).unwrap();
+        apply_event(dir.path(), "preflight-captured", None, None).unwrap();
+        dir
     }
 
     #[test]
@@ -1078,21 +1077,14 @@ mod tests {
 
     #[test]
     fn apply_event_abort_from_execution() {
-        let dir = TempDir::new().unwrap();
-        initialize_runner_state(dir.path()).unwrap();
-        apply_event(dir.path(), "cluster-prepared", None, None).unwrap();
-        apply_event(dir.path(), "preflight-captured", None, None).unwrap();
-
+        let dir = setup_execution_phase();
         let state = apply_event(dir.path(), "abort", None, None).unwrap();
         assert_eq!(state.phase, RunnerPhase::Aborted);
     }
 
     #[test]
     fn apply_event_suspend_and_resume() {
-        let dir = TempDir::new().unwrap();
-        initialize_runner_state(dir.path()).unwrap();
-        apply_event(dir.path(), "cluster-prepared", None, None).unwrap();
-        apply_event(dir.path(), "preflight-captured", None, None).unwrap();
+        let dir = setup_execution_phase();
 
         let state = apply_event(dir.path(), "suspend", None, None).unwrap();
         assert_eq!(state.phase, RunnerPhase::Suspended);
@@ -1199,10 +1191,7 @@ mod tests {
 
     #[test]
     fn apply_event_cannot_transition_from_completed() {
-        let dir = TempDir::new().unwrap();
-        initialize_runner_state(dir.path()).unwrap();
-        apply_event(dir.path(), "cluster-prepared", None, None).unwrap();
-        apply_event(dir.path(), "preflight-captured", None, None).unwrap();
+        let dir = setup_execution_phase();
         apply_event(dir.path(), "closeout-started", None, None).unwrap();
         apply_event(dir.path(), "run-completed", None, None).unwrap();
 
@@ -1241,10 +1230,7 @@ mod tests {
 
     #[test]
     fn ensure_execution_phase_noop_when_already_executing() {
-        let dir = TempDir::new().unwrap();
-        initialize_runner_state(dir.path()).unwrap();
-        apply_event(dir.path(), "cluster-prepared", None, None).unwrap();
-        apply_event(dir.path(), "preflight-captured", None, None).unwrap();
+        let dir = setup_execution_phase();
 
         let advanced = ensure_execution_phase(dir.path()).unwrap();
         assert!(!advanced);

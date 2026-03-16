@@ -13,17 +13,15 @@ use super::{control_file_hint, is_command_owned_run_file, normalize_path};
 /// # Errors
 /// Returns `CliError` on failure.
 pub fn execute(ctx: &HookContext) -> Result<HookResult, CliError> {
-    if !ctx.skill_active {
-        return Ok(HookResult::allow());
-    }
     let paths = ctx.write_paths();
     if paths.is_empty() {
         return Ok(HookResult::allow());
     }
-    if ctx.is_suite_author() {
-        return Ok(guard_suite_author(ctx, &paths));
-    }
-    Ok(guard_suite_runner(ctx, &paths))
+    super::dispatch_by_skill(
+        ctx,
+        |ctx| Ok(guard_suite_runner(ctx, &paths)),
+        |ctx| Ok(guard_suite_author(ctx, &paths)),
+    )
 }
 
 fn guard_suite_author(ctx: &HookContext, paths: &[&Path]) -> HookResult {
