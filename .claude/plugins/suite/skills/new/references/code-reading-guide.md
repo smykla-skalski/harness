@@ -144,6 +144,7 @@ Every generated manifest (Kubernetes or Universal) must be verified against the 
 - `targetRef.name` and `targetRef.labels` are mutually exclusive - use one or the other, never both, because mixed targeting makes the manifest ambiguous before the policy logic even runs. The TargetRef struct doc says: "Either Labels or Name and Namespace can be used."
 - from/to nesting: config lives at `spec.from[].default` or `spec.to[].default`, NOT `spec.default`. There is no top-level `default` field on from/to policies. See [Policy spec nesting patterns](#policy-spec-nesting-patterns) above.
 - Kubernetes Services with multiple `spec.ports` entries must name every port (`name` field). Kubernetes rejects unnamed ports when count > 1.
+- OTel collector ConfigMaps must use the `debug` exporter, not `logging`. The `logging` exporter was removed in recent collector versions and causes CrashLoopBackOff at startup.
 
 ### Verification workflow
 
