@@ -35,6 +35,21 @@ impl RunLayout {
     }
 
     #[must_use]
+    pub fn audit_log_path(&self) -> PathBuf {
+        self.run_dir().join("audit-log.jsonl")
+    }
+
+    #[must_use]
+    pub fn audit_artifacts_dir(&self) -> PathBuf {
+        self.artifacts_dir().join("audit")
+    }
+
+    #[must_use]
+    pub fn command_log_path(&self) -> PathBuf {
+        self.commands_dir().join("command-log.md")
+    }
+
+    #[must_use]
     pub fn state_dir(&self) -> PathBuf {
         self.run_dir().join("state")
     }
