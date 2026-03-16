@@ -630,6 +630,398 @@ pub mod suite_runner {
                 .ok_or(())
         }
     }
+
+    /// Binaries that mutate harness-managed run control files.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+    #[non_exhaustive]
+    pub enum ControlFileMutationBinary {
+        Cp,
+        Install,
+        Mv,
+        Tee,
+    }
+
+    impl ControlFileMutationBinary {
+        pub const ALL: &[Self] = &[Self::Cp, Self::Install, Self::Mv, Self::Tee];
+
+        /// Returns `true` when `name` matches a control-file mutation binary.
+        #[must_use]
+        pub fn is_mutation_binary(name: &str) -> bool {
+            Self::from_str(name).is_ok()
+        }
+    }
+
+    impl fmt::Display for ControlFileMutationBinary {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            f.write_str(match self {
+                Self::Cp => "cp",
+                Self::Install => "install",
+                Self::Mv => "mv",
+                Self::Tee => "tee",
+            })
+        }
+    }
+
+    impl FromStr for ControlFileMutationBinary {
+        type Err = ();
+
+        fn from_str(s: &str) -> Result<Self, Self::Err> {
+            match s {
+                "cp" => Ok(Self::Cp),
+                "install" => Ok(Self::Install),
+                "mv" => Ok(Self::Mv),
+                "tee" => Ok(Self::Tee),
+                _ => Err(()),
+            }
+        }
+    }
+
+    /// Binaries that read harness-managed run control files.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+    #[non_exhaustive]
+    pub enum ControlFileReadBinary {
+        Cat,
+        Head,
+        Tail,
+        Less,
+        More,
+    }
+
+    impl ControlFileReadBinary {
+        pub const ALL: &[Self] = &[Self::Cat, Self::Head, Self::Tail, Self::Less, Self::More];
+
+        /// Returns `true` when `name` matches a control-file read binary.
+        #[must_use]
+        pub fn is_read_binary(name: &str) -> bool {
+            Self::from_str(name).is_ok()
+        }
+    }
+
+    impl fmt::Display for ControlFileReadBinary {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            f.write_str(match self {
+                Self::Cat => "cat",
+                Self::Head => "head",
+                Self::Tail => "tail",
+                Self::Less => "less",
+                Self::More => "more",
+            })
+        }
+    }
+
+    impl FromStr for ControlFileReadBinary {
+        type Err = ();
+
+        fn from_str(s: &str) -> Result<Self, Self::Err> {
+            match s {
+                "cat" => Ok(Self::Cat),
+                "head" => Ok(Self::Head),
+                "tail" => Ok(Self::Tail),
+                "less" => Ok(Self::Less),
+                "more" => Ok(Self::More),
+                _ => Err(()),
+            }
+        }
+    }
+
+    /// Binaries that mutate suite storage directories.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+    #[non_exhaustive]
+    pub enum SuiteMutationBinary {
+        Cp,
+        Install,
+        Ln,
+        Mkdir,
+        Mv,
+        Rm,
+        Rmdir,
+        Touch,
+    }
+
+    impl SuiteMutationBinary {
+        pub const ALL: &[Self] = &[
+            Self::Cp,
+            Self::Install,
+            Self::Ln,
+            Self::Mkdir,
+            Self::Mv,
+            Self::Rm,
+            Self::Rmdir,
+            Self::Touch,
+        ];
+
+        /// Returns `true` when `name` matches a suite mutation binary.
+        #[must_use]
+        pub fn is_mutation_binary(name: &str) -> bool {
+            Self::from_str(name).is_ok()
+        }
+    }
+
+    impl fmt::Display for SuiteMutationBinary {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            f.write_str(match self {
+                Self::Cp => "cp",
+                Self::Install => "install",
+                Self::Ln => "ln",
+                Self::Mkdir => "mkdir",
+                Self::Mv => "mv",
+                Self::Rm => "rm",
+                Self::Rmdir => "rmdir",
+                Self::Touch => "touch",
+            })
+        }
+    }
+
+    impl FromStr for SuiteMutationBinary {
+        type Err = ();
+
+        fn from_str(s: &str) -> Result<Self, Self::Err> {
+            match s {
+                "cp" => Ok(Self::Cp),
+                "install" => Ok(Self::Install),
+                "ln" => Ok(Self::Ln),
+                "mkdir" => Ok(Self::Mkdir),
+                "mv" => Ok(Self::Mv),
+                "rm" => Ok(Self::Rm),
+                "rmdir" => Ok(Self::Rmdir),
+                "touch" => Ok(Self::Touch),
+                _ => Err(()),
+            }
+        }
+    }
+
+    /// Shell and scripting interpreters that must not run control files directly.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+    #[non_exhaustive]
+    pub enum ScriptInterpreter {
+        Bash,
+        Sh,
+        Zsh,
+        Node,
+        Perl,
+        Python,
+        Ruby,
+    }
+
+    impl ScriptInterpreter {
+        pub const ALL: &[Self] = &[
+            Self::Bash,
+            Self::Sh,
+            Self::Zsh,
+            Self::Node,
+            Self::Perl,
+            Self::Python,
+            Self::Ruby,
+        ];
+
+        /// Returns `true` when `name` matches a script interpreter.
+        ///
+        /// Exact match for shell interpreters; prefix match for
+        /// `node`, `perl`, `python`, `ruby` (e.g. "node14" matches).
+        #[must_use]
+        pub fn is_interpreter(name: &str) -> bool {
+            if matches!(name, "bash" | "sh" | "zsh") {
+                return true;
+            }
+            name.starts_with("node")
+                || name.starts_with("perl")
+                || name.starts_with("python")
+                || name.starts_with("ruby")
+        }
+    }
+
+    impl fmt::Display for ScriptInterpreter {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            f.write_str(match self {
+                Self::Bash => "bash",
+                Self::Sh => "sh",
+                Self::Zsh => "zsh",
+                Self::Node => "node",
+                Self::Perl => "perl",
+                Self::Python => "python",
+                Self::Ruby => "ruby",
+            })
+        }
+    }
+
+    impl FromStr for ScriptInterpreter {
+        type Err = ();
+
+        /// Parse from canonical name only (prefix matching is in `is_interpreter`).
+        fn from_str(s: &str) -> Result<Self, Self::Err> {
+            match s {
+                "bash" => Ok(Self::Bash),
+                "sh" => Ok(Self::Sh),
+                "zsh" => Ok(Self::Zsh),
+                "node" => Ok(Self::Node),
+                "perl" => Ok(Self::Perl),
+                "python" => Ok(Self::Python),
+                "ruby" => Ok(Self::Ruby),
+                _ => Err(()),
+            }
+        }
+    }
+
+    /// Python binary names used for inline script detection.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+    #[non_exhaustive]
+    pub enum PythonBinary {
+        Python,
+        Python3,
+    }
+
+    impl PythonBinary {
+        pub const ALL: &[Self] = &[Self::Python, Self::Python3];
+
+        /// Returns `true` when `name` matches a python binary.
+        #[must_use]
+        pub fn is_python(name: &str) -> bool {
+            Self::from_str(name).is_ok()
+        }
+    }
+
+    impl fmt::Display for PythonBinary {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            f.write_str(match self {
+                Self::Python => "python",
+                Self::Python3 => "python3",
+            })
+        }
+    }
+
+    impl FromStr for PythonBinary {
+        type Err = ();
+
+        fn from_str(s: &str) -> Result<Self, Self::Err> {
+            match s {
+                "python" => Ok(Self::Python),
+                "python3" => Ok(Self::Python3),
+                _ => Err(()),
+            }
+        }
+    }
+
+    /// Harness subcommands that require tracked execution (one per Bash call).
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+    #[non_exhaustive]
+    pub enum TrackedHarnessSubcommand {
+        Api,
+        Apply,
+        Bootstrap,
+        Capture,
+        Closeout,
+        Cluster,
+        Diff,
+        Envoy,
+        Gateway,
+        Init,
+        InitRun,
+        Kumactl,
+        Preflight,
+        Record,
+        Report,
+        Run,
+        RunnerState,
+        Service,
+        SessionStart,
+        SessionStop,
+        Token,
+        Validate,
+    }
+
+    impl TrackedHarnessSubcommand {
+        pub const ALL: &[Self] = &[
+            Self::Api,
+            Self::Apply,
+            Self::Bootstrap,
+            Self::Capture,
+            Self::Closeout,
+            Self::Cluster,
+            Self::Diff,
+            Self::Envoy,
+            Self::Gateway,
+            Self::Init,
+            Self::InitRun,
+            Self::Kumactl,
+            Self::Preflight,
+            Self::Record,
+            Self::Report,
+            Self::Run,
+            Self::RunnerState,
+            Self::Service,
+            Self::SessionStart,
+            Self::SessionStop,
+            Self::Token,
+            Self::Validate,
+        ];
+
+        /// Returns `true` when `name` matches a tracked subcommand.
+        #[must_use]
+        pub fn is_tracked(name: &str) -> bool {
+            Self::from_str(name).is_ok()
+        }
+    }
+
+    impl fmt::Display for TrackedHarnessSubcommand {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            f.write_str(match self {
+                Self::Api => "api",
+                Self::Apply => "apply",
+                Self::Bootstrap => "bootstrap",
+                Self::Capture => "capture",
+                Self::Closeout => "closeout",
+                Self::Cluster => "cluster",
+                Self::Diff => "diff",
+                Self::Envoy => "envoy",
+                Self::Gateway => "gateway",
+                Self::Init => "init",
+                Self::InitRun => "init-run",
+                Self::Kumactl => "kumactl",
+                Self::Preflight => "preflight",
+                Self::Record => "record",
+                Self::Report => "report",
+                Self::Run => "run",
+                Self::RunnerState => "runner-state",
+                Self::Service => "service",
+                Self::SessionStart => "session-start",
+                Self::SessionStop => "session-stop",
+                Self::Token => "token",
+                Self::Validate => "validate",
+            })
+        }
+    }
+
+    impl FromStr for TrackedHarnessSubcommand {
+        type Err = ();
+
+        fn from_str(s: &str) -> Result<Self, Self::Err> {
+            match s {
+                "api" => Ok(Self::Api),
+                "apply" => Ok(Self::Apply),
+                "bootstrap" => Ok(Self::Bootstrap),
+                "capture" => Ok(Self::Capture),
+                "closeout" => Ok(Self::Closeout),
+                "cluster" => Ok(Self::Cluster),
+                "diff" => Ok(Self::Diff),
+                "envoy" => Ok(Self::Envoy),
+                "gateway" => Ok(Self::Gateway),
+                "init" => Ok(Self::Init),
+                "init-run" => Ok(Self::InitRun),
+                "kumactl" => Ok(Self::Kumactl),
+                "preflight" => Ok(Self::Preflight),
+                "record" => Ok(Self::Record),
+                "report" => Ok(Self::Report),
+                "run" => Ok(Self::Run),
+                "runner-state" => Ok(Self::RunnerState),
+                "service" => Ok(Self::Service),
+                "session-start" => Ok(Self::SessionStart),
+                "session-stop" => Ok(Self::SessionStop),
+                "token" => Ok(Self::Token),
+                "validate" => Ok(Self::Validate),
+                _ => Err(()),
+            }
+        }
+    }
 }
 
 /// Suite:new constants and type definitions.
@@ -1264,5 +1656,226 @@ mod tests {
         assert_eq!(compact::CHAR_LIMIT, 3500);
         assert_eq!(compact::SECTION_CHAR_LIMIT, 1600);
         assert_eq!(compact::SECTION_LINE_LIMIT, 25);
+    }
+
+    // -- ControlFileMutationBinary --
+
+    #[test]
+    fn control_file_mutation_binary_all_count() {
+        assert_eq!(suite_runner::ControlFileMutationBinary::ALL.len(), 4);
+    }
+
+    #[test]
+    fn control_file_mutation_binary_display_roundtrip() {
+        for bin in suite_runner::ControlFileMutationBinary::ALL {
+            let s = bin.to_string();
+            let parsed: suite_runner::ControlFileMutationBinary = s.parse().unwrap();
+            assert_eq!(*bin, parsed);
+        }
+    }
+
+    #[test]
+    fn control_file_mutation_binary_rejects_unknown() {
+        assert!(
+            "cat"
+                .parse::<suite_runner::ControlFileMutationBinary>()
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn control_file_mutation_binary_predicate() {
+        assert!(suite_runner::ControlFileMutationBinary::is_mutation_binary(
+            "cp"
+        ));
+        assert!(suite_runner::ControlFileMutationBinary::is_mutation_binary(
+            "tee"
+        ));
+        assert!(!suite_runner::ControlFileMutationBinary::is_mutation_binary("cat"));
+    }
+
+    // -- ControlFileReadBinary --
+
+    #[test]
+    fn control_file_read_binary_all_count() {
+        assert_eq!(suite_runner::ControlFileReadBinary::ALL.len(), 5);
+    }
+
+    #[test]
+    fn control_file_read_binary_display_roundtrip() {
+        for bin in suite_runner::ControlFileReadBinary::ALL {
+            let s = bin.to_string();
+            let parsed: suite_runner::ControlFileReadBinary = s.parse().unwrap();
+            assert_eq!(*bin, parsed);
+        }
+    }
+
+    #[test]
+    fn control_file_read_binary_rejects_unknown() {
+        assert!("cp".parse::<suite_runner::ControlFileReadBinary>().is_err());
+    }
+
+    #[test]
+    fn control_file_read_binary_predicate() {
+        assert!(suite_runner::ControlFileReadBinary::is_read_binary("cat"));
+        assert!(suite_runner::ControlFileReadBinary::is_read_binary("tail"));
+        assert!(!suite_runner::ControlFileReadBinary::is_read_binary("cp"));
+    }
+
+    // -- SuiteMutationBinary --
+
+    #[test]
+    fn suite_mutation_binary_all_count() {
+        assert_eq!(suite_runner::SuiteMutationBinary::ALL.len(), 8);
+    }
+
+    #[test]
+    fn suite_mutation_binary_display_roundtrip() {
+        for bin in suite_runner::SuiteMutationBinary::ALL {
+            let s = bin.to_string();
+            let parsed: suite_runner::SuiteMutationBinary = s.parse().unwrap();
+            assert_eq!(*bin, parsed);
+        }
+    }
+
+    #[test]
+    fn suite_mutation_binary_rejects_unknown() {
+        assert!("cat".parse::<suite_runner::SuiteMutationBinary>().is_err());
+    }
+
+    #[test]
+    fn suite_mutation_binary_predicate() {
+        assert!(suite_runner::SuiteMutationBinary::is_mutation_binary("rm"));
+        assert!(suite_runner::SuiteMutationBinary::is_mutation_binary(
+            "touch"
+        ));
+        assert!(!suite_runner::SuiteMutationBinary::is_mutation_binary(
+            "cat"
+        ));
+    }
+
+    // -- ScriptInterpreter --
+
+    #[test]
+    fn script_interpreter_all_count() {
+        assert_eq!(suite_runner::ScriptInterpreter::ALL.len(), 7);
+    }
+
+    #[test]
+    fn script_interpreter_display_roundtrip() {
+        for interp in suite_runner::ScriptInterpreter::ALL {
+            let s = interp.to_string();
+            let parsed: suite_runner::ScriptInterpreter = s.parse().unwrap();
+            assert_eq!(*interp, parsed);
+        }
+    }
+
+    #[test]
+    fn script_interpreter_rejects_unknown() {
+        assert!("cat".parse::<suite_runner::ScriptInterpreter>().is_err());
+    }
+
+    #[test]
+    fn script_interpreter_predicate_exact() {
+        assert!(suite_runner::ScriptInterpreter::is_interpreter("bash"));
+        assert!(suite_runner::ScriptInterpreter::is_interpreter("sh"));
+        assert!(suite_runner::ScriptInterpreter::is_interpreter("zsh"));
+    }
+
+    #[test]
+    fn script_interpreter_predicate_prefix() {
+        assert!(suite_runner::ScriptInterpreter::is_interpreter("node"));
+        assert!(suite_runner::ScriptInterpreter::is_interpreter("node14"));
+        assert!(suite_runner::ScriptInterpreter::is_interpreter("python3"));
+        assert!(suite_runner::ScriptInterpreter::is_interpreter("ruby"));
+        assert!(!suite_runner::ScriptInterpreter::is_interpreter("cat"));
+    }
+
+    // -- PythonBinary --
+
+    #[test]
+    fn python_binary_all_count() {
+        assert_eq!(suite_runner::PythonBinary::ALL.len(), 2);
+    }
+
+    #[test]
+    fn python_binary_display_roundtrip() {
+        for bin in suite_runner::PythonBinary::ALL {
+            let s = bin.to_string();
+            let parsed: suite_runner::PythonBinary = s.parse().unwrap();
+            assert_eq!(*bin, parsed);
+        }
+    }
+
+    #[test]
+    fn python_binary_rejects_unknown() {
+        assert!("python2".parse::<suite_runner::PythonBinary>().is_err());
+    }
+
+    #[test]
+    fn python_binary_predicate() {
+        assert!(suite_runner::PythonBinary::is_python("python"));
+        assert!(suite_runner::PythonBinary::is_python("python3"));
+        assert!(!suite_runner::PythonBinary::is_python("python2"));
+    }
+
+    // -- TrackedHarnessSubcommand --
+
+    #[test]
+    fn tracked_harness_subcommand_all_count() {
+        assert_eq!(suite_runner::TrackedHarnessSubcommand::ALL.len(), 22);
+    }
+
+    #[test]
+    fn tracked_harness_subcommand_display_roundtrip() {
+        for sub in suite_runner::TrackedHarnessSubcommand::ALL {
+            let s = sub.to_string();
+            let parsed: suite_runner::TrackedHarnessSubcommand = s.parse().unwrap();
+            assert_eq!(*sub, parsed);
+        }
+    }
+
+    #[test]
+    fn tracked_harness_subcommand_rejects_unknown() {
+        assert!(
+            "unknown"
+                .parse::<suite_runner::TrackedHarnessSubcommand>()
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn tracked_harness_subcommand_predicate() {
+        assert!(suite_runner::TrackedHarnessSubcommand::is_tracked("apply"));
+        assert!(suite_runner::TrackedHarnessSubcommand::is_tracked(
+            "init-run"
+        ));
+        assert!(suite_runner::TrackedHarnessSubcommand::is_tracked(
+            "runner-state"
+        ));
+        assert!(suite_runner::TrackedHarnessSubcommand::is_tracked("token"));
+        assert!(!suite_runner::TrackedHarnessSubcommand::is_tracked(
+            "authoring-show"
+        ));
+    }
+
+    #[test]
+    fn tracked_harness_subcommand_hyphenated_variants() {
+        assert_eq!(
+            suite_runner::TrackedHarnessSubcommand::InitRun.to_string(),
+            "init-run"
+        );
+        assert_eq!(
+            suite_runner::TrackedHarnessSubcommand::RunnerState.to_string(),
+            "runner-state"
+        );
+        assert_eq!(
+            suite_runner::TrackedHarnessSubcommand::SessionStart.to_string(),
+            "session-start"
+        );
+        assert_eq!(
+            suite_runner::TrackedHarnessSubcommand::SessionStop.to_string(),
+            "session-stop"
+        );
     }
 }
