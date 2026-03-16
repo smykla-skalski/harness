@@ -51,9 +51,22 @@ pub fn find_session(session_id: &str, project_hint: Option<&str>) -> Result<Path
         return Ok(candidates.swap_remove(0));
     }
 
-    // Multiple matches - just return the first one. The project_hint filter
-    // was already applied when building the candidate list (lines 34-38).
-    Ok(candidates.swap_remove(0))
+    // Multiple matches without a hint -> ambiguous
+    let project_names: Vec<String> = candidates
+        .iter()
+        .filter_map(|p| {
+            p.parent()
+                .and_then(|d| d.file_name())
+                .and_then(|n| n.to_str())
+                .map(String::from)
+        })
+        .collect();
+    Err(CliErrorKind::session_ambiguous(format!(
+        "session '{session_id}' found in {} projects: {}",
+        candidates.len(),
+        project_names.join(", ")
+    ))
+    .into())
 }
 
 #[cfg(test)]
