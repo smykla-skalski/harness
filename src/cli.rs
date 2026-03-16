@@ -88,6 +88,12 @@ pub struct ClusterArgs {
     /// CP container image override for universal mode.
     #[arg(long)]
     pub image: Option<String>,
+    /// Skip building images (replaces `HARNESS_BUILD_IMAGES=0`).
+    #[arg(long, default_value_t = false)]
+    pub no_build: bool,
+    /// Skip loading images into k3d clusters (replaces `HARNESS_LOAD_IMAGES=0`).
+    #[arg(long, default_value_t = false)]
+    pub no_load: bool,
 }
 
 /// Arguments for `harness record`.
@@ -1411,6 +1417,74 @@ mod tests {
                 assert_eq!(mode, "global-zone-up");
                 assert_eq!(cluster_name, "global");
                 assert_eq!(extra_cluster_names, vec!["zone1", "zone2"]);
+            }
+            _ => panic!("expected Cluster command"),
+        }
+    }
+
+    #[test]
+    fn parse_cluster_no_build_flag() {
+        let cli = Cli::try_parse_from([
+            "harness",
+            "cluster",
+            "--platform",
+            "universal",
+            "--no-build",
+            "single-up",
+            "test-cp",
+        ])
+        .unwrap();
+        match cli.command {
+            Command::Cluster(args) => {
+                assert!(args.no_build);
+                assert!(!args.no_load);
+            }
+            _ => panic!("expected Cluster command"),
+        }
+    }
+
+    #[test]
+    fn parse_cluster_no_load_flag() {
+        let cli = Cli::try_parse_from(["harness", "cluster", "--no-load", "single-up", "test-cp"])
+            .unwrap();
+        match cli.command {
+            Command::Cluster(args) => {
+                assert!(!args.no_build);
+                assert!(args.no_load);
+            }
+            _ => panic!("expected Cluster command"),
+        }
+    }
+
+    #[test]
+    fn parse_cluster_both_skip_flags() {
+        let cli = Cli::try_parse_from([
+            "harness",
+            "cluster",
+            "--no-build",
+            "--no-load",
+            "--platform",
+            "universal",
+            "single-up",
+            "test-cp",
+        ])
+        .unwrap();
+        match cli.command {
+            Command::Cluster(args) => {
+                assert!(args.no_build);
+                assert!(args.no_load);
+            }
+            _ => panic!("expected Cluster command"),
+        }
+    }
+
+    #[test]
+    fn parse_cluster_skip_flags_default_false() {
+        let cli = Cli::try_parse_from(["harness", "cluster", "single-up", "test-cp"]).unwrap();
+        match cli.command {
+            Command::Cluster(args) => {
+                assert!(!args.no_build);
+                assert!(!args.no_load);
             }
             _ => panic!("expected Cluster command"),
         }
