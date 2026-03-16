@@ -26,6 +26,8 @@ restart_namespaces:
 
 ## Configure
 
+File: g01/01-demo-metrics.yaml
+
 ```yaml
 apiVersion: kuma.io/v1alpha1
 kind: MeshMetric
@@ -49,7 +51,7 @@ spec:
           port: 5670
 ```
 
-`harness preflight` materializes this block as `g01/01.yaml`. Phase 4 applies that prepared manifest via `harness apply --manifest "g01/01.yaml"`.
+The same manifest is pre-written at `g01/01-demo-metrics.yaml`. Phase 4 applies it via `harness apply --manifest g01` (whole directory) or `harness apply --manifest "g01/01-demo-metrics.yaml"` (single file). `harness preflight` also extracts the inline block above as a fallback.
 
 ## Consume
 
