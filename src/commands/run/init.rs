@@ -5,7 +5,7 @@ use crate::audit_log::write_run_status_with_audit;
 use crate::context::{CurrentRunRecord, RunLayout, RunMetadata};
 use crate::core_defs::{current_run_context_path, shorten_path, utc_now};
 use crate::errors::{CliError, CliErrorKind, cow};
-use crate::io::{append_markdown_row, validate_safe_segment};
+use crate::io::validate_safe_segment;
 use crate::resolve::resolve_suite_path;
 use crate::schema::{RunCounts, RunReport, RunReportFrontmatter, RunStatus, SuiteSpec, Verdict};
 use crate::workflow::runner::initialize_runner_state;
@@ -123,26 +123,8 @@ fn populate_run_dir(
 
     initialize_runner_state(&layout.run_dir())?;
 
-    let command_log = layout.command_log_path();
-    append_markdown_row(
-        &command_log,
-        &[
-            "ran_at",
-            "phase",
-            "group_id",
-            "command",
-            "exit_code",
-            "artifact",
-        ],
-        &["(init)", "bootstrap", "-", "harness init", "0", "-"],
-    )?;
-
-    let manifest_index = layout.manifests_dir().join("manifest-index.md");
-    append_markdown_row(
-        &manifest_index,
-        &["copied_at", "manifest", "validated", "applied", "notes"],
-        &["(init)", "-", "-", "-", "index created"],
-    )?;
+    layout.append_command_log("(init)", "bootstrap", "-", "harness init", "0", "-")?;
+    layout.append_manifest_index("(init)", "-", "-", "-", "index created")?;
 
     let report = RunReport::new(
         layout.report_path(),
