@@ -271,11 +271,18 @@ impl RunContext {
             None
         };
 
+        let cluster_path = layout.state_dir().join("cluster.json");
+        let cluster = if cluster_path.exists() {
+            Some(read_json_file(&cluster_path)?)
+        } else {
+            None
+        };
+
         Ok(Self {
             layout,
             metadata,
             status: Some(status),
-            cluster: None,
+            cluster,
             prepared_suite,
             preflight,
         })
@@ -303,7 +310,13 @@ impl RunContext {
             return Ok(None);
         }
         match Self::from_run_dir(&run_dir) {
-            Ok(ctx) => Ok(Some(ctx)),
+            Ok(mut ctx) => {
+                // If run dir didn't have cluster spec, fall back to session record
+                if ctx.cluster.is_none() {
+                    ctx.cluster = record.cluster;
+                }
+                Ok(Some(ctx))
+            }
             Err(_) => Ok(None),
         }
     }
@@ -904,5 +917,62 @@ mod tests {
         assert!(pf.repo_root.is_none());
         assert_eq!(pf.tools, serde_json::Value::Null);
         assert_eq!(pf.nodes, serde_json::Value::Null);
+    }
+
+    #[test]
+    fn run_context_loads_cluster_from_state_dir() {
+        use crate::cluster::{ClusterSpec, Platform};
+
+        let tmp = tempfile::tempdir().unwrap();
+        let run_dir = tmp.path().join("run-cluster");
+        let layout = RunLayout::from_run_dir(&run_dir);
+        layout.ensure_dirs().unwrap();
+
+        let metadata = sample_metadata();
+        fs::write(
+            layout.metadata_path(),
+            serde_json::to_string_pretty(&metadata).unwrap(),
+        )
+        .unwrap();
+        let status_data = serde_json::json!({
+            "run_id": "run-1",
+            "suite_id": "suite-a",
+            "profile": "single-zone",
+            "started_at": "2026-03-14T00:00:00Z",
+            "overall_verdict": "pending",
+            "notes": []
+        });
+        fs::write(
+            layout.status_path(),
+            serde_json::to_string_pretty(&status_data).unwrap(),
+        )
+        .unwrap();
+
+        // Write cluster spec to state/cluster.json
+        let mut spec = ClusterSpec::from_mode_with_platform(
+            "single-up",
+            &["cp".into()],
+            "/r",
+            vec![],
+            vec![],
+            Platform::Universal,
+        )
+        .unwrap();
+        spec.admin_token = Some("test-token-abc".into());
+        spec.members[0].container_ip = Some("172.57.0.2".into());
+        fs::write(
+            layout.state_dir().join("cluster.json"),
+            serde_json::to_string_pretty(&spec).unwrap(),
+        )
+        .unwrap();
+
+        let ctx = RunContext::from_run_dir(&run_dir).unwrap();
+        let cluster = ctx.cluster.unwrap();
+        assert_eq!(cluster.platform, Platform::Universal);
+        assert_eq!(cluster.admin_token.as_deref(), Some("test-token-abc"));
+        assert_eq!(
+            cluster.members[0].container_ip.as_deref(),
+            Some("172.57.0.2")
+        );
     }
 }

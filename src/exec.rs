@@ -572,6 +572,32 @@ pub fn cp_api_post_with_token(
     Ok(resp_body)
 }
 
+/// PUT JSON to the CP API with optional auth token.
+///
+/// Used for creating/updating resources via the REST API.
+///
+/// # Errors
+/// Returns `CliError` on HTTP or parse failure.
+pub fn cp_api_put_with_token(
+    base_url: &str,
+    path: &str,
+    body: &serde_json::Value,
+    token: Option<&str>,
+) -> Result<serde_json::Value, CliError> {
+    let url = format!("{base_url}{path}");
+    let mut req = ureq::put(&url).header("Content-Type", "application/json");
+    if let Some(tok) = token {
+        req = req.header("Authorization", &format!("Bearer {tok}"));
+    }
+    let resp_body: serde_json::Value = req
+        .send_json(body)
+        .map_err(|e| CliErrorKind::cp_api_unreachable(url.clone()).with_details(e.to_string()))?
+        .body_mut()
+        .read_json()
+        .map_err(|e| CliErrorKind::cp_api_unreachable(url).with_details(e.to_string()))?;
+    Ok(resp_body)
+}
+
 /// Extract the admin user token from a running CP container.
 ///
 /// The CP stores the admin token in the global-secrets endpoint.

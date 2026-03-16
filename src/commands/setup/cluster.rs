@@ -181,8 +181,7 @@ fn cluster_universal(
         }
         "single-down" => universal_single_down(network_name, &all_names[0])?,
         "global-zone-up" => {
-            let result =
-                universal_global_zone_up(&cp_image, network_name, store, &all_names)?;
+            let result = universal_global_zone_up(&cp_image, network_name, store, &all_names)?;
             spec.cp_image = Some(cp_image);
             spec.store_type = Some(store.to_string());
             spec.admin_token = Some(result.admin_token);
@@ -190,8 +189,7 @@ fn cluster_universal(
         }
         "global-zone-down" => universal_global_zone_down(network_name, &all_names)?,
         "global-two-zones-up" => {
-            let result =
-                universal_global_two_zones_up(&cp_image, network_name, store, &all_names)?;
+            let result = universal_global_two_zones_up(&cp_image, network_name, store, &all_names)?;
             spec.cp_image = Some(cp_image);
             spec.store_type = Some(store.to_string());
             spec.admin_token = Some(result.admin_token);
@@ -223,25 +221,25 @@ struct UniversalUpResult {
 fn persist_cluster_spec(spec: &ClusterSpec) -> Result<(), CliError> {
     // Update session context (current-run.json) if it exists
     let ctx_path = current_run_context_path()?;
-    if let Ok(text) = fs::read_to_string(&ctx_path) {
-        if let Ok(mut record) = serde_json::from_str::<CurrentRunRecord>(&text) {
-            record.cluster = Some(spec.clone());
-            let json = serde_json::to_string_pretty(&record)
-                .map_err(|e| CliErrorKind::serialize(cow!("cluster spec: {e}")))?;
-            fs::write(&ctx_path, format!("{json}\n"))
-                .map_err(|e| CliErrorKind::io(cow!("write session context: {e}")))?;
+    if let Ok(text) = fs::read_to_string(&ctx_path)
+        && let Ok(mut record) = serde_json::from_str::<CurrentRunRecord>(&text)
+    {
+        record.cluster = Some(spec.clone());
+        let json = serde_json::to_string_pretty(&record)
+            .map_err(|e| CliErrorKind::serialize(cow!("cluster spec: {e}")))?;
+        fs::write(&ctx_path, format!("{json}\n"))
+            .map_err(|e| CliErrorKind::io(cow!("write session context: {e}")))?;
 
-            // Also write to run dir state/cluster.json
-            let run_dir = record.layout.run_dir();
-            let state_dir = run_dir.join("state");
-            if state_dir.is_dir() {
-                let cluster_path = state_dir.join("cluster.json");
-                let cluster_json = serde_json::to_string_pretty(spec)
-                    .map_err(|e| CliErrorKind::serialize(cow!("cluster spec: {e}")))?;
-                fs::write(&cluster_path, format!("{cluster_json}\n"))
-                    .map_err(|e| CliErrorKind::io(cow!("write cluster spec: {e}")))?;
-                eprintln!("{} cluster: spec saved to state/cluster.json", utc_now());
-            }
+        // Also write to run dir state/cluster.json
+        let run_dir = record.layout.run_dir();
+        let state_dir = run_dir.join("state");
+        if state_dir.is_dir() {
+            let cluster_path = state_dir.join("cluster.json");
+            let cluster_json = serde_json::to_string_pretty(spec)
+                .map_err(|e| CliErrorKind::serialize(cow!("cluster spec: {e}")))?;
+            fs::write(&cluster_path, format!("{cluster_json}\n"))
+                .map_err(|e| CliErrorKind::io(cow!("write cluster spec: {e}")))?;
+            eprintln!("{} cluster: spec saved to state/cluster.json", utc_now());
         }
     }
 
@@ -586,7 +584,7 @@ fn universal_global_two_zones_up(
     network: &str,
     store: &str,
     names: &[String],
-) -> Result<(), CliError> {
+) -> Result<UniversalUpResult, CliError> {
     if names.len() < 5 {
         return Err(CliErrorKind::usage_error(
             "global-two-zones-up requires names: <global> <zone1-container> <zone2-container> <zone1-label> <zone2-label>",
@@ -638,9 +636,11 @@ fn universal_global_two_zones_up(
         "{} cluster: global CP ready (admin token extracted)",
         utc_now()
     );
-    eprintln!("admin-token={admin_token}");
 
-    Ok(())
+    Ok(UniversalUpResult {
+        admin_token,
+        cp_ip: global_ip,
+    })
 }
 
 fn universal_global_two_zones_down(_network: &str, names: &[String]) -> Result<(), CliError> {
