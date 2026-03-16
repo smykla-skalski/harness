@@ -23,6 +23,23 @@ const MIN_DUMP_TEXT_LENGTH: usize = 5;
 /// Maximum characters shown per dump line.
 const DUMP_TRUNCATE_LENGTH: usize = 500;
 
+/// Maximum characters stored in issue detail fields.
+const MAX_DETAIL_LENGTH: usize = 2000;
+
+/// Truncate text to at most `max_len` bytes at a valid UTF-8 char boundary.
+fn truncate_at(text: &str, max_len: usize) -> &str {
+    if text.len() <= max_len {
+        text
+    } else {
+        &text[..text.floor_char_boundary(max_len)]
+    }
+}
+
+/// Cap issue detail text at construction time.
+pub(crate) fn truncate_details(text: &str) -> String {
+    truncate_at(text, MAX_DETAIL_LENGTH).to_string()
+}
+
 /// Extract text from a `tool_result` content block.
 pub(crate) fn tool_result_text(block: &serde_json::Value) -> String {
     let content = &block["content"];
@@ -175,6 +192,76 @@ fn execute_scan(session_id: &str, filter: &ObserveFilterArgs) -> Result<i32, Cli
     Ok(0)
 }
 
+/// Compute the byte offset for skipping the first `from_line` lines.
+fn compute_initial_byte_offset(path: &Path, from_line: usize) -> u64 {
+    if from_line == 0 {
+        return 0;
+    }
+    let Ok(file) = fs::File::open(path) else {
+        return 0;
+    };
+    let reader = BufReader::new(file);
+    let mut offset = 0u64;
+    for (index, line_result) in reader.lines().enumerate() {
+        if index >= from_line {
+            break;
+        }
+        if let Ok(line) = line_result {
+            offset += line.len() as u64 + 1;
+        }
+    }
+    offset
+}
+
+/// Read new lines from the session file at the current byte offset and classify them.
+fn poll_session_lines(
+    path: &Path,
+    byte_offset: &mut u64,
+    last_line: &mut usize,
+    state: &mut ScanState,
+) -> Vec<Issue> {
+    let Ok(mut file) = fs::File::open(path) else {
+        return Vec::new();
+    };
+    let _ = file.seek(SeekFrom::Start(*byte_offset));
+    let reader = BufReader::new(file);
+    let mut issues = Vec::new();
+    for line_result in reader.lines() {
+        let Ok(line) = line_result else { continue };
+        *byte_offset += line.len() as u64 + 1;
+        let index = *last_line;
+        *last_line += 1;
+        issues.extend(classifier::classify_line(index, &line, state));
+    }
+    issues
+}
+
+/// Write an issue to the appropriate outputs (details file, output file, or stdout).
+fn emit_watch_issue(
+    issue: &Issue,
+    json_mode: bool,
+    details_writer: &mut Option<fs::File>,
+    output_writer: &mut Option<fs::File>,
+) {
+    if let Some(detail_out) = details_writer
+        && let Ok(json_str) = serde_json::to_string(issue)
+    {
+        let _ = writeln!(detail_out, "{json_str}");
+        let _ = detail_out.flush();
+    }
+    let rendered = if json_mode {
+        output::render_json(issue)
+    } else {
+        output::render_human(issue)
+    };
+    if let Some(file_out) = output_writer {
+        let _ = writeln!(file_out, "{rendered}");
+        let _ = file_out.flush();
+    } else {
+        println!("{rendered}");
+    }
+}
+
 /// Execute watch mode with polling.
 ///
 /// Tracks the byte offset in the session file so each poll cycle only reads
@@ -198,7 +285,7 @@ fn execute_watch(
     let mut all_issues: Vec<Issue> = Vec::new();
     let mut last_line = filter.from_line;
     let mut last_activity = Instant::now();
-    let mut byte_offset: u64 = 0;
+    let mut byte_offset = compute_initial_byte_offset(&path, filter.from_line);
     let poll_duration = Duration::from_secs(poll_interval);
     let timeout_duration = Duration::from_secs(timeout);
 
@@ -225,59 +312,14 @@ fn execute_watch(
         .map(|p| open_append(p, "details"))
         .transpose()?;
 
-    // Skip to from_line on first read by reading through the initial lines
-    if filter.from_line > 0
-        && let Ok(file) = fs::File::open(&path)
-    {
-        let reader = BufReader::new(file);
-        for (index, line_result) in reader.lines().enumerate() {
-            if index >= filter.from_line {
-                break;
-            }
-            if let Ok(line) = line_result {
-                // +1 for the newline byte
-                byte_offset += line.len() as u64 + 1;
-            }
-        }
-    }
-
     loop {
-        if let Ok(mut file) = fs::File::open(&path) {
-            let _ = file.seek(SeekFrom::Start(byte_offset));
-            let reader = BufReader::new(file);
-            for line_result in reader.lines() {
-                let Ok(line) = line_result else {
-                    continue;
-                };
-                byte_offset += line.len() as u64 + 1;
-                let index = last_line;
-                last_line += 1;
-
-                let new_issues = classifier::classify_line(index, &line, &mut state);
-                for issue in &new_issues {
-                    if let Some(ref mut detail_out) = details_writer
-                        && let Ok(json_str) = serde_json::to_string(issue)
-                    {
-                        let _ = writeln!(detail_out, "{json_str}");
-                        let _ = detail_out.flush();
-                    }
-                    let rendered = if filter.json {
-                        output::render_json(issue)
-                    } else {
-                        output::render_human(issue)
-                    };
-                    if let Some(ref mut file_out) = output_writer {
-                        let _ = writeln!(file_out, "{rendered}");
-                        let _ = file_out.flush();
-                    } else {
-                        println!("{rendered}");
-                    }
-                }
-                if !new_issues.is_empty() {
-                    all_issues.extend(new_issues);
-                    last_activity = Instant::now();
-                }
-            }
+        let new_issues = poll_session_lines(&path, &mut byte_offset, &mut last_line, &mut state);
+        for issue in &new_issues {
+            emit_watch_issue(issue, filter.json, &mut details_writer, &mut output_writer);
+        }
+        if !new_issues.is_empty() {
+            all_issues.extend(new_issues);
+            last_activity = Instant::now();
         }
 
         if timeout > 0 && last_activity.elapsed() > timeout_duration {
@@ -340,9 +382,15 @@ fn execute_dump(
     Ok(0)
 }
 
-/// Check if text matches the pre-lowercased dump filter.
-fn matches_dump_filter(text: &str, filter_lower: Option<&str>) -> bool {
-    filter_lower.is_none_or(|f| text.to_lowercase().contains(f))
+/// Check if pre-lowered text matches the pre-lowercased dump filter.
+fn matches_dump_filter(text_lower: &str, filter_lower: Option<&str>) -> bool {
+    filter_lower.is_none_or(|f| text_lower.contains(f))
+}
+
+/// A formatted dump block with a label prefix and the block text.
+struct DumpBlock {
+    label: String,
+    text: String,
 }
 
 /// Print content blocks from a message in dump format.
@@ -354,74 +402,81 @@ fn dump_message_content(
 ) {
     if let Some(blocks) = content.as_array() {
         for block in blocks {
-            let (label, text) = format_dump_block(index, role, block);
-            if text.len() <= MIN_DUMP_TEXT_LENGTH {
+            let db = format_dump_block(index, role, block);
+            if db.text.len() <= MIN_DUMP_TEXT_LENGTH {
                 continue;
             }
-            if !matches_dump_filter(&text, filter_lower) {
+            if !matches_dump_filter(&db.text.to_lowercase(), filter_lower) {
                 continue;
             }
-            let truncated: String = text.chars().take(DUMP_TRUNCATE_LENGTH).collect();
-            println!("{label}: {truncated}");
+            let truncated = truncate_at(&db.text, DUMP_TRUNCATE_LENGTH);
+            println!("{}: {truncated}", db.label);
         }
     } else if let Some(text) = content.as_str() {
         if text.len() <= MIN_DUMP_TEXT_LENGTH {
             return;
         }
-        if !matches_dump_filter(text, filter_lower) {
+        if !matches_dump_filter(&text.to_lowercase(), filter_lower) {
             return;
         }
-        let truncated: String = text.chars().take(DUMP_TRUNCATE_LENGTH).collect();
+        let truncated = truncate_at(text, DUMP_TRUNCATE_LENGTH);
         println!("L{index} [{role}]: {truncated}");
     }
 }
 
 /// Format a content block for dump output.
-fn format_dump_block(index: usize, role: &str, block: &serde_json::Value) -> (String, String) {
+fn format_dump_block(index: usize, role: &str, block: &serde_json::Value) -> DumpBlock {
     let block_type = block["type"].as_str().unwrap_or("");
     match block_type {
         "text" => {
             let text = block["text"].as_str().unwrap_or("").to_string();
-            (format!("L{index} [{role}] text"), text)
+            DumpBlock {
+                label: format!("L{index} [{role}] text"),
+                text,
+            }
         }
         "tool_use" => format_tool_use_dump(index, role, block),
         "tool_result" => {
             let text = tool_result_text(block);
-            (format!("L{index} [{role}] result"), text)
+            DumpBlock {
+                label: format!("L{index} [{role}] result"),
+                text,
+            }
         }
-        _ => (format!("L{index} [{role}] {block_type}"), String::new()),
+        _ => DumpBlock {
+            label: format!("L{index} [{role}] {block_type}"),
+            text: String::new(),
+        },
     }
 }
 
 /// Format a `tool_use` block for dump output.
-fn format_tool_use_dump(index: usize, role: &str, block: &serde_json::Value) -> (String, String) {
+fn format_tool_use_dump(index: usize, role: &str, block: &serde_json::Value) -> DumpBlock {
     let name = block["name"].as_str().unwrap_or("");
     let input = &block["input"];
     match name {
         "Bash" => {
             let cmd = input["command"].as_str().unwrap_or("");
-            (format!("L{index} [{role}] Bash"), cmd.to_string())
+            DumpBlock {
+                label: format!("L{index} [{role}] Bash"),
+                text: cmd.to_string(),
+            }
         }
         "Read" | "Write" => {
             let file_path = input["file_path"].as_str().unwrap_or("");
-            (format!("L{index} [{role}] {name}"), file_path.to_string())
+            DumpBlock {
+                label: format!("L{index} [{role}] {name}"),
+                text: file_path.to_string(),
+            }
         }
         "Edit" => {
             let file_path = input["file_path"].as_str().unwrap_or("");
-            let old: String = input["old_string"]
-                .as_str()
-                .unwrap_or("")
-                .chars()
-                .take(100)
-                .collect();
-            let new_str: String = input["new_string"]
-                .as_str()
-                .unwrap_or("")
-                .chars()
-                .take(100)
-                .collect();
-            let text = format!("{file_path}\n  old: {old}\n  new: {new_str}");
-            (format!("L{index} [{role}] Edit"), text)
+            let old = truncate_at(input["old_string"].as_str().unwrap_or(""), 100);
+            let new_str = truncate_at(input["new_string"].as_str().unwrap_or(""), 100);
+            DumpBlock {
+                label: format!("L{index} [{role}] Edit"),
+                text: format!("{file_path}\n  old: {old}\n  new: {new_str}"),
+            }
         }
         "AskUserQuestion" => {
             let questions = input["questions"].as_array();
@@ -434,20 +489,24 @@ fn format_tool_use_dump(index: usize, role: &str, block: &serde_json::Value) -> 
                     format!("header={header}, q={question}")
                 })
                 .collect();
-            let text = parts.join("; ");
-            (format!("L{index} [{role}] AskUser"), text)
+            DumpBlock {
+                label: format!("L{index} [{role}] AskUser"),
+                text: parts.join("; "),
+            }
         }
         "Agent" => {
             let desc = input["description"].as_str().unwrap_or("");
-            (format!("L{index} [{role}] Agent"), desc.to_string())
+            DumpBlock {
+                label: format!("L{index} [{role}] Agent"),
+                text: desc.to_string(),
+            }
         }
         _ => {
-            let text: String = serde_json::to_string(input)
-                .unwrap_or_default()
-                .chars()
-                .take(300)
-                .collect();
-            (format!("L{index} [{role}] {name}"), text)
+            let raw = serde_json::to_string(input).unwrap_or_default();
+            DumpBlock {
+                label: format!("L{index} [{role}] {name}"),
+                text: truncate_at(&raw, 300).to_string(),
+            }
         }
     }
 }

@@ -51,14 +51,8 @@ pub fn find_session(session_id: &str, project_hint: Option<&str>) -> Result<Path
         return Ok(candidates.swap_remove(0));
     }
 
-    // Multiple matches - prefer the one matching the project hint most closely.
-    if let Some(hint) = project_hint {
-        for candidate in &candidates {
-            if candidate.to_string_lossy().contains(hint) {
-                return Ok(candidate.clone());
-            }
-        }
-    }
+    // Multiple matches - just return the first one. The project_hint filter
+    // was already applied when building the candidate list (lines 34-38).
     Ok(candidates.swap_remove(0))
 }
 
