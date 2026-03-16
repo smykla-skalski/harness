@@ -193,53 +193,20 @@ after Rust changes.
 
 ## Deep analysis cron (every 5 minutes)
 
-Create a second cron that spawns a subagent for holistic analysis of recent session activity. This catches subtle issues that automated heuristics miss - wrong assumptions, questionable decisions, suboptimal approaches, schema misunderstandings, missing validations, and anything that smells off.
+Spawn the [deep-analyst](agents/deep-analyst.md) agent every 5 minutes to holistically review recent session activity. The agent catches subtle issues that automated heuristics miss - wrong assumptions, schema misuse, skipped verification, contract violations, and anything that smells off.
 
-Call `CronCreate` with `*/5 * * * *` and this prompt (bake in session ID and project hint):
+Read [agents/deep-analyst.md](agents/deep-analyst.md) for the full analysis methodology and issue categories.
+
+Call `CronCreate` with `*/5 * * * *` and this prompt (bake in session ID, project hint, and state file path):
 
 ```
-Spawn a general-purpose Agent with mode: "auto" and this prompt:
+Read the cursor from <STATE_FILE>. Compute a window start: max(0, cursor - 200).
 
-"You are a deep session analyst. Dump the last 5 minutes of session activity:
+Spawn a deep-analyst Agent with run_in_background: true and this prompt:
 
-harness observe dump <SESSION_ID> --project-hint <PROJECT_HINT> --from-line <CURSOR_FROM_STATE_FILE>
-
-Read the full dump carefully. You are looking for ANYTHING wrong, questionable, or suboptimal
-that automated heuristics would miss. Think holistically about what the runner is doing.
-
-Flag issues in these categories:
-
-1. **Wrong assumptions** - runner assumes something about the API, CRD schema, or behavior
-   that isn't verified. Example: assuming ContainerPatch value is a YAML object when it's
-   actually a JSON string field.
-
-2. **Skipped verification** - runner applies a manifest and moves on without checking it
-   actually took effect. Example: applying a policy without verifying xDS config changed.
-
-3. **Questionable decisions** - runner makes a choice that seems wrong for the context.
-   Example: skipping a group without asking, continuing after a failure without triage.
-
-4. **Schema/API misuse** - using wrong field names, wrong resource versions, deprecated
-   fields, or fields that don't exist in the CRD.
-
-5. **Missing cleanup** - resources created but never deleted, leftover state from previous
-   groups that could contaminate later tests.
-
-6. **Inefficiency** - doing the same thing multiple times, using sleep when --delay exists,
-   absolute paths when relative would work, manual commands when harness wraps them.
-
-7. **Anything else that smells wrong** - trust your instincts. If something looks off,
-   flag it.
-
-For each finding, report:
-- Line number(s)
-- What you found
-- Why it's wrong
-- Suggested fix
-
-If you find nothing: say 'Deep analysis: clean' and stop.
-If you find issues: present them via AskUserQuestion with the header 'Deep analysis'
-and options 'Fix all', 'Review individually', 'Skip'."
+"Analyze session <SESSION_ID> from line <WINDOW_START> to <CURSOR>.
+Project hint: <PROJECT_HINT>.
+Harness project: /Users/bart.smykla@konghq.com/Projects/github.com/smykla-skalski/harness"
 ```
 
 Store both cron IDs. When stopping the observer, delete both.
