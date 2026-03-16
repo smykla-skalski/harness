@@ -110,6 +110,7 @@ fn dispatch_run(cmd: Command) -> Result<i32, CliError> {
             args.repo_root.as_deref(),
             args.phase.as_deref(),
             args.label.as_deref(),
+            args.gid.as_deref(),
             args.cluster.as_deref(),
             &args.command,
             &args.run_dir,
