@@ -2,6 +2,7 @@ use std::env;
 use std::fmt;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::process;
 
 use serde::{Deserialize, Serialize};
 
@@ -189,7 +190,7 @@ pub fn write_author_state(state: &AuthorWorkflowState) -> Result<(), CliError> {
     let json = serde_json::to_string_pretty(state).map_err(|e| -> CliError {
         CliErrorKind::workflow_serialize(cow!("failed to serialize author state: {e}")).into()
     })?;
-    let tmp_path = path.with_extension("json.tmp");
+    let tmp_path = path.with_extension(format!("{}.json.tmp", process::id()));
     fs::write(&tmp_path, &json).map_err(|e| -> CliError {
         CliErrorKind::workflow_io(cow!("failed to write {}: {e}", tmp_path.display())).into()
     })?;
