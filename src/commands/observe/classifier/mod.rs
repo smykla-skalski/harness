@@ -101,7 +101,6 @@ pub(super) struct TextCheckContext<'a> {
     pub role: MessageRole,
     pub text: &'a str,
     pub lower: &'a str,
-    pub source_tool: Option<SourceTool>,
     pub matched_categories: HashSet<IssueCategory>,
     pub state: &'a mut ScanState,
 }
@@ -137,20 +136,26 @@ pub fn check_text_for_issues(
         role,
         text,
         lower: &lower,
-        source_tool,
         matched_categories,
         state,
     };
 
-    // Complex standalone checks that need regex, multi-branch, or dynamic formatting.
-    text_checks::check_ksa_codes(&mut context, &mut issues);
-    text_checks::check_exit_code_issues(&mut context, &mut issues);
-    text_checks::check_permission_failures(&mut context, &mut issues);
-    text_checks::check_save_failures(&mut context, &mut issues);
-    text_checks::check_payload_recovery(&mut context, &mut issues);
-    text_checks::check_env_misconfiguration(&mut context, &mut issues);
-    text_checks::check_incomplete_writer(&mut context, &mut issues);
-    text_checks::check_user_frustration(&mut context, &mut issues);
+    // Complex standalone checks grouped by role/tool guard so each check
+    // doesn't repeat the same filtering.
+    if source_tool == Some(SourceTool::Bash) {
+        text_checks::check_ksa_codes(&mut context, &mut issues);
+        text_checks::check_exit_code_issues(&mut context, &mut issues);
+        text_checks::check_env_misconfiguration(&mut context, &mut issues);
+    }
+    if role == MessageRole::User && source_tool.is_none() {
+        text_checks::check_permission_failures(&mut context, &mut issues);
+        text_checks::check_user_frustration(&mut context, &mut issues);
+    }
+    if role == MessageRole::Assistant && source_tool.is_none() {
+        text_checks::check_save_failures(&mut context, &mut issues);
+        text_checks::check_payload_recovery(&mut context, &mut issues);
+        text_checks::check_incomplete_writer(&mut context, &mut issues);
+    }
 
     issues
 }
