@@ -63,10 +63,10 @@ pub fn session_stop(_project_dir: Option<&str>) -> Result<i32, CliError> {
     };
 
     let run_dir = record.layout.run_dir();
-    if run_dir.is_dir() {
-        if let Err(e) = ephemeral_metallb::cleanup_templates(&run_dir) {
-            eprintln!("warning: cleanup templates failed: {e}");
-        }
+    if run_dir.is_dir()
+        && let Err(e) = ephemeral_metallb::cleanup_templates(&run_dir)
+    {
+        eprintln!("warning: cleanup templates failed: {e}");
     }
 
     if let Err(e) = fs::remove_file(&ctx_path) {
