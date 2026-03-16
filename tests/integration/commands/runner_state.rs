@@ -100,5 +100,5 @@ fn runner_state_event_returns_error() {
     let result = runner_state(Some("some-event"), None, None, &args);
     assert!(result.is_err(), "event-based transitions should return Err");
     let err = result.unwrap_err();
-    assert_eq!(err.code(), "USAGE");
+    assert_eq!(err.code(), "KSRCLI084");
 }
