@@ -139,6 +139,21 @@ Read [references/workflow.md](references/workflow.md) for the authoritative deta
 
 ### Phase 0: Environment check
 
+0. Query harness capabilities before anything else:
+
+```bash
+harness capabilities
+```
+
+Parse the JSON output and keep it as the `CAPABILITIES` context for all later phases. Use it to:
+
+- Validate that the suite's `profiles` are supported by the available `cluster_topologies` and `platforms`. If a suite requires `multi-zone-universal` but `universal` platform is missing, stop immediately and tell the user.
+- Check that `required_dependencies` in the suite metadata map to available features (e.g. `gateway-api-crds` requires `features.gateway_api.available`).
+- In Phase 4, use available features to decide which harness commands are valid for validation (e.g. only use `harness envoy capture` if `features.envoy_admin.available`).
+- When applying universal-mode manifests, confirm `features.dataplane_tokens` and `features.service_containers` are available before attempting token generation or service container management.
+
+If `harness capabilities` fails (binary too old, not installed), fall back to the hardcoded default assumption: both platforms available, all features available.
+
 1. Set `DATA_DIR` to the pre-resolved suites directory from "Preprocessed context". Do not create it from `suite:run`; if it is missing, stop and use AskUserQuestion with options `Author suite with /suite:new` and `Provide a different suite path` (no recommendation markers or promotional labels):
 
 ```bash
@@ -360,7 +375,7 @@ The options must be exactly:
 - `Skip this step`
 - `Stop run`
 
-`Fix in suite and this run` unlocks edits only for that exact suite file plus `amendments.md`. Harness code, plugin code, `.claude/skills`, `.claude/agents`, and unrelated repo files are never editable from `suite:run`.
+`Fix in suite and this run` unlocks edits only for that exact suite file plus `amendments.md`. Harness code, plugin code, `.claude/skills`, `.claude/agents`, and unrelated repo files are never editable from `suite:run`. After the suite source is amended, re-materialize the prepared manifest before re-applying - the prepared copy in the run directory is stale. Use `harness apply` which reads from the current suite source, not the stale prepared copy. See [references/troubleshooting.md](references/troubleshooting.md) item 12 for details.
 5. Allow at most one re-run attempt per failure. After the re-run, either resume at the next group or stop the run based on the user's choice.
 
 The detailed failure matrix and user-choice branches live in [references/workflow.md](references/workflow.md), [references/validation.md](references/validation.md), and [references/troubleshooting.md](references/troubleshooting.md).
@@ -433,6 +448,7 @@ Hook codes:
 
 **harness commands** (run via Bash, context-aware after `init`):
 
+- `capabilities` - report available platforms, topologies, and features as JSON
 - `init` - create run directory and current-run shim
 - `preflight` - prepare suite once, verify cluster readiness
 - `cluster` - start/stop/deploy k3d clusters by profile

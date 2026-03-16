@@ -11,7 +11,8 @@
 9. [KDS connection](#9-zone-cannot-connect-to-global-kds)
 10. [MetalLB file missing](#10-k3dstart-fails-for-kuma-3-with-missing-metallb-file)
 11. [Disk pressure on k3d node](#11-disk-pressure-on-k3d-node)
-12. [Failure triage checklist](#failure-triage-checklist)
+12. [Prepared manifest stale after suite-fix](#12-prepared-manifest-stale-after-suite-fix)
+13. [Failure triage checklist](#failure-triage-checklist)
 
 ---
 
@@ -141,6 +142,16 @@ K3D_HELM_DEPLOY_NO_CNI=true make k3d/deploy/helm KIND_CLUSTER_NAME=kuma-1 \
 This triggers a full build cycle (images + load + helm upgrade). After the deploy, restart test workloads to pick up the new sidecar images.
 
 Prevention: `HARNESS_DOCKER_PRUNE=1` (default) in `harness cluster` prunes old kumahq/* images before each build. The preflight script also warns when >30 kumahq/* images or >50 dangling volumes exist.
+
+## 12) Prepared manifest stale after suite-fix
+
+Symptoms: after choosing "Fix in suite and this run", the re-applied manifest still has the old broken content. The suite source file is correct but the prepared copy in `runs/<run-id>/manifests/prepared/` was not updated.
+
+Fix: re-materialize the prepared manifest before re-applying. Use `harness apply --manifest <path> --step <label>` which reads from the suite source, not from the stale prepared copy. Alternatively, copy the fixed file to the prepared directory before re-applying:
+
+```bash
+cp <fixed-suite-source-file> runs/<run-id>/manifests/prepared/<matching-path>
+```
 
 ## Failure triage checklist
 

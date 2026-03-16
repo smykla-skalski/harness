@@ -87,6 +87,10 @@ harness record --phase verify --label get-policy-origin -- \
 
 Before writing test manifests, confirm supported kinds on the policy page in docs.
 
+## 3b) Zone CP restrictions on system namespaces
+
+Zone CPs reject policy apply operations on system namespaces (`kuma-system`) via admission webhook. In multi-zone deployments, policies targeting `kuma-system` must be applied on the Global CP only. When running `harness apply` or `harness run ... kubectl apply` for system-namespace policies, use `--cluster <global-cluster>` to target the global CP.
+
 ## 4) Safe apply flow
 
 ```bash
