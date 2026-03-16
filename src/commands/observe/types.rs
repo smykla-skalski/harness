@@ -1,5 +1,6 @@
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::fmt;
+use std::ops::Index;
 
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -771,11 +772,64 @@ pub struct ToolUseRecord {
     pub input: serde_json::Value,
 }
 
+/// Ordered bounded window of recent `tool_use` blocks.
+#[derive(Debug, Clone, Default)]
+pub struct ToolUseWindow {
+    order: VecDeque<String>,
+    records: HashMap<String, ToolUseRecord>,
+}
+
+impl ToolUseWindow {
+    const LIMIT: usize = 100;
+
+    pub fn insert(&mut self, tool_use_id: String, record: ToolUseRecord) {
+        if self.records.contains_key(&tool_use_id) {
+            self.order.retain(|existing| existing != &tool_use_id);
+        }
+        self.order.push_back(tool_use_id.clone());
+        self.records.insert(tool_use_id, record);
+
+        while self.order.len() > Self::LIMIT {
+            if let Some(oldest) = self.order.pop_front() {
+                self.records.remove(&oldest);
+            }
+        }
+    }
+
+    #[must_use]
+    pub fn get(&self, tool_use_id: &str) -> Option<&ToolUseRecord> {
+        self.records.get(tool_use_id)
+    }
+
+    #[must_use]
+    pub fn contains_key(&self, tool_use_id: &str) -> bool {
+        self.records.contains_key(tool_use_id)
+    }
+
+    #[must_use]
+    pub fn len(&self) -> usize {
+        self.records.len()
+    }
+
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.records.is_empty()
+    }
+}
+
+impl Index<&str> for ToolUseWindow {
+    type Output = ToolUseRecord;
+
+    fn index(&self, index: &str) -> &Self::Output {
+        &self.records[index]
+    }
+}
+
 /// Mutable state carried across lines during a scan.
 #[derive(Debug, Default)]
 pub struct ScanState {
     /// Map `tool_use_id` to the `tool_use` block for correlating with `tool_result`.
-    pub last_tool_uses: HashMap<String, ToolUseRecord>,
+    pub last_tool_uses: ToolUseWindow,
     /// Track file edit churn: path -> edit count.
     pub edit_counts: HashMap<String, usize>,
     /// Dedup key: (stable issue family, semantic fingerprint).
@@ -784,8 +838,6 @@ pub struct ScanState {
     pub session_start_timestamp: Option<String>,
     /// Occurrence tracking: (code, fingerprint) -> tracker.
     pub issue_occurrences: HashMap<(IssueCode, String), OccurrenceTracker>,
-    /// Serial counter for tool use correlation window pruning.
-    pub tool_use_serial: usize,
     /// Set when a source code file is edited via Write/Edit without a
     /// subsequent `git commit`. Cleared on commit detection.
     pub source_code_edited_without_commit: bool,
@@ -877,12 +929,29 @@ mod tests {
         assert!(state.seen_issues.is_empty());
         assert!(state.session_start_timestamp.is_none());
         assert!(state.issue_occurrences.is_empty());
-        assert_eq!(state.tool_use_serial, 0);
         assert!(!state.source_code_edited_without_commit);
         assert!(state.pending_resource_creates.is_empty());
         assert!(state.kubectl_query_targets.is_empty());
         assert!(!state.seen_capture_since_last_group_report);
         assert!(!state.seen_any_group_report);
+    }
+
+    #[test]
+    fn tool_use_window_evicts_oldest_entry() {
+        let mut window = ToolUseWindow::default();
+        for index in 0..=ToolUseWindow::LIMIT {
+            window.insert(
+                format!("tool-{index}"),
+                ToolUseRecord {
+                    name: "Bash".to_string(),
+                    input: serde_json::json!({"command": "echo hello"}),
+                },
+            );
+        }
+
+        assert_eq!(window.len(), ToolUseWindow::LIMIT);
+        assert!(!window.contains_key("tool-0"));
+        assert!(window.contains_key(&format!("tool-{}", ToolUseWindow::LIMIT)));
     }
 
     #[test]

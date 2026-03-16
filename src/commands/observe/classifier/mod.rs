@@ -107,6 +107,41 @@ impl TextCheckContext<'_> {
     }
 }
 
+type TextCheckFn = fn(&mut TextCheckContext<'_>, &mut Vec<Issue>);
+
+const BASH_TEXT_CHECKS: &[TextCheckFn] = &[
+    text_checks::check_ksa_codes,
+    text_checks::check_exit_code_issues,
+    text_checks::check_env_misconfiguration,
+    text_checks::check_jq_errors,
+    text_checks::check_closeout_verdict_pending,
+    text_checks::check_runner_state_event_error,
+    text_checks::check_runner_state_machine_stale,
+];
+
+const USER_TEXT_CHECKS: &[TextCheckFn] = &[
+    text_checks::check_permission_failures,
+    text_checks::check_user_frustration,
+];
+
+const ASSISTANT_TEXT_CHECKS: &[TextCheckFn] = &[
+    text_checks::check_save_failures,
+    text_checks::check_payload_recovery,
+    text_checks::check_incomplete_writer,
+    text_checks::check_harness_infrastructure,
+    text_checks::check_missing_connection_or_env_var,
+];
+
+fn run_text_checks(
+    checks: &[TextCheckFn],
+    context: &mut TextCheckContext<'_>,
+    issues: &mut Vec<Issue>,
+) {
+    for check in checks {
+        check(context, issues);
+    }
+}
+
 // ─── Public API ────────────────────────────────────────────────────
 
 /// Classify text content for issues.
@@ -146,26 +181,15 @@ pub fn check_text_for_issues(
     // Complex standalone checks grouped by role/tool guard so each check
     // doesn't repeat the same filtering.
     if source_tool == Some(SourceTool::Bash) {
-        text_checks::check_ksa_codes(&mut context, &mut issues);
-        text_checks::check_exit_code_issues(&mut context, &mut issues);
-        text_checks::check_env_misconfiguration(&mut context, &mut issues);
-        text_checks::check_jq_errors(&mut context, &mut issues);
-        text_checks::check_closeout_verdict_pending(&mut context, &mut issues);
-        text_checks::check_runner_state_event_error(&mut context, &mut issues);
-        text_checks::check_runner_state_machine_stale(&mut context, &mut issues);
+        run_text_checks(BASH_TEXT_CHECKS, &mut context, &mut issues);
     }
 
     if role == MessageRole::User && source_tool.is_none() {
-        text_checks::check_permission_failures(&mut context, &mut issues);
-        text_checks::check_user_frustration(&mut context, &mut issues);
+        run_text_checks(USER_TEXT_CHECKS, &mut context, &mut issues);
     }
 
     if role == MessageRole::Assistant && source_tool.is_none() {
-        text_checks::check_save_failures(&mut context, &mut issues);
-        text_checks::check_payload_recovery(&mut context, &mut issues);
-        text_checks::check_incomplete_writer(&mut context, &mut issues);
-        text_checks::check_harness_infrastructure(&mut context, &mut issues);
-        text_checks::check_missing_connection_or_env_var(&mut context, &mut issues);
+        run_text_checks(ASSISTANT_TEXT_CHECKS, &mut context, &mut issues);
     }
 
     issues

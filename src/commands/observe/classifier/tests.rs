@@ -9,6 +9,15 @@ fn make_state() -> ScanState {
     ScanState::default()
 }
 
+fn bash_tool_use(command: &str) -> serde_json::Value {
+    serde_json::json!({
+        "type": "tool_use",
+        "id": "t1",
+        "name": "Bash",
+        "input": { "command": command }
+    })
+}
+
 #[test]
 fn detects_hook_denial() {
     let mut state = make_state();
@@ -172,12 +181,7 @@ fn detects_auth_flow() {
 #[test]
 fn detects_old_skill_name_in_bash() {
     let mut state = make_state();
-    let block = serde_json::json!({
-        "type": "tool_use",
-        "id": "t1",
-        "name": "Bash",
-        "input": { "command": "harness hook --skill suite-runner guard-bash" }
-    });
+    let block = bash_tool_use("harness hook --skill suite-runner guard-bash");
     let issues = check_tool_use_for_issues(10, &block, &mut state);
     assert!(
         issues
@@ -368,12 +372,8 @@ fn details_truncated_at_construction() {
 #[test]
 fn detects_raw_make_k3d_target() {
     let mut state = make_state();
-    let block = serde_json::json!({
-        "type": "tool_use",
-        "id": "t1",
-        "name": "Bash",
-        "input": { "command": "K3D_HELM_DEPLOY_NO_CNI=true KIND_CLUSTER_NAME=kuma-1 make k3d/deploy/helm" }
-    });
+    let block =
+        bash_tool_use("K3D_HELM_DEPLOY_NO_CNI=true KIND_CLUSTER_NAME=kuma-1 make k3d/deploy/helm");
     let issues = check_tool_use_for_issues(10, &block, &mut state);
     assert!(
         issues
@@ -387,12 +387,7 @@ fn detects_raw_make_k3d_target() {
 #[test]
 fn detects_raw_make_kind_target() {
     let mut state = make_state();
-    let block = serde_json::json!({
-        "type": "tool_use",
-        "id": "t1",
-        "name": "Bash",
-        "input": { "command": "make kind/create" }
-    });
+    let block = bash_tool_use("make kind/create");
     let issues = check_tool_use_for_issues(10, &block, &mut state);
     assert!(
         issues
@@ -405,12 +400,8 @@ fn detects_raw_make_kind_target() {
 #[test]
 fn detects_git_commit_during_run() {
     let mut state = make_state();
-    let block = serde_json::json!({
-        "type": "tool_use",
-        "id": "t1",
-        "name": "Bash",
-        "input": { "command": "git add src/xds.go && git commit -sS -m \"fix(xds): correct route\"" }
-    });
+    let block =
+        bash_tool_use("git add src/xds.go && git commit -sS -m \"fix(xds): correct route\"");
     let issues = check_tool_use_for_issues(10, &block, &mut state);
     assert!(
         issues
@@ -424,12 +415,7 @@ fn detects_git_commit_during_run() {
 #[test]
 fn detects_git_add_alone() {
     let mut state = make_state();
-    let block = serde_json::json!({
-        "type": "tool_use",
-        "id": "t1",
-        "name": "Bash",
-        "input": { "command": "git add -A" }
-    });
+    let block = bash_tool_use("git add -A");
     let issues = check_tool_use_for_issues(10, &block, &mut state);
     assert!(
         issues
@@ -442,12 +428,7 @@ fn detects_git_add_alone() {
 #[test]
 fn detects_kubeconfig_env_prefix() {
     let mut state = make_state();
-    let block = serde_json::json!({
-        "type": "tool_use",
-        "id": "t1",
-        "name": "Bash",
-        "input": { "command": "KUBECONFIG=/path/to/config kubectl wait --for=condition=Ready pods" }
-    });
+    let block = bash_tool_use("KUBECONFIG=/path/to/config kubectl wait --for=condition=Ready pods");
     let issues = check_tool_use_for_issues(10, &block, &mut state);
     assert!(issues.iter().any(
         |i| i.category == IssueCategory::UnexpectedBehavior && i.summary.contains("KUBECONFIG")
@@ -457,12 +438,7 @@ fn detects_kubeconfig_env_prefix() {
 #[test]
 fn detects_export_env_var() {
     let mut state = make_state();
-    let block = serde_json::json!({
-        "type": "tool_use",
-        "id": "t1",
-        "name": "Bash",
-        "input": { "command": "export KUBECONFIG=/tmp/k3d-kubeconfig.yaml" }
-    });
+    let block = bash_tool_use("export KUBECONFIG=/tmp/k3d-kubeconfig.yaml");
     let issues = check_tool_use_for_issues(10, &block, &mut state);
     assert!(issues.iter().any(
         |i| i.category == IssueCategory::UnexpectedBehavior && i.summary.contains("KUBECONFIG")
@@ -472,12 +448,7 @@ fn detects_export_env_var() {
 #[test]
 fn detects_generic_env_prefix() {
     let mut state = make_state();
-    let block = serde_json::json!({
-        "type": "tool_use",
-        "id": "t1",
-        "name": "Bash",
-        "input": { "command": "K3D_HELM_DEPLOY_NO_CNI=true helm install kuma" }
-    });
+    let block = bash_tool_use("K3D_HELM_DEPLOY_NO_CNI=true helm install kuma");
     let issues = check_tool_use_for_issues(10, &block, &mut state);
     assert!(
         issues
@@ -490,12 +461,7 @@ fn detects_generic_env_prefix() {
 #[test]
 fn skips_env_detection_for_plain_commands() {
     let mut state = make_state();
-    let block = serde_json::json!({
-        "type": "tool_use",
-        "id": "t1",
-        "name": "Bash",
-        "input": { "command": "ls -la /tmp" }
-    });
+    let block = bash_tool_use("ls -la /tmp");
     let issues = check_tool_use_for_issues(10, &block, &mut state);
     assert!(
         !issues
@@ -633,12 +599,7 @@ fn rule_output_shape_is_preserved() {
 #[test]
 fn detects_direct_task_output_cat() {
     let mut state = make_state();
-    let block = serde_json::json!({
-        "type": "tool_use",
-        "id": "t1",
-        "name": "Bash",
-        "input": { "command": "cat /private/tmp/claude-501/session-abc/tasks/task_123.output" }
-    });
+    let block = bash_tool_use("cat /private/tmp/claude-501/session-abc/tasks/task_123.output");
     let issues = check_tool_use_for_issues(10, &block, &mut state);
     assert!(
         issues
@@ -652,12 +613,7 @@ fn detects_direct_task_output_cat() {
 #[test]
 fn detects_task_output_polling_pattern() {
     let mut state = make_state();
-    let block = serde_json::json!({
-        "type": "tool_use",
-        "id": "t1",
-        "name": "Bash",
-        "input": { "command": "sleep 2 && cat /tmp/tasks/result.output" }
-    });
+    let block = bash_tool_use("sleep 2 && cat /tmp/tasks/result.output");
     let issues = check_tool_use_for_issues(10, &block, &mut state);
     assert!(
         issues
@@ -670,12 +626,7 @@ fn detects_task_output_polling_pattern() {
 #[test]
 fn skips_task_output_for_unrelated_paths() {
     let mut state = make_state();
-    let block = serde_json::json!({
-        "type": "tool_use",
-        "id": "t1",
-        "name": "Bash",
-        "input": { "command": "cat /tmp/my-project/output.log" }
-    });
+    let block = bash_tool_use("cat /tmp/my-project/output.log");
     let issues = check_tool_use_for_issues(10, &block, &mut state);
     assert!(!issues.iter().any(|i| i.summary.contains("task output")));
 }
@@ -966,12 +917,7 @@ fn text_check_output_shape_is_preserved() {
 #[test]
 fn tool_check_output_shape_is_preserved() {
     let mut state = make_state();
-    let block = serde_json::json!({
-        "type": "tool_use",
-        "id": "t1",
-        "name": "Bash",
-        "input": { "command": "rm -rf tmp/output" }
-    });
+    let block = bash_tool_use("rm -rf tmp/output");
     let issues = check_tool_use_for_issues(10, &block, &mut state);
     assert_eq!(issues.len(), 1);
     let issue = &issues[0];
@@ -1000,12 +946,9 @@ fn tool_check_output_shape_is_preserved() {
 #[test]
 fn detects_absolute_manifest_path() {
     let mut state = make_state();
-    let block = serde_json::json!({
-        "type": "tool_use",
-        "id": "t1",
-        "name": "Bash",
-        "input": { "command": "harness apply --manifest /Users/someone/.local/share/kuma/suites/motb/groups/g13/01.yaml" }
-    });
+    let block = bash_tool_use(
+        "harness apply --manifest /Users/someone/.local/share/kuma/suites/motb/groups/g13/01.yaml",
+    );
     let issues = check_tool_use_for_issues(10, &block, &mut state);
     assert!(
         issues
@@ -1019,12 +962,9 @@ fn detects_absolute_manifest_path() {
 #[test]
 fn detects_absolute_manifest_path_with_multiple_flags() {
     let mut state = make_state();
-    let block = serde_json::json!({
-        "type": "tool_use",
-        "id": "t1",
-        "name": "Bash",
-        "input": { "command": "harness apply --manifest /tmp/groups/g02/04.yaml --manifest /tmp/groups/g02/05.yaml" }
-    });
+    let block = bash_tool_use(
+        "harness apply --manifest /tmp/groups/g02/04.yaml --manifest /tmp/groups/g02/05.yaml",
+    );
     let issues = check_tool_use_for_issues(10, &block, &mut state);
     assert!(issues.iter().any(|i| i.summary.contains("Absolute path")));
 }
@@ -1032,12 +972,7 @@ fn detects_absolute_manifest_path_with_multiple_flags() {
 #[test]
 fn skips_relative_manifest_path() {
     let mut state = make_state();
-    let block = serde_json::json!({
-        "type": "tool_use",
-        "id": "t1",
-        "name": "Bash",
-        "input": { "command": "harness apply --manifest g13/01.yaml" }
-    });
+    let block = bash_tool_use("harness apply --manifest g13/01.yaml");
     let issues = check_tool_use_for_issues(10, &block, &mut state);
     assert!(!issues.iter().any(|i| i.summary.contains("Absolute path")));
 }
@@ -1045,12 +980,7 @@ fn skips_relative_manifest_path() {
 #[test]
 fn skips_absolute_path_detection_for_non_apply_commands() {
     let mut state = make_state();
-    let block = serde_json::json!({
-        "type": "tool_use",
-        "id": "t1",
-        "name": "Bash",
-        "input": { "command": "harness run --label test kubectl get pods" }
-    });
+    let block = bash_tool_use("harness run --label test kubectl get pods");
     let issues = check_tool_use_for_issues(10, &block, &mut state);
     assert!(!issues.iter().any(|i| i.summary.contains("Absolute path")));
 }
@@ -1058,12 +988,7 @@ fn skips_absolute_path_detection_for_non_apply_commands() {
 #[test]
 fn absolute_manifest_path_output_shape() {
     let mut state = make_state();
-    let block = serde_json::json!({
-        "type": "tool_use",
-        "id": "t1",
-        "name": "Bash",
-        "input": { "command": "harness apply --manifest /full/path/to/g13/01.yaml" }
-    });
+    let block = bash_tool_use("harness apply --manifest /full/path/to/g13/01.yaml");
     let issues = check_tool_use_for_issues(10, &block, &mut state);
     assert_eq!(issues.len(), 1);
     let issue = &issues[0];
@@ -1080,12 +1005,7 @@ fn absolute_manifest_path_output_shape() {
 #[test]
 fn detects_sleep_and_ampersand_harness() {
     let mut state = make_state();
-    let block = serde_json::json!({
-        "type": "tool_use",
-        "id": "t1",
-        "name": "Bash",
-        "input": { "command": "sleep 8 && harness apply --manifest g13/01.yaml" }
-    });
+    let block = bash_tool_use("sleep 8 && harness apply --manifest g13/01.yaml");
     let issues = check_tool_use_for_issues(10, &block, &mut state);
     assert!(
         issues
@@ -1099,12 +1019,7 @@ fn detects_sleep_and_ampersand_harness() {
 #[test]
 fn detects_sleep_and_semicolon_harness() {
     let mut state = make_state();
-    let block = serde_json::json!({
-        "type": "tool_use",
-        "id": "t1",
-        "name": "Bash",
-        "input": { "command": "sleep 5; harness record --label test -- kubectl get pods" }
-    });
+    let block = bash_tool_use("sleep 5; harness record --label test -- kubectl get pods");
     let issues = check_tool_use_for_issues(10, &block, &mut state);
     assert!(
         issues
@@ -1118,12 +1033,7 @@ fn detects_sleep_and_semicolon_harness() {
 #[test]
 fn skips_sleep_without_harness_continuation() {
     let mut state = make_state();
-    let block = serde_json::json!({
-        "type": "tool_use",
-        "id": "t1",
-        "name": "Bash",
-        "input": { "command": "sleep 5 && echo done" }
-    });
+    let block = bash_tool_use("sleep 5 && echo done");
     let issues = check_tool_use_for_issues(10, &block, &mut state);
     assert!(!issues.iter().any(|i| i.summary.contains("Sleep prefix")));
 }
@@ -1131,12 +1041,7 @@ fn skips_sleep_without_harness_continuation() {
 #[test]
 fn sleep_prefix_output_shape() {
     let mut state = make_state();
-    let block = serde_json::json!({
-        "type": "tool_use",
-        "id": "t1",
-        "name": "Bash",
-        "input": { "command": "sleep 10 && harness capture --label post-apply" }
-    });
+    let block = bash_tool_use("sleep 10 && harness capture --label post-apply");
     let issues = check_tool_use_for_issues(10, &block, &mut state);
     assert_eq!(issues.len(), 1);
     let issue = &issues[0];
@@ -2283,12 +2188,7 @@ fn extract_kubectl_target_returns_none_for_non_query() {
 #[test]
 fn resource_cleanup_tracks_apply_commands() {
     let mut state = make_state();
-    let block = serde_json::json!({
-        "type": "tool_use",
-        "id": "t1",
-        "name": "Bash",
-        "input": { "command": "harness apply --manifest g13/01-meshtrace.yaml" }
-    });
+    let block = bash_tool_use("harness apply --manifest g13/01-meshtrace.yaml");
     check_tool_use_for_issues(10, &block, &mut state);
     assert!(state.pending_resource_creates.contains("01-meshtrace"));
 }
@@ -2296,12 +2196,9 @@ fn resource_cleanup_tracks_apply_commands() {
 #[test]
 fn resource_cleanup_tracks_multiple_manifests() {
     let mut state = make_state();
-    let block = serde_json::json!({
-        "type": "tool_use",
-        "id": "t1",
-        "name": "Bash",
-        "input": { "command": "harness apply --manifest g13/01-meshtrace.yaml --manifest g13/02-containerpatch.yaml" }
-    });
+    let block = bash_tool_use(
+        "harness apply --manifest g13/01-meshtrace.yaml --manifest g13/02-containerpatch.yaml",
+    );
     check_tool_use_for_issues(10, &block, &mut state);
     assert_eq!(state.pending_resource_creates.len(), 2);
     assert!(state.pending_resource_creates.contains("01-meshtrace"));
@@ -2510,12 +2407,7 @@ fn resource_cleanup_output_shape() {
 #[test]
 fn resource_cleanup_ignores_non_harness_commands() {
     let mut state = make_state();
-    let block = serde_json::json!({
-        "type": "tool_use",
-        "id": "t1",
-        "name": "Bash",
-        "input": { "command": "kubectl apply -f manifest.yaml" }
-    });
+    let block = bash_tool_use("kubectl apply -f manifest.yaml");
     check_tool_use_for_issues(10, &block, &mut state);
     assert!(state.pending_resource_creates.is_empty());
 }
@@ -2698,12 +2590,7 @@ fn capture_label_on_report_prevents_flag() {
 #[test]
 fn detects_make_test_piped_through_tail() {
     let mut state = make_state();
-    let block = serde_json::json!({
-        "type": "tool_use",
-        "id": "t1",
-        "name": "Bash",
-        "input": { "command": "make test | tail -10" }
-    });
+    let block = bash_tool_use("make test | tail -10");
     let issues = check_tool_use_for_issues(10, &block, &mut state);
     assert!(
         issues
@@ -2717,12 +2604,7 @@ fn detects_make_test_piped_through_tail() {
 #[test]
 fn detects_cargo_clippy_piped_through_head() {
     let mut state = make_state();
-    let block = serde_json::json!({
-        "type": "tool_use",
-        "id": "t1",
-        "name": "Bash",
-        "input": { "command": "cargo clippy --lib 2>&1 | head -20" }
-    });
+    let block = bash_tool_use("cargo clippy --lib 2>&1 | head -20");
     let issues = check_tool_use_for_issues(10, &block, &mut state);
     assert!(
         issues
@@ -2734,12 +2616,7 @@ fn detects_cargo_clippy_piped_through_head() {
 #[test]
 fn detects_cargo_test_piped_through_tail() {
     let mut state = make_state();
-    let block = serde_json::json!({
-        "type": "tool_use",
-        "id": "t1",
-        "name": "Bash",
-        "input": { "command": "cargo test --lib 2>&1 | tail -15" }
-    });
+    let block = bash_tool_use("cargo test --lib 2>&1 | tail -15");
     let issues = check_tool_use_for_issues(10, &block, &mut state);
     assert!(
         issues
@@ -2751,12 +2628,7 @@ fn detects_cargo_test_piped_through_tail() {
 #[test]
 fn detects_make_check_piped_through_tail() {
     let mut state = make_state();
-    let block = serde_json::json!({
-        "type": "tool_use",
-        "id": "t1",
-        "name": "Bash",
-        "input": { "command": "make check 2>&1 | tail -5" }
-    });
+    let block = bash_tool_use("make check 2>&1 | tail -5");
     let issues = check_tool_use_for_issues(10, &block, &mut state);
     assert!(
         issues
@@ -2768,12 +2640,7 @@ fn detects_make_check_piped_through_tail() {
 #[test]
 fn detects_lint_command_piped_through_head() {
     let mut state = make_state();
-    let block = serde_json::json!({
-        "type": "tool_use",
-        "id": "t1",
-        "name": "Bash",
-        "input": { "command": "golangci-lint run ./... | head -20" }
-    });
+    let block = bash_tool_use("golangci-lint run ./... | head -20");
     let issues = check_tool_use_for_issues(10, &block, &mut state);
     assert!(
         issues
@@ -2786,12 +2653,7 @@ fn detects_lint_command_piped_through_head() {
 #[test]
 fn skips_tail_without_verification_keyword() {
     let mut state = make_state();
-    let block = serde_json::json!({
-        "type": "tool_use",
-        "id": "t1",
-        "name": "Bash",
-        "input": { "command": "ls -la /tmp | tail -5" }
-    });
+    let block = bash_tool_use("ls -la /tmp | tail -5");
     let issues = check_tool_use_for_issues(10, &block, &mut state);
     assert!(
         !issues
@@ -2804,12 +2666,7 @@ fn skips_tail_without_verification_keyword() {
 #[test]
 fn skips_head_without_verification_keyword() {
     let mut state = make_state();
-    let block = serde_json::json!({
-        "type": "tool_use",
-        "id": "t1",
-        "name": "Bash",
-        "input": { "command": "cat output.log | head -50" }
-    });
+    let block = bash_tool_use("cat output.log | head -50");
     let issues = check_tool_use_for_issues(10, &block, &mut state);
     assert!(
         !issues
@@ -2821,12 +2678,7 @@ fn skips_head_without_verification_keyword() {
 #[test]
 fn skips_verification_keyword_without_pipe() {
     let mut state = make_state();
-    let block = serde_json::json!({
-        "type": "tool_use",
-        "id": "t1",
-        "name": "Bash",
-        "input": { "command": "make test" }
-    });
+    let block = bash_tool_use("make test");
     let issues = check_tool_use_for_issues(10, &block, &mut state);
     assert!(
         !issues
@@ -2839,12 +2691,7 @@ fn skips_verification_keyword_without_pipe() {
 #[test]
 fn truncated_verification_output_shape() {
     let mut state = make_state();
-    let block = serde_json::json!({
-        "type": "tool_use",
-        "id": "t1",
-        "name": "Bash",
-        "input": { "command": "make test 2>&1 | tail -10" }
-    });
+    let block = bash_tool_use("make test 2>&1 | tail -10");
     let issues = check_tool_use_for_issues(10, &block, &mut state);
     let issue = issues
         .iter()

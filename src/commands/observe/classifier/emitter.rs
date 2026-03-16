@@ -1,3 +1,4 @@
+use super::registry::issue_code_meta;
 use crate::commands::observe::types::{
     Confidence, FixSafety, Issue, IssueCategory, IssueCode, IssueSeverity, MessageRole,
     OccurrenceTracker, ScanState, SourceTool, compute_issue_id,
@@ -85,28 +86,45 @@ pub(super) struct IssueBlueprint {
 }
 
 impl IssueBlueprint {
+    pub(super) fn from_code(code: IssueCode, summary: impl Into<String>) -> Self {
+        let meta = issue_code_meta(code).expect("issue code registry should cover every code");
+        let summary = summary.into();
+        Self {
+            code,
+            category: meta.default_category,
+            severity: meta.default_severity,
+            fingerprint: summary.clone(),
+            summary,
+            guidance: Guidance::None,
+            confidence: meta.default_confidence,
+            fix_safety: Some(meta.default_fix_safety),
+            source_tool: None,
+        }
+    }
+
     pub(super) fn new(
         code: IssueCode,
         category: IssueCategory,
         severity: IssueSeverity,
         summary: impl Into<String>,
     ) -> Self {
-        let summary = summary.into();
-        Self {
-            code,
-            category,
-            severity,
-            fingerprint: summary.clone(),
-            summary,
-            guidance: Guidance::None,
-            confidence: Confidence::High,
-            fix_safety: None,
-            source_tool: None,
-        }
+        Self::from_code(code, summary)
+            .with_category(category)
+            .with_severity(severity)
     }
 
     pub(super) fn with_fingerprint(mut self, fingerprint: impl Into<String>) -> Self {
         self.fingerprint = fingerprint.into();
+        self
+    }
+
+    pub(super) fn with_category(mut self, category: IssueCategory) -> Self {
+        self.category = category;
+        self
+    }
+
+    pub(super) fn with_severity(mut self, severity: IssueSeverity) -> Self {
+        self.severity = severity;
         self
     }
 

@@ -1,10 +1,10 @@
 use std::collections::HashSet;
 
 use super::emitter::{Guidance, IssueBlueprint, IssueEmitter};
+use super::registry::issue_code_meta;
 use crate::commands::observe::patterns;
 use crate::commands::observe::types::{
-    Confidence, FixSafety, Issue, IssueCategory, IssueCode, IssueSeverity, MessageRole, ScanState,
-    SourceTool,
+    Issue, IssueCategory, IssueCode, MessageRole, ScanState, SourceTool,
 };
 
 /// Filter on message role.
@@ -48,40 +48,6 @@ impl Guard {
         match self {
             Self::None => true,
             Self::Contains(needle) => lower.contains(needle),
-        }
-    }
-}
-
-/// Static source of patterns for a declarative rule.
-#[derive(Clone, Copy)]
-pub(super) enum PatternSource {
-    Literal(&'static [&'static str]),
-    CliErrorPatterns,
-    ToolErrorPatterns,
-    BuildErrorPatterns,
-    WorkflowErrorPatterns,
-    PodFailureSignals,
-    AuthSignals,
-    DeviationSignals,
-    ReleaseVersionSignals,
-    PythonUsageSignals,
-    CorporateClusterSignals,
-}
-
-impl PatternSource {
-    fn as_slice(self) -> &'static [&'static str] {
-        match self {
-            Self::Literal(patterns) => patterns,
-            Self::CliErrorPatterns => patterns::CLI_ERROR_PATTERNS,
-            Self::ToolErrorPatterns => patterns::TOOL_ERROR_PATTERNS,
-            Self::BuildErrorPatterns => patterns::BUILD_ERROR_PATTERNS,
-            Self::WorkflowErrorPatterns => patterns::WORKFLOW_ERROR_PATTERNS,
-            Self::PodFailureSignals => patterns::POD_FAILURE_SIGNALS,
-            Self::AuthSignals => patterns::AUTH_SIGNALS,
-            Self::DeviationSignals => patterns::DEVIATION_SIGNALS,
-            Self::ReleaseVersionSignals => patterns::RELEASE_VERSION_SIGNALS,
-            Self::PythonUsageSignals => patterns::PYTHON_USAGE_SIGNALS,
-            Self::CorporateClusterSignals => patterns::CORPORATE_CLUSTER_SIGNALS,
         }
     }
 }
@@ -154,13 +120,9 @@ pub(super) struct TextRule {
     pub role_filter: RoleFilter,
     pub source_tool_filter: ToolFilter,
     pub guard: Guard,
-    pub patterns: PatternSource,
+    pub patterns: &'static [&'static str],
     pub match_mode: MatchMode,
     pub fingerprint_mode: FingerprintMode,
-    pub category: IssueCategory,
-    pub severity: IssueSeverity,
-    pub confidence: Confidence,
-    pub fix_safety: FixSafety,
     pub summary: SummaryTemplate,
     pub guidance: RuleGuidance,
     pub skip_if_matched: &'static [IssueCategory],
@@ -173,13 +135,9 @@ pub(super) static TEXT_RULES: &[TextRule] = &[
         role_filter: RoleFilter::Any,
         source_tool_filter: ToolFilter::Any,
         guard: Guard::None,
-        patterns: PatternSource::Literal(&["denied this tool", "blocked by hook"]),
+        patterns: &["denied this tool", "blocked by hook"],
         match_mode: MatchMode::FirstMatch,
         fingerprint_mode: FingerprintMode::Static,
-        category: IssueCategory::HookFailure,
-        severity: IssueSeverity::Medium,
-        confidence: Confidence::High,
-        fix_safety: FixSafety::TriageRequired,
         summary: SummaryTemplate::Static("Hook denied a tool call"),
         guidance: RuleGuidance::None,
         skip_if_matched: &[],
@@ -190,13 +148,9 @@ pub(super) static TEXT_RULES: &[TextRule] = &[
         role_filter: RoleFilter::Any,
         source_tool_filter: ToolFilter::Exact(SourceTool::Bash),
         guard: Guard::Contains("harness"),
-        patterns: PatternSource::CliErrorPatterns,
+        patterns: patterns::CLI_ERROR_PATTERNS,
         match_mode: MatchMode::FirstMatch,
         fingerprint_mode: FingerprintMode::MatchedPattern,
-        category: IssueCategory::CliError,
-        severity: IssueSeverity::Medium,
-        confidence: Confidence::High,
-        fix_safety: FixSafety::AutoFixSafe,
         summary: SummaryTemplate::PrefixWithPattern("Harness CLI error: "),
         guidance: RuleGuidance::Fix {
             target: Some("src/cli.rs"),
@@ -210,13 +164,9 @@ pub(super) static TEXT_RULES: &[TextRule] = &[
         role_filter: RoleFilter::Any,
         source_tool_filter: ToolFilter::Any,
         guard: Guard::None,
-        patterns: PatternSource::ToolErrorPatterns,
+        patterns: patterns::TOOL_ERROR_PATTERNS,
         match_mode: MatchMode::FirstMatch,
         fingerprint_mode: FingerprintMode::MatchedPattern,
-        category: IssueCategory::ToolError,
-        severity: IssueSeverity::Low,
-        confidence: Confidence::High,
-        fix_safety: FixSafety::AdvisoryOnly,
         summary: SummaryTemplate::PrefixWithPattern("Tool usage error: "),
         guidance: RuleGuidance::Advisory {
             target: None,
@@ -230,13 +180,9 @@ pub(super) static TEXT_RULES: &[TextRule] = &[
         role_filter: RoleFilter::Any,
         source_tool_filter: ToolFilter::Exact(SourceTool::Bash),
         guard: Guard::None,
-        patterns: PatternSource::BuildErrorPatterns,
+        patterns: patterns::BUILD_ERROR_PATTERNS,
         match_mode: MatchMode::FirstMatch,
         fingerprint_mode: FingerprintMode::Static,
-        category: IssueCategory::BuildError,
-        severity: IssueSeverity::Critical,
-        confidence: Confidence::High,
-        fix_safety: FixSafety::AutoFixSafe,
         summary: SummaryTemplate::Static("Build or lint failure"),
         guidance: RuleGuidance::Fix {
             target: None,
@@ -250,13 +196,9 @@ pub(super) static TEXT_RULES: &[TextRule] = &[
         role_filter: RoleFilter::Any,
         source_tool_filter: ToolFilter::Exact(SourceTool::Bash),
         guard: Guard::None,
-        patterns: PatternSource::WorkflowErrorPatterns,
+        patterns: patterns::WORKFLOW_ERROR_PATTERNS,
         match_mode: MatchMode::FirstMatch,
         fingerprint_mode: FingerprintMode::MatchedPattern,
-        category: IssueCategory::WorkflowError,
-        severity: IssueSeverity::Medium,
-        confidence: Confidence::High,
-        fix_safety: FixSafety::AutoFixGuarded,
         summary: SummaryTemplate::PrefixWithPattern("Workflow state error: "),
         guidance: RuleGuidance::Fix {
             target: None,
@@ -270,13 +212,9 @@ pub(super) static TEXT_RULES: &[TextRule] = &[
         role_filter: RoleFilter::Any,
         source_tool_filter: ToolFilter::Exact(SourceTool::Bash),
         guard: Guard::None,
-        patterns: PatternSource::PodFailureSignals,
+        patterns: patterns::POD_FAILURE_SIGNALS,
         match_mode: MatchMode::Any,
         fingerprint_mode: FingerprintMode::Static,
-        category: IssueCategory::DataIntegrity,
-        severity: IssueSeverity::Medium,
-        confidence: Confidence::Medium,
-        fix_safety: FixSafety::TriageRequired,
         summary: SummaryTemplate::Static(
             "Pod or container failure at runtime - possible product bug",
         ),
@@ -295,13 +233,9 @@ pub(super) static TEXT_RULES: &[TextRule] = &[
         role_filter: RoleFilter::Any,
         source_tool_filter: ToolFilter::Exact(SourceTool::Bash),
         guard: Guard::None,
-        patterns: PatternSource::AuthSignals,
+        patterns: patterns::AUTH_SIGNALS,
         match_mode: MatchMode::Any,
         fingerprint_mode: FingerprintMode::Static,
-        category: IssueCategory::UnexpectedBehavior,
-        severity: IssueSeverity::Critical,
-        confidence: Confidence::Medium,
-        fix_safety: FixSafety::AutoFixSafe,
         summary: SummaryTemplate::Static(
             "OAuth/auth flow triggered - command tried to reach a real cluster",
         ),
@@ -319,13 +253,9 @@ pub(super) static TEXT_RULES: &[TextRule] = &[
         role_filter: RoleFilter::Any,
         source_tool_filter: ToolFilter::Exact(SourceTool::Bash),
         guard: Guard::None,
-        patterns: PatternSource::Literal(&["kubectl-validate"]),
+        patterns: &["kubectl-validate"],
         match_mode: MatchMode::FirstMatch,
         fingerprint_mode: FingerprintMode::Static,
-        category: IssueCategory::SkillBehavior,
-        severity: IssueSeverity::Critical,
-        confidence: Confidence::High,
-        fix_safety: FixSafety::AutoFixSafe,
         summary: SummaryTemplate::Static(
             "kubectl-validate used directly instead of harness authoring-validate",
         ),
@@ -343,13 +273,9 @@ pub(super) static TEXT_RULES: &[TextRule] = &[
         role_filter: RoleFilter::Any,
         source_tool_filter: ToolFilter::Exact(SourceTool::Bash),
         guard: Guard::None,
-        patterns: PatternSource::Literal(&["rsync"]),
+        patterns: &["rsync"],
         match_mode: MatchMode::FirstMatch,
         fingerprint_mode: FingerprintMode::Static,
-        category: IssueCategory::UnexpectedBehavior,
-        severity: IssueSeverity::Medium,
-        confidence: Confidence::High,
-        fix_safety: FixSafety::AdvisoryOnly,
         summary: SummaryTemplate::Static("Shell alias interference - rsync in cp output"),
         guidance: RuleGuidance::Advisory {
             target: None,
@@ -363,13 +289,9 @@ pub(super) static TEXT_RULES: &[TextRule] = &[
         role_filter: RoleFilter::Any,
         source_tool_filter: ToolFilter::Exact(SourceTool::Bash),
         guard: Guard::None,
-        patterns: PatternSource::Literal(&["<json>", "</json>"]),
+        patterns: &["<json>", "</json>"],
         match_mode: MatchMode::Any,
         fingerprint_mode: FingerprintMode::Static,
-        category: IssueCategory::DataIntegrity,
-        severity: IssueSeverity::Medium,
-        confidence: Confidence::High,
-        fix_safety: FixSafety::AutoFixGuarded,
         summary: SummaryTemplate::Static(
             "Payload wrapped in <json> tags - data corruption from subagent",
         ),
@@ -387,13 +309,9 @@ pub(super) static TEXT_RULES: &[TextRule] = &[
         role_filter: RoleFilter::Any,
         source_tool_filter: ToolFilter::Exact(SourceTool::Bash),
         guard: Guard::None,
-        patterns: PatternSource::Literal(&["traceback (most recent call last)"]),
+        patterns: &["traceback (most recent call last)"],
         match_mode: MatchMode::FirstMatch,
         fingerprint_mode: FingerprintMode::Static,
-        category: IssueCategory::BuildError,
-        severity: IssueSeverity::Medium,
-        confidence: Confidence::High,
-        fix_safety: FixSafety::AutoFixGuarded,
         summary: SummaryTemplate::Static("Python traceback in command output"),
         guidance: RuleGuidance::Fix {
             target: None,
@@ -407,13 +325,9 @@ pub(super) static TEXT_RULES: &[TextRule] = &[
         role_filter: RoleFilter::Exact(MessageRole::Assistant),
         source_tool_filter: ToolFilter::Absent,
         guard: Guard::None,
-        patterns: PatternSource::DeviationSignals,
+        patterns: patterns::DEVIATION_SIGNALS,
         match_mode: MatchMode::Any,
         fingerprint_mode: FingerprintMode::Static,
-        category: IssueCategory::SkillBehavior,
-        severity: IssueSeverity::Critical,
-        confidence: Confidence::Medium,
-        fix_safety: FixSafety::TriageRequired,
         summary: SummaryTemplate::Static(
             "Suite deviation - baselines/manifests not distributed to all required clusters",
         ),
@@ -431,13 +345,9 @@ pub(super) static TEXT_RULES: &[TextRule] = &[
         role_filter: RoleFilter::Any,
         source_tool_filter: ToolFilter::Exact(SourceTool::Bash),
         guard: Guard::None,
-        patterns: PatternSource::ReleaseVersionSignals,
+        patterns: patterns::RELEASE_VERSION_SIGNALS,
         match_mode: MatchMode::Any,
         fingerprint_mode: FingerprintMode::Static,
-        category: IssueCategory::SkillBehavior,
-        severity: IssueSeverity::Critical,
-        confidence: Confidence::High,
-        fix_safety: FixSafety::AutoFixSafe,
         summary: SummaryTemplate::Static("Release kumactl binary used instead of worktree build"),
         guidance: RuleGuidance::Fix {
             target: Some("skills/run/SKILL.md"),
@@ -454,13 +364,9 @@ pub(super) static TEXT_RULES: &[TextRule] = &[
         role_filter: RoleFilter::Any,
         source_tool_filter: ToolFilter::Exact(SourceTool::Bash),
         guard: Guard::None,
-        patterns: PatternSource::PythonUsageSignals,
+        patterns: patterns::PYTHON_USAGE_SIGNALS,
         match_mode: MatchMode::Any,
         fingerprint_mode: FingerprintMode::Static,
-        category: IssueCategory::UnexpectedBehavior,
-        severity: IssueSeverity::Medium,
-        confidence: Confidence::High,
-        fix_safety: FixSafety::AutoFixSafe,
         summary: SummaryTemplate::Static(
             "Python used in Bash command - agents should never need python",
         ),
@@ -476,13 +382,9 @@ pub(super) static TEXT_RULES: &[TextRule] = &[
         role_filter: RoleFilter::Any,
         source_tool_filter: ToolFilter::Exact(SourceTool::Bash),
         guard: Guard::None,
-        patterns: PatternSource::CorporateClusterSignals,
+        patterns: patterns::CORPORATE_CLUSTER_SIGNALS,
         match_mode: MatchMode::FirstMatch,
         fingerprint_mode: FingerprintMode::Static,
-        category: IssueCategory::UnexpectedBehavior,
-        severity: IssueSeverity::Critical,
-        confidence: Confidence::High,
-        fix_safety: FixSafety::AutoFixSafe,
         summary: SummaryTemplate::Static(
             "Corporate/remote cluster context detected - should use local k3d",
         ),
@@ -547,12 +449,11 @@ pub(super) fn apply_text_rules(
             continue;
         }
 
-        let patterns = rule.patterns.as_slice();
         let matched_pattern = match rule.match_mode {
-            MatchMode::FirstMatch => patterns.iter().find(|p| lower.contains(*p)).copied(),
+            MatchMode::FirstMatch => rule.patterns.iter().find(|p| lower.contains(*p)).copied(),
             MatchMode::Any => {
-                if patterns.iter().any(|p| lower.contains(p)) {
-                    patterns.iter().find(|p| lower.contains(*p)).copied()
+                if rule.patterns.iter().any(|p| lower.contains(p)) {
+                    rule.patterns.iter().find(|p| lower.contains(*p)).copied()
                 } else {
                     None
                 }
@@ -568,14 +469,14 @@ pub(super) fn apply_text_rules(
                 },
                 FingerprintMode::MatchedPattern => pattern.to_string(),
             };
-            let blueprint = IssueBlueprint::new(rule.code, rule.category, rule.severity, summary)
+            let meta =
+                issue_code_meta(rule.code).expect("issue code registry should cover every code");
+            let blueprint = IssueBlueprint::from_code(rule.code, summary)
                 .with_fingerprint(fingerprint)
                 .with_guidance(rule.guidance.into_guidance())
-                .with_confidence(rule.confidence)
-                .with_fix_safety(rule.fix_safety)
                 .with_source_tool(source_tool);
             emitter.emit(&mut issues, blueprint, text);
-            matched_categories.insert(rule.category);
+            matched_categories.insert(meta.default_category);
         }
     }
 
