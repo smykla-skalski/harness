@@ -13,6 +13,7 @@
 11. [Disk pressure on k3d node](#11-disk-pressure-on-k3d-node)
 12. [Prepared manifest stale after suite-fix](#12-prepared-manifest-stale-after-suite-fix)
 13. [Failure triage checklist](#failure-triage-checklist)
+14. [ContainerPatch value must be JSON string](#14-containerpatch-value-must-be-json-string)
 
 ---
 
@@ -153,6 +154,28 @@ Fix: re-materialize the prepared manifest before re-applying. Use `harness apply
 cp <fixed-suite-source-file> runs/<run-id>/manifests/prepared/<matching-path>
 ```
 
+## 14. ContainerPatch value must be JSON string
+
+ContainerPatch `sidecarPatch` entries use JSON patch format. The `value` field must be a JSON string, not a YAML object:
+
+Wrong (strict decoding error: unknown field "name", "value"):
+```yaml
+- op: add
+  path: /env/-
+  value:
+    name: OTEL_EXPORTER_OTLP_ENDPOINT
+    value: "http://collector:4317"
+```
+
+Correct:
+```yaml
+- op: add
+  path: /env/-
+  value: '{"name": "OTEL_EXPORTER_OTLP_ENDPOINT", "value": "http://collector:4317"}'
+```
+
+This applies to all Kuma resources that use JSON patch operations (ContainerPatch, ProxyTemplate). The CRD enforces strict decoding - nested YAML objects under `value` produce "unknown field" errors even though the intent is clear.
+
 ## Failure triage checklist
 
 When a test fails:
@@ -160,5 +183,5 @@ When a test fails:
 1. Run `harness capture` immediately with label `failure-<test-id>`.
 2. Record exact failing command in command log.
 3. Record expected vs observed behavior.
-4. Classify root cause: manifest issue, cluster/infrastructure issue, or product bug.
-5. Do not continue until classification is explicit.
+4. Classify root cause: **suite bug** (wrong manifest/expectations), **product bug** (Kuma vs spec), **harness bug** (infra misconfiguration), or **environment issue** (timing/resources).
+5. Do not continue until classification is explicit and user approves via AskUserQuestion.
