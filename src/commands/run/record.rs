@@ -8,7 +8,7 @@ use regex::Regex;
 use crate::cli::RunDirArgs;
 use crate::commands::{resolve_kubeconfig, resolve_run_dir};
 use crate::context::RunContext;
-use crate::core_defs::{shorten_path, utc_now};
+use crate::core_defs::{host_platform, shorten_path, utc_now};
 use crate::errors::{CliError, CliErrorKind};
 use crate::io::{append_markdown_row, ensure_dir, write_text};
 
@@ -59,16 +59,7 @@ pub fn record(
             if !repo_root.is_empty() {
                 cmd.env("REPO_ROOT", repo_root);
                 // Prepend kumactl build artifacts to PATH
-                let arch = if cfg!(target_arch = "aarch64") {
-                    "arm64"
-                } else {
-                    "amd64"
-                };
-                let os_name = if cfg!(target_os = "macos") {
-                    "darwin"
-                } else {
-                    "linux"
-                };
+                let (os_name, arch) = host_platform();
                 let kumactl_dir = format!("{repo_root}/build/artifacts-{os_name}-{arch}/kumactl");
                 if Path::new(&kumactl_dir).is_dir() {
                     let current_path = env::var("PATH").unwrap_or_default();

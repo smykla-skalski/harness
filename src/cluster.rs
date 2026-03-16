@@ -6,6 +6,8 @@ use std::str::FromStr;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+use crate::core_defs::HARNESS_PREFIX;
+
 /// Deployment platform for a cluster: Kubernetes (k3d) or Universal (Docker).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "kebab-case")]
@@ -480,7 +482,7 @@ impl ClusterSpec {
         sorted_helm.sort_by(|a, b| a.key.cmp(&b.key));
         let docker_network = if platform == Platform::Universal {
             let first_name = mode_args.first().map_or("default", String::as_str);
-            Some(format!("harness-{first_name}"))
+            Some(format!("{HARNESS_PREFIX}{first_name}"))
         } else {
             None
         };
