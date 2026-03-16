@@ -102,6 +102,10 @@ fn capture_universal(ctx: &RunContext, capture_path: &Path) -> Result<(), CliErr
             None,
             admin_token,
         )
+        .map_err(|e| {
+            eprintln!("warning: CP API dataplanes query failed: {e}");
+            e
+        })
         .ok()
         .unwrap_or(serde_json::json!({"items": []}))
     } else {
