@@ -6,7 +6,7 @@ use clap::Args;
 use crate::bootstrap;
 use crate::commands::resolve_project_dir;
 use crate::compact;
-use crate::context::CurrentRunRecord;
+use crate::context::{CurrentRunRecord, RunRepository};
 use crate::core_defs::current_run_context_path;
 use crate::ephemeral_metallb;
 use crate::errors::CliError;
@@ -68,13 +68,14 @@ pub fn session_start(project_dir: Option<&str>) -> Result<i32, CliError> {
 /// # Errors
 /// Returns `CliError` on failure.
 pub fn session_stop(_project_dir: Option<&str>) -> Result<i32, CliError> {
+    let repo = RunRepository;
     let ctx_path = current_run_context_path()?;
     let Ok(text) = fs::read_to_string(&ctx_path) else {
         return Ok(0);
     };
     let Ok(record) = serde_json::from_str::<CurrentRunRecord>(&text) else {
         eprintln!("warning: corrupt run pointer JSON, removing");
-        if let Err(e) = fs::remove_file(&ctx_path) {
+        if let Err(e) = repo.clear_current_pointer() {
             eprintln!("warning: failed to remove corrupt pointer: {e}");
         }
         return Ok(0);
@@ -87,7 +88,7 @@ pub fn session_stop(_project_dir: Option<&str>) -> Result<i32, CliError> {
         eprintln!("warning: cleanup templates failed: {e}");
     }
 
-    if let Err(e) = fs::remove_file(&ctx_path) {
+    if let Err(e) = repo.clear_current_pointer() {
         eprintln!("warning: failed to remove run pointer: {e}");
     }
     Ok(0)

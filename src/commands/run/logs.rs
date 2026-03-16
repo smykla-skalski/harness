@@ -1,9 +1,8 @@
 use clap::Args;
 
-use crate::cluster::ClusterSpec;
 use crate::commands::RunDirArgs;
 use crate::commands::resolve_run_context;
-use crate::errors::{CliError, CliErrorKind};
+use crate::errors::CliError;
 use crate::exec;
 
 /// Arguments for `harness logs`.
@@ -22,32 +21,6 @@ pub struct LogsArgs {
     pub run_dir: RunDirArgs,
 }
 
-/// Resolve a container name from the cluster spec.
-///
-/// For compose deployments, maps member name to `{project}-{member}-1`.
-/// Falls back to using the name directly (service containers).
-fn resolve_container_name(name: &str, spec: &ClusterSpec) -> String {
-    // Check if this name matches a cluster member
-    for member in &spec.members {
-        if member.name == name {
-            // Compose-managed containers use {project}-{member}-1 naming
-            if spec.docker_network.is_some() {
-                let project = format!(
-                    "harness-{}",
-                    spec.members.first().map_or("default", |m| m.name.as_str())
-                );
-                if spec.is_compose_managed() {
-                    return format!("{project}-{name}-1");
-                }
-            }
-            // Direct docker container - use name as-is
-            return name.to_string();
-        }
-    }
-    // Not a member - assume it's a service container name
-    name.to_string()
-}
-
 /// Show container logs.
 ///
 /// # Errors
@@ -59,12 +32,9 @@ pub fn logs(
     run_dir_args: &RunDirArgs,
 ) -> Result<i32, CliError> {
     let ctx = resolve_run_context(run_dir_args)?;
-    let spec = ctx
-        .cluster
-        .as_ref()
-        .ok_or_else(|| CliErrorKind::missing_run_context_value("cluster"))?;
+    let runtime = ctx.cluster_runtime()?;
 
-    let container = resolve_container_name(name, spec);
+    let container = runtime.resolve_container_name(name);
     let tail_str = tail.to_string();
     let mut args: Vec<&str> = vec!["logs", "--tail", &tail_str];
     if follow {
@@ -90,8 +60,8 @@ pub fn logs(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use crate::cluster::{ClusterSpec, Platform};
+    use crate::runtime::ClusterRuntime;
 
     #[test]
     fn resolve_direct_container_single_zone() {
@@ -105,7 +75,8 @@ mod tests {
         )
         .unwrap();
         // Single-zone memory: direct docker, not compose
-        assert_eq!(resolve_container_name("test-cp", &spec), "test-cp");
+        let runtime = ClusterRuntime::from_spec(&spec).unwrap();
+        assert_eq!(runtime.resolve_container_name("test-cp"), "test-cp");
     }
 
     #[test]
@@ -119,7 +90,8 @@ mod tests {
             Platform::Universal,
         )
         .unwrap();
-        assert_eq!(resolve_container_name("g", &spec), "harness-g-g-1");
+        let runtime = ClusterRuntime::from_spec(&spec).unwrap();
+        assert_eq!(runtime.resolve_container_name("g"), "harness-g-g-1");
     }
 
     #[test]
@@ -134,6 +106,7 @@ mod tests {
         )
         .unwrap();
         // Name not matching any member => passthrough
-        assert_eq!(resolve_container_name("demo-svc", &spec), "demo-svc");
+        let runtime = ClusterRuntime::from_spec(&spec).unwrap();
+        assert_eq!(runtime.resolve_container_name("demo-svc"), "demo-svc");
     }
 }

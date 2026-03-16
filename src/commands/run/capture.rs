@@ -1,4 +1,4 @@
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use chrono::Utc;
 use clap::Args;
@@ -12,9 +12,8 @@ use crate::errors::{CliError, CliErrorKind, cow};
 use crate::exec;
 use crate::exec::kubectl;
 use crate::io::{validate_safe_segment, write_text};
+use crate::runtime::ControlPlaneAccess;
 use crate::workflow::runner::read_runner_state;
-
-use super::shared::detect_platform;
 
 /// Arguments for `harness capture`.
 #[derive(Debug, Clone, Args)]
@@ -41,7 +40,7 @@ pub fn capture(
 ) -> Result<i32, CliError> {
     validate_safe_segment(label)?;
     let ctx = resolve_run_context(run_dir_args)?;
-    let platform = detect_platform(&ctx);
+    let runtime = ctx.cluster_runtime()?;
 
     let timestamp = Utc::now().format("%Y-%m-%dT%H%M%S.%6fZ").to_string();
     let capture_path = ctx
@@ -49,9 +48,15 @@ pub fn capture(
         .state_dir()
         .join(format!("{label}-{timestamp}.json"));
 
-    match platform {
-        Platform::Kubernetes => capture_kubernetes(&ctx, kubeconfig, &capture_path)?,
-        Platform::Universal => capture_universal(&ctx, &capture_path)?,
+    match runtime.platform() {
+        Platform::Kubernetes => {
+            let resolved = runtime.resolve_kubeconfig(kubeconfig, None)?;
+            capture_kubernetes(Some(&resolved), &capture_path)?;
+        }
+        Platform::Universal => {
+            let access = runtime.control_plane_access()?;
+            capture_universal(&ctx, access, &capture_path)?;
+        }
     }
 
     let rel = ctx.layout.relative_path(&capture_path);
@@ -72,19 +77,9 @@ pub fn capture(
     Ok(0)
 }
 
-fn capture_kubernetes(
-    ctx: &RunContext,
-    kubeconfig: Option<&str>,
-    capture_path: &Path,
-) -> Result<(), CliError> {
-    let kc = kubeconfig.map(PathBuf::from).or_else(|| {
-        ctx.cluster
-            .as_ref()
-            .map(|c| PathBuf::from(c.primary_kubeconfig()))
-    });
-
+fn capture_kubernetes(kubeconfig: Option<&Path>, capture_path: &Path) -> Result<(), CliError> {
     let result = kubectl(
-        kc.as_deref(),
+        kubeconfig,
         &["get", "pods", "--all-namespaces", "-o", "json"],
         &[0],
     )?;
@@ -92,12 +87,16 @@ fn capture_kubernetes(
     Ok(())
 }
 
-fn capture_universal(ctx: &RunContext, capture_path: &Path) -> Result<(), CliError> {
-    let spec = ctx
-        .cluster
-        .as_ref()
-        .ok_or_else(|| CliErrorKind::missing_run_context_value("cluster"))?;
-    let network = spec.docker_network.as_deref().unwrap_or("harness-default");
+fn capture_universal(
+    ctx: &RunContext,
+    access: &ControlPlaneAccess,
+    capture_path: &Path,
+) -> Result<(), CliError> {
+    let network = ctx
+        .cluster_runtime()
+        .ok()
+        .and_then(|runtime| runtime.docker_network().ok().map(ToString::to_string))
+        .unwrap_or_else(|| "harness-default".to_string());
 
     // Collect container state
     let containers = exec::docker(
@@ -120,26 +119,21 @@ fn capture_universal(ctx: &RunContext, capture_path: &Path) -> Result<(), CliErr
         .collect();
 
     // Collect dataplane state from CP if available
-    let admin_token = spec.admin_token();
-    let (dataplanes, dataplanes_error) = if let Some(url) = spec.primary_api_url() {
-        match exec::cp_api_json(
-            &url,
-            "/meshes/default/dataplanes",
-            exec::HttpMethod::Get,
-            None,
-            admin_token,
-        ) {
-            Ok(val) => (val, serde_json::Value::Null),
-            Err(e) => {
-                eprintln!("warning: CP API dataplanes query failed: {e}");
-                (
-                    serde_json::json!({"items": []}),
-                    serde_json::Value::String(e.to_string()),
-                )
-            }
+    let (dataplanes, dataplanes_error) = match exec::cp_api_json(
+        &access.addr,
+        "/meshes/default/dataplanes",
+        exec::HttpMethod::Get,
+        None,
+        access.admin_token.as_deref(),
+    ) {
+        Ok(val) => (val, serde_json::Value::Null),
+        Err(e) => {
+            eprintln!("warning: CP API dataplanes query failed: {e}");
+            (
+                serde_json::json!({"items": []}),
+                serde_json::Value::String(e.to_string()),
+            )
         }
-    } else {
-        (serde_json::json!({"items": []}), serde_json::Value::Null)
     };
 
     let capture = serde_json::json!({

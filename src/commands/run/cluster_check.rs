@@ -24,6 +24,7 @@ pub struct ClusterCheckArgs {
 /// Returns `CliError` on failure.
 pub fn cluster_check(run_dir_args: &RunDirArgs) -> Result<i32, CliError> {
     let ctx = resolve_run_context(run_dir_args)?;
+    let runtime = ctx.cluster_runtime()?;
     let spec = ctx
         .cluster
         .as_ref()
@@ -32,7 +33,7 @@ pub fn cluster_check(run_dir_args: &RunDirArgs) -> Result<i32, CliError> {
     let mut all_healthy = true;
     let mut member_statuses = Vec::new();
 
-    match spec.platform {
+    match runtime.platform() {
         Platform::Kubernetes => {
             for member in &spec.members {
                 let running = exec::cluster_exists(&member.name).unwrap_or(false);
@@ -48,15 +49,7 @@ pub fn cluster_check(run_dir_args: &RunDirArgs) -> Result<i32, CliError> {
         }
         Platform::Universal => {
             for member in &spec.members {
-                let container_name = if spec.is_compose_managed() {
-                    let project = format!(
-                        "harness-{}",
-                        spec.members.first().map_or("default", |m| m.name.as_str()),
-                    );
-                    format!("{project}-{}-1", member.name)
-                } else {
-                    member.name.clone()
-                };
+                let container_name = runtime.resolve_container_name(&member.name);
                 let running = exec::container_running(&container_name).unwrap_or(false);
                 if !running {
                     all_healthy = false;
@@ -70,7 +63,7 @@ pub fn cluster_check(run_dir_args: &RunDirArgs) -> Result<i32, CliError> {
             }
 
             // Check network
-            if let Some(ref network) = spec.docker_network {
+            if let Ok(network) = runtime.docker_network() {
                 let net_check = exec::docker(
                     &[
                         "network",
@@ -84,7 +77,7 @@ pub fn cluster_check(run_dir_args: &RunDirArgs) -> Result<i32, CliError> {
                 );
                 let network_exists = net_check
                     .ok()
-                    .is_some_and(|r| r.stdout.trim() == network.as_str());
+                    .is_some_and(|result| result.stdout.trim() == network);
                 if !network_exists {
                     all_healthy = false;
                 }

@@ -1,7 +1,5 @@
 use std::collections::HashMap;
 use std::env;
-use std::fs;
-use std::io;
 use std::path::Path;
 use std::time::Duration;
 
@@ -10,8 +8,8 @@ use clap::Args;
 use crate::cluster::{ClusterSpec, HelmSetting, Platform};
 use crate::commands::resolve_repo_root;
 use crate::compose;
-use crate::context::CurrentRunRecord;
-use crate::core_defs::{HARNESS_PREFIX, current_run_context_path, resolve_build_info, utc_now};
+use crate::context::RunRepository;
+use crate::core_defs::{HARNESS_PREFIX, resolve_build_info, utc_now};
 use crate::errors::{CliError, CliErrorKind, cow};
 use crate::exec::{
     cluster_exists, compose_down_project, compose_up, docker, docker_inspect_ip,
@@ -135,6 +133,7 @@ pub fn cluster(args: &ClusterArgs) -> Result<i32, CliError> {
         .platform
         .parse()
         .map_err(|e: String| CliError::from(CliErrorKind::usage_error(e)))?;
+
     match platform {
         Platform::Kubernetes => cluster_k8s(args),
         Platform::Universal => cluster_universal(args),
@@ -153,6 +152,7 @@ fn cluster_k8s(args: &ClusterArgs) -> Result<i32, CliError> {
     if args.no_build {
         base_env.insert("HARNESS_BUILD_IMAGES".into(), "0".into());
     }
+
     if args.no_load {
         base_env.insert("HARNESS_LOAD_IMAGES".into(), "0".into());
     }
@@ -169,6 +169,7 @@ fn cluster_k8s(args: &ClusterArgs) -> Result<i32, CliError> {
             }
         })
         .collect();
+
     if !bad_settings.is_empty() {
         return Err(CliErrorKind::usage_error(bad_settings.join("; ")).into());
     }
@@ -181,6 +182,7 @@ fn cluster_k8s(args: &ClusterArgs) -> Result<i32, CliError> {
         args.restart_namespace.clone(),
     )
     .map_err(|e| CliError::from(CliErrorKind::cluster_error(e)))?;
+
     let validated_args = &spec.mode_args;
 
     if !helm_settings.is_empty() {
@@ -346,17 +348,10 @@ fn resolve_effective_store(is_up: bool, cli_store: &str) -> String {
 /// Returns `CliError` on corrupt JSON or parse failures. Returns `Ok(None)` when
 /// the context file is missing.
 fn load_persisted_cluster_spec() -> Result<Option<ClusterSpec>, CliError> {
-    let ctx_path = current_run_context_path()?;
-    let text = match fs::read_to_string(&ctx_path) {
-        Ok(t) => t,
-        Err(e) if e.kind() == io::ErrorKind::NotFound => return Ok(None),
-        Err(e) => {
-            return Err(CliErrorKind::io(cow!("read {}: {e}", ctx_path.display())).into());
-        }
-    };
-    let record: CurrentRunRecord = serde_json::from_str(&text)
-        .map_err(|e| CliErrorKind::io(cow!("parse {}: {e}", ctx_path.display())))?;
-    Ok(record.cluster)
+    let repo = RunRepository;
+    Ok(repo
+        .load_current_pointer()?
+        .and_then(|pointer| pointer.cluster))
 }
 
 /// Result from a universal cluster up operation.
@@ -368,15 +363,14 @@ struct UniversalUpResult {
 /// Persist cluster spec to the session context and run directory if available.
 fn persist_cluster_spec(spec: &ClusterSpec) -> Result<(), CliError> {
     // Update session context (current-run.json) if it exists
-    let ctx_path = current_run_context_path()?;
-    if let Ok(text) = fs::read_to_string(&ctx_path)
-        && let Ok(mut record) = serde_json::from_str::<CurrentRunRecord>(&text)
-    {
-        record.cluster = Some(spec.clone());
-        write_json_pretty(&ctx_path, &record)?;
+    let repo = RunRepository;
+    if let Some(pointer) = repo.load_current_pointer()? {
+        let run_dir = pointer.layout.run_dir();
+        let _ = repo.update_current_pointer(|record| {
+            record.cluster = Some(spec.clone());
+        })?;
 
         // Also write to run dir state/cluster.json
-        let run_dir = record.layout.run_dir();
         let state_dir = run_dir.join("state");
         if state_dir.is_dir() {
             let cluster_path = state_dir.join("cluster.json");
@@ -899,6 +893,8 @@ fn universal_global_two_zones_down(_network: &str, names: &[String]) -> Result<(
 
 #[cfg(test)]
 mod tests {
+    use std::fs;
+
     use super::*;
 
     /// Compute the same scope key the production code uses for a given session ID.

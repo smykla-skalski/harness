@@ -1,11 +1,11 @@
 use std::time::Duration;
 
-use crate::cluster::ClusterSpec;
 use clap::Args;
 
-use crate::commands::{RunDirArgs, resolve_admin_token, resolve_cp_addr, resolve_run_context};
+use crate::commands::{RunDirArgs, resolve_run_context};
 use crate::errors::{CliError, CliErrorKind};
 use crate::exec;
+use crate::runtime::XdsAccess;
 
 use super::token::token_via_api;
 
@@ -89,34 +89,6 @@ pub fn service(args: &ServiceArgs) -> Result<i32, CliError> {
     }
 }
 
-/// Derive a service image name from the CP image by replacing kuma-cp with kuma-universal.
-fn derive_service_image(cp_image: &str) -> Option<String> {
-    if cp_image.contains("kuma-cp") {
-        Some(cp_image.replace("kuma-cp", "kuma-universal"))
-    } else {
-        None
-    }
-}
-
-/// Resolve the service image from explicit flag or auto-derive from cluster spec.
-fn resolve_service_image(explicit: Option<&str>, spec: &ClusterSpec) -> Result<String, CliError> {
-    if let Some(img) = explicit {
-        return Ok(img.to_string());
-    }
-    if let Some(ref cp_img) = spec.cp_image {
-        return derive_service_image(cp_img).ok_or_else(|| {
-            CliErrorKind::usage_error(format!(
-                "cannot derive service image from cp_image '{cp_img}' - pass --image explicitly"
-            ))
-            .into()
-        });
-    }
-    Err(CliErrorKind::usage_error(
-        "service image is required (pass --image or ensure cluster has cp_image set)",
-    )
-    .into())
-}
-
 fn service_up(
     name: Option<&str>,
     image: Option<&str>,
@@ -130,27 +102,19 @@ fn service_up(
     let svc_port = port.ok_or_else(|| CliErrorKind::usage_error("service port is required"))?;
 
     let ctx = resolve_run_context(run_dir_args)?;
-    let cp_addr = resolve_cp_addr(&ctx)?;
-    let admin_token = resolve_admin_token(&ctx)?;
-    let spec = ctx
-        .cluster
-        .as_ref()
-        .ok_or_else(|| CliErrorKind::missing_run_context_value("cluster"))?;
-    let network = spec
-        .docker_network
-        .as_deref()
-        .ok_or_else(|| CliErrorKind::missing_run_context_value("docker_network"))?;
-
-    let svc_image = resolve_service_image(image, spec)?;
+    let runtime = ctx.cluster_runtime()?;
+    let access = runtime.control_plane_access()?;
+    let network = runtime.docker_network()?;
+    let svc_image = runtime.service_image(image)?;
 
     // Generate token
     let token_result = token_via_api(
-        &cp_addr,
+        &access.addr,
         "dataplane",
         svc_name,
         mesh,
         "24h",
-        admin_token.as_deref(),
+        access.admin_token.as_deref(),
     )?;
     let token_str = token_result.trim();
 
@@ -177,11 +141,11 @@ fn service_up(
         name: svc_name,
         port: svc_port,
         mesh,
-        spec,
         network,
         token: token_str,
         transparent_proxy,
         timeout,
+        xds: runtime.xds_access()?,
     }) {
         let _ = exec::docker_rm(svc_name);
         return Err(err);
@@ -196,11 +160,11 @@ struct ServiceSetup<'a> {
     name: &'a str,
     port: u16,
     mesh: &'a str,
-    spec: &'a ClusterSpec,
     network: &'a str,
     token: &'a str,
     transparent_proxy: bool,
     timeout: u64,
+    xds: &'a XdsAccess,
 }
 
 /// Post-container-start setup: configure dataplane, inject certs, wait for readiness.
@@ -208,7 +172,6 @@ fn service_up_inner(setup: &ServiceSetup<'_>) -> Result<(), CliError> {
     let svc_name = setup.name;
     let svc_port = setup.port;
     let mesh = setup.mesh;
-    let spec = setup.spec;
     let token_str = setup.token;
     let network = setup.network;
     let transparent_proxy = setup.transparent_proxy;
@@ -249,19 +212,13 @@ fn service_up_inner(setup: &ServiceSetup<'_>) -> Result<(), CliError> {
 
     // Extract CP's CA cert from the XDS endpoint and inject into container.
     // kuma-dp needs this to verify the TLS connection to the CP.
-    let xds_port = spec.primary_member().xds_port.unwrap_or(5678);
-    let cp_ip = spec
-        .primary_member()
-        .container_ip
-        .as_deref()
-        .ok_or_else(|| CliErrorKind::missing_run_context_value("container_ip"))?;
-    let ca_cert = extract_cp_ca_cert(cp_ip, xds_port)?;
+    let ca_cert = extract_cp_ca_cert(&setup.xds.ip, setup.xds.port)?;
     let ca_path = format!("/tmp/{svc_name}-ca.crt");
     exec::docker_write_file(svc_name, &ca_path, &ca_cert)?;
 
     // Start kuma-dp inside the container in detached mode.
     // kuma-dp connects to the XDS port (5678), not the API port (5681).
-    let xds_addr = format!("https://{cp_ip}:{xds_port}");
+    let xds_addr = format!("https://{}:{}", setup.xds.ip, setup.xds.port);
     exec::docker_exec_detached(
         svc_name,
         &[
@@ -363,34 +320,7 @@ fn service_list(run_dir_args: &RunDirArgs) -> Result<i32, CliError> {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    // -- derive_service_image tests --
-
-    #[test]
-    fn derive_replaces_kuma_cp_with_kuma_universal() {
-        assert_eq!(
-            derive_service_image("kuma-cp:latest").as_deref(),
-            Some("kuma-universal:latest")
-        );
-    }
-
-    #[test]
-    fn derive_works_with_registry_prefix() {
-        assert_eq!(
-            derive_service_image("docker.io/kumahq/kuma-cp:2.9.0").as_deref(),
-            Some("docker.io/kumahq/kuma-universal:2.9.0")
-        );
-    }
-
-    #[test]
-    fn derive_returns_none_for_unrelated_image() {
-        assert!(derive_service_image("postgres:16-alpine").is_none());
-    }
-
-    #[test]
-    fn derive_returns_none_for_empty_string() {
-        assert!(derive_service_image("").is_none());
-    }
+    use crate::runtime::ClusterRuntime;
 
     // -- template rendering tests --
 
@@ -455,7 +385,7 @@ mod tests {
         assert_eq!(name_tp, "transparent-proxy.yaml.j2");
     }
 
-    // -- resolve_service_image tests --
+    // -- runtime service image tests --
 
     #[test]
     fn resolve_image_explicit_wins() {
@@ -468,7 +398,8 @@ mod tests {
             crate::cluster::Platform::Universal,
         )
         .unwrap();
-        let result = resolve_service_image(Some("my-image:v1"), &spec).unwrap();
+        let runtime = ClusterRuntime::from_spec(&spec).unwrap();
+        let result = runtime.service_image(Some("my-image:v1")).unwrap();
         assert_eq!(result, "my-image:v1");
     }
 
@@ -484,7 +415,8 @@ mod tests {
         )
         .unwrap();
         spec.cp_image = Some("kuma-cp:dev".into());
-        let result = resolve_service_image(None, &spec).unwrap();
+        let runtime = ClusterRuntime::from_spec(&spec).unwrap();
+        let result = runtime.service_image(None).unwrap();
         assert_eq!(result, "kuma-universal:dev");
     }
 
@@ -521,7 +453,8 @@ mod tests {
             crate::cluster::Platform::Universal,
         )
         .unwrap();
-        let result = resolve_service_image(None, &spec);
+        let runtime = ClusterRuntime::from_spec(&spec).unwrap();
+        let result = runtime.service_image(None);
         assert!(result.is_err());
     }
 }

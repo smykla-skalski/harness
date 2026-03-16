@@ -2,13 +2,15 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::{fs, io};
 
+use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 
 use crate::cluster::ClusterSpec;
 use crate::core_defs::current_run_context_path;
-use crate::errors::CliError;
-use crate::io::{append_markdown_row, read_json_typed};
+use crate::errors::{CliError, CliErrorKind};
+use crate::io::{append_markdown_row, read_json_typed, write_json_pretty};
 use crate::prepared_suite::PreparedSuiteArtifact;
+use crate::runtime::ClusterRuntime;
 use crate::schema::RunStatus;
 
 /// Filesystem layout for a single run.
@@ -276,9 +278,9 @@ pub struct CurrentRunUpdate {
     pub run_report_path: Option<String>,
 }
 
-/// Persisted current run record.
+/// Persisted current run pointer.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CurrentRunRecord {
+pub struct CurrentRunPointer {
     pub layout: RunLayout,
     #[serde(default)]
     pub profile: Option<String>,
@@ -300,48 +302,58 @@ pub struct CurrentRunRecord {
     pub required_dependencies: Vec<String>,
 }
 
-/// Full run context combining layout, metadata, status, cluster, etc.
-#[derive(Debug)]
-pub struct RunContext {
-    pub layout: RunLayout,
-    pub metadata: RunMetadata,
-    pub status: Option<RunStatus>,
-    pub cluster: Option<ClusterSpec>,
-    pub prepared_suite: Option<PreparedSuiteArtifact>,
-    pub preflight: Option<PreflightArtifact>,
+pub type CurrentRunRecord = CurrentRunPointer;
+
+impl CurrentRunPointer {
+    #[must_use]
+    pub fn from_metadata(
+        layout: RunLayout,
+        metadata: &RunMetadata,
+        cluster: Option<ClusterSpec>,
+    ) -> Self {
+        Self {
+            layout,
+            profile: Some(metadata.profile.clone()),
+            repo_root: Some(metadata.repo_root.clone()),
+            suite_dir: Some(metadata.suite_dir.clone()),
+            suite_id: Some(metadata.suite_id.clone()),
+            suite_path: Some(metadata.suite_path.clone()),
+            cluster,
+            keep_clusters: metadata.keep_clusters,
+            user_stories: metadata.user_stories.clone(),
+            required_dependencies: metadata.required_dependencies.clone(),
+        }
+    }
 }
 
-impl RunContext {
-    /// Load from a run directory.
+/// Repository for loading persisted run state.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct RunRepository;
+
+impl RunRepository {
+    fn load_optional<T>(path: &Path) -> Result<Option<T>, CliError>
+    where
+        T: DeserializeOwned,
+    {
+        if path.exists() {
+            return read_json_typed(path).map(Some);
+        }
+        Ok(None)
+    }
+
+    /// Load a full run aggregate from a run directory.
     ///
     /// # Errors
     /// Returns `CliError` if required files are missing or invalid.
-    pub fn from_run_dir(run_dir: &Path) -> Result<Self, CliError> {
+    pub fn load(&self, run_dir: &Path) -> Result<RunAggregate, CliError> {
         let layout = RunLayout::from_run_dir(run_dir);
         let metadata: RunMetadata = read_json_typed(&layout.metadata_path())?;
         let status: RunStatus = read_json_typed(&layout.status_path())?;
+        let prepared_suite = Self::load_optional(&layout.prepared_suite_path())?;
+        let preflight = Self::load_optional(&layout.artifacts_dir().join("preflight.json"))?;
+        let cluster = Self::load_optional(&layout.state_dir().join("cluster.json"))?;
 
-        let prepared_suite = if layout.prepared_suite_path().exists() {
-            Some(read_json_typed(&layout.prepared_suite_path())?)
-        } else {
-            None
-        };
-
-        let preflight_path = layout.artifacts_dir().join("preflight.json");
-        let preflight = if preflight_path.exists() {
-            Some(read_json_typed(&preflight_path)?)
-        } else {
-            None
-        };
-
-        let cluster_path = layout.state_dir().join("cluster.json");
-        let cluster = if cluster_path.exists() {
-            Some(read_json_typed(&cluster_path)?)
-        } else {
-            None
-        };
-
-        Ok(Self {
+        Ok(RunAggregate {
             layout,
             metadata,
             status: Some(status),
@@ -351,37 +363,137 @@ impl RunContext {
         })
     }
 
-    /// Load from the current session context.
+    /// Load the current run pointer from the session context directory.
     ///
-    /// Reads `current-run.json` from the session context directory and
-    /// loads the full `RunContext` from the referenced run directory.
-    /// Returns `None` when the pointer file is missing, unparseable,
-    /// or the referenced run directory no longer exists.
+    /// Missing pointer files return `Ok(None)`. Corrupt pointers are reported
+    /// as explicit load errors instead of being treated as absent.
     ///
     /// # Errors
-    /// Returns `CliError` on failure.
-    pub fn from_current() -> Result<Option<Self>, CliError> {
+    /// Returns `CliError` if the pointer path cannot be resolved, read, or parsed.
+    pub fn load_current_pointer(&self) -> Result<Option<CurrentRunPointer>, CliError> {
         let pointer_path = current_run_context_path()?;
-        let Ok(text) = fs::read_to_string(&pointer_path) else {
-            return Ok(None);
-        };
-        let Ok(record) = serde_json::from_str::<CurrentRunRecord>(&text) else {
-            return Ok(None);
-        };
-        let run_dir = record.layout.run_dir();
-        if !run_dir.is_dir() {
+        if !pointer_path.exists() {
             return Ok(None);
         }
-        match Self::from_run_dir(&run_dir) {
-            Ok(mut ctx) => {
-                // If run dir didn't have cluster spec, fall back to session record
-                if ctx.cluster.is_none() {
-                    ctx.cluster = record.cluster;
-                }
-                Ok(Some(ctx))
-            }
-            Err(_) => Ok(None),
+        let pointer = read_json_typed(&pointer_path)?;
+        Ok(Some(pointer))
+    }
+
+    /// Save the current run pointer to the session context directory.
+    ///
+    /// # Errors
+    /// Returns `CliError` if the pointer path cannot be created or written.
+    pub fn save_current_pointer(&self, pointer: &CurrentRunPointer) -> Result<(), CliError> {
+        let pointer_path = current_run_context_path()?;
+        if let Some(parent) = pointer_path.parent() {
+            fs::create_dir_all(parent)?;
         }
+        write_json_pretty(&pointer_path, pointer)
+    }
+
+    /// Update the current run pointer in place when one exists.
+    ///
+    /// Returns `Ok(false)` when no pointer exists.
+    ///
+    /// # Errors
+    /// Returns `CliError` if the pointer cannot be loaded or saved.
+    pub fn update_current_pointer(
+        &self,
+        update: impl FnOnce(&mut CurrentRunPointer),
+    ) -> Result<bool, CliError> {
+        let Some(mut pointer) = self.load_current_pointer()? else {
+            return Ok(false);
+        };
+        update(&mut pointer);
+        self.save_current_pointer(&pointer)?;
+        Ok(true)
+    }
+
+    /// Remove the current run pointer from the session context directory.
+    ///
+    /// Missing pointer files are ignored.
+    ///
+    /// # Errors
+    /// Returns `CliError` on filesystem failures other than not-found.
+    pub fn clear_current_pointer(&self) -> Result<(), CliError> {
+        let pointer_path = current_run_context_path()?;
+        match fs::remove_file(pointer_path) {
+            Ok(()) => Ok(()),
+            Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(()),
+            Err(error) => Err(error.into()),
+        }
+    }
+
+    /// Load a full run aggregate from a persisted pointer.
+    ///
+    /// # Errors
+    /// Returns `CliError` if the referenced run directory is missing or invalid.
+    pub fn load_from_pointer(&self, pointer: CurrentRunPointer) -> Result<RunAggregate, CliError> {
+        let run_dir = pointer.layout.run_dir();
+        let mut aggregate = self.load(&run_dir)?;
+        if aggregate.cluster.is_none() {
+            aggregate.cluster = pointer.cluster;
+        }
+        Ok(aggregate)
+    }
+
+    /// Load the current run aggregate from the session pointer.
+    ///
+    /// # Errors
+    /// Returns `CliError` if the pointer is corrupt, stale, or the referenced
+    /// run files are invalid.
+    pub fn load_current(&self) -> Result<Option<RunAggregate>, CliError> {
+        let Some(pointer) = self.load_current_pointer()? else {
+            return Ok(None);
+        };
+        if !pointer.layout.run_dir().is_dir() {
+            return Err(
+                CliErrorKind::missing_file(pointer.layout.run_dir().display().to_string()).into(),
+            );
+        }
+        self.load_from_pointer(pointer).map(Some)
+    }
+}
+
+/// Full run aggregate combining layout, metadata, status, cluster, etc.
+#[derive(Debug)]
+pub struct RunAggregate {
+    pub layout: RunLayout,
+    pub metadata: RunMetadata,
+    pub status: Option<RunStatus>,
+    pub cluster: Option<ClusterSpec>,
+    pub prepared_suite: Option<PreparedSuiteArtifact>,
+    pub preflight: Option<PreflightArtifact>,
+}
+
+pub type RunContext = RunAggregate;
+
+impl RunAggregate {
+    /// Load from a run directory.
+    ///
+    /// # Errors
+    /// Returns `CliError` if required files are missing or invalid.
+    pub fn from_run_dir(run_dir: &Path) -> Result<Self, CliError> {
+        let repo = RunRepository;
+        repo.load(run_dir)
+    }
+
+    /// Load from the current session context.
+    ///
+    /// # Errors
+    /// Returns `CliError` when the pointer is corrupt or the referenced
+    /// run cannot be loaded.
+    pub fn from_current() -> Result<Option<Self>, CliError> {
+        let repo = RunRepository;
+        repo.load_current()
+    }
+
+    /// Build a typed cluster runtime from the aggregate.
+    ///
+    /// # Errors
+    /// Returns `CliError` if cluster runtime details are missing.
+    pub fn cluster_runtime(&self) -> Result<ClusterRuntime, CliError> {
+        ClusterRuntime::from_run(self)
     }
 }
 
