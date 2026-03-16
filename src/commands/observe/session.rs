@@ -132,4 +132,22 @@ mod tests {
             assert!(result.is_err());
         });
     }
+
+    #[test]
+    fn find_session_ambiguous_without_hint() {
+        let tmp = tempfile::tempdir().unwrap();
+        let project_a = tmp.path().join(".claude").join("projects").join("alpha");
+        let project_b = tmp.path().join(".claude").join("projects").join("beta");
+        fs::create_dir_all(&project_a).unwrap();
+        fs::create_dir_all(&project_b).unwrap();
+        fs::write(project_a.join("shared.jsonl"), "{}\n").unwrap();
+        fs::write(project_b.join("shared.jsonl"), "{}\n").unwrap();
+
+        temp_env::with_vars([("HOME", Some(tmp.path().to_str().unwrap()))], || {
+            let result = find_session("shared", None);
+            assert!(result.is_err());
+            let err = result.unwrap_err();
+            assert_eq!(err.code(), "KSRCLI085");
+        });
+    }
 }

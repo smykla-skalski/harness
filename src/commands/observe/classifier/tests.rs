@@ -1,7 +1,8 @@
 use super::*;
 use crate::commands::observe::output;
 use crate::commands::observe::types::{
-    IssueCategory, IssueSeverity, MessageRole, ScanState, SourceTool,
+    Confidence, FixSafety, FocusPreset, IssueCategory, IssueCode, IssueSeverity, MessageRole,
+    ScanState, SourceTool,
 };
 
 fn make_state() -> ScanState {
@@ -621,7 +622,7 @@ fn rule_output_shape_is_preserved() {
     let rendered = output::render_json(issue);
     let parsed: serde_json::Value = serde_json::from_str(&rendered).unwrap();
     assert_eq!(parsed["fixable"], true);
-    assert_eq!(parsed["fix_target"], "cli.rs");
+    assert_eq!(parsed["fix_target"], "src/cli.rs");
     assert!(parsed.get("code").is_some());
     assert!(parsed.get("fingerprint").is_some());
     assert!(parsed.get("issue_id").is_some());
@@ -1653,5 +1654,242 @@ fn jq_error_output_shape() {
             .fix_hint
             .as_deref()
             .is_some_and(|hint| hint.contains("valid JSON"))
+    );
+}
+
+// ─── Phase 7 tests ─────────────────────────────────────────────────
+
+#[test]
+fn skill_name_short_does_not_fire() {
+    // Short names (new, run, observe) are the correct convention in SKILL.md
+    let mut state = make_state();
+    let block = serde_json::json!({
+        "type": "tool_use",
+        "id": "t1",
+        "name": "Write",
+        "input": {
+            "file_path": "/data/.claude/skills/observe/SKILL.md",
+            "content": "---\nname: observe\n---\nSome content"
+        }
+    });
+    let issues = check_tool_use_for_issues(10, &block, &mut state);
+    assert!(
+        !issues
+            .iter()
+            .any(|i| i.code == IssueCode::ShortSkillNameInSkillFile),
+        "short name 'observe' should not trigger ShortSkillNameInSkillFile"
+    );
+}
+
+#[test]
+fn skill_name_colon_prefixed_fires() {
+    // Colon-prefixed names (suite:new) are wrong in SKILL.md files
+    let mut state = make_state();
+    let block = serde_json::json!({
+        "type": "tool_use",
+        "id": "t1",
+        "name": "Write",
+        "input": {
+            "file_path": "/data/.claude/skills/new/SKILL.md",
+            "content": "---\nname: suite:new\n---\nSome content"
+        }
+    });
+    let issues = check_tool_use_for_issues(10, &block, &mut state);
+    assert!(
+        issues
+            .iter()
+            .any(|i| i.code == IssueCode::ShortSkillNameInSkillFile),
+        "colon-prefixed 'suite:new' should trigger ShortSkillNameInSkillFile"
+    );
+    let issue = issues
+        .iter()
+        .find(|i| i.code == IssueCode::ShortSkillNameInSkillFile)
+        .unwrap();
+    assert!(issue.summary.contains("suite:new"));
+}
+
+#[test]
+fn golden_json_output_all_fields() {
+    // Construct issue with all fields, verify render_json includes everything
+    let mut state = make_state();
+    let issues = check_text_for_issues(
+        42,
+        MessageRole::User,
+        "error[E0308]: mismatched types\n  expected u32, found &str",
+        Some(SourceTool::Bash),
+        &mut state,
+    );
+    assert!(!issues.is_empty());
+    let issue = &issues[0];
+    let rendered = output::render_json(issue);
+    let parsed: serde_json::Value = serde_json::from_str(&rendered).unwrap();
+
+    // All required fields present
+    assert!(parsed.get("issue_id").is_some());
+    assert!(parsed.get("line").is_some());
+    assert!(parsed.get("code").is_some());
+    assert!(parsed.get("category").is_some());
+    assert!(parsed.get("severity").is_some());
+    assert!(parsed.get("confidence").is_some());
+    assert!(parsed.get("fix_safety").is_some());
+    assert!(parsed.get("summary").is_some());
+    assert!(parsed.get("details").is_some());
+    assert!(parsed.get("fingerprint").is_some());
+    assert!(parsed.get("source_role").is_some());
+    assert!(parsed.get("fixable").is_some());
+
+    // issue_id is 12 hex chars
+    let id = parsed["issue_id"].as_str().unwrap();
+    assert_eq!(id.len(), 12);
+    assert!(id.chars().all(|c| c.is_ascii_hexdigit()));
+}
+
+#[test]
+fn confidence_propagation_from_rules() {
+    let mut state = make_state();
+    // Build error -> High confidence
+    let issues = check_text_for_issues(
+        10,
+        MessageRole::User,
+        "error[E0308]: mismatched types\n  expected u32",
+        Some(SourceTool::Bash),
+        &mut state,
+    );
+    let build_issue = issues
+        .iter()
+        .find(|i| i.code == IssueCode::BuildOrLintFailure);
+    assert!(build_issue.is_some());
+    assert_eq!(build_issue.unwrap().confidence, Confidence::High);
+}
+
+#[test]
+fn fix_safety_backward_compat() {
+    // AutoFixSafe -> fixable: true
+    // TriageRequired -> fixable: false
+    // AdvisoryOnly -> fixable: false
+    // AutoFixGuarded -> fixable: true
+    for (safety, expected) in [
+        (FixSafety::AutoFixSafe, true),
+        (FixSafety::AutoFixGuarded, true),
+        (FixSafety::TriageRequired, false),
+        (FixSafety::AdvisoryOnly, false),
+    ] {
+        assert_eq!(
+            safety.is_fixable(),
+            expected,
+            "{safety} should have fixable={expected}"
+        );
+    }
+}
+
+#[test]
+fn dedup_tracking_occurrence_count() {
+    let mut state = make_state();
+    // Feed same text twice -> should only get 1 issue but occurrence_count=2
+    check_text_for_issues(
+        10,
+        MessageRole::User,
+        "The system denied this tool call because it violates policy",
+        None,
+        &mut state,
+    );
+    check_text_for_issues(
+        20,
+        MessageRole::User,
+        "The system denied this tool call because it violates policy",
+        None,
+        &mut state,
+    );
+
+    // Only 1 unique issue in seen_issues
+    let hook_denial_count = state
+        .seen_issues
+        .iter()
+        .filter(|(code, _)| *code == IssueCode::HookDeniedToolCall)
+        .count();
+    assert_eq!(hook_denial_count, 1);
+
+    // But occurrence tracker has count=2
+    let tracker = state
+        .issue_occurrences
+        .iter()
+        .find(|((code, _), _)| *code == IssueCode::HookDeniedToolCall);
+    assert!(tracker.is_some());
+    let (_, tracker) = tracker.unwrap();
+    assert_eq!(tracker.count, 2);
+    assert_eq!(tracker.first_seen_line, 10);
+    assert_eq!(tracker.last_seen_line, 20);
+}
+
+#[test]
+fn focus_preset_filtering() {
+    let harness_cats = FocusPreset::Harness.categories().unwrap();
+    let skills_cats = FocusPreset::Skills.categories().unwrap();
+
+    // BuildError is in harness, not skills
+    assert!(harness_cats.contains(&IssueCategory::BuildError));
+    assert!(!skills_cats.contains(&IssueCategory::BuildError));
+
+    // SkillBehavior is in skills, not harness
+    assert!(skills_cats.contains(&IssueCategory::SkillBehavior));
+    assert!(!harness_cats.contains(&IssueCategory::SkillBehavior));
+
+    // All returns None (no filter)
+    assert!(FocusPreset::All.categories().is_none());
+}
+
+#[test]
+fn source_tool_in_json_output() {
+    let mut state = make_state();
+    let issues = check_text_for_issues(
+        10,
+        MessageRole::User,
+        "error[E0308]: mismatched types\n  expected u32",
+        Some(SourceTool::Bash),
+        &mut state,
+    );
+    assert!(!issues.is_empty());
+    let issue = &issues[0];
+    assert_eq!(issue.source_tool, Some(SourceTool::Bash));
+
+    let rendered = output::render_json(issue);
+    let parsed: serde_json::Value = serde_json::from_str(&rendered).unwrap();
+    assert_eq!(parsed["source_tool"], "Bash");
+}
+
+#[test]
+fn source_tool_absent_in_json_when_none() {
+    let mut state = make_state();
+    let issues = check_text_for_issues(
+        10,
+        MessageRole::User,
+        "The system denied this tool call because it violates policy",
+        None,
+        &mut state,
+    );
+    assert!(!issues.is_empty());
+    let rendered = output::render_json(&issues[0]);
+    let parsed: serde_json::Value = serde_json::from_str(&rendered).unwrap();
+    assert!(parsed.get("source_tool").is_none());
+}
+
+#[test]
+fn tool_correlation_window_pruning() {
+    let mut state = make_state();
+    // Add 150 tool uses
+    for i in 0..150 {
+        let block = serde_json::json!({
+            "type": "tool_use",
+            "id": format!("tool_{i}"),
+            "name": "Read",
+            "input": {"file_path": format!("/tmp/file_{i}.rs")}
+        });
+        check_tool_use_for_issues(i, &block, &mut state);
+    }
+    // Should be capped at ~100
+    assert!(
+        state.last_tool_uses.len() <= 101,
+        "tool uses should be pruned to ~100, got {}",
+        state.last_tool_uses.len()
     );
 }
