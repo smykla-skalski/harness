@@ -138,19 +138,7 @@ The `last_line` field is the cursor - pass it as `--from-line` on the next invoc
 
 ### Issue categories
 
-| Category | What it catches | Auto-fixable? |
-| --- | --- | --- |
-| `hook_failure` | Guard/verify hooks denied or errored, KSA codes | yes |
-| `skill_behavior` | Wrong SKILL.md name field, wrong question prompts | yes |
-| `cli_error` | Invalid harness arguments, wrong subcommands | yes |
-| `build_error` | Cargo check/clippy/test failures | yes |
-| `workflow_error` | State machine errors from harness Bash output | yes |
-| `naming_error` | Old skill names in `--skill` flag | yes |
-| `tool_error` | Edit before Read, file modified since read | no (model behavior) |
-| `data_integrity` | Stale state, corrupted payloads | sometimes |
-| `subagent_issue` | Non-zero exit codes from subagent commands | sometimes |
-| `unexpected_behavior` | Destructive commands, file churn, alias interference | no (needs triage) |
-| `user_frustration` | User frustration signals (!!!, "don't guess", etc.) | no (UX review) |
+Run `harness observe list-categories` for the full list with descriptions. See [references/issue-taxonomy.md](references/issue-taxonomy.md) for confidence, fix_safety, owner, and retry policy per category.
 
 ## Workflow
 

@@ -705,6 +705,16 @@ pub struct ObserverState {
     pub cycle_history: Vec<CycleRecord>,
     #[serde(default)]
     pub baseline_issue_ids: Vec<String>,
+    #[serde(default)]
+    pub active_workers: Vec<ActiveWorker>,
+}
+
+/// A currently running fix worker tracked in observer state.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ActiveWorker {
+    pub issue_id: String,
+    pub target_file: String,
+    pub started_at: String,
 }
 
 impl ObserverState {
@@ -726,14 +736,15 @@ impl ObserverState {
             muted_codes: Vec::new(),
             cycle_history: Vec::new(),
             baseline_issue_ids: Vec::new(),
+            active_workers: Vec::new(),
         }
     }
 
     /// Whether the observer state is safe for handoff to another observer.
-    /// True when all cycles are complete and cursor is at the end.
+    /// True when no active workers are running and at least one scan completed.
     #[must_use]
     pub fn handoff_safe(&self) -> bool {
-        !self.last_scan_time.is_empty()
+        self.active_workers.is_empty() && !self.last_scan_time.is_empty()
     }
 
     /// Whether a baseline has been captured.

@@ -168,6 +168,60 @@ pub fn render_top_causes(issues: &[Issue], top_n: usize) -> String {
     .expect("valid JSON serialization")
 }
 
+/// Render issues in SARIF (Static Analysis Results Interchange Format) v2.1.0.
+///
+/// # Panics
+/// Panics if the JSON value fails to serialize, which cannot happen
+/// with valid string/integer data.
+#[must_use]
+pub fn render_sarif(issues: &[Issue]) -> String {
+    let results: Vec<serde_json::Value> = issues
+        .iter()
+        .map(|issue| {
+            let level = match issue.severity {
+                super::types::IssueSeverity::Critical => "error",
+                super::types::IssueSeverity::Medium => "warning",
+                super::types::IssueSeverity::Low => "note",
+            };
+            json!({
+                "ruleId": issue.code.to_string(),
+                "level": level,
+                "message": {"text": &issue.summary},
+                "locations": [{
+                    "physicalLocation": {
+                        "artifactLocation": {
+                            "uri": issue.fix_target.as_deref().unwrap_or("session.jsonl"),
+                        },
+                        "region": {"startLine": issue.line},
+                    }
+                }],
+                "properties": {
+                    "category": issue.category.to_string(),
+                    "confidence": issue.confidence.to_string(),
+                    "fixSafety": issue.fix_safety.to_string(),
+                    "issueId": &issue.issue_id,
+                },
+            })
+        })
+        .collect();
+
+    let sarif = json!({
+        "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/main/sarif-2.1/schema/sarif-schema-2.1.0.json",
+        "version": "2.1.0",
+        "runs": [{
+            "tool": {
+                "driver": {
+                    "name": "harness-observe",
+                    "version": "0.1.0",
+                    "informationUri": "https://github.com/smykla-skalski/harness",
+                }
+            },
+            "results": results,
+        }],
+    });
+    serde_json::to_string_pretty(&sarif).expect("valid JSON serialization")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -104,6 +104,7 @@ pub fn execute(mode: ObserveMode) -> Result<i32, CliError> {
             filter,
             role,
             tool_name,
+            raw_json,
             project_hint,
         } => execute_dump(
             &session_id,
@@ -112,6 +113,7 @@ pub fn execute(mode: ObserveMode) -> Result<i32, CliError> {
             filter.as_deref(),
             role.as_deref(),
             tool_name.as_deref(),
+            raw_json,
             project_hint.as_deref(),
         ),
         ObserveMode::Cycle {
@@ -371,6 +373,39 @@ fn apply_filters(issues: Vec<Issue>, filter: &ObserveFilterArgs) -> Result<Vec<I
         filtered.retain(|issue| !muted.contains(&issue.code));
     }
 
+    // Apply YAML overrides file if provided
+    if let Some(ref overrides_path) = filter.overrides {
+        let content = fs::read_to_string(overrides_path).map_err(|e| {
+            CliErrorKind::session_parse_error(format!("cannot read overrides file: {e}"))
+        })?;
+        let overrides: serde_json::Value = serde_yml::from_str(&content).map_err(|e| {
+            CliErrorKind::session_parse_error(format!("invalid overrides YAML: {e}"))
+        })?;
+
+        // Mute list from overrides
+        if let Some(mute_list) = overrides["mute"].as_array() {
+            let muted: Vec<IssueCode> = mute_list
+                .iter()
+                .filter_map(|v| v.as_str().and_then(IssueCode::from_label))
+                .collect();
+            filtered.retain(|issue| !muted.contains(&issue.code));
+        }
+
+        // Severity overrides: downgrade matching issues
+        if let Some(overrides_map) = overrides["severity_overrides"].as_object() {
+            for issue in &mut filtered {
+                let code_str = issue.code.to_string();
+                if let Some(new_sev) = overrides_map
+                    .get(&code_str)
+                    .and_then(|v| v.as_str())
+                    .and_then(IssueSeverity::from_label)
+                {
+                    issue.severity = new_sev;
+                }
+            }
+        }
+    }
+
     Ok(filtered)
 }
 
@@ -468,13 +503,12 @@ fn execute_scan(session_id: &str, filter: &ObserveFilterArgs) -> Result<i32, Cli
         write_details_file(details_path, &filtered)?;
     }
 
-    let use_markdown = filter
-        .format
-        .as_deref()
-        .is_some_and(|f| f == "markdown" || f == "md");
+    let format_str = filter.format.as_deref().unwrap_or("");
 
-    if use_markdown {
+    if format_str == "markdown" || format_str == "md" {
         println!("{}", output::render_markdown(&filtered));
+    } else if format_str == "sarif" {
+        println!("{}", output::render_sarif(&filtered));
     } else if filter.json {
         for issue in &filtered {
             println!("{}", output::render_json(issue));
@@ -668,6 +702,7 @@ fn execute_dump(
     text_filter: Option<&str>,
     roles: Option<&str>,
     tool_name: Option<&str>,
+    raw_json: bool,
     project_hint: Option<&str>,
 ) -> Result<i32, CliError> {
     let path = session::find_session(session_id, project_hint)?;
@@ -697,6 +732,18 @@ fn execute_dump(
         }
         let role = message["role"].as_str().unwrap_or("");
         if role_set.as_ref().is_some_and(|rs| !rs.contains(&role)) {
+            continue;
+        }
+
+        // Raw JSON mode: print the entire JSONL line as-is
+        if raw_json {
+            if filter_lower
+                .as_deref()
+                .is_some_and(|f| !line.to_lowercase().contains(f))
+            {
+                continue;
+            }
+            println!("{}", line.trim());
             continue;
         }
 
@@ -1023,6 +1070,11 @@ fn execute_status(session_id: &str, _project_hint: Option<&str>) -> Result<i32, 
         "muted_codes": state.muted_codes.iter().map(ToString::to_string).collect::<Vec<_>>(),
         "has_baseline": state.has_baseline(),
         "handoff_safe": state.handoff_safe(),
+        "active_workers": state.active_workers.iter().map(|w| json!({
+            "issue_id": w.issue_id,
+            "target_file": w.target_file,
+            "started_at": w.started_at,
+        })).collect::<Vec<_>>(),
         "cycles": state.cycle_history.len(),
         "recent_cycles": recent_cycles,
     });
@@ -1302,6 +1354,7 @@ mod tests {
             mute: None,
             output: None,
             format: None,
+            overrides: None,
             top_causes: None,
             output_details: None,
             since_timestamp: None,
@@ -1329,6 +1382,7 @@ mod tests {
             fixable: false,
             mute: None,
             format: None,
+            overrides: None,
             top_causes: None,
             output: None,
             output_details: None,
@@ -1372,6 +1426,7 @@ mod tests {
             fixable: false,
             mute: Some("build_or_lint_failure".into()),
             format: None,
+            overrides: None,
             top_causes: None,
             output: None,
             output_details: None,
