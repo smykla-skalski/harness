@@ -2,6 +2,7 @@ use std::path::{Path, PathBuf};
 
 use chrono::Utc;
 
+use crate::audit_log::write_run_status_with_audit;
 use crate::cli::RunDirArgs;
 use crate::cluster::Platform;
 use crate::commands::resolve_run_context;
@@ -10,6 +11,7 @@ use crate::errors::{CliError, CliErrorKind, cow};
 use crate::exec;
 use crate::exec::kubectl;
 use crate::io::{validate_safe_segment, write_text};
+use crate::workflow::runner::read_runner_state;
 
 use super::shared::detect_platform;
 
@@ -44,9 +46,14 @@ pub fn capture(
 
     if let Some(mut status) = ctx.status {
         status.last_state_capture = Some(rel.clone());
-        let status_json = serde_json::to_string_pretty(&status)
-            .map_err(|e| CliErrorKind::serialize(cow!("capture status update: {e}")))?;
-        write_text(&ctx.layout.status_path(), &format!("{status_json}\n"))?;
+        let runner_state = read_runner_state(&ctx.layout.run_dir())?;
+        write_run_status_with_audit(
+            &ctx.layout.run_dir(),
+            &status,
+            runner_state.as_ref(),
+            None,
+            None,
+        )?;
     }
 
     println!("{rel}");

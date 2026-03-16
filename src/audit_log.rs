@@ -12,7 +12,7 @@ use crate::context::RunLayout;
 use crate::core_defs::utc_now;
 use crate::errors::{CliError, CliErrorKind, cow};
 use crate::hook_payloads::HookContext;
-use crate::io::ensure_dir;
+use crate::io::{ensure_dir, write_text};
 use crate::schema::RunStatus;
 use crate::workflow::runner::{RunnerPhase, RunnerWorkflowState};
 
@@ -78,6 +78,7 @@ pub fn resolve_phase_context(
         explicit_group_id
             .map(str::to_string)
             .or_else(|| run_status.and_then(|status| status.next_planned_group.clone()))
+            .or_else(|| run_status.and_then(|status| status.last_completed_group.clone()))
     } else {
         None
     };
@@ -116,6 +117,63 @@ pub fn append_audit_entry(request: AuditAppendRequest) -> Result<AuditEntry, Cli
         .map_err(|error| CliErrorKind::serialize(cow!("audit entry: {error}")))?;
     append_jsonl_line(&layout.audit_log_path(), &line)?;
     Ok(entry)
+}
+
+/// Write `run-status.json` and append a matching audit entry.
+///
+/// # Errors
+/// Returns `CliError` on write or audit failure.
+pub fn write_run_status_with_audit(
+    run_dir: &Path,
+    status: &RunStatus,
+    runner_state: Option<&RunnerWorkflowState>,
+    explicit_phase: Option<&str>,
+    explicit_group_id: Option<&str>,
+) -> Result<(), CliError> {
+    let layout = RunLayout::from_run_dir(run_dir);
+    let serialized = serialize_json(status, "run status")?;
+    let content = format!("{serialized}\n");
+    write_text(&layout.status_path(), &content)?;
+
+    let phase_context = resolve_phase_context(
+        runner_state,
+        Some(status),
+        explicit_phase,
+        explicit_group_id,
+    );
+    append_audit_entry(AuditAppendRequest {
+        run_dir: run_dir.to_path_buf(),
+        tool_name: "RunStatusWrite".to_string(),
+        tool_input: "run-status.json".to_string(),
+        full_output: content,
+        phase: phase_context.phase,
+        group_id: phase_context.group_id,
+    })?;
+    Ok(())
+}
+
+/// Append an audit entry after `suite-run-state.json` is written.
+///
+/// # Errors
+/// Returns `CliError` on serialization or audit failure.
+pub fn append_runner_state_audit(
+    run_dir: &Path,
+    state: &RunnerWorkflowState,
+) -> Result<(), CliError> {
+    let serialized = serialize_json(state, "runner state")?;
+    let phase_name = state.phase.to_string();
+    let run_status = load_run_status(run_dir)?;
+    let phase_context =
+        resolve_phase_context(Some(state), run_status.as_ref(), Some(&phase_name), None);
+    append_audit_entry(AuditAppendRequest {
+        run_dir: run_dir.to_path_buf(),
+        tool_name: "RunnerStateWrite".to_string(),
+        tool_input: "suite-run-state.json".to_string(),
+        full_output: format!("{serialized}\n"),
+        phase: phase_context.phase,
+        group_id: phase_context.group_id,
+    })?;
+    Ok(())
 }
 
 /// Build an audit append request from a hook context.
@@ -294,6 +352,22 @@ fn hash_text(text: &str) -> String {
     hex::encode(hasher.finalize())
 }
 
+fn load_run_status(run_dir: &Path) -> Result<Option<RunStatus>, CliError> {
+    let path = RunLayout::from_run_dir(run_dir).status_path();
+    if !path.exists() {
+        return Ok(None);
+    }
+    RunStatus::load(&path).map(Some)
+}
+
+fn serialize_json<T>(value: &T, label: &str) -> Result<String, CliError>
+where
+    T: Serialize,
+{
+    serde_json::to_string_pretty(value)
+        .map_err(|error| CliErrorKind::serialize(cow!("{label}: {error}")).into())
+}
+
 fn unique_artifact_path(layout: &RunLayout, timestamp: &str, tool_name: &str) -> PathBuf {
     let sanitized_tool_name = sanitize_tool_name(tool_name);
     let base_name = format!("{}-{sanitized_tool_name}", artifact_timestamp(timestamp));
@@ -435,6 +509,84 @@ mod tests {
         let log_contents = fs::read_to_string(layout.audit_log_path()).unwrap();
         assert!(log_contents.contains("\"tool_name\":\"Read\""));
         assert!(log_contents.contains("\"group_id\":\"g01\""));
+    }
+
+    #[test]
+    fn write_run_status_with_audit_records_status_write() {
+        let tempdir = tempfile::tempdir().unwrap();
+        let run_dir = tempdir.path().join("r01");
+        let layout = RunLayout::from_run_dir(&run_dir);
+        layout.ensure_dirs().unwrap();
+
+        let status = RunStatus {
+            run_id: "r01".to_string(),
+            suite_id: "suite".to_string(),
+            profile: "single-zone".to_string(),
+            started_at: String::new(),
+            overall_verdict: crate::schema::Verdict::Pending,
+            completed_at: None,
+            counts: crate::schema::RunCounts::default(),
+            executed_groups: vec![],
+            skipped_groups: vec![],
+            last_completed_group: None,
+            last_state_capture: None,
+            last_updated_utc: None,
+            next_planned_group: None,
+            notes: vec![],
+        };
+
+        write_run_status_with_audit(&run_dir, &status, None, Some("bootstrap"), None).unwrap();
+
+        let log_contents = fs::read_to_string(layout.audit_log_path()).unwrap();
+        assert!(log_contents.contains("\"tool_name\":\"RunStatusWrite\""));
+        assert!(log_contents.contains("\"phase\":\"bootstrap\""));
+        assert!(layout.status_path().exists());
+    }
+
+    #[test]
+    fn append_runner_state_audit_records_runner_state_write() {
+        let tempdir = tempfile::tempdir().unwrap();
+        let run_dir = tempdir.path().join("r01");
+        let layout = RunLayout::from_run_dir(&run_dir);
+        layout.ensure_dirs().unwrap();
+
+        let status = RunStatus {
+            run_id: "r01".to_string(),
+            suite_id: "suite".to_string(),
+            profile: "single-zone".to_string(),
+            started_at: String::new(),
+            overall_verdict: crate::schema::Verdict::Pending,
+            completed_at: None,
+            counts: crate::schema::RunCounts::default(),
+            executed_groups: vec![],
+            skipped_groups: vec![],
+            last_completed_group: Some("g02".to_string()),
+            last_state_capture: None,
+            last_updated_utc: None,
+            next_planned_group: Some("g03".to_string()),
+            notes: vec![],
+        };
+        write_run_status_with_audit(&run_dir, &status, None, Some("execution"), Some("g03"))
+            .unwrap();
+
+        let state = RunnerWorkflowState {
+            schema_version: 1,
+            phase: RunnerPhase::Execution,
+            preflight: PreflightState {
+                status: PreflightStatus::Complete,
+            },
+            failure: None,
+            suite_fix: None,
+            updated_at: String::new(),
+            transition_count: 0,
+            last_event: None,
+        };
+
+        append_runner_state_audit(&run_dir, &state).unwrap();
+
+        let log_contents = fs::read_to_string(layout.audit_log_path()).unwrap();
+        assert!(log_contents.contains("\"tool_name\":\"RunnerStateWrite\""));
+        assert!(log_contents.contains("\"group_id\":\"g03\""));
     }
 
     #[test]
