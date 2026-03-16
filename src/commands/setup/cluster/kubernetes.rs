@@ -1,0 +1,333 @@
+use std::collections::HashMap;
+use std::env;
+use std::path::Path;
+
+use crate::cluster::{ClusterSpec, HelmSetting};
+use crate::commands::resolve_repo_root;
+use crate::core_defs::{resolve_build_info, utc_now};
+use crate::errors::{CliError, CliErrorKind, cow};
+use crate::exec::{cluster_exists, docker, kubectl};
+
+use super::{ClusterArgs, make_target, make_target_live, persist_cluster_spec};
+
+/// Helm settings that fix init container CPU throttling on k3d clusters.
+///
+/// Without these, `kuma-init` containers get CPU-throttled by k3d's default
+/// cgroup limits, causing pods to sit at `Init:0/1` for 2-4 minutes. Setting
+/// the CPU limit to `0` removes the limit entirely; a small request is kept
+/// so the scheduler has a baseline.
+const INIT_CONTAINER_THROTTLE_FIX: &[&str] = &[
+    "runtime.kubernetes.injector.initContainer.resources.limits.cpu=0",
+    "runtime.kubernetes.injector.initContainer.resources.requests.cpu=10m",
+];
+
+/// Resolve the KDS address for a global CP running in a k3d cluster.
+///
+/// Discovers the k3d server node IP via `docker inspect` and the
+/// `kuma-global-zone-sync` service `NodePort` via `kubectl`, then
+/// returns `grpcs://<node-ip>:<node-port>`.
+fn resolve_kds_address(global_cluster: &str) -> Result<String, CliError> {
+    let node_container = format!("k3d-{global_cluster}-server-0");
+    let format_string = "{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}";
+    let ip_result = docker(&["inspect", "-f", format_string, &node_container], &[0])?;
+    let node_ip = ip_result.stdout.trim().to_string();
+    if node_ip.is_empty() {
+        return Err(CliErrorKind::cluster_error(cow!(
+            "could not resolve IP for k3d node {node_container}"
+        ))
+        .into());
+    }
+
+    let home = env::var("HOME").unwrap_or_else(|_| "/tmp".into());
+    let kubeconfig = format!("{home}/.kube/kind-{global_cluster}-config");
+    let kubeconfig_path = Path::new(&kubeconfig);
+    let port_result = kubectl(
+        Some(kubeconfig_path),
+        &[
+            "get",
+            "svc",
+            "-n",
+            "kuma-system",
+            "kuma-global-zone-sync",
+            "-o",
+            "jsonpath={.spec.ports[?(@.name==\"global-zone-sync\")].nodePort}",
+        ],
+        &[0],
+    )?;
+    let node_port = port_result.stdout.trim().to_string();
+    if node_port.is_empty() {
+        return Err(CliErrorKind::cluster_error(cow!(
+            "could not resolve KDS NodePort for global cluster {global_cluster}"
+        ))
+        .into());
+    }
+
+    let address = format!("grpcs://{node_ip}:{node_port}");
+    eprintln!(
+        "{} cluster: resolved global KDS address: {address}",
+        utc_now()
+    );
+    Ok(address)
+}
+
+pub(super) fn cluster_k8s(args: &ClusterArgs) -> Result<i32, CliError> {
+    let mode = &args.mode;
+    let mut all_names = vec![args.cluster_name.clone()];
+    all_names.extend(args.extra_cluster_names.iter().cloned());
+
+    let root = resolve_repo_root(args.repo_root.as_deref());
+    let build_info = resolve_build_info(&root)?;
+    let mut base_env = build_info.env();
+
+    if args.no_build {
+        base_env.insert("HARNESS_BUILD_IMAGES".into(), "0".into());
+    }
+
+    if args.no_load {
+        base_env.insert("HARNESS_LOAD_IMAGES".into(), "0".into());
+    }
+
+    let mut bad_settings = Vec::new();
+    let helm_settings: Vec<HelmSetting> = args
+        .helm_setting
+        .iter()
+        .filter_map(|s| match HelmSetting::from_cli_arg(s) {
+            Ok(h) => Some(h),
+            Err(e) => {
+                bad_settings.push(e);
+                None
+            }
+        })
+        .collect();
+
+    if !bad_settings.is_empty() {
+        return Err(CliErrorKind::usage_error(bad_settings.join("; ")).into());
+    }
+
+    let spec = ClusterSpec::from_mode(
+        mode,
+        &all_names,
+        &root.to_string_lossy(),
+        helm_settings.clone(),
+        args.restart_namespace.clone(),
+    )
+    .map_err(|e| CliError::from(CliErrorKind::cluster_error(e)))?;
+
+    let validated_args = &spec.mode_args;
+
+    if !helm_settings.is_empty() {
+        let settings_str: Vec<String> = helm_settings.iter().map(HelmSetting::to_cli_arg).collect();
+        base_env.insert(
+            "K3D_HELM_DEPLOY_ADDITIONAL_SETTINGS".to_string(),
+            settings_str.join(" "),
+        );
+    }
+
+    eprintln!(
+        "{} cluster: starting {mode} for {}",
+        utc_now(),
+        validated_args.join(" ")
+    );
+
+    match mode.as_str() {
+        "single-up" => single_up(&root, &base_env, validated_args)?,
+        "single-down" => single_down(&root, &base_env, validated_args)?,
+        "global-zone-up" => global_zone_up(&root, &base_env, validated_args)?,
+        "global-zone-down" => global_zone_down(&root, &base_env, validated_args)?,
+        "global-two-zones-up" => global_two_zones_up(&root, &base_env, validated_args)?,
+        "global-two-zones-down" => global_two_zones_down(&root, &base_env, validated_args)?,
+        _ => {
+            return Err(
+                CliErrorKind::cluster_error(cow!("unsupported cluster mode: {mode}")).into(),
+            );
+        }
+    }
+
+    if spec.mode.is_up() {
+        persist_cluster_spec(&spec)?;
+    }
+
+    println!("{mode} completed");
+    Ok(0)
+}
+
+fn start_and_deploy(
+    root: &Path,
+    base_env: &HashMap<String, String>,
+    cluster_name: &str,
+    kuma_mode: &str,
+    extra_settings: &[String],
+) -> Result<(), CliError> {
+    let mut env = base_env.clone();
+    env.insert("KIND_CLUSTER_NAME".to_string(), cluster_name.to_string());
+    if !cluster_exists(cluster_name)? {
+        eprintln!("{} cluster: starting k3d cluster {cluster_name}", utc_now());
+        make_target_live(root, "k3d/start", &env)?;
+        eprintln!("{} cluster: k3d cluster {cluster_name} ready", utc_now());
+    }
+    let home = env::var("HOME").unwrap_or_else(|_| "/tmp".into());
+    let kubeconfig = format!("{home}/.kube/kind-{cluster_name}-config");
+    env.insert("KUBECONFIG".to_string(), kubeconfig);
+    env.insert("K3D_HELM_DEPLOY_NO_CNI".to_string(), "true".to_string());
+    env.insert("KUMA_MODE".to_string(), kuma_mode.to_string());
+
+    // Merge existing settings, init container throttle fix, and caller extras.
+    let existing = env
+        .get("K3D_HELM_DEPLOY_ADDITIONAL_SETTINGS")
+        .cloned()
+        .unwrap_or_default();
+    let mut all: Vec<String> = if existing.is_empty() {
+        vec![]
+    } else {
+        existing.split_whitespace().map(String::from).collect()
+    };
+    all.extend(INIT_CONTAINER_THROTTLE_FIX.iter().map(|s| (*s).to_string()));
+    all.extend(extra_settings.iter().cloned());
+    env.insert(
+        "K3D_HELM_DEPLOY_ADDITIONAL_SETTINGS".to_string(),
+        all.join(" "),
+    );
+
+    eprintln!(
+        "{} cluster: deploying Kuma to {cluster_name} ({kuma_mode})",
+        utc_now()
+    );
+    make_target_live(root, "k3d/deploy/helm", &env)?;
+    eprintln!("{} cluster: Kuma deployed to {cluster_name}", utc_now());
+    Ok(())
+}
+
+fn cluster_stop(
+    root: &Path,
+    base_env: &HashMap<String, String>,
+    cluster_name: &str,
+) -> Result<(), CliError> {
+    if !cluster_exists(cluster_name)? {
+        println!("cluster {cluster_name} is already absent");
+        return Ok(());
+    }
+    let mut env = base_env.clone();
+    env.insert("KIND_CLUSTER_NAME".to_string(), cluster_name.to_string());
+    make_target(root, "k3d/stop", &env)?;
+    Ok(())
+}
+
+fn single_up(
+    root: &Path,
+    base_env: &HashMap<String, String>,
+    names: &[String],
+) -> Result<(), CliError> {
+    if names.is_empty() {
+        return Err(CliErrorKind::usage_error("single-up requires names: <cluster>").into());
+    }
+    start_and_deploy(root, base_env, &names[0], "zone", &[])
+}
+
+fn single_down(
+    root: &Path,
+    base_env: &HashMap<String, String>,
+    names: &[String],
+) -> Result<(), CliError> {
+    if names.is_empty() {
+        return Err(CliErrorKind::usage_error("single-down requires names: <cluster>").into());
+    }
+    cluster_stop(root, base_env, &names[0])
+}
+
+fn global_zone_up(
+    root: &Path,
+    base_env: &HashMap<String, String>,
+    names: &[String],
+) -> Result<(), CliError> {
+    if names.len() < 3 {
+        return Err(CliErrorKind::usage_error(
+            "global-zone-up requires names: <global> <zone-cluster> <zone-label>",
+        )
+        .into());
+    }
+    let global_settings: Vec<String> = vec![
+        "controlPlane.mode=global".into(),
+        "controlPlane.globalZoneSyncService.type=NodePort".into(),
+    ];
+    start_and_deploy(root, base_env, &names[0], "global", &global_settings)?;
+    let kds_address = resolve_kds_address(&names[0])?;
+    let zone_settings = vec![
+        "controlPlane.mode=zone".into(),
+        format!("controlPlane.zone={}", names[2]),
+        format!("controlPlane.kdsGlobalAddress={kds_address}"),
+        "controlPlane.tls.kdsZoneClient.skipVerify=true".into(),
+    ];
+    start_and_deploy(root, base_env, &names[1], "zone", &zone_settings)
+}
+
+fn global_zone_down(
+    root: &Path,
+    base_env: &HashMap<String, String>,
+    names: &[String],
+) -> Result<(), CliError> {
+    if names.len() < 2 {
+        return Err(CliErrorKind::usage_error(
+            "global-zone-down requires names: <global> <zone-cluster>",
+        )
+        .into());
+    }
+    cluster_stop(root, base_env, &names[1])?;
+    cluster_stop(root, base_env, &names[0])
+}
+
+fn global_two_zones_up(
+    root: &Path,
+    base_env: &HashMap<String, String>,
+    names: &[String],
+) -> Result<(), CliError> {
+    if names.len() < 5 {
+        return Err(CliErrorKind::usage_error(
+            "global-two-zones-up requires names: <global> <zone1-cluster> <zone2-cluster> <zone1-label> <zone2-label>",
+        )
+        .into());
+    }
+    let global_settings: Vec<String> = vec![
+        "controlPlane.mode=global".into(),
+        "controlPlane.globalZoneSyncService.type=NodePort".into(),
+    ];
+    start_and_deploy(root, base_env, &names[0], "global", &global_settings)?;
+    let kds_address = resolve_kds_address(&names[0])?;
+    eprintln!(
+        "{} cluster: global CP deployed, starting zone clusters",
+        utc_now()
+    );
+    for (zone_cluster, zone_name) in [(&names[1], &names[3]), (&names[2], &names[4])] {
+        eprintln!(
+            "{} cluster: deploying zone {zone_name} on {zone_cluster}",
+            utc_now()
+        );
+        let zone_settings = vec![
+            "controlPlane.mode=zone".into(),
+            format!("controlPlane.zone={zone_name}"),
+            format!("controlPlane.kdsGlobalAddress={kds_address}"),
+            "controlPlane.tls.kdsZoneClient.skipVerify=true".into(),
+        ];
+        start_and_deploy(root, base_env, zone_cluster, "zone", &zone_settings)?;
+        eprintln!(
+            "{} cluster: zone {zone_name} on {zone_cluster} ready",
+            utc_now()
+        );
+    }
+    Ok(())
+}
+
+fn global_two_zones_down(
+    root: &Path,
+    base_env: &HashMap<String, String>,
+    names: &[String],
+) -> Result<(), CliError> {
+    if names.len() < 3 {
+        return Err(CliErrorKind::usage_error(
+            "global-two-zones-down requires names: <global> <zone1-cluster> <zone2-cluster>",
+        )
+        .into());
+    }
+    cluster_stop(root, base_env, &names[2])?;
+    cluster_stop(root, base_env, &names[1])?;
+    cluster_stop(root, base_env, &names[0])
+}
