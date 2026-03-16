@@ -4,7 +4,7 @@ use crate::cli::RunDirArgs;
 use crate::cluster::Platform;
 use crate::commands::{resolve_cp_addr, resolve_kubeconfig, resolve_run_dir};
 use crate::context::RunContext;
-use crate::core_defs::utc_now;
+use crate::core_defs::{shorten_path, utc_now};
 use crate::errors::CliError;
 use crate::exec;
 use crate::exec::kubectl;
@@ -54,7 +54,7 @@ pub fn apply(
             &["copied_at", "manifest", "validated", "applied", "notes"],
             &[&utc_now(), &rel, "PASS", "PASS", &notes],
         )?;
-        println!("{}", manifest.display());
+        println!("{}", shorten_path(&manifest));
     }
     Ok(0)
 }

@@ -1,10 +1,12 @@
 use std::env;
+use std::path::PathBuf;
 use std::process::Command;
 use std::sync::LazyLock;
 
 use regex::Regex;
 
 use crate::cli::RunDirArgs;
+use crate::commands::resolve_run_dir;
 use crate::core_defs::utc_now;
 use crate::errors::{CliError, CliErrorKind};
 use crate::io::{append_markdown_row, ensure_dir, write_text};
@@ -39,7 +41,7 @@ pub fn record(
         return Err(CliErrorKind::usage_error("missing command").into());
     }
 
-    let run_dir = super::resolve_run_dir(run_dir_args).ok();
+    let run_dir = resolve_run_dir(run_dir_args).ok();
 
     let output = Command::new(command[0]).args(&command[1..]).output();
 
@@ -62,7 +64,7 @@ pub fn record(
         artifact_name = format!("{artifact_name}-{}", tags.join("-"));
     }
 
-    let (artifact, command_log) = if let Some(ref rd) = run_dir {
+    let (artifact, command_log): (PathBuf, Option<PathBuf>) = if let Some(ref rd) = run_dir {
         let commands_dir = rd.join("commands");
         ensure_dir(&commands_dir)?;
         let artifact = commands_dir.join(format!("{artifact_name}.txt"));
