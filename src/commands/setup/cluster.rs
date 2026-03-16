@@ -253,6 +253,9 @@ fn single_up(
     base_env: &HashMap<String, String>,
     names: &[String],
 ) -> Result<(), CliError> {
+    if names.is_empty() {
+        return Err(CliErrorKind::usage_error("single-up requires names: <cluster>").into());
+    }
     start_and_deploy(root, base_env, &names[0], "zone", &[])
 }
 
@@ -261,6 +264,9 @@ fn single_down(
     base_env: &HashMap<String, String>,
     names: &[String],
 ) -> Result<(), CliError> {
+    if names.is_empty() {
+        return Err(CliErrorKind::usage_error("single-down requires names: <cluster>").into());
+    }
     cluster_stop(root, base_env, &names[0])
 }
 
@@ -269,6 +275,12 @@ fn global_zone_up(
     base_env: &HashMap<String, String>,
     names: &[String],
 ) -> Result<(), CliError> {
+    if names.len() < 3 {
+        return Err(CliErrorKind::usage_error(
+            "global-zone-up requires names: <global> <zone-cluster> <zone-label>",
+        )
+        .into());
+    }
     let global_settings: Vec<String> = vec![
         "controlPlane.mode=global".into(),
         "controlPlane.globalZoneSyncService.type=NodePort".into(),
@@ -287,6 +299,12 @@ fn global_zone_down(
     base_env: &HashMap<String, String>,
     names: &[String],
 ) -> Result<(), CliError> {
+    if names.len() < 2 {
+        return Err(CliErrorKind::usage_error(
+            "global-zone-down requires names: <global> <zone-cluster>",
+        )
+        .into());
+    }
     cluster_stop(root, base_env, &names[1])?;
     cluster_stop(root, base_env, &names[0])
 }
@@ -296,6 +314,12 @@ fn global_two_zones_up(
     base_env: &HashMap<String, String>,
     names: &[String],
 ) -> Result<(), CliError> {
+    if names.len() < 5 {
+        return Err(CliErrorKind::usage_error(
+            "global-two-zones-up requires names: <global> <zone1-cluster> <zone2-cluster> <zone1-label> <zone2-label>",
+        )
+        .into());
+    }
     let global_settings: Vec<String> = vec![
         "controlPlane.mode=global".into(),
         "controlPlane.globalZoneSyncService.type=NodePort".into(),
@@ -321,6 +345,12 @@ fn global_two_zones_down(
     base_env: &HashMap<String, String>,
     names: &[String],
 ) -> Result<(), CliError> {
+    if names.len() < 3 {
+        return Err(CliErrorKind::usage_error(
+            "global-two-zones-down requires names: <global> <zone1-cluster> <zone2-cluster>",
+        )
+        .into());
+    }
     cluster_stop(root, base_env, &names[2])?;
     cluster_stop(root, base_env, &names[1])?;
     cluster_stop(root, base_env, &names[0])
@@ -428,6 +458,12 @@ fn universal_global_zone_up(
     store: &str,
     names: &[String],
 ) -> Result<(), CliError> {
+    if names.len() < 3 {
+        return Err(CliErrorKind::usage_error(
+            "global-zone-up requires names: <global> <zone-container> <zone-label>",
+        )
+        .into());
+    }
     let global_name = &names[0];
     let zone_name = &names[1];
     let zone_label = &names[2];
@@ -483,6 +519,12 @@ fn universal_global_two_zones_up(
     store: &str,
     names: &[String],
 ) -> Result<(), CliError> {
+    if names.len() < 5 {
+        return Err(CliErrorKind::usage_error(
+            "global-two-zones-up requires names: <global> <zone1-container> <zone2-container> <zone1-label> <zone2-label>",
+        )
+        .into());
+    }
     let global_name = &names[0];
     let zone1_name = &names[1];
     let zone2_name = &names[2];
