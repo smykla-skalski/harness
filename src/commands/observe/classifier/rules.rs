@@ -2,15 +2,17 @@ use std::collections::HashSet;
 
 use crate::commands::observe::patterns;
 use crate::commands::observe::truncate_details;
-use crate::commands::observe::types::{Issue, IssueCategory, IssueSeverity};
+use crate::commands::observe::types::{
+    Issue, IssueCategory, IssueSeverity, MessageRole, SourceTool,
+};
 
 /// Filter on message role.
 #[derive(Clone, Copy)]
 pub(super) enum RoleFilter {
     /// No filter - any role matches.
     Any,
-    /// Must match this exact role string.
-    Exact(&'static str),
+    /// Must match this exact role.
+    Exact(MessageRole),
 }
 
 /// Filter on source tool.
@@ -19,7 +21,7 @@ pub(super) enum ToolFilter {
     /// No filter - any source tool (including None).
     Any,
     /// Must match this exact source tool.
-    Exact(&'static str),
+    Exact(SourceTool),
     /// Source tool must be None (plain text, not tool output).
     Absent,
 }
@@ -72,7 +74,7 @@ pub(super) static TEXT_RULES: &[TextRule] = &[
     // CLI errors (marks CliError so build_errors can skip)
     TextRule {
         role_filter: RoleFilter::Any,
-        source_tool_filter: ToolFilter::Exact("Bash"),
+        source_tool_filter: ToolFilter::Exact(SourceTool::Bash),
         extra_guard: Some("harness"),
         patterns: patterns::CLI_ERROR_PATTERNS,
         match_mode: MatchMode::FirstMatch,
@@ -104,7 +106,7 @@ pub(super) static TEXT_RULES: &[TextRule] = &[
     // Build errors (skip when CLI error already matched)
     TextRule {
         role_filter: RoleFilter::Any,
-        source_tool_filter: ToolFilter::Exact("Bash"),
+        source_tool_filter: ToolFilter::Exact(SourceTool::Bash),
         extra_guard: None,
         patterns: patterns::BUILD_ERROR_PATTERNS,
         match_mode: MatchMode::FirstMatch,
@@ -120,7 +122,7 @@ pub(super) static TEXT_RULES: &[TextRule] = &[
     // Workflow errors
     TextRule {
         role_filter: RoleFilter::Any,
-        source_tool_filter: ToolFilter::Exact("Bash"),
+        source_tool_filter: ToolFilter::Exact(SourceTool::Bash),
         extra_guard: None,
         patterns: patterns::WORKFLOW_ERROR_PATTERNS,
         match_mode: MatchMode::FirstMatch,
@@ -136,7 +138,7 @@ pub(super) static TEXT_RULES: &[TextRule] = &[
     // Pod / container failures
     TextRule {
         role_filter: RoleFilter::Any,
-        source_tool_filter: ToolFilter::Exact("Bash"),
+        source_tool_filter: ToolFilter::Exact(SourceTool::Bash),
         extra_guard: None,
         patterns: patterns::POD_FAILURE_SIGNALS,
         match_mode: MatchMode::Any,
@@ -152,7 +154,7 @@ pub(super) static TEXT_RULES: &[TextRule] = &[
     // Auth flow triggered
     TextRule {
         role_filter: RoleFilter::Any,
-        source_tool_filter: ToolFilter::Exact("Bash"),
+        source_tool_filter: ToolFilter::Exact(SourceTool::Bash),
         extra_guard: None,
         patterns: patterns::AUTH_SIGNALS,
         match_mode: MatchMode::Any,
@@ -170,7 +172,7 @@ pub(super) static TEXT_RULES: &[TextRule] = &[
     // Direct kubectl-validate usage
     TextRule {
         role_filter: RoleFilter::Any,
-        source_tool_filter: ToolFilter::Exact("Bash"),
+        source_tool_filter: ToolFilter::Exact(SourceTool::Bash),
         extra_guard: None,
         patterns: &["kubectl-validate"],
         match_mode: MatchMode::FirstMatch,
@@ -188,7 +190,7 @@ pub(super) static TEXT_RULES: &[TextRule] = &[
     // Shell alias interference (cp -> rsync)
     TextRule {
         role_filter: RoleFilter::Any,
-        source_tool_filter: ToolFilter::Exact("Bash"),
+        source_tool_filter: ToolFilter::Exact(SourceTool::Bash),
         extra_guard: None,
         patterns: &["rsync"],
         match_mode: MatchMode::FirstMatch,
@@ -204,7 +206,7 @@ pub(super) static TEXT_RULES: &[TextRule] = &[
     // Payload corruption (<json> tags around JSON)
     TextRule {
         role_filter: RoleFilter::Any,
-        source_tool_filter: ToolFilter::Exact("Bash"),
+        source_tool_filter: ToolFilter::Exact(SourceTool::Bash),
         extra_guard: None,
         patterns: &["<json>", "</json>"],
         match_mode: MatchMode::Any,
@@ -222,7 +224,7 @@ pub(super) static TEXT_RULES: &[TextRule] = &[
     // Python tracebacks
     TextRule {
         role_filter: RoleFilter::Any,
-        source_tool_filter: ToolFilter::Exact("Bash"),
+        source_tool_filter: ToolFilter::Exact(SourceTool::Bash),
         extra_guard: None,
         patterns: &["traceback (most recent call last)"],
         match_mode: MatchMode::FirstMatch,
@@ -237,7 +239,7 @@ pub(super) static TEXT_RULES: &[TextRule] = &[
     },
     // Suite deviation signals (assistant text only, not tool output)
     TextRule {
-        role_filter: RoleFilter::Exact("assistant"),
+        role_filter: RoleFilter::Exact(MessageRole::Assistant),
         source_tool_filter: ToolFilter::Absent,
         extra_guard: None,
         patterns: patterns::DEVIATION_SIGNALS,
@@ -256,7 +258,7 @@ pub(super) static TEXT_RULES: &[TextRule] = &[
     // Release kumactl version (system binary instead of worktree build)
     TextRule {
         role_filter: RoleFilter::Any,
-        source_tool_filter: ToolFilter::Exact("Bash"),
+        source_tool_filter: ToolFilter::Exact(SourceTool::Bash),
         extra_guard: None,
         patterns: patterns::RELEASE_VERSION_SIGNALS,
         match_mode: MatchMode::Any,
@@ -275,7 +277,7 @@ pub(super) static TEXT_RULES: &[TextRule] = &[
     // Python usage in Bash commands
     TextRule {
         role_filter: RoleFilter::Any,
-        source_tool_filter: ToolFilter::Exact("Bash"),
+        source_tool_filter: ToolFilter::Exact(SourceTool::Bash),
         extra_guard: None,
         patterns: patterns::PYTHON_USAGE_SIGNALS,
         match_mode: MatchMode::Any,
@@ -291,7 +293,7 @@ pub(super) static TEXT_RULES: &[TextRule] = &[
     // Corporate / remote cluster context
     TextRule {
         role_filter: RoleFilter::Any,
-        source_tool_filter: ToolFilter::Exact("Bash"),
+        source_tool_filter: ToolFilter::Exact(SourceTool::Bash),
         extra_guard: None,
         patterns: patterns::CORPORATE_CLUSTER_SIGNALS,
         match_mode: MatchMode::FirstMatch,
@@ -313,10 +315,10 @@ pub(super) static TEXT_RULES: &[TextRule] = &[
 /// and the set of matched categories (for downstream skip logic).
 pub(super) fn apply_text_rules(
     line_num: usize,
-    role: &str,
+    role: MessageRole,
     text: &str,
     lower: &str,
-    source_tool: Option<&str>,
+    source_tool: Option<SourceTool>,
 ) -> (Vec<Issue>, HashSet<IssueCategory>) {
     let mut issues = Vec::new();
     let mut matched_categories = HashSet::new();
@@ -382,7 +384,7 @@ pub(super) fn apply_text_rules(
                 severity: rule.severity,
                 summary,
                 details: truncate_details(text),
-                source_role: role.to_string(),
+                source_role: role,
                 fixable: rule.fixable,
                 fix_target: rule.fix_target.map(String::from),
                 fix_hint: rule.fix_hint.map(String::from),

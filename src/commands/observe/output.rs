@@ -79,7 +79,7 @@ pub fn render_summary(issues: &[Issue], last_line: usize) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::commands::observe::types::{IssueCategory, IssueSeverity};
+    use crate::commands::observe::types::{IssueCategory, IssueSeverity, MessageRole};
 
     fn sample_issue() -> Issue {
         Issue {
@@ -88,7 +88,7 @@ mod tests {
             severity: IssueSeverity::Critical,
             summary: "Build failed".into(),
             details: "error[E0308]: mismatched types".into(),
-            source_role: "assistant".into(),
+            source_role: MessageRole::Assistant,
             fixable: true,
             fix_target: Some("src/main.rs".into()),
             fix_hint: Some("Fix the type mismatch".into()),

@@ -93,6 +93,75 @@ impl IssueSeverity {
     }
 }
 
+/// Role of the message that produced an issue.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum MessageRole {
+    User,
+    Assistant,
+}
+
+impl fmt::Display for MessageRole {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(match self {
+            Self::User => "user",
+            Self::Assistant => "assistant",
+        })
+    }
+}
+
+impl MessageRole {
+    /// Parse a role from its JSON string representation.
+    #[must_use]
+    pub fn from_label(s: &str) -> Option<Self> {
+        match s {
+            "user" | "human" => Some(Self::User),
+            "assistant" => Some(Self::Assistant),
+            _ => None,
+        }
+    }
+}
+
+/// Tool that produced a piece of text (resolved from tool_use correlation).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum SourceTool {
+    Bash,
+    Read,
+    Write,
+    Edit,
+    Agent,
+    AskUserQuestion,
+}
+
+impl fmt::Display for SourceTool {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(match self {
+            Self::Bash => "Bash",
+            Self::Read => "Read",
+            Self::Write => "Write",
+            Self::Edit => "Edit",
+            Self::Agent => "Agent",
+            Self::AskUserQuestion => "AskUserQuestion",
+        })
+    }
+}
+
+impl SourceTool {
+    /// Parse a tool name from its string representation.
+    #[must_use]
+    pub fn from_label(s: &str) -> Option<Self> {
+        match s {
+            "Bash" => Some(Self::Bash),
+            "Read" => Some(Self::Read),
+            "Write" => Some(Self::Write),
+            "Edit" => Some(Self::Edit),
+            "Agent" => Some(Self::Agent),
+            "AskUserQuestion" => Some(Self::AskUserQuestion),
+            _ => None,
+        }
+    }
+}
+
 /// A classified issue found in a session log.
 #[derive(Debug, Clone, Serialize)]
 pub struct Issue {
@@ -101,7 +170,7 @@ pub struct Issue {
     pub severity: IssueSeverity,
     pub summary: String,
     pub details: String,
-    pub source_role: String,
+    pub source_role: MessageRole,
     pub fixable: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub fix_target: Option<String>,
@@ -182,7 +251,7 @@ mod tests {
             severity: IssueSeverity::Critical,
             summary: "Build failed".into(),
             details: "error[E0308]".into(),
-            source_role: "assistant".into(),
+            source_role: MessageRole::Assistant,
             fixable: true,
             fix_target: Some("src/main.rs".into()),
             fix_hint: None,
@@ -190,6 +259,7 @@ mod tests {
         let json = serde_json::to_string(&issue).unwrap();
         assert!(json.contains("\"build_error\""));
         assert!(json.contains("\"critical\""));
+        assert!(json.contains("\"assistant\""));
         assert!(!json.contains("fix_hint"));
     }
 
@@ -200,6 +270,42 @@ mod tests {
         assert!(state.edit_counts.is_empty());
         assert!(state.seen_issues.is_empty());
         assert!(state.session_start_timestamp.is_none());
+    }
+
+    #[test]
+    fn message_role_display_roundtrip() {
+        for role in [MessageRole::User, MessageRole::Assistant] {
+            let label = role.to_string();
+            let parsed = MessageRole::from_label(&label);
+            assert_eq!(parsed, Some(role), "roundtrip failed for {label}");
+        }
+    }
+
+    #[test]
+    fn message_role_human_alias() {
+        assert_eq!(MessageRole::from_label("human"), Some(MessageRole::User));
+    }
+
+    #[test]
+    fn source_tool_display_roundtrip() {
+        let tools = [
+            SourceTool::Bash,
+            SourceTool::Read,
+            SourceTool::Write,
+            SourceTool::Edit,
+            SourceTool::Agent,
+            SourceTool::AskUserQuestion,
+        ];
+        for tool in tools {
+            let label = tool.to_string();
+            let parsed = SourceTool::from_label(&label);
+            assert_eq!(parsed, Some(tool), "roundtrip failed for {label}");
+        }
+    }
+
+    #[test]
+    fn source_tool_unknown_returns_none() {
+        assert_eq!(SourceTool::from_label("Unknown"), None);
     }
 
     #[test]

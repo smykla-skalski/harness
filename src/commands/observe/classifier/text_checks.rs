@@ -3,18 +3,18 @@ use std::collections::HashSet;
 use super::issue_builder::issue;
 use super::{AGENT_NAME_REGEX, EXIT_CODE_REGEX};
 use crate::commands::observe::patterns;
-use crate::commands::observe::types::{Issue, IssueCategory};
+use crate::commands::observe::types::{Issue, IssueCategory, MessageRole, SourceTool};
 
 /// Check for KSA hook codes in Bash output.
 pub(super) fn check_ksa_codes(
     line_num: usize,
-    role: &str,
+    role: MessageRole,
     text: &str,
     lower: &str,
-    source_tool: Option<&str>,
+    source_tool: Option<SourceTool>,
     issues: &mut Vec<Issue>,
 ) {
-    if source_tool != Some("Bash") {
+    if source_tool != Some(SourceTool::Bash) {
         return;
     }
     for code in patterns::KSA_CODES {
@@ -38,14 +38,14 @@ pub(super) fn check_ksa_codes(
 /// Check for harness command failures with non-zero exit codes.
 pub(super) fn check_exit_code_issues(
     line_num: usize,
-    role: &str,
+    role: MessageRole,
     text: &str,
     lower: &str,
-    source_tool: Option<&str>,
+    source_tool: Option<SourceTool>,
     issues: &mut Vec<Issue>,
     matched_categories: &HashSet<IssueCategory>,
 ) {
-    if source_tool != Some("Bash") {
+    if source_tool != Some(SourceTool::Bash) {
         return;
     }
 
@@ -112,13 +112,13 @@ pub(super) fn check_exit_code_issues(
 /// Check for subagent permission failures in user-role text.
 pub(super) fn check_permission_failures(
     line_num: usize,
-    role: &str,
+    role: MessageRole,
     text: &str,
     lower: &str,
-    source_tool: Option<&str>,
+    source_tool: Option<SourceTool>,
     issues: &mut Vec<Issue>,
 ) {
-    if role != "user" || source_tool.is_some() {
+    if role != MessageRole::User || source_tool.is_some() {
         return;
     }
     if !patterns::PERMISSION_SIGNALS
@@ -146,13 +146,13 @@ pub(super) fn check_permission_failures(
 /// Check for subagent save failures in assistant text.
 pub(super) fn check_save_failures(
     line_num: usize,
-    role: &str,
+    role: MessageRole,
     text: &str,
     lower: &str,
-    source_tool: Option<&str>,
+    source_tool: Option<SourceTool>,
     issues: &mut Vec<Issue>,
 ) {
-    if role != "assistant" || source_tool.is_some() {
+    if role != MessageRole::Assistant || source_tool.is_some() {
         return;
     }
     if !patterns::SAVE_FAILURE_SIGNALS
@@ -178,13 +178,13 @@ pub(super) fn check_save_failures(
 /// Check for manual payload recovery patterns.
 pub(super) fn check_payload_recovery(
     line_num: usize,
-    role: &str,
+    role: MessageRole,
     text: &str,
     lower: &str,
-    source_tool: Option<&str>,
+    source_tool: Option<SourceTool>,
     issues: &mut Vec<Issue>,
 ) {
-    if role != "assistant" || source_tool.is_some() {
+    if role != MessageRole::Assistant || source_tool.is_some() {
         return;
     }
     let has_grep = lower.contains("grep");
@@ -212,13 +212,13 @@ pub(super) fn check_payload_recovery(
 /// Uses the `ENV_MISCONFIGURATION_SIGNALS` pattern array from patterns.rs.
 pub(super) fn check_env_misconfiguration(
     line_num: usize,
-    role: &str,
+    role: MessageRole,
     text: &str,
     lower: &str,
-    source_tool: Option<&str>,
+    source_tool: Option<SourceTool>,
     issues: &mut Vec<Issue>,
 ) {
-    if source_tool != Some("Bash") {
+    if source_tool != Some(SourceTool::Bash) {
         return;
     }
     for signal in patterns::ENV_MISCONFIGURATION_SIGNALS {
@@ -259,13 +259,13 @@ pub(super) fn check_env_misconfiguration(
 /// Check for incomplete writer agent output in assistant text.
 pub(super) fn check_incomplete_writer(
     line_num: usize,
-    role: &str,
+    role: MessageRole,
     text: &str,
     lower: &str,
-    source_tool: Option<&str>,
+    source_tool: Option<SourceTool>,
     issues: &mut Vec<Issue>,
 ) {
-    if role != "assistant" || source_tool.is_some() {
+    if role != MessageRole::Assistant || source_tool.is_some() {
         return;
     }
     if !patterns::INCOMPLETE_WRITER_SIGNALS
@@ -289,13 +289,13 @@ pub(super) fn check_incomplete_writer(
 /// Check for user frustration signals in human text.
 pub(super) fn check_user_frustration(
     line_num: usize,
-    role: &str,
+    role: MessageRole,
     text: &str,
     lower: &str,
-    source_tool: Option<&str>,
+    source_tool: Option<SourceTool>,
     issues: &mut Vec<Issue>,
 ) {
-    if role != "user" || source_tool.is_some() || text.len() >= 2000 {
+    if role != MessageRole::User || source_tool.is_some() || text.len() >= 2000 {
         return;
     }
     let exclamation_count = text.chars().filter(|&c| c == '!').count();
