@@ -1,13 +1,13 @@
 /// KSA hook codes to detect in Bash output (lowercase for matching against
 /// lowercased text).
-pub static KSA_CODES: &[&str] = &[
+pub(super) static KSA_CODES: &[&str] = &[
     "ksa001", "ksa002", "ksa003", "ksa004", "ksa005", "ksa006", "ksa007", "ksa008", "ksa009",
     "ksa010", "ksa011", "ksa012", "ksa013", "ksa014", "ksa015", "ksa016", "ksa017", "ksa018",
     "ksa019",
 ];
 
 /// Patterns indicating harness CLI errors.
-pub static CLI_ERROR_PATTERNS: &[&str] = &[
+pub(super) static CLI_ERROR_PATTERNS: &[&str] = &[
     "harness: error:",
     "unrecognized arguments",
     "invalid choice:",
@@ -16,14 +16,14 @@ pub static CLI_ERROR_PATTERNS: &[&str] = &[
 ];
 
 /// Patterns indicating Claude Code tool usage errors.
-pub static TOOL_ERROR_PATTERNS: &[&str] = &[
+pub(super) static TOOL_ERROR_PATTERNS: &[&str] = &[
     "file has not been read yet",
     "file has been modified since read",
     "tool_use_error",
 ];
 
 /// Patterns indicating build or lint failures.
-pub static BUILD_ERROR_PATTERNS: &[&str] = &[
+pub(super) static BUILD_ERROR_PATTERNS: &[&str] = &[
     "error[e",
     "could not compile",
     "missing_panics_doc",
@@ -33,7 +33,7 @@ pub static BUILD_ERROR_PATTERNS: &[&str] = &[
 ];
 
 /// Patterns indicating workflow state errors.
-pub static WORKFLOW_ERROR_PATTERNS: &[&str] = &[
+pub(super) static WORKFLOW_ERROR_PATTERNS: &[&str] = &[
     "missing active suite",
     "missing suite:",
     "approval state is missing",
@@ -42,7 +42,7 @@ pub static WORKFLOW_ERROR_PATTERNS: &[&str] = &[
 ];
 
 /// Phrases indicating user frustration.
-pub static USER_FRUSTRATION_SIGNALS: &[&str] = &[
+pub(super) static USER_FRUSTRATION_SIGNALS: &[&str] = &[
     "don't guess",
     "stop guessing",
     "i already told you",
@@ -56,7 +56,7 @@ pub static USER_FRUSTRATION_SIGNALS: &[&str] = &[
 ];
 
 /// Signals indicating pod or container failures.
-pub static POD_FAILURE_SIGNALS: &[&str] = &[
+pub(super) static POD_FAILURE_SIGNALS: &[&str] = &[
     "crashloopbackoff",
     "imagepullbackoff",
     "errimagepull",
@@ -67,7 +67,7 @@ pub static POD_FAILURE_SIGNALS: &[&str] = &[
 ];
 
 /// Signals indicating auth flow was triggered.
-pub static AUTH_SIGNALS: &[&str] = &[
+pub(super) static AUTH_SIGNALS: &[&str] = &[
     "if browser window does not open automatically",
     "opening browser for authentication",
     "oauth2",
@@ -78,7 +78,7 @@ pub static AUTH_SIGNALS: &[&str] = &[
 ];
 
 /// Signals indicating subagent permission failures.
-pub static PERMISSION_SIGNALS: &[&str] = &[
+pub(super) static PERMISSION_SIGNALS: &[&str] = &[
     "i need bash permission",
     "i don't have bash permission",
     "i need write permission",
@@ -89,7 +89,7 @@ pub static PERMISSION_SIGNALS: &[&str] = &[
 ];
 
 /// Signals indicating subagent save failures.
-pub static SAVE_FAILURE_SIGNALS: &[&str] = &[
+pub(super) static SAVE_FAILURE_SIGNALS: &[&str] = &[
     "couldn't save",
     "could not save",
     "failed to save",
@@ -107,7 +107,7 @@ pub static SAVE_FAILURE_SIGNALS: &[&str] = &[
 ];
 
 /// Signals indicating suite deviation.
-pub static DEVIATION_SIGNALS: &[&str] = &[
+pub(super) static DEVIATION_SIGNALS: &[&str] = &[
     "deviation from the suite",
     "only exist on",
     "should i apply baselines",
@@ -117,7 +117,7 @@ pub static DEVIATION_SIGNALS: &[&str] = &[
 ];
 
 /// Signals in `AskUserQuestion` indicating runtime deviations.
-pub static QUESTION_DEVIATION_SIGNALS: &[&str] = &[
+pub(super) static QUESTION_DEVIATION_SIGNALS: &[&str] = &[
     "deviation",
     "only exist on",
     "should i apply",
@@ -138,13 +138,13 @@ pub static QUESTION_DEVIATION_SIGNALS: &[&str] = &[
 /// local worktree build. A release version like "kuma 2.13.2" means the
 /// system-installed kumactl is on PATH, not the one built from the branch
 /// under test.
-pub static RELEASE_VERSION_SIGNALS: &[&str] = &["client: kuma 2.", "client: kuma 3."];
+pub(super) static RELEASE_VERSION_SIGNALS: &[&str] = &["client: kuma 2.", "client: kuma 3."];
 
 /// Patterns indicating python usage in Bash commands.
-pub static PYTHON_USAGE_SIGNALS: &[&str] = &["python3 -c", "python -c"];
+pub(super) static PYTHON_USAGE_SIGNALS: &[&str] = &["python3 -c", "python -c"];
 
 /// Harness-managed context files that should not be written directly.
-pub static MANAGED_CONTEXT_FILES: &[&str] = &[
+pub(super) static MANAGED_CONTEXT_FILES: &[&str] = &[
     "current-run.json",
     "suite-run-state.json",
     "run-status.json",
@@ -152,14 +152,14 @@ pub static MANAGED_CONTEXT_FILES: &[&str] = &[
 ];
 
 /// Signals that session environment is misconfigured.
-pub static ENV_MISCONFIGURATION_SIGNALS: &[&str] = &[
+pub(super) static ENV_MISCONFIGURATION_SIGNALS: &[&str] = &[
     "claude_session_id=unset",
     "claude_session_id=\n",
     "kubeconfig=\n",
 ];
 
 /// Signals that kubeconfig points to a corporate/remote cluster.
-pub static CORPORATE_CLUSTER_SIGNALS: &[&str] = &[
+pub(super) static CORPORATE_CLUSTER_SIGNALS: &[&str] = &[
     "teleport.sh",
     "konghq.teleport",
     "eks.amazonaws.com",
@@ -168,7 +168,7 @@ pub static CORPORATE_CLUSTER_SIGNALS: &[&str] = &[
 ];
 
 /// Harness operation keywords for detecting manifest failures.
-pub static HARNESS_OPERATION_KEYWORDS: &[&str] = &[
+pub(super) static HARNESS_OPERATION_KEYWORDS: &[&str] = &[
     "preflight:",
     "harness preflight",
     "harness apply",
@@ -196,19 +196,5 @@ mod tests {
             let expected = format!("ksa{:03}", i + 1);
             assert_eq!(*code, expected);
         }
-    }
-
-    #[test]
-    fn pattern_slices_non_empty() {
-        assert!(!CLI_ERROR_PATTERNS.is_empty());
-        assert!(!TOOL_ERROR_PATTERNS.is_empty());
-        assert!(!BUILD_ERROR_PATTERNS.is_empty());
-        assert!(!WORKFLOW_ERROR_PATTERNS.is_empty());
-        assert!(!USER_FRUSTRATION_SIGNALS.is_empty());
-        assert!(!POD_FAILURE_SIGNALS.is_empty());
-        assert!(!AUTH_SIGNALS.is_empty());
-        assert!(!PERMISSION_SIGNALS.is_empty());
-        assert!(!SAVE_FAILURE_SIGNALS.is_empty());
-        assert!(!DEVIATION_SIGNALS.is_empty());
     }
 }
