@@ -311,6 +311,7 @@ pub mod suite_runner {
     #[non_exhaustive]
     pub enum ClusterBinary {
         Kubectl,
+        KubectlValidate,
         Kumactl,
         Helm,
         Docker,
@@ -320,6 +321,7 @@ pub mod suite_runner {
     impl ClusterBinary {
         pub const ALL: &[Self] = &[
             Self::Kubectl,
+            Self::KubectlValidate,
             Self::Kumactl,
             Self::Helm,
             Self::Docker,
@@ -337,6 +339,7 @@ pub mod suite_runner {
         fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
             f.write_str(match self {
                 Self::Kubectl => "kubectl",
+                Self::KubectlValidate => "kubectl-validate",
                 Self::Kumactl => "kumactl",
                 Self::Helm => "helm",
                 Self::Docker => "docker",
@@ -351,6 +354,7 @@ pub mod suite_runner {
         fn from_str(s: &str) -> Result<Self, Self::Err> {
             match s {
                 "kubectl" => Ok(Self::Kubectl),
+                "kubectl-validate" => Ok(Self::KubectlValidate),
                 "kumactl" => Ok(Self::Kumactl),
                 "helm" => Ok(Self::Helm),
                 "docker" => Ok(Self::Docker),
@@ -910,7 +914,7 @@ mod tests {
 
     #[test]
     fn cluster_binary_all_count() {
-        assert_eq!(suite_runner::ClusterBinary::ALL.len(), 5);
+        assert_eq!(suite_runner::ClusterBinary::ALL.len(), 6);
     }
 
     #[test]
@@ -925,6 +929,7 @@ mod tests {
     #[test]
     fn cluster_binary_is_denied() {
         assert!(suite_runner::ClusterBinary::is_denied("kubectl"));
+        assert!(suite_runner::ClusterBinary::is_denied("kubectl-validate"));
         assert!(suite_runner::ClusterBinary::is_denied("kumactl"));
         assert!(suite_runner::ClusterBinary::is_denied("helm"));
         assert!(suite_runner::ClusterBinary::is_denied("docker"));
