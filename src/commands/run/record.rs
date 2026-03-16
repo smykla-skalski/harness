@@ -1,5 +1,5 @@
 use std::env;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::LazyLock;
 
@@ -44,16 +44,37 @@ pub fn record(
 
     let run_dir = resolve_run_dir(run_dir_args).ok();
 
-    // Inject KUBECONFIG from the persisted cluster spec so kubectl commands
-    // hit the local k3d cluster, not whatever is in ~/.kube/config.
+    // Inject KUBECONFIG and REPO_ROOT from the persisted run context so
+    // kubectl hits the local k3d cluster and kumactl resolves to the
+    // worktree build, not whatever is on the default PATH.
     let mut cmd = Command::new(command[0]);
     cmd.args(&command[1..]);
     if let Some(ref rd) = run_dir {
         let ctx = RunContext::from_run_dir(rd).ok();
-        if let Some(ref c) = ctx
-            && let Ok(kc) = resolve_kubeconfig(c, None, cluster)
-        {
-            cmd.env("KUBECONFIG", kc);
+        if let Some(ref c) = ctx {
+            if let Ok(kc) = resolve_kubeconfig(c, None, cluster) {
+                cmd.env("KUBECONFIG", kc);
+            }
+            let repo_root = &c.metadata.repo_root;
+            if !repo_root.is_empty() {
+                cmd.env("REPO_ROOT", repo_root);
+                // Prepend kumactl build artifacts to PATH
+                let arch = if cfg!(target_arch = "aarch64") {
+                    "arm64"
+                } else {
+                    "amd64"
+                };
+                let os_name = if cfg!(target_os = "macos") {
+                    "darwin"
+                } else {
+                    "linux"
+                };
+                let kumactl_dir = format!("{repo_root}/build/artifacts-{os_name}-{arch}/kumactl");
+                if Path::new(&kumactl_dir).is_dir() {
+                    let current_path = env::var("PATH").unwrap_or_default();
+                    cmd.env("PATH", format!("{kumactl_dir}:{current_path}"));
+                }
+            }
         }
     }
     let output = cmd.output();
