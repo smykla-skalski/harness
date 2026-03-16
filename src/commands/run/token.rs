@@ -71,7 +71,13 @@ pub(crate) fn token_via_api(
         "validFor": valid_for,
     });
     // Token endpoint returns plain text (JWT), not JSON
-    let token = exec::cp_api_post_text_with_token(addr, "/tokens/dataplane", &body, admin_token)?;
+    let token = exec::cp_api_text(
+        addr,
+        "/tokens/dataplane",
+        exec::HttpMethod::Post,
+        Some(&body),
+        admin_token,
+    )?;
     let trimmed = token.trim().to_string();
     if trimmed.is_empty() {
         return Err(CliErrorKind::token_generation_failed("empty response").into());
