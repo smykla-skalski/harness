@@ -297,6 +297,10 @@ define_cli_errors! {
         code: "KSRCLI048",
         msg: "suite:new local validator is unavailable"
     },
+    AuthoringSuiteDirExists { path: Cow<'static, str> } => {
+        code: "KSRCLI062",
+        msg: "suite directory already exists at {path}"
+    },
 
     // --- Universal/container errors (exit 4) ---
     ContainerStartFailed { name: Cow<'static, str> } => {
@@ -484,6 +488,7 @@ impl CliErrorKind {
     cli_constructor!(authoring_show_kind_missing, AuthoringShowKindMissing, kind);
     cli_constructor!(amendments_required, AmendmentsRequired, path);
     cli_constructor!(authoring_validate_failed, AuthoringValidateFailed, targets);
+    cli_constructor!(authoring_suite_dir_exists, AuthoringSuiteDirExists, path);
     cli_constructor!(container_start_failed, ContainerStartFailed, name);
     cli_constructor!(container_not_found, ContainerNotFound, name);
     cli_constructor!(cp_api_unreachable, CpApiUnreachable, url);
@@ -551,6 +556,10 @@ impl CliErrorKind {
             Self::ReportGroupEvidenceRequired => {
                 Some("Pass `--evidence-label <label>` or `--evidence <path>`.".into())
             }
+            Self::AuthoringSuiteDirExists { .. } => Some(
+                "Archive the existing suite (rename or move it) or use a different --suite-name."
+                    .into(),
+            ),
             Self::RunDirExists { .. } => Some(
                 "Use a new run id or resume the existing run instead of re-running `harness init`."
                     .into(),
@@ -1032,6 +1041,7 @@ mod tests {
             CliErrorKind::evidence_label_not_found(""),
             CliErrorKind::ReportGroupEvidenceRequired,
             CliErrorKind::amendments_required(""),
+            CliErrorKind::authoring_suite_dir_exists(""),
             CliErrorKind::run_dir_exists(""),
             CliErrorKind::unsafe_name(""),
             CliErrorKind::MissingRunStatus,
