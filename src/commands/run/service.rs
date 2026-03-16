@@ -1,6 +1,3 @@
-use std::fs;
-use std::path::{Path, PathBuf};
-
 use crate::cli::{RunDirArgs, ServiceArgs};
 use crate::commands::{resolve_admin_token, resolve_cp_addr, resolve_run_context};
 use crate::errors::{CliError, CliErrorKind};
@@ -8,23 +5,24 @@ use crate::exec;
 
 use super::token::token_via_api;
 
-const TEMPLATE_DIR: &str = "resources/universal/templates";
+// Embed templates at compile time so they ship with the binary.
+const TEMPLATE_DATAPLANE: &str =
+    include_str!("../../../resources/universal/templates/dataplane.yaml.j2");
+const TEMPLATE_TRANSPARENT_PROXY: &str =
+    include_str!("../../../resources/universal/templates/transparent-proxy.yaml.j2");
 
-/// Render a universal mode template from the repo's template directory.
+/// Render an embedded universal mode template.
 ///
 /// # Errors
-/// Returns `CliError` if the template cannot be found or rendered.
+/// Returns `CliError` if the template cannot be parsed or rendered.
 fn render_template(
-    repo_root: &Path,
     template_name: &str,
+    template_content: &str,
     ctx: &serde_json::Value,
 ) -> Result<String, CliError> {
-    let template_path = repo_root.join(TEMPLATE_DIR).join(template_name);
-    let template_str = fs::read_to_string(&template_path)
-        .map_err(|_| CliErrorKind::missing_file(template_path.display().to_string()))?;
     let env = minijinja::Environment::new();
     let tmpl = env
-        .template_from_str(&template_str)
+        .template_from_str(template_content)
         .map_err(|e| CliErrorKind::template_render(format!("parse {template_name}: {e}")))?;
     tmpl.render(ctx).map_err(|e| {
         CliError::from(CliErrorKind::template_render(format!(
@@ -109,16 +107,15 @@ fn service_up(
     // Resolve the container IP on the Docker network
     let container_address = exec::docker_inspect_ip(svc_name, network)?;
 
-    // Render dataplane YAML from template using the resolved address
-    let repo_root = PathBuf::from(&ctx.metadata.repo_root);
-    let template_name = if transparent_proxy {
-        "transparent-proxy.yaml.j2"
+    // Render dataplane YAML from embedded template using the resolved address
+    let (template_name, template_content) = if transparent_proxy {
+        ("transparent-proxy.yaml.j2", TEMPLATE_TRANSPARENT_PROXY)
     } else {
-        "dataplane.yaml.j2"
+        ("dataplane.yaml.j2", TEMPLATE_DATAPLANE)
     };
     let dp_yaml = render_template(
-        &repo_root,
         template_name,
+        template_content,
         &serde_json::json!({
             "name": svc_name,
             "mesh": mesh,
@@ -142,16 +139,62 @@ fn service_up(
         )?;
     }
 
-    // Start kuma-dp inside the container
+    // Extract CP's CA cert from the XDS endpoint and inject into container.
+    // kuma-dp needs this to verify the TLS connection to the CP.
+    let xds_port = spec.primary_member().xds_port.unwrap_or(5678);
+    let cp_ip = spec
+        .primary_member()
+        .container_ip
+        .as_deref()
+        .ok_or_else(|| CliErrorKind::missing_run_context_value("container_ip"))?;
+    let ca_cert = extract_cp_ca_cert(cp_ip, xds_port)?;
+    let ca_path = format!("/tmp/{svc_name}-ca.crt");
+    exec::docker_write_file(svc_name, &ca_path, &ca_cert)?;
+
+    // Start kuma-dp inside the container.
+    // kuma-dp connects to the XDS port (5678), not the API port (5681).
+    let xds_addr = format!("https://{cp_ip}:{xds_port}");
     let dp_args = format!(
-        "kuma-dp run --cp-address={cp_addr} \
+        "kuma-dp run \
+         --cp-address={xds_addr} \
          --dataplane-token-file={token_path} \
-         --dataplane-file={dp_path}"
+         --dataplane-file={dp_path} \
+         --ca-cert-file={ca_path} \
+         2>&1 &"
     );
-    exec::docker_exec_cmd(svc_name, &["sh", "-c", &format!("{dp_args} &")])?;
+    exec::docker_exec_cmd(svc_name, &["sh", "-c", &dp_args])?;
 
     println!("{svc_name}");
     Ok(0)
+}
+
+/// Extract the CA certificate from the CP's XDS TLS endpoint.
+///
+/// Uses `openssl s_client` to connect and extract the PEM certificate.
+fn extract_cp_ca_cert(cp_ip: &str, xds_port: u16) -> Result<String, CliError> {
+    let connect_arg = format!("{cp_ip}:{xds_port}");
+    // echo | openssl s_client -connect host:port -showcerts 2>/dev/null
+    let result = exec::run_command(
+        &[
+            "sh",
+            "-c",
+            &format!(
+                "echo | openssl s_client -connect {connect_arg} -showcerts 2>/dev/null | \
+                 sed -n '/BEGIN CERTIFICATE/,/END CERTIFICATE/p'"
+            ),
+        ],
+        None,
+        None,
+        &[0],
+    )?;
+    let cert = result.stdout.trim().to_string();
+    if cert.is_empty() || !cert.contains("BEGIN CERTIFICATE") {
+        return Err(CliErrorKind::cp_api_unreachable(format!(
+            "could not extract CA cert from {connect_arg}"
+        ))
+        .into());
+    }
+    Ok(cert)
 }
 
 fn service_down(name: Option<&str>, _run_dir_args: &RunDirArgs) -> Result<i32, CliError> {
