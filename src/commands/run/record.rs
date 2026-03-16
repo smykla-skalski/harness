@@ -25,19 +25,17 @@ fn slugify(raw: &str) -> String {
 /// Inject `KUBECONFIG` and `REPO_ROOT` from the persisted run context so
 /// kubectl hits the local k3d cluster and kumactl resolves to the
 /// worktree build, not whatever is on the default PATH.
-fn inject_run_env(cmd: &mut Command, run_dir: &Path, cluster: Option<&str>) {
-    let ctx = match RunContext::from_run_dir(run_dir) {
-        Ok(c) => c,
-        Err(e) => {
-            eprintln!("warning: failed to load run context: {e}");
-            return;
-        }
-    };
-    if let Ok(kc) = resolve_kubeconfig(&ctx, None, cluster) {
-        cmd.env("KUBECONFIG", kc);
-    } else {
-        eprintln!("warning: failed to resolve kubeconfig");
-    }
+///
+/// # Errors
+/// Returns `CliError` if run context or kubeconfig resolution fails.
+fn inject_run_env(
+    cmd: &mut Command,
+    run_dir: &Path,
+    cluster: Option<&str>,
+) -> Result<(), CliError> {
+    let ctx = RunContext::from_run_dir(run_dir)?;
+    let kc = resolve_kubeconfig(&ctx, None, cluster)?;
+    cmd.env("KUBECONFIG", kc);
     let repo_root = &ctx.metadata.repo_root;
     if !repo_root.is_empty() {
         cmd.env("REPO_ROOT", repo_root);
@@ -48,6 +46,7 @@ fn inject_run_env(cmd: &mut Command, run_dir: &Path, cluster: Option<&str>) {
             cmd.env("PATH", format!("{kumactl_dir}:{current_path}"));
         }
     }
+    Ok(())
 }
 
 /// Record a tracked command and save its output.
@@ -73,17 +72,18 @@ pub fn record(
     let run_dir = match resolve_run_dir(run_dir_args) {
         Ok(rd) => Some(rd),
         Err(e) => {
-            if !matches!(e.kind(), CliErrorKind::MissingRunPointer) {
-                eprintln!("warning: failed to resolve run dir: {e}");
+            if matches!(e.kind(), CliErrorKind::MissingRunPointer) {
+                None
+            } else {
+                return Err(e);
             }
-            None
         }
     };
 
     let mut cmd = Command::new(command[0]);
     cmd.args(&command[1..]);
     if let Some(ref rd) = run_dir {
-        inject_run_env(&mut cmd, rd, cluster);
+        inject_run_env(&mut cmd, rd, cluster)?;
     }
     let output = cmd.output();
 
@@ -145,7 +145,7 @@ pub fn record(
     // wrapped commands often emit noisy warnings (e.g. control plane not
     // reachable yet) that confuse the user.
 
-    if returncode == 0 || returncode == 1 {
+    if returncode == 0 {
         return Ok(returncode);
     }
 
