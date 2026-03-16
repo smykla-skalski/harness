@@ -135,7 +135,16 @@ fn service_up(
     )?;
 
     // Run the rest inside a helper; on failure clean up the container
-    if let Err(err) = service_up_inner(svc_name, svc_port, mesh, spec, network, token_str, transparent_proxy, timeout) {
+    if let Err(err) = service_up_inner(&ServiceSetup {
+        name: svc_name,
+        port: svc_port,
+        mesh,
+        spec,
+        network,
+        token: token_str,
+        transparent_proxy,
+        timeout,
+    }) {
         let _ = exec::docker_rm(svc_name);
         return Err(err);
     }
@@ -144,17 +153,27 @@ fn service_up(
     Ok(0)
 }
 
-/// Post-container-start setup: configure dataplane, inject certs, wait for readiness.
-fn service_up_inner(
-    svc_name: &str,
-    svc_port: u16,
-    mesh: &str,
-    spec: &ClusterSpec,
-    network: &str,
-    token_str: &str,
+/// Arguments for the post-container-start setup phase.
+struct ServiceSetup<'a> {
+    name: &'a str,
+    port: u16,
+    mesh: &'a str,
+    spec: &'a ClusterSpec,
+    network: &'a str,
+    token: &'a str,
     transparent_proxy: bool,
     timeout: u64,
-) -> Result<(), CliError> {
+}
+
+/// Post-container-start setup: configure dataplane, inject certs, wait for readiness.
+fn service_up_inner(setup: &ServiceSetup<'_>) -> Result<(), CliError> {
+    let svc_name = setup.name;
+    let svc_port = setup.port;
+    let mesh = setup.mesh;
+    let spec = setup.spec;
+    let token_str = setup.token;
+    let network = setup.network;
+    let transparent_proxy = setup.transparent_proxy;
     // Resolve the container IP on the Docker network
     let container_address = exec::docker_inspect_ip(svc_name, network)?;
 
@@ -218,7 +237,7 @@ fn service_up_inner(
     // Wait for kuma-dp to become ready
     let readiness_url = format!("http://{container_address}:9902/ready");
     eprintln!("service: waiting for {svc_name} readiness at {readiness_url}");
-    exec::wait_for_http(&readiness_url, Duration::from_secs(timeout)).map_err(|_| {
+    exec::wait_for_http(&readiness_url, Duration::from_secs(setup.timeout)).map_err(|_| {
         CliError::from(CliErrorKind::service_readiness_timeout(
             svc_name.to_string(),
         ))
