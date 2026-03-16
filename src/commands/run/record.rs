@@ -6,6 +6,7 @@ use std::sync::LazyLock;
 use regex::Regex;
 
 use crate::cli::RunDirArgs;
+use crate::cluster::Platform;
 use crate::commands::{resolve_kubeconfig, resolve_run_dir};
 use crate::context::RunContext;
 use crate::core_defs::{host_platform, shorten_path, utc_now};
@@ -36,11 +37,17 @@ fn inject_run_env(cmd: &mut Command, run_dir: &Path, cluster: Option<&str>) {
             return;
         }
     };
-    match resolve_kubeconfig(&ctx, None, cluster) {
-        Ok(kc) => {
-            cmd.env("KUBECONFIG", kc);
+    let is_universal = ctx
+        .cluster
+        .as_ref()
+        .is_some_and(|spec| spec.platform == Platform::Universal);
+    if !is_universal {
+        match resolve_kubeconfig(&ctx, None, cluster) {
+            Ok(kubeconfig) => {
+                cmd.env("KUBECONFIG", kubeconfig);
+            }
+            Err(e) => eprintln!("warning: failed to resolve kubeconfig: {e}"),
         }
-        Err(e) => eprintln!("warning: failed to resolve kubeconfig: {e}"),
     }
     let repo_root = &ctx.metadata.repo_root;
     if !repo_root.is_empty() {
