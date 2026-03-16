@@ -10,7 +10,7 @@ use regex::Regex;
 use crate::cli::{EnvoyCommand, KumactlCommand, ReportCommand, RunDirArgs, ServiceArgs};
 use crate::cluster::Platform;
 use crate::context::RunContext;
-use crate::core_defs::utc_now;
+use crate::core_defs::{shorten_path, utc_now};
 use crate::errors::{CliError, CliErrorKind, cow};
 use crate::exec;
 use crate::exec::{kubectl, run_command};
@@ -193,7 +193,7 @@ pub fn apply(
             &["copied_at", "manifest", "validated", "applied", "notes"],
             &[&utc_now(), &rel, "PASS", "PASS", &notes],
         )?;
-        println!("{}", manifest.display());
+        println!("{}", shorten_path(&manifest));
     }
     Ok(0)
 }
@@ -723,7 +723,7 @@ fn validate_kubernetes(
     log_lines.push(format!("diff exit code: {}", diff_result.returncode));
     write_text(output_path, &format!("{}\n", log_lines.join("\n")))?;
 
-    println!("{}", output_path.display());
+    println!("{}", shorten_path(output_path));
     Ok(0)
 }
 
@@ -782,7 +782,7 @@ fn validate_universal(manifest_path: &Path, output_path: &Path) -> Result<i32, C
     }
 
     write_text(output_path, &format!("{}\n", log_lines.join("\n")))?;
-    println!("{}", output_path.display());
+    println!("{}", shorten_path(output_path));
     Ok(0)
 }
 
@@ -956,14 +956,14 @@ pub fn kumactl(cmd: &KumactlCommand) -> Result<i32, CliError> {
         KumactlCommand::Find { repo_root } => {
             let root = super::resolve_repo_root(repo_root.as_deref());
             let binary = find_kumactl_binary(&root)?;
-            println!("{}", binary.display());
+            println!("{}", shorten_path(&binary));
             Ok(0)
         }
         KumactlCommand::Build { repo_root } => {
             let root = super::resolve_repo_root(repo_root.as_deref());
             build_kumactl(&root)?;
             let binary = find_kumactl_binary(&root)?;
-            println!("{}", binary.display());
+            println!("{}", shorten_path(&binary));
             Ok(0)
         }
     }
