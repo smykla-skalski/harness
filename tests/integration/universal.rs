@@ -1170,3 +1170,40 @@ fn cluster_spec_to_json_and_back_universal() {
     assert_eq!(back.members[0].role, "global-cp");
     assert_eq!(back.members[1].role, "zone-cp");
 }
+
+// ============================================================================
+// Capture universal path: context resolution and platform detection
+// ============================================================================
+
+#[test]
+fn capture_universal_resolves_context() {
+    let tmp = tempfile::tempdir().unwrap();
+    let run_dir = init_run(tmp.path(), "cap-uni", "single-zone");
+
+    // Write a universal cluster spec to state/cluster.json
+    let mut spec = ClusterSpec::from_mode_with_platform(
+        "single-up",
+        &["cp".into()],
+        "/repo",
+        vec![],
+        vec![],
+        Platform::Universal,
+    )
+    .unwrap();
+    spec.admin_token = Some("tok-capture".into());
+    spec.docker_network = Some("harness-cp".into());
+    spec.members[0].container_ip = Some("172.57.0.2".into());
+
+    let state_dir = run_dir.join("state");
+    fs::write(
+        state_dir.join("cluster.json"),
+        serde_json::to_string_pretty(&spec).unwrap(),
+    )
+    .unwrap();
+
+    // Verify context loads with universal platform
+    let context = RunContext::from_run_dir(&run_dir).unwrap();
+    let cluster = context.cluster.as_ref().unwrap();
+    assert_eq!(cluster.platform, Platform::Universal);
+    assert_eq!(cluster.docker_network.as_deref(), Some("harness-cp"));
+}
