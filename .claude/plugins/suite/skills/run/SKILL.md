@@ -119,11 +119,11 @@ Parse from `$ARGUMENTS`:
 
 `DATA_DIR` is the suites directory. The timestamp is the default `RUN_ID` suffix. If session ID is empty or literal `${`, use `standalone`. If Docker is "not running" or any tool is "MISSING", stop immediately.
 
-<!-- justify: I23 harness is installed on PATH by project SessionStart hooks, not bundled as a script -->
-<!-- justify: HK-stdin harness reads hook stdin internally via its Python hook dispatcher -->
-<!-- justify: HK-loop harness has internal re-entry guards in its hook dispatcher -->
-<!-- justify: HK-resolve harness is installed on PATH by SessionStart hooks at runtime, not bundled as a script -->
-<!-- justify: P8 shared code blocks between SKILL.md and workflow.md are intentional - each file must be self-contained when loaded independently -->
+<!-- justify: I23 harness on PATH via SessionStart hooks -->
+<!-- justify: HK-stdin harness reads hook stdin internally -->
+<!-- justify: HK-loop harness has re-entry guards -->
+<!-- justify: HK-resolve harness on PATH via SessionStart hooks -->
+<!-- justify: P8 shared code blocks are intentional for self-contained loading -->
 
 ## Non-negotiable rules
 
@@ -131,7 +131,7 @@ Read [references/agent-contract.md](references/agent-contract.md) in full before
 
 - **No shell variables for paths.** Use `harness apply --manifest g02/04.yaml`, not `SD=... && harness apply --manifest ${SD}/g02/04.yaml`. Exception: Phase 0/1 init flags.
 - **All cluster commands through harness wrappers.** `harness run` for kubectl/kumactl, `harness record` for curl and others. Never raw binaries. Never `python3 -c` for JSON - use `jq` or `harness envoy`.
-- **All manifests through `harness apply`.** Never `/tmp`, never `--validate=false`.
+- **All manifests through `harness apply`.** Always use relative paths with `--manifest` (e.g. `g13/01.yaml`, not `/full/path/to/g13/01.yaml`). Harness resolves them from the suite and run directories. Never `/tmp`, never `--validate=false`.
 - **Hard gate after each group** via `harness report group`. Use `--evidence-label` for tracked artifacts.
 - **No autonomous deviations.** Use AskUserQuestion before any change not in the suite, with options:
   - `Approve deviation`

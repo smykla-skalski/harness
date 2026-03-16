@@ -222,6 +222,7 @@ pub enum IssueCode {
     WrongSkillCrossReference,
     FileEditChurn,
     ShortSkillNameInSkillFile,
+    AbsoluteManifestPathUsed,
     DirectManagedFileWrite,
     DirectTaskOutputFileRead,
     HarnessInfrastructureMisconfiguration,
