@@ -192,8 +192,8 @@ pub struct ScanState {
     pub last_tool_uses: HashMap<String, ToolUseRecord>,
     /// Track file edit churn: path -> edit count.
     pub edit_counts: HashMap<String, usize>,
-    /// Dedup key: (category label, summary prefix 80 chars).
-    pub seen_issues: HashSet<(String, String)>,
+    /// Dedup key: (category, number-normalized summary).
+    pub seen_issues: HashSet<(IssueCategory, String)>,
     /// Session start timestamp from the first event.
     pub session_start_timestamp: Option<String>,
 }
