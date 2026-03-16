@@ -293,6 +293,15 @@ Writer contract:
 - When the proposal includes multi-zone profiles, pass the baseline cluster distribution from the proposal to the baseline-writer and suite-writer so they emit the object form (`- path:` with `clusters:`) in `baseline_files` frontmatter and include the Clusters column in the baseline manifests table.
 - Follow [references/agent-output-format.md](references/agent-output-format.md) for `authoring-show` usage and acknowledgement rules, and [references/suite-structure.md](references/suite-structure.md) for file content requirements.
 
+Writer recovery (partial completion):
+
+When a writer worker finishes but some expected files are missing (partial failure or timeout), the main context must recover without re-launching a full worker. Before writing any file that may already exist on disk from a partial worker run, Read it first. Claude Code tracks file state internally - writing a file that exists on disk but was never Read in the current context triggers "File has been modified since read" errors. The recovery sequence is:
+
+1. Run `ls "${SUITE_DIR}/groups/"` to see which files the worker already created.
+2. For every file that exists on disk but still needs to be written or overwritten, Read it first, then Write the corrected content.
+3. For files that do not exist yet, Write them directly (no Read needed).
+4. Never attempt to Write a batch of files without checking which ones already exist. The subagent's writes are invisible to the parent context's file tracker.
+
 ### Step 10: Post-write review gate
 
 Unless `--yes` or `-y` is set, immediately re-open AskUserQuestion after the suite is saved.
