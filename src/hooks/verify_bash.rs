@@ -488,7 +488,14 @@ mod tests {
         use crate::hook_payloads::{HookEnvelopePayload, HookEvent};
 
         let payload = HookEnvelopePayload {
-            response: response.map(|s| serde_json::Value::String(s.to_string())),
+            tool_name: "Bash".to_string(),
+            tool_response: response.map_or(serde_json::Value::Null, |text| {
+                serde_json::json!({
+                    "stdout": text,
+                    "stderr": "",
+                    "exit_code": 1,
+                })
+            }),
             ..HookEnvelopePayload::default()
         };
 

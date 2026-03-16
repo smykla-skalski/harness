@@ -99,10 +99,6 @@ mod tests {
 
     #[test]
     fn verify_suite_author_nonempty_amendments_allows() {
-        let tmp = tempfile::NamedTempFile::new().unwrap();
-        let path = tmp.path().parent().unwrap().join("amendments-ok.md");
-        // Use a different name to avoid collision - verify_suite_author checks filename
-        // Actually we need the exact name "amendments.md" so let's use a temp dir
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("amendments.md");
         fs::write(&path, "real content here\n").unwrap();
