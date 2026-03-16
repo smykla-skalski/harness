@@ -159,8 +159,51 @@ fn check_bash_tool_use(
         );
     }
 
+    check_absolute_manifest_path(command, &details, &mut emitter, issues);
     check_direct_task_output_read(command, &details, &mut emitter, issues);
     check_env_var_construction(command, &details, &mut emitter, issues);
+}
+
+/// Detect `harness apply --manifest /absolute/path` usage.
+///
+/// Harness resolves manifest paths relative to the suite directory automatically.
+/// Using absolute paths is unnecessary and fragile - relative paths like
+/// `g13/01.yaml` are the expected convention.
+fn check_absolute_manifest_path(
+    command: &str,
+    details: &str,
+    emitter: &mut IssueEmitter<'_>,
+    issues: &mut Vec<Issue>,
+) {
+    if !command.contains("harness") || !command.contains("apply") {
+        return;
+    }
+
+    // Look for `--manifest /...` anywhere in the command. The path token
+    // immediately after `--manifest` starts with `/` when absolute.
+    let mut tokens = command.split_whitespace().peekable();
+    while let Some(token) = tokens.next() {
+        if token == "--manifest"
+            && let Some(path) = tokens.peek()
+            && path.starts_with('/')
+        {
+            emitter.emit(
+                issues,
+                IssueBlueprint::new(
+                    IssueCode::AbsoluteManifestPathUsed,
+                    IssueCategory::UnexpectedBehavior,
+                    IssueSeverity::Medium,
+                    "Absolute path used with harness apply",
+                )
+                .with_guidance(Guidance::fix_hint(
+                    "Use relative manifest paths (e.g. g13/01.yaml). \
+                     Harness resolves them from the suite directory.",
+                )),
+                details,
+            );
+            return;
+        }
+    }
 }
 
 /// Detect direct reads of Claude's internal task output files.
