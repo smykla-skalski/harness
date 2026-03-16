@@ -2,13 +2,12 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::{fs, io};
 
-use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 
 use crate::cluster::ClusterSpec;
 use crate::core_defs::current_run_context_path;
-use crate::errors::{CliError, CliErrorKind};
-use crate::io::append_markdown_row;
+use crate::errors::CliError;
+use crate::io::{append_markdown_row, read_json_typed};
 use crate::prepared_suite::PreparedSuiteArtifact;
 use crate::schema::RunStatus;
 
@@ -312,14 +311,6 @@ pub struct RunContext {
     pub preflight: Option<PreflightArtifact>,
 }
 
-fn read_json_file<T: DeserializeOwned>(path: &Path) -> Result<T, CliError> {
-    let content = fs::read_to_string(path)
-        .map_err(|_| CliError::from(CliErrorKind::missing_file(path.display().to_string())))?;
-    serde_json::from_str(&content).map_err(|e| {
-        CliErrorKind::invalid_json(path.display().to_string()).with_details(e.to_string())
-    })
-}
-
 impl RunContext {
     /// Load from a run directory.
     ///
@@ -327,25 +318,25 @@ impl RunContext {
     /// Returns `CliError` if required files are missing or invalid.
     pub fn from_run_dir(run_dir: &Path) -> Result<Self, CliError> {
         let layout = RunLayout::from_run_dir(run_dir);
-        let metadata: RunMetadata = read_json_file(&layout.metadata_path())?;
-        let status: RunStatus = read_json_file(&layout.status_path())?;
+        let metadata: RunMetadata = read_json_typed(&layout.metadata_path())?;
+        let status: RunStatus = read_json_typed(&layout.status_path())?;
 
         let prepared_suite = if layout.prepared_suite_path().exists() {
-            Some(read_json_file(&layout.prepared_suite_path())?)
+            Some(read_json_typed(&layout.prepared_suite_path())?)
         } else {
             None
         };
 
         let preflight_path = layout.artifacts_dir().join("preflight.json");
         let preflight = if preflight_path.exists() {
-            Some(read_json_file(&preflight_path)?)
+            Some(read_json_typed(&preflight_path)?)
         } else {
             None
         };
 
         let cluster_path = layout.state_dir().join("cluster.json");
         let cluster = if cluster_path.exists() {
-            Some(read_json_file(&cluster_path)?)
+            Some(read_json_typed(&cluster_path)?)
         } else {
             None
         };
@@ -394,23 +385,6 @@ impl RunContext {
     }
 }
 
-/// Extract group ID strings from a `serde_json::Value` array.
-///
-/// Each element can be a plain string or an object with a `group_id` field.
-#[must_use]
-pub fn extract_group_ids(values: &[serde_json::Value]) -> Vec<&str> {
-    values
-        .iter()
-        .filter_map(|v| match v {
-            serde_json::Value::String(s) => Some(s.as_str()),
-            serde_json::Value::Object(map) => {
-                map.get("group_id").and_then(serde_json::Value::as_str)
-            }
-            _ => None,
-        })
-        .collect()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -425,6 +399,25 @@ mod tests {
         RunLayout {
             run_root: "/tmp/runs".into(),
             run_id: "run-1".into(),
+        }
+    }
+
+    fn sample_status() -> crate::schema::RunStatus {
+        crate::schema::RunStatus {
+            run_id: "run-1".into(),
+            suite_id: "suite-a".into(),
+            profile: "single-zone".into(),
+            started_at: "2026-03-14T00:00:00Z".into(),
+            overall_verdict: crate::schema::Verdict::Pending,
+            completed_at: None,
+            counts: crate::schema::RunCounts::default(),
+            executed_groups: vec![],
+            skipped_groups: vec![],
+            last_completed_group: None,
+            last_state_capture: None,
+            last_updated_utc: None,
+            next_planned_group: None,
+            notes: vec![],
         }
     }
 
@@ -729,45 +722,18 @@ mod tests {
                 skipped: 0
             }
         );
-        let group_ids = extract_group_ids(&status.executed_groups);
-        assert_eq!(group_ids, vec!["g02"]);
+        assert_eq!(status.executed_group_ids(), vec!["g02"]);
         assert_eq!(status.last_completed_group.as_deref(), Some("g02"));
         assert_eq!(status.next_planned_group.as_deref(), Some("g03"));
     }
 
-    // -- extract_group_ids tests --
-
     #[test]
-    fn extract_group_ids_from_strings() {
-        let vals = vec![
-            serde_json::Value::String("g01".into()),
-            serde_json::Value::String("g02".into()),
-        ];
-        assert_eq!(extract_group_ids(&vals), vec!["g01", "g02"]);
-    }
-
-    #[test]
-    fn extract_group_ids_from_objects() {
-        let vals = vec![serde_json::json!({"group_id": "g03", "verdict": "pass"})];
-        assert_eq!(extract_group_ids(&vals), vec!["g03"]);
-    }
-
-    #[test]
-    fn extract_group_ids_mixed() {
-        let vals = vec![
-            serde_json::Value::String("g01".into()),
-            serde_json::json!({"group_id": "g02"}),
-        ];
-        assert_eq!(extract_group_ids(&vals), vec!["g01", "g02"]);
-    }
-
-    #[test]
-    fn extract_group_ids_skips_invalid() {
-        let vals = vec![
-            serde_json::json!(42),
-            serde_json::json!({"no_group_id": true}),
-        ];
-        assert!(extract_group_ids(&vals).is_empty());
+    fn executed_group_ids_empty_when_no_groups() {
+        let status = RunStatus {
+            executed_groups: vec![],
+            ..sample_status()
+        };
+        assert!(status.executed_group_ids().is_empty());
     }
 
     // -- RunContext from_run_dir test --

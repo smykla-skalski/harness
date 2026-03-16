@@ -267,7 +267,7 @@ pub fn author_state_path() -> Result<PathBuf, CliError> {
     Ok(cwd.join(".harness").join(skill_dirs::NEW_STATE_FILE))
 }
 
-fn author_repository() -> Result<VersionedJsonRepository, CliError> {
+fn author_repository() -> Result<VersionedJsonRepository<AuthorWorkflowState>, CliError> {
     Ok(VersionedJsonRepository::new(
         author_state_path()?,
         AUTHOR_STATE_SCHEMA_VERSION,
@@ -295,13 +295,7 @@ pub fn read_author_state() -> Result<Option<AuthorWorkflowState>, CliError> {
         Err(error) => return Err(error),
     };
     match loaded {
-        Some(value) => {
-            let state: AuthorWorkflowState =
-                serde_json::from_value(value).map_err(|e| -> CliError {
-                    CliErrorKind::workflow_parse(cow!("failed to parse author state: {e}")).into()
-                })?;
-            Ok(Some(state))
-        }
+        Some(state) => Ok(Some(state)),
         None => Ok(None),
     }
 }
@@ -312,10 +306,7 @@ pub fn read_author_state() -> Result<Option<AuthorWorkflowState>, CliError> {
 /// Returns `CliError` on IO failure.
 pub fn write_author_state(state: &AuthorWorkflowState) -> Result<(), CliError> {
     let repo = author_repository()?;
-    let value = serde_json::to_value(state).map_err(|e| -> CliError {
-        CliErrorKind::workflow_serialize(cow!("failed to serialize author state: {e}")).into()
-    })?;
-    repo.save(&value)?;
+    repo.save(state)?;
     Ok(())
 }
 

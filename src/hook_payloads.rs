@@ -9,9 +9,10 @@ use serde_json::Value;
 use crate::context::RunContext;
 use crate::errors::{CliError, CliErrorKind, cow};
 use crate::rules;
-use crate::shell_parse;
 use crate::workflow::author::{self as author_workflow, AuthorWorkflowState};
 use crate::workflow::runner::{self as runner_workflow, RunnerWorkflowState};
+
+pub use crate::shell_parse::{HarnessCommandInvocation, ParsedCommand};
 
 /// An option in an `AskUserQuestion` prompt.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -282,12 +283,8 @@ impl HookContext {
     /// # Errors
     /// Returns `CliError` if shell tokenization fails (e.g. unmatched quotes).
     pub fn command_words(&self) -> Result<Vec<String>, CliError> {
-        let Some(command_text) = self.command_text() else {
-            return Ok(Vec::new());
-        };
-        shell_words::split(command_text).map_err(|error| {
-            CliErrorKind::hook_payload_invalid(cow!("shell tokenization failed: {error}")).into()
-        })
+        self.parsed_command()
+            .map(|command| command.map_or_else(Vec::new, |parsed| parsed.words().to_vec()))
     }
 
     /// Write target paths from the input payload.
@@ -380,7 +377,9 @@ impl HookContext {
     /// # Errors
     /// Returns `CliError` if shell tokenization fails.
     pub fn significant_words(&self) -> Result<Vec<String>, CliError> {
-        Ok(shell_parse::significant_words(&self.command_words()?))
+        self.parsed_command().map(|command| {
+            command.map_or_else(Vec::new, |parsed| parsed.significant_words().to_vec())
+        })
     }
 
     /// Binary heads from each pipeline segment of the command.
@@ -388,7 +387,27 @@ impl HookContext {
     /// # Errors
     /// Returns `CliError` if shell tokenization fails.
     pub fn command_heads(&self) -> Result<Vec<String>, CliError> {
-        Ok(shell_parse::command_heads(&self.command_words()?))
+        self.parsed_command()
+            .map(|command| command.map_or_else(Vec::new, |parsed| parsed.heads().to_vec()))
+    }
+
+    /// Parsed command view from the input payload, if this tool call has one.
+    ///
+    /// # Errors
+    /// Returns `CliError` if shell tokenization fails.
+    pub fn parsed_command(&self) -> Result<Option<ParsedCommand>, CliError> {
+        let Some(command_text) = self.command_text() else {
+            return Ok(None);
+        };
+        if command_text.trim().is_empty() {
+            return Ok(None);
+        }
+        ParsedCommand::parse(command_text)
+            .map(Some)
+            .map_err(|error| {
+                CliErrorKind::hook_payload_invalid(cow!("shell tokenization failed: {error}"))
+                    .into()
+            })
     }
 }
 

@@ -11,23 +11,22 @@ use crate::hook_payloads::HookContext;
 /// # Errors
 /// Returns `CliError` on failure.
 pub fn execute(ctx: &HookContext) -> Result<HookResult, CliError> {
-    if !ctx.skill_active {
-        return Ok(HookResult::allow());
-    }
-    if ctx.is_suite_author() {
-        return Ok(HookResult::allow());
-    }
-    if ctx.effective_run_dir().is_none() {
-        return Ok(HookResult::allow());
-    }
-
-    match build_hook_audit_request(ctx).and_then(append_audit_entry) {
-        Ok(_) => Ok(HookResult::allow()),
-        Err(error) => Ok(HookResult::warn(
-            "KSR006",
-            format!("audit log write failed: {error}"),
-        )),
-    }
+    super::dispatch_by_skill(
+        ctx,
+        |ctx| {
+            if ctx.effective_run_dir().is_none() {
+                return Ok(HookResult::allow());
+            }
+            match build_hook_audit_request(ctx).and_then(append_audit_entry) {
+                Ok(_) => Ok(HookResult::allow()),
+                Err(error) => Ok(HookResult::warn(
+                    "KSR006",
+                    format!("audit log write failed: {error}"),
+                )),
+            }
+        },
+        |_ctx| Ok(HookResult::allow()),
+    )
 }
 
 #[cfg(test)]

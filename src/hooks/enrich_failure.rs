@@ -1,7 +1,9 @@
 use crate::errors::{CliError, HookMessage};
 use crate::hook::HookResult;
 use crate::hook_payloads::HookContext;
-use crate::workflow::runner::{self as runner_wf, FailureKind, RunnerPhase, RunnerWorkflowState};
+use crate::workflow::runner::{FailureKind, RunnerPhase, RunnerWorkflowState};
+
+use super::effects;
 
 /// Execute the enrich-failure hook.
 ///
@@ -23,20 +25,21 @@ pub fn execute(ctx: &HookContext) -> Result<HookResult, CliError> {
     let Some(state) = &ctx.runner_state else {
         return Ok(HookMessage::run_verdict(status.overall_verdict.to_string()).into_result());
     };
-    let words = ctx.command_words().unwrap_or_default();
-    if words.len() >= 2 && words[0] == "harness" {
-        let sub = words[1].as_str();
+    let subcommand = ctx.parsed_command()?.and_then(|command| {
+        command
+            .first_harness_invocation()
+            .and_then(|invocation| invocation.subcommand.as_deref().map(str::to_string))
+    });
+    if let Some(sub) = subcommand.as_deref() {
         if matches!(sub, "apply" | "validate") && state.phase() == RunnerPhase::Execution {
-            let new_state = request_failure_triage(state, FailureKind::Manifest);
-            if let Some(ref rd) = ctx.effective_run_dir() {
-                runner_wf::write_runner_state(rd, &new_state)?;
-            }
+            let _ = effects::transition_runner_state(ctx, |state| {
+                Some(request_failure_triage(state, FailureKind::Manifest))
+            })?;
         } else if state.phase() == RunnerPhase::Preflight && matches!(sub, "preflight" | "capture")
         {
-            let new_state = request_preflight_failed(state);
-            if let Some(ref rd) = ctx.effective_run_dir() {
-                runner_wf::write_runner_state(rd, &new_state)?;
-            }
+            let _ = effects::transition_runner_state(ctx, |state| {
+                Some(request_preflight_failed(state))
+            })?;
         }
     }
     Ok(HookMessage::run_verdict(status.overall_verdict.to_string()).into_result())

@@ -2,6 +2,7 @@ use std::borrow::Cow;
 use std::collections::HashMap;
 use std::fmt;
 use std::path::{Path, PathBuf};
+use std::str::FromStr;
 
 use serde::{Deserialize, Serialize};
 
@@ -274,6 +275,37 @@ impl Verdict {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum GroupVerdict {
+    Pass,
+    Fail,
+    Skip,
+}
+
+impl fmt::Display for GroupVerdict {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Pass => f.write_str("pass"),
+            Self::Fail => f.write_str("fail"),
+            Self::Skip => f.write_str("skip"),
+        }
+    }
+}
+
+impl FromStr for GroupVerdict {
+    type Err = ();
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        match value {
+            "pass" => Ok(Self::Pass),
+            "fail" => Ok(Self::Fail),
+            "skip" => Ok(Self::Skip),
+            _ => Err(()),
+        }
+    }
+}
+
 impl fmt::Display for Verdict {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -416,6 +448,40 @@ pub struct RunCounts {
     pub skipped: u32,
 }
 
+impl RunCounts {
+    pub fn increment(&mut self, verdict: GroupVerdict) {
+        match verdict {
+            GroupVerdict::Pass => self.passed += 1,
+            GroupVerdict::Fail => self.failed += 1,
+            GroupVerdict::Skip => self.skipped += 1,
+        }
+    }
+
+    pub fn decrement(&mut self, verdict: GroupVerdict) {
+        match verdict {
+            GroupVerdict::Pass => self.passed = self.passed.saturating_sub(1),
+            GroupVerdict::Fail => self.failed = self.failed.saturating_sub(1),
+            GroupVerdict::Skip => self.skipped = self.skipped.saturating_sub(1),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ExecutedGroupRecord {
+    pub group_id: String,
+    pub verdict: GroupVerdict,
+    pub completed_at: String,
+    #[serde(default)]
+    pub state_capture_at_report: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ExecutedGroupChange {
+    Noop,
+    Inserted,
+    Updated(GroupVerdict),
+}
+
 /// Run status tracked in run-status.json.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct RunStatus {
@@ -429,7 +495,7 @@ pub struct RunStatus {
     #[serde(default)]
     pub counts: RunCounts,
     #[serde(default)]
-    pub executed_groups: Vec<serde_json::Value>,
+    pub executed_groups: Vec<ExecutedGroupRecord>,
     #[serde(default)]
     pub skipped_groups: Vec<String>,
     #[serde(default)]
@@ -450,23 +516,73 @@ impl RunStatus {
     /// # Errors
     /// Returns `CliError` if the file is missing or contains invalid JSON.
     pub fn load(path: &Path) -> Result<Self, CliError> {
-        let text = io::read_text(path)?;
-        serde_json::from_str(&text)
+        io::read_json_typed(path)
             .map_err(|e| -> CliError { CliErrorKind::json_parse(e.to_string()).into() })
     }
 
-    /// Extract group IDs from `executed_groups`, handling both string entries
-    /// and structured objects with a `group_id` field.
+    /// Save run status to a JSON file.
+    ///
+    /// # Errors
+    /// Returns `CliError` on IO or serialization failure.
+    pub fn save(&self, path: &Path) -> Result<(), CliError> {
+        io::write_json_pretty(path, self)
+    }
+
     #[must_use]
     pub fn executed_group_ids(&self) -> Vec<&str> {
         self.executed_groups
             .iter()
-            .filter_map(|v| match v {
-                serde_json::Value::String(s) => Some(s.as_str()),
-                serde_json::Value::Object(obj) => obj.get("group_id").and_then(|g| g.as_str()),
-                _ => None,
-            })
+            .map(|group| group.group_id.as_str())
             .collect()
+    }
+
+    #[must_use]
+    pub fn group_verdict(&self, group_id: &str) -> Option<GroupVerdict> {
+        self.executed_groups
+            .iter()
+            .find(|group| group.group_id == group_id)
+            .map(|group| group.verdict)
+    }
+
+    pub fn record_group_result(
+        &mut self,
+        group_id: &str,
+        verdict: GroupVerdict,
+        completed_at: &str,
+        state_capture_at_report: Option<String>,
+    ) -> ExecutedGroupChange {
+        if let Some(group) = self
+            .executed_groups
+            .iter_mut()
+            .find(|group| group.group_id == group_id)
+        {
+            if group.verdict == verdict {
+                return ExecutedGroupChange::Noop;
+            }
+            let previous = group.verdict;
+            self.counts.decrement(previous);
+            group.verdict = verdict;
+            group.completed_at = completed_at.to_string();
+            group.state_capture_at_report = state_capture_at_report;
+            self.counts.increment(verdict);
+            return ExecutedGroupChange::Updated(previous);
+        }
+
+        self.executed_groups.push(ExecutedGroupRecord {
+            group_id: group_id.to_string(),
+            verdict,
+            completed_at: completed_at.to_string(),
+            state_capture_at_report,
+        });
+        self.counts.increment(verdict);
+        ExecutedGroupChange::Inserted
+    }
+
+    #[must_use]
+    pub fn last_group_capture_value(&self) -> Option<&str> {
+        self.executed_groups
+            .last()
+            .and_then(|group| group.state_capture_at_report.as_deref())
     }
 }
 
