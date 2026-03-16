@@ -78,13 +78,20 @@ fn resolve_source_tool(block: &Value, state: &ScanState) -> Option<SourceTool> {
     SourceTool::from_label(&record.name)
 }
 
+/// Regex that replaces all digit sequences with `#` for dedup normalization.
+/// This makes "exit code 1" and "exit code 137" produce the same key.
+static DEDUP_NORMALIZE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"\d+").expect("valid regex"));
+
+/// Build a normalized dedup key from an issue.
+fn dedup_key(issue: &Issue) -> (IssueCategory, String) {
+    let normalized = DEDUP_NORMALIZE.replace_all(&issue.summary, "#");
+    (issue.category, normalized.into_owned())
+}
+
 /// Return true if this issue is a duplicate that should be skipped.
 fn dedup_issue(issue: &Issue, state: &mut ScanState) -> bool {
-    let boundary = issue
-        .summary
-        .floor_char_boundary(issue.summary.len().min(80));
-    let summary_prefix = &issue.summary[..boundary];
-    let key = (issue.category.to_string(), summary_prefix.to_string());
+    let key = dedup_key(issue);
     if state.seen_issues.contains(&key) {
         return true;
     }
