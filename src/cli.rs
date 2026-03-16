@@ -336,9 +336,12 @@ pub struct ObserveFilterArgs {
     /// Only include events at or before this ISO timestamp.
     #[arg(long)]
     pub until_timestamp: Option<String>,
-    /// Output format: json (default), markdown.
+    /// Output format: json (default), markdown, sarif.
     #[arg(long)]
     pub format: Option<String>,
+    /// Path to YAML overrides config file.
+    #[arg(long)]
+    pub overrides: Option<String>,
     /// Show top N root causes grouped by issue code.
     #[arg(long)]
     pub top_causes: Option<usize>,
@@ -395,6 +398,9 @@ pub enum ObserveMode {
         /// Filter by tool name (e.g. Bash, Read, Write).
         #[arg(long)]
         tool_name: Option<String>,
+        /// Output raw JSON instead of formatted text.
+        #[arg(long)]
+        raw_json: bool,
         /// Narrow session search to this project directory name.
         #[arg(long)]
         project_hint: Option<String>,
