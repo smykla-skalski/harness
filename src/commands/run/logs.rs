@@ -18,10 +18,7 @@ fn resolve_container_name(name: &str, spec: &ClusterSpec) -> String {
                     "harness-{}",
                     spec.members.first().map_or("default", |m| m.name.as_str())
                 );
-                // Check if this is likely a compose deployment (multi-zone or postgres)
-                let is_compose = spec.members.len() > 1
-                    || spec.store_type.as_deref().is_some_and(|s| s == "postgres");
-                if is_compose {
+                if spec.is_compose_managed() {
                     return format!("{project}-{name}-1");
                 }
             }

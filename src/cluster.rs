@@ -536,6 +536,13 @@ impl ClusterSpec {
         self.members.iter().map(|m| m.name.as_str()).collect()
     }
 
+    /// Whether this topology requires Docker Compose (multi-zone or postgres store).
+    #[must_use]
+    pub fn is_compose_managed(&self) -> bool {
+        self.members.len() > 1
+            || self.store_type.as_deref().is_some_and(|s| s == "postgres")
+    }
+
     #[must_use]
     pub fn kubeconfigs(&self) -> HashMap<&str, &str> {
         self.members
@@ -1058,6 +1065,51 @@ mod tests {
         .unwrap();
         let json = spec.to_json_dict();
         assert!(json.get("admin_token").is_none());
+    }
+
+    // --- is_compose_managed tests ---
+
+    #[test]
+    fn is_compose_managed_false_for_single_memory() {
+        let spec = ClusterSpec::from_mode_with_platform(
+            "single-up",
+            &["cp".into()],
+            "/r",
+            vec![],
+            vec![],
+            Platform::Universal,
+        )
+        .unwrap();
+        assert!(!spec.is_compose_managed());
+    }
+
+    #[test]
+    fn is_compose_managed_true_for_multi_zone() {
+        let spec = ClusterSpec::from_mode_with_platform(
+            "global-zone-up",
+            &["g".into(), "z".into(), "zone-1".into()],
+            "/r",
+            vec![],
+            vec![],
+            Platform::Universal,
+        )
+        .unwrap();
+        assert!(spec.is_compose_managed());
+    }
+
+    #[test]
+    fn is_compose_managed_true_for_single_postgres() {
+        let mut spec = ClusterSpec::from_mode_with_platform(
+            "single-up",
+            &["cp".into()],
+            "/r",
+            vec![],
+            vec![],
+            Platform::Universal,
+        )
+        .unwrap();
+        spec.store_type = Some("postgres".into());
+        assert!(spec.is_compose_managed());
     }
 
     #[test]

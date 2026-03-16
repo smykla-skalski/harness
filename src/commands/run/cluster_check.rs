@@ -38,10 +38,7 @@ pub fn cluster_check(run_dir_args: &RunDirArgs) -> Result<i32, CliError> {
         }
         Platform::Universal => {
             for member in &spec.members {
-                // For compose deployments, check the compose container name
-                let is_compose = spec.members.len() > 1
-                    || spec.store_type.as_deref().is_some_and(|s| s == "postgres");
-                let container_name = if is_compose {
+                let container_name = if spec.is_compose_managed() {
                     let project = format!(
                         "harness-{}",
                         spec.members.first().map_or("default", |m| m.name.as_str()),
