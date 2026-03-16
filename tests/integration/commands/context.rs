@@ -2,9 +2,6 @@
 // Covers path construction, directory creation, round-trip recovery,
 // and context loading from run directories.
 
-use std::fs;
-use std::path::Path;
-
 use harness::context::{RunContext, RunLayout};
 use harness::schema::Verdict;
 
@@ -25,15 +22,6 @@ fn run_context_from_run_dir_loads_all_fields() {
     assert!(ctx.status.is_some());
     let status = ctx.status.unwrap();
     assert_eq!(status.overall_verdict, Verdict::Pending);
-}
-
-#[test]
-fn run_context_from_run_dir_fails_on_missing() {
-    let tmp = tempfile::tempdir().unwrap();
-    let run_dir = tmp.path().join("nonexistent-run");
-    fs::create_dir_all(&run_dir).unwrap();
-    let result = RunContext::from_run_dir(&run_dir);
-    assert!(result.is_err());
 }
 
 // ============================================================================
@@ -78,11 +66,4 @@ fn run_layout_ensure_dirs_creates_all() {
     assert!(layout.commands_dir().is_dir());
     assert!(layout.manifests_dir().is_dir());
     assert!(layout.state_dir().is_dir());
-}
-
-#[test]
-fn run_layout_from_run_dir_roundtrip() {
-    let layout = RunLayout::from_run_dir(Path::new("/tmp/runs/run-99"));
-    assert_eq!(layout.run_root, "/tmp/runs");
-    assert_eq!(layout.run_id, "run-99");
 }

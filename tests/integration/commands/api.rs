@@ -16,74 +16,56 @@ fn run_dir_args_missing() -> RunDirArgs {
 }
 
 #[test]
-fn api_get_missing_run_dir() {
-    let method = ApiMethod::Get {
-        path: "/zones".to_string(),
-        run_dir: run_dir_args_missing(),
-    };
-    let result = run_command(Command::Api(harness::commands::run::ApiArgs { method }));
-    assert!(result.is_err());
-    let err = result.unwrap_err();
-    assert_eq!(err.code(), "KSRCLI014");
+fn api_missing_run_dir() {
+    let make_methods: [fn() -> ApiMethod; 3] = [
+        || ApiMethod::Get {
+            path: "/zones".to_string(),
+            run_dir: run_dir_args_missing(),
+        },
+        || ApiMethod::Post {
+            path: "/tokens/dataplane".to_string(),
+            body: "{}".to_string(),
+            run_dir: run_dir_args_missing(),
+        },
+        || ApiMethod::Delete {
+            path: "/meshes/default".to_string(),
+            run_dir: run_dir_args_missing(),
+        },
+    ];
+    for make in &make_methods {
+        let result = run_command(Command::Api(harness::commands::run::ApiArgs {
+            method: make(),
+        }));
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err().code(), "KSRCLI014");
+    }
 }
 
 #[test]
-fn api_post_missing_run_dir() {
-    let method = ApiMethod::Post {
-        path: "/tokens/dataplane".to_string(),
-        body: "{}".to_string(),
-        run_dir: run_dir_args_missing(),
-    };
-    let result = run_command(Command::Api(harness::commands::run::ApiArgs { method }));
-    assert!(result.is_err());
-}
-
-#[test]
-fn api_delete_missing_run_dir() {
-    let method = ApiMethod::Delete {
-        path: "/meshes/default".to_string(),
-        run_dir: run_dir_args_missing(),
-    };
-    let result = run_command(Command::Api(harness::commands::run::ApiArgs { method }));
-    assert!(result.is_err());
-}
-
-#[test]
-fn api_get_missing_cluster_spec() {
-    let tmp = tempfile::tempdir().unwrap();
-    let run_dir = init_run(tmp.path(), "api-no-cluster", "single-zone");
-
-    let method = ApiMethod::Get {
-        path: "/zones".to_string(),
-        run_dir: RunDirArgs {
+fn api_missing_cluster_spec() {
+    // Missing cluster spec means no CP address (KSRCLI009) for both Get and Post.
+    for (name, is_post) in [("api-no-cluster", false), ("api-post-no-cluster", true)] {
+        let tmp = tempfile::tempdir().unwrap();
+        let run_dir = init_run(tmp.path(), name, "single-zone");
+        let run_dir_args = RunDirArgs {
             run_dir: Some(run_dir),
             run_id: None,
             run_root: None,
-        },
-    };
-    let result = run_command(Command::Api(harness::commands::run::ApiArgs { method }));
-    assert!(result.is_err());
-    let err = result.unwrap_err();
-    // Missing cluster spec means no CP address
-    assert_eq!(err.code(), "KSRCLI009");
-}
-
-#[test]
-fn api_post_missing_cluster_spec() {
-    let tmp = tempfile::tempdir().unwrap();
-    let run_dir = init_run(tmp.path(), "api-post-no-cluster", "single-zone");
-
-    let method = ApiMethod::Post {
-        path: "/tokens/dataplane".to_string(),
-        body: r#"{"name":"test"}"#.to_string(),
-        run_dir: RunDirArgs {
-            run_dir: Some(run_dir),
-            run_id: None,
-            run_root: None,
-        },
-    };
-    let result = run_command(Command::Api(harness::commands::run::ApiArgs { method }));
-    assert!(result.is_err());
-    let err = result.unwrap_err();
-    assert_eq!(err.code(), "KSRCLI009");
+        };
+        let method = if is_post {
+            ApiMethod::Post {
+                path: "/tokens/dataplane".to_string(),
+                body: r#"{"name":"test"}"#.to_string(),
+                run_dir: run_dir_args,
+            }
+        } else {
+            ApiMethod::Get {
+                path: "/zones".to_string(),
+                run_dir: run_dir_args,
+            }
+        };
+        let result = run_command(Command::Api(harness::commands::run::ApiArgs { method }));
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err().code(), "KSRCLI009");
+    }
 }
