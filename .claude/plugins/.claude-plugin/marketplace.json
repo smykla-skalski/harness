@@ -1,0 +1,13 @@
+{
+  "name": "harness",
+  "owner": {
+    "name": "smykla-skalski"
+  },
+  "plugins": [
+    {
+      "name": "suite",
+      "source": "./suite",
+      "description": "Kuma test suite authoring and execution"
+    }
+  ]
+}
