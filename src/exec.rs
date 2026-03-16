@@ -132,6 +132,117 @@ pub(crate) fn run_command_streaming(
     Err(CliErrorKind::command_failed(command_string(args)).with_details(failure_details(&result)))
 }
 
+/// Check if the line is an error or warning that should surface verbatim.
+fn is_error_or_warning(lower: &str) -> bool {
+    lower.starts_with("error")
+        || lower.starts_with("warning")
+        || lower.starts_with("fatal")
+        || lower.contains("err:")
+        || lower.contains("failed")
+        || lower.contains("timed out")
+}
+
+/// Match k3d checkpoint patterns to harness progress messages.
+fn match_k3d_checkpoint(lower: &str) -> Option<&'static str> {
+    if lower.contains("preparing nodes") {
+        return Some("k3d: preparing nodes");
+    }
+    if lower.contains("creating node") {
+        return Some("k3d: creating nodes");
+    }
+    if lower.contains("pulling image") {
+        return Some("k3d: pulling images");
+    }
+    if lower.contains("importing image") {
+        return Some("k3d: importing images");
+    }
+    if lower.contains("loading images") || lower.contains("importing images into") {
+        return Some("k3d: loading images into cluster");
+    }
+    if lower.contains("successfully created") || lower.contains("cluster created") {
+        return Some("k3d: cluster created");
+    }
+    None
+}
+
+/// Match helm checkpoint patterns to harness progress messages.
+fn match_helm_checkpoint(lower: &str) -> Option<&'static str> {
+    if lower.contains("release") && lower.contains("deployed") {
+        return Some("helm: release deployed");
+    }
+
+    if lower.contains("rollback") {
+        return Some("helm: rollback triggered");
+    }
+
+    if (lower.contains("install") || lower.contains("upgrade"))
+        && lower.contains("helm")
+        && !lower.contains("coalesce")
+    {
+        return Some("helm: installing release");
+    }
+
+    if lower.contains("manifest") && lower.contains("render") {
+        return Some("helm: rendering manifests");
+    }
+
+    None
+}
+
+/// Match kubectl checkpoint patterns to harness progress messages.
+fn match_kubectl_checkpoint(lower: &str, trimmed: &str) -> Option<String> {
+    if lower.contains("condition met") {
+        return Some("kubectl: condition met".into());
+    }
+
+    if lower.contains("rollout") && lower.contains("complete") {
+        return Some("kubectl: rollout complete".into());
+    }
+
+    if lower.contains("waiting for") && lower.contains("rollout") {
+        return Some("kubectl: waiting for rollout".into());
+    }
+
+    if lower.contains("waiting for") && lower.contains("condition") {
+        return Some(filter_kubectl_wait_detail(trimmed));
+    }
+
+    if lower.contains("deployment") && lower.contains("successfully rolled out") {
+        return Some("kubectl: deployment rolled out".into());
+    }
+
+    if lower.contains("pod/") && lower.contains("running") {
+        return Some("kubectl: pod running".into());
+    }
+
+    None
+}
+
+/// Match docker compose checkpoint patterns to harness progress messages.
+fn match_compose_checkpoint(lower: &str) -> Option<&'static str> {
+    if !lower.contains("container") {
+        return None;
+    }
+
+    if lower.contains("started") {
+        return Some("compose: container started");
+    }
+
+    if lower.contains("healthy") {
+        return Some("compose: container healthy");
+    }
+
+    if lower.contains("waiting") {
+        return Some("compose: waiting for container health");
+    }
+
+    if lower.contains("created") {
+        return Some("compose: container created");
+    }
+
+    None
+}
+
 /// Map a subprocess stderr line to a harness checkpoint message.
 ///
 /// Returns `Some(message)` for lines that indicate meaningful progress,
@@ -144,86 +255,21 @@ fn filter_progress_line(line: &str) -> Option<String> {
     }
     let lower = trimmed.to_lowercase();
 
-    // errors and warnings always surface verbatim
-    if lower.starts_with("error")
-        || lower.starts_with("warning")
-        || lower.starts_with("fatal")
-        || lower.contains("err:")
-        || lower.contains("failed")
-        || lower.contains("timed out")
-    {
+    if is_error_or_warning(&lower) {
         return Some(trimmed.to_string());
     }
 
-    // k3d checkpoints -> our own messages
-    if lower.contains("preparing nodes") {
-        return Some("k3d: preparing nodes".into());
+    if let Some(message) = match_k3d_checkpoint(&lower) {
+        return Some(message.into());
     }
-    if lower.contains("creating node") {
-        return Some("k3d: creating nodes".into());
+    if let Some(message) = match_helm_checkpoint(&lower) {
+        return Some(message.into());
     }
-    if lower.contains("pulling image") {
-        return Some("k3d: pulling images".into());
+    if let Some(message) = match_kubectl_checkpoint(&lower, trimmed) {
+        return Some(message);
     }
-    if lower.contains("importing image") {
-        return Some("k3d: importing images".into());
-    }
-    if lower.contains("loading images") || lower.contains("importing images into") {
-        return Some("k3d: loading images into cluster".into());
-    }
-    if lower.contains("successfully created") || lower.contains("cluster created") {
-        return Some("k3d: cluster created".into());
-    }
-
-    // helm checkpoints -> our own messages
-    if lower.contains("release") && lower.contains("deployed") {
-        return Some("helm: release deployed".into());
-    }
-    if lower.contains("rollback") {
-        return Some("helm: rollback triggered".into());
-    }
-    if (lower.contains("install") || lower.contains("upgrade"))
-        && lower.contains("helm")
-        && !lower.contains("coalesce")
-    {
-        return Some("helm: installing release".into());
-    }
-    if lower.contains("manifest") && lower.contains("render") {
-        return Some("helm: rendering manifests".into());
-    }
-
-    // kubectl checkpoints -> our own messages
-    if lower.contains("condition met") {
-        return Some("kubectl: condition met".into());
-    }
-    if lower.contains("rollout") && lower.contains("complete") {
-        return Some("kubectl: rollout complete".into());
-    }
-    if lower.contains("waiting for") && lower.contains("rollout") {
-        return Some("kubectl: waiting for rollout".into());
-    }
-    if lower.contains("waiting for") && lower.contains("condition") {
-        return Some(filter_kubectl_wait_detail(trimmed));
-    }
-    if lower.contains("deployment") && lower.contains("successfully rolled out") {
-        return Some("kubectl: deployment rolled out".into());
-    }
-    if lower.contains("pod/") && lower.contains("running") {
-        return Some("kubectl: pod running".into());
-    }
-
-    // docker compose progress
-    if lower.contains("container") && lower.contains("started") {
-        return Some("compose: container started".into());
-    }
-    if lower.contains("container") && lower.contains("healthy") {
-        return Some("compose: container healthy".into());
-    }
-    if lower.contains("container") && lower.contains("waiting") {
-        return Some("compose: waiting for container health".into());
-    }
-    if lower.contains("container") && lower.contains("created") {
-        return Some("compose: container created".into());
+    if let Some(message) = match_compose_checkpoint(&lower) {
+        return Some(message.into());
     }
 
     // everything else (Docker BuildKit layers, verbose helm output,
