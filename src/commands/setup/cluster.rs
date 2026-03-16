@@ -9,7 +9,7 @@ use crate::cluster::{ClusterSpec, HelmSetting, Platform};
 use crate::commands::resolve_repo_root;
 use crate::compose;
 use crate::context::CurrentRunRecord;
-use crate::core_defs::{current_run_context_path, resolve_build_info, utc_now};
+use crate::core_defs::{HARNESS_PREFIX, current_run_context_path, resolve_build_info, utc_now};
 use crate::errors::{CliError, CliErrorKind, cow};
 use crate::exec::{
     cluster_exists, compose_down_project, compose_up, docker_inspect_ip, docker_network_create,
@@ -202,7 +202,7 @@ fn cluster_universal(
             }
             if effective_store == "postgres" {
                 // Compose-managed single-zone
-                let project = format!("harness-{}", all_names[0]);
+                let project = format!("{HARNESS_PREFIX}{}", all_names[0]);
                 compose_down_project(&project)?;
             } else {
                 universal_single_down(network_name, &all_names[0])?;

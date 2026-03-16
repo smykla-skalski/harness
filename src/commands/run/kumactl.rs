@@ -2,23 +2,9 @@ use std::path::{Path, PathBuf};
 
 use crate::cli::KumactlCommand;
 use crate::commands::resolve_repo_root;
-use crate::core_defs::shorten_path;
+use crate::core_defs::{host_platform, shorten_path};
 use crate::errors::{CliError, CliErrorKind};
 use crate::exec::run_command;
-
-fn host_platform() -> (&'static str, &'static str) {
-    let os_name = if cfg!(target_os = "macos") {
-        "darwin"
-    } else {
-        "linux"
-    };
-    let arch = if cfg!(target_arch = "aarch64") {
-        "arm64"
-    } else {
-        "amd64"
-    };
-    (os_name, arch)
-}
 
 fn kumactl_candidates(root: &Path) -> Vec<PathBuf> {
     let (os_name, arch) = host_platform();

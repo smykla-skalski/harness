@@ -7,6 +7,9 @@ use sha2::{Digest, Sha256};
 
 use crate::errors::{CliError, CliErrorKind, cow};
 
+/// Prefix used for harness-owned resources (containers, networks, temp dirs).
+pub const HARNESS_PREFIX: &str = "harness-";
+
 /// Build information resolved from the repo.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BuildInfo {
@@ -166,15 +169,9 @@ pub(crate) fn merge_env(extra: Option<&HashMap<String, String>>) -> HashMap<Stri
     env
 }
 
-/// If `REPO_ROOT` is set, prepend `{repo_root}/build/artifacts-{os}-{arch}/kumactl`
-/// to `PATH` so locally-built binaries are preferred over system ones.
-fn prepend_build_artifacts_path(env: &mut HashMap<String, String>) {
-    let Some(repo_root) = env.get("REPO_ROOT") else {
-        return;
-    };
-    if repo_root.is_empty() {
-        return;
-    }
+/// Host platform as `(os_name, arch)` - e.g. `("darwin", "arm64")`.
+#[must_use]
+pub fn host_platform() -> (&'static str, &'static str) {
     let os_name = if cfg!(target_os = "macos") {
         "darwin"
     } else {
@@ -185,6 +182,19 @@ fn prepend_build_artifacts_path(env: &mut HashMap<String, String>) {
     } else {
         "amd64"
     };
+    (os_name, arch)
+}
+
+/// If `REPO_ROOT` is set, prepend `{repo_root}/build/artifacts-{os}-{arch}/kumactl`
+/// to `PATH` so locally-built binaries are preferred over system ones.
+fn prepend_build_artifacts_path(env: &mut HashMap<String, String>) {
+    let Some(repo_root) = env.get("REPO_ROOT") else {
+        return;
+    };
+    if repo_root.is_empty() {
+        return;
+    }
+    let (os_name, arch) = host_platform();
     let artifacts_dir = Path::new(repo_root)
         .join("build")
         .join(format!("artifacts-{os_name}-{arch}"))
@@ -246,7 +256,7 @@ pub fn resolve_build_info(repo: &Path) -> Result<BuildInfo, CliError> {
 
 pub fn dirs_home() -> PathBuf {
     env::var("HOME").map_or_else(
-        |_| env::temp_dir().join(format!("harness-{}", uzers::get_current_uid())),
+        |_| env::temp_dir().join(format!("{HARNESS_PREFIX}{}", uzers::get_current_uid())),
         PathBuf::from,
     )
 }

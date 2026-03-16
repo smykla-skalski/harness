@@ -6,6 +6,7 @@ use std::sync::LazyLock;
 use regex::Regex;
 
 use crate::commands::resolve_repo_root;
+use crate::core_defs::HARNESS_PREFIX;
 use crate::errors::{CliError, CliErrorKind, cow};
 use crate::exec::{kubectl, run_command};
 use crate::io::ensure_dir;
@@ -63,7 +64,7 @@ pub fn gateway(
         return Ok(0);
     }
 
-    let tmp_dir = env::temp_dir().join("harness-gateway");
+    let tmp_dir = env::temp_dir().join(format!("{HARNESS_PREFIX}gateway"));
     ensure_dir(&tmp_dir).map_err(|e| {
         CliErrorKind::io(cow!("could not create temp dir {}: {e}", tmp_dir.display()))
     })?;
