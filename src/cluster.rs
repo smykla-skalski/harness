@@ -539,8 +539,7 @@ impl ClusterSpec {
     /// Whether this topology requires Docker Compose (multi-zone or postgres store).
     #[must_use]
     pub fn is_compose_managed(&self) -> bool {
-        self.members.len() > 1
-            || self.store_type.as_deref().is_some_and(|s| s == "postgres")
+        self.members.len() > 1 || self.store_type.as_deref().is_some_and(|s| s == "postgres")
     }
 
     #[must_use]
