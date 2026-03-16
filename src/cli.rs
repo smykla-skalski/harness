@@ -756,6 +756,9 @@ pub enum Command {
 
     /// Manage universal mode test service containers.
     Service(ServiceArgs),
+
+    /// Report harness capabilities for skill planning.
+    Capabilities,
 }
 
 // ---------------------------------------------------------------------------

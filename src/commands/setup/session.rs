@@ -2,6 +2,7 @@ use std::env;
 use std::fs;
 
 use crate::bootstrap;
+use crate::commands::resolve_project_dir;
 use crate::compact;
 use crate::context::CurrentRunRecord;
 use crate::core_defs::current_run_context_path;
@@ -14,7 +15,7 @@ use crate::session_hook::SessionStartHookOutput;
 /// # Errors
 /// Returns `CliError` on failure.
 pub fn session_start(project_dir: Option<&str>) -> Result<i32, CliError> {
-    let dir = crate::commands::resolve_project_dir(project_dir);
+    let dir = resolve_project_dir(project_dir);
 
     // Bootstrap the project wrapper
     let path_env = env::var("PATH").unwrap_or_default();
