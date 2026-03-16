@@ -741,3 +741,87 @@ fn universal_global_two_zones_down(_network: &str, names: &[String]) -> Result<(
     compose_down_project(&project)?;
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Compute the same scope key the production code uses for a given session ID.
+    fn scope_key_for_session(session_id: &str) -> String {
+        use sha2::{Digest, Sha256};
+        let scope = format!("session:{session_id}");
+        let mut hasher = Sha256::new();
+        hasher.update(scope.as_bytes());
+        let hash = hasher.finalize();
+        let digest: String = hash.iter().take(8).map(|b| format!("{b:02x}")).collect();
+        format!("session-{digest}")
+    }
+
+    fn write_context_file(xdg_dir: &std::path::Path, session_id: &str, content: &str) {
+        let scope = scope_key_for_session(session_id);
+        let ctx_dir = xdg_dir.join("kuma").join("contexts").join(scope);
+        fs::create_dir_all(&ctx_dir).unwrap();
+        fs::write(ctx_dir.join("current-run.json"), content).unwrap();
+    }
+
+    #[test]
+    fn load_persisted_spec_none_when_missing() {
+        let tmp = tempfile::tempdir().unwrap();
+        let result = temp_env::with_vars(
+            [
+                ("XDG_DATA_HOME", Some(tmp.path().to_str().unwrap())),
+                ("CLAUDE_SESSION_ID", Some("load-test-missing")),
+            ],
+            load_persisted_cluster_spec,
+        );
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn load_persisted_spec_none_when_corrupt() {
+        let tmp = tempfile::tempdir().unwrap();
+        let session_id = "load-test-corrupt";
+        write_context_file(tmp.path(), session_id, "not valid json {{{{");
+        let result = temp_env::with_vars(
+            [
+                ("XDG_DATA_HOME", Some(tmp.path().to_str().unwrap())),
+                ("CLAUDE_SESSION_ID", Some(session_id)),
+            ],
+            load_persisted_cluster_spec,
+        );
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn load_persisted_spec_returns_cluster() {
+        let tmp = tempfile::tempdir().unwrap();
+        let session_id = "load-test-valid";
+        let record = serde_json::json!({
+            "layout": { "run_root": "/tmp/runs", "run_id": "r1" },
+            "cluster": {
+                "mode": "single-up",
+                "platform": "universal",
+                "mode_args": ["cp"],
+                "members": [{"name": "cp", "role": "cp", "kubeconfig": ""}],
+                "helm_settings": [],
+                "restart_namespaces": [],
+                "repo_root": "/r",
+                "store_type": "postgres"
+            }
+        });
+        write_context_file(
+            tmp.path(),
+            session_id,
+            &serde_json::to_string(&record).unwrap(),
+        );
+        let result = temp_env::with_vars(
+            [
+                ("XDG_DATA_HOME", Some(tmp.path().to_str().unwrap())),
+                ("CLAUDE_SESSION_ID", Some(session_id)),
+            ],
+            load_persisted_cluster_spec,
+        );
+        let spec = result.expect("should load cluster spec");
+        assert_eq!(spec.store_type.as_deref(), Some("postgres"));
+    }
+}
