@@ -56,23 +56,43 @@ The `harness observe` command is the primary data source. All subcommands use `-
 **Filtered dump**: `harness observe dump <session-id> --project-hint <hint> --filter "crashloop" --from-line 4000`
 **Context**: `harness observe context <session-id> --project-hint <hint> --line 4122 --window 20`
 **Watch mode**: `harness observe watch <session-id> --project-hint <hint> --from-line <N>`
+**Focus scan**: `harness observe scan <session-id> --project-hint <hint> --focus harness --json --summary`
+**From timestamp**: `harness observe scan <session-id> --from "2026-03-15T17:00:00" --json --summary`
+**Status**: `harness observe status <session-id>`
+**Resume**: `harness observe resume <session-id> --project-hint <hint> --json --summary`
+**Verify fix**: `harness observe verify <session-id> <issue-id> --since-line 500`
+**Compare**: `harness observe compare <session-id> --from-a 0 --to-a 500 --from-b 500 --to-b 1000`
+**Doctor**: `harness observe doctor`
+**Mute**: `harness observe mute <session-id> shell_alias_interference,user_frustration_detected`
 
 ### Subcommands
 
 | Subcommand | Purpose |
 | --- | --- |
-| `scan` | One-shot scan with `--json --summary`, `--from-line`, `--severity`, `--category` filters |
+| `scan` | One-shot scan with `--json --summary`, `--from-line`, `--severity`, `--category`, `--focus`, `--from`, `--mute` filters |
+| `watch` | Continuous polling with `--poll-interval` and `--timeout`, filters each batch |
 | `cycle` | Read cursor from state file, scan new events, update cursor, report. Used by the automated cron. |
-| `dump` | Raw event dump with `--from-line`, `--to-line`, `--filter`, `--role` |
+| `dump` | Raw event dump with `--from-line`, `--to-line`, `--filter`, `--role`, `--tool-name` |
 | `context` | Show events around a specific `--line` with `--window` |
-| `watch` | Continuous polling with `--poll-interval` and `--timeout` |
+| `status` | Show observer state: cursor, open issues, muted codes, cycle history |
+| `resume` | Resume scanning from the last cursor position |
+| `verify` | Check if a specific issue (by `issue_id`) still reproduces |
+| `compare` | Diff issues between two line ranges in the same session |
+| `resolve-start` | Resolve a `--from` value to a concrete line number |
+| `doctor` | Validate observer setup (paths, binary, state directory) |
+| `mute` | Add issue codes to the mute list |
+| `unmute` | Remove issue codes from the mute list |
+| `list-categories` | Print all valid issue categories with descriptions |
+| `list-focus-presets` | Print all focus presets with descriptions |
 
 ### Output format
 
-**With `--json`**, each issue is one JSON line:
+**With `--json`**, each issue is one JSON line with identity, confidence, and fix safety:
 ```json
-{"line": 1215, "category": "build_error", "severity": "critical", "summary": "Build or lint failure", "details": "error[E0308]: mismatched types...", "source_role": "user", "fixable": true, "fix_target": null, "fix_hint": "Fix the Rust code causing the failure"}
+{"issue_id":"a1b2c3d4e5f6","line":1215,"code":"build_or_lint_failure","category":"build_error","severity":"critical","confidence":"high","fix_safety":"auto_fix_safe","summary":"Build or lint failure","details":"error[E0308]...","fingerprint":"...","source_role":"user","fixable":true,"fix_target":null,"fix_hint":"Fix the Rust code"}
 ```
+
+The `issue_id` is a stable 12-char hex hash of (code + fingerprint). Use it with `verify` to check if an issue still reproduces. `fixable` is derived from `fix_safety` for backward compatibility.
 
 **With `--summary`**, the last line is always a summary object:
 ```json
@@ -85,9 +105,11 @@ The `last_line` field is the cursor - pass it as `--from-line` on the next invoc
 
 **Without `--json`** (human-readable), each issue prints as:
 ```
-[CRITICAL] L1215 (build_error): Build or lint failure
+[CRITICAL/high] L1215 (build_error/build_or_lint_failure): Build or lint failure
   hint: Fix the Rust code causing the failure
 ```
+
+**With `--format markdown`**, a `tabled`-rendered markdown table.
 
 ### Issue categories
 
@@ -147,10 +169,7 @@ For uncertain issues (`category: unexpected_behavior`), report them to the user 
 
 ### Phase 3: Start loop
 
-Write initial cursor state to a temp file:
-```bash
-echo '{"cursor": <CURSOR>, "session_id": "<SESSION_ID>"}' > /tmp/observe-<SESSION_ID>.state
-```
+The observer state is managed automatically by `harness observe cycle` at `$XDG_DATA_HOME/kuma/observe/<SESSION_ID>.state`. No manual state file creation needed.
 
 Create two cron jobs:
 
@@ -291,10 +310,25 @@ The observer re-runs: harness observe scan abc123def --from-line 610 --json --su
 If the build_error at L612 no longer appears in new output, the fix is confirmed. If it still appears, a second fix worker is spawned with the first worker's failure context.
 </example>
 
+## Fix worker concurrency control
+
+When dispatching fix workers:
+- One writer per file - never let two workers edit the same file simultaneously
+- One writer per crate unless the issues are in separate modules with no overlap
+- Batch multiple issues with the same root cause (same `code` + same `fix_target`) into a single worker
+- Cap concurrent workers at 3 - queue additional work and dispatch as workers complete
+- After 2 failed fix attempts for the same issue, escalate to the user instead of retrying
+
+Check `harness observe status <session-id>` before dispatching to see current open issues and avoid duplicate work.
+
+## Zero-issue path
+
+When a scan returns 0 issues: report "Clean scan: 0 issues in N lines" and continue the observation loop. A clean scan is the normal steady state for well-behaved sessions.
+
 ## Stopping
 
 When the user says to stop:
 1. Call `CronDelete` on both cron IDs (automated + deep analysis)
-2. Remove `/tmp/observe-<SESSION_ID>.state`
+2. State at `$XDG_DATA_HOME/kuma/observe/<SESSION_ID>.state` is preserved for later `resume`
 3. Let any running fix workers or deep analysis agents complete
 4. Print final summary: total issues found, fixes applied, deep analysis findings, issues remaining
