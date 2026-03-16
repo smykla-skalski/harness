@@ -98,36 +98,7 @@ impl ObservedCommand {
             }
         })?;
         let after_verb = &remaining[verb_index + 1..];
-
-        let mut positional = Vec::new();
-        let mut skip_next = false;
-        for token in after_verb {
-            if skip_next {
-                skip_next = false;
-                continue;
-            }
-            if shell_parse::is_shell_control_op(token) {
-                break;
-            }
-            if token.starts_with('-') {
-                if matches!(
-                    token.as_str(),
-                    "-o" | "-n"
-                        | "--namespace"
-                        | "--output"
-                        | "-l"
-                        | "--selector"
-                        | "--field-selector"
-                ) {
-                    skip_next = true;
-                }
-                continue;
-            }
-            positional.push(token.clone());
-            if positional.len() >= 2 {
-                break;
-            }
-        }
+        let positional = collect_kubectl_positional_args(after_verb);
 
         if positional.is_empty() {
             return None;
@@ -201,6 +172,44 @@ impl ObservedCommand {
         }
         spans.into_iter()
     }
+}
+
+/// Flags that tell the parser to consume the next token as a value (not a positional arg).
+const KUBECTL_FLAGS_WITH_VALUE: [&str; 7] = [
+    "-o",
+    "-n",
+    "--namespace",
+    "--output",
+    "-l",
+    "--selector",
+    "--field-selector",
+];
+
+/// Collect up to 2 positional arguments from kubectl tokens following a verb.
+///
+/// Skips flag tokens and their values, stops at shell control operators or once
+/// two positional args have been gathered.
+fn collect_kubectl_positional_args(tokens: &[String]) -> Vec<String> {
+    let mut positional = Vec::new();
+    let mut skip_next = false;
+    for token in tokens {
+        if skip_next {
+            skip_next = false;
+            continue;
+        }
+        if shell_parse::is_shell_control_op(token) {
+            break;
+        }
+        if token.starts_with('-') {
+            skip_next = KUBECTL_FLAGS_WITH_VALUE.contains(&token.as_str());
+            continue;
+        }
+        positional.push(token.clone());
+        if positional.len() >= 2 {
+            break;
+        }
+    }
+    positional
 }
 
 /// Check a `tool_use` block for issues.
@@ -1189,62 +1198,96 @@ fn check_uncommitted_source_code_edit(
     state: &mut ScanState,
     issues: &mut Vec<Issue>,
 ) {
-    if tool_name == "Write" || tool_name == "Edit" {
-        let path = input["file_path"].as_str().unwrap_or("");
-        if is_source_code_file(path) {
-            if state.source_code_edited_without_commit {
-                // Second source code edit (or harness action) without commit
-                let details = format!("Path: {path}");
-                IssueEmitter::new(line_num, MessageRole::Assistant, state).emit(
-                    issues,
-                    IssueBlueprint::from_code(
-                        IssueCode::UncommittedSourceCodeEdit,
-                        "Source code edited without committing previous changes",
-                    )
-                    .with_fingerprint("uncommitted_source_code_edit")
-                    .with_guidance(Guidance::fix_target_hint(
-                        "skills/run/SKILL.md",
-                        "Commit code fixes before re-deploying or re-testing. \
-                         Use git add <files> && git commit -m 'fix: description'.",
-                    ))
-                    .with_confidence(Confidence::High)
-                    .with_fix_safety(FixSafety::TriageRequired)
-                    .with_source_tool(Some(if tool_name == "Write" {
-                        SourceTool::Write
-                    } else {
-                        SourceTool::Edit
-                    })),
-                    &details,
-                );
-            }
-            // Mark that source code was edited (whether or not we emitted)
-            state.source_code_edited_without_commit = true;
+    match tool_name {
+        "Write" | "Edit" => {
+            track_source_code_write(line_num, tool_name, input, state, issues);
         }
-    } else if tool_name == "Bash" {
-        let command = input["command"].as_str().unwrap_or("");
-        if command.contains("git commit") {
-            state.source_code_edited_without_commit = false;
-        } else if state.source_code_edited_without_commit && command.contains("harness") {
-            let details = format!("Command: {command}");
-            IssueEmitter::new(line_num, MessageRole::Assistant, state).emit(
-                issues,
-                IssueBlueprint::from_code(
-                    IssueCode::UncommittedSourceCodeEdit,
-                    "Harness command run with uncommitted source code changes",
-                )
-                .with_fingerprint("uncommitted_source_before_harness")
-                .with_guidance(Guidance::fix_target_hint(
-                    "skills/run/SKILL.md",
-                    "Commit code fixes before re-deploying or re-testing. \
-                     Use git add <files> && git commit -m 'fix: description'.",
-                ))
-                .with_confidence(Confidence::High)
-                .with_fix_safety(FixSafety::TriageRequired)
-                .with_source_tool(Some(SourceTool::Bash)),
-                &details,
-            );
+        "Bash" => {
+            track_bash_commit_state(line_num, input, state, issues);
         }
+        _ => {}
     }
+}
+
+/// Track Write/Edit operations on source code files and emit when a prior edit
+/// was not committed.
+fn track_source_code_write(
+    line_num: usize,
+    tool_name: &str,
+    input: &Value,
+    state: &mut ScanState,
+    issues: &mut Vec<Issue>,
+) {
+    let path = input["file_path"].as_str().unwrap_or("");
+    if !is_source_code_file(path) {
+        return;
+    }
+
+    if state.source_code_edited_without_commit {
+        let source_tool = if tool_name == "Write" {
+            SourceTool::Write
+        } else {
+            SourceTool::Edit
+        };
+        let details = format!("Path: {path}");
+        IssueEmitter::new(line_num, MessageRole::Assistant, state).emit(
+            issues,
+            IssueBlueprint::from_code(
+                IssueCode::UncommittedSourceCodeEdit,
+                "Source code edited without committing previous changes",
+            )
+            .with_fingerprint("uncommitted_source_code_edit")
+            .with_guidance(Guidance::fix_target_hint(
+                "skills/run/SKILL.md",
+                "Commit code fixes before re-deploying or re-testing. \
+                 Use git add <files> && git commit -m 'fix: description'.",
+            ))
+            .with_confidence(Confidence::High)
+            .with_fix_safety(FixSafety::TriageRequired)
+            .with_source_tool(Some(source_tool)),
+            &details,
+        );
+    }
+
+    state.source_code_edited_without_commit = true;
+}
+
+/// Check Bash commands for git commits (which clear the dirty flag) or harness
+/// invocations that should have been preceded by a commit.
+fn track_bash_commit_state(
+    line_num: usize,
+    input: &Value,
+    state: &mut ScanState,
+    issues: &mut Vec<Issue>,
+) {
+    let command = input["command"].as_str().unwrap_or("");
+    if command.contains("git commit") {
+        state.source_code_edited_without_commit = false;
+        return;
+    }
+
+    if !state.source_code_edited_without_commit || !command.contains("harness") {
+        return;
+    }
+
+    let details = format!("Command: {command}");
+    IssueEmitter::new(line_num, MessageRole::Assistant, state).emit(
+        issues,
+        IssueBlueprint::from_code(
+            IssueCode::UncommittedSourceCodeEdit,
+            "Harness command run with uncommitted source code changes",
+        )
+        .with_fingerprint("uncommitted_source_before_harness")
+        .with_guidance(Guidance::fix_target_hint(
+            "skills/run/SKILL.md",
+            "Commit code fixes before re-deploying or re-testing. \
+             Use git add <files> && git commit -m 'fix: description'.",
+        ))
+        .with_confidence(Confidence::High)
+        .with_fix_safety(FixSafety::TriageRequired)
+        .with_source_tool(Some(SourceTool::Bash)),
+        &details,
+    );
 }
 
 /// Check for direct writes to harness-managed files via Write/Edit tools.
