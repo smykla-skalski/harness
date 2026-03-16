@@ -1,6 +1,8 @@
 use std::env;
+use std::fs;
 use std::path::{Path, PathBuf};
 
+use crate::context::CurrentRunRecord;
 use crate::core_defs;
 use crate::errors::{CliError, CliErrorKind};
 
@@ -41,6 +43,17 @@ pub fn resolve_run_directory(
 
     if let Some(run_id) = run_id {
         return Err(CliErrorKind::missing_run_location(run_id.to_string()).into());
+    }
+
+    // Fall back to the current-run pointer in the session context directory.
+    if let Ok(pointer_path) = core_defs::current_run_context_path()
+        && let Ok(text) = fs::read_to_string(&pointer_path)
+        && let Ok(record) = serde_json::from_str::<CurrentRunRecord>(&text)
+    {
+        let run_dir = record.layout.run_dir();
+        if run_dir.is_dir() {
+            return Ok(ResolvedRun { run_dir });
+        }
     }
 
     Err(CliErrorKind::MissingRunPointer.into())
@@ -173,8 +186,63 @@ mod tests {
 
     #[test]
     fn resolve_run_directory_no_fields_returns_pointer_error() {
-        let err = resolve_run_directory(None, None, None).unwrap_err();
-        assert_eq!(err.code(), "KSRCLI005");
+        let tmp = tempfile::tempdir().unwrap();
+        temp_env::with_vars(
+            [
+                ("XDG_DATA_HOME", Some(tmp.path().to_str().unwrap())),
+                ("CLAUDE_SESSION_ID", Some("resolve-no-pointer-test")),
+            ],
+            || {
+                let err = resolve_run_directory(None, None, None).unwrap_err();
+                assert_eq!(err.code(), "KSRCLI005");
+            },
+        );
+    }
+
+    #[test]
+    fn resolve_run_directory_falls_back_to_current_run_pointer() {
+        use crate::context::{CurrentRunRecord, RunLayout};
+
+        let tmp = tempfile::tempdir().unwrap();
+
+        // Create a run directory the pointer will reference.
+        let run_dir = tmp.path().join("runs").join("fallback-run");
+        fs::create_dir_all(&run_dir).unwrap();
+
+        // Write the pointer file in the session context directory.
+        let record = CurrentRunRecord {
+            layout: RunLayout {
+                run_root: tmp.path().join("runs").to_string_lossy().into_owned(),
+                run_id: "fallback-run".into(),
+            },
+            profile: None,
+            repo_root: None,
+            suite_dir: None,
+            suite_id: None,
+            suite_path: None,
+            cluster: None,
+            keep_clusters: false,
+            user_stories: vec![],
+            required_dependencies: vec![],
+        };
+
+        temp_env::with_vars(
+            [
+                (
+                    "XDG_DATA_HOME",
+                    Some(tmp.path().join("xdg").to_str().unwrap()),
+                ),
+                ("CLAUDE_SESSION_ID", Some("resolve-fallback-test")),
+            ],
+            || {
+                let ctx_path = core_defs::current_run_context_path().unwrap();
+                fs::create_dir_all(ctx_path.parent().unwrap()).unwrap();
+                fs::write(&ctx_path, serde_json::to_string_pretty(&record).unwrap()).unwrap();
+
+                let resolved = resolve_run_directory(None, None, None).unwrap();
+                assert_eq!(resolved.run_dir, run_dir);
+            },
+        );
     }
 
     #[test]
