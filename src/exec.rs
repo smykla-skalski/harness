@@ -107,80 +107,56 @@ pub(crate) fn run_command_streaming(
     Err(CliErrorKind::command_failed(command_string(args)).with_details(failure_details(&result)))
 }
 
-/// Decide if a stderr line from a subprocess is worth showing as progress.
+/// Map a subprocess stderr line to a harness checkpoint message.
 ///
-/// Returns a short cleaned-up message for important lines, `None` for noise.
+/// Returns `Some(message)` for lines that indicate meaningful progress,
+/// translated into harness's own format. Raw subprocess output is never
+/// passed through - only our own summary messages or actual errors.
 fn filter_progress_line(line: &str) -> Option<String> {
     let trimmed = line.trim();
     if trimmed.is_empty() {
         return None;
     }
-
-    // Docker BuildKit progress lines (e.g. "#8 [5/6] COPY ...") are noise.
-    if trimmed.starts_with('#')
-        && trimmed
-            .as_bytes()
-            .get(1)
-            .is_some_and(u8::is_ascii_digit)
-    {
-        return None;
-    }
-
     let lower = trimmed.to_lowercase();
 
-    // k3d lifecycle
-    if lower.contains("creating cluster")
-        || lower.contains("cluster created")
-        || lower.contains("deleting cluster")
-        || lower.contains("cluster deleted")
-        || lower.contains("starting cluster")
-        || lower.contains("cluster started")
-        || lower.contains("preparing nodes")
-        || lower.contains("creating node")
-        || lower.contains("pulling image")
-        || lower.contains("importing image")
-        || lower.contains("starting helpers")
-        || lower.contains("injecting records")
-        || lower.contains("kubeconfig")
-        || lower.contains("successfully created")
-    {
-        return Some(trimmed.to_string());
-    }
-
-    // helm lifecycle
-    if lower.contains("installing")
-        || lower.contains("deployed")
-        || lower.contains("status: ")
-        || lower.contains("name: ")
-        || lower.contains("upgrading")
-        || lower.contains("release")
-        || lower.contains("waiting for")
-        || lower.contains("ready")
-        || lower.contains("timed out")
-        || lower.contains("rollback")
-    {
-        return Some(trimmed.to_string());
-    }
-
-    // kubectl apply / wait
-    if lower.contains("configured")
-        || lower.contains("created")
-        || lower.contains("unchanged")
-        || lower.contains("condition met")
-    {
-        return Some(trimmed.to_string());
-    }
-
-    // errors and warnings always pass through
+    // errors and warnings always surface verbatim
     if lower.starts_with("error")
         || lower.starts_with("warning")
         || lower.starts_with("fatal")
-        || lower.contains("failed")
         || lower.contains("err:")
+        || lower.contains("failed")
+        || lower.contains("timed out")
     {
         return Some(trimmed.to_string());
     }
 
+    // k3d checkpoints -> our own messages
+    if lower.contains("preparing nodes") {
+        return Some("k3d: preparing nodes".into());
+    }
+    if lower.contains("creating node") {
+        return Some("k3d: creating nodes".into());
+    }
+    if lower.contains("pulling image") {
+        return Some("k3d: pulling images".into());
+    }
+    if lower.contains("importing image") {
+        return Some("k3d: importing images".into());
+    }
+    if lower.contains("successfully created") || lower.contains("cluster created") {
+        return Some("k3d: cluster created".into());
+    }
+
+    // helm checkpoints -> our own messages
+    if lower.contains("release") && lower.contains("deployed") {
+        return Some("helm: release deployed".into());
+    }
+    if lower.contains("rollback") {
+        return Some("helm: rollback triggered".into());
+    }
+
+    // everything else (Docker BuildKit layers, verbose helm output,
+    // kubectl apply lines, etc.) is captured but not printed
     None
 }
 
@@ -817,28 +793,21 @@ mod tests {
     }
 
     #[test]
-    fn filter_progress_creating_cluster() {
-        assert!(filter_progress_line("Creating cluster 'kuma-1'").is_some());
-    }
-
-    #[test]
     fn filter_progress_cluster_created() {
-        assert!(filter_progress_line("cluster created successfully").is_some());
+        let msg = filter_progress_line("cluster created successfully");
+        assert_eq!(msg.as_deref(), Some("k3d: cluster created"));
     }
 
     #[test]
-    fn filter_progress_installing_release() {
-        assert!(filter_progress_line("Installing release kuma...").is_some());
+    fn filter_progress_preparing_nodes() {
+        let msg = filter_progress_line("INFO[0001] Preparing nodes...");
+        assert_eq!(msg.as_deref(), Some("k3d: preparing nodes"));
     }
 
     #[test]
-    fn filter_progress_status_deployed() {
-        assert!(filter_progress_line("status: deployed").is_some());
-    }
-
-    #[test]
-    fn filter_progress_configured() {
-        assert!(filter_progress_line("deployment.apps/kuma-control-plane configured").is_some());
+    fn filter_progress_release_deployed() {
+        let msg = filter_progress_line("Release \"kuma\" deployed");
+        assert_eq!(msg.as_deref(), Some("helm: release deployed"));
     }
 
     #[test]
@@ -852,25 +821,44 @@ mod tests {
     }
 
     #[test]
+    fn filter_progress_failed_line() {
+        assert!(filter_progress_line("pod install failed").is_some());
+    }
+
+    #[test]
     fn filter_progress_random_noise() {
         assert!(filter_progress_line("some random debug output").is_none());
     }
 
     #[test]
+    fn filter_progress_kubectl_apply_is_noise() {
+        assert!(filter_progress_line("deployment.apps/kuma-cp configured").is_none());
+    }
+
+    #[test]
     fn filter_progress_docker_buildkit_layer() {
-        assert!(filter_progress_line("#8 [5/6] COPY /tools/releases/templates/passwd /etc/passwd").is_none());
+        assert!(
+            filter_progress_line("#8 [5/6] COPY /tools/releases/templates/passwd /etc/passwd")
+                .is_none()
+        );
         assert!(filter_progress_line("#5 [2/2] COPY /tools/releases/templates/LICENSE").is_none());
-        assert!(filter_progress_line("#9 [6/6] COPY /tools/releases/templates/group /etc/group").is_none());
+        assert!(
+            filter_progress_line("#9 [6/6] COPY /tools/releases/templates/group /etc/group")
+                .is_none()
+        );
         assert!(filter_progress_line("#12 extracting sha256:abc123").is_none());
     }
 
     // --- docker_rm_by_label test ---
 
     #[test]
-    fn docker_rm_by_label_fails_without_docker() {
-        let result = docker_rm_by_label("io.harness.test=true");
-        // docker binary may not exist in test env
-        assert!(result.is_err());
+    fn docker_rm_by_label_returns_empty_for_no_matches() {
+        // If docker is available, this should return an empty list.
+        // If docker is not available, it should error.
+        match docker_rm_by_label("io.harness.test.nonexistent=true") {
+            Ok(names) => assert!(names.is_empty()),
+            Err(_) => {} // docker not available, that's fine
+        }
     }
 
     #[test]
@@ -897,7 +885,10 @@ mod tests {
 
     /// Spawn a one-shot TCP server that accepts a single connection, reads
     /// the HTTP request, and writes `response_body` with the given content type.
-    fn mock_http_server(response_body: &str, content_type: &str) -> (u16, thread::JoinHandle<String>) {
+    fn mock_http_server(
+        response_body: &str,
+        content_type: &str,
+    ) -> (u16, thread::JoinHandle<String>) {
         use std::net::TcpListener;
 
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
