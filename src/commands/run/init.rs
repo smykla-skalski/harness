@@ -11,6 +11,13 @@ use crate::workflow::runner::initialize_runner_state;
 
 use super::shared::{resolve_init_repo_root, resolve_run_root};
 
+/// Parameters that identify the run being initialized.
+struct RunParams<'a> {
+    run_id: &'a str,
+    profile: &'a str,
+    created_at: &'a str,
+}
+
 /// Initialize a new test run directory.
 ///
 /// # Errors
@@ -44,15 +51,18 @@ pub fn init_run(
 
     layout.ensure_dirs()?;
 
+    let params = RunParams {
+        run_id,
+        profile,
+        created_at: &created_at,
+    };
     let result = populate_run_dir(
         &layout,
         &spec,
         &suite_path,
         &suite_dir,
         &resolved_repo_root,
-        run_id,
-        profile,
-        &created_at,
+        &params,
     );
     if result.is_err() {
         let _ = fs::remove_dir_all(layout.run_dir());
@@ -66,10 +76,11 @@ fn populate_run_dir(
     suite_path: &Path,
     suite_dir: &Path,
     resolved_repo_root: &Path,
-    run_id: &str,
-    profile: &str,
-    created_at: &str,
+    params: &RunParams<'_>,
 ) -> Result<i32, CliError> {
+    let run_id = params.run_id;
+    let profile = params.profile;
+    let created_at = params.created_at;
     let suite_id = spec.frontmatter.suite_id.clone();
     let user_stories = spec.frontmatter.user_stories.clone();
     let required_dependencies = spec.frontmatter.required_dependencies.clone();
