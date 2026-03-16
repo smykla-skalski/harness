@@ -4,8 +4,9 @@ pub mod patterns;
 pub mod session;
 pub mod types;
 
+use std::env;
 use std::fs;
-use std::io::{BufRead, BufReader, Seek, SeekFrom, Write};
+use std::io::{self, BufRead, BufReader, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
 use std::thread;
 use std::time::{Duration, Instant};
@@ -16,7 +17,10 @@ use crate::cli::{ObserveFilterArgs, ObserveMode};
 use crate::core_defs::harness_data_root;
 use crate::errors::{CliError, CliErrorKind};
 
-use self::types::{Issue, IssueCategory, IssueSeverity, ScanState};
+use self::types::{
+    FOCUS_PRESETS, FocusPreset, Issue, IssueCategory, IssueCode, IssueSeverity, ObserverState,
+    ScanState,
+};
 
 /// Minimum text length to bother displaying in dump mode.
 const MIN_DUMP_TEXT_LENGTH: usize = 5;
@@ -82,6 +86,7 @@ pub fn execute(mode: ObserveMode) -> Result<i32, CliError> {
             to_line,
             filter,
             role,
+            tool_name,
             project_hint,
         } => execute_dump(
             &session_id,
@@ -89,6 +94,7 @@ pub fn execute(mode: ObserveMode) -> Result<i32, CliError> {
             to_line,
             filter.as_deref(),
             role.as_deref(),
+            tool_name.as_deref(),
             project_hint.as_deref(),
         ),
         ObserveMode::Cycle {
@@ -101,6 +107,35 @@ pub fn execute(mode: ObserveMode) -> Result<i32, CliError> {
             window,
             project_hint,
         } => execute_context(&session_id, line, window, project_hint.as_deref()),
+        ObserveMode::Status {
+            session_id,
+            project_hint,
+        } => execute_status(&session_id, project_hint.as_deref()),
+        ObserveMode::Resume { session_id, filter } => execute_resume(&session_id, &filter),
+        ObserveMode::Verify {
+            session_id,
+            issue_id,
+            since_line,
+            project_hint,
+        } => execute_verify(&session_id, &issue_id, since_line, project_hint.as_deref()),
+        ObserveMode::ResolveStart {
+            session_id,
+            value,
+            project_hint,
+        } => execute_resolve_start(&session_id, &value, project_hint.as_deref()),
+        ObserveMode::ListCategories => execute_list_categories(),
+        ObserveMode::ListFocusPresets => execute_list_focus_presets(),
+        ObserveMode::Doctor => execute_doctor(),
+        ObserveMode::Mute {
+            session_id,
+            codes,
+            project_hint,
+        } => execute_mute(&session_id, &codes, project_hint.as_deref()),
+        ObserveMode::Unmute {
+            session_id,
+            codes,
+            project_hint,
+        } => execute_unmute(&session_id, &codes, project_hint.as_deref()),
     }
 }
 
@@ -113,26 +148,52 @@ fn state_file_path(session_id: &str) -> PathBuf {
 
 /// Execute one observer cycle: read cursor, scan, update cursor, report.
 fn execute_cycle(session_id: &str, project_hint: Option<&str>) -> Result<i32, CliError> {
-    let state_path = state_file_path(session_id);
-    let from_line = if state_path.exists() {
-        let content = fs::read_to_string(&state_path).map_err(|e| {
-            CliErrorKind::session_parse_error(format!("cannot read state file: {e}"))
-        })?;
-        let parsed: serde_json::Value = serde_json::from_str(&content).map_err(|e| {
-            CliErrorKind::session_parse_error(format!("invalid state file JSON: {e}"))
-        })?;
-        usize::try_from(parsed["cursor"].as_u64().unwrap_or(0)).unwrap_or(0)
-    } else {
-        0
-    };
+    let mut observer_state = load_observer_state(session_id)?;
+    let from_line = observer_state.cursor;
 
     let path = session::find_session(session_id, project_hint)?;
     let (issues, last_line) = scan(&path, from_line)?;
 
-    // Update cursor
-    let state = json!({"cursor": last_line, "session_id": session_id});
-    fs::write(&state_path, state.to_string())
-        .map_err(|e| CliErrorKind::session_parse_error(format!("cannot write state file: {e}")))?;
+    // Update observer state
+    let now = chrono::Utc::now().to_rfc3339();
+    observer_state.cursor = last_line;
+    observer_state.last_scan_time.clone_from(&now);
+
+    // Update open issues
+    for issue in &issues {
+        let existing = observer_state
+            .open_issues
+            .iter_mut()
+            .find(|oi| oi.code == issue.code && oi.fingerprint == issue.fingerprint);
+        if let Some(oi) = existing {
+            oi.occurrence_count += 1;
+            oi.last_seen_line = issue.line;
+        } else {
+            observer_state.open_issues.push(types::OpenIssue {
+                issue_id: issue.issue_id.clone(),
+                code: issue.code,
+                fingerprint: issue.fingerprint.clone(),
+                first_seen_line: issue.line,
+                last_seen_line: issue.line,
+                occurrence_count: 1,
+                severity: issue.severity,
+                category: issue.category,
+                summary: issue.summary.clone(),
+                fix_safety: issue.fix_safety,
+            });
+        }
+    }
+
+    // Record cycle
+    observer_state.cycle_history.push(types::CycleRecord {
+        timestamp: now,
+        from_line,
+        to_line: last_line,
+        new_issues: issues.len(),
+        resolved: 0,
+    });
+
+    save_observer_state(session_id, &observer_state)?;
 
     if issues.is_empty() {
         return Ok(0);
@@ -179,24 +240,61 @@ fn scan(path: &Path, from_line: usize) -> Result<(Vec<Issue>, usize), CliError> 
     Ok((issues, last_line))
 }
 
-/// Apply filters to a list of issues.
-fn apply_filters(issues: Vec<Issue>, filter: &ObserveFilterArgs) -> Vec<Issue> {
+/// Apply filters to a list of issues, validating filter values.
+fn apply_filters(issues: Vec<Issue>, filter: &ObserveFilterArgs) -> Result<Vec<Issue>, CliError> {
     let mut filtered = issues;
 
-    if let Some(ref severity) = filter.severity
-        && let Some(min_severity) = IssueSeverity::from_label(severity)
-    {
+    if let Some(ref severity) = filter.severity {
+        let Some(min_severity) = IssueSeverity::from_label(severity) else {
+            return Err(CliErrorKind::session_parse_error(format!(
+                "unknown severity '{severity}'. Valid: low, medium, critical"
+            ))
+            .into());
+        };
         filtered.retain(|issue| issue.severity >= min_severity);
     }
 
-    if let Some(ref category) = filter.category {
+    // Focus preset applies category filter if no explicit --category is set
+    if let Some(ref focus) = filter.focus {
+        if let Some(preset) = FocusPreset::from_label(focus) {
+            if let Some(focus_categories) = preset.categories() {
+                if let Some(ref category) = filter.category {
+                    // Intersect focus categories with explicit categories
+                    let explicit: Vec<IssueCategory> = category
+                        .split(',')
+                        .filter_map(|c| IssueCategory::from_label(c.trim()))
+                        .collect();
+                    filtered.retain(|issue| {
+                        focus_categories.contains(&issue.category)
+                            && explicit.contains(&issue.category)
+                    });
+                } else {
+                    filtered.retain(|issue| focus_categories.contains(&issue.category));
+                }
+            }
+        } else {
+            return Err(CliErrorKind::session_parse_error(format!(
+                "unknown focus preset '{focus}'. Valid: harness, skills, all"
+            ))
+            .into());
+        }
+    } else if let Some(ref category) = filter.category {
         let categories: Vec<IssueCategory> = category
             .split(',')
             .filter_map(|c| IssueCategory::from_label(c.trim()))
             .collect();
-        if !categories.is_empty() {
-            filtered.retain(|issue| categories.contains(&issue.category));
+        if categories.is_empty() {
+            return Err(CliErrorKind::session_parse_error(format!(
+                "no valid categories in '{category}'. Valid: {}",
+                IssueCategory::ALL
+                    .iter()
+                    .map(ToString::to_string)
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ))
+            .into());
         }
+        filtered.retain(|issue| categories.contains(&issue.category));
     }
 
     if let Some(ref exclude) = filter.exclude {
@@ -211,22 +309,94 @@ fn apply_filters(issues: Vec<Issue>, filter: &ObserveFilterArgs) -> Vec<Issue> {
         filtered.retain(|issue| issue.fix_safety.is_fixable());
     }
 
-    filtered
+    // Mute list
+    if let Some(ref mute) = filter.mute {
+        let muted: Vec<IssueCode> = mute
+            .split(',')
+            .filter_map(|c| IssueCode::from_label(c.trim()))
+            .collect();
+        filtered.retain(|issue| !muted.contains(&issue.code));
+    }
+
+    Ok(filtered)
+}
+
+/// Resolve the effective `from_line`, taking `--from` into account.
+fn resolve_effective_from_line(
+    filter: &ObserveFilterArgs,
+    session_path: &Path,
+) -> Result<usize, CliError> {
+    if let Some(ref from_value) = filter.from {
+        resolve_from(session_path, from_value)
+    } else {
+        Ok(filter.from_line)
+    }
+}
+
+/// Resolve a --from value to a concrete line number.
+///
+/// Resolution order:
+/// 1. Parse as usize -> line number
+/// 2. Starts with 4-digit year and contains T -> ISO timestamp
+/// 3. Otherwise -> prose substring search
+fn resolve_from(session_path: &Path, value: &str) -> Result<usize, CliError> {
+    // 1. Numeric
+    if let Ok(line) = value.parse::<usize>() {
+        return Ok(line);
+    }
+
+    // 2. ISO timestamp (starts with year, contains T)
+    if value.len() >= 10 && value[..4].chars().all(|c| c.is_ascii_digit()) && value.contains('T') {
+        let file = fs::File::open(session_path).map_err(|e| {
+            CliErrorKind::session_parse_error(format!("cannot open session file: {e}"))
+        })?;
+        let reader = BufReader::new(file);
+        for (index, line_result) in reader.lines().enumerate() {
+            let Ok(line) = line_result else { continue };
+            if let Ok(obj) = serde_json::from_str::<serde_json::Value>(line.trim()) {
+                if let Some(ts) = obj["timestamp"].as_str() {
+                    if ts >= value {
+                        return Ok(index);
+                    }
+                }
+            }
+        }
+        return Err(CliErrorKind::session_parse_error(format!(
+            "no event at or after timestamp '{value}'"
+        ))
+        .into());
+    }
+
+    // 3. Prose substring search
+    let lower_value = value.to_lowercase();
+    let file = fs::File::open(session_path)
+        .map_err(|e| CliErrorKind::session_parse_error(format!("cannot open session file: {e}")))?;
+    let reader = BufReader::new(file);
+    for (index, line_result) in reader.lines().enumerate() {
+        let Ok(line) = line_result else { continue };
+        if line.to_lowercase().contains(&lower_value) {
+            return Ok(index);
+        }
+    }
+    Err(CliErrorKind::session_parse_error(format!("no match for --from '{value}'")).into())
 }
 
 /// Execute scan mode.
 fn execute_scan(session_id: &str, filter: &ObserveFilterArgs) -> Result<i32, CliError> {
     let path = session::find_session(session_id, filter.project_hint.as_deref())?;
+    let from_line = resolve_effective_from_line(filter, &path)?;
 
-    let status = json!({
-        "status": "started",
-        "session": path.to_string_lossy(),
-        "from_line": filter.from_line,
-    });
-    println!("{status}");
+    if filter.json {
+        let status = json!({
+            "status": "started",
+            "session": path.to_string_lossy(),
+            "from_line": from_line,
+        });
+        println!("{status}");
+    }
 
-    let (issues, last_line) = scan(&path, filter.from_line)?;
-    let filtered = apply_filters(issues, filter);
+    let (issues, last_line) = scan(&path, from_line)?;
+    let filtered = apply_filters(issues, filter)?;
 
     if let Some(ref details_path) = filter.output_details {
         write_details_file(details_path, &filtered)?;
@@ -341,19 +511,22 @@ fn execute_watch(
     filter: &ObserveFilterArgs,
 ) -> Result<i32, CliError> {
     let path = session::find_session(session_id, filter.project_hint.as_deref())?;
+    let from_line = resolve_effective_from_line(filter, &path)?;
 
-    let status = json!({
-        "status": "started",
-        "session": path.to_string_lossy(),
-        "from_line": filter.from_line,
-    });
-    println!("{status}");
+    if filter.json {
+        let status = json!({
+            "status": "started",
+            "session": path.to_string_lossy(),
+            "from_line": from_line,
+        });
+        println!("{status}");
+    }
 
     let mut state = ScanState::default();
     let mut all_issues: Vec<Issue> = Vec::new();
-    let mut last_line = filter.from_line;
+    let mut last_line = from_line;
     let mut last_activity = Instant::now();
-    let mut byte_offset = compute_initial_byte_offset(&path, filter.from_line);
+    let mut byte_offset = compute_initial_byte_offset(&path, from_line);
     let poll_duration = Duration::from_secs(poll_interval);
     let timeout_duration = Duration::from_secs(timeout);
 
@@ -381,14 +554,20 @@ fn execute_watch(
         .transpose()?;
 
     loop {
+        let prev_last_line = last_line;
         let new_issues = poll_session_lines(&path, &mut byte_offset, &mut last_line, &mut state);
-        for issue in &new_issues {
-            emit_watch_issue(issue, filter.json, &mut details_writer, &mut output_writer);
-        }
-        if !new_issues.is_empty() {
-            all_issues.extend(new_issues);
+
+        // Track log activity (any new lines), not just issue activity
+        if last_line > prev_last_line {
             last_activity = Instant::now();
         }
+
+        // Filter each batch before emitting
+        let filtered_new = apply_filters(new_issues, filter)?;
+        for issue in &filtered_new {
+            emit_watch_issue(issue, filter.json, &mut details_writer, &mut output_writer);
+        }
+        all_issues.extend(filtered_new);
 
         if timeout > 0 && last_activity.elapsed() > timeout_duration {
             break;
@@ -397,9 +576,8 @@ fn execute_watch(
         thread::sleep(poll_duration);
     }
 
-    let filtered = apply_filters(all_issues, filter);
     if filter.summary {
-        println!("{}", output::render_summary(&filtered, last_line));
+        println!("{}", output::render_summary(&all_issues, last_line));
     }
 
     Ok(0)
@@ -412,6 +590,7 @@ fn execute_dump(
     to_line: Option<usize>,
     text_filter: Option<&str>,
     roles: Option<&str>,
+    tool_name: Option<&str>,
     project_hint: Option<&str>,
 ) -> Result<i32, CliError> {
     let path = session::find_session(session_id, project_hint)?;
@@ -444,7 +623,13 @@ fn execute_dump(
             continue;
         }
 
-        dump_message_content(index, role, &message["content"], filter_lower.as_deref());
+        dump_message_content(
+            index,
+            role,
+            &message["content"],
+            filter_lower.as_deref(),
+            tool_name,
+        );
     }
 
     Ok(0)
@@ -467,9 +652,24 @@ fn dump_message_content(
     role: &str,
     content: &serde_json::Value,
     filter_lower: Option<&str>,
+    tool_name_filter: Option<&str>,
 ) {
     if let Some(blocks) = content.as_array() {
         for block in blocks {
+            // Apply tool_name filter for tool_use blocks
+            if let Some(tn_filter) = tool_name_filter {
+                let block_type = block["type"].as_str().unwrap_or("");
+                if block_type == "tool_use" {
+                    let name = block["name"].as_str().unwrap_or("");
+                    if !name.eq_ignore_ascii_case(tn_filter) {
+                        continue;
+                    }
+                } else if block_type == "tool_result" {
+                    // Can't easily filter tool_result by name without correlation,
+                    // so skip tool_result blocks when tool_name filter is active
+                    continue;
+                }
+            }
             let db = format_dump_block(index, role, block);
             if db.text.len() <= MIN_DUMP_TEXT_LENGTH {
                 continue;
@@ -588,7 +788,7 @@ fn execute_context(
 ) -> Result<i32, CliError> {
     let start = target_line.saturating_sub(window);
     let end = target_line + window;
-    execute_dump(session_id, start, Some(end), None, None, project_hint)
+    execute_dump(session_id, start, Some(end), None, None, None, project_hint)
 }
 
 /// Write full untruncated issue details to a file.
@@ -602,4 +802,267 @@ fn write_details_file(path: &str, issues: &[Issue]) -> Result<(), CliError> {
         }
     }
     Ok(())
+}
+
+// ─── New handlers (Phase 4-5) ──────────────────────────────────────
+
+/// Load or create observer state for a session.
+fn load_observer_state(session_id: &str) -> Result<ObserverState, CliError> {
+    let state_path = state_file_path(session_id);
+    if state_path.exists() {
+        let content = fs::read_to_string(&state_path).map_err(|e| {
+            CliErrorKind::session_parse_error(format!("cannot read state file: {e}"))
+        })?;
+        serde_json::from_str(&content).map_err(|e| {
+            CliErrorKind::session_parse_error(format!("invalid state file JSON: {e}")).into()
+        })
+    } else {
+        Ok(ObserverState::default_for_session(session_id))
+    }
+}
+
+/// Save observer state atomically.
+fn save_observer_state(session_id: &str, state: &ObserverState) -> Result<(), CliError> {
+    let state_path = state_file_path(session_id);
+    let json = serde_json::to_string_pretty(state)
+        .map_err(|e| CliErrorKind::session_parse_error(format!("cannot serialize state: {e}")))?;
+    fs::write(&state_path, json)
+        .map_err(|e| CliErrorKind::session_parse_error(format!("cannot write state file: {e}")))?;
+    Ok(())
+}
+
+/// Show observer state for a session.
+fn execute_status(session_id: &str, _project_hint: Option<&str>) -> Result<i32, CliError> {
+    let state = load_observer_state(session_id)?;
+    let status = json!({
+        "session_id": state.session_id,
+        "cursor": state.cursor,
+        "last_scan_time": state.last_scan_time,
+        "open_issues": state.open_issues.len(),
+        "resolved_issues": state.resolved_issue_ids.len(),
+        "muted_codes": state.muted_codes.iter().map(ToString::to_string).collect::<Vec<_>>(),
+        "cycles": state.cycle_history.len(),
+    });
+    println!("{status}");
+    Ok(0)
+}
+
+/// Resume scanning from the last cursor position.
+fn execute_resume(session_id: &str, filter: &ObserveFilterArgs) -> Result<i32, CliError> {
+    let state = load_observer_state(session_id)?;
+    let mut resumed_filter = filter.clone();
+    resumed_filter.from_line = state.cursor;
+    execute_scan(session_id, &resumed_filter)
+}
+
+/// Verify whether a specific issue still reproduces.
+fn execute_verify(
+    session_id: &str,
+    issue_id: &str,
+    since_line: Option<usize>,
+    project_hint: Option<&str>,
+) -> Result<i32, CliError> {
+    let observer_state = load_observer_state(session_id)?;
+    let open_issue = observer_state
+        .open_issues
+        .iter()
+        .find(|i| i.issue_id == issue_id);
+
+    let from_line = since_line.unwrap_or_else(|| open_issue.map_or(0, |i| i.first_seen_line));
+
+    let path = session::find_session(session_id, project_hint)?;
+    let (issues, _last_line) = scan(&path, from_line)?;
+
+    let still_reproducing = open_issue.is_some_and(|oi| {
+        issues
+            .iter()
+            .any(|i| i.code == oi.code && i.fingerprint == oi.fingerprint)
+    });
+
+    let status = if still_reproducing {
+        "still_reproducing"
+    } else {
+        "potentially_resolved"
+    };
+
+    let evidence_lines: Vec<usize> = if let Some(oi) = open_issue {
+        issues
+            .iter()
+            .filter(|i| i.code == oi.code && i.fingerprint == oi.fingerprint)
+            .map(|i| i.line)
+            .collect()
+    } else {
+        Vec::new()
+    };
+
+    let result = json!({
+        "issue_id": issue_id,
+        "status": status,
+        "evidence_lines": evidence_lines,
+    });
+    println!("{result}");
+    Ok(0)
+}
+
+/// Resolve a --from value to a concrete line number and print it.
+fn execute_resolve_start(
+    session_id: &str,
+    value: &str,
+    project_hint: Option<&str>,
+) -> Result<i32, CliError> {
+    let path = session::find_session(session_id, project_hint)?;
+    let resolved = resolve_from(&path, value)?;
+
+    let method = if value.parse::<usize>().is_ok() {
+        "numeric"
+    } else if value.len() >= 10
+        && value[..4].chars().all(|c| c.is_ascii_digit())
+        && value.contains('T')
+    {
+        "timestamp"
+    } else {
+        "prose"
+    };
+
+    let result = json!({
+        "resolved_line": resolved,
+        "method": method,
+    });
+    println!("{result}");
+    Ok(0)
+}
+
+/// List all valid issue categories with descriptions.
+///
+/// # Errors
+/// Returns `CliError` if stdout is not writable.
+fn execute_list_categories() -> Result<i32, CliError> {
+    let stdout = io::stdout();
+    let mut out = stdout.lock();
+    for cat in IssueCategory::ALL {
+        writeln!(out, "{}: {}", cat, cat.description())
+            .map_err(|e| CliErrorKind::session_parse_error(format!("write error: {e}")))?;
+    }
+    Ok(0)
+}
+
+/// List all focus presets with descriptions.
+///
+/// # Errors
+/// Returns `CliError` if stdout is not writable.
+fn execute_list_focus_presets() -> Result<i32, CliError> {
+    let stdout = io::stdout();
+    let mut out = stdout.lock();
+    for preset in FOCUS_PRESETS {
+        writeln!(out, "{}: {}", preset.name, preset.description)
+            .map_err(|e| CliErrorKind::session_parse_error(format!("write error: {e}")))?;
+    }
+    Ok(0)
+}
+
+/// Validate observer setup.
+fn execute_doctor() -> Result<i32, CliError> {
+    let mut failures = 0u32;
+
+    // Check ~/.claude/projects/ exists
+    let home = env::var("HOME")
+        .map_err(|_| CliErrorKind::session_parse_error("HOME environment variable not set"))?;
+    let claude_projects = PathBuf::from(&home).join(".claude").join("projects");
+    if claude_projects.is_dir() {
+        println!("PASS: ~/.claude/projects/ exists");
+    } else {
+        println!("FAIL: ~/.claude/projects/ not found");
+        failures += 1;
+    }
+
+    // Check harness binary
+    let harness_path = PathBuf::from(&home).join(".local/bin/harness");
+    if harness_path.exists() {
+        println!("PASS: ~/.local/bin/harness exists");
+    } else {
+        println!("FAIL: ~/.local/bin/harness not found");
+        failures += 1;
+    }
+
+    // Check XDG data directory
+    let data_root = harness_data_root();
+    if data_root.is_dir() {
+        println!("PASS: data directory {} exists", data_root.display());
+    } else {
+        println!(
+            "WARN: data directory {} does not exist yet",
+            data_root.display()
+        );
+    }
+
+    // Check observe state directory is writable
+    let observe_dir = data_root.join("observe");
+    let _ = fs::create_dir_all(&observe_dir);
+    if observe_dir.is_dir() {
+        println!("PASS: observe state directory writable");
+    } else {
+        println!("FAIL: cannot create observe state directory");
+        failures += 1;
+    }
+
+    if failures > 0 {
+        return Err(
+            CliErrorKind::session_parse_error(format!("doctor found {failures} failures")).into(),
+        );
+    }
+    Ok(0)
+}
+
+/// Add issue codes to the mute list.
+fn execute_mute(
+    session_id: &str,
+    codes: &str,
+    _project_hint: Option<&str>,
+) -> Result<i32, CliError> {
+    let mut state = load_observer_state(session_id)?;
+    for code_str in codes.split(',') {
+        if let Some(code) = IssueCode::from_label(code_str.trim()) {
+            if !state.muted_codes.contains(&code) {
+                state.muted_codes.push(code);
+            }
+        } else {
+            eprintln!("warning: unknown issue code '{}'", code_str.trim());
+        }
+    }
+    save_observer_state(session_id, &state)?;
+    println!(
+        "Muted codes: {}",
+        state
+            .muted_codes
+            .iter()
+            .map(ToString::to_string)
+            .collect::<Vec<_>>()
+            .join(", ")
+    );
+    Ok(0)
+}
+
+/// Remove issue codes from the mute list.
+fn execute_unmute(
+    session_id: &str,
+    codes: &str,
+    _project_hint: Option<&str>,
+) -> Result<i32, CliError> {
+    let mut state = load_observer_state(session_id)?;
+    for code_str in codes.split(',') {
+        if let Some(code) = IssueCode::from_label(code_str.trim()) {
+            state.muted_codes.retain(|c| *c != code);
+        }
+    }
+    save_observer_state(session_id, &state)?;
+    println!(
+        "Muted codes: {}",
+        state
+            .muted_codes
+            .iter()
+            .map(ToString::to_string)
+            .collect::<Vec<_>>()
+            .join(", ")
+    );
+    Ok(0)
 }

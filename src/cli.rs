@@ -294,6 +294,12 @@ pub struct ObserveFilterArgs {
     /// Start scanning from this line number.
     #[arg(long, default_value = "0")]
     pub from_line: usize,
+    /// Resolve start position: line number, ISO timestamp, or prose substring.
+    #[arg(long)]
+    pub from: Option<String>,
+    /// Focus preset: harness, skills, or all.
+    #[arg(long)]
+    pub focus: Option<String>,
     /// Narrow session search to this project directory name.
     #[arg(long)]
     pub project_hint: Option<String>,
@@ -315,6 +321,9 @@ pub struct ObserveFilterArgs {
     /// Only show fixable issues.
     #[arg(long)]
     pub fixable: bool,
+    /// Mute specific issue codes (comma-separated).
+    #[arg(long)]
+    pub mute: Option<String>,
     /// Write truncated issues to this file instead of stdout (watch mode).
     #[arg(long)]
     pub output: Option<String>,
@@ -365,6 +374,9 @@ pub enum ObserveMode {
         /// Role filter (comma-separated: user,assistant).
         #[arg(long)]
         role: Option<String>,
+        /// Filter by tool name (e.g. Bash, Read, Write).
+        #[arg(long)]
+        tool_name: Option<String>,
         /// Narrow session search to this project directory name.
         #[arg(long)]
         project_hint: Option<String>,
@@ -387,6 +399,71 @@ pub enum ObserveMode {
         /// Number of lines before/after.
         #[arg(long, default_value = "10")]
         window: usize,
+        /// Narrow session search to this project directory name.
+        #[arg(long)]
+        project_hint: Option<String>,
+    },
+    /// Show observer state for a session.
+    Status {
+        /// Session ID to query.
+        session_id: String,
+        /// Narrow session search to this project directory name.
+        #[arg(long)]
+        project_hint: Option<String>,
+    },
+    /// Resume scanning from the last cursor position.
+    Resume {
+        /// Session ID to resume.
+        session_id: String,
+        /// Filter arguments.
+        #[command(flatten)]
+        filter: ObserveFilterArgs,
+    },
+    /// Verify whether a specific issue still reproduces.
+    Verify {
+        /// Session ID to check.
+        session_id: String,
+        /// Issue ID to verify.
+        issue_id: String,
+        /// Start verification from this line.
+        #[arg(long)]
+        since_line: Option<usize>,
+        /// Narrow session search to this project directory name.
+        #[arg(long)]
+        project_hint: Option<String>,
+    },
+    /// Resolve a --from value to a concrete line number.
+    ResolveStart {
+        /// Session ID to search.
+        session_id: String,
+        /// Value to resolve: line number, ISO timestamp, or prose substring.
+        value: String,
+        /// Narrow session search to this project directory name.
+        #[arg(long)]
+        project_hint: Option<String>,
+    },
+    /// List all valid issue categories.
+    ListCategories,
+    /// List all focus presets.
+    ListFocusPresets,
+    /// Validate observer setup.
+    Doctor,
+    /// Add issue codes to the mute list.
+    Mute {
+        /// Session ID to update.
+        session_id: String,
+        /// Issue codes to mute (comma-separated).
+        codes: String,
+        /// Narrow session search to this project directory name.
+        #[arg(long)]
+        project_hint: Option<String>,
+    },
+    /// Remove issue codes from the mute list.
+    Unmute {
+        /// Session ID to update.
+        session_id: String,
+        /// Issue codes to unmute (comma-separated).
+        codes: String,
         /// Narrow session search to this project directory name.
         #[arg(long)]
         project_hint: Option<String>,
