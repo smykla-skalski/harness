@@ -5,6 +5,7 @@ use crate::hook::HookResult;
 use crate::hook_payloads::HookContext;
 use crate::rules::suite_runner::{
     AdminEndpointHint, ClusterBinary, LegacyScript, MakeTargetPrefix, RunFile, RunnerBinary,
+    TaskOutputPattern,
 };
 use crate::workflow::runner::{RunnerPhase, RunnerWorkflowState};
 
@@ -148,6 +149,10 @@ fn guard_suite_runner(ctx: &HookContext, words: &[String], heads: &[String]) -> 
     let phase_result = guard_runner_phase(ctx, words);
     if !phase_result.code.is_empty() {
         return phase_result;
+    }
+
+    if has_task_output_access(words, ctx.command_text()) {
+        return deny_runner_flow(TaskOutputPattern::DENY_MESSAGE);
     }
 
     if has_denied_runner_binary(heads) {
@@ -691,6 +696,14 @@ fn has_denied_runner_binary(heads: &[String]) -> bool {
     heads.iter().any(|h| RunnerBinary::is_denied(h))
 }
 
+fn has_task_output_access(words: &[String], command_text: Option<&str>) -> bool {
+    let command = command_text.unwrap_or("");
+    if TaskOutputPattern::matches_any(command) {
+        return true;
+    }
+    words.iter().any(|w| TaskOutputPattern::matches_any(w))
+}
+
 fn has_admin_endpoint_hint(words: &[String]) -> bool {
     words.iter().any(|w| AdminEndpointHint::contains_hint(w))
 }
@@ -1178,6 +1191,51 @@ mod tests {
     #[test]
     fn allows_python_script_file() {
         let c = ctx("suite:new", "python3 script.py");
+        let r = execute(&c).unwrap();
+        assert_eq!(r.decision, Decision::Allow);
+    }
+
+    #[test]
+    fn denies_cat_task_output_file() {
+        let c = ctx(
+            "suite:run",
+            "cat /private/tmp/claude-501/sessions/abc123/tasks/xyz.output",
+        );
+        let r = execute(&c).unwrap();
+        assert_eq!(r.decision, Decision::Deny);
+        assert!(r.message.contains("TaskOutput tool"));
+    }
+
+    #[test]
+    fn denies_sleep_then_cat_task_output() {
+        let c = ctx(
+            "suite:run",
+            "sleep 120 && cat /private/tmp/claude-501/sessions/abc123/tasks/xyz.output",
+        );
+        let r = execute(&c).unwrap();
+        assert_eq!(r.decision, Decision::Deny);
+        assert!(r.message.contains("TaskOutput tool"));
+    }
+
+    #[test]
+    fn denies_task_output_glob() {
+        let c = ctx("suite:run", "cat tasks/*.output");
+        let r = execute(&c).unwrap();
+        assert_eq!(r.decision, Decision::Deny);
+        assert!(r.message.contains("TaskOutput tool"));
+    }
+
+    #[test]
+    fn denies_task_b8m_prefix() {
+        let c = ctx("suite:run", "cat tasks/b8m-something.output");
+        let r = execute(&c).unwrap();
+        assert_eq!(r.decision, Decision::Deny);
+        assert!(r.message.contains("TaskOutput tool"));
+    }
+
+    #[test]
+    fn allows_unrelated_cat_command() {
+        let c = ctx("suite:run", "cat /tmp/some-other-file.txt");
         let r = execute(&c).unwrap();
         assert_eq!(r.decision, Decision::Allow);
     }
