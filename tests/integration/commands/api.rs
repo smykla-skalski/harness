@@ -1,8 +1,9 @@
 // Integration tests for the `harness api` command.
 // Tests error paths since happy path requires a real CP.
 
-use harness::cli::{ApiMethod, Command, RunDirArgs};
-use harness::commands::Execute;
+use harness::cli::Command;
+use harness::commands::RunDirArgs;
+use harness::commands::run::ApiMethod;
 
 use super::super::helpers::*;
 
@@ -20,7 +21,7 @@ fn api_get_missing_run_dir() {
         path: "/zones".to_string(),
         run_dir: run_dir_args_missing(),
     };
-    let result = Command::Api { method }.execute();
+    let result = run_command(Command::Api(harness::commands::run::ApiArgs { method }));
     assert!(result.is_err());
     let err = result.unwrap_err();
     assert_eq!(err.code(), "KSRCLI014");
@@ -33,7 +34,7 @@ fn api_post_missing_run_dir() {
         body: "{}".to_string(),
         run_dir: run_dir_args_missing(),
     };
-    let result = Command::Api { method }.execute();
+    let result = run_command(Command::Api(harness::commands::run::ApiArgs { method }));
     assert!(result.is_err());
 }
 
@@ -43,7 +44,7 @@ fn api_delete_missing_run_dir() {
         path: "/meshes/default".to_string(),
         run_dir: run_dir_args_missing(),
     };
-    let result = Command::Api { method }.execute();
+    let result = run_command(Command::Api(harness::commands::run::ApiArgs { method }));
     assert!(result.is_err());
 }
 
@@ -60,7 +61,7 @@ fn api_get_missing_cluster_spec() {
             run_root: None,
         },
     };
-    let result = Command::Api { method }.execute();
+    let result = run_command(Command::Api(harness::commands::run::ApiArgs { method }));
     assert!(result.is_err());
     let err = result.unwrap_err();
     // Missing cluster spec means no CP address
@@ -81,7 +82,7 @@ fn api_post_missing_cluster_spec() {
             run_root: None,
         },
     };
-    let result = Command::Api { method }.execute();
+    let result = run_command(Command::Api(harness::commands::run::ApiArgs { method }));
     assert!(result.is_err());
     let err = result.unwrap_err();
     assert_eq!(err.code(), "KSRCLI009");

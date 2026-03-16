@@ -9,10 +9,15 @@ use std::path::{Path, PathBuf};
 use std::sync::{Mutex, PoisonError};
 
 use harness::authoring;
-use harness::cli::{
-    AuthoringBeginArgs, Command, EnvoyCommand, KumactlCommand, RecordArgs, RunDirArgs,
+use harness::cli::Command;
+use harness::commands::RunDirArgs;
+use harness::commands::authoring::{
+    ApprovalBeginArgs, AuthoringBeginArgs, AuthoringSaveArgs, AuthoringValidateArgs,
 };
-use harness::commands::Execute;
+use harness::commands::run::{
+    CaptureArgs, CloseoutArgs, EnvoyArgs, EnvoyCommand, KumactlArgs, KumactlCommand, RecordArgs,
+};
+use harness::commands::setup::GatewayArgs;
 use harness::core_defs;
 use harness::schema::Verdict;
 use harness::workflow::author::{self, AuthorPhase};
@@ -294,7 +299,7 @@ fn envoy_capture_records_admin_artifact() {
             run_root: None,
         },
     };
-    let result = Command::Envoy { cmd }.execute();
+    let result = Command::Envoy(EnvoyArgs { cmd }).execute();
     assert!(result.is_ok(), "envoy capture should succeed: {result:?}");
     assert_eq!(result.unwrap(), 0);
 }
@@ -320,7 +325,7 @@ fn envoy_capture_can_filter_config_type() {
             run_root: None,
         },
     };
-    let result = Command::Envoy { cmd }.execute();
+    let result = Command::Envoy(EnvoyArgs { cmd }).execute();
     assert!(result.is_ok());
 }
 
@@ -365,7 +370,7 @@ fn envoy_route_body_can_capture_live_payload() {
             run_root: None,
         },
     };
-    let result = Command::Envoy { cmd }.execute();
+    let result = Command::Envoy(EnvoyArgs { cmd }).execute();
     assert!(
         result.is_ok(),
         "route-body should find /stats route: {result:?}"
@@ -393,7 +398,7 @@ fn envoy_capture_rejects_without_tracked_cluster() {
             run_root: None,
         },
     };
-    let result = Command::Envoy { cmd }.execute();
+    let result = Command::Envoy(EnvoyArgs { cmd }).execute();
     assert!(result.is_err(), "should fail without --file");
 }
 
@@ -435,7 +440,7 @@ fn kumactl_find_returns_first_existing() {
     let cmd = KumactlCommand::Find {
         repo_root: Some(repo_root.to_string_lossy().to_string()),
     };
-    let result = Command::Kumactl { cmd }.execute();
+    let result = Command::Kumactl(KumactlArgs { cmd }).execute();
     assert!(result.is_ok(), "kumactl find should succeed: {result:?}");
 }
 
@@ -474,10 +479,10 @@ fn authoring_validate_accepts_valid_meshmetric_group() {
     .unwrap();
 
     let paths = vec![yaml.to_string_lossy().to_string()];
-    let result = Command::AuthoringValidate {
+    let result = Command::AuthoringValidate(AuthoringValidateArgs {
         path: paths.clone(),
         repo_root: Some(repo_root.to_string_lossy().to_string()),
-    }
+    })
     .execute();
     assert!(result.is_ok(), "valid yaml should pass: {result:?}");
 }
@@ -492,10 +497,10 @@ fn authoring_validate_rejects_invalid_meshmetric_group() {
     fs::write(&md, "# Not yaml").unwrap();
 
     let paths = vec![md.to_string_lossy().to_string()];
-    let result = Command::AuthoringValidate {
+    let result = Command::AuthoringValidate(AuthoringValidateArgs {
         path: paths.clone(),
         repo_root: Some(repo_root.to_string_lossy().to_string()),
-    }
+    })
     .execute();
     // Non-yaml files are skipped, so result is Ok with empty list
     assert!(result.is_ok());
@@ -511,10 +516,10 @@ fn authoring_validate_ignores_universal_format() {
     fs::write(&txt, "universal format block").unwrap();
 
     let paths = vec![txt.to_string_lossy().to_string()];
-    let result = Command::AuthoringValidate {
+    let result = Command::AuthoringValidate(AuthoringValidateArgs {
         path: paths.clone(),
         repo_root: Some(repo_root.to_string_lossy().to_string()),
-    }
+    })
     .execute();
     assert!(result.is_ok(), "universal format should be skipped");
 }
@@ -533,10 +538,10 @@ fn authoring_validate_skips_expected_rejection_manifests() {
     .unwrap();
 
     let paths = vec![yaml.to_string_lossy().to_string()];
-    let result = Command::AuthoringValidate {
+    let result = Command::AuthoringValidate(AuthoringValidateArgs {
         path: paths.clone(),
         repo_root: Some(repo_root.to_string_lossy().to_string()),
-    }
+    })
     .execute();
     assert!(result.is_ok());
 }
@@ -554,11 +559,11 @@ fn approval_begin_initializes_interactive_state() {
     let prev_dir = env::current_dir().unwrap();
     env::set_current_dir(&work_dir).unwrap();
 
-    let result = Command::ApprovalBegin {
+    let result = Command::ApprovalBegin(ApprovalBeginArgs {
         skill: "suite:new".to_string(),
         mode: "interactive".to_string(),
         suite_dir: None,
-    }
+    })
     .execute();
     assert!(result.is_ok(), "approval_begin should succeed: {result:?}");
 
@@ -594,9 +599,9 @@ fn closeout_sets_completed_phase() {
         run_root: None,
     };
 
-    let result = Command::Closeout {
+    let result = Command::Closeout(CloseoutArgs {
         run_dir: args.clone(),
-    }
+    })
     .execute();
     assert!(result.is_ok(), "closeout should succeed: {result:?}");
     assert_eq!(result.unwrap(), 0);
@@ -831,7 +836,7 @@ fn check_kumactl_build_runs_make_and_prints_binary() {
     };
 
     temp_env::with_vars([("PATH", Some(&new_path))], || {
-        let result = Command::Kumactl { cmd: cmd.clone() }.execute();
+        let result = Command::Kumactl(KumactlArgs { cmd: cmd.clone() }).execute();
         assert!(result.is_ok(), "kumactl build should succeed: {result:?}");
     });
 }
@@ -854,11 +859,11 @@ fn check_bootstrap_command_runs_gateway_api_crd_install() {
     let new_path = tc.path_with_prepend(&orig_path);
 
     temp_env::with_vars([("PATH", Some(&new_path))], || {
-        let result = Command::Gateway {
+        let result = Command::Gateway(GatewayArgs {
             kubeconfig: None,
             repo_root: Some(repo_root.to_string_lossy().to_string()),
             check_only: true,
-        }
+        })
         .execute();
         assert!(result.is_ok(), "gateway check should succeed: {result:?}");
     });
@@ -881,11 +886,11 @@ fn check_capture_uses_current_run_context() {
     };
 
     temp_env::with_vars([("PATH", Some(&new_path))], || {
-        let result = Command::Capture {
+        let result = Command::Capture(CaptureArgs {
             kubeconfig: Some("/tmp/fake-kubeconfig".to_string()),
             label: "pod-state".to_string(),
             run_dir: args.clone(),
-        }
+        })
         .execute();
         assert!(result.is_ok(), "capture should succeed: {result:?}");
     });
@@ -996,11 +1001,11 @@ fn check_authoring_save_accepts_inline_payload() {
             })
             .execute();
 
-            let result = Command::AuthoringSave {
+            let result = Command::AuthoringSave(AuthoringSaveArgs {
                 kind: "inventory".to_string(),
                 payload: Some(r#"{"files":[]}"#.to_string()),
                 input: None,
-            }
+            })
             .execute();
             assert!(
                 result.is_ok(),
@@ -1040,11 +1045,11 @@ fn check_authoring_save_accepts_stdin() {
             })
             .execute();
 
-            let result = Command::AuthoringSave {
+            let result = Command::AuthoringSave(AuthoringSaveArgs {
                 kind: "inventory".to_string(),
                 payload: None,
                 input: Some(input_file.to_str().unwrap().to_string()),
-            }
+            })
             .execute();
             assert!(result.is_ok(), "save from file should succeed: {result:?}");
         },
@@ -1075,11 +1080,11 @@ fn check_authoring_save_rejects_schema_missing_fields() {
             })
             .execute();
 
-            let result = Command::AuthoringSave {
+            let result = Command::AuthoringSave(AuthoringSaveArgs {
                 kind: "schema".to_string(),
                 payload: Some(String::new()),
                 input: None,
-            }
+            })
             .execute();
             assert!(result.is_err(), "empty payload should be rejected");
         },

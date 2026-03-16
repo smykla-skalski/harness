@@ -1,9 +1,7 @@
 use crate::errors::{CliError, HookMessage};
 use crate::hook::HookResult;
 use crate::hook_payloads::HookContext;
-use crate::workflow::runner::{
-    self as runner_wf, FailureKind, FailureState, PreflightStatus, RunnerPhase, RunnerWorkflowState,
-};
+use crate::workflow::runner::{self as runner_wf, FailureKind, RunnerPhase, RunnerWorkflowState};
 
 /// Execute the enrich-failure hook.
 ///
@@ -28,12 +26,13 @@ pub fn execute(ctx: &HookContext) -> Result<HookResult, CliError> {
     let words = ctx.command_words().unwrap_or_default();
     if words.len() >= 2 && words[0] == "harness" {
         let sub = words[1].as_str();
-        if matches!(sub, "apply" | "validate") && state.phase == RunnerPhase::Execution {
+        if matches!(sub, "apply" | "validate") && state.phase() == RunnerPhase::Execution {
             let new_state = request_failure_triage(state, FailureKind::Manifest);
             if let Some(ref rd) = ctx.effective_run_dir() {
                 runner_wf::write_runner_state(rd, &new_state)?;
             }
-        } else if state.phase == RunnerPhase::Preflight && matches!(sub, "preflight" | "capture") {
+        } else if state.phase() == RunnerPhase::Preflight && matches!(sub, "preflight" | "capture")
+        {
             let new_state = request_preflight_failed(state);
             if let Some(ref rd) = ctx.effective_run_dir() {
                 runner_wf::write_runner_state(rd, &new_state)?;
@@ -44,32 +43,17 @@ pub fn execute(ctx: &HookContext) -> Result<HookResult, CliError> {
 }
 
 fn request_failure_triage(state: &RunnerWorkflowState, kind: FailureKind) -> RunnerWorkflowState {
-    let mut new_state = state.clone();
-    new_state.phase = RunnerPhase::Triage;
-    new_state.failure = Some(FailureState {
-        kind,
-        suite_target: None,
-        message: None,
-    });
-    new_state.transition_count += 1;
-    new_state.last_event = Some("FailureTriageRequested".to_string());
-    new_state.updated_at = chrono::Utc::now().to_rfc3339();
-    new_state
+    state.request_failure_triage(kind, None, None, "FailureTriageRequested")
 }
 
 fn request_preflight_failed(state: &RunnerWorkflowState) -> RunnerWorkflowState {
-    let mut new_state = state.clone();
-    new_state.preflight.status = PreflightStatus::Pending;
-    new_state.transition_count += 1;
-    new_state.last_event = Some("PreflightFailed".to_string());
-    new_state.updated_at = chrono::Utc::now().to_rfc3339();
-    new_state
+    state.request_preflight_failed("PreflightFailed")
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::workflow::runner::PreflightState;
+    use crate::workflow::runner::{PreflightState, PreflightStatus};
 
     fn base_state() -> RunnerWorkflowState {
         RunnerWorkflowState {

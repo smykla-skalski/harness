@@ -7,7 +7,7 @@ use crate::errors::{CliError, HookMessage};
 use crate::hook::HookResult;
 use crate::hook_payloads::HookContext;
 use crate::rules::suite_runner::{self as runner_rules, PreflightReply};
-use crate::workflow::runner::{self as runner_wf, PreflightStatus, RunnerPhase};
+use crate::workflow::runner::{self as runner_wf, RunnerPhase};
 
 static CODE_BLOCK_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?s)```.*?```").unwrap());
 
@@ -78,13 +78,9 @@ fn validate_suite_runner(ctx: &HookContext) -> Result<HookResult, CliError> {
     let state = ctx.runner_state.as_ref();
     if reply.status == PreflightReply::Fail {
         if let Some(s) = state
-            && s.phase == RunnerPhase::Preflight
+            && s.phase() == RunnerPhase::Preflight
         {
-            let mut new_state = s.clone();
-            new_state.preflight.status = PreflightStatus::Pending;
-            new_state.transition_count += 1;
-            new_state.last_event = Some("PreflightFailed".to_string());
-            new_state.updated_at = chrono::Utc::now().to_rfc3339();
+            let new_state = s.request_preflight_failed("PreflightFailed");
             if let Some(ref rd) = ctx.effective_run_dir() {
                 runner_wf::write_runner_state(rd, &new_state)?;
             }
@@ -109,18 +105,14 @@ fn validate_suite_runner(ctx: &HookContext) -> Result<HookResult, CliError> {
     }
     // Transition to preflight captured.
     if let Some(s) = state {
-        if s.phase == RunnerPhase::Preflight {
-            let mut new_state = s.clone();
-            new_state.preflight.status = PreflightStatus::Complete;
-            new_state.transition_count += 1;
-            new_state.last_event = Some("PreflightCaptured".to_string());
-            new_state.updated_at = chrono::Utc::now().to_rfc3339();
+        if s.phase() == RunnerPhase::Preflight {
+            let new_state = s.record_preflight_captured("PreflightCaptured");
             if let Some(ref rd) = ctx.effective_run_dir() {
                 runner_wf::write_runner_state(rd, &new_state)?;
             }
             return Ok(HookResult::allow());
         }
-        if s.phase == RunnerPhase::Execution {
+        if s.phase() == RunnerPhase::Execution {
             return Ok(HookResult::allow());
         }
     }

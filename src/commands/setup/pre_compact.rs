@@ -1,6 +1,16 @@
+use clap::Args;
+
 use crate::commands::resolve_project_dir;
 use crate::compact::{build_compact_handoff, save_compact_handoff};
 use crate::errors::CliError;
+
+/// Arguments for `harness pre-compact`.
+#[derive(Debug, Clone, Args)]
+pub struct PreCompactArgs {
+    /// Project directory to save the compact handoff for.
+    #[arg(long, env = "CLAUDE_PROJECT_DIR")]
+    pub project_dir: Option<String>,
+}
 
 /// Save compact handoff before compaction.
 ///

@@ -1,10 +1,21 @@
+use clap::Args;
+
 use crate::audit_log::write_run_status_with_audit;
-use crate::cli::RunDirArgs;
-use crate::commands::resolve_run_context;
+use crate::commands::{RunDirArgs, resolve_run_context};
 use crate::core_defs::utc_now;
 use crate::errors::{CliError, CliErrorKind};
 use crate::schema::Verdict;
-use crate::workflow::runner::{apply_event, ensure_execution_phase, read_runner_state};
+use crate::workflow::runner::{
+    RunnerEvent, apply_event, ensure_execution_phase, read_runner_state,
+};
+
+/// Arguments for `harness closeout`.
+#[derive(Debug, Clone, Args)]
+pub struct CloseoutArgs {
+    /// Run-directory resolution.
+    #[command(flatten)]
+    pub run_dir: RunDirArgs,
+}
 
 /// Close out a run by verifying required artifacts.
 ///
@@ -68,12 +79,12 @@ pub fn closeout(run_dir_args: &RunDirArgs) -> Result<i32, CliError> {
     // Advance runner state to closeout then completed.
     ensure_execution_phase(&run_dir)?;
     if let Some(runner) = read_runner_state(&run_dir)? {
-        let phase_str = runner.phase.to_string();
+        let phase_str = runner.phase().to_string();
         if phase_str == "execution" {
-            apply_event(&run_dir, "closeout-started", None, None)?;
-            apply_event(&run_dir, "run-completed", None, None)?;
+            apply_event(&run_dir, RunnerEvent::CloseoutStarted, None, None)?;
+            apply_event(&run_dir, RunnerEvent::RunCompleted, None, None)?;
         } else if phase_str == "closeout" {
-            apply_event(&run_dir, "run-completed", None, None)?;
+            apply_event(&run_dir, RunnerEvent::RunCompleted, None, None)?;
         }
     }
 

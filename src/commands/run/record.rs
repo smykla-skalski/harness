@@ -3,10 +3,10 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::LazyLock;
 
+use clap::Args;
 use regex::Regex;
 
-use crate::cli::RunDirArgs;
-use crate::commands::resolve_run_dir;
+use crate::commands::{RunDirArgs, resolve_run_dir};
 use crate::context::RunLayout;
 use crate::core_defs::{shorten_path, utc_now};
 use crate::errors::{CliError, CliErrorKind};
@@ -14,6 +14,32 @@ use crate::io::{ensure_dir, write_text};
 use crate::workflow::runner::{RunnerPhase, read_runner_state};
 
 use super::shared::inject_run_env;
+
+/// Arguments for `harness record`.
+#[derive(Debug, Clone, Args)]
+pub struct RecordArgs {
+    /// Repo root for local command resolution.
+    #[arg(long)]
+    pub repo_root: Option<String>,
+    /// Optional phase tag for the command artifact name.
+    #[arg(long)]
+    pub phase: Option<String>,
+    /// Optional label tag for the command artifact name.
+    #[arg(long)]
+    pub label: Option<String>,
+    /// Execution-phase group ID for tracked commands.
+    #[arg(long)]
+    pub gid: Option<String>,
+    /// Tracked cluster member name for kubectl commands.
+    #[arg(long)]
+    pub cluster: Option<String>,
+    /// Command to execute; prefix with -- to stop flag parsing.
+    #[arg(allow_hyphen_values = true)]
+    pub command: Vec<String>,
+    /// Run-directory resolution.
+    #[command(flatten)]
+    pub run_dir: RunDirArgs,
+}
 
 static SLUGIFY_RE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"[^A-Za-z0-9_.-]+").expect("invalid slugify regex"));
@@ -138,10 +164,8 @@ fn resolve_workflow_phase(run_dir: Option<&Path>) -> Result<String, CliError> {
     let Some(run_dir) = run_dir else {
         return Ok("-".to_string());
     };
-    Ok(
-        read_runner_state(run_dir)?
-            .map_or_else(|| "-".to_string(), |state| state.phase.to_string()),
-    )
+    Ok(read_runner_state(run_dir)?
+        .map_or_else(|| "-".to_string(), |state| state.phase().to_string()))
 }
 
 fn validate_gid_usage(

@@ -1,10 +1,11 @@
 use std::path::{Path, PathBuf};
 
 use chrono::Utc;
+use clap::Args;
 
 use crate::audit_log::write_run_status_with_audit;
-use crate::cli::RunDirArgs;
 use crate::cluster::Platform;
+use crate::commands::RunDirArgs;
 use crate::commands::resolve_run_context;
 use crate::context::RunContext;
 use crate::errors::{CliError, CliErrorKind, cow};
@@ -14,6 +15,20 @@ use crate::io::{validate_safe_segment, write_text};
 use crate::workflow::runner::read_runner_state;
 
 use super::shared::detect_platform;
+
+/// Arguments for `harness capture`.
+#[derive(Debug, Clone, Args)]
+pub struct CaptureArgs {
+    /// Use this kubeconfig instead of the tracked run cluster.
+    #[arg(long)]
+    pub kubeconfig: Option<String>,
+    /// Label for the saved artifact filename.
+    #[arg(long)]
+    pub label: String,
+    /// Run-directory resolution.
+    #[command(flatten)]
+    pub run_dir: RunDirArgs,
+}
 
 /// Capture cluster pod state for a run.
 ///

@@ -1,14 +1,34 @@
-use crate::cli::RunDirArgs;
-use crate::commands::resolve_run_dir;
+use clap::Args;
+
+use crate::commands::{RunDirArgs, resolve_run_dir};
 use crate::errors::CliError;
-use crate::workflow::runner::{apply_event, initialize_runner_state, read_runner_state};
+use crate::workflow::runner::{
+    RunnerEvent, apply_event, initialize_runner_state, read_runner_state,
+};
+
+/// Arguments for `harness runner-state`.
+#[derive(Debug, Clone, Args)]
+pub struct RunnerStateArgs {
+    /// Workflow event to apply; omit to print the current phase.
+    #[arg(long, value_enum)]
+    pub event: Option<RunnerEvent>,
+    /// Suite-relative manifest path for manifest-fix events.
+    #[arg(long)]
+    pub suite_target: Option<String>,
+    /// Optional message to record on the event.
+    #[arg(long)]
+    pub message: Option<String>,
+    /// Run-directory resolution.
+    #[command(flatten)]
+    pub run_dir: RunDirArgs,
+}
 
 /// Manage runner workflow state.
 ///
 /// # Errors
 /// Returns `CliError` on failure.
 pub fn runner_state(
-    event: Option<&str>,
+    event: Option<RunnerEvent>,
     suite_target: Option<&str>,
     message: Option<&str>,
     run_dir_args: &RunDirArgs,
@@ -21,19 +41,19 @@ pub fn runner_state(
     };
 
     let Some(event_name) = event else {
-        let phase = serde_json::to_value(state.phase)
+        let phase = serde_json::to_value(state.phase())
             .ok()
             .and_then(|v| v.as_str().map(String::from))
-            .unwrap_or_else(|| format!("{:?}", state.phase).to_lowercase());
+            .unwrap_or_else(|| format!("{:?}", state.phase()).to_lowercase());
         println!("{phase}");
         return Ok(0);
     };
 
     let updated = apply_event(&run_dir, event_name, suite_target, message)?;
-    let phase = serde_json::to_value(updated.phase)
+    let phase = serde_json::to_value(updated.phase())
         .ok()
         .and_then(|v| v.as_str().map(String::from))
-        .unwrap_or_else(|| format!("{:?}", updated.phase).to_lowercase());
+        .unwrap_or_else(|| format!("{:?}", updated.phase()).to_lowercase());
     println!("{phase}");
     Ok(0)
 }

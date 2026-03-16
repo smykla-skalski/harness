@@ -1,7 +1,20 @@
 use std::path::{Path, PathBuf};
 
+use clap::Args;
+
 use crate::authoring_validate::{authoring_validation_repo_root, validate_suite_author_paths};
 use crate::errors::CliError;
+
+/// Arguments for `harness authoring-validate`.
+#[derive(Debug, Clone, Args)]
+pub struct AuthoringValidateArgs {
+    /// Manifest or group Markdown path; repeat for multiple inputs.
+    #[arg(long, required = true)]
+    pub path: Vec<String>,
+    /// Repo root for locating checked-in CRDs.
+    #[arg(long)]
+    pub repo_root: Option<String>,
+}
 
 /// Validate authored manifests against local CRDs.
 ///

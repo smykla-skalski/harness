@@ -1,7 +1,23 @@
 use std::path::Path;
 
+use clap::Args;
+
 use crate::errors::{CliError, CliErrorKind, cow};
 use crate::io::{drill, read_text};
+
+/// Arguments for `harness diff`.
+#[derive(Debug, Clone, Args)]
+pub struct DiffArgs {
+    /// Left file path.
+    #[arg(long)]
+    pub left: String,
+    /// Right file path.
+    #[arg(long)]
+    pub right: String,
+    /// Optional dotted path inside parsed JSON payloads.
+    #[arg(long)]
+    pub path: Option<String>,
+}
 
 fn load_diff_payload(path: &Path) -> Result<serde_json::Value, CliError> {
     let text = read_text(path)?;

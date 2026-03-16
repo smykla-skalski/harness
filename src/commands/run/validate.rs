@@ -1,10 +1,26 @@
 use std::path::{Path, PathBuf};
 
+use clap::Args;
+
 use crate::core_defs::shorten_path;
 use crate::errors::{CliError, CliErrorKind};
 use crate::exec::kubectl;
 use crate::io::{read_text, write_text};
 use crate::manifests::default_validation_output;
+
+/// Arguments for `harness validate`.
+#[derive(Debug, Clone, Args)]
+pub struct ValidateArgs {
+    /// Use this kubeconfig instead of the tracked run cluster.
+    #[arg(long)]
+    pub kubeconfig: Option<String>,
+    /// Manifest path.
+    #[arg(long)]
+    pub manifest: String,
+    /// Validation log path; defaults beside the manifest artifact.
+    #[arg(long)]
+    pub output: Option<String>,
+}
 
 /// Validate a manifest against the cluster.
 ///

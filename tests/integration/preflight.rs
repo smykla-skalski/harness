@@ -7,8 +7,9 @@ use std::env;
 use std::fs;
 use std::sync::PoisonError;
 
-use harness::cli::{ApplyArgs, Command, RunDirArgs};
-use harness::commands::Execute;
+use harness::cli::Command;
+use harness::commands::RunDirArgs;
+use harness::commands::run::{ApplyArgs, CaptureArgs, PreflightArgs, ValidateArgs};
 use harness::kubectl_validate::{KubectlValidateDecision, KubectlValidateState};
 use harness::schema::GroupSpec;
 use harness::workflow::runner::{RunnerPhase, read_runner_state};
@@ -250,11 +251,11 @@ fn preflight_prepares_and_caches() {
             run_id: None,
             run_root: None,
         };
-        let result = Command::Preflight {
+        let result = Command::Preflight(PreflightArgs {
             kubeconfig: None,
             repo_root: None,
             run_dir: rda.clone(),
-        }
+        })
         .execute();
         assert!(
             result.is_ok(),
@@ -263,11 +264,11 @@ fn preflight_prepares_and_caches() {
         assert_eq!(result.unwrap(), 0);
 
         // Second call should also succeed (idempotent)
-        let result2 = Command::Preflight {
+        let result2 = Command::Preflight(PreflightArgs {
             kubeconfig: None,
             repo_root: None,
             run_dir: rda,
-        }
+        })
         .execute();
         assert!(
             result2.is_ok(),
@@ -311,11 +312,11 @@ fn preflight_skips_rejections() {
             run_id: None,
             run_root: None,
         };
-        let result = Command::Preflight {
+        let result = Command::Preflight(PreflightArgs {
             kubeconfig: None,
             repo_root: None,
             run_dir: rda,
-        }
+        })
         .execute();
         assert!(
             result.is_ok(),
@@ -359,11 +360,11 @@ fn preflight_skips_inline_rejections() {
             run_id: None,
             run_root: None,
         };
-        let result = Command::Preflight {
+        let result = Command::Preflight(PreflightArgs {
             kubeconfig: None,
             repo_root: None,
             run_dir: rda,
-        }
+        })
         .execute();
         assert!(
             result.is_ok(),
@@ -407,11 +408,11 @@ fn preflight_skips_frontmatter_rejections() {
             run_id: None,
             run_root: None,
         };
-        let result = Command::Preflight {
+        let result = Command::Preflight(PreflightArgs {
             kubeconfig: None,
             repo_root: None,
             run_dir: rda,
-        }
+        })
         .execute();
         assert!(
             result.is_ok(),
@@ -447,11 +448,11 @@ fn preflight_applies_baselines() {
             run_id: None,
             run_root: None,
         };
-        let result = Command::Preflight {
+        let result = Command::Preflight(PreflightArgs {
             kubeconfig: None,
             repo_root: None,
             run_dir: rda,
-        }
+        })
         .execute();
         assert!(
             result.is_ok(),
@@ -487,11 +488,11 @@ fn preflight_namespace_baseline() {
             run_id: None,
             run_root: None,
         };
-        let result = Command::Preflight {
+        let result = Command::Preflight(PreflightArgs {
             kubeconfig: None,
             repo_root: None,
             run_dir: rda,
-        }
+        })
         .execute();
         assert!(
             result.is_ok(),
@@ -522,11 +523,11 @@ fn capture_uses_run_context() {
             run_id: None,
             run_root: None,
         };
-        let result = Command::Capture {
+        let result = Command::Capture(CaptureArgs {
             kubeconfig: Some(kc_path.to_string_lossy().to_string()),
             label: "post-deploy".to_string(),
             run_dir: rda,
-        }
+        })
         .execute();
         assert!(result.is_ok(), "capture should succeed: {result:?}");
         assert_eq!(result.unwrap(), 0);
@@ -677,11 +678,11 @@ fn validate_uses_api_version() {
     let orig_path = env::var("PATH").unwrap_or_default();
 
     temp_env::with_vars([("PATH", Some(&tc.path_with_prepend(&orig_path)))], || {
-        let result = Command::Validate {
+        let result = Command::Validate(ValidateArgs {
             kubeconfig: Some(kc_path.to_string_lossy().to_string()),
             manifest: manifest_path.to_string_lossy().to_string(),
             output: None,
-        }
+        })
         .execute();
         assert!(result.is_ok(), "validate should succeed: {result:?}");
         assert_eq!(result.unwrap(), 0);
@@ -733,11 +734,11 @@ fn preflight_failure_resets() {
             run_id: None,
             run_root: None,
         };
-        let result = Command::Preflight {
+        let result = Command::Preflight(PreflightArgs {
             kubeconfig: None,
             repo_root: None,
             run_dir: rda,
-        }
+        })
         .execute();
         assert!(result.is_ok(), "preflight should succeed: {result:?}");
 
@@ -773,20 +774,20 @@ fn capture_marks_preflight_complete() {
         };
 
         // Run preflight first
-        let pf_result = Command::Preflight {
+        let pf_result = Command::Preflight(PreflightArgs {
             kubeconfig: None,
             repo_root: None,
             run_dir: rda.clone(),
-        }
+        })
         .execute();
         assert!(pf_result.is_ok(), "preflight should succeed: {pf_result:?}");
 
         // Then run capture
-        let cap_result = Command::Capture {
+        let cap_result = Command::Capture(CaptureArgs {
             kubeconfig: Some(kc_path.to_string_lossy().to_string()),
             label: "post-preflight".to_string(),
             run_dir: rda,
-        }
+        })
         .execute();
         assert!(cap_result.is_ok(), "capture should succeed: {cap_result:?}");
         assert_eq!(cap_result.unwrap(), 0);
@@ -840,11 +841,11 @@ fn preflight_dependent_baselines() {
             run_id: None,
             run_root: None,
         };
-        let result = Command::Preflight {
+        let result = Command::Preflight(PreflightArgs {
             kubeconfig: None,
             repo_root: None,
             run_dir: rda,
-        }
+        })
         .execute();
         assert!(
             result.is_ok(),

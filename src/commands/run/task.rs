@@ -3,8 +3,45 @@ use std::path::Path;
 use std::thread;
 use std::time::{Duration, Instant};
 
-use crate::cli::TaskCommand;
+use clap::{Args, Subcommand};
+
 use crate::errors::{CliError, CliErrorKind};
+
+/// Background task output operations.
+#[derive(Debug, Clone, Subcommand)]
+#[non_exhaustive]
+pub enum TaskCommand {
+    /// Wait for a background task to complete by polling its output file.
+    Wait {
+        /// Full path to the task output file.
+        output_file: String,
+        /// Maximum seconds to wait before timing out.
+        #[arg(long, default_value = "600")]
+        timeout: u64,
+        /// Seconds between file-size polls.
+        #[arg(long, default_value = "10")]
+        poll_interval: u64,
+        /// Number of tail lines to print when done.
+        #[arg(long, default_value = "20")]
+        lines: usize,
+    },
+    /// Print the last N lines of a task output file.
+    Tail {
+        /// Full path to the task output file.
+        output_file: String,
+        /// Number of lines to print.
+        #[arg(long, default_value = "20")]
+        lines: usize,
+    },
+}
+
+/// Arguments for `harness task`.
+#[derive(Debug, Clone, Args)]
+pub struct TaskArgs {
+    /// Task subcommand.
+    #[command(subcommand)]
+    pub command: TaskCommand,
+}
 
 /// Maximum number of consecutive poll cycles where the file size stays the
 /// same before we consider the task complete.

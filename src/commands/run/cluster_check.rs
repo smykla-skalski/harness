@@ -1,10 +1,20 @@
 use serde_json::json;
 
-use crate::cli::RunDirArgs;
+use clap::Args;
+
 use crate::cluster::Platform;
+use crate::commands::RunDirArgs;
 use crate::commands::resolve_run_context;
 use crate::errors::{CliError, CliErrorKind};
 use crate::exec;
+
+/// Arguments for `harness cluster-check`.
+#[derive(Debug, Clone, Args)]
+pub struct ClusterCheckArgs {
+    /// Run-directory resolution.
+    #[command(flatten)]
+    pub run_dir: RunDirArgs,
+}
 
 /// Check if cluster containers/networks from the persisted cluster spec are still running.
 ///

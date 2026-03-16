@@ -1,13 +1,12 @@
 use std::env;
 use std::fmt;
-use std::fs;
 use std::path::{Path, PathBuf};
-use std::process;
 
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::errors::{CliError, CliErrorKind, cow};
 use crate::rules::skill_dirs;
+use crate::workflow::engine::VersionedJsonRepository;
 
 /// Author approval mode.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -115,7 +114,7 @@ pub struct AuthorDraftState {
 }
 
 /// Full author workflow state.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AuthorWorkflowState {
     pub schema_version: u32,
     pub mode: ApprovalMode,
@@ -125,11 +124,72 @@ pub struct AuthorWorkflowState {
     pub draft: AuthorDraftState,
     pub updated_at: String,
     pub transition_count: u32,
+    pub last_event: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+struct AuthorWorkflowPayload {
+    pub phase: AuthorPhase,
+    pub review: AuthorReviewState,
+    pub draft: AuthorDraftState,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+struct AuthorWorkflowStateRecord {
+    pub schema_version: u32,
+    pub mode: ApprovalMode,
+    pub session: AuthorSessionInfo,
+    pub state: AuthorWorkflowPayload,
+    pub updated_at: String,
+    pub transition_count: u32,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub last_event: Option<String>,
 }
 
 impl AuthorWorkflowState {
+    #[must_use]
+    pub fn new(mode: ApprovalMode, suite_dir: Option<String>, occurred_at: String) -> Self {
+        let phase = if mode == ApprovalMode::Bypass {
+            AuthorPhase::Writing
+        } else {
+            AuthorPhase::Discovery
+        };
+        Self {
+            schema_version: AUTHOR_STATE_SCHEMA_VERSION,
+            mode,
+            phase,
+            session: AuthorSessionInfo {
+                repo_root: None,
+                feature: None,
+                suite_name: None,
+                suite_dir,
+            },
+            review: AuthorReviewState {
+                gate: None,
+                awaiting_answer: false,
+                round: 0,
+                last_answer: None,
+            },
+            draft: AuthorDraftState {
+                suite_tree_written: false,
+                written_paths: vec![],
+            },
+            updated_at: occurred_at,
+            transition_count: 0,
+            last_event: Some("ApprovalFlowStarted".to_string()),
+        }
+    }
+
+    #[must_use]
+    pub fn mode(&self) -> ApprovalMode {
+        self.mode
+    }
+
+    #[must_use]
+    pub fn phase(&self) -> AuthorPhase {
+        self.phase
+    }
+
     #[must_use]
     pub fn has_written_suite(&self) -> bool {
         self.draft.suite_tree_written
@@ -144,7 +204,57 @@ impl AuthorWorkflowState {
     pub fn suite_path(&self) -> Option<PathBuf> {
         self.session.suite_path()
     }
+
+    fn to_record(&self) -> AuthorWorkflowStateRecord {
+        AuthorWorkflowStateRecord {
+            schema_version: self.schema_version,
+            mode: self.mode,
+            session: self.session.clone(),
+            state: AuthorWorkflowPayload {
+                phase: self.phase,
+                review: self.review.clone(),
+                draft: self.draft.clone(),
+            },
+            updated_at: self.updated_at.clone(),
+            transition_count: self.transition_count,
+            last_event: self.last_event.clone(),
+        }
+    }
+
+    fn from_record(record: AuthorWorkflowStateRecord) -> Self {
+        Self {
+            schema_version: record.schema_version,
+            mode: record.mode,
+            phase: record.state.phase,
+            session: record.session,
+            review: record.state.review,
+            draft: record.state.draft,
+            updated_at: record.updated_at,
+            transition_count: record.transition_count,
+            last_event: record.last_event,
+        }
+    }
 }
+
+impl Serialize for AuthorWorkflowState {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        self.to_record().serialize(serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for AuthorWorkflowState {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        AuthorWorkflowStateRecord::deserialize(deserializer).map(Self::from_record)
+    }
+}
+
+const AUTHOR_STATE_SCHEMA_VERSION: u32 = 2;
 
 /// Path to the author state file.
 ///
@@ -157,22 +267,43 @@ pub fn author_state_path() -> Result<PathBuf, CliError> {
     Ok(cwd.join(".harness").join(skill_dirs::NEW_STATE_FILE))
 }
 
+fn author_repository() -> Result<VersionedJsonRepository, CliError> {
+    Ok(VersionedJsonRepository::new(
+        author_state_path()?,
+        AUTHOR_STATE_SCHEMA_VERSION,
+    ))
+}
+
 /// Read author state from disk.
 ///
 /// # Errors
 /// Returns `CliError` on parse failure.
 pub fn read_author_state() -> Result<Option<AuthorWorkflowState>, CliError> {
     let path = author_state_path()?;
-    if !path.exists() {
-        return Ok(None);
+    let repo = author_repository()?;
+    let loaded = match repo.load() {
+        Ok(loaded) => loaded,
+        Err(error) if error.code() == "WORKFLOW_VERSION" => {
+            return Err(CliErrorKind::workflow_version(cow!(
+                "author state requires schema version 2"
+            ))
+            .with_details(format!(
+                "Delete {} or re-run `harness approval-begin` to regenerate the author state.",
+                path.display()
+            )));
+        }
+        Err(error) => return Err(error),
+    };
+    match loaded {
+        Some(value) => {
+            let state: AuthorWorkflowState =
+                serde_json::from_value(value).map_err(|e| -> CliError {
+                    CliErrorKind::workflow_parse(cow!("failed to parse author state: {e}")).into()
+                })?;
+            Ok(Some(state))
+        }
+        None => Ok(None),
     }
-    let contents = fs::read_to_string(&path).map_err(|e| -> CliError {
-        CliErrorKind::workflow_io(cow!("failed to read {}: {e}", path.display())).into()
-    })?;
-    let state: AuthorWorkflowState = serde_json::from_str(&contents).map_err(|e| -> CliError {
-        CliErrorKind::workflow_parse(cow!("failed to parse author state: {e}")).into()
-    })?;
-    Ok(Some(state))
 }
 
 /// Write author state to disk.
@@ -180,23 +311,11 @@ pub fn read_author_state() -> Result<Option<AuthorWorkflowState>, CliError> {
 /// # Errors
 /// Returns `CliError` on IO failure.
 pub fn write_author_state(state: &AuthorWorkflowState) -> Result<(), CliError> {
-    let path = author_state_path()?;
-    if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent).map_err(|e| -> CliError {
-            CliErrorKind::workflow_io(cow!("failed to create directory {}: {e}", parent.display()))
-                .into()
-        })?;
-    }
-    let json = serde_json::to_string_pretty(state).map_err(|e| -> CliError {
+    let repo = author_repository()?;
+    let value = serde_json::to_value(state).map_err(|e| -> CliError {
         CliErrorKind::workflow_serialize(cow!("failed to serialize author state: {e}")).into()
     })?;
-    let tmp_path = path.with_extension(format!("{}.json.tmp", process::id()));
-    fs::write(&tmp_path, &json).map_err(|e| -> CliError {
-        CliErrorKind::workflow_io(cow!("failed to write {}: {e}", tmp_path.display())).into()
-    })?;
-    fs::rename(&tmp_path, &path).map_err(|e| -> CliError {
-        CliErrorKind::workflow_io(cow!("failed to rename to {}: {e}", path.display())).into()
-    })?;
+    repo.save(&value)?;
     Ok(())
 }
 
@@ -205,10 +324,10 @@ pub fn write_author_state(state: &AuthorWorkflowState) -> Result<(), CliError> {
 /// # Errors
 /// Returns a static reason string when writing is not allowed.
 pub fn can_write(state: &AuthorWorkflowState) -> Result<(), &'static str> {
-    if state.mode == ApprovalMode::Bypass {
+    if state.mode() == ApprovalMode::Bypass {
         return Ok(());
     }
-    match state.phase {
+    match state.phase() {
         AuthorPhase::Writing => Ok(()),
         AuthorPhase::PrewriteReview => {
             Err("wait for the current pre-write approval answer before writing suite files")
@@ -233,12 +352,12 @@ pub fn can_write(state: &AuthorWorkflowState) -> Result<(), &'static str> {
 /// # Errors
 /// Returns a static reason string when the gate cannot be requested.
 pub fn can_request_gate(state: &AuthorWorkflowState, gate: ReviewGate) -> Result<(), &'static str> {
-    if state.mode == ApprovalMode::Bypass {
+    if state.mode() == ApprovalMode::Bypass {
         return Err("bypass mode forbids canonical review prompts");
     }
     match gate {
         ReviewGate::Prewrite => {
-            if state.phase == AuthorPhase::PrewriteReview {
+            if state.phase() == AuthorPhase::PrewriteReview {
                 Ok(())
             } else {
                 Err("pre-write approval can only run while the proposal is still pending")
@@ -248,14 +367,14 @@ pub fn can_request_gate(state: &AuthorWorkflowState, gate: ReviewGate) -> Result
             if !state.has_written_suite() {
                 return Err("ask post-write approval before stopping after suite writes");
             }
-            if state.phase == AuthorPhase::Writing {
+            if state.phase() == AuthorPhase::Writing {
                 Ok(())
             } else {
                 Err("post-write approval is only valid after initial writes or an edit round")
             }
         }
         ReviewGate::Copy => {
-            if state.phase == AuthorPhase::Complete {
+            if state.phase() == AuthorPhase::Complete {
                 Ok(())
             } else {
                 Err("copy prompt is only valid after the saved suite is approved")
@@ -269,10 +388,10 @@ pub fn can_request_gate(state: &AuthorWorkflowState, gate: ReviewGate) -> Result
 /// # Errors
 /// Returns a static reason string when stopping is not allowed.
 pub fn can_stop(state: &AuthorWorkflowState) -> Result<(), &'static str> {
-    if state.mode == ApprovalMode::Bypass {
+    if state.mode() == ApprovalMode::Bypass {
         return Ok(());
     }
-    match state.phase {
+    match state.phase() {
         AuthorPhase::Writing => Err("ask the post-write approval gate before stopping"),
         AuthorPhase::PostwriteReview => {
             Err("wait for the current post-write approval answer before stopping")
@@ -335,10 +454,10 @@ pub fn next_action(state: Option<&AuthorWorkflowState>) -> AuthorNextAction {
     let Some(state) = state else {
         return AuthorNextAction::ReloadState;
     };
-    if state.mode == ApprovalMode::Bypass {
+    if state.mode() == ApprovalMode::Bypass {
         return AuthorNextAction::ContinueBypass;
     }
-    match state.phase {
+    match state.phase() {
         AuthorPhase::Discovery => AuthorNextAction::ResumeDiscovery,
         AuthorPhase::PrewriteReview => AuthorNextAction::ResumePrewriteReview,
         AuthorPhase::Writing => {

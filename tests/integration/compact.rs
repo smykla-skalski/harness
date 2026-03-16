@@ -12,11 +12,11 @@ use std::path::{Path, PathBuf};
 use std::sync::PoisonError;
 
 use harness::cli::Command;
-use harness::commands::Execute;
+use harness::commands::setup::{PreCompactArgs, SessionStartArgs, SessionStopArgs};
 use harness::compact::{self, AuthoringHandoff, FileFingerprint, HandoffStatus, RunnerHandoff};
 use harness::ephemeral_metallb;
 
-use super::helpers::ENV_LOCK;
+use super::helpers::{CommandExt, ENV_LOCK};
 
 // Build a runner handoff for testing.
 fn test_runner() -> RunnerHandoff<'static> {
@@ -234,9 +234,9 @@ fn check_save_consume_compact_handoff(project: &Path) {
 
 // pre_compact::execute creates the latest.json file.
 fn check_pre_compact_persists(project: &Path) {
-    let result = Command::PreCompact {
+    let result = Command::PreCompact(PreCompactArgs {
         project_dir: Some(project.to_string_lossy().to_string()),
-    }
+    })
     .execute();
     assert!(result.is_ok(), "pre-compact should succeed: {result:?}");
     assert_eq!(result.unwrap(), 0);
@@ -257,9 +257,9 @@ fn check_session_start_compact_hydrates(project: &Path) {
     handoff.runner = Some(test_runner());
     compact::save_compact_handoff(project, &handoff).expect("save");
 
-    let result = Command::SessionStart {
+    let result = Command::SessionStart(SessionStartArgs {
         project_dir: Some(project.to_string_lossy().to_string()),
-    }
+    })
     .execute();
     assert!(result.is_ok(), "session-start should succeed: {result:?}");
 
@@ -276,9 +276,9 @@ fn check_session_start_compact_worktree(project: &Path) {
     handoff.runner = Some(test_runner());
     compact::save_compact_handoff(project, &handoff).expect("save");
 
-    let result = Command::SessionStart {
+    let result = Command::SessionStart(SessionStartArgs {
         project_dir: Some(project.to_string_lossy().to_string()),
-    }
+    })
     .execute();
     assert!(result.is_ok(), "session-start should succeed: {result:?}");
 
@@ -304,9 +304,9 @@ fn check_session_start_compact_aborted_resume(project: &Path) {
         "should include resume guidance: {ctx}"
     );
 
-    let result = Command::SessionStart {
+    let result = Command::SessionStart(SessionStartArgs {
         project_dir: Some(project.to_string_lossy().to_string()),
-    }
+    })
     .execute();
     assert!(result.is_ok());
 
@@ -326,9 +326,9 @@ fn check_session_start_compact_restores_author(project: &Path) {
     assert!(ctx.contains("suite:new:"), "should have authoring section");
     assert!(ctx.contains("motb-core"), "should mention suite name");
 
-    let result = Command::SessionStart {
+    let result = Command::SessionStart(SessionStartArgs {
         project_dir: Some(project.to_string_lossy().to_string()),
-    }
+    })
     .execute();
     assert!(result.is_ok());
 
@@ -374,9 +374,9 @@ fn check_session_start_restores_project(project: &Path) {
     handoff.runner = Some(test_runner());
     compact::save_compact_handoff(project, &handoff).expect("save");
 
-    let result = Command::SessionStart {
+    let result = Command::SessionStart(SessionStartArgs {
         project_dir: Some(project.to_string_lossy().to_string()),
-    }
+    })
     .execute();
     assert!(result.is_ok());
 
@@ -394,9 +394,9 @@ fn check_session_start_restores_worktree(project: &Path) {
     handoff.trigger = Some("worktree-switch".into());
     compact::save_compact_handoff(project, &handoff).expect("save");
 
-    let result = Command::SessionStart {
+    let result = Command::SessionStart(SessionStartArgs {
         project_dir: Some(project.to_string_lossy().to_string()),
-    }
+    })
     .execute();
     assert!(result.is_ok());
 
@@ -420,9 +420,9 @@ fn check_session_start_cross_project(project: &Path) {
         "handoff should be pending for same project"
     );
 
-    let result = Command::SessionStart {
+    let result = Command::SessionStart(SessionStartArgs {
         project_dir: Some(project.to_string_lossy().to_string()),
-    }
+    })
     .execute();
     assert!(result.is_ok());
 
@@ -433,9 +433,9 @@ fn check_session_start_cross_project(project: &Path) {
 // No pending handoff - session-start returns Ok(0).
 // Verify ephemeral_metallb APIs are accessible.
 fn check_session_start_metallb_templates(project: &Path) {
-    let result = Command::SessionStart {
+    let result = Command::SessionStart(SessionStartArgs {
         project_dir: Some(project.to_string_lossy().to_string()),
-    }
+    })
     .execute();
     assert!(result.is_ok());
     assert_eq!(result.unwrap(), 0);
@@ -449,9 +449,9 @@ fn check_session_start_metallb_templates(project: &Path) {
 
 // session_stop is currently a no-op. Verify Ok(0).
 fn check_session_stop_metallb_cleanup(project: &Path) {
-    let result = Command::SessionStop {
+    let result = Command::SessionStop(SessionStopArgs {
         project_dir: Some(project.to_string_lossy().to_string()),
-    }
+    })
     .execute();
     assert!(result.is_ok());
     assert_eq!(result.unwrap(), 0);
@@ -469,9 +469,9 @@ fn check_session_start_no_replay(project: &Path) {
     let after = compact::pending_compact_handoff(project);
     assert!(after.is_none(), "consumed handoff should not be pending");
 
-    let result = Command::SessionStart {
+    let result = Command::SessionStart(SessionStartArgs {
         project_dir: Some(project.to_string_lossy().to_string()),
-    }
+    })
     .execute();
     assert!(result.is_ok());
     assert_eq!(result.unwrap(), 0);

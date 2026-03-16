@@ -91,12 +91,15 @@ fn check_bug_found_gate(ctx: &HookContext, subcommand: &str) -> Option<HookResul
     // Only enforce during execution and closeout phases. Bootstrap and
     // preflight failures are handled by their own dedicated flows. Triage
     // means the runner is already handling a failure.
-    if !matches!(state.phase, RunnerPhase::Execution | RunnerPhase::Closeout) {
+    if !matches!(
+        state.phase(),
+        RunnerPhase::Execution | RunnerPhase::Closeout
+    ) {
         return None;
     }
 
     // If a failure is already being triaged, don't block again.
-    if state.failure.is_some() {
+    if state.failure().is_some() {
         return None;
     }
 
@@ -122,9 +125,9 @@ fn check_preflight_gate(ctx: &HookContext, subcommand: &str) -> Option<HookResul
         return None;
     }
     let state = ctx.runner_state.as_ref()?;
-    let blocked = match state.phase {
+    let blocked = match state.phase() {
         RunnerPhase::Bootstrap => true,
-        RunnerPhase::Preflight => state.preflight.status != PreflightStatus::Complete,
+        RunnerPhase::Preflight => state.preflight_status() != PreflightStatus::Complete,
         _ => false,
     };
     if !blocked {
@@ -253,12 +256,11 @@ fn maybe_resume_suite_fix(ctx: &HookContext, words: &[String]) {
 }
 
 fn ready_to_resume(state: &RunnerWorkflowState) -> bool {
-    if state.phase != RunnerPhase::Triage {
+    if state.phase() != RunnerPhase::Triage {
         return false;
     }
     state
-        .suite_fix
-        .as_ref()
+        .suite_fix()
         .is_some_and(SuiteFixState::ready_to_resume)
 }
 

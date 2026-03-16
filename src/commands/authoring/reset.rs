@@ -1,7 +1,17 @@
 use std::fs;
 
+use clap::Args;
+
 use crate::authoring::authoring_workspace_dir;
 use crate::errors::CliError;
+
+/// Arguments for `harness authoring-reset`.
+#[derive(Debug, Clone, Args)]
+pub struct AuthoringResetArgs {
+    /// Managed skill whose saved workspace should be cleared.
+    #[arg(long, value_parser = clap::builder::PossibleValuesParser::new([crate::rules::SKILL_NEW]))]
+    pub skill: String,
+}
 
 /// Reset suite:new workspace.
 ///

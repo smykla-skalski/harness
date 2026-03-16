@@ -1,7 +1,33 @@
 use std::path::Path;
 
+use clap::Args;
+
 use crate::authoring::begin_authoring_session;
 use crate::errors::CliError;
+use crate::rules;
+
+/// Arguments for `harness authoring-begin`.
+#[derive(Debug, Clone, Args)]
+pub struct AuthoringBeginArgs {
+    /// Managed skill to initialize.
+    #[arg(long, value_parser = clap::builder::PossibleValuesParser::new([rules::SKILL_NEW]))]
+    pub skill: String,
+    /// Kuma worktree for source discovery and validation.
+    #[arg(long)]
+    pub repo_root: String,
+    /// Feature or capability being authored.
+    #[arg(long)]
+    pub feature: String,
+    /// Authoring mode.
+    #[arg(long, value_parser = ["interactive", "bypass"])]
+    pub mode: String,
+    /// Suite directory for this session.
+    #[arg(long)]
+    pub suite_dir: String,
+    /// Suite name recorded in state and defaults.
+    #[arg(long)]
+    pub suite_name: String,
+}
 
 // =========================================================================
 // begin

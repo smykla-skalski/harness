@@ -3,6 +3,7 @@ use std::fs;
 use std::path::Path;
 use std::sync::LazyLock;
 
+use clap::Args;
 use regex::Regex;
 
 use crate::commands::resolve_repo_root;
@@ -16,6 +17,20 @@ use crate::io::ensure_dir;
 // =========================================================================
 
 const GATEWAY_CLASS_CRD: &str = "gatewayclasses.gateway.networking.k8s.io";
+
+/// Arguments for `harness gateway`.
+#[derive(Debug, Clone, Args)]
+pub struct GatewayArgs {
+    /// Use this kubeconfig for the target local cluster.
+    #[arg(long)]
+    pub kubeconfig: Option<String>,
+    /// Repo root to resolve the pinned Gateway API version.
+    #[arg(long)]
+    pub repo_root: Option<String>,
+    /// Only check whether the Gateway API CRDs are already installed.
+    #[arg(long)]
+    pub check_only: bool,
+}
 
 static GATEWAY_RE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"sigs\.k8s\.io/gateway-api\s+v([^\s]+)").unwrap());

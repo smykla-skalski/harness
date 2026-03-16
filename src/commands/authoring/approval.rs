@@ -1,13 +1,26 @@
+use clap::Args;
+
 use crate::core_defs::utc_now;
 use crate::errors::{CliError, CliErrorKind, cow};
-use crate::workflow::author::{
-    ApprovalMode, AuthorDraftState, AuthorPhase, AuthorReviewState, AuthorSessionInfo,
-    AuthorWorkflowState, write_author_state,
-};
+use crate::workflow::author::{ApprovalMode, AuthorWorkflowState, write_author_state};
 
 // =========================================================================
 // approval_begin
 // =========================================================================
+
+/// Arguments for `harness approval-begin`.
+#[derive(Debug, Clone, Args)]
+pub struct ApprovalBeginArgs {
+    /// Managed skill to initialize.
+    #[arg(long, value_parser = clap::builder::PossibleValuesParser::new([crate::rules::SKILL_NEW]))]
+    pub skill: String,
+    /// Approval mode.
+    #[arg(long, value_parser = ["interactive", "bypass"])]
+    pub mode: String,
+    /// Optional suite directory for the approval state.
+    #[arg(long)]
+    pub suite_dir: Option<String>,
+}
 
 /// Begin suite:new approval flow.
 ///
@@ -22,36 +35,7 @@ pub fn approval_begin(mode: &str, suite_dir: Option<&str>) -> Result<i32, CliErr
         }
     };
 
-    let initial_phase = if approval_mode == ApprovalMode::Bypass {
-        AuthorPhase::Writing
-    } else {
-        AuthorPhase::Discovery
-    };
-
-    let state = AuthorWorkflowState {
-        schema_version: 1,
-        mode: approval_mode,
-        phase: initial_phase,
-        session: AuthorSessionInfo {
-            repo_root: None,
-            feature: None,
-            suite_name: None,
-            suite_dir: suite_dir.map(String::from),
-        },
-        review: AuthorReviewState {
-            gate: None,
-            awaiting_answer: false,
-            round: 0,
-            last_answer: None,
-        },
-        draft: AuthorDraftState {
-            suite_tree_written: false,
-            written_paths: vec![],
-        },
-        updated_at: utc_now(),
-        transition_count: 0,
-        last_event: Some("ApprovalFlowStarted".to_string()),
-    };
+    let state = AuthorWorkflowState::new(approval_mode, suite_dir.map(String::from), utc_now());
 
     write_author_state(&state)?;
     Ok(0)

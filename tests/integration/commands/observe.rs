@@ -3,8 +3,10 @@
 
 use std::io::Write;
 
-use harness::cli::{Command, ObserveFilterArgs, ObserveMode};
-use harness::commands::Execute;
+use harness::cli::Command;
+use harness::commands::observe::{ObserveArgs, ObserveFilterArgs, ObserveMode};
+
+use super::super::helpers::*;
 
 fn default_filter() -> ObserveFilterArgs {
     ObserveFilterArgs {
@@ -36,15 +38,15 @@ fn scan_missing_session_returns_error() {
     let mut filter = default_filter();
     filter.project_hint = Some("nonexistent".into());
 
-    let cmd = Command::Observe {
+    let cmd = Command::Observe(ObserveArgs {
         mode: ObserveMode::Scan {
             session_id: "does-not-exist-ever".into(),
             filter,
         },
-    };
+    });
 
     temp_env::with_vars([("HOME", Some(tmp.path().to_str().unwrap()))], || {
-        let result = cmd.execute();
+        let result = run_command(cmd);
         assert!(result.is_err());
         let err = result.unwrap_err();
         assert_eq!(err.code(), "KSRCLI080");
@@ -55,7 +57,7 @@ fn scan_missing_session_returns_error() {
 fn dump_missing_session_returns_error() {
     let tmp = tempfile::tempdir().unwrap();
 
-    let cmd = Command::Observe {
+    let cmd = Command::Observe(ObserveArgs {
         mode: ObserveMode::Dump {
             session_id: "no-such-session".into(),
             from_line: None,
@@ -66,10 +68,10 @@ fn dump_missing_session_returns_error() {
             raw_json: false,
             project_hint: None,
         },
-    };
+    });
 
     temp_env::with_vars([("HOME", Some(tmp.path().to_str().unwrap()))], || {
-        let result = cmd.execute();
+        let result = run_command(cmd);
         assert!(result.is_err());
         let err = result.unwrap_err();
         assert_eq!(err.code(), "KSRCLI080");
@@ -80,17 +82,17 @@ fn dump_missing_session_returns_error() {
 fn context_missing_session_returns_error() {
     let tmp = tempfile::tempdir().unwrap();
 
-    let cmd = Command::Observe {
+    let cmd = Command::Observe(ObserveArgs {
         mode: ObserveMode::Context {
             session_id: "no-such-session".into(),
             line: 10,
             window: 5,
             project_hint: None,
         },
-    };
+    });
 
     temp_env::with_vars([("HOME", Some(tmp.path().to_str().unwrap()))], || {
-        let result = cmd.execute();
+        let result = run_command(cmd);
         assert!(result.is_err());
     });
 }
@@ -146,15 +148,15 @@ fn scan_finds_build_error() {
     filter.json = true;
     filter.summary = true;
 
-    let cmd = Command::Observe {
+    let cmd = Command::Observe(ObserveArgs {
         mode: ObserveMode::Scan {
             session_id: "build-err-sess".into(),
             filter,
         },
-    };
+    });
 
     temp_env::with_vars([("HOME", Some(tmp.path().to_str().unwrap()))], || {
-        let result = cmd.execute();
+        let result = run_command(cmd);
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), 0);
     });
@@ -183,15 +185,15 @@ fn scan_severity_filter_excludes_low() {
     filter.severity = Some("medium".into());
     filter.json = true;
 
-    let cmd = Command::Observe {
+    let cmd = Command::Observe(ObserveArgs {
         mode: ObserveMode::Scan {
             session_id: "sev-filter-sess".into(),
             filter,
         },
-    };
+    });
 
     temp_env::with_vars([("HOME", Some(tmp.path().to_str().unwrap()))], || {
-        let result = cmd.execute();
+        let result = run_command(cmd);
         assert!(result.is_ok());
     });
 }
@@ -215,15 +217,15 @@ fn scan_category_filter() {
     filter.category = Some("build_error".into());
     filter.json = true;
 
-    let cmd = Command::Observe {
+    let cmd = Command::Observe(ObserveArgs {
         mode: ObserveMode::Scan {
             session_id: "cat-filter-sess".into(),
             filter,
         },
-    };
+    });
 
     temp_env::with_vars([("HOME", Some(tmp.path().to_str().unwrap()))], || {
-        let result = cmd.execute();
+        let result = run_command(cmd);
         assert!(result.is_ok());
     });
 }
@@ -247,15 +249,15 @@ fn scan_exclude_filter() {
     filter.exclude = Some("user_frustration".into());
     filter.json = true;
 
-    let cmd = Command::Observe {
+    let cmd = Command::Observe(ObserveArgs {
         mode: ObserveMode::Scan {
             session_id: "excl-filter-sess".into(),
             filter,
         },
-    };
+    });
 
     temp_env::with_vars([("HOME", Some(tmp.path().to_str().unwrap()))], || {
-        let result = cmd.execute();
+        let result = run_command(cmd);
         assert!(result.is_ok());
     });
 }
@@ -280,12 +282,12 @@ fn scan_fixable_filter() {
     filter.fixable = true;
     filter.json = true;
 
-    let cmd = Command::Observe {
+    let cmd = Command::Observe(ObserveArgs {
         mode: ObserveMode::Scan {
             session_id: "fix-filter-sess".into(),
             filter,
         },
-    };
+    });
 
     temp_env::with_vars([("HOME", Some(tmp.path().to_str().unwrap()))], || {
         let result = cmd.execute();
@@ -304,7 +306,7 @@ fn dump_returns_ok_with_session() {
     });
     write_session_fixture(&tmp, "dump-sess", &[&serde_json::to_string(&line).unwrap()]);
 
-    let cmd = Command::Observe {
+    let cmd = Command::Observe(ObserveArgs {
         mode: ObserveMode::Dump {
             session_id: "dump-sess".into(),
             from_line: Some(0),
@@ -315,7 +317,7 @@ fn dump_returns_ok_with_session() {
             raw_json: false,
             project_hint: None,
         },
-    };
+    });
 
     temp_env::with_vars([("HOME", Some(tmp.path().to_str().unwrap()))], || {
         let result = cmd.execute();
@@ -335,14 +337,14 @@ fn context_returns_ok_with_session() {
     });
     write_session_fixture(&tmp, "ctx-sess", &[&serde_json::to_string(&line).unwrap()]);
 
-    let cmd = Command::Observe {
+    let cmd = Command::Observe(ObserveArgs {
         mode: ObserveMode::Context {
             session_id: "ctx-sess".into(),
             line: 0,
             window: 5,
             project_hint: None,
         },
-    };
+    });
 
     temp_env::with_vars([("HOME", Some(tmp.path().to_str().unwrap()))], || {
         let result = cmd.execute();
@@ -372,12 +374,12 @@ fn scan_output_details_written() {
     filter.json = true;
     filter.output_details = Some(details_path.to_string_lossy().to_string());
 
-    let cmd = Command::Observe {
+    let cmd = Command::Observe(ObserveArgs {
         mode: ObserveMode::Scan {
             session_id: "details-sess".into(),
             filter,
         },
-    };
+    });
 
     temp_env::with_vars([("HOME", Some(tmp.path().to_str().unwrap()))], || {
         let result = cmd.execute();

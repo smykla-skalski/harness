@@ -3,30 +3,41 @@
 // default repo root, user stories preservation, and CLI aliases.
 
 use std::fs;
+use std::path::Path;
 
-use harness::cli::{Command, InitArgs};
-use harness::commands::Execute;
+use harness::cli::Command;
+use harness::commands::run::InitArgs;
 use harness::context::RunMetadata;
 use harness::schema::{RunStatus, Verdict};
 use harness::workflow::runner::{self as runner_workflow, RunnerPhase};
 
 use super::super::helpers::*;
 
+fn run_init(args: InitArgs, xdg_root: &Path) -> Result<i32, harness::errors::CliError> {
+    temp_env::with_vars(
+        [("XDG_DATA_HOME", Some(xdg_root.to_str().unwrap()))],
+        || run_command(Command::Init(args)),
+    )
+}
+
 #[test]
 fn init_creates_tracked_layout() {
     let tmp = tempfile::tempdir().unwrap();
     let suite_dir = tmp.path().join("suite");
+    let xdg = tmp.path().join("xdg");
     write_suite(&suite_dir.join("suite.md"));
     write_group(&suite_dir.join("groups").join("g01.md"));
 
-    let result = Command::Init(InitArgs {
-        suite: suite_dir.join("suite.md").to_string_lossy().to_string(),
-        run_id: "run-1".to_string(),
-        profile: "single-zone".to_string(),
-        repo_root: Some(tmp.path().to_string_lossy().to_string()),
-        run_root: Some(tmp.path().join("runs").to_string_lossy().to_string()),
-    })
-    .execute();
+    let result = run_init(
+        InitArgs {
+            suite: suite_dir.join("suite.md").to_string_lossy().to_string(),
+            run_id: "run-1".to_string(),
+            profile: "single-zone".to_string(),
+            repo_root: Some(tmp.path().to_string_lossy().to_string()),
+            run_root: Some(tmp.path().join("runs").to_string_lossy().to_string()),
+        },
+        &xdg,
+    );
     assert!(result.is_ok(), "init should succeed: {result:?}");
     assert_eq!(result.unwrap(), 0);
 
@@ -75,30 +86,35 @@ fn init_creates_tracked_layout() {
 fn init_fails_when_run_directory_already_exists() {
     let tmp = tempfile::tempdir().unwrap();
     let suite_dir = tmp.path().join("suite");
+    let xdg = tmp.path().join("xdg");
     write_suite(&suite_dir.join("suite.md"));
     write_group(&suite_dir.join("groups").join("g01.md"));
     let run_root = tmp.path().join("runs");
 
     // First init should succeed
-    let r1 = Command::Init(InitArgs {
-        suite: suite_dir.join("suite.md").to_string_lossy().to_string(),
-        run_id: "run-dup".to_string(),
-        profile: "single-zone".to_string(),
-        repo_root: Some(tmp.path().to_string_lossy().to_string()),
-        run_root: Some(run_root.to_string_lossy().to_string()),
-    })
-    .execute();
-    assert!(r1.is_ok());
+    let r1 = run_init(
+        InitArgs {
+            suite: suite_dir.join("suite.md").to_string_lossy().to_string(),
+            run_id: "run-dup".to_string(),
+            profile: "single-zone".to_string(),
+            repo_root: Some(tmp.path().to_string_lossy().to_string()),
+            run_root: Some(run_root.to_string_lossy().to_string()),
+        },
+        &xdg,
+    );
+    assert!(r1.is_ok(), "first init should succeed: {r1:?}");
 
     // Second init with same run_id should fail
-    let r2 = Command::Init(InitArgs {
-        suite: suite_dir.join("suite.md").to_string_lossy().to_string(),
-        run_id: "run-dup".to_string(),
-        profile: "single-zone".to_string(),
-        repo_root: Some(tmp.path().to_string_lossy().to_string()),
-        run_root: Some(run_root.to_string_lossy().to_string()),
-    })
-    .execute();
+    let r2 = run_init(
+        InitArgs {
+            suite: suite_dir.join("suite.md").to_string_lossy().to_string(),
+            run_id: "run-dup".to_string(),
+            profile: "single-zone".to_string(),
+            repo_root: Some(tmp.path().to_string_lossy().to_string()),
+            run_root: Some(run_root.to_string_lossy().to_string()),
+        },
+        &xdg,
+    );
     assert!(r2.is_err(), "duplicate init should fail");
 }
 
@@ -106,18 +122,21 @@ fn init_fails_when_run_directory_already_exists() {
 fn init_accepts_suite_directory_input() {
     let tmp = tempfile::tempdir().unwrap();
     let suite_dir = tmp.path().join("suite");
+    let xdg = tmp.path().join("xdg");
     write_suite(&suite_dir.join("suite.md"));
     write_group(&suite_dir.join("groups").join("g01.md"));
 
     // Pass the suite directory path (not suite.md) - should find suite.md
-    let result = Command::Init(InitArgs {
-        suite: suite_dir.to_string_lossy().to_string(),
-        run_id: "run-dir-input".to_string(),
-        profile: "single-zone".to_string(),
-        repo_root: Some(tmp.path().to_string_lossy().to_string()),
-        run_root: Some(tmp.path().join("runs").to_string_lossy().to_string()),
-    })
-    .execute();
+    let result = run_init(
+        InitArgs {
+            suite: suite_dir.to_string_lossy().to_string(),
+            run_id: "run-dir-input".to_string(),
+            profile: "single-zone".to_string(),
+            repo_root: Some(tmp.path().to_string_lossy().to_string()),
+            run_root: Some(tmp.path().join("runs").to_string_lossy().to_string()),
+        },
+        &xdg,
+    );
     assert!(
         result.is_ok(),
         "init should accept suite directory: {result:?}"
@@ -128,17 +147,20 @@ fn init_accepts_suite_directory_input() {
 fn init_defaults_repo_root_to_cwd() {
     let tmp = tempfile::tempdir().unwrap();
     let suite_dir = tmp.path().join("suite");
+    let xdg = tmp.path().join("xdg");
     write_suite(&suite_dir.join("suite.md"));
     write_group(&suite_dir.join("groups").join("g01.md"));
 
-    let result = Command::Init(InitArgs {
-        suite: suite_dir.join("suite.md").to_string_lossy().to_string(),
-        run_id: "run-cwd".to_string(),
-        profile: "single-zone".to_string(),
-        repo_root: None, // no explicit repo root
-        run_root: Some(tmp.path().join("runs").to_string_lossy().to_string()),
-    })
-    .execute();
+    let result = run_init(
+        InitArgs {
+            suite: suite_dir.join("suite.md").to_string_lossy().to_string(),
+            run_id: "run-cwd".to_string(),
+            profile: "single-zone".to_string(),
+            repo_root: None, // no explicit repo root
+            run_root: Some(tmp.path().join("runs").to_string_lossy().to_string()),
+        },
+        &xdg,
+    );
     assert!(result.is_ok());
     let run_dir = tmp.path().join("runs").join("run-cwd");
     let meta_text = fs::read_to_string(run_dir.join("run-metadata.json")).unwrap();
@@ -153,6 +175,7 @@ fn init_preserves_user_stories_from_suite() {
 
     let tmp = tempfile::tempdir().unwrap();
     let suite_dir = tmp.path().join("suite-stories");
+    let xdg = tmp.path().join("xdg");
     let _ = SuiteBuilder::new("stories.suite")
         .feature("stories-test")
         .scope("unit")
@@ -164,14 +187,16 @@ fn init_preserves_user_stories_from_suite() {
         .body("# Stories suite\n")
         .write_to(&suite_dir.join("suite.md"));
 
-    let result = Command::Init(InitArgs {
-        suite: suite_dir.join("suite.md").to_string_lossy().to_string(),
-        run_id: "run-stories".to_string(),
-        profile: "single-zone".to_string(),
-        repo_root: Some(tmp.path().to_string_lossy().to_string()),
-        run_root: Some(tmp.path().join("runs").to_string_lossy().to_string()),
-    })
-    .execute();
+    let result = run_init(
+        InitArgs {
+            suite: suite_dir.join("suite.md").to_string_lossy().to_string(),
+            run_id: "run-stories".to_string(),
+            profile: "single-zone".to_string(),
+            repo_root: Some(tmp.path().to_string_lossy().to_string()),
+            run_root: Some(tmp.path().join("runs").to_string_lossy().to_string()),
+        },
+        &xdg,
+    );
     assert!(result.is_ok());
     let run_dir = tmp.path().join("runs").join("run-stories");
     let meta_text = fs::read_to_string(run_dir.join("run-metadata.json")).unwrap();
