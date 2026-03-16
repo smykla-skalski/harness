@@ -16,7 +16,6 @@ use harness::context::{RunLayout, RunMetadata};
 use harness::hook::{Decision, HookResult};
 use harness::hook_payloads::{
     AskUserQuestionOption, AskUserQuestionPrompt, HookContext, HookEnvelopePayload,
-    HookMessagePayload, HookWriteRequest,
 };
 use harness::schema::{RunCounts, RunStatus, Verdict};
 use harness::workflow::runner as runner_workflow;
@@ -1398,11 +1397,12 @@ impl RunDirBuilder {
 
 /// Builds `HookEnvelopePayload` for hook tests.
 pub struct HookPayloadBuilder {
+    tool_name: Option<String>,
     command: Option<String>,
     file_path: Option<PathBuf>,
     writes: Vec<PathBuf>,
     questions: Vec<AskUserQuestionPrompt>,
-    response: Option<serde_json::Value>,
+    tool_response: Option<serde_json::Value>,
     last_assistant_message: Option<String>,
     stop_hook_active: bool,
 }
@@ -1411,11 +1411,12 @@ impl HookPayloadBuilder {
     #[must_use]
     pub fn new() -> Self {
         Self {
+            tool_name: None,
             command: None,
             file_path: None,
             writes: vec![],
             questions: vec![],
-            response: None,
+            tool_response: None,
             last_assistant_message: None,
             stop_hook_active: false,
         }
@@ -1423,24 +1424,28 @@ impl HookPayloadBuilder {
 
     #[must_use]
     pub fn command(mut self, cmd: &str) -> Self {
+        self.tool_name = Some("Bash".to_string());
         self.command = Some(cmd.to_string());
         self
     }
 
     #[must_use]
     pub fn write_path(mut self, path: &str) -> Self {
+        self.tool_name = Some("Write".to_string());
         self.file_path = Some(PathBuf::from(path));
         self
     }
 
     #[must_use]
     pub fn write_paths(mut self, paths: &[&str]) -> Self {
+        self.tool_name = Some("Write".to_string());
         self.writes = paths.iter().map(|s| PathBuf::from(*s)).collect();
         self
     }
 
     #[must_use]
     pub fn question(mut self, question: &str, options: &[&str]) -> Self {
+        self.tool_name = Some("AskUserQuestion".to_string());
         let prompt = AskUserQuestionPrompt {
             question: question.to_string(),
             header: Some("Approval".to_string()),
@@ -1463,6 +1468,7 @@ impl HookPayloadBuilder {
     /// Panics if serialization of the question or answer fails.
     #[must_use]
     pub fn question_with_answer(mut self, question: &str, options: &[&str], answer: &str) -> Self {
+        self.tool_name = Some("AskUserQuestion".to_string());
         let prompt = AskUserQuestionPrompt {
             question: question.to_string(),
             header: Some("Approval".to_string()),
@@ -1475,8 +1481,7 @@ impl HookPayloadBuilder {
                 .collect(),
             multi_select: false,
         };
-        self.response = Some(serde_json::json!({
-            "questions": [serde_json::to_value(&prompt).unwrap()],
+        self.tool_response = Some(serde_json::json!({
             "answers": [{"question": question, "answer": answer}],
         }));
         self.questions.push(prompt);
@@ -1497,35 +1502,27 @@ impl HookPayloadBuilder {
 
     #[must_use]
     pub fn build_envelope(&self) -> HookEnvelopePayload {
-        let has_input = self.command.is_some()
-            || self.file_path.is_some()
-            || !self.writes.is_empty()
-            || !self.questions.is_empty();
-
-        let input_payload = if has_input {
-            Some(HookMessagePayload {
-                command: self.command.clone(),
-                file_path: self.file_path.clone(),
-                writes: self
-                    .writes
-                    .iter()
-                    .map(|p| HookWriteRequest {
-                        file_path: p.clone(),
-                    })
-                    .collect(),
-                questions: self.questions.clone(),
-                answers: vec![],
-                annotations: vec![],
-            })
+        let tool_input = if let Some(command) = &self.command {
+            serde_json::json!({ "command": command })
+        } else if let Some(file_path) = &self.file_path {
+            serde_json::json!({ "file_path": file_path })
+        } else if !self.writes.is_empty() {
+            let paths = self
+                .writes
+                .iter()
+                .map(|path| path.to_string_lossy().into_owned())
+                .collect::<Vec<_>>();
+            serde_json::json!({ "file_paths": paths })
+        } else if !self.questions.is_empty() {
+            serde_json::json!({ "questions": self.questions })
         } else {
-            None
+            serde_json::Value::Null
         };
 
         HookEnvelopePayload {
-            root: None,
-            input_payload,
-            tool_input: None,
-            response: self.response.clone(),
+            tool_name: self.tool_name.clone().unwrap_or_default(),
+            tool_input,
+            tool_response: self.tool_response.clone().unwrap_or(serde_json::Value::Null),
             last_assistant_message: self.last_assistant_message.clone(),
             transcript_path: None,
             stop_hook_active: self.stop_hook_active,

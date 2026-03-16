@@ -292,12 +292,19 @@ impl HookContext {
     /// Write target paths from the input payload.
     #[must_use]
     pub fn write_paths(&self) -> Vec<&Path> {
-        self.tool_input()
-            .get("file_path")
-            .and_then(Value::as_str)
-            .map(Path::new)
-            .into_iter()
-            .collect()
+        let mut paths = Vec::new();
+        if let Some(path) = self.tool_input().get("file_path").and_then(Value::as_str) {
+            paths.push(Path::new(path));
+        }
+        if let Some(extra_paths) = self.tool_input().get("file_paths").and_then(Value::as_array) {
+            paths.extend(
+                extra_paths
+                    .iter()
+                    .filter_map(Value::as_str)
+                    .map(Path::new),
+            );
+        }
+        paths
     }
 
     /// `AskUserQuestion` prompts from the input payload.
