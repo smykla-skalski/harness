@@ -203,6 +203,14 @@ fn cp_env(kuma_mode: &str, store_type: &str) -> BTreeMap<String, String> {
     env
 }
 
+fn postgres_cp_env(env: &mut BTreeMap<String, String>) {
+    env.insert("KUMA_STORE_POSTGRES_HOST".into(), "postgres".into());
+    env.insert("KUMA_STORE_POSTGRES_PORT".into(), "5432".into());
+    env.insert("KUMA_STORE_POSTGRES_USER".into(), "kuma".into());
+    env.insert("KUMA_STORE_POSTGRES_PASSWORD".into(), "kuma".into());
+    env.insert("KUMA_STORE_POSTGRES_DB_NAME".into(), "kuma".into());
+}
+
 /// Generate a compose file for single-zone universal topology.
 #[must_use]
 pub fn single_zone(
@@ -215,11 +223,7 @@ pub fn single_zone(
     let mut services = BTreeMap::new();
     let mut env = cp_env("zone", store_type);
     if store_type == "postgres" {
-        env.insert("KUMA_STORE_POSTGRES_HOST".into(), "postgres".into());
-        env.insert("KUMA_STORE_POSTGRES_PORT".into(), "5432".into());
-        env.insert("KUMA_STORE_POSTGRES_USER".into(), "kuma".into());
-        env.insert("KUMA_STORE_POSTGRES_PASSWORD".into(), "kuma".into());
-        env.insert("KUMA_STORE_POSTGRES_DB_NAME".into(), "kuma".into());
+        postgres_cp_env(&mut env);
     }
 
     let (depends_on, is_postgres) = if store_type == "postgres" {
@@ -271,11 +275,7 @@ pub fn global_zone(
     let (global_depends, is_postgres) = postgres_depends(store_type, network_name, &mut services);
 
     if store_type == "postgres" {
-        global_env.insert("KUMA_STORE_POSTGRES_HOST".into(), "postgres".into());
-        global_env.insert("KUMA_STORE_POSTGRES_PORT".into(), "5432".into());
-        global_env.insert("KUMA_STORE_POSTGRES_USER".into(), "kuma".into());
-        global_env.insert("KUMA_STORE_POSTGRES_PASSWORD".into(), "kuma".into());
-        global_env.insert("KUMA_STORE_POSTGRES_DB_NAME".into(), "kuma".into());
+        postgres_cp_env(&mut global_env);
     }
 
     let mut global_service = ComposeService::new(image, network_name)
@@ -343,11 +343,7 @@ pub fn global_two_zones(config: GlobalTwoZonesConfig<'_>) -> ComposeFile {
         postgres_depends(config.store_type, config.network_name, &mut services);
 
     if config.store_type == "postgres" {
-        global_env.insert("KUMA_STORE_POSTGRES_HOST".into(), "postgres".into());
-        global_env.insert("KUMA_STORE_POSTGRES_PORT".into(), "5432".into());
-        global_env.insert("KUMA_STORE_POSTGRES_USER".into(), "kuma".into());
-        global_env.insert("KUMA_STORE_POSTGRES_PASSWORD".into(), "kuma".into());
-        global_env.insert("KUMA_STORE_POSTGRES_DB_NAME".into(), "kuma".into());
+        postgres_cp_env(&mut global_env);
     }
 
     let mut global_service = ComposeService::new(config.image, config.network_name)
