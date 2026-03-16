@@ -27,6 +27,66 @@ pub struct ComposeService {
     pub healthcheck: Option<ComposeHealthcheck>,
 }
 
+impl ComposeService {
+    /// Create a new service with sensible defaults.
+    #[must_use]
+    pub fn new(image: &str, network: &str) -> Self {
+        Self {
+            image: image.into(),
+            environment: BTreeMap::new(),
+            ports: Vec::new(),
+            depends_on: ComposeDependsOn::Simple(vec![]),
+            networks: vec![network.into()],
+            command: Vec::new(),
+            entrypoint: None,
+            restart: None,
+            healthcheck: None,
+        }
+    }
+
+    #[must_use]
+    pub fn with_environment(mut self, env: BTreeMap<String, String>) -> Self {
+        self.environment = env;
+        self
+    }
+
+    #[must_use]
+    pub fn with_ports(mut self, ports: Vec<String>) -> Self {
+        self.ports = ports;
+        self
+    }
+
+    #[must_use]
+    pub fn with_depends_on(mut self, depends_on: ComposeDependsOn) -> Self {
+        self.depends_on = depends_on;
+        self
+    }
+
+    #[must_use]
+    pub fn with_command(mut self, command: Vec<String>) -> Self {
+        self.command = command;
+        self
+    }
+
+    #[must_use]
+    pub fn with_entrypoint(mut self, entrypoint: Vec<String>) -> Self {
+        self.entrypoint = Some(entrypoint);
+        self
+    }
+
+    #[must_use]
+    pub fn with_restart(mut self, restart: &str) -> Self {
+        self.restart = Some(restart.into());
+        self
+    }
+
+    #[must_use]
+    pub fn with_healthcheck(mut self, healthcheck: ComposeHealthcheck) -> Self {
+        self.healthcheck = Some(healthcheck);
+        self
+    }
+}
+
 /// Compose `depends_on` - either a simple list or a map with conditions.
 #[derive(Debug, Clone)]
 pub enum ComposeDependsOn {
@@ -39,6 +99,15 @@ impl ComposeDependsOn {
         match self {
             Self::Simple(v) => v.is_empty(),
             Self::Conditional(m) => m.is_empty(),
+        }
+    }
+
+    /// Check if a service name is present in the dependency list.
+    #[must_use]
+    pub fn contains(&self, name: &str) -> bool {
+        match self {
+            Self::Simple(v) => v.iter().any(|s| s == name),
+            Self::Conditional(m) => m.contains_key(name),
         }
     }
 }
@@ -153,7 +222,7 @@ pub fn single_zone(
         env.insert("KUMA_STORE_POSTGRES_DB_NAME".into(), "kuma".into());
     }
 
-    let (depends_on, restart) = if store_type == "postgres" {
+    let (depends_on, is_postgres) = if store_type == "postgres" {
         services.insert("postgres".into(), postgres_service(network_name));
         let mut deps = BTreeMap::new();
         deps.insert(
@@ -162,28 +231,23 @@ pub fn single_zone(
                 condition: "service_healthy".into(),
             },
         );
-        (
-            ComposeDependsOn::Conditional(deps),
-            Some("on-failure".into()),
-        )
+        (ComposeDependsOn::Conditional(deps), true)
     } else {
-        (ComposeDependsOn::Simple(vec![]), None)
+        (ComposeDependsOn::Simple(vec![]), false)
     };
 
-    services.insert(
-        cp_name.into(),
-        ComposeService {
-            image: image.into(),
-            environment: env,
-            ports: vec!["5681:5681".into(), "5678:5678".into()],
-            depends_on,
-            networks: vec![network_name.into()],
-            command: cp_command(store_type),
-            entrypoint: cp_entrypoint(store_type),
-            restart,
-            healthcheck: None,
-        },
-    );
+    let mut service = ComposeService::new(image, network_name)
+        .with_environment(env)
+        .with_ports(vec!["5681:5681".into(), "5678:5678".into()])
+        .with_depends_on(depends_on)
+        .with_command(cp_command(store_type));
+    if let Some(ep) = cp_entrypoint(store_type) {
+        service = service.with_entrypoint(ep);
+    }
+    if is_postgres {
+        service = service.with_restart("on-failure");
+    }
+    services.insert(cp_name.into(), service);
 
     let mut networks = BTreeMap::new();
     networks.insert(network_name.into(), bridge_network(subnet));
@@ -204,8 +268,7 @@ pub fn global_zone(
     let mut services = BTreeMap::new();
 
     let mut global_env = cp_env("global", store_type);
-    let (global_depends, global_restart) =
-        postgres_depends(store_type, network_name, &mut services);
+    let (global_depends, is_postgres) = postgres_depends(store_type, network_name, &mut services);
 
     if store_type == "postgres" {
         global_env.insert("KUMA_STORE_POSTGRES_HOST".into(), "postgres".into());
@@ -215,20 +278,18 @@ pub fn global_zone(
         global_env.insert("KUMA_STORE_POSTGRES_DB_NAME".into(), "kuma".into());
     }
 
-    services.insert(
-        global_name.into(),
-        ComposeService {
-            image: image.into(),
-            environment: global_env,
-            ports: vec!["5681:5681".into(), "5685:5685".into()],
-            depends_on: global_depends,
-            networks: vec![network_name.into()],
-            command: cp_command(store_type),
-            entrypoint: cp_entrypoint(store_type),
-            restart: global_restart,
-            healthcheck: None,
-        },
-    );
+    let mut global_service = ComposeService::new(image, network_name)
+        .with_environment(global_env)
+        .with_ports(vec!["5681:5681".into(), "5685:5685".into()])
+        .with_depends_on(global_depends)
+        .with_command(cp_command(store_type));
+    if let Some(ep) = cp_entrypoint(store_type) {
+        global_service = global_service.with_entrypoint(ep);
+    }
+    if is_postgres {
+        global_service = global_service.with_restart("on-failure");
+    }
+    services.insert(global_name.into(), global_service);
 
     let mut zone_env = cp_env("zone", "memory");
     zone_env.insert("KUMA_MULTIZONE_ZONE_NAME".into(), zone_label.into());
@@ -241,20 +302,12 @@ pub fn global_zone(
         "true".into(),
     );
 
-    services.insert(
-        zone_name.into(),
-        ComposeService {
-            image: image.into(),
-            environment: zone_env,
-            ports: vec!["15681:5681".into(), "15678:5678".into()],
-            depends_on: ComposeDependsOn::Simple(vec![global_name.into()]),
-            networks: vec![network_name.into()],
-            command: vec!["run".into()],
-            entrypoint: None,
-            restart: None,
-            healthcheck: None,
-        },
-    );
+    let zone_service = ComposeService::new(image, network_name)
+        .with_environment(zone_env)
+        .with_ports(vec!["15681:5681".into(), "15678:5678".into()])
+        .with_depends_on(ComposeDependsOn::Simple(vec![global_name.into()]))
+        .with_command(vec!["run".into()]);
+    services.insert(zone_name.into(), zone_service);
 
     let mut networks = BTreeMap::new();
     networks.insert(network_name.into(), bridge_network(subnet));
@@ -286,7 +339,7 @@ pub fn global_two_zones(config: GlobalTwoZonesConfig<'_>) -> ComposeFile {
     let mut services = BTreeMap::new();
 
     let mut global_env = cp_env("global", config.store_type);
-    let (global_depends, global_restart) =
+    let (global_depends, is_postgres) =
         postgres_depends(config.store_type, config.network_name, &mut services);
 
     if config.store_type == "postgres" {
@@ -297,20 +350,18 @@ pub fn global_two_zones(config: GlobalTwoZonesConfig<'_>) -> ComposeFile {
         global_env.insert("KUMA_STORE_POSTGRES_DB_NAME".into(), "kuma".into());
     }
 
-    services.insert(
-        config.global_name.into(),
-        ComposeService {
-            image: config.image.into(),
-            environment: global_env,
-            ports: vec!["5681:5681".into(), "5685:5685".into()],
-            depends_on: global_depends,
-            networks: vec![config.network_name.into()],
-            command: cp_command(config.store_type),
-            entrypoint: cp_entrypoint(config.store_type),
-            restart: global_restart,
-            healthcheck: None,
-        },
-    );
+    let mut global_service = ComposeService::new(config.image, config.network_name)
+        .with_environment(global_env)
+        .with_ports(vec!["5681:5681".into(), "5685:5685".into()])
+        .with_depends_on(global_depends)
+        .with_command(cp_command(config.store_type));
+    if let Some(ep) = cp_entrypoint(config.store_type) {
+        global_service = global_service.with_entrypoint(ep);
+    }
+    if is_postgres {
+        global_service = global_service.with_restart("on-failure");
+    }
+    services.insert(config.global_name.into(), global_service);
 
     for (i, zone) in [config.zone1, config.zone2].iter().enumerate() {
         let port_offset = u16::try_from(i).unwrap_or(0) * 10000 + 15681;
@@ -327,20 +378,15 @@ pub fn global_two_zones(config: GlobalTwoZonesConfig<'_>) -> ComposeFile {
             "true".into(),
         );
 
-        services.insert(
-            zone.name.into(),
-            ComposeService {
-                image: config.image.into(),
-                environment: zone_env,
-                ports: vec![format!("{port_offset}:5681"), format!("{xds_offset}:5678")],
-                depends_on: ComposeDependsOn::Simple(vec![config.global_name.into()]),
-                networks: vec![config.network_name.into()],
-                command: vec!["run".into()],
-                entrypoint: None,
-                restart: None,
-                healthcheck: None,
-            },
-        );
+        let zone_service = ComposeService::new(config.image, config.network_name)
+            .with_environment(zone_env)
+            .with_ports(vec![
+                format!("{port_offset}:5681"),
+                format!("{xds_offset}:5678"),
+            ])
+            .with_depends_on(ComposeDependsOn::Simple(vec![config.global_name.into()]))
+            .with_command(vec!["run".into()]);
+        services.insert(zone.name.into(), zone_service);
     }
 
     let mut networks = BTreeMap::new();
@@ -366,14 +412,14 @@ fn cp_entrypoint(store_type: &str) -> Option<Vec<String>> {
     }
 }
 
-/// Build `depends_on` and restart policy for postgres-backed CP services.
+/// Build `depends_on` for postgres-backed CP services. Returns whether postgres is used.
 fn postgres_depends(
     store_type: &str,
     network_name: &str,
     services: &mut BTreeMap<String, ComposeService>,
-) -> (ComposeDependsOn, Option<String>) {
+) -> (ComposeDependsOn, bool) {
     if store_type != "postgres" {
-        return (ComposeDependsOn::Simple(vec![]), None);
+        return (ComposeDependsOn::Simple(vec![]), false);
     }
     services.insert("postgres".into(), postgres_service(network_name));
     let mut deps = BTreeMap::new();
@@ -383,10 +429,7 @@ fn postgres_depends(
             condition: "service_healthy".into(),
         },
     );
-    (
-        ComposeDependsOn::Conditional(deps),
-        Some("on-failure".into()),
-    )
+    (ComposeDependsOn::Conditional(deps), true)
 }
 
 fn postgres_service(network_name: &str) -> ComposeService {
@@ -394,22 +437,15 @@ fn postgres_service(network_name: &str) -> ComposeService {
     env.insert("POSTGRES_USER".into(), "kuma".into());
     env.insert("POSTGRES_PASSWORD".into(), "kuma".into());
     env.insert("POSTGRES_DB".into(), "kuma".into());
-    ComposeService {
-        image: "postgres:16-alpine".into(),
-        environment: env,
-        ports: vec!["5432:5432".into()],
-        depends_on: ComposeDependsOn::Simple(vec![]),
-        networks: vec![network_name.into()],
-        command: vec![],
-        entrypoint: None,
-        restart: None,
-        healthcheck: Some(ComposeHealthcheck {
+    ComposeService::new("postgres:16-alpine", network_name)
+        .with_environment(env)
+        .with_ports(vec!["5432:5432".into()])
+        .with_healthcheck(ComposeHealthcheck {
             test: vec!["CMD-SHELL".into(), "pg_isready -U kuma -d kuma".into()],
             interval: "2s".into(),
             timeout: "5s".into(),
             retries: 10,
-        }),
-    }
+        })
 }
 
 #[cfg(test)]
