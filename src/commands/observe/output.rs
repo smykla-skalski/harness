@@ -98,6 +98,76 @@ pub fn render_summary(issues: &[Issue], last_line: usize) -> String {
     .expect("valid JSON serialization")
 }
 
+/// Render issues as a markdown report using `tabled` for table formatting.
+#[must_use]
+pub fn render_markdown(issues: &[Issue]) -> String {
+    use std::fmt::Write as _;
+    use tabled::settings::Style;
+    use tabled::{Table, Tabled};
+
+    #[derive(Tabled)]
+    struct IssueRow {
+        line: usize,
+        severity: String,
+        category: String,
+        code: String,
+        summary: String,
+    }
+
+    if issues.is_empty() {
+        return "# Observe report\n\nNo issues found.\n".to_string();
+    }
+
+    let rows: Vec<IssueRow> = issues
+        .iter()
+        .map(|i| IssueRow {
+            line: i.line,
+            severity: i.severity.to_string(),
+            category: i.category.to_string(),
+            code: i.code.to_string(),
+            summary: i.summary.clone(),
+        })
+        .collect();
+
+    let table = Table::new(&rows).with(Style::markdown()).to_string();
+    let mut output = String::from("# Observe report\n\n");
+    output.push_str(&table);
+    let _ = write!(output, "\n\n**Total: {} issues**\n", issues.len());
+    output
+}
+
+/// Render top N root causes grouped by issue code.
+///
+/// # Panics
+/// Panics if the JSON value fails to serialize, which cannot happen
+/// with valid string/integer data.
+#[must_use]
+pub fn render_top_causes(issues: &[Issue], top_n: usize) -> String {
+    let mut counts: HashMap<String, (usize, String)> = HashMap::new();
+    for issue in issues {
+        let key = issue.code.to_string();
+        let entry = counts
+            .entry(key)
+            .or_insert_with(|| (0, issue.summary.clone()));
+        entry.0 += 1;
+    }
+
+    let mut sorted: Vec<(String, usize, String)> = counts
+        .into_iter()
+        .map(|(code, (count, summary))| (code, count, summary))
+        .collect();
+    sorted.sort_by(|a, b| b.1.cmp(&a.1));
+    sorted.truncate(top_n);
+
+    // json!() values built from valid data always serialize successfully.
+    serde_json::to_string(&json!({
+        "top_causes": sorted.iter().map(|(code, count, summary)| {
+            json!({"code": code, "count": count, "representative_summary": summary})
+        }).collect::<Vec<_>>(),
+    }))
+    .expect("valid JSON serialization")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

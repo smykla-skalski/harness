@@ -679,6 +679,8 @@ pub struct ObserverState {
     pub issue_attempts: Vec<IssueAttempt>,
     pub muted_codes: Vec<IssueCode>,
     pub cycle_history: Vec<CycleRecord>,
+    #[serde(default)]
+    pub baseline_issue_ids: Vec<String>,
 }
 
 impl ObserverState {
@@ -699,6 +701,7 @@ impl ObserverState {
             issue_attempts: Vec::new(),
             muted_codes: Vec::new(),
             cycle_history: Vec::new(),
+            baseline_issue_ids: Vec::new(),
         }
     }
 }
