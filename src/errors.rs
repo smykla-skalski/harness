@@ -339,6 +339,11 @@ define_cli_errors! {
         msg: "template render failed: {detail}",
         exit: 4
     },
+    ServiceReadinessTimeout { name: Cow<'static, str> } => {
+        code: "KSRCLI078",
+        msg: "service readiness timeout: {name}",
+        exit: 4
+    },
 
     // --- IO/serialization (exit 1) ---
     Io { detail: Cow<'static, str> } => {
@@ -475,6 +480,7 @@ impl CliErrorKind {
     cli_constructor!(compose_file_failed, ComposeFileFailed, path);
     cli_constructor!(image_build_failed, ImageBuildFailed, target);
     cli_constructor!(template_render, TemplateRender, detail);
+    cli_constructor!(service_readiness_timeout, ServiceReadinessTimeout, name);
     cli_constructor!(io, Io, detail);
     cli_constructor!(serialize, Serialize, detail);
     cli_constructor!(hook_payload_invalid, HookPayloadInvalid, detail);
@@ -1017,6 +1023,7 @@ mod tests {
             CliErrorKind::compose_file_failed(""),
             CliErrorKind::image_build_failed(""),
             CliErrorKind::template_render(""),
+            CliErrorKind::service_readiness_timeout(""),
             CliErrorKind::io(""),
             CliErrorKind::serialize(""),
             CliErrorKind::hook_payload_invalid(""),
