@@ -6,7 +6,8 @@ use super::emitter::{Guidance, IssueBlueprint, IssueEmitter};
 use super::{OLD_SKILL_REGEX, RM_RECURSIVE_REGEX, SKILL_NAME_REGEX};
 use crate::commands::observe::patterns;
 use crate::commands::observe::types::{
-    Issue, IssueCategory, IssueCode, IssueSeverity, MessageRole, ScanState, ToolUseRecord,
+    Confidence, FixSafety, Issue, IssueCategory, IssueCode, IssueSeverity, MessageRole, ScanState,
+    SourceTool, ToolUseRecord,
 };
 
 /// Check a `tool_use` block for issues.
@@ -37,6 +38,7 @@ pub fn check_tool_use_for_issues(
     if let Some(tool_id) = block["id"].as_str()
         && !tool_id.is_empty()
     {
+        state.tool_use_serial += 1;
         state.last_tool_uses.insert(
             tool_id.to_string(),
             ToolUseRecord {
@@ -44,6 +46,16 @@ pub fn check_tool_use_for_issues(
                 input: input.clone(),
             },
         );
+
+        // Prune old entries to cap memory usage
+        if state.last_tool_uses.len() > 100 {
+            let cutoff = state.last_tool_uses.len() - 100;
+            let keys_to_remove: Vec<String> =
+                state.last_tool_uses.keys().take(cutoff).cloned().collect();
+            for key in keys_to_remove {
+                state.last_tool_uses.remove(&key);
+            }
+        }
     }
 
     issues
@@ -73,7 +85,10 @@ fn check_bash_tool_use(
             )
             .with_guidance(Guidance::fix_hint(
                 "SKILL.md or model still references old skill names",
-            )),
+            ))
+            .with_confidence(Confidence::High)
+            .with_fix_safety(FixSafety::AutoFixSafe)
+            .with_source_tool(Some(SourceTool::Bash)),
             &details,
         );
     }
@@ -103,7 +118,10 @@ fn check_harness_command_patterns(
             )
             .with_guidance(Guidance::fix_hint(
                 "SKILL.md references a non-existent harness kind",
-            )),
+            ))
+            .with_confidence(Confidence::High)
+            .with_fix_safety(FixSafety::AutoFixSafe)
+            .with_source_tool(Some(SourceTool::Bash)),
             details,
         );
     }
@@ -123,7 +141,10 @@ fn check_harness_command_patterns(
             )
             .with_guidance(Guidance::fix_hint(
                 "Use harness commands or shell builtins instead of python one-liners",
-            )),
+            ))
+            .with_confidence(Confidence::High)
+            .with_fix_safety(FixSafety::AutoFixSafe)
+            .with_source_tool(Some(SourceTool::Bash)),
             details,
         );
     }
@@ -146,7 +167,10 @@ fn check_destructive_patterns(
             )
             .with_guidance(Guidance::advisory(
                 "Should verify target exists and is correct before deleting",
-            )),
+            ))
+            .with_confidence(Confidence::High)
+            .with_fix_safety(FixSafety::AdvisoryOnly)
+            .with_source_tool(Some(SourceTool::Bash)),
             details,
         );
     }
@@ -162,7 +186,10 @@ fn check_destructive_patterns(
             )
             .with_guidance(Guidance::fix_hint(
                 "Use harness cluster instead of raw make targets",
-            )),
+            ))
+            .with_confidence(Confidence::High)
+            .with_fix_safety(FixSafety::AutoFixSafe)
+            .with_source_tool(Some(SourceTool::Bash)),
             details,
         );
     }
@@ -178,7 +205,10 @@ fn check_destructive_patterns(
             )
             .with_guidance(Guidance::fix_hint(
                 "Agent committed code without asking the user via bug-found gate",
-            )),
+            ))
+            .with_confidence(Confidence::High)
+            .with_fix_safety(FixSafety::TriageRequired)
+            .with_source_tool(Some(SourceTool::Bash)),
             details,
         );
     }
@@ -218,7 +248,10 @@ fn check_absolute_manifest_path(
                 .with_guidance(Guidance::fix_hint(
                     "Use relative manifest paths (e.g. g13/01.yaml). \
                      Harness resolves them from the suite directory.",
-                )),
+                ))
+                .with_confidence(Confidence::High)
+                .with_fix_safety(FixSafety::AutoFixSafe)
+                .with_source_tool(Some(SourceTool::Bash)),
                 details,
             );
             return;
@@ -252,7 +285,10 @@ fn check_direct_task_output_read(
             )
             .with_guidance(Guidance::fix_hint(
                 "Use TaskOutput tool instead of reading task files directly",
-            )),
+            ))
+            .with_confidence(Confidence::High)
+            .with_fix_safety(FixSafety::AutoFixSafe)
+            .with_source_tool(Some(SourceTool::Bash)),
             details,
         );
     }
@@ -281,7 +317,10 @@ fn check_env_var_construction(
             )
             .with_guidance(Guidance::fix_hint(
                 "Agent manually setting KUBECONFIG. Harness injects it automatically.",
-            )),
+            ))
+            .with_confidence(Confidence::High)
+            .with_fix_safety(FixSafety::AutoFixSafe)
+            .with_source_tool(Some(SourceTool::Bash)),
             details,
         );
         return;
@@ -299,7 +338,10 @@ fn check_env_var_construction(
             )
             .with_guidance(Guidance::fix_hint(
                 "Agent constructing env vars. Harness handles environment automatically.",
-            )),
+            ))
+            .with_confidence(Confidence::High)
+            .with_fix_safety(FixSafety::AutoFixSafe)
+            .with_source_tool(Some(SourceTool::Bash)),
             details,
         );
         return;
@@ -320,7 +362,10 @@ fn check_env_var_construction(
                 )
                 .with_guidance(Guidance::fix_hint(
                     "Agent constructing env vars. Harness handles environment automatically.",
-                )),
+                ))
+                .with_confidence(Confidence::High)
+                .with_fix_safety(FixSafety::AutoFixSafe)
+                .with_source_tool(Some(SourceTool::Bash)),
                 details,
             );
         }
@@ -374,7 +419,10 @@ fn check_sleep_prefix_before_harness(
             .with_guidance(Guidance::fix_hint(
                 "Use --delay flag instead of sleep prefix \
                  (e.g. harness apply --delay 8 --manifest ...)",
-            )),
+            ))
+            .with_confidence(Confidence::High)
+            .with_fix_safety(FixSafety::AutoFixSafe)
+            .with_source_tool(Some(SourceTool::Bash)),
             details,
         );
     }
@@ -439,7 +487,10 @@ fn check_manifest_fix_prompt(
             .with_guidance(Guidance::fix_hint(
                 "CRD or webhook rejected a manifest. Could be a suite error OR a product bug. \
                  Investigate whether the Go validator accepts what the CRD rejects.",
-            )),
+            ))
+            .with_confidence(Confidence::High)
+            .with_fix_safety(FixSafety::TriageRequired)
+            .with_source_tool(Some(SourceTool::AskUserQuestion)),
             &details,
         );
     }
@@ -465,7 +516,10 @@ fn check_validator_install_prompt(
             .with_guidance(Guidance::fix_target_hint(
                 "skills/new/SKILL.md",
                 "Step 0 should check if binary exists first",
-            )),
+            ))
+            .with_confidence(Confidence::Medium)
+            .with_fix_safety(FixSafety::AutoFixGuarded)
+            .with_source_tool(Some(SourceTool::AskUserQuestion)),
             &details,
         );
     }
@@ -515,7 +569,10 @@ fn check_question_deviations(
             .with_guidance(Guidance::fix_target_hint(
                 "skills/new/SKILL.md",
                 "suite:new should produce suites that don't require runtime deviations",
-            )),
+            ))
+            .with_confidence(Confidence::High)
+            .with_fix_safety(FixSafety::TriageRequired)
+            .with_source_tool(Some(SourceTool::AskUserQuestion)),
             &details,
         );
     }
@@ -547,7 +604,10 @@ fn check_wrong_skill_crossref(
                 .with_guidance(Guidance::fix_target_hint(
                     "skills/run/SKILL.md",
                     "suite:run should not offer suite:new as a structured option",
-                )),
+                ))
+                .with_confidence(Confidence::Medium)
+                .with_fix_safety(FixSafety::AdvisoryOnly)
+                .with_source_tool(Some(SourceTool::AskUserQuestion)),
                 &details,
             );
         }
@@ -563,6 +623,11 @@ fn check_write_edit_tool_use(
     issues: &mut Vec<Issue>,
 ) {
     let path = input["file_path"].as_str().unwrap_or("");
+    let source_tool = if tool_name == "Write" {
+        Some(SourceTool::Write)
+    } else {
+        Some(SourceTool::Edit)
+    };
 
     let current_count = {
         let count = state.edit_counts.entry(path.to_string()).or_insert(0);
@@ -583,11 +648,17 @@ fn check_write_edit_tool_use(
             .with_fingerprint(format!("{path}:{current_count}"))
             .with_guidance(Guidance::advisory(
                 "Repeated modifications suggest trial-and-error",
-            )),
+            ))
+            .with_confidence(Confidence::Medium)
+            .with_fix_safety(FixSafety::AdvisoryOnly)
+            .with_source_tool(source_tool),
             &details,
         );
     }
 
+    // Inverted skill name rule: flag colon-prefixed names in SKILL.md files.
+    // The actual convention in checked-in skills IS short names (e.g. "new", "run").
+    // The colon-prefixed form (e.g. "suite:new") is for CLI invocations only.
     if path.contains("SKILL.md") {
         let content = if tool_name == "Write" {
             input["content"].as_str().unwrap_or("")
@@ -596,7 +667,7 @@ fn check_write_edit_tool_use(
         };
         if let Some(captures) = SKILL_NAME_REGEX.captures(content) {
             let skill_name = captures.get(1).map_or("", |m| m.as_str());
-            if matches!(skill_name, "new" | "run" | "observe") && !skill_name.contains(':') {
+            if skill_name.contains(':') {
                 let details = format!("Path: {path}, name: {skill_name}");
                 IssueEmitter::new(line_num, MessageRole::Assistant, state).emit(
                     issues,
@@ -605,14 +676,17 @@ fn check_write_edit_tool_use(
                         IssueCategory::SkillBehavior,
                         IssueSeverity::Critical,
                         format!(
-                            "SKILL.md name field uses short name '{skill_name}' instead of fully qualified"
+                            "SKILL.md name field uses colon-prefixed '{skill_name}' - should be short name"
                         ),
                     )
                     .with_fingerprint(format!("{path}:{skill_name}"))
                     .with_guidance(Guidance::fix_target_hint(
                         path.to_string(),
-                        "Name should be fully qualified like 'suite:new' or 'suite:run'",
-                    )),
+                        "Name should be the short form like 'new' or 'run', not 'suite:new'",
+                    ))
+                    .with_confidence(Confidence::High)
+                    .with_fix_safety(FixSafety::AutoFixSafe)
+                    .with_source_tool(source_tool),
                     &details,
                 );
             }
@@ -655,7 +729,10 @@ fn check_manifest_created_during_run(
             "skills/new/SKILL.md",
             "All manifests must exist before the run starts. \
              A missing manifest means suite:new failed to author it.",
-        )),
+        ))
+        .with_confidence(Confidence::High)
+        .with_fix_safety(FixSafety::TriageRequired)
+        .with_source_tool(Some(SourceTool::Write)),
         &details,
     );
 }
@@ -684,7 +761,10 @@ fn check_managed_file_writes(
                 .with_guidance(Guidance::fix_target_hint(
                     "skills/run/SKILL.md",
                     "Use harness commands to update managed files, not direct Write/Edit",
-                )),
+                ))
+                .with_confidence(Confidence::High)
+                .with_fix_safety(FixSafety::AutoFixSafe)
+                .with_source_tool(Some(SourceTool::Write)),
                 &details,
             );
             break;

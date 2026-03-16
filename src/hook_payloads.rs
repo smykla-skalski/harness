@@ -4,18 +4,13 @@ use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 
 use crate::context::RunContext;
 use crate::errors::{CliError, CliErrorKind, cow};
 use crate::rules;
 use crate::workflow::author::{self as author_workflow, AuthorWorkflowState};
 use crate::workflow::runner::{self as runner_workflow, RunnerWorkflowState};
-
-/// A write request from a hook envelope.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct HookWriteRequest {
-    pub file_path: PathBuf,
-}
 
 /// An option in an `AskUserQuestion` prompt.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -41,7 +36,10 @@ impl AskUserQuestionPrompt {
     /// Option labels as borrowed string slices.
     #[must_use]
     pub fn option_labels(&self) -> Vec<&str> {
-        self.options.iter().map(|o| o.label.as_str()).collect()
+        self.options
+            .iter()
+            .map(|option| option.label.as_str())
+            .collect()
     }
 
     /// First line of the question text.
@@ -62,41 +60,15 @@ pub struct AskUserAnswer {
     pub answer: String,
 }
 
-/// Annotation payload.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct AskUserAnnotation {
-    pub question: String,
-    pub notes: String,
-}
-
-/// Hook message payload extracted from tool input.
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
-pub struct HookMessagePayload {
-    #[serde(default)]
-    pub command: Option<String>,
-    #[serde(default)]
-    pub file_path: Option<PathBuf>,
-    #[serde(default)]
-    pub writes: Vec<HookWriteRequest>,
-    #[serde(default)]
-    pub questions: Vec<AskUserQuestionPrompt>,
-    #[serde(default)]
-    pub answers: Vec<AskUserAnswer>,
-    #[serde(default)]
-    pub annotations: Vec<AskUserAnnotation>,
-}
-
 /// The full hook envelope payload from Claude Code.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct HookEnvelopePayload {
     #[serde(default)]
-    pub root: Option<String>,
+    pub tool_name: String,
     #[serde(default)]
-    pub input_payload: Option<HookMessagePayload>,
+    pub tool_input: Value,
     #[serde(default)]
-    pub tool_input: Option<serde_json::Value>,
-    #[serde(default)]
-    pub response: Option<serde_json::Value>,
+    pub tool_response: Value,
     #[serde(default)]
     pub last_assistant_message: Option<String>,
     #[serde(default)]
@@ -110,8 +82,8 @@ pub struct HookEnvelopePayload {
 impl FromStr for HookEnvelopePayload {
     type Err = CliError;
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Self::from_json_text(s)
+    fn from_str(text: &str) -> Result<Self, Self::Err> {
+        Self::from_json_text(text)
     }
 }
 
@@ -122,8 +94,8 @@ impl HookEnvelopePayload {
     /// Returns `CliError` if the text is not valid JSON or does not match the
     /// expected envelope shape.
     pub fn from_json_text(text: &str) -> Result<Self, CliError> {
-        serde_json::from_str(text).map_err(|e| {
-            CliErrorKind::hook_payload_invalid(cow!("invalid hook payload: {e}")).into()
+        serde_json::from_str(text).map_err(|error| {
+            CliErrorKind::hook_payload_invalid(cow!("invalid hook payload: {error}")).into()
         })
     }
 
@@ -134,9 +106,9 @@ impl HookEnvelopePayload {
     pub fn from_stdin() -> Result<Self, CliError> {
         use io::Read;
         let mut text = String::new();
-        io::stdin().read_to_string(&mut text).map_err(|e| {
+        io::stdin().read_to_string(&mut text).map_err(|error| {
             CliError::from(CliErrorKind::hook_payload_invalid(cow!(
-                "failed to read stdin: {e}"
+                "failed to read stdin: {error}"
             )))
         })?;
         Self::from_json_text(&text)
@@ -184,20 +156,20 @@ impl HookContext {
     /// Returns `CliError` if stdin cannot be read or the payload is invalid.
     pub fn from_stdin(skill: &str) -> Result<Self, CliError> {
         let event = HookEvent::from_stdin()?;
-        let skill_owned = skill.to_string();
-        let mut ctx = Self {
-            skill: skill_owned.clone(),
+        let skill_name = skill.to_string();
+        let mut context = Self {
+            skill: skill_name.clone(),
             event,
             run_dir: None,
             skill_active: true,
-            active_skill: Some(skill_owned),
+            active_skill: Some(skill_name),
             inactive_reason: None,
             run: None,
             runner_state: None,
             author_state: None,
         };
-        ctx.load_context_from_disk();
-        Ok(ctx)
+        context.load_context_from_disk();
+        Ok(context)
     }
 
     /// Build hook context from a pre-parsed envelope payload.
@@ -205,48 +177,56 @@ impl HookContext {
     /// Used when the envelope has already been read (e.g. from a test).
     #[must_use]
     pub fn from_envelope(skill: &str, payload: HookEnvelopePayload) -> Self {
-        let skill_owned = skill.to_string();
-        let mut ctx = Self {
-            skill: skill_owned.clone(),
+        let skill_name = skill.to_string();
+        let mut context = Self {
+            skill: skill_name.clone(),
             event: HookEvent { payload },
             run_dir: None,
             skill_active: true,
-            active_skill: Some(skill_owned),
+            active_skill: Some(skill_name),
             inactive_reason: None,
             run: None,
             runner_state: None,
             author_state: None,
         };
-        ctx.load_context_from_disk();
-        ctx
+        context.load_context_from_disk();
+        context
     }
 
     /// Attempt to load `RunContext`, runner state, and author state from disk.
     fn load_context_from_disk(&mut self) {
-        // Try loading RunContext from run_dir or by inferring from write paths.
-        if let Some(ref rd) = self.run_dir {
-            match RunContext::from_run_dir(rd) {
-                Ok(ctx) => self.run = Some(ctx),
-                Err(e) => eprintln!("warning: failed to load run context: {e}"),
+        if let Some(run_directory) = &self.run_dir {
+            match RunContext::from_run_dir(run_directory) {
+                Ok(run_context) => self.run = Some(run_context),
+                Err(error) => eprintln!("warning: failed to load run context: {error}"),
+            }
+        } else {
+            match RunContext::from_current() {
+                Ok(Some(run_context)) => {
+                    self.run_dir = Some(run_context.layout.run_dir());
+                    self.run = Some(run_context);
+                }
+                Ok(None) => {}
+                Err(error) => eprintln!("warning: failed to load current run context: {error}"),
             }
         }
-        // If we have a RunContext, load runner state from its directory.
-        if let Some(ref run) = self.run {
-            match runner_workflow::read_runner_state(&run.layout.run_dir()) {
-                Ok(opt) => self.runner_state = opt,
-                Err(e) => eprintln!("warning: failed to load runner state: {e}"),
+
+        if let Some(run_context) = &self.run {
+            match runner_workflow::read_runner_state(&run_context.layout.run_dir()) {
+                Ok(runner_state) => self.runner_state = runner_state,
+                Err(error) => eprintln!("warning: failed to load runner state: {error}"),
             }
-        } else if let Some(ref rd) = self.run_dir {
-            match runner_workflow::read_runner_state(rd) {
-                Ok(opt) => self.runner_state = opt,
-                Err(e) => eprintln!("warning: failed to load runner state: {e}"),
+        } else if let Some(run_directory) = &self.run_dir {
+            match runner_workflow::read_runner_state(run_directory) {
+                Ok(runner_state) => self.runner_state = runner_state,
+                Err(error) => eprintln!("warning: failed to load runner state: {error}"),
             }
         }
-        // Load author state when skill is suite:new.
+
         if self.is_suite_author() {
             match author_workflow::read_author_state() {
-                Ok(opt) => self.author_state = opt,
-                Err(e) => eprintln!("warning: failed to load author state: {e}"),
+                Ok(author_state) => self.author_state = author_state,
+                Err(error) => eprintln!("warning: failed to load author state: {error}"),
             }
         }
     }
@@ -254,30 +234,46 @@ impl HookContext {
     /// Get the run directory, either from explicit `run_dir` or from `RunContext`.
     #[must_use]
     pub fn effective_run_dir(&self) -> Option<PathBuf> {
-        if let Some(ref rd) = self.run_dir {
-            return Some(rd.clone());
+        if let Some(run_directory) = &self.run_dir {
+            return Some(run_directory.clone());
         }
-        self.run.as_ref().map(|r| r.layout.run_dir())
+        self.run
+            .as_ref()
+            .map(|run_context| run_context.layout.run_dir())
     }
 
     /// Get the suite directory from the run context metadata.
     #[must_use]
     pub fn suite_dir(&self) -> Option<PathBuf> {
-        self.run.as_ref().map(|r| {
-            Path::new(&r.metadata.suite_dir)
+        self.run.as_ref().map(|run_context| {
+            Path::new(&run_context.metadata.suite_dir)
                 .canonicalize()
-                .unwrap_or_else(|_| PathBuf::from(&r.metadata.suite_dir))
+                .unwrap_or_else(|_| PathBuf::from(&run_context.metadata.suite_dir))
         })
+    }
+
+    /// Tool name from the hook payload.
+    #[must_use]
+    pub fn tool_name(&self) -> &str {
+        &self.event.payload.tool_name
+    }
+
+    /// Tool input from the hook payload.
+    #[must_use]
+    pub fn tool_input(&self) -> &Value {
+        &self.event.payload.tool_input
+    }
+
+    /// Tool response from the hook payload.
+    #[must_use]
+    pub fn tool_response(&self) -> &Value {
+        &self.event.payload.tool_response
     }
 
     /// The raw command string from the input payload, if any.
     #[must_use]
     pub fn command_text(&self) -> Option<&str> {
-        self.event
-            .payload
-            .input_payload
-            .as_ref()
-            .and_then(|p| p.command.as_deref())
+        self.tool_input().get("command").and_then(Value::as_str)
     }
 
     /// Shell-split command words from the input payload.
@@ -285,47 +281,35 @@ impl HookContext {
     /// # Errors
     /// Returns `CliError` if shell tokenization fails (e.g. unmatched quotes).
     pub fn command_words(&self) -> Result<Vec<String>, CliError> {
-        let Some(cmd) = self.command_text() else {
+        let Some(command_text) = self.command_text() else {
             return Ok(Vec::new());
         };
-        shell_words::split(cmd).map_err(|e| {
-            CliErrorKind::hook_payload_invalid(cow!("shell tokenization failed: {e}")).into()
+        shell_words::split(command_text).map_err(|error| {
+            CliErrorKind::hook_payload_invalid(cow!("shell tokenization failed: {error}")).into()
         })
     }
 
     /// Write target paths from the input payload.
     #[must_use]
     pub fn write_paths(&self) -> Vec<&Path> {
-        let mut paths = Vec::new();
-        if let Some(p) = &self.event.payload.input_payload {
-            if let Some(fp) = &p.file_path {
-                paths.push(fp.as_path());
-            }
-            for w in &p.writes {
-                paths.push(w.file_path.as_path());
-            }
-        }
-        paths
+        self.tool_input()
+            .get("file_path")
+            .and_then(Value::as_str)
+            .map(Path::new)
+            .into_iter()
+            .collect()
     }
 
     /// `AskUserQuestion` prompts from the input payload.
     #[must_use]
-    pub fn question_prompts(&self) -> &[AskUserQuestionPrompt] {
-        self.event
-            .payload
-            .input_payload
-            .as_ref()
-            .map_or(&[], |p| &p.questions)
+    pub fn question_prompts(&self) -> Vec<AskUserQuestionPrompt> {
+        deserialize_value_list(self.tool_input().get("questions"))
     }
 
-    /// `AskUserQuestion` answers from the input payload.
+    /// `AskUserQuestion` answers from the tool response.
     #[must_use]
-    pub fn question_answers(&self) -> &[AskUserAnswer] {
-        self.event
-            .payload
-            .input_payload
-            .as_ref()
-            .map_or(&[], |p| &p.answers)
+    pub fn question_answers(&self) -> Vec<AskUserAnswer> {
+        deserialize_value_list(self.tool_response().get("answers"))
     }
 
     /// Last assistant message from the envelope.
@@ -344,18 +328,32 @@ impl HookContext {
         self.event.payload.stop_hook_active
     }
 
-    /// Tool response text from the envelope (post-tool-use hooks).
-    ///
-    /// For Bash tools, this is the combined stdout/stderr output. Returns
-    /// an empty string when no response is present.
+    /// Bash stdout from the tool response.
     #[must_use]
-    pub fn response_text(&self) -> &str {
-        self.event
-            .payload
-            .response
-            .as_ref()
-            .and_then(serde_json::Value::as_str)
-            .unwrap_or("")
+    pub fn bash_stdout(&self) -> Option<&str> {
+        self.tool_response().get("stdout").and_then(Value::as_str)
+    }
+
+    /// Bash stderr from the tool response.
+    #[must_use]
+    pub fn bash_stderr(&self) -> Option<&str> {
+        self.tool_response().get("stderr").and_then(Value::as_str)
+    }
+
+    /// Bash exit code from the tool response.
+    #[must_use]
+    pub fn bash_exit_code(&self) -> Option<i32> {
+        self.tool_response()
+            .get("exit_code")
+            .or_else(|| self.tool_response().get("exitCode"))
+            .and_then(Value::as_i64)
+            .and_then(|value| i32::try_from(value).ok())
+    }
+
+    /// Tool response text from the envelope.
+    #[must_use]
+    pub fn response_text(&self) -> String {
+        render_tool_response_text(self.tool_name(), self.tool_response())
     }
 
     /// Whether this context is for the suite:run skill.
@@ -368,6 +366,44 @@ impl HookContext {
     #[must_use]
     pub fn is_suite_author(&self) -> bool {
         self.skill == rules::SKILL_NEW
+    }
+}
+
+fn deserialize_value_list<T>(value: Option<&Value>) -> Vec<T>
+where
+    T: for<'de> Deserialize<'de>,
+{
+    value
+        .cloned()
+        .and_then(|inner| serde_json::from_value(inner).ok())
+        .unwrap_or_default()
+}
+
+fn render_tool_response_text(tool_name: &str, tool_response: &Value) -> String {
+    if tool_name == "Bash" {
+        let stdout = tool_response
+            .get("stdout")
+            .and_then(Value::as_str)
+            .unwrap_or("");
+        let stderr = tool_response
+            .get("stderr")
+            .and_then(Value::as_str)
+            .unwrap_or("");
+        let exit_code = tool_response
+            .get("exit_code")
+            .or_else(|| tool_response.get("exitCode"))
+            .and_then(Value::as_i64)
+            .and_then(|value| i32::try_from(value).ok())
+            .unwrap_or_default();
+        return format!(
+            "exit code: {exit_code}\n--- STDOUT ---\n{stdout}\n--- STDERR ---\n{stderr}"
+        );
+    }
+
+    match tool_response {
+        Value::Null => String::new(),
+        Value::String(text) => text.clone(),
+        other => serde_json::to_string_pretty(other).unwrap_or_else(|_| other.to_string()),
     }
 }
 
@@ -384,9 +420,10 @@ mod tests {
 
     #[test]
     fn envelope_from_str_parses() {
-        let json = r#"{"root": "/workspace"}"#;
+        let json = r#"{"tool_name": "Read", "tool_input": {"file_path": "/workspace/file.txt"}}"#;
         let envelope: HookEnvelopePayload = json.parse().unwrap();
-        assert_eq!(envelope.root.as_deref(), Some("/workspace"));
+        assert_eq!(envelope.tool_name, "Read");
+        assert_eq!(envelope.tool_input["file_path"], "/workspace/file.txt");
     }
 
     #[test]
@@ -398,34 +435,26 @@ mod tests {
     #[test]
     fn envelope_from_json_empty_object() {
         let envelope = HookEnvelopePayload::from_json_text("{}").unwrap();
-        assert!(envelope.root.is_none());
-        assert!(envelope.input_payload.is_none());
-        assert!(envelope.tool_input.is_none());
+        assert!(envelope.tool_name.is_empty());
+        assert_eq!(envelope.tool_input, Value::Null);
+        assert_eq!(envelope.tool_response, Value::Null);
         assert!(!envelope.stop_hook_active);
         assert!(envelope.raw_keys.is_empty());
     }
 
     #[test]
     fn envelope_from_json_with_command() {
-        let json = r#"{"input_payload": {"command": "kubectl get pods"}}"#;
+        let json = r#"{"tool_name": "Bash", "tool_input": {"command": "kubectl get pods"}}"#;
         let envelope = HookEnvelopePayload::from_json_text(json).unwrap();
-        let payload = envelope.input_payload.unwrap();
-        assert_eq!(payload.command.as_deref(), Some("kubectl get pods"));
-    }
-
-    #[test]
-    fn envelope_from_json_with_writes() {
-        let json = r#"{"input_payload": {"writes": [{"file_path": "/tmp/test.txt"}]}}"#;
-        let envelope = HookEnvelopePayload::from_json_text(json).unwrap();
-        let payload = envelope.input_payload.unwrap();
-        assert_eq!(payload.writes.len(), 1);
-        assert_eq!(payload.writes[0].file_path, PathBuf::from("/tmp/test.txt"));
+        assert_eq!(envelope.tool_name, "Bash");
+        assert_eq!(envelope.tool_input["command"], "kubectl get pods");
     }
 
     #[test]
     fn envelope_from_json_with_questions() {
         let json = r#"{
-            "input_payload": {
+            "tool_name": "AskUserQuestion",
+            "tool_input": {
                 "questions": [{
                     "question": "Install validator?",
                     "options": [
@@ -436,33 +465,35 @@ mod tests {
             }
         }"#;
         let envelope = HookEnvelopePayload::from_json_text(json).unwrap();
-        let payload = envelope.input_payload.unwrap();
-        assert_eq!(payload.questions.len(), 1);
-        let q = &payload.questions[0];
-        assert_eq!(q.question, "Install validator?");
-        assert_eq!(q.option_labels(), vec!["Yes", "No"]);
-        assert_eq!(q.question_head(), "Install validator?");
+        let context = HookContext::from_envelope("suite:run", envelope);
+        let prompts = context.question_prompts();
+        assert_eq!(prompts.len(), 1);
+        let prompt = &prompts[0];
+        assert_eq!(prompt.question, "Install validator?");
+        assert_eq!(prompt.option_labels(), vec!["Yes", "No"]);
+        assert_eq!(prompt.question_head(), "Install validator?");
     }
 
     #[test]
     fn envelope_from_json_invalid() {
         let result = HookEnvelopePayload::from_json_text("not json");
         assert!(result.is_err());
-        let err = result.unwrap_err();
-        assert_eq!(err.code(), "KSH001");
-        assert!(err.message().contains("invalid hook payload"));
+        let error = result.unwrap_err();
+        assert_eq!(error.code(), "KSH001");
+        assert!(error.message().contains("invalid hook payload"));
     }
 
     #[test]
     fn envelope_from_json_full_envelope() {
         let json = r#"{
-            "root": "/workspace",
+            "tool_name": "Agent",
+            "tool_input": {"description": "run preflight"},
             "transcript_path": "/tmp/transcript.json",
             "stop_hook_active": true,
             "raw_keys": ["key1", "key2"]
         }"#;
         let envelope = HookEnvelopePayload::from_json_text(json).unwrap();
-        assert_eq!(envelope.root.as_deref(), Some("/workspace"));
+        assert_eq!(envelope.tool_name, "Agent");
         assert_eq!(
             envelope.transcript_path.as_deref(),
             Some(Path::new("/tmp/transcript.json"))
@@ -474,10 +505,10 @@ mod tests {
     #[test]
     fn context_from_envelope_sets_skill() {
         let payload = HookEnvelopePayload::from_json_text("{}").unwrap();
-        let ctx = HookContext::from_envelope("suite:run", payload);
-        assert_eq!(ctx.skill, "suite:run");
-        assert!(ctx.skill_active);
-        assert_eq!(ctx.active_skill.as_deref(), Some("suite:run"));
+        let context = HookContext::from_envelope("suite:run", payload);
+        assert_eq!(context.skill, "suite:run");
+        assert!(context.skill_active);
+        assert_eq!(context.active_skill.as_deref(), Some("suite:run"));
     }
 
     #[test]
@@ -492,25 +523,34 @@ mod tests {
     }
 
     #[test]
-    fn response_text_returns_string_value() {
-        let json = r#"{"response": "ERROR [KSRCLI004] command failed"}"#;
+    fn response_text_renders_bash_output() {
+        let json = r#"{
+            "tool_name": "Bash",
+            "tool_response": {"stdout": "ok", "stderr": "warn", "exit_code": 3}
+        }"#;
         let payload = HookEnvelopePayload::from_json_text(json).unwrap();
-        let ctx = HookContext::from_envelope("suite:run", payload);
-        assert_eq!(ctx.response_text(), "ERROR [KSRCLI004] command failed");
+        let context = HookContext::from_envelope("suite:run", payload);
+        assert_eq!(
+            context.response_text(),
+            "exit code: 3\n--- STDOUT ---\nok\n--- STDERR ---\nwarn"
+        );
     }
 
     #[test]
     fn response_text_returns_empty_when_absent() {
         let payload = HookEnvelopePayload::from_json_text("{}").unwrap();
-        let ctx = HookContext::from_envelope("suite:run", payload);
-        assert_eq!(ctx.response_text(), "");
+        let context = HookContext::from_envelope("suite:run", payload);
+        assert_eq!(context.response_text(), "");
     }
 
     #[test]
-    fn response_text_returns_empty_for_non_string() {
-        let json = r#"{"response": {"stdout": "text"}}"#;
+    fn response_text_renders_non_bash_json() {
+        let json = r#"{
+            "tool_name": "AskUserQuestion",
+            "tool_response": {"answers": [{"question": "Q", "answer": "A"}]}
+        }"#;
         let payload = HookEnvelopePayload::from_json_text(json).unwrap();
-        let ctx = HookContext::from_envelope("suite:run", payload);
-        assert_eq!(ctx.response_text(), "");
+        let context = HookContext::from_envelope("suite:run", payload);
+        assert!(context.response_text().contains("\"answer\": \"A\""));
     }
 }

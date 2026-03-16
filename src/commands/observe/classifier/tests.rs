@@ -615,7 +615,7 @@ fn rule_output_shape_is_preserved() {
     assert_eq!(issues.len(), 1);
     let issue = &issues[0];
     assert!(issue.fix_safety.is_fixable());
-    assert_eq!(issue.fix_target.as_deref(), Some("cli.rs"));
+    assert_eq!(issue.fix_target.as_deref(), Some("src/cli.rs"));
     assert!(issue.fix_hint.is_none());
 
     let rendered = output::render_json(issue);
@@ -897,7 +897,7 @@ fn harness_infrastructure_output_shape() {
     );
     assert_eq!(issues.len(), 1);
     let issue = &issues[0];
-    assert!(issue.fix_safety.is_fixable());
+    assert!(!issue.fix_safety.is_fixable());
     assert!(issue.fix_target.is_none());
     assert!(
         issue
@@ -1248,7 +1248,7 @@ fn manifest_created_during_run_output_shape() {
     let issues = check_tool_use_for_issues(10, &block, &mut state);
     assert_eq!(issues.len(), 1);
     let issue = &issues[0];
-    assert!(issue.fix_safety.is_fixable());
+    assert!(!issue.fix_safety.is_fixable());
     assert_eq!(issue.fix_target.as_deref(), Some("skills/new/SKILL.md"));
     assert!(
         issue
