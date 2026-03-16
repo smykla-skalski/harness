@@ -45,6 +45,21 @@ pub(crate) fn truncate_details(text: &str) -> String {
     truncate_at(text, MAX_DETAIL_LENGTH).to_string()
 }
 
+/// Redact absolute paths and env var values from details text.
+#[must_use]
+fn redact_details(text: &str) -> String {
+    use std::sync::LazyLock;
+    static HOME_PATH_RE: LazyLock<regex::Regex> =
+        LazyLock::new(|| regex::Regex::new(r"/(?:Users|home)/[^/\s]+/").expect("valid regex"));
+    static ENV_VALUE_RE: LazyLock<regex::Regex> =
+        LazyLock::new(|| regex::Regex::new(r"([A-Z_]{3,})=\S+").expect("valid regex"));
+
+    let redacted = HOME_PATH_RE.replace_all(text, "<home>/");
+    ENV_VALUE_RE
+        .replace_all(&redacted, "$1=<redacted>")
+        .into_owned()
+}
+
 /// Extract text from a `tool_result` content block.
 pub(crate) fn tool_result_text(block: &serde_json::Value) -> String {
     let content = &block["content"];
@@ -136,6 +151,21 @@ pub fn execute(mode: ObserveMode) -> Result<i32, CliError> {
             codes,
             project_hint,
         } => execute_unmute(&session_id, &codes, project_hint.as_deref()),
+        ObserveMode::Compare {
+            session_id,
+            from_a,
+            to_a,
+            from_b,
+            to_b,
+            project_hint,
+        } => execute_compare(
+            &session_id,
+            from_a,
+            to_a,
+            from_b,
+            to_b,
+            project_hint.as_deref(),
+        ),
     }
 }
 
@@ -402,7 +432,14 @@ fn execute_scan(session_id: &str, filter: &ObserveFilterArgs) -> Result<i32, Cli
         write_details_file(details_path, &filtered)?;
     }
 
-    if filter.json {
+    let use_markdown = filter
+        .format
+        .as_deref()
+        .is_some_and(|f| f == "markdown" || f == "md");
+
+    if use_markdown {
+        println!("{}", output::render_markdown(&filtered));
+    } else if filter.json {
         for issue in &filtered {
             println!("{}", output::render_json(issue));
         }
@@ -410,6 +447,10 @@ fn execute_scan(session_id: &str, filter: &ObserveFilterArgs) -> Result<i32, Cli
         for issue in &filtered {
             println!("{}", output::render_human(issue));
         }
+    }
+
+    if let Some(n) = filter.top_causes {
+        println!("{}", output::render_top_causes(&filtered, n));
     }
 
     if filter.summary {
@@ -1115,6 +1156,8 @@ mod tests {
             fixable: false,
             mute: None,
             output: None,
+            format: None,
+            top_causes: None,
             output_details: None,
         };
         let result = apply_filters(Vec::new(), &filter);
@@ -1137,6 +1180,8 @@ mod tests {
             exclude: None,
             fixable: false,
             mute: None,
+            format: None,
+            top_causes: None,
             output: None,
             output_details: None,
         };
@@ -1175,11 +1220,29 @@ mod tests {
             exclude: None,
             fixable: false,
             mute: Some("build_or_lint_failure".into()),
+            format: None,
+            top_causes: None,
             output: None,
             output_details: None,
         };
         let result = apply_filters(vec![issue], &filter).unwrap();
         assert!(result.is_empty());
+    }
+
+    #[test]
+    fn redact_details_strips_home_paths() {
+        let text = "Error in /Users/alice/Projects/foo/src/main.rs";
+        let redacted = redact_details(text);
+        assert!(redacted.contains("<home>/"));
+        assert!(!redacted.contains("alice"));
+    }
+
+    #[test]
+    fn redact_details_strips_env_values() {
+        let text = "KUBECONFIG=/tmp/k3d-config SECRET_KEY=abc123 other text";
+        let redacted = redact_details(text);
+        assert!(redacted.contains("KUBECONFIG=<redacted>"));
+        assert!(redacted.contains("SECRET_KEY=<redacted>"));
     }
 }
 
@@ -1206,4 +1269,79 @@ fn execute_unmute(
             .join(", ")
     );
     Ok(0)
+}
+
+/// Compare issues between two line ranges in the same session.
+fn execute_compare(
+    session_id: &str,
+    from_a: usize,
+    to_a: usize,
+    from_b: usize,
+    to_b: usize,
+    project_hint: Option<&str>,
+) -> Result<i32, CliError> {
+    use std::collections::HashSet;
+
+    let path = session::find_session(session_id, project_hint)?;
+
+    let (issues_a, _) = scan_range(&path, from_a, to_a)?;
+    let (issues_b, _) = scan_range(&path, from_b, to_b)?;
+
+    let ids_a: HashSet<_> = issues_a.iter().map(|i| &i.issue_id).collect();
+    let ids_b: HashSet<_> = issues_b.iter().map(|i| &i.issue_id).collect();
+
+    let new_issues: Vec<&Issue> = issues_b
+        .iter()
+        .filter(|i| !ids_a.contains(&&i.issue_id))
+        .collect();
+    let resolved_issues: Vec<&Issue> = issues_a
+        .iter()
+        .filter(|i| !ids_b.contains(&&i.issue_id))
+        .collect();
+    let unchanged_count = ids_a.intersection(&ids_b).count();
+
+    let result = json!({
+        "range_a": {"from": from_a, "to": to_a, "issues": issues_a.len()},
+        "range_b": {"from": from_b, "to": to_b, "issues": issues_b.len()},
+        "new": new_issues.len(),
+        "resolved": resolved_issues.len(),
+        "unchanged": unchanged_count,
+        "new_issues": new_issues.iter().map(|i| json!({"issue_id": i.issue_id, "code": i.code.to_string(), "summary": i.summary})).collect::<Vec<_>>(),
+        "resolved_issues": resolved_issues.iter().map(|i| json!({"issue_id": i.issue_id, "code": i.code.to_string(), "summary": i.summary})).collect::<Vec<_>>(),
+    });
+    println!(
+        "{}",
+        serde_json::to_string_pretty(&result).expect("valid JSON")
+    );
+    Ok(0)
+}
+
+/// Scan a specific line range (`from_line..=to_line`).
+fn scan_range(
+    path: &Path,
+    from_line: usize,
+    to_line: usize,
+) -> Result<(Vec<Issue>, usize), CliError> {
+    let file = fs::File::open(path)
+        .map_err(|e| CliErrorKind::session_parse_error(format!("cannot open session file: {e}")))?;
+    let reader = BufReader::new(file);
+    let mut state = ScanState::default();
+    let mut issues = Vec::new();
+    let mut last_line = from_line;
+
+    for (index, line_result) in reader.lines().enumerate() {
+        if index < from_line {
+            continue;
+        }
+        if index > to_line {
+            break;
+        }
+        let line = line_result.map_err(|e| {
+            CliErrorKind::session_parse_error(format!("read error at line {index}: {e}"))
+        })?;
+        last_line = index + 1;
+        issues.extend(classifier::classify_line(index, &line, &mut state));
+    }
+
+    Ok((issues, last_line))
 }

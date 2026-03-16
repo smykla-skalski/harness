@@ -1,4 +1,5 @@
 mod emitter;
+pub mod registry;
 mod rules;
 mod text_checks;
 mod tool_checks;

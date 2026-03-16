@@ -327,6 +327,12 @@ pub struct ObserveFilterArgs {
     /// Mute specific issue codes (comma-separated).
     #[arg(long)]
     pub mute: Option<String>,
+    /// Output format: json (default), markdown.
+    #[arg(long)]
+    pub format: Option<String>,
+    /// Show top N root causes grouped by issue code.
+    #[arg(long)]
+    pub top_causes: Option<usize>,
     /// Write truncated issues to this file instead of stdout (watch mode).
     #[arg(long)]
     pub output: Option<String>,
@@ -467,6 +473,26 @@ pub enum ObserveMode {
         session_id: String,
         /// Issue codes to unmute (comma-separated).
         codes: String,
+        /// Narrow session search to this project directory name.
+        #[arg(long)]
+        project_hint: Option<String>,
+    },
+    /// Compare issues between two line ranges.
+    Compare {
+        /// Session ID to compare.
+        session_id: String,
+        /// First range start line.
+        #[arg(long)]
+        from_a: usize,
+        /// First range end line.
+        #[arg(long)]
+        to_a: usize,
+        /// Second range start line.
+        #[arg(long)]
+        from_b: usize,
+        /// Second range end line.
+        #[arg(long)]
+        to_b: usize,
         /// Narrow session search to this project directory name.
         #[arg(long)]
         project_hint: Option<String>,
