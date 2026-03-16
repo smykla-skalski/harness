@@ -327,6 +327,15 @@ pub struct ObserveFilterArgs {
     /// Mute specific issue codes (comma-separated).
     #[arg(long)]
     pub mute: Option<String>,
+    /// Stop scanning at this line number.
+    #[arg(long)]
+    pub until_line: Option<usize>,
+    /// Only include events at or after this ISO timestamp.
+    #[arg(long)]
+    pub since_timestamp: Option<String>,
+    /// Only include events at or before this ISO timestamp.
+    #[arg(long)]
+    pub until_timestamp: Option<String>,
     /// Output format: json (default), markdown.
     #[arg(long)]
     pub format: Option<String>,

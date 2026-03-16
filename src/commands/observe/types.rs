@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::fmt;
 
 use serde::{Deserialize, Serialize};
@@ -401,6 +401,11 @@ pub enum IssueCode {
     CloseoutVerdictPending,
     RunnerStateEventNotSupported,
     RunnerStateMachineStale,
+    UncommittedSourceCodeEdit,
+    ResourceNotCleanedUpBeforeGroupEnd,
+    RepeatedKubectlQueryForSameResource,
+    GroupReportedWithoutCapture,
+    VerificationOutputTruncated,
 }
 
 impl fmt::Display for IssueCode {
@@ -460,6 +465,11 @@ impl fmt::Display for IssueCode {
             Self::CloseoutVerdictPending => "closeout_verdict_pending",
             Self::RunnerStateEventNotSupported => "runner_state_event_not_supported",
             Self::RunnerStateMachineStale => "runner_state_machine_stale",
+            Self::UncommittedSourceCodeEdit => "uncommitted_source_code_edit",
+            Self::ResourceNotCleanedUpBeforeGroupEnd => "resource_not_cleaned_up_before_group_end",
+            Self::RepeatedKubectlQueryForSameResource => "repeated_kubectl_query_for_same_resource",
+            Self::GroupReportedWithoutCapture => "group_reported_without_capture",
+            Self::VerificationOutputTruncated => "verification_output_truncated",
         };
         f.write_str(label)
     }
@@ -524,6 +534,15 @@ impl IssueCode {
             "closeout_verdict_pending" => Some(Self::CloseoutVerdictPending),
             "runner_state_event_not_supported" => Some(Self::RunnerStateEventNotSupported),
             "runner_state_machine_stale" => Some(Self::RunnerStateMachineStale),
+            "uncommitted_source_code_edit" => Some(Self::UncommittedSourceCodeEdit),
+            "resource_not_cleaned_up_before_group_end" => {
+                Some(Self::ResourceNotCleanedUpBeforeGroupEnd)
+            }
+            "repeated_kubectl_query_for_same_resource" => {
+                Some(Self::RepeatedKubectlQueryForSameResource)
+            }
+            "group_reported_without_capture" => Some(Self::GroupReportedWithoutCapture),
+            "verification_output_truncated" => Some(Self::VerificationOutputTruncated),
             _ => None,
         }
     }
@@ -582,6 +601,11 @@ impl IssueCode {
         Self::CloseoutVerdictPending,
         Self::RunnerStateEventNotSupported,
         Self::RunnerStateMachineStale,
+        Self::UncommittedSourceCodeEdit,
+        Self::ResourceNotCleanedUpBeforeGroupEnd,
+        Self::RepeatedKubectlQueryForSameResource,
+        Self::GroupReportedWithoutCapture,
+        Self::VerificationOutputTruncated,
     ];
 }
 
@@ -704,6 +728,19 @@ impl ObserverState {
             baseline_issue_ids: Vec::new(),
         }
     }
+
+    /// Whether the observer state is safe for handoff to another observer.
+    /// True when all cycles are complete and cursor is at the end.
+    #[must_use]
+    pub fn handoff_safe(&self) -> bool {
+        !self.last_scan_time.is_empty()
+    }
+
+    /// Whether a baseline has been captured.
+    #[must_use]
+    pub fn has_baseline(&self) -> bool {
+        !self.baseline_issue_ids.is_empty()
+    }
 }
 
 // ─── Occurrence tracking ───────────────────────────────────────────
@@ -738,6 +775,26 @@ pub struct ScanState {
     pub issue_occurrences: HashMap<(IssueCode, String), OccurrenceTracker>,
     /// Serial counter for tool use correlation window pruning.
     pub tool_use_serial: usize,
+    /// Set when a source code file is edited via Write/Edit without a
+    /// subsequent `git commit`. Cleared on commit detection.
+    pub source_code_edited_without_commit: bool,
+    /// Resources created via `harness apply` or `harness delete` in the
+    /// current group. Entries are `(resource_kind, resource_name)` pairs
+    /// extracted from `--manifest` path segments. Cleared when
+    /// `harness report group` is called after checking for missing deletes.
+    pub pending_resource_creates: HashSet<String>,
+    /// Recent kubectl get/describe targets with their line numbers.
+    /// Used to detect piecemeal queries against the same resource.
+    /// Each entry is `(normalized_target, line_number)`.
+    pub kubectl_query_targets: VecDeque<(String, usize)>,
+    /// Whether `harness capture` was seen since the last `harness report group`.
+    /// Set to `true` on capture, reset to `false` on group report. Starts
+    /// `true` so the very first group does not trigger a false positive.
+    pub seen_capture_since_last_group_report: bool,
+    /// Whether at least one `harness report group` has been seen. Used to
+    /// distinguish the first group (no preceding capture obligation) from
+    /// subsequent groups.
+    pub seen_any_group_report: bool,
 }
 
 #[cfg(test)]
@@ -810,6 +867,11 @@ mod tests {
         assert!(state.session_start_timestamp.is_none());
         assert!(state.issue_occurrences.is_empty());
         assert_eq!(state.tool_use_serial, 0);
+        assert!(!state.source_code_edited_without_commit);
+        assert!(state.pending_resource_creates.is_empty());
+        assert!(state.kubectl_query_targets.is_empty());
+        assert!(!state.seen_capture_since_last_group_report);
+        assert!(!state.seen_any_group_report);
     }
 
     #[test]
@@ -918,7 +980,7 @@ mod tests {
 
     #[test]
     fn issue_code_all_count() {
-        assert_eq!(IssueCode::ALL.len(), 52);
+        assert_eq!(IssueCode::ALL.len(), 57);
     }
 
     #[test]

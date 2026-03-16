@@ -1,8 +1,8 @@
-use crate::commands::observe::truncate_details;
 use crate::commands::observe::types::{
     Confidence, FixSafety, Issue, IssueCategory, IssueCode, IssueSeverity, MessageRole,
     OccurrenceTracker, ScanState, SourceTool, compute_issue_id,
 };
+use crate::commands::observe::{redact_details, truncate_details};
 
 /// Internal guidance shape for classifier authors.
 #[derive(Debug, Clone)]
@@ -181,14 +181,28 @@ impl<'a> IssueEmitter<'a> {
             confidence: blueprint.confidence,
             fix_safety,
             summary: blueprint.summary,
-            details: truncate_details(details),
+            details: redact_details(&truncate_details(details)),
             fingerprint: blueprint.fingerprint,
             source_role: self.role,
             source_tool: blueprint.source_tool,
             fix_target,
             fix_hint,
-            evidence_excerpt: None,
+            evidence_excerpt: extract_evidence_excerpt(details),
         });
         true
     }
+}
+
+/// Extract a short evidence excerpt from the details text.
+/// Returns the first 200 chars of meaningful content, or None if too short.
+fn extract_evidence_excerpt(details: &str) -> Option<String> {
+    const EXCERPT_LENGTH: usize = 200;
+    const MIN_LENGTH: usize = 20;
+
+    let trimmed = details.trim();
+    if trimmed.len() < MIN_LENGTH {
+        return None;
+    }
+    let end = trimmed.floor_char_boundary(trimmed.len().min(EXCERPT_LENGTH));
+    Some(trimmed[..end].to_string())
 }
