@@ -39,10 +39,7 @@ pub fn capture(
         Platform::Universal => capture_universal(&ctx, &capture_path)?,
     }
 
-    let rel = capture_path.strip_prefix(ctx.layout.run_dir()).map_or_else(
-        |_| capture_path.display().to_string(),
-        |p| p.display().to_string(),
-    );
+    let rel = ctx.layout.relative_path(&capture_path);
 
     if let Some(mut status) = ctx.status {
         status.last_state_capture = Some(rel.clone());

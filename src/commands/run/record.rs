@@ -8,10 +8,10 @@ use regex::Regex;
 use crate::cli::RunDirArgs;
 use crate::cluster::Platform;
 use crate::commands::{resolve_kubeconfig, resolve_run_dir};
-use crate::context::RunContext;
+use crate::context::{RunContext, RunLayout};
 use crate::core_defs::{host_platform, shorten_path, utc_now};
 use crate::errors::{CliError, CliErrorKind};
-use crate::io::{append_markdown_row, ensure_dir, write_text};
+use crate::io::{ensure_dir, write_text};
 use crate::workflow::runner::{RunnerPhase, read_runner_state};
 
 static SLUGIFY_RE: LazyLock<Regex> =
@@ -122,51 +122,33 @@ pub fn record(
         artifact_name = format!("{artifact_name}-{}", tags.join("-"));
     }
 
-    let (artifact, command_log): (PathBuf, Option<PathBuf>) = if let Some(ref rd) = run_dir {
-        let commands_dir = rd.join("commands");
+    let layout = run_dir.as_deref().map(RunLayout::from_run_dir);
+
+    let artifact: PathBuf = if let Some(ref layout) = layout {
+        let commands_dir = layout.commands_dir();
         ensure_dir(&commands_dir)?;
-        let artifact = commands_dir.join(format!("{artifact_name}.txt"));
-        let log = commands_dir.join("command-log.md");
-        (artifact, Some(log))
+        commands_dir.join(format!("{artifact_name}.txt"))
     } else {
         let tmp = env::temp_dir().join("harness").join("run");
         ensure_dir(&tmp)?;
-        (tmp.join(format!("{artifact_name}.txt")), None)
+        tmp.join(format!("{artifact_name}.txt"))
     };
 
     let content =
         format!("exit code: {returncode}\n--- STDOUT ---\n{stdout}\n--- STDERR ---\n{stderr}");
     write_text(&artifact, &content)?;
 
-    if let Some(ref log_path) = command_log {
-        let artifact_rel = if let Some(ref rd) = run_dir {
-            artifact.strip_prefix(rd).map_or_else(
-                |_| artifact.display().to_string(),
-                |p| p.display().to_string(),
-            )
-        } else {
-            artifact.display().to_string()
-        };
+    if let Some(ref layout) = layout {
+        let artifact_rel = layout.relative_path(&artifact);
         let cmd_str = shell_words::join(&command);
         let group_id = log_group_id(&workflow_phase, gid);
-        append_markdown_row(
-            log_path,
-            &[
-                "ran_at",
-                "phase",
-                "group_id",
-                "command",
-                "exit_code",
-                "artifact",
-            ],
-            &[
-                &utc_now(),
-                &workflow_phase,
-                group_id,
-                &cmd_str,
-                &returncode.to_string(),
-                &artifact_rel,
-            ],
+        layout.append_command_log(
+            &utc_now(),
+            &workflow_phase,
+            group_id,
+            &cmd_str,
+            &returncode.to_string(),
+            &artifact_rel,
         )?;
     }
 

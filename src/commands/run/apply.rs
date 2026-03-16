@@ -10,7 +10,7 @@ use crate::core_defs::{shorten_path, utc_now};
 use crate::errors::{CliError, CliErrorKind, cow};
 use crate::exec;
 use crate::exec::kubectl;
-use crate::io::{append_markdown_row, ensure_dir, validate_safe_segment, write_text};
+use crate::io::{ensure_dir, validate_safe_segment, write_text};
 use crate::resolve::resolve_manifest_path;
 
 use super::kumactl::find_kumactl_binary;
@@ -49,17 +49,10 @@ pub fn apply(
             }
         }
 
-        let manifest_index = ctx.layout.manifests_dir().join("manifest-index.md");
-        let rel = manifest.strip_prefix(ctx.layout.run_dir()).map_or_else(
-            |_| manifest.display().to_string(),
-            |p| p.display().to_string(),
-        );
+        let rel = ctx.layout.relative_path(&manifest);
         let notes = step.map_or_else(String::new, |s| format!("{s}: "));
-        append_markdown_row(
-            &manifest_index,
-            &["copied_at", "manifest", "validated", "applied", "notes"],
-            &[&utc_now(), &rel, "-", "PASS", &notes],
-        )?;
+        ctx.layout
+            .append_manifest_index(&utc_now(), &rel, "-", "PASS", &notes)?;
         println!("{}", shorten_path(&manifest));
     }
     Ok(0)
