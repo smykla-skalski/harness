@@ -664,9 +664,11 @@ fn execute_dump(
             continue;
         }
 
+        let timestamp = obj["timestamp"].as_str().unwrap_or("");
         dump_message_content(
             index,
             role,
+            timestamp,
             &message["content"],
             filter_lower.as_deref(),
             tool_name,
@@ -691,10 +693,17 @@ struct DumpBlock {
 fn dump_message_content(
     index: usize,
     role: &str,
+    timestamp: &str,
     content: &serde_json::Value,
     filter_lower: Option<&str>,
     tool_name_filter: Option<&str>,
 ) {
+    let ts_prefix = if timestamp.is_empty() {
+        String::new()
+    } else {
+        format!(" {timestamp}")
+    };
+
     if let Some(blocks) = content.as_array() {
         for block in blocks {
             // Apply tool_name filter for tool_use blocks
@@ -719,7 +728,7 @@ fn dump_message_content(
                 continue;
             }
             let truncated = truncate_at(&db.text, DUMP_TRUNCATE_LENGTH);
-            println!("{}: {truncated}", db.label);
+            println!("{}{ts_prefix}: {truncated}", db.label);
         }
     } else if let Some(text) = content.as_str() {
         if text.len() <= MIN_DUMP_TEXT_LENGTH {
@@ -729,13 +738,23 @@ fn dump_message_content(
             return;
         }
         let truncated = truncate_at(text, DUMP_TRUNCATE_LENGTH);
-        println!("L{index} [{role}]: {truncated}");
+        println!("L{index} [{role}]{ts_prefix}: {truncated}");
     }
 }
 
 /// Format a content block for dump output.
 fn format_dump_block(index: usize, role: &str, block: &serde_json::Value) -> DumpBlock {
     let block_type = block["type"].as_str().unwrap_or("");
+    let block_id = block["id"]
+        .as_str()
+        .or_else(|| block["tool_use_id"].as_str())
+        .unwrap_or("");
+    let id_suffix = if block_id.is_empty() {
+        String::new()
+    } else {
+        format!(" ({block_id})")
+    };
+
     match block_type {
         "text" => {
             let text = block["text"].as_str().unwrap_or("").to_string();
@@ -744,37 +763,42 @@ fn format_dump_block(index: usize, role: &str, block: &serde_json::Value) -> Dum
                 text,
             }
         }
-        "tool_use" => format_tool_use_dump(index, role, block),
+        "tool_use" => format_tool_use_dump(index, role, block, &id_suffix),
         "tool_result" => {
             let text = tool_result_text(block);
             DumpBlock {
-                label: format!("L{index} [{role}] result"),
+                label: format!("L{index} [{role}] result{id_suffix}"),
                 text,
             }
         }
         _ => DumpBlock {
-            label: format!("L{index} [{role}] {block_type}"),
+            label: format!("L{index} [{role}] {block_type}{id_suffix}"),
             text: String::new(),
         },
     }
 }
 
 /// Format a `tool_use` block for dump output.
-fn format_tool_use_dump(index: usize, role: &str, block: &serde_json::Value) -> DumpBlock {
+fn format_tool_use_dump(
+    index: usize,
+    role: &str,
+    block: &serde_json::Value,
+    id_suffix: &str,
+) -> DumpBlock {
     let name = block["name"].as_str().unwrap_or("");
     let input = &block["input"];
     match name {
         "Bash" => {
             let cmd = input["command"].as_str().unwrap_or("");
             DumpBlock {
-                label: format!("L{index} [{role}] Bash"),
+                label: format!("L{index} [{role}] Bash{id_suffix}"),
                 text: cmd.to_string(),
             }
         }
         "Read" | "Write" => {
             let file_path = input["file_path"].as_str().unwrap_or("");
             DumpBlock {
-                label: format!("L{index} [{role}] {name}"),
+                label: format!("L{index} [{role}] {name}{id_suffix}"),
                 text: file_path.to_string(),
             }
         }
@@ -783,7 +807,7 @@ fn format_tool_use_dump(index: usize, role: &str, block: &serde_json::Value) -> 
             let old = truncate_at(input["old_string"].as_str().unwrap_or(""), 100);
             let new_str = truncate_at(input["new_string"].as_str().unwrap_or(""), 100);
             DumpBlock {
-                label: format!("L{index} [{role}] Edit"),
+                label: format!("L{index} [{role}] Edit{id_suffix}"),
                 text: format!("{file_path}\n  old: {old}\n  new: {new_str}"),
             }
         }
@@ -799,21 +823,21 @@ fn format_tool_use_dump(index: usize, role: &str, block: &serde_json::Value) -> 
                 })
                 .collect();
             DumpBlock {
-                label: format!("L{index} [{role}] AskUser"),
+                label: format!("L{index} [{role}] AskUser{id_suffix}"),
                 text: parts.join("; "),
             }
         }
         "Agent" => {
             let desc = input["description"].as_str().unwrap_or("");
             DumpBlock {
-                label: format!("L{index} [{role}] Agent"),
+                label: format!("L{index} [{role}] Agent{id_suffix}"),
                 text: desc.to_string(),
             }
         }
         _ => {
             let raw = serde_json::to_string(input).unwrap_or_default();
             DumpBlock {
-                label: format!("L{index} [{role}] {name}"),
+                label: format!("L{index} [{role}] {name}{id_suffix}"),
                 text: truncate_at(&raw, 300).to_string(),
             }
         }
