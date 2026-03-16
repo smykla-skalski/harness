@@ -242,6 +242,75 @@ pub(super) fn check_incomplete_writer(context: &mut TextCheckContext<'_>, issues
     context.emit_current(issues, blueprint);
 }
 
+/// Check for assistant text admitting harness infrastructure problems.
+/// Caller guarantees: role == Assistant, `source_tool` == None.
+pub(super) fn check_harness_infrastructure(
+    context: &mut TextCheckContext<'_>,
+    issues: &mut Vec<Issue>,
+) {
+    // Direct phrases: "harness infrastructure issue", "harness bug"
+    let direct_match = patterns::HARNESS_INFRASTRUCTURE_SIGNALS
+        .iter()
+        .any(|signal| context.lower.contains(signal));
+
+    // Compound: harness subsystem keyword + failure word
+    let subsystem_match = patterns::HARNESS_SUBSYSTEM_KEYWORDS
+        .iter()
+        .any(|keyword| context.lower.contains(keyword))
+        && patterns::HARNESS_SUBSYSTEM_FAILURE_WORDS
+            .iter()
+            .any(|word| context.lower.contains(word));
+
+    if direct_match || subsystem_match {
+        let blueprint = IssueBlueprint::new(
+            IssueCode::HarnessInfrastructureMisconfiguration,
+            IssueCategory::WorkflowError,
+            IssueSeverity::Critical,
+            "Harness infrastructure misconfiguration detected",
+        )
+        .with_fingerprint("harness_infrastructure_misconfiguration")
+        .with_guidance(Guidance::fix_hint(
+            "Fix the harness bootstrap/cluster command to handle this automatically",
+        ));
+        context.emit_current(issues, blueprint);
+    }
+}
+
+/// Check for assistant text acknowledging missing env vars or connections.
+/// Caller guarantees: role == Assistant, `source_tool` == None.
+pub(super) fn check_missing_connection_or_env_var(
+    context: &mut TextCheckContext<'_>,
+    issues: &mut Vec<Issue>,
+) {
+    // "lack"/"missing" + env var name
+    let env_var_match = patterns::MISSING_CONFIG_ABSENCE_WORDS
+        .iter()
+        .any(|word| context.lower.contains(word))
+        && patterns::MISSING_CONFIG_ENV_VARS
+            .iter()
+            .any(|variable| context.lower.contains(variable));
+
+    // "not established" + "kds"/"connection"
+    let connection_match = context.lower.contains("not established")
+        && patterns::MISSING_CONNECTION_COMPONENTS
+            .iter()
+            .any(|component| context.lower.contains(component));
+
+    if env_var_match || connection_match {
+        let blueprint = IssueBlueprint::new(
+            IssueCode::MissingConnectionOrEnvVar,
+            IssueCategory::DataIntegrity,
+            IssueSeverity::Medium,
+            "Missing configuration or connection acknowledged by assistant",
+        )
+        .with_fingerprint("missing_connection_or_env_var")
+        .with_guidance(Guidance::advisory(
+            "Could be a harness bootstrap gap or a product bug - investigate which layer dropped it",
+        ));
+        context.emit_current(issues, blueprint);
+    }
+}
+
 /// Check for user frustration signals in human text.
 /// Caller guarantees: role == User, `source_tool` == None.
 pub(super) fn check_user_frustration(context: &mut TextCheckContext<'_>, issues: &mut Vec<Issue>) {

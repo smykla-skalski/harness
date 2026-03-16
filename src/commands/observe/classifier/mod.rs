@@ -155,6 +155,8 @@ pub fn check_text_for_issues(
         text_checks::check_save_failures(&mut context, &mut issues);
         text_checks::check_payload_recovery(&mut context, &mut issues);
         text_checks::check_incomplete_writer(&mut context, &mut issues);
+        text_checks::check_harness_infrastructure(&mut context, &mut issues);
+        text_checks::check_missing_connection_or_env_var(&mut context, &mut issues);
     }
 
     issues

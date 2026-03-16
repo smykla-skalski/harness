@@ -224,6 +224,8 @@ pub enum IssueCode {
     ShortSkillNameInSkillFile,
     DirectManagedFileWrite,
     DirectTaskOutputFileRead,
+    HarnessInfrastructureMisconfiguration,
+    MissingConnectionOrEnvVar,
 }
 
 /// Record of a `tool_use` block, for correlating with `tool_result`.
