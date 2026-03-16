@@ -564,6 +564,9 @@ impl CliErrorKind {
                 "Check the session ID and ensure ~/.claude/projects/ contains the session file."
                     .into(),
             ),
+            Self::ServiceReadinessTimeout { name } => Some(format!(
+                "Run `harness service down {name}` to clean up the container."
+            )),
             _ => None,
         }
     }
@@ -1076,6 +1079,13 @@ mod tests {
     fn cli_err_hint_formats_correctly() {
         let err: CliError = CliErrorKind::KumactlNotFound.into();
         assert_eq!(err.hint().as_deref(), Some("Build kumactl first."));
+    }
+
+    #[test]
+    fn service_readiness_timeout_has_hint() {
+        let err: CliError = CliErrorKind::service_readiness_timeout("demo-svc").into();
+        let hint = err.hint().expect("should have a hint");
+        assert!(hint.contains("harness service down demo-svc"));
     }
 
     #[test]
