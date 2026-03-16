@@ -1659,6 +1659,140 @@ mod tests {
         let (_, last_line) = scan_with_limit(&path, 0, Some(1)).unwrap();
         assert_eq!(last_line, 2); // scanned lines 0 and 1
     }
+
+    #[test]
+    fn sarif_output_has_correct_shape() {
+        let issue = Issue {
+            issue_id: "abc123".into(),
+            line: 42,
+            code: IssueCode::BuildOrLintFailure,
+            category: IssueCategory::BuildError,
+            severity: IssueSeverity::Critical,
+            confidence: types::Confidence::High,
+            fix_safety: types::FixSafety::AutoFixSafe,
+            summary: "Build failed".into(),
+            details: String::new(),
+            fingerprint: "test".into(),
+            source_role: types::MessageRole::Assistant,
+            source_tool: None,
+            fix_target: Some("src/main.rs".into()),
+            fix_hint: None,
+            evidence_excerpt: None,
+        };
+        let rendered = output::render_sarif(&[issue]);
+        let parsed: serde_json::Value = serde_json::from_str(&rendered).unwrap();
+        assert_eq!(parsed["version"], "2.1.0");
+        let runs = parsed["runs"].as_array().unwrap();
+        assert_eq!(runs.len(), 1);
+        let results = runs[0]["results"].as_array().unwrap();
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0]["ruleId"], "build_or_lint_failure");
+        assert_eq!(results[0]["level"], "error");
+    }
+
+    #[test]
+    fn scan_range_returns_bounded_results() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = write_session_file(
+            dir.path(),
+            &[
+                r#"{"message":{"role":"user","content":"line zero"}}"#,
+                r#"{"message":{"role":"user","content":"line one"}}"#,
+                r#"{"message":{"role":"user","content":"line two"}}"#,
+            ],
+        );
+        let (_, last) = scan_range(&path, 1, 1).unwrap();
+        assert_eq!(last, 2); // scanned only line 1
+    }
+
+    #[test]
+    fn observer_state_active_workers_tracks() {
+        let mut state = ObserverState::default_for_session("test");
+        assert!(state.handoff_safe() == false); // no scan done yet
+        state.last_scan_time = "2026-03-16T00:00:00Z".into();
+        assert!(state.handoff_safe()); // no workers, scan done
+        state.active_workers.push(types::ActiveWorker {
+            issue_id: "abc".into(),
+            target_file: "src/main.rs".into(),
+            started_at: "2026-03-16T00:00:00Z".into(),
+        });
+        assert!(!state.handoff_safe()); // worker active
+    }
+
+    #[test]
+    fn overrides_yaml_mutes_and_adjusts_severity() {
+        let dir = tempfile::tempdir().unwrap();
+        let overrides_path = dir.path().join("overrides.yaml");
+        fs::write(
+            &overrides_path,
+            "mute:\n  - hook_denied_tool_call\nseverity_overrides:\n  build_or_lint_failure: low\n",
+        )
+        .unwrap();
+
+        let hook_issue = Issue {
+            issue_id: "h1".into(),
+            line: 1,
+            code: IssueCode::HookDeniedToolCall,
+            category: IssueCategory::HookFailure,
+            severity: IssueSeverity::Medium,
+            confidence: types::Confidence::High,
+            fix_safety: types::FixSafety::TriageRequired,
+            summary: "hook denied".into(),
+            details: String::new(),
+            fingerprint: "test".into(),
+            source_role: types::MessageRole::User,
+            source_tool: None,
+            fix_target: None,
+            fix_hint: None,
+            evidence_excerpt: None,
+        };
+        let build_issue = Issue {
+            issue_id: "b1".into(),
+            line: 2,
+            code: IssueCode::BuildOrLintFailure,
+            category: IssueCategory::BuildError,
+            severity: IssueSeverity::Critical,
+            confidence: types::Confidence::High,
+            fix_safety: types::FixSafety::AutoFixSafe,
+            summary: "build fail".into(),
+            details: String::new(),
+            fingerprint: "test".into(),
+            source_role: types::MessageRole::Assistant,
+            source_tool: None,
+            fix_target: None,
+            fix_hint: None,
+            evidence_excerpt: None,
+        };
+
+        let filter = ObserveFilterArgs {
+            from_line: 0,
+            from: None,
+            focus: None,
+            project_hint: None,
+            json: false,
+            summary: false,
+            severity: None,
+            category: None,
+            exclude: None,
+            fixable: false,
+            mute: None,
+            format: None,
+            overrides: Some(overrides_path.to_string_lossy().into_owned()),
+            top_causes: None,
+            output: None,
+            output_details: None,
+            since_timestamp: None,
+            until_line: None,
+            until_timestamp: None,
+        };
+
+        let result = apply_filters(vec![hook_issue, build_issue], &filter).unwrap();
+        // hook_denied_tool_call should be muted
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].code, IssueCode::BuildOrLintFailure);
+        // severity should be overridden to low
+        assert_eq!(result[0].severity, IssueSeverity::Low);
+    }
 }
 
 /// Remove issue codes from the mute list.
