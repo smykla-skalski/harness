@@ -7,6 +7,9 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread;
 use std::time::{Duration, Instant};
 
+use ureq::Body;
+use ureq::http::Response;
+
 use crate::core_defs::{CommandResult, merge_env, utc_now};
 use crate::errors::{CliError, CliErrorKind};
 
@@ -815,8 +818,8 @@ pub fn cp_api_text(
 macro_rules! with_bearer_auth {
     ($request:expr, $auth_header:expr) => {{
         let mut request = $request;
-        if let Some(ref auth) = $auth_header {
-            request = request.header("Authorization", auth);
+        if let Some(auth) = $auth_header {
+            request = request.header("Authorization", auth.to_string());
         }
         request
     }};
@@ -830,39 +833,75 @@ fn cp_api_send(
     token: Option<&str>,
 ) -> Result<String, CliError> {
     let auth_header = token.map(|tok| format!("Bearer {tok}"));
-    let map_err = |e: ureq::Error| {
-        CliErrorKind::cp_api_unreachable(url.to_string()).with_details(e.to_string())
-    };
+    match method {
+        HttpMethod::Get => cp_api_get(url, auth_header.as_deref()),
+        HttpMethod::Delete => cp_api_delete(url, auth_header.as_deref()),
+        HttpMethod::Post => cp_api_post(url, body, auth_header.as_deref()),
+        HttpMethod::Put => cp_api_put(url, body, auth_header.as_deref()),
+    }
+}
 
-    let mut response = match (method, body) {
-        (HttpMethod::Get, _) => with_bearer_auth!(ureq::get(url), auth_header)
-            .call()
-            .map_err(map_err)?,
-        (HttpMethod::Delete, _) => with_bearer_auth!(ureq::delete(url), auth_header)
-            .call()
-            .map_err(map_err)?,
-        (HttpMethod::Post, Some(json)) => {
-            with_bearer_auth!(ureq::post(url).header("Content-Type", "application/json"), auth_header)
-                .send_json(json)
-                .map_err(map_err)?
-        }
-        (HttpMethod::Post, None) => with_bearer_auth!(ureq::post(url), auth_header)
-            .send_empty()
-            .map_err(map_err)?,
-        (HttpMethod::Put, Some(json)) => {
-            with_bearer_auth!(ureq::put(url).header("Content-Type", "application/json"), auth_header)
-                .send_json(json)
-                .map_err(map_err)?
-        }
-        (HttpMethod::Put, None) => with_bearer_auth!(ureq::put(url), auth_header)
-            .send_empty()
-            .map_err(map_err)?,
-    };
+fn cp_api_error(url: &str, error: &impl ToString) -> CliError {
+    CliErrorKind::cp_api_unreachable(url.to_string()).with_details(error.to_string())
+}
 
+fn read_cp_api_body(url: &str, mut response: Response<Body>) -> Result<String, CliError> {
     response
         .body_mut()
         .read_to_string()
-        .map_err(|e| CliErrorKind::cp_api_unreachable(url.to_string()).with_details(e.to_string()))
+        .map_err(|error| cp_api_error(url, &error))
+}
+
+fn cp_api_get(url: &str, auth_header: Option<&str>) -> Result<String, CliError> {
+    let response = with_bearer_auth!(ureq::get(url), auth_header)
+        .call()
+        .map_err(|error| cp_api_error(url, &error))?;
+    read_cp_api_body(url, response)
+}
+
+fn cp_api_delete(url: &str, auth_header: Option<&str>) -> Result<String, CliError> {
+    let response = with_bearer_auth!(ureq::delete(url), auth_header)
+        .call()
+        .map_err(|error| cp_api_error(url, &error))?;
+    read_cp_api_body(url, response)
+}
+
+fn cp_api_post(
+    url: &str,
+    body: Option<&serde_json::Value>,
+    auth_header: Option<&str>,
+) -> Result<String, CliError> {
+    let response = match body {
+        Some(json) => with_bearer_auth!(
+            ureq::post(url).header("Content-Type", "application/json"),
+            auth_header
+        )
+        .send_json(json)
+        .map_err(|error| cp_api_error(url, &error))?,
+        None => with_bearer_auth!(ureq::post(url), auth_header)
+            .send_empty()
+            .map_err(|error| cp_api_error(url, &error))?,
+    };
+    read_cp_api_body(url, response)
+}
+
+fn cp_api_put(
+    url: &str,
+    body: Option<&serde_json::Value>,
+    auth_header: Option<&str>,
+) -> Result<String, CliError> {
+    let response = match body {
+        Some(json) => with_bearer_auth!(
+            ureq::put(url).header("Content-Type", "application/json"),
+            auth_header
+        )
+        .send_json(json)
+        .map_err(|error| cp_api_error(url, &error))?,
+        None => with_bearer_auth!(ureq::put(url), auth_header)
+            .send_empty()
+            .map_err(|error| cp_api_error(url, &error))?,
+    };
+    read_cp_api_body(url, response)
 }
 
 /// Extract the admin user token from a running CP container.

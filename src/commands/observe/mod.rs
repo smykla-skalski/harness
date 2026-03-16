@@ -549,8 +549,7 @@ fn apply_category_filter(
                 .filter_map(|c| IssueCategory::from_label(c.trim()))
                 .collect();
             filtered.retain(|issue| {
-                focus_categories.contains(&issue.category)
-                    && explicit.contains(&issue.category)
+                focus_categories.contains(&issue.category) && explicit.contains(&issue.category)
             });
         } else {
             filtered.retain(|issue| focus_categories.contains(&issue.category));
@@ -577,16 +576,12 @@ fn apply_category_filter(
 }
 
 /// Apply a YAML overrides file (mute list and severity overrides).
-fn apply_overrides_file(
-    filtered: &mut Vec<Issue>,
-    overrides_path: &str,
-) -> Result<(), CliError> {
+fn apply_overrides_file(filtered: &mut Vec<Issue>, overrides_path: &str) -> Result<(), CliError> {
     let content = fs::read_to_string(overrides_path).map_err(|e| {
         CliErrorKind::session_parse_error(format!("cannot read overrides file: {e}"))
     })?;
-    let overrides: serde_json::Value = serde_yml::from_str(&content).map_err(|e| {
-        CliErrorKind::session_parse_error(format!("invalid overrides YAML: {e}"))
-    })?;
+    let overrides: serde_json::Value = serde_yml::from_str(&content)
+        .map_err(|e| CliErrorKind::session_parse_error(format!("invalid overrides YAML: {e}")))?;
 
     if let Some(mute_list) = overrides["mute"].as_array() {
         let muted: Vec<IssueCode> = mute_list
@@ -736,26 +731,31 @@ fn resolve_effective_bounds(
 
 /// Render scan results to stdout using the requested format.
 fn render_scan_output(filter: &ObserveFilterArgs, issues: &[Issue], last_line: usize) {
-    let format_str = filter.format.as_deref().unwrap_or("");
+    render_scan_issues(filter, issues);
+    render_scan_followups(filter, issues, last_line);
+}
 
-    if format_str == "markdown" || format_str == "md" {
-        println!("{}", output::render_markdown(issues));
-    } else if format_str == "sarif" {
-        println!("{}", output::render_sarif(issues));
-    } else if filter.json {
-        for issue in issues {
-            println!("{}", output::render_json(issue));
+fn render_scan_issues(filter: &ObserveFilterArgs, issues: &[Issue]) {
+    match filter.format.as_deref().unwrap_or("") {
+        "markdown" | "md" => println!("{}", output::render_markdown(issues)),
+        "sarif" => println!("{}", output::render_sarif(issues)),
+        _ if filter.json => {
+            for issue in issues {
+                println!("{}", output::render_json(issue));
+            }
         }
-    } else {
-        for issue in issues {
-            println!("{}", output::render_human(issue));
+        _ => {
+            for issue in issues {
+                println!("{}", output::render_human(issue));
+            }
         }
     }
+}
 
+fn render_scan_followups(filter: &ObserveFilterArgs, issues: &[Issue], last_line: usize) {
     if let Some(n) = filter.top_causes {
         println!("{}", output::render_top_causes(issues, n));
     }
-
     if filter.summary {
         println!("{}", output::render_summary(issues, last_line));
     }
@@ -1088,36 +1088,25 @@ fn dump_message_content(
     filter_lower: Option<&str>,
     tool_name_filter: Option<&str>,
 ) {
-    let ts_prefix = if timestamp.is_empty() {
-        String::new()
-    } else {
-        format!(" {timestamp}")
-    };
-
     if let Some(blocks) = content.as_array() {
-        for block in blocks {
-            if !passes_tool_name_filter(block, tool_name_filter) {
-                continue;
-            }
-            let db = format_dump_block(index, role, block);
-            if db.text.len() <= MIN_DUMP_TEXT_LENGTH {
-                continue;
-            }
-            if !matches_dump_filter(&db.text.to_lowercase(), filter_lower) {
-                continue;
-            }
-            let truncated = truncate_at(&db.text, DUMP_TRUNCATE_LENGTH);
-            println!("{}{ts_prefix}: {truncated}", db.label);
-        }
-    } else if let Some(text) = content.as_str() {
-        if text.len() <= MIN_DUMP_TEXT_LENGTH {
-            return;
-        }
-        if !matches_dump_filter(&text.to_lowercase(), filter_lower) {
-            return;
-        }
-        let truncated = truncate_at(text, DUMP_TRUNCATE_LENGTH);
-        println!("L{index} [{role}]{ts_prefix}: {truncated}");
+        dump_content_blocks(
+            index,
+            role,
+            &timestamp_suffix(timestamp),
+            blocks,
+            filter_lower,
+            tool_name_filter,
+        );
+        return;
+    }
+    if let Some(text) = content.as_str() {
+        dump_text_content(
+            index,
+            role,
+            &timestamp_suffix(timestamp),
+            text,
+            filter_lower,
+        );
     }
 }
 
@@ -1223,6 +1212,56 @@ fn format_tool_use_dump(
     }
 }
 
+fn timestamp_suffix(timestamp: &str) -> String {
+    if timestamp.is_empty() {
+        String::new()
+    } else {
+        format!(" {timestamp}")
+    }
+}
+
+fn should_dump_text(text: &str, filter_lower: Option<&str>) -> bool {
+    text.len() > MIN_DUMP_TEXT_LENGTH && matches_dump_filter(&text.to_lowercase(), filter_lower)
+}
+
+fn print_dump_line(label: &str, ts_suffix: &str, text: &str) {
+    let truncated = truncate_at(text, DUMP_TRUNCATE_LENGTH);
+    println!("{label}{ts_suffix}: {truncated}");
+}
+
+fn dump_content_blocks(
+    index: usize,
+    role: &str,
+    ts_suffix: &str,
+    blocks: &[serde_json::Value],
+    filter_lower: Option<&str>,
+    tool_name_filter: Option<&str>,
+) {
+    for block in blocks {
+        if !passes_tool_name_filter(block, tool_name_filter) {
+            continue;
+        }
+        let db = format_dump_block(index, role, block);
+        if should_dump_text(&db.text, filter_lower) {
+            print_dump_line(&db.label, ts_suffix, &db.text);
+        }
+    }
+}
+
+fn dump_text_content(
+    index: usize,
+    role: &str,
+    ts_suffix: &str,
+    text: &str,
+    filter_lower: Option<&str>,
+) {
+    if !should_dump_text(text, filter_lower) {
+        return;
+    }
+    let label = format!("L{index} [{role}]");
+    print_dump_line(&label, ts_suffix, text);
+}
+
 /// Render a single line of context output from a parsed JSONL event.
 fn render_context_line(index: usize, target_line: usize, obj: &serde_json::Value) {
     let message = &obj["message"];
@@ -1230,29 +1269,41 @@ fn render_context_line(index: usize, target_line: usize, obj: &serde_json::Value
         return;
     }
     let role = message["role"].as_str().unwrap_or("");
-    let timestamp = obj["timestamp"].as_str().unwrap_or("");
     let prefix = if index == target_line { ">>> " } else { "    " };
-    let ts_part = if timestamp.is_empty() {
-        String::new()
-    } else {
-        format!(" {timestamp}")
-    };
+    let ts_part = timestamp_suffix(obj["timestamp"].as_str().unwrap_or(""));
 
     if let Some(blocks) = message["content"].as_array() {
-        for block in blocks {
-            let db = format_dump_block(index, role, block);
-            if db.text.len() <= MIN_DUMP_TEXT_LENGTH {
-                continue;
-            }
-            let truncated = truncate_at(&db.text, DUMP_TRUNCATE_LENGTH);
-            println!("{prefix}{}{ts_part}: {truncated}", db.label);
-        }
-    } else if let Some(text) = message["content"].as_str()
-        && text.len() > MIN_DUMP_TEXT_LENGTH
-    {
-        let truncated = truncate_at(text, DUMP_TRUNCATE_LENGTH);
-        println!("{prefix}L{index} [{role}]{ts_part}: {truncated}");
+        render_context_blocks(index, role, prefix, &ts_part, blocks);
+        return;
     }
+    if let Some(text) = message["content"].as_str() {
+        render_context_text(index, role, prefix, &ts_part, text);
+    }
+}
+
+fn render_context_blocks(
+    index: usize,
+    role: &str,
+    prefix: &str,
+    ts_part: &str,
+    blocks: &[serde_json::Value],
+) {
+    for block in blocks {
+        let db = format_dump_block(index, role, block);
+        if db.text.len() <= MIN_DUMP_TEXT_LENGTH {
+            continue;
+        }
+        let truncated = truncate_at(&db.text, DUMP_TRUNCATE_LENGTH);
+        println!("{prefix}{}{ts_part}: {truncated}", db.label);
+    }
+}
+
+fn render_context_text(index: usize, role: &str, prefix: &str, ts_part: &str, text: &str) {
+    if text.len() <= MIN_DUMP_TEXT_LENGTH {
+        return;
+    }
+    let truncated = truncate_at(text, DUMP_TRUNCATE_LENGTH);
+    println!("{prefix}L{index} [{role}]{ts_part}: {truncated}");
 }
 
 /// Execute context mode - show events around a specific line.
