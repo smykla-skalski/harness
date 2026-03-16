@@ -128,6 +128,10 @@ fn cluster_k8s(
         }
     }
 
+    if spec.mode.is_up() {
+        persist_cluster_spec(&spec)?;
+    }
+
     println!("{mode} completed");
     Ok(0)
 }
