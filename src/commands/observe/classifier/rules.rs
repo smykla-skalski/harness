@@ -399,6 +399,45 @@ pub(super) static TEXT_RULES: &[TextRule] = &[
     },
 ];
 
+/// Check whether a rule's filters (role, source tool, guard) all pass.
+fn rule_matches_filters(
+    text_rule: &TextRule,
+    role: MessageRole,
+    source_tool: Option<SourceTool>,
+    lower: &str,
+) -> bool {
+    match text_rule.role_filter {
+        RoleFilter::Exact(r) if role != r => return false,
+        _ => {}
+    }
+    match text_rule.source_tool_filter {
+        ToolFilter::Exact(t) if source_tool != Some(t) => return false,
+        ToolFilter::Absent if source_tool.is_some() => return false,
+        _ => {}
+    }
+    text_rule.guard.matches(lower)
+}
+
+/// Find the first matching pattern for a rule against lowercased text.
+fn find_matched_pattern<'a>(rule: &'a TextRule, lower: &str) -> Option<&'a str> {
+    match rule.match_mode {
+        MatchMode::FirstMatch | MatchMode::Any => {
+            rule.patterns.iter().find(|p| lower.contains(*p)).copied()
+        }
+    }
+}
+
+/// Derive the dedup fingerprint for a rule hit.
+fn build_fingerprint(rule: &TextRule, pattern: &str) -> String {
+    match rule.fingerprint_mode {
+        FingerprintMode::Static => match rule.summary {
+            SummaryTemplate::Static(summary) => summary.to_string(),
+            SummaryTemplate::PrefixWithPattern(prefix) => prefix.to_string(),
+        },
+        FingerprintMode::MatchedPattern => pattern.to_string(),
+    }
+}
+
 /// Apply the static rule table against a text block. Returns the issues found
 /// and the set of matched categories (for downstream skip logic).
 pub(super) fn apply_text_rules(
@@ -421,57 +460,14 @@ pub(super) fn apply_text_rules(
         {
             continue;
         }
-
-        match rule.role_filter {
-            RoleFilter::Exact(r) => {
-                if role != r {
-                    continue;
-                }
-            }
-            RoleFilter::Any => {}
-        }
-
-        match rule.source_tool_filter {
-            ToolFilter::Exact(t) => {
-                if source_tool != Some(t) {
-                    continue;
-                }
-            }
-            ToolFilter::Absent => {
-                if source_tool.is_some() {
-                    continue;
-                }
-            }
-            ToolFilter::Any => {}
-        }
-
-        if !rule.guard.matches(lower) {
+        if !rule_matches_filters(rule, role, source_tool, lower) {
             continue;
         }
-
-        let matched_pattern = match rule.match_mode {
-            MatchMode::FirstMatch => rule.patterns.iter().find(|p| lower.contains(*p)).copied(),
-            MatchMode::Any => {
-                if rule.patterns.iter().any(|p| lower.contains(p)) {
-                    rule.patterns.iter().find(|p| lower.contains(*p)).copied()
-                } else {
-                    None
-                }
-            }
-        };
-
-        if let Some(pattern) = matched_pattern {
-            let summary = rule.summary.render(pattern);
-            let fingerprint = match rule.fingerprint_mode {
-                FingerprintMode::Static => match rule.summary {
-                    SummaryTemplate::Static(summary) => summary.to_string(),
-                    SummaryTemplate::PrefixWithPattern(prefix) => prefix.to_string(),
-                },
-                FingerprintMode::MatchedPattern => pattern.to_string(),
-            };
+        if let Some(pattern) = find_matched_pattern(rule, lower) {
+            let fingerprint = build_fingerprint(rule, pattern);
             let meta =
                 issue_code_meta(rule.code).expect("issue code registry should cover every code");
-            let blueprint = IssueBlueprint::from_code(rule.code, summary)
+            let blueprint = IssueBlueprint::from_code(rule.code, rule.summary.render(pattern))
                 .with_fingerprint(fingerprint)
                 .with_guidance(rule.guidance.into_guidance())
                 .with_source_tool(source_tool);
