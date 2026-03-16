@@ -110,16 +110,20 @@ pub fn install_wrapper(target_dir: &Path) -> Result<PathBuf, CliError> {
 
     let target = target_dir.join("harness");
 
-    if target.exists()
-        && let Ok(existing) = fs::read_to_string(&target)
-        && existing == WRAPPER
-    {
-        // Just ensure executable
-        let meta = fs::metadata(&target)?;
-        let mut perms = meta.permissions();
-        perms.set_mode(perms.mode() | 0o111);
-        fs::set_permissions(&target, perms)?;
-        return Ok(target);
+    if target.exists() {
+        if let Ok(existing) = fs::read_to_string(&target) {
+            if existing == WRAPPER {
+                // Wrapper already installed - just ensure executable
+                let meta = fs::metadata(&target)?;
+                let mut perms = meta.permissions();
+                perms.set_mode(perms.mode() | 0o111);
+                fs::set_permissions(&target, perms)?;
+                return Ok(target);
+            }
+        } else {
+            // Cannot read as text - likely a compiled binary. Do not overwrite.
+            return Ok(target);
+        }
     }
 
     fs::write(&target, WRAPPER)?;
@@ -143,10 +147,7 @@ pub fn main(project_dir: &Path, path_env: &str) -> Result<i32, CliError> {
 /// # Errors
 /// Returns `CliError` on failure.
 pub fn main_with_home(project_dir: &Path, path_env: &str, home: &Path) -> Result<i32, CliError> {
-    let plugin_dir = project_dir
-        .join(".claude")
-        .join("plugins")
-        .join("suite");
+    let plugin_dir = project_dir.join(".claude").join("plugins").join("suite");
     let plugin_path = plugin_dir.join("harness");
     let legacy_path = project_dir.join(".claude").join("skills").join("harness");
 
@@ -452,10 +453,7 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(
-            read_plugin_version(dir.path()),
-            Some("0.1.0".to_string())
-        );
+        assert_eq!(read_plugin_version(dir.path()), Some("0.1.0".to_string()));
     }
 
     #[test]
@@ -476,8 +474,14 @@ mod tests {
 
         sync_directory(&source, &target).unwrap();
 
-        assert_eq!(fs::read_to_string(target.join("a.md")).unwrap(), "content a");
-        assert_eq!(fs::read_to_string(target.join("b.md")).unwrap(), "content b");
+        assert_eq!(
+            fs::read_to_string(target.join("a.md")).unwrap(),
+            "content a"
+        );
+        assert_eq!(
+            fs::read_to_string(target.join("b.md")).unwrap(),
+            "content b"
+        );
     }
 
     #[test]
@@ -510,11 +514,17 @@ mod tests {
         fs::write(source.join("a.md"), "same").unwrap();
         fs::write(target.join("a.md"), "same").unwrap();
 
-        let before = fs::metadata(target.join("a.md")).unwrap().modified().unwrap();
+        let before = fs::metadata(target.join("a.md"))
+            .unwrap()
+            .modified()
+            .unwrap();
         // Small delay so mtime would differ if rewritten
         std::thread::sleep(std::time::Duration::from_millis(50));
         sync_directory(&source, &target).unwrap();
-        let after = fs::metadata(target.join("a.md")).unwrap().modified().unwrap();
+        let after = fs::metadata(target.join("a.md"))
+            .unwrap()
+            .modified()
+            .unwrap();
 
         assert_eq!(before, after, "identical file should not be rewritten");
     }
@@ -543,7 +553,12 @@ mod tests {
         let home = dir.path().join("home");
 
         // Set up plugin source
-        let plugin_dir = dir.path().join("project").join(".claude").join("plugins").join("suite");
+        let plugin_dir = dir
+            .path()
+            .join("project")
+            .join(".claude")
+            .join("plugins")
+            .join("suite");
         let source_agents = plugin_dir.join("agents");
         fs::create_dir_all(&source_agents).unwrap();
         fs::write(source_agents.join("writer.md"), "new agent def").unwrap();
@@ -582,7 +597,12 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let home = dir.path().join("home");
 
-        let plugin_dir = dir.path().join("project").join(".claude").join("plugins").join("suite");
+        let plugin_dir = dir
+            .path()
+            .join("project")
+            .join(".claude")
+            .join("plugins")
+            .join("suite");
         let source_agents = plugin_dir.join("agents");
         fs::create_dir_all(&source_agents).unwrap();
         fs::write(source_agents.join("a.md"), "content").unwrap();
