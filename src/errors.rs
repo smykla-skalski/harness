@@ -736,6 +736,13 @@ pub enum HookMessage {
     #[error("Suite:new local validator gate is not allowed here: {details}")]
     ValidatorGateUnexpected { details: Cow<'static, str> },
 
+    #[error(
+        "Bug or failure detected during test execution. \
+         Use AskUserQuestion with the bug-found gate before continuing. \
+         Command: {command}"
+    )]
+    BugFoundGateRequired { command: Cow<'static, str> },
+
     // --- Warn ---
     #[error("Expected artifact missing after {script}: {target}")]
     MissingArtifact {
@@ -856,6 +863,11 @@ impl HookMessage {
             verdict: verdict.into(),
         }
     }
+    pub fn bug_found_gate_required(command: impl Into<Cow<'static, str>>) -> Self {
+        Self::BugFoundGateRequired {
+            command: command.into(),
+        }
+    }
 }
 
 impl HookMessage {
@@ -884,6 +896,7 @@ impl HookMessage {
             Self::ValidatorGateRequired { .. } => "KSA009",
             Self::ValidatorInstallFailed { .. } => "KSA010",
             Self::ValidatorGateUnexpected { .. } => "KSA011",
+            Self::BugFoundGateRequired { .. } => "KSR016",
         }
     }
 
@@ -907,7 +920,8 @@ impl HookMessage {
             | Self::SuiteIncomplete { .. }
             | Self::ValidatorGateRequired { .. }
             | Self::ValidatorInstallFailed { .. }
-            | Self::ValidatorGateUnexpected { .. } => Decision::Deny,
+            | Self::ValidatorGateUnexpected { .. }
+            | Self::BugFoundGateRequired { .. } => Decision::Deny,
             Self::MissingArtifact { .. }
             | Self::RunPreflight
             | Self::PreflightMissing
@@ -1190,6 +1204,15 @@ mod tests {
     }
 
     #[test]
+    fn hook_msg_bug_found_gate_required() {
+        let result = HookMessage::bug_found_gate_required("harness apply").into_result();
+        assert_eq!(result.decision, Decision::Deny);
+        assert_eq!(result.code, "KSR016");
+        assert!(result.message.contains("harness apply"));
+        assert!(result.message.contains("bug-found gate"));
+    }
+
+    #[test]
     fn hook_message_count() {
         let all_hooks: Vec<HookMessage> = vec![
             HookMessage::ClusterBinary,
@@ -1209,6 +1232,7 @@ mod tests {
             HookMessage::validator_gate_required(""),
             HookMessage::validator_install_failed(""),
             HookMessage::validator_gate_unexpected(""),
+            HookMessage::bug_found_gate_required(""),
             HookMessage::missing_artifact("", ""),
             HookMessage::RunPreflight,
             HookMessage::PreflightMissing,
@@ -1219,6 +1243,6 @@ mod tests {
             HookMessage::run_verdict(""),
             HookMessage::SuiteAuthorTracked,
         ];
-        assert_eq!(all_hooks.len(), 26);
+        assert_eq!(all_hooks.len(), 27);
     }
 }

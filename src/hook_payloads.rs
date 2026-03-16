@@ -344,6 +344,20 @@ impl HookContext {
         self.event.payload.stop_hook_active
     }
 
+    /// Tool response text from the envelope (post-tool-use hooks).
+    ///
+    /// For Bash tools, this is the combined stdout/stderr output. Returns
+    /// an empty string when no response is present.
+    #[must_use]
+    pub fn response_text(&self) -> &str {
+        self.event
+            .payload
+            .response
+            .as_ref()
+            .and_then(serde_json::Value::as_str)
+            .unwrap_or("")
+    }
+
     /// Whether this context is for the suite:run skill.
     #[must_use]
     pub fn is_suite_runner(&self) -> bool {
@@ -475,5 +489,28 @@ mod tests {
             multi_select: false,
         };
         assert_eq!(prompt.question_head(), "First line");
+    }
+
+    #[test]
+    fn response_text_returns_string_value() {
+        let json = r#"{"response": "ERROR [KSRCLI004] command failed"}"#;
+        let payload = HookEnvelopePayload::from_json_text(json).unwrap();
+        let ctx = HookContext::from_envelope("suite:run", payload);
+        assert_eq!(ctx.response_text(), "ERROR [KSRCLI004] command failed");
+    }
+
+    #[test]
+    fn response_text_returns_empty_when_absent() {
+        let payload = HookEnvelopePayload::from_json_text("{}").unwrap();
+        let ctx = HookContext::from_envelope("suite:run", payload);
+        assert_eq!(ctx.response_text(), "");
+    }
+
+    #[test]
+    fn response_text_returns_empty_for_non_string() {
+        let json = r#"{"response": {"stdout": "text"}}"#;
+        let payload = HookEnvelopePayload::from_json_text(json).unwrap();
+        let ctx = HookContext::from_envelope("suite:run", payload);
+        assert_eq!(ctx.response_text(), "");
     }
 }
