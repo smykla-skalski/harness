@@ -91,6 +91,47 @@ impl FakeToolchain {
         self
     }
 
+    /// Add a fake `docker` that responds to common subcommands.
+    ///
+    /// Supports: ps, inspect, run, rm, exec, cp, network, logs.
+    /// All invocations are logged for assertion.
+    pub fn add_docker(&mut self) -> &mut Self {
+        let script = format!(
+            "#!/bin/sh\n\
+             echo \"$0 $*\" >> \"{dir}/docker.invocations\"\n\
+             case \"$1\" in\n\
+               ps) printf '' ; exit 0 ;;\n\
+               inspect) printf '{{{{}}}}' ; exit 0 ;;\n\
+               run) printf 'fake-container-id' ; exit 0 ;;\n\
+               rm) exit 0 ;;\n\
+               exec) exit 0 ;;\n\
+               cp) exit 0 ;;\n\
+               network) exit 0 ;;\n\
+               logs) printf 'fake log output' ; exit 0 ;;\n\
+               compose) exit 0 ;;\n\
+               *) exit 0 ;;\n\
+             esac\n",
+            dir = self.dir.path().display(),
+        );
+        let _ = write_fake_binary_with_script(self.dir.path(), "docker", &script);
+        self
+    }
+
+    /// Add a fake `openssl` that returns a PEM certificate.
+    ///
+    /// All invocations are logged for assertion.
+    pub fn add_openssl(&mut self) -> &mut Self {
+        let script = format!(
+            "#!/bin/sh\n\
+             echo \"$0 $*\" >> \"{dir}/openssl.invocations\"\n\
+             printf '-----BEGIN CERTIFICATE-----\\nMIIBfake\\n-----END CERTIFICATE-----\\n'\n\
+             exit 0\n",
+            dir = self.dir.path().display(),
+        );
+        let _ = write_fake_binary_with_script(self.dir.path(), "openssl", &script);
+        self
+    }
+
     /// Add a fake `curl` that exits 0.
     pub fn add_curl(&mut self) -> &mut Self {
         // Simulate curl -sL -o <file> <url> by writing a placeholder file
