@@ -395,7 +395,7 @@ fn compose_single_zone_postgres_includes_postgres_service() {
 
     // CP should depend on postgres
     let cp_service = &compose.services["cp"];
-    assert!(cp_service.depends_on.contains(&"postgres".to_string()));
+    assert!(cp_service.depends_on.contains("postgres"));
 }
 
 #[test]
@@ -434,11 +434,7 @@ fn compose_global_zone_yaml_structure() {
     );
 
     // Zone CP should depend on global CP
-    assert!(
-        compose.services["zone-cp"]
-            .depends_on
-            .contains(&"global-cp".to_string())
-    );
+    assert!(compose.services["zone-cp"].depends_on.contains("global-cp"));
 
     // Global CP ports: 5681 and 5685 (KDS)
     assert!(yaml.contains("5685:5685"));
@@ -490,8 +486,8 @@ fn compose_global_two_zones_yaml_structure() {
     assert_eq!(z2_env.get("KUMA_MULTIZONE_ZONE_NAME").unwrap(), "zone-2");
 
     // Both zones depend on global
-    assert!(zone1.depends_on.contains(&"global-cp".to_string()));
-    assert!(zone2.depends_on.contains(&"global-cp".to_string()));
+    assert!(zone1.depends_on.contains("global-cp"));
+    assert!(zone2.depends_on.contains("global-cp"));
 }
 
 #[test]
@@ -517,7 +513,7 @@ fn compose_global_two_zones_postgres_includes_postgres() {
     assert!(
         compose.services["global-cp"]
             .depends_on
-            .contains(&"postgres".to_string())
+            .contains("postgres")
     );
     // Zones use memory store (not postgres) - check env
     let z1_env = &compose.services["z1"].environment;
