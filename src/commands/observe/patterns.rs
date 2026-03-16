@@ -179,6 +179,34 @@ pub(super) static CORPORATE_CLUSTER_SIGNALS: &[&str] = &[
     "gke_",
 ];
 
+/// Exact phrases where the assistant admits a harness infrastructure problem.
+pub(super) static HARNESS_INFRASTRUCTURE_SIGNALS: &[&str] = &[
+    "harness infrastructure issue",
+    "harness bug",
+];
+
+/// Harness subsystem keywords that, combined with a failure word, indicate
+/// the assistant identified a harness misconfiguration.
+pub(super) static HARNESS_SUBSYSTEM_KEYWORDS: &[&str] =
+    &["harness bootstrap", "harness cluster", "harness setup"];
+
+/// Failure words paired with harness subsystem keywords.
+pub(super) static HARNESS_SUBSYSTEM_FAILURE_WORDS: &[&str] = &[
+    "didn't",
+    "missing",
+    "failed",
+    "not configured",
+];
+
+/// Environment variable names whose absence signals a missing configuration.
+pub(super) static MISSING_CONFIG_ENV_VARS: &[&str] = &["kuma_multizone", "kubeconfig"];
+
+/// Absence words paired with environment variable names.
+pub(super) static MISSING_CONFIG_ABSENCE_WORDS: &[&str] = &["lack", "missing"];
+
+/// Infrastructure component names whose connection was not established.
+pub(super) static MISSING_CONNECTION_COMPONENTS: &[&str] = &["kds", "connection"];
+
 /// Harness operation keywords for detecting manifest failures.
 pub(super) static HARNESS_OPERATION_KEYWORDS: &[&str] = &[
     "preflight:",
