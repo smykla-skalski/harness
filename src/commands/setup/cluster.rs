@@ -173,13 +173,26 @@ fn cluster_universal(
 
     match mode {
         "single-up" => {
-            let result = universal_single_up(&cp_image, network_name, store, &all_names[0])?;
+            // Postgres needs Compose (for the postgres service); memory uses Docker CLI
+            let result = if store == "postgres" {
+                universal_single_up_compose(&cp_image, network_name, store, &all_names[0])?
+            } else {
+                universal_single_up(&cp_image, network_name, store, &all_names[0])?
+            };
             spec.cp_image = Some(cp_image);
             spec.store_type = Some(store.to_string());
             spec.admin_token = Some(result.admin_token);
             spec.members[0].container_ip = Some(result.cp_ip);
         }
-        "single-down" => universal_single_down(network_name, &all_names[0])?,
+        "single-down" => {
+            if store == "postgres" {
+                // Compose-managed single-zone
+                let project = format!("harness-{}", all_names[0]);
+                compose_down_project(&project)?;
+            } else {
+                universal_single_down(network_name, &all_names[0])?;
+            }
+        }
         "global-zone-up" => {
             let result = universal_global_zone_up(&cp_image, network_name, store, &all_names)?;
             spec.cp_image = Some(cp_image);
@@ -500,6 +513,39 @@ fn universal_single_up(
     wait_for_http(&health_url, Duration::from_mins(1))?;
 
     let admin_token = extract_admin_token(cp_name)?;
+    eprintln!(
+        "{} cluster: CP ready at {health_url} (admin token extracted)",
+        utc_now()
+    );
+    Ok(UniversalUpResult {
+        admin_token,
+        cp_ip: ip,
+    })
+}
+
+fn universal_single_up_compose(
+    image: &str,
+    network: &str,
+    store: &str,
+    cp_name: &str,
+) -> Result<UniversalUpResult, CliError> {
+    let compose_file = compose::single_zone(image, network, UNIVERSAL_SUBNET, store, cp_name);
+    let tmp_dir = tempfile::tempdir().map_err(|e| CliErrorKind::io(cow!("temp dir: {e}")))?;
+    let compose_path = tmp_dir.path().join("docker-compose.yaml");
+    compose_file.write_to(&compose_path)?;
+
+    let project = format!("harness-{cp_name}");
+    compose_up(&compose_path, &project)?;
+
+    let compose_network = format!("{project}_{network}");
+    let container = format!("{project}-{cp_name}-1");
+    let ip = docker_inspect_ip(&container, &compose_network)?;
+
+    let health_url = format!("http://{ip}:5681");
+    eprintln!("{} cluster: waiting for CP at {health_url}", utc_now());
+    wait_for_http(&health_url, Duration::from_mins(1))?;
+
+    let admin_token = extract_admin_token(&container)?;
     eprintln!(
         "{} cluster: CP ready at {health_url} (admin token extracted)",
         utc_now()
