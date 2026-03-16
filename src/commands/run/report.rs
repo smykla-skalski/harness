@@ -1,12 +1,12 @@
 use std::fmt::Write as _;
 use std::path::PathBuf;
 
+use crate::audit_log::write_run_status_with_audit;
 use crate::cli::{ReportCommand, RunDirArgs};
 use crate::commands::resolve_run_dir;
 use crate::context::RunContext;
 use crate::core_defs::utc_now;
-use crate::errors::{CliError, CliErrorKind, cow};
-use crate::io::write_text;
+use crate::errors::{CliError, CliErrorKind};
 use crate::rules::suite_runner::{REPORT_CODE_BLOCK_LIMIT, REPORT_LINE_LIMIT};
 use crate::schema::{RunCounts, RunReport};
 use crate::workflow::runner::ensure_execution_phase;
@@ -165,13 +165,17 @@ fn report_group(
     report.body.push_str(&section);
     report.save()?;
 
-    let status_json = serde_json::to_string_pretty(&run_status)
-        .map_err(|e| CliErrorKind::serialize(cow!("group status update: {e}")))?;
-    write_text(&ctx.layout.status_path(), &format!("{status_json}\n"))?;
+    write_run_status_with_audit(
+        &ctx.layout.run_dir(),
+        &run_status,
+        None,
+        Some("execution"),
+        Some(group_id),
+    )?;
 
     // Auto-advance runner state from bootstrap/preflight to execution when
     // a group result is recorded.
-    let _ = ensure_execution_phase(&run_dir);
+    ensure_execution_phase(&run_dir)?;
 
     Ok(0)
 }

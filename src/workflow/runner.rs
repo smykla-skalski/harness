@@ -3,6 +3,7 @@ use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
+use crate::audit_log::append_runner_state_audit;
 use crate::errors::{CliError, CliErrorKind, cow};
 use crate::rules::skill_dirs;
 use crate::workflow::engine::VersionedJsonRepository;
@@ -158,6 +159,7 @@ fn save_state(run_dir: &Path, state: &RunnerWorkflowState) -> Result<(), CliErro
         CliErrorKind::workflow_serialize(cow!("failed to serialize runner state: {e}")).into()
     })?;
     repo.save(&value)?;
+    append_runner_state_audit(run_dir, state)?;
     Ok(())
 }
 
