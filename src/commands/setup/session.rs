@@ -55,15 +55,22 @@ pub fn session_stop(_project_dir: Option<&str>) -> Result<i32, CliError> {
         return Ok(0);
     };
     let Ok(record) = serde_json::from_str::<CurrentRunRecord>(&text) else {
-        let _ = fs::remove_file(&ctx_path);
+        eprintln!("warning: corrupt run pointer JSON, removing");
+        if let Err(e) = fs::remove_file(&ctx_path) {
+            eprintln!("warning: failed to remove corrupt pointer: {e}");
+        }
         return Ok(0);
     };
 
     let run_dir = record.layout.run_dir();
     if run_dir.is_dir() {
-        let _ = ephemeral_metallb::cleanup_templates(&run_dir);
+        if let Err(e) = ephemeral_metallb::cleanup_templates(&run_dir) {
+            eprintln!("warning: cleanup templates failed: {e}");
+        }
     }
 
-    let _ = fs::remove_file(&ctx_path);
+    if let Err(e) = fs::remove_file(&ctx_path) {
+        eprintln!("warning: failed to remove run pointer: {e}");
+    }
     Ok(0)
 }

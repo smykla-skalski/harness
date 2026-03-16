@@ -29,6 +29,10 @@ pub fn render_human(issue: &Issue) -> String {
 ///
 /// Builds the JSON object directly rather than serializing, modifying, and
 /// re-serializing the Issue struct.
+///
+/// # Panics
+/// Panics if the `json!()` value fails to serialize, which cannot happen
+/// with valid string/integer/boolean data.
 #[must_use]
 pub fn render_json(issue: &Issue) -> String {
     let details: &str = if issue.details.len() > DETAIL_TRUNCATE_LENGTH {
@@ -52,10 +56,15 @@ pub fn render_json(issue: &Issue) -> String {
     if let Some(ref hint) = issue.fix_hint {
         obj["fix_hint"] = json!(hint);
     }
-    serde_json::to_string(&obj).unwrap_or_default()
+    // json!() values built from valid data always serialize successfully.
+    serde_json::to_string(&obj).expect("valid JSON serialization")
 }
 
 /// Render a summary JSON object with counts by severity and category.
+///
+/// # Panics
+/// Panics if the `json!()` value fails to serialize, which cannot happen
+/// with valid string/integer data.
 #[must_use]
 pub fn render_summary(issues: &[Issue], last_line: usize) -> String {
     let mut by_severity: HashMap<String, usize> = HashMap::new();
@@ -66,6 +75,7 @@ pub fn render_summary(issues: &[Issue], last_line: usize) -> String {
         *by_category.entry(issue.category.to_string()).or_default() += 1;
     }
 
+    // json!() values built from valid data always serialize successfully.
     serde_json::to_string(&json!({
         "status": "done",
         "last_line": last_line,
@@ -73,7 +83,7 @@ pub fn render_summary(issues: &[Issue], last_line: usize) -> String {
         "by_severity": by_severity,
         "by_category": by_category,
     }))
-    .unwrap_or_default()
+    .expect("valid JSON serialization")
 }
 
 #[cfg(test)]
