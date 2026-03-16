@@ -267,3 +267,22 @@ pub(crate) fn resolve_cp_addr(ctx: &RunContext) -> Result<String, CliError> {
     }
     Err(CliErrorKind::missing_run_context_value("cp_api_url").into())
 }
+
+/// Resolve admin token from run context cluster spec.
+///
+/// Returns `None` for Kubernetes mode (no admin token needed).
+///
+/// # Errors
+/// Returns `CliError` when the platform is universal but no admin token is available.
+pub(crate) fn resolve_admin_token(ctx: &RunContext) -> Result<Option<String>, CliError> {
+    let Some(ref spec) = ctx.cluster else {
+        return Ok(None);
+    };
+    if spec.platform != Platform::Universal {
+        return Ok(None);
+    }
+    spec.admin_token
+        .clone()
+        .map(Some)
+        .ok_or_else(|| CliErrorKind::missing_run_context_value("admin_token").into())
+}

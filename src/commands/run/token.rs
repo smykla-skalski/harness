@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 use crate::cli::RunDirArgs;
-use crate::commands::{resolve_cp_addr, resolve_run_context};
+use crate::commands::{resolve_admin_token, resolve_cp_addr, resolve_run_context};
 use crate::errors::{CliError, CliErrorKind};
 use crate::exec;
 
@@ -21,15 +21,16 @@ pub fn token(
     valid_for: &str,
     run_dir_args: &RunDirArgs,
 ) -> Result<i32, CliError> {
+    let ctx = resolve_run_context(run_dir_args)?;
     let addr = if let Some(a) = cp_addr {
         a.to_string()
     } else {
-        let ctx = resolve_run_context(run_dir_args)?;
         resolve_cp_addr(&ctx)?
     };
+    let admin_token = resolve_admin_token(&ctx)?;
 
     // Try REST API first
-    match token_via_api(&addr, kind, name, mesh, valid_for) {
+    match token_via_api(&addr, kind, name, mesh, valid_for, admin_token.as_deref()) {
         Ok(tok) => {
             println!("{tok}");
             return Ok(0);
@@ -40,7 +41,6 @@ pub fn token(
     }
 
     // Fallback to kumactl
-    let ctx = resolve_run_context(run_dir_args)?;
     let root = PathBuf::from(&ctx.metadata.repo_root);
     let binary = find_kumactl_binary(&root)?;
 
@@ -62,6 +62,7 @@ pub(crate) fn token_via_api(
     name: &str,
     mesh: &str,
     valid_for: &str,
+    admin_token: Option<&str>,
 ) -> Result<String, CliError> {
     let body = serde_json::json!({
         "name": name,
@@ -69,7 +70,7 @@ pub(crate) fn token_via_api(
         "type": kind,
         "validFor": valid_for,
     });
-    let resp = exec::cp_api_post(addr, "/tokens/dataplane", &body)?;
+    let resp = exec::cp_api_post_with_token(addr, "/tokens/dataplane", &body, admin_token)?;
     resp.as_str()
         .map(String::from)
         .ok_or_else(|| CliErrorKind::token_generation_failed("unexpected response format").into())
