@@ -57,7 +57,10 @@ impl Execute for Command {
             | Command::Kumactl { .. }
             | Command::Api { .. }
             | Command::Token(..)
-            | Command::Service(..) => dispatch_run(self),
+            | Command::Service(..)
+            | Command::Status { .. }
+            | Command::Logs { .. }
+            | Command::ClusterCheck { .. } => dispatch_run(self),
             Command::AuthoringBegin(..)
             | Command::AuthoringSave { .. }
             | Command::AuthoringShow { .. }
@@ -145,6 +148,14 @@ fn dispatch_run(cmd: Command) -> Result<i32, CliError> {
             &args.run_dir,
         ),
         Command::Service(args) => run::service(&args),
+        Command::Status { run_dir } => run::status(&run_dir),
+        Command::Logs {
+            name,
+            tail,
+            follow,
+            run_dir,
+        } => run::logs(&name, tail, follow, &run_dir),
+        Command::ClusterCheck { run_dir } => run::cluster_check(&run_dir),
         _ => unreachable!(),
     }
 }
