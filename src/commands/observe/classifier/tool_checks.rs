@@ -112,6 +112,38 @@ fn check_bash_tool_use(line_num: usize, input: &Value, issues: &mut Vec<Issue>) 
             fix_hint: Some("Should verify target exists and is correct before deleting".into()),
         });
     }
+
+    if command.contains("make k3d/") || command.contains("make kind/") {
+        issues.push(Issue {
+            line: line_num,
+            category: IssueCategory::UnexpectedBehavior,
+            severity: IssueSeverity::Critical,
+            summary: "Raw make target used for cluster operation".into(),
+            details: format!("Command: {command}"),
+            source_role: MessageRole::Assistant,
+            fixable: true,
+            fix_target: None,
+            fix_hint: Some(
+                "Use harness cluster instead of raw make targets".into(),
+            ),
+        });
+    }
+
+    if command.contains("git commit") || command.contains("git add") {
+        issues.push(Issue {
+            line: line_num,
+            category: IssueCategory::UnexpectedBehavior,
+            severity: IssueSeverity::Critical,
+            summary: "Unauthorized git commit during active run".into(),
+            details: format!("Command: {command}"),
+            source_role: MessageRole::Assistant,
+            fixable: true,
+            fix_target: None,
+            fix_hint: Some(
+                "Agent committed code without asking the user via bug-found gate".into(),
+            ),
+        });
+    }
 }
 
 /// Check `AskUserQuestion` `tool_use` for issue patterns.
