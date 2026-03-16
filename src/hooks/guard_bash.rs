@@ -103,6 +103,32 @@ fn guard_suite_author(_ctx: &HookContext, words: &[String], heads: &[String]) ->
     if !is_harness_head(heads) && has_admin_endpoint_hint(words) {
         return HookMessage::AdminEndpoint.into_result();
     }
+    let suite_mutation = deny_author_suite_storage_mutation(words);
+    if !suite_mutation.code.is_empty() {
+        return suite_mutation;
+    }
+    HookResult::allow()
+}
+
+fn deny_author_suite_storage_mutation(words: &[String]) -> HookResult {
+    let heads = command_heads(words);
+    if !heads
+        .iter()
+        .any(|h| is_suite_mutation_bin(&normalized_binary_name(h)))
+    {
+        return HookResult::allow();
+    }
+    let path_words = path_like_words(words);
+    for word in &path_words {
+        if word.contains("/suites/") || word.starts_with("suites/") {
+            return HookMessage::approval_required(
+                "mutate suite storage",
+                "do not delete or overwrite existing suite directories; \
+                 use `harness authoring-begin` which handles conflicts",
+            )
+            .into_result();
+        }
+    }
     HookResult::allow()
 }
 
@@ -795,6 +821,17 @@ mod tests {
         let c = ctx("suite:new", "kubectl get pods");
         let r = execute(&c).unwrap();
         assert_eq!(r.decision, Decision::Deny);
+    }
+
+    #[test]
+    fn denies_rm_rf_suite_dir_for_suite_author() {
+        let c = ctx(
+            "suite:new",
+            "rm -rf ~/.local/share/kuma/suites/motb-compliance",
+        );
+        let r = execute(&c).unwrap();
+        assert_eq!(r.decision, Decision::Deny);
+        assert!(r.message.contains("mutate suite storage"));
     }
 
     #[test]

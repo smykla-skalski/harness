@@ -100,6 +100,10 @@ Parse from `$ARGUMENTS`:
 - Current repo root: !`git rev-parse --show-toplevel 2>/dev/null || echo "not in a git repo"`
 - Existing suites: !`ls -1 "${XDG_DATA_HOME:-$HOME/.local/share}/kuma/suites" 2>/dev/null | head -20 || echo "none yet"`
 
+## Workflow rules
+
+- Never delete, rm, or overwrite existing suite directories. If `authoring-begin` detects an existing suite, it will prompt for resolution.
+
 ## Workflow - generate mode (default, `--mode generate`)
 
 ### Step 0: Query harness capabilities
