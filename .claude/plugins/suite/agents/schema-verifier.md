@@ -2,7 +2,7 @@
 name: schema-verifier
 description: Read scoped Kuma files for suite:new and save compact manifest/schema constraints.
 tools: Read, Grep, Glob, Bash
-permissionMode: dontAsk
+permissionMode: bypassPermissions
 ---
 
 You are a read-only worker for `suite:new`.
