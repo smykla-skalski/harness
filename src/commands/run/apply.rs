@@ -1,11 +1,12 @@
+use std::fs;
 use std::path::PathBuf;
 
 use crate::cli::RunDirArgs;
 use crate::cluster::Platform;
-use crate::commands::{resolve_cp_addr, resolve_kubeconfig, resolve_run_dir};
+use crate::commands::{resolve_admin_token, resolve_cp_addr, resolve_kubeconfig, resolve_run_dir};
 use crate::context::RunContext;
 use crate::core_defs::{shorten_path, utc_now};
-use crate::errors::CliError;
+use crate::errors::{CliError, CliErrorKind, cow};
 use crate::exec;
 use crate::exec::kubectl;
 use crate::io::append_markdown_row;
@@ -61,6 +62,32 @@ pub fn apply(
 
 fn apply_universal(ctx: &RunContext, manifest: &str) -> Result<(), CliError> {
     let cp_addr = resolve_cp_addr(ctx)?;
+    let admin_token = resolve_admin_token(ctx)?;
+
+    // Try REST API first - parse manifest YAML and PUT to CP
+    let content = fs::read_to_string(manifest)
+        .map_err(|e| CliErrorKind::io(cow!("read manifest {manifest}: {e}")))?;
+    let resource: serde_json::Value = serde_yml::from_str(&content)
+        .map_err(|e| CliErrorKind::io(cow!("parse manifest {manifest}: {e}")))?;
+
+    if let (Some(resource_type), Some(name), Some(mesh)) = (
+        resource["type"].as_str(),
+        resource["name"].as_str(),
+        resource["mesh"].as_str(),
+    ) {
+        let path = format!(
+            "/meshes/{mesh}/{resource_type}s/{name}",
+            resource_type = resource_type.to_lowercase()
+        );
+        let result =
+            exec::cp_api_put_with_token(&cp_addr, &path, &resource, admin_token.as_deref());
+        if result.is_ok() {
+            return Ok(());
+        }
+        eprintln!("apply: REST API failed, falling back to kumactl");
+    }
+
+    // Fallback to kumactl
     let root = PathBuf::from(&ctx.metadata.repo_root);
     let binary = find_kumactl_binary(&root)?;
     exec::kumactl_run(&binary, &cp_addr, &["apply", "-f", manifest], &[0])?;

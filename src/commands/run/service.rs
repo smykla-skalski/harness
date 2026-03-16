@@ -2,7 +2,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use crate::cli::{RunDirArgs, ServiceArgs};
-use crate::commands::{resolve_cp_addr, resolve_run_context};
+use crate::commands::{resolve_admin_token, resolve_cp_addr, resolve_run_context};
 use crate::errors::{CliError, CliErrorKind};
 use crate::exec;
 
@@ -69,6 +69,7 @@ fn service_up(
 
     let ctx = resolve_run_context(run_dir_args)?;
     let cp_addr = resolve_cp_addr(&ctx)?;
+    let admin_token = resolve_admin_token(&ctx)?;
     let spec = ctx
         .cluster
         .as_ref()
@@ -79,7 +80,14 @@ fn service_up(
         .ok_or_else(|| CliErrorKind::missing_run_context_value("docker_network"))?;
 
     // Generate token
-    let token_result = token_via_api(&cp_addr, "dataplane", svc_name, mesh, "24h")?;
+    let token_result = token_via_api(
+        &cp_addr,
+        "dataplane",
+        svc_name,
+        mesh,
+        "24h",
+        admin_token.as_deref(),
+    )?;
     let token_str = token_result.trim();
 
     // Render dataplane YAML from template

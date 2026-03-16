@@ -1014,6 +1014,7 @@ mod tests {
         .unwrap();
         spec.store_type = Some("memory".into());
         spec.cp_image = Some("kuma-cp:latest".into());
+        spec.admin_token = Some("test-admin-token-xyz".into());
         spec.members[0].container_id = Some("abc123".into());
         spec.members[0].container_ip = Some("172.57.0.2".into());
 
@@ -1023,8 +1024,40 @@ mod tests {
         assert_eq!(back.docker_network.as_deref(), Some("harness-cp"));
         assert_eq!(back.store_type.as_deref(), Some("memory"));
         assert_eq!(back.cp_image.as_deref(), Some("kuma-cp:latest"));
+        assert_eq!(back.admin_token.as_deref(), Some("test-admin-token-xyz"));
         assert_eq!(back.members[0].container_id.as_deref(), Some("abc123"));
         assert_eq!(back.members[0].container_ip.as_deref(), Some("172.57.0.2"));
+    }
+
+    #[test]
+    fn admin_token_accessor() {
+        let mut spec = ClusterSpec::from_mode_with_platform(
+            "single-up",
+            &["cp".into()],
+            "/r",
+            vec![],
+            vec![],
+            Platform::Universal,
+        )
+        .unwrap();
+        assert!(spec.admin_token().is_none());
+        spec.admin_token = Some("tok-123".into());
+        assert_eq!(spec.admin_token(), Some("tok-123"));
+    }
+
+    #[test]
+    fn admin_token_skipped_when_none() {
+        let spec = ClusterSpec::from_mode_with_platform(
+            "single-up",
+            &["cp".into()],
+            "/r",
+            vec![],
+            vec![],
+            Platform::Universal,
+        )
+        .unwrap();
+        let json = spec.to_json_dict();
+        assert!(json.get("admin_token").is_none());
     }
 
     #[test]

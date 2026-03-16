@@ -85,8 +85,9 @@ fn capture_universal(ctx: &RunContext, capture_path: &Path) -> Result<(), CliErr
     )?;
 
     // Collect dataplane state from CP if available
+    let admin_token = spec.admin_token();
     let dataplanes = if let Some(url) = spec.primary_api_url() {
-        exec::cp_api_get(&url, "/meshes/default/dataplanes")
+        exec::cp_api_get_with_token(&url, "/meshes/default/dataplanes", admin_token)
             .ok()
             .unwrap_or(serde_json::json!({"items": []}))
     } else {
