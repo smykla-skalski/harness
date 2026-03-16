@@ -124,9 +124,9 @@ pub fn record(
     if !stdout.is_empty() {
         print!("{stdout}");
     }
-    if !stderr.is_empty() {
-        eprint!("{stderr}");
-    }
+    // stderr is saved to the artifact file but not printed to the terminal -
+    // wrapped commands often emit noisy warnings (e.g. control plane not
+    // reachable yet) that confuse the user.
 
     if returncode == 0 || returncode == 1 {
         return Ok(returncode);
