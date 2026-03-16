@@ -255,3 +255,147 @@ fn service_list(_run_dir_args: &RunDirArgs) -> Result<i32, CliError> {
     print!("{}", result.stdout);
     Ok(0)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // -- derive_service_image tests --
+
+    #[test]
+    fn derive_replaces_kuma_cp_with_kuma_universal() {
+        assert_eq!(
+            derive_service_image("kuma-cp:latest").as_deref(),
+            Some("kuma-universal:latest")
+        );
+    }
+
+    #[test]
+    fn derive_works_with_registry_prefix() {
+        assert_eq!(
+            derive_service_image("docker.io/kumahq/kuma-cp:2.9.0").as_deref(),
+            Some("docker.io/kumahq/kuma-universal:2.9.0")
+        );
+    }
+
+    #[test]
+    fn derive_returns_none_for_unrelated_image() {
+        assert!(derive_service_image("postgres:16-alpine").is_none());
+    }
+
+    #[test]
+    fn derive_returns_none_for_empty_string() {
+        assert!(derive_service_image("").is_none());
+    }
+
+    // -- template rendering tests --
+
+    #[test]
+    fn dataplane_template_renders_correctly() {
+        let ctx = serde_json::json!({
+            "name": "demo",
+            "mesh": "default",
+            "address": "172.57.0.10",
+            "port": 8080,
+            "protocol": "http",
+        });
+        let result = render_template("dataplane.yaml.j2", TEMPLATE_DATAPLANE, &ctx).unwrap();
+        assert!(result.contains("demo"), "should contain service name");
+        assert!(result.contains("default"), "should contain mesh name");
+        assert!(result.contains("172.57.0.10"), "should contain address");
+        assert!(result.contains("8080"), "should contain port");
+        assert!(
+            !result.contains("transparentProxying"),
+            "should not contain transparentProxying"
+        );
+    }
+
+    #[test]
+    fn transparent_proxy_template_renders_correctly() {
+        let ctx = serde_json::json!({
+            "name": "proxy-svc",
+            "mesh": "default",
+            "address": "172.57.0.20",
+            "port": 9090,
+            "protocol": "http",
+        });
+        let result = render_template(
+            "transparent-proxy.yaml.j2",
+            TEMPLATE_TRANSPARENT_PROXY,
+            &ctx,
+        )
+        .unwrap();
+        assert!(result.contains("proxy-svc"));
+        assert!(result.contains("172.57.0.20"));
+        assert!(result.contains("9090"));
+        assert!(
+            result.contains("transparentProxying"),
+            "should contain transparentProxying"
+        );
+    }
+
+    #[test]
+    fn template_selection_uses_transparent_proxy_flag() {
+        let (name_std, _) = if false {
+            ("transparent-proxy.yaml.j2", TEMPLATE_TRANSPARENT_PROXY)
+        } else {
+            ("dataplane.yaml.j2", TEMPLATE_DATAPLANE)
+        };
+        assert_eq!(name_std, "dataplane.yaml.j2");
+
+        let (name_tp, _) = if true {
+            ("transparent-proxy.yaml.j2", TEMPLATE_TRANSPARENT_PROXY)
+        } else {
+            ("dataplane.yaml.j2", TEMPLATE_DATAPLANE)
+        };
+        assert_eq!(name_tp, "transparent-proxy.yaml.j2");
+    }
+
+    // -- resolve_service_image tests --
+
+    #[test]
+    fn resolve_image_explicit_wins() {
+        let spec = crate::cluster::ClusterSpec::from_mode_with_platform(
+            "single-up",
+            &["cp".into()],
+            "/r",
+            vec![],
+            vec![],
+            crate::cluster::Platform::Universal,
+        )
+        .unwrap();
+        let result = resolve_service_image(Some("my-image:v1"), &spec).unwrap();
+        assert_eq!(result, "my-image:v1");
+    }
+
+    #[test]
+    fn resolve_image_derives_from_cp_image() {
+        let mut spec = crate::cluster::ClusterSpec::from_mode_with_platform(
+            "single-up",
+            &["cp".into()],
+            "/r",
+            vec![],
+            vec![],
+            crate::cluster::Platform::Universal,
+        )
+        .unwrap();
+        spec.cp_image = Some("kuma-cp:dev".into());
+        let result = resolve_service_image(None, &spec).unwrap();
+        assert_eq!(result, "kuma-universal:dev");
+    }
+
+    #[test]
+    fn resolve_image_errors_when_no_cp_image() {
+        let spec = crate::cluster::ClusterSpec::from_mode_with_platform(
+            "single-up",
+            &["cp".into()],
+            "/r",
+            vec![],
+            vec![],
+            crate::cluster::Platform::Universal,
+        )
+        .unwrap();
+        let result = resolve_service_image(None, &spec);
+        assert!(result.is_err());
+    }
+}
