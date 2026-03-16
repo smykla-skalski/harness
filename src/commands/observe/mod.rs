@@ -713,6 +713,54 @@ fn resolve_from(session_path: &Path, value: &str) -> Result<usize, CliError> {
     Err(CliErrorKind::session_parse_error(format!("no match for --from '{value}'")).into())
 }
 
+/// Resolve timestamp-based `--since` / `--until` to effective line bounds.
+fn resolve_effective_bounds(
+    path: &Path,
+    filter: &ObserveFilterArgs,
+    from_line: usize,
+) -> Result<(usize, Option<usize>), CliError> {
+    let effective_from = if let Some(ref ts) = filter.since_timestamp {
+        let resolved = resolve_from(path, ts)?;
+        resolved.max(from_line)
+    } else {
+        from_line
+    };
+    let effective_until = if let Some(ref ts) = filter.until_timestamp {
+        let resolved = resolve_from(path, ts)?;
+        Some(filter.until_line.map_or(resolved, |ul| ul.min(resolved)))
+    } else {
+        filter.until_line
+    };
+    Ok((effective_from, effective_until))
+}
+
+/// Render scan results to stdout using the requested format.
+fn render_scan_output(filter: &ObserveFilterArgs, issues: &[Issue], last_line: usize) {
+    let format_str = filter.format.as_deref().unwrap_or("");
+
+    if format_str == "markdown" || format_str == "md" {
+        println!("{}", output::render_markdown(issues));
+    } else if format_str == "sarif" {
+        println!("{}", output::render_sarif(issues));
+    } else if filter.json {
+        for issue in issues {
+            println!("{}", output::render_json(issue));
+        }
+    } else {
+        for issue in issues {
+            println!("{}", output::render_human(issue));
+        }
+    }
+
+    if let Some(n) = filter.top_causes {
+        println!("{}", output::render_top_causes(issues, n));
+    }
+
+    if filter.summary {
+        println!("{}", output::render_summary(issues, last_line));
+    }
+}
+
 /// Execute scan mode.
 fn execute_scan(session_id: &str, filter: &ObserveFilterArgs) -> Result<i32, CliError> {
     let path = session::find_session(session_id, filter.project_hint.as_deref())?;
@@ -727,19 +775,7 @@ fn execute_scan(session_id: &str, filter: &ObserveFilterArgs) -> Result<i32, Cli
         println!("{status}");
     }
 
-    // Resolve timestamp bounds to line numbers if provided
-    let effective_from = if let Some(ref ts) = filter.since_timestamp {
-        let resolved = resolve_from(&path, ts)?;
-        resolved.max(from_line)
-    } else {
-        from_line
-    };
-    let effective_until = if let Some(ref ts) = filter.until_timestamp {
-        let resolved = resolve_from(&path, ts)?;
-        Some(filter.until_line.map_or(resolved, |ul| ul.min(resolved)))
-    } else {
-        filter.until_line
-    };
+    let (effective_from, effective_until) = resolve_effective_bounds(&path, filter, from_line)?;
 
     let (issues, last_line) = scan_with_limit(&path, effective_from, effective_until)?;
     let filtered = apply_filters(issues, filter)?;
@@ -748,29 +784,7 @@ fn execute_scan(session_id: &str, filter: &ObserveFilterArgs) -> Result<i32, Cli
         write_details_file(details_path, &filtered)?;
     }
 
-    let format_str = filter.format.as_deref().unwrap_or("");
-
-    if format_str == "markdown" || format_str == "md" {
-        println!("{}", output::render_markdown(&filtered));
-    } else if format_str == "sarif" {
-        println!("{}", output::render_sarif(&filtered));
-    } else if filter.json {
-        for issue in &filtered {
-            println!("{}", output::render_json(issue));
-        }
-    } else {
-        for issue in &filtered {
-            println!("{}", output::render_human(issue));
-        }
-    }
-
-    if let Some(n) = filter.top_causes {
-        println!("{}", output::render_top_causes(&filtered, n));
-    }
-
-    if filter.summary {
-        println!("{}", output::render_summary(&filtered, last_line));
-    }
+    render_scan_output(filter, &filtered, last_line);
 
     Ok(0)
 }
@@ -822,6 +836,16 @@ fn poll_session_lines(
     issues
 }
 
+/// Write a line to a file and flush, printing a warning on failure.
+fn write_and_flush(file: &mut fs::File, line: &str, label: &str) {
+    if let Err(e) = writeln!(file, "{line}") {
+        eprintln!("warning: failed to write {label}: {e}");
+    }
+    if let Err(e) = file.flush() {
+        eprintln!("warning: failed to flush {label}: {e}");
+    }
+}
+
 /// Write an issue to the appropriate outputs (details file, output file, or stdout).
 fn emit_watch_issue(
     issue: &Issue,
@@ -832,12 +856,7 @@ fn emit_watch_issue(
     if let Some(detail_out) = details_writer
         && let Ok(json_str) = serde_json::to_string(issue)
     {
-        if let Err(e) = writeln!(detail_out, "{json_str}") {
-            eprintln!("warning: failed to write issue details: {e}");
-        }
-        if let Err(e) = detail_out.flush() {
-            eprintln!("warning: failed to flush issue details: {e}");
-        }
+        write_and_flush(detail_out, &json_str, "issue details");
     }
     let rendered = if json_mode {
         output::render_json(issue)
@@ -845,12 +864,7 @@ fn emit_watch_issue(
         output::render_human(issue)
     };
     if let Some(file_out) = output_writer {
-        if let Err(e) = writeln!(file_out, "{rendered}") {
-            eprintln!("warning: failed to write issue output: {e}");
-        }
-        if let Err(e) = file_out.flush() {
-            eprintln!("warning: failed to flush issue output: {e}");
-        }
+        write_and_flush(file_out, &rendered, "issue output");
     } else {
         println!("{rendered}");
     }
@@ -948,6 +962,34 @@ struct DumpOptions<'a> {
     raw_json: bool,
 }
 
+/// Parsed fields from a valid dump JSONL line.
+struct ParsedDumpLine<'a> {
+    role: &'a str,
+    timestamp: &'a str,
+    message: &'a serde_json::Value,
+}
+
+/// Parse a JSONL object and return the message fields if it passes role filters.
+fn parse_dump_line<'a>(
+    obj: &'a serde_json::Value,
+    role_set: Option<&[&str]>,
+) -> Option<ParsedDumpLine<'a>> {
+    let message = &obj["message"];
+    if !message.is_object() {
+        return None;
+    }
+    let role = message["role"].as_str().unwrap_or("");
+    if role_set.is_some_and(|rs| !rs.contains(&role)) {
+        return None;
+    }
+    let timestamp = obj["timestamp"].as_str().unwrap_or("");
+    Some(ParsedDumpLine {
+        role,
+        timestamp,
+        message,
+    })
+}
+
 /// Execute dump mode - raw event stream without classification.
 fn execute_dump(
     session_id: &str,
@@ -976,23 +1018,15 @@ fn execute_dump(
         if to_line.is_some_and(|end| index > end) {
             break;
         }
-        let Ok(line) = line_result else {
-            continue;
-        };
+        let Ok(line) = line_result else { continue };
         let Ok(obj) = serde_json::from_str::<serde_json::Value>(line.trim()) else {
             continue;
         };
 
-        let message = &obj["message"];
-        if !message.is_object() {
+        let Some(parsed) = parse_dump_line(&obj, role_set.as_deref()) else {
             continue;
-        }
-        let role = message["role"].as_str().unwrap_or("");
-        if role_set.as_ref().is_some_and(|rs| !rs.contains(&role)) {
-            continue;
-        }
+        };
 
-        // Raw JSON mode: print the entire JSONL line as-is
         if raw_json {
             if filter_lower
                 .as_deref()
@@ -1004,12 +1038,11 @@ fn execute_dump(
             continue;
         }
 
-        let timestamp = obj["timestamp"].as_str().unwrap_or("");
         dump_message_content(
             index,
-            role,
-            timestamp,
-            &message["content"],
+            parsed.role,
+            parsed.timestamp,
+            &parsed.message["content"],
             filter_lower.as_deref(),
             tool_name,
         );
@@ -1029,6 +1062,23 @@ struct DumpBlock {
     text: String,
 }
 
+/// Check whether a content block passes the tool-name filter.
+///
+/// Returns `true` if there is no filter or if the block matches.
+/// Returns `false` if the block should be skipped.
+fn passes_tool_name_filter(block: &serde_json::Value, filter: Option<&str>) -> bool {
+    let Some(name_filter) = filter else {
+        return true;
+    };
+    let block_type = block["type"].as_str().unwrap_or("");
+    if block_type == "tool_use" {
+        let name = block["name"].as_str().unwrap_or("");
+        return name.eq_ignore_ascii_case(name_filter);
+    }
+    // Can't correlate tool_result by name, so skip when filter is active
+    block_type != "tool_result"
+}
+
 /// Print content blocks from a message in dump format.
 fn dump_message_content(
     index: usize,
@@ -1046,19 +1096,8 @@ fn dump_message_content(
 
     if let Some(blocks) = content.as_array() {
         for block in blocks {
-            // Apply tool_name filter for tool_use blocks
-            if let Some(tn_filter) = tool_name_filter {
-                let block_type = block["type"].as_str().unwrap_or("");
-                if block_type == "tool_use" {
-                    let name = block["name"].as_str().unwrap_or("");
-                    if !name.eq_ignore_ascii_case(tn_filter) {
-                        continue;
-                    }
-                } else if block_type == "tool_result" {
-                    // Can't easily filter tool_result by name without correlation,
-                    // so skip tool_result blocks when tool_name filter is active
-                    continue;
-                }
+            if !passes_tool_name_filter(block, tool_name_filter) {
+                continue;
             }
             let db = format_dump_block(index, role, block);
             if db.text.len() <= MIN_DUMP_TEXT_LENGTH {
@@ -1184,6 +1223,38 @@ fn format_tool_use_dump(
     }
 }
 
+/// Render a single line of context output from a parsed JSONL event.
+fn render_context_line(index: usize, target_line: usize, obj: &serde_json::Value) {
+    let message = &obj["message"];
+    if !message.is_object() {
+        return;
+    }
+    let role = message["role"].as_str().unwrap_or("");
+    let timestamp = obj["timestamp"].as_str().unwrap_or("");
+    let prefix = if index == target_line { ">>> " } else { "    " };
+    let ts_part = if timestamp.is_empty() {
+        String::new()
+    } else {
+        format!(" {timestamp}")
+    };
+
+    if let Some(blocks) = message["content"].as_array() {
+        for block in blocks {
+            let db = format_dump_block(index, role, block);
+            if db.text.len() <= MIN_DUMP_TEXT_LENGTH {
+                continue;
+            }
+            let truncated = truncate_at(&db.text, DUMP_TRUNCATE_LENGTH);
+            println!("{prefix}{}{ts_part}: {truncated}", db.label);
+        }
+    } else if let Some(text) = message["content"].as_str()
+        && text.len() > MIN_DUMP_TEXT_LENGTH
+    {
+        let truncated = truncate_at(text, DUMP_TRUNCATE_LENGTH);
+        println!("{prefix}L{index} [{role}]{ts_part}: {truncated}");
+    }
+}
+
 /// Execute context mode - show events around a specific line.
 fn execute_context(
     session_id: &str,
@@ -1209,34 +1280,7 @@ fn execute_context(
         let Ok(obj) = serde_json::from_str::<serde_json::Value>(line.trim()) else {
             continue;
         };
-        let message = &obj["message"];
-        if !message.is_object() {
-            continue;
-        }
-        let role = message["role"].as_str().unwrap_or("");
-        let timestamp = obj["timestamp"].as_str().unwrap_or("");
-        let prefix = if index == target_line { ">>> " } else { "    " };
-        let ts_part = if timestamp.is_empty() {
-            String::new()
-        } else {
-            format!(" {timestamp}")
-        };
-
-        if let Some(blocks) = message["content"].as_array() {
-            for block in blocks {
-                let db = format_dump_block(index, role, block);
-                if db.text.len() <= MIN_DUMP_TEXT_LENGTH {
-                    continue;
-                }
-                let truncated = truncate_at(&db.text, DUMP_TRUNCATE_LENGTH);
-                println!("{prefix}{}{ts_part}: {truncated}", db.label);
-            }
-        } else if let Some(text) = message["content"].as_str()
-            && text.len() > MIN_DUMP_TEXT_LENGTH
-        {
-            let truncated = truncate_at(text, DUMP_TRUNCATE_LENGTH);
-            println!("{prefix}L{index} [{role}]{ts_part}: {truncated}");
-        }
+        render_context_line(index, target_line, &obj);
     }
     Ok(0)
 }
