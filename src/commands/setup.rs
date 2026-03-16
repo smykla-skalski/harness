@@ -18,7 +18,7 @@ use crate::core_defs::{current_run_context_path, resolve_build_info, utc_now};
 use crate::ephemeral_metallb;
 use crate::errors::{CliError, CliErrorKind, cow};
 use crate::exec::{
-    cluster_exists, compose_down, compose_up, docker_inspect_ip, docker_network_create,
+    cluster_exists, compose_down_project, compose_up, docker_inspect_ip, docker_network_create,
     docker_network_rm, docker_rm, docker_run_detached, extract_admin_token, kubectl, run_command,
     run_command_streaming, wait_for_http,
 };
@@ -460,8 +460,7 @@ fn universal_global_zone_up(
     let zone_name = &names[1];
     let zone_label = &names[2];
 
-    docker_network_create(network, UNIVERSAL_SUBNET)?;
-
+    // Compose manages its own network - don't pre-create
     let compose_file = compose::global_zone(
         image,
         network,
@@ -475,41 +474,34 @@ fn universal_global_zone_up(
     let compose_path = tmp_dir.path().join("docker-compose.yaml");
     compose_file.write_to(&compose_path)?;
 
-    compose_up(&compose_path, &format!("harness-{global_name}"))?;
+    let project = format!("harness-{global_name}");
+    compose_up(&compose_path, &project)?;
 
-    let global_ip = docker_inspect_ip(&format!("harness-{global_name}-{global_name}-1"), network)
-        .or_else(|_| docker_inspect_ip(global_name, network))?;
+    let compose_network = format!("{project}_{network}");
+    let global_container = format!("{project}-{global_name}-1");
+    let global_ip = docker_inspect_ip(&global_container, &compose_network)?;
 
     let global_url = format!("http://{global_ip}:5681");
     eprintln!(
         "{} cluster: waiting for global CP at {global_url}",
         utc_now()
     );
-    wait_for_http(&global_url, Duration::from_secs(30))?;
-    eprintln!("{} cluster: global CP ready", utc_now());
+    wait_for_http(&global_url, Duration::from_secs(60))?;
+
+    let admin_token = extract_admin_token(&global_container)?;
+    eprintln!(
+        "{} cluster: global CP ready (admin token extracted)",
+        utc_now()
+    );
+    eprintln!("admin-token={admin_token}");
 
     Ok(())
 }
 
-fn universal_global_zone_down(network: &str, names: &[String]) -> Result<(), CliError> {
+fn universal_global_zone_down(_network: &str, names: &[String]) -> Result<(), CliError> {
     let global_name = &names[0];
-    let compose_file = compose::global_zone(
-        "unused",
-        network,
-        UNIVERSAL_SUBNET,
-        "memory",
-        global_name,
-        "zone",
-        "zone-1",
-    );
-    let tmp_dir = tempfile::tempdir().map_err(|e| CliErrorKind::io(cow!("temp dir: {e}")))?;
-    let compose_path = tmp_dir.path().join("docker-compose.yaml");
-    compose_file.write_to(&compose_path)?;
-    compose_down(&compose_path, &format!("harness-{global_name}"))?;
-    for name in names {
-        docker_rm(name)?;
-    }
-    docker_network_rm(network)?;
+    let project = format!("harness-{global_name}");
+    compose_down_project(&project)?;
     Ok(())
 }
 
@@ -525,8 +517,7 @@ fn universal_global_two_zones_up(
     let zone1_label = &names[3];
     let zone2_label = &names[4];
 
-    docker_network_create(network, UNIVERSAL_SUBNET)?;
-
+    // Compose manages its own network - don't pre-create
     let compose_file = compose::global_two_zones(compose::GlobalTwoZonesConfig {
         image,
         network_name: network,
@@ -546,47 +537,34 @@ fn universal_global_two_zones_up(
     let compose_path = tmp_dir.path().join("docker-compose.yaml");
     compose_file.write_to(&compose_path)?;
 
-    compose_up(&compose_path, &format!("harness-{global_name}"))?;
+    let project = format!("harness-{global_name}");
+    compose_up(&compose_path, &project)?;
 
-    let global_ip = docker_inspect_ip(&format!("harness-{global_name}-{global_name}-1"), network)
-        .or_else(|_| docker_inspect_ip(global_name, network))?;
+    let compose_network = format!("{project}_{network}");
+    let global_container = format!("{project}-{global_name}-1");
+    let global_ip = docker_inspect_ip(&global_container, &compose_network)?;
 
     let global_url = format!("http://{global_ip}:5681");
     eprintln!(
         "{} cluster: waiting for global CP at {global_url}",
         utc_now()
     );
-    wait_for_http(&global_url, Duration::from_secs(30))?;
-    eprintln!("{} cluster: global CP ready", utc_now());
+    wait_for_http(&global_url, Duration::from_secs(60))?;
+
+    let admin_token = extract_admin_token(&global_container)?;
+    eprintln!(
+        "{} cluster: global CP ready (admin token extracted)",
+        utc_now()
+    );
+    eprintln!("admin-token={admin_token}");
 
     Ok(())
 }
 
-fn universal_global_two_zones_down(network: &str, names: &[String]) -> Result<(), CliError> {
+fn universal_global_two_zones_down(_network: &str, names: &[String]) -> Result<(), CliError> {
     let global_name = &names[0];
-    let compose_file = compose::global_two_zones(compose::GlobalTwoZonesConfig {
-        image: "unused",
-        network_name: network,
-        subnet: UNIVERSAL_SUBNET,
-        store_type: "memory",
-        global_name,
-        zone1: compose::ZoneConfig {
-            name: "z1",
-            label: "z1",
-        },
-        zone2: compose::ZoneConfig {
-            name: "z2",
-            label: "z2",
-        },
-    });
-    let tmp_dir = tempfile::tempdir().map_err(|e| CliErrorKind::io(cow!("temp dir: {e}")))?;
-    let compose_path = tmp_dir.path().join("docker-compose.yaml");
-    compose_file.write_to(&compose_path)?;
-    compose_down(&compose_path, &format!("harness-{global_name}"))?;
-    for name in names {
-        docker_rm(name)?;
-    }
-    docker_network_rm(network)?;
+    let project = format!("harness-{global_name}");
+    compose_down_project(&project)?;
     Ok(())
 }
 

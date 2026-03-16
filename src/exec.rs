@@ -400,7 +400,7 @@ pub fn compose_up(file: &Path, project: &str) -> Result<CommandResult, CliError>
     )
 }
 
-/// Stop and remove compose services.
+/// Stop and remove compose services using a compose file.
 ///
 /// # Errors
 /// Returns `CliError` on command failure.
@@ -410,6 +410,21 @@ pub fn compose_down(file: &Path, project: &str) -> Result<CommandResult, CliErro
         &[
             "docker", "compose", "-f", &file_str, "-p", project, "down", "-v",
         ],
+        None,
+        None,
+        &[0],
+    )
+}
+
+/// Stop and remove compose services by project name only.
+///
+/// Does not require the original compose file.
+///
+/// # Errors
+/// Returns `CliError` on command failure.
+pub fn compose_down_project(project: &str) -> Result<CommandResult, CliError> {
+    run_command(
+        &["docker", "compose", "-p", project, "down", "-v"],
         None,
         None,
         &[0],
@@ -537,27 +552,61 @@ pub fn cp_api_post_with_token(
 /// Extract the admin user token from a running CP container.
 ///
 /// The CP stores the admin token in the global-secrets endpoint.
-/// Since `localhostIsAdmin` is true, we exec into the container to fetch it.
+/// Since `localhostIsAdmin` is true by default, we exec into the container
+/// using busybox wget to fetch it from localhost.
 ///
 /// # Errors
 /// Returns `CliError` if the token cannot be extracted.
 pub fn extract_admin_token(cp_container: &str) -> Result<String, CliError> {
-    let result = docker_exec_cmd(
-        cp_container,
-        &[
-            "sh",
-            "-c",
-            "curl -s http://localhost:5681/global-secrets/admin-user-token | \
-             sed 's/.*\"data\":\"\\([^\"]*\\)\".*/\\1/' | base64 -d",
-        ],
-    )?;
-    let token = result.stdout.trim().to_string();
-    if token.is_empty() {
-        return Err(
-            CliErrorKind::token_generation_failed("could not extract admin token from CP").into(),
-        );
+    use base64::Engine as _;
+    use base64::engine::general_purpose::STANDARD;
+
+    // The CP bootstraps the admin token asynchronously after startup.
+    // Retry with short delays to wait for it.
+    let max_attempts = 10;
+    let mut last_err = String::new();
+    for attempt in 0..max_attempts {
+        if attempt > 0 {
+            thread::sleep(Duration::from_secs(1));
+        }
+        let Ok(result) = docker_exec_cmd(
+            cp_container,
+            &[
+                "/busybox/wget",
+                "-q",
+                "-O",
+                "-",
+                "http://localhost:5681/global-secrets/admin-user-token",
+            ],
+        ) else {
+            last_err = format!("attempt {}: wget failed", attempt + 1);
+            continue;
+        };
+        let Ok(body) = serde_json::from_str::<serde_json::Value>(result.stdout.trim()) else {
+            last_err = format!("attempt {}: invalid JSON response", attempt + 1);
+            continue;
+        };
+        let Some(b64_data) = body["data"].as_str() else {
+            last_err = format!("attempt {}: missing data field", attempt + 1);
+            continue;
+        };
+        let Ok(bytes) = STANDARD.decode(b64_data) else {
+            last_err = format!("attempt {}: base64 decode failed", attempt + 1);
+            continue;
+        };
+        let Ok(token) = String::from_utf8(bytes) else {
+            last_err = format!("attempt {}: invalid UTF-8 in token", attempt + 1);
+            continue;
+        };
+        if !token.is_empty() {
+            return Ok(token);
+        }
+        last_err = format!("attempt {}: empty token", attempt + 1);
     }
-    Ok(token)
+    Err(CliErrorKind::token_generation_failed(format!(
+        "could not extract admin token after {max_attempts} attempts: {last_err}"
+    ))
+    .into())
 }
 
 #[cfg(test)]
