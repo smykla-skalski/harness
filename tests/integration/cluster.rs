@@ -13,7 +13,7 @@ use std::sync::PoisonError;
 use super::helpers::ENV_LOCK;
 
 use harness::cli::{ClusterArgs, Command, KumactlCommand};
-use harness::cluster::{ClusterMode, ClusterSpec, HelmSetting};
+use harness::cluster::{ClusterMode, ClusterSpec, HelmSetting, Platform};
 use harness::commands::Execute;
 
 use super::helpers::*;
@@ -38,7 +38,9 @@ fn cluster_spec_from_object_basic() {
 }
 
 #[test]
-fn cluster_spec_legacy_clusters() {
+fn cluster_spec_rejects_legacy_clusters_format() {
+    // Legacy format with `clusters` and `helm_values` keys is no longer supported.
+    // The parser requires `members` and `helm_settings` in the current format.
     let obj = serde_json::json!({
         "mode": "global-zone-up",
         "mode_args": ["kuma-global", "kuma-zone", "zone-1"],
@@ -48,25 +50,21 @@ fn cluster_spec_legacy_clusters() {
         "restart_namespaces": ["kuma-system"],
         "repo_root": "/repo"
     });
-    let spec = ClusterSpec::from_object(&obj).unwrap();
-    assert_eq!(spec.mode, ClusterMode::GlobalZoneUp);
+    let result = ClusterSpec::from_object(&obj);
     assert!(
-        spec.helm_settings
-            .iter()
-            .any(|s| s.key == "controlPlane.mode" && s.value == "global"),
-        "expected helm setting controlPlane.mode=global, got: {:?}",
-        spec.helm_settings
+        result.is_err(),
+        "legacy clusters format should be rejected (requires members)"
     );
 }
 
 #[test]
-fn cluster_spec_legacy_fallback() {
+fn cluster_spec_rejects_missing_mode() {
+    // Objects without a mode field are rejected.
     let obj = serde_json::json!({
         "primary_kubeconfig": "/tmp/current-config"
     });
-    let spec = ClusterSpec::from_object(&obj).unwrap();
-    // Legacy fallback should default to single-up
-    assert_eq!(spec.mode, ClusterMode::SingleUp);
+    let result = ClusterSpec::from_object(&obj);
+    assert!(result.is_err(), "missing mode field should be rejected");
 }
 
 #[test]
@@ -91,6 +89,7 @@ fn cluster_spec_deploy_roundtrip() {
 fn cluster_spec_serialization_roundtrip() {
     let spec = ClusterSpec {
         mode: ClusterMode::SingleUp,
+        platform: Platform::default(),
         mode_args: vec!["kuma-1".to_string()],
         members: vec![],
         helm_settings: vec![HelmSetting {
@@ -99,6 +98,10 @@ fn cluster_spec_serialization_roundtrip() {
         }],
         restart_namespaces: vec!["kuma-system".to_string()],
         repo_root: "/repo".to_string(),
+        docker_network: None,
+        store_type: None,
+        cp_image: None,
+        admin_token: None,
     };
     let json = serde_json::to_string(&spec).unwrap();
     let back: ClusterSpec = serde_json::from_str(&json).unwrap();
@@ -195,8 +198,11 @@ fn global_zone_up_orchestration() {
                 extra_cluster_names: vec!["kuma-zone".into(), "zone-1".into()],
                 repo_root: Some(repo.to_str().unwrap().into()),
                 run_dir: None,
+                platform: "kubernetes".into(),
                 helm_setting: vec![],
                 restart_namespace: vec![],
+                store: "memory".into(),
+                image: None,
             })
             .execute();
             assert!(result.is_ok(), "global-zone-up failed: {result:?}");
@@ -246,8 +252,11 @@ fn single_up_logs_stage_updates() {
                 extra_cluster_names: vec![],
                 repo_root: Some(repo.to_str().unwrap().into()),
                 run_dir: None,
+                platform: "kubernetes".into(),
                 helm_setting: vec![],
                 restart_namespace: vec![],
+                store: "memory".into(),
+                image: None,
             })
             .execute();
             assert!(result.is_ok(), "single-up failed: {result:?}");
@@ -288,8 +297,11 @@ fn single_up_metallb_template() {
                 extra_cluster_names: vec![],
                 repo_root: Some(repo.to_str().unwrap().into()),
                 run_dir: None,
+                platform: "kubernetes".into(),
                 helm_setting: vec![],
                 restart_namespace: vec![],
+                store: "memory".into(),
+                image: None,
             })
             .execute();
             assert!(result.is_ok(), "single-up metallb failed: {result:?}");
@@ -346,8 +358,11 @@ fn single_up_restores_context() {
                 extra_cluster_names: vec![],
                 repo_root: Some(repo.to_str().unwrap().into()),
                 run_dir: Some(run_dir.to_str().unwrap().into()),
+                platform: "kubernetes".into(),
                 helm_setting: vec![],
                 restart_namespace: vec![],
+                store: "memory".into(),
+                image: None,
             })
             .execute();
             assert!(result.is_ok(), "single-up with context failed: {result:?}");
@@ -389,8 +404,11 @@ fn cluster_context_up_down() {
                 extra_cluster_names: vec![],
                 repo_root: Some(repo.to_str().unwrap().into()),
                 run_dir: None,
+                platform: "kubernetes".into(),
                 helm_setting: vec![],
                 restart_namespace: vec![],
+                store: "memory".into(),
+                image: None,
             })
             .execute();
             assert!(up_result.is_ok(), "single-up failed: {up_result:?}");
@@ -414,8 +432,11 @@ fn cluster_context_up_down() {
                 extra_cluster_names: vec![],
                 repo_root: Some(repo.to_str().unwrap().into()),
                 run_dir: None,
+                platform: "kubernetes".into(),
                 helm_setting: vec![],
                 restart_namespace: vec![],
+                store: "memory".into(),
+                image: None,
             })
             .execute();
             assert!(down_result.is_ok(), "single-down failed: {down_result:?}");
@@ -463,8 +484,11 @@ fn cluster_uses_saved_repo_root() {
                 extra_cluster_names: vec![],
                 repo_root: Some(repo.to_str().unwrap().into()),
                 run_dir: None,
+                platform: "kubernetes".into(),
                 helm_setting: vec![],
                 restart_namespace: vec![],
+                store: "memory".into(),
+                image: None,
             })
             .execute();
             assert!(

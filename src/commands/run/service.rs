@@ -64,7 +64,11 @@ fn service_up(
     run_dir_args: &RunDirArgs,
 ) -> Result<i32, CliError> {
     let svc_name = name.ok_or_else(|| CliErrorKind::usage_error("service name is required"))?;
-    let svc_image = image.ok_or_else(|| CliErrorKind::usage_error("service image is required"))?;
+    let svc_image = image.ok_or_else(|| {
+        CliErrorKind::usage_error(
+            "service image is required (should contain kuma-dp, e.g. kuma-universal)",
+        )
+    })?;
     let svc_port = port.ok_or_else(|| CliErrorKind::usage_error("service port is required"))?;
 
     let ctx = resolve_run_context(run_dir_args)?;
@@ -90,7 +94,22 @@ fn service_up(
     )?;
     let token_str = token_result.trim();
 
-    // Render dataplane YAML from template
+    // Start service container first so we can inspect its IP address
+    let port_pair = [(svc_port, svc_port)];
+    exec::docker_run_detached(
+        svc_image,
+        svc_name,
+        network,
+        &[],
+        &port_pair,
+        &["--label", "io.harness.service=true"],
+        &["sleep", "infinity"],
+    )?;
+
+    // Resolve the container IP on the Docker network
+    let container_address = exec::docker_inspect_ip(svc_name, network)?;
+
+    // Render dataplane YAML from template using the resolved address
     let repo_root = PathBuf::from(&ctx.metadata.repo_root);
     let template_name = if transparent_proxy {
         "transparent-proxy.yaml.j2"
@@ -103,22 +122,10 @@ fn service_up(
         &serde_json::json!({
             "name": svc_name,
             "mesh": mesh,
-            "address": "{{ address }}",
+            "address": container_address,
             "port": svc_port,
             "protocol": "http",
         }),
-    )?;
-
-    // Start service container
-    let port_pair = [(svc_port, svc_port)];
-    exec::docker_run_detached(
-        svc_image,
-        svc_name,
-        network,
-        &[],
-        &port_pair,
-        &[],
-        &["sleep", "infinity"],
     )?;
 
     // Write token and dataplane YAML into container
