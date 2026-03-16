@@ -27,8 +27,8 @@ pub fn render_human(issue: &Issue) -> String {
 
 /// Render an issue as a JSON string with truncated details.
 ///
-/// Builds the JSON manually to avoid cloning the entire issue just to
-/// truncate the details field.
+/// Builds the JSON object directly rather than serializing, modifying, and
+/// re-serializing the Issue struct.
 #[must_use]
 pub fn render_json(issue: &Issue) -> String {
     let details: &str = if issue.details.len() > DETAIL_TRUNCATE_LENGTH {
@@ -37,8 +37,21 @@ pub fn render_json(issue: &Issue) -> String {
         &issue.details
     };
 
-    let mut obj = serde_json::to_value(issue).unwrap_or_default();
-    obj["details"] = serde_json::Value::String(details.to_string());
+    let mut obj = json!({
+        "line": issue.line,
+        "category": issue.category.to_string(),
+        "severity": issue.severity.to_string(),
+        "summary": &issue.summary,
+        "details": details,
+        "source_role": &issue.source_role,
+        "fixable": issue.fixable,
+    });
+    if let Some(ref target) = issue.fix_target {
+        obj["fix_target"] = json!(target);
+    }
+    if let Some(ref hint) = issue.fix_hint {
+        obj["fix_hint"] = json!(hint);
+    }
     serde_json::to_string(&obj).unwrap_or_default()
 }
 
