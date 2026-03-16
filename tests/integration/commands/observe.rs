@@ -16,7 +16,8 @@ fn default_filter() -> ObserveFilterArgs {
         category: None,
         exclude: None,
         fixable: false,
-        details_file: None,
+        output: None,
+        output_details: None,
     }
 }
 
@@ -338,7 +339,7 @@ fn context_returns_ok_with_session() {
 }
 
 #[test]
-fn scan_details_file_written() {
+fn scan_output_details_written() {
     let tmp = tempfile::tempdir().unwrap();
     let details_path = tmp.path().join("details.jsonl");
 
@@ -356,7 +357,7 @@ fn scan_details_file_written() {
 
     let mut filter = default_filter();
     filter.json = true;
-    filter.details_file = Some(details_path.to_string_lossy().to_string());
+    filter.output_details = Some(details_path.to_string_lossy().to_string());
 
     let cmd = Command::Observe {
         mode: ObserveMode::Scan {
