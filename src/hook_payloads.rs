@@ -225,19 +225,29 @@ impl HookContext {
     fn load_context_from_disk(&mut self) {
         // Try loading RunContext from run_dir or by inferring from write paths.
         if let Some(ref rd) = self.run_dir {
-            self.run = RunContext::from_run_dir(rd).ok();
+            match RunContext::from_run_dir(rd) {
+                Ok(ctx) => self.run = Some(ctx),
+                Err(e) => eprintln!("warning: failed to load run context: {e}"),
+            }
         }
         // If we have a RunContext, load runner state from its directory.
         if let Some(ref run) = self.run {
-            self.runner_state = runner_workflow::read_runner_state(&run.layout.run_dir())
-                .ok()
-                .flatten();
+            match runner_workflow::read_runner_state(&run.layout.run_dir()) {
+                Ok(opt) => self.runner_state = opt,
+                Err(e) => eprintln!("warning: failed to load runner state: {e}"),
+            }
         } else if let Some(ref rd) = self.run_dir {
-            self.runner_state = runner_workflow::read_runner_state(rd).ok().flatten();
+            match runner_workflow::read_runner_state(rd) {
+                Ok(opt) => self.runner_state = opt,
+                Err(e) => eprintln!("warning: failed to load runner state: {e}"),
+            }
         }
         // Load author state when skill is suite:new.
         if self.is_suite_author() {
-            self.author_state = author_workflow::read_author_state().ok().flatten();
+            match author_workflow::read_author_state() {
+                Ok(opt) => self.author_state = opt,
+                Err(e) => eprintln!("warning: failed to load author state: {e}"),
+            }
         }
     }
 
@@ -271,17 +281,15 @@ impl HookContext {
     }
 
     /// Shell-split command words from the input payload.
-    #[must_use]
-    pub fn command_words(&self) -> Vec<String> {
-        self.command_text().map_or_else(Vec::new, |cmd| {
-            shell_words::split(cmd).unwrap_or_else(|e| {
-                eprintln!(
-                    "warning: shell_words::split failed ({e}), \
-                     treating entire command as one word - \
-                     per-word security checks may be bypassed"
-                );
-                vec![cmd.to_string()]
-            })
+    ///
+    /// # Errors
+    /// Returns `CliError` if shell tokenization fails (e.g. unmatched quotes).
+    pub fn command_words(&self) -> Result<Vec<String>, CliError> {
+        let Some(cmd) = self.command_text() else {
+            return Ok(Vec::new());
+        };
+        shell_words::split(cmd).map_err(|e| {
+            CliErrorKind::hook_payload_invalid(cow!("shell tokenization failed: {e}")).into()
         })
     }
 

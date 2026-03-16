@@ -1,6 +1,6 @@
 use crate::cli::RunDirArgs;
 use crate::commands::resolve_run_dir;
-use crate::errors::CliError;
+use crate::errors::{CliError, CliErrorKind};
 use crate::workflow::runner::{initialize_runner_state, read_runner_state};
 
 /// Manage runner workflow state.
@@ -29,9 +29,9 @@ pub fn runner_state(
         return Ok(0);
     }
 
-    // For now, just acknowledge the event. Full state machine transitions
-    // are handled by the workflow module's request_* functions.
-    let event_name = event.unwrap_or("unknown");
-    eprintln!("runner-state: applied event {event_name}");
-    Ok(0)
+    Err(CliErrorKind::usage_error(
+        "event-based transitions are handled by the workflow module's \
+         request_* functions; this CLI path only supports state queries",
+    )
+    .into())
 }
