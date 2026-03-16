@@ -223,6 +223,7 @@ pub enum IssueCode {
     FileEditChurn,
     ShortSkillNameInSkillFile,
     DirectManagedFileWrite,
+    DirectTaskOutputFileRead,
 }
 
 /// Record of a `tool_use` block, for correlating with `tool_result`.
