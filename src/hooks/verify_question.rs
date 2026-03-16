@@ -64,3 +64,33 @@ fn handle_suite_author(ctx: &HookContext) -> HookResult {
     }
     HookResult::allow()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::hook::Decision;
+    use crate::hook_payloads::{HookContext, HookEnvelopePayload, HookEvent};
+
+    fn inactive_context() -> HookContext {
+        HookContext {
+            skill: String::new(),
+            event: HookEvent {
+                payload: HookEnvelopePayload::default(),
+            },
+            run_dir: None,
+            skill_active: false,
+            active_skill: None,
+            inactive_reason: None,
+            run: None,
+            runner_state: None,
+            author_state: None,
+        }
+    }
+
+    #[test]
+    fn inactive_skill_allows() {
+        let ctx = inactive_context();
+        let result = execute(&ctx).unwrap();
+        assert_eq!(result.decision, Decision::Allow);
+    }
+}
