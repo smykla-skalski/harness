@@ -91,42 +91,30 @@ pub fn cluster(args: &ClusterArgs) -> Result<i32, CliError> {
         .parse()
         .map_err(|e: String| CliError::from(CliErrorKind::usage_error(e)))?;
     match platform {
-        Platform::Kubernetes => cluster_k8s(
-            &args.mode,
-            &args.cluster_name,
-            &args.extra_cluster_names,
-            args.repo_root.as_deref(),
-            &args.helm_setting,
-            &args.restart_namespace,
-        ),
-        Platform::Universal => cluster_universal(
-            &args.mode,
-            &args.cluster_name,
-            &args.extra_cluster_names,
-            args.repo_root.as_deref(),
-            &args.store,
-            args.image.as_deref(),
-        ),
+        Platform::Kubernetes => cluster_k8s(args),
+        Platform::Universal => cluster_universal(args),
     }
 }
 
-fn cluster_k8s(
-    mode: &str,
-    cluster_name: &str,
-    extra_cluster_names: &[String],
-    repo_root: Option<&str>,
-    helm_setting: &[String],
-    restart_namespace: &[String],
-) -> Result<i32, CliError> {
-    let mut all_names = vec![cluster_name.to_string()];
-    all_names.extend(extra_cluster_names.iter().cloned());
+fn cluster_k8s(args: &ClusterArgs) -> Result<i32, CliError> {
+    let mode = &args.mode;
+    let mut all_names = vec![args.cluster_name.clone()];
+    all_names.extend(args.extra_cluster_names.iter().cloned());
 
-    let root = resolve_repo_root(repo_root);
+    let root = resolve_repo_root(args.repo_root.as_deref());
     let build_info = resolve_build_info(&root)?;
     let mut base_env = build_info.env();
 
+    if args.no_build {
+        base_env.insert("HARNESS_BUILD_IMAGES".into(), "0".into());
+    }
+    if args.no_load {
+        base_env.insert("HARNESS_LOAD_IMAGES".into(), "0".into());
+    }
+
     let mut bad_settings = Vec::new();
-    let helm_settings: Vec<HelmSetting> = helm_setting
+    let helm_settings: Vec<HelmSetting> = args
+        .helm_setting
         .iter()
         .filter_map(|s| match HelmSetting::from_cli_arg(s) {
             Ok(h) => Some(h),
@@ -145,7 +133,7 @@ fn cluster_k8s(
         &all_names,
         &root.to_string_lossy(),
         helm_settings.clone(),
-        restart_namespace.to_vec(),
+        args.restart_namespace.clone(),
     )
     .map_err(|e| CliError::from(CliErrorKind::cluster_error(e)))?;
     let validated_args = &spec.mode_args;
@@ -164,7 +152,7 @@ fn cluster_k8s(
         validated_args.join(" ")
     );
 
-    match mode {
+    match mode.as_str() {
         "single-up" => single_up(&root, &base_env, validated_args)?,
         "single-down" => single_down(&root, &base_env, validated_args)?,
         "global-zone-up" => global_zone_up(&root, &base_env, validated_args)?,
@@ -186,18 +174,12 @@ fn cluster_k8s(
     Ok(0)
 }
 
-fn cluster_universal(
-    mode: &str,
-    cluster_name: &str,
-    extra_cluster_names: &[String],
-    repo_root: Option<&str>,
-    store: &str,
-    image: Option<&str>,
-) -> Result<i32, CliError> {
-    let mut all_names = vec![cluster_name.to_string()];
-    all_names.extend(extra_cluster_names.iter().cloned());
+fn cluster_universal(args: &ClusterArgs) -> Result<i32, CliError> {
+    let mode = &args.mode;
+    let mut all_names = vec![args.cluster_name.clone()];
+    all_names.extend(args.extra_cluster_names.iter().cloned());
 
-    let root = resolve_repo_root(repo_root);
+    let root = resolve_repo_root(args.repo_root.as_deref());
 
     let mut spec = ClusterSpec::from_mode_with_platform(
         mode,
@@ -212,11 +194,11 @@ fn cluster_universal(
     let network_name = spec.docker_network.as_deref().unwrap_or("harness-default");
     let is_up = spec.mode.is_up();
 
-    let effective_store = resolve_effective_store(is_up, store);
+    let effective_store = resolve_effective_store(is_up, &args.store);
 
     // Only resolve image for up commands
     let cp_image = if is_up {
-        resolve_cp_image(&root, image)?
+        resolve_cp_image(&root, args.image.as_deref(), args.no_build)?
     } else {
         String::new()
     };
@@ -227,7 +209,7 @@ fn cluster_universal(
         all_names.join(" ")
     );
 
-    match mode {
+    match mode.as_str() {
         "single-up" => {
             // Postgres needs Compose (for the postgres service); memory uses Docker CLI
             let result = if effective_store == "postgres" {
@@ -570,51 +552,68 @@ fn global_two_zones_down(
 
 const UNIVERSAL_SUBNET: &str = "172.57.0.0/16";
 
-fn resolve_cp_image(root: &Path, explicit: Option<&str>) -> Result<String, CliError> {
+/// Docker filter patterns for finding kuma-cp images. The glob `*kuma-cp`
+/// matches both bare `kuma-cp` and namespaced `kumahq/kuma-cp` repositories.
+const KUMA_CP_IMAGE_FILTERS: &[&str] = &["reference=*kuma-cp", "reference=kuma-cp"];
+
+/// Search for a local kuma-cp image using multiple reference filters.
+///
+/// Docker's `--filter reference=` doesn't glob across namespaces the same
+/// way in all versions, so we try the namespaced glob first and fall back
+/// to the bare name.
+fn find_local_kuma_cp_image() -> Result<Option<String>, CliError> {
+    for filter in KUMA_CP_IMAGE_FILTERS {
+        let result = run_command(
+            &[
+                "docker",
+                "images",
+                "--format",
+                "{{.Repository}}:{{.Tag}}",
+                "--filter",
+                filter,
+            ],
+            None,
+            None,
+            &[0],
+        )?;
+        let first_line = result.stdout.lines().next().unwrap_or("").trim();
+        if !first_line.is_empty() && first_line != "<none>:<none>" {
+            return Ok(Some(first_line.to_string()));
+        }
+    }
+    Ok(None)
+}
+
+fn resolve_cp_image(
+    root: &Path,
+    explicit: Option<&str>,
+    skip_build: bool,
+) -> Result<String, CliError> {
     if let Some(img) = explicit {
         return Ok(img.to_string());
     }
+
     // Check for locally-built kuma-cp image
-    let check = run_command(
-        &[
-            "docker",
-            "images",
-            "--format",
-            "{{.Repository}}:{{.Tag}}",
-            "--filter",
-            "reference=kuma-cp",
-        ],
-        None,
-        None,
-        &[0],
-    )?;
-    let first_line = check.stdout.lines().next().unwrap_or("").trim();
-    if !first_line.is_empty() && first_line != "<none>:<none>" {
-        return Ok(first_line.to_string());
+    if let Some(found) = find_local_kuma_cp_image()? {
+        return Ok(found);
     }
+
+    if skip_build {
+        return Err(CliErrorKind::image_build_failed(
+            "kuma-cp image not found and --no-build was specified",
+        )
+        .into());
+    }
+
     // Build images from repo
     eprintln!("{} cluster: building kuma images", utc_now());
     run_command(&["make", "images"], Some(root), None, &[0])
         .map_err(|e| CliErrorKind::image_build_failed("make images").with_details(e.message()))?;
-    // Re-check
-    let recheck = run_command(
-        &[
-            "docker",
-            "images",
-            "--format",
-            "{{.Repository}}:{{.Tag}}",
-            "--filter",
-            "reference=kuma-cp",
-        ],
-        None,
-        None,
-        &[0],
-    )?;
-    let img = recheck.stdout.lines().next().unwrap_or("").trim();
-    if img.is_empty() || img == "<none>:<none>" {
-        return Err(CliErrorKind::image_build_failed("kuma-cp image not found after build").into());
-    }
-    Ok(img.to_string())
+
+    // Re-check after build
+    find_local_kuma_cp_image()?.ok_or_else(|| {
+        CliErrorKind::image_build_failed("kuma-cp image not found after build").into()
+    })
 }
 
 fn universal_single_up(
@@ -1002,5 +1001,38 @@ mod tests {
         );
         let spec = result.unwrap().expect("should load cluster spec");
         assert_eq!(spec.store_type.as_deref(), Some("postgres"));
+    }
+
+    // --- image filter tests ---
+
+    #[test]
+    fn kuma_cp_image_filters_include_glob_pattern() {
+        // The glob filter must come first so namespaced images like
+        // kumahq/kuma-cp are found before trying the bare name.
+        assert!(KUMA_CP_IMAGE_FILTERS[0].contains('*'));
+        assert_eq!(KUMA_CP_IMAGE_FILTERS[0], "reference=*kuma-cp");
+    }
+
+    #[test]
+    fn kuma_cp_image_filters_include_bare_name() {
+        assert!(
+            KUMA_CP_IMAGE_FILTERS
+                .iter()
+                .any(|f| *f == "reference=kuma-cp")
+        );
+    }
+
+    #[test]
+    fn resolve_cp_image_returns_explicit_image() {
+        let tmp = tempfile::tempdir().unwrap();
+        let result = resolve_cp_image(tmp.path(), Some("my-registry/kuma-cp:v1.0"), false);
+        assert_eq!(result.unwrap(), "my-registry/kuma-cp:v1.0");
+    }
+
+    #[test]
+    fn resolve_cp_image_returns_explicit_even_with_skip_build() {
+        let tmp = tempfile::tempdir().unwrap();
+        let result = resolve_cp_image(tmp.path(), Some("kumahq/kuma-cp:latest"), true);
+        assert_eq!(result.unwrap(), "kumahq/kuma-cp:latest");
     }
 }
