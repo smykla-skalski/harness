@@ -213,6 +213,10 @@ define_cli_errors! {
         code: "KSRCLI031",
         msg: "route {route_match} not found"
     },
+    UniversalValidationFailed { manifest: Cow<'static, str> } => {
+        code: "KSRCLI083",
+        msg: "universal manifest validation failed: {manifest}"
+    },
     KumactlNotFound => {
         code: "KSRCLI034",
         msg: "unable to find local kumactl"
@@ -453,6 +457,11 @@ impl CliErrorKind {
     cli_constructor!(missing_sections, MissingSections, label, sections);
     cli_constructor!(gateway_download_empty, GatewayDownloadEmpty, path);
     cli_constructor!(no_resource_kinds, NoResourceKinds, manifest);
+    cli_constructor!(
+        universal_validation_failed,
+        UniversalValidationFailed,
+        manifest
+    );
     cli_constructor!(route_not_found, RouteNotFound, route_match);
     cli_constructor!(
         kubectl_target_override_forbidden,
@@ -1081,6 +1090,7 @@ mod tests {
             CliErrorKind::usage_error(""),
             CliErrorKind::session_not_found(""),
             CliErrorKind::session_parse_error(""),
+            CliErrorKind::universal_validation_failed(""),
         ]
     }
 

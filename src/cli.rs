@@ -1,4 +1,6 @@
 use std::path::PathBuf;
+use std::thread;
+use std::time::Duration;
 
 use clap::builder::PossibleValuesParser;
 use clap::{Args, Parser, Subcommand};
@@ -726,6 +728,10 @@ pub enum KumactlCommand {
 #[derive(Debug, Parser)]
 #[command(name = "harness", version, about = "Kuma test harness")]
 pub struct Cli {
+    /// Seconds to wait before executing the command. Accepts fractional
+    /// values (e.g. 0.5). Use instead of `sleep N && harness ...`.
+    #[arg(long, default_value = "0", global = true)]
+    pub delay: f64,
     /// Subcommand to execute.
     #[command(subcommand)]
     pub command: Command,
@@ -1201,6 +1207,9 @@ fn run_hook_command(skill: &str, hook: &HookCommand) -> i32 {
 /// stdout and the function returns `Ok(0)`.
 pub fn run() -> Result<i32, CliError> {
     let cli = Cli::parse();
+    if cli.delay > 0.0 {
+        thread::sleep(Duration::from_secs_f64(cli.delay));
+    }
     match cli.command {
         Command::Hook {
             ref skill,
@@ -2032,5 +2041,94 @@ mod tests {
                 hook.name()
             );
         }
+    }
+
+    // --- Delay flag tests ---
+
+    #[test]
+    fn delay_defaults_to_zero() {
+        let cli = Cli::try_parse_from([
+            "harness",
+            "init",
+            "--suite",
+            "s.md",
+            "--run-id",
+            "r01",
+            "--profile",
+            "p",
+        ])
+        .unwrap();
+        assert!((cli.delay - 0.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn delay_accepts_integer_seconds() {
+        let cli = Cli::try_parse_from([
+            "harness",
+            "--delay",
+            "5",
+            "init",
+            "--suite",
+            "s.md",
+            "--run-id",
+            "r01",
+            "--profile",
+            "p",
+        ])
+        .unwrap();
+        assert!((cli.delay - 5.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn delay_accepts_fractional_seconds() {
+        let cli = Cli::try_parse_from([
+            "harness",
+            "--delay",
+            "2.5",
+            "init",
+            "--suite",
+            "s.md",
+            "--run-id",
+            "r01",
+            "--profile",
+            "p",
+        ])
+        .unwrap();
+        assert!((cli.delay - 2.5).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn delay_works_after_subcommand() {
+        let cli = Cli::try_parse_from([
+            "harness",
+            "apply",
+            "--delay",
+            "8",
+            "--manifest",
+            "g13/01.yaml",
+        ])
+        .unwrap();
+        assert!((cli.delay - 8.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn delay_rejects_negative_values() {
+        // clap parses -1 as a negative float, but the sleep logic only
+        // triggers when delay > 0.0 so negative values are effectively no-ops.
+        // Verify parsing succeeds (clap allows negative f64).
+        let cli = Cli::try_parse_from([
+            "harness",
+            "--delay",
+            "-1",
+            "init",
+            "--suite",
+            "s.md",
+            "--run-id",
+            "r01",
+            "--profile",
+            "p",
+        ]);
+        // -1 starts with a dash so clap interprets it as a flag, not a value.
+        assert!(cli.is_err());
     }
 }

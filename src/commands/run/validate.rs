@@ -33,10 +33,14 @@ fn extract_resources(manifest: &Path) -> Result<Vec<(String, String)>, CliError>
 
     let text = read_text(manifest)?;
     let mut resources = Vec::new();
-    for document in serde_yml::Deserializer::from_str(&text) {
+    let mut parse_errors = Vec::new();
+    for (index, document) in serde_yml::Deserializer::from_str(&text).enumerate() {
         let parsed: serde_yml::Value = match serde_yml::Value::deserialize(document) {
             Ok(v) => v,
-            Err(_) => continue,
+            Err(e) => {
+                parse_errors.push(format!("document {}: {e}", index + 1));
+                continue;
+            }
         };
         let kind = parsed
             .get("kind")
@@ -51,7 +55,11 @@ fn extract_resources(manifest: &Path) -> Result<Vec<(String, String)>, CliError>
         }
     }
     if resources.is_empty() {
-        return Err(CliErrorKind::no_resource_kinds(manifest.display().to_string()).into());
+        let mut detail = manifest.display().to_string();
+        if !parse_errors.is_empty() {
+            detail = format!("{detail} (parse errors: {})", parse_errors.join("; "));
+        }
+        return Err(CliErrorKind::no_resource_kinds(detail).into());
     }
     Ok(resources)
 }
@@ -150,7 +158,9 @@ fn validate_universal(manifest_path: &Path, output_path: &Path) -> Result<i32, C
     if !errors.is_empty() {
         log_lines.extend(errors.iter().map(|e| format!("ERROR: {e}")));
         write_text(output_path, &format!("{}\n", log_lines.join("\n")))?;
-        return Err(CliErrorKind::no_resource_kinds(manifest_path.display().to_string()).into());
+        return Err(
+            CliErrorKind::universal_validation_failed(manifest_path.display().to_string()).into(),
+        );
     }
 
     write_text(output_path, &format!("{}\n", log_lines.join("\n")))?;
