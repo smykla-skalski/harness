@@ -274,6 +274,104 @@ pub struct ServiceArgs {
 }
 
 // ---------------------------------------------------------------------------
+// Observe arguments
+// ---------------------------------------------------------------------------
+
+/// Shared filter arguments for observe scan/watch modes.
+#[derive(Debug, Clone, Args)]
+pub struct ObserveFilterArgs {
+    /// Start scanning from this line number.
+    #[arg(long, default_value = "0")]
+    pub from_line: usize,
+    /// Narrow session search to this project directory name.
+    #[arg(long)]
+    pub project_hint: Option<String>,
+    /// Output as JSON lines.
+    #[arg(long)]
+    pub json: bool,
+    /// Print summary at end.
+    #[arg(long)]
+    pub summary: bool,
+    /// Filter by minimum severity: low, medium, critical.
+    #[arg(long)]
+    pub severity: Option<String>,
+    /// Filter by category (comma-separated).
+    #[arg(long)]
+    pub category: Option<String>,
+    /// Exclude categories (comma-separated).
+    #[arg(long)]
+    pub exclude: Option<String>,
+    /// Only show fixable issues.
+    #[arg(long)]
+    pub fixable: bool,
+    /// Write full untruncated issues to this file.
+    #[arg(long)]
+    pub details_file: Option<String>,
+}
+
+/// Observe subcommands.
+#[derive(Debug, Clone, Subcommand)]
+#[non_exhaustive]
+pub enum ObserveMode {
+    /// One-shot scan of a session log.
+    Scan {
+        /// Session ID to observe.
+        session_id: String,
+        /// Filter arguments.
+        #[command(flatten)]
+        filter: ObserveFilterArgs,
+    },
+    /// Continuously poll for new events.
+    Watch {
+        /// Session ID to observe.
+        session_id: String,
+        /// Seconds between polls.
+        #[arg(long, default_value = "3")]
+        poll_interval: u64,
+        /// Exit after this many seconds of no new events.
+        #[arg(long, default_value = "90")]
+        timeout: u64,
+        /// Filter arguments.
+        #[command(flatten)]
+        filter: ObserveFilterArgs,
+    },
+    /// Raw event dump without classification.
+    Dump {
+        /// Session ID to observe.
+        session_id: String,
+        /// Start from this line number.
+        #[arg(long)]
+        from_line: Option<usize>,
+        /// Stop at this line number.
+        #[arg(long)]
+        to_line: Option<usize>,
+        /// Text filter (case-insensitive substring match).
+        #[arg(long)]
+        filter: Option<String>,
+        /// Role filter (comma-separated: user,assistant).
+        #[arg(long)]
+        role: Option<String>,
+        /// Narrow session search to this project directory name.
+        #[arg(long)]
+        project_hint: Option<String>,
+    },
+    /// Show events around a specific line.
+    Context {
+        /// Session ID to observe.
+        session_id: String,
+        /// Target line number.
+        #[arg(long)]
+        line: usize,
+        /// Number of lines before/after.
+        #[arg(long, default_value = "10")]
+        window: usize,
+        /// Narrow session search to this project directory name.
+        #[arg(long)]
+        project_hint: Option<String>,
+    },
+}
+
+// ---------------------------------------------------------------------------
 // Hook subcommands
 // ---------------------------------------------------------------------------
 
@@ -839,6 +937,13 @@ pub enum Command {
 
     /// Report harness capabilities for skill planning.
     Capabilities,
+
+    /// Observe and classify Claude Code session logs.
+    Observe {
+        /// Observe subcommand.
+        #[command(subcommand)]
+        mode: ObserveMode,
+    },
 }
 
 // ---------------------------------------------------------------------------
@@ -1085,6 +1190,7 @@ mod tests {
             "hook",
             "init",
             "kumactl",
+            "observe",
             "pre-compact",
             "preflight",
             "record",

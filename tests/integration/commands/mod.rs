@@ -5,6 +5,7 @@
 mod api;
 mod context;
 mod init_run;
+mod observe;
 mod record;
 mod report;
 mod runner_state;
