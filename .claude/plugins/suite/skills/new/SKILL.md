@@ -277,13 +277,14 @@ Launch these workers after approval:
 
 - [../../agents/suite-writer.md](../../agents/suite-writer.md) for `${SUITE_DIR}/suite.md`
 - [../../agents/baseline-writer.md](../../agents/baseline-writer.md) for `${SUITE_DIR}/baseline/*.yaml`
-- [../../agents/group-writer.md](../../agents/group-writer.md) for `${SUITE_DIR}/groups/g{NN}-*.md`
+- [../../agents/group-writer.md](../../agents/group-writer.md) for `${SUITE_DIR}/groups/g{NN}-*.md` and `${SUITE_DIR}/groups/g{NN}/*.yaml`
 
 Writer contract:
 
 - Pass only the saved proposal, schema facts, and the exact file ownership for that worker.
 - Keep writer fan-out bounded. Do not start more than four writer workers at once.
 - Launch all writer workers with `mode: "auto"` so they can write files without interactive approval. Background workers cannot prompt the user, so writes are denied without this mode.
+- The group-writer must create a `groups/{group-id}/` directory for each group and write the group's test manifests there as individual YAML files (e.g., `groups/g01/01-create.yaml`, `groups/g01/02-update.yaml`). These are the same manifests that appear in the group markdown's `## Configure` section. The `## Configure` section should reference them by relative path (e.g., `See g01/01-create.yaml`) and also keep the inline YAML blocks so `harness preflight` can still extract and validate them. This gives suite:run pre-written manifests ready for `harness apply --manifest g01` without depending on preflight extraction.
 - Require every writer that emits manifests to run `harness authoring-validate --path <file>` on its owned outputs before it stops. Use the current repo checkout as the schema source of truth; all required schemas, including CRDs, are already in this repo. Do not substitute a live-cluster check.
 - When the proposal includes multi-zone profiles, pass the baseline cluster distribution from the proposal to the baseline-writer and suite-writer so they emit the object form (`- path:` with `clusters:`) in `baseline_files` frontmatter and include the Clusters column in the baseline manifests table.
 - Follow [references/agent-output-format.md](references/agent-output-format.md) for `authoring-show` usage and acknowledgement rules, and [references/suite-structure.md](references/suite-structure.md) for file content requirements.
@@ -391,13 +392,33 @@ Output structure:
 │   └── demo-app.yaml
 └── groups/
     ├── g01-crud.md
+    ├── g01/
+    │   ├── 01-create.yaml
+    │   └── 02-update.yaml
     ├── g02-validation.md
+    ├── g02/
+    │   ├── 01-invalid-enum.yaml
+    │   └── 02-missing-field.yaml
     ├── g03-runtime.md
+    ├── g03/
+    │   └── 01-policy.yaml
     ├── g04-e2e.md
+    ├── g04/
+    │   └── 01-policy.yaml
     ├── g05-edge.md
+    ├── g05/
+    │   └── 01-dangling-ref.yaml
     ├── g06-multizone.md
+    ├── g06/
+    │   └── 01-policy.yaml
     ├── g07-compat.md
+    ├── g07/
+    │   └── 01-legacy.yaml
     ├── g08-zipkin.md
-    └── g09-otel.md
+    ├── g08/
+    │   └── 01-zipkin-backend.yaml
+    ├── g09-otel.md
+    └── g09/
+        └── 01-otel-backend.yaml
 ```
 </example>
