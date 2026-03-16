@@ -14,6 +14,7 @@ fn service_args(action: &str, name: Option<&str>, run_dir: RunDirArgs) -> Servic
         port: None,
         mesh: "default".to_string(),
         transparent_proxy: false,
+        timeout: 60,
         dataplane_template: None,
         run_dir,
     }
