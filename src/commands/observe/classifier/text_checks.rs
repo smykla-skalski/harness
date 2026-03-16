@@ -4,7 +4,7 @@ use crate::commands::observe::patterns;
 use crate::commands::observe::types::{Issue, IssueCategory};
 
 /// Check for KSA hook codes in Bash output.
-/// Caller guarantees: source_tool == Bash.
+/// Caller guarantees: `source_tool` == Bash.
 pub(super) fn check_ksa_codes(context: &mut TextCheckContext<'_>, issues: &mut Vec<Issue>) {
     for code in patterns::KSA_CODES {
         if context.lower.contains(code) {
@@ -29,7 +29,7 @@ pub(super) fn check_ksa_codes(context: &mut TextCheckContext<'_>, issues: &mut V
 }
 
 /// Check for harness command failures with non-zero exit codes.
-/// Caller guarantees: source_tool == Bash.
+/// Caller guarantees: `source_tool` == Bash.
 pub(super) fn check_exit_code_issues(context: &mut TextCheckContext<'_>, issues: &mut Vec<Issue>) {
     let is_harness_operation = patterns::HARNESS_OPERATION_KEYWORDS
         .iter()
@@ -106,7 +106,7 @@ pub(super) fn check_exit_code_issues(context: &mut TextCheckContext<'_>, issues:
 }
 
 /// Check for subagent permission failures in user-role text.
-/// Caller guarantees: role == User, source_tool == None.
+/// Caller guarantees: role == User, `source_tool` == None.
 pub(super) fn check_permission_failures(
     context: &mut TextCheckContext<'_>,
     issues: &mut Vec<Issue>,
@@ -138,7 +138,7 @@ pub(super) fn check_permission_failures(
 }
 
 /// Check for subagent save failures in assistant text.
-/// Caller guarantees: role == Assistant, source_tool == None.
+/// Caller guarantees: role == Assistant, `source_tool` == None.
 pub(super) fn check_save_failures(context: &mut TextCheckContext<'_>, issues: &mut Vec<Issue>) {
     if !patterns::SAVE_FAILURE_SIGNALS
         .iter()
@@ -165,7 +165,7 @@ pub(super) fn check_save_failures(context: &mut TextCheckContext<'_>, issues: &m
 }
 
 /// Check for manual payload recovery patterns.
-/// Caller guarantees: role == Assistant, source_tool == None.
+/// Caller guarantees: role == Assistant, `source_tool` == None.
 pub(super) fn check_payload_recovery(context: &mut TextCheckContext<'_>, issues: &mut Vec<Issue>) {
     let has_grep = context.lower.contains("grep");
     let has_target = context.lower.contains("output")
@@ -194,7 +194,7 @@ pub(super) fn check_payload_recovery(context: &mut TextCheckContext<'_>, issues:
 }
 
 /// Check for misconfigured environment variables in Bash output.
-/// Caller guarantees: source_tool == Bash.
+/// Caller guarantees: `source_tool` == Bash.
 pub(super) fn check_env_misconfiguration(
     context: &mut TextCheckContext<'_>,
     issues: &mut Vec<Issue>,
@@ -243,7 +243,7 @@ pub(super) fn check_env_misconfiguration(
 }
 
 /// Check for incomplete writer agent output in assistant text.
-/// Caller guarantees: role == Assistant, source_tool == None.
+/// Caller guarantees: role == Assistant, `source_tool` == None.
 pub(super) fn check_incomplete_writer(context: &mut TextCheckContext<'_>, issues: &mut Vec<Issue>) {
     if !patterns::INCOMPLETE_WRITER_SIGNALS
         .iter()
@@ -268,7 +268,7 @@ pub(super) fn check_incomplete_writer(context: &mut TextCheckContext<'_>, issues
 }
 
 /// Check for user frustration signals in human text.
-/// Caller guarantees: role == User, source_tool == None.
+/// Caller guarantees: role == User, `source_tool` == None.
 pub(super) fn check_user_frustration(context: &mut TextCheckContext<'_>, issues: &mut Vec<Issue>) {
     if context.text.len() >= 2000 {
         return;
