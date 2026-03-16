@@ -124,13 +124,19 @@ fn service_up(
 
     // Start service container first so we can inspect its IP address
     let port_pair = [(svc_port, svc_port)];
+    let run_id_label = format!("io.harness.run-id={}", ctx.layout.run_id);
     exec::docker_run_detached(
         &svc_image,
         svc_name,
         network,
         &[],
         &port_pair,
-        &["--label", "io.harness.service=true"],
+        &[
+            "--label",
+            "io.harness.service=true",
+            "--label",
+            &run_id_label,
+        ],
         &["sleep", "infinity"],
     )?;
 
@@ -303,12 +309,16 @@ fn service_down(name: Option<&str>, _run_dir_args: &RunDirArgs) -> Result<i32, C
     Ok(0)
 }
 
-fn service_list(_run_dir_args: &RunDirArgs) -> Result<i32, CliError> {
+fn service_list(run_dir_args: &RunDirArgs) -> Result<i32, CliError> {
+    let filter = match resolve_run_context(run_dir_args) {
+        Ok(ctx) => format!("label=io.harness.run-id={}", ctx.layout.run_id),
+        Err(_) => "label=io.harness.service=true".to_string(),
+    };
     let result = exec::docker(
         &[
             "ps",
             "--filter",
-            "label=io.harness.service=true",
+            &filter,
             "--format",
             "{{.Names}}\t{{.Status}}",
         ],
