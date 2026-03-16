@@ -70,8 +70,11 @@ pub(crate) fn token_via_api(
         "type": kind,
         "validFor": valid_for,
     });
-    let resp = exec::cp_api_post_with_token(addr, "/tokens/dataplane", &body, admin_token)?;
-    resp.as_str()
-        .map(String::from)
-        .ok_or_else(|| CliErrorKind::token_generation_failed("unexpected response format").into())
+    // Token endpoint returns plain text (JWT), not JSON
+    let token = exec::cp_api_post_text_with_token(addr, "/tokens/dataplane", &body, admin_token)?;
+    let trimmed = token.trim().to_string();
+    if trimmed.is_empty() {
+        return Err(CliErrorKind::token_generation_failed("empty response").into());
+    }
+    Ok(trimmed)
 }
