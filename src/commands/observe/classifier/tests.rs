@@ -7,11 +7,13 @@ fn make_state() -> ScanState {
 
 #[test]
 fn detects_hook_denial() {
+    let mut state = make_state();
     let issues = check_text_for_issues(
         10,
         MessageRole::User,
         "The system denied this tool call because it violates policy",
         None,
+        &mut state,
     );
     assert_eq!(issues.len(), 1);
     assert_eq!(issues[0].category, IssueCategory::HookFailure);
@@ -19,11 +21,13 @@ fn detects_hook_denial() {
 
 #[test]
 fn detects_ksa_code_in_bash() {
+    let mut state = make_state();
     let issues = check_text_for_issues(
         20,
         MessageRole::User,
         "ERROR [KSA001] Write path is outside the suite:new surface",
         Some(SourceTool::Bash),
+        &mut state,
     );
     assert!(
         issues
@@ -34,33 +38,39 @@ fn detects_ksa_code_in_bash() {
 
 #[test]
 fn skips_ksa_code_not_bash() {
+    let mut state = make_state();
     let issues = check_text_for_issues(
         20,
         MessageRole::User,
         "ERROR [KSA001] Write path is outside",
         None,
+        &mut state,
     );
     assert!(!issues.iter().any(|i| i.summary.contains("KSA001")));
 }
 
 #[test]
 fn detects_cli_error() {
+    let mut state = make_state();
     let issues = check_text_for_issues(
         30,
         MessageRole::User,
         "harness: error: unrecognized arguments --bad-flag",
         Some(SourceTool::Bash),
+        &mut state,
     );
     assert!(issues.iter().any(|i| i.category == IssueCategory::CliError));
 }
 
 #[test]
 fn detects_tool_error() {
+    let mut state = make_state();
     let issues = check_text_for_issues(
         40,
         MessageRole::User,
         "Error: file has not been read yet. Read the file first.",
         None,
+        &mut state,
     );
     assert!(
         issues
@@ -71,11 +81,13 @@ fn detects_tool_error() {
 
 #[test]
 fn detects_build_error() {
+    let mut state = make_state();
     let issues = check_text_for_issues(
         50,
         MessageRole::User,
         "error[E0308]: mismatched types\n  expected u32, found &str",
         Some(SourceTool::Bash),
+        &mut state,
     );
     assert!(
         issues
@@ -86,11 +98,13 @@ fn detects_build_error() {
 
 #[test]
 fn detects_user_frustration() {
+    let mut state = make_state();
     let issues = check_text_for_issues(
         60,
         MessageRole::User,
         "stop guessing and read it again!",
         None,
+        &mut state,
     );
     assert!(
         issues
@@ -101,41 +115,48 @@ fn detects_user_frustration() {
 
 #[test]
 fn skips_file_content() {
+    let mut state = make_state();
     let text =
         "     1\u{2192}fn main() {\n     2\u{2192}    println!(\"error[E0308]\");\n     3\u{2192}}";
-    let issues = check_text_for_issues(70, MessageRole::User, text, None);
+    let issues = check_text_for_issues(70, MessageRole::User, text, None, &mut state);
     assert!(issues.is_empty());
 }
 
 #[test]
 fn skips_help_output() {
+    let mut state = make_state();
     let issues = check_text_for_issues(
         80,
         MessageRole::User,
         "Kuma test harness\n\nUsage: harness [COMMAND]",
         Some(SourceTool::Bash),
+        &mut state,
     );
     assert!(issues.is_empty());
 }
 
 #[test]
 fn skips_compaction_summary() {
+    let mut state = make_state();
     let issues = check_text_for_issues(
         90,
         MessageRole::User,
         "This session is being continued from a previous conversation. Here is context.",
         None,
+        &mut state,
     );
     assert!(issues.is_empty());
 }
 
 #[test]
 fn detects_auth_flow() {
+    let mut state = make_state();
     let issues = check_text_for_issues(
         100,
         MessageRole::User,
         "Opening browser for authentication to your cluster",
         Some(SourceTool::Bash),
+        &mut state,
     );
     assert!(
         issues
@@ -291,11 +312,13 @@ fn classify_line_string_content() {
 
 #[test]
 fn build_error_skipped_when_cli_error_matched() {
+    let mut state = make_state();
     let issues = check_text_for_issues(
         10,
         MessageRole::User,
         "harness: error: unresolved import cannot find value",
         Some(SourceTool::Bash),
+        &mut state,
     );
     assert!(issues.iter().any(|i| i.category == IssueCategory::CliError));
     assert!(
@@ -307,11 +330,13 @@ fn build_error_skipped_when_cli_error_matched() {
 
 #[test]
 fn env_misconfiguration_uses_pattern_array() {
+    let mut state = make_state();
     let issues = check_text_for_issues(
         10,
         MessageRole::User,
         "CLAUDE_SESSION_ID=unset",
         Some(SourceTool::Bash),
+        &mut state,
     );
     assert!(
         issues
@@ -322,9 +347,16 @@ fn env_misconfiguration_uses_pattern_array() {
 
 #[test]
 fn details_truncated_at_construction() {
+    let mut state = make_state();
     let long_text = "x".repeat(5000);
     let input = format!("harness: error: {long_text}");
-    let issues = check_text_for_issues(10, MessageRole::User, &input, Some(SourceTool::Bash));
+    let issues = check_text_for_issues(
+        10,
+        MessageRole::User,
+        &input,
+        Some(SourceTool::Bash),
+        &mut state,
+    );
     assert!(!issues.is_empty());
     assert!(issues[0].details.len() <= 2001);
 }

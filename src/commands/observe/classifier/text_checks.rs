@@ -1,23 +1,27 @@
 use super::issue_builder::issue;
-use super::{AGENT_NAME_REGEX, EXIT_CODE_REGEX, TextCheckContext};
+use super::{AGENT_NAME_REGEX, EXIT_CODE_REGEX, TextCheckContext, should_emit};
 use crate::commands::observe::patterns;
 use crate::commands::observe::types::{Issue, IssueCategory, MessageRole, SourceTool};
 
 /// Check for KSA hook codes in Bash output.
-pub(super) fn check_ksa_codes(context: &TextCheckContext<'_>, issues: &mut Vec<Issue>) {
+pub(super) fn check_ksa_codes(context: &mut TextCheckContext<'_>, issues: &mut Vec<Issue>) {
     if context.source_tool != Some(SourceTool::Bash) {
         return;
     }
     for code in patterns::KSA_CODES {
         if context.lower.contains(code) {
             let display_code = code.to_uppercase();
+            let summary = format!("Harness hook code {display_code} triggered");
+            if !should_emit(IssueCategory::HookFailure, &summary, context.state) {
+                break;
+            }
             issues.push(issue!(
                 context.line_number,
                 context.role,
                 context.text,
                 HookFailure,
                 Medium,
-                format!("Harness hook code {display_code} triggered"),
+                summary,
                 fixable: true,
                 fix_hint: format!("Check hook logic for {display_code}"),
             ));
@@ -27,7 +31,7 @@ pub(super) fn check_ksa_codes(context: &TextCheckContext<'_>, issues: &mut Vec<I
 }
 
 /// Check for harness command failures with non-zero exit codes.
-pub(super) fn check_exit_code_issues(context: &TextCheckContext<'_>, issues: &mut Vec<Issue>) {
+pub(super) fn check_exit_code_issues(context: &mut TextCheckContext<'_>, issues: &mut Vec<Issue>) {
     if context.source_tool != Some(SourceTool::Bash) {
         return;
     }
@@ -61,44 +65,56 @@ pub(super) fn check_exit_code_issues(context: &TextCheckContext<'_>, issues: &mu
         context.lower.contains("harness") && context.lower.contains("authoring");
 
     if is_harness_operation {
-        issues.push(issue!(
-            context.line_number,
-            context.role,
-            context.text,
-            SkillBehavior,
-            Medium,
-            format!("Authored manifest failed at runtime (exit {exit_code})"),
-            fixable: true,
-            fix_target: "skills/new/SKILL.md",
-            fix_hint: "suite:new produced manifests that fail preflight/apply/validate - check authoring validation",
-        ));
+        let summary = format!("Authored manifest failed at runtime (exit {exit_code})");
+        if should_emit(IssueCategory::SkillBehavior, &summary, context.state) {
+            issues.push(issue!(
+                context.line_number,
+                context.role,
+                context.text,
+                SkillBehavior,
+                Medium,
+                summary,
+                fixable: true,
+                fix_target: "skills/new/SKILL.md",
+                fix_hint: "suite:new produced manifests that fail preflight/apply/validate - check authoring validation",
+            ));
+        }
     } else if is_harness_authoring {
-        issues.push(issue!(
-            context.line_number,
-            context.role,
-            context.text,
-            WorkflowError,
-            Medium,
-            format!("Harness authoring command failed (exit {exit_code})"),
-            fixable: true,
-            fix_hint:
-                "Harness authoring command returned non-zero - check payload or arguments",
-        ));
+        let summary = format!("Harness authoring command failed (exit {exit_code})");
+        if should_emit(IssueCategory::WorkflowError, &summary, context.state) {
+            issues.push(issue!(
+                context.line_number,
+                context.role,
+                context.text,
+                WorkflowError,
+                Medium,
+                summary,
+                fixable: true,
+                fix_hint:
+                    "Harness authoring command returned non-zero - check payload or arguments",
+            ));
+        }
     } else if exit_code != 1 {
-        issues.push(issue!(
-            context.line_number,
-            context.role,
-            context.text,
-            SubagentIssue,
-            Low,
-            format!("Non-zero exit code {exit_code}"),
-            fix_hint: format!("Command exited with code {exit_code}"),
-        ));
+        let summary = format!("Non-zero exit code {exit_code}");
+        if should_emit(IssueCategory::SubagentIssue, &summary, context.state) {
+            issues.push(issue!(
+                context.line_number,
+                context.role,
+                context.text,
+                SubagentIssue,
+                Low,
+                summary,
+                fix_hint: format!("Command exited with code {exit_code}"),
+            ));
+        }
     }
 }
 
 /// Check for subagent permission failures in user-role text.
-pub(super) fn check_permission_failures(context: &TextCheckContext<'_>, issues: &mut Vec<Issue>) {
+pub(super) fn check_permission_failures(
+    context: &mut TextCheckContext<'_>,
+    issues: &mut Vec<Issue>,
+) {
     if context.role != MessageRole::User || context.source_tool.is_some() {
         return;
     }
@@ -112,20 +128,24 @@ pub(super) fn check_permission_failures(context: &TextCheckContext<'_>, issues: 
         .captures(context.text)
         .and_then(|c| c.get(1))
         .map_or("unknown", |m| m.as_str());
+    let summary = format!("Subagent '{agent_name}' blocked by missing permissions");
+    if !should_emit(IssueCategory::SubagentIssue, &summary, context.state) {
+        return;
+    }
     issues.push(issue!(
         context.line_number,
         context.role,
         context.text,
         SubagentIssue,
         Medium,
-        format!("Subagent '{agent_name}' blocked by missing permissions"),
+        summary,
         fixable: true,
         fix_hint: "Subagent needs permissionMode dontAsk or mode auto for Bash/Write",
     ));
 }
 
 /// Check for subagent save failures in assistant text.
-pub(super) fn check_save_failures(context: &TextCheckContext<'_>, issues: &mut Vec<Issue>) {
+pub(super) fn check_save_failures(context: &mut TextCheckContext<'_>, issues: &mut Vec<Issue>) {
     if context.role != MessageRole::Assistant || context.source_tool.is_some() {
         return;
     }
@@ -137,20 +157,24 @@ pub(super) fn check_save_failures(context: &TextCheckContext<'_>, issues: &mut V
     }
     let text_context: String = context.text.chars().take(40).collect();
     let text_context = text_context.replace('\n', " ");
+    let summary = format!("Subagent manual recovery: {text_context}");
+    if !should_emit(IssueCategory::SubagentIssue, &summary, context.state) {
+        return;
+    }
     issues.push(issue!(
         context.line_number,
         context.role,
         context.text,
         SubagentIssue,
         Medium,
-        format!("Subagent manual recovery: {text_context}"),
+        summary,
         fixable: true,
         fix_hint: "Subagent lacks write permissions or hit a harness CLI error during save",
     ));
 }
 
 /// Check for manual payload recovery patterns.
-pub(super) fn check_payload_recovery(context: &TextCheckContext<'_>, issues: &mut Vec<Issue>) {
+pub(super) fn check_payload_recovery(context: &mut TextCheckContext<'_>, issues: &mut Vec<Issue>) {
     if context.role != MessageRole::Assistant || context.source_tool.is_some() {
         return;
     }
@@ -162,13 +186,17 @@ pub(super) fn check_payload_recovery(context: &TextCheckContext<'_>, issues: &mu
         || context.lower.contains("extract and save")
         || context.lower.contains("grab its");
     if has_grep && has_target && has_recovery {
+        let summary = "Manual payload recovery from subagent output";
+        if !should_emit(IssueCategory::SubagentIssue, summary, context.state) {
+            return;
+        }
         issues.push(issue!(
             context.line_number,
             context.role,
             context.text,
             SubagentIssue,
             Medium,
-            "Manual payload recovery from subagent output",
+            summary,
             fixable: true,
             fix_hint:
                 "Subagent should save its own payload - manual grep recovery is a workflow failure",
@@ -177,7 +205,10 @@ pub(super) fn check_payload_recovery(context: &TextCheckContext<'_>, issues: &mu
 }
 
 /// Check for misconfigured environment variables in Bash output.
-pub(super) fn check_env_misconfiguration(context: &TextCheckContext<'_>, issues: &mut Vec<Issue>) {
+pub(super) fn check_env_misconfiguration(
+    context: &mut TextCheckContext<'_>,
+    issues: &mut Vec<Issue>,
+) {
     if context.source_tool != Some(SourceTool::Bash) {
         return;
     }
@@ -186,26 +217,34 @@ pub(super) fn check_env_misconfiguration(context: &TextCheckContext<'_>, issues:
             continue;
         }
         if signal.contains("claude_session_id") {
+            let summary = "CLAUDE_SESSION_ID is unset - harness cannot resolve session context";
+            if !should_emit(IssueCategory::DataIntegrity, summary, context.state) {
+                continue;
+            }
             issues.push(issue!(
                 context.line_number,
                 context.role,
                 context.text,
                 DataIntegrity,
                 Critical,
-                "CLAUDE_SESSION_ID is unset - harness cannot resolve session context",
+                summary,
                 fixable: true,
                 fix_target: "src/context.rs",
                 fix_hint: "Session ID env var not set. Harness init and runner-state \
                            cannot find the context directory without it.",
             ));
         } else if signal.contains("kubeconfig") {
+            let summary = "KUBECONFIG is empty - cluster commands will hit default context";
+            if !should_emit(IssueCategory::SkillBehavior, summary, context.state) {
+                continue;
+            }
             issues.push(issue!(
                 context.line_number,
                 context.role,
                 context.text,
                 SkillBehavior,
                 Critical,
-                "KUBECONFIG is empty - cluster commands will hit default context",
+                summary,
                 fixable: true,
                 fix_target: "skills/run/SKILL.md",
                 fix_hint: "harness cluster should set KUBECONFIG to the k3d cluster config. \
@@ -217,7 +256,7 @@ pub(super) fn check_env_misconfiguration(context: &TextCheckContext<'_>, issues:
 }
 
 /// Check for incomplete writer agent output in assistant text.
-pub(super) fn check_incomplete_writer(context: &TextCheckContext<'_>, issues: &mut Vec<Issue>) {
+pub(super) fn check_incomplete_writer(context: &mut TextCheckContext<'_>, issues: &mut Vec<Issue>) {
     if context.role != MessageRole::Assistant || context.source_tool.is_some() {
         return;
     }
@@ -227,20 +266,24 @@ pub(super) fn check_incomplete_writer(context: &TextCheckContext<'_>, issues: &m
     {
         return;
     }
+    let summary = "Writer subagent produced incomplete output";
+    if !should_emit(IssueCategory::SubagentIssue, summary, context.state) {
+        return;
+    }
     issues.push(issue!(
         context.line_number,
         context.role,
         context.text,
         SubagentIssue,
         Medium,
-        "Writer subagent produced incomplete output",
+        summary,
         fixable: true,
         fix_hint: "Writer agent failed to save all files - check permissions and payload size",
     ));
 }
 
 /// Check for user frustration signals in human text.
-pub(super) fn check_user_frustration(context: &TextCheckContext<'_>, issues: &mut Vec<Issue>) {
+pub(super) fn check_user_frustration(context: &mut TextCheckContext<'_>, issues: &mut Vec<Issue>) {
     if context.role != MessageRole::User
         || context.source_tool.is_some()
         || context.text.len() >= 2000
@@ -253,13 +296,17 @@ pub(super) fn check_user_frustration(context: &TextCheckContext<'_>, issues: &mu
         .any(|signal| context.lower.contains(signal));
 
     if exclamation_count >= 4 || has_signal {
+        let summary = "User frustration signal detected";
+        if !should_emit(IssueCategory::UserFrustration, summary, context.state) {
+            return;
+        }
         issues.push(issue!(
             context.line_number,
             context.role,
             context.text,
             UserFrustration,
             Medium,
-            "User frustration signal detected",
+            summary,
             fix_hint: "Review what happened before this - likely a UX issue",
         ));
     }

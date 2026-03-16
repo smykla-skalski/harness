@@ -49,7 +49,6 @@ fn is_file_content(text: &str) -> bool {
 
 /// Detect harness `--help` output (success, not error).
 fn is_help_output(text: &str) -> bool {
-    // Only need to check the prefix - no need to lowercase the entire text.
     let end = text.floor_char_boundary(text.len().min(200));
     let lower = text[..end].to_lowercase();
     let trimmed = lower.trim();
@@ -78,25 +77,20 @@ fn resolve_source_tool(block: &Value, state: &ScanState) -> Option<SourceTool> {
     SourceTool::from_label(&record.name)
 }
 
+// ─── Dedup ─────────────────────────────────────────────────────────
+
 /// Regex that replaces all digit sequences with `#` for dedup normalization.
 /// This makes "exit code 1" and "exit code 137" produce the same key.
 static DEDUP_NORMALIZE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"\d+").expect("valid regex"));
 
-/// Build a normalized dedup key from an issue.
-fn dedup_key(issue: &Issue) -> (IssueCategory, String) {
-    let normalized = DEDUP_NORMALIZE.replace_all(&issue.summary, "#");
-    (issue.category, normalized.into_owned())
-}
-
-/// Return true if this issue is a duplicate that should be skipped.
-fn dedup_issue(issue: &Issue, state: &mut ScanState) -> bool {
-    let key = dedup_key(issue);
-    if state.seen_issues.contains(&key) {
-        return true;
-    }
-    state.seen_issues.insert(key);
-    false
+/// Check whether an issue with the given category and summary should be
+/// emitted, and record it in the dedup set if so. Returns true if the
+/// issue is new (should be emitted), false if it's a duplicate.
+pub(super) fn should_emit(category: IssueCategory, summary: &str, state: &mut ScanState) -> bool {
+    let normalized = DEDUP_NORMALIZE.replace_all(summary, "#");
+    let key = (category, normalized.into_owned());
+    state.seen_issues.insert(key)
 }
 
 // ─── Context struct ────────────────────────────────────────────────
@@ -109,6 +103,7 @@ pub(super) struct TextCheckContext<'a> {
     pub lower: &'a str,
     pub source_tool: Option<SourceTool>,
     pub matched_categories: HashSet<IssueCategory>,
+    pub state: &'a mut ScanState,
 }
 
 // ─── Public API ────────────────────────────────────────────────────
@@ -117,12 +112,12 @@ pub(super) struct TextCheckContext<'a> {
 ///
 /// `source_tool` is the tool that produced this text - `None` for
 /// assistant/human text blocks.
-#[must_use]
 pub fn check_text_for_issues(
     line_num: usize,
     role: MessageRole,
     text: &str,
     source_tool: Option<SourceTool>,
+    state: &mut ScanState,
 ) -> Vec<Issue> {
     if source_tool == Some(SourceTool::Read) || is_file_content(text) {
         return Vec::new();
@@ -135,26 +130,27 @@ pub fn check_text_for_issues(
 
     // Rule table handles the 15 simple pattern-matching checks.
     let (mut issues, matched_categories) =
-        rules::apply_text_rules(line_num, role, text, &lower, source_tool);
+        rules::apply_text_rules(line_num, role, text, &lower, source_tool, state);
 
-    let context = TextCheckContext {
+    let mut context = TextCheckContext {
         line_number: line_num,
         role,
         text,
         lower: &lower,
         source_tool,
         matched_categories,
+        state,
     };
 
     // Complex standalone checks that need regex, multi-branch, or dynamic formatting.
-    text_checks::check_ksa_codes(&context, &mut issues);
-    text_checks::check_exit_code_issues(&context, &mut issues);
-    text_checks::check_permission_failures(&context, &mut issues);
-    text_checks::check_save_failures(&context, &mut issues);
-    text_checks::check_payload_recovery(&context, &mut issues);
-    text_checks::check_env_misconfiguration(&context, &mut issues);
-    text_checks::check_incomplete_writer(&context, &mut issues);
-    text_checks::check_user_frustration(&context, &mut issues);
+    text_checks::check_ksa_codes(&mut context, &mut issues);
+    text_checks::check_exit_code_issues(&mut context, &mut issues);
+    text_checks::check_permission_failures(&mut context, &mut issues);
+    text_checks::check_save_failures(&mut context, &mut issues);
+    text_checks::check_payload_recovery(&mut context, &mut issues);
+    text_checks::check_env_misconfiguration(&mut context, &mut issues);
+    text_checks::check_incomplete_writer(&mut context, &mut issues);
+    text_checks::check_user_frustration(&mut context, &mut issues);
 
     issues
 }
@@ -192,10 +188,9 @@ pub fn classify_line(line_num: usize, raw: &str, state: &mut ScanState) -> Vec<I
     } else if let Some(text) = content.as_str()
         && text.len() > MIN_TEXT_LENGTH
     {
-        issues.extend(check_text_for_issues(line_num, role, text, None));
+        issues.extend(check_text_for_issues(line_num, role, text, None, state));
     }
 
-    issues.retain(|issue| !dedup_issue(issue, state));
     issues
 }
 
@@ -213,7 +208,7 @@ fn classify_content_blocks(
             "text" => {
                 let text = block["text"].as_str().unwrap_or("");
                 if text.len() > MIN_TEXT_LENGTH {
-                    issues.extend(check_text_for_issues(line_num, role, text, None));
+                    issues.extend(check_text_for_issues(line_num, role, text, None, state));
                 }
             }
             "tool_use" => {
@@ -223,7 +218,7 @@ fn classify_content_blocks(
                 let text = tool_result_text(block);
                 if text.len() > MIN_TEXT_LENGTH {
                     let source = resolve_source_tool(block, state);
-                    issues.extend(check_text_for_issues(line_num, role, &text, source));
+                    issues.extend(check_text_for_issues(line_num, role, &text, source, state));
                 }
             }
             _ => {}
