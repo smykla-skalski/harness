@@ -271,6 +271,11 @@ Amendments are permanent fixes to the suite. Future runs use the corrected manif
 - `name`: resource name (top-level field)
 - `spec`: same field names as Kubernetes format (from Go struct JSON tags)
 
+### Multi-zone policy placement
+
+- Policies targeting system namespaces (`kuma-system`) must be applied on the Global CP. Zone CPs reject policy operations on system namespaces via admission webhook.
+- When authoring multi-zone suites, manifests that create or update policies in `kuma-system` must specify `clusters: global` (or omit `clusters` to get the global-only default). Applying them to zone clusters will fail with an admission error.
+
 ### Kubernetes Services
 
 - Services with multiple ports must name every port. Kubernetes rejects unnamed ports when count > 1.
@@ -281,6 +286,10 @@ Amendments are permanent fixes to the suite. Future runs use the corrected manif
 - Every manifest field must be verified against the CRD or Go API spec before inclusion. See [code-reading-guide.md](code-reading-guide.md) (Schema verification sources) for the full checklist.
 - Check the policy spec nesting pattern (from/to/rules) before writing manifests. Config like `action` lives at `spec.from[].default.action`, NOT `spec.default.action`. See [code-reading-guide.md](code-reading-guide.md) (Policy spec nesting patterns) for the full pattern table and correct/incorrect examples.
 - `targetRef.name` and `targetRef.labels` are mutually exclusive - never use both in the same targetRef, because mixed selectors create ambiguous targeting and often fail validation. Use `name` to target a specific resource, `labels` to target a group.
+
+### OTel collector configuration
+
+- Use the `debug` exporter, not `logging`. The `logging` exporter was removed in recent collector versions and causes immediate crash (CrashLoopBackOff).
 
 ## Command authoring defaults
 

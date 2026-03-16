@@ -72,9 +72,9 @@ hooks:
 
 Generate test suites for `suite:run` by reading Kuma source code and emitting ready-to-run manifests, commands, and variant coverage.
 
-Not designed for running suites (use `/suite:run`), editing existing suites, or generating non-Kuma test plans, because authoring and execution need different guardrails.
+Avoid using for running suites (use `/suite:run`), editing existing suites, or generating non-Kuma test plans, because authoring and execution need different guardrails.
 
-This repo-local skill routes every hook through `harness hook --skill suite:new <hook-name>`, using the bare `harness` command installed by project `SessionStart` hooks.
+All hooks route through `harness hook --skill suite:new <hook-name>`, using the bare `harness` command installed by project `SessionStart` hooks.
 
 ## Compact recovery
 
@@ -102,7 +102,24 @@ Parse from `$ARGUMENTS`:
 
 ## Workflow - generate mode (default, `--mode generate`)
 
-### Step 0: Local validator gate
+### Step 0: Query harness capabilities
+
+Before any other work, query what harness can do so the rest of the workflow can adapt:
+
+```bash
+harness capabilities
+```
+
+Parse the JSON output and keep it as the `CAPABILITIES` context for all later steps. Use it to:
+
+- Decide which `profiles` to offer (only include profiles whose platform and topology appear in `cluster_topologies` and `platforms`).
+- Scope `required_dependencies` to features that are actually available (e.g. only add `gateway-api-crds` if `features.gateway_api.available` is true).
+- When building the proposal (step 7), only propose universal-mode groups if the `universal` platform is listed, and only propose envoy admin validation steps if `features.envoy_admin.available` is true.
+- Pass relevant capability facts to discovery workers so they don't suggest groups the harness can't execute.
+
+If `harness capabilities` fails (binary too old, not installed), fall back to the hardcoded default assumption: both platforms available, all features available.
+
+### Step 1: Local validator gate
 
 Before any Bash commands, writes, or canonical review prompts, check whether the suite:new local validator decision is still unresolved.
 
@@ -112,7 +129,7 @@ First, check if `kubectl-validate` is already installed:
 which kubectl-validate 2>/dev/null
 ```
 
-If the binary is found, the decision is resolved - record that it exists and continue to Step 1. Do not ask the user anything. The harness guard hook will also block the install prompt when the binary is already present.
+If the binary is found, record that it exists and continue to Step 2. Do not ask the user anything. The harness guard hook will also block the install prompt when the binary is already present.
 
 If the binary is **not** found and no prior decision is recorded, ask exactly one AskUserQuestion using:
 
@@ -120,14 +137,14 @@ If the binary is **not** found and no prior decision is recorded, ask exactly on
 - Question head: `suite:new/kubectl-validate: install local validator?`
 - Options: `Install kubectl-validate` and `Skip local validator`
 
-The prompt body must explain the tradeoff clearly:
+Explain the tradeoff in the prompt body:
 
 - Installing the `kubectl-validate` plugin enables `kubectl validate --local-crds deployments/charts/kuma/crds` against the checked-in CRDs in this repo.
 - Skipping it means suite:new falls back to Markdown and shape checks only, so CRD/schema mistakes can survive until later runner or cluster feedback.
 
-If the user approves installation, let the hook install it automatically. If the user skips it, continue authoring with the weaker safety bar and do not try to replace that local CRD validation with a live cluster. This gate is not bypassed by `--yes` or `-y`.
+If the user approves installation, let the hook install it automatically. If the user skips it, continue authoring with Markdown and shape checks only instead of CRD validation. This gate is not bypassed by `--yes` or `-y`.
 
-### Step 1: Resolve paths
+### Step 2: Resolve paths
 
 Before resolving paths, check for stale authoring state from a previous session:
 
@@ -141,7 +158,7 @@ Use the pre-resolved data directory and repo root from the preprocessed context 
 
 Resolve `REPO_ROOT`: `--repo` flag > pre-resolved repo root (if in a git repo) > check if cwd has `go.mod` with `kumahq/kuma` > fail with message.
 
-### Step 2: Check worktree and branch
+### Step 3: Check worktree and branch
 
 Run `git rev-parse --show-toplevel` and `git branch --show-current` in `REPO_ROOT`.
 
@@ -152,7 +169,7 @@ Use AskUserQuestion showing the detected path and branch in the description (e.g
 
 If wrong location: run `git worktree list` and `git branch --list`, then present available worktrees and branches via AskUserQuestion. After selection, update `REPO_ROOT` or run `git checkout` accordingly.
 
-### Step 3: Scope the feature
+### Step 4: Scope the feature
 
 Identify what code to read based on the input:
 
@@ -168,7 +185,7 @@ Handle ambiguity with AskUserQuestion:
 
 **Error cases**: if the feature name matches no policy dir and Grep finds nothing, ask for the exact path or a more specific name. If a PR URL returns a 404 or `gh` fails, fall back to a branch name or feature name.
 
-### Step 4: Derive suite identity and initialize authoring state
+### Step 5: Derive suite identity and initialize authoring state
 
 Read [references/suite-structure.md](references/suite-structure.md) before deriving the suite name.
 
@@ -199,24 +216,15 @@ harness authoring-begin \
   --suite-name "${SUITE_NAME}"
 ```
 
-Then save the scoped file inventory from step 3 with `harness authoring-save --kind inventory` using this exact payload shape:
-
-```json
-{
-  "scoped_files": [
-    "/abs/path/to/file.go",
-    "/abs/path/to/validator.go"
-  ]
-}
-```
+Then save the scoped file inventory from step 4 with `harness authoring-save --kind inventory`. Read [references/agent-output-format.md](references/agent-output-format.md) for the inventory payload shape.
 
 If the suite name or directory changes later, rerun `authoring-begin` and then resave the inventory before any workers continue.
 
-### Step 5: Launch parallel discovery workers
+### Step 6: Launch parallel discovery workers
 
-Read [references/code-reading-guide.md](references/code-reading-guide.md), [references/variant-detection.md](references/variant-detection.md), and [references/agent-output-format.md](references/agent-output-format.md) before constructing worker prompts.
+Read [references/code-reading-guide.md](references/code-reading-guide.md) for source navigation paths, [references/variant-detection.md](references/variant-detection.md) for signal taxonomy, and [references/agent-output-format.md](references/agent-output-format.md) for payload contracts before constructing worker prompts.
 
-Launch these project subagents in parallel:
+Launch these workers in parallel:
 
 - [../../agents/coverage-reader.md](../../agents/coverage-reader.md) for G1-G7 group material and evidence coverage
 - [../../agents/variant-analyzer.md](../../agents/variant-analyzer.md) for S1-S7 variant signals
@@ -224,15 +232,15 @@ Launch these project subagents in parallel:
 
 Worker contract:
 
-- Pass `REPO_ROOT`, the scoped file list from step 3, the feature name, and only the references needed for that worker.
-- Launch all discovery agents with `mode: "auto"` so they can run `harness authoring-save` via Bash without interactive approval. Background agents cannot prompt the user for tool permissions.
+- Pass `REPO_ROOT`, the scoped file list from step 4, the feature name, and only the references needed for that worker.
+- Launch all discovery workers with `mode: "auto"` so they can run `harness authoring-save` via Bash without interactive approval. Background workers cannot prompt the user for tool permissions.
 - Follow [references/agent-output-format.md](references/agent-output-format.md) for the exact payload schema, save path, and acknowledgement contract for each worker kind.
 
 After all workers finish, load the saved payloads with `harness authoring-show --kind inventory|coverage|variants|schema`.
 
 If any worker result is missing, malformed, or clearly incomplete, rerun only that worker instead of continuing with gaps.
 
-### Step 6: Build the proposal from saved worker outputs
+### Step 7: Build the proposal from saved worker outputs
 
 Read [references/suite-structure.md](references/suite-structure.md) for the format spec.
 Read [examples/example-motb-core-suite.md](examples/example-motb-core-suite.md) for a worked example of the suite format.
@@ -243,8 +251,8 @@ Build the proposal from the saved worker outputs:
 - Use coverage data to decide which base groups G1-G7 have enough evidence.
 - Use variant signals to propose G8+ groups and to decide which signals are strong, moderate, or weak.
 - Use schema facts to constrain manifests from the start, but treat them as planning input only.
-- If the local validator was installed, validate authored manifests locally with `harness authoring-validate` before stopping. That command runs `kubectl validate --local-crds deployments/charts/kuma/crds` against the checked-in CRDs from this repo, so do not defer first validation to a live cluster.
-- When `profiles` includes `multi-zone`, set `clusters: all` on every baseline that deploys workloads (namespace, demo-workload, otel-collector). Zone clusters need these resources present for xDS inspection. Use the object form in `baseline_files` frontmatter (`- path: baseline/foo.yaml` with `clusters: all`) and add a Clusters column to the baseline manifests table. Infrastructure-only baselines that only apply to the global CP can omit the field or use `clusters: global`.
+- If the local validator was installed, run `harness authoring-validate` on authored manifests before stopping. Do not defer to a live cluster.
+- When `profiles` includes `multi-zone`, set `clusters: all` on workload-deploying baselines per [references/suite-structure.md](references/suite-structure.md).
 - Save the merged proposal with `harness authoring-save --kind proposal`.
 
 Variant review rules:
@@ -260,13 +268,13 @@ Proposal rules:
 - Default every cluster-interacting command to full `harness` invocations. Only keep raw `kubectl`, `kumactl`, `curl`, or similar commands when the user explicitly asked for raw commands.
 - Follow [references/suite-structure.md](references/suite-structure.md) for file ownership, naming, and manifest conventions.
 - Add `gateway-api-crds` when proposed groups touch `MeshGateway`, `GatewayClass`, `Gateway`, or `HTTPRoute`.
-- For universal mode suites (`--profile single-zone-universal`), use REST API format manifests (type/name/mesh instead of apiVersion/kind/metadata). Use `harness apply` for manifest application (it dispatches to `kumactl apply` in universal mode). Use `harness token` and `harness service` for dataplane token generation and service container management.
+- For universal mode suites (`--profile single-zone-universal`), use REST API format manifests and `harness apply`/`token`/`service` commands per [references/suite-structure.md](references/suite-structure.md).
 
-### Step 7: Pre-write review gate
+### Step 8: Pre-write review gate
 
 Build the full proposed suite in memory and, unless `--yes` or `-y` is set, run a mandatory AskUserQuestion review loop before creating `${SUITE_DIR}` or writing any files.
 
-Use the same AskUserQuestion header as step 7 so the suite path and runner command stay visible in every review round.
+Use the same AskUserQuestion header as step 8 so the suite path and runner command stay visible in every review round.
 
 Review loop rules:
 
@@ -276,9 +284,9 @@ Review loop rules:
 - Re-run only the affected discovery worker when feedback invalidates earlier coverage, variant, or schema assumptions, then resave the proposal and show the loop again until approval.
 - Immediately initialize the approval state with `harness approval-begin --skill suite:new --mode interactive --suite-dir "${SUITE_DIR}"`. If `--yes` or `-y` is set, use `--mode bypass` instead. If the suite name or directory changes during the pre-write review loop, rerun `approval-begin` with the updated `SUITE_DIR` before asking the canonical pre-write approval question.
 - The approval gate question must be exactly `suite:new/prewrite: approve current proposal?` with options `Approve proposal`, `Request changes`, and `Cancel`. `Approve proposal` is the only answer that unlocks writes to `${SUITE_DIR}`.
-- No suite files are written before this loop ends. `--yes` and `-y` are the only bypass.
+- Suite files are only written after this loop approves. `--yes` and `-y` are the only bypass.
 
-### Step 8: Save suite through dedicated writing workers
+### Step 9: Save suite through dedicated writing workers
 
 After the pre-write review gate approves the proposal, create the suite directory:
 
@@ -286,7 +294,7 @@ After the pre-write review gate approves the proposal, create the suite director
 mkdir -p "${SUITE_DIR}/baseline" "${SUITE_DIR}/groups"
 ```
 
-Launch these project subagents after approval:
+Launch these workers after approval:
 
 - [../../agents/suite-writer.md](../../agents/suite-writer.md) for `${SUITE_DIR}/suite.md`
 - [../../agents/baseline-writer.md](../../agents/baseline-writer.md) for `${SUITE_DIR}/baseline/*.yaml`
@@ -296,12 +304,12 @@ Writer contract:
 
 - Pass only the saved proposal, schema facts, and the exact file ownership for that worker.
 - Keep writer fan-out bounded. Do not start more than four writer workers at once.
-- Launch all writer agents with `mode: "auto"` so they can write files without interactive approval. Background agents cannot prompt the user, so writes are denied without this mode.
+- Launch all writer workers with `mode: "auto"` so they can write files without interactive approval. Background workers cannot prompt the user, so writes are denied without this mode.
 - If the local validator was installed, require every writer that emits manifests to run `harness authoring-validate` on its owned outputs before it stops. Use the current repo checkout as the schema source of truth; all required schemas, including CRDs, are already in this repo. If the validator was explicitly skipped, do not substitute a live-cluster check here.
 - When the proposal includes multi-zone profiles, pass the baseline cluster distribution from the proposal to the baseline-writer and suite-writer so they emit the object form (`- path:` with `clusters:`) in `baseline_files` frontmatter and include the Clusters column in the baseline manifests table.
 - Follow [references/agent-output-format.md](references/agent-output-format.md) for `authoring-show` usage and acknowledgement rules, and [references/suite-structure.md](references/suite-structure.md) for file content requirements.
 
-### Step 9: Post-write review gate
+### Step 10: Post-write review gate
 
 Unless `--yes` or `-y` is set, immediately re-open AskUserQuestion after the suite is saved.
 
@@ -321,7 +329,7 @@ Post-write loop rules:
 - The approval gate question must be exactly `suite:new/postwrite: approve saved suite?` with options `Approve suite`, `Request changes`, and `Cancel`. `Approve suite` is the only answer that unlocks a successful stop after suite files were written.
 - After final approval, show one last AskUserQuestion with the exact question `suite:new/copy: copy run command?` and the exact options `Copy command` and `Skip`. Do not offer the suite path as a copy target because the prompt already exposes it for manual copying.
 
-### Step 10: Report
+### Step 11: Report
 
 Print the saved path and suggest how to run it:
 
@@ -332,59 +340,15 @@ Run with: /suite:run ${SUITE_NAME}
 
 ## Workflow - wizard mode
 
-Interactive step-by-step suite generation. It uses the same authoring state, workers, approval gates, and final report as generate mode. The only differences are:
-
-1. After step 2, ask for feature name, target environment (`kubernetes`, `universal`, `both`), and scope (`full surface`, `focused aspect`) with AskUserQuestion.
-2. Run the same discovery workers as generate step 5, but review variant signals one by one with AskUserQuestion options such as `Include`, `Exclude`, and `Need more evidence` instead of the batch multiSelect.
-3. Present G1-G7 as a selectable list, then review each selected group in order with its cached worker evidence.
-4. For each group, use AskUserQuestion with `Approve`, `Edit manifests`, `Edit validation commands`, and `Skip this group`. Save every edit round with `harness authoring-save --kind edit-request` and rerun only the affected writer or discovery worker.
-5. After individual group review completes, run the same pre-write gate, writing workers, post-write gate, and final report as generate mode.
-
-## Bundled resources
-
-- [references/code-reading-guide.md](references/code-reading-guide.md) - code-reading paths and manifest verification
-- [references/agent-output-format.md](references/agent-output-format.md) - worker payload and acknowledgement contract
-- [references/variant-detection.md](references/variant-detection.md) - variant signals
-- [references/suite-structure.md](references/suite-structure.md) - suite format and manifest conventions
-- [examples/example-motb-core-suite.md](examples/example-motb-core-suite.md) - worked suite
-- [examples/example-motb-core-group.md](examples/example-motb-core-group.md) - worked group
-- [../../agents/coverage-reader.md](../../agents/coverage-reader.md) - saves compact G1-G7 coverage facts
-- [../../agents/variant-analyzer.md](../../agents/variant-analyzer.md) - saves compact variant signals
-- [../../agents/schema-verifier.md](../../agents/schema-verifier.md) - saves compact schema facts
-- [../../agents/suite-writer.md](../../agents/suite-writer.md) - writes `suite.md`
-- [../../agents/baseline-writer.md](../../agents/baseline-writer.md) - writes `baseline/*.yaml`
-- [../../agents/group-writer.md](../../agents/group-writer.md) - writes `groups/*.md`
-- `harness authoring-begin` - resets and seeds the session-scoped authoring workspace
-- `harness authoring-save` - validates and persists compact worker payloads
-- `harness authoring-show` - loads saved session and worker payloads
-- `harness authoring-reset` - removes stale authoring state for the current session
+Read [references/operational-guide.md](references/operational-guide.md) for wizard mode. Same state, workers, and gates as generate mode - review loop presents items individually instead of batch multiSelect.
 
 ## Hook messages
 
-Hooks emit these codes during suite authoring:
+Read [references/operational-guide.md](references/operational-guide.md) for hook codes KSA001-KSA010 emitted during suite authoring.
 
-| Code | Hook | Meaning |
-| --- | --- | --- |
-| KSA001 | guard-write | Write path is outside the suite:new surface |
-| KSA002 | guard-question / verify-question / guard-write / verify-write / guard-stop | Approval state is missing, malformed, or the canonical approval prompt shape is wrong |
-| KSA003 | guard-write / guard-stop | Approval is required before writing suite files or stopping after saved-suite edits |
-| KSA004 | verify-write / guard-stop | Suite validation: authored manifests must pass local repo-backed validation, groups/baselines must be lists, and the suite must be complete |
-| KSA006 | worker contract | Worker agents must save structured payloads through `harness authoring-save` |
-| KSA007 | worker contract | Worker reply must stay short and acknowledge the saved result |
-| KSA008 | audit | Suites must stay user-story-first with concrete variant evidence |
-| KSA009 | guard-question / verify-question / guard-bash / guard-write | The suite:new local validator decision must be resolved before real work starts |
-| KSA010 | verify-question | Automatic `kubectl-validate` installation failed |
+## Error recovery
 
-## Error handling
-
-- If repo resolution is ambiguous, stop and re-ask before reading code because a suite authored from the wrong worktree or branch is misleading.
-- If the local-validator question is still unresolved, ask it before doing Bash work, writing files, or opening the canonical approval gates because the hooks fail closed until that one-time decision is recorded.
-- If `authoring-begin` was not run after deriving `SUITE_DIR`, stop and run `harness authoring-begin --skill suite:new --repo-root "${REPO_ROOT}" --feature "${FEATURE}" --mode interactive|bypass --suite-dir "${SUITE_DIR}" --suite-name "${SUITE_NAME}"` before launching workers because the compact worker state must exist before caching results.
-- If `approval-begin` was not run after deriving `SUITE_DIR`, stop and run `harness approval-begin --skill suite:new --mode interactive|bypass --suite-dir "${SUITE_DIR}"` before the canonical approval gates because the hooks fail closed on missing approval state.
-- If a worker payload fails validation or is missing after a run, rerun only that worker and re-save its compact result instead of rereading the whole repo.
-- If a worker returns raw file dumps or long prose, stop and rerun it with the compact-output contract because returning the heavy transcript defeats the architecture.
-- If local manifest verification keeps failing, go back to the checked-in CRD or Go struct before saving because a broken suite wastes runner time and hides whether the bug is in Kuma or in the suite.
-- If a write would land outside `${DATA_DIR}/${SUITE_NAME}`, stop and fix the target path because `suite:new` must only mutate the selected suite surface.
+Read [references/operational-guide.md](references/operational-guide.md) for error recovery procedures.
 
 ## Example invocations
 

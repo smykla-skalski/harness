@@ -240,6 +240,18 @@ harness runner-state \
 
 Then ask the canonical manifest-fix gate documented in `SKILL.md` and `validation.md`. `Fix in suite and this run` may edit only the exact approved suite file plus `amendments.md`.
 
+After a `Fix in suite and this run` edit, the prepared manifest in `runs/<run-id>/manifests/prepared/` is stale - it still has the old content. Re-materialize before re-applying:
+
+```bash
+# Option A: re-apply reads from the suite source, not the stale prepared copy
+harness apply --manifest <path> --step <label>
+
+# Option B: copy the fixed source to the prepared directory manually, then apply
+cp <fixed-suite-source-file> runs/<run-id>/manifests/prepared/<matching-path>
+```
+
+Do not re-apply the stale prepared copy. Either use `harness apply` which reads from the current suite source, or overwrite the prepared file first.
+
 ```bash
 harness capture \
   --label "failure-<test-id>"
