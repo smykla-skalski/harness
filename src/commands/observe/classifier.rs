@@ -912,6 +912,26 @@ fn check_bash_tool_use(line_num: usize, input: &Value, issues: &mut Vec<Issue>) 
         });
     }
 
+    let command_lower = command.to_lowercase();
+    if patterns::PYTHON_USAGE_SIGNALS
+        .iter()
+        .any(|signal| command_lower.contains(signal))
+    {
+        issues.push(Issue {
+            line: line_num,
+            category: IssueCategory::UnexpectedBehavior,
+            severity: IssueSeverity::Medium,
+            summary: "Python used in Bash command - agents should never need python".into(),
+            details: format!("Command: {command}"),
+            source_role: "assistant".into(),
+            fixable: true,
+            fix_target: None,
+            fix_hint: Some(
+                "Use harness commands or shell builtins instead of python one-liners".into(),
+            ),
+        });
+    }
+
     if RM_RECURSIVE_REGEX.is_match(command) && !command.contains("&&") {
         issues.push(Issue {
             line: line_num,
