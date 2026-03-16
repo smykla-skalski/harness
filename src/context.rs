@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 use crate::cluster::ClusterSpec;
 use crate::core_defs::current_run_context_path;
 use crate::errors::{CliError, CliErrorKind};
+use crate::io::append_markdown_row;
 use crate::prepared_suite::PreparedSuiteArtifact;
 use crate::schema::RunStatus;
 
@@ -106,6 +107,62 @@ impl RunLayout {
             .parent()
             .map_or_else(|| ".".to_string(), |p| p.to_string_lossy().into_owned());
         Self { run_root, run_id }
+    }
+
+    /// Strip the run directory prefix from `path`, returning a relative string.
+    ///
+    /// Falls back to the full display path when stripping fails.
+    #[must_use]
+    pub fn relative_path(&self, path: &Path) -> String {
+        path.strip_prefix(self.run_dir())
+            .map_or_else(|_| path.display().to_string(), |p| p.display().to_string())
+    }
+
+    /// Append a row to `commands/command-log.md`.
+    ///
+    /// # Errors
+    /// Returns `CliError` on IO or shape mismatch.
+    pub fn append_command_log(
+        &self,
+        ran_at: &str,
+        phase: &str,
+        group_id: &str,
+        command: &str,
+        exit_code: &str,
+        artifact: &str,
+    ) -> Result<(), CliError> {
+        append_markdown_row(
+            &self.command_log_path(),
+            &[
+                "ran_at",
+                "phase",
+                "group_id",
+                "command",
+                "exit_code",
+                "artifact",
+            ],
+            &[ran_at, phase, group_id, command, exit_code, artifact],
+        )
+    }
+
+    /// Append a row to `manifests/manifest-index.md`.
+    ///
+    /// # Errors
+    /// Returns `CliError` on IO or shape mismatch.
+    pub fn append_manifest_index(
+        &self,
+        copied_at: &str,
+        manifest: &str,
+        validated: &str,
+        applied: &str,
+        notes: &str,
+    ) -> Result<(), CliError> {
+        let manifest_index = self.manifests_dir().join("manifest-index.md");
+        append_markdown_row(
+            &manifest_index,
+            &["copied_at", "manifest", "validated", "applied", "notes"],
+            &[copied_at, manifest, validated, applied, notes],
+        )
     }
 }
 
