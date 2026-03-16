@@ -223,6 +223,17 @@ After all workers finish, load the saved payloads with `harness authoring-show -
 
 If any worker result is missing, malformed, or clearly incomplete, rerun only that worker instead of continuing with gaps.
 
+### Manifest completeness rule
+
+Every Kubernetes resource that any test group references during its steps must exist as a YAML file in the suite before authoring finishes. This includes:
+
+- ContainerPatch resources for sidecar environment variables or proxy configuration
+- MeshTrafficPermission, MeshRetry, MeshTimeout, or any other Mesh* policy that groups apply
+- Gateway API CRDs (GatewayClass, Gateway, HTTPRoute) if groups reference them
+- Any resource that a group's `## Configure` or `## Execute` steps apply but that does not yet exist as a manifest file
+
+If a group step references applying a resource that has no corresponding YAML file in `groups/{group-id}/`, the authoring process must create it. The suite:run runner must never need to create manifests on the fly - all manifests ship with the suite.
+
 ### Step 7: Build the proposal from saved worker outputs
 
 Read [references/suite-structure.md](references/suite-structure.md) for the format spec.
