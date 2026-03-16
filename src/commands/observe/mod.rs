@@ -406,12 +406,11 @@ fn resolve_from(session_path: &Path, value: &str) -> Result<usize, CliError> {
         let reader = BufReader::new(file);
         for (index, line_result) in reader.lines().enumerate() {
             let Ok(line) = line_result else { continue };
-            if let Ok(obj) = serde_json::from_str::<serde_json::Value>(line.trim()) {
-                if let Some(ts) = obj["timestamp"].as_str() {
-                    if ts >= value {
-                        return Ok(index);
-                    }
-                }
+            if let Ok(obj) = serde_json::from_str::<serde_json::Value>(line.trim())
+                && let Some(ts) = obj["timestamp"].as_str()
+                && ts >= value
+            {
+                return Ok(index);
             }
         }
         return Err(CliErrorKind::session_parse_error(format!(
@@ -928,11 +927,11 @@ fn execute_context(
                 let truncated = truncate_at(&db.text, DUMP_TRUNCATE_LENGTH);
                 println!("{prefix}{}{ts_part}: {truncated}", db.label);
             }
-        } else if let Some(text) = message["content"].as_str() {
-            if text.len() > MIN_DUMP_TEXT_LENGTH {
-                let truncated = truncate_at(text, DUMP_TRUNCATE_LENGTH);
-                println!("{prefix}L{index} [{role}]{ts_part}: {truncated}");
-            }
+        } else if let Some(text) = message["content"].as_str()
+            && text.len() > MIN_DUMP_TEXT_LENGTH
+        {
+            let truncated = truncate_at(text, DUMP_TRUNCATE_LENGTH);
+            println!("{prefix}L{index} [{role}]{ts_part}: {truncated}");
         }
     }
     Ok(0)
@@ -1394,10 +1393,216 @@ mod tests {
 
     #[test]
     fn redact_details_strips_env_values() {
-        let text = "KUBECONFIG=/tmp/k3d-config SECRET_KEY=abc123 other text";
+        let text = "KUBECONFIG=/data/k3d-config SECRET_KEY=abc123 other text";
         let redacted = redact_details(text);
         assert!(redacted.contains("KUBECONFIG=<redacted>"));
         assert!(redacted.contains("SECRET_KEY=<redacted>"));
+    }
+
+    #[test]
+    fn state_file_lifecycle_two_cycles() {
+        let session_id = "lifecycle-test-session";
+        let tmp_dir = tempfile::tempdir().unwrap();
+        let session_file = write_session_file(
+            tmp_dir.path(),
+            &[
+                r#"{"timestamp":"2026-03-15T10:00:00Z","message":{"role":"user","content":"hello"}}"#,
+                r#"{"timestamp":"2026-03-15T10:01:00Z","message":{"role":"user","content":"world"}}"#,
+            ],
+        );
+
+        // Use XDG isolation for state files
+        let data_dir = tmp_dir.path().join("xdg_data");
+        fs::create_dir_all(&data_dir).unwrap();
+        temp_env::with_vars(
+            [
+                ("XDG_DATA_HOME", Some(data_dir.to_str().unwrap())),
+                ("HOME", Some(tmp_dir.path().to_str().unwrap())),
+            ],
+            || {
+                // First scan
+                let (issues, last_line) = scan(&session_file, 0).unwrap();
+                assert_eq!(last_line, 2);
+
+                // Save state after first cycle
+                let mut state = ObserverState::default_for_session(session_id);
+                state.cursor = last_line;
+                state.last_scan_time = "2026-03-15T10:02:00Z".to_string();
+                save_observer_state(session_id, &state).unwrap();
+
+                // Load and verify cursor advanced
+                let loaded = load_observer_state(session_id).unwrap();
+                assert_eq!(loaded.cursor, 2);
+                assert_eq!(loaded.session_id, session_id);
+
+                // Second cycle from cursor
+                let (issues2, last_line2) = scan(&session_file, loaded.cursor).unwrap();
+                assert!(issues2.is_empty());
+                assert_eq!(last_line2, 2);
+
+                // Verify state file is atomic (exists, not corrupted)
+                let loaded2 = load_observer_state(session_id).unwrap();
+                assert_eq!(loaded2.cursor, 2);
+
+                drop(issues);
+            },
+        );
+    }
+
+    #[test]
+    fn golden_scan_json_output() {
+        let mut state = ScanState::default();
+        let issues = crate::commands::observe::classifier::check_text_for_issues(
+            42,
+            types::MessageRole::User,
+            "error[E0308]: mismatched types\n  expected u32, found &str",
+            Some(types::SourceTool::Bash),
+            &mut state,
+        );
+        assert!(!issues.is_empty());
+
+        let rendered = output::render_json(&issues[0]);
+        let parsed: serde_json::Value = serde_json::from_str(&rendered).unwrap();
+
+        // Verify exact JSON shape
+        assert!(parsed["issue_id"].is_string());
+        assert!(parsed["line"].is_number());
+        assert!(parsed["code"].is_string());
+        assert!(parsed["category"].is_string());
+        assert!(parsed["severity"].is_string());
+        assert!(parsed["confidence"].is_string());
+        assert!(parsed["fix_safety"].is_string());
+        assert!(parsed["summary"].is_string());
+        assert!(parsed["details"].is_string());
+        assert!(parsed["fingerprint"].is_string());
+        assert!(parsed["fixable"].is_boolean());
+    }
+
+    #[test]
+    fn golden_human_output_format() {
+        let issue = Issue {
+            issue_id: "abc123def456".into(),
+            line: 42,
+            code: IssueCode::BuildOrLintFailure,
+            category: IssueCategory::BuildError,
+            severity: IssueSeverity::Critical,
+            confidence: types::Confidence::High,
+            fix_safety: types::FixSafety::AutoFixSafe,
+            summary: "Build failed".into(),
+            details: "error[E0308]".into(),
+            fingerprint: "build_or_lint_failure".into(),
+            source_role: types::MessageRole::Assistant,
+            source_tool: None,
+            fix_target: Some("src/main.rs".into()),
+            fix_hint: Some("Fix the type".into()),
+            evidence_excerpt: None,
+        };
+        let rendered = output::render_human(&issue);
+        assert!(rendered.contains("[CRITICAL/high]"));
+        assert!(rendered.contains("L42"));
+        assert!(rendered.contains("build_error/build_or_lint_failure"));
+        assert!(rendered.contains("fix: src/main.rs"));
+        assert!(rendered.contains("hint: Fix the type"));
+    }
+
+    #[test]
+    fn golden_summary_json_shape() {
+        let issue = Issue {
+            issue_id: "abc123".into(),
+            line: 1,
+            code: IssueCode::BuildOrLintFailure,
+            category: IssueCategory::BuildError,
+            severity: IssueSeverity::Critical,
+            confidence: types::Confidence::High,
+            fix_safety: types::FixSafety::AutoFixSafe,
+            summary: "test".into(),
+            details: String::new(),
+            fingerprint: "test".into(),
+            source_role: types::MessageRole::Assistant,
+            source_tool: None,
+            fix_target: None,
+            fix_hint: None,
+            evidence_excerpt: None,
+        };
+        let rendered = output::render_summary(&[issue], 100);
+        let parsed: serde_json::Value = serde_json::from_str(&rendered).unwrap();
+        assert_eq!(parsed["status"], "done");
+        assert_eq!(parsed["last_line"], 100);
+        assert_eq!(parsed["total_issues"], 1);
+        assert!(parsed["by_severity"].is_object());
+        assert!(parsed["by_category"].is_object());
+    }
+
+    #[test]
+    fn markdown_output_contains_table() {
+        let issue = Issue {
+            issue_id: "abc123".into(),
+            line: 42,
+            code: IssueCode::BuildOrLintFailure,
+            category: IssueCategory::BuildError,
+            severity: IssueSeverity::Critical,
+            confidence: types::Confidence::High,
+            fix_safety: types::FixSafety::AutoFixSafe,
+            summary: "Build failed".into(),
+            details: String::new(),
+            fingerprint: "test".into(),
+            source_role: types::MessageRole::Assistant,
+            source_tool: None,
+            fix_target: None,
+            fix_hint: None,
+            evidence_excerpt: None,
+        };
+        let rendered = output::render_markdown(&[issue]);
+        assert!(rendered.contains("# Observe report"));
+        assert!(rendered.contains("Build failed"));
+        assert!(rendered.contains("Total: 1 issues"));
+    }
+
+    #[test]
+    fn top_causes_groups_by_code() {
+        let make_issue = |code: IssueCode, summary: &str| Issue {
+            issue_id: "x".into(),
+            line: 1,
+            code,
+            category: IssueCategory::BuildError,
+            severity: IssueSeverity::Critical,
+            confidence: types::Confidence::High,
+            fix_safety: types::FixSafety::AutoFixSafe,
+            summary: summary.into(),
+            details: String::new(),
+            fingerprint: "x".into(),
+            source_role: types::MessageRole::Assistant,
+            source_tool: None,
+            fix_target: None,
+            fix_hint: None,
+            evidence_excerpt: None,
+        };
+        let issues = vec![
+            make_issue(IssueCode::BuildOrLintFailure, "Build 1"),
+            make_issue(IssueCode::BuildOrLintFailure, "Build 2"),
+            make_issue(IssueCode::HookDeniedToolCall, "Hook denied"),
+        ];
+        let rendered = output::render_top_causes(&issues, 2);
+        let parsed: serde_json::Value = serde_json::from_str(&rendered).unwrap();
+        let causes = parsed["top_causes"].as_array().unwrap();
+        assert_eq!(causes.len(), 2);
+        assert_eq!(causes[0]["count"], 2);
+    }
+
+    #[test]
+    fn scan_with_limit_stops_at_bound() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = write_session_file(
+            dir.path(),
+            &[
+                r#"{"message":{"role":"user","content":"line zero"}}"#,
+                r#"{"message":{"role":"user","content":"line one"}}"#,
+                r#"{"message":{"role":"user","content":"line two"}}"#,
+                r#"{"message":{"role":"user","content":"line three"}}"#,
+            ],
+        );
+        let (_, last_line) = scan_with_limit(&path, 0, Some(1)).unwrap();
+        assert_eq!(last_line, 2); // scanned lines 0 and 1
     }
 }
 
