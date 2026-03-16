@@ -43,9 +43,15 @@ ${DATA_DIR}/${SUITE_NAME}/
     namespace.yaml
     otel-collector.yaml
     demo-workload.yaml
-  groups/                    # one file per group (or per range)
+  groups/                    # one markdown file + one manifest directory per group
     g01-crud.md
+    g01/                     # pre-written manifests for G1, applied via harness apply --manifest g01
+      01-create.yaml
+      02-update.yaml
     g02-validation.md
+    g02/                     # pre-written manifests for G2
+      01-invalid-enum.yaml
+      02-missing-field.yaml
     ...
 ```
 
@@ -163,7 +169,9 @@ When `profiles` includes `multi-zone`, baselines that deploy workloads (demo app
 
 ## Groups directory
 
-One file per group. Naming convention: `g{NN}-{slug}.md` where NN is zero-padded and slug is kebab-case. Range groups use: `g17-g26-pipe-mode.md`.
+One markdown file per group plus a manifest directory with the same group ID prefix. Naming convention: `g{NN}-{slug}.md` for the markdown, `g{NN}/` for the manifest directory where NN is zero-padded and slug is kebab-case. Range groups use: `g17-g26-pipe-mode.md` with `g17-g26/` for manifests.
+
+Each manifest directory contains the YAML files from the group's `## Configure` section, named in apply order: `01-{descriptive-slug}.yaml`, `02-{descriptive-slug}.yaml`, etc. These files are identical to the inline fenced blocks in the markdown and give `suite:run` pre-written manifests ready for `harness apply --manifest g{NN}` without depending on preflight extraction.
 
 ## Group file structure
 
@@ -201,7 +209,7 @@ restart_namespaces:
 
 ## Configure
 
-Inline YAML manifests in fenced code blocks. These are authoritative. `harness preflight` extracts them verbatim into the active run's `manifests/prepared/groups/<group_id>/01.yaml`, `02.yaml`, and so on.
+Each manifest block is preceded by a `File:` reference line pointing to the corresponding pre-written YAML file in the group's manifest directory (e.g., `File: g01/01-create.yaml`). The inline YAML blocks remain authoritative - `harness preflight` extracts them verbatim into the active run's `manifests/prepared/groups/<group_id>/01.yaml`, `02.yaml`, and so on. The pre-written files in `groups/<group_id>/` contain identical content and allow `harness apply --manifest <group-id>` to work without preflight extraction.
 
 Use `expected_rejection_orders` when a prepared manifest is intentionally invalid and a later execution step must prove the API rejects it. The list is 1-based and follows the profile-specific `## Configure` manifest order. `harness preflight` and `authoring-validate` still materialize those manifests, but they skip up-front schema validation for the listed ordinals so the rejection path can run in Phase 4.
 
