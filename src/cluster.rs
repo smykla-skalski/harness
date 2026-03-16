@@ -424,6 +424,9 @@ pub struct ClusterSpec {
     /// CP container image (universal mode only).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cp_image: Option<String>,
+    /// Admin user token extracted from CP (universal mode only).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub admin_token: Option<String>,
 }
 
 impl ClusterSpec {
@@ -492,6 +495,7 @@ impl ClusterSpec {
             docker_network,
             store_type: None,
             cp_image: None,
+            admin_token: None,
         })
     }
 
@@ -505,6 +509,12 @@ impl ClusterSpec {
         let ip = member.container_ip.as_deref()?;
         let port = member.cp_api_port.unwrap_or(5681);
         Some(format!("http://{ip}:{port}"))
+    }
+
+    /// Returns the admin token for universal mode, `None` for Kubernetes.
+    #[must_use]
+    pub fn admin_token(&self) -> Option<&str> {
+        self.admin_token.as_deref()
     }
 
     #[must_use]
@@ -567,6 +577,8 @@ pub struct ClusterRecordPayload {
     pub store_type: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cp_image: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub admin_token: Option<String>,
 }
 
 impl ClusterRecordPayload {
@@ -614,6 +626,10 @@ impl ClusterRecordPayload {
             .and_then(Value::as_str)
             .map(Into::into);
         let cp_image = obj.get("cp_image").and_then(Value::as_str).map(Into::into);
+        let admin_token = obj
+            .get("admin_token")
+            .and_then(Value::as_str)
+            .map(Into::into);
         Ok(Self {
             mode,
             platform,
@@ -625,6 +641,7 @@ impl ClusterRecordPayload {
             docker_network,
             store_type,
             cp_image,
+            admin_token,
         })
     }
 
@@ -641,6 +658,7 @@ impl ClusterRecordPayload {
             docker_network: spec.docker_network.clone(),
             store_type: spec.store_type.clone(),
             cp_image: spec.cp_image.clone(),
+            admin_token: spec.admin_token.clone(),
         }
     }
 
@@ -663,6 +681,7 @@ impl ClusterRecordPayload {
             docker_network: self.docker_network.clone(),
             store_type: self.store_type.clone(),
             cp_image: self.cp_image.clone(),
+            admin_token: self.admin_token.clone(),
         })
     }
 
