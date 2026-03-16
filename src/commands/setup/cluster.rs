@@ -569,7 +569,7 @@ fn universal_single_up_compose(
     compose_file.write_to(&compose_path)?;
 
     let project = format!("harness-{cp_name}");
-    compose_up(&compose_path, &project)?;
+    compose_up(&compose_path, &project, 180)?;
 
     let compose_network = format!("{project}_{network}");
     let container = format!("{project}-{cp_name}-1");
@@ -627,7 +627,7 @@ fn universal_global_zone_up(
     compose_file.write_to(&compose_path)?;
 
     let project = format!("harness-{global_name}");
-    compose_up(&compose_path, &project)?;
+    compose_up(&compose_path, &project, 180)?;
 
     let compose_network = format!("{project}_{network}");
     let global_container = format!("{project}-{global_name}-1");
@@ -702,7 +702,7 @@ fn universal_global_two_zones_up(
     compose_file.write_to(&compose_path)?;
 
     let project = format!("harness-{global_name}");
-    compose_up(&compose_path, &project)?;
+    compose_up(&compose_path, &project, 180)?;
 
     let compose_network = format!("{project}_{network}");
     let global_container = format!("{project}-{global_name}-1");
