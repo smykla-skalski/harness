@@ -307,9 +307,12 @@ pub struct ObserveFilterArgs {
     /// Only show fixable issues.
     #[arg(long)]
     pub fixable: bool,
+    /// Write truncated issues to this file instead of stdout (watch mode).
+    #[arg(long)]
+    pub output: Option<String>,
     /// Write full untruncated issues to this file.
     #[arg(long)]
-    pub details_file: Option<String>,
+    pub output_details: Option<String>,
 }
 
 /// Observe subcommands.
