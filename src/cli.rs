@@ -265,6 +265,9 @@ pub struct ServiceArgs {
     /// Enable transparent proxy.
     #[arg(long)]
     pub transparent_proxy: bool,
+    /// Readiness timeout in seconds.
+    #[arg(long, default_value = "60")]
+    pub timeout: u64,
     /// Custom dataplane template path.
     #[arg(long)]
     pub dataplane_template: Option<String>,

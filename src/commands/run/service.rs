@@ -90,6 +90,7 @@ fn service_up(
     port: Option<u16>,
     mesh: &str,
     transparent_proxy: bool,
+    timeout: u64,
     run_dir_args: &RunDirArgs,
 ) -> Result<i32, CliError> {
     let svc_name = name.ok_or_else(|| CliErrorKind::usage_error("service name is required"))?;
@@ -132,6 +133,27 @@ fn service_up(
         &["sleep", "infinity"],
     )?;
 
+    // Run the rest inside a helper; on failure clean up the container
+    if let Err(err) = service_up_inner(svc_name, svc_port, mesh, spec, network, token_str, transparent_proxy, timeout) {
+        let _ = exec::docker_rm(svc_name);
+        return Err(err);
+    }
+
+    println!("{svc_name}");
+    Ok(0)
+}
+
+/// Post-container-start setup: configure dataplane, inject certs, wait for readiness.
+fn service_up_inner(
+    svc_name: &str,
+    svc_port: u16,
+    mesh: &str,
+    spec: &ClusterSpec,
+    network: &str,
+    token_str: &str,
+    transparent_proxy: bool,
+    timeout: u64,
+) -> Result<(), CliError> {
     // Resolve the container IP on the Docker network
     let container_address = exec::docker_inspect_ip(svc_name, network)?;
 
@@ -195,14 +217,13 @@ fn service_up(
     // Wait for kuma-dp to become ready
     let readiness_url = format!("http://{container_address}:9902/ready");
     eprintln!("service: waiting for {svc_name} readiness at {readiness_url}");
-    exec::wait_for_http(&readiness_url, Duration::from_secs(60)).map_err(|_| {
+    exec::wait_for_http(&readiness_url, Duration::from_secs(timeout)).map_err(|_| {
         CliError::from(CliErrorKind::service_readiness_timeout(
             svc_name.to_string(),
         ))
     })?;
 
-    println!("{svc_name}");
-    Ok(0)
+    Ok(())
 }
 
 /// Extract the CA certificate from the CP's XDS TLS endpoint.
