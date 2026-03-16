@@ -458,7 +458,11 @@ pub fn compose_down_project(project: &str) -> Result<CommandResult, CliError> {
 // kumactl execution
 // ---------------------------------------------------------------------------
 
-/// Run kumactl with a CP address.
+/// Run kumactl configured to talk to a CP at the given address.
+///
+/// Creates a temporary config file pointing kumactl at the CP.
+/// kumactl does not accept a direct `--cp-addr` flag - it needs a
+/// config file with a named control plane entry.
 ///
 /// # Errors
 /// Returns `CliError` on command failure.
@@ -468,8 +472,18 @@ pub fn kumactl_run(
     args: &[&str],
     ok_exit_codes: &[i32],
 ) -> Result<CommandResult, CliError> {
+    use std::io::Write as _;
+    let config_content = format!(
+        "contexts:\n- controlPlane: harness\n  name: harness\ncurrentContext: harness\ncontrolPlanes:\n- coordinates:\n    apiServer:\n      url: {cp_addr}\n  name: harness\n"
+    );
+    let mut tmp = tempfile::NamedTempFile::new()
+        .map_err(|e| CliErrorKind::io(format!("kumactl config temp: {e}")))?;
+    tmp.write_all(config_content.as_bytes())
+        .map_err(|e| CliErrorKind::io(format!("write kumactl config: {e}")))?;
+    let config_path = tmp.path().to_string_lossy().into_owned();
+
     let binary_str = binary.to_string_lossy();
-    let mut command: Vec<&str> = vec![&binary_str, "--cp-addr", cp_addr];
+    let mut command: Vec<&str> = vec![&binary_str, "--config-file", &config_path];
     command.extend_from_slice(args);
     run_command(&command, None, None, ok_exit_codes)
 }
@@ -570,6 +584,31 @@ pub fn cp_api_post_with_token(
         .read_json()
         .map_err(|e| CliErrorKind::cp_api_unreachable(url).with_details(e.to_string()))?;
     Ok(resp_body)
+}
+
+/// POST JSON to the CP API with optional auth token, returning the response as
+/// a raw string. Used for endpoints that return plain text (e.g., token generation).
+///
+/// # Errors
+/// Returns `CliError` on HTTP failure.
+pub fn cp_api_post_text_with_token(
+    base_url: &str,
+    path: &str,
+    body: &serde_json::Value,
+    token: Option<&str>,
+) -> Result<String, CliError> {
+    let url = format!("{base_url}{path}");
+    let mut req = ureq::post(&url).header("Content-Type", "application/json");
+    if let Some(tok) = token {
+        req = req.header("Authorization", &format!("Bearer {tok}"));
+    }
+    let text = req
+        .send_json(body)
+        .map_err(|e| CliErrorKind::cp_api_unreachable(url.clone()).with_details(e.to_string()))?
+        .body_mut()
+        .read_to_string()
+        .map_err(|e| CliErrorKind::cp_api_unreachable(url).with_details(e.to_string()))?;
+    Ok(text)
 }
 
 /// PUT JSON to the CP API with optional auth token.
