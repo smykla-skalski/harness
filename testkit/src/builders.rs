@@ -1391,6 +1391,24 @@ impl RunDirBuilder {
     }
 }
 
+/// Default kubernetes run: single-zone profile with standard suite and group.
+#[must_use]
+pub fn default_kubernetes_run(tmp: &Path, run_id: &str) -> RunDirBuilder {
+    RunDirBuilder::new(tmp, run_id)
+        .profile("single-zone")
+        .suite(default_suite())
+        .group(default_group())
+}
+
+/// Default universal run: single-zone-universal profile with universal suite and group.
+#[must_use]
+pub fn default_universal_run(tmp: &Path, run_id: &str) -> RunDirBuilder {
+    RunDirBuilder::new(tmp, run_id)
+        .profile("single-zone-universal")
+        .suite(default_universal_suite())
+        .group(default_group())
+}
+
 // ---------------------------------------------------------------------------
 // HookPayloadBuilder
 // ---------------------------------------------------------------------------
