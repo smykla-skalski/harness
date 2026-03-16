@@ -56,7 +56,13 @@ The prompt body must include:
 - `Suite target: <relative path within the suite>`
 - the validation or apply error message
 
-The options must be exactly:
+For baseline manifests (files under `baseline/`), the "Fix in suite and this run" option is NOT available. Baseline fixes are authoring-time decisions that belong in `suite:new`, not mid-run edits. If a baseline manifest fails validation, this indicates a `suite:new` authoring defect - record it as a product finding. For baseline manifests, the options must be exactly:
+
+1. **"Fix for this run only"**
+2. **"Skip this step"**
+3. **"Stop run"**
+
+For all other manifests (group manifests, runtime manifests), the full options apply:
 
 1. **"Fix for this run only"** - Write the corrected manifest to the active run's `manifests/` directory, record a deviation in the run report (what changed, why, user-approved). The suite files stay unchanged. Future runs will hit the same error.
 

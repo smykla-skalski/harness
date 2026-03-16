@@ -280,7 +280,7 @@ mkdir -p "${SUITE_DIR}/baseline" "${SUITE_DIR}/groups"
 Launch these workers after approval:
 
 - [../../agents/suite-writer.md](../../agents/suite-writer.md) for `${SUITE_DIR}/suite.md`
-- [../../agents/baseline-writer.md](../../agents/baseline-writer.md) for `${SUITE_DIR}/baseline/*.yaml`
+- [../../agents/baseline-writer.md](../../agents/baseline-writer.md) for `${SUITE_DIR}/baseline/*.yaml` - the baseline-writer must validate that Service manifests have `appProtocol` set on all ports (catches missing `appProtocol: http` on demo-app services and similar). Baseline manifests must pass `kubectl dry-run` validation (via `harness authoring-validate`) before the suite is marked complete.
 - [../../agents/group-writer.md](../../agents/group-writer.md) for `${SUITE_DIR}/groups/g{NN}-*.md` and `${SUITE_DIR}/groups/g{NN}/*.yaml`
 
 Writer contract:
