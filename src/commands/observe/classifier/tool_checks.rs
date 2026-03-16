@@ -6,8 +6,7 @@ use super::emitter::{Guidance, IssueBlueprint, IssueEmitter};
 use super::{OLD_SKILL_REGEX, RM_RECURSIVE_REGEX, SKILL_NAME_REGEX};
 use crate::commands::observe::patterns;
 use crate::commands::observe::types::{
-    Confidence, FixSafety, Issue, IssueCategory, IssueCode, IssueSeverity, MessageRole, ScanState,
-    SourceTool, ToolUseRecord,
+    Confidence, FixSafety, Issue, IssueCode, MessageRole, ScanState, SourceTool, ToolUseRecord,
 };
 use crate::shell_parse::{self, ParsedCommand, is_env_assignment};
 
@@ -269,10 +268,8 @@ fn check_bash_tool_use(
         if OLD_SKILL_REGEX.is_match(command) {
             emitter.emit(
                 issues,
-                IssueBlueprint::new(
+                IssueBlueprint::from_code(
                     IssueCode::OldSkillNameUsedInCommand,
-                    IssueCategory::NamingError,
-                    IssueSeverity::Medium,
                     "Old skill name used in harness command",
                 )
                 .with_guidance(Guidance::fix_hint(
@@ -356,10 +353,8 @@ fn track_resource_lifecycle(
 
         IssueEmitter::new(line_num, MessageRole::Assistant, state).emit(
             issues,
-            IssueBlueprint::new(
+            IssueBlueprint::from_code(
                 IssueCode::ResourceNotCleanedUpBeforeGroupEnd,
-                IssueCategory::SkillBehavior,
-                IssueSeverity::Low,
                 "Resources created but not cleaned up before group end",
             )
             .with_fingerprint(resource_list)
@@ -417,10 +412,8 @@ fn track_capture_between_groups(
             let details = format!("Command: {}", command.raw);
             IssueEmitter::new(line_num, MessageRole::Assistant, state).emit(
                 issues,
-                IssueBlueprint::new(
+                IssueBlueprint::from_code(
                     IssueCode::GroupReportedWithoutCapture,
-                    IssueCategory::SkillBehavior,
-                    IssueSeverity::Medium,
                     "Group reported without a preceding state capture",
                 )
                 .with_fingerprint("group_reported_without_capture")
@@ -467,10 +460,8 @@ fn check_harness_command_patterns(
     if command.has_harness_subcommand("validator-decision") {
         emitter.emit(
             issues,
-            IssueBlueprint::new(
+            IssueBlueprint::from_code(
                 IssueCode::InvalidHarnessSubcommandUsed,
-                IssueCategory::CliError,
-                IssueSeverity::Medium,
                 "Invalid harness subcommand/argument used",
             )
             .with_guidance(Guidance::fix_hint(
@@ -489,10 +480,8 @@ fn check_harness_command_patterns(
     {
         emitter.emit(
             issues,
-            IssueBlueprint::new(
+            IssueBlueprint::from_code(
                 IssueCode::PythonUsedInBashToolUse,
-                IssueCategory::UnexpectedBehavior,
-                IssueSeverity::Medium,
                 "Python used in Bash command - agents should never need python",
             )
             .with_guidance(Guidance::fix_hint(
@@ -515,10 +504,8 @@ fn check_destructive_patterns(
     if RM_RECURSIVE_REGEX.is_match(command) && !command.contains("&&") {
         emitter.emit(
             issues,
-            IssueBlueprint::new(
+            IssueBlueprint::from_code(
                 IssueCode::UnverifiedRecursiveRemove,
-                IssueCategory::UnexpectedBehavior,
-                IssueSeverity::Medium,
                 "Destructive rm -r without chained verification",
             )
             .with_guidance(Guidance::advisory(
@@ -534,10 +521,8 @@ fn check_destructive_patterns(
     if command.contains("make k3d/") || command.contains("make kind/") {
         emitter.emit(
             issues,
-            IssueBlueprint::new(
+            IssueBlueprint::from_code(
                 IssueCode::RawClusterMakeTargetUsed,
-                IssueCategory::UnexpectedBehavior,
-                IssueSeverity::Critical,
                 "Raw make target used for cluster operation",
             )
             .with_guidance(Guidance::fix_hint(
@@ -553,10 +538,8 @@ fn check_destructive_patterns(
     if command.contains("git commit") || command.contains("git add") {
         emitter.emit(
             issues,
-            IssueBlueprint::new(
+            IssueBlueprint::from_code(
                 IssueCode::UnauthorizedGitCommitDuringRun,
-                IssueCategory::SkillBehavior,
-                IssueSeverity::Low,
                 "Git commit during active run",
             )
             .with_guidance(Guidance::fix_hint(
@@ -592,10 +575,8 @@ fn check_absolute_manifest_path(
     {
         emitter.emit(
             issues,
-            IssueBlueprint::new(
+            IssueBlueprint::from_code(
                 IssueCode::AbsoluteManifestPathUsed,
-                IssueCategory::UnexpectedBehavior,
-                IssueSeverity::Medium,
                 "Absolute path used with harness apply",
             )
             .with_guidance(Guidance::fix_hint(
@@ -628,10 +609,8 @@ fn check_direct_task_output_read(
     if is_task_file_read || is_polling_pattern {
         emitter.emit(
             issues,
-            IssueBlueprint::new(
+            IssueBlueprint::from_code(
                 IssueCode::DirectTaskOutputFileRead,
-                IssueCategory::UnexpectedBehavior,
-                IssueSeverity::Medium,
                 "Direct read of internal task output file",
             )
             .with_guidance(Guidance::fix_hint(
@@ -664,10 +643,8 @@ fn check_env_var_construction(
     {
         emitter.emit(
             issues,
-            IssueBlueprint::new(
+            IssueBlueprint::from_code(
                 IssueCode::ManualKubeconfigConstruction,
-                IssueCategory::UnexpectedBehavior,
-                IssueSeverity::Medium,
                 "Agent manually setting KUBECONFIG",
             )
             .with_guidance(Guidance::fix_hint(
@@ -685,10 +662,8 @@ fn check_env_var_construction(
     if command.starts_with_export() && command.raw.contains('=') {
         emitter.emit(
             issues,
-            IssueBlueprint::new(
+            IssueBlueprint::from_code(
                 IssueCode::ManualExportConstruction,
-                IssueCategory::UnexpectedBehavior,
-                IssueSeverity::Medium,
                 "Agent constructing env vars via export",
             )
             .with_guidance(Guidance::fix_hint(
@@ -707,10 +682,8 @@ fn check_env_var_construction(
     if command.has_env_prefix_assignment() && command.words.len() > 1 {
         emitter.emit(
             issues,
-            IssueBlueprint::new(
+            IssueBlueprint::from_code(
                 IssueCode::ManualEnvPrefixConstruction,
-                IssueCategory::UnexpectedBehavior,
-                IssueSeverity::Medium,
                 "Agent constructing env var prefix",
             )
             .with_guidance(Guidance::fix_hint(
@@ -744,10 +717,8 @@ fn check_sleep_prefix_before_harness(
     if has_harness_continuation {
         emitter.emit(
             issues,
-            IssueBlueprint::new(
+            IssueBlueprint::from_code(
                 IssueCode::SleepPrefixBeforeHarnessCommand,
-                IssueCategory::UnexpectedBehavior,
-                IssueSeverity::Low,
                 "Sleep prefix before harness command",
             )
             .with_guidance(Guidance::fix_hint(
@@ -801,10 +772,8 @@ fn check_truncated_verification_output(
     if has_verification_keyword {
         emitter.emit(
             issues,
-            IssueBlueprint::new(
+            IssueBlueprint::from_code(
                 IssueCode::VerificationOutputTruncated,
-                IssueCategory::SkillBehavior,
-                IssueSeverity::Low,
                 "Verification output truncated by tail/head",
             )
             .with_guidance(Guidance::advisory(
@@ -871,10 +840,8 @@ fn check_repeated_kubectl_queries(
         let details = format!("Resource: {target}, queries in window: {count}");
         IssueEmitter::new(line_num, MessageRole::Assistant, state).emit(
             issues,
-            IssueBlueprint::new(
+            IssueBlueprint::from_code(
                 IssueCode::RepeatedKubectlQueryForSameResource,
-                IssueCategory::UnexpectedBehavior,
-                IssueSeverity::Low,
                 "Repeated kubectl queries for same resource - dump once and read the file",
             )
             .with_fingerprint(target)
@@ -949,10 +916,8 @@ fn check_manifest_fix_prompt(
         let details = format!("Question: {question_text}");
         emitter.emit(
             issues,
-            IssueBlueprint::new(
+            IssueBlueprint::from_code(
                 IssueCode::ManifestFixPromptShown,
-                IssueCategory::DataIntegrity,
-                IssueSeverity::Medium,
                 "Manifest rejected by cluster - possible product bug",
             )
             .with_guidance(Guidance::fix_hint(
@@ -978,10 +943,8 @@ fn check_validator_install_prompt(
         let details = format!("Question: {question_text}");
         emitter.emit(
             issues,
-            IssueBlueprint::new(
+            IssueBlueprint::from_code(
                 IssueCode::ValidatorInstallPromptShown,
-                IssueCategory::SkillBehavior,
-                IssueSeverity::Medium,
                 "Validator install prompt when binary may already exist",
             )
             .with_guidance(Guidance::fix_target_hint(
@@ -1031,10 +994,8 @@ fn check_question_deviations(
         let details = format!("Header: {header}, Question: {question_text}");
         emitter.emit(
             issues,
-            IssueBlueprint::new(
+            IssueBlueprint::from_code(
                 IssueCode::RuntimeDeviationPromptShown,
-                IssueCategory::SkillBehavior,
-                IssueSeverity::Critical,
                 "Runtime deviation - authored suite needs runtime correction",
             )
             .with_guidance(Guidance::fix_target_hint(
@@ -1066,10 +1027,8 @@ fn check_wrong_skill_crossref(
             let details = format!("Question: {question_text}, Option: {label}");
             emitter.emit(
                 issues,
-                IssueBlueprint::new(
+                IssueBlueprint::from_code(
                     IssueCode::WrongSkillCrossReference,
-                    IssueCategory::SkillBehavior,
-                    IssueSeverity::Medium,
                     "suite:run offering suite:new as structured choice",
                 )
                 .with_guidance(Guidance::fix_target_hint(
@@ -1110,10 +1069,8 @@ fn check_write_edit_tool_use(
         let details = format!("Path: {path}");
         IssueEmitter::new(line_num, MessageRole::Assistant, state).emit(
             issues,
-            IssueBlueprint::new(
+            IssueBlueprint::from_code(
                 IssueCode::FileEditChurn,
-                IssueCategory::UnexpectedBehavior,
-                IssueSeverity::Medium,
                 format!("File modified {current_count} times - possible churn"),
             )
             .with_fingerprint(format!("{path}:{current_count}"))
@@ -1142,10 +1099,8 @@ fn check_write_edit_tool_use(
                 let details = format!("Path: {path}, name: {skill_name}");
                 IssueEmitter::new(line_num, MessageRole::Assistant, state).emit(
                     issues,
-                    IssueBlueprint::new(
+                    IssueBlueprint::from_code(
                         IssueCode::ShortSkillNameInSkillFile,
-                        IssueCategory::SkillBehavior,
-                        IssueSeverity::Critical,
                         format!(
                             "SKILL.md name field uses colon-prefixed '{skill_name}' - should be short name"
                         ),
@@ -1189,10 +1144,8 @@ fn check_manifest_created_during_run(
     let details = format!("Path: {path}");
     IssueEmitter::new(line_num, MessageRole::Assistant, state).emit(
         issues,
-        IssueBlueprint::new(
+        IssueBlueprint::from_code(
             IssueCode::ManifestCreatedDuringRun,
-            IssueCategory::SkillBehavior,
-            IssueSeverity::Critical,
             "Manifest created during run - should be authored in suite:new",
         )
         .with_fingerprint(path.to_string())
@@ -1244,10 +1197,8 @@ fn check_uncommitted_source_code_edit(
                 let details = format!("Path: {path}");
                 IssueEmitter::new(line_num, MessageRole::Assistant, state).emit(
                     issues,
-                    IssueBlueprint::new(
+                    IssueBlueprint::from_code(
                         IssueCode::UncommittedSourceCodeEdit,
-                        IssueCategory::SkillBehavior,
-                        IssueSeverity::Medium,
                         "Source code edited without committing previous changes",
                     )
                     .with_fingerprint("uncommitted_source_code_edit")
@@ -1277,10 +1228,8 @@ fn check_uncommitted_source_code_edit(
             let details = format!("Command: {command}");
             IssueEmitter::new(line_num, MessageRole::Assistant, state).emit(
                 issues,
-                IssueBlueprint::new(
+                IssueBlueprint::from_code(
                     IssueCode::UncommittedSourceCodeEdit,
-                    IssueCategory::SkillBehavior,
-                    IssueSeverity::Medium,
                     "Harness command run with uncommitted source code changes",
                 )
                 .with_fingerprint("uncommitted_source_before_harness")
@@ -1312,10 +1261,8 @@ fn check_managed_file_writes(
             let details = format!("Path: {path}");
             IssueEmitter::new(line_num, MessageRole::Assistant, state).emit(
                 issues,
-                IssueBlueprint::new(
+                IssueBlueprint::from_code(
                     IssueCode::DirectManagedFileWrite,
-                    IssueCategory::UnexpectedBehavior,
-                    IssueSeverity::Critical,
                     format!("Direct write to harness-managed file: {managed}"),
                 )
                 .with_fingerprint(path.to_string())

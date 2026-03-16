@@ -1,9 +1,7 @@
 use super::emitter::{Guidance, IssueBlueprint};
 use super::{AGENT_NAME_REGEX, EXIT_CODE_REGEX, TextCheckContext};
 use crate::commands::observe::patterns;
-use crate::commands::observe::types::{
-    Confidence, FixSafety, Issue, IssueCategory, IssueCode, IssueSeverity,
-};
+use crate::commands::observe::types::{Confidence, FixSafety, Issue, IssueCategory, IssueCode};
 
 /// Check for KSA hook codes in Bash output.
 /// Caller guarantees: `source_tool` == Bash.
@@ -12,19 +10,14 @@ pub(super) fn check_ksa_codes(context: &mut TextCheckContext<'_>, issues: &mut V
         if context.lower.contains(code) {
             let display_code = code.to_uppercase();
             let summary = format!("Harness hook code {display_code} triggered");
-            let blueprint = IssueBlueprint::new(
-                IssueCode::HarnessHookCodeTriggered,
-                IssueCategory::HookFailure,
-                IssueSeverity::Medium,
-                summary,
-            )
-            .with_fingerprint(display_code.clone())
-            .with_guidance(Guidance::fix_hint(format!(
-                "Check hook logic for {display_code}"
-            )))
-            .with_confidence(Confidence::High)
-            .with_fix_safety(FixSafety::AutoFixSafe)
-            .with_source_tool(context.source_tool);
+            let blueprint = IssueBlueprint::from_code(IssueCode::HarnessHookCodeTriggered, summary)
+                .with_fingerprint(display_code.clone())
+                .with_guidance(Guidance::fix_hint(format!(
+                    "Check hook logic for {display_code}"
+                )))
+                .with_confidence(Confidence::High)
+                .with_fix_safety(FixSafety::AutoFixSafe)
+                .with_source_tool(context.source_tool);
             context.emit_current(issues, blueprint);
             break;
         }
@@ -66,12 +59,7 @@ pub(super) fn check_exit_code_issues(context: &mut TextCheckContext<'_>, issues:
         let summary = format!(
             "Manifest operation failed at runtime (exit {exit_code}) - possible product bug"
         );
-        let blueprint = IssueBlueprint::new(
-            IssueCode::ManifestRuntimeFailure,
-            IssueCategory::DataIntegrity,
-            IssueSeverity::Medium,
-            summary,
-        )
+        let blueprint = IssueBlueprint::from_code(IssueCode::ManifestRuntimeFailure, summary)
         .with_fingerprint("manifest_runtime_failure")
         .with_guidance(Guidance::fix_hint(
             "Manifest preflight/apply/validate failed. Could be a suite error OR a product bug. \
@@ -83,35 +71,26 @@ pub(super) fn check_exit_code_issues(context: &mut TextCheckContext<'_>, issues:
         context.emit_current(issues, blueprint);
     } else if is_harness_authoring {
         let summary = format!("Harness authoring command failed (exit {exit_code})");
-        let blueprint = IssueBlueprint::new(
-            IssueCode::HarnessAuthoringCommandFailure,
-            IssueCategory::WorkflowError,
-            IssueSeverity::Medium,
-            summary,
-        )
-        .with_fingerprint("harness_authoring_failure")
-        .with_guidance(Guidance::fix_hint(
-            "Harness authoring command returned non-zero - check payload or arguments",
-        ))
-        .with_confidence(Confidence::High)
-        .with_fix_safety(FixSafety::AutoFixGuarded)
-        .with_source_tool(context.source_tool);
+        let blueprint =
+            IssueBlueprint::from_code(IssueCode::HarnessAuthoringCommandFailure, summary)
+                .with_fingerprint("harness_authoring_failure")
+                .with_guidance(Guidance::fix_hint(
+                    "Harness authoring command returned non-zero - check payload or arguments",
+                ))
+                .with_confidence(Confidence::High)
+                .with_fix_safety(FixSafety::AutoFixGuarded)
+                .with_source_tool(context.source_tool);
         context.emit_current(issues, blueprint);
     } else if exit_code != 1 {
         let summary = format!("Non-zero exit code {exit_code}");
-        let blueprint = IssueBlueprint::new(
-            IssueCode::NonZeroExitCode,
-            IssueCategory::SubagentIssue,
-            IssueSeverity::Low,
-            summary,
-        )
-        .with_fingerprint("non_zero_exit_code")
-        .with_guidance(Guidance::advisory(format!(
-            "Command exited with code {exit_code}"
-        )))
-        .with_confidence(Confidence::Medium)
-        .with_fix_safety(FixSafety::AdvisoryOnly)
-        .with_source_tool(context.source_tool);
+        let blueprint = IssueBlueprint::from_code(IssueCode::NonZeroExitCode, summary)
+            .with_fingerprint("non_zero_exit_code")
+            .with_guidance(Guidance::advisory(format!(
+                "Command exited with code {exit_code}"
+            )))
+            .with_confidence(Confidence::Medium)
+            .with_fix_safety(FixSafety::AdvisoryOnly)
+            .with_source_tool(context.source_tool);
         context.emit_current(issues, blueprint);
     }
 }
@@ -133,19 +112,14 @@ pub(super) fn check_permission_failures(
         .and_then(|c| c.get(1))
         .map_or("unknown", |m| m.as_str());
     let summary = format!("Subagent '{agent_name}' blocked by missing permissions");
-    let blueprint = IssueBlueprint::new(
-        IssueCode::SubagentPermissionFailure,
-        IssueCategory::SubagentIssue,
-        IssueSeverity::Medium,
-        summary,
-    )
-    .with_fingerprint(agent_name)
-    .with_guidance(Guidance::fix_hint(
-        "Subagent needs permissionMode dontAsk or mode auto for Bash/Write",
-    ))
-    .with_confidence(Confidence::High)
-    .with_fix_safety(FixSafety::AutoFixSafe)
-    .with_source_tool(context.source_tool);
+    let blueprint = IssueBlueprint::from_code(IssueCode::SubagentPermissionFailure, summary)
+        .with_fingerprint(agent_name)
+        .with_guidance(Guidance::fix_hint(
+            "Subagent needs permissionMode dontAsk or mode auto for Bash/Write",
+        ))
+        .with_confidence(Confidence::High)
+        .with_fix_safety(FixSafety::AutoFixSafe)
+        .with_source_tool(context.source_tool);
     context.emit_current(issues, blueprint);
 }
 
@@ -161,18 +135,13 @@ pub(super) fn check_save_failures(context: &mut TextCheckContext<'_>, issues: &m
     let text_context: String = context.text.chars().take(40).collect();
     let text_context = text_context.replace('\n', " ");
     let summary = format!("Subagent manual recovery: {text_context}");
-    let blueprint = IssueBlueprint::new(
-        IssueCode::SubagentManualRecovery,
-        IssueCategory::SubagentIssue,
-        IssueSeverity::Medium,
-        summary,
-    )
-    .with_guidance(Guidance::fix_hint(
-        "Subagent lacks write permissions or hit a harness CLI error during save",
-    ))
-    .with_confidence(Confidence::Medium)
-    .with_fix_safety(FixSafety::AutoFixGuarded)
-    .with_source_tool(context.source_tool);
+    let blueprint = IssueBlueprint::from_code(IssueCode::SubagentManualRecovery, summary)
+        .with_guidance(Guidance::fix_hint(
+            "Subagent lacks write permissions or hit a harness CLI error during save",
+        ))
+        .with_confidence(Confidence::Medium)
+        .with_fix_safety(FixSafety::AutoFixGuarded)
+        .with_source_tool(context.source_tool);
     context.emit_current(issues, blueprint);
 }
 
@@ -187,10 +156,8 @@ pub(super) fn check_payload_recovery(context: &mut TextCheckContext<'_>, issues:
         || context.lower.contains("extract and save")
         || context.lower.contains("grab its");
     if has_grep && has_target && has_recovery {
-        let blueprint = IssueBlueprint::new(
+        let blueprint = IssueBlueprint::from_code(
             IssueCode::ManualPayloadRecovery,
-            IssueCategory::SubagentIssue,
-            IssueSeverity::Medium,
             "Manual payload recovery from subagent output",
         )
         .with_guidance(Guidance::fix_hint(
@@ -214,10 +181,8 @@ pub(super) fn check_env_misconfiguration(
             continue;
         }
         if signal.contains("claude_session_id") {
-            let blueprint = IssueBlueprint::new(
+            let blueprint = IssueBlueprint::from_code(
                 IssueCode::MissingClaudeSessionId,
-                IssueCategory::DataIntegrity,
-                IssueSeverity::Critical,
                 "CLAUDE_SESSION_ID is unset - harness cannot resolve session context",
             )
             .with_guidance(Guidance::fix_target_hint(
@@ -230,10 +195,8 @@ pub(super) fn check_env_misconfiguration(
             .with_source_tool(context.source_tool);
             context.emit_current(issues, blueprint);
         } else if signal.contains("kubeconfig") {
-            let blueprint = IssueBlueprint::new(
+            let blueprint = IssueBlueprint::from_code(
                 IssueCode::EmptyKubeconfig,
-                IssueCategory::SkillBehavior,
-                IssueSeverity::Critical,
                 "KUBECONFIG is empty - cluster commands will hit default context",
             )
             .with_guidance(Guidance::fix_target_hint(
@@ -259,10 +222,8 @@ pub(super) fn check_incomplete_writer(context: &mut TextCheckContext<'_>, issues
     {
         return;
     }
-    let blueprint = IssueBlueprint::new(
+    let blueprint = IssueBlueprint::from_code(
         IssueCode::IncompleteWriterOutput,
-        IssueCategory::SubagentIssue,
-        IssueSeverity::Medium,
         "Writer subagent produced incomplete output",
     )
     .with_guidance(Guidance::fix_hint(
@@ -299,10 +260,8 @@ pub(super) fn check_harness_infrastructure(
         } else {
             Confidence::Medium
         };
-        let blueprint = IssueBlueprint::new(
+        let blueprint = IssueBlueprint::from_code(
             IssueCode::HarnessInfrastructureMisconfiguration,
-            IssueCategory::WorkflowError,
-            IssueSeverity::Critical,
             "Harness infrastructure misconfiguration detected",
         )
         .with_fingerprint("harness_infrastructure_misconfiguration")
@@ -337,10 +296,8 @@ pub(super) fn check_missing_connection_or_env_var(
             .any(|component| context.lower.contains(component));
 
     if env_var_match || connection_match {
-        let blueprint = IssueBlueprint::new(
+        let blueprint = IssueBlueprint::from_code(
             IssueCode::MissingConnectionOrEnvVar,
-            IssueCategory::DataIntegrity,
-            IssueSeverity::Medium,
             "Missing configuration or connection acknowledged by assistant",
         )
         .with_fingerprint("missing_connection_or_env_var")
@@ -364,10 +321,8 @@ pub(super) fn check_jq_errors(context: &mut TextCheckContext<'_>, issues: &mut V
         || context.lower.contains("null is not iterable");
 
     if has_jq_error || has_null_iteration {
-        let blueprint = IssueBlueprint::new(
+        let blueprint = IssueBlueprint::from_code(
             IssueCode::JqErrorInCommandOutput,
-            IssueCategory::DataIntegrity,
-            IssueSeverity::Medium,
             "jq parse/iteration error in command output",
         )
         .with_fingerprint("jq_error_in_output")
@@ -391,10 +346,8 @@ pub(super) fn check_closeout_verdict_pending(
     if !context.lower.contains("ksrcli008") && !context.lower.contains("verdict is still pending") {
         return;
     }
-    let blueprint = IssueBlueprint::new(
+    let blueprint = IssueBlueprint::from_code(
         IssueCode::CloseoutVerdictPending,
-        IssueCategory::WorkflowError,
-        IssueSeverity::Critical,
         "Closeout blocked - no final verdict set",
     )
     .with_fingerprint("closeout_verdict_pending")
@@ -422,10 +375,8 @@ pub(super) fn check_runner_state_event_error(
     if !has_event_transition && !has_state_query_only {
         return;
     }
-    let blueprint = IssueBlueprint::new(
+    let blueprint = IssueBlueprint::from_code(
         IssueCode::RunnerStateEventNotSupported,
-        IssueCategory::CliError,
-        IssueSeverity::Medium,
         "runner-state event transition not supported via CLI",
     )
     .with_fingerprint("runner_state_event_not_supported")
@@ -464,10 +415,8 @@ pub(super) fn check_runner_state_machine_stale(
     let has_group_evidence = context.lower.contains("group") || context.lower.contains("passed");
 
     if (has_zero_transitions || has_bootstrap_phase) && has_group_evidence {
-        let blueprint = IssueBlueprint::new(
+        let blueprint = IssueBlueprint::from_code(
             IssueCode::RunnerStateMachineStale,
-            IssueCategory::WorkflowError,
-            IssueSeverity::Critical,
             "Runner state machine never advanced",
         )
         .with_fingerprint("runner_state_machine_stale")
@@ -493,10 +442,8 @@ pub(super) fn check_user_frustration(context: &mut TextCheckContext<'_>, issues:
         .any(|signal| context.lower.contains(signal));
 
     if exclamation_count >= 4 || has_signal {
-        let blueprint = IssueBlueprint::new(
+        let blueprint = IssueBlueprint::from_code(
             IssueCode::UserFrustrationDetected,
-            IssueCategory::UserFrustration,
-            IssueSeverity::Medium,
             "User frustration signal detected",
         )
         .with_guidance(Guidance::advisory(

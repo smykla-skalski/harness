@@ -479,8 +479,8 @@ static ISSUE_CODE_REGISTRY: &[IssueCodeMeta] = &[
     IssueCodeMeta {
         code: IssueCode::ResourceNotCleanedUpBeforeGroupEnd,
         default_category: IssueCategory::SkillBehavior,
-        default_severity: IssueSeverity::Medium,
-        default_confidence: Confidence::Medium,
+        default_severity: IssueSeverity::Low,
+        default_confidence: Confidence::High,
         default_fix_safety: FixSafety::AdvisoryOnly,
         description: "Resources created during group not cleaned up before group end",
         owner: IssueOwner::Skill,

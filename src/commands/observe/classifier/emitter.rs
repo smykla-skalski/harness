@@ -102,29 +102,8 @@ impl IssueBlueprint {
         }
     }
 
-    pub(super) fn new(
-        code: IssueCode,
-        category: IssueCategory,
-        severity: IssueSeverity,
-        summary: impl Into<String>,
-    ) -> Self {
-        Self::from_code(code, summary)
-            .with_category(category)
-            .with_severity(severity)
-    }
-
     pub(super) fn with_fingerprint(mut self, fingerprint: impl Into<String>) -> Self {
         self.fingerprint = fingerprint.into();
-        self
-    }
-
-    pub(super) fn with_category(mut self, category: IssueCategory) -> Self {
-        self.category = category;
-        self
-    }
-
-    pub(super) fn with_severity(mut self, severity: IssueSeverity) -> Self {
-        self.severity = severity;
         self
     }
 
