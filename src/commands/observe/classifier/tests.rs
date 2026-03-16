@@ -992,3 +992,83 @@ fn tool_check_output_shape_is_preserved() {
     );
     assert!(parsed.get("code").is_none());
 }
+
+#[test]
+fn detects_absolute_manifest_path() {
+    let mut state = make_state();
+    let block = serde_json::json!({
+        "type": "tool_use",
+        "id": "t1",
+        "name": "Bash",
+        "input": { "command": "harness apply --manifest /Users/someone/.local/share/kuma/suites/motb/groups/g13/01.yaml" }
+    });
+    let issues = check_tool_use_for_issues(10, &block, &mut state);
+    assert!(
+        issues
+            .iter()
+            .any(|i| i.category == IssueCategory::UnexpectedBehavior
+                && i.severity == IssueSeverity::Medium
+                && i.summary.contains("Absolute path"))
+    );
+}
+
+#[test]
+fn detects_absolute_manifest_path_with_multiple_flags() {
+    let mut state = make_state();
+    let block = serde_json::json!({
+        "type": "tool_use",
+        "id": "t1",
+        "name": "Bash",
+        "input": { "command": "harness apply --manifest /tmp/groups/g02/04.yaml --manifest /tmp/groups/g02/05.yaml" }
+    });
+    let issues = check_tool_use_for_issues(10, &block, &mut state);
+    assert!(issues.iter().any(|i| i.summary.contains("Absolute path")));
+}
+
+#[test]
+fn skips_relative_manifest_path() {
+    let mut state = make_state();
+    let block = serde_json::json!({
+        "type": "tool_use",
+        "id": "t1",
+        "name": "Bash",
+        "input": { "command": "harness apply --manifest g13/01.yaml" }
+    });
+    let issues = check_tool_use_for_issues(10, &block, &mut state);
+    assert!(!issues.iter().any(|i| i.summary.contains("Absolute path")));
+}
+
+#[test]
+fn skips_absolute_path_detection_for_non_apply_commands() {
+    let mut state = make_state();
+    let block = serde_json::json!({
+        "type": "tool_use",
+        "id": "t1",
+        "name": "Bash",
+        "input": { "command": "harness run --label test kubectl get pods" }
+    });
+    let issues = check_tool_use_for_issues(10, &block, &mut state);
+    assert!(!issues.iter().any(|i| i.summary.contains("Absolute path")));
+}
+
+#[test]
+fn absolute_manifest_path_output_shape() {
+    let mut state = make_state();
+    let block = serde_json::json!({
+        "type": "tool_use",
+        "id": "t1",
+        "name": "Bash",
+        "input": { "command": "harness apply --manifest /full/path/to/g13/01.yaml" }
+    });
+    let issues = check_tool_use_for_issues(10, &block, &mut state);
+    assert_eq!(issues.len(), 1);
+    let issue = &issues[0];
+    assert!(issue.fixable);
+    assert!(issue.fix_target.is_none());
+    assert!(
+        issue
+            .fix_hint
+            .as_deref()
+            .is_some_and(|hint| hint.contains("relative manifest paths"))
+    );
+}
