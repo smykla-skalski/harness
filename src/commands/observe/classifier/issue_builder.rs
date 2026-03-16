@@ -8,7 +8,7 @@ macro_rules! issue {
             severity: $crate::commands::observe::types::IssueSeverity::$sev,
             summary: String::from($summary),
             details: $crate::commands::observe::truncate_details($text),
-            source_role: String::from($role),
+            source_role: $role,
             fixable: false,
             fix_target: None,
             fix_hint: None,

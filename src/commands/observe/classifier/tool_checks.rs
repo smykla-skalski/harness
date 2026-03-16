@@ -3,7 +3,7 @@ use serde_json::Value;
 use super::{OLD_SKILL_REGEX, RM_RECURSIVE_REGEX, SKILL_NAME_REGEX};
 use crate::commands::observe::patterns;
 use crate::commands::observe::types::{
-    Issue, IssueCategory, IssueSeverity, ScanState, ToolUseRecord,
+    Issue, IssueCategory, IssueSeverity, MessageRole, ScanState, ToolUseRecord,
 };
 
 /// Check a `tool_use` block for issues.
@@ -58,7 +58,7 @@ fn check_bash_tool_use(line_num: usize, input: &Value, issues: &mut Vec<Issue>) 
             severity: IssueSeverity::Medium,
             summary: "Old skill name used in harness command".into(),
             details: format!("Command: {command}"),
-            source_role: "assistant".into(),
+            source_role: MessageRole::Assistant,
             fixable: true,
             fix_target: None,
             fix_hint: Some("SKILL.md or model still references old skill names".into()),
@@ -72,7 +72,7 @@ fn check_bash_tool_use(line_num: usize, input: &Value, issues: &mut Vec<Issue>) 
             severity: IssueSeverity::Medium,
             summary: "Invalid harness subcommand/argument used".into(),
             details: format!("Command: {command}"),
-            source_role: "assistant".into(),
+            source_role: MessageRole::Assistant,
             fixable: true,
             fix_target: None,
             fix_hint: Some("SKILL.md references a non-existent harness kind".into()),
@@ -90,7 +90,7 @@ fn check_bash_tool_use(line_num: usize, input: &Value, issues: &mut Vec<Issue>) 
             severity: IssueSeverity::Medium,
             summary: "Python used in Bash command - agents should never need python".into(),
             details: format!("Command: {command}"),
-            source_role: "assistant".into(),
+            source_role: MessageRole::Assistant,
             fixable: true,
             fix_target: None,
             fix_hint: Some(
@@ -106,7 +106,7 @@ fn check_bash_tool_use(line_num: usize, input: &Value, issues: &mut Vec<Issue>) 
             severity: IssueSeverity::Medium,
             summary: "Destructive rm -r without chained verification".into(),
             details: format!("Command: {command}"),
-            source_role: "assistant".into(),
+            source_role: MessageRole::Assistant,
             fixable: false,
             fix_target: None,
             fix_hint: Some("Should verify target exists and is correct before deleting".into()),
@@ -155,7 +155,7 @@ fn check_manifest_fix_prompt(
             severity: IssueSeverity::Critical,
             summary: "Manifest fix needed at runtime - authored suite has broken manifest".into(),
             details: format!("Question: {question_text}"),
-            source_role: "assistant".into(),
+            source_role: MessageRole::Assistant,
             fixable: true,
             fix_target: Some("skills/new/SKILL.md".into()),
             fix_hint: Some(
@@ -180,7 +180,7 @@ fn check_validator_install_prompt(
             severity: IssueSeverity::Medium,
             summary: "Validator install prompt when binary may already exist".into(),
             details: format!("Question: {question_text}"),
-            source_role: "assistant".into(),
+            source_role: MessageRole::Assistant,
             fixable: true,
             fix_target: Some("skills/new/SKILL.md".into()),
             fix_hint: Some("Step 0 should check if binary exists first".into()),
@@ -226,7 +226,7 @@ fn check_question_deviations(
             severity: IssueSeverity::Critical,
             summary: "Runtime deviation - authored suite needs runtime correction".into(),
             details: format!("Header: {header}, Question: {question_text}"),
-            source_role: "assistant".into(),
+            source_role: MessageRole::Assistant,
             fixable: true,
             fix_target: Some("skills/new/SKILL.md".into()),
             fix_hint: Some(
@@ -256,7 +256,7 @@ fn check_wrong_skill_crossref(
                 severity: IssueSeverity::Medium,
                 summary: "suite:run offering suite:new as structured choice".into(),
                 details: format!("Question: {question_text}, Option: {label}"),
-                source_role: "assistant".into(),
+                source_role: MessageRole::Assistant,
                 fixable: true,
                 fix_target: Some("skills/run/SKILL.md".into()),
                 fix_hint: Some(
@@ -287,7 +287,7 @@ fn check_write_edit_tool_use(
             severity: IssueSeverity::Medium,
             summary: format!("File modified {} times - possible churn", *count),
             details: format!("Path: {path}"),
-            source_role: "assistant".into(),
+            source_role: MessageRole::Assistant,
             fixable: false,
             fix_target: None,
             fix_hint: Some("Repeated modifications suggest trial-and-error".into()),
@@ -311,7 +311,7 @@ fn check_write_edit_tool_use(
                         "SKILL.md name field uses short name '{skill_name}' instead of fully qualified"
                     ),
                     details: format!("Path: {path}, name: {skill_name}"),
-                    source_role: "assistant".into(),
+                    source_role: MessageRole::Assistant,
                     fixable: true,
                     fix_target: Some(path.to_string()),
                     fix_hint: Some(
@@ -335,7 +335,7 @@ fn check_managed_file_writes(line_num: usize, input: &Value, issues: &mut Vec<Is
                 severity: IssueSeverity::Critical,
                 summary: format!("Direct write to harness-managed file: {managed}"),
                 details: format!("Path: {path}"),
-                source_role: "assistant".into(),
+                source_role: MessageRole::Assistant,
                 fixable: true,
                 fix_target: Some("skills/run/SKILL.md".into()),
                 fix_hint: Some(
