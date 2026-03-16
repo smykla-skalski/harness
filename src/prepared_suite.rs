@@ -1,11 +1,15 @@
 use std::collections::BTreeMap;
 use std::fmt;
+use std::fs;
 use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 
+use crate::context::RunLayout;
 use crate::errors::{CliError, CliErrorKind};
-use crate::io::{read_json_typed, write_json_pretty};
+use crate::io::{ensure_dir, read_json_typed, write_json_pretty, write_text};
+use crate::schema::{GroupSpec, SuiteSpec};
 
 /// A file to copy from source to prepared location.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -162,6 +166,28 @@ impl PreparedSuiteArtifact {
             .iter()
             .chain(self.groups.iter().flat_map(|group| group.manifests.iter()))
     }
+
+    pub fn iter_manifests_mut(&mut self) -> impl Iterator<Item = &mut ManifestRef> {
+        self.baselines.iter_mut().chain(
+            self.groups
+                .iter_mut()
+                .flat_map(|group| group.manifests.iter_mut()),
+        )
+    }
+
+    #[must_use]
+    pub fn manifest_by_prepared_path(&self, prepared_path: &str) -> Option<&ManifestRef> {
+        self.iter_manifests()
+            .find(|manifest| manifest.prepared_path.as_deref() == Some(prepared_path))
+    }
+
+    pub fn manifest_mut_by_prepared_path(
+        &mut self,
+        prepared_path: &str,
+    ) -> Option<&mut ManifestRef> {
+        self.iter_manifests_mut()
+            .find(|manifest| manifest.prepared_path.as_deref() == Some(prepared_path))
+    }
 }
 
 /// Plan for materializing a prepared suite.
@@ -170,6 +196,324 @@ pub struct PreparedSuitePlan {
     pub artifact: PreparedSuiteArtifact,
     pub baseline_copies: Vec<PreparedCopy>,
     pub group_writes: Vec<PreparedWrite>,
+    pub validation_writes: Vec<PreparedWrite>,
+}
+
+#[derive(Debug, Default)]
+struct BaselinePlan {
+    source_digests: Vec<SourceDigest>,
+    baselines: Vec<ManifestRef>,
+    baseline_copies: Vec<PreparedCopy>,
+    validation_writes: Vec<PreparedWrite>,
+}
+
+#[derive(Debug)]
+struct GroupPlan {
+    source_digest: SourceDigest,
+    group: PreparedGroup,
+    group_writes: Vec<PreparedWrite>,
+    validation_writes: Vec<PreparedWrite>,
+}
+
+#[derive(Debug)]
+struct GroupManifestPlan {
+    refs: Vec<ManifestRef>,
+    group_writes: Vec<PreparedWrite>,
+    validation_writes: Vec<PreparedWrite>,
+}
+
+impl PreparedSuitePlan {
+    /// Build the prepared-suite materialization plan for a run.
+    ///
+    /// # Errors
+    /// Returns `CliError` if suite files cannot be loaded or hashed.
+    pub fn build(
+        layout: &RunLayout,
+        suite: &SuiteSpec,
+        profile: &str,
+        prepared_at: &str,
+    ) -> Result<Self, CliError> {
+        let mut source_digests = vec![source_digest(&suite.path, "suite.md")?];
+        let mut groups = Vec::new();
+        let mut group_writes = Vec::new();
+        let baseline_plan = build_baseline_plan(layout, suite)?;
+        source_digests.extend(baseline_plan.source_digests);
+        let mut validation_writes = baseline_plan.validation_writes;
+
+        for group_rel in &suite.frontmatter.groups {
+            let Some(group_plan) = build_group_plan(layout, suite, profile, group_rel)? else {
+                continue;
+            };
+            source_digests.push(group_plan.source_digest);
+            groups.push(group_plan.group);
+            group_writes.extend(group_plan.group_writes);
+            validation_writes.extend(group_plan.validation_writes);
+        }
+
+        Ok(Self {
+            artifact: PreparedSuiteArtifact {
+                suite_path: suite.path.display().to_string(),
+                profile: profile.to_string(),
+                prepared_at: prepared_at.to_string(),
+                source_digests,
+                baselines: baseline_plan.baselines,
+                groups,
+            },
+            baseline_copies: baseline_plan.baseline_copies,
+            group_writes,
+            validation_writes,
+        })
+    }
+
+    /// Materialize the prepared manifests and validation notes to disk.
+    ///
+    /// # Errors
+    /// Returns `CliError` on IO failure.
+    pub fn materialize(&self) -> Result<(), CliError> {
+        for copy in &self.baseline_copies {
+            copy_prepared_file(copy)?;
+        }
+        for write in self
+            .group_writes
+            .iter()
+            .chain(self.validation_writes.iter())
+        {
+            write_text(&write.prepared_path, &write.text)?;
+        }
+        Ok(())
+    }
+}
+
+fn build_baseline_plan(layout: &RunLayout, suite: &SuiteSpec) -> Result<BaselinePlan, CliError> {
+    let suite_dir = suite.suite_dir();
+    let run_dir = layout.run_dir();
+    let mut plan = BaselinePlan::default();
+
+    for baseline in &suite.frontmatter.baseline_files {
+        let source_path = suite_dir.join(baseline);
+        let prepared_rel = PathBuf::from("manifests")
+            .join("prepared")
+            .join("baseline")
+            .join(baseline);
+        let validation_rel = validation_path_for(&prepared_rel);
+        plan.source_digests
+            .push(source_digest(&source_path, baseline)?);
+        plan.baseline_copies.push(PreparedCopy {
+            source_path: source_path.clone(),
+            prepared_path: run_dir.join(&prepared_rel),
+        });
+        plan.validation_writes.push(PreparedWrite {
+            prepared_path: run_dir.join(&validation_rel),
+            text: pending_validation_text(false),
+        });
+        plan.baselines.push(build_baseline_manifest_ref(
+            baseline,
+            &source_path,
+            &prepared_rel,
+            &validation_rel,
+        )?);
+    }
+
+    Ok(plan)
+}
+
+fn build_group_plan(
+    layout: &RunLayout,
+    suite: &SuiteSpec,
+    profile: &str,
+    group_rel: &str,
+) -> Result<Option<GroupPlan>, CliError> {
+    let group_path = suite.suite_dir().join(group_rel);
+    let group = GroupSpec::from_markdown(&group_path)?;
+    if suite
+        .frontmatter
+        .skipped_groups
+        .iter()
+        .any(|item| item == group_rel || item == &group.frontmatter.group_id)
+    {
+        return Ok(None);
+    }
+    if !group.frontmatter.profiles.is_empty()
+        && !group
+            .frontmatter
+            .profiles
+            .iter()
+            .any(|item| item == profile)
+    {
+        return Ok(None);
+    }
+
+    let manifests = build_group_manifests(layout, group_rel, &group)?;
+    Ok(Some(GroupPlan {
+        source_digest: source_digest(&group.path, group_rel)?,
+        group: PreparedGroup {
+            group_id: group.frontmatter.group_id,
+            source_path: group_rel.to_string(),
+            helm_values: group.frontmatter.helm_values.into_iter().collect(),
+            restart_namespaces: group.frontmatter.restart_namespaces,
+            skip_validation_orders: group.frontmatter.expected_rejection_orders,
+            manifests: manifests.refs,
+        },
+        group_writes: manifests.group_writes,
+        validation_writes: manifests.validation_writes,
+    }))
+}
+
+fn build_group_manifests(
+    layout: &RunLayout,
+    group_rel: &str,
+    group: &GroupSpec,
+) -> Result<GroupManifestPlan, CliError> {
+    let run_dir = layout.run_dir();
+    let mut refs = Vec::new();
+    let mut group_writes = Vec::new();
+    let mut validation_writes = Vec::new();
+
+    for (index, yaml) in yaml_blocks(&configure_section(&group.body).unwrap_or_default())
+        .into_iter()
+        .enumerate()
+    {
+        let order = i64::try_from(index + 1).map_err(|error| {
+            CliErrorKind::serialize(format!("group manifest order overflow: {error}"))
+        })?;
+        let prepared_rel = PathBuf::from("manifests")
+            .join("prepared")
+            .join("groups")
+            .join(&group.frontmatter.group_id)
+            .join(format!("{:02}.yaml", index + 1));
+        let validation_rel = validation_path_for(&prepared_rel);
+        let skip_validation = group.frontmatter.expected_rejection_orders.contains(&order);
+        group_writes.push(PreparedWrite {
+            prepared_path: run_dir.join(&prepared_rel),
+            text: yaml.clone(),
+        });
+        validation_writes.push(PreparedWrite {
+            prepared_path: run_dir.join(&validation_rel),
+            text: pending_validation_text(skip_validation),
+        });
+        refs.push(build_group_manifest_ref(
+            group_rel,
+            &group.frontmatter.group_id,
+            index + 1,
+            order,
+            &yaml,
+            &prepared_rel,
+            &validation_rel,
+        ));
+    }
+
+    Ok(GroupManifestPlan {
+        refs,
+        group_writes,
+        validation_writes,
+    })
+}
+
+fn build_baseline_manifest_ref(
+    baseline: &str,
+    source_path: &Path,
+    prepared_rel: &Path,
+    validation_rel: &Path,
+) -> Result<ManifestRef, CliError> {
+    Ok(ManifestRef {
+        manifest_id: baseline.to_string(),
+        scope: ManifestScope::Baseline,
+        source_path: baseline.to_string(),
+        validation: Some(ManifestValidation {
+            output_path: Some(validation_rel.display().to_string()),
+            status: ValidationStatus::Pending,
+            checked_at: None,
+            resource_kinds: vec![],
+        }),
+        group_id: None,
+        prepared_path: Some(prepared_rel.display().to_string()),
+        digest: Some(file_sha256(source_path)?),
+        order: None,
+        applied: false,
+        applied_at: None,
+        step: None,
+        applied_path: None,
+    })
+}
+
+fn build_group_manifest_ref(
+    group_rel: &str,
+    group_id: &str,
+    manifest_number: usize,
+    order: i64,
+    yaml: &str,
+    prepared_rel: &Path,
+    validation_rel: &Path,
+) -> ManifestRef {
+    ManifestRef {
+        manifest_id: format!("{group_id}:{manifest_number:02}"),
+        scope: ManifestScope::Group,
+        source_path: group_rel.to_string(),
+        validation: Some(ManifestValidation {
+            output_path: Some(validation_rel.display().to_string()),
+            status: ValidationStatus::Pending,
+            checked_at: None,
+            resource_kinds: vec![],
+        }),
+        group_id: Some(group_id.to_string()),
+        prepared_path: Some(prepared_rel.display().to_string()),
+        digest: Some(text_sha256(yaml)),
+        order: Some(order),
+        applied: false,
+        applied_at: None,
+        step: None,
+        applied_path: None,
+    }
+}
+
+fn copy_prepared_file(copy: &PreparedCopy) -> Result<(), CliError> {
+    let parent = copy
+        .prepared_path
+        .parent()
+        .unwrap_or_else(|| Path::new("."));
+    ensure_dir(parent)
+        .map_err(|error| CliErrorKind::io(format!("create dir {}: {error}", parent.display())))?;
+    fs::copy(&copy.source_path, &copy.prepared_path).map_err(|error| {
+        CliErrorKind::io(format!(
+            "copy {} -> {}: {error}",
+            copy.source_path.display(),
+            copy.prepared_path.display(),
+        ))
+    })?;
+    Ok(())
+}
+
+fn source_digest(path: &Path, source_path: &str) -> Result<SourceDigest, CliError> {
+    Ok(SourceDigest {
+        source_path: source_path.to_string(),
+        digest: file_sha256(path)?,
+    })
+}
+
+fn file_sha256(path: &Path) -> Result<String, CliError> {
+    let bytes = fs::read(path)
+        .map_err(|error| CliErrorKind::io(format!("read {}: {error}", path.display())))?;
+    let digest = Sha256::digest(&bytes);
+    Ok(hex::encode(digest))
+}
+
+fn text_sha256(text: &str) -> String {
+    hex::encode(Sha256::digest(text.as_bytes()))
+}
+
+fn validation_path_for(prepared_rel: &Path) -> PathBuf {
+    let extension = prepared_rel
+        .extension()
+        .and_then(|ext| ext.to_str())
+        .unwrap_or("txt");
+    prepared_rel.with_extension(format!("{extension}.validate.txt"))
+}
+
+fn pending_validation_text(skip_validation: bool) -> String {
+    if skip_validation {
+        return "validation intentionally skipped by expected_rejection_orders\n".to_string();
+    }
+    "validation pending\n".to_string()
 }
 
 fn extract_section(body: &str, heading: &str) -> Option<String> {

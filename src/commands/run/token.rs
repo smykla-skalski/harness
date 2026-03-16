@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use clap::Args;
 
-use crate::commands::{RunDirArgs, resolve_run_context};
+use crate::commands::{RunDirArgs, resolve_run_services};
 use crate::errors::{CliError, CliErrorKind};
 use crate::exec;
 
@@ -45,9 +45,8 @@ pub fn token(
     valid_for: &str,
     run_dir_args: &RunDirArgs,
 ) -> Result<i32, CliError> {
-    let ctx = resolve_run_context(run_dir_args)?;
-    let runtime = ctx.cluster_runtime()?;
-    let access = runtime.control_plane_access()?;
+    let services = resolve_run_services(run_dir_args)?;
+    let access = services.control_plane_access()?;
     let addr = if let Some(a) = cp_addr {
         a.to_string()
     } else {
@@ -67,7 +66,7 @@ pub fn token(
     }
 
     // Fallback to kumactl
-    let root = PathBuf::from(&ctx.metadata.repo_root);
+    let root = PathBuf::from(&services.metadata().repo_root);
     let binary = find_kumactl_binary(&root)?;
 
     let mut args = vec!["generate", "dataplane-token"];

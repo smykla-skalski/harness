@@ -1,7 +1,7 @@
 use clap::Args;
 
 use crate::commands::RunDirArgs;
-use crate::commands::resolve_run_context;
+use crate::commands::resolve_run_services;
 use crate::errors::CliError;
 use crate::exec;
 
@@ -31,10 +31,8 @@ pub fn logs(
     follow: bool,
     run_dir_args: &RunDirArgs,
 ) -> Result<i32, CliError> {
-    let ctx = resolve_run_context(run_dir_args)?;
-    let runtime = ctx.cluster_runtime()?;
-
-    let container = runtime.resolve_container_name(name);
+    let services = resolve_run_services(run_dir_args)?;
+    let container = services.resolve_container_name(name);
     let tail_str = tail.to_string();
     let mut args: Vec<&str> = vec!["logs", "--tail", &tail_str];
     if follow {
