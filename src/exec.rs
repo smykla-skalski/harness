@@ -33,12 +33,12 @@ pub(crate) fn run_command(
     Err(CliErrorKind::command_failed(command_string(args)).with_details(failure_details(&result)))
 }
 
-/// Run a command that filters stderr for meaningful progress lines.
+/// Run a command, capturing all output silently.
 ///
-/// Pipes both stdout and stderr. Stderr is read line-by-line, filtered
-/// through [`is_progress_line`], and matching lines are printed to stderr
-/// with a timestamp prefix. The full stderr is captured in the result for
-/// error diagnostics.
+/// Pipes both stdout and stderr. All stderr is captured in the result for
+/// error diagnostics but nothing is printed to the terminal. Callers are
+/// responsible for emitting their own progress messages before and after
+/// the command runs.
 ///
 /// # Errors
 /// Returns `CliError` if the exit code is not in `ok_exit_codes`.
@@ -617,6 +617,10 @@ pub fn cp_api_text(
 }
 
 /// Build, send, and read the full response body as a string from the CP API.
+///
+/// Each match arm repeats the auth header insertion because ureq v3 returns
+/// different builder types for body vs no-body methods (`WithBody` vs request
+/// builder), preventing a shared builder chain.
 fn cp_api_send(
     url: &str,
     method: HttpMethod,
