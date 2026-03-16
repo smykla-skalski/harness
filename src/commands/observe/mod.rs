@@ -9,7 +9,6 @@ use std::env;
 use std::fs;
 use std::io::{self, BufRead, BufReader, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
-use std::process;
 use std::thread;
 use std::time::{Duration, Instant};
 
@@ -18,6 +17,7 @@ use serde_json::json;
 
 use crate::core_defs::harness_data_root;
 use crate::errors::{CliError, CliErrorKind};
+use crate::io::{read_text, write_json_pretty};
 
 use self::types::{
     FOCUS_PRESETS, FocusPreset, Issue, IssueCategory, IssueCode, IssueSeverity, ObserverState,
@@ -1248,8 +1248,8 @@ fn write_details_file(path: &str, issues: &[Issue]) -> Result<(), CliError> {
 fn load_observer_state(session_id: &str) -> Result<ObserverState, CliError> {
     let state_path = state_file_path(session_id);
     if state_path.exists() {
-        let content = fs::read_to_string(&state_path).map_err(|e| {
-            CliErrorKind::session_parse_error(format!("cannot read state file: {e}"))
+        let content = read_text(&state_path).map_err(|e| -> CliError {
+            CliErrorKind::session_parse_error(format!("cannot read state file: {e}")).into()
         })?;
         serde_json::from_str(&content).map_err(|e| {
             CliErrorKind::session_parse_error(format!("invalid state file JSON: {e}")).into()
@@ -1259,21 +1259,12 @@ fn load_observer_state(session_id: &str) -> Result<ObserverState, CliError> {
     }
 }
 
-/// Save observer state atomically via tmp-file rename.
+/// Save observer state via shared atomic JSON persistence.
 fn save_observer_state(session_id: &str, state: &ObserverState) -> Result<(), CliError> {
     let state_path = state_file_path(session_id);
-    if let Some(parent) = state_path.parent() {
-        let _ = fs::create_dir_all(parent);
-    }
-    let json = serde_json::to_string_pretty(state)
-        .map_err(|e| CliErrorKind::session_parse_error(format!("cannot serialize state: {e}")))?;
-    let tmp_name = format!("state.{}.tmp", process::id());
-    let tmp_path = state_path.with_extension(tmp_name);
-    fs::write(&tmp_path, &json)
-        .map_err(|e| CliErrorKind::session_parse_error(format!("cannot write temp file: {e}")))?;
-    fs::rename(&tmp_path, &state_path)
-        .map_err(|e| CliErrorKind::session_parse_error(format!("cannot rename state file: {e}")))?;
-    Ok(())
+    write_json_pretty(&state_path, state).map_err(|e| {
+        CliErrorKind::session_parse_error(format!("cannot write state file: {e}")).into()
+    })
 }
 
 /// Show observer state for a session.

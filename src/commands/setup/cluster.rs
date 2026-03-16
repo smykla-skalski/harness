@@ -18,6 +18,7 @@ use crate::exec::{
     docker_network_create, docker_network_rm, docker_rm, docker_rm_by_label, docker_run_detached,
     extract_admin_token, kubectl, run_command, run_command_streaming, wait_for_http,
 };
+use crate::io::write_json_pretty;
 
 /// Arguments for `harness cluster`.
 #[derive(Debug, Clone, Args)]
@@ -372,20 +373,14 @@ fn persist_cluster_spec(spec: &ClusterSpec) -> Result<(), CliError> {
         && let Ok(mut record) = serde_json::from_str::<CurrentRunRecord>(&text)
     {
         record.cluster = Some(spec.clone());
-        let json = serde_json::to_string_pretty(&record)
-            .map_err(|e| CliErrorKind::serialize(cow!("cluster spec: {e}")))?;
-        fs::write(&ctx_path, format!("{json}\n"))
-            .map_err(|e| CliErrorKind::io(cow!("write session context: {e}")))?;
+        write_json_pretty(&ctx_path, &record)?;
 
         // Also write to run dir state/cluster.json
         let run_dir = record.layout.run_dir();
         let state_dir = run_dir.join("state");
         if state_dir.is_dir() {
             let cluster_path = state_dir.join("cluster.json");
-            let cluster_json = serde_json::to_string_pretty(spec)
-                .map_err(|e| CliErrorKind::serialize(cow!("cluster spec: {e}")))?;
-            fs::write(&cluster_path, format!("{cluster_json}\n"))
-                .map_err(|e| CliErrorKind::io(cow!("write cluster spec: {e}")))?;
+            write_json_pretty(&cluster_path, spec)?;
             eprintln!("{} cluster: spec saved to state/cluster.json", utc_now());
         }
     }

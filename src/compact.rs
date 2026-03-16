@@ -1,7 +1,6 @@
 use std::borrow::Cow;
 use std::fmt;
 use std::path::{Path, PathBuf};
-use std::process;
 use std::time::UNIX_EPOCH;
 use std::{fs, result};
 
@@ -9,6 +8,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::core_defs::{project_context_dir, session_scope_key, utc_now};
 use crate::errors::{CliError, CliErrorKind, cow};
+use crate::io::write_json_pretty;
 use crate::rules;
 use crate::rules::compact as compact_rules;
 
@@ -622,26 +622,7 @@ fn truncate_lines(lines: &[String], char_limit: usize, line_limit: usize) -> Str
 }
 
 fn write_json_atomic(path: &Path, payload: &CompactHandoff<'_>) -> Result<(), CliError> {
-    if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent).map_err(|e| -> CliError {
-            CliErrorKind::io(cow!("failed to create directory: {e}")).into()
-        })?;
-    }
-    let tmp = path.with_extension(format!("{}.json.tmp", process::id()));
-    let text = serde_json::to_string_pretty(payload)
-        .map_err(|e| -> CliError { CliErrorKind::serialize(cow!("{e}")).into() })?;
-    fs::write(&tmp, &text).map_err(|e| -> CliError {
-        CliErrorKind::io(cow!("failed to write {}: {e}", tmp.display())).into()
-    })?;
-    fs::rename(&tmp, path).map_err(|e| -> CliError {
-        CliErrorKind::io(cow!(
-            "failed to rename {} to {}: {e}",
-            tmp.display(),
-            path.display()
-        ))
-        .into()
-    })?;
-    Ok(())
+    write_json_pretty(path, payload)
 }
 
 fn trim_history(project_dir: &Path) {

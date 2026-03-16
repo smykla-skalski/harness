@@ -1,10 +1,13 @@
 use std::collections::BTreeMap;
-use std::fs;
 use std::path::Path;
 
 use serde::Serialize;
 
 use crate::errors::{CliError, CliErrorKind, cow};
+use crate::io::write_text;
+
+#[cfg(test)]
+use std::fs;
 
 /// A Docker Compose service definition.
 #[derive(Debug, Clone, Serialize)]
@@ -179,8 +182,7 @@ impl ComposeFile {
     /// Returns `CliError` on write failure.
     pub fn write_to(&self, path: &Path) -> Result<(), CliError> {
         let yaml = self.to_yaml()?;
-        fs::write(path, yaml)?;
-        Ok(())
+        write_text(path, &yaml)
     }
 }
 
