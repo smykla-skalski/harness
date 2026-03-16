@@ -115,6 +115,17 @@ fn filter_progress_line(line: &str) -> Option<String> {
     if trimmed.is_empty() {
         return None;
     }
+
+    // Docker BuildKit progress lines (e.g. "#8 [5/6] COPY ...") are noise.
+    if trimmed.starts_with('#')
+        && trimmed
+            .as_bytes()
+            .get(1)
+            .is_some_and(u8::is_ascii_digit)
+    {
+        return None;
+    }
+
     let lower = trimmed.to_lowercase();
 
     // k3d lifecycle
@@ -841,6 +852,14 @@ mod tests {
         assert!(filter_progress_line("some random debug output").is_none());
     }
 
+    #[test]
+    fn filter_progress_docker_buildkit_layer() {
+        assert!(filter_progress_line("#8 [5/6] COPY /tools/releases/templates/passwd /etc/passwd").is_none());
+        assert!(filter_progress_line("#5 [2/2] COPY /tools/releases/templates/LICENSE").is_none());
+        assert!(filter_progress_line("#9 [6/6] COPY /tools/releases/templates/group /etc/group").is_none());
+        assert!(filter_progress_line("#12 extracting sha256:abc123").is_none());
+    }
+
     // --- docker_rm_by_label test ---
 
     #[test]
@@ -868,5 +887,68 @@ mod tests {
             &[0],
         );
         assert!(result.is_err());
+    }
+
+    // --- cp_api mock server tests ---
+
+    /// Spawn a one-shot TCP server that accepts a single connection, reads
+    /// the HTTP request, and writes `response_body` with the given content type.
+    fn mock_http_server(response_body: &str, content_type: &str) -> (u16, thread::JoinHandle<String>) {
+        use std::net::TcpListener;
+
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let body = response_body.to_string();
+        let ct = content_type.to_string();
+        let handle = thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            let mut buf = [0u8; 4096];
+            let n = std::io::Read::read(&mut stream, &mut buf).unwrap_or(0);
+            let request = String::from_utf8_lossy(&buf[..n]).to_string();
+            let response = format!(
+                "HTTP/1.1 200 OK\r\nContent-Type: {ct}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+                body.len()
+            );
+            std::io::Write::write_all(&mut stream, response.as_bytes()).ok();
+            request
+        });
+        (port, handle)
+    }
+
+    #[test]
+    fn cp_api_json_parses_response() {
+        let (port, _handle) = mock_http_server(r#"{"key":"value"}"#, "application/json");
+        let base = format!("http://127.0.0.1:{port}");
+        let result = cp_api_json(&base, "/test", HttpMethod::Get, None, None).unwrap();
+        assert_eq!(result["key"], "value");
+    }
+
+    #[test]
+    fn cp_api_text_returns_raw() {
+        let (port, _handle) = mock_http_server("plain text response", "text/plain");
+        let base = format!("http://127.0.0.1:{port}");
+        let result = cp_api_text(&base, "/test", HttpMethod::Get, None, None).unwrap();
+        assert_eq!(result, "plain text response");
+    }
+
+    #[test]
+    fn cp_api_json_errors_on_bad_json() {
+        let (port, _handle) = mock_http_server("not json at all", "text/plain");
+        let base = format!("http://127.0.0.1:{port}");
+        let result = cp_api_json(&base, "/test", HttpMethod::Get, None, None);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn cp_api_send_includes_auth_header() {
+        let (port, handle) = mock_http_server("{}", "application/json");
+        let base = format!("http://127.0.0.1:{port}");
+        cp_api_json(&base, "/test", HttpMethod::Get, None, Some("my-token")).unwrap();
+        let request = handle.join().unwrap();
+        let lower = request.to_lowercase();
+        assert!(
+            lower.contains("authorization: bearer my-token"),
+            "request should contain auth header, got: {request}"
+        );
     }
 }
