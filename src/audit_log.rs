@@ -67,9 +67,10 @@ pub fn resolve_phase_context(
 ) -> AuditPhaseContext {
     let phase = explicit_phase.map_or_else(
         || {
-            runner_state
-                .map(|state| state.phase.to_string())
-                .unwrap_or_else(|| RunnerPhase::Bootstrap.to_string())
+            runner_state.map_or_else(
+                || RunnerPhase::Bootstrap.to_string(),
+                |state| state.phase.to_string(),
+            )
         },
         str::to_string,
     );

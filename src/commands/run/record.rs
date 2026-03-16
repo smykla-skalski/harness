@@ -193,9 +193,10 @@ fn resolve_workflow_phase(run_dir: Option<&Path>) -> Result<String, CliError> {
     let Some(run_dir) = run_dir else {
         return Ok("-".to_string());
     };
-    Ok(read_runner_state(run_dir)?
-        .map(|state| state.phase.to_string())
-        .unwrap_or_else(|| "-".to_string()))
+    Ok(
+        read_runner_state(run_dir)?
+            .map_or_else(|| "-".to_string(), |state| state.phase.to_string()),
+    )
 }
 
 fn validate_gid_usage(
