@@ -39,7 +39,7 @@ When the value is prose, resolve it to a line number by scanning the session JSO
 
 ## Preprocessed context
 
-- Classifier script: `${CLAUDE_SKILL_DIR}/scripts/classify-session.py`
+- Classifier: `harness observe` (Rust binary, installed at `~/.local/bin/harness`)
 - Project dir: !`echo "$CLAUDE_PROJECT_DIR"`
 - Session search path: !`echo "$HOME/.claude/projects/"`
 
@@ -320,7 +320,7 @@ The observer scans timestamps in the JSONL, finds the line closest to 2 hours be
 <example>
 Input: Fix verification after a fix worker completes
 
-The observer re-runs: "${CLAUDE_SKILL_DIR}/scripts/classify-session.py" abc123def --from-line 610 --category build_error --json
+The observer re-runs: harness observe scan abc123def --from-line 610 --json --summary
 If the build_error at L612 no longer appears in new output, the fix is confirmed. If it still appears, a second fix worker is spawned with the first worker's failure context.
 </example>
 
