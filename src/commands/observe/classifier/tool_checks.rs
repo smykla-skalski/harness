@@ -159,7 +159,40 @@ fn check_bash_tool_use(
         );
     }
 
+    check_direct_task_output_read(command, &details, &mut emitter, issues);
     check_env_var_construction(command, &details, &mut emitter, issues);
+}
+
+/// Detect direct reads of Claude's internal task output files.
+///
+/// Agents sometimes bypass `TaskOutput` by reading `/private/tmp/claude-501/.../tasks/*.output`
+/// directly, or polling with `sleep && cat`. Both patterns skip harness tracking.
+fn check_direct_task_output_read(
+    command: &str,
+    details: &str,
+    emitter: &mut IssueEmitter<'_>,
+    issues: &mut Vec<Issue>,
+) {
+    let is_task_file_read = command.contains("/private/tmp/claude-501/")
+        && (command.contains("tasks/") || command.contains(".output"));
+    let is_polling_pattern =
+        command.contains("sleep") && command.contains("cat") && command.contains("tasks/");
+
+    if is_task_file_read || is_polling_pattern {
+        emitter.emit(
+            issues,
+            IssueBlueprint::new(
+                IssueCode::DirectTaskOutputFileRead,
+                IssueCategory::UnexpectedBehavior,
+                IssueSeverity::Medium,
+                "Direct read of internal task output file",
+            )
+            .with_guidance(Guidance::fix_hint(
+                "Use TaskOutput tool instead of reading task files directly",
+            )),
+            details,
+        );
+    }
 }
 
 /// Detect env var prefixes and export statements in Bash commands.

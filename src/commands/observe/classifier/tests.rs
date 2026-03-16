@@ -627,6 +627,56 @@ fn rule_output_shape_is_preserved() {
 }
 
 #[test]
+fn detects_direct_task_output_cat() {
+    let mut state = make_state();
+    let block = serde_json::json!({
+        "type": "tool_use",
+        "id": "t1",
+        "name": "Bash",
+        "input": { "command": "cat /private/tmp/claude-501/session-abc/tasks/task_123.output" }
+    });
+    let issues = check_tool_use_for_issues(10, &block, &mut state);
+    assert!(
+        issues
+            .iter()
+            .any(|i| i.category == IssueCategory::UnexpectedBehavior
+                && i.severity == IssueSeverity::Medium
+                && i.summary.contains("task output"))
+    );
+}
+
+#[test]
+fn detects_task_output_polling_pattern() {
+    let mut state = make_state();
+    let block = serde_json::json!({
+        "type": "tool_use",
+        "id": "t1",
+        "name": "Bash",
+        "input": { "command": "sleep 2 && cat /tmp/tasks/result.output" }
+    });
+    let issues = check_tool_use_for_issues(10, &block, &mut state);
+    assert!(
+        issues
+            .iter()
+            .any(|i| i.category == IssueCategory::UnexpectedBehavior
+                && i.summary.contains("task output"))
+    );
+}
+
+#[test]
+fn skips_task_output_for_unrelated_paths() {
+    let mut state = make_state();
+    let block = serde_json::json!({
+        "type": "tool_use",
+        "id": "t1",
+        "name": "Bash",
+        "input": { "command": "cat /tmp/my-project/output.log" }
+    });
+    let issues = check_tool_use_for_issues(10, &block, &mut state);
+    assert!(!issues.iter().any(|i| i.summary.contains("task output")));
+}
+
+#[test]
 fn text_check_output_shape_is_preserved() {
     let mut state = make_state();
     let issues = check_text_for_issues(
