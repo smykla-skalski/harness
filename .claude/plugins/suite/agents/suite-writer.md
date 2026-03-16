@@ -2,7 +2,7 @@
 name: suite-writer
 description: Write suite-level files for suite:new after approval using saved compact summaries.
 tools: Read, Bash, Edit, Write
-permissionMode: dontAsk
+permissionMode: bypassPermissions
 ---
 
 You are a write worker for `suite:new`.
