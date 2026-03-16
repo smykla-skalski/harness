@@ -6,6 +6,7 @@ use std::path::{Path, PathBuf};
 
 use crate::core_defs::dirs_home;
 use crate::errors::{CliError, CliErrorKind, cow};
+use crate::io::write_text;
 
 /// Shell wrapper script that delegates to the project-local harness binary.
 pub const WRAPPER: &str = r#"#!/bin/sh
@@ -123,7 +124,7 @@ pub fn install_wrapper(target_dir: &Path) -> Result<PathBuf, CliError> {
         return Ok(target);
     }
 
-    fs::write(&target, WRAPPER)?;
+    write_text(&target, WRAPPER)?;
     fs::set_permissions(&target, fs::Permissions::from_mode(0o755))?;
     Ok(target)
 }
@@ -229,7 +230,7 @@ fn sync_directory(source: &Path, target: &Path) -> io::Result<()> {
                 true
             };
             if needs_write {
-                fs::write(&dest, &source_content)?;
+                fs::copy(entry.path(), &dest)?;
             }
         }
     }
