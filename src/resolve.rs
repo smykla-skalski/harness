@@ -153,7 +153,7 @@ fn manifest_path_candidates(raw: &str, run_dir: Option<&Path>) -> Result<Vec<Pat
         items.push(active.join("manifests").join(&raw_path));
 
         // Suite directory (read from run metadata if available)
-        if let Ok(content) = std::fs::read_to_string(active.join("run-metadata.json"))
+        if let Ok(content) = fs::read_to_string(active.join("run-metadata.json"))
             && let Ok(meta) = serde_json::from_str::<serde_json::Value>(&content)
             && let Some(suite_dir) = meta["suite_dir"].as_str()
         {
