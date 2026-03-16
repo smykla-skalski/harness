@@ -1,16 +1,19 @@
 pub mod classifier;
+mod compare;
+mod context_cmd;
+mod doctor;
+mod dump;
 pub mod output;
 pub mod patterns;
+mod scan;
 pub mod session;
 pub mod types;
+mod watch;
 
 use std::collections::HashMap;
-use std::env;
 use std::fs;
-use std::io::{self, BufRead, BufReader, Seek, SeekFrom, Write};
-use std::path::{Path, PathBuf};
-use std::thread;
-use std::time::{Duration, Instant};
+use std::io::{self, Write};
+use std::path::PathBuf;
 
 use clap::{Args, Subcommand};
 use serde_json::json;
@@ -19,10 +22,10 @@ use crate::core_defs::harness_data_root;
 use crate::errors::{CliError, CliErrorKind};
 use crate::io::{read_text, write_json_pretty};
 
-use self::types::{
-    FOCUS_PRESETS, FocusPreset, Issue, IssueCategory, IssueCode, IssueSeverity, ObserverState,
-    ScanState,
-};
+use self::types::{FOCUS_PRESETS, IssueCategory, IssueCode, IssueSeverity, ObserverState};
+
+// Re-exports consumed by classifier submodules via `super::`.
+pub(crate) use self::dump::tool_result_text;
 
 /// Minimum text length to bother displaying in dump mode.
 const MIN_DUMP_TEXT_LENGTH: usize = 5;
@@ -293,41 +296,19 @@ pub(crate) fn redact_details(text: &str) -> String {
         .into_owned()
 }
 
-/// Extract text from a `tool_result` content block.
-pub(crate) fn tool_result_text(block: &serde_json::Value) -> String {
-    let content = &block["content"];
-    if let Some(arr) = content.as_array() {
-        let parts: Vec<&str> = arr
-            .iter()
-            .filter_map(|item| {
-                if item["type"].as_str() == Some("text") {
-                    item["text"].as_str()
-                } else {
-                    None
-                }
-            })
-            .collect();
-        parts.join("\n")
-    } else if let Some(s) = content.as_str() {
-        s.to_string()
-    } else {
-        String::new()
-    }
-}
-
 /// Execute the observe command in the given mode.
 ///
 /// # Errors
 /// Returns `CliError` on session lookup or parse failures.
 pub fn execute(mode: ObserveMode) -> Result<i32, CliError> {
     match mode {
-        ObserveMode::Scan { session_id, filter } => execute_scan(&session_id, &filter),
+        ObserveMode::Scan { session_id, filter } => scan::execute_scan(&session_id, &filter),
         ObserveMode::Watch {
             session_id,
             poll_interval,
             timeout,
             filter,
-        } => execute_watch(&session_id, poll_interval, timeout, &filter),
+        } => watch::execute_watch(&session_id, poll_interval, timeout, &filter),
         ObserveMode::Dump {
             session_id,
             from_line,
@@ -337,9 +318,9 @@ pub fn execute(mode: ObserveMode) -> Result<i32, CliError> {
             tool_name,
             raw_json,
             project_hint,
-        } => execute_dump(
+        } => dump::execute_dump(
             &session_id,
-            &DumpOptions {
+            &dump::DumpOptions {
                 from_line: from_line.unwrap_or(0),
                 to_line,
                 text_filter: filter.as_deref(),
@@ -358,7 +339,7 @@ pub fn execute(mode: ObserveMode) -> Result<i32, CliError> {
             line,
             window,
             project_hint,
-        } => execute_context(&session_id, line, window, project_hint.as_deref()),
+        } => context_cmd::execute_context(&session_id, line, window, project_hint.as_deref()),
         ObserveMode::Status {
             session_id,
             project_hint,
@@ -377,7 +358,7 @@ pub fn execute(mode: ObserveMode) -> Result<i32, CliError> {
         } => execute_resolve_start(&session_id, &value, project_hint.as_deref()),
         ObserveMode::ListCategories => execute_list_categories(),
         ObserveMode::ListFocusPresets => execute_list_focus_presets(),
-        ObserveMode::Doctor => execute_doctor(),
+        ObserveMode::Doctor => doctor::execute_doctor(),
         ObserveMode::Mute {
             session_id,
             codes,
@@ -395,7 +376,7 @@ pub fn execute(mode: ObserveMode) -> Result<i32, CliError> {
             from_b,
             to_b,
             project_hint,
-        } => execute_compare(
+        } => compare::execute_compare(
             &session_id,
             from_a,
             to_a,
@@ -419,7 +400,7 @@ fn execute_cycle(session_id: &str, project_hint: Option<&str>) -> Result<i32, Cl
     let from_line = observer_state.cursor;
 
     let path = session::find_session(session_id, project_hint)?;
-    let (issues, last_line) = scan(&path, from_line)?;
+    let (issues, last_line) = scan::scan(&path, from_line)?;
 
     // Update observer state
     let now = chrono::Utc::now().to_rfc3339();
@@ -492,864 +473,6 @@ fn execute_cycle(session_id: &str, project_hint: Option<&str>) -> Result<i32, Cl
 
     Ok(0)
 }
-
-/// One-shot scan returning all classified issues.
-fn scan(path: &Path, from_line: usize) -> Result<(Vec<Issue>, usize), CliError> {
-    scan_with_limit(path, from_line, None)
-}
-
-/// One-shot scan with optional upper line bound.
-fn scan_with_limit(
-    path: &Path,
-    from_line: usize,
-    until_line: Option<usize>,
-) -> Result<(Vec<Issue>, usize), CliError> {
-    let file = fs::File::open(path)
-        .map_err(|e| CliErrorKind::session_parse_error(format!("cannot open session file: {e}")))?;
-    let reader = BufReader::new(file);
-    let mut state = ScanState::default();
-    let mut issues = Vec::new();
-    let mut last_line = from_line;
-
-    for (index, line_result) in reader.lines().enumerate() {
-        if index < from_line {
-            continue;
-        }
-        if until_line.is_some_and(|ul| index > ul) {
-            break;
-        }
-        let line = line_result.map_err(|e| {
-            CliErrorKind::session_parse_error(format!("read error at line {index}: {e}"))
-        })?;
-        last_line = index + 1;
-        issues.extend(classifier::classify_line(index, &line, &mut state));
-    }
-
-    Ok((issues, last_line))
-}
-
-/// Apply focus/category filters, returning an error for invalid values.
-fn apply_category_filter(
-    filtered: &mut Vec<Issue>,
-    filter: &ObserveFilterArgs,
-) -> Result<(), CliError> {
-    if let Some(ref focus) = filter.focus {
-        let Some(preset) = FocusPreset::from_label(focus) else {
-            return Err(CliErrorKind::session_parse_error(format!(
-                "unknown focus preset '{focus}'. Valid: harness, skills, all"
-            ))
-            .into());
-        };
-        let Some(focus_categories) = preset.categories() else {
-            return Ok(());
-        };
-        if let Some(ref category) = filter.category {
-            let explicit: Vec<IssueCategory> = category
-                .split(',')
-                .filter_map(|c| IssueCategory::from_label(c.trim()))
-                .collect();
-            filtered.retain(|issue| {
-                focus_categories.contains(&issue.category) && explicit.contains(&issue.category)
-            });
-        } else {
-            filtered.retain(|issue| focus_categories.contains(&issue.category));
-        }
-    } else if let Some(ref category) = filter.category {
-        let categories: Vec<IssueCategory> = category
-            .split(',')
-            .filter_map(|c| IssueCategory::from_label(c.trim()))
-            .collect();
-        if categories.is_empty() {
-            return Err(CliErrorKind::session_parse_error(format!(
-                "no valid categories in '{category}'. Valid: {}",
-                IssueCategory::ALL
-                    .iter()
-                    .map(ToString::to_string)
-                    .collect::<Vec<_>>()
-                    .join(", ")
-            ))
-            .into());
-        }
-        filtered.retain(|issue| categories.contains(&issue.category));
-    }
-    Ok(())
-}
-
-/// Apply a YAML overrides file (mute list and severity overrides).
-fn apply_overrides_file(filtered: &mut Vec<Issue>, overrides_path: &str) -> Result<(), CliError> {
-    let content = fs::read_to_string(overrides_path).map_err(|e| {
-        CliErrorKind::session_parse_error(format!("cannot read overrides file: {e}"))
-    })?;
-    let overrides: serde_json::Value = serde_yml::from_str(&content)
-        .map_err(|e| CliErrorKind::session_parse_error(format!("invalid overrides YAML: {e}")))?;
-
-    if let Some(mute_list) = overrides["mute"].as_array() {
-        let muted: Vec<IssueCode> = mute_list
-            .iter()
-            .filter_map(|v| v.as_str().and_then(IssueCode::from_label))
-            .collect();
-        filtered.retain(|issue| !muted.contains(&issue.code));
-    }
-
-    if let Some(overrides_map) = overrides["severity_overrides"].as_object() {
-        for issue in filtered.iter_mut() {
-            let code_str = issue.code.to_string();
-            if let Some(new_sev) = overrides_map
-                .get(&code_str)
-                .and_then(|v| v.as_str())
-                .and_then(IssueSeverity::from_label)
-            {
-                issue.severity = new_sev;
-            }
-        }
-    }
-    Ok(())
-}
-
-/// Apply filters to a list of issues, validating filter values.
-fn apply_filters(issues: Vec<Issue>, filter: &ObserveFilterArgs) -> Result<Vec<Issue>, CliError> {
-    let mut filtered = issues;
-
-    if let Some(ref severity) = filter.severity {
-        let Some(min_severity) = IssueSeverity::from_label(severity) else {
-            return Err(CliErrorKind::session_parse_error(format!(
-                "unknown severity '{severity}'. Valid: low, medium, critical"
-            ))
-            .into());
-        };
-        filtered.retain(|issue| issue.severity >= min_severity);
-    }
-
-    apply_category_filter(&mut filtered, filter)?;
-
-    if let Some(ref exclude) = filter.exclude {
-        let excluded: Vec<IssueCategory> = exclude
-            .split(',')
-            .filter_map(|c| IssueCategory::from_label(c.trim()))
-            .collect();
-        filtered.retain(|issue| !excluded.contains(&issue.category));
-    }
-
-    if filter.fixable {
-        filtered.retain(|issue| issue.fix_safety.is_fixable());
-    }
-
-    if let Some(ref mute) = filter.mute {
-        let muted: Vec<IssueCode> = mute
-            .split(',')
-            .filter_map(|c| IssueCode::from_label(c.trim()))
-            .collect();
-        filtered.retain(|issue| !muted.contains(&issue.code));
-    }
-
-    if let Some(ref overrides_path) = filter.overrides {
-        apply_overrides_file(&mut filtered, overrides_path)?;
-    }
-
-    Ok(filtered)
-}
-
-/// Resolve the effective `from_line`, taking `--from` into account.
-fn resolve_effective_from_line(
-    filter: &ObserveFilterArgs,
-    session_path: &Path,
-) -> Result<usize, CliError> {
-    if let Some(ref from_value) = filter.from {
-        resolve_from(session_path, from_value)
-    } else {
-        Ok(filter.from_line)
-    }
-}
-
-/// Resolve a --from value to a concrete line number.
-///
-/// Resolution order:
-/// 1. Parse as usize -> line number
-/// 2. Starts with 4-digit year and contains T -> ISO timestamp
-/// 3. Otherwise -> prose substring search
-fn resolve_from(session_path: &Path, value: &str) -> Result<usize, CliError> {
-    // 1. Numeric
-    if let Ok(line) = value.parse::<usize>() {
-        return Ok(line);
-    }
-
-    // 2. ISO timestamp (starts with year, contains T)
-    if value.len() >= 10 && value[..4].chars().all(|c| c.is_ascii_digit()) && value.contains('T') {
-        let file = fs::File::open(session_path).map_err(|e| {
-            CliErrorKind::session_parse_error(format!("cannot open session file: {e}"))
-        })?;
-        let reader = BufReader::new(file);
-        for (index, line_result) in reader.lines().enumerate() {
-            let Ok(line) = line_result else { continue };
-            if let Ok(obj) = serde_json::from_str::<serde_json::Value>(line.trim())
-                && let Some(ts) = obj["timestamp"].as_str()
-                && ts >= value
-            {
-                return Ok(index);
-            }
-        }
-        return Err(CliErrorKind::session_parse_error(format!(
-            "no event at or after timestamp '{value}'"
-        ))
-        .into());
-    }
-
-    // 3. Prose substring search
-    let lower_value = value.to_lowercase();
-    let file = fs::File::open(session_path)
-        .map_err(|e| CliErrorKind::session_parse_error(format!("cannot open session file: {e}")))?;
-    let reader = BufReader::new(file);
-    for (index, line_result) in reader.lines().enumerate() {
-        let Ok(line) = line_result else { continue };
-        if line.to_lowercase().contains(&lower_value) {
-            return Ok(index);
-        }
-    }
-    Err(CliErrorKind::session_parse_error(format!("no match for --from '{value}'")).into())
-}
-
-/// Resolve timestamp-based `--since` / `--until` to effective line bounds.
-fn resolve_effective_bounds(
-    path: &Path,
-    filter: &ObserveFilterArgs,
-    from_line: usize,
-) -> Result<(usize, Option<usize>), CliError> {
-    let effective_from = if let Some(ref ts) = filter.since_timestamp {
-        let resolved = resolve_from(path, ts)?;
-        resolved.max(from_line)
-    } else {
-        from_line
-    };
-    let effective_until = if let Some(ref ts) = filter.until_timestamp {
-        let resolved = resolve_from(path, ts)?;
-        Some(filter.until_line.map_or(resolved, |ul| ul.min(resolved)))
-    } else {
-        filter.until_line
-    };
-    Ok((effective_from, effective_until))
-}
-
-/// Render scan results to stdout using the requested format.
-fn render_scan_output(filter: &ObserveFilterArgs, issues: &[Issue], last_line: usize) {
-    render_scan_issues(filter, issues);
-    render_scan_followups(filter, issues, last_line);
-}
-
-fn render_scan_issues(filter: &ObserveFilterArgs, issues: &[Issue]) {
-    match filter.format.as_deref().unwrap_or("") {
-        "markdown" | "md" => println!("{}", output::render_markdown(issues)),
-        "sarif" => println!("{}", output::render_sarif(issues)),
-        _ if filter.json => {
-            for issue in issues {
-                println!("{}", output::render_json(issue));
-            }
-        }
-        _ => {
-            for issue in issues {
-                println!("{}", output::render_human(issue));
-            }
-        }
-    }
-}
-
-fn render_scan_followups(filter: &ObserveFilterArgs, issues: &[Issue], last_line: usize) {
-    if let Some(n) = filter.top_causes {
-        println!("{}", output::render_top_causes(issues, n));
-    }
-    if filter.summary {
-        println!("{}", output::render_summary(issues, last_line));
-    }
-}
-
-/// Execute scan mode.
-fn execute_scan(session_id: &str, filter: &ObserveFilterArgs) -> Result<i32, CliError> {
-    let path = session::find_session(session_id, filter.project_hint.as_deref())?;
-    let from_line = resolve_effective_from_line(filter, &path)?;
-
-    if filter.json {
-        let status = json!({
-            "status": "started",
-            "session": path.to_string_lossy(),
-            "from_line": from_line,
-        });
-        println!("{status}");
-    }
-
-    let (effective_from, effective_until) = resolve_effective_bounds(&path, filter, from_line)?;
-
-    let (issues, last_line) = scan_with_limit(&path, effective_from, effective_until)?;
-    let filtered = apply_filters(issues, filter)?;
-
-    if let Some(ref details_path) = filter.output_details {
-        write_details_file(details_path, &filtered)?;
-    }
-
-    render_scan_output(filter, &filtered, last_line);
-
-    Ok(0)
-}
-
-/// Compute the byte offset for skipping the first `from_line` lines.
-fn compute_initial_byte_offset(path: &Path, from_line: usize) -> u64 {
-    if from_line == 0 {
-        return 0;
-    }
-    let Ok(file) = fs::File::open(path) else {
-        return 0;
-    };
-    let reader = BufReader::new(file);
-    let mut offset = 0u64;
-    for (index, line_result) in reader.lines().enumerate() {
-        if index >= from_line {
-            break;
-        }
-        if let Ok(line) = line_result {
-            offset += line.len() as u64 + 1;
-        }
-    }
-    offset
-}
-
-/// Read new lines from the session file at the current byte offset and classify them.
-fn poll_session_lines(
-    path: &Path,
-    byte_offset: &mut u64,
-    last_line: &mut usize,
-    state: &mut ScanState,
-) -> Vec<Issue> {
-    let Ok(mut file) = fs::File::open(path) else {
-        return Vec::new();
-    };
-    if let Err(e) = file.seek(SeekFrom::Start(*byte_offset)) {
-        eprintln!("warning: seek failed on session file: {e}");
-        return Vec::new();
-    }
-    let reader = BufReader::new(file);
-    let mut issues = Vec::new();
-    for line_result in reader.lines() {
-        let Ok(line) = line_result else { continue };
-        *byte_offset += line.len() as u64 + 1;
-        let index = *last_line;
-        *last_line += 1;
-        issues.extend(classifier::classify_line(index, &line, state));
-    }
-    issues
-}
-
-/// Write a line to a file and flush, printing a warning on failure.
-fn write_and_flush(file: &mut fs::File, line: &str, label: &str) {
-    if let Err(e) = writeln!(file, "{line}") {
-        eprintln!("warning: failed to write {label}: {e}");
-    }
-    if let Err(e) = file.flush() {
-        eprintln!("warning: failed to flush {label}: {e}");
-    }
-}
-
-/// Write an issue to the appropriate outputs (details file, output file, or stdout).
-fn emit_watch_issue(
-    issue: &Issue,
-    json_mode: bool,
-    details_writer: &mut Option<fs::File>,
-    output_writer: &mut Option<fs::File>,
-) {
-    if let Some(detail_out) = details_writer
-        && let Ok(json_str) = serde_json::to_string(issue)
-    {
-        write_and_flush(detail_out, &json_str, "issue details");
-    }
-    let rendered = if json_mode {
-        output::render_json(issue)
-    } else {
-        output::render_human(issue)
-    };
-    if let Some(file_out) = output_writer {
-        write_and_flush(file_out, &rendered, "issue output");
-    } else {
-        println!("{rendered}");
-    }
-}
-
-/// Execute watch mode with polling.
-///
-/// Tracks the byte offset in the session file so each poll cycle only reads
-/// new lines instead of re-reading the entire file.
-fn execute_watch(
-    session_id: &str,
-    poll_interval: u64,
-    timeout: u64,
-    filter: &ObserveFilterArgs,
-) -> Result<i32, CliError> {
-    let path = session::find_session(session_id, filter.project_hint.as_deref())?;
-    let from_line = resolve_effective_from_line(filter, &path)?;
-
-    if filter.json {
-        let status = json!({
-            "status": "started",
-            "session": path.to_string_lossy(),
-            "from_line": from_line,
-        });
-        println!("{status}");
-    }
-
-    let mut state = ScanState::default();
-    let mut all_issues: Vec<Issue> = Vec::new();
-    let mut last_line = from_line;
-    let mut last_activity = Instant::now();
-    let mut byte_offset = compute_initial_byte_offset(&path, from_line);
-    let poll_duration = Duration::from_secs(poll_interval);
-    let timeout_duration = Duration::from_secs(timeout);
-
-    let open_append = |path: &str, label: &str| -> Result<fs::File, CliError> {
-        fs::OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(path)
-            .map_err(|e| {
-                CliError::from(CliErrorKind::session_parse_error(format!(
-                    "cannot open {label} file: {e}"
-                )))
-            })
-    };
-
-    let mut output_writer: Option<fs::File> = filter
-        .output
-        .as_deref()
-        .map(|p| open_append(p, "output"))
-        .transpose()?;
-    let mut details_writer: Option<fs::File> = filter
-        .output_details
-        .as_deref()
-        .map(|p| open_append(p, "details"))
-        .transpose()?;
-
-    loop {
-        let prev_last_line = last_line;
-        let new_issues = poll_session_lines(&path, &mut byte_offset, &mut last_line, &mut state);
-
-        // Track log activity (any new lines), not just issue activity
-        if last_line > prev_last_line {
-            last_activity = Instant::now();
-        }
-
-        // Filter each batch before emitting
-        let filtered_new = apply_filters(new_issues, filter)?;
-        for issue in &filtered_new {
-            emit_watch_issue(issue, filter.json, &mut details_writer, &mut output_writer);
-        }
-        all_issues.extend(filtered_new);
-
-        if timeout > 0 && last_activity.elapsed() > timeout_duration {
-            break;
-        }
-
-        thread::sleep(poll_duration);
-    }
-
-    if filter.summary {
-        println!("{}", output::render_summary(&all_issues, last_line));
-    }
-
-    Ok(0)
-}
-
-struct DumpOptions<'a> {
-    from_line: usize,
-    to_line: Option<usize>,
-    text_filter: Option<&'a str>,
-    roles: Option<&'a str>,
-    tool_name: Option<&'a str>,
-    raw_json: bool,
-}
-
-/// Parsed fields from a valid dump JSONL line.
-struct ParsedDumpLine<'a> {
-    role: &'a str,
-    timestamp: &'a str,
-    message: &'a serde_json::Value,
-}
-
-/// Parse a JSONL object and return the message fields if it passes role filters.
-fn parse_dump_line<'a>(
-    obj: &'a serde_json::Value,
-    role_set: Option<&[&str]>,
-) -> Option<ParsedDumpLine<'a>> {
-    let message = &obj["message"];
-    if !message.is_object() {
-        return None;
-    }
-    let role = message["role"].as_str().unwrap_or("");
-    if role_set.is_some_and(|rs| !rs.contains(&role)) {
-        return None;
-    }
-    let timestamp = obj["timestamp"].as_str().unwrap_or("");
-    Some(ParsedDumpLine {
-        role,
-        timestamp,
-        message,
-    })
-}
-
-/// Execute dump mode - raw event stream without classification.
-fn execute_dump(
-    session_id: &str,
-    options: &DumpOptions<'_>,
-    project_hint: Option<&str>,
-) -> Result<i32, CliError> {
-    let DumpOptions {
-        from_line,
-        to_line,
-        text_filter,
-        roles,
-        tool_name,
-        raw_json,
-    } = *options;
-    let path = session::find_session(session_id, project_hint)?;
-    let file = fs::File::open(&path)
-        .map_err(|e| CliErrorKind::session_parse_error(format!("cannot open session file: {e}")))?;
-    let reader = BufReader::new(file);
-    let role_set: Option<Vec<&str>> = roles.map(|r| r.split(',').collect());
-    let filter_lower: Option<String> = text_filter.map(str::to_lowercase);
-
-    for (index, line_result) in reader.lines().enumerate() {
-        if index < from_line {
-            continue;
-        }
-        if to_line.is_some_and(|end| index > end) {
-            break;
-        }
-        let Ok(line) = line_result else { continue };
-        let Ok(obj) = serde_json::from_str::<serde_json::Value>(line.trim()) else {
-            continue;
-        };
-
-        let Some(parsed) = parse_dump_line(&obj, role_set.as_deref()) else {
-            continue;
-        };
-
-        if raw_json {
-            if filter_lower
-                .as_deref()
-                .is_some_and(|f| !line.to_lowercase().contains(f))
-            {
-                continue;
-            }
-            println!("{}", line.trim());
-            continue;
-        }
-
-        dump_message_content(
-            index,
-            parsed.role,
-            parsed.timestamp,
-            &parsed.message["content"],
-            filter_lower.as_deref(),
-            tool_name,
-        );
-    }
-
-    Ok(0)
-}
-
-/// Check if pre-lowered text matches the pre-lowercased dump filter.
-fn matches_dump_filter(text_lower: &str, filter_lower: Option<&str>) -> bool {
-    filter_lower.is_none_or(|f| text_lower.contains(f))
-}
-
-/// A formatted dump block with a label prefix and the block text.
-struct DumpBlock {
-    label: String,
-    text: String,
-}
-
-/// Check whether a content block passes the tool-name filter.
-///
-/// Returns `true` if there is no filter or if the block matches.
-/// Returns `false` if the block should be skipped.
-fn passes_tool_name_filter(block: &serde_json::Value, filter: Option<&str>) -> bool {
-    let Some(name_filter) = filter else {
-        return true;
-    };
-    let block_type = block["type"].as_str().unwrap_or("");
-    if block_type == "tool_use" {
-        let name = block["name"].as_str().unwrap_or("");
-        return name.eq_ignore_ascii_case(name_filter);
-    }
-    // Can't correlate tool_result by name, so skip when filter is active
-    block_type != "tool_result"
-}
-
-/// Print content blocks from a message in dump format.
-fn dump_message_content(
-    index: usize,
-    role: &str,
-    timestamp: &str,
-    content: &serde_json::Value,
-    filter_lower: Option<&str>,
-    tool_name_filter: Option<&str>,
-) {
-    if let Some(blocks) = content.as_array() {
-        dump_content_blocks(
-            index,
-            role,
-            &timestamp_suffix(timestamp),
-            blocks,
-            filter_lower,
-            tool_name_filter,
-        );
-        return;
-    }
-    if let Some(text) = content.as_str() {
-        dump_text_content(
-            index,
-            role,
-            &timestamp_suffix(timestamp),
-            text,
-            filter_lower,
-        );
-    }
-}
-
-/// Format a content block for dump output.
-fn format_dump_block(index: usize, role: &str, block: &serde_json::Value) -> DumpBlock {
-    let block_type = block["type"].as_str().unwrap_or("");
-    let block_id = block["id"]
-        .as_str()
-        .or_else(|| block["tool_use_id"].as_str())
-        .unwrap_or("");
-    let id_suffix = if block_id.is_empty() {
-        String::new()
-    } else {
-        format!(" ({block_id})")
-    };
-
-    match block_type {
-        "text" => {
-            let text = block["text"].as_str().unwrap_or("").to_string();
-            DumpBlock {
-                label: format!("L{index} [{role}] text"),
-                text,
-            }
-        }
-        "tool_use" => format_tool_use_dump(index, role, block, &id_suffix),
-        "tool_result" => {
-            let text = tool_result_text(block);
-            DumpBlock {
-                label: format!("L{index} [{role}] result{id_suffix}"),
-                text,
-            }
-        }
-        _ => DumpBlock {
-            label: format!("L{index} [{role}] {block_type}{id_suffix}"),
-            text: String::new(),
-        },
-    }
-}
-
-/// Format a `tool_use` block for dump output.
-fn format_tool_use_dump(
-    index: usize,
-    role: &str,
-    block: &serde_json::Value,
-    id_suffix: &str,
-) -> DumpBlock {
-    let name = block["name"].as_str().unwrap_or("");
-    let input = &block["input"];
-    match name {
-        "Bash" => {
-            let cmd = input["command"].as_str().unwrap_or("");
-            DumpBlock {
-                label: format!("L{index} [{role}] Bash{id_suffix}"),
-                text: cmd.to_string(),
-            }
-        }
-        "Read" | "Write" => {
-            let file_path = input["file_path"].as_str().unwrap_or("");
-            DumpBlock {
-                label: format!("L{index} [{role}] {name}{id_suffix}"),
-                text: file_path.to_string(),
-            }
-        }
-        "Edit" => {
-            let file_path = input["file_path"].as_str().unwrap_or("");
-            let old = truncate_at(input["old_string"].as_str().unwrap_or(""), 100);
-            let new_str = truncate_at(input["new_string"].as_str().unwrap_or(""), 100);
-            DumpBlock {
-                label: format!("L{index} [{role}] Edit{id_suffix}"),
-                text: format!("{file_path}\n  old: {old}\n  new: {new_str}"),
-            }
-        }
-        "AskUserQuestion" => {
-            let questions = input["questions"].as_array();
-            let parts: Vec<String> = questions
-                .iter()
-                .flat_map(|qs| qs.iter())
-                .map(|q| {
-                    let header = q["header"].as_str().unwrap_or("");
-                    let question = q["question"].as_str().unwrap_or("");
-                    format!("header={header}, q={question}")
-                })
-                .collect();
-            DumpBlock {
-                label: format!("L{index} [{role}] AskUser{id_suffix}"),
-                text: parts.join("; "),
-            }
-        }
-        "Agent" => {
-            let desc = input["description"].as_str().unwrap_or("");
-            DumpBlock {
-                label: format!("L{index} [{role}] Agent{id_suffix}"),
-                text: desc.to_string(),
-            }
-        }
-        _ => {
-            let raw = serde_json::to_string(input).unwrap_or_default();
-            DumpBlock {
-                label: format!("L{index} [{role}] {name}{id_suffix}"),
-                text: truncate_at(&raw, 300).to_string(),
-            }
-        }
-    }
-}
-
-fn timestamp_suffix(timestamp: &str) -> String {
-    if timestamp.is_empty() {
-        String::new()
-    } else {
-        format!(" {timestamp}")
-    }
-}
-
-fn should_dump_text(text: &str, filter_lower: Option<&str>) -> bool {
-    text.len() > MIN_DUMP_TEXT_LENGTH && matches_dump_filter(&text.to_lowercase(), filter_lower)
-}
-
-fn print_dump_line(label: &str, ts_suffix: &str, text: &str) {
-    let truncated = truncate_at(text, DUMP_TRUNCATE_LENGTH);
-    println!("{label}{ts_suffix}: {truncated}");
-}
-
-fn dump_content_blocks(
-    index: usize,
-    role: &str,
-    ts_suffix: &str,
-    blocks: &[serde_json::Value],
-    filter_lower: Option<&str>,
-    tool_name_filter: Option<&str>,
-) {
-    for block in blocks {
-        if !passes_tool_name_filter(block, tool_name_filter) {
-            continue;
-        }
-        let db = format_dump_block(index, role, block);
-        if should_dump_text(&db.text, filter_lower) {
-            print_dump_line(&db.label, ts_suffix, &db.text);
-        }
-    }
-}
-
-fn dump_text_content(
-    index: usize,
-    role: &str,
-    ts_suffix: &str,
-    text: &str,
-    filter_lower: Option<&str>,
-) {
-    if !should_dump_text(text, filter_lower) {
-        return;
-    }
-    let label = format!("L{index} [{role}]");
-    print_dump_line(&label, ts_suffix, text);
-}
-
-/// Render a single line of context output from a parsed JSONL event.
-fn render_context_line(index: usize, target_line: usize, obj: &serde_json::Value) {
-    let message = &obj["message"];
-    if !message.is_object() {
-        return;
-    }
-    let role = message["role"].as_str().unwrap_or("");
-    let prefix = if index == target_line { ">>> " } else { "    " };
-    let ts_part = timestamp_suffix(obj["timestamp"].as_str().unwrap_or(""));
-
-    if let Some(blocks) = message["content"].as_array() {
-        render_context_blocks(index, role, prefix, &ts_part, blocks);
-        return;
-    }
-    if let Some(text) = message["content"].as_str() {
-        render_context_text(index, role, prefix, &ts_part, text);
-    }
-}
-
-fn render_context_blocks(
-    index: usize,
-    role: &str,
-    prefix: &str,
-    ts_part: &str,
-    blocks: &[serde_json::Value],
-) {
-    for block in blocks {
-        let db = format_dump_block(index, role, block);
-        if db.text.len() <= MIN_DUMP_TEXT_LENGTH {
-            continue;
-        }
-        let truncated = truncate_at(&db.text, DUMP_TRUNCATE_LENGTH);
-        println!("{prefix}{}{ts_part}: {truncated}", db.label);
-    }
-}
-
-fn render_context_text(index: usize, role: &str, prefix: &str, ts_part: &str, text: &str) {
-    if text.len() <= MIN_DUMP_TEXT_LENGTH {
-        return;
-    }
-    let truncated = truncate_at(text, DUMP_TRUNCATE_LENGTH);
-    println!("{prefix}L{index} [{role}]{ts_part}: {truncated}");
-}
-
-/// Execute context mode - show events around a specific line.
-fn execute_context(
-    session_id: &str,
-    target_line: usize,
-    window: usize,
-    project_hint: Option<&str>,
-) -> Result<i32, CliError> {
-    let start = target_line.saturating_sub(window);
-    let end = target_line + window;
-    let path = session::find_session(session_id, project_hint)?;
-    let file = fs::File::open(&path)
-        .map_err(|e| CliErrorKind::session_parse_error(format!("cannot open session file: {e}")))?;
-    let reader = BufReader::new(file);
-
-    for (index, line_result) in reader.lines().enumerate() {
-        if index < start {
-            continue;
-        }
-        if index > end {
-            break;
-        }
-        let Ok(line) = line_result else { continue };
-        let Ok(obj) = serde_json::from_str::<serde_json::Value>(line.trim()) else {
-            continue;
-        };
-        render_context_line(index, target_line, &obj);
-    }
-    Ok(0)
-}
-
-/// Write full untruncated issue details to a file.
-fn write_details_file(path: &str, issues: &[Issue]) -> Result<(), CliError> {
-    let mut file = fs::File::create(path).map_err(|e| {
-        CliErrorKind::session_parse_error(format!("cannot create details file: {e}"))
-    })?;
-    for issue in issues {
-        if let Ok(json_str) = serde_json::to_string(issue) {
-            let _ = writeln!(file, "{json_str}");
-        }
-    }
-    Ok(())
-}
-
-// ─── New handlers (Phase 4-5) ──────────────────────────────────────
 
 /// Load or create observer state for a session.
 fn load_observer_state(session_id: &str) -> Result<ObserverState, CliError> {
@@ -1433,7 +556,7 @@ fn execute_resume(session_id: &str, filter: &ObserveFilterArgs) -> Result<i32, C
     let state = load_observer_state(session_id)?;
     let mut resumed_filter = filter.clone();
     resumed_filter.from_line = state.cursor;
-    execute_scan(session_id, &resumed_filter)
+    scan::execute_scan(session_id, &resumed_filter)
 }
 
 /// Verify whether a specific issue still reproduces.
@@ -1452,7 +575,7 @@ fn execute_verify(
     let from_line = since_line.unwrap_or_else(|| open_issue.map_or(0, |i| i.first_seen_line));
 
     let path = session::find_session(session_id, project_hint)?;
-    let (issues, _last_line) = scan(&path, from_line)?;
+    let (issues, _last_line) = scan::scan(&path, from_line)?;
 
     let still_reproducing = open_issue.is_some_and(|oi| {
         issues
@@ -1492,7 +615,7 @@ fn execute_resolve_start(
     project_hint: Option<&str>,
 ) -> Result<i32, CliError> {
     let path = session::find_session(session_id, project_hint)?;
-    let resolved = resolve_from(&path, value)?;
+    let resolved = scan::resolve_from(&path, value)?;
 
     let method = if value.parse::<usize>().is_ok() {
         "numeric"
@@ -1541,59 +664,6 @@ fn execute_list_focus_presets() -> Result<i32, CliError> {
     Ok(0)
 }
 
-/// Validate observer setup.
-fn execute_doctor() -> Result<i32, CliError> {
-    let mut failures = 0u32;
-
-    // Check ~/.claude/projects/ exists
-    let home = env::var("HOME")
-        .map_err(|_| CliErrorKind::session_parse_error("HOME environment variable not set"))?;
-    let claude_projects = PathBuf::from(&home).join(".claude").join("projects");
-    if claude_projects.is_dir() {
-        println!("PASS: ~/.claude/projects/ exists");
-    } else {
-        println!("FAIL: ~/.claude/projects/ not found");
-        failures += 1;
-    }
-
-    // Check harness binary
-    let harness_path = PathBuf::from(&home).join(".local/bin/harness");
-    if harness_path.exists() {
-        println!("PASS: ~/.local/bin/harness exists");
-    } else {
-        println!("FAIL: ~/.local/bin/harness not found");
-        failures += 1;
-    }
-
-    // Check XDG data directory
-    let data_root = harness_data_root();
-    if data_root.is_dir() {
-        println!("PASS: data directory {} exists", data_root.display());
-    } else {
-        println!(
-            "WARN: data directory {} does not exist yet",
-            data_root.display()
-        );
-    }
-
-    // Check observe state directory is writable
-    let observe_dir = data_root.join("observe");
-    let _ = fs::create_dir_all(&observe_dir);
-    if observe_dir.is_dir() {
-        println!("PASS: observe state directory writable");
-    } else {
-        println!("FAIL: cannot create observe state directory");
-        failures += 1;
-    }
-
-    if failures > 0 {
-        return Err(
-            CliErrorKind::session_parse_error(format!("doctor found {failures} failures")).into(),
-        );
-    }
-    Ok(0)
-}
-
 /// Add issue codes to the mute list.
 fn execute_mute(
     session_id: &str,
@@ -1623,11 +693,37 @@ fn execute_mute(
     Ok(0)
 }
 
+/// Remove issue codes from the mute list.
+fn execute_unmute(
+    session_id: &str,
+    codes: &str,
+    _project_hint: Option<&str>,
+) -> Result<i32, CliError> {
+    let mut state = load_observer_state(session_id)?;
+    for code_str in codes.split(',') {
+        if let Some(code) = IssueCode::from_label(code_str.trim()) {
+            state.muted_codes.retain(|c| *c != code);
+        }
+    }
+    save_observer_state(session_id, &state)?;
+    println!(
+        "Muted codes: {}",
+        state
+            .muted_codes
+            .iter()
+            .map(ToString::to_string)
+            .collect::<Vec<_>>()
+            .join(", ")
+    );
+    Ok(0)
+}
+
 #[cfg(test)]
 mod tests {
+    use super::types::Issue;
     use super::*;
 
-    fn write_session_file(dir: &Path, lines: &[&str]) -> PathBuf {
+    fn write_session_file(dir: &std::path::Path, lines: &[&str]) -> std::path::PathBuf {
         let path = dir.join("test-session.jsonl");
         let mut file = fs::File::create(&path).unwrap();
         for line in lines {
@@ -1640,7 +736,7 @@ mod tests {
     fn resolve_from_numeric() {
         let tmp = tempfile::tempdir().unwrap();
         let path = write_session_file(tmp.path(), &["{}", "{}"]);
-        let result = resolve_from(&path, "500");
+        let result = scan::resolve_from(&path, "500");
         assert_eq!(result.unwrap(), 500);
     }
 
@@ -1653,7 +749,7 @@ mod tests {
             r#"{"timestamp":"2026-03-15T12:00:00Z","message":{"role":"user","content":"end"}}"#,
         ];
         let path = write_session_file(tmp.path(), &lines);
-        let result = resolve_from(&path, "2026-03-15T11:00:00Z");
+        let result = scan::resolve_from(&path, "2026-03-15T11:00:00Z");
         assert_eq!(result.unwrap(), 1);
     }
 
@@ -1665,7 +761,7 @@ mod tests {
             r#"{"message":{"role":"user","content":"running tests now"}}"#,
         ];
         let path = write_session_file(tmp.path(), &lines);
-        let result = resolve_from(&path, "running tests");
+        let result = scan::resolve_from(&path, "running tests");
         assert_eq!(result.unwrap(), 1);
     }
 
@@ -1676,7 +772,7 @@ mod tests {
             tmp.path(),
             &[r#"{"message":{"role":"user","content":"hello"}}"#],
         );
-        let result = resolve_from(&path, "nonexistent phrase");
+        let result = scan::resolve_from(&path, "nonexistent phrase");
         assert!(result.is_err());
     }
 
@@ -1703,7 +799,7 @@ mod tests {
             until_line: None,
             until_timestamp: None,
         };
-        let result = apply_filters(Vec::new(), &filter);
+        let result = scan::apply_filters(Vec::new(), &filter);
         assert!(result.is_err());
         let err = result.unwrap_err();
         assert!(err.to_string().contains("unknown severity"));
@@ -1732,7 +828,7 @@ mod tests {
             until_line: None,
             until_timestamp: None,
         };
-        let result = apply_filters(Vec::new(), &filter);
+        let result = scan::apply_filters(Vec::new(), &filter);
         assert!(result.is_err());
     }
 
@@ -1742,7 +838,7 @@ mod tests {
             issue_id: "abc123".into(),
             line: 1,
             code: IssueCode::BuildOrLintFailure,
-            category: IssueCategory::BuildError,
+            category: types::IssueCategory::BuildError,
             severity: IssueSeverity::Critical,
             confidence: types::Confidence::High,
             fix_safety: types::FixSafety::AutoFixSafe,
@@ -1776,7 +872,7 @@ mod tests {
             until_line: None,
             until_timestamp: None,
         };
-        let result = apply_filters(vec![issue], &filter).unwrap();
+        let result = scan::apply_filters(vec![issue], &filter).unwrap();
         assert!(result.is_empty());
     }
 
@@ -1818,7 +914,7 @@ mod tests {
             ],
             || {
                 // First scan
-                let (issues, last_line) = scan(&session_file, 0).unwrap();
+                let (issues, last_line) = scan::scan(&session_file, 0).unwrap();
                 assert_eq!(last_line, 2);
 
                 // Save state after first cycle
@@ -1833,7 +929,7 @@ mod tests {
                 assert_eq!(loaded.session_id, session_id);
 
                 // Second cycle from cursor
-                let (issues2, last_line2) = scan(&session_file, loaded.cursor).unwrap();
+                let (issues2, last_line2) = scan::scan(&session_file, loaded.cursor).unwrap();
                 assert!(issues2.is_empty());
                 assert_eq!(last_line2, 2);
 
@@ -1848,7 +944,7 @@ mod tests {
 
     #[test]
     fn golden_scan_json_output() {
-        let mut state = ScanState::default();
+        let mut state = types::ScanState::default();
         let issues = crate::commands::observe::classifier::check_text_for_issues(
             42,
             types::MessageRole::User,
@@ -1881,7 +977,7 @@ mod tests {
             issue_id: "abc123def456".into(),
             line: 42,
             code: IssueCode::BuildOrLintFailure,
-            category: IssueCategory::BuildError,
+            category: types::IssueCategory::BuildError,
             severity: IssueSeverity::Critical,
             confidence: types::Confidence::High,
             fix_safety: types::FixSafety::AutoFixSafe,
@@ -1908,7 +1004,7 @@ mod tests {
             issue_id: "abc123".into(),
             line: 1,
             code: IssueCode::BuildOrLintFailure,
-            category: IssueCategory::BuildError,
+            category: types::IssueCategory::BuildError,
             severity: IssueSeverity::Critical,
             confidence: types::Confidence::High,
             fix_safety: types::FixSafety::AutoFixSafe,
@@ -1936,7 +1032,7 @@ mod tests {
             issue_id: "abc123".into(),
             line: 42,
             code: IssueCode::BuildOrLintFailure,
-            category: IssueCategory::BuildError,
+            category: types::IssueCategory::BuildError,
             severity: IssueSeverity::Critical,
             confidence: types::Confidence::High,
             fix_safety: types::FixSafety::AutoFixSafe,
@@ -1961,7 +1057,7 @@ mod tests {
             issue_id: "x".into(),
             line: 1,
             code,
-            category: IssueCategory::BuildError,
+            category: types::IssueCategory::BuildError,
             severity: IssueSeverity::Critical,
             confidence: types::Confidence::High,
             fix_safety: types::FixSafety::AutoFixSafe,
@@ -1998,7 +1094,7 @@ mod tests {
                 r#"{"message":{"role":"user","content":"line three"}}"#,
             ],
         );
-        let (_, last_line) = scan_with_limit(&path, 0, Some(1)).unwrap();
+        let (_, last_line) = scan::scan_range(&path, 0, 1).unwrap();
         assert_eq!(last_line, 2); // scanned lines 0 and 1
     }
 
@@ -2008,7 +1104,7 @@ mod tests {
             issue_id: "abc123".into(),
             line: 42,
             code: IssueCode::BuildOrLintFailure,
-            category: IssueCategory::BuildError,
+            category: types::IssueCategory::BuildError,
             severity: IssueSeverity::Critical,
             confidence: types::Confidence::High,
             fix_safety: types::FixSafety::AutoFixSafe,
@@ -2043,7 +1139,7 @@ mod tests {
                 r#"{"message":{"role":"user","content":"line two"}}"#,
             ],
         );
-        let (_, last) = scan_range(&path, 1, 1).unwrap();
+        let (_, last) = scan::scan_range(&path, 1, 1).unwrap();
         assert_eq!(last, 2); // scanned only line 1
     }
 
@@ -2075,7 +1171,7 @@ mod tests {
             issue_id: "h1".into(),
             line: 1,
             code: IssueCode::HookDeniedToolCall,
-            category: IssueCategory::HookFailure,
+            category: types::IssueCategory::HookFailure,
             severity: IssueSeverity::Medium,
             confidence: types::Confidence::High,
             fix_safety: types::FixSafety::TriageRequired,
@@ -2092,7 +1188,7 @@ mod tests {
             issue_id: "b1".into(),
             line: 2,
             code: IssueCode::BuildOrLintFailure,
-            category: IssueCategory::BuildError,
+            category: types::IssueCategory::BuildError,
             severity: IssueSeverity::Critical,
             confidence: types::Confidence::High,
             fix_safety: types::FixSafety::AutoFixSafe,
@@ -2128,111 +1224,11 @@ mod tests {
             until_timestamp: None,
         };
 
-        let result = apply_filters(vec![hook_issue, build_issue], &filter).unwrap();
+        let result = scan::apply_filters(vec![hook_issue, build_issue], &filter).unwrap();
         // hook_denied_tool_call should be muted
         assert_eq!(result.len(), 1);
         assert_eq!(result[0].code, IssueCode::BuildOrLintFailure);
         // severity should be overridden to low
         assert_eq!(result[0].severity, IssueSeverity::Low);
     }
-}
-
-/// Remove issue codes from the mute list.
-fn execute_unmute(
-    session_id: &str,
-    codes: &str,
-    _project_hint: Option<&str>,
-) -> Result<i32, CliError> {
-    let mut state = load_observer_state(session_id)?;
-    for code_str in codes.split(',') {
-        if let Some(code) = IssueCode::from_label(code_str.trim()) {
-            state.muted_codes.retain(|c| *c != code);
-        }
-    }
-    save_observer_state(session_id, &state)?;
-    println!(
-        "Muted codes: {}",
-        state
-            .muted_codes
-            .iter()
-            .map(ToString::to_string)
-            .collect::<Vec<_>>()
-            .join(", ")
-    );
-    Ok(0)
-}
-
-/// Compare issues between two line ranges in the same session.
-fn execute_compare(
-    session_id: &str,
-    from_a: usize,
-    to_a: usize,
-    from_b: usize,
-    to_b: usize,
-    project_hint: Option<&str>,
-) -> Result<i32, CliError> {
-    use std::collections::HashSet;
-
-    let path = session::find_session(session_id, project_hint)?;
-
-    let (issues_a, _) = scan_range(&path, from_a, to_a)?;
-    let (issues_b, _) = scan_range(&path, from_b, to_b)?;
-
-    let ids_a: HashSet<_> = issues_a.iter().map(|i| &i.issue_id).collect();
-    let ids_b: HashSet<_> = issues_b.iter().map(|i| &i.issue_id).collect();
-
-    let new_issues: Vec<&Issue> = issues_b
-        .iter()
-        .filter(|i| !ids_a.contains(&&i.issue_id))
-        .collect();
-    let resolved_issues: Vec<&Issue> = issues_a
-        .iter()
-        .filter(|i| !ids_b.contains(&&i.issue_id))
-        .collect();
-    let unchanged_count = ids_a.intersection(&ids_b).count();
-
-    let result = json!({
-        "range_a": {"from": from_a, "to": to_a, "issues": issues_a.len()},
-        "range_b": {"from": from_b, "to": to_b, "issues": issues_b.len()},
-        "new": new_issues.len(),
-        "resolved": resolved_issues.len(),
-        "unchanged": unchanged_count,
-        "new_issues": new_issues.iter().map(|i| json!({"issue_id": i.issue_id, "code": i.code.to_string(), "summary": i.summary})).collect::<Vec<_>>(),
-        "resolved_issues": resolved_issues.iter().map(|i| json!({"issue_id": i.issue_id, "code": i.code.to_string(), "summary": i.summary})).collect::<Vec<_>>(),
-    });
-    println!(
-        "{}",
-        serde_json::to_string_pretty(&result).expect("valid JSON")
-    );
-    Ok(0)
-}
-
-/// Scan a specific line range (`from_line..=to_line`).
-fn scan_range(
-    path: &Path,
-    from_line: usize,
-    to_line: usize,
-) -> Result<(Vec<Issue>, usize), CliError> {
-    let file = fs::File::open(path)
-        .map_err(|e| CliErrorKind::session_parse_error(format!("cannot open session file: {e}")))?;
-    let reader = BufReader::new(file);
-    let mut state = ScanState::default();
-    let mut issues = Vec::new();
-    let mut last_line = from_line;
-
-    for (index, line_result) in reader.lines().enumerate() {
-        if index < from_line {
-            continue;
-        }
-        if index > to_line {
-            break;
-        }
-        let line = line_result.map_err(|e| {
-            CliErrorKind::session_parse_error(format!("read error at line {index}: {e}"))
-        })?;
-        last_line = index + 1;
-        issues.extend(classifier::classify_line(index, &line, &mut state));
-    }
-
-    Ok((issues, last_line))
 }
