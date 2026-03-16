@@ -27,22 +27,32 @@ pub enum TopologyMode {
 pub enum Feature {
     ApiAccess,
     Bootstrap,
+    BugFoundGate,
     ClusterCheck,
     ClusterManagement,
     ContainerLogs,
     DataplaneTokens,
     EnvoyAdmin,
     GatewayApi,
+    GlobalDelay,
     HelmSettings,
+    HookSystem,
+    IdempotentGroupReporting,
     JsonDiff,
     Kumactl,
     ManifestApply,
     ManifestValidate,
+    MultiZoneKdsAutoConfig,
     NamespaceRestart,
+    Observation,
+    PreCompactHandoff,
+    ProgressHeartbeat,
     RunLifecycle,
     ServiceContainers,
+    SessionLifecycle,
     StateCapture,
     StatusReport,
+    TaskManagement,
     TrackedRecording,
     TransparentProxy,
 }
@@ -149,6 +159,7 @@ fn cluster_topologies() -> Vec<ClusterTopology> {
 fn features() -> BTreeMap<Feature, FeatureInfo> {
     let mut map = core_features();
     map.extend(extended_features());
+    map.extend(operational_features());
     map
 }
 
@@ -241,9 +252,35 @@ fn extended_features() -> BTreeMap<Feature, FeatureInfo> {
     let kubernetes = &[Platform::Kubernetes];
     BTreeMap::from([
         (
+            Feature::MultiZoneKdsAutoConfig,
+            FeatureInfo::new(
+                "automatic KDS address resolution for zone control planes in multi-zone topologies",
+            ),
+        ),
+        (
             Feature::NamespaceRestart,
             FeatureInfo::new("restart workloads in specified namespaces after deployment changes")
                 .platforms(kubernetes),
+        ),
+        (
+            Feature::Observation,
+            FeatureInfo::new("session monitoring with scan, cycle, dump, context, and watch modes")
+                .commands(&[
+                    "harness observe scan",
+                    "harness observe cycle",
+                    "harness observe dump",
+                    "harness observe context",
+                    "harness observe watch",
+                ]),
+        ),
+        (
+            Feature::PreCompactHandoff,
+            FeatureInfo::new("context compaction before session handoff")
+                .command("harness pre-compact"),
+        ),
+        (
+            Feature::ProgressHeartbeat,
+            FeatureInfo::new("30-second heartbeat during long operations to signal liveness"),
         ),
         (
             Feature::RunLifecycle,
@@ -264,6 +301,13 @@ fn extended_features() -> BTreeMap<Feature, FeatureInfo> {
                 .platforms(universal),
         ),
         (
+            Feature::SessionLifecycle,
+            FeatureInfo::new(
+                "start and stop session boundaries for observation and state tracking",
+            )
+            .commands(&["harness session-start", "harness session-stop"]),
+        ),
+        (
             Feature::StateCapture,
             FeatureInfo::new("snapshot cluster pod state as timestamped artifacts")
                 .command("harness capture"),
@@ -274,6 +318,11 @@ fn extended_features() -> BTreeMap<Feature, FeatureInfo> {
                 .command("harness status"),
         ),
         (
+            Feature::TaskManagement,
+            FeatureInfo::new("background task polling and log tailing for long-running operations")
+                .commands(&["harness task wait", "harness task tail"]),
+        ),
+        (
             Feature::TrackedRecording,
             FeatureInfo::new("record arbitrary shell commands with stdout capture and audit trail")
                 .commands(&["harness record", "harness run"]),
@@ -282,6 +331,33 @@ fn extended_features() -> BTreeMap<Feature, FeatureInfo> {
             Feature::TransparentProxy,
             FeatureInfo::new("install transparent proxy on universal service containers")
                 .platforms(universal),
+        ),
+    ])
+}
+
+fn operational_features() -> BTreeMap<Feature, FeatureInfo> {
+    BTreeMap::from([
+        (
+            Feature::BugFoundGate,
+            FeatureInfo::new("KSR016 enforcement during Phase 4+ to gate on discovered bugs"),
+        ),
+        (
+            Feature::GlobalDelay,
+            FeatureInfo::new("--delay flag for pre-command sleep on any harness invocation"),
+        ),
+        (
+            Feature::HookSystem,
+            FeatureInfo::new(
+                "12 hook types intercepting tool usage: guard-bash, guard-write, guard-question, \
+                 guard-stop, verify-bash, verify-write, verify-question, audit, enrich-failure, \
+                 context-agent, validate-agent",
+            )
+            .command("harness hook"),
+        ),
+        (
+            Feature::IdempotentGroupReporting,
+            FeatureInfo::new("report group accepts re-reports gracefully without duplication")
+                .command("harness report group"),
         ),
     ])
 }
@@ -378,6 +454,12 @@ mod tests {
         assert!(f.contains_key(&Feature::ApiAccess));
         assert!(f.contains_key(&Feature::Bootstrap));
         assert!(f.contains_key(&Feature::ClusterManagement));
+    }
+
+    #[test]
+    fn feature_count_is_current() {
+        let f = features();
+        assert_eq!(f.len(), 30, "feature count changed - update this test");
     }
 
     #[test]
