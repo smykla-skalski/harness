@@ -351,6 +351,8 @@ After closeout, spawn parallel subagents to analyze the completed run from multi
 
 Tear down the clusters created in Phase 2. This is the default - always clean up unless the user explicitly asks to keep clusters running or the suite metadata includes `keep_clusters: true`.
 
+When running multiple profiles (`--profile all`), overlap teardown and setup at profile transitions. Run the old cluster's teardown with `run_in_background: true` while starting the next cluster's setup in foreground. All artifacts from the completed profile are already captured, so the background teardown won't lose data.
+
 Use AskUserQuestion if the teardown situation is unclear:
 
 - `Tear down now` - proceed with teardown
