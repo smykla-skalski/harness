@@ -219,6 +219,37 @@ Prefer `--evidence-label` whenever the artifact came from `harness record --labe
 
 2. Verify `run-status.json` and `run-report.md` were updated correctly before starting the next group.
 
+### Bug-found gate (mandatory, per-group)
+
+During any group's verification steps, if the output reveals that actual implementation behavior differs from suite expectations, the runner MUST pause before finalizing the group. This gate fires for any of these signals:
+
+- "Finding:" appears in test output
+- A check result shows "expected X, actual Y" (implementation does not match suite expectations)
+- Implementation behavior differs from what the suite defines
+- CRD validation rejects what Go validator accepts (or vice versa)
+
+When any signal fires:
+
+1. Enter triage mode:
+
+```bash
+harness runner-state --event failure-manifest
+```
+
+2. Present an AskUserQuestion with this exact first line:
+
+```text
+suite:run/bug-found: actual behavior differs from suite expectations
+```
+
+The question body must include the specific finding or mismatch detail. The options must be exactly:
+
+- `Fix now` - Pause the run, investigate and fix the product code, then resume
+- `Continue and fix later` - Record the finding as a known bug, mark the group as failed, continue with next groups
+- `Stop run` - Stop the tracked run
+
+If the user picks `Fix now`, the run stays paused while the product code is investigated and fixed. After the fix, re-run the failing check to confirm it passes, then resume from the current group. If the user picks `Continue and fix later`, record the finding in the report with status `fail` and a note referencing the bug, then proceed to the next group.
+
 On first unexpected failure, go to Phase 5.
 
 **Gate**: all planned tests have pass/fail entries in the report. Every artifact path in the report resolves to an existing file. `run-status.json` reflects final counts.
