@@ -11,12 +11,12 @@ Only write the exact group files assigned by the parent prompt. Read saved state
 
 For each group you write:
 
-1. Write the group markdown file at `groups/g{NN}-{slug}.md` with frontmatter, Configure, Consume, and Debug sections as usual.
+1. Write the group markdown file at `groups/g{NN}-{slug}.md` with frontmatter, Configure, Consume, and Debug sections.
 2. Create a `groups/g{NN}/` directory alongside the markdown file.
-3. Write each manifest from the group's `## Configure` section as a separate YAML file in that directory, named in apply order: `01-{descriptive-slug}.yaml`, `02-{descriptive-slug}.yaml`, etc. The YAML content must be identical to the inline fenced block in the markdown.
-4. In the `## Configure` section, keep the inline YAML blocks (they are the authoritative source for `harness preflight`) and add a reference line before each block noting the corresponding file path, e.g. `File: g01/01-create.yaml`.
+3. Write each manifest as a separate YAML file in that directory, named in apply order: `01-{descriptive-slug}.yaml`, `02-{descriptive-slug}.yaml`, etc.
+4. The `## Configure` section in the group markdown must NOT contain inline YAML blocks. Instead, write only `harness apply` commands that reference the manifest directory or individual files. Use `harness apply --manifest g{NN}` to apply the whole directory, or `harness apply --manifest g{NN}/01-name.yaml` for a specific file.
 
-This gives `suite:run` pre-written manifests ready for `harness apply --manifest g{NN}` without depending on preflight extraction.
+The YAML lives only in the `groups/g{NN}/` directory. The group markdown references it, never duplicates it.
 
 For multi-zone suites, group manifests that apply policies to system namespaces (`kuma-system`) must target the global cluster only. Zone CPs reject policy operations on system namespaces via admission webhook. Use `clusters: global` in the manifest metadata or step annotation to route them correctly.
 
