@@ -102,9 +102,10 @@ fn is_universal_manifest(manifest_path: &Path) -> bool {
     let Ok(text) = read_text(manifest_path) else {
         return false;
     };
-    // Universal manifests use `type:` instead of `apiVersion:`
-    text.lines()
-        .any(|line| line.starts_with("type:") && !line.contains("apiVersion"))
+    // Universal manifests use `type:` instead of `apiVersion:`.
+    // A file with any `apiVersion:` line is always Kubernetes (e.g. Service with type: LoadBalancer).
+    !text.lines().any(|line| line.starts_with("apiVersion:"))
+        && text.lines().any(|line| line.starts_with("type:"))
 }
 
 fn validate_universal(manifest_path: &Path, output_path: &Path) -> Result<i32, CliError> {
