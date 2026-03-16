@@ -60,18 +60,18 @@ pub(super) fn check_exit_code_issues(context: &mut TextCheckContext<'_>, issues:
         context.lower.contains("harness") && context.lower.contains("authoring");
 
     if is_harness_operation {
-        let summary = format!("Authored manifest failed at runtime (exit {exit_code})");
-        if should_emit(IssueCategory::SkillBehavior, &summary, context.state) {
+        let summary = format!("Manifest operation failed at runtime (exit {exit_code}) - possible product bug");
+        if should_emit(IssueCategory::DataIntegrity, &summary, context.state) {
             issues.push(issue!(
                 context.line_number,
                 context.role,
                 context.text,
-                SkillBehavior,
+                DataIntegrity,
                 Medium,
                 summary,
                 fixable: true,
-                fix_target: "skills/new/SKILL.md",
-                fix_hint: "suite:new produced manifests that fail preflight/apply/validate - check authoring validation",
+                fix_hint: "Manifest preflight/apply/validate failed. Could be a suite error OR a product bug. \
+                           Investigate whether the Go validator accepts what the CRD rejects.",
             ));
         }
     } else if is_harness_authoring {
