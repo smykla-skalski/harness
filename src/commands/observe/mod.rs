@@ -108,12 +108,14 @@ pub fn execute(mode: ObserveMode) -> Result<i32, CliError> {
             project_hint,
         } => execute_dump(
             &session_id,
-            from_line.unwrap_or(0),
-            to_line,
-            filter.as_deref(),
-            role.as_deref(),
-            tool_name.as_deref(),
-            raw_json,
+            &DumpOptions {
+                from_line: from_line.unwrap_or(0),
+                to_line,
+                text_filter: filter.as_deref(),
+                roles: role.as_deref(),
+                tool_name: tool_name.as_deref(),
+                raw_json,
+            },
             project_hint.as_deref(),
         ),
         ObserveMode::Cycle {
@@ -694,17 +696,22 @@ fn execute_watch(
     Ok(0)
 }
 
+struct DumpOptions<'a> {
+    from_line: usize,
+    to_line: Option<usize>,
+    text_filter: Option<&'a str>,
+    roles: Option<&'a str>,
+    tool_name: Option<&'a str>,
+    raw_json: bool,
+}
+
 /// Execute dump mode - raw event stream without classification.
 fn execute_dump(
     session_id: &str,
-    from_line: usize,
-    to_line: Option<usize>,
-    text_filter: Option<&str>,
-    roles: Option<&str>,
-    tool_name: Option<&str>,
-    raw_json: bool,
+    options: &DumpOptions<'_>,
     project_hint: Option<&str>,
 ) -> Result<i32, CliError> {
+    let DumpOptions { from_line, to_line, text_filter, roles, tool_name, raw_json } = *options;
     let path = session::find_session(session_id, project_hint)?;
     let file = fs::File::open(&path)
         .map_err(|e| CliErrorKind::session_parse_error(format!("cannot open session file: {e}")))?;
