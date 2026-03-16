@@ -534,43 +534,10 @@ where
     state.phase = new_phase;
     state.touch(event.label());
 
-    // Clear failure/suite_fix on forward movement out of triage.
-    if new_phase != RunnerPhase::Triage {
-        if state.failure.is_some() && !matches!(new_phase, RunnerPhase::Aborted) {
-            state.failure = None;
-        }
-        if state.suite_fix.is_some() {
-            state.suite_fix = None;
-        }
-    }
-
-    // Set preflight sub-state on preflight events.
-    match event {
-        RunnerEvent::PreflightStarted => state.preflight.status = PreflightStatus::Running,
-        RunnerEvent::PreflightCaptured => state.preflight.status = PreflightStatus::Complete,
-        _ => {}
-    }
-
-    // Set failure on failure-manifest.
-    if event == RunnerEvent::FailureManifest {
-        state.failure = Some(FailureState {
-            kind: FailureKind::Manifest,
-            suite_target: suite_target.map(str::to_string),
-            message: message.map(str::to_string),
-        });
-    }
-
-    // Set suite_fix on manifest-fix decisions that enter triage.
-    if let Some(decision) = event.manifest_fix_decision()
-        && new_phase == RunnerPhase::Triage
-    {
-        state.suite_fix = Some(SuiteFixState {
-            approved_paths: suite_target.map_or_else(Vec::new, |s| vec![s.to_string()]),
-            suite_written: false,
-            amendments_written: false,
-            decision,
-        });
-    }
+    clear_triage_state_on_forward_movement(&mut state, new_phase);
+    apply_preflight_status(&mut state, event);
+    apply_failure_manifest(&mut state, event, suite_target, message);
+    apply_suite_fix(&mut state, event, new_phase, suite_target);
 
     save_state(run_dir, &state)?;
     Ok(state)
@@ -596,6 +563,63 @@ pub fn ensure_execution_phase(run_dir: &Path) -> Result<bool, CliError> {
         return Ok(true);
     }
     Ok(false)
+}
+
+/// Clear failure and `suite_fix` state when moving forward out of triage.
+fn clear_triage_state_on_forward_movement(state: &mut RunnerWorkflowState, new_phase: RunnerPhase) {
+    if new_phase == RunnerPhase::Triage {
+        return;
+    }
+    if state.failure.is_some() && !matches!(new_phase, RunnerPhase::Aborted) {
+        state.failure = None;
+    }
+    if state.suite_fix.is_some() {
+        state.suite_fix = None;
+    }
+}
+
+/// Update preflight sub-state for preflight events.
+fn apply_preflight_status(state: &mut RunnerWorkflowState, event: RunnerEvent) {
+    match event {
+        RunnerEvent::PreflightStarted => state.preflight.status = PreflightStatus::Running,
+        RunnerEvent::PreflightCaptured => state.preflight.status = PreflightStatus::Complete,
+        _ => {}
+    }
+}
+
+/// Set failure state on failure-manifest events.
+fn apply_failure_manifest(
+    state: &mut RunnerWorkflowState,
+    event: RunnerEvent,
+    suite_target: Option<&str>,
+    message: Option<&str>,
+) {
+    if event == RunnerEvent::FailureManifest {
+        state.failure = Some(FailureState {
+            kind: FailureKind::Manifest,
+            suite_target: suite_target.map(str::to_string),
+            message: message.map(str::to_string),
+        });
+    }
+}
+
+/// Set `suite_fix` on manifest-fix decisions that enter triage.
+fn apply_suite_fix(
+    state: &mut RunnerWorkflowState,
+    event: RunnerEvent,
+    new_phase: RunnerPhase,
+    suite_target: Option<&str>,
+) {
+    if let Some(decision) = event.manifest_fix_decision()
+        && new_phase == RunnerPhase::Triage
+    {
+        state.suite_fix = Some(SuiteFixState {
+            approved_paths: suite_target.map_or_else(Vec::new, |s| vec![s.to_string()]),
+            suite_written: false,
+            amendments_written: false,
+            decision,
+        });
+    }
 }
 
 /// Map an event name to the target phase, validating that the transition
@@ -627,14 +651,26 @@ where
     let Ok(event) = event.try_into() else {
         return false;
     };
-    // Abort and suspend are allowed from any non-terminal phase.
+    if let Some(allowed) = is_special_transition(from, to, event) {
+        return allowed;
+    }
+    is_standard_transition(from, to)
+}
+
+/// Handle abort, suspend, and resume - these bypass normal phase rules.
+/// Returns `Some(true/false)` when the event is special, `None` to fall through.
+fn is_special_transition(from: RunnerPhase, to: RunnerPhase, event: RunnerEvent) -> Option<bool> {
     if matches!(to, RunnerPhase::Aborted | RunnerPhase::Suspended) {
-        return !matches!(from, RunnerPhase::Completed);
+        return Some(!matches!(from, RunnerPhase::Completed));
     }
-    // Resume is only valid from suspended or aborted.
     if event == RunnerEvent::ResumeRun {
-        return matches!(from, RunnerPhase::Suspended | RunnerPhase::Aborted);
+        return Some(matches!(from, RunnerPhase::Suspended | RunnerPhase::Aborted));
     }
+    None
+}
+
+/// Check whether a standard (non-special) phase transition is allowed.
+fn is_standard_transition(from: RunnerPhase, to: RunnerPhase) -> bool {
     match from {
         RunnerPhase::Bootstrap => matches!(
             to,
