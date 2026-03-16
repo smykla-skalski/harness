@@ -84,7 +84,7 @@ Execute reproducible suite runs on local k3d clusters for any Kuma feature. Clus
 
 Track every manifest, command, and artifact for full run reproducibility.
 
-This is a repo-local skill package. All hooks run through `harness hook --skill suite:run <hook-name>`. Project `SessionStart` hooks install a repo-aware `harness` wrapper on `PATH`, so the skill uses the bare command everywhere. Run `harness --help` for the full list of subcommands.
+Repo-local skill package. Hooks run through `harness hook --skill suite:run <hook-name>`. `SessionStart` hooks install a repo-aware `harness` wrapper on `PATH`. Run `harness --help` for all subcommands.
 
 ## Compact recovery
 
@@ -127,7 +127,7 @@ Parse from `$ARGUMENTS`:
 
 ## Non-negotiable rules
 
-Read [references/agent-contract.md](references/agent-contract.md) in full before starting any run. It has 15 rules with expanded rationale. The top-level summary:
+Read [references/agent-contract.md](references/agent-contract.md) in full before starting any run. Top-level summary:
 
 - **No shell variables for paths.** Use `harness apply --manifest g02/04.yaml`, not `SD=... && harness apply --manifest ${SD}/g02/04.yaml`. Exception: Phase 0/1 init flags.
 - **All cluster commands through harness wrappers.** `harness run` for kubectl/kumactl, `harness record` for curl and others. Never raw binaries. Never `python3 -c` for JSON - use `jq` or `harness envoy`.
@@ -141,7 +141,7 @@ Read [references/agent-contract.md](references/agent-contract.md) in full before
 
 ## Workflow
 
-Read [references/workflow.md](references/workflow.md) for the authoritative detailed procedure. The section below is the entrypoint checklist; load the referenced files before acting when a phase needs deeper operational detail.
+Read [references/workflow.md](references/workflow.md) for the full procedure. The section below is the entrypoint checklist; load referenced files before acting.
 
 ### Phase 0: Environment check
 
@@ -183,7 +183,9 @@ Read [references/cluster-setup.md](references/cluster-setup.md) before starting 
 
 When `--profile all` (the default), read all group files and collect the set of required profiles. Sort groups by profile tier: standalone, single-zone Kubernetes, single-zone universal, multi-zone Kubernetes, multi-zone universal. Execute all groups for one profile before tearing down and moving to the next. Parallelizable groups within a profile can run concurrently. If suite profile ordering is non-contiguous, warn and propose a reorder.
 
-For each profile, execute a full run (Phase 1-8) with only the groups matching that profile. Present the execution plan via AskUserQuestion with options:
+For each profile, execute a full run (Phase 1-8) with only the groups matching that profile. When transitioning between profiles, overlap teardown and setup: run the old cluster's teardown with `run_in_background: true` while starting the next cluster in foreground. Artifacts are already captured so teardown is safe to background.
+
+Present the execution plan via AskUserQuestion with options:
 
 - `Run all profiles` - execute every required profile sequentially
 - `Select profiles` - user picks which profiles to run
@@ -282,7 +284,7 @@ harness report check
 harness closeout
 ```
 
-**Gate**: command log complete (every command has an entry), manifest index complete, all tests have pass/fail, every artifact path in the report resolves to an existing file, `run-status.json` has correct final counts, state captures exist for preflight + each completed group + postrun, compactness check passes.
+**Gate**: command log complete, manifest index complete, all tests have pass/fail, every artifact path resolves to an existing file, `run-status.json` has correct final counts, state captures exist for preflight + each group + postrun, compactness check passes.
 
 After all gates pass, proceed to Phase 7 (retrospective) before tearing down clusters.
 
