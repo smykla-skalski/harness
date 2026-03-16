@@ -6,6 +6,13 @@ use crate::io;
 
 pub const DEFAULTS_FILE: &str = ".harness.json";
 
+/// Persisted defaults for a suite directory.
+#[derive(Debug, Clone, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct SuiteDefaults {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub repo_root: Option<String>,
+}
+
 /// Path to the suite defaults file.
 #[must_use]
 pub fn suite_defaults_path(suite_dir: &Path) -> PathBuf {
@@ -22,15 +29,11 @@ pub fn write_suite_defaults(
 ) -> Result<PathBuf, CliError> {
     io::ensure_dir(suite_dir)
         .map_err(|e| CliError::from(CliErrorKind::missing_file(e.to_string())))?;
-    let mut payload = serde_json::Map::new();
-    if let Some(root) = repo_root {
-        payload.insert(
-            "repo_root".to_string(),
-            serde_json::Value::String(root.display().to_string()),
-        );
-    }
+    let payload = SuiteDefaults {
+        repo_root: repo_root.map(|root| root.display().to_string()),
+    };
     let path = suite_defaults_path(suite_dir);
-    io::write_json(&path, &serde_json::Value::Object(payload))?;
+    io::write_json_pretty(&path, &payload)?;
     Ok(path)
 }
 
@@ -38,12 +41,12 @@ pub fn write_suite_defaults(
 ///
 /// # Errors
 /// Returns `CliError` on parse failure.
-pub fn load_suite_defaults(suite_dir: &Path) -> Result<Option<serde_json::Value>, CliError> {
+pub fn load_suite_defaults(suite_dir: &Path) -> Result<Option<SuiteDefaults>, CliError> {
     let path = suite_defaults_path(suite_dir);
     if !path.is_file() {
         return Ok(None);
     }
-    let value = io::read_json(&path)?;
+    let value = io::read_json_typed(&path)?;
     Ok(Some(value))
 }
 
@@ -96,7 +99,7 @@ pub fn default_repo_root_for_suite(suite_dir: &Path) -> Option<PathBuf> {
             return None;
         }
     };
-    let raw = payload.get("repo_root")?.as_str()?;
+    let raw = payload.repo_root.as_deref()?;
     let trimmed = raw.trim();
     if trimmed.is_empty() {
         return None;
@@ -134,9 +137,8 @@ mod tests {
         let loaded = load_suite_defaults(&suite_dir).unwrap();
         assert!(loaded.is_some());
         let val = loaded.unwrap();
-        assert!(val.is_object());
         // No repo_root key
-        assert!(val.get("repo_root").is_none());
+        assert!(val.repo_root.is_none());
     }
 
     #[test]
@@ -150,7 +152,7 @@ mod tests {
         write_suite_defaults(&suite_dir, Some(&repo_root)).unwrap();
 
         let loaded = load_suite_defaults(&suite_dir).unwrap().unwrap();
-        let stored_root = loaded["repo_root"].as_str().unwrap();
+        let stored_root = loaded.repo_root.unwrap();
         assert!(stored_root.contains("repo"));
     }
 

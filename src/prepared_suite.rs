@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::fmt;
 use std::path::{Path, PathBuf};
 
@@ -59,11 +60,22 @@ pub struct ManifestValidation {
     pub resource_kinds: Vec<String>,
 }
 
+/// Scope of a prepared manifest.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[non_exhaustive]
+pub enum ManifestScope {
+    Baseline,
+    Group,
+}
+
+pub type HelmValues = BTreeMap<String, serde_json::Value>;
+
 /// Reference to a manifest in the prepared suite.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ManifestRef {
     pub manifest_id: String,
-    pub scope: String,
+    pub scope: ManifestScope,
     pub source_path: String,
     #[serde(default)]
     pub validation: Option<ManifestValidation>,
@@ -91,7 +103,7 @@ pub struct PreparedGroup {
     pub group_id: String,
     pub source_path: String,
     #[serde(default)]
-    pub helm_values: serde_json::Value,
+    pub helm_values: HelmValues,
     #[serde(default)]
     pub restart_namespaces: Vec<String>,
     #[serde(default)]
@@ -138,6 +150,17 @@ impl PreparedSuiteArtifact {
         write_json_pretty(path, self).map_err(|e| {
             CliErrorKind::missing_file(path.display().to_string()).with_details(e.to_string())
         })
+    }
+
+    #[must_use]
+    pub fn group(&self, group_id: &str) -> Option<&PreparedGroup> {
+        self.groups.iter().find(|group| group.group_id == group_id)
+    }
+
+    pub fn iter_manifests(&self) -> impl Iterator<Item = &ManifestRef> {
+        self.baselines
+            .iter()
+            .chain(self.groups.iter().flat_map(|group| group.manifests.iter()))
     }
 }
 
@@ -376,7 +399,7 @@ mod tests {
             }],
             baselines: vec![ManifestRef {
                 manifest_id: "baseline/namespace.yaml".to_string(),
-                scope: "baseline".to_string(),
+                scope: ManifestScope::Baseline,
                 source_path: "baseline/namespace.yaml".to_string(),
                 validation: Some(ManifestValidation {
                     output_path: Some(
@@ -400,12 +423,15 @@ mod tests {
             groups: vec![PreparedGroup {
                 group_id: "g01".to_string(),
                 source_path: "groups/g01.md".to_string(),
-                helm_values: serde_json::json!({"kuma.controlPlane.replicas": 1}),
+                helm_values: HelmValues::from([(
+                    "kuma.controlPlane.replicas".to_string(),
+                    serde_json::json!(1),
+                )]),
                 restart_namespaces: vec![],
                 skip_validation_orders: vec![],
                 manifests: vec![ManifestRef {
                     manifest_id: "g01:01".to_string(),
-                    scope: "group".to_string(),
+                    scope: ManifestScope::Group,
                     source_path: "groups/g01.md".to_string(),
                     group_id: Some("g01".to_string()),
                     validation: Some(ManifestValidation {
@@ -499,7 +525,7 @@ mod tests {
         assert_eq!(artifact.source_digests.len(), 1);
         assert_eq!(artifact.source_digests[0].digest, "suite-sha");
         assert_eq!(artifact.baselines.len(), 1);
-        assert_eq!(artifact.baselines[0].scope, "baseline");
+        assert_eq!(artifact.baselines[0].scope, ManifestScope::Baseline);
         assert_eq!(
             artifact.baselines[0].validation.as_ref().unwrap().status,
             ValidationStatus::Passed
@@ -507,7 +533,7 @@ mod tests {
         assert_eq!(artifact.groups.len(), 1);
         assert_eq!(artifact.groups[0].group_id, "g01");
         assert_eq!(artifact.groups[0].manifests.len(), 1);
-        assert_eq!(artifact.groups[0].manifests[0].scope, "group");
+        assert_eq!(artifact.groups[0].manifests[0].scope, ManifestScope::Group);
         assert_eq!(
             artifact.groups[0].manifests[0].group_id.as_deref(),
             Some("g01")
@@ -529,12 +555,12 @@ mod tests {
             groups: vec![PreparedGroup {
                 group_id: "g01".to_string(),
                 source_path: "groups/g01.md".to_string(),
-                helm_values: serde_json::json!({}),
+                helm_values: HelmValues::new(),
                 restart_namespaces: vec![],
                 skip_validation_orders: vec![],
                 manifests: vec![ManifestRef {
                     manifest_id: "g01:01".to_string(),
-                    scope: "group".to_string(),
+                    scope: ManifestScope::Group,
                     source_path: "groups/g01.md".to_string(),
                     group_id: Some("g01".to_string()),
                     validation: None,
