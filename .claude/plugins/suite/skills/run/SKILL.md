@@ -135,6 +135,7 @@ Read [references/agent-contract.md](references/agent-contract.md) in full before
 - **Relative paths only.** `g13/01.yaml` not `/full/path/...`. No `/tmp`, no `--validate=false`.
 - **Hard gate after each group** via `harness report group`.
 - **No autonomous deviations.** AskUserQuestion before any unplanned change.
+- **Never create manifests during a run.** All manifests must exist in the suite before the run starts. If a missing manifest is discovered, this is a suite:new authoring defect - use the bug-found gate with classification "suite bug" and do not create the file.
 - **STOP AND TRIAGE EVERY FAILURE.** On ANY unexpected result, failure, or mismatch - STOP. Classify as suite bug, product bug, harness bug, or environment issue. Present classification to user via AskUserQuestion BEFORE continuing. Never say "known bug" and move on. See bug-found gate in Phase 4.
 
 ## Workflow

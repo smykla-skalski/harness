@@ -1,3 +1,5 @@
+use std::path::Path;
+
 use serde_json::Value;
 
 use super::emitter::{Guidance, IssueBlueprint, IssueEmitter};
@@ -28,6 +30,7 @@ pub fn check_tool_use_for_issues(
     if name == "Write" || name == "Edit" {
         check_write_edit_tool_use(line_num, name, input, state, &mut issues);
         check_managed_file_writes(line_num, input, state, &mut issues);
+        check_manifest_created_during_run(line_num, input, state, &mut issues);
     }
 
     // Record tool_use for correlating with tool_result.
@@ -615,6 +618,46 @@ fn check_write_edit_tool_use(
             }
         }
     }
+}
+
+/// Detect when Write/Edit creates a YAML file inside a `manifests/` directory.
+///
+/// During suite:run, all manifests must already exist in the suite. Creating
+/// new manifests on the fly is a suite:new authoring defect.
+fn check_manifest_created_during_run(
+    line_num: usize,
+    input: &Value,
+    state: &mut ScanState,
+    issues: &mut Vec<Issue>,
+) {
+    let path = input["file_path"].as_str().unwrap_or("");
+    if !path.contains("/manifests/") {
+        return;
+    }
+    let extension = Path::new(path)
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("");
+    if !extension.eq_ignore_ascii_case("yaml") && !extension.eq_ignore_ascii_case("yml") {
+        return;
+    }
+    let details = format!("Path: {path}");
+    IssueEmitter::new(line_num, MessageRole::Assistant, state).emit(
+        issues,
+        IssueBlueprint::new(
+            IssueCode::ManifestCreatedDuringRun,
+            IssueCategory::SkillBehavior,
+            IssueSeverity::Critical,
+            "Manifest created during run - should be authored in suite:new",
+        )
+        .with_fingerprint(path.to_string())
+        .with_guidance(Guidance::fix_target_hint(
+            "skills/new/SKILL.md",
+            "All manifests must exist before the run starts. \
+             A missing manifest means suite:new failed to author it.",
+        )),
+        &details,
+    );
 }
 
 /// Check for direct writes to harness-managed files via Write/Edit tools.

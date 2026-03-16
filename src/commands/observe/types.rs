@@ -224,6 +224,7 @@ pub enum IssueCode {
     ShortSkillNameInSkillFile,
     AbsoluteManifestPathUsed,
     DirectManagedFileWrite,
+    ManifestCreatedDuringRun,
     DirectTaskOutputFileRead,
     HarnessInfrastructureMisconfiguration,
     MissingConnectionOrEnvVar,
