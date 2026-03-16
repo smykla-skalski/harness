@@ -18,6 +18,14 @@ fn subcommand_artifacts(subcommand: &str) -> Option<&'static [&'static str]> {
     }
 }
 
+/// Error code patterns that indicate a harness command failure requiring user
+/// triage via the bug-found gate.
+const FAILURE_ERROR_CODES: &[&str] = &["KSRCLI004", "KSRCLI014"];
+
+/// Freeform patterns in command output that signal an apply or validation
+/// failure even when a structured error code is absent.
+const FAILURE_OUTPUT_PATTERNS: &[&str] = &["command failed", "apply failed", "validation failed"];
+
 /// Execute the verify-bash hook.
 ///
 /// # Errors
@@ -42,6 +50,12 @@ pub fn execute(ctx: &HookContext) -> Result<HookResult, CliError> {
     let Some(run) = &ctx.run else {
         return Ok(HookResult::allow());
     };
+
+    // Check for command failures that require the bug-found gate.
+    if let Some(result) = check_bug_found_gate(ctx, subcommand) {
+        return Ok(result);
+    }
+
     if subcommand == "cluster" {
         let result = check_cluster(&words, run);
         if result.code.is_empty() {
@@ -59,6 +73,54 @@ pub fn execute(ctx: &HookContext) -> Result<HookResult, CliError> {
     }
     let target = missing_target(subcommand, run);
     Ok(HookMessage::missing_artifact(cow!("harness {subcommand}"), target).into_result())
+}
+
+/// Check the command response for failure patterns during test execution.
+///
+/// Returns `Some(HookResult)` with a blocking deny when a harness command
+/// failure is detected and the runner is in a phase that requires user
+/// triage. Returns `None` when no gate is needed.
+fn check_bug_found_gate(ctx: &HookContext, subcommand: &str) -> Option<HookResult> {
+    let state = ctx.runner_state.as_ref()?;
+
+    // Only enforce during execution and closeout phases. Bootstrap and
+    // preflight failures are handled by their own dedicated flows. Triage
+    // means the runner is already handling a failure.
+    if !matches!(state.phase, RunnerPhase::Execution | RunnerPhase::Closeout) {
+        return None;
+    }
+
+    // If a failure is already being triaged, don't block again.
+    if state.failure.is_some() {
+        return None;
+    }
+
+    let response = ctx.response_text();
+    if response.is_empty() {
+        return None;
+    }
+
+    if !response_contains_failure(response) {
+        return None;
+    }
+
+    Some(HookMessage::bug_found_gate_required(cow!("harness {subcommand}")).into_result())
+}
+
+/// Returns `true` when the response text contains any known failure indicator.
+fn response_contains_failure(response: &str) -> bool {
+    for code in FAILURE_ERROR_CODES {
+        if response.contains(code) {
+            return true;
+        }
+    }
+    let lower = response.to_lowercase();
+    for pattern in FAILURE_OUTPUT_PATTERNS {
+        if lower.contains(pattern) {
+            return true;
+        }
+    }
+    false
 }
 
 fn artifact_ready(subcommand: &str, run: &RunContext) -> bool {
@@ -171,7 +233,8 @@ fn ready_to_resume(state: &RunnerWorkflowState) -> bool {
 mod tests {
     use super::*;
     use crate::workflow::runner::{
-        ManifestFixDecision, PreflightState, PreflightStatus, RunnerWorkflowState,
+        FailureKind, FailureState, ManifestFixDecision, PreflightState, PreflightStatus,
+        RunnerWorkflowState,
     };
 
     fn base_state(phase: RunnerPhase) -> RunnerWorkflowState {
@@ -271,5 +334,174 @@ mod tests {
             decision: ManifestFixDecision::SuiteAndRun,
         });
         assert!(!ready_to_resume(&state));
+    }
+
+    // -- response_contains_failure --
+
+    #[test]
+    fn response_contains_failure_detects_error_code() {
+        assert!(response_contains_failure(
+            "ERROR [KSRCLI004] command failed: harness apply"
+        ));
+    }
+
+    #[test]
+    fn response_contains_failure_detects_missing_file_code() {
+        assert!(response_contains_failure(
+            "ERROR [KSRCLI014] missing file: /tmp/manifest.yaml"
+        ));
+    }
+
+    #[test]
+    fn response_contains_failure_detects_command_failed_text() {
+        assert!(response_contains_failure("Command failed with exit code 1"));
+    }
+
+    #[test]
+    fn response_contains_failure_detects_apply_failed() {
+        assert!(response_contains_failure(
+            "apply failed for namespace default"
+        ));
+    }
+
+    #[test]
+    fn response_contains_failure_detects_validation_failed() {
+        assert!(response_contains_failure(
+            "validation failed: MeshHTTPRoute is invalid"
+        ));
+    }
+
+    #[test]
+    fn response_contains_failure_ignores_clean_output() {
+        assert!(!response_contains_failure(
+            "Successfully applied 3 manifests"
+        ));
+    }
+
+    #[test]
+    fn response_contains_failure_empty_string() {
+        assert!(!response_contains_failure(""));
+    }
+
+    // -- check_bug_found_gate --
+
+    #[test]
+    fn check_bug_found_gate_blocks_during_execution() {
+        let state = base_state(RunnerPhase::Execution);
+        let ctx = stub_context_with_state_and_response(
+            Some(state),
+            Some("ERROR [KSRCLI004] command failed: harness apply"),
+        );
+        let result = check_bug_found_gate(&ctx, "apply");
+        assert!(result.is_some());
+        let hook_result = result.unwrap();
+        assert_eq!(hook_result.code, "KSR016");
+    }
+
+    #[test]
+    fn check_bug_found_gate_blocks_during_closeout() {
+        let state = base_state(RunnerPhase::Closeout);
+        let ctx = stub_context_with_state_and_response(
+            Some(state),
+            Some("ERROR [KSRCLI004] command failed: harness capture"),
+        );
+        let result = check_bug_found_gate(&ctx, "capture");
+        assert!(result.is_some());
+    }
+
+    #[test]
+    fn check_bug_found_gate_skips_during_bootstrap() {
+        let state = base_state(RunnerPhase::Bootstrap);
+        let ctx = stub_context_with_state_and_response(
+            Some(state),
+            Some("ERROR [KSRCLI004] command failed: harness cluster"),
+        );
+        assert!(check_bug_found_gate(&ctx, "cluster").is_none());
+    }
+
+    #[test]
+    fn check_bug_found_gate_skips_during_preflight() {
+        let state = base_state(RunnerPhase::Preflight);
+        let ctx = stub_context_with_state_and_response(
+            Some(state),
+            Some("ERROR [KSRCLI004] command failed: harness preflight"),
+        );
+        assert!(check_bug_found_gate(&ctx, "preflight").is_none());
+    }
+
+    #[test]
+    fn check_bug_found_gate_skips_during_triage() {
+        let state = base_state(RunnerPhase::Triage);
+        let ctx = stub_context_with_state_and_response(
+            Some(state),
+            Some("ERROR [KSRCLI004] command failed: harness apply"),
+        );
+        assert!(check_bug_found_gate(&ctx, "apply").is_none());
+    }
+
+    #[test]
+    fn check_bug_found_gate_skips_when_failure_already_set() {
+        let mut state = base_state(RunnerPhase::Execution);
+        state.failure = Some(FailureState {
+            kind: FailureKind::Manifest,
+            suite_target: None,
+            message: None,
+        });
+        let ctx = stub_context_with_state_and_response(
+            Some(state),
+            Some("ERROR [KSRCLI004] command failed: harness apply"),
+        );
+        assert!(check_bug_found_gate(&ctx, "apply").is_none());
+    }
+
+    #[test]
+    fn check_bug_found_gate_skips_when_no_state() {
+        let ctx = stub_context_with_state_and_response(
+            None,
+            Some("ERROR [KSRCLI004] command failed: harness apply"),
+        );
+        assert!(check_bug_found_gate(&ctx, "apply").is_none());
+    }
+
+    #[test]
+    fn check_bug_found_gate_skips_when_no_failure_in_response() {
+        let state = base_state(RunnerPhase::Execution);
+        let ctx = stub_context_with_state_and_response(
+            Some(state),
+            Some("Successfully applied 3 manifests"),
+        );
+        assert!(check_bug_found_gate(&ctx, "apply").is_none());
+    }
+
+    #[test]
+    fn check_bug_found_gate_skips_when_response_empty() {
+        let state = base_state(RunnerPhase::Execution);
+        let ctx = stub_context_with_state_and_response(Some(state), None);
+        assert!(check_bug_found_gate(&ctx, "apply").is_none());
+    }
+
+    /// Build a minimal `HookContext` with the given runner state and response.
+    fn stub_context_with_state_and_response(
+        runner_state: Option<RunnerWorkflowState>,
+        response: Option<&str>,
+    ) -> HookContext {
+        use crate::hook_payloads::{HookEnvelopePayload, HookEvent};
+
+        let payload = HookEnvelopePayload {
+            response: response.map(|s| serde_json::Value::String(s.to_string())),
+            ..HookEnvelopePayload::default()
+        };
+
+        HookContext {
+            skill: "suite:run".to_string(),
+            event: HookEvent { payload },
+            run_dir: None,
+            skill_active: true,
+            active_skill: Some("suite:run".to_string()),
+            inactive_reason: None,
+            run: None,
+            runner_state,
+            author_state: None,
+        }
     }
 }
