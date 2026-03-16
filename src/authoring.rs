@@ -199,6 +199,11 @@ pub fn begin_authoring_session(
     suite_dir: &Path,
     suite_name: &str,
 ) -> Result<AuthoringSession, CliError> {
+    if suite_dir.join("suite.md").exists() {
+        return Err(
+            CliErrorKind::authoring_suite_dir_exists(suite_dir.display().to_string()).into(),
+        );
+    }
     let session = AuthoringSession {
         repo_root: repo_root
             .canonicalize()
@@ -380,6 +385,37 @@ mod tests {
 
                     let loaded = load_authoring_session().unwrap().unwrap();
                     assert_eq!(loaded.feature, "mesh");
+                },
+            );
+        }
+
+        // -- begin_session_rejects_existing_suite_dir --
+        {
+            let dir = tempfile::tempdir().unwrap();
+            let xdg = dir.path().join("exists-xdg");
+            temp_env::with_vars(
+                [
+                    ("XDG_DATA_HOME", Some(xdg.to_str().unwrap())),
+                    ("CLAUDE_SESSION_ID", Some("authoring-exists-test")),
+                ],
+                || {
+                    let repo = dir.path().join("repo");
+                    fs::create_dir_all(&repo).unwrap();
+                    let suite_dir = dir.path().join("existing-suite");
+                    fs::create_dir_all(&suite_dir).unwrap();
+                    fs::write(suite_dir.join("suite.md"), "# existing suite").unwrap();
+
+                    let result = begin_authoring_session(
+                        &repo,
+                        "mesh",
+                        "interactive",
+                        &suite_dir,
+                        "install",
+                    );
+
+                    assert!(result.is_err());
+                    let err = result.unwrap_err();
+                    assert_eq!(err.code(), "KSRCLI062");
                 },
             );
         }
