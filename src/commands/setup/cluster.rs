@@ -158,6 +158,17 @@ fn cluster_universal(
     let network_name = spec.docker_network.as_deref().unwrap_or("harness-default");
     let is_up = spec.mode.is_up();
 
+    // For down operations, resolve store type from persisted spec first,
+    // falling back to CLI arg. Fixes the case where `single-down` without
+    // `--store postgres` uses the wrong teardown path.
+    let effective_store = if is_up {
+        store.to_string()
+    } else {
+        load_persisted_cluster_spec()
+            .and_then(|s| s.store_type)
+            .unwrap_or_else(|| store.to_string())
+    };
+
     // Only resolve image for up commands
     let cp_image = if is_up {
         resolve_cp_image(&root, image)?
@@ -174,18 +185,23 @@ fn cluster_universal(
     match mode {
         "single-up" => {
             // Postgres needs Compose (for the postgres service); memory uses Docker CLI
-            let result = if store == "postgres" {
-                universal_single_up_compose(&cp_image, network_name, store, &all_names[0])?
+            let result = if effective_store == "postgres" {
+                universal_single_up_compose(
+                    &cp_image,
+                    network_name,
+                    &effective_store,
+                    &all_names[0],
+                )?
             } else {
-                universal_single_up(&cp_image, network_name, store, &all_names[0])?
+                universal_single_up(&cp_image, network_name, &effective_store, &all_names[0])?
             };
             spec.cp_image = Some(cp_image);
-            spec.store_type = Some(store.to_string());
+            spec.store_type = Some(effective_store);
             spec.admin_token = Some(result.admin_token);
             spec.members[0].container_ip = Some(result.cp_ip);
         }
         "single-down" => {
-            if store == "postgres" {
+            if effective_store == "postgres" {
                 // Compose-managed single-zone
                 let project = format!("harness-{}", all_names[0]);
                 compose_down_project(&project)?;
@@ -194,17 +210,23 @@ fn cluster_universal(
             }
         }
         "global-zone-up" => {
-            let result = universal_global_zone_up(&cp_image, network_name, store, &all_names)?;
+            let result =
+                universal_global_zone_up(&cp_image, network_name, &effective_store, &all_names)?;
             spec.cp_image = Some(cp_image);
-            spec.store_type = Some(store.to_string());
+            spec.store_type = Some(effective_store);
             spec.admin_token = Some(result.admin_token);
             spec.members[0].container_ip = Some(result.cp_ip);
         }
         "global-zone-down" => universal_global_zone_down(network_name, &all_names)?,
         "global-two-zones-up" => {
-            let result = universal_global_two_zones_up(&cp_image, network_name, store, &all_names)?;
+            let result = universal_global_two_zones_up(
+                &cp_image,
+                network_name,
+                &effective_store,
+                &all_names,
+            )?;
             spec.cp_image = Some(cp_image);
-            spec.store_type = Some(store.to_string());
+            spec.store_type = Some(effective_store);
             spec.admin_token = Some(result.admin_token);
             spec.members[0].container_ip = Some(result.cp_ip);
         }
@@ -222,6 +244,14 @@ fn cluster_universal(
 
     println!("{mode} completed");
     Ok(0)
+}
+
+/// Load persisted cluster spec from the session context file.
+fn load_persisted_cluster_spec() -> Option<ClusterSpec> {
+    let ctx_path = current_run_context_path().ok()?;
+    let text = fs::read_to_string(&ctx_path).ok()?;
+    let record: CurrentRunRecord = serde_json::from_str(&text).ok()?;
+    record.cluster
 }
 
 /// Result from a universal cluster up operation.
