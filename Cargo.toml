@@ -45,3 +45,6 @@ needless_pass_by_value = { level = "deny", priority = 2 }
 ptr_arg = { level = "deny", priority = 2 }
 redundant_clone = { level = "deny", priority = 2 }
 unnecessary_to_owned = { level = "deny", priority = 2 }
+
+[lints.rust]
+unused = { level = "deny", priority = 1 }
