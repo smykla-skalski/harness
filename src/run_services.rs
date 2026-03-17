@@ -4,6 +4,7 @@ use std::path::Path;
 #[cfg(test)]
 use std::path::PathBuf;
 
+use rayon::prelude::*;
 use serde::Serialize;
 
 use crate::audit_log::write_run_status_with_audit;
@@ -314,7 +315,7 @@ impl RunServices {
         let mut members = match runtime.platform() {
             Platform::Kubernetes => spec
                 .members
-                .iter()
+                .par_iter()
                 .map(|member| ClusterMemberHealthRecord {
                     name: member.name.as_str(),
                     role: member.role.as_str(),
@@ -324,7 +325,7 @@ impl RunServices {
                 .collect::<Vec<_>>(),
             Platform::Universal => spec
                 .members
-                .iter()
+                .par_iter()
                 .map(|member| {
                     let container = runtime.resolve_container_name(&member.name);
                     ClusterMemberHealthRecord {
@@ -529,7 +530,7 @@ impl RunServices {
             .as_array()
             .map(|items| {
                 items
-                    .iter()
+                    .par_iter()
                     .map(|item| KubernetesPodSnapshot {
                         namespace: item["metadata"]["namespace"]
                             .as_str()
