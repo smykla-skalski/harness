@@ -7,7 +7,8 @@ use crate::hook_payloads::HookContext;
 
 use predicates::{
     deny_python, has_admin_endpoint_hint, has_denied_cluster_binary,
-    has_denied_cluster_binary_anywhere, has_python_inline, is_harness_head,
+    has_denied_cluster_binary_anywhere, has_denied_subshell_binary, has_python_inline,
+    is_harness_head,
 };
 use runner_guards::{
     deny_author_suite_storage_mutation, deny_batched_tracked_harness_commands,
@@ -46,7 +47,10 @@ pub fn execute(ctx: &HookContext) -> Result<HookResult, CliError> {
     Ok(guard_suite_runner(ctx, words, heads))
 }
 
-fn guard_suite_author(_ctx: &HookContext, words: &[String], heads: &[String]) -> HookResult {
+fn guard_suite_author(ctx: &HookContext, words: &[String], heads: &[String]) -> HookResult {
+    if has_denied_subshell_binary(ctx.command_text(), words) {
+        return HookMessage::SubshellSmuggling.into_result();
+    }
     if has_denied_cluster_binary(heads) || has_denied_cluster_binary_anywhere(words) {
         return HookMessage::ClusterBinary.into_result();
     }
@@ -66,6 +70,10 @@ fn guard_suite_author(_ctx: &HookContext, words: &[String], heads: &[String]) ->
 fn guard_suite_runner(ctx: &HookContext, words: &[String], heads: &[String]) -> HookResult {
     if let Some(denied) = guard_runner_phase(ctx, words).into_denial() {
         return denied;
+    }
+    // Subshell smuggling check - must run before token-level binary checks
+    if has_denied_subshell_binary(ctx.command_text(), words) {
+        return HookMessage::SubshellSmuggling.into_result();
     }
     if let Some(denied) = runner_binary_and_pattern_guards(ctx, words, heads) {
         return denied;
@@ -488,6 +496,81 @@ mod tests {
     #[test]
     fn allows_unrelated_cat_command() {
         let c = ctx("suite:run", "cat /tmp/some-other-file.txt");
+        let r = execute(&c).unwrap();
+        assert_eq!(r.decision, Decision::Allow);
+    }
+
+    // --- Subshell smuggling tests ---
+
+    #[test]
+    fn denies_kubectl_in_dollar_paren_subshell() {
+        let c = ctx("suite:run", "echo $(kubectl get pods)");
+        let r = execute(&c).unwrap();
+        assert_eq!(r.decision, Decision::Deny);
+        assert_eq!(r.code, "KSR017");
+    }
+
+    #[test]
+    fn denies_kumactl_in_backtick_subshell() {
+        let c = ctx("suite:run", "echo `kumactl version`");
+        let r = execute(&c).unwrap();
+        assert_eq!(r.decision, Decision::Deny);
+        assert_eq!(r.code, "KSR017");
+    }
+
+    #[test]
+    fn denies_nested_subshell_kubectl() {
+        let c = ctx("suite:run", "echo $(echo $(kubectl get pods))");
+        let r = execute(&c).unwrap();
+        assert_eq!(r.decision, Decision::Deny);
+        assert_eq!(r.code, "KSR017");
+    }
+
+    #[test]
+    fn denies_docker_in_subshell() {
+        let c = ctx("suite:run", "result=$(docker ps -a)");
+        let r = execute(&c).unwrap();
+        assert_eq!(r.decision, Decision::Deny);
+        assert_eq!(r.code, "KSR017");
+    }
+
+    #[test]
+    fn denies_helm_in_backtick_subshell() {
+        let c = ctx("suite:run", "echo `helm list`");
+        let r = execute(&c).unwrap();
+        assert_eq!(r.decision, Decision::Deny);
+        assert_eq!(r.code, "KSR017");
+    }
+
+    #[test]
+    fn denies_k3d_in_subshell() {
+        let c = ctx("suite:run", "echo $(k3d cluster list)");
+        let r = execute(&c).unwrap();
+        assert_eq!(r.decision, Decision::Deny);
+        assert_eq!(r.code, "KSR017");
+    }
+
+    #[test]
+    fn denies_subshell_kubectl_in_suite_author() {
+        let c = ctx("suite:new", "echo $(kubectl get pods)");
+        let r = execute(&c).unwrap();
+        assert_eq!(r.decision, Decision::Deny);
+        assert_eq!(r.code, "KSR017");
+    }
+
+    #[test]
+    fn allows_safe_subshell_no_denied_binary() {
+        let c = ctx("suite:run", "echo $(date +%Y-%m-%d)");
+        let r = execute(&c).unwrap();
+        assert_eq!(r.decision, Decision::Allow);
+    }
+
+    #[test]
+    fn allows_harness_record_with_safe_subshell() {
+        let c = ctx(
+            "suite:run",
+            "harness record --phase verify --label ts -- echo $(date)",
+        );
         let r = execute(&c).unwrap();
         assert_eq!(r.decision, Decision::Allow);
     }

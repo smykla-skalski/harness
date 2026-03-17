@@ -168,18 +168,56 @@ pub fn is_env_assignment(word: &str) -> bool {
     }
 }
 
-/// Normalize a binary name: strip path prefix, `$` / `${...}` wrappers, and lowercase.
+/// Normalize a binary name: strip path prefix, `$` / `${...}` wrappers,
+/// `$(...)` subshell wrappers, backtick wrappers, and lowercase.
 #[must_use]
 pub fn normalized_binary_name(raw: &str) -> String {
     let mut s = raw.trim().to_string();
+
+    // Strip subshell substitution: $(cmd) -> cmd
+    // Loop handles nested: $($(cmd)) -> $(cmd) -> cmd
+    loop {
+        if let Some(inner) = s.strip_prefix("$(").and_then(|rest| rest.strip_suffix(')')) {
+            s = inner.to_string();
+            continue;
+        }
+        // Strip leading $( without closing ) (split across tokens)
+        if let Some(inner) = s.strip_prefix("$(") {
+            s = inner.to_string();
+            continue;
+        }
+        // Strip trailing ) from split token (the other half of a subshell)
+        if s.ends_with(')') && !s.contains('(') {
+            s = s[..s.len() - 1].to_string();
+        }
+        break;
+    }
+
+    // Strip backtick wrappers
+    if s.starts_with('`') {
+        s = s.trim_start_matches('`').to_string();
+    }
+    if s.ends_with('`') {
+        s = s.trim_end_matches('`').to_string();
+    }
+
+    // Existing: strip ${VAR} and $VAR
     if let Some(inner) = s.strip_prefix("${").and_then(|rest| rest.strip_suffix('}')) {
         s = inner.to_string();
     } else if let Some(stripped) = s.strip_prefix('$') {
         s = stripped.to_string();
     }
+
     Path::new(&s)
         .file_name()
         .map_or_else(|| s.to_lowercase(), |n| n.to_string_lossy().to_lowercase())
+}
+
+/// Returns `true` when the raw command text contains subshell substitution
+/// (`$(...)` or backticks).
+#[must_use]
+pub fn contains_subshell_pattern(text: &str) -> bool {
+    text.contains("$(") || text.contains('`')
 }
 
 /// Extract the binary head from each pipeline segment in a token list.
@@ -392,5 +430,22 @@ mod tests {
         assert_eq!(invocation.head(), "harness");
         assert_eq!(invocation.subcommand(), Some("report"));
         assert_eq!(invocation.gid(), Some("g01"));
+    }
+
+    #[test]
+    fn normalized_binary_name_strips_dollar_paren() {
+        assert_eq!(normalized_binary_name("$(kubectl"), "kubectl");
+        assert_eq!(normalized_binary_name("$(kubectl)"), "kubectl");
+    }
+
+    #[test]
+    fn normalized_binary_name_strips_backticks() {
+        assert_eq!(normalized_binary_name("`kumactl`"), "kumactl");
+        assert_eq!(normalized_binary_name("`kumactl"), "kumactl");
+    }
+
+    #[test]
+    fn normalized_binary_name_strips_nested_subshell() {
+        assert_eq!(normalized_binary_name("$($(kubectl)"), "kubectl");
     }
 }
