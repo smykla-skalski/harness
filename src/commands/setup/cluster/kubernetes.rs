@@ -8,6 +8,7 @@ use crate::cluster::{ClusterSpec, HelmSetting};
 use crate::commands::resolve_repo_root;
 use crate::core_defs::resolve_build_info;
 use crate::errors::{CliError, CliErrorKind, cow};
+use crate::exec;
 use crate::exec::{cluster_exists, docker, kubectl};
 
 use super::{ClusterArgs, make_target, make_target_live, persist_cluster_spec};
@@ -138,12 +139,27 @@ pub(super) fn cluster_k8s(args: &ClusterArgs) -> Result<i32, CliError> {
         }
     }
 
+    if spec.mode.is_up() && !spec.restart_namespaces.is_empty() {
+        restart_cluster_namespaces(&spec)?;
+    }
+
     if spec.mode.is_up() {
         persist_cluster_spec(&spec)?;
     }
 
     println!("{mode} completed");
     Ok(0)
+}
+
+fn restart_cluster_namespaces(spec: &ClusterSpec) -> Result<(), CliError> {
+    for member in &spec.members {
+        if member.kubeconfig.is_empty() {
+            continue;
+        }
+        let kubeconfig = Path::new(&member.kubeconfig);
+        exec::kubectl_rollout_restart(Some(kubeconfig), &spec.restart_namespaces)?;
+    }
+    Ok(())
 }
 
 fn start_and_deploy(

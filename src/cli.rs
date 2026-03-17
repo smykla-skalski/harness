@@ -11,8 +11,8 @@ use crate::commands::authoring::{
 use crate::commands::observe::ObserveArgs;
 use crate::commands::run::{
     ApiArgs, ApplyArgs, CaptureArgs, CloseoutArgs, ClusterCheckArgs, DiffArgs, EnvoyArgs, InitArgs,
-    KumactlArgs, LogsArgs, PreflightArgs, RecordArgs, ReportArgs, RunnerStateArgs, ServiceArgs,
-    StatusArgs, TaskArgs, TokenArgs, ValidateArgs,
+    KumactlArgs, LogsArgs, PreflightArgs, RecordArgs, ReportArgs, RestartNamespaceArgs,
+    RunnerStateArgs, ServiceArgs, StatusArgs, TaskArgs, TokenArgs, ValidateArgs,
 };
 use crate::commands::setup::{
     BootstrapArgs, ClusterArgs, GatewayArgs, PreCompactArgs, SessionStartArgs, SessionStopArgs,
@@ -59,6 +59,9 @@ pub enum Command {
     /// Record a tracked command.
     #[command(alias = "run", trailing_var_arg = true)]
     Record(RecordArgs),
+
+    /// Restart deployments in specified namespaces.
+    RestartNamespace(RestartNamespaceArgs),
 
     /// Apply manifests to the cluster.
     Apply(ApplyArgs),
@@ -225,6 +228,7 @@ fn dispatch_run(cmd: Command) -> Result<i32, CliError> {
         }
         Command::ClusterCheck(args) => commands::run::cluster_check(&args.run_dir),
         Command::Task(args) => commands::run::task(&args.command),
+        Command::RestartNamespace(args) => commands::run::restart_namespace(&args),
         _ => unreachable!(),
     }
 }
@@ -286,7 +290,8 @@ pub fn dispatch(command: Command) -> Result<i32, CliError> {
         | Command::Status(_)
         | Command::Logs(_)
         | Command::ClusterCheck(_)
-        | Command::Task(_) => dispatch_run(command),
+        | Command::Task(_)
+        | Command::RestartNamespace(_) => dispatch_run(command),
         Command::AuthoringBegin(_)
         | Command::AuthoringSave(_)
         | Command::AuthoringShow(_)
@@ -347,6 +352,7 @@ mod tests {
             "preflight",
             "record",
             "report",
+            "restart-namespace",
             "runner-state",
             "service",
             "session-start",
@@ -600,6 +606,19 @@ mod tests {
                 assert_eq!(mode, "interactive");
             }
             _ => panic!("expected AuthoringBegin command"),
+        }
+    }
+
+    #[test]
+    fn parse_restart_namespace() {
+        let cli =
+            Cli::try_parse_from(["harness", "restart-namespace", "--namespace", "kuma-system"])
+                .unwrap();
+        match cli.command {
+            Command::RestartNamespace(RestartNamespaceArgs { namespace, .. }) => {
+                assert_eq!(namespace, vec!["kuma-system"]);
+            }
+            _ => panic!("expected RestartNamespace command"),
         }
     }
 
