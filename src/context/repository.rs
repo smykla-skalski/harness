@@ -1,4 +1,5 @@
 use std::path::{Path, PathBuf};
+use std::thread;
 use std::{fs, io};
 
 use serde::de::DeserializeOwned;
@@ -30,21 +31,32 @@ impl RunRepository {
     ///
     /// # Errors
     /// Returns `CliError` if required files are missing or invalid.
+    ///
+    /// # Panics
+    /// Panics if an internal file-reading thread panics (should not happen).
     pub fn load(&self, run_dir: &Path) -> Result<RunAggregate, CliError> {
         let layout = RunLayout::from_run_dir(run_dir);
-        let metadata: RunMetadata = read_json_typed(&layout.metadata_path())?;
-        let status: RunStatus = read_json_typed(&layout.status_path())?;
-        let prepared_suite = Self::load_optional(&layout.prepared_suite_path())?;
-        let preflight = Self::load_optional(&layout.preflight_artifact_path())?;
-        let cluster = Self::load_optional(&layout.state_dir().join("cluster.json"))?;
+        let metadata_path = layout.metadata_path();
+        let status_path = layout.status_path();
+        let prepared_suite_path = layout.prepared_suite_path();
+        let preflight_path = layout.preflight_artifact_path();
+        let cluster_path = layout.state_dir().join("cluster.json");
 
-        Ok(RunAggregate {
-            layout,
-            metadata,
-            status: Some(status),
-            cluster,
-            prepared_suite,
-            preflight,
+        thread::scope(|scope| {
+            let t_meta = scope.spawn(|| read_json_typed::<RunMetadata>(&metadata_path));
+            let t_status = scope.spawn(|| read_json_typed::<RunStatus>(&status_path));
+            let t_suite = scope.spawn(|| Self::load_optional(&prepared_suite_path));
+            let t_preflight = scope.spawn(|| Self::load_optional(&preflight_path));
+            let t_cluster = scope.spawn(|| Self::load_optional(&cluster_path));
+
+            Ok(RunAggregate {
+                layout,
+                metadata: t_meta.join().expect("meta thread panicked")?,
+                status: Some(t_status.join().expect("status thread panicked")?),
+                prepared_suite: t_suite.join().expect("suite thread panicked")?,
+                preflight: t_preflight.join().expect("preflight thread panicked")?,
+                cluster: t_cluster.join().expect("cluster thread panicked")?,
+            })
         })
     }
 
