@@ -1,9 +1,9 @@
 use std::time::{Duration, Instant};
 
+use tracing::info;
 use ureq::Body;
 use ureq::http::Response;
 
-use crate::core_defs::utc_now;
 use crate::errors::{CliError, CliErrorKind};
 
 /// HTTP method for CP API requests.
@@ -163,10 +163,9 @@ pub fn wait_for_http(url: &str, timeout: Duration) -> Result<(), CliError> {
     backoff::retry(backoff_config, || {
         let elapsed = start.elapsed();
         if last_progress.elapsed() >= Duration::from_secs(10) {
-            let ts = utc_now();
-            eprintln!(
-                "    {ts} cluster: waiting for health check ({:.0}s elapsed)",
-                elapsed.as_secs_f64()
+            info!(
+                elapsed_seconds = elapsed.as_secs_f64(),
+                "waiting for health check"
             );
             last_progress = Instant::now();
         }

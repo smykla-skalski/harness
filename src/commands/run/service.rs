@@ -2,6 +2,8 @@ use std::time::Duration;
 
 use clap::Args;
 
+use tracing::info;
+
 use crate::commands::{RunDirArgs, resolve_run_services};
 use crate::errors::{CliError, CliErrorKind};
 use crate::exec;
@@ -232,7 +234,7 @@ fn service_up_inner(setup: &ServiceSetup<'_>) -> Result<(), CliError> {
 
     // Wait for kuma-dp to become ready
     let readiness_url = format!("http://{container_address}:9902/ready");
-    eprintln!("service: waiting for {svc_name} readiness at {readiness_url}");
+    info!(%svc_name, %readiness_url, "waiting for service readiness");
     exec::wait_for_http(&readiness_url, Duration::from_secs(setup.timeout)).map_err(|_| {
         CliError::from(CliErrorKind::service_readiness_timeout(
             svc_name.to_string(),

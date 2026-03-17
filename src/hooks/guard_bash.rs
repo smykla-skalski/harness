@@ -184,18 +184,18 @@ fn completed_run_reuse_reason(words: &[String]) -> Option<&'static str> {
     if sig.len() < 2 {
         return None;
     }
-    let head = Path::new(&sig[0])
+    let head = Path::new(sig[0])
         .file_name()
         .map_or("", |n| n.to_str().unwrap_or(""));
     if head != "harness" {
         return None;
     }
-    completed_run_reuse_for_subcommand(sig[1].as_str(), &sig)
+    completed_run_reuse_for_subcommand(sig[1], &sig)
 }
 
 fn completed_run_reuse_for_subcommand(
     subcommand: &str,
-    significant: &[String],
+    significant: &[&str],
 ) -> Option<&'static str> {
     match subcommand {
         "cluster" if cluster_mode_is_teardown(significant) => None,
@@ -208,7 +208,7 @@ fn completed_run_reuse_for_subcommand(
         "runner-state"
             if significant
                 .iter()
-                .any(|w| w == "--event" || w.starts_with("--event=")) =>
+                .any(|w| *w == "--event" || w.starts_with("--event=")) =>
         {
             Some("the active run is already final; do not reopen or advance it")
         }
@@ -221,7 +221,7 @@ fn completed_run_reuse_for_subcommand(
     }
 }
 
-fn cluster_mode_is_teardown(significant: &[String]) -> bool {
+fn cluster_mode_is_teardown(significant: &[&str]) -> bool {
     significant
         .get(2)
         .is_some_and(|mode| mode.ends_with("-down"))
@@ -237,13 +237,13 @@ fn allowed_command(state: &RunnerWorkflowState, words: &[String]) -> (bool, Opti
     if sig.len() < 2 {
         return (true, None);
     }
-    let head = Path::new(&sig[0])
+    let head = Path::new(sig[0])
         .file_name()
         .map_or("", |n| n.to_str().unwrap_or(""));
     if head != "harness" {
         return (true, None);
     }
-    let sub = sig[1].as_str();
+    let sub = sig[1];
     match state.phase() {
         RunnerPhase::Completed | RunnerPhase::Aborted => match sub {
             "closeout" | "runner-state" | "report" | "session-stop" => (true, None),
@@ -289,7 +289,7 @@ fn deny_batched_tracked_harness_commands(words: &[String]) -> HookResult {
     HookResult::allow()
 }
 
-fn tracked_harness_subcommands(words: &[String]) -> Vec<String> {
+fn tracked_harness_subcommands(words: &[String]) -> Vec<&str> {
     let sig = significant_words(words);
     let mut subs = Vec::new();
     for (i, word) in sig.iter().enumerate() {
@@ -302,9 +302,9 @@ fn tracked_harness_subcommands(words: &[String]) -> Vec<String> {
         if name != "harness" {
             continue;
         }
-        let sub = &sig[i + 1];
+        let sub = sig[i + 1];
         if !sub.starts_with('-') && TrackedHarnessSubcommand::is_tracked(sub) {
-            subs.push(sub.clone());
+            subs.push(sub);
         }
     }
     subs
@@ -469,7 +469,7 @@ fn deny_mixed_kuma_delete(words: &[String]) -> HookResult {
     };
     if dw
         .iter()
-        .any(|w| w == "-f" || w == "--filename" || w.starts_with("--filename="))
+        .any(|w| *w == "-f" || *w == "--filename" || w.starts_with("--filename="))
     {
         return HookResult::allow();
     }
@@ -480,14 +480,14 @@ fn deny_mixed_kuma_delete(words: &[String]) -> HookResult {
             skip_next = false;
             continue;
         }
-        if DELETE_FLAGS_WITH_VALUE.contains(&word.as_str()) {
+        if DELETE_FLAGS_WITH_VALUE.contains(word) {
             skip_next = true;
             continue;
         }
         if word.starts_with('-') {
             continue;
         }
-        positional.push(word.as_str());
+        positional.push(*word);
     }
     let kinds: Vec<&str> = positional
         .iter()
@@ -506,15 +506,15 @@ fn deny_mixed_kuma_delete(words: &[String]) -> HookResult {
     )
 }
 
-fn tracked_kubectl_delete_words(words: &[String]) -> Option<Vec<String>> {
+fn tracked_kubectl_delete_words(words: &[String]) -> Option<Vec<&str>> {
     let sig = significant_words(words);
     if sig.len() < 4 {
         return None;
     }
-    let head = Path::new(&sig[0])
+    let head = Path::new(sig[0])
         .file_name()
         .map_or("", |n| n.to_str().unwrap_or(""));
-    if head != "harness" || !matches!(sig[1].as_str(), "run" | "record") {
+    if head != "harness" || !matches!(sig[1], "run" | "record") {
         return None;
     }
     for (i, word) in sig.iter().enumerate() {
@@ -539,8 +539,8 @@ fn is_harness_head(heads: &[String]) -> bool {
 fn is_tracked_harness_command(words: &[String]) -> bool {
     let sig = significant_words(words);
     sig.len() >= 2
-        && normalized_binary_name(&sig[0]) == "harness"
-        && TrackedHarnessSubcommand::is_tracked(&sig[1])
+        && normalized_binary_name(sig[0]) == "harness"
+        && TrackedHarnessSubcommand::is_tracked(sig[1])
 }
 
 fn has_denied_cluster_binary(heads: &[String]) -> bool {

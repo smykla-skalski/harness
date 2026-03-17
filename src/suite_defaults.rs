@@ -1,6 +1,8 @@
 use std::env;
 use std::path::{Path, PathBuf};
 
+use tracing::warn;
+
 use crate::errors::{CliError, CliErrorKind};
 use crate::io;
 
@@ -95,7 +97,7 @@ pub fn default_repo_root_for_suite(suite_dir: &Path) -> Option<PathBuf> {
         Ok(Some(v)) => v,
         Ok(None) => return None,
         Err(e) => {
-            eprintln!("warning: {}: {e}", suite_defaults_path(suite_dir).display());
+            warn!(path = %suite_defaults_path(suite_dir).display(), %e, "failed to load suite defaults");
             return None;
         }
     };

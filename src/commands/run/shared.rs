@@ -2,6 +2,8 @@ use std::env;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+use tracing::warn;
+
 use crate::cluster::Platform;
 use crate::core_defs::{harness_data_root, host_platform};
 use crate::errors::{CliError, CliErrorKind, cow};
@@ -50,7 +52,7 @@ pub(crate) fn inject_run_env(cmd: &mut Command, run_dir: &Path, cluster: Option<
     let services = match RunServices::from_run_dir(run_dir) {
         Ok(s) => s,
         Err(e) => {
-            eprintln!("warning: failed to load run context: {e}");
+            warn!(%e, "failed to load run context");
             return;
         }
     };
@@ -60,22 +62,36 @@ pub(crate) fn inject_run_env(cmd: &mut Command, run_dir: &Path, cluster: Option<
         .as_ref()
         .map(|spec| spec.platform)
         .is_some_and(|platform| platform == Platform::Universal);
-    if !is_universal {
-        match services.resolve_kubeconfig(None, cluster) {
-            Ok(kubeconfig) => {
-                cmd.env("KUBECONFIG", kubeconfig.as_ref());
-            }
-            Err(e) => eprintln!("warning: failed to resolve kubeconfig: {e}"),
-        }
+    inject_kubeconfig_env(cmd, &services, is_universal, cluster);
+    inject_repo_env(cmd, &ctx.metadata.repo_root);
+}
+
+fn inject_kubeconfig_env(
+    cmd: &mut Command,
+    services: &RunServices,
+    is_universal: bool,
+    cluster: Option<&str>,
+) {
+    if is_universal {
+        return;
     }
-    let repo_root = &ctx.metadata.repo_root;
-    if !repo_root.is_empty() {
-        cmd.env("REPO_ROOT", repo_root);
-        let (os_name, arch) = host_platform();
-        let kumactl_dir = format!("{repo_root}/build/artifacts-{os_name}-{arch}/kumactl");
-        if Path::new(&kumactl_dir).is_dir() {
-            let current_path = env::var("PATH").unwrap_or_default();
-            cmd.env("PATH", format!("{kumactl_dir}:{current_path}"));
+    match services.resolve_kubeconfig(None, cluster) {
+        Ok(kubeconfig) => {
+            cmd.env("KUBECONFIG", kubeconfig.as_ref());
         }
+        Err(e) => warn!(%e, "failed to resolve kubeconfig"),
+    }
+}
+
+fn inject_repo_env(cmd: &mut Command, repo_root: &str) {
+    if repo_root.is_empty() {
+        return;
+    }
+    cmd.env("REPO_ROOT", repo_root);
+    let (os_name, arch) = host_platform();
+    let kumactl_dir = format!("{repo_root}/build/artifacts-{os_name}-{arch}/kumactl");
+    if Path::new(&kumactl_dir).is_dir() {
+        let current_path = env::var("PATH").unwrap_or_default();
+        cmd.env("PATH", format!("{kumactl_dir}:{current_path}"));
     }
 }

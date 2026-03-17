@@ -1,18 +1,63 @@
 use std::path::Path;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+enum FlagValueLocation {
+    NextToken(usize),
+    Inline {
+        token_index: usize,
+        value_start: usize,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct HarnessCommandInvocation {
-    pub head: String,
-    pub subcommand: Option<String>,
-    pub gid: Option<String>,
+    head_index: usize,
+    subcommand_index: Option<usize>,
+    gid: Option<FlagValueLocation>,
     pub has_explicit_run_scope: bool,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct HarnessCommandInvocationRef<'a> {
+    words: &'a [String],
+    invocation: &'a HarnessCommandInvocation,
+}
+
+impl<'a> HarnessCommandInvocationRef<'a> {
+    #[must_use]
+    pub fn head(self) -> &'a str {
+        self.words[self.invocation.head_index].as_str()
+    }
+
+    #[must_use]
+    pub fn subcommand(self) -> Option<&'a str> {
+        self.invocation
+            .subcommand_index
+            .map(|index| self.words[index].as_str())
+    }
+
+    #[must_use]
+    pub fn gid(self) -> Option<&'a str> {
+        match self.invocation.gid {
+            Some(FlagValueLocation::NextToken(index)) => Some(self.words[index].as_str()),
+            Some(FlagValueLocation::Inline {
+                token_index,
+                value_start,
+            }) => Some(&self.words[token_index][value_start..]),
+            None => None,
+        }
+    }
+
+    #[must_use]
+    pub const fn has_explicit_run_scope(self) -> bool {
+        self.invocation.has_explicit_run_scope
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ParsedCommand {
-    raw: String,
     words: Vec<String>,
-    significant_words: Vec<String>,
+    significant_word_indices: Vec<usize>,
     heads: Vec<String>,
     harness_invocations: Vec<HarnessCommandInvocation>,
 }
@@ -24,21 +69,15 @@ impl ParsedCommand {
     /// Returns the shell tokenization error when parsing fails.
     pub fn parse(text: &str) -> Result<Self, shell_words::ParseError> {
         let words = shell_words::split(text)?;
-        let significant_words = significant_words(&words);
+        let significant_word_indices = significant_word_indices(&words);
         let heads = command_heads(&words);
-        let harness_invocations = parse_harness_invocations(&significant_words);
+        let harness_invocations = parse_harness_invocations(&words, &significant_word_indices);
         Ok(Self {
-            raw: text.to_string(),
             words,
-            significant_words,
+            significant_word_indices,
             heads,
             harness_invocations,
         })
-    }
-
-    #[must_use]
-    pub fn raw(&self) -> &str {
-        &self.raw
     }
 
     #[must_use]
@@ -46,9 +85,10 @@ impl ParsedCommand {
         &self.words
     }
 
-    #[must_use]
-    pub fn significant_words(&self) -> &[String] {
-        &self.significant_words
+    pub fn significant_words(&self) -> impl Iterator<Item = &str> {
+        self.significant_word_indices
+            .iter()
+            .map(|&index| self.words[index].as_str())
     }
 
     #[must_use]
@@ -57,13 +97,27 @@ impl ParsedCommand {
     }
 
     #[must_use]
-    pub fn first_harness_invocation(&self) -> Option<&HarnessCommandInvocation> {
-        self.harness_invocations.first()
+    pub fn first_harness_invocation(&self) -> Option<HarnessCommandInvocationRef<'_>> {
+        self.harness_invocations
+            .first()
+            .map(|invocation| HarnessCommandInvocationRef {
+                words: &self.words,
+                invocation,
+            })
+    }
+
+    pub fn harness_invocations(&self) -> impl Iterator<Item = HarnessCommandInvocationRef<'_>> {
+        self.harness_invocations
+            .iter()
+            .map(|invocation| HarnessCommandInvocationRef {
+                words: &self.words,
+                invocation,
+            })
     }
 
     #[must_use]
-    pub fn harness_invocations(&self) -> &[HarnessCommandInvocation] {
-        &self.harness_invocations
+    pub(crate) fn significant_word_indices(&self) -> &[usize] {
+        &self.significant_word_indices
     }
 }
 
@@ -154,11 +208,11 @@ pub fn command_heads(words: &[String]) -> Vec<String> {
 
 /// Filter out shell control operators and environment assignments.
 #[must_use]
-pub fn significant_words(words: &[String]) -> Vec<String> {
+pub fn significant_words(words: &[String]) -> Vec<&str> {
     words
         .iter()
         .filter(|w| !is_shell_control_op(w) && !is_env_assignment(w))
-        .cloned()
+        .map(String::as_str)
         .collect()
 }
 
@@ -178,22 +232,38 @@ pub fn path_like_words(words: &[String]) -> Vec<&str> {
 }
 
 #[must_use]
-pub fn extract_flag_value(words: &[String], flag: &str) -> Option<String> {
+pub fn extract_flag_value<'a>(words: &'a [String], flag: &str) -> Option<&'a str> {
     for (index, word) in words.iter().enumerate() {
         if word == flag {
-            return words.get(index + 1).cloned();
+            return words.get(index + 1).map(String::as_str);
         }
-        if let Some(value) = word.strip_prefix(&format!("{flag}=")) {
-            return Some(value.to_string());
+        if let Some(rest) = word.strip_prefix(flag)
+            && let Some(value) = rest.strip_prefix('=')
+        {
+            return Some(value);
         }
     }
     None
 }
 
-fn parse_harness_invocations(significant_words: &[String]) -> Vec<HarnessCommandInvocation> {
+fn significant_word_indices(words: &[String]) -> Vec<usize> {
+    words
+        .iter()
+        .enumerate()
+        .filter_map(|(index, word)| {
+            (!is_shell_control_op(word) && !is_env_assignment(word)).then_some(index)
+        })
+        .collect()
+}
+
+fn parse_harness_invocations(
+    words: &[String],
+    significant_word_indices: &[usize],
+) -> Vec<HarnessCommandInvocation> {
     let mut invocations = Vec::new();
-    let len = significant_words.len();
-    for (index, word) in significant_words.iter().enumerate() {
+    let len = significant_word_indices.len();
+    for (index, &word_index) in significant_word_indices.iter().enumerate() {
+        let word = &words[word_index];
         let head = Path::new(word)
             .file_name()
             .and_then(|name| name.to_str())
@@ -201,35 +271,61 @@ fn parse_harness_invocations(significant_words: &[String]) -> Vec<HarnessCommand
         if head != "harness" {
             continue;
         }
-        let subcommand = significant_words
+        let subcommand_index = significant_word_indices
             .get(index + 1)
-            .filter(|next| !next.starts_with('-'))
-            .cloned();
-        let search_end = significant_words[index + 1..]
+            .copied()
+            .filter(|&next_index| !words[next_index].starts_with('-'));
+        let search_end = significant_word_indices[index + 1..]
             .iter()
-            .position(|candidate| {
-                Path::new(candidate)
+            .position(|&candidate_index| {
+                Path::new(&words[candidate_index])
                     .file_name()
                     .and_then(|name| name.to_str())
                     == Some("harness")
             })
             .map_or(len, |offset| index + 1 + offset);
-        let span = &significant_words[index + 1..search_end];
-        let gid = extract_flag_value(span, "--gid");
-        let has_explicit_run_scope = span.iter().any(|word| {
-            matches!(word.as_str(), "--run-dir" | "--run-id" | "--run-root")
-                || word.starts_with("--run-dir=")
-                || word.starts_with("--run-id=")
-                || word.starts_with("--run-root=")
+        let span = &significant_word_indices[index + 1..search_end];
+        let gid = extract_flag_value_location(words, span, "--gid");
+        let has_explicit_run_scope = span.iter().any(|&span_index| {
+            let span_word = &words[span_index];
+            matches!(span_word.as_str(), "--run-dir" | "--run-id" | "--run-root")
+                || span_word.starts_with("--run-dir=")
+                || span_word.starts_with("--run-id=")
+                || span_word.starts_with("--run-root=")
         });
         invocations.push(HarnessCommandInvocation {
-            head: word.clone(),
-            subcommand,
+            head_index: word_index,
+            subcommand_index,
             gid,
             has_explicit_run_scope,
         });
     }
     invocations
+}
+
+fn extract_flag_value_location(
+    words: &[String],
+    span_indices: &[usize],
+    flag: &str,
+) -> Option<FlagValueLocation> {
+    for (offset, &span_index) in span_indices.iter().enumerate() {
+        let word = &words[span_index];
+        if word == flag {
+            return span_indices
+                .get(offset + 1)
+                .copied()
+                .map(FlagValueLocation::NextToken);
+        }
+        if let Some(rest) = word.strip_prefix(flag)
+            && rest.starts_with('=')
+        {
+            return Some(FlagValueLocation::Inline {
+                token_index: span_index,
+                value_start: flag.len() + 1,
+            });
+        }
+    }
+    None
 }
 
 #[cfg(test)]
@@ -291,9 +387,10 @@ mod tests {
         let parsed =
             ParsedCommand::parse("KUBECONFIG=/tmp/conf harness report group --gid g01").unwrap();
         assert_eq!(parsed.heads(), ["harness"]);
-        assert_eq!(parsed.harness_invocations().len(), 1);
+        assert_eq!(parsed.harness_invocations().count(), 1);
         let invocation = parsed.first_harness_invocation().unwrap();
-        assert_eq!(invocation.subcommand.as_deref(), Some("report"));
-        assert_eq!(invocation.gid.as_deref(), Some("g01"));
+        assert_eq!(invocation.head(), "harness");
+        assert_eq!(invocation.subcommand(), Some("report"));
+        assert_eq!(invocation.gid(), Some("g01"));
     }
 }

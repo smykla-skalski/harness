@@ -12,6 +12,8 @@ use crate::context::{
     NodeCheckRecord, NodeCheckSnapshot, PreflightArtifact, RunContext, RunLayout, RunMetadata,
     ToolCheckRecord, ToolCheckSnapshot,
 };
+use tracing::warn;
+
 use crate::core_defs::utc_now;
 use crate::errors::{CliError, CliErrorKind};
 use crate::exec::{self, HttpMethod};
@@ -586,7 +588,7 @@ impl RunServices {
         let (dataplanes, dataplanes_error) = match self.query_dataplanes("default") {
             Ok(dataplanes) => (dataplanes, None),
             Err(error) => {
-                eprintln!("warning: CP API dataplanes query failed: {error}");
+                warn!(%error, "CP API dataplanes query failed");
                 (
                     UniversalDataplaneCollection::default(),
                     Some(error.to_string()),

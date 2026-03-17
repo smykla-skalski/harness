@@ -6,6 +6,8 @@ use std::time::{Duration, Instant};
 
 use serde_json::json;
 
+use tracing::warn;
+
 use crate::errors::{CliError, CliErrorKind};
 
 use super::ObserveFilterArgs;
@@ -47,7 +49,7 @@ fn poll_session_lines(
         return Vec::new();
     };
     if let Err(e) = file.seek(SeekFrom::Start(*byte_offset)) {
-        eprintln!("warning: seek failed on session file: {e}");
+        warn!(%e, "seek failed on session file");
         return Vec::new();
     }
     let reader = BufReader::new(file);
@@ -65,10 +67,10 @@ fn poll_session_lines(
 /// Write a line to a file and flush, printing a warning on failure.
 fn write_and_flush(file: &mut fs::File, line: &str, label: &str) {
     if let Err(e) = writeln!(file, "{line}") {
-        eprintln!("warning: failed to write {label}: {e}");
+        warn!(%label, %e, "failed to write");
     }
     if let Err(e) = file.flush() {
-        eprintln!("warning: failed to flush {label}: {e}");
+        warn!(%label, %e, "failed to flush");
     }
 }
 

@@ -1,6 +1,7 @@
 use crate::errors::{CliError, HookMessage};
 use crate::hook::HookResult;
 use crate::hook_payloads::HookContext;
+use crate::shell_parse::HarnessCommandInvocationRef;
 use crate::workflow::runner::{FailureKind, RunnerPhase, RunnerWorkflowState};
 
 use super::effects;
@@ -28,9 +29,9 @@ pub fn execute(ctx: &HookContext) -> Result<HookResult, CliError> {
     let subcommand = ctx.parsed_command()?.and_then(|command| {
         command
             .first_harness_invocation()
-            .and_then(|invocation| invocation.subcommand.as_deref().map(str::to_string))
+            .and_then(HarnessCommandInvocationRef::subcommand)
     });
-    if let Some(sub) = subcommand.as_deref() {
+    if let Some(sub) = subcommand {
         if matches!(sub, "apply" | "validate") && state.phase() == RunnerPhase::Execution {
             let _ = effects::transition_runner_state(ctx, |state| {
                 Some(request_failure_triage(state, FailureKind::Manifest))

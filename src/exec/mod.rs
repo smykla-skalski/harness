@@ -20,7 +20,9 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread;
 use std::time::Duration;
 
-use crate::core_defs::{CommandResult, merge_env, utc_now};
+use tracing::info;
+
+use crate::core_defs::{CommandResult, merge_env};
 use crate::errors::{CliError, CliErrorKind};
 
 /// How long a subprocess can run without emitting a progress line before
@@ -87,8 +89,7 @@ pub(crate) fn run_command_streaming(
         while heartbeat_flag.load(Ordering::Relaxed) {
             thread::sleep(HEARTBEAT_INTERVAL);
             if heartbeat_flag.load(Ordering::Relaxed) {
-                let ts = utc_now();
-                eprintln!("    {ts} cluster: {heartbeat_label} still running...");
+                info!("{heartbeat_label} still running...");
             }
         }
     });
@@ -107,8 +108,7 @@ pub(crate) fn run_command_streaming(
                 }
                 let trimmed = line.trim_end_matches(['\n', '\r']);
                 if let Some(msg) = filter_progress_line(trimmed) {
-                    let ts = utc_now();
-                    eprintln!("    {ts} {msg}");
+                    info!("{msg}");
                 }
                 captured.push_str(trimmed);
                 captured.push('\n');

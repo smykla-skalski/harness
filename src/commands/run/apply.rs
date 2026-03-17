@@ -4,6 +4,8 @@ use std::path::{Path, PathBuf};
 
 use clap::Args;
 
+use tracing::warn;
+
 use crate::cluster::Platform;
 use crate::commands::{RunDirArgs, resolve_run_services};
 use crate::core_defs::{shorten_path, utc_now};
@@ -144,7 +146,7 @@ fn apply_universal(
             access.admin_token,
         ) {
             Ok(_) => return Ok(()),
-            Err(e) => eprintln!("apply: REST API failed ({e}), falling back to kumactl"),
+            Err(e) => warn!(%e, "REST API failed, falling back to kumactl"),
         }
     }
 

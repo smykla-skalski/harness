@@ -3,6 +3,8 @@ use std::path::PathBuf;
 
 use clap::{Args, Subcommand};
 
+use tracing::warn;
+
 use crate::audit_log::write_run_status_with_audit;
 use crate::commands::{RunDirArgs, resolve_run_services};
 use crate::core_defs::utc_now;
@@ -149,34 +151,8 @@ fn report_group(
         ))
     })?;
 
-    let now = utc_now();
-    let existing_verdict = run_status.group_verdict(group_id);
-    let state_capture_at_report = run_status.last_state_capture.take();
-
-    if let Some(previous) = existing_verdict {
-        if previous == verdict {
-            // Same status reported again - silently succeed for idempotency.
-            return Ok(0);
-        }
-        // Different status - update the entry and adjust counts.
-        eprintln!("group {group_id} status updated from {previous} to {verdict}");
-    } else {
-        // Warn if no state capture happened since the last group report.
-        // The capture_label flag on this command triggers an inline capture,
-        // so only warn when that flag is also absent.
-        if capture_label.is_none() {
-            warn_if_capture_missing(run_status);
-        }
-    }
-    let change =
-        run_status.record_group_result(group_id, verdict, &now, state_capture_at_report.as_deref());
-    run_status.last_completed_group = Some(group_id.to_string());
-    run_status.last_updated_utc = Some(now);
-    run_status.last_state_capture = state_capture_at_report;
-    debug_assert_ne!(change, ExecutedGroupChange::Noop);
-
-    if let Some(n) = note {
-        run_status.notes.push(n.to_string());
+    if !apply_group_report_result(run_status, group_id, verdict, capture_label, note) {
+        return Ok(0);
     }
 
     // Write report section first so status is never updated if report fails.
@@ -214,10 +190,64 @@ fn report_group(
     Ok(0)
 }
 
-/// Emit a warning when no state capture happened between the previous group
-/// report and the current one. Compares `last_state_capture` against the
-/// capture value recorded at the time of the most recent group entry.
-fn warn_if_capture_missing(run_status: &RunStatus) {
+fn apply_group_report_result(
+    run_status: &mut RunStatus,
+    group_id: &str,
+    verdict: GroupVerdict,
+    capture_label: Option<&str>,
+    note: Option<&str>,
+) -> bool {
+    let state_capture_at_report = run_status.last_state_capture.take();
+
+    if !prepare_group_report_update(
+        run_status,
+        group_id,
+        verdict,
+        capture_label,
+        state_capture_at_report.as_deref(),
+    ) {
+        run_status.last_state_capture = state_capture_at_report;
+        return false;
+    }
+
+    let now = utc_now();
+    let change =
+        run_status.record_group_result(group_id, verdict, &now, state_capture_at_report.as_deref());
+    run_status.last_completed_group = Some(group_id.to_string());
+    run_status.last_updated_utc = Some(now);
+    run_status.last_state_capture = state_capture_at_report;
+    debug_assert_ne!(change, ExecutedGroupChange::Noop);
+
+    if let Some(n) = note {
+        run_status.notes.push(n.to_string());
+    }
+
+    true
+}
+
+fn prepare_group_report_update(
+    run_status: &RunStatus,
+    group_id: &str,
+    verdict: GroupVerdict,
+    capture_label: Option<&str>,
+    state_capture_at_report: Option<&str>,
+) -> bool {
+    match run_status.group_verdict(group_id) {
+        Some(previous) if previous == verdict => false,
+        Some(previous) => {
+            warn!(%group_id, %previous, %verdict, "group status updated");
+            true
+        }
+        None => {
+            if capture_label.is_none() {
+                warn_if_capture_missing_with_state(run_status, state_capture_at_report);
+            }
+            true
+        }
+    }
+}
+
+fn warn_if_capture_missing_with_state(run_status: &RunStatus, last_state_capture: Option<&str>) {
     // No previous group means this is the first group - no between-group
     // capture obligation exists yet.
     if run_status.last_completed_group.is_none() {
@@ -225,18 +255,17 @@ fn warn_if_capture_missing(run_status: &RunStatus) {
     }
 
     let previous_capture = run_status.last_group_capture_value();
-    let current_capture = run_status.last_state_capture.as_deref();
 
     // If the capture value is the same as when the previous group was
     // reported, no standalone capture happened in between.
-    if current_capture == previous_capture {
-        eprintln!(
-            "warning: no state capture between group '{}' and this group - \
-             run 'harness capture' or pass --capture-label to preserve state snapshots",
-            run_status
-                .last_completed_group
-                .as_deref()
-                .unwrap_or("unknown"),
+    if last_state_capture == previous_capture {
+        let previous_group = run_status
+            .last_completed_group
+            .as_deref()
+            .unwrap_or("unknown");
+        warn!(
+            %previous_group,
+            "no state capture between groups - run 'harness capture' or pass --capture-label"
         );
     }
 }

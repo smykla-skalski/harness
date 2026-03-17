@@ -17,7 +17,7 @@ use crate::commands::observe::types::{
 /// cleared for the next group.
 pub(super) fn track_resource_lifecycle(
     line_num: usize,
-    command: &ObservedCommand,
+    command: &ObservedCommand<'_>,
     state: &mut ScanState,
     issues: &mut Vec<Issue>,
 ) {
@@ -44,8 +44,8 @@ pub(super) fn track_resource_lifecycle(
     // On `harness report group`, check for leftover creates
     if command.has_harness_subcommand("report")
         && command.harness_spans().any(|span| {
-            span.first().is_some_and(|word| word == "report")
-                && span.get(1).is_some_and(|word| word == "group")
+            span.first().is_some_and(|word| *word == "report")
+                && span.get(1).is_some_and(|word| *word == "group")
         })
     {
         if state.pending_resource_creates.is_empty() {
@@ -90,7 +90,7 @@ pub(super) fn track_resource_lifecycle(
 /// warning.
 pub(super) fn track_capture_between_groups(
     line_num: usize,
-    command: &ObservedCommand,
+    command: &ObservedCommand<'_>,
     state: &mut ScanState,
     issues: &mut Vec<Issue>,
 ) {
@@ -107,8 +107,8 @@ pub(super) fn track_capture_between_groups(
     // `harness report group` checks the flag
     if command.has_harness_subcommand("report")
         && command.harness_spans().any(|span| {
-            span.first().is_some_and(|word| word == "report")
-                && span.get(1).is_some_and(|word| word == "group")
+            span.first().is_some_and(|word| *word == "report")
+                && span.get(1).is_some_and(|word| *word == "group")
         })
     {
         let has_capture_label = command.harness_has_flag("--capture-label");
@@ -148,7 +148,7 @@ pub(super) fn track_capture_between_groups(
 ///
 /// Given `harness apply --manifest g13/01-meshtrace.yaml --manifest g13/02-patch.yaml`,
 /// returns `["01-meshtrace", "02-patch"]`.
-fn extract_manifest_stems(command: &ObservedCommand) -> Vec<String> {
+fn extract_manifest_stems(command: &ObservedCommand<'_>) -> Vec<String> {
     command
         .manifest_paths()
         .into_iter()

@@ -9,7 +9,7 @@ pub(crate) fn persist_runner_state(
     let Some(run_dir) = ctx.effective_run_dir() else {
         return Ok(false);
     };
-    runner_wf::write_runner_state(&run_dir, state)?;
+    runner_wf::write_runner_state(run_dir.as_ref(), state)?;
     Ok(true)
 }
 
