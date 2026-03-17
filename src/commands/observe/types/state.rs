@@ -1,0 +1,135 @@
+use serde::{Deserialize, Serialize};
+
+use super::{
+    Confidence, FixSafety, IssueCategory, IssueCode, IssueSeverity, MessageRole, SourceTool,
+};
+
+/// A classified issue found in a session log.
+#[derive(Debug, Clone, Serialize)]
+pub struct Issue {
+    pub issue_id: String,
+    pub line: usize,
+    pub code: IssueCode,
+    pub category: IssueCategory,
+    pub severity: IssueSeverity,
+    pub confidence: Confidence,
+    pub fix_safety: FixSafety,
+    pub summary: String,
+    pub details: String,
+    pub fingerprint: String,
+    pub source_role: MessageRole,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub source_tool: Option<SourceTool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fix_target: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fix_hint: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub evidence_excerpt: Option<String>,
+}
+
+/// Result of a fix attempt for an open issue.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AttemptResult {
+    Fixed,
+    Failed,
+    Escalated,
+}
+
+/// Record of a single observer cycle.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CycleRecord {
+    pub timestamp: String,
+    pub from_line: usize,
+    pub to_line: usize,
+    pub new_issues: usize,
+    pub resolved: usize,
+}
+
+/// An open issue tracked across observer cycles.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OpenIssue {
+    pub issue_id: String,
+    pub code: IssueCode,
+    pub fingerprint: String,
+    pub first_seen_line: usize,
+    pub last_seen_line: usize,
+    pub occurrence_count: usize,
+    pub severity: IssueSeverity,
+    pub category: IssueCategory,
+    pub summary: String,
+    pub fix_safety: FixSafety,
+}
+
+/// A fix attempt record.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct IssueAttempt {
+    pub issue_id: String,
+    pub attempt: u32,
+    pub result: AttemptResult,
+}
+
+/// Durable observer state persisted between cycles.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ObserverState {
+    pub schema_version: u32,
+    pub session_id: String,
+    pub project_hint: Option<String>,
+    pub cursor: usize,
+    pub last_scan_time: String,
+    pub open_issues: Vec<OpenIssue>,
+    pub resolved_issue_ids: Vec<String>,
+    pub issue_attempts: Vec<IssueAttempt>,
+    pub muted_codes: Vec<IssueCode>,
+    pub cycle_history: Vec<CycleRecord>,
+    #[serde(default)]
+    pub baseline_issue_ids: Vec<String>,
+    #[serde(default)]
+    pub active_workers: Vec<ActiveWorker>,
+}
+
+/// A currently running fix worker tracked in observer state.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ActiveWorker {
+    pub issue_id: String,
+    pub target_file: String,
+    pub started_at: String,
+}
+
+impl ObserverState {
+    /// Current schema version for observer state files.
+    pub const CURRENT_VERSION: u32 = 1;
+
+    /// Create a default state for a new session.
+    #[must_use]
+    pub fn default_for_session(session_id: impl Into<String>) -> Self {
+        Self {
+            schema_version: Self::CURRENT_VERSION,
+            session_id: session_id.into(),
+            project_hint: None,
+            cursor: 0,
+            last_scan_time: String::new(),
+            open_issues: Vec::new(),
+            resolved_issue_ids: Vec::new(),
+            issue_attempts: Vec::new(),
+            muted_codes: Vec::new(),
+            cycle_history: Vec::new(),
+            baseline_issue_ids: Vec::new(),
+            active_workers: Vec::new(),
+        }
+    }
+
+    /// Whether the observer state is safe for handoff to another observer.
+    /// True when no active workers are running and at least one scan completed.
+    #[must_use]
+    pub fn handoff_safe(&self) -> bool {
+        self.active_workers.is_empty() && !self.last_scan_time.is_empty()
+    }
+
+    /// Whether a baseline has been captured.
+    #[must_use]
+    pub fn has_baseline(&self) -> bool {
+        !self.baseline_issue_ids.is_empty()
+    }
+}
