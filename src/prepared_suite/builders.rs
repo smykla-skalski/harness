@@ -2,6 +2,8 @@ use std::borrow::Cow;
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use rayon::prelude::*;
+
 use crate::context::RunLayout;
 use crate::errors::{CliError, CliErrorKind};
 use crate::io::ensure_dir;
@@ -43,28 +45,43 @@ pub(super) fn build_baseline_plan(
 ) -> Result<BaselinePlan, CliError> {
     let suite_dir = suite.suite_dir();
     let run_dir = layout.run_dir();
-    let mut plan = BaselinePlan::default();
 
-    for baseline in &suite.frontmatter.baseline_files {
-        let source_path = suite_dir.join(baseline);
-        let prepared_rel = PathBuf::from("manifests")
-            .join("prepared")
-            .join("baseline")
-            .join(baseline);
-        let validation_rel = validation_path_for(&prepared_rel);
-        plan.source_digests
-            .push(source_digest(&source_path, baseline)?);
-        let manifest_ref =
-            build_baseline_manifest_ref(baseline, &source_path, &prepared_rel, &validation_rel)?;
-        plan.baseline_copies.push(PreparedCopy {
-            source_path,
-            prepared_path: run_dir.join(&prepared_rel),
-        });
-        plan.validation_writes.push(PreparedWrite {
-            prepared_path: run_dir.join(&validation_rel),
-            text: Cow::Borrowed(pending_validation_text(false)),
-        });
+    let results: Result<Vec<_>, CliError> = suite
+        .frontmatter
+        .baseline_files
+        .par_iter()
+        .map(|baseline| {
+            let source_path = suite_dir.join(baseline.as_str());
+            let prepared_rel = PathBuf::from("manifests")
+                .join("prepared")
+                .join("baseline")
+                .join(baseline.as_str());
+            let validation_rel = validation_path_for(&prepared_rel);
+            let sd = source_digest(&source_path, baseline)?;
+            let manifest_ref = build_baseline_manifest_ref(
+                baseline,
+                &source_path,
+                &prepared_rel,
+                &validation_rel,
+            )?;
+            let baseline_copy = PreparedCopy {
+                source_path,
+                prepared_path: run_dir.join(&prepared_rel),
+            };
+            let validation_write = PreparedWrite {
+                prepared_path: run_dir.join(&validation_rel),
+                text: Cow::Borrowed(pending_validation_text(false)),
+            };
+            Ok((sd, manifest_ref, baseline_copy, validation_write))
+        })
+        .collect();
+
+    let mut plan = BaselinePlan::default();
+    for (sd, manifest_ref, baseline_copy, validation_write) in results? {
+        plan.source_digests.push(sd);
         plan.baselines.push(manifest_ref);
+        plan.baseline_copies.push(baseline_copy);
+        plan.validation_writes.push(validation_write);
     }
 
     Ok(plan)
