@@ -1,9 +1,8 @@
 use std::collections::BTreeMap;
 
 use super::{
-    ComposeFile, ComposeService, ComposeDependsOn, ComposeDependsOnEntry,
-    bridge_network, cp_command, cp_entrypoint, cp_env, postgres_cp_env,
-    postgres_service,
+    ComposeDependsOn, ComposeDependsOnEntry, ComposeFile, ComposeService, bridge_network,
+    cp_command, cp_entrypoint, cp_env, postgres_cp_env, postgres_service,
 };
 
 /// Generate a compose file for single-zone universal topology.
