@@ -107,6 +107,12 @@ pub enum HookMessage {
     )]
     ReaderOversizedBlock,
 
+    #[error(
+        "Subshell substitution containing a denied binary was detected. \
+         Run cluster interactions through `harness run` or another `harness` wrapper."
+    )]
+    SubshellSmuggling,
+
     #[error("Suite:run runs must stay user-story-first and tracked.")]
     SuiteRunnerTracked,
 
@@ -230,6 +236,7 @@ impl HookMessage {
             Self::RunnerStateInvalid { .. } => "KSR013",
             Self::RunnerFlowRequired { .. } => "KSR014",
             Self::PreflightReplyInvalid { .. } => "KSR015",
+            Self::SubshellSmuggling => "KSR017",
             Self::WriteOutsideSuite { .. } => "KSA001",
             Self::ApprovalStateInvalid { .. } => "KSA002",
             Self::ApprovalRequired { .. } => "KSA003",
@@ -249,6 +256,7 @@ impl HookMessage {
         match self {
             Self::ClusterBinary
             | Self::AdminEndpoint
+            | Self::SubshellSmuggling
             | Self::MissingStateCapture
             | Self::VerdictPending
             | Self::WriteOutsideRun { .. }
