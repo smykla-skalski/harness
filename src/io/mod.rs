@@ -94,6 +94,12 @@ pub fn read_text(path: &Path) -> Result<String, CliError> {
 ///
 /// # Errors
 /// Returns `CliError` on IO failure.
+/// Write UTF-8 text to a file, creating parent directories.
+///
+/// On Unix, files are created with mode 0600 (owner read/write only).
+///
+/// # Errors
+/// Returns `CliError` on IO failure.
 pub fn write_text(path: &Path, text: &str) -> Result<(), CliError> {
     let parent = path.parent().unwrap_or_else(|| Path::new("."));
     ensure_dir(parent).map_err(|e| {
@@ -110,7 +116,16 @@ pub fn write_text(path: &Path, text: &str) -> Result<(), CliError> {
         .map_err(|e| CliErrorKind::io(cow!("flush temp file for {}: {e}", path.display())))?;
     tmp.persist(path)
         .map(|_| ())
-        .map_err(|e| CliErrorKind::io(cow!("persist {}: {}", path.display(), e.error)).into())
+        .map_err(|e| CliErrorKind::io(cow!("persist {}: {}", path.display(), e.error)))?;
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600))
+            .map_err(|e| CliErrorKind::io(cow!("set permissions {}: {e}", path.display())))?;
+    }
+
+    Ok(())
 }
 
 /// Read and parse a JSON file into a `serde_json::Value`.
@@ -331,5 +346,17 @@ mod tests {
         let content = fs::read_to_string(&path).unwrap();
         assert_eq!(content.matches("| 1 |").count(), 1);
         assert_eq!(content.matches("| 2 |").count(), 1);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn write_text_sets_owner_only_permissions() {
+        use std::os::unix::fs::PermissionsExt;
+        let tmp = TempDir::new().unwrap();
+        let path = tmp.path().join("secret.txt");
+        write_text(&path, "sensitive data").unwrap();
+        let metadata = fs::metadata(&path).unwrap();
+        let mode = metadata.permissions().mode() & 0o777;
+        assert_eq!(mode, 0o600, "expected 0600, got {mode:o}");
     }
 }
