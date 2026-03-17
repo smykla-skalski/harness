@@ -13,9 +13,7 @@ use crate::io::write_text;
 use std::fs;
 
 pub use builders::{GlobalTwoZonesConfig, ZoneConfig, global_two_zones, global_zone, single_zone};
-pub use service::{
-    ComposeDependsOn, ComposeDependsOnEntry, ComposeHealthcheck, ComposeService,
-};
+pub use service::{ComposeDependsOn, ComposeDependsOnEntry, ComposeHealthcheck, ComposeService};
 
 /// A Docker Compose network definition.
 #[derive(Debug, Clone, Serialize)]
