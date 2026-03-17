@@ -1,6 +1,5 @@
 use std::io::Write as _;
 use std::path::Path;
-use std::thread;
 use std::time::Duration;
 
 use crate::core_defs::CommandResult;
@@ -276,18 +275,21 @@ pub fn compose_down_project(project: &str) -> Result<CommandResult, CliError> {
 /// # Errors
 /// Returns `CliError` if the token cannot be extracted.
 pub fn extract_admin_token(cp_container: &str) -> Result<String, CliError> {
+    use backoff::ExponentialBackoff;
     use base64::Engine as _;
     use base64::engine::general_purpose::STANDARD;
 
     // The CP bootstraps the admin token asynchronously after startup.
-    // Retry with short delays to wait for it.
-    let max_attempts = 10;
-    let mut last_err = String::new();
-    for attempt in 0..max_attempts {
-        if attempt > 0 {
-            thread::sleep(Duration::from_secs(1));
-        }
-        let Ok(result) = docker_exec_cmd(
+    // Use exponential backoff: starts at 200ms, caps at 2s, gives up after 15s.
+    let backoff_config = ExponentialBackoff {
+        initial_interval: Duration::from_millis(200),
+        max_interval: Duration::from_secs(2),
+        max_elapsed_time: Some(Duration::from_secs(15)),
+        ..ExponentialBackoff::default()
+    };
+
+    backoff::retry(backoff_config, || -> Result<String, backoff::Error<CliError>> {
+        let result = docker_exec_cmd(
             cp_container,
             &[
                 "/busybox/wget",
@@ -296,33 +298,49 @@ pub fn extract_admin_token(cp_container: &str) -> Result<String, CliError> {
                 "-",
                 "http://localhost:5681/global-secrets/admin-user-token",
             ],
-        ) else {
-            last_err = format!("attempt {}: wget failed", attempt + 1);
-            continue;
-        };
-        let Ok(body) = serde_json::from_str::<serde_json::Value>(result.stdout.trim()) else {
-            last_err = format!("attempt {}: invalid JSON response", attempt + 1);
-            continue;
-        };
-        let Some(b64_data) = body["data"].as_str() else {
-            last_err = format!("attempt {}: missing data field", attempt + 1);
-            continue;
-        };
-        let Ok(bytes) = STANDARD.decode(b64_data) else {
-            last_err = format!("attempt {}: base64 decode failed", attempt + 1);
-            continue;
-        };
-        let Ok(token) = String::from_utf8(bytes) else {
-            last_err = format!("attempt {}: invalid UTF-8 in token", attempt + 1);
-            continue;
-        };
-        if !token.is_empty() {
-            return Ok(token);
+        )
+        .map_err(backoff::Error::transient)?;
+
+        let body = serde_json::from_str::<serde_json::Value>(result.stdout.trim())
+            .map_err(|error| {
+                backoff::Error::transient(
+                    CliErrorKind::serialize(format!("invalid JSON in token response: {error}"))
+                        .into(),
+                )
+            })?;
+
+        let b64_data = body["data"].as_str().ok_or_else(|| {
+            backoff::Error::transient(
+                CliErrorKind::token_generation_failed("missing data field").into(),
+            )
+        })?;
+
+        let bytes = STANDARD.decode(b64_data).map_err(|error| {
+            backoff::Error::transient(
+                CliErrorKind::token_generation_failed(format!("base64 decode failed: {error}"))
+                    .into(),
+            )
+        })?;
+
+        let token = String::from_utf8(bytes).map_err(|error| {
+            backoff::Error::permanent(
+                CliErrorKind::token_generation_failed(format!("invalid UTF-8 in token: {error}"))
+                    .into(),
+            )
+        })?;
+
+        if token.is_empty() {
+            return Err(backoff::Error::transient(
+                CliErrorKind::token_generation_failed("empty token").into(),
+            ));
         }
-        last_err = format!("attempt {}: empty token", attempt + 1);
-    }
-    Err(CliErrorKind::token_generation_failed(format!(
-        "could not extract admin token after {max_attempts} attempts: {last_err}"
-    ))
-    .into())
+
+        Ok(token)
+    })
+    .map_err(|error| {
+        CliErrorKind::token_generation_failed(format!(
+            "could not extract admin token within timeout: {error}"
+        ))
+        .into()
+    })
 }
