@@ -223,6 +223,7 @@ fn core_features() -> BTreeMap<Feature, FeatureInfo> {
         (
             Feature::HelmSettings,
             FeatureInfo::new("pass custom Helm values during cluster bootstrap")
+                .command("harness cluster <mode> --helm-setting <key>=<value>")
                 .platforms(kubernetes),
         ),
         (
@@ -260,6 +261,7 @@ fn extended_features() -> BTreeMap<Feature, FeatureInfo> {
         (
             Feature::NamespaceRestart,
             FeatureInfo::new("restart workloads in specified namespaces after deployment changes")
+                .command("harness restart-namespace")
                 .platforms(kubernetes),
         ),
         (
@@ -342,6 +344,7 @@ fn extended_features() -> BTreeMap<Feature, FeatureInfo> {
         (
             Feature::TransparentProxy,
             FeatureInfo::new("install transparent proxy on universal service containers")
+                .command("harness service up --transparent-proxy")
                 .platforms(universal),
         ),
     ])

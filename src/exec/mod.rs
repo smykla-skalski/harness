@@ -242,6 +242,27 @@ fn describe_command(args: &[&str]) -> String {
     args.iter().take(2).copied().collect::<Vec<_>>().join(" ")
 }
 
+/// Restart all deployments in the given namespaces via `kubectl rollout restart`.
+///
+/// No-op if the list is empty. Requires a kubeconfig for cluster access.
+///
+/// # Errors
+/// Returns `CliError` if any restart command fails.
+pub fn kubectl_rollout_restart(
+    kubeconfig: Option<&Path>,
+    namespaces: &[String],
+) -> Result<(), CliError> {
+    for namespace in namespaces {
+        kubectl(
+            kubeconfig,
+            &["rollout", "restart", "deployment", "-n", namespace],
+            &[0],
+        )?;
+        info!(%namespace, "restarted deployments");
+    }
+    Ok(())
+}
+
 /// Run kubectl with optional kubeconfig.
 ///
 /// # Errors
@@ -553,6 +574,12 @@ mod tests {
         if let Ok(names) = docker_rm_by_label("io.harness.test.nonexistent=true") {
             assert!(names.is_empty());
         }
+    }
+
+    #[test]
+    fn kubectl_rollout_restart_skips_empty_list() {
+        let result = kubectl_rollout_restart(None, &[]);
+        assert!(result.is_ok());
     }
 
     #[test]
