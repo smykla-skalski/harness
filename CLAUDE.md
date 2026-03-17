@@ -5,19 +5,21 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Build and test commands
 
 ```bash
-cargo check                    # type-check without building
-cargo build                    # full build
-cargo test --lib               # run all unit tests
-cargo test --lib errors::tests::cli_err_basic_fields -- --exact  # single test
+mise run check                 # type-check without building
+mise run test                  # unit + integration (fast, single-threaded)
+mise run test:unit             # unit tests only
+mise run test:slow             # slow tests (#[ignore])
+mise run lint:fix              # format + clippy fixes
+mise run install               # build release binary, install to ~/.local/bin
 cargo test --lib cli::tests    # all tests in a module
-cargo clippy --lib             # lint (pedantic = deny)
+cargo test --lib errors::tests::cli_err_basic_fields -- --exact  # single test
 cargo fmt --check              # check formatting
-cargo fmt                      # auto-format
+cargo clippy --lib             # lint check only
 ```
 
-Unit tests are in-crate `#[test]` blocks. Integration tests live in `tests/integration/` and cover hooks, commands, and workflows end-to-end. No Makefile or CI pipeline.
+Unit tests are in-crate `#[test]` blocks. Integration tests live in `tests/integration/` and cover hooks, commands, and workflows end-to-end. Integration tests run single-threaded (`--test-threads=1`) for env safety. Tests that read XDG paths must isolate state with `temp_env::with_vars` setting both `XDG_DATA_HOME` and `CLAUDE_SESSION_ID`. No mocks - tests use real filesystem state. Slow tests are marked `#[ignore]` and run via `mise run test:slow`.
 
-Pre-commit checklist: `cargo fmt --check && cargo clippy --lib && cargo test`
+Pre-commit: `cargo fmt --check && cargo clippy --lib && mise run test`
 
 ## Architecture
 
@@ -62,6 +64,26 @@ Hooks intercept Claude Code tool usage. Classified in `cli.rs` as constants:
 - Clippy pedantic is set to `deny` - all new code must pass pedantic lints
 - Errors use `CliErrorKind` enum variants with typed fields via thiserror
 - Hook messages use `HookMessage` enum with `into_result()` conversion
+- Commits: `{type}({scope}): {message}` — types: `feat`, `fix`, `refactor`, `chore`, `docs`, `test`, `perf`
+
+## Versioning
+
+Every feature change must evaluate semver and bump the version in the same change. Do not ship feature work without updating the version surfaces that track the release.
+
+- `major` - any breaking change to CLI commands or flags, hook payload contracts, persisted state/schema/artifact formats, machine-consumed output, or behavior that user scripts or suites can reasonably rely on
+- `minor` - backward-compatible new functionality such as a new command, flag, output field, hook capability, report surface, or materially expanded behavior
+- `patch` - backward-compatible bug fixes, internal refactors, diagnostics, performance work, or test/doc updates that do not add new capability and do not break an existing contract
+
+Manual bump surfaces for harness:
+
+- `Cargo.toml` - canonical crate/package version
+- `testkit/Cargo.toml` - keep the testkit crate aligned with the root package version
+- `.claude/plugins/suite/.claude-plugin/plugin.json` - keep the suite plugin version aligned with the released feature set; `src/bootstrap.rs` reads this file for plugin-cache sync
+- `src/commands/observe/output.rs` - bump the SARIF `driver.version` only; do not change the SARIF schema version `2.1.0` unless the SARIF spec itself changes
+- `Cargo.lock` - regenerate after the package-version changes
+- `src/bootstrap.rs` - update only versioned plugin fixtures and cache-path expectations in tests when they intentionally track the released version; this file consumes the plugin version but is not a canonical version source
+
+Related note: `src/cli.rs` uses Clap's derived `version`, so it follows the root `Cargo.toml` version automatically and should not get a manual version string.
 
 ## Logging
 
