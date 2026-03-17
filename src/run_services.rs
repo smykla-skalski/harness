@@ -1,14 +1,17 @@
 use std::borrow::Cow;
 use std::collections::BTreeMap;
+use std::fmt;
 use std::path::Path;
 #[cfg(test)]
 use std::path::PathBuf;
+use std::sync::Arc;
 use std::thread;
 
 use rayon::prelude::*;
 use serde::Serialize;
 
 use crate::audit_log::write_run_status_with_audit;
+use crate::blocks::{ContainerRuntime, DockerContainerRuntime, StdProcessExecutor};
 use crate::cluster::{ClusterSpec, Platform};
 use crate::context::{
     NodeCheckRecord, NodeCheckSnapshot, PreflightArtifact, RunContext, RunLayout, RunMetadata,
@@ -33,9 +36,18 @@ use crate::workflow::runner::{
 };
 
 /// Domain access layer for a tracked run.
-#[derive(Debug)]
 pub struct RunServices {
     ctx: RunContext,
+    docker: Option<Arc<dyn ContainerRuntime>>,
+}
+
+impl fmt::Debug for RunServices {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("RunServices")
+            .field("ctx", &self.ctx)
+            .field("has_docker", &self.docker.is_some())
+            .finish()
+    }
 }
 
 /// Runtime health for a tracked cluster member or backing network.
@@ -105,7 +117,9 @@ impl RunServices {
     /// # Errors
     /// Returns `CliError` if the persisted cluster spec cannot be adapted.
     pub fn from_context(ctx: RunContext) -> Result<Self, CliError> {
-        Ok(Self { ctx })
+        let docker: Arc<dyn ContainerRuntime> =
+            Arc::new(DockerContainerRuntime::new(Arc::new(StdProcessExecutor)));
+        Ok(Self::with_docker(ctx, Some(docker)))
     }
 
     /// Build services from a run directory.
@@ -124,6 +138,10 @@ impl RunServices {
         RunContext::from_current()?
             .map(Self::from_context)
             .transpose()
+    }
+
+    fn with_docker(ctx: RunContext, docker: Option<Arc<dyn ContainerRuntime>>) -> Self {
+        Self { ctx, docker }
     }
 
     #[must_use]
@@ -153,6 +171,12 @@ impl RunServices {
 
     pub fn status_mut(&mut self) -> Option<&mut RunStatus> {
         self.ctx.status.as_mut()
+    }
+
+    fn docker(&self) -> Result<&dyn ContainerRuntime, CliError> {
+        self.docker
+            .as_deref()
+            .ok_or_else(|| CliErrorKind::missing_run_context_value("docker").into())
     }
 
     /// Return the persisted cluster spec.
@@ -272,16 +296,10 @@ impl RunServices {
     /// # Errors
     /// Returns `CliError` on docker invocation failures.
     pub fn list_service_containers(&self) -> Result<Vec<ServiceStatusRecord>, CliError> {
-        let result = exec::docker(
-            &[
-                "ps",
-                "--filter",
-                &self.service_container_filter(),
-                "--format",
-                "{{.Names}}\t{{.Status}}",
-            ],
-            &[0],
-        )?;
+        let filter = self.service_container_filter();
+        let result = self
+            .docker()?
+            .list_formatted(&["--filter", &filter], "{{.Names}}\t{{.Status}}")?;
         Ok(result
             .stdout
             .lines()
@@ -332,7 +350,9 @@ impl RunServices {
                     ClusterMemberHealthRecord {
                         name: member.name.as_str(),
                         role: member.role.as_str(),
-                        running: exec::container_running(&container).unwrap_or(false),
+                        running: self.docker.as_ref().map_or(false, |docker| {
+                            docker.is_running(&container).unwrap_or(false)
+                        }),
                         container: Some(container),
                     }
                 })
@@ -573,16 +593,10 @@ impl RunServices {
             .docker_network()
             .ok()
             .map_or_else(|| "harness-default".to_string(), str::to_string);
-        let containers = exec::docker(
-            &[
-                "ps",
-                "--filter",
-                &format!("network={network}"),
-                "--format",
-                "{{json .}}",
-            ],
-            &[0],
-        )?;
+        let filter = format!("network={network}");
+        let containers = self
+            .docker()?
+            .list_formatted(&["--filter", &filter], "{{json .}}")?;
         let container_rows = containers
             .stdout
             .lines()
@@ -927,5 +941,48 @@ keep_clusters: false
             services.service_container_filter(),
             "label=io.harness.run-id=run-4"
         );
+    }
+
+    #[test]
+    fn list_service_containers_parses_docker_rows() {
+        let dir = tempfile::tempdir().unwrap();
+        let suite_path = write_suite(dir.path());
+        let layout = RunLayout::from_run_dir(&dir.path().join("runs").join("run-5"));
+        write_run(&layout, &suite_path);
+
+        let ctx = RunContext::from_run_dir(&layout.run_dir()).unwrap();
+        let docker: Arc<dyn ContainerRuntime> =
+            Arc::new(crate::blocks::FakeContainerRuntime::new());
+        docker
+            .run_detached(&crate::blocks::ContainerConfig {
+                image: "demo:latest".to_string(),
+                name: "svc-a".to_string(),
+                network: "demo-net".to_string(),
+                env: vec![],
+                ports: vec![],
+                labels: vec![("io.harness.run-id".to_string(), "run-5".to_string())],
+                extra_args: vec![],
+                command: vec![],
+            })
+            .unwrap();
+        docker
+            .run_detached(&crate::blocks::ContainerConfig {
+                image: "demo:latest".to_string(),
+                name: "svc-b".to_string(),
+                network: "demo-net".to_string(),
+                env: vec![],
+                ports: vec![],
+                labels: vec![("io.harness.run-id".to_string(), "other-run".to_string())],
+                extra_args: vec![],
+                command: vec![],
+            })
+            .unwrap();
+
+        let services = RunServices::with_docker(ctx, Some(docker));
+        let rows = services.list_service_containers().unwrap();
+
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].name, "svc-a");
+        assert_eq!(rows[0].status, "running");
     }
 }

@@ -232,7 +232,7 @@ impl ContainerRuntime for DockerContainerRuntime {
         filter_args: &[&str],
         format_template: &str,
     ) -> Result<CommandResult, BlockError> {
-        let mut args = vec!["ps", "-a"];
+        let mut args = vec!["ps"];
         args.extend_from_slice(filter_args);
         args.push("--format");
         args.push(format_template);
@@ -440,6 +440,14 @@ impl ContainerRuntime for FakeContainerRuntime {
                 "{{.ID}}" => container.id.clone(),
                 "{{.Image}}" => container.image.clone(),
                 "{{.Names}}" => name.clone(),
+                "{{.Names}}\t{{.Status}}" => format!(
+                    "{name}\t{}",
+                    if container.running {
+                        "running"
+                    } else {
+                        "exited"
+                    }
+                ),
                 "{{.Status}}" => {
                     if container.running {
                         "running".to_string()
@@ -448,6 +456,14 @@ impl ContainerRuntime for FakeContainerRuntime {
                     }
                 }
                 "{{.Networks}}" => container.network.clone(),
+                "{{json .}}" => serde_json::json!({
+                    "ID": container.id,
+                    "Image": container.image,
+                    "Names": name,
+                    "Status": if container.running { "running" } else { "exited" },
+                    "Networks": container.network,
+                })
+                .to_string(),
                 _ => name.clone(),
             })
             .collect::<Vec<_>>()
@@ -835,6 +851,40 @@ mod tests {
             .expect("expected exec to succeed");
 
         assert_eq!(result.stdout, "hello\n");
+    }
+
+    #[test]
+    fn docker_container_runtime_list_formatted_uses_ps_without_all_flag() {
+        let fake = Arc::new(FakeProcessExecutor::new(vec![FakeResponse {
+            expected_program: "docker".to_string(),
+            expected_args: Some(vec![
+                "docker".into(),
+                "ps".into(),
+                "--filter".into(),
+                "label=suite=mesh".into(),
+                "--format".into(),
+                "{{.Names}}".into(),
+            ]),
+            expected_method: Some(FakeProcessMethod::Run),
+            result: Ok(success_result(
+                &[
+                    "docker",
+                    "ps",
+                    "--filter",
+                    "label=suite=mesh",
+                    "--format",
+                    "{{.Names}}",
+                ],
+                "svc-1\n",
+            )),
+        }]));
+        let runtime = DockerContainerRuntime::new(fake);
+
+        let result = runtime
+            .list_formatted(&["--filter", "label=suite=mesh"], "{{.Names}}")
+            .expect("expected list_formatted to succeed");
+
+        assert_eq!(result.stdout, "svc-1\n");
     }
 
     #[test]
