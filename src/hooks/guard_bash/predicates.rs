@@ -131,16 +131,11 @@ pub(super) fn allows_wrapped_envoy_admin(words: &[String]) -> bool {
 /// Scan raw command text for subshell substitution patterns that contain
 /// denied cluster binaries. This catches smuggling attempts that bypass
 /// token-level binary name checks.
-pub(super) fn has_denied_subshell_binary(
-    command_text: Option<&str>,
-    words: &[String],
-) -> bool {
+pub(super) fn has_denied_subshell_binary(command_text: Option<&str>, words: &[String]) -> bool {
     let text = command_text.unwrap_or("");
 
     // Fast path: no subshell syntax at all
-    if !contains_subshell_pattern(text)
-        && !words.iter().any(|w| contains_subshell_pattern(w))
-    {
+    if !contains_subshell_pattern(text) && !words.iter().any(|w| contains_subshell_pattern(w)) {
         return false;
     }
 
