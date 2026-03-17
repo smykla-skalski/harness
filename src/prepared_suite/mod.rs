@@ -12,6 +12,7 @@ pub use manifest::{
 
 use std::path::Path;
 
+use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 
 use builders::{build_baseline_plan, build_group_plan, copy_prepared_file};
@@ -124,8 +125,14 @@ impl PreparedSuitePlan {
         source_digests.extend(baseline_plan.source_digests);
         let mut validation_writes = baseline_plan.validation_writes;
 
-        for group_rel in &suite.frontmatter.groups {
-            let Some(group_plan) = build_group_plan(layout, suite, profile, group_rel)? else {
+        let group_plans: Result<Vec<_>, CliError> = suite
+            .frontmatter
+            .groups
+            .par_iter()
+            .map(|group_rel| build_group_plan(layout, suite, profile, group_rel))
+            .collect();
+        for maybe_plan in group_plans? {
+            let Some(group_plan) = maybe_plan else {
                 continue;
             };
             source_digests.push(group_plan.source_digest);
