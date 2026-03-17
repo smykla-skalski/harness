@@ -331,14 +331,13 @@ mod tests {
     fn warn_if_capture_missing_no_previous_group() {
         let status = make_status();
         // Should not panic - first group has no obligation.
-        warn_if_capture_missing(&status);
+        warn_if_capture_missing_with_state(&status, None);
     }
 
     #[test]
     fn warn_if_capture_missing_capture_unchanged() {
         let mut status = make_status();
         status.last_completed_group = Some("g01".to_string());
-        status.last_state_capture = Some("state/capture-1.json".to_string());
         status.executed_groups = vec![ExecutedGroupRecord {
             group_id: "g01".to_string(),
             verdict: GroupVerdict::Pass,
@@ -346,14 +345,13 @@ mod tests {
             state_capture_at_report: Some("state/capture-1.json".to_string()),
         }];
         // Capture unchanged since g01 - should warn (captured in stderr).
-        warn_if_capture_missing(&status);
+        warn_if_capture_missing_with_state(&status, Some("state/capture-1.json"));
     }
 
     #[test]
     fn warn_if_capture_missing_capture_changed() {
         let mut status = make_status();
         status.last_completed_group = Some("g01".to_string());
-        status.last_state_capture = Some("state/capture-2.json".to_string());
         status.executed_groups = vec![ExecutedGroupRecord {
             group_id: "g01".to_string(),
             verdict: GroupVerdict::Pass,
@@ -361,6 +359,6 @@ mod tests {
             state_capture_at_report: Some("state/capture-1.json".to_string()),
         }];
         // Capture changed since g01 - should not warn.
-        warn_if_capture_missing(&status);
+        warn_if_capture_missing_with_state(&status, Some("state/capture-2.json"));
     }
 }
