@@ -1,5 +1,3 @@
-mod parsers;
-
 mod frontmatter;
 mod run;
 mod suite;
