@@ -602,7 +602,7 @@ mod tests {
         runner_state: Option<RunnerWorkflowState>,
         response: Option<&str>,
     ) -> HookContext {
-        use crate::hook_payloads::{HookEnvelopePayload, HookEvent};
+        use crate::hook_payloads::HookEnvelopePayload;
 
         let payload = HookEnvelopePayload {
             tool_name: "Bash".to_string(),
