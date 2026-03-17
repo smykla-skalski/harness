@@ -1,3 +1,4 @@
+use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
 
@@ -5,6 +6,9 @@ use clap::Args;
 
 use tracing::info;
 
+use crate::blocks::{
+    ContainerConfig, ContainerRuntime, DockerContainerRuntime, StdProcessExecutor,
+};
 use crate::commands::{RunDirArgs, resolve_run_services};
 use crate::errors::{CliError, CliErrorKind};
 use crate::exec;
@@ -74,6 +78,7 @@ fn render_template(
 /// # Errors
 /// Returns `CliError` on failure.
 pub fn service(args: &ServiceArgs) -> Result<i32, CliError> {
+    let docker = DockerContainerRuntime::new(Arc::new(StdProcessExecutor));
     match args.action.as_str() {
         "up" => service_up(
             args.name.as_deref(),
@@ -83,9 +88,10 @@ pub fn service(args: &ServiceArgs) -> Result<i32, CliError> {
             args.transparent_proxy,
             args.timeout,
             &args.run_dir,
+            &docker,
         ),
-        "down" => service_down(args.name.as_deref(), &args.run_dir),
-        "list" => service_list(&args.run_dir),
+        "down" => service_down(args.name.as_deref(), &args.run_dir, &docker),
+        "list" => service_list(&args.run_dir, &docker),
         _ => Err(
             CliErrorKind::usage_error(format!("unknown service action: {}", args.action)).into(),
         ),
@@ -100,6 +106,7 @@ fn service_up(
     transparent_proxy: bool,
     timeout: u64,
     run_dir_args: &RunDirArgs,
+    docker: &dyn ContainerRuntime,
 ) -> Result<i32, CliError> {
     let svc_name = name.ok_or_else(|| CliErrorKind::usage_error("service name is required"))?;
     let svc_port = port.ok_or_else(|| CliErrorKind::usage_error("service port is required"))?;
@@ -121,25 +128,26 @@ fn service_up(
     let token_str = token_result.trim();
 
     // Start service container first so we can inspect its IP address
-    let port_pair = [(svc_port, svc_port)];
-    let run_id_label = format!("io.harness.run-id={}", services.layout().run_id);
-    exec::docker_run_detached(
-        svc_image.as_ref(),
-        svc_name,
-        network,
-        &[],
-        &port_pair,
-        &[
-            "--label",
-            "io.harness.service=true",
-            "--label",
-            &run_id_label,
+    docker.run_detached(&ContainerConfig {
+        image: svc_image.into_owned(),
+        name: svc_name.to_string(),
+        network: network.to_string(),
+        env: vec![],
+        ports: vec![(svc_port, svc_port)],
+        labels: vec![
+            ("io.harness.service".to_string(), "true".to_string()),
+            (
+                "io.harness.run-id".to_string(),
+                services.layout().run_id.clone(),
+            ),
         ],
-        &["sleep", "infinity"],
-    )?;
+        extra_args: vec![],
+        command: vec!["sleep".to_string(), "infinity".to_string()],
+    })?;
 
     // Run the rest inside a helper; on failure clean up the container
     if let Err(err) = service_up_inner(&ServiceSetup {
+        docker,
         name: svc_name,
         port: svc_port,
         mesh,
@@ -149,7 +157,7 @@ fn service_up(
         timeout,
         xds: services.xds_access()?,
     }) {
-        let _ = exec::docker_rm(svc_name);
+        let _ = docker.remove(svc_name);
         return Err(err);
     }
 
@@ -159,6 +167,7 @@ fn service_up(
 
 /// Arguments for the post-container-start setup phase.
 struct ServiceSetup<'a> {
+    docker: &'a dyn ContainerRuntime,
     name: &'a str,
     port: u16,
     mesh: &'a str,
@@ -178,7 +187,7 @@ fn service_up_inner(setup: &ServiceSetup<'_>) -> Result<(), CliError> {
     let network = setup.network;
     let transparent_proxy = setup.transparent_proxy;
     // Resolve the container IP on the Docker network
-    let container_address = exec::docker_inspect_ip(svc_name, network)?;
+    let container_address = setup.docker.inspect_ip(svc_name, network)?;
 
     // Render dataplane YAML from embedded template using the resolved address
     let (template_name, template_content) = if transparent_proxy {
@@ -202,8 +211,8 @@ fn service_up_inner(setup: &ServiceSetup<'_>) -> Result<(), CliError> {
     let token_path = format!("/tmp/{svc_name}-token");
     let dp_path = format!("/tmp/{svc_name}-dp.yaml");
     let ca_cert = thread::scope(|scope| {
-        let t_token = scope.spawn(|| exec::docker_write_file(svc_name, &token_path, token_str));
-        let t_yaml = scope.spawn(|| exec::docker_write_file(svc_name, &dp_path, &dp_yaml));
+        let t_token = scope.spawn(|| setup.docker.write_file(svc_name, &token_path, token_str));
+        let t_yaml = scope.spawn(|| setup.docker.write_file(svc_name, &dp_path, &dp_yaml));
         let t_cert = scope.spawn(|| extract_cp_ca_cert(setup.xds.ip, setup.xds.port));
         t_token.join().expect("token write thread panicked")?;
         t_yaml.join().expect("yaml write thread panicked")?;
@@ -212,7 +221,7 @@ fn service_up_inner(setup: &ServiceSetup<'_>) -> Result<(), CliError> {
 
     // Install transparent proxy if requested
     if transparent_proxy {
-        exec::docker_exec_cmd(
+        setup.docker.exec_command(
             svc_name,
             &["kumactl", "install", "transparent-proxy", "--redirect-dns"],
         )?;
@@ -221,12 +230,12 @@ fn service_up_inner(setup: &ServiceSetup<'_>) -> Result<(), CliError> {
     // Inject the CA cert into the container.
     // kuma-dp needs this to verify the TLS connection to the CP.
     let ca_path = format!("/tmp/{svc_name}-ca.crt");
-    exec::docker_write_file(svc_name, &ca_path, &ca_cert)?;
+    setup.docker.write_file(svc_name, &ca_path, &ca_cert)?;
 
     // Start kuma-dp inside the container in detached mode.
     // kuma-dp connects to the XDS port (5678), not the API port (5681).
     let xds_addr = format!("https://{}:{}", setup.xds.ip, setup.xds.port);
-    exec::docker_exec_detached(
+    setup.docker.exec_detached(
         svc_name,
         &[
             "kuma-dp",
@@ -298,14 +307,18 @@ fn extract_pem_certificates(output: &str) -> String {
     result.trim().to_string()
 }
 
-fn service_down(name: Option<&str>, _run_dir_args: &RunDirArgs) -> Result<i32, CliError> {
+fn service_down(
+    name: Option<&str>,
+    _run_dir_args: &RunDirArgs,
+    docker: &dyn ContainerRuntime,
+) -> Result<i32, CliError> {
     let svc_name = name.ok_or_else(|| CliErrorKind::usage_error("service name is required"))?;
-    exec::docker_rm(svc_name)?;
+    docker.remove(svc_name)?;
     println!("{svc_name} removed");
     Ok(0)
 }
 
-fn service_list(run_dir_args: &RunDirArgs) -> Result<i32, CliError> {
+fn service_list(run_dir_args: &RunDirArgs, docker: &dyn ContainerRuntime) -> Result<i32, CliError> {
     if let Ok(services) = resolve_run_services(run_dir_args) {
         for row in services.list_service_containers()? {
             println!("{}\t{}", row.name, row.status);
@@ -313,15 +326,9 @@ fn service_list(run_dir_args: &RunDirArgs) -> Result<i32, CliError> {
         return Ok(0);
     }
 
-    let result = exec::docker(
-        &[
-            "ps",
-            "--filter",
-            "label=io.harness.service=true",
-            "--format",
-            "{{.Names}}\t{{.Status}}",
-        ],
-        &[0],
+    let result = docker.list_formatted(
+        &["--filter", "label=io.harness.service=true"],
+        "{{.Names}}\t{{.Status}}",
     )?;
     print!("{}", result.stdout);
     Ok(0)
