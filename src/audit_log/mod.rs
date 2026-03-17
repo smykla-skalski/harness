@@ -1,3 +1,4 @@
+mod scrub;
 mod summarize;
 mod types;
 
@@ -69,16 +70,17 @@ pub fn append_audit_entry(request: AuditAppendRequest) -> Result<AuditEntry, Cli
         .map_err(|error| CliErrorKind::io(cow!("create audit artifacts dir: {error}")))?;
 
     let timestamp = utc_now();
-    let content_hash = hash_text(&request.full_output);
+    let scrubbed_output = scrub::scrub(&request.full_output);
+    let content_hash = hash_text(&scrubbed_output);
     let artifact_path = unique_artifact_path(&layout, &timestamp, &request.tool_name);
-    write_text(&artifact_path, &request.full_output)?;
+    write_text(&artifact_path, &scrubbed_output)?;
 
     let artifact_path = relativize_path(&artifact_path, &request.run_dir);
     let entry = AuditEntry {
         timestamp,
         tool_name: request.tool_name,
         tool_input: request.tool_input,
-        output_summary: truncate_summary(&request.full_output),
+        output_summary: truncate_summary(&scrubbed_output),
         content_hash,
         artifact_path,
         phase: request.phase,
@@ -479,5 +481,27 @@ mod tests {
         let log_metadata = fs::metadata(layout.audit_log_path()).unwrap();
         let log_mode = log_metadata.permissions().mode() & 0o777;
         assert_eq!(log_mode, 0o600, "audit log expected 0600, got {log_mode:o}");
+    }
+
+    #[test]
+    fn append_audit_entry_scrubs_secrets_from_artifact() {
+        let tempdir = tempfile::tempdir().unwrap();
+        let run_dir = tempdir.path().join("r01");
+        let layout = RunLayout::from_run_dir(&run_dir);
+        layout.ensure_dirs().unwrap();
+
+        let entry = append_audit_entry(AuditAppendRequest {
+            run_dir: run_dir.clone(),
+            tool_name: "Bash".to_string(),
+            tool_input: "harness token dataplane".to_string(),
+            full_output: "token: eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIn0.Signature1234567890abcdef".to_string(),
+            phase: "execution".to_string(),
+            group_id: None,
+        })
+        .unwrap();
+
+        let artifact_content = fs::read_to_string(run_dir.join(&entry.artifact_path)).unwrap();
+        assert!(artifact_content.contains("[REDACTED:JWT]"));
+        assert!(!artifact_content.contains("eyJhbGciOiJSUzI1NiI"));
     }
 }
