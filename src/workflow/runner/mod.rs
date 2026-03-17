@@ -11,8 +11,8 @@ pub use persistence::{
     initialize_runner_state, read_runner_state, runner_state_path, write_runner_state,
 };
 pub use types::{
-    FailureKind, FailureState, ManifestFixDecision, PreflightState, PreflightStatus,
-    RunnerEvent, RunnerNextAction, RunnerPhase, RunnerWorkflowState, SuiteFixState,
+    FailureKind, FailureState, ManifestFixDecision, PreflightState, PreflightStatus, RunnerEvent,
+    RunnerNextAction, RunnerPhase, RunnerWorkflowState, SuiteFixState,
 };
 
 use persistence::{make_initial_state, save_state};
@@ -114,6 +114,8 @@ pub fn next_action(state: Option<&RunnerWorkflowState>) -> RunnerNextAction {
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::absolute_paths, clippy::cognitive_complexity)]
+
     use super::*;
     use tempfile::TempDir;
 

@@ -582,6 +582,7 @@ pub fn issue_code_meta(code: IssueCode) -> Option<&'static IssueCodeMeta> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::HashSet;
 
     #[test]
     fn registry_covers_all_codes() {
@@ -595,7 +596,7 @@ mod tests {
 
     #[test]
     fn registry_has_no_duplicates() {
-        let mut seen = std::collections::HashSet::new();
+        let mut seen = HashSet::new();
         for entry in ISSUE_CODE_REGISTRY {
             assert!(
                 seen.insert(entry.code),

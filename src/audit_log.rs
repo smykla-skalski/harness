@@ -426,7 +426,27 @@ fn append_jsonl_line(path: &Path, line: &str) -> Result<(), CliError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::schema::{RunCounts, Verdict};
     use crate::workflow::runner::{PreflightState, PreflightStatus};
+
+    fn sample_status(run_id: &str, suite_id: &str) -> RunStatus {
+        RunStatus {
+            run_id: run_id.to_string(),
+            suite_id: suite_id.to_string(),
+            profile: "single-zone".to_string(),
+            started_at: String::new(),
+            overall_verdict: Verdict::Pending,
+            completed_at: None,
+            counts: RunCounts::default(),
+            executed_groups: vec![],
+            skipped_groups: vec![],
+            last_completed_group: None,
+            last_state_capture: None,
+            last_updated_utc: None,
+            next_planned_group: None,
+            notes: vec![],
+        }
+    }
 
     #[test]
     fn resolve_phase_context_keeps_group_only_for_execution() {
@@ -442,22 +462,8 @@ mod tests {
             transition_count: 0,
             last_event: None,
         };
-        let status = RunStatus {
-            run_id: "r1".to_string(),
-            suite_id: "s1".to_string(),
-            profile: "single-zone".to_string(),
-            started_at: String::new(),
-            overall_verdict: crate::schema::Verdict::Pending,
-            completed_at: None,
-            counts: crate::schema::RunCounts::default(),
-            executed_groups: vec![],
-            skipped_groups: vec![],
-            last_completed_group: None,
-            last_state_capture: None,
-            last_updated_utc: None,
-            next_planned_group: Some("g03".to_string()),
-            notes: vec![],
-        };
+        let mut status = sample_status("r1", "s1");
+        status.next_planned_group = Some("g03".to_string());
 
         let context = resolve_phase_context(Some(&state), Some(&status), None, None);
         assert_eq!(context.phase, "execution");
@@ -485,6 +491,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::cognitive_complexity)]
     fn append_audit_entry_writes_jsonl_and_artifact() {
         let tempdir = tempfile::tempdir().unwrap();
         let run_dir = tempdir.path().join("r01");
@@ -519,22 +526,7 @@ mod tests {
         let layout = RunLayout::from_run_dir(&run_dir);
         layout.ensure_dirs().unwrap();
 
-        let status = RunStatus {
-            run_id: "r01".to_string(),
-            suite_id: "suite".to_string(),
-            profile: "single-zone".to_string(),
-            started_at: String::new(),
-            overall_verdict: crate::schema::Verdict::Pending,
-            completed_at: None,
-            counts: crate::schema::RunCounts::default(),
-            executed_groups: vec![],
-            skipped_groups: vec![],
-            last_completed_group: None,
-            last_state_capture: None,
-            last_updated_utc: None,
-            next_planned_group: None,
-            notes: vec![],
-        };
+        let status = sample_status("r01", "suite");
 
         write_run_status_with_audit(&run_dir, &status, None, Some("bootstrap"), None).unwrap();
 
@@ -551,22 +543,9 @@ mod tests {
         let layout = RunLayout::from_run_dir(&run_dir);
         layout.ensure_dirs().unwrap();
 
-        let status = RunStatus {
-            run_id: "r01".to_string(),
-            suite_id: "suite".to_string(),
-            profile: "single-zone".to_string(),
-            started_at: String::new(),
-            overall_verdict: crate::schema::Verdict::Pending,
-            completed_at: None,
-            counts: crate::schema::RunCounts::default(),
-            executed_groups: vec![],
-            skipped_groups: vec![],
-            last_completed_group: Some("g02".to_string()),
-            last_state_capture: None,
-            last_updated_utc: None,
-            next_planned_group: Some("g03".to_string()),
-            notes: vec![],
-        };
+        let mut status = sample_status("r01", "suite");
+        status.last_completed_group = Some("g02".to_string());
+        status.next_planned_group = Some("g03".to_string());
         write_run_status_with_audit(&run_dir, &status, None, Some("execution"), Some("g03"))
             .unwrap();
 

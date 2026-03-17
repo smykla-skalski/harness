@@ -720,10 +720,15 @@ fn execute_unmute(
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::absolute_paths, clippy::cognitive_complexity)]
+
+    use std::path::{Path, PathBuf};
+
     use super::types::Issue;
     use super::*;
+    use super::{classifier, output};
 
-    fn write_session_file(dir: &std::path::Path, lines: &[&str]) -> std::path::PathBuf {
+    fn write_session_file(dir: &Path, lines: &[&str]) -> PathBuf {
         let path = dir.join("test-session.jsonl");
         let mut file = fs::File::create(&path).unwrap();
         for line in lines {
@@ -945,7 +950,7 @@ mod tests {
     #[test]
     fn golden_scan_json_output() {
         let mut state = types::ScanState::default();
-        let issues = crate::commands::observe::classifier::check_text_for_issues(
+        let issues = classifier::check_text_for_issues(
             42,
             types::MessageRole::User,
             "error[E0308]: mismatched types\n  expected u32, found &str",
@@ -1146,7 +1151,7 @@ mod tests {
     #[test]
     fn observer_state_active_workers_tracks() {
         let mut state = ObserverState::default_for_session("test");
-        assert!(state.handoff_safe() == false); // no scan done yet
+        assert!(!state.handoff_safe()); // no scan done yet
         state.last_scan_time = "2026-03-16T00:00:00Z".into();
         assert!(state.handoff_safe()); // no workers, scan done
         state.active_workers.push(types::ActiveWorker {

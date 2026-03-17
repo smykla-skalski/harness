@@ -297,6 +297,8 @@ fn canonical_or_same(path: &Path) -> PathBuf {
 
 #[cfg(test)]
 mod tests {
+    use std::{thread, time::Duration};
+
     use super::*;
 
     #[test]
@@ -518,7 +520,7 @@ mod tests {
             .modified()
             .unwrap();
         // Small delay so mtime would differ if rewritten
-        std::thread::sleep(std::time::Duration::from_millis(50));
+        thread::sleep(Duration::from_millis(50));
         sync_directory(&source, &target).unwrap();
         let after = fs::metadata(target.join("a.md"))
             .unwrap()

@@ -12,116 +12,109 @@ use harness::workflow::runner::{
 
 use super::super::helpers::*;
 
+const GUARD_BASH_PAYLOAD_CASES: &[(&str, &str, bool)] = &[
+    ("suite:run", "kubectl get pods", false),
+    (
+        "suite:run",
+        "python3 tools/record_command.py -- echo hello",
+        false,
+    ),
+    (
+        "suite:run",
+        "ls -la /tmp/kumactl && /tmp/kumactl version 2>&1",
+        false,
+    ),
+    ("suite:run", "$KUMACTL version", false),
+    ("suite:run", "ls -la /tmp/kumactl", false),
+    (
+        "suite:run",
+        "harness run --phase setup --label kumactl-version kumactl version",
+        true,
+    ),
+    (
+        "suite:run",
+        "harness run --phase verify --label admin-check curl localhost:9901/config_dump",
+        true,
+    ),
+    (
+        "suite:run",
+        "harness envoy capture --phase verify --label config-dump \
+         --namespace kuma-demo --workload deploy/demo-client --admin-path /config_dump",
+        true,
+    ),
+    (
+        "suite:run",
+        "harness record --phase cleanup --label cleanup-g04 -- \
+         kubectl delete meshopentelemetrybackend otel-runtime \
+         meshmetric metrics-runtime -n kuma-system",
+        false,
+    ),
+    (
+        "suite:run",
+        "harness run --phase cleanup --label cleanup-g04 \
+         kubectl delete meshopentelemetrybackend otel-runtime \
+         meshmetric metrics-runtime -n kuma-system",
+        false,
+    ),
+    (
+        "suite:run",
+        "harness record --phase cleanup --label cleanup-g05 -- \
+         kubectl delete meshopentelemetrybackend otel-e2e -n kuma-system",
+        true,
+    ),
+    ("suite:run", "ls -la /tmp", true),
+    (
+        "suite:run",
+        "mkdir -p /tmp/suites/my-new-suite/groups",
+        false,
+    ),
+    ("suite:run", "make k3d/stop", false),
+    ("suite:run", "gh run view 12345", false),
+    (
+        "suite:run",
+        "python3 -c 'import json; ...' run-status.json",
+        false,
+    ),
+    ("suite:run", "echo '# report' > run-report.md", false),
+    ("suite:run", "cat suite-run-state.json", false),
+    ("suite:run", "cat commands/command-log.md", false),
+    ("suite:run", "echo row >> commands/command-log.md", false),
+    (
+        "suite:run",
+        "sleep 5 && harness run --phase verify --label ctx kubectl config current-context",
+        false,
+    ),
+    (
+        "suite:run",
+        "harness record --phase verify --label pods \
+         kubectl get pods -o json | jq '.items[].metadata.name'",
+        true,
+    ),
+    ("suite:run", "helm install kuma kuma/kuma", false),
+    ("suite:run", "docker ps", false),
+    ("suite:run", "k3d cluster list", false),
+    (
+        "suite:run",
+        "harness record --phase verify --label test -- echo hello",
+        true,
+    ),
+    ("suite:run", "", true),
+    ("suite:run", "wget -qO- localhost:9901/config_dump", false),
+    ("suite:new", "kubectl get pods", false),
+    ("suite:new", "harness authoring-show --kind session", true),
+    ("suite:new", "curl localhost:9901/config_dump", false),
+    ("suite:new", "helm install kuma kuma/kuma", false),
+    ("suite:new", "docker ps", false),
+    ("suite:new", "k3d cluster list", false),
+];
+
 // ============================================================================
 // Simple allow/deny payloads (table-driven)
 // ============================================================================
 
 #[test]
 fn guard_bash_payloads() {
-    // (skill, command, should_allow)
-    let cases: &[(&str, &str, bool)] = &[
-        // suite:run denied binaries
-        ("suite:run", "kubectl get pods", false),
-        (
-            "suite:run",
-            "python3 tools/record_command.py -- echo hello",
-            false,
-        ),
-        (
-            "suite:run",
-            "ls -la /tmp/kumactl && /tmp/kumactl version 2>&1",
-            false,
-        ),
-        ("suite:run", "$KUMACTL version", false),
-        ("suite:run", "ls -la /tmp/kumactl", false),
-        // suite:run wrapped harness commands
-        (
-            "suite:run",
-            "harness run --phase setup --label kumactl-version kumactl version",
-            true,
-        ),
-        (
-            "suite:run",
-            "harness run --phase verify --label admin-check curl localhost:9901/config_dump",
-            true,
-        ),
-        (
-            "suite:run",
-            "harness envoy capture --phase verify --label config-dump \
-             --namespace kuma-demo --workload deploy/demo-client --admin-path /config_dump",
-            true,
-        ),
-        // mixed kuma resource delete
-        (
-            "suite:run",
-            "harness record --phase cleanup --label cleanup-g04 -- \
-             kubectl delete meshopentelemetrybackend otel-runtime \
-             meshmetric metrics-runtime -n kuma-system",
-            false,
-        ),
-        (
-            "suite:run",
-            "harness run --phase cleanup --label cleanup-g04 \
-             kubectl delete meshopentelemetrybackend otel-runtime \
-             meshmetric metrics-runtime -n kuma-system",
-            false,
-        ),
-        (
-            "suite:run",
-            "harness record --phase cleanup --label cleanup-g05 -- \
-             kubectl delete meshopentelemetrybackend otel-e2e -n kuma-system",
-            true,
-        ),
-        // allow/deny patterns
-        ("suite:run", "ls -la /tmp", true),
-        (
-            "suite:run",
-            "mkdir -p /tmp/suites/my-new-suite/groups",
-            false,
-        ),
-        ("suite:run", "make k3d/stop", false),
-        ("suite:run", "gh run view 12345", false),
-        (
-            "suite:run",
-            "python3 -c 'import json; ...' run-status.json",
-            false,
-        ),
-        ("suite:run", "echo '# report' > run-report.md", false),
-        ("suite:run", "cat suite-run-state.json", false),
-        ("suite:run", "cat commands/command-log.md", false),
-        ("suite:run", "echo row >> commands/command-log.md", false),
-        // shell chain and loop
-        (
-            "suite:run",
-            "sleep 5 && harness run --phase verify --label ctx kubectl config current-context",
-            false,
-        ),
-        (
-            "suite:run",
-            "harness record --phase verify --label pods \
-             kubectl get pods -o json | jq '.items[].metadata.name'",
-            true,
-        ),
-        // direct binary denials
-        ("suite:run", "helm install kuma kuma/kuma", false),
-        ("suite:run", "docker ps", false),
-        ("suite:run", "k3d cluster list", false),
-        (
-            "suite:run",
-            "harness record --phase verify --label test -- echo hello",
-            true,
-        ),
-        ("suite:run", "", true),
-        ("suite:run", "wget -qO- localhost:9901/config_dump", false),
-        // suite:new skill
-        ("suite:new", "kubectl get pods", false),
-        ("suite:new", "harness authoring-show --kind session", true),
-        ("suite:new", "curl localhost:9901/config_dump", false),
-        ("suite:new", "helm install kuma kuma/kuma", false),
-        ("suite:new", "docker ps", false),
-        ("suite:new", "k3d cluster list", false),
-    ];
-    for &(skill, command, should_allow) in cases {
+    for &(skill, command, should_allow) in GUARD_BASH_PAYLOAD_CASES {
         let ctx = make_hook_context(skill, make_bash_payload(command));
         let r = guard_bash::execute(&ctx).unwrap();
         if should_allow {

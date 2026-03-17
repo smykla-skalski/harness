@@ -862,6 +862,8 @@ pub struct ScanState {
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::cognitive_complexity)]
+
     use super::*;
 
     #[test]

@@ -140,7 +140,7 @@ fn check_harness_command_patterns(
 
     if patterns::PYTHON_USAGE_SIGNALS
         .iter()
-        .any(|signal| command.lower.contains(signal))
+        .any(|signal| command.lower().contains(signal))
     {
         emitter.emit(
             issues,
@@ -301,7 +301,7 @@ fn check_env_var_construction(
 ) {
     // KUBECONFIG= is a specific, higher-signal pattern
     if command
-        .words
+        .words()
         .iter()
         .any(|word| word.starts_with("KUBECONFIG="))
     {
@@ -323,7 +323,7 @@ fn check_env_var_construction(
     }
 
     // Generic: `export FOO=bar` or `FOO=bar command` prefix patterns
-    if command.starts_with_export() && command.raw.contains('=') {
+    if command.starts_with_export() && command.raw().contains('=') {
         emitter.emit(
             issues,
             IssueBlueprint::from_code(
@@ -343,7 +343,7 @@ fn check_env_var_construction(
 
     // `VAR=value command` prefix: first token looks like an env assignment
     // and there is at least one more token after it.
-    if command.has_env_prefix_assignment() && command.words.len() > 1 {
+    if command.has_env_prefix_assignment() && command.words().len() > 1 {
         emitter.emit(
             issues,
             IssueBlueprint::from_code(
@@ -375,9 +375,9 @@ fn check_sleep_prefix_before_harness(
         return;
     }
     let has_harness_continuation = command.has_harness_after_chain()
-        || command.raw.contains("&& harness")
-        || command.raw.contains("; harness")
-        || (command.raw.contains("&& /") && command.raw.contains("harness"));
+        || command.raw().contains("&& harness")
+        || command.raw().contains("; harness")
+        || (command.raw().contains("&& /") && command.raw().contains("harness"));
     if has_harness_continuation {
         emitter.emit(
             issues,
