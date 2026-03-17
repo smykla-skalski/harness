@@ -338,6 +338,8 @@ pub fn kumactl_run(
 mod tests {
     #![allow(clippy::absolute_paths)]
 
+    use std::thread;
+
     use super::*;
 
     #[test]
