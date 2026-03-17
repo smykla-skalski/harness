@@ -78,7 +78,7 @@ Manual bump surfaces for harness:
 
 - `Cargo.toml` - canonical crate/package version
 - `testkit/Cargo.toml` - keep the testkit crate aligned with the root package version
-- `.claude/plugins/suite/.claude-plugin/plugin.json` - keep the suite plugin version aligned with the released feature set; `src/bootstrap.rs` reads this file for plugin-cache sync
+- `.claude/plugins/suite/.claude-plugin/plugin.json` - bump only when plugin content changes (prompts, tools, SKILL.md, agent config); harness-only changes do not require a plugin version bump; `src/bootstrap.rs` reads this file for plugin-cache sync
 - `src/commands/observe/output.rs` - bump the SARIF `driver.version` only; do not change the SARIF schema version `2.1.0` unless the SARIF spec itself changes
 - `Cargo.lock` - regenerate after the package-version changes
 - `src/bootstrap.rs` - update only versioned plugin fixtures and cache-path expectations in tests when they intentionally track the released version; this file consumes the plugin version but is not a canonical version source
