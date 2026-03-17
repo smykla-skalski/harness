@@ -121,7 +121,7 @@ pub fn write_text(path: &Path, text: &str) -> Result<(), CliError> {
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
-        std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600))
+        fs::set_permissions(path, fs::Permissions::from_mode(0o600))
             .map_err(|e| CliErrorKind::io(cow!("set permissions {}: {e}", path.display())))?;
     }
 

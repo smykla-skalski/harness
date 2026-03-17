@@ -72,7 +72,8 @@ mod tests {
 
     #[test]
     fn scrubs_pem_private_key() {
-        let input = "-----BEGIN RSA PRIVATE KEY-----\nMIIEpAIBAAKCAQ...\n-----END RSA PRIVATE KEY-----";
+        let input =
+            "-----BEGIN RSA PRIVATE KEY-----\nMIIEpAIBAAKCAQ...\n-----END RSA PRIVATE KEY-----";
         let result = scrub(input);
         assert!(result.contains("[REDACTED:PEM]"));
         assert!(!result.contains("MIIEpAIBAAKCAQ"));

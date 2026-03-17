@@ -5,7 +5,7 @@ mod types;
 pub use summarize::{normalize_tool_output, summarize_tool_input};
 pub use types::{AuditAppendRequest, AuditEntry, AuditPhaseContext};
 
-use std::fs::OpenOptions;
+use std::fs::{self, OpenOptions};
 use std::io::Write as _;
 use std::path::{Path, PathBuf};
 use std::sync::LazyLock;
@@ -21,9 +21,6 @@ use crate::hook_payloads::HookContext;
 use crate::io::{ensure_dir, write_text};
 use crate::schema::RunStatus;
 use crate::workflow::runner::{RunnerPhase, RunnerWorkflowState};
-
-#[cfg(test)]
-use std::fs;
 
 static SANITIZE_NAME_RE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"[^A-Za-z0-9_.-]+").expect("invalid sanitize regex"));
@@ -281,7 +278,7 @@ fn append_jsonl_line(path: &Path, line: &str) -> Result<(), CliError> {
     #[cfg(unix)]
     if is_new {
         use std::os::unix::fs::PermissionsExt;
-        std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600))
+        fs::set_permissions(path, fs::Permissions::from_mode(0o600))
             .map_err(|e| CliErrorKind::io(cow!("set permissions {}: {e}", path.display())))?;
     }
 

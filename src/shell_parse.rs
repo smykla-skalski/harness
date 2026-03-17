@@ -168,10 +168,11 @@ pub fn is_env_assignment(word: &str) -> bool {
     }
 }
 
-/// Normalize a binary name: strip path prefix, `$` / `${...}` wrappers,
-/// `$(...)` subshell wrappers, backtick wrappers, and lowercase.
-#[must_use]
-pub fn normalized_binary_name(raw: &str) -> String {
+/// Strip subshell and backtick wrappers from a token.
+///
+/// Handles `$(cmd)`, nested `$($(cmd))`, split tokens like `$(kubectl`
+/// and `kuma-system)`, and backtick wrappers.
+fn strip_shell_wrappers(raw: &str) -> String {
     let mut s = raw.trim().to_string();
 
     // Strip subshell substitution: $(cmd) -> cmd
@@ -181,12 +182,10 @@ pub fn normalized_binary_name(raw: &str) -> String {
             s = inner.to_string();
             continue;
         }
-        // Strip leading $( without closing ) (split across tokens)
         if let Some(inner) = s.strip_prefix("$(") {
             s = inner.to_string();
             continue;
         }
-        // Strip trailing ) from split token (the other half of a subshell)
         if s.ends_with(')') && !s.contains('(') {
             s = s[..s.len() - 1].to_string();
         }
@@ -201,7 +200,16 @@ pub fn normalized_binary_name(raw: &str) -> String {
         s = s.trim_end_matches('`').to_string();
     }
 
-    // Existing: strip ${VAR} and $VAR
+    s
+}
+
+/// Normalize a binary name: strip path prefix, `$` / `${...}` wrappers,
+/// `$(...)` subshell wrappers, backtick wrappers, and lowercase.
+#[must_use]
+pub fn normalized_binary_name(raw: &str) -> String {
+    let mut s = strip_shell_wrappers(raw);
+
+    // Strip ${VAR} and $VAR
     if let Some(inner) = s.strip_prefix("${").and_then(|rest| rest.strip_suffix('}')) {
         s = inner.to_string();
     } else if let Some(stripped) = s.strip_prefix('$') {
