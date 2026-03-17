@@ -1,6 +1,7 @@
 use std::path::{Path, PathBuf};
 
 use clap::Args;
+use rayon::prelude::*;
 
 use crate::core_defs::shorten_path;
 use crate::errors::{CliError, CliErrorKind};
@@ -87,19 +88,34 @@ fn validate_kubernetes(
     output_path: &Path,
 ) -> Result<i32, CliError> {
     let resources = extract_resources(manifest_path)?;
-    let mut log_lines: Vec<String> = Vec::new();
 
-    for (kind, api_version) in &resources {
+    // Write all "running" entries before spawning parallel explain calls.
+    let mut log_lines: Vec<String> = resources
+        .iter()
+        .map(|(kind, api_version)| format!("explain {kind} ({api_version}): running"))
+        .collect();
+    write_text(output_path, &format!("{}\n", log_lines.join("\n")))?;
+
+    // Run kubectl explain for all resources in parallel.
+    let explain_results: Vec<_> = resources
+        .par_iter()
+        .map(|(kind, api_version)| {
+            kubectl(kc, &["explain", kind, "--api-version", api_version], &[0])
+        })
+        .collect();
+
+    // Update log lines in declaration order, stopping on first failure.
+    for (index, result) in explain_results.into_iter().enumerate() {
+        let (kind, api_version) = &resources[index];
         let label = format!("{kind} ({api_version})");
-        log_lines.push(format!("explain {label}: running"));
-        write_text(output_path, &format!("{}\n", log_lines.join("\n")))?;
-
-        kubectl(kc, &["explain", kind, "--api-version", api_version], &[0])?;
-        if let Some(last) = log_lines.last_mut() {
-            *last = format!("explain {label}: ok");
-        }
-        write_text(output_path, &format!("{}\n", log_lines.join("\n")))?;
+        log_lines[index] = if result.is_ok() {
+            format!("explain {label}: ok")
+        } else {
+            format!("explain {label}: failed")
+        };
+        result?;
     }
+    write_text(output_path, &format!("{}\n", log_lines.join("\n")))?;
 
     log_lines.push("dry-run: running".to_string());
     write_text(output_path, &format!("{}\n", log_lines.join("\n")))?;
