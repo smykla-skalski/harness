@@ -3,6 +3,7 @@
 pub mod audit_log;
 pub mod authoring;
 pub mod authoring_validate;
+pub mod blocks;
 pub mod bootstrap;
 pub mod cli;
 pub mod cluster;
