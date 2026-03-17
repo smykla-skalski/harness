@@ -10,6 +10,7 @@ use std::borrow::Cow;
 use std::path::{Path, PathBuf};
 use std::{fs, result};
 
+use rayon::prelude::*;
 use tracing::warn;
 
 use crate::core_defs::{project_context_dir, session_scope_key, utc_now};
@@ -150,7 +151,7 @@ pub fn consume_compact_handoff<'a>(
 pub fn verify_fingerprints<'a>(handoff: &'a CompactHandoff<'_>) -> Vec<&'a Path> {
     handoff
         .fingerprints
-        .iter()
+        .par_iter()
         .filter(|fp| !fp.matches_disk())
         .map(|fp| fp.path.as_path())
         .collect()
