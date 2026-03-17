@@ -5,7 +5,8 @@ use std::time::Duration;
 use tracing::{info, warn};
 
 use crate::blocks::{
-    ContainerConfig, ContainerRuntime, DockerContainerRuntime, StdProcessExecutor,
+    ComposeOrchestrator, ContainerConfig, ContainerRuntime, DockerComposeOrchestrator,
+    DockerContainerRuntime, StdProcessExecutor,
 };
 use crate::cluster::{ClusterSpec, Platform};
 use crate::commands::resolve_repo_root;
@@ -13,9 +14,7 @@ use crate::compose;
 use crate::context::RunRepository;
 use crate::core_defs::HARNESS_PREFIX;
 use crate::errors::{CliError, CliErrorKind, cow};
-use crate::exec::{
-    compose_down_project, compose_up, extract_admin_token, run_command, wait_for_http,
-};
+use crate::exec::{extract_admin_token, run_command, wait_for_http};
 
 use super::{ClusterArgs, persist_cluster_spec};
 
@@ -146,7 +145,9 @@ pub(super) fn cluster_universal(args: &ClusterArgs) -> Result<i32, CliError> {
 
     let effective_store = resolve_effective_store(is_up, &args.store);
     let cp_image = resolve_universal_cp_image(is_up, &root, args.image.as_deref(), args.no_build)?;
-    let docker = DockerContainerRuntime::new(Arc::new(StdProcessExecutor));
+    let process = Arc::new(StdProcessExecutor);
+    let docker = DockerContainerRuntime::new(process.clone());
+    let compose_runtime = DockerComposeOrchestrator::new(process);
 
     info!(%mode, names = %all_names.join(" "), "starting universal cluster");
 
@@ -158,6 +159,7 @@ pub(super) fn cluster_universal(args: &ClusterArgs) -> Result<i32, CliError> {
         &cp_image,
         &mut spec,
         &docker,
+        &compose_runtime,
     )?;
 
     if is_up {
@@ -188,6 +190,7 @@ fn execute_universal_mode(
     cp_image: &str,
     spec: &mut ClusterSpec,
     docker: &dyn ContainerRuntime,
+    compose_runtime: &dyn ComposeOrchestrator,
 ) -> Result<(), CliError> {
     match mode {
         "single-up" => handle_single_up(
@@ -197,8 +200,15 @@ fn execute_universal_mode(
             effective_store,
             &all_names[0],
             docker,
+            compose_runtime,
         ),
-        "single-down" => handle_single_down(network_name, effective_store, &all_names[0], docker),
+        "single-down" => handle_single_down(
+            network_name,
+            effective_store,
+            &all_names[0],
+            docker,
+            compose_runtime,
+        ),
         "global-zone-up" => handle_global_zone_up(
             spec,
             cp_image,
@@ -206,8 +216,11 @@ fn execute_universal_mode(
             effective_store,
             all_names,
             docker,
+            compose_runtime,
         ),
-        "global-zone-down" => universal_global_zone_down(network_name, all_names, docker),
+        "global-zone-down" => {
+            universal_global_zone_down(network_name, all_names, docker, compose_runtime)
+        }
         "global-two-zones-up" => handle_global_two_zones_up(
             spec,
             cp_image,
@@ -215,8 +228,11 @@ fn execute_universal_mode(
             effective_store,
             all_names,
             docker,
+            compose_runtime,
         ),
-        "global-two-zones-down" => universal_global_two_zones_down(network_name, all_names, docker),
+        "global-two-zones-down" => {
+            universal_global_two_zones_down(network_name, all_names, docker, compose_runtime)
+        }
         _ => Err(CliErrorKind::cluster_error(cow!("unsupported cluster mode: {mode}")).into()),
     }
 }
@@ -228,6 +244,7 @@ fn handle_single_up(
     effective_store: &str,
     cluster_name: &str,
     docker: &dyn ContainerRuntime,
+    compose_runtime: &dyn ComposeOrchestrator,
 ) -> Result<(), CliError> {
     let result = if effective_store == "postgres" {
         universal_single_up_compose(
@@ -236,6 +253,7 @@ fn handle_single_up(
             effective_store,
             cluster_name,
             docker,
+            compose_runtime,
         )?
     } else {
         universal_single_up(
@@ -255,6 +273,7 @@ fn handle_single_down(
     effective_store: &str,
     cluster_name: &str,
     docker: &dyn ContainerRuntime,
+    compose_runtime: &dyn ComposeOrchestrator,
 ) -> Result<(), CliError> {
     let removed = docker.remove_by_label("io.harness.service=true")?;
     for name in &removed {
@@ -262,7 +281,7 @@ fn handle_single_down(
     }
     if effective_store == "postgres" {
         let project = format!("{HARNESS_PREFIX}{cluster_name}");
-        compose_down_project(&project)?;
+        compose_runtime.down_project(&project)?;
         return Ok(());
     }
     universal_single_down(network_name, cluster_name, docker)
@@ -275,9 +294,16 @@ fn handle_global_zone_up(
     effective_store: &str,
     all_names: &[String],
     docker: &dyn ContainerRuntime,
+    compose_runtime: &dyn ComposeOrchestrator,
 ) -> Result<(), CliError> {
-    let result =
-        universal_global_zone_up(cp_image, network_name, effective_store, all_names, docker)?;
+    let result = universal_global_zone_up(
+        cp_image,
+        network_name,
+        effective_store,
+        all_names,
+        docker,
+        compose_runtime,
+    )?;
     apply_universal_up_result(spec, cp_image, effective_store, result);
     Ok(())
 }
@@ -289,9 +315,16 @@ fn handle_global_two_zones_up(
     effective_store: &str,
     all_names: &[String],
     docker: &dyn ContainerRuntime,
+    compose_runtime: &dyn ComposeOrchestrator,
 ) -> Result<(), CliError> {
-    let result =
-        universal_global_two_zones_up(cp_image, network_name, effective_store, all_names, docker)?;
+    let result = universal_global_two_zones_up(
+        cp_image,
+        network_name,
+        effective_store,
+        all_names,
+        docker,
+        compose_runtime,
+    )?;
     apply_universal_up_result(spec, cp_image, effective_store, result);
     Ok(())
 }
@@ -352,6 +385,7 @@ fn universal_single_up_compose(
     store: &str,
     cp_name: &str,
     docker: &dyn ContainerRuntime,
+    compose_runtime: &dyn ComposeOrchestrator,
 ) -> Result<UniversalUpResult, CliError> {
     let compose_file = compose::single_zone(image, network, UNIVERSAL_SUBNET, store, cp_name);
     let tmp_dir = tempfile::tempdir().map_err(|e| CliErrorKind::io(cow!("temp dir: {e}")))?;
@@ -360,7 +394,7 @@ fn universal_single_up_compose(
 
     let project = format!("harness-{cp_name}");
     info!(%cp_name, "starting compose services");
-    compose_up(&compose_path, &project, 180)?;
+    compose_runtime.up(&compose_path, &project, Duration::from_secs(180))?;
     info!(%cp_name, "compose services started");
 
     let compose_network = format!("{project}_{network}");
@@ -396,6 +430,7 @@ fn universal_global_zone_up(
     store: &str,
     names: &[String],
     docker: &dyn ContainerRuntime,
+    compose_runtime: &dyn ComposeOrchestrator,
 ) -> Result<UniversalUpResult, CliError> {
     if names.len() < 3 {
         return Err(CliErrorKind::usage_error(
@@ -423,7 +458,7 @@ fn universal_global_zone_up(
 
     let project = format!("harness-{global_name}");
     info!("starting compose services for global + zone");
-    compose_up(&compose_path, &project, 180)?;
+    compose_runtime.up(&compose_path, &project, Duration::from_secs(180))?;
     info!("compose services started");
 
     let compose_network = format!("{project}_{network}");
@@ -448,6 +483,7 @@ fn universal_global_zone_down(
     _network: &str,
     names: &[String],
     docker: &dyn ContainerRuntime,
+    compose_runtime: &dyn ComposeOrchestrator,
 ) -> Result<(), CliError> {
     let removed = docker.remove_by_label("io.harness.service=true")?;
     for name in &removed {
@@ -455,7 +491,7 @@ fn universal_global_zone_down(
     }
     let global_name = &names[0];
     let project = format!("harness-{global_name}");
-    compose_down_project(&project)?;
+    compose_runtime.down_project(&project)?;
     Ok(())
 }
 
@@ -465,6 +501,7 @@ fn universal_global_two_zones_up(
     store: &str,
     names: &[String],
     docker: &dyn ContainerRuntime,
+    compose_runtime: &dyn ComposeOrchestrator,
 ) -> Result<UniversalUpResult, CliError> {
     if names.len() < 5 {
         return Err(CliErrorKind::usage_error(
@@ -500,7 +537,7 @@ fn universal_global_two_zones_up(
 
     let project = format!("harness-{global_name}");
     info!("starting compose services for global + two zones");
-    compose_up(&compose_path, &project, 180)?;
+    compose_runtime.up(&compose_path, &project, Duration::from_secs(180))?;
     info!("compose services started");
 
     let compose_network = format!("{project}_{network}");
@@ -525,6 +562,7 @@ fn universal_global_two_zones_down(
     _network: &str,
     names: &[String],
     docker: &dyn ContainerRuntime,
+    compose_runtime: &dyn ComposeOrchestrator,
 ) -> Result<(), CliError> {
     let removed = docker.remove_by_label("io.harness.service=true")?;
     for name in &removed {
@@ -532,6 +570,6 @@ fn universal_global_two_zones_down(
     }
     let global_name = &names[0];
     let project = format!("harness-{global_name}");
-    compose_down_project(&project)?;
+    compose_runtime.down_project(&project)?;
     Ok(())
 }
