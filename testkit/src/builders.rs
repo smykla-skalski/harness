@@ -1819,6 +1819,37 @@ pub fn read_runner_state(run_dir: &Path) -> Option<harness::workflow::runner::Ru
 // kubectl-validate helpers
 // ---------------------------------------------------------------------------
 
+/// Seed a minimal cluster.json in a run directory's state folder.
+///
+/// Creates the file that `RunServices::cluster_runtime()` loads, giving
+/// the run a synthetic cluster context so that capture/apply commands work
+/// without running `harness cluster`.
+///
+/// # Panics
+/// Panics if directory creation or file write fails.
+pub fn seed_cluster_state(run_dir: &Path, kubeconfig: &str) {
+    let state_dir = run_dir.join("state");
+    fs::create_dir_all(&state_dir).expect("create state dir");
+    let payload = serde_json::json!({
+        "mode": "single-up",
+        "platform": "kubernetes",
+        "members": [{
+            "name": "kuma-test",
+            "role": "primary",
+            "kubeconfig": kubeconfig,
+        }],
+        "mode_args": ["kuma-test"],
+        "helm_settings": [],
+        "restart_namespaces": [],
+        "repo_root": "/tmp",
+    });
+    fs::write(
+        state_dir.join("cluster.json"),
+        serde_json::to_string_pretty(&payload).unwrap(),
+    )
+    .expect("write cluster.json");
+}
+
 /// Seed kubectl-validate state for tests.
 ///
 /// # Panics

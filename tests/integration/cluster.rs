@@ -185,7 +185,10 @@ fn global_zone_up_orchestration() {
     .unwrap();
 
     let mut tc = FakeToolchain::new();
-    tc.add_make().add_k3d_cluster_list(&[]);
+    tc.add_make()
+        .add_k3d_cluster_list(&[])
+        .add_docker()
+        .add_kubectl("30685");
     let orig_path = env::var("PATH").unwrap_or_default();
     let new_path = tc.path_with_prepend(&orig_path);
     temp_env::with_vars(

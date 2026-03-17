@@ -843,6 +843,7 @@ fn check_bootstrap_command_runs_gateway_api_crd_install() {
 fn check_capture_uses_current_run_context() {
     let tmp = tempfile::tempdir().unwrap();
     let run_dir = init_run(tmp.path(), "rec-capture", "single-zone");
+    seed_cluster_state(&run_dir, "/tmp/fake-kubeconfig");
 
     let mut tc = FakeToolchain::new();
     tc.add_kubectl(r#"{"items":[]}"#);
