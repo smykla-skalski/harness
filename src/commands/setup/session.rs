@@ -3,6 +3,8 @@ use std::fs;
 
 use clap::Args;
 
+use tracing::warn;
+
 use crate::bootstrap;
 use crate::commands::resolve_project_dir;
 use crate::compact;
@@ -38,7 +40,7 @@ pub fn session_start(project_dir: Option<&str>) -> Result<i32, CliError> {
     // Bootstrap the project wrapper
     let path_env = env::var("PATH").unwrap_or_default();
     if let Err(e) = bootstrap::main(&dir, &path_env) {
-        eprintln!("warning: bootstrap failed: {e}");
+        warn!(%e, "bootstrap failed");
     }
 
     // Check for a pending compact handoff to restore
@@ -47,7 +49,7 @@ pub fn session_start(project_dir: Option<&str>) -> Result<i32, CliError> {
         let diverged = compact::verify_fingerprints(&h);
         let context = compact::render_hydration_context(&h, &diverged);
         if let Err(e) = compact::consume_compact_handoff(&dir, h) {
-            eprintln!("warning: compact handoff consume failed: {e}");
+            warn!(%e, "compact handoff consume failed");
         }
         let output = SessionStartHookOutput::from_additional_context(&context);
         if let Ok(json) = output.to_json() {
@@ -74,9 +76,9 @@ pub fn session_stop(_project_dir: Option<&str>) -> Result<i32, CliError> {
         return Ok(0);
     };
     let Ok(record) = serde_json::from_str::<CurrentRunRecord>(&text) else {
-        eprintln!("warning: corrupt run pointer JSON, removing");
+        warn!("corrupt run pointer JSON, removing");
         if let Err(e) = repo.clear_current_pointer() {
-            eprintln!("warning: failed to remove corrupt pointer: {e}");
+            warn!(%e, "failed to remove corrupt pointer");
         }
         return Ok(0);
     };
@@ -85,11 +87,11 @@ pub fn session_stop(_project_dir: Option<&str>) -> Result<i32, CliError> {
     if run_dir.is_dir()
         && let Err(e) = ephemeral_metallb::cleanup_templates(&run_dir)
     {
-        eprintln!("warning: cleanup templates failed: {e}");
+        warn!(%e, "cleanup templates failed");
     }
 
     if let Err(e) = repo.clear_current_pointer() {
-        eprintln!("warning: failed to remove run pointer: {e}");
+        warn!(%e, "failed to remove run pointer");
     }
     Ok(0)
 }

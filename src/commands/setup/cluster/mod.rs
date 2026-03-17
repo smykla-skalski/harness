@@ -6,9 +6,10 @@ use std::path::Path;
 
 use clap::Args;
 
+use tracing::{debug, info};
+
 use crate::cluster::{ClusterSpec, Platform};
 use crate::context::RunRepository;
-use crate::core_defs::utc_now;
 use crate::errors::{CliError, CliErrorKind, cow};
 use crate::exec::{run_command, run_command_streaming};
 use crate::io::write_json_pretty;
@@ -104,14 +105,14 @@ fn persist_cluster_spec(spec: &ClusterSpec) -> Result<(), CliError> {
         if state_dir.is_dir() {
             let cluster_path = state_dir.join("cluster.json");
             write_json_pretty(&cluster_path, spec)?;
-            eprintln!("{} cluster: spec saved to state/cluster.json", utc_now());
+            info!("spec saved to state/cluster.json");
         }
     }
 
     // Always output spec JSON to stdout for scripting
     let spec_json = serde_json::to_string_pretty(&spec.to_json_dict())
         .map_err(|e| CliErrorKind::serialize(cow!("cluster spec json: {e}")))?;
-    eprintln!("{spec_json}");
+    debug!("{spec_json}");
 
     Ok(())
 }

@@ -1,15 +1,18 @@
 use std::path::Path;
 use std::{fs, io};
 
+use tracing::warn;
+
 use crate::cluster::ClusterMode;
 use crate::context::RunContext;
 use crate::errors::{CliError, HookMessage, cow};
 use crate::hook::HookResult;
 use crate::hook_payloads::HookContext;
+use crate::shell_parse::HarnessCommandInvocationRef;
 use crate::workflow::runner::{PreflightStatus, RunnerPhase, RunnerWorkflowState, SuiteFixState};
 
 /// Parsed harness context: (subcommand, words, run context).
-type HarnessCommandContext<'a> = (String, Vec<String>, &'a RunContext);
+type HarnessCommandContext<'a> = (&'a str, &'a [String], &'a RunContext);
 
 fn subcommand_artifacts(subcommand: &str) -> Option<&'static [&'static str]> {
     match subcommand {
@@ -37,13 +40,13 @@ pub fn execute(ctx: &HookContext) -> Result<HookResult, CliError> {
     let Some((subcommand, words, run)) = extract_harness_context(ctx)? else {
         return Ok(HookResult::allow());
     };
-    if let Some(result) = check_bug_found_gate(ctx, &subcommand) {
+    if let Some(result) = check_bug_found_gate(ctx, subcommand) {
         return Ok(result);
     }
-    if let Some(result) = check_preflight_gate(ctx, &subcommand) {
+    if let Some(result) = check_preflight_gate(ctx, subcommand) {
         return Ok(result);
     }
-    Ok(verify_artifacts(ctx, &subcommand, &words, run))
+    Ok(verify_artifacts(ctx, subcommand, words, run))
 }
 
 /// Extract the harness subcommand, words, and run context from the hook
@@ -59,18 +62,14 @@ fn extract_harness_context(
     };
     let subcommand = command
         .first_harness_invocation()
-        .and_then(|invocation| invocation.subcommand.as_deref());
+        .and_then(HarnessCommandInvocationRef::subcommand);
     let Some(subcommand) = subcommand else {
         return Ok(None);
     };
     let Some(run) = &ctx.run else {
         return Ok(None);
     };
-    Ok(Some((
-        subcommand.to_string(),
-        command.words().to_vec(),
-        run,
-    )))
+    Ok(Some((subcommand, command.words(), run)))
 }
 
 fn verify_artifacts(
@@ -203,7 +202,7 @@ fn has_table_rows(path: &Path) -> bool {
         Ok(content) => content.matches("\n|").count() > 2,
         Err(e) if e.kind() == io::ErrorKind::NotFound => false,
         Err(e) => {
-            eprintln!("warning: cannot read {}: {e}", path.display());
+            warn!(path = %path.display(), %e, "cannot read file");
             false
         }
     }
@@ -617,16 +616,8 @@ mod tests {
             ..HookEnvelopePayload::default()
         };
 
-        HookContext {
-            skill: "suite:run".to_string(),
-            event: HookEvent { payload },
-            run_dir: None,
-            skill_active: true,
-            active_skill: Some("suite:run".to_string()),
-            inactive_reason: None,
-            run: None,
-            runner_state,
-            author_state: None,
-        }
+        let mut context = HookContext::from_test_envelope("suite:run", payload);
+        context.runner_state = runner_state;
+        context
     }
 }

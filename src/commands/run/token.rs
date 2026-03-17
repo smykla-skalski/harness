@@ -3,6 +3,8 @@ use std::path::PathBuf;
 
 use clap::Args;
 
+use tracing::warn;
+
 use crate::commands::{RunDirArgs, resolve_run_services};
 use crate::errors::{CliError, CliErrorKind};
 use crate::exec;
@@ -58,7 +60,7 @@ pub fn token(
             return Ok(0);
         }
         Err(api_err) => {
-            eprintln!("token: API failed ({api_err}), trying kumactl");
+            warn!(%api_err, "token API failed, trying kumactl");
         }
     }
 

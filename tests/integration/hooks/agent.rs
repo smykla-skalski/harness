@@ -136,7 +136,7 @@ fn hook_context_command_words_empty() {
 #[test]
 fn hook_context_command_words_splits() {
     let ctx = make_hook_context("suite:run", make_bash_payload("echo hello world"));
-    assert_eq!(ctx.command_words().unwrap(), vec!["echo", "hello", "world"]);
+    assert_eq!(ctx.command_words().unwrap(), ["echo", "hello", "world"]);
 }
 
 #[test]

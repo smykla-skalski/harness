@@ -1,5 +1,7 @@
 use clap::Args;
 
+use tracing::info;
+
 use crate::commands::RunDirArgs;
 use crate::commands::resolve_run_services;
 use crate::core_defs::{shorten_path, utc_now};
@@ -33,7 +35,7 @@ pub fn preflight(
     let _ = services.save_preflight_outputs(&checked_at)?;
     services.record_preflight_complete()?;
 
-    eprintln!("{checked_at} preflight: complete");
+    info!("preflight complete");
     println!("{}", shorten_path(&services.layout().artifacts_dir()));
     Ok(0)
 }

@@ -116,7 +116,7 @@ fn check_bash_tool_use(
 }
 
 fn check_harness_command_patterns(
-    command: &ObservedCommand,
+    command: &ObservedCommand<'_>,
     details: &str,
     emitter: &mut IssueEmitter<'_>,
     issues: &mut Vec<Issue>,
@@ -223,7 +223,7 @@ fn check_destructive_patterns(
 /// Using absolute paths is unnecessary and fragile - relative paths like
 /// `g13/01.yaml` are the expected convention.
 fn check_absolute_manifest_path(
-    command: &ObservedCommand,
+    command: &ObservedCommand<'_>,
     details: &str,
     emitter: &mut IssueEmitter<'_>,
     issues: &mut Vec<Issue>,
@@ -294,7 +294,7 @@ fn check_direct_task_output_read(
 /// head, but the observer needs to flag these patterns too - agents should
 /// not be constructing environment manually since harness handles it.
 fn check_env_var_construction(
-    command: &ObservedCommand,
+    command: &ObservedCommand<'_>,
     details: &str,
     emitter: &mut IssueEmitter<'_>,
     issues: &mut Vec<Issue>,
@@ -366,7 +366,7 @@ fn check_env_var_construction(
 /// Agents sometimes prefix harness commands with `sleep` to wait for resources
 /// to settle. Harness has a built-in `--delay` flag for this purpose.
 fn check_sleep_prefix_before_harness(
-    command: &ObservedCommand,
+    command: &ObservedCommand<'_>,
     details: &str,
     emitter: &mut IssueEmitter<'_>,
     issues: &mut Vec<Issue>,
@@ -467,7 +467,7 @@ const KUBECTL_QUERY_THRESHOLD: usize = 3;
 /// and flags when the same target appears 3+ times within a 20-line window.
 fn check_repeated_kubectl_queries(
     line_num: usize,
-    command: &ObservedCommand,
+    command: &ObservedCommand<'_>,
     state: &mut ScanState,
     issues: &mut Vec<Issue>,
 ) {

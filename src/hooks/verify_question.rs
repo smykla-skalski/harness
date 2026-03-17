@@ -69,22 +69,13 @@ fn handle_suite_author(ctx: &HookContext) -> HookResult {
 mod tests {
     use super::*;
     use crate::hook::Decision;
-    use crate::hook_payloads::{HookContext, HookEnvelopePayload, HookEvent};
+    use crate::hook_payloads::{HookContext, HookEnvelopePayload};
 
     fn inactive_context() -> HookContext {
-        HookContext {
-            skill: String::new(),
-            event: HookEvent {
-                payload: HookEnvelopePayload::default(),
-            },
-            run_dir: None,
-            skill_active: false,
-            active_skill: None,
-            inactive_reason: None,
-            run: None,
-            runner_state: None,
-            author_state: None,
-        }
+        let mut context = HookContext::from_test_envelope("", HookEnvelopePayload::default());
+        context.skill_active = false;
+        context.active_skill = None;
+        context
     }
 
     #[test]

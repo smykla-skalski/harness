@@ -5,22 +5,23 @@ use crate::shell_parse::{self, ParsedCommand, is_env_assignment};
 enum ObservedCommandInner {
     Parsed(ParsedCommand),
     Fallback {
-        raw: String,
         words: Vec<String>,
-        significant_words: Vec<String>,
+        significant_word_indices: Vec<usize>,
     },
 }
 
-pub(super) struct ObservedCommand {
+pub(super) struct ObservedCommand<'a> {
+    raw: &'a str,
     lower: String,
     inner: ObservedCommandInner,
 }
 
-impl ObservedCommand {
-    pub(super) fn parse(command: &str) -> Self {
+impl<'a> ObservedCommand<'a> {
+    pub(super) fn parse(command: &'a str) -> Self {
         if let Ok(parsed) = ParsedCommand::parse(command) {
             return Self {
-                lower: parsed.raw().to_lowercase(),
+                raw: command,
+                lower: command.to_lowercase(),
                 inner: ObservedCommandInner::Parsed(parsed),
             };
         }
@@ -29,22 +30,26 @@ impl ObservedCommand {
             .split_whitespace()
             .map(ToString::to_string)
             .collect::<Vec<_>>();
-        let significant_words = shell_parse::significant_words(&words).into_iter().collect();
+        let significant_word_indices = words
+            .iter()
+            .enumerate()
+            .filter_map(|(index, word)| {
+                (!shell_parse::is_shell_control_op(word) && !is_env_assignment(word))
+                    .then_some(index)
+            })
+            .collect();
         Self {
+            raw: command,
             lower: command.to_lowercase(),
             inner: ObservedCommandInner::Fallback {
-                raw: command.to_string(),
                 words,
-                significant_words,
+                significant_word_indices,
             },
         }
     }
 
     pub(super) fn raw(&self) -> &str {
-        match &self.inner {
-            ObservedCommandInner::Parsed(parsed) => parsed.raw(),
-            ObservedCommandInner::Fallback { raw, .. } => raw,
-        }
+        self.raw
     }
 
     pub(super) fn lower(&self) -> &str {
@@ -58,12 +63,13 @@ impl ObservedCommand {
         }
     }
 
-    fn significant_words(&self) -> &[String] {
+    fn significant_word_indices(&self) -> &[usize] {
         match &self.inner {
-            ObservedCommandInner::Parsed(parsed) => parsed.significant_words(),
+            ObservedCommandInner::Parsed(parsed) => parsed.significant_word_indices(),
             ObservedCommandInner::Fallback {
-                significant_words, ..
-            } => significant_words,
+                significant_word_indices,
+                ..
+            } => significant_word_indices,
         }
     }
 
@@ -73,13 +79,13 @@ impl ObservedCommand {
 
     pub(super) fn has_harness_subcommand(&self, subcommand: &str) -> bool {
         self.harness_spans()
-            .any(|span| span.first().is_some_and(|word| word == subcommand))
+            .any(|span| span.first().is_some_and(|word| *word == subcommand))
     }
 
     pub(super) fn harness_has_flag(&self, flag: &str) -> bool {
         self.harness_spans().any(|span| {
             span.iter().any(|word| {
-                word == flag
+                *word == flag
                     || word
                         .strip_prefix(flag)
                         .is_some_and(|rest| rest.starts_with('='))
@@ -94,7 +100,7 @@ impl ObservedCommand {
             while index < span.len() {
                 if span[index] == "--manifest" {
                     if let Some(path) = span.get(index + 1) {
-                        manifests.push(path.as_str());
+                        manifests.push(*path);
                     }
                     index += 2;
                     continue;
@@ -174,11 +180,13 @@ impl ObservedCommand {
         false
     }
 
-    pub(super) fn harness_spans(&self) -> impl Iterator<Item = &[String]> {
+    pub(super) fn harness_spans(&self) -> impl Iterator<Item = Vec<&str>> {
         let mut spans = Vec::new();
-        let significant_words = self.significant_words();
-        let len = significant_words.len();
-        for (index, word) in significant_words.iter().enumerate() {
+        let words = self.words();
+        let significant_word_indices = self.significant_word_indices();
+        let len = significant_word_indices.len();
+        for (index, &word_index) in significant_word_indices.iter().enumerate() {
+            let word = &words[word_index];
             let head = Path::new(word)
                 .file_name()
                 .and_then(|name| name.to_str())
@@ -186,16 +194,21 @@ impl ObservedCommand {
             if head != "harness" {
                 continue;
             }
-            let search_end = significant_words[index + 1..]
+            let search_end = significant_word_indices[index + 1..]
                 .iter()
-                .position(|candidate| {
-                    Path::new(candidate)
+                .position(|&candidate_index| {
+                    Path::new(&words[candidate_index])
                         .file_name()
                         .and_then(|name| name.to_str())
                         == Some("harness")
                 })
                 .map_or(len, |offset| index + 1 + offset);
-            spans.push(&significant_words[index + 1..search_end]);
+            spans.push(
+                significant_word_indices[index + 1..search_end]
+                    .iter()
+                    .map(|&span_index| words[span_index].as_str())
+                    .collect(),
+            );
         }
         spans.into_iter()
     }

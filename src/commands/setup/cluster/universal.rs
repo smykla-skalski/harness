@@ -1,11 +1,13 @@
 use std::path::Path;
 use std::time::Duration;
 
+use tracing::{info, warn};
+
 use crate::cluster::{ClusterSpec, Platform};
 use crate::commands::resolve_repo_root;
 use crate::compose;
 use crate::context::RunRepository;
-use crate::core_defs::{HARNESS_PREFIX, utc_now};
+use crate::core_defs::HARNESS_PREFIX;
 use crate::errors::{CliError, CliErrorKind, cow};
 use crate::exec::{
     compose_down_project, compose_up, docker_inspect_ip, docker_network_create, docker_network_rm,
@@ -77,7 +79,7 @@ pub(super) fn resolve_cp_image(
     }
 
     // Build images from repo
-    eprintln!("{} cluster: building kuma images", utc_now());
+    info!("building kuma images");
     run_command(&["make", "images"], Some(root), None, &[0])
         .map_err(|e| CliErrorKind::image_build_failed("make images").with_details(e.message()))?;
 
@@ -99,7 +101,7 @@ pub(super) fn resolve_effective_store(is_up: bool, cli_store: &str) -> String {
         Ok(Some(spec)) => spec.store_type.unwrap_or_else(|| cli_store.to_string()),
         Ok(None) => cli_store.to_string(),
         Err(e) => {
-            eprintln!("warning: failed to load persisted cluster spec: {e}");
+            warn!(%e, "failed to load persisted cluster spec");
             cli_store.to_string()
         }
     }
@@ -134,83 +136,25 @@ pub(super) fn cluster_universal(args: &ClusterArgs) -> Result<i32, CliError> {
     )
     .map_err(|e| CliError::from(CliErrorKind::cluster_error(e)))?;
 
-    let network_name = spec.docker_network.as_deref().unwrap_or("harness-default");
+    let network_name = spec
+        .docker_network
+        .clone()
+        .unwrap_or_else(|| "harness-default".to_string());
     let is_up = spec.mode.is_up();
 
     let effective_store = resolve_effective_store(is_up, &args.store);
+    let cp_image = resolve_universal_cp_image(is_up, &root, args.image.as_deref(), args.no_build)?;
 
-    // Only resolve image for up commands
-    let cp_image = if is_up {
-        resolve_cp_image(&root, args.image.as_deref(), args.no_build)?
-    } else {
-        String::new()
-    };
+    info!(%mode, names = %all_names.join(" "), "starting universal cluster");
 
-    eprintln!(
-        "{} cluster: starting universal {mode} for {}",
-        utc_now(),
-        all_names.join(" ")
-    );
-
-    match mode.as_str() {
-        "single-up" => {
-            // Postgres needs Compose (for the postgres service); memory uses Docker CLI
-            let result = if effective_store == "postgres" {
-                universal_single_up_compose(
-                    &cp_image,
-                    network_name,
-                    &effective_store,
-                    &all_names[0],
-                )?
-            } else {
-                universal_single_up(&cp_image, network_name, &effective_store, &all_names[0])?
-            };
-            spec.cp_image = Some(cp_image);
-            spec.store_type = Some(effective_store);
-            spec.admin_token = Some(result.admin_token);
-            spec.members[0].container_ip = Some(result.cp_ip);
-        }
-        "single-down" => {
-            let removed = docker_rm_by_label("io.harness.service=true")?;
-            for name in &removed {
-                eprintln!("{} cluster: removed service container {name}", utc_now());
-            }
-            if effective_store == "postgres" {
-                // Compose-managed single-zone
-                let project = format!("{HARNESS_PREFIX}{}", all_names[0]);
-                compose_down_project(&project)?;
-            } else {
-                universal_single_down(network_name, &all_names[0])?;
-            }
-        }
-        "global-zone-up" => {
-            let result =
-                universal_global_zone_up(&cp_image, network_name, &effective_store, &all_names)?;
-            spec.cp_image = Some(cp_image);
-            spec.store_type = Some(effective_store);
-            spec.admin_token = Some(result.admin_token);
-            spec.members[0].container_ip = Some(result.cp_ip);
-        }
-        "global-zone-down" => universal_global_zone_down(network_name, &all_names)?,
-        "global-two-zones-up" => {
-            let result = universal_global_two_zones_up(
-                &cp_image,
-                network_name,
-                &effective_store,
-                &all_names,
-            )?;
-            spec.cp_image = Some(cp_image);
-            spec.store_type = Some(effective_store);
-            spec.admin_token = Some(result.admin_token);
-            spec.members[0].container_ip = Some(result.cp_ip);
-        }
-        "global-two-zones-down" => universal_global_two_zones_down(network_name, &all_names)?,
-        _ => {
-            return Err(
-                CliErrorKind::cluster_error(cow!("unsupported cluster mode: {mode}")).into(),
-            );
-        }
-    }
+    execute_universal_mode(
+        mode,
+        &all_names,
+        &network_name,
+        &effective_store,
+        &cp_image,
+        &mut spec,
+    )?;
 
     if is_up {
         persist_cluster_spec(&spec)?;
@@ -218,6 +162,112 @@ pub(super) fn cluster_universal(args: &ClusterArgs) -> Result<i32, CliError> {
 
     println!("{mode} completed");
     Ok(0)
+}
+
+fn resolve_universal_cp_image(
+    is_up: bool,
+    root: &Path,
+    explicit: Option<&str>,
+    skip_build: bool,
+) -> Result<String, CliError> {
+    if is_up {
+        return resolve_cp_image(root, explicit, skip_build);
+    }
+    Ok(String::new())
+}
+
+fn execute_universal_mode(
+    mode: &str,
+    all_names: &[String],
+    network_name: &str,
+    effective_store: &str,
+    cp_image: &str,
+    spec: &mut ClusterSpec,
+) -> Result<(), CliError> {
+    match mode {
+        "single-up" => {
+            handle_single_up(spec, cp_image, network_name, effective_store, &all_names[0])
+        }
+        "single-down" => handle_single_down(network_name, effective_store, &all_names[0]),
+        "global-zone-up" => {
+            handle_global_zone_up(spec, cp_image, network_name, effective_store, all_names)
+        }
+        "global-zone-down" => universal_global_zone_down(network_name, all_names),
+        "global-two-zones-up" => {
+            handle_global_two_zones_up(spec, cp_image, network_name, effective_store, all_names)
+        }
+        "global-two-zones-down" => universal_global_two_zones_down(network_name, all_names),
+        _ => Err(CliErrorKind::cluster_error(cow!("unsupported cluster mode: {mode}")).into()),
+    }
+}
+
+fn handle_single_up(
+    spec: &mut ClusterSpec,
+    cp_image: &str,
+    network_name: &str,
+    effective_store: &str,
+    cluster_name: &str,
+) -> Result<(), CliError> {
+    let result = if effective_store == "postgres" {
+        universal_single_up_compose(cp_image, network_name, effective_store, cluster_name)?
+    } else {
+        universal_single_up(cp_image, network_name, effective_store, cluster_name)?
+    };
+    apply_universal_up_result(spec, cp_image, effective_store, result);
+    Ok(())
+}
+
+fn handle_single_down(
+    network_name: &str,
+    effective_store: &str,
+    cluster_name: &str,
+) -> Result<(), CliError> {
+    let removed = docker_rm_by_label("io.harness.service=true")?;
+    for name in &removed {
+        info!(%name, "removed service container");
+    }
+    if effective_store == "postgres" {
+        let project = format!("{HARNESS_PREFIX}{cluster_name}");
+        compose_down_project(&project)?;
+        return Ok(());
+    }
+    universal_single_down(network_name, cluster_name)
+}
+
+fn handle_global_zone_up(
+    spec: &mut ClusterSpec,
+    cp_image: &str,
+    network_name: &str,
+    effective_store: &str,
+    all_names: &[String],
+) -> Result<(), CliError> {
+    let result = universal_global_zone_up(cp_image, network_name, effective_store, all_names)?;
+    apply_universal_up_result(spec, cp_image, effective_store, result);
+    Ok(())
+}
+
+fn handle_global_two_zones_up(
+    spec: &mut ClusterSpec,
+    cp_image: &str,
+    network_name: &str,
+    effective_store: &str,
+    all_names: &[String],
+) -> Result<(), CliError> {
+    let result = universal_global_two_zones_up(cp_image, network_name, effective_store, all_names)?;
+    apply_universal_up_result(spec, cp_image, effective_store, result);
+    Ok(())
+}
+
+fn apply_universal_up_result(
+    spec: &mut ClusterSpec,
+    cp_image: &str,
+    effective_store: &str,
+    result: UniversalUpResult,
+) {
+    spec.cp_image = Some(cp_image.to_string());
+    spec.store_type = Some(effective_store.to_string());
+    spec.admin_token = Some(result.admin_token);
+    spec.members[0].container_ip = Some(result.cp_ip);
 }
 
 fn universal_single_up(
@@ -245,15 +295,12 @@ fn universal_single_up(
 
     let ip = docker_inspect_ip(cp_name, network)?;
     let health_url = format!("http://{ip}:5681");
-    eprintln!("{} cluster: waiting for CP at {health_url}", utc_now());
+    info!(%health_url, "waiting for CP");
     wait_for_http(&health_url, Duration::from_mins(1))?;
 
-    eprintln!("{} cluster: extracting admin token", utc_now());
+    info!("extracting admin token");
     let admin_token = extract_admin_token(cp_name)?;
-    eprintln!(
-        "{} cluster: CP ready at {health_url} (admin token extracted)",
-        utc_now()
-    );
+    info!(%health_url, "CP ready (admin token extracted)");
     Ok(UniversalUpResult {
         admin_token,
         cp_ip: ip,
@@ -272,30 +319,21 @@ fn universal_single_up_compose(
     compose_file.write_to(&compose_path)?;
 
     let project = format!("harness-{cp_name}");
-    eprintln!(
-        "{} cluster: starting compose services for {cp_name}",
-        utc_now()
-    );
+    info!(%cp_name, "starting compose services");
     compose_up(&compose_path, &project, 180)?;
-    eprintln!(
-        "{} cluster: compose services for {cp_name} started",
-        utc_now()
-    );
+    info!(%cp_name, "compose services started");
 
     let compose_network = format!("{project}_{network}");
     let container = format!("{project}-{cp_name}-1");
     let ip = docker_inspect_ip(&container, &compose_network)?;
 
     let health_url = format!("http://{ip}:5681");
-    eprintln!("{} cluster: waiting for CP at {health_url}", utc_now());
+    info!(%health_url, "waiting for CP");
     wait_for_http(&health_url, Duration::from_mins(1))?;
 
-    eprintln!("{} cluster: extracting admin token", utc_now());
+    info!("extracting admin token");
     let admin_token = extract_admin_token(&container)?;
-    eprintln!(
-        "{} cluster: CP ready at {health_url} (admin token extracted)",
-        utc_now()
-    );
+    info!(%health_url, "CP ready (admin token extracted)");
     Ok(UniversalUpResult {
         admin_token,
         cp_ip: ip,
@@ -339,30 +377,21 @@ fn universal_global_zone_up(
     compose_file.write_to(&compose_path)?;
 
     let project = format!("harness-{global_name}");
-    eprintln!(
-        "{} cluster: starting compose services for global + zone",
-        utc_now()
-    );
+    info!("starting compose services for global + zone");
     compose_up(&compose_path, &project, 180)?;
-    eprintln!("{} cluster: compose services started", utc_now());
+    info!("compose services started");
 
     let compose_network = format!("{project}_{network}");
     let global_container = format!("{project}-{global_name}-1");
     let global_ip = docker_inspect_ip(&global_container, &compose_network)?;
 
     let global_url = format!("http://{global_ip}:5681");
-    eprintln!(
-        "{} cluster: waiting for global CP at {global_url}",
-        utc_now()
-    );
+    info!(%global_url, "waiting for global CP");
     wait_for_http(&global_url, Duration::from_mins(1))?;
 
-    eprintln!("{} cluster: extracting admin token", utc_now());
+    info!("extracting admin token");
     let admin_token = extract_admin_token(&global_container)?;
-    eprintln!(
-        "{} cluster: global CP ready (admin token extracted)",
-        utc_now()
-    );
+    info!("global CP ready (admin token extracted)");
 
     Ok(UniversalUpResult {
         admin_token,
@@ -373,7 +402,7 @@ fn universal_global_zone_up(
 fn universal_global_zone_down(_network: &str, names: &[String]) -> Result<(), CliError> {
     let removed = docker_rm_by_label("io.harness.service=true")?;
     for name in &removed {
-        eprintln!("{} cluster: removed service container {name}", utc_now());
+        info!(%name, "removed service container");
     }
     let global_name = &names[0];
     let project = format!("harness-{global_name}");
@@ -420,30 +449,21 @@ fn universal_global_two_zones_up(
     compose_file.write_to(&compose_path)?;
 
     let project = format!("harness-{global_name}");
-    eprintln!(
-        "{} cluster: starting compose services for global + two zones",
-        utc_now()
-    );
+    info!("starting compose services for global + two zones");
     compose_up(&compose_path, &project, 180)?;
-    eprintln!("{} cluster: compose services started", utc_now());
+    info!("compose services started");
 
     let compose_network = format!("{project}_{network}");
     let global_container = format!("{project}-{global_name}-1");
     let global_ip = docker_inspect_ip(&global_container, &compose_network)?;
 
     let global_url = format!("http://{global_ip}:5681");
-    eprintln!(
-        "{} cluster: waiting for global CP at {global_url}",
-        utc_now()
-    );
+    info!(%global_url, "waiting for global CP");
     wait_for_http(&global_url, Duration::from_mins(1))?;
 
-    eprintln!("{} cluster: extracting admin token", utc_now());
+    info!("extracting admin token");
     let admin_token = extract_admin_token(&global_container)?;
-    eprintln!(
-        "{} cluster: global CP ready (admin token extracted)",
-        utc_now()
-    );
+    info!("global CP ready (admin token extracted)");
 
     Ok(UniversalUpResult {
         admin_token,
@@ -454,7 +474,7 @@ fn universal_global_two_zones_up(
 fn universal_global_two_zones_down(_network: &str, names: &[String]) -> Result<(), CliError> {
     let removed = docker_rm_by_label("io.harness.service=true")?;
     for name in &removed {
-        eprintln!("{} cluster: removed service container {name}", utc_now());
+        info!(%name, "removed service container");
     }
     let global_name = &names[0];
     let project = format!("harness-{global_name}");

@@ -1,5 +1,7 @@
 use clap::Args;
 
+use tracing::info;
+
 use crate::audit_log::write_run_status_with_audit;
 use crate::commands::{RunDirArgs, resolve_run_services};
 use crate::core_defs::utc_now;
@@ -69,9 +71,12 @@ pub fn closeout(run_dir_args: &RunDirArgs) -> Result<i32, CliError> {
                 Some("closeout"),
                 None,
             )?;
-            eprintln!(
-                "auto-computed verdict from counts: {verdict} (passed={}, failed={}, skipped={})",
-                status.counts.passed, status.counts.failed, status.counts.skipped
+            info!(
+                %verdict,
+                passed = status.counts.passed,
+                failed = status.counts.failed,
+                skipped = status.counts.skipped,
+                "auto-computed verdict from counts"
             );
         } else {
             return Err(CliErrorKind::VerdictPending.into());
