@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::collections::HashMap;
 use std::io;
 use std::path::{Path, PathBuf};
@@ -5,6 +6,7 @@ use std::str::FromStr;
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use tracing::warn;
 
 use crate::context::RunContext;
 use crate::errors::{CliError, CliErrorKind, cow};
@@ -12,7 +14,7 @@ use crate::rules;
 use crate::workflow::author::{self as author_workflow, AuthorWorkflowState};
 use crate::workflow::runner::{self as runner_workflow, RunnerWorkflowState};
 
-pub use crate::shell_parse::{HarnessCommandInvocation, ParsedCommand};
+pub use crate::shell_parse::{HarnessCommandInvocationRef, ParsedCommand};
 
 /// An option in an `AskUserQuestion` prompt.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -139,6 +141,7 @@ impl HookEvent {
 pub struct HookContext {
     pub skill: String,
     pub event: HookEvent,
+    parsed_command: ParsedCommandState,
     pub run_dir: Option<PathBuf>,
     pub skill_active: bool,
     pub active_skill: Option<String>,
@@ -148,7 +151,57 @@ pub struct HookContext {
     pub author_state: Option<AuthorWorkflowState>,
 }
 
+#[derive(Debug)]
+enum ParsedCommandState {
+    Missing,
+    Parsed(ParsedCommand),
+    Error(String),
+}
+
+impl ParsedCommandState {
+    fn from_payload(payload: &HookEnvelopePayload) -> Self {
+        let Some(command_text) = payload.tool_input.get("command").and_then(Value::as_str) else {
+            return Self::Missing;
+        };
+        if command_text.trim().is_empty() {
+            return Self::Missing;
+        }
+        match ParsedCommand::parse(command_text) {
+            Ok(parsed) => Self::Parsed(parsed),
+            Err(error) => Self::Error(error.to_string()),
+        }
+    }
+
+    fn as_result(&self) -> Result<Option<&ParsedCommand>, CliError> {
+        match self {
+            Self::Missing => Ok(None),
+            Self::Parsed(parsed) => Ok(Some(parsed)),
+            Self::Error(error) => Err(CliErrorKind::hook_payload_invalid(cow!(
+                "shell tokenization failed: {error}"
+            ))
+            .into()),
+        }
+    }
+}
+
 impl HookContext {
+    fn with_event(skill: &str, event: HookEvent) -> Self {
+        let skill_name = skill.to_string();
+        let parsed_command = ParsedCommandState::from_payload(&event.payload);
+        Self {
+            skill: skill_name.clone(),
+            event,
+            parsed_command,
+            run_dir: None,
+            skill_active: true,
+            active_skill: Some(skill_name),
+            inactive_reason: None,
+            run: None,
+            runner_state: None,
+            author_state: None,
+        }
+    }
+
     /// Build hook context from stdin for a given skill.
     ///
     /// Reads the hook envelope from stdin and resolves run context,
@@ -158,18 +211,7 @@ impl HookContext {
     /// Returns `CliError` if stdin cannot be read or the payload is invalid.
     pub fn from_stdin(skill: &str) -> Result<Self, CliError> {
         let event = HookEvent::from_stdin()?;
-        let skill_name = skill.to_string();
-        let mut context = Self {
-            skill: skill_name.clone(),
-            event,
-            run_dir: None,
-            skill_active: true,
-            active_skill: Some(skill_name),
-            inactive_reason: None,
-            run: None,
-            runner_state: None,
-            author_state: None,
-        };
+        let mut context = Self::with_event(skill, event);
         context.load_context_from_disk();
         Ok(context)
     }
@@ -179,20 +221,15 @@ impl HookContext {
     /// Used when the envelope has already been read (e.g. from a test).
     #[must_use]
     pub fn from_envelope(skill: &str, payload: HookEnvelopePayload) -> Self {
-        let skill_name = skill.to_string();
-        let mut context = Self {
-            skill: skill_name.clone(),
-            event: HookEvent { payload },
-            run_dir: None,
-            skill_active: true,
-            active_skill: Some(skill_name),
-            inactive_reason: None,
-            run: None,
-            runner_state: None,
-            author_state: None,
-        };
+        let mut context = Self::with_event(skill, HookEvent { payload });
         context.load_context_from_disk();
         context
+    }
+
+    #[cfg(test)]
+    #[must_use]
+    pub(crate) fn from_test_envelope(skill: &str, payload: HookEnvelopePayload) -> Self {
+        Self::with_event(skill, HookEvent { payload })
     }
 
     /// Attempt to load `RunContext`, runner state, and author state from disk.
@@ -207,7 +244,7 @@ impl HookContext {
         if let Some(run_directory) = &self.run_dir {
             match RunContext::from_run_dir(run_directory) {
                 Ok(run_context) => self.run = Some(run_context),
-                Err(error) => eprintln!("warning: failed to load run context: {error}"),
+                Err(error) => warn!(%error, "failed to load run context"),
             }
             return;
         }
@@ -217,7 +254,7 @@ impl HookContext {
                 self.run = Some(run_context);
             }
             Ok(None) => {}
-            Err(error) => eprintln!("warning: failed to load current run context: {error}"),
+            Err(error) => warn!(%error, "failed to load current run context"),
         }
     }
 
@@ -235,7 +272,7 @@ impl HookContext {
 
         match runner_workflow::read_runner_state(&run_directory) {
             Ok(runner_state) => self.runner_state = runner_state,
-            Err(error) => eprintln!("warning: failed to load runner state: {error}"),
+            Err(error) => warn!(%error, "failed to load runner state"),
         }
     }
 
@@ -246,28 +283,31 @@ impl HookContext {
         }
         match author_workflow::read_author_state() {
             Ok(author_state) => self.author_state = author_state,
-            Err(error) => eprintln!("warning: failed to load author state: {error}"),
+            Err(error) => warn!(%error, "failed to load author state"),
         }
     }
 
     /// Get the run directory, either from explicit `run_dir` or from `RunContext`.
     #[must_use]
-    pub fn effective_run_dir(&self) -> Option<PathBuf> {
+    pub fn effective_run_dir(&self) -> Option<Cow<'_, Path>> {
         if let Some(run_directory) = &self.run_dir {
-            return Some(run_directory.clone());
+            return Some(Cow::Borrowed(run_directory.as_path()));
         }
         self.run
             .as_ref()
-            .map(|run_context| run_context.layout.run_dir())
+            .map(|run_context| Cow::Owned(run_context.layout.run_dir()))
     }
 
     /// Get the suite directory from the run context metadata.
     #[must_use]
-    pub fn suite_dir(&self) -> Option<PathBuf> {
+    pub fn suite_dir(&self) -> Option<Cow<'_, Path>> {
         self.run.as_ref().map(|run_context| {
             Path::new(&run_context.metadata.suite_dir)
                 .canonicalize()
-                .unwrap_or_else(|_| PathBuf::from(&run_context.metadata.suite_dir))
+                .map_or_else(
+                    |_| Cow::Borrowed(Path::new(&run_context.metadata.suite_dir)),
+                    Cow::Owned,
+                )
         })
     }
 
@@ -299,9 +339,9 @@ impl HookContext {
     ///
     /// # Errors
     /// Returns `CliError` if shell tokenization fails (e.g. unmatched quotes).
-    pub fn command_words(&self) -> Result<Vec<String>, CliError> {
+    pub fn command_words(&self) -> Result<&[String], CliError> {
         self.parsed_command()
-            .map(|command| command.map_or_else(Vec::new, |parsed| parsed.words().to_vec()))
+            .map(|command| command.map_or(&[][..], ParsedCommand::words))
     }
 
     /// Write target paths from the input payload.
@@ -393,9 +433,9 @@ impl HookContext {
     ///
     /// # Errors
     /// Returns `CliError` if shell tokenization fails.
-    pub fn significant_words(&self) -> Result<Vec<String>, CliError> {
+    pub fn significant_words(&self) -> Result<Vec<&str>, CliError> {
         self.parsed_command().map(|command| {
-            command.map_or_else(Vec::new, |parsed| parsed.significant_words().to_vec())
+            command.map_or_else(Vec::new, |parsed| parsed.significant_words().collect())
         })
     }
 
@@ -403,28 +443,17 @@ impl HookContext {
     ///
     /// # Errors
     /// Returns `CliError` if shell tokenization fails.
-    pub fn command_heads(&self) -> Result<Vec<String>, CliError> {
+    pub fn command_heads(&self) -> Result<&[String], CliError> {
         self.parsed_command()
-            .map(|command| command.map_or_else(Vec::new, |parsed| parsed.heads().to_vec()))
+            .map(|command| command.map_or(&[][..], ParsedCommand::heads))
     }
 
     /// Parsed command view from the input payload, if this tool call has one.
     ///
     /// # Errors
     /// Returns `CliError` if shell tokenization fails.
-    pub fn parsed_command(&self) -> Result<Option<ParsedCommand>, CliError> {
-        let Some(command_text) = self.command_text() else {
-            return Ok(None);
-        };
-        if command_text.trim().is_empty() {
-            return Ok(None);
-        }
-        ParsedCommand::parse(command_text)
-            .map(Some)
-            .map_err(|error| {
-                CliErrorKind::hook_payload_invalid(cow!("shell tokenization failed: {error}"))
-                    .into()
-            })
+    pub fn parsed_command(&self) -> Result<Option<&ParsedCommand>, CliError> {
+        self.parsed_command.as_result()
     }
 }
 

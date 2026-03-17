@@ -10,6 +10,8 @@ use std::borrow::Cow;
 use std::path::{Path, PathBuf};
 use std::{fs, result};
 
+use tracing::warn;
+
 use crate::core_defs::{project_context_dir, session_scope_key, utc_now};
 use crate::errors::{CliError, CliErrorKind, cow};
 use crate::io::write_json_pretty;
@@ -117,7 +119,7 @@ pub fn pending_compact_handoff(project_dir: &Path) -> Option<CompactHandoff<'sta
     match load_latest_compact_handoff(project_dir) {
         Ok(opt) => opt.filter(|h| h.status == HandoffStatus::Pending),
         Err(e) => {
-            eprintln!("warning: compact handoff load failed: {e}");
+            warn!(%e, "compact handoff load failed");
             None
         }
     }
@@ -175,10 +177,7 @@ fn trim_history(project_dir: &Path) {
     let excess = files.len().saturating_sub(compact_rules::HISTORY_LIMIT);
     for path in files.into_iter().take(excess) {
         if let Err(e) = fs::remove_file(&path) {
-            eprintln!(
-                "warning: failed to remove history file {}: {e}",
-                path.display()
-            );
+            warn!(path = %path.display(), %e, "failed to remove history file");
         }
     }
 }

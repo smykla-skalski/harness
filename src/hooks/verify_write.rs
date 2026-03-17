@@ -48,7 +48,7 @@ fn verify_suite_runner(ctx: &HookContext, paths: &[&Path]) -> Result<HookResult,
     let suite_dir = ctx.suite_dir();
     for raw_path in paths {
         let path = normalize_path(raw_path);
-        if let Some(ref rd) = run_dir
+        if let Some(rd) = run_dir.as_deref()
             && is_command_owned_run_file(&path, rd)
         {
             let hint = control_file_hint(&path);

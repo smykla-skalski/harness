@@ -95,44 +95,38 @@ mod tests {
         status.next_planned_group = Some("g01".to_string());
         run_context.status = Some(status);
 
-        let context = HookContext {
-            skill: "suite:run".to_string(),
-            event: crate::hook_payloads::HookEvent {
-                payload: HookEnvelopePayload {
-                    tool_name: "Bash".to_string(),
-                    tool_input: serde_json::json!({
-                        "command": "harness record --phase verify --gid g01 -- echo hello",
-                    }),
-                    tool_response: serde_json::json!({
-                        "stdout": "hello\n",
-                        "stderr": "",
-                        "exit_code": 0,
-                    }),
-                    last_assistant_message: None,
-                    transcript_path: None,
-                    stop_hook_active: false,
-                    raw_keys: vec![],
-                },
+        let mut context = HookContext::from_test_envelope(
+            "suite:run",
+            HookEnvelopePayload {
+                tool_name: "Bash".to_string(),
+                tool_input: serde_json::json!({
+                    "command": "harness record --phase verify --gid g01 -- echo hello",
+                }),
+                tool_response: serde_json::json!({
+                    "stdout": "hello\n",
+                    "stderr": "",
+                    "exit_code": 0,
+                }),
+                last_assistant_message: None,
+                transcript_path: None,
+                stop_hook_active: false,
+                raw_keys: vec![],
             },
-            run_dir: Some(run_dir.clone()),
-            skill_active: true,
-            active_skill: Some("suite:run".to_string()),
-            inactive_reason: None,
-            run: Some(run_context),
-            runner_state: Some(RunnerWorkflowState {
-                schema_version: 1,
-                phase: RunnerPhase::Execution,
-                preflight: PreflightState {
-                    status: PreflightStatus::Complete,
-                },
-                failure: None,
-                suite_fix: None,
-                updated_at: String::new(),
-                transition_count: 0,
-                last_event: None,
-            }),
-            author_state: None,
-        };
+        );
+        context.run_dir = Some(run_dir.clone());
+        context.run = Some(run_context);
+        context.runner_state = Some(RunnerWorkflowState {
+            schema_version: 1,
+            phase: RunnerPhase::Execution,
+            preflight: PreflightState {
+                status: PreflightStatus::Complete,
+            },
+            failure: None,
+            suite_fix: None,
+            updated_at: String::new(),
+            transition_count: 0,
+            last_event: None,
+        });
 
         let result = execute(&context).unwrap();
         assert_eq!(result.decision, Decision::Allow);

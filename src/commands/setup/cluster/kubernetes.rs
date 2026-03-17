@@ -2,9 +2,11 @@ use std::collections::HashMap;
 use std::env;
 use std::path::Path;
 
+use tracing::info;
+
 use crate::cluster::{ClusterSpec, HelmSetting};
 use crate::commands::resolve_repo_root;
-use crate::core_defs::{resolve_build_info, utc_now};
+use crate::core_defs::resolve_build_info;
 use crate::errors::{CliError, CliErrorKind, cow};
 use crate::exec::{cluster_exists, docker, kubectl};
 
@@ -63,10 +65,7 @@ fn resolve_kds_address(global_cluster: &str) -> Result<String, CliError> {
     }
 
     let address = format!("grpcs://{node_ip}:{node_port}");
-    eprintln!(
-        "{} cluster: resolved global KDS address: {address}",
-        utc_now()
-    );
+    info!(%address, "resolved global KDS address");
     Ok(address)
 }
 
@@ -123,11 +122,7 @@ pub(super) fn cluster_k8s(args: &ClusterArgs) -> Result<i32, CliError> {
         );
     }
 
-    eprintln!(
-        "{} cluster: starting {mode} for {}",
-        utc_now(),
-        validated_args.join(" ")
-    );
+    info!(%mode, names = %validated_args.join(" "), "starting cluster");
 
     match mode.as_str() {
         "single-up" => single_up(&root, &base_env, validated_args)?,
@@ -161,9 +156,9 @@ fn start_and_deploy(
     let mut env = base_env.clone();
     env.insert("KIND_CLUSTER_NAME".to_string(), cluster_name.to_string());
     if !cluster_exists(cluster_name)? {
-        eprintln!("{} cluster: starting k3d cluster {cluster_name}", utc_now());
+        info!(%cluster_name, "starting k3d cluster");
         make_target_live(root, "k3d/start", &env)?;
-        eprintln!("{} cluster: k3d cluster {cluster_name} ready", utc_now());
+        info!(%cluster_name, "k3d cluster ready");
     }
     let home = env::var("HOME").unwrap_or_else(|_| "/tmp".into());
     let kubeconfig = format!("{home}/.kube/kind-{cluster_name}-config");
@@ -188,12 +183,9 @@ fn start_and_deploy(
         all.join(" "),
     );
 
-    eprintln!(
-        "{} cluster: deploying Kuma to {cluster_name} ({kuma_mode})",
-        utc_now()
-    );
+    info!(%cluster_name, %kuma_mode, "deploying Kuma");
     make_target_live(root, "k3d/deploy/helm", &env)?;
-    eprintln!("{} cluster: Kuma deployed to {cluster_name}", utc_now());
+    info!(%cluster_name, "Kuma deployed");
     Ok(())
 }
 
@@ -292,15 +284,9 @@ fn global_two_zones_up(
     ];
     start_and_deploy(root, base_env, &names[0], "global", &global_settings)?;
     let kds_address = resolve_kds_address(&names[0])?;
-    eprintln!(
-        "{} cluster: global CP deployed, starting zone clusters",
-        utc_now()
-    );
+    info!("global CP deployed, starting zone clusters");
     for (zone_cluster, zone_name) in [(&names[1], &names[3]), (&names[2], &names[4])] {
-        eprintln!(
-            "{} cluster: deploying zone {zone_name} on {zone_cluster}",
-            utc_now()
-        );
+        info!(%zone_name, %zone_cluster, "deploying zone");
         let zone_settings = vec![
             "controlPlane.mode=zone".into(),
             format!("controlPlane.zone={zone_name}"),
@@ -308,10 +294,7 @@ fn global_two_zones_up(
             "controlPlane.tls.kdsZoneClient.skipVerify=true".into(),
         ];
         start_and_deploy(root, base_env, zone_cluster, "zone", &zone_settings)?;
-        eprintln!(
-            "{} cluster: zone {zone_name} on {zone_cluster} ready",
-            utc_now()
-        );
+        info!(%zone_name, %zone_cluster, "zone ready");
     }
     Ok(())
 }

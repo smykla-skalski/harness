@@ -17,6 +17,7 @@ use std::path::PathBuf;
 
 use clap::{Args, Subcommand};
 use serde_json::json;
+use tracing::warn;
 
 use crate::core_defs::harness_data_root;
 use crate::errors::{CliError, CliErrorKind};
@@ -677,7 +678,7 @@ fn execute_mute(
                 state.muted_codes.push(code);
             }
         } else {
-            eprintln!("warning: unknown issue code '{}'", code_str.trim());
+            warn!(code = code_str.trim(), "unknown issue code");
         }
     }
     save_observer_state(session_id, &state)?;

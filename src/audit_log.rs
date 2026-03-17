@@ -195,7 +195,7 @@ pub fn build_hook_audit_request(ctx: &HookContext) -> Result<AuditAppendRequest,
     );
 
     Ok(AuditAppendRequest {
-        run_dir,
+        run_dir: run_dir.into_owned(),
         tool_name: ctx.tool_name().to_string(),
         tool_input: summarize_tool_input(ctx.tool_name(), ctx.tool_input()),
         full_output: normalize_tool_output(ctx.tool_name(), ctx.tool_response()),
@@ -248,7 +248,7 @@ fn hook_group_id(ctx: &HookContext) -> Option<String> {
     if let Some(gid) = ctx.parsed_command().ok().flatten().and_then(|command| {
         command
             .first_harness_invocation()
-            .and_then(|invocation| invocation.gid.clone())
+            .and_then(|invocation| invocation.gid().map(str::to_string))
     }) {
         return Some(gid);
     }
