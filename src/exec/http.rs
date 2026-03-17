@@ -118,7 +118,10 @@ async fn wait_for_http_async(url: &str, timeout: Duration) -> Result<(), CliErro
             {
                 let mut last = last_progress.lock().expect("lock poisoned");
                 if last.elapsed() >= Duration::from_secs(10) {
-                    info!(elapsed_seconds = elapsed.as_secs_f64(), "waiting for health check");
+                    info!(
+                        elapsed_seconds = elapsed.as_secs_f64(),
+                        "waiting for health check"
+                    );
                     *last = Instant::now();
                 }
             }

@@ -51,7 +51,9 @@ pub(crate) fn run_command(
                 .output()
                 .await
         })
-        .map_err(|e| CliErrorKind::command_failed(cmd_string.clone()).with_details(e.to_string()))?;
+        .map_err(|e| {
+            CliErrorKind::command_failed(cmd_string.clone()).with_details(e.to_string())
+        })?;
     let result = build_result(args, output);
     if ok_exit_codes.contains(&result.returncode) {
         return Ok(result);
@@ -81,79 +83,75 @@ pub(crate) fn run_command_streaming(
     let heartbeat_label = describe_command(args);
     let args_owned: Vec<String> = args.iter().map(|s| (*s).to_string()).collect();
 
-    let result = RUNTIME
-        .block_on(async move {
-            use tokio::io::BufReader;
+    let result = RUNTIME.block_on(async move {
+        use tokio::io::BufReader;
 
-            let mut cmd = build_tokio_command(program, cmd_args, cwd, env);
-            cmd.stdout(Stdio::piped()).stderr(Stdio::piped());
-            let mut child = cmd.spawn().map_err(|e| {
-                CliErrorKind::command_failed(cmd_string.clone()).with_details(e.to_string())
-            })?;
-
-            // Heartbeat task: emits a periodic "still running" message.
-            let heartbeat_task = tokio::spawn(async move {
-                loop {
-                    sleep(HEARTBEAT_INTERVAL).await;
-                    info!("{heartbeat_label} still running...");
-                }
-            });
-
-            // Stderr reader task to avoid deadlock if both pipes fill.
-            let stderr_pipe = child.stderr.take();
-            let stderr_task = tokio::spawn(async move {
-                let mut captured = String::new();
-                if let Some(pipe) = stderr_pipe {
-                    let mut reader = BufReader::new(pipe);
-                    let mut line = String::new();
-                    loop {
-                        line.clear();
-                        let bytes = reader.read_line(&mut line).await.unwrap_or(0);
-                        if bytes == 0 {
-                            break;
-                        }
-                        let trimmed = line.trim_end_matches(['\n', '\r']);
-                        if let Some(msg) = filter_progress_line(trimmed) {
-                            info!("{msg}");
-                        }
-                        captured.push_str(trimmed);
-                        captured.push('\n');
-                    }
-                }
-                captured
-            });
-
-            let stdout = {
-                let mut buf = Vec::new();
-                if let Some(mut pipe) = child.stdout.take() {
-                    pipe.read_to_end(&mut buf).await.ok();
-                }
-                String::from_utf8_lossy(&buf).into_owned()
-            };
-
-            let status = child.wait().await.map_err(|e| {
-                CliErrorKind::command_failed(cmd_string.clone()).with_details(e.to_string())
-            })?;
-
-            heartbeat_task.abort();
-            heartbeat_task.await.ok();
-            let stderr = stderr_task.await.unwrap_or_default();
-
-            Ok::<CommandResult, CliError>(CommandResult {
-                args: args_owned,
-                returncode: status.code().unwrap_or(-1),
-                stdout,
-                stderr,
-            })
+        let mut cmd = build_tokio_command(program, cmd_args, cwd, env);
+        cmd.stdout(Stdio::piped()).stderr(Stdio::piped());
+        let mut child = cmd.spawn().map_err(|e| {
+            CliErrorKind::command_failed(cmd_string.clone()).with_details(e.to_string())
         })?;
+
+        // Heartbeat task: emits a periodic "still running" message.
+        let heartbeat_task = tokio::spawn(async move {
+            loop {
+                sleep(HEARTBEAT_INTERVAL).await;
+                info!("{heartbeat_label} still running...");
+            }
+        });
+
+        // Stderr reader task to avoid deadlock if both pipes fill.
+        let stderr_pipe = child.stderr.take();
+        let stderr_task = tokio::spawn(async move {
+            let mut captured = String::new();
+            if let Some(pipe) = stderr_pipe {
+                let mut reader = BufReader::new(pipe);
+                let mut line = String::new();
+                loop {
+                    line.clear();
+                    let bytes = reader.read_line(&mut line).await.unwrap_or(0);
+                    if bytes == 0 {
+                        break;
+                    }
+                    let trimmed = line.trim_end_matches(['\n', '\r']);
+                    if let Some(msg) = filter_progress_line(trimmed) {
+                        info!("{msg}");
+                    }
+                    captured.push_str(trimmed);
+                    captured.push('\n');
+                }
+            }
+            captured
+        });
+
+        let stdout = {
+            let mut buf = Vec::new();
+            if let Some(mut pipe) = child.stdout.take() {
+                pipe.read_to_end(&mut buf).await.ok();
+            }
+            String::from_utf8_lossy(&buf).into_owned()
+        };
+
+        let status = child.wait().await.map_err(|e| {
+            CliErrorKind::command_failed(cmd_string.clone()).with_details(e.to_string())
+        })?;
+
+        heartbeat_task.abort();
+        heartbeat_task.await.ok();
+        let stderr = stderr_task.await.unwrap_or_default();
+
+        Ok::<CommandResult, CliError>(CommandResult {
+            args: args_owned,
+            returncode: status.code().unwrap_or(-1),
+            stdout,
+            stderr,
+        })
+    })?;
 
     if ok_exit_codes.contains(&result.returncode) {
         return Ok(result);
     }
-    Err(
-        CliErrorKind::command_failed(command_string(args))
-            .with_details(failure_details(&result)),
-    )
+    Err(CliErrorKind::command_failed(command_string(args)).with_details(failure_details(&result)))
 }
 
 /// Run a command with stdout and stderr inherited by the terminal.
