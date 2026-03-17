@@ -80,7 +80,7 @@ fn cluster_spec_deploy_roundtrip() {
         "restart_namespaces": ["kuma-system"],
         "repo_root": "/repo"
     });
-    let spec: ClusterSpec = serde_json::from_value(obj.clone()).unwrap();
+    let spec: ClusterSpec = serde_json::from_value(obj).unwrap();
     let json = serde_json::to_value(&spec).unwrap();
     let spec2: ClusterSpec = serde_json::from_value(json).unwrap();
     assert_eq!(spec.mode, spec2.mode);

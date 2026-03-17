@@ -1,10 +1,11 @@
+use std::borrow::Cow;
 use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use super::{
-    dedup_preserving_order, members_for_mode, universal_members_for_mode, ClusterMode, Platform,
+    ClusterMode, Platform, dedup_preserving_order, members_for_mode, universal_members_for_mode,
 };
 use crate::core_defs::HARNESS_PREFIX;
 
@@ -147,6 +148,16 @@ impl ClusterSpec {
         Some(format!("http://{ip}:{port}"))
     }
 
+    #[must_use]
+    pub fn primary_api_parts(&self) -> Option<(&str, u16)> {
+        if self.platform != Platform::Universal {
+            return None;
+        }
+        let member = self.primary_member();
+        let ip = member.container_ip.as_deref()?;
+        Some((ip, member.cp_api_port.unwrap_or(5681)))
+    }
+
     /// Returns the admin token for universal mode, `None` for Kubernetes.
     #[must_use]
     pub fn admin_token(&self) -> Option<&str> {
@@ -160,6 +171,23 @@ impl ClusterSpec {
             "primary_member called on ClusterSpec with no members"
         );
         &self.members[0]
+    }
+
+    #[must_use]
+    pub fn member(&self, name: &str) -> Option<&super::ClusterMember> {
+        self.members.iter().find(|member| member.name == name)
+    }
+
+    #[must_use]
+    pub fn resolve_container_name<'a>(&'a self, requested: &'a str) -> Cow<'a, str> {
+        if !self.is_compose_managed() || self.member(requested).is_none() {
+            return Cow::Borrowed(requested);
+        }
+        let project = self
+            .members
+            .first()
+            .map_or("default", |item| item.name.as_str());
+        Cow::Owned(format!("harness-{project}-{requested}-1"))
     }
 
     #[must_use]

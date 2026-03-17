@@ -135,11 +135,11 @@ fn report_group(
         return Err(CliErrorKind::ReportGroupEvidenceRequired.into());
     }
 
-    let services = resolve_run_services(run_dir_args)?;
+    let mut services = resolve_run_services(run_dir_args)?;
     let run_dir = services.layout().run_dir();
-    let ctx = services.context();
+    let report_path = services.layout().report_path();
 
-    let Some(mut run_status) = ctx.status.clone() else {
+    let Some(run_status) = services.status_mut() else {
         return Err(CliErrorKind::MissingRunStatus.into());
     };
 
@@ -151,7 +151,7 @@ fn report_group(
 
     let now = utc_now();
     let existing_verdict = run_status.group_verdict(group_id);
-    let state_capture_at_report = run_status.last_state_capture.clone();
+    let state_capture_at_report = run_status.last_state_capture.take();
 
     if let Some(previous) = existing_verdict {
         if previous == verdict {
@@ -165,12 +165,14 @@ fn report_group(
         // The capture_label flag on this command triggers an inline capture,
         // so only warn when that flag is also absent.
         if capture_label.is_none() {
-            warn_if_capture_missing(&run_status);
+            warn_if_capture_missing(run_status);
         }
     }
-    let change = run_status.record_group_result(group_id, verdict, &now, state_capture_at_report);
+    let change =
+        run_status.record_group_result(group_id, verdict, &now, state_capture_at_report.as_deref());
     run_status.last_completed_group = Some(group_id.to_string());
-    run_status.last_updated_utc = Some(now.clone());
+    run_status.last_updated_utc = Some(now);
+    run_status.last_state_capture = state_capture_at_report;
     debug_assert_ne!(change, ExecutedGroupChange::Noop);
 
     if let Some(n) = note {
@@ -178,7 +180,7 @@ fn report_group(
     }
 
     // Write report section first so status is never updated if report fails.
-    let mut report = RunReport::from_markdown(&ctx.layout.report_path())?;
+    let mut report = RunReport::from_markdown(&report_path)?;
 
     let mut section = format!("\n## Group: {group_id}\n\n**Verdict:** {verdict}\n");
     let all_refs: Vec<&str> = evidence
@@ -198,8 +200,8 @@ fn report_group(
     report.save()?;
 
     write_run_status_with_audit(
-        &ctx.layout.run_dir(),
-        &run_status,
+        &run_dir,
+        run_status,
         None,
         Some("execution"),
         Some(group_id),

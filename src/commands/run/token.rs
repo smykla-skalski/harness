@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::path::PathBuf;
 
 use clap::Args;
@@ -47,15 +48,11 @@ pub fn token(
 ) -> Result<i32, CliError> {
     let services = resolve_run_services(run_dir_args)?;
     let access = services.control_plane_access()?;
-    let addr = if let Some(a) = cp_addr {
-        a.to_string()
-    } else {
-        access.addr.clone()
-    };
-    let admin_token = access.admin_token.clone();
+    let addr = cp_addr.map_or(access.addr, Cow::Borrowed);
+    let admin_token = access.admin_token;
 
     // Try REST API first
-    match token_via_api(&addr, kind, name, mesh, valid_for, admin_token.as_deref()) {
+    match token_via_api(addr.as_ref(), kind, name, mesh, valid_for, admin_token) {
         Ok(tok) => {
             println!("{tok}");
             return Ok(0);
@@ -75,7 +72,7 @@ pub fn token(
     args.extend_from_slice(&["--type", kind]);
     args.extend_from_slice(&["--valid-for", valid_for]);
 
-    let result = exec::kumactl_run(&binary, &addr, &args, &[0])?;
+    let result = exec::kumactl_run(&binary, addr.as_ref(), &args, &[0])?;
     let tok = result.stdout.trim();
     println!("{tok}");
     Ok(0)

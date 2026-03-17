@@ -19,8 +19,7 @@ const UNIVERSAL_SUBNET: &str = "172.57.0.0/16";
 
 /// Docker filter patterns for finding kuma-cp images. The glob `*kuma-cp`
 /// matches both bare `kuma-cp` and namespaced `kumahq/kuma-cp` repositories.
-pub(super) const KUMA_CP_IMAGE_FILTERS: &[&str] =
-    &["reference=*kuma-cp", "reference=kuma-cp"];
+pub(super) const KUMA_CP_IMAGE_FILTERS: &[&str] = &["reference=*kuma-cp", "reference=kuma-cp"];
 
 /// Result from a universal cluster up operation.
 struct UniversalUpResult {

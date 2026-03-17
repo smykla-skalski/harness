@@ -549,7 +549,7 @@ impl RunStatus {
         group_id: &str,
         verdict: GroupVerdict,
         completed_at: &str,
-        state_capture_at_report: Option<String>,
+        state_capture_at_report: Option<&str>,
     ) -> ExecutedGroupChange {
         if let Some(group) = self
             .executed_groups
@@ -563,7 +563,7 @@ impl RunStatus {
             self.counts.decrement(previous);
             group.verdict = verdict;
             group.completed_at = completed_at.to_string();
-            group.state_capture_at_report = state_capture_at_report;
+            group.state_capture_at_report = state_capture_at_report.map(str::to_string);
             self.counts.increment(verdict);
             return ExecutedGroupChange::Updated(previous);
         }
@@ -572,7 +572,7 @@ impl RunStatus {
             group_id: group_id.to_string(),
             verdict,
             completed_at: completed_at.to_string(),
-            state_capture_at_report,
+            state_capture_at_report: state_capture_at_report.map(str::to_string),
         });
         self.counts.increment(verdict);
         ExecutedGroupChange::Inserted
@@ -588,6 +588,8 @@ impl RunStatus {
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::cognitive_complexity)]
+
     use super::*;
     use std::fs;
     use std::io::Write as _;

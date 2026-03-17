@@ -46,7 +46,7 @@ impl RunAggregate {
     ///
     /// # Errors
     /// Returns `CliError` if cluster runtime details are missing.
-    pub fn cluster_runtime(&self) -> Result<ClusterRuntime, CliError> {
+    pub fn cluster_runtime(&self) -> Result<ClusterRuntime<'_>, CliError> {
         ClusterRuntime::from_run(self)
     }
 }

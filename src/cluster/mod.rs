@@ -26,9 +26,16 @@ pub enum Platform {
 
 impl fmt::Display for Platform {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+impl Platform {
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
         match self {
-            Self::Kubernetes => f.write_str("kubernetes"),
-            Self::Universal => f.write_str("universal"),
+            Self::Kubernetes => "kubernetes",
+            Self::Universal => "universal",
         }
     }
 }
@@ -79,13 +86,20 @@ impl ClusterMode {
 
 impl fmt::Display for ClusterMode {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+impl ClusterMode {
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
         match self {
-            Self::SingleUp => f.write_str("single-up"),
-            Self::SingleDown => f.write_str("single-down"),
-            Self::GlobalZoneUp => f.write_str("global-zone-up"),
-            Self::GlobalZoneDown => f.write_str("global-zone-down"),
-            Self::GlobalTwoZonesUp => f.write_str("global-two-zones-up"),
-            Self::GlobalTwoZonesDown => f.write_str("global-two-zones-down"),
+            Self::SingleUp => "single-up",
+            Self::SingleDown => "single-down",
+            Self::GlobalZoneUp => "global-zone-up",
+            Self::GlobalZoneDown => "global-zone-down",
+            Self::GlobalTwoZonesUp => "global-two-zones-up",
+            Self::GlobalTwoZonesDown => "global-two-zones-down",
         }
     }
 }
@@ -597,6 +611,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::cognitive_complexity)]
     fn universal_spec_serialization_roundtrip() {
         let mut spec = ClusterSpec::from_mode_with_platform(
             "single-up",

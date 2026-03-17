@@ -61,10 +61,10 @@ pub fn apply(
         match runtime.platform() {
             Platform::Kubernetes => {
                 let kc = services.resolve_kubeconfig(kubeconfig, cluster_arg)?;
-                kubectl(Some(&kc), &["apply", "-f", &manifest_str], &[0])?;
+                kubectl(Some(kc.as_ref()), &["apply", "-f", &manifest_str], &[0])?;
             }
             Platform::Universal => {
-                apply_universal(&services.metadata().repo_root, runtime, &manifest_str)?;
+                apply_universal(&services.metadata().repo_root, &runtime, &manifest_str)?;
             }
         }
 
@@ -73,7 +73,7 @@ pub fn apply(
         let notes = step.map_or_else(String::new, |s| format!("{s}: "));
         services
             .layout()
-            .append_manifest_index(&applied_at, &rel, "-", "PASS", &notes)?;
+            .append_manifest_index(&applied_at, rel.as_ref(), "-", "PASS", &notes)?;
         services.mark_manifest_applied(&manifest, &applied_at, step)?;
         println!("{}", shorten_path(&manifest));
     }
@@ -120,7 +120,7 @@ fn kuma_api_path(resource_type: &str, name: &str, mesh: Option<&str>) -> String 
 
 fn apply_universal(
     repo_root: &str,
-    runtime: &ClusterRuntime,
+    runtime: &ClusterRuntime<'_>,
     manifest: &str,
 ) -> Result<(), CliError> {
     let access = runtime.control_plane_access()?;
@@ -137,11 +137,11 @@ fn apply_universal(
         let mesh = resource["mesh"].as_str();
         let path = kuma_api_path(resource_type, name, mesh);
         match exec::cp_api_json(
-            &access.addr,
+            access.addr.as_ref(),
             &path,
             exec::HttpMethod::Put,
             Some(&resource),
-            access.admin_token.as_deref(),
+            access.admin_token,
         ) {
             Ok(_) => return Ok(()),
             Err(e) => eprintln!("apply: REST API failed ({e}), falling back to kumactl"),

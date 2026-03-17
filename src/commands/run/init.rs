@@ -117,8 +117,8 @@ fn populate_run_dir(
         repo_root: resolved_repo_root.to_string_lossy().into_owned(),
         keep_clusters: spec.frontmatter.keep_clusters,
         created_at: created_at.to_string(),
-        user_stories: user_stories.clone(),
-        required_dependencies: required_dependencies.clone(),
+        user_stories,
+        required_dependencies,
     };
 
     write_json_pretty(&layout.metadata_path(), &metadata)
@@ -151,7 +151,7 @@ fn populate_run_dir(
         layout.report_path(),
         RunReportFrontmatter {
             run_id: run_id.to_string(),
-            suite_id: suite_id.clone(),
+            suite_id,
             profile: profile.to_string(),
             overall_verdict: Verdict::Pending,
             story_results: vec![],

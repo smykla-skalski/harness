@@ -1,7 +1,7 @@
 use serde_json::Value;
 
 use super::spec::{ClusterSpec, HelmSetting};
-use super::{parse_helm_settings, parse_string_vec, ClusterMode};
+use super::{ClusterMode, parse_helm_settings, parse_string_vec};
 
 /// Current deploy state, written to current-deploy.json.
 #[derive(Debug, Clone, PartialEq)]

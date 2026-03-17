@@ -1,5 +1,8 @@
+use std::borrow::Cow;
 use std::collections::BTreeMap;
-use std::path::{Path, PathBuf};
+use std::path::Path;
+#[cfg(test)]
+use std::path::PathBuf;
 
 use serde::Serialize;
 
@@ -29,26 +32,25 @@ use crate::workflow::runner::{
 #[derive(Debug)]
 pub struct RunServices {
     ctx: RunContext,
-    runtime: Option<ClusterRuntime>,
 }
 
 /// Runtime health for a tracked cluster member or backing network.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-pub struct ClusterMemberHealthRecord {
-    pub name: String,
-    pub role: String,
+pub struct ClusterMemberHealthRecord<'a> {
+    pub name: &'a str,
+    pub role: &'a str,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub container: Option<String>,
+    pub container: Option<Cow<'a, str>>,
     pub running: bool,
 }
 
 /// Structured result for `harness cluster-check`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-pub struct ClusterHealthReport {
+pub struct ClusterHealthReport<'a> {
     pub healthy: bool,
-    pub members: Vec<ClusterMemberHealthRecord>,
+    pub members: Vec<ClusterMemberHealthRecord<'a>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub hint: Option<String>,
+    pub hint: Option<&'static str>,
 }
 
 /// Structured service status row for `harness status`.
@@ -60,11 +62,11 @@ pub struct ServiceStatusRecord {
 
 /// Structured cluster-member row for `harness status`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-pub struct ClusterMemberStatusRecord {
-    pub name: String,
-    pub role: String,
+pub struct ClusterMemberStatusRecord<'a> {
+    pub name: &'a str,
+    pub role: &'a str,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub container_ip: Option<String>,
+    pub container_ip: Option<&'a str>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cp_api_port: Option<u16>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -73,20 +75,20 @@ pub struct ClusterMemberStatusRecord {
 
 /// Structured result for `harness status`.
 #[derive(Debug, Clone, PartialEq, Serialize)]
-pub struct ClusterStatusReport {
-    pub platform: String,
-    pub mode: String,
+pub struct ClusterStatusReport<'a> {
+    pub platform: &'static str,
+    pub mode: &'static str,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub cp_address: Option<String>,
+    pub cp_address: Option<Cow<'a, str>>,
     #[serde(default)]
     pub admin_token: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub store_type: Option<String>,
+    pub store_type: Option<&'a str>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub docker_network: Option<String>,
+    pub docker_network: Option<&'a str>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub cp_image: Option<String>,
-    pub members: Vec<ClusterMemberStatusRecord>,
+    pub cp_image: Option<&'a str>,
+    pub members: Vec<ClusterMemberStatusRecord<'a>>,
     #[serde(default)]
     pub services: Vec<ServiceStatusRecord>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -99,12 +101,7 @@ impl RunServices {
     /// # Errors
     /// Returns `CliError` if the persisted cluster spec cannot be adapted.
     pub fn from_context(ctx: RunContext) -> Result<Self, CliError> {
-        let runtime = ctx
-            .cluster
-            .as_ref()
-            .map(ClusterRuntime::from_spec)
-            .transpose()?;
-        Ok(Self { ctx, runtime })
+        Ok(Self { ctx })
     }
 
     /// Build services from a run directory.
@@ -150,6 +147,10 @@ impl RunServices {
         self.ctx.status.as_ref()
     }
 
+    pub fn status_mut(&mut self) -> Option<&mut RunStatus> {
+        self.ctx.status.as_mut()
+    }
+
     /// Return the persisted cluster spec.
     ///
     /// # Errors
@@ -165,9 +166,11 @@ impl RunServices {
     ///
     /// # Errors
     /// Returns `CliError` when the run has no cluster spec yet.
-    pub fn cluster_runtime(&self) -> Result<&ClusterRuntime, CliError> {
-        self.runtime
+    pub fn cluster_runtime(&self) -> Result<ClusterRuntime<'_>, CliError> {
+        self.ctx
+            .cluster
             .as_ref()
+            .map(ClusterRuntime::from_spec)
             .ok_or_else(|| CliErrorKind::missing_run_context_value("cluster").into())
     }
 
@@ -175,11 +178,11 @@ impl RunServices {
     ///
     /// # Errors
     /// Returns `CliError` when no kubeconfig can be determined.
-    pub fn resolve_kubeconfig(
-        &self,
-        explicit: Option<&str>,
+    pub fn resolve_kubeconfig<'a>(
+        &'a self,
+        explicit: Option<&'a str>,
         cluster: Option<&str>,
-    ) -> Result<PathBuf, CliError> {
+    ) -> Result<Cow<'a, Path>, CliError> {
         self.cluster_runtime()?
             .resolve_kubeconfig(explicit, cluster)
     }
@@ -188,7 +191,7 @@ impl RunServices {
     ///
     /// # Errors
     /// Returns `CliError` when the run is not universal or the endpoint is incomplete.
-    pub fn control_plane_access(&self) -> Result<&ControlPlaneAccess, CliError> {
+    pub fn control_plane_access(&self) -> Result<ControlPlaneAccess<'_>, CliError> {
         self.cluster_runtime()?.control_plane_access()
     }
 
@@ -196,7 +199,7 @@ impl RunServices {
     ///
     /// # Errors
     /// Returns `CliError` when the run is not universal or the endpoint is incomplete.
-    pub fn xds_access(&self) -> Result<&XdsAccess, CliError> {
+    pub fn xds_access(&self) -> Result<XdsAccess<'_>, CliError> {
         self.cluster_runtime()?.xds_access()
     }
 
@@ -209,10 +212,10 @@ impl RunServices {
     }
 
     #[must_use]
-    pub fn resolve_container_name(&self, requested: &str) -> String {
-        self.runtime.as_ref().map_or_else(
-            || requested.to_string(),
-            |runtime| runtime.resolve_container_name(requested),
+    pub fn resolve_container_name<'a>(&'a self, requested: &'a str) -> Cow<'a, str> {
+        self.ctx.cluster.as_ref().map_or_else(
+            || Cow::Borrowed(requested),
+            |spec| ClusterRuntime::from_spec(spec).resolve_container_name(requested),
         )
     }
 
@@ -220,7 +223,10 @@ impl RunServices {
     ///
     /// # Errors
     /// Returns `CliError` when the runtime cannot derive a service image.
-    pub fn service_image(&self, explicit: Option<&str>) -> Result<String, CliError> {
+    pub fn service_image<'a>(
+        &'a self,
+        explicit: Option<&'a str>,
+    ) -> Result<Cow<'a, str>, CliError> {
         self.cluster_runtime()?.service_image(explicit)
     }
 
@@ -235,13 +241,7 @@ impl RunServices {
         body: Option<&serde_json::Value>,
     ) -> Result<String, CliError> {
         let access = self.control_plane_access()?;
-        exec::cp_api_text(
-            &access.addr,
-            path,
-            method,
-            body,
-            access.admin_token.as_deref(),
-        )
+        exec::cp_api_text(access.addr.as_ref(), path, method, body, access.admin_token)
     }
 
     /// Call the control-plane API and parse the JSON response.
@@ -255,13 +255,7 @@ impl RunServices {
         body: Option<&serde_json::Value>,
     ) -> Result<serde_json::Value, CliError> {
         let access = self.control_plane_access()?;
-        exec::cp_api_json(
-            &access.addr,
-            path,
-            method,
-            body,
-            access.admin_token.as_deref(),
-        )
+        exec::cp_api_json(access.addr.as_ref(), path, method, body, access.admin_token)
     }
 
     #[must_use]
@@ -312,7 +306,7 @@ impl RunServices {
     ///
     /// # Errors
     /// Returns `CliError` when the run has no tracked cluster spec yet.
-    pub fn cluster_health_report(&self) -> Result<ClusterHealthReport, CliError> {
+    pub fn cluster_health_report(&self) -> Result<ClusterHealthReport<'_>, CliError> {
         let runtime = self.cluster_runtime()?;
         let spec = self.cluster_spec()?;
         let mut members = match runtime.platform() {
@@ -320,8 +314,8 @@ impl RunServices {
                 .members
                 .iter()
                 .map(|member| ClusterMemberHealthRecord {
-                    name: member.name.clone(),
-                    role: member.role.clone(),
+                    name: member.name.as_str(),
+                    role: member.role.as_str(),
                     container: None,
                     running: exec::cluster_exists(&member.name).unwrap_or(false),
                 })
@@ -332,8 +326,8 @@ impl RunServices {
                 .map(|member| {
                     let container = runtime.resolve_container_name(&member.name);
                     ClusterMemberHealthRecord {
-                        name: member.name.clone(),
-                        role: member.role.clone(),
+                        name: member.name.as_str(),
+                        role: member.role.as_str(),
                         running: exec::container_running(&container).unwrap_or(false),
                         container: Some(container),
                     }
@@ -344,8 +338,8 @@ impl RunServices {
             && let Ok(network) = runtime.docker_network()
         {
             members.push(ClusterMemberHealthRecord {
-                name: network.to_string(),
-                role: "network".to_string(),
+                name: network,
+                role: "network",
                 container: None,
                 running: docker_network_exists(network),
             });
@@ -355,8 +349,7 @@ impl RunServices {
             healthy,
             members,
             hint: (!healthy).then_some(
-                "use 'harness logs <name>' to inspect, or re-run 'harness cluster' to recreate"
-                    .to_string(),
+                "use 'harness logs <name>' to inspect, or re-run 'harness cluster' to recreate",
             ),
         })
     }
@@ -365,33 +358,30 @@ impl RunServices {
     ///
     /// # Errors
     /// Returns `CliError` when the run has no tracked cluster spec yet.
-    pub fn status_report(&self) -> Result<ClusterStatusReport, CliError> {
+    pub fn status_report(&self) -> Result<ClusterStatusReport<'_>, CliError> {
         let runtime = self.cluster_runtime()?;
         let spec = self.cluster_spec()?;
         let services = self.list_service_containers().unwrap_or_default();
         let dataplanes = self.query_dataplanes("default").ok();
         Ok(ClusterStatusReport {
-            platform: runtime.platform().to_string(),
-            mode: spec.mode.to_string(),
-            cp_address: self
-                .control_plane_access()
-                .ok()
-                .map(|access| access.addr.clone()),
+            platform: runtime.platform().as_str(),
+            mode: spec.mode.as_str(),
+            cp_address: self.control_plane_access().ok().map(|access| access.addr),
             admin_token: spec
                 .admin_token
                 .as_deref()
                 .map(mask_token)
                 .unwrap_or_default(),
-            store_type: spec.store_type.clone(),
-            docker_network: spec.docker_network.clone(),
-            cp_image: spec.cp_image.clone(),
+            store_type: spec.store_type.as_deref(),
+            docker_network: spec.docker_network.as_deref(),
+            cp_image: spec.cp_image.as_deref(),
             members: spec
                 .members
                 .iter()
                 .map(|member| ClusterMemberStatusRecord {
-                    name: member.name.clone(),
-                    role: member.role.clone(),
-                    container_ip: member.container_ip.clone(),
+                    name: member.name.as_str(),
+                    role: member.role.as_str(),
+                    container_ip: member.container_ip.as_deref(),
                     cp_api_port: member.cp_api_port,
                     xds_port: member.xds_port,
                 })
@@ -438,7 +428,11 @@ impl RunServices {
     ///
     /// # Errors
     /// Returns `CliError` on capture or persistence failures.
-    pub fn capture_state(&self, label: &str, kubeconfig: Option<&str>) -> Result<String, CliError> {
+    pub fn capture_state(
+        &mut self,
+        label: &str,
+        kubeconfig: Option<&str>,
+    ) -> Result<String, CliError> {
         let timestamp = utc_now().replace(':', "");
         let capture_path = self
             .layout()
@@ -447,17 +441,12 @@ impl RunServices {
         let snapshot = self.build_capture_snapshot(kubeconfig)?;
         write_json_pretty(&capture_path, &snapshot)?;
 
-        let rel = self.layout().relative_path(&capture_path);
-        if let Some(mut status) = self.ctx.status.clone() {
+        let rel = self.layout().relative_path(&capture_path).into_owned();
+        let run_dir = self.layout().run_dir();
+        if let Some(status) = self.ctx.status.as_mut() {
             status.last_state_capture = Some(rel.clone());
-            let runner_state = read_runner_state(&self.layout().run_dir())?;
-            write_run_status_with_audit(
-                &self.layout().run_dir(),
-                &status,
-                runner_state.as_ref(),
-                None,
-                None,
-            )?;
+            let runner_state = read_runner_state(&run_dir)?;
+            write_run_status_with_audit(&run_dir, status, runner_state.as_ref(), None, None)?;
         }
         Ok(rel)
     }
@@ -476,7 +465,7 @@ impl RunServices {
         else {
             return Ok(());
         };
-        let rel = self.layout().relative_path(manifest_path);
+        let rel = self.layout().relative_path(manifest_path).into_owned();
         let Some(manifest) = artifact.manifest_mut_by_prepared_path(&rel) else {
             return Ok(());
         };
@@ -528,7 +517,7 @@ impl RunServices {
     ) -> Result<StateCaptureSnapshot, CliError> {
         let resolved = self.resolve_kubeconfig(kubeconfig, None)?;
         let result = exec::kubectl(
-            Some(&resolved),
+            Some(resolved.as_ref()),
             &["get", "pods", "--all-namespaces", "-o", "json"],
             &[0],
         )?;
@@ -653,7 +642,8 @@ impl RunServices {
             checked_at: checked_at.to_string(),
             prepared_suite_path: Some(
                 self.layout()
-                    .relative_path(&self.layout().prepared_suite_path()),
+                    .relative_path(&self.layout().prepared_suite_path())
+                    .into_owned(),
             ),
             repo_root: Some(self.metadata().repo_root.clone()),
             tools,
@@ -687,6 +677,8 @@ fn docker_network_exists(network: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::absolute_paths, clippy::cognitive_complexity)]
+
     use std::fs;
 
     use super::*;
@@ -706,7 +698,7 @@ mod tests {
         .unwrap();
         fs::write(
             suite_dir.join("groups").join("g01.md"),
-            r#"---
+            r"---
 group_id: g01
 story: demo
 capability: demo
@@ -745,13 +737,13 @@ observe
 ## Debug
 
 debug
-"#,
+",
         )
         .unwrap();
         let suite_path = suite_dir.join("suite.md");
         fs::write(
             &suite_path,
-            r#"---
+            r"---
 suite_id: demo.suite
 feature: demo
 scope: unit
@@ -767,7 +759,7 @@ keep_clusters: false
 ---
 
 # Demo Suite
-"#,
+",
         )
         .unwrap();
         suite_path

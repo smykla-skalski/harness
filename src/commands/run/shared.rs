@@ -63,7 +63,7 @@ pub(crate) fn inject_run_env(cmd: &mut Command, run_dir: &Path, cluster: Option<
     if !is_universal {
         match services.resolve_kubeconfig(None, cluster) {
             Ok(kubeconfig) => {
-                cmd.env("KUBECONFIG", kubeconfig);
+                cmd.env("KUBECONFIG", kubeconfig.as_ref());
             }
             Err(e) => eprintln!("warning: failed to resolve kubeconfig: {e}"),
         }

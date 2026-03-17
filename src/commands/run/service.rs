@@ -108,12 +108,12 @@ fn service_up(
 
     // Generate token
     let token_result = token_via_api(
-        &access.addr,
+        access.addr.as_ref(),
         "dataplane",
         svc_name,
         mesh,
         "24h",
-        access.admin_token.as_deref(),
+        access.admin_token,
     )?;
     let token_str = token_result.trim();
 
@@ -121,7 +121,7 @@ fn service_up(
     let port_pair = [(svc_port, svc_port)];
     let run_id_label = format!("io.harness.run-id={}", services.layout().run_id);
     exec::docker_run_detached(
-        &svc_image,
+        svc_image.as_ref(),
         svc_name,
         network,
         &[],
@@ -163,7 +163,7 @@ struct ServiceSetup<'a> {
     token: &'a str,
     transparent_proxy: bool,
     timeout: u64,
-    xds: &'a XdsAccess,
+    xds: XdsAccess<'a>,
 }
 
 /// Post-container-start setup: configure dataplane, inject certs, wait for readiness.
@@ -211,7 +211,7 @@ fn service_up_inner(setup: &ServiceSetup<'_>) -> Result<(), CliError> {
 
     // Extract CP's CA cert from the XDS endpoint and inject into container.
     // kuma-dp needs this to verify the TLS connection to the CP.
-    let ca_cert = extract_cp_ca_cert(&setup.xds.ip, setup.xds.port)?;
+    let ca_cert = extract_cp_ca_cert(setup.xds.ip, setup.xds.port)?;
     let ca_path = format!("/tmp/{svc_name}-ca.crt");
     exec::docker_write_file(svc_name, &ca_path, &ca_cert)?;
 
@@ -322,6 +322,7 @@ fn service_list(run_dir_args: &RunDirArgs) -> Result<i32, CliError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::cluster::{ClusterSpec, Platform};
     use crate::runtime::ClusterRuntime;
 
     // -- template rendering tests --
@@ -391,33 +392,33 @@ mod tests {
 
     #[test]
     fn resolve_image_explicit_wins() {
-        let spec = crate::cluster::ClusterSpec::from_mode_with_platform(
+        let spec = ClusterSpec::from_mode_with_platform(
             "single-up",
             &["cp".into()],
             "/r",
             vec![],
             vec![],
-            crate::cluster::Platform::Universal,
+            Platform::Universal,
         )
         .unwrap();
-        let runtime = ClusterRuntime::from_spec(&spec).unwrap();
+        let runtime = ClusterRuntime::from_spec(&spec);
         let result = runtime.service_image(Some("my-image:v1")).unwrap();
         assert_eq!(result, "my-image:v1");
     }
 
     #[test]
     fn resolve_image_derives_from_cp_image() {
-        let mut spec = crate::cluster::ClusterSpec::from_mode_with_platform(
+        let mut spec = ClusterSpec::from_mode_with_platform(
             "single-up",
             &["cp".into()],
             "/r",
             vec![],
             vec![],
-            crate::cluster::Platform::Universal,
+            Platform::Universal,
         )
         .unwrap();
         spec.cp_image = Some("kuma-cp:dev".into());
-        let runtime = ClusterRuntime::from_spec(&spec).unwrap();
+        let runtime = ClusterRuntime::from_spec(&spec);
         let result = runtime.service_image(None).unwrap();
         assert_eq!(result, "kuma-universal:dev");
     }
@@ -446,16 +447,16 @@ mod tests {
 
     #[test]
     fn resolve_image_errors_when_no_cp_image() {
-        let spec = crate::cluster::ClusterSpec::from_mode_with_platform(
+        let spec = ClusterSpec::from_mode_with_platform(
             "single-up",
             &["cp".into()],
             "/r",
             vec![],
             vec![],
-            crate::cluster::Platform::Universal,
+            Platform::Universal,
         )
         .unwrap();
-        let runtime = ClusterRuntime::from_spec(&spec).unwrap();
+        let runtime = ClusterRuntime::from_spec(&spec);
         let result = runtime.service_image(None);
         assert!(result.is_err());
     }

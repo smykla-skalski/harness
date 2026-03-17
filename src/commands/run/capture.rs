@@ -28,7 +28,7 @@ pub fn capture(
     run_dir_args: &RunDirArgs,
 ) -> Result<i32, CliError> {
     validate_safe_segment(label)?;
-    let services = resolve_run_services(run_dir_args)?;
+    let mut services = resolve_run_services(run_dir_args)?;
     let rel = services.capture_state(label, kubeconfig)?;
     println!("{rel}");
     Ok(0)

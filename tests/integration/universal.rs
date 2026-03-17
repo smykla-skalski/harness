@@ -1,3 +1,5 @@
+#![allow(clippy::cognitive_complexity)]
+
 // Universal mode integration tests.
 // Tests Platform enum, ClusterSpec universal fields, compose file generation,
 // capabilities output, universal manifest validation, context loading with
@@ -95,6 +97,7 @@ fn platform_default_is_kubernetes() {
 // ============================================================================
 
 #[test]
+#[allow(clippy::cognitive_complexity)]
 fn cluster_spec_universal_fields_roundtrip() {
     let mut spec = ClusterSpec::from_mode_with_platform(
         "single-up",
@@ -237,7 +240,7 @@ fn from_mode_universal_topologies() {
         },
     ];
     for c in &cases {
-        let args: Vec<String> = c.args.iter().map(|s| s.to_string()).collect();
+        let args: Vec<String> = c.args.iter().map(ToString::to_string).collect();
         let spec = ClusterSpec::from_mode_with_platform(
             c.mode,
             &args,
@@ -298,6 +301,7 @@ fn from_mode_universal_rejects_wrong_arg_count() {
 // ============================================================================
 
 #[test]
+#[allow(clippy::cognitive_complexity)]
 fn compose_single_zone_memory_yaml_structure() {
     let compose = compose::single_zone(
         "kuma-cp:latest",
@@ -351,6 +355,7 @@ fn compose_single_zone_postgres_includes_postgres_service() {
 }
 
 #[test]
+#[allow(clippy::cognitive_complexity)]
 fn compose_global_zone_yaml_structure() {
     let compose = compose::global_zone(
         "kuma-cp:dev",
@@ -398,6 +403,7 @@ fn compose_global_zone_yaml_structure() {
 }
 
 #[test]
+#[allow(clippy::cognitive_complexity)]
 fn compose_global_two_zones_yaml_structure() {
     let compose = compose::global_two_zones(GlobalTwoZonesConfig {
         image: "kuma-cp:latest",
@@ -912,6 +918,7 @@ fn primary_api_url_returns_none_for_universal_without_ip() {
 // ============================================================================
 
 #[test]
+#[allow(clippy::cognitive_complexity)]
 fn cluster_member_universal_defaults() {
     let member = ClusterMember::universal("test-cp", "cp", None);
     assert_eq!(member.name, "test-cp");
@@ -953,6 +960,7 @@ fn cluster_member_universal_serialization_roundtrip() {
 // ============================================================================
 
 #[test]
+#[allow(clippy::cognitive_complexity)]
 fn cluster_spec_from_object_with_universal_fields() {
     let obj = serde_json::json!({
         "mode": "single-up",
@@ -1058,6 +1066,7 @@ fn run_layout_from_run_dir_universal_run() {
 // ============================================================================
 
 #[test]
+#[allow(clippy::cognitive_complexity)]
 fn cluster_spec_to_json_and_back_universal() {
     let mut spec = ClusterSpec::from_mode_with_platform(
         "global-zone-up",

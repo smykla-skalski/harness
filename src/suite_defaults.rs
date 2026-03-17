@@ -68,7 +68,7 @@ pub fn find_suite_dir(path: &Path) -> Option<PathBuf> {
     }
 
     let start = if resolved.is_dir() {
-        resolved.clone()
+        resolved
     } else {
         resolved.parent()?.to_path_buf()
     };
@@ -206,7 +206,7 @@ mod tests {
         fs::write(suite_dir.join("suite.md"), "# Suite").unwrap();
 
         let result = find_suite_dir(&suite_dir);
-        assert_eq!(result, Some(suite_dir.clone()));
+        assert_eq!(result, Some(suite_dir));
     }
 
     #[test]

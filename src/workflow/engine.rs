@@ -95,7 +95,7 @@ mod tests {
     fn save_and_load_round_trip() {
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("state.json");
-        let repo = VersionedJsonRepository::<Value>::new(path.clone(), 1);
+        let repo = VersionedJsonRepository::<Value>::new(path, 1);
         let state = json!({"schema_version": 1, "phase": "bootstrap"});
         repo.save(&state).unwrap();
         let loaded = repo.load().unwrap().unwrap();
@@ -117,17 +117,17 @@ mod tests {
     fn save_creates_parent_directories() {
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("nested").join("dir").join("state.json");
-        let repo = VersionedJsonRepository::<Value>::new(path.clone(), 1);
+        let repo = VersionedJsonRepository::<Value>::new(path, 1);
         let state = json!({"schema_version": 1});
         repo.save(&state).unwrap();
-        assert!(path.exists());
+        assert!(repo.path.exists());
     }
 
     #[test]
     fn save_is_atomic_via_rename() {
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("state.json");
-        let repo = VersionedJsonRepository::<Value>::new(path.clone(), 1);
+        let repo = VersionedJsonRepository::<Value>::new(path, 1);
         let state = json!({"schema_version": 1, "data": "first"});
         repo.save(&state).unwrap();
         let state2 = json!({"schema_version": 1, "data": "second"});
