@@ -1,14 +1,17 @@
 use std::fs;
 use std::io::{BufRead, BufReader, Seek, SeekFrom, Write};
 use std::path::Path;
-use std::thread;
 use std::time::{Duration, Instant};
 
+use notify::{RecommendedWatcher, RecursiveMode, Watcher};
 use serde_json::json;
+use tokio::sync::mpsc;
+use tokio::time::sleep;
 
 use tracing::warn;
 
 use crate::errors::{CliError, CliErrorKind};
+use crate::exec::RUNTIME;
 
 use super::ObserveFilterArgs;
 use super::classifier;
@@ -98,10 +101,11 @@ fn emit_watch_issue(
     }
 }
 
-/// Execute watch mode with polling.
+/// Execute watch mode with file-event-driven updates and a fallback poll interval.
 ///
-/// Tracks the byte offset in the session file so each poll cycle only reads
-/// new lines instead of re-reading the entire file.
+/// Uses `notify` to receive filesystem events for immediate reaction when the
+/// session file changes, with a fallback `poll_duration` sleep to catch any
+/// missed events.
 pub(super) fn execute_watch(
     session_id: &str,
     poll_interval: u64,
@@ -151,28 +155,61 @@ pub(super) fn execute_watch(
         .map(|p| open_append(p, "details"))
         .transpose()?;
 
-    loop {
-        let prev_last_line = last_line;
-        let new_issues = poll_session_lines(&path, &mut byte_offset, &mut last_line, &mut state);
+    RUNTIME.block_on(async {
+        let (event_tx, mut event_rx) = mpsc::channel::<notify::Result<notify::Event>>(32);
 
-        // Track log activity (any new lines), not just issue activity
-        if last_line > prev_last_line {
-            last_activity = Instant::now();
+        let mut watcher = RecommendedWatcher::new(
+            move |res| {
+                let _ = event_tx.blocking_send(res);
+            },
+            notify::Config::default(),
+        )
+        .map_err(|e| {
+            CliError::from(CliErrorKind::session_parse_error(format!(
+                "cannot create file watcher: {e}"
+            )))
+        })?;
+
+        watcher
+            .watch(&path, RecursiveMode::NonRecursive)
+            .map_err(|e| {
+                CliError::from(CliErrorKind::session_parse_error(format!(
+                    "cannot watch session file: {e}"
+                )))
+            })?;
+
+        loop {
+            tokio::select! {
+                Some(_event) = event_rx.recv() => {
+                    // file changed — drain any additional queued events immediately
+                    while event_rx.try_recv().is_ok() {}
+                }
+                () = sleep(poll_duration) => {
+                    // fallback poll to catch missed events
+                }
+            }
+
+            let prev_last_line = last_line;
+            let new_issues =
+                poll_session_lines(&path, &mut byte_offset, &mut last_line, &mut state);
+
+            if last_line > prev_last_line {
+                last_activity = Instant::now();
+            }
+
+            let filtered_new = apply_filters(new_issues, filter)?;
+            for issue in &filtered_new {
+                emit_watch_issue(issue, filter.json, &mut details_writer, &mut output_writer);
+            }
+            all_issues.extend(filtered_new);
+
+            if timeout > 0 && last_activity.elapsed() > timeout_duration {
+                break;
+            }
         }
 
-        // Filter each batch before emitting
-        let filtered_new = apply_filters(new_issues, filter)?;
-        for issue in &filtered_new {
-            emit_watch_issue(issue, filter.json, &mut details_writer, &mut output_writer);
-        }
-        all_issues.extend(filtered_new);
-
-        if timeout > 0 && last_activity.elapsed() > timeout_duration {
-            break;
-        }
-
-        thread::sleep(poll_duration);
-    }
+        Ok::<(), CliError>(())
+    })?;
 
     if filter.summary {
         println!("{}", output::render_summary(&all_issues, last_line));

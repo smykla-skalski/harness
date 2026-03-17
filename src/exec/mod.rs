@@ -3,6 +3,8 @@ mod http;
 mod output_filter;
 mod runtime;
 
+pub(crate) use runtime::RUNTIME;
+
 pub use docker::{
     cluster_exists, compose_down, compose_down_project, compose_up, container_running, docker,
     docker_exec_cmd, docker_exec_detached, docker_inspect_ip, docker_network_create,
@@ -24,8 +26,6 @@ use tracing::info;
 
 use crate::core_defs::{CommandResult, merge_env};
 use crate::errors::{CliError, CliErrorKind};
-
-use runtime::RUNTIME;
 
 /// How long a subprocess can run without emitting a progress line before
 /// we print a heartbeat message.
