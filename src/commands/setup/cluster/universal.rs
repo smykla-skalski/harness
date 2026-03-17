@@ -1,8 +1,12 @@
 use std::path::Path;
+use std::sync::Arc;
 use std::time::Duration;
 
 use tracing::{info, warn};
 
+use crate::blocks::{
+    ContainerConfig, ContainerRuntime, DockerContainerRuntime, StdProcessExecutor,
+};
 use crate::cluster::{ClusterSpec, Platform};
 use crate::commands::resolve_repo_root;
 use crate::compose;
@@ -10,9 +14,7 @@ use crate::context::RunRepository;
 use crate::core_defs::HARNESS_PREFIX;
 use crate::errors::{CliError, CliErrorKind, cow};
 use crate::exec::{
-    compose_down_project, compose_up, docker_inspect_ip, docker_network_create, docker_network_rm,
-    docker_rm, docker_rm_by_label, docker_run_detached, extract_admin_token, run_command,
-    wait_for_http,
+    compose_down_project, compose_up, extract_admin_token, run_command, wait_for_http,
 };
 
 use super::{ClusterArgs, persist_cluster_spec};
@@ -144,6 +146,7 @@ pub(super) fn cluster_universal(args: &ClusterArgs) -> Result<i32, CliError> {
 
     let effective_store = resolve_effective_store(is_up, &args.store);
     let cp_image = resolve_universal_cp_image(is_up, &root, args.image.as_deref(), args.no_build)?;
+    let docker = DockerContainerRuntime::new(Arc::new(StdProcessExecutor));
 
     info!(%mode, names = %all_names.join(" "), "starting universal cluster");
 
@@ -154,6 +157,7 @@ pub(super) fn cluster_universal(args: &ClusterArgs) -> Result<i32, CliError> {
         &effective_store,
         &cp_image,
         &mut spec,
+        &docker,
     )?;
 
     if is_up {
@@ -183,20 +187,36 @@ fn execute_universal_mode(
     effective_store: &str,
     cp_image: &str,
     spec: &mut ClusterSpec,
+    docker: &dyn ContainerRuntime,
 ) -> Result<(), CliError> {
     match mode {
-        "single-up" => {
-            handle_single_up(spec, cp_image, network_name, effective_store, &all_names[0])
-        }
-        "single-down" => handle_single_down(network_name, effective_store, &all_names[0]),
-        "global-zone-up" => {
-            handle_global_zone_up(spec, cp_image, network_name, effective_store, all_names)
-        }
-        "global-zone-down" => universal_global_zone_down(network_name, all_names),
-        "global-two-zones-up" => {
-            handle_global_two_zones_up(spec, cp_image, network_name, effective_store, all_names)
-        }
-        "global-two-zones-down" => universal_global_two_zones_down(network_name, all_names),
+        "single-up" => handle_single_up(
+            spec,
+            cp_image,
+            network_name,
+            effective_store,
+            &all_names[0],
+            docker,
+        ),
+        "single-down" => handle_single_down(network_name, effective_store, &all_names[0], docker),
+        "global-zone-up" => handle_global_zone_up(
+            spec,
+            cp_image,
+            network_name,
+            effective_store,
+            all_names,
+            docker,
+        ),
+        "global-zone-down" => universal_global_zone_down(network_name, all_names, docker),
+        "global-two-zones-up" => handle_global_two_zones_up(
+            spec,
+            cp_image,
+            network_name,
+            effective_store,
+            all_names,
+            docker,
+        ),
+        "global-two-zones-down" => universal_global_two_zones_down(network_name, all_names, docker),
         _ => Err(CliErrorKind::cluster_error(cow!("unsupported cluster mode: {mode}")).into()),
     }
 }
@@ -207,11 +227,24 @@ fn handle_single_up(
     network_name: &str,
     effective_store: &str,
     cluster_name: &str,
+    docker: &dyn ContainerRuntime,
 ) -> Result<(), CliError> {
     let result = if effective_store == "postgres" {
-        universal_single_up_compose(cp_image, network_name, effective_store, cluster_name)?
+        universal_single_up_compose(
+            cp_image,
+            network_name,
+            effective_store,
+            cluster_name,
+            docker,
+        )?
     } else {
-        universal_single_up(cp_image, network_name, effective_store, cluster_name)?
+        universal_single_up(
+            cp_image,
+            network_name,
+            effective_store,
+            cluster_name,
+            docker,
+        )?
     };
     apply_universal_up_result(spec, cp_image, effective_store, result);
     Ok(())
@@ -221,8 +254,9 @@ fn handle_single_down(
     network_name: &str,
     effective_store: &str,
     cluster_name: &str,
+    docker: &dyn ContainerRuntime,
 ) -> Result<(), CliError> {
-    let removed = docker_rm_by_label("io.harness.service=true")?;
+    let removed = docker.remove_by_label("io.harness.service=true")?;
     for name in &removed {
         info!(%name, "removed service container");
     }
@@ -231,7 +265,7 @@ fn handle_single_down(
         compose_down_project(&project)?;
         return Ok(());
     }
-    universal_single_down(network_name, cluster_name)
+    universal_single_down(network_name, cluster_name, docker)
 }
 
 fn handle_global_zone_up(
@@ -240,8 +274,10 @@ fn handle_global_zone_up(
     network_name: &str,
     effective_store: &str,
     all_names: &[String],
+    docker: &dyn ContainerRuntime,
 ) -> Result<(), CliError> {
-    let result = universal_global_zone_up(cp_image, network_name, effective_store, all_names)?;
+    let result =
+        universal_global_zone_up(cp_image, network_name, effective_store, all_names, docker)?;
     apply_universal_up_result(spec, cp_image, effective_store, result);
     Ok(())
 }
@@ -252,8 +288,10 @@ fn handle_global_two_zones_up(
     network_name: &str,
     effective_store: &str,
     all_names: &[String],
+    docker: &dyn ContainerRuntime,
 ) -> Result<(), CliError> {
-    let result = universal_global_two_zones_up(cp_image, network_name, effective_store, all_names)?;
+    let result =
+        universal_global_two_zones_up(cp_image, network_name, effective_store, all_names, docker)?;
     apply_universal_up_result(spec, cp_image, effective_store, result);
     Ok(())
 }
@@ -275,25 +313,26 @@ fn universal_single_up(
     network: &str,
     store: &str,
     cp_name: &str,
+    docker: &dyn ContainerRuntime,
 ) -> Result<UniversalUpResult, CliError> {
-    docker_network_create(network, UNIVERSAL_SUBNET)?;
+    docker.create_network(network, UNIVERSAL_SUBNET)?;
 
-    let env = [
-        ("KUMA_ENVIRONMENT", "universal"),
-        ("KUMA_MODE", "zone"),
-        ("KUMA_STORE_TYPE", store),
-    ];
-    docker_run_detached(
-        image,
-        cp_name,
-        network,
-        &env,
-        &[(5681, 5681), (5678, 5678)],
-        &[],
-        &["run"],
-    )?;
+    docker.run_detached(&ContainerConfig {
+        image: image.to_string(),
+        name: cp_name.to_string(),
+        network: network.to_string(),
+        env: vec![
+            ("KUMA_ENVIRONMENT".to_string(), "universal".to_string()),
+            ("KUMA_MODE".to_string(), "zone".to_string()),
+            ("KUMA_STORE_TYPE".to_string(), store.to_string()),
+        ],
+        ports: vec![(5681, 5681), (5678, 5678)],
+        labels: vec![],
+        extra_args: vec![],
+        command: vec!["run".to_string()],
+    })?;
 
-    let ip = docker_inspect_ip(cp_name, network)?;
+    let ip = docker.inspect_ip(cp_name, network)?;
     let health_url = format!("http://{ip}:5681");
     info!(%health_url, "waiting for CP");
     wait_for_http(&health_url, Duration::from_mins(1))?;
@@ -312,6 +351,7 @@ fn universal_single_up_compose(
     network: &str,
     store: &str,
     cp_name: &str,
+    docker: &dyn ContainerRuntime,
 ) -> Result<UniversalUpResult, CliError> {
     let compose_file = compose::single_zone(image, network, UNIVERSAL_SUBNET, store, cp_name);
     let tmp_dir = tempfile::tempdir().map_err(|e| CliErrorKind::io(cow!("temp dir: {e}")))?;
@@ -325,7 +365,7 @@ fn universal_single_up_compose(
 
     let compose_network = format!("{project}_{network}");
     let container = format!("{project}-{cp_name}-1");
-    let ip = docker_inspect_ip(&container, &compose_network)?;
+    let ip = docker.inspect_ip(&container, &compose_network)?;
 
     let health_url = format!("http://{ip}:5681");
     info!(%health_url, "waiting for CP");
@@ -340,9 +380,13 @@ fn universal_single_up_compose(
     })
 }
 
-fn universal_single_down(network: &str, cp_name: &str) -> Result<(), CliError> {
-    docker_rm(cp_name)?;
-    docker_network_rm(network)?;
+fn universal_single_down(
+    network: &str,
+    cp_name: &str,
+    docker: &dyn ContainerRuntime,
+) -> Result<(), CliError> {
+    docker.remove(cp_name)?;
+    docker.remove_network(network)?;
     Ok(())
 }
 
@@ -351,6 +395,7 @@ fn universal_global_zone_up(
     network: &str,
     store: &str,
     names: &[String],
+    docker: &dyn ContainerRuntime,
 ) -> Result<UniversalUpResult, CliError> {
     if names.len() < 3 {
         return Err(CliErrorKind::usage_error(
@@ -383,7 +428,7 @@ fn universal_global_zone_up(
 
     let compose_network = format!("{project}_{network}");
     let global_container = format!("{project}-{global_name}-1");
-    let global_ip = docker_inspect_ip(&global_container, &compose_network)?;
+    let global_ip = docker.inspect_ip(&global_container, &compose_network)?;
 
     let global_url = format!("http://{global_ip}:5681");
     info!(%global_url, "waiting for global CP");
@@ -399,8 +444,12 @@ fn universal_global_zone_up(
     })
 }
 
-fn universal_global_zone_down(_network: &str, names: &[String]) -> Result<(), CliError> {
-    let removed = docker_rm_by_label("io.harness.service=true")?;
+fn universal_global_zone_down(
+    _network: &str,
+    names: &[String],
+    docker: &dyn ContainerRuntime,
+) -> Result<(), CliError> {
+    let removed = docker.remove_by_label("io.harness.service=true")?;
     for name in &removed {
         info!(%name, "removed service container");
     }
@@ -415,6 +464,7 @@ fn universal_global_two_zones_up(
     network: &str,
     store: &str,
     names: &[String],
+    docker: &dyn ContainerRuntime,
 ) -> Result<UniversalUpResult, CliError> {
     if names.len() < 5 {
         return Err(CliErrorKind::usage_error(
@@ -455,7 +505,7 @@ fn universal_global_two_zones_up(
 
     let compose_network = format!("{project}_{network}");
     let global_container = format!("{project}-{global_name}-1");
-    let global_ip = docker_inspect_ip(&global_container, &compose_network)?;
+    let global_ip = docker.inspect_ip(&global_container, &compose_network)?;
 
     let global_url = format!("http://{global_ip}:5681");
     info!(%global_url, "waiting for global CP");
@@ -471,8 +521,12 @@ fn universal_global_two_zones_up(
     })
 }
 
-fn universal_global_two_zones_down(_network: &str, names: &[String]) -> Result<(), CliError> {
-    let removed = docker_rm_by_label("io.harness.service=true")?;
+fn universal_global_two_zones_down(
+    _network: &str,
+    names: &[String],
+    docker: &dyn ContainerRuntime,
+) -> Result<(), CliError> {
+    let removed = docker.remove_by_label("io.harness.service=true")?;
     for name in &removed {
         info!(%name, "removed service container");
     }
