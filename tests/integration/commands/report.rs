@@ -107,6 +107,23 @@ fn create_initial_report(run_dir: &Path) {
     rpt.save().unwrap();
 }
 
+#[allow(clippy::cognitive_complexity)]
+fn assert_group_report(run_dir: &Path) {
+    let ctx = RunContext::from_run_dir(run_dir).unwrap();
+    let status = ctx.status.unwrap();
+    assert_eq!(status.executed_group_ids(), vec!["g01"]);
+    assert_eq!(status.counts.passed, 1);
+    assert_eq!(status.counts.failed, 0);
+    assert_eq!(status.last_completed_group.as_deref(), Some("g01"));
+    assert!(status.last_updated_utc.is_some());
+    assert_eq!(status.notes, vec!["all checks passed"]);
+
+    let report_text = fs::read_to_string(ctx.layout.report_path()).unwrap();
+    assert!(report_text.contains("## Group: g01"));
+    assert!(report_text.contains("**Verdict:** pass"));
+    assert!(report_text.contains("commands/g01.txt"));
+}
+
 #[test]
 fn run_group_updates_status_and_report() {
     let tmp = tempfile::tempdir().unwrap();
@@ -128,29 +145,7 @@ fn run_group_updates_status_and_report() {
     };
     let exit_code = Command::Report(ReportArgs { cmd }).execute().unwrap();
     assert_eq!(exit_code, 0);
-
-    let ctx = RunContext::from_run_dir(&run_dir).unwrap();
-    let status = ctx.status.unwrap();
-    assert_eq!(status.executed_group_ids(), vec!["g01"]);
-    assert_eq!(status.counts.passed, 1);
-    assert_eq!(status.counts.failed, 0);
-    assert_eq!(status.last_completed_group.as_deref(), Some("g01"));
-    assert!(status.last_updated_utc.is_some());
-    assert_eq!(status.notes, vec!["all checks passed"]);
-
-    let report_text = fs::read_to_string(ctx.layout.report_path()).unwrap();
-    assert!(
-        report_text.contains("## Group: g01"),
-        "report should contain group section"
-    );
-    assert!(
-        report_text.contains("**Verdict:** pass"),
-        "report should contain verdict"
-    );
-    assert!(
-        report_text.contains("commands/g01.txt"),
-        "report should contain evidence"
-    );
+    assert_group_report(&run_dir);
 }
 
 #[test]

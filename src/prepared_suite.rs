@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::fmt;
 use std::fs;
@@ -22,7 +23,7 @@ pub struct PreparedCopy {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PreparedWrite {
     pub prepared_path: PathBuf,
-    pub text: String,
+    pub text: Cow<'static, str>,
 }
 
 /// SHA256 digest of a source file.
@@ -278,7 +279,7 @@ impl PreparedSuitePlan {
             .iter()
             .chain(self.validation_writes.iter())
         {
-            write_text(&write.prepared_path, &write.text)?;
+            write_text(&write.prepared_path, write.text.as_ref())?;
         }
         Ok(())
     }
@@ -298,20 +299,17 @@ fn build_baseline_plan(layout: &RunLayout, suite: &SuiteSpec) -> Result<Baseline
         let validation_rel = validation_path_for(&prepared_rel);
         plan.source_digests
             .push(source_digest(&source_path, baseline)?);
+        let manifest_ref =
+            build_baseline_manifest_ref(baseline, &source_path, &prepared_rel, &validation_rel)?;
         plan.baseline_copies.push(PreparedCopy {
-            source_path: source_path.clone(),
+            source_path,
             prepared_path: run_dir.join(&prepared_rel),
         });
         plan.validation_writes.push(PreparedWrite {
             prepared_path: run_dir.join(&validation_rel),
-            text: pending_validation_text(false),
+            text: Cow::Borrowed(pending_validation_text(false)),
         });
-        plan.baselines.push(build_baseline_manifest_ref(
-            baseline,
-            &source_path,
-            &prepared_rel,
-            &validation_rel,
-        )?);
+        plan.baselines.push(manifest_ref);
     }
 
     Ok(plan)
@@ -369,7 +367,7 @@ fn build_group_manifests(
     let mut group_writes = Vec::new();
     let mut validation_writes = Vec::new();
 
-    for (index, yaml) in yaml_blocks(&configure_section(&group.body).unwrap_or_default())
+    for (index, yaml) in yaml_blocks(configure_section(&group.body).unwrap_or_default())
         .into_iter()
         .enumerate()
     {
@@ -383,15 +381,7 @@ fn build_group_manifests(
             .join(format!("{:02}.yaml", index + 1));
         let validation_rel = validation_path_for(&prepared_rel);
         let skip_validation = group.frontmatter.expected_rejection_orders.contains(&order);
-        group_writes.push(PreparedWrite {
-            prepared_path: run_dir.join(&prepared_rel),
-            text: yaml.clone(),
-        });
-        validation_writes.push(PreparedWrite {
-            prepared_path: run_dir.join(&validation_rel),
-            text: pending_validation_text(skip_validation),
-        });
-        refs.push(build_group_manifest_ref(
+        let manifest_ref = build_group_manifest_ref(
             group_rel,
             &group.frontmatter.group_id,
             index + 1,
@@ -399,7 +389,16 @@ fn build_group_manifests(
             &yaml,
             &prepared_rel,
             &validation_rel,
-        ));
+        );
+        group_writes.push(PreparedWrite {
+            prepared_path: run_dir.join(&prepared_rel),
+            text: Cow::Owned(yaml),
+        });
+        validation_writes.push(PreparedWrite {
+            prepared_path: run_dir.join(&validation_rel),
+            text: Cow::Borrowed(pending_validation_text(skip_validation)),
+        });
+        refs.push(manifest_ref);
     }
 
     Ok(GroupManifestPlan {
@@ -509,41 +508,42 @@ fn validation_path_for(prepared_rel: &Path) -> PathBuf {
     prepared_rel.with_extension(format!("{extension}.validate.txt"))
 }
 
-fn pending_validation_text(skip_validation: bool) -> String {
+fn pending_validation_text(skip_validation: bool) -> &'static str {
     if skip_validation {
-        return "validation intentionally skipped by expected_rejection_orders\n".to_string();
+        return "validation intentionally skipped by expected_rejection_orders\n";
     }
-    "validation pending\n".to_string()
+    "validation pending\n"
 }
 
-fn extract_section(body: &str, heading: &str) -> Option<String> {
+fn extract_section<'a>(body: &'a str, heading: &str) -> Option<&'a str> {
     let pattern = format!("## {heading}");
-    let lines: Vec<&str> = body.lines().collect();
     let mut start = None;
-    for (i, line) in lines.iter().enumerate() {
-        if let Some(s) = start {
-            if line.starts_with("## ") {
-                return Some(lines[s..i].join("\n"));
+    let mut offset = 0;
+
+    for line in body.split_inclusive('\n') {
+        let trimmed = line.trim_end_matches('\n').trim_end_matches('\r');
+        if let Some(section_start) = start {
+            if trimmed.starts_with("## ") {
+                return Some(body[section_start..offset].trim_end_matches(['\n', '\r']));
             }
-        } else {
-            let trimmed = line.trim_end();
-            if trimmed == pattern || trimmed.starts_with(&format!("{pattern} ")) {
-                start = Some(i + 1);
-            }
+        } else if trimmed == pattern || trimmed.starts_with(&format!("{pattern} ")) {
+            start = Some(offset + line.len());
         }
+        offset += line.len();
     }
-    start.map(|s| lines[s..].join("\n"))
+
+    start.map(|section_start| body[section_start..].trim_end_matches(['\n', '\r']))
 }
 
 /// Extract the Configure section from a group body.
 #[must_use]
-pub fn configure_section(body: &str) -> Option<String> {
+pub fn configure_section(body: &str) -> Option<&str> {
     extract_section(body, "Configure")
 }
 
 /// Extract the Consume section from a group body.
 #[must_use]
-pub fn consume_section(body: &str) -> Option<String> {
+pub fn consume_section(body: &str) -> Option<&str> {
     extract_section(body, "Consume")
 }
 
@@ -593,6 +593,8 @@ pub fn shell_blocks(text: &str) -> Vec<String> {
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::cognitive_complexity)]
+
     use super::*;
     use std::fs;
 

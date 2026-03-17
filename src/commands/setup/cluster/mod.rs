@@ -118,7 +118,9 @@ fn persist_cluster_spec(spec: &ClusterSpec) -> Result<(), CliError> {
 
 #[cfg(test)]
 mod tests {
+    use std::fmt::Write as _;
     use std::fs;
+    use std::path::Path;
 
     use super::universal::{
         KUMA_CP_IMAGE_FILTERS, load_persisted_cluster_spec, resolve_cp_image,
@@ -132,11 +134,17 @@ mod tests {
         let mut hasher = Sha256::new();
         hasher.update(scope.as_bytes());
         let hash = hasher.finalize();
-        let digest: String = hash.iter().take(8).map(|b| format!("{b:02x}")).collect();
+        let digest = hash
+            .iter()
+            .take(8)
+            .fold(String::with_capacity(16), |mut acc, byte| {
+                let _ = write!(acc, "{byte:02x}");
+                acc
+            });
         format!("session-{digest}")
     }
 
-    fn write_context_file(xdg_dir: &std::path::Path, session_id: &str, content: &str) {
+    fn write_context_file(xdg_dir: &Path, session_id: &str, content: &str) {
         let scope = scope_key_for_session(session_id);
         let ctx_dir = xdg_dir.join("kuma").join("contexts").join(scope);
         fs::create_dir_all(&ctx_dir).unwrap();
@@ -278,11 +286,7 @@ mod tests {
 
     #[test]
     fn kuma_cp_image_filters_include_bare_name() {
-        assert!(
-            KUMA_CP_IMAGE_FILTERS
-                .iter()
-                .any(|f| *f == "reference=kuma-cp")
-        );
+        assert!(KUMA_CP_IMAGE_FILTERS.contains(&"reference=kuma-cp"));
     }
 
     #[test]

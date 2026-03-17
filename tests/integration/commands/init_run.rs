@@ -8,16 +8,60 @@ use std::path::Path;
 use harness::cli::Command;
 use harness::commands::run::InitArgs;
 use harness::context::RunMetadata;
+use harness::errors::CliError;
 use harness::schema::{RunStatus, Verdict};
 use harness::workflow::runner::{self as runner_workflow, RunnerPhase};
 
 use super::super::helpers::*;
 
-fn run_init(args: InitArgs, xdg_root: &Path) -> Result<i32, harness::errors::CliError> {
+fn run_init(args: InitArgs, xdg_root: &Path) -> Result<i32, CliError> {
     temp_env::with_vars(
         [("XDG_DATA_HOME", Some(xdg_root.to_str().unwrap()))],
         || run_command(Command::Init(args)),
     )
+}
+
+#[allow(clippy::cognitive_complexity)]
+fn assert_init_layout(run_dir: &Path) {
+    assert!(run_dir.exists(), "run dir should exist");
+    assert!(run_dir.join("run-metadata.json").exists());
+    assert!(run_dir.join("run-status.json").exists());
+    assert!(run_dir.join("run-report.md").exists());
+    assert!(run_dir.join("suite-run-state.json").exists());
+    assert!(run_dir.join("artifacts").is_dir());
+    assert!(run_dir.join("commands").is_dir());
+    assert!(run_dir.join("manifests").is_dir());
+    assert!(run_dir.join("state").is_dir());
+}
+
+fn assert_init_metadata(run_dir: &Path) {
+    let meta_text = fs::read_to_string(run_dir.join("run-metadata.json")).unwrap();
+    let metadata: RunMetadata = serde_json::from_str(&meta_text).unwrap();
+    assert_eq!(metadata.run_id, "run-1");
+    assert_eq!(metadata.suite_id, "example.suite");
+    assert_eq!(metadata.profile, "single-zone");
+}
+
+fn assert_init_status(run_dir: &Path) {
+    let status_text = fs::read_to_string(run_dir.join("run-status.json")).unwrap();
+    let status: RunStatus = serde_json::from_str(&status_text).unwrap();
+    assert_eq!(status.overall_verdict, Verdict::Pending);
+    assert_eq!(status.run_id, "run-1");
+
+    let runner_state = runner_workflow::read_runner_state(run_dir)
+        .unwrap()
+        .expect("runner state should exist");
+    assert_eq!(runner_state.phase, RunnerPhase::Bootstrap);
+}
+
+fn assert_init_logs(run_dir: &Path) {
+    let cmd_log = run_dir.join("commands").join("command-log.md");
+    assert!(cmd_log.exists(), "command log should exist");
+    let cmd_text = fs::read_to_string(&cmd_log).unwrap();
+    assert!(cmd_text.contains("harness init"));
+
+    let manifest_index = run_dir.join("manifests").join("manifest-index.md");
+    assert!(manifest_index.exists(), "manifest index should exist");
 }
 
 #[test]
@@ -42,44 +86,10 @@ fn init_creates_tracked_layout() {
     assert_eq!(result.unwrap(), 0);
 
     let run_dir = tmp.path().join("runs").join("run-1");
-    assert!(run_dir.exists(), "run dir should exist");
-    assert!(run_dir.join("run-metadata.json").exists());
-    assert!(run_dir.join("run-status.json").exists());
-    assert!(run_dir.join("run-report.md").exists());
-    assert!(run_dir.join("suite-run-state.json").exists());
-    assert!(run_dir.join("artifacts").is_dir());
-    assert!(run_dir.join("commands").is_dir());
-    assert!(run_dir.join("manifests").is_dir());
-    assert!(run_dir.join("state").is_dir());
-
-    // Verify metadata
-    let meta_text = fs::read_to_string(run_dir.join("run-metadata.json")).unwrap();
-    let metadata: RunMetadata = serde_json::from_str(&meta_text).unwrap();
-    assert_eq!(metadata.run_id, "run-1");
-    assert_eq!(metadata.suite_id, "example.suite");
-    assert_eq!(metadata.profile, "single-zone");
-
-    // Verify status
-    let status_text = fs::read_to_string(run_dir.join("run-status.json")).unwrap();
-    let status: RunStatus = serde_json::from_str(&status_text).unwrap();
-    assert_eq!(status.overall_verdict, Verdict::Pending);
-    assert_eq!(status.run_id, "run-1");
-
-    // Verify runner state
-    let runner_state = runner_workflow::read_runner_state(&run_dir)
-        .unwrap()
-        .expect("runner state should exist");
-    assert_eq!(runner_state.phase, RunnerPhase::Bootstrap);
-
-    // Verify command log
-    let cmd_log = run_dir.join("commands").join("command-log.md");
-    assert!(cmd_log.exists(), "command log should exist");
-    let cmd_text = fs::read_to_string(&cmd_log).unwrap();
-    assert!(cmd_text.contains("harness init"));
-
-    // Verify manifest index
-    let manifest_index = run_dir.join("manifests").join("manifest-index.md");
-    assert!(manifest_index.exists(), "manifest index should exist");
+    assert_init_layout(&run_dir);
+    assert_init_metadata(&run_dir);
+    assert_init_status(&run_dir);
+    assert_init_logs(&run_dir);
 }
 
 #[test]

@@ -2,7 +2,7 @@ use serde::Serialize;
 use serde_json::Value;
 
 use super::spec::{ClusterSpec, HelmSetting};
-use super::{parse_helm_settings, parse_string_vec, ClusterMember, ClusterMode, Platform};
+use super::{ClusterMember, ClusterMode, Platform, parse_helm_settings, parse_string_vec};
 
 /// Cluster record payload for serialization.
 #[derive(Debug, Clone, Serialize)]
