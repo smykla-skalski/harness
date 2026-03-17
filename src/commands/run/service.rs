@@ -1,3 +1,4 @@
+use std::thread;
 use std::time::Duration;
 
 use clap::Args;
@@ -197,11 +198,17 @@ fn service_up_inner(setup: &ServiceSetup<'_>) -> Result<(), CliError> {
         }),
     )?;
 
-    // Write token and dataplane YAML into container
+    // Write token and dataplane YAML into container while extracting CA cert in parallel.
     let token_path = format!("/tmp/{svc_name}-token");
     let dp_path = format!("/tmp/{svc_name}-dp.yaml");
-    exec::docker_write_file(svc_name, &token_path, token_str)?;
-    exec::docker_write_file(svc_name, &dp_path, &dp_yaml)?;
+    let ca_cert = thread::scope(|scope| {
+        let t_token = scope.spawn(|| exec::docker_write_file(svc_name, &token_path, token_str));
+        let t_yaml = scope.spawn(|| exec::docker_write_file(svc_name, &dp_path, &dp_yaml));
+        let t_cert = scope.spawn(|| extract_cp_ca_cert(setup.xds.ip, setup.xds.port));
+        t_token.join().expect("token write thread panicked")?;
+        t_yaml.join().expect("yaml write thread panicked")?;
+        t_cert.join().expect("cert extract thread panicked")
+    })?;
 
     // Install transparent proxy if requested
     if transparent_proxy {
@@ -211,9 +218,8 @@ fn service_up_inner(setup: &ServiceSetup<'_>) -> Result<(), CliError> {
         )?;
     }
 
-    // Extract CP's CA cert from the XDS endpoint and inject into container.
+    // Inject the CA cert into the container.
     // kuma-dp needs this to verify the TLS connection to the CP.
-    let ca_cert = extract_cp_ca_cert(setup.xds.ip, setup.xds.port)?;
     let ca_path = format!("/tmp/{svc_name}-ca.crt");
     exec::docker_write_file(svc_name, &ca_path, &ca_cert)?;
 
