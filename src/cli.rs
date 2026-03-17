@@ -1,8 +1,10 @@
+use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
 
 use clap::{Parser, Subcommand};
 
+use crate::blocks::{DockerContainerRuntime, StdProcessExecutor};
 use crate::commands;
 use crate::commands::authoring::{
     ApprovalBeginArgs, AuthoringBeginArgs, AuthoringResetArgs, AuthoringSaveArgs,
@@ -224,7 +226,8 @@ fn dispatch_run(cmd: Command) -> Result<i32, CliError> {
         Command::Service(args) => commands::run::service(&args),
         Command::Status(args) => commands::run::status(&args.run_dir),
         Command::Logs(args) => {
-            commands::run::logs(&args.name, args.tail, args.follow, &args.run_dir)
+            let docker = DockerContainerRuntime::new(Arc::new(StdProcessExecutor));
+            commands::run::logs(&args.name, args.tail, args.follow, &args.run_dir, &docker)
         }
         Command::ClusterCheck(args) => commands::run::cluster_check(&args.run_dir),
         Command::Task(args) => commands::run::task(&args.command),
