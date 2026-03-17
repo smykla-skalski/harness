@@ -509,13 +509,16 @@ fn capture_uses_run_context() {
     let tmp = tempfile::tempdir().unwrap();
     let (run_dir, _suite_dir) = init_run_with_suite(tmp.path(), "run-capture", "single-zone");
 
-    let mut tc = FakeToolchain::new();
-    tc.add_kubectl("{\"items\": []}");
-    let orig_path = env::var("PATH").unwrap_or_default();
-
     // Write a fake kubeconfig for the capture command
     let kc_path = tmp.path().join("kubeconfig");
     fs::write(&kc_path, "apiVersion: v1\nkind: Config\n").unwrap();
+
+    // Seed cluster context so capture can find the cluster spec
+    seed_cluster_state(&run_dir, &kc_path.to_string_lossy());
+
+    let mut tc = FakeToolchain::new();
+    tc.add_kubectl("{\"items\": []}");
+    let orig_path = env::var("PATH").unwrap_or_default();
 
     temp_env::with_vars([("PATH", Some(&tc.path_with_prepend(&orig_path)))], || {
         let rda = RunDirArgs {
@@ -574,9 +577,10 @@ fn apply_reuses_prepared() {
     )
     .unwrap();
 
-    // Write a fake kubeconfig
+    // Write a fake kubeconfig and seed cluster context
     let kc_path = tmp.path().join("kubeconfig");
     fs::write(&kc_path, "apiVersion: v1\nkind: Config\n").unwrap();
+    seed_cluster_state(&run_dir, &kc_path.to_string_lossy());
 
     let mut tc = FakeToolchain::new();
     tc.add_kubectl("configmap/test configured");
@@ -627,6 +631,7 @@ fn apply_validate_shorthand() {
 
     let kc_path = tmp.path().join("kubeconfig");
     fs::write(&kc_path, "apiVersion: v1\nkind: Config\n").unwrap();
+    seed_cluster_state(&run_dir, &kc_path.to_string_lossy());
 
     let mut tc = FakeToolchain::new();
     tc.add_kubectl("configmap/shorthand configured");
@@ -742,12 +747,12 @@ fn preflight_failure_resets() {
         .execute();
         assert!(result.is_ok(), "preflight should succeed: {result:?}");
 
-        // Since preflight is minimal, runner state should remain at Bootstrap
+        // Preflight succeeds and advances the runner phase to Execution
         let state_after = read_runner_state(&run_dir).unwrap().unwrap();
         assert_eq!(
             state_after.phase,
-            RunnerPhase::Bootstrap,
-            "runner phase should remain at Bootstrap since preflight is minimal"
+            RunnerPhase::Execution,
+            "runner phase should advance to Execution after successful preflight"
         );
     });
 }
@@ -761,6 +766,7 @@ fn capture_marks_preflight_complete() {
 
     let kc_path = tmp.path().join("kubeconfig");
     fs::write(&kc_path, "apiVersion: v1\nkind: Config\n").unwrap();
+    seed_cluster_state(&run_dir, &kc_path.to_string_lossy());
 
     let mut tc = FakeToolchain::new();
     tc.add_kubectl("{\"items\": []}");
