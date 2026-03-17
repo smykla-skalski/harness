@@ -63,6 +63,19 @@ Hooks intercept Claude Code tool usage. Classified in `cli.rs` as constants:
 - Errors use `CliErrorKind` enum variants with typed fields via thiserror
 - Hook messages use `HookMessage` enum with `into_result()` conversion
 
+## Logging
+
+All diagnostic output uses `tracing` macros. Never use `eprintln!` for new diagnostic messages.
+
+- `warn!` - non-fatal failures, fallbacks, degraded operations
+- `info!` - progress updates, phase transitions, completion
+- `debug!` - verbose dumps (full JSON specs, etc.)
+- `println!` stays for user-facing command output and hook JSON protocol
+- Use structured fields: `warn!(%error, "failed to load context")`, `info!(name = %value, "message")`
+- No `#[instrument]` unless explicitly requested
+- Subscriber is initialized in `main.rs` only - tests run without one (silent no-op)
+- Default filter: `RUST_LOG=harness=info`
+
 ## Gotchas
 
 - `guard-bash` denies direct use of `kubectl`, `kumactl`, `helm`, `docker`, `k3d` - all cluster access must go through harness commands (see `rules.rs:26`)
