@@ -450,11 +450,11 @@ mod tests {
         fs::create_dir_all(&plugin_json_dir).unwrap();
         fs::write(
             plugin_json_dir.join("plugin.json"),
-            r#"{"name":"suite","version":"0.1.0"}"#,
+            r#"{"name":"suite","version":"1.0.0"}"#,
         )
         .unwrap();
 
-        assert_eq!(read_plugin_version(dir.path()), Some("0.1.0".to_string()));
+        assert_eq!(read_plugin_version(dir.path()), Some("1.0.0".to_string()));
     }
 
     #[test]
@@ -569,7 +569,7 @@ mod tests {
         fs::create_dir_all(&plugin_json_dir).unwrap();
         fs::write(
             plugin_json_dir.join("plugin.json"),
-            r#"{"name":"suite","version":"0.1.0"}"#,
+            r#"{"name":"suite","version":"1.0.0"}"#,
         )
         .unwrap();
 
@@ -580,7 +580,7 @@ mod tests {
             .join("cache")
             .join("harness")
             .join("suite")
-            .join("0.1.0")
+            .join("1.0.0")
             .join("agents");
         fs::create_dir_all(&cache_agents).unwrap();
         fs::write(cache_agents.join("writer.md"), "old agent def").unwrap();
@@ -612,7 +612,7 @@ mod tests {
         fs::create_dir_all(&plugin_json_dir).unwrap();
         fs::write(
             plugin_json_dir.join("plugin.json"),
-            r#"{"name":"suite","version":"0.1.0"}"#,
+            r#"{"name":"suite","version":"1.0.0"}"#,
         )
         .unwrap();
 
