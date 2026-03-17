@@ -1,10 +1,10 @@
 use std::time::{Duration, Instant};
 
 use tracing::info;
-use ureq::Body;
-use ureq::http::Response;
 
 use crate::errors::{CliError, CliErrorKind};
+
+use super::runtime::RUNTIME;
 
 /// HTTP method for CP API requests.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -27,7 +27,7 @@ pub fn cp_api_json(
     token: Option<&str>,
 ) -> Result<serde_json::Value, CliError> {
     let url = format!("{base_url}{path}");
-    let text = cp_api_send(&url, method, body, token)?;
+    let text = RUNTIME.block_on(cp_api_send(&url, method, body, token))?;
     serde_json::from_str(&text)
         .map_err(|e| CliErrorKind::cp_api_unreachable(url).with_details(e.to_string()))
 }
@@ -46,133 +46,90 @@ pub fn cp_api_text(
     token: Option<&str>,
 ) -> Result<String, CliError> {
     let url = format!("{base_url}{path}");
-    cp_api_send(&url, method, body, token)
-}
-
-/// Apply an optional bearer token to any ureq `RequestBuilder` type.
-///
-/// ureq v3 uses distinct typestates (`WithBody` / `WithoutBody`) so we cannot
-/// pass the builder through a single generic helper. A macro keeps the auth
-/// logic in one place without duplicating the `if let` across every match arm.
-macro_rules! with_bearer_auth {
-    ($request:expr, $auth_header:expr) => {{
-        let mut request = $request;
-        if let Some(auth) = $auth_header {
-            request = request.header("Authorization", auth.to_string());
-        }
-        request
-    }};
-}
-
-/// Build, send, and read the full response body as a string from the CP API.
-fn cp_api_send(
-    url: &str,
-    method: HttpMethod,
-    body: Option<&serde_json::Value>,
-    token: Option<&str>,
-) -> Result<String, CliError> {
-    let auth_header = token.map(|tok| format!("Bearer {tok}"));
-    match method {
-        HttpMethod::Get => cp_api_get(url, auth_header.as_deref()),
-        HttpMethod::Delete => cp_api_delete(url, auth_header.as_deref()),
-        HttpMethod::Post => cp_api_post(url, body, auth_header.as_deref()),
-        HttpMethod::Put => cp_api_put(url, body, auth_header.as_deref()),
-    }
+    RUNTIME.block_on(cp_api_send(&url, method, body, token))
 }
 
 fn cp_api_error(url: &str, error: &impl ToString) -> CliError {
     CliErrorKind::cp_api_unreachable(url.to_string()).with_details(error.to_string())
 }
 
-fn read_cp_api_body(url: &str, mut response: Response<Body>) -> Result<String, CliError> {
-    response
-        .body_mut()
-        .read_to_string()
-        .map_err(|error| cp_api_error(url, &error))
-}
-
-fn cp_api_get(url: &str, auth_header: Option<&str>) -> Result<String, CliError> {
-    let response = with_bearer_auth!(ureq::get(url), auth_header)
-        .call()
-        .map_err(|error| cp_api_error(url, &error))?;
-    read_cp_api_body(url, response)
-}
-
-fn cp_api_delete(url: &str, auth_header: Option<&str>) -> Result<String, CliError> {
-    let response = with_bearer_auth!(ureq::delete(url), auth_header)
-        .call()
-        .map_err(|error| cp_api_error(url, &error))?;
-    read_cp_api_body(url, response)
-}
-
-fn cp_api_post(
+async fn cp_api_send(
     url: &str,
+    method: HttpMethod,
     body: Option<&serde_json::Value>,
-    auth_header: Option<&str>,
+    token: Option<&str>,
 ) -> Result<String, CliError> {
-    let response = match body {
-        Some(json) => with_bearer_auth!(
-            ureq::post(url).header("Content-Type", "application/json"),
-            auth_header
-        )
-        .send_json(json)
-        .map_err(|error| cp_api_error(url, &error))?,
-        None => with_bearer_auth!(ureq::post(url), auth_header)
-            .send_empty()
-            .map_err(|error| cp_api_error(url, &error))?,
+    let client = reqwest::Client::new();
+    let mut builder = match method {
+        HttpMethod::Get => client.get(url),
+        HttpMethod::Delete => client.delete(url),
+        HttpMethod::Post => client.post(url),
+        HttpMethod::Put => client.put(url),
     };
-    read_cp_api_body(url, response)
-}
-
-fn cp_api_put(
-    url: &str,
-    body: Option<&serde_json::Value>,
-    auth_header: Option<&str>,
-) -> Result<String, CliError> {
-    let response = match body {
-        Some(json) => with_bearer_auth!(
-            ureq::put(url).header("Content-Type", "application/json"),
-            auth_header
-        )
-        .send_json(json)
-        .map_err(|error| cp_api_error(url, &error))?,
-        None => with_bearer_auth!(ureq::put(url), auth_header)
-            .send_empty()
-            .map_err(|error| cp_api_error(url, &error))?,
-    };
-    read_cp_api_body(url, response)
+    if let Some(tok) = token {
+        builder = builder.bearer_auth(tok);
+    }
+    if let Some(json) = body {
+        builder = builder
+            .header("Content-Type", "application/json")
+            .json(json);
+    }
+    let text = builder
+        .send()
+        .await
+        .map_err(|e| cp_api_error(url, &e))?
+        .text()
+        .await
+        .map_err(|e| cp_api_error(url, &e))?;
+    Ok(text)
 }
 
 /// Wait for an HTTP endpoint to return 200, with exponential backoff.
 ///
-/// Uses `ureq` for sync HTTP and `backoff` for retry logic.
+/// Uses `reqwest` for async HTTP and `backoff` for retry logic.
 /// Default: starts at 500ms, caps at the given timeout.
 /// Emits a progress message every 10 seconds while waiting.
 ///
 /// # Errors
 /// Returns `CpApiUnreachable` if the endpoint does not respond within the timeout.
 pub fn wait_for_http(url: &str, timeout: Duration) -> Result<(), CliError> {
-    use backoff::ExponentialBackoff;
+    RUNTIME.block_on(wait_for_http_async(url, timeout))
+}
 
-    let backoff_config = ExponentialBackoff {
+async fn wait_for_http_async(url: &str, timeout: Duration) -> Result<(), CliError> {
+    use backoff::ExponentialBackoff;
+    use backoff::future::retry;
+
+    use std::sync::{Arc, Mutex};
+    let client = reqwest::Client::new();
+    let start = Instant::now();
+    let last_progress: Arc<Mutex<Instant>> = Arc::new(Mutex::new(Instant::now()));
+    let cfg = ExponentialBackoff {
         max_elapsed_time: Some(timeout),
         ..ExponentialBackoff::default()
     };
-    let start = Instant::now();
-    let mut last_progress = Instant::now();
-    backoff::retry(backoff_config, || {
+    let url_owned = url.to_string();
+    retry(cfg, || {
+        let client = client.clone();
+        let url = url_owned.clone();
         let elapsed = start.elapsed();
-        if last_progress.elapsed() >= Duration::from_secs(10) {
-            info!(
-                elapsed_seconds = elapsed.as_secs_f64(),
-                "waiting for health check"
-            );
-            last_progress = Instant::now();
+        let last_progress = last_progress.clone();
+        async move {
+            {
+                let mut last = last_progress.lock().expect("lock poisoned");
+                if last.elapsed() >= Duration::from_secs(10) {
+                    info!(elapsed_seconds = elapsed.as_secs_f64(), "waiting for health check");
+                    *last = Instant::now();
+                }
+            }
+            client
+                .get(&url)
+                .send()
+                .await
+                .map(|_| ())
+                .map_err(backoff::Error::transient)
         }
-        ureq::get(url)
-            .call()
-            .map(|_| ())
-            .map_err(backoff::Error::transient)
     })
+    .await
     .map_err(|_| CliError::from(CliErrorKind::cp_api_unreachable(url.to_string())))
 }
