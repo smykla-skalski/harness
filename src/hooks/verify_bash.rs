@@ -280,6 +280,8 @@ fn ready_to_resume(state: &RunnerWorkflowState) -> bool {
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::absolute_paths)]
+
     use super::*;
     use crate::workflow::runner::{
         FailureKind, FailureState, ManifestFixDecision, PreflightState, PreflightStatus,

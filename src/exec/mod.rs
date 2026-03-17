@@ -304,6 +304,8 @@ pub fn kumactl_run(
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::absolute_paths)]
+
     use super::*;
 
     #[test]
@@ -548,9 +550,8 @@ mod tests {
     fn docker_rm_by_label_returns_empty_for_no_matches() {
         // If docker is available, this should return an empty list.
         // If docker is not available, it should error.
-        match docker_rm_by_label("io.harness.test.nonexistent=true") {
-            Ok(names) => assert!(names.is_empty()),
-            Err(_) => {} // docker not available, that's fine
+        if let Ok(names) = docker_rm_by_label("io.harness.test.nonexistent=true") {
+            assert!(names.is_empty());
         }
     }
 

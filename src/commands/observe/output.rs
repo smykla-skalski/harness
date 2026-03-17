@@ -224,9 +224,11 @@ pub fn render_sarif(issues: &[Issue]) -> String {
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::cognitive_complexity)]
+
     use super::*;
     use crate::commands::observe::types::{
-        Confidence, FixSafety, IssueCategory, IssueCode, IssueSeverity, MessageRole,
+        Confidence, FixSafety, IssueCategory, IssueCode, IssueSeverity, MessageRole, SourceTool,
     };
 
     fn sample_issue() -> Issue {
@@ -278,6 +280,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::cognitive_complexity)]
     fn json_output_valid() {
         let rendered = render_json(&sample_issue());
         let parsed: serde_json::Value = serde_json::from_str(&rendered).unwrap();
@@ -309,7 +312,7 @@ mod tests {
     #[test]
     fn json_output_source_tool() {
         let mut issue = sample_issue();
-        issue.source_tool = Some(crate::commands::observe::types::SourceTool::Bash);
+        issue.source_tool = Some(SourceTool::Bash);
         let rendered = render_json(&issue);
         let parsed: serde_json::Value = serde_json::from_str(&rendered).unwrap();
         assert_eq!(parsed["source_tool"], "Bash");

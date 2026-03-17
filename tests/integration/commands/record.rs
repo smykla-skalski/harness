@@ -1,3 +1,5 @@
+#![allow(clippy::redundant_clone)]
+
 // Tests for the record command and related CLI operations.
 // Covers recording with run directories, kubectl rewriting, context export,
 // and artifact creation. Most tests exercise command handlers directly;

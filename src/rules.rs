@@ -1161,6 +1161,8 @@ pub mod compact {
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::cognitive_complexity)]
+
     use super::*;
 
     // Generates all_count, display_roundtrip, and rejects_unknown tests for a string enum.

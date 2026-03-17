@@ -1,7 +1,7 @@
 use std::borrow::Cow;
+use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::UNIX_EPOCH;
-use std::fs;
 
 use serde::{Deserialize, Serialize};
 

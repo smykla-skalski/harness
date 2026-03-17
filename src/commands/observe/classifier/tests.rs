@@ -1,8 +1,10 @@
+#![allow(clippy::cognitive_complexity)]
+
 use super::*;
 use crate::commands::observe::output;
 use crate::commands::observe::types::{
     Confidence, FixSafety, FocusPreset, IssueCategory, IssueCode, IssueSeverity, MessageRole,
-    ScanState, SourceTool,
+    ScanState, SourceTool, ToolUseRecord,
 };
 
 fn make_state() -> ScanState {
@@ -1844,7 +1846,7 @@ fn scan_fixture_finds_known_issues() {
     // Seed a tool_use record so the tool_result resolves to Bash
     state.last_tool_uses.insert(
         "t1".to_string(),
-        crate::commands::observe::types::ToolUseRecord {
+        ToolUseRecord {
             name: "Bash".to_string(),
             input: serde_json::json!({"command": "cargo check"}),
         },

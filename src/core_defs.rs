@@ -281,6 +281,8 @@ pub fn shorten_path(path: &Path) -> String {
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::absolute_paths)]
+
     use crate::errors::{CliErrorKind, render_error};
 
     use super::*;

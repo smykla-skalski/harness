@@ -204,6 +204,7 @@ fn check_build_compact_author_fallback(project: &Path) {
 }
 
 // Save writes latest + history. Consume marks consumed.
+#[allow(clippy::cognitive_complexity)]
 fn check_save_consume_compact_handoff(project: &Path) {
     let handoff = compact::build_compact_handoff(project).expect("build");
     compact::save_compact_handoff(project, &handoff).expect("save");

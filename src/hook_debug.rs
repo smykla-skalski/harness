@@ -146,6 +146,8 @@ impl HookOutcome {
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::cognitive_complexity)]
+
     use std::fs as stdfs;
 
     use crate::core_defs::session_context_dir;
