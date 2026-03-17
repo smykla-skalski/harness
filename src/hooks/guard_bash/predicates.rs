@@ -7,7 +7,8 @@ use crate::rules::suite_runner::{
     TrackedHarnessSubcommand,
 };
 use crate::shell_parse::{
-    is_env_assignment, is_shell_control_op, normalized_binary_name, significant_words,
+    contains_subshell_pattern, is_env_assignment, is_shell_control_op, normalized_binary_name,
+    significant_words,
 };
 
 pub(super) fn is_run_scope_flag(s: &str) -> bool {
@@ -125,4 +126,44 @@ pub(super) fn allows_wrapped_envoy_admin(words: &[String]) -> bool {
     sig[1] == "run"
         || sig[1] == "record"
         || (sig.len() >= 3 && sig[1] == "envoy" && sig[2] == "capture")
+}
+
+/// Scan raw command text for subshell substitution patterns that contain
+/// denied cluster binaries. This catches smuggling attempts that bypass
+/// token-level binary name checks.
+pub(super) fn has_denied_subshell_binary(
+    command_text: Option<&str>,
+    words: &[String],
+) -> bool {
+    let text = command_text.unwrap_or("");
+
+    // Fast path: no subshell syntax at all
+    if !contains_subshell_pattern(text)
+        && !words.iter().any(|w| contains_subshell_pattern(w))
+    {
+        return false;
+    }
+
+    // Check every token for subshell-wrapped denied binaries
+    for word in words {
+        let normalized = normalized_binary_name(word);
+        if ClusterBinary::is_denied(&normalized) {
+            return true;
+        }
+    }
+
+    // Also scan the raw text for denied binary names inside $(...) or backticks.
+    // This catches cases where shell_words splits tokens in ways that hide
+    // the binary name from individual token normalization.
+    for variant in ClusterBinary::ALL {
+        let name = variant.to_string();
+        if text.contains(&format!("$({name}"))
+            || text.contains(&format!("`{name}"))
+            || text.contains(&format!("`{name}`"))
+        {
+            return true;
+        }
+    }
+
+    false
 }
