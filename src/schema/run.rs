@@ -5,10 +5,8 @@ use std::str::FromStr;
 
 use serde::{Deserialize, Serialize};
 
-use crate::errors::{CliError, CliErrorKind};
+use crate::errors::{CliError, CliErrorKind, cow};
 use crate::io;
-
-use super::parsers::{split_frontmatter, yaml_str, yaml_str_list};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -97,23 +95,10 @@ impl RunReport {
     /// Returns `CliError` on failure.
     pub fn from_markdown(path: &Path) -> Result<Self, CliError> {
         let text = io::read_text(path)?;
-        let (yaml, body) = split_frontmatter(&text)?;
-        let map = &yaml;
+        let (yaml_text, body) = io::extract_raw_frontmatter(&text)?;
 
-        // debug_summary can be a list of strings or an empty list []
-        // In the Python test, debug_summary: [] is passed but it parses as empty tuple
-        let debug_summary = yaml_str_list(map, "debug_summary");
-
-        let frontmatter = RunReportFrontmatter {
-            run_id: yaml_str(map, "run_id").unwrap_or_default(),
-            suite_id: yaml_str(map, "suite_id").unwrap_or_default(),
-            profile: yaml_str(map, "profile").unwrap_or_default(),
-            overall_verdict: yaml_str(map, "overall_verdict")
-                .and_then(|s| serde_json::from_value(serde_json::Value::String(s)).ok())
-                .unwrap_or(Verdict::Pending),
-            story_results: yaml_str_list(map, "story_results"),
-            debug_summary,
-        };
+        let frontmatter: RunReportFrontmatter = serde_yml::from_str(&yaml_text)
+            .map_err(|e| CliErrorKind::workflow_parse(cow!("report frontmatter: {e}")))?;
 
         Ok(Self {
             frontmatter,
