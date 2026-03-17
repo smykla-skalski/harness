@@ -89,9 +89,8 @@ pub fn resolve_manifest_path(raw: &str, run_dir: Option<&Path>) -> Result<PathBu
     let candidates = manifest_path_candidates(raw, run_dir)?;
 
     for candidate in &candidates {
-        let normalized = candidate.clone();
-        if normalized.exists() {
-            return Ok(normalized);
+        if candidate.exists() {
+            return Ok(candidate.clone());
         }
     }
 
@@ -101,7 +100,7 @@ pub fn resolve_manifest_path(raw: &str, run_dir: Option<&Path>) -> Result<PathBu
 fn suite_path_candidates(raw: &str, suite_root: &Path) -> Result<Vec<PathBuf>, CliError> {
     let raw_path = PathBuf::from(raw);
     let direct = if raw_path.is_absolute() {
-        raw_path.clone()
+        raw_path
     } else {
         env::current_dir()?.join(&raw_path)
     };

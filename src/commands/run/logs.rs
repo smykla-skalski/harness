@@ -38,7 +38,7 @@ pub fn logs(
     if follow {
         args.push("-f");
     }
-    args.push(&container);
+    args.push(container.as_ref());
 
     if follow {
         // Stream directly to terminal so the user sees output in real time.
@@ -73,7 +73,7 @@ mod tests {
         )
         .unwrap();
         // Single-zone memory: direct docker, not compose
-        let runtime = ClusterRuntime::from_spec(&spec).unwrap();
+        let runtime = ClusterRuntime::from_spec(&spec);
         assert_eq!(runtime.resolve_container_name("test-cp"), "test-cp");
     }
 
@@ -88,7 +88,7 @@ mod tests {
             Platform::Universal,
         )
         .unwrap();
-        let runtime = ClusterRuntime::from_spec(&spec).unwrap();
+        let runtime = ClusterRuntime::from_spec(&spec);
         assert_eq!(runtime.resolve_container_name("g"), "harness-g-g-1");
     }
 
@@ -104,7 +104,7 @@ mod tests {
         )
         .unwrap();
         // Name not matching any member => passthrough
-        let runtime = ClusterRuntime::from_spec(&spec).unwrap();
+        let runtime = ClusterRuntime::from_spec(&spec);
         assert_eq!(runtime.resolve_container_name("demo-svc"), "demo-svc");
     }
 }

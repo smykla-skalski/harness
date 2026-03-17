@@ -8,6 +8,7 @@ pub use snapshots::{
     ArtifactSnapshot, NodeCheckRecord, NodeCheckSnapshot, ToolCheckRecord, ToolCheckSnapshot,
 };
 
+use std::borrow::Cow;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::{fs, io};
@@ -134,9 +135,12 @@ impl RunLayout {
     ///
     /// Falls back to the full display path when stripping fails.
     #[must_use]
-    pub fn relative_path(&self, path: &Path) -> String {
-        path.strip_prefix(self.run_dir())
-            .map_or_else(|_| path.display().to_string(), |p| p.display().to_string())
+    pub fn relative_path<'a>(&self, path: &'a Path) -> Cow<'a, str> {
+        let run_dir = self.run_dir();
+        let relative = path.strip_prefix(&run_dir).unwrap_or(path);
+        relative
+            .to_str()
+            .map_or_else(|| Cow::Owned(relative.display().to_string()), Cow::Borrowed)
     }
 
     /// Append a row to `commands/command-log.md`.
@@ -230,6 +234,25 @@ pub struct CommandEnv {
 }
 
 impl CommandEnv {
+    pub fn iter_env_vars(&self) -> impl Iterator<Item = (&'static str, &str)> {
+        [
+            ("PROFILE", Some(self.profile.as_str())),
+            ("REPO_ROOT", Some(self.repo_root.as_str())),
+            ("RUN_DIR", Some(self.run_dir.as_str())),
+            ("RUN_ID", Some(self.run_id.as_str())),
+            ("RUN_ROOT", Some(self.run_root.as_str())),
+            ("SUITE_DIR", Some(self.suite_dir.as_str())),
+            ("SUITE_ID", Some(self.suite_id.as_str())),
+            ("SUITE_PATH", Some(self.suite_path.as_str())),
+            ("KUBECONFIG", self.kubeconfig.as_deref()),
+            ("PLATFORM", self.platform.as_deref()),
+            ("CP_API_URL", self.cp_api_url.as_deref()),
+            ("DOCKER_NETWORK", self.docker_network.as_deref()),
+        ]
+        .into_iter()
+        .filter_map(|(key, value)| value.map(|value| (key, value)))
+    }
+
     /// Convert to a map of environment variable names to values.
     ///
     /// Returns owned strings because `Command::envs()` needs `AsRef<OsStr>`
@@ -238,28 +261,9 @@ impl CommandEnv {
     /// env vars to child processes, so owned strings are the right fit.
     #[must_use]
     pub fn to_env_dict(&self) -> HashMap<String, String> {
-        let mut map = HashMap::with_capacity(12);
-        map.insert("PROFILE".into(), self.profile.clone());
-        map.insert("REPO_ROOT".into(), self.repo_root.clone());
-        map.insert("RUN_DIR".into(), self.run_dir.clone());
-        map.insert("RUN_ID".into(), self.run_id.clone());
-        map.insert("RUN_ROOT".into(), self.run_root.clone());
-        map.insert("SUITE_DIR".into(), self.suite_dir.clone());
-        map.insert("SUITE_ID".into(), self.suite_id.clone());
-        map.insert("SUITE_PATH".into(), self.suite_path.clone());
-        if let Some(ref kc) = self.kubeconfig {
-            map.insert("KUBECONFIG".into(), kc.clone());
-        }
-        if let Some(ref p) = self.platform {
-            map.insert("PLATFORM".into(), p.clone());
-        }
-        if let Some(ref url) = self.cp_api_url {
-            map.insert("CP_API_URL".into(), url.clone());
-        }
-        if let Some(ref net) = self.docker_network {
-            map.insert("DOCKER_NETWORK".into(), net.clone());
-        }
-        map
+        self.iter_env_vars()
+            .map(|(key, value)| (key.to_string(), value.to_string()))
+            .collect()
     }
 }
 
@@ -336,12 +340,14 @@ impl CurrentRunPointer {
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::absolute_paths, clippy::cognitive_complexity)]
+
     use super::*;
-    use crate::schema::{RunCounts, Verdict};
+    use crate::schema::{RunCounts, RunStatus, Verdict};
     use std::fs;
     use std::sync::Mutex;
 
-    /// Mutex for tests that modify environment variables (XDG_DATA_HOME, CLAUDE_SESSION_ID).
+    /// Mutex for tests that modify environment variables (`XDG_DATA_HOME`, `CLAUDE_SESSION_ID`).
     static ENV_MUTEX: Mutex<()> = Mutex::new(());
 
     fn sample_layout() -> RunLayout {
@@ -351,15 +357,15 @@ mod tests {
         }
     }
 
-    fn sample_status() -> crate::schema::RunStatus {
-        crate::schema::RunStatus {
+    fn sample_status() -> RunStatus {
+        RunStatus {
             run_id: "run-1".into(),
             suite_id: "suite-a".into(),
             profile: "single-zone".into(),
             started_at: "2026-03-14T00:00:00Z".into(),
-            overall_verdict: crate::schema::Verdict::Pending,
+            overall_verdict: Verdict::Pending,
             completed_at: None,
-            counts: crate::schema::RunCounts::default(),
+            counts: RunCounts::default(),
             executed_groups: vec![],
             skipped_groups: vec![],
             last_completed_group: None,
@@ -738,7 +744,9 @@ mod tests {
 
     #[test]
     fn run_context_from_current_returns_none_when_no_pointer() {
-        let _guard = ENV_MUTEX.lock().unwrap_or_else(|e| e.into_inner());
+        let _guard = ENV_MUTEX
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         let tmp = tempfile::tempdir().unwrap();
         temp_env::with_vars(
             [
@@ -785,7 +793,7 @@ mod tests {
 
         // Write pointer file and verify deserialization path
         let record = CurrentRunRecord {
-            layout: layout.clone(),
+            layout,
             profile: Some("single-zone".into()),
             repo_root: None,
             suite_dir: None,

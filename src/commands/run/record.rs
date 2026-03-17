@@ -96,7 +96,7 @@ pub fn record(
             group_id,
             &cmd_str,
             &returncode.to_string(),
-            &artifact_rel,
+            artifact_rel.as_ref(),
         )?;
     }
 

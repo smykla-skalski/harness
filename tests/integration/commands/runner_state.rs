@@ -95,7 +95,7 @@ fn runner_state_event_returns_error() {
     let tmp = tempfile::tempdir().unwrap();
     let run_dir = init_run(tmp.path(), "run-evt-err", "single-zone");
     let args = RunDirArgs {
-        run_dir: Some(run_dir.clone()),
+        run_dir: Some(run_dir),
         run_id: None,
         run_root: None,
     };
