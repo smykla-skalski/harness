@@ -1,9 +1,9 @@
 use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::path::Path;
-use std::thread;
 #[cfg(test)]
 use std::path::PathBuf;
+use std::thread;
 
 use rayon::prelude::*;
 use serde::Serialize;
