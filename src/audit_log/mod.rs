@@ -267,13 +267,23 @@ fn append_jsonl_line(path: &Path, line: &str) -> Result<(), CliError> {
         .ok_or_else(|| CliErrorKind::io(cow!("missing parent directory for {}", path.display())))?;
     ensure_dir(parent)
         .map_err(|error| CliErrorKind::io(cow!("create dir {}: {error}", parent.display())))?;
+    let is_new = !path.exists();
     let mut file = OpenOptions::new()
         .create(true)
         .append(true)
         .open(path)
         .map_err(|error| CliErrorKind::io(cow!("open {}: {error}", path.display())))?;
     writeln!(file, "{line}")
-        .map_err(|error| CliErrorKind::io(cow!("append {}: {error}", path.display())).into())
+        .map_err(|error| CliErrorKind::io(cow!("append {}: {error}", path.display())))?;
+
+    #[cfg(unix)]
+    if is_new {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600))
+            .map_err(|e| CliErrorKind::io(cow!("set permissions {}: {e}", path.display())))?;
+    }
+
+    Ok(())
 }
 
 #[cfg(test)]
@@ -445,5 +455,29 @@ mod tests {
             ]
         }));
         assert_eq!(summary, "Proceed? => Yes");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn audit_log_file_has_restricted_permissions() {
+        use std::os::unix::fs::PermissionsExt;
+        let tempdir = tempfile::tempdir().unwrap();
+        let run_dir = tempdir.path().join("r01");
+        let layout = RunLayout::from_run_dir(&run_dir);
+        layout.ensure_dirs().unwrap();
+
+        append_audit_entry(AuditAppendRequest {
+            run_dir: run_dir.clone(),
+            tool_name: "Read".to_string(),
+            tool_input: "test.md".to_string(),
+            full_output: "contents".to_string(),
+            phase: "execution".to_string(),
+            group_id: None,
+        })
+        .unwrap();
+
+        let log_metadata = fs::metadata(layout.audit_log_path()).unwrap();
+        let log_mode = log_metadata.permissions().mode() & 0o777;
+        assert_eq!(log_mode, 0o600, "audit log expected 0600, got {log_mode:o}");
     }
 }
