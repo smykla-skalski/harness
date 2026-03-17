@@ -12,7 +12,7 @@ use serde_json::Value;
 use crate::errors::{CliError, CliErrorKind, cow};
 
 pub use self::markdown::{append_markdown_row, as_list, as_mapping, drill};
-pub use self::yaml::{extract_raw_frontmatter, parse_frontmatter_values, yaml_to_json};
+pub use self::yaml::extract_raw_frontmatter;
 
 /// Check whether a name is safe to use as a path component.
 ///
@@ -212,91 +212,25 @@ mod tests {
         assert!(ensure_str_list(&val, "test").is_err());
     }
 
-    // --- Frontmatter parser tests ---
+    // --- Frontmatter splitter tests ---
 
     #[test]
-    fn parse_frontmatter_scalars() {
-        let text = "---\nname: hello\ncount: 42\nrate: 3.15\n---\n\nbody";
-        let (payload, _body) = parse_frontmatter_values(text).unwrap();
-        assert_eq!(payload["name"], json!("hello"));
-        assert_eq!(payload["count"], json!(42));
-        assert_eq!(payload["rate"], json!(3.15));
-    }
-
-    #[test]
-    fn parse_frontmatter_booleans() {
-        let text = "---\nenabled: true\ndisabled: false\nalso_yes: yes\nalso_no: no\n---\n\nbody";
-        let (payload, _) = parse_frontmatter_values(text).unwrap();
-        assert_eq!(payload["enabled"], json!(true));
-        assert_eq!(payload["disabled"], json!(false));
-        // serde_yml treats yes/no as booleans
-        assert_eq!(payload["also_yes"], json!(true));
-        assert_eq!(payload["also_no"], json!(false));
-    }
-
-    #[test]
-    fn parse_frontmatter_null() {
-        let text = "---\nempty: null\ntilde: ~\nbare:\n---\n\nbody";
-        let (payload, _) = parse_frontmatter_values(text).unwrap();
-        assert_eq!(payload["empty"], Value::Null);
-        assert_eq!(payload["tilde"], Value::Null);
-        assert_eq!(payload["bare"], Value::Null);
-    }
-
-    #[test]
-    fn parse_frontmatter_inline_list() {
-        let text = "---\nitems: [a, b, c]\n---\n\nbody";
-        let (payload, _) = parse_frontmatter_values(text).unwrap();
-        assert_eq!(payload["items"], json!(["a", "b", "c"]));
-    }
-
-    #[test]
-    fn parse_frontmatter_empty_inline_list() {
-        let text = "---\nitems: []\n---\n\nbody";
-        let (payload, _) = parse_frontmatter_values(text).unwrap();
-        assert_eq!(payload["items"], json!([]));
-    }
-
-    #[test]
-    fn parse_frontmatter_empty_dict() {
-        let text = "---\nmeta: {}\n---\n\nbody";
-        let (payload, _) = parse_frontmatter_values(text).unwrap();
-        assert_eq!(payload["meta"], json!({}));
-    }
-
-    #[test]
-    fn parse_frontmatter_block_list() {
-        let text = "---\nitems:\n  - alpha\n  - beta\n  - gamma\n---\n\nbody";
-        let (payload, _) = parse_frontmatter_values(text).unwrap();
-        assert_eq!(payload["items"], json!(["alpha", "beta", "gamma"]));
-    }
-
-    #[test]
-    fn parse_frontmatter_quoted_strings() {
-        let text = "---\nname: \"hello world\"\nsingle: 'test'\n---\n\nbody";
-        let (payload, _) = parse_frontmatter_values(text).unwrap();
-        assert_eq!(payload["name"], json!("hello world"));
-        assert_eq!(payload["single"], json!("test"));
-    }
-
-    #[test]
-    fn parse_frontmatter_values_valid() {
+    fn extract_frontmatter_valid() {
         let text = "---\nname: test\ncount: 3\n---\n\nBody content here.";
-        let (payload, body) = parse_frontmatter_values(text).unwrap();
-        assert_eq!(payload["name"], json!("test"));
-        assert_eq!(payload["count"], json!(3));
-        assert!(body.contains("Body content here."));
+        let (yaml, body) = extract_raw_frontmatter(text).unwrap();
+        assert_eq!(yaml, "name: test\ncount: 3");
+        assert_eq!(body, "Body content here.");
     }
 
     #[test]
-    fn parse_frontmatter_values_missing_start() {
-        let err = parse_frontmatter_values("no frontmatter").unwrap_err();
+    fn extract_frontmatter_missing() {
+        let err = extract_raw_frontmatter("no frontmatter").unwrap_err();
         assert!(err.message().contains("missing YAML frontmatter"));
     }
 
     #[test]
-    fn parse_frontmatter_values_unterminated() {
-        let err = parse_frontmatter_values("---\nname: test\n").unwrap_err();
+    fn extract_frontmatter_unterminated() {
+        let err = extract_raw_frontmatter("---\nname: test\n").unwrap_err();
         assert!(err.message().contains("unterminated"));
     }
 

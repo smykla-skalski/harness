@@ -3,14 +3,11 @@ use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
-use crate::errors::{CliError, CliErrorKind};
+use crate::errors::{CliError, CliErrorKind, cow};
 use crate::io;
 use crate::rules;
 
 use super::frontmatter::SuiteFrontmatter;
-use super::parsers::{
-    split_frontmatter, yaml_bool, yaml_helm_values, yaml_int_list, yaml_str, yaml_str_list,
-};
 
 /// A loaded suite specification with its source path.
 #[derive(Debug, Clone)]
@@ -26,27 +23,17 @@ impl SuiteSpec {
     /// Returns `CliError` if the file is missing or frontmatter is invalid.
     pub fn from_markdown(path: &Path) -> Result<Self, CliError> {
         let text = io::read_text(path)?;
-        let (yaml, _body) = split_frontmatter(&text)?;
-        let map = &yaml;
+        let (yaml_text, _body) = io::extract_raw_frontmatter(&text)?;
 
-        let suite_id = yaml_str(map, "suite_id");
-        let feature = yaml_str(map, "feature");
+        // First pass: check required keys exist in the mapping.
+        let map: serde_yml::Mapping = serde_yml::from_str(&yaml_text)
+            .map_err(|e| CliErrorKind::workflow_parse(cow!("frontmatter YAML: {e}")))?;
 
-        // Require both suite_id and feature
         let mut missing = Vec::new();
-        if suite_id.is_none() {
-            missing.push("suite_id");
-        }
-        if feature.is_none() {
-            missing.push("feature");
-        }
-        if yaml_str(map, "scope").is_none()
-            && !map.contains_key(serde_yml::Value::String("scope".to_string()))
-        {
-            missing.push("scope");
-        }
-        if !map.contains_key(serde_yml::Value::String("keep_clusters".to_string())) {
-            missing.push("keep_clusters");
+        for key in ["suite_id", "feature", "scope", "keep_clusters"] {
+            if !map.contains_key(serde_yml::Value::String(key.to_string())) {
+                missing.push(key);
+            }
         }
         if !missing.is_empty() {
             return Err(
@@ -54,20 +41,9 @@ impl SuiteSpec {
             );
         }
 
-        let frontmatter = SuiteFrontmatter {
-            suite_id: suite_id.unwrap_or_default(),
-            feature: feature.unwrap_or_default(),
-            scope: yaml_str(map, "scope"),
-            profiles: yaml_str_list(map, "profiles"),
-            required_dependencies: yaml_str_list(map, "required_dependencies"),
-            user_stories: yaml_str_list(map, "user_stories"),
-            variant_decisions: yaml_str_list(map, "variant_decisions"),
-            coverage_expectations: yaml_str_list(map, "coverage_expectations"),
-            baseline_files: yaml_str_list(map, "baseline_files"),
-            groups: yaml_str_list(map, "groups"),
-            skipped_groups: yaml_str_list(map, "skipped_groups"),
-            keep_clusters: yaml_bool(map, "keep_clusters"),
-        };
+        // Second pass: typed deserialization.
+        let frontmatter: SuiteFrontmatter = serde_yml::from_str(&yaml_text)
+            .map_err(|e| CliErrorKind::workflow_parse(cow!("suite frontmatter: {e}")))?;
 
         Ok(Self {
             frontmatter,
@@ -124,8 +100,7 @@ impl GroupSpec {
     /// or required sections are missing.
     pub fn from_markdown(path: &Path) -> Result<Self, CliError> {
         let text = io::read_text(path)?;
-        let (yaml, body) = split_frontmatter(&text)?;
-        let map = &yaml;
+        let (yaml_text, body) = io::extract_raw_frontmatter(&text)?;
 
         // Check required sections in body
         let missing = rules::shared::GroupSection::missing_from(&body);
@@ -134,20 +109,8 @@ impl GroupSpec {
             return Err(CliErrorKind::missing_sections("group body", labels.join(", ")).into());
         }
 
-        let frontmatter = GroupFrontmatter {
-            group_id: yaml_str(map, "group_id").unwrap_or_default(),
-            story: yaml_str(map, "story").unwrap_or_default(),
-            capability: yaml_str(map, "capability"),
-            profiles: yaml_str_list(map, "profiles"),
-            preconditions: yaml_str_list(map, "preconditions"),
-            success_criteria: yaml_str_list(map, "success_criteria"),
-            debug_checks: yaml_str_list(map, "debug_checks"),
-            artifacts: yaml_str_list(map, "artifacts"),
-            variant_source: yaml_str(map, "variant_source"),
-            helm_values: yaml_helm_values(map, "helm_values"),
-            restart_namespaces: yaml_str_list(map, "restart_namespaces"),
-            expected_rejection_orders: yaml_int_list(map, "expected_rejection_orders"),
-        };
+        let frontmatter: GroupFrontmatter = serde_yml::from_str(&yaml_text)
+            .map_err(|e| CliErrorKind::workflow_parse(cow!("group frontmatter: {e}")))?;
 
         Ok(Self {
             frontmatter,
