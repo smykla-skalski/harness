@@ -39,3 +39,7 @@ temp-env = "0.3.6"
 pedantic = { level = "deny", priority = 1 }
 absolute_paths = { level = "deny", priority = 2 }
 cognitive_complexity = { level = "deny", priority = 2 }
+needless_pass_by_value = { level = "deny", priority = 2 }
+ptr_arg = { level = "deny", priority = 2 }
+redundant_clone = { level = "deny", priority = 2 }
+unnecessary_to_owned = { level = "deny", priority = 2 }

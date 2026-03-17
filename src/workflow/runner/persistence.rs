@@ -5,9 +5,7 @@ use crate::errors::{CliError, CliErrorKind, cow};
 use crate::rules::skill_dirs;
 use crate::workflow::engine::VersionedJsonRepository;
 
-use super::types::{
-    PreflightState, PreflightStatus, RunnerPhase, RunnerWorkflowState,
-};
+use super::types::{PreflightState, PreflightStatus, RunnerPhase, RunnerWorkflowState};
 
 pub(super) const RUNNER_STATE_SCHEMA_VERSION: u32 = 2;
 
@@ -17,9 +15,7 @@ pub fn runner_state_path(run_dir: &Path) -> PathBuf {
     run_dir.join(skill_dirs::RUN_STATE_FILE)
 }
 
-pub(super) fn runner_repository(
-    run_dir: &Path,
-) -> VersionedJsonRepository<RunnerWorkflowState> {
+pub(super) fn runner_repository(run_dir: &Path) -> VersionedJsonRepository<RunnerWorkflowState> {
     VersionedJsonRepository::new(runner_state_path(run_dir), RUNNER_STATE_SCHEMA_VERSION)
 }
 
@@ -38,10 +34,7 @@ pub(super) fn make_initial_state(occurred_at: &str) -> RunnerWorkflowState {
     }
 }
 
-pub(super) fn save_state(
-    run_dir: &Path,
-    state: &RunnerWorkflowState,
-) -> Result<(), CliError> {
+pub(super) fn save_state(run_dir: &Path, state: &RunnerWorkflowState) -> Result<(), CliError> {
     let repo = runner_repository(run_dir);
     repo.save(state)?;
     append_runner_state_audit(run_dir, state)?;
@@ -52,9 +45,7 @@ pub(super) fn save_state(
 ///
 /// # Errors
 /// Returns `CliError` on IO failure.
-pub fn initialize_runner_state(
-    run_dir: &Path,
-) -> Result<RunnerWorkflowState, CliError> {
+pub fn initialize_runner_state(run_dir: &Path) -> Result<RunnerWorkflowState, CliError> {
     let state = make_initial_state(&super::now_utc());
     save_state(run_dir, &state)?;
     Ok(state)
@@ -64,9 +55,7 @@ pub fn initialize_runner_state(
 ///
 /// # Errors
 /// Returns `CliError` on parse failure.
-pub fn read_runner_state(
-    run_dir: &Path,
-) -> Result<Option<RunnerWorkflowState>, CliError> {
+pub fn read_runner_state(run_dir: &Path) -> Result<Option<RunnerWorkflowState>, CliError> {
     let repo = runner_repository(run_dir);
     let loaded = match repo.load() {
         Ok(loaded) => loaded,
@@ -91,9 +80,6 @@ pub fn read_runner_state(
 ///
 /// # Errors
 /// Returns `CliError` on IO failure.
-pub fn write_runner_state(
-    run_dir: &Path,
-    state: &RunnerWorkflowState,
-) -> Result<(), CliError> {
+pub fn write_runner_state(run_dir: &Path, state: &RunnerWorkflowState) -> Result<(), CliError> {
     save_state(run_dir, state)
 }

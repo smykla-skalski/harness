@@ -2,8 +2,8 @@ use std::path::Path;
 
 use serde_json::Value;
 
-use crate::commands::observe::classifier::emitter::{Guidance, IssueBlueprint, IssueEmitter};
 use crate::commands::observe::classifier::SKILL_NAME_REGEX;
+use crate::commands::observe::classifier::emitter::{Guidance, IssueBlueprint, IssueEmitter};
 use crate::commands::observe::patterns;
 use crate::commands::observe::types::{
     Confidence, FixSafety, Issue, IssueCode, MessageRole, ScanState, SourceTool,

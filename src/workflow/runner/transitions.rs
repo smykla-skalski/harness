@@ -1,8 +1,8 @@
 use crate::errors::{CliError, CliErrorKind};
 
 use super::types::{
-    FailureKind, FailureState, PreflightStatus, RunnerEvent, RunnerPhase,
-    RunnerWorkflowState, SuiteFixState,
+    FailureKind, FailureState, PreflightStatus, RunnerEvent, RunnerPhase, RunnerWorkflowState,
+    SuiteFixState,
 };
 
 /// Map an event name to the target phase, validating that the transition
@@ -42,11 +42,7 @@ where
 
 /// Handle abort, suspend, and resume - these bypass normal phase rules.
 /// Returns `Some(true/false)` when the event is special, `None` to fall through.
-fn is_special_transition(
-    from: RunnerPhase,
-    to: RunnerPhase,
-    event: RunnerEvent,
-) -> Option<bool> {
+fn is_special_transition(from: RunnerPhase, to: RunnerPhase, event: RunnerEvent) -> Option<bool> {
     if matches!(to, RunnerPhase::Aborted | RunnerPhase::Suspended) {
         return Some(!matches!(from, RunnerPhase::Completed));
     }
@@ -97,10 +93,7 @@ pub(super) fn clear_triage_state_on_forward_movement(
 }
 
 /// Update preflight sub-state for preflight events.
-pub(super) fn apply_preflight_status(
-    state: &mut RunnerWorkflowState,
-    event: RunnerEvent,
-) {
+pub(super) fn apply_preflight_status(state: &mut RunnerWorkflowState, event: RunnerEvent) {
     match event {
         RunnerEvent::PreflightStarted => state.preflight.status = PreflightStatus::Running,
         RunnerEvent::PreflightCaptured => state.preflight.status = PreflightStatus::Complete,

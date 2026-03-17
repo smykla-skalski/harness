@@ -294,6 +294,7 @@ mod tests {
     // All env-dependent authoring tests are combined into one test to avoid
     // races on global env vars when cargo runs tests in parallel.
     #[test]
+    #[allow(clippy::too_many_lines)]
     fn env_dependent_authoring_tests() {
         // -- save_and_load_session_round_trip --
         {

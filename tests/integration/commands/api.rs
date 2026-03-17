@@ -3,6 +3,7 @@
 
 use harness::cli::Command;
 use harness::commands::RunDirArgs;
+use harness::commands::run::ApiArgs;
 use harness::commands::run::ApiMethod;
 
 use super::super::helpers::*;
@@ -33,9 +34,7 @@ fn api_missing_run_dir() {
         },
     ];
     for make in &make_methods {
-        let result = run_command(Command::Api(harness::commands::run::ApiArgs {
-            method: make(),
-        }));
+        let result = run_command(Command::Api(ApiArgs { method: make() }));
         assert!(result.is_err());
         assert_eq!(result.unwrap_err().code(), "KSRCLI014");
     }
@@ -64,7 +63,7 @@ fn api_missing_cluster_spec() {
                 run_dir: run_dir_args,
             }
         };
-        let result = run_command(Command::Api(harness::commands::run::ApiArgs { method }));
+        let result = run_command(Command::Api(ApiArgs { method }));
         assert!(result.is_err());
         assert_eq!(result.unwrap_err().code(), "KSRCLI009");
     }

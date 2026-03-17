@@ -1,6 +1,7 @@
 // Integration tests for the `harness observe` command.
 // Tests error paths and basic scan behavior with synthetic JSONL fixtures.
 
+use std::fs::{self, File};
 use std::io::Write;
 
 use harness::cli::Command;
@@ -103,9 +104,9 @@ fn write_session_fixture(tmp: &tempfile::TempDir, session_id: &str, lines: &[&st
         .join(".claude")
         .join("projects")
         .join("test-project");
-    std::fs::create_dir_all(&project_dir).unwrap();
+    fs::create_dir_all(&project_dir).unwrap();
     let session_file = project_dir.join(format!("{session_id}.jsonl"));
-    let mut file = std::fs::File::create(session_file).unwrap();
+    let mut file = File::create(session_file).unwrap();
     for line in lines {
         writeln!(file, "{line}").unwrap();
     }
@@ -387,6 +388,6 @@ fn scan_output_details_written() {
     });
 
     assert!(details_path.exists(), "details file should be created");
-    let content = std::fs::read_to_string(&details_path).unwrap();
+    let content = fs::read_to_string(&details_path).unwrap();
     assert!(!content.is_empty(), "details file should have content");
 }

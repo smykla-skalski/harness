@@ -119,7 +119,7 @@ pub(super) fn track_capture_between_groups(
             && !state.seen_capture_since_last_group_report
             && !has_capture_label
         {
-            let details = format!("Command: {}", command.raw);
+            let details = format!("Command: {}", command.raw());
             IssueEmitter::new(line_num, MessageRole::Assistant, state).emit(
                 issues,
                 IssueBlueprint::from_code(
@@ -153,7 +153,7 @@ fn extract_manifest_stems(command: &ObservedCommand) -> Vec<String> {
         .manifest_paths()
         .into_iter()
         .filter_map(|path| {
-            Path::new(&path)
+            Path::new(path)
                 .file_stem()
                 .and_then(|stem| stem.to_str())
                 .map(ToString::to_string)
