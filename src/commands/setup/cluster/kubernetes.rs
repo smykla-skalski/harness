@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::env;
 use std::path::Path;
+use std::thread;
 
 use tracing::info;
 
@@ -300,19 +301,42 @@ fn global_two_zones_up(
     ];
     start_and_deploy(root, base_env, &names[0], "global", &global_settings)?;
     let kds_address = resolve_kds_address(&names[0])?;
-    info!("global CP deployed, starting zone clusters");
-    for (zone_cluster, zone_name) in [(&names[1], &names[3]), (&names[2], &names[4])] {
-        info!(%zone_name, %zone_cluster, "deploying zone");
-        let zone_settings = vec![
-            "controlPlane.mode=zone".into(),
-            format!("controlPlane.zone={zone_name}"),
-            format!("controlPlane.kdsGlobalAddress={kds_address}"),
-            "controlPlane.tls.kdsZoneClient.skipVerify=true".into(),
-        ];
-        start_and_deploy(root, base_env, zone_cluster, "zone", &zone_settings)?;
-        info!(%zone_name, %zone_cluster, "zone ready");
-    }
-    Ok(())
+    info!("global CP deployed, starting zone clusters in parallel");
+
+    let zone1_settings = vec![
+        "controlPlane.mode=zone".into(),
+        format!("controlPlane.zone={}", names[3]),
+        format!("controlPlane.kdsGlobalAddress={kds_address}"),
+        "controlPlane.tls.kdsZoneClient.skipVerify=true".into(),
+    ];
+    let zone2_settings = vec![
+        "controlPlane.mode=zone".into(),
+        format!("controlPlane.zone={}", names[4]),
+        format!("controlPlane.kdsGlobalAddress={kds_address}"),
+        "controlPlane.tls.kdsZoneClient.skipVerify=true".into(),
+    ];
+
+    thread::scope(|scope| {
+        let zone1_cluster = &names[1];
+        let zone1_name = &names[3];
+        let zone2_cluster = &names[2];
+        let zone2_name = &names[4];
+        let t_zone1 = scope.spawn(move || {
+            info!(%zone1_name, %zone1_cluster, "deploying zone");
+            start_and_deploy(root, base_env, zone1_cluster, "zone", &zone1_settings)?;
+            info!(%zone1_name, %zone1_cluster, "zone ready");
+            Ok::<(), CliError>(())
+        });
+        let t_zone2 = scope.spawn(move || {
+            info!(%zone2_name, %zone2_cluster, "deploying zone");
+            start_and_deploy(root, base_env, zone2_cluster, "zone", &zone2_settings)?;
+            info!(%zone2_name, %zone2_cluster, "zone ready");
+            Ok::<(), CliError>(())
+        });
+        t_zone1.join().expect("zone1 thread panicked")?;
+        t_zone2.join().expect("zone2 thread panicked")?;
+        Ok(())
+    })
 }
 
 fn global_two_zones_down(
