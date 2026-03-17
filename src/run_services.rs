@@ -1,6 +1,7 @@
 use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::path::Path;
+use std::thread;
 #[cfg(test)]
 use std::path::PathBuf;
 
@@ -361,11 +362,20 @@ impl RunServices {
     ///
     /// # Errors
     /// Returns `CliError` when the run has no tracked cluster spec yet.
+    ///
+    /// # Panics
+    /// Panics if an internal query thread panics (should not happen).
     pub fn status_report(&self) -> Result<ClusterStatusReport<'_>, CliError> {
         let runtime = self.cluster_runtime()?;
         let spec = self.cluster_spec()?;
-        let services = self.list_service_containers().unwrap_or_default();
-        let dataplanes = self.query_dataplanes("default").ok();
+        let (services, dataplanes) = thread::scope(|scope| {
+            let t_svc = scope.spawn(|| self.list_service_containers().unwrap_or_default());
+            let t_dp = scope.spawn(|| self.query_dataplanes("default").ok());
+            (
+                t_svc.join().expect("service list thread panicked"),
+                t_dp.join().expect("dataplane query thread panicked"),
+            )
+        });
         Ok(ClusterStatusReport {
             platform: runtime.platform().as_str(),
             mode: spec.mode.as_str(),
