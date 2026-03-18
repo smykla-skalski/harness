@@ -37,6 +37,7 @@ fn session_stop_cleans_up_templates_and_removes_pointer() {
         keep_clusters: false,
         user_stories: vec![],
         required_dependencies: vec![],
+        requires: vec![],
     };
 
     temp_env::with_vars(

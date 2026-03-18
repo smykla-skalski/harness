@@ -80,16 +80,7 @@ fn render_template(
 pub fn service(args: &ServiceArgs) -> Result<i32, CliError> {
     let docker = DockerContainerRuntime::new(Arc::new(StdProcessExecutor));
     match args.action.as_str() {
-        "up" => service_up(
-            args.name.as_deref(),
-            args.image.as_deref(),
-            args.port,
-            &args.mesh,
-            args.transparent_proxy,
-            args.timeout,
-            &args.run_dir,
-            &docker,
-        ),
+        "up" => service_up(args, &docker),
         "down" => service_down(args.name.as_deref(), &args.run_dir, &docker),
         "list" => service_list(&args.run_dir, &docker),
         _ => Err(
@@ -98,30 +89,26 @@ pub fn service(args: &ServiceArgs) -> Result<i32, CliError> {
     }
 }
 
-fn service_up(
-    name: Option<&str>,
-    image: Option<&str>,
-    port: Option<u16>,
-    mesh: &str,
-    transparent_proxy: bool,
-    timeout: u64,
-    run_dir_args: &RunDirArgs,
-    docker: &dyn ContainerRuntime,
-) -> Result<i32, CliError> {
-    let svc_name = name.ok_or_else(|| CliErrorKind::usage_error("service name is required"))?;
-    let svc_port = port.ok_or_else(|| CliErrorKind::usage_error("service port is required"))?;
+fn service_up(args: &ServiceArgs, docker: &dyn ContainerRuntime) -> Result<i32, CliError> {
+    let svc_name = args
+        .name
+        .as_deref()
+        .ok_or_else(|| CliErrorKind::usage_error("service name is required"))?;
+    let svc_port = args
+        .port
+        .ok_or_else(|| CliErrorKind::usage_error("service port is required"))?;
 
-    let services = resolve_run_services(run_dir_args)?;
+    let services = resolve_run_services(&args.run_dir)?;
     let access = services.control_plane_access()?;
     let network = services.docker_network()?;
-    let svc_image = services.service_image(image)?;
+    let svc_image = services.service_image(args.image.as_deref())?;
 
     // Generate token
     let token_result = token_via_api(
         access.addr.as_ref(),
         "dataplane",
         svc_name,
-        mesh,
+        &args.mesh,
         "24h",
         access.admin_token,
     )?;
@@ -150,11 +137,11 @@ fn service_up(
         docker,
         name: svc_name,
         port: svc_port,
-        mesh,
+        mesh: &args.mesh,
         network,
         token: token_str,
-        transparent_proxy,
-        timeout,
+        transparent_proxy: args.transparent_proxy,
+        timeout: args.timeout,
         xds: services.xds_access()?,
     }) {
         let _ = docker.remove(svc_name);

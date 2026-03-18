@@ -6,6 +6,7 @@ use crate::core_defs::{session_context_dir, utc_now};
 use crate::errors::{CliError, CliErrorKind};
 use crate::io::{read_json_typed, write_json_pretty};
 use crate::rules::skill_dirs;
+use crate::schema::frontmatter::merge_requirement_lists;
 
 /// Active authoring session state.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -121,7 +122,16 @@ pub struct ProposalSummary {
     #[serde(default)]
     pub required_dependencies: Vec<String>,
     #[serde(default)]
+    pub requires: Vec<String>,
+    #[serde(default)]
     pub skipped_groups: Vec<String>,
+}
+
+impl ProposalSummary {
+    #[must_use]
+    pub fn effective_requires(&self) -> Vec<String> {
+        merge_requirement_lists(&self.requires, &self.required_dependencies)
+    }
 }
 
 /// Draft edit request.
@@ -429,8 +439,51 @@ mod tests {
         assert_eq!(summary.summary, "proposal");
         assert!(summary.groups.is_empty());
         assert!(summary.required_dependencies.is_empty());
+        assert!(summary.requires.is_empty());
         assert!(summary.skipped_groups.is_empty());
         assert!(summary.suite_name.is_none());
+    }
+
+    #[test]
+    fn proposal_summary_effective_requires_falls_back_to_required_dependencies() {
+        let summary = ProposalSummary {
+            summary: "proposal".to_string(),
+            suite_name: None,
+            suite_dir: None,
+            run_command: None,
+            groups: vec![],
+            required_dependencies: vec!["docker".to_string(), "helm".to_string()],
+            requires: vec![],
+            skipped_groups: vec![],
+        };
+
+        assert_eq!(
+            summary.effective_requires(),
+            vec!["docker".to_string(), "helm".to_string()]
+        );
+    }
+
+    #[test]
+    fn proposal_summary_effective_requires_merges_requires_and_legacy_dependencies() {
+        let summary = ProposalSummary {
+            summary: "proposal".to_string(),
+            suite_name: None,
+            suite_dir: None,
+            run_command: None,
+            groups: vec![],
+            required_dependencies: vec!["docker".to_string(), "helm".to_string()],
+            requires: vec!["kubernetes".to_string(), "docker".to_string()],
+            skipped_groups: vec![],
+        };
+
+        assert_eq!(
+            summary.effective_requires(),
+            vec![
+                "kubernetes".to_string(),
+                "docker".to_string(),
+                "helm".to_string()
+            ]
+        );
     }
 
     #[test]

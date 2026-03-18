@@ -1,4 +1,4 @@
-mod frontmatter;
+pub mod frontmatter;
 mod run;
 mod suite;
 
