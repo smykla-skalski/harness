@@ -5,17 +5,19 @@ mod types;
 use std::fmt;
 use std::path::Path;
 
+use crate::audit_log::append_runner_state_audit;
 use crate::errors::{CliError, CliErrorKind};
 
 pub use persistence::{
     initialize_runner_state, read_runner_state, runner_state_path, write_runner_state,
+    write_runner_state_if_current,
 };
 pub use types::{
     FailureKind, FailureState, ManifestFixDecision, PreflightState, PreflightStatus, RunnerEvent,
     RunnerNextAction, RunnerPhase, RunnerWorkflowState, SuiteFixState,
 };
 
-use persistence::{make_initial_state, save_state};
+use persistence::{make_initial_state, runner_repository};
 use transitions::{
     apply_failure_manifest, apply_preflight_status, apply_suite_fix,
     clear_triage_state_on_forward_movement, resolve_transition,
@@ -45,18 +47,26 @@ where
     let event = event
         .try_into()
         .map_err(|error| CliErrorKind::invalid_transition(format!("unknown event: {error}")))?;
-    let mut state = read_runner_state(run_dir)?.unwrap_or_else(|| make_initial_state(&now_utc()));
+    let _ = read_runner_state(run_dir)?;
+    let repo = runner_repository(run_dir);
+    let updated = repo.update(|current| {
+        let mut state = current.unwrap_or_else(|| make_initial_state(&now_utc()));
 
-    let new_phase = resolve_transition(&state, event)?;
-    state.phase = new_phase;
-    state.touch(event.label());
+        let new_phase = resolve_transition(&state, event)?;
+        state.phase = new_phase;
+        state.touch(event.label());
 
-    clear_triage_state_on_forward_movement(&mut state, new_phase);
-    apply_preflight_status(&mut state, event);
-    apply_failure_manifest(&mut state, event, suite_target, message);
-    apply_suite_fix(&mut state, event, new_phase, suite_target);
+        clear_triage_state_on_forward_movement(&mut state, new_phase);
+        apply_preflight_status(&mut state, event);
+        apply_failure_manifest(&mut state, event, suite_target, message);
+        apply_suite_fix(&mut state, event, new_phase, suite_target);
 
-    save_state(run_dir, &state)?;
+        Ok(Some(state))
+    })?;
+    let Some(state) = updated else {
+        unreachable!("runner updates always persist a state");
+    };
+    append_runner_state_audit(run_dir, &state)?;
     Ok(state)
 }
 
@@ -70,16 +80,23 @@ where
 /// # Errors
 /// Returns `CliError` on IO failure.
 pub fn ensure_execution_phase(run_dir: &Path) -> Result<bool, CliError> {
-    let Some(mut state) = read_runner_state(run_dir)? else {
-        return Ok(false);
-    };
-    if matches!(state.phase, RunnerPhase::Bootstrap | RunnerPhase::Preflight) {
-        state.phase = RunnerPhase::Execution;
-        state.touch("AutoAdvanceToExecution");
-        save_state(run_dir, &state)?;
-        return Ok(true);
+    let _ = read_runner_state(run_dir)?;
+    let repo = runner_repository(run_dir);
+    let updated = repo.update(|current| {
+        let Some(mut state) = current else {
+            return Ok(None);
+        };
+        if matches!(state.phase, RunnerPhase::Bootstrap | RunnerPhase::Preflight) {
+            state.phase = RunnerPhase::Execution;
+            state.touch("AutoAdvanceToExecution");
+            return Ok(Some(state));
+        }
+        Ok(None)
+    })?;
+    if let Some(state) = updated.as_ref() {
+        append_runner_state_audit(run_dir, state)?;
     }
-    Ok(false)
+    Ok(updated.is_some())
 }
 
 /// Get the next action hint based on runner state.
