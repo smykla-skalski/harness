@@ -33,7 +33,7 @@ fn validate_agent_rejects_not_at_end() {
         raw_keys: vec![],
     };
     let ctx = make_hook_context("suite:new", payload);
-    let r = validate_agent::execute(&ctx).unwrap();
+    let r = validate_agent::execute(&ctx).unwrap().to_hook_result();
     // "saved" is not at the end, so should warn
     assert_warn(&r);
 }
@@ -50,7 +50,7 @@ fn validate_agent_accepts_at_end() {
         raw_keys: vec![],
     };
     let ctx = make_hook_context("suite:new", payload);
-    let r = validate_agent::execute(&ctx).unwrap();
+    let r = validate_agent::execute(&ctx).unwrap().to_hook_result();
     assert_allow(&r);
 }
 
@@ -66,7 +66,7 @@ fn validate_agent_trailing_period() {
         raw_keys: vec![],
     };
     let ctx = make_hook_context("suite:new", payload);
-    let r = validate_agent::execute(&ctx).unwrap();
+    let r = validate_agent::execute(&ctx).unwrap().to_hook_result();
     assert_allow(&r);
 }
 
@@ -80,7 +80,7 @@ fn context_agent_requires_preflight() {
     let run_dir = init_run(tmp.path(), "run-1", "single-zone");
     let payload = make_empty_payload();
     let ctx = make_hook_context_with_run("suite:run", payload, &run_dir);
-    let r = context_agent::execute(&ctx).unwrap();
+    let r = context_agent::execute(&ctx).unwrap().to_hook_result();
     // Context agent should check preflight state - it should deny if not ready
     assert!(
         r.decision == Decision::Deny
@@ -108,7 +108,7 @@ fn context_agent_preflight_ready() {
     runner_workflow::write_runner_state(&run_dir, &state).unwrap();
     let payload = make_empty_payload();
     let ctx = make_hook_context_with_run("suite:run", payload, &run_dir);
-    let r = context_agent::execute(&ctx).unwrap();
+    let r = context_agent::execute(&ctx).unwrap().to_hook_result();
     assert!(r.decision == Decision::Allow || r.decision == Decision::Info);
 }
 
@@ -119,7 +119,7 @@ fn context_agent_preflight_ready() {
 #[test]
 fn enrich_failure_no_run() {
     let ctx = make_hook_context("suite:run", make_empty_payload());
-    let r = enrich_failure::execute(&ctx).unwrap();
+    let r = enrich_failure::execute(&ctx).unwrap().to_hook_result();
     assert_allow(&r);
 }
 
