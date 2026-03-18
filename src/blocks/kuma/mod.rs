@@ -5,6 +5,9 @@ use crate::blocks::{
     BlockError, ComposeOrchestrator, ContainerRuntime, HttpClient, ProcessExecutor,
 };
 
+#[cfg(test)]
+pub mod fake;
+
 pub mod compose;
 pub mod defaults;
 pub mod service;

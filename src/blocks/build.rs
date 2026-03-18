@@ -134,6 +134,64 @@ impl BuildSystem for ProcessBuildSystem {
 }
 
 #[cfg(test)]
+use std::sync;
+
+/// Test fake for `BuildSystem` that records invocations and returns canned results.
+#[cfg(test)]
+pub struct FakeBuildSystem {
+    invocations: sync::Mutex<Vec<BuildTarget>>,
+    result_factory: Box<dyn Fn() -> Result<CommandResult, BlockError> + Send + Sync>,
+}
+
+#[cfg(test)]
+impl FakeBuildSystem {
+    #[must_use]
+    pub fn success() -> Self {
+        Self {
+            invocations: sync::Mutex::new(Vec::new()),
+            result_factory: Box::new(|| {
+                Ok(CommandResult {
+                    args: vec![],
+                    returncode: 0,
+                    stdout: String::new(),
+                    stderr: String::new(),
+                })
+            }),
+        }
+    }
+
+    #[must_use]
+    pub fn with_result(result: CommandResult) -> Self {
+        Self {
+            invocations: sync::Mutex::new(Vec::new()),
+            result_factory: Box::new(move || Ok(result.clone())),
+        }
+    }
+
+    pub fn invocations(&self) -> Vec<BuildTarget> {
+        self.invocations
+            .lock()
+            .unwrap_or_else(sync::PoisonError::into_inner)
+            .clone()
+    }
+}
+
+#[cfg(test)]
+impl BuildSystem for FakeBuildSystem {
+    fn run_target(&self, target: &BuildTarget) -> Result<CommandResult, BlockError> {
+        self.invocations
+            .lock()
+            .unwrap_or_else(sync::PoisonError::into_inner)
+            .push(target.clone());
+        (self.result_factory)()
+    }
+
+    fn run_target_streaming(&self, target: &BuildTarget) -> Result<CommandResult, BlockError> {
+        self.run_target(target)
+    }
+}
+
+#[cfg(test)]
 mod tests {
     use std::collections::HashMap;
     use std::path::Path;
@@ -247,5 +305,33 @@ mod tests {
 
         assert_send_sync::<BuildTarget>();
         assert_send_sync::<ProcessBuildSystem>();
+    }
+
+    #[test]
+    fn fake_build_system_records_invocations() {
+        let fake = FakeBuildSystem::success();
+        let target = BuildTarget::make("check");
+        let result = fake.run_target(&target).expect("should succeed");
+
+        assert_eq!(result.returncode, 0);
+        let invocations = fake.invocations();
+        assert_eq!(invocations.len(), 1);
+        assert_eq!(invocations[0].program, "make");
+    }
+
+    #[test]
+    fn fake_build_system_returns_custom_result() {
+        let custom = CommandResult {
+            args: vec!["make".into(), "test".into()],
+            returncode: 2,
+            stdout: "output".into(),
+            stderr: "err".into(),
+        };
+        let fake = FakeBuildSystem::with_result(custom);
+        let result = fake
+            .run_target(&BuildTarget::make("test"))
+            .expect("should return custom result");
+        assert_eq!(result.returncode, 2);
+        assert_eq!(result.stdout, "output");
     }
 }
