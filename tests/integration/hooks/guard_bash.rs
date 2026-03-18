@@ -5,10 +5,10 @@
 // and phase-gated command restrictions after run completion.
 
 use harness::hooks::guard_bash;
-use harness::schema::Verdict;
-use harness::workflow::runner::{
+use harness::run::workflow::{
     self as runner_workflow, PreflightState, PreflightStatus, RunnerPhase, RunnerWorkflowState,
 };
+use harness::schema::Verdict;
 
 use super::super::helpers::*;
 

@@ -4,8 +4,8 @@
 use std::fs::{self, File};
 use std::io::Write;
 
-use harness::cli::Command;
-use harness::commands::observe::{ObserveArgs, ObserveFilterArgs, ObserveMode};
+use harness::app::cli::Command;
+use harness::observe::{ObserveArgs, ObserveFilterArgs, ObserveMode};
 
 use super::super::helpers::*;
 

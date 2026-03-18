@@ -30,7 +30,7 @@ Harness is organized by domain first, with infrastructure and platform code kept
 - `run`, `authoring`, `observe`, and `setup` may depend on `platform`, `infra`, `errors`, `schema`, and `hooks` facades when needed.
 - `platform` must not depend on `app`, `run`, `authoring`, or `observe`.
 - `infra` must stay generic and must not depend on product domains.
-- Legacy flat module paths are temporarily re-exported from `lib.rs` for compatibility, but new code should use the domain-first paths.
+- The public crate surface is domain-first; tests and consumers should import from `app`, `run`, `authoring`, `observe`, `setup`, `platform`, or `infra` directly.
 
 ## Borrowing Rule
 

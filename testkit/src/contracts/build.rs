@@ -1,4 +1,4 @@
-use harness::blocks::{BuildSystem, BuildTarget};
+use harness::infra::blocks::{BuildSystem, BuildTarget};
 
 /// `name()` returns a non-empty block identifier.
 ///
@@ -37,10 +37,10 @@ pub fn contract_run_target_streaming_does_not_panic(build: &dyn BuildSystem) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use harness::blocks::ProcessBuildSystem;
+    use harness::infra::blocks::ProcessBuildSystem;
 
     fn production_build() -> ProcessBuildSystem {
-        use harness::blocks::StdProcessExecutor;
+        use harness::infra::blocks::StdProcessExecutor;
         use std::sync::Arc;
         ProcessBuildSystem::new(Arc::new(StdProcessExecutor))
     }

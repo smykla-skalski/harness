@@ -1,4 +1,4 @@
-use harness::blocks::ProcessExecutor;
+use harness::infra::blocks::ProcessExecutor;
 
 /// A successful `run` with `echo` returns exit code 0 and the echoed text.
 ///
@@ -68,7 +68,7 @@ pub fn contract_run_inherited_returns_exit_code(executor: &dyn ProcessExecutor) 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use harness::blocks::StdProcessExecutor;
+    use harness::infra::blocks::StdProcessExecutor;
 
     #[test]
     #[ignore] // needs real system binaries

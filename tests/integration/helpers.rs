@@ -5,8 +5,16 @@
 
 use std::sync::Mutex;
 
-use harness::cli::{self, Command};
+use harness::app::cli::{self, AuthoringCommand, Command, RunCommand, SetupCommand};
+use harness::authoring::commands::{
+    ApprovalBeginArgs, AuthoringBeginArgs, AuthoringSaveArgs, AuthoringValidateArgs,
+};
 use harness::errors::CliError;
+use harness::run::commands::{
+    ApiArgs, ApplyArgs, CaptureArgs, CloseoutArgs, EnvoyArgs, KumactlArgs, PreflightArgs,
+    RecordArgs, ReportArgs, ServiceArgs, ValidateArgs,
+};
+use harness::setup::{ClusterArgs, GatewayArgs, PreCompactArgs, SessionStartArgs, SessionStopArgs};
 
 // Re-export everything from the testkit so integration tests can use
 // `helpers::write_suite`, `helpers::make_bash_payload`, etc. unchanged.
@@ -22,6 +30,102 @@ pub static ENV_LOCK: Mutex<()> = Mutex::new(());
 
 pub fn run_command(command: Command) -> Result<i32, CliError> {
     cli::dispatch(&command)
+}
+
+pub fn run_cmd(command: RunCommand) -> Command {
+    Command::Run { command }
+}
+
+pub fn setup_cmd(command: SetupCommand) -> Command {
+    Command::Setup { command }
+}
+
+pub fn authoring_cmd(command: AuthoringCommand) -> Command {
+    Command::Authoring { command }
+}
+
+pub fn api_cmd(args: ApiArgs) -> Command {
+    run_cmd(RunCommand::Api(args))
+}
+
+pub fn apply_cmd(args: ApplyArgs) -> Command {
+    run_cmd(RunCommand::Apply(args))
+}
+
+pub fn authoring_begin_cmd(args: AuthoringBeginArgs) -> Command {
+    authoring_cmd(AuthoringCommand::Begin(args))
+}
+
+pub fn authoring_save_cmd(args: AuthoringSaveArgs) -> Command {
+    authoring_cmd(AuthoringCommand::Save(args))
+}
+
+pub fn authoring_validate_cmd(args: AuthoringValidateArgs) -> Command {
+    authoring_cmd(AuthoringCommand::Validate(args))
+}
+
+pub fn approval_begin_cmd(args: ApprovalBeginArgs) -> Command {
+    authoring_cmd(AuthoringCommand::ApprovalBegin(args))
+}
+
+pub fn capabilities_cmd() -> Command {
+    setup_cmd(SetupCommand::Capabilities)
+}
+
+pub fn capture_cmd(args: CaptureArgs) -> Command {
+    run_cmd(RunCommand::Capture(args))
+}
+
+pub fn closeout_cmd(args: CloseoutArgs) -> Command {
+    run_cmd(RunCommand::Closeout(args))
+}
+
+pub fn cluster_cmd(args: ClusterArgs) -> Command {
+    setup_cmd(SetupCommand::Cluster(args))
+}
+
+pub fn envoy_cmd(args: EnvoyArgs) -> Command {
+    run_cmd(RunCommand::Envoy(args))
+}
+
+pub fn gateway_cmd(args: GatewayArgs) -> Command {
+    setup_cmd(SetupCommand::Gateway(args))
+}
+
+pub fn kumactl_cmd(args: KumactlArgs) -> Command {
+    run_cmd(RunCommand::Kumactl(args))
+}
+
+pub fn pre_compact_cmd(args: PreCompactArgs) -> Command {
+    setup_cmd(SetupCommand::PreCompact(args))
+}
+
+pub fn preflight_cmd(args: PreflightArgs) -> Command {
+    run_cmd(RunCommand::Preflight(args))
+}
+
+pub fn record_cmd(args: RecordArgs) -> Command {
+    run_cmd(RunCommand::Record(args))
+}
+
+pub fn report_cmd(args: ReportArgs) -> Command {
+    run_cmd(RunCommand::Report(args))
+}
+
+pub fn service_cmd(args: ServiceArgs) -> Command {
+    run_cmd(RunCommand::Service(args))
+}
+
+pub fn session_start_cmd(args: SessionStartArgs) -> Command {
+    setup_cmd(SetupCommand::SessionStart(args))
+}
+
+pub fn session_stop_cmd(args: SessionStopArgs) -> Command {
+    setup_cmd(SetupCommand::SessionStop(args))
+}
+
+pub fn validate_cmd(args: ValidateArgs) -> Command {
+    run_cmd(RunCommand::Validate(args))
 }
 
 pub trait CommandExt {

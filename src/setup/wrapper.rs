@@ -20,10 +20,6 @@ if [ "${CLAUDE_PROJECT_DIR:-}" ]; then
   if [ -x "${candidate}" ]; then
     exec "${candidate}" "$@"
   fi
-  candidate="${CLAUDE_PROJECT_DIR}/.claude/skills/harness"
-  if [ -x "${candidate}" ]; then
-    exec "${candidate}" "$@"
-  fi
 fi
 
 if command -v git >/dev/null 2>&1; then
@@ -32,15 +28,10 @@ if command -v git >/dev/null 2>&1; then
     if [ -x "${candidate}" ]; then
       exec "${candidate}" "$@"
     fi
-    candidate="${repo_root}/.claude/skills/harness"
-    if [ -x "${candidate}" ]; then
-      exec "${candidate}" "$@"
-    fi
   fi
 fi
 
 echo "harness: unable to resolve .claude/plugins/suite/harness" >&2
-echo "or .claude/skills/harness from CLAUDE_PROJECT_DIR or git repo" >&2
 exit 1
 "#;
 
@@ -150,13 +141,11 @@ pub fn main(project_dir: &Path, path_env: &str) -> Result<i32, CliError> {
 pub fn main_with_home(project_dir: &Path, path_env: &str, home: &Path) -> Result<i32, CliError> {
     let plugin_dir = project_dir.join(".claude").join("plugins").join("suite");
     let plugin_path = plugin_dir.join("harness");
-    let legacy_path = project_dir.join(".claude").join("skills").join("harness");
 
-    if !plugin_path.exists() && !legacy_path.exists() {
+    if !plugin_path.exists() {
         return Err(CliErrorKind::missing_file(format!(
-            "missing source wrapper: {} or {}",
-            plugin_path.display(),
-            legacy_path.display()
+            "missing source wrapper: {}",
+            plugin_path.display()
         ))
         .into());
     }
@@ -601,11 +590,6 @@ mod tests {
     }
 
     #[test]
-    fn wrapper_content_references_legacy_path() {
-        assert!(WRAPPER.contains(".claude/skills/harness"));
-    }
-
-    #[test]
     fn wrapper_content_references_git_rev_parse() {
         assert!(WRAPPER.contains("git rev-parse --show-toplevel"));
     }
@@ -679,23 +663,6 @@ mod tests {
             .join("plugins")
             .join("suite")
             .join("harness");
-        fs::create_dir_all(source.parent().unwrap()).unwrap();
-        fs::write(&source, "#!/bin/sh\necho ok\n").unwrap();
-
-        let bin_dir = dir.path().join(".local").join("bin");
-        fs::create_dir_all(&bin_dir).unwrap();
-
-        let path_env = bin_dir.to_string_lossy().into_owned();
-        let result = main_with_home(dir.path(), &path_env, dir.path());
-
-        assert_eq!(result.unwrap(), 0);
-        assert!(bin_dir.join("harness").exists());
-    }
-
-    #[test]
-    fn main_succeeds_with_legacy_path() {
-        let dir = tempfile::tempdir().unwrap();
-        let source = dir.path().join(".claude").join("skills").join("harness");
         fs::create_dir_all(source.parent().unwrap()).unwrap();
         fs::write(&source, "#!/bin/sh\necho ok\n").unwrap();
 

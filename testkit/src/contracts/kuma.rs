@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use harness::blocks::MeshControlPlane;
+use harness::infra::blocks::MeshControlPlane;
 
 /// `system_namespace()` returns a non-empty string.
 ///
