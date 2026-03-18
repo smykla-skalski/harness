@@ -127,7 +127,6 @@ fn guard_write_suite_fix_allows_approved_path() {
     let suite_dir = tmp.path().join("suite");
     let group_path = suite_dir.join("groups").join("g01.md");
     let state = RunnerWorkflowState {
-        schema_version: 2,
         phase: RunnerPhase::Triage,
         preflight: PreflightState {
             status: PreflightStatus::Complete,
@@ -168,7 +167,6 @@ fn guard_write_denies_suite_edit_without_fix() {
     let group_path = suite_dir.join("groups").join("g01.md");
     // Runner state without suite_fix
     let state = RunnerWorkflowState {
-        schema_version: 2,
         phase: RunnerPhase::Execution,
         preflight: PreflightState {
             status: PreflightStatus::Complete,

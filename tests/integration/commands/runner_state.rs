@@ -19,7 +19,6 @@ fn runner_state_initialize_and_read() {
         .expect("runner state should exist");
     assert_eq!(state.phase, RunnerPhase::Bootstrap);
     assert_eq!(state.preflight.status, PreflightStatus::Pending);
-    assert_eq!(state.schema_version, 2);
 }
 
 #[test]

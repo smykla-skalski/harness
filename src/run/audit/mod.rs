@@ -313,7 +313,6 @@ mod tests {
     #[test]
     fn resolve_phase_context_keeps_group_only_for_execution() {
         let state = RunnerWorkflowState {
-            schema_version: 1,
             phase: RunnerPhase::Execution,
             preflight: PreflightState {
                 status: PreflightStatus::Complete,
@@ -413,7 +412,6 @@ mod tests {
             .unwrap();
 
         let state = RunnerWorkflowState {
-            schema_version: 1,
             phase: RunnerPhase::Execution,
             preflight: PreflightState {
                 status: PreflightStatus::Complete,
