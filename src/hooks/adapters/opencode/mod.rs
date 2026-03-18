@@ -74,8 +74,9 @@ impl AgentAdapter for OpenCodeAdapter {
             .filter_map(|registration| {
                 self.event_name(&registration.event).map(|event_name| {
                     json!({
+                        "name": registration.name,
                         "event": event_name,
-                        "hook": registration.hook_name,
+                        "command": registration.command,
                         "matcher": registration.matcher,
                     })
                 })

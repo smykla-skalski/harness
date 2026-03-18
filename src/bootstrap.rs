@@ -4,8 +4,11 @@ use std::io;
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 
+use crate::blocks::BlockRegistry;
 use crate::core_defs::dirs_home;
 use crate::errors::{CliError, CliErrorKind, cow};
+use crate::hooks::adapters::{HookAgent, HookRegistration, adapter_for};
+use crate::hooks::context::NormalizedEvent;
 use crate::io::write_text;
 
 /// Shell wrapper script that delegates to the project-local harness binary.
@@ -168,6 +171,273 @@ pub fn main_with_home(project_dir: &Path, path_env: &str, home: &Path) -> Result
     }
 
     Ok(0)
+}
+
+/// Generate agent-specific bootstrap files in the project directory.
+///
+/// # Errors
+/// Returns `CliError` on IO or serialization failure.
+pub fn write_agent_bootstrap(
+    project_dir: &Path,
+    agent: HookAgent,
+) -> Result<Vec<PathBuf>, CliError> {
+    match agent {
+        HookAgent::ClaudeCode | HookAgent::GeminiCli | HookAgent::Codex => {
+            write_process_agent_bootstrap(project_dir, agent)
+        }
+        HookAgent::OpenCode => write_opencode_bootstrap(project_dir),
+    }
+}
+
+/// Returns whether `harness` resolves from the provided PATH.
+#[must_use]
+pub fn harness_on_path(path_env: &str) -> bool {
+    path_candidates(path_env)
+        .iter()
+        .any(|dir| dir.join("harness").is_file())
+}
+
+fn write_process_agent_bootstrap(
+    project_dir: &Path,
+    agent: HookAgent,
+) -> Result<Vec<PathBuf>, CliError> {
+    let path = match agent {
+        HookAgent::ClaudeCode => project_dir.join(".claude").join("settings.json"),
+        HookAgent::GeminiCli => project_dir.join(".gemini").join("settings.json"),
+        HookAgent::Codex => project_dir.join(".codex").join("hooks.json"),
+        HookAgent::OpenCode => unreachable!("handled separately"),
+    };
+    let registrations = process_agent_registrations(agent);
+    let config = adapter_for(agent).generate_config(&registrations);
+    write_text(&path, &config)?;
+
+    let mut written = vec![path];
+    if agent == HookAgent::Codex {
+        let config_path = project_dir.join(".codex").join("config.toml");
+        write_text(&config_path, &build_codex_config())?;
+        written.push(config_path);
+    }
+
+    Ok(written)
+}
+
+fn write_opencode_bootstrap(project_dir: &Path) -> Result<Vec<PathBuf>, CliError> {
+    let plugin_path = project_dir
+        .join(".opencode")
+        .join("plugins")
+        .join("harness-bridge.ts");
+    let package_path = project_dir.join(".opencode").join("package.json");
+    let registry = BlockRegistry::production();
+
+    write_text(&plugin_path, &build_opencode_bridge(&registry)?)?;
+    if !package_path.exists() {
+        write_text(
+            &package_path,
+            "{\n  \"name\": \"harness-opencode\",\n  \"private\": true,\n  \"type\": \"module\"\n}\n",
+        )?;
+    }
+
+    Ok(vec![plugin_path, package_path])
+}
+
+fn process_agent_registrations(agent: HookAgent) -> Vec<HookRegistration> {
+    let mut registrations = vec![command_registration(
+        "session-start",
+        lifecycle_command(agent, "session-start"),
+        NormalizedEvent::SessionStart,
+        None,
+    )];
+
+    if matches!(agent, HookAgent::ClaudeCode | HookAgent::GeminiCli) {
+        registrations.push(command_registration(
+            "pre-compact",
+            lifecycle_command(agent, "pre-compact"),
+            NormalizedEvent::BeforeCompaction,
+            None,
+        ));
+        registrations.push(command_registration(
+            "session-stop",
+            lifecycle_command(agent, "session-stop"),
+            NormalizedEvent::SessionEnd,
+            None,
+        ));
+    }
+
+    match agent {
+        HookAgent::ClaudeCode => registrations.extend([
+            hook_registration(
+                agent,
+                "guard-bash",
+                NormalizedEvent::BeforeToolUse,
+                Some("Bash"),
+            ),
+            hook_registration(
+                agent,
+                "guard-write",
+                NormalizedEvent::BeforeToolUse,
+                Some("Write|Edit"),
+            ),
+            hook_registration(
+                agent,
+                "guard-question",
+                NormalizedEvent::BeforeToolUse,
+                Some("AskUserQuestion"),
+            ),
+            hook_registration(agent, "guard-stop", NormalizedEvent::AgentStop, None),
+            hook_registration(
+                agent,
+                "verify-bash",
+                NormalizedEvent::AfterToolUse,
+                Some("Bash"),
+            ),
+            hook_registration(
+                agent,
+                "verify-write",
+                NormalizedEvent::AfterToolUse,
+                Some("Write|Edit"),
+            ),
+            hook_registration(
+                agent,
+                "verify-question",
+                NormalizedEvent::AfterToolUse,
+                Some("AskUserQuestion"),
+            ),
+            hook_registration(agent, "audit", NormalizedEvent::AfterToolUse, Some(".*")),
+            hook_registration(
+                agent,
+                "enrich-failure",
+                NormalizedEvent::AfterToolUseFailure,
+                Some(".*"),
+            ),
+            hook_registration(agent, "context-agent", NormalizedEvent::SubagentStart, None),
+            hook_registration(agent, "validate-agent", NormalizedEvent::SubagentStop, None),
+        ]),
+        HookAgent::GeminiCli => registrations.extend([
+            hook_registration(
+                agent,
+                "guard-bash",
+                NormalizedEvent::BeforeToolUse,
+                Some("run_shell_command"),
+            ),
+            hook_registration(
+                agent,
+                "guard-write",
+                NormalizedEvent::BeforeToolUse,
+                Some("write_file|replace"),
+            ),
+            hook_registration(agent, "guard-stop", NormalizedEvent::AgentStop, None),
+            hook_registration(
+                agent,
+                "verify-bash",
+                NormalizedEvent::AfterToolUse,
+                Some("run_shell_command"),
+            ),
+            hook_registration(
+                agent,
+                "verify-write",
+                NormalizedEvent::AfterToolUse,
+                Some("write_file|replace"),
+            ),
+            hook_registration(agent, "audit", NormalizedEvent::AfterToolUse, Some(".*")),
+            hook_registration(
+                agent,
+                "enrich-failure",
+                NormalizedEvent::AfterToolUseFailure,
+                Some(".*"),
+            ),
+        ]),
+        HookAgent::Codex => registrations.push(hook_registration(
+            agent,
+            "guard-stop",
+            NormalizedEvent::AgentStop,
+            None,
+        )),
+        HookAgent::OpenCode => unreachable!("handled separately"),
+    }
+
+    registrations
+}
+
+fn build_codex_config() -> String {
+    concat!(
+        "notify = [\"harness\", \"hook\", \"--agent\", \"codex\", \"suite:run\", \"audit-turn\"]\n",
+        "\n",
+        "[features]\n",
+        "codex_hooks = true\n"
+    )
+    .to_string()
+}
+
+fn lifecycle_command(agent: HookAgent, subcommand: &str) -> String {
+    match agent {
+        HookAgent::ClaudeCode => {
+            format!("harness {subcommand} --project-dir \"$CLAUDE_PROJECT_DIR\"")
+        }
+        HookAgent::GeminiCli => format!(
+            "harness {subcommand} --project-dir \"${{CLAUDE_PROJECT_DIR:-$GEMINI_PROJECT_DIR}}\""
+        ),
+        HookAgent::Codex => format!("harness {subcommand} --project-dir \"$PWD\""),
+        HookAgent::OpenCode => unreachable!("opencode lifecycle is handled by the bridge"),
+    }
+}
+
+fn hook_registration(
+    agent: HookAgent,
+    name: &'static str,
+    event: NormalizedEvent,
+    matcher: Option<&str>,
+) -> HookRegistration {
+    HookRegistration {
+        name,
+        event,
+        matcher: matcher.map(ToString::to_string),
+        command: format!(
+            "harness hook --agent {} suite:run {name}",
+            adapter_for(agent).name()
+        ),
+    }
+}
+
+fn command_registration(
+    name: &'static str,
+    command: impl Into<String>,
+    event: NormalizedEvent,
+    matcher: Option<&str>,
+) -> HookRegistration {
+    HookRegistration {
+        name,
+        event,
+        matcher: matcher.map(ToString::to_string),
+        command: command.into(),
+    }
+}
+
+fn build_opencode_bridge(registry: &BlockRegistry) -> Result<String, CliError> {
+    let denied_binaries = registry
+        .all_denied_binaries()
+        .into_iter()
+        .collect::<Vec<_>>();
+    let denied_binaries_json = serde_json::to_string(&denied_binaries)
+        .map_err(|error| CliErrorKind::serialize(cow!("opencode denied binaries: {error}")))?;
+    let tool_guards = serde_json::to_string(&serde_json::json!({
+        "bash": "guard-bash",
+        "write": "guard-write",
+        "edit": "guard-write",
+    }))
+    .map_err(|error| CliErrorKind::serialize(cow!("opencode tool guards: {error}")))?;
+    let tool_verifiers = serde_json::to_string(&serde_json::json!({
+        "bash": "verify-bash",
+        "write": "verify-write",
+        "edit": "verify-write",
+    }))
+    .map_err(|error| CliErrorKind::serialize(cow!("opencode tool verifiers: {error}")))?;
+
+    let bridge = include_str!("../resources/opencode/harness-bridge.ts")
+        .replace("__DENIED_BINARY_HINTS__", &denied_binaries_json)
+        .replace("__TOOL_GUARDS__", &tool_guards)
+        .replace("__TOOL_VERIFIERS__", &tool_verifiers);
+
+    Ok(bridge)
 }
 
 /// Read the plugin version from `.claude-plugin/plugin.json`.
@@ -618,5 +888,81 @@ mod tests {
 
         // No cache directory exists - should not panic
         sync_plugin_cache(&plugin_dir, &home);
+    }
+
+    #[test]
+    fn lifecycle_commands_include_project_dirs() {
+        assert_eq!(
+            lifecycle_command(HookAgent::ClaudeCode, "session-start"),
+            "harness session-start --project-dir \"$CLAUDE_PROJECT_DIR\""
+        );
+        assert_eq!(
+            lifecycle_command(HookAgent::GeminiCli, "pre-compact"),
+            "harness pre-compact --project-dir \"${CLAUDE_PROJECT_DIR:-$GEMINI_PROJECT_DIR}\""
+        );
+        assert_eq!(
+            lifecycle_command(HookAgent::Codex, "session-stop"),
+            "harness session-stop --project-dir \"$PWD\""
+        );
+    }
+
+    #[test]
+    fn build_codex_config_includes_notify_and_hooks_flag() {
+        let config = build_codex_config();
+        assert!(config.contains("notify = [\"harness\", \"hook\", \"--agent\", \"codex\", \"suite:run\", \"audit-turn\"]"));
+        assert!(config.contains("[features]\ncodex_hooks = true"));
+    }
+
+    #[test]
+    fn build_opencode_bridge_replaces_placeholders_and_uses_directory() {
+        let bridge = build_opencode_bridge(&BlockRegistry::production()).unwrap();
+        assert!(!bridge.contains("__DENIED_BINARY_HINTS__"));
+        assert!(!bridge.contains("__TOOL_GUARDS__"));
+        assert!(!bridge.contains("__TOOL_VERIFIERS__"));
+        assert!(bridge.contains("[\"session-start\", \"--project-dir\", directory]"));
+        assert!(bridge.contains("[\"pre-compact\", \"--project-dir\", directory]"));
+        assert!(bridge.contains("[\"session-stop\", \"--project-dir\", directory]"));
+    }
+
+    #[test]
+    fn write_agent_bootstrap_writes_opencode_bridge_and_package() {
+        let dir = tempfile::tempdir().unwrap();
+        let written = write_agent_bootstrap(dir.path(), HookAgent::OpenCode).unwrap();
+
+        let bridge_path = dir
+            .path()
+            .join(".opencode")
+            .join("plugins")
+            .join("harness-bridge.ts");
+        let package_path = dir.path().join(".opencode").join("package.json");
+
+        assert!(written.contains(&bridge_path));
+        assert!(written.contains(&package_path));
+        assert!(bridge_path.exists());
+        assert!(package_path.exists());
+
+        let bridge = fs::read_to_string(bridge_path).unwrap();
+        assert!(bridge.contains("[\"session-start\", \"--project-dir\", directory]"));
+    }
+
+    #[test]
+    fn write_agent_bootstrap_writes_codex_notify_config() {
+        let dir = tempfile::tempdir().unwrap();
+        let written = write_agent_bootstrap(dir.path(), HookAgent::Codex).unwrap();
+
+        let hooks_path = dir.path().join(".codex").join("hooks.json");
+        let config_path = dir.path().join(".codex").join("config.toml");
+
+        assert!(written.contains(&hooks_path));
+        assert!(written.contains(&config_path));
+
+        let hooks = fs::read_to_string(hooks_path).unwrap();
+        let config = fs::read_to_string(config_path).unwrap();
+
+        assert!(hooks.contains("\"SessionStart\""));
+        assert!(hooks.contains("\"Stop\""));
+        assert!(!hooks.contains("guard-bash"));
+        assert!(config.contains("\"audit-turn\""));
+        assert!(config.contains("codex_hooks = true"));
     }
 }

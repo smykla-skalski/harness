@@ -43,9 +43,10 @@ pub struct RenderedHookResponse {
 /// One hook registration entry for agent-specific config generation.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct HookRegistration {
-    pub hook_name: &'static str,
+    pub name: &'static str,
     pub event: NormalizedEvent,
     pub matcher: Option<String>,
+    pub command: String,
 }
 
 /// Adapter trait for agent-specific parsing/rendering/config generation.
