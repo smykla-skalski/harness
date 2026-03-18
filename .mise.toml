@@ -19,7 +19,7 @@ depends = ["test:unit", "test:integration"]
 
 [tasks.check]
 description = "Type-check without building"
-run = "cargo check"
+run = ["cargo check", "cargo clippy --lib"]
 
 [tasks."lint:fix"]
 description = "Format and apply clippy fixes"
