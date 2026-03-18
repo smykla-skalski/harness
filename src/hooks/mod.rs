@@ -8,7 +8,6 @@ use crate::rules::suite_runner::RunFile;
 
 use self::adapters::{HookAgent, adapter_for};
 use self::context::{GuardContext, NormalizedEvent};
-use self::effects::HookOutcome;
 use self::engine::{Hook, HookEngine};
 use self::result::NormalizedHookResult;
 
@@ -29,6 +28,8 @@ pub mod validate_agent;
 pub mod verify_bash;
 pub mod verify_question;
 pub mod verify_write;
+
+pub use self::effects::{HookEffect, HookOutcome};
 
 /// Hook lifecycle categories.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -63,6 +64,28 @@ macro_rules! define_legacy_hook {
 
             fn execute(&self, ctx: &GuardContext) -> Result<HookOutcome, CliError> {
                 $module::execute(ctx).map(HookOutcome::from_hook_result)
+            }
+        }
+
+        static $static_name: $struct_name = $struct_name;
+    };
+}
+
+macro_rules! define_effect_hook {
+    ($static_name:ident, $struct_name:ident, $hook_name:literal, $hook_type:expr, $module:ident) => {
+        struct $struct_name;
+
+        impl Hook for $struct_name {
+            fn name(&self) -> &str {
+                $hook_name
+            }
+
+            fn hook_type(&self) -> HookType {
+                $hook_type
+            }
+
+            fn execute(&self, ctx: &GuardContext) -> Result<HookOutcome, CliError> {
+                $module::execute(ctx)
             }
         }
 
@@ -105,7 +128,7 @@ define_legacy_hook!(
     HookType::PostToolUse,
     verify_bash
 );
-define_legacy_hook!(
+define_effect_hook!(
     VERIFY_WRITE_HOOK,
     VerifyWriteHook,
     "verify-write",
@@ -119,22 +142,22 @@ define_legacy_hook!(
     HookType::PostToolUse,
     verify_question
 );
-define_legacy_hook!(AUDIT_HOOK, AuditHook, "audit", HookType::PostToolUse, audit);
-define_legacy_hook!(
+define_effect_hook!(AUDIT_HOOK, AuditHook, "audit", HookType::PostToolUse, audit);
+define_effect_hook!(
     ENRICH_FAILURE_HOOK,
     EnrichFailureHook,
     "enrich-failure",
     HookType::PostToolUseFailure,
     enrich_failure
 );
-define_legacy_hook!(
+define_effect_hook!(
     CONTEXT_AGENT_HOOK,
     ContextAgentHook,
     "context-agent",
     HookType::SubagentStart,
     context_agent
 );
-define_legacy_hook!(
+define_effect_hook!(
     VALIDATE_AGENT_HOOK,
     ValidateAgentHook,
     "validate-agent",
@@ -246,6 +269,24 @@ where
 {
     if !ctx.skill_active {
         return Ok(HookResult::allow());
+    }
+    if ctx.is_suite_author() {
+        return author(ctx);
+    }
+    runner(ctx)
+}
+
+pub(crate) fn dispatch_outcome_by_skill<RunnerFn, AuthorFn>(
+    ctx: &GuardContext,
+    runner: RunnerFn,
+    author: AuthorFn,
+) -> Result<HookOutcome, CliError>
+where
+    RunnerFn: FnOnce(&GuardContext) -> Result<HookOutcome, CliError>,
+    AuthorFn: FnOnce(&GuardContext) -> Result<HookOutcome, CliError>,
+{
+    if !ctx.skill_active {
+        return Ok(HookOutcome::allow());
     }
     if ctx.is_suite_author() {
         return author(ctx);

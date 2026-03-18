@@ -1,10 +1,9 @@
 use crate::errors::{CliError, HookMessage};
-use crate::hook::HookResult;
 use crate::hooks::context::GuardContext as HookContext;
 use crate::shell_parse::HarnessCommandInvocationRef;
 use crate::workflow::runner::{FailureKind, RunnerPhase, RunnerWorkflowState};
 
-use super::effects;
+use super::effects::{self, HookOutcome};
 
 /// Execute the enrich-failure hook.
 ///
@@ -13,19 +12,26 @@ use super::effects;
 ///
 /// # Errors
 /// Returns `CliError` on failure.
-pub fn execute(ctx: &HookContext) -> Result<HookResult, CliError> {
+pub fn execute(ctx: &HookContext) -> Result<HookOutcome, CliError> {
     if !ctx.skill_active || !ctx.is_suite_runner() {
-        return Ok(HookResult::allow());
+        return Ok(HookOutcome::allow());
     }
     let Some(run) = &ctx.run else {
-        return Ok(HookResult::allow());
+        return Ok(HookOutcome::allow());
     };
     let Some(status) = &run.status else {
-        return Ok(HookMessage::run_verdict("pending").into_result());
+        return Ok(HookOutcome::from_hook_result(
+            HookMessage::run_verdict("pending").into_result(),
+        ));
     };
     let Some(state) = &ctx.runner_state else {
-        return Ok(HookMessage::run_verdict(status.overall_verdict.to_string()).into_result());
+        return Ok(HookOutcome::from_hook_result(
+            HookMessage::run_verdict(status.overall_verdict.to_string()).into_result(),
+        ));
     };
+    let mut outcome = HookOutcome::from_hook_result(
+        HookMessage::run_verdict(status.overall_verdict.to_string()).into_result(),
+    );
     let subcommand = ctx.parsed_command()?.and_then(|command| {
         command
             .first_harness_invocation()
@@ -33,17 +39,21 @@ pub fn execute(ctx: &HookContext) -> Result<HookResult, CliError> {
     });
     if let Some(sub) = subcommand {
         if matches!(sub, "apply" | "validate") && state.phase() == RunnerPhase::Execution {
-            let _ = effects::transition_runner_state(ctx, |state| {
+            if let Some(effect) = effects::transition_runner_state(ctx, |state| {
                 Some(request_failure_triage(state, FailureKind::Manifest))
-            })?;
+            })? {
+                outcome = outcome.with_effect(effect);
+            }
         } else if state.phase() == RunnerPhase::Preflight && matches!(sub, "preflight" | "capture")
         {
-            let _ = effects::transition_runner_state(ctx, |state| {
+            if let Some(effect) = effects::transition_runner_state(ctx, |state| {
                 Some(request_preflight_failed(state))
-            })?;
+            })? {
+                outcome = outcome.with_effect(effect);
+            }
         }
     }
-    Ok(HookMessage::run_verdict(status.overall_verdict.to_string()).into_result())
+    Ok(outcome)
 }
 
 fn request_failure_triage(state: &RunnerWorkflowState, kind: FailureKind) -> RunnerWorkflowState {

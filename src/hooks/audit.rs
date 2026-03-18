@@ -1,7 +1,8 @@
-use crate::audit_log::{append_audit_entry, build_hook_audit_request};
+use crate::audit_log::build_hook_audit_request;
 use crate::errors::CliError;
-use crate::hook::HookResult;
 use crate::hooks::context::GuardContext as HookContext;
+
+use super::effects::{HookEffect, HookOutcome};
 
 /// Execute the audit hook.
 ///
@@ -10,22 +11,17 @@ use crate::hooks::context::GuardContext as HookContext;
 ///
 /// # Errors
 /// Returns `CliError` on failure.
-pub fn execute(ctx: &HookContext) -> Result<HookResult, CliError> {
-    super::dispatch_by_skill(
+pub fn execute(ctx: &HookContext) -> Result<HookOutcome, CliError> {
+    super::dispatch_outcome_by_skill(
         ctx,
         |ctx| {
             if ctx.effective_run_dir().is_none() {
-                return Ok(HookResult::allow());
+                return Ok(HookOutcome::allow());
             }
-            match build_hook_audit_request(ctx).and_then(append_audit_entry) {
-                Ok(_) => Ok(HookResult::allow()),
-                Err(error) => Ok(HookResult::warn(
-                    "KSR006",
-                    format!("audit log write failed: {error}"),
-                )),
-            }
+            let request = build_hook_audit_request(ctx)?;
+            Ok(HookOutcome::allow().with_effect(HookEffect::AppendAudit(request)))
         },
-        |_ctx| Ok(HookResult::allow()),
+        |_ctx| Ok(HookOutcome::allow()),
     )
 }
 
@@ -65,7 +61,7 @@ mod tests {
     #[test]
     fn is_silent_suite_runner() {
         let c = ctx_audit("suite:run");
-        let result = execute(&c).unwrap();
+        let result = execute(&c).unwrap().to_hook_result();
         assert_eq!(result.decision, Decision::Allow);
         assert!(result.code.is_empty());
     }
@@ -74,7 +70,7 @@ mod tests {
     #[test]
     fn is_silent_suite_author() {
         let c = ctx_audit("suite:new");
-        let result = execute(&c).unwrap();
+        let result = execute(&c).unwrap().to_hook_result();
         assert_eq!(result.decision, Decision::Allow);
         assert!(result.code.is_empty());
     }
@@ -83,7 +79,7 @@ mod tests {
     fn allows_inactive_skill() {
         let mut c = ctx_audit("suite:run");
         c.skill_active = false;
-        let result = execute(&c).unwrap();
+        let result = execute(&c).unwrap().to_hook_result();
         assert_eq!(result.decision, Decision::Allow);
     }
 
@@ -129,8 +125,10 @@ mod tests {
             last_event: None,
         });
 
-        let result = execute(&context).unwrap();
-        assert_eq!(result.decision, Decision::Allow);
+        let outcome = execute(&context).unwrap();
+        let mut result = outcome.normalized_result();
+        super::super::effects::apply_effects(&context, &mut result, outcome.effects()).unwrap();
+        assert_eq!(result.to_hook_result().decision, Decision::Allow);
 
         let log_path = run_dir.join("audit-log.jsonl");
         let contents = fs::read_to_string(&log_path).unwrap();
@@ -156,7 +154,7 @@ mod tests {
             },
         );
 
-        let result = execute(&context).unwrap();
+        let result = execute(&context).unwrap().to_hook_result();
         assert_eq!(result.decision, Decision::Allow);
     }
 }

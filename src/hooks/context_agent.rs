@@ -1,7 +1,8 @@
 use crate::errors::{CliError, HookMessage};
-use crate::hook::HookResult;
 use crate::hooks::context::GuardContext as HookContext;
 use crate::workflow::runner::{PreflightStatus, RunnerPhase, RunnerWorkflowState};
+
+use super::effects::{HookEffect, HookOutcome};
 
 /// Execute the context-agent hook.
 ///
@@ -12,29 +13,35 @@ use crate::workflow::runner::{PreflightStatus, RunnerPhase, RunnerWorkflowState}
 ///
 /// # Errors
 /// Returns `CliError` on failure.
-pub fn execute(ctx: &HookContext) -> Result<HookResult, CliError> {
+pub fn execute(ctx: &HookContext) -> Result<HookOutcome, CliError> {
     if !ctx.skill_active {
-        return Ok(HookResult::allow());
+        return Ok(HookOutcome::allow());
     }
     if ctx.is_suite_author() {
-        return Ok(HookMessage::CodeReaderFormat.into_result());
+        return Ok(HookOutcome::allow().with_effect(HookEffect::InjectContext(
+            HookMessage::CodeReaderFormat.to_string(),
+        )));
     }
     // suite:run: validate preflight worker can start.
     let Some(state) = &ctx.runner_state else {
-        return Ok(HookMessage::runner_state_invalid(
-            "runner state is missing; initialize the suite run first",
-        )
-        .into_result());
+        return Ok(HookOutcome::from_hook_result(
+            HookMessage::runner_state_invalid(
+                "runner state is missing; initialize the suite run first",
+            )
+            .into_result(),
+        ));
     };
     let (allowed, reason) = can_start_preflight_worker(state);
     if !allowed {
-        return Ok(HookMessage::runner_flow_required(
-            "start the preflight worker",
-            reason.unwrap_or("enter the guarded preflight phase before spawning the worker"),
-        )
-        .into_result());
+        return Ok(HookOutcome::from_hook_result(
+            HookMessage::runner_flow_required(
+                "start the preflight worker",
+                reason.unwrap_or("enter the guarded preflight phase before spawning the worker"),
+            )
+            .into_result(),
+        ));
     }
-    Ok(HookResult::allow())
+    Ok(HookOutcome::allow())
 }
 
 fn can_start_preflight_worker(state: &RunnerWorkflowState) -> (bool, Option<&'static str>) {

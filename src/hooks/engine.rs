@@ -58,8 +58,9 @@ impl HookEngine {
         normalized: NormalizedHookContext,
     ) -> Result<NormalizedHookResult, CliError> {
         let guard_context = GuardContext::from_normalized(normalized);
-        let mut outcome = hook.execute(&guard_context)?;
-        apply_effects(&guard_context, &mut outcome.result, &outcome.effects)?;
-        Ok(outcome.result)
+        let outcome = hook.execute(&guard_context)?;
+        let mut result = outcome.normalized_result();
+        apply_effects(&guard_context, &mut result, outcome.effects())?;
+        Ok(result)
     }
 }
