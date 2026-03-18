@@ -5,7 +5,10 @@ use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 
-use crate::blocks::{BlockError, ContainerRuntime, ProcessExecutor};
+use crate::blocks::BlockError;
+#[cfg(feature = "k3d")]
+use crate::blocks::ContainerRuntime;
+use crate::blocks::ProcessExecutor;
 use crate::core_defs::CommandResult;
 
 /// Snapshot of a Kubernetes pod from `kubectl get pods -o json`.
@@ -200,12 +203,14 @@ pub trait LocalClusterManager: Send + Sync {
 }
 
 /// Production local-cluster manager backed by `k3d`.
+#[cfg(feature = "k3d")]
 pub struct K3dClusterManager {
     process: Arc<dyn ProcessExecutor>,
     #[allow(dead_code)]
     container_runtime: Arc<dyn ContainerRuntime>,
 }
 
+#[cfg(feature = "k3d")]
 impl K3dClusterManager {
     #[must_use]
     pub fn new(
@@ -219,6 +224,7 @@ impl K3dClusterManager {
     }
 }
 
+#[cfg(feature = "k3d")]
 impl LocalClusterManager for K3dClusterManager {
     fn run(&self, args: &[&str], ok_exit_codes: &[i32]) -> Result<CommandResult, BlockError> {
         let mut command = vec!["k3d"];

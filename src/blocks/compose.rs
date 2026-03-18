@@ -1,12 +1,15 @@
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::Path;
+#[cfg(feature = "compose")]
 use std::sync::Arc;
 use std::time::Duration;
 
 use serde::Serialize;
 
-use crate::blocks::{BlockError, ProcessExecutor};
+use crate::blocks::BlockError;
+#[cfg(feature = "compose")]
+use crate::blocks::ProcessExecutor;
 use crate::core_defs::CommandResult;
 
 /// Compose network settings for a rendered topology.
@@ -171,10 +174,12 @@ pub trait ComposeOrchestrator: Send + Sync {
 }
 
 /// Production compose implementation backed by `docker compose`.
+#[cfg(feature = "compose")]
 pub struct DockerComposeOrchestrator {
     process: Arc<dyn ProcessExecutor>,
 }
 
+#[cfg(feature = "compose")]
 impl DockerComposeOrchestrator {
     #[must_use]
     pub fn new(process: Arc<dyn ProcessExecutor>) -> Self {
@@ -182,6 +187,7 @@ impl DockerComposeOrchestrator {
     }
 }
 
+#[cfg(feature = "compose")]
 impl ComposeOrchestrator for DockerComposeOrchestrator {
     fn up(
         &self,

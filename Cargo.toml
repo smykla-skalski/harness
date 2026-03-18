@@ -3,7 +3,7 @@ members = [".", "testkit"]
 
 [package]
 name = "harness"
-version = "1.7.0"
+version = "1.8.0"
 edition = "2024"
 rust-version = "1.94"
 
@@ -39,6 +39,14 @@ tempfile = "3.27.0"
 insta = "1.46.3"
 harness-testkit = { path = "testkit" }
 temp-env = "0.3.6"
+
+[features]
+default = ["all-adapters"]
+all-adapters = ["kuma", "helm", "k3d", "compose"]
+kuma = []
+helm = []
+k3d = []
+compose = []
 
 [lints.clippy]
 pedantic = { level = "deny", priority = 1 }
