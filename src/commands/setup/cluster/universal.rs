@@ -152,11 +152,13 @@ pub(super) fn cluster_universal(args: &ClusterArgs) -> Result<i32, CliError> {
     info!(%mode, names = %all_names.join(" "), "starting universal cluster");
 
     execute_universal_mode(
-        mode,
-        &all_names,
-        &network_name,
-        &effective_store,
-        &cp_image,
+        &UniversalModeContext {
+            mode,
+            all_names: &all_names,
+            network_name: &network_name,
+            effective_store: &effective_store,
+            cp_image: &cp_image,
+        },
         &mut spec,
         &docker,
         &compose_runtime,
@@ -182,58 +184,70 @@ fn resolve_universal_cp_image(
     Ok(String::new())
 }
 
+struct UniversalModeContext<'a> {
+    mode: &'a str,
+    all_names: &'a [String],
+    network_name: &'a str,
+    effective_store: &'a str,
+    cp_image: &'a str,
+}
+
 fn execute_universal_mode(
-    mode: &str,
-    all_names: &[String],
-    network_name: &str,
-    effective_store: &str,
-    cp_image: &str,
+    context: &UniversalModeContext<'_>,
     spec: &mut ClusterSpec,
     docker: &dyn ContainerRuntime,
     compose_runtime: &dyn ComposeOrchestrator,
 ) -> Result<(), CliError> {
-    match mode {
+    match context.mode {
         "single-up" => handle_single_up(
             spec,
-            cp_image,
-            network_name,
-            effective_store,
-            &all_names[0],
+            context.cp_image,
+            context.network_name,
+            context.effective_store,
+            &context.all_names[0],
             docker,
             compose_runtime,
         ),
         "single-down" => handle_single_down(
-            network_name,
-            effective_store,
-            &all_names[0],
+            context.network_name,
+            context.effective_store,
+            &context.all_names[0],
             docker,
             compose_runtime,
         ),
         "global-zone-up" => handle_global_zone_up(
             spec,
-            cp_image,
-            network_name,
-            effective_store,
-            all_names,
+            context.cp_image,
+            context.network_name,
+            context.effective_store,
+            context.all_names,
             docker,
             compose_runtime,
         ),
-        "global-zone-down" => {
-            universal_global_zone_down(network_name, all_names, docker, compose_runtime)
-        }
+        "global-zone-down" => universal_global_zone_down(
+            context.network_name,
+            context.all_names,
+            docker,
+            compose_runtime,
+        ),
         "global-two-zones-up" => handle_global_two_zones_up(
             spec,
-            cp_image,
-            network_name,
-            effective_store,
-            all_names,
+            context.cp_image,
+            context.network_name,
+            context.effective_store,
+            context.all_names,
             docker,
             compose_runtime,
         ),
-        "global-two-zones-down" => {
-            universal_global_two_zones_down(network_name, all_names, docker, compose_runtime)
-        }
-        _ => Err(CliErrorKind::cluster_error(cow!("unsupported cluster mode: {mode}")).into()),
+        "global-two-zones-down" => universal_global_two_zones_down(
+            context.network_name,
+            context.all_names,
+            docker,
+            compose_runtime,
+        ),
+        _ => Err(
+            CliErrorKind::cluster_error(cow!("unsupported cluster mode: {}", context.mode)).into(),
+        ),
     }
 }
 

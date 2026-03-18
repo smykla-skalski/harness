@@ -207,6 +207,8 @@ pub struct RunMetadata {
     pub user_stories: Vec<String>,
     #[serde(default)]
     pub required_dependencies: Vec<String>,
+    #[serde(default)]
+    pub requires: Vec<String>,
 }
 
 /// Environment variables for command execution within a run.
@@ -312,6 +314,8 @@ pub struct CurrentRunPointer {
     pub user_stories: Vec<String>,
     #[serde(default)]
     pub required_dependencies: Vec<String>,
+    #[serde(default)]
+    pub requires: Vec<String>,
 }
 
 pub type CurrentRunRecord = CurrentRunPointer;
@@ -334,6 +338,7 @@ impl CurrentRunPointer {
             keep_clusters: metadata.keep_clusters,
             user_stories: metadata.user_stories.clone(),
             required_dependencies: metadata.required_dependencies.clone(),
+            requires: metadata.requires.clone(),
         }
     }
 }
@@ -388,6 +393,7 @@ mod tests {
             created_at: "2026-03-14T00:00:00Z".into(),
             user_stories: vec![],
             required_dependencies: vec![],
+            requires: vec![],
         }
     }
 
@@ -611,6 +617,7 @@ mod tests {
         assert!(!meta.keep_clusters);
         assert!(meta.user_stories.is_empty());
         assert!(meta.required_dependencies.is_empty());
+        assert!(meta.requires.is_empty());
     }
 
     // -- RunStatus deserialization tests (ported from test_schema.py:251-309) --
@@ -803,6 +810,7 @@ mod tests {
             keep_clusters: false,
             user_stories: vec![],
             required_dependencies: vec![],
+            requires: vec![],
         };
         let ctx_dir = tmp.path().join("ctx");
         fs::create_dir_all(&ctx_dir).unwrap();
@@ -837,6 +845,7 @@ mod tests {
             keep_clusters: false,
             user_stories: vec![],
             required_dependencies: vec![],
+            requires: vec![],
         };
         assert!(!record.layout.run_dir().is_dir());
     }
@@ -856,6 +865,7 @@ mod tests {
             keep_clusters: false,
             user_stories: vec![],
             required_dependencies: vec![],
+            requires: vec![],
         };
         let json = serde_json::to_string(&record).unwrap();
         let back: CurrentRunRecord = serde_json::from_str(&json).unwrap();

@@ -17,6 +17,7 @@ use harness::hook::{Decision, HookResult};
 use harness::hook_payloads::{
     AskUserQuestionOption, AskUserQuestionPrompt, HookContext, HookEnvelopePayload,
 };
+use harness::schema::frontmatter::merge_requirement_lists;
 use harness::schema::{RunCounts, RunStatus, Verdict};
 use harness::workflow::runner as runner_workflow;
 use jsonschema::{Registry, Resource, Validator, options as jsonschema_options};
@@ -33,6 +34,7 @@ pub struct SuiteBuilder {
     scope: String,
     profiles: Vec<String>,
     required_dependencies: Vec<String>,
+    requires: Vec<String>,
     user_stories: Vec<String>,
     variant_decisions: Vec<String>,
     coverage_expectations: Vec<String>,
@@ -52,6 +54,7 @@ impl SuiteBuilder {
             scope: "unit".to_string(),
             profiles: vec![],
             required_dependencies: vec![],
+            requires: vec![],
             user_stories: vec![],
             variant_decisions: vec![],
             coverage_expectations: vec!["configure".into(), "consume".into(), "debug".into()],
@@ -94,6 +97,12 @@ impl SuiteBuilder {
     }
 
     #[must_use]
+    pub fn require(mut self, requirement: &str) -> Self {
+        self.requires.push(requirement.to_string());
+        self
+    }
+
+    #[must_use]
     pub fn user_story(mut self, story: &str) -> Self {
         self.user_stories.push(story.to_string());
         self
@@ -131,6 +140,7 @@ impl SuiteBuilder {
         push_field(&mut s, "scope", &self.scope);
         push_str_list(&mut s, "profiles", &self.profiles);
         push_str_list(&mut s, "required_dependencies", &self.required_dependencies);
+        push_str_list(&mut s, "requires", &self.effective_requires());
         push_str_list(&mut s, "user_stories", &self.user_stories);
         push_str_list(&mut s, "variant_decisions", &self.variant_decisions);
         push_str_list(&mut s, "coverage_expectations", &self.coverage_expectations);
@@ -141,6 +151,10 @@ impl SuiteBuilder {
         s.push_str("---\n\n");
         s.push_str(&self.body);
         s
+    }
+
+    fn effective_requires(&self) -> Vec<String> {
+        merge_requirement_lists(&self.requires, &self.required_dependencies)
     }
 
     /// Write the suite markdown to a file, creating parent directories.
@@ -1355,6 +1369,7 @@ impl RunDirBuilder {
             created_at: "2026-03-14T00:00:00Z".to_string(),
             user_stories: vec![],
             required_dependencies: vec![],
+            requires: vec![],
         };
         let meta_json = serde_json::to_string_pretty(&metadata).expect("serialize metadata");
         fs::write(layout.metadata_path(), format!("{meta_json}\n")).expect("write metadata");
