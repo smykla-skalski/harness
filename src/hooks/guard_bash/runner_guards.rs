@@ -2,7 +2,7 @@ use std::path::Path;
 
 use crate::errors::HookMessage;
 use crate::hook::HookResult;
-use crate::hook_payloads::HookContext;
+use crate::hooks::context::GuardContext as HookContext;
 use crate::rules::suite_runner::{
     ControlFileMutationBinary, ControlFileReadBinary, MakeTargetPrefix, RunFile, ScriptInterpreter,
     SuiteMutationBinary, TaskOutputPattern, TrackedHarnessSubcommand,

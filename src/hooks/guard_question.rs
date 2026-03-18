@@ -1,6 +1,7 @@
 use crate::errors::{CliError, HookMessage};
 use crate::hook::HookResult;
-use crate::hook_payloads::{AskUserQuestionPrompt, HookContext};
+use crate::hook_payloads::AskUserQuestionPrompt;
+use crate::hooks::context::GuardContext as HookContext;
 use crate::kubectl_validate::kubectl_validate_prompt_required;
 use crate::rules::suite_runner as runner_rules;
 use crate::workflow::author::{ApprovalMode, ReviewGate, can_request_gate};

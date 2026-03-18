@@ -59,7 +59,7 @@ impl HookResult {
     /// Returns `true` when this result is a denial (non-empty code).
     #[must_use]
     pub fn is_denial(&self) -> bool {
-        !self.code.is_empty()
+        self.decision == Decision::Deny
     }
 
     /// Converts this result into `Some(self)` when it is a denial, `None`

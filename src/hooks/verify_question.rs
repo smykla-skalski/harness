@@ -1,6 +1,6 @@
 use crate::errors::{CliError, HookMessage};
 use crate::hook::HookResult;
-use crate::hook_payloads::HookContext;
+use crate::hooks::context::GuardContext as HookContext;
 use crate::rules::suite_runner as runner_rules;
 use crate::workflow::runner::RunnerPhase;
 
@@ -69,12 +69,12 @@ fn handle_suite_author(ctx: &HookContext) -> HookResult {
 mod tests {
     use super::*;
     use crate::hook::Decision;
-    use crate::hook_payloads::{HookContext, HookEnvelopePayload};
+    use crate::hook_payloads::HookEnvelopePayload;
+    use crate::hooks::context::GuardContext as HookContext;
 
     fn inactive_context() -> HookContext {
         let mut context = HookContext::from_test_envelope("", HookEnvelopePayload::default());
         context.skill_active = false;
-        context.active_skill = None;
         context
     }
 

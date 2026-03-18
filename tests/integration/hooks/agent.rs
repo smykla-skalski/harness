@@ -173,7 +173,7 @@ fn hook_context_stop_hook_active() {
 fn hook_context_skill_active_default() {
     let ctx = make_hook_context("suite:run", make_empty_payload());
     assert!(ctx.skill_active);
-    assert_eq!(ctx.active_skill.as_deref(), Some("suite:run"));
+    assert_eq!(ctx.skill.name.as_deref(), Some("suite:run"));
 }
 
 #[test]

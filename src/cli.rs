@@ -316,7 +316,7 @@ pub fn run() -> Result<i32, CliError> {
         thread::sleep(Duration::from_secs_f64(cli.delay));
     }
     match cli.command {
-        Command::Hook(args) => Ok(hooks::run_hook_command(&args.skill, &args.hook)),
+        Command::Hook(args) => Ok(hooks::run_hook_command(args.agent, &args.skill, &args.hook)),
         other => dispatch(other),
     }
 }
@@ -402,7 +402,7 @@ mod tests {
     fn parse_hook_command() {
         let cli = Cli::try_parse_from(["harness", "hook", "suite:run", "guard-bash"]).unwrap();
         match cli.command {
-            Command::Hook(HookArgs { skill, hook }) => {
+            Command::Hook(HookArgs { skill, hook, .. }) => {
                 assert_eq!(skill, "suite:run");
                 assert_eq!(hook.name(), "guard-bash");
             }
