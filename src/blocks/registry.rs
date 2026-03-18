@@ -4,10 +4,17 @@ use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 
-use crate::blocks::{
-    BlockError, BuildSystem, ComposeOrchestrator, ContainerRuntime, HttpClient, KubernetesOperator,
-    LocalClusterManager, MeshControlPlane, PackageDeployer, ProcessExecutor,
+use super::build::{BuildSystem, ProcessBuildSystem};
+use super::compose::{ComposeOrchestrator, DockerComposeOrchestrator};
+use super::docker::{ContainerRuntime, DockerContainerRuntime};
+use super::error::BlockError;
+use super::helm::{HelmDeployer, PackageDeployer};
+use super::http::{HttpClient, ReqwestHttpClient};
+use super::kubernetes::{
+    K3dClusterManager, KubectlOperator, KubernetesOperator, LocalClusterManager,
 };
+use super::kuma::{KumaControlPlane, MeshControlPlane};
+use super::process::{ProcessExecutor, StdProcessExecutor};
 
 /// Named block requirements declared by suites and validated at preflight time.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
@@ -143,6 +150,37 @@ impl BlockRegistry {
     }
 
     #[must_use]
+    pub fn production() -> Self {
+        let process: Arc<dyn ProcessExecutor> = Arc::new(StdProcessExecutor);
+        let http: Arc<dyn HttpClient> = Arc::new(ReqwestHttpClient::new());
+        let docker: Arc<dyn ContainerRuntime> =
+            Arc::new(DockerContainerRuntime::new(process.clone()));
+        let compose: Arc<dyn ComposeOrchestrator> =
+            Arc::new(DockerComposeOrchestrator::new(process.clone()));
+        let kubernetes: Arc<dyn KubernetesOperator> =
+            Arc::new(KubectlOperator::new(process.clone()));
+        let k3d: Arc<dyn LocalClusterManager> =
+            Arc::new(K3dClusterManager::new(process.clone(), docker.clone()));
+        let helm: Arc<dyn PackageDeployer> = Arc::new(HelmDeployer::new(process.clone()));
+        let kuma: Arc<dyn MeshControlPlane> = Arc::new(KumaControlPlane::new(
+            process.clone(),
+            http.clone(),
+            docker.clone(),
+            compose.clone(),
+        ));
+        let build: Arc<dyn BuildSystem> = Arc::new(ProcessBuildSystem::new(process.clone()));
+
+        Self::new(process, http)
+            .with_docker(docker)
+            .with_compose(compose)
+            .with_kubernetes(kubernetes)
+            .with_k3d(k3d)
+            .with_helm(helm)
+            .with_kuma(kuma)
+            .with_build(build)
+    }
+
+    #[must_use]
     pub fn with_docker(mut self, docker: Arc<dyn ContainerRuntime>) -> Self {
         self.docker = Some(docker);
         self
@@ -261,5 +299,37 @@ impl BlockRegistry {
             .chain(build_binaries)
             .map(ToString::to_string)
             .collect()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{BlockRegistry, BlockRequirement};
+
+    #[test]
+    fn production_registry_supports_core_blocks() {
+        let registry = BlockRegistry::production();
+
+        assert!(registry.supports(BlockRequirement::Docker));
+        assert!(registry.supports(BlockRequirement::Compose));
+        assert!(registry.supports(BlockRequirement::Kubernetes));
+        assert!(registry.supports(BlockRequirement::K3d));
+        assert!(registry.supports(BlockRequirement::Helm));
+        assert!(registry.supports(BlockRequirement::Kuma));
+        assert!(registry.supports(BlockRequirement::Build));
+        assert!(!registry.supports(BlockRequirement::Envoy));
+    }
+
+    #[test]
+    fn production_registry_aggregates_denied_binaries() {
+        let registry = BlockRegistry::production();
+
+        let denied = registry.all_denied_binaries();
+
+        assert!(denied.contains("docker"));
+        assert!(denied.contains("kubectl"));
+        assert!(denied.contains("k3d"));
+        assert!(denied.contains("helm"));
+        assert!(denied.contains("kumactl"));
     }
 }

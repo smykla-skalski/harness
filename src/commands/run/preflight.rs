@@ -2,8 +2,7 @@ use clap::Args;
 
 use tracing::info;
 
-use crate::commands::RunDirArgs;
-use crate::commands::resolve_run_services;
+use crate::commands::{CommandContext, RunDirArgs};
 use crate::core_defs::{shorten_path, utc_now};
 use crate::errors::CliError;
 
@@ -26,12 +25,16 @@ pub struct PreflightArgs {
 /// # Errors
 /// Returns `CliError` on failure.
 pub fn preflight(
+    ctx: &CommandContext,
     _kubeconfig: Option<&str>,
     _repo_root: Option<&str>,
     run_dir_args: &RunDirArgs,
 ) -> Result<i32, CliError> {
     let checked_at = utc_now();
-    let services = resolve_run_services(run_dir_args)?;
+    let services = ctx.resolve_run_services(run_dir_args)?;
+    services
+        .blocks()
+        .validate_requirement_names(&services.metadata().requires)?;
     let _ = services.save_preflight_outputs(&checked_at)?;
     services.record_preflight_complete()?;
 

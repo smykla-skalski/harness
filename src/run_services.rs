@@ -11,7 +11,7 @@ use rayon::prelude::*;
 use serde::Serialize;
 
 use crate::audit_log::write_run_status_with_audit;
-use crate::blocks::{ContainerRuntime, DockerContainerRuntime, StdProcessExecutor};
+use crate::blocks::{BlockRegistry, ContainerRuntime};
 use crate::cluster::{ClusterSpec, Platform};
 use crate::context::{
     NodeCheckRecord, NodeCheckSnapshot, PreflightArtifact, RunContext, RunLayout, RunMetadata,
@@ -38,14 +38,14 @@ use crate::workflow::runner::{
 /// Domain access layer for a tracked run.
 pub struct RunServices {
     ctx: RunContext,
-    docker: Option<Arc<dyn ContainerRuntime>>,
+    blocks: Arc<BlockRegistry>,
 }
 
 impl fmt::Debug for RunServices {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("RunServices")
             .field("ctx", &self.ctx)
-            .field("has_docker", &self.docker.is_some())
+            .field("has_docker", &self.blocks.docker.is_some())
             .finish()
     }
 }
@@ -117,9 +117,19 @@ impl RunServices {
     /// # Errors
     /// Returns `CliError` if the persisted cluster spec cannot be adapted.
     pub fn from_context(ctx: RunContext) -> Result<Self, CliError> {
-        let docker: Arc<dyn ContainerRuntime> =
-            Arc::new(DockerContainerRuntime::new(Arc::new(StdProcessExecutor)));
-        Ok(Self::with_docker(ctx, Some(docker)))
+        Self::from_context_with_blocks(ctx, Arc::new(BlockRegistry::production()))
+    }
+
+    /// Build services from a loaded run context using the provided block
+    /// registry.
+    ///
+    /// # Errors
+    /// Returns `CliError` if the persisted cluster spec cannot be adapted.
+    pub fn from_context_with_blocks(
+        ctx: RunContext,
+        blocks: Arc<BlockRegistry>,
+    ) -> Result<Self, CliError> {
+        Ok(Self::with_blocks(ctx, blocks))
     }
 
     /// Build services from a run directory.
@@ -140,8 +150,21 @@ impl RunServices {
             .transpose()
     }
 
+    fn with_blocks(ctx: RunContext, blocks: Arc<BlockRegistry>) -> Self {
+        Self { ctx, blocks }
+    }
+
+    #[cfg(test)]
     fn with_docker(ctx: RunContext, docker: Option<Arc<dyn ContainerRuntime>>) -> Self {
-        Self { ctx, docker }
+        let process: Arc<dyn crate::blocks::ProcessExecutor> =
+            Arc::new(crate::blocks::FakeProcessExecutor::new(vec![]));
+        let http: Arc<dyn crate::blocks::HttpClient> =
+            Arc::new(crate::blocks::FakeHttpClient::new(vec![]));
+        let mut blocks = BlockRegistry::new(process, http);
+        if let Some(docker) = docker {
+            blocks = blocks.with_docker(docker);
+        }
+        Self::with_blocks(ctx, Arc::new(blocks))
     }
 
     #[must_use]
@@ -152,6 +175,11 @@ impl RunServices {
     #[must_use]
     pub fn into_context(self) -> RunContext {
         self.ctx
+    }
+
+    #[must_use]
+    pub fn blocks(&self) -> &BlockRegistry {
+        self.blocks.as_ref()
     }
 
     #[must_use]
@@ -174,7 +202,8 @@ impl RunServices {
     }
 
     fn docker(&self) -> Result<&dyn ContainerRuntime, CliError> {
-        self.docker
+        self.blocks
+            .docker
             .as_deref()
             .ok_or_else(|| CliErrorKind::missing_run_context_value("docker").into())
     }
@@ -350,7 +379,7 @@ impl RunServices {
                         ClusterMemberHealthRecord {
                             name: member.name.as_str(),
                             role: member.role.as_str(),
-                            running: self.docker.as_ref().is_some_and(|docker| {
+                            running: self.blocks.docker.as_ref().is_some_and(|docker| {
                                 docker.is_running(&container).unwrap_or(false)
                             }),
                             container: Some(container),
