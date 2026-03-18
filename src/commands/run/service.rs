@@ -1,4 +1,3 @@
-use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
 
@@ -6,10 +5,8 @@ use clap::Args;
 
 use tracing::info;
 
-use crate::blocks::{
-    ContainerConfig, ContainerRuntime, DockerContainerRuntime, StdProcessExecutor,
-};
-use crate::commands::{RunDirArgs, resolve_run_services};
+use crate::blocks::{ContainerConfig, ContainerRuntime};
+use crate::commands::{CommandContext, RunDirArgs};
 use crate::errors::{CliError, CliErrorKind};
 use crate::exec;
 use crate::runtime::XdsAccess;
@@ -77,19 +74,27 @@ fn render_template(
 ///
 /// # Errors
 /// Returns `CliError` on failure.
-pub fn service(args: &ServiceArgs) -> Result<i32, CliError> {
-    let docker = DockerContainerRuntime::new(Arc::new(StdProcessExecutor));
+pub fn service(ctx: &CommandContext, args: &ServiceArgs) -> Result<i32, CliError> {
+    let docker = ctx
+        .blocks()
+        .docker
+        .as_deref()
+        .ok_or_else(|| CliErrorKind::missing_run_context_value("docker"))?;
     match args.action.as_str() {
-        "up" => service_up(args, &docker),
-        "down" => service_down(args.name.as_deref(), &args.run_dir, &docker),
-        "list" => service_list(&args.run_dir, &docker),
+        "up" => service_up(ctx, args, docker),
+        "down" => service_down(args.name.as_deref(), &args.run_dir, docker),
+        "list" => service_list(ctx, &args.run_dir, docker),
         _ => Err(
             CliErrorKind::usage_error(format!("unknown service action: {}", args.action)).into(),
         ),
     }
 }
 
-fn service_up(args: &ServiceArgs, docker: &dyn ContainerRuntime) -> Result<i32, CliError> {
+fn service_up(
+    ctx: &CommandContext,
+    args: &ServiceArgs,
+    docker: &dyn ContainerRuntime,
+) -> Result<i32, CliError> {
     let svc_name = args
         .name
         .as_deref()
@@ -98,7 +103,7 @@ fn service_up(args: &ServiceArgs, docker: &dyn ContainerRuntime) -> Result<i32, 
         .port
         .ok_or_else(|| CliErrorKind::usage_error("service port is required"))?;
 
-    let services = resolve_run_services(&args.run_dir)?;
+    let services = ctx.resolve_run_services(&args.run_dir)?;
     let access = services.control_plane_access()?;
     let network = services.docker_network()?;
     let svc_image = services.service_image(args.image.as_deref())?;
@@ -305,8 +310,12 @@ fn service_down(
     Ok(0)
 }
 
-fn service_list(run_dir_args: &RunDirArgs, docker: &dyn ContainerRuntime) -> Result<i32, CliError> {
-    if let Ok(services) = resolve_run_services(run_dir_args) {
+fn service_list(
+    ctx: &CommandContext,
+    run_dir_args: &RunDirArgs,
+    docker: &dyn ContainerRuntime,
+) -> Result<i32, CliError> {
+    if let Ok(services) = ctx.resolve_run_services(run_dir_args) {
         for row in services.list_service_containers()? {
             println!("{}\t{}", row.name, row.status);
         }

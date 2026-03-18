@@ -1,11 +1,8 @@
-use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
 
 use clap::{Parser, Subcommand};
 
-use crate::blocks::{DockerContainerRuntime, StdProcessExecutor};
-use crate::commands;
 use crate::commands::authoring::{
     ApprovalBeginArgs, AuthoringBeginArgs, AuthoringResetArgs, AuthoringSaveArgs,
     AuthoringShowArgs, AuthoringValidateArgs,
@@ -19,6 +16,7 @@ use crate::commands::run::{
 use crate::commands::setup::{
     BootstrapArgs, ClusterArgs, GatewayArgs, PreCompactArgs, SessionStartArgs, SessionStopArgs,
 };
+use crate::commands::{self, CommandContext};
 use crate::errors::CliError;
 use crate::hooks::{self, HookArgs};
 
@@ -172,7 +170,7 @@ fn dispatch_setup(cmd: Command) -> Result<i32, CliError> {
     }
 }
 
-fn dispatch_run(cmd: Command) -> Result<i32, CliError> {
+fn dispatch_run(ctx: &CommandContext, cmd: Command) -> Result<i32, CliError> {
     match cmd {
         Command::Capture(args) => {
             commands::run::capture(args.kubeconfig.as_deref(), &args.label, &args.run_dir)
@@ -199,6 +197,7 @@ fn dispatch_run(cmd: Command) -> Result<i32, CliError> {
             args.output.as_deref(),
         ),
         Command::Preflight(args) => commands::run::preflight(
+            ctx,
             args.kubeconfig.as_deref(),
             args.repo_root.as_deref(),
             &args.run_dir,
@@ -223,11 +222,10 @@ fn dispatch_run(cmd: Command) -> Result<i32, CliError> {
             &args.valid_for,
             &args.run_dir,
         ),
-        Command::Service(args) => commands::run::service(&args),
+        Command::Service(args) => commands::run::service(ctx, &args),
         Command::Status(args) => commands::run::status(&args.run_dir),
         Command::Logs(args) => {
-            let docker = DockerContainerRuntime::new(Arc::new(StdProcessExecutor));
-            commands::run::logs(&args.name, args.tail, args.follow, &args.run_dir, &docker)
+            commands::run::logs(ctx, &args.name, args.tail, args.follow, &args.run_dir)
         }
         Command::ClusterCheck(args) => commands::run::cluster_check(&args.run_dir),
         Command::Task(args) => commands::run::task(&args.command),
@@ -294,7 +292,10 @@ pub fn dispatch(command: Command) -> Result<i32, CliError> {
         | Command::Logs(_)
         | Command::ClusterCheck(_)
         | Command::Task(_)
-        | Command::RestartNamespace(_) => dispatch_run(command),
+        | Command::RestartNamespace(_) => {
+            let ctx = CommandContext::production();
+            dispatch_run(&ctx, command)
+        }
         Command::AuthoringBegin(_)
         | Command::AuthoringSave(_)
         | Command::AuthoringShow(_)

@@ -1,6 +1,8 @@
 use std::env;
 use std::path::PathBuf;
+use std::sync::Arc;
 
+use crate::blocks::BlockRegistry;
 use crate::context::{RunAggregate, RunContext, RunRepository};
 use crate::errors::CliError;
 use crate::resolve::resolve_run_directory;
@@ -12,6 +14,39 @@ pub mod observe;
 pub mod run;
 pub mod setup;
 pub use args::RunDirArgs;
+
+/// Shared runtime context for command execution.
+///
+/// Carries the active block registry so command handlers and domain services
+/// can resolve their dependencies from one place instead of constructing
+/// concrete adapters ad hoc.
+#[derive(Clone, Debug)]
+pub struct CommandContext {
+    blocks: Arc<BlockRegistry>,
+}
+
+impl CommandContext {
+    #[must_use]
+    pub fn production() -> Self {
+        Self {
+            blocks: Arc::new(BlockRegistry::production()),
+        }
+    }
+
+    #[must_use]
+    pub fn blocks(&self) -> &BlockRegistry {
+        self.blocks.as_ref()
+    }
+
+    /// Resolve a run directory and build the domain service layer in one step
+    /// using this command's shared block registry.
+    ///
+    /// # Errors
+    /// Returns `CliError` when the run directory cannot be resolved or loaded.
+    pub fn resolve_run_services(&self, args: &RunDirArgs) -> Result<RunServices, CliError> {
+        RunServices::from_context_with_blocks(resolve_run_context(args)?, self.blocks.clone())
+    }
+}
 
 // ---------------------------------------------------------------------------
 // Shared helpers
@@ -62,7 +97,7 @@ pub(crate) fn resolve_run_context(args: &RunDirArgs) -> Result<RunContext, CliEr
 /// # Errors
 /// Returns `CliError` when the run directory cannot be resolved or loaded.
 pub(crate) fn resolve_run_services(args: &RunDirArgs) -> Result<RunServices, CliError> {
-    RunServices::from_context(resolve_run_context(args)?)
+    CommandContext::production().resolve_run_services(args)
 }
 
 /// Resolve a run directory and load its aggregate in one step.
