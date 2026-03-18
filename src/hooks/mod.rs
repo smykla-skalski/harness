@@ -6,36 +6,33 @@ use crate::errors::{CliError, CliErrorKind, cow};
 use crate::rules::suite_runner::RunFile;
 
 use self::adapters::{HookAgent, adapter_for};
-use self::context::{GuardContext, NormalizedEvent};
-use self::engine::{Hook, HookEngine};
-use self::hook_result::HookResult;
-use self::result::NormalizedHookResult;
+use self::protocol::context::{GuardContext, NormalizedEvent};
+use self::protocol::hook_result::HookResult;
+use self::protocol::result::NormalizedHookResult;
+use self::registry::{Hook, HookEngine};
 
 pub mod debug;
-pub mod hook_result;
-pub mod payloads;
+pub mod protocol;
 pub mod session;
 
 pub mod adapters;
 pub mod audit;
-pub mod context;
 pub mod context_agent;
 mod effects;
-pub mod engine;
 pub mod enrich_failure;
 pub mod guard_bash;
 pub mod guard_question;
 pub mod guard_stop;
 pub mod guard_write;
 pub mod guards;
-pub mod output;
-pub mod result;
+pub mod registry;
 pub mod validate_agent;
 pub mod verify_bash;
 pub mod verify_question;
 pub mod verify_write;
 
 pub use self::effects::{HookEffect, HookOutcome};
+pub use self::protocol::{context, hook_result, output, payloads, result};
 
 /// Hook lifecycle categories.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -472,7 +469,7 @@ mod tests {
     use clap::Parser;
 
     use super::*;
-    use crate::hooks::hook_result::Decision;
+    use crate::hooks::protocol::hook_result::Decision;
 
     #[test]
     fn normalize_path_resolves_dot_dot() {
@@ -543,13 +540,13 @@ mod tests {
     #[test]
     fn control_file_hint_command_log() {
         let hint = control_file_hint(Path::new("commands/command-log.md"));
-        assert!(hint.contains("harness record"));
+        assert!(hint.contains("harness run record"));
     }
 
     #[test]
     fn control_file_hint_other() {
         let hint = control_file_hint(Path::new("run-report.md"));
-        assert!(hint.contains("harness report group"));
+        assert!(hint.contains("harness run report group"));
     }
 
     #[test]

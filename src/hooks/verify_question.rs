@@ -1,8 +1,8 @@
 use crate::errors::{CliError, HookMessage};
-use crate::hooks::context::GuardContext as HookContext;
-use crate::hooks::hook_result::HookResult;
+use crate::hooks::protocol::context::GuardContext as HookContext;
+use crate::hooks::protocol::hook_result::HookResult;
 use crate::rules::suite_runner as runner_rules;
-use crate::workflow::runner::RunnerPhase;
+use crate::run::workflow::RunnerPhase;
 
 /// Execute the verify-question hook.
 ///
@@ -68,9 +68,9 @@ fn handle_suite_author(ctx: &HookContext) -> HookResult {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::hooks::context::GuardContext as HookContext;
-    use crate::hooks::hook_result::Decision;
-    use crate::hooks::payloads::HookEnvelopePayload;
+    use crate::hooks::protocol::context::GuardContext as HookContext;
+    use crate::hooks::protocol::hook_result::Decision;
+    use crate::hooks::protocol::payloads::HookEnvelopePayload;
 
     fn inactive_context() -> HookContext {
         let mut context = HookContext::from_test_envelope("", HookEnvelopePayload::default());

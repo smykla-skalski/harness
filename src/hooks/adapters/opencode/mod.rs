@@ -4,8 +4,8 @@ use crate::errors::CliError;
 use crate::hooks::adapters::{
     AgentAdapter, HookRegistration, RenderedHookResponse, parse_process_payload, payload_context,
 };
-use crate::hooks::context::{NormalizedEvent, NormalizedHookContext, ToolCategory};
-use crate::hooks::result::{NormalizedDecision, NormalizedHookResult};
+use crate::hooks::protocol::context::{NormalizedEvent, NormalizedHookContext, ToolCategory};
+use crate::hooks::protocol::result::{NormalizedDecision, NormalizedHookResult};
 
 pub struct OpenCodeAdapter;
 

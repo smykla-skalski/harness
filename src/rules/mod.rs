@@ -8,7 +8,7 @@ mod gates;
 pub use gates::Gate;
 pub use skills::{SKILL_NAMES, SKILL_NEW, SKILL_RUN, skill_dirs};
 
-pub mod suite_author;
+pub use crate::authoring::rules as suite_author;
 pub mod suite_runner;
 
 /// Constants shared between suite:run and suite:new.
@@ -222,16 +222,16 @@ mod tests {
     #[test]
     fn run_file_write_hint() {
         use suite_runner::RunFile;
-        assert!(RunFile::CommandLog.write_hint().contains("harness record"));
+        assert!(RunFile::CommandLog.write_hint().contains("harness run record"));
         assert!(
             RunFile::RunReport
                 .write_hint()
-                .contains("harness report group")
+                .contains("harness run report group")
         );
         assert!(
             RunFile::RunnerState
                 .write_hint()
-                .contains("harness runner-state")
+                .contains("harness run runner-state")
         );
     }
 

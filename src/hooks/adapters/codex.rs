@@ -8,11 +8,11 @@ use crate::errors::{CliError, CliErrorKind, cow};
 use crate::hooks::adapters::{
     AgentAdapter, HookRegistration, ProcessHookPayload, RenderedHookResponse, payload_context,
 };
-use crate::hooks::context::{
+use crate::hooks::protocol::context::{
     AgentContext, NormalizedEvent, NormalizedHookContext, RawPayload, SessionContext, SkillContext,
     ToolCategory, ToolContext, ToolInput,
 };
-use crate::hooks::result::NormalizedHookResult;
+use crate::hooks::protocol::result::NormalizedHookResult;
 
 pub struct CodexAdapter;
 

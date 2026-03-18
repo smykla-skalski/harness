@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use crate::hooks::hook_result::{Decision, HookResult};
+use crate::hooks::protocol::hook_result::{Decision, HookResult};
 
 /// Enum of all hook messages, replacing the static `HookDef` definitions.
 ///
@@ -8,12 +8,12 @@ use crate::hooks::hook_result::{Decision, HookResult};
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 #[non_exhaustive]
 pub enum HookMessage {
-    #[error("Run cluster interactions through `harness run` or another `harness` wrapper.")]
+    #[error("Run cluster interactions through `harness run ...` or another `harness` wrapper.")]
     ClusterBinary,
 
     #[error(
-        "Envoy admin calls must go through `harness envoy` or another tracked \
-         `harness` wrapper. Prefer one live `harness envoy ...` command over \
+        "Envoy admin calls must go through `harness run envoy` or another tracked \
+         `harness` wrapper. Prefer one live `harness run envoy ...` command over \
          capture-then-read flows."
     )]
     AdminEndpoint,
@@ -23,7 +23,7 @@ pub enum HookMessage {
 
     #[error(
         "Run closeout is incomplete: verdict is still pending. \
-         Run `harness runner-state --event abort` to mark the run as aborted \
+         Run `harness run runner-state --event abort` to mark the run as aborted \
          for clean resume later."
     )]
     VerdictPending,
@@ -86,7 +86,7 @@ pub enum HookMessage {
         target: Cow<'static, str>,
     },
 
-    #[error("Run `harness preflight` before the first cluster mutation.")]
+    #[error("Run `harness run preflight` before the first cluster mutation.")]
     RunPreflight,
 
     #[error("Expected preflight artifacts are missing or incomplete.")]
@@ -94,7 +94,7 @@ pub enum HookMessage {
 
     #[error(
         "Suite:new workers must save structured results through \
-         `harness authoring-save` and return only a short acknowledgement."
+         `harness authoring save` and return only a short acknowledgement."
     )]
     CodeReaderFormat,
 
@@ -109,7 +109,7 @@ pub enum HookMessage {
 
     #[error(
         "Subshell substitution containing a denied binary was detected. \
-         Run cluster interactions through `harness run` or another `harness` wrapper."
+         Run cluster interactions through `harness run ...` or another `harness` wrapper."
     )]
     SubshellSmuggling,
 

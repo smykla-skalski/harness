@@ -3,16 +3,15 @@ use std::{fs, io};
 
 use tracing::warn;
 
-use crate::cluster::ClusterMode;
-use crate::context::RunContext;
+use crate::platform::cluster::ClusterMode;
+use crate::run::context::RunContext;
 use crate::errors::{CliError, HookMessage, cow};
-use crate::hooks::context::GuardContext as HookContext;
-use crate::hooks::hook_result::HookResult;
-use crate::shell_parse::HarnessCommandInvocationRef;
-use crate::workflow::runner::{PreflightStatus, RunnerPhase, RunnerWorkflowState, SuiteFixState};
+use crate::hooks::protocol::context::GuardContext as HookContext;
+use crate::hooks::protocol::hook_result::HookResult;
+use crate::run::workflow::{PreflightStatus, RunnerPhase, RunnerWorkflowState, SuiteFixState};
 
-/// Parsed harness context: (subcommand, words, run context).
-type HarnessCommandContext<'a> = (&'a str, &'a [String], &'a RunContext);
+/// Parsed harness context: (subcommand, command label, words, run context).
+type HarnessCommandContext<'a> = (&'a str, String, &'a [String], &'a RunContext);
 
 fn subcommand_artifacts(subcommand: &str) -> Option<&'static [&'static str]> {
     match subcommand {
@@ -37,16 +36,16 @@ const FAILURE_OUTPUT_PATTERNS: &[&str] = &["command failed", "apply failed", "va
 /// # Errors
 /// Returns `CliError` on failure.
 pub fn execute(ctx: &HookContext) -> Result<HookResult, CliError> {
-    let Some((subcommand, words, run)) = extract_harness_context(ctx)? else {
+    let Some((subcommand, command_label, words, run)) = extract_harness_context(ctx)? else {
         return Ok(HookResult::allow());
     };
-    if let Some(result) = check_bug_found_gate(ctx, subcommand) {
+    if let Some(result) = check_bug_found_gate(ctx, &command_label) {
         return Ok(result);
     }
     if let Some(result) = check_preflight_gate(ctx, subcommand) {
         return Ok(result);
     }
-    Ok(verify_artifacts(ctx, subcommand, words, run))
+    Ok(verify_artifacts(ctx, subcommand, &command_label, words, run))
 }
 
 /// Extract the harness subcommand, words, and run context from the hook
@@ -60,21 +59,22 @@ fn extract_harness_context(
     let Some(command) = ctx.parsed_command()? else {
         return Ok(None);
     };
-    let subcommand = command
-        .first_harness_invocation()
-        .and_then(HarnessCommandInvocationRef::subcommand);
-    let Some(subcommand) = subcommand else {
+    let Some(invocation) = command.first_harness_invocation() else {
+        return Ok(None);
+    };
+    let Some(subcommand) = invocation.subcommand() else {
         return Ok(None);
     };
     let Some(run) = &ctx.run else {
         return Ok(None);
     };
-    Ok(Some((subcommand, command.words(), run)))
+    Ok(Some((subcommand, invocation.command_label(), command.words(), run)))
 }
 
 fn verify_artifacts(
     ctx: &HookContext,
     subcommand: &str,
+    command_label: &str,
     words: &[String],
     run: &RunContext,
 ) -> HookResult {
@@ -90,7 +90,7 @@ fn verify_artifacts(
         return HookResult::allow();
     }
     let target = missing_target(subcommand, run);
-    HookMessage::missing_artifact(cow!("harness {subcommand}"), target).into_result()
+    HookMessage::missing_artifact(command_label.to_string(), target).into_result()
 }
 
 /// Check the command response for failure patterns during test execution.
@@ -98,7 +98,7 @@ fn verify_artifacts(
 /// Returns `Some(HookResult)` with a blocking deny when a harness command
 /// failure is detected and the runner is in a phase that requires user
 /// triage. Returns `None` when no gate is needed.
-fn check_bug_found_gate(ctx: &HookContext, subcommand: &str) -> Option<HookResult> {
+fn check_bug_found_gate(ctx: &HookContext, command_label: &str) -> Option<HookResult> {
     let state = ctx.runner_state.as_ref()?;
 
     // Only enforce during execution and closeout phases. Bootstrap and
@@ -125,7 +125,7 @@ fn check_bug_found_gate(ctx: &HookContext, subcommand: &str) -> Option<HookResul
         return None;
     }
 
-    Some(HookMessage::bug_found_gate_required(cow!("harness {subcommand}")).into_result())
+    Some(HookMessage::bug_found_gate_required(command_label.to_string()).into_result())
 }
 
 /// Block `harness apply` when the runner has not completed preflight.
@@ -148,8 +148,8 @@ fn check_preflight_gate(ctx: &HookContext, subcommand: &str) -> Option<HookResul
     }
     Some(
         HookMessage::runner_flow_required(
-            "harness apply",
-            "Run harness preflight before applying manifests. \
+            "harness run apply",
+            "Run `harness run preflight` before applying manifests. \
              Preflight materializes baselines and group YAML into prepared manifests.",
         )
         .into_result(),
@@ -237,7 +237,10 @@ fn check_cluster(words: &[String], run: &RunContext) -> HookResult {
     if target.exists() {
         return HookResult::allow();
     }
-    HookMessage::missing_artifact(cow!("harness cluster {mode}"), target.display().to_string())
+    HookMessage::missing_artifact(
+        cow!("harness setup cluster {mode}"),
+        target.display().to_string(),
+    )
         .into_result()
 }
 
@@ -282,7 +285,7 @@ mod tests {
     #![allow(clippy::absolute_paths)]
 
     use super::*;
-    use crate::workflow::runner::{
+    use crate::run::workflow::{
         FailureKind, FailureState, ManifestFixDecision, PreflightState, PreflightStatus,
         RunnerWorkflowState,
     };
@@ -603,7 +606,7 @@ mod tests {
         runner_state: Option<RunnerWorkflowState>,
         response: Option<&str>,
     ) -> HookContext {
-        use crate::hooks::payloads::HookEnvelopePayload;
+        use crate::hooks::protocol::payloads::HookEnvelopePayload;
 
         let payload = HookEnvelopePayload {
             tool_name: "Bash".to_string(),

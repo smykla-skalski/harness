@@ -15,7 +15,7 @@ use tracing::warn;
 
 use crate::core_defs::{project_context_dir, session_scope_key, utc_now};
 use crate::errors::{CliError, CliErrorKind, cow, io_for};
-use crate::io::write_json_pretty;
+use crate::infra::io::write_json_pretty;
 use crate::rules::compact as compact_rules;
 
 /// Compact directory for a project.
@@ -448,7 +448,7 @@ mod tests {
             state_paths: vec![],
         };
         let ctx = render_runner_restore_context(Path::new("/p"), &runner);
-        assert!(ctx.contains("harness runner-state --event resume-run"));
+        assert!(ctx.contains("harness run runner-state --event resume-run"));
         assert!(ctx.contains("do not edit control files"));
     }
 

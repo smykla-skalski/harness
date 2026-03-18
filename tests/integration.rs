@@ -2,6 +2,7 @@
 // Declares all submodules under tests/integration/.
 
 mod integration {
+    mod architecture;
     pub mod helpers;
 
     mod cluster;
