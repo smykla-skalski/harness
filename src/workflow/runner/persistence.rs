@@ -75,12 +75,12 @@ pub fn initialize_runner_state(run_dir: &Path) -> Result<RunnerWorkflowState, Cl
 pub fn read_runner_state(run_dir: &Path) -> Result<Option<RunnerWorkflowState>, CliError> {
     let path = runner_state_path(run_dir);
     if path.exists() {
-        return load_runner_state_repo(runner_repository_for_path(path.clone()), &path);
+        return load_runner_state_repo(&runner_repository_for_path(path.clone()), &path);
     }
 
     let legacy_path = legacy_runner_state_path(run_dir);
     let loaded = load_runner_state_repo(
-        runner_repository_for_path(legacy_path.clone()),
+        &runner_repository_for_path(legacy_path.clone()),
         &legacy_path,
     )?;
     if let Some(state) = loaded.as_ref() {
@@ -143,7 +143,7 @@ pub fn write_runner_state_if_current(
 }
 
 fn load_runner_state_repo(
-    repo: VersionedJsonRepository<RunnerWorkflowState>,
+    repo: &VersionedJsonRepository<RunnerWorkflowState>,
     path: &Path,
 ) -> Result<Option<RunnerWorkflowState>, CliError> {
     match repo.load() {
@@ -270,7 +270,7 @@ mod tests {
         });
         write_runner_state(dir.path(), &state).unwrap();
 
-        let mut next = state.clone();
+        let mut next = state;
         next.transition_count = 4;
         next.suite_fix = Some(SuiteFixState {
             approved_paths: vec![],

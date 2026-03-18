@@ -228,8 +228,7 @@ impl HookCommand {
             Self::VerifyBash => &VERIFY_BASH_HOOK,
             Self::VerifyWrite => &VERIFY_WRITE_HOOK,
             Self::VerifyQuestion => &VERIFY_QUESTION_HOOK,
-            Self::Audit => &AUDIT_HOOK,
-            Self::AuditTurn(_) => &AUDIT_HOOK,
+            Self::Audit | Self::AuditTurn(_) => &AUDIT_HOOK,
             Self::EnrichFailure => &ENRICH_FAILURE_HOOK,
             Self::ContextAgent => &CONTEXT_AGENT_HOOK,
             Self::ValidateAgent => &VALIDATE_AGENT_HOOK,
@@ -361,10 +360,10 @@ fn render_runtime_error(
 }
 
 fn read_stdin_bytes() -> Result<Vec<u8>, CliError> {
-    use std::io::Read;
+    use std::io::{self, Read};
 
     let mut bytes = Vec::new();
-    std::io::stdin().read_to_end(&mut bytes).map_err(|error| {
+    io::stdin().read_to_end(&mut bytes).map_err(|error| {
         CliError::from(CliErrorKind::hook_payload_invalid(cow!(
             "failed to read stdin: {error}"
         )))
@@ -395,7 +394,7 @@ pub fn run_hook_command(agent: HookAgent, skill: &str, hook: &HookCommand) -> i3
 
     let adapter = adapter_for(agent);
     let normalized = match adapter.parse_input(&raw) {
-        Ok(context) => context.with_skill(skill).with_default_event(event.clone()),
+        Ok(context) => context.with_skill(skill).with_default_event(event),
         Err(error) => {
             let message = format!("`{hook_name}` received invalid hook payload: {error}");
             return render_runtime_error(agent, hook_impl, &event, "KSH001", &message);

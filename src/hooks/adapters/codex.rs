@@ -17,7 +17,7 @@ use crate::hooks::result::NormalizedHookResult;
 pub struct CodexAdapter;
 
 impl AgentAdapter for CodexAdapter {
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         "codex"
     }
 
@@ -178,6 +178,24 @@ fn notify_payload_context(raw_value: Value) -> Result<NormalizedHookContext, Cli
 mod tests {
     use super::*;
 
+    fn assert_notify_context(context: &NormalizedHookContext) {
+        assert_eq!(context.event, NormalizedEvent::Notification);
+        assert_eq!(context.session.session_id, "session-123");
+        assert_eq!(context.session.cwd, PathBuf::from("/tmp/project"));
+        let tool = context.tool.as_ref().expect("expected tool");
+        assert_eq!(tool.original_name, CODEX_TURN_TOOL_NAME);
+        assert_eq!(tool.input_raw["input_messages"][0], json!("run the suite"));
+        let response = tool.response.as_ref().expect("expected response");
+        assert_eq!(response["last_assistant_message"], json!("done"));
+    }
+
+    fn assert_notify_agent(context: &NormalizedHookContext) {
+        let agent = context.agent.as_ref().expect("expected agent");
+        assert_eq!(agent.agent_id.as_deref(), Some("turn-456"));
+        assert_eq!(agent.agent_type.as_deref(), Some(CODEX_TURN_AGENT_TYPE));
+        assert_eq!(agent.response.as_deref(), Some("done"));
+    }
+
     #[test]
     fn parse_notify_payload_into_notification_context() {
         let adapter = CodexAdapter;
@@ -192,24 +210,7 @@ mod tests {
         .unwrap();
 
         let context = adapter.parse_input(&raw).unwrap();
-        let tool = context
-            .tool
-            .expect("notify payload should synthesize a tool");
-        let response = tool
-            .response
-            .expect("notify payload should synthesize a response");
-        let agent = context
-            .agent
-            .expect("notify payload should synthesize agent data");
-
-        assert_eq!(context.event, NormalizedEvent::Notification);
-        assert_eq!(context.session.session_id, "session-123");
-        assert_eq!(context.session.cwd, PathBuf::from("/tmp/project"));
-        assert_eq!(tool.original_name, CODEX_TURN_TOOL_NAME);
-        assert_eq!(tool.input_raw["input_messages"][0], json!("run the suite"));
-        assert_eq!(response["last_assistant_message"], json!("done"));
-        assert_eq!(agent.agent_id.as_deref(), Some("turn-456"));
-        assert_eq!(agent.agent_type.as_deref(), Some(CODEX_TURN_AGENT_TYPE));
-        assert_eq!(agent.response.as_deref(), Some("done"));
+        assert_notify_context(&context);
+        assert_notify_agent(&context);
     }
 }

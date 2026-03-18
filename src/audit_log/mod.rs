@@ -466,7 +466,7 @@ mod tests {
         layout.ensure_dirs().unwrap();
 
         append_audit_entry(AuditAppendRequest {
-            run_dir: run_dir.clone(),
+            run_dir,
             tool_name: "Read".to_string(),
             tool_input: "test.md".to_string(),
             full_output: "contents".to_string(),

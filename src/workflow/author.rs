@@ -292,12 +292,12 @@ fn author_repository_for_path(path: PathBuf) -> VersionedJsonRepository<AuthorWo
 pub fn read_author_state() -> Result<Option<AuthorWorkflowState>, CliError> {
     let path = author_state_path()?;
     if path.exists() {
-        return load_author_state_repo(author_repository()?, &path);
+        return load_author_state_repo(&author_repository()?, &path);
     }
 
     let legacy_path = legacy_author_state_path()?;
     let loaded = load_author_state_repo(
-        author_repository_for_path(legacy_path.clone()),
+        &author_repository_for_path(legacy_path.clone()),
         &legacy_path,
     )?;
     if let Some(state) = loaded.as_ref() {
@@ -317,7 +317,7 @@ pub fn write_author_state(state: &AuthorWorkflowState) -> Result<(), CliError> {
 }
 
 fn load_author_state_repo(
-    repo: VersionedJsonRepository<AuthorWorkflowState>,
+    repo: &VersionedJsonRepository<AuthorWorkflowState>,
     path: &Path,
 ) -> Result<Option<AuthorWorkflowState>, CliError> {
     match repo.load() {

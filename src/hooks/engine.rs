@@ -36,11 +36,21 @@ impl GuardChain {
 pub trait Hook: Send + Sync {
     fn name(&self) -> &str;
     fn hook_type(&self) -> HookType;
+    /// Run the hook logic against a guard context.
+    ///
+    /// # Errors
+    /// Returns `CliError` when hook execution fails.
     fn execute(&self, ctx: &GuardContext) -> Result<HookOutcome, CliError>;
 }
 
 /// Agent-agnostic hook execution engine.
 pub struct HookEngine;
+
+impl Default for HookEngine {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 impl HookEngine {
     #[must_use]

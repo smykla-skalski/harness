@@ -404,9 +404,14 @@ fn seconds_string(value: u64) -> String {
 }
 
 #[cfg(test)]
+use std::collections;
+#[cfg(test)]
+use std::sync;
+
+#[cfg(test)]
 #[derive(Debug, Default)]
 pub struct FakeComposeOrchestrator {
-    projects: std::sync::Mutex<std::collections::HashMap<String, bool>>,
+    projects: sync::Mutex<collections::HashMap<String, bool>>,
 }
 
 #[cfg(test)]
@@ -477,9 +482,8 @@ mod tests {
         }
     }
 
-    #[test]
-    fn compose_topology_renders_compose_yaml() {
-        let topology = ComposeTopology {
+    fn sample_topology_with_service() -> ComposeTopology {
+        ComposeTopology {
             project_name: "mesh".to_string(),
             network: NetworkSpec {
                 name: "mesh-net".to_string(),
@@ -502,17 +506,26 @@ mod tests {
                 }),
                 restart: Some("unless-stopped".to_string()),
             }],
-        };
+        }
+    }
 
-        let yaml = topology.to_yaml().expect("expected compose yaml");
+    #[test]
+    fn compose_topology_renders_compose_yaml() {
+        let yaml = sample_topology_with_service()
+            .to_yaml()
+            .expect("expected compose yaml");
 
-        assert!(yaml.contains("services:"));
-        assert!(yaml.contains("cp:"));
-        assert!(yaml.contains("kumahq/kuma-cp:latest"));
-        assert!(yaml.contains("mesh-net"));
-        assert!(yaml.contains("172.57.0.0/16"));
-        assert!(yaml.contains("5681:5681"));
-        assert!(yaml.contains("start_period: '5s'"));
+        for expected in [
+            "services:",
+            "cp:",
+            "kumahq/kuma-cp:latest",
+            "mesh-net",
+            "172.57.0.0/16",
+            "5681:5681",
+            "start_period: '5s'",
+        ] {
+            assert!(yaml.contains(expected), "missing: {expected}");
+        }
     }
 
     #[test]
@@ -594,7 +607,7 @@ mod tests {
             .write_to(&path)
             .expect("expected compose file write");
 
-        let content = std::fs::read_to_string(&path).expect("read compose file");
+        let content = fs::read_to_string(&path).expect("read compose file");
         assert!(content.contains("networks:"));
         assert!(content.contains("mesh-net"));
     }

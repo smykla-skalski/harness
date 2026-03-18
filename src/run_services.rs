@@ -12,6 +12,8 @@ use serde::Serialize;
 
 use crate::audit_log::write_run_status_with_audit;
 use crate::blocks::{BlockRegistry, ContainerRuntime};
+#[cfg(test)]
+use crate::blocks::{FakeHttpClient, FakeProcessExecutor, HttpClient, ProcessExecutor};
 use crate::cluster::{ClusterSpec, Platform};
 use crate::context::{
     NodeCheckRecord, NodeCheckSnapshot, PreflightArtifact, RunContext, RunLayout, RunMetadata,
@@ -156,10 +158,8 @@ impl RunServices {
 
     #[cfg(test)]
     fn with_docker(ctx: RunContext, docker: Option<Arc<dyn ContainerRuntime>>) -> Self {
-        let process: Arc<dyn crate::blocks::ProcessExecutor> =
-            Arc::new(crate::blocks::FakeProcessExecutor::new(vec![]));
-        let http: Arc<dyn crate::blocks::HttpClient> =
-            Arc::new(crate::blocks::FakeHttpClient::new(vec![]));
+        let process: Arc<dyn ProcessExecutor> = Arc::new(FakeProcessExecutor::new(vec![]));
+        let http: Arc<dyn HttpClient> = Arc::new(FakeHttpClient::new(vec![]));
         let mut blocks = BlockRegistry::new(process, http);
         if let Some(docker) = docker {
             blocks = blocks.with_docker(docker);

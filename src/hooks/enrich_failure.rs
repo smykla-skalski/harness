@@ -41,16 +41,15 @@ pub fn execute(ctx: &HookContext) -> Result<HookOutcome, CliError> {
         if matches!(sub, "apply" | "validate") && state.phase() == RunnerPhase::Execution {
             if let Some(effect) = effects::transition_runner_state(ctx, |state| {
                 Some(request_failure_triage(state, FailureKind::Manifest))
-            })? {
+            }) {
                 outcome = outcome.with_effect(effect);
             }
-        } else if state.phase() == RunnerPhase::Preflight && matches!(sub, "preflight" | "capture")
+        } else if state.phase() == RunnerPhase::Preflight
+            && matches!(sub, "preflight" | "capture")
+            && let Some(effect) =
+                effects::transition_runner_state(ctx, |state| Some(request_preflight_failed(state)))
         {
-            if let Some(effect) = effects::transition_runner_state(ctx, |state| {
-                Some(request_preflight_failed(state))
-            })? {
-                outcome = outcome.with_effect(effect);
-            }
+            outcome = outcome.with_effect(effect);
         }
     }
     Ok(outcome)

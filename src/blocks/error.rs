@@ -75,15 +75,13 @@ impl From<BlockError> for CliError {
 
 #[cfg(test)]
 mod tests {
+    use std::io;
+
     use super::*;
 
     #[test]
     fn block_error_new_preserves_fields() {
-        let err = BlockError::new(
-            "process",
-            "run echo hello",
-            std::io::Error::new(std::io::ErrorKind::Other, "boom"),
-        );
+        let err = BlockError::new("process", "run echo hello", io::Error::other("boom"));
         assert_eq!(err.block, "process");
         assert_eq!(err.operation, "run echo hello");
         assert_eq!(err.cause.to_string(), "boom");

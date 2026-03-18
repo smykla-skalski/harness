@@ -1,4 +1,6 @@
 use std::path::Path;
+#[cfg(test)]
+use std::sync;
 use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
@@ -247,19 +249,24 @@ pub struct FakeKubectlInvocation {
 
 #[cfg(test)]
 pub struct FakeKubernetesOperator {
-    responses: std::sync::Mutex<Vec<Result<CommandResult, BlockError>>>,
-    invocations: std::sync::Mutex<Vec<FakeKubectlInvocation>>,
+    responses: sync::Mutex<Vec<Result<CommandResult, BlockError>>>,
+    invocations: sync::Mutex<Vec<FakeKubectlInvocation>>,
 }
 
 #[cfg(test)]
 impl FakeKubernetesOperator {
+    #[must_use]
     pub fn new(responses: Vec<Result<CommandResult, BlockError>>) -> Self {
         Self {
-            responses: std::sync::Mutex::new(responses),
-            invocations: std::sync::Mutex::new(Vec::new()),
+            responses: sync::Mutex::new(responses),
+            invocations: sync::Mutex::new(Vec::new()),
         }
     }
 
+    /// Returns recorded invocations.
+    ///
+    /// # Panics
+    /// Panics if the mutex is poisoned.
     #[must_use]
     pub fn invocations(&self) -> Vec<FakeKubectlInvocation> {
         self.invocations.lock().expect("lock poisoned").clone()
@@ -357,19 +364,24 @@ pub struct FakeK3dInvocation {
 
 #[cfg(test)]
 pub struct FakeLocalClusterManager {
-    responses: std::sync::Mutex<Vec<Result<CommandResult, BlockError>>>,
-    invocations: std::sync::Mutex<Vec<FakeK3dInvocation>>,
+    responses: sync::Mutex<Vec<Result<CommandResult, BlockError>>>,
+    invocations: sync::Mutex<Vec<FakeK3dInvocation>>,
 }
 
 #[cfg(test)]
 impl FakeLocalClusterManager {
+    #[must_use]
     pub fn new(responses: Vec<Result<CommandResult, BlockError>>) -> Self {
         Self {
-            responses: std::sync::Mutex::new(responses),
-            invocations: std::sync::Mutex::new(Vec::new()),
+            responses: sync::Mutex::new(responses),
+            invocations: sync::Mutex::new(Vec::new()),
         }
     }
 
+    /// Returns recorded invocations.
+    ///
+    /// # Panics
+    /// Panics if the mutex is poisoned.
     #[must_use]
     pub fn invocations(&self) -> Vec<FakeK3dInvocation> {
         self.invocations.lock().expect("lock poisoned").clone()
@@ -414,7 +426,9 @@ impl LocalClusterManager for FakeLocalClusterManager {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::blocks::{FakeProcessExecutor, FakeProcessMethod, FakeResponse};
+    use crate::blocks::{
+        FakeContainerRuntime, FakeProcessExecutor, FakeProcessMethod, FakeResponse,
+    };
     use std::sync::Arc;
 
     fn success_result(args: &[&str], stdout: &str) -> CommandResult {
@@ -452,6 +466,15 @@ mod tests {
         assert_eq!(result.returncode, 0);
     }
 
+    fn assert_demo_pod(pod: &PodSnapshot) {
+        assert_eq!(pod.namespace.as_deref(), Some("default"));
+        assert_eq!(pod.name.as_deref(), Some("demo-123"));
+        assert_eq!(pod.ready.as_deref(), Some("1/2"));
+        assert_eq!(pod.status.as_deref(), Some("Running"));
+        assert_eq!(pod.restarts, Some(3));
+        assert_eq!(pod.node.as_deref(), Some("node-a"));
+    }
+
     #[test]
     fn kubectl_operator_list_pods_parses_json() {
         let fake = Arc::new(FakeProcessExecutor::new(vec![FakeResponse {
@@ -480,14 +503,8 @@ mod tests {
         let operator = KubectlOperator::new(fake);
 
         let pods = operator.list_pods(None).expect("expected pod list");
-
         assert_eq!(pods.len(), 1);
-        assert_eq!(pods[0].namespace.as_deref(), Some("default"));
-        assert_eq!(pods[0].name.as_deref(), Some("demo-123"));
-        assert_eq!(pods[0].ready.as_deref(), Some("1/2"));
-        assert_eq!(pods[0].status.as_deref(), Some("Running"));
-        assert_eq!(pods[0].restarts, Some(3));
-        assert_eq!(pods[0].node.as_deref(), Some("node-a"));
+        assert_demo_pod(&pods[0]);
     }
 
     #[test]
@@ -506,7 +523,7 @@ mod tests {
                 "demo 1/1 0/0\n",
             )),
         }]));
-        let fake_container = Arc::new(crate::blocks::FakeContainerRuntime::new());
+        let fake_container = Arc::new(FakeContainerRuntime::new());
         let manager = K3dClusterManager::new(fake_process, fake_container);
 
         let exists = manager

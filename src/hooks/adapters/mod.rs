@@ -3,7 +3,6 @@ mod codex;
 mod gemini;
 pub mod opencode;
 
-use std::collections::HashMap;
 use std::env;
 use std::path::PathBuf;
 
@@ -51,7 +50,11 @@ pub struct HookRegistration {
 
 /// Adapter trait for agent-specific parsing/rendering/config generation.
 pub trait AgentAdapter: Send + Sync {
-    fn name(&self) -> &str;
+    fn name(&self) -> &'static str;
+    /// Parse raw hook payload bytes into a normalized context.
+    ///
+    /// # Errors
+    /// Returns `CliError` when the payload is malformed or unrecognized.
     fn parse_input(&self, raw: &[u8]) -> Result<NormalizedHookContext, CliError>;
     fn render_output(
         &self,
@@ -84,8 +87,6 @@ pub(crate) struct ProcessHookPayload {
     #[serde(default)]
     pub hook_event_name: Option<String>,
     #[serde(default)]
-    pub stop_hook_active: bool,
-    #[serde(default)]
     pub agent_id: Option<String>,
     #[serde(default)]
     pub agent_type: Option<String>,
@@ -93,8 +94,6 @@ pub(crate) struct ProcessHookPayload {
     pub prompt: Option<String>,
     #[serde(default)]
     pub original_request_name: Option<String>,
-    #[serde(flatten)]
-    pub extra: HashMap<String, Value>,
 }
 
 pub(crate) fn parse_process_payload(raw: &[u8]) -> Result<(ProcessHookPayload, Value), CliError> {
@@ -109,24 +108,20 @@ pub(crate) fn parse_process_payload(raw: &[u8]) -> Result<(ProcessHookPayload, V
 
 pub(crate) fn payload_event(payload: &ProcessHookPayload) -> NormalizedEvent {
     match payload.hook_event_name.as_deref() {
-        Some("PreToolUse")
-        | Some("BeforeTool")
-        | Some("BeforeToolUse")
-        | Some("tool.execute.before") => NormalizedEvent::BeforeToolUse,
-        Some("PostToolUse")
-        | Some("AfterTool")
-        | Some("AfterToolUse")
-        | Some("tool.execute.after") => NormalizedEvent::AfterToolUse,
-        Some("PostToolUseFailure") | Some("AfterToolUseFailure") => {
-            NormalizedEvent::AfterToolUseFailure
+        Some("PreToolUse" | "BeforeTool" | "BeforeToolUse" | "tool.execute.before") => {
+            NormalizedEvent::BeforeToolUse
         }
-        Some("SessionStart") | Some("session.created") => NormalizedEvent::SessionStart,
-        Some("SessionEnd") | Some("session.deleted") => NormalizedEvent::SessionEnd,
+        Some("PostToolUse" | "AfterTool" | "AfterToolUse" | "tool.execute.after") => {
+            NormalizedEvent::AfterToolUse
+        }
+        Some("PostToolUseFailure" | "AfterToolUseFailure") => NormalizedEvent::AfterToolUseFailure,
+        Some("SessionStart" | "session.created") => NormalizedEvent::SessionStart,
+        Some("SessionEnd" | "session.deleted") => NormalizedEvent::SessionEnd,
         Some("BeforeAgent") => NormalizedEvent::AgentStart,
-        Some("Stop") | Some("AfterAgent") | Some("stop") => NormalizedEvent::AgentStop,
+        Some("Stop" | "AfterAgent" | "stop") => NormalizedEvent::AgentStop,
         Some("SubagentStart") => NormalizedEvent::SubagentStart,
         Some("SubagentStop") => NormalizedEvent::SubagentStop,
-        Some("PreCompact") | Some("PreCompress") | Some("session.compacting") => {
+        Some("PreCompact" | "PreCompress" | "session.compacting") => {
             NormalizedEvent::BeforeCompaction
         }
         Some("PostCompact") => NormalizedEvent::AfterCompaction,
@@ -144,8 +139,6 @@ pub(crate) fn payload_context<F>(
 where
     F: Fn(&str) -> ToolCategory,
 {
-    let _stop_hook_active = payload.stop_hook_active;
-    let _extra_field_count = payload.extra.len();
     let tool_name = payload
         .tool_name
         .as_deref()
