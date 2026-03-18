@@ -16,6 +16,7 @@ pub use repository::InMemoryRunRepository;
 use std::borrow::Cow;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
+use std::sync::OnceLock;
 use std::{fs, io};
 
 use serde::{Deserialize, Serialize};
@@ -25,16 +26,52 @@ use crate::errors::CliError;
 use crate::io::append_markdown_row;
 
 /// Filesystem layout for a single run.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+///
+/// The `run_dir()` result is cached via `OnceLock` to avoid repeated
+/// `PathBuf` allocation on every call. Because `OnceLock` does not
+/// implement `PartialEq` or `Clone` automatically, those traits are
+/// implemented manually below.
+#[derive(Debug, Serialize, Deserialize)]
 pub struct RunLayout {
     pub run_root: String,
     pub run_id: String,
+    #[serde(skip)]
+    cached_run_dir: OnceLock<PathBuf>,
 }
+
+impl Clone for RunLayout {
+    fn clone(&self) -> Self {
+        Self {
+            run_root: self.run_root.clone(),
+            run_id: self.run_id.clone(),
+            cached_run_dir: OnceLock::new(),
+        }
+    }
+}
+
+impl PartialEq for RunLayout {
+    fn eq(&self, other: &Self) -> bool {
+        self.run_root == other.run_root && self.run_id == other.run_id
+    }
+}
+
+impl Eq for RunLayout {}
 
 impl RunLayout {
     #[must_use]
+    pub fn new(run_root: impl Into<String>, run_id: impl Into<String>) -> Self {
+        Self {
+            run_root: run_root.into(),
+            run_id: run_id.into(),
+            cached_run_dir: OnceLock::new(),
+        }
+    }
+
+    #[must_use]
     pub fn run_dir(&self) -> PathBuf {
-        PathBuf::from(&self.run_root).join(&self.run_id)
+        self.cached_run_dir
+            .get_or_init(|| PathBuf::from(&self.run_root).join(&self.run_id))
+            .clone()
     }
 
     #[must_use]
@@ -138,7 +175,11 @@ impl RunLayout {
         let run_root = run_dir
             .parent()
             .map_or_else(|| ".".to_string(), |p| p.to_string_lossy().into_owned());
-        Self { run_root, run_id }
+        Self {
+            run_root,
+            run_id,
+            cached_run_dir: OnceLock::new(),
+        }
     }
 
     /// Strip the run directory prefix from `path`, returning a relative string.
@@ -366,10 +407,7 @@ mod tests {
     static ENV_MUTEX: Mutex<()> = Mutex::new(());
 
     fn sample_layout() -> RunLayout {
-        RunLayout {
-            run_root: "/tmp/runs".into(),
-            run_id: "run-1".into(),
-        }
+        RunLayout::new("/tmp/runs", "run-1")
     }
 
     fn sample_status() -> RunStatus {
@@ -495,10 +533,7 @@ mod tests {
     #[test]
     fn run_layout_ensure_dirs_creates_subdirs() {
         let tmp = tempfile::tempdir().unwrap();
-        let layout = RunLayout {
-            run_root: tmp.path().to_string_lossy().into_owned(),
-            run_id: "test-run".into(),
-        };
+        let layout = RunLayout::new(tmp.path().to_string_lossy().into_owned(), "test-run");
         layout.ensure_dirs().unwrap();
         assert!(layout.run_dir().is_dir());
         assert!(layout.artifacts_dir().is_dir());
@@ -510,10 +545,7 @@ mod tests {
     #[test]
     fn run_layout_ensure_dirs_is_idempotent() {
         let tmp = tempfile::tempdir().unwrap();
-        let layout = RunLayout {
-            run_root: tmp.path().to_string_lossy().into_owned(),
-            run_id: "test-run".into(),
-        };
+        let layout = RunLayout::new(tmp.path().to_string_lossy().into_owned(), "test-run");
         layout.ensure_dirs().unwrap();
         layout.ensure_dirs().unwrap();
         assert!(layout.run_dir().is_dir());
@@ -842,10 +874,7 @@ mod tests {
     #[test]
     fn run_context_stale_pointer_returns_none_for_missing_dir() {
         let record = CurrentRunRecord {
-            layout: RunLayout {
-                run_root: "/nonexistent/path".into(),
-                run_id: "vanished".into(),
-            },
+            layout: RunLayout::new("/nonexistent/path", "vanished"),
             profile: None,
             repo_root: None,
             suite_dir: None,

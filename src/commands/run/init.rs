@@ -76,10 +76,10 @@ pub fn init_run(
     let resolved_run_root = resolve_run_root(run_root, Some(&suite_dir));
     let created_at = utc_now();
 
-    let layout = RunLayout {
-        run_root: resolved_run_root.to_string_lossy().into_owned(),
-        run_id: run_id.to_string(),
-    };
+    let layout = RunLayout::new(
+        resolved_run_root.to_string_lossy().into_owned(),
+        run_id.to_string(),
+    );
 
     if layout.run_dir().exists() {
         return Err(CliErrorKind::run_dir_exists(layout.run_dir().display().to_string()).into());
