@@ -2,6 +2,7 @@ mod aggregate;
 pub mod cleanup;
 mod repository;
 mod snapshots;
+mod validated;
 
 pub use aggregate::{RunAggregate, RunContext};
 pub use cleanup::{CleanupManifest, CleanupResource};
@@ -9,6 +10,7 @@ pub use repository::{RunRepository, RunRepositoryPort};
 pub use snapshots::{
     ArtifactSnapshot, NodeCheckRecord, NodeCheckSnapshot, ToolCheckRecord, ToolCheckSnapshot,
 };
+pub use validated::ValidatedRunLayout;
 
 #[cfg(test)]
 pub use repository::InMemoryRunRepository;

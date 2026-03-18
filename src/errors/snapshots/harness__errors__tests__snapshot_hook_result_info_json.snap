@@ -1,0 +1,9 @@
+---
+source: src/errors/mod.rs
+expression: json
+---
+{
+  "decision": "info",
+  "code": "KSR012",
+  "message": "Run verdict: pass"
+}

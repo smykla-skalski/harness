@@ -374,4 +374,44 @@ mod tests {
         assert_send_sync::<HelmDeployer>();
         assert_send_sync::<FakePackageDeployer>();
     }
+
+    // -- Contract tests: fake satisfies the same invariants as production --
+
+    mod contracts {
+        use super::*;
+
+        fn contract_upgrade_install_returns_deploy_result(deployer: &dyn PackageDeployer) {
+            let result = deployer
+                .upgrade_install("contract-test", "oci://example/chart", None, &[], &["--dry-run"])
+                .expect("upgrade_install should succeed");
+            assert_eq!(result.release, "contract-test");
+            assert_eq!(result.chart, "oci://example/chart");
+        }
+
+        fn contract_uninstall_nonexistent_is_tolerant(deployer: &dyn PackageDeployer) {
+            let _ = deployer.uninstall("nonexistent-contract-test-release", None, &[]);
+        }
+
+        fn contract_run_target_returns_result(deployer: &dyn PackageDeployer) {
+            let result = deployer
+                .run_target(Path::new("/repo"), "test", &HashMap::new())
+                .expect("run_target should succeed");
+            assert_eq!(result.returncode, 0);
+        }
+
+        #[test]
+        fn fake_satisfies_upgrade_install() {
+            contract_upgrade_install_returns_deploy_result(&FakePackageDeployer::new());
+        }
+
+        #[test]
+        fn fake_satisfies_uninstall_nonexistent() {
+            contract_uninstall_nonexistent_is_tolerant(&FakePackageDeployer::new());
+        }
+
+        #[test]
+        fn fake_satisfies_run_target() {
+            contract_run_target_returns_result(&FakePackageDeployer::new());
+        }
+    }
 }

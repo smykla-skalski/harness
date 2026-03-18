@@ -319,4 +319,60 @@ mod tests {
         fn assert_send_sync<T: Send + Sync>() {}
         assert_send_sync::<FakeHttpClient>();
     }
+
+    // -- Contract tests: fake satisfies the same invariants as production --
+
+    mod contracts {
+        use super::*;
+
+        fn contract_request_returns_response(client: &dyn HttpClient) {
+            let response = client
+                .request(HttpMethod::Get, "http://example.com/get", None, &[])
+                .expect("GET should succeed");
+            assert!(
+                response.status >= 200 && response.status < 400,
+                "expected 2xx/3xx status, got {}",
+                response.status
+            );
+            assert!(!response.body.is_empty(), "body should not be empty");
+        }
+
+        fn contract_request_json_parses_body(client: &dyn HttpClient) {
+            let value = client
+                .request_json(HttpMethod::Get, "http://example.com/get", None, &[])
+                .expect("GET JSON should succeed");
+            assert!(value.is_object(), "expected JSON object");
+        }
+
+        fn contract_wait_until_ready_times_out(client: &dyn HttpClient) {
+            let result =
+                client.wait_until_ready("http://127.0.0.1:1", Duration::from_millis(200));
+            assert!(result.is_err(), "unreachable URL should time out");
+        }
+
+        #[test]
+        fn fake_satisfies_request_returns_response() {
+            let client = FakeHttpClient::single(200, "hello from fake");
+            contract_request_returns_response(&client);
+        }
+
+        #[test]
+        fn fake_satisfies_request_json_parses_body() {
+            let client =
+                FakeHttpClient::single(200, r#"{"url":"http://example.com"}"#);
+            contract_request_json_parses_body(&client);
+        }
+
+        #[test]
+        #[ignore = "needs network access"]
+        fn production_satisfies_request_returns_response() {
+            contract_request_returns_response(&ReqwestHttpClient::new());
+        }
+
+        #[test]
+        #[ignore = "needs network access"]
+        fn production_satisfies_wait_until_ready_times_out() {
+            contract_wait_until_ready_times_out(&ReqwestHttpClient::new());
+        }
+    }
 }

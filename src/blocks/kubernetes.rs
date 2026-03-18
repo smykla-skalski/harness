@@ -568,4 +568,44 @@ mod tests {
         assert_send_sync::<K3dClusterManager>();
         assert_send_sync::<PodSnapshot>();
     }
+
+    // -- Contract tests: fake satisfies the same invariants as production --
+
+    mod contracts {
+        use super::*;
+
+        fn contract_rollout_restart_empty_namespaces(
+            operator: &dyn KubernetesOperator,
+            kubeconfig: Option<&Path>,
+        ) {
+            operator
+                .rollout_restart(kubeconfig, &[])
+                .expect("rollout_restart with empty namespaces should be a no-op");
+        }
+
+        fn contract_list_pods_returns_list(
+            operator: &dyn KubernetesOperator,
+            kubeconfig: Option<&Path>,
+        ) {
+            let pods = operator
+                .list_pods(kubeconfig)
+                .expect("list_pods should succeed");
+            let _ = pods.len();
+        }
+
+        #[test]
+        fn fake_satisfies_rollout_restart_empty_namespaces() {
+            let fake = FakeKubernetesOperator::new(vec![]);
+            contract_rollout_restart_empty_namespaces(&fake, None);
+        }
+
+        #[test]
+        fn fake_satisfies_list_pods_returns_list() {
+            let fake = FakeKubernetesOperator::new(vec![Ok(success_result(
+                &["kubectl", "get", "pods", "--all-namespaces", "-o", "json"],
+                r#"{"items":[]}"#,
+            ))]);
+            contract_list_pods_returns_list(&fake, None);
+        }
+    }
 }

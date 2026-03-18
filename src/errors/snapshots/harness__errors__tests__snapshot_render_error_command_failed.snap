@@ -1,0 +1,7 @@
+---
+source: src/errors/mod.rs
+expression: rendered
+---
+ERROR [KSRCLI004] command failed: kubectl apply -f manifest.yaml
+Details:
+error: the path "manifest.yaml" does not exist

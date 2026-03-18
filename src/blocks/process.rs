@@ -306,4 +306,143 @@ mod tests {
         fn assert_send_sync<T: Send + Sync>() {}
         assert_send_sync::<FakeProcessExecutor>();
     }
+
+    // -- Contract tests: verify fakes satisfy the same invariants as production --
+
+    mod contracts {
+        use super::*;
+        use crate::blocks::process as process_block;
+        use crate::blocks::BlockError;
+
+        fn contract_run_returns_output(executor: &dyn ProcessExecutor) {
+            let result = executor
+                .run(&["echo", "hello"], None, None, &[0])
+                .expect("echo should succeed");
+            assert_eq!(result.returncode, 0);
+            assert!(
+                result.stdout.contains("hello"),
+                "stdout should contain 'hello', got: {:?}",
+                result.stdout
+            );
+        }
+
+        fn contract_run_rejects_bad_exit_code(executor: &dyn ProcessExecutor) {
+            let result = executor.run(&["false"], None, None, &[0]);
+            assert!(result.is_err(), "false should fail with exit code 1");
+        }
+
+        fn contract_run_streaming_returns_output(executor: &dyn ProcessExecutor) {
+            let result = executor
+                .run_streaming(&["echo", "stream"], None, None, &[0])
+                .expect("streaming echo should succeed");
+            assert_eq!(result.returncode, 0);
+            assert!(
+                result.stdout.contains("stream"),
+                "stdout should contain 'stream', got: {:?}",
+                result.stdout
+            );
+        }
+
+        fn contract_run_inherited_returns_exit_code(executor: &dyn ProcessExecutor) {
+            let code = executor
+                .run_inherited(&["true"], None, None, &[0])
+                .expect("true should succeed");
+            assert_eq!(code, 0);
+        }
+
+        #[test]
+        fn fake_satisfies_run_returns_output() {
+            let fake = process_block::FakeProcessExecutor::new(vec![
+                process_block::FakeResponse {
+                    expected_program: "echo".to_string(),
+                    expected_args: None,
+                    expected_method: None,
+                    result: Ok(CommandResult {
+                        args: vec!["echo".to_string(), "hello".to_string()],
+                        returncode: 0,
+                        stdout: "hello\n".to_string(),
+                        stderr: String::new(),
+                    }),
+                },
+            ]);
+            contract_run_returns_output(&fake);
+        }
+
+        #[test]
+        fn fake_satisfies_run_rejects_bad_exit_code() {
+            let fake = process_block::FakeProcessExecutor::new(vec![
+                process_block::FakeResponse {
+                    expected_program: "false".to_string(),
+                    expected_args: None,
+                    expected_method: None,
+                    result: Err(BlockError::message(
+                        "process",
+                        "false",
+                        "exit code 1",
+                    )),
+                },
+            ]);
+            contract_run_rejects_bad_exit_code(&fake);
+        }
+
+        #[test]
+        fn fake_satisfies_run_streaming_returns_output() {
+            let fake = process_block::FakeProcessExecutor::new(vec![
+                process_block::FakeResponse {
+                    expected_program: "echo".to_string(),
+                    expected_args: None,
+                    expected_method: None,
+                    result: Ok(CommandResult {
+                        args: vec!["echo".to_string(), "stream".to_string()],
+                        returncode: 0,
+                        stdout: "stream\n".to_string(),
+                        stderr: String::new(),
+                    }),
+                },
+            ]);
+            contract_run_streaming_returns_output(&fake);
+        }
+
+        #[test]
+        fn fake_satisfies_run_inherited_returns_exit_code() {
+            let fake = process_block::FakeProcessExecutor::new(vec![
+                process_block::FakeResponse {
+                    expected_program: "true".to_string(),
+                    expected_args: None,
+                    expected_method: None,
+                    result: Ok(CommandResult {
+                        args: vec!["true".to_string()],
+                        returncode: 0,
+                        stdout: String::new(),
+                        stderr: String::new(),
+                    }),
+                },
+            ]);
+            contract_run_inherited_returns_exit_code(&fake);
+        }
+
+        #[test]
+        #[ignore = "needs real system binaries"]
+        fn production_satisfies_run_returns_output() {
+            contract_run_returns_output(&process_block::StdProcessExecutor);
+        }
+
+        #[test]
+        #[ignore = "needs real system binaries"]
+        fn production_satisfies_run_rejects_bad_exit_code() {
+            contract_run_rejects_bad_exit_code(&process_block::StdProcessExecutor);
+        }
+
+        #[test]
+        #[ignore = "needs real system binaries"]
+        fn production_satisfies_run_streaming_returns_output() {
+            contract_run_streaming_returns_output(&process_block::StdProcessExecutor);
+        }
+
+        #[test]
+        #[ignore = "needs real system binaries"]
+        fn production_satisfies_run_inherited_returns_exit_code() {
+            contract_run_inherited_returns_exit_code(&process_block::StdProcessExecutor);
+        }
+    }
 }

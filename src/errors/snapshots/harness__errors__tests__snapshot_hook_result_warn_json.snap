@@ -1,0 +1,9 @@
+---
+source: src/errors/mod.rs
+expression: json
+---
+{
+  "decision": "warn",
+  "code": "KSR006",
+  "message": "Artifact missing: preflight.json"
+}

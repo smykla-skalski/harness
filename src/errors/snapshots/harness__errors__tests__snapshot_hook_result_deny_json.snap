@@ -1,0 +1,9 @@
+---
+source: src/errors/mod.rs
+expression: json
+---
+{
+  "decision": "deny",
+  "code": "KSR005",
+  "message": "Direct cluster binary access is not allowed."
+}

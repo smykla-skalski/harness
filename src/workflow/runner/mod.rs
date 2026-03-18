@@ -698,4 +698,46 @@ mod tests {
             "resume-run"
         ));
     }
+
+    // -- Snapshot tests --
+
+    #[test]
+    fn snapshot_initial_state() {
+        let state = make_initial_state("2026-01-01T00:00:00Z");
+        let json = serde_json::to_value(&state).expect("serialize state");
+        insta::assert_snapshot!(serde_json::to_string_pretty(&json).unwrap());
+    }
+
+    fn redact_timestamps(json: &mut serde_json::Value) {
+        json["updated_at"] = serde_json::json!("REDACTED");
+        json["state"]["updated_at"] = serde_json::json!("REDACTED");
+        if let Some(history) = json["state"]["history"].as_array_mut() {
+            for entry in history {
+                entry["timestamp"] = serde_json::json!("REDACTED");
+            }
+        }
+    }
+
+    #[test]
+    fn snapshot_state_after_cluster_prepared() {
+        let dir = TempDir::new().unwrap();
+        initialize_runner_state(dir.path()).unwrap();
+        let state = apply_event(dir.path(), "cluster-prepared", None, None).unwrap();
+        let mut json = serde_json::to_value(&state).expect("serialize state");
+        redact_timestamps(&mut json);
+        insta::assert_snapshot!(serde_json::to_string_pretty(&json).unwrap());
+    }
+
+    #[test]
+    fn snapshot_state_after_full_happy_path() {
+        let dir = TempDir::new().unwrap();
+        initialize_runner_state(dir.path()).unwrap();
+        apply_event(dir.path(), "cluster-prepared", None, None).unwrap();
+        apply_event(dir.path(), "preflight-captured", None, None).unwrap();
+        apply_event(dir.path(), "closeout-started", None, None).unwrap();
+        let state = apply_event(dir.path(), "run-completed", None, None).unwrap();
+        let mut json = serde_json::to_value(&state).expect("serialize state");
+        redact_timestamps(&mut json);
+        insta::assert_snapshot!(serde_json::to_string_pretty(&json).unwrap());
+    }
 }

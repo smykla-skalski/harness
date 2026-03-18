@@ -1,0 +1,5 @@
+---
+source: src/errors/mod.rs
+expression: rendered
+---
+ERROR [KSRCLI014] missing file: /tmp/runs/run-1/run-metadata.json
