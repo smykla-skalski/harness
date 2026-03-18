@@ -325,6 +325,7 @@ mod tests {
             updated_at: String::new(),
             transition_count: 0,
             last_event: None,
+            history: Vec::new(),
         };
         let mut status = sample_status("r1", "s1");
         status.next_planned_group = Some("g03".to_string());
@@ -424,6 +425,7 @@ mod tests {
             updated_at: String::new(),
             transition_count: 0,
             last_event: None,
+            history: Vec::new(),
         };
 
         append_runner_state_audit(&run_dir, &state).unwrap();

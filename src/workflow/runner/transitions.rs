@@ -5,10 +5,76 @@ use super::types::{
     SuiteFixState,
 };
 
+/// A single allowed phase-to-phase transition in the standard table.
+struct TransitionRule {
+    from: RunnerPhase,
+    to: RunnerPhase,
+}
+
+/// Declarative table of every legal standard (non-special) transition.
+/// Abort, suspend, and resume bypass this table via `is_special_transition`.
+static TRANSITIONS: &[TransitionRule] = &[
+    // bootstrap ->
+    TransitionRule {
+        from: RunnerPhase::Bootstrap,
+        to: RunnerPhase::Preflight,
+    },
+    TransitionRule {
+        from: RunnerPhase::Bootstrap,
+        to: RunnerPhase::Execution,
+    },
+    TransitionRule {
+        from: RunnerPhase::Bootstrap,
+        to: RunnerPhase::Triage,
+    },
+    // preflight ->
+    TransitionRule {
+        from: RunnerPhase::Preflight,
+        to: RunnerPhase::Execution,
+    },
+    TransitionRule {
+        from: RunnerPhase::Preflight,
+        to: RunnerPhase::Triage,
+    },
+    TransitionRule {
+        from: RunnerPhase::Preflight,
+        to: RunnerPhase::Preflight,
+    },
+    // execution ->
+    TransitionRule {
+        from: RunnerPhase::Execution,
+        to: RunnerPhase::Triage,
+    },
+    TransitionRule {
+        from: RunnerPhase::Execution,
+        to: RunnerPhase::Closeout,
+    },
+    TransitionRule {
+        from: RunnerPhase::Execution,
+        to: RunnerPhase::Execution,
+    },
+    // triage ->
+    TransitionRule {
+        from: RunnerPhase::Triage,
+        to: RunnerPhase::Execution,
+    },
+    TransitionRule {
+        from: RunnerPhase::Triage,
+        to: RunnerPhase::Triage,
+    },
+    // closeout ->
+    TransitionRule {
+        from: RunnerPhase::Closeout,
+        to: RunnerPhase::Completed,
+    },
+];
+
 /// Map an event name to the target phase, validating that the transition
-/// is legal from the current phase.
+/// is legal from the current phase. On success the state is touched
+/// (transition count incremented, timestamp and last-event updated)
+/// and a `TransitionRecord` is appended to the history.
 pub(super) fn resolve_transition(
-    state: &RunnerWorkflowState,
+    state: &mut RunnerWorkflowState,
     event: RunnerEvent,
 ) -> Result<RunnerPhase, CliError> {
     let current = state.phase;
@@ -22,6 +88,9 @@ pub(super) fn resolve_transition(
         ))
         .into());
     }
+
+    state.touch(event.label());
+    state.append_history(current, target, event.as_str());
 
     Ok(target)
 }
@@ -55,25 +124,11 @@ fn is_special_transition(from: RunnerPhase, to: RunnerPhase, event: RunnerEvent)
     None
 }
 
-/// Check whether a standard (non-special) phase transition is allowed.
+/// Look up the `(from, to)` pair in the static transition table.
 fn is_standard_transition(from: RunnerPhase, to: RunnerPhase) -> bool {
-    match from {
-        RunnerPhase::Bootstrap => matches!(
-            to,
-            RunnerPhase::Preflight | RunnerPhase::Execution | RunnerPhase::Triage
-        ),
-        RunnerPhase::Preflight => matches!(
-            to,
-            RunnerPhase::Execution | RunnerPhase::Triage | RunnerPhase::Preflight
-        ),
-        RunnerPhase::Execution => matches!(
-            to,
-            RunnerPhase::Triage | RunnerPhase::Closeout | RunnerPhase::Execution
-        ),
-        RunnerPhase::Triage => matches!(to, RunnerPhase::Execution | RunnerPhase::Triage),
-        RunnerPhase::Closeout => matches!(to, RunnerPhase::Completed),
-        RunnerPhase::Completed | RunnerPhase::Aborted | RunnerPhase::Suspended => false,
-    }
+    TRANSITIONS
+        .iter()
+        .any(|rule| rule.from == from && rule.to == to)
 }
 
 /// Clear failure and `suite_fix` state when moving forward out of triage.
