@@ -70,7 +70,6 @@ mod tests {
 
     fn base_state() -> RunnerWorkflowState {
         RunnerWorkflowState {
-            schema_version: 1,
             phase: RunnerPhase::Execution,
             preflight: PreflightState {
                 status: PreflightStatus::Complete,

@@ -69,7 +69,6 @@ mod tests {
 
     fn base_state(phase: RunnerPhase, preflight_status: PreflightStatus) -> RunnerWorkflowState {
         RunnerWorkflowState {
-            schema_version: 1,
             phase,
             preflight: PreflightState {
                 status: preflight_status,
