@@ -3,9 +3,7 @@ use std::collections::HashSet;
 use super::emitter::{Guidance, IssueBlueprint, IssueEmitter};
 use super::registry::issue_code_meta;
 use crate::observe::patterns;
-use crate::observe::types::{
-    Issue, IssueCategory, IssueCode, MessageRole, ScanState, SourceTool,
-};
+use crate::observe::types::{Issue, IssueCategory, IssueCode, MessageRole, ScanState, SourceTool};
 
 /// Filter on message role.
 #[derive(Clone, Copy)]

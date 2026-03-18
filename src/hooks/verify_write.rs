@@ -108,10 +108,10 @@ fn verify_suite_runner(ctx: &HookContext, paths: &[&Path]) -> HookOutcome {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::run::context::RunContext;
     use crate::hooks::protocol::context::GuardContext as HookContext;
     use crate::hooks::protocol::hook_result::Decision;
     use crate::hooks::protocol::payloads::HookEnvelopePayload;
+    use crate::run::context::RunContext;
     use crate::run::workflow::{
         ManifestFixDecision, PreflightState, PreflightStatus, RunnerPhase, SuiteFixState,
     };

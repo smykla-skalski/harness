@@ -7,10 +7,10 @@ use std::sync::Mutex;
 
 use serde::{Deserialize, Serialize};
 
+use crate::core_defs::CommandResult;
 use crate::infra::blocks::BlockError;
 #[cfg(feature = "helm")]
 use crate::infra::blocks::ProcessExecutor;
-use crate::core_defs::CommandResult;
 
 /// A single Helm setting (`key=value`) passed through to a deployment target.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -388,7 +388,13 @@ mod tests {
 
         fn contract_upgrade_install_returns_deploy_result(deployer: &dyn PackageDeployer) {
             let result = deployer
-                .upgrade_install("contract-test", "oci://example/chart", None, &[], &["--dry-run"])
+                .upgrade_install(
+                    "contract-test",
+                    "oci://example/chart",
+                    None,
+                    &[],
+                    &["--dry-run"],
+                )
                 .expect("upgrade_install should succeed");
             assert_eq!(result.release, "contract-test");
             assert_eq!(result.chart, "oci://example/chart");

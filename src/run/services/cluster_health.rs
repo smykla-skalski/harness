@@ -3,9 +3,9 @@ use std::borrow::Cow;
 use rayon::prelude::*;
 use serde::Serialize;
 
-use crate::platform::cluster::Platform;
 use crate::errors::CliError;
 use crate::infra::exec;
+use crate::platform::cluster::Platform;
 
 use super::RunServices;
 

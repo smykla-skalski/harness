@@ -16,7 +16,10 @@ pub fn contract_name_is_non_empty(build: &dyn BuildSystem) {
 pub fn contract_denied_binaries_is_stable(build: &dyn BuildSystem) {
     let first = build.denied_binaries();
     let second = build.denied_binaries();
-    assert_eq!(first, second, "denied_binaries should be stable across calls");
+    assert_eq!(
+        first, second,
+        "denied_binaries should be stable across calls"
+    );
 }
 
 /// `run_target` with a make target returns a result or error (no panic).

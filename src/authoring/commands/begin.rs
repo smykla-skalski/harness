@@ -2,8 +2,8 @@ use std::path::Path;
 
 use clap::Args;
 
-use crate::authoring::begin_authoring_session;
 use crate::app::command_context::{CommandContext, Execute};
+use crate::authoring::begin_authoring_session;
 use crate::errors::CliError;
 use crate::rules;
 

@@ -1,6 +1,6 @@
-use crate::run::audit::build_hook_audit_request;
 use crate::errors::CliError;
 use crate::hooks::protocol::context::GuardContext as HookContext;
+use crate::run::audit::build_hook_audit_request;
 
 use super::effects::{HookEffect, HookOutcome};
 
@@ -34,13 +34,11 @@ mod tests {
 
     use harness_testkit::RunDirBuilder;
 
-    use crate::run::context::RunContext;
     use crate::hooks::protocol::context::GuardContext as HookContext;
     use crate::hooks::protocol::hook_result::Decision;
     use crate::hooks::protocol::payloads::HookEnvelopePayload;
-    use crate::run::workflow::{
-        PreflightState, PreflightStatus, RunnerPhase, RunnerWorkflowState,
-    };
+    use crate::run::context::RunContext;
+    use crate::run::workflow::{PreflightState, PreflightStatus, RunnerPhase, RunnerWorkflowState};
 
     fn ctx_audit(skill: &str) -> HookContext {
         HookContext::from_envelope(
