@@ -58,14 +58,14 @@ impl BlockRequirement {
     }
 
     #[must_use]
-    pub fn denied_binary(self) -> Option<&'static str> {
+    pub fn denied_binaries(self) -> &'static [&'static str] {
         match self {
-            Self::Docker | Self::Compose => Some("docker"),
-            Self::Kubernetes => Some("kubectl"),
-            Self::K3d => Some("k3d"),
-            Self::Helm => Some("helm"),
-            Self::Kuma => Some("kumactl"),
-            Self::Envoy | Self::Build => None,
+            Self::Docker | Self::Compose => &["docker"],
+            Self::Kubernetes => &["kubectl", "kubectl-validate"],
+            Self::K3d => &["k3d"],
+            Self::Helm => &["helm"],
+            Self::Kuma => &["kumactl"],
+            Self::Envoy | Self::Build => &[],
         }
     }
 
@@ -282,7 +282,7 @@ impl BlockRegistry {
         let static_binaries = BlockRequirement::ALL
             .iter()
             .filter(|requirement| self.supports(**requirement))
-            .filter_map(|requirement| requirement.denied_binary());
+            .flat_map(|requirement| requirement.denied_binaries().iter().copied());
 
         let kuma_binaries = self
             .kuma
@@ -328,6 +328,7 @@ mod tests {
 
         assert!(denied.contains("docker"));
         assert!(denied.contains("kubectl"));
+        assert!(denied.contains("kubectl-validate"));
         assert!(denied.contains("k3d"));
         assert!(denied.contains("helm"));
         assert!(denied.contains("kumactl"));

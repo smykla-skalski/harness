@@ -1,15 +1,27 @@
+use std::collections::BTreeSet;
 use std::path::Path;
+use std::sync::OnceLock;
 
+use crate::blocks::BlockRegistry;
 use crate::errors::HookMessage;
 use crate::hook::HookResult;
 use crate::rules::suite_runner::{
-    AdminEndpointHint, ClusterBinary, LegacyScript, PythonBinary, RunnerBinary, TaskOutputPattern,
+    AdminEndpointHint, LegacyScript, PythonBinary, RunnerBinary, TaskOutputPattern,
     TrackedHarnessSubcommand,
 };
 use crate::shell_parse::{
     contains_subshell_pattern, is_env_assignment, is_shell_control_op, normalized_binary_name,
     significant_words,
 };
+
+fn denied_cluster_binaries() -> &'static BTreeSet<String> {
+    static DENIED: OnceLock<BTreeSet<String>> = OnceLock::new();
+    DENIED.get_or_init(|| BlockRegistry::production().all_denied_binaries())
+}
+
+fn is_denied_cluster_binary(name: &str) -> bool {
+    denied_cluster_binaries().contains(name)
+}
 
 pub(super) fn is_run_scope_flag(s: &str) -> bool {
     matches!(s, "--run-dir" | "--run-id" | "--run-root")
@@ -34,13 +46,13 @@ pub(super) fn is_tracked_harness_command(words: &[String]) -> bool {
 }
 
 pub(super) fn has_denied_cluster_binary(heads: &[String]) -> bool {
-    heads.iter().any(|h| ClusterBinary::is_denied(h))
+    heads.iter().any(|h| is_denied_cluster_binary(h))
 }
 
 pub(super) fn has_denied_cluster_binary_anywhere(words: &[String]) -> bool {
     words
         .iter()
-        .any(|w| ClusterBinary::is_denied(&normalized_binary_name(w)))
+        .any(|w| is_denied_cluster_binary(&normalized_binary_name(w)))
 }
 
 pub(super) fn has_denied_runner_binary(heads: &[String]) -> bool {
@@ -142,7 +154,7 @@ pub(super) fn has_denied_subshell_binary(command_text: Option<&str>, words: &[St
     // Check every token for subshell-wrapped denied binaries
     for word in words {
         let normalized = normalized_binary_name(word);
-        if ClusterBinary::is_denied(&normalized) {
+        if is_denied_cluster_binary(&normalized) {
             return true;
         }
     }
@@ -150,8 +162,7 @@ pub(super) fn has_denied_subshell_binary(command_text: Option<&str>, words: &[St
     // Also scan the raw text for denied binary names inside $(...) or backticks.
     // This catches cases where shell_words splits tokens in ways that hide
     // the binary name from individual token normalization.
-    for variant in ClusterBinary::ALL {
-        let name = variant.to_string();
+    for name in denied_cluster_binaries() {
         if text.contains(&format!("$({name}"))
             || text.contains(&format!("`{name}"))
             || text.contains(&format!("`{name}`"))
