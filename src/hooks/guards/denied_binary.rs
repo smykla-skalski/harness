@@ -1,13 +1,13 @@
 use crate::errors::HookMessage;
-use crate::hooks::context::GuardContext;
-use crate::hooks::engine::Guard;
+use crate::hooks::protocol::context::GuardContext;
+use crate::hooks::registry::Guard;
 use crate::hooks::guard_bash::predicates::{
     deny_python, has_denied_cluster_binary, has_denied_cluster_binary_anywhere,
     has_denied_legacy_script, has_denied_runner_binary, has_python_inline, has_task_output_access,
     is_tracked_harness_command,
 };
 use crate::hooks::guard_bash::runner_guards::deny_author_suite_storage_mutation;
-use crate::hooks::result::NormalizedHookResult;
+use crate::hooks::protocol::result::NormalizedHookResult;
 use crate::rules::suite_runner::TaskOutputPattern;
 
 use super::parsed_parts;
@@ -127,7 +127,7 @@ fn check_author(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::hooks::payloads::HookEnvelopePayload;
+    use crate::hooks::protocol::payloads::HookEnvelopePayload;
 
     fn ctx(skill: &str, command: &str) -> GuardContext {
         GuardContext::from_test_envelope(
@@ -156,7 +156,7 @@ mod tests {
         let guard = DeniedBinaryGuard::runner();
         let c = ctx(
             "suite:run",
-            "harness run --phase verify --label pods kubectl get pods -o json",
+            "harness run record --phase verify --label pods -- kubectl get pods -o json",
         );
         assert!(guard.check(&c).is_none());
     }

@@ -2,9 +2,9 @@ use std::fs;
 use std::path::Path;
 
 use crate::errors::{CliError, HookMessage};
-use crate::hooks::context::GuardContext as HookContext;
-use crate::hooks::hook_result::HookResult;
-use crate::workflow::runner::RunnerWorkflowState;
+use crate::hooks::protocol::context::GuardContext as HookContext;
+use crate::hooks::protocol::hook_result::HookResult;
+use crate::run::workflow::RunnerWorkflowState;
 
 use super::effects::{HookEffect, HookOutcome};
 
@@ -108,11 +108,11 @@ fn verify_suite_runner(ctx: &HookContext, paths: &[&Path]) -> HookOutcome {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::context::RunContext;
-    use crate::hooks::context::GuardContext as HookContext;
-    use crate::hooks::hook_result::Decision;
-    use crate::hooks::payloads::HookEnvelopePayload;
-    use crate::workflow::runner::{
+    use crate::run::context::RunContext;
+    use crate::hooks::protocol::context::GuardContext as HookContext;
+    use crate::hooks::protocol::hook_result::Decision;
+    use crate::hooks::protocol::payloads::HookEnvelopePayload;
+    use crate::run::workflow::{
         ManifestFixDecision, PreflightState, PreflightStatus, RunnerPhase, SuiteFixState,
     };
     use harness_testkit::RunDirBuilder;

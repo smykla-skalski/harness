@@ -19,8 +19,7 @@ pub fn render_hydration_context(handoff: &CompactHandoff<'_>, diverged_paths: &[
     if handoff.runner.is_some() {
         lines.push(
             "Tracked cluster commands stay on \
-             `harness run --phase <phase> --label <label> --gid <group-id> kubectl <args>` or \
-             `harness record --phase <phase> --label <label> --gid <group-id> -- kubectl <args>`."
+             `harness run record --phase <phase> --label <label> --gid <group-id> -- kubectl <args>`."
                 .to_string(),
         );
     }
@@ -74,7 +73,7 @@ pub fn render_runner_restore_context(project_dir: &Path, runner: &RunnerHandoff<
     lines.push(format!(
         "If the user passed `--resume {}`, treat this run as already initialized. \
          Read `{}` and continue from its next planned group instead of rerunning \
-         `harness init`.",
+         `harness run init`.",
         runner.run_id,
         PathBuf::from(&*runner.run_dir)
             .join("run-status.json")
@@ -82,8 +81,7 @@ pub fn render_runner_restore_context(project_dir: &Path, runner: &RunnerHandoff<
     ));
     lines.push(
         "Do not run raw `kubectl` or `kubectl --kubeconfig ...` after restore. Use \
-         `harness run --phase <phase> --label <label> --gid <group-id> kubectl <args>` or \
-         `harness record --phase <phase> --label <label> --gid <group-id> -- kubectl <args>`."
+         `harness run record --phase <phase> --label <label> --gid <group-id> -- kubectl <args>`."
             .to_string(),
     );
     lines.push(
@@ -97,14 +95,14 @@ pub fn render_runner_restore_context(project_dir: &Path, runner: &RunnerHandoff<
     {
         lines.push(
             "If this saved run was paused unexpectedly mid-run, do not edit control files \
-             manually. Run `harness runner-state --event resume-run` once, then continue \
+             manually. Run `harness run runner-state --event resume-run` once, then continue \
              from the saved `next_planned_group`."
                 .to_string(),
         );
     }
     lines.push(
         "Continue from the restored harness state. \
-         Do not rerun `harness init` unless the run directory is missing or corrupt."
+         Do not rerun `harness run init` unless the run directory is missing or corrupt."
             .to_string(),
     );
 
@@ -157,8 +155,7 @@ pub(super) fn render_runner_section(handoff: &RunnerHandoff<'_>) -> String {
             handoff.last_state_capture.as_deref().unwrap_or("missing")
         ),
         "- Cluster commands: \
-         `harness run --phase <phase> --label <label> --gid <group-id> kubectl <args>` or \
-         `harness record --phase <phase> --label <label> --gid <group-id> -- kubectl <args>`; \
+         `harness run record --phase <phase> --label <label> --gid <group-id> -- kubectl <args>`; \
          never raw `kubectl`."
             .to_string(),
     ];
@@ -174,7 +171,7 @@ pub(super) fn render_runner_section(handoff: &RunnerHandoff<'_>) -> String {
             );
         } else {
             lines.push("- Resume: Do not blame the user for `guard-stop` feedback.".to_string());
-            lines.push("- Resume: run `harness runner-state --event resume-run`.".to_string());
+            lines.push("- Resume: run `harness run runner-state --event resume-run`.".to_string());
             lines.push(
                 "- Resume: do not edit `run-status.json`, `run-report.md`, or reset verdict \
                  fields manually."

@@ -2,16 +2,16 @@ use std::collections::BTreeSet;
 use std::path::Path;
 use std::sync::OnceLock;
 
-use crate::blocks::BlockRegistry;
+use crate::infra::blocks::BlockRegistry;
 use crate::errors::HookMessage;
-use crate::hooks::hook_result::HookResult;
+use crate::hooks::protocol::hook_result::HookResult;
 use crate::rules::suite_runner::{
     AdminEndpointHint, LegacyScript, PythonBinary, RunnerBinary, TaskOutputPattern,
     TrackedHarnessSubcommand,
 };
 use crate::shell_parse::{
     contains_subshell_pattern, is_env_assignment, is_shell_control_op, normalized_binary_name,
-    significant_words,
+    semantic_harness_subcommand, semantic_harness_tail, significant_words,
 };
 
 fn denied_cluster_binaries() -> &'static BTreeSet<String> {
@@ -40,9 +40,7 @@ pub(crate) fn is_harness_head(heads: &[String]) -> bool {
 
 pub(crate) fn is_tracked_harness_command(words: &[String]) -> bool {
     let sig = significant_words(words);
-    sig.len() >= 2
-        && normalized_binary_name(sig[0]) == "harness"
-        && TrackedHarnessSubcommand::is_tracked(sig[1])
+    semantic_harness_subcommand(&sig).is_some_and(TrackedHarnessSubcommand::is_tracked)
 }
 
 pub(crate) fn has_denied_cluster_binary(heads: &[String]) -> bool {
@@ -88,7 +86,7 @@ pub(crate) fn deny_python() -> HookResult {
     HookMessage::approval_required(
         "use python",
         "do not use python for JSON parsing; \
-         use jq for JSON filtering or harness envoy capture for Envoy admin data",
+         use jq for JSON filtering or harness run envoy capture for Envoy admin data",
     )
     .into_result()
 }
@@ -126,18 +124,11 @@ pub(crate) fn allows_wrapped_envoy_admin(words: &[String]) -> bool {
         .filter(|w| !is_shell_control_op(w) && !is_env_assignment(w))
         .map(String::as_str)
         .collect();
-    if sig.len() < 2 {
+    let Some(tail) = semantic_harness_tail(&sig) else {
         return false;
-    }
-    let head = Path::new(sig[0])
-        .file_name()
-        .map_or("", |n| n.to_str().unwrap_or(""));
-    if head != "harness" {
-        return false;
-    }
-    sig[1] == "run"
-        || sig[1] == "record"
-        || (sig.len() >= 3 && sig[1] == "envoy" && sig[2] == "capture")
+    };
+    semantic_harness_subcommand(&sig) == Some("record")
+        || (tail.len() >= 2 && tail[0] == "envoy" && tail[1] == "capture")
 }
 
 /// Scan raw command text for subshell substitution patterns that contain

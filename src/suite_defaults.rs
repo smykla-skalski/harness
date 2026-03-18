@@ -7,7 +7,7 @@ use tracing::warn;
 use crate::errors::CliError;
 #[cfg(test)]
 use crate::errors::CliErrorKind;
-use crate::io;
+use crate::infra::io;
 
 pub const DEFAULTS_FILE: &str = ".harness.json";
 

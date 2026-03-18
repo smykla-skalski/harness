@@ -1,0 +1,16 @@
+---
+source: src/run/workflow/mod.rs
+expression: "serde_json::to_string_pretty(&json).unwrap()"
+---
+{
+  "last_event": "RunInitialized",
+  "schema_version": 2,
+  "state": {
+    "phase": "bootstrap",
+    "preflight": {
+      "status": "pending"
+    }
+  },
+  "transition_count": 0,
+  "updated_at": "2026-01-01T00:00:00Z"
+}

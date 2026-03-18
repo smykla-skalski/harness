@@ -1,8 +1,8 @@
 use crate::errors::{CliError, HookMessage};
-use crate::hooks::context::GuardContext as HookContext;
-use crate::hooks::hook_result::HookResult;
+use crate::hooks::protocol::context::GuardContext as HookContext;
+use crate::hooks::protocol::hook_result::HookResult;
 use crate::schema::Verdict;
-use crate::workflow::author::can_stop;
+use crate::authoring::workflow::can_stop;
 
 /// Execute the guard-stop hook.
 ///
@@ -45,9 +45,9 @@ fn guard_suite_runner_stop(ctx: &HookContext) -> HookResult {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::hooks::context::GuardContext as HookContext;
-    use crate::hooks::hook_result::Decision;
-    use crate::hooks::payloads::HookEnvelopePayload;
+    use crate::hooks::protocol::context::GuardContext as HookContext;
+    use crate::hooks::protocol::hook_result::Decision;
+    use crate::hooks::protocol::payloads::HookEnvelopePayload;
 
     fn inactive_context() -> HookContext {
         let mut context = HookContext::from_test_envelope("", HookEnvelopePayload::default());

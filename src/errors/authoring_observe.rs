@@ -77,7 +77,7 @@ impl AuthoringObserveError {
     pub fn hint(&self) -> Option<String> {
         match self {
             Self::AuthoringSessionMissing => Some(
-                "Run `harness authoring-begin --skill suite:new --repo-root <path> --feature <name> --mode <interactive|bypass> --suite-dir <path> --suite-name <name>` first."
+                "Run `harness authoring begin --skill suite:new --repo-root <path> --feature <name> --mode <interactive|bypass> --suite-dir <path> --suite-name <name>` first."
                     .into(),
             ),
             Self::AuthoringPayloadMissing => Some(
