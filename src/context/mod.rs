@@ -1,8 +1,10 @@
 mod aggregate;
+pub mod cleanup;
 mod repository;
 mod snapshots;
 
 pub use aggregate::{RunAggregate, RunContext};
+pub use cleanup::{CleanupManifest, CleanupResource};
 pub use repository::{RunRepository, RunRepositoryPort};
 pub use snapshots::{
     ArtifactSnapshot, NodeCheckRecord, NodeCheckSnapshot, ToolCheckRecord, ToolCheckSnapshot,
@@ -93,6 +95,11 @@ impl RunLayout {
     #[must_use]
     pub fn preflight_artifact_path(&self) -> PathBuf {
         self.artifacts_dir().join("preflight.json")
+    }
+
+    #[must_use]
+    pub fn cleanup_manifest_path(&self) -> PathBuf {
+        self.state_dir().join("cleanup-manifest.json")
     }
 
     #[must_use]
