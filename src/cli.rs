@@ -154,7 +154,9 @@ fn dispatch_setup(cmd: Command) -> Result<i32, CliError> {
             args.repo_root.as_deref(),
             args.run_root.as_deref(),
         ),
-        Command::Bootstrap(args) => commands::setup::bootstrap(args.project_dir.as_deref()),
+        Command::Bootstrap(args) => {
+            commands::setup::bootstrap(args.project_dir.as_deref(), args.agent)
+        }
         Command::Cluster(args) => commands::setup::cluster(&args),
         Command::Gateway(args) => commands::setup::gateway(
             args.kubeconfig.as_deref(),
