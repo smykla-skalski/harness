@@ -1,9 +1,10 @@
 use std::path::{Path, PathBuf};
+#[cfg(feature = "kuma")]
 use std::sync::Arc;
 
-use crate::blocks::{
-    BlockError, ComposeOrchestrator, ContainerRuntime, HttpClient, ProcessExecutor,
-};
+use crate::blocks::BlockError;
+#[cfg(feature = "kuma")]
+use crate::blocks::{ComposeOrchestrator, ContainerRuntime, HttpClient, ProcessExecutor};
 
 #[cfg(test)]
 pub mod fake;
@@ -114,6 +115,7 @@ pub trait MeshControlPlane: Send + Sync {
 /// process/container/HTTP/compose building blocks. It provides a single place
 /// for Kuma constants and domain-oriented helpers while the larger extraction
 /// proceeds incrementally.
+#[cfg(feature = "kuma")]
 pub struct KumaControlPlane {
     process: Arc<dyn ProcessExecutor>,
     http: Arc<dyn HttpClient>,
@@ -121,6 +123,7 @@ pub struct KumaControlPlane {
     compose_orchestrator: Arc<dyn ComposeOrchestrator>,
 }
 
+#[cfg(feature = "kuma")]
 impl KumaControlPlane {
     #[must_use]
     pub fn new(
@@ -158,6 +161,7 @@ impl KumaControlPlane {
     }
 }
 
+#[cfg(feature = "kuma")]
 impl MeshControlPlane for KumaControlPlane {
     fn system_namespace(&self) -> &'static str {
         defaults::SYSTEM_NAMESPACE

@@ -1,4 +1,5 @@
 mod kubernetes;
+#[cfg(feature = "compose")]
 mod universal;
 
 use std::collections::HashMap;
@@ -16,6 +17,7 @@ use crate::exec::{run_command, run_command_streaming};
 use crate::io::write_json_pretty;
 
 use kubernetes::cluster_k8s;
+#[cfg(feature = "compose")]
 use universal::cluster_universal;
 
 impl Execute for ClusterArgs {
@@ -93,7 +95,12 @@ pub fn cluster(args: &ClusterArgs) -> Result<i32, CliError> {
 
     match platform {
         Platform::Kubernetes => cluster_k8s(args),
+        #[cfg(feature = "compose")]
         Platform::Universal => cluster_universal(args),
+        #[cfg(not(feature = "compose"))]
+        Platform::Universal => Err(CliError::from(CliErrorKind::usage_error(
+            "universal platform requires the 'compose' feature",
+        ))),
     }
 }
 

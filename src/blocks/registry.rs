@@ -6,16 +6,22 @@ use serde::{Deserialize, Serialize};
 
 use super::build::{BuildSystem, ProcessBuildSystem};
 use super::clock::{Clock, SystemClock};
-use super::compose::{ComposeOrchestrator, DockerComposeOrchestrator};
+use super::compose::ComposeOrchestrator;
+#[cfg(feature = "compose")]
+use super::compose::DockerComposeOrchestrator;
 use super::docker::{ContainerRuntime, DockerContainerRuntime};
 use super::envoy::ProxyIntrospector;
 use super::error::BlockError;
-use super::helm::{HelmDeployer, PackageDeployer};
+#[cfg(feature = "helm")]
+use super::helm::HelmDeployer;
+use super::helm::PackageDeployer;
 use super::http::{HttpClient, ReqwestHttpClient};
-use super::kubernetes::{
-    K3dClusterManager, KubectlOperator, KubernetesOperator, LocalClusterManager,
-};
-use super::kuma::{KumaControlPlane, MeshControlPlane};
+#[cfg(feature = "k3d")]
+use super::kubernetes::K3dClusterManager;
+use super::kubernetes::{KubectlOperator, KubernetesOperator, LocalClusterManager};
+#[cfg(feature = "kuma")]
+use super::kuma::KumaControlPlane;
+use super::kuma::MeshControlPlane;
 use super::process::{ProcessExecutor, StdProcessExecutor};
 
 /// Named block requirements declared by suites and validated at preflight time.
@@ -168,29 +174,16 @@ impl BlockRegistry {
         let http: Arc<dyn HttpClient> = Arc::new(ReqwestHttpClient::new());
         let docker: Arc<dyn ContainerRuntime> =
             Arc::new(DockerContainerRuntime::new(process.clone()));
-        let compose: Arc<dyn ComposeOrchestrator> =
-            Arc::new(DockerComposeOrchestrator::new(process.clone()));
         let kubernetes: Arc<dyn KubernetesOperator> =
             Arc::new(KubectlOperator::new(process.clone()));
-        let k3d: Arc<dyn LocalClusterManager> =
-            Arc::new(K3dClusterManager::new(process.clone(), docker.clone()));
-        let helm: Arc<dyn PackageDeployer> = Arc::new(HelmDeployer::new(process.clone()));
-        let kuma: Arc<dyn MeshControlPlane> = Arc::new(KumaControlPlane::new(
-            process.clone(),
-            http.clone(),
-            docker.clone(),
-            compose.clone(),
-        ));
         let build: Arc<dyn BuildSystem> = Arc::new(ProcessBuildSystem::new(process.clone()));
 
-        Self::new(process, http)
-            .with_docker(docker)
-            .with_compose(compose)
+        let registry = Self::new(process.clone(), http.clone())
+            .with_docker(docker.clone())
             .with_kubernetes(kubernetes)
-            .with_k3d(k3d)
-            .with_helm(helm)
-            .with_kuma(kuma)
-            .with_build(build)
+            .with_build(build);
+
+        production_adapters(registry, process, http, docker)
     }
 
     #[must_use]
@@ -319,6 +312,48 @@ impl BlockRegistry {
             .map(ToString::to_string)
             .collect()
     }
+}
+
+/// Wire optional adapter features into a base registry.
+///
+/// Separated from the `production()` method to keep the conditional compilation
+/// clean: the base registry (process, http, docker, kubernetes, build) is always
+/// constructed, while feature-gated adapters are layered on conditionally.
+fn production_adapters(
+    #[allow(unused_mut)] mut registry: BlockRegistry,
+    #[allow(unused_variables)] process: Arc<dyn ProcessExecutor>,
+    #[allow(unused_variables)] http: Arc<dyn HttpClient>,
+    #[allow(unused_variables)] docker: Arc<dyn ContainerRuntime>,
+) -> BlockRegistry {
+    #[cfg(feature = "compose")]
+    {
+        let compose: Arc<dyn ComposeOrchestrator> =
+            Arc::new(DockerComposeOrchestrator::new(process.clone()));
+        registry = registry.with_compose(compose.clone());
+
+        #[cfg(feature = "kuma")]
+        {
+            let kuma: Arc<dyn MeshControlPlane> = Arc::new(KumaControlPlane::new(
+                process.clone(),
+                http,
+                docker.clone(),
+                compose,
+            ));
+            registry = registry.with_kuma(kuma);
+        }
+    }
+
+    #[cfg(feature = "k3d")]
+    {
+        registry = registry.with_k3d(Arc::new(K3dClusterManager::new(process.clone(), docker)));
+    }
+
+    #[cfg(feature = "helm")]
+    {
+        registry = registry.with_helm(Arc::new(HelmDeployer::new(process)));
+    }
+
+    registry
 }
 
 #[cfg(test)]
