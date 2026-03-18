@@ -2,6 +2,8 @@
 
 Test orchestration framework for Kubernetes/Kuma. Tracks every run through a state machine, logs all commands, and blocks direct cluster access so tests are reproducible and auditable.
 
+Architecture map: [`ARCHITECTURE.md`](ARCHITECTURE.md)
+
 ## How it works
 
 A suite is a Markdown file with YAML frontmatter describing what to test - user stories, Helm values, manifest groups. A run is one execution of a suite against a real cluster.
@@ -23,20 +25,20 @@ Requires Rust 1.94+.
 
 ```bash
 # spin up a disposable cluster
-harness cluster single-up my-cluster --repo-root /path/to/repo
+harness setup cluster single-up my-cluster --repo-root /path/to/repo
 
 # create a run from a suite file
-harness init --suite suites/my-feature.md --run-id run-1 --profile single-zone --repo-root /path/to/repo
+harness run init --suite suites/my-feature.md --run-id run-1 --profile single-zone --repo-root /path/to/repo
 
 # run preflight checks and prepare manifests
-harness preflight --run-dir $XDG_DATA_HOME/kuma/runs/run-1
+harness run preflight --run-dir $XDG_DATA_HOME/kuma/runs/run-1
 
 # apply manifests and record commands
-harness apply --manifest manifests/app.yaml --run-dir ...
-harness record --run-dir ... -- kubectl get pods
+harness run apply --manifest manifests/app.yaml --run-dir ...
+harness run record --run-dir ... -- kubectl get pods
 
 # close out
-harness closeout --run-dir ...
+harness run closeout --run-dir ...
 ```
 
 ## Runs and state
@@ -54,18 +56,18 @@ run-status.json     mutable: verdict, group pass/fail counts
 run-report.md       human-readable summary
 ```
 
-Older `suite-run-state.json` files are rejected. Delete the file or re-run `harness init` to regenerate the runner state.
+Older `suite-run-state.json` files are rejected. Delete the file or re-run `harness run init` to regenerate the runner state.
 
 ## Suite authoring
 
-Harness has a two-part authoring flow for writing new suites: `authoring-begin` creates the session workspace for `suite:new`, and `approval-begin` initializes the approval workflow state that review hooks read.
+Harness has a two-part authoring flow for writing new suites: `authoring begin` creates the session workspace for `suite:new`, and `authoring approval-begin` initializes the approval workflow state that review hooks read.
 
 ```bash
-harness authoring-begin --skill suite:new --repo-root /path/to/repo --feature my-feature --mode interactive --suite-dir /path/to/repo/suites/my-feature --suite-name my-feature
-harness approval-begin --skill suite:new --mode interactive --suite-dir /path/to/repo/suites/my-feature
+harness authoring begin --skill suite:new --repo-root /path/to/repo --feature my-feature --mode interactive --suite-dir /path/to/repo/suites/my-feature --suite-name my-feature
+harness authoring approval-begin --skill suite:new --mode interactive --suite-dir /path/to/repo/suites/my-feature
 ```
 
-Authoring moves through `discovery` -> `prewrite_review` -> `writing` -> `postwrite_review` -> `complete`, with approval gates at each review step. Use `authoring-save`, `authoring-show`, `authoring-reset`, and `authoring-validate` during the session. The approval state lives in `.harness/suite-new-state.json` on schema version `2`; older files are rejected and must be regenerated with `harness approval-begin`.
+Authoring moves through `discovery` -> `prewrite_review` -> `writing` -> `postwrite_review` -> `complete`, with approval gates at each review step. Use `harness authoring save`, `harness authoring show`, `harness authoring reset`, and `harness authoring validate` during the session. The approval state lives in `.harness/suite-new-state.json` on schema version `2`; older files are rejected and must be regenerated with `harness authoring approval-begin`.
 
 ## Hook system
 
