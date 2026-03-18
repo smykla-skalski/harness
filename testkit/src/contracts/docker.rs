@@ -1,4 +1,4 @@
-use harness::blocks::{ContainerConfig, ContainerRuntime};
+use harness::infra::blocks::{ContainerConfig, ContainerRuntime};
 
 /// Helper to build a minimal container config for contract tests.
 #[must_use]
@@ -87,10 +87,10 @@ pub fn contract_network_lifecycle(runtime: &dyn ContainerRuntime) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use harness::blocks::DockerContainerRuntime;
+    use harness::infra::blocks::DockerContainerRuntime;
 
     fn production_runtime() -> DockerContainerRuntime {
-        use harness::blocks::StdProcessExecutor;
+        use harness::infra::blocks::StdProcessExecutor;
         use std::sync::Arc;
         DockerContainerRuntime::new(Arc::new(StdProcessExecutor))
     }

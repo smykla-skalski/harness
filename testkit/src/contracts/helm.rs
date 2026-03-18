@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::path::Path;
 
-use harness::blocks::PackageDeployer;
+use harness::infra::blocks::PackageDeployer;
 
 /// `run_target` with a valid make target returns a result.
 ///
@@ -44,10 +44,10 @@ pub fn contract_uninstall_nonexistent_is_tolerant(deployer: &dyn PackageDeployer
 #[cfg(test)]
 mod tests {
     use super::*;
-    use harness::blocks::HelmDeployer;
+    use harness::infra::blocks::HelmDeployer;
 
     fn production_deployer() -> HelmDeployer {
-        use harness::blocks::StdProcessExecutor;
+        use harness::infra::blocks::StdProcessExecutor;
         use std::sync::Arc;
         HelmDeployer::new(Arc::new(StdProcessExecutor))
     }

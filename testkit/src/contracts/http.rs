@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use harness::blocks::{HttpClient, HttpMethod};
+use harness::infra::blocks::{HttpClient, HttpMethod};
 
 /// A GET request returns a response with a status code and body.
 ///
@@ -41,7 +41,7 @@ pub fn contract_wait_until_ready_times_out_on_unreachable(client: &dyn HttpClien
 #[cfg(test)]
 mod tests {
     use super::*;
-    use harness::blocks::ReqwestHttpClient;
+    use harness::infra::blocks::ReqwestHttpClient;
 
     #[test]
     #[ignore] // needs network access

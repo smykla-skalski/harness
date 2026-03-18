@@ -8,7 +8,7 @@ use std::path::Path;
 use harness::hooks::hook_result::Decision;
 use harness::hooks::payloads::HookEnvelopePayload;
 use harness::hooks::{context_agent, enrich_failure, validate_agent};
-use harness::workflow::runner::{
+use harness::run::workflow::{
     self as runner_workflow, PreflightState, PreflightStatus, RunnerPhase, RunnerWorkflowState,
 };
 

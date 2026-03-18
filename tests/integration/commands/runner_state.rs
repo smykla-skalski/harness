@@ -2,11 +2,9 @@
 // Covers state initialization, read/write round-trips, phase transitions
 // (preflight, abort, completed), and event tracking.
 
-use harness::commands::RunDirArgs;
-use harness::commands::run::runner_state;
-use harness::workflow::runner::{
-    self as runner_workflow, PreflightStatus, RunnerEvent, RunnerPhase,
-};
+use harness::run::RunDirArgs;
+use harness::run::commands::runner_state;
+use harness::run::workflow::{self as runner_workflow, PreflightStatus, RunnerEvent, RunnerPhase};
 
 use super::super::helpers::*;
 

@@ -1,8 +1,8 @@
 use std::path::Path;
 use std::time::Duration;
 
-use harness::blocks::ComposeOrchestrator;
 use harness::core_defs::CommandResult;
+use harness::infra::blocks::{BlockError, ComposeOrchestrator};
 
 /// `up` followed by `down` completes without error.
 ///
@@ -30,17 +30,17 @@ pub fn contract_up_then_down_succeeds(
 /// Returns `BlockError` if the orchestrator rejects the down call.
 pub fn contract_down_project_is_idempotent(
     orchestrator: &dyn ComposeOrchestrator,
-) -> Result<CommandResult, harness::blocks::BlockError> {
+) -> Result<CommandResult, BlockError> {
     orchestrator.down_project("nonexistent-contract-test-project")
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use harness::blocks::DockerComposeOrchestrator;
+    use harness::infra::blocks::DockerComposeOrchestrator;
 
     fn production_orchestrator() -> DockerComposeOrchestrator {
-        use harness::blocks::StdProcessExecutor;
+        use harness::infra::blocks::StdProcessExecutor;
         use std::sync::Arc;
         DockerComposeOrchestrator::new(Arc::new(StdProcessExecutor))
     }

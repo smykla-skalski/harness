@@ -12,13 +12,13 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
 
-use harness::context::{RunLayout, RunMetadata};
 use harness::hooks::context::GuardContext;
 use harness::hooks::hook_result::{Decision, HookResult};
 use harness::hooks::payloads::{AskUserQuestionOption, AskUserQuestionPrompt, HookEnvelopePayload};
+use harness::run::workflow as runner_workflow;
+use harness::run::{RunLayout, RunMetadata};
 use harness::schema::frontmatter::merge_requirement_lists;
 use harness::schema::{RunCounts, RunStatus, Verdict};
-use harness::workflow::runner as runner_workflow;
 use jsonschema::{Registry, Resource, Validator, options as jsonschema_options};
 use serde_json::{Number as JsonNumber, Value as JsonValue};
 
@@ -1571,7 +1571,7 @@ impl HookPayloadBuilder {
     /// Build a `GuardContext` with an associated run directory.
     #[must_use]
     pub fn build_context_with_run(self, skill: &str, run_dir: &Path) -> GuardContext {
-        use harness::context::RunContext;
+        use harness::run::RunContext;
 
         let envelope = self.build_envelope();
         let mut ctx = GuardContext::from_envelope(skill, envelope);
@@ -1748,7 +1748,7 @@ pub fn make_hook_context_with_run(
     payload: HookEnvelopePayload,
     run_dir: &Path,
 ) -> GuardContext {
-    use harness::context::RunContext;
+    use harness::run::RunContext;
 
     let mut ctx = GuardContext::from_envelope(skill, payload);
     ctx.run_dir = Some(run_dir.to_path_buf());
@@ -1822,7 +1822,7 @@ pub fn write_run_status(run_dir: &Path, status: &RunStatus) {
 /// # Panics
 /// Panics if reading the state file fails.
 #[must_use]
-pub fn read_runner_state(run_dir: &Path) -> Option<harness::workflow::runner::RunnerWorkflowState> {
+pub fn read_runner_state(run_dir: &Path) -> Option<harness::run::workflow::RunnerWorkflowState> {
     runner_workflow::read_runner_state(run_dir).expect("read runner state")
 }
 

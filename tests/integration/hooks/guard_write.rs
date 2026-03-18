@@ -6,7 +6,7 @@
 
 use harness::hooks::guard_write;
 use harness::hooks::hook_result::Decision;
-use harness::workflow::runner::{
+use harness::run::workflow::{
     self as runner_workflow, FailureKind, FailureState, ManifestFixDecision, PreflightState,
     PreflightStatus, RunnerPhase, RunnerWorkflowState, SuiteFixState,
 };

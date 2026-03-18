@@ -11,12 +11,11 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::PoisonError;
 
-use harness::cli::Command;
-use harness::commands::setup::{PreCompactArgs, SessionStartArgs, SessionStopArgs};
 use harness::compact::{self, AuthoringHandoff, FileFingerprint, HandoffStatus, RunnerHandoff};
-use harness::ephemeral_metallb;
+use harness::platform::ephemeral_metallb;
+use harness::setup::{PreCompactArgs, SessionStartArgs, SessionStopArgs};
 
-use super::helpers::{CommandExt, ENV_LOCK};
+use super::helpers::*;
 
 // Build a runner handoff for testing.
 fn test_runner() -> RunnerHandoff<'static> {
@@ -57,16 +56,16 @@ fn test_authoring() -> AuthoringHandoff<'static> {
 
 // Set up an isolated env for compact tests.
 //
-// Creates the `.claude/skills/harness` wrapper so bootstrap doesn't fail.
+// Creates the plugin wrapper so bootstrap doesn't fail.
 // Returns `(xdg_dir, project_dir)` as temp dirs.
 fn setup_env() -> (tempfile::TempDir, tempfile::TempDir) {
     let xdg = tempfile::tempdir().unwrap();
     let project = tempfile::tempdir().unwrap();
 
-    // bootstrap expects .claude/skills/harness to exist
-    let skills_dir = project.path().join(".claude").join("skills");
-    fs::create_dir_all(&skills_dir).unwrap();
-    fs::write(skills_dir.join("harness"), "#!/bin/sh\necho ok\n").unwrap();
+    // bootstrap expects .claude/plugins/suite/harness to exist
+    let plugin_dir = project.path().join(".claude").join("plugins").join("suite");
+    fs::create_dir_all(&plugin_dir).unwrap();
+    fs::write(plugin_dir.join("harness"), "#!/bin/sh\necho ok\n").unwrap();
 
     // bootstrap also needs a writable bin dir
     let bin_dir = xdg.path().join("bin");
@@ -235,7 +234,7 @@ fn check_save_consume_compact_handoff(project: &Path) {
 
 // pre_compact::execute creates the latest.json file.
 fn check_pre_compact_persists(project: &Path) {
-    let result = Command::PreCompact(PreCompactArgs {
+    let result = pre_compact_cmd(PreCompactArgs {
         project_dir: Some(project.to_string_lossy().to_string()),
     })
     .execute();
@@ -258,7 +257,7 @@ fn check_session_start_compact_hydrates(project: &Path) {
     handoff.runner = Some(test_runner());
     compact::save_compact_handoff(project, &handoff).expect("save");
 
-    let result = Command::SessionStart(SessionStartArgs {
+    let result = session_start_cmd(SessionStartArgs {
         project_dir: Some(project.to_string_lossy().to_string()),
     })
     .execute();
@@ -277,7 +276,7 @@ fn check_session_start_compact_worktree(project: &Path) {
     handoff.runner = Some(test_runner());
     compact::save_compact_handoff(project, &handoff).expect("save");
 
-    let result = Command::SessionStart(SessionStartArgs {
+    let result = session_start_cmd(SessionStartArgs {
         project_dir: Some(project.to_string_lossy().to_string()),
     })
     .execute();
@@ -305,7 +304,7 @@ fn check_session_start_compact_aborted_resume(project: &Path) {
         "should include resume guidance: {ctx}"
     );
 
-    let result = Command::SessionStart(SessionStartArgs {
+    let result = session_start_cmd(SessionStartArgs {
         project_dir: Some(project.to_string_lossy().to_string()),
     })
     .execute();
@@ -327,7 +326,7 @@ fn check_session_start_compact_restores_author(project: &Path) {
     assert!(ctx.contains("suite:new:"), "should have authoring section");
     assert!(ctx.contains("motb-core"), "should mention suite name");
 
-    let result = Command::SessionStart(SessionStartArgs {
+    let result = session_start_cmd(SessionStartArgs {
         project_dir: Some(project.to_string_lossy().to_string()),
     })
     .execute();
@@ -375,7 +374,7 @@ fn check_session_start_restores_project(project: &Path) {
     handoff.runner = Some(test_runner());
     compact::save_compact_handoff(project, &handoff).expect("save");
 
-    let result = Command::SessionStart(SessionStartArgs {
+    let result = session_start_cmd(SessionStartArgs {
         project_dir: Some(project.to_string_lossy().to_string()),
     })
     .execute();
@@ -395,7 +394,7 @@ fn check_session_start_restores_worktree(project: &Path) {
     handoff.trigger = Some("worktree-switch".into());
     compact::save_compact_handoff(project, &handoff).expect("save");
 
-    let result = Command::SessionStart(SessionStartArgs {
+    let result = session_start_cmd(SessionStartArgs {
         project_dir: Some(project.to_string_lossy().to_string()),
     })
     .execute();
@@ -421,7 +420,7 @@ fn check_session_start_cross_project(project: &Path) {
         "handoff should be pending for same project"
     );
 
-    let result = Command::SessionStart(SessionStartArgs {
+    let result = session_start_cmd(SessionStartArgs {
         project_dir: Some(project.to_string_lossy().to_string()),
     })
     .execute();
@@ -434,7 +433,7 @@ fn check_session_start_cross_project(project: &Path) {
 // No pending handoff - session-start returns Ok(0).
 // Verify ephemeral_metallb APIs are accessible.
 fn check_session_start_metallb_templates(project: &Path) {
-    let result = Command::SessionStart(SessionStartArgs {
+    let result = session_start_cmd(SessionStartArgs {
         project_dir: Some(project.to_string_lossy().to_string()),
     })
     .execute();
@@ -450,7 +449,7 @@ fn check_session_start_metallb_templates(project: &Path) {
 
 // session_stop is currently a no-op. Verify Ok(0).
 fn check_session_stop_metallb_cleanup(project: &Path) {
-    let result = Command::SessionStop(SessionStopArgs {
+    let result = session_stop_cmd(SessionStopArgs {
         project_dir: Some(project.to_string_lossy().to_string()),
     })
     .execute();
@@ -470,7 +469,7 @@ fn check_session_start_no_replay(project: &Path) {
     let after = compact::pending_compact_handoff(project);
     assert!(after.is_none(), "consumed handoff should not be pending");
 
-    let result = Command::SessionStart(SessionStartArgs {
+    let result = session_start_cmd(SessionStartArgs {
         project_dir: Some(project.to_string_lossy().to_string()),
     })
     .execute();

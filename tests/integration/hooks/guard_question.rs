@@ -3,7 +3,7 @@
 // gating, and approval state requirements.
 
 use harness::hooks::guard_question;
-use harness::workflow::runner::{
+use harness::run::workflow::{
     self as runner_workflow, FailureKind, FailureState, PreflightState, PreflightStatus,
     RunnerPhase, RunnerWorkflowState,
 };

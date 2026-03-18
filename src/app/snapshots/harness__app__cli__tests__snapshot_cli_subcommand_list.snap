@@ -1,42 +1,10 @@
 ---
 source: src/app/cli.rs
+assertion_line: 566
 expression: "names.join(\"\\n\")"
 ---
-api
-apply
-approval-begin
 authoring
-authoring-begin
-authoring-reset
-authoring-save
-authoring-show
-authoring-validate
-bootstrap
-capabilities
-capture
-closeout
-cluster
-cluster-check
-diff
-envoy
-gateway
 hook
-init
-kumactl
-logs
 observe
-pre-compact
-preflight
-record
-report
-restart-namespace
 run
-runner-state
-service
-session-start
-session-stop
 setup
-status
-task
-token
-validate
