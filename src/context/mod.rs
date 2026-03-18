@@ -3,10 +3,13 @@ mod repository;
 mod snapshots;
 
 pub use aggregate::{RunAggregate, RunContext};
-pub use repository::RunRepository;
+pub use repository::{RunRepository, RunRepositoryPort};
 pub use snapshots::{
     ArtifactSnapshot, NodeCheckRecord, NodeCheckSnapshot, ToolCheckRecord, ToolCheckSnapshot,
 };
+
+#[cfg(test)]
+pub use repository::InMemoryRunRepository;
 
 use std::borrow::Cow;
 use std::collections::HashMap;

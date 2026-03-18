@@ -5,8 +5,10 @@ use std::sync::Arc;
 use serde::{Deserialize, Serialize};
 
 use super::build::{BuildSystem, ProcessBuildSystem};
+use super::clock::{Clock, SystemClock};
 use super::compose::{ComposeOrchestrator, DockerComposeOrchestrator};
 use super::docker::{ContainerRuntime, DockerContainerRuntime};
+use super::envoy::ProxyIntrospector;
 use super::error::BlockError;
 use super::helm::{HelmDeployer, PackageDeployer};
 use super::http::{HttpClient, ReqwestHttpClient};
@@ -110,11 +112,13 @@ impl fmt::Display for BlockRequirement {
 pub struct BlockRegistry {
     pub process: Arc<dyn ProcessExecutor>,
     pub http: Arc<dyn HttpClient>,
+    pub clock: Arc<dyn Clock>,
     pub docker: Option<Arc<dyn ContainerRuntime>>,
     pub compose: Option<Arc<dyn ComposeOrchestrator>>,
     pub kubernetes: Option<Arc<dyn KubernetesOperator>>,
     pub k3d: Option<Arc<dyn LocalClusterManager>>,
     pub helm: Option<Arc<dyn PackageDeployer>>,
+    pub envoy: Option<Arc<dyn ProxyIntrospector>>,
     pub kuma: Option<Arc<dyn MeshControlPlane>>,
     pub build: Option<Arc<dyn BuildSystem>>,
 }
@@ -127,6 +131,7 @@ impl fmt::Debug for BlockRegistry {
             .field("has_kubernetes", &self.kubernetes.is_some())
             .field("has_k3d", &self.k3d.is_some())
             .field("has_helm", &self.helm.is_some())
+            .field("has_envoy", &self.envoy.is_some())
             .field("has_kuma", &self.kuma.is_some())
             .field("has_build", &self.build.is_some())
             .finish_non_exhaustive()
@@ -139,14 +144,22 @@ impl BlockRegistry {
         Self {
             process,
             http,
+            clock: Arc::new(SystemClock),
             docker: None,
             compose: None,
             kubernetes: None,
             k3d: None,
             helm: None,
+            envoy: None,
             kuma: None,
             build: None,
         }
+    }
+
+    #[must_use]
+    pub fn with_clock(mut self, clock: Arc<dyn Clock>) -> Self {
+        self.clock = clock;
+        self
     }
 
     #[must_use]
@@ -211,6 +224,12 @@ impl BlockRegistry {
     }
 
     #[must_use]
+    pub fn with_envoy(mut self, envoy: Arc<dyn ProxyIntrospector>) -> Self {
+        self.envoy = Some(envoy);
+        self
+    }
+
+    #[must_use]
     pub fn with_kuma(mut self, kuma: Arc<dyn MeshControlPlane>) -> Self {
         self.kuma = Some(kuma);
         self
@@ -231,7 +250,7 @@ impl BlockRegistry {
             BlockRequirement::K3d => self.k3d.is_some(),
             BlockRequirement::Helm => self.helm.is_some(),
             BlockRequirement::Kuma => self.kuma.is_some(),
-            BlockRequirement::Envoy => false,
+            BlockRequirement::Envoy => self.envoy.is_some(),
             BlockRequirement::Build => self.build.is_some(),
         }
     }
@@ -309,14 +328,18 @@ mod tests {
     #[test]
     fn production_registry_supports_core_blocks() {
         let registry = BlockRegistry::production();
-
-        assert!(registry.supports(BlockRequirement::Docker));
-        assert!(registry.supports(BlockRequirement::Compose));
-        assert!(registry.supports(BlockRequirement::Kubernetes));
-        assert!(registry.supports(BlockRequirement::K3d));
-        assert!(registry.supports(BlockRequirement::Helm));
-        assert!(registry.supports(BlockRequirement::Kuma));
-        assert!(registry.supports(BlockRequirement::Build));
+        let supported = [
+            BlockRequirement::Docker,
+            BlockRequirement::Compose,
+            BlockRequirement::Kubernetes,
+            BlockRequirement::K3d,
+            BlockRequirement::Helm,
+            BlockRequirement::Kuma,
+            BlockRequirement::Build,
+        ];
+        for requirement in supported {
+            assert!(registry.supports(requirement), "missing: {requirement:?}");
+        }
         assert!(!registry.supports(BlockRequirement::Envoy));
     }
 
