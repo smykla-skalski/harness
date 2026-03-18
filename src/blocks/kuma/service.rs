@@ -99,10 +99,7 @@ impl KumaService {
     /// Derive the readiness URL for a started universal service container.
     #[must_use]
     pub fn readiness_url(address: &str) -> String {
-        format!(
-            "http://{address}:{}/ready",
-            defaults::DEFAULT_DATAPLANE_READY_PORT
-        )
+        format!("http://{address}:{}/ready", defaults::DATAPLANE_READY_PORT)
     }
 
     /// Derive the XDS control-plane URL from resolved access details.

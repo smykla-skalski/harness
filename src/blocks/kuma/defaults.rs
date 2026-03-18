@@ -75,17 +75,6 @@ pub const HELM_KDS_GLOBAL_ADDRESS_PREFIX: &str = "controlPlane.kdsGlobalAddress=
 /// Helm setting that disables KDS TLS verification for local disposable setups.
 pub const HELM_KDS_SKIP_VERIFY: &str = "controlPlane.tls.kdsZoneClient.skipVerify=true";
 
-// Backward-compatible aliases for earlier scaffold names.
-pub const DEFAULT_ENVIRONMENT: &str = UNIVERSAL_ENVIRONMENT;
-pub const DEFAULT_ZONE_MODE: &str = ZONE_MODE;
-pub const DEFAULT_GLOBAL_MODE: &str = GLOBAL_MODE;
-pub const DEFAULT_STORE_MEMORY: &str = STORE_MEMORY;
-pub const DEFAULT_STORE_POSTGRES: &str = STORE_POSTGRES;
-pub const DEFAULT_CP_API_PORT: u16 = CP_API_PORT;
-pub const DEFAULT_XDS_PORT: u16 = XDS_PORT;
-pub const DEFAULT_DATAPLANE_READY_PORT: u16 = DATAPLANE_READY_PORT;
-pub const DEFAULT_ADMIN_TOKEN_PATH: &str = ADMIN_TOKEN_PATH;
-
 /// Returns the default API base address for a given control-plane IP.
 #[must_use]
 pub fn default_cp_addr(ip: &str) -> String {
@@ -205,18 +194,5 @@ mod tests {
     fn derive_universal_service_image_rewrites_cp_name() {
         let derived = derive_universal_service_image("docker.io/kumahq/kuma-cp:2.12.0").unwrap();
         assert_eq!(derived, "docker.io/kumahq/kuma-universal:2.12.0");
-    }
-
-    #[test]
-    fn aliases_match_primary_constants() {
-        assert_eq!(DEFAULT_ENVIRONMENT, UNIVERSAL_ENVIRONMENT);
-        assert_eq!(DEFAULT_ZONE_MODE, ZONE_MODE);
-        assert_eq!(DEFAULT_GLOBAL_MODE, GLOBAL_MODE);
-        assert_eq!(DEFAULT_STORE_MEMORY, STORE_MEMORY);
-        assert_eq!(DEFAULT_STORE_POSTGRES, STORE_POSTGRES);
-        assert_eq!(DEFAULT_CP_API_PORT, CP_API_PORT);
-        assert_eq!(DEFAULT_XDS_PORT, XDS_PORT);
-        assert_eq!(DEFAULT_DATAPLANE_READY_PORT, DATAPLANE_READY_PORT);
-        assert_eq!(DEFAULT_ADMIN_TOKEN_PATH, ADMIN_TOKEN_PATH);
     }
 }
