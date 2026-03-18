@@ -1,5 +1,6 @@
 use crate::audit_log::{AuditAppendRequest, append_audit_entry};
 use crate::errors::CliError;
+use crate::hook::HookResult;
 use crate::hooks::context::GuardContext;
 use crate::hooks::result::NormalizedHookResult;
 use crate::workflow::runner::{self as runner_wf, RunnerWorkflowState};
@@ -7,35 +8,34 @@ use crate::workflow::runner::{self as runner_wf, RunnerWorkflowState};
 /// Explicit side effects emitted by hook handlers and applied by the engine.
 #[derive(Debug, Clone)]
 pub enum HookEffect {
+    Decide(NormalizedHookResult),
     WriteRunnerState(RunnerWorkflowState),
-    AppendAudit {
-        request: AuditAppendRequest,
-        warn_only: bool,
-    },
+    AppendAudit(AuditAppendRequest),
+    InjectContext(String),
 }
 
-/// Full hook outcome: decision plus explicit side effects.
+/// Full hook outcome: ordered explicit effects emitted by a hook.
 #[derive(Debug, Clone)]
 pub struct HookOutcome {
-    pub result: NormalizedHookResult,
-    pub effects: Vec<HookEffect>,
+    effects: Vec<HookEffect>,
 }
 
 impl HookOutcome {
     #[must_use]
     pub fn allow() -> Self {
+        Self::decide(NormalizedHookResult::allow())
+    }
+
+    #[must_use]
+    pub fn decide(result: NormalizedHookResult) -> Self {
         Self {
-            result: NormalizedHookResult::allow(),
-            effects: Vec::new(),
+            effects: vec![HookEffect::Decide(result)],
         }
     }
 
     #[must_use]
-    pub fn from_hook_result(result: crate::hook::HookResult) -> Self {
-        Self {
-            result: NormalizedHookResult::from_hook_result(result),
-            effects: Vec::new(),
-        }
+    pub fn from_hook_result(result: HookResult) -> Self {
+        Self::decide(NormalizedHookResult::from_hook_result(result))
     }
 
     #[must_use]
@@ -45,9 +45,67 @@ impl HookOutcome {
     }
 
     #[must_use]
-    pub fn with_result(mut self, result: NormalizedHookResult) -> Self {
-        self.result = result;
-        self
+    pub fn effects(&self) -> &[HookEffect] {
+        &self.effects
+    }
+
+    #[must_use]
+    pub fn decision(&self) -> &NormalizedHookResult {
+        self.effects
+            .iter()
+            .find_map(|effect| match effect {
+                HookEffect::Decide(result) => Some(result),
+                HookEffect::WriteRunnerState(_)
+                | HookEffect::AppendAudit(_)
+                | HookEffect::InjectContext(_) => None,
+            })
+            .expect("hook outcomes must include a Decide effect")
+    }
+
+    pub fn state_transitions(&self) -> impl Iterator<Item = &RunnerWorkflowState> {
+        self.effects.iter().filter_map(|effect| match effect {
+            HookEffect::WriteRunnerState(state) => Some(state),
+            HookEffect::Decide(_) | HookEffect::AppendAudit(_) | HookEffect::InjectContext(_) => {
+                None
+            }
+        })
+    }
+
+    pub fn audit_entries(&self) -> impl Iterator<Item = &AuditAppendRequest> {
+        self.effects.iter().filter_map(|effect| match effect {
+            HookEffect::AppendAudit(request) => Some(request),
+            HookEffect::Decide(_)
+            | HookEffect::WriteRunnerState(_)
+            | HookEffect::InjectContext(_) => None,
+        })
+    }
+
+    pub fn injected_contexts(&self) -> impl Iterator<Item = &str> {
+        self.effects.iter().filter_map(|effect| match effect {
+            HookEffect::InjectContext(text) => Some(text.as_str()),
+            HookEffect::Decide(_)
+            | HookEffect::WriteRunnerState(_)
+            | HookEffect::AppendAudit(_) => None,
+        })
+    }
+
+    #[must_use]
+    pub fn normalized_result(&self) -> NormalizedHookResult {
+        let mut result = self.decision().clone();
+        let injected = self.injected_contexts().collect::<Vec<_>>();
+        if !injected.is_empty() {
+            let joined = injected.join("\n\n");
+            result.additional_context = Some(match result.additional_context.take() {
+                Some(existing) if !existing.is_empty() => format!("{existing}\n\n{joined}"),
+                Some(_) | None => joined,
+            });
+        }
+        result
+    }
+
+    #[must_use]
+    pub fn to_hook_result(&self) -> HookResult {
+        self.normalized_result().to_hook_result()
     }
 }
 
@@ -82,19 +140,16 @@ pub(crate) fn apply_effects(
 ) -> Result<(), CliError> {
     for effect in effects {
         match effect {
+            HookEffect::Decide(_) | HookEffect::InjectContext(_) => {}
             HookEffect::WriteRunnerState(state) => {
                 let _ = persist_runner_state(ctx, state)?;
             }
-            HookEffect::AppendAudit { request, warn_only } => {
+            HookEffect::AppendAudit(request) => {
                 if let Err(error) = append_audit_entry(request.clone()) {
-                    if *warn_only {
-                        *result = NormalizedHookResult::warn(
-                            "KSR006",
-                            format!("audit log write failed: {error}"),
-                        );
-                        continue;
-                    }
-                    return Err(error);
+                    *result = NormalizedHookResult::warn(
+                        "KSR006",
+                        format!("audit log write failed: {error}"),
+                    );
                 }
             }
         }

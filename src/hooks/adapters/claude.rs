@@ -27,8 +27,7 @@ impl AgentAdapter for ClaudeCodeAdapter {
         result: &NormalizedHookResult,
         event: &NormalizedEvent,
     ) -> RenderedHookResponse {
-        let stdout =
-            output::render_hook_output(event_to_hook_type(event), &result.to_hook_result());
+        let stdout = output::render_normalized_hook_output(event_to_hook_type(event), result);
         RenderedHookResponse {
             stdout,
             exit_code: 0,

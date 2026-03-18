@@ -29,7 +29,7 @@ fn verify_write_allows_artifact() {
     let artifact_path = run_dir.join("artifacts").join("output.json");
     let payload = make_write_payload(&artifact_path.to_string_lossy());
     let ctx = make_hook_context_with_run("suite:run", payload, &run_dir);
-    let r = verify_write::execute(&ctx).unwrap();
+    let r = verify_write::execute(&ctx).unwrap().to_hook_result();
     assert!(r.decision == Decision::Allow || r.decision == Decision::Warn);
 }
 
@@ -40,7 +40,7 @@ fn verify_write_denies_command_log() {
     let log_path = run_dir.join("commands").join("command-log.md");
     let payload = make_write_payload(&log_path.to_string_lossy());
     let ctx = make_hook_context_with_run("suite:run", payload, &run_dir);
-    let r = verify_write::execute(&ctx).unwrap();
+    let r = verify_write::execute(&ctx).unwrap().to_hook_result();
     // verify-write should also deny control file edits
     assert!(r.decision == Decision::Deny || r.decision == Decision::Warn);
 }

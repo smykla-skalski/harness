@@ -1,6 +1,7 @@
 use serde_json::json;
 
 use crate::hook::{Decision, HookResult};
+use crate::hooks::result::{NormalizedDecision, NormalizedHookResult};
 
 use super::HookType;
 
@@ -22,11 +23,11 @@ pub fn render_hook_message(result: &HookResult) -> String {
     }
 }
 
-fn render_pre_tool_use_output(result: &HookResult) -> String {
-    if result.decision == Decision::Allow {
+fn render_pre_tool_use_output_normalized(result: &NormalizedHookResult) -> String {
+    if result.decision == NormalizedDecision::Allow {
         return String::new();
     }
-    let message = render_hook_message(result);
+    let message = result.display_message();
     serde_json::to_string(&json!({
         "hookSpecificOutput": {
             "hookEventName": "PreToolUse",
@@ -37,12 +38,12 @@ fn render_pre_tool_use_output(result: &HookResult) -> String {
     .expect("hand-built JSON serializes")
 }
 
-fn render_blocking_hook_output(result: &HookResult) -> String {
-    if result.decision == Decision::Allow {
+fn render_blocking_hook_output_normalized(result: &NormalizedHookResult) -> String {
+    if result.decision == NormalizedDecision::Allow && result.additional_context.is_none() {
         return String::new();
     }
-    let message = render_hook_message(result);
-    if result.decision == Decision::Deny {
+    let message = result.display_message();
+    if result.decision == NormalizedDecision::Deny {
         serde_json::to_string(&json!({"decision": "block", "reason": message}))
             .expect("hand-built JSON serializes")
     } else {
@@ -51,53 +52,90 @@ fn render_blocking_hook_output(result: &HookResult) -> String {
     }
 }
 
-fn render_post_tool_use_output(result: &HookResult, event_name: &str) -> String {
-    if result.decision == Decision::Allow {
+fn render_post_tool_use_output_normalized(
+    result: &NormalizedHookResult,
+    event_name: &str,
+) -> String {
+    if result.decision == NormalizedDecision::Allow
+        && result.additional_context.is_none()
+        && result.updated_input.is_none()
+    {
         return String::new();
     }
-    let message = render_hook_message(result);
+    let message = result.display_message();
     let mut payload = json!({
         "hookSpecificOutput": {
             "hookEventName": event_name,
-            "additionalContext": message,
         }
     });
-    if result.decision == Decision::Deny {
+    if let Some(additional_context) = &result.additional_context {
+        payload["hookSpecificOutput"]["additionalContext"] = json!(additional_context);
+    } else if result.decision != NormalizedDecision::Allow {
+        payload["hookSpecificOutput"]["additionalContext"] = json!(message.clone());
+    }
+    if let Some(updated_input) = &result.updated_input {
+        payload["hookSpecificOutput"]["toolInput"] = updated_input.clone();
+    }
+    if result.decision == NormalizedDecision::Deny {
         payload["decision"] = json!("block");
         payload["reason"] = json!(message);
     }
     serde_json::to_string(&payload).expect("hand-built JSON serializes")
 }
 
-fn render_additional_context_output(result: &HookResult, event_name: &str) -> String {
-    if result.decision == Decision::Allow {
+fn render_additional_context_output_normalized(
+    result: &NormalizedHookResult,
+    event_name: &str,
+) -> String {
+    if result.decision == NormalizedDecision::Allow && result.additional_context.is_none() {
         return String::new();
     }
+    let message = result
+        .additional_context
+        .clone()
+        .unwrap_or_else(|| result.display_message());
     serde_json::to_string(&json!({
         "hookSpecificOutput": {
             "hookEventName": event_name,
-            "additionalContext": render_hook_message(result),
+            "additionalContext": message,
         }
     }))
     .expect("hand-built JSON serializes")
+}
+
+/// Transform a `NormalizedHookResult` into the native Claude Code hook output
+/// format for the given hook type.
+#[must_use]
+pub fn render_normalized_hook_output(hook_type: HookType, result: &NormalizedHookResult) -> String {
+    if result.decision == NormalizedDecision::Allow
+        && result.additional_context.is_none()
+        && result.updated_input.is_none()
+    {
+        return String::new();
+    }
+
+    match hook_type {
+        HookType::PreToolUse => render_pre_tool_use_output_normalized(result),
+        HookType::PostToolUse => render_post_tool_use_output_normalized(result, "PostToolUse"),
+        HookType::PostToolUseFailure => {
+            render_post_tool_use_output_normalized(result, "PostToolUseFailure")
+        }
+        HookType::SubagentStart => {
+            render_additional_context_output_normalized(result, "SubagentStart")
+        }
+        HookType::SubagentStop => render_post_tool_use_output_normalized(result, "SubagentStop"),
+        HookType::Blocking => render_blocking_hook_output_normalized(result),
+    }
 }
 
 /// Transform a `HookResult` into the native Claude Code hook output format for
 /// the given hook type.
 #[must_use]
 pub fn render_hook_output(hook_type: HookType, result: &HookResult) -> String {
-    if result.decision == Decision::Allow && result.code.is_empty() {
-        return String::new();
-    }
-
-    match hook_type {
-        HookType::PreToolUse => render_pre_tool_use_output(result),
-        HookType::PostToolUse => render_post_tool_use_output(result, "PostToolUse"),
-        HookType::PostToolUseFailure => render_post_tool_use_output(result, "PostToolUseFailure"),
-        HookType::SubagentStart => render_additional_context_output(result, "SubagentStart"),
-        HookType::SubagentStop => render_post_tool_use_output(result, "SubagentStop"),
-        HookType::Blocking => render_blocking_hook_output(result),
-    }
+    render_normalized_hook_output(
+        hook_type,
+        &NormalizedHookResult::from_hook_result(result.clone()),
+    )
 }
 
 #[cfg(test)]
@@ -178,6 +216,23 @@ mod tests {
         let v: serde_json::Value = serde_json::from_str(&output).unwrap();
         assert_eq!(v["decision"], "block");
         assert_eq!(v["hookSpecificOutput"]["hookEventName"], "PostToolUse");
+    }
+
+    #[test]
+    fn subagent_start_allow_with_additional_context_is_emitted() {
+        let output = render_normalized_hook_output(
+            HookType::SubagentStart,
+            &NormalizedHookResult::allow().with_additional_context("save through authoring-save"),
+        );
+        let value: serde_json::Value = serde_json::from_str(&output).unwrap();
+        assert_eq!(
+            value["hookSpecificOutput"]["hookEventName"],
+            "SubagentStart"
+        );
+        assert_eq!(
+            value["hookSpecificOutput"]["additionalContext"],
+            "save through authoring-save"
+        );
     }
 
     #[test]

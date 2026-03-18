@@ -9,13 +9,13 @@ use super::super::helpers::*;
 #[test]
 fn audit_silent_runner() {
     let ctx = make_hook_context("suite:run", make_bash_payload("echo hello"));
-    let r = audit::execute(&ctx).unwrap();
+    let r = audit::execute(&ctx).unwrap().to_hook_result();
     assert_allow(&r);
 }
 
 #[test]
 fn audit_silent_author() {
     let ctx = make_hook_context("suite:new", make_bash_payload("echo hello"));
-    let r = audit::execute(&ctx).unwrap();
+    let r = audit::execute(&ctx).unwrap().to_hook_result();
     assert_allow(&r);
 }
