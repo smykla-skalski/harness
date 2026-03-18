@@ -1,12 +1,15 @@
 use std::collections::HashMap;
 use std::path::Path;
+#[cfg(feature = "helm")]
 use std::sync::Arc;
 #[cfg(test)]
 use std::sync::Mutex;
 
 use serde::{Deserialize, Serialize};
 
-use crate::blocks::{BlockError, ProcessExecutor};
+use crate::blocks::BlockError;
+#[cfg(feature = "helm")]
+use crate::blocks::ProcessExecutor;
 use crate::core_defs::CommandResult;
 
 /// A single Helm setting (`key=value`) passed through to a deployment target.
@@ -114,10 +117,12 @@ pub trait PackageDeployer: Send + Sync {
 ///
 /// This implementation preserves the repository's current deployment model:
 /// many callers still invoke `make` targets that encapsulate Helm logic.
+#[cfg(feature = "helm")]
 pub struct HelmDeployer {
     process: Arc<dyn ProcessExecutor>,
 }
 
+#[cfg(feature = "helm")]
 impl HelmDeployer {
     #[must_use]
     pub fn new(process: Arc<dyn ProcessExecutor>) -> Self {
@@ -140,6 +145,7 @@ impl HelmDeployer {
     }
 }
 
+#[cfg(feature = "helm")]
 impl PackageDeployer for HelmDeployer {
     fn run_target(
         &self,

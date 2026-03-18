@@ -277,21 +277,6 @@ pub fn path_like_words(words: &[String]) -> Vec<&str> {
         .collect()
 }
 
-#[must_use]
-pub fn extract_flag_value<'a>(words: &'a [String], flag: &str) -> Option<&'a str> {
-    for (index, word) in words.iter().enumerate() {
-        if word == flag {
-            return words.get(index + 1).map(String::as_str);
-        }
-        if let Some(rest) = word.strip_prefix(flag)
-            && let Some(value) = rest.strip_prefix('=')
-        {
-            return Some(value);
-        }
-    }
-    None
-}
-
 fn significant_word_indices(words: &[String]) -> Vec<usize> {
     words
         .iter()

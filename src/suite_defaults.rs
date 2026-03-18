@@ -1,9 +1,12 @@
+#[cfg(test)]
 use std::env;
 use std::path::{Path, PathBuf};
 
 use tracing::warn;
 
-use crate::errors::{CliError, CliErrorKind};
+use crate::errors::CliError;
+#[cfg(test)]
+use crate::errors::CliErrorKind;
 use crate::io;
 
 pub const DEFAULTS_FILE: &str = ".harness.json";
@@ -25,6 +28,7 @@ pub fn suite_defaults_path(suite_dir: &Path) -> PathBuf {
 ///
 /// # Errors
 /// Returns `CliError` on IO failure.
+#[cfg(test)]
 pub fn write_suite_defaults(
     suite_dir: &Path,
     repo_root: Option<&Path>,
@@ -56,6 +60,7 @@ pub fn load_suite_defaults(suite_dir: &Path) -> Result<Option<SuiteDefaults>, Cl
 ///
 /// Walks up the directory tree looking for `suite.md` or `.harness.json`.
 /// If the given path is a file named `suite.md`, returns its parent.
+#[cfg(test)]
 #[must_use]
 pub fn find_suite_dir(path: &Path) -> Option<PathBuf> {
     let resolved = if path.is_absolute() {
