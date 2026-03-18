@@ -199,12 +199,22 @@ pub enum HookCommand {
     VerifyQuestion,
     /// Audit hook events.
     Audit,
+    /// Audit a Codex turn-complete notification.
+    AuditTurn(AuditTurnArgs),
     /// Enrich failure context.
     EnrichFailure,
     /// Validate subagent startup context.
     ContextAgent,
     /// Validate subagent results.
     ValidateAgent,
+}
+
+/// Arguments for the Codex notify-based audit shim.
+#[derive(Debug, Clone, Default, Args)]
+pub struct AuditTurnArgs {
+    /// Raw Codex notify payload passed as `argv[1]`.
+    #[arg(hide = true)]
+    pub payload: Option<String>,
 }
 
 impl HookCommand {
@@ -219,6 +229,7 @@ impl HookCommand {
             Self::VerifyWrite => &VERIFY_WRITE_HOOK,
             Self::VerifyQuestion => &VERIFY_QUESTION_HOOK,
             Self::Audit => &AUDIT_HOOK,
+            Self::AuditTurn(_) => &AUDIT_HOOK,
             Self::EnrichFailure => &ENRICH_FAILURE_HOOK,
             Self::ContextAgent => &CONTEXT_AGENT_HOOK,
             Self::ValidateAgent => &VALIDATE_AGENT_HOOK,
@@ -227,12 +238,23 @@ impl HookCommand {
 
     #[must_use]
     pub fn name(&self) -> &'static str {
-        self.hook().name()
+        match self {
+            Self::AuditTurn(_) => "audit-turn",
+            _ => self.hook().name(),
+        }
     }
 
     #[must_use]
     pub fn hook_type(&self) -> HookType {
         self.hook().hook_type()
+    }
+
+    #[must_use]
+    fn inline_payload(&self) -> Option<&str> {
+        match self {
+            Self::AuditTurn(args) => args.payload.as_deref(),
+            _ => None,
+        }
     }
 }
 
@@ -316,6 +338,13 @@ fn default_event_for_hook(hook_type: HookType) -> NormalizedEvent {
     }
 }
 
+fn default_event_for_command(hook: &HookCommand) -> NormalizedEvent {
+    match hook {
+        HookCommand::AuditTurn(_) => NormalizedEvent::Notification,
+        _ => default_event_for_hook(hook.hook_type()),
+    }
+}
+
 fn render_runtime_error(
     agent: HookAgent,
     hook: &dyn Hook,
@@ -343,18 +372,23 @@ fn read_stdin_bytes() -> Result<Vec<u8>, CliError> {
     Ok(bytes)
 }
 
+fn read_hook_input_bytes(hook: &HookCommand) -> Result<Vec<u8>, CliError> {
+    if let Some(payload) = hook.inline_payload() {
+        return Ok(payload.as_bytes().to_vec());
+    }
+    read_stdin_bytes()
+}
+
 /// Execute a hook command through the layered adapter/engine stack.
 #[must_use]
 pub fn run_hook_command(agent: HookAgent, skill: &str, hook: &HookCommand) -> i32 {
     let hook_impl = hook.hook();
-    let event = default_event_for_hook(hook_impl.hook_type());
-    let raw = match read_stdin_bytes() {
+    let hook_name = hook.name();
+    let event = default_event_for_command(hook);
+    let raw = match read_hook_input_bytes(hook) {
         Ok(raw) => raw,
         Err(error) => {
-            let message = format!(
-                "`{}` received invalid hook payload: {error}",
-                hook_impl.name()
-            );
+            let message = format!("`{hook_name}` received invalid hook payload: {error}");
             return render_runtime_error(agent, hook_impl, &event, "KSH001", &message);
         }
     };
@@ -363,10 +397,7 @@ pub fn run_hook_command(agent: HookAgent, skill: &str, hook: &HookCommand) -> i3
     let normalized = match adapter.parse_input(&raw) {
         Ok(context) => context.with_skill(skill).with_default_event(event.clone()),
         Err(error) => {
-            let message = format!(
-                "`{}` received invalid hook payload: {error}",
-                hook_impl.name()
-            );
+            let message = format!("`{hook_name}` received invalid hook payload: {error}");
             return render_runtime_error(agent, hook_impl, &event, "KSH001", &message);
         }
     };
@@ -433,6 +464,8 @@ pub(crate) fn control_file_hint(path: &Path) -> &'static str {
 
 #[cfg(test)]
 mod tests {
+    use clap::Parser;
+
     use super::*;
     use crate::hook::Decision;
 
@@ -533,6 +566,7 @@ mod tests {
             HookCommand::VerifyWrite,
             HookCommand::VerifyQuestion,
             HookCommand::Audit,
+            HookCommand::AuditTurn(AuditTurnArgs { payload: None }),
             HookCommand::EnrichFailure,
             HookCommand::ContextAgent,
             HookCommand::ValidateAgent,
@@ -563,5 +597,33 @@ mod tests {
     fn hook_runtime_result_verify_is_warn() {
         let result = hook_runtime_result(&VERIFY_BASH_HOOK, "KSH002", "error");
         assert_eq!(result.decision, Decision::Warn);
+    }
+
+    #[test]
+    fn hook_args_accept_audit_turn_payload_arg() {
+        #[derive(clap::Parser)]
+        struct TestCli {
+            #[command(flatten)]
+            hook: HookArgs,
+        }
+
+        let cli = TestCli::try_parse_from([
+            "harness",
+            "--agent",
+            "codex",
+            "suite:run",
+            "audit-turn",
+            r#"{"type":"agent-turn-complete"}"#,
+        ])
+        .unwrap();
+
+        assert_eq!(cli.hook.agent, HookAgent::Codex);
+        assert_eq!(cli.hook.skill, "suite:run");
+        assert!(matches!(
+            cli.hook.hook,
+            HookCommand::AuditTurn(AuditTurnArgs {
+                payload: Some(ref payload)
+            }) if payload == r#"{"type":"agent-turn-complete"}"#
+        ));
     }
 }

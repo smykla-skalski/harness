@@ -27,9 +27,8 @@ impl AgentAdapter for ClaudeCodeAdapter {
         result: &NormalizedHookResult,
         event: &NormalizedEvent,
     ) -> RenderedHookResponse {
-        let stdout = output::render_normalized_hook_output(event_to_hook_type(event), result);
         RenderedHookResponse {
-            stdout,
+            stdout: output::render_normalized_hook_output(event_to_hook_type(event), result),
             exit_code: 0,
         }
     }
@@ -64,19 +63,30 @@ impl AgentAdapter for ClaudeCodeAdapter {
     }
 
     fn generate_config(&self, hooks: &[HookRegistration]) -> String {
-        let entries = hooks
-            .iter()
-            .filter_map(|registration| {
-                self.event_name(&registration.event).map(|event_name| {
-                    json!({
-                        "event": event_name,
-                        "matcher": registration.matcher,
-                        "command": format!("harness hook --agent claude-code suite:run {}", registration.hook_name),
-                    })
-                })
-            })
-            .collect::<Vec<_>>();
-        serde_json::to_string_pretty(&json!({ "hooks": entries }))
+        use std::collections::BTreeMap;
+
+        let mut events: BTreeMap<&str, Vec<serde_json::Value>> = BTreeMap::new();
+        for registration in hooks {
+            let Some(event_name) = self.event_name(&registration.event) else {
+                continue;
+            };
+            let mut entry = serde_json::Map::new();
+            if let Some(matcher) = &registration.matcher {
+                entry.insert("matcher".to_string(), json!(matcher));
+            }
+            entry.insert(
+                "hooks".to_string(),
+                json!([{
+                    "type": "command",
+                    "command": registration.command,
+                }]),
+            );
+            events
+                .entry(event_name)
+                .or_default()
+                .push(serde_json::Value::Object(entry));
+        }
+        serde_json::to_string_pretty(&json!({ "hooks": events }))
             .expect("hand-built JSON serializes")
     }
 }
