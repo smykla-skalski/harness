@@ -2,8 +2,8 @@ use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 
-use crate::platform::cluster::Platform;
 use crate::errors::{CliError, CliErrorKind};
+use crate::platform::cluster::Platform;
 
 /// Cluster topology mode (single-zone vs multi-zone).
 ///
@@ -228,7 +228,8 @@ fn core_features() -> BTreeMap<Feature, FeatureInfo> {
         ),
         (
             Feature::JsonDiff,
-            FeatureInfo::new("key-by-key JSON diff between two payloads").command("harness run diff"),
+            FeatureInfo::new("key-by-key JSON diff between two payloads")
+                .command("harness run diff"),
         ),
         (
             Feature::Kumactl,

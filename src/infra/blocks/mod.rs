@@ -13,25 +13,25 @@ mod registry;
 
 pub use build::{BuildSystem, BuildTarget, ProcessBuildSystem};
 pub use clock::{Clock, SystemClock};
+#[cfg(feature = "compose")]
+pub use compose::DockerComposeOrchestrator;
 pub use compose::{
     ComposeFile, ComposeOrchestrator, ComposeTopology, HealthcheckSpec, NetworkSpec,
     ServiceDependency, ServiceSpec,
 };
-#[cfg(feature = "compose")]
-pub use compose::DockerComposeOrchestrator;
 pub use docker::{ContainerConfig, ContainerRuntime, ContainerSnapshot, DockerContainerRuntime};
 pub use envoy::{CaptureRequest, EnvoyIntrospector, ProxyIntrospector};
 pub use error::BlockError;
-pub use helm::{HelmSetting, PackageDeployResult, PackageDeployer};
 #[cfg(feature = "helm")]
 pub use helm::HelmDeployer;
+pub use helm::{HelmSetting, PackageDeployResult, PackageDeployer};
 pub use http::{HttpClient, HttpMethod, HttpResponse, ReqwestHttpClient};
-pub use kubernetes::{KubectlOperator, KubernetesOperator, LocalClusterManager, PodSnapshot};
 #[cfg(feature = "k3d")]
 pub use kubernetes::K3dClusterManager;
-pub use kuma::MeshControlPlane;
+pub use kubernetes::{KubectlOperator, KubernetesOperator, LocalClusterManager, PodSnapshot};
 #[cfg(feature = "kuma")]
 pub use kuma::KumaControlPlane;
+pub use kuma::MeshControlPlane;
 pub use process::{ProcessExecutor, StdProcessExecutor};
 pub use registry::{BlockRegistry, BlockRequirement};
 

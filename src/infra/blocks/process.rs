@@ -3,8 +3,8 @@ use std::path::Path;
 #[cfg(test)]
 use std::sync;
 
-use crate::infra::blocks::BlockError;
 use crate::core_defs::CommandResult;
+use crate::infra::blocks::BlockError;
 use crate::infra::exec;
 
 /// Subprocess execution. The lowest-level block.
@@ -311,8 +311,8 @@ mod tests {
 
     mod contracts {
         use super::*;
-        use crate::infra::blocks::process as process_block;
         use crate::infra::blocks::BlockError;
+        use crate::infra::blocks::process as process_block;
 
         fn contract_run_returns_output(executor: &dyn ProcessExecutor) {
             let result = executor
@@ -352,72 +352,60 @@ mod tests {
 
         #[test]
         fn fake_satisfies_run_returns_output() {
-            let fake = process_block::FakeProcessExecutor::new(vec![
-                process_block::FakeResponse {
-                    expected_program: "echo".to_string(),
-                    expected_args: None,
-                    expected_method: None,
-                    result: Ok(CommandResult {
-                        args: vec!["echo".to_string(), "hello".to_string()],
-                        returncode: 0,
-                        stdout: "hello\n".to_string(),
-                        stderr: String::new(),
-                    }),
-                },
-            ]);
+            let fake = process_block::FakeProcessExecutor::new(vec![process_block::FakeResponse {
+                expected_program: "echo".to_string(),
+                expected_args: None,
+                expected_method: None,
+                result: Ok(CommandResult {
+                    args: vec!["echo".to_string(), "hello".to_string()],
+                    returncode: 0,
+                    stdout: "hello\n".to_string(),
+                    stderr: String::new(),
+                }),
+            }]);
             contract_run_returns_output(&fake);
         }
 
         #[test]
         fn fake_satisfies_run_rejects_bad_exit_code() {
-            let fake = process_block::FakeProcessExecutor::new(vec![
-                process_block::FakeResponse {
-                    expected_program: "false".to_string(),
-                    expected_args: None,
-                    expected_method: None,
-                    result: Err(BlockError::message(
-                        "process",
-                        "false",
-                        "exit code 1",
-                    )),
-                },
-            ]);
+            let fake = process_block::FakeProcessExecutor::new(vec![process_block::FakeResponse {
+                expected_program: "false".to_string(),
+                expected_args: None,
+                expected_method: None,
+                result: Err(BlockError::message("process", "false", "exit code 1")),
+            }]);
             contract_run_rejects_bad_exit_code(&fake);
         }
 
         #[test]
         fn fake_satisfies_run_streaming_returns_output() {
-            let fake = process_block::FakeProcessExecutor::new(vec![
-                process_block::FakeResponse {
-                    expected_program: "echo".to_string(),
-                    expected_args: None,
-                    expected_method: None,
-                    result: Ok(CommandResult {
-                        args: vec!["echo".to_string(), "stream".to_string()],
-                        returncode: 0,
-                        stdout: "stream\n".to_string(),
-                        stderr: String::new(),
-                    }),
-                },
-            ]);
+            let fake = process_block::FakeProcessExecutor::new(vec![process_block::FakeResponse {
+                expected_program: "echo".to_string(),
+                expected_args: None,
+                expected_method: None,
+                result: Ok(CommandResult {
+                    args: vec!["echo".to_string(), "stream".to_string()],
+                    returncode: 0,
+                    stdout: "stream\n".to_string(),
+                    stderr: String::new(),
+                }),
+            }]);
             contract_run_streaming_returns_output(&fake);
         }
 
         #[test]
         fn fake_satisfies_run_inherited_returns_exit_code() {
-            let fake = process_block::FakeProcessExecutor::new(vec![
-                process_block::FakeResponse {
-                    expected_program: "true".to_string(),
-                    expected_args: None,
-                    expected_method: None,
-                    result: Ok(CommandResult {
-                        args: vec!["true".to_string()],
-                        returncode: 0,
-                        stdout: String::new(),
-                        stderr: String::new(),
-                    }),
-                },
-            ]);
+            let fake = process_block::FakeProcessExecutor::new(vec![process_block::FakeResponse {
+                expected_program: "true".to_string(),
+                expected_args: None,
+                expected_method: None,
+                result: Ok(CommandResult {
+                    args: vec!["true".to_string()],
+                    returncode: 0,
+                    stdout: String::new(),
+                    stderr: String::new(),
+                }),
+            }]);
             contract_run_inherited_returns_exit_code(&fake);
         }
 

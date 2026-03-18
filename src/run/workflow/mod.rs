@@ -5,8 +5,8 @@ mod types;
 use std::fmt;
 use std::path::Path;
 
-use crate::run::audit::append_runner_state_audit;
 use crate::errors::{CliError, CliErrorKind};
+use crate::run::audit::append_runner_state_audit;
 
 pub use persistence::{
     initialize_runner_state, read_runner_state, runner_state_path, write_runner_state,

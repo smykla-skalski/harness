@@ -1,8 +1,8 @@
 use serde_json::json;
 
+use crate::hooks::HookType;
 use crate::hooks::protocol::hook_result::{Decision, HookResult};
 use crate::hooks::protocol::result::{NormalizedDecision, NormalizedHookResult};
-use crate::hooks::HookType;
 
 /// Format a hook result message with level prefix.
 #[must_use]

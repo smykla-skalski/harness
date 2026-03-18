@@ -1,8 +1,8 @@
-use crate::run::audit::{AuditAppendRequest, append_audit_entry};
 use crate::errors::CliError;
 use crate::hooks::protocol::context::GuardContext;
 use crate::hooks::protocol::hook_result::HookResult;
 use crate::hooks::protocol::result::NormalizedHookResult;
+use crate::run::audit::{AuditAppendRequest, append_audit_entry};
 use crate::run::workflow::{self as runner_wf, RunnerWorkflowState};
 
 /// Explicit side effects emitted by hook handlers and applied by the engine.

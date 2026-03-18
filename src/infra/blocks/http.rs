@@ -345,8 +345,7 @@ mod tests {
         }
 
         fn contract_wait_until_ready_times_out(client: &dyn HttpClient) {
-            let result =
-                client.wait_until_ready("http://127.0.0.1:1", Duration::from_millis(200));
+            let result = client.wait_until_ready("http://127.0.0.1:1", Duration::from_millis(200));
             assert!(result.is_err(), "unreachable URL should time out");
         }
 
@@ -358,8 +357,7 @@ mod tests {
 
         #[test]
         fn fake_satisfies_request_json_parses_body() {
-            let client =
-                FakeHttpClient::single(200, r#"{"url":"http://example.com"}"#);
+            let client = FakeHttpClient::single(200, r#"{"url":"http://example.com"}"#);
             contract_request_json_parses_body(&client);
         }
 

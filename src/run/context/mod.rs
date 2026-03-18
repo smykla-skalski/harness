@@ -23,9 +23,9 @@ use std::{fs, io};
 
 use serde::{Deserialize, Serialize};
 
-use crate::platform::cluster::ClusterSpec;
 use crate::errors::CliError;
 use crate::infra::io::append_markdown_row;
+use crate::platform::cluster::ClusterSpec;
 
 /// Filesystem layout for a single run.
 ///

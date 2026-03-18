@@ -2,8 +2,8 @@ use std::path::{Path, PathBuf};
 
 use clap::Args;
 
-use crate::authoring::validate::{authoring_validation_repo_root, validate_suite_author_paths};
 use crate::app::command_context::{CommandContext, Execute};
+use crate::authoring::validate::{authoring_validation_repo_root, validate_suite_author_paths};
 use crate::errors::CliError;
 
 impl Execute for AuthoringValidateArgs {

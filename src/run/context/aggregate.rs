@@ -1,9 +1,9 @@
 use std::path::Path;
 
-use crate::platform::cluster::ClusterSpec;
 use crate::errors::CliError;
-use crate::run::prepared_suite::PreparedSuiteArtifact;
+use crate::platform::cluster::ClusterSpec;
 use crate::platform::runtime::ClusterRuntime;
+use crate::run::prepared_suite::PreparedSuiteArtifact;
 use crate::schema::RunStatus;
 
 use super::repository::RunRepository;

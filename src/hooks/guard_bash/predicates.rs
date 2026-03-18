@@ -2,9 +2,9 @@ use std::collections::BTreeSet;
 use std::path::Path;
 use std::sync::OnceLock;
 
-use crate::infra::blocks::BlockRegistry;
 use crate::errors::HookMessage;
 use crate::hooks::protocol::hook_result::HookResult;
+use crate::infra::blocks::BlockRegistry;
 use crate::rules::suite_runner::{
     AdminEndpointHint, LegacyScript, PythonBinary, RunnerBinary, TaskOutputPattern,
     TrackedHarnessSubcommand,

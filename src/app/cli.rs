@@ -3,23 +3,23 @@ use std::time::Duration;
 
 use clap::{Parser, Subcommand};
 
+use crate::app::command_context::{CommandContext, Execute};
 use crate::authoring::commands::{
     ApprovalBeginArgs, AuthoringBeginArgs, AuthoringResetArgs, AuthoringSaveArgs,
     AuthoringShowArgs, AuthoringValidateArgs,
 };
+use crate::errors::CliError;
+use crate::hooks::{self, HookArgs};
 use crate::observe::ObserveArgs;
 use crate::run::commands::{
     ApiArgs, ApplyArgs, CaptureArgs, CloseoutArgs, ClusterCheckArgs, DiffArgs, EnvoyArgs, InitArgs,
     KumactlArgs, LogsArgs, PreflightArgs, RecordArgs, ReportArgs, RestartNamespaceArgs,
     RunnerStateArgs, ServiceArgs, StatusArgs, TaskArgs, TokenArgs, ValidateArgs,
 };
+use crate::setup;
 use crate::setup::{
     BootstrapArgs, ClusterArgs, GatewayArgs, PreCompactArgs, SessionStartArgs, SessionStopArgs,
 };
-use crate::app::command_context::{CommandContext, Execute};
-use crate::errors::CliError;
-use crate::hooks::{self, HookArgs};
-use crate::setup;
 
 /// Kuma test harness CLI.
 #[derive(Debug, Parser)]
@@ -649,15 +649,14 @@ mod tests {
 
     #[test]
     fn parse_restart_namespace() {
-        let cli =
-            Cli::try_parse_from([
-                "harness",
-                "run",
-                "restart-namespace",
-                "--namespace",
-                "kuma-system",
-            ])
-                .unwrap();
+        let cli = Cli::try_parse_from([
+            "harness",
+            "run",
+            "restart-namespace",
+            "--namespace",
+            "kuma-system",
+        ])
+        .unwrap();
         match cli.command {
             Command::Run {
                 command: RunCommand::RestartNamespace(RestartNamespaceArgs { namespace, .. }),

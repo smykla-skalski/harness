@@ -1,8 +1,6 @@
 use std::fmt;
 
-use crate::observe::types::{
-    Confidence, FixSafety, IssueCategory, IssueCode, IssueSeverity,
-};
+use crate::observe::types::{Confidence, FixSafety, IssueCategory, IssueCode, IssueSeverity};
 
 /// Responsibility owner for an issue code.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

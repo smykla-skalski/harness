@@ -2,9 +2,9 @@ use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use crate::run::context::RunRepository;
 use crate::core_defs;
 use crate::errors::{CliError, CliErrorKind};
+use crate::run::context::RunRepository;
 
 /// Resolved run directory.
 #[derive(Debug, Clone)]

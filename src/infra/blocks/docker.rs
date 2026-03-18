@@ -3,8 +3,8 @@ use std::sync::Arc;
 
 use tempfile::NamedTempFile;
 
-use crate::infra::blocks::{BlockError, ProcessExecutor};
 use crate::core_defs::CommandResult;
+use crate::infra::blocks::{BlockError, ProcessExecutor};
 
 #[cfg(test)]
 use std::collections::{HashMap, HashSet};
@@ -1087,7 +1087,10 @@ mod tests {
 
         fn contract_remove_is_idempotent(runtime: &dyn ContainerRuntime) {
             let result = runtime.remove("nonexistent-contract-test");
-            assert!(result.is_ok(), "removing nonexistent container should not fail");
+            assert!(
+                result.is_ok(),
+                "removing nonexistent container should not fail"
+            );
         }
 
         fn contract_network_lifecycle(runtime: &dyn ContainerRuntime) {

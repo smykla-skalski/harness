@@ -5,11 +5,11 @@ use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 
+use crate::core_defs::CommandResult;
 use crate::infra::blocks::BlockError;
 #[cfg(feature = "k3d")]
 use crate::infra::blocks::ContainerRuntime;
 use crate::infra::blocks::ProcessExecutor;
-use crate::core_defs::CommandResult;
 
 /// Snapshot of a Kubernetes pod from `kubectl get pods -o json`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]

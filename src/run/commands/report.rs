@@ -5,14 +5,14 @@ use clap::{Args, Subcommand};
 
 use tracing::warn;
 
-use crate::run::audit::write_run_status_with_audit;
 use crate::app::command_context::{CommandContext, Execute, RunDirArgs, resolve_run_services};
 use crate::core_defs::utc_now;
 use crate::errors::{CliError, CliErrorKind};
 use crate::rules::suite_runner::{REPORT_CODE_BLOCK_LIMIT, REPORT_LINE_LIMIT};
+use crate::run::audit::write_run_status_with_audit;
 use crate::run::services::RunServices;
-use crate::schema::{ExecutedGroupChange, GroupVerdict, RunReport, RunStatus};
 use crate::run::workflow::ensure_execution_phase;
+use crate::schema::{ExecutedGroupChange, GroupVerdict, RunReport, RunStatus};
 
 impl Execute for ReportArgs {
     fn execute(&self, _context: &CommandContext) -> Result<i32, CliError> {

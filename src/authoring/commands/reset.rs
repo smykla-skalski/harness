@@ -2,8 +2,8 @@ use std::fs;
 
 use clap::Args;
 
-use crate::authoring::authoring_workspace_dir;
 use crate::app::command_context::{CommandContext, Execute};
+use crate::authoring::authoring_workspace_dir;
 use crate::errors::CliError;
 
 impl Execute for AuthoringResetArgs {

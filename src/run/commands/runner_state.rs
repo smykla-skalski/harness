@@ -2,9 +2,7 @@ use clap::Args;
 
 use crate::app::command_context::{CommandContext, Execute, RunDirArgs, resolve_run_dir};
 use crate::errors::CliError;
-use crate::run::workflow::{
-    RunnerEvent, apply_event, initialize_runner_state, read_runner_state,
-};
+use crate::run::workflow::{RunnerEvent, apply_event, initialize_runner_state, read_runner_state};
 
 impl Execute for RunnerStateArgs {
     fn execute(&self, _context: &CommandContext) -> Result<i32, CliError> {

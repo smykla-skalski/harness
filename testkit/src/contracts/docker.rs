@@ -47,14 +47,15 @@ pub fn contract_is_running_reflects_state(runtime: &dyn ContainerRuntime) {
         .expect("is_running should succeed");
     assert!(running, "container should be running after run_detached");
 
-    runtime
-        .remove(&config.name)
-        .expect("remove should succeed");
+    runtime.remove(&config.name).expect("remove should succeed");
 
     let still_running = runtime
         .is_running(&config.name)
         .expect("is_running should succeed after remove");
-    assert!(!still_running, "container should not be running after remove");
+    assert!(
+        !still_running,
+        "container should not be running after remove"
+    );
 }
 
 /// `remove` succeeds for both existing and non-existing containers.
