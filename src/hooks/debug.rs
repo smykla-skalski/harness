@@ -5,7 +5,7 @@ use std::io::Write;
 use serde::Serialize;
 
 use crate::core_defs::{session_context_dir, utc_now};
-use crate::hook_payloads::HookEvent;
+use crate::hooks::payloads::HookEvent;
 
 /// A single JSONL debug log entry.
 #[derive(Serialize)]
@@ -151,7 +151,7 @@ mod tests {
     use std::fs as stdfs;
 
     use crate::core_defs::session_context_dir;
-    use crate::hook_payloads::HookEnvelopePayload;
+    use crate::hooks::payloads::HookEnvelopePayload;
 
     use super::*;
 

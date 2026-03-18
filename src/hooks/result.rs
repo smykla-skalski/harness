@@ -1,6 +1,6 @@
 use serde_json::Value;
 
-use crate::hook::{Decision, HookResult};
+use crate::hooks::hook_result::{Decision, HookResult};
 
 /// Agent-agnostic decision used by the hook engine.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

@@ -6,8 +6,8 @@ use tracing::warn;
 use crate::cluster::ClusterMode;
 use crate::context::RunContext;
 use crate::errors::{CliError, HookMessage, cow};
-use crate::hook::HookResult;
 use crate::hooks::context::GuardContext as HookContext;
+use crate::hooks::hook_result::HookResult;
 use crate::shell_parse::HarnessCommandInvocationRef;
 use crate::workflow::runner::{PreflightStatus, RunnerPhase, RunnerWorkflowState, SuiteFixState};
 
@@ -602,7 +602,7 @@ mod tests {
         runner_state: Option<RunnerWorkflowState>,
         response: Option<&str>,
     ) -> HookContext {
-        use crate::hook_payloads::HookEnvelopePayload;
+        use crate::hooks::payloads::HookEnvelopePayload;
 
         let payload = HookEnvelopePayload {
             tool_name: "Bash".to_string(),

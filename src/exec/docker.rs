@@ -319,9 +319,7 @@ pub fn extract_admin_token(cp_container: &str) -> Result<String, CliError> {
 
             let bytes = STANDARD.decode(b64_data).map_err(|error| {
                 backoff::Error::transient(Box::new(CliError::from(
-                    CliErrorKind::token_generation_failed(format!(
-                        "base64 decode failed: {error}"
-                    )),
+                    CliErrorKind::token_generation_failed(format!("base64 decode failed: {error}")),
                 )))
             })?;
 

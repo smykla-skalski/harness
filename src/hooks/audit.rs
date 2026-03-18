@@ -35,9 +35,9 @@ mod tests {
     use harness_testkit::RunDirBuilder;
 
     use crate::context::RunContext;
-    use crate::hook::Decision;
-    use crate::hook_payloads::HookEnvelopePayload;
     use crate::hooks::context::GuardContext as HookContext;
+    use crate::hooks::hook_result::Decision;
+    use crate::hooks::payloads::HookEnvelopePayload;
     use crate::workflow::runner::{
         PreflightState, PreflightStatus, RunnerPhase, RunnerWorkflowState,
     };

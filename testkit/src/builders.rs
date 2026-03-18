@@ -13,9 +13,9 @@ use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
 
 use harness::context::{RunLayout, RunMetadata};
-use harness::hook::{Decision, HookResult};
-use harness::hook_payloads::{AskUserQuestionOption, AskUserQuestionPrompt, HookEnvelopePayload};
 use harness::hooks::context::GuardContext;
+use harness::hooks::hook_result::{Decision, HookResult};
+use harness::hooks::payloads::{AskUserQuestionOption, AskUserQuestionPrompt, HookEnvelopePayload};
 use harness::schema::frontmatter::merge_requirement_lists;
 use harness::schema::{RunCounts, RunStatus, Verdict};
 use harness::workflow::runner as runner_workflow;

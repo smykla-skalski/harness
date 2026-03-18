@@ -600,7 +600,7 @@ mod tests {
     use std::collections::HashSet;
 
     use super::*;
-    use crate::hook::Decision;
+    use crate::hooks::hook_result::Decision;
 
     #[test]
     fn cli_err_basic_fields() {

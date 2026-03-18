@@ -4,8 +4,8 @@
 // artifact path allowance, multi-write validation, suite-fix approved paths,
 // and basename-outside-run denial.
 
-use harness::hook::Decision;
 use harness::hooks::guard_write;
+use harness::hooks::hook_result::Decision;
 use harness::workflow::runner::{
     self as runner_workflow, FailureKind, FailureState, ManifestFixDecision, PreflightState,
     PreflightStatus, RunnerPhase, RunnerWorkflowState, SuiteFixState,

@@ -2,7 +2,7 @@
 // These post-tool-use hooks validate command output, write results,
 // and question responses.
 
-use harness::hook::Decision;
+use harness::hooks::hook_result::Decision;
 use harness::hooks::{verify_bash, verify_question, verify_write};
 
 use super::super::helpers::*;

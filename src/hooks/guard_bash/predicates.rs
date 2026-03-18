@@ -4,7 +4,7 @@ use std::sync::OnceLock;
 
 use crate::blocks::BlockRegistry;
 use crate::errors::HookMessage;
-use crate::hook::HookResult;
+use crate::hooks::hook_result::HookResult;
 use crate::rules::suite_runner::{
     AdminEndpointHint, LegacyScript, PythonBinary, RunnerBinary, TaskOutputPattern,
     TrackedHarnessSubcommand,
