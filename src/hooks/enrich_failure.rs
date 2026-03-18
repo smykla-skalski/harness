@@ -80,6 +80,7 @@ mod tests {
             updated_at: String::new(),
             transition_count: 0,
             last_event: None,
+            history: Vec::new(),
         }
     }
 

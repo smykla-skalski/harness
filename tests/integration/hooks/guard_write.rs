@@ -146,6 +146,7 @@ fn guard_write_suite_fix_allows_approved_path() {
         updated_at: "2026-03-14T00:00:00Z".to_string(),
         transition_count: 4,
         last_event: Some("SuiteFixApproved".to_string()),
+        history: Vec::new(),
     };
     runner_workflow::write_runner_state(&run_dir, &state).unwrap();
     let payload = make_write_payload(&group_path.to_string_lossy());
@@ -177,6 +178,7 @@ fn guard_write_denies_suite_edit_without_fix() {
         updated_at: "2026-03-14T00:00:00Z".to_string(),
         transition_count: 3,
         last_event: Some("RunStarted".to_string()),
+        history: Vec::new(),
     };
     runner_workflow::write_runner_state(&run_dir, &state).unwrap();
     let payload = make_write_payload(&group_path.to_string_lossy());

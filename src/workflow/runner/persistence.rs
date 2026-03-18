@@ -48,6 +48,7 @@ pub(super) fn make_initial_state(occurred_at: &str) -> RunnerWorkflowState {
         updated_at: occurred_at.to_string(),
         transition_count: 0,
         last_event: Some("RunInitialized".to_string()),
+        history: Vec::new(),
     }
 }
 
@@ -185,6 +186,7 @@ fn migrate_runner_v1_to_v2(data: Value) -> Result<Value, CliError> {
             preflight: v1.preflight,
             failure: v1.failure,
             suite_fix: v1.suite_fix,
+            history: Vec::new(),
         },
         updated_at: v1.updated_at,
         transition_count: v1.transition_count,
