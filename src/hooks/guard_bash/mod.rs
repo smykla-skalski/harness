@@ -350,14 +350,7 @@ mod tests {
         assert!(is_tracked_harness_command(&words));
 
         let words: Vec<String> = vec![
-            "harness",
-            "run",
-            "record",
-            "--phase",
-            "setup",
-            "--",
-            "kumactl",
-            "version",
+            "harness", "run", "record", "--phase", "setup", "--", "kumactl", "version",
         ]
         .into_iter()
         .map(String::from)

@@ -222,7 +222,11 @@ mod tests {
     #[test]
     fn run_file_write_hint() {
         use suite_runner::RunFile;
-        assert!(RunFile::CommandLog.write_hint().contains("harness run record"));
+        assert!(
+            RunFile::CommandLog
+                .write_hint()
+                .contains("harness run record")
+        );
         assert!(
             RunFile::RunReport
                 .write_hint()

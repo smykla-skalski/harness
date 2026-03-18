@@ -26,9 +26,7 @@ impl ValidatedRunLayout {
     pub fn new(layout: RunLayout) -> Result<Self, CliError> {
         let run_dir = layout.run_dir();
         if !run_dir.is_dir() {
-            return Err(
-                CliErrorKind::missing_file(run_dir.to_string_lossy().into_owned()).into(),
-            );
+            return Err(CliErrorKind::missing_file(run_dir.to_string_lossy().into_owned()).into());
         }
         Ok(Self { layout })
     }

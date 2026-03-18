@@ -185,14 +185,13 @@ pub(super) static HARNESS_INFRASTRUCTURE_SIGNALS: &[&str] =
 
 /// Harness subsystem keywords that, combined with a failure word, indicate
 /// the assistant identified a harness misconfiguration.
-pub(super) static HARNESS_SUBSYSTEM_KEYWORDS: &[&str] =
-    &[
-        "harness bootstrap",
-        "harness cluster",
-        "harness setup",
-        "harness setup bootstrap",
-        "harness setup cluster",
-    ];
+pub(super) static HARNESS_SUBSYSTEM_KEYWORDS: &[&str] = &[
+    "harness bootstrap",
+    "harness cluster",
+    "harness setup",
+    "harness setup bootstrap",
+    "harness setup cluster",
+];
 
 /// Failure words paired with harness subsystem keywords.
 pub(super) static HARNESS_SUBSYSTEM_FAILURE_WORDS: &[&str] =

@@ -1,7 +1,7 @@
 use crate::errors::{CliError, HookMessage};
 use crate::hooks::protocol::context::GuardContext as HookContext;
-use crate::shell_parse::HarnessCommandInvocationRef;
 use crate::run::workflow::{FailureKind, RunnerPhase, RunnerWorkflowState};
+use crate::shell_parse::HarnessCommandInvocationRef;
 
 use super::effects::{self, HookOutcome};
 

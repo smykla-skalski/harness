@@ -2,9 +2,9 @@ use std::env;
 use std::path::PathBuf;
 use std::sync::Arc;
 
+use crate::errors::CliError;
 use crate::infra::blocks::BlockRegistry;
 use crate::run::context::{RunAggregate, RunContext, RunRepository};
-use crate::errors::CliError;
 use crate::run::resolve::resolve_run_directory;
 use crate::run::services::RunServices;
 

@@ -4,8 +4,8 @@ use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 
-use crate::infra::blocks::{BlockError, ProcessExecutor};
 use crate::core_defs::CommandResult;
+use crate::infra::blocks::{BlockError, ProcessExecutor};
 
 /// A single build target invocation.
 ///
@@ -198,8 +198,8 @@ mod tests {
     use std::sync::Arc;
 
     use super::*;
-    use crate::infra::blocks::{FakeProcessExecutor, FakeProcessMethod, FakeResponse};
     use crate::core_defs::CommandResult;
+    use crate::infra::blocks::{FakeProcessExecutor, FakeProcessMethod, FakeResponse};
 
     fn success_result(args: &[&str]) -> CommandResult {
         CommandResult {

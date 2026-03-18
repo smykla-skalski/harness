@@ -13,23 +13,22 @@ use std::sync::Arc;
 use rayon::prelude::*;
 use tracing::warn;
 
-use crate::run::audit::write_run_status_with_audit;
+use crate::core_defs::utc_now;
+use crate::errors::{CliError, CliErrorKind};
 use crate::infra::blocks::{BlockRegistry, ContainerRuntime};
 #[cfg(test)]
 use crate::infra::blocks::{FakeHttpClient, FakeProcessExecutor, HttpClient, ProcessExecutor};
+use crate::infra::exec::{self, HttpMethod};
+use crate::infra::io::write_json_pretty;
 use crate::platform::cluster::{ClusterSpec, Platform};
+use crate::platform::kubectl_validate::resolve_kubectl_validate_binary;
+use crate::platform::runtime::{ClusterRuntime, ControlPlaneAccess, XdsAccess};
+use crate::run::audit::write_run_status_with_audit;
 use crate::run::context::{
     NodeCheckRecord, NodeCheckSnapshot, PreflightArtifact, RunContext, RunLayout, RunMetadata,
     ToolCheckRecord, ToolCheckSnapshot,
 };
-use crate::core_defs::utc_now;
-use crate::errors::{CliError, CliErrorKind};
-use crate::infra::exec::{self, HttpMethod};
-use crate::infra::io::write_json_pretty;
-use crate::platform::kubectl_validate::resolve_kubectl_validate_binary;
 use crate::run::prepared_suite::{PreparedSuiteArtifact, PreparedSuitePlan};
-use crate::platform::runtime::{ClusterRuntime, ControlPlaneAccess, XdsAccess};
-use crate::schema::{RunStatus, SuiteSpec};
 use crate::run::state_capture::{
     DockerContainerSnapshot, KubernetesCaptureSnapshot, KubernetesPodSnapshot,
     StateCaptureSnapshot, UniversalCaptureSnapshot, UniversalDataplaneCollection,
@@ -37,6 +36,7 @@ use crate::run::state_capture::{
 use crate::run::workflow::{
     PreflightStatus, RunnerEvent, RunnerPhase, apply_event, read_runner_state,
 };
+use crate::schema::{RunStatus, SuiteSpec};
 
 pub use cluster_health::{ClusterHealthReport, ClusterMemberHealthRecord};
 pub use status::{ClusterMemberStatusRecord, ClusterStatusReport, ServiceStatusRecord};
@@ -520,10 +520,10 @@ mod tests {
     use std::fs;
 
     use super::*;
-    use crate::run::context::RunLayout;
     use crate::infra::io::read_json_typed;
-    use crate::schema::{RunCounts, RunStatus, Verdict};
+    use crate::run::context::RunLayout;
     use crate::run::workflow::{PreflightStatus, RunnerPhase, initialize_runner_state};
+    use crate::schema::{RunCounts, RunStatus, Verdict};
 
     fn write_suite(dir: &Path) -> PathBuf {
         let suite_dir = dir.join("suite");
