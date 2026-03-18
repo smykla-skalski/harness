@@ -1,5 +1,7 @@
 use std::collections::HashMap;
 use std::path::Path;
+#[cfg(test)]
+use std::sync;
 
 use crate::blocks::BlockError;
 use crate::core_defs::CommandResult;
@@ -101,8 +103,8 @@ fn command_label(args: &[&str]) -> String {
 
 #[cfg(test)]
 pub struct FakeProcessExecutor {
-    responses: std::sync::Mutex<Vec<FakeResponse>>,
-    invocations: std::sync::Mutex<Vec<FakeInvocation>>,
+    responses: sync::Mutex<Vec<FakeResponse>>,
+    invocations: sync::Mutex<Vec<FakeInvocation>>,
 }
 
 #[cfg(test)]
@@ -130,40 +132,29 @@ pub struct FakeResponse {
 
 #[cfg(test)]
 impl FakeProcessExecutor {
+    #[must_use]
     pub fn new(responses: Vec<FakeResponse>) -> Self {
         Self {
-            responses: std::sync::Mutex::new(responses),
-            invocations: std::sync::Mutex::new(Vec::new()),
+            responses: sync::Mutex::new(responses),
+            invocations: sync::Mutex::new(Vec::new()),
         }
     }
 
+    /// Returns recorded invocations.
+    ///
+    /// # Panics
+    /// Panics if the mutex is poisoned.
     #[must_use]
     pub fn invocations(&self) -> Vec<FakeInvocation> {
         self.invocations.lock().expect("lock poisoned").clone()
     }
 
-    fn next_response(
-        &self,
+    fn validate_response(
+        response: &FakeResponse,
         method: FakeProcessMethod,
         args: &[&str],
-    ) -> Result<CommandResult, BlockError> {
-        let actual_args = args
-            .iter()
-            .map(|arg| (*arg).to_string())
-            .collect::<Vec<_>>();
-        self.invocations
-            .lock()
-            .expect("lock poisoned")
-            .push(FakeInvocation {
-                method,
-                args: actual_args.clone(),
-            });
-        let mut responses = self.responses.lock().expect("lock poisoned");
-        assert!(
-            !responses.is_empty(),
-            "FakeProcessExecutor: no responses left"
-        );
-        let response = responses.remove(0);
+        actual_args: &[String],
+    ) {
         if let Some(expected_method) = response.expected_method {
             assert_eq!(
                 method, expected_method,
@@ -177,12 +168,34 @@ impl FakeProcessExecutor {
                 "FakeProcessExecutor: unexpected program"
             );
         }
-        if let Some(expected_args) = response.expected_args {
+        if let Some(ref expected_args) = response.expected_args {
             assert_eq!(
                 actual_args, expected_args,
                 "FakeProcessExecutor: unexpected args"
             );
         }
+    }
+
+    fn next_response(
+        &self,
+        method: FakeProcessMethod,
+        args: &[&str],
+    ) -> Result<CommandResult, BlockError> {
+        let actual_args: Vec<String> = args.iter().map(|arg| (*arg).to_string()).collect();
+        self.invocations
+            .lock()
+            .expect("lock poisoned")
+            .push(FakeInvocation {
+                method,
+                args: actual_args.clone(),
+            });
+        let mut responses = self.responses.lock().expect("lock poisoned");
+        assert!(
+            !responses.is_empty(),
+            "FakeProcessExecutor: no responses left"
+        );
+        let response = responses.remove(0);
+        Self::validate_response(&response, method, args, &actual_args);
         response.result
     }
 }

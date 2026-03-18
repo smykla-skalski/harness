@@ -2,6 +2,7 @@ use std::fs;
 use std::path::Path;
 
 use crate::errors::{CliError, HookMessage};
+use crate::hook::HookResult;
 use crate::hooks::context::GuardContext as HookContext;
 use crate::workflow::runner::RunnerWorkflowState;
 
@@ -20,12 +21,12 @@ pub fn execute(ctx: &HookContext) -> Result<HookOutcome, CliError> {
     }
     super::dispatch_outcome_by_skill(
         ctx,
-        |ctx| verify_suite_runner(ctx, &paths),
+        |ctx| Ok(verify_suite_runner(ctx, &paths)),
         |_ctx| Ok(HookOutcome::from_hook_result(verify_suite_author(&paths))),
     )
 }
 
-fn verify_suite_author(paths: &[&Path]) -> crate::hook::HookResult {
+fn verify_suite_author(paths: &[&Path]) -> HookResult {
     for raw_path in paths {
         let name = raw_path
             .file_name()
@@ -40,10 +41,10 @@ fn verify_suite_author(paths: &[&Path]) -> crate::hook::HookResult {
             .into_result();
         }
     }
-    crate::hook::HookResult::allow()
+    HookResult::allow()
 }
 
-fn verify_suite_runner(ctx: &HookContext, paths: &[&Path]) -> Result<HookOutcome, CliError> {
+fn verify_suite_runner(ctx: &HookContext, paths: &[&Path]) -> HookOutcome {
     let run_dir = ctx.effective_run_dir();
     let suite_dir = ctx.suite_dir();
     let mut next_state = ctx.runner_state.clone();
@@ -54,7 +55,7 @@ fn verify_suite_runner(ctx: &HookContext, paths: &[&Path]) -> Result<HookOutcome
             && is_command_owned_run_file(&path, rd)
         {
             let hint = control_file_hint(&path);
-            return Ok(HookOutcome::from_hook_result(
+            return HookOutcome::from_hook_result(
                 HookMessage::runner_flow_required(
                     "edit run control files",
                     format!(
@@ -64,20 +65,20 @@ fn verify_suite_runner(ctx: &HookContext, paths: &[&Path]) -> Result<HookOutcome
                     ),
                 )
                 .into_result(),
-            ));
+            );
         }
         let name = path.file_name().map_or("", |n| n.to_str().unwrap_or(""));
         if name == "amendments.md"
             && path.exists()
             && fs::read_to_string(&path).is_ok_and(|content| content.trim().is_empty())
         {
-            return Ok(HookOutcome::from_hook_result(
+            return HookOutcome::from_hook_result(
                 HookMessage::suite_incomplete(format!(
                     "suite amendments entry is missing or empty: {}",
                     raw_path.display()
                 ))
                 .into_result(),
-            ));
+            );
         }
         if let Some(suite_root) = suite_dir.as_deref()
             && let Some(current_state) = next_state.as_ref()
@@ -101,7 +102,7 @@ fn verify_suite_runner(ctx: &HookContext, paths: &[&Path]) -> Result<HookOutcome
             state,
         });
     }
-    Ok(outcome)
+    outcome
 }
 
 #[cfg(test)]

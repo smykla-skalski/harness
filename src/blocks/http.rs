@@ -1,3 +1,5 @@
+#[cfg(test)]
+use std::sync;
 use std::time::Duration;
 
 use crate::blocks::BlockError;
@@ -124,7 +126,7 @@ impl HttpClient for ReqwestHttpClient {
 
 #[cfg(test)]
 pub struct FakeHttpClient {
-    responses: std::sync::Mutex<Vec<FakeHttpResponse>>,
+    responses: sync::Mutex<Vec<FakeHttpResponse>>,
 }
 
 #[cfg(test)]
@@ -135,12 +137,14 @@ pub struct FakeHttpResponse {
 
 #[cfg(test)]
 impl FakeHttpClient {
+    #[must_use]
     pub fn new(responses: Vec<FakeHttpResponse>) -> Self {
         Self {
-            responses: std::sync::Mutex::new(responses),
+            responses: sync::Mutex::new(responses),
         }
     }
 
+    #[must_use]
     pub fn single(status: u16, body: &str) -> Self {
         Self::new(vec![FakeHttpResponse {
             status,
@@ -174,6 +178,7 @@ impl HttpClient for FakeHttpClient {
 
 #[cfg(test)]
 mod tests {
+    use std::io::{Read as _, Write as _};
     use std::net::TcpListener;
     use std::thread;
 
@@ -190,13 +195,13 @@ mod tests {
         let handle = thread::spawn(move || {
             let (mut stream, _) = listener.accept().unwrap();
             let mut buf = [0u8; 4096];
-            let n = std::io::Read::read(&mut stream, &mut buf).unwrap_or(0);
+            let n = stream.read(&mut buf).unwrap_or(0);
             let request = String::from_utf8_lossy(&buf[..n]).to_string();
             let response = format!(
                 "HTTP/1.1 200 OK\r\nContent-Type: {ct}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
                 body.len()
             );
-            std::io::Write::write_all(&mut stream, response.as_bytes()).ok();
+            stream.write_all(response.as_bytes()).ok();
             request
         });
         (port, handle)

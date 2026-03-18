@@ -10,7 +10,7 @@ use super::repository::RunRepository;
 use super::{PreflightArtifact, RunLayout, RunMetadata};
 
 /// Full run aggregate combining layout, metadata, status, cluster, etc.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct RunAggregate {
     pub layout: RunLayout,
     pub metadata: RunMetadata,

@@ -1,6 +1,7 @@
 use serde_json::json;
 
 use crate::errors::CliError;
+use crate::hooks::HookType;
 use crate::hooks::adapters::{
     AgentAdapter, HookRegistration, RenderedHookResponse, parse_process_payload, payload_context,
 };
@@ -11,7 +12,7 @@ use crate::hooks::result::NormalizedHookResult;
 pub struct ClaudeCodeAdapter;
 
 impl AgentAdapter for ClaudeCodeAdapter {
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         "claude-code"
     }
 
@@ -91,16 +92,13 @@ impl AgentAdapter for ClaudeCodeAdapter {
     }
 }
 
-fn event_to_hook_type(event: &NormalizedEvent) -> crate::hooks::HookType {
+fn event_to_hook_type(event: &NormalizedEvent) -> HookType {
     match event {
-        NormalizedEvent::BeforeToolUse => crate::hooks::HookType::PreToolUse,
-        NormalizedEvent::AfterToolUse => crate::hooks::HookType::PostToolUse,
-        NormalizedEvent::AfterToolUseFailure => crate::hooks::HookType::PostToolUseFailure,
-        NormalizedEvent::SubagentStart => crate::hooks::HookType::SubagentStart,
-        NormalizedEvent::SubagentStop => crate::hooks::HookType::SubagentStop,
-        NormalizedEvent::AgentStop | NormalizedEvent::SessionEnd => {
-            crate::hooks::HookType::Blocking
-        }
-        _ => crate::hooks::HookType::PostToolUse,
+        NormalizedEvent::BeforeToolUse => HookType::PreToolUse,
+        NormalizedEvent::AfterToolUseFailure => HookType::PostToolUseFailure,
+        NormalizedEvent::SubagentStart => HookType::SubagentStart,
+        NormalizedEvent::SubagentStop => HookType::SubagentStop,
+        NormalizedEvent::AgentStop | NormalizedEvent::SessionEnd => HookType::Blocking,
+        _ => HookType::PostToolUse,
     }
 }

@@ -281,13 +281,14 @@ impl GuardContext {
         let parsed_command = ParsedCommandState::from_command_text(
             tool_input.get("command").and_then(Value::as_str),
         );
+        let skill_active = normalized.skill.active;
         let mut context = Self {
-            event: normalized.event.clone(),
-            session: normalized.session.clone(),
-            tool: normalized.tool.clone(),
-            agent: normalized.agent.clone(),
-            skill: normalized.skill.clone(),
-            skill_active: normalized.skill.active,
+            event: normalized.event,
+            session: normalized.session,
+            tool: normalized.tool,
+            agent: normalized.agent,
+            skill: normalized.skill,
+            skill_active,
             run_dir: None,
             run: None,
             runner_state: None,
@@ -460,6 +461,8 @@ impl GuardContext {
         self.tool_input().get("command").and_then(Value::as_str)
     }
 
+    /// # Errors
+    /// Returns `CliError` when shell tokenization of the command text fails.
     pub fn command_words(&self) -> Result<&[String], CliError> {
         self.parsed_command()
             .map(|command| command.map_or(&[][..], ParsedCommand::words))
@@ -535,17 +538,23 @@ impl GuardContext {
         self.skill.is_author
     }
 
+    /// # Errors
+    /// Returns `CliError` when shell tokenization of the command text fails.
     pub fn significant_words(&self) -> Result<Vec<&str>, CliError> {
         self.parsed_command().map(|command| {
             command.map_or_else(Vec::new, |parsed| parsed.significant_words().collect())
         })
     }
 
+    /// # Errors
+    /// Returns `CliError` when shell tokenization of the command text fails.
     pub fn command_heads(&self) -> Result<&[String], CliError> {
         self.parsed_command()
             .map(|command| command.map_or(&[][..], ParsedCommand::heads))
     }
 
+    /// # Errors
+    /// Returns `CliError` when shell tokenization of the command text fails.
     pub fn parsed_command(&self) -> Result<Option<&ParsedCommand>, CliError> {
         self.parsed_command.as_result()
     }
@@ -553,9 +562,9 @@ impl GuardContext {
 
 fn normalized_from_envelope(skill: &str, payload: HookEnvelopePayload) -> NormalizedHookContext {
     let raw = serde_json::to_value(&payload).unwrap_or(Value::Null);
-    let tool_name = payload.tool_name.clone();
-    let input_raw = payload.tool_input.clone();
-    let response_raw = payload.tool_response.clone();
+    let tool_name = payload.tool_name;
+    let input_raw = payload.tool_input;
+    let response_raw = payload.tool_response;
     let tool = (!tool_name.is_empty()).then(|| ToolContext {
         category: normalize_legacy_tool(&tool_name),
         input: normalize_tool_input(&tool_name, &input_raw),
@@ -569,18 +578,15 @@ fn normalized_from_envelope(skill: &str, payload: HookEnvelopePayload) -> Normal
         session: SessionContext {
             session_id: String::new(),
             cwd: env::current_dir().unwrap_or_else(|_| PathBuf::from(".")),
-            transcript_path: payload.transcript_path.clone(),
+            transcript_path: payload.transcript_path,
         },
         tool,
-        agent: payload
-            .last_assistant_message
-            .clone()
-            .map(|response| AgentContext {
-                agent_id: None,
-                agent_type: None,
-                prompt: None,
-                response: Some(response),
-            }),
+        agent: payload.last_assistant_message.map(|response| AgentContext {
+            agent_id: None,
+            agent_type: None,
+            prompt: None,
+            response: Some(response),
+        }),
         skill: SkillContext::from_skill_name(skill),
         raw: RawPayload::new(raw),
     }

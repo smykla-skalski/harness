@@ -1,4 +1,6 @@
-use std::fs::{self, OpenOptions};
+use std::ffi::OsStr;
+use std::fmt;
+use std::fs::{self, File, OpenOptions};
 use std::marker::PhantomData;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -15,6 +17,9 @@ use crate::io;
 #[derive(Debug, thiserror::Error)]
 #[error("{0}")]
 pub struct TransitionError(pub String);
+
+/// A boxed migration closure accepted by `with_migrations`.
+pub type BoxedMigration = Box<dyn Fn(Value) -> Result<Value, CliError> + Send + Sync>;
 
 type MigrationFn = Arc<dyn Fn(Value) -> Result<Value, CliError> + Send + Sync>;
 
@@ -41,10 +46,7 @@ where
     }
 
     #[must_use]
-    pub fn with_migrations(
-        mut self,
-        migrations: Vec<Box<dyn Fn(Value) -> Result<Value, CliError> + Send + Sync>>,
-    ) -> Self {
+    pub fn with_migrations(mut self, migrations: Vec<BoxedMigration>) -> Self {
         self.migrations = migrations.into_iter().map(Arc::from).collect();
         self
     }
@@ -67,7 +69,7 @@ where
         let Some(contents) = self.read_value()? else {
             return Ok(None);
         };
-        if self.schema_version(&contents) == self.current_version {
+        if Self::schema_version(&contents) == self.current_version {
             return self.deserialize(contents).map(Some);
         }
 
@@ -139,7 +141,7 @@ where
     }
 
     fn migrate_value(&self, contents: Value) -> Result<(Value, bool), CliError> {
-        let mut version = self.schema_version(&contents);
+        let mut version = Self::schema_version(&contents);
         if version == self.current_version {
             return Ok((contents, false));
         }
@@ -174,7 +176,7 @@ where
             })?;
             data = migration(data)?;
 
-            let next_version = self.schema_version(&data);
+            let next_version = Self::schema_version(&data);
             if next_version != version + 1 {
                 return Err(CliErrorKind::workflow_version(cow!(
                     "migration for {} produced schema version v{next_version}, expected v{}",
@@ -210,7 +212,7 @@ where
         })
     }
 
-    fn schema_version(&self, contents: &Value) -> u32 {
+    fn schema_version(contents: &Value) -> u32 {
         contents
             .get("schema_version")
             .and_then(Value::as_u64)
@@ -218,7 +220,7 @@ where
             .unwrap_or(0)
     }
 
-    fn workflow_parse_error(&self, error: impl std::fmt::Display) -> CliError {
+    fn workflow_parse_error(&self, error: impl fmt::Display) -> CliError {
         CliErrorKind::workflow_parse(cow!("failed to parse {}: {error}", self.path.display()))
             .with_details(error.to_string())
     }
@@ -227,12 +229,12 @@ where
         let file_name = self
             .path
             .file_name()
-            .and_then(std::ffi::OsStr::to_str)
+            .and_then(OsStr::to_str)
             .map_or_else(|| "state.json".to_string(), ToString::to_string);
         self.path.with_file_name(format!("{file_name}.lock"))
     }
 
-    fn open_lock_file(&self) -> Result<std::fs::File, CliError> {
+    fn open_lock_file(&self) -> Result<File, CliError> {
         let lock_path = self.lock_path();
         if let Some(parent) = lock_path.parent() {
             fs::create_dir_all(parent).map_err(|error| -> CliError {
@@ -283,8 +285,7 @@ where
 
         match (result, unlock_result) {
             (Ok(value), Ok(())) => Ok(value),
-            (Err(error), Ok(())) | (Err(error), Err(_)) => Err(error),
-            (Ok(_), Err(error)) => Err(error),
+            (Err(error), Ok(()) | Err(_)) | (Ok(_), Err(error)) => Err(error),
         }
     }
 }

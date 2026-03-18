@@ -5,12 +5,12 @@ use crate::hooks::adapters::{
     AgentAdapter, HookRegistration, RenderedHookResponse, parse_process_payload, payload_context,
 };
 use crate::hooks::context::{NormalizedEvent, NormalizedHookContext, ToolCategory};
-use crate::hooks::result::NormalizedHookResult;
+use crate::hooks::result::{NormalizedDecision, NormalizedHookResult};
 
 pub struct OpenCodeAdapter;
 
 impl AgentAdapter for OpenCodeAdapter {
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         "opencode"
     }
 
@@ -28,10 +28,10 @@ impl AgentAdapter for OpenCodeAdapter {
     ) -> RenderedHookResponse {
         let payload = json!({
             "decision": match result.decision {
-                crate::hooks::result::NormalizedDecision::Allow => "allow",
-                crate::hooks::result::NormalizedDecision::Deny => "deny",
-                crate::hooks::result::NormalizedDecision::Warn => "warn",
-                crate::hooks::result::NormalizedDecision::Info => "info",
+                NormalizedDecision::Allow => "allow",
+                NormalizedDecision::Deny => "deny",
+                NormalizedDecision::Warn => "warn",
+                NormalizedDecision::Info => "info",
             },
             "reason": result.reason,
             "code": result.code,

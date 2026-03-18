@@ -10,7 +10,7 @@ use crate::hooks::result::{NormalizedDecision, NormalizedHookResult};
 pub struct GeminiCliAdapter;
 
 impl AgentAdapter for GeminiCliAdapter {
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         "gemini-cli"
     }
 
@@ -36,30 +36,7 @@ impl AgentAdapter for GeminiCliAdapter {
             };
         }
 
-        let mut payload = json!({});
-        if result.is_denial() {
-            payload["decision"] = json!("deny");
-            payload["reason"] = json!(result.display_message());
-        } else if matches!(
-            result.decision,
-            NormalizedDecision::Warn | NormalizedDecision::Info
-        ) {
-            payload["systemMessage"] = json!(result.display_message());
-        }
-        if let Some(updated_input) = &result.updated_input {
-            payload["hookSpecificOutput"]["tool_input"] = updated_input.clone();
-        }
-        if let Some(additional_context) = &result.additional_context {
-            payload["hookSpecificOutput"]["additionalContext"] = json!(additional_context);
-        }
-        if result.halt_agent {
-            payload["continue"] = json!(false);
-        }
-        if result.suppress_output {
-            payload["suppressOutput"] = json!(true);
-        }
-        payload["hookSpecificOutput"]["eventName"] =
-            json!(self.event_name(event).unwrap_or("unknown"));
+        let payload = build_gemini_payload(result, self.event_name(event).unwrap_or("unknown"));
         RenderedHookResponse {
             stdout: serde_json::to_string(&payload).expect("hand-built JSON serializes"),
             exit_code: 0,
@@ -80,8 +57,9 @@ impl AgentAdapter for GeminiCliAdapter {
     fn event_name(&self, event: &NormalizedEvent) -> Option<&str> {
         match event {
             NormalizedEvent::BeforeToolUse => Some("BeforeTool"),
-            NormalizedEvent::AfterToolUse => Some("AfterTool"),
-            NormalizedEvent::AfterToolUseFailure => Some("AfterTool"),
+            NormalizedEvent::AfterToolUse | NormalizedEvent::AfterToolUseFailure => {
+                Some("AfterTool")
+            }
             NormalizedEvent::SessionStart => Some("SessionStart"),
             NormalizedEvent::SessionEnd => Some("SessionEnd"),
             NormalizedEvent::AgentStart => Some("BeforeAgent"),
@@ -119,4 +97,36 @@ impl AgentAdapter for GeminiCliAdapter {
         serde_json::to_string_pretty(&json!({ "hooks": events }))
             .expect("hand-built JSON serializes")
     }
+}
+
+fn build_gemini_payload(result: &NormalizedHookResult, event_name: &str) -> serde_json::Value {
+    let mut payload = gemini_decision_payload(result);
+    if let Some(updated_input) = &result.updated_input {
+        payload["hookSpecificOutput"]["tool_input"] = updated_input.clone();
+    }
+    if let Some(additional_context) = &result.additional_context {
+        payload["hookSpecificOutput"]["additionalContext"] = json!(additional_context);
+    }
+    if result.halt_agent {
+        payload["continue"] = json!(false);
+    }
+    if result.suppress_output {
+        payload["suppressOutput"] = json!(true);
+    }
+    payload["hookSpecificOutput"]["eventName"] = json!(event_name);
+    payload
+}
+
+fn gemini_decision_payload(result: &NormalizedHookResult) -> serde_json::Value {
+    let mut payload = json!({});
+    if result.is_denial() {
+        payload["decision"] = json!("deny");
+        payload["reason"] = json!(result.display_message());
+    } else if matches!(
+        result.decision,
+        NormalizedDecision::Warn | NormalizedDecision::Info
+    ) {
+        payload["systemMessage"] = json!(result.display_message());
+    }
+    payload
 }

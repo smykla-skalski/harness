@@ -408,7 +408,7 @@ fn universal_single_up_compose(
 
     let project = format!("harness-{cp_name}");
     info!(%cp_name, "starting compose services");
-    compose_runtime.up(&compose_path, &project, Duration::from_secs(180))?;
+    compose_runtime.up(&compose_path, &project, Duration::from_mins(3))?;
     info!(%cp_name, "compose services started");
 
     let compose_network = format!("{project}_{network}");
@@ -472,7 +472,7 @@ fn universal_global_zone_up(
 
     let project = format!("harness-{global_name}");
     info!("starting compose services for global + zone");
-    compose_runtime.up(&compose_path, &project, Duration::from_secs(180))?;
+    compose_runtime.up(&compose_path, &project, Duration::from_mins(3))?;
     info!("compose services started");
 
     let compose_network = format!("{project}_{network}");
@@ -551,7 +551,7 @@ fn universal_global_two_zones_up(
 
     let project = format!("harness-{global_name}");
     info!("starting compose services for global + two zones");
-    compose_runtime.up(&compose_path, &project, Duration::from_secs(180))?;
+    compose_runtime.up(&compose_path, &project, Duration::from_mins(3))?;
     info!("compose services started");
 
     let compose_network = format!("{project}_{network}");

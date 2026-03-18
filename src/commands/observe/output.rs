@@ -1,3 +1,4 @@
+use std::cmp::Reverse;
 use std::collections::HashMap;
 use std::fmt::Write as _;
 
@@ -156,7 +157,7 @@ pub fn render_top_causes(issues: &[Issue], top_n: usize) -> String {
         .into_iter()
         .map(|(code, (count, summary))| (code, count, summary))
         .collect();
-    sorted.sort_by(|a, b| b.1.cmp(&a.1));
+    sorted.sort_by_key(|entry| Reverse(entry.1));
     sorted.truncate(top_n);
 
     // json!() values built from valid data always serialize successfully.

@@ -71,7 +71,7 @@ fn render_post_tool_use_output_normalized(
     if let Some(additional_context) = &result.additional_context {
         payload["hookSpecificOutput"]["additionalContext"] = json!(additional_context);
     } else if result.decision != NormalizedDecision::Allow {
-        payload["hookSpecificOutput"]["additionalContext"] = json!(message.clone());
+        payload["hookSpecificOutput"]["additionalContext"] = json!(message);
     }
     if let Some(updated_input) = &result.updated_input {
         payload["hookSpecificOutput"]["toolInput"] = updated_input.clone();
