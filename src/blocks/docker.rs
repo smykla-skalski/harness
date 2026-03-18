@@ -8,6 +8,8 @@ use crate::core_defs::CommandResult;
 
 #[cfg(test)]
 use std::collections::{HashMap, HashSet};
+#[cfg(test)]
+use std::sync;
 
 /// Configuration for starting a detached container.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -323,8 +325,8 @@ struct FakeContainer {
 #[cfg(test)]
 #[derive(Debug, Default)]
 pub struct FakeContainerRuntime {
-    containers: std::sync::Mutex<HashMap<String, FakeContainer>>,
-    networks: std::sync::Mutex<HashSet<String>>,
+    containers: sync::Mutex<HashMap<String, FakeContainer>>,
+    networks: sync::Mutex<HashSet<String>>,
 }
 
 #[cfg(test)]
@@ -439,7 +441,6 @@ impl ContainerRuntime for FakeContainerRuntime {
             .map(|(name, container)| match format_template {
                 "{{.ID}}" => container.id.clone(),
                 "{{.Image}}" => container.image.clone(),
-                "{{.Names}}" => name.clone(),
                 "{{.Names}}\t{{.Status}}" => format!(
                     "{name}\t{}",
                     if container.running {

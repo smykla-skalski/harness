@@ -4,6 +4,7 @@ use std::sync::LazyLock;
 use regex::Regex;
 
 use crate::errors::{CliError, HookMessage};
+use crate::hook::HookResult;
 use crate::hooks::context::GuardContext as HookContext;
 use crate::rules::suite_runner::{self as runner_rules, PreflightReply};
 use crate::workflow::runner::RunnerPhase;
@@ -30,18 +31,20 @@ const CODE_BLOCK_LINE_LIMIT: usize = 60;
 /// # Errors
 /// Returns `CliError` on failure.
 pub fn execute(ctx: &HookContext) -> Result<HookOutcome, CliError> {
-    super::dispatch_outcome_by_skill(ctx, validate_suite_runner, |ctx| {
-        Ok(HookOutcome::from_hook_result(validate_suite_author(ctx)))
-    })
+    super::dispatch_outcome_by_skill(
+        ctx,
+        |ctx| Ok(validate_suite_runner(ctx)),
+        |ctx| Ok(HookOutcome::from_hook_result(validate_suite_author(ctx))),
+    )
 }
 
-fn validate_suite_author(ctx: &HookContext) -> crate::hook::HookResult {
+fn validate_suite_author(ctx: &HookContext) -> HookResult {
     if ctx.stop_hook_active() {
-        return crate::hook::HookResult::allow();
+        return HookResult::allow();
     }
     let message = ctx.last_assistant_message().to_lowercase();
     if message.is_empty() {
-        return crate::hook::HookResult::allow();
+        return HookResult::allow();
     }
     let stripped = message.trim_end_matches('.');
     if !stripped.ends_with("saved") {
@@ -52,84 +55,85 @@ fn validate_suite_author(ctx: &HookContext) -> crate::hook::HookResult {
             return HookMessage::ReaderOversizedBlock.into_result();
         }
     }
-    crate::hook::HookResult::allow()
+    HookResult::allow()
 }
 
-fn validate_suite_runner(ctx: &HookContext) -> Result<HookOutcome, CliError> {
+fn validate_suite_runner(ctx: &HookContext) -> HookOutcome {
     if ctx.run.is_none() {
-        return Ok(HookOutcome::from_hook_result(
+        return HookOutcome::from_hook_result(
             HookMessage::runner_state_invalid(
                 "run context is missing; initialize the suite run first",
             )
             .into_result(),
-        ));
+        );
     }
     let message = ctx.last_assistant_message();
     if message.is_empty() {
-        return Ok(HookOutcome::allow());
+        return HookOutcome::allow();
     }
     let reply = match parse_preflight_reply(message) {
         Ok(r) => r,
         Err(detail) => {
-            return Ok(HookOutcome::from_hook_result(
+            return HookOutcome::from_hook_result(
                 HookMessage::preflight_reply_invalid(detail).into_result(),
-            ));
+            );
         }
     };
-    let state = ctx.runner_state.as_ref();
     if reply.status == PreflightReply::Fail {
-        if let Some(s) = state
-            && s.phase() == RunnerPhase::Preflight
-        {
-            let mut outcome = HookOutcome::allow();
-            if let Some(effect) = effects::transition_runner_state(ctx, |state| {
-                (state.phase() == RunnerPhase::Preflight)
-                    .then(|| state.request_preflight_failed("PreflightFailed"))
-            })? {
-                outcome = outcome.with_effect(effect);
-            }
-            return Ok(outcome);
-        }
-        return Ok(HookOutcome::from_hook_result(
-            HookMessage::PreflightMissing.into_result(),
-        ));
+        return handle_preflight_fail(ctx);
     }
-    // Pass reply - validate artifacts exist.
+    handle_preflight_pass(ctx)
+}
+
+fn handle_preflight_fail(ctx: &HookContext) -> HookOutcome {
+    if let Some(s) = ctx.runner_state.as_ref()
+        && s.phase() == RunnerPhase::Preflight
+    {
+        let mut outcome = HookOutcome::allow();
+        if let Some(effect) = effects::transition_runner_state(ctx, |state| {
+            (state.phase() == RunnerPhase::Preflight)
+                .then(|| state.request_preflight_failed("PreflightFailed"))
+        }) {
+            outcome = outcome.with_effect(effect);
+        }
+        return outcome;
+    }
+    HookOutcome::from_hook_result(HookMessage::PreflightMissing.into_result())
+}
+
+fn handle_preflight_pass(ctx: &HookContext) -> HookOutcome {
     if let Some(ref run) = ctx.run {
         if run.prepared_suite.is_none() || run.preflight.is_none() {
-            return Ok(HookOutcome::from_hook_result(
+            return HookOutcome::from_hook_result(
                 HookMessage::preflight_reply_invalid("preflight artifacts were not saved")
                     .into_result(),
-            ));
+            );
         }
         if !run.layout.prepared_suite_path().exists() {
-            return Ok(HookOutcome::from_hook_result(
+            return HookOutcome::from_hook_result(
                 HookMessage::preflight_reply_invalid(
                     "prepared-suite artifact is missing or incomplete",
                 )
                 .into_result(),
-            ));
+            );
         }
     }
-    // Transition to preflight captured.
-    if let Some(s) = state {
+    if let Some(s) = ctx.runner_state.as_ref() {
         if s.phase() == RunnerPhase::Preflight {
             let mut outcome = HookOutcome::allow();
             if let Some(effect) = effects::transition_runner_state(ctx, |state| {
                 (state.phase() == RunnerPhase::Preflight)
                     .then(|| state.record_preflight_captured("PreflightCaptured"))
-            })? {
+            }) {
                 outcome = outcome.with_effect(effect);
             }
-            return Ok(outcome);
+            return outcome;
         }
         if s.phase() == RunnerPhase::Execution {
-            return Ok(HookOutcome::allow());
+            return HookOutcome::allow();
         }
     }
-    Ok(HookOutcome::from_hook_result(
-        HookMessage::PreflightMissing.into_result(),
-    ))
+    HookOutcome::from_hook_result(HookMessage::PreflightMissing.into_result())
 }
 
 #[derive(Debug)]

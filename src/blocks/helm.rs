@@ -1,6 +1,8 @@
 use std::collections::HashMap;
 use std::path::Path;
 use std::sync::Arc;
+#[cfg(test)]
+use std::sync::Mutex;
 
 use serde::{Deserialize, Serialize};
 
@@ -220,8 +222,8 @@ impl PackageDeployer for HelmDeployer {
 #[cfg(test)]
 #[derive(Debug, Default)]
 pub struct FakePackageDeployer {
-    targets: std::sync::Mutex<Vec<String>>,
-    releases: std::sync::Mutex<HashMap<String, Vec<HelmSetting>>>,
+    targets: Mutex<Vec<String>>,
+    releases: Mutex<HashMap<String, Vec<HelmSetting>>>,
 }
 
 #[cfg(test)]

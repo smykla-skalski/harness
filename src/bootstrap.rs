@@ -264,88 +264,8 @@ fn process_agent_registrations(agent: HookAgent) -> Vec<HookRegistration> {
     }
 
     match agent {
-        HookAgent::ClaudeCode => registrations.extend([
-            hook_registration(
-                agent,
-                "guard-bash",
-                NormalizedEvent::BeforeToolUse,
-                Some("Bash"),
-            ),
-            hook_registration(
-                agent,
-                "guard-write",
-                NormalizedEvent::BeforeToolUse,
-                Some("Write|Edit"),
-            ),
-            hook_registration(
-                agent,
-                "guard-question",
-                NormalizedEvent::BeforeToolUse,
-                Some("AskUserQuestion"),
-            ),
-            hook_registration(agent, "guard-stop", NormalizedEvent::AgentStop, None),
-            hook_registration(
-                agent,
-                "verify-bash",
-                NormalizedEvent::AfterToolUse,
-                Some("Bash"),
-            ),
-            hook_registration(
-                agent,
-                "verify-write",
-                NormalizedEvent::AfterToolUse,
-                Some("Write|Edit"),
-            ),
-            hook_registration(
-                agent,
-                "verify-question",
-                NormalizedEvent::AfterToolUse,
-                Some("AskUserQuestion"),
-            ),
-            hook_registration(agent, "audit", NormalizedEvent::AfterToolUse, Some(".*")),
-            hook_registration(
-                agent,
-                "enrich-failure",
-                NormalizedEvent::AfterToolUseFailure,
-                Some(".*"),
-            ),
-            hook_registration(agent, "context-agent", NormalizedEvent::SubagentStart, None),
-            hook_registration(agent, "validate-agent", NormalizedEvent::SubagentStop, None),
-        ]),
-        HookAgent::GeminiCli => registrations.extend([
-            hook_registration(
-                agent,
-                "guard-bash",
-                NormalizedEvent::BeforeToolUse,
-                Some("run_shell_command"),
-            ),
-            hook_registration(
-                agent,
-                "guard-write",
-                NormalizedEvent::BeforeToolUse,
-                Some("write_file|replace"),
-            ),
-            hook_registration(agent, "guard-stop", NormalizedEvent::AgentStop, None),
-            hook_registration(
-                agent,
-                "verify-bash",
-                NormalizedEvent::AfterToolUse,
-                Some("run_shell_command"),
-            ),
-            hook_registration(
-                agent,
-                "verify-write",
-                NormalizedEvent::AfterToolUse,
-                Some("write_file|replace"),
-            ),
-            hook_registration(agent, "audit", NormalizedEvent::AfterToolUse, Some(".*")),
-            hook_registration(
-                agent,
-                "enrich-failure",
-                NormalizedEvent::AfterToolUseFailure,
-                Some(".*"),
-            ),
-        ]),
+        HookAgent::ClaudeCode => registrations.extend(claude_code_hooks(agent)),
+        HookAgent::GeminiCli => registrations.extend(gemini_cli_hooks(agent)),
         HookAgent::Codex => registrations.push(hook_registration(
             agent,
             "guard-stop",
@@ -356,6 +276,94 @@ fn process_agent_registrations(agent: HookAgent) -> Vec<HookRegistration> {
     }
 
     registrations
+}
+
+fn claude_code_hooks(agent: HookAgent) -> Vec<HookRegistration> {
+    vec![
+        hook_registration(
+            agent,
+            "guard-bash",
+            NormalizedEvent::BeforeToolUse,
+            Some("Bash"),
+        ),
+        hook_registration(
+            agent,
+            "guard-write",
+            NormalizedEvent::BeforeToolUse,
+            Some("Write|Edit"),
+        ),
+        hook_registration(
+            agent,
+            "guard-question",
+            NormalizedEvent::BeforeToolUse,
+            Some("AskUserQuestion"),
+        ),
+        hook_registration(agent, "guard-stop", NormalizedEvent::AgentStop, None),
+        hook_registration(
+            agent,
+            "verify-bash",
+            NormalizedEvent::AfterToolUse,
+            Some("Bash"),
+        ),
+        hook_registration(
+            agent,
+            "verify-write",
+            NormalizedEvent::AfterToolUse,
+            Some("Write|Edit"),
+        ),
+        hook_registration(
+            agent,
+            "verify-question",
+            NormalizedEvent::AfterToolUse,
+            Some("AskUserQuestion"),
+        ),
+        hook_registration(agent, "audit", NormalizedEvent::AfterToolUse, Some(".*")),
+        hook_registration(
+            agent,
+            "enrich-failure",
+            NormalizedEvent::AfterToolUseFailure,
+            Some(".*"),
+        ),
+        hook_registration(agent, "context-agent", NormalizedEvent::SubagentStart, None),
+        hook_registration(agent, "validate-agent", NormalizedEvent::SubagentStop, None),
+    ]
+}
+
+fn gemini_cli_hooks(agent: HookAgent) -> Vec<HookRegistration> {
+    vec![
+        hook_registration(
+            agent,
+            "guard-bash",
+            NormalizedEvent::BeforeToolUse,
+            Some("run_shell_command"),
+        ),
+        hook_registration(
+            agent,
+            "guard-write",
+            NormalizedEvent::BeforeToolUse,
+            Some("write_file|replace"),
+        ),
+        hook_registration(agent, "guard-stop", NormalizedEvent::AgentStop, None),
+        hook_registration(
+            agent,
+            "verify-bash",
+            NormalizedEvent::AfterToolUse,
+            Some("run_shell_command"),
+        ),
+        hook_registration(
+            agent,
+            "verify-write",
+            NormalizedEvent::AfterToolUse,
+            Some("write_file|replace"),
+        ),
+        hook_registration(agent, "audit", NormalizedEvent::AfterToolUse, Some(".*")),
+        hook_registration(
+            agent,
+            "enrich-failure",
+            NormalizedEvent::AfterToolUseFailure,
+            Some(".*"),
+        ),
+    ]
 }
 
 fn build_codex_config() -> String {
@@ -945,6 +953,12 @@ mod tests {
         assert!(bridge.contains("[\"session-start\", \"--project-dir\", directory]"));
     }
 
+    fn assert_codex_hooks(hooks: &str) {
+        assert!(hooks.contains("\"SessionStart\""));
+        assert!(hooks.contains("\"Stop\""));
+        assert!(!hooks.contains("guard-bash"));
+    }
+
     #[test]
     fn write_agent_bootstrap_writes_codex_notify_config() {
         let dir = tempfile::tempdir().unwrap();
@@ -956,12 +970,8 @@ mod tests {
         assert!(written.contains(&hooks_path));
         assert!(written.contains(&config_path));
 
-        let hooks = fs::read_to_string(hooks_path).unwrap();
+        assert_codex_hooks(&fs::read_to_string(hooks_path).unwrap());
         let config = fs::read_to_string(config_path).unwrap();
-
-        assert!(hooks.contains("\"SessionStart\""));
-        assert!(hooks.contains("\"Stop\""));
-        assert!(!hooks.contains("guard-bash"));
         assert!(config.contains("\"audit-turn\""));
         assert!(config.contains("codex_hooks = true"));
     }

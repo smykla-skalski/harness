@@ -52,6 +52,8 @@ impl HookOutcome {
         &self.effects
     }
 
+    /// # Panics
+    /// Panics when the outcome contains no `Decide` effect.
     #[must_use]
     pub fn decision(&self) -> &NormalizedHookResult {
         self.effects
@@ -124,20 +126,15 @@ pub(crate) fn persist_runner_state(
     Ok(true)
 }
 
-pub(crate) fn transition_runner_state<F>(
-    ctx: &GuardContext,
-    update: F,
-) -> Result<Option<HookEffect>, CliError>
+pub(crate) fn transition_runner_state<F>(ctx: &GuardContext, update: F) -> Option<HookEffect>
 where
     F: FnOnce(&RunnerWorkflowState) -> Option<RunnerWorkflowState>,
 {
-    let Some(current) = ctx.runner_state.as_ref() else {
-        return Ok(None);
-    };
-    Ok(update(current).map(|state| HookEffect::WriteRunnerState {
+    let current = ctx.runner_state.as_ref()?;
+    update(current).map(|state| HookEffect::WriteRunnerState {
         expected_transition_count: current.transition_count,
         state,
-    }))
+    })
 }
 
 pub(crate) fn apply_effects(
