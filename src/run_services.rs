@@ -342,21 +342,22 @@ impl RunServices {
                     running: exec::cluster_exists(&member.name).unwrap_or(false),
                 })
                 .collect::<Vec<_>>(),
-            Platform::Universal => spec
-                .members
-                .par_iter()
-                .map(|member| {
-                    let container = runtime.resolve_container_name(&member.name);
-                    ClusterMemberHealthRecord {
-                        name: member.name.as_str(),
-                        role: member.role.as_str(),
-                        running: self.docker.as_ref().map_or(false, |docker| {
-                            docker.is_running(&container).unwrap_or(false)
-                        }),
-                        container: Some(container),
-                    }
-                })
-                .collect::<Vec<_>>(),
+            Platform::Universal => {
+                spec.members
+                    .par_iter()
+                    .map(|member| {
+                        let container = runtime.resolve_container_name(&member.name);
+                        ClusterMemberHealthRecord {
+                            name: member.name.as_str(),
+                            role: member.role.as_str(),
+                            running: self.docker.as_ref().is_some_and(|docker| {
+                                docker.is_running(&container).unwrap_or(false)
+                            }),
+                            container: Some(container),
+                        }
+                    })
+                    .collect::<Vec<_>>()
+            }
         };
         if runtime.platform() == Platform::Universal
             && let Ok(network) = runtime.docker_network()
@@ -776,6 +777,7 @@ feature: demo
 scope: unit
 profiles: [single-zone]
 required_dependencies: []
+requires: []
 user_stories: []
 variant_decisions: []
 coverage_expectations: []
@@ -806,6 +808,7 @@ keep_clusters: false
             created_at: "2026-03-16T00:00:00Z".to_string(),
             user_stories: vec![],
             required_dependencies: vec![],
+            requires: vec![],
         };
         let status = RunStatus {
             run_id: layout.run_id.clone(),

@@ -107,6 +107,7 @@ fn populate_run_dir(
     let suite_id = spec.frontmatter.suite_id.clone();
     let user_stories = spec.frontmatter.user_stories.clone();
     let required_dependencies = spec.frontmatter.required_dependencies.clone();
+    let requires = spec.frontmatter.effective_requires();
 
     let metadata = RunMetadata {
         run_id: run_id.to_string(),
@@ -119,6 +120,7 @@ fn populate_run_dir(
         created_at: created_at.to_string(),
         user_stories,
         required_dependencies,
+        requires,
     };
 
     write_json_pretty(&layout.metadata_path(), &metadata)

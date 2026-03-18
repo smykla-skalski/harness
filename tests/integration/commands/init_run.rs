@@ -216,6 +216,7 @@ fn init_preserves_user_stories_from_suite() {
         vec!["prepare manifests once", "validate all resources"]
     );
     assert_eq!(metadata.required_dependencies, vec!["docker"]);
+    assert_eq!(metadata.requires, vec!["docker"]);
 }
 
 // ============================================================================

@@ -240,6 +240,7 @@ mod tests {
             keep_clusters: false,
             user_stories: vec![],
             required_dependencies: vec![],
+            requires: vec![],
         };
 
         temp_env::with_vars(
