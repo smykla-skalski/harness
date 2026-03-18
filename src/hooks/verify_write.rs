@@ -93,7 +93,13 @@ fn verify_suite_runner(ctx: &HookContext, paths: &[&Path]) -> Result<HookOutcome
     }
     let mut outcome = HookOutcome::allow();
     if let Some(state) = tracked_state {
-        outcome = outcome.with_effect(HookEffect::WriteRunnerState(state));
+        outcome = outcome.with_effect(HookEffect::WriteRunnerState {
+            expected_transition_count: ctx
+                .runner_state
+                .as_ref()
+                .map_or(0, |runner_state| runner_state.transition_count),
+            state,
+        });
     }
     Ok(outcome)
 }
