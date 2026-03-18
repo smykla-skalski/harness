@@ -4,11 +4,11 @@ use std::io;
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 
-use crate::infra::blocks::BlockRegistry;
 use crate::core_defs::dirs_home;
-use crate::errors::{CliError, CliErrorKind, cow};
+use crate::errors::{CliError, CliErrorKind};
 use crate::hooks::adapters::{HookAgent, HookRegistration, adapter_for};
 use crate::hooks::protocol::context::NormalizedEvent;
+use crate::infra::blocks::BlockRegistry;
 use crate::infra::io::write_text;
 
 /// Shell wrapper script that delegates to the project-local harness binary.
@@ -153,7 +153,7 @@ pub fn main_with_home(project_dir: &Path, path_env: &str, home: &Path) -> Result
     let legacy_path = project_dir.join(".claude").join("skills").join("harness");
 
     if !plugin_path.exists() && !legacy_path.exists() {
-        return Err(CliErrorKind::missing_file(cow!(
+        return Err(CliErrorKind::missing_file(format!(
             "missing source wrapper: {} or {}",
             plugin_path.display(),
             legacy_path.display()
@@ -432,19 +432,19 @@ fn build_opencode_bridge(registry: &BlockRegistry) -> Result<String, CliError> {
         .into_iter()
         .collect::<Vec<_>>();
     let denied_binaries_json = serde_json::to_string(&denied_binaries)
-        .map_err(|error| CliErrorKind::serialize(cow!("opencode denied binaries: {error}")))?;
+        .map_err(|error| CliErrorKind::serialize(format!("opencode denied binaries: {error}")))?;
     let tool_guards = serde_json::to_string(&serde_json::json!({
         "bash": "guard-bash",
         "write": "guard-write",
         "edit": "guard-write",
     }))
-    .map_err(|error| CliErrorKind::serialize(cow!("opencode tool guards: {error}")))?;
+    .map_err(|error| CliErrorKind::serialize(format!("opencode tool guards: {error}")))?;
     let tool_verifiers = serde_json::to_string(&serde_json::json!({
         "bash": "verify-bash",
         "write": "verify-write",
         "edit": "verify-write",
     }))
-    .map_err(|error| CliErrorKind::serialize(cow!("opencode tool verifiers: {error}")))?;
+    .map_err(|error| CliErrorKind::serialize(format!("opencode tool verifiers: {error}")))?;
 
     let bridge = include_str!("../../resources/opencode/harness-bridge.ts")
         .replace("__DENIED_BINARY_HINTS__", &denied_binaries_json)

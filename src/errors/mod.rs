@@ -17,26 +17,14 @@ use self::common::CommonError;
 use self::run_setup::RunSetupError;
 use self::workflow::WorkflowError;
 
-/// Build a `Cow<'static, str>` from a `format!`-style expression.
-///
-/// Produces `Cow::Owned(format!(...))` so the caller never needs a
-/// trailing `.into()`.
-macro_rules! cow {
-    ($($arg:tt)*) => {
-        ::std::borrow::Cow::Owned(format!($($arg)*))
-    };
-}
-
-pub(crate) use cow;
-
 /// Build an IO-category `CliErrorKind` from an operation name, path, and cause.
 ///
 /// Formats the message as `"{operation} {path}: {cause}"` and wraps it in
-/// `CliErrorKind::io`. Use this instead of manual `cow!()` formatting for
+/// `CliErrorKind::io`. Use this instead of manual string formatting for
 /// filesystem errors that reference a path.
 #[must_use]
 pub fn io_for(operation: &str, path: &Path, cause: &dyn fmt::Display) -> CliErrorKind {
-    CliErrorKind::io(cow!("{operation} {}: {cause}", path.display()))
+    CliErrorKind::io(format!("{operation} {}: {cause}", path.display()))
 }
 
 /// Named exit code constants for CLI process results.
@@ -587,7 +575,7 @@ impl From<CliErrorKind> for CliError {
 
 impl From<io::Error> for CliError {
     fn from(error: io::Error) -> Self {
-        CliErrorKind::io(cow!("IO error: {error}")).into()
+        CliErrorKind::io(format!("IO error: {error}")).into()
     }
 }
 

@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use serde::Deserialize;
 use serde_json::{Value, json};
 
-use crate::errors::{CliError, CliErrorKind, cow};
+use crate::errors::{CliError, CliErrorKind};
 use crate::hooks::adapters::{
     AgentAdapter, HookRegistration, ProcessHookPayload, RenderedHookResponse, payload_context,
 };
@@ -28,7 +28,7 @@ impl AgentAdapter for CodexAdapter {
         }
         let payload: ProcessHookPayload =
             serde_json::from_value(raw_value.clone()).map_err(|error| {
-                CliErrorKind::hook_payload_invalid(cow!("invalid hook payload: {error}"))
+                CliErrorKind::hook_payload_invalid(format!("invalid hook payload: {error}"))
             })?;
         Ok(payload_context(payload, raw_value, |tool_name| {
             self.normalize_tool(tool_name)
@@ -120,7 +120,7 @@ struct CodexNotifyPayload {
 
 fn parse_json_value(raw: &[u8]) -> Result<Value, CliError> {
     serde_json::from_slice(raw).map_err(|error| {
-        CliErrorKind::hook_payload_invalid(cow!("invalid hook payload: {error}")).into()
+        CliErrorKind::hook_payload_invalid(format!("invalid hook payload: {error}")).into()
     })
 }
 
@@ -131,7 +131,7 @@ fn is_notify_payload(value: &Value) -> bool {
 fn notify_payload_context(raw_value: Value) -> Result<NormalizedHookContext, CliError> {
     let payload: CodexNotifyPayload =
         serde_json::from_value(raw_value.clone()).map_err(|error| {
-            CliErrorKind::hook_payload_invalid(cow!("invalid hook payload: {error}"))
+            CliErrorKind::hook_payload_invalid(format!("invalid hook payload: {error}"))
         })?;
     let cwd = payload
         .cwd

@@ -5,7 +5,7 @@ use std::str::FromStr;
 
 use serde::{Deserialize, Serialize};
 
-use crate::errors::{CliError, CliErrorKind, cow};
+use crate::errors::{CliError, CliErrorKind};
 use crate::infra::io;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -98,7 +98,7 @@ impl RunReport {
         let (yaml_text, body) = io::extract_raw_frontmatter(&text)?;
 
         let frontmatter: RunReportFrontmatter = serde_yml::from_str(&yaml_text)
-            .map_err(|e| CliErrorKind::workflow_parse(cow!("report frontmatter: {e}")))?;
+            .map_err(|e| CliErrorKind::workflow_parse(format!("report frontmatter: {e}")))?;
 
         Ok(Self {
             frontmatter,

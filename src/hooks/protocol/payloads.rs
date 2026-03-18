@@ -8,10 +8,10 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tracing::warn;
 
-use crate::run::context::RunContext;
-use crate::errors::{CliError, CliErrorKind, cow};
-use crate::rules;
 use crate::authoring::workflow::{self as author_workflow, AuthorWorkflowState};
+use crate::errors::{CliError, CliErrorKind};
+use crate::rules;
+use crate::run::context::RunContext;
 use crate::run::workflow::{self as runner_workflow, RunnerWorkflowState};
 
 pub use crate::shell_parse::{HarnessCommandInvocationRef, ParsedCommand};
@@ -99,7 +99,7 @@ impl HookEnvelopePayload {
     /// expected envelope shape.
     pub fn from_json_text(text: &str) -> Result<Self, CliError> {
         serde_json::from_str(text).map_err(|error| {
-            CliErrorKind::hook_payload_invalid(cow!("invalid hook payload: {error}")).into()
+            CliErrorKind::hook_payload_invalid(format!("invalid hook payload: {error}")).into()
         })
     }
 
@@ -111,7 +111,7 @@ impl HookEnvelopePayload {
         use io::Read;
         let mut text = String::new();
         io::stdin().read_to_string(&mut text).map_err(|error| {
-            CliError::from(CliErrorKind::hook_payload_invalid(cow!(
+            CliError::from(CliErrorKind::hook_payload_invalid(format!(
                 "failed to read stdin: {error}"
             )))
         })?;
@@ -176,7 +176,7 @@ impl ParsedCommandState {
         match self {
             Self::Missing => Ok(None),
             Self::Parsed(parsed) => Ok(Some(parsed)),
-            Self::Error(error) => Err(CliErrorKind::hook_payload_invalid(cow!(
+            Self::Error(error) => Err(CliErrorKind::hook_payload_invalid(format!(
                 "shell tokenization failed: {error}"
             ))
             .into()),

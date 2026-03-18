@@ -9,7 +9,7 @@ use serde::Serialize;
 use serde::de::DeserializeOwned;
 use serde_json::Value;
 
-use crate::errors::{CliError, CliErrorKind, cow, io_for};
+use crate::errors::{CliError, CliErrorKind, io_for};
 
 pub use self::markdown::{append_markdown_row, as_list, as_mapping, drill};
 pub use self::yaml::extract_raw_frontmatter;
@@ -165,7 +165,7 @@ where
     T: Serialize,
 {
     let text = serde_json::to_string_pretty(payload)
-        .map_err(|e| CliErrorKind::serialize(cow!("JSON value: {e}")))?;
+        .map_err(|e| CliErrorKind::serialize(format!("JSON value: {e}")))?;
     write_text(path, &format!("{text}\n"))
 }
 

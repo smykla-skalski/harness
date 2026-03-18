@@ -3,7 +3,7 @@ use std::path::Path;
 use clap::Args;
 
 use crate::app::command_context::{CommandContext, Execute};
-use crate::errors::{CliError, CliErrorKind, cow};
+use crate::errors::{CliError, CliErrorKind};
 use crate::infra::io::{drill, read_text};
 
 impl Execute for DiffArgs {
@@ -40,7 +40,7 @@ fn render_diff_value(value: &serde_json::Value) -> Result<String, CliError> {
     match value {
         serde_json::Value::String(s) => Ok(s.clone()),
         other => serde_json::to_string_pretty(other)
-            .map_err(|e| CliErrorKind::serialize(cow!("render diff value: {e}")).into()),
+            .map_err(|e| CliErrorKind::serialize(format!("render diff value: {e}")).into()),
     }
 }
 

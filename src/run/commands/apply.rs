@@ -6,15 +6,15 @@ use clap::Args;
 
 use tracing::warn;
 
-use crate::platform::cluster::Platform;
 use crate::app::command_context::{CommandContext, Execute, RunDirArgs, resolve_run_services};
 use crate::core_defs::{shorten_path, utc_now};
-use crate::errors::{CliError, CliErrorKind, cow};
+use crate::errors::{CliError, CliErrorKind};
 use crate::infra::exec;
 use crate::infra::exec::kubectl;
 use crate::infra::io::{ensure_dir, validate_safe_segment, write_text};
-use crate::run::resolve::resolve_manifest_path;
+use crate::platform::cluster::Platform;
 use crate::platform::runtime::ClusterRuntime;
+use crate::run::resolve::resolve_manifest_path;
 
 use super::kumactl::find_kumactl_binary;
 
@@ -99,7 +99,7 @@ fn materialize_stdin(run_dir: &Path, step: Option<&str>) -> Result<PathBuf, CliE
     let mut content = String::new();
     io::stdin()
         .read_to_string(&mut content)
-        .map_err(|e| CliErrorKind::io(cow!("read stdin: {e}")))?;
+        .map_err(|e| CliErrorKind::io(format!("read stdin: {e}")))?;
     if content.trim().is_empty() {
         return Err(CliErrorKind::usage_error("stdin manifest is empty").into());
     }
@@ -141,9 +141,9 @@ fn apply_universal(
 
     // Try REST API first - parse manifest YAML and PUT to CP
     let content = fs::read_to_string(manifest)
-        .map_err(|e| CliErrorKind::io(cow!("read manifest {manifest}: {e}")))?;
+        .map_err(|e| CliErrorKind::io(format!("read manifest {manifest}: {e}")))?;
     let resource: serde_json::Value = serde_yml::from_str(&content)
-        .map_err(|e| CliErrorKind::io(cow!("parse manifest {manifest}: {e}")))?;
+        .map_err(|e| CliErrorKind::io(format!("parse manifest {manifest}: {e}")))?;
 
     if let (Some(resource_type), Some(name)) =
         (resource["type"].as_str(), resource["name"].as_str())

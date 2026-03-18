@@ -2,10 +2,10 @@ use std::env;
 
 use clap::Args;
 
-use crate::setup::wrapper;
 use crate::app::command_context::{CommandContext, Execute, resolve_project_dir};
-use crate::errors::{CliError, CliErrorKind, cow};
+use crate::errors::{CliError, CliErrorKind};
 use crate::hooks::adapters::HookAgent;
+use crate::setup::wrapper;
 
 impl Execute for BootstrapArgs {
     fn execute(&self, _context: &CommandContext) -> Result<i32, CliError> {
@@ -33,7 +33,7 @@ pub fn bootstrap(project_dir: Option<&str>, agent: HookAgent) -> Result<i32, Cli
     let path_env = env::var("PATH").unwrap_or_default();
     wrapper::main(&dir, &path_env)?;
     if !wrapper::harness_on_path(&path_env) {
-        return Err(CliErrorKind::usage_error(cow!(
+        return Err(CliErrorKind::usage_error(format!(
             "`harness` is not on PATH after bootstrap; add ~/.local/bin (or your chosen install dir) before using generated {agent:?} hooks"
         ))
         .into());
