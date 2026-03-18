@@ -6,12 +6,18 @@ use clap::Args;
 use tracing::info;
 
 use crate::blocks::{ContainerConfig, ContainerRuntime};
-use crate::commands::{CommandContext, RunDirArgs};
+use crate::commands::{CommandContext, Execute, RunDirArgs};
 use crate::errors::{CliError, CliErrorKind};
 use crate::exec;
 use crate::runtime::XdsAccess;
 
 use super::token::token_via_api;
+
+impl Execute for ServiceArgs {
+    fn execute(&self, context: &CommandContext) -> Result<i32, CliError> {
+        service(context, self)
+    }
+}
 
 // Embed templates at compile time so they ship with the binary.
 const TEMPLATE_DATAPLANE: &str =

@@ -1,8 +1,14 @@
 use clap::{Args, Subcommand};
 
-use crate::commands::{RunDirArgs, resolve_run_services};
+use crate::commands::{CommandContext, Execute, RunDirArgs, resolve_run_services};
 use crate::errors::{CliError, CliErrorKind};
 use crate::exec::HttpMethod;
+
+impl Execute for ApiArgs {
+    fn execute(&self, _context: &CommandContext) -> Result<i32, CliError> {
+        api(&self.method)
+    }
+}
 
 /// HTTP method for `harness api` requests.
 #[derive(Debug, Clone, Subcommand)]

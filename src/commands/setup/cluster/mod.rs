@@ -9,6 +9,7 @@ use clap::Args;
 use tracing::{debug, info};
 
 use crate::cluster::{ClusterSpec, Platform};
+use crate::commands::{CommandContext, Execute};
 use crate::context::RunRepository;
 use crate::errors::{CliError, CliErrorKind, cow};
 use crate::exec::{run_command, run_command_streaming};
@@ -16,6 +17,12 @@ use crate::io::write_json_pretty;
 
 use kubernetes::cluster_k8s;
 use universal::cluster_universal;
+
+impl Execute for ClusterArgs {
+    fn execute(&self, _context: &CommandContext) -> Result<i32, CliError> {
+        cluster(self)
+    }
+}
 
 /// Arguments for `harness cluster`.
 #[derive(Debug, Clone, Args)]

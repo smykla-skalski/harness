@@ -19,9 +19,16 @@ use clap::{Args, Subcommand};
 use serde_json::json;
 use tracing::warn;
 
+use crate::commands::{CommandContext, Execute};
 use crate::core_defs::harness_data_root;
 use crate::errors::{CliError, CliErrorKind};
 use crate::io::{read_text, write_json_pretty};
+
+impl Execute for ObserveArgs {
+    fn execute(&self, _context: &CommandContext) -> Result<i32, CliError> {
+        execute(self.mode.clone())
+    }
+}
 
 use self::types::{FOCUS_PRESETS, IssueCategory, IssueCode, IssueSeverity, ObserverState};
 

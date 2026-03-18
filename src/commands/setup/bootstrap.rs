@@ -3,9 +3,15 @@ use std::env;
 use clap::Args;
 
 use crate::bootstrap;
-use crate::commands::resolve_project_dir;
+use crate::commands::{CommandContext, Execute, resolve_project_dir};
 use crate::errors::{CliError, CliErrorKind, cow};
 use crate::hooks::adapters::HookAgent;
+
+impl Execute for BootstrapArgs {
+    fn execute(&self, _context: &CommandContext) -> Result<i32, CliError> {
+        bootstrap(self.project_dir.as_deref(), self.agent)
+    }
+}
 
 /// Arguments for `harness bootstrap`.
 #[derive(Debug, Clone, Args)]

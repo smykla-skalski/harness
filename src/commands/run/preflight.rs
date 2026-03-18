@@ -2,9 +2,20 @@ use clap::Args;
 
 use tracing::info;
 
-use crate::commands::{CommandContext, RunDirArgs};
+use crate::commands::{CommandContext, Execute, RunDirArgs};
 use crate::core_defs::{shorten_path, utc_now};
 use crate::errors::CliError;
+
+impl Execute for PreflightArgs {
+    fn execute(&self, context: &CommandContext) -> Result<i32, CliError> {
+        preflight(
+            context,
+            self.kubeconfig.as_deref(),
+            self.repo_root.as_deref(),
+            &self.run_dir,
+        )
+    }
+}
 
 /// Arguments for `harness preflight`.
 #[derive(Debug, Clone, Args)]

@@ -6,11 +6,21 @@ use std::sync::LazyLock;
 use clap::Args;
 use regex::Regex;
 
-use crate::commands::resolve_repo_root;
+use crate::commands::{CommandContext, Execute, resolve_repo_root};
 use crate::core_defs::HARNESS_PREFIX;
 use crate::errors::{CliError, CliErrorKind, cow};
 use crate::exec::{kubectl, run_command};
 use crate::io::ensure_dir;
+
+impl Execute for GatewayArgs {
+    fn execute(&self, _context: &CommandContext) -> Result<i32, CliError> {
+        gateway(
+            self.kubeconfig.as_deref(),
+            self.repo_root.as_deref(),
+            self.check_only,
+        )
+    }
+}
 
 // =========================================================================
 // gateway

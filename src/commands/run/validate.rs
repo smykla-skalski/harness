@@ -3,11 +3,22 @@ use std::path::{Path, PathBuf};
 use clap::Args;
 use rayon::prelude::*;
 
+use crate::commands::{CommandContext, Execute};
 use crate::core_defs::shorten_path;
 use crate::errors::{CliError, CliErrorKind};
 use crate::exec::kubectl;
 use crate::io::{read_text, write_text};
 use crate::manifests::default_validation_output;
+
+impl Execute for ValidateArgs {
+    fn execute(&self, _context: &CommandContext) -> Result<i32, CliError> {
+        validate(
+            self.kubeconfig.as_deref(),
+            &self.manifest,
+            self.output.as_deref(),
+        )
+    }
+}
 
 /// Arguments for `harness validate`.
 #[derive(Debug, Clone, Args)]

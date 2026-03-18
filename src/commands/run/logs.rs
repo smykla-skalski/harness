@@ -1,7 +1,13 @@
 use clap::Args;
 
-use crate::commands::{CommandContext, RunDirArgs};
+use crate::commands::{CommandContext, Execute, RunDirArgs};
 use crate::errors::{CliError, CliErrorKind};
+
+impl Execute for LogsArgs {
+    fn execute(&self, context: &CommandContext) -> Result<i32, CliError> {
+        logs(context, &self.name, self.tail, self.follow, &self.run_dir)
+    }
+}
 
 /// Arguments for `harness logs`.
 #[derive(Debug, Clone, Args)]

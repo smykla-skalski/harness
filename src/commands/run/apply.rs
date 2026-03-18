@@ -7,7 +7,7 @@ use clap::Args;
 use tracing::warn;
 
 use crate::cluster::Platform;
-use crate::commands::{RunDirArgs, resolve_run_services};
+use crate::commands::{CommandContext, Execute, RunDirArgs, resolve_run_services};
 use crate::core_defs::{shorten_path, utc_now};
 use crate::errors::{CliError, CliErrorKind, cow};
 use crate::exec;
@@ -17,6 +17,18 @@ use crate::resolve::resolve_manifest_path;
 use crate::runtime::ClusterRuntime;
 
 use super::kumactl::find_kumactl_binary;
+
+impl Execute for ApplyArgs {
+    fn execute(&self, _context: &CommandContext) -> Result<i32, CliError> {
+        apply(
+            self.kubeconfig.as_deref(),
+            self.cluster.as_deref(),
+            &self.manifest,
+            self.step.as_deref(),
+            &self.run_dir,
+        )
+    }
+}
 /// Arguments for `harness apply`.
 #[derive(Debug, Clone, Args)]
 pub struct ApplyArgs {

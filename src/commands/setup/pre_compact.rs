@@ -1,8 +1,14 @@
 use clap::Args;
 
-use crate::commands::resolve_project_dir;
+use crate::commands::{CommandContext, Execute, resolve_project_dir};
 use crate::compact::{build_compact_handoff, save_compact_handoff};
 use crate::errors::CliError;
+
+impl Execute for PreCompactArgs {
+    fn execute(&self, _context: &CommandContext) -> Result<i32, CliError> {
+        pre_compact(self.project_dir.as_deref())
+    }
+}
 
 /// Arguments for `harness pre-compact`.
 #[derive(Debug, Clone, Args)]
