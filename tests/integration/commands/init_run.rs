@@ -5,19 +5,23 @@
 use std::fs;
 use std::path::Path;
 
-use harness::cli::Command;
-use harness::commands::run::InitArgs;
-use harness::context::RunMetadata;
+use harness::app::cli::{Command, RunCommand};
 use harness::errors::CliError;
+use harness::run::RunMetadata;
+use harness::run::commands::InitArgs;
+use harness::run::workflow::{self as runner_workflow, RunnerPhase};
 use harness::schema::{RunStatus, Verdict};
-use harness::workflow::runner::{self as runner_workflow, RunnerPhase};
 
 use super::super::helpers::*;
 
 fn run_init(args: InitArgs, xdg_root: &Path) -> Result<i32, CliError> {
     temp_env::with_vars(
         [("XDG_DATA_HOME", Some(xdg_root.to_str().unwrap()))],
-        || run_command(Command::Init(args)),
+        || {
+            run_command(Command::Run {
+                command: RunCommand::Init(args),
+            })
+        },
     )
 }
 
@@ -217,25 +221,4 @@ fn init_preserves_user_stories_from_suite() {
     );
     assert_eq!(metadata.required_dependencies, vec!["docker"]);
     assert_eq!(metadata.requires, vec!["docker"]);
-}
-
-// ============================================================================
-// CLI-level init tests (require binary)
-// ============================================================================
-
-#[test]
-fn init_run_alias_still_works() {
-    // harness init-run (with hyphen) should be recognized as a valid subcommand
-    // It will fail because no suite is provided, but it should not say "unrecognized subcommand"
-    let output = harness_testkit::harness_cmd()
-        .arg("init-run")
-        .output()
-        .expect("run harness init-run");
-    let stderr = String::from_utf8_lossy(&output.stderr);
-    // Should NOT contain "unrecognized" - the alias should be recognized
-    // It may fail with a usage error (missing args), but that's expected
-    assert!(
-        !stderr.contains("unrecognized"),
-        "init-run should be a recognized alias: {stderr}"
-    );
 }

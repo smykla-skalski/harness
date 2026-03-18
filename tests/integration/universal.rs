@@ -11,11 +11,10 @@
 use std::fs;
 use std::path::Path;
 
-use harness::cli::Command;
-use harness::cluster::{ClusterMember, ClusterMode, ClusterSpec, HelmSetting, Platform};
-use harness::commands::run::ValidateArgs;
-use harness::compose::{self, GlobalTwoZonesConfig, ZoneConfig};
-use harness::context::{CommandEnv, RunContext, RunLayout};
+use harness::platform::cluster::{ClusterMember, ClusterMode, ClusterSpec, HelmSetting, Platform};
+use harness::platform::compose::{self, GlobalTwoZonesConfig, ZoneConfig};
+use harness::run::commands::ValidateArgs;
+use harness::run::context::{CommandEnv, RunContext, RunLayout};
 
 use super::helpers::*;
 
@@ -507,7 +506,7 @@ fn compose_single_zone_deterministic_output() {
 
 #[test]
 fn capabilities_command_exits_zero() {
-    let result = Command::Capabilities.execute();
+    let result = capabilities_cmd().execute();
     assert!(result.is_ok(), "capabilities should succeed: {result:?}");
     assert_eq!(result.unwrap(), 0);
 }
@@ -526,7 +525,7 @@ fn validate_universal_manifest_valid() {
     )
     .unwrap();
 
-    let result = Command::Validate(ValidateArgs {
+    let result = validate_cmd(ValidateArgs {
         kubeconfig: None,
         manifest: manifest_path.to_string_lossy().to_string(),
         output: None,
@@ -566,7 +565,7 @@ fn validate_universal_manifest_missing_required_fields() {
         let tmp = tempfile::tempdir().unwrap();
         let manifest_path = tmp.path().join("bad-manifest.yaml");
         fs::write(&manifest_path, yaml).unwrap();
-        let result = Command::Validate(ValidateArgs {
+        let result = validate_cmd(ValidateArgs {
             kubeconfig: None,
             manifest: manifest_path.to_string_lossy().to_string(),
             output: None,
@@ -587,7 +586,7 @@ fn validate_universal_manifest_zone_ingress_no_mesh_ok() {
     )
     .unwrap();
 
-    let result = Command::Validate(ValidateArgs {
+    let result = validate_cmd(ValidateArgs {
         kubeconfig: None,
         manifest: manifest_path.to_string_lossy().to_string(),
         output: None,
@@ -609,7 +608,7 @@ fn validate_universal_manifest_zone_egress_no_mesh_ok() {
     )
     .unwrap();
 
-    let result = Command::Validate(ValidateArgs {
+    let result = validate_cmd(ValidateArgs {
         kubeconfig: None,
         manifest: manifest_path.to_string_lossy().to_string(),
         output: None,
@@ -631,7 +630,7 @@ fn validate_universal_manifest_zone_no_mesh_ok() {
     )
     .unwrap();
 
-    let result = Command::Validate(ValidateArgs {
+    let result = validate_cmd(ValidateArgs {
         kubeconfig: None,
         manifest: manifest_path.to_string_lossy().to_string(),
         output: None,
@@ -654,7 +653,7 @@ fn validate_universal_manifest_custom_output_path() {
     )
     .unwrap();
 
-    let result = Command::Validate(ValidateArgs {
+    let result = validate_cmd(ValidateArgs {
         kubeconfig: None,
         manifest: manifest_path.to_string_lossy().to_string(),
         output: Some(output_path.to_string_lossy().to_string()),

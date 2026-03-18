@@ -1,4 +1,4 @@
-use harness::blocks::KubernetesOperator;
+use harness::infra::blocks::KubernetesOperator;
 
 /// `run` with a simple kubectl subcommand returns a result.
 ///
@@ -48,10 +48,10 @@ pub fn contract_rollout_restart_empty_namespaces(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use harness::blocks::KubectlOperator;
+    use harness::infra::blocks::KubectlOperator;
 
     fn production_operator() -> KubectlOperator {
-        use harness::blocks::StdProcessExecutor;
+        use harness::infra::blocks::StdProcessExecutor;
         use std::sync::Arc;
         KubectlOperator::new(Arc::new(StdProcessExecutor))
     }

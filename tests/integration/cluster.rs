@@ -12,10 +12,9 @@ use std::sync::PoisonError;
 // modify PATH serialize against each other (not just within this module).
 use super::helpers::ENV_LOCK;
 
-use harness::cli::Command;
-use harness::cluster::{ClusterMode, ClusterSpec, HelmSetting, Platform};
-use harness::commands::run::{KumactlArgs, KumactlCommand};
-use harness::commands::setup::ClusterArgs;
+use harness::platform::cluster::{ClusterMode, ClusterSpec, HelmSetting, Platform};
+use harness::run::commands::{KumactlArgs, KumactlCommand};
+use harness::setup::ClusterArgs;
 
 use super::helpers::*;
 
@@ -197,7 +196,7 @@ fn global_zone_up_orchestration() {
             ("HOME", Some(tmp.path().to_str().unwrap())),
         ],
         || {
-            let result = Command::Cluster(ClusterArgs {
+            let result = cluster_cmd(ClusterArgs {
                 mode: "global-zone-up".into(),
                 cluster_name: "kuma-global".into(),
                 extra_cluster_names: vec!["kuma-zone".into(), "zone-1".into()],
@@ -254,7 +253,7 @@ fn single_up_logs_stage_updates() {
             ("HOME", Some(tmp.path().to_str().unwrap())),
         ],
         || {
-            let result = Command::Cluster(ClusterArgs {
+            let result = cluster_cmd(ClusterArgs {
                 mode: "single-up".into(),
                 cluster_name: "kuma-test".into(),
                 extra_cluster_names: vec![],
@@ -302,7 +301,7 @@ fn single_up_metallb_template() {
             ("HOME", Some(tmp.path().to_str().unwrap())),
         ],
         || {
-            let result = Command::Cluster(ClusterArgs {
+            let result = cluster_cmd(ClusterArgs {
                 mode: "single-up".into(),
                 cluster_name: "kuma-metallb".into(),
                 extra_cluster_names: vec![],
@@ -366,7 +365,7 @@ fn single_up_restores_context() {
             ("HOME", Some(tmp.path().to_str().unwrap())),
         ],
         || {
-            let result = Command::Cluster(ClusterArgs {
+            let result = cluster_cmd(ClusterArgs {
                 mode: "single-up".into(),
                 cluster_name: "kuma-ctx".into(),
                 extra_cluster_names: vec![],
@@ -415,7 +414,7 @@ fn cluster_context_up_down() {
             ("HOME", Some(tmp.path().to_str().unwrap())),
         ],
         || {
-            let up_result = Command::Cluster(ClusterArgs {
+            let up_result = cluster_cmd(ClusterArgs {
                 mode: "single-up".into(),
                 cluster_name: "kuma-updown".into(),
                 extra_cluster_names: vec![],
@@ -445,7 +444,7 @@ fn cluster_context_up_down() {
             ("HOME", Some(tmp.path().to_str().unwrap())),
         ],
         || {
-            let down_result = Command::Cluster(ClusterArgs {
+            let down_result = cluster_cmd(ClusterArgs {
                 mode: "single-down".into(),
                 cluster_name: "kuma-updown".into(),
                 extra_cluster_names: vec![],
@@ -500,7 +499,7 @@ fn cluster_uses_saved_repo_root() {
             ("HOME", Some(tmp.path().to_str().unwrap())),
         ],
         || {
-            let result = Command::Cluster(ClusterArgs {
+            let result = cluster_cmd(ClusterArgs {
                 mode: "single-up".into(),
                 cluster_name: "kuma-saved".into(),
                 extra_cluster_names: vec![],
@@ -541,7 +540,7 @@ fn kumactl_find_repo_root() {
     let cmd = KumactlCommand::Find {
         repo_root: Some(repo.to_str().unwrap().to_string()),
     };
-    let result = Command::Kumactl(KumactlArgs { cmd }).execute();
+    let result = kumactl_cmd(KumactlArgs { cmd }).execute();
     assert!(result.is_ok(), "kumactl find failed: {result:?}");
     assert_eq!(result.unwrap(), 0);
 }

@@ -7,12 +7,11 @@ use std::env;
 use std::fs;
 use std::sync::PoisonError;
 
-use harness::cli::Command;
-use harness::commands::RunDirArgs;
-use harness::commands::run::{ApplyArgs, CaptureArgs, PreflightArgs, ValidateArgs};
-use harness::kubectl_validate::{KubectlValidateDecision, KubectlValidateState};
+use harness::platform::kubectl_validate::{KubectlValidateDecision, KubectlValidateState};
+use harness::run::RunDirArgs;
+use harness::run::commands::{ApplyArgs, CaptureArgs, PreflightArgs, ValidateArgs};
+use harness::run::workflow::{RunnerPhase, read_runner_state};
 use harness::schema::GroupSpec;
-use harness::workflow::runner::{RunnerPhase, read_runner_state};
 use harness_testkit::{
     FakeToolchain, GroupBuilder, RunDirBuilder, SuiteBuilder, init_run_with_suite,
 };
@@ -251,7 +250,7 @@ fn preflight_prepares_and_caches() {
             run_id: None,
             run_root: None,
         };
-        let result = Command::Preflight(PreflightArgs {
+        let result = preflight_cmd(PreflightArgs {
             kubeconfig: None,
             repo_root: None,
             run_dir: rda.clone(),
@@ -264,7 +263,7 @@ fn preflight_prepares_and_caches() {
         assert_eq!(result.unwrap(), 0);
 
         // Second call should also succeed (idempotent)
-        let result2 = Command::Preflight(PreflightArgs {
+        let result2 = preflight_cmd(PreflightArgs {
             kubeconfig: None,
             repo_root: None,
             run_dir: rda,
@@ -312,7 +311,7 @@ fn preflight_skips_rejections() {
             run_id: None,
             run_root: None,
         };
-        let result = Command::Preflight(PreflightArgs {
+        let result = preflight_cmd(PreflightArgs {
             kubeconfig: None,
             repo_root: None,
             run_dir: rda,
@@ -360,7 +359,7 @@ fn preflight_skips_inline_rejections() {
             run_id: None,
             run_root: None,
         };
-        let result = Command::Preflight(PreflightArgs {
+        let result = preflight_cmd(PreflightArgs {
             kubeconfig: None,
             repo_root: None,
             run_dir: rda,
@@ -408,7 +407,7 @@ fn preflight_skips_frontmatter_rejections() {
             run_id: None,
             run_root: None,
         };
-        let result = Command::Preflight(PreflightArgs {
+        let result = preflight_cmd(PreflightArgs {
             kubeconfig: None,
             repo_root: None,
             run_dir: rda,
@@ -448,7 +447,7 @@ fn preflight_applies_baselines() {
             run_id: None,
             run_root: None,
         };
-        let result = Command::Preflight(PreflightArgs {
+        let result = preflight_cmd(PreflightArgs {
             kubeconfig: None,
             repo_root: None,
             run_dir: rda,
@@ -488,7 +487,7 @@ fn preflight_namespace_baseline() {
             run_id: None,
             run_root: None,
         };
-        let result = Command::Preflight(PreflightArgs {
+        let result = preflight_cmd(PreflightArgs {
             kubeconfig: None,
             repo_root: None,
             run_dir: rda,
@@ -526,7 +525,7 @@ fn capture_uses_run_context() {
             run_id: None,
             run_root: None,
         };
-        let result = Command::Capture(CaptureArgs {
+        let result = capture_cmd(CaptureArgs {
             kubeconfig: Some(kc_path.to_string_lossy().to_string()),
             label: "post-deploy".to_string(),
             run_dir: rda,
@@ -593,7 +592,7 @@ fn apply_reuses_prepared() {
             run_root: None,
         };
         let manifests = vec![manifest_path.to_string_lossy().to_string()];
-        let result = Command::Apply(ApplyArgs {
+        let result = apply_cmd(ApplyArgs {
             kubeconfig: Some(kc_path.to_string_lossy().to_string()),
             cluster: None,
             manifest: manifests,
@@ -645,7 +644,7 @@ fn apply_validate_shorthand() {
         };
         // Use the shorthand name (not full path) - resolve_manifest_path should find it
         let manifests = vec!["g01-configure.yaml".to_string()];
-        let result = Command::Apply(ApplyArgs {
+        let result = apply_cmd(ApplyArgs {
             kubeconfig: Some(kc_path.to_string_lossy().to_string()),
             cluster: None,
             manifest: manifests,
@@ -683,7 +682,7 @@ fn validate_uses_api_version() {
     let orig_path = env::var("PATH").unwrap_or_default();
 
     temp_env::with_vars([("PATH", Some(&tc.path_with_prepend(&orig_path)))], || {
-        let result = Command::Validate(ValidateArgs {
+        let result = validate_cmd(ValidateArgs {
             kubeconfig: Some(kc_path.to_string_lossy().to_string()),
             manifest: manifest_path.to_string_lossy().to_string(),
             output: None,
@@ -739,7 +738,7 @@ fn preflight_failure_resets() {
             run_id: None,
             run_root: None,
         };
-        let result = Command::Preflight(PreflightArgs {
+        let result = preflight_cmd(PreflightArgs {
             kubeconfig: None,
             repo_root: None,
             run_dir: rda,
@@ -780,7 +779,7 @@ fn capture_marks_preflight_complete() {
         };
 
         // Run preflight first
-        let pf_result = Command::Preflight(PreflightArgs {
+        let pf_result = preflight_cmd(PreflightArgs {
             kubeconfig: None,
             repo_root: None,
             run_dir: rda.clone(),
@@ -789,7 +788,7 @@ fn capture_marks_preflight_complete() {
         assert!(pf_result.is_ok(), "preflight should succeed: {pf_result:?}");
 
         // Then run capture
-        let cap_result = Command::Capture(CaptureArgs {
+        let cap_result = capture_cmd(CaptureArgs {
             kubeconfig: Some(kc_path.to_string_lossy().to_string()),
             label: "post-preflight".to_string(),
             run_dir: rda,
@@ -847,7 +846,7 @@ fn preflight_dependent_baselines() {
             run_id: None,
             run_root: None,
         };
-        let result = Command::Preflight(PreflightArgs {
+        let result = preflight_cmd(PreflightArgs {
             kubeconfig: None,
             repo_root: None,
             run_dir: rda,
