@@ -14,13 +14,13 @@ use regex::Regex;
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 
-use crate::run::context::RunLayout;
 use crate::core_defs::utc_now;
-use crate::errors::{CliError, CliErrorKind, cow, io_for};
+use crate::errors::{CliError, CliErrorKind, io_for};
 use crate::hooks::protocol::context::GuardContext as HookContext;
 use crate::infra::io::{ensure_dir, write_text};
-use crate::schema::RunStatus;
+use crate::run::context::RunLayout;
 use crate::run::workflow::{RunnerPhase, RunnerWorkflowState};
+use crate::schema::RunStatus;
 
 static SANITIZE_NAME_RE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"[^A-Za-z0-9_.-]+").expect("invalid sanitize regex"));
@@ -64,7 +64,7 @@ pub fn resolve_phase_context(
 pub fn append_audit_entry(request: AuditAppendRequest) -> Result<AuditEntry, CliError> {
     let layout = RunLayout::from_run_dir(&request.run_dir);
     ensure_dir(&layout.audit_artifacts_dir())
-        .map_err(|error| CliErrorKind::io(cow!("create audit artifacts dir: {error}")))?;
+        .map_err(|error| CliErrorKind::io(format!("create audit artifacts dir: {error}")))?;
 
     let timestamp = utc_now();
     let scrubbed_output = scrub::scrub(&request.full_output);
@@ -85,7 +85,7 @@ pub fn append_audit_entry(request: AuditAppendRequest) -> Result<AuditEntry, Cli
     };
 
     let line = serde_json::to_string(&entry)
-        .map_err(|error| CliErrorKind::serialize(cow!("audit entry: {error}")))?;
+        .map_err(|error| CliErrorKind::serialize(format!("audit entry: {error}")))?;
     append_jsonl_line(&layout.audit_log_path(), &line)?;
     Ok(entry)
 }
@@ -218,7 +218,7 @@ where
     T: Serialize,
 {
     serde_json::to_string_pretty(value)
-        .map_err(|error| CliErrorKind::serialize(cow!("{label}: {error}")).into())
+        .map_err(|error| CliErrorKind::serialize(format!("{label}: {error}")).into())
 }
 
 fn unique_artifact_path(layout: &RunLayout, timestamp: &str, tool_name: &str) -> PathBuf {
@@ -261,9 +261,9 @@ fn relativize_path(path: &Path, run_dir: &Path) -> String {
 }
 
 fn append_jsonl_line(path: &Path, line: &str) -> Result<(), CliError> {
-    let parent = path
-        .parent()
-        .ok_or_else(|| CliErrorKind::io(cow!("missing parent directory for {}", path.display())))?;
+    let parent = path.parent().ok_or_else(|| {
+        CliErrorKind::io(format!("missing parent directory for {}", path.display()))
+    })?;
     ensure_dir(parent).map_err(|error| io_for("create dir", parent, &error))?;
     let is_new = !path.exists();
     let mut file = OpenOptions::new()
@@ -286,8 +286,8 @@ fn append_jsonl_line(path: &Path, line: &str) -> Result<(), CliError> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::schema::{RunCounts, Verdict};
     use crate::run::workflow::{PreflightState, PreflightStatus};
+    use crate::schema::{RunCounts, Verdict};
 
     use summarize::summarize_answers;
 

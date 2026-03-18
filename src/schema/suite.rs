@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
-use crate::errors::{CliError, CliErrorKind, cow};
+use crate::errors::{CliError, CliErrorKind};
 use crate::infra::io;
 use crate::rules;
 
@@ -27,7 +27,7 @@ impl SuiteSpec {
 
         // First pass: check required keys exist in the mapping.
         let map: serde_yml::Mapping = serde_yml::from_str(&yaml_text)
-            .map_err(|e| CliErrorKind::workflow_parse(cow!("frontmatter YAML: {e}")))?;
+            .map_err(|e| CliErrorKind::workflow_parse(format!("frontmatter YAML: {e}")))?;
 
         let mut missing = Vec::new();
         for key in ["suite_id", "feature", "scope", "keep_clusters"] {
@@ -43,7 +43,7 @@ impl SuiteSpec {
 
         // Second pass: typed deserialization.
         let frontmatter: SuiteFrontmatter = serde_yml::from_str(&yaml_text)
-            .map_err(|e| CliErrorKind::workflow_parse(cow!("suite frontmatter: {e}")))?;
+            .map_err(|e| CliErrorKind::workflow_parse(format!("suite frontmatter: {e}")))?;
 
         Ok(Self {
             frontmatter,
@@ -110,7 +110,7 @@ impl GroupSpec {
         }
 
         let frontmatter: GroupFrontmatter = serde_yml::from_str(&yaml_text)
-            .map_err(|e| CliErrorKind::workflow_parse(cow!("group frontmatter: {e}")))?;
+            .map_err(|e| CliErrorKind::workflow_parse(format!("group frontmatter: {e}")))?;
 
         Ok(Self {
             frontmatter,

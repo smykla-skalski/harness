@@ -3,10 +3,10 @@ use std::path::{Path, PathBuf};
 use serde::Deserialize;
 use serde_json::Value;
 
-use crate::run::audit::append_runner_state_audit;
-use crate::errors::{CliError, CliErrorKind, cow};
-use crate::rules::skill_dirs;
+use crate::errors::{CliError, CliErrorKind};
 use crate::infra::persistence::VersionedJsonRepository;
+use crate::rules::skill_dirs;
+use crate::run::audit::append_runner_state_audit;
 
 use super::types::{
     FailureState, PreflightState, PreflightStatus, RunnerPhase, RunnerWorkflowPayload,
@@ -115,7 +115,7 @@ pub fn write_runner_state_if_current(
     let desired = state.clone();
     let updated = runner_repository(run_dir).update(|current| {
         let Some(current) = current else {
-            return Err(CliErrorKind::concurrent_modification(cow!(
+            return Err(CliErrorKind::concurrent_modification(format!(
                 "missing runner state while applying {}",
                 desired.last_event.as_deref().unwrap_or("runner transition")
             ))
@@ -125,7 +125,7 @@ pub fn write_runner_state_if_current(
             )));
         };
         if current.transition_count != expected_transition_count {
-            return Err(CliErrorKind::concurrent_modification(cow!(
+            return Err(CliErrorKind::concurrent_modification(format!(
                 "expected runner transition_count {expected_transition_count}, found {}",
                 current.transition_count
             ))
@@ -150,7 +150,7 @@ fn load_runner_state_repo(
     match repo.load() {
         Ok(loaded) => Ok(loaded),
         Err(error) if error.code() == "WORKFLOW_VERSION" => Err(CliErrorKind::workflow_version(
-            cow!("runner state requires schema version 2"),
+            "runner state requires schema version 2",
         )
         .with_details(format!(
             "{}\nDelete {} or re-run `harness run init` to regenerate the runner state.",
@@ -177,7 +177,7 @@ struct RunnerWorkflowStateV1 {
 
 fn migrate_runner_v1_to_v2(data: Value) -> Result<Value, CliError> {
     let v1: RunnerWorkflowStateV1 = serde_json::from_value(data).map_err(|error| -> CliError {
-        CliErrorKind::workflow_parse(cow!("failed to parse runner workflow v1: {error}")).into()
+        CliErrorKind::workflow_parse(format!("failed to parse runner workflow v1: {error}")).into()
     })?;
     let v2 = RunnerWorkflowStateRecord {
         schema_version: RUNNER_STATE_SCHEMA_VERSION,
@@ -193,7 +193,7 @@ fn migrate_runner_v1_to_v2(data: Value) -> Result<Value, CliError> {
         last_event: v1.last_event,
     };
     serde_json::to_value(v2).map_err(|error| -> CliError {
-        CliErrorKind::workflow_serialize(cow!("failed to serialize runner workflow v2: {error}"))
+        CliErrorKind::workflow_serialize(format!("failed to serialize runner workflow v2: {error}"))
             .into()
     })
 }

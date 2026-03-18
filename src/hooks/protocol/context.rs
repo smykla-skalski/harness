@@ -5,13 +5,13 @@ use std::path::{Path, PathBuf};
 use serde_json::Value;
 use tracing::warn;
 
-use crate::run::context::RunContext;
-use crate::errors::{CliError, CliErrorKind, cow};
+use crate::authoring::workflow::{self as author_workflow, AuthorWorkflowState};
+use crate::errors::{CliError, CliErrorKind};
 use crate::hooks::protocol::payloads::{AskUserAnswer, AskUserQuestionPrompt, HookEnvelopePayload};
 use crate::rules;
-use crate::shell_parse::ParsedCommand;
-use crate::authoring::workflow::{self as author_workflow, AuthorWorkflowState};
+use crate::run::context::RunContext;
 use crate::run::workflow::{self as runner_workflow, RunnerWorkflowState};
+use crate::shell_parse::ParsedCommand;
 
 /// Opaque raw agent payload preserved for adapter-specific features.
 #[derive(Debug, Clone)]
@@ -212,7 +212,7 @@ impl ParsedCommandState {
         match self {
             Self::Missing => Ok(None),
             Self::Parsed(parsed) => Ok(Some(parsed)),
-            Self::Error(error) => Err(CliErrorKind::hook_payload_invalid(cow!(
+            Self::Error(error) => Err(CliErrorKind::hook_payload_invalid(format!(
                 "shell tokenization failed: {error}"
             ))
             .into()),

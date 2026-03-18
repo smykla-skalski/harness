@@ -4,9 +4,9 @@ use std::process::Command;
 
 use tracing::warn;
 
-use crate::platform::cluster::Platform;
 use crate::core_defs::{harness_data_root, host_platform};
-use crate::errors::{CliError, CliErrorKind, cow};
+use crate::errors::{CliError, CliErrorKind};
+use crate::platform::cluster::Platform;
 use crate::run::services::RunServices;
 use crate::suite_defaults::default_repo_root_for_suite;
 
@@ -21,7 +21,7 @@ pub(crate) fn resolve_init_repo_root(
     if let Some(r) = raw {
         return PathBuf::from(r)
             .canonicalize()
-            .map_err(|e| CliErrorKind::io(cow!("canonicalize repo root {r}: {e}")).into());
+            .map_err(|e| CliErrorKind::io(format!("canonicalize repo root {r}: {e}")).into());
     }
     if let Some(default) = default_repo_root_for_suite(suite_dir) {
         return Ok(default);

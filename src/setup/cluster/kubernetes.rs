@@ -5,12 +5,12 @@ use std::thread;
 
 use tracing::info;
 
-use crate::platform::cluster::{ClusterMode, ClusterSpec, HelmSetting};
 use crate::app::command_context::resolve_repo_root;
 use crate::core_defs::resolve_build_info;
-use crate::errors::{CliError, CliErrorKind, cow};
+use crate::errors::{CliError, CliErrorKind};
 use crate::infra::exec;
 use crate::infra::exec::{cluster_exists, docker, kubectl};
+use crate::platform::cluster::{ClusterMode, ClusterSpec, HelmSetting};
 
 use super::{ClusterArgs, make_target, make_target_live, persist_cluster_spec};
 
@@ -36,7 +36,7 @@ fn resolve_kds_address(global_cluster: &str) -> Result<String, CliError> {
     let ip_result = docker(&["inspect", "-f", format_string, &node_container], &[0])?;
     let node_ip = ip_result.stdout.trim().to_string();
     if node_ip.is_empty() {
-        return Err(CliErrorKind::cluster_error(cow!(
+        return Err(CliErrorKind::cluster_error(format!(
             "could not resolve IP for k3d node {node_container}"
         ))
         .into());
@@ -60,7 +60,7 @@ fn resolve_kds_address(global_cluster: &str) -> Result<String, CliError> {
     )?;
     let node_port = port_result.stdout.trim().to_string();
     if node_port.is_empty() {
-        return Err(CliErrorKind::cluster_error(cow!(
+        return Err(CliErrorKind::cluster_error(format!(
             "could not resolve KDS NodePort for global cluster {global_cluster}"
         ))
         .into());

@@ -4,7 +4,7 @@ use std::{env, fs};
 use serde::{Deserialize, Serialize};
 
 use crate::core_defs::{dirs_home, harness_data_root};
-use crate::errors::{CliError, CliErrorKind, cow, io_for};
+use crate::errors::{CliError, CliErrorKind, io_for};
 
 /// Decision about kubectl-validate installation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -47,7 +47,7 @@ pub fn read_kubectl_validate_state() -> Result<Option<KubectlValidateState>, Cli
     let text =
         fs::read_to_string(&path).map_err(|e| -> CliError { io_for("read", &path, &e).into() })?;
     let state: KubectlValidateState = serde_json::from_str(&text).map_err(|e| -> CliError {
-        CliErrorKind::workflow_parse(cow!("failed to parse {}: {e}", path.display())).into()
+        CliErrorKind::workflow_parse(format!("failed to parse {}: {e}", path.display())).into()
     })?;
     Ok(Some(state))
 }

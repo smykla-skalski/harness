@@ -1,9 +1,9 @@
 use clap::Args;
 
 use crate::app::command_context::{CommandContext, Execute};
-use crate::core_defs::utc_now;
-use crate::errors::{CliError, CliErrorKind, cow};
 use crate::authoring::workflow::{ApprovalMode, AuthorWorkflowState, write_author_state};
+use crate::core_defs::utc_now;
+use crate::errors::{CliError, CliErrorKind};
 
 impl Execute for ApprovalBeginArgs {
     fn execute(&self, _context: &CommandContext) -> Result<i32, CliError> {
@@ -38,7 +38,7 @@ pub fn approval_begin(mode: &str, suite_dir: Option<&str>) -> Result<i32, CliErr
         "interactive" => ApprovalMode::Interactive,
         "bypass" => ApprovalMode::Bypass,
         _ => {
-            return Err(CliErrorKind::usage_error(cow!("invalid approval mode: {mode}")).into());
+            return Err(CliErrorKind::usage_error(format!("invalid approval mode: {mode}")).into());
         }
     };
 

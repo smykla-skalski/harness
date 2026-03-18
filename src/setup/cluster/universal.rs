@@ -4,17 +4,17 @@ use std::time::Duration;
 
 use tracing::{info, warn};
 
+use crate::app::command_context::resolve_repo_root;
+use crate::core_defs::HARNESS_PREFIX;
+use crate::errors::{CliError, CliErrorKind};
 use crate::infra::blocks::{
     ComposeOrchestrator, ContainerConfig, ContainerRuntime, DockerComposeOrchestrator,
     DockerContainerRuntime, StdProcessExecutor,
 };
+use crate::infra::exec::{extract_admin_token, run_command, wait_for_http};
 use crate::platform::cluster::{ClusterMode, ClusterSpec, Platform};
-use crate::app::command_context::resolve_repo_root;
 use crate::platform::compose;
 use crate::run::context::RunRepository;
-use crate::core_defs::HARNESS_PREFIX;
-use crate::errors::{CliError, CliErrorKind, cow};
-use crate::infra::exec::{extract_admin_token, run_command, wait_for_http};
 
 use super::{ClusterArgs, persist_cluster_spec};
 
@@ -399,7 +399,7 @@ fn universal_single_up_compose(
     compose_runtime: &dyn ComposeOrchestrator,
 ) -> Result<UniversalUpResult, CliError> {
     let compose_file = compose::single_zone(image, network, UNIVERSAL_SUBNET, store, cp_name);
-    let tmp_dir = tempfile::tempdir().map_err(|e| CliErrorKind::io(cow!("temp dir: {e}")))?;
+    let tmp_dir = tempfile::tempdir().map_err(|e| CliErrorKind::io(format!("temp dir: {e}")))?;
     let compose_path = tmp_dir.path().join("docker-compose.yaml");
     compose_file.write_to(&compose_path)?;
 
@@ -463,7 +463,7 @@ fn universal_global_zone_up(
         zone_name,
         zone_label,
     );
-    let tmp_dir = tempfile::tempdir().map_err(|e| CliErrorKind::io(cow!("temp dir: {e}")))?;
+    let tmp_dir = tempfile::tempdir().map_err(|e| CliErrorKind::io(format!("temp dir: {e}")))?;
     let compose_path = tmp_dir.path().join("docker-compose.yaml");
     compose_file.write_to(&compose_path)?;
 
@@ -542,7 +542,7 @@ fn universal_global_two_zones_up(
             label: zone2_label,
         },
     });
-    let tmp_dir = tempfile::tempdir().map_err(|e| CliErrorKind::io(cow!("temp dir: {e}")))?;
+    let tmp_dir = tempfile::tempdir().map_err(|e| CliErrorKind::io(format!("temp dir: {e}")))?;
     let compose_path = tmp_dir.path().join("docker-compose.yaml");
     compose_file.write_to(&compose_path)?;
 
