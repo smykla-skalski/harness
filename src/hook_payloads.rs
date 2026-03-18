@@ -226,12 +226,6 @@ impl HookContext {
         context
     }
 
-    #[cfg(test)]
-    #[must_use]
-    pub(crate) fn from_test_envelope(skill: &str, payload: HookEnvelopePayload) -> Self {
-        Self::with_event(skill, HookEvent { payload })
-    }
-
     /// Attempt to load `RunContext`, runner state, and author state from disk.
     fn load_context_from_disk(&mut self) {
         self.load_run_context();

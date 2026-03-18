@@ -14,9 +14,8 @@ use std::sync::OnceLock;
 
 use harness::context::{RunLayout, RunMetadata};
 use harness::hook::{Decision, HookResult};
-use harness::hook_payloads::{
-    AskUserQuestionOption, AskUserQuestionPrompt, HookContext, HookEnvelopePayload,
-};
+use harness::hook_payloads::{AskUserQuestionOption, AskUserQuestionPrompt, HookEnvelopePayload};
+use harness::hooks::context::GuardContext;
 use harness::schema::frontmatter::merge_requirement_lists;
 use harness::schema::{RunCounts, RunStatus, Verdict};
 use harness::workflow::runner as runner_workflow;
@@ -1566,19 +1565,19 @@ impl HookPayloadBuilder {
         }
     }
 
-    /// Build a `HookContext` for a given skill.
+    /// Build a `GuardContext` for a given skill.
     #[must_use]
-    pub fn build_context(self, skill: &str) -> HookContext {
-        HookContext::from_envelope(skill, self.build_envelope())
+    pub fn build_context(self, skill: &str) -> GuardContext {
+        GuardContext::from_envelope(skill, self.build_envelope())
     }
 
-    /// Build a `HookContext` with an associated run directory.
+    /// Build a `GuardContext` with an associated run directory.
     #[must_use]
-    pub fn build_context_with_run(self, skill: &str, run_dir: &Path) -> HookContext {
+    pub fn build_context_with_run(self, skill: &str, run_dir: &Path) -> GuardContext {
         use harness::context::RunContext;
 
         let envelope = self.build_envelope();
-        let mut ctx = HookContext::from_envelope(skill, envelope);
+        let mut ctx = GuardContext::from_envelope(skill, envelope);
         ctx.run_dir = Some(run_dir.to_path_buf());
         if let Ok(run_ctx) = RunContext::from_run_dir(run_dir) {
             ctx.runner_state = runner_workflow::read_runner_state(&run_ctx.layout.run_dir())
@@ -1737,24 +1736,24 @@ pub fn make_empty_payload() -> HookEnvelopePayload {
     HookPayloadBuilder::new().build_envelope()
 }
 
-/// Build a `HookContext` for a given skill and envelope.
+/// Build a `GuardContext` for a given skill and envelope.
 /// Drop-in for `helpers::make_hook_context`.
 #[must_use]
-pub fn make_hook_context(skill: &str, payload: HookEnvelopePayload) -> HookContext {
-    HookContext::from_envelope(skill, payload)
+pub fn make_hook_context(skill: &str, payload: HookEnvelopePayload) -> GuardContext {
+    GuardContext::from_envelope(skill, payload)
 }
 
-/// Build a `HookContext` with an associated run directory.
+/// Build a `GuardContext` with an associated run directory.
 /// Drop-in for `helpers::make_hook_context_with_run`.
 #[must_use]
 pub fn make_hook_context_with_run(
     skill: &str,
     payload: HookEnvelopePayload,
     run_dir: &Path,
-) -> HookContext {
+) -> GuardContext {
     use harness::context::RunContext;
 
-    let mut ctx = HookContext::from_envelope(skill, payload);
+    let mut ctx = GuardContext::from_envelope(skill, payload);
     ctx.run_dir = Some(run_dir.to_path_buf());
     if let Ok(run_ctx) = RunContext::from_run_dir(run_dir) {
         ctx.runner_state = runner_workflow::read_runner_state(&run_ctx.layout.run_dir())
