@@ -1,5 +1,5 @@
-mod predicates;
-mod runner_guards;
+pub(crate) mod predicates;
+pub(crate) mod runner_guards;
 
 use crate::errors::{CliError, HookMessage};
 use crate::hooks::context::GuardContext as HookContext;
