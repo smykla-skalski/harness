@@ -10,7 +10,7 @@ use clap::ValueEnum;
 use serde::Deserialize;
 use serde_json::Value;
 
-use crate::errors::{CliError, CliErrorKind, cow};
+use crate::errors::{CliError, CliErrorKind};
 use crate::hooks::protocol::context::{
     AgentContext, NormalizedEvent, NormalizedHookContext, RawPayload, SessionContext, SkillContext,
     ToolCategory, ToolContext, ToolInput,
@@ -98,10 +98,10 @@ pub(crate) struct ProcessHookPayload {
 
 pub(crate) fn parse_process_payload(raw: &[u8]) -> Result<(ProcessHookPayload, Value), CliError> {
     let value: Value = serde_json::from_slice(raw).map_err(|error| {
-        CliErrorKind::hook_payload_invalid(cow!("invalid hook payload: {error}"))
+        CliErrorKind::hook_payload_invalid(format!("invalid hook payload: {error}"))
     })?;
     let payload: ProcessHookPayload = serde_json::from_value(value.clone()).map_err(|error| {
-        CliErrorKind::hook_payload_invalid(cow!("invalid hook payload: {error}"))
+        CliErrorKind::hook_payload_invalid(format!("invalid hook payload: {error}"))
     })?;
     Ok((payload, value))
 }

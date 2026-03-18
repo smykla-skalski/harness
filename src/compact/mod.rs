@@ -14,7 +14,7 @@ use rayon::prelude::*;
 use tracing::warn;
 
 use crate::core_defs::{project_context_dir, session_scope_key, utc_now};
-use crate::errors::{CliError, CliErrorKind, cow, io_for};
+use crate::errors::{CliError, CliErrorKind, io_for};
 use crate::infra::io::write_json_pretty;
 use crate::rules::compact as compact_rules;
 
@@ -107,8 +107,9 @@ pub fn load_latest_compact_handoff(
 /// # Errors
 /// Returns `CliError` on parse failure.
 pub fn parse_compact_handoff(text: &str) -> Result<CompactHandoff<'static>, CliError> {
-    serde_json::from_str(text)
-        .map_err(|e| -> CliError { CliErrorKind::io(cow!("corrupt compact handoff: {e}")).into() })
+    serde_json::from_str(text).map_err(|e| -> CliError {
+        CliErrorKind::io(format!("corrupt compact handoff: {e}")).into()
+    })
 }
 
 /// Load a pending (unconsumed) compact handoff, if any.

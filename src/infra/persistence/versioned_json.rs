@@ -10,7 +10,7 @@ use serde::Serialize;
 use serde::de::DeserializeOwned;
 use serde_json::Value;
 
-use crate::errors::{CliError, CliErrorKind, cow};
+use crate::errors::{CliError, CliErrorKind};
 use crate::infra::io;
 
 /// Error for invalid state transitions.
@@ -146,14 +146,14 @@ where
             return Ok((contents, false));
         }
         if version == 0 {
-            return Err(CliErrorKind::workflow_version(cow!(
+            return Err(CliErrorKind::workflow_version(format!(
                 "{} is missing schema_version",
                 self.path.display()
             ))
             .into());
         }
         if version > self.current_version {
-            return Err(CliErrorKind::workflow_version(cow!(
+            return Err(CliErrorKind::workflow_version(format!(
                 "v{version} is newer than supported v{}",
                 self.current_version
             ))
@@ -163,12 +163,12 @@ where
         let mut data = contents;
         while version < self.current_version {
             let migration_index = usize::try_from(version - 1).map_err(|error| {
-                CliErrorKind::workflow_version(cow!(
+                CliErrorKind::workflow_version(format!(
                     "invalid migration index for v{version}: {error}"
                 ))
             })?;
             let migration = self.migrations.get(migration_index).ok_or_else(|| {
-                CliErrorKind::workflow_version(cow!(
+                CliErrorKind::workflow_version(format!(
                     "no migration from v{version} to v{} for {}",
                     version + 1,
                     self.path.display()
@@ -178,7 +178,7 @@ where
 
             let next_version = Self::schema_version(&data);
             if next_version != version + 1 {
-                return Err(CliErrorKind::workflow_version(cow!(
+                return Err(CliErrorKind::workflow_version(format!(
                     "migration for {} produced schema version v{next_version}, expected v{}",
                     self.path.display(),
                     version + 1
@@ -193,7 +193,7 @@ where
 
     fn serialize(&self, state: &T) -> Result<Value, CliError> {
         serde_json::to_value(state).map_err(|error| -> CliError {
-            CliErrorKind::workflow_serialize(cow!(
+            CliErrorKind::workflow_serialize(format!(
                 "failed to serialize {}: {error}",
                 self.path.display()
             ))
@@ -207,7 +207,7 @@ where
 
     fn write_value(&self, value: &Value) -> Result<(), CliError> {
         io::write_json_pretty(&self.path, value).map_err(|error| -> CliError {
-            CliErrorKind::workflow_io(cow!("failed to write {}: {error}", self.path.display()))
+            CliErrorKind::workflow_io(format!("failed to write {}: {error}", self.path.display()))
                 .into()
         })
     }
@@ -221,7 +221,7 @@ where
     }
 
     fn workflow_parse_error(&self, error: impl fmt::Display) -> CliError {
-        CliErrorKind::workflow_parse(cow!("failed to parse {}: {error}", self.path.display()))
+        CliErrorKind::workflow_parse(format!("failed to parse {}: {error}", self.path.display()))
             .with_details(error.to_string())
     }
 
@@ -238,7 +238,7 @@ where
         let lock_path = self.lock_path();
         if let Some(parent) = lock_path.parent() {
             fs::create_dir_all(parent).map_err(|error| -> CliError {
-                CliErrorKind::workflow_io(cow!(
+                CliErrorKind::workflow_io(format!(
                     "failed to create lock directory {}: {error}",
                     parent.display()
                 ))
@@ -253,7 +253,7 @@ where
             .truncate(false)
             .open(&lock_path)
             .map_err(|error| -> CliError {
-                CliErrorKind::workflow_io(cow!(
+                CliErrorKind::workflow_io(format!(
                     "failed to open workflow lock {}: {error}",
                     lock_path.display()
                 ))
@@ -267,7 +267,7 @@ where
     ) -> Result<R, CliError> {
         let lock_file = self.open_lock_file()?;
         lock_file.lock_exclusive().map_err(|error| -> CliError {
-            CliErrorKind::workflow_io(cow!(
+            CliErrorKind::workflow_io(format!(
                 "failed to acquire workflow lock {}: {error}",
                 self.lock_path().display()
             ))
@@ -276,7 +276,7 @@ where
 
         let result = action();
         let unlock_result = lock_file.unlock().map_err(|error| -> CliError {
-            CliErrorKind::workflow_io(cow!(
+            CliErrorKind::workflow_io(format!(
                 "failed to release workflow lock {}: {error}",
                 self.lock_path().display()
             ))

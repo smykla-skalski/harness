@@ -2,7 +2,7 @@ use std::path::{Component, Path, PathBuf};
 
 use clap::{Args, Subcommand};
 
-use crate::errors::{CliError, CliErrorKind, cow};
+use crate::errors::{CliError, CliErrorKind};
 use crate::rules::suite_runner::RunFile;
 
 use self::adapters::{HookAgent, adapter_for};
@@ -367,7 +367,7 @@ fn read_stdin_bytes() -> Result<Vec<u8>, CliError> {
 
     let mut bytes = Vec::new();
     io::stdin().read_to_end(&mut bytes).map_err(|error| {
-        CliError::from(CliErrorKind::hook_payload_invalid(cow!(
+        CliError::from(CliErrorKind::hook_payload_invalid(format!(
             "failed to read stdin: {error}"
         )))
     })?;

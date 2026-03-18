@@ -3,11 +3,11 @@ use std::{fs, io};
 
 use tracing::warn;
 
-use crate::platform::cluster::ClusterMode;
-use crate::run::context::RunContext;
-use crate::errors::{CliError, HookMessage, cow};
+use crate::errors::{CliError, HookMessage};
 use crate::hooks::protocol::context::GuardContext as HookContext;
 use crate::hooks::protocol::hook_result::HookResult;
+use crate::platform::cluster::ClusterMode;
+use crate::run::context::RunContext;
 use crate::run::workflow::{PreflightStatus, RunnerPhase, RunnerWorkflowState, SuiteFixState};
 
 /// Parsed harness context: (subcommand, command label, words, run context).
@@ -45,7 +45,13 @@ pub fn execute(ctx: &HookContext) -> Result<HookResult, CliError> {
     if let Some(result) = check_preflight_gate(ctx, subcommand) {
         return Ok(result);
     }
-    Ok(verify_artifacts(ctx, subcommand, &command_label, words, run))
+    Ok(verify_artifacts(
+        ctx,
+        subcommand,
+        &command_label,
+        words,
+        run,
+    ))
 }
 
 /// Extract the harness subcommand, words, and run context from the hook
@@ -68,7 +74,12 @@ fn extract_harness_context(
     let Some(run) = &ctx.run else {
         return Ok(None);
     };
-    Ok(Some((subcommand, invocation.command_label(), command.words(), run)))
+    Ok(Some((
+        subcommand,
+        invocation.command_label(),
+        command.words(),
+        run,
+    )))
 }
 
 fn verify_artifacts(
@@ -238,10 +249,10 @@ fn check_cluster(words: &[String], run: &RunContext) -> HookResult {
         return HookResult::allow();
     }
     HookMessage::missing_artifact(
-        cow!("harness setup cluster {mode}"),
+        format!("harness setup cluster {mode}"),
         target.display().to_string(),
     )
-        .into_result()
+    .into_result()
 }
 
 fn cluster_mode(words: &[String]) -> Option<&str> {

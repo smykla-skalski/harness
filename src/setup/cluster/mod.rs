@@ -9,12 +9,12 @@ use clap::Args;
 
 use tracing::{debug, info};
 
-use crate::platform::cluster::{ClusterSpec, Platform};
 use crate::app::command_context::{CommandContext, Execute};
-use crate::run::context::RunRepository;
-use crate::errors::{CliError, CliErrorKind, cow};
+use crate::errors::{CliError, CliErrorKind};
 use crate::infra::exec::{run_command, run_command_streaming};
 use crate::infra::io::write_json_pretty;
+use crate::platform::cluster::{ClusterSpec, Platform};
+use crate::run::context::RunRepository;
 
 use kubernetes::cluster_k8s;
 #[cfg(feature = "compose")]
@@ -125,7 +125,7 @@ fn persist_cluster_spec(spec: &ClusterSpec) -> Result<(), CliError> {
 
     // Always output spec JSON to stdout for scripting
     let spec_json = serde_json::to_string_pretty(&spec.to_json_dict())
-        .map_err(|e| CliErrorKind::serialize(cow!("cluster spec json: {e}")))?;
+        .map_err(|e| CliErrorKind::serialize(format!("cluster spec json: {e}")))?;
     debug!("{spec_json}");
 
     Ok(())

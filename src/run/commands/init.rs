@@ -3,15 +3,15 @@ use std::path::Path;
 
 use clap::Args;
 
-use crate::run::audit::write_run_status_with_audit;
 use crate::app::command_context::{CommandContext, Execute};
-use crate::run::context::{CurrentRunPointer, RunLayout, RunMetadata, RunRepository};
 use crate::core_defs::{shorten_path, utc_now};
-use crate::errors::{CliError, CliErrorKind, cow};
+use crate::errors::{CliError, CliErrorKind};
 use crate::infra::io::{validate_safe_segment, write_json_pretty};
+use crate::run::audit::write_run_status_with_audit;
+use crate::run::context::{CurrentRunPointer, RunLayout, RunMetadata, RunRepository};
 use crate::run::resolve::resolve_suite_path;
-use crate::schema::{RunCounts, RunReport, RunReportFrontmatter, RunStatus, SuiteSpec, Verdict};
 use crate::run::workflow::initialize_runner_state;
+use crate::schema::{RunCounts, RunReport, RunReportFrontmatter, RunStatus, SuiteSpec, Verdict};
 
 use super::shared::{resolve_init_repo_root, resolve_run_root};
 
@@ -137,7 +137,7 @@ fn populate_run_dir(
     };
 
     write_json_pretty(&layout.metadata_path(), &metadata)
-        .map_err(|e| CliErrorKind::serialize(cow!("run metadata: {e}")))?;
+        .map_err(|e| CliErrorKind::serialize(format!("run metadata: {e}")))?;
 
     let status = RunStatus {
         run_id: run_id.to_string(),
@@ -179,7 +179,7 @@ fn populate_run_dir(
     let pointer = CurrentRunPointer::from_metadata(layout.clone(), &metadata, None);
     let repo = RunRepository;
     repo.save_current_pointer(&pointer)
-        .map_err(|e| CliErrorKind::serialize(cow!("run context record: {e}")))?;
+        .map_err(|e| CliErrorKind::serialize(format!("run context record: {e}")))?;
 
     println!("{}", shorten_path(&layout.run_dir()));
     Ok(0)

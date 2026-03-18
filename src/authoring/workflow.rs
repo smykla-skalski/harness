@@ -5,9 +5,9 @@ use std::path::{Path, PathBuf};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_json::Value;
 
-use crate::errors::{CliError, CliErrorKind, cow};
-use crate::rules::skill_dirs;
+use crate::errors::{CliError, CliErrorKind};
 use crate::infra::persistence::VersionedJsonRepository;
+use crate::rules::skill_dirs;
 
 /// Author approval mode.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -264,14 +264,14 @@ const LEGACY_AUTHOR_STATE_FILE: &str = "suite-author-state.json";
 /// Returns `CliError` if the current directory cannot be determined.
 pub fn author_state_path() -> Result<PathBuf, CliError> {
     let cwd = env::current_dir().map_err(|e| -> CliError {
-        CliErrorKind::workflow_io(cow!("failed to determine current directory: {e}")).into()
+        CliErrorKind::workflow_io(format!("failed to determine current directory: {e}")).into()
     })?;
     Ok(cwd.join(".harness").join(skill_dirs::NEW_STATE_FILE))
 }
 
 fn legacy_author_state_path() -> Result<PathBuf, CliError> {
     let cwd = env::current_dir().map_err(|e| -> CliError {
-        CliErrorKind::workflow_io(cow!("failed to determine current directory: {e}")).into()
+        CliErrorKind::workflow_io(format!("failed to determine current directory: {e}")).into()
     })?;
     Ok(cwd.join(".harness").join(LEGACY_AUTHOR_STATE_FILE))
 }
@@ -323,7 +323,7 @@ fn load_author_state_repo(
     match repo.load() {
         Ok(loaded) => Ok(loaded),
         Err(error) if error.code() == "WORKFLOW_VERSION" => Err(CliErrorKind::workflow_version(
-            cow!("author state requires schema version 2"),
+            "author state requires schema version 2",
         )
         .with_details(format!(
             "{}\nDelete {} or re-run `harness authoring approval-begin` to regenerate the author state.",
@@ -349,7 +349,7 @@ struct AuthorWorkflowStateV1 {
 
 fn migrate_author_v1_to_v2(data: Value) -> Result<Value, CliError> {
     let v1: AuthorWorkflowStateV1 = serde_json::from_value(data).map_err(|error| -> CliError {
-        CliErrorKind::workflow_parse(cow!("failed to parse author workflow v1: {error}")).into()
+        CliErrorKind::workflow_parse(format!("failed to parse author workflow v1: {error}")).into()
     })?;
     let v2 = AuthorWorkflowStateRecord {
         schema_version: AUTHOR_STATE_SCHEMA_VERSION,
@@ -365,7 +365,7 @@ fn migrate_author_v1_to_v2(data: Value) -> Result<Value, CliError> {
         last_event: v1.last_event,
     };
     serde_json::to_value(v2).map_err(|error| -> CliError {
-        CliErrorKind::workflow_serialize(cow!("failed to serialize author workflow v2: {error}"))
+        CliErrorKind::workflow_serialize(format!("failed to serialize author workflow v2: {error}"))
             .into()
     })
 }

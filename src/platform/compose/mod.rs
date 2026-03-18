@@ -6,7 +6,7 @@ use std::path::Path;
 
 use serde::Serialize;
 
-use crate::errors::{CliError, CliErrorKind, cow};
+use crate::errors::{CliError, CliErrorKind};
 use crate::infra::io::write_text;
 
 #[cfg(test)]
@@ -49,7 +49,7 @@ impl ComposeFile {
     /// Returns `CliError` on serialization failure.
     pub fn to_yaml(&self) -> Result<String, CliError> {
         serde_yml::to_string(self)
-            .map_err(|e| CliErrorKind::serialize(cow!("compose file: {e}")).into())
+            .map_err(|e| CliErrorKind::serialize(format!("compose file: {e}")).into())
     }
 
     /// Write the compose file to disk.

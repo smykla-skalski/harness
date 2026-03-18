@@ -3,7 +3,7 @@ use std::path::Path;
 use std::time::Duration;
 
 use crate::core_defs::CommandResult;
-use crate::errors::{CliError, CliErrorKind, cow};
+use crate::errors::{CliError, CliErrorKind};
 
 use super::{k3d, run_command, run_command_streaming};
 
@@ -188,9 +188,9 @@ pub fn docker_write_file(
     content: &str,
 ) -> Result<(), CliError> {
     let mut tmp =
-        tempfile::NamedTempFile::new().map_err(|e| CliErrorKind::io(cow!("temp file: {e}")))?;
+        tempfile::NamedTempFile::new().map_err(|e| CliErrorKind::io(format!("temp file: {e}")))?;
     tmp.write_all(content.as_bytes())
-        .map_err(|e| CliErrorKind::io(cow!("write temp file: {e}")))?;
+        .map_err(|e| CliErrorKind::io(format!("write temp file: {e}")))?;
     let src = tmp.path().to_string_lossy();
     let dest = format!("{container}:{container_path}");
     docker(&["cp", &src, &dest], &[0])?;

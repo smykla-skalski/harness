@@ -8,7 +8,7 @@ use regex::Regex;
 
 use crate::app::command_context::{CommandContext, Execute, resolve_repo_root};
 use crate::core_defs::HARNESS_PREFIX;
-use crate::errors::{CliError, CliErrorKind, cow};
+use crate::errors::{CliError, CliErrorKind};
 use crate::infra::exec::{kubectl, run_command};
 use crate::infra::io::ensure_dir;
 
@@ -91,7 +91,10 @@ pub fn gateway(
 
     let tmp_dir = env::temp_dir().join(format!("{HARNESS_PREFIX}gateway"));
     ensure_dir(&tmp_dir).map_err(|e| {
-        CliErrorKind::io(cow!("could not create temp dir {}: {e}", tmp_dir.display()))
+        CliErrorKind::io(format!(
+            "could not create temp dir {}: {e}",
+            tmp_dir.display()
+        ))
     })?;
 
     let temp_manifest = tmp_dir.join(format!("gateway-api-{version}.yaml"));
