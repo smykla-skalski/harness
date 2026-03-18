@@ -1,7 +1,7 @@
 use crate::errors::{CliError, HookMessage};
-use crate::hooks::context::GuardContext as HookContext;
+use crate::hooks::protocol::context::GuardContext as HookContext;
 use crate::shell_parse::HarnessCommandInvocationRef;
-use crate::workflow::runner::{FailureKind, RunnerPhase, RunnerWorkflowState};
+use crate::run::workflow::{FailureKind, RunnerPhase, RunnerWorkflowState};
 
 use super::effects::{self, HookOutcome};
 
@@ -66,7 +66,7 @@ fn request_preflight_failed(state: &RunnerWorkflowState) -> RunnerWorkflowState 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::workflow::runner::{PreflightState, PreflightStatus};
+    use crate::run::workflow::{PreflightState, PreflightStatus};
 
     fn base_state() -> RunnerWorkflowState {
         RunnerWorkflowState {

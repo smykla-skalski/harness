@@ -4,7 +4,7 @@ use std::process::ExitCode;
 use tracing_subscriber::EnvFilter;
 use tracing_subscriber::fmt::time::ChronoUtc;
 
-use harness::cli;
+use harness::app::cli;
 use harness::errors;
 
 fn main() -> ExitCode {

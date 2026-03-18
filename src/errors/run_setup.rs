@@ -222,42 +222,42 @@ impl RunSetupError {
         match self {
             Self::MissingRunPointer => Some("Run init first.".into()),
             Self::MissingRunContextValue { .. } => {
-                Some("Run `harness init` and the required setup step first.".into())
+                Some("Run `harness run init` and the required setup step first.".into())
             }
             Self::MissingRunLocation { .. } => {
-                Some("Pass `--run-root` or `--run-dir`, or run `harness init` first.".into())
+                Some("Pass `--run-root` or `--run-dir`, or run `harness run init` first.".into())
             }
             Self::GatewayDownloadEmpty { .. } => {
                 Some("Check the URL and network connectivity.".into())
             }
             Self::KumactlNotFound => Some("Build kumactl first.".into()),
             Self::TrackedKubectlRequired => {
-                Some("Run `harness init` and `harness cluster ...` first.".into())
+                Some("Run `harness run init` and `harness setup cluster ...` first.".into())
             }
             Self::KubectlTargetOverrideForbidden { .. } => Some(
-                "Use `harness run --cluster <name> kubectl ...` for another tracked member.".into(),
+                "Use `harness run record --cluster <name> -- kubectl ...` for another tracked member.".into(),
             ),
             Self::UnknownTrackedCluster { choices, .. } => Some(format!("Use one of: {choices}.")),
             Self::NonLocalKubeconfig { .. } => Some(
-                "Recreate the local cluster with `harness cluster ...` before continuing.".into(),
+                "Recreate the local cluster with `harness setup cluster ...` before continuing.".into(),
             ),
             Self::EvidenceLabelNotFound { .. } => Some(
-                "Use `harness record --label <label>` or inspect `commands/command-log.md`."
+                "Use `harness run record --label <label>` or inspect `commands/command-log.md`."
                     .into(),
             ),
             Self::ReportGroupEvidenceRequired => {
                 Some("Pass `--evidence-label <label>` or `--evidence <path>`.".into())
             }
             Self::RunDirExists { .. } => Some(
-                "Use a new run id or resume the existing run instead of re-running `harness init`."
+                "Use a new run id or resume the existing run instead of re-running `harness run init`."
                     .into(),
             ),
             Self::MissingRunStatus => Some(
-                "The run-status.json file could not be loaded. Re-run `harness init` or check the run directory."
+                "The run-status.json file could not be loaded. Re-run `harness run init` or check the run directory."
                     .into(),
             ),
             Self::ServiceReadinessTimeout { name } => Some(format!(
-                "Run `harness service down {name}` to clean up the container."
+                "Run `harness run service down {name}` to clean up the container."
             )),
             _ => None,
         }

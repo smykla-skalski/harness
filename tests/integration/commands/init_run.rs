@@ -58,7 +58,7 @@ fn assert_init_logs(run_dir: &Path) {
     let cmd_log = run_dir.join("commands").join("command-log.md");
     assert!(cmd_log.exists(), "command log should exist");
     let cmd_text = fs::read_to_string(&cmd_log).unwrap();
-    assert!(cmd_text.contains("harness init"));
+    assert!(cmd_text.contains("harness run init"));
 
     let manifest_index = run_dir.join("manifests").join("manifest-index.md");
     assert!(manifest_index.exists(), "manifest index should exist");

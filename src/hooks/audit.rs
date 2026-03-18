@@ -1,6 +1,6 @@
-use crate::audit_log::build_hook_audit_request;
+use crate::run::audit::build_hook_audit_request;
 use crate::errors::CliError;
-use crate::hooks::context::GuardContext as HookContext;
+use crate::hooks::protocol::context::GuardContext as HookContext;
 
 use super::effects::{HookEffect, HookOutcome};
 
@@ -34,11 +34,11 @@ mod tests {
 
     use harness_testkit::RunDirBuilder;
 
-    use crate::context::RunContext;
-    use crate::hooks::context::GuardContext as HookContext;
-    use crate::hooks::hook_result::Decision;
-    use crate::hooks::payloads::HookEnvelopePayload;
-    use crate::workflow::runner::{
+    use crate::run::context::RunContext;
+    use crate::hooks::protocol::context::GuardContext as HookContext;
+    use crate::hooks::protocol::hook_result::Decision;
+    use crate::hooks::protocol::payloads::HookEnvelopePayload;
+    use crate::run::workflow::{
         PreflightState, PreflightStatus, RunnerPhase, RunnerWorkflowState,
     };
 

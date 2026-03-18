@@ -1,8 +1,8 @@
 use crate::errors::HookMessage;
-use crate::hooks::context::GuardContext;
-use crate::hooks::engine::Guard;
+use crate::hooks::protocol::context::GuardContext;
+use crate::hooks::registry::Guard;
 use crate::hooks::guard_bash::predicates::make_target;
-use crate::hooks::result::NormalizedHookResult;
+use crate::hooks::protocol::result::NormalizedHookResult;
 use crate::rules::suite_runner::MakeTargetPrefix;
 
 use super::parsed_parts;
@@ -28,7 +28,7 @@ impl Guard for MakeTargetGuard {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::hooks::payloads::HookEnvelopePayload;
+    use crate::hooks::protocol::payloads::HookEnvelopePayload;
 
     fn ctx(command: &str) -> GuardContext {
         GuardContext::from_test_envelope(

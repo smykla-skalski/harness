@@ -12,8 +12,8 @@ pub use run_phase::RunPhaseGuard;
 pub use structural::StructuralGuard;
 pub use subshell::SubshellGuard;
 
-use crate::hooks::context::GuardContext;
-use crate::hooks::engine::GuardChain;
+use crate::hooks::protocol::context::GuardContext;
+use crate::hooks::registry::GuardChain;
 use crate::shell_parse::ParsedCommand;
 
 /// Extract parsed command parts, returning `None` when the command is empty
@@ -54,9 +54,9 @@ pub fn author_bash_chain() -> GuardChain {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::hooks::context::GuardContext;
-    use crate::hooks::payloads::HookEnvelopePayload;
-    use crate::hooks::result::NormalizedDecision;
+    use crate::hooks::protocol::context::GuardContext;
+    use crate::hooks::protocol::payloads::HookEnvelopePayload;
+    use crate::hooks::protocol::result::NormalizedDecision;
 
     fn ctx(skill: &str, command: &str) -> GuardContext {
         GuardContext::from_test_envelope(

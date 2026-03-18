@@ -11,11 +11,11 @@ use serde::Deserialize;
 use serde_json::Value;
 
 use crate::errors::{CliError, CliErrorKind, cow};
-use crate::hooks::context::{
+use crate::hooks::protocol::context::{
     AgentContext, NormalizedEvent, NormalizedHookContext, RawPayload, SessionContext, SkillContext,
     ToolCategory, ToolContext, ToolInput,
 };
-use crate::hooks::result::NormalizedHookResult;
+use crate::hooks::protocol::result::NormalizedHookResult;
 
 pub use claude::ClaudeCodeAdapter;
 pub use codex::CodexAdapter;

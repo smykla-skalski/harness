@@ -28,12 +28,12 @@ const GUARD_BASH_PAYLOAD_CASES: &[(&str, &str, bool)] = &[
     ("suite:run", "ls -la /tmp/kumactl", false),
     (
         "suite:run",
-        "harness run --phase setup --label kumactl-version kumactl version",
+        "harness run record --phase setup --label kumactl-version -- kumactl version",
         true,
     ),
     (
         "suite:run",
-        "harness run --phase verify --label admin-check curl localhost:9901/config_dump",
+        "harness run record --phase verify --label admin-check -- curl localhost:9901/config_dump",
         true,
     ),
     (
@@ -51,7 +51,7 @@ const GUARD_BASH_PAYLOAD_CASES: &[(&str, &str, bool)] = &[
     ),
     (
         "suite:run",
-        "harness run --phase cleanup --label cleanup-g04 \
+        "harness run record --phase cleanup --label cleanup-g04 -- \
          kubectl delete meshopentelemetrybackend otel-runtime \
          meshmetric metrics-runtime -n kuma-system",
         false,
@@ -81,7 +81,7 @@ const GUARD_BASH_PAYLOAD_CASES: &[(&str, &str, bool)] = &[
     ("suite:run", "echo row >> commands/command-log.md", false),
     (
         "suite:run",
-        "sleep 5 && harness run --phase verify --label ctx kubectl config current-context",
+        "sleep 5 && harness run record --phase verify --label ctx -- kubectl config current-context",
         false,
     ),
     (
@@ -101,7 +101,7 @@ const GUARD_BASH_PAYLOAD_CASES: &[(&str, &str, bool)] = &[
     ("suite:run", "", true),
     ("suite:run", "wget -qO- localhost:9901/config_dump", false),
     ("suite:new", "kubectl get pods", false),
-    ("suite:new", "harness authoring-show --kind session", true),
+    ("suite:new", "harness authoring show --kind session", true),
     ("suite:new", "curl localhost:9901/config_dump", false),
     ("suite:new", "helm install kuma kuma/kuma", false),
     ("suite:new", "docker ps", false),
@@ -151,7 +151,7 @@ fn guard_bash_denies_harness_in_loop() {
         "suite:run",
         make_bash_payload(
             "for i in 01 02 03; do \
-             harness apply --manifest \"g10/${i}.yaml\" --step \"g10-manifest-${i}\" || break; \
+             harness run apply --manifest \"g10/${i}.yaml\" --step \"g10-manifest-${i}\" || break; \
              done",
         ),
     );
@@ -171,7 +171,7 @@ fn guard_bash_denies_rebootstrap_after_completed() {
     let mut status = read_run_status(&run_dir);
     status.overall_verdict = Verdict::Pass;
     write_run_status(&run_dir, &status);
-    let payload = make_bash_payload("harness cluster single-up kuma-1");
+    let payload = make_bash_payload("harness setup cluster single-up kuma-1");
     let ctx = make_hook_context_with_run("suite:run", payload, &run_dir);
     let r = guard_bash::execute(&ctx).unwrap();
     assert_deny(&r);
@@ -184,7 +184,7 @@ fn guard_bash_denies_continuation_after_completed() {
     let mut status = read_run_status(&run_dir);
     status.overall_verdict = Verdict::Pass;
     write_run_status(&run_dir, &status);
-    let payload = make_bash_payload("harness preflight");
+    let payload = make_bash_payload("harness run preflight");
     let ctx = make_hook_context_with_run("suite:run", payload, &run_dir);
     let r = guard_bash::execute(&ctx).unwrap();
     assert_deny(&r);
@@ -197,7 +197,7 @@ fn guard_bash_allows_cluster_down_after_completed() {
     let mut status = read_run_status(&run_dir);
     status.overall_verdict = Verdict::Pass;
     write_run_status(&run_dir, &status);
-    let payload = make_bash_payload("harness cluster single-down kuma-1");
+    let payload = make_bash_payload("harness setup cluster single-down kuma-1");
     let ctx = make_hook_context_with_run("suite:run", payload, &run_dir);
     let r = guard_bash::execute(&ctx).unwrap();
     assert_allow(&r);
@@ -210,7 +210,7 @@ fn guard_bash_allows_report_check_after_completed() {
     let mut status = read_run_status(&run_dir);
     status.overall_verdict = Verdict::Pass;
     write_run_status(&run_dir, &status);
-    let payload = make_bash_payload("harness report check");
+    let payload = make_bash_payload("harness run report check");
     let ctx = make_hook_context_with_run("suite:run", payload, &run_dir);
     let r = guard_bash::execute(&ctx).unwrap();
     assert_allow(&r);
@@ -234,7 +234,7 @@ fn guard_bash_completed_state_blocks_commands() {
         history: Vec::new(),
     };
     runner_workflow::write_runner_state(&run_dir, &state).unwrap();
-    let payload = make_bash_payload("harness apply --manifest test.yaml");
+    let payload = make_bash_payload("harness run apply --manifest test.yaml");
     let ctx = make_hook_context_with_run("suite:run", payload, &run_dir);
     let r = guard_bash::execute(&ctx).unwrap();
     assert_deny(&r);

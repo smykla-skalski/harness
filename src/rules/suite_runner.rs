@@ -88,10 +88,10 @@ impl RunFile {
     ];
 
     pub const CONTROL_HINT: &str =
-        "use `harness report group`, `harness runner-state`, or `harness closeout`";
+        "use `harness run report group`, `harness run runner-state`, or `harness run closeout`";
 
     pub const COMMAND_LOG_HINT: &str =
-        "use `harness record`, `harness run`, or recorded command artifacts instead";
+        "use `harness run record` or recorded command artifacts instead";
 
     /// Part of the allowed run surface (everything except `RunnerState`).
     #[must_use]

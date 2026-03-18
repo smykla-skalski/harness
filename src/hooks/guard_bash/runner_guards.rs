@@ -1,17 +1,18 @@
 use std::path::Path;
 
 use crate::errors::HookMessage;
-use crate::hooks::context::GuardContext as HookContext;
-use crate::hooks::hook_result::HookResult;
+use crate::hooks::protocol::context::GuardContext as HookContext;
+use crate::hooks::protocol::hook_result::HookResult;
 use crate::rules::suite_runner::{
     ControlFileMutationBinary, ControlFileReadBinary, MakeTargetPrefix, RunFile, ScriptInterpreter,
     SuiteMutationBinary, TaskOutputPattern, TrackedHarnessSubcommand,
 };
 use crate::shell_parse::{
     command_heads, is_shell_chain_op, is_shell_flow_word, is_shell_redirect_op,
-    normalized_binary_name, path_like_words, significant_words,
+    normalized_binary_name, path_like_words, semantic_harness_subcommand, semantic_harness_tail,
+    significant_words,
 };
-use crate::workflow::runner::{RunnerPhase, RunnerWorkflowState};
+use crate::run::workflow::{RunnerPhase, RunnerWorkflowState};
 
 use super::predicates::{
     allows_wrapped_envoy_admin, deny_python, deny_runner_flow, has_admin_endpoint_hint,
@@ -28,7 +29,7 @@ pub(crate) fn guard_runner_phase(ctx: &HookContext, words: &[String]) -> HookRes
     {
         return deny_runner_flow(&format!(
             "{reason}. Start a new run with \
-             `harness init --run-id <new-run-id> ...` first"
+             `harness run init --run-id <new-run-id> ...` first"
         ));
     }
     if let Some(ref state) = ctx.runner_state {
@@ -45,16 +46,9 @@ fn completed_run_reuse_reason(words: &[String]) -> Option<&'static str> {
         return None;
     }
     let sig = significant_words(words);
-    if sig.len() < 2 {
-        return None;
-    }
-    let head = Path::new(sig[0])
-        .file_name()
-        .map_or("", |n| n.to_str().unwrap_or(""));
-    if head != "harness" {
-        return None;
-    }
-    completed_run_reuse_for_subcommand(sig[1], &sig)
+    let semantic = semantic_harness_tail(&sig)?;
+    let subcommand = semantic_harness_subcommand(&sig)?;
+    completed_run_reuse_for_subcommand(subcommand, semantic)
 }
 
 fn completed_run_reuse_for_subcommand(
@@ -67,7 +61,7 @@ fn completed_run_reuse_for_subcommand(
             "the active run is already final; do not start or \
              redeploy clusters on it",
         ),
-        "report" if significant.len() >= 3 && significant[2] == "check" => None,
+        "report" if significant.len() >= 2 && significant[1] == "check" => None,
         "report" => Some("the active run is already final; do not mutate the finalized report"),
         "runner-state"
             if significant
@@ -87,7 +81,7 @@ fn completed_run_reuse_for_subcommand(
 
 fn cluster_mode_is_teardown(significant: &[&str]) -> bool {
     significant
-        .get(2)
+        .get(1)
         .is_some_and(|mode| mode.ends_with("-down"))
 }
 
@@ -98,16 +92,9 @@ fn has_explicit_run_scope(words: &[String]) -> bool {
 
 fn allowed_command(state: &RunnerWorkflowState, words: &[String]) -> (bool, Option<&'static str>) {
     let sig = significant_words(words);
-    if sig.len() < 2 {
+    let Some(sub) = semantic_harness_subcommand(&sig) else {
         return (true, None);
-    }
-    let head = Path::new(sig[0])
-        .file_name()
-        .map_or("", |n| n.to_str().unwrap_or(""));
-    if head != "harness" {
-        return (true, None);
-    }
-    let sub = sig[1];
+    };
     match state.phase() {
         RunnerPhase::Completed | RunnerPhase::Aborted => match sub {
             "closeout" | "runner-state" | "report" | "session-stop" => (true, None),
@@ -153,22 +140,20 @@ pub(crate) fn deny_batched_tracked_harness_commands(words: &[String]) -> HookRes
     HookResult::allow()
 }
 
-fn tracked_harness_subcommands(words: &[String]) -> Vec<&str> {
+fn tracked_harness_subcommands(words: &[String]) -> Vec<String> {
     let sig = significant_words(words);
     let mut subs = Vec::new();
     for (i, word) in sig.iter().enumerate() {
-        if i + 1 >= sig.len() {
-            break;
-        }
         let name = Path::new(word)
             .file_name()
             .map_or("", |n| n.to_str().unwrap_or(""));
         if name != "harness" {
             continue;
         }
-        let sub = sig[i + 1];
-        if !sub.starts_with('-') && TrackedHarnessSubcommand::is_tracked(sub) {
-            subs.push(sub);
+        if let Some(sub) = semantic_harness_subcommand(&sig[i..])
+            && TrackedHarnessSubcommand::is_tracked(sub)
+        {
+            subs.push(sub.to_string());
         }
     }
     subs
@@ -347,14 +332,14 @@ pub(crate) fn deny_mixed_kuma_delete(words: &[String]) -> HookResult {
             skip_next = false;
             continue;
         }
-        if DELETE_FLAGS_WITH_VALUE.contains(word) {
+        if DELETE_FLAGS_WITH_VALUE.contains(&word.as_str()) {
             skip_next = true;
             continue;
         }
         if word.starts_with('-') {
             continue;
         }
-        positional.push(*word);
+        positional.push(word.as_str());
     }
     let kinds: Vec<&str> = positional
         .iter()
@@ -373,23 +358,23 @@ pub(crate) fn deny_mixed_kuma_delete(words: &[String]) -> HookResult {
     )
 }
 
-fn tracked_kubectl_delete_words(words: &[String]) -> Option<Vec<&str>> {
+fn tracked_kubectl_delete_words(words: &[String]) -> Option<Vec<String>> {
     let sig = significant_words(words);
-    if sig.len() < 4 {
+    let semantic = semantic_harness_tail(&sig)?;
+    if semantic_harness_subcommand(&sig) != Some("record") {
         return None;
     }
-    let head = Path::new(sig[0])
-        .file_name()
-        .map_or("", |n| n.to_str().unwrap_or(""));
-    if head != "harness" || !matches!(sig[1], "run" | "record") {
-        return None;
-    }
-    for (i, word) in sig.iter().enumerate() {
+    for (i, word) in semantic.iter().enumerate() {
         let name = Path::new(word)
             .file_name()
             .map_or("", |n| n.to_str().unwrap_or(""));
-        if name == "kubectl" && i + 1 < sig.len() && sig[i + 1] == "delete" {
-            return Some(sig[i + 2..].to_vec());
+        if name == "kubectl" && i + 1 < semantic.len() && semantic[i + 1] == "delete" {
+            return Some(
+                semantic[i + 2..]
+                    .iter()
+                    .map(|word| (*word).to_string())
+                    .collect(),
+            );
         }
     }
     None
@@ -409,7 +394,7 @@ pub(crate) fn deny_author_suite_storage_mutation(words: &[String]) -> HookResult
             return HookMessage::approval_required(
                 "mutate suite storage",
                 "do not delete or overwrite existing suite directories; \
-                 use `harness authoring-begin` which handles conflicts",
+                 use `harness authoring begin` which handles conflicts",
             )
             .into_result();
         }

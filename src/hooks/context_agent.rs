@@ -1,6 +1,6 @@
 use crate::errors::{CliError, HookMessage};
-use crate::hooks::context::GuardContext as HookContext;
-use crate::workflow::runner::{PreflightStatus, RunnerPhase, RunnerWorkflowState};
+use crate::hooks::protocol::context::GuardContext as HookContext;
+use crate::run::workflow::{PreflightStatus, RunnerPhase, RunnerWorkflowState};
 
 use super::effects::{HookEffect, HookOutcome};
 
@@ -65,7 +65,7 @@ fn can_start_preflight_worker(state: &RunnerWorkflowState) -> (bool, Option<&'st
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::workflow::runner::PreflightState;
+    use crate::run::workflow::PreflightState;
 
     fn base_state(phase: RunnerPhase, preflight_status: PreflightStatus) -> RunnerWorkflowState {
         RunnerWorkflowState {

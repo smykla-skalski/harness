@@ -1,10 +1,10 @@
 use std::path::Path;
 
 use crate::errors::{CliError, HookMessage};
-use crate::hooks::context::GuardContext as HookContext;
-use crate::hooks::hook_result::HookResult;
+use crate::hooks::protocol::context::GuardContext as HookContext;
+use crate::hooks::protocol::hook_result::HookResult;
 use crate::rules::suite_runner::{RunDir, RunFile};
-use crate::workflow::author::{self, can_write};
+use crate::authoring::workflow::{self, can_write};
 
 use super::{control_file_hint, is_command_owned_run_file, normalize_path};
 
@@ -43,7 +43,7 @@ fn guard_suite_author(ctx: &HookContext, paths: &[&Path]) -> HookResult {
             if !norm.starts_with(sdn) {
                 continue;
             }
-            if !author::suite_author_path_allowed(&norm, sdn) {
+            if !workflow::suite_author_path_allowed(&norm, sdn) {
                 return HookMessage::write_outside_suite(raw_path.display().to_string())
                     .into_result();
             }

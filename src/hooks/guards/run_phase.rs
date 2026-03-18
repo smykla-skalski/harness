@@ -1,7 +1,7 @@
-use crate::hooks::context::GuardContext;
-use crate::hooks::engine::Guard;
+use crate::hooks::protocol::context::GuardContext;
+use crate::hooks::registry::Guard;
 use crate::hooks::guard_bash::runner_guards::guard_runner_phase;
-use crate::hooks::result::NormalizedHookResult;
+use crate::hooks::protocol::result::NormalizedHookResult;
 
 use super::parsed_parts;
 
@@ -23,7 +23,7 @@ impl Guard for RunPhaseGuard {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::hooks::payloads::HookEnvelopePayload;
+    use crate::hooks::protocol::payloads::HookEnvelopePayload;
 
     fn ctx(command: &str) -> GuardContext {
         GuardContext::from_test_envelope(

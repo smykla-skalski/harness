@@ -1,33 +1,53 @@
 #![deny(unsafe_code)]
 
-pub mod audit_log;
+pub mod app;
 pub mod authoring;
-pub mod authoring_validate;
-pub mod blocks;
-pub mod bootstrap;
-pub mod cli;
-pub mod cluster;
 #[cfg(test)]
 mod codec;
-pub mod commands;
 pub mod compact;
-pub mod compose;
-pub mod context;
 pub mod core_defs;
-pub mod ephemeral_metallb;
 pub mod errors;
-pub mod exec;
 pub mod hooks;
-pub mod io;
-pub mod kubectl_validate;
+pub mod infra;
 pub(crate) mod manifests;
-pub mod prepared_suite;
-pub(crate) mod resolve;
+pub mod observe;
+pub mod platform;
 pub mod rules;
-pub mod run_services;
-pub mod runtime;
+pub mod run;
 pub mod schema;
+pub mod setup;
 pub(crate) mod shell_parse;
-pub(crate) mod state_capture;
 pub(crate) mod suite_defaults;
-pub mod workflow;
+
+#[doc(hidden)]
+pub use crate::app::cli;
+#[doc(hidden)]
+pub use crate::infra::blocks;
+#[doc(hidden)]
+pub use crate::platform::cluster;
+#[doc(hidden)]
+pub use crate::platform::compose;
+#[doc(hidden)]
+pub use crate::platform::ephemeral_metallb;
+#[doc(hidden)]
+pub use crate::platform::kubectl_validate;
+#[doc(hidden)]
+pub use crate::platform::runtime;
+#[doc(hidden)]
+pub use crate::run::context;
+
+#[doc(hidden)]
+pub mod commands {
+    pub use crate::authoring::commands as authoring;
+    pub use crate::observe;
+    pub use crate::run::RunDirArgs;
+    pub use crate::run::commands as run;
+    pub use crate::setup;
+}
+
+#[doc(hidden)]
+pub mod workflow {
+    pub use crate::authoring::workflow as author;
+    pub use crate::infra::persistence;
+    pub use crate::run::workflow as runner;
+}

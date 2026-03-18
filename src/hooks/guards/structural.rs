@@ -1,12 +1,12 @@
-use crate::hooks::context::GuardContext;
-use crate::hooks::engine::Guard;
+use crate::hooks::protocol::context::GuardContext;
+use crate::hooks::registry::Guard;
 use crate::hooks::guard_bash::runner_guards::{
     deny_batched_tracked_harness_commands, deny_direct_command_log_access,
     deny_harness_managed_run_control_mutation, deny_mixed_kuma_delete, deny_raw_manifest_write,
     deny_suite_storage_mutation,
 };
-use crate::hooks::hook_result::HookResult;
-use crate::hooks::result::NormalizedHookResult;
+use crate::hooks::protocol::hook_result::HookResult;
+use crate::hooks::protocol::result::NormalizedHookResult;
 
 use super::parsed_parts;
 
@@ -48,7 +48,7 @@ impl Guard for StructuralGuard {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::hooks::payloads::HookEnvelopePayload;
+    use crate::hooks::protocol::payloads::HookEnvelopePayload;
 
     fn ctx(command: &str) -> GuardContext {
         GuardContext::from_test_envelope(

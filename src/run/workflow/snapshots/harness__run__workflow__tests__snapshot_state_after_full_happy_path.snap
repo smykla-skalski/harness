@@ -1,0 +1,43 @@
+---
+source: src/run/workflow/mod.rs
+expression: "serde_json::to_string_pretty(&json).unwrap()"
+---
+{
+  "last_event": "RunCompleted",
+  "schema_version": 2,
+  "state": {
+    "history": [
+      {
+        "event": "cluster-prepared",
+        "from": "bootstrap",
+        "timestamp": "REDACTED",
+        "to": "preflight"
+      },
+      {
+        "event": "preflight-captured",
+        "from": "preflight",
+        "timestamp": "REDACTED",
+        "to": "execution"
+      },
+      {
+        "event": "closeout-started",
+        "from": "execution",
+        "timestamp": "REDACTED",
+        "to": "closeout"
+      },
+      {
+        "event": "run-completed",
+        "from": "closeout",
+        "timestamp": "REDACTED",
+        "to": "completed"
+      }
+    ],
+    "phase": "completed",
+    "preflight": {
+      "status": "complete"
+    },
+    "updated_at": "REDACTED"
+  },
+  "transition_count": 4,
+  "updated_at": "REDACTED"
+}

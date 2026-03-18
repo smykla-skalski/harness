@@ -2,8 +2,8 @@ pub(crate) mod predicates;
 pub(crate) mod runner_guards;
 
 use crate::errors::{CliError, HookMessage};
-use crate::hooks::context::GuardContext as HookContext;
-use crate::hooks::hook_result::HookResult;
+use crate::hooks::protocol::context::GuardContext as HookContext;
+use crate::hooks::protocol::hook_result::HookResult;
 
 use predicates::{
     deny_python, has_admin_endpoint_hint, has_denied_cluster_binary,
@@ -97,9 +97,9 @@ fn guard_suite_runner(ctx: &HookContext, words: &[String], heads: &[String]) -> 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::hooks::context::GuardContext as HookContext;
-    use crate::hooks::hook_result::Decision;
-    use crate::hooks::payloads::HookEnvelopePayload;
+    use crate::hooks::protocol::context::GuardContext as HookContext;
+    use crate::hooks::protocol::hook_result::Decision;
+    use crate::hooks::protocol::payloads::HookEnvelopePayload;
     use crate::rules::suite_runner::TrackedHarnessSubcommand;
 
     use super::predicates::{is_tracked_harness_command, make_target};
@@ -157,7 +157,7 @@ mod tests {
     fn allows_kumactl_in_harness_run() {
         let c = ctx(
             "suite:run",
-            "harness run --phase setup --label kumactl-version kumactl version",
+            "harness run record --phase setup --label kumactl-version -- kumactl version",
         );
         let r = execute(&c).unwrap();
         assert_eq!(r.decision, Decision::Allow);
@@ -303,7 +303,7 @@ mod tests {
     fn denies_chained_tracked_harness() {
         let c = ctx(
             "suite:run",
-            "sleep 5 && harness run --phase verify --label ctx kubectl config current-context",
+            "sleep 5 && harness run record --phase verify --label ctx -- kubectl config current-context",
         );
         let r = execute(&c).unwrap();
         assert_eq!(r.decision, Decision::Deny);
@@ -349,10 +349,19 @@ mod tests {
         .collect();
         assert!(is_tracked_harness_command(&words));
 
-        let words: Vec<String> = vec!["harness", "run", "--phase", "setup", "kumactl", "version"]
-            .into_iter()
-            .map(String::from)
-            .collect();
+        let words: Vec<String> = vec![
+            "harness",
+            "run",
+            "record",
+            "--phase",
+            "setup",
+            "--",
+            "kumactl",
+            "version",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect();
         assert!(is_tracked_harness_command(&words));
     }
 
@@ -704,7 +713,7 @@ mod tests {
     fn allows_harness_run_with_kubectl() {
         let c = ctx(
             "suite:run",
-            "harness run --phase verify --label pods kubectl get pods -o json",
+            "harness run record --phase verify --label pods -- kubectl get pods -o json",
         );
         let r = execute(&c).unwrap();
         assert_eq!(r.decision, Decision::Allow);

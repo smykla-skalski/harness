@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
 
 use crate::errors::{CliError, CliErrorKind, cow};
-use crate::io;
+use crate::infra::io;
 use crate::rules;
 
 use super::frontmatter::SuiteFrontmatter;

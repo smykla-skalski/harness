@@ -1,11 +1,11 @@
 use crate::errors::{CliError, HookMessage};
-use crate::hooks::context::GuardContext as HookContext;
-use crate::hooks::hook_result::HookResult;
-use crate::hooks::payloads::AskUserQuestionPrompt;
-use crate::kubectl_validate::kubectl_validate_prompt_required;
+use crate::hooks::protocol::context::GuardContext as HookContext;
+use crate::hooks::protocol::hook_result::HookResult;
+use crate::hooks::protocol::payloads::AskUserQuestionPrompt;
+use crate::platform::kubectl_validate::kubectl_validate_prompt_required;
 use crate::rules::suite_runner as runner_rules;
-use crate::workflow::author::{ApprovalMode, ReviewGate, can_request_gate};
-use crate::workflow::runner::{RunnerPhase, RunnerWorkflowState};
+use crate::authoring::workflow::{ApprovalMode, ReviewGate, can_request_gate};
+use crate::run::workflow::{RunnerPhase, RunnerWorkflowState};
 
 /// Execute the guard-question hook.
 ///
@@ -129,7 +129,7 @@ fn can_ask_manifest_fix(state: &RunnerWorkflowState) -> (bool, Option<&'static s
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::workflow::runner::{
+    use crate::run::workflow::{
         FailureKind, FailureState, PreflightState, PreflightStatus, RunnerWorkflowState,
     };
 

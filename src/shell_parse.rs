@@ -12,6 +12,7 @@ enum FlagValueLocation {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct HarnessCommandInvocation {
     head_index: usize,
+    group_index: Option<usize>,
     subcommand_index: Option<usize>,
     gid: Option<FlagValueLocation>,
     pub has_explicit_run_scope: bool,
@@ -34,6 +35,27 @@ impl<'a> HarnessCommandInvocationRef<'a> {
         self.invocation
             .subcommand_index
             .map(|index| self.words[index].as_str())
+    }
+
+    #[must_use]
+    pub fn group(self) -> Option<&'a str> {
+        self.invocation
+            .group_index
+            .map(|index| self.words[index].as_str())
+    }
+
+    #[must_use]
+    pub fn command_label(self) -> String {
+        let mut parts = vec![self.head()];
+        if let Some(group) = self.group() {
+            parts.push(group);
+        }
+        if let Some(subcommand) = self.subcommand()
+            && Some(subcommand) != self.group()
+        {
+            parts.push(subcommand);
+        }
+        parts.join(" ")
     }
 
     #[must_use]
@@ -262,6 +284,40 @@ pub fn significant_words(words: &[String]) -> Vec<&str> {
         .collect()
 }
 
+fn is_harness_scope_group(word: &str) -> bool {
+    matches!(word, "run" | "setup" | "authoring")
+}
+
+/// Return the semantic harness command tail starting at the effective command.
+///
+/// For grouped invocations like `harness run apply`, this strips the grouping
+/// token and returns `["apply", ...]`. Flat invocations are returned unchanged.
+#[must_use]
+pub fn semantic_harness_tail<'a>(significant_words: &'a [&'a str]) -> Option<&'a [&'a str]> {
+    let (head, rest) = significant_words.split_first()?;
+    if normalized_binary_name(head) != "harness" {
+        return None;
+    }
+    let Some(first) = rest.first().copied() else {
+        return Some(rest);
+    };
+    if is_harness_scope_group(first)
+        && let Some(offset) = rest[1..].iter().position(|word| !word.starts_with('-'))
+    {
+        return Some(&rest[offset + 1..]);
+    }
+    Some(rest)
+}
+
+/// Return the effective harness subcommand for flat and grouped invocations.
+#[must_use]
+pub fn semantic_harness_subcommand<'a>(significant_words: &'a [&'a str]) -> Option<&'a str> {
+    semantic_harness_tail(significant_words)?
+        .iter()
+        .copied()
+        .find(|word| !word.starts_with('-'))
+}
+
 /// Extract tokens that look like file paths (contain `/`, start with `~` or `.`).
 #[must_use]
 pub fn path_like_words(words: &[String]) -> Vec<&str> {
@@ -302,10 +358,6 @@ fn parse_harness_invocations(
         if head != "harness" {
             continue;
         }
-        let subcommand_index = significant_word_indices
-            .get(index + 1)
-            .copied()
-            .filter(|&next_index| !words[next_index].starts_with('-'));
         let search_end = significant_word_indices[index + 1..]
             .iter()
             .position(|&candidate_index| {
@@ -316,6 +368,23 @@ fn parse_harness_invocations(
             })
             .map_or(len, |offset| index + 1 + offset);
         let span = &significant_word_indices[index + 1..search_end];
+        let group_index = span
+            .iter()
+            .copied()
+            .find(|&span_index| !words[span_index].starts_with('-'))
+            .filter(|&span_index| is_harness_scope_group(&words[span_index]));
+        let subcommand_index = if let Some(group_index) = group_index {
+            span.iter()
+                .copied()
+                .skip_while(|&span_index| span_index != group_index)
+                .skip(1)
+                .find(|&span_index| !words[span_index].starts_with('-'))
+                .or(Some(group_index))
+        } else {
+            span.iter()
+                .copied()
+                .find(|&span_index| !words[span_index].starts_with('-'))
+        };
         let gid = extract_flag_value_location(words, span, "--gid");
         let has_explicit_run_scope = span.iter().any(|&span_index| {
             let span_word = &words[span_index];
@@ -326,6 +395,7 @@ fn parse_harness_invocations(
         });
         invocations.push(HarnessCommandInvocation {
             head_index: word_index,
+            group_index,
             subcommand_index,
             gid,
             has_explicit_run_scope,
@@ -423,6 +493,29 @@ mod tests {
         assert_eq!(invocation.head(), "harness");
         assert_eq!(invocation.subcommand(), Some("report"));
         assert_eq!(invocation.gid(), Some("g01"));
+    }
+
+    #[test]
+    fn parsed_command_extracts_grouped_harness_invocation() {
+        let parsed =
+            ParsedCommand::parse("KUBECONFIG=/tmp/conf harness run report group --gid g01")
+                .unwrap();
+        let invocation = parsed.first_harness_invocation().unwrap();
+        assert_eq!(invocation.group(), Some("run"));
+        assert_eq!(invocation.subcommand(), Some("report"));
+        assert_eq!(invocation.command_label(), "harness run report");
+        assert_eq!(invocation.gid(), Some("g01"));
+    }
+
+    #[test]
+    fn semantic_harness_tail_strips_group_prefix() {
+        let grouped = ["harness", "setup", "cluster", "single-up"];
+        assert_eq!(
+            semantic_harness_tail(&grouped).unwrap(),
+            ["cluster", "single-up"]
+        );
+        let flat = ["harness", "report", "group"];
+        assert_eq!(semantic_harness_tail(&flat).unwrap(), ["report", "group"]);
     }
 
     #[test]

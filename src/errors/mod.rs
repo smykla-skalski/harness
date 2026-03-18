@@ -611,7 +611,7 @@ mod tests {
     use std::collections::HashSet;
 
     use super::*;
-    use crate::hooks::hook_result::Decision;
+    use crate::hooks::protocol::hook_result::Decision;
 
     #[test]
     fn cli_err_basic_fields() {
@@ -757,7 +757,7 @@ mod tests {
     fn service_readiness_timeout_has_hint() {
         let err: CliError = CliErrorKind::service_readiness_timeout("demo-svc").into();
         let hint = err.hint().expect("should have a hint");
-        assert!(hint.contains("harness service down demo-svc"));
+        assert!(hint.contains("harness run service down demo-svc"));
     }
 
     #[test]
@@ -816,7 +816,7 @@ mod tests {
         let result = HookMessage::ClusterBinary.into_result();
         assert_eq!(result.decision, Decision::Deny);
         assert_eq!(result.code, "KSR005");
-        assert!(result.message.contains("`harness run`"));
+        assert!(result.message.contains("`harness run ...`"));
     }
 
     #[test]
@@ -884,7 +884,7 @@ mod tests {
 
     #[test]
     fn snapshot_hook_result_deny_json() {
-        use crate::hooks::hook_result::HookResult;
+        use crate::hooks::protocol::hook_result::HookResult;
         let result = HookResult::deny("KSR005", "Direct cluster binary access is not allowed.");
         let json = serde_json::to_string_pretty(&result).expect("serialize hook result");
         insta::assert_snapshot!(json);
@@ -892,7 +892,7 @@ mod tests {
 
     #[test]
     fn snapshot_hook_result_warn_json() {
-        use crate::hooks::hook_result::HookResult;
+        use crate::hooks::protocol::hook_result::HookResult;
         let result = HookResult::warn("KSR006", "Artifact missing: preflight.json");
         let json = serde_json::to_string_pretty(&result).expect("serialize hook result");
         insta::assert_snapshot!(json);
@@ -900,7 +900,7 @@ mod tests {
 
     #[test]
     fn snapshot_hook_result_info_json() {
-        use crate::hooks::hook_result::HookResult;
+        use crate::hooks::protocol::hook_result::HookResult;
         let result = HookResult::info("KSR012", "Run verdict: pass");
         let json = serde_json::to_string_pretty(&result).expect("serialize hook result");
         insta::assert_snapshot!(json);
