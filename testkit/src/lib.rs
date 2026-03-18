@@ -5,6 +5,7 @@
 // in test code with readable, type-safe construction.
 
 pub mod builders;
+pub mod contracts;
 pub mod fake_binary;
 pub mod fake_toolchain;
 

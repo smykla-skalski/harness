@@ -334,4 +334,48 @@ mod tests {
         assert_eq!(result.returncode, 2);
         assert_eq!(result.stdout, "output");
     }
+
+    // -- Contract tests: fake satisfies the same invariants as production --
+
+    mod contracts {
+        use super::*;
+
+        fn contract_name_is_non_empty(build: &dyn BuildSystem) {
+            assert!(!build.name().is_empty(), "block name should not be empty");
+        }
+
+        fn contract_denied_binaries_is_stable(build: &dyn BuildSystem) {
+            let first = build.denied_binaries();
+            let second = build.denied_binaries();
+            assert_eq!(first, second, "denied_binaries should be stable");
+        }
+
+        fn contract_run_target_does_not_panic(build: &dyn BuildSystem) {
+            let _ = build.run_target(&BuildTarget::make("echo-test"));
+        }
+
+        fn contract_run_target_streaming_does_not_panic(build: &dyn BuildSystem) {
+            let _ = build.run_target_streaming(&BuildTarget::make("echo-test"));
+        }
+
+        #[test]
+        fn fake_satisfies_name_is_non_empty() {
+            contract_name_is_non_empty(&FakeBuildSystem::success());
+        }
+
+        #[test]
+        fn fake_satisfies_denied_binaries_is_stable() {
+            contract_denied_binaries_is_stable(&FakeBuildSystem::success());
+        }
+
+        #[test]
+        fn fake_satisfies_run_target_does_not_panic() {
+            contract_run_target_does_not_panic(&FakeBuildSystem::success());
+        }
+
+        #[test]
+        fn fake_satisfies_run_target_streaming_does_not_panic() {
+            contract_run_target_streaming_does_not_panic(&FakeBuildSystem::success());
+        }
+    }
 }
