@@ -477,6 +477,11 @@ impl CliErrorKind {
     }
 
     #[must_use]
+    pub fn concurrent_modification(detail: impl Into<Cow<'static, str>>) -> Self {
+        Self::Workflow(WorkflowError::concurrent_modification(detail))
+    }
+
+    #[must_use]
     pub fn workflow_serialize(detail: impl Into<Cow<'static, str>>) -> Self {
         Self::Workflow(WorkflowError::workflow_serialize(detail))
     }
@@ -678,6 +683,7 @@ mod tests {
             CliErrorKind::workflow_io(""),
             CliErrorKind::workflow_parse(""),
             CliErrorKind::workflow_version(""),
+            CliErrorKind::concurrent_modification(""),
             CliErrorKind::workflow_serialize(""),
             CliErrorKind::json_parse(""),
             CliErrorKind::cluster_error(""),

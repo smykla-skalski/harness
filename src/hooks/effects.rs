@@ -9,7 +9,10 @@ use crate::workflow::runner::{self as runner_wf, RunnerWorkflowState};
 #[derive(Debug, Clone)]
 pub enum HookEffect {
     Decide(NormalizedHookResult),
-    WriteRunnerState(RunnerWorkflowState),
+    WriteRunnerState {
+        expected_transition_count: u32,
+        state: RunnerWorkflowState,
+    },
     AppendAudit(AuditAppendRequest),
     InjectContext(String),
 }
@@ -55,7 +58,7 @@ impl HookOutcome {
             .iter()
             .find_map(|effect| match effect {
                 HookEffect::Decide(result) => Some(result),
-                HookEffect::WriteRunnerState(_)
+                HookEffect::WriteRunnerState { .. }
                 | HookEffect::AppendAudit(_)
                 | HookEffect::InjectContext(_) => None,
             })
@@ -64,7 +67,7 @@ impl HookOutcome {
 
     pub fn state_transitions(&self) -> impl Iterator<Item = &RunnerWorkflowState> {
         self.effects.iter().filter_map(|effect| match effect {
-            HookEffect::WriteRunnerState(state) => Some(state),
+            HookEffect::WriteRunnerState { state, .. } => Some(state),
             HookEffect::Decide(_) | HookEffect::AppendAudit(_) | HookEffect::InjectContext(_) => {
                 None
             }
@@ -75,7 +78,7 @@ impl HookOutcome {
         self.effects.iter().filter_map(|effect| match effect {
             HookEffect::AppendAudit(request) => Some(request),
             HookEffect::Decide(_)
-            | HookEffect::WriteRunnerState(_)
+            | HookEffect::WriteRunnerState { .. }
             | HookEffect::InjectContext(_) => None,
         })
     }
@@ -84,7 +87,7 @@ impl HookOutcome {
         self.effects.iter().filter_map(|effect| match effect {
             HookEffect::InjectContext(text) => Some(text.as_str()),
             HookEffect::Decide(_)
-            | HookEffect::WriteRunnerState(_)
+            | HookEffect::WriteRunnerState { .. }
             | HookEffect::AppendAudit(_) => None,
         })
     }
@@ -111,12 +114,13 @@ impl HookOutcome {
 
 pub(crate) fn persist_runner_state(
     ctx: &GuardContext,
+    expected_transition_count: u32,
     state: &RunnerWorkflowState,
 ) -> Result<bool, CliError> {
     let Some(run_dir) = ctx.effective_run_dir() else {
         return Ok(false);
     };
-    runner_wf::write_runner_state(run_dir.as_ref(), state)?;
+    runner_wf::write_runner_state_if_current(run_dir.as_ref(), expected_transition_count, state)?;
     Ok(true)
 }
 
@@ -130,7 +134,10 @@ where
     let Some(current) = ctx.runner_state.as_ref() else {
         return Ok(None);
     };
-    Ok(update(current).map(HookEffect::WriteRunnerState))
+    Ok(update(current).map(|state| HookEffect::WriteRunnerState {
+        expected_transition_count: current.transition_count,
+        state,
+    }))
 }
 
 pub(crate) fn apply_effects(
@@ -141,8 +148,11 @@ pub(crate) fn apply_effects(
     for effect in effects {
         match effect {
             HookEffect::Decide(_) | HookEffect::InjectContext(_) => {}
-            HookEffect::WriteRunnerState(state) => {
-                let _ = persist_runner_state(ctx, state)?;
+            HookEffect::WriteRunnerState {
+                expected_transition_count,
+                state,
+            } => {
+                let _ = persist_runner_state(ctx, *expected_transition_count, state)?;
             }
             HookEffect::AppendAudit(request) => {
                 if let Err(error) = append_audit_entry(request.clone()) {

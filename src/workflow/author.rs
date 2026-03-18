@@ -3,6 +3,7 @@ use std::fmt;
 use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use serde_json::Value;
 
 use crate::errors::{CliError, CliErrorKind, cow};
 use crate::rules::skill_dirs;
@@ -255,6 +256,7 @@ impl<'de> Deserialize<'de> for AuthorWorkflowState {
 }
 
 const AUTHOR_STATE_SCHEMA_VERSION: u32 = 2;
+const LEGACY_AUTHOR_STATE_FILE: &str = "suite-author-state.json";
 
 /// Path to the author state file.
 ///
@@ -267,11 +269,20 @@ pub fn author_state_path() -> Result<PathBuf, CliError> {
     Ok(cwd.join(".harness").join(skill_dirs::NEW_STATE_FILE))
 }
 
+fn legacy_author_state_path() -> Result<PathBuf, CliError> {
+    let cwd = env::current_dir().map_err(|e| -> CliError {
+        CliErrorKind::workflow_io(cow!("failed to determine current directory: {e}")).into()
+    })?;
+    Ok(cwd.join(".harness").join(LEGACY_AUTHOR_STATE_FILE))
+}
+
 fn author_repository() -> Result<VersionedJsonRepository<AuthorWorkflowState>, CliError> {
-    Ok(VersionedJsonRepository::new(
-        author_state_path()?,
-        AUTHOR_STATE_SCHEMA_VERSION,
-    ))
+    Ok(author_repository_for_path(author_state_path()?))
+}
+
+fn author_repository_for_path(path: PathBuf) -> VersionedJsonRepository<AuthorWorkflowState> {
+    VersionedJsonRepository::new(path, AUTHOR_STATE_SCHEMA_VERSION)
+        .with_migrations(vec![Box::new(migrate_author_v1_to_v2)])
 }
 
 /// Read author state from disk.
@@ -280,24 +291,19 @@ fn author_repository() -> Result<VersionedJsonRepository<AuthorWorkflowState>, C
 /// Returns `CliError` on parse failure.
 pub fn read_author_state() -> Result<Option<AuthorWorkflowState>, CliError> {
     let path = author_state_path()?;
-    let repo = author_repository()?;
-    let loaded = match repo.load() {
-        Ok(loaded) => loaded,
-        Err(error) if error.code() == "WORKFLOW_VERSION" => {
-            return Err(CliErrorKind::workflow_version(cow!(
-                "author state requires schema version 2"
-            ))
-            .with_details(format!(
-                "Delete {} or re-run `harness approval-begin` to regenerate the author state.",
-                path.display()
-            )));
-        }
-        Err(error) => return Err(error),
-    };
-    match loaded {
-        Some(state) => Ok(Some(state)),
-        None => Ok(None),
+    if path.exists() {
+        return load_author_state_repo(author_repository()?, &path);
     }
+
+    let legacy_path = legacy_author_state_path()?;
+    let loaded = load_author_state_repo(
+        author_repository_for_path(legacy_path.clone()),
+        &legacy_path,
+    )?;
+    if let Some(state) = loaded.as_ref() {
+        author_repository()?.save(state)?;
+    }
+    Ok(loaded)
 }
 
 /// Write author state to disk.
@@ -308,6 +314,60 @@ pub fn write_author_state(state: &AuthorWorkflowState) -> Result<(), CliError> {
     let repo = author_repository()?;
     repo.save(state)?;
     Ok(())
+}
+
+fn load_author_state_repo(
+    repo: VersionedJsonRepository<AuthorWorkflowState>,
+    path: &Path,
+) -> Result<Option<AuthorWorkflowState>, CliError> {
+    match repo.load() {
+        Ok(loaded) => Ok(loaded),
+        Err(error) if error.code() == "WORKFLOW_VERSION" => Err(CliErrorKind::workflow_version(
+            cow!("author state requires schema version 2"),
+        )
+        .with_details(format!(
+            "{}\nDelete {} or re-run `harness approval-begin` to regenerate the author state.",
+            error.message(),
+            path.display()
+        ))),
+        Err(error) => Err(error),
+    }
+}
+
+#[derive(Debug, Deserialize)]
+struct AuthorWorkflowStateV1 {
+    pub mode: ApprovalMode,
+    pub phase: AuthorPhase,
+    pub session: AuthorSessionInfo,
+    pub review: AuthorReviewState,
+    pub draft: AuthorDraftState,
+    pub updated_at: String,
+    pub transition_count: u32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last_event: Option<String>,
+}
+
+fn migrate_author_v1_to_v2(data: Value) -> Result<Value, CliError> {
+    let v1: AuthorWorkflowStateV1 = serde_json::from_value(data).map_err(|error| -> CliError {
+        CliErrorKind::workflow_parse(cow!("failed to parse author workflow v1: {error}")).into()
+    })?;
+    let v2 = AuthorWorkflowStateRecord {
+        schema_version: AUTHOR_STATE_SCHEMA_VERSION,
+        mode: v1.mode,
+        session: v1.session,
+        state: AuthorWorkflowPayload {
+            phase: v1.phase,
+            review: v1.review,
+            draft: v1.draft,
+        },
+        updated_at: v1.updated_at,
+        transition_count: v1.transition_count,
+        last_event: v1.last_event,
+    };
+    serde_json::to_value(v2).map_err(|error| -> CliError {
+        CliErrorKind::workflow_serialize(cow!("failed to serialize author workflow v2: {error}"))
+            .into()
+    })
 }
 
 /// Check if writing is allowed in the current state.
@@ -478,6 +538,11 @@ pub fn suite_author_path_allowed(path: &Path, suite_dir: &Path) -> bool {
 
 #[cfg(test)]
 mod tests {
+    use std::fs;
+
+    use serde_json::{Value, json};
+    use tempfile::TempDir;
+
     use super::*;
 
     fn make_state(phase: AuthorPhase, mode: ApprovalMode) -> AuthorWorkflowState {
@@ -809,5 +874,71 @@ mod tests {
             suite_dir: None,
         };
         assert_eq!(info_none.suite_path(), None);
+    }
+
+    #[test]
+    fn migrate_author_v1_to_v2_nests_state_payload() {
+        let v1 = json!({
+            "schema_version": 1,
+            "mode": "interactive",
+            "phase": "writing",
+            "session": {
+                "suite_dir": "/tmp/suite"
+            },
+            "review": {
+                "gate": "prewrite",
+                "awaiting_answer": true,
+                "round": 2,
+                "last_answer": "Request changes"
+            },
+            "draft": {
+                "suite_tree_written": true,
+                "written_paths": ["suite.md"]
+            },
+            "updated_at": "2025-01-01T00:00:00Z",
+            "transition_count": 3,
+            "last_event": "RequestChanges"
+        });
+
+        let migrated = migrate_author_v1_to_v2(v1).unwrap();
+        assert_eq!(migrated["schema_version"], 2);
+        assert_eq!(migrated["state"]["phase"], "writing");
+        assert_eq!(migrated["state"]["review"]["round"], 2);
+        assert_eq!(migrated["state"]["draft"]["written_paths"][0], "suite.md");
+    }
+
+    #[test]
+    fn author_repository_load_migrates_flat_v1_state() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("suite-new-state.json");
+        let repo = author_repository_for_path(path.clone());
+        let v1 = json!({
+            "schema_version": 1,
+            "mode": "interactive",
+            "phase": "discovery",
+            "session": {
+                "suite_dir": "/tmp/suite"
+            },
+            "review": {
+                "awaiting_answer": false,
+                "round": 0
+            },
+            "draft": {
+                "suite_tree_written": false,
+                "written_paths": []
+            },
+            "updated_at": "2025-01-01T00:00:00Z",
+            "transition_count": 0,
+            "last_event": "ApprovalFlowStarted"
+        });
+        fs::write(&path, serde_json::to_string_pretty(&v1).unwrap()).unwrap();
+
+        let state = repo.load().unwrap().unwrap();
+        assert_eq!(state.schema_version, 2);
+        assert_eq!(state.phase, AuthorPhase::Discovery);
+
+        let on_disk: Value = serde_json::from_str(&fs::read_to_string(path).unwrap()).unwrap();
+        assert_eq!(on_disk["schema_version"], 2);
+        assert_eq!(on_disk["state"]["phase"], "discovery");
     }
 }

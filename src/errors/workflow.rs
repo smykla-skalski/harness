@@ -20,6 +20,10 @@ define_domain_error_enum! {
             code: "WORKFLOW_VERSION",
             msg: "unsupported workflow schema version: {detail}"
         },
+        ConcurrentModification { detail: Cow<'static, str> } => {
+            code: "WORKFLOW_CONCURRENT",
+            msg: "workflow state changed concurrently: {detail}"
+        },
         WorkflowSerialize { detail: Cow<'static, str> } => {
             code: "WORKFLOW_SERIALIZE",
             msg: "serialization failed: {detail}"
@@ -32,6 +36,7 @@ impl WorkflowError {
     domain_constructor!(workflow_io, WorkflowIo, detail);
     domain_constructor!(workflow_parse, WorkflowParse, detail);
     domain_constructor!(workflow_version, WorkflowVersion, detail);
+    domain_constructor!(concurrent_modification, ConcurrentModification, detail);
     domain_constructor!(workflow_serialize, WorkflowSerialize, detail);
 
     #[must_use]
