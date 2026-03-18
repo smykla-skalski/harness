@@ -1,3 +1,7 @@
+mod cluster_health;
+mod service_lifecycle;
+mod status;
+
 use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::fmt;
@@ -5,10 +9,9 @@ use std::path::Path;
 #[cfg(test)]
 use std::path::PathBuf;
 use std::sync::Arc;
-use std::thread;
 
 use rayon::prelude::*;
-use serde::Serialize;
+use tracing::warn;
 
 use crate::audit_log::write_run_status_with_audit;
 use crate::blocks::{BlockRegistry, ContainerRuntime};
@@ -19,8 +22,6 @@ use crate::context::{
     NodeCheckRecord, NodeCheckSnapshot, PreflightArtifact, RunContext, RunLayout, RunMetadata,
     ToolCheckRecord, ToolCheckSnapshot,
 };
-use tracing::warn;
-
 use crate::core_defs::utc_now;
 use crate::errors::{CliError, CliErrorKind};
 use crate::exec::{self, HttpMethod};
@@ -37,6 +38,9 @@ use crate::workflow::runner::{
     PreflightStatus, RunnerEvent, RunnerPhase, apply_event, read_runner_state,
 };
 
+pub use cluster_health::{ClusterHealthReport, ClusterMemberHealthRecord};
+pub use status::{ClusterMemberStatusRecord, ClusterStatusReport, ServiceStatusRecord};
+
 /// Domain access layer for a tracked run.
 pub struct RunServices {
     ctx: RunContext,
@@ -50,67 +54,6 @@ impl fmt::Debug for RunServices {
             .field("has_docker", &self.blocks.docker.is_some())
             .finish()
     }
-}
-
-/// Runtime health for a tracked cluster member or backing network.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-pub struct ClusterMemberHealthRecord<'a> {
-    pub name: &'a str,
-    pub role: &'a str,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub container: Option<Cow<'a, str>>,
-    pub running: bool,
-}
-
-/// Structured result for `harness cluster-check`.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-pub struct ClusterHealthReport<'a> {
-    pub healthy: bool,
-    pub members: Vec<ClusterMemberHealthRecord<'a>>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub hint: Option<&'static str>,
-}
-
-/// Structured service status row for `harness status`.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-pub struct ServiceStatusRecord {
-    pub name: String,
-    pub status: String,
-}
-
-/// Structured cluster-member row for `harness status`.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-pub struct ClusterMemberStatusRecord<'a> {
-    pub name: &'a str,
-    pub role: &'a str,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub container_ip: Option<&'a str>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub cp_api_port: Option<u16>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub xds_port: Option<u16>,
-}
-
-/// Structured result for `harness status`.
-#[derive(Debug, Clone, PartialEq, Serialize)]
-pub struct ClusterStatusReport<'a> {
-    pub platform: &'static str,
-    pub mode: &'static str,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub cp_address: Option<Cow<'a, str>>,
-    #[serde(default)]
-    pub admin_token: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub store_type: Option<&'a str>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub docker_network: Option<&'a str>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub cp_image: Option<&'a str>,
-    pub members: Vec<ClusterMemberStatusRecord<'a>>,
-    #[serde(default)]
-    pub services: Vec<ServiceStatusRecord>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub dataplanes: Option<UniversalDataplaneCollection>,
 }
 
 impl RunServices {
@@ -313,145 +256,6 @@ impl RunServices {
     ) -> Result<serde_json::Value, CliError> {
         let access = self.control_plane_access()?;
         exec::cp_api_json(access.addr.as_ref(), path, method, body, access.admin_token)
-    }
-
-    #[must_use]
-    pub fn service_container_filter(&self) -> String {
-        format!("label=io.harness.run-id={}", self.layout().run_id)
-    }
-
-    /// List service containers scoped to the current run.
-    ///
-    /// # Errors
-    /// Returns `CliError` on docker invocation failures.
-    pub fn list_service_containers(&self) -> Result<Vec<ServiceStatusRecord>, CliError> {
-        let filter = self.service_container_filter();
-        let result = self
-            .docker()?
-            .list_formatted(&["--filter", &filter], "{{.Names}}\t{{.Status}}")?;
-        Ok(result
-            .stdout
-            .lines()
-            .filter(|line| !line.trim().is_empty())
-            .map(|line| {
-                let mut parts = line.splitn(2, '\t');
-                ServiceStatusRecord {
-                    name: parts.next().unwrap_or_default().to_string(),
-                    status: parts.next().unwrap_or_default().to_string(),
-                }
-            })
-            .collect())
-    }
-
-    /// Query the control plane for dataplanes in the target mesh.
-    ///
-    /// # Errors
-    /// Returns `CliError` when the control-plane request fails.
-    pub fn query_dataplanes(&self, mesh: &str) -> Result<UniversalDataplaneCollection, CliError> {
-        let path = format!("/meshes/{mesh}/dataplanes");
-        self.call_control_plane_json(&path, HttpMethod::Get, None)
-            .map(UniversalDataplaneCollection::from_api_value)
-    }
-
-    /// Build a typed runtime health report for the tracked cluster.
-    ///
-    /// # Errors
-    /// Returns `CliError` when the run has no tracked cluster spec yet.
-    pub fn cluster_health_report(&self) -> Result<ClusterHealthReport<'_>, CliError> {
-        let runtime = self.cluster_runtime()?;
-        let spec = self.cluster_spec()?;
-        let mut members = match runtime.platform() {
-            Platform::Kubernetes => spec
-                .members
-                .par_iter()
-                .map(|member| ClusterMemberHealthRecord {
-                    name: member.name.as_str(),
-                    role: member.role.as_str(),
-                    container: None,
-                    running: exec::cluster_exists(&member.name).unwrap_or(false),
-                })
-                .collect::<Vec<_>>(),
-            Platform::Universal => {
-                spec.members
-                    .par_iter()
-                    .map(|member| {
-                        let container = runtime.resolve_container_name(&member.name);
-                        ClusterMemberHealthRecord {
-                            name: member.name.as_str(),
-                            role: member.role.as_str(),
-                            running: self.blocks.docker.as_ref().is_some_and(|docker| {
-                                docker.is_running(&container).unwrap_or(false)
-                            }),
-                            container: Some(container),
-                        }
-                    })
-                    .collect::<Vec<_>>()
-            }
-        };
-        if runtime.platform() == Platform::Universal
-            && let Ok(network) = runtime.docker_network()
-        {
-            members.push(ClusterMemberHealthRecord {
-                name: network,
-                role: "network",
-                container: None,
-                running: docker_network_exists(network),
-            });
-        }
-        let healthy = members.iter().all(|member| member.running);
-        Ok(ClusterHealthReport {
-            healthy,
-            members,
-            hint: (!healthy).then_some(
-                "use 'harness logs <name>' to inspect, or re-run 'harness cluster' to recreate",
-            ),
-        })
-    }
-
-    /// Build a typed runtime status report for the tracked cluster.
-    ///
-    /// # Errors
-    /// Returns `CliError` when the run has no tracked cluster spec yet.
-    ///
-    /// # Panics
-    /// Panics if an internal query thread panics (should not happen).
-    pub fn status_report(&self) -> Result<ClusterStatusReport<'_>, CliError> {
-        let runtime = self.cluster_runtime()?;
-        let spec = self.cluster_spec()?;
-        let (services, dataplanes) = thread::scope(|scope| {
-            let t_svc = scope.spawn(|| self.list_service_containers().unwrap_or_default());
-            let t_dp = scope.spawn(|| self.query_dataplanes("default").ok());
-            (
-                t_svc.join().expect("service list thread panicked"),
-                t_dp.join().expect("dataplane query thread panicked"),
-            )
-        });
-        Ok(ClusterStatusReport {
-            platform: runtime.platform().as_str(),
-            mode: spec.mode.as_str(),
-            cp_address: self.control_plane_access().ok().map(|access| access.addr),
-            admin_token: spec
-                .admin_token
-                .as_deref()
-                .map(mask_token)
-                .unwrap_or_default(),
-            store_type: spec.store_type.as_deref(),
-            docker_network: spec.docker_network.as_deref(),
-            cp_image: spec.cp_image.as_deref(),
-            members: spec
-                .members
-                .iter()
-                .map(|member| ClusterMemberStatusRecord {
-                    name: member.name.as_str(),
-                    role: member.role.as_str(),
-                    container_ip: member.container_ip.as_deref(),
-                    cp_api_port: member.cp_api_port,
-                    xds_port: member.xds_port,
-                })
-                .collect(),
-            services,
-            dataplanes,
-        })
     }
 
     /// Load the suite specification referenced by the run metadata.
@@ -707,29 +511,6 @@ impl RunServices {
             nodes,
         }
     }
-}
-
-fn mask_token(token: &str) -> String {
-    if token.len() <= 8 {
-        return "****".to_string();
-    }
-    format!("{}...{}", &token[..4], &token[token.len() - 4..])
-}
-
-fn docker_network_exists(network: &str) -> bool {
-    exec::docker(
-        &[
-            "network",
-            "ls",
-            "--filter",
-            &format!("name=^{network}$"),
-            "--format",
-            "{{.Name}}",
-        ],
-        &[0],
-    )
-    .ok()
-    .is_some_and(|result| result.stdout.trim() == network)
 }
 
 #[cfg(test)]
