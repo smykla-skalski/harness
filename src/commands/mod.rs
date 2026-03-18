@@ -15,6 +15,18 @@ pub mod run;
 pub mod setup;
 pub use args::RunDirArgs;
 
+/// Uniform command execution trait.
+///
+/// Every command's Args struct implements this so dispatch can call
+/// `.execute(&ctx)` without knowing the concrete type.
+pub trait Execute {
+    /// Run the command, returning an exit code on success.
+    ///
+    /// # Errors
+    /// Returns `CliError` when the command fails.
+    fn execute(&self, context: &CommandContext) -> Result<i32, CliError>;
+}
+
 /// Shared runtime context for command execution.
 ///
 /// Carries the active block registry so command handlers and domain services

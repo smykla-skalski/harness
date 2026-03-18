@@ -6,7 +6,7 @@ use std::sync::LazyLock;
 use clap::Args;
 use regex::Regex;
 
-use crate::commands::{RunDirArgs, resolve_run_dir};
+use crate::commands::{CommandContext, Execute, RunDirArgs, resolve_run_dir};
 use crate::context::RunLayout;
 use crate::core_defs::{shorten_path, utc_now};
 use crate::errors::{CliError, CliErrorKind};
@@ -14,6 +14,20 @@ use crate::io::{ensure_dir, write_text};
 use crate::workflow::runner::{RunnerPhase, read_runner_state};
 
 use super::shared::inject_run_env;
+
+impl Execute for RecordArgs {
+    fn execute(&self, _context: &CommandContext) -> Result<i32, CliError> {
+        record(
+            self.repo_root.as_deref(),
+            self.phase.as_deref(),
+            self.label.as_deref(),
+            self.gid.as_deref(),
+            self.cluster.as_deref(),
+            &self.command,
+            &self.run_dir,
+        )
+    }
+}
 
 /// Arguments for `harness record`.
 #[derive(Debug, Clone, Args)]

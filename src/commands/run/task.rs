@@ -5,7 +5,14 @@ use std::time::{Duration, Instant};
 
 use clap::{Args, Subcommand};
 
+use crate::commands::{CommandContext, Execute};
 use crate::errors::{CliError, CliErrorKind};
+
+impl Execute for TaskArgs {
+    fn execute(&self, _context: &CommandContext) -> Result<i32, CliError> {
+        task(&self.command)
+    }
+}
 
 /// Background task output operations.
 #[derive(Debug, Clone, Subcommand)]

@@ -2,9 +2,15 @@ use std::path::Path;
 
 use clap::{Args, Subcommand};
 
-use crate::commands::RunDirArgs;
+use crate::commands::{CommandContext, Execute, RunDirArgs};
 use crate::errors::{CliError, CliErrorKind};
 use crate::io::read_text;
+
+impl Execute for EnvoyArgs {
+    fn execute(&self, _context: &CommandContext) -> Result<i32, CliError> {
+        envoy(&self.cmd)
+    }
+}
 
 /// Envoy admin operations.
 #[non_exhaustive]

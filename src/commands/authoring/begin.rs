@@ -3,8 +3,21 @@ use std::path::Path;
 use clap::Args;
 
 use crate::authoring::begin_authoring_session;
+use crate::commands::{CommandContext, Execute};
 use crate::errors::CliError;
 use crate::rules;
+
+impl Execute for AuthoringBeginArgs {
+    fn execute(&self, _context: &CommandContext) -> Result<i32, CliError> {
+        begin(
+            &self.repo_root,
+            &self.feature,
+            &self.mode,
+            &self.suite_dir,
+            &self.suite_name,
+        )
+    }
+}
 
 /// Arguments for `harness authoring-begin`.
 #[derive(Debug, Clone, Args)]

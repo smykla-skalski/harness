@@ -6,13 +6,25 @@ use clap::Args;
 use tracing::warn;
 
 use crate::bootstrap;
-use crate::commands::resolve_project_dir;
+use crate::commands::{CommandContext, Execute, resolve_project_dir};
 use crate::compact;
 use crate::context::{CurrentRunRecord, RunRepository};
 use crate::core_defs::current_run_context_path;
 use crate::ephemeral_metallb;
 use crate::errors::CliError;
 use crate::hooks::session::SessionStartHookOutput;
+
+impl Execute for SessionStartArgs {
+    fn execute(&self, _context: &CommandContext) -> Result<i32, CliError> {
+        session_start(self.project_dir.as_deref())
+    }
+}
+
+impl Execute for SessionStopArgs {
+    fn execute(&self, _context: &CommandContext) -> Result<i32, CliError> {
+        session_stop(self.project_dir.as_deref())
+    }
+}
 
 /// Arguments for `harness session-start`.
 #[derive(Debug, Clone, Args)]

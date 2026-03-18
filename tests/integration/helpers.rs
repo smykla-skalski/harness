@@ -21,7 +21,7 @@ pub use harness_testkit::*;
 pub static ENV_LOCK: Mutex<()> = Mutex::new(());
 
 pub fn run_command(command: Command) -> Result<i32, CliError> {
-    cli::dispatch(command)
+    cli::dispatch(&command)
 }
 
 pub trait CommandExt {

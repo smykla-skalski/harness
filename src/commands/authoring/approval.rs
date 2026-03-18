@@ -1,8 +1,15 @@
 use clap::Args;
 
+use crate::commands::{CommandContext, Execute};
 use crate::core_defs::utc_now;
 use crate::errors::{CliError, CliErrorKind, cow};
 use crate::workflow::author::{ApprovalMode, AuthorWorkflowState, write_author_state};
+
+impl Execute for ApprovalBeginArgs {
+    fn execute(&self, _context: &CommandContext) -> Result<i32, CliError> {
+        approval_begin(&self.mode, self.suite_dir.as_deref())
+    }
+}
 
 // =========================================================================
 // approval_begin

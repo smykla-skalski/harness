@@ -4,6 +4,7 @@ use std::path::Path;
 use clap::Args;
 
 use crate::audit_log::write_run_status_with_audit;
+use crate::commands::{CommandContext, Execute};
 use crate::context::{CurrentRunPointer, RunLayout, RunMetadata, RunRepository};
 use crate::core_defs::{shorten_path, utc_now};
 use crate::errors::{CliError, CliErrorKind, cow};
@@ -13,6 +14,18 @@ use crate::schema::{RunCounts, RunReport, RunReportFrontmatter, RunStatus, Suite
 use crate::workflow::runner::initialize_runner_state;
 
 use super::shared::{resolve_init_repo_root, resolve_run_root};
+
+impl Execute for InitArgs {
+    fn execute(&self, _context: &CommandContext) -> Result<i32, CliError> {
+        init_run(
+            &self.suite,
+            &self.run_id,
+            &self.profile,
+            self.repo_root.as_deref(),
+            self.run_root.as_deref(),
+        )
+    }
+}
 
 /// Arguments for `harness init`.
 #[derive(Debug, Clone, Args)]

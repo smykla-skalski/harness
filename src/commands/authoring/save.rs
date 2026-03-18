@@ -1,10 +1,17 @@
 use clap::Args;
 
 use crate::authoring::{authoring_workspace_dir, require_authoring_session};
+use crate::commands::{CommandContext, Execute};
 use crate::errors::{CliError, CliErrorKind, cow};
 use crate::io::{ensure_dir, is_safe_name, write_text};
 
 use super::shared::{parse_payload, read_input};
+
+impl Execute for AuthoringSaveArgs {
+    fn execute(&self, _context: &CommandContext) -> Result<i32, CliError> {
+        save(&self.kind, self.payload.as_deref(), self.input.as_deref())
+    }
+}
 
 /// Arguments for `harness authoring-save`.
 #[derive(Debug, Clone, Args)]

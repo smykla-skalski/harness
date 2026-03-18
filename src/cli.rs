@@ -16,7 +16,7 @@ use crate::commands::run::{
 use crate::commands::setup::{
     BootstrapArgs, ClusterArgs, GatewayArgs, PreCompactArgs, SessionStartArgs, SessionStopArgs,
 };
-use crate::commands::{self, CommandContext};
+use crate::commands::{self, CommandContext, Execute};
 use crate::errors::CliError;
 use crate::hooks::{self, HookArgs};
 
@@ -145,165 +145,51 @@ pub enum Command {
     Observe(ObserveArgs),
 }
 
-fn dispatch_setup(cmd: Command) -> Result<i32, CliError> {
-    match cmd {
-        Command::Init(args) => commands::run::init_run(
-            &args.suite,
-            &args.run_id,
-            &args.profile,
-            args.repo_root.as_deref(),
-            args.run_root.as_deref(),
-        ),
-        Command::Bootstrap(args) => {
-            commands::setup::bootstrap(args.project_dir.as_deref(), args.agent)
-        }
-        Command::Cluster(args) => commands::setup::cluster(&args),
-        Command::Gateway(args) => commands::setup::gateway(
-            args.kubeconfig.as_deref(),
-            args.repo_root.as_deref(),
-            args.check_only,
-        ),
-        Command::SessionStart(args) => commands::setup::session_start(args.project_dir.as_deref()),
-        Command::SessionStop(args) => commands::setup::session_stop(args.project_dir.as_deref()),
-        Command::PreCompact(args) => commands::setup::pre_compact(args.project_dir.as_deref()),
-        Command::Capabilities => commands::setup::capabilities(),
-        Command::Observe(args) => commands::observe::execute(args.mode),
-        _ => unreachable!(),
-    }
-}
-
-fn dispatch_run(ctx: &CommandContext, cmd: Command) -> Result<i32, CliError> {
-    match cmd {
-        Command::Capture(args) => {
-            commands::run::capture(args.kubeconfig.as_deref(), &args.label, &args.run_dir)
-        }
-        Command::Record(args) => commands::run::record(
-            args.repo_root.as_deref(),
-            args.phase.as_deref(),
-            args.label.as_deref(),
-            args.gid.as_deref(),
-            args.cluster.as_deref(),
-            &args.command,
-            &args.run_dir,
-        ),
-        Command::Apply(args) => commands::run::apply(
-            args.kubeconfig.as_deref(),
-            args.cluster.as_deref(),
-            &args.manifest,
-            args.step.as_deref(),
-            &args.run_dir,
-        ),
-        Command::Validate(args) => commands::run::validate(
-            args.kubeconfig.as_deref(),
-            &args.manifest,
-            args.output.as_deref(),
-        ),
-        Command::Preflight(args) => commands::run::preflight(
-            ctx,
-            args.kubeconfig.as_deref(),
-            args.repo_root.as_deref(),
-            &args.run_dir,
-        ),
-        Command::RunnerState(args) => commands::run::runner_state(
-            args.event,
-            args.suite_target.as_deref(),
-            args.message.as_deref(),
-            &args.run_dir,
-        ),
-        Command::Closeout(args) => commands::run::closeout(&args.run_dir),
-        Command::Report(args) => commands::run::report(&args.cmd),
-        Command::Diff(args) => commands::run::diff(&args.left, &args.right, args.path.as_deref()),
-        Command::Envoy(args) => commands::run::envoy(&args.cmd),
-        Command::Kumactl(args) => commands::run::kumactl(&args.cmd),
-        Command::Api(args) => commands::run::api(&args.method),
-        Command::Token(args) => commands::run::token(
-            &args.kind,
-            &args.name,
-            &args.mesh,
-            args.cp_addr.as_deref(),
-            &args.valid_for,
-            &args.run_dir,
-        ),
-        Command::Service(args) => commands::run::service(ctx, &args),
-        Command::Status(args) => commands::run::status(&args.run_dir),
-        Command::Logs(args) => {
-            commands::run::logs(ctx, &args.name, args.tail, args.follow, &args.run_dir)
-        }
-        Command::ClusterCheck(args) => commands::run::cluster_check(&args.run_dir),
-        Command::Task(args) => commands::run::task(&args.command),
-        Command::RestartNamespace(args) => commands::run::restart_namespace(&args),
-        _ => unreachable!(),
-    }
-}
-
-fn dispatch_authoring(cmd: Command) -> Result<i32, CliError> {
-    match cmd {
-        Command::AuthoringBegin(args) => commands::authoring::begin(
-            &args.repo_root,
-            &args.feature,
-            &args.mode,
-            &args.suite_dir,
-            &args.suite_name,
-        ),
-        Command::AuthoringSave(args) => {
-            commands::authoring::save(&args.kind, args.payload.as_deref(), args.input.as_deref())
-        }
-        Command::AuthoringShow(args) => commands::authoring::show(&args.kind),
-        Command::AuthoringReset(_args) => commands::authoring::reset(),
-        Command::AuthoringValidate(args) => {
-            commands::authoring::validate(&args.path, args.repo_root.as_deref())
-        }
-        Command::ApprovalBegin(args) => {
-            commands::authoring::approval_begin(&args.mode, args.suite_dir.as_deref())
-        }
-        _ => unreachable!(),
-    }
-}
-
 /// Dispatch a parsed command to its owning subsystem.
 ///
 /// # Errors
 /// Returns `CliError` when the selected command fails.
-pub fn dispatch(command: Command) -> Result<i32, CliError> {
+pub fn dispatch(command: &Command) -> Result<i32, CliError> {
+    let ctx = CommandContext::production();
     match command {
         Command::Hook(_) => unreachable!("hooks are handled separately"),
-        Command::Init(_)
-        | Command::Bootstrap(_)
-        | Command::Cluster(_)
-        | Command::Gateway(_)
-        | Command::SessionStart(_)
-        | Command::SessionStop(_)
-        | Command::PreCompact(_)
-        | Command::Capabilities
-        | Command::Observe(_) => dispatch_setup(command),
-        Command::Capture(_)
-        | Command::Record(_)
-        | Command::Apply(_)
-        | Command::Validate(_)
-        | Command::Preflight(_)
-        | Command::RunnerState(_)
-        | Command::Closeout(_)
-        | Command::Report(_)
-        | Command::Diff(_)
-        | Command::Envoy(_)
-        | Command::Kumactl(_)
-        | Command::Api(_)
-        | Command::Token(_)
-        | Command::Service(_)
-        | Command::Status(_)
-        | Command::Logs(_)
-        | Command::ClusterCheck(_)
-        | Command::Task(_)
-        | Command::RestartNamespace(_) => {
-            let ctx = CommandContext::production();
-            dispatch_run(&ctx, command)
-        }
-        Command::AuthoringBegin(_)
-        | Command::AuthoringSave(_)
-        | Command::AuthoringShow(_)
-        | Command::AuthoringReset(_)
-        | Command::AuthoringValidate(_)
-        | Command::ApprovalBegin(_) => dispatch_authoring(command),
+        // Setup commands
+        Command::Init(args) => args.execute(&ctx),
+        Command::Bootstrap(args) => args.execute(&ctx),
+        Command::Cluster(args) => args.execute(&ctx),
+        Command::Gateway(args) => args.execute(&ctx),
+        Command::SessionStart(args) => args.execute(&ctx),
+        Command::SessionStop(args) => args.execute(&ctx),
+        Command::PreCompact(args) => args.execute(&ctx),
+        Command::Capabilities => commands::setup::capabilities(),
+        Command::Observe(args) => args.execute(&ctx),
+        // Run commands
+        Command::Capture(args) => args.execute(&ctx),
+        Command::Record(args) => args.execute(&ctx),
+        Command::Apply(args) => args.execute(&ctx),
+        Command::Validate(args) => args.execute(&ctx),
+        Command::Preflight(args) => args.execute(&ctx),
+        Command::RunnerState(args) => args.execute(&ctx),
+        Command::Closeout(args) => args.execute(&ctx),
+        Command::Report(args) => args.execute(&ctx),
+        Command::Diff(args) => args.execute(&ctx),
+        Command::Envoy(args) => args.execute(&ctx),
+        Command::Kumactl(args) => args.execute(&ctx),
+        Command::Api(args) => args.execute(&ctx),
+        Command::Token(args) => args.execute(&ctx),
+        Command::Service(args) => args.execute(&ctx),
+        Command::Status(args) => args.execute(&ctx),
+        Command::Logs(args) => args.execute(&ctx),
+        Command::ClusterCheck(args) => args.execute(&ctx),
+        Command::Task(args) => args.execute(&ctx),
+        Command::RestartNamespace(args) => args.execute(&ctx),
+        // Authoring commands
+        Command::AuthoringBegin(args) => args.execute(&ctx),
+        Command::AuthoringSave(args) => args.execute(&ctx),
+        Command::AuthoringShow(args) => args.execute(&ctx),
+        Command::AuthoringReset(args) => args.execute(&ctx),
+        Command::AuthoringValidate(args) => args.execute(&ctx),
+        Command::ApprovalBegin(args) => args.execute(&ctx),
     }
 }
 
@@ -318,8 +204,8 @@ pub fn run() -> Result<i32, CliError> {
         thread::sleep(Duration::from_secs_f64(cli.delay));
     }
     match cli.command {
-        Command::Hook(args) => Ok(hooks::run_hook_command(args.agent, &args.skill, &args.hook)),
-        other => dispatch(other),
+        Command::Hook(ref args) => Ok(hooks::run_hook_command(args.agent, &args.skill, &args.hook)),
+        ref other => dispatch(other),
     }
 }
 

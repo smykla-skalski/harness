@@ -3,13 +3,19 @@ use clap::Args;
 use tracing::info;
 
 use crate::audit_log::write_run_status_with_audit;
-use crate::commands::{RunDirArgs, resolve_run_services};
+use crate::commands::{CommandContext, Execute, RunDirArgs, resolve_run_services};
 use crate::core_defs::utc_now;
 use crate::errors::{CliError, CliErrorKind};
 use crate::schema::Verdict;
 use crate::workflow::runner::{
     RunnerEvent, apply_event, ensure_execution_phase, read_runner_state,
 };
+
+impl Execute for CloseoutArgs {
+    fn execute(&self, _context: &CommandContext) -> Result<i32, CliError> {
+        closeout(&self.run_dir)
+    }
+}
 
 /// Arguments for `harness closeout`.
 #[derive(Debug, Clone, Args)]

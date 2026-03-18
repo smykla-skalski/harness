@@ -6,13 +6,19 @@ use clap::{Args, Subcommand};
 use tracing::warn;
 
 use crate::audit_log::write_run_status_with_audit;
-use crate::commands::{RunDirArgs, resolve_run_services};
+use crate::commands::{CommandContext, Execute, RunDirArgs, resolve_run_services};
 use crate::core_defs::utc_now;
 use crate::errors::{CliError, CliErrorKind};
 use crate::rules::suite_runner::{REPORT_CODE_BLOCK_LIMIT, REPORT_LINE_LIMIT};
 use crate::run_services::RunServices;
 use crate::schema::{ExecutedGroupChange, GroupVerdict, RunReport, RunStatus};
 use crate::workflow::runner::ensure_execution_phase;
+
+impl Execute for ReportArgs {
+    fn execute(&self, _context: &CommandContext) -> Result<i32, CliError> {
+        report(&self.cmd)
+    }
+}
 
 #[non_exhaustive]
 /// Report validation and group finalization.

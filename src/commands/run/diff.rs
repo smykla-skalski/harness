@@ -2,8 +2,15 @@ use std::path::Path;
 
 use clap::Args;
 
+use crate::commands::{CommandContext, Execute};
 use crate::errors::{CliError, CliErrorKind, cow};
 use crate::io::{drill, read_text};
+
+impl Execute for DiffArgs {
+    fn execute(&self, _context: &CommandContext) -> Result<i32, CliError> {
+        diff(&self.left, &self.right, self.path.as_deref())
+    }
+}
 
 /// Arguments for `harness diff`.
 #[derive(Debug, Clone, Args)]

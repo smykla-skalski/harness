@@ -2,9 +2,15 @@ use std::path::PathBuf;
 
 use clap::Args;
 
-use crate::commands::{RunDirArgs, resolve_run_services};
+use crate::commands::{CommandContext, Execute, RunDirArgs, resolve_run_services};
 use crate::errors::CliError;
 use crate::exec;
+
+impl Execute for RestartNamespaceArgs {
+    fn execute(&self, _context: &CommandContext) -> Result<i32, CliError> {
+        restart_namespace(self)
+    }
+}
 
 /// Arguments for `harness restart-namespace`.
 #[derive(Debug, Clone, Args)]

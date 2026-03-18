@@ -3,7 +3,14 @@ use std::path::{Path, PathBuf};
 use clap::Args;
 
 use crate::authoring_validate::{authoring_validation_repo_root, validate_suite_author_paths};
+use crate::commands::{CommandContext, Execute};
 use crate::errors::CliError;
+
+impl Execute for AuthoringValidateArgs {
+    fn execute(&self, _context: &CommandContext) -> Result<i32, CliError> {
+        validate(&self.path, self.repo_root.as_deref())
+    }
+}
 
 /// Arguments for `harness authoring-validate`.
 #[derive(Debug, Clone, Args)]

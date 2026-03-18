@@ -1,8 +1,14 @@
 use clap::Args;
 
-use crate::commands::{RunDirArgs, resolve_run_services};
+use crate::commands::{CommandContext, Execute, RunDirArgs, resolve_run_services};
 use crate::errors::CliError;
 use crate::io::validate_safe_segment;
+
+impl Execute for CaptureArgs {
+    fn execute(&self, _context: &CommandContext) -> Result<i32, CliError> {
+        capture(self.kubeconfig.as_deref(), &self.label, &self.run_dir)
+    }
+}
 
 /// Arguments for `harness capture`.
 #[derive(Debug, Clone, Args)]
