@@ -1350,10 +1350,7 @@ impl RunDirBuilder {
         }
 
         let run_root = self.tmp_path.join("runs");
-        let layout = RunLayout {
-            run_root: run_root.to_string_lossy().to_string(),
-            run_id: self.run_id.clone(),
-        };
+        let layout = RunLayout::new(run_root.to_string_lossy().to_string(), self.run_id.clone());
         layout.ensure_dirs().expect("create run dirs");
 
         let suite_path = suite_dir.join("suite.md");

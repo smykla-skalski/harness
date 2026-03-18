@@ -9,7 +9,7 @@ use serde::Serialize;
 use serde::de::DeserializeOwned;
 use serde_json::Value;
 
-use crate::errors::{CliError, CliErrorKind, cow};
+use crate::errors::{CliError, CliErrorKind, cow, io_for};
 
 pub use self::markdown::{append_markdown_row, as_list, as_mapping, drill};
 pub use self::yaml::extract_raw_frontmatter;
@@ -85,7 +85,7 @@ pub fn read_text(path: &Path) -> Result<String, CliError> {
         if e.kind() == io::ErrorKind::NotFound {
             CliErrorKind::missing_file(path.display().to_string()).into()
         } else {
-            CliErrorKind::io(cow!("read {}: {e}", path.display())).into()
+            io_for("read", path, &e).into()
         }
     })
 }
@@ -102,27 +102,22 @@ pub fn read_text(path: &Path) -> Result<String, CliError> {
 /// Returns `CliError` on IO failure.
 pub fn write_text(path: &Path, text: &str) -> Result<(), CliError> {
     let parent = path.parent().unwrap_or_else(|| Path::new("."));
-    ensure_dir(parent).map_err(|e| {
-        CliError::from(CliErrorKind::io(cow!(
-            "create dir {}: {e}",
-            parent.display()
-        )))
-    })?;
+    ensure_dir(parent).map_err(|e| CliError::from(io_for("create dir", parent, &e)))?;
     let mut tmp = tempfile::NamedTempFile::new_in(parent)
-        .map_err(|e| CliErrorKind::io(cow!("create temp file in {}: {e}", parent.display())))?;
+        .map_err(|e| io_for("create temp file in", parent, &e))?;
     tmp.write_all(text.as_bytes())
-        .map_err(|e| CliErrorKind::io(cow!("write temp file for {}: {e}", path.display())))?;
+        .map_err(|e| io_for("write temp file for", path, &e))?;
     tmp.flush()
-        .map_err(|e| CliErrorKind::io(cow!("flush temp file for {}: {e}", path.display())))?;
+        .map_err(|e| io_for("flush temp file for", path, &e))?;
     tmp.persist(path)
         .map(|_| ())
-        .map_err(|e| CliErrorKind::io(cow!("persist {}: {}", path.display(), e.error)))?;
+        .map_err(|e| io_for("persist", path, &e.error))?;
 
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
         fs::set_permissions(path, fs::Permissions::from_mode(0o600))
-            .map_err(|e| CliErrorKind::io(cow!("set permissions {}: {e}", path.display())))?;
+            .map_err(|e| io_for("set permissions", path, &e))?;
     }
 
     Ok(())

@@ -8,7 +8,7 @@ use crate::blocks::{
     ComposeOrchestrator, ContainerConfig, ContainerRuntime, DockerComposeOrchestrator,
     DockerContainerRuntime, StdProcessExecutor,
 };
-use crate::cluster::{ClusterSpec, Platform};
+use crate::cluster::{ClusterMode, ClusterSpec, Platform};
 use crate::commands::resolve_repo_root;
 use crate::compose;
 use crate::context::RunRepository;
@@ -153,7 +153,7 @@ pub(super) fn cluster_universal(args: &ClusterArgs) -> Result<i32, CliError> {
 
     execute_universal_mode(
         &UniversalModeContext {
-            mode,
+            mode: spec.mode,
             all_names: &all_names,
             network_name: &network_name,
             effective_store: &effective_store,
@@ -185,7 +185,7 @@ fn resolve_universal_cp_image(
 }
 
 struct UniversalModeContext<'a> {
-    mode: &'a str,
+    mode: ClusterMode,
     all_names: &'a [String],
     network_name: &'a str,
     effective_store: &'a str,
@@ -199,7 +199,7 @@ fn execute_universal_mode(
     compose_runtime: &dyn ComposeOrchestrator,
 ) -> Result<(), CliError> {
     match context.mode {
-        "single-up" => handle_single_up(
+        ClusterMode::SingleUp => handle_single_up(
             spec,
             context.cp_image,
             context.network_name,
@@ -208,14 +208,14 @@ fn execute_universal_mode(
             docker,
             compose_runtime,
         ),
-        "single-down" => handle_single_down(
+        ClusterMode::SingleDown => handle_single_down(
             context.network_name,
             context.effective_store,
             &context.all_names[0],
             docker,
             compose_runtime,
         ),
-        "global-zone-up" => handle_global_zone_up(
+        ClusterMode::GlobalZoneUp => handle_global_zone_up(
             spec,
             context.cp_image,
             context.network_name,
@@ -224,13 +224,13 @@ fn execute_universal_mode(
             docker,
             compose_runtime,
         ),
-        "global-zone-down" => universal_global_zone_down(
+        ClusterMode::GlobalZoneDown => universal_global_zone_down(
             context.network_name,
             context.all_names,
             docker,
             compose_runtime,
         ),
-        "global-two-zones-up" => handle_global_two_zones_up(
+        ClusterMode::GlobalTwoZonesUp => handle_global_two_zones_up(
             spec,
             context.cp_image,
             context.network_name,
@@ -239,14 +239,11 @@ fn execute_universal_mode(
             docker,
             compose_runtime,
         ),
-        "global-two-zones-down" => universal_global_two_zones_down(
+        ClusterMode::GlobalTwoZonesDown => universal_global_two_zones_down(
             context.network_name,
             context.all_names,
             docker,
             compose_runtime,
-        ),
-        _ => Err(
-            CliErrorKind::cluster_error(cow!("unsupported cluster mode: {}", context.mode)).into(),
         ),
     }
 }
