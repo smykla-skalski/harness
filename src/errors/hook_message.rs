@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use crate::hook::{Decision, HookResult};
+use crate::hooks::hook_result::{Decision, HookResult};
 
 /// Enum of all hook messages, replacing the static `HookDef` definitions.
 ///

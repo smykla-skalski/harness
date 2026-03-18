@@ -3,13 +3,18 @@ use std::path::{Component, Path, PathBuf};
 use clap::{Args, Subcommand};
 
 use crate::errors::{CliError, CliErrorKind, cow};
-use crate::hook::HookResult;
 use crate::rules::suite_runner::RunFile;
 
 use self::adapters::{HookAgent, adapter_for};
 use self::context::{GuardContext, NormalizedEvent};
 use self::engine::{Hook, HookEngine};
+use self::hook_result::HookResult;
 use self::result::NormalizedHookResult;
+
+pub mod debug;
+pub mod hook_result;
+pub mod payloads;
+pub mod session;
 
 pub mod adapters;
 pub mod audit;
@@ -466,7 +471,7 @@ mod tests {
     use clap::Parser;
 
     use super::*;
-    use crate::hook::Decision;
+    use crate::hooks::hook_result::Decision;
 
     #[test]
     fn normalize_path_resolves_dot_dot() {

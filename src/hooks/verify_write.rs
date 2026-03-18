@@ -2,8 +2,8 @@ use std::fs;
 use std::path::Path;
 
 use crate::errors::{CliError, HookMessage};
-use crate::hook::HookResult;
 use crate::hooks::context::GuardContext as HookContext;
+use crate::hooks::hook_result::HookResult;
 use crate::workflow::runner::RunnerWorkflowState;
 
 use super::effects::{HookEffect, HookOutcome};
@@ -109,9 +109,9 @@ fn verify_suite_runner(ctx: &HookContext, paths: &[&Path]) -> HookOutcome {
 mod tests {
     use super::*;
     use crate::context::RunContext;
-    use crate::hook::Decision;
-    use crate::hook_payloads::HookEnvelopePayload;
     use crate::hooks::context::GuardContext as HookContext;
+    use crate::hooks::hook_result::Decision;
+    use crate::hooks::payloads::HookEnvelopePayload;
     use crate::workflow::runner::{
         ManifestFixDecision, PreflightState, PreflightStatus, RunnerPhase, SuiteFixState,
     };

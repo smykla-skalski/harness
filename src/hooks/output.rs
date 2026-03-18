@@ -1,6 +1,6 @@
 use serde_json::json;
 
-use crate::hook::{Decision, HookResult};
+use crate::hooks::hook_result::{Decision, HookResult};
 use crate::hooks::result::{NormalizedDecision, NormalizedHookResult};
 
 use super::HookType;

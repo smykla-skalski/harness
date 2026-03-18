@@ -199,64 +199,6 @@ impl FromStr for RunDir {
     }
 }
 
-/// Cluster binaries that must go through harness wrappers.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[non_exhaustive]
-pub enum ClusterBinary {
-    Kubectl,
-    KubectlValidate,
-    Kumactl,
-    Helm,
-    Docker,
-    K3d,
-}
-
-impl ClusterBinary {
-    pub const ALL: &[Self] = &[
-        Self::Kubectl,
-        Self::KubectlValidate,
-        Self::Kumactl,
-        Self::Helm,
-        Self::Docker,
-        Self::K3d,
-    ];
-
-    /// Returns `true` when `name` matches a denied cluster binary.
-    #[must_use]
-    pub fn is_denied(name: &str) -> bool {
-        Self::from_str(name).is_ok()
-    }
-}
-
-impl fmt::Display for ClusterBinary {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(match self {
-            Self::Kubectl => "kubectl",
-            Self::KubectlValidate => "kubectl-validate",
-            Self::Kumactl => "kumactl",
-            Self::Helm => "helm",
-            Self::Docker => "docker",
-            Self::K3d => "k3d",
-        })
-    }
-}
-
-impl FromStr for ClusterBinary {
-    type Err = ();
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "kubectl" => Ok(Self::Kubectl),
-            "kubectl-validate" => Ok(Self::KubectlValidate),
-            "kumactl" => Ok(Self::Kumactl),
-            "helm" => Ok(Self::Helm),
-            "docker" => Ok(Self::Docker),
-            "k3d" => Ok(Self::K3d),
-            _ => Err(()),
-        }
-    }
-}
-
 /// Legacy Python scripts that are no longer allowed.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]

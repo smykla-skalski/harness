@@ -239,21 +239,6 @@ mod tests {
 
     test_string_enum!(run_dir, suite_runner::RunDir);
 
-    // -- ClusterBinary --
-
-    test_string_enum!(cluster_binary, suite_runner::ClusterBinary);
-
-    #[test]
-    fn cluster_binary_is_denied() {
-        assert!(suite_runner::ClusterBinary::is_denied("kubectl"));
-        assert!(suite_runner::ClusterBinary::is_denied("kubectl-validate"));
-        assert!(suite_runner::ClusterBinary::is_denied("kumactl"));
-        assert!(suite_runner::ClusterBinary::is_denied("helm"));
-        assert!(suite_runner::ClusterBinary::is_denied("docker"));
-        assert!(suite_runner::ClusterBinary::is_denied("k3d"));
-        assert!(!suite_runner::ClusterBinary::is_denied("harness"));
-    }
-
     // -- LegacyScript --
 
     test_string_enum!(legacy_script, suite_runner::LegacyScript);

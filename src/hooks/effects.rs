@@ -1,7 +1,7 @@
 use crate::audit_log::{AuditAppendRequest, append_audit_entry};
 use crate::errors::CliError;
-use crate::hook::HookResult;
 use crate::hooks::context::GuardContext;
+use crate::hooks::hook_result::HookResult;
 use crate::hooks::result::NormalizedHookResult;
 use crate::workflow::runner::{self as runner_wf, RunnerWorkflowState};
 
