@@ -38,7 +38,7 @@ mod tests {
         assert_eq!(suite.frontmatter.feature, "example");
         assert_eq!(suite.frontmatter.scope.as_deref(), Some("unit"));
         assert_eq!(suite.frontmatter.profiles, vec!["single-zone"]);
-        assert!(suite.frontmatter.required_dependencies.is_empty());
+        assert!(suite.frontmatter.requires.is_empty());
         assert!(suite.frontmatter.user_stories.is_empty());
         assert!(suite.frontmatter.variant_decisions.is_empty());
         assert_eq!(
