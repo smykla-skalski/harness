@@ -553,4 +553,23 @@ mod tests {
             .unwrap_or_default();
         assert!(help.contains("explicit batch order"));
     }
+
+    // -- Snapshot tests --
+
+    #[test]
+    fn snapshot_cli_help_text() {
+        let mut cmd = Cli::command();
+        let mut buf = Vec::new();
+        cmd.write_help(&mut buf).expect("render help");
+        let help = String::from_utf8(buf).expect("utf8 help");
+        insta::assert_snapshot!(help);
+    }
+
+    #[test]
+    fn snapshot_cli_subcommand_list() {
+        let cmd = Cli::command();
+        let mut names: Vec<&str> = cmd.get_subcommands().map(clap::Command::get_name).collect();
+        names.sort_unstable();
+        insta::assert_snapshot!(names.join("\n"));
+    }
 }

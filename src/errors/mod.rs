@@ -858,6 +858,54 @@ mod tests {
         assert!(result.message.contains("bug-found gate"));
     }
 
+    // -- Snapshot tests --
+
+    #[test]
+    fn snapshot_render_error_with_hint_and_details() {
+        let err = CliErrorKind::MissingRunPointer.with_details("checked /tmp/ctx/current-run.json");
+        let rendered = render_error(&err);
+        insta::assert_snapshot!(rendered);
+    }
+
+    #[test]
+    fn snapshot_render_error_missing_file() {
+        let err: CliError = CliErrorKind::missing_file("/tmp/runs/run-1/run-metadata.json").into();
+        let rendered = render_error(&err);
+        insta::assert_snapshot!(rendered);
+    }
+
+    #[test]
+    fn snapshot_render_error_command_failed() {
+        let err = CliErrorKind::command_failed("kubectl apply -f manifest.yaml")
+            .with_details("error: the path \"manifest.yaml\" does not exist");
+        let rendered = render_error(&err);
+        insta::assert_snapshot!(rendered);
+    }
+
+    #[test]
+    fn snapshot_hook_result_deny_json() {
+        use crate::hooks::hook_result::HookResult;
+        let result = HookResult::deny("KSR005", "Direct cluster binary access is not allowed.");
+        let json = serde_json::to_string_pretty(&result).expect("serialize hook result");
+        insta::assert_snapshot!(json);
+    }
+
+    #[test]
+    fn snapshot_hook_result_warn_json() {
+        use crate::hooks::hook_result::HookResult;
+        let result = HookResult::warn("KSR006", "Artifact missing: preflight.json");
+        let json = serde_json::to_string_pretty(&result).expect("serialize hook result");
+        insta::assert_snapshot!(json);
+    }
+
+    #[test]
+    fn snapshot_hook_result_info_json() {
+        use crate::hooks::hook_result::HookResult;
+        let result = HookResult::info("KSR012", "Run verdict: pass");
+        let json = serde_json::to_string_pretty(&result).expect("serialize hook result");
+        insta::assert_snapshot!(json);
+    }
+
     #[test]
     fn hook_message_count() {
         let all_hooks: Vec<HookMessage> = vec![
