@@ -23,43 +23,43 @@ fn is_denied_cluster_binary(name: &str) -> bool {
     denied_cluster_binaries().contains(name)
 }
 
-pub(super) fn is_run_scope_flag(s: &str) -> bool {
+pub(crate) fn is_run_scope_flag(s: &str) -> bool {
     matches!(s, "--run-dir" | "--run-id" | "--run-root")
         || s.starts_with("--run-dir=")
         || s.starts_with("--run-id=")
         || s.starts_with("--run-root=")
 }
 
-pub(super) fn deny_runner_flow(details: &str) -> HookResult {
+pub(crate) fn deny_runner_flow(details: &str) -> HookResult {
     HookMessage::runner_flow_required("run this command", details.to_string()).into_result()
 }
 
-pub(super) fn is_harness_head(heads: &[String]) -> bool {
+pub(crate) fn is_harness_head(heads: &[String]) -> bool {
     !heads.is_empty() && heads.iter().all(|h| h == "harness")
 }
 
-pub(super) fn is_tracked_harness_command(words: &[String]) -> bool {
+pub(crate) fn is_tracked_harness_command(words: &[String]) -> bool {
     let sig = significant_words(words);
     sig.len() >= 2
         && normalized_binary_name(sig[0]) == "harness"
         && TrackedHarnessSubcommand::is_tracked(sig[1])
 }
 
-pub(super) fn has_denied_cluster_binary(heads: &[String]) -> bool {
+pub(crate) fn has_denied_cluster_binary(heads: &[String]) -> bool {
     heads.iter().any(|h| is_denied_cluster_binary(h))
 }
 
-pub(super) fn has_denied_cluster_binary_anywhere(words: &[String]) -> bool {
+pub(crate) fn has_denied_cluster_binary_anywhere(words: &[String]) -> bool {
     words
         .iter()
         .any(|w| is_denied_cluster_binary(&normalized_binary_name(w)))
 }
 
-pub(super) fn has_denied_runner_binary(heads: &[String]) -> bool {
+pub(crate) fn has_denied_runner_binary(heads: &[String]) -> bool {
     heads.iter().any(|h| RunnerBinary::is_denied(h))
 }
 
-pub(super) fn has_task_output_access(words: &[String], command_text: Option<&str>) -> bool {
+pub(crate) fn has_task_output_access(words: &[String], command_text: Option<&str>) -> bool {
     let command = command_text.unwrap_or("");
     if TaskOutputPattern::matches_any(command) {
         return true;
@@ -67,11 +67,11 @@ pub(super) fn has_task_output_access(words: &[String], command_text: Option<&str
     words.iter().any(|w| TaskOutputPattern::matches_any(w))
 }
 
-pub(super) fn has_admin_endpoint_hint(words: &[String]) -> bool {
+pub(crate) fn has_admin_endpoint_hint(words: &[String]) -> bool {
     words.iter().any(|w| AdminEndpointHint::contains_hint(w))
 }
 
-pub(super) fn has_python_inline(words: &[String]) -> bool {
+pub(crate) fn has_python_inline(words: &[String]) -> bool {
     for (i, word) in words.iter().enumerate() {
         let name = normalized_binary_name(word);
         if !PythonBinary::is_python(&name) {
@@ -84,7 +84,7 @@ pub(super) fn has_python_inline(words: &[String]) -> bool {
     false
 }
 
-pub(super) fn deny_python() -> HookResult {
+pub(crate) fn deny_python() -> HookResult {
     HookMessage::approval_required(
         "use python",
         "do not use python for JSON parsing; \
@@ -93,7 +93,7 @@ pub(super) fn deny_python() -> HookResult {
     .into_result()
 }
 
-pub(super) fn has_denied_legacy_script(words: &[String]) -> bool {
+pub(crate) fn has_denied_legacy_script(words: &[String]) -> bool {
     words.iter().any(|w| {
         let name = Path::new(w)
             .file_name()
@@ -102,7 +102,7 @@ pub(super) fn has_denied_legacy_script(words: &[String]) -> bool {
     })
 }
 
-pub(super) fn make_target(words: &[String]) -> Option<&str> {
+pub(crate) fn make_target(words: &[String]) -> Option<&str> {
     let mut seen_make = false;
     for word in words {
         let name = Path::new(word)
@@ -120,7 +120,7 @@ pub(super) fn make_target(words: &[String]) -> Option<&str> {
     None
 }
 
-pub(super) fn allows_wrapped_envoy_admin(words: &[String]) -> bool {
+pub(crate) fn allows_wrapped_envoy_admin(words: &[String]) -> bool {
     let sig: Vec<&str> = words
         .iter()
         .filter(|w| !is_shell_control_op(w) && !is_env_assignment(w))
@@ -143,7 +143,7 @@ pub(super) fn allows_wrapped_envoy_admin(words: &[String]) -> bool {
 /// Scan raw command text for subshell substitution patterns that contain
 /// denied cluster binaries. This catches smuggling attempts that bypass
 /// token-level binary name checks.
-pub(super) fn has_denied_subshell_binary(command_text: Option<&str>, words: &[String]) -> bool {
+pub(crate) fn has_denied_subshell_binary(command_text: Option<&str>, words: &[String]) -> bool {
     let text = command_text.unwrap_or("");
 
     // Fast path: no subshell syntax at all
