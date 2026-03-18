@@ -1,9 +1,7 @@
 use clap::Args;
 
-use crate::blocks::ContainerRuntime;
-use crate::commands::RunDirArgs;
-use crate::commands::resolve_run_services;
-use crate::errors::CliError;
+use crate::commands::{CommandContext, RunDirArgs};
+use crate::errors::{CliError, CliErrorKind};
 
 /// Arguments for `harness logs`.
 #[derive(Debug, Clone, Args)]
@@ -26,13 +24,18 @@ pub struct LogsArgs {
 /// # Errors
 /// Returns `CliError` on failure.
 pub fn logs(
+    ctx: &CommandContext,
     name: &str,
     tail: u32,
     follow: bool,
     run_dir_args: &RunDirArgs,
-    docker: &dyn ContainerRuntime,
 ) -> Result<i32, CliError> {
-    let services = resolve_run_services(run_dir_args)?;
+    let services = ctx.resolve_run_services(run_dir_args)?;
+    let docker = services
+        .blocks()
+        .docker
+        .as_deref()
+        .ok_or_else(|| CliErrorKind::missing_run_context_value("docker"))?;
     let container = services.resolve_container_name(name);
     let tail_str = tail.to_string();
     let mut args: Vec<&str> = vec!["--tail", &tail_str];
