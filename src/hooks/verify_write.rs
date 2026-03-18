@@ -3,7 +3,7 @@ use std::path::Path;
 
 use crate::errors::{CliError, HookMessage};
 use crate::hook::HookResult;
-use crate::hook_payloads::HookContext;
+use crate::hooks::context::GuardContext as HookContext;
 
 use super::effects;
 

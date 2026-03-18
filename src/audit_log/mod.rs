@@ -17,7 +17,7 @@ use sha2::{Digest, Sha256};
 use crate::context::RunLayout;
 use crate::core_defs::utc_now;
 use crate::errors::{CliError, CliErrorKind, cow};
-use crate::hook_payloads::HookContext;
+use crate::hooks::context::GuardContext as HookContext;
 use crate::io::{ensure_dir, write_text};
 use crate::schema::RunStatus;
 use crate::workflow::runner::{RunnerPhase, RunnerWorkflowState};

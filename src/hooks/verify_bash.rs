@@ -7,7 +7,7 @@ use crate::cluster::ClusterMode;
 use crate::context::RunContext;
 use crate::errors::{CliError, HookMessage, cow};
 use crate::hook::HookResult;
-use crate::hook_payloads::HookContext;
+use crate::hooks::context::GuardContext as HookContext;
 use crate::shell_parse::HarnessCommandInvocationRef;
 use crate::workflow::runner::{PreflightStatus, RunnerPhase, RunnerWorkflowState, SuiteFixState};
 

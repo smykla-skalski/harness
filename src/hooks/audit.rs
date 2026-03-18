@@ -1,7 +1,7 @@
 use crate::audit_log::{append_audit_entry, build_hook_audit_request};
 use crate::errors::CliError;
 use crate::hook::HookResult;
-use crate::hook_payloads::HookContext;
+use crate::hooks::context::GuardContext as HookContext;
 
 /// Execute the audit hook.
 ///
@@ -40,7 +40,8 @@ mod tests {
 
     use crate::context::RunContext;
     use crate::hook::Decision;
-    use crate::hook_payloads::{HookContext, HookEnvelopePayload};
+    use crate::hook_payloads::HookEnvelopePayload;
+    use crate::hooks::context::GuardContext as HookContext;
     use crate::workflow::runner::{
         PreflightState, PreflightStatus, RunnerPhase, RunnerWorkflowState,
     };

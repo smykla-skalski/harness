@@ -2,20 +2,29 @@ use std::path::{Component, Path, PathBuf};
 
 use clap::{Args, Subcommand};
 
-use crate::errors::CliError;
+use crate::errors::{CliError, CliErrorKind, cow};
 use crate::hook::HookResult;
-use crate::hook_payloads::HookContext;
 use crate::rules::suite_runner::RunFile;
 
+use self::adapters::{HookAgent, adapter_for};
+use self::context::{GuardContext, NormalizedEvent};
+use self::effects::HookOutcome;
+use self::engine::{Hook, HookEngine};
+use self::result::NormalizedHookResult;
+
+pub mod adapters;
 pub mod audit;
+pub mod context;
 pub mod context_agent;
 mod effects;
+pub mod engine;
 pub mod enrich_failure;
 pub mod guard_bash;
 pub mod guard_question;
 pub mod guard_stop;
 pub mod guard_write;
 pub mod output;
+pub mod result;
 pub mod validate_agent;
 pub mod verify_bash;
 pub mod verify_question;
@@ -39,76 +48,112 @@ impl HookType {
     }
 }
 
-/// One hook registration entry.
-#[derive(Clone, Copy)]
-pub struct HookSpec {
-    pub name: &'static str,
-    pub hook_type: HookType,
-    pub execute: fn(&HookContext) -> Result<HookResult, CliError>,
-}
+macro_rules! define_legacy_hook {
+    ($static_name:ident, $struct_name:ident, $hook_name:literal, $hook_type:expr, $module:ident) => {
+        struct $struct_name;
 
-impl HookSpec {
-    const fn new(
-        name: &'static str,
-        hook_type: HookType,
-        execute: fn(&HookContext) -> Result<HookResult, CliError>,
-    ) -> Self {
-        Self {
-            name,
-            hook_type,
-            execute,
+        impl Hook for $struct_name {
+            fn name(&self) -> &str {
+                $hook_name
+            }
+
+            fn hook_type(&self) -> HookType {
+                $hook_type
+            }
+
+            fn execute(&self, ctx: &GuardContext) -> Result<HookOutcome, CliError> {
+                $module::execute(ctx).map(HookOutcome::from_hook_result)
+            }
         }
-    }
+
+        static $static_name: $struct_name = $struct_name;
+    };
 }
 
-static GUARD_BASH: HookSpec =
-    HookSpec::new("guard-bash", HookType::PreToolUse, guard_bash::execute);
-static GUARD_WRITE: HookSpec =
-    HookSpec::new("guard-write", HookType::PreToolUse, guard_write::execute);
-static GUARD_QUESTION: HookSpec = HookSpec::new(
+define_legacy_hook!(
+    GUARD_BASH_HOOK,
+    GuardBashHook,
+    "guard-bash",
+    HookType::PreToolUse,
+    guard_bash
+);
+define_legacy_hook!(
+    GUARD_WRITE_HOOK,
+    GuardWriteHook,
+    "guard-write",
+    HookType::PreToolUse,
+    guard_write
+);
+define_legacy_hook!(
+    GUARD_QUESTION_HOOK,
+    GuardQuestionHook,
     "guard-question",
     HookType::PreToolUse,
-    guard_question::execute,
+    guard_question
 );
-static GUARD_STOP: HookSpec = HookSpec::new("guard-stop", HookType::Blocking, guard_stop::execute);
-static VERIFY_BASH: HookSpec =
-    HookSpec::new("verify-bash", HookType::PostToolUse, verify_bash::execute);
-static VERIFY_WRITE: HookSpec =
-    HookSpec::new("verify-write", HookType::PostToolUse, verify_write::execute);
-static VERIFY_QUESTION: HookSpec = HookSpec::new(
+define_legacy_hook!(
+    GUARD_STOP_HOOK,
+    GuardStopHook,
+    "guard-stop",
+    HookType::Blocking,
+    guard_stop
+);
+define_legacy_hook!(
+    VERIFY_BASH_HOOK,
+    VerifyBashHook,
+    "verify-bash",
+    HookType::PostToolUse,
+    verify_bash
+);
+define_legacy_hook!(
+    VERIFY_WRITE_HOOK,
+    VerifyWriteHook,
+    "verify-write",
+    HookType::PostToolUse,
+    verify_write
+);
+define_legacy_hook!(
+    VERIFY_QUESTION_HOOK,
+    VerifyQuestionHook,
     "verify-question",
     HookType::PostToolUse,
-    verify_question::execute,
+    verify_question
 );
-static AUDIT: HookSpec = HookSpec::new("audit", HookType::PostToolUse, audit::execute);
-static ENRICH_FAILURE: HookSpec = HookSpec::new(
+define_legacy_hook!(AUDIT_HOOK, AuditHook, "audit", HookType::PostToolUse, audit);
+define_legacy_hook!(
+    ENRICH_FAILURE_HOOK,
+    EnrichFailureHook,
     "enrich-failure",
     HookType::PostToolUseFailure,
-    enrich_failure::execute,
+    enrich_failure
 );
-static CONTEXT_AGENT: HookSpec = HookSpec::new(
+define_legacy_hook!(
+    CONTEXT_AGENT_HOOK,
+    ContextAgentHook,
     "context-agent",
     HookType::SubagentStart,
-    context_agent::execute,
+    context_agent
 );
-static VALIDATE_AGENT: HookSpec = HookSpec::new(
+define_legacy_hook!(
+    VALIDATE_AGENT_HOOK,
+    ValidateAgentHook,
     "validate-agent",
     HookType::SubagentStop,
-    validate_agent::execute,
+    validate_agent
 );
 
-pub static ALL_HOOKS: [&HookSpec; 11] = [
-    &GUARD_BASH,
-    &GUARD_WRITE,
-    &GUARD_QUESTION,
-    &GUARD_STOP,
-    &VERIFY_BASH,
-    &VERIFY_WRITE,
-    &VERIFY_QUESTION,
-    &AUDIT,
-    &ENRICH_FAILURE,
-    &CONTEXT_AGENT,
-    &VALIDATE_AGENT,
+pub static ALL_HOOKS: [&'static dyn Hook; 11] = [
+    &GUARD_BASH_HOOK,
+    &GUARD_WRITE_HOOK,
+    &GUARD_QUESTION_HOOK,
+    &GUARD_STOP_HOOK,
+    &VERIFY_BASH_HOOK,
+    &VERIFY_WRITE_HOOK,
+    &VERIFY_QUESTION_HOOK,
+    &AUDIT_HOOK,
+    &ENRICH_FAILURE_HOOK,
+    &CONTEXT_AGENT_HOOK,
+    &VALIDATE_AGENT_HOOK,
 ];
 
 /// Available hooks.
@@ -141,36 +186,39 @@ pub enum HookCommand {
 
 impl HookCommand {
     #[must_use]
-    pub fn spec(&self) -> &'static HookSpec {
+    pub fn hook(&self) -> &'static dyn Hook {
         match self {
-            Self::GuardBash => &GUARD_BASH,
-            Self::GuardWrite => &GUARD_WRITE,
-            Self::GuardQuestion => &GUARD_QUESTION,
-            Self::GuardStop => &GUARD_STOP,
-            Self::VerifyBash => &VERIFY_BASH,
-            Self::VerifyWrite => &VERIFY_WRITE,
-            Self::VerifyQuestion => &VERIFY_QUESTION,
-            Self::Audit => &AUDIT,
-            Self::EnrichFailure => &ENRICH_FAILURE,
-            Self::ContextAgent => &CONTEXT_AGENT,
-            Self::ValidateAgent => &VALIDATE_AGENT,
+            Self::GuardBash => &GUARD_BASH_HOOK,
+            Self::GuardWrite => &GUARD_WRITE_HOOK,
+            Self::GuardQuestion => &GUARD_QUESTION_HOOK,
+            Self::GuardStop => &GUARD_STOP_HOOK,
+            Self::VerifyBash => &VERIFY_BASH_HOOK,
+            Self::VerifyWrite => &VERIFY_WRITE_HOOK,
+            Self::VerifyQuestion => &VERIFY_QUESTION_HOOK,
+            Self::Audit => &AUDIT_HOOK,
+            Self::EnrichFailure => &ENRICH_FAILURE_HOOK,
+            Self::ContextAgent => &CONTEXT_AGENT_HOOK,
+            Self::ValidateAgent => &VALIDATE_AGENT_HOOK,
         }
     }
 
     #[must_use]
     pub fn name(&self) -> &'static str {
-        self.spec().name
+        self.hook().name()
     }
 
     #[must_use]
     pub fn hook_type(&self) -> HookType {
-        self.spec().hook_type
+        self.hook().hook_type()
     }
 }
 
 /// Arguments for `harness hook`.
 #[derive(Debug, Clone, Args)]
 pub struct HookArgs {
+    /// Hook transport/agent protocol.
+    #[arg(long, value_enum, default_value_t = HookAgent::ClaudeCode)]
+    pub agent: HookAgent,
     /// Skill name (suite:run or suite:new).
     #[arg(value_parser = clap::builder::PossibleValuesParser::new(crate::rules::SKILL_NAMES))]
     pub skill: String,
@@ -179,8 +227,8 @@ pub struct HookArgs {
     pub hook: HookCommand,
 }
 
-fn hook_runtime_result(spec: &HookSpec, code: &str, message: &str) -> HookResult {
-    if spec.hook_type.is_guard() {
+fn hook_runtime_result(hook: &dyn Hook, code: &str, message: &str) -> HookResult {
+    if hook.hook_type().is_guard() {
         HookResult::deny(code, message)
     } else {
         HookResult::warn(code, message)
@@ -188,13 +236,13 @@ fn hook_runtime_result(spec: &HookSpec, code: &str, message: &str) -> HookResult
 }
 
 pub(crate) fn dispatch_by_skill<RunnerFn, AuthorFn>(
-    ctx: &HookContext,
+    ctx: &GuardContext,
     runner: RunnerFn,
     author: AuthorFn,
 ) -> Result<HookResult, CliError>
 where
-    RunnerFn: FnOnce(&HookContext) -> Result<HookResult, CliError>,
-    AuthorFn: FnOnce(&HookContext) -> Result<HookResult, CliError>,
+    RunnerFn: FnOnce(&GuardContext) -> Result<HookResult, CliError>,
+    AuthorFn: FnOnce(&GuardContext) -> Result<HookResult, CliError>,
 {
     if !ctx.skill_active {
         return Ok(HookResult::allow());
@@ -205,8 +253,8 @@ where
     runner(ctx)
 }
 
-fn format_hook_error_detail(spec: &HookSpec, error: &CliError) -> String {
-    let mut parts = vec![format!("`{}` failed internally: {error}", spec.name)];
+fn format_hook_error_detail(hook: &dyn Hook, error: &CliError) -> String {
+    let mut parts = vec![format!("`{}` failed internally: {error}", hook.name())];
     if let Some(hint) = error.hint() {
         parts.push(format!("Hint: {hint}"));
     }
@@ -216,36 +264,89 @@ fn format_hook_error_detail(spec: &HookSpec, error: &CliError) -> String {
     parts.join(" ")
 }
 
-/// Execute a hook command: build context, dispatch, render output.
+fn default_event_for_hook(hook_type: HookType) -> NormalizedEvent {
+    match hook_type {
+        HookType::PreToolUse => NormalizedEvent::BeforeToolUse,
+        HookType::PostToolUse => NormalizedEvent::AfterToolUse,
+        HookType::PostToolUseFailure => NormalizedEvent::AfterToolUseFailure,
+        HookType::SubagentStart => NormalizedEvent::SubagentStart,
+        HookType::SubagentStop => NormalizedEvent::SubagentStop,
+        HookType::Blocking => NormalizedEvent::AgentStop,
+    }
+}
+
+fn render_runtime_error(
+    agent: HookAgent,
+    hook: &dyn Hook,
+    event: &NormalizedEvent,
+    code: &str,
+    message: &str,
+) -> i32 {
+    let result = NormalizedHookResult::from_hook_result(hook_runtime_result(hook, code, message));
+    let rendered = adapter_for(agent).render_output(&result, event);
+    if !rendered.stdout.is_empty() {
+        print!("{}", rendered.stdout);
+    }
+    rendered.exit_code
+}
+
+fn read_stdin_bytes() -> Result<Vec<u8>, CliError> {
+    use std::io::Read;
+
+    let mut bytes = Vec::new();
+    std::io::stdin().read_to_end(&mut bytes).map_err(|error| {
+        CliError::from(CliErrorKind::hook_payload_invalid(cow!(
+            "failed to read stdin: {error}"
+        )))
+    })?;
+    Ok(bytes)
+}
+
+/// Execute a hook command through the layered adapter/engine stack.
 #[must_use]
-pub fn run_hook_command(skill: &str, hook: &HookCommand) -> i32 {
-    let spec = hook.spec();
-    let ctx = match HookContext::from_stdin(skill) {
-        Ok(ctx) => ctx,
+pub fn run_hook_command(agent: HookAgent, skill: &str, hook: &HookCommand) -> i32 {
+    let hook_impl = hook.hook();
+    let event = default_event_for_hook(hook_impl.hook_type());
+    let raw = match read_stdin_bytes() {
+        Ok(raw) => raw,
         Err(error) => {
-            let message = format!("`{}` received invalid hook payload: {error}", spec.name);
-            let result = hook_runtime_result(spec, "KSH001", &message);
-            let output = output::render_hook_output(spec.hook_type, &result);
-            if !output.is_empty() {
-                print!("{output}");
-            }
-            return 0;
+            let message = format!(
+                "`{}` received invalid hook payload: {error}",
+                hook_impl.name()
+            );
+            return render_runtime_error(agent, hook_impl, &event, "KSH001", &message);
         }
     };
 
-    let result = match (spec.execute)(&ctx) {
+    let adapter = adapter_for(agent);
+    let normalized = match adapter.parse_input(&raw) {
+        Ok(context) => context.with_skill(skill).with_default_event(event.clone()),
+        Err(error) => {
+            let message = format!(
+                "`{}` received invalid hook payload: {error}",
+                hook_impl.name()
+            );
+            return render_runtime_error(agent, hook_impl, &event, "KSH001", &message);
+        }
+    };
+    let render_event = normalized.event.clone();
+
+    let engine = HookEngine::new();
+    let result = match engine.execute(hook_impl, normalized) {
         Ok(result) => result,
         Err(error) => {
-            let detail = format_hook_error_detail(spec, &error);
-            hook_runtime_result(spec, "KSH002", &detail)
+            let detail = format_hook_error_detail(hook_impl, &error);
+            NormalizedHookResult::from_hook_result(hook_runtime_result(
+                hook_impl, "KSH002", &detail,
+            ))
         }
     };
 
-    let output = output::render_hook_output(spec.hook_type, &result);
-    if !output.is_empty() {
-        print!("{output}");
+    let rendered = adapter.render_output(&result, &render_event);
+    if !rendered.stdout.is_empty() {
+        print!("{}", rendered.stdout);
     }
-    0
+    rendered.exit_code
 }
 
 /// Normalize a path by resolving `.` and `..` segments without touching the
@@ -374,7 +475,7 @@ mod tests {
 
     #[test]
     fn hook_names_are_unique() {
-        let mut names: Vec<&str> = ALL_HOOKS.iter().map(|spec| spec.name).collect();
+        let mut names: Vec<&str> = ALL_HOOKS.iter().map(|hook| hook.name()).collect();
         names.sort_unstable();
         names.dedup();
         assert_eq!(names.len(), ALL_HOOKS.len());
@@ -413,13 +514,13 @@ mod tests {
 
     #[test]
     fn hook_runtime_result_guard_is_deny() {
-        let result = hook_runtime_result(&GUARD_BASH, "KSH002", "error");
+        let result = hook_runtime_result(&GUARD_BASH_HOOK, "KSH002", "error");
         assert_eq!(result.decision, Decision::Deny);
     }
 
     #[test]
     fn hook_runtime_result_verify_is_warn() {
-        let result = hook_runtime_result(&VERIFY_BASH, "KSH002", "error");
+        let result = hook_runtime_result(&VERIFY_BASH_HOOK, "KSH002", "error");
         assert_eq!(result.decision, Decision::Warn);
     }
 }
