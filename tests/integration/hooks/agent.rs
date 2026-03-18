@@ -94,7 +94,6 @@ fn context_agent_preflight_ready() {
     let tmp = tempfile::tempdir().unwrap();
     let run_dir = init_run(tmp.path(), "run-1", "single-zone");
     let state = RunnerWorkflowState {
-        schema_version: 2,
         phase: RunnerPhase::Preflight,
         preflight: PreflightState {
             status: PreflightStatus::Running,

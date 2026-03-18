@@ -257,6 +257,7 @@ impl TryFrom<&str> for RunnerEvent {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub(super) struct RunnerWorkflowPayload {
     pub phase: RunnerPhase,
     pub preflight: PreflightState,
@@ -269,8 +270,8 @@ pub(super) struct RunnerWorkflowPayload {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub(super) struct RunnerWorkflowStateRecord {
-    pub schema_version: u32,
     pub state: RunnerWorkflowPayload,
     pub updated_at: String,
     pub transition_count: u32,
@@ -281,7 +282,6 @@ pub(super) struct RunnerWorkflowStateRecord {
 /// Full runner workflow state.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RunnerWorkflowState {
-    pub schema_version: u32,
     pub phase: RunnerPhase,
     pub preflight: PreflightState,
     pub failure: Option<FailureState>,
@@ -405,7 +405,6 @@ impl RunnerWorkflowState {
 
     pub(super) fn to_record(&self) -> RunnerWorkflowStateRecord {
         RunnerWorkflowStateRecord {
-            schema_version: self.schema_version,
             state: RunnerWorkflowPayload {
                 phase: self.phase,
                 preflight: self.preflight.clone(),
@@ -421,7 +420,6 @@ impl RunnerWorkflowState {
 
     pub(super) fn from_record(record: RunnerWorkflowStateRecord) -> Self {
         Self {
-            schema_version: record.schema_version,
             phase: record.state.phase,
             preflight: record.state.preflight,
             failure: record.state.failure,

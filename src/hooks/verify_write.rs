@@ -162,7 +162,6 @@ mod tests {
         context.run_dir = Some(run_dir.clone());
         context.run = Some(RunContext::from_run_dir(&run_dir).unwrap());
         context.runner_state = Some(RunnerWorkflowState {
-            schema_version: 2,
             phase: RunnerPhase::Triage,
             preflight: PreflightState {
                 status: PreflightStatus::Complete,

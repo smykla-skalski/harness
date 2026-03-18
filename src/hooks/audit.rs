@@ -111,7 +111,6 @@ mod tests {
         context.run_dir = Some(run_dir.clone());
         context.run = Some(run_context);
         context.runner_state = Some(RunnerWorkflowState {
-            schema_version: 1,
             phase: RunnerPhase::Execution,
             preflight: PreflightState {
                 status: PreflightStatus::Complete,

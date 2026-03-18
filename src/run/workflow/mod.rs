@@ -17,7 +17,7 @@ pub use types::{
     RunnerNextAction, RunnerPhase, RunnerWorkflowState, SuiteFixState, TransitionRecord,
 };
 
-use persistence::{make_initial_state, runner_repository};
+use persistence::{make_initial_state, update_runner_state};
 use transitions::{
     apply_failure_manifest, apply_preflight_status, apply_suite_fix,
     clear_triage_state_on_forward_movement, resolve_transition,
@@ -47,9 +47,7 @@ where
     let event = event
         .try_into()
         .map_err(|error| CliErrorKind::invalid_transition(format!("unknown event: {error}")))?;
-    let _ = read_runner_state(run_dir)?;
-    let repo = runner_repository(run_dir);
-    let updated = repo.update(|current| {
+    let updated = update_runner_state(run_dir, |current| {
         let mut state = current.unwrap_or_else(|| make_initial_state(&now_utc()));
 
         let new_phase = resolve_transition(&mut state, event)?;
@@ -79,9 +77,7 @@ where
 /// # Errors
 /// Returns `CliError` on IO failure.
 pub fn ensure_execution_phase(run_dir: &Path) -> Result<bool, CliError> {
-    let _ = read_runner_state(run_dir)?;
-    let repo = runner_repository(run_dir);
-    let updated = repo.update(|current| {
+    let updated = update_runner_state(run_dir, |current| {
         let Some(mut state) = current else {
             return Ok(None);
         };
@@ -343,7 +339,6 @@ mod tests {
     #[test]
     fn full_state_serialization_with_all_fields() {
         let state = RunnerWorkflowState {
-            schema_version: 1,
             phase: RunnerPhase::Triage,
             preflight: PreflightState {
                 status: PreflightStatus::Complete,
