@@ -14,7 +14,7 @@ pub use persistence::{
 };
 pub use types::{
     FailureKind, FailureState, ManifestFixDecision, PreflightState, PreflightStatus, RunnerEvent,
-    RunnerNextAction, RunnerPhase, RunnerWorkflowState, SuiteFixState,
+    RunnerNextAction, RunnerPhase, RunnerWorkflowState, SuiteFixState, TransitionRecord,
 };
 
 use persistence::{make_initial_state, runner_repository};
@@ -52,9 +52,8 @@ where
     let updated = repo.update(|current| {
         let mut state = current.unwrap_or_else(|| make_initial_state(&now_utc()));
 
-        let new_phase = resolve_transition(&state, event)?;
+        let new_phase = resolve_transition(&mut state, event)?;
         state.phase = new_phase;
-        state.touch(event.label());
 
         clear_triage_state_on_forward_movement(&mut state, new_phase);
         apply_preflight_status(&mut state, event);
@@ -363,6 +362,7 @@ mod tests {
             updated_at: "2025-01-01T00:00:00Z".to_string(),
             transition_count: 5,
             last_event: Some("ManifestFixAnswered".to_string()),
+            history: Vec::new(),
         };
         let json = serde_json::to_value(&state).unwrap();
         let loaded: RunnerWorkflowState = serde_json::from_value(json).unwrap();

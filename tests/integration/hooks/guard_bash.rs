@@ -231,6 +231,7 @@ fn guard_bash_completed_state_blocks_commands() {
         updated_at: "2026-03-14T00:00:00Z".to_string(),
         transition_count: 5,
         last_event: Some("RunCompleted".to_string()),
+        history: Vec::new(),
     };
     runner_workflow::write_runner_state(&run_dir, &state).unwrap();
     let payload = make_bash_payload("harness apply --manifest test.yaml");
@@ -254,6 +255,7 @@ fn guard_bash_completed_allows_closeout() {
         updated_at: "2026-03-14T00:00:00Z".to_string(),
         transition_count: 5,
         last_event: Some("RunCompleted".to_string()),
+        history: Vec::new(),
     };
     runner_workflow::write_runner_state(&run_dir, &state).unwrap();
     let payload = make_bash_payload("harness closeout");

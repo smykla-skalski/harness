@@ -34,6 +34,19 @@ impl fmt::Display for RunnerPhase {
     }
 }
 
+/// Maximum number of transition records kept in history.
+/// When full, the oldest entry is dropped.
+const MAX_HISTORY_ENTRIES: usize = 50;
+
+/// A single recorded phase transition.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TransitionRecord {
+    pub from: RunnerPhase,
+    pub to: RunnerPhase,
+    pub event: String,
+    pub timestamp: String,
+}
+
 /// Preflight status within the runner workflow.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -251,6 +264,8 @@ pub(super) struct RunnerWorkflowPayload {
     pub failure: Option<FailureState>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub suite_fix: Option<SuiteFixState>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub history: Vec<TransitionRecord>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -274,6 +289,7 @@ pub struct RunnerWorkflowState {
     pub updated_at: String,
     pub transition_count: u32,
     pub last_event: Option<String>,
+    pub history: Vec<TransitionRecord>,
 }
 
 impl RunnerWorkflowState {
@@ -301,6 +317,18 @@ impl RunnerWorkflowState {
         self.transition_count += 1;
         self.updated_at = super::now_utc();
         self.last_event = Some(label.to_string());
+    }
+
+    pub(super) fn append_history(&mut self, from: RunnerPhase, to: RunnerPhase, event: &str) {
+        if self.history.len() >= MAX_HISTORY_ENTRIES {
+            self.history.remove(0);
+        }
+        self.history.push(TransitionRecord {
+            from,
+            to,
+            event: event.to_string(),
+            timestamp: self.updated_at.clone(),
+        });
     }
 
     #[must_use]
@@ -383,6 +411,7 @@ impl RunnerWorkflowState {
                 preflight: self.preflight.clone(),
                 failure: self.failure.clone(),
                 suite_fix: self.suite_fix.clone(),
+                history: self.history.clone(),
             },
             updated_at: self.updated_at.clone(),
             transition_count: self.transition_count,
@@ -397,6 +426,7 @@ impl RunnerWorkflowState {
             preflight: record.state.preflight,
             failure: record.state.failure,
             suite_fix: record.state.suite_fix,
+            history: record.state.history,
             updated_at: record.updated_at,
             transition_count: record.transition_count,
             last_event: record.last_event,

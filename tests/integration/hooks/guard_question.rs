@@ -64,6 +64,7 @@ fn guard_question_allows_manifest_fix_in_triage() {
         updated_at: "2026-03-14T00:00:00Z".to_string(),
         transition_count: 3,
         last_event: Some("FailureRecorded".to_string()),
+        history: Vec::new(),
     };
     runner_workflow::write_runner_state(&run_dir, &state).unwrap();
     let question = "suite:run/manifest-fix: how should this failure be handled?";

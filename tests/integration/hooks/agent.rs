@@ -104,6 +104,7 @@ fn context_agent_preflight_ready() {
         updated_at: "2026-03-14T00:00:00Z".to_string(),
         transition_count: 2,
         last_event: Some("PreflightStarted".to_string()),
+        history: Vec::new(),
     };
     runner_workflow::write_runner_state(&run_dir, &state).unwrap();
     let payload = make_empty_payload();
