@@ -1,7 +1,13 @@
 use clap::Args;
 
-use crate::commands::{RunDirArgs, resolve_run_services};
+use crate::commands::{CommandContext, Execute, RunDirArgs, resolve_run_services};
 use crate::errors::{CliError, CliErrorKind};
+
+impl Execute for StatusArgs {
+    fn execute(&self, _context: &CommandContext) -> Result<i32, CliError> {
+        status(&self.run_dir)
+    }
+}
 
 /// Arguments for `harness status`.
 #[derive(Debug, Clone, Args)]

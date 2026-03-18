@@ -5,11 +5,24 @@ use clap::Args;
 
 use tracing::warn;
 
-use crate::commands::{RunDirArgs, resolve_run_services};
+use crate::commands::{CommandContext, Execute, RunDirArgs, resolve_run_services};
 use crate::errors::{CliError, CliErrorKind};
 use crate::exec;
 
 use super::kumactl::find_kumactl_binary;
+
+impl Execute for TokenArgs {
+    fn execute(&self, _context: &CommandContext) -> Result<i32, CliError> {
+        token(
+            &self.kind,
+            &self.name,
+            &self.mesh,
+            self.cp_addr.as_deref(),
+            &self.valid_for,
+            &self.run_dir,
+        )
+    }
+}
 
 /// Arguments for `harness token`.
 #[derive(Debug, Clone, Args)]

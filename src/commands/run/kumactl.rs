@@ -2,10 +2,16 @@ use std::path::{Path, PathBuf};
 
 use clap::{Args, Subcommand};
 
-use crate::commands::resolve_repo_root;
+use crate::commands::{CommandContext, Execute, resolve_repo_root};
 use crate::core_defs::{host_platform, shorten_path};
 use crate::errors::{CliError, CliErrorKind};
 use crate::exec::run_command;
+
+impl Execute for KumactlArgs {
+    fn execute(&self, _context: &CommandContext) -> Result<i32, CliError> {
+        kumactl(&self.cmd)
+    }
+}
 
 /// Find or build kumactl.
 #[derive(Debug, Clone, Subcommand)]

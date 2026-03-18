@@ -1,10 +1,21 @@
 use clap::Args;
 
-use crate::commands::{RunDirArgs, resolve_run_dir};
+use crate::commands::{CommandContext, Execute, RunDirArgs, resolve_run_dir};
 use crate::errors::CliError;
 use crate::workflow::runner::{
     RunnerEvent, apply_event, initialize_runner_state, read_runner_state,
 };
+
+impl Execute for RunnerStateArgs {
+    fn execute(&self, _context: &CommandContext) -> Result<i32, CliError> {
+        runner_state(
+            self.event,
+            self.suite_target.as_deref(),
+            self.message.as_deref(),
+            &self.run_dir,
+        )
+    }
+}
 
 /// Arguments for `harness runner-state`.
 #[derive(Debug, Clone, Args)]

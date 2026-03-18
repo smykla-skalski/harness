@@ -1,8 +1,15 @@
 use clap::Args;
 
 use crate::authoring::{authoring_workspace_dir, load_authoring_session};
+use crate::commands::{CommandContext, Execute};
 use crate::errors::{CliError, CliErrorKind};
 use crate::io::{is_safe_name, read_text};
+
+impl Execute for AuthoringShowArgs {
+    fn execute(&self, _context: &CommandContext) -> Result<i32, CliError> {
+        show(&self.kind)
+    }
+}
 
 /// Arguments for `harness authoring-show`.
 #[derive(Debug, Clone, Args)]
