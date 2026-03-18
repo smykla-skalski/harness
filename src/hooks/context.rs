@@ -7,7 +7,7 @@ use tracing::warn;
 
 use crate::context::RunContext;
 use crate::errors::{CliError, CliErrorKind, cow};
-use crate::hook_payloads::{AskUserAnswer, AskUserQuestionPrompt, HookEnvelopePayload};
+use crate::hooks::payloads::{AskUserAnswer, AskUserQuestionPrompt, HookEnvelopePayload};
 use crate::rules;
 use crate::shell_parse::ParsedCommand;
 use crate::workflow::author::{self as author_workflow, AuthorWorkflowState};

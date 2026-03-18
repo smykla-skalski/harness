@@ -2,8 +2,8 @@ mod predicates;
 mod runner_guards;
 
 use crate::errors::{CliError, HookMessage};
-use crate::hook::HookResult;
 use crate::hooks::context::GuardContext as HookContext;
+use crate::hooks::hook_result::HookResult;
 
 use predicates::{
     deny_python, has_admin_endpoint_hint, has_denied_cluster_binary,
@@ -97,9 +97,9 @@ fn guard_suite_runner(ctx: &HookContext, words: &[String], heads: &[String]) -> 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::hook::Decision;
-    use crate::hook_payloads::HookEnvelopePayload;
     use crate::hooks::context::GuardContext as HookContext;
+    use crate::hooks::hook_result::Decision;
+    use crate::hooks::payloads::HookEnvelopePayload;
     use crate::rules::suite_runner::TrackedHarnessSubcommand;
 
     use super::predicates::{is_tracked_harness_command, make_target};

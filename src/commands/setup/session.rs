@@ -12,7 +12,7 @@ use crate::context::{CurrentRunRecord, RunRepository};
 use crate::core_defs::current_run_context_path;
 use crate::ephemeral_metallb;
 use crate::errors::CliError;
-use crate::session_hook::SessionStartHookOutput;
+use crate::hooks::session::SessionStartHookOutput;
 
 /// Arguments for `harness session-start`.
 #[derive(Debug, Clone, Args)]
