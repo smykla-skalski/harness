@@ -28,6 +28,16 @@ macro_rules! cow {
 
 pub(crate) use cow;
 
+/// Named exit code constants for CLI process results.
+pub mod exit_code {
+    pub const SUCCESS: i32 = 0;
+    pub const VALIDATION_ERROR: i32 = 1;
+    pub const EMPTY_ARGS: i32 = 3;
+    pub const COMMAND_FAILED: i32 = 4;
+    pub const CLI_ERROR: i32 = 5;
+    pub const FORMAT_ERROR: i32 = 6;
+}
+
 macro_rules! define_domain_error_enum {
     (
         $name:ident {
@@ -159,6 +169,7 @@ impl CliErrorKind {
         CliError {
             kind: self,
             details: Some(details.into()),
+            source: None,
         }
     }
 
@@ -489,11 +500,13 @@ impl CliErrorKind {
 
 /// The unified CLI error type, following the `io::Error` pattern.
 ///
-/// Wraps a [`CliErrorKind`] with optional detail text.
+/// Wraps a [`CliErrorKind`] with optional detail text and an optional
+/// source error for chain traversal via `Error::source()`.
 #[derive(Debug)]
 pub struct CliError {
     kind: CliErrorKind,
     details: Option<String>,
+    source: Option<Box<dyn Error + Send + Sync>>,
 }
 
 impl CliError {
@@ -518,13 +531,20 @@ impl CliError {
     }
 
     #[must_use]
-    pub fn kind(&self) -> CliErrorKind {
-        self.kind.clone()
+    pub fn kind(&self) -> &CliErrorKind {
+        &self.kind
     }
 
     #[must_use]
     pub fn message(&self) -> String {
         self.kind.to_string()
+    }
+
+    /// Attach an explicit source error for chain traversal.
+    #[must_use]
+    pub fn with_source(mut self, source: impl Error + Send + Sync + 'static) -> Self {
+        self.source = Some(Box::new(source));
+        self
     }
 }
 
@@ -536,7 +556,11 @@ impl fmt::Display for CliError {
 
 impl Error for CliError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
-        Some(&self.kind)
+        if let Some(ref source) = self.source {
+            Some(source.as_ref())
+        } else {
+            Some(&self.kind)
+        }
     }
 }
 
@@ -545,6 +569,7 @@ impl From<CliErrorKind> for CliError {
         Self {
             kind,
             details: None,
+            source: None,
         }
     }
 }
