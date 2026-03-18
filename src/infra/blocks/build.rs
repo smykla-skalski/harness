@@ -45,7 +45,7 @@ impl BuildTarget {
     }
 }
 
-/// Generic build-system block.
+/// Generic build block.
 ///
 /// The current codebase still shells out directly to repo-local build entry
 /// points such as `make` or `mise`. This trait provides the block boundary so
@@ -93,7 +93,7 @@ pub trait BuildSystem: Send + Sync {
     }
 }
 
-/// Production build-system implementation backed by the process block.
+/// Production build implementation backed by the process block.
 pub struct ProcessBuildSystem {
     process: Arc<dyn ProcessExecutor>,
 }

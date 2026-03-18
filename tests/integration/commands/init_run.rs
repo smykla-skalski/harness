@@ -194,7 +194,7 @@ fn init_preserves_user_stories_from_suite() {
         .feature("stories-test")
         .scope("unit")
         .profile("single-zone")
-        .required_dependency("docker")
+        .require("docker")
         .user_story("prepare manifests once")
         .user_story("validate all resources")
         .keep_clusters(false)
@@ -219,6 +219,5 @@ fn init_preserves_user_stories_from_suite() {
         metadata.user_stories,
         vec!["prepare manifests once", "validate all resources"]
     );
-    assert_eq!(metadata.required_dependencies, vec!["docker"]);
     assert_eq!(metadata.requires, vec!["docker"]);
 }

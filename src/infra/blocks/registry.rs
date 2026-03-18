@@ -79,22 +79,19 @@ impl BlockRequirement {
 
     /// Parse a user- or suite-supplied requirement name.
     ///
-    /// Accepts both the architecture-review names and a few compatibility
-    /// aliases from the current codebase.
-    ///
     /// # Errors
     ///
     /// Returns `BlockError` for unknown requirement names.
     pub fn parse(raw: &str) -> Result<Self, BlockError> {
         match raw.trim().to_ascii_lowercase().as_str() {
-            "docker" | "container-runtime" => Ok(Self::Docker),
-            "compose" | "docker-compose" | "compose-orchestrator" => Ok(Self::Compose),
-            "kubernetes" | "kubectl" => Ok(Self::Kubernetes),
-            "k3d" | "local-cluster" | "local-cluster-manager" => Ok(Self::K3d),
-            "helm" | "package-deployer" => Ok(Self::Helm),
-            "envoy" | "proxy-introspector" => Ok(Self::Envoy),
-            "kuma" | "mesh-control-plane" => Ok(Self::Kuma),
-            "build" | "build-system" => Ok(Self::Build),
+            "docker" => Ok(Self::Docker),
+            "compose" => Ok(Self::Compose),
+            "kubernetes" => Ok(Self::Kubernetes),
+            "k3d" => Ok(Self::K3d),
+            "helm" => Ok(Self::Helm),
+            "envoy" => Ok(Self::Envoy),
+            "kuma" => Ok(Self::Kuma),
+            "build" => Ok(Self::Build),
             other => Err(BlockError::message(
                 "registry",
                 "parse requirement",

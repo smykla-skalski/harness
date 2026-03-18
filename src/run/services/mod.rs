@@ -586,7 +586,6 @@ suite_id: demo.suite
 feature: demo
 scope: unit
 profiles: [single-zone]
-required_dependencies: []
 requires: []
 user_stories: []
 variant_decisions: []
@@ -617,7 +616,6 @@ keep_clusters: false
             keep_clusters: false,
             created_at: "2026-03-16T00:00:00Z".to_string(),
             user_stories: vec![],
-            required_dependencies: vec![],
             requires: vec![],
         };
         let status = RunStatus {

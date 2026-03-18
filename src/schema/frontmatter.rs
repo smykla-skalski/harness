@@ -17,8 +17,6 @@ pub struct SuiteFrontmatter {
     #[serde(default)]
     pub profiles: Vec<String>,
     #[serde(default)]
-    pub required_dependencies: Vec<String>,
-    #[serde(default)]
     pub requires: Vec<String>,
     #[serde(default)]
     pub user_stories: Vec<String>,
@@ -39,26 +37,6 @@ pub struct SuiteFrontmatter {
 impl SuiteFrontmatter {
     #[must_use]
     pub fn effective_requires(&self) -> Vec<String> {
-        merge_requirement_lists(&self.requires, &self.required_dependencies)
+        self.requires.clone()
     }
-}
-
-/// Merge `requires` with legacy `required_dependencies`, deduplicating entries.
-///
-/// When `requires` is empty, falls back to `required_dependencies` for backward
-/// compatibility. Otherwise returns `requires` extended with any entries from
-/// `required_dependencies` not already present.
-#[must_use]
-pub fn merge_requirement_lists(requires: &[String], legacy: &[String]) -> Vec<String> {
-    if requires.is_empty() {
-        return legacy.to_vec();
-    }
-
-    let mut merged = requires.to_vec();
-    for entry in legacy {
-        if !merged.contains(entry) {
-            merged.push(entry.clone());
-        }
-    }
-    merged
 }

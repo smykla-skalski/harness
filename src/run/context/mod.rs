@@ -259,8 +259,6 @@ pub struct RunMetadata {
     #[serde(default)]
     pub user_stories: Vec<String>,
     #[serde(default)]
-    pub required_dependencies: Vec<String>,
-    #[serde(default)]
     pub requires: Vec<String>,
 }
 
@@ -366,8 +364,6 @@ pub struct CurrentRunPointer {
     #[serde(default)]
     pub user_stories: Vec<String>,
     #[serde(default)]
-    pub required_dependencies: Vec<String>,
-    #[serde(default)]
     pub requires: Vec<String>,
 }
 
@@ -390,7 +386,6 @@ impl CurrentRunPointer {
             cluster,
             keep_clusters: metadata.keep_clusters,
             user_stories: metadata.user_stories.clone(),
-            required_dependencies: metadata.required_dependencies.clone(),
             requires: metadata.requires.clone(),
         }
     }
@@ -442,7 +437,6 @@ mod tests {
             keep_clusters: false,
             created_at: "2026-03-14T00:00:00Z".into(),
             user_stories: vec![],
-            required_dependencies: vec![],
             requires: vec![],
         }
     }
@@ -660,7 +654,6 @@ mod tests {
         let meta: RunMetadata = serde_json::from_str(json).unwrap();
         assert!(!meta.keep_clusters);
         assert!(meta.user_stories.is_empty());
-        assert!(meta.required_dependencies.is_empty());
         assert!(meta.requires.is_empty());
     }
 
@@ -853,7 +846,6 @@ mod tests {
             cluster: None,
             keep_clusters: false,
             user_stories: vec![],
-            required_dependencies: vec![],
             requires: vec![],
         };
         let ctx_dir = tmp.path().join("ctx");
@@ -885,7 +877,6 @@ mod tests {
             cluster: None,
             keep_clusters: false,
             user_stories: vec![],
-            required_dependencies: vec![],
             requires: vec![],
         };
         assert!(!record.layout.run_dir().is_dir());
@@ -905,7 +896,6 @@ mod tests {
             cluster: None,
             keep_clusters: false,
             user_stories: vec![],
-            required_dependencies: vec![],
             requires: vec![],
         };
         let json = serde_json::to_string(&record).unwrap();

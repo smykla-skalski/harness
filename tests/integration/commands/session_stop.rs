@@ -35,7 +35,6 @@ fn session_stop_cleans_up_templates_and_removes_pointer() {
         cluster: None,
         keep_clusters: false,
         user_stories: vec![],
-        required_dependencies: vec![],
         requires: vec![],
     };
 

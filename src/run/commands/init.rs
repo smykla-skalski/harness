@@ -119,7 +119,6 @@ fn populate_run_dir(
     let created_at = params.created_at;
     let suite_id = spec.frontmatter.suite_id.clone();
     let user_stories = spec.frontmatter.user_stories.clone();
-    let required_dependencies = spec.frontmatter.required_dependencies.clone();
     let requires = spec.frontmatter.effective_requires();
 
     let metadata = RunMetadata {
@@ -132,7 +131,6 @@ fn populate_run_dir(
         keep_clusters: spec.frontmatter.keep_clusters,
         created_at: created_at.to_string(),
         user_stories,
-        required_dependencies,
         requires,
     };
 
