@@ -27,6 +27,7 @@ pub mod guard_bash;
 pub mod guard_question;
 pub mod guard_stop;
 pub mod guard_write;
+pub mod guards;
 pub mod output;
 pub mod result;
 pub mod validate_agent;

@@ -20,7 +20,7 @@ use super::predicates::{
     is_run_scope_flag, is_tracked_harness_command, make_target,
 };
 
-pub(super) fn guard_runner_phase(ctx: &HookContext, words: &[String]) -> HookResult {
+pub(crate) fn guard_runner_phase(ctx: &HookContext, words: &[String]) -> HookResult {
     if let Some(ref run) = ctx.run
         && let Some(reason) = completed_run_reuse_reason(words)
         && let Some(ref status) = run.status
@@ -129,7 +129,7 @@ fn allowed_command(state: &RunnerWorkflowState, words: &[String]) -> (bool, Opti
     }
 }
 
-pub(super) fn deny_batched_tracked_harness_commands(words: &[String]) -> HookResult {
+pub(crate) fn deny_batched_tracked_harness_commands(words: &[String]) -> HookResult {
     let tracked = tracked_harness_subcommands(words);
     if tracked.is_empty() {
         return HookResult::allow();
@@ -174,7 +174,7 @@ fn tracked_harness_subcommands(words: &[String]) -> Vec<&str> {
     subs
 }
 
-pub(super) fn deny_harness_managed_run_control_mutation(
+pub(crate) fn deny_harness_managed_run_control_mutation(
     ctx: &HookContext,
     words: &[String],
 ) -> HookResult {
@@ -243,7 +243,7 @@ fn run_control_files_mentioned(words: &[String], command_text: Option<&str>) -> 
         .collect()
 }
 
-pub(super) fn deny_direct_command_log_access(ctx: &HookContext, words: &[String]) -> HookResult {
+pub(crate) fn deny_direct_command_log_access(ctx: &HookContext, words: &[String]) -> HookResult {
     let cmd_text = ctx.command_text().unwrap_or("");
     let refs = ["commands/command-log.md", "command-log.md"];
     let mentioned = words.iter().any(|w| refs.iter().any(|r| w.contains(r)))
@@ -257,7 +257,7 @@ pub(super) fn deny_direct_command_log_access(ctx: &HookContext, words: &[String]
     ))
 }
 
-pub(super) fn deny_raw_manifest_write(words: &[String], command_text: Option<&str>) -> HookResult {
+pub(crate) fn deny_raw_manifest_write(words: &[String], command_text: Option<&str>) -> HookResult {
     let cmd_text = command_text.unwrap_or("");
     let hints = ["/manifests/", "manifests/"];
     let any_mention = words.iter().any(|w| hints.iter().any(|h| w.contains(h)))
@@ -282,7 +282,7 @@ pub(super) fn deny_raw_manifest_write(words: &[String], command_text: Option<&st
     HookResult::allow()
 }
 
-pub(super) fn deny_suite_storage_mutation(words: &[String]) -> HookResult {
+pub(crate) fn deny_suite_storage_mutation(words: &[String]) -> HookResult {
     let heads = command_heads(words);
     if !heads
         .iter()
@@ -330,7 +330,7 @@ const KUMA_DELETE_RESOURCE_KINDS: &[&str] = &[
     "meshaccesslogs",
 ];
 
-pub(super) fn deny_mixed_kuma_delete(words: &[String]) -> HookResult {
+pub(crate) fn deny_mixed_kuma_delete(words: &[String]) -> HookResult {
     let Some(dw) = tracked_kubectl_delete_words(words) else {
         return HookResult::allow();
     };
@@ -395,7 +395,7 @@ fn tracked_kubectl_delete_words(words: &[String]) -> Option<Vec<&str>> {
     None
 }
 
-pub(super) fn deny_author_suite_storage_mutation(words: &[String]) -> HookResult {
+pub(crate) fn deny_author_suite_storage_mutation(words: &[String]) -> HookResult {
     let heads = command_heads(words);
     if !heads
         .iter()
@@ -417,7 +417,7 @@ pub(super) fn deny_author_suite_storage_mutation(words: &[String]) -> HookResult
     HookResult::allow()
 }
 
-pub(super) fn runner_binary_and_pattern_guards(
+pub(crate) fn runner_binary_and_pattern_guards(
     ctx: &HookContext,
     words: &[String],
     heads: &[String],
@@ -442,7 +442,7 @@ pub(super) fn runner_binary_and_pattern_guards(
     None
 }
 
-pub(super) fn runner_tail_guards(words: &[String], heads: &[String]) -> HookResult {
+pub(crate) fn runner_tail_guards(words: &[String], heads: &[String]) -> HookResult {
     if has_denied_legacy_script(words) {
         return HookMessage::ClusterBinary.into_result();
     }
