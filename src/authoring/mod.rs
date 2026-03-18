@@ -11,8 +11,6 @@ use crate::core_defs::{session_context_dir, utc_now};
 use crate::errors::{CliError, CliErrorKind};
 use crate::infra::io::{read_json_typed, write_json_pretty};
 use crate::rules::skill_dirs;
-use crate::schema::frontmatter::merge_requirement_lists;
-
 /// Active authoring session state.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AuthoringSession {
@@ -125,8 +123,6 @@ pub struct ProposalSummary {
     #[serde(default)]
     pub groups: Vec<ProposalGroup>,
     #[serde(default)]
-    pub required_dependencies: Vec<String>,
-    #[serde(default)]
     pub requires: Vec<String>,
     #[serde(default)]
     pub skipped_groups: Vec<String>,
@@ -135,7 +131,7 @@ pub struct ProposalSummary {
 impl ProposalSummary {
     #[must_use]
     pub fn effective_requires(&self) -> Vec<String> {
-        merge_requirement_lists(&self.requires, &self.required_dependencies)
+        self.requires.clone()
     }
 }
 
@@ -443,51 +439,26 @@ mod tests {
         let summary: ProposalSummary = serde_json::from_str(json).unwrap();
         assert_eq!(summary.summary, "proposal");
         assert!(summary.groups.is_empty());
-        assert!(summary.required_dependencies.is_empty());
         assert!(summary.requires.is_empty());
         assert!(summary.skipped_groups.is_empty());
         assert!(summary.suite_name.is_none());
     }
 
     #[test]
-    fn proposal_summary_effective_requires_falls_back_to_required_dependencies() {
+    fn proposal_summary_effective_requires_returns_requires() {
         let summary = ProposalSummary {
             summary: "proposal".to_string(),
             suite_name: None,
             suite_dir: None,
             run_command: None,
             groups: vec![],
-            required_dependencies: vec!["docker".to_string(), "helm".to_string()],
-            requires: vec![],
+            requires: vec!["docker".to_string(), "helm".to_string()],
             skipped_groups: vec![],
         };
 
         assert_eq!(
             summary.effective_requires(),
             vec!["docker".to_string(), "helm".to_string()]
-        );
-    }
-
-    #[test]
-    fn proposal_summary_effective_requires_merges_requires_and_legacy_dependencies() {
-        let summary = ProposalSummary {
-            summary: "proposal".to_string(),
-            suite_name: None,
-            suite_dir: None,
-            run_command: None,
-            groups: vec![],
-            required_dependencies: vec!["docker".to_string(), "helm".to_string()],
-            requires: vec!["kubernetes".to_string(), "docker".to_string()],
-            skipped_groups: vec![],
-        };
-
-        assert_eq!(
-            summary.effective_requires(),
-            vec![
-                "kubernetes".to_string(),
-                "docker".to_string(),
-                "helm".to_string()
-            ]
         );
     }
 

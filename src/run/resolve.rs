@@ -239,7 +239,6 @@ mod tests {
             cluster: None,
             keep_clusters: false,
             user_stories: vec![],
-            required_dependencies: vec![],
             requires: vec![],
         };
 
