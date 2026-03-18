@@ -126,7 +126,7 @@ fn resolve_optional_run_dir(run_dir_args: &RunDirArgs) -> Result<Option<PathBuf>
         && run_dir_args.run_root.is_none();
     match resolve_run_dir(run_dir_args) {
         Ok(rd) => Ok(Some(rd)),
-        Err(e) if matches!(e.kind(), CliErrorKind::MissingRunPointer) => Ok(None),
+        Err(e) if matches!(*e.kind(), CliErrorKind::MissingRunPointer) => Ok(None),
         Err(e) if implicit_lookup && e.code() == "KSRCLI014" => Ok(None),
         Err(e) => Err(e),
     }

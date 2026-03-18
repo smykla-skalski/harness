@@ -68,8 +68,10 @@ impl Error for SimpleError {}
 
 impl From<BlockError> for CliError {
     fn from(error: BlockError) -> Self {
+        let details = error.cause.to_string();
         CliErrorKind::command_failed(format!("[{}] {}", error.block, error.operation))
-            .with_details(error.cause.to_string())
+            .with_details(details)
+            .with_source(error)
     }
 }
 

@@ -285,6 +285,22 @@ impl HookMessage {
         }
     }
 
+    /// Convert a `CliErrorKind` into a `HookResult` with the given decision.
+    ///
+    /// Reuses the error's code and message instead of duplicating hook-specific
+    /// strings for overlapping variants like `MissingStateCapture` / `VerdictPending`.
+    #[must_use]
+    pub fn from_error(kind: &super::CliErrorKind, decision: Decision) -> HookResult {
+        let code = kind.code().to_string();
+        let message = kind.to_string();
+        match decision {
+            Decision::Deny => HookResult::deny(code, message),
+            Decision::Warn => HookResult::warn(code, message),
+            Decision::Info => HookResult::info(code, message),
+            Decision::Allow => HookResult::allow(),
+        }
+    }
+
     #[must_use]
     pub fn into_result(self) -> HookResult {
         let code = self.code().to_string();

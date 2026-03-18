@@ -290,7 +290,7 @@ pub fn extract_admin_token(cp_container: &str) -> Result<String, CliError> {
 
     backoff::retry(
         backoff_config,
-        || -> Result<String, backoff::Error<CliError>> {
+        || -> Result<String, backoff::Error<Box<CliError>>> {
             let result = docker_exec_cmd(
                 cp_container,
                 &[
@@ -301,43 +301,42 @@ pub fn extract_admin_token(cp_container: &str) -> Result<String, CliError> {
                     "http://localhost:5681/global-secrets/admin-user-token",
                 ],
             )
-            .map_err(backoff::Error::transient)?;
+            .map_err(|e| backoff::Error::transient(Box::new(e)))?;
 
             let body = serde_json::from_str::<serde_json::Value>(result.stdout.trim()).map_err(
                 |error| {
-                    backoff::Error::transient(
-                        CliErrorKind::serialize(format!("invalid JSON in token response: {error}"))
-                            .into(),
-                    )
+                    backoff::Error::transient(Box::new(CliError::from(CliErrorKind::serialize(
+                        format!("invalid JSON in token response: {error}"),
+                    ))))
                 },
             )?;
 
             let b64_data = body["data"].as_str().ok_or_else(|| {
-                backoff::Error::transient(
-                    CliErrorKind::token_generation_failed("missing data field").into(),
-                )
+                backoff::Error::transient(Box::new(CliError::from(
+                    CliErrorKind::token_generation_failed("missing data field"),
+                )))
             })?;
 
             let bytes = STANDARD.decode(b64_data).map_err(|error| {
-                backoff::Error::transient(
-                    CliErrorKind::token_generation_failed(format!("base64 decode failed: {error}"))
-                        .into(),
-                )
+                backoff::Error::transient(Box::new(CliError::from(
+                    CliErrorKind::token_generation_failed(format!(
+                        "base64 decode failed: {error}"
+                    )),
+                )))
             })?;
 
             let token = String::from_utf8(bytes).map_err(|error| {
-                backoff::Error::permanent(
+                backoff::Error::permanent(Box::new(CliError::from(
                     CliErrorKind::token_generation_failed(format!(
                         "invalid UTF-8 in token: {error}"
-                    ))
-                    .into(),
-                )
+                    )),
+                )))
             })?;
 
             if token.is_empty() {
-                return Err(backoff::Error::transient(
-                    CliErrorKind::token_generation_failed("empty token").into(),
-                ));
+                return Err(backoff::Error::transient(Box::new(CliError::from(
+                    CliErrorKind::token_generation_failed("empty token"),
+                ))));
             }
 
             Ok(token)
