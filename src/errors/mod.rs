@@ -2,6 +2,7 @@ use std::borrow::Cow;
 use std::error::Error;
 use std::fmt;
 use std::io;
+use std::path::Path;
 
 mod authoring_observe;
 mod common;
@@ -27,6 +28,16 @@ macro_rules! cow {
 }
 
 pub(crate) use cow;
+
+/// Build an IO-category `CliErrorKind` from an operation name, path, and cause.
+///
+/// Formats the message as `"{operation} {path}: {cause}"` and wraps it in
+/// `CliErrorKind::io`. Use this instead of manual `cow!()` formatting for
+/// filesystem errors that reference a path.
+#[must_use]
+pub fn io_for(operation: &str, path: &Path, cause: &dyn fmt::Display) -> CliErrorKind {
+    CliErrorKind::io(cow!("{operation} {}: {cause}", path.display()))
+}
 
 /// Named exit code constants for CLI process results.
 pub mod exit_code {

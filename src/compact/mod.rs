@@ -14,7 +14,7 @@ use rayon::prelude::*;
 use tracing::warn;
 
 use crate::core_defs::{project_context_dir, session_scope_key, utc_now};
-use crate::errors::{CliError, CliErrorKind, cow};
+use crate::errors::{CliError, CliErrorKind, cow, io_for};
 use crate::io::write_json_pretty;
 use crate::rules::compact as compact_rules;
 
@@ -95,14 +95,11 @@ pub fn load_latest_compact_handoff(
     if !path.exists() {
         return Ok(None);
     }
-    let text = fs::read_to_string(&path).map_err(|e| -> CliError {
-        CliErrorKind::io(cow!("failed to read {}: {e}", path.display())).into()
-    })?;
+    let text =
+        fs::read_to_string(&path).map_err(|e| -> CliError { io_for("read", &path, &e).into() })?;
     serde_json::from_str(&text)
         .map(Some)
-        .map_err(|e| -> CliError {
-            CliErrorKind::io(cow!("corrupt compact handoff at {}: {e}", path.display())).into()
-        })
+        .map_err(|e| -> CliError { io_for("parse compact handoff at", &path, &e).into() })
 }
 
 /// Parse a compact handoff from JSON text.

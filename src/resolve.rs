@@ -227,10 +227,10 @@ mod tests {
 
         // Write the pointer file in the session context directory.
         let record = CurrentRunRecord {
-            layout: RunLayout {
-                run_root: tmp.path().join("runs").to_string_lossy().into_owned(),
-                run_id: "fallback-run".into(),
-            },
+            layout: RunLayout::new(
+                tmp.path().join("runs").to_string_lossy().into_owned(),
+                "fallback-run",
+            ),
             profile: None,
             repo_root: None,
             suite_dir: None,

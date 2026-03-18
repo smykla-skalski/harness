@@ -5,7 +5,7 @@ use std::thread;
 
 use tracing::info;
 
-use crate::cluster::{ClusterSpec, HelmSetting};
+use crate::cluster::{ClusterMode, ClusterSpec, HelmSetting};
 use crate::commands::resolve_repo_root;
 use crate::core_defs::resolve_build_info;
 use crate::errors::{CliError, CliErrorKind, cow};
@@ -125,20 +125,7 @@ pub(super) fn cluster_k8s(args: &ClusterArgs) -> Result<i32, CliError> {
     }
 
     info!(%mode, names = %validated_args.join(" "), "starting cluster");
-
-    match mode.as_str() {
-        "single-up" => single_up(&root, &base_env, validated_args)?,
-        "single-down" => single_down(&root, &base_env, validated_args)?,
-        "global-zone-up" => global_zone_up(&root, &base_env, validated_args)?,
-        "global-zone-down" => global_zone_down(&root, &base_env, validated_args)?,
-        "global-two-zones-up" => global_two_zones_up(&root, &base_env, validated_args)?,
-        "global-two-zones-down" => global_two_zones_down(&root, &base_env, validated_args)?,
-        _ => {
-            return Err(
-                CliErrorKind::cluster_error(cow!("unsupported cluster mode: {mode}")).into(),
-            );
-        }
-    }
+    dispatch_k8s_mode(spec.mode, &root, &base_env, validated_args)?;
 
     if spec.mode.is_up() && !spec.restart_namespaces.is_empty() {
         restart_cluster_namespaces(&spec)?;
@@ -150,6 +137,22 @@ pub(super) fn cluster_k8s(args: &ClusterArgs) -> Result<i32, CliError> {
 
     println!("{mode} completed");
     Ok(0)
+}
+
+fn dispatch_k8s_mode(
+    mode: ClusterMode,
+    root: &Path,
+    env: &HashMap<String, String>,
+    args: &[String],
+) -> Result<(), CliError> {
+    match mode {
+        ClusterMode::SingleUp => single_up(root, env, args),
+        ClusterMode::SingleDown => single_down(root, env, args),
+        ClusterMode::GlobalZoneUp => global_zone_up(root, env, args),
+        ClusterMode::GlobalZoneDown => global_zone_down(root, env, args),
+        ClusterMode::GlobalTwoZonesUp => global_two_zones_up(root, env, args),
+        ClusterMode::GlobalTwoZonesDown => global_two_zones_down(root, env, args),
+    }
 }
 
 fn restart_cluster_namespaces(spec: &ClusterSpec) -> Result<(), CliError> {

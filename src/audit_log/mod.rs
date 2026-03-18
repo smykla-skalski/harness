@@ -16,7 +16,7 @@ use sha2::{Digest, Sha256};
 
 use crate::context::RunLayout;
 use crate::core_defs::utc_now;
-use crate::errors::{CliError, CliErrorKind, cow};
+use crate::errors::{CliError, CliErrorKind, cow, io_for};
 use crate::hooks::context::GuardContext as HookContext;
 use crate::io::{ensure_dir, write_text};
 use crate::schema::RunStatus;
@@ -264,22 +264,20 @@ fn append_jsonl_line(path: &Path, line: &str) -> Result<(), CliError> {
     let parent = path
         .parent()
         .ok_or_else(|| CliErrorKind::io(cow!("missing parent directory for {}", path.display())))?;
-    ensure_dir(parent)
-        .map_err(|error| CliErrorKind::io(cow!("create dir {}: {error}", parent.display())))?;
+    ensure_dir(parent).map_err(|error| io_for("create dir", parent, &error))?;
     let is_new = !path.exists();
     let mut file = OpenOptions::new()
         .create(true)
         .append(true)
         .open(path)
-        .map_err(|error| CliErrorKind::io(cow!("open {}: {error}", path.display())))?;
-    writeln!(file, "{line}")
-        .map_err(|error| CliErrorKind::io(cow!("append {}: {error}", path.display())))?;
+        .map_err(|error| io_for("open", path, &error))?;
+    writeln!(file, "{line}").map_err(|error| io_for("append", path, &error))?;
 
     #[cfg(unix)]
     if is_new {
         use std::os::unix::fs::PermissionsExt;
         fs::set_permissions(path, fs::Permissions::from_mode(0o600))
-            .map_err(|e| CliErrorKind::io(cow!("set permissions {}: {e}", path.display())))?;
+            .map_err(|e| io_for("set permissions", path, &e))?;
     }
 
     Ok(())

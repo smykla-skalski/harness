@@ -30,10 +30,7 @@ fn run_context_from_run_dir_loads_all_fields() {
 
 #[test]
 fn run_layout_paths_are_consistent() {
-    let layout = RunLayout {
-        run_root: "/tmp/runs".to_string(),
-        run_id: "run-42".to_string(),
-    };
+    let layout = RunLayout::new("/tmp/runs", "run-42");
     assert_eq!(layout.run_dir().to_string_lossy(), "/tmp/runs/run-42");
     assert_eq!(
         layout.artifacts_dir().to_string_lossy(),
@@ -56,10 +53,7 @@ fn run_layout_paths_are_consistent() {
 #[test]
 fn run_layout_ensure_dirs_creates_all() {
     let tmp = tempfile::tempdir().unwrap();
-    let layout = RunLayout {
-        run_root: tmp.path().to_string_lossy().to_string(),
-        run_id: "test-ensure".to_string(),
-    };
+    let layout = RunLayout::new(tmp.path().to_string_lossy().to_string(), "test-ensure");
     layout.ensure_dirs().unwrap();
     assert!(layout.run_dir().is_dir());
     assert!(layout.artifacts_dir().is_dir());
