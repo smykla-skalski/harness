@@ -221,6 +221,19 @@ fn run_domain_does_not_depend_on_block_registry() {
 }
 
 #[test]
+fn run_services_do_not_load_their_own_context() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let contents = fs::read_to_string(root.join("src/run/services/mod.rs")).unwrap();
+
+    for needle in ["pub fn from_run_dir(", "pub fn from_current("] {
+        assert!(
+            !contents.contains(needle),
+            "src/run/services/mod.rs should not own persistence/session loading via `{needle}`"
+        );
+    }
+}
+
+#[test]
 fn authoring_commands_depend_on_application_boundary() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
     let commands_root = root.join("src/authoring/commands");

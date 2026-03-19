@@ -1,11 +1,9 @@
 use std::fmt::Write as _;
-use std::path::PathBuf;
 
 use tracing::warn;
 
 use crate::errors::{CliError, CliErrorKind};
 use crate::run::audit::write_run_status_with_audit;
-use crate::run::report_policy::{REPORT_CODE_BLOCK_LIMIT, REPORT_LINE_LIMIT};
 use crate::run::workflow::ensure_execution_phase;
 use crate::run::{ExecutedGroupChange, GroupVerdict, RunReport, RunStatus};
 use crate::workspace::utc_now;
@@ -26,39 +24,6 @@ pub struct GroupReportRequest<'a> {
     pub evidence_label: &'a [String],
     pub capture_label: Option<&'a str>,
     pub note: Option<&'a str>,
-}
-
-/// Check report compactness, resolving the active run report by default.
-///
-/// # Errors
-/// Returns `CliError` when the report cannot be loaded or exceeds compactness limits.
-pub fn check_report_compactness(report_path: Option<&str>) -> Result<ReportCheckOutcome, CliError> {
-    let path = resolve_report_path(report_path)?;
-    if !path.exists() {
-        return Ok(ReportCheckOutcome::Missing);
-    }
-
-    let report = RunReport::from_markdown(&path)?;
-    let body = report.to_markdown();
-    let line_count = body.lines().count();
-    let code_blocks = body.matches("```").count() / 2;
-
-    if line_count > REPORT_LINE_LIMIT {
-        return Err(CliErrorKind::report_line_limit(
-            line_count.to_string(),
-            REPORT_LINE_LIMIT.to_string(),
-        )
-        .into());
-    }
-    if code_blocks > REPORT_CODE_BLOCK_LIMIT {
-        return Err(CliErrorKind::report_code_block_limit(
-            code_blocks.to_string(),
-            REPORT_CODE_BLOCK_LIMIT.to_string(),
-        )
-        .into());
-    }
-
-    Ok(ReportCheckOutcome::Valid)
 }
 
 impl RunServices {
@@ -126,16 +91,6 @@ impl RunServices {
         ensure_execution_phase(&run_dir)?;
         Ok(true)
     }
-}
-
-fn resolve_report_path(report_path: Option<&str>) -> Result<PathBuf, CliError> {
-    if let Some(path) = report_path {
-        return Ok(PathBuf::from(path));
-    }
-
-    let services = RunServices::from_current()?
-        .ok_or_else(|| -> CliError { CliErrorKind::missing_run_context_value("report").into() })?;
-    Ok(services.layout().report_path())
 }
 
 fn apply_group_report_result(
