@@ -1,8 +1,7 @@
 use std::path::PathBuf;
 
-use crate::hooks::protocol::payloads::HookEnvelopePayload;
 use crate::kernel::skills::{SKILL_NEW, SKILL_RUN};
-use crate::kernel::tooling::{ToolContext, legacy_tool_context};
+use crate::kernel::tooling::ToolContext;
 use serde_json::Value;
 
 /// Opaque raw agent payload preserved for adapter-specific features.
@@ -124,40 +123,5 @@ impl NormalizedHookContext {
             self.event = event;
         }
         self
-    }
-}
-
-pub(crate) fn normalized_from_envelope(
-    skill: &str,
-    payload: HookEnvelopePayload,
-) -> NormalizedHookContext {
-    let raw = serde_json::to_value(&payload).unwrap_or(Value::Null);
-    let tool_name = payload.tool_name;
-    let input_raw = payload.tool_input;
-    let response_raw = payload.tool_response;
-    let tool = (!tool_name.is_empty()).then(|| {
-        legacy_tool_context(
-            &tool_name,
-            input_raw,
-            (!response_raw.is_null()).then_some(response_raw),
-        )
-    });
-
-    NormalizedHookContext {
-        event: NormalizedEvent::unspecified(),
-        session: SessionContext {
-            session_id: String::new(),
-            cwd: None,
-            transcript_path: payload.transcript_path,
-        },
-        tool,
-        agent: payload.last_assistant_message.map(|response| AgentContext {
-            agent_id: None,
-            agent_type: None,
-            prompt: None,
-            response: Some(response),
-        }),
-        skill: SkillContext::from_skill_name(skill),
-        raw: RawPayload::new(raw),
     }
 }

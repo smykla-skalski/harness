@@ -530,9 +530,24 @@ fn hooks_transport_does_not_hydrate_session_defaults() {
         protocol.contains("pub cwd: Option<PathBuf>"),
         "src/hooks/protocol/context.rs should preserve missing cwd in normalized transport context"
     );
+    for needle in [
+        "HookEnvelopePayload",
+        "legacy_tool_context",
+        "fn normalized_from_envelope(",
+    ] {
+        assert!(
+            !protocol.contains(needle),
+            "src/hooks/protocol/context.rs should stay transport-only instead of owning `{needle}`"
+        );
+    }
 
     let application = fs::read_to_string(root.join("src/hooks/application/context.rs")).unwrap();
-    for needle in ["fn hydrate_normalized_context(", "fn hydrate_session("] {
+    for needle in [
+        "fn normalized_from_envelope(",
+        "fn hydrate_normalized_context(",
+        "fn hydrate_session(",
+        "legacy_tool_context(",
+    ] {
         assert!(
             application.contains(needle),
             "src/hooks/application/context.rs should own `{needle}`"
