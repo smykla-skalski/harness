@@ -8,10 +8,10 @@ use tracing::warn;
 use crate::authoring::workflow::{self as author_workflow, AuthorWorkflowState};
 use crate::errors::{CliError, CliErrorKind};
 use crate::hooks::protocol::payloads::{AskUserAnswer, AskUserQuestionPrompt, HookEnvelopePayload};
+use crate::kernel::skills::{SKILL_NEW, SKILL_RUN};
+use crate::kernel::command_intent::{ObservedCommand, ParsedCommand};
 use crate::run::context::RunContext;
 use crate::run::workflow::{self as runner_workflow, RunnerWorkflowState};
-use crate::kernel::command_intent::ParsedCommand;
-use crate::kernel::skills::{SKILL_NEW, SKILL_RUN};
 
 /// Opaque raw agent payload preserved for adapter-specific features.
 #[derive(Debug, Clone)]
@@ -190,8 +190,7 @@ impl NormalizedHookContext {
 #[derive(Debug, Clone)]
 enum ParsedCommandState {
     Missing,
-    Parsed(ParsedCommand),
-    Error(String),
+    Parsed(ObservedCommand),
 }
 
 impl ParsedCommandState {
@@ -202,20 +201,22 @@ impl ParsedCommandState {
         if command_text.trim().is_empty() {
             return Self::Missing;
         }
-        match ParsedCommand::parse(command_text) {
-            Ok(parsed) => Self::Parsed(parsed),
-            Err(error) => Self::Error(error.to_string()),
-        }
+        Self::Parsed(ObservedCommand::parse(command_text))
     }
 
     fn as_result(&self) -> Result<Option<&ParsedCommand>, CliError> {
         match self {
             Self::Missing => Ok(None),
-            Self::Parsed(parsed) => Ok(Some(parsed)),
-            Self::Error(error) => Err(CliErrorKind::hook_payload_invalid(format!(
+            Self::Parsed(observed) => observed.parsed().map_or_else(
+                || {
+                    let error = observed.tokenization_error().unwrap_or("unknown parse error");
+                    Err(CliErrorKind::hook_payload_invalid(format!(
                 "shell tokenization failed: {error}"
             ))
-            .into()),
+                    .into())
+                },
+                |parsed| Ok(Some(parsed)),
+            ),
         }
     }
 }

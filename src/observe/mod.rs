@@ -1,3 +1,4 @@
+mod application;
 pub mod classifier;
 mod compare;
 mod context_cmd;
@@ -31,9 +32,6 @@ impl Execute for ObserveArgs {
 }
 
 use self::types::{FOCUS_PRESETS, IssueCategory, IssueCode, IssueSeverity, ObserverState};
-
-// Re-exports consumed by classifier submodules via `super::`.
-pub(crate) use self::dump::tool_result_text;
 
 /// Minimum text length to bother displaying in dump mode.
 const MIN_DUMP_TEXT_LENGTH: usize = 5;
