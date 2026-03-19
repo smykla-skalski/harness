@@ -3,11 +3,11 @@ use clap::Args;
 use tracing::info;
 
 use crate::app::command_context::{AppContext, Execute};
-use crate::workspace::{shorten_path, utc_now};
 use crate::errors::CliError;
 use crate::run::args::RunDirArgs;
+use crate::workspace::{shorten_path, utc_now};
 
-use super::shared::resolve_run_services_with_blocks;
+use super::shared::resolve_run_application_with_blocks;
 
 impl Execute for PreflightArgs {
     fn execute(&self, context: &AppContext) -> Result<i32, CliError> {
@@ -45,14 +45,12 @@ pub fn preflight(
     run_dir_args: &RunDirArgs,
 ) -> Result<i32, CliError> {
     let checked_at = utc_now();
-    let services = resolve_run_services_with_blocks(run_dir_args, ctx.shared_blocks())?;
-    services
-        .blocks()
-        .validate_requirement_names(&services.metadata().requires)?;
-    let _ = services.save_preflight_outputs(&checked_at)?;
-    services.record_preflight_complete()?;
+    let run = resolve_run_application_with_blocks(run_dir_args, ctx.shared_blocks())?;
+    run.validate_requirement_names()?;
+    let _ = run.save_preflight_outputs(&checked_at)?;
+    run.record_preflight_complete()?;
 
     info!("preflight complete");
-    println!("{}", shorten_path(&services.layout().artifacts_dir()));
+    println!("{}", shorten_path(&run.layout().artifacts_dir()));
     Ok(0)
 }

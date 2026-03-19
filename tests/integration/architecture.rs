@@ -142,6 +142,45 @@ fn bespoke_frontmatter_paths_are_gone() {
 }
 
 #[test]
+fn run_commands_depend_on_application_boundary_not_services() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let commands_root = root.join("src/run/commands");
+    let denylist = [
+        "use crate::run::services::{",
+        "use crate::run::services::StartServiceRequest",
+        "use crate::run::services::RecordCommandRequest",
+        "use crate::run::services::tail_task_output",
+        "use crate::run::services::wait_for_task_output",
+        "super::shared::resolve_run_services",
+        "super::shared::resolve_run_services_with_blocks",
+    ];
+    let mut hits = Vec::new();
+
+    for entry in fs::read_dir(&commands_root).unwrap() {
+        let entry = entry.unwrap();
+        let child = entry.path();
+        if !matches_extension(&child) {
+            continue;
+        }
+        let contents = fs::read_to_string(&child).unwrap();
+        for needle in denylist {
+            if contents.contains(needle) {
+                hits.push(format!(
+                    "{} still depends on legacy run services via `{needle}`",
+                    child.strip_prefix(root).unwrap().display()
+                ));
+            }
+        }
+    }
+
+    assert!(
+        hits.is_empty(),
+        "run commands must route through src/run/application:\n{}",
+        hits.join("\n")
+    );
+}
+
+#[test]
 fn kuma_contracts_are_isolated_to_block_namespace() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
     let src_root = root.join("src");

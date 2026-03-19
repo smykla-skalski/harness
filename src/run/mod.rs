@@ -1,19 +1,21 @@
 //! Tracked run domain: run models, state, workflow, audit, and commands.
 
+pub mod application;
 pub mod args;
 pub mod audit;
 pub mod commands;
 pub mod context;
 pub mod prepared_suite;
-pub(crate) mod report_policy;
 pub mod report;
+pub(crate) mod report_policy;
 pub mod resolve;
-pub mod services;
+pub(crate) mod services;
 pub mod specs;
 pub mod state_capture;
 pub mod status;
 pub mod workflow;
 
+pub use application::RunApplication;
 pub use args::RunDirArgs;
 pub use context::{
     CleanupManifest, CleanupResource, RunAggregate, RunContext, RunLayout, RunMetadata,
@@ -21,7 +23,6 @@ pub use context::{
 };
 pub use prepared_suite::{PreparedSuiteArtifact, PreparedSuitePlan};
 pub use report::{GroupVerdict, RunReport, RunReportFrontmatter, Verdict};
-pub use services::RunServices;
 pub use specs::{
     GroupFrontmatter, GroupSection, GroupSpec, HelmValueEntry, SuiteFrontmatter, SuiteSpec,
 };

@@ -2,9 +2,10 @@ use clap::Args;
 
 use crate::app::command_context::{AppContext, Execute};
 use crate::errors::{CliError, CliErrorKind};
+use crate::infra::blocks::ContainerRuntime;
 use crate::run::args::RunDirArgs;
 
-use super::shared::resolve_run_services_with_blocks;
+use super::shared::resolve_run_application_with_blocks;
 
 impl Execute for LogsArgs {
     fn execute(&self, context: &AppContext) -> Result<i32, CliError> {
@@ -39,13 +40,13 @@ pub fn logs(
     follow: bool,
     run_dir_args: &RunDirArgs,
 ) -> Result<i32, CliError> {
-    let services = resolve_run_services_with_blocks(run_dir_args, ctx.shared_blocks())?;
-    let docker = services
+    let run = resolve_run_application_with_blocks(run_dir_args, ctx.shared_blocks())?;
+    let docker = ctx
         .blocks()
         .docker
         .as_deref()
         .ok_or_else(|| CliErrorKind::missing_run_context_value("docker"))?;
-    let container = services.resolve_container_name(name);
+    let container = run.resolve_container_name(name);
     let tail_str = tail.to_string();
     let mut args: Vec<&str> = vec!["--tail", &tail_str];
     if follow {
@@ -56,7 +57,7 @@ pub fn logs(
         // Stream directly to terminal so the user sees output in real time.
         docker.logs_follow(container.as_ref(), &args)?;
     } else {
-        let result = docker.logs(container.as_ref(), &args)?;
+        let result = ContainerRuntime::logs(docker, container.as_ref(), &args)?;
         print!("{}", result.stdout);
         if !result.stderr.is_empty() {
             eprint!("{}", result.stderr);

@@ -4,13 +4,13 @@ use tracing::info;
 
 use crate::app::command_context::{AppContext, Execute};
 use crate::errors::{CliError, CliErrorKind};
+use crate::run::Verdict;
 use crate::run::args::RunDirArgs;
 use crate::run::audit::write_run_status_with_audit;
-use crate::run::Verdict;
 use crate::run::workflow::{RunnerEvent, apply_event, ensure_execution_phase, read_runner_state};
 use crate::workspace::utc_now;
 
-use super::shared::resolve_run_services;
+use super::shared::resolve_run_application;
 
 impl Execute for CloseoutArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
@@ -35,9 +35,9 @@ pub struct CloseoutArgs {
 /// # Errors
 /// Returns `CliError` on failure.
 pub fn closeout(run_dir_args: &RunDirArgs) -> Result<i32, CliError> {
-    let services = resolve_run_services(run_dir_args)?;
-    let ctx = services.context();
-    let run_dir = services.layout().run_dir();
+    let run = resolve_run_application(run_dir_args)?;
+    let ctx = run.context();
+    let run_dir = run.layout().run_dir();
 
     let required = [
         "commands/command-log.md",

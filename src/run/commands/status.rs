@@ -4,7 +4,7 @@ use crate::app::command_context::{AppContext, Execute};
 use crate::errors::{CliError, CliErrorKind};
 use crate::run::args::RunDirArgs;
 
-use super::shared::resolve_run_services;
+use super::shared::resolve_run_application;
 
 impl Execute for StatusArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
@@ -25,8 +25,8 @@ pub struct StatusArgs {
 /// # Errors
 /// Returns `CliError` on failure.
 pub fn status(run_dir_args: &RunDirArgs) -> Result<i32, CliError> {
-    let services = resolve_run_services(run_dir_args)?;
-    let output = services.status_report()?;
+    let run = resolve_run_application(run_dir_args)?;
+    let output = run.status_report()?;
     let pretty = serde_json::to_string_pretty(&output)
         .map_err(|e| CliErrorKind::serialize(format!("status: {e}")))?;
     println!("{pretty}");

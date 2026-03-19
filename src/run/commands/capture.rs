@@ -5,7 +5,7 @@ use crate::errors::CliError;
 use crate::infra::io::validate_safe_segment;
 use crate::run::args::RunDirArgs;
 
-use super::shared::resolve_run_services;
+use super::shared::resolve_run_application;
 
 impl Execute for CaptureArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
@@ -37,8 +37,8 @@ pub fn capture(
     run_dir_args: &RunDirArgs,
 ) -> Result<i32, CliError> {
     validate_safe_segment(label)?;
-    let mut services = resolve_run_services(run_dir_args)?;
-    let rel = services.capture_state(label, kubeconfig)?;
+    let mut run = resolve_run_application(run_dir_args)?;
+    let rel = run.capture_state(label, kubeconfig)?;
     println!("{rel}");
     Ok(0)
 }

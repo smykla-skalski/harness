@@ -5,7 +5,7 @@ use crate::errors::{CliError, CliErrorKind};
 use crate::infra::exec::HttpMethod;
 use crate::run::args::RunDirArgs;
 
-use super::shared::resolve_run_services;
+use super::shared::resolve_run_application;
 
 impl Execute for ApiArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
@@ -76,23 +76,21 @@ pub struct ApiArgs {
 /// fails, or the response body cannot be read.
 pub fn api(method: &ApiMethod) -> Result<i32, CliError> {
     let (run_dir_args, path) = method_run_dir_and_path(method);
-    let services = resolve_run_services(run_dir_args)?;
+    let run = resolve_run_application(run_dir_args)?;
 
     // All methods read the response as raw text since the CP API sometimes
     // returns plain text (e.g., token endpoints) rather than JSON.
     let response_text = match method {
-        ApiMethod::Get { .. } => services.call_control_plane_text(path, HttpMethod::Get, None)?,
+        ApiMethod::Get { .. } => run.call_control_plane_text(path, HttpMethod::Get, None)?,
         ApiMethod::Post { body, .. } => {
             let parsed = parse_json_body(body)?;
-            services.call_control_plane_text(path, HttpMethod::Post, Some(&parsed))?
+            run.call_control_plane_text(path, HttpMethod::Post, Some(&parsed))?
         }
         ApiMethod::Put { body, .. } => {
             let parsed = parse_json_body(body)?;
-            services.call_control_plane_text(path, HttpMethod::Put, Some(&parsed))?
+            run.call_control_plane_text(path, HttpMethod::Put, Some(&parsed))?
         }
-        ApiMethod::Delete { .. } => {
-            services.call_control_plane_text(path, HttpMethod::Delete, None)?
-        }
+        ApiMethod::Delete { .. } => run.call_control_plane_text(path, HttpMethod::Delete, None)?,
     };
 
     // Try to pretty-print as JSON, fall back to raw text.

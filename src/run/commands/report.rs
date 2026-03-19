@@ -2,11 +2,11 @@ use clap::{Args, Subcommand};
 
 use crate::app::command_context::{AppContext, Execute};
 use crate::errors::{CliError, CliErrorKind};
-use crate::run::args::RunDirArgs;
 use crate::run::GroupVerdict;
-use crate::run::services::{GroupReportRequest, ReportCheckOutcome, check_report_compactness};
+use crate::run::application::{GroupReportRequest, ReportCheckOutcome, check_report_compactness};
+use crate::run::args::RunDirArgs;
 
-use super::shared::resolve_run_services;
+use super::shared::resolve_run_application;
 
 impl Execute for ReportArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
@@ -100,14 +100,14 @@ fn report_group(
     note: Option<&str>,
     run_dir_args: &RunDirArgs,
 ) -> Result<i32, CliError> {
-    let mut services = resolve_run_services(run_dir_args)?;
+    let mut run = resolve_run_application(run_dir_args)?;
     let verdict: GroupVerdict = status.parse().map_err(|()| {
         CliErrorKind::usage_error(format!(
             "unknown group status '{status}': must be pass, fail, or skip"
         ))
     })?;
 
-    let _ = services.finalize_group_report(&GroupReportRequest {
+    run.finalize_group_report(&GroupReportRequest {
         group_id,
         verdict,
         evidence,
