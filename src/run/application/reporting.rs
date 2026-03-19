@@ -1,9 +1,9 @@
 use std::path::PathBuf;
 
 use crate::errors::{CliError, CliErrorKind};
+use crate::run::RunReport;
 use crate::run::report_policy::{REPORT_CODE_BLOCK_LIMIT, REPORT_LINE_LIMIT};
 use crate::run::services::ReportCheckOutcome;
-use crate::run::RunReport;
 
 use super::RunApplication;
 

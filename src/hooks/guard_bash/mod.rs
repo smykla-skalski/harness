@@ -68,6 +68,9 @@ fn guard_suite_author(ctx: &HookContext, words: &[String], heads: &[String]) -> 
 }
 
 fn guard_suite_runner(ctx: &HookContext, words: &[String], heads: &[String]) -> HookResult {
+    if !runner_guards::has_tracked_run_context(ctx) {
+        return HookResult::allow();
+    }
     if let Some(denied) = guard_runner_phase(ctx, words).into_denial() {
         return denied;
     }
@@ -97,15 +100,18 @@ fn guard_suite_runner(ctx: &HookContext, words: &[String], heads: &[String]) -> 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::path::PathBuf;
+
     use crate::hooks::application::GuardContext as HookContext;
     use crate::hooks::protocol::hook_result::Decision;
     use crate::hooks::protocol::payloads::HookEnvelopePayload;
     use crate::hooks::runner_policy::TrackedHarnessSubcommand;
+    use crate::run::workflow::{PreflightState, PreflightStatus, RunnerPhase, RunnerWorkflowState};
 
     use super::predicates::{is_tracked_harness_command, make_target};
 
-    fn ctx(skill: &str, command: &str) -> HookContext {
-        HookContext::from_envelope(
+    fn base_ctx(skill: &str, command: &str) -> HookContext {
+        HookContext::from_test_envelope(
             skill,
             HookEnvelopePayload {
                 tool_name: "Bash".to_string(),
@@ -119,6 +125,34 @@ mod tests {
                 raw_keys: vec![],
             },
         )
+    }
+
+    fn active_runner_state() -> RunnerWorkflowState {
+        RunnerWorkflowState {
+            phase: RunnerPhase::Execution,
+            preflight: PreflightState {
+                status: PreflightStatus::Complete,
+            },
+            failure: None,
+            suite_fix: None,
+            updated_at: "2026-03-19T00:00:00Z".to_string(),
+            transition_count: 1,
+            last_event: Some("RunStarted".to_string()),
+            history: Vec::new(),
+        }
+    }
+
+    fn ctx(skill: &str, command: &str) -> HookContext {
+        let mut ctx = base_ctx(skill, command);
+        if skill == "suite:run" {
+            ctx.run_dir = Some(PathBuf::from("/tmp/harness-test-run"));
+            ctx.runner_state = Some(active_runner_state());
+        }
+        ctx
+    }
+
+    fn ctx_without_run(skill: &str, command: &str) -> HookContext {
+        base_ctx(skill, command)
     }
 
     #[test]
@@ -175,10 +209,17 @@ mod tests {
     }
 
     #[test]
-    fn denies_github_sidequest() {
-        let c = ctx("suite:run", "gh run view 12345");
+    fn allows_github_without_tracked_run() {
+        let c = ctx_without_run("suite:run", "gh run view 12345");
         let r = execute(&c).unwrap();
-        assert_eq!(r.decision, Decision::Deny);
+        assert_eq!(r.decision, Decision::Allow);
+    }
+
+    #[test]
+    fn allows_kubectl_without_tracked_run() {
+        let c = ctx_without_run("suite:run", "kubectl get pods");
+        let r = execute(&c).unwrap();
+        assert_eq!(r.decision, Decision::Allow);
     }
 
     #[test]
