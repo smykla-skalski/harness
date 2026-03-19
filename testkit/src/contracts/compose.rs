@@ -1,8 +1,8 @@
 use std::path::Path;
 use std::time::Duration;
 
-use harness::core_defs::CommandResult;
 use harness::infra::blocks::{BlockError, ComposeOrchestrator};
+use harness::infra::exec::CommandResult;
 
 /// `up` followed by `down` completes without error.
 ///

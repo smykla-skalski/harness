@@ -14,13 +14,13 @@ use regex::Regex;
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 
-use crate::core_defs::utc_now;
 use crate::errors::{CliError, CliErrorKind, io_for};
 use crate::hooks::protocol::context::GuardContext as HookContext;
 use crate::infra::io::{ensure_dir, write_text};
 use crate::run::context::RunLayout;
 use crate::run::workflow::{RunnerPhase, RunnerWorkflowState};
 use crate::schema::RunStatus;
+use crate::workspace::utc_now;
 
 static SANITIZE_NAME_RE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"[^A-Za-z0-9_.-]+").expect("invalid sanitize regex"));

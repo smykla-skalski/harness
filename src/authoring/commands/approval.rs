@@ -2,8 +2,8 @@ use clap::Args;
 
 use crate::app::command_context::{AppContext, Execute};
 use crate::authoring::workflow::{ApprovalMode, AuthorWorkflowState, write_author_state};
-use crate::core_defs::utc_now;
 use crate::errors::{CliError, CliErrorKind};
+use crate::workspace::utc_now;
 
 impl Execute for ApprovalBeginArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {

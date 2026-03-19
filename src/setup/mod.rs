@@ -1,3 +1,4 @@
+pub(crate) mod build_info;
 mod bootstrap;
 mod capabilities;
 mod cluster;

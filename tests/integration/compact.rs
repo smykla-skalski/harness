@@ -4,7 +4,7 @@
 //
 // All env-dependent tests are combined into one #[test] to avoid races
 // from parallel test execution mutating the same env vars (XDG_DATA_HOME,
-// CLAUDE_SESSION_ID, HOME). See core_defs::tests for the same pattern.
+// CLAUDE_SESSION_ID, HOME). See workspace tests for the same pattern.
 
 use std::env;
 use std::fs;

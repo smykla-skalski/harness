@@ -7,10 +7,10 @@ use clap::Args;
 use regex::Regex;
 
 use crate::app::command_context::{AppContext, Execute, resolve_repo_root};
-use crate::core_defs::HARNESS_PREFIX;
 use crate::errors::{CliError, CliErrorKind};
 use crate::infra::exec::{kubectl, run_command};
 use crate::infra::io::ensure_dir;
+use crate::workspace::HARNESS_PREFIX;
 
 impl Execute for GatewayArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {

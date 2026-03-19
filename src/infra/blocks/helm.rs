@@ -7,10 +7,10 @@ use std::sync::Mutex;
 
 use serde::{Deserialize, Serialize};
 
-use crate::core_defs::CommandResult;
 use crate::infra::blocks::BlockError;
 #[cfg(feature = "helm")]
 use crate::infra::blocks::ProcessExecutor;
+use crate::infra::exec::CommandResult;
 
 /// A single Helm setting (`key=value`) passed through to a deployment target.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

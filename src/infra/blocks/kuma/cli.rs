@@ -1,6 +1,6 @@
 use std::path::{Path, PathBuf};
 
-use crate::core_defs::host_platform;
+use crate::infra::environment::host_platform;
 
 /// Default build target used to produce a local `kumactl`.
 pub const BUILD_TARGET: &str = "build/kumactl";

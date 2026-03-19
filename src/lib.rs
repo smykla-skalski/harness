@@ -4,7 +4,6 @@ pub mod app;
 pub mod authoring;
 #[cfg(test)]
 mod codec;
-pub mod core_defs;
 pub mod errors;
 pub mod hooks;
 pub mod infra;

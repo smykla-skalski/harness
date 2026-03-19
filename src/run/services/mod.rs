@@ -16,7 +16,6 @@ use std::sync::Arc;
 use rayon::prelude::*;
 use tracing::warn;
 
-use crate::core_defs::utc_now;
 use crate::errors::{CliError, CliErrorKind};
 use crate::infra::blocks::{BlockRegistry, ContainerRuntime};
 #[cfg(test)]
@@ -39,6 +38,7 @@ use crate::run::state_capture::{
 use crate::run::workflow::{
     PreflightStatus, RunnerEvent, RunnerPhase, apply_event, read_runner_state,
 };
+use crate::workspace::utc_now;
 use crate::schema::{RunStatus, SuiteSpec};
 
 pub use cluster_health::{ClusterHealthReport, ClusterMemberHealthRecord};
