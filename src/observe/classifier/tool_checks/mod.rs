@@ -1,4 +1,3 @@
-mod command;
 mod lifecycle;
 mod write_checks;
 
@@ -6,13 +5,13 @@ use std::path::Path;
 
 use serde_json::Value;
 
-use self::command::ObservedCommand;
 use self::lifecycle::{
     check_uncommitted_source_code_edit, track_capture_between_groups, track_resource_lifecycle,
 };
 use self::write_checks::{
     check_managed_file_writes, check_manifest_created_during_run, check_write_edit_tool_use,
 };
+use crate::kernel::command_intent::ObservedCommand;
 use super::emitter::{Guidance, IssueBlueprint, IssueEmitter};
 use super::{OLD_SKILL_REGEX, RM_RECURSIVE_REGEX};
 use crate::observe::patterns;
@@ -116,7 +115,7 @@ fn check_bash_tool_use(
 }
 
 fn check_harness_command_patterns(
-    command: &ObservedCommand<'_>,
+    command: &ObservedCommand,
     details: &str,
     emitter: &mut IssueEmitter<'_>,
     issues: &mut Vec<Issue>,
@@ -223,7 +222,7 @@ fn check_destructive_patterns(
 /// Using absolute paths is unnecessary and fragile - relative paths like
 /// `g13/01.yaml` are the expected convention.
 fn check_absolute_manifest_path(
-    command: &ObservedCommand<'_>,
+    command: &ObservedCommand,
     details: &str,
     emitter: &mut IssueEmitter<'_>,
     issues: &mut Vec<Issue>,
@@ -294,7 +293,7 @@ fn check_direct_task_output_read(
 /// head, but the observer needs to flag these patterns too - agents should
 /// not be constructing environment manually since harness handles it.
 fn check_env_var_construction(
-    command: &ObservedCommand<'_>,
+    command: &ObservedCommand,
     details: &str,
     emitter: &mut IssueEmitter<'_>,
     issues: &mut Vec<Issue>,
@@ -366,7 +365,7 @@ fn check_env_var_construction(
 /// Agents sometimes prefix harness commands with `sleep` to wait for resources
 /// to settle. Harness has a built-in `--delay` flag for this purpose.
 fn check_sleep_prefix_before_harness(
-    command: &ObservedCommand<'_>,
+    command: &ObservedCommand,
     details: &str,
     emitter: &mut IssueEmitter<'_>,
     issues: &mut Vec<Issue>,
@@ -467,7 +466,7 @@ const KUBECTL_QUERY_THRESHOLD: usize = 3;
 /// and flags when the same target appears 3+ times within a 20-line window.
 fn check_repeated_kubectl_queries(
     line_num: usize,
-    command: &ObservedCommand<'_>,
+    command: &ObservedCommand,
     state: &mut ScanState,
     issues: &mut Vec<Issue>,
 ) {

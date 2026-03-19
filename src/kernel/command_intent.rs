@@ -183,6 +183,251 @@ impl ParsedCommand {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum ObservedCommandInner {
+    Parsed(ParsedCommand),
+    Fallback {
+        words: Vec<String>,
+        significant_word_indices: Vec<usize>,
+        tokenization_error: String,
+    },
+}
+
+/// Shared command facts for hook guards and observe classification.
+///
+/// This type prefers the fully tokenized `ParsedCommand` shape but preserves a
+/// lossy fallback when shell tokenization fails so read-only analysis can keep
+/// working while hook enforcement still reports malformed commands explicitly.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ObservedCommand {
+    raw: String,
+    lower: String,
+    inner: ObservedCommandInner,
+}
+
+impl ObservedCommand {
+    #[must_use]
+    pub fn parse(command: &str) -> Self {
+        if let Ok(parsed) = ParsedCommand::parse(command) {
+            return Self {
+                raw: command.to_string(),
+                lower: command.to_lowercase(),
+                inner: ObservedCommandInner::Parsed(parsed),
+            };
+        }
+
+        let words = command
+            .split_whitespace()
+            .map(ToString::to_string)
+            .collect::<Vec<_>>();
+        let significant_word_indices = significant_word_indices(&words);
+        let tokenization_error = ParsedCommand::parse(command)
+            .err()
+            .map_or_else(String::new, |error| error.to_string());
+        Self {
+            raw: command.to_string(),
+            lower: command.to_lowercase(),
+            inner: ObservedCommandInner::Fallback {
+                words,
+                significant_word_indices,
+                tokenization_error,
+            },
+        }
+    }
+
+    #[must_use]
+    pub fn raw(&self) -> &str {
+        &self.raw
+    }
+
+    #[must_use]
+    pub fn lower(&self) -> &str {
+        &self.lower
+    }
+
+    #[must_use]
+    pub fn parsed(&self) -> Option<&ParsedCommand> {
+        match &self.inner {
+            ObservedCommandInner::Parsed(parsed) => Some(parsed),
+            ObservedCommandInner::Fallback { .. } => None,
+        }
+    }
+
+    #[must_use]
+    pub fn tokenization_error(&self) -> Option<&str> {
+        match &self.inner {
+            ObservedCommandInner::Parsed(_) => None,
+            ObservedCommandInner::Fallback {
+                tokenization_error,
+                ..
+            } => Some(tokenization_error.as_str()),
+        }
+    }
+
+    #[must_use]
+    pub fn words(&self) -> &[String] {
+        match &self.inner {
+            ObservedCommandInner::Parsed(parsed) => parsed.words(),
+            ObservedCommandInner::Fallback { words, .. } => words,
+        }
+    }
+
+    fn significant_word_indices(&self) -> &[usize] {
+        match &self.inner {
+            ObservedCommandInner::Parsed(parsed) => parsed.significant_word_indices(),
+            ObservedCommandInner::Fallback {
+                significant_word_indices,
+                ..
+            } => significant_word_indices,
+        }
+    }
+
+    #[must_use]
+    pub fn is_harness_command(&self) -> bool {
+        match &self.inner {
+            ObservedCommandInner::Parsed(parsed) => parsed.first_harness_invocation().is_some(),
+            ObservedCommandInner::Fallback { .. } => self.harness_spans().next().is_some(),
+        }
+    }
+
+    #[must_use]
+    pub fn has_harness_subcommand(&self, subcommand: &str) -> bool {
+        match &self.inner {
+            ObservedCommandInner::Parsed(parsed) => parsed
+                .harness_invocations()
+                .any(|invocation| invocation.subcommand() == Some(subcommand)),
+            ObservedCommandInner::Fallback { .. } => self
+                .harness_spans()
+                .any(|span| span.first().is_some_and(|word| *word == subcommand)),
+        }
+    }
+
+    #[must_use]
+    pub fn harness_has_flag(&self, flag: &str) -> bool {
+        match &self.inner {
+            ObservedCommandInner::Parsed(parsed) => parsed
+                .harness_invocations()
+                .any(|invocation| invocation.has_flag(flag)),
+            ObservedCommandInner::Fallback { .. } => self.harness_spans().any(|span| {
+                span.iter().any(|word| {
+                    *word == flag
+                        || word
+                            .strip_prefix(flag)
+                            .is_some_and(|rest| rest.starts_with('='))
+                })
+            }),
+        }
+    }
+
+    #[must_use]
+    pub fn manifest_paths(&self) -> Vec<&str> {
+        let mut manifests = Vec::new();
+        for span in self.harness_spans() {
+            let mut index = 0;
+            while index < span.len() {
+                if span[index] == "--manifest" {
+                    if let Some(path) = span.get(index + 1) {
+                        manifests.push(*path);
+                    }
+                    index += 2;
+                    continue;
+                }
+                if let Some(value) = span[index].strip_prefix("--manifest=") {
+                    manifests.push(value);
+                }
+                index += 1;
+            }
+        }
+        manifests
+    }
+
+    #[must_use]
+    pub fn kubectl_query_target(&self) -> Option<String> {
+        let kubectl_position = self.words().iter().position(|word| {
+            Path::new(word)
+                .file_name()
+                .and_then(|name| name.to_str())
+                .is_some_and(|head| head == "kubectl")
+        })?;
+        let remaining = &self.words()[kubectl_position + 1..];
+        let (verb_index, verb) = remaining.iter().enumerate().find_map(|(index, token)| {
+            if matches!(token.as_str(), "get" | "describe") {
+                Some((index, token.as_str()))
+            } else {
+                None
+            }
+        })?;
+        let after_verb = &remaining[verb_index + 1..];
+        let positional = collect_kubectl_positional_args(after_verb);
+
+        if positional.is_empty() {
+            return None;
+        }
+
+        Some(format!("{verb} {}", positional.join(" ")))
+    }
+
+    #[must_use]
+    pub fn has_env_prefix_assignment(&self) -> bool {
+        self.words()
+            .first()
+            .is_some_and(|word| is_env_assignment(word))
+    }
+
+    #[must_use]
+    pub fn starts_with_export(&self) -> bool {
+        self.words().first().is_some_and(|word| word == "export")
+    }
+
+    #[must_use]
+    pub fn starts_with_sleep(&self) -> bool {
+        self.words().first().is_some_and(|word| word == "sleep")
+    }
+
+    #[must_use]
+    pub fn has_harness_after_chain(&self) -> bool {
+        if let ObservedCommandInner::Parsed(parsed) = &self.inner {
+            return parsed.heads().iter().skip(1).any(|head| head == "harness");
+        }
+        let mut seen_chain = false;
+        let mut expect_head = true;
+        for word in self.words() {
+            if is_shell_control_op(word) {
+                seen_chain = true;
+                expect_head = true;
+                continue;
+            }
+            if expect_head && is_env_assignment(word) {
+                continue;
+            }
+            if expect_head {
+                if seen_chain
+                    && Path::new(word)
+                        .file_name()
+                        .and_then(|name| name.to_str())
+                        .is_some_and(|head| head == "harness")
+                {
+                    return true;
+                }
+                expect_head = false;
+            }
+        }
+        false
+    }
+
+    pub fn harness_spans(&self) -> impl Iterator<Item = Vec<&str>> {
+        if let ObservedCommandInner::Parsed(parsed) = &self.inner {
+            let spans = parsed
+                .harness_invocations()
+                .map(HarnessCommandInvocationRef::semantic_words)
+                .collect::<Vec<_>>();
+            return spans.into_iter();
+        }
+
+        fallback_harness_spans(self.words(), self.significant_word_indices()).into_iter()
+    }
+}
+
 /// Returns `true` for shell control operators: `&&`, `||`, `;`, `|`, `&`.
 #[must_use]
 pub fn is_shell_control_op(s: &str) -> bool {
@@ -500,6 +745,98 @@ fn extract_flag_value_location(
         }
     }
     None
+}
+
+/// Flags that tell kubectl to consume the next token as a value rather than a
+/// positional resource argument.
+const KUBECTL_FLAGS_WITH_VALUE: [&str; 7] = [
+    "-o",
+    "-n",
+    "--namespace",
+    "--output",
+    "-l",
+    "--selector",
+    "--field-selector",
+];
+
+fn collect_kubectl_positional_args(tokens: &[String]) -> Vec<&str> {
+    let mut positional = Vec::new();
+    let mut skip_next = false;
+
+    for token in tokens {
+        if skip_next {
+            skip_next = false;
+            continue;
+        }
+        if is_shell_control_op(token) {
+            break;
+        }
+        if KUBECTL_FLAGS_WITH_VALUE.contains(&token.as_str()) {
+            skip_next = true;
+            continue;
+        }
+        if token.starts_with('-') {
+            continue;
+        }
+        positional.push(token.as_str());
+        if positional.len() == 2 {
+            break;
+        }
+    }
+
+    positional
+}
+
+fn fallback_harness_spans<'a>(
+    words: &'a [String],
+    significant_word_indices: &[usize],
+) -> Vec<Vec<&'a str>> {
+    let mut spans = Vec::new();
+    let len = significant_word_indices.len();
+    for (index, &word_index) in significant_word_indices.iter().enumerate() {
+        let word = &words[word_index];
+        let head = Path::new(word)
+            .file_name()
+            .and_then(|name| name.to_str())
+            .unwrap_or(word.as_str());
+        if head != "harness" {
+            continue;
+        }
+        let search_end = next_harness_index(words, significant_word_indices, index).unwrap_or(len);
+        let span = semantic_fallback_span(words, &significant_word_indices[index + 1..search_end]);
+        spans.push(span);
+    }
+    spans
+}
+
+fn next_harness_index(
+    words: &[String],
+    significant_word_indices: &[usize],
+    start_index: usize,
+) -> Option<usize> {
+    significant_word_indices[start_index + 1..]
+        .iter()
+        .position(|&candidate_index| {
+            Path::new(&words[candidate_index])
+                .file_name()
+                .and_then(|name| name.to_str())
+                == Some("harness")
+        })
+        .map(|offset| start_index + 1 + offset)
+}
+
+fn semantic_fallback_span<'a>(words: &'a [String], span_indices: &[usize]) -> Vec<&'a str> {
+    let mut span: Vec<&str> = span_indices
+        .iter()
+        .map(|&span_index| words[span_index].as_str())
+        .collect();
+    if matches!(span.first(), Some(&"run" | &"setup" | &"authoring")) && span.len() > 1 {
+        span.remove(0);
+    }
+    if matches!(span.first(), Some(&"kuma")) && span.len() > 1 {
+        span.remove(0);
+    }
+    span
 }
 
 #[cfg(test)]
