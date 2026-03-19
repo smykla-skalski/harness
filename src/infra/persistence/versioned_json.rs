@@ -1,6 +1,5 @@
 use std::ffi::OsStr;
 use std::fmt;
-use std::fs::{self, File, OpenOptions};
 use std::marker::PhantomData;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -9,6 +8,7 @@ use fs2::FileExt;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 use serde_json::Value;
+use std::fs::{self, File, OpenOptions};
 
 use crate::errors::{CliError, CliErrorKind};
 use crate::infra::io;

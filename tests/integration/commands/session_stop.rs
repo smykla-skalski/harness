@@ -82,7 +82,7 @@ fn session_stop_returns_ok_with_no_pointer() {
 }
 
 #[test]
-fn session_stop_handles_corrupt_pointer_json() {
+fn session_stop_rejects_corrupt_pointer_json() {
     let tmp = tempfile::tempdir().unwrap();
     let xdg = tmp.path().join("xdg");
 
@@ -99,15 +99,10 @@ fn session_stop_handles_corrupt_pointer_json() {
             fs::write(&ctx_path, "not valid json {{{{").unwrap();
             assert!(ctx_path.exists());
 
-            let code =
-                run_command(session_stop_cmd(SessionStopArgs { project_dir: None })).unwrap();
-            assert_eq!(code, 0);
-
-            // Corrupt pointer should be removed
-            assert!(
-                !ctx_path.exists(),
-                "corrupt pointer should have been removed"
-            );
+            let error =
+                run_command(session_stop_cmd(SessionStopArgs { project_dir: None })).unwrap_err();
+            assert_eq!(error.code(), "KSRCLI019");
+            assert!(ctx_path.exists(), "corrupt pointer should be preserved for inspection");
         },
     );
 }

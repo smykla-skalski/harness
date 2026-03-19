@@ -7,7 +7,7 @@ use crate::errors::{CliError, CliErrorKind};
 use crate::infra::io;
 use crate::rules;
 
-use super::frontmatter::SuiteFrontmatter;
+use super::frontmatter::{SuiteFrontmatter, SuiteFrontmatterUnchecked};
 
 /// A loaded suite specification with its source path.
 #[derive(Debug, Clone)]
@@ -23,27 +23,8 @@ impl SuiteSpec {
     /// Returns `CliError` if the file is missing or frontmatter is invalid.
     pub fn from_markdown(path: &Path) -> Result<Self, CliError> {
         let text = io::read_text(path)?;
-        let (yaml_text, _body) = io::extract_raw_frontmatter(&text)?;
-
-        // First pass: check required keys exist in the mapping.
-        let map: serde_yml::Mapping = serde_yml::from_str(&yaml_text)
-            .map_err(|e| CliErrorKind::workflow_parse(format!("frontmatter YAML: {e}")))?;
-
-        let mut missing = Vec::new();
-        for key in ["suite_id", "feature", "scope", "keep_clusters"] {
-            if !map.contains_key(serde_yml::Value::String(key.to_string())) {
-                missing.push(key);
-            }
-        }
-        if !missing.is_empty() {
-            return Err(
-                CliErrorKind::missing_fields("suite frontmatter", missing.join(", ")).into(),
-            );
-        }
-
-        // Second pass: typed deserialization.
-        let frontmatter: SuiteFrontmatter = serde_yml::from_str(&yaml_text)
-            .map_err(|e| CliErrorKind::workflow_parse(format!("suite frontmatter: {e}")))?;
+        let parsed = io::parse_frontmatter::<SuiteFrontmatterUnchecked>(&text, "suite")?;
+        let frontmatter = SuiteFrontmatter::try_from(parsed.frontmatter)?;
 
         Ok(Self {
             frontmatter,
@@ -100,7 +81,8 @@ impl GroupSpec {
     /// or required sections are missing.
     pub fn from_markdown(path: &Path) -> Result<Self, CliError> {
         let text = io::read_text(path)?;
-        let (yaml_text, body) = io::extract_raw_frontmatter(&text)?;
+        let parsed = io::parse_frontmatter::<GroupFrontmatter>(&text, "group")?;
+        let body = parsed.body;
 
         // Check required sections in body
         let missing = rules::shared::GroupSection::missing_from(&body);
@@ -109,11 +91,8 @@ impl GroupSpec {
             return Err(CliErrorKind::missing_sections("group body", labels.join(", ")).into());
         }
 
-        let frontmatter: GroupFrontmatter = serde_yml::from_str(&yaml_text)
-            .map_err(|e| CliErrorKind::workflow_parse(format!("group frontmatter: {e}")))?;
-
         Ok(Self {
-            frontmatter,
+            frontmatter: parsed.frontmatter,
             path: path.to_path_buf(),
             body,
         })
