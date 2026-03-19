@@ -77,11 +77,6 @@ impl ClusterMode {
     pub fn is_single(self) -> bool {
         matches!(self, Self::SingleUp | Self::SingleDown)
     }
-
-    #[must_use]
-    pub fn is_global(self) -> bool {
-        !self.is_single()
-    }
 }
 
 impl fmt::Display for ClusterMode {

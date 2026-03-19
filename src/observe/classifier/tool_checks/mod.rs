@@ -525,7 +525,7 @@ fn check_repeated_kubectl_queries(
 /// Returns `Some("get <resource> [name]")` or `Some("describe <resource> [name]")`
 /// for kubectl commands, stripping any jq filter, output format flags, and
 /// namespace flags to normalize the target for comparison.
-#[cfg_attr(not(test), allow(dead_code))]
+#[cfg(test)]
 pub(super) fn extract_kubectl_query_target(command: &str) -> Option<String> {
     ObservedCommand::parse(command).kubectl_query_target()
 }

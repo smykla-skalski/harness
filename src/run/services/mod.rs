@@ -123,11 +123,6 @@ impl RunServices {
     }
 
     #[must_use]
-    pub fn into_context(self) -> RunContext {
-        self.ctx
-    }
-
-    #[must_use]
     pub fn blocks(&self) -> &BlockRegistry {
         self.blocks.as_ref()
     }

@@ -27,16 +27,6 @@ pub fn io_for(operation: &str, path: &Path, cause: &dyn fmt::Display) -> CliErro
     CliErrorKind::io(format!("{operation} {}: {cause}", path.display()))
 }
 
-/// Named exit code constants for CLI process results.
-pub mod exit_code {
-    pub const SUCCESS: i32 = 0;
-    pub const VALIDATION_ERROR: i32 = 1;
-    pub const EMPTY_ARGS: i32 = 3;
-    pub const COMMAND_FAILED: i32 = 4;
-    pub const CLI_ERROR: i32 = 5;
-    pub const FORMAT_ERROR: i32 = 6;
-}
-
 macro_rules! define_domain_error_enum {
     (
         $name:ident {

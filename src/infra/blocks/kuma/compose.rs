@@ -4,18 +4,6 @@ use crate::infra::blocks::compose::{
     ComposeTopology, HealthcheckSpec, NetworkSpec, ServiceDependency, ServiceSpec,
 };
 
-/// Supported Kuma universal compose layouts.
-///
-/// These are Kuma-specific topology recipes that sit on top of the generic
-/// compose block types. The actual orchestration remains the responsibility of
-/// the generic compose block.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum KumaComposeLayout {
-    SingleZone,
-    GlobalZone,
-    GlobalTwoZones,
-}
-
 /// Input describing a single Kuma control-plane service in a compose recipe.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct KumaControlPlaneSpec {
@@ -122,75 +110,6 @@ pub struct RecipeBase {
     pub subnet: String,
     pub image: String,
     pub store_type: String,
-}
-
-/// Build a global+zone Kuma universal compose topology recipe.
-#[must_use]
-pub fn global_zone_recipe(
-    base: RecipeBase,
-    global_name: impl Into<String>,
-    zone_name: impl Into<String>,
-    zone_label: impl Into<String>,
-) -> KumaComposeRecipe {
-    let project_name = base.project_name;
-    let network_name = base.network_name;
-    let subnet = base.subnet;
-    let global_name = global_name.into();
-    let zone_name = zone_name.into();
-    let zone_label = zone_label.into();
-    let image = base.image;
-    let store_type = base.store_type;
-
-    let postgres = (store_type == "postgres").then_some(default_postgres_spec());
-
-    let global_depends_on = postgres
-        .as_ref()
-        .map(|pg| {
-            vec![ServiceDependency {
-                service_name: pg.service_name.clone(),
-                condition: Some("service_healthy".to_string()),
-            }]
-        })
-        .unwrap_or_default();
-
-    let zone_depends_on = vec![ServiceDependency {
-        service_name: global_name.clone(),
-        condition: Some("service_started".to_string()),
-    }];
-
-    let mut global_env = base_cp_env("global", &store_type);
-    global_env.insert("KUMA_MODE".to_string(), "global".to_string());
-
-    let mut zone_env = base_cp_env("zone", &store_type);
-    zone_env.insert("KUMA_MODE".to_string(), "zone".to_string());
-    zone_env.insert("KUMA_ZONE".to_string(), zone_label.clone());
-
-    KumaComposeRecipe {
-        project_name,
-        network_name,
-        subnet,
-        control_planes: vec![
-            KumaControlPlaneSpec {
-                name: global_name,
-                image: image.clone(),
-                mode: "global".to_string(),
-                zone: None,
-                env: global_env,
-                ports: vec![(5681, 5681), (5678, 5678)],
-                depends_on: global_depends_on,
-            },
-            KumaControlPlaneSpec {
-                name: zone_name,
-                image,
-                mode: "zone".to_string(),
-                zone: Some(zone_label),
-                env: zone_env,
-                ports: vec![],
-                depends_on: zone_depends_on,
-            },
-        ],
-        postgres,
-    }
 }
 
 /// Build a global+two-zones Kuma universal compose topology recipe.

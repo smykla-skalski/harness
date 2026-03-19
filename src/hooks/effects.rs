@@ -76,15 +76,6 @@ impl HookOutcome {
         })
     }
 
-    pub fn audit_entries(&self) -> impl Iterator<Item = &AuditAppendRequest> {
-        self.effects.iter().filter_map(|effect| match effect {
-            HookEffect::AppendAudit(request) => Some(request),
-            HookEffect::Decide(_)
-            | HookEffect::WriteRunnerState { .. }
-            | HookEffect::InjectContext(_) => None,
-        })
-    }
-
     pub fn injected_contexts(&self) -> impl Iterator<Item = &str> {
         self.effects.iter().filter_map(|effect| match effect {
             HookEffect::InjectContext(text) => Some(text.as_str()),
