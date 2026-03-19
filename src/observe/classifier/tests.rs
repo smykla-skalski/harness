@@ -1725,7 +1725,6 @@ fn dedup_tracking_occurrence_count() {
     assert!(tracker.is_some());
     let (_, tracker) = tracker.unwrap();
     assert_eq!(tracker.count, 2);
-    assert_eq!(tracker.first_seen_line, 10);
     assert_eq!(tracker.last_seen_line, 20);
 }
 

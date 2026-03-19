@@ -44,7 +44,7 @@ pub(super) fn execute_cycle(session_id: &str, project_hint: Option<&str>) -> Res
             open_issue.last_seen_line = issue.line;
         } else {
             observer_state.open_issues.push(types::OpenIssue {
-                issue_id: issue.issue_id.clone(),
+                issue_id: issue.id.clone(),
                 code: issue.code,
                 fingerprint: issue.fingerprint.clone(),
                 first_seen_line: issue.line,

@@ -88,6 +88,7 @@ pub(super) struct IssueBlueprint {
 impl IssueBlueprint {
     pub(super) fn from_code(code: IssueCode, summary: impl Into<String>) -> Self {
         let meta = issue_code_meta(code).expect("issue code registry should cover every code");
+        let _ = (meta.description, meta.owner);
         let summary = summary.into();
         Self {
             code,
@@ -155,7 +156,6 @@ impl<'a> IssueEmitter<'a> {
             .entry(dedup_key.clone())
             .or_insert_with(|| OccurrenceTracker {
                 count: 0,
-                first_seen_line: self.line,
                 last_seen_line: self.line,
             });
         tracker.count += 1;
@@ -167,10 +167,10 @@ impl<'a> IssueEmitter<'a> {
 
         let (guidance_fix_safety, fix_target, fix_hint) = blueprint.guidance.materialize();
         let fix_safety = blueprint.fix_safety.unwrap_or(guidance_fix_safety);
-        let issue_id = compute_issue_id(&blueprint.code, &blueprint.fingerprint);
+        let issue_id = compute_issue_id(blueprint.code, &blueprint.fingerprint);
 
         issues.push(Issue {
-            issue_id,
+            id: issue_id,
             line: self.line,
             code: blueprint.code,
             category: blueprint.category,
