@@ -29,13 +29,13 @@ restart_namespaces:
 Apply the whole group manifest directory:
 
 ```bash
-harness apply --manifest g01
+harness run apply --manifest g01
 ```
 
 Or apply a specific file:
 
 ```bash
-harness apply --manifest g01/01-demo-metrics.yaml
+harness run apply --manifest g01/01-demo-metrics.yaml
 ```
 
 The YAML manifests live in the `groups/g01/` directory (e.g., `g01/01-demo-metrics.yaml`). Do not duplicate them inline here.
@@ -43,11 +43,11 @@ The YAML manifests live in the `groups/g01/` directory (e.g., `g01/01-demo-metri
 ## Consume
 
 ```bash
-harness run --phase verify --label get-demo-metrics \
-  kubectl get meshmetrics demo-metrics -n kuma-system -o yaml
+harness run record --phase verify --label get-demo-metrics \
+  -- kubectl get meshmetrics demo-metrics -n kuma-system -o yaml
 
-harness run --phase verify --label inspect-dataplanes \
-  kumactl inspect dataplanes --mesh default
+harness run record --phase verify --label inspect-dataplanes \
+  -- kumactl inspect dataplanes --mesh default
 ```
 
 Expected outcome: the policy is accepted and the captured dataplane wiring reflects the configured backend.
@@ -55,11 +55,11 @@ Expected outcome: the policy is accepted and the captured dataplane wiring refle
 ## Debug
 
 ```bash
-harness envoy capture --phase debug --label config-dump \
+harness run envoy capture --phase debug --label config-dump \
   --namespace kuma-demo --workload deploy/demo-client
 
-harness run --phase debug --label control-plane-logs \
-  kubectl logs -n kuma-system deploy/kuma-control-plane --tail=50
+harness run record --phase debug --label control-plane-logs \
+  -- kubectl logs -n kuma-system deploy/kuma-control-plane --tail=50
 ```
 
 Capture these artifacts if the expected backend cluster is missing or the policy is rejected unexpectedly.

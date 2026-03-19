@@ -96,13 +96,13 @@ Parse from `$ARGUMENTS`:
 
 ## Preprocessed context
 
-- Data directory: !`echo "${XDG_DATA_HOME:-$HOME/.local/share}/kuma/suites"`
+- Data directory: !`echo "${XDG_DATA_HOME:-$HOME/.local/share}/harness/suites"`
 - Current repo root: !`git rev-parse --show-toplevel 2>/dev/null || echo "not in a git repo"`
-- Existing suites: !`ls -1 "${XDG_DATA_HOME:-$HOME/.local/share}/kuma/suites" 2>/dev/null | head -20 || echo "none yet"`
+- Existing suites: !`ls -1 "${XDG_DATA_HOME:-$HOME/.local/share}/harness/suites" 2>/dev/null | head -20 || echo "none yet"`
 
 ## Workflow rules
 
-- Never delete, rm, or overwrite existing suite directories. If `authoring-begin` detects an existing suite, it will prompt for resolution.
+- Never delete, rm, or overwrite existing suite directories. If `harness authoring begin` detects an existing suite, it will prompt for resolution.
 
 ## Workflow - generate mode (default, `--mode generate`)
 
@@ -111,7 +111,7 @@ Parse from `$ARGUMENTS`:
 Before any other work, query what harness can do so the rest of the workflow can adapt:
 
 ```bash
-harness capabilities
+harness setup capabilities
 ```
 
 Parse the JSON output and keep it as the `CAPABILITIES` context for all later steps. Use it to:
@@ -121,23 +121,23 @@ Parse the JSON output and keep it as the `CAPABILITIES` context for all later st
 - When building the proposal (step 7), only propose universal-mode groups if the `universal` platform is listed, and only propose envoy admin validation steps if `features.envoy_admin.available` is true.
 - Pass relevant capability facts to discovery workers so they don't suggest groups the harness can't execute.
 
-If `harness capabilities` fails (binary too old, not installed), fall back to the hardcoded default assumption: both platforms available, all features available.
+If `harness setup capabilities` fails (binary too old, not installed), fall back to the hardcoded default assumption: both platforms available, all features available.
 
 ### Step 1: Local validation
 
-Manifest validation uses `harness authoring-validate --path <file>`, which does local-only CRD validation without cluster access. No external binary install is needed. Continue to Step 2.
+Manifest validation uses `harness authoring validate --path <file>`, which does local-only CRD validation without cluster access. No external binary install is needed. Continue to Step 2.
 
 ### Step 2: Resolve paths
 
 Before resolving paths, check for stale authoring state from a previous session:
 
 ```bash
-harness authoring-show --kind session 2>/dev/null
+harness authoring show --kind session 2>/dev/null
 ```
 
-If state exists from a different feature or a previous day, run `harness authoring-reset --skill suite:new` to clear it before proceeding. If state exists for the same feature being authored, continue without reset.
+If state exists from a different feature or a previous day, run `harness authoring reset --skill suite:new` to clear it before proceeding. If state exists for the same feature being authored, continue without reset.
 
-Use the pre-resolved data directory and repo root from the preprocessed context above. Do not eagerly create `DATA_DIR` here; `harness authoring-begin` creates the concrete suite directory when authoring starts.
+Use the pre-resolved data directory and repo root from the preprocessed context above. Do not eagerly create `DATA_DIR` here; `harness authoring begin` creates the concrete suite directory when authoring starts.
 
 Resolve `REPO_ROOT`: `--repo` flag > pre-resolved repo root (if in a git repo) > check if cwd has `go.mod` with `kumahq/kuma` > fail with message.
 
@@ -185,12 +185,12 @@ SUITE_DIR="${DATA_DIR}/${SUITE_NAME}"
 APPROVAL_MODE="${APPROVAL_MODE:-interactive}"
 ```
 
-If `--yes` or `-y` is set, change `APPROVAL_MODE` to `bypass` before calling `authoring-begin` and `approval-begin`.
+If `--yes` or `-y` is set, change `APPROVAL_MODE` to `bypass` before calling `harness authoring begin` and `harness authoring approval-begin`.
 
 Immediately initialize the internal authoring workspace:
 
 ```bash
-harness authoring-begin \
+harness authoring begin \
   --skill suite:new \
   --repo-root "${REPO_ROOT}" \
   --feature "${FEATURE}" \
@@ -199,9 +199,9 @@ harness authoring-begin \
   --suite-name "${SUITE_NAME}"
 ```
 
-Then save the scoped file inventory from step 4 with `harness authoring-save --kind inventory`. Read [references/agent-output-format.md](references/agent-output-format.md) for the inventory payload shape.
+Then save the scoped file inventory from step 4 with `harness authoring save --kind inventory`. Read [references/agent-output-format.md](references/agent-output-format.md) for the inventory payload shape.
 
-If the suite name or directory changes later, rerun `authoring-begin` and then resave the inventory before any workers continue.
+If the suite name or directory changes later, rerun `harness authoring begin` and then resave the inventory before any workers continue.
 
 ### Step 6: Launch parallel discovery workers
 
@@ -216,10 +216,10 @@ Launch these workers in parallel:
 Worker contract:
 
 - Pass `REPO_ROOT`, the scoped file list from step 4, the feature name, and only the references needed for that worker.
-- Launch all discovery workers with `mode: "auto"` so they can run `harness authoring-save` via Bash without interactive approval. Background workers cannot prompt the user for tool permissions.
+- Launch all discovery workers with `mode: "auto"` so they can run `harness authoring save` via Bash without interactive approval. Background workers cannot prompt the user for tool permissions.
 - Follow [references/agent-output-format.md](references/agent-output-format.md) for the exact payload schema, save path, and acknowledgement contract for each worker kind.
 
-After all workers finish, load the saved payloads with `harness authoring-show --kind inventory|coverage|variants|schema`.
+After all workers finish, load the saved payloads with `harness authoring show --kind inventory|coverage|variants|schema`.
 
 If any worker result is missing, malformed, or clearly incomplete, rerun only that worker instead of continuing with gaps.
 
@@ -245,9 +245,9 @@ Build the proposal from the saved worker outputs:
 - Use coverage data to decide which base groups G1-G7 have enough evidence.
 - Use variant signals to propose G8+ groups and to decide which signals are strong, moderate, or weak.
 - Use schema facts to constrain manifests from the start, but treat them as planning input only.
-- Run `harness authoring-validate --path <file>` on authored manifests before stopping. Do not defer to a live cluster.
+- Run `harness authoring validate --path <file>` on authored manifests before stopping. Do not defer to a live cluster.
 - When `profiles` includes `multi-zone`, set `clusters: all` on workload-deploying baselines per [references/suite-structure.md](references/suite-structure.md).
-- Save the merged proposal with `harness authoring-save --kind proposal`.
+- Save the merged proposal with `harness authoring save --kind proposal`.
 
 Group ordering rule - groups MUST be ordered by infrastructure complexity to avoid unnecessary cluster rebuilds:
 
@@ -272,7 +272,7 @@ Proposal rules:
 - Default every cluster-interacting command to full `harness` invocations. Only keep raw `kubectl`, `kumactl`, `curl`, or similar commands when the user explicitly asked for raw commands.
 - Follow [references/suite-structure.md](references/suite-structure.md) for file ownership, naming, and manifest conventions.
 - Add `gateway-api-crds` when proposed groups touch `MeshGateway`, `GatewayClass`, `Gateway`, or `HTTPRoute`.
-- For universal mode suites (`--profile single-zone-universal`), use REST API format manifests and `harness apply`/`token`/`service` commands per [references/suite-structure.md](references/suite-structure.md).
+- For universal mode suites (`--profile single-zone-universal`), use REST API format manifests and `harness run apply` plus `harness run kuma token` and `harness run kuma service` commands per [references/suite-structure.md](references/suite-structure.md).
 
 ### Step 8: Pre-write review gate
 
@@ -284,9 +284,9 @@ Review loop rules:
 
 - Present **every single group** as a structured AskUserQuestion option with multiSelect. Each option must use the `label` + `description` form so the user sees the group ID and title on the left, with profiles, preconditions, and success criteria in the description preview on the right. Do NOT summarize groups in prose text. If one prompt is too small, split across multiple AskUserQuestion passes. Every page must include an `All suggested groups` option.
 - Never present the proposal as a text block followed by an approval question. The group list IS the approval question - each option is a group the user can include or exclude.
-- After selection, gather one comment per selected group and one general suite-level comment, save them with `harness authoring-save --kind edit-request`, and rebuild the proposal from cached worker outputs.
+- After selection, gather one comment per selected group and one general suite-level comment, save them with `harness authoring save --kind edit-request`, and rebuild the proposal from cached worker outputs.
 - Re-run only the affected discovery worker when feedback invalidates earlier coverage, variant, or schema assumptions, then resave the proposal and show the loop again until approval.
-- Immediately initialize the approval state with `harness approval-begin --skill suite:new --mode interactive --suite-dir "${SUITE_DIR}"`. If `--yes` or `-y` is set, use `--mode bypass` instead. If the suite name or directory changes during the pre-write review loop, rerun `approval-begin` with the updated `SUITE_DIR` before asking the canonical pre-write approval question.
+- Immediately initialize the approval state with `harness authoring approval-begin --skill suite:new --mode interactive --suite-dir "${SUITE_DIR}"`. If `--yes` or `-y` is set, use `--mode bypass` instead. If the suite name or directory changes during the pre-write review loop, rerun `harness authoring approval-begin` with the updated `SUITE_DIR` before asking the canonical pre-write approval question.
 - The approval gate question must be exactly `suite:new/prewrite: approve current proposal?` with options `Approve proposal`, `Request changes`, and `Cancel`. `Approve proposal` is the only answer that unlocks writes to `${SUITE_DIR}`.
 - Suite files are only written after this loop approves. `--yes` and `-y` are the only bypass.
 
@@ -301,7 +301,7 @@ mkdir -p "${SUITE_DIR}/baseline" "${SUITE_DIR}/groups"
 Launch these workers after approval:
 
 - [../../agents/suite-writer.md](../../agents/suite-writer.md) for `${SUITE_DIR}/suite.md`
-- [../../agents/baseline-writer.md](../../agents/baseline-writer.md) for `${SUITE_DIR}/baseline/*.yaml` - the baseline-writer must validate that Service manifests have `appProtocol` set on all ports (catches missing `appProtocol: http` on demo-app services and similar). Baseline manifests must pass `kubectl dry-run` validation (via `harness authoring-validate`) before the suite is marked complete.
+- [../../agents/baseline-writer.md](../../agents/baseline-writer.md) for `${SUITE_DIR}/baseline/*.yaml` - the baseline-writer must validate that Service manifests have `appProtocol` set on all ports (catches missing `appProtocol: http` on demo-app services and similar). Baseline manifests must pass `kubectl dry-run` validation (via `harness authoring validate`) before the suite is marked complete.
 - [../../agents/group-writer.md](../../agents/group-writer.md) for `${SUITE_DIR}/groups/g{NN}-*.md` and `${SUITE_DIR}/groups/g{NN}/*.yaml`
 
 Writer contract:
@@ -309,10 +309,10 @@ Writer contract:
 - Pass only the saved proposal, schema facts, and the exact file ownership for that worker.
 - Keep writer fan-out bounded. Do not start more than four writer workers at once.
 - Launch all writer workers with `mode: "auto"` so they can write files without interactive approval. Background workers cannot prompt the user, so writes are denied without this mode.
-- The group-writer must create a `groups/{group-id}/` directory for each group and write the group's test manifests there as individual YAML files (e.g., `groups/g01/01-create.yaml`, `groups/g01/02-update.yaml`). The group markdown's `## Configure` section must NOT contain inline YAML blocks. Instead it should contain only `harness apply` commands that reference the manifest directory (e.g., `harness apply --manifest g01` for the whole directory or `harness apply --manifest g01/01-create.yaml` for a single file). The YAML lives only in the `groups/g{NN}/` directory.
-- Require every writer that emits manifests to run `harness authoring-validate --path <file>` on its owned outputs before it stops. Use the current repo checkout as the schema source of truth; all required schemas, including CRDs, are already in this repo. Do not substitute a live-cluster check.
+- The group-writer must create a `groups/{group-id}/` directory for each group and write the group's test manifests there as individual YAML files (e.g., `groups/g01/01-create.yaml`, `groups/g01/02-update.yaml`). The group markdown's `## Configure` section must NOT contain inline YAML blocks. Instead it should contain only `harness run apply` commands that reference the manifest directory (e.g., `harness run apply --manifest g01` for the whole directory or `harness run apply --manifest g01/01-create.yaml` for a single file). The YAML lives only in the `groups/g{NN}/` directory.
+- Require every writer that emits manifests to run `harness authoring validate --path <file>` on its owned outputs before it stops. Use the current repo checkout as the schema source of truth; all required schemas, including CRDs, are already in this repo. Do not substitute a live-cluster check.
 - When the proposal includes multi-zone profiles, pass the baseline cluster distribution from the proposal to the baseline-writer and suite-writer so they emit the object form (`- path:` with `clusters:`) in `baseline_files` frontmatter and include the Clusters column in the baseline manifests table.
-- Follow [references/agent-output-format.md](references/agent-output-format.md) for `authoring-show` usage and acknowledgement rules, and [references/suite-structure.md](references/suite-structure.md) for file content requirements.
+- Follow [references/agent-output-format.md](references/agent-output-format.md) for `harness authoring show` usage and acknowledgement rules, and [references/suite-structure.md](references/suite-structure.md) for file content requirements.
 
 Writer recovery (partial completion):
 
@@ -336,7 +336,7 @@ Post-write loop rules:
 
 - Show the saved suite summary with metadata, groups, dependencies, and current files on disk.
 - Ask whether anything should change, be added, or is already correct.
-- If the user requests changes, collect targeted comments plus one general suite-level comment, save them with `harness authoring-save --kind edit-request`, and rerun only the affected writer workers. Rerun a discovery worker only if the requested change invalidates the cached evidence.
+- If the user requests changes, collect targeted comments plus one general suite-level comment, save them with `harness authoring save --kind edit-request`, and rerun only the affected writer workers. Rerun a discovery worker only if the requested change invalidates the cached evidence.
 - Apply tiny deterministic single-file fixes directly with `Edit` instead of respawning a writer worker. Keep broader or multi-file changes in the writer-worker path.
 - Reuse the saved authoring payloads for edit rounds. Do not reread the whole repo when the existing cached summaries are still valid.
 - Re-open the same AskUserQuestion flow after every edit round until the user explicitly approves the suite.
@@ -419,7 +419,7 @@ Input: `/suite:new meshtrace --repo ~/Projects/kuma`
 
 Output structure:
 ```
-~/.local/share/kuma/suites/meshtrace-core/
+~/.local/share/harness/suites/meshtrace-core/
 ├── suite.md
 ├── baseline/
 │   ├── namespace.yaml

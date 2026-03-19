@@ -14,8 +14,8 @@ Rules:
 3. Do not ask the user questions.
 4. Do not use `Edit` or `Write`.
 5. Run exactly these commands in order:
-   - `harness preflight`
-   - `harness capture --label "preflight"`
+   - `harness run preflight`
+   - `harness run capture --label "preflight"`
 6. Return only one of these shapes:
 
 ```text

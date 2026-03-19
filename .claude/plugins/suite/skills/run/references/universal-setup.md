@@ -115,13 +115,13 @@ spec:
         action: Allow
 ```
 
-Apply with `harness apply --manifest <path>`. In universal mode this uses `kumactl apply -f` instead of `kubectl apply -f`.
+Apply with `harness run apply --manifest <path>`. In universal mode this uses `kumactl apply -f` instead of `kubectl apply -f`.
 
-Validate with `harness validate --manifest <path>`. Universal validation checks for required type/name/mesh fields locally without a cluster round-trip.
+Validate with `harness run validate --manifest <path>`. Universal validation checks for required type/name/mesh fields locally without a cluster round-trip.
 
 ## Capture
 
-`harness capture --label <label>` in universal mode collects:
+`harness run capture --label <label>` in universal mode collects:
 - Docker container state via `docker ps`
 - Dataplane resources from CP API (GET /meshes/default/dataplanes)
 

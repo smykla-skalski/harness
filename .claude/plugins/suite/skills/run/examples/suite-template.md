@@ -2,7 +2,7 @@
 
 Template for `suite.md` in a directory-format suite. Copy the directory structure and fill in the blanks.
 
-This runner-local template mirrors the suite schema consumed by `harness preflight` and `suite:run`.
+This runner-local template mirrors the suite schema consumed by `harness run preflight` and `suite:run`.
 
 ## Directory structure
 
@@ -66,15 +66,15 @@ keep_clusters: false
 
 ### Execution contract
 
-- all manifests applied through `harness apply`
-- `harness preflight` materializes baseline manifests and group `## Configure` YAML once, then writes the prepared-suite artifact in the active run
-- kubectl, `curl`, and other cluster-touching commands recorded via `harness record`, with `harness run ... kumactl ...` reserved for `kumactl`
-- cluster state captured after each completed group via `harness capture`
-- group completion recorded through `harness report group`, which updates `run-status.json` and `run-report.md`
+- all manifests applied through `harness run apply`
+- `harness run preflight` materializes baseline manifests and group `## Configure` YAML once, then writes the prepared-suite artifact in the active run
+- kubectl, `curl`, and other cluster-touching commands recorded via `harness run record`, with `harness run record ... -- kumactl ...` reserved for `kumactl`
+- cluster state captured after each completed group via `harness run capture`
+- group completion recorded through `harness run report group`, which updates `run-status.json` and `run-report.md`
 - all failures trigger immediate triage before next group
 - all pass/fail decisions include artifact pointers to existing files
 - deviations from suite definitions require user approval and are recorded in the report
-- inline manifests in group files are authoritative - `harness preflight` must materialize them verbatim and Phase 4 must reuse the prepared manifest entries from the active run context
+- inline manifests in group files are authoritative - `harness run preflight` must materialize them verbatim and Phase 4 must reuse the prepared manifest entries from the active run context
 - policy authoring follows the rules in [../references/mesh-policies.md](../references/mesh-policies.md) when applicable
 
 ### Failure triage
@@ -121,14 +121,14 @@ spec:
   ...
 ```
 
-Add one fenced `yaml` or `yml` block per manifest. `harness preflight` materializes them verbatim into the active run's prepared manifests directory.
+Add one fenced `yaml` or `yml` block per manifest. `harness run preflight` materializes them verbatim into the active run's prepared manifests directory.
 
 If a prepared manifest is intentionally invalid and the test must prove the API rejects it later, list its 1-based ordinal in `expected_rejection_orders`. Preflight still materializes that manifest, but it skips the up-front schema validation for that prepared entry.
 
 ## Consume
 
-- `harness record` commands and expected outputs
-- After `harness init`, use context-driven commands only. Prepared group manifests must be referenced via `harness apply --manifest "<group-id>/<file>"`.
+- `harness run record` commands and expected outputs
+- After `harness run init`, use context-driven commands only. Prepared group manifests must be referenced via `harness run apply --manifest "<group-id>/<file>"`.
 
 ## Debug
 
