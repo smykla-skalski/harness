@@ -1,7 +1,7 @@
 use std::env;
 use std::path::{Path, PathBuf};
 
-use crate::core_defs::harness_data_root;
+use crate::workspace::harness_data_root;
 use crate::errors::{CliError, CliErrorKind};
 use crate::suite_defaults::default_repo_root_for_suite;
 

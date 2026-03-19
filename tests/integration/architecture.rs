@@ -11,6 +11,8 @@ fn new_domain_roots_exist() {
         "src/authoring",
         "src/observe",
         "src/setup",
+        "src/workspace",
+        "src/kernel",
         "src/platform",
         "src/infra",
         "src/hooks",
@@ -35,12 +37,49 @@ fn legacy_scatter_roots_are_gone() {
         "src/exec",
         "src/io",
         "src/runtime.rs",
+        "src/compact",
+        "src/shell_parse.rs",
     ] {
         assert!(
             !root.join(path).exists(),
             "legacy layout path should not exist anymore: {path}"
         );
     }
+}
+
+#[test]
+fn internal_code_uses_kernel_command_intent_instead_of_legacy_shell_parse() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let src_root = root.join("src");
+    let mut stack = vec![src_root];
+    let mut hits = Vec::new();
+
+    while let Some(path) = stack.pop() {
+        for entry in fs::read_dir(&path).unwrap() {
+            let entry = entry.unwrap();
+            let child = entry.path();
+            if child.is_dir() {
+                stack.push(child);
+                continue;
+            }
+            if !matches_extension(&child) {
+                continue;
+            }
+            let contents = fs::read_to_string(&child).unwrap();
+            if contents.contains("crate::shell_parse") {
+                hits.push(format!(
+                    "{} still references crate::shell_parse",
+                    child.strip_prefix(root).unwrap().display()
+                ));
+            }
+        }
+    }
+
+    assert!(
+        hits.is_empty(),
+        "found legacy command-intent imports:\n{}",
+        hits.join("\n")
+    );
 }
 
 #[test]

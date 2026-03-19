@@ -5,7 +5,7 @@ use clap::Args;
 use tracing::warn;
 
 use crate::app::command_context::{CommandContext, Execute, resolve_project_dir};
-use crate::compact;
+use crate::workspace::compact;
 use crate::errors::CliError;
 use crate::hooks::session::SessionStartHookOutput;
 use crate::platform::ephemeral_metallb;

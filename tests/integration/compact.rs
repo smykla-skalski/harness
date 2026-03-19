@@ -11,7 +11,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::PoisonError;
 
-use harness::compact::{self, AuthoringHandoff, FileFingerprint, HandoffStatus, RunnerHandoff};
+use harness::workspace::compact::{self, AuthoringHandoff, FileFingerprint, HandoffStatus, RunnerHandoff};
 use harness::platform::ephemeral_metallb;
 use harness::setup::{PreCompactArgs, SessionStartArgs, SessionStopArgs};
 
