@@ -2,12 +2,15 @@ use std::path::PathBuf;
 
 use clap::Args;
 
-use crate::app::command_context::{CommandContext, Execute, RunDirArgs, resolve_run_dir};
+use crate::app::command_context::{AppContext, Execute};
 use crate::errors::{CliError, CliErrorKind};
+use crate::run::args::RunDirArgs;
 use crate::run::services::{RecordCommandRequest, record_command};
 
+use super::shared::resolve_run_dir;
+
 impl Execute for RecordArgs {
-    fn execute(&self, _context: &CommandContext) -> Result<i32, CliError> {
+    fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
         record(
             self.repo_root.as_deref(),
             self.phase.as_deref(),

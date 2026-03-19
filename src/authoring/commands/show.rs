@@ -1,12 +1,12 @@
 use clap::Args;
 
-use crate::app::command_context::{CommandContext, Execute};
+use crate::app::command_context::{AppContext, Execute};
 use crate::authoring::{authoring_workspace_dir, load_authoring_session};
 use crate::errors::{CliError, CliErrorKind};
 use crate::infra::io::{is_safe_name, read_text};
 
 impl Execute for AuthoringShowArgs {
-    fn execute(&self, _context: &CommandContext) -> Result<i32, CliError> {
+    fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
         show(&self.kind)
     }
 }

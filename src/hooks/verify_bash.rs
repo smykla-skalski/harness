@@ -11,7 +11,7 @@ use crate::run::context::RunContext;
 use crate::run::workflow::{PreflightStatus, RunnerPhase, RunnerWorkflowState, SuiteFixState};
 
 /// Parsed harness context: (subcommand, command label, words, run context).
-type HarnessCommandContext<'a> = (&'a str, String, &'a [String], &'a RunContext);
+type HarnessAppContext<'a> = (&'a str, String, &'a [String], &'a RunContext);
 
 fn subcommand_artifacts(subcommand: &str) -> Option<&'static [&'static str]> {
     match subcommand {
@@ -58,7 +58,7 @@ pub fn execute(ctx: &HookContext) -> Result<HookResult, CliError> {
 /// context. Returns `None` when this hook should allow without further checks.
 fn extract_harness_context(
     ctx: &HookContext,
-) -> Result<Option<HarnessCommandContext<'_>>, CliError> {
+) -> Result<Option<HarnessAppContext<'_>>, CliError> {
     if !ctx.skill_active || !ctx.is_suite_runner() {
         return Ok(None);
     }

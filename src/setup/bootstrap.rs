@@ -2,13 +2,13 @@ use std::env;
 
 use clap::Args;
 
-use crate::app::command_context::{CommandContext, Execute, resolve_project_dir};
+use crate::app::command_context::{AppContext, Execute, resolve_project_dir};
 use crate::errors::{CliError, CliErrorKind};
 use crate::hooks::adapters::HookAgent;
 use crate::setup::wrapper;
 
 impl Execute for BootstrapArgs {
-    fn execute(&self, _context: &CommandContext) -> Result<i32, CliError> {
+    fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
         bootstrap(self.project_dir.as_deref(), self.agent)
     }
 }

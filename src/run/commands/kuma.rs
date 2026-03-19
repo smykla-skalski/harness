@@ -1,6 +1,6 @@
 use clap::{Args, Subcommand};
 
-use crate::app::command_context::{CommandContext, Execute};
+use crate::app::command_context::{AppContext, Execute};
 use crate::errors::CliError;
 
 use super::{ApiArgs, KumactlArgs, ServiceArgs, TokenArgs};
@@ -24,7 +24,7 @@ pub struct KumaArgs {
 }
 
 impl Execute for KumaArgs {
-    fn execute(&self, context: &CommandContext) -> Result<i32, CliError> {
+    fn execute(&self, context: &AppContext) -> Result<i32, CliError> {
         match &self.command {
             KumaCommand::Api(args) => args.execute(context),
             KumaCommand::Cli(args) => args.execute(context),

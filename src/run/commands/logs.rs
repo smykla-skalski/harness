@@ -1,10 +1,13 @@
 use clap::Args;
 
-use crate::app::command_context::{CommandContext, Execute, RunDirArgs};
+use crate::app::command_context::{AppContext, Execute};
 use crate::errors::{CliError, CliErrorKind};
+use crate::run::args::RunDirArgs;
+
+use super::shared::resolve_run_services_with_blocks;
 
 impl Execute for LogsArgs {
-    fn execute(&self, context: &CommandContext) -> Result<i32, CliError> {
+    fn execute(&self, context: &AppContext) -> Result<i32, CliError> {
         logs(context, &self.name, self.tail, self.follow, &self.run_dir)
     }
 }
@@ -30,13 +33,13 @@ pub struct LogsArgs {
 /// # Errors
 /// Returns `CliError` on failure.
 pub fn logs(
-    ctx: &CommandContext,
+    ctx: &AppContext,
     name: &str,
     tail: u32,
     follow: bool,
     run_dir_args: &RunDirArgs,
 ) -> Result<i32, CliError> {
-    let services = ctx.resolve_run_services(run_dir_args)?;
+    let services = resolve_run_services_with_blocks(run_dir_args, ctx.shared_blocks())?;
     let docker = services
         .blocks()
         .docker

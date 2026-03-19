@@ -2,12 +2,15 @@ use clap::Args;
 
 use tracing::info;
 
-use crate::app::command_context::{CommandContext, Execute, RunDirArgs};
+use crate::app::command_context::{AppContext, Execute};
 use crate::workspace::{shorten_path, utc_now};
 use crate::errors::CliError;
+use crate::run::args::RunDirArgs;
+
+use super::shared::resolve_run_services_with_blocks;
 
 impl Execute for PreflightArgs {
-    fn execute(&self, context: &CommandContext) -> Result<i32, CliError> {
+    fn execute(&self, context: &AppContext) -> Result<i32, CliError> {
         preflight(
             context,
             self.kubeconfig.as_deref(),
@@ -36,13 +39,13 @@ pub struct PreflightArgs {
 /// # Errors
 /// Returns `CliError` on failure.
 pub fn preflight(
-    ctx: &CommandContext,
+    ctx: &AppContext,
     _kubeconfig: Option<&str>,
     _repo_root: Option<&str>,
     run_dir_args: &RunDirArgs,
 ) -> Result<i32, CliError> {
     let checked_at = utc_now();
-    let services = ctx.resolve_run_services(run_dir_args)?;
+    let services = resolve_run_services_with_blocks(run_dir_args, ctx.shared_blocks())?;
     services
         .blocks()
         .validate_requirement_names(&services.metadata().requires)?;

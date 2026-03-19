@@ -2,12 +2,12 @@ use std::path::{Path, PathBuf};
 
 use clap::Args;
 
-use crate::app::command_context::{CommandContext, Execute};
+use crate::app::command_context::{AppContext, Execute};
 use crate::authoring::validate::{authoring_validation_repo_root, validate_suite_author_paths};
 use crate::errors::CliError;
 
 impl Execute for AuthoringValidateArgs {
-    fn execute(&self, _context: &CommandContext) -> Result<i32, CliError> {
+    fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
         validate(&self.path, self.repo_root.as_deref())
     }
 }

@@ -3,7 +3,7 @@ use std::time::Duration;
 
 use clap::{Parser, Subcommand};
 
-use crate::app::command_context::{CommandContext, Execute};
+use crate::app::command_context::{AppContext, Execute};
 use crate::authoring::commands::{
     ApprovalBeginArgs, AuthoringBeginArgs, AuthoringResetArgs, AuthoringSaveArgs,
     AuthoringShowArgs, AuthoringValidateArgs,
@@ -129,7 +129,7 @@ pub enum Command {
 /// # Errors
 /// Returns `CliError` when the selected command fails.
 pub fn dispatch(command: &Command) -> Result<i32, CliError> {
-    let ctx = CommandContext::production();
+    let ctx = AppContext::production();
     match command {
         Command::Hook(_) => unreachable!("hooks are handled separately"),
         Command::Run { command } => dispatch_run(&ctx, command),
@@ -142,7 +142,7 @@ pub fn dispatch(command: &Command) -> Result<i32, CliError> {
     }
 }
 
-fn dispatch_run(ctx: &CommandContext, command: &RunCommand) -> Result<i32, CliError> {
+fn dispatch_run(ctx: &AppContext, command: &RunCommand) -> Result<i32, CliError> {
     match command {
         RunCommand::Init(args) => args.execute(ctx),
         RunCommand::Preflight(args) => args.execute(ctx),
@@ -164,7 +164,7 @@ fn dispatch_run(ctx: &CommandContext, command: &RunCommand) -> Result<i32, CliEr
     }
 }
 
-fn dispatch_authoring(ctx: &CommandContext, command: &AuthoringCommand) -> Result<i32, CliError> {
+fn dispatch_authoring(ctx: &AppContext, command: &AuthoringCommand) -> Result<i32, CliError> {
     match command {
         AuthoringCommand::Begin(args) => args.execute(ctx),
         AuthoringCommand::Save(args) => args.execute(ctx),
@@ -175,7 +175,7 @@ fn dispatch_authoring(ctx: &CommandContext, command: &AuthoringCommand) -> Resul
     }
 }
 
-fn dispatch_setup(ctx: &CommandContext, command: &SetupCommand) -> Result<i32, CliError> {
+fn dispatch_setup(ctx: &AppContext, command: &SetupCommand) -> Result<i32, CliError> {
     match command {
         SetupCommand::Bootstrap(args) => args.execute(ctx),
         SetupCommand::Kuma(args) => args.execute(ctx),

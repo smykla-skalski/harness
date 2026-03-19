@@ -19,13 +19,13 @@ use clap::{Args, Subcommand, ValueEnum};
 use serde_json::json;
 use tracing::warn;
 
-use crate::app::command_context::{CommandContext, Execute};
+use crate::app::command_context::{AppContext, Execute};
 use crate::workspace::harness_data_root;
 use crate::errors::{CliError, CliErrorKind};
 use crate::infra::io::{read_text, write_json_pretty};
 
 impl Execute for ObserveArgs {
-    fn execute(&self, _context: &CommandContext) -> Result<i32, CliError> {
+    fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
         execute(self.mode.clone())
     }
 }

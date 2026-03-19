@@ -6,14 +6,14 @@ use std::sync::LazyLock;
 use clap::Args;
 use regex::Regex;
 
-use crate::app::command_context::{CommandContext, Execute, resolve_repo_root};
+use crate::app::command_context::{AppContext, Execute, resolve_repo_root};
 use crate::core_defs::HARNESS_PREFIX;
 use crate::errors::{CliError, CliErrorKind};
 use crate::infra::exec::{kubectl, run_command};
 use crate::infra::io::ensure_dir;
 
 impl Execute for GatewayArgs {
-    fn execute(&self, _context: &CommandContext) -> Result<i32, CliError> {
+    fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
         gateway(
             self.kubeconfig.as_deref(),
             self.repo_root.as_deref(),

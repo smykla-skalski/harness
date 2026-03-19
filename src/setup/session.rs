@@ -4,7 +4,7 @@ use clap::Args;
 
 use tracing::warn;
 
-use crate::app::command_context::{CommandContext, Execute, resolve_project_dir};
+use crate::app::command_context::{AppContext, Execute, resolve_project_dir};
 use crate::workspace::compact;
 use crate::errors::CliError;
 use crate::hooks::session::SessionStartHookOutput;
@@ -13,13 +13,13 @@ use crate::run::context::RunRepository;
 use crate::setup::wrapper;
 
 impl Execute for SessionStartArgs {
-    fn execute(&self, _context: &CommandContext) -> Result<i32, CliError> {
+    fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
         session_start(self.project_dir.as_deref())
     }
 }
 
 impl Execute for SessionStopArgs {
-    fn execute(&self, _context: &CommandContext) -> Result<i32, CliError> {
+    fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
         session_stop(self.project_dir.as_deref())
     }
 }

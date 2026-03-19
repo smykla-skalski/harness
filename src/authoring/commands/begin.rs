@@ -2,13 +2,13 @@ use std::path::Path;
 
 use clap::Args;
 
-use crate::app::command_context::{CommandContext, Execute};
+use crate::app::command_context::{AppContext, Execute};
 use crate::authoring::begin_authoring_session;
 use crate::errors::CliError;
 use crate::rules;
 
 impl Execute for AuthoringBeginArgs {
-    fn execute(&self, _context: &CommandContext) -> Result<i32, CliError> {
+    fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
         begin(
             &self.repo_root,
             &self.feature,

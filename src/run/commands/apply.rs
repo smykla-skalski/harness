@@ -6,7 +6,7 @@ use clap::Args;
 
 use tracing::warn;
 
-use crate::app::command_context::{CommandContext, Execute, RunDirArgs, resolve_run_services};
+use crate::app::command_context::{AppContext, Execute};
 use crate::workspace::{shorten_path, utc_now};
 use crate::errors::{CliError, CliErrorKind};
 use crate::infra::blocks::kuma::manifest::resource_api_path;
@@ -15,12 +15,14 @@ use crate::infra::exec::kubectl;
 use crate::infra::io::{ensure_dir, validate_safe_segment, write_text};
 use crate::platform::cluster::Platform;
 use crate::platform::runtime::ClusterRuntime;
+use crate::run::args::RunDirArgs;
 use crate::run::resolve::resolve_manifest_path;
 
 use super::kumactl::find_kumactl_binary;
+use super::shared::resolve_run_services;
 
 impl Execute for ApplyArgs {
-    fn execute(&self, _context: &CommandContext) -> Result<i32, CliError> {
+    fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
         apply(
             self.kubeconfig.as_deref(),
             self.cluster.as_deref(),

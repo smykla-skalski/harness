@@ -1,11 +1,11 @@
 use clap::Args;
 
-use crate::app::command_context::{CommandContext, Execute, resolve_project_dir};
+use crate::app::command_context::{AppContext, Execute, resolve_project_dir};
 use crate::workspace::compact::{build_compact_handoff, save_compact_handoff};
 use crate::errors::CliError;
 
 impl Execute for PreCompactArgs {
-    fn execute(&self, _context: &CommandContext) -> Result<i32, CliError> {
+    fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
         pre_compact(self.project_dir.as_deref())
     }
 }

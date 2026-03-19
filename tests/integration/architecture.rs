@@ -83,6 +83,25 @@ fn internal_code_uses_kernel_command_intent_instead_of_legacy_shell_parse() {
 }
 
 #[test]
+fn app_context_stays_app_wiring_only() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let contents = fs::read_to_string(root.join("src/app/command_context.rs")).unwrap();
+
+    for needle in [
+        "RunAggregate",
+        "RunContext",
+        "RunRepository",
+        "resolve_run_directory",
+        "RunDirArgs",
+    ] {
+        assert!(
+            !contents.contains(needle),
+            "src/app/command_context.rs should not own run resolution via `{needle}`"
+        );
+    }
+}
+
+#[test]
 fn bespoke_frontmatter_paths_are_gone() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
     let denylist = ["extract_raw_frontmatter(", "serde_yml::Mapping"];
