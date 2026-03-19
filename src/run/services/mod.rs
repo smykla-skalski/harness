@@ -1,6 +1,6 @@
 mod cluster_health;
 mod recording;
-mod reporting;
+pub(crate) mod reporting;
 pub(crate) mod service_lifecycle;
 mod status;
 mod task_output;
@@ -33,7 +33,6 @@ use crate::workspace::utc_now;
 
 pub use cluster_health::{ClusterHealthReport, ClusterMemberHealthRecord};
 pub use recording::RecordCommandRequest;
-pub use reporting::{GroupReportRequest, ReportCheckOutcome};
 pub use service_lifecycle::StartServiceRequest;
 pub use status::{ClusterMemberStatusRecord, ClusterStatusReport, ServiceStatusRecord};
 pub use task_output::{tail_task_output, wait_for_task_output};
