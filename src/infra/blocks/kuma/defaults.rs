@@ -26,9 +26,6 @@ pub const GLOBAL_MODE: &str = "global";
 /// Default in-memory store type for lightweight local runs.
 pub const STORE_MEMORY: &str = "memory";
 
-/// Default postgres-backed store type for compose-managed runs.
-pub const STORE_POSTGRES: &str = "postgres";
-
 /// Default Kuma control-plane admin/API port.
 pub const CP_API_PORT: u16 = 5681;
 
@@ -40,9 +37,6 @@ pub const ENVOY_ADMIN_PORT: u16 = 9901;
 
 /// Default Envoy readiness/admin probe port used by universal service helpers.
 pub const DATAPLANE_READY_PORT: u16 = 9902;
-
-/// Default admin token secret path inside the control-plane API.
-pub const ADMIN_TOKEN_PATH: &str = "/global-secrets/admin-user-token";
 
 /// Default mesh name for local harness flows.
 pub const DEFAULT_MESH: &str = "default";

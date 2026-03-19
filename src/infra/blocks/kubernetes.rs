@@ -7,8 +7,6 @@ use serde::{Deserialize, Serialize};
 
 use crate::core_defs::CommandResult;
 use crate::infra::blocks::BlockError;
-#[cfg(feature = "k3d")]
-use crate::infra::blocks::ContainerRuntime;
 use crate::infra::blocks::ProcessExecutor;
 
 /// Snapshot of a Kubernetes pod from `kubectl get pods -o json`.
@@ -206,21 +204,13 @@ pub trait LocalClusterManager: Send + Sync {
 #[cfg(feature = "k3d")]
 pub struct K3dClusterManager {
     process: Arc<dyn ProcessExecutor>,
-    #[allow(dead_code)]
-    container_runtime: Arc<dyn ContainerRuntime>,
 }
 
 #[cfg(feature = "k3d")]
 impl K3dClusterManager {
     #[must_use]
-    pub fn new(
-        process: Arc<dyn ProcessExecutor>,
-        container_runtime: Arc<dyn ContainerRuntime>,
-    ) -> Self {
-        Self {
-            process,
-            container_runtime,
-        }
+    pub fn new(process: Arc<dyn ProcessExecutor>) -> Self {
+        Self { process }
     }
 }
 
@@ -432,9 +422,7 @@ impl LocalClusterManager for FakeLocalClusterManager {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::infra::blocks::{
-        FakeContainerRuntime, FakeProcessExecutor, FakeProcessMethod, FakeResponse,
-    };
+    use crate::infra::blocks::{FakeProcessExecutor, FakeProcessMethod, FakeResponse};
     use std::sync::Arc;
 
     fn success_result(args: &[&str], stdout: &str) -> CommandResult {
@@ -529,8 +517,7 @@ mod tests {
                 "demo 1/1 0/0\n",
             )),
         }]));
-        let fake_container = Arc::new(FakeContainerRuntime::new());
-        let manager = K3dClusterManager::new(fake_process, fake_container);
+        let manager = K3dClusterManager::new(fake_process);
 
         let exists = manager
             .cluster_exists("demo")

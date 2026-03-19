@@ -1,13 +1,10 @@
 use super::{FromStr, Gate, fmt};
 
 pub const SKILL_NAME: &str = super::SKILL_RUN;
-pub const AGENT_PREFLIGHT: &str = "preflight-worker";
 pub const PREFLIGHT_REPLY_HEAD: &str = concat!(skill_run!(), "/preflight:");
 
 pub const REPORT_LINE_LIMIT: usize = 220;
 pub const REPORT_CODE_BLOCK_LIMIT: usize = 4;
-
-pub const MANIFEST_FIX_TARGET_PREFIX: &str = "Suite target: ";
 
 pub const MANIFEST_FIX_GATE: Gate = Gate {
     question: concat!(

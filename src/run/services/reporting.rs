@@ -133,9 +133,8 @@ fn resolve_report_path(report_path: Option<&str>) -> Result<PathBuf, CliError> {
         return Ok(PathBuf::from(path));
     }
 
-    let services = RunServices::from_current()?.ok_or_else(|| -> CliError {
-        CliErrorKind::missing_run_context_value("report").into()
-    })?;
+    let services = RunServices::from_current()?
+        .ok_or_else(|| -> CliError { CliErrorKind::missing_run_context_value("report").into() })?;
     Ok(services.layout().report_path())
 }
 

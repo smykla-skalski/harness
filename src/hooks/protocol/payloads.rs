@@ -1,11 +1,10 @@
-use std::collections::HashMap;
 use std::io;
 use std::path::PathBuf;
 use std::str::FromStr;
 
+use crate::errors::{CliError, CliErrorKind};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use crate::errors::{CliError, CliErrorKind};
 
 /// An option in an `AskUserQuestion` prompt.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -125,13 +124,6 @@ impl HookEvent {
         let payload = HookEnvelopePayload::from_stdin()?;
         Ok(Self { payload })
     }
-}
-
-/// Extra types used in hook payload extraction.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct ToolTracking {
-    #[serde(default)]
-    pub tracked_tools: HashMap<String, u32>,
 }
 
 #[cfg(test)]

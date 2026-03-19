@@ -8,10 +8,10 @@ use crate::infra::exec::{run_command, run_command_streaming};
 use crate::infra::io::write_json_pretty;
 use crate::platform::cluster::{ClusterSpec, Platform};
 use crate::run::context::RunRepository;
+use crate::setup::cluster::ClusterArgs;
 use crate::setup::cluster::kubernetes::cluster_k8s;
 #[cfg(feature = "compose")]
 use crate::setup::cluster::universal::cluster_universal;
-use crate::setup::cluster::ClusterArgs;
 
 pub(crate) fn make_target(
     root: &Path,

@@ -39,7 +39,9 @@ static SLUGIFY_RE: LazyLock<Regex> =
 ///
 /// # Errors
 /// Returns `CliError` on validation, IO, or wrapped command failure.
-pub fn record_command(request: &RecordCommandRequest<'_>) -> Result<RecordedCommandResult, CliError> {
+pub fn record_command(
+    request: &RecordCommandRequest<'_>,
+) -> Result<RecordedCommandResult, CliError> {
     let mut command: Vec<&str> = request.command_args.iter().map(String::as_str).collect();
     if command.first() == Some(&"--") {
         command.remove(0);
