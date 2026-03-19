@@ -334,15 +334,6 @@ pub struct PreflightArtifact {
     pub nodes: NodeCheckSnapshot,
 }
 
-/// Update fields for the current run context.
-#[derive(Debug, Clone, Default)]
-pub struct CurrentRunUpdate {
-    pub cluster: Option<ClusterSpec>,
-    pub prepared_suite_path: Option<String>,
-    pub preflight_artifact_path: Option<String>,
-    pub run_report_path: Option<String>,
-}
-
 /// Persisted current run pointer.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CurrentRunPointer {

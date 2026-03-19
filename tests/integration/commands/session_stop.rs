@@ -102,7 +102,10 @@ fn session_stop_rejects_corrupt_pointer_json() {
             let error =
                 run_command(session_stop_cmd(SessionStopArgs { project_dir: None })).unwrap_err();
             assert_eq!(error.code(), "KSRCLI019");
-            assert!(ctx_path.exists(), "corrupt pointer should be preserved for inspection");
+            assert!(
+                ctx_path.exists(),
+                "corrupt pointer should be preserved for inspection"
+            );
         },
     );
 }

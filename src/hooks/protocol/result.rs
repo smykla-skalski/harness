@@ -125,18 +125,6 @@ impl NormalizedHookResult {
     }
 
     #[must_use]
-    pub fn with_updated_input(mut self, updated_input: Value) -> Self {
-        self.updated_input = Some(updated_input);
-        self
-    }
-
-    #[must_use]
-    pub fn with_halt(mut self) -> Self {
-        self.halt_agent = true;
-        self
-    }
-
-    #[must_use]
     pub fn is_denial(&self) -> bool {
         self.decision == NormalizedDecision::Deny
     }

@@ -14,10 +14,7 @@ pub struct FrontmatterDocument<T> {
 ///
 /// # Errors
 /// Returns `CliError` if frontmatter is missing, unterminated, or invalid.
-pub fn parse_frontmatter<T>(
-    text: &str,
-    label: &str,
-) -> Result<FrontmatterDocument<T>, CliError>
+pub fn parse_frontmatter<T>(text: &str, label: &str) -> Result<FrontmatterDocument<T>, CliError>
 where
     T: DeserializeOwned,
 {

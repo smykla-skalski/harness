@@ -89,26 +89,6 @@ impl ComposeFile {
             BlockError::new("compose", &format!("write {}", path.display()), error)
         })
     }
-
-    #[must_use]
-    pub fn services_len(&self) -> usize {
-        self.services.len()
-    }
-
-    #[must_use]
-    pub fn networks_len(&self) -> usize {
-        self.networks.len()
-    }
-
-    #[must_use]
-    pub fn contains_service(&self, name: &str) -> bool {
-        self.services.contains_key(name)
-    }
-
-    #[must_use]
-    pub fn contains_network(&self, name: &str) -> bool {
-        self.networks.contains_key(name)
-    }
 }
 
 impl ComposeTopology {

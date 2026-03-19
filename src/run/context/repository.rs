@@ -302,13 +302,6 @@ impl InMemoryRunRepository {
             .unwrap_or_else(sync::PoisonError::into_inner)
             .insert(run_dir, aggregate);
     }
-
-    pub fn set_pointer(&self, pointer: CurrentRunPointer) {
-        *self
-            .pointer
-            .lock()
-            .unwrap_or_else(sync::PoisonError::into_inner) = Some(pointer);
-    }
 }
 
 #[cfg(test)]

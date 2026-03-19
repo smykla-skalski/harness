@@ -1,9 +1,9 @@
 mod markdown;
 mod yaml;
 
+use std::io;
 use std::io::Write as _;
 use std::path::Path;
-use std::io;
 
 use fs_err as fs;
 use serde::Serialize;

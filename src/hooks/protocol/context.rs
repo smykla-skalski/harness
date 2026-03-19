@@ -505,25 +505,6 @@ impl GuardContext {
     }
 
     #[must_use]
-    pub fn bash_stdout(&self) -> Option<&str> {
-        self.tool_response().get("stdout").and_then(Value::as_str)
-    }
-
-    #[must_use]
-    pub fn bash_stderr(&self) -> Option<&str> {
-        self.tool_response().get("stderr").and_then(Value::as_str)
-    }
-
-    #[must_use]
-    pub fn bash_exit_code(&self) -> Option<i32> {
-        self.tool_response()
-            .get("exit_code")
-            .or_else(|| self.tool_response().get("exitCode"))
-            .and_then(Value::as_i64)
-            .and_then(|value| i32::try_from(value).ok())
-    }
-
-    #[must_use]
     pub fn response_text(&self) -> String {
         render_tool_response_text(self.tool_name(), self.tool_response())
     }

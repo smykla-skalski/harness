@@ -160,12 +160,6 @@ impl BlockRegistry {
     }
 
     #[must_use]
-    pub fn with_clock(mut self, clock: Arc<dyn Clock>) -> Self {
-        self.clock = clock;
-        self
-    }
-
-    #[must_use]
     pub fn production() -> Self {
         let process: Arc<dyn ProcessExecutor> = Arc::new(StdProcessExecutor);
         let http: Arc<dyn HttpClient> = Arc::new(ReqwestHttpClient::new());
@@ -180,7 +174,7 @@ impl BlockRegistry {
             .with_kubernetes(kubernetes)
             .with_build(build);
 
-        production_adapters(registry, process, http, docker)
+        production_adapters(registry, process, http, &docker)
     }
 
     #[must_use]
@@ -210,12 +204,6 @@ impl BlockRegistry {
     #[must_use]
     pub fn with_helm(mut self, helm: Arc<dyn PackageDeployer>) -> Self {
         self.helm = Some(helm);
-        self
-    }
-
-    #[must_use]
-    pub fn with_envoy(mut self, envoy: Arc<dyn ProxyIntrospector>) -> Self {
-        self.envoy = Some(envoy);
         self
     }
 
@@ -320,7 +308,7 @@ fn production_adapters(
     #[allow(unused_mut)] mut registry: BlockRegistry,
     #[allow(unused_variables)] process: Arc<dyn ProcessExecutor>,
     #[allow(unused_variables)] http: Arc<dyn HttpClient>,
-    #[allow(unused_variables)] docker: Arc<dyn ContainerRuntime>,
+    #[allow(unused_variables)] docker: &Arc<dyn ContainerRuntime>,
 ) -> BlockRegistry {
     #[cfg(feature = "compose")]
     {
@@ -342,7 +330,7 @@ fn production_adapters(
 
     #[cfg(feature = "k3d")]
     {
-        registry = registry.with_k3d(Arc::new(K3dClusterManager::new(process.clone(), docker)));
+        registry = registry.with_k3d(Arc::new(K3dClusterManager::new(process.clone())));
     }
 
     #[cfg(feature = "helm")]
