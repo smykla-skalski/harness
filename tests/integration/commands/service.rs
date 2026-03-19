@@ -2,7 +2,7 @@
 // Tests error paths for missing args and missing cluster spec.
 
 use harness::run::RunDirArgs;
-use harness::run::commands::ServiceArgs;
+use harness::run::ServiceArgs;
 
 use super::super::helpers::*;
 

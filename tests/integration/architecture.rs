@@ -551,6 +551,46 @@ fn application_submodules_are_not_public_library_surface() {
 }
 
 #[test]
+fn transport_command_modules_stay_internal_to_domains() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+
+    for (path, needle) in [
+        ("src/run/mod.rs", "pub mod commands;"),
+        ("src/authoring/mod.rs", "pub mod commands;"),
+    ] {
+        let contents = fs::read_to_string(root.join(path)).unwrap();
+        assert!(
+            !contents.contains(needle),
+            "{path} should keep `commands` crate-internal instead of exporting `{needle}`"
+        );
+        assert!(
+            contents.contains("pub(crate) mod commands;"),
+            "{path} should expose `commands` as crate-internal only"
+        );
+    }
+
+    for path in [
+        "src/app/cli.rs",
+        "tests/integration/helpers.rs",
+        "tests/integration/cluster.rs",
+        "tests/integration/commands/api.rs",
+        "tests/integration/commands/init_run.rs",
+        "tests/integration/commands/record.rs",
+        "tests/integration/commands/report.rs",
+        "tests/integration/commands/runner_state.rs",
+        "tests/integration/commands/service.rs",
+        "tests/integration/preflight.rs",
+        "tests/integration/universal.rs",
+    ] {
+        let contents = fs::read_to_string(root.join(path)).unwrap();
+        assert!(
+            !contents.contains("::commands::"),
+            "{path} should depend on domain-root transport exports instead of `::commands::`"
+        );
+    }
+}
+
+#[test]
 fn observe_transport_stays_transport_only() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
     let transport = fs::read_to_string(root.join("src/observe/mod.rs")).unwrap();

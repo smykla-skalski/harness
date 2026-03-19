@@ -2,8 +2,9 @@
 // Covers state initialization, read/write round-trips, phase transitions
 // (preflight, abort, completed), and event tracking.
 
+use harness::app::cli::RunCommand;
 use harness::run::RunDirArgs;
-use harness::run::commands::runner_state;
+use harness::run::RunnerStateArgs;
 use harness::run::workflow::{self as runner_workflow, PreflightStatus, RunnerEvent, RunnerPhase};
 
 use super::super::helpers::*;
@@ -96,7 +97,12 @@ fn runner_state_event_returns_error() {
         run_id: None,
         run_root: None,
     };
-    let result = runner_state(Some(RunnerEvent::RunCompleted), None, None, &args);
+    let result = run_command(run_cmd(RunCommand::RunnerState(RunnerStateArgs {
+        event: Some(RunnerEvent::RunCompleted),
+        suite_target: None,
+        message: None,
+        run_dir: args,
+    })));
     assert!(result.is_err(), "event-based transitions should return Err");
     let err = result.unwrap_err();
     assert_eq!(err.code(), "KSRCLI084");

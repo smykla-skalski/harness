@@ -2,7 +2,7 @@
 // Tests error paths since happy path requires a real CP.
 
 use harness::run::RunDirArgs;
-use harness::run::commands::{ApiArgs, ApiMethod};
+use harness::run::{ApiArgs, ApiMethod};
 
 use super::super::helpers::*;
 
