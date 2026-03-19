@@ -15,7 +15,7 @@ For `Mesh*` policy specifics (roles, `targetRef` rules, inspect flow), read
 
 ## Validate
 
-After `harness init` and `harness cluster`, `validate` and `apply` read the active run and kubeconfig from `current-run.json`. Fresh sessions restore that active run automatically from saved project state. Do not add explicit path or kubeconfig flags unless debugging a broken run context.
+After `harness init` and `harness setup kuma cluster`, `validate` and `apply` read the active run and kubeconfig from `current-run.json`. Fresh sessions restore that active run automatically from saved project state. Do not add explicit path or kubeconfig flags unless debugging a broken run context.
 
 ```bash
 harness validate \

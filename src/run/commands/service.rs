@@ -7,6 +7,8 @@ use tracing::info;
 
 use crate::app::command_context::{CommandContext, Execute, RunDirArgs};
 use crate::errors::{CliError, CliErrorKind};
+use crate::infra::blocks::kuma::defaults;
+use crate::infra::blocks::kuma::service::{KumaService, KumaServiceSpec};
 use crate::infra::blocks::{ContainerConfig, ContainerRuntime};
 use crate::infra::exec;
 use crate::platform::runtime::XdsAccess;
@@ -25,7 +27,7 @@ const TEMPLATE_DATAPLANE: &str =
 const TEMPLATE_TRANSPARENT_PROXY: &str =
     include_str!("../../../resources/universal/templates/transparent-proxy.yaml.j2");
 
-/// Arguments for `harness service`.
+/// Arguments for `harness run kuma service`.
 #[derive(Debug, Clone, Args)]
 pub struct ServiceArgs {
     /// Service action.
@@ -54,26 +56,6 @@ pub struct ServiceArgs {
     /// Run-directory resolution.
     #[command(flatten)]
     pub run_dir: RunDirArgs,
-}
-
-/// Render an embedded universal mode template.
-///
-/// # Errors
-/// Returns `CliError` if the template cannot be parsed or rendered.
-fn render_template(
-    template_name: &str,
-    template_content: &str,
-    ctx: &serde_json::Value,
-) -> Result<String, CliError> {
-    let env = minijinja::Environment::new();
-    let tmpl = env
-        .template_from_str(template_content)
-        .map_err(|e| CliErrorKind::template_render(format!("parse {template_name}: {e}")))?;
-    tmpl.render(ctx).map_err(|e| {
-        CliError::from(CliErrorKind::template_render(format!(
-            "render {template_name}: {e}"
-        )))
-    })
 }
 
 /// Manage universal mode test service containers.
@@ -120,7 +102,7 @@ fn service_up(
         "dataplane",
         svc_name,
         &args.mesh,
-        "24h",
+        defaults::DEFAULT_TOKEN_VALID_FOR,
         access.admin_token,
     )?;
     let token_str = token_result.trim();
@@ -186,6 +168,7 @@ fn service_up_inner(setup: &ServiceSetup<'_>) -> Result<(), CliError> {
     let transparent_proxy = setup.transparent_proxy;
     // Resolve the container IP on the Docker network
     let container_address = setup.docker.inspect_ip(svc_name, network)?;
+    let files = KumaService::files_for(svc_name);
 
     // Render dataplane YAML from embedded template using the resolved address
     let (template_name, template_content) = if transparent_proxy {
@@ -193,24 +176,31 @@ fn service_up_inner(setup: &ServiceSetup<'_>) -> Result<(), CliError> {
     } else {
         ("dataplane.yaml.j2", TEMPLATE_DATAPLANE)
     };
-    let dp_yaml = render_template(
+    let dp_yaml = KumaService::render_dataplane_template(
         template_name,
         template_content,
-        &serde_json::json!({
-            "name": svc_name,
-            "mesh": mesh,
-            "address": container_address,
-            "port": svc_port,
-            "protocol": "http",
-        }),
-    )?;
+        &KumaServiceSpec {
+            name: svc_name.to_string(),
+            mesh: mesh.to_string(),
+            address: container_address.clone(),
+            port: svc_port,
+            transparent_proxy,
+        },
+    )
+    .map_err(|error| CliErrorKind::template_render(error.to_string()))?;
 
     // Write token and dataplane YAML into container while extracting CA cert in parallel.
-    let token_path = format!("/tmp/{svc_name}-token");
-    let dp_path = format!("/tmp/{svc_name}-dp.yaml");
     let ca_cert = thread::scope(|scope| {
-        let t_token = scope.spawn(|| setup.docker.write_file(svc_name, &token_path, token_str));
-        let t_yaml = scope.spawn(|| setup.docker.write_file(svc_name, &dp_path, &dp_yaml));
+        let t_token = scope.spawn(|| {
+            setup
+                .docker
+                .write_file(svc_name, &files.token_path, token_str)
+        });
+        let t_yaml = scope.spawn(|| {
+            setup
+                .docker
+                .write_file(svc_name, &files.dataplane_path, &dp_yaml)
+        });
         let t_cert = scope.spawn(|| extract_cp_ca_cert(setup.xds.ip, setup.xds.port));
         t_token.join().expect("token write thread panicked")?;
         t_yaml.join().expect("yaml write thread panicked")?;
@@ -227,26 +217,18 @@ fn service_up_inner(setup: &ServiceSetup<'_>) -> Result<(), CliError> {
 
     // Inject the CA cert into the container.
     // kuma-dp needs this to verify the TLS connection to the CP.
-    let ca_path = format!("/tmp/{svc_name}-ca.crt");
-    setup.docker.write_file(svc_name, &ca_path, &ca_cert)?;
+    setup
+        .docker
+        .write_file(svc_name, &files.ca_cert_path, &ca_cert)?;
 
     // Start kuma-dp inside the container in detached mode.
     // kuma-dp connects to the XDS port (5678), not the API port (5681).
-    let xds_addr = format!("https://{}:{}", setup.xds.ip, setup.xds.port);
-    setup.docker.exec_detached(
-        svc_name,
-        &[
-            "kuma-dp",
-            "run",
-            &format!("--cp-address={xds_addr}"),
-            &format!("--dataplane-token-file={token_path}"),
-            &format!("--dataplane-file={dp_path}"),
-            &format!("--ca-cert-file={ca_path}"),
-        ],
-    )?;
+    let launch = KumaService::launch_for(svc_name, &files, setup.xds);
+    let launch_args = launch.args.iter().map(String::as_str).collect::<Vec<_>>();
+    setup.docker.exec_detached(svc_name, &launch_args)?;
 
     // Wait for kuma-dp to become ready
-    let readiness_url = format!("http://{container_address}:9902/ready");
+    let readiness_url = KumaService::readiness_url(&container_address);
     info!(%svc_name, %readiness_url, "waiting for service readiness");
     exec::wait_for_http(&readiness_url, Duration::from_secs(setup.timeout)).map_err(|_| {
         CliError::from(CliErrorKind::service_readiness_timeout(
@@ -341,69 +323,6 @@ mod tests {
     use super::*;
     use crate::platform::cluster::{ClusterSpec, Platform};
     use crate::platform::runtime::ClusterRuntime;
-
-    // -- template rendering tests --
-
-    #[test]
-    fn dataplane_template_renders_correctly() {
-        let ctx = serde_json::json!({
-            "name": "demo",
-            "mesh": "default",
-            "address": "172.57.0.10",
-            "port": 8080,
-            "protocol": "http",
-        });
-        let result = render_template("dataplane.yaml.j2", TEMPLATE_DATAPLANE, &ctx).unwrap();
-        assert!(result.contains("demo"), "should contain service name");
-        assert!(result.contains("default"), "should contain mesh name");
-        assert!(result.contains("172.57.0.10"), "should contain address");
-        assert!(result.contains("8080"), "should contain port");
-        assert!(
-            !result.contains("transparentProxying"),
-            "should not contain transparentProxying"
-        );
-    }
-
-    #[test]
-    fn transparent_proxy_template_renders_correctly() {
-        let ctx = serde_json::json!({
-            "name": "proxy-svc",
-            "mesh": "default",
-            "address": "172.57.0.20",
-            "port": 9090,
-            "protocol": "http",
-        });
-        let result = render_template(
-            "transparent-proxy.yaml.j2",
-            TEMPLATE_TRANSPARENT_PROXY,
-            &ctx,
-        )
-        .unwrap();
-        assert!(result.contains("proxy-svc"));
-        assert!(result.contains("172.57.0.20"));
-        assert!(result.contains("9090"));
-        assert!(
-            result.contains("transparentProxying"),
-            "should contain transparentProxying"
-        );
-    }
-
-    #[test]
-    fn template_selection_uses_transparent_proxy_flag() {
-        let (name_std, _) = if false {
-            ("transparent-proxy.yaml.j2", TEMPLATE_TRANSPARENT_PROXY)
-        } else {
-            ("dataplane.yaml.j2", TEMPLATE_DATAPLANE)
-        };
-        assert_eq!(name_std, "dataplane.yaml.j2");
-
-        let (name_tp, _) = if true {
-            ("transparent-proxy.yaml.j2", TEMPLATE_TRANSPARENT_PROXY)
-        } else {
-            ("dataplane.yaml.j2", TEMPLATE_DATAPLANE)
-        };
-        assert_eq!(name_tp, "transparent-proxy.yaml.j2");
-    }
 
     // -- runtime service image tests --
 

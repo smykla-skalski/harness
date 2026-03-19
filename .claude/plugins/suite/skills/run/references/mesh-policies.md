@@ -16,7 +16,7 @@
 
 Use this reference when a test run includes any `Mesh*` policy.
 
-After `harness init` and `harness cluster`, the `harness` examples below rely on the active `current-run.json` shim for run path, repo root, and kubeconfig defaults. Use `harness run --cluster <name> kubectl ...` when a multi-zone check must target a non-primary tracked cluster member. Do not pass kubeconfig or cluster-target override flags through tracked `kubectl` commands.
+After `harness init` and `harness setup kuma cluster`, the `harness` examples below rely on the active `current-run.json` shim for run path, repo root, and kubeconfig defaults. Use `harness run --cluster <name> kubectl ...` when a multi-zone check must target a non-primary tracked cluster member. Do not pass kubeconfig or cluster-target override flags through tracked `kubectl` commands.
 
 This file is based on Kuma docs `2.13.x` pages. Check kuma.io/docs/ for newer versions - if a newer release exists, substitute the version in the URLs below:
 

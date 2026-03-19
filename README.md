@@ -25,7 +25,7 @@ Requires Rust 1.94+.
 
 ```bash
 # spin up a disposable cluster
-harness setup cluster single-up my-cluster --repo-root /path/to/repo
+harness setup kuma cluster single-up my-cluster --repo-root /path/to/repo
 
 # create a run from a suite file
 harness run init --suite suites/my-feature.md --run-id run-1 --profile single-zone --repo-root /path/to/repo

@@ -190,7 +190,7 @@ fn check_destructive_patterns(
                 "Raw make target used for cluster operation",
             )
             .with_guidance(Guidance::fix_hint(
-                "Use harness cluster instead of raw make targets",
+                "Use harness setup kuma cluster instead of raw make targets",
             ))
             .with_confidence(Confidence::High)
             .with_fix_safety(FixSafety::AutoFixSafe)

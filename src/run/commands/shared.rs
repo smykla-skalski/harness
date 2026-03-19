@@ -4,8 +4,9 @@ use std::process::Command;
 
 use tracing::warn;
 
-use crate::core_defs::{harness_data_root, host_platform};
+use crate::core_defs::harness_data_root;
 use crate::errors::{CliError, CliErrorKind};
+use crate::infra::blocks::kuma::cli::primary_kumactl_dir;
 use crate::platform::cluster::Platform;
 use crate::run::services::RunServices;
 use crate::suite_defaults::default_repo_root_for_suite;
@@ -88,10 +89,9 @@ fn inject_repo_env(cmd: &mut Command, repo_root: &str) {
         return;
     }
     cmd.env("REPO_ROOT", repo_root);
-    let (os_name, arch) = host_platform();
-    let kumactl_dir = format!("{repo_root}/build/artifacts-{os_name}-{arch}/kumactl");
-    if Path::new(&kumactl_dir).is_dir() {
+    let kumactl_dir = primary_kumactl_dir(Path::new(repo_root));
+    if kumactl_dir.is_dir() {
         let current_path = env::var("PATH").unwrap_or_default();
-        cmd.env("PATH", format!("{kumactl_dir}:{current_path}"));
+        cmd.env("PATH", format!("{}:{current_path}", kumactl_dir.display()));
     }
 }

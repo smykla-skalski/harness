@@ -2,6 +2,8 @@ use std::collections::HashMap;
 use std::env;
 use std::path::Path;
 
+use crate::infra::blocks::kuma::cli::primary_kumactl_dir;
+
 /// Merge current env with extra key-value pairs.
 ///
 /// When the merged env contains `REPO_ROOT`, the build artifacts directory
@@ -42,11 +44,7 @@ fn prepend_build_artifacts_path(env: &mut HashMap<String, String>) {
     if repo_root.is_empty() {
         return;
     }
-    let (os_name, arch) = host_platform();
-    let artifacts_dir = Path::new(repo_root)
-        .join("build")
-        .join(format!("artifacts-{os_name}-{arch}"))
-        .join("kumactl");
+    let artifacts_dir = primary_kumactl_dir(Path::new(repo_root));
     if !artifacts_dir.is_dir() {
         return;
     }

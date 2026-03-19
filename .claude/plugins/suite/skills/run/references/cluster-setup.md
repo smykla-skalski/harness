@@ -34,7 +34,7 @@ After `harness init`, rely on the active run context for repo root and the prima
 ### Single-zone
 
 ```bash
-harness cluster single-up kuma-1
+harness setup kuma cluster single-up kuma-1
 ```
 
 Manual equivalent:
@@ -53,7 +53,7 @@ KIND_CLUSTER_NAME=kuma-1 make k3d/stop
 ### Global + one zone
 
 ```bash
-harness cluster global-zone-up kuma-1 kuma-2 zone-1
+harness setup kuma cluster global-zone-up kuma-1 kuma-2 zone-1
 ```
 
 Manual equivalent for global:
@@ -92,7 +92,7 @@ KUBECONFIG="${HOME}/.kube/kind-kuma-2-config" \
 ### Global + two zones
 
 ```bash
-harness cluster global-two-zones-up kuma-1 kuma-2 kuma-3 zone-1 zone-2
+harness setup kuma cluster global-two-zones-up kuma-1 kuma-2 kuma-3 zone-1 zone-2
 ```
 
 Stop all:
@@ -118,7 +118,7 @@ K3D_HELM_DEPLOY_NO_CNI=true KIND_CLUSTER_NAME=kuma-1 make k3d/deploy/helm
 
 After CRD/schema changes, force-update CRDs:
 
-Do not refresh CRDs with a bare `kubectl apply` during a tracked run. If CRDs changed, recreate the affected cluster profile with `harness cluster` and rerun `harness preflight`.
+Do not refresh CRDs with a bare `kubectl apply` during a tracked run. If CRDs changed, recreate the affected cluster profile with `harness setup kuma cluster` and rerun `harness preflight`.
 
 ## Gateway API CRDs
 
@@ -144,5 +144,5 @@ Before test execution, run `harness preflight` and `harness capture --label pref
 
 ## Notes
 
-- `harness cluster` auto-generates a temporary `mk/metallb-k3d-kuma-<n>.yaml` when missing for numeric cluster names like `kuma-3`.
+- `harness setup kuma cluster` auto-generates a temporary `mk/metallb-k3d-kuma-<n>.yaml` when missing for numeric cluster names like `kuma-3`.
 - Performance toggles are documented in [workflow.md](workflow.md) (performance toggles section).

@@ -201,7 +201,7 @@ pub(super) fn check_env_misconfiguration(
             )
             .with_guidance(Guidance::fix_target_hint(
                 "skills/run/SKILL.md",
-                "harness cluster should set KUBECONFIG to the k3d cluster config. \
+                "harness setup kuma cluster should set KUBECONFIG to the k3d cluster config. \
                  Without it, kubectl defaults to ~/.kube/config which may point \
                  to a corporate cluster.",
             ))

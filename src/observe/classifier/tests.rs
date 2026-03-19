@@ -143,7 +143,7 @@ fn skips_help_output() {
     let issues = check_text_for_issues(
         80,
         MessageRole::User,
-        "Kuma test harness\n\nUsage: harness [COMMAND]",
+        "Harness CLI\n\nUsage: harness [COMMAND]",
         Some(SourceTool::Bash),
         &mut state,
     );
@@ -688,7 +688,7 @@ fn detects_harness_cluster_missing() {
     let issues = check_text_for_issues(
         10,
         MessageRole::Assistant,
-        "The harness cluster command is missing the zone-to-global link setup",
+        "The harness setup kuma cluster command is missing the zone-to-global link setup",
         None,
         &mut state,
     );

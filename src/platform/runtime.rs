@@ -2,6 +2,7 @@ use std::borrow::Cow;
 use std::path::Path;
 
 use crate::errors::{CliError, CliErrorKind};
+use crate::infra::blocks::kuma::defaults;
 use crate::platform::cluster::{ClusterSpec, Platform};
 use crate::run::context::RunAggregate;
 
@@ -106,7 +107,7 @@ impl<'a> UniversalRuntime<'a> {
         };
         Ok(XdsAccess {
             ip,
-            port: member.xds_port.unwrap_or(5678),
+            port: member.xds_port.unwrap_or(defaults::XDS_PORT),
         })
     }
 
@@ -124,8 +125,8 @@ impl<'a> UniversalRuntime<'a> {
             )
             .into());
         };
-        if cp_image.contains("kuma-cp") {
-            return Ok(Cow::Owned(cp_image.replace("kuma-cp", "kuma-universal")));
+        if let Ok(image) = defaults::derive_universal_service_image(cp_image) {
+            return Ok(Cow::Owned(image));
         }
         Err(CliErrorKind::usage_error(format!(
             "cannot derive service image from cp_image '{cp_image}' - pass --image explicitly"

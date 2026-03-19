@@ -170,10 +170,10 @@ fn core_features() -> BTreeMap<Feature, FeatureInfo> {
         (
             Feature::ApiAccess,
             FeatureInfo::new("send HTTP requests to CP REST API endpoints").commands(&[
-                "harness run api get",
-                "harness run api post",
-                "harness run api put",
-                "harness run api delete",
+                "harness run kuma api get",
+                "harness run kuma api post",
+                "harness run kuma api put",
+                "harness run kuma api delete",
             ]),
         ),
         (
@@ -189,7 +189,7 @@ fn core_features() -> BTreeMap<Feature, FeatureInfo> {
         (
             Feature::ClusterManagement,
             FeatureInfo::new("create and tear down local k3d or universal Docker clusters")
-                .command("harness setup cluster"),
+                .command("harness setup kuma cluster"),
         ),
         (
             Feature::ContainerLogs,
@@ -201,7 +201,7 @@ fn core_features() -> BTreeMap<Feature, FeatureInfo> {
             FeatureInfo::new(
                 "generate dataplane/ingress/egress tokens from CP REST API or kumactl",
             )
-            .command("harness run token")
+            .command("harness run kuma token")
             .platforms(universal),
         ),
         (
@@ -223,7 +223,7 @@ fn core_features() -> BTreeMap<Feature, FeatureInfo> {
         (
             Feature::HelmSettings,
             FeatureInfo::new("pass custom Helm values during cluster bootstrap")
-                .command("harness setup cluster <mode> --helm-setting <key>=<value>")
+                .command("harness setup kuma cluster <mode> --helm-setting <key>=<value>")
                 .platforms(kubernetes),
         ),
         (
@@ -234,7 +234,7 @@ fn core_features() -> BTreeMap<Feature, FeatureInfo> {
         (
             Feature::Kumactl,
             FeatureInfo::new("find or build kumactl from local repo checkout")
-                .commands(&["harness run kumactl find", "harness run kumactl build"]),
+                .commands(&["harness run kuma cli find", "harness run kuma cli build"]),
         ),
         (
             Feature::ManifestApply,
@@ -312,7 +312,7 @@ fn extended_features() -> BTreeMap<Feature, FeatureInfo> {
         (
             Feature::ServiceContainers,
             FeatureInfo::new("manage test service Docker containers with dataplane sidecars")
-                .command("harness run service")
+                .command("harness run kuma service")
                 .platforms(universal),
         ),
         (
@@ -345,7 +345,7 @@ fn extended_features() -> BTreeMap<Feature, FeatureInfo> {
         (
             Feature::TransparentProxy,
             FeatureInfo::new("install transparent proxy on universal service containers")
-                .command("harness run service up --transparent-proxy")
+                .command("harness run kuma service up --transparent-proxy")
                 .platforms(universal),
         ),
     ])
