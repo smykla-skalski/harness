@@ -1,12 +1,15 @@
 use clap::Args;
 
-use crate::app::command_context::{CommandContext, Execute, RunDirArgs};
+use crate::app::command_context::{AppContext, Execute};
 use crate::errors::{CliError, CliErrorKind};
 use crate::infra::blocks::ContainerRuntime;
+use crate::run::args::RunDirArgs;
 use crate::run::services::StartServiceRequest;
 
+use super::shared::resolve_run_services_with_blocks;
+
 impl Execute for ServiceArgs {
-    fn execute(&self, context: &CommandContext) -> Result<i32, CliError> {
+    fn execute(&self, context: &AppContext) -> Result<i32, CliError> {
         service(context, self)
     }
 }
@@ -46,7 +49,7 @@ pub struct ServiceArgs {
 ///
 /// # Errors
 /// Returns `CliError` on failure.
-pub fn service(ctx: &CommandContext, args: &ServiceArgs) -> Result<i32, CliError> {
+pub fn service(ctx: &AppContext, args: &ServiceArgs) -> Result<i32, CliError> {
     let docker = ctx
         .blocks()
         .docker
@@ -63,7 +66,7 @@ pub fn service(ctx: &CommandContext, args: &ServiceArgs) -> Result<i32, CliError
 }
 
 fn service_up(
-    ctx: &CommandContext,
+    ctx: &AppContext,
     args: &ServiceArgs,
     docker: &dyn ContainerRuntime,
 ) -> Result<i32, CliError> {
@@ -74,7 +77,7 @@ fn service_up(
     let port = args
         .port
         .ok_or_else(|| CliErrorKind::usage_error("service port is required"))?;
-    let services = ctx.resolve_run_services(&args.run_dir)?;
+    let services = resolve_run_services_with_blocks(&args.run_dir, ctx.shared_blocks())?;
     services.start_service(
         docker,
         &StartServiceRequest {
@@ -98,11 +101,11 @@ fn service_down(name: Option<&str>, docker: &dyn ContainerRuntime) -> Result<i32
 }
 
 fn service_list(
-    ctx: &CommandContext,
+    ctx: &AppContext,
     run_dir_args: &RunDirArgs,
     docker: &dyn ContainerRuntime,
 ) -> Result<i32, CliError> {
-    if let Ok(services) = ctx.resolve_run_services(run_dir_args) {
+    if let Ok(services) = resolve_run_services_with_blocks(run_dir_args, ctx.shared_blocks()) {
         for row in services.list_service_containers()? {
             println!("{}\t{}", row.name, row.status);
         }

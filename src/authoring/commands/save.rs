@@ -1,6 +1,6 @@
 use clap::Args;
 
-use crate::app::command_context::{CommandContext, Execute};
+use crate::app::command_context::{AppContext, Execute};
 use crate::authoring::{authoring_workspace_dir, require_authoring_session};
 use crate::errors::{CliError, CliErrorKind};
 use crate::infra::io::{ensure_dir, is_safe_name, write_text};
@@ -8,7 +8,7 @@ use crate::infra::io::{ensure_dir, is_safe_name, write_text};
 use super::shared::{parse_payload, read_input};
 
 impl Execute for AuthoringSaveArgs {
-    fn execute(&self, _context: &CommandContext) -> Result<i32, CliError> {
+    fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
         save(&self.kind, self.payload.as_deref(), self.input.as_deref())
     }
 }

@@ -5,15 +5,17 @@ use clap::Args;
 
 use tracing::warn;
 
-use crate::app::command_context::{CommandContext, Execute, RunDirArgs, resolve_run_services};
+use crate::app::command_context::{AppContext, Execute};
 use crate::errors::{CliError, CliErrorKind};
 use crate::infra::blocks::kuma::token::parse_token_response;
 use crate::infra::exec;
+use crate::run::args::RunDirArgs;
 
 use super::kumactl::find_kumactl_binary;
+use super::shared::resolve_run_services;
 
 impl Execute for TokenArgs {
-    fn execute(&self, _context: &CommandContext) -> Result<i32, CliError> {
+    fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
         token(
             &self.kind,
             &self.name,
