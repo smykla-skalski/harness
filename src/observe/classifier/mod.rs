@@ -13,11 +13,11 @@ use std::sync::LazyLock;
 use regex::Regex;
 
 use self::emitter::{IssueBlueprint, IssueEmitter};
+use super::types::{Issue, IssueCategory, MessageRole, ScanState, SourceTool};
 use crate::observe::application::session_event::{
     SessionContent, SessionContentBlock, parse_session_event,
 };
 use crate::observe::dump::tool_result_text;
-use super::types::{Issue, IssueCategory, MessageRole, ScanState, SourceTool};
 
 pub use tool_checks::check_tool_use_for_issues;
 
@@ -78,7 +78,7 @@ fn is_skill_injection(text: &str) -> bool {
 fn resolve_source_tool(block: &serde_json::Value, state: &ScanState) -> Option<SourceTool> {
     let tool_id = block["tool_use_id"].as_str()?;
     let record = state.last_tool_uses.get(tool_id)?;
-    SourceTool::from_label(&record.name)
+    SourceTool::from_label(&record.tool.original_name)
 }
 
 // ─── Context struct ────────────────────────────────────────────────

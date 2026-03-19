@@ -273,6 +273,30 @@ fn setup_wrapper_does_not_depend_on_block_registry() {
 }
 
 #[test]
+fn tool_fact_model_is_owned_by_kernel() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let hooks_context = fs::read_to_string(root.join("src/hooks/protocol/context.rs")).unwrap();
+
+    for needle in [
+        "pub enum ToolCategory",
+        "pub enum ToolInput",
+        "pub struct ToolContext",
+        "fn normalize_tool_input",
+    ] {
+        assert!(
+            !hooks_context.contains(needle),
+            "src/hooks/protocol/context.rs should consume kernel::tooling instead of redefining `{needle}`"
+        );
+    }
+
+    let kernel_tooling = fs::read_to_string(root.join("src/kernel/tooling.rs")).unwrap();
+    assert!(
+        kernel_tooling.contains("pub struct ToolContext"),
+        "src/kernel/tooling.rs should own the shared tool fact model"
+    );
+}
+
+#[test]
 fn kuma_contracts_are_isolated_to_block_namespace() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
     let src_root = root.join("src");

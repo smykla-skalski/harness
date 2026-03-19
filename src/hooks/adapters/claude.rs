@@ -5,9 +5,10 @@ use crate::hooks::HookType;
 use crate::hooks::adapters::{
     AgentAdapter, HookRegistration, RenderedHookResponse, parse_process_payload, payload_context,
 };
-use crate::hooks::protocol::context::{NormalizedEvent, NormalizedHookContext, ToolCategory};
+use crate::hooks::protocol::context::{NormalizedEvent, NormalizedHookContext};
 use crate::hooks::protocol::output;
 use crate::hooks::protocol::result::NormalizedHookResult;
+use crate::kernel::tooling::ToolCategory;
 
 pub struct ClaudeCodeAdapter;
 

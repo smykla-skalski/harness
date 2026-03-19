@@ -1,6 +1,7 @@
 #![allow(clippy::cognitive_complexity)]
 
 use super::*;
+use crate::kernel::tooling::legacy_tool_context;
 use crate::observe::output;
 use crate::observe::types::{
     Confidence, FixSafety, FocusPreset, IssueCategory, IssueCode, IssueSeverity, MessageRole,
@@ -203,7 +204,7 @@ fn tracks_tool_use_for_correlation() {
     });
     check_tool_use_for_issues(10, &block, &mut state);
     assert!(state.last_tool_uses.contains_key("tool_abc"));
-    assert_eq!(state.last_tool_uses["tool_abc"].name, "Bash");
+    assert_eq!(state.last_tool_uses["tool_abc"].tool.original_name, "Bash");
 }
 
 #[test]
@@ -1847,8 +1848,7 @@ fn scan_fixture_finds_known_issues() {
     state.last_tool_uses.insert(
         "t1".to_string(),
         ToolUseRecord {
-            name: "Bash".to_string(),
-            input: serde_json::json!({"command": "cargo check"}),
+            tool: legacy_tool_context("Bash", serde_json::json!({"command": "cargo check"}), None),
         },
     );
     let issues = super::classify_line(0, session_line, &mut state);
