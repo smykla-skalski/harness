@@ -1,9 +1,7 @@
-use std::path::Path;
-
 use clap::Args;
 
 use crate::app::command_context::{AppContext, Execute};
-use crate::authoring::begin_authoring_session;
+use crate::authoring::application::AuthoringApplication;
 use crate::errors::CliError;
 use crate::kernel::skills::SKILL_NEW;
 
@@ -57,12 +55,6 @@ pub fn begin(
     suite_dir: &str,
     suite_name: &str,
 ) -> Result<i32, CliError> {
-    begin_authoring_session(
-        Path::new(repo_root),
-        feature,
-        mode,
-        Path::new(suite_dir),
-        suite_name,
-    )?;
+    AuthoringApplication::begin_session(repo_root, feature, mode, suite_dir, suite_name)?;
     Ok(0)
 }

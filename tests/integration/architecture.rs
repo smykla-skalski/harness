@@ -181,6 +181,45 @@ fn run_commands_depend_on_application_boundary_not_services() {
 }
 
 #[test]
+fn authoring_commands_depend_on_application_boundary() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let commands_root = root.join("src/authoring/commands");
+    let denylist = [
+        "crate::authoring::authoring_workspace_dir",
+        "crate::authoring::load_authoring_session",
+        "crate::authoring::require_authoring_session",
+        "crate::authoring::begin_authoring_session",
+        "crate::authoring::validate::",
+        "crate::authoring::workflow::",
+        "super::shared::",
+    ];
+    let mut hits = Vec::new();
+
+    for entry in fs::read_dir(&commands_root).unwrap() {
+        let entry = entry.unwrap();
+        let child = entry.path();
+        if !matches_extension(&child) {
+            continue;
+        }
+        let contents = fs::read_to_string(&child).unwrap();
+        for needle in denylist {
+            if contents.contains(needle) {
+                hits.push(format!(
+                    "{} still bypasses src/authoring/application via `{needle}`",
+                    child.strip_prefix(root).unwrap().display()
+                ));
+            }
+        }
+    }
+
+    assert!(
+        hits.is_empty(),
+        "authoring commands must route through src/authoring/application:\n{}",
+        hits.join("\n")
+    );
+}
+
+#[test]
 fn kuma_contracts_are_isolated_to_block_namespace() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
     let src_root = root.join("src");
