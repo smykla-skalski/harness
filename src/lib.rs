@@ -10,7 +10,7 @@ pub mod infra;
 pub mod kernel;
 pub(crate) mod manifests;
 pub mod observe;
-pub mod platform;
+pub(crate) mod platform;
 pub mod run;
 pub mod setup;
 pub(crate) mod suite_defaults;

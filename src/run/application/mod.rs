@@ -149,7 +149,7 @@ impl RunApplication {
     ///
     /// # Errors
     /// Returns `CliError` when the run has no cluster spec yet.
-    pub fn cluster_runtime(&self) -> Result<ClusterRuntime<'_>, CliError> {
+    pub(crate) fn cluster_runtime(&self) -> Result<ClusterRuntime<'_>, CliError> {
         self.services.cluster_runtime()
     }
 
@@ -169,7 +169,7 @@ impl RunApplication {
     ///
     /// # Errors
     /// Returns `CliError` when the run is not universal or the endpoint is incomplete.
-    pub fn control_plane_access(&self) -> Result<ControlPlaneAccess<'_>, CliError> {
+    pub(crate) fn control_plane_access(&self) -> Result<ControlPlaneAccess<'_>, CliError> {
         self.services.control_plane_access()
     }
 
@@ -177,7 +177,7 @@ impl RunApplication {
     ///
     /// # Errors
     /// Returns `CliError` when the run is not universal or the endpoint is incomplete.
-    pub fn xds_access(&self) -> Result<XdsAccess<'_>, CliError> {
+    pub(crate) fn xds_access(&self) -> Result<XdsAccess<'_>, CliError> {
         self.services.xds_access()
     }
 
