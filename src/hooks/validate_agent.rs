@@ -6,7 +6,7 @@ use regex::Regex;
 use crate::errors::{CliError, HookMessage};
 use crate::hooks::protocol::context::GuardContext as HookContext;
 use crate::hooks::protocol::hook_result::HookResult;
-use crate::rules::suite_runner::{self as runner_rules, PreflightReply};
+use crate::hooks::runner_policy::{self as runner_rules, PreflightReply};
 use crate::run::workflow::RunnerPhase;
 
 use super::effects::{self, HookOutcome};

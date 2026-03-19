@@ -19,7 +19,7 @@ impl Execute for ApprovalBeginArgs {
 #[derive(Debug, Clone, Args)]
 pub struct ApprovalBeginArgs {
     /// Managed skill to initialize.
-    #[arg(long, value_parser = clap::builder::PossibleValuesParser::new([crate::rules::SKILL_NEW]))]
+    #[arg(long, value_parser = clap::builder::PossibleValuesParser::new([crate::kernel::skills::SKILL_NEW]))]
     pub skill: String,
     /// Approval mode.
     #[arg(long, value_parser = ["interactive", "bypass"])]

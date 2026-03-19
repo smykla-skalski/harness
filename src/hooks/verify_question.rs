@@ -1,7 +1,7 @@
 use crate::errors::{CliError, HookMessage};
 use crate::hooks::protocol::context::GuardContext as HookContext;
 use crate::hooks::protocol::hook_result::HookResult;
-use crate::rules::suite_runner as runner_rules;
+use crate::hooks::runner_policy as runner_rules;
 use crate::run::workflow::RunnerPhase;
 
 /// Execute the verify-question hook.

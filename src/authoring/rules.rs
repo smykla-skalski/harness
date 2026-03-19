@@ -1,7 +1,7 @@
 use std::fmt;
 use std::str::FromStr;
 
-use crate::rules::Gate;
+use crate::kernel::gate::Gate;
 
 pub const SKILL_NAME: &str = "suite:new";
 

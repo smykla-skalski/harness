@@ -12,7 +12,6 @@ pub mod kernel;
 pub(crate) mod manifests;
 pub mod observe;
 pub mod platform;
-pub mod rules;
 pub mod run;
 pub mod schema;
 pub mod setup;

@@ -3,7 +3,8 @@ use std::path::{Component, Path, PathBuf};
 use clap::{Args, Subcommand};
 
 use crate::errors::{CliError, CliErrorKind};
-use crate::rules::suite_runner::RunFile;
+use crate::kernel::run_surface::RunFile;
+use crate::kernel::skills::SKILL_NAMES;
 
 use self::adapters::{HookAgent, adapter_for};
 use self::protocol::context::{GuardContext, NormalizedEvent};
@@ -13,6 +14,7 @@ use self::registry::{Hook, HookEngine};
 
 pub mod debug;
 pub mod protocol;
+pub mod runner_policy;
 pub mod session;
 
 pub mod adapters;
@@ -267,7 +269,7 @@ pub struct HookArgs {
     #[arg(long, value_enum, default_value_t = HookAgent::ClaudeCode)]
     pub agent: HookAgent,
     /// Skill name (suite:run or suite:new).
-    #[arg(value_parser = clap::builder::PossibleValuesParser::new(crate::rules::SKILL_NAMES))]
+    #[arg(value_parser = clap::builder::PossibleValuesParser::new(SKILL_NAMES))]
     pub skill: String,
     /// Hook to run.
     #[command(subcommand)]

@@ -100,7 +100,7 @@ mod tests {
     use crate::hooks::protocol::context::GuardContext as HookContext;
     use crate::hooks::protocol::hook_result::Decision;
     use crate::hooks::protocol::payloads::HookEnvelopePayload;
-    use crate::rules::suite_runner::TrackedHarnessSubcommand;
+    use crate::hooks::runner_policy::TrackedHarnessSubcommand;
 
     use super::predicates::{is_tracked_harness_command, make_target};
 
