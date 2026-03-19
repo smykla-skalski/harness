@@ -192,6 +192,18 @@ pub struct GuardContext {
     interaction: HookInteraction,
 }
 
+pub(crate) fn prepare_normalized_context(
+    mut normalized: NormalizedHookContext,
+    skill: &str,
+    default_event: NormalizedEvent,
+) -> NormalizedHookContext {
+    normalized.skill = SkillContext::from_skill_name(skill);
+    if normalized.event.is_unspecified() {
+        normalized.event = default_event;
+    }
+    normalized
+}
+
 impl GuardContext {
     #[must_use]
     pub fn from_normalized(normalized: NormalizedHookContext) -> Self {
