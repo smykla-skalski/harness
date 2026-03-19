@@ -33,7 +33,7 @@ pub use kubernetes::{KubectlOperator, KubernetesOperator, LocalClusterManager, P
 pub use kuma::KumaControlPlane;
 pub use kuma::MeshControlPlane;
 pub use process::{ProcessExecutor, StdProcessExecutor};
-pub use registry::{BlockRegistry, BlockRequirement};
+pub use registry::BlockRequirement;
 
 #[cfg(test)]
 pub use build::FakeBuildSystem;
