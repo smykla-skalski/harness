@@ -6,7 +6,6 @@ mod status;
 mod task_output;
 
 use std::borrow::Cow;
-use std::collections::BTreeMap;
 use std::fmt;
 use std::path::Path;
 #[cfg(test)]
@@ -22,23 +21,16 @@ use crate::infra::blocks::ContainerRuntime;
 use crate::infra::exec::{self, HttpMethod};
 use crate::infra::io::write_json_pretty;
 use crate::platform::cluster::{ClusterSpec, Platform};
-use crate::platform::kubectl_validate::resolve_kubectl_validate_binary;
 use crate::platform::runtime::{ClusterRuntime, ControlPlaneAccess, XdsAccess};
+use crate::run::RunStatus;
 use crate::run::application::dependencies::RunDependencies;
 use crate::run::audit::write_run_status_with_audit;
-use crate::run::context::{
-    NodeCheckRecord, NodeCheckSnapshot, PreflightArtifact, RunContext, RunLayout, RunMetadata,
-    ToolCheckRecord, ToolCheckSnapshot,
-};
-use crate::run::prepared_suite::{PreparedSuiteArtifact, PreparedSuitePlan};
+use crate::run::context::{RunContext, RunLayout, RunMetadata};
 use crate::run::state_capture::{
     DockerContainerSnapshot, KubernetesCaptureSnapshot, KubernetesPodSnapshot,
     StateCaptureSnapshot, UniversalCaptureSnapshot, UniversalDataplaneCollection,
 };
-use crate::run::workflow::{
-    PreflightStatus, RunnerEvent, RunnerPhase, apply_event, read_runner_state,
-};
-use crate::run::{RunStatus, SuiteSpec};
+use crate::run::workflow::read_runner_state;
 use crate::workspace::utc_now;
 
 pub use cluster_health::ClusterHealthReport;
@@ -236,39 +228,6 @@ impl RunServices {
         exec::cp_api_json(access.addr.as_ref(), path, method, body, access.admin_token)
     }
 
-    /// Load the suite specification referenced by the run metadata.
-    ///
-    /// # Errors
-    /// Returns `CliError` if the suite markdown cannot be loaded.
-    pub fn suite_spec(&self) -> Result<SuiteSpec, CliError> {
-        SuiteSpec::from_markdown(Path::new(&self.metadata().suite_path))
-    }
-
-    /// Build the preflight materialization plan for this run.
-    ///
-    /// # Errors
-    /// Returns `CliError` if the suite cannot be loaded or parsed.
-    pub fn build_preflight_plan(&self, checked_at: &str) -> Result<PreparedSuitePlan, CliError> {
-        let suite = self.suite_spec()?;
-        PreparedSuitePlan::build(self.layout(), &suite, &self.metadata().profile, checked_at)
-    }
-
-    /// Materialize prepared-suite and preflight artifacts to disk.
-    ///
-    /// # Errors
-    /// Returns `CliError` on parse or IO failures.
-    pub fn save_preflight_outputs(
-        &self,
-        checked_at: &str,
-    ) -> Result<PreparedSuiteArtifact, CliError> {
-        let plan = self.build_preflight_plan(checked_at)?;
-        plan.materialize()?;
-        plan.artifact.save(&self.layout().prepared_suite_path())?;
-        let preflight = self.build_preflight_artifact(checked_at);
-        write_json_pretty(&self.layout().preflight_artifact_path(), &preflight)?;
-        Ok(plan.artifact)
-    }
-
     /// Capture the current cluster state, persist it, and update the run status.
     ///
     /// # Errors
@@ -294,56 +253,6 @@ impl RunServices {
             write_run_status_with_audit(&run_dir, status, runner_state.as_ref(), None, None)?;
         }
         Ok(rel)
-    }
-
-    /// Mark a prepared manifest as applied when it belongs to the tracked run.
-    ///
-    /// # Errors
-    /// Returns `CliError` on prepared-suite load/save failures.
-    pub fn mark_manifest_applied(
-        &self,
-        manifest_path: &Path,
-        applied_at: &str,
-        step: Option<&str>,
-    ) -> Result<(), CliError> {
-        let Some(mut artifact) = PreparedSuiteArtifact::load(&self.layout().prepared_suite_path())?
-        else {
-            return Ok(());
-        };
-        let rel = self.layout().relative_path(manifest_path).into_owned();
-        let Some(manifest) = artifact.manifest_mut_by_prepared_path(&rel) else {
-            return Ok(());
-        };
-        manifest.applied = true;
-        manifest.applied_at = Some(applied_at.to_string());
-        manifest.applied_path = Some(rel);
-        manifest.step = step.map(str::to_string);
-        artifact.save(&self.layout().prepared_suite_path())
-    }
-
-    /// Advance the runner workflow to completed preflight when applicable.
-    ///
-    /// # Errors
-    /// Returns `CliError` on workflow persistence failures.
-    pub fn record_preflight_complete(&self) -> Result<(), CliError> {
-        let run_dir = self.layout().run_dir();
-        let Some(state) = read_runner_state(&run_dir)? else {
-            return Ok(());
-        };
-        match state.phase() {
-            RunnerPhase::Bootstrap => {
-                let _ = apply_event(&run_dir, RunnerEvent::PreflightStarted, None, None)?;
-                let _ = apply_event(&run_dir, RunnerEvent::PreflightCaptured, None, None)?;
-            }
-            RunnerPhase::Preflight => {
-                if state.preflight_status() != PreflightStatus::Running {
-                    let _ = apply_event(&run_dir, RunnerEvent::PreflightStarted, None, None)?;
-                }
-                let _ = apply_event(&run_dir, RunnerEvent::PreflightCaptured, None, None)?;
-            }
-            _ => {}
-        }
-        Ok(())
     }
 
     fn build_capture_snapshot(
@@ -438,57 +347,6 @@ impl RunServices {
             dataplanes_error,
         }))
     }
-
-    fn build_preflight_artifact(&self, checked_at: &str) -> PreflightArtifact {
-        let binary = resolve_kubectl_validate_binary();
-        let tools = ToolCheckSnapshot {
-            items: vec![ToolCheckRecord {
-                name: "kubectl-validate".to_string(),
-                available: binary.is_some(),
-                path: binary.as_ref().map(|path| path.display().to_string()),
-                detail: binary
-                    .is_none()
-                    .then_some("binary not installed".to_string()),
-            }],
-            extra: BTreeMap::default(),
-        };
-        let nodes = NodeCheckSnapshot {
-            items: self
-                .ctx
-                .cluster
-                .as_ref()
-                .map(|spec| {
-                    spec.members
-                        .iter()
-                        .map(|member| NodeCheckRecord {
-                            name: member.name.clone(),
-                            role: Some(member.role.clone()),
-                            reachable: Some(
-                                spec.platform != Platform::Universal
-                                    || member.container_ip.is_some(),
-                            ),
-                            detail: (spec.platform == Platform::Universal
-                                && member.container_ip.is_none())
-                            .then_some("container_ip missing".to_string()),
-                        })
-                        .collect()
-                })
-                .unwrap_or_default(),
-            extra: BTreeMap::default(),
-        };
-
-        PreflightArtifact {
-            checked_at: checked_at.to_string(),
-            prepared_suite_path: Some(
-                self.layout()
-                    .relative_path(&self.layout().prepared_suite_path())
-                    .into_owned(),
-            ),
-            repo_root: Some(self.metadata().repo_root.clone()),
-            tools,
-            nodes,
-        }
-    }
 }
 
 #[cfg(test)]
@@ -499,9 +357,10 @@ mod tests {
 
     use super::*;
     use crate::infra::io::read_json_typed;
-    use crate::run::context::RunLayout;
+    use crate::run::application::RunApplication;
+    use crate::run::context::{PreflightArtifact, RunLayout};
     use crate::run::workflow::{PreflightStatus, RunnerPhase, initialize_runner_state};
-    use crate::run::{RunCounts, RunStatus, Verdict};
+    use crate::run::{PreparedSuiteArtifact, RunCounts, RunStatus, Verdict};
 
     fn write_suite(dir: &Path) -> PathBuf {
         let suite_dir = dir.join("suite");
@@ -632,10 +491,8 @@ keep_clusters: false
         write_run(&layout, &suite_path);
 
         let ctx = RunContext::from_run_dir(&layout.run_dir()).unwrap();
-        let services = RunServices::from_context(ctx);
-        let artifact = services
-            .save_preflight_outputs("2026-03-16T12:00:00Z")
-            .unwrap();
+        let run = RunApplication::from_context(ctx);
+        let artifact = run.save_preflight_outputs("2026-03-16T12:00:00Z").unwrap();
 
         assert_eq!(artifact.baselines.len(), 1);
         assert_eq!(artifact.groups.len(), 1);
@@ -679,8 +536,8 @@ keep_clusters: false
         initialize_runner_state(&layout.run_dir()).unwrap();
 
         let ctx = RunContext::from_run_dir(&layout.run_dir()).unwrap();
-        let services = RunServices::from_context(ctx);
-        services.record_preflight_complete().unwrap();
+        let run = RunApplication::from_context(ctx);
+        run.record_preflight_complete().unwrap();
 
         let state = crate::run::workflow::read_runner_state(&layout.run_dir())
             .unwrap()
@@ -697,16 +554,13 @@ keep_clusters: false
         write_run(&layout, &suite_path);
 
         let ctx = RunContext::from_run_dir(&layout.run_dir()).unwrap();
-        let services = RunServices::from_context(ctx);
-        services
-            .save_preflight_outputs("2026-03-16T12:00:00Z")
-            .unwrap();
+        let run = RunApplication::from_context(ctx);
+        run.save_preflight_outputs("2026-03-16T12:00:00Z").unwrap();
 
         let manifest_path = layout
             .run_dir()
             .join("manifests/prepared/groups/g01/01.yaml");
-        services
-            .mark_manifest_applied(&manifest_path, "2026-03-16T12:30:00Z", Some("deploy"))
+        run.mark_manifest_applied(&manifest_path, "2026-03-16T12:30:00Z", Some("deploy"))
             .unwrap();
 
         let artifact = PreparedSuiteArtifact::load(&layout.prepared_suite_path())

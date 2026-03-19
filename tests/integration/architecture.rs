@@ -234,6 +234,40 @@ fn run_services_do_not_load_their_own_context() {
 }
 
 #[test]
+fn run_services_do_not_own_preflight_application_flows() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let services = fs::read_to_string(root.join("src/run/services/mod.rs")).unwrap();
+
+    for needle in [
+        "pub fn suite_spec(",
+        "pub fn build_preflight_plan(",
+        "pub fn save_preflight_outputs(",
+        "pub fn mark_manifest_applied(",
+        "pub fn record_preflight_complete(",
+        "fn build_preflight_artifact(",
+    ] {
+        assert!(
+            !services.contains(needle),
+            "src/run/services/mod.rs should not own preflight application flow `{needle}`"
+        );
+    }
+
+    let preflight = fs::read_to_string(root.join("src/run/application/preflight.rs")).unwrap();
+    for needle in [
+        "pub fn suite_spec(",
+        "pub fn build_preflight_plan(",
+        "pub fn save_preflight_outputs(",
+        "pub fn mark_manifest_applied(",
+        "pub fn record_preflight_complete(",
+    ] {
+        assert!(
+            preflight.contains(needle),
+            "src/run/application/preflight.rs should own `{needle}`"
+        );
+    }
+}
+
+#[test]
 fn authoring_commands_depend_on_application_boundary() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
     let commands_root = root.join("src/authoring/commands");
