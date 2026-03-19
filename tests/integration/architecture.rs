@@ -225,10 +225,31 @@ fn run_services_do_not_load_their_own_context() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
     let contents = fs::read_to_string(root.join("src/run/services/mod.rs")).unwrap();
 
-    for needle in ["pub fn from_run_dir(", "pub fn from_current("] {
+    for needle in [
+        "pub struct RunServices",
+        "pub fn from_context(",
+        "pub fn from_run_dir(",
+        "pub fn from_current(",
+        "pub fn context(",
+        "pub fn layout(",
+        "pub fn metadata(",
+        "pub fn status(",
+        "pub fn status_mut(",
+        "pub fn validate_requirement_names(",
+        "pub fn cluster_spec(",
+        "pub fn cluster_runtime(",
+        "pub fn resolve_kubeconfig(",
+        "pub fn control_plane_access(",
+        "pub fn xds_access(",
+        "pub fn docker_network(",
+        "pub fn resolve_container_name(",
+        "pub fn service_image(",
+        "pub fn call_control_plane_text(",
+        "pub fn call_control_plane_json(",
+    ] {
         assert!(
             !contents.contains(needle),
-            "src/run/services/mod.rs should not own persistence/session loading via `{needle}`"
+            "src/run/services/mod.rs should stay an internal helper layer, not a public run boundary via `{needle}`"
         );
     }
 }

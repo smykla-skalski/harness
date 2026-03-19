@@ -26,8 +26,8 @@ pub use service_lifecycle::StartServiceRequest;
 pub use status::{ClusterMemberStatusRecord, ClusterStatusReport, ServiceStatusRecord};
 pub use task_output::{tail_task_output, wait_for_task_output};
 
-/// Domain access layer for a tracked run.
-pub struct RunServices {
+/// Internal helper layer for tracked-run application code.
+pub(crate) struct RunServices {
     ctx: RunContext,
     dependencies: RunDependencies,
 }
@@ -45,7 +45,7 @@ impl RunServices {
     /// Build services from a loaded run context.
     ///
     #[must_use]
-    pub fn from_context(ctx: RunContext) -> Self {
+    pub(crate) fn from_context(ctx: RunContext) -> Self {
         Self::from_context_with_dependencies(ctx, RunDependencies::production())
     }
 
@@ -63,26 +63,26 @@ impl RunServices {
     }
 
     #[must_use]
-    pub fn context(&self) -> &RunContext {
+    pub(crate) fn context(&self) -> &RunContext {
         &self.ctx
     }
 
     #[must_use]
-    pub fn layout(&self) -> &RunLayout {
+    pub(crate) fn layout(&self) -> &RunLayout {
         &self.ctx.layout
     }
 
     #[must_use]
-    pub fn metadata(&self) -> &RunMetadata {
+    pub(crate) fn metadata(&self) -> &RunMetadata {
         &self.ctx.metadata
     }
 
     #[must_use]
-    pub fn status(&self) -> Option<&RunStatus> {
+    pub(crate) fn status(&self) -> Option<&RunStatus> {
         self.ctx.status.as_ref()
     }
 
-    pub fn status_mut(&mut self) -> Option<&mut RunStatus> {
+    pub(crate) fn status_mut(&mut self) -> Option<&mut RunStatus> {
         self.ctx.status.as_mut()
     }
 
@@ -90,7 +90,10 @@ impl RunServices {
     ///
     /// # Errors
     /// Returns `CliError` for unknown or unsupported requirements.
-    pub fn validate_requirement_names(&self, requirements: &[String]) -> Result<(), CliError> {
+    pub(crate) fn validate_requirement_names(
+        &self,
+        requirements: &[String],
+    ) -> Result<(), CliError> {
         self.dependencies.validate_requirement_names(requirements)
     }
 
@@ -106,7 +109,7 @@ impl RunServices {
     ///
     /// # Errors
     /// Returns `CliError` when the run has no cluster spec yet.
-    pub fn cluster_spec(&self) -> Result<&ClusterSpec, CliError> {
+    pub(crate) fn cluster_spec(&self) -> Result<&ClusterSpec, CliError> {
         self.ctx
             .cluster
             .as_ref()
@@ -117,7 +120,7 @@ impl RunServices {
     ///
     /// # Errors
     /// Returns `CliError` when the run has no cluster spec yet.
-    pub fn cluster_runtime(&self) -> Result<ClusterRuntime<'_>, CliError> {
+    pub(crate) fn cluster_runtime(&self) -> Result<ClusterRuntime<'_>, CliError> {
         self.ctx
             .cluster
             .as_ref()
@@ -129,7 +132,7 @@ impl RunServices {
     ///
     /// # Errors
     /// Returns `CliError` when no kubeconfig can be determined.
-    pub fn resolve_kubeconfig<'a>(
+    pub(crate) fn resolve_kubeconfig<'a>(
         &'a self,
         explicit: Option<&'a str>,
         cluster: Option<&str>,
@@ -142,7 +145,7 @@ impl RunServices {
     ///
     /// # Errors
     /// Returns `CliError` when the run is not universal or the endpoint is incomplete.
-    pub fn control_plane_access(&self) -> Result<ControlPlaneAccess<'_>, CliError> {
+    pub(crate) fn control_plane_access(&self) -> Result<ControlPlaneAccess<'_>, CliError> {
         self.cluster_runtime()?.control_plane_access()
     }
 
@@ -150,7 +153,7 @@ impl RunServices {
     ///
     /// # Errors
     /// Returns `CliError` when the run is not universal or the endpoint is incomplete.
-    pub fn xds_access(&self) -> Result<XdsAccess<'_>, CliError> {
+    pub(crate) fn xds_access(&self) -> Result<XdsAccess<'_>, CliError> {
         self.cluster_runtime()?.xds_access()
     }
 
@@ -158,12 +161,12 @@ impl RunServices {
     ///
     /// # Errors
     /// Returns `CliError` when the run is not universal or no network was recorded.
-    pub fn docker_network(&self) -> Result<&str, CliError> {
+    pub(crate) fn docker_network(&self) -> Result<&str, CliError> {
         self.cluster_runtime()?.docker_network()
     }
 
     #[must_use]
-    pub fn resolve_container_name<'a>(&'a self, requested: &'a str) -> Cow<'a, str> {
+    pub(crate) fn resolve_container_name<'a>(&'a self, requested: &'a str) -> Cow<'a, str> {
         self.ctx.cluster.as_ref().map_or_else(
             || Cow::Borrowed(requested),
             |spec| ClusterRuntime::from_spec(spec).resolve_container_name(requested),
@@ -174,7 +177,7 @@ impl RunServices {
     ///
     /// # Errors
     /// Returns `CliError` when the runtime cannot derive a service image.
-    pub fn service_image<'a>(
+    pub(crate) fn service_image<'a>(
         &'a self,
         explicit: Option<&'a str>,
     ) -> Result<Cow<'a, str>, CliError> {
@@ -185,7 +188,7 @@ impl RunServices {
     ///
     /// # Errors
     /// Returns `CliError` when the run has no control-plane endpoint or the request fails.
-    pub fn call_control_plane_text(
+    pub(crate) fn call_control_plane_text(
         &self,
         path: &str,
         method: HttpMethod,
@@ -199,7 +202,7 @@ impl RunServices {
     ///
     /// # Errors
     /// Returns `CliError` when the run has no control-plane endpoint or the request fails.
-    pub fn call_control_plane_json(
+    pub(crate) fn call_control_plane_json(
         &self,
         path: &str,
         method: HttpMethod,
