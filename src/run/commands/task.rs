@@ -1,11 +1,11 @@
 use clap::{Args, Subcommand};
 
-use crate::app::command_context::{CommandContext, Execute};
+use crate::app::command_context::{AppContext, Execute};
 use crate::errors::CliError;
 use crate::run::services::{tail_task_output, wait_for_task_output};
 
 impl Execute for TaskArgs {
-    fn execute(&self, _context: &CommandContext) -> Result<i32, CliError> {
+    fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
         task(&self.command)
     }
 }

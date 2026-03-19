@@ -3,7 +3,7 @@ use std::path::Path;
 
 use clap::Args;
 
-use crate::app::command_context::{CommandContext, Execute};
+use crate::app::command_context::{AppContext, Execute};
 use crate::workspace::{shorten_path, utc_now};
 use crate::errors::{CliError, CliErrorKind};
 use crate::infra::io::{validate_safe_segment, write_json_pretty};
@@ -16,7 +16,7 @@ use crate::schema::{RunCounts, RunReport, RunReportFrontmatter, RunStatus, Suite
 use super::shared::{resolve_init_repo_root, resolve_run_root};
 
 impl Execute for InitArgs {
-    fn execute(&self, _context: &CommandContext) -> Result<i32, CliError> {
+    fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
         init_run(
             &self.suite,
             &self.run_id,

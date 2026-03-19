@@ -2,12 +2,15 @@ use std::path::PathBuf;
 
 use clap::Args;
 
-use crate::app::command_context::{CommandContext, Execute, RunDirArgs, resolve_run_services};
+use crate::app::command_context::{AppContext, Execute};
 use crate::errors::CliError;
 use crate::infra::exec;
+use crate::run::args::RunDirArgs;
+
+use super::shared::resolve_run_services;
 
 impl Execute for RestartNamespaceArgs {
-    fn execute(&self, _context: &CommandContext) -> Result<i32, CliError> {
+    fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
         restart_namespace(self)
     }
 }

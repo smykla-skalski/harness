@@ -1,6 +1,6 @@
 use clap::{Args, Subcommand};
 
-use crate::app::command_context::{CommandContext, Execute};
+use crate::app::command_context::{AppContext, Execute};
 use crate::errors::CliError;
 
 use super::ClusterArgs;
@@ -21,7 +21,7 @@ pub struct KumaSetupArgs {
 }
 
 impl Execute for KumaSetupArgs {
-    fn execute(&self, context: &CommandContext) -> Result<i32, CliError> {
+    fn execute(&self, context: &AppContext) -> Result<i32, CliError> {
         match &self.command {
             KumaSetupCommand::Cluster(args) => args.execute(context),
         }

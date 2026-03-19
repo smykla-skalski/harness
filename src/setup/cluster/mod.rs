@@ -4,12 +4,12 @@ pub(crate) mod universal;
 
 use clap::Args;
 
-use crate::app::command_context::{CommandContext, Execute};
+use crate::app::command_context::{AppContext, Execute};
 use crate::errors::CliError;
 use crate::setup::services::cluster::execute_cluster;
 
 impl Execute for ClusterArgs {
-    fn execute(&self, _context: &CommandContext) -> Result<i32, CliError> {
+    fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
         execute_cluster(self)
     }
 }
