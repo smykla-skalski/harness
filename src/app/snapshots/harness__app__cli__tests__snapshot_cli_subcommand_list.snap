@@ -1,10 +1,13 @@
 ---
 source: src/app/cli.rs
-assertion_line: 566
+assertion_line: 631
 expression: "names.join(\"\\n\")"
 ---
 authoring
 hook
 observe
+pre-compact
 run
+session-start
+session-stop
 setup

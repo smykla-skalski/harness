@@ -111,6 +111,15 @@ pub enum Command {
         command: SetupCommand,
     },
 
+    /// Handle session start hook.
+    SessionStart(SessionStartArgs),
+
+    /// Handle session stop cleanup.
+    SessionStop(SessionStopArgs),
+
+    /// Save compact handoff before compaction.
+    PreCompact(PreCompactArgs),
+
     /// Observe and classify Claude Code session logs.
     Observe(ObserveArgs),
 }
@@ -126,6 +135,9 @@ pub fn dispatch(command: &Command) -> Result<i32, CliError> {
         Command::Run { command } => dispatch_run(&ctx, command),
         Command::Authoring { command } => dispatch_authoring(&ctx, command),
         Command::Setup { command } => dispatch_setup(&ctx, command),
+        Command::SessionStart(args) => args.execute(&ctx),
+        Command::SessionStop(args) => args.execute(&ctx),
+        Command::PreCompact(args) => args.execute(&ctx),
         Command::Observe(args) => args.execute(&ctx),
     }
 }
@@ -200,7 +212,16 @@ mod tests {
     fn all_expected_subcommands_registered() {
         let cmd = Cli::command();
         let names: Vec<&str> = cmd.get_subcommands().map(clap::Command::get_name).collect();
-        for expected in ["authoring", "hook", "observe", "run", "setup"] {
+        for expected in [
+            "authoring",
+            "hook",
+            "observe",
+            "pre-compact",
+            "run",
+            "session-start",
+            "session-stop",
+            "setup",
+        ] {
             assert!(names.contains(&expected), "missing subcommand: {expected}");
         }
     }
@@ -338,6 +359,43 @@ mod tests {
                 assert_eq!(extra_cluster_names, vec!["zone1", "zone2"]);
             }
             _ => panic!("expected Cluster command"),
+        }
+    }
+
+    #[test]
+    fn parse_legacy_top_level_session_start() {
+        let cli =
+            Cli::try_parse_from(["harness", "session-start", "--project-dir", "/tmp/project"])
+                .unwrap();
+        match cli.command {
+            Command::SessionStart(SessionStartArgs { project_dir }) => {
+                assert_eq!(project_dir.as_deref(), Some("/tmp/project"));
+            }
+            _ => panic!("expected top-level SessionStart command"),
+        }
+    }
+
+    #[test]
+    fn parse_legacy_top_level_session_stop() {
+        let cli = Cli::try_parse_from(["harness", "session-stop", "--project-dir", "/tmp/project"])
+            .unwrap();
+        match cli.command {
+            Command::SessionStop(SessionStopArgs { project_dir }) => {
+                assert_eq!(project_dir.as_deref(), Some("/tmp/project"));
+            }
+            _ => panic!("expected top-level SessionStop command"),
+        }
+    }
+
+    #[test]
+    fn parse_legacy_top_level_pre_compact() {
+        let cli = Cli::try_parse_from(["harness", "pre-compact", "--project-dir", "/tmp/project"])
+            .unwrap();
+        match cli.command {
+            Command::PreCompact(PreCompactArgs { project_dir }) => {
+                assert_eq!(project_dir.as_deref(), Some("/tmp/project"));
+            }
+            _ => panic!("expected top-level PreCompact command"),
         }
     }
 
