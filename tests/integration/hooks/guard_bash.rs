@@ -108,20 +108,52 @@ const GUARD_BASH_PAYLOAD_CASES: &[(&str, &str, bool)] = &[
     ("suite:new", "k3d cluster list", false),
 ];
 
+fn execute_payload_case(
+    skill: &str,
+    command: &str,
+    case_idx: usize,
+) -> harness::hooks::hook_result::HookResult {
+    if skill == "suite:run" {
+        let tmp = tempfile::tempdir().unwrap();
+        let run_dir = init_run(
+            tmp.path(),
+            &format!("guard-bash-case-{case_idx}"),
+            "single-zone",
+        );
+        let ctx = make_hook_context_with_run(skill, make_bash_payload(command), &run_dir);
+        return guard_bash::execute(&ctx).unwrap();
+    }
+    let ctx = make_hook_context(skill, make_bash_payload(command));
+    guard_bash::execute(&ctx).unwrap()
+}
+
 // ============================================================================
 // Simple allow/deny payloads (table-driven)
 // ============================================================================
 
 #[test]
 fn guard_bash_payloads() {
-    for &(skill, command, should_allow) in GUARD_BASH_PAYLOAD_CASES {
-        let ctx = make_hook_context(skill, make_bash_payload(command));
-        let r = guard_bash::execute(&ctx).unwrap();
+    for (case_idx, &(skill, command, should_allow)) in GUARD_BASH_PAYLOAD_CASES.iter().enumerate() {
+        let r = execute_payload_case(skill, command, case_idx);
         if should_allow {
             assert_allow(&r);
         } else {
             assert_deny(&r);
         }
+    }
+}
+
+#[test]
+fn guard_bash_allows_suite_run_bash_when_no_run_exists() {
+    for command in [
+        "kubectl get pods",
+        "gh pr checks 12345",
+        "curl localhost:9901/config_dump",
+        "python3 -c 'print(1)'",
+    ] {
+        let ctx = make_hook_context("suite:run", make_bash_payload(command));
+        let r = guard_bash::execute(&ctx).unwrap();
+        assert_allow(&r);
     }
 }
 
@@ -147,13 +179,16 @@ fn guard_hook_structured_denial_invalid_payload() {
 
 #[test]
 fn guard_bash_denies_harness_in_loop() {
-    let ctx = make_hook_context(
+    let tmp = tempfile::tempdir().unwrap();
+    let run_dir = init_run(tmp.path(), "run-loop", "single-zone");
+    let ctx = make_hook_context_with_run(
         "suite:run",
         make_bash_payload(
             "for i in 01 02 03; do \
              harness run apply --manifest \"g10/${i}.yaml\" --step \"g10-manifest-${i}\" || break; \
              done",
         ),
+        &run_dir,
     );
     let r = guard_bash::execute(&ctx).unwrap();
     assert_deny(&r);
@@ -214,6 +249,17 @@ fn guard_bash_allows_report_check_after_completed() {
     let ctx = make_hook_context_with_run("suite:run", payload, &run_dir);
     let r = guard_bash::execute(&ctx).unwrap();
     assert_allow(&r);
+}
+
+#[test]
+fn guard_bash_denies_github_sidequest_with_active_run() {
+    let tmp = tempfile::tempdir().unwrap();
+    let run_dir = init_run(tmp.path(), "run-gh", "single-zone");
+    let payload = make_bash_payload("gh pr checks 12345");
+    let ctx = make_hook_context_with_run("suite:run", payload, &run_dir);
+    let r = guard_bash::execute(&ctx).unwrap();
+    assert_deny(&r);
+    assert!(r.message.contains("GitHub workflows"));
 }
 
 #[test]

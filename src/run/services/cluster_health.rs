@@ -47,22 +47,21 @@ impl RunServices {
                     running: exec::cluster_exists(&member.name).unwrap_or(false),
                 })
                 .collect::<Vec<_>>(),
-            Platform::Universal => {
-                spec.members
-                    .par_iter()
-                    .map(|member| {
-                        let container = runtime.resolve_container_name(&member.name);
-                        ClusterMemberHealthRecord {
-                            name: member.name.as_str(),
-                            role: member.role.as_str(),
-                            running: self
-                                .docker_if_available()
-                                .is_some_and(|docker| docker.is_running(&container).unwrap_or(false)),
-                            container: Some(container),
-                        }
-                    })
-                    .collect::<Vec<_>>()
-            }
+            Platform::Universal => spec
+                .members
+                .par_iter()
+                .map(|member| {
+                    let container = runtime.resolve_container_name(&member.name);
+                    ClusterMemberHealthRecord {
+                        name: member.name.as_str(),
+                        role: member.role.as_str(),
+                        running: self
+                            .docker_if_available()
+                            .is_some_and(|docker| docker.is_running(&container).unwrap_or(false)),
+                        container: Some(container),
+                    }
+                })
+                .collect::<Vec<_>>(),
         };
         if runtime.platform() == Platform::Universal
             && let Ok(network) = runtime.docker_network()

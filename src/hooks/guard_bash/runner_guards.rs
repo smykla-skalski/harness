@@ -403,6 +403,11 @@ pub(crate) fn deny_author_suite_storage_mutation(words: &[String]) -> HookResult
     HookResult::allow()
 }
 
+#[must_use]
+pub(crate) fn has_tracked_run_context(ctx: &HookContext) -> bool {
+    ctx.run.is_some() || ctx.runner_state.is_some() || ctx.effective_run_dir().is_some()
+}
+
 pub(crate) fn runner_binary_and_pattern_guards(
     ctx: &HookContext,
     words: &[String],
@@ -411,7 +416,7 @@ pub(crate) fn runner_binary_and_pattern_guards(
     if has_task_output_access(words, ctx.command_text()) {
         return Some(deny_runner_flow(TaskOutputPattern::DENY_MESSAGE));
     }
-    if has_denied_runner_binary(heads) {
+    if has_tracked_run_context(ctx) && has_denied_runner_binary(heads) {
         return Some(deny_runner_flow(
             "suite runs must stay on the tracked run; \
              do not switch into CI or GitHub workflows",
