@@ -31,7 +31,7 @@ harness setup kuma cluster single-up my-cluster --repo-root /path/to/repo
 harness run init --suite suites/my-feature.md --run-id run-1 --profile single-zone --repo-root /path/to/repo
 
 # run preflight checks and prepare manifests
-harness run preflight --run-dir $XDG_DATA_HOME/kuma/runs/run-1
+harness run preflight --run-dir $XDG_DATA_HOME/harness/runs/run-1
 
 # apply manifests and record commands
 harness run apply --manifest manifests/app.yaml --run-dir ...
@@ -43,7 +43,7 @@ harness run closeout --run-dir ...
 
 ## Runs and state
 
-Run directories live under `$XDG_DATA_HOME/kuma/runs/{run-id}/`:
+Run directories live under `$XDG_DATA_HOME/harness/runs/{run-id}/`:
 
 ```
 artifacts/          collected outputs

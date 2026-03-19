@@ -950,7 +950,7 @@ fn tool_check_output_shape_is_preserved() {
 fn detects_absolute_manifest_path() {
     let mut state = make_state();
     let block = bash_tool_use(
-        "harness apply --manifest /Users/someone/.local/share/kuma/suites/motb/groups/g13/01.yaml",
+        "harness apply --manifest /Users/someone/.local/share/harness/suites/motb/groups/g13/01.yaml",
     );
     let issues = check_tool_use_for_issues(10, &block, &mut state);
     assert!(
@@ -1066,7 +1066,7 @@ fn detects_manifest_created_in_manifests_directory() {
         "id": "t1",
         "name": "Write",
         "input": {
-            "file_path": "/home/user/.local/share/kuma/runs/20260315/manifests/containerpatch-otel-env.yaml",
+            "file_path": "/home/user/.local/share/harness/runs/20260315/manifests/containerpatch-otel-env.yaml",
             "content": "apiVersion: kuma.io/v1alpha1\nkind: ContainerPatch"
         }
     });
