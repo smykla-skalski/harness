@@ -14,9 +14,9 @@ use fs_err as fs;
 use rayon::prelude::*;
 use tracing::warn;
 
-use crate::workspace::{project_context_dir, session_scope_key, utc_now};
 use crate::errors::{CliError, io_for};
 use crate::infra::io::{read_text, write_json_pretty};
+use crate::workspace::{project_context_dir, session_scope_key, utc_now};
 
 pub(super) const HANDOFF_VERSION: u32 = 1;
 pub(super) const HISTORY_LIMIT: usize = 10;

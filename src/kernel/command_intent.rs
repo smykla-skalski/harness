@@ -258,8 +258,7 @@ impl ObservedCommand {
         match &self.inner {
             ObservedCommandInner::Parsed(_) => None,
             ObservedCommandInner::Fallback {
-                tokenization_error,
-                ..
+                tokenization_error, ..
             } => Some(tokenization_error.as_str()),
         }
     }

@@ -139,7 +139,7 @@ where
                     BaselineFileEntry::Path(path) | BaselineFileEntry::Structured { path } => path,
                 })
                 .collect()
-            })
+        })
     })
 }
 
