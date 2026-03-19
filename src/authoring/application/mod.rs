@@ -2,12 +2,11 @@ use std::fs;
 use std::io::{self, IsTerminal, Read};
 use std::path::{Path, PathBuf};
 
-use crate::authoring::session::{
-    AuthoringSession, authoring_workspace_dir, begin_authoring_session, load_authoring_session,
-    require_authoring_session,
+use crate::authoring::{
+    ApprovalMode, AuthorWorkflowState, AuthoringSession, authoring_validation_repo_root,
+    authoring_workspace_dir, begin_authoring_session, load_authoring_session,
+    require_authoring_session, validate_suite_author_paths, write_author_state,
 };
-use crate::authoring::validate::{authoring_validation_repo_root, validate_suite_author_paths};
-use crate::authoring::workflow::{ApprovalMode, AuthorWorkflowState, write_author_state};
 use crate::errors::{CliError, CliErrorKind};
 use crate::infra::io::{ensure_dir, is_safe_name, read_text, write_text};
 use crate::workspace::utc_now;
