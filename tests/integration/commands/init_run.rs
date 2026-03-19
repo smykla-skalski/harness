@@ -7,10 +7,8 @@ use std::path::Path;
 
 use harness::app::cli::{Command, RunCommand};
 use harness::errors::CliError;
-use harness::run::RunMetadata;
-use harness::run::commands::InitArgs;
 use harness::run::workflow::{self as runner_workflow, RunnerPhase};
-use harness::run::{RunStatus, Verdict};
+use harness::run::{InitArgs, RunMetadata, RunStatus, Verdict};
 
 use super::super::helpers::*;
 
