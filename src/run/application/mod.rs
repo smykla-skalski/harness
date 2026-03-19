@@ -3,6 +3,7 @@ mod inspection;
 mod preflight;
 mod recording;
 mod reporting;
+mod services;
 
 use std::borrow::Cow;
 use std::fmt;
@@ -10,7 +11,7 @@ use std::path::Path;
 use std::path::PathBuf;
 
 use crate::errors::CliError;
-use crate::infra::exec::{CommandResult, HttpMethod};
+use crate::infra::exec::HttpMethod;
 use crate::infra::io::write_json_pretty;
 use crate::platform::cluster::ClusterSpec;
 use crate::platform::runtime::{ClusterRuntime, ControlPlaneAccess, XdsAccess};
@@ -250,19 +251,6 @@ impl RunApplication {
         self.services.capture_state(label, kubeconfig)
     }
 
-    #[must_use]
-    pub fn service_container_filter(&self) -> String {
-        self.services.service_container_filter()
-    }
-
-    /// List service containers scoped to the current run.
-    ///
-    /// # Errors
-    /// Returns `CliError` on docker invocation failures.
-    pub fn list_service_containers(&self) -> Result<Vec<ServiceStatusRecord>, CliError> {
-        self.services.list_service_containers()
-    }
-
     /// List all managed service containers without requiring a tracked run.
     ///
     /// # Errors
@@ -297,30 +285,6 @@ impl RunApplication {
         let docker = dependencies.docker_required()?;
         docker.remove(name)?;
         Ok(())
-    }
-
-    /// Start a tracked universal service container and attach a Kuma dataplane.
-    ///
-    /// # Errors
-    /// Returns `CliError` when the tracked run is missing universal access details
-    /// or when container setup fails.
-    pub fn start_service(&self, request: &StartServiceRequest<'_>) -> Result<(), CliError> {
-        self.services.start_service(request)
-    }
-
-    /// Read or stream logs for a tracked cluster container.
-    ///
-    /// Returns `None` when logs are streamed directly to the terminal.
-    ///
-    /// # Errors
-    /// Returns `CliError` on docker invocation failures.
-    pub fn service_logs(
-        &self,
-        name: &str,
-        tail: u32,
-        follow: bool,
-    ) -> Result<Option<CommandResult>, CliError> {
-        self.services.service_logs(name, tail, follow)
     }
 
     /// Finalize a completed group in the tracked run report.

@@ -34,15 +34,6 @@ impl RunDependencies {
         }
     }
 
-    #[cfg(test)]
-    #[must_use]
-    pub(crate) fn for_tests(docker: Option<Arc<dyn ContainerRuntime>>) -> Self {
-        Self {
-            docker,
-            requirements: RequirementSupport::production(),
-        }
-    }
-
     #[must_use]
     pub(crate) fn has_docker(&self) -> bool {
         self.docker.is_some()
