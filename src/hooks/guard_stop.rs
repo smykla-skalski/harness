@@ -1,4 +1,4 @@
-use crate::authoring::workflow::can_stop;
+use crate::authoring::can_stop;
 use crate::errors::{CliError, HookMessage};
 use crate::hooks::application::GuardContext as HookContext;
 use crate::hooks::protocol::hook_result::HookResult;

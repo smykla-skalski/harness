@@ -1,4 +1,7 @@
-use crate::authoring::workflow::{ApprovalMode, ReviewGate, can_request_gate};
+use crate::authoring::{
+    ApprovalMode, COPY_GATE as AUTHOR_COPY_GATE, POSTWRITE_GATE as AUTHOR_POSTWRITE_GATE,
+    PREWRITE_GATE as AUTHOR_PREWRITE_GATE, ReviewGate, can_request_gate,
+};
 use crate::errors::{CliError, HookMessage};
 use crate::hooks::application::GuardContext as HookContext;
 use crate::hooks::protocol::hook_result::HookResult;
@@ -97,16 +100,15 @@ fn is_install_prompt(prompts: &[AskUserQuestionPrompt]) -> bool {
 }
 
 fn classify_canonical_gate(prompts: &[AskUserQuestionPrompt]) -> Option<ReviewGate> {
-    use crate::authoring::rules as author_rules;
     for prompt in prompts {
         let head = prompt.question_head();
-        if head == author_rules::PREWRITE_GATE.question {
+        if head == AUTHOR_PREWRITE_GATE.question {
             return Some(ReviewGate::Prewrite);
         }
-        if head == author_rules::POSTWRITE_GATE.question {
+        if head == AUTHOR_POSTWRITE_GATE.question {
             return Some(ReviewGate::Postwrite);
         }
-        if head == author_rules::COPY_GATE.question {
+        if head == AUTHOR_COPY_GATE.question {
             return Some(ReviewGate::Copy);
         }
     }
