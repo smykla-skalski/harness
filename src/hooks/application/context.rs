@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+use std::env;
 use std::path::{Path, PathBuf};
 
 use serde_json::Value;
@@ -195,6 +196,7 @@ pub struct GuardContext {
 impl GuardContext {
     #[must_use]
     pub fn from_normalized(normalized: NormalizedHookContext) -> Self {
+        let normalized = hydrate_normalized_context(normalized);
         let interaction = HookInteraction::from_normalized(&normalized);
         let skill_active = normalized.skill.active;
         let hydrated = HydratedHookState::from_skill(&normalized.skill);
@@ -222,7 +224,7 @@ impl GuardContext {
     #[cfg(test)]
     #[must_use]
     pub(crate) fn from_test_envelope(skill: &str, payload: HookEnvelopePayload) -> Self {
-        let normalized = normalized_from_envelope(skill, payload);
+        let normalized = hydrate_normalized_context(normalized_from_envelope(skill, payload));
         let interaction = HookInteraction::from_normalized(&normalized);
         Self {
             event: normalized.event.clone(),
@@ -374,6 +376,18 @@ impl GuardContext {
     }
 }
 
+fn hydrate_normalized_context(mut normalized: NormalizedHookContext) -> NormalizedHookContext {
+    normalized.session = hydrate_session(normalized.session);
+    normalized
+}
+
+fn hydrate_session(mut session: SessionContext) -> SessionContext {
+    if session.cwd.is_none() {
+        session.cwd = Some(env::current_dir().unwrap_or_else(|_| PathBuf::from(".")));
+    }
+    session
+}
+
 fn deserialize_value_list<T>(value: Option<&Value>) -> Vec<T>
 where
     T: for<'de> serde::Deserialize<'de>,
@@ -409,5 +423,31 @@ fn render_tool_response_text(tool_name: &str, tool_response: &Value) -> String {
         Value::Null => String::new(),
         Value::String(text) => text.clone(),
         other => serde_json::to_string_pretty(other).unwrap_or_else(|_| other.to_string()),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn from_normalized_hydrates_missing_session_cwd() {
+        let context = GuardContext::from_normalized(NormalizedHookContext {
+            event: NormalizedEvent::Notification,
+            session: SessionContext {
+                session_id: String::new(),
+                cwd: None,
+                transcript_path: None,
+            },
+            tool: None,
+            agent: None,
+            skill: SkillContext::inactive(),
+            raw: crate::hooks::protocol::context::RawPayload::new(Value::Null),
+        });
+
+        assert_eq!(
+            context.session.cwd,
+            Some(env::current_dir().unwrap_or_else(|_| PathBuf::from(".")))
+        );
     }
 }
