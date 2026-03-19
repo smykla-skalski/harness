@@ -3,7 +3,6 @@ mod codex;
 mod gemini;
 pub mod opencode;
 
-use std::env;
 use std::path::PathBuf;
 
 use clap::ValueEnum;
@@ -157,10 +156,7 @@ where
         event: payload_event(&payload),
         session: SessionContext {
             session_id: payload.session_id.unwrap_or_default(),
-            cwd: payload
-                .cwd
-                .or(payload.directory)
-                .unwrap_or_else(|| env::current_dir().unwrap_or_else(|_| PathBuf::from("."))),
+            cwd: payload.cwd.or(payload.directory),
             transcript_path: payload.transcript_path,
         },
         tool,
