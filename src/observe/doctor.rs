@@ -2,7 +2,7 @@ use std::env;
 use std::fs;
 use std::path::PathBuf;
 
-use crate::core_defs::harness_data_root;
+use crate::workspace::harness_data_root;
 use crate::errors::{CliError, CliErrorKind};
 
 /// Validate observer setup.

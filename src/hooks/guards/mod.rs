@@ -14,7 +14,7 @@ pub use subshell::SubshellGuard;
 
 use crate::hooks::protocol::context::GuardContext;
 use crate::hooks::registry::GuardChain;
-use crate::shell_parse::ParsedCommand;
+use crate::kernel::command_intent::ParsedCommand;
 
 /// Extract parsed command parts, returning `None` when the command is empty
 /// or missing. Parse errors are treated as allow-through so the caller's

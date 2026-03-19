@@ -20,7 +20,7 @@ use serde_json::json;
 use tracing::warn;
 
 use crate::app::command_context::{CommandContext, Execute};
-use crate::core_defs::harness_data_root;
+use crate::workspace::harness_data_root;
 use crate::errors::{CliError, CliErrorKind};
 use crate::infra::io::{read_text, write_json_pretty};
 

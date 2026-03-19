@@ -3,7 +3,7 @@ use clap::Args;
 use tracing::info;
 
 use crate::app::command_context::{CommandContext, Execute, RunDirArgs};
-use crate::core_defs::{shorten_path, utc_now};
+use crate::workspace::{shorten_path, utc_now};
 use crate::errors::CliError;
 
 impl Execute for PreflightArgs {

@@ -4,7 +4,7 @@ use std::path::Path;
 use clap::Args;
 
 use crate::app::command_context::{CommandContext, Execute};
-use crate::core_defs::{shorten_path, utc_now};
+use crate::workspace::{shorten_path, utc_now};
 use crate::errors::{CliError, CliErrorKind};
 use crate::infra::io::{validate_safe_segment, write_json_pretty};
 use crate::run::audit::write_run_status_with_audit;

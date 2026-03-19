@@ -7,7 +7,7 @@ use clap::Args;
 use tracing::warn;
 
 use crate::app::command_context::{CommandContext, Execute, RunDirArgs, resolve_run_services};
-use crate::core_defs::{shorten_path, utc_now};
+use crate::workspace::{shorten_path, utc_now};
 use crate::errors::{CliError, CliErrorKind};
 use crate::infra::blocks::kuma::manifest::resource_api_path;
 use crate::infra::exec;

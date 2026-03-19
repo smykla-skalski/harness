@@ -15,7 +15,7 @@ use harness::authoring::commands::{
     ApprovalBeginArgs, AuthoringBeginArgs, AuthoringSaveArgs, AuthoringValidateArgs,
 };
 use harness::authoring::workflow::{self as author_workflow, AuthorPhase};
-use harness::core_defs;
+use harness::workspace;
 use harness::run::RunDirArgs;
 use harness::run::commands::{
     CaptureArgs, CloseoutArgs, EnvoyArgs, EnvoyCommand, KumactlArgs, KumactlCommand, RecordArgs,
@@ -892,7 +892,7 @@ fn check_record_isolates_run_context_by_session_id() {
             ("CLAUDE_SESSION_ID", Some("session-alpha")),
         ],
         || {
-            *da.lock().unwrap() = core_defs::session_context_dir().unwrap();
+            *da.lock().unwrap() = workspace::session_context_dir().unwrap();
         },
     );
     let db = &dir_b;
@@ -902,7 +902,7 @@ fn check_record_isolates_run_context_by_session_id() {
             ("CLAUDE_SESSION_ID", Some("session-beta")),
         ],
         || {
-            *db.lock().unwrap() = core_defs::session_context_dir().unwrap();
+            *db.lock().unwrap() = workspace::session_context_dir().unwrap();
         },
     );
 

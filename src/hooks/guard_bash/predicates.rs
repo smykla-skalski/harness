@@ -9,7 +9,7 @@ use crate::rules::suite_runner::{
     AdminEndpointHint, LegacyScript, PythonBinary, RunnerBinary, TaskOutputPattern,
     TrackedHarnessSubcommand,
 };
-use crate::shell_parse::{
+use crate::kernel::command_intent::{
     contains_subshell_pattern, is_env_assignment, is_shell_control_op, normalized_binary_name,
     semantic_harness_subcommand, semantic_harness_tail, significant_words,
 };

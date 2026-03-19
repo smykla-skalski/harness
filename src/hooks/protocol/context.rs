@@ -11,7 +11,7 @@ use crate::hooks::protocol::payloads::{AskUserAnswer, AskUserQuestionPrompt, Hoo
 use crate::rules;
 use crate::run::context::RunContext;
 use crate::run::workflow::{self as runner_workflow, RunnerWorkflowState};
-use crate::shell_parse::ParsedCommand;
+use crate::kernel::command_intent::ParsedCommand;
 
 /// Opaque raw agent payload preserved for adapter-specific features.
 #[derive(Debug, Clone)]

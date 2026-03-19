@@ -22,7 +22,7 @@ pub fn dirs_home() -> PathBuf {
 /// Harness data root: `data_root/harness`.
 #[must_use]
 pub fn harness_data_root() -> PathBuf {
-    super::xdg::data_root().join("harness")
+    super::session::data_root().join("harness")
 }
 
 /// Shorten an absolute path for human-readable terminal output.

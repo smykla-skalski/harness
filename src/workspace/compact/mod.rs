@@ -14,7 +14,7 @@ use fs_err as fs;
 use rayon::prelude::*;
 use tracing::warn;
 
-use crate::core_defs::{project_context_dir, session_scope_key, utc_now};
+use crate::workspace::{project_context_dir, session_scope_key, utc_now};
 use crate::errors::{CliError, io_for};
 use crate::infra::io::{read_text, write_json_pretty};
 use crate::rules::compact as compact_rules;

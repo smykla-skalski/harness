@@ -2,9 +2,9 @@ use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use crate::core_defs;
 use crate::errors::{CliError, CliErrorKind};
 use crate::run::context::RunRepository;
+use crate::workspace;
 
 /// Resolved run directory.
 #[derive(Debug, Clone)]
@@ -63,7 +63,7 @@ pub fn resolve_run_directory(
 /// # Errors
 /// Returns `CliError` if not found.
 pub fn resolve_suite_path(raw: &str) -> Result<PathBuf, CliError> {
-    let suite_root = core_defs::suite_root();
+    let suite_root = workspace::suite_root();
     let candidates = suite_path_candidates(raw, &suite_root)?;
 
     for candidate in &candidates {
@@ -251,7 +251,7 @@ mod tests {
                 ("CLAUDE_SESSION_ID", Some("resolve-fallback-test")),
             ],
             || {
-                let ctx_path = core_defs::current_run_context_path().unwrap();
+                let ctx_path = workspace::current_run_context_path().unwrap();
                 fs::create_dir_all(ctx_path.parent().unwrap()).unwrap();
                 fs::write(&ctx_path, serde_json::to_string_pretty(&record).unwrap()).unwrap();
 

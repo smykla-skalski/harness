@@ -1,15 +1,13 @@
 mod build_info;
 mod environment;
-mod paths;
-mod xdg;
 
 pub use build_info::{BuildInfo, CommandResult, resolve_build_info};
 pub use environment::host_platform;
 pub(crate) use environment::merge_env;
-pub use paths::{HARNESS_PREFIX, dirs_home, harness_data_root, shorten_path, utc_now};
-pub use xdg::{
+pub use crate::workspace::{
     current_run_context_path, data_root, project_context_dir, session_context_dir,
-    session_scope_key, suite_root,
+    session_scope_key, suite_root, HARNESS_PREFIX, dirs_home, harness_data_root, shorten_path,
+    utc_now,
 };
 
 #[cfg(test)]

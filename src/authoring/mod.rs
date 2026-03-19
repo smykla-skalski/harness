@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
-use crate::core_defs::{session_context_dir, utc_now};
+use crate::workspace::{session_context_dir, utc_now};
 use crate::errors::{CliError, CliErrorKind};
 use crate::infra::io::{read_json_typed, write_json_pretty};
 use crate::rules::skill_dirs;

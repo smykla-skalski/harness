@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use crate::shell_parse::{self, ParsedCommand, is_env_assignment};
+use crate::kernel::command_intent::{is_env_assignment, is_shell_control_op, ParsedCommand};
 
 enum ObservedCommandInner {
     Parsed(ParsedCommand),
@@ -34,7 +34,7 @@ impl<'a> ObservedCommand<'a> {
             .iter()
             .enumerate()
             .filter_map(|(index, word)| {
-                (!shell_parse::is_shell_control_op(word) && !is_env_assignment(word))
+                (!is_shell_control_op(word) && !is_env_assignment(word))
                     .then_some(index)
             })
             .collect();
@@ -174,7 +174,7 @@ impl<'a> ObservedCommand<'a> {
         let mut seen_chain = false;
         let mut expect_head = true;
         for word in self.words() {
-            if shell_parse::is_shell_control_op(word) {
+            if is_shell_control_op(word) {
                 seen_chain = true;
                 expect_head = true;
                 continue;
@@ -201,7 +201,7 @@ impl<'a> ObservedCommand<'a> {
         if let ObservedCommandInner::Parsed(parsed) = &self.inner {
             let spans = parsed
                 .harness_invocations()
-                .map(crate::shell_parse::HarnessCommandInvocationRef::semantic_words)
+                .map(crate::kernel::command_intent::HarnessCommandInvocationRef::semantic_words)
                 .collect::<Vec<_>>();
             return spans.into_iter();
         }
@@ -264,7 +264,7 @@ fn collect_kubectl_positional_args(tokens: &[String]) -> Vec<&str> {
             skip_next = false;
             continue;
         }
-        if shell_parse::is_shell_control_op(token) {
+        if is_shell_control_op(token) {
             break;
         }
         if token.starts_with('-') {
