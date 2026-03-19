@@ -4,7 +4,7 @@ use crate::app::command_context::{AppContext, Execute};
 use crate::errors::{CliError, CliErrorKind};
 use crate::run::args::RunDirArgs;
 
-use super::shared::resolve_run_services;
+use super::shared::resolve_run_application;
 
 impl Execute for ClusterCheckArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
@@ -27,8 +27,8 @@ pub struct ClusterCheckArgs {
 /// # Errors
 /// Returns `CliError` on failure.
 pub fn cluster_check(run_dir_args: &RunDirArgs) -> Result<i32, CliError> {
-    let services = resolve_run_services(run_dir_args)?;
-    let output = services.cluster_health_report()?;
+    let run = resolve_run_application(run_dir_args)?;
+    let output = run.cluster_health_report()?;
     let pretty = serde_json::to_string_pretty(&output)
         .map_err(|e| CliErrorKind::serialize(format!("cluster-check: {e}")))?;
     println!("{pretty}");

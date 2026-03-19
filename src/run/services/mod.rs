@@ -31,7 +31,6 @@ use crate::run::context::{
     ToolCheckRecord, ToolCheckSnapshot,
 };
 use crate::run::prepared_suite::{PreparedSuiteArtifact, PreparedSuitePlan};
-use crate::run::{RunStatus, SuiteSpec};
 use crate::run::state_capture::{
     DockerContainerSnapshot, KubernetesCaptureSnapshot, KubernetesPodSnapshot,
     StateCaptureSnapshot, UniversalCaptureSnapshot, UniversalDataplaneCollection,
@@ -39,13 +38,14 @@ use crate::run::state_capture::{
 use crate::run::workflow::{
     PreflightStatus, RunnerEvent, RunnerPhase, apply_event, read_runner_state,
 };
+use crate::run::{RunStatus, SuiteSpec};
 use crate::workspace::utc_now;
 
-pub use cluster_health::{ClusterHealthReport, ClusterMemberHealthRecord};
-pub use recording::{RecordCommandRequest, RecordedCommandResult, record_command};
+pub use cluster_health::ClusterHealthReport;
+pub use recording::{RecordCommandRequest, record_command};
 pub use reporting::{GroupReportRequest, ReportCheckOutcome, check_report_compactness};
 pub use service_lifecycle::StartServiceRequest;
-pub use status::{ClusterMemberStatusRecord, ClusterStatusReport, ServiceStatusRecord};
+pub use status::{ClusterStatusReport, ServiceStatusRecord};
 pub use task_output::{tail_task_output, wait_for_task_output};
 
 /// Domain access layer for a tracked run.
@@ -66,22 +66,16 @@ impl fmt::Debug for RunServices {
 impl RunServices {
     /// Build services from a loaded run context.
     ///
-    /// # Errors
-    /// Returns `CliError` if the persisted cluster spec cannot be adapted.
-    pub fn from_context(ctx: RunContext) -> Result<Self, CliError> {
+    #[must_use]
+    pub fn from_context(ctx: RunContext) -> Self {
         Self::from_context_with_blocks(ctx, Arc::new(BlockRegistry::production()))
     }
 
     /// Build services from a loaded run context using the provided block
     /// registry.
     ///
-    /// # Errors
-    /// Returns `CliError` if the persisted cluster spec cannot be adapted.
-    pub fn from_context_with_blocks(
-        ctx: RunContext,
-        blocks: Arc<BlockRegistry>,
-    ) -> Result<Self, CliError> {
-        Ok(Self::with_blocks(ctx, blocks))
+    pub fn from_context_with_blocks(ctx: RunContext, blocks: Arc<BlockRegistry>) -> Self {
+        Self::with_blocks(ctx, blocks)
     }
 
     /// Build services from a run directory.
@@ -89,7 +83,10 @@ impl RunServices {
     /// # Errors
     /// Returns `CliError` if the run context cannot be loaded.
     pub fn from_run_dir(run_dir: &Path) -> Result<Self, CliError> {
-        Self::from_context(RunContext::from_run_dir(run_dir)?)
+        Ok(Self::from_context_with_blocks(
+            RunContext::from_run_dir(run_dir)?,
+            Arc::new(BlockRegistry::production()),
+        ))
     }
 
     /// Build services from the current session run pointer.
@@ -97,9 +94,7 @@ impl RunServices {
     /// # Errors
     /// Returns `CliError` if the pointer or referenced run is invalid.
     pub fn from_current() -> Result<Option<Self>, CliError> {
-        RunContext::from_current()?
-            .map(Self::from_context)
-            .transpose()
+        Ok(RunContext::from_current()?.map(Self::from_context))
     }
 
     fn with_blocks(ctx: RunContext, blocks: Arc<BlockRegistry>) -> Self {

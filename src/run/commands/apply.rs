@@ -7,7 +7,6 @@ use clap::Args;
 use tracing::warn;
 
 use crate::app::command_context::{AppContext, Execute};
-use crate::workspace::{shorten_path, utc_now};
 use crate::errors::{CliError, CliErrorKind};
 use crate::infra::blocks::kuma::manifest::resource_api_path;
 use crate::infra::exec;
@@ -17,9 +16,10 @@ use crate::platform::cluster::Platform;
 use crate::platform::runtime::ClusterRuntime;
 use crate::run::args::RunDirArgs;
 use crate::run::resolve::resolve_manifest_path;
+use crate::workspace::{shorten_path, utc_now};
 
 use super::kumactl::find_kumactl_binary;
-use super::shared::resolve_run_services;
+use super::shared::resolve_run_application;
 
 impl Execute for ApplyArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
@@ -63,9 +63,9 @@ pub fn apply(
     step: Option<&str>,
     run_dir_args: &RunDirArgs,
 ) -> Result<i32, CliError> {
-    let services = resolve_run_services(run_dir_args)?;
-    let run_dir = services.layout().run_dir();
-    let runtime = services.cluster_runtime()?;
+    let run = resolve_run_application(run_dir_args)?;
+    let run_dir = run.layout().run_dir();
+    let runtime = run.cluster_runtime()?;
 
     for manifest_raw in manifests {
         let manifest = if manifest_raw == "-" {
@@ -77,21 +77,20 @@ pub fn apply(
 
         match runtime.platform() {
             Platform::Kubernetes => {
-                let kc = services.resolve_kubeconfig(kubeconfig, cluster_arg)?;
+                let kc = run.resolve_kubeconfig(kubeconfig, cluster_arg)?;
                 kubectl(Some(kc.as_ref()), &["apply", "-f", &manifest_str], &[0])?;
             }
             Platform::Universal => {
-                apply_universal(&services.metadata().repo_root, &runtime, &manifest_str)?;
+                apply_universal(&run.metadata().repo_root, &runtime, &manifest_str)?;
             }
         }
 
         let applied_at = utc_now();
-        let rel = services.layout().relative_path(&manifest);
+        let rel = run.layout().relative_path(&manifest);
         let notes = step.map_or_else(String::new, |s| format!("{s}: "));
-        services
-            .layout()
+        run.layout()
             .append_manifest_index(&applied_at, rel.as_ref(), "-", "PASS", &notes)?;
-        services.mark_manifest_applied(&manifest, &applied_at, step)?;
+        run.mark_manifest_applied(&manifest, &applied_at, step)?;
         println!("{}", shorten_path(&manifest));
     }
     Ok(0)

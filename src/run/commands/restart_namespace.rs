@@ -7,7 +7,7 @@ use crate::errors::CliError;
 use crate::infra::exec;
 use crate::run::args::RunDirArgs;
 
-use super::shared::resolve_run_services;
+use super::shared::resolve_run_application;
 
 impl Execute for RestartNamespaceArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
@@ -40,8 +40,8 @@ pub fn restart_namespace(args: &RestartNamespaceArgs) -> Result<i32, CliError> {
     let kubeconfig = if let Some(ref explicit) = args.kubeconfig {
         PathBuf::from(explicit)
     } else {
-        let services = resolve_run_services(&args.run_dir)?;
-        let resolved = services.resolve_kubeconfig(None, args.cluster.as_deref())?;
+        let run = resolve_run_application(&args.run_dir)?;
+        let resolved = run.resolve_kubeconfig(None, args.cluster.as_deref())?;
         resolved.into_owned()
     };
     exec::kubectl_rollout_restart(Some(&kubeconfig), &args.namespace)?;
