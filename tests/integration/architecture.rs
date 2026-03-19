@@ -273,6 +273,49 @@ fn authoring_commands_depend_on_application_boundary() {
 }
 
 #[test]
+fn observe_transport_stays_transport_only() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let transport = fs::read_to_string(root.join("src/observe/mod.rs")).unwrap();
+
+    for needle in [
+        "pub fn execute(",
+        "fn execute_scan_mode(",
+        "fn execute_dump_mode(",
+        "fn resolve_scan_action(",
+        "fn state_file_path(",
+        "fn load_observer_state(",
+        "fn save_observer_state(",
+        "fn execute_cycle(",
+        "fn execute_status(",
+        "fn execute_resume(",
+        "fn execute_verify(",
+        "fn execute_resolve_start(",
+        "fn execute_mute(",
+        "fn execute_unmute(",
+    ] {
+        assert!(
+            !transport.contains(needle),
+            "src/observe/mod.rs should stay transport-only instead of owning `{needle}`"
+        );
+    }
+
+    let application = fs::read_to_string(root.join("src/observe/application/mod.rs")).unwrap();
+    assert!(
+        application.contains("pub(crate) fn execute("),
+        "src/observe/application/mod.rs should own observe execution dispatch"
+    );
+
+    let maintenance =
+        fs::read_to_string(root.join("src/observe/application/maintenance.rs")).unwrap();
+    for needle in ["fn load_observer_state(", "fn execute_cycle("] {
+        assert!(
+            maintenance.contains(needle),
+            "src/observe/application/maintenance.rs should own `{needle}`"
+        );
+    }
+}
+
+#[test]
 fn setup_does_not_mutate_run_repository_directly() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
     let setup_root = root.join("src/setup");
