@@ -510,6 +510,37 @@ fn observe_transport_stays_transport_only() {
 }
 
 #[test]
+fn hooks_transport_does_not_hydrate_session_defaults() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+
+    for path in [
+        "src/hooks/protocol/context.rs",
+        "src/hooks/adapters/mod.rs",
+        "src/hooks/adapters/codex.rs",
+    ] {
+        let contents = fs::read_to_string(root.join(path)).unwrap();
+        assert!(
+            !contents.contains("current_dir("),
+            "{path} should not hydrate ambient cwd defaults in hooks transport"
+        );
+    }
+
+    let protocol = fs::read_to_string(root.join("src/hooks/protocol/context.rs")).unwrap();
+    assert!(
+        protocol.contains("pub cwd: Option<PathBuf>"),
+        "src/hooks/protocol/context.rs should preserve missing cwd in normalized transport context"
+    );
+
+    let application = fs::read_to_string(root.join("src/hooks/application/context.rs")).unwrap();
+    for needle in ["fn hydrate_normalized_context(", "fn hydrate_session("] {
+        assert!(
+            application.contains(needle),
+            "src/hooks/application/context.rs should own `{needle}`"
+        );
+    }
+}
+
+#[test]
 fn setup_does_not_mutate_run_repository_directly() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
     let setup_root = root.join("src/setup");

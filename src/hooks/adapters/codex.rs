@@ -1,4 +1,3 @@
-use std::env;
 use std::path::PathBuf;
 
 use serde::Deserialize;
@@ -133,9 +132,7 @@ fn notify_payload_context(raw_value: Value) -> Result<NormalizedHookContext, Cli
         serde_json::from_value(raw_value.clone()).map_err(|error| {
             CliErrorKind::hook_payload_invalid(format!("invalid hook payload: {error}"))
         })?;
-    let cwd = payload
-        .cwd
-        .unwrap_or_else(|| env::current_dir().unwrap_or_else(|_| PathBuf::from(".")));
+    let cwd = payload.cwd.clone();
     let turn_id = payload.turn_id.clone();
     let prompt = (!payload.input_messages.is_empty()).then(|| payload.input_messages.join("\n\n"));
     let tool_input = json!({
@@ -181,7 +178,7 @@ mod tests {
     fn assert_notify_context(context: &NormalizedHookContext) {
         assert_eq!(context.event, NormalizedEvent::Notification);
         assert_eq!(context.session.session_id, "session-123");
-        assert_eq!(context.session.cwd, PathBuf::from("/tmp/project"));
+        assert_eq!(context.session.cwd, Some(PathBuf::from("/tmp/project")));
         let tool = context.tool.as_ref().expect("expected tool");
         assert_eq!(tool.original_name, CODEX_TURN_TOOL_NAME);
         assert_eq!(tool.input_raw["input_messages"][0], json!("run the suite"));

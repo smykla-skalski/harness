@@ -1,4 +1,3 @@
-use std::env;
 use std::path::PathBuf;
 
 use crate::hooks::protocol::payloads::HookEnvelopePayload;
@@ -57,7 +56,7 @@ impl NormalizedEvent {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SessionContext {
     pub session_id: String,
-    pub cwd: PathBuf,
+    pub cwd: Option<PathBuf>,
     pub transcript_path: Option<PathBuf>,
 }
 
@@ -148,7 +147,7 @@ pub(crate) fn normalized_from_envelope(
         event: NormalizedEvent::unspecified(),
         session: SessionContext {
             session_id: String::new(),
-            cwd: env::current_dir().unwrap_or_else(|_| PathBuf::from(".")),
+            cwd: None,
             transcript_path: payload.transcript_path,
         },
         tool,
