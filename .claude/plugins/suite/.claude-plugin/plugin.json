@@ -1,5 +1,5 @@
 {
   "name": "suite",
-  "description": "Kuma test suite authoring and execution",
-  "version": "1.1.0"
+  "description": "Harness suite authoring and execution",
+  "version": "2.0.0"
 }

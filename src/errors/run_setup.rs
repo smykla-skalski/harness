@@ -232,14 +232,14 @@ impl RunSetupError {
             }
             Self::KumactlNotFound => Some("Build kumactl first.".into()),
             Self::TrackedKubectlRequired => {
-                Some("Run `harness run init` and `harness setup cluster ...` first.".into())
+                Some("Run `harness run init` and `harness setup kuma cluster ...` first.".into())
             }
             Self::KubectlTargetOverrideForbidden { .. } => Some(
                 "Use `harness run record --cluster <name> -- kubectl ...` for another tracked member.".into(),
             ),
             Self::UnknownTrackedCluster { choices, .. } => Some(format!("Use one of: {choices}.")),
             Self::NonLocalKubeconfig { .. } => Some(
-                "Recreate the local cluster with `harness setup cluster ...` before continuing.".into(),
+                "Recreate the local cluster with `harness setup kuma cluster ...` before continuing.".into(),
             ),
             Self::EvidenceLabelNotFound { .. } => Some(
                 "Use `harness run record --label <label>` or inspect `commands/command-log.md`."
@@ -257,7 +257,7 @@ impl RunSetupError {
                     .into(),
             ),
             Self::ServiceReadinessTimeout { name } => Some(format!(
-                "Run `harness run service down {name}` to clean up the container."
+                "Run `harness run kuma service down {name}` to clean up the container."
             )),
             _ => None,
         }

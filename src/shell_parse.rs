@@ -13,6 +13,7 @@ enum FlagValueLocation {
 pub struct HarnessCommandInvocation {
     head_index: usize,
     group_index: Option<usize>,
+    namespace_index: Option<usize>,
     subcommand_index: Option<usize>,
     gid: Option<FlagValueLocation>,
     pub has_explicit_run_scope: bool,
@@ -49,6 +50,13 @@ impl<'a> HarnessCommandInvocationRef<'a> {
         let mut parts = vec![self.head()];
         if let Some(group) = self.group() {
             parts.push(group);
+        }
+        if let Some(namespace) = self
+            .invocation
+            .namespace_index
+            .map(|index| self.words[index].as_str())
+        {
+            parts.push(namespace);
         }
         if let Some(subcommand) = self.subcommand()
             && Some(subcommand) != self.group()
@@ -288,10 +296,16 @@ fn is_harness_scope_group(word: &str) -> bool {
     matches!(word, "run" | "setup" | "authoring")
 }
 
+fn is_harness_namespace(word: &str) -> bool {
+    matches!(word, "kuma")
+}
+
 /// Return the semantic harness command tail starting at the effective command.
 ///
-/// For grouped invocations like `harness run apply`, this strips the grouping
-/// token and returns `["apply", ...]`. Flat invocations are returned unchanged.
+/// For grouped invocations like `harness run apply` or namespaced invocations
+/// like `harness run kuma token`, this strips the grouping and namespace
+/// tokens and returns the effective command tail. Flat invocations are returned
+/// unchanged.
 #[must_use]
 pub fn semantic_harness_tail<'a>(significant_words: &'a [&'a str]) -> Option<&'a [&'a str]> {
     let (head, rest) = significant_words.split_first()?;
@@ -304,7 +318,14 @@ pub fn semantic_harness_tail<'a>(significant_words: &'a [&'a str]) -> Option<&'a
     if is_harness_scope_group(first)
         && let Some(offset) = rest[1..].iter().position(|word| !word.starts_with('-'))
     {
-        return Some(&rest[offset + 1..]);
+        let mut tail = &rest[offset + 1..];
+        if let Some(namespace) = tail.first().copied()
+            && is_harness_namespace(namespace)
+            && let Some(namespace_offset) = tail[1..].iter().position(|word| !word.starts_with('-'))
+        {
+            tail = &tail[namespace_offset + 1..];
+        }
+        return Some(tail);
     }
     Some(rest)
 }
@@ -373,7 +394,25 @@ fn parse_harness_invocations(
             .copied()
             .find(|&span_index| !words[span_index].starts_with('-'))
             .filter(|&span_index| is_harness_scope_group(&words[span_index]));
-        let subcommand_index = if let Some(group_index) = group_index {
+        let namespace_index = if let Some(group_index) = group_index {
+            span.iter()
+                .copied()
+                .skip_while(|&span_index| span_index != group_index)
+                .skip(1)
+                .find(|&span_index| {
+                    !words[span_index].starts_with('-') && is_harness_namespace(&words[span_index])
+                })
+        } else {
+            None
+        };
+        let subcommand_index = if let Some(namespace_index) = namespace_index {
+            span.iter()
+                .copied()
+                .skip_while(|&span_index| span_index != namespace_index)
+                .skip(1)
+                .find(|&span_index| !words[span_index].starts_with('-'))
+                .or(Some(namespace_index))
+        } else if let Some(group_index) = group_index {
             span.iter()
                 .copied()
                 .skip_while(|&span_index| span_index != group_index)
@@ -396,6 +435,7 @@ fn parse_harness_invocations(
         invocations.push(HarnessCommandInvocation {
             head_index: word_index,
             group_index,
+            namespace_index,
             subcommand_index,
             gid,
             has_explicit_run_scope,
@@ -508,11 +548,27 @@ mod tests {
     }
 
     #[test]
+    fn parsed_command_extracts_namespaced_harness_invocation() {
+        let parsed =
+            ParsedCommand::parse("harness run kuma token dataplane --name demo --mesh default")
+                .unwrap();
+        let invocation = parsed.first_harness_invocation().unwrap();
+        assert_eq!(invocation.group(), Some("run"));
+        assert_eq!(invocation.subcommand(), Some("token"));
+        assert_eq!(invocation.command_label(), "harness run kuma token");
+    }
+
+    #[test]
     fn semantic_harness_tail_strips_group_prefix() {
         let grouped = ["harness", "setup", "cluster", "single-up"];
         assert_eq!(
             semantic_harness_tail(&grouped).unwrap(),
             ["cluster", "single-up"]
+        );
+        let namespaced = ["harness", "run", "kuma", "token", "dataplane"];
+        assert_eq!(
+            semantic_harness_tail(&namespaced).unwrap(),
+            ["token", "dataplane"]
         );
         let flat = ["harness", "report", "group"];
         assert_eq!(semantic_harness_tail(&flat).unwrap(), ["report", "group"]);

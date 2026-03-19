@@ -56,7 +56,7 @@ fn seed_kubectl_validate_and_read_back() {
     let xdg = tmp.path().join("xdg");
     seed_kubectl_validate_state(&xdg, "declined", None);
     let state_path = xdg
-        .join("kuma")
+        .join("harness")
         .join("tooling")
         .join("kubectl-validate.json");
     assert!(state_path.exists());
@@ -74,7 +74,7 @@ fn seed_kubectl_validate_with_binary_path() {
     fs::write(&binary, "#!/bin/sh\necho ok\n").unwrap();
     seed_kubectl_validate_state(&xdg, "installed", Some(&binary));
     let state_path = xdg
-        .join("kuma")
+        .join("harness")
         .join("tooling")
         .join("kubectl-validate.json");
     let text = fs::read_to_string(&state_path).unwrap();

@@ -102,10 +102,10 @@ Pick a profile and start the cluster:
 
 ```bash
 # Single-zone:
-harness cluster single-up kuma-1
+harness setup kuma cluster single-up kuma-1
 
 # Or multi-zone:
-harness cluster global-two-zones-up kuma-1 kuma-2 kuma-3 zone-1 zone-2
+harness setup kuma cluster global-two-zones-up kuma-1 kuma-2 kuma-3 zone-1 zone-2
 ```
 
 If changes modify CRDs, re-run Phase 2 bootstrap for the affected cluster profile and then rerun Phase 3 preflight. Do not use a bare `kubectl apply` during a tracked run.
@@ -151,7 +151,7 @@ For directory suites (`SUITE_DIR` is set):
 2. **The test groups table is authoritative.** Every group listed in the table must be executed. Do not skip groups because they need a different cluster profile. If a group requires multi-zone but the current profile is single-zone, tear down the current cluster and bring up a multi-zone cluster before that group. If profile switching is impractical, use AskUserQuestion - do not silently skip.
 3. Phase 3 already prepared the suite. Do not re-copy baseline manifests and do not re-parse group frontmatter during each group. Use the active run's prepared-suite artifact as the runtime source of truth for prepared manifests plus cluster deltas.
 4. Before each group, read the group file from the suite's `groups/` directory using the file path in the group table. The group file stays authoritative for `## Consume`, `## Debug`, validation commands, and expected outcomes. The prepared-suite artifact is authoritative for prepared manifest paths plus `helm_values` and `restart_namespaces`.
-5. If the prepared-suite entry for the current group includes `helm_values` or `restart_namespaces`, rerun the active Phase 2 cluster command with repeated `--helm-setting key=value` and `--restart-namespace <ns>` flags derived from the prepared-suite artifact. `harness cluster` compares the desired deploy state against the active run's `current-deploy.json`; if mode, mode args, and Helm values already match, it prints a no-op message and skips redeploy. Otherwise it redeploys, performs rollout restarts in the listed namespaces, and rewrites the deploy state.
+5. If the prepared-suite entry for the current group includes `helm_values` or `restart_namespaces`, rerun the active Phase 2 cluster command with repeated `--helm-setting key=value` and `--restart-namespace <ns>` flags derived from the prepared-suite artifact. `harness setup kuma cluster` compares the desired deploy state against the active run's `current-deploy.json`; if mode, mode args, and Helm values already match, it prints a no-op message and skips redeploy. Otherwise it redeploys, performs rollout restarts in the listed namespaces, and rewrites the deploy state.
 6. Apply only the prepared group manifests listed for the current group in the prepared-suite artifact. Baselines were already applied once during Phase 3.
 7. Follow the group file's validation commands and expected outcomes exactly. If something doesn't match, report it as a finding - do not silently adjust expectations.
 8. After completing a group, the group file content can be dropped from context.
@@ -366,16 +366,16 @@ Use the matching teardown command for the active profile:
 
 ```bash
 # Kubernetes single-zone
-harness cluster single-down kuma-1
+harness setup kuma cluster single-down kuma-1
 
 # Kubernetes multi-zone (global + 2 zones)
-harness cluster global-two-zones-down kuma-1 kuma-2 kuma-3
+harness setup kuma cluster global-two-zones-down kuma-1 kuma-2 kuma-3
 
 # Universal single-zone
-harness cluster --platform universal single-down test-cp
+harness setup kuma cluster --platform universal single-down test-cp
 
 # Universal multi-zone
-harness cluster --platform universal global-zone-down global-cp zone-cp
+harness setup kuma cluster --platform universal global-zone-down global-cp zone-cp
 ```
 
 ## Performance toggles
@@ -390,5 +390,5 @@ Example:
 
 ```bash
 HARNESS_BUILD_IMAGES=0 HARNESS_LOAD_IMAGES=0 \
-  harness cluster single-up kuma-1
+  harness setup kuma cluster single-up kuma-1
 ```

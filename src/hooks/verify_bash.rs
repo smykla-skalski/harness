@@ -249,7 +249,7 @@ fn check_cluster(words: &[String], run: &RunContext) -> HookResult {
         return HookResult::allow();
     }
     HookMessage::missing_artifact(
-        format!("harness setup cluster {mode}"),
+        format!("harness setup kuma cluster {mode}"),
         target.display().to_string(),
     )
     .into_result()
@@ -478,7 +478,7 @@ mod tests {
         let state = base_state(RunnerPhase::Bootstrap);
         let ctx = stub_context_with_state_and_response(
             Some(state),
-            Some("ERROR [KSRCLI004] command failed: harness cluster"),
+            Some("ERROR [KSRCLI004] command failed: harness setup kuma cluster"),
         );
         assert!(check_bug_found_gate(&ctx, "cluster").is_none());
     }

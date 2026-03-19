@@ -488,7 +488,7 @@ mod tests {
         let entry = append_audit_entry(AuditAppendRequest {
             run_dir: run_dir.clone(),
             tool_name: "Bash".to_string(),
-            tool_input: "harness token dataplane".to_string(),
+            tool_input: "harness run kuma token dataplane".to_string(),
             full_output: "token: eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIn0.Signature1234567890abcdef".to_string(),
             phase: "execution".to_string(),
             group_id: None,

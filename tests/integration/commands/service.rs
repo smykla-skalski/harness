@@ -1,4 +1,4 @@
-// Integration tests for the `harness service` command.
+// Integration tests for the `harness run kuma service` command.
 // Tests error paths for missing args and missing cluster spec.
 
 use harness::run::RunDirArgs;

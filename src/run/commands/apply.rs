@@ -9,6 +9,7 @@ use tracing::warn;
 use crate::app::command_context::{CommandContext, Execute, RunDirArgs, resolve_run_services};
 use crate::core_defs::{shorten_path, utc_now};
 use crate::errors::{CliError, CliErrorKind};
+use crate::infra::blocks::kuma::manifest::resource_api_path;
 use crate::infra::exec;
 use crate::infra::exec::kubectl;
 use crate::infra::io::{ensure_dir, validate_safe_segment, write_text};
@@ -112,26 +113,6 @@ fn materialize_stdin(run_dir: &Path, step: Option<&str>) -> Result<PathBuf, CliE
     Ok(path)
 }
 
-/// Build the Kuma REST API path for a resource.
-///
-/// Kuma endpoints use lowercased type names without separators as the
-/// collection segment. For example, `MeshTrafficPermission` maps to
-/// `/meshes/{mesh}/meshtrafficpermissions/{name}`.
-///
-/// The `Mesh` type itself is a special case - it lives at `/meshes/{name}`
-/// since it has no mesh scope.
-fn kuma_api_path(resource_type: &str, name: &str, mesh: Option<&str>) -> String {
-    let collection = resource_type.to_lowercase();
-
-    // The Mesh resource lives at the top level
-    if collection == "mesh" {
-        return format!("/meshes/{name}");
-    }
-
-    let mesh_name = mesh.unwrap_or("default");
-    format!("/meshes/{mesh_name}/{collection}s/{name}")
-}
-
 fn apply_universal(
     repo_root: &str,
     runtime: &ClusterRuntime<'_>,
@@ -149,7 +130,8 @@ fn apply_universal(
         (resource["type"].as_str(), resource["name"].as_str())
     {
         let mesh = resource["mesh"].as_str();
-        let path = kuma_api_path(resource_type, name, mesh);
+        let path = resource_api_path(resource_type, name, mesh)
+            .map_err(|error| CliErrorKind::usage_error(error.to_string()))?;
         match exec::cp_api_json(
             access.addr.as_ref(),
             &path,
@@ -175,9 +157,12 @@ mod tests {
 
     #[test]
     fn kuma_api_path_mesh_resource() {
-        assert_eq!(kuma_api_path("Mesh", "my-mesh", None), "/meshes/my-mesh");
         assert_eq!(
-            kuma_api_path("Mesh", "default", Some("ignored")),
+            resource_api_path("Mesh", "my-mesh", None).unwrap(),
+            "/meshes/my-mesh"
+        );
+        assert_eq!(
+            resource_api_path("Mesh", "default", Some("ignored")).unwrap(),
             "/meshes/default"
         );
     }
@@ -185,7 +170,7 @@ mod tests {
     #[test]
     fn kuma_api_path_mesh_scoped_policy() {
         assert_eq!(
-            kuma_api_path("MeshTrafficPermission", "allow-all", Some("default")),
+            resource_api_path("MeshTrafficPermission", "allow-all", Some("default")).unwrap(),
             "/meshes/default/meshtrafficpermissions/allow-all"
         );
     }
@@ -193,7 +178,7 @@ mod tests {
     #[test]
     fn kuma_api_path_simple_type() {
         assert_eq!(
-            kuma_api_path("Dataplane", "dp-1", Some("default")),
+            resource_api_path("Dataplane", "dp-1", Some("default")).unwrap(),
             "/meshes/default/dataplanes/dp-1"
         );
     }
@@ -201,7 +186,7 @@ mod tests {
     #[test]
     fn kuma_api_path_defaults_to_default_mesh() {
         assert_eq!(
-            kuma_api_path("MeshTimeout", "mt-1", None),
+            resource_api_path("MeshTimeout", "mt-1", None).unwrap(),
             "/meshes/default/meshtimeouts/mt-1"
         );
     }

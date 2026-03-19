@@ -10,7 +10,7 @@ impl Execute for ApiArgs {
     }
 }
 
-/// HTTP method for `harness api` requests.
+/// HTTP method for `harness run kuma api` requests.
 #[derive(Debug, Clone, Subcommand)]
 #[non_exhaustive]
 pub enum ApiMethod {
@@ -54,7 +54,7 @@ pub enum ApiMethod {
     },
 }
 
-/// Arguments for `harness api`.
+/// Arguments for `harness run kuma api`.
 #[derive(Debug, Clone, Args)]
 pub struct ApiArgs {
     /// HTTP method and path.

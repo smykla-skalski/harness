@@ -41,7 +41,7 @@ Symptoms: `kubectl apply` fails with CRD required-field or enum errors.
 Fix:
 
 1. Run server-side dry-run with `harness validate`.
-2. Re-run Phase 2 bootstrap for the affected cluster profile with `harness cluster`, then re-run preflight. Avoid ad-hoc CRD refresh commands during a tracked run because bare `kubectl apply` is outside the harness contract.
+2. Re-run Phase 2 bootstrap for the affected cluster profile with `harness setup kuma cluster`, then re-run preflight. Avoid ad-hoc CRD refresh commands during a tracked run because bare `kubectl apply` is outside the harness contract.
 3. Retry validation.
 
 ## 3) Wrong kumactl behavior
@@ -103,7 +103,7 @@ Fix:
 
 ```bash
 HARNESS_HELM_CLEAN=1 \
-  harness cluster single-up kuma-1
+  harness setup kuma cluster single-up kuma-1
 ```
 
 Then rerun preflight and continue tests.
@@ -120,7 +120,7 @@ Fix: expose global sync service as NodePort and use `grpcs://<global-node-ip>:<n
 
 Symptoms: error references missing `mk/metallb-k3d-kuma-3.yaml`.
 
-Fix: use `harness cluster`, which auto-generates a temporary manifest for numeric names `kuma-<n>`.
+Fix: use `harness setup kuma cluster`, which auto-generates a temporary manifest for numeric names `kuma-<n>`.
 
 ## 11) Disk pressure on k3d node
 
@@ -143,7 +143,7 @@ K3D_HELM_DEPLOY_NO_CNI=true make k3d/deploy/helm KIND_CLUSTER_NAME=kuma-1 \
 
 This triggers a full build cycle (images + load + helm upgrade). After the deploy, restart test workloads to pick up the new sidecar images.
 
-Prevention: `HARNESS_DOCKER_PRUNE=1` (default) in `harness cluster` prunes old kumahq/* images before each build. The preflight script also warns when >30 kumahq/* images or >50 dangling volumes exist.
+Prevention: `HARNESS_DOCKER_PRUNE=1` (default) in `harness setup kuma cluster` prunes old kumahq/* images before each build. The preflight script also warns when >30 kumahq/* images or >50 dangling volumes exist.
 
 ## 12) Prepared manifest stale after suite-fix
 
@@ -190,12 +190,12 @@ runtime.kubernetes.injector.initContainer.resources.limits.cpu=0
 runtime.kubernetes.injector.initContainer.resources.requests.cpu=10m
 ```
 
-Setting the CPU limit to `0` removes it entirely. No manual action needed - `harness cluster` handles this for all k3d deployments.
+Setting the CPU limit to `0` removes it entirely. No manual action needed - `harness setup kuma cluster` handles this for all k3d deployments.
 
 If you are deploying outside harness and hit this, pass the settings via `K3D_HELM_DEPLOY_ADDITIONAL_SETTINGS` or `--helm-setting`:
 
 ```bash
-harness cluster single-up kuma-1 \
+harness setup kuma cluster single-up kuma-1 \
   --helm-setting "runtime.kubernetes.injector.initContainer.resources.limits.cpu=0" \
   --helm-setting "runtime.kubernetes.injector.initContainer.resources.requests.cpu=10m"
 ```

@@ -26,7 +26,7 @@ impl Execute for ClusterArgs {
     }
 }
 
-/// Arguments for `harness cluster`.
+/// Arguments for `harness setup kuma cluster`.
 #[derive(Debug, Clone, Args)]
 pub struct ClusterArgs {
     /// Cluster lifecycle mode.
@@ -161,7 +161,7 @@ mod tests {
 
     fn write_context_file(xdg_dir: &Path, session_id: &str, content: &str) {
         let scope = scope_key_for_session(session_id);
-        let ctx_dir = xdg_dir.join("kuma").join("contexts").join(scope);
+        let ctx_dir = xdg_dir.join("harness").join("contexts").join(scope);
         fs::create_dir_all(&ctx_dir).unwrap();
         fs::write(ctx_dir.join("current-run.json"), content).unwrap();
     }

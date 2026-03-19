@@ -1856,7 +1856,7 @@ pub fn seed_kubectl_validate_state(
     binary_path: Option<&Path>,
 ) {
     let path = xdg_data_home
-        .join("kuma")
+        .join("harness")
         .join("tooling")
         .join("kubectl-validate.json");
     if let Some(parent) = path.parent() {

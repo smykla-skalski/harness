@@ -171,7 +171,7 @@ fn guard_bash_denies_rebootstrap_after_completed() {
     let mut status = read_run_status(&run_dir);
     status.overall_verdict = Verdict::Pass;
     write_run_status(&run_dir, &status);
-    let payload = make_bash_payload("harness setup cluster single-up kuma-1");
+    let payload = make_bash_payload("harness setup kuma cluster single-up kuma-1");
     let ctx = make_hook_context_with_run("suite:run", payload, &run_dir);
     let r = guard_bash::execute(&ctx).unwrap();
     assert_deny(&r);
@@ -197,7 +197,7 @@ fn guard_bash_allows_cluster_down_after_completed() {
     let mut status = read_run_status(&run_dir);
     status.overall_verdict = Verdict::Pass;
     write_run_status(&run_dir, &status);
-    let payload = make_bash_payload("harness setup cluster single-down kuma-1");
+    let payload = make_bash_payload("harness setup kuma cluster single-down kuma-1");
     let ctx = make_hook_context_with_run("suite:run", payload, &run_dir);
     let r = guard_bash::execute(&ctx).unwrap();
     assert_allow(&r);

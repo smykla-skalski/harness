@@ -11,10 +11,13 @@ use harness::authoring::commands::{
 };
 use harness::errors::CliError;
 use harness::run::commands::{
-    ApiArgs, ApplyArgs, CaptureArgs, CloseoutArgs, EnvoyArgs, KumactlArgs, PreflightArgs,
-    RecordArgs, ReportArgs, ServiceArgs, ValidateArgs,
+    ApiArgs, ApplyArgs, CaptureArgs, CloseoutArgs, EnvoyArgs, KumaArgs, KumaCommand, KumactlArgs,
+    PreflightArgs, RecordArgs, ReportArgs, ServiceArgs, ValidateArgs,
 };
-use harness::setup::{ClusterArgs, GatewayArgs, PreCompactArgs, SessionStartArgs, SessionStopArgs};
+use harness::setup::{
+    ClusterArgs, GatewayArgs, KumaSetupArgs, KumaSetupCommand, PreCompactArgs, SessionStartArgs,
+    SessionStopArgs,
+};
 
 // Re-export everything from the testkit so integration tests can use
 // `helpers::write_suite`, `helpers::make_bash_payload`, etc. unchanged.
@@ -45,7 +48,9 @@ pub fn authoring_cmd(command: AuthoringCommand) -> Command {
 }
 
 pub fn api_cmd(args: ApiArgs) -> Command {
-    run_cmd(RunCommand::Api(args))
+    run_cmd(RunCommand::Kuma(KumaArgs {
+        command: KumaCommand::Api(args),
+    }))
 }
 
 pub fn apply_cmd(args: ApplyArgs) -> Command {
@@ -81,7 +86,9 @@ pub fn closeout_cmd(args: CloseoutArgs) -> Command {
 }
 
 pub fn cluster_cmd(args: ClusterArgs) -> Command {
-    setup_cmd(SetupCommand::Cluster(args))
+    setup_cmd(SetupCommand::Kuma(KumaSetupArgs {
+        command: KumaSetupCommand::Cluster(args),
+    }))
 }
 
 pub fn envoy_cmd(args: EnvoyArgs) -> Command {
@@ -93,7 +100,9 @@ pub fn gateway_cmd(args: GatewayArgs) -> Command {
 }
 
 pub fn kumactl_cmd(args: KumactlArgs) -> Command {
-    run_cmd(RunCommand::Kumactl(args))
+    run_cmd(RunCommand::Kuma(KumaArgs {
+        command: KumaCommand::Cli(args),
+    }))
 }
 
 pub fn pre_compact_cmd(args: PreCompactArgs) -> Command {
@@ -113,7 +122,9 @@ pub fn report_cmd(args: ReportArgs) -> Command {
 }
 
 pub fn service_cmd(args: ServiceArgs) -> Command {
-    run_cmd(RunCommand::Service(args))
+    run_cmd(RunCommand::Kuma(KumaArgs {
+        command: KumaCommand::Service(args),
+    }))
 }
 
 pub fn session_start_cmd(args: SessionStartArgs) -> Command {

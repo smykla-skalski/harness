@@ -70,8 +70,8 @@ fn completed_run_reuse_for_subcommand(
         {
             Some("the active run is already final; do not reopen or advance it")
         }
-        "apply" | "bootstrap" | "capture" | "diff" | "envoy" | "gateway" | "kumactl"
-        | "preflight" | "record" | "run" | "validate" => Some(
+        "apply" | "bootstrap" | "capture" | "cli" | "diff" | "envoy" | "gateway" | "preflight"
+        | "record" | "run" | "validate" => Some(
             "the active run is already final; start a new run before \
              continuing bootstrap or execution",
         ),

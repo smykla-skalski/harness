@@ -1,4 +1,4 @@
-// Integration tests for the `harness api` command.
+// Integration tests for the `harness run kuma api` command.
 // Tests error paths since happy path requires a real CP.
 
 use harness::run::RunDirArgs;

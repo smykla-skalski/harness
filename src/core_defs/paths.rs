@@ -17,22 +17,22 @@ pub fn dirs_home() -> PathBuf {
     )
 }
 
-/// Harness data root: `data_root/kuma`.
+/// Harness data root: `data_root/harness`.
 #[must_use]
 pub fn harness_data_root() -> PathBuf {
-    super::xdg::data_root().join("kuma")
+    super::xdg::data_root().join("harness")
 }
 
 /// Shorten an absolute path for human-readable terminal output.
 ///
-/// Paths under the harness data root become `~kuma/<rest>`.
+/// Paths under the harness data root become `~harness/<rest>`.
 /// Other paths under `$HOME` get the home prefix replaced with `~`.
 /// Everything else is returned unchanged.
 #[must_use]
 pub fn shorten_path(path: &Path) -> String {
     let hdr = harness_data_root();
     if let Ok(rel) = path.strip_prefix(&hdr) {
-        return format!("~kuma/{}", rel.display());
+        return format!("~harness/{}", rel.display());
     }
     let home = dirs_home();
     if let Ok(rel) = path.strip_prefix(&home) {

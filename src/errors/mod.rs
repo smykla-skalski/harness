@@ -745,7 +745,7 @@ mod tests {
     fn service_readiness_timeout_has_hint() {
         let err: CliError = CliErrorKind::service_readiness_timeout("demo-svc").into();
         let hint = err.hint().expect("should have a hint");
-        assert!(hint.contains("harness run service down demo-svc"));
+        assert!(hint.contains("harness run kuma service down demo-svc"));
     }
 
     #[test]
