@@ -186,6 +186,41 @@ fn run_commands_depend_on_application_boundary_not_services() {
 }
 
 #[test]
+fn run_domain_does_not_depend_on_block_registry() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let run_root = root.join("src/run");
+    let mut stack = vec![run_root];
+    let mut hits = Vec::new();
+
+    while let Some(path) = stack.pop() {
+        for entry in fs::read_dir(&path).unwrap() {
+            let entry = entry.unwrap();
+            let child = entry.path();
+            if child.is_dir() {
+                stack.push(child);
+                continue;
+            }
+            if !matches_extension(&child) {
+                continue;
+            }
+            let contents = fs::read_to_string(&child).unwrap();
+            if contents.contains("BlockRegistry") {
+                hits.push(format!(
+                    "{} still depends on BlockRegistry instead of explicit run-owned dependencies",
+                    child.strip_prefix(root).unwrap().display()
+                ));
+            }
+        }
+    }
+
+    assert!(
+        hits.is_empty(),
+        "run domain should not depend on infra::blocks::BlockRegistry anymore:\n{}",
+        hits.join("\n")
+    );
+}
+
+#[test]
 fn authoring_commands_depend_on_application_boundary() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
     let commands_root = root.join("src/authoring/commands");
