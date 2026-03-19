@@ -8,10 +8,10 @@ use tracing::warn;
 use crate::authoring::workflow::{self as author_workflow, AuthorWorkflowState};
 use crate::errors::{CliError, CliErrorKind};
 use crate::hooks::protocol::payloads::{AskUserAnswer, AskUserQuestionPrompt, HookEnvelopePayload};
-use crate::rules;
 use crate::run::context::RunContext;
 use crate::run::workflow::{self as runner_workflow, RunnerWorkflowState};
 use crate::kernel::command_intent::ParsedCommand;
+use crate::kernel::skills::{SKILL_NEW, SKILL_RUN};
 
 /// Opaque raw agent payload preserved for adapter-specific features.
 #[derive(Debug, Clone)]
@@ -154,8 +154,8 @@ impl SkillContext {
         Self {
             active: !skill.is_empty(),
             name: (!skill.is_empty()).then(|| skill.to_string()),
-            is_runner: skill == rules::SKILL_RUN,
-            is_author: skill == rules::SKILL_NEW,
+            is_runner: skill == SKILL_RUN,
+            is_author: skill == SKILL_NEW,
         }
     }
 }

@@ -8,7 +8,7 @@ use crate::hooks::guard_bash::runner_guards::deny_author_suite_storage_mutation;
 use crate::hooks::protocol::context::GuardContext;
 use crate::hooks::protocol::result::NormalizedHookResult;
 use crate::hooks::registry::Guard;
-use crate::rules::suite_runner::TaskOutputPattern;
+use crate::hooks::runner_policy::TaskOutputPattern;
 
 use super::parsed_parts;
 

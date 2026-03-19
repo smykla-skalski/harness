@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 
 use crate::errors::{CliError, CliErrorKind};
 use crate::infra::io::{read_text, write_json_pretty};
-use crate::rules::skill_dirs;
+use crate::kernel::skills::dirs as skill_dirs;
 use crate::run::audit::append_runner_state_audit;
 use fs_err as fs;
 use fs2::FileExt;

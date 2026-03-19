@@ -1,16 +1,13 @@
-use super::{FromStr, Gate, fmt};
+use std::fmt;
+use std::str::FromStr;
 
-pub const SKILL_NAME: &str = super::SKILL_RUN;
-pub const PREFLIGHT_REPLY_HEAD: &str = concat!(skill_run!(), "/preflight:");
+use crate::kernel::gate::Gate;
+use crate::kernel::skills::SKILL_RUN;
 
-pub const REPORT_LINE_LIMIT: usize = 220;
-pub const REPORT_CODE_BLOCK_LIMIT: usize = 4;
+pub const PREFLIGHT_REPLY_HEAD: &str = "suite:run/preflight:";
 
 pub const MANIFEST_FIX_GATE: Gate = Gate {
-    question: concat!(
-        skill_run!(),
-        "/manifest-fix: how should this failure be handled?"
-    ),
+    question: "suite:run/manifest-fix: how should this failure be handled?",
     options: &[
         "Fix for this run only",
         "Fix in suite and this run",
@@ -20,12 +17,11 @@ pub const MANIFEST_FIX_GATE: Gate = Gate {
 };
 
 pub const BUG_FOUND_GATE: Gate = Gate {
-    question: concat!(
-        skill_run!(),
-        "/bug-found: bug or failure detected during test execution"
-    ),
+    question: "suite:run/bug-found: bug or failure detected during test execution",
     options: &["Fix now", "Continue and fix later", "Stop run"],
 };
+
+pub const SKILL_NAME: &str = SKILL_RUN;
 
 /// Preflight reply status.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -60,142 +56,6 @@ impl FromStr for PreflightReply {
     }
 }
 
-/// Files within a run directory.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[non_exhaustive]
-pub enum RunFile {
-    RunReport,
-    RunStatus,
-    RunMetadata,
-    CurrentDeploy,
-    CommandLog,
-    ManifestIndex,
-    RunnerState,
-}
-
-impl RunFile {
-    pub const ALL: &[Self] = &[
-        Self::RunReport,
-        Self::RunStatus,
-        Self::RunMetadata,
-        Self::CurrentDeploy,
-        Self::CommandLog,
-        Self::ManifestIndex,
-        Self::RunnerState,
-    ];
-
-    pub const CONTROL_HINT: &str =
-        "use `harness run report group`, `harness run runner-state`, or `harness run closeout`";
-
-    pub const COMMAND_LOG_HINT: &str =
-        "use `harness run record` or recorded command artifacts instead";
-
-    /// Part of the allowed run surface (everything except `RunnerState`).
-    #[must_use]
-    pub const fn is_allowed(self) -> bool {
-        !matches!(self, Self::RunnerState)
-    }
-
-    /// Files that must not be written directly by the agent.
-    #[must_use]
-    pub const fn is_direct_write_denied(self) -> bool {
-        matches!(
-            self,
-            Self::RunReport | Self::RunStatus | Self::RunnerState | Self::CommandLog
-        )
-    }
-
-    /// Files fully managed by harness commands (no agent writes at all).
-    #[must_use]
-    pub const fn is_harness_managed(self) -> bool {
-        matches!(self, Self::RunReport | Self::RunStatus | Self::RunnerState)
-    }
-
-    /// Hint text for denied writes.
-    #[must_use]
-    pub const fn write_hint(self) -> &'static str {
-        match self {
-            Self::CommandLog => Self::COMMAND_LOG_HINT,
-            _ => Self::CONTROL_HINT,
-        }
-    }
-}
-
-impl fmt::Display for RunFile {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(match self {
-            Self::RunReport => "run-report.md",
-            Self::RunStatus => "run-status.json",
-            Self::RunMetadata => "run-metadata.json",
-            Self::CurrentDeploy => "current-deploy.json",
-            Self::CommandLog => "commands/command-log.md",
-            Self::ManifestIndex => "manifests/manifest-index.md",
-            Self::RunnerState => super::skill_dirs::RUN_STATE_FILE,
-        })
-    }
-}
-
-impl FromStr for RunFile {
-    type Err = ();
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "run-report.md" => Ok(Self::RunReport),
-            "run-status.json" => Ok(Self::RunStatus),
-            "run-metadata.json" => Ok(Self::RunMetadata),
-            "current-deploy.json" => Ok(Self::CurrentDeploy),
-            "commands/command-log.md" => Ok(Self::CommandLog),
-            "manifests/manifest-index.md" => Ok(Self::ManifestIndex),
-            _ if s == super::skill_dirs::RUN_STATE_FILE => Ok(Self::RunnerState),
-            _ => Err(()),
-        }
-    }
-}
-
-/// Allowed subdirectories within a run directory.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[non_exhaustive]
-pub enum RunDir {
-    Artifacts,
-    Commands,
-    Manifests,
-    State,
-}
-
-impl RunDir {
-    pub const ALL: &[Self] = &[
-        Self::Artifacts,
-        Self::Commands,
-        Self::Manifests,
-        Self::State,
-    ];
-}
-
-impl fmt::Display for RunDir {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(match self {
-            Self::Artifacts => "artifacts",
-            Self::Commands => "commands",
-            Self::Manifests => "manifests",
-            Self::State => "state",
-        })
-    }
-}
-
-impl FromStr for RunDir {
-    type Err = ();
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "artifacts" => Ok(Self::Artifacts),
-            "commands" => Ok(Self::Commands),
-            "manifests" => Ok(Self::Manifests),
-            "state" => Ok(Self::State),
-            _ => Err(()),
-        }
-    }
-}
-
 /// Legacy Python scripts that are no longer allowed.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
@@ -220,7 +80,6 @@ impl LegacyScript {
         Self::ValidateManifest,
     ];
 
-    /// Returns `true` when `name` matches a denied legacy script filename.
     #[must_use]
     pub fn is_denied(name: &str) -> bool {
         Self::from_str(name).is_ok()
@@ -268,7 +127,6 @@ pub enum RunnerBinary {
 impl RunnerBinary {
     pub const ALL: &[Self] = &[Self::Gh];
 
-    /// Returns `true` when `name` matches a denied runner binary.
     #[must_use]
     pub fn is_denied(name: &str) -> bool {
         Self::from_str(name).is_ok()
@@ -305,15 +163,14 @@ pub enum MakeTargetPrefix {
 impl MakeTargetPrefix {
     pub const ALL: &[Self] = &[Self::K3d, Self::Kind];
 
-    /// Returns `true` when `target` starts with a denied prefix.
     #[must_use]
     pub fn is_denied_target(target: &str) -> bool {
-        Self::ALL.iter().any(|p| {
-            let prefix = match p {
+        Self::ALL.iter().any(|prefix| {
+            let raw = match prefix {
                 Self::K3d => "k3d/",
                 Self::Kind => "kind/",
             };
-            target.starts_with(prefix)
+            target.starts_with(raw)
         })
     }
 }
@@ -359,7 +216,6 @@ impl AdminEndpointHint {
         Self::Routes,
     ];
 
-    /// The string representation of this hint.
     #[must_use]
     pub const fn as_str(&self) -> &'static str {
         match self {
@@ -371,10 +227,9 @@ impl AdminEndpointHint {
         }
     }
 
-    /// Returns `true` when `word` contains any admin endpoint hint.
     #[must_use]
     pub fn contains_hint(word: &str) -> bool {
-        Self::ALL.iter().any(|h| word.contains(h.as_str()))
+        Self::ALL.iter().any(|hint| word.contains(hint.as_str()))
     }
 }
 
@@ -390,15 +245,13 @@ impl FromStr for AdminEndpointHint {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Self::ALL
             .iter()
-            .find(|h| h.as_str() == s)
+            .find(|hint| hint.as_str() == s)
             .copied()
             .ok_or(())
     }
 }
 
-/// Patterns that indicate direct access to Claude's internal task output
-/// files. These must never be read by the runner - use the `TaskOutput` tool
-/// instead.
+/// Patterns that indicate direct access to task output files.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum TaskOutputPattern {
@@ -414,7 +267,6 @@ impl TaskOutputPattern {
         Self::TasksB8mPrefix,
     ];
 
-    /// The substring to search for in a command.
     #[must_use]
     pub const fn as_str(&self) -> &'static str {
         match self {
@@ -424,12 +276,9 @@ impl TaskOutputPattern {
         }
     }
 
-    /// Returns `true` when `text` contains any task output pattern.
     #[must_use]
     pub fn matches_any(text: &str) -> bool {
-        Self::ALL
-            .iter()
-            .any(|pattern| text.contains(pattern.as_str()))
+        Self::ALL.iter().any(|pattern| text.contains(pattern.as_str()))
     }
 
     pub const DENY_MESSAGE: &str = "do not read task output files directly. \
@@ -468,7 +317,6 @@ pub enum ControlFileMutationBinary {
 impl ControlFileMutationBinary {
     pub const ALL: &[Self] = &[Self::Cp, Self::Install, Self::Mv, Self::Tee];
 
-    /// Returns `true` when `name` matches a control-file mutation binary.
     #[must_use]
     pub fn is_mutation_binary(name: &str) -> bool {
         Self::from_str(name).is_ok()
@@ -514,7 +362,6 @@ pub enum ControlFileReadBinary {
 impl ControlFileReadBinary {
     pub const ALL: &[Self] = &[Self::Cat, Self::Head, Self::Tail, Self::Less, Self::More];
 
-    /// Returns `true` when `name` matches a control-file read binary.
     #[must_use]
     pub fn is_read_binary(name: &str) -> bool {
         Self::from_str(name).is_ok()
@@ -574,7 +421,6 @@ impl SuiteMutationBinary {
         Self::Touch,
     ];
 
-    /// Returns `true` when `name` matches a suite mutation binary.
     #[must_use]
     pub fn is_mutation_binary(name: &str) -> bool {
         Self::from_str(name).is_ok()
@@ -638,10 +484,6 @@ impl ScriptInterpreter {
         Self::Ruby,
     ];
 
-    /// Returns `true` when `name` matches a script interpreter.
-    ///
-    /// Exact match for shell interpreters; prefix match for
-    /// `node`, `perl`, `python`, `ruby` (e.g. "node14" matches).
     #[must_use]
     pub fn is_interpreter(name: &str) -> bool {
         if matches!(name, "bash" | "sh" | "zsh") {
@@ -671,7 +513,6 @@ impl fmt::Display for ScriptInterpreter {
 impl FromStr for ScriptInterpreter {
     type Err = ();
 
-    /// Parse from canonical name only (prefix matching is in `is_interpreter`).
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             "bash" => Ok(Self::Bash),
@@ -697,7 +538,6 @@ pub enum PythonBinary {
 impl PythonBinary {
     pub const ALL: &[Self] = &[Self::Python, Self::Python3];
 
-    /// Returns `true` when `name` matches a python binary.
     #[must_use]
     pub fn is_python(name: &str) -> bool {
         Self::from_str(name).is_ok()
@@ -725,7 +565,7 @@ impl FromStr for PythonBinary {
     }
 }
 
-/// Harness subcommands that require tracked execution (one per Bash call).
+/// Harness subcommands that require tracked execution.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum TrackedHarnessSubcommand {
@@ -779,7 +619,6 @@ impl TrackedHarnessSubcommand {
         Self::Validate,
     ];
 
-    /// Returns `true` when `name` matches a tracked subcommand.
     #[must_use]
     pub fn is_tracked(name: &str) -> bool {
         Self::from_str(name).is_ok()

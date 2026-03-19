@@ -3,10 +3,11 @@ use std::path::Path;
 use crate::errors::HookMessage;
 use crate::hooks::protocol::context::GuardContext as HookContext;
 use crate::hooks::protocol::hook_result::HookResult;
-use crate::rules::suite_runner::{
-    ControlFileMutationBinary, ControlFileReadBinary, MakeTargetPrefix, RunFile, ScriptInterpreter,
+use crate::hooks::runner_policy::{
+    ControlFileMutationBinary, ControlFileReadBinary, MakeTargetPrefix, ScriptInterpreter,
     SuiteMutationBinary, TaskOutputPattern, TrackedHarnessSubcommand,
 };
+use crate::kernel::run_surface::RunFile;
 use crate::run::workflow::{RunnerPhase, RunnerWorkflowState};
 use crate::kernel::command_intent::{
     command_heads, is_shell_chain_op, is_shell_flow_word, is_shell_redirect_op,
