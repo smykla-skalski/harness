@@ -43,7 +43,10 @@ pub fn resolve_build_info(repo: &Path) -> Result<BuildInfo, CliError> {
             CliError::from(CliErrorKind::command_failed(format!("git status: {error}")))
         })?;
 
-    if !String::from_utf8_lossy(&dirty_output.stdout).trim().is_empty() {
+    if !String::from_utf8_lossy(&dirty_output.stdout)
+        .trim()
+        .is_empty()
+    {
         return Ok(BuildInfo {
             version: "0.0.0-preview.vlocal-build".into(),
         });

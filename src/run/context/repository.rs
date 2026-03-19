@@ -8,10 +8,10 @@ use std::{fs, io};
 
 use serde::de::DeserializeOwned;
 
-use crate::workspace::current_run_context_path;
 use crate::errors::{CliError, CliErrorKind};
 use crate::infra::io::{read_json_typed, write_json_pretty};
 use crate::run::RunStatus;
+use crate::workspace::current_run_context_path;
 
 use super::aggregate::RunAggregate;
 use super::{CurrentRunPointer, RunLayout, RunMetadata};

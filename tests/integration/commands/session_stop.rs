@@ -3,10 +3,10 @@
 
 use std::fs;
 
-use harness::workspace::current_run_context_path;
 use harness::platform::ephemeral_metallb;
 use harness::run::context::{CurrentRunRecord, RunLayout};
 use harness::setup::SessionStopArgs;
+use harness::workspace::current_run_context_path;
 
 use super::super::helpers::*;
 

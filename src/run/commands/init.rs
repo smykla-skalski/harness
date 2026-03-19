@@ -4,7 +4,6 @@ use std::path::Path;
 use clap::Args;
 
 use crate::app::command_context::{AppContext, Execute};
-use crate::workspace::{shorten_path, utc_now};
 use crate::errors::{CliError, CliErrorKind};
 use crate::infra::io::{validate_safe_segment, write_json_pretty};
 use crate::run::audit::write_run_status_with_audit;
@@ -12,6 +11,7 @@ use crate::run::context::{CurrentRunPointer, RunLayout, RunMetadata, RunReposito
 use crate::run::resolve::resolve_suite_path;
 use crate::run::workflow::initialize_runner_state;
 use crate::run::{RunCounts, RunReport, RunReportFrontmatter, RunStatus, SuiteSpec, Verdict};
+use crate::workspace::{shorten_path, utc_now};
 
 use super::shared::{resolve_init_repo_root, resolve_run_root};
 

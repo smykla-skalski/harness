@@ -55,11 +55,7 @@ pub fn render_hydration_context(handoff: &CompactHandoff<'_>, diverged_paths: &[
         }
     }
 
-    truncate_lines(
-        &lines,
-        CHAR_LIMIT,
-        SECTION_LINE_LIMIT * 2,
-    )
+    truncate_lines(&lines, CHAR_LIMIT, SECTION_LINE_LIMIT * 2)
 }
 
 /// Render a runner restore context (for session-start without compact).
@@ -106,11 +102,7 @@ pub fn render_runner_restore_context(project_dir: &Path, runner: &RunnerHandoff<
             .to_string(),
     );
 
-    truncate_lines(
-        &lines,
-        CHAR_LIMIT,
-        SECTION_LINE_LIMIT * 2,
-    )
+    truncate_lines(&lines, CHAR_LIMIT, SECTION_LINE_LIMIT * 2)
 }
 
 pub(super) fn render_runner_section(handoff: &RunnerHandoff<'_>) -> String {
@@ -190,11 +182,7 @@ pub(super) fn render_runner_section(handoff: &RunnerHandoff<'_>) -> String {
     lines.push(format!("- Key state files: {}", state_preview.join(", ")));
     lines.push(format!("- Next action: {}", handoff.next_action));
 
-    truncate_lines(
-        &lines,
-        SECTION_CHAR_LIMIT,
-        SECTION_LINE_LIMIT,
-    )
+    truncate_lines(&lines, SECTION_CHAR_LIMIT, SECTION_LINE_LIMIT)
 }
 
 fn render_authoring_section(handoff: &AuthoringHandoff<'_>) -> String {
@@ -235,11 +223,7 @@ fn render_authoring_section(handoff: &AuthoringHandoff<'_>) -> String {
         format!("- Next action: {}", handoff.next_action),
     ];
 
-    truncate_lines(
-        &lines,
-        SECTION_CHAR_LIMIT,
-        SECTION_LINE_LIMIT,
-    )
+    truncate_lines(&lines, SECTION_CHAR_LIMIT, SECTION_LINE_LIMIT)
 }
 
 pub(super) fn ordered_sections<'a>(handoff: &'a CompactHandoff<'_>) -> Vec<&'a str> {
