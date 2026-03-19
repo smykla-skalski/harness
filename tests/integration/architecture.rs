@@ -514,6 +514,43 @@ fn authoring_exposes_a_facade_instead_of_public_internal_modules() {
 }
 
 #[test]
+fn application_submodules_are_not_public_library_surface() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+
+    for (path, needle) in [
+        ("src/run/mod.rs", "pub mod application;"),
+        ("src/authoring/mod.rs", "pub mod application;"),
+        ("src/hooks/mod.rs", "pub mod application;"),
+    ] {
+        let contents = fs::read_to_string(root.join(path)).unwrap();
+        assert!(
+            !contents.contains(needle),
+            "{path} should keep `application` crate-internal instead of exporting `{needle}`"
+        );
+        assert!(
+            contents.contains("pub(crate) mod application;"),
+            "{path} should expose `application` as crate-internal only"
+        );
+    }
+
+    let hooks_root = fs::read_to_string(root.join("src/hooks/mod.rs")).unwrap();
+    assert!(
+        hooks_root.contains("pub use self::application::GuardContext;"),
+        "src/hooks/mod.rs should re-export GuardContext as the stable public hook facade"
+    );
+
+    let testkit_builders = fs::read_to_string(root.join("testkit/src/builders.rs")).unwrap();
+    assert!(
+        !testkit_builders.contains("harness::hooks::application::GuardContext"),
+        "testkit should not depend on the private hooks::application module"
+    );
+    assert!(
+        testkit_builders.contains("harness::hooks::GuardContext"),
+        "testkit should depend on the public hooks facade for GuardContext"
+    );
+}
+
+#[test]
 fn observe_transport_stays_transport_only() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
     let transport = fs::read_to_string(root.join("src/observe/mod.rs")).unwrap();
