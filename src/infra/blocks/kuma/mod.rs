@@ -9,8 +9,10 @@ use crate::infra::blocks::{ComposeOrchestrator, ContainerRuntime, HttpClient, Pr
 #[cfg(test)]
 pub mod fake;
 
+pub mod cli;
 pub mod compose;
 pub mod defaults;
+pub mod manifest;
 pub mod service;
 pub mod token;
 
@@ -234,10 +236,7 @@ impl MeshControlPlane for KumaControlPlane {
     }
 
     fn default_kumactl_path(&self, repo_root: &Path) -> PathBuf {
-        repo_root
-            .join("build")
-            .join("artifacts-docker")
-            .join("kumactl")
+        cli::primary_kumactl_dir(repo_root)
     }
 
     fn extract_admin_token(&self, cp_container: &str) -> Result<String, BlockError> {

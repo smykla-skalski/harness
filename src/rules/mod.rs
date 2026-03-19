@@ -496,6 +496,7 @@ mod tests {
     #[test]
     fn tracked_harness_subcommand_predicate() {
         assert!(suite_runner::TrackedHarnessSubcommand::is_tracked("apply"));
+        assert!(suite_runner::TrackedHarnessSubcommand::is_tracked("cli"));
         assert!(suite_runner::TrackedHarnessSubcommand::is_tracked(
             "init-run"
         ));

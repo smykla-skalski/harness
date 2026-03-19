@@ -2,7 +2,7 @@
 source: src/cli.rs
 expression: help
 ---
-Kuma test harness
+Harness CLI
 
 Usage: harness [OPTIONS] <COMMAND>
 

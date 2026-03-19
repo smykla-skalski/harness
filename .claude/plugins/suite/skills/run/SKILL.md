@@ -90,7 +90,7 @@ hooks:
 
 # Kuma suite runner
 
-Execute reproducible suite runs on local k3d clusters for any Kuma feature. Cluster creation and teardown are managed through `harness cluster` in Phase 2 and Phase 8. Before any unplanned cluster operation, use AskUserQuestion with options:
+Execute reproducible suite runs on local k3d clusters for any Kuma feature. Cluster creation and teardown are managed through `harness setup kuma cluster` in Phase 2 and Phase 8. Before any unplanned cluster operation, use AskUserQuestion with options:
 
 - `Approve operation` - proceed with the cluster change
 - `Reject` - skip the operation
@@ -211,19 +211,19 @@ Select the cluster topology based on the profile being executed:
 
 ```bash
 # Kubernetes single-zone (--profile single-zone):
-harness cluster single-up kuma-1
+harness setup kuma cluster single-up kuma-1
 
 # Kubernetes multi-zone (--profile multi-zone):
-harness cluster global-two-zones-up kuma-1 kuma-2 kuma-3 zone-1 zone-2
+harness setup kuma cluster global-two-zones-up kuma-1 kuma-2 kuma-3 zone-1 zone-2
 
 # Universal single-zone (--profile single-zone-universal):
-harness cluster --platform universal single-up test-cp
+harness setup kuma cluster --platform universal single-up test-cp
 
 # Universal multi-zone (--profile multi-zone-universal):
-harness cluster --platform universal global-zone-up global-cp zone-cp zone-1
+harness setup kuma cluster --platform universal global-zone-up global-cp zone-cp zone-1
 ```
 
-Universal mode uses Docker containers instead of k3d. See [references/universal-setup.md](references/universal-setup.md) for the full lifecycle, including `harness token` and `harness service` for service containers.
+Universal mode uses Docker containers instead of k3d. See [references/universal-setup.md](references/universal-setup.md) for the full lifecycle, including `harness run kuma token` and `harness run kuma service` for service containers.
 
 If changes modify CRDs, re-run Phase 2 bootstrap and Phase 3 preflight. If the suite references gateways (MeshGateway, GatewayClass, HTTPRoute, Gateway), install CRDs with `harness gateway` and verify with `harness gateway --check-only`.
 
@@ -324,11 +324,11 @@ Read [references/workflow.md](references/workflow.md) Phase 7 section for the fu
 
 ### Phase 8: Cluster teardown
 
-Tear down the clusters created in Phase 2. Use the matching `harness cluster` teardown command for the active profile. Read [references/workflow.md](references/workflow.md) Phase 8 section for the per-profile teardown commands.
+Tear down the clusters created in Phase 2. Use the matching `harness setup kuma cluster` teardown command for the active profile. Read [references/workflow.md](references/workflow.md) Phase 8 section for the per-profile teardown commands.
 
 ## Performance toggles
 
-Override env vars on `harness cluster` calls: `HARNESS_BUILD_IMAGES=0 HARNESS_LOAD_IMAGES=0` skips rebuilds, `HARNESS_HELM_CLEAN=1` adds full isolation, `HARNESS_DOCKER_PRUNE=0` skips image cleanup (not recommended).
+Override env vars on `harness setup kuma cluster` calls: `HARNESS_BUILD_IMAGES=0 HARNESS_LOAD_IMAGES=0` skips rebuilds, `HARNESS_HELM_CLEAN=1` adds full isolation, `HARNESS_DOCKER_PRUNE=0` skips image cleanup (not recommended).
 
 ## Report compactness thresholds
 

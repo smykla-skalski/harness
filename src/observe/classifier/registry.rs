@@ -372,7 +372,7 @@ static ISSUE_CODE_REGISTRY: &[IssueCodeMeta] = &[
         default_severity: IssueSeverity::Critical,
         default_confidence: Confidence::High,
         default_fix_safety: FixSafety::AutoFixSafe,
-        description: "Raw make k3d/kind target used instead of harness cluster",
+        description: "Raw make k3d/kind target used instead of harness setup kuma cluster",
         owner: IssueOwner::Model,
     },
     IssueCodeMeta {

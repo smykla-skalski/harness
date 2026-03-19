@@ -25,7 +25,7 @@ pub struct AuthoringBeginArgs {
     /// Managed skill to initialize.
     #[arg(long, value_parser = clap::builder::PossibleValuesParser::new([rules::SKILL_NEW]))]
     pub skill: String,
-    /// Kuma worktree for source discovery and validation.
+    /// Repository worktree for source discovery and validation.
     #[arg(long)]
     pub repo_root: String,
     /// Feature or capability being authored.

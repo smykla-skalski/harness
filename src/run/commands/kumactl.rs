@@ -3,8 +3,9 @@ use std::path::{Path, PathBuf};
 use clap::{Args, Subcommand};
 
 use crate::app::command_context::{CommandContext, Execute, resolve_repo_root};
-use crate::core_defs::{host_platform, shorten_path};
+use crate::core_defs::shorten_path;
 use crate::errors::{CliError, CliErrorKind};
+use crate::infra::blocks::kuma::cli::{BUILD_TARGET, kumactl_candidates};
 use crate::infra::exec::run_command;
 
 impl Execute for KumactlArgs {
@@ -31,34 +32,12 @@ pub enum KumactlCommand {
     },
 }
 
-/// Arguments for `harness kumactl`.
+/// Arguments for `harness run kuma cli`.
 #[derive(Debug, Clone, Args)]
 pub struct KumactlArgs {
     /// Kumactl subcommand.
     #[command(subcommand)]
     pub cmd: KumactlCommand,
-}
-
-fn kumactl_candidates(root: &Path) -> Vec<PathBuf> {
-    let (os_name, arch) = host_platform();
-    let mut result = vec![
-        root.join("build")
-            .join(format!("artifacts-{os_name}-{arch}"))
-            .join("kumactl")
-            .join("kumactl"),
-        root.join("build")
-            .join(format!("artifacts-{os_name}-{arch}"))
-            .join("kumactl"),
-    ];
-    let alt_arch = if arch == "arm64" { "amd64" } else { "arm64" };
-    result.push(
-        root.join("build")
-            .join(format!("artifacts-{os_name}-{alt_arch}"))
-            .join("kumactl")
-            .join("kumactl"),
-    );
-    result.push(root.join("bin").join("kumactl"));
-    result
 }
 
 pub(crate) fn find_kumactl_binary(root: &Path) -> Result<PathBuf, CliError> {
@@ -71,7 +50,7 @@ pub(crate) fn find_kumactl_binary(root: &Path) -> Result<PathBuf, CliError> {
 }
 
 fn build_kumactl(root: &Path) -> Result<(), CliError> {
-    run_command(&["make", "build/kumactl"], Some(root), None, &[0])?;
+    run_command(&["make", BUILD_TARGET], Some(root), None, &[0])?;
     Ok(())
 }
 

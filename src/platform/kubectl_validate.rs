@@ -225,7 +225,7 @@ mod tests {
     #[test]
     fn read_state_returns_parsed_when_file_exists() {
         let dir = tempfile::tempdir().unwrap();
-        let tooling = dir.path().join("kuma").join("tooling");
+        let tooling = dir.path().join("harness").join("tooling");
         fs::create_dir_all(&tooling).unwrap();
         let state_file = tooling.join("kubectl-validate.json");
         fs::write(

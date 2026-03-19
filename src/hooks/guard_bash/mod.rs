@@ -390,7 +390,7 @@ mod tests {
     fn allows_harness_token_command() {
         let c = ctx(
             "suite:run",
-            "harness token dataplane --name demo --mesh default",
+            "harness run kuma token dataplane --name demo --mesh default",
         );
         let r = execute(&c).unwrap();
         assert_eq!(r.decision, Decision::Allow);
@@ -400,7 +400,7 @@ mod tests {
     fn allows_harness_service_command() {
         let c = ctx(
             "suite:run",
-            "harness service up demo --image kuma-dp:latest --port 5050",
+            "harness run kuma service up demo --image kuma-dp:latest --port 5050",
         );
         let r = execute(&c).unwrap();
         assert_eq!(r.decision, Decision::Allow);

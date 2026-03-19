@@ -1,4 +1,5 @@
 mod init;
+mod kuma;
 mod preflight;
 mod shared;
 
@@ -37,6 +38,7 @@ pub use envoy::envoy;
 pub use envoy::{EnvoyArgs, EnvoyCommand};
 pub use init::InitArgs;
 pub use init::init_run;
+pub use kuma::{KumaArgs, KumaCommand};
 pub use kumactl::kumactl;
 pub use kumactl::{KumactlArgs, KumactlCommand};
 pub use logs::LogsArgs;

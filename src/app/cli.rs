@@ -11,19 +11,23 @@ use crate::authoring::commands::{
 use crate::errors::CliError;
 use crate::hooks::{self, HookArgs};
 use crate::observe::ObserveArgs;
+#[cfg(test)]
+use crate::run::commands::{ApiArgs, KumactlArgs};
 use crate::run::commands::{
-    ApiArgs, ApplyArgs, CaptureArgs, CloseoutArgs, ClusterCheckArgs, DiffArgs, EnvoyArgs, InitArgs,
-    KumactlArgs, LogsArgs, PreflightArgs, RecordArgs, ReportArgs, RestartNamespaceArgs,
-    RunnerStateArgs, ServiceArgs, StatusArgs, TaskArgs, TokenArgs, ValidateArgs,
+    ApplyArgs, CaptureArgs, CloseoutArgs, ClusterCheckArgs, DiffArgs, EnvoyArgs, InitArgs,
+    KumaArgs, LogsArgs, PreflightArgs, RecordArgs, ReportArgs, RestartNamespaceArgs,
+    RunnerStateArgs, StatusArgs, TaskArgs, ValidateArgs,
 };
 use crate::setup;
+#[cfg(test)]
+use crate::setup::ClusterArgs;
 use crate::setup::{
-    BootstrapArgs, ClusterArgs, GatewayArgs, PreCompactArgs, SessionStartArgs, SessionStopArgs,
+    BootstrapArgs, GatewayArgs, KumaSetupArgs, PreCompactArgs, SessionStartArgs, SessionStopArgs,
 };
 
-/// Kuma test harness CLI.
+/// Harness CLI.
 #[derive(Debug, Parser)]
-#[command(name = "harness", version, about = "Kuma test harness")]
+#[command(name = "harness", version, about = "Harness CLI")]
 pub struct Cli {
     /// Seconds to wait before executing the command. Accepts fractional
     /// values (e.g. 0.5). Use instead of `sleep N && harness ...`.
@@ -50,10 +54,7 @@ pub enum RunCommand {
     Report(ReportArgs),
     Diff(DiffArgs),
     Envoy(EnvoyArgs),
-    Kumactl(KumactlArgs),
-    Api(ApiArgs),
-    Token(TokenArgs),
-    Service(ServiceArgs),
+    Kuma(KumaArgs),
     Status(StatusArgs),
     Logs(LogsArgs),
     ClusterCheck(ClusterCheckArgs),
@@ -77,7 +78,7 @@ pub enum AuthoringCommand {
 #[non_exhaustive]
 pub enum SetupCommand {
     Bootstrap(BootstrapArgs),
-    Cluster(ClusterArgs),
+    Kuma(KumaSetupArgs),
     Gateway(GatewayArgs),
     SessionStart(SessionStartArgs),
     SessionStop(SessionStopArgs),
@@ -143,10 +144,7 @@ fn dispatch_run(ctx: &CommandContext, command: &RunCommand) -> Result<i32, CliEr
         RunCommand::Report(args) => args.execute(ctx),
         RunCommand::Diff(args) => args.execute(ctx),
         RunCommand::Envoy(args) => args.execute(ctx),
-        RunCommand::Kumactl(args) => args.execute(ctx),
-        RunCommand::Api(args) => args.execute(ctx),
-        RunCommand::Token(args) => args.execute(ctx),
-        RunCommand::Service(args) => args.execute(ctx),
+        RunCommand::Kuma(args) => args.execute(ctx),
         RunCommand::Status(args) => args.execute(ctx),
         RunCommand::Logs(args) => args.execute(ctx),
         RunCommand::ClusterCheck(args) => args.execute(ctx),
@@ -168,7 +166,7 @@ fn dispatch_authoring(ctx: &CommandContext, command: &AuthoringCommand) -> Resul
 fn dispatch_setup(ctx: &CommandContext, command: &SetupCommand) -> Result<i32, CliError> {
     match command {
         SetupCommand::Bootstrap(args) => args.execute(ctx),
-        SetupCommand::Cluster(args) => args.execute(ctx),
+        SetupCommand::Kuma(args) => args.execute(ctx),
         SetupCommand::Gateway(args) => args.execute(ctx),
         SetupCommand::SessionStart(args) => args.execute(ctx),
         SetupCommand::SessionStop(args) => args.execute(ctx),
@@ -314,6 +312,7 @@ mod tests {
         let cli = Cli::try_parse_from([
             "harness",
             "setup",
+            "kuma",
             "cluster",
             "global-zone-up",
             "global",
@@ -324,11 +323,14 @@ mod tests {
         match cli.command {
             Command::Setup {
                 command:
-                    SetupCommand::Cluster(ClusterArgs {
-                        mode,
-                        cluster_name,
-                        extra_cluster_names,
-                        ..
+                    SetupCommand::Kuma(KumaSetupArgs {
+                        command:
+                            crate::setup::KumaSetupCommand::Cluster(ClusterArgs {
+                                mode,
+                                cluster_name,
+                                extra_cluster_names,
+                                ..
+                            }),
                     }),
             } => {
                 assert_eq!(mode, "global-zone-up");
@@ -500,12 +502,14 @@ mod tests {
 
     #[test]
     fn parse_kumactl_find() {
-        let cli = Cli::try_parse_from(["harness", "run", "kumactl", "find"]).unwrap();
+        let cli = Cli::try_parse_from(["harness", "run", "kuma", "cli", "find"]).unwrap();
         assert!(matches!(
             cli.command,
             Command::Run {
-                command: RunCommand::Kumactl(KumactlArgs {
-                    cmd: crate::run::commands::KumactlCommand::Find { .. }
+                command: RunCommand::Kuma(KumaArgs {
+                    command: crate::run::commands::KumaCommand::Cli(KumactlArgs {
+                        cmd: crate::run::commands::KumactlCommand::Find { .. }
+                    })
                 })
             }
         ));
@@ -513,12 +517,15 @@ mod tests {
 
     #[test]
     fn parse_api_get() {
-        let cli = Cli::try_parse_from(["harness", "run", "api", "get", "/zones"]).unwrap();
+        let cli = Cli::try_parse_from(["harness", "run", "kuma", "api", "get", "/zones"]).unwrap();
         match cli.command {
             Command::Run {
                 command:
-                    RunCommand::Api(ApiArgs {
-                        method: crate::run::commands::ApiMethod::Get { path, .. },
+                    RunCommand::Kuma(KumaArgs {
+                        command:
+                            crate::run::commands::KumaCommand::Api(ApiArgs {
+                                method: crate::run::commands::ApiMethod::Get { path, .. },
+                            }),
                     }),
             } => assert_eq!(path, "/zones"),
             _ => panic!("expected Api Get command"),

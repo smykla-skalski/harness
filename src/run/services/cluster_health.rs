@@ -79,7 +79,7 @@ impl RunServices {
             healthy,
             members,
             hint: (!healthy).then_some(
-                "use 'harness run logs <name>' to inspect, or re-run 'harness setup cluster' to recreate",
+                "use 'harness run logs <name>' to inspect, or re-run 'harness setup kuma cluster' to recreate",
             ),
         })
     }

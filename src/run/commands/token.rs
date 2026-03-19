@@ -7,6 +7,7 @@ use tracing::warn;
 
 use crate::app::command_context::{CommandContext, Execute, RunDirArgs, resolve_run_services};
 use crate::errors::{CliError, CliErrorKind};
+use crate::infra::blocks::kuma::token::parse_token_response;
 use crate::infra::exec;
 
 use super::kumactl::find_kumactl_binary;
@@ -24,7 +25,7 @@ impl Execute for TokenArgs {
     }
 }
 
-/// Arguments for `harness token`.
+/// Arguments for `harness run kuma token`.
 #[derive(Debug, Clone, Args)]
 pub struct TokenArgs {
     /// Token kind: dataplane, ingress, or egress.
@@ -88,8 +89,9 @@ pub fn token(
     args.extend_from_slice(&["--valid-for", valid_for]);
 
     let result = exec::kumactl_run(&binary, addr.as_ref(), &args, &[0])?;
-    let tok = result.stdout.trim();
-    println!("{tok}");
+    let token = parse_token_response(&result.stdout)
+        .map_err(|error| CliErrorKind::token_generation_failed(error.to_string()))?;
+    println!("{}", token.token);
     Ok(0)
 }
 
@@ -115,9 +117,7 @@ pub(crate) fn token_via_api(
         Some(&body),
         admin_token,
     )?;
-    let trimmed = token.trim().to_string();
-    if trimmed.is_empty() {
-        return Err(CliErrorKind::token_generation_failed("empty response").into());
-    }
-    Ok(trimmed)
+    parse_token_response(&token)
+        .map(|response| response.token)
+        .map_err(|error| CliErrorKind::token_generation_failed(error.to_string()).into())
 }
