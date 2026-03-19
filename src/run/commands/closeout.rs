@@ -3,12 +3,12 @@ use clap::Args;
 use tracing::info;
 
 use crate::app::command_context::{AppContext, Execute};
-use crate::core_defs::utc_now;
 use crate::errors::{CliError, CliErrorKind};
 use crate::run::args::RunDirArgs;
 use crate::run::audit::write_run_status_with_audit;
 use crate::run::workflow::{RunnerEvent, apply_event, ensure_execution_phase, read_runner_state};
 use crate::schema::Verdict;
+use crate::workspace::utc_now;
 
 use super::shared::resolve_run_services;
 

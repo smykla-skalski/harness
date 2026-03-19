@@ -7,10 +7,10 @@ use std::time::Duration;
 
 use serde::Serialize;
 
-use crate::core_defs::CommandResult;
 use crate::infra::blocks::BlockError;
 #[cfg(feature = "compose")]
 use crate::infra::blocks::ProcessExecutor;
+use crate::infra::exec::CommandResult;
 
 /// Compose network settings for a rendered topology.
 #[derive(Debug, Clone, PartialEq, Eq)]

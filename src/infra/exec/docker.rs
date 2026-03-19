@@ -2,10 +2,10 @@ use std::io::Write as _;
 use std::path::Path;
 use std::time::Duration;
 
-use crate::core_defs::CommandResult;
 use crate::errors::{CliError, CliErrorKind};
 
 use super::{k3d, run_command, run_command_streaming};
+use super::CommandResult;
 
 /// Run docker.
 ///

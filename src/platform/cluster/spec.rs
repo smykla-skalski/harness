@@ -7,7 +7,7 @@ use serde_json::Value;
 use super::{
     ClusterMode, Platform, dedup_preserving_order, members_for_mode, universal_members_for_mode,
 };
-use crate::core_defs::HARNESS_PREFIX;
+use crate::workspace::HARNESS_PREFIX;
 
 use super::deploy::CurrentDeployPayload;
 use super::record::ClusterRecordPayload;
