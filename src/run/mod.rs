@@ -1,6 +1,6 @@
 //! Tracked run domain: run models, state, workflow, audit, and commands.
 
-pub mod application;
+pub(crate) mod application;
 pub mod args;
 pub mod audit;
 pub mod commands;

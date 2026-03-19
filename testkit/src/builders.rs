@@ -12,7 +12,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
 
-use harness::hooks::application::GuardContext;
+use harness::hooks::GuardContext;
 use harness::hooks::hook_result::{Decision, HookResult};
 use harness::hooks::payloads::{AskUserQuestionOption, AskUserQuestionPrompt, HookEnvelopePayload};
 use harness::run::workflow as runner_workflow;
