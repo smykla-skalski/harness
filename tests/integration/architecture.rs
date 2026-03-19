@@ -220,6 +220,59 @@ fn authoring_commands_depend_on_application_boundary() {
 }
 
 #[test]
+fn setup_does_not_mutate_run_repository_directly() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let setup_root = root.join("src/setup");
+    let denylist = [
+        "RunRepository",
+        "current_pointer_path(",
+        "RunLayout::current_pointer",
+        "write_json_pretty(",
+    ];
+    let mut stack = vec![setup_root];
+    let mut hits = Vec::new();
+
+    while let Some(path) = stack.pop() {
+        for entry in fs::read_dir(&path).unwrap() {
+            let entry = entry.unwrap();
+            let child = entry.path();
+            if child.is_dir() {
+                stack.push(child);
+                continue;
+            }
+            if !matches_extension(&child) {
+                continue;
+            }
+            let contents = fs::read_to_string(&child).unwrap();
+            for needle in denylist {
+                if contents.contains(needle) {
+                    hits.push(format!(
+                        "{} still reaches into run-owned persistence via `{needle}`",
+                        child.strip_prefix(root).unwrap().display()
+                    ));
+                }
+            }
+        }
+    }
+
+    assert!(
+        hits.is_empty(),
+        "setup should go through run application helpers for current-run persistence:\n{}",
+        hits.join("\n")
+    );
+}
+
+#[test]
+fn setup_wrapper_does_not_depend_on_block_registry() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let contents = fs::read_to_string(root.join("src/setup/wrapper.rs")).unwrap();
+    assert!(
+        !contents.contains("BlockRegistry"),
+        "src/setup/wrapper.rs should use pure runner policy data instead of BlockRegistry"
+    );
+}
+
+#[test]
 fn kuma_contracts_are_isolated_to_block_namespace() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
     let src_root = root.join("src");

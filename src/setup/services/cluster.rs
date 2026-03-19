@@ -5,9 +5,8 @@ use tracing::{debug, info};
 
 use crate::errors::{CliError, CliErrorKind};
 use crate::infra::exec::{run_command, run_command_streaming};
-use crate::infra::io::write_json_pretty;
 use crate::platform::cluster::{ClusterSpec, Platform};
-use crate::run::context::RunRepository;
+use crate::run::application::RunApplication;
 use crate::setup::cluster::ClusterArgs;
 use crate::setup::cluster::kubernetes::cluster_k8s;
 #[cfg(feature = "compose")]
@@ -54,19 +53,9 @@ pub(crate) fn execute_cluster(args: &ClusterArgs) -> Result<i32, CliError> {
 
 /// Persist cluster spec to the session context and run directory if available.
 pub(crate) fn persist_cluster_spec(spec: &ClusterSpec) -> Result<(), CliError> {
-    let repo = RunRepository;
-    if let Some(pointer) = repo.load_current_pointer()? {
-        let run_dir = pointer.layout.run_dir();
-        let _ = repo.update_current_pointer(|record| {
-            record.cluster = Some(spec.clone());
-        })?;
-
-        let state_dir = run_dir.join("state");
-        if state_dir.is_dir() {
-            let cluster_path = state_dir.join("cluster.json");
-            write_json_pretty(&cluster_path, spec)?;
-            info!("spec saved to state/cluster.json");
-        }
+    if RunApplication::current_run_dir()?.is_some() {
+        RunApplication::persist_current_cluster_spec(spec)?;
+        info!("spec saved to state/cluster.json");
     }
 
     let spec_json = serde_json::to_string_pretty(&spec.to_json_dict())

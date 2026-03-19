@@ -8,12 +8,12 @@ use fs_err as fs;
 use serde::Deserialize;
 use walkdir::WalkDir;
 
-use crate::workspace::dirs_home;
 use crate::errors::{CliError, CliErrorKind};
 use crate::hooks::adapters::{HookAgent, HookRegistration, adapter_for};
 use crate::hooks::protocol::context::NormalizedEvent;
-use crate::infra::blocks::BlockRegistry;
+use crate::hooks::runner_policy::managed_cluster_binaries;
 use crate::infra::io::{read_json_typed, write_text};
+use crate::workspace::dirs_home;
 
 /// Shell wrapper script that delegates to the project-local harness binary.
 pub const WRAPPER: &str = r#"#!/bin/sh
@@ -220,9 +220,8 @@ fn write_opencode_bootstrap(project_dir: &Path) -> Result<Vec<PathBuf>, CliError
         .join("plugins")
         .join("harness-bridge.ts");
     let package_path = project_dir.join(".opencode").join("package.json");
-    let registry = BlockRegistry::production();
 
-    write_text(&plugin_path, &build_opencode_bridge(&registry)?)?;
+    write_text(&plugin_path, &build_opencode_bridge()?)?;
     if !package_path.exists() {
         write_text(
             &package_path,
@@ -419,11 +418,8 @@ fn command_registration(
     }
 }
 
-fn build_opencode_bridge(registry: &BlockRegistry) -> Result<String, CliError> {
-    let denied_binaries = registry
-        .all_denied_binaries()
-        .into_iter()
-        .collect::<Vec<_>>();
+fn build_opencode_bridge() -> Result<String, CliError> {
+    let denied_binaries = managed_cluster_binaries().into_iter().collect::<Vec<_>>();
     let denied_binaries_json = serde_json::to_string(&denied_binaries)
         .map_err(|error| CliErrorKind::serialize(format!("opencode denied binaries: {error}")))?;
     let tool_guards = serde_json::to_string(&serde_json::json!({
@@ -936,7 +932,7 @@ mod tests {
 
     #[test]
     fn build_opencode_bridge_replaces_placeholders_and_uses_directory() {
-        let bridge = build_opencode_bridge(&BlockRegistry::production()).unwrap();
+        let bridge = build_opencode_bridge().unwrap();
         assert!(!bridge.contains("__DENIED_BINARY_HINTS__"));
         assert!(!bridge.contains("__TOOL_GUARDS__"));
         assert!(!bridge.contains("__TOOL_VERIFIERS__"));
