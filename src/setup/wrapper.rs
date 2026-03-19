@@ -1,9 +1,11 @@
 use std::collections::HashSet;
-use std::fs;
+use std::fs::Permissions;
 use std::io;
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 
+use fs_err as fs;
+use serde::Deserialize;
 use walkdir::WalkDir;
 
 use crate::core_defs::dirs_home;
@@ -11,7 +13,7 @@ use crate::errors::{CliError, CliErrorKind};
 use crate::hooks::adapters::{HookAgent, HookRegistration, adapter_for};
 use crate::hooks::protocol::context::NormalizedEvent;
 use crate::infra::blocks::BlockRegistry;
-use crate::infra::io::write_text;
+use crate::infra::io::{read_json_typed, write_text};
 
 /// Shell wrapper script that delegates to the project-local harness binary.
 pub const WRAPPER: &str = r#"#!/bin/sh
@@ -121,7 +123,7 @@ pub fn install_wrapper(target_dir: &Path) -> Result<PathBuf, CliError> {
     }
 
     write_text(&target, WRAPPER)?;
-    fs::set_permissions(&target, fs::Permissions::from_mode(0o755))?;
+    fs::set_permissions(&target, Permissions::from_mode(0o755))?;
     Ok(target)
 }
 
@@ -158,7 +160,7 @@ pub fn main_with_home(project_dir: &Path, path_env: &str, home: &Path) -> Result
     // Sync plugin source files to Claude Code's plugin cache so agent
     // definitions, hooks, and skills stay up to date between sessions.
     if plugin_dir.is_dir() {
-        sync_plugin_cache(&plugin_dir, home);
+        sync_plugin_cache(&plugin_dir, home)?;
     }
 
     Ok(0)
@@ -447,12 +449,22 @@ fn build_opencode_bridge(registry: &BlockRegistry) -> Result<String, CliError> {
 
 /// Read the plugin version from `.claude-plugin/plugin.json`.
 ///
-/// Returns `None` if the file is missing or unparseable.
-fn read_plugin_version(plugin_dir: &Path) -> Option<String> {
+/// Returns `Ok(None)` if the file is missing.
+///
+/// # Errors
+/// Returns `CliError` if the manifest exists but is invalid.
+fn read_plugin_version(plugin_dir: &Path) -> Result<Option<String>, CliError> {
+    #[derive(Deserialize)]
+    struct PluginManifest {
+        version: String,
+    }
+
     let json_path = plugin_dir.join(".claude-plugin").join("plugin.json");
-    let text = fs::read_to_string(json_path).ok()?;
-    let value: serde_json::Value = serde_json::from_str(&text).ok()?;
-    value.get("version")?.as_str().map(String::from)
+    if !json_path.exists() {
+        return Ok(None);
+    }
+    let manifest: PluginManifest = read_json_typed(&json_path)?;
+    Ok(Some(manifest.version))
 }
 
 /// Sync plugin source directories to the Claude Code plugin cache.
@@ -460,10 +472,13 @@ fn read_plugin_version(plugin_dir: &Path) -> Option<String> {
 /// Copies `agents/`, `hooks/`, and `skills/` from the project source
 /// into `~/.claude/plugins/cache/harness/suite/{version}/`, creating
 /// or overwriting files as needed. Skips the binary (`harness`) since
-/// it is already current. Degrades silently on any IO error.
-fn sync_plugin_cache(plugin_dir: &Path, home: &Path) {
-    let Some(version) = read_plugin_version(plugin_dir) else {
-        return;
+/// it is already current.
+///
+/// # Errors
+/// Returns `CliError` if the plugin manifest is invalid or the cache sync fails.
+fn sync_plugin_cache(plugin_dir: &Path, home: &Path) -> Result<(), CliError> {
+    let Some(version) = read_plugin_version(plugin_dir)? else {
+        return Ok(());
     };
 
     let cache_dir = home
@@ -475,16 +490,18 @@ fn sync_plugin_cache(plugin_dir: &Path, home: &Path) {
         .join(&version);
 
     if !cache_dir.is_dir() {
-        return;
+        return Ok(());
     }
 
     for subdir in &["agents", "hooks", "skills"] {
         let source = plugin_dir.join(subdir);
         if source.is_dir() {
             let target = cache_dir.join(subdir);
-            let _ = sync_directory(&source, &target);
+            sync_directory(&source, &target).map_err(CliError::from)?;
         }
     }
+
+    Ok(())
 }
 
 /// Recursively copy all files from `source` into `target`, overwriting
@@ -714,13 +731,27 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(read_plugin_version(dir.path()), Some("1.0.0".to_string()));
+        assert_eq!(
+            read_plugin_version(dir.path()).unwrap(),
+            Some("1.0.0".to_string())
+        );
     }
 
     #[test]
     fn read_plugin_version_returns_none_when_missing() {
         let dir = tempfile::tempdir().unwrap();
-        assert_eq!(read_plugin_version(dir.path()), None);
+        assert_eq!(read_plugin_version(dir.path()).unwrap(), None);
+    }
+
+    #[test]
+    fn read_plugin_version_rejects_invalid_json() {
+        let dir = tempfile::tempdir().unwrap();
+        let plugin_json_dir = dir.path().join(".claude-plugin");
+        fs::create_dir_all(&plugin_json_dir).unwrap();
+        fs::write(plugin_json_dir.join("plugin.json"), "{ invalid").unwrap();
+
+        let error = read_plugin_version(dir.path()).unwrap_err();
+        assert_eq!(error.code(), "KSRCLI019");
     }
 
     #[test]
@@ -845,7 +876,7 @@ mod tests {
         fs::create_dir_all(&cache_agents).unwrap();
         fs::write(cache_agents.join("writer.md"), "old agent def").unwrap();
 
-        sync_plugin_cache(&plugin_dir, &home);
+        sync_plugin_cache(&plugin_dir, &home).unwrap();
 
         assert_eq!(
             fs::read_to_string(cache_agents.join("writer.md")).unwrap(),
@@ -877,7 +908,7 @@ mod tests {
         .unwrap();
 
         // No cache directory exists - should not panic
-        sync_plugin_cache(&plugin_dir, &home);
+        sync_plugin_cache(&plugin_dir, &home).unwrap();
     }
 
     #[test]

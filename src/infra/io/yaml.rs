@@ -1,28 +1,41 @@
+use gray_matter::engine::YAML;
+use gray_matter::{Matter, ParsedEntity};
+use serde::de::DeserializeOwned;
+
 use crate::errors::{CliError, CliErrorKind};
 
-/// Extract raw frontmatter YAML text and body from a markdown document.
-///
-/// Splits on the first `---\n ... \n---` delimiters using plain string
-/// operations. Returns `(yaml_text, body)`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FrontmatterDocument<T> {
+    pub frontmatter: T,
+    pub body: String,
+}
+
+/// Parse typed YAML frontmatter from a markdown document.
 ///
 /// # Errors
-/// Returns `CliError` if frontmatter is missing or unterminated.
-pub fn extract_raw_frontmatter(text: &str) -> Result<(String, String), CliError> {
+/// Returns `CliError` if frontmatter is missing, unterminated, or invalid.
+pub fn parse_frontmatter<T>(
+    text: &str,
+    label: &str,
+) -> Result<FrontmatterDocument<T>, CliError>
+where
+    T: DeserializeOwned,
+{
     if !text.starts_with("---\n") {
         return Err(CliErrorKind::MissingFrontmatter.into());
     }
-
-    let after_open = 4; // length of "---\n"
-    let Some(close_pos) = text[after_open..].find("\n---") else {
+    if !text[4..].contains("\n---") {
         return Err(CliErrorKind::UnterminatedFrontmatter.into());
-    };
+    }
 
-    let yaml_text = &text[after_open..after_open + close_pos];
+    let matter = Matter::<YAML>::new();
+    let parsed: ParsedEntity<T> = matter
+        .parse(text)
+        .map_err(|error| CliErrorKind::workflow_parse(format!("{label} frontmatter: {error}")))?;
+    let frontmatter = parsed.data.ok_or(CliErrorKind::MissingFrontmatter)?;
 
-    // Body starts after the closing "---" and any leading newlines.
-    let after_close = after_open + close_pos + 4; // length of "\n---"
-    let body = text.get(after_close..).unwrap_or("");
-    let body = body.trim_start_matches('\n');
-
-    Ok((yaml_text.to_string(), body.to_string()))
+    Ok(FrontmatterDocument {
+        frontmatter,
+        body: parsed.content.trim_start_matches('\n').to_string(),
+    })
 }

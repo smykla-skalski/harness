@@ -95,15 +95,12 @@ impl RunReport {
     /// Returns `CliError` on failure.
     pub fn from_markdown(path: &Path) -> Result<Self, CliError> {
         let text = io::read_text(path)?;
-        let (yaml_text, body) = io::extract_raw_frontmatter(&text)?;
-
-        let frontmatter: RunReportFrontmatter = serde_yml::from_str(&yaml_text)
-            .map_err(|e| CliErrorKind::workflow_parse(format!("report frontmatter: {e}")))?;
+        let parsed = io::parse_frontmatter::<RunReportFrontmatter>(&text, "report")?;
 
         Ok(Self {
-            frontmatter,
+            frontmatter: parsed.frontmatter,
             path: path.to_path_buf(),
-            body,
+            body: parsed.body,
         })
     }
 

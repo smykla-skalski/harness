@@ -3,8 +3,9 @@ mod yaml;
 
 use std::io::Write as _;
 use std::path::Path;
-use std::{fs, io};
+use std::io;
 
+use fs_err as fs;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 use serde_json::Value;
@@ -12,7 +13,7 @@ use serde_json::Value;
 use crate::errors::{CliError, CliErrorKind, io_for};
 
 pub use self::markdown::{append_markdown_row, as_list, as_mapping, drill};
-pub use self::yaml::extract_raw_frontmatter;
+pub use self::yaml::{FrontmatterDocument, parse_frontmatter};
 
 /// Check whether a name is safe to use as a path component.
 ///
@@ -115,8 +116,9 @@ pub fn write_text(path: &Path, text: &str) -> Result<(), CliError> {
 
     #[cfg(unix)]
     {
+        use std::fs::Permissions;
         use std::os::unix::fs::PermissionsExt;
-        fs::set_permissions(path, fs::Permissions::from_mode(0o600))
+        fs::set_permissions(path, Permissions::from_mode(0o600))
             .map_err(|e| io_for("set permissions", path, &e))?;
     }
 
@@ -222,25 +224,38 @@ mod tests {
         assert!(ensure_str_list(&val, "test").is_err());
     }
 
-    // --- Frontmatter splitter tests ---
+    #[derive(Debug, serde::Deserialize, PartialEq, Eq)]
+    struct FrontmatterFixture {
+        name: String,
+        count: i64,
+    }
+
+    // --- Frontmatter parser tests ---
 
     #[test]
-    fn extract_frontmatter_valid() {
+    fn parse_frontmatter_valid() {
         let text = "---\nname: test\ncount: 3\n---\n\nBody content here.";
-        let (yaml, body) = extract_raw_frontmatter(text).unwrap();
-        assert_eq!(yaml, "name: test\ncount: 3");
-        assert_eq!(body, "Body content here.");
+        let parsed = parse_frontmatter::<FrontmatterFixture>(text, "fixture").unwrap();
+        assert_eq!(
+            parsed.frontmatter,
+            FrontmatterFixture {
+                name: "test".to_string(),
+                count: 3,
+            }
+        );
+        assert_eq!(parsed.body, "Body content here.");
     }
 
     #[test]
-    fn extract_frontmatter_missing() {
-        let err = extract_raw_frontmatter("no frontmatter").unwrap_err();
+    fn parse_frontmatter_missing() {
+        let err = parse_frontmatter::<FrontmatterFixture>("no frontmatter", "fixture").unwrap_err();
         assert!(err.message().contains("missing YAML frontmatter"));
     }
 
     #[test]
-    fn extract_frontmatter_unterminated() {
-        let err = extract_raw_frontmatter("---\nname: test\n").unwrap_err();
+    fn parse_frontmatter_unterminated() {
+        let err =
+            parse_frontmatter::<FrontmatterFixture>("---\nname: test\n", "fixture").unwrap_err();
         assert!(err.message().contains("unterminated"));
     }
 

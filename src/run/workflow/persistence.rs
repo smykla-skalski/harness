@@ -1,6 +1,7 @@
-use std::fs::{self, File, OpenOptions};
 use std::path::{Path, PathBuf};
 
+use fs_err as fs;
+use std::fs::{File, OpenOptions};
 use crate::errors::{CliError, CliErrorKind};
 use crate::infra::io::{read_text, write_json_pretty};
 use crate::rules::skill_dirs;

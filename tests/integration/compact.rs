@@ -216,14 +216,15 @@ fn check_save_consume_compact_handoff(project: &Path) {
     let history_count = fs::read_dir(&history_dir).unwrap().count();
     assert!(history_count >= 1, "should have at least 1 history entry");
 
-    let pending = compact::pending_compact_handoff(project);
-    assert!(pending.is_some(), "should be pending");
+    let pending = compact::pending_compact_handoff(project)
+        .expect("load pending")
+        .expect("should be pending");
 
-    let consumed = compact::consume_compact_handoff(project, pending.unwrap()).expect("consume");
+    let consumed = compact::consume_compact_handoff(project, pending).expect("consume");
     assert_eq!(consumed.status, HandoffStatus::Consumed);
     assert!(consumed.consumed_at.is_some());
 
-    let after = compact::pending_compact_handoff(project);
+    let after = compact::pending_compact_handoff(project).expect("load consumed");
     assert!(after.is_none(), "should not be pending after consume");
 
     let reloaded = compact::load_latest_compact_handoff(project)
@@ -282,7 +283,7 @@ fn check_session_start_compact_worktree(project: &Path) {
     .execute();
     assert!(result.is_ok(), "session-start should succeed: {result:?}");
 
-    let pending = compact::pending_compact_handoff(project);
+    let pending = compact::pending_compact_handoff(project).expect("load consumed");
     assert!(pending.is_none(), "should be consumed after session-start");
 }
 
@@ -296,7 +297,9 @@ fn check_session_start_compact_aborted_resume(project: &Path) {
     handoff.runner = Some(runner);
     compact::save_compact_handoff(project, &handoff).expect("save");
 
-    let pending = compact::pending_compact_handoff(project).expect("should be pending");
+    let pending = compact::pending_compact_handoff(project)
+        .expect("load pending")
+        .expect("should be pending");
     let diverged = compact::verify_fingerprints(&pending);
     let ctx = compact::render_hydration_context(&pending, &diverged);
     assert!(
@@ -310,7 +313,7 @@ fn check_session_start_compact_aborted_resume(project: &Path) {
     .execute();
     assert!(result.is_ok());
 
-    let after = compact::pending_compact_handoff(project);
+    let after = compact::pending_compact_handoff(project).expect("load consumed");
     assert!(after.is_none());
 }
 
@@ -321,7 +324,9 @@ fn check_session_start_compact_restores_author(project: &Path) {
     handoff.authoring = Some(test_authoring());
     compact::save_compact_handoff(project, &handoff).expect("save");
 
-    let pending = compact::pending_compact_handoff(project).expect("should be pending");
+    let pending = compact::pending_compact_handoff(project)
+        .expect("load pending")
+        .expect("should be pending");
     let ctx = compact::render_hydration_context(&pending, &[]);
     assert!(ctx.contains("suite:new:"), "should have authoring section");
     assert!(ctx.contains("motb-core"), "should mention suite name");
@@ -332,7 +337,7 @@ fn check_session_start_compact_restores_author(project: &Path) {
     .execute();
     assert!(result.is_ok());
 
-    let after = compact::pending_compact_handoff(project);
+    let after = compact::pending_compact_handoff(project).expect("load consumed");
     assert!(after.is_none());
 }
 
@@ -414,7 +419,7 @@ fn check_session_start_cross_project(project: &Path) {
     handoff.runner = Some(test_runner());
     compact::save_compact_handoff(project, &handoff).expect("save");
 
-    let pending = compact::pending_compact_handoff(project);
+    let pending = compact::pending_compact_handoff(project).expect("load pending");
     assert!(
         pending.is_some(),
         "handoff should be pending for same project"
@@ -426,7 +431,7 @@ fn check_session_start_cross_project(project: &Path) {
     .execute();
     assert!(result.is_ok());
 
-    let after = compact::pending_compact_handoff(project);
+    let after = compact::pending_compact_handoff(project).expect("load consumed");
     assert!(after.is_none(), "should be consumed");
 }
 
@@ -463,10 +468,12 @@ fn check_session_start_no_replay(project: &Path) {
     let handoff = compact::build_compact_handoff(project).expect("build");
     compact::save_compact_handoff(project, &handoff).expect("save");
 
-    let pending = compact::pending_compact_handoff(project).expect("should be pending");
+    let pending = compact::pending_compact_handoff(project)
+        .expect("load pending")
+        .expect("should be pending");
     let _ = compact::consume_compact_handoff(project, pending).expect("consume");
 
-    let after = compact::pending_compact_handoff(project);
+    let after = compact::pending_compact_handoff(project).expect("load consumed");
     assert!(after.is_none(), "consumed handoff should not be pending");
 
     let result = session_start_cmd(SessionStartArgs {
