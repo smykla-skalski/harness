@@ -223,6 +223,24 @@ mod tests {
         let compose = single_zone("img", "harness-net", "172.57.0.0/16", "memory", "cp");
         let net = &compose.networks["harness-net"];
         let ipam = net.ipam.as_ref().unwrap();
+        assert_eq!(net.driver, "bridge");
         assert_eq!(ipam.config[0].subnet, "172.57.0.0/16");
+    }
+
+    #[test]
+    fn global_zone_zone_uses_memory_store_even_with_postgres_global() {
+        let compose = global_zone(
+            "img",
+            "net",
+            "172.57.0.0/16",
+            "postgres",
+            "global-cp",
+            "zone-cp",
+            "zone-1",
+        );
+        let zone_env = &compose.services["zone-cp"].environment;
+        let global_env = &compose.services["global-cp"].environment;
+        assert_eq!(zone_env.get("KUMA_STORE_TYPE").unwrap(), "memory");
+        assert_eq!(global_env.get("KUMA_STORE_TYPE").unwrap(), "postgres");
     }
 }

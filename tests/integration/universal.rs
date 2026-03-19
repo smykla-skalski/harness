@@ -12,7 +12,6 @@ use std::fs;
 use std::path::Path;
 
 use harness::kernel::topology::{ClusterMember, ClusterMode, ClusterSpec, HelmSetting, Platform};
-use harness::platform::compose::{self, GlobalTwoZonesConfig, ZoneConfig};
 use harness::run::ValidateArgs;
 use harness::run::context::{CommandEnv, RunContext, RunLayout};
 
@@ -296,212 +295,7 @@ fn from_mode_universal_rejects_wrong_arg_count() {
 }
 
 // ============================================================================
-// 4. Compose file generation: verify YAML output structure
-// ============================================================================
-
-#[test]
-#[allow(clippy::cognitive_complexity)]
-fn compose_single_zone_memory_yaml_structure() {
-    let compose = compose::single_zone(
-        "kuma-cp:latest",
-        "harness-net",
-        "172.57.0.0/16",
-        "memory",
-        "cp",
-    );
-    let yaml = compose.to_yaml().unwrap();
-
-    assert!(yaml.contains("kuma-cp:latest"), "image should be in yaml");
-    assert!(
-        yaml.contains("harness-net"),
-        "network name should be in yaml"
-    );
-    assert!(
-        yaml.contains("KUMA_ENVIRONMENT: universal"),
-        "env should set universal"
-    );
-    assert!(
-        yaml.contains("KUMA_MODE: zone"),
-        "mode should be zone for single-zone"
-    );
-    assert!(
-        yaml.contains("KUMA_STORE_TYPE: memory"),
-        "store should be memory"
-    );
-    assert!(yaml.contains("5681:5681"), "CP API port should be mapped");
-    assert!(yaml.contains("5678:5678"), "XDS port should be mapped");
-    assert!(!yaml.contains("postgres"), "no postgres for memory store");
-
-    // Network should have IPAM config
-    let net = &compose.networks["harness-net"];
-    let ipam = net.ipam.as_ref().unwrap();
-    assert_eq!(ipam.config[0].subnet, "172.57.0.0/16");
-}
-
-#[test]
-fn compose_single_zone_postgres_includes_postgres_service() {
-    let compose = compose::single_zone("kuma-cp:latest", "net", "172.57.0.0/16", "postgres", "cp");
-    let yaml = compose.to_yaml().unwrap();
-
-    assert!(compose.services.contains_key("postgres"));
-    assert!(yaml.contains("KUMA_STORE_POSTGRES_HOST: postgres"));
-    assert!(yaml.contains("KUMA_STORE_POSTGRES_PORT: '5432'"));
-    assert!(yaml.contains("POSTGRES_USER: kuma"));
-
-    // CP should depend on postgres
-    let cp_service = &compose.services["cp"];
-    assert!(cp_service.depends_on.contains("postgres"));
-}
-
-#[test]
-#[allow(clippy::cognitive_complexity)]
-fn compose_global_zone_yaml_structure() {
-    let compose = compose::global_zone(
-        "kuma-cp:dev",
-        "harness-net",
-        "172.57.0.0/16",
-        "memory",
-        "global-cp",
-        "zone-cp",
-        "zone-1",
-    );
-    let yaml = compose.to_yaml().unwrap();
-
-    assert!(compose.services.contains_key("global-cp"));
-    assert!(compose.services.contains_key("zone-cp"));
-
-    // Global CP should use global mode
-    let global_env = &compose.services["global-cp"].environment;
-    assert_eq!(global_env.get("KUMA_MODE").unwrap(), "global");
-
-    // Zone CP should use zone mode with zone name and KDS address
-    let zone_env = &compose.services["zone-cp"].environment;
-    assert_eq!(zone_env.get("KUMA_MODE").unwrap(), "zone");
-    assert_eq!(zone_env.get("KUMA_MULTIZONE_ZONE_NAME").unwrap(), "zone-1");
-    assert_eq!(
-        zone_env.get("KUMA_MULTIZONE_ZONE_GLOBAL_ADDRESS").unwrap(),
-        "grpcs://global-cp:5685"
-    );
-    assert_eq!(
-        zone_env
-            .get("KUMA_MULTIZONE_ZONE_KDS_TLS_SKIP_VERIFY")
-            .unwrap(),
-        "true"
-    );
-
-    // Zone CP should depend on global CP
-    assert!(compose.services["zone-cp"].depends_on.contains("global-cp"));
-
-    // Global CP ports: 5681 and 5685 (KDS)
-    assert!(yaml.contains("5685:5685"));
-
-    // Zone CP ports should be offset
-    let zone_ports = &compose.services["zone-cp"].ports;
-    assert!(zone_ports.contains(&"15681:5681".to_string()));
-    assert!(zone_ports.contains(&"15678:5678".to_string()));
-}
-
-#[test]
-#[allow(clippy::cognitive_complexity)]
-fn compose_global_two_zones_yaml_structure() {
-    let compose = compose::global_two_zones(GlobalTwoZonesConfig {
-        image: "kuma-cp:latest",
-        network_name: "harness-net",
-        subnet: "172.57.0.0/16",
-        store_type: "memory",
-        global_name: "global-cp",
-        zone1: ZoneConfig {
-            name: "zone-1-cp",
-            label: "zone-1",
-        },
-        zone2: ZoneConfig {
-            name: "zone-2-cp",
-            label: "zone-2",
-        },
-    });
-
-    assert!(compose.services.contains_key("global-cp"));
-    assert!(compose.services.contains_key("zone-1-cp"));
-    assert!(compose.services.contains_key("zone-2-cp"));
-    assert_eq!(compose.services.len(), 3);
-
-    // Zone 1 ports start at 15681
-    let zone1 = &compose.services["zone-1-cp"];
-    assert!(zone1.ports.contains(&"15681:5681".to_string()));
-    assert!(zone1.ports.contains(&"15678:5678".to_string()));
-
-    // Zone 2 ports start at 25681
-    let zone2 = &compose.services["zone-2-cp"];
-    assert!(zone2.ports.contains(&"25681:5681".to_string()));
-    assert!(zone2.ports.contains(&"25678:5678".to_string()));
-
-    // Both zones should have zone labels
-    let z1_env = &zone1.environment;
-    assert_eq!(z1_env.get("KUMA_MULTIZONE_ZONE_NAME").unwrap(), "zone-1");
-
-    let z2_env = &zone2.environment;
-    assert_eq!(z2_env.get("KUMA_MULTIZONE_ZONE_NAME").unwrap(), "zone-2");
-
-    // Both zones depend on global
-    assert!(zone1.depends_on.contains("global-cp"));
-    assert!(zone2.depends_on.contains("global-cp"));
-}
-
-#[test]
-fn compose_global_two_zones_postgres_includes_postgres() {
-    let compose = compose::global_two_zones(GlobalTwoZonesConfig {
-        image: "kuma-cp:latest",
-        network_name: "net",
-        subnet: "172.57.0.0/16",
-        store_type: "postgres",
-        global_name: "global-cp",
-        zone1: ZoneConfig {
-            name: "z1",
-            label: "zone-1",
-        },
-        zone2: ZoneConfig {
-            name: "z2",
-            label: "zone-2",
-        },
-    });
-
-    assert!(compose.services.contains_key("postgres"));
-    // Global depends on postgres
-    assert!(
-        compose.services["global-cp"]
-            .depends_on
-            .contains("postgres")
-    );
-    // Zones use memory store (not postgres) - check env
-    let z1_env = &compose.services["z1"].environment;
-    assert_eq!(z1_env.get("KUMA_STORE_TYPE").unwrap(), "memory");
-}
-
-#[test]
-fn compose_file_write_and_read() {
-    let tmp = tempfile::tempdir().unwrap();
-    let path = tmp.path().join("docker-compose.yaml");
-    let compose = compose::single_zone("img", "net", "172.57.0.0/16", "memory", "cp");
-    compose.write_to(&path).unwrap();
-
-    let content = fs::read_to_string(&path).unwrap();
-    assert!(content.contains("img"));
-    assert!(content.contains("net"));
-}
-
-#[test]
-fn compose_single_zone_deterministic_output() {
-    let first = compose::single_zone("img", "net", "172.57.0.0/16", "memory", "cp")
-        .to_yaml()
-        .unwrap();
-    let second = compose::single_zone("img", "net", "172.57.0.0/16", "memory", "cp")
-        .to_yaml()
-        .unwrap();
-    assert_eq!(first, second);
-}
-
-// ============================================================================
-// 5. Capabilities command: verify JSON includes universal platform and features
+// 4. Capabilities command: verify JSON includes universal platform and features
 // ============================================================================
 
 #[test]
@@ -512,7 +306,7 @@ fn capabilities_command_exits_zero() {
 }
 
 // ============================================================================
-// 6. Validate command: universal manifest validation
+// 5. Validate command: universal manifest validation
 // ============================================================================
 
 #[test]
@@ -664,7 +458,7 @@ fn validate_universal_manifest_custom_output_path() {
 }
 
 // ============================================================================
-// 7. Context loading: RunContext loads cluster from state/cluster.json
+// 6. Context loading: RunContext loads cluster from state/cluster.json
 // ============================================================================
 
 #[test]
@@ -747,7 +541,7 @@ fn run_context_no_cluster_when_state_file_missing() {
 }
 
 // ============================================================================
-// 8. CommandEnv: universal fields in env dict
+// 7. CommandEnv: universal fields in env dict
 // ============================================================================
 
 #[test]
@@ -826,7 +620,7 @@ fn command_env_serialization_roundtrip_universal() {
 }
 
 // ============================================================================
-// 9. admin_token accessor: ClusterSpec.admin_token() returns correct values
+// 8. admin_token accessor: ClusterSpec.admin_token() returns correct values
 // ============================================================================
 
 #[test]
@@ -868,7 +662,7 @@ fn admin_token_returns_none_for_kubernetes() {
 }
 
 // ============================================================================
-// 10. primary_api_url: universal vs kubernetes behavior
+// 9. primary_api_url: universal vs kubernetes behavior
 // ============================================================================
 
 #[test]
@@ -1006,43 +800,6 @@ fn cluster_spec_from_object_defaults_to_kubernetes() {
     let spec = ClusterSpec::from_object(&obj).unwrap();
     assert_eq!(spec.platform, Platform::Kubernetes);
     assert!(spec.docker_network.is_none());
-}
-
-// ============================================================================
-// Compose network bridge configuration
-// ============================================================================
-
-#[test]
-fn compose_network_bridge_driver_and_subnet() {
-    let compose = compose::single_zone("img", "test-net", "10.0.0.0/24", "memory", "cp");
-    let network = &compose.networks["test-net"];
-    assert_eq!(network.driver, "bridge");
-    let ipam = network.ipam.as_ref().unwrap();
-    assert_eq!(ipam.config.len(), 1);
-    assert_eq!(ipam.config[0].subnet, "10.0.0.0/24");
-}
-
-// ============================================================================
-// Global zone compose: zone CP uses memory store regardless of global store
-// ============================================================================
-
-#[test]
-fn compose_global_zone_zone_uses_memory_store() {
-    let compose = compose::global_zone(
-        "img",
-        "net",
-        "172.57.0.0/16",
-        "postgres",
-        "global-cp",
-        "zone-cp",
-        "zone-1",
-    );
-    // Zone always uses memory
-    let zone_env = &compose.services["zone-cp"].environment;
-    assert_eq!(zone_env.get("KUMA_STORE_TYPE").unwrap(), "memory");
-    // Global uses postgres
-    let global_env = &compose.services["global-cp"].environment;
-    assert_eq!(global_env.get("KUMA_STORE_TYPE").unwrap(), "postgres");
 }
 
 // ============================================================================

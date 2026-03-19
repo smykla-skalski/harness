@@ -101,6 +101,33 @@ fn cluster_topology_is_owned_by_kernel() {
 }
 
 #[test]
+fn platform_module_stays_internal_to_the_crate() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let lib_rs = fs::read_to_string(root.join("src/lib.rs")).unwrap();
+    assert!(
+        !lib_rs.contains("pub mod platform;"),
+        "src/lib.rs should not expose platform as a public crate surface"
+    );
+    assert!(
+        lib_rs.contains("pub(crate) mod platform;"),
+        "src/lib.rs should keep platform crate-internal"
+    );
+
+    for path in [
+        "tests/integration/universal.rs",
+        "tests/integration/preflight.rs",
+        "tests/integration/compact.rs",
+        "tests/integration/commands/session_stop.rs",
+    ] {
+        let contents = fs::read_to_string(root.join(path)).unwrap();
+        assert!(
+            !contents.contains("harness::platform::"),
+            "{path} should not depend on the internal platform module"
+        );
+    }
+}
+
+#[test]
 fn internal_code_uses_kernel_command_intent_instead_of_legacy_shell_parse() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
     let src_root = root.join("src");

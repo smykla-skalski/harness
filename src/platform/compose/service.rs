@@ -97,15 +97,6 @@ impl ComposeDependsOn {
             Self::Conditional(m) => m.is_empty(),
         }
     }
-
-    /// Check if a service name is present in the dependency list.
-    #[must_use]
-    pub fn contains(&self, name: &str) -> bool {
-        match self {
-            Self::Simple(v) => v.iter().any(|s| s == name),
-            Self::Conditional(m) => m.contains_key(name),
-        }
-    }
 }
 
 impl Serialize for ComposeDependsOn {

@@ -2,7 +2,6 @@ use std::path::Path;
 
 use crate::errors::CliError;
 use crate::kernel::topology::ClusterSpec;
-use crate::platform::runtime::ClusterRuntime;
 use crate::run::RunStatus;
 use crate::run::prepared_suite::PreparedSuiteArtifact;
 
@@ -40,13 +39,5 @@ impl RunAggregate {
     pub fn from_current() -> Result<Option<Self>, CliError> {
         let repo = RunRepository;
         repo.load_current()
-    }
-
-    /// Build a typed cluster runtime from the aggregate.
-    ///
-    /// # Errors
-    /// Returns `CliError` if cluster runtime details are missing.
-    pub fn cluster_runtime(&self) -> Result<ClusterRuntime<'_>, CliError> {
-        ClusterRuntime::from_run(self)
     }
 }

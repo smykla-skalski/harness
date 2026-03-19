@@ -11,7 +11,6 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::PoisonError;
 
-use harness::platform::ephemeral_metallb;
 use harness::setup::{PreCompactArgs, SessionStartArgs, SessionStopArgs};
 use harness::workspace::compact::{
     self, AuthoringHandoff, FileFingerprint, HandoffStatus, RunnerHandoff,
@@ -438,7 +437,6 @@ fn check_session_start_cross_project(project: &Path) {
 }
 
 // No pending handoff - session-start returns Ok(0).
-// Verify ephemeral_metallb APIs are accessible.
 fn check_session_start_metallb_templates(project: &Path) {
     let result = session_start_cmd(SessionStartArgs {
         project_dir: Some(project.to_string_lossy().to_string()),
@@ -446,12 +444,6 @@ fn check_session_start_metallb_templates(project: &Path) {
     .execute();
     assert!(result.is_ok());
     assert_eq!(result.unwrap(), 0);
-
-    let run_dir = project.join("test-run");
-    fs::create_dir_all(&run_dir).unwrap();
-    let cleaned = ephemeral_metallb::cleanup_templates(&run_dir);
-    assert!(cleaned.is_ok());
-    assert!(cleaned.unwrap().is_empty());
 }
 
 // session_stop is currently a no-op. Verify Ok(0).

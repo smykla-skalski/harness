@@ -3,7 +3,6 @@
 
 use std::fs;
 
-use harness::platform::ephemeral_metallb;
 use harness::run::context::{CurrentRunRecord, RunLayout};
 use harness::setup::SessionStopArgs;
 use harness::workspace::current_run_context_path;
@@ -19,9 +18,26 @@ fn session_stop_cleans_up_templates_and_removes_pointer() {
     // Create ephemeral templates
     let mk_dir = tmp.path().join("mk");
     fs::create_dir_all(&mk_dir).unwrap();
-    fs::write(mk_dir.join("metallb-k3d-kuma.yaml"), "template").unwrap();
-    ephemeral_metallb::ensure_templates(tmp.path(), &["local"], Some(&run_dir)).unwrap();
-    let template = ephemeral_metallb::template_path(tmp.path(), "local").unwrap();
+    let source = mk_dir.join("metallb-k3d-kuma.yaml");
+    fs::write(&source, "template").unwrap();
+    let template = mk_dir.join("metallb-k3d-local.yaml");
+    fs::write(&template, "template").unwrap();
+    let state_dir = run_dir.join("state");
+    fs::create_dir_all(&state_dir).unwrap();
+    fs::write(
+        state_dir.join("ephemeral-metallb-templates.json"),
+        serde_json::json!({
+            "schema_version": 1,
+            "entries": [{
+                "cluster_name": "local",
+                "created_at": "2026-03-19T00:00:00Z",
+                "source_path": source,
+                "template_path": template,
+            }],
+        })
+        .to_string(),
+    )
+    .unwrap();
     assert!(template.exists());
 
     // Write a current-run pointer
