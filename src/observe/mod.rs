@@ -15,7 +15,7 @@ use std::fs;
 use std::io::{self, Write};
 use std::path::PathBuf;
 
-use clap::{Args, Subcommand};
+use clap::{Args, Subcommand, ValueEnum};
 use serde_json::json;
 use tracing::warn;
 
@@ -110,10 +110,31 @@ pub struct ObserveFilterArgs {
 #[derive(Debug, Clone, Subcommand)]
 #[non_exhaustive]
 pub enum ObserveMode {
-    /// One-shot scan of a session log.
+    /// One-shot scan of a session log, plus observer maintenance actions.
     Scan {
         /// Session ID to observe.
-        session_id: String,
+        session_id: Option<String>,
+        /// Optional maintenance action to run instead of a normal scan.
+        #[arg(long, value_enum)]
+        action: Option<ObserveScanActionKind>,
+        /// Issue ID used by `--action verify`.
+        #[arg(long, value_name = "ISSUE_ID")]
+        issue_id: Option<String>,
+        /// Start verification from this line instead of the issue's first-seen line.
+        #[arg(long)]
+        since_line: Option<usize>,
+        /// Value used by `--action resolve-from`.
+        #[arg(long, value_name = "VALUE")]
+        value: Option<String>,
+        /// First comparison range for `--action compare`, using `FROM:TO` syntax.
+        #[arg(long, value_name = "FROM:TO")]
+        range_a: Option<String>,
+        /// Second comparison range for `--action compare`, using `FROM:TO` syntax.
+        #[arg(long, value_name = "FROM:TO")]
+        range_b: Option<String>,
+        /// Issue codes used by `--action mute` or `--action unmute`.
+        #[arg(long, value_name = "CODES")]
+        codes: Option<String>,
         /// Filter arguments.
         #[command(flatten)]
         filter: ObserveFilterArgs,
@@ -136,6 +157,12 @@ pub enum ObserveMode {
     Dump {
         /// Session ID to observe.
         session_id: String,
+        /// Show context around a specific line instead of a generic dump.
+        #[arg(long)]
+        context_line: Option<usize>,
+        /// Number of lines before and after `--context-line`.
+        #[arg(long, default_value = "10")]
+        context_window: usize,
         /// Start from this line number.
         #[arg(long)]
         from_line: Option<usize>,
@@ -158,113 +185,6 @@ pub enum ObserveMode {
         #[arg(long)]
         project_hint: Option<String>,
     },
-    /// Run one observer cycle: read cursor, scan, update cursor, report.
-    Cycle {
-        /// Session ID to observe.
-        session_id: String,
-        /// Narrow session search to this project directory name.
-        #[arg(long)]
-        project_hint: Option<String>,
-    },
-    /// Show events around a specific line.
-    Context {
-        /// Session ID to observe.
-        session_id: String,
-        /// Target line number.
-        #[arg(long)]
-        line: usize,
-        /// Number of lines before/after.
-        #[arg(long, default_value = "10")]
-        window: usize,
-        /// Narrow session search to this project directory name.
-        #[arg(long)]
-        project_hint: Option<String>,
-    },
-    /// Show observer state for a session.
-    Status {
-        /// Session ID to query.
-        session_id: String,
-        /// Narrow session search to this project directory name.
-        #[arg(long)]
-        project_hint: Option<String>,
-    },
-    /// Resume scanning from the last cursor position.
-    Resume {
-        /// Session ID to resume.
-        session_id: String,
-        /// Filter arguments.
-        #[command(flatten)]
-        filter: ObserveFilterArgs,
-    },
-    /// Verify whether a specific issue still reproduces.
-    Verify {
-        /// Session ID to check.
-        session_id: String,
-        /// Issue ID to verify.
-        issue_id: String,
-        /// Start verification from this line.
-        #[arg(long)]
-        since_line: Option<usize>,
-        /// Narrow session search to this project directory name.
-        #[arg(long)]
-        project_hint: Option<String>,
-    },
-    /// Resolve a --from value to a concrete line number.
-    ResolveStart {
-        /// Session ID to search.
-        session_id: String,
-        /// Value to resolve: line number, ISO timestamp, or prose substring.
-        value: String,
-        /// Narrow session search to this project directory name.
-        #[arg(long)]
-        project_hint: Option<String>,
-    },
-    /// List all valid issue categories.
-    ListCategories,
-    /// List all focus presets.
-    ListFocusPresets,
-    /// Validate observer setup.
-    Doctor,
-    /// Add issue codes to the mute list.
-    Mute {
-        /// Session ID to update.
-        session_id: String,
-        /// Issue codes to mute (comma-separated).
-        codes: String,
-        /// Narrow session search to this project directory name.
-        #[arg(long)]
-        project_hint: Option<String>,
-    },
-    /// Remove issue codes from the mute list.
-    Unmute {
-        /// Session ID to update.
-        session_id: String,
-        /// Issue codes to unmute (comma-separated).
-        codes: String,
-        /// Narrow session search to this project directory name.
-        #[arg(long)]
-        project_hint: Option<String>,
-    },
-    /// Compare issues between two line ranges.
-    Compare {
-        /// Session ID to compare.
-        session_id: String,
-        /// First range start line.
-        #[arg(long)]
-        from_a: usize,
-        /// First range end line.
-        #[arg(long)]
-        to_a: usize,
-        /// Second range start line.
-        #[arg(long)]
-        from_b: usize,
-        /// Second range end line.
-        #[arg(long)]
-        to_b: usize,
-        /// Narrow session search to this project directory name.
-        #[arg(long)]
-        project_hint: Option<String>,
-    },
 }
 
 /// Arguments for `harness observe`.
@@ -273,6 +193,97 @@ pub struct ObserveArgs {
     /// Observe subcommand.
     #[command(subcommand)]
     pub mode: ObserveMode,
+}
+
+#[derive(Debug, Clone, Copy, ValueEnum)]
+pub enum ObserveScanActionKind {
+    Cycle,
+    Status,
+    Resume,
+    Verify,
+    ResolveFrom,
+    Compare,
+    ListCategories,
+    ListFocusPresets,
+    Doctor,
+    Mute,
+    Unmute,
+}
+
+enum ObserveScanAction<'a> {
+    Scan {
+        session_id: &'a str,
+        filter: &'a ObserveFilterArgs,
+    },
+    Cycle {
+        session_id: &'a str,
+        project_hint: Option<&'a str>,
+    },
+    Status {
+        session_id: &'a str,
+        project_hint: Option<&'a str>,
+    },
+    Resume {
+        session_id: &'a str,
+        filter: &'a ObserveFilterArgs,
+    },
+    Verify {
+        session_id: &'a str,
+        issue_id: &'a str,
+        since_line: Option<usize>,
+        project_hint: Option<&'a str>,
+    },
+    ResolveFrom {
+        session_id: &'a str,
+        value: &'a str,
+        project_hint: Option<&'a str>,
+    },
+    Compare {
+        session_id: &'a str,
+        from_a: usize,
+        to_a: usize,
+        from_b: usize,
+        to_b: usize,
+        project_hint: Option<&'a str>,
+    },
+    ListCategories,
+    ListFocusPresets,
+    Doctor,
+    Mute {
+        session_id: &'a str,
+        codes: &'a str,
+        project_hint: Option<&'a str>,
+    },
+    Unmute {
+        session_id: &'a str,
+        codes: &'a str,
+        project_hint: Option<&'a str>,
+    },
+}
+
+struct ObserveScanRequest<'a> {
+    session_id: Option<&'a String>,
+    action: Option<ObserveScanActionKind>,
+    issue_id: Option<&'a str>,
+    since_line: Option<usize>,
+    value: Option<&'a str>,
+    range_a: Option<&'a str>,
+    range_b: Option<&'a str>,
+    codes: Option<&'a str>,
+    filter: &'a ObserveFilterArgs,
+}
+
+struct ObserveDumpRequest {
+    session_id: String,
+    context_line: Option<usize>,
+    context_window: usize,
+    from_line: Option<usize>,
+    to_line: Option<usize>,
+    filter: Option<String>,
+    role: Option<String>,
+    tool_name: Option<String>,
+    raw_json: bool,
+    project_hint: Option<String>,
 }
 
 /// Truncate text to at most `max_len` bytes at a valid UTF-8 char boundary.
@@ -304,13 +315,107 @@ pub(crate) fn redact_details(text: &str) -> String {
         .into_owned()
 }
 
+fn execute_scan_mode(request: &ObserveScanRequest<'_>) -> Result<i32, CliError> {
+    match resolve_scan_action(request)? {
+        ObserveScanAction::Scan { session_id, filter } => scan::execute_scan(session_id, filter),
+        ObserveScanAction::Cycle {
+            session_id,
+            project_hint,
+        } => execute_cycle(session_id, project_hint),
+        ObserveScanAction::Status {
+            session_id,
+            project_hint,
+        } => execute_status(session_id, project_hint),
+        ObserveScanAction::Resume { session_id, filter } => execute_resume(session_id, filter),
+        ObserveScanAction::Verify {
+            session_id,
+            issue_id,
+            since_line,
+            project_hint,
+        } => execute_verify(session_id, issue_id, since_line, project_hint),
+        ObserveScanAction::ResolveFrom {
+            session_id,
+            value,
+            project_hint,
+        } => execute_resolve_start(session_id, value, project_hint),
+        ObserveScanAction::Compare {
+            session_id,
+            from_a,
+            to_a,
+            from_b,
+            to_b,
+            project_hint,
+        } => compare::execute_compare(session_id, from_a, to_a, from_b, to_b, project_hint),
+        ObserveScanAction::ListCategories => execute_list_categories(),
+        ObserveScanAction::ListFocusPresets => execute_list_focus_presets(),
+        ObserveScanAction::Doctor => doctor::execute_doctor(),
+        ObserveScanAction::Mute {
+            session_id,
+            codes,
+            project_hint,
+        } => execute_mute(session_id, codes, project_hint),
+        ObserveScanAction::Unmute {
+            session_id,
+            codes,
+            project_hint,
+        } => execute_unmute(session_id, codes, project_hint),
+    }
+}
+
+fn execute_dump_mode(request: &ObserveDumpRequest) -> Result<i32, CliError> {
+    if let Some(line) = request.context_line {
+        context_cmd::execute_context(
+            &request.session_id,
+            line,
+            request.context_window,
+            request.project_hint.as_deref(),
+        )
+    } else {
+        dump::execute_dump(
+            &request.session_id,
+            &dump::DumpOptions {
+                from_line: request.from_line.unwrap_or(0),
+                to_line: request.to_line,
+                text_filter: request.filter.as_deref(),
+                roles: request.role.as_deref(),
+                tool_name: request.tool_name.as_deref(),
+                raw_json: request.raw_json,
+            },
+            request.project_hint.as_deref(),
+        )
+    }
+}
+
 /// Execute the observe command in the given mode.
 ///
 /// # Errors
 /// Returns `CliError` on session lookup or parse failures.
 pub fn execute(mode: ObserveMode) -> Result<i32, CliError> {
     match mode {
-        ObserveMode::Scan { session_id, filter } => scan::execute_scan(&session_id, &filter),
+        ObserveMode::Scan {
+            session_id,
+            action,
+            issue_id,
+            since_line,
+            value,
+            range_a,
+            range_b,
+            codes,
+            filter,
+        } => {
+            let request = ObserveScanRequest {
+                session_id: session_id.as_ref(),
+                action,
+                issue_id: issue_id.as_deref(),
+                since_line,
+                value: value.as_deref(),
+                range_a: range_a.as_deref(),
+                range_b: range_b.as_deref(),
+                codes: codes.as_deref(),
+                filter: &filter,
+            };
+            execute_scan_mode(&request)
+        }
         ObserveMode::Watch {
             session_id,
             poll_interval,
@@ -319,6 +424,8 @@ pub fn execute(mode: ObserveMode) -> Result<i32, CliError> {
         } => watch::execute_watch(&session_id, poll_interval, timeout, &filter),
         ObserveMode::Dump {
             session_id,
+            context_line,
+            context_window,
             from_line,
             to_line,
             filter,
@@ -326,72 +433,131 @@ pub fn execute(mode: ObserveMode) -> Result<i32, CliError> {
             tool_name,
             raw_json,
             project_hint,
-        } => dump::execute_dump(
-            &session_id,
-            &dump::DumpOptions {
-                from_line: from_line.unwrap_or(0),
-                to_line,
-                text_filter: filter.as_deref(),
-                roles: role.as_deref(),
-                tool_name: tool_name.as_deref(),
-                raw_json,
-            },
-            project_hint.as_deref(),
-        ),
-        ObserveMode::Cycle {
+        } => execute_dump_mode(&ObserveDumpRequest {
             session_id,
+            context_line,
+            context_window,
+            from_line,
+            to_line,
+            filter,
+            role,
+            tool_name,
+            raw_json,
             project_hint,
-        } => execute_cycle(&session_id, project_hint.as_deref()),
-        ObserveMode::Context {
-            session_id,
-            line,
-            window,
+        }),
+    }
+}
+
+fn require_scan_session_id<'a>(
+    session_id: Option<&'a String>,
+    action: &str,
+) -> Result<&'a str, CliError> {
+    session_id.map(String::as_str).ok_or_else(|| {
+        CliErrorKind::session_parse_error(format!(
+            "observe scan {action} requires a session_id positional argument"
+        ))
+        .into()
+    })
+}
+
+fn parse_compare_range(value: &str, label: &str) -> Result<(usize, usize), CliError> {
+    let Some((from, to)) = value.split_once(':') else {
+        return Err(
+            CliErrorKind::session_parse_error(format!("{label} must use FROM:TO syntax")).into(),
+        );
+    };
+    let from = from.parse::<usize>().map_err(|_| {
+        CliErrorKind::session_parse_error(format!("{label} has invalid start line '{from}'"))
+    })?;
+    let to = to.parse::<usize>().map_err(|_| {
+        CliErrorKind::session_parse_error(format!("{label} has invalid end line '{to}'"))
+    })?;
+    Ok((from, to))
+}
+
+fn resolve_scan_action<'a>(
+    request: &'a ObserveScanRequest<'a>,
+) -> Result<ObserveScanAction<'a>, CliError> {
+    let project_hint = request.filter.project_hint.as_deref();
+    match request.action {
+        None => Ok(ObserveScanAction::Scan {
+            session_id: require_scan_session_id(request.session_id, "scan")?,
+            filter: request.filter,
+        }),
+        Some(ObserveScanActionKind::Cycle) => Ok(ObserveScanAction::Cycle {
+            session_id: require_scan_session_id(request.session_id, "--action cycle")?,
             project_hint,
-        } => context_cmd::execute_context(&session_id, line, window, project_hint.as_deref()),
-        ObserveMode::Status {
-            session_id,
+        }),
+        Some(ObserveScanActionKind::Status) => Ok(ObserveScanAction::Status {
+            session_id: require_scan_session_id(request.session_id, "--action status")?,
             project_hint,
-        } => execute_status(&session_id, project_hint.as_deref()),
-        ObserveMode::Resume { session_id, filter } => execute_resume(&session_id, &filter),
-        ObserveMode::Verify {
-            session_id,
-            issue_id,
-            since_line,
+        }),
+        Some(ObserveScanActionKind::Resume) => Ok(ObserveScanAction::Resume {
+            session_id: require_scan_session_id(request.session_id, "--action resume")?,
+            filter: request.filter,
+        }),
+        Some(ObserveScanActionKind::Verify) => Ok(ObserveScanAction::Verify {
+            session_id: require_scan_session_id(request.session_id, "--action verify")?,
+            issue_id: request.issue_id.ok_or_else(|| {
+                CliError::from(CliErrorKind::session_parse_error(
+                    "--action verify requires --issue-id",
+                ))
+            })?,
+            since_line: request.since_line,
             project_hint,
-        } => execute_verify(&session_id, &issue_id, since_line, project_hint.as_deref()),
-        ObserveMode::ResolveStart {
-            session_id,
-            value,
+        }),
+        Some(ObserveScanActionKind::ResolveFrom) => Ok(ObserveScanAction::ResolveFrom {
+            session_id: require_scan_session_id(request.session_id, "--action resolve-from")?,
+            value: request.value.ok_or_else(|| {
+                CliError::from(CliErrorKind::session_parse_error(
+                    "--action resolve-from requires --value",
+                ))
+            })?,
             project_hint,
-        } => execute_resolve_start(&session_id, &value, project_hint.as_deref()),
-        ObserveMode::ListCategories => execute_list_categories(),
-        ObserveMode::ListFocusPresets => execute_list_focus_presets(),
-        ObserveMode::Doctor => doctor::execute_doctor(),
-        ObserveMode::Mute {
-            session_id,
-            codes,
+        }),
+        Some(ObserveScanActionKind::Compare) => {
+            let range_a = request.range_a.ok_or_else(|| {
+                CliError::from(CliErrorKind::session_parse_error(
+                    "--action compare requires --range-a",
+                ))
+            })?;
+            let range_b = request.range_b.ok_or_else(|| {
+                CliError::from(CliErrorKind::session_parse_error(
+                    "--action compare requires --range-b",
+                ))
+            })?;
+            let (from_a, to_a) = parse_compare_range(range_a, "--range-a")?;
+            let (from_b, to_b) = parse_compare_range(range_b, "--range-b")?;
+            Ok(ObserveScanAction::Compare {
+                session_id: require_scan_session_id(request.session_id, "--action compare")?,
+                from_a,
+                to_a,
+                from_b,
+                to_b,
+                project_hint,
+            })
+        }
+        Some(ObserveScanActionKind::ListCategories) => Ok(ObserveScanAction::ListCategories),
+        Some(ObserveScanActionKind::ListFocusPresets) => Ok(ObserveScanAction::ListFocusPresets),
+        Some(ObserveScanActionKind::Doctor) => Ok(ObserveScanAction::Doctor),
+        Some(ObserveScanActionKind::Mute) => Ok(ObserveScanAction::Mute {
+            session_id: require_scan_session_id(request.session_id, "--action mute")?,
+            codes: request.codes.ok_or_else(|| {
+                CliError::from(CliErrorKind::session_parse_error(
+                    "--action mute requires --codes",
+                ))
+            })?,
             project_hint,
-        } => execute_mute(&session_id, &codes, project_hint.as_deref()),
-        ObserveMode::Unmute {
-            session_id,
-            codes,
+        }),
+        Some(ObserveScanActionKind::Unmute) => Ok(ObserveScanAction::Unmute {
+            session_id: require_scan_session_id(request.session_id, "--action unmute")?,
+            codes: request.codes.ok_or_else(|| {
+                CliError::from(CliErrorKind::session_parse_error(
+                    "--action unmute requires --codes",
+                ))
+            })?,
             project_hint,
-        } => execute_unmute(&session_id, &codes, project_hint.as_deref()),
-        ObserveMode::Compare {
-            session_id,
-            from_a,
-            to_a,
-            from_b,
-            to_b,
-            project_hint,
-        } => compare::execute_compare(
-            &session_id,
-            from_a,
-            to_a,
-            from_b,
-            to_b,
-            project_hint.as_deref(),
-        ),
+        }),
     }
 }
 
