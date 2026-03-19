@@ -8,7 +8,7 @@ use fs_err as fs;
 use serde::Deserialize;
 use walkdir::WalkDir;
 
-use crate::core_defs::dirs_home;
+use crate::workspace::dirs_home;
 use crate::errors::{CliError, CliErrorKind};
 use crate::hooks::adapters::{HookAgent, HookRegistration, adapter_for};
 use crate::hooks::protocol::context::NormalizedEvent;

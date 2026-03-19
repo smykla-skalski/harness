@@ -6,7 +6,7 @@ use std::sync::LazyLock;
 use regex::Regex;
 use tracing::warn;
 
-use crate::core_defs::{shorten_path, utc_now};
+use crate::workspace::{shorten_path, utc_now};
 use crate::errors::{CliError, CliErrorKind};
 use crate::infra::blocks::kuma::cli::primary_kumactl_dir;
 use crate::infra::io::{ensure_dir, write_text};

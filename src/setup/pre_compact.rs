@@ -1,7 +1,7 @@
 use clap::Args;
 
 use crate::app::command_context::{CommandContext, Execute, resolve_project_dir};
-use crate::compact::{build_compact_handoff, save_compact_handoff};
+use crate::workspace::compact::{build_compact_handoff, save_compact_handoff};
 use crate::errors::CliError;
 
 impl Execute for PreCompactArgs {

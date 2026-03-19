@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use walkdir::WalkDir;
 
-use crate::core_defs::dirs_home;
+use crate::workspace::dirs_home;
 use crate::errors::{CliError, CliErrorKind};
 
 /// Locate a session JSONL file under `~/.claude/projects/*/`.
