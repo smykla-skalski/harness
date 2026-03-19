@@ -1,28 +1,16 @@
-mod kubernetes;
+pub(crate) mod kubernetes;
 #[cfg(feature = "compose")]
-mod universal;
-
-use std::collections::HashMap;
-use std::path::Path;
+pub(crate) mod universal;
 
 use clap::Args;
 
-use tracing::{debug, info};
-
 use crate::app::command_context::{CommandContext, Execute};
-use crate::errors::{CliError, CliErrorKind};
-use crate::infra::exec::{run_command, run_command_streaming};
-use crate::infra::io::write_json_pretty;
-use crate::platform::cluster::{ClusterSpec, Platform};
-use crate::run::context::RunRepository;
-
-use kubernetes::cluster_k8s;
-#[cfg(feature = "compose")]
-use universal::cluster_universal;
+use crate::errors::CliError;
+use crate::setup::services::cluster::execute_cluster;
 
 impl Execute for ClusterArgs {
     fn execute(&self, _context: &CommandContext) -> Result<i32, CliError> {
-        cluster(self)
+        execute_cluster(self)
     }
 }
 
@@ -69,66 +57,12 @@ pub struct ClusterArgs {
     pub no_load: bool,
 }
 
-fn make_target(root: &Path, target: &str, env: &HashMap<String, String>) -> Result<(), CliError> {
-    run_command(&["make", target], Some(root), Some(env), &[0])?;
-    Ok(())
-}
-
-fn make_target_live(
-    root: &Path,
-    target: &str,
-    env: &HashMap<String, String>,
-) -> Result<(), CliError> {
-    run_command_streaming(&["make", target], Some(root), Some(env), &[0])?;
-    Ok(())
-}
-
 /// Manage disposable local clusters (k3d or universal Docker).
 ///
 /// # Errors
 /// Returns `CliError` on failure.
 pub fn cluster(args: &ClusterArgs) -> Result<i32, CliError> {
-    let platform: Platform = args
-        .platform
-        .parse()
-        .map_err(|e: String| CliError::from(CliErrorKind::usage_error(e)))?;
-
-    match platform {
-        Platform::Kubernetes => cluster_k8s(args),
-        #[cfg(feature = "compose")]
-        Platform::Universal => cluster_universal(args),
-        #[cfg(not(feature = "compose"))]
-        Platform::Universal => Err(CliError::from(CliErrorKind::usage_error(
-            "universal platform requires the 'compose' feature",
-        ))),
-    }
-}
-
-/// Persist cluster spec to the session context and run directory if available.
-fn persist_cluster_spec(spec: &ClusterSpec) -> Result<(), CliError> {
-    // Update session context (current-run.json) if it exists
-    let repo = RunRepository;
-    if let Some(pointer) = repo.load_current_pointer()? {
-        let run_dir = pointer.layout.run_dir();
-        let _ = repo.update_current_pointer(|record| {
-            record.cluster = Some(spec.clone());
-        })?;
-
-        // Also write to run dir state/cluster.json
-        let state_dir = run_dir.join("state");
-        if state_dir.is_dir() {
-            let cluster_path = state_dir.join("cluster.json");
-            write_json_pretty(&cluster_path, spec)?;
-            info!("spec saved to state/cluster.json");
-        }
-    }
-
-    // Always output spec JSON to stdout for scripting
-    let spec_json = serde_json::to_string_pretty(&spec.to_json_dict())
-        .map_err(|e| CliErrorKind::serialize(format!("cluster spec json: {e}")))?;
-    debug!("{spec_json}");
-
-    Ok(())
+    execute_cluster(args)
 }
 
 #[cfg(test)]
