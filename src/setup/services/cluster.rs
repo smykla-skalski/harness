@@ -5,7 +5,7 @@ use tracing::{debug, info};
 
 use crate::errors::{CliError, CliErrorKind};
 use crate::infra::exec::{run_command, run_command_streaming};
-use crate::platform::cluster::{ClusterSpec, Platform};
+use crate::kernel::topology::{ClusterSpec, Platform};
 use crate::run::application::RunApplication;
 use crate::setup::cluster::ClusterArgs;
 use crate::setup::cluster::kubernetes::cluster_k8s;

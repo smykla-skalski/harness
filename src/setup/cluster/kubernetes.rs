@@ -9,7 +9,7 @@ use crate::app::command_context::resolve_repo_root;
 use crate::errors::{CliError, CliErrorKind};
 use crate::infra::exec;
 use crate::infra::exec::{cluster_exists, docker, kubectl};
-use crate::platform::cluster::{ClusterMode, ClusterSpec, HelmSetting};
+use crate::kernel::topology::{ClusterMode, ClusterSpec, HelmSetting};
 use crate::setup::build_info::resolve_build_info;
 use crate::setup::services::cluster::{make_target, make_target_live, persist_cluster_spec};
 

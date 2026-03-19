@@ -4,7 +4,7 @@ use rayon::prelude::*;
 
 use crate::errors::CliError;
 use crate::infra::exec;
-use crate::platform::cluster::Platform;
+use crate::kernel::topology::Platform;
 use crate::run::services::{
     ClusterHealthReport, ClusterMemberHealthRecord, ClusterMemberStatusRecord, ClusterStatusReport,
 };

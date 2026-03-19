@@ -14,7 +14,7 @@ use std::path::PathBuf;
 use crate::errors::CliError;
 use crate::infra::exec::HttpMethod;
 use crate::infra::io::write_json_pretty;
-use crate::platform::cluster::ClusterSpec;
+use crate::kernel::topology::ClusterSpec;
 use crate::platform::runtime::{ClusterRuntime, ControlPlaneAccess, XdsAccess};
 use crate::run::RunStatus;
 use crate::run::context::{RunContext, RunLayout, RunMetadata, RunRepository};

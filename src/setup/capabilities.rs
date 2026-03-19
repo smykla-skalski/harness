@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 use serde::{Deserialize, Serialize};
 
 use crate::errors::{CliError, CliErrorKind};
-use crate::platform::cluster::Platform;
+use crate::kernel::topology::Platform;
 
 /// Cluster topology mode (single-zone vs multi-zone).
 ///

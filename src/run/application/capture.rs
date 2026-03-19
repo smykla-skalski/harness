@@ -4,7 +4,7 @@ use tracing::warn;
 use crate::errors::{CliError, CliErrorKind};
 use crate::infra::exec;
 use crate::infra::io::write_json_pretty;
-use crate::platform::cluster::Platform;
+use crate::kernel::topology::Platform;
 use crate::run::audit::write_run_status_with_audit;
 use crate::run::state_capture::{
     DockerContainerSnapshot, KubernetesCaptureSnapshot, KubernetesPodSnapshot,
