@@ -10,12 +10,7 @@ use super::paths::{dirs_home, harness_data_root};
 /// XDG data root (`XDG_DATA_HOME` or `~/.local/share`).
 #[must_use]
 pub fn data_root() -> PathBuf {
-    if let Ok(xdg) = env::var("XDG_DATA_HOME")
-        && !xdg.is_empty()
-    {
-        return PathBuf::from(xdg);
-    }
-    dirs_home().join(".local").join("share")
+    user_dirs::data_dir().unwrap_or_else(|_| dirs_home().join(".local").join("share"))
 }
 
 /// Suite root: `harness_data_root/suites`.
@@ -113,4 +108,18 @@ pub fn project_context_dir(project_dir: &Path) -> PathBuf {
     harness_data_root()
         .join("projects")
         .join(format!("project-{digest}"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn data_root_prefers_xdg_data_home() {
+        let tmp = tempfile::tempdir().unwrap();
+        let xdg_data = tmp.path().join("xdg-data");
+        temp_env::with_var("XDG_DATA_HOME", Some(&xdg_data), || {
+            assert_eq!(data_root(), xdg_data);
+        });
+    }
 }
