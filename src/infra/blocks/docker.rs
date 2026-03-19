@@ -3,8 +3,8 @@ use std::sync::Arc;
 
 use tempfile::NamedTempFile;
 
-use crate::core_defs::CommandResult;
 use crate::infra::blocks::{BlockError, ProcessExecutor};
+use crate::infra::exec::CommandResult;
 
 #[cfg(test)]
 use std::collections::{HashMap, HashSet};

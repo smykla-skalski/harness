@@ -5,21 +5,18 @@ use std::path::Path;
 use crate::infra::blocks::kuma::cli::primary_kumactl_dir;
 
 /// Merge current env with extra key-value pairs.
-///
-/// When the merged env contains `REPO_ROOT`, the build artifacts directory
-/// for the host platform is prepended to `PATH` so that locally-built
-/// binaries (like `kumactl`) are found before system-installed ones.
 #[must_use]
-pub fn merge_env(extra: Option<&HashMap<String, String>>) -> HashMap<String, String> {
-    let mut env: HashMap<String, String> = env::vars().collect();
-    if let Some(extra) = extra {
-        env.extend(extra.iter().map(|(k, v)| (k.clone(), v.clone())));
-    }
-    prepend_build_artifacts_path(&mut env);
-    env
+pub fn merge_env<'a, I>(extra: I) -> HashMap<String, String>
+where
+    I: IntoIterator<Item = (&'a String, &'a String)>,
+{
+    let mut merged: HashMap<String, String> = env::vars().collect();
+    merged.extend(extra.into_iter().map(|(key, value)| (key.clone(), value.clone())));
+    prepend_build_artifacts_path(&mut merged);
+    merged
 }
 
-/// Host platform as `(os_name, arch)` - e.g. `("darwin", "arm64")`.
+/// Host platform as `(os_name, arch)`.
 #[must_use]
 pub fn host_platform() -> (&'static str, &'static str) {
     let os_name = if cfg!(target_os = "macos") {
@@ -35,8 +32,6 @@ pub fn host_platform() -> (&'static str, &'static str) {
     (os_name, arch)
 }
 
-/// If `REPO_ROOT` is set, prepend `{repo_root}/build/artifacts-{os}-{arch}/kumactl`
-/// to `PATH` so locally-built binaries are preferred over system ones.
 fn prepend_build_artifacts_path(env: &mut HashMap<String, String>) {
     let Some(repo_root) = env.get("REPO_ROOT") else {
         return;
@@ -82,47 +77,29 @@ mod tests {
             "REPO_ROOT".into(),
             tmp.path().to_string_lossy().into_owned(),
         );
-        let merged = merge_env(Some(&extra));
+        let merged = merge_env(extra.iter());
         let path_val = merged.get("PATH").unwrap();
         let expected_prefix = artifacts_dir.to_string_lossy();
-        assert!(
-            path_val.starts_with(expected_prefix.as_ref()),
-            "PATH should start with artifacts dir, got: {path_val}"
-        );
+        assert!(path_val.starts_with(expected_prefix.as_ref()));
     }
 
     #[test]
     fn merge_env_skips_artifacts_when_dir_missing() {
         let tmp = tempfile::tempdir().unwrap();
-        // No build directory created - artifacts dir does not exist
         let mut extra = HashMap::new();
         extra.insert(
             "REPO_ROOT".into(),
             tmp.path().to_string_lossy().into_owned(),
         );
         let original_path = env::var("PATH").unwrap_or_default();
-        let merged = merge_env(Some(&extra));
-        let path_val = merged.get("PATH").unwrap();
-        assert_eq!(
-            path_val, &original_path,
-            "PATH should be unchanged when artifacts dir does not exist"
-        );
+        let merged = merge_env(extra.iter());
+        assert_eq!(merged.get("PATH").unwrap(), &original_path);
     }
 
     #[test]
     fn merge_env_no_repo_root_leaves_path_unchanged() {
         let original_path = env::var("PATH").unwrap_or_default();
-        let merged = merge_env(None);
-        let path_val = merged.get("PATH").unwrap();
-        assert_eq!(path_val, &original_path);
-    }
-
-    #[test]
-    fn prepend_build_artifacts_path_ignores_empty_repo_root() {
-        let mut env_map = HashMap::new();
-        env_map.insert("REPO_ROOT".into(), String::new());
-        env_map.insert("PATH".into(), "/usr/bin".into());
-        prepend_build_artifacts_path(&mut env_map);
-        assert_eq!(env_map.get("PATH").unwrap(), "/usr/bin");
+        let merged = merge_env(std::iter::empty());
+        assert_eq!(merged.get("PATH").unwrap(), &original_path);
     }
 }

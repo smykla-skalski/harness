@@ -3,9 +3,9 @@ use std::path::{Path, PathBuf};
 
 use walkdir::WalkDir;
 
-use crate::core_defs::utc_now;
 use crate::errors::{CliError, CliErrorKind};
 use crate::infra::io::{is_safe_name, write_json_pretty};
+use crate::workspace::utc_now;
 
 const STATE_FILE: &str = "ephemeral-metallb-templates.json";
 const DEFAULT_TEMPLATE_BASENAME: &str = "metallb-k3d-kuma.yaml";

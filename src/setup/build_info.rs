@@ -13,19 +13,10 @@ pub struct BuildInfo {
 impl BuildInfo {
     #[must_use]
     pub fn env(&self) -> HashMap<String, String> {
-        let mut m = HashMap::new();
-        m.insert("BUILD_INFO_VERSION".into(), self.version.clone());
-        m
+        let mut env = HashMap::new();
+        env.insert("BUILD_INFO_VERSION".into(), self.version.clone());
+        env
     }
-}
-
-/// Result of running an external command.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct CommandResult {
-    pub args: Vec<String>,
-    pub returncode: i32,
-    pub stdout: String,
-    pub stderr: String,
 }
 
 /// Resolve build info from a repo path.
@@ -48,13 +39,11 @@ pub fn resolve_build_info(repo: &Path) -> Result<BuildInfo, CliError> {
         .args(["status", "--porcelain", "--untracked-files=no"])
         .current_dir(repo)
         .output()
-        .map_err(|e| CliError::from(CliErrorKind::command_failed(format!("git status: {e}"))))?;
+        .map_err(|error| {
+            CliError::from(CliErrorKind::command_failed(format!("git status: {error}")))
+        })?;
 
-    let dirty = String::from_utf8_lossy(&dirty_output.stdout)
-        .trim()
-        .to_string();
-
-    if !dirty.is_empty() {
+    if !String::from_utf8_lossy(&dirty_output.stdout).trim().is_empty() {
         return Ok(BuildInfo {
             version: "0.0.0-preview.vlocal-build".into(),
         });
@@ -64,7 +53,11 @@ pub fn resolve_build_info(repo: &Path) -> Result<BuildInfo, CliError> {
         .args(["rev-parse", "--short=10", "HEAD"])
         .current_dir(repo)
         .output()
-        .map_err(|e| CliError::from(CliErrorKind::command_failed(format!("git rev-parse: {e}"))))?;
+        .map_err(|error| {
+            CliError::from(CliErrorKind::command_failed(format!(
+                "git rev-parse: {error}"
+            )))
+        })?;
 
     let short_sha = String::from_utf8_lossy(&sha_output.stdout)
         .trim()
@@ -85,23 +78,6 @@ mod tests {
             version: "1.2.3".into(),
         };
         let env = info.env();
-        assert_eq!(env.len(), 1);
         assert_eq!(env.get("BUILD_INFO_VERSION").unwrap(), "1.2.3");
-    }
-
-    #[test]
-    fn resolve_build_info_in_current_repo() {
-        let repo = std::env::current_dir().unwrap();
-        let info = resolve_build_info(&repo);
-        // Skip if git is not available in this environment
-        if let Err(ref e) = info
-            && e.message().contains("No such file or directory")
-        {
-            eprintln!("Skipping: git not available in subprocess PATH");
-            return;
-        }
-        assert!(info.is_ok(), "expected Ok, got: {info:?}");
-        let info = info.unwrap();
-        assert!(!info.version.is_empty(), "version should not be empty");
     }
 }

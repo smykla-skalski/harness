@@ -1,6 +1,7 @@
 mod docker;
 mod http;
 mod output_filter;
+mod result;
 mod runtime;
 
 pub(crate) use runtime::RUNTIME;
@@ -12,11 +13,13 @@ pub use docker::{
     extract_admin_token,
 };
 pub use http::{HttpMethod, cp_api_json, cp_api_text, wait_for_http};
+pub use result::CommandResult;
 pub(crate) use output_filter::filter_progress_line;
 
 use std::collections::HashMap;
 use std::path::Path;
 use std::process::{Command, Output, Stdio};
+use std::iter;
 use std::time::Duration;
 
 use tokio::io::{AsyncBufReadExt as _, AsyncReadExt as _};
@@ -24,8 +27,8 @@ use tokio::process::Command as TokioCommand;
 use tokio::time::sleep;
 use tracing::info;
 
-use crate::core_defs::{CommandResult, merge_env};
 use crate::errors::{CliError, CliErrorKind};
+use crate::infra::environment::merge_env;
 
 /// How long a subprocess can run without emitting a progress line before
 /// we print a heartbeat message.
@@ -165,7 +168,7 @@ pub(crate) fn run_command_inherited(args: &[&str], ok_exit_codes: &[i32]) -> Res
     let (program, cmd_args) = args
         .split_first()
         .ok_or_else(|| CliError::from(CliErrorKind::EmptyCommandArgs))?;
-    let merged = merge_env(None);
+    let merged = merge_env(iter::empty());
     let status = Command::new(program)
         .args(cmd_args)
         .envs(&merged)
@@ -189,7 +192,7 @@ fn build_tokio_command(
     cwd: Option<&Path>,
     env: Option<&HashMap<String, String>>,
 ) -> TokioCommand {
-    let merged = merge_env(env);
+    let merged = merge_env(env.into_iter().flat_map(|vars| vars.iter()));
     let mut cmd = TokioCommand::new(program);
     cmd.args(cmd_args).envs(&merged);
     if let Some(dir) = cwd {
