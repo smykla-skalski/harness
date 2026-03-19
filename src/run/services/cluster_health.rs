@@ -55,9 +55,9 @@ impl RunServices {
                         ClusterMemberHealthRecord {
                             name: member.name.as_str(),
                             role: member.role.as_str(),
-                            running: self.blocks.docker.as_ref().is_some_and(|docker| {
-                                docker.is_running(&container).unwrap_or(false)
-                            }),
+                            running: self
+                                .docker_if_available()
+                                .is_some_and(|docker| docker.is_running(&container).unwrap_or(false)),
                             container: Some(container),
                         }
                     })

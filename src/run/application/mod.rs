@@ -1,11 +1,11 @@
+pub(crate) mod dependencies;
+
 use std::borrow::Cow;
 use std::fmt;
 use std::path::Path;
 use std::path::PathBuf;
-use std::sync::Arc;
 
-use crate::errors::{CliError, CliErrorKind};
-use crate::infra::blocks::BlockRegistry;
+use crate::errors::CliError;
 use crate::infra::exec::{CommandResult, HttpMethod};
 use crate::infra::io::write_json_pretty;
 use crate::platform::cluster::ClusterSpec;
@@ -15,6 +15,8 @@ use crate::run::services::{
     ClusterHealthReport, ClusterStatusReport, RunServices, ServiceStatusRecord,
 };
 use crate::run::{PreparedSuiteArtifact, PreparedSuitePlan, RunStatus, SuiteSpec};
+
+use self::dependencies::RunDependencies;
 
 /// Application boundary for tracked-run use cases.
 pub struct RunApplication {
@@ -87,10 +89,7 @@ impl RunApplication {
     #[must_use]
     pub fn from_context(ctx: RunContext) -> Self {
         Self {
-            services: RunServices::from_context_with_blocks(
-                ctx,
-                Arc::new(BlockRegistry::production()),
-            ),
+            services: RunServices::from_context_with_dependencies(ctx, RunDependencies::production()),
         }
     }
 
@@ -260,10 +259,8 @@ impl RunApplication {
     /// # Errors
     /// Returns `CliError` when any requirement name is unknown.
     pub fn validate_requirement_names(&self) -> Result<(), CliError> {
-        Ok(self
-            .services
-            .blocks()
-            .validate_requirement_names(&self.metadata().requires)?)
+        self.services
+            .validate_requirement_names(&self.metadata().requires)
     }
 
     /// Capture the current cluster state, persist it, and update the run status.
@@ -334,11 +331,8 @@ impl RunApplication {
     /// # Errors
     /// Returns `CliError` when docker is unavailable or listing fails.
     pub fn list_managed_service_containers() -> Result<Vec<ServiceStatusRecord>, CliError> {
-        let blocks = BlockRegistry::production();
-        let docker = blocks
-            .docker
-            .as_deref()
-            .ok_or_else(|| CliErrorKind::missing_run_context_value("docker"))?;
+        let dependencies = RunDependencies::production();
+        let docker = dependencies.docker_required()?;
         let result = docker.list_formatted(
             &["--filter", "label=io.harness.service=true"],
             "{{.Names}}\t{{.Status}}",
@@ -362,11 +356,8 @@ impl RunApplication {
     /// # Errors
     /// Returns `CliError` when docker is unavailable or the removal fails.
     pub fn remove_managed_service_container(name: &str) -> Result<(), CliError> {
-        let blocks = BlockRegistry::production();
-        let docker = blocks
-            .docker
-            .as_deref()
-            .ok_or_else(|| CliErrorKind::missing_run_context_value("docker"))?;
+        let dependencies = RunDependencies::production();
+        let docker = dependencies.docker_required()?;
         docker.remove(name)?;
         Ok(())
     }

@@ -11,20 +11,20 @@ use std::fmt;
 use std::path::Path;
 #[cfg(test)]
 use std::path::PathBuf;
+#[cfg(test)]
 use std::sync::Arc;
 
 use rayon::prelude::*;
 use tracing::warn;
 
 use crate::errors::{CliError, CliErrorKind};
-use crate::infra::blocks::{BlockRegistry, ContainerRuntime};
-#[cfg(test)]
-use crate::infra::blocks::{FakeHttpClient, FakeProcessExecutor, HttpClient, ProcessExecutor};
+use crate::infra::blocks::ContainerRuntime;
 use crate::infra::exec::{self, HttpMethod};
 use crate::infra::io::write_json_pretty;
 use crate::platform::cluster::{ClusterSpec, Platform};
 use crate::platform::kubectl_validate::resolve_kubectl_validate_binary;
 use crate::platform::runtime::{ClusterRuntime, ControlPlaneAccess, XdsAccess};
+use crate::run::application::dependencies::RunDependencies;
 use crate::run::audit::write_run_status_with_audit;
 use crate::run::context::{
     NodeCheckRecord, NodeCheckSnapshot, PreflightArtifact, RunContext, RunLayout, RunMetadata,
@@ -51,14 +51,14 @@ pub use task_output::{tail_task_output, wait_for_task_output};
 /// Domain access layer for a tracked run.
 pub struct RunServices {
     ctx: RunContext,
-    blocks: Arc<BlockRegistry>,
+    dependencies: RunDependencies,
 }
 
 impl fmt::Debug for RunServices {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("RunServices")
             .field("ctx", &self.ctx)
-            .field("has_docker", &self.blocks.docker.is_some())
+            .field("has_docker", &self.dependencies.has_docker())
             .finish()
     }
 }
@@ -68,14 +68,13 @@ impl RunServices {
     ///
     #[must_use]
     pub fn from_context(ctx: RunContext) -> Self {
-        Self::from_context_with_blocks(ctx, Arc::new(BlockRegistry::production()))
+        Self::from_context_with_dependencies(ctx, RunDependencies::production())
     }
 
-    /// Build services from a loaded run context using the provided block
-    /// registry.
+    /// Build services from a loaded run context using the provided dependencies.
     ///
-    pub fn from_context_with_blocks(ctx: RunContext, blocks: Arc<BlockRegistry>) -> Self {
-        Self::with_blocks(ctx, blocks)
+    pub fn from_context_with_dependencies(ctx: RunContext, dependencies: RunDependencies) -> Self {
+        Self::with_dependencies(ctx, dependencies)
     }
 
     /// Build services from a run directory.
@@ -83,9 +82,9 @@ impl RunServices {
     /// # Errors
     /// Returns `CliError` if the run context cannot be loaded.
     pub fn from_run_dir(run_dir: &Path) -> Result<Self, CliError> {
-        Ok(Self::from_context_with_blocks(
+        Ok(Self::from_context_with_dependencies(
             RunContext::from_run_dir(run_dir)?,
-            Arc::new(BlockRegistry::production()),
+            RunDependencies::production(),
         ))
     }
 
@@ -97,29 +96,18 @@ impl RunServices {
         Ok(RunContext::from_current()?.map(Self::from_context))
     }
 
-    fn with_blocks(ctx: RunContext, blocks: Arc<BlockRegistry>) -> Self {
-        Self { ctx, blocks }
+    fn with_dependencies(ctx: RunContext, dependencies: RunDependencies) -> Self {
+        Self { ctx, dependencies }
     }
 
     #[cfg(test)]
     fn with_docker(ctx: RunContext, docker: Option<Arc<dyn ContainerRuntime>>) -> Self {
-        let process: Arc<dyn ProcessExecutor> = Arc::new(FakeProcessExecutor::new(vec![]));
-        let http: Arc<dyn HttpClient> = Arc::new(FakeHttpClient::new(vec![]));
-        let mut blocks = BlockRegistry::new(process, http);
-        if let Some(docker) = docker {
-            blocks = blocks.with_docker(docker);
-        }
-        Self::with_blocks(ctx, Arc::new(blocks))
+        Self::with_dependencies(ctx, RunDependencies::for_tests(docker))
     }
 
     #[must_use]
     pub fn context(&self) -> &RunContext {
         &self.ctx
-    }
-
-    #[must_use]
-    pub fn blocks(&self) -> &BlockRegistry {
-        self.blocks.as_ref()
     }
 
     #[must_use]
@@ -141,11 +129,20 @@ impl RunServices {
         self.ctx.status.as_mut()
     }
 
+    /// Validate suite-declared requirement names against active run support.
+    ///
+    /// # Errors
+    /// Returns `CliError` for unknown or unsupported requirements.
+    pub fn validate_requirement_names(&self, requirements: &[String]) -> Result<(), CliError> {
+        self.dependencies.validate_requirement_names(requirements)
+    }
+
     fn docker(&self) -> Result<&dyn ContainerRuntime, CliError> {
-        self.blocks
-            .docker
-            .as_deref()
-            .ok_or_else(|| CliErrorKind::missing_run_context_value("docker").into())
+        self.dependencies.docker_required()
+    }
+
+    fn docker_if_available(&self) -> Option<&dyn ContainerRuntime> {
+        self.dependencies.docker()
     }
 
     /// Return the persisted cluster spec.
