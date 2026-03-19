@@ -11,10 +11,12 @@ use std::collections::HashSet;
 use std::sync::LazyLock;
 
 use regex::Regex;
-use serde_json::Value;
 
 use self::emitter::{IssueBlueprint, IssueEmitter};
-use super::tool_result_text;
+use crate::observe::application::session_event::{
+    SessionContent, SessionContentBlock, parse_session_event,
+};
+use crate::observe::dump::tool_result_text;
 use super::types::{Issue, IssueCategory, MessageRole, ScanState, SourceTool};
 
 pub use tool_checks::check_tool_use_for_issues;
@@ -73,7 +75,7 @@ fn is_skill_injection(text: &str) -> bool {
 }
 
 /// Figure out which tool produced a `tool_result` block.
-fn resolve_source_tool(block: &Value, state: &ScanState) -> Option<SourceTool> {
+fn resolve_source_tool(block: &serde_json::Value, state: &ScanState) -> Option<SourceTool> {
     let tool_id = block["tool_use_id"].as_str()?;
     let record = state.last_tool_uses.get(tool_id)?;
     SourceTool::from_label(&record.name)
@@ -199,36 +201,29 @@ pub fn check_text_for_issues(
 ///
 /// Parses the JSON, dispatches to text/`tool_use` checkers, and deduplicates.
 pub fn classify_line(line_num: usize, raw: &str, state: &mut ScanState) -> Vec<Issue> {
-    let obj: Value = match serde_json::from_str(raw.trim()) {
-        Ok(v) => v,
-        Err(_) => return Vec::new(),
+    let Some(event) = parse_session_event(raw) else {
+        return Vec::new();
     };
 
     if state.session_start_timestamp.is_none()
-        && let Some(ts) = obj["timestamp"].as_str()
+        && let Some(ts) = &event.timestamp
     {
-        state.session_start_timestamp = Some(ts.to_string());
+        state.session_start_timestamp = Some(ts.clone());
     }
 
-    let message = &obj["message"];
-    if !message.is_object() {
-        return Vec::new();
-    }
-
-    let role_str = message["role"].as_str().unwrap_or("");
-    let Some(role) = MessageRole::from_label(role_str) else {
+    let Some(role) = MessageRole::from_label(&event.message.role) else {
         return Vec::new();
     };
-
-    let content = &message["content"];
     let mut issues = Vec::new();
 
-    if let Some(blocks) = content.as_array() {
-        classify_content_blocks(line_num, role, blocks, state, &mut issues);
-    } else if let Some(text) = content.as_str()
-        && text.len() > MIN_TEXT_LENGTH
-    {
-        issues.extend(check_text_for_issues(line_num, role, text, None, state));
+    match event.message.content {
+        SessionContent::Blocks(blocks) => {
+            classify_content_blocks(line_num, role, &blocks, state, &mut issues);
+        }
+        SessionContent::Text(text) if text.len() > MIN_TEXT_LENGTH => {
+            issues.extend(check_text_for_issues(line_num, role, &text, None, state));
+        }
+        SessionContent::Text(_) => {}
     }
 
     issues
@@ -238,30 +233,28 @@ pub fn classify_line(line_num: usize, raw: &str, state: &mut ScanState) -> Vec<I
 fn classify_content_blocks(
     line_num: usize,
     role: MessageRole,
-    blocks: &[Value],
+    blocks: &[SessionContentBlock],
     state: &mut ScanState,
     issues: &mut Vec<Issue>,
 ) {
     for block in blocks {
-        let block_type = block["type"].as_str().unwrap_or("");
-        match block_type {
-            "text" => {
-                let text = block["text"].as_str().unwrap_or("");
+        match block {
+            SessionContentBlock::Text(text) => {
                 if text.len() > MIN_TEXT_LENGTH {
                     issues.extend(check_text_for_issues(line_num, role, text, None, state));
                 }
             }
-            "tool_use" => {
+            SessionContentBlock::ToolUse(block) => {
                 issues.extend(check_tool_use_for_issues(line_num, block, state));
             }
-            "tool_result" => {
+            SessionContentBlock::ToolResult(block) => {
                 let text = tool_result_text(block);
                 if text.len() > MIN_TEXT_LENGTH {
                     let source = resolve_source_tool(block, state);
                     issues.extend(check_text_for_issues(line_num, role, &text, source, state));
                 }
             }
-            _ => {}
+            SessionContentBlock::Other => {}
         }
     }
 }
