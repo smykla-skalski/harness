@@ -4,11 +4,11 @@ use std::sync::OnceLock;
 
 use crate::errors::HookMessage;
 use crate::hooks::protocol::hook_result::HookResult;
+use crate::hooks::runner_policy::managed_cluster_binaries;
 use crate::hooks::runner_policy::{
     AdminEndpointHint, LegacyScript, PythonBinary, RunnerBinary, TaskOutputPattern,
     TrackedHarnessSubcommand,
 };
-use crate::infra::blocks::BlockRegistry;
 use crate::kernel::command_intent::{
     contains_subshell_pattern, is_env_assignment, is_shell_control_op, normalized_binary_name,
     semantic_harness_subcommand, semantic_harness_tail, significant_words,
@@ -16,7 +16,7 @@ use crate::kernel::command_intent::{
 
 fn denied_cluster_binaries() -> &'static BTreeSet<String> {
     static DENIED: OnceLock<BTreeSet<String>> = OnceLock::new();
-    DENIED.get_or_init(|| BlockRegistry::production().all_denied_binaries())
+    DENIED.get_or_init(managed_cluster_binaries)
 }
 
 fn is_denied_cluster_binary(name: &str) -> bool {
