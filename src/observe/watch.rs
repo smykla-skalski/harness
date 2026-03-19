@@ -13,7 +13,7 @@ use tracing::warn;
 use crate::errors::{CliError, CliErrorKind};
 use crate::infra::exec::RUNTIME;
 
-use super::ObserveFilterArgs;
+use super::application::ObserveFilter;
 use super::classifier;
 use super::output;
 use super::scan::apply_filters;
@@ -110,7 +110,7 @@ pub(super) fn execute_watch(
     session_id: &str,
     poll_interval: u64,
     timeout: u64,
-    filter: &ObserveFilterArgs,
+    filter: &ObserveFilter,
 ) -> Result<i32, CliError> {
     let path = session::find_session(session_id, filter.project_hint.as_deref())?;
     let from_line = super::scan::resolve_effective_from_line(filter, &path)?;

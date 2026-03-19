@@ -10,13 +10,13 @@ use crate::errors::{CliError, CliErrorKind};
 use crate::infra::io::{read_text, write_json_pretty};
 use crate::workspace::harness_data_root;
 
-use super::super::ObserveFilterArgs;
 use super::super::output;
 use super::super::scan;
 use super::super::session;
 use super::super::types::{
     self, FOCUS_PRESETS, IssueCategory, IssueCode, IssueSeverity, ObserverState,
 };
+use super::ObserveFilter;
 
 fn state_file_path(session_id: &str) -> PathBuf {
     let observe_dir = harness_data_root().join("observe");
@@ -175,10 +175,7 @@ pub(super) fn execute_status(
     Ok(0)
 }
 
-pub(super) fn execute_resume(
-    session_id: &str,
-    filter: &ObserveFilterArgs,
-) -> Result<i32, CliError> {
+pub(super) fn execute_resume(session_id: &str, filter: &ObserveFilter) -> Result<i32, CliError> {
     let state = load_observer_state(session_id)?;
     let mut resumed_filter = filter.clone();
     resumed_filter.from_line = state.cursor;

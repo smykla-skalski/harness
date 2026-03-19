@@ -486,10 +486,18 @@ fn observe_transport_stays_transport_only() {
     }
 
     let application = fs::read_to_string(root.join("src/observe/application/mod.rs")).unwrap();
-    assert!(
-        application.contains("pub(crate) fn execute("),
-        "src/observe/application/mod.rs should own observe execution dispatch"
-    );
+    for needle in ["pub(crate) fn execute(", "pub(crate) enum ObserveRequest"] {
+        assert!(
+            application.contains(needle),
+            "src/observe/application/mod.rs should own `{needle}`"
+        );
+    }
+    for needle in ["ObserveMode", "ObserveScanActionKind"] {
+        assert!(
+            !application.contains(needle),
+            "src/observe/application/mod.rs should not depend on transport enum `{needle}`"
+        );
+    }
 
     let maintenance =
         fs::read_to_string(root.join("src/observe/application/maintenance.rs")).unwrap();
