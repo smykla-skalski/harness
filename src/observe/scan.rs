@@ -6,7 +6,7 @@ use serde_json::json;
 
 use crate::errors::{CliError, CliErrorKind};
 
-use super::ObserveFilterArgs;
+use super::application::ObserveFilter;
 use super::classifier;
 use super::output;
 use super::session;
@@ -50,7 +50,7 @@ fn scan_with_limit(
 /// Apply focus/category filters, returning an error for invalid values.
 fn apply_category_filter(
     filtered: &mut Vec<Issue>,
-    filter: &ObserveFilterArgs,
+    filter: &ObserveFilter,
 ) -> Result<(), CliError> {
     if let Some(ref focus) = filter.focus {
         let Some(preset) = FocusPreset::from_label(focus) else {
@@ -128,7 +128,7 @@ fn apply_overrides_file(filtered: &mut Vec<Issue>, overrides_path: &str) -> Resu
 /// Apply filters to a list of issues, validating filter values.
 pub(super) fn apply_filters(
     issues: Vec<Issue>,
-    filter: &ObserveFilterArgs,
+    filter: &ObserveFilter,
 ) -> Result<Vec<Issue>, CliError> {
     let mut filtered = issues;
 
@@ -173,7 +173,7 @@ pub(super) fn apply_filters(
 
 /// Resolve the effective `from_line`, taking `--from` into account.
 pub(super) fn resolve_effective_from_line(
-    filter: &ObserveFilterArgs,
+    filter: &ObserveFilter,
     session_path: &Path,
 ) -> Result<usize, CliError> {
     if let Some(ref from_value) = filter.from {
@@ -233,7 +233,7 @@ pub(super) fn resolve_from(session_path: &Path, value: &str) -> Result<usize, Cl
 /// Resolve timestamp-based `--since` / `--until` to effective line bounds.
 fn resolve_effective_bounds(
     path: &Path,
-    filter: &ObserveFilterArgs,
+    filter: &ObserveFilter,
     from_line: usize,
 ) -> Result<(usize, Option<usize>), CliError> {
     let effective_from = if let Some(ref ts) = filter.since_timestamp {
@@ -252,12 +252,12 @@ fn resolve_effective_bounds(
 }
 
 /// Render scan results to stdout using the requested format.
-fn render_scan_output(filter: &ObserveFilterArgs, issues: &[Issue], last_line: usize) {
+fn render_scan_output(filter: &ObserveFilter, issues: &[Issue], last_line: usize) {
     render_scan_issues(filter, issues);
     render_scan_followups(filter, issues, last_line);
 }
 
-fn render_scan_issues(filter: &ObserveFilterArgs, issues: &[Issue]) {
+fn render_scan_issues(filter: &ObserveFilter, issues: &[Issue]) {
     match filter.format.as_deref().unwrap_or("") {
         "markdown" | "md" => println!("{}", output::render_markdown(issues)),
         "sarif" => println!("{}", output::render_sarif(issues)),
@@ -274,7 +274,7 @@ fn render_scan_issues(filter: &ObserveFilterArgs, issues: &[Issue]) {
     }
 }
 
-fn render_scan_followups(filter: &ObserveFilterArgs, issues: &[Issue], last_line: usize) {
+fn render_scan_followups(filter: &ObserveFilter, issues: &[Issue], last_line: usize) {
     if let Some(n) = filter.top_causes {
         println!("{}", output::render_top_causes(issues, n));
     }
@@ -284,7 +284,7 @@ fn render_scan_followups(filter: &ObserveFilterArgs, issues: &[Issue], last_line
 }
 
 /// Execute scan mode.
-pub(super) fn execute_scan(session_id: &str, filter: &ObserveFilterArgs) -> Result<i32, CliError> {
+pub(super) fn execute_scan(session_id: &str, filter: &ObserveFilter) -> Result<i32, CliError> {
     let path = session::find_session(session_id, filter.project_hint.as_deref())?;
     let from_line = resolve_effective_from_line(filter, &path)?;
 

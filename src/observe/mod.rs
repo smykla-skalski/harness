@@ -16,9 +16,14 @@ use clap::{Args, Subcommand, ValueEnum};
 use crate::app::command_context::{AppContext, Execute};
 use crate::errors::CliError;
 
+use self::application::{
+    ObserveActionKind, ObserveDumpRequest, ObserveFilter, ObserveRequest, ObserveScanRequest,
+    ObserveWatchRequest,
+};
+
 impl Execute for ObserveArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
-        application::execute(self.mode.clone())
+        application::execute(self.mode.clone().into_request())
     }
 }
 
@@ -174,6 +179,68 @@ pub enum ObserveMode {
     },
 }
 
+impl ObserveMode {
+    fn into_request(self) -> ObserveRequest {
+        match self {
+            Self::Scan {
+                session_id,
+                action,
+                issue_id,
+                since_line,
+                value,
+                range_a,
+                range_b,
+                codes,
+                filter,
+            } => ObserveRequest::Scan(ObserveScanRequest {
+                session_id,
+                action: action.map(Into::into),
+                issue_id,
+                since_line,
+                value,
+                range_a,
+                range_b,
+                codes,
+                filter: filter.into(),
+            }),
+            Self::Watch {
+                session_id,
+                poll_interval,
+                timeout,
+                filter,
+            } => ObserveRequest::Watch(ObserveWatchRequest {
+                session_id,
+                poll_interval,
+                timeout,
+                filter: filter.into(),
+            }),
+            Self::Dump {
+                session_id,
+                context_line,
+                context_window,
+                from_line,
+                to_line,
+                filter,
+                role,
+                tool_name,
+                raw_json,
+                project_hint,
+            } => ObserveRequest::Dump(ObserveDumpRequest {
+                session_id,
+                context_line,
+                context_window,
+                from_line,
+                to_line,
+                filter,
+                role,
+                tool_name,
+                raw_json,
+                project_hint,
+            }),
+        }
+    }
+}
+
 /// Arguments for `harness observe`.
 #[derive(Debug, Clone, Args)]
 pub struct ObserveArgs {
@@ -195,6 +262,50 @@ pub enum ObserveScanActionKind {
     Doctor,
     Mute,
     Unmute,
+}
+
+impl From<ObserveFilterArgs> for ObserveFilter {
+    fn from(value: ObserveFilterArgs) -> Self {
+        Self {
+            from_line: value.from_line,
+            from: value.from,
+            focus: value.focus,
+            project_hint: value.project_hint,
+            json: value.json,
+            summary: value.summary,
+            severity: value.severity,
+            category: value.category,
+            exclude: value.exclude,
+            fixable: value.fixable,
+            mute: value.mute,
+            until_line: value.until_line,
+            since_timestamp: value.since_timestamp,
+            until_timestamp: value.until_timestamp,
+            format: value.format,
+            overrides: value.overrides,
+            top_causes: value.top_causes,
+            output: value.output,
+            output_details: value.output_details,
+        }
+    }
+}
+
+impl From<ObserveScanActionKind> for ObserveActionKind {
+    fn from(value: ObserveScanActionKind) -> Self {
+        match value {
+            ObserveScanActionKind::Cycle => Self::Cycle,
+            ObserveScanActionKind::Status => Self::Status,
+            ObserveScanActionKind::Resume => Self::Resume,
+            ObserveScanActionKind::Verify => Self::Verify,
+            ObserveScanActionKind::ResolveFrom => Self::ResolveFrom,
+            ObserveScanActionKind::Compare => Self::Compare,
+            ObserveScanActionKind::ListCategories => Self::ListCategories,
+            ObserveScanActionKind::ListFocusPresets => Self::ListFocusPresets,
+            ObserveScanActionKind::Doctor => Self::Doctor,
+            ObserveScanActionKind::Mute => Self::Mute,
+            ObserveScanActionKind::Unmute => Self::Unmute,
+        }
+    }
 }
 
 /// Truncate text to at most `max_len` bytes at a valid UTF-8 char boundary.
@@ -234,6 +345,7 @@ mod tests {
     use std::io::Write;
     use std::path::{Path, PathBuf};
 
+    use super::application::ObserveFilter;
     use super::application::maintenance::{load_observer_state, save_observer_state};
     use super::types::{Issue, IssueCode, IssueSeverity, ObserverState};
     use super::{ObserveFilterArgs, classifier, output, redact_details, scan, types};
@@ -293,7 +405,7 @@ mod tests {
 
     #[test]
     fn filter_validation_unknown_severity() {
-        let filter = ObserveFilterArgs {
+        let filter: ObserveFilter = ObserveFilterArgs {
             from_line: 0,
             from: None,
             focus: None,
@@ -313,7 +425,8 @@ mod tests {
             since_timestamp: None,
             until_line: None,
             until_timestamp: None,
-        };
+        }
+        .into();
         let result = scan::apply_filters(Vec::new(), &filter);
         assert!(result.is_err());
         let err = result.unwrap_err();
@@ -322,7 +435,7 @@ mod tests {
 
     #[test]
     fn filter_validation_unknown_focus() {
-        let filter = ObserveFilterArgs {
+        let filter: ObserveFilter = ObserveFilterArgs {
             from_line: 0,
             from: None,
             focus: Some("invalid_preset".into()),
@@ -342,7 +455,8 @@ mod tests {
             since_timestamp: None,
             until_line: None,
             until_timestamp: None,
-        };
+        }
+        .into();
         let result = scan::apply_filters(Vec::new(), &filter);
         assert!(result.is_err());
     }
@@ -366,7 +480,7 @@ mod tests {
             fix_hint: None,
             evidence_excerpt: None,
         };
-        let filter = ObserveFilterArgs {
+        let filter: ObserveFilter = ObserveFilterArgs {
             from_line: 0,
             from: None,
             focus: None,
@@ -386,7 +500,8 @@ mod tests {
             since_timestamp: None,
             until_line: None,
             until_timestamp: None,
-        };
+        }
+        .into();
         let result = scan::apply_filters(vec![issue], &filter).unwrap();
         assert!(result.is_empty());
     }
@@ -717,7 +832,7 @@ mod tests {
             evidence_excerpt: None,
         };
 
-        let filter = ObserveFilterArgs {
+        let filter: ObserveFilter = ObserveFilterArgs {
             from_line: 0,
             from: None,
             focus: None,
@@ -737,7 +852,8 @@ mod tests {
             since_timestamp: None,
             until_line: None,
             until_timestamp: None,
-        };
+        }
+        .into();
 
         let result = scan::apply_filters(vec![hook_issue, build_issue], &filter).unwrap();
         // hook_denied_tool_call should be muted
