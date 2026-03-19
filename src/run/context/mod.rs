@@ -25,7 +25,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::errors::CliError;
 use crate::infra::io::append_markdown_row;
-use crate::platform::cluster::ClusterSpec;
+use crate::kernel::topology::ClusterSpec;
 
 /// Filesystem layout for a single run.
 ///
@@ -963,7 +963,7 @@ mod tests {
 
     #[test]
     fn run_context_loads_cluster_from_state_dir() {
-        use crate::platform::cluster::{ClusterSpec, Platform};
+        use crate::kernel::topology::{ClusterSpec, Platform};
 
         let tmp = tempfile::tempdir().unwrap();
         let run_dir = tmp.path().join("run-cluster");

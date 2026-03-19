@@ -12,7 +12,7 @@ use std::sync::PoisonError;
 // modify PATH serialize against each other (not just within this module).
 use super::helpers::ENV_LOCK;
 
-use harness::platform::cluster::{ClusterMode, ClusterSpec, HelmSetting, Platform};
+use harness::kernel::topology::{ClusterMode, ClusterSpec, HelmSetting, Platform};
 use harness::run::{KumactlArgs, KumactlCommand};
 use harness::setup::ClusterArgs;
 

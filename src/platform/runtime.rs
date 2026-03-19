@@ -3,7 +3,7 @@ use std::path::Path;
 
 use crate::errors::{CliError, CliErrorKind};
 use crate::infra::blocks::kuma::defaults;
-use crate::platform::cluster::{ClusterSpec, Platform};
+use crate::kernel::topology::{ClusterSpec, Platform};
 use crate::run::context::RunAggregate;
 
 /// Borrowed access details for the universal control plane API.
@@ -268,7 +268,7 @@ mod tests {
     use std::path::Path;
 
     use super::*;
-    use crate::platform::cluster::{ClusterMember, ClusterMode, HelmSetting};
+    use crate::kernel::topology::{ClusterMember, ClusterMode, HelmSetting};
 
     fn universal_spec() -> ClusterSpec {
         let mut spec = ClusterSpec::from_mode_with_platform(

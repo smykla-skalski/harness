@@ -1,7 +1,7 @@
 use std::path::Path;
 
 use crate::errors::CliError;
-use crate::platform::cluster::ClusterSpec;
+use crate::kernel::topology::ClusterSpec;
 use crate::platform::runtime::ClusterRuntime;
 use crate::run::RunStatus;
 use crate::run::prepared_suite::PreparedSuiteArtifact;

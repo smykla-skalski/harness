@@ -42,12 +42,62 @@ fn legacy_scatter_roots_are_gone() {
         "src/schema",
         "src/rules",
         "src/shell_parse.rs",
+        "src/platform/cluster",
     ] {
         assert!(
             !root.join(path).exists(),
             "legacy layout path should not exist anymore: {path}"
         );
     }
+}
+
+#[test]
+fn cluster_topology_is_owned_by_kernel() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    assert!(
+        root.join("src/kernel/topology.rs").exists(),
+        "kernel topology module should exist"
+    );
+
+    let platform_mod = fs::read_to_string(root.join("src/platform/mod.rs")).unwrap();
+    assert!(
+        !platform_mod.contains("pub mod cluster;"),
+        "src/platform/mod.rs should not publicly expose a cluster topology module"
+    );
+
+    let mut hits = Vec::new();
+    for path in [
+        "src/run/context/mod.rs",
+        "src/run/context/aggregate.rs",
+        "src/run/application/mod.rs",
+        "src/run/application/preflight.rs",
+        "src/run/application/inspection.rs",
+        "src/run/application/capture.rs",
+        "src/run/application/recording.rs",
+        "src/setup/services/cluster.rs",
+        "src/setup/capabilities.rs",
+        "src/setup/cluster/kubernetes.rs",
+        "src/setup/cluster/universal.rs",
+        "src/platform/runtime.rs",
+        "src/hooks/verify_bash.rs",
+        "tests/integration/cluster.rs",
+        "tests/integration/universal.rs",
+    ] {
+        let contents = fs::read_to_string(root.join(path)).unwrap();
+        if contents.contains("platform::cluster::") {
+            hits.push(format!("{path} still depends on platform::cluster"));
+        }
+        if contents.contains("kernel::topology::") {
+            continue;
+        }
+        hits.push(format!("{path} should depend on kernel::topology"));
+    }
+
+    assert!(
+        hits.is_empty(),
+        "generic cluster topology must be owned by kernel:\n{}",
+        hits.join("\n")
+    );
 }
 
 #[test]

@@ -14,7 +14,7 @@ use std::path::PathBuf;
 use crate::errors::{CliError, CliErrorKind};
 use crate::infra::blocks::ContainerRuntime;
 use crate::infra::exec::{self, HttpMethod};
-use crate::platform::cluster::ClusterSpec;
+use crate::kernel::topology::ClusterSpec;
 use crate::platform::runtime::{ClusterRuntime, ControlPlaneAccess, XdsAccess};
 use crate::run::RunStatus;
 use crate::run::application::dependencies::RunDependencies;

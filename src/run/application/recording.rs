@@ -9,7 +9,7 @@ use tracing::warn;
 use crate::errors::{CliError, CliErrorKind};
 use crate::infra::blocks::kuma::cli::primary_kumactl_dir;
 use crate::infra::io::{ensure_dir, write_text};
-use crate::platform::cluster::Platform;
+use crate::kernel::topology::Platform;
 use crate::run::context::RunLayout;
 use crate::run::services::RecordCommandRequest;
 use crate::run::workflow::{RunnerPhase, read_runner_state};
