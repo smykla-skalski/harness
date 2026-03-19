@@ -5,7 +5,9 @@ use crate::hooks::guard_bash::predicates::{
     has_denied_legacy_script, has_denied_runner_binary, has_python_inline, has_task_output_access,
     is_tracked_harness_command,
 };
-use crate::hooks::guard_bash::runner_guards::deny_author_suite_storage_mutation;
+use crate::hooks::guard_bash::runner_guards::{
+    deny_author_suite_storage_mutation, has_tracked_run_context,
+};
 use crate::hooks::protocol::result::NormalizedHookResult;
 use crate::hooks::registry::Guard;
 use crate::hooks::runner_policy::TaskOutputPattern;
@@ -65,12 +67,15 @@ fn check_runner(
     words: &[String],
     heads: &[String],
 ) -> Option<NormalizedHookResult> {
+    if !has_tracked_run_context(ctx) {
+        return None;
+    }
     // Task output access
     if has_task_output_access(words, ctx.command_text()) {
         return Some(deny_runner_flow(TaskOutputPattern::DENY_MESSAGE));
     }
     // Runner binary (gh, etc.)
-    if has_denied_runner_binary(heads) {
+    if has_tracked_run_context(ctx) && has_denied_runner_binary(heads) {
         return Some(deny_runner_flow(
             "suite runs must stay on the tracked run; \
              do not switch into CI or GitHub workflows",
@@ -127,9 +132,12 @@ fn check_author(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::hooks::protocol::payloads::HookEnvelopePayload;
+    use std::path::PathBuf;
 
-    fn ctx(skill: &str, command: &str) -> GuardContext {
+    use crate::hooks::protocol::payloads::HookEnvelopePayload;
+    use crate::run::workflow::{PreflightState, PreflightStatus, RunnerPhase, RunnerWorkflowState};
+
+    fn base_ctx(skill: &str, command: &str) -> GuardContext {
         GuardContext::from_test_envelope(
             skill,
             HookEnvelopePayload {
@@ -142,6 +150,34 @@ mod tests {
                 raw_keys: vec![],
             },
         )
+    }
+
+    fn active_runner_state() -> RunnerWorkflowState {
+        RunnerWorkflowState {
+            phase: RunnerPhase::Execution,
+            preflight: PreflightState {
+                status: PreflightStatus::Complete,
+            },
+            failure: None,
+            suite_fix: None,
+            updated_at: "2026-03-19T00:00:00Z".to_string(),
+            transition_count: 1,
+            last_event: Some("RunStarted".to_string()),
+            history: Vec::new(),
+        }
+    }
+
+    fn ctx(skill: &str, command: &str) -> GuardContext {
+        let mut ctx = base_ctx(skill, command);
+        if skill == "suite:run" {
+            ctx.run_dir = Some(PathBuf::from("/tmp/harness-test-run"));
+            ctx.runner_state = Some(active_runner_state());
+        }
+        ctx
+    }
+
+    fn ctx_without_run(skill: &str, command: &str) -> GuardContext {
+        base_ctx(skill, command)
     }
 
     #[test]
@@ -172,6 +208,20 @@ mod tests {
     fn runner_allows_python_version() {
         let guard = DeniedBinaryGuard::runner();
         let c = ctx("suite:run", "python3 --version");
+        assert!(guard.check(&c).is_none());
+    }
+
+    #[test]
+    fn runner_allows_gh_without_tracked_run() {
+        let guard = DeniedBinaryGuard::runner();
+        let c = ctx_without_run("suite:run", "gh run view 12345");
+        assert!(guard.check(&c).is_none());
+    }
+
+    #[test]
+    fn runner_allows_kubectl_without_tracked_run() {
+        let guard = DeniedBinaryGuard::runner();
+        let c = ctx_without_run("suite:run", "kubectl get pods");
         assert!(guard.check(&c).is_none());
     }
 
