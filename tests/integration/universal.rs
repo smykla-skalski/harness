@@ -13,7 +13,7 @@ use std::path::Path;
 
 use harness::platform::cluster::{ClusterMember, ClusterMode, ClusterSpec, HelmSetting, Platform};
 use harness::platform::compose::{self, GlobalTwoZonesConfig, ZoneConfig};
-use harness::run::commands::ValidateArgs;
+use harness::run::ValidateArgs;
 use harness::run::context::{CommandEnv, RunContext, RunLayout};
 
 use super::helpers::*;

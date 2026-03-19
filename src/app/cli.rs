@@ -4,7 +4,7 @@ use std::time::Duration;
 use clap::{Parser, Subcommand};
 
 use crate::app::command_context::{AppContext, Execute};
-use crate::authoring::commands::{
+use crate::authoring::{
     ApprovalBeginArgs, AuthoringBeginArgs, AuthoringResetArgs, AuthoringSaveArgs,
     AuthoringShowArgs, AuthoringValidateArgs,
 };
@@ -12,8 +12,8 @@ use crate::errors::CliError;
 use crate::hooks::{self, HookArgs};
 use crate::observe::ObserveArgs;
 #[cfg(test)]
-use crate::run::commands::{ApiArgs, KumactlArgs};
-use crate::run::commands::{
+use crate::run::{ApiArgs, KumactlArgs};
+use crate::run::{
     ApplyArgs, CaptureArgs, CloseoutArgs, ClusterCheckArgs, DiffArgs, EnvoyArgs, InitArgs,
     KumaArgs, LogsArgs, PreflightArgs, RecordArgs, ReportArgs, RestartNamespaceArgs,
     RunnerStateArgs, StatusArgs, TaskArgs, ValidateArgs,
@@ -441,7 +441,7 @@ mod tests {
                 command:
                     RunCommand::Envoy(EnvoyArgs {
                         cmd:
-                            crate::run::commands::EnvoyCommand::Capture {
+                            crate::run::EnvoyCommand::Capture {
                                 namespace,
                                 workload,
                                 label,
@@ -475,7 +475,7 @@ mod tests {
                 command:
                     RunCommand::Report(ReportArgs {
                         cmd:
-                            crate::run::commands::ReportCommand::Group {
+                            crate::run::ReportCommand::Group {
                                 group_id, status, ..
                             },
                     }),
@@ -565,8 +565,8 @@ mod tests {
             cli.command,
             Command::Run {
                 command: RunCommand::Kuma(KumaArgs {
-                    command: crate::run::commands::KumaCommand::Cli(KumactlArgs {
-                        cmd: crate::run::commands::KumactlCommand::Find { .. }
+                    command: crate::run::KumaCommand::Cli(KumactlArgs {
+                        cmd: crate::run::KumactlCommand::Find { .. }
                     })
                 })
             }
@@ -581,8 +581,8 @@ mod tests {
                 command:
                     RunCommand::Kuma(KumaArgs {
                         command:
-                            crate::run::commands::KumaCommand::Api(ApiArgs {
-                                method: crate::run::commands::ApiMethod::Get { path, .. },
+                            crate::run::KumaCommand::Api(ApiArgs {
+                                method: crate::run::ApiMethod::Get { path, .. },
                             }),
                     }),
             } => assert_eq!(path, "/zones"),

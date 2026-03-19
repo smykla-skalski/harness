@@ -7,8 +7,7 @@ use std::path::Path;
 
 use harness::run::RunContext;
 use harness::run::RunDirArgs;
-use harness::run::commands::{ReportArgs, ReportCommand};
-use harness::run::{RunReport, RunReportFrontmatter, Verdict};
+use harness::run::{ReportArgs, ReportCommand, RunReport, RunReportFrontmatter, Verdict};
 
 use super::super::helpers::*;
 

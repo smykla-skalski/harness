@@ -13,7 +13,7 @@ use std::sync::PoisonError;
 use super::helpers::ENV_LOCK;
 
 use harness::platform::cluster::{ClusterMode, ClusterSpec, HelmSetting, Platform};
-use harness::run::commands::{KumactlArgs, KumactlCommand};
+use harness::run::{KumactlArgs, KumactlCommand};
 use harness::setup::ClusterArgs;
 
 use super::helpers::*;

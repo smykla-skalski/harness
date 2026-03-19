@@ -1,5 +1,5 @@
 pub(crate) mod application;
-pub mod commands;
+pub(crate) mod commands;
 mod payload;
 mod rules;
 mod session;
@@ -7,6 +7,10 @@ mod validate;
 mod workflow;
 
 pub use application::{AuthoringApplication, AuthoringPayloadView};
+pub use commands::{
+    ApprovalBeginArgs, AuthoringBeginArgs, AuthoringResetArgs, AuthoringSaveArgs,
+    AuthoringShowArgs, AuthoringValidateArgs,
+};
 pub use payload::{
     CoverageGroup, CoverageSummary, DraftEditRequest, FileInventory, ProposalGroup,
     ProposalSummary, SchemaFact, SchemaSummary, VariantSignal, VariantSummary,

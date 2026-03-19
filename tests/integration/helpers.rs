@@ -6,11 +6,11 @@
 use std::sync::Mutex;
 
 use harness::app::cli::{self, AuthoringCommand, Command, RunCommand, SetupCommand};
-use harness::authoring::commands::{
+use harness::authoring::{
     ApprovalBeginArgs, AuthoringBeginArgs, AuthoringSaveArgs, AuthoringValidateArgs,
 };
 use harness::errors::CliError;
-use harness::run::commands::{
+use harness::run::{
     ApiArgs, ApplyArgs, CaptureArgs, CloseoutArgs, EnvoyArgs, KumaArgs, KumaCommand, KumactlArgs,
     PreflightArgs, RecordArgs, ReportArgs, ServiceArgs, ValidateArgs,
 };

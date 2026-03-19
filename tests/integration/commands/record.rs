@@ -11,16 +11,16 @@ use std::path::{Path, PathBuf};
 use std::sync::{Mutex, PoisonError};
 
 use harness::authoring;
-use harness::authoring::commands::{
+use harness::authoring::{
     ApprovalBeginArgs, AuthoringBeginArgs, AuthoringSaveArgs, AuthoringValidateArgs,
 };
 use harness::authoring::{AuthorPhase, read_author_state};
 use harness::run::RunDirArgs;
 use harness::run::Verdict;
-use harness::run::commands::{
+use harness::run::workflow::{self as runner_workflow, RunnerPhase};
+use harness::run::{
     CaptureArgs, CloseoutArgs, EnvoyArgs, EnvoyCommand, KumactlArgs, KumactlCommand, RecordArgs,
 };
-use harness::run::workflow::{self as runner_workflow, RunnerPhase};
 use harness::setup::GatewayArgs;
 use harness::workspace;
 
