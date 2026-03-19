@@ -286,22 +286,11 @@ impl RunApplication {
         docker.remove(name)?;
         Ok(())
     }
-
-    /// Finalize a completed group in the tracked run report.
-    ///
-    /// # Errors
-    /// Returns `CliError` on capture, persistence, or status-update failures.
-    pub fn finalize_group_report(
-        &mut self,
-        request: &GroupReportRequest<'_>,
-    ) -> Result<(), CliError> {
-        self.services.finalize_group_report(request).map(|_| ())
-    }
 }
 
 pub use crate::run::services::{
-    GroupReportRequest, RecordCommandRequest, ReportCheckOutcome, StartServiceRequest,
-    tail_task_output, wait_for_task_output,
+    RecordCommandRequest, StartServiceRequest, tail_task_output, wait_for_task_output,
 };
 pub(crate) use recording::record_command;
 pub(crate) use reporting::check_report_compactness;
+pub use reporting::{GroupReportRequest, ReportCheckOutcome};

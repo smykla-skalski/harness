@@ -338,6 +338,36 @@ fn run_services_do_not_own_service_lifecycle_application_flows() {
 }
 
 #[test]
+fn run_services_do_not_own_group_reporting_application_flow() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let reporting = fs::read_to_string(root.join("src/run/services/reporting.rs")).unwrap();
+
+    for needle in [
+        "impl RunServices",
+        "pub enum ReportCheckOutcome",
+        "pub struct GroupReportRequest",
+        "pub fn finalize_group_report(",
+    ] {
+        assert!(
+            !reporting.contains(needle),
+            "src/run/services/reporting.rs should not own application-facing reporting flow `{needle}`"
+        );
+    }
+
+    let application = fs::read_to_string(root.join("src/run/application/reporting.rs")).unwrap();
+    for needle in [
+        "pub enum ReportCheckOutcome",
+        "pub struct GroupReportRequest",
+        "pub fn finalize_group_report(",
+    ] {
+        assert!(
+            application.contains(needle),
+            "src/run/application/reporting.rs should own `{needle}`"
+        );
+    }
+}
+
+#[test]
 fn authoring_commands_depend_on_application_boundary() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
     let commands_root = root.join("src/authoring/commands");
