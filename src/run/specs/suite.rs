@@ -113,7 +113,6 @@ impl GroupSpec {
         let parsed = io::parse_frontmatter::<GroupFrontmatter>(&text, "group")?;
         let body = parsed.body;
 
-        // Check required sections in body
         let missing = GroupSection::missing_from(&body);
         if !missing.is_empty() {
             let labels: Vec<&str> = missing.iter().map(|s| s.as_str()).collect();

@@ -387,7 +387,7 @@ mod tests {
     #![allow(clippy::absolute_paths, clippy::cognitive_complexity)]
 
     use super::*;
-    use crate::schema::{RunCounts, RunStatus, Verdict};
+    use crate::run::{RunCounts, RunStatus, Verdict};
     use std::fs;
     use std::sync::Mutex;
 
@@ -669,7 +669,7 @@ mod tests {
         fs::write(&path, serde_json::to_string(&data).unwrap()).unwrap();
 
         let content = fs::read_to_string(&path).unwrap();
-        let status: crate::schema::RunStatus = serde_json::from_str(&content).unwrap();
+        let status: crate::run::RunStatus = serde_json::from_str(&content).unwrap();
 
         assert_eq!(status.last_state_capture, None);
         assert_eq!(status.counts, RunCounts::default());
@@ -702,7 +702,7 @@ mod tests {
             "notes": []
         });
 
-        let status: crate::schema::RunStatus = serde_json::from_value(data).unwrap();
+        let status: crate::run::RunStatus = serde_json::from_value(data).unwrap();
 
         assert_eq!(
             status.counts,
@@ -719,7 +719,7 @@ mod tests {
 
     #[test]
     fn executed_group_ids_empty_when_no_groups() {
-        let status = crate::schema::RunStatus {
+        let status = crate::run::RunStatus {
             executed_groups: vec![],
             ..sample_status()
         };

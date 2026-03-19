@@ -4,10 +4,10 @@ use std::path::PathBuf;
 use tracing::warn;
 
 use crate::errors::{CliError, CliErrorKind};
-use crate::run::report_policy::{REPORT_CODE_BLOCK_LIMIT, REPORT_LINE_LIMIT};
 use crate::run::audit::write_run_status_with_audit;
+use crate::run::report_policy::{REPORT_CODE_BLOCK_LIMIT, REPORT_LINE_LIMIT};
+use crate::run::{ExecutedGroupChange, GroupVerdict, RunReport, RunStatus};
 use crate::run::workflow::ensure_execution_phase;
-use crate::schema::{ExecutedGroupChange, GroupVerdict, RunReport, RunStatus};
 use crate::workspace::utc_now;
 
 use super::RunServices;
@@ -214,7 +214,7 @@ fn warn_if_capture_missing_with_state(run_status: &RunStatus, last_state_capture
 
 #[cfg(test)]
 mod tests {
-    use crate::schema::{ExecutedGroupRecord, RunCounts, Verdict};
+    use crate::run::{ExecutedGroupRecord, RunCounts, Verdict};
 
     use super::*;
 

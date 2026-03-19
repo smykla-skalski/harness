@@ -4,7 +4,7 @@
 
 use std::fs;
 
-use harness::schema::{
+use harness::run::{
     ExecutedGroupRecord, GroupSpec, GroupVerdict, RunCounts, RunStatus, SuiteSpec, Verdict,
 };
 
