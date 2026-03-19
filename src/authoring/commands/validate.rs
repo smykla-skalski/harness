@@ -1,9 +1,7 @@
-use std::path::{Path, PathBuf};
-
 use clap::Args;
 
 use crate::app::command_context::{AppContext, Execute};
-use crate::authoring::validate::{authoring_validation_repo_root, validate_suite_author_paths};
+use crate::authoring::application::AuthoringApplication;
 use crate::errors::CliError;
 
 impl Execute for AuthoringValidateArgs {
@@ -28,13 +26,7 @@ pub struct AuthoringValidateArgs {
 /// # Errors
 /// Returns `CliError` on failure.
 pub fn validate(paths: &[String], repo_root: Option<&str>) -> Result<i32, CliError> {
-    let path_refs: Vec<PathBuf> = paths.iter().map(PathBuf::from).collect();
-    let path_slices: Vec<&Path> = path_refs.iter().map(PathBuf::as_path).collect();
-
-    let root = authoring_validation_repo_root(repo_root, &path_slices)?;
-
-    let validated = validate_suite_author_paths(&path_slices, &root, false)?;
-
+    let validated = AuthoringApplication::validate_paths(paths, repo_root)?;
     for label in &validated {
         println!("{label}");
     }
