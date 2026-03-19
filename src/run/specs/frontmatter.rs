@@ -1,4 +1,6 @@
-use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
+
+use serde::{Deserialize, Deserializer, Serialize};
 
 use crate::errors::{CliError, CliErrorKind};
 
@@ -18,7 +20,7 @@ pub struct SuiteFrontmatter {
     pub scope: Option<String>,
     #[serde(default)]
     pub profiles: Vec<String>,
-    #[serde(default)]
+    #[serde(default, alias = "required_dependencies")]
     pub requires: Vec<String>,
     #[serde(default)]
     pub user_stories: Vec<String>,
@@ -26,11 +28,11 @@ pub struct SuiteFrontmatter {
     pub variant_decisions: Vec<String>,
     #[serde(default)]
     pub coverage_expectations: Vec<String>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_baseline_files")]
     pub baseline_files: Vec<String>,
     #[serde(default)]
     pub groups: Vec<String>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_skipped_groups")]
     pub skipped_groups: Vec<String>,
     #[serde(default)]
     pub keep_clusters: bool,
@@ -53,7 +55,7 @@ pub(crate) struct SuiteFrontmatterUnchecked {
     pub scope: Option<String>,
     #[serde(default)]
     pub profiles: Vec<String>,
-    #[serde(default)]
+    #[serde(default, alias = "required_dependencies")]
     pub requires: Vec<String>,
     #[serde(default)]
     pub user_stories: Vec<String>,
@@ -61,11 +63,11 @@ pub(crate) struct SuiteFrontmatterUnchecked {
     pub variant_decisions: Vec<String>,
     #[serde(default)]
     pub coverage_expectations: Vec<String>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_baseline_files")]
     pub baseline_files: Vec<String>,
     #[serde(default)]
     pub groups: Vec<String>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_skipped_groups")]
     pub skipped_groups: Vec<String>,
     #[serde(default)]
     pub keep_clusters: Option<bool>,
@@ -109,4 +111,54 @@ impl TryFrom<SuiteFrontmatterUnchecked> for SuiteFrontmatter {
             keep_clusters: raw.keep_clusters.expect("validated keep_clusters"),
         })
     }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(untagged)]
+enum BaselineFileEntry {
+    Path(String),
+    Structured { path: String },
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(untagged)]
+enum SkippedGroupEntry {
+    Label(String),
+    Structured(BTreeMap<String, String>),
+}
+
+fn deserialize_baseline_files<'de, D>(deserializer: D) -> Result<Vec<String>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    Option::<Vec<BaselineFileEntry>>::deserialize(deserializer).map(|entries| {
+        entries.map_or_else(Vec::new, |entries| {
+            entries
+                .into_iter()
+                .map(|entry| match entry {
+                    BaselineFileEntry::Path(path) | BaselineFileEntry::Structured { path } => path,
+                })
+                .collect()
+            })
+    })
+}
+
+fn deserialize_skipped_groups<'de, D>(deserializer: D) -> Result<Vec<String>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    Option::<Vec<SkippedGroupEntry>>::deserialize(deserializer).map(|entries| {
+        entries.map_or_else(Vec::new, |entries| {
+            entries
+                .into_iter()
+                .flat_map(|entry| match entry {
+                    SkippedGroupEntry::Label(label) => vec![label],
+                    SkippedGroupEntry::Structured(map) => map
+                        .into_iter()
+                        .map(|(group, reason)| format!("{group}: {reason}"))
+                        .collect(),
+                })
+                .collect()
+        })
+    })
 }

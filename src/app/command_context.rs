@@ -1,9 +1,7 @@
 use std::env;
 use std::path::PathBuf;
-use std::sync::Arc;
 
 use crate::errors::CliError;
-use crate::infra::blocks::BlockRegistry;
 
 /// Uniform command execution trait.
 ///
@@ -19,29 +17,15 @@ pub trait Execute {
 
 /// Shared runtime context for command execution.
 ///
-/// Carries the active block registry so command handlers can reuse the same
-/// concrete adapters chosen by the app wiring layer.
-#[derive(Clone, Debug)]
-pub struct AppContext {
-    blocks: Arc<BlockRegistry>,
-}
+/// This remains a thin app-layer handle. Domain commands should route through
+/// application boundaries instead of reaching into concrete adapters here.
+#[derive(Clone, Debug, Default)]
+pub struct AppContext;
 
 impl AppContext {
     #[must_use]
     pub fn production() -> Self {
-        Self {
-            blocks: Arc::new(BlockRegistry::production()),
-        }
-    }
-
-    #[must_use]
-    pub fn blocks(&self) -> &BlockRegistry {
-        self.blocks.as_ref()
-    }
-
-    #[must_use]
-    pub fn shared_blocks(&self) -> Arc<BlockRegistry> {
-        self.blocks.clone()
+        Self
     }
 }
 

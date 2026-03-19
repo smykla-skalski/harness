@@ -4,9 +4,9 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use crate::errors::CliError;
-use crate::infra::blocks::{BlockRegistry, ContainerRuntime};
-use crate::infra::exec::HttpMethod;
+use crate::errors::{CliError, CliErrorKind};
+use crate::infra::blocks::BlockRegistry;
+use crate::infra::exec::{CommandResult, HttpMethod};
 use crate::infra::io::write_json_pretty;
 use crate::platform::cluster::ClusterSpec;
 use crate::platform::runtime::{ClusterRuntime, ControlPlaneAccess, XdsAccess};
@@ -86,15 +86,11 @@ impl RunApplication {
     ///
     #[must_use]
     pub fn from_context(ctx: RunContext) -> Self {
-        Self::from_context_with_blocks(ctx, Arc::new(BlockRegistry::production()))
-    }
-
-    /// Build the application boundary from a loaded run context using the
-    /// provided adapters.
-    ///
-    pub fn from_context_with_blocks(ctx: RunContext, blocks: Arc<BlockRegistry>) -> Self {
         Self {
-            services: RunServices::from_context_with_blocks(ctx, blocks),
+            services: RunServices::from_context_with_blocks(
+                ctx,
+                Arc::new(BlockRegistry::production()),
+            ),
         }
     }
 
@@ -333,17 +329,70 @@ impl RunApplication {
         self.services.list_service_containers()
     }
 
+    /// List all managed service containers without requiring a tracked run.
+    ///
+    /// # Errors
+    /// Returns `CliError` when docker is unavailable or listing fails.
+    pub fn list_managed_service_containers() -> Result<Vec<ServiceStatusRecord>, CliError> {
+        let blocks = BlockRegistry::production();
+        let docker = blocks
+            .docker
+            .as_deref()
+            .ok_or_else(|| CliErrorKind::missing_run_context_value("docker"))?;
+        let result = docker.list_formatted(
+            &["--filter", "label=io.harness.service=true"],
+            "{{.Names}}\t{{.Status}}",
+        )?;
+        Ok(result
+            .stdout
+            .lines()
+            .filter(|line| !line.trim().is_empty())
+            .map(|line| {
+                let mut parts = line.splitn(2, '\t');
+                ServiceStatusRecord {
+                    name: parts.next().unwrap_or_default().to_string(),
+                    status: parts.next().unwrap_or_default().to_string(),
+                }
+            })
+            .collect())
+    }
+
+    /// Remove a managed service container by name without requiring a tracked run.
+    ///
+    /// # Errors
+    /// Returns `CliError` when docker is unavailable or the removal fails.
+    pub fn remove_managed_service_container(name: &str) -> Result<(), CliError> {
+        let blocks = BlockRegistry::production();
+        let docker = blocks
+            .docker
+            .as_deref()
+            .ok_or_else(|| CliErrorKind::missing_run_context_value("docker"))?;
+        docker.remove(name)?;
+        Ok(())
+    }
+
     /// Start a tracked universal service container and attach a Kuma dataplane.
     ///
     /// # Errors
     /// Returns `CliError` when the tracked run is missing universal access details
     /// or when container setup fails.
-    pub fn start_service(
+    pub fn start_service(&self, request: &StartServiceRequest<'_>) -> Result<(), CliError> {
+        self.services.start_service(request)
+    }
+
+    /// Read or stream logs for a tracked cluster container.
+    ///
+    /// Returns `None` when logs are streamed directly to the terminal.
+    ///
+    /// # Errors
+    /// Returns `CliError` on docker invocation failures.
+    pub fn service_logs(
         &self,
-        docker: &dyn ContainerRuntime,
-        request: &StartServiceRequest<'_>,
-    ) -> Result<(), CliError> {
-        self.services.start_service(docker, request)
+        name: &str,
+        tail: u32,
+        follow: bool,
+    ) -> Result<Option<CommandResult>, CliError> {
+        self.services.service_logs(name, tail, follow)
     }
 
     /// Finalize a completed group in the tracked run report.

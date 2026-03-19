@@ -2,15 +2,14 @@ use clap::Args;
 
 use crate::app::command_context::{AppContext, Execute};
 use crate::errors::{CliError, CliErrorKind};
-use crate::infra::blocks::ContainerRuntime;
-use crate::run::application::StartServiceRequest;
+use crate::run::application::{RunApplication, StartServiceRequest};
 use crate::run::args::RunDirArgs;
 
-use super::shared::resolve_run_application_with_blocks;
+use super::shared::resolve_run_application;
 
 impl Execute for ServiceArgs {
-    fn execute(&self, context: &AppContext) -> Result<i32, CliError> {
-        service(context, self)
+    fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
+        service(self)
     }
 }
 
@@ -49,27 +48,18 @@ pub struct ServiceArgs {
 ///
 /// # Errors
 /// Returns `CliError` on failure.
-pub fn service(ctx: &AppContext, args: &ServiceArgs) -> Result<i32, CliError> {
-    let docker = ctx
-        .blocks()
-        .docker
-        .as_deref()
-        .ok_or_else(|| CliErrorKind::missing_run_context_value("docker"))?;
+pub fn service(args: &ServiceArgs) -> Result<i32, CliError> {
     match args.action.as_str() {
-        "up" => service_up(ctx, args, docker),
-        "down" => service_down(args.name.as_deref(), docker),
-        "list" => service_list(ctx, &args.run_dir, docker),
+        "up" => service_up(args),
+        "down" => service_down(args.name.as_deref()),
+        "list" => service_list(&args.run_dir),
         _ => Err(
             CliErrorKind::usage_error(format!("unknown service action: {}", args.action)).into(),
         ),
     }
 }
 
-fn service_up(
-    ctx: &AppContext,
-    args: &ServiceArgs,
-    docker: &dyn ContainerRuntime,
-) -> Result<i32, CliError> {
+fn service_up(args: &ServiceArgs) -> Result<i32, CliError> {
     let name = args
         .name
         .as_deref()
@@ -77,46 +67,37 @@ fn service_up(
     let port = args
         .port
         .ok_or_else(|| CliErrorKind::usage_error("service port is required"))?;
-    let run = resolve_run_application_with_blocks(&args.run_dir, ctx.shared_blocks())?;
-    run.start_service(
-        docker,
-        &StartServiceRequest {
-            name,
-            image: args.image.as_deref(),
-            port,
-            mesh: &args.mesh,
-            transparent_proxy: args.transparent_proxy,
-            timeout: args.timeout,
-        },
-    )?;
+    let run = resolve_run_application(&args.run_dir)?;
+    run.start_service(&StartServiceRequest {
+        name,
+        image: args.image.as_deref(),
+        port,
+        mesh: &args.mesh,
+        transparent_proxy: args.transparent_proxy,
+        timeout: args.timeout,
+    })?;
     println!("{name}");
     Ok(0)
 }
 
-fn service_down(name: Option<&str>, docker: &dyn ContainerRuntime) -> Result<i32, CliError> {
+fn service_down(name: Option<&str>) -> Result<i32, CliError> {
     let name = name.ok_or_else(|| CliErrorKind::usage_error("service name is required"))?;
-    docker.remove(name)?;
+    RunApplication::remove_managed_service_container(name)?;
     println!("{name} removed");
     Ok(0)
 }
 
-fn service_list(
-    ctx: &AppContext,
-    run_dir_args: &RunDirArgs,
-    docker: &dyn ContainerRuntime,
-) -> Result<i32, CliError> {
-    if let Ok(run) = resolve_run_application_with_blocks(run_dir_args, ctx.shared_blocks()) {
+fn service_list(run_dir_args: &RunDirArgs) -> Result<i32, CliError> {
+    if let Ok(run) = resolve_run_application(run_dir_args) {
         for row in run.list_service_containers()? {
             println!("{}\t{}", row.name, row.status);
         }
         return Ok(0);
     }
 
-    let result = docker.list_formatted(
-        &["--filter", "label=io.harness.service=true"],
-        "{{.Names}}\t{{.Status}}",
-    )?;
-    print!("{}", result.stdout);
+    for row in RunApplication::list_managed_service_containers()? {
+        println!("{}\t{}", row.name, row.status);
+    }
     Ok(0)
 }
 
