@@ -247,7 +247,13 @@ mod tests {
                 assert!(debug_path.exists(), "debug file should exist");
 
                 let content = stdfs::read_to_string(&debug_path).unwrap();
-                let line: serde_json::Value = serde_json::from_str(content.trim()).unwrap();
+                let line: serde_json::Value = serde_json::from_str(
+                    content
+                        .lines()
+                        .last()
+                        .expect("debug file should contain at least one JSONL line"),
+                )
+                .unwrap();
                 assert_eq!(line["hook_name"], "guard-bash");
                 assert_eq!(line["exit_code"], 2);
                 assert_eq!(line["outcome"], "error");

@@ -1,7 +1,8 @@
-use std::env;
-use std::fs;
 use std::path::PathBuf;
 
+use walkdir::WalkDir;
+
+use crate::core_defs::dirs_home;
 use crate::errors::{CliError, CliErrorKind};
 
 /// Locate a session JSONL file under `~/.claude/projects/*/`.
@@ -13,34 +14,43 @@ use crate::errors::{CliError, CliErrorKind};
 /// # Errors
 /// Returns `SessionNotFound` when the session file cannot be located.
 pub fn find_session(session_id: &str, project_hint: Option<&str>) -> Result<PathBuf, CliError> {
-    let home =
-        env::var("HOME").map_err(|_| CliErrorKind::session_not_found(session_id.to_string()))?;
-    let claude_dir = PathBuf::from(home).join(".claude").join("projects");
+    let claude_dir = dirs_home().join(".claude").join("projects");
 
     if !claude_dir.is_dir() {
         return Err(CliErrorKind::session_not_found(session_id.to_string()).into());
     }
 
     let mut candidates = Vec::new();
+    let session_file_name = format!("{session_id}.jsonl");
 
-    let entries = fs::read_dir(&claude_dir)
-        .map_err(|_| CliErrorKind::session_not_found(session_id.to_string()))?;
-
-    for entry in entries.flatten() {
-        let path = entry.path();
-        if !path.is_dir() {
+    for entry in WalkDir::new(&claude_dir)
+        .min_depth(2)
+        .max_depth(2)
+        .sort_by_file_name()
+    {
+        let Ok(entry) = entry else {
+            continue;
+        };
+        if !entry.file_type().is_file() {
             continue;
         }
+        let path = entry.path();
+        if path.file_name().and_then(|name| name.to_str()) != Some(session_file_name.as_str()) {
+            continue;
+        }
+        let Some(project_dir) = path.parent() else {
+            continue;
+        };
         if let Some(hint) = project_hint {
-            let dir_name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
+            let dir_name = project_dir
+                .file_name()
+                .and_then(|n| n.to_str())
+                .unwrap_or("");
             if !dir_name.contains(hint) {
                 continue;
             }
         }
-        let candidate = path.join(format!("{session_id}.jsonl"));
-        if candidate.exists() {
-            candidates.push(candidate);
-        }
+        candidates.push(path.to_path_buf());
     }
 
     if candidates.is_empty() {
@@ -71,6 +81,8 @@ pub fn find_session(session_id: &str, project_hint: Option<&str>) -> Result<Path
 
 #[cfg(test)]
 mod tests {
+    use std::fs;
+
     use super::*;
 
     #[test]

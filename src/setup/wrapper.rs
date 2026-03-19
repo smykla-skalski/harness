@@ -4,6 +4,8 @@ use std::io;
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 
+use walkdir::WalkDir;
+
 use crate::core_defs::dirs_home;
 use crate::errors::{CliError, CliErrorKind};
 use crate::hooks::adapters::{HookAgent, HookRegistration, adapter_for};
@@ -489,13 +491,20 @@ fn sync_plugin_cache(plugin_dir: &Path, home: &Path) {
 /// any file whose content differs. Creates subdirectories as needed.
 fn sync_directory(source: &Path, target: &Path) -> io::Result<()> {
     fs::create_dir_all(target)?;
-    for entry in fs::read_dir(source)? {
-        let entry = entry?;
-        let file_type = entry.file_type()?;
-        let dest = target.join(entry.file_name());
-        if file_type.is_dir() {
-            sync_directory(&entry.path(), &dest)?;
-        } else if file_type.is_file() {
+    for entry in WalkDir::new(source).min_depth(1).sort_by_file_name() {
+        let entry = entry.map_err(io::Error::other)?;
+        let rel = entry
+            .path()
+            .strip_prefix(source)
+            .map_err(io::Error::other)?;
+        let dest = target.join(rel);
+
+        if entry.file_type().is_dir() {
+            fs::create_dir_all(&dest)?;
+        } else if entry.file_type().is_file() {
+            if let Some(parent) = dest.parent() {
+                fs::create_dir_all(parent)?;
+            }
             let source_content = fs::read(entry.path())?;
             let needs_write = if let Ok(existing) = fs::read(&dest) {
                 existing != source_content
