@@ -1,19 +1,19 @@
 use std::path::Path;
 
 use crate::errors::HookMessage;
-use crate::hooks::protocol::context::GuardContext as HookContext;
+use crate::hooks::application::GuardContext as HookContext;
 use crate::hooks::protocol::hook_result::HookResult;
 use crate::hooks::runner_policy::{
     ControlFileMutationBinary, ControlFileReadBinary, MakeTargetPrefix, ScriptInterpreter,
     SuiteMutationBinary, TaskOutputPattern, TrackedHarnessSubcommand,
 };
-use crate::kernel::run_surface::RunFile;
-use crate::run::workflow::{RunnerPhase, RunnerWorkflowState};
 use crate::kernel::command_intent::{
     command_heads, is_shell_chain_op, is_shell_flow_word, is_shell_redirect_op,
     normalized_binary_name, path_like_words, semantic_harness_subcommand, semantic_harness_tail,
     significant_words,
 };
+use crate::kernel::run_surface::RunFile;
+use crate::run::workflow::{RunnerPhase, RunnerWorkflowState};
 
 use super::predicates::{
     allows_wrapped_envoy_admin, deny_python, deny_runner_flow, has_admin_endpoint_hint,

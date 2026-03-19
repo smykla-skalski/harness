@@ -1,10 +1,10 @@
 use crate::authoring::workflow::{ApprovalMode, ReviewGate, can_request_gate};
 use crate::errors::{CliError, HookMessage};
-use crate::hooks::protocol::context::GuardContext as HookContext;
+use crate::hooks::application::GuardContext as HookContext;
 use crate::hooks::protocol::hook_result::HookResult;
 use crate::hooks::protocol::payloads::AskUserQuestionPrompt;
-use crate::platform::kubectl_validate::kubectl_validate_prompt_required;
 use crate::hooks::runner_policy as runner_rules;
+use crate::platform::kubectl_validate::kubectl_validate_prompt_required;
 use crate::run::workflow::{RunnerPhase, RunnerWorkflowState};
 
 /// Execute the guard-question hook.

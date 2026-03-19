@@ -7,11 +7,13 @@ use crate::kernel::run_surface::RunFile;
 use crate::kernel::skills::SKILL_NAMES;
 
 use self::adapters::{HookAgent, adapter_for};
-use self::protocol::context::{GuardContext, NormalizedEvent};
+use self::application::GuardContext;
+use self::protocol::context::NormalizedEvent;
 use self::protocol::hook_result::HookResult;
 use self::protocol::result::NormalizedHookResult;
 use self::registry::{Hook, HookEngine};
 
+pub mod application;
 pub mod debug;
 pub mod protocol;
 pub mod runner_policy;

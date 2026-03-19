@@ -131,7 +131,7 @@ mod tests {
     use std::path::Path;
 
     use super::*;
-    use crate::hooks::protocol::context::GuardContext;
+    use crate::hooks::application::GuardContext;
 
     #[test]
     fn envelope_from_str_parses() {

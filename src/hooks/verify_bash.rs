@@ -4,7 +4,7 @@ use std::{fs, io};
 use tracing::warn;
 
 use crate::errors::{CliError, HookMessage};
-use crate::hooks::protocol::context::GuardContext as HookContext;
+use crate::hooks::application::GuardContext as HookContext;
 use crate::hooks::protocol::hook_result::HookResult;
 use crate::platform::cluster::ClusterMode;
 use crate::run::context::RunContext;
@@ -56,9 +56,7 @@ pub fn execute(ctx: &HookContext) -> Result<HookResult, CliError> {
 
 /// Extract the harness subcommand, words, and run context from the hook
 /// context. Returns `None` when this hook should allow without further checks.
-fn extract_harness_context(
-    ctx: &HookContext,
-) -> Result<Option<HarnessAppContext<'_>>, CliError> {
+fn extract_harness_context(ctx: &HookContext) -> Result<Option<HarnessAppContext<'_>>, CliError> {
     if !ctx.skill_active || !ctx.is_suite_runner() {
         return Ok(None);
     }

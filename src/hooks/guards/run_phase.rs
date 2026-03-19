@@ -1,5 +1,5 @@
+use crate::hooks::application::GuardContext;
 use crate::hooks::guard_bash::runner_guards::guard_runner_phase;
-use crate::hooks::protocol::context::GuardContext;
 use crate::hooks::protocol::result::NormalizedHookResult;
 use crate::hooks::registry::Guard;
 

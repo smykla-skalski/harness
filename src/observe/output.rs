@@ -213,7 +213,7 @@ pub fn render_sarif(issues: &[Issue]) -> String {
             "tool": {
                 "driver": {
                     "name": "harness-observe",
-                    "version": "5.0.2",
+                    "version": "5.1.0",
                     "informationUri": "https://github.com/smykla-skalski/harness",
                 }
             },

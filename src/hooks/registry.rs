@@ -1,6 +1,7 @@
 use crate::errors::CliError;
+use crate::hooks::application::GuardContext;
 use crate::hooks::effects::{HookOutcome, apply_effects};
-use crate::hooks::protocol::context::{GuardContext, NormalizedHookContext};
+use crate::hooks::protocol::context::NormalizedHookContext;
 use crate::hooks::protocol::result::NormalizedHookResult;
 
 use super::HookType;

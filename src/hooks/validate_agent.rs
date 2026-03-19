@@ -4,7 +4,7 @@ use std::sync::LazyLock;
 use regex::Regex;
 
 use crate::errors::{CliError, HookMessage};
-use crate::hooks::protocol::context::GuardContext as HookContext;
+use crate::hooks::application::GuardContext as HookContext;
 use crate::hooks::protocol::hook_result::HookResult;
 use crate::hooks::runner_policy::{self as runner_rules, PreflightReply};
 use crate::run::workflow::RunnerPhase;

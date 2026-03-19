@@ -12,12 +12,12 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
 
-use harness::hooks::context::GuardContext;
+use harness::hooks::application::GuardContext;
 use harness::hooks::hook_result::{Decision, HookResult};
 use harness::hooks::payloads::{AskUserQuestionOption, AskUserQuestionPrompt, HookEnvelopePayload};
 use harness::run::workflow as runner_workflow;
-use harness::run::{RunLayout, RunMetadata};
 use harness::run::{RunCounts, RunStatus, Verdict};
+use harness::run::{RunLayout, RunMetadata};
 use jsonschema::{Registry, Resource, Validator, options as jsonschema_options};
 use serde_json::{Number as JsonNumber, Value as JsonValue};
 

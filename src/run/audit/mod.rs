@@ -15,10 +15,10 @@ use serde::Serialize;
 use sha2::{Digest, Sha256};
 
 use crate::errors::{CliError, CliErrorKind, io_for};
-use crate::hooks::protocol::context::GuardContext as HookContext;
+use crate::hooks::application::GuardContext as HookContext;
 use crate::infra::io::{ensure_dir, write_text};
-use crate::run::context::RunLayout;
 use crate::run::RunStatus;
+use crate::run::context::RunLayout;
 use crate::run::workflow::{RunnerPhase, RunnerWorkflowState};
 use crate::workspace::utc_now;
 
@@ -286,8 +286,8 @@ fn append_jsonl_line(path: &Path, line: &str) -> Result<(), CliError> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::run::{RunCounts, Verdict};
     use crate::run::workflow::{PreflightState, PreflightStatus};
+    use crate::run::{RunCounts, Verdict};
 
     use summarize::summarize_answers;
 

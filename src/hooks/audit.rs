@@ -1,5 +1,5 @@
 use crate::errors::CliError;
-use crate::hooks::protocol::context::GuardContext as HookContext;
+use crate::hooks::application::GuardContext as HookContext;
 use crate::run::audit::build_hook_audit_request;
 
 use super::effects::{HookEffect, HookOutcome};
@@ -34,7 +34,7 @@ mod tests {
 
     use harness_testkit::RunDirBuilder;
 
-    use crate::hooks::protocol::context::GuardContext as HookContext;
+    use crate::hooks::application::GuardContext as HookContext;
     use crate::hooks::protocol::hook_result::Decision;
     use crate::hooks::protocol::payloads::HookEnvelopePayload;
     use crate::run::context::RunContext;

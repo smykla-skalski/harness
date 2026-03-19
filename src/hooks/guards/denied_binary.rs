@@ -1,11 +1,11 @@
 use crate::errors::HookMessage;
+use crate::hooks::application::GuardContext;
 use crate::hooks::guard_bash::predicates::{
     deny_python, has_denied_cluster_binary, has_denied_cluster_binary_anywhere,
     has_denied_legacy_script, has_denied_runner_binary, has_python_inline, has_task_output_access,
     is_tracked_harness_command,
 };
 use crate::hooks::guard_bash::runner_guards::deny_author_suite_storage_mutation;
-use crate::hooks::protocol::context::GuardContext;
 use crate::hooks::protocol::result::NormalizedHookResult;
 use crate::hooks::registry::Guard;
 use crate::hooks::runner_policy::TaskOutputPattern;
