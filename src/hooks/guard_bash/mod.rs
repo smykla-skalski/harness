@@ -233,7 +233,7 @@ mod tests {
     fn denies_rm_rf_suite_dir_for_suite_author() {
         let c = ctx(
             "suite:new",
-            "rm -rf ~/.local/share/kuma/suites/motb-compliance",
+            "rm -rf ~/.local/share/harness/suites/motb-compliance",
         );
         let r = execute(&c).unwrap();
         assert_eq!(r.decision, Decision::Deny);
