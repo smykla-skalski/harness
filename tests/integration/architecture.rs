@@ -459,6 +459,61 @@ fn authoring_commands_depend_on_application_boundary() {
 }
 
 #[test]
+fn authoring_exposes_a_facade_instead_of_public_internal_modules() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let authoring_mod = fs::read_to_string(root.join("src/authoring/mod.rs")).unwrap();
+
+    for needle in ["pub mod rules;", "pub mod validate;", "pub mod workflow;"] {
+        assert!(
+            !authoring_mod.contains(needle),
+            "src/authoring/mod.rs should not publicly expose internal module `{needle}`"
+        );
+    }
+
+    for needle in [
+        "pub use workflow::{",
+        "pub use session::{",
+        "pub use validate::{",
+        "pub use rules::{",
+    ] {
+        assert!(
+            authoring_mod.contains(needle),
+            "src/authoring/mod.rs should expose the authoring facade via `{needle}`"
+        );
+    }
+
+    let mut hits = Vec::new();
+    for path in [
+        "src/hooks/application/context.rs",
+        "src/hooks/guard_question.rs",
+        "src/hooks/guard_stop.rs",
+        "src/hooks/guard_write.rs",
+        "tests/integration/commands/record.rs",
+    ] {
+        let contents = fs::read_to_string(root.join(path)).unwrap();
+        for needle in [
+            "crate::authoring::workflow::",
+            "crate::authoring::validate::",
+            "crate::authoring::session::",
+            "crate::authoring::rules::",
+            "harness::authoring::workflow::",
+        ] {
+            if contents.contains(needle) {
+                hits.push(format!(
+                    "{path} still depends on authoring internals via `{needle}`"
+                ));
+            }
+        }
+    }
+
+    assert!(
+        hits.is_empty(),
+        "authoring callers should depend on the root facade instead of internal modules:\n{}",
+        hits.join("\n")
+    );
+}
+
+#[test]
 fn observe_transport_stays_transport_only() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
     let transport = fs::read_to_string(root.join("src/observe/mod.rs")).unwrap();

@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use crate::authoring::workflow::{self, can_write};
+use crate::authoring::{can_write, suite_author_path_allowed};
 use crate::errors::{CliError, HookMessage};
 use crate::hooks::application::GuardContext as HookContext;
 use crate::hooks::protocol::hook_result::HookResult;
@@ -43,7 +43,7 @@ fn guard_suite_author(ctx: &HookContext, paths: &[&Path]) -> HookResult {
             if !norm.starts_with(sdn) {
                 continue;
             }
-            if !workflow::suite_author_path_allowed(&norm, sdn) {
+            if !suite_author_path_allowed(&norm, sdn) {
                 return HookMessage::write_outside_suite(raw_path.display().to_string())
                     .into_result();
             }

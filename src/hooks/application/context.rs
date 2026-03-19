@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 use serde_json::Value;
 use tracing::warn;
 
-use crate::authoring::workflow::{self as author_workflow, AuthorWorkflowState};
+use crate::authoring::{AuthorWorkflowState, read_author_state};
 use crate::errors::{CliError, CliErrorKind};
 use crate::hooks::protocol::context::{
     AgentContext, NormalizedEvent, NormalizedHookContext, RawPayload, SessionContext, SkillContext,
@@ -166,7 +166,7 @@ impl HydratedHookState {
         if !skill.is_author {
             return;
         }
-        match author_workflow::read_author_state() {
+        match read_author_state() {
             Ok(author_state) => self.author_state = author_state,
             Err(error) => warn!(%error, "failed to load author state"),
         }

@@ -14,7 +14,7 @@ use harness::authoring;
 use harness::authoring::commands::{
     ApprovalBeginArgs, AuthoringBeginArgs, AuthoringSaveArgs, AuthoringValidateArgs,
 };
-use harness::authoring::workflow::{self as author_workflow, AuthorPhase};
+use harness::authoring::{AuthorPhase, read_author_state};
 use harness::run::RunDirArgs;
 use harness::run::Verdict;
 use harness::run::commands::{
@@ -537,7 +537,7 @@ fn approval_begin_initializes_interactive_state() {
     .execute();
     assert!(result.is_ok(), "approval_begin should succeed: {result:?}");
 
-    let state = author_workflow::read_author_state().unwrap().unwrap();
+    let state = read_author_state().unwrap().unwrap();
     assert_eq!(state.phase, AuthorPhase::Discovery);
 
     env::set_current_dir(&prev_dir).unwrap();
