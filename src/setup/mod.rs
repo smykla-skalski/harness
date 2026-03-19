@@ -7,7 +7,7 @@ mod kuma;
 mod pre_compact;
 mod services;
 mod session;
-pub mod wrapper;
+pub(crate) mod wrapper;
 
 pub use bootstrap::BootstrapArgs;
 pub use bootstrap::bootstrap;

@@ -2,7 +2,7 @@ use clap::Args;
 
 use crate::app::command_context::{AppContext, Execute, resolve_project_dir};
 use crate::errors::CliError;
-use crate::hooks::session::SessionStartHookOutput;
+use crate::hooks::SessionStartHookOutput;
 use crate::setup::services::session as session_service;
 
 impl Execute for SessionStartArgs {

@@ -4,11 +4,13 @@ mod state;
 mod tracking;
 
 pub use issue_code::{IssueCode, compute_issue_id};
-pub use presets::{FOCUS_PRESETS, FocusPreset, FocusPresetDef};
-pub use state::{
-    ActiveWorker, AttemptResult, CycleRecord, Issue, IssueAttempt, ObserverState, OpenIssue,
-};
-pub use tracking::{OccurrenceTracker, ScanState, ToolUseRecord, ToolUseWindow};
+pub use presets::{FOCUS_PRESETS, FocusPreset};
+#[cfg(test)]
+pub use state::ActiveWorker;
+pub use state::{CycleRecord, Issue, ObserverState, OpenIssue};
+#[cfg(test)]
+pub use tracking::ToolUseWindow;
+pub use tracking::{OccurrenceTracker, ScanState, ToolUseRecord};
 
 use std::fmt;
 
@@ -319,7 +321,7 @@ mod tests {
     #[test]
     fn issue_serializes_to_json() {
         let issue = Issue {
-            issue_id: "abc123def456".into(),
+            id: "abc123def456".into(),
             line: 42,
             code: IssueCode::BuildOrLintFailure,
             category: IssueCategory::BuildError,
@@ -492,16 +494,16 @@ mod tests {
 
     #[test]
     fn compute_issue_id_deterministic() {
-        let id1 = compute_issue_id(&IssueCode::BuildOrLintFailure, "build_or_lint_failure");
-        let id2 = compute_issue_id(&IssueCode::BuildOrLintFailure, "build_or_lint_failure");
+        let id1 = compute_issue_id(IssueCode::BuildOrLintFailure, "build_or_lint_failure");
+        let id2 = compute_issue_id(IssueCode::BuildOrLintFailure, "build_or_lint_failure");
         assert_eq!(id1, id2);
         assert_eq!(id1.len(), 12);
     }
 
     #[test]
     fn compute_issue_id_differs_by_code() {
-        let id1 = compute_issue_id(&IssueCode::BuildOrLintFailure, "test");
-        let id2 = compute_issue_id(&IssueCode::HookDeniedToolCall, "test");
+        let id1 = compute_issue_id(IssueCode::BuildOrLintFailure, "test");
+        let id2 = compute_issue_id(IssueCode::HookDeniedToolCall, "test");
         assert_ne!(id1, id2);
     }
 

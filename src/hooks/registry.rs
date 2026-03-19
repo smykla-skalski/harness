@@ -7,15 +7,18 @@ use crate::hooks::protocol::result::NormalizedHookResult;
 use super::HookType;
 
 /// A composable guard in the hook engine chain-of-responsibility.
+#[cfg(test)]
 pub trait Guard: Send + Sync {
     fn check(&self, ctx: &GuardContext) -> Option<NormalizedHookResult>;
 }
 
 /// Ordered collection of guards that stops at the first denial/warning.
+#[cfg(test)]
 pub struct GuardChain {
     guards: Vec<Box<dyn Guard>>,
 }
 
+#[cfg(test)]
 impl GuardChain {
     #[must_use]
     pub fn new(guards: Vec<Box<dyn Guard>>) -> Self {
@@ -64,7 +67,6 @@ impl HookEngine {
     /// # Errors
     /// Returns `CliError` when hook execution or effect application fails.
     pub fn execute(
-        &self,
         hook: &dyn Hook,
         normalized: NormalizedHookContext,
     ) -> Result<NormalizedHookResult, CliError> {

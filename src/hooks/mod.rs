@@ -14,12 +14,13 @@ use self::protocol::result::NormalizedHookResult;
 use self::registry::{Hook, HookEngine};
 
 pub(crate) mod application;
-pub mod debug;
+#[cfg(test)]
+pub(crate) mod debug;
 pub mod protocol;
-pub mod runner_policy;
-pub mod session;
+pub(crate) mod runner_policy;
+pub(crate) mod session;
 
-pub mod adapters;
+pub(crate) mod adapters;
 pub mod audit;
 pub mod context_agent;
 mod effects;
@@ -28,8 +29,9 @@ pub mod guard_bash;
 pub mod guard_question;
 pub mod guard_stop;
 pub mod guard_write;
-pub mod guards;
-pub mod registry;
+#[cfg(test)]
+pub(crate) mod guards;
+pub(crate) mod registry;
 pub mod validate_agent;
 pub mod verify_bash;
 pub mod verify_question;
@@ -38,6 +40,7 @@ pub mod verify_write;
 pub use self::application::GuardContext;
 pub use self::effects::{HookEffect, HookOutcome};
 pub use self::protocol::{context, hook_result, output, payloads, result};
+pub use self::session::{PreCompactHookInput, SessionStartHookInput, SessionStartHookOutput};
 
 /// Hook lifecycle categories.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -410,8 +413,7 @@ pub fn run_hook_command(agent: HookAgent, skill: &str, hook: &HookCommand) -> i3
     };
     let render_event = normalized.event.clone();
 
-    let engine = HookEngine::new();
-    let result = match engine.execute(hook_impl, normalized) {
+    let result = match HookEngine::execute(hook_impl, normalized) {
         Ok(result) => result,
         Err(error) => {
             let detail = format_hook_error_detail(hook_impl, &error);

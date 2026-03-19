@@ -12,7 +12,6 @@ pub enum FocusPreset {
 pub struct FocusPresetDef {
     pub name: &'static str,
     pub description: &'static str,
-    pub categories: Option<&'static [IssueCategory]>,
 }
 
 static HARNESS_CATEGORIES: &[IssueCategory] = &[
@@ -33,17 +32,14 @@ pub static FOCUS_PRESETS: &[FocusPresetDef] = &[
     FocusPresetDef {
         name: "harness",
         description: "Build, CLI, workflow, and data integrity issues",
-        categories: Some(HARNESS_CATEGORIES),
     },
     FocusPresetDef {
         name: "skills",
         description: "Skill behavior, hooks, naming, and subagent issues",
-        categories: Some(SKILLS_CATEGORIES),
     },
     FocusPresetDef {
         name: "all",
         description: "All categories (no filter)",
-        categories: None,
     },
 ];
 

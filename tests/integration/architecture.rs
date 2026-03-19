@@ -591,6 +591,102 @@ fn transport_command_modules_stay_internal_to_domains() {
 }
 
 #[test]
+fn helper_modules_do_not_leak_publicly() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+
+    for (path, public_needle, crate_needle) in [
+        (
+            "src/app/mod.rs",
+            "pub mod command_context;",
+            "pub(crate) mod command_context;",
+        ),
+        (
+            "src/setup/mod.rs",
+            "pub mod wrapper;",
+            "pub(crate) mod wrapper;",
+        ),
+        (
+            "src/observe/mod.rs",
+            "pub mod classifier;",
+            "pub(crate) mod classifier;",
+        ),
+        (
+            "src/observe/mod.rs",
+            "pub mod patterns;",
+            "pub(crate) mod patterns;",
+        ),
+        (
+            "src/observe/mod.rs",
+            "pub mod session;",
+            "pub(crate) mod session;",
+        ),
+        (
+            "src/observe/mod.rs",
+            "pub mod types;",
+            "pub(crate) mod types;",
+        ),
+        (
+            "src/hooks/mod.rs",
+            "pub mod debug;",
+            "pub(crate) mod debug;",
+        ),
+        (
+            "src/hooks/mod.rs",
+            "pub mod runner_policy;",
+            "pub(crate) mod runner_policy;",
+        ),
+        (
+            "src/hooks/mod.rs",
+            "pub mod session;",
+            "pub(crate) mod session;",
+        ),
+        (
+            "src/hooks/mod.rs",
+            "pub mod adapters;",
+            "pub(crate) mod adapters;",
+        ),
+        (
+            "src/hooks/mod.rs",
+            "pub mod guards;",
+            "pub(crate) mod guards;",
+        ),
+        (
+            "src/hooks/mod.rs",
+            "pub mod registry;",
+            "pub(crate) mod registry;",
+        ),
+    ] {
+        let contents = fs::read_to_string(root.join(path)).unwrap();
+        assert!(
+            !contents.contains(public_needle),
+            "{path} should not leak helper module `{public_needle}` publicly"
+        );
+        assert!(
+            contents.contains(crate_needle),
+            "{path} should keep helper module `{crate_needle}` crate-internal"
+        );
+    }
+
+    let setup_session = fs::read_to_string(root.join("src/setup/session.rs")).unwrap();
+    assert!(
+        !setup_session.contains("crate::hooks::session::SessionStartHookOutput"),
+        "src/setup/session.rs should not depend on the private hooks::session module"
+    );
+    assert!(
+        setup_session.contains("crate::hooks::SessionStartHookOutput"),
+        "src/setup/session.rs should use the public hooks facade for SessionStartHookOutput"
+    );
+
+    let hooks_root = fs::read_to_string(root.join("src/hooks/mod.rs")).unwrap();
+    assert!(
+        hooks_root.contains(
+            "pub use self::session::{PreCompactHookInput, SessionStartHookInput, SessionStartHookOutput};"
+        ),
+        "src/hooks/mod.rs should re-export session hook payload types through the hooks facade"
+    );
+}
+
+#[test]
 fn observe_transport_stays_transport_only() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
     let transport = fs::read_to_string(root.join("src/observe/mod.rs")).unwrap();

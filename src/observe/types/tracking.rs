@@ -9,7 +9,6 @@ use super::IssueCode;
 #[derive(Debug, Clone)]
 pub struct OccurrenceTracker {
     pub count: usize,
-    pub first_seen_line: usize,
     pub last_seen_line: usize,
 }
 
@@ -49,16 +48,19 @@ impl ToolUseWindow {
     }
 
     #[must_use]
+    #[cfg(test)]
     pub fn contains_key(&self, tool_use_id: &str) -> bool {
         self.records.contains_key(tool_use_id)
     }
 
     #[must_use]
+    #[cfg(test)]
     pub fn len(&self) -> usize {
         self.records.len()
     }
 
     #[must_use]
+    #[cfg(test)]
     pub fn is_empty(&self) -> bool {
         self.records.is_empty()
     }

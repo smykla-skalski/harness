@@ -1,6 +1,7 @@
-use std::path::{Path, PathBuf};
-
 use serde::{Deserialize, Serialize};
+
+#[cfg(test)]
+use std::path::{Path, PathBuf};
 
 /// Input payload for the session-start hook.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -72,6 +73,7 @@ impl SessionStartHookOutput {
 
 /// Resolve the effective cwd from the hook payload or project dir fallback.
 #[must_use]
+#[cfg(test)]
 pub fn resolve_cwd(payload_cwd: &str, project_dir: &Path) -> PathBuf {
     if !payload_cwd.is_empty() {
         return PathBuf::from(payload_cwd);

@@ -22,16 +22,16 @@ pub(super) fn execute_compare(
     let (issues_a, _) = scan_range(&path, from_a, to_a)?;
     let (issues_b, _) = scan_range(&path, from_b, to_b)?;
 
-    let ids_a: HashSet<_> = issues_a.iter().map(|i| &i.issue_id).collect();
-    let ids_b: HashSet<_> = issues_b.iter().map(|i| &i.issue_id).collect();
+    let ids_a: HashSet<_> = issues_a.iter().map(|i| &i.id).collect();
+    let ids_b: HashSet<_> = issues_b.iter().map(|i| &i.id).collect();
 
     let new_issues: Vec<&Issue> = issues_b
         .iter()
-        .filter(|i| !ids_a.contains(&&i.issue_id))
+        .filter(|i| !ids_a.contains(&&i.id))
         .collect();
     let resolved_issues: Vec<&Issue> = issues_a
         .iter()
-        .filter(|i| !ids_b.contains(&&i.issue_id))
+        .filter(|i| !ids_b.contains(&&i.id))
         .collect();
     let unchanged_count = ids_a.intersection(&ids_b).count();
 
@@ -41,8 +41,8 @@ pub(super) fn execute_compare(
         "new": new_issues.len(),
         "resolved": resolved_issues.len(),
         "unchanged": unchanged_count,
-        "new_issues": new_issues.iter().map(|i| json!({"issue_id": i.issue_id, "code": i.code.to_string(), "summary": i.summary})).collect::<Vec<_>>(),
-        "resolved_issues": resolved_issues.iter().map(|i| json!({"issue_id": i.issue_id, "code": i.code.to_string(), "summary": i.summary})).collect::<Vec<_>>(),
+        "new_issues": new_issues.iter().map(|i| json!({"issue_id": i.id, "code": i.code.to_string(), "summary": i.summary})).collect::<Vec<_>>(),
+        "resolved_issues": resolved_issues.iter().map(|i| json!({"issue_id": i.id, "code": i.code.to_string(), "summary": i.summary})).collect::<Vec<_>>(),
     });
     println!(
         "{}",

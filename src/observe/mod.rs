@@ -1,14 +1,14 @@
 mod application;
-pub mod classifier;
+pub(crate) mod classifier;
 mod compare;
 mod context_cmd;
 mod doctor;
 mod dump;
 pub mod output;
-pub mod patterns;
+pub(crate) mod patterns;
 mod scan;
-pub mod session;
-pub mod types;
+pub(crate) mod session;
+pub(crate) mod types;
 mod watch;
 
 use clap::{Args, Subcommand, ValueEnum};
@@ -464,7 +464,7 @@ mod tests {
     #[test]
     fn filter_mute_suppresses_issues() {
         let issue = Issue {
-            issue_id: "abc123".into(),
+            id: "abc123".into(),
             line: 1,
             code: IssueCode::BuildOrLintFailure,
             category: types::IssueCategory::BuildError,
@@ -604,7 +604,7 @@ mod tests {
     #[test]
     fn golden_human_output_format() {
         let issue = Issue {
-            issue_id: "abc123def456".into(),
+            id: "abc123def456".into(),
             line: 42,
             code: IssueCode::BuildOrLintFailure,
             category: types::IssueCategory::BuildError,
@@ -631,7 +631,7 @@ mod tests {
     #[test]
     fn golden_summary_json_shape() {
         let issue = Issue {
-            issue_id: "abc123".into(),
+            id: "abc123".into(),
             line: 1,
             code: IssueCode::BuildOrLintFailure,
             category: types::IssueCategory::BuildError,
@@ -659,7 +659,7 @@ mod tests {
     #[test]
     fn markdown_output_contains_table() {
         let issue = Issue {
-            issue_id: "abc123".into(),
+            id: "abc123".into(),
             line: 42,
             code: IssueCode::BuildOrLintFailure,
             category: types::IssueCategory::BuildError,
@@ -684,7 +684,7 @@ mod tests {
     #[test]
     fn top_causes_groups_by_code() {
         let make_issue = |code: IssueCode, summary: &str| Issue {
-            issue_id: "x".into(),
+            id: "x".into(),
             line: 1,
             code,
             category: types::IssueCategory::BuildError,
@@ -731,7 +731,7 @@ mod tests {
     #[test]
     fn sarif_output_has_correct_shape() {
         let issue = Issue {
-            issue_id: "abc123".into(),
+            id: "abc123".into(),
             line: 42,
             code: IssueCode::BuildOrLintFailure,
             category: types::IssueCategory::BuildError,
@@ -798,7 +798,7 @@ mod tests {
         .unwrap();
 
         let hook_issue = Issue {
-            issue_id: "h1".into(),
+            id: "h1".into(),
             line: 1,
             code: IssueCode::HookDeniedToolCall,
             category: types::IssueCategory::HookFailure,
@@ -815,7 +815,7 @@ mod tests {
             evidence_excerpt: None,
         };
         let build_issue = Issue {
-            issue_id: "b1".into(),
+            id: "b1".into(),
             line: 2,
             code: IssueCode::BuildOrLintFailure,
             category: types::IssueCategory::BuildError,

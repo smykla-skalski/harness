@@ -7,7 +7,8 @@ use super::{
 /// A classified issue found in a session log.
 #[derive(Debug, Clone, Serialize)]
 pub struct Issue {
-    pub issue_id: String,
+    #[serde(rename = "issue_id")]
+    pub id: String,
     pub line: usize,
     pub code: IssueCode,
     pub category: IssueCategory,

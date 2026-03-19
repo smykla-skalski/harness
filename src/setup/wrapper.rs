@@ -49,11 +49,7 @@ exit 1
 ///
 /// # Errors
 /// Returns `CliError` if no suitable directory is found.
-pub fn choose_install_dir(path_env: &str) -> Result<(PathBuf, bool), CliError> {
-    choose_install_dir_with_home(path_env, &dirs_home())
-}
-
-/// Like [`choose_install_dir`] but accepts an explicit `home` directory so
+/// Resolve the install directory with an explicit `home` directory so
 /// callers (and tests) don't depend on the ambient `HOME` env var.
 ///
 /// # Errors
