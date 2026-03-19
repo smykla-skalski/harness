@@ -1,13 +1,16 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use crate::errors::{CliError, CliErrorKind};
+#[cfg(test)]
+use crate::infra::io::{is_safe_name, write_json_pretty};
+#[cfg(test)]
+use crate::workspace::utc_now;
+#[cfg(test)]
 use walkdir::WalkDir;
 
-use crate::errors::{CliError, CliErrorKind};
-use crate::infra::io::{is_safe_name, write_json_pretty};
-use crate::workspace::utc_now;
-
 const STATE_FILE: &str = "ephemeral-metallb-templates.json";
+#[cfg(test)]
 const DEFAULT_TEMPLATE_BASENAME: &str = "metallb-k3d-kuma.yaml";
 
 /// State path for ephemeral `MetalLB` config.
@@ -20,6 +23,7 @@ pub fn state_path(run_dir: &Path) -> PathBuf {
 ///
 /// # Errors
 /// Returns `CliError` if `cluster_name` contains path separators or `..`.
+#[cfg(test)]
 pub fn template_path(root: &Path, cluster_name: &str) -> Result<PathBuf, CliError> {
     if !is_safe_name(cluster_name) {
         return Err(CliErrorKind::unsafe_name(cluster_name.to_string()).into());
@@ -30,6 +34,7 @@ pub fn template_path(root: &Path, cluster_name: &str) -> Result<PathBuf, CliErro
 }
 
 /// Default source template path.
+#[cfg(test)]
 fn default_source_template(root: &Path) -> Result<PathBuf, CliError> {
     let default = root.join("mk").join(DEFAULT_TEMPLATE_BASENAME);
     if default.is_file() {
@@ -69,6 +74,7 @@ fn default_source_template(root: &Path) -> Result<PathBuf, CliError> {
 ///
 /// # Errors
 /// Returns `CliError` if the default source template is missing or on IO failure.
+#[cfg(test)]
 pub fn ensure_templates(
     root: &Path,
     cluster_names: &[&str],
@@ -137,6 +143,7 @@ pub fn cleanup_templates(run_dir: &Path) -> Result<Vec<PathBuf>, CliError> {
 ///
 /// # Errors
 /// Returns `CliError` on IO failure or missing source.
+#[cfg(test)]
 pub fn restore_templates(run_dir: &Path) -> Result<Vec<PathBuf>, CliError> {
     let entries = load_entries(Some(run_dir))?;
     if entries.is_empty() {
@@ -195,6 +202,7 @@ fn load_entries(run_dir: Option<&Path>) -> Result<Vec<serde_json::Value>, CliErr
         .unwrap_or_default())
 }
 
+#[cfg(test)]
 fn save_entries(run_dir: &Path, entries: &[serde_json::Value]) -> Result<(), CliError> {
     let path = state_path(run_dir);
     let payload = serde_json::json!({

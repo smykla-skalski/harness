@@ -4,7 +4,6 @@ use std::path::Path;
 use crate::errors::{CliError, CliErrorKind};
 use crate::infra::blocks::kuma::defaults;
 use crate::kernel::topology::{ClusterSpec, Platform};
-use crate::run::context::RunAggregate;
 
 /// Borrowed access details for the universal control plane API.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -36,7 +35,7 @@ impl<'a> KubernetesRuntime<'a> {
     /// # Errors
     /// Returns `CliError` when the requested cluster is not tracked.
     pub fn resolve_kubeconfig(
-        &self,
+        self,
         explicit: Option<&'a str>,
         cluster: Option<&str>,
     ) -> Result<Cow<'a, Path>, CliError> {
@@ -67,7 +66,7 @@ impl<'a> UniversalRuntime<'a> {
 
     /// Resolve a tracked member name to the underlying container name.
     #[must_use]
-    pub fn resolve_container_name(&self, requested: &'a str) -> Cow<'a, str> {
+    pub fn resolve_container_name(self, requested: &'a str) -> Cow<'a, str> {
         self.spec.resolve_container_name(requested)
     }
 
@@ -75,7 +74,7 @@ impl<'a> UniversalRuntime<'a> {
     ///
     /// # Errors
     /// Returns `CliError` when the network is unavailable.
-    pub fn docker_network(&self) -> Result<&'a str, CliError> {
+    pub fn docker_network(self) -> Result<&'a str, CliError> {
         self.spec
             .docker_network
             .as_deref()
@@ -86,7 +85,7 @@ impl<'a> UniversalRuntime<'a> {
     ///
     /// # Errors
     /// Returns `CliError` when the control plane endpoint is unavailable.
-    pub fn control_plane(&self) -> Result<ControlPlaneAccess<'a>, CliError> {
+    pub fn control_plane(self) -> Result<ControlPlaneAccess<'a>, CliError> {
         let Some((ip, port)) = self.spec.primary_api_parts() else {
             return Err(CliErrorKind::missing_run_context_value("cp_api_url").into());
         };
@@ -100,7 +99,7 @@ impl<'a> UniversalRuntime<'a> {
     ///
     /// # Errors
     /// Returns `CliError` when the XDS endpoint is unavailable.
-    pub fn xds(&self) -> Result<XdsAccess<'a>, CliError> {
+    pub fn xds(self) -> Result<XdsAccess<'a>, CliError> {
         let member = self.spec.primary_member();
         let Some(ip) = member.container_ip.as_deref() else {
             return Err(CliErrorKind::missing_run_context_value("container_ip").into());
@@ -115,7 +114,7 @@ impl<'a> UniversalRuntime<'a> {
     ///
     /// # Errors
     /// Returns `CliError` when no image can be determined.
-    pub fn service_image(&self, explicit: Option<&'a str>) -> Result<Cow<'a, str>, CliError> {
+    pub fn service_image(self, explicit: Option<&'a str>) -> Result<Cow<'a, str>, CliError> {
         if let Some(image) = explicit {
             return Ok(Cow::Borrowed(image));
         }
@@ -144,18 +143,6 @@ pub enum ClusterRuntime<'a> {
 }
 
 impl<'a> ClusterRuntime<'a> {
-    /// Build runtime access from a run aggregate.
-    ///
-    /// # Errors
-    /// Returns `CliError` when cluster details are unavailable.
-    pub fn from_run(run: &'a RunAggregate) -> Result<Self, CliError> {
-        let spec = run
-            .cluster
-            .as_ref()
-            .ok_or_else(|| CliErrorKind::missing_run_context_value("cluster"))?;
-        Ok(Self::from_spec(spec))
-    }
-
     /// Build runtime access from a persisted cluster spec.
     #[must_use]
     pub fn from_spec(spec: &'a ClusterSpec) -> Self {
@@ -256,6 +243,7 @@ impl<'a> ClusterRuntime<'a> {
 
 /// Resolve a run profile to a runtime platform when no cluster spec exists yet.
 #[must_use]
+#[cfg(test)]
 pub fn profile_platform(profile: &str) -> Platform {
     if profile == "universal" || profile.starts_with("universal-") {
         return Platform::Universal;

@@ -7,7 +7,6 @@ use std::env;
 use std::fs;
 use std::sync::PoisonError;
 
-use harness::platform::kubectl_validate::{KubectlValidateDecision, KubectlValidateState};
 use harness::run::GroupSpec;
 use harness::run::RunDirArgs;
 use harness::run::workflow::{RunnerPhase, read_runner_state};
@@ -17,38 +16,6 @@ use harness_testkit::{
 };
 
 use super::helpers::*;
-
-// ============================================================================
-// kubectl-validate state tests
-// ============================================================================
-
-#[test]
-fn kubectl_validate_state_serialization() {
-    let state = KubectlValidateState {
-        schema_version: 1,
-        decision: KubectlValidateDecision::Installed,
-        decided_at: "2026-03-13T00:00:00Z".to_string(),
-        binary_path: Some("/usr/local/bin/kubectl-validate".to_string()),
-    };
-    let json = serde_json::to_string(&state).unwrap();
-    let back: KubectlValidateState = serde_json::from_str(&json).unwrap();
-    assert_eq!(state, back);
-}
-
-#[test]
-fn kubectl_validate_state_declined() {
-    let state = KubectlValidateState {
-        schema_version: 1,
-        decision: KubectlValidateDecision::Declined,
-        decided_at: "2026-03-13T00:00:00Z".to_string(),
-        binary_path: None,
-    };
-    let json = serde_json::to_string(&state).unwrap();
-    assert!(json.contains("declined"));
-    let back: KubectlValidateState = serde_json::from_str(&json).unwrap();
-    assert_eq!(back.decision, KubectlValidateDecision::Declined);
-    assert!(back.binary_path.is_none());
-}
 
 #[test]
 fn seed_kubectl_validate_and_read_back() {
@@ -61,8 +28,8 @@ fn seed_kubectl_validate_and_read_back() {
         .join("kubectl-validate.json");
     assert!(state_path.exists());
     let text = fs::read_to_string(&state_path).unwrap();
-    let state: KubectlValidateState = serde_json::from_str(&text).unwrap();
-    assert_eq!(state.decision, KubectlValidateDecision::Declined);
+    let state: serde_json::Value = serde_json::from_str(&text).unwrap();
+    assert_eq!(state["decision"], "declined");
 }
 
 #[test]
@@ -78,9 +45,12 @@ fn seed_kubectl_validate_with_binary_path() {
         .join("tooling")
         .join("kubectl-validate.json");
     let text = fs::read_to_string(&state_path).unwrap();
-    let state: KubectlValidateState = serde_json::from_str(&text).unwrap();
-    assert_eq!(state.decision, KubectlValidateDecision::Installed);
-    assert!(state.binary_path.is_some());
+    let state: serde_json::Value = serde_json::from_str(&text).unwrap();
+    assert_eq!(state["decision"], "installed");
+    assert_eq!(
+        state["binary_path"].as_str(),
+        Some(binary.to_string_lossy().as_ref())
+    );
 }
 
 // ============================================================================
