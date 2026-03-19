@@ -2,8 +2,8 @@ use std::env;
 use std::fs;
 use std::path::PathBuf;
 
-use crate::workspace::harness_data_root;
 use crate::errors::{CliError, CliErrorKind};
+use crate::workspace::harness_data_root;
 
 /// Validate observer setup.
 pub(super) fn execute_doctor() -> Result<i32, CliError> {

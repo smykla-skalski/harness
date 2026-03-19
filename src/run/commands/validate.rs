@@ -4,11 +4,11 @@ use clap::Args;
 use rayon::prelude::*;
 
 use crate::app::command_context::{AppContext, Execute};
-use crate::workspace::shorten_path;
 use crate::errors::{CliError, CliErrorKind};
 use crate::infra::exec::kubectl;
 use crate::infra::io::{read_text, write_text};
 use crate::manifests::default_validation_output;
+use crate::workspace::shorten_path;
 
 impl Execute for ValidateArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {

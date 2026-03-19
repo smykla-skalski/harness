@@ -1,8 +1,8 @@
 use clap::Args;
 
 use crate::app::command_context::{AppContext, Execute, resolve_project_dir};
-use crate::workspace::compact::{build_compact_handoff, save_compact_handoff};
 use crate::errors::CliError;
+use crate::workspace::compact::{build_compact_handoff, save_compact_handoff};
 
 impl Execute for PreCompactArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {

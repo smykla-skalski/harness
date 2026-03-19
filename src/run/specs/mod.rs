@@ -214,7 +214,10 @@ groups:\n\
 ---\n\nBody.\n",
         );
         let suite = SuiteSpec::from_markdown(&path).unwrap();
-        assert_eq!(suite.frontmatter.baseline_files, vec!["baseline/namespace.yaml"]);
+        assert_eq!(
+            suite.frontmatter.baseline_files,
+            vec!["baseline/namespace.yaml"]
+        );
     }
 
     #[test]

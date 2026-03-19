@@ -3,8 +3,8 @@ use std::{env, fs};
 
 use serde::{Deserialize, Serialize};
 
-use crate::workspace::{dirs_home, harness_data_root};
 use crate::errors::{CliError, CliErrorKind, io_for};
+use crate::workspace::{dirs_home, harness_data_root};
 
 /// Decision about kubectl-validate installation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

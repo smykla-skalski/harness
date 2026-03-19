@@ -2,8 +2,8 @@
 // Covers path construction, directory creation, round-trip recovery,
 // and context loading from run directories.
 
-use harness::run::{RunContext, RunLayout};
 use harness::run::Verdict;
+use harness::run::{RunContext, RunLayout};
 
 use super::super::helpers::*;
 

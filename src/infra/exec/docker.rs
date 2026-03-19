@@ -4,8 +4,8 @@ use std::time::Duration;
 
 use crate::errors::{CliError, CliErrorKind};
 
-use super::{k3d, run_command, run_command_streaming};
 use super::CommandResult;
+use super::{k3d, run_command, run_command_streaming};
 
 /// Run docker.
 ///

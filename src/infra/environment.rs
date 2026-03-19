@@ -11,7 +11,11 @@ where
     I: IntoIterator<Item = (&'a String, &'a String)>,
 {
     let mut merged: HashMap<String, String> = env::vars().collect();
-    merged.extend(extra.into_iter().map(|(key, value)| (key.clone(), value.clone())));
+    merged.extend(
+        extra
+            .into_iter()
+            .map(|(key, value)| (key.clone(), value.clone())),
+    );
     prepend_build_artifacts_path(&mut merged);
     merged
 }

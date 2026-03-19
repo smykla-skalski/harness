@@ -1,5 +1,5 @@
-pub(crate) mod build_info;
 mod bootstrap;
+pub(crate) mod build_info;
 mod capabilities;
 mod cluster;
 mod gateway;

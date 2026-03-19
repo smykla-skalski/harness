@@ -13,13 +13,13 @@ pub use docker::{
     extract_admin_token,
 };
 pub use http::{HttpMethod, cp_api_json, cp_api_text, wait_for_http};
-pub use result::CommandResult;
 pub(crate) use output_filter::filter_progress_line;
+pub use result::CommandResult;
 
 use std::collections::HashMap;
+use std::iter;
 use std::path::Path;
 use std::process::{Command, Output, Stdio};
-use std::iter;
 use std::time::Duration;
 
 use tokio::io::{AsyncBufReadExt as _, AsyncReadExt as _};

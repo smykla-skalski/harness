@@ -3,10 +3,10 @@ use std::path::{Path, PathBuf};
 use clap::{Args, Subcommand};
 
 use crate::app::command_context::{AppContext, Execute, resolve_repo_root};
-use crate::workspace::shorten_path;
 use crate::errors::{CliError, CliErrorKind};
 use crate::infra::blocks::kuma::cli::{BUILD_TARGET, kumactl_candidates};
 use crate::infra::exec::run_command;
+use crate::workspace::shorten_path;
 
 impl Execute for KumactlArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
