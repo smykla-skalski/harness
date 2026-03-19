@@ -8,12 +8,56 @@ use super::doctor;
 use super::dump;
 use super::scan;
 use super::watch;
-use super::{ObserveFilterArgs, ObserveMode, ObserveScanActionKind};
+
+#[derive(Debug, Clone)]
+pub(crate) struct ObserveFilter {
+    pub(crate) from_line: usize,
+    pub(crate) from: Option<String>,
+    pub(crate) focus: Option<String>,
+    pub(crate) project_hint: Option<String>,
+    pub(crate) json: bool,
+    pub(crate) summary: bool,
+    pub(crate) severity: Option<String>,
+    pub(crate) category: Option<String>,
+    pub(crate) exclude: Option<String>,
+    pub(crate) fixable: bool,
+    pub(crate) mute: Option<String>,
+    pub(crate) until_line: Option<usize>,
+    pub(crate) since_timestamp: Option<String>,
+    pub(crate) until_timestamp: Option<String>,
+    pub(crate) format: Option<String>,
+    pub(crate) overrides: Option<String>,
+    pub(crate) top_causes: Option<usize>,
+    pub(crate) output: Option<String>,
+    pub(crate) output_details: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub(crate) enum ObserveActionKind {
+    Cycle,
+    Status,
+    Resume,
+    Verify,
+    ResolveFrom,
+    Compare,
+    ListCategories,
+    ListFocusPresets,
+    Doctor,
+    Mute,
+    Unmute,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) enum ObserveRequest {
+    Scan(ObserveScanRequest),
+    Watch(ObserveWatchRequest),
+    Dump(ObserveDumpRequest),
+}
 
 enum ObserveScanAction<'a> {
     Scan {
         session_id: &'a str,
-        filter: &'a ObserveFilterArgs,
+        filter: &'a ObserveFilter,
     },
     Cycle {
         session_id: &'a str,
@@ -25,7 +69,7 @@ enum ObserveScanAction<'a> {
     },
     Resume {
         session_id: &'a str,
-        filter: &'a ObserveFilterArgs,
+        filter: &'a ObserveFilter,
     },
     Verify {
         session_id: &'a str,
@@ -61,90 +105,55 @@ enum ObserveScanAction<'a> {
     },
 }
 
-struct ObserveScanRequest<'a> {
-    session_id: Option<&'a str>,
-    action: Option<ObserveScanActionKind>,
-    issue_id: Option<&'a str>,
-    since_line: Option<usize>,
-    value: Option<&'a str>,
-    range_a: Option<&'a str>,
-    range_b: Option<&'a str>,
-    codes: Option<&'a str>,
-    filter: &'a ObserveFilterArgs,
+#[derive(Debug, Clone)]
+pub(crate) struct ObserveScanRequest {
+    pub(crate) session_id: Option<String>,
+    pub(crate) action: Option<ObserveActionKind>,
+    pub(crate) issue_id: Option<String>,
+    pub(crate) since_line: Option<usize>,
+    pub(crate) value: Option<String>,
+    pub(crate) range_a: Option<String>,
+    pub(crate) range_b: Option<String>,
+    pub(crate) codes: Option<String>,
+    pub(crate) filter: ObserveFilter,
 }
 
-struct ObserveDumpRequest {
-    session_id: String,
-    context_line: Option<usize>,
-    context_window: usize,
-    from_line: Option<usize>,
-    to_line: Option<usize>,
-    filter: Option<String>,
-    role: Option<String>,
-    tool_name: Option<String>,
-    raw_json: bool,
-    project_hint: Option<String>,
+#[derive(Debug, Clone)]
+pub(crate) struct ObserveWatchRequest {
+    pub(crate) session_id: String,
+    pub(crate) poll_interval: u64,
+    pub(crate) timeout: u64,
+    pub(crate) filter: ObserveFilter,
 }
 
-pub(crate) fn execute(mode: ObserveMode) -> Result<i32, CliError> {
-    match mode {
-        ObserveMode::Scan {
-            session_id,
-            action,
-            issue_id,
-            since_line,
-            value,
-            range_a,
-            range_b,
-            codes,
-            filter,
-        } => {
-            let request = ObserveScanRequest {
-                session_id: session_id.as_deref(),
-                action,
-                issue_id: issue_id.as_deref(),
-                since_line,
-                value: value.as_deref(),
-                range_a: range_a.as_deref(),
-                range_b: range_b.as_deref(),
-                codes: codes.as_deref(),
-                filter: &filter,
-            };
-            execute_scan_mode(&request)
-        }
-        ObserveMode::Watch {
-            session_id,
-            poll_interval,
-            timeout,
-            filter,
-        } => watch::execute_watch(&session_id, poll_interval, timeout, &filter),
-        ObserveMode::Dump {
-            session_id,
-            context_line,
-            context_window,
-            from_line,
-            to_line,
-            filter,
-            role,
-            tool_name,
-            raw_json,
-            project_hint,
-        } => execute_dump_mode(&ObserveDumpRequest {
-            session_id,
-            context_line,
-            context_window,
-            from_line,
-            to_line,
-            filter,
-            role,
-            tool_name,
-            raw_json,
-            project_hint,
-        }),
+#[derive(Debug, Clone)]
+pub(crate) struct ObserveDumpRequest {
+    pub(crate) session_id: String,
+    pub(crate) context_line: Option<usize>,
+    pub(crate) context_window: usize,
+    pub(crate) from_line: Option<usize>,
+    pub(crate) to_line: Option<usize>,
+    pub(crate) filter: Option<String>,
+    pub(crate) role: Option<String>,
+    pub(crate) tool_name: Option<String>,
+    pub(crate) raw_json: bool,
+    pub(crate) project_hint: Option<String>,
+}
+
+pub(crate) fn execute(request: ObserveRequest) -> Result<i32, CliError> {
+    match request {
+        ObserveRequest::Scan(request) => execute_scan_mode(&request),
+        ObserveRequest::Watch(request) => watch::execute_watch(
+            &request.session_id,
+            request.poll_interval,
+            request.timeout,
+            &request.filter,
+        ),
+        ObserveRequest::Dump(request) => execute_dump_mode(&request),
     }
 }
 
-fn execute_scan_mode(request: &ObserveScanRequest<'_>) -> Result<i32, CliError> {
+fn execute_scan_mode(request: &ObserveScanRequest) -> Result<i32, CliError> {
     match resolve_scan_action(request)? {
         ObserveScanAction::Scan { session_id, filter } => scan::execute_scan(session_id, filter),
         ObserveScanAction::Cycle {
@@ -244,30 +253,28 @@ fn parse_compare_range(value: &str, label: &str) -> Result<(usize, usize), CliEr
     Ok((from, to))
 }
 
-fn resolve_scan_action<'a>(
-    request: &'a ObserveScanRequest<'a>,
-) -> Result<ObserveScanAction<'a>, CliError> {
+fn resolve_scan_action(request: &ObserveScanRequest) -> Result<ObserveScanAction<'_>, CliError> {
     let project_hint = request.filter.project_hint.as_deref();
     match request.action {
         None => Ok(ObserveScanAction::Scan {
-            session_id: require_scan_session_id(request.session_id, "scan")?,
-            filter: request.filter,
+            session_id: require_scan_session_id(request.session_id.as_deref(), "scan")?,
+            filter: &request.filter,
         }),
-        Some(ObserveScanActionKind::Cycle) => Ok(ObserveScanAction::Cycle {
-            session_id: require_scan_session_id(request.session_id, "--action cycle")?,
+        Some(ObserveActionKind::Cycle) => Ok(ObserveScanAction::Cycle {
+            session_id: require_scan_session_id(request.session_id.as_deref(), "--action cycle")?,
             project_hint,
         }),
-        Some(ObserveScanActionKind::Status) => Ok(ObserveScanAction::Status {
-            session_id: require_scan_session_id(request.session_id, "--action status")?,
+        Some(ObserveActionKind::Status) => Ok(ObserveScanAction::Status {
+            session_id: require_scan_session_id(request.session_id.as_deref(), "--action status")?,
             project_hint,
         }),
-        Some(ObserveScanActionKind::Resume) => Ok(ObserveScanAction::Resume {
-            session_id: require_scan_session_id(request.session_id, "--action resume")?,
-            filter: request.filter,
+        Some(ObserveActionKind::Resume) => Ok(ObserveScanAction::Resume {
+            session_id: require_scan_session_id(request.session_id.as_deref(), "--action resume")?,
+            filter: &request.filter,
         }),
-        Some(ObserveScanActionKind::Verify) => Ok(ObserveScanAction::Verify {
-            session_id: require_scan_session_id(request.session_id, "--action verify")?,
-            issue_id: request.issue_id.ok_or_else(|| {
+        Some(ObserveActionKind::Verify) => Ok(ObserveScanAction::Verify {
+            session_id: require_scan_session_id(request.session_id.as_deref(), "--action verify")?,
+            issue_id: request.issue_id.as_deref().ok_or_else(|| {
                 CliError::from(CliErrorKind::session_parse_error(
                     "--action verify requires --issue-id",
                 ))
@@ -275,22 +282,25 @@ fn resolve_scan_action<'a>(
             since_line: request.since_line,
             project_hint,
         }),
-        Some(ObserveScanActionKind::ResolveFrom) => Ok(ObserveScanAction::ResolveFrom {
-            session_id: require_scan_session_id(request.session_id, "--action resolve-from")?,
-            value: request.value.ok_or_else(|| {
+        Some(ObserveActionKind::ResolveFrom) => Ok(ObserveScanAction::ResolveFrom {
+            session_id: require_scan_session_id(
+                request.session_id.as_deref(),
+                "--action resolve-from",
+            )?,
+            value: request.value.as_deref().ok_or_else(|| {
                 CliError::from(CliErrorKind::session_parse_error(
                     "--action resolve-from requires --value",
                 ))
             })?,
             project_hint,
         }),
-        Some(ObserveScanActionKind::Compare) => {
-            let range_a = request.range_a.ok_or_else(|| {
+        Some(ObserveActionKind::Compare) => {
+            let range_a = request.range_a.as_deref().ok_or_else(|| {
                 CliError::from(CliErrorKind::session_parse_error(
                     "--action compare requires --range-a",
                 ))
             })?;
-            let range_b = request.range_b.ok_or_else(|| {
+            let range_b = request.range_b.as_deref().ok_or_else(|| {
                 CliError::from(CliErrorKind::session_parse_error(
                     "--action compare requires --range-b",
                 ))
@@ -298,7 +308,10 @@ fn resolve_scan_action<'a>(
             let (from_a, to_a) = parse_compare_range(range_a, "--range-a")?;
             let (from_b, to_b) = parse_compare_range(range_b, "--range-b")?;
             Ok(ObserveScanAction::Compare {
-                session_id: require_scan_session_id(request.session_id, "--action compare")?,
+                session_id: require_scan_session_id(
+                    request.session_id.as_deref(),
+                    "--action compare",
+                )?,
                 from_a,
                 to_a,
                 from_b,
@@ -306,21 +319,21 @@ fn resolve_scan_action<'a>(
                 project_hint,
             })
         }
-        Some(ObserveScanActionKind::ListCategories) => Ok(ObserveScanAction::ListCategories),
-        Some(ObserveScanActionKind::ListFocusPresets) => Ok(ObserveScanAction::ListFocusPresets),
-        Some(ObserveScanActionKind::Doctor) => Ok(ObserveScanAction::Doctor),
-        Some(ObserveScanActionKind::Mute) => Ok(ObserveScanAction::Mute {
-            session_id: require_scan_session_id(request.session_id, "--action mute")?,
-            codes: request.codes.ok_or_else(|| {
+        Some(ObserveActionKind::ListCategories) => Ok(ObserveScanAction::ListCategories),
+        Some(ObserveActionKind::ListFocusPresets) => Ok(ObserveScanAction::ListFocusPresets),
+        Some(ObserveActionKind::Doctor) => Ok(ObserveScanAction::Doctor),
+        Some(ObserveActionKind::Mute) => Ok(ObserveScanAction::Mute {
+            session_id: require_scan_session_id(request.session_id.as_deref(), "--action mute")?,
+            codes: request.codes.as_deref().ok_or_else(|| {
                 CliError::from(CliErrorKind::session_parse_error(
                     "--action mute requires --codes",
                 ))
             })?,
             project_hint,
         }),
-        Some(ObserveScanActionKind::Unmute) => Ok(ObserveScanAction::Unmute {
-            session_id: require_scan_session_id(request.session_id, "--action unmute")?,
-            codes: request.codes.ok_or_else(|| {
+        Some(ObserveActionKind::Unmute) => Ok(ObserveScanAction::Unmute {
+            session_id: require_scan_session_id(request.session_id.as_deref(), "--action unmute")?,
+            codes: request.codes.as_deref().ok_or_else(|| {
                 CliError::from(CliErrorKind::session_parse_error(
                     "--action unmute requires --codes",
                 ))
