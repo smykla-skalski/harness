@@ -1,6 +1,8 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use walkdir::WalkDir;
+
 use crate::core_defs::utc_now;
 use crate::errors::{CliError, CliErrorKind};
 use crate::infra::io::{is_safe_name, write_json_pretty};
@@ -36,11 +38,13 @@ fn default_source_template(root: &Path) -> Result<PathBuf, CliError> {
     // Try any metallb-k3d-*.yaml in mk/
     let mk_dir = root.join("mk");
     if mk_dir.is_dir() {
-        let mut templates: Vec<PathBuf> = fs::read_dir(&mk_dir)
+        let mut templates: Vec<PathBuf> = WalkDir::new(&mk_dir)
+            .min_depth(1)
+            .max_depth(1)
+            .sort_by_file_name()
             .into_iter()
-            .flatten()
             .filter_map(Result::ok)
-            .map(|e| e.path())
+            .map(walkdir::DirEntry::into_path)
             .filter(|p| {
                 p.file_name().and_then(|n| n.to_str()).is_some_and(|n| {
                     n.starts_with("metallb-k3d-")
