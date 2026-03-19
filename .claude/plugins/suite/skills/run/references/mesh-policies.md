@@ -16,7 +16,7 @@
 
 Use this reference when a test run includes any `Mesh*` policy.
 
-After `harness init` and `harness setup kuma cluster`, the `harness` examples below rely on the active `current-run.json` shim for run path, repo root, and kubeconfig defaults. Use `harness run --cluster <name> kubectl ...` when a multi-zone check must target a non-primary tracked cluster member. Do not pass kubeconfig or cluster-target override flags through tracked `kubectl` commands.
+After `harness run init` and `harness setup kuma cluster`, the `harness` examples below rely on the active `current-run.json` shim for run path, repo root, and kubeconfig defaults. Use `harness run record --cluster <name> -- kubectl ...` when a multi-zone check must target a non-primary tracked cluster member. Do not pass kubeconfig or cluster-target override flags through tracked `kubectl` commands.
 
 This file is based on Kuma docs `2.13.x` pages. Check kuma.io/docs/ for newer versions - if a newer release exists, substitute the version in the URLs below:
 
@@ -69,10 +69,10 @@ Kuma policy role affects priority and multi-zone sync.
 Verify labels after apply:
 
 ```bash
-harness record --phase verify --label get-policy-role -- \
-  kubectl get <policy-kind> <name> -n <namespace> -o jsonpath='{.metadata.labels.kuma\.io/policy-role}'
-harness record --phase verify --label get-policy-origin -- \
-  kubectl get <policy-kind> <name> -n <namespace> -o jsonpath='{.metadata.labels.kuma\.io/origin}'
+harness run record --phase verify --label get-policy-role \
+  -- kubectl get <policy-kind> <name> -n <namespace> -o jsonpath='{.metadata.labels.kuma\.io/policy-role}'
+harness run record --phase verify --label get-policy-origin \
+  -- kubectl get <policy-kind> <name> -n <namespace> -o jsonpath='{.metadata.labels.kuma\.io/origin}'
 ```
 
 ## 3) `targetRef` guardrails
@@ -89,15 +89,15 @@ Before writing test manifests, confirm supported kinds on the policy page in doc
 
 ## 3b) Zone CP restrictions on system namespaces
 
-Zone CPs reject policy apply operations on system namespaces (`kuma-system`) via admission webhook. In multi-zone deployments, policies targeting `kuma-system` must be applied on the Global CP only. When running `harness apply` or `harness run ... kubectl apply` for system-namespace policies, use `--cluster <global-cluster>` to target the global CP.
+Zone CPs reject policy apply operations on system namespaces (`kuma-system`) via admission webhook. In multi-zone deployments, policies targeting `kuma-system` must be applied on the Global CP only. When running `harness run apply --cluster <global-cluster>` or `harness run record ... --cluster <global-cluster> -- kubectl apply ...` for system-namespace policies, use the global cluster target explicitly.
 
 ## 4) Safe apply flow
 
 ```bash
-harness validate \
+harness run validate \
   --manifest "<manifest-file>"
 
-harness apply \
+harness run apply \
   --manifest "<manifest-file>" \
   --step "<step-name>"
 ```
@@ -109,15 +109,15 @@ Do not run raw `kubectl apply` for test manifests.
 1. Check object acceptance and stored shape.
 
 ```bash
-harness record --phase verify --label get-policy-yaml -- \
-  kubectl get <policy-kind> <name> -n <namespace> -o yaml
+harness run record --phase verify --label get-policy-yaml \
+  -- kubectl get <policy-kind> <name> -n <namespace> -o yaml
 ```
 
 2. Check impacted dataplanes from policy side.
 
 ```bash
-harness run --phase verify --label inspect-policy \
-  kumactl inspect <policy-resource-name> <name> --mesh <mesh>
+harness run record --phase verify --label inspect-policy \
+  -- kumactl inspect <policy-resource-name> <name> --mesh <mesh>
 ```
 
 `<policy-resource-name>` is the CLI resource form, for example `meshretry`.
@@ -125,8 +125,8 @@ harness run --phase verify --label inspect-policy \
 3. Check matched policies from dataplane side.
 
 ```bash
-harness run --phase verify --label inspect-dataplane \
-  kumactl inspect dataplane <dataplane-name> --mesh <mesh>
+harness run record --phase verify --label inspect-dataplane \
+  -- kumactl inspect dataplane <dataplane-name> --mesh <mesh>
 ```
 
 Look at all four attachment points:
@@ -139,8 +139,8 @@ Look at all four attachment points:
 4. Check generated Envoy config.
 
 ```bash
-harness run --phase verify --label inspect-config-dump \
-  kumactl inspect dataplane <dataplane-name> --mesh <mesh> --type=config-dump
+harness run record --phase verify --label inspect-config-dump \
+  -- kumactl inspect dataplane <dataplane-name> --mesh <mesh> --type=config-dump
 ```
 
 In multi-zone, run `inspect --type=config-dump` against a zone control plane,
@@ -149,10 +149,10 @@ not global.
 5. Check runtime logs.
 
 ```bash
-harness record --phase verify --label sidecar-logs -- \
-  kubectl logs -n <ns> <pod-name> -c kuma-sidecar --tail=300
-harness record --phase verify --label cp-logs -- \
-  kubectl logs -n kuma-system deploy/kuma-control-plane --tail=400
+harness run record --phase verify --label sidecar-logs \
+  -- kubectl logs -n <ns> <pod-name> -c kuma-sidecar --tail=300
+harness run record --phase verify --label cp-logs \
+  -- kubectl logs -n kuma-system deploy/kuma-control-plane --tail=400
 ```
 
 6. Check protocol assumptions.
@@ -164,10 +164,10 @@ harness record --phase verify --label cp-logs -- \
 7. In multi-zone, check sync.
 
 ```bash
-harness record --phase verify --label get-zones -- \
-  kubectl get zones
-harness record --phase verify --label get-zoneinsights -- \
-  kubectl get zoneinsights -o yaml
+harness run record --phase verify --label get-zones \
+  -- kubectl get zones
+harness run record --phase verify --label get-zoneinsights \
+  -- kubectl get zoneinsights -o yaml
 ```
 
 ## 6) Edge-case matrix for every Mesh\* feature test plan
@@ -192,16 +192,16 @@ Add these groups to the suite unless out of scope:
 ## 7) Common command set for policy-focused runs
 
 ```bash
-harness record --phase verify --label api-resources -- \
-  kubectl api-resources --api-group kuma.io
-harness record --phase verify --label get-meshes -- \
-  kubectl get mesh -A
-harness record --phase verify --label get-dataplanes -- \
-  kubectl get dataplanes -A
-harness run --phase verify --label inspect-dataplane \
-  kumactl inspect dataplane <dp-name> --mesh <mesh>
-harness run --phase verify --label inspect-config-dump \
-  kumactl inspect dataplane <dp-name> --mesh <mesh> --type=config-dump
-harness run --phase verify --label inspect-policy \
-  kumactl inspect <policy-resource-name> <policy-name> --mesh <mesh>
+harness run record --phase verify --label api-resources \
+  -- kubectl api-resources --api-group kuma.io
+harness run record --phase verify --label get-meshes \
+  -- kubectl get mesh -A
+harness run record --phase verify --label get-dataplanes \
+  -- kubectl get dataplanes -A
+harness run record --phase verify --label inspect-dataplane \
+  -- kumactl inspect dataplane <dp-name> --mesh <mesh>
+harness run record --phase verify --label inspect-config-dump \
+  -- kumactl inspect dataplane <dp-name> --mesh <mesh> --type=config-dump
+harness run record --phase verify --label inspect-policy \
+  -- kumactl inspect <policy-resource-name> <policy-name> --mesh <mesh>
 ```

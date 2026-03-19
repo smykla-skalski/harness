@@ -7,7 +7,7 @@ For `Mesh*` policy specifics (roles, `targetRef` rules, inspect flow), read
 
 ## Pre-apply checklist
 
-- Confirm all `kind` values exist in the live API (`harness run --phase verify --label explain-kind kubectl explain <kind>`)
+- Confirm all `kind` values exist in the live API (`harness run record --phase verify --label explain-kind -- kubectl explain <kind>`)
 - Confirm namespace and labels match test intent
 - Confirm required fields and enum values are valid for the cluster's CRDs
 - If the manifest references other resources, confirm those names exist in the same mesh and expected namespace
@@ -15,25 +15,25 @@ For `Mesh*` policy specifics (roles, `targetRef` rules, inspect flow), read
 
 ## Validate
 
-After `harness init` and `harness setup kuma cluster`, `validate` and `apply` read the active run and kubeconfig from `current-run.json`. Fresh sessions restore that active run automatically from saved project state. Do not add explicit path or kubeconfig flags unless debugging a broken run context.
+After `harness run init` and `harness setup kuma cluster`, `validate` and `apply` read the active run and kubeconfig from `current-run.json`. Fresh sessions restore that active run automatically from saved project state. Do not add explicit path or kubeconfig flags unless debugging a broken run context.
 
 ```bash
-harness validate \
+harness run validate \
   --manifest "<manifest-file>"
 ```
 
 Validation is not optional. Never pass `--validate=false` to kubectl - validation failures indicate a bug in the manifest or missing CRDs. Fix the root cause instead.
 
-The exception is an intentional rejection test defined by the suite itself. When a group keeps a prepared manifest invalid on purpose so Phase 4 can prove the API rejects it, mark that 1-based `## Configure` ordinal in the group frontmatter `expected_rejection_orders`. `harness preflight` and `authoring-validate` will still materialize the manifest, but they will skip the up-front schema validation for that specific prepared entry.
+The exception is an intentional rejection test defined by the suite itself. When a group keeps a prepared manifest invalid on purpose so Phase 4 can prove the API rejects it, mark that 1-based `## Configure` ordinal in the group frontmatter `expected_rejection_orders`. `harness run preflight` and `harness authoring validate` will still materialize the manifest, but they will skip the up-front schema validation for that specific prepared entry.
 
 ## Safe apply flow
 
-1. If the suite already provides a prepared manifest, reference it via `harness apply --manifest "<group-id>/<file>"`. Otherwise write the new manifest to the active run's `manifests/` directory resolved from `current-run.json`. Never use `/tmp`. When a suite group provides inline YAML, use it verbatim without modifications.
-2. Validate with `harness validate`.
+1. If the suite already provides a prepared manifest, reference it via `harness run apply --manifest "<group-id>/<file>"`. Otherwise write the new manifest to the active run's `manifests/` directory resolved from `current-run.json`. Never use `/tmp`. When a suite group provides inline YAML, use it verbatim without modifications.
+2. Validate with `harness run validate`.
 3. If validation fails, follow the manifest error handling flow below.
-4. Apply with `harness apply`.
+4. Apply with `harness run apply`.
 5. If apply fails, follow the manifest error handling flow below.
-6. Run kubectl verification commands through `harness run ... kubectl ...`, kumactl verification commands through `harness run ... kumactl ...`, Envoy admin inspection through `harness envoy ...`, and other cluster-touching commands through `harness record`, saving output to `artifacts/`. Prefer one-command live inspection such as `harness envoy capture --grep ...`, `harness envoy capture --type-contains ...`, `harness envoy route-body`, or `harness envoy bootstrap` instead of capture-then-read flows.
+6. Run kubectl verification commands through `harness run record ... -- kubectl ...`, kumactl verification commands through `harness run record ... -- kumactl ...`, Envoy admin inspection through `harness run envoy ...`, and other cluster-touching commands through `harness run record`, saving output to `artifacts/`. Prefer one-command live inspection such as `harness run envoy capture --grep ...`, `harness run envoy capture --type-contains ...`, `harness run envoy route-body`, or `harness run envoy bootstrap` instead of capture-then-read flows.
 7. Record artifacts in report. Every artifact path must resolve to a real file.
 
 ## Manifest error handling
@@ -41,7 +41,7 @@ The exception is an intentional rejection test defined by the suite itself. When
 When a suite manifest fails validation or apply, first move the runner into failure triage:
 
 ```bash
-harness runner-state \
+harness run runner-state \
   --event failure-manifest
 ```
 
@@ -90,7 +90,7 @@ Always include the validation/apply error message in the AskUserQuestion descrip
 ## Tracked apply example
 
 ```bash
-harness apply \
+harness run apply \
   --manifest "<manifest-file>" \
   --step "<step-name>"
 ```

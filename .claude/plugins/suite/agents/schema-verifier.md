@@ -31,5 +31,5 @@ Always include `required_fields` for every fact. When a fact has no required fie
 
 When verifying Kubernetes Service manifests, check that if `spec.ports` has more than one entry, every entry includes a `name` field. Kubernetes requires named ports when a Service defines multiple ports.
 
-2. Save it with `harness authoring-save --kind schema`.
+2. Save it with `harness authoring save --kind schema`.
 3. Return only `schema summary saved`.

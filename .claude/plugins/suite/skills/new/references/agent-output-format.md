@@ -12,7 +12,7 @@
 
 # Agent output format
 
-Structured payload contract for the dedicated `suite:new` workers. Discovery workers save compact JSON through `harness authoring-save`. Writer workers load saved state with `harness authoring-show` and only acknowledge completion.
+Structured payload contract for the dedicated `suite:new` workers. Discovery workers save compact JSON through `harness authoring save`. Writer workers load saved state with `harness authoring show` and only acknowledge completion.
 
 ## Discovery workers
 
@@ -24,7 +24,7 @@ Discovery workers read only the scoped files from the parent prompt. They must n
 
 ## Inventory payload
 
-Before launching discovery workers, the main `suite:new` flow saves the scoped repository inventory with `harness authoring-save --kind inventory`.
+Before launching discovery workers, the main `suite:new` flow saves the scoped repository inventory with `harness authoring save --kind inventory`.
 
 Use this exact JSON shape:
 
@@ -84,9 +84,9 @@ Collected for manifest verification in the generation step:
 
 Writer workers must:
 
-- load saved state with `harness authoring-show`
+- load saved state with `harness authoring show`
 - honor the exact file ownership from the parent prompt
-- if the local validator is enabled for this environment, validate owned manifests with `harness authoring-validate` before stopping
+- if the local validator is enabled for this environment, validate owned manifests with `harness authoring validate` before stopping
 - use the current repo checkout as the schema source of truth; the required schemas and CRDs are already checked into this repo
 - return only a short acknowledgement such as `suite draft saved`
 

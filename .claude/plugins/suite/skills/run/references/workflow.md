@@ -20,20 +20,20 @@ Supplementary detail for the nine-phase execution flow in `SKILL.md`. Each phase
 
 ## Resuming a partial run
 
-If a previous run was interrupted, do not re-run `harness init` for that existing run. Reattach the saved run context, then check `runs/<run-id>/run-status.json` for `last_completed_group` and `next_planned_group`. Skip to the next planned group and continue from there. Do not re-run already-passed groups unless investigating a failure.
+If a previous run was interrupted, do not re-run `harness run init` for that existing run. Reattach the saved run context, then check `runs/<run-id>/run-status.json` for `last_completed_group` and `next_planned_group`. Skip to the next planned group and continue from there. Do not re-run already-passed groups unless investigating a failure.
 
 If SessionStart already restored the matching active run for `--resume <run-id>`, skip the reattach command too. Read the restored run's `run-status.json` and continue from `next_planned_group`.
 
 Only unfinished runs can resume. If the saved run already has a final `pass` or `fail` verdict, start a new run ID instead of reattaching it.
 
-After restore, do not treat a remembered kubeconfig path as permission to run raw `kubectl` or `kubectl --kubeconfig ...`. Keep using `harness run --phase <phase> --label <label> --gid <group-id> kubectl <args>` or `harness record --phase <phase> --label <label> --gid <group-id> -- kubectl <args>` during execution groups.
+After restore, do not treat a remembered kubeconfig path as permission to run raw `kubectl` or `kubectl --kubeconfig ...`. Keep using `harness run record --phase <phase> --label <label> --gid <group-id> -- kubectl <args>` for kubectl checks and `harness run record --phase <phase> --label <label> --gid <group-id> -- kumactl <args>` for kumactl checks during execution groups.
 
 ## Phase 0 - environment check
 
 Resolve persistent storage and repo root first:
 
 ```bash
-DATA_DIR="$(echo "${XDG_DATA_HOME:-$HOME/.local/share}/kuma/suites")"
+DATA_DIR="$(echo "${XDG_DATA_HOME:-$HOME/.local/share}/harness/suites")"
 ```
 
 Do not create `DATA_DIR` from `suite:run`. If it does not exist, stop and ask whether the suite should be authored first or a different suite path should be used.
@@ -43,8 +43,8 @@ Resolve `REPO_ROOT`: `--repo` flag > check if cwd has `go.mod` with `kumahq/kuma
 Build and verify kumactl:
 
 ```bash
-harness run --repo-root "${REPO_ROOT}" --phase setup --label kumactl-version \
-  kumactl version
+harness run record --repo-root "${REPO_ROOT}" --phase setup --label kumactl-version \
+  -- kumactl version
 ```
 
 ## Phase 1 - initialize or resume run
@@ -58,7 +58,7 @@ RUN_ID="$(date +%Y%m%d-%H%M%S)-manual"
 PROFILE="<resolved --profile value>"
 SUITE_PATH="<resolved suite path>"
 SUITE_DIR="$(dirname "${SUITE_PATH}")"
-harness init \
+harness run init \
   --suite "${SUITE_PATH}" \
   --run-id "${RUN_ID}" \
   --profile "${PROFILE}" \
@@ -75,18 +75,18 @@ SUITE_PATH="<resolved suite path>"
 SUITE_DIR="$(dirname "${SUITE_PATH}")"
 RUN_DIR="${SUITE_DIR}/runs/${RUN_ID}"
 test -f "${RUN_DIR}/run-status.json"
-harness run \
+harness run record \
   --run-id "${RUN_ID}" \
   --run-root "${SUITE_DIR}/runs" \
   --repo-root "${REPO_ROOT}" \
   --phase setup \
   --label kumactl-version \
-  kumactl version
+  -- kumactl version
 ```
 
 Suite resolution uses the two-step order (managed directory suite, literal path). Set `SUITE_DIR` and `SUITE_FILE` accordingly.
 
-After fresh `harness init` or the explicit resume reattach command, rely on the active `current-run.json` shim for run path, suite path, profile, and later cluster context. The harness also saves that active run in project state, so fresh sessions can restore it automatically. The remaining commands must omit repeated `--run-dir`, `--run-root`, `--repo-root`, and `--kubeconfig` flags unless debugging a broken run context. Do not switch to raw `kubectl --kubeconfig ...`; the canonical tracked forms remain `harness run --phase <phase> --label <label> --gid <group-id> kubectl <args>` and `harness record --phase <phase> --label <label> --gid <group-id> -- kubectl <args>` during execution groups.
+After fresh `harness run init` or the explicit resume reattach command, rely on the active `current-run.json` shim for run path, suite path, profile, and later cluster context. The harness also saves that active run in project state, so fresh sessions can restore it automatically. The remaining commands must omit repeated `--run-dir`, `--run-root`, `--repo-root`, and `--kubeconfig` flags unless debugging a broken run context. Do not switch to raw `kubectl --kubeconfig ...`; the canonical tracked forms remain `harness run record --phase <phase> --label <label> --gid <group-id> -- kubectl <args>` for kubectl and `harness run record --phase <phase> --label <label> --gid <group-id> -- kumactl <args>` for kumactl during execution groups.
 
 **Gate**: the `Client:` line in the recorded `kumactl version` output matches the repo HEAD. A server connection warning on stderr is expected until the control plane exists.
 
@@ -117,22 +117,22 @@ If changes modify CRDs, re-run Phase 2 bootstrap for the affected cluster profil
 Before spawning the preflight worker, mark the run as guarded preflight:
 
 ```bash
-harness runner-state \
+harness run runner-state \
   --event preflight-started
 ```
 
 Use the dedicated `preflight-worker`, not a generic subagent. The worker may only run:
 
 ```bash
-harness preflight
+harness run preflight
 
-harness capture \
+harness run capture \
   --label "preflight"
 ```
 
-The worker must return only the canonical summary documented in `SKILL.md`. It must not inspect harness internals, CI, GitHub state, or raw context files. `harness preflight` prepares the suite once for this run. It materializes baseline manifests and group `## Configure` YAML into the active run's prepared manifests directory, validates every prepared manifest, applies baselines, writes the prepared-suite artifact, and then runs readiness checks.
+The worker must return only the canonical summary documented in `SKILL.md`. It must not inspect harness internals, CI, GitHub state, or raw context files. `harness run preflight` prepares the suite once for this run. It materializes baseline manifests and group `## Configure` YAML into the active run's prepared manifests directory, validates every prepared manifest, applies baselines, writes the prepared-suite artifact, and then runs readiness checks.
 
-For multi-zone profiles, `harness preflight` reads each baseline's `clusters` field from the suite frontmatter. Baselines with `clusters: all` are applied to every cluster in the topology (global + all zones) using `harness apply --cluster <name>` for each non-primary cluster. Baselines without a `clusters` field or with `clusters: global` are applied to the primary cluster only. This ensures zone clusters have the workloads (demo apps, collectors, test namespaces) needed for xDS inspection during Phase 4.
+For multi-zone profiles, `harness run preflight` reads each baseline's `clusters` field from the suite frontmatter. Baselines with `clusters: all` are applied to every cluster in the topology (global + all zones) using `harness run apply --cluster <name>` for each non-primary cluster. Baselines without a `clusters` field or with `clusters: global` are applied to the primary cluster only. This ensures zone clusters have the workloads (demo apps, collectors, test namespaces) needed for xDS inspection during Phase 4.
 
 Do not start tests until preflight is green and the prepared-suite artifact exists.
 
@@ -160,44 +160,44 @@ For single-file suites: read the entire suite file, but require the same frontma
 
 **Deviation rule**: if any step requires diverging from the suite definition (different values, skipped step, reordered steps, extra steps, changed expected outcome), use AskUserQuestion for approval before making the change. Record every deviation in the report with what changed, why, and whether user-approved or suite-allowed.
 
-All manifest paths passed to `harness apply` are relative - harness resolves them from the suite and run directories automatically. Never construct shell variables (`SD=`, `SUITE_DIR=`, etc.) to build manifest paths. Use `harness apply --manifest g02/04.yaml`, not `SD=... && harness apply --manifest ${SD}/g02/04.yaml`.
+All manifest paths passed to `harness run apply` are relative - harness resolves them from the suite and run directories automatically. Never construct shell variables (`SD=`, `SUITE_DIR=`, etc.) to build manifest paths. Use `harness run apply --manifest g02/04.yaml`, not `SD=... && harness run apply --manifest ${SD}/g02/04.yaml`.
 
 For each test step:
 
 1. Use prepared manifest entries from the active run's prepared-suite artifact whenever the suite already defines the manifest. Only write a new manifest to the active run's `manifests/` directory when the suite does not already provide one or the user explicitly approved a deviation. Never use `/tmp`.
-2. Apply through `harness apply`. Prepared manifests reuse the preflight validation/cache; non-prepared manifests are copied, validated, and applied by the command. When a step needs more than one manifest, prefer one batched `harness apply` call over shell loops: repeat `--manifest` in the exact apply order, or pass the manifest directory to apply its immediate `.json/.yaml/.yml` files in lexicographic filename order.
-3. Run kubectl verification commands through `harness run ... kubectl ...`, kumactl verification commands through `harness run ... kumactl ...`, Envoy admin captures through `harness envoy capture`, and other cluster-touching commands such as `curl` through `harness record`. During Phase 4 execution, every `harness run` and `harness record` command must include `--gid <group-id>`. Do not run these bare. These wrappers are part of the tracked run, not post-hoc loggers. For raw `kubectl`, `harness run` and `harness record` inject the tracked local `--kubeconfig`, fail closed if the active run has no tracked local kubeconfig yet, and reject kubeconfig or cluster-target override flags. Even after resume or compaction, do not replace them with raw `kubectl --kubeconfig ...`. Prefer `harness envoy route-body` or `harness envoy bootstrap` when you want the inspected Envoy output directly; omit `--file` to capture live first. Save output to `artifacts/`.
-4. Run kubectl cleanup commands through `harness run ... kubectl ...`. Prefer `kubectl delete -f` against the prepared manifest files for the current group, one recorded command per manifest or resource kind. Never mix resource kinds in one `kubectl delete` command such as `kubectl delete kind-a name-a kind-b name-b`; kubectl interprets the later kinds as names of the first kind. If the suite doesn't specify the cleanup, confirm with AskUserQuestion (options: run as proposed, skip, stop). Every command that touches the cluster goes through a tracked harness wrapper.
+2. Apply through `harness run apply`. Prepared manifests reuse the preflight validation/cache; non-prepared manifests are copied, validated, and applied by the command. When a step needs more than one manifest, prefer one batched `harness run apply` call over shell loops: repeat `--manifest` in the exact apply order, or pass the manifest directory to apply its immediate `.json/.yaml/.yml` files in lexicographic filename order.
+3. Run kubectl verification commands through `harness run record ... -- kubectl ...`, kumactl verification commands through `harness run record ... -- kumactl ...`, Envoy admin captures through `harness run envoy capture`, and other cluster-touching commands such as `curl` through `harness run record`. During Phase 4 execution, every `harness run record` command must include `--gid <group-id>`. Do not run these bare. These wrappers are part of the tracked run, not post-hoc loggers. For raw `kubectl`, `harness run record` injects the tracked local `--kubeconfig`, fails closed if the active run has no tracked local kubeconfig yet, and rejects kubeconfig or cluster-target override flags. Even after resume or compaction, do not replace it with raw `kubectl --kubeconfig ...`. Prefer `harness run envoy route-body` or `harness run envoy bootstrap` when you want the inspected Envoy output directly; omit `--file` to capture live first. Save output to `artifacts/`.
+4. Run kubectl cleanup commands through `harness run record ... -- kubectl ...`. Prefer `kubectl delete -f` against the prepared manifest files for the current group, one recorded command per manifest or resource kind. Never mix resource kinds in one `kubectl delete` command such as `kubectl delete kind-a name-a kind-b name-b`; kubectl interprets the later kinds as names of the first kind. If the suite doesn't specify the cleanup, confirm with AskUserQuestion (options: run as proposed, skip, stop). Every command that touches the cluster goes through a tracked harness wrapper.
 5. Write result into the report. Every artifact path referenced must point to an existing file.
 
 ```bash
 # Preferred when the whole prepared group should apply in filename order
-harness apply \
+harness run apply \
   --manifest "<group-id>" \
   --step "<step-name>"
 
 # Or keep an explicit partial order in one command
-harness apply \
+harness run apply \
   --manifest "<group-id>/01.yaml" \
   --manifest "<group-id>/02.yaml" \
   --step "<step-name>"
 
 # Record kubectl verification/cleanup commands
-harness record \
+harness run record \
   --phase "test" \
   --label "<step-label>" \
   --gid "<group-id>" \
   -- kubectl <kubectl-args>
 
 # Preferred cleanup for suite-defined resources
-harness record \
+harness run record \
   --phase "cleanup" \
   --label "cleanup-<group-id>-01" \
   --gid "<group-id>" \
   -- kubectl delete -f manifests/prepared/groups/<group-id>/01.yaml
 
 # Record other cluster-touching commands
-harness record \
+harness run record \
   --phase "test" \
   --label "<step-label>" \
   --gid "<group-id>" \
@@ -209,7 +209,7 @@ After completing each group (hard gate - do not skip any of these):
 1. Finalize the group through the harness-owned report path. This one command captures the post-group pod snapshot and updates both `run-status.json` and `run-report.md`:
 
 ```bash
-harness report group \
+harness run report group \
   --group-id "<group-id>" \
   --status <pass|fail|skip> \
   --capture-label "after-<group-id>" \
@@ -220,7 +220,7 @@ harness report group \
   [--note "<one-line note>"]
 ```
 
-Prefer `--evidence-label` whenever the artifact came from `harness record --label ...` or `harness envoy capture --label ...`. It resolves the latest tracked artifact for that label and avoids guessed timestamped filenames.
+Prefer `--evidence-label` whenever the artifact came from `harness run record --label ...` or `harness run envoy capture --label ...`. It resolves the latest tracked artifact for that label and avoids guessed timestamped filenames.
 
 2. Verify `run-status.json` and `run-report.md` were updated correctly before starting the next group.
 
@@ -238,7 +238,7 @@ When any signal fires:
 1. Enter triage mode:
 
 ```bash
-harness runner-state --event failure-manifest
+harness run runner-state --event failure-manifest
 ```
 
 2. Present an AskUserQuestion with this exact first line:
@@ -272,7 +272,7 @@ Read [troubleshooting.md](troubleshooting.md) for known failure modes.
 For manifest validation or apply failures, switch the runner into failure triage before asking the user:
 
 ```bash
-harness runner-state \
+harness run runner-state \
   --event failure-manifest
 ```
 
@@ -282,28 +282,28 @@ After a `Fix in suite and this run` edit, the prepared manifest in `runs/<run-id
 
 ```bash
 # Option A: re-apply reads from the suite source, not the stale prepared copy
-harness apply --manifest <path> --step <label>
+harness run apply --manifest <path> --step <label>
 
 # Option B: copy the fixed source to the prepared directory manually, then apply
 cp <fixed-suite-source-file> runs/<run-id>/manifests/prepared/<matching-path>
 ```
 
-Do not re-apply the stale prepared copy. Either use `harness apply` which reads from the current suite source, or overwrite the prepared file first.
+Do not re-apply the stale prepared copy. Either use `harness run apply` which reads from the current suite source, or overwrite the prepared file first.
 
 ```bash
-harness capture \
+harness run capture \
   --label "failure-<test-id>"
 ```
 
 ## Phase 6 - closeout
 
 ```bash
-harness capture \
+harness run capture \
   --label "postrun"
 
-harness report check
+harness run report check
 
-harness closeout
+harness run closeout
 ```
 
 **Gate**: all of these are true before marking the run complete:
@@ -319,7 +319,7 @@ harness closeout
 
 After all gates pass, proceed to Phase 7 (retrospective) before tearing down clusters.
 
-After `harness closeout`, that run is final. Do not reuse it for another cluster bootstrap or execution step. Start a new run with a new run ID instead.
+After `harness run closeout`, that run is final. Do not reuse it for another cluster bootstrap or execution step. Start a new run with a new run ID instead.
 
 ## Phase 7 - retrospective
 

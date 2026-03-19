@@ -28,5 +28,5 @@ Before finishing:
 }
 ```
 
-2. Save it with `harness authoring-save --kind variants`.
+2. Save it with `harness authoring save --kind variants`.
 3. Return only `variant summary saved`.

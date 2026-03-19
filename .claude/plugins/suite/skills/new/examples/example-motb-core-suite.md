@@ -54,12 +54,12 @@ keep_clusters: false
 
 ## Execution contract
 
-- `harness preflight` materializes baseline manifests and group `## Configure` YAML once, validates them, applies baselines to all clusters declared in each baseline's `clusters` field, and writes the prepared-suite artifact for the active run.
-- All manifests are applied through `harness apply`.
-- All cluster-interacting commands are executed through tracked harness wrappers such as `harness run ... kubectl ...`, `harness run ... kumactl ...`, or `harness record`.
+- `harness run preflight` materializes baseline manifests and group `## Configure` YAML once, validates them, applies baselines to all clusters declared in each baseline's `clusters` field, and writes the prepared-suite artifact for the active run.
+- All manifests are applied through `harness run apply`.
+- All cluster-interacting commands are executed through tracked harness wrappers such as `harness run record ... -- kubectl ...`, `harness run record ... -- kumactl ...`, or `harness run record`.
 - Group files stay authoritative for `## Consume`, `## Debug`, and expected outcomes.
 - The prepared-suite artifact is the runtime source of truth for prepared manifest paths plus `helm_values` and `restart_namespaces`.
-- State is captured after each completed group with `harness capture`.
+- State is captured after each completed group with `harness run capture`.
 - Deviations require user approval and are recorded in the run report.
 
 ## Failure triage
