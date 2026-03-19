@@ -657,6 +657,39 @@ fn setup_does_not_mutate_run_repository_directly() {
 }
 
 #[test]
+fn setup_session_transport_stays_transport_only() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let transport = fs::read_to_string(root.join("src/setup/session.rs")).unwrap();
+
+    for needle in [
+        "wrapper::main(",
+        "pending_compact_handoff(",
+        "render_hydration_context(",
+        "consume_compact_handoff(",
+        "ephemeral_metallb::cleanup_templates(",
+        "RunApplication::current_run_dir(",
+        "RunApplication::clear_current_pointer(",
+    ] {
+        assert!(
+            !transport.contains(needle),
+            "src/setup/session.rs should stay transport-only instead of owning `{needle}`"
+        );
+    }
+
+    let service = fs::read_to_string(root.join("src/setup/services/session.rs")).unwrap();
+    for needle in [
+        "fn bootstrap_project_wrapper(",
+        "fn restore_compact_handoff(",
+        "fn cleanup_current_run_context(",
+    ] {
+        assert!(
+            service.contains(needle),
+            "src/setup/services/session.rs should own `{needle}`"
+        );
+    }
+}
+
+#[test]
 fn setup_wrapper_does_not_depend_on_block_registry() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
     let contents = fs::read_to_string(root.join("src/setup/wrapper.rs")).unwrap();

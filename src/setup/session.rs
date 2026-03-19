@@ -1,16 +1,9 @@
-use std::env;
-
 use clap::Args;
-
-use tracing::warn;
 
 use crate::app::command_context::{AppContext, Execute, resolve_project_dir};
 use crate::errors::CliError;
 use crate::hooks::session::SessionStartHookOutput;
-use crate::platform::ephemeral_metallb;
-use crate::run::application::RunApplication;
-use crate::setup::wrapper;
-use crate::workspace::compact;
+use crate::setup::services::session as session_service;
 
 impl Execute for SessionStartArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
@@ -46,21 +39,9 @@ pub struct SessionStopArgs {
 /// Returns `CliError` on failure.
 pub fn session_start(project_dir: Option<&str>) -> Result<i32, CliError> {
     let dir = resolve_project_dir(project_dir);
+    session_service::bootstrap_project_wrapper(&dir);
 
-    // Bootstrap the project wrapper
-    let path_env = env::var("PATH").unwrap_or_default();
-    if let Err(e) = wrapper::main(&dir, &path_env) {
-        warn!(%e, "bootstrap failed");
-    }
-
-    // Check for a pending compact handoff to restore
-    let handoff = compact::pending_compact_handoff(&dir)?;
-    if let Some(h) = handoff {
-        let diverged = compact::verify_fingerprints(&h);
-        let context = compact::render_hydration_context(&h, &diverged);
-        if let Err(e) = compact::consume_compact_handoff(&dir, h) {
-            warn!(%e, "compact handoff consume failed");
-        }
+    if let Some(context) = session_service::restore_compact_handoff(&dir)? {
         let output = SessionStartHookOutput::from_additional_context(&context);
         if let Ok(json) = output.to_json() {
             print!("{json}");
@@ -80,17 +61,6 @@ pub fn session_start(project_dir: Option<&str>) -> Result<i32, CliError> {
 /// # Errors
 /// Returns `CliError` on failure.
 pub fn session_stop(_project_dir: Option<&str>) -> Result<i32, CliError> {
-    let Some(run_dir) = RunApplication::current_run_dir()? else {
-        return Ok(0);
-    };
-    if run_dir.is_dir()
-        && let Err(e) = ephemeral_metallb::cleanup_templates(&run_dir)
-    {
-        warn!(%e, "cleanup templates failed");
-    }
-
-    if let Err(e) = RunApplication::clear_current_pointer() {
-        warn!(%e, "failed to remove run pointer");
-    }
+    session_service::cleanup_current_run_context()?;
     Ok(0)
 }
