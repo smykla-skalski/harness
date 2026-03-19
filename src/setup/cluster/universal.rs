@@ -13,7 +13,7 @@ use crate::infra::blocks::{
 use crate::infra::exec::{extract_admin_token, run_command, wait_for_http};
 use crate::platform::cluster::{ClusterMode, ClusterSpec, Platform};
 use crate::platform::compose;
-use crate::run::context::RunRepository;
+use crate::run::application::RunApplication;
 use crate::setup::services::cluster::persist_cluster_spec;
 use crate::workspace::HARNESS_PREFIX;
 
@@ -115,10 +115,7 @@ pub(super) fn resolve_effective_store(is_up: bool, cli_store: &str) -> String {
 /// Returns `CliError` on corrupt JSON or parse failures. Returns `Ok(None)` when
 /// the context file is missing.
 pub(super) fn load_persisted_cluster_spec() -> Result<Option<ClusterSpec>, CliError> {
-    let repo = RunRepository;
-    Ok(repo
-        .load_current_pointer()?
-        .and_then(|pointer| pointer.cluster))
+    RunApplication::load_current_cluster_spec()
 }
 
 pub(crate) fn cluster_universal(args: &ClusterArgs) -> Result<i32, CliError> {

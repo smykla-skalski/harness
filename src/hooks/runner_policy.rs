@@ -1,6 +1,8 @@
+use std::collections::BTreeSet;
 use std::fmt;
 use std::str::FromStr;
 
+use crate::infra::blocks::BlockRequirement;
 use crate::kernel::gate::Gate;
 use crate::kernel::skills::SKILL_RUN;
 
@@ -22,6 +24,15 @@ pub const BUG_FOUND_GATE: Gate = Gate {
 };
 
 pub const SKILL_NAME: &str = SKILL_RUN;
+
+#[must_use]
+pub fn managed_cluster_binaries() -> BTreeSet<String> {
+    BlockRequirement::ALL
+        .iter()
+        .flat_map(|requirement| requirement.denied_binaries().iter().copied())
+        .map(ToString::to_string)
+        .collect()
+}
 
 /// Preflight reply status.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -278,7 +289,9 @@ impl TaskOutputPattern {
 
     #[must_use]
     pub fn matches_any(text: &str) -> bool {
-        Self::ALL.iter().any(|pattern| text.contains(pattern.as_str()))
+        Self::ALL
+            .iter()
+            .any(|pattern| text.contains(pattern.as_str()))
     }
 
     pub const DENY_MESSAGE: &str = "do not read task output files directly. \

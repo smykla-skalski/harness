@@ -5,12 +5,12 @@ use clap::Args;
 use tracing::warn;
 
 use crate::app::command_context::{AppContext, Execute, resolve_project_dir};
-use crate::workspace::compact;
 use crate::errors::CliError;
 use crate::hooks::session::SessionStartHookOutput;
 use crate::platform::ephemeral_metallb;
-use crate::run::context::RunRepository;
+use crate::run::application::RunApplication;
 use crate::setup::wrapper;
+use crate::workspace::compact;
 
 impl Execute for SessionStartArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
@@ -80,19 +80,16 @@ pub fn session_start(project_dir: Option<&str>) -> Result<i32, CliError> {
 /// # Errors
 /// Returns `CliError` on failure.
 pub fn session_stop(_project_dir: Option<&str>) -> Result<i32, CliError> {
-    let repo = RunRepository;
-    let Some(record) = repo.load_current_pointer()? else {
+    let Some(run_dir) = RunApplication::current_run_dir()? else {
         return Ok(0);
     };
-
-    let run_dir = record.layout.run_dir();
     if run_dir.is_dir()
         && let Err(e) = ephemeral_metallb::cleanup_templates(&run_dir)
     {
         warn!(%e, "cleanup templates failed");
     }
 
-    if let Err(e) = repo.clear_current_pointer() {
+    if let Err(e) = RunApplication::clear_current_pointer() {
         warn!(%e, "failed to remove run pointer");
     }
     Ok(0)
