@@ -2,7 +2,7 @@ use crate::authoring::workflow::can_stop;
 use crate::errors::{CliError, HookMessage};
 use crate::hooks::protocol::context::GuardContext as HookContext;
 use crate::hooks::protocol::hook_result::HookResult;
-use crate::schema::Verdict;
+use crate::run::Verdict;
 
 /// Execute the guard-stop hook.
 ///

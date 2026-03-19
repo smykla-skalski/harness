@@ -3,7 +3,7 @@
 // and context loading from run directories.
 
 use harness::run::{RunContext, RunLayout};
-use harness::schema::Verdict;
+use harness::run::Verdict;
 
 use super::super::helpers::*;
 

@@ -4,7 +4,7 @@
 // skill bypass.
 
 use harness::hooks::guard_stop;
-use harness::schema::Verdict;
+use harness::run::Verdict;
 
 use super::super::helpers::*;
 

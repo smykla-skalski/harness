@@ -8,7 +8,7 @@ use harness::hooks::guard_bash;
 use harness::run::workflow::{
     self as runner_workflow, PreflightState, PreflightStatus, RunnerPhase, RunnerWorkflowState,
 };
-use harness::schema::Verdict;
+use harness::run::Verdict;
 
 use super::super::helpers::*;
 

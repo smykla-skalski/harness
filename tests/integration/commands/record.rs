@@ -21,7 +21,7 @@ use harness::run::commands::{
     CaptureArgs, CloseoutArgs, EnvoyArgs, EnvoyCommand, KumactlArgs, KumactlCommand, RecordArgs,
 };
 use harness::run::workflow::{self as runner_workflow, RunnerPhase};
-use harness::schema::Verdict;
+use harness::run::Verdict;
 use harness::setup::GatewayArgs;
 
 use super::super::helpers::*;

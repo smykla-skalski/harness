@@ -18,8 +18,8 @@ use crate::errors::{CliError, CliErrorKind, io_for};
 use crate::hooks::protocol::context::GuardContext as HookContext;
 use crate::infra::io::{ensure_dir, write_text};
 use crate::run::context::RunLayout;
+use crate::run::RunStatus;
 use crate::run::workflow::{RunnerPhase, RunnerWorkflowState};
-use crate::schema::RunStatus;
 use crate::workspace::utc_now;
 
 static SANITIZE_NAME_RE: LazyLock<Regex> =
@@ -286,8 +286,8 @@ fn append_jsonl_line(path: &Path, line: &str) -> Result<(), CliError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::run::{RunCounts, Verdict};
     use crate::run::workflow::{PreflightState, PreflightStatus};
-    use crate::schema::{RunCounts, Verdict};
 
     use summarize::summarize_answers;
 
