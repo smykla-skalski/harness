@@ -96,6 +96,9 @@ fn app_context_stays_app_wiring_only() {
         "RunRepository",
         "resolve_run_directory",
         "RunDirArgs",
+        "BlockRegistry",
+        "shared_blocks(",
+        "blocks(",
     ] {
         assert!(
             !contents.contains(needle),
@@ -153,6 +156,8 @@ fn run_commands_depend_on_application_boundary_not_services() {
         "use crate::run::services::wait_for_task_output",
         "super::shared::resolve_run_services",
         "super::shared::resolve_run_services_with_blocks",
+        "ctx.shared_blocks()",
+        "ctx.blocks()",
     ];
     let mut hits = Vec::new();
 

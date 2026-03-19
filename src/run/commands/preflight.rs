@@ -7,7 +7,7 @@ use crate::errors::CliError;
 use crate::run::args::RunDirArgs;
 use crate::workspace::{shorten_path, utc_now};
 
-use super::shared::resolve_run_application_with_blocks;
+use super::shared::resolve_run_application;
 
 impl Execute for PreflightArgs {
     fn execute(&self, context: &AppContext) -> Result<i32, CliError> {
@@ -39,13 +39,13 @@ pub struct PreflightArgs {
 /// # Errors
 /// Returns `CliError` on failure.
 pub fn preflight(
-    ctx: &AppContext,
+    _ctx: &AppContext,
     _kubeconfig: Option<&str>,
     _repo_root: Option<&str>,
     run_dir_args: &RunDirArgs,
 ) -> Result<i32, CliError> {
     let checked_at = utc_now();
-    let run = resolve_run_application_with_blocks(run_dir_args, ctx.shared_blocks())?;
+    let run = resolve_run_application(run_dir_args)?;
     run.validate_requirement_names()?;
     let _ = run.save_preflight_outputs(&checked_at)?;
     run.record_preflight_complete()?;

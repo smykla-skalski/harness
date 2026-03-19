@@ -1,9 +1,7 @@
 use std::env;
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
 
 use crate::errors::{CliError, CliErrorKind};
-use crate::infra::blocks::BlockRegistry;
 use crate::run::application::RunApplication;
 use crate::run::args::RunDirArgs;
 use crate::run::context::{RunAggregate, RunRepository};
@@ -71,17 +69,6 @@ pub(crate) fn resolve_run_aggregate(args: &RunDirArgs) -> Result<RunAggregate, C
 /// # Errors
 /// Returns `CliError` when the run aggregate cannot be loaded.
 pub(crate) fn resolve_run_application(args: &RunDirArgs) -> Result<RunApplication, CliError> {
-    resolve_run_application_with_blocks(args, Arc::new(BlockRegistry::production()))
-}
-
-/// Resolve a run aggregate and build the application boundary with the provided adapters.
-///
-/// # Errors
-/// Returns `CliError` when the run aggregate cannot be loaded.
-pub(crate) fn resolve_run_application_with_blocks(
-    args: &RunDirArgs,
-    blocks: Arc<BlockRegistry>,
-) -> Result<RunApplication, CliError> {
     let aggregate = resolve_run_aggregate(args)?;
-    Ok(RunApplication::from_context_with_blocks(aggregate, blocks))
+    Ok(RunApplication::from_context(aggregate))
 }

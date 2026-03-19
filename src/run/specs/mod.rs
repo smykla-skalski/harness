@@ -175,6 +175,73 @@ Do config.
     }
 
     #[test]
+    fn test_load_suite_supports_required_dependencies_alias() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = write_temp_file(
+            dir.path(),
+            "suite.md",
+            "---\n\
+suite_id: alias.suite\n\
+feature: example\n\
+scope: unit\n\
+keep_clusters: false\n\
+required_dependencies:\n\
+  - demo-workload\n\
+groups:\n\
+  - groups/g01.md\n\
+---\n\nBody.\n",
+        );
+        let suite = SuiteSpec::from_markdown(&path).unwrap();
+        assert_eq!(suite.frontmatter.requires, vec!["demo-workload"]);
+    }
+
+    #[test]
+    fn test_load_suite_supports_structured_baseline_files() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = write_temp_file(
+            dir.path(),
+            "suite.md",
+            "---\n\
+suite_id: baseline.suite\n\
+feature: example\n\
+scope: unit\n\
+keep_clusters: false\n\
+baseline_files:\n\
+  - path: baseline/namespace.yaml\n\
+    clusters: all\n\
+groups:\n\
+  - groups/g01.md\n\
+---\n\nBody.\n",
+        );
+        let suite = SuiteSpec::from_markdown(&path).unwrap();
+        assert_eq!(suite.frontmatter.baseline_files, vec!["baseline/namespace.yaml"]);
+    }
+
+    #[test]
+    fn test_load_suite_supports_structured_skipped_groups() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = write_temp_file(
+            dir.path(),
+            "suite.md",
+            "---\n\
+suite_id: skipped.suite\n\
+feature: example\n\
+scope: unit\n\
+keep_clusters: false\n\
+skipped_groups:\n\
+  - g03-runtime: omitted in the example\n\
+groups:\n\
+  - groups/g01.md\n\
+---\n\nBody.\n",
+        );
+        let suite = SuiteSpec::from_markdown(&path).unwrap();
+        assert_eq!(
+            suite.frontmatter.skipped_groups,
+            vec!["g03-runtime: omitted in the example"]
+        );
+    }
+
+    #[test]
     fn test_load_documented_example_group() {
         let alt = Path::new(
             "/Users/bart.smykla@konghq.com/Projects/github.com/kumahq/kuma/.claude/worktrees/kuma-claude-plugins/.claude/skills/suite/new/examples/example-motb-core-group.md",
