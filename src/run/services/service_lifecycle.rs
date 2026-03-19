@@ -6,7 +6,7 @@ use crate::infra::blocks::kuma::defaults;
 use crate::infra::blocks::kuma::service::{KumaService, KumaServiceSpec};
 use crate::infra::blocks::kuma::token::parse_token_response;
 use crate::infra::blocks::{ContainerConfig, ContainerRuntime};
-use crate::infra::exec::{self, HttpMethod};
+use crate::infra::exec::{self, CommandResult, HttpMethod};
 use crate::platform::runtime::XdsAccess;
 use crate::run::state_capture::UniversalDataplaneCollection;
 
@@ -84,11 +84,8 @@ impl RunServices {
     /// # Errors
     /// Returns `CliError` when the tracked run is missing universal access details
     /// or when container setup fails.
-    pub fn start_service(
-        &self,
-        docker: &dyn ContainerRuntime,
-        request: &StartServiceRequest<'_>,
-    ) -> Result<(), CliError> {
+    pub fn start_service(&self, request: &StartServiceRequest<'_>) -> Result<(), CliError> {
+        let docker = self.docker()?;
         let access = self.control_plane_access()?;
         let network = self.docker_network()?;
         let service_image = self.service_image(request.image)?;
@@ -133,6 +130,34 @@ impl RunServices {
         }
 
         Ok(())
+    }
+
+    /// Read or stream logs for a tracked cluster container.
+    ///
+    /// Returns `None` when logs are streamed directly to the terminal.
+    ///
+    /// # Errors
+    /// Returns `CliError` on docker invocation failures.
+    pub fn service_logs(
+        &self,
+        name: &str,
+        tail: u32,
+        follow: bool,
+    ) -> Result<Option<CommandResult>, CliError> {
+        let container = self.resolve_container_name(name);
+        let tail_str = tail.to_string();
+        let mut args: Vec<&str> = vec!["--tail", &tail_str];
+        if follow {
+            args.push("-f");
+            self.docker()?.logs_follow(container.as_ref(), &args)?;
+            return Ok(None);
+        }
+
+        Ok(Some(ContainerRuntime::logs(
+            self.docker()?,
+            container.as_ref(),
+            &args,
+        )?))
     }
 }
 
