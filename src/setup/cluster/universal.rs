@@ -11,7 +11,7 @@ use crate::infra::blocks::{
     DockerContainerRuntime, StdProcessExecutor,
 };
 use crate::infra::exec::{extract_admin_token, run_command, wait_for_http};
-use crate::platform::cluster::{ClusterMode, ClusterSpec, Platform};
+use crate::kernel::topology::{ClusterMode, ClusterSpec, Platform};
 use crate::platform::compose;
 use crate::run::application::RunApplication;
 use crate::setup::services::cluster::persist_cluster_spec;

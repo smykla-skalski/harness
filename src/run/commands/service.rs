@@ -103,7 +103,7 @@ fn service_list(run_dir_args: &RunDirArgs) -> Result<i32, CliError> {
 
 #[cfg(test)]
 mod tests {
-    use crate::platform::cluster::{ClusterSpec, Platform};
+    use crate::kernel::topology::{ClusterSpec, Platform};
     use crate::platform::runtime::ClusterRuntime;
     use crate::run::services::service_lifecycle::extract_pem_certificates;
 

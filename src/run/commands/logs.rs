@@ -51,7 +51,7 @@ pub fn logs(
 
 #[cfg(test)]
 mod tests {
-    use crate::platform::cluster::{ClusterSpec, Platform};
+    use crate::kernel::topology::{ClusterSpec, Platform};
     use crate::platform::runtime::ClusterRuntime;
 
     #[test]

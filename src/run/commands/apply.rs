@@ -12,7 +12,7 @@ use crate::infra::blocks::kuma::manifest::resource_api_path;
 use crate::infra::exec;
 use crate::infra::exec::kubectl;
 use crate::infra::io::{ensure_dir, validate_safe_segment, write_text};
-use crate::platform::cluster::Platform;
+use crate::kernel::topology::Platform;
 use crate::platform::runtime::ClusterRuntime;
 use crate::run::args::RunDirArgs;
 use crate::run::resolve::resolve_manifest_path;

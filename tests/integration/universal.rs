@@ -11,7 +11,7 @@
 use std::fs;
 use std::path::Path;
 
-use harness::platform::cluster::{ClusterMember, ClusterMode, ClusterSpec, HelmSetting, Platform};
+use harness::kernel::topology::{ClusterMember, ClusterMode, ClusterSpec, HelmSetting, Platform};
 use harness::platform::compose::{self, GlobalTwoZonesConfig, ZoneConfig};
 use harness::run::ValidateArgs;
 use harness::run::context::{CommandEnv, RunContext, RunLayout};
