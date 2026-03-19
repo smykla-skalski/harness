@@ -308,6 +308,36 @@ fn run_services_do_not_own_cluster_inspection_reports() {
 }
 
 #[test]
+fn run_services_do_not_own_service_lifecycle_application_flows() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let lifecycle = fs::read_to_string(root.join("src/run/services/service_lifecycle.rs")).unwrap();
+
+    for needle in [
+        "impl RunServices",
+        "pub fn list_service_containers(",
+        "pub fn start_service(",
+        "pub fn service_logs(",
+    ] {
+        assert!(
+            !lifecycle.contains(needle),
+            "src/run/services/service_lifecycle.rs should not own application-facing service flow `{needle}`"
+        );
+    }
+
+    let application = fs::read_to_string(root.join("src/run/application/services.rs")).unwrap();
+    for needle in [
+        "pub fn list_service_containers(",
+        "pub fn start_service(",
+        "pub fn service_logs(",
+    ] {
+        assert!(
+            application.contains(needle),
+            "src/run/application/services.rs should own `{needle}`"
+        );
+    }
+}
+
+#[test]
 fn authoring_commands_depend_on_application_boundary() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
     let commands_root = root.join("src/authoring/commands");

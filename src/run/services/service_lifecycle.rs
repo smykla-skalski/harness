@@ -6,11 +6,10 @@ use crate::infra::blocks::kuma::defaults;
 use crate::infra::blocks::kuma::service::{KumaService, KumaServiceSpec};
 use crate::infra::blocks::kuma::token::parse_token_response;
 use crate::infra::blocks::{ContainerConfig, ContainerRuntime};
-use crate::infra::exec::{self, CommandResult, HttpMethod};
+use crate::infra::exec::{self, CommandResult};
+use crate::platform::runtime::ControlPlaneAccess;
 use crate::platform::runtime::XdsAccess;
-use crate::run::state_capture::UniversalDataplaneCollection;
 
-use super::RunServices;
 use super::status::ServiceStatusRecord;
 
 #[derive(Debug, Clone)]
@@ -40,125 +39,109 @@ const TEMPLATE_DATAPLANE: &str =
 const TEMPLATE_TRANSPARENT_PROXY: &str =
     include_str!("../../../resources/universal/templates/transparent-proxy.yaml.j2");
 
-impl RunServices {
-    #[must_use]
-    pub fn service_container_filter(&self) -> String {
-        format!("label=io.harness.run-id={}", self.layout().run_id)
+#[must_use]
+pub(crate) fn run_service_filter(run_id: &str) -> String {
+    format!("label=io.harness.run-id={run_id}")
+}
+
+/// List service containers scoped to the current run.
+///
+/// # Errors
+/// Returns `CliError` on docker invocation failures.
+pub(crate) fn read_service_container_rows(
+    docker: &dyn ContainerRuntime,
+    filter: &str,
+) -> Result<Vec<ServiceStatusRecord>, CliError> {
+    let result = docker.list_formatted(&["--filter", filter], "{{.Names}}\t{{.Status}}")?;
+    Ok(result
+        .stdout
+        .lines()
+        .filter(|line| !line.trim().is_empty())
+        .map(|line| {
+            let mut parts = line.splitn(2, '\t');
+            ServiceStatusRecord {
+                name: parts.next().unwrap_or_default().to_string(),
+                status: parts.next().unwrap_or_default().to_string(),
+            }
+        })
+        .collect())
+}
+
+/// Start a tracked universal service container and attach a Kuma dataplane.
+///
+/// # Errors
+/// Returns `CliError` when the tracked run is missing universal access details
+/// or when container setup fails.
+pub(crate) fn start_tracked_service_container(
+    docker: &dyn ContainerRuntime,
+    run_id: &str,
+    access: &ControlPlaneAccess<'_>,
+    xds: XdsAccess<'_>,
+    network: &str,
+    service_image: &str,
+    request: &StartServiceRequest<'_>,
+) -> Result<(), CliError> {
+    let token = token_via_api(
+        access.addr.as_ref(),
+        request.name,
+        request.mesh,
+        defaults::DEFAULT_TOKEN_VALID_FOR,
+        access.admin_token,
+    )?;
+
+    docker.run_detached(&ContainerConfig {
+        image: service_image.to_string(),
+        name: request.name.to_string(),
+        network: network.to_string(),
+        env: vec![],
+        ports: vec![(request.port, request.port)],
+        labels: vec![
+            ("io.harness.service".to_string(), "true".to_string()),
+            ("io.harness.run-id".to_string(), run_id.to_string()),
+        ],
+        extra_args: vec![],
+        command: vec!["sleep".to_string(), "infinity".to_string()],
+    })?;
+
+    if let Err(error) = service_up_inner(&ServiceSetup {
+        docker,
+        name: request.name,
+        port: request.port,
+        mesh: request.mesh,
+        network,
+        token: token.trim(),
+        transparent_proxy: request.transparent_proxy,
+        timeout: request.timeout,
+        xds,
+    }) {
+        let _ = docker.remove(request.name);
+        return Err(error);
     }
 
-    /// List service containers scoped to the current run.
-    ///
-    /// # Errors
-    /// Returns `CliError` on docker invocation failures.
-    pub fn list_service_containers(&self) -> Result<Vec<ServiceStatusRecord>, CliError> {
-        let filter = self.service_container_filter();
-        let result = self
-            .docker()?
-            .list_formatted(&["--filter", &filter], "{{.Names}}\t{{.Status}}")?;
-        Ok(result
-            .stdout
-            .lines()
-            .filter(|line| !line.trim().is_empty())
-            .map(|line| {
-                let mut parts = line.splitn(2, '\t');
-                ServiceStatusRecord {
-                    name: parts.next().unwrap_or_default().to_string(),
-                    status: parts.next().unwrap_or_default().to_string(),
-                }
-            })
-            .collect())
+    Ok(())
+}
+
+/// Read or stream logs for a tracked cluster container.
+///
+/// Returns `None` when logs are streamed directly to the terminal.
+///
+/// # Errors
+/// Returns `CliError` on docker invocation failures.
+pub(crate) fn read_service_logs(
+    docker: &dyn ContainerRuntime,
+    container: &str,
+    tail: u32,
+    follow: bool,
+) -> Result<Option<CommandResult>, CliError> {
+    let tail_str = tail.to_string();
+    let mut args: Vec<&str> = vec!["--tail", &tail_str];
+    if follow {
+        args.push("-f");
+        docker.logs_follow(container, &args)?;
+        return Ok(None);
     }
 
-    /// Query the control plane for dataplanes in the target mesh.
-    ///
-    /// # Errors
-    /// Returns `CliError` when the control-plane request fails.
-    pub fn query_dataplanes(&self, mesh: &str) -> Result<UniversalDataplaneCollection, CliError> {
-        let path = format!("/meshes/{mesh}/dataplanes");
-        self.call_control_plane_json(&path, HttpMethod::Get, None)
-            .map(UniversalDataplaneCollection::from_api_value)
-    }
-
-    /// Start a tracked universal service container and attach a Kuma dataplane.
-    ///
-    /// # Errors
-    /// Returns `CliError` when the tracked run is missing universal access details
-    /// or when container setup fails.
-    pub fn start_service(&self, request: &StartServiceRequest<'_>) -> Result<(), CliError> {
-        let docker = self.docker()?;
-        let access = self.control_plane_access()?;
-        let network = self.docker_network()?;
-        let service_image = self.service_image(request.image)?;
-        let token = token_via_api(
-            access.addr.as_ref(),
-            request.name,
-            request.mesh,
-            defaults::DEFAULT_TOKEN_VALID_FOR,
-            access.admin_token,
-        )?;
-
-        docker.run_detached(&ContainerConfig {
-            image: service_image.into_owned(),
-            name: request.name.to_string(),
-            network: network.to_string(),
-            env: vec![],
-            ports: vec![(request.port, request.port)],
-            labels: vec![
-                ("io.harness.service".to_string(), "true".to_string()),
-                (
-                    "io.harness.run-id".to_string(),
-                    self.layout().run_id.clone(),
-                ),
-            ],
-            extra_args: vec![],
-            command: vec!["sleep".to_string(), "infinity".to_string()],
-        })?;
-
-        if let Err(error) = service_up_inner(&ServiceSetup {
-            docker,
-            name: request.name,
-            port: request.port,
-            mesh: request.mesh,
-            network,
-            token: token.trim(),
-            transparent_proxy: request.transparent_proxy,
-            timeout: request.timeout,
-            xds: self.xds_access()?,
-        }) {
-            let _ = docker.remove(request.name);
-            return Err(error);
-        }
-
-        Ok(())
-    }
-
-    /// Read or stream logs for a tracked cluster container.
-    ///
-    /// Returns `None` when logs are streamed directly to the terminal.
-    ///
-    /// # Errors
-    /// Returns `CliError` on docker invocation failures.
-    pub fn service_logs(
-        &self,
-        name: &str,
-        tail: u32,
-        follow: bool,
-    ) -> Result<Option<CommandResult>, CliError> {
-        let container = self.resolve_container_name(name);
-        let tail_str = tail.to_string();
-        let mut args: Vec<&str> = vec!["--tail", &tail_str];
-        if follow {
-            args.push("-f");
-            self.docker()?.logs_follow(container.as_ref(), &args)?;
-            return Ok(None);
-        }
-
-        Ok(Some(ContainerRuntime::logs(
-            self.docker()?,
-            container.as_ref(),
-            &args,
-        )?))
-    }
+    Ok(Some(ContainerRuntime::logs(docker, container, &args)?))
 }
 
 fn service_up_inner(setup: &ServiceSetup<'_>) -> Result<(), CliError> {
