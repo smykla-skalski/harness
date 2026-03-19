@@ -2,7 +2,7 @@ use std::path::Path;
 
 use crate::authoring::workflow::{self, can_write};
 use crate::errors::{CliError, HookMessage};
-use crate::hooks::protocol::context::GuardContext as HookContext;
+use crate::hooks::application::GuardContext as HookContext;
 use crate::hooks::protocol::hook_result::HookResult;
 use crate::kernel::run_surface::{RunDir, RunFile};
 

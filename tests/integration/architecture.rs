@@ -302,6 +302,65 @@ fn tool_fact_model_is_owned_by_kernel() {
 }
 
 #[test]
+fn hook_application_owns_guard_context_hydration() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let protocol_context = fs::read_to_string(root.join("src/hooks/protocol/context.rs")).unwrap();
+
+    for needle in [
+        "pub struct GuardContext",
+        "RunContext",
+        "RunnerWorkflowState",
+        "AuthorWorkflowState",
+        "load_run_context",
+        "load_runner_state",
+        "load_author_state",
+    ] {
+        assert!(
+            !protocol_context.contains(needle),
+            "src/hooks/protocol/context.rs should stay transport-only instead of owning `{needle}`"
+        );
+    }
+
+    let application_context =
+        fs::read_to_string(root.join("src/hooks/application/context.rs")).unwrap();
+    assert!(
+        application_context.contains("pub struct GuardContext"),
+        "src/hooks/application/context.rs should own the hook policy input context"
+    );
+
+    let hooks_root = root.join("src/hooks");
+    let mut stack = vec![hooks_root];
+    let mut hits = Vec::new();
+
+    while let Some(path) = stack.pop() {
+        for entry in fs::read_dir(&path).unwrap() {
+            let entry = entry.unwrap();
+            let child = entry.path();
+            if child.is_dir() {
+                stack.push(child);
+                continue;
+            }
+            if !matches_extension(&child) {
+                continue;
+            }
+            let contents = fs::read_to_string(&child).unwrap();
+            if contents.contains("protocol::context::GuardContext") {
+                hits.push(format!(
+                    "{} still imports GuardContext from hooks::protocol",
+                    child.strip_prefix(root).unwrap().display()
+                ));
+            }
+        }
+    }
+
+    assert!(
+        hits.is_empty(),
+        "hook code should consume hooks::application::GuardContext instead of the protocol layer:\n{}",
+        hits.join("\n")
+    );
+}
+
+#[test]
 fn kuma_contracts_are_isolated_to_block_namespace() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
     let src_root = root.join("src");
