@@ -1,6 +1,9 @@
 mod cluster_health;
-mod service_lifecycle;
+mod recording;
+mod reporting;
+pub(crate) mod service_lifecycle;
 mod status;
+mod task_output;
 
 use std::borrow::Cow;
 use std::collections::BTreeMap;
@@ -39,7 +42,11 @@ use crate::run::workflow::{
 use crate::schema::{RunStatus, SuiteSpec};
 
 pub use cluster_health::{ClusterHealthReport, ClusterMemberHealthRecord};
+pub use recording::{RecordCommandRequest, RecordedCommandResult, record_command};
+pub use reporting::{GroupReportRequest, ReportCheckOutcome, check_report_compactness};
+pub use service_lifecycle::StartServiceRequest;
 pub use status::{ClusterMemberStatusRecord, ClusterStatusReport, ServiceStatusRecord};
+pub use task_output::{tail_task_output, wait_for_task_output};
 
 /// Domain access layer for a tracked run.
 pub struct RunServices {
