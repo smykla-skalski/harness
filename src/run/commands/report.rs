@@ -1,18 +1,9 @@
-use std::fmt::Write as _;
-use std::path::PathBuf;
-
 use clap::{Args, Subcommand};
 
-use tracing::warn;
-
 use crate::app::command_context::{CommandContext, Execute, RunDirArgs, resolve_run_services};
-use crate::core_defs::utc_now;
 use crate::errors::{CliError, CliErrorKind};
-use crate::rules::suite_runner::{REPORT_CODE_BLOCK_LIMIT, REPORT_LINE_LIMIT};
-use crate::run::audit::write_run_status_with_audit;
-use crate::run::services::RunServices;
-use crate::run::workflow::ensure_execution_phase;
-use crate::schema::{ExecutedGroupChange, GroupVerdict, RunReport, RunStatus};
+use crate::run::services::{GroupReportRequest, ReportCheckOutcome, check_report_compactness};
+use crate::schema::GroupVerdict;
 
 impl Execute for ReportArgs {
     fn execute(&self, _context: &CommandContext) -> Result<i32, CliError> {
@@ -70,7 +61,13 @@ pub struct ReportArgs {
 /// Returns `CliError` on failure.
 pub fn report(cmd: &ReportCommand) -> Result<i32, CliError> {
     match cmd {
-        ReportCommand::Check { report } => report_check(report.as_deref()),
+        ReportCommand::Check { report } => {
+            match check_report_compactness(report.as_deref())? {
+                ReportCheckOutcome::Missing => println!("no report generated yet"),
+                ReportCheckOutcome::Valid => println!("report is compact enough"),
+            }
+            Ok(0)
+        }
         ReportCommand::Group {
             group_id,
             status,
@@ -91,45 +88,6 @@ pub fn report(cmd: &ReportCommand) -> Result<i32, CliError> {
     }
 }
 
-fn report_check(report_path: Option<&str>) -> Result<i32, CliError> {
-    let path = if let Some(p) = report_path {
-        PathBuf::from(p)
-    } else {
-        let services = RunServices::from_current()?.ok_or_else(|| -> CliError {
-            CliErrorKind::missing_run_context_value("report").into()
-        })?;
-        services.layout().report_path()
-    };
-
-    if !path.exists() {
-        println!("no report generated yet");
-        return Ok(0);
-    }
-
-    let rpt = RunReport::from_markdown(&path)?;
-    let body = rpt.to_markdown();
-    let line_count = body.lines().count();
-    let code_blocks = body.matches("```").count() / 2;
-
-    if line_count > REPORT_LINE_LIMIT {
-        return Err(CliErrorKind::report_line_limit(
-            line_count.to_string(),
-            REPORT_LINE_LIMIT.to_string(),
-        )
-        .into());
-    }
-    if code_blocks > REPORT_CODE_BLOCK_LIMIT {
-        return Err(CliErrorKind::report_code_block_limit(
-            code_blocks.to_string(),
-            REPORT_CODE_BLOCK_LIMIT.to_string(),
-        )
-        .into());
-    }
-
-    println!("report is compact enough");
-    Ok(0)
-}
-
 fn report_group(
     group_id: &str,
     status: &str,
@@ -139,232 +97,20 @@ fn report_group(
     note: Option<&str>,
     run_dir_args: &RunDirArgs,
 ) -> Result<i32, CliError> {
-    if evidence.is_empty() && evidence_label.is_empty() && capture_label.is_none() {
-        return Err(CliErrorKind::ReportGroupEvidenceRequired.into());
-    }
-
     let mut services = resolve_run_services(run_dir_args)?;
-    let run_dir = services.layout().run_dir();
-    let report_path = services.layout().report_path();
-
-    let Some(run_status) = services.status_mut() else {
-        return Err(CliErrorKind::MissingRunStatus.into());
-    };
-
     let verdict: GroupVerdict = status.parse().map_err(|()| {
         CliErrorKind::usage_error(format!(
             "unknown group status '{status}': must be pass, fail, or skip"
         ))
     })?;
 
-    if !apply_group_report_result(run_status, group_id, verdict, capture_label, note) {
-        return Ok(0);
-    }
-
-    // Write report section first so status is never updated if report fails.
-    let mut report = RunReport::from_markdown(&report_path)?;
-
-    let mut section = format!("\n## Group: {group_id}\n\n**Verdict:** {verdict}\n");
-    let all_refs: Vec<&str> = evidence
-        .iter()
-        .map(String::as_str)
-        .chain(evidence_label.iter().map(String::as_str))
-        .chain(capture_label)
-        .collect();
-    if !all_refs.is_empty() {
-        let _ = write!(section, "\n**Evidence:** {}\n", all_refs.join(", "));
-    }
-    if let Some(n) = note {
-        let _ = write!(section, "\n**Note:** {n}\n");
-    }
-
-    report.body.push_str(&section);
-    report.save()?;
-
-    write_run_status_with_audit(
-        &run_dir,
-        run_status,
-        None,
-        Some("execution"),
-        Some(group_id),
-    )?;
-
-    // Auto-advance runner state from bootstrap/preflight to execution when
-    // a group result is recorded.
-    ensure_execution_phase(&run_dir)?;
-
-    Ok(0)
-}
-
-fn apply_group_report_result(
-    run_status: &mut RunStatus,
-    group_id: &str,
-    verdict: GroupVerdict,
-    capture_label: Option<&str>,
-    note: Option<&str>,
-) -> bool {
-    let state_capture_at_report = run_status.last_state_capture.take();
-
-    if !prepare_group_report_update(
-        run_status,
+    let _ = services.finalize_group_report(&GroupReportRequest {
         group_id,
         verdict,
+        evidence,
+        evidence_label,
         capture_label,
-        state_capture_at_report.as_deref(),
-    ) {
-        run_status.last_state_capture = state_capture_at_report;
-        return false;
-    }
-
-    let now = utc_now();
-    let change =
-        run_status.record_group_result(group_id, verdict, &now, state_capture_at_report.as_deref());
-    run_status.last_completed_group = Some(group_id.to_string());
-    run_status.last_updated_utc = Some(now);
-    run_status.last_state_capture = state_capture_at_report;
-    debug_assert_ne!(change, ExecutedGroupChange::Noop);
-
-    if let Some(n) = note {
-        run_status.notes.push(n.to_string());
-    }
-
-    true
-}
-
-fn prepare_group_report_update(
-    run_status: &RunStatus,
-    group_id: &str,
-    verdict: GroupVerdict,
-    capture_label: Option<&str>,
-    state_capture_at_report: Option<&str>,
-) -> bool {
-    match run_status.group_verdict(group_id) {
-        Some(previous) if previous == verdict => false,
-        Some(previous) => {
-            warn!(%group_id, %previous, %verdict, "group status updated");
-            true
-        }
-        None => {
-            if capture_label.is_none() {
-                warn_if_capture_missing_with_state(run_status, state_capture_at_report);
-            }
-            true
-        }
-    }
-}
-
-fn warn_if_capture_missing_with_state(run_status: &RunStatus, last_state_capture: Option<&str>) {
-    // No previous group means this is the first group - no between-group
-    // capture obligation exists yet.
-    if run_status.last_completed_group.is_none() {
-        return;
-    }
-
-    let previous_capture = run_status.last_group_capture_value();
-
-    // If the capture value is the same as when the previous group was
-    // reported, no standalone capture happened in between.
-    if last_state_capture == previous_capture {
-        let previous_group = run_status
-            .last_completed_group
-            .as_deref()
-            .unwrap_or("unknown");
-        warn!(
-            %previous_group,
-            "no state capture between groups - run 'harness run capture' or pass --capture-label"
-        );
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::schema::{ExecutedGroupRecord, RunCounts, Verdict};
-
-    fn make_status() -> RunStatus {
-        RunStatus {
-            run_id: "test-run".to_string(),
-            suite_id: "test-suite".to_string(),
-            profile: "default".to_string(),
-            started_at: "2026-03-16T00:00:00Z".to_string(),
-            overall_verdict: Verdict::Pending,
-            completed_at: None,
-            counts: RunCounts::default(),
-            executed_groups: vec![],
-            skipped_groups: vec![],
-            last_completed_group: None,
-            last_state_capture: None,
-            last_updated_utc: None,
-            next_planned_group: None,
-            notes: vec![],
-        }
-    }
-
-    #[test]
-    fn last_group_capture_value_empty_groups() {
-        let status = make_status();
-        assert_eq!(status.last_group_capture_value(), None);
-    }
-
-    #[test]
-    fn last_group_capture_value_with_capture() {
-        let mut status = make_status();
-        status.executed_groups = vec![ExecutedGroupRecord {
-            group_id: "g01".to_string(),
-            verdict: GroupVerdict::Pass,
-            completed_at: "2026-03-16T00:00:00Z".to_string(),
-            state_capture_at_report: Some("state/after-g01.json".to_string()),
-        }];
-        assert_eq!(
-            status.last_group_capture_value(),
-            Some("state/after-g01.json")
-        );
-    }
-
-    #[test]
-    fn last_group_capture_value_null_capture() {
-        let mut status = make_status();
-        status.executed_groups = vec![ExecutedGroupRecord {
-            group_id: "g01".to_string(),
-            verdict: GroupVerdict::Pass,
-            completed_at: "2026-03-16T00:00:00Z".to_string(),
-            state_capture_at_report: None,
-        }];
-        assert_eq!(status.last_group_capture_value(), None);
-    }
-
-    #[test]
-    fn warn_if_capture_missing_no_previous_group() {
-        let status = make_status();
-        // Should not panic - first group has no obligation.
-        warn_if_capture_missing_with_state(&status, None);
-    }
-
-    #[test]
-    fn warn_if_capture_missing_capture_unchanged() {
-        let mut status = make_status();
-        status.last_completed_group = Some("g01".to_string());
-        status.executed_groups = vec![ExecutedGroupRecord {
-            group_id: "g01".to_string(),
-            verdict: GroupVerdict::Pass,
-            completed_at: "2026-03-16T00:00:00Z".to_string(),
-            state_capture_at_report: Some("state/capture-1.json".to_string()),
-        }];
-        // Capture unchanged since g01 - should warn (captured in stderr).
-        warn_if_capture_missing_with_state(&status, Some("state/capture-1.json"));
-    }
-
-    #[test]
-    fn warn_if_capture_missing_capture_changed() {
-        let mut status = make_status();
-        status.last_completed_group = Some("g01".to_string());
-        status.executed_groups = vec![ExecutedGroupRecord {
-            group_id: "g01".to_string(),
-            verdict: GroupVerdict::Pass,
-            completed_at: "2026-03-16T00:00:00Z".to_string(),
-            state_capture_at_report: Some("state/capture-1.json".to_string()),
-        }];
-        // Capture changed since g01 - should not warn.
-        warn_if_capture_missing_with_state(&status, Some("state/capture-2.json"));
-    }
+        note,
+    })?;
+    Ok(0)
 }
