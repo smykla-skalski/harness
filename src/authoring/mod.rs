@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use crate::workspace::{session_context_dir, utc_now};
 use crate::errors::{CliError, CliErrorKind};
 use crate::infra::io::{read_json_typed, write_json_pretty};
-use crate::rules::skill_dirs;
+use crate::kernel::skills::dirs as skill_dirs;
 /// Active authoring session state.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AuthoringSession {

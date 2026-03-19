@@ -1,9 +1,9 @@
 use std::path::{Path, PathBuf};
 
-use crate::rules;
-use crate::rules::compact as compact_rules;
+use crate::kernel::skills::{SKILL_NEW, SKILL_RUN};
 
 use super::handoff::{AuthoringHandoff, CompactHandoff, RunnerHandoff};
+use super::{CHAR_LIMIT, SECTION_CHAR_LIMIT, SECTION_LINE_LIMIT};
 
 /// Render the hydration context for a compact handoff.
 #[must_use]
@@ -57,8 +57,8 @@ pub fn render_hydration_context(handoff: &CompactHandoff<'_>, diverged_paths: &[
 
     truncate_lines(
         &lines,
-        compact_rules::CHAR_LIMIT,
-        compact_rules::SECTION_LINE_LIMIT * 2,
+        CHAR_LIMIT,
+        SECTION_LINE_LIMIT * 2,
     )
 }
 
@@ -108,14 +108,14 @@ pub fn render_runner_restore_context(project_dir: &Path, runner: &RunnerHandoff<
 
     truncate_lines(
         &lines,
-        compact_rules::CHAR_LIMIT,
-        compact_rules::SECTION_LINE_LIMIT * 2,
+        CHAR_LIMIT,
+        SECTION_LINE_LIMIT * 2,
     )
 }
 
 pub(super) fn render_runner_section(handoff: &RunnerHandoff<'_>) -> String {
     let mut lines = vec![
-        format!("{}:", rules::SKILL_RUN),
+        format!("{SKILL_RUN}:"),
         format!("- Run: {}", handoff.run_id),
         format!("- Run dir: {}", handoff.run_dir),
         format!(
@@ -192,14 +192,14 @@ pub(super) fn render_runner_section(handoff: &RunnerHandoff<'_>) -> String {
 
     truncate_lines(
         &lines,
-        compact_rules::SECTION_CHAR_LIMIT,
-        compact_rules::SECTION_LINE_LIMIT,
+        SECTION_CHAR_LIMIT,
+        SECTION_LINE_LIMIT,
     )
 }
 
 fn render_authoring_section(handoff: &AuthoringHandoff<'_>) -> String {
     let lines = vec![
-        format!("{}:", rules::SKILL_NEW),
+        format!("{SKILL_NEW}:"),
         format!("- Suite dir: {}", handoff.suite_dir),
         format!(
             "- Suite name: {}",
@@ -237,8 +237,8 @@ fn render_authoring_section(handoff: &AuthoringHandoff<'_>) -> String {
 
     truncate_lines(
         &lines,
-        compact_rules::SECTION_CHAR_LIMIT,
-        compact_rules::SECTION_LINE_LIMIT,
+        SECTION_CHAR_LIMIT,
+        SECTION_LINE_LIMIT,
     )
 }
 

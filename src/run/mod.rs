@@ -5,6 +5,7 @@ pub mod audit;
 pub mod commands;
 pub mod context;
 pub mod prepared_suite;
+pub(crate) mod report_policy;
 pub mod resolve;
 pub mod services;
 pub mod state_capture;

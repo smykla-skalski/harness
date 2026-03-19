@@ -16,7 +16,7 @@ impl Execute for AuthoringResetArgs {
 #[derive(Debug, Clone, Args)]
 pub struct AuthoringResetArgs {
     /// Managed skill whose saved workspace should be cleared.
-    #[arg(long, value_parser = clap::builder::PossibleValuesParser::new([crate::rules::SKILL_NEW]))]
+    #[arg(long, value_parser = clap::builder::PossibleValuesParser::new([crate::kernel::skills::SKILL_NEW]))]
     pub skill: String,
 }
 

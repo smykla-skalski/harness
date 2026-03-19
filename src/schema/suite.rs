@@ -5,9 +5,38 @@ use serde::{Deserialize, Serialize};
 
 use crate::errors::{CliError, CliErrorKind};
 use crate::infra::io;
-use crate::rules;
 
 use super::frontmatter::{SuiteFrontmatter, SuiteFrontmatterUnchecked};
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum GroupSection {
+    Configure,
+    Consume,
+    Debug,
+}
+
+impl GroupSection {
+    pub const ALL: &[Self] = &[Self::Configure, Self::Consume, Self::Debug];
+
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Configure => "## Configure",
+            Self::Consume => "## Consume",
+            Self::Debug => "## Debug",
+        }
+    }
+
+    #[must_use]
+    pub fn missing_from(text: &str) -> Vec<Self> {
+        Self::ALL
+            .iter()
+            .filter(|section| !text.contains(section.as_str()))
+            .copied()
+            .collect()
+    }
+}
 
 /// A loaded suite specification with its source path.
 #[derive(Debug, Clone)]
@@ -85,7 +114,7 @@ impl GroupSpec {
         let body = parsed.body;
 
         // Check required sections in body
-        let missing = rules::shared::GroupSection::missing_from(&body);
+        let missing = GroupSection::missing_from(&body);
         if !missing.is_empty() {
             let labels: Vec<&str> = missing.iter().map(|s| s.as_str()).collect();
             return Err(CliErrorKind::missing_sections("group body", labels.join(", ")).into());

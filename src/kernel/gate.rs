@@ -13,6 +13,6 @@ impl Gate {
             && labels
                 .iter()
                 .zip(self.options)
-                .all(|(a, b)| a.as_ref() == *b)
+                .all(|(actual, expected)| actual.as_ref() == *expected)
     }
 }

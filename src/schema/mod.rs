@@ -7,7 +7,7 @@ pub use run::{
     ExecutedGroupChange, ExecutedGroupRecord, GroupVerdict, RunCounts, RunReport,
     RunReportFrontmatter, RunStatus, Verdict,
 };
-pub use suite::{GroupFrontmatter, GroupSpec, SuiteSpec};
+pub use suite::{GroupFrontmatter, GroupSection, GroupSpec, SuiteSpec};
 
 #[cfg(test)]
 mod tests {

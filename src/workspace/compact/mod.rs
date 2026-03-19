@@ -17,7 +17,12 @@ use tracing::warn;
 use crate::workspace::{project_context_dir, session_scope_key, utc_now};
 use crate::errors::{CliError, io_for};
 use crate::infra::io::{read_text, write_json_pretty};
-use crate::rules::compact as compact_rules;
+
+pub(super) const HANDOFF_VERSION: u32 = 1;
+pub(super) const HISTORY_LIMIT: usize = 10;
+pub(super) const CHAR_LIMIT: usize = 3500;
+pub(super) const SECTION_CHAR_LIMIT: usize = 1600;
+pub(super) const SECTION_LINE_LIMIT: usize = 25;
 
 /// Compact directory for a project.
 #[must_use]
@@ -46,7 +51,7 @@ pub fn compact_history_dir(project_dir: &Path) -> PathBuf {
 /// Returns `CliError` on failure.
 pub fn build_compact_handoff(project_dir: &Path) -> Result<CompactHandoff<'static>, CliError> {
     Ok(CompactHandoff {
-        version: compact_rules::HANDOFF_VERSION,
+        version: HANDOFF_VERSION,
         project_dir: Cow::Owned(project_dir.to_string_lossy().into_owned()),
         created_at: Cow::Owned(utc_now()),
         status: HandoffStatus::Pending,
@@ -164,7 +169,7 @@ fn trim_history(project_dir: &Path) {
         .filter(|p| p.is_file())
         .collect();
     files.sort();
-    let excess = files.len().saturating_sub(compact_rules::HISTORY_LIMIT);
+    let excess = files.len().saturating_sub(HISTORY_LIMIT);
     for path in files.into_iter().take(excess) {
         if let Err(e) = fs::remove_file(&path) {
             warn!(path = %path.display(), %e, "failed to remove history file");
@@ -180,7 +185,7 @@ mod tests {
 
     fn test_handoff(project_dir: &str) -> CompactHandoff<'static> {
         CompactHandoff {
-            version: compact_rules::HANDOFF_VERSION,
+            version: HANDOFF_VERSION,
             project_dir: Cow::Owned(project_dir.to_string()),
             created_at: "2026-01-01T000000Z".into(),
             status: HandoffStatus::Pending,
@@ -562,7 +567,7 @@ mod tests {
             .filter(|p| p.is_file())
             .collect();
         files.sort();
-        let excess = files.len().saturating_sub(compact_rules::HISTORY_LIMIT);
+        let excess = files.len().saturating_sub(HISTORY_LIMIT);
         for path in files.into_iter().take(excess) {
             fs::remove_file(path).unwrap();
         }
@@ -571,7 +576,7 @@ mod tests {
             .unwrap()
             .filter_map(result::Result::ok)
             .collect();
-        assert_eq!(remaining.len(), compact_rules::HISTORY_LIMIT);
+        assert_eq!(remaining.len(), HISTORY_LIMIT);
     }
 
     #[test]

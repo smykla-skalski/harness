@@ -5,7 +5,7 @@ use clap::Args;
 use crate::app::command_context::{AppContext, Execute};
 use crate::authoring::begin_authoring_session;
 use crate::errors::CliError;
-use crate::rules;
+use crate::kernel::skills::SKILL_NEW;
 
 impl Execute for AuthoringBeginArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
@@ -23,7 +23,7 @@ impl Execute for AuthoringBeginArgs {
 #[derive(Debug, Clone, Args)]
 pub struct AuthoringBeginArgs {
     /// Managed skill to initialize.
-    #[arg(long, value_parser = clap::builder::PossibleValuesParser::new([rules::SKILL_NEW]))]
+    #[arg(long, value_parser = clap::builder::PossibleValuesParser::new([SKILL_NEW]))]
     pub skill: String,
     /// Repository worktree for source discovery and validation.
     #[arg(long)]
