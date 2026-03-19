@@ -534,6 +534,8 @@ fn hooks_transport_does_not_hydrate_session_defaults() {
         "HookEnvelopePayload",
         "legacy_tool_context",
         "fn normalized_from_envelope(",
+        "fn with_skill(",
+        "fn with_default_event(",
     ] {
         assert!(
             !protocol.contains(needle),
@@ -544,6 +546,7 @@ fn hooks_transport_does_not_hydrate_session_defaults() {
     let application = fs::read_to_string(root.join("src/hooks/application/context.rs")).unwrap();
     for needle in [
         "fn normalized_from_envelope(",
+        "pub(crate) fn prepare_normalized_context(",
         "fn hydrate_normalized_context(",
         "fn hydrate_session(",
         "legacy_tool_context(",

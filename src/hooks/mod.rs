@@ -7,7 +7,7 @@ use crate::kernel::run_surface::RunFile;
 use crate::kernel::skills::SKILL_NAMES;
 
 use self::adapters::{HookAgent, adapter_for};
-use self::application::GuardContext;
+use self::application::{GuardContext, prepare_normalized_context};
 use self::protocol::context::NormalizedEvent;
 use self::protocol::hook_result::HookResult;
 use self::protocol::result::NormalizedHookResult;
@@ -401,7 +401,7 @@ pub fn run_hook_command(agent: HookAgent, skill: &str, hook: &HookCommand) -> i3
 
     let adapter = adapter_for(agent);
     let normalized = match adapter.parse_input(&raw) {
-        Ok(context) => context.with_skill(skill).with_default_event(event),
+        Ok(context) => prepare_normalized_context(context, skill, event),
         Err(error) => {
             let message = format!("`{hook_name}` received invalid hook payload: {error}");
             return render_runtime_error(agent, hook_impl, &event, "KSH001", &message);

@@ -109,19 +109,3 @@ pub struct NormalizedHookContext {
     pub skill: SkillContext,
     pub raw: RawPayload,
 }
-
-impl NormalizedHookContext {
-    #[must_use]
-    pub fn with_skill(mut self, skill: &str) -> Self {
-        self.skill = SkillContext::from_skill_name(skill);
-        self
-    }
-
-    #[must_use]
-    pub fn with_default_event(mut self, event: NormalizedEvent) -> Self {
-        if self.event.is_unspecified() {
-            self.event = event;
-        }
-        self
-    }
-}
