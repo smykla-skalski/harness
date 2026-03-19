@@ -4,7 +4,6 @@ use std::str::FromStr;
 
 use crate::infra::blocks::BlockRequirement;
 use crate::kernel::gate::Gate;
-use crate::kernel::skills::SKILL_RUN;
 
 pub const PREFLIGHT_REPLY_HEAD: &str = "suite:run/preflight:";
 
@@ -17,13 +16,6 @@ pub const MANIFEST_FIX_GATE: Gate = Gate {
         "Stop run",
     ],
 };
-
-pub const BUG_FOUND_GATE: Gate = Gate {
-    question: "suite:run/bug-found: bug or failure detected during test execution",
-    options: &["Fix now", "Continue and fix later", "Stop run"],
-};
-
-pub const SKILL_NAME: &str = SKILL_RUN;
 
 #[must_use]
 pub fn managed_cluster_binaries() -> BTreeSet<String> {
@@ -42,9 +34,7 @@ pub enum PreflightReply {
     Fail,
 }
 
-impl PreflightReply {
-    pub const ALL: &[Self] = &[Self::Pass, Self::Fail];
-}
+impl PreflightReply {}
 
 impl fmt::Display for PreflightReply {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -81,16 +71,6 @@ pub enum LegacyScript {
 }
 
 impl LegacyScript {
-    pub const ALL: &[Self] = &[
-        Self::ApplyTrackedManifest,
-        Self::CaptureState,
-        Self::ClusterLifecycle,
-        Self::InstallGatewayApiCrds,
-        Self::Preflight,
-        Self::RecordCommand,
-        Self::ValidateManifest,
-    ];
-
     #[must_use]
     pub fn is_denied(name: &str) -> bool {
         Self::from_str(name).is_ok()
@@ -136,8 +116,6 @@ pub enum RunnerBinary {
 }
 
 impl RunnerBinary {
-    pub const ALL: &[Self] = &[Self::Gh];
-
     #[must_use]
     pub fn is_denied(name: &str) -> bool {
         Self::from_str(name).is_ok()
@@ -228,7 +206,7 @@ impl AdminEndpointHint {
     ];
 
     #[must_use]
-    pub const fn as_str(&self) -> &'static str {
+    pub const fn as_str(self) -> &'static str {
         match self {
             Self::LocalhostEnvoy => "localhost:9901",
             Self::ConfigDump => "/config_dump",
@@ -279,7 +257,7 @@ impl TaskOutputPattern {
     ];
 
     #[must_use]
-    pub const fn as_str(&self) -> &'static str {
+    pub const fn as_str(self) -> &'static str {
         match self {
             Self::PrivateTmpClaude => "/private/tmp/claude-",
             Self::TasksOutputGlob => "tasks/*.output",
@@ -328,8 +306,6 @@ pub enum ControlFileMutationBinary {
 }
 
 impl ControlFileMutationBinary {
-    pub const ALL: &[Self] = &[Self::Cp, Self::Install, Self::Mv, Self::Tee];
-
     #[must_use]
     pub fn is_mutation_binary(name: &str) -> bool {
         Self::from_str(name).is_ok()
@@ -373,8 +349,6 @@ pub enum ControlFileReadBinary {
 }
 
 impl ControlFileReadBinary {
-    pub const ALL: &[Self] = &[Self::Cat, Self::Head, Self::Tail, Self::Less, Self::More];
-
     #[must_use]
     pub fn is_read_binary(name: &str) -> bool {
         Self::from_str(name).is_ok()
@@ -423,17 +397,6 @@ pub enum SuiteMutationBinary {
 }
 
 impl SuiteMutationBinary {
-    pub const ALL: &[Self] = &[
-        Self::Cp,
-        Self::Install,
-        Self::Ln,
-        Self::Mkdir,
-        Self::Mv,
-        Self::Rm,
-        Self::Rmdir,
-        Self::Touch,
-    ];
-
     #[must_use]
     pub fn is_mutation_binary(name: &str) -> bool {
         Self::from_str(name).is_ok()
@@ -487,16 +450,6 @@ pub enum ScriptInterpreter {
 }
 
 impl ScriptInterpreter {
-    pub const ALL: &[Self] = &[
-        Self::Bash,
-        Self::Sh,
-        Self::Zsh,
-        Self::Node,
-        Self::Perl,
-        Self::Python,
-        Self::Ruby,
-    ];
-
     #[must_use]
     pub fn is_interpreter(name: &str) -> bool {
         if matches!(name, "bash" | "sh" | "zsh") {
@@ -549,8 +502,6 @@ pub enum PythonBinary {
 }
 
 impl PythonBinary {
-    pub const ALL: &[Self] = &[Self::Python, Self::Python3];
-
     #[must_use]
     pub fn is_python(name: &str) -> bool {
         Self::from_str(name).is_ok()
@@ -607,31 +558,6 @@ pub enum TrackedHarnessSubcommand {
 }
 
 impl TrackedHarnessSubcommand {
-    pub const ALL: &[Self] = &[
-        Self::Api,
-        Self::Apply,
-        Self::Bootstrap,
-        Self::Capture,
-        Self::Cli,
-        Self::Closeout,
-        Self::Cluster,
-        Self::Diff,
-        Self::Envoy,
-        Self::Gateway,
-        Self::Init,
-        Self::InitRun,
-        Self::Preflight,
-        Self::Record,
-        Self::Report,
-        Self::Run,
-        Self::RunnerState,
-        Self::Service,
-        Self::SessionStart,
-        Self::SessionStop,
-        Self::Token,
-        Self::Validate,
-    ];
-
     #[must_use]
     pub fn is_tracked(name: &str) -> bool {
         Self::from_str(name).is_ok()

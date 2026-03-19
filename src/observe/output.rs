@@ -44,7 +44,7 @@ pub fn render_json(issue: &Issue) -> String {
     };
 
     let mut obj = json!({
-        "issue_id": &issue.issue_id,
+        "issue_id": &issue.id,
         "line": issue.line,
         "code": issue.code.to_string(),
         "category": issue.category.to_string(),
@@ -200,7 +200,7 @@ pub fn render_sarif(issues: &[Issue]) -> String {
                     "category": issue.category.to_string(),
                     "confidence": issue.confidence.to_string(),
                     "fixSafety": issue.fix_safety.to_string(),
-                    "issueId": &issue.issue_id,
+                    "issueId": &issue.id,
                 },
             })
         })
@@ -213,7 +213,7 @@ pub fn render_sarif(issues: &[Issue]) -> String {
             "tool": {
                 "driver": {
                     "name": "harness-observe",
-                    "version": "5.8.0",
+                    "version": "5.9.0",
                     "informationUri": "https://github.com/smykla-skalski/harness",
                 }
             },
@@ -234,7 +234,7 @@ mod tests {
 
     fn sample_issue() -> Issue {
         Issue {
-            issue_id: "abc123def456".into(),
+            id: "abc123def456".into(),
             line: 42,
             code: IssueCode::BuildOrLintFailure,
             category: IssueCategory::BuildError,
