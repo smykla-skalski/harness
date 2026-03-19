@@ -1,3 +1,4 @@
+mod capture;
 pub(crate) mod dependencies;
 mod inspection;
 mod preflight;
@@ -237,18 +238,6 @@ impl RunApplication {
     pub fn validate_requirement_names(&self) -> Result<(), CliError> {
         self.services
             .validate_requirement_names(&self.metadata().requires)
-    }
-
-    /// Capture the current cluster state, persist it, and update the run status.
-    ///
-    /// # Errors
-    /// Returns `CliError` on capture or persistence failures.
-    pub fn capture_state(
-        &mut self,
-        label: &str,
-        kubeconfig: Option<&str>,
-    ) -> Result<String, CliError> {
-        self.services.capture_state(label, kubeconfig)
     }
 
     /// List all managed service containers without requiring a tracked run.

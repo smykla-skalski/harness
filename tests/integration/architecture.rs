@@ -268,6 +268,37 @@ fn run_services_do_not_own_preflight_application_flows() {
 }
 
 #[test]
+fn run_services_do_not_own_capture_application_flow() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let services = fs::read_to_string(root.join("src/run/services/mod.rs")).unwrap();
+
+    for needle in [
+        "pub fn capture_state(",
+        "fn build_capture_snapshot(",
+        "fn capture_kubernetes_snapshot(",
+        "fn capture_universal_snapshot(",
+    ] {
+        assert!(
+            !services.contains(needle),
+            "src/run/services/mod.rs should not own capture application flow `{needle}`"
+        );
+    }
+
+    let capture = fs::read_to_string(root.join("src/run/application/capture.rs")).unwrap();
+    for needle in [
+        "pub fn capture_state(",
+        "fn build_capture_snapshot(",
+        "fn capture_kubernetes_snapshot(",
+        "fn capture_universal_snapshot(",
+    ] {
+        assert!(
+            capture.contains(needle),
+            "src/run/application/capture.rs should own `{needle}`"
+        );
+    }
+}
+
+#[test]
 fn run_services_do_not_own_cluster_inspection_reports() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
     let cluster_health =
