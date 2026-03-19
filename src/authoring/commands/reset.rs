@@ -1,9 +1,7 @@
-use std::fs;
-
 use clap::Args;
 
 use crate::app::command_context::{AppContext, Execute};
-use crate::authoring::authoring_workspace_dir;
+use crate::authoring::application::AuthoringApplication;
 use crate::errors::CliError;
 
 impl Execute for AuthoringResetArgs {
@@ -25,9 +23,6 @@ pub struct AuthoringResetArgs {
 /// # Errors
 /// Returns `CliError` on failure.
 pub fn reset() -> Result<i32, CliError> {
-    let workspace = authoring_workspace_dir()?;
-    if workspace.exists() {
-        fs::remove_dir_all(&workspace)?;
-    }
+    AuthoringApplication::reset_workspace()?;
     Ok(0)
 }

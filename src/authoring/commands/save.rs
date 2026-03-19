@@ -1,11 +1,8 @@
 use clap::Args;
 
 use crate::app::command_context::{AppContext, Execute};
-use crate::authoring::{authoring_workspace_dir, require_authoring_session};
-use crate::errors::{CliError, CliErrorKind};
-use crate::infra::io::{ensure_dir, is_safe_name, write_text};
-
-use super::shared::{parse_payload, read_input};
+use crate::authoring::application::AuthoringApplication;
+use crate::errors::CliError;
 
 impl Execute for AuthoringSaveArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
@@ -35,20 +32,6 @@ pub struct AuthoringSaveArgs {
 /// # Errors
 /// Returns `CliError` on failure.
 pub fn save(kind: &str, payload: Option<&str>, input: Option<&str>) -> Result<i32, CliError> {
-    if !is_safe_name(kind) {
-        return Err(CliErrorKind::unsafe_name(kind.to_string()).into());
-    }
-
-    let _session = require_authoring_session()?;
-    let text = read_input(input, payload)?;
-    let value = parse_payload(&text, kind)?;
-
-    let workspace = authoring_workspace_dir()?;
-    ensure_dir(&workspace)?;
-    let path = workspace.join(format!("{kind}.json"));
-    let json = serde_json::to_string_pretty(&value)
-        .map_err(|e| CliErrorKind::serialize(format!("save {kind}: {e}")))?;
-    write_text(&path, &json)?;
-
+    AuthoringApplication::save_payload(kind, payload, input)?;
     Ok(0)
 }

@@ -2,7 +2,6 @@ mod approval;
 mod begin;
 mod reset;
 mod save;
-mod shared;
 mod show;
 mod validate;
 
