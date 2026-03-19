@@ -74,23 +74,37 @@ impl<'a> ObservedCommand<'a> {
     }
 
     pub(super) fn is_harness_command(&self) -> bool {
-        self.harness_spans().next().is_some()
+        match &self.inner {
+            ObservedCommandInner::Parsed(parsed) => parsed.first_harness_invocation().is_some(),
+            ObservedCommandInner::Fallback { .. } => self.harness_spans().next().is_some(),
+        }
     }
 
     pub(super) fn has_harness_subcommand(&self, subcommand: &str) -> bool {
-        self.harness_spans()
-            .any(|span| span.first().is_some_and(|word| *word == subcommand))
+        match &self.inner {
+            ObservedCommandInner::Parsed(parsed) => parsed
+                .harness_invocations()
+                .any(|invocation| invocation.subcommand() == Some(subcommand)),
+            ObservedCommandInner::Fallback { .. } => self
+                .harness_spans()
+                .any(|span| span.first().is_some_and(|word| *word == subcommand)),
+        }
     }
 
     pub(super) fn harness_has_flag(&self, flag: &str) -> bool {
-        self.harness_spans().any(|span| {
-            span.iter().any(|word| {
-                *word == flag
-                    || word
-                        .strip_prefix(flag)
-                        .is_some_and(|rest| rest.starts_with('='))
-            })
-        })
+        match &self.inner {
+            ObservedCommandInner::Parsed(parsed) => parsed
+                .harness_invocations()
+                .any(|invocation| invocation.has_flag(flag)),
+            ObservedCommandInner::Fallback { .. } => self.harness_spans().any(|span| {
+                span.iter().any(|word| {
+                    *word == flag
+                        || word
+                            .strip_prefix(flag)
+                            .is_some_and(|rest| rest.starts_with('='))
+                })
+            }),
+        }
     }
 
     pub(super) fn manifest_paths(&self) -> Vec<&str> {
@@ -154,6 +168,9 @@ impl<'a> ObservedCommand<'a> {
     }
 
     pub(super) fn has_harness_after_chain(&self) -> bool {
+        if let ObservedCommandInner::Parsed(parsed) = &self.inner {
+            return parsed.heads().iter().skip(1).any(|head| head == "harness");
+        }
         let mut seen_chain = false;
         let mut expect_head = true;
         for word in self.words() {
@@ -181,6 +198,14 @@ impl<'a> ObservedCommand<'a> {
     }
 
     pub(super) fn harness_spans(&self) -> impl Iterator<Item = Vec<&str>> {
+        if let ObservedCommandInner::Parsed(parsed) = &self.inner {
+            let spans = parsed
+                .harness_invocations()
+                .map(crate::shell_parse::HarnessCommandInvocationRef::semantic_words)
+                .collect::<Vec<_>>();
+            return spans.into_iter();
+        }
+
         let mut spans = Vec::new();
         let words = self.words();
         let significant_word_indices = self.significant_word_indices();
