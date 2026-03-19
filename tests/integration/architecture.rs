@@ -268,6 +268,46 @@ fn run_services_do_not_own_preflight_application_flows() {
 }
 
 #[test]
+fn run_services_do_not_own_cluster_inspection_reports() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let cluster_health =
+        fs::read_to_string(root.join("src/run/services/cluster_health.rs")).unwrap();
+    let status = fs::read_to_string(root.join("src/run/services/status.rs")).unwrap();
+
+    for (contents, label, needle) in [
+        (
+            &cluster_health,
+            "src/run/services/cluster_health.rs",
+            "impl RunServices",
+        ),
+        (
+            &cluster_health,
+            "src/run/services/cluster_health.rs",
+            "pub fn cluster_health_report(",
+        ),
+        (&status, "src/run/services/status.rs", "impl RunServices"),
+        (
+            &status,
+            "src/run/services/status.rs",
+            "pub fn status_report(",
+        ),
+    ] {
+        assert!(
+            !contents.contains(needle),
+            "{label} should not own application-facing inspection flow `{needle}`"
+        );
+    }
+
+    let inspection = fs::read_to_string(root.join("src/run/application/inspection.rs")).unwrap();
+    for needle in ["pub fn cluster_health_report(", "pub fn status_report("] {
+        assert!(
+            inspection.contains(needle),
+            "src/run/application/inspection.rs should own `{needle}`"
+        );
+    }
+}
+
+#[test]
 fn authoring_commands_depend_on_application_boundary() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
     let commands_root = root.join("src/authoring/commands");
