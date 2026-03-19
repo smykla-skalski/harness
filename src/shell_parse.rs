@@ -12,6 +12,7 @@ enum FlagValueLocation {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct HarnessCommandInvocation {
     head_index: usize,
+    span_indices: Vec<usize>,
     group_index: Option<usize>,
     namespace_index: Option<usize>,
     subcommand_index: Option<usize>,
@@ -64,6 +65,37 @@ impl<'a> HarnessCommandInvocationRef<'a> {
             parts.push(subcommand);
         }
         parts.join(" ")
+    }
+
+    #[must_use]
+    pub fn span_words(self) -> Vec<&'a str> {
+        self.invocation
+            .span_indices
+            .iter()
+            .map(|&index| self.words[index].as_str())
+            .collect()
+    }
+
+    #[must_use]
+    pub fn semantic_words(self) -> Vec<&'a str> {
+        let mut words = self.span_words();
+        if matches!(words.first(), Some(&"run" | &"setup" | &"authoring")) && words.len() > 1 {
+            words.remove(0);
+        }
+        if matches!(words.first(), Some(&"kuma")) && words.len() > 1 {
+            words.remove(0);
+        }
+        words
+    }
+
+    #[must_use]
+    pub fn has_flag(self, flag: &str) -> bool {
+        self.span_words().into_iter().any(|word| {
+            word == flag
+                || word
+                    .strip_prefix(flag)
+                    .is_some_and(|rest| rest.starts_with('='))
+        })
     }
 
     #[must_use]
@@ -434,6 +466,7 @@ fn parse_harness_invocations(
         });
         invocations.push(HarnessCommandInvocation {
             head_index: word_index,
+            span_indices: span.to_vec(),
             group_index,
             namespace_index,
             subcommand_index,
