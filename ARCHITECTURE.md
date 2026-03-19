@@ -13,7 +13,7 @@ Harness is organized by domain first, with a small shared kernel and an explicit
 - `src/setup/`: Bootstrap, session lifecycle, pre-compact, capability reporting, and cluster setup entrypoints.
 - `src/hooks/`: Agent-facing hook protocol, adapters, registry, guards, and effect application.
 - `src/platform/`: Provider/runtime adapters and platform-specific helpers such as compose generation, `kubectl_validate`, and ephemeral `MetalLB`.
-- `src/infra/`: Generic shared building blocks such as process/docker/http abstractions, raw execution helpers, I/O helpers, and versioned JSON persistence.
+- `src/infra/`: Generic shared building blocks such as process/docker/http abstractions, raw execution helpers, I/O helpers, and versioned JSON persistence. Infra dependencies are injected explicitly per use case; there is no global block registry.
 - `src/errors/`: Typed error families and rendering.
 ## Where Concepts Live
 

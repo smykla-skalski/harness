@@ -950,6 +950,22 @@ fn setup_wrapper_does_not_depend_on_block_registry() {
 }
 
 #[test]
+fn infra_blocks_do_not_export_legacy_block_registry() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let blocks_mod = fs::read_to_string(root.join("src/infra/blocks/mod.rs")).unwrap();
+    let registry = fs::read_to_string(root.join("src/infra/blocks/registry.rs")).unwrap();
+
+    assert!(
+        !blocks_mod.contains("BlockRegistry"),
+        "src/infra/blocks/mod.rs should not export the retired BlockRegistry"
+    );
+    assert!(
+        !registry.contains("pub struct BlockRegistry"),
+        "src/infra/blocks/registry.rs should keep only block requirement policy, not a global registry"
+    );
+}
+
+#[test]
 fn tool_fact_model_is_owned_by_kernel() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
     let hooks_context = fs::read_to_string(root.join("src/hooks/protocol/context.rs")).unwrap();

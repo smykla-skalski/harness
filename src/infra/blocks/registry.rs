@@ -1,28 +1,8 @@
-use std::collections::BTreeSet;
 use std::fmt;
-use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 
-use super::build::{BuildSystem, ProcessBuildSystem};
-use super::clock::{Clock, SystemClock};
-use super::compose::ComposeOrchestrator;
-#[cfg(feature = "compose")]
-use super::compose::DockerComposeOrchestrator;
-use super::docker::{ContainerRuntime, DockerContainerRuntime};
-use super::envoy::ProxyIntrospector;
 use super::error::BlockError;
-#[cfg(feature = "helm")]
-use super::helm::HelmDeployer;
-use super::helm::PackageDeployer;
-use super::http::{HttpClient, ReqwestHttpClient};
-#[cfg(feature = "k3d")]
-use super::kubernetes::K3dClusterManager;
-use super::kubernetes::{KubectlOperator, KubernetesOperator, LocalClusterManager};
-#[cfg(feature = "kuma")]
-use super::kuma::KumaControlPlane;
-use super::kuma::MeshControlPlane;
-use super::process::{ProcessExecutor, StdProcessExecutor};
 
 /// Named block requirements declared by suites and validated at preflight time.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
@@ -107,273 +87,26 @@ impl fmt::Display for BlockRequirement {
     }
 }
 
-/// Registry of active block implementations.
-///
-/// This is the architecture-review carrier object that allows commands,
-/// services, and hooks to depend on a single typed registry instead of
-/// constructing tool adapters ad hoc.
-pub struct BlockRegistry {
-    pub process: Arc<dyn ProcessExecutor>,
-    pub http: Arc<dyn HttpClient>,
-    pub clock: Arc<dyn Clock>,
-    pub docker: Option<Arc<dyn ContainerRuntime>>,
-    pub compose: Option<Arc<dyn ComposeOrchestrator>>,
-    pub kubernetes: Option<Arc<dyn KubernetesOperator>>,
-    pub k3d: Option<Arc<dyn LocalClusterManager>>,
-    pub helm: Option<Arc<dyn PackageDeployer>>,
-    pub envoy: Option<Arc<dyn ProxyIntrospector>>,
-    pub kuma: Option<Arc<dyn MeshControlPlane>>,
-    pub build: Option<Arc<dyn BuildSystem>>,
-}
-
-impl fmt::Debug for BlockRegistry {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("BlockRegistry")
-            .field("has_docker", &self.docker.is_some())
-            .field("has_compose", &self.compose.is_some())
-            .field("has_kubernetes", &self.kubernetes.is_some())
-            .field("has_k3d", &self.k3d.is_some())
-            .field("has_helm", &self.helm.is_some())
-            .field("has_envoy", &self.envoy.is_some())
-            .field("has_kuma", &self.kuma.is_some())
-            .field("has_build", &self.build.is_some())
-            .finish_non_exhaustive()
-    }
-}
-
-impl BlockRegistry {
-    #[must_use]
-    pub fn new(process: Arc<dyn ProcessExecutor>, http: Arc<dyn HttpClient>) -> Self {
-        Self {
-            process,
-            http,
-            clock: Arc::new(SystemClock),
-            docker: None,
-            compose: None,
-            kubernetes: None,
-            k3d: None,
-            helm: None,
-            envoy: None,
-            kuma: None,
-            build: None,
-        }
-    }
-
-    #[must_use]
-    pub fn production() -> Self {
-        let process: Arc<dyn ProcessExecutor> = Arc::new(StdProcessExecutor);
-        let http: Arc<dyn HttpClient> = Arc::new(ReqwestHttpClient::new());
-        let docker: Arc<dyn ContainerRuntime> =
-            Arc::new(DockerContainerRuntime::new(process.clone()));
-        let kubernetes: Arc<dyn KubernetesOperator> =
-            Arc::new(KubectlOperator::new(process.clone()));
-        let build: Arc<dyn BuildSystem> = Arc::new(ProcessBuildSystem::new(process.clone()));
-
-        let registry = Self::new(process.clone(), http.clone())
-            .with_docker(docker.clone())
-            .with_kubernetes(kubernetes)
-            .with_build(build);
-
-        production_adapters(registry, process, http, &docker)
-    }
-
-    #[must_use]
-    pub fn with_docker(mut self, docker: Arc<dyn ContainerRuntime>) -> Self {
-        self.docker = Some(docker);
-        self
-    }
-
-    #[must_use]
-    pub fn with_compose(mut self, compose: Arc<dyn ComposeOrchestrator>) -> Self {
-        self.compose = Some(compose);
-        self
-    }
-
-    #[must_use]
-    pub fn with_kubernetes(mut self, kubernetes: Arc<dyn KubernetesOperator>) -> Self {
-        self.kubernetes = Some(kubernetes);
-        self
-    }
-
-    #[must_use]
-    pub fn with_k3d(mut self, k3d: Arc<dyn LocalClusterManager>) -> Self {
-        self.k3d = Some(k3d);
-        self
-    }
-
-    #[must_use]
-    pub fn with_helm(mut self, helm: Arc<dyn PackageDeployer>) -> Self {
-        self.helm = Some(helm);
-        self
-    }
-
-    #[must_use]
-    pub fn with_kuma(mut self, kuma: Arc<dyn MeshControlPlane>) -> Self {
-        self.kuma = Some(kuma);
-        self
-    }
-
-    #[must_use]
-    pub fn with_build(mut self, build: Arc<dyn BuildSystem>) -> Self {
-        self.build = Some(build);
-        self
-    }
-
-    #[must_use]
-    pub fn supports(&self, requirement: BlockRequirement) -> bool {
-        match requirement {
-            BlockRequirement::Docker => self.docker.is_some(),
-            BlockRequirement::Compose => self.compose.is_some(),
-            BlockRequirement::Kubernetes => self.kubernetes.is_some(),
-            BlockRequirement::K3d => self.k3d.is_some(),
-            BlockRequirement::Helm => self.helm.is_some(),
-            BlockRequirement::Kuma => self.kuma.is_some(),
-            BlockRequirement::Envoy => self.envoy.is_some(),
-            BlockRequirement::Build => self.build.is_some(),
-        }
-    }
-
-    /// Validate that all declared requirements are present.
-    ///
-    /// # Errors
-    ///
-    /// Returns `BlockError` listing the missing blocks.
-    pub fn validate_requirements(
-        &self,
-        requirements: &[BlockRequirement],
-    ) -> Result<(), BlockError> {
-        let missing = requirements
-            .iter()
-            .copied()
-            .filter(|requirement| !self.supports(*requirement))
-            .map(BlockRequirement::as_str)
-            .collect::<Vec<_>>();
-
-        if missing.is_empty() {
-            return Ok(());
-        }
-
-        Err(BlockError::message(
-            "registry",
-            "validate requirements",
-            format!("missing required blocks: {}", missing.join(", ")),
-        ))
-    }
-
-    /// Parse and validate requirement names from suite/frontmatter metadata.
-    ///
-    /// # Errors
-    ///
-    /// Returns `BlockError` for unknown names or missing required blocks.
-    pub fn validate_requirement_names(&self, requirements: &[String]) -> Result<(), BlockError> {
-        let parsed = requirements
-            .iter()
-            .map(|name| BlockRequirement::parse(name))
-            .collect::<Result<Vec<_>, _>>()?;
-        self.validate_requirements(&parsed)
-    }
-
-    /// Aggregate binaries denied by the active blocks.
-    #[must_use]
-    pub fn all_denied_binaries(&self) -> BTreeSet<String> {
-        let static_binaries = BlockRequirement::ALL
-            .iter()
-            .filter(|requirement| self.supports(**requirement))
-            .flat_map(|requirement| requirement.denied_binaries().iter().copied());
-
-        let kuma_binaries = self
-            .kuma
-            .iter()
-            .flat_map(|kuma| kuma.denied_binaries().iter().copied());
-
-        let build_binaries = self
-            .build
-            .iter()
-            .flat_map(|build| build.denied_binaries().iter().copied());
-
-        static_binaries
-            .chain(kuma_binaries)
-            .chain(build_binaries)
-            .map(ToString::to_string)
-            .collect()
-    }
-}
-
-/// Wire optional adapter features into a base registry.
-///
-/// Separated from the `production()` method to keep the conditional compilation
-/// clean: the base registry (process, http, docker, kubernetes, build) is always
-/// constructed, while feature-gated adapters are layered on conditionally.
-fn production_adapters(
-    #[allow(unused_mut)] mut registry: BlockRegistry,
-    #[allow(unused_variables)] process: Arc<dyn ProcessExecutor>,
-    #[allow(unused_variables)] http: Arc<dyn HttpClient>,
-    #[allow(unused_variables)] docker: &Arc<dyn ContainerRuntime>,
-) -> BlockRegistry {
-    #[cfg(feature = "compose")]
-    {
-        let compose: Arc<dyn ComposeOrchestrator> =
-            Arc::new(DockerComposeOrchestrator::new(process.clone()));
-        registry = registry.with_compose(compose.clone());
-
-        #[cfg(feature = "kuma")]
-        {
-            let kuma: Arc<dyn MeshControlPlane> = Arc::new(KumaControlPlane::new(
-                process.clone(),
-                http,
-                docker.clone(),
-                compose,
-            ));
-            registry = registry.with_kuma(kuma);
-        }
-    }
-
-    #[cfg(feature = "k3d")]
-    {
-        registry = registry.with_k3d(Arc::new(K3dClusterManager::new(process.clone())));
-    }
-
-    #[cfg(feature = "helm")]
-    {
-        registry = registry.with_helm(Arc::new(HelmDeployer::new(process)));
-    }
-
-    registry
-}
-
 #[cfg(test)]
 mod tests {
-    use super::{BlockRegistry, BlockRequirement};
+    use super::BlockRequirement;
 
     #[test]
-    fn production_registry_supports_core_blocks() {
-        let registry = BlockRegistry::production();
-        let supported = [
-            BlockRequirement::Docker,
-            BlockRequirement::Compose,
-            BlockRequirement::Kubernetes,
-            BlockRequirement::K3d,
-            BlockRequirement::Helm,
-            BlockRequirement::Kuma,
-            BlockRequirement::Build,
-        ];
-        for requirement in supported {
-            assert!(registry.supports(requirement), "missing: {requirement:?}");
+    fn denied_binaries_cover_managed_cluster_tools() {
+        for name in ["docker", "kubectl", "kubectl-validate", "k3d", "helm", "kumactl"] {
+            assert!(
+                BlockRequirement::ALL
+                    .iter()
+                    .flat_map(|requirement| requirement.denied_binaries().iter().copied())
+                    .any(|binary| binary == name),
+                "missing denied binary: {name}"
+            );
         }
-        assert!(!registry.supports(BlockRequirement::Envoy));
     }
 
     #[test]
-    fn production_registry_aggregates_denied_binaries() {
-        let registry = BlockRegistry::production();
-
-        let denied = registry.all_denied_binaries();
-
-        assert!(denied.contains("docker"));
-        assert!(denied.contains("kubectl"));
-        assert!(denied.contains("kubectl-validate"));
-        assert!(denied.contains("k3d"));
-        assert!(denied.contains("helm"));
-        assert!(denied.contains("kumactl"));
+    fn parse_rejects_unknown_requirement() {
+        let error = BlockRequirement::parse("not-a-block").unwrap_err();
+        assert_eq!(error.cause.to_string(), "unknown block requirement: not-a-block");
     }
 }
