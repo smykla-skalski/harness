@@ -42,8 +42,8 @@ use crate::run::{RunStatus, SuiteSpec};
 use crate::workspace::utc_now;
 
 pub use cluster_health::ClusterHealthReport;
-pub use recording::{RecordCommandRequest, record_command};
-pub use reporting::{GroupReportRequest, ReportCheckOutcome, check_report_compactness};
+pub use recording::RecordCommandRequest;
+pub use reporting::{GroupReportRequest, ReportCheckOutcome};
 pub use service_lifecycle::StartServiceRequest;
 pub use status::{ClusterStatusReport, ServiceStatusRecord};
 pub use task_output::{tail_task_output, wait_for_task_output};
@@ -73,27 +73,11 @@ impl RunServices {
 
     /// Build services from a loaded run context using the provided dependencies.
     ///
-    pub fn from_context_with_dependencies(ctx: RunContext, dependencies: RunDependencies) -> Self {
+    pub(crate) fn from_context_with_dependencies(
+        ctx: RunContext,
+        dependencies: RunDependencies,
+    ) -> Self {
         Self::with_dependencies(ctx, dependencies)
-    }
-
-    /// Build services from a run directory.
-    ///
-    /// # Errors
-    /// Returns `CliError` if the run context cannot be loaded.
-    pub fn from_run_dir(run_dir: &Path) -> Result<Self, CliError> {
-        Ok(Self::from_context_with_dependencies(
-            RunContext::from_run_dir(run_dir)?,
-            RunDependencies::production(),
-        ))
-    }
-
-    /// Build services from the current session run pointer.
-    ///
-    /// # Errors
-    /// Returns `CliError` if the pointer or referenced run is invalid.
-    pub fn from_current() -> Result<Option<Self>, CliError> {
-        Ok(RunContext::from_current()?.map(Self::from_context))
     }
 
     fn with_dependencies(ctx: RunContext, dependencies: RunDependencies) -> Self {
@@ -647,7 +631,8 @@ keep_clusters: false
         let layout = RunLayout::from_run_dir(&dir.path().join("runs").join("run-1"));
         write_run(&layout, &suite_path);
 
-        let services = RunServices::from_run_dir(&layout.run_dir()).unwrap();
+        let ctx = RunContext::from_run_dir(&layout.run_dir()).unwrap();
+        let services = RunServices::from_context(ctx);
         let artifact = services
             .save_preflight_outputs("2026-03-16T12:00:00Z")
             .unwrap();
@@ -693,7 +678,8 @@ keep_clusters: false
         write_run(&layout, &suite_path);
         initialize_runner_state(&layout.run_dir()).unwrap();
 
-        let services = RunServices::from_run_dir(&layout.run_dir()).unwrap();
+        let ctx = RunContext::from_run_dir(&layout.run_dir()).unwrap();
+        let services = RunServices::from_context(ctx);
         services.record_preflight_complete().unwrap();
 
         let state = crate::run::workflow::read_runner_state(&layout.run_dir())
@@ -710,7 +696,8 @@ keep_clusters: false
         let layout = RunLayout::from_run_dir(&dir.path().join("runs").join("run-3"));
         write_run(&layout, &suite_path);
 
-        let services = RunServices::from_run_dir(&layout.run_dir()).unwrap();
+        let ctx = RunContext::from_run_dir(&layout.run_dir()).unwrap();
+        let services = RunServices::from_context(ctx);
         services
             .save_preflight_outputs("2026-03-16T12:00:00Z")
             .unwrap();
@@ -740,7 +727,8 @@ keep_clusters: false
         let layout = RunLayout::from_run_dir(&dir.path().join("runs").join("run-4"));
         write_run(&layout, &suite_path);
 
-        let services = RunServices::from_run_dir(&layout.run_dir()).unwrap();
+        let ctx = RunContext::from_run_dir(&layout.run_dir()).unwrap();
+        let services = RunServices::from_context(ctx);
 
         assert_eq!(
             services.service_container_filter(),

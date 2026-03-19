@@ -1,4 +1,6 @@
 pub(crate) mod dependencies;
+mod recording;
+mod reporting;
 
 use std::borrow::Cow;
 use std::fmt;
@@ -89,7 +91,7 @@ impl RunApplication {
     #[must_use]
     pub fn from_context(ctx: RunContext) -> Self {
         Self {
-            services: RunServices::from_context_with_dependencies(ctx, RunDependencies::production()),
+            services: RunServices::from_context(ctx),
         }
     }
 
@@ -400,5 +402,7 @@ impl RunApplication {
 
 pub use crate::run::services::{
     GroupReportRequest, RecordCommandRequest, ReportCheckOutcome, StartServiceRequest,
-    check_report_compactness, record_command, tail_task_output, wait_for_task_output,
+    tail_task_output, wait_for_task_output,
 };
+pub(crate) use recording::record_command;
+pub(crate) use reporting::check_report_compactness;
