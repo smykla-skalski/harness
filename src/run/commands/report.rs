@@ -3,8 +3,8 @@ use clap::{Args, Subcommand};
 use crate::app::command_context::{AppContext, Execute};
 use crate::errors::{CliError, CliErrorKind};
 use crate::run::args::RunDirArgs;
+use crate::run::GroupVerdict;
 use crate::run::services::{GroupReportRequest, ReportCheckOutcome, check_report_compactness};
-use crate::schema::GroupVerdict;
 
 use super::shared::resolve_run_services;
 

@@ -12,7 +12,6 @@ pub(crate) mod manifests;
 pub mod observe;
 pub mod platform;
 pub mod run;
-pub mod schema;
 pub mod setup;
 pub(crate) mod suite_defaults;
 pub mod workspace;

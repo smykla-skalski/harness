@@ -10,7 +10,7 @@ use harness::errors::CliError;
 use harness::run::RunMetadata;
 use harness::run::commands::InitArgs;
 use harness::run::workflow::{self as runner_workflow, RunnerPhase};
-use harness::schema::{RunStatus, Verdict};
+use harness::run::{RunStatus, Verdict};
 
 use super::super::helpers::*;
 

@@ -11,7 +11,7 @@ use crate::run::audit::write_run_status_with_audit;
 use crate::run::context::{CurrentRunPointer, RunLayout, RunMetadata, RunRepository};
 use crate::run::resolve::resolve_suite_path;
 use crate::run::workflow::initialize_runner_state;
-use crate::schema::{RunCounts, RunReport, RunReportFrontmatter, RunStatus, SuiteSpec, Verdict};
+use crate::run::{RunCounts, RunReport, RunReportFrontmatter, RunStatus, SuiteSpec, Verdict};
 
 use super::shared::{resolve_init_repo_root, resolve_run_root};
 

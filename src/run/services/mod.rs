@@ -31,6 +31,7 @@ use crate::run::context::{
     ToolCheckRecord, ToolCheckSnapshot,
 };
 use crate::run::prepared_suite::{PreparedSuiteArtifact, PreparedSuitePlan};
+use crate::run::{RunStatus, SuiteSpec};
 use crate::run::state_capture::{
     DockerContainerSnapshot, KubernetesCaptureSnapshot, KubernetesPodSnapshot,
     StateCaptureSnapshot, UniversalCaptureSnapshot, UniversalDataplaneCollection,
@@ -39,7 +40,6 @@ use crate::run::workflow::{
     PreflightStatus, RunnerEvent, RunnerPhase, apply_event, read_runner_state,
 };
 use crate::workspace::utc_now;
-use crate::schema::{RunStatus, SuiteSpec};
 
 pub use cluster_health::{ClusterHealthReport, ClusterMemberHealthRecord};
 pub use recording::{RecordCommandRequest, RecordedCommandResult, record_command};
@@ -525,7 +525,7 @@ mod tests {
     use crate::infra::io::read_json_typed;
     use crate::run::context::RunLayout;
     use crate::run::workflow::{PreflightStatus, RunnerPhase, initialize_runner_state};
-    use crate::schema::{RunCounts, RunStatus, Verdict};
+    use crate::run::{RunCounts, RunStatus, Verdict};
 
     fn write_suite(dir: &Path) -> PathBuf {
         let suite_dir = dir.join("suite");

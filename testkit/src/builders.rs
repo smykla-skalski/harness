@@ -17,7 +17,7 @@ use harness::hooks::hook_result::{Decision, HookResult};
 use harness::hooks::payloads::{AskUserQuestionOption, AskUserQuestionPrompt, HookEnvelopePayload};
 use harness::run::workflow as runner_workflow;
 use harness::run::{RunLayout, RunMetadata};
-use harness::schema::{RunCounts, RunStatus, Verdict};
+use harness::run::{RunCounts, RunStatus, Verdict};
 use jsonschema::{Registry, Resource, Validator, options as jsonschema_options};
 use serde_json::{Number as JsonNumber, Value as JsonValue};
 

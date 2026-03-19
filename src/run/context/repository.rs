@@ -11,7 +11,7 @@ use serde::de::DeserializeOwned;
 use crate::workspace::current_run_context_path;
 use crate::errors::{CliError, CliErrorKind};
 use crate::infra::io::{read_json_typed, write_json_pretty};
-use crate::schema::RunStatus;
+use crate::run::RunStatus;
 
 use super::aggregate::RunAggregate;
 use super::{CurrentRunPointer, RunLayout, RunMetadata};

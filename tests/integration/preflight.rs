@@ -11,7 +11,7 @@ use harness::platform::kubectl_validate::{KubectlValidateDecision, KubectlValida
 use harness::run::RunDirArgs;
 use harness::run::commands::{ApplyArgs, CaptureArgs, PreflightArgs, ValidateArgs};
 use harness::run::workflow::{RunnerPhase, read_runner_state};
-use harness::schema::GroupSpec;
+use harness::run::GroupSpec;
 use harness_testkit::{
     FakeToolchain, GroupBuilder, RunDirBuilder, SuiteBuilder, init_run_with_suite,
 };

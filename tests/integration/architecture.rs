@@ -39,6 +39,7 @@ fn legacy_scatter_roots_are_gone() {
         "src/runtime.rs",
         "src/compact",
         "src/core_defs",
+        "src/schema",
         "src/rules",
         "src/shell_parse.rs",
     ] {

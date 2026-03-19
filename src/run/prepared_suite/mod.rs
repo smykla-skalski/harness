@@ -20,9 +20,8 @@ use digest::source_digest;
 
 use crate::errors::{CliError, CliErrorKind};
 use crate::infra::io::{read_json_typed, write_json_pretty, write_text};
-use crate::schema::SuiteSpec;
-
 use crate::run::context::RunLayout;
+use crate::run::SuiteSpec;
 
 /// The full prepared suite artifact.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
