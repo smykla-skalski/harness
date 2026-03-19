@@ -1,4 +1,5 @@
 pub(crate) mod dependencies;
+mod inspection;
 mod preflight;
 mod recording;
 mod reporting;
@@ -15,9 +16,7 @@ use crate::platform::cluster::ClusterSpec;
 use crate::platform::runtime::{ClusterRuntime, ControlPlaneAccess, XdsAccess};
 use crate::run::RunStatus;
 use crate::run::context::{RunContext, RunLayout, RunMetadata, RunRepository};
-use crate::run::services::{
-    ClusterHealthReport, ClusterStatusReport, RunServices, ServiceStatusRecord,
-};
+use crate::run::services::{RunServices, ServiceStatusRecord};
 
 use self::dependencies::RunDependencies;
 
@@ -249,22 +248,6 @@ impl RunApplication {
         kubeconfig: Option<&str>,
     ) -> Result<String, CliError> {
         self.services.capture_state(label, kubeconfig)
-    }
-
-    /// Check current cluster member health.
-    ///
-    /// # Errors
-    /// Returns `CliError` on runtime inspection failures.
-    pub fn cluster_health_report(&self) -> Result<ClusterHealthReport<'_>, CliError> {
-        self.services.cluster_health_report()
-    }
-
-    /// Build the current cluster status report.
-    ///
-    /// # Errors
-    /// Returns `CliError` on runtime inspection failures.
-    pub fn status_report(&self) -> Result<ClusterStatusReport<'_>, CliError> {
-        self.services.status_report()
     }
 
     #[must_use]

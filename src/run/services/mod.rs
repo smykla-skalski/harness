@@ -33,11 +33,11 @@ use crate::run::state_capture::{
 use crate::run::workflow::read_runner_state;
 use crate::workspace::utc_now;
 
-pub use cluster_health::ClusterHealthReport;
+pub use cluster_health::{ClusterHealthReport, ClusterMemberHealthRecord};
 pub use recording::RecordCommandRequest;
 pub use reporting::{GroupReportRequest, ReportCheckOutcome};
 pub use service_lifecycle::StartServiceRequest;
-pub use status::{ClusterStatusReport, ServiceStatusRecord};
+pub use status::{ClusterMemberStatusRecord, ClusterStatusReport, ServiceStatusRecord};
 pub use task_output::{tail_task_output, wait_for_task_output};
 
 /// Domain access layer for a tracked run.
@@ -117,7 +117,7 @@ impl RunServices {
         self.dependencies.docker_required()
     }
 
-    fn docker_if_available(&self) -> Option<&dyn ContainerRuntime> {
+    pub(crate) fn docker_if_available(&self) -> Option<&dyn ContainerRuntime> {
         self.dependencies.docker()
     }
 
