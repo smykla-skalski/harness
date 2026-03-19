@@ -1,5 +1,5 @@
 use crate::errors::{CliError, HookMessage};
-use crate::hooks::protocol::context::GuardContext as HookContext;
+use crate::hooks::application::GuardContext as HookContext;
 use crate::run::workflow::{PreflightStatus, RunnerPhase, RunnerWorkflowState};
 
 use super::effects::{HookEffect, HookOutcome};

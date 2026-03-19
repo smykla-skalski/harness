@@ -12,7 +12,7 @@ pub use run_phase::RunPhaseGuard;
 pub use structural::StructuralGuard;
 pub use subshell::SubshellGuard;
 
-use crate::hooks::protocol::context::GuardContext;
+use crate::hooks::application::GuardContext;
 use crate::hooks::registry::GuardChain;
 use crate::kernel::command_intent::ParsedCommand;
 
@@ -54,7 +54,7 @@ pub fn author_bash_chain() -> GuardChain {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::hooks::protocol::context::GuardContext;
+    use crate::hooks::application::GuardContext;
     use crate::hooks::protocol::payloads::HookEnvelopePayload;
     use crate::hooks::protocol::result::NormalizedDecision;
 

@@ -1,8 +1,8 @@
 use crate::errors::HookMessage;
+use crate::hooks::application::GuardContext;
 use crate::hooks::guard_bash::predicates::{
     allows_wrapped_envoy_admin, has_admin_endpoint_hint, is_harness_head,
 };
-use crate::hooks::protocol::context::GuardContext;
 use crate::hooks::protocol::result::NormalizedHookResult;
 use crate::hooks::registry::Guard;
 

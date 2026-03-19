@@ -2,7 +2,7 @@ pub(crate) mod predicates;
 pub(crate) mod runner_guards;
 
 use crate::errors::{CliError, HookMessage};
-use crate::hooks::protocol::context::GuardContext as HookContext;
+use crate::hooks::application::GuardContext as HookContext;
 use crate::hooks::protocol::hook_result::HookResult;
 
 use predicates::{
@@ -97,7 +97,7 @@ fn guard_suite_runner(ctx: &HookContext, words: &[String], heads: &[String]) -> 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::hooks::protocol::context::GuardContext as HookContext;
+    use crate::hooks::application::GuardContext as HookContext;
     use crate::hooks::protocol::hook_result::Decision;
     use crate::hooks::protocol::payloads::HookEnvelopePayload;
     use crate::hooks::runner_policy::TrackedHarnessSubcommand;

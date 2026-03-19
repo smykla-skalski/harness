@@ -1,5 +1,5 @@
 use crate::errors::{CliError, HookMessage};
-use crate::hooks::protocol::context::GuardContext as HookContext;
+use crate::hooks::application::GuardContext as HookContext;
 use crate::hooks::protocol::hook_result::HookResult;
 use crate::hooks::runner_policy as runner_rules;
 use crate::run::workflow::RunnerPhase;
@@ -68,7 +68,7 @@ fn handle_suite_author(ctx: &HookContext) -> HookResult {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::hooks::protocol::context::GuardContext as HookContext;
+    use crate::hooks::application::GuardContext as HookContext;
     use crate::hooks::protocol::hook_result::Decision;
     use crate::hooks::protocol::payloads::HookEnvelopePayload;
 
