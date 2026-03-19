@@ -8,8 +8,9 @@ use tracing::warn;
 use crate::authoring::workflow::{self as author_workflow, AuthorWorkflowState};
 use crate::errors::{CliError, CliErrorKind};
 use crate::hooks::protocol::payloads::{AskUserAnswer, AskUserQuestionPrompt, HookEnvelopePayload};
-use crate::kernel::skills::{SKILL_NEW, SKILL_RUN};
 use crate::kernel::command_intent::{ObservedCommand, ParsedCommand};
+use crate::kernel::skills::{SKILL_NEW, SKILL_RUN};
+use crate::kernel::tooling::{ToolContext, legacy_tool_context};
 use crate::run::context::RunContext;
 use crate::run::workflow::{self as runner_workflow, RunnerWorkflowState};
 
@@ -66,58 +67,6 @@ pub struct SessionContext {
     pub session_id: String,
     pub cwd: PathBuf,
     pub transcript_path: Option<PathBuf>,
-}
-
-/// Normalized tool categories shared across supported agents.
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[non_exhaustive]
-pub enum ToolCategory {
-    Shell,
-    FileRead,
-    FileWrite,
-    FileEdit,
-    FileSearch,
-    Agent,
-    WebFetch,
-    WebSearch,
-    Custom(String),
-}
-
-/// Agent-agnostic representation of tool input.
-#[derive(Debug, Clone, PartialEq)]
-#[non_exhaustive]
-pub enum ToolInput {
-    Shell {
-        command: String,
-        description: Option<String>,
-    },
-    FileRead {
-        path: PathBuf,
-    },
-    FileWrite {
-        path: PathBuf,
-        content: String,
-    },
-    FileEdit {
-        path: PathBuf,
-        old_text: String,
-        new_text: String,
-    },
-    FileSearch {
-        pattern: String,
-        path: Option<PathBuf>,
-    },
-    Other(Value),
-}
-
-/// Tool metadata extracted by an adapter.
-#[derive(Debug, Clone, PartialEq)]
-pub struct ToolContext {
-    pub category: ToolCategory,
-    pub original_name: String,
-    pub input: ToolInput,
-    pub input_raw: Value,
-    pub response: Option<Value>,
 }
 
 /// Agent lifecycle metadata extracted by an adapter.
@@ -209,10 +158,12 @@ impl ParsedCommandState {
             Self::Missing => Ok(None),
             Self::Parsed(observed) => observed.parsed().map_or_else(
                 || {
-                    let error = observed.tokenization_error().unwrap_or("unknown parse error");
+                    let error = observed
+                        .tokenization_error()
+                        .unwrap_or("unknown parse error");
                     Err(CliErrorKind::hook_payload_invalid(format!(
-                "shell tokenization failed: {error}"
-            ))
+                        "shell tokenization failed: {error}"
+                    ))
                     .into())
                 },
                 |parsed| Ok(Some(parsed)),
@@ -459,7 +410,10 @@ impl GuardContext {
 
     #[must_use]
     pub fn command_text(&self) -> Option<&str> {
-        self.tool_input().get("command").and_then(Value::as_str)
+        self.tool
+            .as_ref()
+            .and_then(|tool| tool.input.command_text())
+            .or_else(|| self.tool_input().get("command").and_then(Value::as_str))
     }
 
     /// # Errors
@@ -471,18 +425,25 @@ impl GuardContext {
 
     #[must_use]
     pub fn write_paths(&self) -> Vec<&Path> {
-        let mut paths = Vec::new();
+        if let Some(tool) = &self.tool {
+            let paths = tool.input.write_paths();
+            if !paths.is_empty() {
+                return paths;
+            }
+        }
+
+        let mut fallback_paths = Vec::new();
         if let Some(path) = self.tool_input().get("file_path").and_then(Value::as_str) {
-            paths.push(Path::new(path));
+            fallback_paths.push(Path::new(path));
         }
         if let Some(extra_paths) = self
             .tool_input()
             .get("file_paths")
             .and_then(Value::as_array)
         {
-            paths.extend(extra_paths.iter().filter_map(Value::as_str).map(Path::new));
+            fallback_paths.extend(extra_paths.iter().filter_map(Value::as_str).map(Path::new));
         }
-        paths
+        fallback_paths
     }
 
     #[must_use]
@@ -547,12 +508,12 @@ fn normalized_from_envelope(skill: &str, payload: HookEnvelopePayload) -> Normal
     let tool_name = payload.tool_name;
     let input_raw = payload.tool_input;
     let response_raw = payload.tool_response;
-    let tool = (!tool_name.is_empty()).then(|| ToolContext {
-        category: normalize_legacy_tool(&tool_name),
-        input: normalize_tool_input(&tool_name, &input_raw),
-        original_name: tool_name,
-        input_raw,
-        response: (!response_raw.is_null()).then_some(response_raw),
+    let tool = (!tool_name.is_empty()).then(|| {
+        legacy_tool_context(
+            &tool_name,
+            input_raw,
+            (!response_raw.is_null()).then_some(response_raw),
+        )
     });
 
     NormalizedHookContext {
@@ -571,84 +532,6 @@ fn normalized_from_envelope(skill: &str, payload: HookEnvelopePayload) -> Normal
         }),
         skill: SkillContext::from_skill_name(skill),
         raw: RawPayload::new(raw),
-    }
-}
-
-fn normalize_legacy_tool(name: &str) -> ToolCategory {
-    match name {
-        "Bash" => ToolCategory::Shell,
-        "Read" => ToolCategory::FileRead,
-        "Write" => ToolCategory::FileWrite,
-        "Edit" => ToolCategory::FileEdit,
-        "Glob" | "Grep" => ToolCategory::FileSearch,
-        "Agent" => ToolCategory::Agent,
-        "WebFetch" => ToolCategory::WebFetch,
-        "WebSearch" => ToolCategory::WebSearch,
-        other => ToolCategory::Custom(other.to_string()),
-    }
-}
-
-fn normalize_tool_input(tool_name: &str, input: &Value) -> ToolInput {
-    match tool_name {
-        "Bash" => ToolInput::Shell {
-            command: input
-                .get("command")
-                .and_then(Value::as_str)
-                .unwrap_or_default()
-                .to_string(),
-            description: input
-                .get("description")
-                .and_then(Value::as_str)
-                .map(ToString::to_string),
-        },
-        "Read" => ToolInput::FileRead {
-            path: PathBuf::from(
-                input
-                    .get("file_path")
-                    .and_then(Value::as_str)
-                    .unwrap_or_default(),
-            ),
-        },
-        "Write" => ToolInput::FileWrite {
-            path: PathBuf::from(
-                input
-                    .get("file_path")
-                    .and_then(Value::as_str)
-                    .unwrap_or_default(),
-            ),
-            content: input
-                .get("content")
-                .and_then(Value::as_str)
-                .unwrap_or_default()
-                .to_string(),
-        },
-        "Edit" => ToolInput::FileEdit {
-            path: PathBuf::from(
-                input
-                    .get("file_path")
-                    .and_then(Value::as_str)
-                    .unwrap_or_default(),
-            ),
-            old_text: input
-                .get("old_text")
-                .and_then(Value::as_str)
-                .unwrap_or_default()
-                .to_string(),
-            new_text: input
-                .get("new_text")
-                .and_then(Value::as_str)
-                .unwrap_or_default()
-                .to_string(),
-        },
-        "Glob" | "Grep" => ToolInput::FileSearch {
-            pattern: input
-                .get("pattern")
-                .and_then(Value::as_str)
-                .unwrap_or_default()
-                .to_string(),
-            path: input.get("path").and_then(Value::as_str).map(PathBuf::from),
-        },
-        _ => ToolInput::Other(input.clone()),
     }
 }
 

@@ -13,9 +13,9 @@ use serde_json::Value;
 use crate::errors::{CliError, CliErrorKind};
 use crate::hooks::protocol::context::{
     AgentContext, NormalizedEvent, NormalizedHookContext, RawPayload, SessionContext, SkillContext,
-    ToolCategory, ToolContext, ToolInput,
 };
 use crate::hooks::protocol::result::NormalizedHookResult;
+use crate::kernel::tooling::{ToolCategory, ToolContext};
 
 pub use claude::ClaudeCodeAdapter;
 pub use codex::CodexAdapter;
@@ -145,13 +145,12 @@ where
         .or(payload.original_request_name.as_deref());
     let tool = tool_name.map(|name| {
         let category = normalize_tool(name);
-        ToolContext {
-            category: category.clone(),
-            original_name: name.to_string(),
-            input: normalize_tool_input(&category, &payload.tool_input),
-            input_raw: payload.tool_input.clone(),
-            response: (!payload.tool_response.is_null()).then_some(payload.tool_response.clone()),
-        }
+        ToolContext::new(
+            name,
+            category,
+            payload.tool_input.clone(),
+            (!payload.tool_response.is_null()).then_some(payload.tool_response.clone()),
+        )
     });
 
     NormalizedHookContext {
@@ -173,75 +172,6 @@ where
         }),
         skill: SkillContext::inactive(),
         raw: RawPayload::new(raw_value),
-    }
-}
-
-fn normalize_tool_input(category: &ToolCategory, input: &Value) -> ToolInput {
-    match category {
-        ToolCategory::Shell => ToolInput::Shell {
-            command: input
-                .get("command")
-                .and_then(Value::as_str)
-                .unwrap_or_default()
-                .to_string(),
-            description: input
-                .get("description")
-                .and_then(Value::as_str)
-                .map(ToString::to_string),
-        },
-        ToolCategory::FileRead => ToolInput::FileRead {
-            path: PathBuf::from(
-                input
-                    .get("file_path")
-                    .or_else(|| input.get("path"))
-                    .and_then(Value::as_str)
-                    .unwrap_or_default(),
-            ),
-        },
-        ToolCategory::FileWrite => ToolInput::FileWrite {
-            path: PathBuf::from(
-                input
-                    .get("file_path")
-                    .or_else(|| input.get("path"))
-                    .and_then(Value::as_str)
-                    .unwrap_or_default(),
-            ),
-            content: input
-                .get("content")
-                .and_then(Value::as_str)
-                .unwrap_or_default()
-                .to_string(),
-        },
-        ToolCategory::FileEdit => ToolInput::FileEdit {
-            path: PathBuf::from(
-                input
-                    .get("file_path")
-                    .or_else(|| input.get("path"))
-                    .and_then(Value::as_str)
-                    .unwrap_or_default(),
-            ),
-            old_text: input
-                .get("old_text")
-                .or_else(|| input.get("oldText"))
-                .and_then(Value::as_str)
-                .unwrap_or_default()
-                .to_string(),
-            new_text: input
-                .get("new_text")
-                .or_else(|| input.get("newText"))
-                .and_then(Value::as_str)
-                .unwrap_or_default()
-                .to_string(),
-        },
-        ToolCategory::FileSearch => ToolInput::FileSearch {
-            pattern: input
-                .get("pattern")
-                .and_then(Value::as_str)
-                .unwrap_or_default()
-                .to_string(),
-            path: input.get("path").and_then(Value::as_str).map(PathBuf::from),
-        },
-        _ => ToolInput::Other(input.clone()),
     }
 }
 

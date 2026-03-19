@@ -2,6 +2,7 @@ use std::fs;
 use std::io::{BufRead, BufReader};
 
 use crate::errors::{CliError, CliErrorKind};
+use crate::kernel::tooling::{ToolInput, legacy_tool_context};
 
 use super::session;
 use super::{DUMP_TRUNCATE_LENGTH, MIN_DUMP_TEXT_LENGTH, truncate_at};
@@ -230,31 +231,31 @@ fn format_tool_use_dump(
 ) -> DumpBlock {
     let name = block["name"].as_str().unwrap_or("");
     let input = &block["input"];
-    match name {
-        "Bash" => {
-            let cmd = input["command"].as_str().unwrap_or("");
-            DumpBlock {
-                label: format!("L{index} [{role}] Bash{id_suffix}"),
-                text: cmd.to_string(),
-            }
-        }
-        "Read" | "Write" => {
-            let file_path = input["file_path"].as_str().unwrap_or("");
-            DumpBlock {
-                label: format!("L{index} [{role}] {name}{id_suffix}"),
-                text: file_path.to_string(),
-            }
-        }
-        "Edit" => {
-            let file_path = input["file_path"].as_str().unwrap_or("");
-            let old = truncate_at(input["old_string"].as_str().unwrap_or(""), 100);
-            let new_str = truncate_at(input["new_string"].as_str().unwrap_or(""), 100);
+    let tool = legacy_tool_context(name, input.clone(), None);
+    match &tool.input {
+        ToolInput::Shell { command, .. } => DumpBlock {
+            label: format!("L{index} [{role}] Bash{id_suffix}"),
+            text: command.clone(),
+        },
+        ToolInput::FileRead { paths } | ToolInput::FileWrite { paths, .. } => DumpBlock {
+            label: format!("L{index} [{role}] {name}{id_suffix}"),
+            text: paths
+                .first()
+                .map_or_else(String::new, |path| path.display().to_string()),
+        },
+        ToolInput::FileEdit {
+            path,
+            old_text,
+            new_text,
+        } => {
+            let old = truncate_at(old_text, 100);
+            let new_str = truncate_at(new_text, 100);
             DumpBlock {
                 label: format!("L{index} [{role}] Edit{id_suffix}"),
-                text: format!("{file_path}\n  old: {old}\n  new: {new_str}"),
+                text: format!("{}\n  old: {old}\n  new: {new_str}", path.display()),
             }
         }
-        "AskUserQuestion" => {
+        ToolInput::Other(input) if name == "AskUserQuestion" => {
             let questions = input["questions"].as_array();
             let parts: Vec<String> = questions
                 .iter()
@@ -270,14 +271,18 @@ fn format_tool_use_dump(
                 text: parts.join("; "),
             }
         }
-        "Agent" => {
+        ToolInput::Other(input) if name == "Agent" => {
             let desc = input["description"].as_str().unwrap_or("");
             DumpBlock {
                 label: format!("L{index} [{role}] Agent{id_suffix}"),
                 text: desc.to_string(),
             }
         }
-        _ => {
+        ToolInput::FileSearch { pattern, .. } => DumpBlock {
+            label: format!("L{index} [{role}] {name}{id_suffix}"),
+            text: pattern.clone(),
+        },
+        ToolInput::Other(input) => {
             let raw = serde_json::to_string(input).unwrap_or_default();
             DumpBlock {
                 label: format!("L{index} [{role}] {name}{id_suffix}"),

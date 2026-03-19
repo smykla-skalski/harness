@@ -1,6 +1,8 @@
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::ops::Index;
 
+use crate::kernel::tooling::ToolContext;
+
 use super::IssueCode;
 
 /// Tracks occurrences of a deduplicated issue family.
@@ -14,8 +16,7 @@ pub struct OccurrenceTracker {
 /// Record of a `tool_use` block, for correlating with `tool_result`.
 #[derive(Debug, Clone)]
 pub struct ToolUseRecord {
-    pub name: String,
-    pub input: serde_json::Value,
+    pub tool: ToolContext,
 }
 
 /// Ordered bounded window of recent `tool_use` blocks.

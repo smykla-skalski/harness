@@ -11,9 +11,10 @@ use self::lifecycle::{
 use self::write_checks::{
     check_managed_file_writes, check_manifest_created_during_run, check_write_edit_tool_use,
 };
-use crate::kernel::command_intent::ObservedCommand;
 use super::emitter::{Guidance, IssueBlueprint, IssueEmitter};
 use super::{OLD_SKILL_REGEX, RM_RECURSIVE_REGEX};
+use crate::kernel::command_intent::ObservedCommand;
+use crate::kernel::tooling::{ToolInput, legacy_tool_context};
 use crate::observe::patterns;
 use crate::observe::types::{
     Confidence, FixSafety, Issue, IssueCode, MessageRole, ScanState, SourceTool, ToolUseRecord,
@@ -28,6 +29,7 @@ pub fn check_tool_use_for_issues(
     let mut issues = Vec::new();
     let name = block["name"].as_str().unwrap_or("");
     let input = &block["input"];
+    let tool = legacy_tool_context(name, input.clone(), None);
 
     // Uncommitted source code detection runs for Write/Edit and Bash to track
     // the edit-then-act-without-commit pattern across tool boundaries.
@@ -36,7 +38,7 @@ pub fn check_tool_use_for_issues(
     }
 
     if name == "Bash" {
-        check_bash_tool_use(line_num, input, state, &mut issues);
+        check_bash_tool_use(line_num, &tool.input, state, &mut issues);
     }
 
     if name == "AskUserQuestion" {
@@ -53,13 +55,9 @@ pub fn check_tool_use_for_issues(
     if let Some(tool_id) = block["id"].as_str()
         && !tool_id.is_empty()
     {
-        state.last_tool_uses.insert(
-            tool_id.to_string(),
-            ToolUseRecord {
-                name: name.to_string(),
-                input: input.clone(),
-            },
-        );
+        state
+            .last_tool_uses
+            .insert(tool_id.to_string(), ToolUseRecord { tool });
     }
 
     issues
@@ -70,11 +68,11 @@ pub fn check_tool_use_for_issues(
 /// Check Bash `tool_use` for specific patterns.
 fn check_bash_tool_use(
     line_num: usize,
-    input: &Value,
+    input: &ToolInput,
     state: &mut ScanState,
     issues: &mut Vec<Issue>,
 ) {
-    let command = input["command"].as_str().unwrap_or("");
+    let command = input.command_text().unwrap_or("");
     let details = format!("Command: {command}");
     let observed = ObservedCommand::parse(command);
 

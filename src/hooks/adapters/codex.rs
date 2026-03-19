@@ -10,9 +10,9 @@ use crate::hooks::adapters::{
 };
 use crate::hooks::protocol::context::{
     AgentContext, NormalizedEvent, NormalizedHookContext, RawPayload, SessionContext, SkillContext,
-    ToolCategory, ToolContext, ToolInput,
 };
 use crate::hooks::protocol::result::NormalizedHookResult;
+use crate::kernel::tooling::{ToolCategory, ToolContext, ToolInput};
 
 pub struct CodexAdapter;
 

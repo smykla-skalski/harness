@@ -286,6 +286,7 @@ mod tests {
     #![allow(clippy::cognitive_complexity)]
 
     use super::*;
+    use crate::kernel::tooling::legacy_tool_context;
 
     #[test]
     fn severity_ordering() {
@@ -366,8 +367,11 @@ mod tests {
             window.insert(
                 format!("tool-{index}"),
                 ToolUseRecord {
-                    name: "Bash".to_string(),
-                    input: serde_json::json!({"command": "echo hello"}),
+                    tool: legacy_tool_context(
+                        "Bash",
+                        serde_json::json!({"command": "echo hello"}),
+                        None,
+                    ),
                 },
             );
         }
