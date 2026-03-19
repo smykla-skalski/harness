@@ -1,4 +1,5 @@
 pub(crate) mod dependencies;
+mod preflight;
 mod recording;
 mod reporting;
 
@@ -12,11 +13,11 @@ use crate::infra::exec::{CommandResult, HttpMethod};
 use crate::infra::io::write_json_pretty;
 use crate::platform::cluster::ClusterSpec;
 use crate::platform::runtime::{ClusterRuntime, ControlPlaneAccess, XdsAccess};
+use crate::run::RunStatus;
 use crate::run::context::{RunContext, RunLayout, RunMetadata, RunRepository};
 use crate::run::services::{
     ClusterHealthReport, ClusterStatusReport, RunServices, ServiceStatusRecord,
 };
-use crate::run::{PreparedSuiteArtifact, PreparedSuitePlan, RunStatus, SuiteSpec};
 
 use self::dependencies::RunDependencies;
 
@@ -229,33 +230,6 @@ impl RunApplication {
         self.services.call_control_plane_json(path, method, body)
     }
 
-    /// Load the suite specification referenced by the run metadata.
-    ///
-    /// # Errors
-    /// Returns `CliError` if the suite markdown cannot be loaded.
-    pub fn suite_spec(&self) -> Result<SuiteSpec, CliError> {
-        self.services.suite_spec()
-    }
-
-    /// Build the preflight materialization plan for this run.
-    ///
-    /// # Errors
-    /// Returns `CliError` if the suite cannot be loaded or parsed.
-    pub fn build_preflight_plan(&self, checked_at: &str) -> Result<PreparedSuitePlan, CliError> {
-        self.services.build_preflight_plan(checked_at)
-    }
-
-    /// Materialize prepared-suite and preflight artifacts to disk.
-    ///
-    /// # Errors
-    /// Returns `CliError` on parse or IO failures.
-    pub fn save_preflight_outputs(
-        &self,
-        checked_at: &str,
-    ) -> Result<PreparedSuiteArtifact, CliError> {
-        self.services.save_preflight_outputs(checked_at)
-    }
-
     /// Validate that the run metadata only references registered requirement names.
     ///
     /// # Errors
@@ -275,28 +249,6 @@ impl RunApplication {
         kubeconfig: Option<&str>,
     ) -> Result<String, CliError> {
         self.services.capture_state(label, kubeconfig)
-    }
-
-    /// Mark a prepared manifest as applied when it belongs to the tracked run.
-    ///
-    /// # Errors
-    /// Returns `CliError` on prepared-suite load/save failures.
-    pub fn mark_manifest_applied(
-        &self,
-        manifest_path: &Path,
-        applied_at: &str,
-        step: Option<&str>,
-    ) -> Result<(), CliError> {
-        self.services
-            .mark_manifest_applied(manifest_path, applied_at, step)
-    }
-
-    /// Advance the runner workflow to completed preflight when applicable.
-    ///
-    /// # Errors
-    /// Returns `CliError` on workflow persistence failures.
-    pub fn record_preflight_complete(&self) -> Result<(), CliError> {
-        self.services.record_preflight_complete()
     }
 
     /// Check current cluster member health.
