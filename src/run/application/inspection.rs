@@ -79,7 +79,7 @@ impl RunApplication {
         let spec = self.cluster_spec()?;
         let (services, dataplanes) = thread::scope(|scope| {
             let list_services = scope.spawn(|| self.list_service_containers().unwrap_or_default());
-            let query_dataplanes = scope.spawn(|| self.services.query_dataplanes("default").ok());
+            let query_dataplanes = scope.spawn(|| self.query_dataplanes("default").ok());
             (
                 list_services.join().expect("service list thread panicked"),
                 query_dataplanes

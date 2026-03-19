@@ -10,8 +10,6 @@ use std::fmt;
 use std::path::Path;
 #[cfg(test)]
 use std::path::PathBuf;
-#[cfg(test)]
-use std::sync::Arc;
 
 use rayon::prelude::*;
 use tracing::warn;
@@ -76,11 +74,6 @@ impl RunServices {
         Self { ctx, dependencies }
     }
 
-    #[cfg(test)]
-    fn with_docker(ctx: RunContext, docker: Option<Arc<dyn ContainerRuntime>>) -> Self {
-        Self::with_dependencies(ctx, RunDependencies::for_tests(docker))
-    }
-
     #[must_use]
     pub fn context(&self) -> &RunContext {
         &self.ctx
@@ -113,7 +106,7 @@ impl RunServices {
         self.dependencies.validate_requirement_names(requirements)
     }
 
-    fn docker(&self) -> Result<&dyn ContainerRuntime, CliError> {
+    pub(crate) fn docker(&self) -> Result<&dyn ContainerRuntime, CliError> {
         self.dependencies.docker_required()
     }
 
@@ -226,6 +219,12 @@ impl RunServices {
     ) -> Result<serde_json::Value, CliError> {
         let access = self.control_plane_access()?;
         exec::cp_api_json(access.addr.as_ref(), path, method, body, access.admin_token)
+    }
+
+    fn query_dataplanes(&self, mesh: &str) -> Result<UniversalDataplaneCollection, CliError> {
+        let path = format!("/meshes/{mesh}/dataplanes");
+        self.call_control_plane_json(&path, HttpMethod::Get, None)
+            .map(UniversalDataplaneCollection::from_api_value)
     }
 
     /// Capture the current cluster state, persist it, and update the run status.
@@ -354,11 +353,15 @@ mod tests {
     #![allow(clippy::absolute_paths, clippy::cognitive_complexity)]
 
     use std::fs;
+    use std::sync::Arc;
 
     use super::*;
     use crate::infra::io::read_json_typed;
     use crate::run::application::RunApplication;
     use crate::run::context::{PreflightArtifact, RunLayout};
+    use crate::run::services::service_lifecycle::{
+        read_service_container_rows, run_service_filter,
+    };
     use crate::run::workflow::{PreflightStatus, RunnerPhase, initialize_runner_state};
     use crate::run::{PreparedSuiteArtifact, RunCounts, RunStatus, Verdict};
 
@@ -576,28 +579,11 @@ keep_clusters: false
 
     #[test]
     fn service_container_filter_uses_run_id_label() {
-        let dir = tempfile::tempdir().unwrap();
-        let suite_path = write_suite(dir.path());
-        let layout = RunLayout::from_run_dir(&dir.path().join("runs").join("run-4"));
-        write_run(&layout, &suite_path);
-
-        let ctx = RunContext::from_run_dir(&layout.run_dir()).unwrap();
-        let services = RunServices::from_context(ctx);
-
-        assert_eq!(
-            services.service_container_filter(),
-            "label=io.harness.run-id=run-4"
-        );
+        assert_eq!(run_service_filter("run-4"), "label=io.harness.run-id=run-4");
     }
 
     #[test]
     fn list_service_containers_parses_docker_rows() {
-        let dir = tempfile::tempdir().unwrap();
-        let suite_path = write_suite(dir.path());
-        let layout = RunLayout::from_run_dir(&dir.path().join("runs").join("run-5"));
-        write_run(&layout, &suite_path);
-
-        let ctx = RunContext::from_run_dir(&layout.run_dir()).unwrap();
         let docker: Arc<dyn ContainerRuntime> =
             Arc::new(crate::infra::blocks::FakeContainerRuntime::new());
         docker
@@ -625,8 +611,8 @@ keep_clusters: false
             })
             .unwrap();
 
-        let services = RunServices::with_docker(ctx, Some(docker));
-        let rows = services.list_service_containers().unwrap();
+        let rows =
+            read_service_container_rows(docker.as_ref(), &run_service_filter("run-5")).unwrap();
 
         assert_eq!(rows.len(), 1);
         assert_eq!(rows[0].name, "svc-a");
