@@ -1105,6 +1105,19 @@ fn kuma_contracts_are_isolated_to_block_namespace() {
     );
 }
 
+#[test]
+fn docs_do_not_reference_legacy_kuma_storage_paths() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let readme = fs::read_to_string(root.join("README.md")).unwrap();
+
+    for needle in ["$XDG_DATA_HOME/kuma", ".local/share/kuma"] {
+        assert!(
+            !readme.contains(needle),
+            "README.md should not reference legacy Kuma storage paths via `{needle}`"
+        );
+    }
+}
+
 fn matches_extension(path: &Path) -> bool {
     matches!(
         path.extension().and_then(|ext| ext.to_str()),

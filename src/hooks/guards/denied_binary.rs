@@ -244,7 +244,7 @@ mod tests {
         let guard = DeniedBinaryGuard::author();
         let c = ctx(
             "suite:new",
-            "rm -rf ~/.local/share/kuma/suites/motb-compliance",
+            "rm -rf ~/.local/share/harness/suites/motb-compliance",
         );
         let result = guard.check(&c);
         assert!(result.is_some());
