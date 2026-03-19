@@ -12,7 +12,7 @@ use crate::infra::exec;
 use crate::run::args::RunDirArgs;
 
 use super::kumactl::find_kumactl_binary;
-use super::shared::resolve_run_services;
+use super::shared::resolve_run_application;
 
 impl Execute for TokenArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
@@ -64,8 +64,8 @@ pub fn token(
     valid_for: &str,
     run_dir_args: &RunDirArgs,
 ) -> Result<i32, CliError> {
-    let services = resolve_run_services(run_dir_args)?;
-    let access = services.control_plane_access()?;
+    let run = resolve_run_application(run_dir_args)?;
+    let access = run.control_plane_access()?;
     let addr = cp_addr.map_or(access.addr, Cow::Borrowed);
     let admin_token = access.admin_token;
 
@@ -81,7 +81,7 @@ pub fn token(
     }
 
     // Fallback to kumactl
-    let root = PathBuf::from(&services.metadata().repo_root);
+    let root = PathBuf::from(&run.metadata().repo_root);
     let binary = find_kumactl_binary(&root)?;
 
     let mut args = vec!["generate", "dataplane-token"];

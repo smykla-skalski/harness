@@ -3,10 +3,10 @@ use clap::Args;
 use crate::app::command_context::{AppContext, Execute};
 use crate::errors::{CliError, CliErrorKind};
 use crate::infra::blocks::ContainerRuntime;
+use crate::run::application::StartServiceRequest;
 use crate::run::args::RunDirArgs;
-use crate::run::services::StartServiceRequest;
 
-use super::shared::resolve_run_services_with_blocks;
+use super::shared::resolve_run_application_with_blocks;
 
 impl Execute for ServiceArgs {
     fn execute(&self, context: &AppContext) -> Result<i32, CliError> {
@@ -77,8 +77,8 @@ fn service_up(
     let port = args
         .port
         .ok_or_else(|| CliErrorKind::usage_error("service port is required"))?;
-    let services = resolve_run_services_with_blocks(&args.run_dir, ctx.shared_blocks())?;
-    services.start_service(
+    let run = resolve_run_application_with_blocks(&args.run_dir, ctx.shared_blocks())?;
+    run.start_service(
         docker,
         &StartServiceRequest {
             name,
@@ -105,8 +105,8 @@ fn service_list(
     run_dir_args: &RunDirArgs,
     docker: &dyn ContainerRuntime,
 ) -> Result<i32, CliError> {
-    if let Ok(services) = resolve_run_services_with_blocks(run_dir_args, ctx.shared_blocks()) {
-        for row in services.list_service_containers()? {
+    if let Ok(run) = resolve_run_application_with_blocks(run_dir_args, ctx.shared_blocks()) {
+        for row in run.list_service_containers()? {
             println!("{}\t{}", row.name, row.status);
         }
         return Ok(0);
