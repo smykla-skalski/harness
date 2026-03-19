@@ -4,6 +4,7 @@ mod cluster;
 mod gateway;
 mod kuma;
 mod pre_compact;
+mod services;
 mod session;
 pub mod wrapper;
 

@@ -15,8 +15,9 @@ use crate::infra::exec::{extract_admin_token, run_command, wait_for_http};
 use crate::platform::cluster::{ClusterMode, ClusterSpec, Platform};
 use crate::platform::compose;
 use crate::run::context::RunRepository;
+use crate::setup::services::cluster::persist_cluster_spec;
 
-use super::{ClusterArgs, persist_cluster_spec};
+use super::ClusterArgs;
 
 const UNIVERSAL_SUBNET: &str = "172.57.0.0/16";
 
@@ -120,7 +121,7 @@ pub(super) fn load_persisted_cluster_spec() -> Result<Option<ClusterSpec>, CliEr
         .and_then(|pointer| pointer.cluster))
 }
 
-pub(super) fn cluster_universal(args: &ClusterArgs) -> Result<i32, CliError> {
+pub(crate) fn cluster_universal(args: &ClusterArgs) -> Result<i32, CliError> {
     let mode = &args.mode;
     let mut all_names = vec![args.cluster_name.clone()];
     all_names.extend(args.extra_cluster_names.iter().cloned());

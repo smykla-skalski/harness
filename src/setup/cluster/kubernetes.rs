@@ -11,8 +11,9 @@ use crate::errors::{CliError, CliErrorKind};
 use crate::infra::exec;
 use crate::infra::exec::{cluster_exists, docker, kubectl};
 use crate::platform::cluster::{ClusterMode, ClusterSpec, HelmSetting};
+use crate::setup::services::cluster::{make_target, make_target_live, persist_cluster_spec};
 
-use super::{ClusterArgs, make_target, make_target_live, persist_cluster_spec};
+use super::ClusterArgs;
 
 /// Helm settings that fix init container CPU throttling on k3d clusters.
 ///
@@ -71,7 +72,7 @@ fn resolve_kds_address(global_cluster: &str) -> Result<String, CliError> {
     Ok(address)
 }
 
-pub(super) fn cluster_k8s(args: &ClusterArgs) -> Result<i32, CliError> {
+pub(crate) fn cluster_k8s(args: &ClusterArgs) -> Result<i32, CliError> {
     let mode = &args.mode;
     let mut all_names = vec![args.cluster_name.clone()];
     all_names.extend(args.extra_cluster_names.iter().cloned());
