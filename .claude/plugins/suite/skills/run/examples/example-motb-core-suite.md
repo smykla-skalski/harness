@@ -34,7 +34,7 @@ keep_clusters: false
 
 # Example suite - MOTB core (runner view)
 
-Worked suite example showing the structure expected by `suite:run`. Group files stay authoritative for `## Consume` and `## Debug`, while `harness preflight` materializes the `## Configure` YAML into prepared manifests for the active run.
+Worked suite example showing the structure expected by `suite:run`. Group files stay authoritative for `## Consume` and `## Debug`, while `harness run preflight` materializes the `## Configure` YAML into prepared manifests for the active run.
 
 ## Baseline manifests
 
@@ -53,12 +53,12 @@ Worked suite example showing the structure expected by `suite:run`. Group files 
 
 ## Execution contract
 
-- `harness preflight` materializes baseline manifests and group `## Configure` YAML once, validates them, applies baselines once, and writes the prepared-suite artifact for the active run.
-- All manifests are applied through `harness apply`.
-- After `harness init`, use context-driven commands only. Prepared manifests are referenced as `harness apply --manifest "<group-id>/<file>"`.
-- All cluster-interacting verification and cleanup commands are executed through `harness record`.
+- `harness run preflight` materializes baseline manifests and group `## Configure` YAML once, validates them, applies baselines once, and writes the prepared-suite artifact for the active run.
+- All manifests are applied through `harness run apply`.
+- After `harness run init`, use context-driven commands only. Prepared manifests are referenced as `harness run apply --manifest "<group-id>/<file>"`.
+- All cluster-interacting verification and cleanup commands are executed through `harness run record`.
 - Group files stay authoritative for `## Consume`, `## Debug`, and expected outcomes.
-- State is captured after each completed group with `harness capture`.
+- State is captured after each completed group with `harness run capture`.
 - Deviations require user approval and are recorded in the run report.
 
 ## Failure triage

@@ -1,6 +1,6 @@
 # Manifest index
 
-Each row is one manifest application event tracked by `harness apply`.
+Each row is one manifest application event tracked by `harness run apply`.
 
 - `copied_at`: UTC timestamp of the applied manifest version
 - `manifest`: relative path to the applied manifest in the run

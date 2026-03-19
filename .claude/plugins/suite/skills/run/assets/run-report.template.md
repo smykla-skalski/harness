@@ -14,7 +14,7 @@ Compactness rules:
 - keep this report concise and summary-oriented
 - do not paste raw command output or full YAML dumps here
 - reference evidence files in `artifacts/`, `state/`, and `manifests/`
-- run `harness report check` before closeout
+- run `harness run report check` before closeout
 
 ## Run summary
 

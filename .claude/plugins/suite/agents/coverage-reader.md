@@ -28,5 +28,5 @@ Before finishing:
 }
 ```
 
-2. Save it with `harness authoring-save --kind coverage`.
+2. Save it with `harness authoring save --kind coverage`.
 3. Return only `coverage summary saved`.

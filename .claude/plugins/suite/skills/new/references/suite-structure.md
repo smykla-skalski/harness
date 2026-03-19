@@ -45,7 +45,7 @@ ${DATA_DIR}/${SUITE_NAME}/
     demo-workload.yaml
   groups/                    # one markdown file + one manifest directory per group
     g01-crud.md
-    g01/                     # pre-written manifests for G1, applied via harness apply --manifest g01
+    g01/                     # pre-written manifests for G1, applied via harness run apply --manifest g01
       01-create.yaml
       02-update.yaml
     g02-validation.md
@@ -137,7 +137,7 @@ Short section telling the runner to stop on the first unexpected failure, captur
 
 ## Baseline directory
 
-One `.yaml` file per shared resource applied once during `harness preflight`. These are manifests that multiple groups depend on (namespace setup, otel collector, demo workloads). Extract them from group steps to avoid duplication. The runner materializes them into the active run's `manifests/prepared/baseline/` directory and applies them before Phase 4 begins.
+One `.yaml` file per shared resource applied once during `harness run preflight`. These are manifests that multiple groups depend on (namespace setup, otel collector, demo workloads). Extract them from group steps to avoid duplication. The runner materializes them into the active run's `manifests/prepared/baseline/` directory and applies them before Phase 4 begins.
 
 ### Baseline cluster distribution
 
@@ -171,7 +171,7 @@ When `profiles` includes `multi-zone`, baselines that deploy workloads (demo app
 
 One markdown file per group plus a manifest directory with the same group ID prefix. Naming convention: `g{NN}-{slug}.md` for the markdown, `g{NN}/` for the manifest directory where NN is zero-padded and slug is kebab-case. Range groups use: `g17-g26-pipe-mode.md` with `g17-g26/` for manifests.
 
-Each manifest directory contains the group's YAML manifests, named in apply order: `01-{descriptive-slug}.yaml`, `02-{descriptive-slug}.yaml`, etc. The group markdown's `## Configure` section references these files with `harness apply` commands (e.g., `harness apply --manifest g{NN}`) but does not duplicate the YAML inline. The YAML lives only in the `groups/g{NN}/` directory.
+Each manifest directory contains the group's YAML manifests, named in apply order: `01-{descriptive-slug}.yaml`, `02-{descriptive-slug}.yaml`, etc. The group markdown's `## Configure` section references these files with `harness run apply` commands (e.g., `harness run apply --manifest g{NN}`) but does not duplicate the YAML inline. The YAML lives only in the `groups/g{NN}/` directory.
 
 ## Group file structure
 
@@ -209,9 +209,9 @@ restart_namespaces:
 
 ## Configure
 
-This section contains `harness apply` commands that reference the pre-written YAML files in the group's manifest directory (`groups/g{NN}/`). Do not embed inline YAML blocks here. Use `harness apply --manifest g{NN}` to apply the whole directory, or `harness apply --manifest g{NN}/01-name.yaml` for a specific file.
+This section contains `harness run apply` commands that reference the pre-written YAML files in the group's manifest directory (`groups/g{NN}/`). Do not embed inline YAML blocks here. Use `harness run apply --manifest g{NN}` to apply the whole directory, or `harness run apply --manifest g{NN}/01-name.yaml` for a specific file.
 
-Use `expected_rejection_orders` when a prepared manifest is intentionally invalid and a later execution step must prove the API rejects it. The list is 1-based and follows the manifest file order in the `groups/g{NN}/` directory. `harness authoring-validate` still validates those manifests but skips up-front schema validation for the listed ordinals so the rejection path can run in Phase 4.
+Use `expected_rejection_orders` when a prepared manifest is intentionally invalid and a later execution step must prove the API rejects it. The list is 1-based and follows the manifest file order in the `groups/g{NN}/` directory. `harness authoring validate` still validates those manifests but skips up-front schema validation for the listed ordinals so the rejection path can run in Phase 4.
 
 ## Consume
 
@@ -302,7 +302,7 @@ Amendments are permanent fixes to the suite. Future runs use the corrected manif
 ## Command authoring defaults
 
 - Generate executable commands, not placeholders. The default authored output uses full `harness` invocations.
-- Use `harness apply` for prepared manifests, `harness run --phase <phase> --label <label> [--cluster <name>] kubectl <args>` for kubectl commands, `harness run --phase <phase> --label <label> kumactl <args>` for kumactl commands, `harness envoy capture --phase <phase> --label <label> --namespace <ns> --workload <target> [--type-contains <Type>|--grep <Text>]` for Envoy admin payloads, and `harness record --phase <phase> --label <label> -- <command>` for `curl`, `wget`, `jq`, and other non-wrapped commands.
+- Use `harness run apply` for prepared manifests, `harness run record --phase <phase> --label <label> [--cluster <name>] -- kubectl <args>` for kubectl commands, `harness run record --phase <phase> --label <label> -- kumactl <args>` for kumactl commands, `harness run envoy capture --phase <phase> --label <label> --namespace <ns> --workload <target> [--type-contains <Type>|--grep <Text>]` for Envoy admin payloads, and `harness run record --phase <phase> --label <label> -- <command>` for `curl`, `wget`, `jq`, and other non-wrapped commands.
 - Raw `kubectl`, `kumactl`, `curl`, or similar commands are allowed only when the suite:new prompt explicitly asks for raw commands.
 
 ## Domain knowledge
@@ -351,7 +351,7 @@ A "delegated gateway" in Kuma is a standalone gateway proxy (not managed by Kuma
 Builtin gateways are managed by Kuma using MeshGateway + GatewayClass resources from the Kubernetes Gateway API. They require Gateway API CRDs to be installed in the cluster. When generating suites that include builtin gateway groups:
 
 - Add `gateway-api-crds` to the suite metadata `required dependencies`
-- The test runner will install them via `harness gateway` during Phase 2
+- The test runner will install them via `harness setup gateway` during Phase 2
 - Use `GatewayClass`, `Gateway`, `HTTPRoute` from `gateway.networking.k8s.io/v1` or `v1beta1`
 - Builtin gateways are NOT available on Universal - only Kubernetes
 
@@ -373,21 +373,21 @@ Commands to verify expected state after applying manifests:
 
 ```bash
 # Resource exists
-harness run --phase verify --label get-resource \
-  kubectl get <resource-type> <name> -n <namespace> -o yaml
+harness run record --phase verify --label get-resource \
+  -- kubectl get <resource-type> <name> -n <namespace> -o yaml
 
 # kumactl inspection
-harness run --phase verify --label inspect-dataplanes \
-  kumactl inspect dataplanes --mesh default
+harness run record --phase verify --label inspect-dataplanes \
+  -- kumactl inspect dataplanes --mesh default
 
 # Envoy config dump
-harness envoy capture --phase verify --label config-dump \
+harness run envoy capture --phase verify --label config-dump \
   --namespace <ns> --workload deploy/<name> \
   --type-contains ClustersConfigDump
 
 # Control plane logs
-harness run --phase debug --label control-plane-logs \
-  kubectl logs -n kuma-system deploy/kuma-control-plane --tail=50
+harness run record --phase debug --label control-plane-logs \
+  -- kubectl logs -n kuma-system deploy/kuma-control-plane --tail=50
 ```
 
 ## Artifact capture patterns
@@ -406,16 +406,16 @@ harness run --phase debug --label control-plane-logs \
 
 Every suite must include this checklist in suite.md:
 
-- `harness preflight` validates baseline manifests and per-group manifest directories, applies baselines once (to all clusters specified by each baseline's `clusters` field), and writes the prepared-suite artifact for the active run
-- all manifests applied through `harness apply`
-- all commands (inspect, curl, delete, kubectl get, etc.) recorded via `harness record`
-- cluster state captured after each completed group via `harness capture`
+- `harness run preflight` validates baseline manifests and per-group manifest directories, applies baselines once (to all clusters specified by each baseline's `clusters` field), and writes the prepared-suite artifact for the active run
+- all manifests applied through `harness run apply`
+- all commands (inspect, curl, delete, kubectl get, etc.) recorded via `harness run record`
+- cluster state captured after each completed group via `harness run capture`
 - `run-status.json` updated after each group with counts and last_completed_group
 - all failures trigger immediate triage before next group
 - all pass/fail decisions include artifact pointers to existing files
 - deviations from suite definitions require user approval and are recorded in the report
 - manifest errors trigger user choice: fix for run only, fix in suite (with `amendments.md` entry), or skip
-- manifests in per-group directories (`groups/g{NN}/`) are authoritative - the runner applies them via `harness apply --manifest g{NN}` during Phase 4
+- manifests in per-group directories (`groups/g{NN}/`) are authoritative - the runner applies them via `harness run apply --manifest g{NN}` during Phase 4
 - Mesh\* policy suites include the edge cases from [Mesh\* policy suite requirements](#mesh-policy-suite-requirements)
 
 ## Reference

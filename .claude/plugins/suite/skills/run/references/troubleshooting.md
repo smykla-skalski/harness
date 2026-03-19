@@ -40,7 +40,7 @@ Symptoms: `kubectl apply` fails with CRD required-field or enum errors.
 
 Fix:
 
-1. Run server-side dry-run with `harness validate`.
+1. Run server-side dry-run with `harness run validate`.
 2. Re-run Phase 2 bootstrap for the affected cluster profile with `harness setup kuma cluster`, then re-run preflight. Avoid ad-hoc CRD refresh commands during a tracked run because bare `kubectl apply` is outside the harness contract.
 3. Retry validation.
 
@@ -51,11 +51,11 @@ Symptoms: unknown resource types, missing command support for newer resources.
 Fix:
 
 ```bash
-harness run --phase debug --label kumactl-version \
-  kumactl version
+harness run record --phase debug --label kumactl-version \
+  -- kumactl version
 ```
 
-Use `harness run ... kumactl ...` for tracked local version and inspect commands so they stay audited and captured.
+Use `harness run record ... -- kumactl ...` for tracked local version and inspect commands so they stay audited and captured.
 
 ## 4) Dependency workload crashes after start
 
@@ -149,7 +149,7 @@ Prevention: `HARNESS_DOCKER_PRUNE=1` (default) in `harness setup kuma cluster` p
 
 Symptoms: after choosing "Fix in suite and this run", the re-applied manifest still has the old broken content. The suite source file is correct but the prepared copy in `runs/<run-id>/manifests/prepared/` was not updated.
 
-Fix: re-materialize the prepared manifest before re-applying. Use `harness apply --manifest <path> --step <label>` which reads from the suite source, not from the stale prepared copy. Alternatively, copy the fixed file to the prepared directory before re-applying:
+Fix: re-materialize the prepared manifest before re-applying. Use `harness run apply --manifest <path> --step <label>` which reads from the suite source, not from the stale prepared copy. Alternatively, copy the fixed file to the prepared directory before re-applying:
 
 ```bash
 cp <fixed-suite-source-file> runs/<run-id>/manifests/prepared/<matching-path>
@@ -204,7 +204,7 @@ harness setup kuma cluster single-up kuma-1 \
 
 When a test fails:
 
-1. Run `harness capture` immediately with label `failure-<test-id>`.
+1. Run `harness run capture` immediately with label `failure-<test-id>`.
 2. Record exact failing command in command log.
 3. Record expected vs observed behavior.
 4. Classify root cause: **suite bug** (wrong manifest/expectations), **product bug** (Kuma vs spec), **harness bug** (infra misconfiguration), or **environment issue** (timing/resources).

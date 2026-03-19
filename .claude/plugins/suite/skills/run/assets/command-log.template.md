@@ -1,6 +1,6 @@
 # Command log
 
-Append one row for every `harness record` invocation.
+Append one row for every `harness run record` invocation.
 
 - `ran_at`: UTC timestamp
 - `command`: exact recorded command line
