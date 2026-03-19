@@ -1,5 +1,4 @@
 use std::env;
-use std::fs;
 
 use clap::Args;
 
@@ -7,11 +6,10 @@ use tracing::warn;
 
 use crate::app::command_context::{CommandContext, Execute, resolve_project_dir};
 use crate::compact;
-use crate::core_defs::current_run_context_path;
 use crate::errors::CliError;
 use crate::hooks::session::SessionStartHookOutput;
 use crate::platform::ephemeral_metallb;
-use crate::run::context::{CurrentRunRecord, RunRepository};
+use crate::run::context::RunRepository;
 use crate::setup::wrapper;
 
 impl Execute for SessionStartArgs {
@@ -56,7 +54,7 @@ pub fn session_start(project_dir: Option<&str>) -> Result<i32, CliError> {
     }
 
     // Check for a pending compact handoff to restore
-    let handoff = compact::pending_compact_handoff(&dir);
+    let handoff = compact::pending_compact_handoff(&dir)?;
     if let Some(h) = handoff {
         let diverged = compact::verify_fingerprints(&h);
         let context = compact::render_hydration_context(&h, &diverged);
@@ -83,15 +81,7 @@ pub fn session_start(project_dir: Option<&str>) -> Result<i32, CliError> {
 /// Returns `CliError` on failure.
 pub fn session_stop(_project_dir: Option<&str>) -> Result<i32, CliError> {
     let repo = RunRepository;
-    let ctx_path = current_run_context_path()?;
-    let Ok(text) = fs::read_to_string(&ctx_path) else {
-        return Ok(0);
-    };
-    let Ok(record) = serde_json::from_str::<CurrentRunRecord>(&text) else {
-        warn!("corrupt run pointer JSON, removing");
-        if let Err(e) = repo.clear_current_pointer() {
-            warn!(%e, "failed to remove corrupt pointer");
-        }
+    let Some(record) = repo.load_current_pointer()? else {
         return Ok(0);
     };
 

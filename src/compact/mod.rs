@@ -8,14 +8,15 @@ pub use render::{render_hydration_context, render_runner_restore_context};
 
 use std::borrow::Cow;
 use std::path::{Path, PathBuf};
-use std::{fs, result};
+use std::result;
 
+use fs_err as fs;
 use rayon::prelude::*;
 use tracing::warn;
 
 use crate::core_defs::{project_context_dir, session_scope_key, utc_now};
 use crate::errors::{CliError, CliErrorKind, io_for};
-use crate::infra::io::write_json_pretty;
+use crate::infra::io::{read_text, write_json_pretty};
 use crate::rules::compact as compact_rules;
 
 /// Compact directory for a project.
@@ -95,8 +96,7 @@ pub fn load_latest_compact_handoff(
     if !path.exists() {
         return Ok(None);
     }
-    let text =
-        fs::read_to_string(&path).map_err(|e| -> CliError { io_for("read", &path, &e).into() })?;
+    let text = read_text(&path).map_err(|error| -> CliError { io_for("read", &path, &error).into() })?;
     serde_json::from_str(&text)
         .map(Some)
         .map_err(|e| -> CliError { io_for("parse compact handoff at", &path, &e).into() })
@@ -113,15 +113,15 @@ pub fn parse_compact_handoff(text: &str) -> Result<CompactHandoff<'static>, CliE
 }
 
 /// Load a pending (unconsumed) compact handoff, if any.
-#[must_use]
-pub fn pending_compact_handoff(project_dir: &Path) -> Option<CompactHandoff<'static>> {
-    match load_latest_compact_handoff(project_dir) {
-        Ok(opt) => opt.filter(|h| h.status == HandoffStatus::Pending),
-        Err(e) => {
-            warn!(%e, "compact handoff load failed");
-            None
-        }
-    }
+///
+/// # Errors
+/// Returns `CliError` if the persisted compact handoff exists but is unreadable
+/// or corrupt.
+pub fn pending_compact_handoff(
+    project_dir: &Path,
+) -> Result<Option<CompactHandoff<'static>>, CliError> {
+    let handoff = load_latest_compact_handoff(project_dir)?;
+    Ok(handoff.filter(|item| item.status == HandoffStatus::Pending))
 }
 
 /// Mark a handoff as consumed.
@@ -217,7 +217,7 @@ mod tests {
 
     /// Read a handoff directly from a path.
     fn read_handoff_from(path: &Path) -> Option<CompactHandoff<'static>> {
-        let text = fs::read_to_string(path).ok()?;
+        let text = read_text(path).ok()?;
         serde_json::from_str(&text).ok()
     }
 
@@ -283,6 +283,22 @@ mod tests {
     fn load_returns_none_when_no_file() {
         let path = Path::new("/nonexistent/latest.json");
         assert!(read_handoff_from(path).is_none());
+    }
+
+    #[test]
+    fn pending_compact_handoff_rejects_corrupt_latest_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let xdg = dir.path().join("xdg");
+        temp_env::with_vars([("XDG_DATA_HOME", Some(xdg.to_str().unwrap()))], || {
+            let latest = compact_latest_path(dir.path());
+            if let Some(parent) = latest.parent() {
+                fs::create_dir_all(parent).unwrap();
+            }
+            fs::write(&latest, "{ invalid").unwrap();
+
+            let error = pending_compact_handoff(dir.path()).unwrap_err();
+            assert_eq!(error.code(), "IO001");
+        });
     }
 
     #[test]

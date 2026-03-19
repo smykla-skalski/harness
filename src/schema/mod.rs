@@ -372,7 +372,7 @@ debug_summary: []
         let path = write_temp_file(dir.path(), "suite.md", "---\n: [\n---\n\nBody.\n");
         let err = SuiteSpec::from_markdown(&path).unwrap_err();
         assert!(
-            err.message().contains("frontmatter YAML"),
+            err.message().contains("suite frontmatter"),
             "expected YAML parse error, got: {}",
             err.message()
         );

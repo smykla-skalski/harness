@@ -44,6 +44,43 @@ fn legacy_scatter_roots_are_gone() {
 }
 
 #[test]
+fn bespoke_frontmatter_paths_are_gone() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let denylist = ["extract_raw_frontmatter(", "serde_yml::Mapping"];
+    let mut stack = vec![root.join("src")];
+    let mut hits = Vec::new();
+
+    while let Some(path) = stack.pop() {
+        for entry in fs::read_dir(&path).unwrap() {
+            let entry = entry.unwrap();
+            let child = entry.path();
+            if child.is_dir() {
+                stack.push(child);
+                continue;
+            }
+            if !matches_extension(&child) {
+                continue;
+            }
+            let contents = fs::read_to_string(&child).unwrap();
+            for needle in denylist {
+                if contents.contains(needle) {
+                    hits.push(format!(
+                        "{} contains forbidden bespoke frontmatter logic `{needle}`",
+                        child.strip_prefix(root).unwrap().display()
+                    ));
+                }
+            }
+        }
+    }
+
+    assert!(
+        hits.is_empty(),
+        "found bespoke frontmatter logic after dependency migration:\n{}",
+        hits.join("\n")
+    );
+}
+
+#[test]
 fn kuma_contracts_are_isolated_to_block_namespace() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
     let src_root = root.join("src");
