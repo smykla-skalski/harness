@@ -1,5 +1,3 @@
-#![allow(clippy::redundant_clone)]
-
 // Tests for the record command and related CLI operations.
 // Covers recording with run directories, kubectl rewriting, context export,
 // and artifact creation. Most tests exercise command handlers directly;
@@ -60,7 +58,7 @@ fn record_accepts_run_dir_phase_and_label() {
         gid: None,
         cluster: None,
         command: vec!["echo".into(), "hello".into()],
-        run_dir: args.clone(),
+        run_dir: args,
     })
     .execute();
     assert!(result.is_ok(), "record should succeed: {result:?}");
@@ -106,7 +104,7 @@ fn record_exports_context_env() {
         gid: None,
         cluster: None,
         command: vec!["env".into()],
-        run_dir: args.clone(),
+        run_dir: args,
     })
     .execute();
     assert!(result.is_ok(), "record env should succeed: {result:?}");
@@ -144,7 +142,7 @@ fn run_can_target_another_tracked_cluster_member() {
         gid: None,
         cluster: Some("zone-1".into()),
         command: vec!["echo".into(), "cluster-test".into()],
-        run_dir: args.clone(),
+        run_dir: args,
     })
     .execute();
     assert!(
@@ -170,7 +168,7 @@ fn record_creates_artifact_even_when_binary_not_found() {
         gid: None,
         cluster: None,
         command: vec!["nonexistent-binary-xyz-12345".into()],
-        run_dir: args.clone(),
+        run_dir: args,
     })
     .execute();
     // The command fails with exit code 127, which triggers an error
@@ -210,7 +208,7 @@ fn record_run_dir_refreshes_current_session_context() {
         gid: None,
         cluster: None,
         command: vec!["echo".into(), "refresh-test".into()],
-        run_dir: args.clone(),
+        run_dir: args,
     })
     .execute();
     assert!(
@@ -235,7 +233,7 @@ fn run_uses_active_project_run_without_explicit_run_id() {
         gid: None,
         cluster: None,
         command: vec!["echo".into(), "no-run-id".into()],
-        run_dir: args.clone(),
+        run_dir: args,
     })
     .execute();
     assert!(
@@ -450,7 +448,7 @@ fn authoring_validate_accepts_valid_meshmetric_group() {
 
     let paths = vec![yaml.to_string_lossy().to_string()];
     let result = authoring_validate_cmd(AuthoringValidateArgs {
-        path: paths.clone(),
+        path: paths,
         repo_root: Some(repo_root.to_string_lossy().to_string()),
     })
     .execute();
@@ -468,7 +466,7 @@ fn authoring_validate_rejects_invalid_meshmetric_group() {
 
     let paths = vec![md.to_string_lossy().to_string()];
     let result = authoring_validate_cmd(AuthoringValidateArgs {
-        path: paths.clone(),
+        path: paths,
         repo_root: Some(repo_root.to_string_lossy().to_string()),
     })
     .execute();
@@ -487,7 +485,7 @@ fn authoring_validate_ignores_universal_format() {
 
     let paths = vec![txt.to_string_lossy().to_string()];
     let result = authoring_validate_cmd(AuthoringValidateArgs {
-        path: paths.clone(),
+        path: paths,
         repo_root: Some(repo_root.to_string_lossy().to_string()),
     })
     .execute();
@@ -509,7 +507,7 @@ fn authoring_validate_skips_expected_rejection_manifests() {
 
     let paths = vec![yaml.to_string_lossy().to_string()];
     let result = authoring_validate_cmd(AuthoringValidateArgs {
-        path: paths.clone(),
+        path: paths,
         repo_root: Some(repo_root.to_string_lossy().to_string()),
     })
     .execute();
@@ -569,10 +567,7 @@ fn closeout_sets_completed_phase() {
         run_root: None,
     };
 
-    let result = closeout_cmd(CloseoutArgs {
-        run_dir: args.clone(),
-    })
-    .execute();
+    let result = closeout_cmd(CloseoutArgs { run_dir: args }).execute();
     assert!(result.is_ok(), "closeout should succeed: {result:?}");
     assert_eq!(result.unwrap(), 0);
 }

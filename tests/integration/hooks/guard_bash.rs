@@ -5,6 +5,7 @@
 // and phase-gated command restrictions after run completion.
 
 use harness::hooks::guard_bash;
+use harness::hooks::hook_result::HookResult;
 use harness::run::Verdict;
 use harness::run::workflow::{
     self as runner_workflow, PreflightState, PreflightStatus, RunnerPhase, RunnerWorkflowState,
@@ -108,11 +109,7 @@ const GUARD_BASH_PAYLOAD_CASES: &[(&str, &str, bool)] = &[
     ("suite:new", "k3d cluster list", false),
 ];
 
-fn execute_payload_case(
-    skill: &str,
-    command: &str,
-    case_idx: usize,
-) -> harness::hooks::hook_result::HookResult {
+fn execute_payload_case(skill: &str, command: &str, case_idx: usize) -> HookResult {
     if skill == "suite:run" {
         let tmp = tempfile::tempdir().unwrap();
         let run_dir = init_run(

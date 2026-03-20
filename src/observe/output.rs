@@ -8,8 +8,7 @@ use serde::Serialize;
 use serde_sarif::sarif::PropertyBag;
 
 use super::types::{
-    Confidence, FixSafety, Issue, IssueCategory, IssueCode, IssueSeverity, MessageRole,
-    SourceTool,
+    Confidence, FixSafety, Issue, IssueCategory, IssueCode, IssueSeverity, MessageRole, SourceTool,
 };
 
 /// Maximum detail length in JSON output.
@@ -188,11 +187,13 @@ impl<'a> RenderedTopCauses<'a> {
     fn new(issues: &'a [Issue], top_n: usize) -> Self {
         let mut counts: HashMap<IssueCode, RenderedTopCause<'a>> = HashMap::new();
         for issue in issues {
-            let entry = counts.entry(issue.code).or_insert_with(|| RenderedTopCause {
-                code: issue.code,
-                occurrences: 0,
-                summary: &issue.summary,
-            });
+            let entry = counts
+                .entry(issue.code)
+                .or_insert_with(|| RenderedTopCause {
+                    code: issue.code,
+                    occurrences: 0,
+                    summary: &issue.summary,
+                });
             entry.occurrences += 1;
         }
 
@@ -624,7 +625,10 @@ mod tests {
     fn json_output_source_tool() {
         let mut issue = sample_issue();
         issue.source_tool = Some(SourceTool::Bash);
-        assert_eq!(parse_issue_json(&issue).source.tool.as_deref(), Some("Bash"));
+        assert_eq!(
+            parse_issue_json(&issue).source.tool.as_deref(),
+            Some("Bash")
+        );
     }
 
     #[test]

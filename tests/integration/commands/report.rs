@@ -105,8 +105,12 @@ fn create_initial_report(run_dir: &Path) {
     rpt.save().unwrap();
 }
 
-#[allow(clippy::cognitive_complexity)]
 fn assert_group_report(run_dir: &Path) {
+    assert_group_status(run_dir);
+    assert_group_report_body(run_dir);
+}
+
+fn assert_group_status(run_dir: &Path) {
     let ctx = RunContext::from_run_dir(run_dir).unwrap();
     let status = ctx.status.unwrap();
     assert_eq!(status.executed_group_ids(), vec!["g01"]);
@@ -115,7 +119,10 @@ fn assert_group_report(run_dir: &Path) {
     assert_eq!(status.last_completed_group.as_deref(), Some("g01"));
     assert!(status.last_updated_utc.is_some());
     assert_eq!(status.notes, vec!["all checks passed"]);
+}
 
+fn assert_group_report_body(run_dir: &Path) {
+    let ctx = RunContext::from_run_dir(run_dir).unwrap();
     let report_text = fs::read_to_string(ctx.layout.report_path()).unwrap();
     assert!(report_text.contains("## Group: g01"));
     assert!(report_text.contains("**Verdict:** pass"));
