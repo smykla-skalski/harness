@@ -6,8 +6,6 @@ pub use suite::{GroupFrontmatter, GroupSection, GroupSpec, SuiteSpec};
 
 #[cfg(test)]
 mod tests {
-    #![allow(clippy::cognitive_complexity)]
-
     use std::fs;
     use std::path::{Path, PathBuf};
 
@@ -21,26 +19,38 @@ mod tests {
         path
     }
 
-    #[test]
-    fn test_load_suite() {
-        let dir = tempfile::tempdir().unwrap();
-        let path = default_suite().write_to(&dir.path().join("suite.md"));
-        let suite = SuiteSpec::from_markdown(&path).unwrap();
+    fn assert_default_suite_identity(suite: &SuiteSpec) {
         assert_eq!(suite.frontmatter.suite_id, "example.suite");
         assert_eq!(suite.frontmatter.groups, vec!["groups/g01.md"]);
         assert!(!suite.frontmatter.keep_clusters);
         assert_eq!(suite.frontmatter.feature, "example");
+    }
+
+    fn assert_default_suite_profiles(suite: &SuiteSpec) {
         assert_eq!(suite.frontmatter.scope.as_deref(), Some("unit"));
         assert_eq!(suite.frontmatter.profiles, vec!["single-zone"]);
         assert!(suite.frontmatter.requires.is_empty());
         assert!(suite.frontmatter.user_stories.is_empty());
         assert!(suite.frontmatter.variant_decisions.is_empty());
+    }
+
+    fn assert_default_suite_coverage(suite: &SuiteSpec) {
         assert_eq!(
             suite.frontmatter.coverage_expectations,
             vec!["configure", "consume", "debug"]
         );
         assert!(suite.frontmatter.baseline_files.is_empty());
         assert!(suite.frontmatter.skipped_groups.is_empty());
+    }
+
+    #[test]
+    fn test_load_suite() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = default_suite().write_to(&dir.path().join("suite.md"));
+        let suite = SuiteSpec::from_markdown(&path).unwrap();
+        assert_default_suite_identity(&suite);
+        assert_default_suite_profiles(&suite);
+        assert_default_suite_coverage(&suite);
     }
 
     #[test]

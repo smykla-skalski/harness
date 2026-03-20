@@ -1,5 +1,3 @@
-#![allow(clippy::cognitive_complexity)]
-
 use super::*;
 use crate::kernel::tooling::legacy_tool_context;
 use crate::observe::output;
@@ -19,6 +17,95 @@ fn bash_tool_use(command: &str) -> serde_json::Value {
         "name": "Bash",
         "input": { "command": command }
     })
+}
+
+fn assert_remediation_fields(
+    issue: &Issue,
+    expected_fixable: bool,
+    expected_target: Option<&str>,
+    hint_fragment: Option<&str>,
+) {
+    assert_eq!(issue.fix_safety.is_fixable(), expected_fixable);
+    assert_eq!(issue.fix_target.as_deref(), expected_target);
+    match hint_fragment {
+        Some(fragment) => assert!(
+            issue
+                .fix_hint
+                .as_deref()
+                .is_some_and(|hint| hint.contains(fragment))
+        ),
+        None => assert!(issue.fix_hint.is_none()),
+    }
+}
+
+fn assert_rule_rendered_target(parsed: &serde_json::Value, expected_target: Option<&str>) {
+    assert_eq!(
+        parsed["remediation"]["available"],
+        expected_target.is_some()
+    );
+    match expected_target {
+        Some(target) => assert_eq!(parsed["remediation"]["target"], target),
+        None => assert!(parsed["remediation"].get("target").is_none()),
+    }
+}
+
+fn assert_rule_rendered_classification(parsed: &serde_json::Value) {
+    assert!(parsed["classification"]["code"].is_string());
+    assert!(parsed["classification"]["fingerprint"].is_string());
+    assert!(parsed["classification"]["confidence"].is_string());
+    assert!(parsed["remediation"]["safety"].is_string());
+}
+
+fn assert_output_json_identity_fields(parsed: &serde_json::Value) {
+    assert!(parsed.get("id").is_some());
+    assert!(parsed["location"].get("line").is_some());
+    assert!(parsed["classification"].get("code").is_some());
+    assert!(parsed["classification"].get("category").is_some());
+}
+
+fn assert_output_json_classification_fields(parsed: &serde_json::Value) {
+    assert!(parsed["classification"].get("severity").is_some());
+    assert!(parsed["classification"].get("confidence").is_some());
+    assert!(parsed["classification"].get("fingerprint").is_some());
+}
+
+fn assert_output_json_message_fields(parsed: &serde_json::Value) {
+    assert!(parsed["message"].get("summary").is_some());
+    assert!(parsed["message"].get("details").is_some());
+    assert!(parsed["source"].get("role").is_some());
+    assert!(parsed["remediation"].get("safety").is_some());
+    assert!(parsed["remediation"].get("available").is_some());
+}
+
+fn repeated_kubectl_query_block(index: usize) -> serde_json::Value {
+    serde_json::json!({
+        "type": "tool_use",
+        "id": format!("t{index}"),
+        "name": "Bash",
+        "input": { "command": "kubectl get crd meshretries.kuma.io -o json | jq '.spec'" }
+    })
+}
+
+fn warm_repeated_kubectl_query_state() {
+    let mut state = make_state();
+    for index in 0..3 {
+        let block = repeated_kubectl_query_block(index);
+        check_tool_use_for_issues(10 + index, &block, &mut state);
+    }
+}
+
+fn collect_repeated_kubectl_query_issues() -> Vec<Issue> {
+    let mut fresh_state = make_state();
+    let mut all_issues = Vec::new();
+    for index in 0..3 {
+        let block = repeated_kubectl_query_block(index);
+        all_issues.extend(check_tool_use_for_issues(
+            10 + index,
+            &block,
+            &mut fresh_state,
+        ));
+    }
+    all_issues
 }
 
 #[test]
@@ -584,19 +671,13 @@ fn rule_output_shape_is_preserved() {
     );
     assert_eq!(issues.len(), 1);
     let issue = &issues[0];
-    assert!(issue.fix_safety.is_fixable());
-    assert_eq!(issue.fix_target.as_deref(), Some("src/cli.rs"));
-    assert!(issue.fix_hint.is_none());
+    assert_remediation_fields(issue, true, Some("src/cli.rs"), None);
 
     let rendered = output::render_json(issue);
     let parsed: serde_json::Value = serde_json::from_str(&rendered).unwrap();
-    assert_eq!(parsed["remediation"]["available"], true);
-    assert_eq!(parsed["remediation"]["target"], "src/cli.rs");
-    assert!(parsed["classification"]["code"].is_string());
-    assert!(parsed["classification"]["fingerprint"].is_string());
+    assert_rule_rendered_target(&parsed, Some("src/cli.rs"));
+    assert_rule_rendered_classification(&parsed);
     assert!(parsed["id"].is_string());
-    assert!(parsed["classification"]["confidence"].is_string());
-    assert!(parsed["remediation"]["safety"].is_string());
 }
 
 #[test]
@@ -895,26 +976,23 @@ fn text_check_output_shape_is_preserved() {
     );
     assert_eq!(issues.len(), 1);
     let issue = &issues[0];
-    assert!(issue.fix_safety.is_fixable());
-    assert_eq!(issue.fix_target.as_deref(), Some("src/context.rs"));
-    assert!(
-        issue
-            .fix_hint
-            .as_deref()
-            .is_some_and(|hint| hint.contains("context directory"))
+    assert_remediation_fields(
+        issue,
+        true,
+        Some("src/context.rs"),
+        Some("context directory"),
     );
 
     let rendered = output::render_json(issue);
     let parsed: serde_json::Value = serde_json::from_str(&rendered).unwrap();
-    assert_eq!(parsed["remediation"]["available"], true);
-    assert_eq!(parsed["remediation"]["target"], "src/context.rs");
+    assert_rule_rendered_target(&parsed, Some("src/context.rs"));
+    assert_rule_rendered_classification(&parsed);
     assert!(
         parsed["remediation"]["hint"]
             .as_str()
             .unwrap()
             .contains("context directory")
     );
-    assert!(parsed["classification"]["code"].is_string());
 }
 
 #[test]
@@ -924,19 +1002,12 @@ fn tool_check_output_shape_is_preserved() {
     let issues = check_tool_use_for_issues(10, &block, &mut state);
     assert_eq!(issues.len(), 1);
     let issue = &issues[0];
-    assert!(!issue.fix_safety.is_fixable());
-    assert!(issue.fix_target.is_none());
-    assert!(
-        issue
-            .fix_hint
-            .as_deref()
-            .is_some_and(|hint| hint.contains("verify target"))
-    );
+    assert_remediation_fields(issue, false, None, Some("verify target"));
 
     let rendered = output::render_json(issue);
     let parsed: serde_json::Value = serde_json::from_str(&rendered).unwrap();
-    assert_eq!(parsed["remediation"]["available"], false);
-    assert!(parsed["remediation"].get("target").is_none());
+    assert_rule_rendered_target(&parsed, None);
+    assert_rule_rendered_classification(&parsed);
     assert!(
         parsed["remediation"]["hint"]
             .as_str()
@@ -1632,19 +1703,9 @@ fn golden_json_output_all_fields() {
     let rendered = output::render_json(issue);
     let parsed: serde_json::Value = serde_json::from_str(&rendered).unwrap();
 
-    // All required fields present
-    assert!(parsed.get("id").is_some());
-    assert!(parsed["location"].get("line").is_some());
-    assert!(parsed["classification"].get("code").is_some());
-    assert!(parsed["classification"].get("category").is_some());
-    assert!(parsed["classification"].get("severity").is_some());
-    assert!(parsed["classification"].get("confidence").is_some());
-    assert!(parsed["remediation"].get("safety").is_some());
-    assert!(parsed["message"].get("summary").is_some());
-    assert!(parsed["message"].get("details").is_some());
-    assert!(parsed["classification"].get("fingerprint").is_some());
-    assert!(parsed["source"].get("role").is_some());
-    assert!(parsed["remediation"].get("available").is_some());
+    assert_output_json_identity_fields(&parsed);
+    assert_output_json_classification_fields(&parsed);
+    assert_output_json_message_fields(&parsed);
 
     let id = parsed["id"].as_str().unwrap();
     assert_eq!(id.len(), 12);
@@ -2130,32 +2191,9 @@ fn non_kubectl_commands_ignored_by_query_tracker() {
 
 #[test]
 fn repeated_kubectl_query_output_shape() {
-    let mut state = make_state();
-    for index in 0..3 {
-        let block = serde_json::json!({
-            "type": "tool_use",
-            "id": format!("t{index}"),
-            "name": "Bash",
-            "input": { "command": "kubectl get crd meshretries.kuma.io -o json | jq '.spec'" }
-        });
-        check_tool_use_for_issues(10 + index, &block, &mut state);
-    }
+    warm_repeated_kubectl_query_state();
     // Re-run to get issues on the 3rd (dedup means the first emit sticks)
-    let mut fresh_state = make_state();
-    let mut all_issues = Vec::new();
-    for index in 0..3 {
-        let block = serde_json::json!({
-            "type": "tool_use",
-            "id": format!("t{index}"),
-            "name": "Bash",
-            "input": { "command": "kubectl get crd meshretries.kuma.io -o json | jq '.spec'" }
-        });
-        all_issues.extend(check_tool_use_for_issues(
-            10 + index,
-            &block,
-            &mut fresh_state,
-        ));
-    }
+    let all_issues = collect_repeated_kubectl_query_issues();
     let issue = all_issues
         .iter()
         .find(|i| i.code == IssueCode::RepeatedKubectlQueryForSameResource)

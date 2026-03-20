@@ -352,8 +352,20 @@ mod tests {
         );
     }
 
+    fn assert_audit_entry_fields(entry: &AuditEntry) {
+        assert_eq!(entry.tool_name, "Read");
+        assert_eq!(entry.tool_input, "suite.md");
+        assert_eq!(entry.output_summary, "file contents");
+        assert_eq!(entry.group_id.as_deref(), Some("g01"));
+    }
+
+    fn assert_audit_log_contains_entry(layout: &RunLayout) {
+        let log_contents = fs::read_to_string(layout.audit_log_path()).unwrap();
+        assert!(log_contents.contains("\"tool_name\":\"Read\""));
+        assert!(log_contents.contains("\"group_id\":\"g01\""));
+    }
+
     #[test]
-    #[allow(clippy::cognitive_complexity)]
     fn append_audit_entry_writes_jsonl_and_artifact() {
         let tempdir = tempfile::tempdir().unwrap();
         let run_dir = tempdir.path().join("r01");
@@ -370,15 +382,9 @@ mod tests {
         })
         .unwrap();
 
-        assert_eq!(entry.tool_name, "Read");
-        assert_eq!(entry.tool_input, "suite.md");
-        assert_eq!(entry.output_summary, "file contents");
-        assert_eq!(entry.group_id.as_deref(), Some("g01"));
+        assert_audit_entry_fields(&entry);
         assert!(run_dir.join(&entry.artifact_path).exists());
-
-        let log_contents = fs::read_to_string(layout.audit_log_path()).unwrap();
-        assert!(log_contents.contains("\"tool_name\":\"Read\""));
-        assert!(log_contents.contains("\"group_id\":\"g01\""));
+        assert_audit_log_contains_entry(&layout);
     }
 
     #[test]

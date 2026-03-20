@@ -285,10 +285,70 @@ impl FixSafety {
 
 #[cfg(test)]
 mod tests {
-    #![allow(clippy::cognitive_complexity)]
-
     use super::*;
     use crate::kernel::tooling::legacy_tool_context;
+
+    fn sample_issue() -> Issue {
+        Issue {
+            id: "abc123def456".into(),
+            line: 42,
+            code: IssueCode::BuildOrLintFailure,
+            category: IssueCategory::BuildError,
+            severity: IssueSeverity::Critical,
+            confidence: Confidence::High,
+            fix_safety: FixSafety::AutoFixSafe,
+            summary: "Build failed".into(),
+            details: "error[E0308]".into(),
+            fingerprint: "build_or_lint_failure".into(),
+            source_role: MessageRole::Assistant,
+            source_tool: None,
+            fix_target: Some("src/main.rs".into()),
+            fix_hint: None,
+            evidence_excerpt: None,
+        }
+    }
+
+    fn assert_issue_json_identity(json: &str) {
+        assert!(json.contains("\"build_error\""));
+        assert!(json.contains("\"critical\""));
+        assert!(json.contains("\"assistant\""));
+        assert!(json.contains("\"abc123def456\""));
+    }
+
+    fn assert_issue_json_optionals_omitted(json: &str) {
+        assert!(!json.contains("fix_hint"));
+        assert!(!json.contains("source_tool"));
+        assert!(!json.contains("evidence_excerpt"));
+    }
+
+    fn assert_scan_state_collections_empty(state: &ScanState) {
+        assert!(state.last_tool_uses.is_empty());
+        assert!(state.edit_counts.is_empty());
+        assert!(state.seen_issues.is_empty());
+        assert!(state.issue_occurrences.is_empty());
+        assert!(state.pending_resource_creates.is_empty());
+        assert!(state.kubectl_query_targets.is_empty());
+    }
+
+    fn assert_scan_state_flags_default(state: &ScanState) {
+        assert!(state.session_start_timestamp.is_none());
+        assert!(!state.source_code_edited_without_commit);
+        assert!(!state.seen_capture_since_last_group_report);
+        assert!(!state.seen_any_group_report);
+    }
+
+    fn assert_observer_state_identity(state: &ObserverState) {
+        assert_eq!(state.schema_version, ObserverState::CURRENT_VERSION);
+        assert_eq!(state.session_id, "test-session");
+        assert_eq!(state.cursor, 0);
+    }
+
+    fn assert_observer_state_collections_empty(state: &ObserverState) {
+        assert!(state.open_issues.is_empty());
+        assert!(state.resolved_issue_ids.is_empty());
+        assert!(state.muted_codes.is_empty());
+        assert!(state.cycle_history.is_empty());
+    }
 
     #[test]
     fn severity_ordering() {
@@ -320,46 +380,16 @@ mod tests {
 
     #[test]
     fn issue_serializes_to_json() {
-        let issue = Issue {
-            id: "abc123def456".into(),
-            line: 42,
-            code: IssueCode::BuildOrLintFailure,
-            category: IssueCategory::BuildError,
-            severity: IssueSeverity::Critical,
-            confidence: Confidence::High,
-            fix_safety: FixSafety::AutoFixSafe,
-            summary: "Build failed".into(),
-            details: "error[E0308]".into(),
-            fingerprint: "build_or_lint_failure".into(),
-            source_role: MessageRole::Assistant,
-            source_tool: None,
-            fix_target: Some("src/main.rs".into()),
-            fix_hint: None,
-            evidence_excerpt: None,
-        };
-        let json = serde_json::to_string(&issue).unwrap();
-        assert!(json.contains("\"build_error\""));
-        assert!(json.contains("\"critical\""));
-        assert!(json.contains("\"assistant\""));
-        assert!(json.contains("\"abc123def456\""));
-        assert!(!json.contains("fix_hint"));
-        assert!(!json.contains("source_tool"));
-        assert!(!json.contains("evidence_excerpt"));
+        let json = serde_json::to_string(&sample_issue()).unwrap();
+        assert_issue_json_identity(&json);
+        assert_issue_json_optionals_omitted(&json);
     }
 
     #[test]
     fn scan_state_defaults_empty() {
         let state = ScanState::default();
-        assert!(state.last_tool_uses.is_empty());
-        assert!(state.edit_counts.is_empty());
-        assert!(state.seen_issues.is_empty());
-        assert!(state.session_start_timestamp.is_none());
-        assert!(state.issue_occurrences.is_empty());
-        assert!(!state.source_code_edited_without_commit);
-        assert!(state.pending_resource_creates.is_empty());
-        assert!(state.kubectl_query_targets.is_empty());
-        assert!(!state.seen_capture_since_last_group_report);
-        assert!(!state.seen_any_group_report);
+        assert_scan_state_collections_empty(&state);
+        assert_scan_state_flags_default(&state);
     }
 
     #[test]
@@ -510,13 +540,8 @@ mod tests {
     #[test]
     fn observer_state_default_for_session() {
         let state = ObserverState::default_for_session("test-session");
-        assert_eq!(state.schema_version, ObserverState::CURRENT_VERSION);
-        assert_eq!(state.session_id, "test-session");
-        assert_eq!(state.cursor, 0);
-        assert!(state.open_issues.is_empty());
-        assert!(state.resolved_issue_ids.is_empty());
-        assert!(state.muted_codes.is_empty());
-        assert!(state.cycle_history.is_empty());
+        assert_observer_state_identity(&state);
+        assert_observer_state_collections_empty(&state);
     }
 
     #[test]

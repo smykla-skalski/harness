@@ -146,8 +146,6 @@ impl HookOutcome {
 
 #[cfg(test)]
 mod tests {
-    #![allow(clippy::cognitive_complexity)]
-
     use std::fs as stdfs;
 
     use crate::hooks::protocol::payloads::HookEnvelopePayload;
@@ -247,20 +245,28 @@ mod tests {
                 assert!(debug_path.exists(), "debug file should exist");
 
                 let content = stdfs::read_to_string(&debug_path).unwrap();
-                let line: serde_json::Value = serde_json::from_str(
-                    content
-                        .lines()
-                        .last()
-                        .expect("debug file should contain at least one JSONL line"),
-                )
-                .unwrap();
-                assert_eq!(line["hook_name"], "guard-bash");
-                assert_eq!(line["exit_code"], 2);
-                assert_eq!(line["outcome"], "error");
-                assert_eq!(line["message"], "blocked");
-                assert_eq!(line["gate"], "prebash");
-                assert!(line["timestamp"].as_str().unwrap().ends_with('Z'));
+                let line = parse_last_debug_line(&content);
+                assert_debug_line_fields(&line);
             },
         );
+    }
+
+    fn parse_last_debug_line(content: &str) -> serde_json::Value {
+        serde_json::from_str(
+            content
+                .lines()
+                .last()
+                .expect("debug file should contain at least one JSONL line"),
+        )
+        .unwrap()
+    }
+
+    fn assert_debug_line_fields(line: &serde_json::Value) {
+        assert_eq!(line["hook_name"], "guard-bash");
+        assert_eq!(line["exit_code"], 2);
+        assert_eq!(line["outcome"], "error");
+        assert_eq!(line["message"], "blocked");
+        assert_eq!(line["gate"], "prebash");
+        assert!(line["timestamp"].as_str().unwrap().ends_with('Z'));
     }
 }
