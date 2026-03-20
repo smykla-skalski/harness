@@ -305,3 +305,34 @@ fn observe_tool_checks_root_stays_a_facade() {
         );
     }
 }
+
+#[test]
+fn workspace_compact_root_stays_a_facade() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let compact_mod = fs::read_to_string(root.join("src/workspace/compact/mod.rs")).unwrap();
+
+    for needle in [
+        "pub fn compact_project_dir(",
+        "pub fn build_compact_handoff(",
+        "pub fn save_compact_handoff(",
+        "pub fn load_latest_compact_handoff(",
+        "fn trim_history(",
+        "mod tests {",
+    ] {
+        assert!(
+            !compact_mod.contains(needle),
+            "src/workspace/compact/mod.rs should stay a thin facade instead of owning `{needle}`"
+        );
+    }
+
+    for path in [
+        "src/workspace/compact/paths.rs",
+        "src/workspace/compact/storage.rs",
+        "src/workspace/compact/tests.rs",
+    ] {
+        assert!(
+            root.join(path).exists(),
+            "workspace compact split module should exist: {path}"
+        );
+    }
+}
