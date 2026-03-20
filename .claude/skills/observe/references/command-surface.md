@@ -19,6 +19,10 @@ Supported invocation shapes for `harness observe`.
 
 Maintenance actions go through `scan --action`:
 
+- canonical cycle form:
+  `harness observe scan <session-id> --action cycle`
+- canonical status form:
+  `harness observe scan <session-id> --action status`
 - cycle:
   `harness observe scan <session-id> --project-hint <hint> --action cycle`
 - status:
