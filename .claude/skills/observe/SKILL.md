@@ -125,8 +125,11 @@ For skill or docs changes, re-check the referenced observe command surface again
 
 For JSON scans:
 - each issue is one JSON line
-- with `--summary`, the final line is the summary object
-- `last_line` from the summary is the next cursor for incremental follow-up
+- each issue uses nested sections: `location`, `classification`, `source`, `message`, and `remediation`
+- with `--summary`, the final line is a summary envelope with `cursor.last_line` and `issues.{total,by_severity,by_category}`
+- use `remediation.available` instead of looking for a flat `fixable` field
+- use `source.tool` instead of looking for a flat `source_tool` field
+- use `cursor.last_line` as the next cursor for incremental follow-up
 
 For watch mode:
 - issues stream as they arrive

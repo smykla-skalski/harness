@@ -45,3 +45,14 @@ Maintenance actions go through `scan --action`:
   `harness observe scan <session-id> --project-hint <hint> --action mute --codes <csv>`
 - unmute:
   `harness observe scan <session-id> --project-hint <hint> --action unmute --codes <csv>`
+
+## Machine-readable output
+
+- issue JSON is one line per issue and uses nested sections:
+  `id`, `location`, `classification`, `source`, `message`, `remediation`
+- summary JSON is the final line when `--summary` is set and uses:
+  `status`, `cursor.last_line`, `issues.total`, `issues.by_severity[]`, `issues.by_category[]`
+- top causes use:
+  `causes[]` with `code`, `occurrences`, and `summary`
+- SARIF remains SARIF `2.1.0`, with harness-specific properties nested under:
+  `properties.harnessObserve`
