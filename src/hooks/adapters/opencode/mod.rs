@@ -1,4 +1,5 @@
-use serde_json::json;
+use serde::Serialize;
+use serde_json::Value;
 
 use crate::errors::CliError;
 use crate::hooks::adapters::{
@@ -9,6 +10,41 @@ use crate::hooks::protocol::result::{NormalizedDecision, NormalizedHookResult};
 use crate::kernel::tooling::ToolCategory;
 
 pub struct OpenCodeAdapter;
+
+#[derive(Serialize)]
+struct OpenCodeOutput<'a> {
+    decision: &'static str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    reason: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    code: Option<&'a str>,
+    #[serde(rename = "additionalContext", skip_serializing_if = "Option::is_none")]
+    additional_context: Option<&'a str>,
+    #[serde(rename = "updatedInput", skip_serializing_if = "Option::is_none")]
+    updated_input: Option<&'a Value>,
+    #[serde(rename = "suppressOutput")]
+    suppress_output: bool,
+    #[serde(rename = "haltAgent")]
+    halt_agent: bool,
+}
+
+#[derive(Serialize)]
+struct OpenCodeConfig<'a> {
+    registrations: Vec<OpenCodeRegistration<'a>>,
+}
+
+#[derive(Serialize)]
+struct OpenCodeRegistration<'a> {
+    name: &'a str,
+    event: &'a str,
+    command: &'a str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    matcher: Option<&'a str>,
+}
+
+fn render_json<T: Serialize>(payload: &T) -> String {
+    serde_json::to_string(payload).expect("typed hook JSON serializes")
+}
 
 impl AgentAdapter for OpenCodeAdapter {
     fn name(&self) -> &'static str {
@@ -27,22 +63,21 @@ impl AgentAdapter for OpenCodeAdapter {
         result: &NormalizedHookResult,
         _event: &NormalizedEvent,
     ) -> RenderedHookResponse {
-        let payload = json!({
-            "decision": match result.decision {
-                NormalizedDecision::Allow => "allow",
-                NormalizedDecision::Deny => "deny",
-                NormalizedDecision::Warn => "warn",
-                NormalizedDecision::Info => "info",
-            },
-            "reason": result.reason,
-            "code": result.code,
-            "additionalContext": result.additional_context,
-            "updatedInput": result.updated_input,
-            "suppressOutput": result.suppress_output,
-            "haltAgent": result.halt_agent,
-        });
         RenderedHookResponse {
-            stdout: serde_json::to_string(&payload).expect("hand-built JSON serializes"),
+            stdout: render_json(&OpenCodeOutput {
+                decision: match result.decision {
+                    NormalizedDecision::Allow => "allow",
+                    NormalizedDecision::Deny => "deny",
+                    NormalizedDecision::Warn => "warn",
+                    NormalizedDecision::Info => "info",
+                },
+                reason: result.reason.as_deref(),
+                code: result.code.as_deref(),
+                additional_context: result.additional_context.as_deref(),
+                updated_input: result.updated_input.as_ref(),
+                suppress_output: result.suppress_output,
+                halt_agent: result.halt_agent,
+            }),
             exit_code: 0,
         }
     }
@@ -73,17 +108,16 @@ impl AgentAdapter for OpenCodeAdapter {
         let registrations = hooks
             .iter()
             .filter_map(|registration| {
-                self.event_name(&registration.event).map(|event_name| {
-                    json!({
-                        "name": registration.name,
-                        "event": event_name,
-                        "command": registration.command,
-                        "matcher": registration.matcher,
+                self.event_name(&registration.event)
+                    .map(|event_name| OpenCodeRegistration {
+                        name: registration.name,
+                        event: event_name,
+                        command: &registration.command,
+                        matcher: registration.matcher.as_deref(),
                     })
-                })
             })
             .collect::<Vec<_>>();
-        serde_json::to_string_pretty(&json!({ "registrations": registrations }))
-            .expect("hand-built JSON serializes")
+        serde_json::to_string_pretty(&OpenCodeConfig { registrations })
+            .expect("typed hook JSON serializes")
     }
 }

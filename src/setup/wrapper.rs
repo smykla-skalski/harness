@@ -5,7 +5,7 @@ use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 
 use fs_err as fs;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use walkdir::WalkDir;
 
 use crate::errors::{CliError, CliErrorKind};
@@ -414,21 +414,28 @@ fn command_registration(
     }
 }
 
+#[derive(Serialize)]
+struct OpenCodeToolBindings<'a> {
+    bash: &'a str,
+    write: &'a str,
+    edit: &'a str,
+}
+
 fn build_opencode_bridge() -> Result<String, CliError> {
     let denied_binaries = managed_cluster_binaries().into_iter().collect::<Vec<_>>();
     let denied_binaries_json = serde_json::to_string(&denied_binaries)
         .map_err(|error| CliErrorKind::serialize(format!("opencode denied binaries: {error}")))?;
-    let tool_guards = serde_json::to_string(&serde_json::json!({
-        "bash": "guard-bash",
-        "write": "guard-write",
-        "edit": "guard-write",
-    }))
+    let tool_guards = serde_json::to_string(&OpenCodeToolBindings {
+        bash: "guard-bash",
+        write: "guard-write",
+        edit: "guard-write",
+    })
     .map_err(|error| CliErrorKind::serialize(format!("opencode tool guards: {error}")))?;
-    let tool_verifiers = serde_json::to_string(&serde_json::json!({
-        "bash": "verify-bash",
-        "write": "verify-write",
-        "edit": "verify-write",
-    }))
+    let tool_verifiers = serde_json::to_string(&OpenCodeToolBindings {
+        bash: "verify-bash",
+        write: "verify-write",
+        edit: "verify-write",
+    })
     .map_err(|error| CliErrorKind::serialize(format!("opencode tool verifiers: {error}")))?;
 
     let bridge = include_str!("../../resources/opencode/harness-bridge.ts")
