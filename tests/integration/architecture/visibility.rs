@@ -807,6 +807,28 @@ fn runner_policy_root_stays_a_facade() {
 }
 
 #[test]
+fn platform_runtime_root_stays_prod_only() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let runtime = fs::read_to_string(root.join("src/platform/runtime.rs")).unwrap();
+
+    for needle in [
+        "fn universal_runtime_exposes_control_plane_access(",
+        "fn profile_platform_detects_universal_variants(",
+        "mod tests {",
+    ] {
+        assert!(
+            !runtime.contains(needle),
+            "src/platform/runtime.rs should stay focused on production runtime access instead of owning `{needle}`"
+        );
+    }
+
+    assert!(
+        root.join("src/platform/runtime/tests.rs").exists(),
+        "platform runtime split test module should exist"
+    );
+}
+
+#[test]
 fn kubernetes_block_root_stays_a_facade() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
     let kubernetes_mod = fs::read_to_string(root.join("src/infra/blocks/kubernetes.rs")).unwrap();
