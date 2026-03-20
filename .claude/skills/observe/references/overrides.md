@@ -1,40 +1,59 @@
 # Observer overrides
 
-Configure classifier behavior per-session via CLI flags or the observer state file.
+Configure classifier behavior through CLI flags or the persisted observer state.
+
+Observer state is stored automatically at `$XDG_DATA_HOME/harness/observe/<SESSION_ID>.state`.
 
 ## Mute list
 
-Suppress specific issue codes that are known false positives for your environment.
+Suppress specific issue codes that are known false positives for the current session.
 
-CLI: `harness observe mute <session-id> shell_alias_interference,user_frustration_detected`
+Persisted mute:
 
-Or pass per-scan: `harness observe scan <session-id> --mute shell_alias_interference`
+`harness observe scan <session-id> --action mute --codes shell_alias_interference,user_frustration_detected`
 
-To unmute: `harness observe unmute <session-id> shell_alias_interference`
+Persisted unmute:
+
+`harness observe scan <session-id> --action unmute --codes shell_alias_interference`
+
+One-shot per-scan mute:
+
+`harness observe scan <session-id> --mute shell_alias_interference --json --summary`
+
+Inspect the current persisted observer state:
+
+`harness observe scan <session-id> --action status`
 
 ## Focus presets
 
-Filter by category group instead of listing individual categories.
+Focus presets map to these category groups:
 
 - `--focus harness`: build_error, cli_error, workflow_error, data_integrity
 - `--focus skills`: skill_behavior, hook_failure, naming_error, subagent_issue
-- `--focus all`: no filter (default)
+- `--focus all`: no preset filter
 
-When both `--focus` and `--category` are set, the result is the intersection.
+If both `--focus` and `--category` are set, the result is the intersection.
+
+List current presets from the CLI:
+
+`harness observe scan <session-id> --action list-focus-presets`
 
 ## Severity filtering
 
-`--severity medium` filters out low-severity issues. Valid values: low, medium, critical.
+`--severity medium` filters out low-severity issues. Valid values are `low`, `medium`, and `critical`.
 
 ## Format options
 
-- `--json`: JSONL output (one issue per line)
-- `--format markdown`: tabled markdown report
-- `--top-causes 5`: show top 5 root causes grouped by issue code
+- `--json`: JSONL output
+- `--format markdown`: markdown table
+- `--format sarif`: SARIF output
+- `--top-causes 5`: summarize the most frequent issue codes
 
-## Future: YAML override file
+## YAML overrides file
 
-Planned support for a YAML override config file:
+YAML overrides are supported today through `--overrides path/to/file.yaml`.
+
+Example:
 
 ```yaml
 mute:
@@ -45,4 +64,7 @@ severity_overrides:
   file_edit_churn: low
 ```
 
-Pass via `--overrides path/to/overrides.yaml` to apply on top of CLI flags.
+Use it with scan or watch:
+
+- `harness observe scan <session-id> --overrides path/to/overrides.yaml --json --summary`
+- `harness observe watch <session-id> --overrides path/to/overrides.yaml --json --summary`
