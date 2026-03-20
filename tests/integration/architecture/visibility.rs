@@ -797,3 +797,25 @@ fn run_services_root_stays_a_facade() {
         "run services split test module should exist"
     );
 }
+
+#[test]
+fn run_audit_root_stays_prod_only() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let run_audit = fs::read_to_string(root.join("src/run/audit/mod.rs")).unwrap();
+
+    for needle in [
+        "fn sample_status(",
+        "fn assert_audit_entry_fields(",
+        "mod tests {",
+    ] {
+        assert!(
+            !run_audit.contains(needle),
+            "src/run/audit/mod.rs should stay focused on production audit logic instead of owning `{needle}`"
+        );
+    }
+
+    assert!(
+        root.join("src/run/audit/tests.rs").exists(),
+        "run audit split test module should exist"
+    );
+}
