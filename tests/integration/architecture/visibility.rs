@@ -540,6 +540,8 @@ fn kernel_topology_root_stays_prod_only() {
     for needle in [
         "fn platform_display_roundtrip(",
         "fn current_deploy_round_trip(",
+        "pub fn from_object(",
+        "pub fn from_mode_with_platform(",
         "mod tests {",
     ] {
         assert!(
@@ -551,6 +553,10 @@ fn kernel_topology_root_stays_prod_only() {
     assert!(
         root.join("src/kernel/topology/tests.rs").exists(),
         "kernel topology split test module should exist"
+    );
+    assert!(
+        root.join("src/kernel/topology/parsing.rs").exists(),
+        "kernel topology parsing split module should exist"
     );
 }
 
