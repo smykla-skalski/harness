@@ -1,5 +1,6 @@
 pub mod fingerprint;
 pub mod handoff;
+mod history;
 mod paths;
 mod render;
 mod storage;
