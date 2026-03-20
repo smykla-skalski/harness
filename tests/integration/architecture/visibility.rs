@@ -369,6 +369,28 @@ fn infra_exec_root_stays_a_facade() {
 }
 
 #[test]
+fn infra_process_root_stays_prod_only() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let process = fs::read_to_string(root.join("src/infra/blocks/process.rs")).unwrap();
+
+    for needle in [
+        "fn std_process_executor_run_echo(",
+        "fn fake_process_executor_panics_when_exhausted(",
+        "mod tests {",
+    ] {
+        assert!(
+            !process.contains(needle),
+            "src/infra/blocks/process.rs should stay focused on production process execution instead of owning `{needle}`"
+        );
+    }
+
+    assert!(
+        root.join("src/infra/blocks/process/tests.rs").exists(),
+        "infra process split test module should exist"
+    );
+}
+
+#[test]
 fn observe_classifier_tests_stay_split_by_scenario() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
     let tests_mod = fs::read_to_string(root.join("src/observe/classifier/tests/mod.rs")).unwrap();
