@@ -597,3 +597,25 @@ fn app_cli_root_stays_prod_only() {
         "app cli split test module should exist"
     );
 }
+
+#[test]
+fn observe_output_root_stays_prod_only() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let output = fs::read_to_string(root.join("src/observe/output.rs")).unwrap();
+
+    for needle in [
+        "fn human_output_format(",
+        "fn json_output_uses_nested_contract(",
+        "mod tests {",
+    ] {
+        assert!(
+            !output.contains(needle),
+            "src/observe/output.rs should stay focused on production rendering logic instead of owning `{needle}`"
+        );
+    }
+
+    assert!(
+        root.join("src/observe/output/tests.rs").exists(),
+        "observe output split test module should exist"
+    );
+}
