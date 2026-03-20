@@ -202,3 +202,37 @@ fn errors_root_stays_a_transport_facade() {
         );
     }
 }
+
+#[test]
+fn kernel_command_intent_root_stays_a_facade() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let command_intent_mod =
+        fs::read_to_string(root.join("src/kernel/command_intent/mod.rs")).unwrap();
+
+    for needle in [
+        "pub struct ParsedCommand {",
+        "pub struct ObservedCommand {",
+        "pub struct HarnessCommandInvocationRef",
+        "fn parse_harness_invocations(",
+        "fn command_heads_basic()",
+    ] {
+        assert!(
+            !command_intent_mod.contains(needle),
+            "src/kernel/command_intent/mod.rs should stay a thin facade instead of owning `{needle}`"
+        );
+    }
+
+    for path in [
+        "src/kernel/command_intent/shell.rs",
+        "src/kernel/command_intent/harness.rs",
+        "src/kernel/command_intent/parsed.rs",
+        "src/kernel/command_intent/observed.rs",
+        "src/kernel/command_intent/fallback.rs",
+        "src/kernel/command_intent/tests.rs",
+    ] {
+        assert!(
+            root.join(path).exists(),
+            "kernel command_intent split module should exist: {path}"
+        );
+    }
+}
