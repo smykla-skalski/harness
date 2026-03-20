@@ -83,16 +83,43 @@ fn hooks_transport_does_not_hydrate_session_defaults() {
     );
 
     let application = read_repo_file(root, "src/hooks/application/context.rs");
-    assert_file_contains_needles(
+    assert_file_lacks_needles(
         &application,
-        "src/hooks/application/context.rs should own",
+        "src/hooks/application/context.rs should stay a facade instead of owning",
         &[
             "fn normalized_from_envelope(",
-            "pub(crate) fn prepare_normalized_context(",
             "fn hydrate_normalized_context(",
             "fn hydrate_session(",
             "legacy_tool_context(",
         ],
+    );
+    assert!(
+        root.join("src/hooks/application/context/hydration.rs")
+            .exists(),
+        "src/hooks/application/context/hydration.rs should exist after the context split"
+    );
+    assert!(
+        root.join("src/hooks/application/context/interaction.rs")
+            .exists(),
+        "src/hooks/application/context/interaction.rs should exist after the context split"
+    );
+
+    let hydration = read_repo_file(root, "src/hooks/application/context/hydration.rs");
+    assert_file_contains_needles(
+        &hydration,
+        "src/hooks/application/context/hydration.rs should own",
+        &[
+            "pub(crate) fn prepare_normalized_context(",
+            "fn hydrate_normalized_context(",
+            "fn hydrate_session(",
+        ],
+    );
+
+    let interaction = read_repo_file(root, "src/hooks/application/context/interaction.rs");
+    assert_file_contains_needles(
+        &interaction,
+        "src/hooks/application/context/interaction.rs should own",
+        &["fn normalized_from_envelope(", "legacy_tool_context("],
     );
 }
 
