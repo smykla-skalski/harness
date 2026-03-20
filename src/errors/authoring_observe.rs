@@ -1,77 +1,127 @@
 use std::borrow::Cow;
 
-use super::{define_domain_error_enum, domain_constructor};
-
-define_domain_error_enum! {
-    AuthoringObserveError {
-        AuthoringSessionMissing => {
-            code: "KSRCLI040",
-            msg: "missing active suite:new authoring session"
-        },
-        AuthoringPayloadMissing => {
-            code: "KSRCLI041",
-            msg: "missing suite:new payload input"
-        },
-        AuthoringPayloadInvalid { kind: Cow<'static, str>, details: Cow<'static, str> } => {
-            code: "KSRCLI042",
-            msg: "invalid suite:new {kind} payload: {details}"
-        },
-        AuthoringShowKindMissing { kind: Cow<'static, str> } => {
-            code: "KSRCLI043",
-            msg: "missing saved suite:new payload: {kind}"
-        },
-        AmendmentsRequired { path: Cow<'static, str> } => {
-            code: "KSRCLI045",
-            msg: "suite amendments entry is missing or empty: {path}"
-        },
-        AuthoringValidateFailed { targets: Cow<'static, str> } => {
-            code: "KSRCLI046",
-            msg: "suite:new manifest validation failed: {targets}"
-        },
-        KubectlValidateDecisionRequired => {
-            code: "KSRCLI047",
-            msg: "suite:new local validator decision is still required"
-        },
-        KubectlValidateUnavailable => {
-            code: "KSRCLI048",
-            msg: "suite:new local validator is unavailable"
-        },
-        AuthoringSuiteDirExists { path: Cow<'static, str> } => {
-            code: "KSRCLI062",
-            msg: "suite directory already exists at {path}"
-        },
-        SessionNotFound { session_id: Cow<'static, str> } => {
-            code: "KSRCLI080",
-            msg: "session not found: {session_id}",
-            exit: 1
-        },
-        SessionParseError { detail: Cow<'static, str> } => {
-            code: "KSRCLI081",
-            msg: "session parse error: {detail}",
-            exit: 1
-        },
-        SessionAmbiguous { detail: Cow<'static, str> } => {
-            code: "KSRCLI085",
-            msg: "ambiguous session: {detail}",
-            exit: 1
-        }
-    }
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+#[non_exhaustive]
+pub enum AuthoringObserveError {
+    #[error("missing active suite:new authoring session")]
+    AuthoringSessionMissing,
+    #[error("missing suite:new payload input")]
+    AuthoringPayloadMissing,
+    #[error("invalid suite:new {kind} payload: {details}")]
+    AuthoringPayloadInvalid {
+        kind: Cow<'static, str>,
+        details: Cow<'static, str>,
+    },
+    #[error("missing saved suite:new payload: {kind}")]
+    AuthoringShowKindMissing { kind: Cow<'static, str> },
+    #[error("suite amendments entry is missing or empty: {path}")]
+    AmendmentsRequired { path: Cow<'static, str> },
+    #[error("suite:new manifest validation failed: {targets}")]
+    AuthoringValidateFailed { targets: Cow<'static, str> },
+    #[error("suite:new local validator decision is still required")]
+    KubectlValidateDecisionRequired,
+    #[error("suite:new local validator is unavailable")]
+    KubectlValidateUnavailable,
+    #[error("suite directory already exists at {path}")]
+    AuthoringSuiteDirExists { path: Cow<'static, str> },
+    #[error("session not found: {session_id}")]
+    SessionNotFound { session_id: Cow<'static, str> },
+    #[error("session parse error: {detail}")]
+    SessionParseError { detail: Cow<'static, str> },
+    #[error("ambiguous session: {detail}")]
+    SessionAmbiguous { detail: Cow<'static, str> },
 }
 
 impl AuthoringObserveError {
-    domain_constructor!(
-        authoring_payload_invalid,
-        AuthoringPayloadInvalid,
-        kind,
-        details
-    );
-    domain_constructor!(authoring_show_kind_missing, AuthoringShowKindMissing, kind);
-    domain_constructor!(amendments_required, AmendmentsRequired, path);
-    domain_constructor!(authoring_validate_failed, AuthoringValidateFailed, targets);
-    domain_constructor!(authoring_suite_dir_exists, AuthoringSuiteDirExists, path);
-    domain_constructor!(session_not_found, SessionNotFound, session_id);
-    domain_constructor!(session_parse_error, SessionParseError, detail);
-    domain_constructor!(session_ambiguous, SessionAmbiguous, detail);
+    #[must_use]
+    pub fn code(&self) -> &'static str {
+        match self {
+            Self::AuthoringSessionMissing => "KSRCLI040",
+            Self::AuthoringPayloadMissing => "KSRCLI041",
+            Self::AuthoringPayloadInvalid { .. } => "KSRCLI042",
+            Self::AuthoringShowKindMissing { .. } => "KSRCLI043",
+            Self::AmendmentsRequired { .. } => "KSRCLI045",
+            Self::AuthoringValidateFailed { .. } => "KSRCLI046",
+            Self::KubectlValidateDecisionRequired => "KSRCLI047",
+            Self::KubectlValidateUnavailable => "KSRCLI048",
+            Self::AuthoringSuiteDirExists { .. } => "KSRCLI062",
+            Self::SessionNotFound { .. } => "KSRCLI080",
+            Self::SessionParseError { .. } => "KSRCLI081",
+            Self::SessionAmbiguous { .. } => "KSRCLI085",
+        }
+    }
+
+    #[must_use]
+    pub fn exit_code(&self) -> i32 {
+        match self {
+            Self::SessionNotFound { .. }
+            | Self::SessionParseError { .. }
+            | Self::SessionAmbiguous { .. } => 1,
+            Self::AuthoringSessionMissing
+            | Self::AuthoringPayloadMissing
+            | Self::AuthoringPayloadInvalid { .. }
+            | Self::AuthoringShowKindMissing { .. }
+            | Self::AmendmentsRequired { .. }
+            | Self::AuthoringValidateFailed { .. }
+            | Self::KubectlValidateDecisionRequired
+            | Self::KubectlValidateUnavailable
+            | Self::AuthoringSuiteDirExists { .. } => 5,
+        }
+    }
+
+    #[must_use]
+    pub fn authoring_payload_invalid(
+        kind: impl Into<Cow<'static, str>>,
+        details: impl Into<Cow<'static, str>>,
+    ) -> Self {
+        Self::AuthoringPayloadInvalid {
+            kind: kind.into(),
+            details: details.into(),
+        }
+    }
+
+    #[must_use]
+    pub fn authoring_show_kind_missing(kind: impl Into<Cow<'static, str>>) -> Self {
+        Self::AuthoringShowKindMissing { kind: kind.into() }
+    }
+
+    #[must_use]
+    pub fn amendments_required(path: impl Into<Cow<'static, str>>) -> Self {
+        Self::AmendmentsRequired { path: path.into() }
+    }
+
+    #[must_use]
+    pub fn authoring_validate_failed(targets: impl Into<Cow<'static, str>>) -> Self {
+        Self::AuthoringValidateFailed {
+            targets: targets.into(),
+        }
+    }
+
+    #[must_use]
+    pub fn authoring_suite_dir_exists(path: impl Into<Cow<'static, str>>) -> Self {
+        Self::AuthoringSuiteDirExists { path: path.into() }
+    }
+
+    #[must_use]
+    pub fn session_not_found(session_id: impl Into<Cow<'static, str>>) -> Self {
+        Self::SessionNotFound {
+            session_id: session_id.into(),
+        }
+    }
+
+    #[must_use]
+    pub fn session_parse_error(detail: impl Into<Cow<'static, str>>) -> Self {
+        Self::SessionParseError {
+            detail: detail.into(),
+        }
+    }
+
+    #[must_use]
+    pub fn session_ambiguous(detail: impl Into<Cow<'static, str>>) -> Self {
+        Self::SessionAmbiguous {
+            detail: detail.into(),
+        }
+    }
 
     #[must_use]
     pub fn hint(&self) -> Option<String> {
@@ -92,10 +142,14 @@ impl AuthoringObserveError {
                 "Check the session ID and ensure ~/.claude/projects/ contains the session file."
                     .into(),
             ),
-            Self::SessionAmbiguous { .. } => {
-                Some("Use --project-hint to narrow the search.".into())
-            }
-            _ => None,
+            Self::SessionAmbiguous { .. } => Some("Use --project-hint to narrow the search.".into()),
+            Self::AuthoringPayloadInvalid { .. }
+            | Self::AuthoringShowKindMissing { .. }
+            | Self::AmendmentsRequired { .. }
+            | Self::AuthoringValidateFailed { .. }
+            | Self::KubectlValidateDecisionRequired
+            | Self::KubectlValidateUnavailable
+            | Self::SessionParseError { .. } => None,
         }
     }
 }
