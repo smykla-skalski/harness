@@ -2,7 +2,7 @@ use std::fs;
 use std::io::{BufRead, BufReader, Write};
 use std::path::Path;
 
-use serde_json::json;
+use serde::Serialize;
 
 use crate::errors::{CliError, CliErrorKind};
 
@@ -11,6 +11,13 @@ use super::classifier;
 use super::output;
 use super::session;
 use super::types::{FocusPreset, Issue, IssueCategory, IssueCode, IssueSeverity, ScanState};
+
+#[derive(Serialize)]
+struct ScanStarted<'a> {
+    status: &'static str,
+    session: &'a str,
+    from_line: usize,
+}
 
 /// One-shot scan returning all classified issues.
 pub(super) fn scan(path: &Path, from_line: usize) -> Result<(Vec<Issue>, usize), CliError> {
@@ -289,12 +296,16 @@ pub(super) fn execute_scan(session_id: &str, filter: &ObserveFilter) -> Result<i
     let from_line = resolve_effective_from_line(filter, &path)?;
 
     if filter.json {
-        let status = json!({
-            "status": "started",
-            "session": path.to_string_lossy(),
-            "from_line": from_line,
-        });
-        println!("{status}");
+        let session = path.to_string_lossy();
+        println!(
+            "{}",
+            serde_json::to_string(&ScanStarted {
+                status: "started",
+                session: session.as_ref(),
+                from_line,
+            })
+            .expect("scan status serializes")
+        );
     }
 
     let (effective_from, effective_until) = resolve_effective_bounds(&path, filter, from_line)?;
