@@ -640,6 +640,28 @@ fn observe_classifier_text_checks_root_stays_prod_only() {
 }
 
 #[test]
+fn observe_classifier_rules_root_stays_prod_only() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let rules = fs::read_to_string(root.join("src/observe/classifier/rules.rs")).unwrap();
+
+    for needle in [
+        "pub(super) static TEXT_RULES:",
+        "patterns::CLI_ERROR_PATTERNS",
+        "patterns::CORPORATE_CLUSTER_SIGNALS",
+    ] {
+        assert!(
+            !rules.contains(needle),
+            "src/observe/classifier/rules.rs should stay focused on rule evaluation instead of owning `{needle}`"
+        );
+    }
+
+    assert!(
+        root.join("src/observe/classifier/rules/data.rs").exists(),
+        "observe classifier rules data split module should exist"
+    );
+}
+
+#[test]
 fn docker_block_root_stays_a_facade() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
     let docker_mod = fs::read_to_string(root.join("src/infra/blocks/docker/mod.rs")).unwrap();
