@@ -721,3 +721,30 @@ fn runner_policy_root_stays_a_facade() {
         );
     }
 }
+
+#[test]
+fn kubernetes_block_root_stays_a_facade() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let kubernetes_mod = fs::read_to_string(root.join("src/infra/blocks/kubernetes.rs")).unwrap();
+
+    for needle in [
+        "pub struct FakeKubernetesOperator {",
+        "pub struct FakeLocalClusterManager {",
+        "mod tests {",
+    ] {
+        assert!(
+            !kubernetes_mod.contains(needle),
+            "src/infra/blocks/kubernetes.rs should stay a thin facade instead of owning `{needle}`"
+        );
+    }
+
+    for path in [
+        "src/infra/blocks/kubernetes/fake.rs",
+        "src/infra/blocks/kubernetes/tests.rs",
+    ] {
+        assert!(
+            root.join(path).exists(),
+            "kubernetes block split module should exist: {path}"
+        );
+    }
+}
