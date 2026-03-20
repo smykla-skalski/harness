@@ -872,6 +872,29 @@ fn platform_runtime_root_stays_prod_only() {
 }
 
 #[test]
+fn platform_ephemeral_metallb_root_stays_prod_only() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let metallb = fs::read_to_string(root.join("src/platform/ephemeral_metallb.rs")).unwrap();
+
+    for needle in [
+        "fn state_path_includes_state_dir(",
+        "fn ensure_templates_fails_when_no_source(",
+        "mod tests {",
+    ] {
+        assert!(
+            !metallb.contains(needle),
+            "src/platform/ephemeral_metallb.rs should stay focused on production template state handling instead of owning `{needle}`"
+        );
+    }
+
+    assert!(
+        root.join("src/platform/ephemeral_metallb/tests.rs")
+            .exists(),
+        "platform ephemeral_metallb split test module should exist"
+    );
+}
+
+#[test]
 fn kubernetes_block_root_stays_a_facade() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
     let kubernetes_mod = fs::read_to_string(root.join("src/infra/blocks/kubernetes.rs")).unwrap();
