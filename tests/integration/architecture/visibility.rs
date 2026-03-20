@@ -511,6 +511,28 @@ fn verify_bash_root_stays_prod_only() {
 }
 
 #[test]
+fn setup_capabilities_root_stays_prod_only() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let capabilities = fs::read_to_string(root.join("src/setup/capabilities.rs")).unwrap();
+
+    for needle in [
+        "fn capabilities_returns_zero(",
+        "fn feature_count_is_current(",
+        "mod tests {",
+    ] {
+        assert!(
+            !capabilities.contains(needle),
+            "src/setup/capabilities.rs should stay focused on production capability modeling instead of owning `{needle}`"
+        );
+    }
+
+    assert!(
+        root.join("src/setup/capabilities/tests.rs").exists(),
+        "setup capabilities split test module should exist"
+    );
+}
+
+#[test]
 fn authoring_workflow_root_stays_prod_only() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
     let workflow = fs::read_to_string(root.join("src/authoring/workflow.rs")).unwrap();
