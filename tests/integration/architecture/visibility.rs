@@ -625,3 +625,25 @@ fn observe_output_root_stays_prod_only() {
         "observe output split test module should exist"
     );
 }
+
+#[test]
+fn observe_types_root_stays_prod_only() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let types_mod = fs::read_to_string(root.join("src/observe/types/mod.rs")).unwrap();
+
+    for needle in [
+        "fn render_format_displays_stable_names(",
+        "fn focus_presets_static(",
+        "mod tests {",
+    ] {
+        assert!(
+            !types_mod.contains(needle),
+            "src/observe/types/mod.rs should stay focused on production observe types instead of owning `{needle}`"
+        );
+    }
+
+    assert!(
+        root.join("src/observe/types/tests.rs").exists(),
+        "observe types split test module should exist"
+    );
+}
