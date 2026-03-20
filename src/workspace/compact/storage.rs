@@ -1,18 +1,15 @@
 use std::borrow::Cow;
 use std::path::Path;
-use std::result;
 
-use fs_err as fs;
 use rayon::prelude::*;
-use tracing::warn;
 
 use crate::errors::{CliError, io_for};
 use crate::infra::io::{read_text, write_json_pretty};
 use crate::workspace::{session_scope_key, utc_now};
 
 use super::{
-    CompactHandoff, HANDOFF_VERSION, HISTORY_LIMIT, HandoffStatus, compact_history_dir,
-    compact_latest_path,
+    CompactHandoff, HANDOFF_VERSION, HandoffStatus, compact_history_dir, compact_latest_path,
+    history::trim_history,
 };
 
 /// Build a compact handoff from the current state.
@@ -53,7 +50,7 @@ pub fn save_compact_handoff(
 
     write_json_atomic(&latest_path, handoff)?;
     write_json_atomic(&history_path, handoff)?;
-    trim_history(project_dir);
+    trim_history(&history_dir);
 
     Ok(())
 }
@@ -118,28 +115,4 @@ pub fn verify_fingerprints<'a>(handoff: &'a CompactHandoff<'_>) -> Vec<&'a Path>
 
 pub(super) fn write_json_atomic(path: &Path, payload: &CompactHandoff<'_>) -> Result<(), CliError> {
     write_json_pretty(path, payload)
-}
-
-fn trim_history(project_dir: &Path) {
-    let history_dir = compact_history_dir(project_dir);
-    if !history_dir.exists() {
-        return;
-    }
-
-    let Ok(entries) = fs::read_dir(&history_dir) else {
-        return;
-    };
-    let mut files: Vec<_> = entries
-        .filter_map(result::Result::ok)
-        .map(|entry| entry.path())
-        .filter(|path| path.is_file())
-        .collect();
-    files.sort();
-
-    let excess = files.len().saturating_sub(HISTORY_LIMIT);
-    for path in files.into_iter().take(excess) {
-        if let Err(error) = fs::remove_file(&path) {
-            warn!(path = %path.display(), %error, "failed to remove history file");
-        }
-    }
 }

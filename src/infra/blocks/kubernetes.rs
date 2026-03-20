@@ -7,6 +7,8 @@ use crate::infra::blocks::BlockError;
 use crate::infra::blocks::ProcessExecutor;
 use crate::infra::exec::CommandResult;
 
+mod pods;
+
 /// Snapshot of a Kubernetes pod from `kubectl get pods -o json`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct PodSnapshot {
@@ -106,71 +108,7 @@ impl KubernetesOperator for KubectlOperator {
             &["get", "pods", "--all-namespaces", "-o", "json"],
             &[0],
         )?;
-        let value: serde_json::Value = serde_json::from_str(&result.stdout)
-            .map_err(|error| BlockError::new("kubernetes", "list_pods parse", error))?;
-        let Some(items) = value.get("items").and_then(serde_json::Value::as_array) else {
-            return Ok(Vec::new());
-        };
-
-        Ok(items
-            .iter()
-            .map(|item| {
-                let namespace = item
-                    .get("metadata")
-                    .and_then(|v| v.get("namespace"))
-                    .and_then(serde_json::Value::as_str)
-                    .map(ToString::to_string);
-                let name = item
-                    .get("metadata")
-                    .and_then(|v| v.get("name"))
-                    .and_then(serde_json::Value::as_str)
-                    .map(ToString::to_string);
-                let status = item
-                    .get("status")
-                    .and_then(|v| v.get("phase"))
-                    .and_then(serde_json::Value::as_str)
-                    .map(ToString::to_string);
-                let node = item
-                    .get("spec")
-                    .and_then(|v| v.get("nodeName"))
-                    .and_then(serde_json::Value::as_str)
-                    .map(ToString::to_string);
-
-                let (ready_containers, total_containers, restarts) = item
-                    .get("status")
-                    .and_then(|v| v.get("containerStatuses"))
-                    .and_then(serde_json::Value::as_array)
-                    .map_or((0_usize, 0_usize, 0_i64), |statuses| {
-                        let ready = statuses
-                            .iter()
-                            .filter(|status| {
-                                status
-                                    .get("ready")
-                                    .and_then(serde_json::Value::as_bool)
-                                    .unwrap_or(false)
-                            })
-                            .count();
-                        let restarts = statuses
-                            .iter()
-                            .filter_map(|status| {
-                                status
-                                    .get("restartCount")
-                                    .and_then(serde_json::Value::as_i64)
-                            })
-                            .sum();
-                        (ready, statuses.len(), restarts)
-                    });
-
-                PodSnapshot {
-                    namespace,
-                    name,
-                    ready: Some(format!("{ready_containers}/{total_containers}")),
-                    status,
-                    restarts: Some(restarts),
-                    node,
-                }
-            })
-            .collect())
+        pods::pod_snapshots_from_json(&result.stdout)
     }
 }
 

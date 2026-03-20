@@ -4,6 +4,8 @@ use std::sync;
 use crate::infra::blocks::{BlockError, KubernetesOperator, LocalClusterManager, PodSnapshot};
 use crate::infra::exec::CommandResult;
 
+use super::pods::pod_snapshots_from_json;
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FakeKubectlInvocation {
     pub kubeconfig: Option<String>,
@@ -81,38 +83,7 @@ impl KubernetesOperator for FakeKubernetesOperator {
             &["get", "pods", "--all-namespaces", "-o", "json"],
             &[0],
         )?;
-        let value: serde_json::Value = serde_json::from_str(&result.stdout)
-            .map_err(|error| BlockError::new("kubernetes", "list_pods parse", error))?;
-        let Some(items) = value.get("items").and_then(serde_json::Value::as_array) else {
-            return Ok(Vec::new());
-        };
-        Ok(items
-            .iter()
-            .map(|item| PodSnapshot {
-                namespace: item
-                    .get("metadata")
-                    .and_then(|v| v.get("namespace"))
-                    .and_then(serde_json::Value::as_str)
-                    .map(ToString::to_string),
-                name: item
-                    .get("metadata")
-                    .and_then(|v| v.get("name"))
-                    .and_then(serde_json::Value::as_str)
-                    .map(ToString::to_string),
-                ready: None,
-                status: item
-                    .get("status")
-                    .and_then(|v| v.get("phase"))
-                    .and_then(serde_json::Value::as_str)
-                    .map(ToString::to_string),
-                restarts: None,
-                node: item
-                    .get("spec")
-                    .and_then(|v| v.get("nodeName"))
-                    .and_then(serde_json::Value::as_str)
-                    .map(ToString::to_string),
-            })
-            .collect())
+        pod_snapshots_from_json(&result.stdout)
     }
 }
 

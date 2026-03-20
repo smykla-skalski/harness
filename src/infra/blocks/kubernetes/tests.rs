@@ -81,6 +81,33 @@ fn kubectl_operator_list_pods_parses_json() {
 }
 
 #[test]
+fn pod_snapshots_from_json_keeps_container_counts() {
+    let pods = super::pods::pod_snapshots_from_json(
+        r#"{
+          "items": [
+            {
+              "metadata": { "namespace": "ns", "name": "demo" },
+              "spec": { "nodeName": "node-x" },
+              "status": {
+                "phase": "Running",
+                "containerStatuses": [
+                  { "ready": true, "restartCount": 2 },
+                  { "ready": false, "restartCount": 3 }
+                ]
+              }
+            }
+          ]
+        }"#,
+    )
+    .expect("expected typed pod parser to succeed");
+
+    assert_eq!(pods.len(), 1);
+    assert_eq!(pods[0].ready.as_deref(), Some("1/2"));
+    assert_eq!(pods[0].restarts, Some(5));
+    assert_eq!(pods[0].node.as_deref(), Some("node-x"));
+}
+
+#[test]
 fn k3d_cluster_manager_detects_existing_cluster() {
     let fake_process = Arc::new(FakeProcessExecutor::new(vec![FakeResponse {
         expected_program: "k3d".to_string(),
