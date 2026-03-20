@@ -27,8 +27,6 @@ pub fn execute(ctx: &HookContext) -> Result<HookOutcome, CliError> {
 
 #[cfg(test)]
 mod tests {
-    #![allow(clippy::absolute_paths)]
-
     use super::*;
     use std::fs;
 

@@ -104,127 +104,118 @@ mod tests {
     }
 
     #[test]
-    #[allow(clippy::too_many_lines)]
-    fn env_dependent_authoring_tests() {
-        {
-            let dir = tempfile::tempdir().unwrap();
-            let xdg = dir.path().join("xdg");
-            temp_env::with_vars(
-                [
-                    ("XDG_DATA_HOME", Some(xdg.to_str().unwrap())),
-                    ("CLAUDE_SESSION_ID", Some("authoring-unit-test")),
-                ],
-                || {
-                    let session = AuthoringSession {
-                        repo_root: "/repo".to_string(),
-                        feature: "mesh".to_string(),
-                        mode: "interactive".to_string(),
-                        suite_name: "install".to_string(),
-                        suite_dir: "/repo/suites/install".to_string(),
-                        updated_at: "2026-03-13T10:00:00Z".to_string(),
-                    };
+    fn authoring_session_persistence_under_xdg() {
+        let dir = tempfile::tempdir().unwrap();
+        let xdg = dir.path().join("xdg");
+        temp_env::with_vars(
+            [
+                ("XDG_DATA_HOME", Some(xdg.to_str().unwrap())),
+                ("CLAUDE_SESSION_ID", Some("authoring-unit-test")),
+            ],
+            || {
+                let session = AuthoringSession {
+                    repo_root: "/repo".to_string(),
+                    feature: "mesh".to_string(),
+                    mode: "interactive".to_string(),
+                    suite_name: "install".to_string(),
+                    suite_dir: "/repo/suites/install".to_string(),
+                    updated_at: "2026-03-13T10:00:00Z".to_string(),
+                };
 
-                    let saved = save_authoring_session(&session).unwrap();
-                    assert_eq!(saved, session);
+                let saved = save_authoring_session(&session).unwrap();
+                assert_eq!(saved, session);
 
-                    let loaded = load_authoring_session().unwrap();
-                    assert!(loaded.is_some());
-                    assert_eq!(loaded.unwrap(), session);
-                },
-            );
-        }
+                let loaded = load_authoring_session().unwrap();
+                assert!(loaded.is_some());
+                assert_eq!(loaded.unwrap(), session);
+            },
+        );
+    }
 
-        {
-            let dir = tempfile::tempdir().unwrap();
-            let xdg = dir.path().join("empty-xdg");
-            temp_env::with_vars(
-                [
-                    ("XDG_DATA_HOME", Some(xdg.to_str().unwrap())),
-                    ("CLAUDE_SESSION_ID", Some("authoring-require-test")),
-                ],
-                || {
-                    let result = require_authoring_session();
-                    assert!(result.is_err());
-                    let err = result.unwrap_err();
-                    assert_eq!(err.code(), "KSRCLI040");
-                },
-            );
-        }
+    #[test]
+    fn require_authoring_session_fails_without_saved_session() {
+        let dir = tempfile::tempdir().unwrap();
+        let xdg = dir.path().join("empty-xdg");
+        temp_env::with_vars(
+            [
+                ("XDG_DATA_HOME", Some(xdg.to_str().unwrap())),
+                ("CLAUDE_SESSION_ID", Some("authoring-require-test")),
+            ],
+            || {
+                let result = require_authoring_session();
+                assert!(result.is_err());
+                let err = result.unwrap_err();
+                assert_eq!(err.code(), "KSRCLI040");
+            },
+        );
+    }
 
-        {
-            let dir = tempfile::tempdir().unwrap();
-            let xdg = dir.path().join("begin-xdg");
-            temp_env::with_vars(
-                [
-                    ("XDG_DATA_HOME", Some(xdg.to_str().unwrap())),
-                    ("CLAUDE_SESSION_ID", Some("authoring-begin-test")),
-                ],
-                || {
-                    let repo = dir.path().join("repo");
-                    fs::create_dir_all(&repo).unwrap();
-                    let suite_dir = dir.path().join("suite");
-                    fs::create_dir_all(&suite_dir).unwrap();
+    #[test]
+    fn begin_authoring_session_persists_new_session() {
+        let dir = tempfile::tempdir().unwrap();
+        let xdg = dir.path().join("begin-xdg");
+        temp_env::with_vars(
+            [
+                ("XDG_DATA_HOME", Some(xdg.to_str().unwrap())),
+                ("CLAUDE_SESSION_ID", Some("authoring-begin-test")),
+            ],
+            || {
+                let repo = dir.path().join("repo");
+                fs::create_dir_all(&repo).unwrap();
+                let suite_dir = dir.path().join("suite");
+                fs::create_dir_all(&suite_dir).unwrap();
 
-                    let session = begin_authoring_session(
-                        &repo,
-                        "mesh",
-                        "interactive",
-                        &suite_dir,
-                        "install",
-                    )
-                    .unwrap();
+                let session =
+                    begin_authoring_session(&repo, "mesh", "interactive", &suite_dir, "install")
+                        .unwrap();
 
-                    assert_eq!(session.feature, "mesh");
-                    assert_eq!(session.mode, "interactive");
-                    assert_eq!(session.suite_name, "install");
+                assert_eq!(session.feature, "mesh");
+                assert_eq!(session.mode, "interactive");
+                assert_eq!(session.suite_name, "install");
 
-                    let loaded = load_authoring_session().unwrap().unwrap();
-                    assert_eq!(loaded.feature, "mesh");
-                },
-            );
-        }
+                let loaded = load_authoring_session().unwrap().unwrap();
+                assert_eq!(loaded.feature, "mesh");
+            },
+        );
+    }
 
-        {
-            let dir = tempfile::tempdir().unwrap();
-            let xdg = dir.path().join("exists-xdg");
-            temp_env::with_vars(
-                [
-                    ("XDG_DATA_HOME", Some(xdg.to_str().unwrap())),
-                    ("CLAUDE_SESSION_ID", Some("authoring-exists-test")),
-                ],
-                || {
-                    let repo = dir.path().join("repo");
-                    fs::create_dir_all(&repo).unwrap();
-                    let suite_dir = dir.path().join("existing-suite");
-                    fs::create_dir_all(&suite_dir).unwrap();
-                    fs::write(suite_dir.join("suite.md"), "# existing suite").unwrap();
+    #[test]
+    fn begin_authoring_session_rejects_existing_suite() {
+        let dir = tempfile::tempdir().unwrap();
+        let xdg = dir.path().join("exists-xdg");
+        temp_env::with_vars(
+            [
+                ("XDG_DATA_HOME", Some(xdg.to_str().unwrap())),
+                ("CLAUDE_SESSION_ID", Some("authoring-exists-test")),
+            ],
+            || {
+                let repo = dir.path().join("repo");
+                fs::create_dir_all(&repo).unwrap();
+                let suite_dir = dir.path().join("existing-suite");
+                fs::create_dir_all(&suite_dir).unwrap();
+                fs::write(suite_dir.join("suite.md"), "# existing suite").unwrap();
 
-                    let result = begin_authoring_session(
-                        &repo,
-                        "mesh",
-                        "interactive",
-                        &suite_dir,
-                        "install",
-                    );
+                let result =
+                    begin_authoring_session(&repo, "mesh", "interactive", &suite_dir, "install");
 
-                    assert!(result.is_err());
-                    let err = result.unwrap_err();
-                    assert_eq!(err.code(), "KSRCLI062");
-                },
-            );
-        }
+                assert!(result.is_err());
+                let err = result.unwrap_err();
+                assert_eq!(err.code(), "KSRCLI062");
+            },
+        );
+    }
 
-        {
-            temp_env::with_vars([("CLAUDE_SESSION_ID", Some("workspace-dir-test"))], || {
-                let workspace = authoring_workspace_dir().unwrap();
-                let name = workspace
-                    .file_name()
-                    .unwrap()
-                    .to_string_lossy()
-                    .into_owned();
-                assert_eq!(name, "suite-new");
-            });
-        }
+    #[test]
+    fn authoring_workspace_dir_uses_suite_new_name() {
+        temp_env::with_vars([("CLAUDE_SESSION_ID", Some("workspace-dir-test"))], || {
+            let workspace = authoring_workspace_dir().unwrap();
+            let name = workspace
+                .file_name()
+                .unwrap()
+                .to_string_lossy()
+                .into_owned();
+            assert_eq!(name, "suite-new");
+        });
     }
 
     #[test]

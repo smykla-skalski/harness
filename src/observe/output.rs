@@ -591,24 +591,10 @@ mod tests {
     #[test]
     fn json_output_uses_nested_contract() {
         let parsed = parse_issue_json(&sample_issue());
-        assert_eq!(parsed.id, "abc123def456");
-        assert_eq!(parsed.location.line, 42);
-        assert_eq!(parsed.classification.code, "build_or_lint_failure");
-        assert_eq!(parsed.classification.category, "build_error");
-        assert_eq!(parsed.classification.severity, "critical");
-        assert_eq!(parsed.classification.confidence, "high");
-        assert_eq!(parsed.classification.fingerprint, "build_or_lint_failure");
-        assert_eq!(parsed.source.role, "assistant");
-        assert!(parsed.source.tool.is_none());
-        assert_eq!(parsed.message.summary, "Build failed");
-        assert_eq!(parsed.remediation.safety, "auto_fix_safe");
-        assert!(parsed.remediation.available);
-        assert_eq!(parsed.remediation.target.as_deref(), Some("src/main.rs"));
-        assert_eq!(
-            parsed.remediation.hint.as_deref(),
-            Some("Fix the type mismatch")
-        );
-        assert!(parsed.message.evidence_excerpt.is_none());
+        assert_issue_identity(&parsed);
+        assert_issue_classification(&parsed);
+        assert_issue_source_and_message(&parsed);
+        assert_issue_remediation(&parsed);
     }
 
     #[test]
@@ -634,15 +620,9 @@ mod tests {
     #[test]
     fn summary_counts_use_typed_arrays() {
         let parsed = parse_summary_json(&[sample_issue(), sample_issue()], 100);
-        assert_eq!(parsed.status, "done");
-        assert_eq!(parsed.cursor.last_line, 100);
-        assert_eq!(parsed.issues.total, 2);
-        assert_eq!(parsed.issues.by_severity.len(), 1);
-        assert_eq!(parsed.issues.by_severity[0].severity, "critical");
-        assert_eq!(parsed.issues.by_severity[0].count, 2);
-        assert_eq!(parsed.issues.by_category.len(), 1);
-        assert_eq!(parsed.issues.by_category[0].category, "build_error");
-        assert_eq!(parsed.issues.by_category[0].count, 2);
+        assert_summary_cursor(&parsed);
+        assert_summary_severity_counts(&parsed);
+        assert_summary_category_counts(&parsed);
     }
 
     #[test]
@@ -661,5 +641,53 @@ mod tests {
         assert_eq!(parsed.causes[0].code, "build_or_lint_failure");
         assert_eq!(parsed.causes[0].occurrences, 2);
         assert_eq!(parsed.causes[0].summary, "Build failed");
+    }
+
+    fn assert_issue_identity(parsed: &ParsedIssue) {
+        assert_eq!(parsed.id, "abc123def456");
+        assert_eq!(parsed.location.line, 42);
+    }
+
+    fn assert_issue_classification(parsed: &ParsedIssue) {
+        assert_eq!(parsed.classification.code, "build_or_lint_failure");
+        assert_eq!(parsed.classification.category, "build_error");
+        assert_eq!(parsed.classification.severity, "critical");
+        assert_eq!(parsed.classification.confidence, "high");
+        assert_eq!(parsed.classification.fingerprint, "build_or_lint_failure");
+    }
+
+    fn assert_issue_source_and_message(parsed: &ParsedIssue) {
+        assert_eq!(parsed.source.role, "assistant");
+        assert!(parsed.source.tool.is_none());
+        assert_eq!(parsed.message.summary, "Build failed");
+        assert!(parsed.message.evidence_excerpt.is_none());
+    }
+
+    fn assert_issue_remediation(parsed: &ParsedIssue) {
+        assert_eq!(parsed.remediation.safety, "auto_fix_safe");
+        assert!(parsed.remediation.available);
+        assert_eq!(parsed.remediation.target.as_deref(), Some("src/main.rs"));
+        assert_eq!(
+            parsed.remediation.hint.as_deref(),
+            Some("Fix the type mismatch")
+        );
+    }
+
+    fn assert_summary_cursor(parsed: &ParsedSummary) {
+        assert_eq!(parsed.status, "done");
+        assert_eq!(parsed.cursor.last_line, 100);
+        assert_eq!(parsed.issues.total, 2);
+    }
+
+    fn assert_summary_severity_counts(parsed: &ParsedSummary) {
+        assert_eq!(parsed.issues.by_severity.len(), 1);
+        assert_eq!(parsed.issues.by_severity[0].severity, "critical");
+        assert_eq!(parsed.issues.by_severity[0].count, 2);
+    }
+
+    fn assert_summary_category_counts(parsed: &ParsedSummary) {
+        assert_eq!(parsed.issues.by_category.len(), 1);
+        assert_eq!(parsed.issues.by_category[0].category, "build_error");
+        assert_eq!(parsed.issues.by_category[0].count, 2);
     }
 }

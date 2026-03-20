@@ -206,6 +206,8 @@ pub fn run() -> Result<i32, CliError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::run::{ApiMethod, EnvoyCommand, KumaCommand, KumactlCommand, ReportCommand};
+    use crate::setup::KumaSetupCommand;
     use clap::CommandFactory;
 
     #[test]
@@ -346,7 +348,7 @@ mod tests {
                 command:
                     SetupCommand::Kuma(KumaSetupArgs {
                         command:
-                            crate::setup::KumaSetupCommand::Cluster(ClusterArgs {
+                            KumaSetupCommand::Cluster(ClusterArgs {
                                 mode,
                                 cluster_name,
                                 extra_cluster_names,
@@ -441,7 +443,7 @@ mod tests {
                 command:
                     RunCommand::Envoy(EnvoyArgs {
                         cmd:
-                            crate::run::EnvoyCommand::Capture {
+                            EnvoyCommand::Capture {
                                 namespace,
                                 workload,
                                 label,
@@ -475,7 +477,7 @@ mod tests {
                 command:
                     RunCommand::Report(ReportArgs {
                         cmd:
-                            crate::run::ReportCommand::Group {
+                            ReportCommand::Group {
                                 group_id, status, ..
                             },
                     }),
@@ -565,8 +567,8 @@ mod tests {
             cli.command,
             Command::Run {
                 command: RunCommand::Kuma(KumaArgs {
-                    command: crate::run::KumaCommand::Cli(KumactlArgs {
-                        cmd: crate::run::KumactlCommand::Find { .. }
+                    command: KumaCommand::Cli(KumactlArgs {
+                        cmd: KumactlCommand::Find { .. }
                     })
                 })
             }
@@ -581,8 +583,8 @@ mod tests {
                 command:
                     RunCommand::Kuma(KumaArgs {
                         command:
-                            crate::run::KumaCommand::Api(ApiArgs {
-                                method: crate::run::ApiMethod::Get { path, .. },
+                            KumaCommand::Api(ApiArgs {
+                                method: ApiMethod::Get { path, .. },
                             }),
                     }),
             } => assert_eq!(path, "/zones"),

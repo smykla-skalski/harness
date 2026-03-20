@@ -126,9 +126,8 @@ pub fn next_action(state: Option<&RunnerWorkflowState>) -> RunnerNextAction {
 
 #[cfg(test)]
 mod tests {
-    #![allow(clippy::absolute_paths, clippy::cognitive_complexity)]
-
     use super::*;
+    use std::path::{Path, PathBuf};
     use tempfile::TempDir;
 
     use persistence::make_initial_state;
@@ -136,6 +135,15 @@ mod tests {
 
     fn bootstrap_state() -> RunnerWorkflowState {
         make_initial_state("2025-01-01T00:00:00Z")
+    }
+
+    fn assert_next_action(
+        state: &RunnerWorkflowState,
+        expected: RunnerNextAction,
+        expected_text: &str,
+    ) {
+        assert_eq!(next_action(Some(state)), expected);
+        assert!(next_action(Some(state)).to_string().contains(expected_text));
     }
 
     fn setup_execution_phase() -> TempDir {
@@ -253,57 +261,35 @@ mod tests {
     #[test]
     fn next_action_each_phase() {
         let mut state = bootstrap_state();
-        assert_eq!(next_action(Some(&state)), RunnerNextAction::FinishBootstrap);
-        assert!(next_action(Some(&state)).to_string().contains("bootstrap"));
+        assert_next_action(&state, RunnerNextAction::FinishBootstrap, "bootstrap");
 
         state.phase = RunnerPhase::Preflight;
-        assert_eq!(
-            next_action(Some(&state)),
-            RunnerNextAction::ExecutePreflight
-        );
-        assert!(next_action(Some(&state)).to_string().contains("preflight"));
+        assert_next_action(&state, RunnerNextAction::ExecutePreflight, "preflight");
 
         state.preflight.status = PreflightStatus::Running;
-        assert_eq!(
-            next_action(Some(&state)),
-            RunnerNextAction::FinishPreflightWorker
-        );
-        assert!(
-            next_action(Some(&state))
-                .to_string()
-                .contains("preflight worker")
+        assert_next_action(
+            &state,
+            RunnerNextAction::FinishPreflightWorker,
+            "preflight worker",
         );
 
         state.phase = RunnerPhase::Execution;
-        assert_eq!(
-            next_action(Some(&state)),
-            RunnerNextAction::ContinueExecution
-        );
-        assert!(next_action(Some(&state)).to_string().contains("execution"));
+        assert_next_action(&state, RunnerNextAction::ContinueExecution, "execution");
 
         state.phase = RunnerPhase::Triage;
-        assert_eq!(next_action(Some(&state)), RunnerNextAction::ResolveTriage);
-        assert!(next_action(Some(&state)).to_string().contains("triage"));
+        assert_next_action(&state, RunnerNextAction::ResolveTriage, "triage");
 
         state.phase = RunnerPhase::Closeout;
-        assert_eq!(next_action(Some(&state)), RunnerNextAction::FinishCloseout);
-        assert!(next_action(Some(&state)).to_string().contains("closeout"));
+        assert_next_action(&state, RunnerNextAction::FinishCloseout, "closeout");
 
         state.phase = RunnerPhase::Completed;
-        assert_eq!(next_action(Some(&state)), RunnerNextAction::ReviewReport);
-        assert!(
-            next_action(Some(&state))
-                .to_string()
-                .contains("final verdict")
-        );
+        assert_next_action(&state, RunnerNextAction::ReviewReport, "final verdict");
 
         state.phase = RunnerPhase::Aborted;
-        assert_eq!(next_action(Some(&state)), RunnerNextAction::HandleAbort);
-        assert!(next_action(Some(&state)).to_string().contains("guard-stop"));
+        assert_next_action(&state, RunnerNextAction::HandleAbort, "guard-stop");
 
         state.phase = RunnerPhase::Suspended;
-        assert_eq!(next_action(Some(&state)), RunnerNextAction::ResumeRun);
-        assert!(next_action(Some(&state)).to_string().contains("suspended"));
+        assert_next_action(&state, RunnerNextAction::ResumeRun, "suspended");
     }
 
     #[test]
@@ -329,11 +315,8 @@ mod tests {
 
     #[test]
     fn runner_state_path_builds_correctly() {
-        let path = runner_state_path(std::path::Path::new("/runs/r1"));
-        assert_eq!(
-            path,
-            std::path::PathBuf::from("/runs/r1/suite-run-state.json")
-        );
+        let path = runner_state_path(Path::new("/runs/r1"));
+        assert_eq!(path, PathBuf::from("/runs/r1/suite-run-state.json"));
     }
 
     #[test]
@@ -418,7 +401,7 @@ mod tests {
     }
 
     #[test]
-    fn apply_event_full_happy_path() {
+    fn apply_event_reaches_execution_after_preflight() {
         let dir = TempDir::new().unwrap();
         initialize_runner_state(dir.path()).unwrap();
 
@@ -426,19 +409,23 @@ mod tests {
         assert_eq!(state.phase, RunnerPhase::Preflight);
 
         let state = apply_event(dir.path(), "preflight-started", None, None).unwrap();
-        assert_eq!(state.phase, RunnerPhase::Preflight);
         assert_eq!(state.preflight.status, PreflightStatus::Running);
 
         let state = apply_event(dir.path(), "preflight-captured", None, None).unwrap();
         assert_eq!(state.phase, RunnerPhase::Execution);
         assert_eq!(state.preflight.status, PreflightStatus::Complete);
+    }
 
-        let state = apply_event(dir.path(), "closeout-started", None, None).unwrap();
-        assert_eq!(state.phase, RunnerPhase::Closeout);
+    #[test]
+    fn apply_event_reaches_completed_after_closeout() {
+        let dir = setup_execution_phase();
+
+        let closeout = apply_event(dir.path(), "closeout-started", None, None).unwrap();
+        assert_eq!(closeout.phase, RunnerPhase::Closeout);
 
         let state = apply_event(dir.path(), "run-completed", None, None).unwrap();
         assert_eq!(state.phase, RunnerPhase::Completed);
-        assert_eq!(state.transition_count, 5);
+        assert_eq!(state.transition_count, 4);
     }
 
     #[test]

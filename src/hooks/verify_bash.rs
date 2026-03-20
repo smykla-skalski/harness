@@ -291,9 +291,10 @@ fn ready_to_resume(state: &RunnerWorkflowState) -> bool {
 
 #[cfg(test)]
 mod tests {
-    #![allow(clippy::absolute_paths)]
-
     use super::*;
+    use std::fs;
+
+    use crate::hooks::protocol::payloads::HookEnvelopePayload;
     use crate::run::workflow::{
         FailureKind, FailureState, ManifestFixDecision, PreflightState, PreflightStatus,
         RunnerWorkflowState,
@@ -344,14 +345,14 @@ mod tests {
     #[test]
     fn has_table_rows_with_enough_rows() {
         let tmp = tempfile::NamedTempFile::new().unwrap();
-        std::fs::write(tmp.path(), "| h1 | h2 |\n|---|---|\n| a | b |\n| c | d |\n").unwrap();
+        fs::write(tmp.path(), "| h1 | h2 |\n|---|---|\n| a | b |\n| c | d |\n").unwrap();
         assert!(has_table_rows(tmp.path()));
     }
 
     #[test]
     fn has_table_rows_with_too_few() {
         let tmp = tempfile::NamedTempFile::new().unwrap();
-        std::fs::write(tmp.path(), "| h1 | h2 |\n|---|---|\n").unwrap();
+        fs::write(tmp.path(), "| h1 | h2 |\n|---|---|\n").unwrap();
         assert!(!has_table_rows(tmp.path()));
     }
 
@@ -614,8 +615,6 @@ mod tests {
         runner_state: Option<RunnerWorkflowState>,
         response: Option<&str>,
     ) -> HookContext {
-        use crate::hooks::protocol::payloads::HookEnvelopePayload;
-
         let payload = HookEnvelopePayload {
             tool_name: "Bash".to_string(),
             tool_response: response.map_or(serde_json::Value::Null, |text| {

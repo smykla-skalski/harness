@@ -836,16 +836,9 @@ mod tests {
         let json = serde_json::to_string(&spec).unwrap();
         let back: ClusterSpec = serde_json::from_str(&json).unwrap();
 
-        assert_eq!(back.platform, Platform::Universal);
-        assert_eq!(back.admin_token.as_deref(), Some("admin-token-abc123"));
-        assert_eq!(back.docker_network.as_deref(), Some("harness-test-cp"));
-        assert_eq!(back.store_type.as_deref(), Some("memory"));
-        assert_eq!(back.cp_image.as_deref(), Some("kuma-cp:dev"));
-        assert_eq!(
-            back.members[0].container_id.as_deref(),
-            Some("container-xyz")
-        );
-        assert_eq!(back.members[0].container_ip.as_deref(), Some("172.57.0.3"));
+        assert_universal_spec_identity(&back);
+        assert_universal_spec_runtime(&back);
+        assert_universal_spec_member(&back);
     }
 
     #[test]
@@ -860,6 +853,25 @@ mod tests {
         )
         .unwrap();
         assert_eq!(spec.docker_network.as_deref(), Some("harness-my-cp"));
+    }
+
+    fn assert_universal_spec_identity(spec: &ClusterSpec) {
+        assert_eq!(spec.platform, Platform::Universal);
+        assert_eq!(spec.admin_token.as_deref(), Some("admin-token-abc123"));
+        assert_eq!(spec.docker_network.as_deref(), Some("harness-test-cp"));
+    }
+
+    fn assert_universal_spec_runtime(spec: &ClusterSpec) {
+        assert_eq!(spec.store_type.as_deref(), Some("memory"));
+        assert_eq!(spec.cp_image.as_deref(), Some("kuma-cp:dev"));
+    }
+
+    fn assert_universal_spec_member(spec: &ClusterSpec) {
+        assert_eq!(
+            spec.members[0].container_id.as_deref(),
+            Some("container-xyz")
+        );
+        assert_eq!(spec.members[0].container_ip.as_deref(), Some("172.57.0.3"));
     }
 
     #[test]
