@@ -710,6 +710,28 @@ fn run_workflow_root_stays_prod_only() {
 }
 
 #[test]
+fn run_task_output_root_stays_prod_only() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let task_output = fs::read_to_string(root.join("src/run/services/task_output.rs")).unwrap();
+
+    for needle in [
+        "fn extract_plain_text_line(",
+        "fn extract_skips_user_messages(",
+        "mod tests {",
+    ] {
+        assert!(
+            !task_output.contains(needle),
+            "src/run/services/task_output.rs should stay focused on production task-output parsing instead of owning `{needle}`"
+        );
+    }
+
+    assert!(
+        root.join("src/run/services/task_output/tests.rs").exists(),
+        "run task_output split test module should exist"
+    );
+}
+
+#[test]
 fn app_cli_root_stays_prod_only() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
     let cli = fs::read_to_string(root.join("src/app/cli.rs")).unwrap();
