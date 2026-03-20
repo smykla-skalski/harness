@@ -487,3 +487,25 @@ fn guard_bash_root_stays_prod_only() {
         "guard_bash split test module should exist"
     );
 }
+
+#[test]
+fn verify_bash_root_stays_prod_only() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let verify_bash = fs::read_to_string(root.join("src/hooks/verify_bash.rs")).unwrap();
+
+    for needle in [
+        "fn subcommand_artifacts_apply(",
+        "fn has_table_rows_with_enough_rows(",
+        "mod tests {",
+    ] {
+        assert!(
+            !verify_bash.contains(needle),
+            "src/hooks/verify_bash.rs should stay focused on production hook logic instead of owning `{needle}`"
+        );
+    }
+
+    assert!(
+        root.join("src/hooks/verify_bash/tests.rs").exists(),
+        "verify_bash split test module should exist"
+    );
+}
