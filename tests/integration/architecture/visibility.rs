@@ -775,3 +775,25 @@ fn setup_universal_root_stays_a_facade() {
         );
     }
 }
+
+#[test]
+fn run_services_root_stays_a_facade() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let run_services = fs::read_to_string(root.join("src/run/services/mod.rs")).unwrap();
+
+    for needle in [
+        "fn write_suite(",
+        "fn prepare_preflight_run(",
+        "mod tests {",
+    ] {
+        assert!(
+            !run_services.contains(needle),
+            "src/run/services/mod.rs should stay a thin facade instead of owning `{needle}`"
+        );
+    }
+
+    assert!(
+        root.join("src/run/services/tests.rs").exists(),
+        "run services split test module should exist"
+    );
+}
