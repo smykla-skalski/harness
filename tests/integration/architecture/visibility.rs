@@ -748,3 +748,30 @@ fn kubernetes_block_root_stays_a_facade() {
         );
     }
 }
+
+#[test]
+fn setup_universal_root_stays_a_facade() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let universal_mod = fs::read_to_string(root.join("src/setup/cluster/universal.rs")).unwrap();
+
+    for needle in [
+        "fn universal_single_up(",
+        "fn universal_global_zone_up(",
+        "fn universal_global_two_zones_up(",
+    ] {
+        assert!(
+            !universal_mod.contains(needle),
+            "src/setup/cluster/universal.rs should stay a thin facade instead of owning `{needle}`"
+        );
+    }
+
+    for path in [
+        "src/setup/cluster/universal/config.rs",
+        "src/setup/cluster/universal/runtime.rs",
+    ] {
+        assert!(
+            root.join(path).exists(),
+            "setup universal split module should exist: {path}"
+        );
+    }
+}
