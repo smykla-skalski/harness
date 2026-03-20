@@ -165,7 +165,8 @@ fn transport_outputs_use_typed_serialization_helpers() {
         "src/observe/scan.rs",
         "src/observe/compare.rs",
         "src/observe/application/maintenance.rs",
-        "src/setup/wrapper.rs",
+        "src/setup/wrapper/mod.rs",
+        "src/setup/wrapper/registrations.rs",
     ] {
         let contents = read_repo_file(root, path);
         assert_file_lacks_needles(
@@ -243,10 +244,10 @@ fn transport_outputs_use_typed_serialization_helpers() {
         ],
     );
 
-    let wrapper = read_repo_file(root, "src/setup/wrapper.rs");
+    let wrapper = read_repo_file(root, "src/setup/wrapper/registrations.rs");
     assert_file_contains_needles(
         &wrapper,
-        "src/setup/wrapper.rs should serialize bridge bindings from typed structs via",
+        "src/setup/wrapper/registrations.rs should serialize bridge bindings from typed structs via",
         &["#[derive(Serialize)]", "struct OpenCodeToolBindings"],
     );
 }
