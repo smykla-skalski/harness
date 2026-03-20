@@ -176,10 +176,74 @@ impl PreparedSuitePlan {
 
 #[cfg(test)]
 mod tests {
-    #![allow(clippy::cognitive_complexity)]
-
     use super::*;
     use std::fs;
+
+    fn full_artifact_json() -> serde_json::Value {
+        serde_json::json!({
+            "suite_path": "/tmp/suite.md",
+            "profile": "single-zone",
+            "prepared_at": "2026-03-13T10:00:00Z",
+            "source_digests": [
+                {"source_path": "suite.md", "digest": "suite-sha"}
+            ],
+            "baselines": [{
+                "manifest_id": "baseline/namespace.yaml",
+                "scope": "baseline",
+                "source_path": "baseline/namespace.yaml",
+                "prepared_path": "manifests/prepared/baseline/baseline/namespace.yaml",
+                "digest": "baseline-sha",
+                "validation": {
+                    "output_path": "manifests/prepared/baseline/baseline/namespace.validate.txt",
+                    "status": "passed"
+                }
+            }],
+            "groups": [{
+                "group_id": "g01",
+                "source_path": "groups/g01.md",
+                "helm_values": {"kuma.controlPlane.replicas": 1},
+                "manifests": [{
+                    "manifest_id": "g01:01",
+                    "scope": "group",
+                    "source_path": "groups/g01.md",
+                    "group_id": "g01",
+                    "prepared_path": "manifests/prepared/groups/g01/01.yaml",
+                    "digest": "group-sha",
+                    "order": 1,
+                    "validation": {
+                        "output_path": "manifests/prepared/groups/g01/01.validate.txt",
+                        "status": "pending"
+                    }
+                }]
+            }]
+        })
+    }
+
+    fn assert_full_artifact_sources(artifact: &PreparedSuiteArtifact) {
+        assert_eq!(artifact.source_digests.len(), 1);
+        assert_eq!(artifact.source_digests[0].digest, "suite-sha");
+    }
+
+    fn assert_full_artifact_baseline(artifact: &PreparedSuiteArtifact) {
+        assert_eq!(artifact.baselines.len(), 1);
+        assert_eq!(artifact.baselines[0].scope, ManifestScope::Baseline);
+        assert_eq!(
+            artifact.baselines[0].validation.as_ref().unwrap().status,
+            ValidationStatus::Passed
+        );
+    }
+
+    fn assert_full_artifact_group(artifact: &PreparedSuiteArtifact) {
+        assert_eq!(artifact.groups.len(), 1);
+        assert_eq!(artifact.groups[0].group_id, "g01");
+        assert_eq!(artifact.groups[0].manifests.len(), 1);
+        assert_eq!(artifact.groups[0].manifests[0].scope, ManifestScope::Group);
+        assert_eq!(
+            artifact.groups[0].manifests[0].group_id.as_deref(),
+            Some("g01")
+        );
+        assert_eq!(artifact.groups[0].manifests[0].order, Some(1));
+    }
 
     // -- configure_section tests --
 
@@ -411,63 +475,13 @@ mod tests {
     fn load_parses_full_artifact_with_groups() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("suite.json");
-        let json = serde_json::json!({
-            "suite_path": "/tmp/suite.md",
-            "profile": "single-zone",
-            "prepared_at": "2026-03-13T10:00:00Z",
-            "source_digests": [
-                {"source_path": "suite.md", "digest": "suite-sha"}
-            ],
-            "baselines": [{
-                "manifest_id": "baseline/namespace.yaml",
-                "scope": "baseline",
-                "source_path": "baseline/namespace.yaml",
-                "prepared_path": "manifests/prepared/baseline/baseline/namespace.yaml",
-                "digest": "baseline-sha",
-                "validation": {
-                    "output_path": "manifests/prepared/baseline/baseline/namespace.validate.txt",
-                    "status": "passed"
-                }
-            }],
-            "groups": [{
-                "group_id": "g01",
-                "source_path": "groups/g01.md",
-                "helm_values": {"kuma.controlPlane.replicas": 1},
-                "manifests": [{
-                    "manifest_id": "g01:01",
-                    "scope": "group",
-                    "source_path": "groups/g01.md",
-                    "group_id": "g01",
-                    "prepared_path": "manifests/prepared/groups/g01/01.yaml",
-                    "digest": "group-sha",
-                    "order": 1,
-                    "validation": {
-                        "output_path": "manifests/prepared/groups/g01/01.validate.txt",
-                        "status": "pending"
-                    }
-                }]
-            }]
-        });
+        let json = full_artifact_json();
         fs::write(&path, serde_json::to_string_pretty(&json).unwrap()).unwrap();
 
         let artifact = PreparedSuiteArtifact::load(&path).unwrap().unwrap();
-        assert_eq!(artifact.source_digests.len(), 1);
-        assert_eq!(artifact.source_digests[0].digest, "suite-sha");
-        assert_eq!(artifact.baselines.len(), 1);
-        assert_eq!(artifact.baselines[0].scope, ManifestScope::Baseline);
-        assert_eq!(
-            artifact.baselines[0].validation.as_ref().unwrap().status,
-            ValidationStatus::Passed
-        );
-        assert_eq!(artifact.groups.len(), 1);
-        assert_eq!(artifact.groups[0].group_id, "g01");
-        assert_eq!(artifact.groups[0].manifests.len(), 1);
-        assert_eq!(artifact.groups[0].manifests[0].scope, ManifestScope::Group);
-        assert_eq!(
-            artifact.groups[0].manifests[0].group_id.as_deref(),
-            Some("g01")
-        );
-        assert_eq!(artifact.groups[0].manifests[0].order, Some(1));
+        assert_full_artifact_sources(&artifact);
+        assert_full_artifact_baseline(&artifact);
+        assert_full_artifact_group(&artifact);
     }
 
     #[test]

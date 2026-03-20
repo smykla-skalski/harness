@@ -339,8 +339,6 @@ pub(crate) fn redact_details(text: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    #![allow(clippy::absolute_paths, clippy::cognitive_complexity)]
-
     use std::fs;
     use std::io::Write;
     use std::path::{Path, PathBuf};
@@ -357,6 +355,27 @@ mod tests {
             writeln!(file, "{line}").unwrap();
         }
         path
+    }
+
+    fn assert_json_issue_identity_shape(parsed: &serde_json::Value) {
+        assert!(parsed["id"].is_string());
+        assert!(parsed["location"]["line"].is_number());
+        assert!(parsed["classification"]["code"].is_string());
+        assert!(parsed["classification"]["category"].is_string());
+    }
+
+    fn assert_json_issue_classification_shape(parsed: &serde_json::Value) {
+        assert!(parsed["classification"]["severity"].is_string());
+        assert!(parsed["classification"]["confidence"].is_string());
+        assert!(parsed["classification"]["fingerprint"].is_string());
+    }
+
+    fn assert_json_issue_message_shape(parsed: &serde_json::Value) {
+        assert!(parsed["source"]["role"].is_string());
+        assert!(parsed["message"]["summary"].is_string());
+        assert!(parsed["message"]["details"].is_string());
+        assert!(parsed["remediation"]["safety"].is_string());
+        assert!(parsed["remediation"]["available"].is_boolean());
     }
 
     #[test]
@@ -587,18 +606,9 @@ mod tests {
         let rendered = output::render_json(&issues[0]);
         let parsed: serde_json::Value = serde_json::from_str(&rendered).unwrap();
 
-        assert!(parsed["id"].is_string());
-        assert!(parsed["location"]["line"].is_number());
-        assert!(parsed["classification"]["code"].is_string());
-        assert!(parsed["classification"]["category"].is_string());
-        assert!(parsed["classification"]["severity"].is_string());
-        assert!(parsed["classification"]["confidence"].is_string());
-        assert!(parsed["classification"]["fingerprint"].is_string());
-        assert!(parsed["source"]["role"].is_string());
-        assert!(parsed["message"]["summary"].is_string());
-        assert!(parsed["message"]["details"].is_string());
-        assert!(parsed["remediation"]["safety"].is_string());
-        assert!(parsed["remediation"]["available"].is_boolean());
+        assert_json_issue_identity_shape(&parsed);
+        assert_json_issue_classification_shape(&parsed);
+        assert_json_issue_message_shape(&parsed);
     }
 
     #[test]
