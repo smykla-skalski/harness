@@ -69,7 +69,7 @@ fn cluster_topology_is_owned_by_kernel() {
 
     let mut hits = Vec::new();
     for path in [
-        "src/run/context/mod.rs",
+        "src/run/context/current.rs",
         "src/run/context/aggregate.rs",
         "src/run/application/mod.rs",
         "src/run/application/preflight.rs",

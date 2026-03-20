@@ -82,6 +82,43 @@ fn run_domain_does_not_depend_on_block_registry() {
 }
 
 #[test]
+fn run_context_root_stays_a_facade() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let context_mod = fs::read_to_string(root.join("src/run/context/mod.rs")).unwrap();
+
+    for needle in [
+        "pub struct RunLayout",
+        "pub struct RunMetadata",
+        "pub struct CommandEnv",
+        "pub struct PreflightArtifact",
+        "pub struct CurrentRunPointer",
+        "impl RunLayout",
+        "impl CommandEnv",
+        "impl CurrentRunPointer",
+        "mod tests {",
+    ] {
+        assert!(
+            !context_mod.contains(needle),
+            "src/run/context/mod.rs should stay a thin facade instead of owning `{needle}`"
+        );
+    }
+
+    for path in [
+        "src/run/context/layout.rs",
+        "src/run/context/metadata.rs",
+        "src/run/context/command_env.rs",
+        "src/run/context/preflight.rs",
+        "src/run/context/current.rs",
+        "src/run/context/tests.rs",
+    ] {
+        assert!(
+            root.join(path).exists(),
+            "run/context split module should exist: {path}"
+        );
+    }
+}
+
+#[test]
 fn run_services_do_not_load_their_own_context() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
     let contents = fs::read_to_string(root.join("src/run/services/mod.rs")).unwrap();
