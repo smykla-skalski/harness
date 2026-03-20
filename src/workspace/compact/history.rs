@@ -11,7 +11,7 @@ pub(super) fn trim_history(history_dir: &Path) {
         return;
     }
 
-    let Ok(entries) = fs::read_dir(&history_dir) else {
+    let Ok(entries) = fs::read_dir(history_dir) else {
         return;
     };
     let mut files: Vec<_> = entries
