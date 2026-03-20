@@ -215,19 +215,20 @@ impl RunServices {
 
 #[cfg(test)]
 mod tests {
-    #![allow(clippy::absolute_paths, clippy::cognitive_complexity)]
-
     use std::fs;
     use std::sync::Arc;
 
     use super::*;
+    use crate::infra::blocks::{ContainerConfig, FakeContainerRuntime};
     use crate::infra::io::read_json_typed;
     use crate::run::application::RunApplication;
     use crate::run::context::{PreflightArtifact, RunLayout};
     use crate::run::services::service_lifecycle::{
         read_service_container_rows, run_service_filter,
     };
-    use crate::run::workflow::{PreflightStatus, RunnerPhase, initialize_runner_state};
+    use crate::run::workflow::{
+        PreflightStatus, RunnerPhase, initialize_runner_state, read_runner_state,
+    };
     use crate::run::{PreparedSuiteArtifact, RunCounts, RunStatus, Verdict};
 
     fn write_suite(dir: &Path) -> PathBuf {
@@ -351,20 +352,20 @@ keep_clusters: false
         .unwrap();
     }
 
-    #[test]
-    fn save_preflight_outputs_materializes_artifacts() {
-        let dir = tempfile::tempdir().unwrap();
-        let suite_path = write_suite(dir.path());
-        let layout = RunLayout::from_run_dir(&dir.path().join("runs").join("run-1"));
+    fn prepare_preflight_run(dir: &Path, run_id: &str) -> RunLayout {
+        let suite_path = write_suite(dir);
+        let layout = RunLayout::from_run_dir(&dir.join("runs").join(run_id));
         write_run(&layout, &suite_path);
+        layout
+    }
 
-        let ctx = RunContext::from_run_dir(&layout.run_dir()).unwrap();
-        let run = RunApplication::from_context(ctx);
-        let artifact = run.save_preflight_outputs("2026-03-16T12:00:00Z").unwrap();
-
+    fn assert_prepared_suite_summary(artifact: &PreparedSuiteArtifact) {
         assert_eq!(artifact.baselines.len(), 1);
         assert_eq!(artifact.groups.len(), 1);
         assert_eq!(artifact.groups[0].manifests.len(), 2);
+    }
+
+    fn assert_prepared_suite_files(layout: &RunLayout) {
         assert!(layout.prepared_suite_path().exists());
         assert!(layout.preflight_artifact_path().exists());
         assert!(
@@ -385,9 +386,21 @@ keep_clusters: false
                 .join("manifests/prepared/groups/g01/02.yaml.validate.txt")
                 .exists()
         );
+    }
+
+    #[test]
+    fn save_preflight_outputs_materializes_artifacts() {
+        let dir = tempfile::tempdir().unwrap();
+        let layout = prepare_preflight_run(dir.path(), "run-1");
+
+        let ctx = RunContext::from_run_dir(&layout.run_dir()).unwrap();
+        let run = RunApplication::from_context(ctx);
+        let artifact = run.save_preflight_outputs("2026-03-16T12:00:00Z").unwrap();
 
         let preflight: PreflightArtifact =
             read_json_typed(&layout.preflight_artifact_path()).unwrap();
+        assert_prepared_suite_summary(&artifact);
+        assert_prepared_suite_files(&layout);
         assert_eq!(preflight.tools.items[0].name, "kubectl-validate");
         assert_eq!(
             preflight.prepared_suite_path.as_deref(),
@@ -407,9 +420,7 @@ keep_clusters: false
         let run = RunApplication::from_context(ctx);
         run.record_preflight_complete().unwrap();
 
-        let state = crate::run::workflow::read_runner_state(&layout.run_dir())
-            .unwrap()
-            .unwrap();
+        let state = read_runner_state(&layout.run_dir()).unwrap().unwrap();
         assert_eq!(state.phase(), RunnerPhase::Execution);
         assert_eq!(state.preflight_status(), PreflightStatus::Complete);
     }
@@ -449,10 +460,9 @@ keep_clusters: false
 
     #[test]
     fn list_service_containers_parses_docker_rows() {
-        let docker: Arc<dyn ContainerRuntime> =
-            Arc::new(crate::infra::blocks::FakeContainerRuntime::new());
+        let docker: Arc<dyn ContainerRuntime> = Arc::new(FakeContainerRuntime::new());
         docker
-            .run_detached(&crate::infra::blocks::ContainerConfig {
+            .run_detached(&ContainerConfig {
                 image: "demo:latest".to_string(),
                 name: "svc-a".to_string(),
                 network: "demo-net".to_string(),
@@ -464,7 +474,7 @@ keep_clusters: false
             })
             .unwrap();
         docker
-            .run_detached(&crate::infra::blocks::ContainerConfig {
+            .run_detached(&ContainerConfig {
                 image: "demo:latest".to_string(),
                 name: "svc-b".to_string(),
                 network: "demo-net".to_string(),
