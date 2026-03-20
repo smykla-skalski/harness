@@ -819,3 +819,27 @@ fn run_audit_root_stays_prod_only() {
         "run audit split test module should exist"
     );
 }
+
+#[test]
+fn versioned_json_root_stays_prod_only() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let versioned_json =
+        fs::read_to_string(root.join("src/infra/persistence/versioned_json.rs")).unwrap();
+
+    for needle in [
+        "fn load_returns_none_when_file_missing(",
+        "fn update_serializes_concurrent_writers(",
+        "mod tests {",
+    ] {
+        assert!(
+            !versioned_json.contains(needle),
+            "src/infra/persistence/versioned_json.rs should stay focused on production persistence logic instead of owning `{needle}`"
+        );
+    }
+
+    assert!(
+        root.join("src/infra/persistence/versioned_json/tests.rs")
+            .exists(),
+        "versioned json split test module should exist"
+    );
+}
