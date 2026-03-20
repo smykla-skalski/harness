@@ -29,61 +29,6 @@ pub fn io_for(operation: &str, path: &Path, cause: &dyn fmt::Display) -> CliErro
     CliErrorKind::io(format!("{operation} {}: {cause}", path.display()))
 }
 
-macro_rules! define_domain_error_enum {
-    (
-        $name:ident {
-            $(
-                $variant:ident $({ $($field:ident : $type:ty),* $(,)? })?
-                => {
-                    code: $code:literal,
-                    msg: $msg:literal
-                    $(, exit: $exit:expr)?
-                }
-            ),* $(,)?
-        }
-    ) => {
-        #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
-        #[non_exhaustive]
-        pub enum $name {
-            $(
-                #[error($msg)]
-                $variant $({ $($field: $type),* })?,
-            )*
-        }
-
-        impl $name {
-            #[must_use]
-            pub fn code(&self) -> &'static str {
-                match self {
-                    $(Self::$variant { .. } => $code,)*
-                }
-            }
-
-            #[must_use]
-            pub fn exit_code(&self) -> i32 {
-                match self {
-                    $(Self::$variant { .. } => define_domain_error_enum!(@exit $($exit)?),)*
-                }
-            }
-        }
-    };
-
-    (@exit) => { 5 };
-    (@exit $exit:expr) => { $exit };
-}
-
-pub(crate) use define_domain_error_enum;
-
-macro_rules! domain_constructor {
-    ($fn_name:ident, $variant:ident, $($field:ident),+) => {
-        pub fn $fn_name($($field: impl Into<Cow<'static, str>>),+) -> Self {
-            Self::$variant { $($field: $field.into()),+ }
-        }
-    };
-}
-
-pub(crate) use domain_constructor;
-
 /// Public wrapper around domain-specific CLI errors.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 #[non_exhaustive]

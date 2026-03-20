@@ -47,7 +47,7 @@ impl CliErrorKind {
             Self::Common(error) => error.exit_code(),
             Self::RunSetup(error) => error.exit_code(),
             Self::AuthoringObserve(error) => error.exit_code(),
-            Self::Workflow(error) => error.exit_code(),
+            Self::Workflow(_) => WorkflowError::exit_code(),
         }
     }
 
