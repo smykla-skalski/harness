@@ -1,23 +1,26 @@
 ---
 name: observe
 description: >-
-  Live session observer for harness and skill testing. Monitors another Claude Code
-  session's JSONL log for bugs, hook failures, skill misbehavior, CLI errors, and
-  unexpected outcomes. Use whenever testing harness skills in a separate session and
-  you want continuous automated monitoring with parallel fix dispatching. Also use
-  when the user says "watch this session", "observe session", "monitor for issues",
-  or gives you a session ID to analyze.
+  Session observer for harness and skill testing. Use it to scan, watch, or dump
+  another Claude Code session with the current `harness observe` contract.
 argument-hint: "<session-id> [--from-line N] [--from <line|timestamp|prose>] [--focus harness|skills|all]"
-allowed-tools: Agent, AskUserQuestion, Bash, CronCreate, CronDelete, Edit, Read
+allowed-tools: AskUserQuestion, Bash, Edit, Read
 disable-model-invocation: true
 user-invocable: true
 ---
 
-# Session observer
+# Observe
 
-Monitor a live Claude Code session for issues in harness behavior, skill correctness, hook failures, and unexpected outcomes. Runs as a manager that dispatches parallel fix workers.
+Use this skill when the user wants to inspect or monitor another Claude Code session and `harness observe` is the source of truth.
 
-This is not a one-shot scan. Run continuously until explicitly stopped. Between observation cycles, advance the cursor from where the last cycle ended so no events are missed even across session compactions or skill switches.
+This skill must follow the current observe contract to prevent drift between the skill instructions and the CLI binary:
+- top-level subcommands are `scan`, `watch`, and `dump`
+- maintenance operations are routed through `harness observe scan <session-id> --action ...`
+- observer state is stored automatically at `$XDG_DATA_HOME/harness/observe/<SESSION_ID>.state`
+
+Do not use the removed top-level observe maintenance commands because they were consolidated under `scan --action ...` and the old entry points no longer resolve.
+
+Do not assume autonomous fixing because misidentified classifier findings can cause regressions if applied without triage. Observe first, summarize clearly, and ask the user before applying fixes or spawning deeper analysis.
 
 ## Arguments
 
@@ -25,322 +28,135 @@ Parse from `$ARGUMENTS`:
 
 | Argument | Default | Purpose |
 | --- | --- | --- |
-| (positional) | required | Session ID to observe |
-| `--from-line` | 0 | Start observation from this JSONL line number |
-| `--from` | - | When to start observing. Accepts a line number, ISO timestamp, or prose description |
-| `--focus` | all | Filter scope: `harness` (Rust code only), `skills` (SKILL.md/agents only), `all` |
+| positional | required | Session ID to observe |
+| `--from-line` | `0` | Start at a specific JSONL line |
+| `--from` | none | Resolve the start from a line number, ISO timestamp, or prose substring |
+| `--focus` | `all` | Preset category filter: `harness`, `skills`, or `all` |
 
-The `--from` argument is flexible. It can be:
-- A line number: `--from 2500`
-- An ISO timestamp: `--from 2026-03-15T17:00:00`
-- A prose description: `--from "when suite:new started running"`, `--from "about 2 hours ago"`, `--from "after the compaction"`, `--from "when the MOTB feature was scoped"`
+Resolution rules for `--from`:
+- numeric value: use directly as the starting line
+- ISO timestamp: start at the first event at or after that timestamp
+- prose: find the earliest matching substring in the session log
 
-When the value is prose, resolve it to a line number by scanning the session JSONL for matching context. Look at timestamps on events and text content that matches the description. Use the earliest matching line as the starting point. If multiple candidates match, use AskUserQuestion to let the user pick which event they meant before proceeding.
+If prose resolution is ambiguous, ask the user which point they mean before proceeding.
 
-## Preprocessed context
+## Project hint
 
-- Classifier: `harness observe` (Rust binary, installed at `~/.local/bin/harness`)
-- Project dir: !`echo "$CLAUDE_PROJECT_DIR"`
-- Session search path: !`echo "$HOME/.claude/projects/"`
-
-## Deriving --project-hint
-
-The `--project-hint` narrows session search to a specific project directory. Derive it from `CLAUDE_PROJECT_DIR`:
+When `CLAUDE_PROJECT_DIR` is available, derive `--project-hint` from it:
 
 ```bash
-# Extract the directory name (last path segment, hyphenated)
 PROJECT_HINT=$(basename "$CLAUDE_PROJECT_DIR")
 ```
 
-If `CLAUDE_PROJECT_DIR` is unset, omit `--project-hint` and let harness search all project directories.
-
-## Observation modes
-
-The observer supports these operational modes:
-
-- **scan-once**: One-shot `harness observe scan` with filters. Report results and exit.
-- **watch-only**: Continuous `harness observe watch` polling. Report issues as they arrive, no fix dispatch.
-- **triage**: Scan + present issues to user for classification. User decides what to fix.
-- **auto-fix-critical**: Scan + auto-dispatch fix workers for critical/fixable issues. Report the rest.
-- **status**: Check observer state with `harness observe status`. Shows cursor, open issues, cycle history.
-- **resume**: Pick up from last cursor with `harness observe resume`.
-- **stop**: Delete crons, preserve state file for later resume.
-
-The default workflow (Phase 1-3 below) uses auto-fix-critical mode.
-
-## Harness observe command reference
-
-The `harness observe` command is the primary data source. All subcommands use `--project-hint` to narrow session search.
-
-### Invocation patterns
-
-**Full scan**: `harness observe scan <session-id> --project-hint <hint> --json --summary`
-**Filtered**: `harness observe scan <session-id> --project-hint <hint> --from-line 2000 --json --summary`
-**One-shot cycle**: `harness observe cycle <session-id> --project-hint <hint>` (reads/updates cursor from state file)
-**Raw dump**: `harness observe dump <session-id> --project-hint <hint> --from-line 3800 --to-line 3900`
-**Filtered dump**: `harness observe dump <session-id> --project-hint <hint> --filter "crashloop" --from-line 4000`
-**Context**: `harness observe context <session-id> --project-hint <hint> --line 4122 --window 20`
-**Watch mode**: `harness observe watch <session-id> --project-hint <hint> --from-line <N>`
-**Focus scan**: `harness observe scan <session-id> --project-hint <hint> --focus harness --json --summary`
-**From timestamp**: `harness observe scan <session-id> --from "2026-03-15T17:00:00" --json --summary`
-**Status**: `harness observe status <session-id>`
-**Resume**: `harness observe resume <session-id> --project-hint <hint> --json --summary`
-**Verify fix**: `harness observe verify <session-id> <issue-id> --since-line 500`
-**Compare**: `harness observe compare <session-id> --from-a 0 --to-a 500 --from-b 500 --to-b 1000`
-**Doctor**: `harness observe doctor`
-**Mute**: `harness observe mute <session-id> shell_alias_interference,user_frustration_detected`
-
-### Subcommands
-
-| Subcommand | Purpose |
-| --- | --- |
-| `scan` | One-shot scan with `--json --summary`, `--from-line`, `--severity`, `--category`, `--focus`, `--from`, `--mute` filters |
-| `watch` | Continuous polling with `--poll-interval` and `--timeout`, filters each batch |
-| `cycle` | Read cursor from state file, scan new events, update cursor, report. Used by the automated cron. |
-| `dump` | Raw event dump with `--from-line`, `--to-line`, `--filter`, `--role`, `--tool-name` |
-| `context` | Show events around a specific `--line` with `--window` |
-| `status` | Show observer state: cursor, open issues, muted codes, cycle history |
-| `resume` | Resume scanning from the last cursor position |
-| `verify` | Check if a specific issue (by `issue_id`) still reproduces |
-| `compare` | Diff issues between two line ranges in the same session |
-| `resolve-start` | Resolve a `--from` value to a concrete line number |
-| `doctor` | Validate observer setup (paths, binary, state directory) |
-| `mute` | Add issue codes to the mute list |
-| `unmute` | Remove issue codes from the mute list |
-| `list-categories` | Print all valid issue categories with descriptions |
-| `list-focus-presets` | Print all focus presets with descriptions |
-
-### Output format
-
-**With `--json`**, each issue is one JSON line with identity, confidence, and fix safety:
-```json
-{"issue_id":"a1b2c3d4e5f6","line":1215,"code":"build_or_lint_failure","category":"build_error","severity":"critical","confidence":"high","fix_safety":"auto_fix_safe","summary":"Build or lint failure","details":"error[E0308]...","fingerprint":"...","source_role":"user","fixable":true,"fix_target":null,"fix_hint":"Fix the Rust code"}
-```
-
-The `issue_id` is a stable 12-char hex hash of (code + fingerprint). Use it with `verify` to check if an issue still reproduces. `fixable` is derived from `fix_safety` for backward compatibility.
-
-**With `--summary`**, the last line is always a summary object:
-```json
-{"status": "done", "last_line": 2928, "total_issues": 19, "by_severity": {"critical": 3, "medium": 11, "low": 5}, "by_category": {"build_error": 1, "cli_error": 4, ...}}
-```
-
-The `last_line` field is the cursor - pass it as `--from-line` on the next invocation to pick up where you left off.
-
-**With `--watch`**, issues are flushed to stdout as they arrive (one JSON line per issue). The summary prints at the end when the timeout triggers.
-
-**Without `--json`** (human-readable), each issue prints as:
-```
-[CRITICAL/high] L1215 (build_error/build_or_lint_failure): Build or lint failure
-  hint: Fix the Rust code causing the failure
-```
-
-**With `--format markdown`**, a `tabled`-rendered markdown table.
-
-### Issue categories
-
-Run `harness observe list-categories` for the full list with descriptions. See [references/issue-taxonomy.md](references/issue-taxonomy.md) for confidence, fix_safety, owner, and retry policy per category.
+If `CLAUDE_PROJECT_DIR` is unset, omit `--project-hint`.
 
 ## Workflow
 
-### Phase 1: Locate session and initial scan
+### 1. Establish scope
 
-If `--focus` is set to `harness` or `skills`, filter the classifier output accordingly - use `--category` to include only the relevant subset (e.g., `build_error,cli_error,workflow_error` for harness focus, `skill_behavior,hook_failure,naming_error` for skills focus).
+Resolve:
+- session ID
+- `--project-hint`
+- optional start from `--from` or `--from-line`
+- optional `--focus` preset
 
-If `--from` was provided, resolve it to a `--from-line` value before running the classifier. For numeric or timestamp values, map directly. For prose, scan the JSONL to find the matching line (see Arguments section).
+If the user did not request continuous monitoring, start with a one-shot scan.
 
-Run the classifier for a full scan with `--json --summary`. Parse every JSON line. The last line with `"status": "done"` is the summary - extract `last_line` as the cursor.
+Read [references/command-surface.md](references/command-surface.md) for the full list of supported invocation shapes and maintenance actions.
 
-Present a brief triage summary to the user:
-- Count by severity (critical / medium / low)
-- Count by category
-- List critical issues first with their line numbers and summaries
+### 2. Run the initial scan
 
-Ask the user: "Found N issues (X critical). Start fixing critical issues now, or adjust the observation scope first?"
+Preferred baseline:
 
-### Phase 2: Fix dispatch
-
-For each fixable issue with severity critical or medium:
-
-1. Read [references/issue-taxonomy.md](references/issue-taxonomy.md) for fix routing guidance
-2. Spawn a background fix worker agent with:
-   - The issue description and line reference
-   - The target file to fix
-   - The fix hint from the classifier
-   - Instructions to run `cargo clippy --lib && cargo test --lib` after Rust changes
-   - Instructions to verify the fix doesn't break other things
-3. Spawn all fix workers in parallel because sequential dispatch blocks observation while waiting for builds. Waiting per-issue adds minutes of idle time when issues are independent.
-
-When fix workers complete:
-- Re-run the classifier with `--from-line` targeting the original issue's line range to confirm the fix resolved it
-- If the issue still appears: read the fix worker's output, identify what went wrong, and spawn a second fix attempt with the failure context added
-- If the second attempt also fails: escalate to the user with both attempts' output
-- Log successful fixes and note which issues remain unfixed
-
-For issues marked `fixable: false` (like model behavior issues), just log them in the summary.
-
-For uncertain issues (`category: unexpected_behavior`), report them to the user with the raw event details and ask for a triage decision.
-
-### Phase 3: Start loop
-
-The observer state is managed automatically by `harness observe cycle` at `$XDG_DATA_HOME/kuma/observe/<SESSION_ID>.state`. No manual state file creation needed.
-
-Create two cron jobs:
-
-1. **Automated cron** (`*/2 * * * *`) - runs `harness observe cycle` for fast heuristic scanning. See "Automated cron" section below.
-2. **Deep analysis cron** (`*/5 * * * *`) - spawns a subagent that reads recent activity holistically and flags subtle issues automated heuristics miss. See "Deep analysis cron" section below.
-
-Store both cron IDs. Print to user:
-```
-Observer started. Automated scan every 2min (task <ID1>), deep analysis every 5min (task <ID2>). From line <CURSOR>.
+```bash
+harness observe scan <session-id> --project-hint <hint> --json --summary
 ```
 
-Then stay available for ad-hoc queries and fix worker results.
+If the user requested a narrower slice, add the filters up front instead of scanning wide and triaging noise later.
 
-**Ad-hoc queries** between cron cycles - call the classifier directly:
+### 3. Triage before fixing
 
-- "What build errors happened after line 2000?" → run with `--from-line 2000 --category build_error --json`
-- "Show me only critical fixable issues" → run with `--severity critical --fixable --json`
-- "Any new CLI errors?" → run with `--from-line <cursor> --category cli_error --json`
+Summarize:
+- counts by severity
+- counts by category
+- critical issues first
+- whether the issues look fixable, advisory, or likely environment noise
 
-## Automated cron (every 2 minutes)
+Default follow-up question:
+"Found N issues, including X critical. Do you want me to fix anything now, or just keep observing?"
 
-Bake in the actual `SESSION_ID` and state file path when calling `CronCreate`.
+### 4. Use dump or verify when needed
 
-```
-Run: harness observe cycle <SESSION_ID> --project-hint <PROJECT_HINT>
+Use `dump` when:
+- a classifier finding looks suspicious
+- the issue is `unexpected_behavior`
+- you need the exact session context around a line
 
-If the output is empty (no issues), do nothing.
+Use `scan --action verify` after a fix to check whether the same fingerprint still reproduces.
 
-If issues were found, parse each JSON line and apply this policy:
+### 5. Continuous monitoring
 
-**Critical or medium severity + fixable**: Immediately spawn a background fix worker agent
-with mode: "auto" and run_in_background: true. Include the issue summary, details,
-fix_target, and fix_hint. Instruct the worker to run cargo clippy --lib && cargo test --lib
-after Rust changes.
+Use `watch` only when the user explicitly wants live monitoring in the current session.
 
-**Low severity or not fixable**: Log to state file only. The foreground manager
-owns all user prompts - background crons never use AskUserQuestion.
-```
+Use `scan --action cycle` only when you want persisted observer cursor/state behavior. It is stateful maintenance, not the default scan path.
 
-## Deep analysis cron (every 5 minutes)
+## Deep analysis
 
-Spawn the [deep-analyst](agents/deep-analyst.md) agent every 5 minutes to holistically review recent session activity. The agent catches subtle issues that automated heuristics miss - wrong assumptions, schema misuse, skipped verification, contract violations, and anything that smells off.
+If the user explicitly asks for a deeper pass, read [agents/deep-analyst.md](agents/deep-analyst.md) and review a recent dump window holistically.
 
-Read [agents/deep-analyst.md](agents/deep-analyst.md) for the full analysis methodology and issue categories.
+Do not spawn deep analysts or fix workers by default. Ask first.
 
-Call `CronCreate` with `*/5 * * * *` and this prompt (bake in session ID, project hint, and state file path):
+## Fix routing
 
-```
-Read the cursor from <STATE_FILE>. Compute a window start: max(0, cursor - 200).
+Read [references/issue-taxonomy.md](references/issue-taxonomy.md) for category ownership, likely fix targets, and validation expectations.
 
-Spawn a deep-analyst Agent with run_in_background: true and this prompt:
+Read [references/overrides.md](references/overrides.md) for mutes, focus presets, and overrides-file behavior.
 
-"Analyze session <SESSION_ID> from line <WINDOW_START> to <CURSOR>.
-Project hint: <PROJECT_HINT>.
-Harness project: /Users/bart.smykla@konghq.com/Projects/github.com/smykla-skalski/harness"
-```
+When a fix is approved, use Edit to apply the change to the identified fix target. For Rust changes in this repo, validate with:
 
-Store both cron IDs. When stopping the observer, delete both.
-
-### Handling session compaction
-
-The observed session may compact. The JSONL file gets new entries with compaction metadata. The observer picks these up naturally since it reads incrementally. When you see compaction events (text containing "this session is being continued"), note them in the status update.
-
-### Handling skill switches
-
-The user may test one skill, compact, then test another in the same session. The observer handles this naturally - it classifies events regardless of which skill produced them.
-
-## Fix worker template
-
-When spawning a fix worker agent, use this prompt structure:
-
-```
-Fix this issue in the harness project:
-
-Issue: <summary>
-Category: <category>
-Session line: <line>
-Details: <details>
-
-Target file: <fix_target>
-Hint: <fix_hint>
-
-Requirements:
-- Read the target file before editing
-- Make the minimal fix needed
-- Run: cargo clippy --lib && cargo test --lib
-- Verify the fix passes
-- Do not change unrelated code
+```bash
+mise run check
+TMPDIR=/tmp mise run test
 ```
 
-Set `mode: "auto"` and `run_in_background: true` on fix workers. `mode: "auto"` grants tool permissions so the agent can edit and build without prompts. Background execution prevents fix workers from blocking the observation loop.
+For skill or docs changes, re-check the referenced observe command surface against source before claiming the skill is fresh.
+
+## Output handling
+
+For JSON scans:
+- each issue is one JSON line
+- with `--summary`, the final line is the summary object
+- `last_line` from the summary is the next cursor for incremental follow-up
+
+For watch mode:
+- issues stream as they arrive
+- the summary arrives when the timeout ends
+
+For dump mode:
+- use it to inspect raw context before deciding whether a classifier finding is real
 
 ## Example invocations
 
+<example>
+Scan a session with default settings:
+
 ```bash
-# Observe a session from the beginning
-/observe abc123def
-
-# Start from a specific line (skip already-reviewed events)
-/observe abc123def --from-line 2500
-
-# Start from a timestamp
-/observe abc123def --from "2026-03-15T17:00:00"
-
-# Start from a prose description
-/observe abc123def --from "when suite:new started running"
-
-# Focus on harness Rust code issues only
-/observe abc123def --focus harness
-
-# Focus on skill behavior only, starting from a specific point
-/observe abc123def --focus skills --from-line 1000
+harness observe scan abc123 --project-hint harness --json --summary
 ```
-
-<example>
-Input: /observe abc123def --from-line 500 --focus harness
-
-Classifier output (3 issues):
-{"line": 612, "category": "build_error", "severity": "critical", "summary": "Build or lint failure", "fixable": true, "fix_hint": "Fix the Rust code causing the failure"}
-{"line": 789, "category": "cli_error", "severity": "medium", "summary": "Harness CLI error: harness: error:", "fixable": true, "fix_target": "src/cli.rs"}
-{"line": 1102, "category": "tool_error", "severity": "low", "summary": "Tool usage error: file has not been read yet", "fixable": false}
-{"status": "done", "last_line": 1200, "total_issues": 3, "by_severity": {"critical": 1, "medium": 1, "low": 1}, "by_category": {"build_error": 1, "cli_error": 1, "tool_error": 1}}
-
-Observer response: "Found 3 issues (1 critical). 1 build failure at L612, 1 CLI error at L789, 1 tool error at L1102 (not fixable). Start fixing critical issues now, or adjust the observation scope first?"
 </example>
 
 <example>
-Input: /observe abc123def --from "about 2 hours ago"
+Resume from a specific line with harness-only focus:
 
-The observer scans timestamps in the JSONL, finds the line closest to 2 hours before the latest event, and uses that as --from-line. If the session started 90 minutes ago, it reports: "Session is only 90 minutes old - starting from line 0."
+```bash
+harness observe scan abc123 --project-hint harness --from-line 500 --focus harness --json --summary
+```
 </example>
 
 <example>
-Input: Fix verification after a fix worker completes
+Start from a prose match and filter to skills issues:
 
-The observer re-runs: harness observe scan abc123def --from-line 610 --json --summary
-If the build_error at L612 no longer appears in new output, the fix is confirmed. If it still appears, a second fix worker is spawned with the first worker's failure context.
+```bash
+harness observe scan abc123 --project-hint harness --from "suite:run started" --focus skills --json --summary
+```
 </example>
-
-## Fix worker concurrency control
-
-When dispatching fix workers:
-- One writer per file - never let two workers edit the same file simultaneously
-- One writer per crate unless the issues are in separate modules with no overlap
-- Batch multiple issues with the same root cause (same `code` + same `fix_target`) into a single worker
-- Cap concurrent workers at 3 - queue additional work and dispatch as workers complete
-- After 2 failed fix attempts for the same issue, escalate to the user instead of retrying
-
-Check `harness observe status <session-id>` before dispatching to see current open issues and avoid duplicate work.
-
-## Zero-issue path
-
-When a scan returns 0 issues: report "Clean scan: 0 issues in N lines" and continue the observation loop. A clean scan is the normal steady state for well-behaved sessions.
-
-## Stopping
-
-When the user says to stop:
-1. Call `CronDelete` on both cron IDs (automated + deep analysis)
-2. State at `$XDG_DATA_HOME/kuma/observe/<SESSION_ID>.state` is preserved for later `resume`
-3. Let any running fix workers or deep analysis agents complete
-4. Print final summary: total issues found, fixes applied, deep analysis findings, issues remaining
