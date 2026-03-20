@@ -204,18 +204,11 @@ fn check_build_compact_author_fallback(project: &Path) {
 }
 
 // Save writes latest + history. Consume marks consumed.
-#[allow(clippy::cognitive_complexity)]
 fn check_save_consume_compact_handoff(project: &Path) {
     let handoff = compact::build_compact_handoff(project).expect("build");
     compact::save_compact_handoff(project, &handoff).expect("save");
 
-    let latest = compact::compact_latest_path(project);
-    assert!(latest.exists(), "latest.json should exist");
-
-    let history_dir = compact::compact_project_dir(project).join("history");
-    assert!(history_dir.is_dir(), "history dir should exist");
-    let history_count = fs::read_dir(&history_dir).unwrap().count();
-    assert!(history_count >= 1, "should have at least 1 history entry");
+    assert_compact_handoff_persisted(project);
 
     let pending = compact::pending_compact_handoff(project)
         .expect("load pending")
@@ -228,6 +221,20 @@ fn check_save_consume_compact_handoff(project: &Path) {
     let after = compact::pending_compact_handoff(project).expect("load consumed");
     assert!(after.is_none(), "should not be pending after consume");
 
+    assert_compact_handoff_consumed(project);
+}
+
+fn assert_compact_handoff_persisted(project: &Path) {
+    let latest = compact::compact_latest_path(project);
+    assert!(latest.exists(), "latest.json should exist");
+
+    let history_dir = compact::compact_project_dir(project).join("history");
+    assert!(history_dir.is_dir(), "history dir should exist");
+    let history_count = fs::read_dir(&history_dir).unwrap().count();
+    assert!(history_count >= 1, "should have at least 1 history entry");
+}
+
+fn assert_compact_handoff_consumed(project: &Path) {
     let reloaded = compact::load_latest_compact_handoff(project)
         .expect("load")
         .expect("still exists");

@@ -3,6 +3,7 @@
 
 #![allow(dead_code)]
 
+use std::borrow::Borrow;
 use std::sync::Mutex;
 
 use harness::app::cli::{self, AuthoringCommand, Command, RunCommand, SetupCommand};
@@ -31,8 +32,8 @@ pub use harness_testkit::*;
 /// different modules on the same thread pool.
 pub static ENV_LOCK: Mutex<()> = Mutex::new(());
 
-pub fn run_command(command: Command) -> Result<i32, CliError> {
-    cli::dispatch(&command)
+pub fn run_command(command: impl Borrow<Command>) -> Result<i32, CliError> {
+    cli::dispatch(command.borrow())
 }
 
 pub fn run_cmd(command: RunCommand) -> Command {

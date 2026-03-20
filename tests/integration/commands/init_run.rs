@@ -23,17 +23,32 @@ fn run_init(args: InitArgs, xdg_root: &Path) -> Result<i32, CliError> {
     )
 }
 
-#[allow(clippy::cognitive_complexity)]
 fn assert_init_layout(run_dir: &Path) {
-    assert!(run_dir.exists(), "run dir should exist");
-    assert!(run_dir.join("run-metadata.json").exists());
-    assert!(run_dir.join("run-status.json").exists());
-    assert!(run_dir.join("run-report.md").exists());
-    assert!(run_dir.join("suite-run-state.json").exists());
-    assert!(run_dir.join("artifacts").is_dir());
-    assert!(run_dir.join("commands").is_dir());
-    assert!(run_dir.join("manifests").is_dir());
-    assert!(run_dir.join("state").is_dir());
+    assert_init_files(run_dir);
+    assert_init_directories(run_dir);
+}
+
+fn assert_init_files(run_dir: &Path) {
+    for path in [
+        run_dir.to_path_buf(),
+        run_dir.join("run-metadata.json"),
+        run_dir.join("run-status.json"),
+        run_dir.join("run-report.md"),
+        run_dir.join("suite-run-state.json"),
+    ] {
+        assert!(path.exists(), "{} should exist", path.display());
+    }
+}
+
+fn assert_init_directories(run_dir: &Path) {
+    for path in [
+        run_dir.join("artifacts"),
+        run_dir.join("commands"),
+        run_dir.join("manifests"),
+        run_dir.join("state"),
+    ] {
+        assert!(path.is_dir(), "{} should be a directory", path.display());
+    }
 }
 
 fn assert_init_metadata(run_dir: &Path) {
