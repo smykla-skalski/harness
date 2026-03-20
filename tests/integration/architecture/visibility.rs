@@ -647,3 +647,25 @@ fn observe_types_root_stays_prod_only() {
         "observe types split test module should exist"
     );
 }
+
+#[test]
+fn run_prepared_suite_root_stays_prod_only() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let prepared_suite = fs::read_to_string(root.join("src/run/prepared_suite/mod.rs")).unwrap();
+
+    for needle in [
+        "fn prepared_suite_digests_tracking_defaults(",
+        "fn to_json_includes_group_source_paths_and_manifest_metadata(",
+        "mod tests {",
+    ] {
+        assert!(
+            !prepared_suite.contains(needle),
+            "src/run/prepared_suite/mod.rs should stay focused on production prepared-suite logic instead of owning `{needle}`"
+        );
+    }
+
+    assert!(
+        root.join("src/run/prepared_suite/tests.rs").exists(),
+        "run prepared_suite split test module should exist"
+    );
+}
