@@ -465,3 +465,25 @@ fn compose_block_root_stays_a_facade() {
         );
     }
 }
+
+#[test]
+fn guard_bash_root_stays_prod_only() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let guard_bash_mod = fs::read_to_string(root.join("src/hooks/guard_bash/mod.rs")).unwrap();
+
+    for needle in [
+        "fn denies_direct_kubectl(",
+        "fn allows_plain_echo(",
+        "mod tests {",
+    ] {
+        assert!(
+            !guard_bash_mod.contains(needle),
+            "src/hooks/guard_bash/mod.rs should stay focused on production hook logic instead of owning `{needle}`"
+        );
+    }
+
+    assert!(
+        root.join("src/hooks/guard_bash/tests.rs").exists(),
+        "guard_bash split test module should exist"
+    );
+}
