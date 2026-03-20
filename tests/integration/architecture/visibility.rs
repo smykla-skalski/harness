@@ -511,6 +511,28 @@ fn compose_block_root_stays_a_facade() {
 }
 
 #[test]
+fn helm_block_root_stays_prod_only() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let helm = fs::read_to_string(root.join("src/infra/blocks/helm.rs")).unwrap();
+
+    for needle in [
+        "fn helm_setting_parses_cli_arg(",
+        "fn fake_package_deployer_tracks_release_state(",
+        "mod tests {",
+    ] {
+        assert!(
+            !helm.contains(needle),
+            "src/infra/blocks/helm.rs should stay focused on production Helm deployment behavior instead of owning `{needle}`"
+        );
+    }
+
+    assert!(
+        root.join("src/infra/blocks/helm/tests.rs").exists(),
+        "helm block split test module should exist"
+    );
+}
+
+#[test]
 fn guard_bash_root_stays_prod_only() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
     let guard_bash_mod = fs::read_to_string(root.join("src/hooks/guard_bash/mod.rs")).unwrap();
