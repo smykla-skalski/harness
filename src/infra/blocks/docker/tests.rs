@@ -1,0 +1,500 @@
+use std::sync::Arc;
+
+use super::*;
+use crate::infra::blocks::{
+    FakeContainerRuntime, FakeInvocation, FakeProcessExecutor, FakeProcessMethod, FakeResponse,
+};
+
+fn success_result(args: &[&str], stdout: &str) -> CommandResult {
+    CommandResult {
+        args: args.iter().map(|arg| (*arg).to_string()).collect(),
+        returncode: 0,
+        stdout: stdout.to_string(),
+        stderr: String::new(),
+    }
+}
+
+fn sample_config() -> ContainerConfig {
+    ContainerConfig {
+        image: "example:latest".to_string(),
+        name: "example".to_string(),
+        network: "mesh-net".to_string(),
+        env: vec![("MODE".to_string(), "test".to_string())],
+        ports: vec![(8080, 80)],
+        labels: vec![("suite".to_string(), "mesh".to_string())],
+        extra_args: vec!["--restart".to_string(), "unless-stopped".to_string()],
+        command: vec!["server".to_string()],
+    }
+}
+
+fn last_invocation(fake: &FakeProcessExecutor) -> FakeInvocation {
+    fake.invocations()
+        .into_iter()
+        .last()
+        .expect("expected at least one invocation")
+}
+
+#[test]
+fn docker_container_runtime_run_detached_builds_expected_command() {
+    let fake = Arc::new(FakeProcessExecutor::new(vec![FakeResponse {
+        expected_program: "docker".to_string(),
+        expected_args: Some(vec![
+            "docker".into(),
+            "run".into(),
+            "-d".into(),
+            "--name".into(),
+            "example".into(),
+            "--network".into(),
+            "mesh-net".into(),
+            "-e".into(),
+            "MODE=test".into(),
+            "-p".into(),
+            "8080:80".into(),
+            "--label".into(),
+            "suite=mesh".into(),
+            "--restart".into(),
+            "unless-stopped".into(),
+            "example:latest".into(),
+            "server".into(),
+        ]),
+        expected_method: Some(FakeProcessMethod::Run),
+        result: Ok(success_result(
+            &[
+                "docker",
+                "run",
+                "-d",
+                "--name",
+                "example",
+                "--network",
+                "mesh-net",
+                "-e",
+                "MODE=test",
+                "-p",
+                "8080:80",
+                "--label",
+                "suite=mesh",
+                "--restart",
+                "unless-stopped",
+                "example:latest",
+                "server",
+            ],
+            "container-id\n",
+        )),
+    }]));
+    let runtime = DockerContainerRuntime::new(fake);
+
+    let result = runtime
+        .run_detached(&sample_config())
+        .expect("expected docker run to succeed");
+
+    assert_eq!(result.stdout, "container-id\n");
+}
+
+#[test]
+fn docker_container_runtime_remove_invokes_rm_force() {
+    let fake = Arc::new(FakeProcessExecutor::new(vec![FakeResponse {
+        expected_program: "docker".to_string(),
+        expected_args: Some(vec![
+            "docker".into(),
+            "rm".into(),
+            "-f".into(),
+            "example".into(),
+        ]),
+        expected_method: Some(FakeProcessMethod::Run),
+        result: Ok(success_result(&["docker", "rm", "-f", "example"], "")),
+    }]));
+    let runtime = DockerContainerRuntime::new(fake);
+
+    let result = runtime
+        .remove("example")
+        .expect("expected remove to succeed");
+
+    assert_eq!(result.returncode, 0);
+}
+
+#[test]
+fn docker_container_runtime_inspect_ip_handles_present_and_missing_ips() {
+    let fake = Arc::new(FakeProcessExecutor::new(vec![
+        FakeResponse {
+            expected_program: "docker".to_string(),
+            expected_args: None,
+            expected_method: Some(FakeProcessMethod::Run),
+            result: Ok(success_result(
+                &["docker", "inspect", "-f", "{{...}}", "example"],
+                "10.0.0.5\n",
+            )),
+        },
+        FakeResponse {
+            expected_program: "docker".to_string(),
+            expected_args: None,
+            expected_method: Some(FakeProcessMethod::Run),
+            result: Ok(success_result(
+                &["docker", "inspect", "-f", "{{...}}", "example"],
+                "\n",
+            )),
+        },
+    ]));
+    let runtime = DockerContainerRuntime::new(fake);
+
+    let ip = runtime
+        .inspect_ip("example", "mesh-net")
+        .expect("expected IP lookup to succeed");
+    assert_eq!(ip, "10.0.0.5");
+
+    let error = runtime
+        .inspect_ip("example", "mesh-net")
+        .expect_err("expected empty IP to fail");
+    assert!(error.to_string().contains("no IP on network mesh-net"));
+}
+
+#[test]
+fn docker_container_runtime_is_running_reflects_inspect_output() {
+    let fake = Arc::new(FakeProcessExecutor::new(vec![
+        FakeResponse {
+            expected_program: "docker".to_string(),
+            expected_args: Some(vec![
+                "docker".into(),
+                "inspect".into(),
+                "-f".into(),
+                "{{.State.Running}}".into(),
+                "example".into(),
+            ]),
+            expected_method: Some(FakeProcessMethod::Run),
+            result: Ok(success_result(
+                &["docker", "inspect", "-f", "{{.State.Running}}", "example"],
+                "true\n",
+            )),
+        },
+        FakeResponse {
+            expected_program: "docker".to_string(),
+            expected_args: Some(vec![
+                "docker".into(),
+                "inspect".into(),
+                "-f".into(),
+                "{{.State.Running}}".into(),
+                "example".into(),
+            ]),
+            expected_method: Some(FakeProcessMethod::Run),
+            result: Ok(CommandResult {
+                args: vec![
+                    "docker".into(),
+                    "inspect".into(),
+                    "-f".into(),
+                    "{{.State.Running}}".into(),
+                    "example".into(),
+                ],
+                returncode: 1,
+                stdout: "false\n".to_string(),
+                stderr: String::new(),
+            }),
+        },
+    ]));
+    let runtime = DockerContainerRuntime::new(fake);
+
+    assert!(
+        runtime
+            .is_running("example")
+            .expect("expected inspect to succeed")
+    );
+    assert!(
+        !runtime
+            .is_running("example")
+            .expect("expected inspect to succeed")
+    );
+}
+
+#[test]
+fn docker_container_runtime_exec_command_builds_expected_args() {
+    let fake = Arc::new(FakeProcessExecutor::new(vec![FakeResponse {
+        expected_program: "docker".to_string(),
+        expected_args: Some(vec![
+            "docker".into(),
+            "exec".into(),
+            "example".into(),
+            "echo".into(),
+            "hello".into(),
+        ]),
+        expected_method: Some(FakeProcessMethod::Run),
+        result: Ok(success_result(
+            &["docker", "exec", "example", "echo", "hello"],
+            "hello\n",
+        )),
+    }]));
+    let runtime = DockerContainerRuntime::new(fake);
+
+    let result = runtime
+        .exec_command("example", &["echo", "hello"])
+        .expect("expected exec to succeed");
+
+    assert_eq!(result.stdout, "hello\n");
+}
+
+#[test]
+fn docker_container_runtime_list_formatted_uses_ps_without_all_flag() {
+    let fake = Arc::new(FakeProcessExecutor::new(vec![FakeResponse {
+        expected_program: "docker".to_string(),
+        expected_args: Some(vec![
+            "docker".into(),
+            "ps".into(),
+            "--filter".into(),
+            "label=suite=mesh".into(),
+            "--format".into(),
+            "{{.Names}}".into(),
+        ]),
+        expected_method: Some(FakeProcessMethod::Run),
+        result: Ok(success_result(
+            &[
+                "docker",
+                "ps",
+                "--filter",
+                "label=suite=mesh",
+                "--format",
+                "{{.Names}}",
+            ],
+            "svc-1\n",
+        )),
+    }]));
+    let runtime = DockerContainerRuntime::new(fake);
+
+    let result = runtime
+        .list_formatted(&["--filter", "label=suite=mesh"], "{{.Names}}")
+        .expect("expected list_formatted to succeed");
+
+    assert_eq!(result.stdout, "svc-1\n");
+}
+
+#[test]
+fn docker_container_runtime_write_file_invokes_docker_cp() {
+    let fake = Arc::new(FakeProcessExecutor::new(vec![FakeResponse {
+        expected_program: "docker".to_string(),
+        expected_args: None,
+        expected_method: Some(FakeProcessMethod::Run),
+        result: Ok(success_result(&["docker", "cp"], "")),
+    }]));
+    let runtime = DockerContainerRuntime::new(fake.clone());
+
+    runtime
+        .write_file("example", "/tmp/config.yaml", "kind: ConfigMap")
+        .expect("expected write_file to succeed");
+
+    let invocation = last_invocation(fake.as_ref());
+    assert_eq!(invocation.method, FakeProcessMethod::Run);
+    assert_eq!(invocation.args[0], "docker");
+    assert_eq!(invocation.args[1], "cp");
+    assert_eq!(invocation.args[3], "example:/tmp/config.yaml");
+    assert!(!invocation.args[2].is_empty());
+}
+
+#[test]
+fn docker_container_runtime_create_network_skips_create_when_network_exists() {
+    let fake = Arc::new(FakeProcessExecutor::new(vec![FakeResponse {
+        expected_program: "docker".to_string(),
+        expected_args: Some(vec![
+            "docker".into(),
+            "network".into(),
+            "ls".into(),
+            "--filter".into(),
+            "name=^mesh-net$".into(),
+            "--format".into(),
+            "{{.Name}}".into(),
+        ]),
+        expected_method: Some(FakeProcessMethod::Run),
+        result: Ok(success_result(
+            &[
+                "docker",
+                "network",
+                "ls",
+                "--filter",
+                "name=^mesh-net$",
+                "--format",
+                "{{.Name}}",
+            ],
+            "mesh-net\n",
+        )),
+    }]));
+    let runtime = DockerContainerRuntime::new(fake.clone());
+
+    runtime
+        .create_network("mesh-net", "172.18.0.0/24")
+        .expect("expected create_network to succeed");
+
+    assert_eq!(fake.invocations().len(), 1);
+}
+
+#[test]
+fn docker_container_runtime_remove_by_label_removes_each_match() {
+    let fake = Arc::new(FakeProcessExecutor::new(vec![
+        FakeResponse {
+            expected_program: "docker".to_string(),
+            expected_args: Some(vec![
+                "docker".into(),
+                "ps".into(),
+                "-a".into(),
+                "--filter".into(),
+                "label=suite=mesh".into(),
+                "--format".into(),
+                "{{.Names}}".into(),
+            ]),
+            expected_method: Some(FakeProcessMethod::Run),
+            result: Ok(success_result(
+                &[
+                    "docker",
+                    "ps",
+                    "-a",
+                    "--filter",
+                    "label=suite=mesh",
+                    "--format",
+                    "{{.Names}}",
+                ],
+                "cp-1\ndp-1\n",
+            )),
+        },
+        FakeResponse {
+            expected_program: "docker".to_string(),
+            expected_args: Some(vec![
+                "docker".into(),
+                "rm".into(),
+                "-f".into(),
+                "cp-1".into(),
+            ]),
+            expected_method: Some(FakeProcessMethod::Run),
+            result: Ok(success_result(&["docker", "rm", "-f", "cp-1"], "")),
+        },
+        FakeResponse {
+            expected_program: "docker".to_string(),
+            expected_args: Some(vec![
+                "docker".into(),
+                "rm".into(),
+                "-f".into(),
+                "dp-1".into(),
+            ]),
+            expected_method: Some(FakeProcessMethod::Run),
+            result: Ok(success_result(&["docker", "rm", "-f", "dp-1"], "")),
+        },
+    ]));
+    let runtime = DockerContainerRuntime::new(fake);
+
+    let removed = runtime
+        .remove_by_label("suite=mesh")
+        .expect("expected remove_by_label to succeed");
+
+    assert_eq!(removed, vec!["cp-1", "dp-1"]);
+}
+
+#[test]
+fn fake_container_runtime_tracks_container_lifecycle() {
+    let runtime = FakeContainerRuntime::new();
+    let config = sample_config();
+
+    runtime
+        .create_network("mesh-net", "172.18.0.0/24")
+        .expect("expected network creation to succeed");
+    runtime
+        .run_detached(&config)
+        .expect("expected run_detached to succeed");
+    assert!(
+        runtime
+            .is_running("example")
+            .expect("expected running check to succeed")
+    );
+    assert_eq!(
+        runtime
+            .inspect_ip("example", "mesh-net")
+            .expect("expected IP lookup to succeed"),
+        "172.18.0.2"
+    );
+    runtime
+        .write_file("example", "/tmp/config.yaml", "data")
+        .expect("expected write_file to succeed");
+
+    let removed = runtime
+        .remove_by_label("suite=mesh")
+        .expect("expected remove_by_label to succeed");
+    assert_eq!(removed, vec!["example"]);
+    assert!(
+        !runtime
+            .is_running("example")
+            .expect("expected running check to succeed")
+    );
+}
+
+#[test]
+fn docker_types_are_send_sync() {
+    fn assert_send_sync<T: Send + Sync>() {}
+
+    assert_send_sync::<DockerContainerRuntime>();
+    assert_send_sync::<FakeContainerRuntime>();
+}
+
+// -- Contract tests: fake satisfies the same invariants as production --
+
+mod contracts {
+    use super::*;
+
+    fn contract_run_detached_returns_id(runtime: &dyn ContainerRuntime) {
+        let config = sample_config();
+        let result = runtime
+            .run_detached(&config)
+            .expect("run_detached should succeed");
+        assert_eq!(result.returncode, 0);
+        assert!(
+            !result.stdout.trim().is_empty(),
+            "stdout should contain a container ID"
+        );
+        let _ = runtime.remove(&config.name);
+    }
+
+    fn contract_is_running_reflects_state(runtime: &dyn ContainerRuntime) {
+        let config = sample_config();
+        runtime
+            .run_detached(&config)
+            .expect("run_detached should succeed");
+        let running = runtime
+            .is_running(&config.name)
+            .expect("is_running should succeed");
+        assert!(running, "should be running after run_detached");
+        runtime.remove(&config.name).expect("remove should succeed");
+        let still = runtime
+            .is_running(&config.name)
+            .expect("is_running check after remove");
+        assert!(!still, "should not be running after remove");
+    }
+
+    fn contract_remove_is_idempotent(runtime: &dyn ContainerRuntime) {
+        let result = runtime.remove("nonexistent-contract-test");
+        assert!(
+            result.is_ok(),
+            "removing nonexistent container should not fail"
+        );
+    }
+
+    fn contract_network_lifecycle(runtime: &dyn ContainerRuntime) {
+        let name = "contract-test-net";
+        runtime
+            .create_network(name, "172.250.0.0/24")
+            .expect("create_network should succeed");
+        runtime
+            .remove_network(name)
+            .expect("remove_network should succeed");
+    }
+
+    #[test]
+    fn fake_satisfies_run_detached_returns_id() {
+        contract_run_detached_returns_id(&FakeContainerRuntime::new());
+    }
+
+    #[test]
+    fn fake_satisfies_is_running_reflects_state() {
+        contract_is_running_reflects_state(&FakeContainerRuntime::new());
+    }
+
+    #[test]
+    fn fake_satisfies_remove_is_idempotent() {
+        contract_remove_is_idempotent(&FakeContainerRuntime::new());
+    }
+
+    #[test]
+    fn fake_satisfies_network_lifecycle() {
+        contract_network_lifecycle(&FakeContainerRuntime::new());
+    }
+}
