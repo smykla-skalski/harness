@@ -382,6 +382,36 @@ fn question_and_stop_hooks_root_stay_prod_only() {
 }
 
 #[test]
+fn runner_guards_root_stays_a_facade() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let runner_guards =
+        fs::read_to_string(root.join("src/hooks/guard_bash/runner_guards.rs")).unwrap();
+
+    for needle in [
+        "fn completed_run_reuse_reason(",
+        "fn allowed_command(",
+        "fn tracked_harness_subcommands(",
+        "fn run_control_files_mentioned(",
+        "fn tracked_kubectl_delete_words(",
+    ] {
+        assert!(
+            !runner_guards.contains(needle),
+            "src/hooks/guard_bash/runner_guards.rs should stay a thin facade instead of owning `{needle}`"
+        );
+    }
+
+    for path in [
+        "src/hooks/guard_bash/runner_guards/phase.rs",
+        "src/hooks/guard_bash/runner_guards/structural.rs",
+    ] {
+        assert!(
+            root.join(path).exists(),
+            "runner guards split module should exist: {path}"
+        );
+    }
+}
+
+#[test]
 fn observe_tool_checks_root_stays_a_facade() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
     let tool_checks_mod =
