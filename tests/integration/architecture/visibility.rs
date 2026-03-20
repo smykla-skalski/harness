@@ -276,6 +276,27 @@ fn hooks_root_stays_a_facade() {
 }
 
 #[test]
+fn hooks_application_context_root_stays_prod_only() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let context = fs::read_to_string(root.join("src/hooks/application/context.rs")).unwrap();
+
+    for needle in [
+        "fn from_normalized_hydrates_missing_session_cwd(",
+        "mod tests {",
+    ] {
+        assert!(
+            !context.contains(needle),
+            "src/hooks/application/context.rs should stay focused on production context hydration instead of owning `{needle}`"
+        );
+    }
+
+    assert!(
+        root.join("src/hooks/application/context/tests.rs").exists(),
+        "hooks application context split test module should exist"
+    );
+}
+
+#[test]
 fn observe_tool_checks_root_stays_a_facade() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
     let tool_checks_mod =

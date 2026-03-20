@@ -470,27 +470,4 @@ fn render_tool_response_text(tool_name: &str, tool_response: &Value) -> String {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn from_normalized_hydrates_missing_session_cwd() {
-        let context = GuardContext::from_normalized(NormalizedHookContext {
-            event: NormalizedEvent::Notification,
-            session: SessionContext {
-                session_id: String::new(),
-                cwd: None,
-                transcript_path: None,
-            },
-            tool: None,
-            agent: None,
-            skill: SkillContext::inactive(),
-            raw: RawPayload::new(Value::Null),
-        });
-
-        assert_eq!(
-            context.session.cwd,
-            Some(env::current_dir().unwrap_or_else(|_| PathBuf::from(".")))
-        );
-    }
-}
+mod tests;
