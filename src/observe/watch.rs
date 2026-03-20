@@ -4,7 +4,7 @@ use std::path::Path;
 use std::time::{Duration, Instant};
 
 use notify::{RecommendedWatcher, RecursiveMode, Watcher};
-use serde_json::json;
+use serde::Serialize;
 use tokio::sync::mpsc;
 use tokio::time::sleep;
 
@@ -19,6 +19,13 @@ use super::output;
 use super::scan::apply_filters;
 use super::session;
 use super::types::{Issue, ScanState};
+
+#[derive(Serialize)]
+struct WatchStarted<'a> {
+    status: &'static str,
+    session: &'a str,
+    from_line: usize,
+}
 
 /// Compute the byte offset for skipping the first `from_line` lines.
 fn compute_initial_byte_offset(path: &Path, from_line: usize) -> u64 {
@@ -116,12 +123,16 @@ pub(super) fn execute_watch(
     let from_line = super::scan::resolve_effective_from_line(filter, &path)?;
 
     if filter.json {
-        let status = json!({
-            "status": "started",
-            "session": path.to_string_lossy(),
-            "from_line": from_line,
-        });
-        println!("{status}");
+        let session = path.to_string_lossy();
+        println!(
+            "{}",
+            serde_json::to_string(&WatchStarted {
+                status: "started",
+                session: session.as_ref(),
+                from_line,
+            })
+            .expect("watch status serializes")
+        );
     }
 
     let mut state = ScanState::default();

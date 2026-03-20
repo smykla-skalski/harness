@@ -1,7 +1,8 @@
+use std::collections::BTreeMap;
 use std::path::PathBuf;
 
-use serde::Deserialize;
-use serde_json::{Value, json};
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
 
 use crate::errors::{CliError, CliErrorKind};
 use crate::hooks::adapters::{
@@ -14,6 +15,55 @@ use crate::hooks::protocol::result::NormalizedHookResult;
 use crate::kernel::tooling::{ToolCategory, ToolContext, ToolInput};
 
 pub struct CodexAdapter;
+
+#[derive(Serialize)]
+struct CodexDenyOutput<'a> {
+    decision: &'static str,
+    reason: &'a str,
+}
+
+#[derive(Serialize)]
+struct CodexConfig<'a> {
+    hooks: BTreeMap<&'a str, Vec<CodexEventRegistration<'a>>>,
+}
+
+#[derive(Serialize)]
+struct CodexEventRegistration<'a> {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    matcher: Option<&'a str>,
+    hooks: Vec<CodexCommandHook<'a>>,
+}
+
+#[derive(Serialize)]
+struct CodexCommandHook<'a> {
+    #[serde(rename = "type")]
+    hook_type: &'static str,
+    command: &'a str,
+    timeout: u64,
+}
+
+#[derive(Serialize)]
+struct CodexTurnToolInput<'a> {
+    #[serde(rename = "type")]
+    event_type: &'a str,
+    cwd: Option<&'a PathBuf>,
+    turn_id: Option<&'a str>,
+    input_messages: &'a [String],
+}
+
+#[derive(Serialize)]
+struct CodexTurnToolResponse<'a> {
+    last_assistant_message: Option<&'a str>,
+    turn_id: Option<&'a str>,
+}
+
+fn render_json<T: Serialize>(payload: &T) -> String {
+    serde_json::to_string(payload).expect("typed hook JSON serializes")
+}
+
+fn to_json_value<T: Serialize>(payload: &T) -> Value {
+    serde_json::to_value(payload).expect("typed hook JSON converts to value")
+}
 
 impl AgentAdapter for CodexAdapter {
     fn name(&self) -> &'static str {
@@ -45,12 +95,12 @@ impl AgentAdapter for CodexAdapter {
                 exit_code: 0,
             };
         }
-        let payload = json!({
-            "decision": "block",
-            "reason": result.display_message(),
-        });
+        let reason = result.display_message();
         RenderedHookResponse {
-            stdout: serde_json::to_string(&payload).expect("hand-built JSON serializes"),
+            stdout: render_json(&CodexDenyOutput {
+                decision: "block",
+                reason: &reason,
+            }),
             exit_code: 0,
         }
     }
@@ -68,32 +118,25 @@ impl AgentAdapter for CodexAdapter {
     }
 
     fn generate_config(&self, hooks: &[HookRegistration]) -> String {
-        use std::collections::BTreeMap;
-
-        let mut events: BTreeMap<&str, Vec<serde_json::Value>> = BTreeMap::new();
+        let mut events = BTreeMap::new();
         for registration in hooks {
             let Some(event_name) = self.event_name(&registration.event) else {
                 continue;
             };
-            let mut entry = serde_json::Map::new();
-            if let Some(matcher) = &registration.matcher {
-                entry.insert("matcher".to_string(), json!(matcher));
-            }
-            entry.insert(
-                "hooks".to_string(),
-                json!([{
-                    "type": "command",
-                    "command": registration.command,
-                    "timeout": 10,
-                }]),
-            );
             events
                 .entry(event_name)
-                .or_default()
-                .push(serde_json::Value::Object(entry));
+                .or_insert_with(Vec::new)
+                .push(CodexEventRegistration {
+                    matcher: registration.matcher.as_deref(),
+                    hooks: vec![CodexCommandHook {
+                        hook_type: "command",
+                        command: &registration.command,
+                        timeout: 10,
+                    }],
+                });
         }
-        serde_json::to_string_pretty(&json!({ "hooks": events }))
-            .expect("hand-built JSON serializes")
+        serde_json::to_string_pretty(&CodexConfig { hooks: events })
+            .expect("typed hook JSON serializes")
     }
 }
 
@@ -135,15 +178,15 @@ fn notify_payload_context(raw_value: Value) -> Result<NormalizedHookContext, Cli
     let cwd = payload.cwd.clone();
     let turn_id = payload.turn_id.clone();
     let prompt = (!payload.input_messages.is_empty()).then(|| payload.input_messages.join("\n\n"));
-    let tool_input = json!({
-        "type": payload.event_type,
-        "cwd": cwd,
-        "turn_id": turn_id,
-        "input_messages": payload.input_messages,
+    let tool_input = to_json_value(&CodexTurnToolInput {
+        event_type: &payload.event_type,
+        cwd: payload.cwd.as_ref(),
+        turn_id: turn_id.as_deref(),
+        input_messages: &payload.input_messages,
     });
-    let tool_response = json!({
-        "last_assistant_message": payload.last_assistant_message,
-        "turn_id": payload.turn_id,
+    let tool_response = to_json_value(&CodexTurnToolResponse {
+        last_assistant_message: payload.last_assistant_message.as_deref(),
+        turn_id: payload.turn_id.as_deref(),
     });
 
     Ok(NormalizedHookContext {
@@ -181,9 +224,15 @@ mod tests {
         assert_eq!(context.session.cwd, Some(PathBuf::from("/tmp/project")));
         let tool = context.tool.as_ref().expect("expected tool");
         assert_eq!(tool.original_name, CODEX_TURN_TOOL_NAME);
-        assert_eq!(tool.input_raw["input_messages"][0], json!("run the suite"));
+        assert_eq!(
+            tool.input_raw["input_messages"][0],
+            Value::String("run the suite".into())
+        );
         let response = tool.response.as_ref().expect("expected response");
-        assert_eq!(response["last_assistant_message"], json!("done"));
+        assert_eq!(
+            response["last_assistant_message"],
+            Value::String("done".into())
+        );
     }
 
     fn assert_notify_agent(context: &NormalizedHookContext) {
@@ -196,15 +245,15 @@ mod tests {
     #[test]
     fn parse_notify_payload_into_notification_context() {
         let adapter = CodexAdapter;
-        let raw = serde_json::to_vec(&json!({
-            "type": "agent-turn-complete",
-            "thread-id": "session-123",
-            "turn-id": "turn-456",
-            "cwd": "/tmp/project",
-            "input-messages": ["run the suite", "report failures"],
-            "last-assistant-message": "done",
-        }))
-        .unwrap();
+        let raw = br#"{
+            "type":"agent-turn-complete",
+            "thread-id":"session-123",
+            "turn-id":"turn-456",
+            "cwd":"/tmp/project",
+            "input-messages":["run the suite","report failures"],
+            "last-assistant-message":"done"
+        }"#
+        .to_vec();
 
         let context = adapter.parse_input(&raw).unwrap();
         assert_notify_context(&context);

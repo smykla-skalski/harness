@@ -981,6 +981,57 @@ fn hook_protocol_output_uses_typed_serialization() {
 }
 
 #[test]
+fn transport_outputs_use_typed_serialization_helpers() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+
+    for path in [
+        "src/hooks/adapters/codex.rs",
+        "src/hooks/adapters/opencode/mod.rs",
+        "src/observe/watch.rs",
+        "src/setup/wrapper.rs",
+    ] {
+        let contents = read_repo_file(root, path);
+        assert_file_lacks_needles(
+            &contents,
+            &format!("{path} should not hand-build transport JSON via"),
+            &["use serde_json::json;", "json!(", "serde_json::json!("],
+        );
+    }
+
+    let codex = read_repo_file(root, "src/hooks/adapters/codex.rs");
+    assert_file_contains_needles(
+        &codex,
+        "src/hooks/adapters/codex.rs should use typed serialization helpers via",
+        &[
+            "#[derive(Serialize)]",
+            "fn render_json<T: Serialize>(",
+            "fn to_json_value<T: Serialize>(",
+        ],
+    );
+
+    let opencode = read_repo_file(root, "src/hooks/adapters/opencode/mod.rs");
+    assert_file_contains_needles(
+        &opencode,
+        "src/hooks/adapters/opencode/mod.rs should use typed serialization helpers via",
+        &["#[derive(Serialize)]", "fn render_json<T: Serialize>("],
+    );
+
+    let watch = read_repo_file(root, "src/observe/watch.rs");
+    assert_file_contains_needles(
+        &watch,
+        "src/observe/watch.rs should emit typed watch status JSON via",
+        &["#[derive(Serialize)]", "struct WatchStarted"],
+    );
+
+    let wrapper = read_repo_file(root, "src/setup/wrapper.rs");
+    assert_file_contains_needles(
+        &wrapper,
+        "src/setup/wrapper.rs should serialize bridge bindings from typed structs via",
+        &["#[derive(Serialize)]", "struct OpenCodeToolBindings"],
+    );
+}
+
+#[test]
 fn kuma_contracts_are_isolated_to_block_namespace() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
     let hits = collect_hits_in_tree(
