@@ -820,6 +820,28 @@ fn run_prepared_suite_root_stays_prod_only() {
 }
 
 #[test]
+fn run_validated_layout_root_stays_prod_only() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let validated = fs::read_to_string(root.join("src/run/context/validated.rs")).unwrap();
+
+    for needle in [
+        "fn validated_layout_succeeds_for_existing_dir(",
+        "fn validated_layout_into_inner_returns_original(",
+        "mod tests {",
+    ] {
+        assert!(
+            !validated.contains(needle),
+            "src/run/context/validated.rs should stay focused on production validated-layout behavior instead of owning `{needle}`"
+        );
+    }
+
+    assert!(
+        root.join("src/run/context/validated/tests.rs").exists(),
+        "run validated-layout split test module should exist"
+    );
+}
+
+#[test]
 fn observe_registry_root_stays_prod_only() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
     let registry = fs::read_to_string(root.join("src/observe/classifier/registry.rs")).unwrap();
