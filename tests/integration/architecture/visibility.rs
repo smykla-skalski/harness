@@ -240,3 +240,37 @@ fn kernel_command_intent_root_stays_a_facade() {
         );
     }
 }
+
+#[test]
+fn hooks_root_stays_a_facade() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let hooks_mod = fs::read_to_string(root.join("src/hooks/mod.rs")).unwrap();
+
+    for needle in [
+        "pub enum HookType {",
+        "pub enum HookCommand {",
+        "pub struct HookArgs {",
+        "define_legacy_hook!(",
+        "pub fn run_hook_command(",
+        "fn normalize_path(",
+        "mod tests {",
+    ] {
+        assert!(
+            !hooks_mod.contains(needle),
+            "src/hooks/mod.rs should stay a thin facade instead of owning `{needle}`"
+        );
+    }
+
+    for path in [
+        "src/hooks/catalog.rs",
+        "src/hooks/transport.rs",
+        "src/hooks/runtime.rs",
+        "src/hooks/write_surface.rs",
+        "src/hooks/tests.rs",
+    ] {
+        assert!(
+            root.join(path).exists(),
+            "hooks split module should exist: {path}"
+        );
+    }
+}
