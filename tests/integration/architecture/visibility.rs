@@ -432,6 +432,28 @@ fn observe_classifier_tests_stay_split_by_scenario() {
 }
 
 #[test]
+fn observe_patterns_root_stays_prod_only() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let patterns = fs::read_to_string(root.join("src/observe/patterns.rs")).unwrap();
+
+    for needle in [
+        "fn ksa_codes_count(",
+        "fn ksa_codes_sequential(",
+        "mod tests {",
+    ] {
+        assert!(
+            !patterns.contains(needle),
+            "src/observe/patterns.rs should stay focused on production signal lists instead of owning `{needle}`"
+        );
+    }
+
+    assert!(
+        root.join("src/observe/patterns/tests.rs").exists(),
+        "observe patterns split test module should exist"
+    );
+}
+
+#[test]
 fn docker_block_root_stays_a_facade() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
     let docker_mod = fs::read_to_string(root.join("src/infra/blocks/docker/mod.rs")).unwrap();
