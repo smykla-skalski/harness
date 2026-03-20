@@ -367,3 +367,44 @@ fn infra_exec_root_stays_a_facade() {
         );
     }
 }
+
+#[test]
+fn observe_classifier_tests_stay_split_by_scenario() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let tests_mod = fs::read_to_string(root.join("src/observe/classifier/tests/mod.rs")).unwrap();
+
+    for needle in [
+        "fn detects_hook_denial(",
+        "fn detects_harness_infrastructure_issue_phrase(",
+        "fn resource_cleanup_tracks_apply_commands(",
+        "fn truncated_verification_output_shape(",
+    ] {
+        assert!(
+            !tests_mod.contains(needle),
+            "src/observe/classifier/tests/mod.rs should stay a helper facade instead of owning `{needle}`"
+        );
+    }
+
+    assert!(
+        !root.join("src/observe/classifier/tests.rs").exists(),
+        "src/observe/classifier/tests.rs should not return as a monolithic test file"
+    );
+
+    for path in [
+        "src/observe/classifier/tests/mod.rs",
+        "src/observe/classifier/tests/text_and_line.rs",
+        "src/observe/classifier/tests/tool_use_patterns.rs",
+        "src/observe/classifier/tests/assistant_diagnostics.rs",
+        "src/observe/classifier/tests/tool_guard_patterns.rs",
+        "src/observe/classifier/tests/workflow_rules.rs",
+        "src/observe/classifier/tests/state_and_registry.rs",
+        "src/observe/classifier/tests/query_tracking.rs",
+        "src/observe/classifier/tests/resource_tracking.rs",
+        "src/observe/classifier/tests/verification.rs",
+    ] {
+        assert!(
+            root.join(path).exists(),
+            "observe classifier split test module should exist: {path}"
+        );
+    }
+}
