@@ -281,6 +281,10 @@ fn hooks_application_context_root_stays_prod_only() {
     let context = fs::read_to_string(root.join("src/hooks/application/context.rs")).unwrap();
 
     for needle in [
+        "struct HookInteraction {",
+        "struct HydratedHookState {",
+        "fn normalized_from_envelope(",
+        "fn hydrate_normalized_context(",
         "fn from_normalized_hydrates_missing_session_cwd(",
         "mod tests {",
     ] {
@@ -293,6 +297,16 @@ fn hooks_application_context_root_stays_prod_only() {
     assert!(
         root.join("src/hooks/application/context/tests.rs").exists(),
         "hooks application context split test module should exist"
+    );
+    assert!(
+        root.join("src/hooks/application/context/hydration.rs")
+            .exists(),
+        "hooks application context hydration split module should exist"
+    );
+    assert!(
+        root.join("src/hooks/application/context/interaction.rs")
+            .exists(),
+        "hooks application context interaction split module should exist"
     );
 }
 
