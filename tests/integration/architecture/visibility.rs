@@ -274,3 +274,34 @@ fn hooks_root_stays_a_facade() {
         );
     }
 }
+
+#[test]
+fn observe_tool_checks_root_stays_a_facade() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let tool_checks_mod =
+        fs::read_to_string(root.join("src/observe/classifier/tool_checks/mod.rs")).unwrap();
+
+    for needle in [
+        "fn check_bash_tool_use(",
+        "fn check_ask_user_question(",
+        "fn check_destructive_patterns(",
+        "fn check_validator_install_prompt(",
+        "const VERIFICATION_KEYWORDS:",
+        "const KUBECTL_QUERY_WINDOW:",
+    ] {
+        assert!(
+            !tool_checks_mod.contains(needle),
+            "src/observe/classifier/tool_checks/mod.rs should stay a thin facade instead of owning `{needle}`"
+        );
+    }
+
+    for path in [
+        "src/observe/classifier/tool_checks/bash.rs",
+        "src/observe/classifier/tool_checks/questions.rs",
+    ] {
+        assert!(
+            root.join(path).exists(),
+            "observe tool-check split module should exist: {path}"
+        );
+    }
+}
