@@ -798,6 +798,28 @@ fn observe_types_root_stays_prod_only() {
 }
 
 #[test]
+fn observe_session_root_stays_prod_only() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let session = fs::read_to_string(root.join("src/observe/session.rs")).unwrap();
+
+    for needle in [
+        "fn find_session_in_temp_dir(",
+        "fn find_session_ambiguous_without_hint(",
+        "mod tests {",
+    ] {
+        assert!(
+            !session.contains(needle),
+            "src/observe/session.rs should stay focused on production session lookup instead of owning `{needle}`"
+        );
+    }
+
+    assert!(
+        root.join("src/observe/session/tests.rs").exists(),
+        "observe session split test module should exist"
+    );
+}
+
+#[test]
 fn run_prepared_suite_root_stays_prod_only() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
     let prepared_suite = fs::read_to_string(root.join("src/run/prepared_suite/mod.rs")).unwrap();
