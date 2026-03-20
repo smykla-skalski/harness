@@ -1,162 +1,139 @@
 # Issue taxonomy
 
-Categories, severity levels, confidence, fix safety, and fix routing for the session observer.
+Categories, severity, fix safety, ownership, and routing guidance for `harness observe`.
+
+## Contents
+
+- [Categories](#categories)
+- [Severity](#severity)
+- [Fix routing](#fix-routing)
+- [Common fix patterns](#common-fix-patterns)
 
 ## Categories
 
 ### hook_failure
 - Confidence: high
-- Fix safety: triage_required (hooks are safety-critical)
+- Fix safety: triage_required
 - Owner: harness
-- Root cause: guard/verify hook denied or errored unexpectedly
-- Fix target: `src/hooks/`, SKILL.md hook config
-- Validation: `cargo test --lib hooks`
-- False positives: intentional denials (hook working correctly)
-- Retry: max 2 attempts, escalate on 3rd
-- Escalation: ask user if the denial is expected behavior
+- Root cause: guard or verify hook denied or errored unexpectedly
+- Fix target: `src/hooks/`, `.claude/plugins/suite/skills/`, or hook transport wiring
+- Validation: `mise run check` and `TMPDIR=/tmp mise run test`
 
 ### skill_behavior
 - Confidence: medium-high
 - Fix safety: triage_required or auto_fix_guarded
 - Owner: skill
-- Root cause: skill deviated from SKILL.md instructions
-- Fix target: `skills/*/SKILL.md`
-- Validation: re-run the skill step that failed
-- False positives: model creativity that happens to match a pattern
-- Retry: max 2 attempts, escalate on 3rd
-- Escalation: show both attempts to user
+- Root cause: the skill drifted from its contract or examples
+- Fix target: `.claude/skills/*/SKILL.md`, `.claude/plugins/suite/skills/*/SKILL.md`, references, or agent descriptors
+- Validation: re-run the affected skill path and the repo gates when code changed
 
 ### cli_error
 - Confidence: high
 - Fix safety: auto_fix_safe
 - Owner: harness
-- Root cause: harness CLI returned unexpected error or bad args
-- Fix target: `src/cli.rs`, `src/commands/`
-- Validation: `cargo clippy --lib && cargo test --lib`
-- False positives: rare - CLI errors are unambiguous
-- Retry: max 2 attempts
-- Escalation: include the full error message
+- Root cause: `harness` returned an unexpected error or bad arg handling
+- Fix target: `src/app/cli.rs` plus the owning domain under `src/run/`, `src/setup/`, `src/authoring/`, `src/observe/`, or `src/hooks/`
+- Validation: `mise run check` and `TMPDIR=/tmp mise run test`
 
 ### build_error
 - Confidence: high
 - Fix safety: auto_fix_safe
 - Owner: harness
-- Root cause: cargo check/clippy/test failure
-- Fix target: Rust source files indicated in error
-- Validation: `cargo clippy --lib && cargo test --lib`
-- False positives: none - compiler errors are definitive
-- Retry: max 2 attempts
-- Escalation: include compiler output
+- Root cause: `cargo check`, clippy, or tests failed
+- Fix target: the Rust source files identified in the failure
+- Validation: `mise run check` and `TMPDIR=/tmp mise run test`
 
 ### workflow_error
 - Confidence: high
 - Fix safety: auto_fix_guarded
 - Owner: harness
-- Root cause: state machine or approval flow in wrong state
-- Fix target: `src/workflow/`
-- Validation: `cargo test --lib workflow`
-- False positives: transient state during transitions
-- Retry: max 2 attempts
-- Escalation: include current state and expected state
+- Root cause: a workflow or state machine is in the wrong state
+- Fix target: the owning workflow under `src/run/`, `src/authoring/`, `src/hooks/`, or `src/workspace/`
+- Validation: `mise run check` and `TMPDIR=/tmp mise run test`
 
 ### naming_error
 - Confidence: high
 - Fix safety: auto_fix_safe
 - Owner: skill
-- Root cause: old or wrong skill/path names used
-- Fix target: SKILL.md, `src/rules.rs`
-- Validation: grep for old names
-- False positives: none
-- Retry: 1 attempt (mechanical fix)
+- Root cause: old or wrong command names, skill names, or path roots are still used
+- Fix target: SKILL.md files, `.claude/plugins/suite/skills/`, `src/kernel/skills.rs`, or `src/app/cli.rs`
+- Validation: grep for stale names and re-check the current command surface in source
 
 ### tool_error
 - Confidence: high
 - Fix safety: advisory_only
 - Owner: model
-- Root cause: Claude tool usage error (edit before read, etc.)
-- Fix target: not fixable in harness - model behavior
+- Root cause: a tool was used incorrectly
+- Fix target: usually not a harness code fix
 - Validation: n/a
-- False positives: none
-- Retry: 0 (model must self-correct)
 
 ### data_integrity
 - Confidence: medium-high
 - Fix safety: triage_required
 - Owner: harness or product
-- Root cause: stale state, corrupted payloads, missing artifacts
-- Fix target: `src/authoring.rs`, `src/workflow/`
-- Validation: re-run the failing operation
-- False positives: transient filesystem state
-- Retry: max 2 attempts
-- Escalation: include file contents and expected shape
+- Root cause: stale state, corrupted payloads, missing artifacts, or invalid persisted data
+- Fix target: `src/run/`, `src/authoring/`, `src/workspace/`, or `src/observe/`
+- Validation: rerun the affected flow plus the repo gates if code changed
 
 ### subagent_issue
 - Confidence: medium
 - Fix safety: auto_fix_guarded
 - Owner: skill
-- Root cause: worker agent permissions, wrong format, or failed save
-- Fix target: agent descriptors, SKILL.md agent config
-- Validation: re-spawn the agent
-- False positives: permission prompts that the user handled
-- Retry: max 2 attempts
-- Escalation: include agent output
+- Root cause: a worker or analyst agent was configured incorrectly or returned unusable output
+- Fix target: the owning SKILL.md, agent descriptor, or supporting reference docs
+- Validation: rerun the subagent path with the corrected prompt or descriptor
 
 ### unexpected_behavior
 - Confidence: medium
 - Fix safety: advisory_only or triage_required
-- Owner: varies (harness/skill/model)
-- Root cause: anything that doesn't fit above but looks wrong
-- Fix target: triage manually
+- Owner: varies
+- Root cause: suspicious behavior that does not fit the known classifier buckets
+- Fix target: manual triage
 - Validation: case-by-case
-- False positives: shell aliases, env differences
-- Retry: 0 (needs human judgment)
 
 ### user_frustration
 - Confidence: low
 - Fix safety: advisory_only
-- Owner: harness (UX)
-- Root cause: user frustration signals (!!!, explicit complaints)
-- Fix target: review UX of the preceding interaction
+- Owner: harness UX or skill UX
+- Root cause: frustration signals in the observed session
+- Fix target: the immediately preceding UX or instruction path
 - Validation: n/a
-- False positives: enthusiastic punctuation, quoted text
-- Retry: 0 (observational only)
 
-## Severity levels
+## Severity
 
-| Level | Meaning | Action |
+| Level | Meaning | Default action |
 | --- | --- | --- |
-| critical | Breaks functionality, blocks the skill workflow | Dispatch fix worker immediately |
-| medium | Causes user friction, wrong output, wasted time | Dispatch fix worker or report to user |
-| low | Cosmetic, self-correcting, or minor inefficiency | Log and report in summary |
+| critical | blocks the workflow or produces clearly wrong behavior | escalate first, then fix if approved |
+| medium | wrong output, friction, or wasted time | fix if user asks, otherwise report |
+| low | cosmetic or minor inefficiency | log and report |
 
 ## Fix routing
 
-When dispatching a fix worker, provide:
+When preparing a fix proposal or worker handoff, include:
 
-1. The issue summary, issue_id, and affected lines
-2. The specific file(s) to fix (from fix_target)
-3. What the correct behavior should be (from fix_hint)
-4. A requirement to run `cargo clippy --lib && cargo test --lib` for Rust changes
-5. A requirement to verify the fix doesn't break anything else
-6. The fix_safety level - auto_fix_safe can proceed without confirmation, auto_fix_guarded needs a test pass, triage_required needs user approval
+1. the issue summary and line references
+2. the likely fix target
+3. the expected correct behavior
+4. the required validation
+5. whether the issue is safe to fix automatically or needs approval
 
-### Common fix patterns
+For Rust changes in this repo, the required validation is:
 
-**Hook not firing**: Check bootstrap wrapper path, SKILL.md hook commands, harness CLI skill name validation.
+```bash
+mise run check
+TMPDIR=/tmp mise run test
+```
 
-**Wrong question asked**: Update SKILL.md step instructions to add precondition checks.
+## Common fix patterns
 
-**CLI argument error**: Fix `src/cli.rs` value_parser or add the missing subcommand/kind.
+**Hook not firing**: check hook registration, skill config, and hook transport wiring under `src/hooks/`.
 
-**Build failure**: Fix the Rust code, ensure clippy pedantic passes.
+**Wrong question or wrong operator flow**: update the owning SKILL.md or agent descriptor to add the missing precondition checks.
 
-**Stale state**: Check `src/authoring.rs` or `src/workflow/` for state cleanup logic.
+**CLI argument error**: fix `src/app/cli.rs` or the owning observe/run/setup transport layer.
 
-**Old names**: Search for `suite-author`/`suite-runner` in all files and replace with `suite:new`/`suite:run`.
+**Build failure**: fix the Rust code, then run the repo gates.
 
-### Retry and escalation policy
+**Stale state**: check the owning state store under `src/run/`, `src/authoring/`, `src/workspace/`, or `src/observe/`.
 
-- Max 2 fix attempts per issue before escalating to user
-- After escalation, include both attempts' output and the original issue details
-- Never retry advisory_only issues - report and move on
-- Batch issues with the same code + fix_target into a single worker
+**Old names or old paths**: search for stale subcommands, stale skill names, or stale `kuma` storage paths and align them with the current `harness` contract.

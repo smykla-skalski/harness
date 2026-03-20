@@ -1118,6 +1118,39 @@ fn docs_do_not_reference_legacy_kuma_storage_paths() {
     }
 }
 
+#[test]
+fn observe_skill_matches_current_cli_surface() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let skill = fs::read_to_string(root.join(".claude/skills/observe/SKILL.md")).unwrap();
+    let overrides =
+        fs::read_to_string(root.join(".claude/skills/observe/references/overrides.md")).unwrap();
+
+    for needle in [
+        "harness observe cycle",
+        "harness observe status",
+        "harness observe resume",
+        "harness observe compare",
+        "harness observe doctor",
+        "$XDG_DATA_HOME/kuma/observe",
+    ] {
+        assert!(
+            !skill.contains(needle) && !overrides.contains(needle),
+            "observe skill docs should not use legacy observe contract `{needle}`"
+        );
+    }
+
+    for needle in [
+        "harness observe scan <session-id> --action cycle",
+        "harness observe scan <session-id> --action status",
+        "$XDG_DATA_HOME/harness/observe/<SESSION_ID>.state",
+    ] {
+        assert!(
+            skill.contains(needle) || overrides.contains(needle),
+            "observe skill docs should describe current observe contract via `{needle}`"
+        );
+    }
+}
+
 fn matches_extension(path: &Path) -> bool {
     matches!(
         path.extension().and_then(|ext| ext.to_str()),
