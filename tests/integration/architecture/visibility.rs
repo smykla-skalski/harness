@@ -206,6 +206,10 @@ fn errors_root_stays_a_transport_facade() {
 #[test]
 fn kernel_command_intent_root_stays_a_facade() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    assert!(
+        !root.join("src/kernel/command_intent.rs").exists(),
+        "legacy flat kernel command-intent module should not exist"
+    );
     let command_intent_mod =
         fs::read_to_string(root.join("src/kernel/command_intent/mod.rs")).unwrap();
 
