@@ -311,6 +311,34 @@ fn hooks_application_context_root_stays_prod_only() {
 }
 
 #[test]
+fn authoring_workflow_root_stays_focused_on_runtime_state() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let workflow = fs::read_to_string(root.join("src/authoring/workflow.rs")).unwrap();
+
+    for needle in [
+        "struct StoredAuthorWorkflowData",
+        "struct StoredAuthorWorkflowState",
+        "fn to_stored(&self)",
+        "fn from_stored(",
+        "fn serialize<S>(",
+        "fn deserialize<D>(",
+        "pub fn author_state_path()",
+        "pub fn read_author_state()",
+        "pub fn write_author_state(",
+    ] {
+        assert!(
+            !workflow.contains(needle),
+            "src/authoring/workflow.rs should stay focused on runtime state and gating instead of owning `{needle}`"
+        );
+    }
+
+    assert!(
+        root.join("src/authoring/workflow/storage.rs").exists(),
+        "authoring workflow storage split module should exist"
+    );
+}
+
+#[test]
 fn question_and_stop_hooks_root_stay_prod_only() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
 
@@ -556,6 +584,32 @@ fn observe_patterns_root_stays_prod_only() {
 }
 
 #[test]
+fn observe_classifier_text_checks_root_stays_prod_only() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let text_checks =
+        fs::read_to_string(root.join("src/observe/classifier/text_checks.rs")).unwrap();
+
+    for needle in [
+        "fn check_ksa_codes(",
+        "fn check_exit_code_issues(",
+        "fn check_jq_errors(",
+        "fn check_closeout_verdict_pending(",
+        "fn check_runner_state_machine_stale(",
+    ] {
+        assert!(
+            !text_checks.contains(needle),
+            "src/observe/classifier/text_checks.rs should stay focused on non-Bash checks instead of owning `{needle}`"
+        );
+    }
+
+    assert!(
+        root.join("src/observe/classifier/text_checks/bash.rs")
+            .exists(),
+        "observe classifier bash text checks split module should exist"
+    );
+}
+
+#[test]
 fn docker_block_root_stays_a_facade() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
     let docker_mod = fs::read_to_string(root.join("src/infra/blocks/docker/mod.rs")).unwrap();
@@ -772,6 +826,7 @@ fn kernel_topology_root_stays_prod_only() {
         "fn current_deploy_round_trip(",
         "pub fn from_object(",
         "pub fn from_mode_with_platform(",
+        "CurrentDeployPayload",
         "mod tests {",
     ] {
         assert!(
@@ -787,6 +842,10 @@ fn kernel_topology_root_stays_prod_only() {
     assert!(
         root.join("src/kernel/topology/parsing.rs").exists(),
         "kernel topology parsing split module should exist"
+    );
+    assert!(
+        root.join("src/kernel/topology/current_deploy.rs").exists(),
+        "kernel topology current_deploy split module should exist"
     );
 }
 
@@ -1005,6 +1064,9 @@ fn runner_policy_root_stays_a_facade() {
         "pub enum TaskOutputPattern {",
         "pub enum TrackedHarnessSubcommand {",
         "pub fn managed_cluster_binaries()",
+        "pub fn is_manifest_fix_prompt(",
+        "pub fn matches_manifest_fix_question(",
+        "pub fn classify_canonical_gate(",
     ] {
         assert!(
             !runner_policy.contains(needle),
@@ -1016,6 +1078,8 @@ fn runner_policy_root_stays_a_facade() {
         "src/hooks/runner_policy/cluster.rs",
         "src/hooks/runner_policy/files.rs",
         "src/hooks/runner_policy/commands.rs",
+        "src/hooks/runner_policy/questions.rs",
+        "src/hooks/runner_policy/tests.rs",
     ] {
         assert!(
             root.join(path).exists(),
@@ -1124,6 +1188,30 @@ fn setup_universal_root_stays_a_facade() {
             "setup universal split module should exist: {path}"
         );
     }
+}
+
+#[test]
+fn setup_universal_runtime_root_stays_prod_only() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let runtime = fs::read_to_string(root.join("src/setup/cluster/universal/runtime.rs")).unwrap();
+
+    for needle in [
+        "fn universal_single_up_compose(",
+        "fn universal_global_zone_up(",
+        "fn universal_global_two_zones_up(",
+        "mod tests {",
+    ] {
+        assert!(
+            !runtime.contains(needle),
+            "src/setup/cluster/universal/runtime.rs should stay focused on runtime dispatch instead of owning `{needle}`"
+        );
+    }
+
+    assert!(
+        root.join("src/setup/cluster/universal/runtime/compose.rs")
+            .exists(),
+        "setup universal runtime compose split module should exist"
+    );
 }
 
 #[test]

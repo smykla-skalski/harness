@@ -23,7 +23,7 @@ pub use session::{
 pub use validate::{ManifestTarget, authoring_validation_repo_root, validate_suite_author_paths};
 pub use workflow::{
     ApprovalMode, AuthorAnswer, AuthorNextAction, AuthorPhase, AuthorWorkflowState, ReviewGate,
-    can_request_gate, can_stop, can_write, next_action, read_author_state,
+    author_state_path, can_request_gate, can_stop, can_write, next_action, read_author_state,
     suite_author_path_allowed, write_author_state,
 };
 

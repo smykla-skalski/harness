@@ -2,12 +2,14 @@ use std::time::Duration;
 
 use tracing::info;
 
-use crate::errors::{CliError, CliErrorKind};
+use crate::errors::CliError;
 use crate::infra::blocks::{ComposeOrchestrator, ContainerConfig, ContainerRuntime};
 use crate::infra::exec::{extract_admin_token, wait_for_http};
 use crate::kernel::topology::{ClusterMode, ClusterSpec};
-use crate::platform::compose;
 use crate::workspace::HARNESS_PREFIX;
+
+#[path = "runtime/compose.rs"]
+mod compose_runtime;
 
 const UNIVERSAL_SUBNET: &str = "172.57.0.0/16";
 
@@ -58,7 +60,7 @@ pub(super) fn execute_universal_mode(
             compose_runtime,
         ),
         ClusterMode::GlobalZoneDown => {
-            universal_global_zone_down(context.all_names, docker, compose_runtime)
+            compose_runtime::universal_global_zone_down(context.all_names, docker, compose_runtime)
         }
         ClusterMode::GlobalTwoZonesUp => handle_global_two_zones_up(
             spec,
@@ -69,9 +71,11 @@ pub(super) fn execute_universal_mode(
             docker,
             compose_runtime,
         ),
-        ClusterMode::GlobalTwoZonesDown => {
-            universal_global_two_zones_down(context.all_names, docker, compose_runtime)
-        }
+        ClusterMode::GlobalTwoZonesDown => compose_runtime::universal_global_two_zones_down(
+            context.all_names,
+            docker,
+            compose_runtime,
+        ),
     }
 }
 
@@ -85,7 +89,7 @@ fn handle_single_up(
     compose_runtime: &dyn ComposeOrchestrator,
 ) -> Result<(), CliError> {
     let result = if effective_store == "postgres" {
-        universal_single_up_compose(
+        compose_runtime::universal_single_up_compose(
             cp_image,
             network_name,
             effective_store,
@@ -134,7 +138,7 @@ fn handle_global_zone_up(
     docker: &dyn ContainerRuntime,
     compose_runtime: &dyn ComposeOrchestrator,
 ) -> Result<(), CliError> {
-    let result = universal_global_zone_up(
+    let result = compose_runtime::universal_global_zone_up(
         cp_image,
         network_name,
         effective_store,
@@ -155,7 +159,7 @@ fn handle_global_two_zones_up(
     docker: &dyn ContainerRuntime,
     compose_runtime: &dyn ComposeOrchestrator,
 ) -> Result<(), CliError> {
-    let result = universal_global_two_zones_up(
+    let result = compose_runtime::universal_global_two_zones_up(
         cp_image,
         network_name,
         effective_store,
@@ -217,42 +221,6 @@ fn universal_single_up(
     })
 }
 
-fn universal_single_up_compose(
-    image: &str,
-    network: &str,
-    store: &str,
-    cp_name: &str,
-    docker: &dyn ContainerRuntime,
-    compose_runtime: &dyn ComposeOrchestrator,
-) -> Result<UniversalUpResult, CliError> {
-    let compose_file = compose::single_zone(image, network, UNIVERSAL_SUBNET, store, cp_name);
-    let tmp_dir =
-        tempfile::tempdir().map_err(|error| CliErrorKind::io(format!("temp dir: {error}")))?;
-    let compose_path = tmp_dir.path().join("docker-compose.yaml");
-    compose_file.write_to(&compose_path)?;
-
-    let project = format!("harness-{cp_name}");
-    info!(%cp_name, "starting compose services");
-    compose_runtime.up(&compose_path, &project, Duration::from_mins(3))?;
-    info!(%cp_name, "compose services started");
-
-    let compose_network = format!("{project}_{network}");
-    let container = format!("{project}-{cp_name}-1");
-    let ip = docker.inspect_ip(&container, &compose_network)?;
-
-    let health_url = format!("http://{ip}:5681");
-    info!(%health_url, "waiting for CP");
-    wait_for_http(&health_url, Duration::from_mins(1))?;
-
-    info!("extracting admin token");
-    let admin_token = extract_admin_token(&container)?;
-    info!(%health_url, "CP ready (admin token extracted)");
-    Ok(UniversalUpResult {
-        admin_token,
-        cp_ip: ip,
-    })
-}
-
 fn universal_single_down(
     network: &str,
     cp_name: &str,
@@ -260,153 +228,5 @@ fn universal_single_down(
 ) -> Result<(), CliError> {
     docker.remove(cp_name)?;
     docker.remove_network(network)?;
-    Ok(())
-}
-
-fn universal_global_zone_up(
-    image: &str,
-    network: &str,
-    store: &str,
-    names: &[String],
-    docker: &dyn ContainerRuntime,
-    compose_runtime: &dyn ComposeOrchestrator,
-) -> Result<UniversalUpResult, CliError> {
-    if names.len() < 3 {
-        return Err(CliErrorKind::usage_error(
-            "global-zone-up requires names: <global> <zone-container> <zone-label>",
-        )
-        .into());
-    }
-    let global_name = &names[0];
-    let zone_name = &names[1];
-    let zone_label = &names[2];
-
-    let compose_file = compose::global_zone(
-        image,
-        network,
-        UNIVERSAL_SUBNET,
-        store,
-        global_name,
-        zone_name,
-        zone_label,
-    );
-    let tmp_dir =
-        tempfile::tempdir().map_err(|error| CliErrorKind::io(format!("temp dir: {error}")))?;
-    let compose_path = tmp_dir.path().join("docker-compose.yaml");
-    compose_file.write_to(&compose_path)?;
-
-    let project = format!("harness-{global_name}");
-    info!("starting compose services for global + zone");
-    compose_runtime.up(&compose_path, &project, Duration::from_mins(3))?;
-    info!("compose services started");
-
-    let compose_network = format!("{project}_{network}");
-    let global_container = format!("{project}-{global_name}-1");
-    let global_ip = docker.inspect_ip(&global_container, &compose_network)?;
-
-    let global_url = format!("http://{global_ip}:5681");
-    info!(%global_url, "waiting for global CP");
-    wait_for_http(&global_url, Duration::from_mins(1))?;
-
-    info!("extracting admin token");
-    let admin_token = extract_admin_token(&global_container)?;
-    info!("global CP ready (admin token extracted)");
-
-    Ok(UniversalUpResult {
-        admin_token,
-        cp_ip: global_ip,
-    })
-}
-
-fn universal_global_zone_down(
-    names: &[String],
-    docker: &dyn ContainerRuntime,
-    compose_runtime: &dyn ComposeOrchestrator,
-) -> Result<(), CliError> {
-    let removed = docker.remove_by_label("io.harness.service=true")?;
-    for name in &removed {
-        info!(%name, "removed service container");
-    }
-    let global_name = &names[0];
-    let project = format!("harness-{global_name}");
-    compose_runtime.down_project(&project)?;
-    Ok(())
-}
-
-fn universal_global_two_zones_up(
-    image: &str,
-    network: &str,
-    store: &str,
-    names: &[String],
-    docker: &dyn ContainerRuntime,
-    compose_runtime: &dyn ComposeOrchestrator,
-) -> Result<UniversalUpResult, CliError> {
-    if names.len() < 5 {
-        return Err(CliErrorKind::usage_error(
-            "global-two-zones-up requires names: <global> <zone1-container> <zone2-container> <zone1-label> <zone2-label>",
-        )
-        .into());
-    }
-    let global_name = &names[0];
-    let zone1_name = &names[1];
-    let zone2_name = &names[2];
-    let zone1_label = &names[3];
-    let zone2_label = &names[4];
-
-    let compose_file = compose::global_two_zones(compose::GlobalTwoZonesConfig {
-        image,
-        network_name: network,
-        subnet: UNIVERSAL_SUBNET,
-        store_type: store,
-        global_name,
-        zone1: compose::ZoneConfig {
-            name: zone1_name,
-            label: zone1_label,
-        },
-        zone2: compose::ZoneConfig {
-            name: zone2_name,
-            label: zone2_label,
-        },
-    });
-    let tmp_dir =
-        tempfile::tempdir().map_err(|error| CliErrorKind::io(format!("temp dir: {error}")))?;
-    let compose_path = tmp_dir.path().join("docker-compose.yaml");
-    compose_file.write_to(&compose_path)?;
-
-    let project = format!("harness-{global_name}");
-    info!("starting compose services for global + two zones");
-    compose_runtime.up(&compose_path, &project, Duration::from_mins(3))?;
-    info!("compose services started");
-
-    let compose_network = format!("{project}_{network}");
-    let global_container = format!("{project}-{global_name}-1");
-    let global_ip = docker.inspect_ip(&global_container, &compose_network)?;
-
-    let global_url = format!("http://{global_ip}:5681");
-    info!(%global_url, "waiting for global CP");
-    wait_for_http(&global_url, Duration::from_mins(1))?;
-
-    info!("extracting admin token");
-    let admin_token = extract_admin_token(&global_container)?;
-    info!("global CP ready (admin token extracted)");
-
-    Ok(UniversalUpResult {
-        admin_token,
-        cp_ip: global_ip,
-    })
-}
-
-fn universal_global_two_zones_down(
-    names: &[String],
-    docker: &dyn ContainerRuntime,
-    compose_runtime: &dyn ComposeOrchestrator,
-) -> Result<(), CliError> {
-    let removed = docker.remove_by_label("io.harness.service=true")?;
-    for name in &removed {
-        info!(%name, "removed service container");
-    }
-    let global_name = &names[0];
-    let project = format!("harness-{global_name}");
-    compose_runtime.down_project(&project)?;
     Ok(())
 }
