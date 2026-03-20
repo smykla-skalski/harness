@@ -1,12 +1,37 @@
 use std::collections::HashSet;
 
-use serde_json::json;
+use serde::Serialize;
 
 use crate::errors::CliError;
 
 use super::scan::scan_range;
 use super::session;
 use super::types::Issue;
+
+#[derive(Serialize)]
+struct ComparedRange {
+    from: usize,
+    to: usize,
+    issues: usize,
+}
+
+#[derive(Serialize)]
+struct ComparedIssue<'a> {
+    issue_id: &'a str,
+    code: String,
+    summary: &'a str,
+}
+
+#[derive(Serialize)]
+struct CompareResult<'a> {
+    range_a: ComparedRange,
+    range_b: ComparedRange,
+    new: usize,
+    resolved: usize,
+    unchanged: usize,
+    new_issues: Vec<ComparedIssue<'a>>,
+    resolved_issues: Vec<ComparedIssue<'a>>,
+}
 
 /// Compare issues between two line ranges in the same session.
 pub(super) fn execute_compare(
@@ -35,18 +60,40 @@ pub(super) fn execute_compare(
         .collect();
     let unchanged_count = ids_a.intersection(&ids_b).count();
 
-    let result = json!({
-        "range_a": {"from": from_a, "to": to_a, "issues": issues_a.len()},
-        "range_b": {"from": from_b, "to": to_b, "issues": issues_b.len()},
-        "new": new_issues.len(),
-        "resolved": resolved_issues.len(),
-        "unchanged": unchanged_count,
-        "new_issues": new_issues.iter().map(|i| json!({"issue_id": i.id, "code": i.code.to_string(), "summary": i.summary})).collect::<Vec<_>>(),
-        "resolved_issues": resolved_issues.iter().map(|i| json!({"issue_id": i.id, "code": i.code.to_string(), "summary": i.summary})).collect::<Vec<_>>(),
-    });
+    let result = CompareResult {
+        range_a: ComparedRange {
+            from: from_a,
+            to: to_a,
+            issues: issues_a.len(),
+        },
+        range_b: ComparedRange {
+            from: from_b,
+            to: to_b,
+            issues: issues_b.len(),
+        },
+        new: new_issues.len(),
+        resolved: resolved_issues.len(),
+        unchanged: unchanged_count,
+        new_issues: new_issues
+            .iter()
+            .map(|issue| ComparedIssue {
+                issue_id: &issue.id,
+                code: issue.code.to_string(),
+                summary: &issue.summary,
+            })
+            .collect(),
+        resolved_issues: resolved_issues
+            .iter()
+            .map(|issue| ComparedIssue {
+                issue_id: &issue.id,
+                code: issue.code.to_string(),
+                summary: &issue.summary,
+            })
+            .collect(),
+    };
     println!(
         "{}",
-        serde_json::to_string_pretty(&result).expect("valid JSON")
+        serde_json::to_string_pretty(&result).expect("valid compare JSON")
     );
     Ok(0)
 }

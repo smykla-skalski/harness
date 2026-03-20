@@ -1,4 +1,7 @@
-use serde_json::json;
+use std::collections::BTreeMap;
+
+use serde::Serialize;
+use serde_json::Value;
 
 use crate::errors::CliError;
 use crate::hooks::adapters::{
@@ -9,6 +12,56 @@ use crate::hooks::protocol::result::{NormalizedDecision, NormalizedHookResult};
 use crate::kernel::tooling::ToolCategory;
 
 pub struct GeminiCliAdapter;
+
+#[derive(Serialize)]
+struct GeminiConfig<'a> {
+    hooks: BTreeMap<&'a str, Vec<GeminiEventRegistration<'a>>>,
+}
+
+#[derive(Serialize)]
+struct GeminiEventRegistration<'a> {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    matcher: Option<&'a str>,
+    hooks: Vec<GeminiCommandHook<'a>>,
+}
+
+#[derive(Serialize)]
+struct GeminiCommandHook<'a> {
+    #[serde(rename = "type")]
+    hook_type: &'static str,
+    command: &'a str,
+    timeout: u64,
+}
+
+#[derive(Serialize)]
+struct GeminiOutput<'a> {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    decision: Option<&'static str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    reason: Option<String>,
+    #[serde(rename = "systemMessage", skip_serializing_if = "Option::is_none")]
+    system_message: Option<String>,
+    #[serde(rename = "hookSpecificOutput")]
+    hook_specific_output: GeminiHookSpecificOutput<'a>,
+    #[serde(rename = "continue", skip_serializing_if = "Option::is_none")]
+    continue_processing: Option<bool>,
+    #[serde(rename = "suppressOutput", skip_serializing_if = "Option::is_none")]
+    suppress_output: Option<bool>,
+}
+
+#[derive(Serialize)]
+struct GeminiHookSpecificOutput<'a> {
+    #[serde(rename = "eventName")]
+    event_name: &'a str,
+    #[serde(rename = "additionalContext", skip_serializing_if = "Option::is_none")]
+    additional_context: Option<&'a str>,
+    #[serde(rename = "tool_input", skip_serializing_if = "Option::is_none")]
+    tool_input: Option<&'a Value>,
+}
+
+fn render_json<T: Serialize>(payload: &T) -> String {
+    serde_json::to_string(payload).expect("typed hook JSON serializes")
+}
 
 impl AgentAdapter for GeminiCliAdapter {
     fn name(&self) -> &'static str {
@@ -39,7 +92,7 @@ impl AgentAdapter for GeminiCliAdapter {
 
         let payload = build_gemini_payload(result, self.event_name(event).unwrap_or("unknown"));
         RenderedHookResponse {
-            stdout: serde_json::to_string(&payload).expect("hand-built JSON serializes"),
+            stdout: render_json(&payload),
             exit_code: 0,
         }
     }
@@ -71,63 +124,49 @@ impl AgentAdapter for GeminiCliAdapter {
     }
 
     fn generate_config(&self, hooks: &[HookRegistration]) -> String {
-        use std::collections::BTreeMap;
-
-        let mut events: BTreeMap<&str, Vec<serde_json::Value>> = BTreeMap::new();
+        let mut events = BTreeMap::new();
         for registration in hooks {
             let Some(event_name) = self.event_name(&registration.event) else {
                 continue;
             };
-            let mut entry = serde_json::Map::new();
-            if let Some(matcher) = &registration.matcher {
-                entry.insert("matcher".to_string(), json!(matcher));
-            }
-            entry.insert(
-                "hooks".to_string(),
-                json!([{
-                    "type": "command",
-                    "command": registration.command,
-                    "timeout": 5000,
-                }]),
-            );
             events
                 .entry(event_name)
-                .or_default()
-                .push(serde_json::Value::Object(entry));
+                .or_insert_with(Vec::new)
+                .push(GeminiEventRegistration {
+                    matcher: registration.matcher.as_deref(),
+                    hooks: vec![GeminiCommandHook {
+                        hook_type: "command",
+                        command: &registration.command,
+                        timeout: 5000,
+                    }],
+                });
         }
-        serde_json::to_string_pretty(&json!({ "hooks": events }))
-            .expect("hand-built JSON serializes")
+        serde_json::to_string_pretty(&GeminiConfig { hooks: events })
+            .expect("typed hook JSON serializes")
     }
 }
 
-fn build_gemini_payload(result: &NormalizedHookResult, event_name: &str) -> serde_json::Value {
-    let mut payload = gemini_decision_payload(result);
-    if let Some(updated_input) = &result.updated_input {
-        payload["hookSpecificOutput"]["tool_input"] = updated_input.clone();
-    }
-    if let Some(additional_context) = &result.additional_context {
-        payload["hookSpecificOutput"]["additionalContext"] = json!(additional_context);
-    }
-    if result.halt_agent {
-        payload["continue"] = json!(false);
-    }
-    if result.suppress_output {
-        payload["suppressOutput"] = json!(true);
-    }
-    payload["hookSpecificOutput"]["eventName"] = json!(event_name);
-    payload
-}
-
-fn gemini_decision_payload(result: &NormalizedHookResult) -> serde_json::Value {
-    let mut payload = json!({});
-    if result.is_denial() {
-        payload["decision"] = json!("deny");
-        payload["reason"] = json!(result.display_message());
-    } else if matches!(
+fn build_gemini_payload<'a>(
+    result: &'a NormalizedHookResult,
+    event_name: &'a str,
+) -> GeminiOutput<'a> {
+    let display_message = result.display_message();
+    let denial = result.is_denial();
+    let informational = matches!(
         result.decision,
         NormalizedDecision::Warn | NormalizedDecision::Info
-    ) {
-        payload["systemMessage"] = json!(result.display_message());
+    );
+
+    GeminiOutput {
+        decision: denial.then_some("deny"),
+        reason: denial.then(|| display_message.clone()),
+        system_message: informational.then_some(display_message),
+        hook_specific_output: GeminiHookSpecificOutput {
+            event_name,
+            additional_context: result.additional_context.as_deref(),
+            tool_input: result.updated_input.as_ref(),
+        },
+        continue_processing: result.halt_agent.then_some(false),
+        suppress_output: result.suppress_output.then_some(true),
     }
-    payload
 }

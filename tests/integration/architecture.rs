@@ -985,9 +985,14 @@ fn transport_outputs_use_typed_serialization_helpers() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
 
     for path in [
+        "src/hooks/adapters/claude.rs",
+        "src/hooks/adapters/gemini.rs",
         "src/hooks/adapters/codex.rs",
         "src/hooks/adapters/opencode/mod.rs",
         "src/observe/watch.rs",
+        "src/observe/scan.rs",
+        "src/observe/compare.rs",
+        "src/observe/application/maintenance.rs",
         "src/setup/wrapper.rs",
     ] {
         let contents = read_repo_file(root, path);
@@ -1016,11 +1021,54 @@ fn transport_outputs_use_typed_serialization_helpers() {
         &["#[derive(Serialize)]", "fn render_json<T: Serialize>("],
     );
 
+    let claude = read_repo_file(root, "src/hooks/adapters/claude.rs");
+    assert_file_contains_needles(
+        &claude,
+        "src/hooks/adapters/claude.rs should serialize typed hook registrations via",
+        &["#[derive(Serialize)]", "struct ClaudeConfig"],
+    );
+
+    let gemini = read_repo_file(root, "src/hooks/adapters/gemini.rs");
+    assert_file_contains_needles(
+        &gemini,
+        "src/hooks/adapters/gemini.rs should serialize typed hook payloads via",
+        &[
+            "#[derive(Serialize)]",
+            "struct GeminiOutput",
+            "fn render_json<T: Serialize>(",
+        ],
+    );
+
     let watch = read_repo_file(root, "src/observe/watch.rs");
     assert_file_contains_needles(
         &watch,
         "src/observe/watch.rs should emit typed watch status JSON via",
         &["#[derive(Serialize)]", "struct WatchStarted"],
+    );
+
+    let scan = read_repo_file(root, "src/observe/scan.rs");
+    assert_file_contains_needles(
+        &scan,
+        "src/observe/scan.rs should emit typed scan status JSON via",
+        &["#[derive(Serialize)]", "struct ScanStarted"],
+    );
+
+    let compare = read_repo_file(root, "src/observe/compare.rs");
+    assert_file_contains_needles(
+        &compare,
+        "src/observe/compare.rs should render typed compare output via",
+        &["#[derive(Serialize)]", "struct CompareResult"],
+    );
+
+    let maintenance = read_repo_file(root, "src/observe/application/maintenance.rs");
+    assert_file_contains_needles(
+        &maintenance,
+        "src/observe/application/maintenance.rs should render typed maintenance output via",
+        &[
+            "#[derive(Serialize)]",
+            "struct ObserverStatus",
+            "fn render_pretty_json<T: Serialize>(",
+        ],
     );
 
     let wrapper = read_repo_file(root, "src/setup/wrapper.rs");
