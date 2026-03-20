@@ -1,8 +1,75 @@
-use serde_json::json;
+use serde::Serialize;
+use serde_json::Value;
 
 use crate::hooks::HookType;
 use crate::hooks::protocol::hook_result::{Decision, HookResult};
 use crate::hooks::protocol::result::{NormalizedDecision, NormalizedHookResult};
+
+#[derive(Serialize)]
+struct PermissionHookOutput<'a> {
+    #[serde(rename = "hookSpecificOutput")]
+    hook_specific_output: PermissionHookSpecificOutput<'a>,
+}
+
+#[derive(Serialize)]
+struct PermissionHookSpecificOutput<'a> {
+    #[serde(rename = "hookEventName")]
+    hook_event_name: &'static str,
+    #[serde(rename = "permissionDecision")]
+    permission_decision: &'static str,
+    #[serde(rename = "permissionDecisionReason")]
+    permission_decision_reason: &'a str,
+}
+
+#[derive(Serialize)]
+struct BlockingDenyOutput<'a> {
+    decision: &'static str,
+    reason: &'a str,
+}
+
+#[derive(Serialize)]
+struct BlockingInfoOutput<'a> {
+    #[serde(rename = "systemMessage")]
+    system_message: &'a str,
+}
+
+#[derive(Serialize)]
+struct PostToolUseOutput<'a> {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    decision: Option<&'static str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    reason: Option<&'a str>,
+    #[serde(rename = "hookSpecificOutput")]
+    hook_specific_output: PostToolUseSpecificOutput<'a>,
+}
+
+#[derive(Serialize)]
+struct PostToolUseSpecificOutput<'a> {
+    #[serde(rename = "hookEventName")]
+    hook_event_name: &'a str,
+    #[serde(rename = "additionalContext", skip_serializing_if = "Option::is_none")]
+    additional_context: Option<&'a str>,
+    #[serde(rename = "toolInput", skip_serializing_if = "Option::is_none")]
+    tool_input: Option<&'a Value>,
+}
+
+#[derive(Serialize)]
+struct AdditionalContextOutput<'a> {
+    #[serde(rename = "hookSpecificOutput")]
+    hook_specific_output: AdditionalContextSpecificOutput<'a>,
+}
+
+#[derive(Serialize)]
+struct AdditionalContextSpecificOutput<'a> {
+    #[serde(rename = "hookEventName")]
+    hook_event_name: &'a str,
+    #[serde(rename = "additionalContext")]
+    additional_context: &'a str,
+}
+
+fn render_json<T: Serialize>(payload: &T) -> String {
+    serde_json::to_string(payload).expect("typed hook JSON serializes")
+}
 
 /// Format a hook result message with level prefix.
 #[must_use]
@@ -27,14 +94,13 @@ fn render_pre_tool_use_output_normalized(result: &NormalizedHookResult) -> Strin
         return String::new();
     }
     let message = result.display_message();
-    serde_json::to_string(&json!({
-        "hookSpecificOutput": {
-            "hookEventName": "PreToolUse",
-            "permissionDecision": "deny",
-            "permissionDecisionReason": message,
-        }
-    }))
-    .expect("hand-built JSON serializes")
+    render_json(&PermissionHookOutput {
+        hook_specific_output: PermissionHookSpecificOutput {
+            hook_event_name: "PreToolUse",
+            permission_decision: "deny",
+            permission_decision_reason: &message,
+        },
+    })
 }
 
 fn render_blocking_hook_output_normalized(result: &NormalizedHookResult) -> String {
@@ -43,11 +109,14 @@ fn render_blocking_hook_output_normalized(result: &NormalizedHookResult) -> Stri
     }
     let message = result.display_message();
     if result.decision == NormalizedDecision::Deny {
-        serde_json::to_string(&json!({"decision": "block", "reason": message}))
-            .expect("hand-built JSON serializes")
+        render_json(&BlockingDenyOutput {
+            decision: "block",
+            reason: &message,
+        })
     } else {
-        serde_json::to_string(&json!({"systemMessage": message}))
-            .expect("hand-built JSON serializes")
+        render_json(&BlockingInfoOutput {
+            system_message: &message,
+        })
     }
 }
 
@@ -62,24 +131,20 @@ fn render_post_tool_use_output_normalized(
         return String::new();
     }
     let message = result.display_message();
-    let mut payload = json!({
-        "hookSpecificOutput": {
-            "hookEventName": event_name,
-        }
-    });
-    if let Some(additional_context) = &result.additional_context {
-        payload["hookSpecificOutput"]["additionalContext"] = json!(additional_context);
-    } else if result.decision != NormalizedDecision::Allow {
-        payload["hookSpecificOutput"]["additionalContext"] = json!(message);
-    }
-    if let Some(updated_input) = &result.updated_input {
-        payload["hookSpecificOutput"]["toolInput"] = updated_input.clone();
-    }
-    if result.decision == NormalizedDecision::Deny {
-        payload["decision"] = json!("block");
-        payload["reason"] = json!(message);
-    }
-    serde_json::to_string(&payload).expect("hand-built JSON serializes")
+    let additional_context = result
+        .additional_context
+        .as_deref()
+        .or((result.decision != NormalizedDecision::Allow).then_some(message.as_str()));
+
+    render_json(&PostToolUseOutput {
+        decision: (result.decision == NormalizedDecision::Deny).then_some("block"),
+        reason: (result.decision == NormalizedDecision::Deny).then_some(message.as_str()),
+        hook_specific_output: PostToolUseSpecificOutput {
+            hook_event_name: event_name,
+            additional_context,
+            tool_input: result.updated_input.as_ref(),
+        },
+    })
 }
 
 fn render_additional_context_output_normalized(
@@ -89,17 +154,16 @@ fn render_additional_context_output_normalized(
     if result.decision == NormalizedDecision::Allow && result.additional_context.is_none() {
         return String::new();
     }
-    let message = result
+    let additional_context = result
         .additional_context
-        .clone()
-        .unwrap_or_else(|| result.display_message());
-    serde_json::to_string(&json!({
-        "hookSpecificOutput": {
-            "hookEventName": event_name,
-            "additionalContext": message,
-        }
-    }))
-    .expect("hand-built JSON serializes")
+        .as_deref()
+        .map_or_else(|| result.display_message(), str::to_owned);
+    render_json(&AdditionalContextOutput {
+        hook_specific_output: AdditionalContextSpecificOutput {
+            hook_event_name: event_name,
+            additional_context: &additional_context,
+        },
+    })
 }
 
 /// Transform a `NormalizedHookResult` into the native Claude Code hook output

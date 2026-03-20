@@ -964,6 +964,23 @@ fn hook_application_owns_guard_context_hydration() {
 }
 
 #[test]
+fn hook_protocol_output_uses_typed_serialization() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let output = read_repo_file(root, "src/hooks/protocol/output.rs");
+
+    assert_file_lacks_needles(
+        &output,
+        "src/hooks/protocol/output.rs should not hand-build JSON via",
+        &["use serde_json::json;", "json!(", "payload[\""],
+    );
+    assert_file_contains_needles(
+        &output,
+        "src/hooks/protocol/output.rs should serialize typed hook DTOs via",
+        &["#[derive(Serialize)]", "fn render_json<T: Serialize>("],
+    );
+}
+
+#[test]
 fn kuma_contracts_are_isolated_to_block_namespace() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
     let hits = collect_hits_in_tree(
