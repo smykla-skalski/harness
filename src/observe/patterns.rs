@@ -223,19 +223,4 @@ pub(super) static HARNESS_OPERATION_KEYWORDS: &[&str] = &[
 ];
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn ksa_codes_count() {
-        assert_eq!(KSA_CODES.len(), 19);
-    }
-
-    #[test]
-    fn ksa_codes_sequential() {
-        for (i, code) in KSA_CODES.iter().enumerate() {
-            let expected = format!("ksa{:03}", i + 1);
-            assert_eq!(*code, expected);
-        }
-    }
-}
+mod tests;
