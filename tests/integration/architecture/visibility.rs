@@ -555,6 +555,24 @@ fn setup_capabilities_root_stays_prod_only() {
 }
 
 #[test]
+fn setup_build_info_root_stays_prod_only() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let build_info = fs::read_to_string(root.join("src/setup/build_info.rs")).unwrap();
+
+    for needle in ["fn build_info_env(", "mod tests {"] {
+        assert!(
+            !build_info.contains(needle),
+            "src/setup/build_info.rs should stay focused on production build-info resolution instead of owning `{needle}`"
+        );
+    }
+
+    assert!(
+        root.join("src/setup/build_info/tests.rs").exists(),
+        "setup build_info split test module should exist"
+    );
+}
+
+#[test]
 fn authoring_workflow_root_stays_prod_only() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
     let workflow = fs::read_to_string(root.join("src/authoring/workflow.rs")).unwrap();
