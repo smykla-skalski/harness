@@ -173,3 +173,32 @@ fn helper_modules_do_not_leak_publicly() {
         "src/hooks/mod.rs should re-export session hook payload types through the hooks facade"
     );
 }
+
+#[test]
+fn errors_root_stays_a_transport_facade() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let errors_mod = fs::read_to_string(root.join("src/errors/mod.rs")).unwrap();
+
+    for needle in [
+        "impl CliErrorKind {",
+        "pub struct CliError {",
+        "fn cli_err_basic_fields()",
+        "mod tests {",
+    ] {
+        assert!(
+            !errors_mod.contains(needle),
+            "src/errors/mod.rs should stay a thin facade instead of owning `{needle}`"
+        );
+    }
+
+    for path in [
+        "src/errors/cli_kind.rs",
+        "src/errors/cli_error.rs",
+        "src/errors/tests.rs",
+    ] {
+        assert!(
+            root.join(path).exists(),
+            "errors split module should exist: {path}"
+        );
+    }
+}
