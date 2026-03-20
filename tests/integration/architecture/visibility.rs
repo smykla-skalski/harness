@@ -553,3 +553,25 @@ fn kernel_topology_root_stays_prod_only() {
         "kernel topology split test module should exist"
     );
 }
+
+#[test]
+fn run_workflow_root_stays_prod_only() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let workflow = fs::read_to_string(root.join("src/run/workflow/mod.rs")).unwrap();
+
+    for needle in [
+        "fn runner_phase_display(",
+        "fn apply_event_cluster_prepared_advances_to_preflight(",
+        "mod tests {",
+    ] {
+        assert!(
+            !workflow.contains(needle),
+            "src/run/workflow/mod.rs should stay focused on production workflow logic instead of owning `{needle}`"
+        );
+    }
+
+    assert!(
+        root.join("src/run/workflow/tests.rs").exists(),
+        "run workflow split test module should exist"
+    );
+}
