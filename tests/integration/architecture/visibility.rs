@@ -408,3 +408,32 @@ fn observe_classifier_tests_stay_split_by_scenario() {
         );
     }
 }
+
+#[test]
+fn docker_block_root_stays_a_facade() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let docker_mod = fs::read_to_string(root.join("src/infra/blocks/docker/mod.rs")).unwrap();
+
+    for needle in [
+        "impl ContainerRuntime for DockerContainerRuntime",
+        "struct FakeContainer {",
+        "pub struct FakeContainerRuntime {",
+        "mod tests {",
+    ] {
+        assert!(
+            !docker_mod.contains(needle),
+            "src/infra/blocks/docker/mod.rs should stay a thin facade instead of owning `{needle}`"
+        );
+    }
+
+    for path in [
+        "src/infra/blocks/docker/runtime.rs",
+        "src/infra/blocks/docker/fake.rs",
+        "src/infra/blocks/docker/tests.rs",
+    ] {
+        assert!(
+            root.join(path).exists(),
+            "docker block split module should exist: {path}"
+        );
+    }
+}
