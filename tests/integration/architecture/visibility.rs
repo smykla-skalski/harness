@@ -297,6 +297,49 @@ fn hooks_application_context_root_stays_prod_only() {
 }
 
 #[test]
+fn question_and_stop_hooks_root_stay_prod_only() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+
+    for (path, needles) in [
+        (
+            "src/hooks/guard_question.rs",
+            &[
+                "fn triage_with_failure_allows_manifest_fix()",
+                "fn execution_phase_denies_manifest_fix()",
+                "mod tests {",
+            ][..],
+        ),
+        (
+            "src/hooks/guard_stop.rs",
+            &["fn inactive_skill_allows()", "mod tests {"][..],
+        ),
+        (
+            "src/hooks/verify_question.rs",
+            &["fn inactive_skill_allows()", "mod tests {"][..],
+        ),
+    ] {
+        let contents = fs::read_to_string(root.join(path)).unwrap();
+        for needle in needles {
+            assert!(
+                !contents.contains(needle),
+                "{path} should stay focused on production hook logic instead of owning `{needle}`"
+            );
+        }
+    }
+
+    for path in [
+        "src/hooks/guard_question/tests.rs",
+        "src/hooks/guard_stop/tests.rs",
+        "src/hooks/verify_question/tests.rs",
+    ] {
+        assert!(
+            root.join(path).exists(),
+            "question/stop hook split test module should exist: {path}"
+        );
+    }
+}
+
+#[test]
 fn observe_tool_checks_root_stays_a_facade() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
     let tool_checks_mod =
@@ -347,6 +390,7 @@ fn workspace_compact_root_stays_a_facade() {
     }
 
     for path in [
+        "src/workspace/compact/history.rs",
         "src/workspace/compact/paths.rs",
         "src/workspace/compact/storage.rs",
         "src/workspace/compact/tests.rs",
@@ -356,6 +400,29 @@ fn workspace_compact_root_stays_a_facade() {
             "workspace compact split module should exist: {path}"
         );
     }
+}
+
+#[test]
+fn workspace_compact_storage_root_stays_prod_only() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let storage_mod = fs::read_to_string(root.join("src/workspace/compact/storage.rs")).unwrap();
+
+    for needle in [
+        "fn trim_history(",
+        "use std::result;",
+        "use fs_err as fs;",
+        "use tracing::warn;",
+    ] {
+        assert!(
+            !storage_mod.contains(needle),
+            "src/workspace/compact/storage.rs should stay focused on handoff persistence instead of owning `{needle}`"
+        );
+    }
+
+    assert!(
+        root.join("src/workspace/compact/history.rs").exists(),
+        "workspace compact history split module should exist"
+    );
 }
 
 #[test]
@@ -634,6 +701,28 @@ fn setup_build_info_root_stays_prod_only() {
     assert!(
         root.join("src/setup/build_info/tests.rs").exists(),
         "setup build_info split test module should exist"
+    );
+}
+
+#[test]
+fn setup_gateway_root_stays_prod_only() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let gateway = fs::read_to_string(root.join("src/setup/gateway.rs")).unwrap();
+
+    for needle in [
+        "fn detect_version_parses_standard_entry()",
+        "fn install_url_embeds_arbitrary_version()",
+        "mod tests {",
+    ] {
+        assert!(
+            !gateway.contains(needle),
+            "src/setup/gateway.rs should stay focused on production gateway setup instead of owning `{needle}`"
+        );
+    }
+
+    assert!(
+        root.join("src/setup/gateway/tests.rs").exists(),
+        "setup gateway split test module should exist"
     );
 }
 
@@ -966,6 +1055,8 @@ fn kubernetes_block_root_stays_a_facade() {
     let kubernetes_mod = fs::read_to_string(root.join("src/infra/blocks/kubernetes.rs")).unwrap();
 
     for needle in [
+        "serde_json::from_str(&result.stdout)",
+        "containerStatuses",
         "pub struct FakeKubernetesOperator {",
         "pub struct FakeLocalClusterManager {",
         "mod tests {",
@@ -978,6 +1069,7 @@ fn kubernetes_block_root_stays_a_facade() {
 
     for path in [
         "src/infra/blocks/kubernetes/fake.rs",
+        "src/infra/blocks/kubernetes/pods.rs",
         "src/infra/blocks/kubernetes/tests.rs",
     ] {
         assert!(
@@ -1079,5 +1171,71 @@ fn versioned_json_root_stays_prod_only() {
         root.join("src/infra/persistence/versioned_json/tests.rs")
             .exists(),
         "versioned json split test module should exist"
+    );
+}
+
+#[test]
+fn run_resolve_root_stays_prod_only() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let resolve_mod = fs::read_to_string(root.join("src/run/resolve.rs")).unwrap();
+
+    for needle in [
+        "fn resolve_run_directory_with_existing_dir()",
+        "fn resolve_manifest_path_leading_slash_treated_as_relative()",
+        "mod tests {",
+    ] {
+        assert!(
+            !resolve_mod.contains(needle),
+            "src/run/resolve.rs should stay focused on production resolution logic instead of owning `{needle}`"
+        );
+    }
+
+    assert!(
+        root.join("src/run/resolve/tests.rs").exists(),
+        "run resolve split test module should exist"
+    );
+}
+
+#[test]
+fn run_state_capture_root_stays_prod_only() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let state_capture = fs::read_to_string(root.join("src/run/state_capture.rs")).unwrap();
+
+    for needle in [
+        "fn dataplane_collection_extracts_known_fields()",
+        "fn dataplane_snapshot_reads_nested_meta_fields()",
+        "mod tests {",
+    ] {
+        assert!(
+            !state_capture.contains(needle),
+            "src/run/state_capture.rs should stay focused on production capture types instead of owning `{needle}`"
+        );
+    }
+
+    assert!(
+        root.join("src/run/state_capture/tests.rs").exists(),
+        "run state_capture split test module should exist"
+    );
+}
+
+#[test]
+fn infra_io_root_stays_prod_only() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let infra_io = fs::read_to_string(root.join("src/infra/io/mod.rs")).unwrap();
+
+    for needle in [
+        "fn write_and_read_json(",
+        "fn append_markdown_row_appends_to_existing(",
+        "mod tests {",
+    ] {
+        assert!(
+            !infra_io.contains(needle),
+            "src/infra/io/mod.rs should stay focused on production io helpers instead of owning `{needle}`"
+        );
+    }
+
+    assert!(
+        root.join("src/infra/io/tests.rs").exists(),
+        "infra io split test module should exist"
     );
 }

@@ -1,5 +1,5 @@
 use std::borrow::Cow;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::result;
 
 use fs_err as fs;
@@ -369,38 +369,34 @@ fn compact_handoff_serialization_roundtrip() {
 
 #[test]
 fn trim_history_logic() {
-    let dir = tempfile::tempdir().unwrap();
-    let history = dir.path().join("history");
-    fs::create_dir_all(&history).unwrap();
+    let project = tempfile::tempdir().unwrap();
+    let xdg = tempfile::tempdir().unwrap();
+    temp_env::with_vars(
+        [("XDG_DATA_HOME", Some(xdg.path().to_str().unwrap()))],
+        || {
+            let history = compact_history_dir(project.path());
+            fs::create_dir_all(&history).unwrap();
 
-    for index in 0..15 {
-        let name = format!("{index:04}.json");
-        fs::write(history.join(name), "{}").unwrap();
-    }
+            for index in 0..15 {
+                let name = format!("{index:04}.json");
+                fs::write(history.join(name), "{}").unwrap();
+            }
 
-    let entries_before: Vec<_> = fs::read_dir(&history)
-        .unwrap()
-        .filter_map(result::Result::ok)
-        .collect();
-    assert_eq!(entries_before.len(), 15);
+            let entries_before: Vec<_> = fs::read_dir(&history)
+                .unwrap()
+                .filter_map(result::Result::ok)
+                .collect();
+            assert_eq!(entries_before.len(), 15);
 
-    let mut files: Vec<PathBuf> = fs::read_dir(&history)
-        .unwrap()
-        .filter_map(result::Result::ok)
-        .map(|entry| entry.path())
-        .filter(|path| path.is_file())
-        .collect();
-    files.sort();
-    let excess = files.len().saturating_sub(HISTORY_LIMIT);
-    for path in files.into_iter().take(excess) {
-        fs::remove_file(path).unwrap();
-    }
+            super::history::trim_history(&history);
 
-    let remaining: Vec<_> = fs::read_dir(&history)
-        .unwrap()
-        .filter_map(result::Result::ok)
-        .collect();
-    assert_eq!(remaining.len(), HISTORY_LIMIT);
+            let remaining: Vec<_> = fs::read_dir(&history)
+                .unwrap()
+                .filter_map(result::Result::ok)
+                .collect();
+            assert_eq!(remaining.len(), HISTORY_LIMIT);
+        },
+    );
 }
 
 #[test]
