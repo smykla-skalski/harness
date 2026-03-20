@@ -1124,6 +1124,12 @@ fn observe_skill_matches_current_cli_surface() {
     let skill = fs::read_to_string(root.join(".claude/skills/observe/SKILL.md")).unwrap();
     let overrides =
         fs::read_to_string(root.join(".claude/skills/observe/references/overrides.md")).unwrap();
+    let command_surface = fs::read_to_string(
+        root.join(".claude/skills/observe/references/command-surface.md"),
+    )
+    .unwrap();
+
+    let all_docs = [skill.as_str(), overrides.as_str(), command_surface.as_str()];
 
     for needle in [
         "harness observe cycle",
@@ -1134,7 +1140,7 @@ fn observe_skill_matches_current_cli_surface() {
         "$XDG_DATA_HOME/kuma/observe",
     ] {
         assert!(
-            !skill.contains(needle) && !overrides.contains(needle),
+            !all_docs.iter().any(|doc| doc.contains(needle)),
             "observe skill docs should not use legacy observe contract `{needle}`"
         );
     }
@@ -1145,7 +1151,7 @@ fn observe_skill_matches_current_cli_surface() {
         "$XDG_DATA_HOME/harness/observe/<SESSION_ID>.state",
     ] {
         assert!(
-            skill.contains(needle) || overrides.contains(needle),
+            all_docs.iter().any(|doc| doc.contains(needle)),
             "observe skill docs should describe current observe contract via `{needle}`"
         );
     }
