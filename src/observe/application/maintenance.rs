@@ -1,9 +1,9 @@
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::fs;
 use std::io::{self, Write};
 use std::path::PathBuf;
 
-use serde_json::json;
+use serde::Serialize;
 use tracing::warn;
 
 use crate::errors::{CliError, CliErrorKind};
@@ -17,6 +17,58 @@ use super::super::types::{
     self, FOCUS_PRESETS, IssueCategory, IssueCode, IssueSeverity, ObserverState,
 };
 use super::ObserveFilter;
+
+#[derive(Serialize)]
+struct RecentCycle {
+    from: usize,
+    to: usize,
+    new_issues: usize,
+    resolved: usize,
+}
+
+#[derive(Serialize)]
+struct ActiveWorkerView<'a> {
+    issue_id: &'a str,
+    target_file: &'a str,
+    started_at: &'a str,
+}
+
+#[derive(Serialize)]
+struct ObserverStatus<'a> {
+    session_id: &'a str,
+    cursor: usize,
+    last_scan_time: &'a str,
+    open_issues: usize,
+    open_issues_by_severity: BTreeMap<String, usize>,
+    resolved_issues: usize,
+    muted_codes: Vec<String>,
+    has_baseline: bool,
+    handoff_safe: bool,
+    active_workers: Vec<ActiveWorkerView<'a>>,
+    cycles: usize,
+    recent_cycles: Vec<RecentCycle>,
+}
+
+#[derive(Serialize)]
+struct IssueVerification {
+    issue_id: String,
+    status: &'static str,
+    evidence_lines: Vec<usize>,
+}
+
+#[derive(Serialize)]
+struct ResolveStartResult {
+    resolved_line: usize,
+    method: &'static str,
+}
+
+fn render_json<T: Serialize>(payload: &T) -> String {
+    serde_json::to_string(payload).expect("typed observe JSON serializes")
+}
+
+fn render_pretty_json<T: Serialize>(payload: &T) -> String {
+    serde_json::to_string_pretty(payload).expect("typed observe JSON serializes")
+}
 
 fn state_file_path(session_id: &str) -> PathBuf {
     let observe_dir = harness_data_root().join("observe");
@@ -127,51 +179,50 @@ pub(super) fn execute_status(
 ) -> Result<i32, CliError> {
     let state = load_observer_state(session_id)?;
 
-    let by_severity: HashMap<String, usize> = {
-        let mut map = HashMap::new();
+    let by_severity: BTreeMap<String, usize> = {
+        let mut map = BTreeMap::new();
         for issue in &state.open_issues {
             *map.entry(issue.severity.to_string()).or_default() += 1;
         }
         map
     };
 
-    let recent_cycles: Vec<serde_json::Value> = state
+    let recent_cycles = state
         .cycle_history
         .iter()
         .rev()
         .take(5)
-        .map(|cycle| {
-            json!({
-                "from": cycle.from_line,
-                "to": cycle.to_line,
-                "new_issues": cycle.new_issues,
-                "resolved": cycle.resolved,
-            })
+        .map(|cycle| RecentCycle {
+            from: cycle.from_line,
+            to: cycle.to_line,
+            new_issues: cycle.new_issues,
+            resolved: cycle.resolved,
         })
-        .collect();
+        .collect::<Vec<_>>();
 
-    let status = json!({
-        "session_id": state.session_id,
-        "cursor": state.cursor,
-        "last_scan_time": state.last_scan_time,
-        "open_issues": state.open_issues.len(),
-        "open_issues_by_severity": by_severity,
-        "resolved_issues": state.resolved_issue_ids.len(),
-        "muted_codes": state.muted_codes.iter().map(ToString::to_string).collect::<Vec<_>>(),
-        "has_baseline": state.has_baseline(),
-        "handoff_safe": state.handoff_safe(),
-        "active_workers": state.active_workers.iter().map(|worker| json!({
-            "issue_id": worker.issue_id,
-            "target_file": worker.target_file,
-            "started_at": worker.started_at,
-        })).collect::<Vec<_>>(),
-        "cycles": state.cycle_history.len(),
-        "recent_cycles": recent_cycles,
-    });
-    println!(
-        "{}",
-        serde_json::to_string_pretty(&status).expect("valid JSON")
-    );
+    let status = ObserverStatus {
+        session_id: &state.session_id,
+        cursor: state.cursor,
+        last_scan_time: &state.last_scan_time,
+        open_issues: state.open_issues.len(),
+        open_issues_by_severity: by_severity,
+        resolved_issues: state.resolved_issue_ids.len(),
+        muted_codes: state.muted_codes.iter().map(ToString::to_string).collect(),
+        has_baseline: state.has_baseline(),
+        handoff_safe: state.handoff_safe(),
+        active_workers: state
+            .active_workers
+            .iter()
+            .map(|worker| ActiveWorkerView {
+                issue_id: &worker.issue_id,
+                target_file: &worker.target_file,
+                started_at: &worker.started_at,
+            })
+            .collect(),
+        cycles: state.cycle_history.len(),
+        recent_cycles,
+    };
+    println!("{}", render_pretty_json(&status));
     Ok(0)
 }
 
@@ -224,12 +275,14 @@ pub(super) fn execute_verify(
         Vec::new()
     };
 
-    let result = json!({
-        "issue_id": issue_id,
-        "status": status,
-        "evidence_lines": evidence_lines,
-    });
-    println!("{result}");
+    println!(
+        "{}",
+        render_json(&IssueVerification {
+            issue_id: issue_id.to_string(),
+            status,
+            evidence_lines,
+        })
+    );
     Ok(0)
 }
 
@@ -254,11 +307,13 @@ pub(super) fn execute_resolve_start(
         "prose"
     };
 
-    let result = json!({
-        "resolved_line": resolved,
-        "method": method,
-    });
-    println!("{result}");
+    println!(
+        "{}",
+        render_json(&ResolveStartResult {
+            resolved_line: resolved,
+            method,
+        })
+    );
     Ok(0)
 }
 

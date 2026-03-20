@@ -1,4 +1,6 @@
-use serde_json::json;
+use std::collections::BTreeMap;
+
+use serde::Serialize;
 
 use crate::errors::CliError;
 use crate::hooks::HookType;
@@ -11,6 +13,25 @@ use crate::hooks::protocol::result::NormalizedHookResult;
 use crate::kernel::tooling::ToolCategory;
 
 pub struct ClaudeCodeAdapter;
+
+#[derive(Serialize)]
+struct ClaudeConfig<'a> {
+    hooks: BTreeMap<&'a str, Vec<ClaudeEventRegistration<'a>>>,
+}
+
+#[derive(Serialize)]
+struct ClaudeEventRegistration<'a> {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    matcher: Option<&'a str>,
+    hooks: Vec<ClaudeCommandHook<'a>>,
+}
+
+#[derive(Serialize)]
+struct ClaudeCommandHook<'a> {
+    #[serde(rename = "type")]
+    hook_type: &'static str,
+    command: &'a str,
+}
 
 impl AgentAdapter for ClaudeCodeAdapter {
     fn name(&self) -> &'static str {
@@ -65,31 +86,24 @@ impl AgentAdapter for ClaudeCodeAdapter {
     }
 
     fn generate_config(&self, hooks: &[HookRegistration]) -> String {
-        use std::collections::BTreeMap;
-
-        let mut events: BTreeMap<&str, Vec<serde_json::Value>> = BTreeMap::new();
+        let mut events = BTreeMap::new();
         for registration in hooks {
             let Some(event_name) = self.event_name(&registration.event) else {
                 continue;
             };
-            let mut entry = serde_json::Map::new();
-            if let Some(matcher) = &registration.matcher {
-                entry.insert("matcher".to_string(), json!(matcher));
-            }
-            entry.insert(
-                "hooks".to_string(),
-                json!([{
-                    "type": "command",
-                    "command": registration.command,
-                }]),
-            );
             events
                 .entry(event_name)
-                .or_default()
-                .push(serde_json::Value::Object(entry));
+                .or_insert_with(Vec::new)
+                .push(ClaudeEventRegistration {
+                    matcher: registration.matcher.as_deref(),
+                    hooks: vec![ClaudeCommandHook {
+                        hook_type: "command",
+                        command: &registration.command,
+                    }],
+                });
         }
-        serde_json::to_string_pretty(&json!({ "hooks": events }))
-            .expect("hand-built JSON serializes")
+        serde_json::to_string_pretty(&ClaudeConfig { hooks: events })
+            .expect("typed hook JSON serializes")
     }
 }
 
