@@ -384,12 +384,11 @@ impl CurrentRunPointer {
 
 #[cfg(test)]
 mod tests {
-    #![allow(clippy::absolute_paths, clippy::cognitive_complexity)]
-
     use super::*;
+    use crate::kernel::topology::{ClusterSpec, Platform};
     use crate::run::{RunCounts, RunStatus, Verdict};
     use std::fs;
-    use std::sync::Mutex;
+    use std::sync::{Mutex, PoisonError};
 
     /// Mutex for tests that modify environment variables (`XDG_DATA_HOME`, `CLAUDE_SESSION_ID`).
     static ENV_MUTEX: Mutex<()> = Mutex::new(());
@@ -430,6 +429,63 @@ mod tests {
             user_stories: vec![],
             requires: vec![],
         }
+    }
+
+    fn sample_command_env() -> CommandEnv {
+        CommandEnv {
+            profile: "single-zone".into(),
+            repo_root: "/repo".into(),
+            run_dir: "/runs/r1".into(),
+            run_id: "r1".into(),
+            run_root: "/runs".into(),
+            suite_dir: "/suites/s".into(),
+            suite_id: "s".into(),
+            suite_path: "/suites/s/suite.md".into(),
+            kubeconfig: None,
+            platform: None,
+            cp_api_url: None,
+            docker_network: None,
+        }
+    }
+
+    fn assert_env_entries(dict: &HashMap<String, String>, expected: &[(&str, &str)]) {
+        for (key, value) in expected {
+            assert_eq!(dict.get(*key).unwrap(), value);
+        }
+    }
+
+    fn write_run_status_file(layout: &RunLayout, run_id: &str) {
+        let status_data = serde_json::json!({
+            "run_id": run_id,
+            "suite_id": "suite-a",
+            "profile": "single-zone",
+            "started_at": "2026-03-14T00:00:00Z",
+            "overall_verdict": "pending",
+            "notes": []
+        });
+        fs::write(
+            layout.status_path(),
+            serde_json::to_string_pretty(&status_data).unwrap(),
+        )
+        .unwrap();
+    }
+
+    fn assert_run_context_identity(ctx: &RunContext, run_id: &str) {
+        assert_eq!(ctx.layout.run_id, run_id);
+        assert_eq!(ctx.metadata.suite_id, "suite-a");
+        assert_eq!(ctx.metadata.profile, "single-zone");
+    }
+
+    fn assert_run_context_status(ctx: &RunContext, run_id: &str) {
+        let status = ctx.status.as_ref().unwrap();
+        assert_eq!(status.overall_verdict, Verdict::Pending);
+        assert_eq!(status.run_id, run_id);
+    }
+
+    fn assert_run_context_optional_artifacts_absent(ctx: &RunContext) {
+        assert!(ctx.cluster.is_none());
+        assert!(ctx.prepared_suite.is_none());
+        assert!(ctx.preflight.is_none());
     }
 
     // -- RunLayout path tests --
@@ -550,29 +606,21 @@ mod tests {
 
     #[test]
     fn command_env_to_env_dict_without_kubeconfig() {
-        let env = CommandEnv {
-            profile: "single-zone".into(),
-            repo_root: "/repo".into(),
-            run_dir: "/runs/r1".into(),
-            run_id: "r1".into(),
-            run_root: "/runs".into(),
-            suite_dir: "/suites/s".into(),
-            suite_id: "s".into(),
-            suite_path: "/suites/s/suite.md".into(),
-            kubeconfig: None,
-            platform: None,
-            cp_api_url: None,
-            docker_network: None,
-        };
+        let env = sample_command_env();
         let dict = env.to_env_dict();
-        assert_eq!(dict.get("PROFILE").unwrap(), "single-zone");
-        assert_eq!(dict.get("REPO_ROOT").unwrap(), "/repo");
-        assert_eq!(dict.get("RUN_DIR").unwrap(), "/runs/r1");
-        assert_eq!(dict.get("RUN_ID").unwrap(), "r1");
-        assert_eq!(dict.get("RUN_ROOT").unwrap(), "/runs");
-        assert_eq!(dict.get("SUITE_DIR").unwrap(), "/suites/s");
-        assert_eq!(dict.get("SUITE_ID").unwrap(), "s");
-        assert_eq!(dict.get("SUITE_PATH").unwrap(), "/suites/s/suite.md");
+        assert_env_entries(
+            &dict,
+            &[
+                ("PROFILE", "single-zone"),
+                ("REPO_ROOT", "/repo"),
+                ("RUN_DIR", "/runs/r1"),
+                ("RUN_ID", "r1"),
+                ("RUN_ROOT", "/runs"),
+                ("SUITE_DIR", "/suites/s"),
+                ("SUITE_ID", "s"),
+                ("SUITE_PATH", "/suites/s/suite.md"),
+            ],
+        );
         assert!(!dict.contains_key("KUBECONFIG"));
         assert_eq!(dict.len(), 8);
     }
@@ -669,7 +717,7 @@ mod tests {
         fs::write(&path, serde_json::to_string(&data).unwrap()).unwrap();
 
         let content = fs::read_to_string(&path).unwrap();
-        let status: crate::run::RunStatus = serde_json::from_str(&content).unwrap();
+        let status: RunStatus = serde_json::from_str(&content).unwrap();
 
         assert_eq!(status.last_state_capture, None);
         assert_eq!(status.counts, RunCounts::default());
@@ -702,7 +750,7 @@ mod tests {
             "notes": []
         });
 
-        let status: crate::run::RunStatus = serde_json::from_value(data).unwrap();
+        let status: RunStatus = serde_json::from_value(data).unwrap();
 
         assert_eq!(
             status.counts,
@@ -719,7 +767,7 @@ mod tests {
 
     #[test]
     fn executed_group_ids_empty_when_no_groups() {
-        let status = crate::run::RunStatus {
+        let status = RunStatus {
             executed_groups: vec![],
             ..sample_status()
         };
@@ -738,31 +786,12 @@ mod tests {
         let metadata = sample_metadata();
         let meta_json = serde_json::to_string_pretty(&metadata).unwrap();
         fs::write(layout.metadata_path(), &meta_json).unwrap();
-
-        let status_data = serde_json::json!({
-            "run_id": "run-1",
-            "suite_id": "suite-a",
-            "profile": "single-zone",
-            "started_at": "2026-03-14T00:00:00Z",
-            "overall_verdict": "pending",
-            "notes": []
-        });
-        fs::write(
-            layout.status_path(),
-            serde_json::to_string_pretty(&status_data).unwrap(),
-        )
-        .unwrap();
+        write_run_status_file(&layout, "run-1");
 
         let ctx = RunContext::from_run_dir(&run_dir).unwrap();
-        assert_eq!(ctx.layout.run_id, "run-1");
-        assert_eq!(ctx.metadata.suite_id, "suite-a");
-        assert_eq!(ctx.metadata.profile, "single-zone");
-        let status = ctx.status.unwrap();
-        assert_eq!(status.overall_verdict, Verdict::Pending);
-        assert_eq!(status.run_id, "run-1");
-        assert!(ctx.cluster.is_none());
-        assert!(ctx.prepared_suite.is_none());
-        assert!(ctx.preflight.is_none());
+        assert_run_context_identity(&ctx, "run-1");
+        assert_run_context_status(&ctx, "run-1");
+        assert_run_context_optional_artifacts_absent(&ctx);
     }
 
     #[test]
@@ -779,9 +808,7 @@ mod tests {
 
     #[test]
     fn run_context_from_current_returns_none_when_no_pointer() {
-        let _guard = ENV_MUTEX
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let _guard = ENV_MUTEX.lock().unwrap_or_else(PoisonError::into_inner);
         let tmp = tempfile::tempdir().unwrap();
         temp_env::with_vars(
             [
@@ -963,8 +990,6 @@ mod tests {
 
     #[test]
     fn run_context_loads_cluster_from_state_dir() {
-        use crate::kernel::topology::{ClusterSpec, Platform};
-
         let tmp = tempfile::tempdir().unwrap();
         let run_dir = tmp.path().join("run-cluster");
         let layout = RunLayout::from_run_dir(&run_dir);

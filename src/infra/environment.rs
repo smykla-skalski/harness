@@ -55,6 +55,8 @@ fn prepend_build_artifacts_path(env: &mut HashMap<String, String>) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fs;
+    use std::iter;
 
     #[test]
     fn merge_env_prepends_build_artifacts_to_path() {
@@ -74,7 +76,7 @@ mod tests {
             .join("build")
             .join(format!("artifacts-{os_name}-{arch}"))
             .join("kumactl");
-        std::fs::create_dir_all(&artifacts_dir).unwrap();
+        fs::create_dir_all(&artifacts_dir).unwrap();
 
         let mut extra = HashMap::new();
         extra.insert(
@@ -103,7 +105,7 @@ mod tests {
     #[test]
     fn merge_env_no_repo_root_leaves_path_unchanged() {
         let original_path = env::var("PATH").unwrap_or_default();
-        let merged = merge_env(std::iter::empty());
+        let merged = merge_env(iter::empty());
         assert_eq!(merged.get("PATH").unwrap(), &original_path);
     }
 }

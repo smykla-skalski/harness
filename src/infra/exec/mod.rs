@@ -337,8 +337,8 @@ pub fn kumactl_run(
 
 #[cfg(test)]
 mod tests {
-    #![allow(clippy::absolute_paths)]
-
+    use std::io::{Read, Write};
+    use std::net::TcpListener;
     use std::thread;
 
     use super::*;
@@ -624,8 +624,6 @@ mod tests {
         response_body: &str,
         content_type: &str,
     ) -> (u16, thread::JoinHandle<String>) {
-        use std::net::TcpListener;
-
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
         let port = listener.local_addr().unwrap().port();
         let body = response_body.to_string();
@@ -633,13 +631,13 @@ mod tests {
         let handle = thread::spawn(move || {
             let (mut stream, _) = listener.accept().unwrap();
             let mut buf = [0u8; 4096];
-            let n = std::io::Read::read(&mut stream, &mut buf).unwrap_or(0);
+            let n = Read::read(&mut stream, &mut buf).unwrap_or(0);
             let request = String::from_utf8_lossy(&buf[..n]).to_string();
             let response = format!(
                 "HTTP/1.1 200 OK\r\nContent-Type: {ct}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
                 body.len()
             );
-            std::io::Write::write_all(&mut stream, response.as_bytes()).ok();
+            Write::write_all(&mut stream, response.as_bytes()).ok();
             request
         });
         (port, handle)
