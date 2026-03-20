@@ -336,3 +336,34 @@ fn workspace_compact_root_stays_a_facade() {
         );
     }
 }
+
+#[test]
+fn infra_exec_root_stays_a_facade() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let exec_mod = fs::read_to_string(root.join("src/infra/exec/mod.rs")).unwrap();
+
+    for needle in [
+        "pub(crate) fn run_command(",
+        "pub(crate) fn run_command_streaming(",
+        "pub(crate) fn run_command_inherited(",
+        "pub fn kubectl_rollout_restart(",
+        "pub fn kumactl_run(",
+        "mod tests {",
+    ] {
+        assert!(
+            !exec_mod.contains(needle),
+            "src/infra/exec/mod.rs should stay a thin facade instead of owning `{needle}`"
+        );
+    }
+
+    for path in [
+        "src/infra/exec/runner.rs",
+        "src/infra/exec/tools.rs",
+        "src/infra/exec/tests.rs",
+    ] {
+        assert!(
+            root.join(path).exists(),
+            "infra exec split module should exist: {path}"
+        );
+    }
+}
