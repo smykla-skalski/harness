@@ -590,13 +590,13 @@ fn rule_output_shape_is_preserved() {
 
     let rendered = output::render_json(issue);
     let parsed: serde_json::Value = serde_json::from_str(&rendered).unwrap();
-    assert_eq!(parsed["fixable"], true);
-    assert_eq!(parsed["fix_target"], "src/cli.rs");
-    assert!(parsed.get("code").is_some());
-    assert!(parsed.get("fingerprint").is_some());
-    assert!(parsed.get("issue_id").is_some());
-    assert!(parsed.get("confidence").is_some());
-    assert!(parsed.get("fix_safety").is_some());
+    assert_eq!(parsed["remediation"]["available"], true);
+    assert_eq!(parsed["remediation"]["target"], "src/cli.rs");
+    assert!(parsed["classification"]["code"].is_string());
+    assert!(parsed["classification"]["fingerprint"].is_string());
+    assert!(parsed["id"].is_string());
+    assert!(parsed["classification"]["confidence"].is_string());
+    assert!(parsed["remediation"]["safety"].is_string());
 }
 
 #[test]
@@ -906,15 +906,15 @@ fn text_check_output_shape_is_preserved() {
 
     let rendered = output::render_json(issue);
     let parsed: serde_json::Value = serde_json::from_str(&rendered).unwrap();
-    assert_eq!(parsed["fixable"], true);
-    assert_eq!(parsed["fix_target"], "src/context.rs");
+    assert_eq!(parsed["remediation"]["available"], true);
+    assert_eq!(parsed["remediation"]["target"], "src/context.rs");
     assert!(
-        parsed["fix_hint"]
+        parsed["remediation"]["hint"]
             .as_str()
             .unwrap()
             .contains("context directory")
     );
-    assert!(parsed.get("code").is_some());
+    assert!(parsed["classification"]["code"].is_string());
 }
 
 #[test]
@@ -935,15 +935,15 @@ fn tool_check_output_shape_is_preserved() {
 
     let rendered = output::render_json(issue);
     let parsed: serde_json::Value = serde_json::from_str(&rendered).unwrap();
-    assert_eq!(parsed["fixable"], false);
-    assert!(parsed.get("fix_target").is_none());
+    assert_eq!(parsed["remediation"]["available"], false);
+    assert!(parsed["remediation"].get("target").is_none());
     assert!(
-        parsed["fix_hint"]
+        parsed["remediation"]["hint"]
             .as_str()
             .unwrap()
             .contains("verify target")
     );
-    assert!(parsed.get("code").is_some());
+    assert!(parsed["classification"].get("code").is_some());
 }
 
 #[test]
@@ -1633,21 +1633,20 @@ fn golden_json_output_all_fields() {
     let parsed: serde_json::Value = serde_json::from_str(&rendered).unwrap();
 
     // All required fields present
-    assert!(parsed.get("issue_id").is_some());
-    assert!(parsed.get("line").is_some());
-    assert!(parsed.get("code").is_some());
-    assert!(parsed.get("category").is_some());
-    assert!(parsed.get("severity").is_some());
-    assert!(parsed.get("confidence").is_some());
-    assert!(parsed.get("fix_safety").is_some());
-    assert!(parsed.get("summary").is_some());
-    assert!(parsed.get("details").is_some());
-    assert!(parsed.get("fingerprint").is_some());
-    assert!(parsed.get("source_role").is_some());
-    assert!(parsed.get("fixable").is_some());
+    assert!(parsed.get("id").is_some());
+    assert!(parsed["location"].get("line").is_some());
+    assert!(parsed["classification"].get("code").is_some());
+    assert!(parsed["classification"].get("category").is_some());
+    assert!(parsed["classification"].get("severity").is_some());
+    assert!(parsed["classification"].get("confidence").is_some());
+    assert!(parsed["remediation"].get("safety").is_some());
+    assert!(parsed["message"].get("summary").is_some());
+    assert!(parsed["message"].get("details").is_some());
+    assert!(parsed["classification"].get("fingerprint").is_some());
+    assert!(parsed["source"].get("role").is_some());
+    assert!(parsed["remediation"].get("available").is_some());
 
-    // issue_id is 12 hex chars
-    let id = parsed["issue_id"].as_str().unwrap();
+    let id = parsed["id"].as_str().unwrap();
     assert_eq!(id.len(), 12);
     assert!(id.chars().all(|c| c.is_ascii_hexdigit()));
 }
@@ -1761,7 +1760,7 @@ fn source_tool_in_json_output() {
 
     let rendered = output::render_json(issue);
     let parsed: serde_json::Value = serde_json::from_str(&rendered).unwrap();
-    assert_eq!(parsed["source_tool"], "Bash");
+    assert_eq!(parsed["source"]["tool"], "Bash");
 }
 
 #[test]
@@ -1777,7 +1776,7 @@ fn source_tool_absent_in_json_when_none() {
     assert!(!issues.is_empty());
     let rendered = output::render_json(&issues[0]);
     let parsed: serde_json::Value = serde_json::from_str(&rendered).unwrap();
-    assert!(parsed.get("source_tool").is_none());
+    assert!(parsed["source"].get("tool").is_none());
 }
 
 #[test]

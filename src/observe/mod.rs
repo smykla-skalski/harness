@@ -587,18 +587,18 @@ mod tests {
         let rendered = output::render_json(&issues[0]);
         let parsed: serde_json::Value = serde_json::from_str(&rendered).unwrap();
 
-        // Verify exact JSON shape
-        assert!(parsed["issue_id"].is_string());
-        assert!(parsed["line"].is_number());
-        assert!(parsed["code"].is_string());
-        assert!(parsed["category"].is_string());
-        assert!(parsed["severity"].is_string());
-        assert!(parsed["confidence"].is_string());
-        assert!(parsed["fix_safety"].is_string());
-        assert!(parsed["summary"].is_string());
-        assert!(parsed["details"].is_string());
-        assert!(parsed["fingerprint"].is_string());
-        assert!(parsed["fixable"].is_boolean());
+        assert!(parsed["id"].is_string());
+        assert!(parsed["location"]["line"].is_number());
+        assert!(parsed["classification"]["code"].is_string());
+        assert!(parsed["classification"]["category"].is_string());
+        assert!(parsed["classification"]["severity"].is_string());
+        assert!(parsed["classification"]["confidence"].is_string());
+        assert!(parsed["classification"]["fingerprint"].is_string());
+        assert!(parsed["source"]["role"].is_string());
+        assert!(parsed["message"]["summary"].is_string());
+        assert!(parsed["message"]["details"].is_string());
+        assert!(parsed["remediation"]["safety"].is_string());
+        assert!(parsed["remediation"]["available"].is_boolean());
     }
 
     #[test]
@@ -650,10 +650,10 @@ mod tests {
         let rendered = output::render_summary(&[issue], 100);
         let parsed: serde_json::Value = serde_json::from_str(&rendered).unwrap();
         assert_eq!(parsed["status"], "done");
-        assert_eq!(parsed["last_line"], 100);
-        assert_eq!(parsed["total_issues"], 1);
-        assert!(parsed["by_severity"].is_object());
-        assert!(parsed["by_category"].is_object());
+        assert_eq!(parsed["cursor"]["last_line"], 100);
+        assert_eq!(parsed["issues"]["total"], 1);
+        assert!(parsed["issues"]["by_severity"].is_array());
+        assert!(parsed["issues"]["by_category"].is_array());
     }
 
     #[test]
@@ -707,9 +707,9 @@ mod tests {
         ];
         let rendered = output::render_top_causes(&issues, 2);
         let parsed: serde_json::Value = serde_json::from_str(&rendered).unwrap();
-        let causes = parsed["top_causes"].as_array().unwrap();
+        let causes = parsed["causes"].as_array().unwrap();
         assert_eq!(causes.len(), 2);
-        assert_eq!(causes[0]["count"], 2);
+        assert_eq!(causes[0]["occurrences"], 2);
     }
 
     #[test]
@@ -756,6 +756,10 @@ mod tests {
         assert_eq!(results.len(), 1);
         assert_eq!(results[0]["ruleId"], "build_or_lint_failure");
         assert_eq!(results[0]["level"], "error");
+        assert_eq!(
+            results[0]["properties"]["harnessObserve"]["classification"]["code"],
+            "build_or_lint_failure"
+        );
     }
 
     #[test]
