@@ -531,3 +531,25 @@ fn authoring_workflow_root_stays_prod_only() {
         "authoring workflow split test module should exist"
     );
 }
+
+#[test]
+fn kernel_topology_root_stays_prod_only() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let topology = fs::read_to_string(root.join("src/kernel/topology.rs")).unwrap();
+
+    for needle in [
+        "fn platform_display_roundtrip(",
+        "fn current_deploy_round_trip(",
+        "mod tests {",
+    ] {
+        assert!(
+            !topology.contains(needle),
+            "src/kernel/topology.rs should stay focused on production topology logic instead of owning `{needle}`"
+        );
+    }
+
+    assert!(
+        root.join("src/kernel/topology/tests.rs").exists(),
+        "kernel topology split test module should exist"
+    );
+}
