@@ -509,3 +509,25 @@ fn verify_bash_root_stays_prod_only() {
         "verify_bash split test module should exist"
     );
 }
+
+#[test]
+fn authoring_workflow_root_stays_prod_only() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let workflow = fs::read_to_string(root.join("src/authoring/workflow.rs")).unwrap();
+
+    for needle in [
+        "fn author_phase_display(",
+        "fn approval_mode_serialization(",
+        "mod tests {",
+    ] {
+        assert!(
+            !workflow.contains(needle),
+            "src/authoring/workflow.rs should stay focused on production workflow logic instead of owning `{needle}`"
+        );
+    }
+
+    assert!(
+        root.join("src/authoring/workflow/tests.rs").exists(),
+        "authoring workflow split test module should exist"
+    );
+}
