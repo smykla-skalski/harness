@@ -692,3 +692,32 @@ fn observe_registry_root_stays_prod_only() {
         "observe classifier registry split test module should exist"
     );
 }
+
+#[test]
+fn runner_policy_root_stays_a_facade() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let runner_policy = fs::read_to_string(root.join("src/hooks/runner_policy.rs")).unwrap();
+
+    for needle in [
+        "pub enum LegacyScript {",
+        "pub enum TaskOutputPattern {",
+        "pub enum TrackedHarnessSubcommand {",
+        "pub fn managed_cluster_binaries()",
+    ] {
+        assert!(
+            !runner_policy.contains(needle),
+            "src/hooks/runner_policy.rs should stay a thin facade instead of owning `{needle}`"
+        );
+    }
+
+    for path in [
+        "src/hooks/runner_policy/cluster.rs",
+        "src/hooks/runner_policy/files.rs",
+        "src/hooks/runner_policy/commands.rs",
+    ] {
+        assert!(
+            root.join(path).exists(),
+            "runner_policy split module should exist: {path}"
+        );
+    }
+}
