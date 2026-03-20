@@ -17,75 +17,171 @@ const DETAIL_TRUNCATE_LENGTH: usize = 500;
 
 #[derive(Serialize)]
 struct RenderedIssue<'a> {
-    issue_id: &'a str,
-    line: usize,
-    code: IssueCode,
-    category: IssueCategory,
-    severity: IssueSeverity,
-    confidence: Confidence,
-    fix_safety: FixSafety,
-    summary: &'a str,
-    details: Cow<'a, str>,
-    fingerprint: &'a str,
-    source_role: MessageRole,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    source_tool: Option<SourceTool>,
-    fixable: bool,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    fix_target: Option<&'a str>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    fix_hint: Option<&'a str>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    evidence_excerpt: Option<&'a str>,
+    id: &'a str,
+    location: RenderedIssueLocation,
+    classification: RenderedIssueClassification<'a>,
+    source: RenderedIssueSource,
+    message: RenderedIssueMessage<'a>,
+    remediation: RenderedIssueRemediation<'a>,
 }
 
 impl<'a> From<&'a Issue> for RenderedIssue<'a> {
     fn from(issue: &'a Issue) -> Self {
         Self {
-            issue_id: &issue.id,
-            line: issue.line,
-            code: issue.code,
-            category: issue.category,
-            severity: issue.severity,
-            confidence: issue.confidence,
-            fix_safety: issue.fix_safety,
-            summary: &issue.summary,
-            details: truncate_details(&issue.details),
-            fingerprint: &issue.fingerprint,
-            source_role: issue.source_role,
-            source_tool: issue.source_tool,
-            fixable: issue.fix_safety.is_fixable(),
-            fix_target: issue.fix_target.as_deref(),
-            fix_hint: issue.fix_hint.as_deref(),
-            evidence_excerpt: issue.evidence_excerpt.as_deref(),
+            id: &issue.id,
+            location: RenderedIssueLocation { line: issue.line },
+            classification: RenderedIssueClassification {
+                code: issue.code,
+                category: issue.category,
+                severity: issue.severity,
+                confidence: issue.confidence,
+                fingerprint: &issue.fingerprint,
+            },
+            source: RenderedIssueSource {
+                role: issue.source_role,
+                tool: issue.source_tool,
+            },
+            message: RenderedIssueMessage {
+                summary: &issue.summary,
+                details: truncate_details(&issue.details),
+                evidence_excerpt: issue.evidence_excerpt.as_deref(),
+            },
+            remediation: RenderedIssueRemediation {
+                safety: issue.fix_safety,
+                available: issue.fix_safety.is_fixable(),
+                target: issue.fix_target.as_deref(),
+                hint: issue.fix_hint.as_deref(),
+            },
         }
     }
 }
 
 #[derive(Serialize)]
+struct RenderedIssueLocation {
+    line: usize,
+}
+
+#[derive(Serialize)]
+struct RenderedIssueClassification<'a> {
+    code: IssueCode,
+    category: IssueCategory,
+    severity: IssueSeverity,
+    confidence: Confidence,
+    fingerprint: &'a str,
+}
+
+#[derive(Serialize)]
+struct RenderedIssueSource {
+    role: MessageRole,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    tool: Option<SourceTool>,
+}
+
+#[derive(Serialize)]
+struct RenderedIssueMessage<'a> {
+    summary: &'a str,
+    details: Cow<'a, str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    evidence_excerpt: Option<&'a str>,
+}
+
+#[derive(Serialize)]
+struct RenderedIssueRemediation<'a> {
+    safety: FixSafety,
+    available: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    target: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    hint: Option<&'a str>,
+}
+
+#[derive(Serialize)]
 struct RenderedSummary {
     status: &'static str,
-    last_line: usize,
-    total_issues: usize,
-    by_severity: BTreeMap<String, usize>,
-    by_category: BTreeMap<String, usize>,
+    cursor: RenderedSummaryCursor,
+    issues: RenderedIssueSummary,
 }
 
 impl RenderedSummary {
     fn new(issues: &[Issue], last_line: usize) -> Self {
         Self {
             status: "done",
-            last_line,
-            total_issues: issues.len(),
-            by_severity: count_by_label(issues, |issue| issue.severity.to_string()),
-            by_category: count_by_label(issues, |issue| issue.category.to_string()),
+            cursor: RenderedSummaryCursor { last_line },
+            issues: RenderedIssueSummary::new(issues),
         }
     }
 }
 
 #[derive(Serialize)]
+struct RenderedSummaryCursor {
+    last_line: usize,
+}
+
+#[derive(Serialize)]
+struct RenderedIssueSummary {
+    total: usize,
+    by_severity: Vec<RenderedSeverityCount>,
+    by_category: Vec<RenderedCategoryCount>,
+}
+
+impl RenderedIssueSummary {
+    fn new(issues: &[Issue]) -> Self {
+        let mut severity_counts: HashMap<IssueSeverity, usize> = HashMap::new();
+        let mut category_counts: HashMap<IssueCategory, usize> = HashMap::new();
+
+        for issue in issues {
+            *severity_counts.entry(issue.severity).or_insert(0) += 1;
+            *category_counts.entry(issue.category).or_insert(0) += 1;
+        }
+
+        let by_severity = [
+            IssueSeverity::Critical,
+            IssueSeverity::Medium,
+            IssueSeverity::Low,
+        ]
+        .into_iter()
+        .filter_map(|severity| {
+            severity_counts
+                .get(&severity)
+                .copied()
+                .map(|count| RenderedSeverityCount { severity, count })
+        })
+        .collect();
+
+        let by_category = IssueCategory::ALL
+            .iter()
+            .copied()
+            .filter_map(|category| {
+                category_counts
+                    .get(&category)
+                    .copied()
+                    .map(|count| RenderedCategoryCount { category, count })
+            })
+            .collect();
+
+        Self {
+            total: issues.len(),
+            by_severity,
+            by_category,
+        }
+    }
+}
+
+#[derive(Serialize)]
+struct RenderedSeverityCount {
+    severity: IssueSeverity,
+    count: usize,
+}
+
+#[derive(Serialize)]
+struct RenderedCategoryCount {
+    category: IssueCategory,
+    count: usize,
+}
+
+#[derive(Serialize)]
 struct RenderedTopCauses<'a> {
-    top_causes: Vec<RenderedTopCause<'a>>,
+    causes: Vec<RenderedTopCause<'a>>,
 }
 
 impl<'a> RenderedTopCauses<'a> {
@@ -94,43 +190,47 @@ impl<'a> RenderedTopCauses<'a> {
         for issue in issues {
             let entry = counts.entry(issue.code).or_insert_with(|| RenderedTopCause {
                 code: issue.code,
-                count: 0,
-                representative_summary: &issue.summary,
+                occurrences: 0,
+                summary: &issue.summary,
             });
-            entry.count += 1;
+            entry.occurrences += 1;
         }
 
-        let mut top_causes: Vec<_> = counts.into_values().collect();
-        top_causes.sort_by_key(|cause| Reverse(cause.count));
-        top_causes.truncate(top_n);
-        Self { top_causes }
+        let mut causes: Vec<_> = counts.into_values().collect();
+        causes.sort_by(|left, right| {
+            Reverse(left.occurrences)
+                .cmp(&Reverse(right.occurrences))
+                .then_with(|| left.code.to_string().cmp(&right.code.to_string()))
+        });
+        causes.truncate(top_n);
+        Self { causes }
     }
 }
 
 #[derive(Serialize)]
 struct RenderedTopCause<'a> {
     code: IssueCode,
-    count: usize,
-    representative_summary: &'a str,
+    occurrences: usize,
+    summary: &'a str,
 }
 
 #[derive(Serialize, tabled::Tabled)]
-struct RenderedMarkdownRow {
+struct RenderedMarkdownRow<'a> {
     line: usize,
-    severity: String,
-    category: String,
-    code: String,
-    summary: String,
+    severity: IssueSeverity,
+    category: IssueCategory,
+    code: IssueCode,
+    summary: &'a str,
 }
 
-impl From<&Issue> for RenderedMarkdownRow {
-    fn from(issue: &Issue) -> Self {
+impl<'a> From<&'a Issue> for RenderedMarkdownRow<'a> {
+    fn from(issue: &'a Issue) -> Self {
         Self {
             line: issue.line,
-            severity: issue.severity.to_string(),
-            category: issue.category.to_string(),
-            code: issue.code.to_string(),
-            summary: issue.summary.clone(),
+            severity: issue.severity,
+            category: issue.category,
+            code: issue.code,
+            summary: &issue.summary,
         }
     }
 }
@@ -138,10 +238,25 @@ impl From<&Issue> for RenderedMarkdownRow {
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 struct SarifProperties<'a> {
+    harness_observe: SarifObserveProperties<'a>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct SarifObserveProperties<'a> {
+    id: &'a str,
+    classification: SarifIssueClassification<'a>,
+    source: RenderedIssueSource,
+    remediation: RenderedIssueRemediation<'a>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct SarifIssueClassification<'a> {
+    code: IssueCode,
     category: IssueCategory,
     confidence: Confidence,
-    fix_safety: FixSafety,
-    issue_id: &'a str,
+    fingerprint: &'a str,
 }
 
 fn truncate_details(details: &str) -> Cow<'_, str> {
@@ -151,17 +266,6 @@ fn truncate_details(details: &str) -> Cow<'_, str> {
         let boundary = details.floor_char_boundary(DETAIL_TRUNCATE_LENGTH);
         Cow::Owned(details[..boundary].to_string())
     }
-}
-
-fn count_by_label<F>(issues: &[Issue], key: F) -> BTreeMap<String, usize>
-where
-    F: Fn(&Issue) -> String,
-{
-    let mut counts = BTreeMap::new();
-    for issue in issues {
-        *counts.entry(key(issue)).or_insert(0) += 1;
-    }
-    counts
 }
 
 fn render_json_string<T>(value: &T) -> String
@@ -271,10 +375,25 @@ pub fn render_sarif(issues: &[Issue]) -> String {
                 .level(level)
                 .locations(vec![location])
                 .properties(render_property_bag(&SarifProperties {
-                    category: issue.category,
-                    confidence: issue.confidence,
-                    fix_safety: issue.fix_safety,
-                    issue_id: &issue.id,
+                    harness_observe: SarifObserveProperties {
+                        id: &issue.id,
+                        classification: SarifIssueClassification {
+                            code: issue.code,
+                            category: issue.category,
+                            confidence: issue.confidence,
+                            fingerprint: &issue.fingerprint,
+                        },
+                        source: RenderedIssueSource {
+                            role: issue.source_role,
+                            tool: issue.source_tool,
+                        },
+                        remediation: RenderedIssueRemediation {
+                            safety: issue.fix_safety,
+                            available: issue.fix_safety.is_fixable(),
+                            target: issue.fix_target.as_deref(),
+                            hint: issue.fix_hint.as_deref(),
+                        },
+                    },
                 }))
                 .build()
         })
@@ -321,35 +440,93 @@ mod tests {
     use serde::Deserialize;
 
     use super::*;
-    use crate::observe::types::{IssueCode, SourceTool};
 
     #[derive(Deserialize)]
     struct ParsedIssue {
-        issue_id: String,
+        id: String,
+        location: ParsedLocation,
+        classification: ParsedClassification,
+        source: ParsedSource,
+        message: ParsedMessage,
+        remediation: ParsedRemediation,
+    }
+
+    #[derive(Deserialize)]
+    struct ParsedLocation {
         line: usize,
+    }
+
+    #[derive(Deserialize)]
+    struct ParsedClassification {
         code: String,
         category: String,
         severity: String,
         confidence: String,
-        fix_safety: String,
+        fingerprint: String,
+    }
+
+    #[derive(Deserialize)]
+    struct ParsedSource {
+        role: String,
+        tool: Option<String>,
+    }
+
+    #[derive(Deserialize)]
+    struct ParsedMessage {
         summary: String,
         details: String,
-        fingerprint: String,
-        source_role: String,
-        source_tool: Option<String>,
-        fixable: bool,
-        fix_target: Option<String>,
-        fix_hint: Option<String>,
         evidence_excerpt: Option<String>,
+    }
+
+    #[derive(Deserialize)]
+    struct ParsedRemediation {
+        safety: String,
+        available: bool,
+        target: Option<String>,
+        hint: Option<String>,
     }
 
     #[derive(Deserialize)]
     struct ParsedSummary {
         status: String,
+        cursor: ParsedCursor,
+        issues: ParsedIssueSummary,
+    }
+
+    #[derive(Deserialize)]
+    struct ParsedCursor {
         last_line: usize,
-        total_issues: usize,
-        by_severity: BTreeMap<String, usize>,
-        by_category: BTreeMap<String, usize>,
+    }
+
+    #[derive(Deserialize)]
+    struct ParsedIssueSummary {
+        total: usize,
+        by_severity: Vec<ParsedSeverityCount>,
+        by_category: Vec<ParsedCategoryCount>,
+    }
+
+    #[derive(Deserialize)]
+    struct ParsedSeverityCount {
+        severity: String,
+        count: usize,
+    }
+
+    #[derive(Deserialize)]
+    struct ParsedCategoryCount {
+        category: String,
+        count: usize,
+    }
+
+    #[derive(Deserialize)]
+    struct ParsedTopCauses {
+        causes: Vec<ParsedTopCause>,
+    }
+
+    #[derive(Deserialize)]
+    struct ParsedTopCause {
+        code: String,
+        occurrences: usize,
+        summary: String,
     }
 
     fn sample_issue() -> Issue {
@@ -380,6 +557,10 @@ mod tests {
         serde_json::from_str(&render_summary(issues, last_line)).unwrap()
     }
 
+    fn parse_top_causes_json(issues: &[Issue], top_n: usize) -> ParsedTopCauses {
+        serde_json::from_str(&render_top_causes(issues, top_n)).unwrap()
+    }
+
     #[test]
     fn human_output_format() {
         let rendered = render_human(&sample_issue());
@@ -403,65 +584,78 @@ mod tests {
         let mut issue = sample_issue();
         issue.details = "x".repeat(1000);
         let parsed = parse_issue_json(&issue);
-        assert_eq!(parsed.details.len(), DETAIL_TRUNCATE_LENGTH);
+        assert_eq!(parsed.message.details.len(), DETAIL_TRUNCATE_LENGTH);
     }
 
     #[test]
-    fn json_output_valid() {
+    fn json_output_uses_nested_contract() {
         let parsed = parse_issue_json(&sample_issue());
-        assert_eq!(parsed.line, 42);
-        assert_eq!(parsed.category, "build_error");
-        assert_eq!(parsed.severity, "critical");
-        assert_eq!(parsed.issue_id, "abc123def456");
-        assert_eq!(parsed.code, "build_or_lint_failure");
-        assert_eq!(parsed.confidence, "high");
-        assert_eq!(parsed.fix_safety, "auto_fix_safe");
-        assert_eq!(parsed.summary, "Build failed");
-        assert_eq!(parsed.fingerprint, "build_or_lint_failure");
-        assert_eq!(parsed.source_role, "assistant");
-        assert_eq!(parsed.fix_target.as_deref(), Some("src/main.rs"));
-        assert_eq!(parsed.fix_hint.as_deref(), Some("Fix the type mismatch"));
-        assert!(parsed.evidence_excerpt.is_none());
-        assert!(parsed.fixable);
+        assert_eq!(parsed.id, "abc123def456");
+        assert_eq!(parsed.location.line, 42);
+        assert_eq!(parsed.classification.code, "build_or_lint_failure");
+        assert_eq!(parsed.classification.category, "build_error");
+        assert_eq!(parsed.classification.severity, "critical");
+        assert_eq!(parsed.classification.confidence, "high");
+        assert_eq!(parsed.classification.fingerprint, "build_or_lint_failure");
+        assert_eq!(parsed.source.role, "assistant");
+        assert!(parsed.source.tool.is_none());
+        assert_eq!(parsed.message.summary, "Build failed");
+        assert_eq!(parsed.remediation.safety, "auto_fix_safe");
+        assert!(parsed.remediation.available);
+        assert_eq!(parsed.remediation.target.as_deref(), Some("src/main.rs"));
+        assert_eq!(
+            parsed.remediation.hint.as_deref(),
+            Some("Fix the type mismatch")
+        );
+        assert!(parsed.message.evidence_excerpt.is_none());
     }
 
     #[test]
-    fn json_output_fixable_backward_compat() {
+    fn json_output_remediation_availability_tracks_fix_safety() {
         let mut issue = sample_issue();
         issue.fix_safety = FixSafety::TriageRequired;
-        assert!(!parse_issue_json(&issue).fixable);
+        assert!(!parse_issue_json(&issue).remediation.available);
 
         issue.fix_safety = FixSafety::AutoFixGuarded;
-        assert!(parse_issue_json(&issue).fixable);
+        assert!(parse_issue_json(&issue).remediation.available);
     }
 
     #[test]
     fn json_output_source_tool() {
         let mut issue = sample_issue();
         issue.source_tool = Some(SourceTool::Bash);
-        assert_eq!(parse_issue_json(&issue).source_tool.as_deref(), Some("Bash"));
+        assert_eq!(parse_issue_json(&issue).source.tool.as_deref(), Some("Bash"));
     }
 
     #[test]
-    fn json_output_no_source_tool() {
-        assert!(parse_issue_json(&sample_issue()).source_tool.is_none());
-    }
-
-    #[test]
-    fn summary_counts() {
+    fn summary_counts_use_typed_arrays() {
         let parsed = parse_summary_json(&[sample_issue(), sample_issue()], 100);
         assert_eq!(parsed.status, "done");
-        assert_eq!(parsed.total_issues, 2);
-        assert_eq!(parsed.last_line, 100);
-        assert_eq!(parsed.by_severity.get("critical"), Some(&2));
-        assert_eq!(parsed.by_category.get("build_error"), Some(&2));
+        assert_eq!(parsed.cursor.last_line, 100);
+        assert_eq!(parsed.issues.total, 2);
+        assert_eq!(parsed.issues.by_severity.len(), 1);
+        assert_eq!(parsed.issues.by_severity[0].severity, "critical");
+        assert_eq!(parsed.issues.by_severity[0].count, 2);
+        assert_eq!(parsed.issues.by_category.len(), 1);
+        assert_eq!(parsed.issues.by_category[0].category, "build_error");
+        assert_eq!(parsed.issues.by_category[0].count, 2);
     }
 
     #[test]
     fn summary_empty_issues() {
         let parsed = parse_summary_json(&[], 0);
-        assert_eq!(parsed.total_issues, 0);
-        assert!(parsed.by_category.is_empty());
-        assert!(parsed.by_severity.is_empty());
+        assert_eq!(parsed.issues.total, 0);
+        assert!(parsed.issues.by_category.is_empty());
+        assert!(parsed.issues.by_severity.is_empty());
+    }
+
+    #[test]
+    fn top_causes_output_uses_typed_entries() {
+        let issues = vec![sample_issue(), sample_issue()];
+        let parsed = parse_top_causes_json(&issues, 2);
+        assert_eq!(parsed.causes.len(), 1);
+        assert_eq!(parsed.causes[0].code, "build_or_lint_failure");
+        assert_eq!(parsed.causes[0].occurrences, 2);
+        assert_eq!(parsed.causes[0].summary, "Build failed");
     }
 }
