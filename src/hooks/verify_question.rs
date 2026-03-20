@@ -29,10 +29,9 @@ pub fn execute(ctx: &HookContext) -> Result<HookResult, CliError> {
 
 fn handle_suite_runner(ctx: &HookContext) -> HookResult {
     let answers = ctx.question_answers();
-    let is_manifest_fix = answers.iter().any(|a| {
-        a.question
-            .contains(runner_rules::MANIFEST_FIX_GATE.question)
-    });
+    let is_manifest_fix = answers
+        .iter()
+        .any(|a| runner_rules::matches_manifest_fix_question(&a.question));
     if !is_manifest_fix {
         return HookResult::allow();
     }
@@ -52,7 +51,7 @@ fn handle_suite_author(ctx: &HookContext) -> HookResult {
     let answers = ctx.question_answers();
     let is_install = answers
         .iter()
-        .any(|a| a.question.contains("kubectl-validate"));
+        .any(|a| runner_rules::matches_kubectl_validate_question(&a.question));
     if is_install {
         return HookResult::allow();
     }
