@@ -669,3 +669,26 @@ fn run_prepared_suite_root_stays_prod_only() {
         "run prepared_suite split test module should exist"
     );
 }
+
+#[test]
+fn observe_registry_root_stays_prod_only() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let registry = fs::read_to_string(root.join("src/observe/classifier/registry.rs")).unwrap();
+
+    for needle in [
+        "fn registry_covers_all_codes(",
+        "fn issue_owner_display(",
+        "mod tests {",
+    ] {
+        assert!(
+            !registry.contains(needle),
+            "src/observe/classifier/registry.rs should stay focused on production registry data instead of owning `{needle}`"
+        );
+    }
+
+    assert!(
+        root.join("src/observe/classifier/registry/tests.rs")
+            .exists(),
+        "observe classifier registry split test module should exist"
+    );
+}
