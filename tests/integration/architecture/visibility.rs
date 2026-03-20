@@ -437,3 +437,31 @@ fn docker_block_root_stays_a_facade() {
         );
     }
 }
+
+#[test]
+fn compose_block_root_stays_a_facade() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let compose_mod = fs::read_to_string(root.join("src/infra/blocks/compose/mod.rs")).unwrap();
+
+    for needle in [
+        "pub struct DockerComposeOrchestrator",
+        "pub struct FakeComposeOrchestrator",
+        "mod tests {",
+    ] {
+        assert!(
+            !compose_mod.contains(needle),
+            "src/infra/blocks/compose/mod.rs should stay a thin facade instead of owning `{needle}`"
+        );
+    }
+
+    for path in [
+        "src/infra/blocks/compose/runtime.rs",
+        "src/infra/blocks/compose/fake.rs",
+        "src/infra/blocks/compose/tests.rs",
+    ] {
+        assert!(
+            root.join(path).exists(),
+            "compose block split module should exist: {path}"
+        );
+    }
+}
