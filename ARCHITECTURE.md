@@ -1,42 +1,131 @@
 # Harness Architecture
 
-Harness is organized by domain first, with a small shared kernel and an explicit workspace layer kept separate from product workflows.
+Harness is organized by domain, with a small pure kernel and an explicit workspace layer for ambient state.
 
-## Top-Level Map
+## Shape
 
-- `src/app/`: Clap entrypoints and command dispatch only. This is the transport layer.
-- `src/kernel/`: Pure shared value objects and parsing logic such as command intent and cluster topology.
-- `src/workspace/`: Harness-owned ambient state such as XDG paths, session context, and compact handoff state.
-- `src/run/`: Everything for tracked suite execution. Run arguments, suite/group specs, persisted report and status codecs, prepared artifacts, workflow state, audit trail, run services, and run commands all live here.
-- `src/authoring/`: Everything for `suite:new`. Session payloads, approval workflow, validation, authoring rules, and authoring commands live here.
-- `src/observe/`: Session-log observation and classification. CLI args, state, scan/watch modes, classifier rules, and output formats stay together.
-- `src/setup/`: Bootstrap, session lifecycle, pre-compact, capability reporting, and cluster setup entrypoints.
-- `src/hooks/`: Agent-facing hook protocol, adapters, registry, guards, and effect application.
-- `src/platform/`: Provider/runtime adapters and platform-specific helpers such as compose generation, `kubectl_validate`, and ephemeral `MetalLB`.
-- `src/infra/`: Generic shared building blocks such as process/docker/http abstractions, raw execution helpers, I/O helpers, and versioned JSON persistence. Infra dependencies are injected explicitly per use case; there is no global block registry.
-- `src/errors/`: Typed error families and rendering.
-## Where Concepts Live
+```mermaid
+flowchart LR
+    App["app\nCLI transport and wiring"]
 
-- `suite:run`: `src/run/`
-- `suite:new`: `src/authoring/`
-- observe/reporting: `src/observe/`
-- hook protocol and policy: `src/hooks/`
-- ambient harness session and project state: `src/workspace/`
-- shared command, workflow, and topology primitives: `src/kernel/`
-- cluster/runtime adapters: `src/platform/`
-- generic execution and persistence helpers: `src/infra/`
+    Run["run\nsuite:run domain"]
+    Authoring["authoring\nsuite:new domain"]
+    Observe["observe\nsession observation"]
+    Setup["setup\nbootstrap and session lifecycle"]
+    Hooks["hooks\nagent-facing policy and protocol"]
 
-## Dependency Rules
+    Kernel["kernel\npure shared primitives"]
+    Workspace["workspace\nambient harness state"]
+    Platform["platform\nruntime and provider adapters"]
+    Infra["infra\ngeneric side effects"]
+    Errors["errors\ntyped error families"]
 
-- `app` may depend on any domain, but domains must not depend on `app`.
-- `kernel` must stay pure and must not depend on `app`, `run`, `authoring`, `observe`, `setup`, `platform`, or `infra`.
-- generic cluster topology, cluster-mode parsing, and cluster-state value objects live in `kernel`, not `platform`.
-- `workspace` may depend on `kernel`, `infra`, and `errors`, but product domains should treat it as the single owner of ambient session/project state instead of rebuilding that logic locally.
-- `run`, `authoring`, `observe`, and `setup` may depend on `platform`, `infra`, `errors`, and `hooks` facades when needed.
-- `platform` must not own generic cluster topology or persisted cluster state. It may depend on `kernel`, but not on `app`, `run`, `authoring`, or `observe`.
-- `infra` must stay generic and must not depend on product domains.
-- The public crate surface is app-first and domain-oriented. Shared internals should be consumed through `kernel` or `workspace` only when they are true cross-domain concepts.
+    App --> Run
+    App --> Authoring
+    App --> Observe
+    App --> Setup
+    App --> Hooks
 
-## Borrowing Rule
+    Run --> Kernel
+    Run --> Workspace
+    Run --> Platform
+    Run --> Infra
+    Run --> Errors
 
-Persisted DTOs and process-boundary types stay owned. Borrowing work belongs in service and helper APIs: prefer `&str`, `&Path`, borrowed domain views, and `Cow` for transient access instead of cloning owned state through the call stack.
+    Authoring --> Kernel
+    Authoring --> Workspace
+    Authoring --> Infra
+    Authoring --> Errors
+
+    Observe --> Kernel
+    Observe --> Workspace
+    Observe --> Infra
+    Observe --> Errors
+
+    Setup --> Workspace
+    Setup --> Platform
+    Setup --> Infra
+    Setup --> Errors
+
+    Hooks --> Kernel
+    Hooks --> Workspace
+    Hooks --> Infra
+    Hooks --> Errors
+
+    Platform --> Kernel
+    Platform --> Infra
+    Workspace --> Kernel
+    Workspace --> Infra
+```
+
+## Ownership
+
+| Area | Owns |
+| --- | --- |
+| `src/app/` | Clap entrypoints, top-level command grouping, wiring into domain APIs |
+| `src/run/` | tracked run lifecycle, specs, prepared artifacts, reporting, run workflow |
+| `src/authoring/` | `suite:new` payloads, approval workflow, validation, authoring session state |
+| `src/observe/` | session scanning, watch/dump flows, classifier output, observer state |
+| `src/setup/` | bootstrap, wrapper/session lifecycle, cluster setup entrypoints |
+| `src/hooks/` | hook protocol, normalization, policy input hydration, guards, effects |
+| `src/kernel/` | pure shared concepts such as command intent, tool facts, run surface, topology, gates, skill ids |
+| `src/workspace/` | XDG paths, session context, current-run pointers, compact handoff, harness-owned ambient files |
+| `src/platform/` | provider-specific runtime helpers such as `kubectl_validate`, runtime access, ephemeral `MetalLB` |
+| `src/infra/` | generic execution, HTTP, process, persistence, environment, and block abstractions |
+| `src/errors/` | typed error families and transport-safe rendering |
+
+## Runtime Flow
+
+```mermaid
+sequenceDiagram
+    participant U as User or Hook Event
+    participant A as app
+    participant D as domain
+    participant W as workspace
+    participant P as platform
+    participant I as infra
+
+    U->>A: CLI args or hook payload
+    A->>D: typed request
+    D->>W: resolve ambient state if needed
+    D->>P: ask for runtime-specific translation
+    D->>I: execute side effects
+    D-->>A: typed result or typed error
+    A-->>U: CLI output or hook response
+```
+
+## Rules
+
+- `app` is transport only. It may wire domains together, but domains must not depend on `app`.
+- `kernel` is pure. It must not depend on product domains, `platform`, or `infra`.
+- `workspace` is the only owner of ambient harness state. Domains should not rebuild XDG/session/current-run logic on their own.
+- `platform` is adapter logic only. Generic topology lives in `kernel`, not `platform`.
+- `infra` stays generic. It must not depend on product domains.
+- `run`, `authoring`, `observe`, `setup`, and `hooks` own their own workflows and persistence-facing models.
+- The public crate surface is domain-oriented. `platform` is intentionally crate-internal.
+- Shared abstractions must have a real owner. If a concept is cross-domain and pure, it belongs in `kernel`; if it is ambient state, it belongs in `workspace`.
+
+## Public Surface
+
+The intended public shape is app-first and domain-first:
+
+- public: `app`, `run`, `authoring`, `observe`, `setup`, `hooks`, `kernel`, `workspace`, `infra`, `errors`
+- internal: `platform`, manifest plumbing, suite defaults, test-only codec helpers
+
+## State Boundaries
+
+```mermaid
+flowchart TD
+    Workspace["workspace\ncurrent session and ambient pointers"]
+    Run["run\ntracked run state and reports"]
+    Authoring["authoring\nsuite:new state"]
+    Observe["observe\nobserver state"]
+    Hooks["hooks\nnormalized hook context"]
+
+    Workspace --> Run
+    Workspace --> Authoring
+    Workspace --> Observe
+    Workspace --> Hooks
+```
+
+Use this document as the short contract. If a module does not clearly fit one of these ownership buckets, it is probably in the wrong place.
