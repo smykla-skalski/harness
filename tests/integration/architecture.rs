@@ -188,31 +188,9 @@ fn app_context_stays_app_wiring_only() {
 fn bespoke_frontmatter_paths_are_gone() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
     let denylist = ["extract_raw_frontmatter(", "serde_yml::Mapping"];
-    let mut stack = vec![root.join("src")];
-    let mut hits = Vec::new();
-
-    while let Some(path) = stack.pop() {
-        for entry in fs::read_dir(&path).unwrap() {
-            let entry = entry.unwrap();
-            let child = entry.path();
-            if child.is_dir() {
-                stack.push(child);
-                continue;
-            }
-            if !matches_extension(&child) {
-                continue;
-            }
-            let contents = fs::read_to_string(&child).unwrap();
-            for needle in denylist {
-                if contents.contains(needle) {
-                    hits.push(format!(
-                        "{} contains forbidden bespoke frontmatter logic `{needle}`",
-                        child.strip_prefix(root).unwrap().display()
-                    ));
-                }
-            }
-        }
-    }
+    let hits = collect_hits_in_tree(&root.join("src"), root, None, &denylist, |path, needle| {
+        format!("{path} contains forbidden bespoke frontmatter logic `{needle}`")
+    });
 
     assert!(
         hits.is_empty(),
@@ -538,50 +516,41 @@ fn authoring_commands_depend_on_application_boundary() {
 #[test]
 fn authoring_exposes_a_facade_instead_of_public_internal_modules() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let authoring_mod = fs::read_to_string(root.join("src/authoring/mod.rs")).unwrap();
+    let authoring_mod = read_repo_file(root, "src/authoring/mod.rs");
+    assert_file_lacks_needles(
+        &authoring_mod,
+        "src/authoring/mod.rs should not publicly expose internal module",
+        &["pub mod rules;", "pub mod validate;", "pub mod workflow;"],
+    );
+    assert_file_contains_needles(
+        &authoring_mod,
+        "src/authoring/mod.rs should expose the authoring facade via",
+        &[
+            "pub use workflow::{",
+            "pub use session::{",
+            "pub use validate::{",
+            "pub use rules::{",
+        ],
+    );
 
-    for needle in ["pub mod rules;", "pub mod validate;", "pub mod workflow;"] {
-        assert!(
-            !authoring_mod.contains(needle),
-            "src/authoring/mod.rs should not publicly expose internal module `{needle}`"
-        );
-    }
-
-    for needle in [
-        "pub use workflow::{",
-        "pub use session::{",
-        "pub use validate::{",
-        "pub use rules::{",
-    ] {
-        assert!(
-            authoring_mod.contains(needle),
-            "src/authoring/mod.rs should expose the authoring facade via `{needle}`"
-        );
-    }
-
-    let mut hits = Vec::new();
-    for path in [
-        "src/hooks/application/context.rs",
-        "src/hooks/guard_question.rs",
-        "src/hooks/guard_stop.rs",
-        "src/hooks/guard_write.rs",
-        "tests/integration/commands/record.rs",
-    ] {
-        let contents = fs::read_to_string(root.join(path)).unwrap();
-        for needle in [
+    let hits = collect_hits_in_paths(
+        root,
+        &[
+            "src/hooks/application/context.rs",
+            "src/hooks/guard_question.rs",
+            "src/hooks/guard_stop.rs",
+            "src/hooks/guard_write.rs",
+            "tests/integration/commands/record.rs",
+        ],
+        &[
             "crate::authoring::workflow::",
             "crate::authoring::validate::",
             "crate::authoring::session::",
             "crate::authoring::rules::",
             "harness::authoring::workflow::",
-        ] {
-            if contents.contains(needle) {
-                hits.push(format!(
-                    "{path} still depends on authoring internals via `{needle}`"
-                ));
-            }
-        }
-    }
+        ],
+        |path, needle| format!("{path} still depends on authoring internals via `{needle}`"),
+    );
 
     assert!(
         hits.is_empty(),
@@ -766,138 +735,109 @@ fn helper_modules_do_not_leak_publicly() {
 #[test]
 fn observe_transport_stays_transport_only() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let transport = fs::read_to_string(root.join("src/observe/mod.rs")).unwrap();
+    let transport = read_repo_file(root, "src/observe/mod.rs");
+    assert_file_lacks_needles(
+        &transport,
+        "src/observe/mod.rs should stay transport-only instead of owning",
+        &[
+            "pub fn execute(",
+            "fn execute_scan_mode(",
+            "fn execute_dump_mode(",
+            "fn resolve_scan_action(",
+            "fn state_file_path(",
+            "fn load_observer_state(",
+            "fn save_observer_state(",
+            "fn execute_cycle(",
+            "fn execute_status(",
+            "fn execute_resume(",
+            "fn execute_verify(",
+            "fn execute_resolve_start(",
+            "fn execute_mute(",
+            "fn execute_unmute(",
+        ],
+    );
 
-    for needle in [
-        "pub fn execute(",
-        "fn execute_scan_mode(",
-        "fn execute_dump_mode(",
-        "fn resolve_scan_action(",
-        "fn state_file_path(",
-        "fn load_observer_state(",
-        "fn save_observer_state(",
-        "fn execute_cycle(",
-        "fn execute_status(",
-        "fn execute_resume(",
-        "fn execute_verify(",
-        "fn execute_resolve_start(",
-        "fn execute_mute(",
-        "fn execute_unmute(",
-    ] {
-        assert!(
-            !transport.contains(needle),
-            "src/observe/mod.rs should stay transport-only instead of owning `{needle}`"
-        );
-    }
+    let application = read_repo_file(root, "src/observe/application/mod.rs");
+    assert_file_contains_needles(
+        &application,
+        "src/observe/application/mod.rs should own",
+        &["pub(crate) fn execute(", "pub(crate) enum ObserveRequest"],
+    );
+    assert_file_lacks_needles(
+        &application,
+        "src/observe/application/mod.rs should not depend on transport enum",
+        &["ObserveMode", "ObserveScanActionKind"],
+    );
 
-    let application = fs::read_to_string(root.join("src/observe/application/mod.rs")).unwrap();
-    for needle in ["pub(crate) fn execute(", "pub(crate) enum ObserveRequest"] {
-        assert!(
-            application.contains(needle),
-            "src/observe/application/mod.rs should own `{needle}`"
-        );
-    }
-    for needle in ["ObserveMode", "ObserveScanActionKind"] {
-        assert!(
-            !application.contains(needle),
-            "src/observe/application/mod.rs should not depend on transport enum `{needle}`"
-        );
-    }
-
-    let maintenance =
-        fs::read_to_string(root.join("src/observe/application/maintenance.rs")).unwrap();
-    for needle in ["fn load_observer_state(", "fn execute_cycle("] {
-        assert!(
-            maintenance.contains(needle),
-            "src/observe/application/maintenance.rs should own `{needle}`"
-        );
-    }
+    let maintenance = read_repo_file(root, "src/observe/application/maintenance.rs");
+    assert_file_contains_needles(
+        &maintenance,
+        "src/observe/application/maintenance.rs should own",
+        &["fn load_observer_state(", "fn execute_cycle("],
+    );
 }
 
 #[test]
 fn hooks_transport_does_not_hydrate_session_defaults() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let hits = collect_hits_in_paths(
+        root,
+        &[
+            "src/hooks/protocol/context.rs",
+            "src/hooks/adapters/mod.rs",
+            "src/hooks/adapters/codex.rs",
+        ],
+        &["current_dir("],
+        |path, _| format!("{path} should not hydrate ambient cwd defaults in hooks transport"),
+    );
+    assert!(hits.is_empty(), "{}", hits.join("\n"));
 
-    for path in [
-        "src/hooks/protocol/context.rs",
-        "src/hooks/adapters/mod.rs",
-        "src/hooks/adapters/codex.rs",
-    ] {
-        let contents = fs::read_to_string(root.join(path)).unwrap();
-        assert!(
-            !contents.contains("current_dir("),
-            "{path} should not hydrate ambient cwd defaults in hooks transport"
-        );
-    }
-
-    let protocol = fs::read_to_string(root.join("src/hooks/protocol/context.rs")).unwrap();
+    let protocol = read_repo_file(root, "src/hooks/protocol/context.rs");
     assert!(
         protocol.contains("pub cwd: Option<PathBuf>"),
         "src/hooks/protocol/context.rs should preserve missing cwd in normalized transport context"
     );
-    for needle in [
-        "HookEnvelopePayload",
-        "legacy_tool_context",
-        "fn normalized_from_envelope(",
-        "fn with_skill(",
-        "fn with_default_event(",
-    ] {
-        assert!(
-            !protocol.contains(needle),
-            "src/hooks/protocol/context.rs should stay transport-only instead of owning `{needle}`"
-        );
-    }
+    assert_file_lacks_needles(
+        &protocol,
+        "src/hooks/protocol/context.rs should stay transport-only instead of owning",
+        &[
+            "HookEnvelopePayload",
+            "legacy_tool_context",
+            "fn normalized_from_envelope(",
+            "fn with_skill(",
+            "fn with_default_event(",
+        ],
+    );
 
-    let application = fs::read_to_string(root.join("src/hooks/application/context.rs")).unwrap();
-    for needle in [
-        "fn normalized_from_envelope(",
-        "pub(crate) fn prepare_normalized_context(",
-        "fn hydrate_normalized_context(",
-        "fn hydrate_session(",
-        "legacy_tool_context(",
-    ] {
-        assert!(
-            application.contains(needle),
-            "src/hooks/application/context.rs should own `{needle}`"
-        );
-    }
+    let application = read_repo_file(root, "src/hooks/application/context.rs");
+    assert_file_contains_needles(
+        &application,
+        "src/hooks/application/context.rs should own",
+        &[
+            "fn normalized_from_envelope(",
+            "pub(crate) fn prepare_normalized_context(",
+            "fn hydrate_normalized_context(",
+            "fn hydrate_session(",
+            "legacy_tool_context(",
+        ],
+    );
 }
 
 #[test]
 fn setup_does_not_mutate_run_repository_directly() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let setup_root = root.join("src/setup");
-    let denylist = [
-        "RunRepository",
-        "current_pointer_path(",
-        "RunLayout::current_pointer",
-        "write_json_pretty(",
-    ];
-    let mut stack = vec![setup_root];
-    let mut hits = Vec::new();
-
-    while let Some(path) = stack.pop() {
-        for entry in fs::read_dir(&path).unwrap() {
-            let entry = entry.unwrap();
-            let child = entry.path();
-            if child.is_dir() {
-                stack.push(child);
-                continue;
-            }
-            if !matches_extension(&child) {
-                continue;
-            }
-            let contents = fs::read_to_string(&child).unwrap();
-            for needle in denylist {
-                if contents.contains(needle) {
-                    hits.push(format!(
-                        "{} still reaches into run-owned persistence via `{needle}`",
-                        child.strip_prefix(root).unwrap().display()
-                    ));
-                }
-            }
-        }
-    }
+    let hits = collect_hits_in_tree(
+        &root.join("src/setup"),
+        root,
+        None,
+        &[
+            "RunRepository",
+            "current_pointer_path(",
+            "RunLayout::current_pointer",
+            "write_json_pretty(",
+        ],
+        |path, needle| format!("{path} still reaches into run-owned persistence via `{needle}`"),
+    );
 
     assert!(
         hits.is_empty(),
@@ -909,40 +849,37 @@ fn setup_does_not_mutate_run_repository_directly() {
 #[test]
 fn setup_session_transport_stays_transport_only() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let transport = fs::read_to_string(root.join("src/setup/session.rs")).unwrap();
+    let session_mod = read_repo_file(root, "src/setup/session.rs");
+    assert_file_lacks_needles(
+        &session_mod,
+        "src/setup/session.rs should stay transport-only instead of owning",
+        &[
+            "wrapper::main(",
+            "pending_compact_handoff(",
+            "render_hydration_context(",
+            "consume_compact_handoff(",
+            "ephemeral_metallb::cleanup_templates(",
+            "RunApplication::current_run_dir(",
+            "RunApplication::clear_current_pointer(",
+        ],
+    );
 
-    for needle in [
-        "wrapper::main(",
-        "pending_compact_handoff(",
-        "render_hydration_context(",
-        "consume_compact_handoff(",
-        "ephemeral_metallb::cleanup_templates(",
-        "RunApplication::current_run_dir(",
-        "RunApplication::clear_current_pointer(",
-    ] {
-        assert!(
-            !transport.contains(needle),
-            "src/setup/session.rs should stay transport-only instead of owning `{needle}`"
-        );
-    }
-
-    let service = fs::read_to_string(root.join("src/setup/services/session.rs")).unwrap();
-    for needle in [
-        "fn bootstrap_project_wrapper(",
-        "fn restore_compact_handoff(",
-        "fn cleanup_current_run_context(",
-    ] {
-        assert!(
-            service.contains(needle),
-            "src/setup/services/session.rs should own `{needle}`"
-        );
-    }
+    let service = read_repo_file(root, "src/setup/services/session.rs");
+    assert_file_contains_needles(
+        &service,
+        "src/setup/services/session.rs should own",
+        &[
+            "fn bootstrap_project_wrapper(",
+            "fn restore_compact_handoff(",
+            "fn cleanup_current_run_context(",
+        ],
+    );
 }
 
 #[test]
 fn setup_wrapper_does_not_depend_on_block_registry() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let contents = fs::read_to_string(root.join("src/setup/wrapper.rs")).unwrap();
+    let contents = read_repo_file(root, "src/setup/wrapper.rs");
     assert!(
         !contents.contains("BlockRegistry"),
         "src/setup/wrapper.rs should use pure runner policy data instead of BlockRegistry"
@@ -952,8 +889,8 @@ fn setup_wrapper_does_not_depend_on_block_registry() {
 #[test]
 fn infra_blocks_do_not_export_legacy_block_registry() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let blocks_mod = fs::read_to_string(root.join("src/infra/blocks/mod.rs")).unwrap();
-    let registry = fs::read_to_string(root.join("src/infra/blocks/registry.rs")).unwrap();
+    let blocks_mod = read_repo_file(root, "src/infra/blocks/mod.rs");
+    let registry = read_repo_file(root, "src/infra/blocks/registry.rs");
 
     assert!(
         !blocks_mod.contains("BlockRegistry"),
@@ -968,21 +905,19 @@ fn infra_blocks_do_not_export_legacy_block_registry() {
 #[test]
 fn tool_fact_model_is_owned_by_kernel() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let hooks_context = fs::read_to_string(root.join("src/hooks/protocol/context.rs")).unwrap();
+    let hooks_context = read_repo_file(root, "src/hooks/protocol/context.rs");
+    assert_file_lacks_needles(
+        &hooks_context,
+        "src/hooks/protocol/context.rs should consume kernel::tooling instead of redefining",
+        &[
+            "pub enum ToolCategory",
+            "pub enum ToolInput",
+            "pub struct ToolContext",
+            "fn normalize_tool_input",
+        ],
+    );
 
-    for needle in [
-        "pub enum ToolCategory",
-        "pub enum ToolInput",
-        "pub struct ToolContext",
-        "fn normalize_tool_input",
-    ] {
-        assert!(
-            !hooks_context.contains(needle),
-            "src/hooks/protocol/context.rs should consume kernel::tooling instead of redefining `{needle}`"
-        );
-    }
-
-    let kernel_tooling = fs::read_to_string(root.join("src/kernel/tooling.rs")).unwrap();
+    let kernel_tooling = read_repo_file(root, "src/kernel/tooling.rs");
     assert!(
         kernel_tooling.contains("pub struct ToolContext"),
         "src/kernel/tooling.rs should own the shared tool fact model"
@@ -992,54 +927,34 @@ fn tool_fact_model_is_owned_by_kernel() {
 #[test]
 fn hook_application_owns_guard_context_hydration() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let protocol_context = fs::read_to_string(root.join("src/hooks/protocol/context.rs")).unwrap();
+    let protocol_context = read_repo_file(root, "src/hooks/protocol/context.rs");
+    assert_file_lacks_needles(
+        &protocol_context,
+        "src/hooks/protocol/context.rs should stay transport-only instead of owning",
+        &[
+            "pub struct GuardContext",
+            "RunContext",
+            "RunnerWorkflowState",
+            "AuthorWorkflowState",
+            "load_run_context",
+            "load_runner_state",
+            "load_author_state",
+        ],
+    );
 
-    for needle in [
-        "pub struct GuardContext",
-        "RunContext",
-        "RunnerWorkflowState",
-        "AuthorWorkflowState",
-        "load_run_context",
-        "load_runner_state",
-        "load_author_state",
-    ] {
-        assert!(
-            !protocol_context.contains(needle),
-            "src/hooks/protocol/context.rs should stay transport-only instead of owning `{needle}`"
-        );
-    }
-
-    let application_context =
-        fs::read_to_string(root.join("src/hooks/application/context.rs")).unwrap();
+    let application_context = read_repo_file(root, "src/hooks/application/context.rs");
     assert!(
         application_context.contains("pub struct GuardContext"),
         "src/hooks/application/context.rs should own the hook policy input context"
     );
 
-    let hooks_root = root.join("src/hooks");
-    let mut stack = vec![hooks_root];
-    let mut hits = Vec::new();
-
-    while let Some(path) = stack.pop() {
-        for entry in fs::read_dir(&path).unwrap() {
-            let entry = entry.unwrap();
-            let child = entry.path();
-            if child.is_dir() {
-                stack.push(child);
-                continue;
-            }
-            if !matches_extension(&child) {
-                continue;
-            }
-            let contents = fs::read_to_string(&child).unwrap();
-            if contents.contains("protocol::context::GuardContext") {
-                hits.push(format!(
-                    "{} still imports GuardContext from hooks::protocol",
-                    child.strip_prefix(root).unwrap().display()
-                ));
-            }
-        }
-    }
+    let hits = collect_hits_in_tree(
+        &root.join("src/hooks"),
+        root,
+        None,
+        &["protocol::context::GuardContext"],
+        |path, _| format!("{path} still imports GuardContext from hooks::protocol"),
+    );
 
     assert!(
         hits.is_empty(),
@@ -1051,52 +966,27 @@ fn hook_application_owns_guard_context_hydration() {
 #[test]
 fn kuma_contracts_are_isolated_to_block_namespace() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let src_root = root.join("src");
-    let excluded = root.join("src/infra/blocks/kuma");
-    let denylist = [
-        "Kuma test harness",
-        "~kuma",
-        ".join(\"kuma\")",
-        "`harness cluster`",
-        "harness cluster ",
-        "`harness token`",
-        "harness token ",
-        "`harness service`",
-        "harness service ",
-        "`harness api`",
-        "harness api ",
-        "`harness kumactl`",
-        "harness kumactl ",
-    ];
-
-    let mut stack = vec![src_root];
-    let mut hits = Vec::new();
-
-    while let Some(path) = stack.pop() {
-        for entry in fs::read_dir(&path).unwrap() {
-            let entry = entry.unwrap();
-            let child = entry.path();
-            if child.starts_with(&excluded) {
-                continue;
-            }
-            if child.is_dir() {
-                stack.push(child);
-                continue;
-            }
-            if !matches_extension(&child) {
-                continue;
-            }
-            let contents = fs::read_to_string(&child).unwrap();
-            for needle in denylist {
-                if contents.contains(needle) {
-                    hits.push(format!(
-                        "{} contains forbidden Kuma contract `{needle}`",
-                        child.strip_prefix(root).unwrap().display()
-                    ));
-                }
-            }
-        }
-    }
+    let hits = collect_hits_in_tree(
+        &root.join("src"),
+        root,
+        Some(&root.join("src/infra/blocks/kuma")),
+        &[
+            "Kuma test harness",
+            "~kuma",
+            ".join(\"kuma\")",
+            "`harness cluster`",
+            "harness cluster ",
+            "`harness token`",
+            "harness token ",
+            "`harness service`",
+            "harness service ",
+            "`harness api`",
+            "harness api ",
+            "`harness kumactl`",
+            "harness kumactl ",
+        ],
+        |path, needle| format!("{path} contains forbidden Kuma contract `{needle}`"),
+    );
 
     assert!(
         hits.is_empty(),
@@ -1108,53 +998,130 @@ fn kuma_contracts_are_isolated_to_block_namespace() {
 #[test]
 fn docs_do_not_reference_legacy_kuma_storage_paths() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let readme = fs::read_to_string(root.join("README.md")).unwrap();
-
-    for needle in ["$XDG_DATA_HOME/kuma", ".local/share/kuma"] {
-        assert!(
-            !readme.contains(needle),
-            "README.md should not reference legacy Kuma storage paths via `{needle}`"
-        );
-    }
+    let readme = read_repo_file(root, "README.md");
+    assert_file_lacks_needles(
+        &readme,
+        "README.md should not reference legacy Kuma storage paths via",
+        &["$XDG_DATA_HOME/kuma", ".local/share/kuma"],
+    );
 }
 
 #[test]
 fn observe_skill_matches_current_cli_surface() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let skill = fs::read_to_string(root.join(".claude/skills/observe/SKILL.md")).unwrap();
-    let overrides =
-        fs::read_to_string(root.join(".claude/skills/observe/references/overrides.md")).unwrap();
-    let command_surface = fs::read_to_string(
-        root.join(".claude/skills/observe/references/command-surface.md"),
-    )
-    .unwrap();
+    let docs = [
+        read_repo_file(root, ".claude/skills/observe/SKILL.md"),
+        read_repo_file(root, ".claude/skills/observe/references/overrides.md"),
+        read_repo_file(root, ".claude/skills/observe/references/command-surface.md"),
+    ];
+    let all_docs: Vec<&str> = docs.iter().map(String::as_str).collect();
 
-    let all_docs = [skill.as_str(), overrides.as_str(), command_surface.as_str()];
+    assert_docs_lack_needles(
+        &all_docs,
+        "observe skill docs should not use legacy observe contract",
+        &[
+            "harness observe cycle",
+            "harness observe status",
+            "harness observe resume",
+            "harness observe compare",
+            "harness observe doctor",
+            "$XDG_DATA_HOME/kuma/observe",
+        ],
+    );
+    assert_docs_contain_needles(
+        &all_docs,
+        "observe skill docs should describe current observe contract via",
+        &[
+            "harness observe scan <session-id> --action cycle",
+            "harness observe scan <session-id> --action status",
+            "$XDG_DATA_HOME/harness/observe/<SESSION_ID>.state",
+        ],
+    );
+}
 
-    for needle in [
-        "harness observe cycle",
-        "harness observe status",
-        "harness observe resume",
-        "harness observe compare",
-        "harness observe doctor",
-        "$XDG_DATA_HOME/kuma/observe",
-    ] {
+fn assert_file_lacks_needles(contents: &str, message_prefix: &str, needles: &[&str]) {
+    for needle in needles {
+        assert!(!contents.contains(needle), "{message_prefix} `{needle}`");
+    }
+}
+
+fn assert_file_contains_needles(contents: &str, message_prefix: &str, needles: &[&str]) {
+    for needle in needles {
+        assert!(contents.contains(needle), "{message_prefix} `{needle}`");
+    }
+}
+
+fn assert_docs_lack_needles(docs: &[&str], message_prefix: &str, needles: &[&str]) {
+    for needle in needles {
         assert!(
-            !all_docs.iter().any(|doc| doc.contains(needle)),
-            "observe skill docs should not use legacy observe contract `{needle}`"
+            !docs.iter().any(|doc| doc.contains(needle)),
+            "{message_prefix} `{needle}`"
         );
     }
+}
 
-    for needle in [
-        "harness observe scan <session-id> --action cycle",
-        "harness observe scan <session-id> --action status",
-        "$XDG_DATA_HOME/harness/observe/<SESSION_ID>.state",
-    ] {
+fn assert_docs_contain_needles(docs: &[&str], message_prefix: &str, needles: &[&str]) {
+    for needle in needles {
         assert!(
-            all_docs.iter().any(|doc| doc.contains(needle)),
-            "observe skill docs should describe current observe contract via `{needle}`"
+            docs.iter().any(|doc| doc.contains(needle)),
+            "{message_prefix} `{needle}`"
         );
     }
+}
+
+fn read_repo_file(root: &Path, path: &str) -> String {
+    fs::read_to_string(root.join(path)).unwrap()
+}
+
+fn collect_hits_in_paths<F>(root: &Path, paths: &[&str], needles: &[&str], render: F) -> Vec<String>
+where
+    F: Fn(&str, &str) -> String,
+{
+    let mut hits = Vec::new();
+    for path in paths {
+        let contents = read_repo_file(root, path);
+        for needle in needles {
+            if contents.contains(needle) {
+                hits.push(render(path, needle));
+            }
+        }
+    }
+    hits
+}
+
+fn collect_hits_in_tree<F>(
+    start: &Path,
+    root: &Path,
+    skip_prefix: Option<&Path>,
+    needles: &[&str],
+    render: F,
+) -> Vec<String>
+where
+    F: Fn(&str, &str) -> String,
+{
+    let mut hits = Vec::new();
+
+    for entry in walkdir::WalkDir::new(start)
+        .into_iter()
+        .filter_map(Result::ok)
+    {
+        let child = entry.into_path();
+        if skip_prefix.is_some_and(|prefix| child.starts_with(prefix)) || child.is_dir() {
+            continue;
+        }
+        if !matches_extension(&child) {
+            continue;
+        }
+        let contents = fs::read_to_string(&child).unwrap();
+        let relative = child.strip_prefix(root).unwrap().display().to_string();
+        for needle in needles {
+            if contents.contains(needle) {
+                hits.push(render(&relative, needle));
+            }
+        }
+    }
+
+    hits
 }
 
 fn matches_extension(path: &Path) -> bool {

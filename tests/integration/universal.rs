@@ -1,5 +1,3 @@
-#![allow(clippy::cognitive_complexity)]
-
 // Universal mode integration tests.
 // Tests Platform enum, ClusterSpec universal fields, compose file generation,
 // capabilities output, universal manifest validation, context loading with
@@ -95,7 +93,6 @@ fn platform_default_is_kubernetes() {
 // ============================================================================
 
 #[test]
-#[allow(clippy::cognitive_complexity)]
 fn cluster_spec_universal_fields_roundtrip() {
     let mut spec = ClusterSpec::from_mode_with_platform(
         "single-up",
@@ -116,16 +113,7 @@ fn cluster_spec_universal_fields_roundtrip() {
     let json = serde_json::to_string(&spec).unwrap();
     let back: ClusterSpec = serde_json::from_str(&json).unwrap();
 
-    assert_eq!(back.platform, Platform::Universal);
-    assert_eq!(back.admin_token.as_deref(), Some("admin-token-abc123"));
-    assert_eq!(back.docker_network.as_deref(), Some("harness-test-cp"));
-    assert_eq!(back.store_type.as_deref(), Some("memory"));
-    assert_eq!(back.cp_image.as_deref(), Some("kuma-cp:dev"));
-    assert_eq!(
-        back.members[0].container_id.as_deref(),
-        Some("container-xyz")
-    );
-    assert_eq!(back.members[0].container_ip.as_deref(), Some("172.57.0.3"));
+    assert_universal_cluster_roundtrip(&back);
 }
 
 #[test]
@@ -140,15 +128,7 @@ fn cluster_spec_universal_omits_none_fields_in_json() {
     )
     .unwrap();
     let json_value = spec.to_json_dict();
-    // store_type, cp_image, admin_token should be absent when None
-    assert!(json_value.get("store_type").is_none());
-    assert!(json_value.get("cp_image").is_none());
-    assert!(json_value.get("admin_token").is_none());
-    // docker_network should be present (auto-generated)
-    assert_eq!(
-        json_value.get("docker_network").and_then(|v| v.as_str()),
-        Some("harness-cp")
-    );
+    assert_missing_optional_universal_fields(&json_value);
 }
 
 #[test]
@@ -711,18 +691,9 @@ fn primary_api_url_returns_none_for_universal_without_ip() {
 // ============================================================================
 
 #[test]
-#[allow(clippy::cognitive_complexity)]
 fn cluster_member_universal_defaults() {
     let member = ClusterMember::universal("test-cp", "cp", None);
-    assert_eq!(member.name, "test-cp");
-    assert_eq!(member.role, "cp");
-    assert!(member.kubeconfig.is_empty());
-    assert!(member.zone_name.is_none());
-    assert!(member.container_id.is_none());
-    assert!(member.container_ip.is_none());
-    assert_eq!(member.cp_api_port, Some(5681));
-    assert_eq!(member.xds_port, Some(5678));
-    assert!(member.kds_port.is_none());
+    assert_universal_member_defaults(&member);
 }
 
 #[test]
@@ -753,7 +724,6 @@ fn cluster_member_universal_serialization_roundtrip() {
 // ============================================================================
 
 #[test]
-#[allow(clippy::cognitive_complexity)]
 fn cluster_spec_from_object_with_universal_fields() {
     let obj = serde_json::json!({
         "mode": "single-up",
@@ -775,14 +745,7 @@ fn cluster_spec_from_object_with_universal_fields() {
         "repo_root": "/repo"
     });
     let spec = ClusterSpec::from_object(&obj).unwrap();
-    assert_eq!(spec.platform, Platform::Universal);
-    assert_eq!(spec.docker_network.as_deref(), Some("harness-cp"));
-    assert_eq!(spec.store_type.as_deref(), Some("memory"));
-    assert_eq!(spec.cp_image.as_deref(), Some("kuma-cp:dev"));
-    assert_eq!(spec.admin_token.as_deref(), Some("tok-xyz"));
-    assert_eq!(spec.members[0].container_id.as_deref(), Some("abc"));
-    assert_eq!(spec.members[0].container_ip.as_deref(), Some("172.57.0.2"));
-    assert_eq!(spec.members[0].cp_api_port, Some(5681));
+    assert_universal_spec_from_object(&spec);
 }
 
 #[test]
@@ -822,7 +785,6 @@ fn run_layout_from_run_dir_universal_run() {
 // ============================================================================
 
 #[test]
-#[allow(clippy::cognitive_complexity)]
 fn cluster_spec_to_json_and_back_universal() {
     let mut spec = ClusterSpec::from_mode_with_platform(
         "global-zone-up",
@@ -842,22 +804,118 @@ fn cluster_spec_to_json_and_back_universal() {
     let json_value = spec.to_json_dict();
     let back = ClusterSpec::from_object(&json_value).unwrap();
 
-    assert_eq!(back.platform, Platform::Universal);
-    assert_eq!(back.mode, ClusterMode::GlobalZoneUp);
-    assert_eq!(back.admin_token.as_deref(), Some("roundtrip-token"));
-    assert_eq!(back.store_type.as_deref(), Some("memory"));
-    assert_eq!(back.cp_image.as_deref(), Some("kuma-cp:test"));
+    assert_universal_json_roundtrip(&back);
+}
+
+fn assert_universal_cluster_roundtrip(spec: &ClusterSpec) {
+    assert_universal_cluster_identity(spec);
+    assert_universal_cluster_runtime(spec);
+    assert_universal_cluster_member(spec);
+}
+
+fn assert_missing_optional_universal_fields(json_value: &serde_json::Value) {
+    assert!(json_value.get("store_type").is_none());
+    assert!(json_value.get("cp_image").is_none());
+    assert!(json_value.get("admin_token").is_none());
     assert_eq!(
-        back.members[0].container_ip.as_deref(),
+        json_value
+            .get("docker_network")
+            .and_then(serde_json::Value::as_str),
+        Some("harness-cp")
+    );
+}
+
+fn assert_universal_member_defaults(member: &ClusterMember) {
+    assert_universal_member_identity(member);
+    assert_universal_member_network(member);
+    assert_universal_member_ports(member);
+}
+
+fn assert_universal_spec_from_object(spec: &ClusterSpec) {
+    assert_universal_spec_from_object_identity(spec);
+    assert_universal_spec_from_object_runtime(spec);
+    assert_universal_spec_from_object_member(spec);
+}
+
+fn assert_universal_spec_from_object_identity(spec: &ClusterSpec) {
+    assert_eq!(spec.platform, Platform::Universal);
+    assert_eq!(spec.docker_network.as_deref(), Some("harness-cp"));
+}
+
+fn assert_universal_spec_from_object_runtime(spec: &ClusterSpec) {
+    assert_eq!(spec.store_type.as_deref(), Some("memory"));
+    assert_eq!(spec.cp_image.as_deref(), Some("kuma-cp:dev"));
+    assert_eq!(spec.admin_token.as_deref(), Some("tok-xyz"));
+}
+
+fn assert_universal_spec_from_object_member(spec: &ClusterSpec) {
+    assert_eq!(spec.members[0].container_id.as_deref(), Some("abc"));
+    assert_eq!(spec.members[0].container_ip.as_deref(), Some("172.57.0.2"));
+    assert_eq!(spec.members[0].cp_api_port, Some(5681));
+}
+
+fn assert_universal_json_roundtrip(spec: &ClusterSpec) {
+    assert_universal_json_metadata(spec);
+    assert_universal_json_member(spec);
+}
+
+fn assert_universal_cluster_identity(spec: &ClusterSpec) {
+    assert_eq!(spec.platform, Platform::Universal);
+    assert_eq!(spec.admin_token.as_deref(), Some("admin-token-abc123"));
+    assert_eq!(spec.docker_network.as_deref(), Some("harness-test-cp"));
+}
+
+fn assert_universal_cluster_runtime(spec: &ClusterSpec) {
+    assert_eq!(spec.store_type.as_deref(), Some("memory"));
+    assert_eq!(spec.cp_image.as_deref(), Some("kuma-cp:dev"));
+}
+
+fn assert_universal_cluster_member(spec: &ClusterSpec) {
+    assert_eq!(
+        spec.members[0].container_id.as_deref(),
+        Some("container-xyz")
+    );
+    assert_eq!(spec.members[0].container_ip.as_deref(), Some("172.57.0.3"));
+}
+
+fn assert_universal_member_identity(member: &ClusterMember) {
+    assert_eq!(member.name, "test-cp");
+    assert_eq!(member.role, "cp");
+    assert!(member.kubeconfig.is_empty());
+}
+
+fn assert_universal_member_network(member: &ClusterMember) {
+    assert!(member.zone_name.is_none());
+    assert!(member.container_id.is_none());
+    assert!(member.container_ip.is_none());
+}
+
+fn assert_universal_member_ports(member: &ClusterMember) {
+    assert_eq!(member.cp_api_port, Some(5681));
+    assert_eq!(member.xds_port, Some(5678));
+    assert!(member.kds_port.is_none());
+}
+
+fn assert_universal_json_metadata(spec: &ClusterSpec) {
+    assert_eq!(spec.platform, Platform::Universal);
+    assert_eq!(spec.mode, ClusterMode::GlobalZoneUp);
+    assert_eq!(spec.admin_token.as_deref(), Some("roundtrip-token"));
+    assert_eq!(spec.store_type.as_deref(), Some("memory"));
+    assert_eq!(spec.cp_image.as_deref(), Some("kuma-cp:test"));
+    assert_eq!(spec.members.len(), 2);
+}
+
+fn assert_universal_json_member(spec: &ClusterSpec) {
+    assert_eq!(
+        spec.members[0].container_ip.as_deref(),
         Some("172.57.0.100")
     );
     assert_eq!(
-        back.members[0].container_id.as_deref(),
+        spec.members[0].container_id.as_deref(),
         Some("global-container-id")
     );
-    assert_eq!(back.members.len(), 2);
-    assert_eq!(back.members[0].role, "global-cp");
-    assert_eq!(back.members[1].role, "zone-cp");
+    assert_eq!(spec.members[0].role, "global-cp");
+    assert_eq!(spec.members[1].role, "zone-cp");
 }
 
 // ============================================================================
