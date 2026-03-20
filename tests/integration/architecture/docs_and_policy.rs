@@ -58,11 +58,14 @@ fn setup_session_transport_stays_transport_only() {
 #[test]
 fn setup_wrapper_does_not_depend_on_block_registry() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let contents = read_repo_file(root, "src/setup/wrapper.rs");
-    assert!(
-        !contents.contains("BlockRegistry"),
-        "src/setup/wrapper.rs should use pure runner policy data instead of BlockRegistry"
+    let hits = collect_hits_in_tree(
+        &root.join("src/setup/wrapper"),
+        root,
+        None,
+        &["BlockRegistry"],
+        |path, _| format!("{path} should use pure runner policy data instead of BlockRegistry"),
     );
+    assert!(hits.is_empty(), "{}", hits.join("\n"));
 }
 
 #[test]
