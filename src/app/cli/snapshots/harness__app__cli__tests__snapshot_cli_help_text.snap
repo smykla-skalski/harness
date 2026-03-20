@@ -1,6 +1,6 @@
 ---
-source: src/app/cli.rs
-assertion_line: 623
+source: src/app/cli/tests.rs
+assertion_line: 419
 expression: help
 ---
 Harness CLI

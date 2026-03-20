@@ -1,6 +1,6 @@
 ---
-source: src/app/cli.rs
-assertion_line: 631
+source: src/app/cli/tests.rs
+assertion_line: 427
 expression: "names.join(\"\\n\")"
 ---
 authoring
