@@ -232,6 +232,71 @@ fn hook_protocol_roots_stay_prod_only() {
 }
 
 #[test]
+fn hook_misc_roots_stay_prod_only() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+
+    for (path, needles, split_path) in [
+        (
+            "src/hooks/session.rs",
+            &[
+                "fn session_start_output_from_additional_context()",
+                "fn resolve_cwd_falls_back_to_project_dir()",
+                "mod tests {",
+            ][..],
+            "src/hooks/session/tests.rs",
+        ),
+        (
+            "src/hooks/audit.rs",
+            &[
+                "fn is_silent_suite_runner()",
+                "fn writes_audit_entry_for_suite_run_hook()",
+                "mod tests {",
+            ][..],
+            "src/hooks/audit/tests.rs",
+        ),
+        (
+            "src/hooks/enrich_failure.rs",
+            &[
+                "fn request_failure_triage_sets_phase_and_failure()",
+                "fn request_preflight_failed_resets_status()",
+                "mod tests {",
+            ][..],
+            "src/hooks/enrich_failure/tests.rs",
+        ),
+        (
+            "src/hooks/verify_write.rs",
+            &[
+                "fn verify_suite_author_empty_amendments_denies()",
+                "fn verify_suite_runner_accumulates_suite_and_amendments_writes()",
+                "mod tests {",
+            ][..],
+            "src/hooks/verify_write/tests.rs",
+        ),
+        (
+            "src/hooks/protocol/hook_result.rs",
+            &[
+                "fn allow_has_empty_code_and_message()",
+                "fn clone_is_equal()",
+                "mod tests {",
+            ][..],
+            "src/hooks/protocol/hook_result/tests.rs",
+        ),
+    ] {
+        let contents = fs::read_to_string(root.join(path)).unwrap();
+        for needle in needles {
+            assert!(
+                !contents.contains(needle),
+                "{path} should stay focused on production hook runtime logic instead of owning `{needle}`"
+            );
+        }
+        assert!(
+            root.join(split_path).exists(),
+            "hook misc split test module should exist: {split_path}"
+        );
+    }
+}
+
+#[test]
 fn guard_write_root_stays_prod_only() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
     let guard_write = fs::read_to_string(root.join("src/hooks/guard_write.rs")).unwrap();
