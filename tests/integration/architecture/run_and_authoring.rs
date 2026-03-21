@@ -275,6 +275,28 @@ fn run_command_roots_stay_prod_only() {
 }
 
 #[test]
+fn authoring_root_stays_prod_only() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let authoring = fs::read_to_string(root.join("src/authoring/mod.rs")).unwrap();
+
+    for needle in [
+        "fn suite_path_joins_suite_md()",
+        "fn schema_summary_serialization()",
+        "mod tests {",
+    ] {
+        assert!(
+            !authoring.contains(needle),
+            "src/authoring/mod.rs should stay focused on authoring exports instead of owning `{needle}`"
+        );
+    }
+
+    assert!(
+        root.join("src/authoring/tests.rs").exists(),
+        "authoring split test module should exist"
+    );
+}
+
+#[test]
 fn run_services_do_not_load_their_own_context() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
     let contents = fs::read_to_string(root.join("src/run/services/mod.rs")).unwrap();
