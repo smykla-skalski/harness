@@ -246,10 +246,10 @@ fn transport_outputs_use_typed_serialization_helpers() {
         &["#[derive(Serialize)]", "struct WatchStarted"],
     );
 
-    let scan = read_repo_file(root, "src/observe/scan.rs");
+    let scan = read_repo_file(root, "src/observe/scan/execute.rs");
     assert_file_contains_needles(
         &scan,
-        "src/observe/scan.rs should emit typed scan status JSON via",
+        "src/observe/scan/execute.rs should emit typed scan status JSON via",
         &["#[derive(Serialize)]", "struct ScanStarted"],
     );
 
@@ -277,6 +277,38 @@ fn transport_outputs_use_typed_serialization_helpers() {
         "src/setup/wrapper/registrations.rs should serialize bridge bindings from typed structs via",
         &["#[derive(Serialize)]", "struct OpenCodeToolBindings"],
     );
+}
+
+#[test]
+fn observe_scan_root_stays_prod_only() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let scan = read_repo_file(root, "src/observe/scan.rs");
+
+    assert_file_lacks_needles(
+        &scan,
+        "src/observe/scan.rs should stay focused on facade exports instead of owning",
+        &[
+            "fn scan_with_limit(",
+            "fn apply_category_filter(",
+            "fn resolve_effective_bounds(",
+            "fn render_scan_output(",
+            "fn write_details_file(",
+            "struct ScanStarted {",
+        ],
+    );
+
+    for path in [
+        "src/observe/scan/execute.rs",
+        "src/observe/scan/filters.rs",
+        "src/observe/scan/from.rs",
+        "src/observe/scan/io.rs",
+        "src/observe/scan/render.rs",
+    ] {
+        assert!(
+            root.join(path).exists(),
+            "observe scan split module should exist: {path}"
+        );
+    }
 }
 
 #[test]
