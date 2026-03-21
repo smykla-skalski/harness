@@ -1,6 +1,10 @@
 use serde::Deserialize;
 
+use super::rendering::DETAIL_TRUNCATE_LENGTH;
 use super::*;
+use crate::observe::types::{
+    Confidence, FixSafety, IssueCategory, IssueCode, MessageRole, SourceTool,
+};
 
 #[derive(Deserialize)]
 struct ParsedIssue {
