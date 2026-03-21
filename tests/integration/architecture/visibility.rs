@@ -662,6 +662,31 @@ fn observe_classifier_rules_root_stays_prod_only() {
 }
 
 #[test]
+fn observe_output_root_stays_focused_on_render_entrypoints() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let output = fs::read_to_string(root.join("src/observe/output.rs")).unwrap();
+
+    for needle in [
+        "struct RenderedIssue<'a>",
+        "struct RenderedSummary",
+        "struct RenderedTopCauses<'a>",
+        "struct SarifProperties<'a>",
+        "fn render_json_string<T>(",
+        "fn render_property_bag<T>(",
+    ] {
+        assert!(
+            !output.contains(needle),
+            "src/observe/output.rs should stay focused on renderer entrypoints instead of owning `{needle}`"
+        );
+    }
+
+    assert!(
+        root.join("src/observe/output/rendering.rs").exists(),
+        "observe output rendering split module should exist"
+    );
+}
+
+#[test]
 fn docker_block_root_stays_a_facade() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
     let docker_mod = fs::read_to_string(root.join("src/infra/blocks/docker/mod.rs")).unwrap();
