@@ -119,6 +119,53 @@ fn run_context_root_stays_a_facade() {
 }
 
 #[test]
+fn run_small_roots_stay_prod_only() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+
+    for (path, needles, split_path) in [
+        (
+            "src/run/context/cleanup.rs",
+            &[
+                "fn new_manifest_is_empty()",
+                "fn deserialization_from_json()",
+                "mod tests {",
+            ][..],
+            "src/run/context/cleanup/tests.rs",
+        ),
+        (
+            "src/run/application/dependencies.rs",
+            &[
+                "fn production_support_includes_core_run_blocks()",
+                "fn validate_requirement_names_reports_missing_block()",
+                "mod tests {",
+            ][..],
+            "src/run/application/dependencies/tests.rs",
+        ),
+        (
+            "src/run/services/reporting.rs",
+            &[
+                "fn last_group_capture_value_empty_groups()",
+                "fn warn_if_capture_missing_capture_changed()",
+                "mod tests {",
+            ][..],
+            "src/run/services/reporting/tests.rs",
+        ),
+    ] {
+        let contents = fs::read_to_string(root.join(path)).unwrap();
+        for needle in needles {
+            assert!(
+                !contents.contains(needle),
+                "{path} should stay focused on production run logic instead of owning `{needle}`"
+            );
+        }
+        assert!(
+            root.join(split_path).exists(),
+            "run split test module should exist: {split_path}"
+        );
+    }
+}
+
+#[test]
 fn run_services_do_not_load_their_own_context() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
     let contents = fs::read_to_string(root.join("src/run/services/mod.rs")).unwrap();
