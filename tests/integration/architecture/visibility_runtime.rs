@@ -95,6 +95,28 @@ fn build_block_root_stays_a_facade() {
 }
 
 #[test]
+fn codec_root_stays_prod_only() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let codec = fs::read_to_string(root.join("src/codec.rs")).unwrap();
+
+    for needle in [
+        "fn test_from_mapping_basic()",
+        "fn test_from_mapping_with_defaults()",
+        "mod tests {",
+    ] {
+        assert!(
+            !codec.contains(needle),
+            "src/codec.rs should stay focused on production codec helpers instead of owning `{needle}`"
+        );
+    }
+
+    assert!(
+        root.join("src/codec/tests.rs").exists(),
+        "codec split test module should exist"
+    );
+}
+
+#[test]
 fn helm_block_root_stays_prod_only() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
     let helm = fs::read_to_string(root.join("src/infra/blocks/helm.rs")).unwrap();
@@ -208,6 +230,30 @@ fn setup_capabilities_root_stays_prod_only() {
 }
 
 #[test]
+fn run_report_root_stays_prod_only() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let report = fs::read_to_string(root.join("src/run/report.rs")).unwrap();
+
+    for needle in [
+        "fn render_frontmatter_list_into(",
+        "fn yaml_quote_if_needed(",
+        "mod tests {",
+    ] {
+        assert!(
+            !report.contains(needle),
+            "src/run/report.rs should stay focused on report modeling and delegation instead of owning `{needle}`"
+        );
+    }
+
+    for path in ["src/run/report/markdown.rs", "src/run/report/tests.rs"] {
+        assert!(
+            root.join(path).exists(),
+            "run report split module should exist: {path}"
+        );
+    }
+}
+
+#[test]
 fn setup_build_info_root_stays_prod_only() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
     let build_info = fs::read_to_string(root.join("src/setup/build_info.rs")).unwrap();
@@ -244,6 +290,28 @@ fn setup_gateway_root_stays_prod_only() {
     assert!(
         root.join("src/setup/gateway/tests.rs").exists(),
         "setup gateway split test module should exist"
+    );
+}
+
+#[test]
+fn setup_cluster_root_stays_prod_only() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let cluster_mod = fs::read_to_string(root.join("src/setup/cluster/mod.rs")).unwrap();
+
+    for needle in [
+        "fn effective_store_uses_cli_arg_for_up(",
+        "fn load_persisted_spec_returns_cluster(",
+        "mod tests {",
+    ] {
+        assert!(
+            !cluster_mod.contains(needle),
+            "src/setup/cluster/mod.rs should stay focused on transport and dispatch instead of owning `{needle}`"
+        );
+    }
+
+    assert!(
+        root.join("src/setup/cluster/tests.rs").exists(),
+        "setup cluster split test module should exist"
     );
 }
 
@@ -837,6 +905,27 @@ fn infra_io_root_stays_prod_only() {
     assert!(
         root.join("src/infra/io/tests.rs").exists(),
         "infra io split test module should exist"
+    );
+}
+
+#[test]
+fn suite_defaults_root_stays_prod_only() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let defaults = fs::read_to_string(root.join("src/suite_defaults.rs")).unwrap();
+
+    for needle in [
+        "mod tests {",
+        "fn write_and_load_suite_defaults_no_repo_root(",
+    ] {
+        assert!(
+            !defaults.contains(needle),
+            "src/suite_defaults.rs should stay focused on production defaults logic instead of owning `{needle}`"
+        );
+    }
+
+    assert!(
+        root.join("src/suite_defaults/tests.rs").exists(),
+        "suite_defaults split test module should exist"
     );
 }
 
