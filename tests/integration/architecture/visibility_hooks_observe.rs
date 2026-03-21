@@ -1,6 +1,12 @@
 use std::fs;
 use std::path::Path;
 
+fn assert_split_modules_exist(root: &Path, paths: &[&str], message: &str) {
+    for path in paths {
+        assert!(root.join(path).exists(), "{message}: {path}");
+    }
+}
+
 #[test]
 fn hooks_application_context_root_stays_prod_only() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
@@ -11,6 +17,9 @@ fn hooks_application_context_root_stays_prod_only() {
         "struct HydratedHookState {",
         "fn normalized_from_envelope(",
         "fn hydrate_normalized_context(",
+        "pub fn effective_run_dir(&self)",
+        "pub fn command_text(&self)",
+        "pub fn parsed_command(&self)",
         "fn from_normalized_hydrates_missing_session_cwd(",
         "mod tests {",
     ] {
@@ -20,19 +29,22 @@ fn hooks_application_context_root_stays_prod_only() {
         );
     }
 
-    assert!(
-        root.join("src/hooks/application/context/tests.rs").exists(),
-        "hooks application context split test module should exist"
+    assert_split_modules_exist(
+        root,
+        &[
+            "src/hooks/application/context/tests.rs",
+            "src/hooks/application/context/hydration.rs",
+            "src/hooks/application/context/interaction.rs",
+        ],
+        "hooks application context split module should exist",
     );
-    assert!(
-        root.join("src/hooks/application/context/hydration.rs")
-            .exists(),
-        "hooks application context hydration split module should exist"
-    );
-    assert!(
-        root.join("src/hooks/application/context/interaction.rs")
-            .exists(),
-        "hooks application context interaction split module should exist"
+    assert_split_modules_exist(
+        root,
+        &[
+            "src/hooks/application/context/command.rs",
+            "src/hooks/application/context/view.rs",
+        ],
+        "hooks application context split module should exist",
     );
 }
 
