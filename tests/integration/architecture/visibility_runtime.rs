@@ -533,24 +533,24 @@ fn setup_cluster_kubernetes_root_stays_a_facade() {
 }
 
 #[test]
-fn authoring_workflow_root_stays_prod_only() {
+fn create_workflow_root_stays_prod_only() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let workflow = fs::read_to_string(root.join("src/authoring/workflow.rs")).unwrap();
+    let workflow = fs::read_to_string(root.join("src/create/workflow.rs")).unwrap();
 
     for needle in [
-        "fn author_phase_display(",
+        "fn create_phase_display(",
         "fn approval_mode_serialization(",
         "mod tests {",
     ] {
         assert!(
             !workflow.contains(needle),
-            "src/authoring/workflow.rs should stay focused on production workflow logic instead of owning `{needle}`"
+            "src/create/workflow.rs should stay focused on production workflow logic instead of owning `{needle}`"
         );
     }
 
     assert!(
-        root.join("src/authoring/workflow/tests.rs").exists(),
-        "authoring workflow split test module should exist"
+        root.join("src/create/workflow/tests.rs").exists(),
+        "create workflow split test module should exist"
     );
 }
 

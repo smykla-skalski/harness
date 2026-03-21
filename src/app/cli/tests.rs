@@ -10,7 +10,7 @@ fn all_expected_subcommands_registered() {
     let cmd = Cli::command();
     let names: Vec<&str> = cmd.get_subcommands().map(clap::Command::get_name).collect();
     for expected in [
-        "authoring",
+        "create",
         "hook",
         "observe",
         "pre-compact",
@@ -297,13 +297,13 @@ fn parse_runner_state_without_event() {
 }
 
 #[test]
-fn parse_authoring_begin() {
+fn parse_create_begin() {
     let cli = Cli::try_parse_from([
         "harness",
-        "authoring",
+        "create",
         "begin",
         "--skill",
-        "suite:new",
+        "suite:create",
         "--repo-root",
         "/repo",
         "--feature",
@@ -317,20 +317,20 @@ fn parse_authoring_begin() {
     ])
     .unwrap();
     match cli.command {
-        Command::Authoring {
+        Command::Create {
             command:
-                AuthoringCommand::Begin(AuthoringBeginArgs {
+                CreateCommand::Begin(CreateBeginArgs {
                     skill,
                     feature,
                     mode,
                     ..
                 }),
         } => {
-            assert_eq!(skill, "suite:new");
+            assert_eq!(skill, "suite:create");
             assert_eq!(feature, "mesh-traffic");
             assert_eq!(mode, "interactive");
         }
-        _ => panic!("expected AuthoringBegin command"),
+        _ => panic!("expected CreateBegin command"),
     }
 }
 

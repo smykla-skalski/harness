@@ -5,7 +5,7 @@ mod data;
 #[path = "capabilities/model.rs"]
 mod model;
 
-use data::{authoring, cluster_topologies, features, platforms};
+use data::{cluster_topologies, create, features, platforms};
 use model::CapabilitiesReport;
 
 /// Report harness capabilities as structured JSON for skill planning.
@@ -14,7 +14,7 @@ use model::CapabilitiesReport;
 /// Returns `CliError` on failure.
 pub fn capabilities() -> Result<i32, CliError> {
     let caps = CapabilitiesReport {
-        authoring: authoring(),
+        create: create(),
         cluster_topologies: cluster_topologies(),
         features: features(),
         platforms: platforms(),

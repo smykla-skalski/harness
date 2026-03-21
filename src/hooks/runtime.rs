@@ -16,38 +16,38 @@ pub(crate) fn hook_runtime_result(hook: &dyn Hook, code: &str, message: &str) ->
     }
 }
 
-pub(crate) fn dispatch_by_skill<RunnerFn, AuthorFn>(
+pub(crate) fn dispatch_by_skill<RunnerFn, CreateFn>(
     ctx: &GuardContext,
     runner: RunnerFn,
-    author: AuthorFn,
+    create: CreateFn,
 ) -> Result<HookResult, CliError>
 where
     RunnerFn: FnOnce(&GuardContext) -> Result<HookResult, CliError>,
-    AuthorFn: FnOnce(&GuardContext) -> Result<HookResult, CliError>,
+    CreateFn: FnOnce(&GuardContext) -> Result<HookResult, CliError>,
 {
     if !ctx.skill_active {
         return Ok(HookResult::allow());
     }
-    if ctx.is_suite_author() {
-        return author(ctx);
+    if ctx.is_suite_create() {
+        return create(ctx);
     }
     runner(ctx)
 }
 
-pub(crate) fn dispatch_outcome_by_skill<RunnerFn, AuthorFn>(
+pub(crate) fn dispatch_outcome_by_skill<RunnerFn, CreateFn>(
     ctx: &GuardContext,
     runner: RunnerFn,
-    author: AuthorFn,
+    create: CreateFn,
 ) -> Result<HookOutcome, CliError>
 where
     RunnerFn: FnOnce(&GuardContext) -> Result<HookOutcome, CliError>,
-    AuthorFn: FnOnce(&GuardContext) -> Result<HookOutcome, CliError>,
+    CreateFn: FnOnce(&GuardContext) -> Result<HookOutcome, CliError>,
 {
     if !ctx.skill_active {
         return Ok(HookOutcome::allow());
     }
-    if ctx.is_suite_author() {
-        return author(ctx);
+    if ctx.is_suite_create() {
+        return create(ctx);
     }
     runner(ctx)
 }

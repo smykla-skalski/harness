@@ -5,11 +5,11 @@ expression: "names.join(\"\\n\")"
 api
 apply
 approval-begin
-authoring-begin
-authoring-reset
-authoring-save
-authoring-show
-authoring-validate
+create-begin
+create-reset
+create-save
+create-show
+create-validate
 bootstrap
 capabilities
 capture

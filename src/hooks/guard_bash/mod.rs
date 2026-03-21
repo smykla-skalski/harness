@@ -11,7 +11,7 @@ use predicates::{
     is_harness_head,
 };
 use runner_guards::{
-    deny_author_suite_storage_mutation, deny_batched_tracked_harness_commands,
+    deny_batched_tracked_harness_commands, deny_create_suite_storage_mutation,
     deny_direct_command_log_access, deny_harness_managed_run_control_mutation,
     deny_mixed_kuma_delete, deny_raw_manifest_write, deny_suite_storage_mutation,
     guard_runner_phase, runner_binary_and_pattern_guards, runner_tail_guards,
@@ -41,13 +41,13 @@ pub fn execute(ctx: &HookContext) -> Result<HookResult, CliError> {
         return Ok(HookResult::allow());
     }
     let heads = command.heads();
-    if ctx.is_suite_author() {
-        return Ok(guard_suite_author(ctx, words, heads));
+    if ctx.is_suite_create() {
+        return Ok(guard_suite_create(ctx, words, heads));
     }
     Ok(guard_suite_runner(ctx, words, heads))
 }
 
-fn guard_suite_author(ctx: &HookContext, words: &[String], heads: &[String]) -> HookResult {
+fn guard_suite_create(ctx: &HookContext, words: &[String], heads: &[String]) -> HookResult {
     if has_denied_subshell_binary(ctx.command_text(), words) {
         return HookMessage::SubshellSmuggling.into_result();
     }
@@ -60,7 +60,7 @@ fn guard_suite_author(ctx: &HookContext, words: &[String], heads: &[String]) -> 
     if !is_harness_head(heads) && has_admin_endpoint_hint(words) {
         return HookMessage::AdminEndpoint.into_result();
     }
-    let suite_mutation = deny_author_suite_storage_mutation(words);
+    let suite_mutation = deny_create_suite_storage_mutation(words);
     if !suite_mutation.code.is_empty() {
         return suite_mutation;
     }

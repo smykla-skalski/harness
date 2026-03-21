@@ -8,7 +8,7 @@ pub(super) static ISSUE_CODE_METAS: &[IssueCodeMeta] = &[
         default_severity: IssueSeverity::Critical,
         default_confidence: Confidence::High,
         default_fix_safety: FixSafety::AutoFixSafe,
-        description: "kubectl-validate used directly instead of harness authoring-validate",
+        description: "kubectl-validate used directly instead of harness create-validate",
         owner: IssueOwner::Skill,
     },
     IssueCodeMeta {
@@ -62,7 +62,7 @@ pub(super) static ISSUE_CODE_METAS: &[IssueCodeMeta] = &[
         default_severity: IssueSeverity::Medium,
         default_confidence: Confidence::Medium,
         default_fix_safety: FixSafety::AdvisoryOnly,
-        description: "suite:run offering suite:new as a structured choice",
+        description: "suite:run offering suite:create as a structured choice",
         owner: IssueOwner::Skill,
     },
     IssueCodeMeta {
@@ -80,7 +80,7 @@ pub(super) static ISSUE_CODE_METAS: &[IssueCodeMeta] = &[
         default_severity: IssueSeverity::Critical,
         default_confidence: Confidence::High,
         default_fix_safety: FixSafety::TriageRequired,
-        description: "Manifest YAML created during run - should be authored in suite:new",
+        description: "Manifest YAML created during run - should be authored in suite:create",
         owner: IssueOwner::Skill,
     },
     IssueCodeMeta {

@@ -1,10 +1,10 @@
 use std::fmt;
 use std::path::Path;
 
-mod authoring_observe;
 mod cli_error;
 mod cli_kind;
 mod common;
+mod create_observe;
 mod hook_message;
 mod run_setup;
 #[cfg(test)]
@@ -14,8 +14,8 @@ mod workflow;
 pub use cli_error::{CliError, render_error};
 pub use hook_message::HookMessage;
 
-use self::authoring_observe::AuthoringObserveError;
 use self::common::CommonError;
+use self::create_observe::CreateObserveError;
 use self::run_setup::RunSetupError;
 use self::workflow::WorkflowError;
 
@@ -38,7 +38,7 @@ pub enum CliErrorKind {
     #[error(transparent)]
     RunSetup(RunSetupError),
     #[error(transparent)]
-    AuthoringObserve(AuthoringObserveError),
+    CreateObserve(CreateObserveError),
     #[error(transparent)]
     Workflow(WorkflowError),
 }

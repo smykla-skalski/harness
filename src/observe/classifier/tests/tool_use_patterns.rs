@@ -163,14 +163,14 @@ fn deduplicates_same_ksa_code_across_repeats() {
     let first = check_text_for_issues(
         10,
         MessageRole::User,
-        "ERROR [KSA001] Write path is outside the suite:new surface",
+        "ERROR [KSA001] Write path is outside the suite:create surface",
         Some(SourceTool::Bash),
         &mut state,
     );
     let second = check_text_for_issues(
         11,
         MessageRole::User,
-        "ERROR [KSA001] Write path is outside the suite:new surface",
+        "ERROR [KSA001] Write path is outside the suite:create surface",
         Some(SourceTool::Bash),
         &mut state,
     );
@@ -184,7 +184,7 @@ fn keeps_distinct_ksa_codes_separate() {
     let first = check_text_for_issues(
         10,
         MessageRole::User,
-        "ERROR [KSA001] Write path is outside the suite:new surface",
+        "ERROR [KSA001] Write path is outside the suite:create surface",
         Some(SourceTool::Bash),
         &mut state,
     );

@@ -1,6 +1,6 @@
 // Tests for the audit hook.
 // Verifies that audit is silent (allows) for both suite:run and
-// suite:new skills.
+// suite:create skills.
 
 use harness::hooks::audit;
 
@@ -14,8 +14,8 @@ fn audit_silent_runner() {
 }
 
 #[test]
-fn audit_silent_author() {
-    let ctx = make_hook_context("suite:new", make_bash_payload("echo hello"));
+fn audit_silent_create() {
+    let ctx = make_hook_context("suite:create", make_bash_payload("echo hello"));
     let r = audit::execute(&ctx).unwrap().to_hook_result();
     assert_allow(&r);
 }

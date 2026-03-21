@@ -80,7 +80,7 @@ fn post_tool_use_deny_includes_block() {
 fn subagent_start_allow_with_additional_context_is_emitted() {
     let output = render_normalized_hook_output(
         HookType::SubagentStart,
-        &NormalizedHookResult::allow().with_additional_context("save through authoring-save"),
+        &NormalizedHookResult::allow().with_additional_context("save through create-save"),
     );
     let value: serde_json::Value = serde_json::from_str(&output).unwrap();
     assert_eq!(
@@ -89,7 +89,7 @@ fn subagent_start_allow_with_additional_context_is_emitted() {
     );
     assert_eq!(
         value["hookSpecificOutput"]["additionalContext"],
-        "save through authoring-save"
+        "save through create-save"
     );
 }
 

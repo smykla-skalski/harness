@@ -22,11 +22,11 @@ pub fn execute(ctx: &HookContext) -> Result<HookOutcome, CliError> {
     super::dispatch_outcome_by_skill(
         ctx,
         |ctx| Ok(verify_suite_runner(ctx, &paths)),
-        |_ctx| Ok(HookOutcome::from_hook_result(verify_suite_author(&paths))),
+        |_ctx| Ok(HookOutcome::from_hook_result(verify_suite_create(&paths))),
     )
 }
 
-fn verify_suite_author(paths: &[&Path]) -> HookResult {
+fn verify_suite_create(paths: &[&Path]) -> HookResult {
     for raw_path in paths {
         let name = raw_path
             .file_name()

@@ -41,12 +41,12 @@ pub fn runner_bash_chain() -> GuardChain {
     ])
 }
 
-/// Build the standard guard chain for suite:new bash commands.
+/// Build the standard guard chain for suite:create bash commands.
 #[must_use]
-pub fn author_bash_chain() -> GuardChain {
+pub fn create_bash_chain() -> GuardChain {
     GuardChain::new(vec![
         Box::new(SubshellGuard),
-        Box::new(DeniedBinaryGuard::author()),
+        Box::new(DeniedBinaryGuard::create()),
         Box::new(AdminEndpointGuard),
     ])
 }

@@ -75,7 +75,7 @@ keep_clusters: false
 - all pass/fail decisions include artifact pointers to existing files
 - deviations from suite definitions require user approval and are recorded in the report
 - inline manifests in group files are authoritative - `harness run preflight` must materialize them verbatim and Phase 4 must reuse the prepared manifest entries from the active run context
-- policy authoring follows the rules in [../references/mesh-policies.md](../references/mesh-policies.md) when applicable
+- policy create follows the rules in [../references/mesh-policies.md](../references/mesh-policies.md) when applicable
 
 ### Failure triage
 

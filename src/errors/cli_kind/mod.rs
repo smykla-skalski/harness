@@ -1,10 +1,10 @@
-mod authoring_observe;
 mod common;
+mod create_observe;
 mod run_setup;
 mod workflow;
 
 use super::{
-    AuthoringObserveError, CliError, CliErrorKind, CommonError, RunSetupError, WorkflowError,
+    CliError, CliErrorKind, CommonError, CreateObserveError, RunSetupError, WorkflowError,
 };
 
 #[allow(non_upper_case_globals)]
@@ -21,14 +21,14 @@ impl CliErrorKind {
     pub const KumactlNotFound: Self = Self::RunSetup(RunSetupError::KumactlNotFound);
     pub const ReportGroupEvidenceRequired: Self =
         Self::RunSetup(RunSetupError::ReportGroupEvidenceRequired);
-    pub const AuthoringSessionMissing: Self =
-        Self::AuthoringObserve(AuthoringObserveError::AuthoringSessionMissing);
-    pub const AuthoringPayloadMissing: Self =
-        Self::AuthoringObserve(AuthoringObserveError::AuthoringPayloadMissing);
+    pub const CreateSessionMissing: Self =
+        Self::CreateObserve(CreateObserveError::CreateSessionMissing);
+    pub const CreatePayloadMissing: Self =
+        Self::CreateObserve(CreateObserveError::CreatePayloadMissing);
     pub const KubectlValidateDecisionRequired: Self =
-        Self::AuthoringObserve(AuthoringObserveError::KubectlValidateDecisionRequired);
+        Self::CreateObserve(CreateObserveError::KubectlValidateDecisionRequired);
     pub const KubectlValidateUnavailable: Self =
-        Self::AuthoringObserve(AuthoringObserveError::KubectlValidateUnavailable);
+        Self::CreateObserve(CreateObserveError::KubectlValidateUnavailable);
     pub const TrackedKubectlRequired: Self = Self::RunSetup(RunSetupError::TrackedKubectlRequired);
     pub const MissingRunStatus: Self = Self::RunSetup(RunSetupError::MissingRunStatus);
 }
@@ -39,7 +39,7 @@ impl CliErrorKind {
         match self {
             Self::Common(error) => error.code(),
             Self::RunSetup(error) => error.code(),
-            Self::AuthoringObserve(error) => error.code(),
+            Self::CreateObserve(error) => error.code(),
             Self::Workflow(error) => error.code(),
         }
     }
@@ -49,7 +49,7 @@ impl CliErrorKind {
         match self {
             Self::Common(error) => error.exit_code(),
             Self::RunSetup(error) => error.exit_code(),
-            Self::AuthoringObserve(error) => error.exit_code(),
+            Self::CreateObserve(error) => error.exit_code(),
             Self::Workflow(_) => WorkflowError::exit_code(),
         }
     }
@@ -59,7 +59,7 @@ impl CliErrorKind {
         match self {
             Self::Common(_) => CommonError::hint(),
             Self::RunSetup(error) => error.hint(),
-            Self::AuthoringObserve(error) => error.hint(),
+            Self::CreateObserve(error) => error.hint(),
             Self::Workflow(_) => WorkflowError::hint(),
         }
     }

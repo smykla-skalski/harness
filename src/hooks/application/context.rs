@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 
 use serde_json::Value;
 
-use crate::authoring::AuthorWorkflowState;
+use crate::create::CreateWorkflowState;
 use crate::hooks::protocol::context::{
     AgentContext, NormalizedEvent, NormalizedHookContext, SessionContext, SkillContext,
 };
@@ -39,7 +39,7 @@ pub struct GuardContext {
     pub run_dir: Option<PathBuf>,
     pub run: Option<RunContext>,
     pub runner_state: Option<RunnerWorkflowState>,
-    pub author_state: Option<AuthorWorkflowState>,
+    pub create_state: Option<CreateWorkflowState>,
     interaction: HookInteraction,
 }
 
@@ -60,7 +60,7 @@ impl GuardContext {
             run_dir: hydrated.run_dir,
             run: hydrated.run,
             runner_state: hydrated.runner_state,
-            author_state: hydrated.author_state,
+            create_state: hydrated.create_state,
             interaction,
         }
     }
@@ -86,7 +86,7 @@ impl GuardContext {
             run_dir: None,
             run: None,
             runner_state: None,
-            author_state: None,
+            create_state: None,
             interaction,
         }
     }
@@ -162,8 +162,8 @@ impl GuardContext {
     }
 
     #[must_use]
-    pub fn is_suite_author(&self) -> bool {
-        self.skill.is_author
+    pub fn is_suite_create(&self) -> bool {
+        self.skill.is_create
     }
 }
 

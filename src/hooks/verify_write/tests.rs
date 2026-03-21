@@ -9,21 +9,21 @@ use crate::run::workflow::{
 use harness_testkit::RunDirBuilder;
 
 #[test]
-fn verify_suite_author_empty_amendments_denies() {
+fn verify_suite_create_empty_amendments_denies() {
     let tmp = tempfile::NamedTempFile::new().unwrap();
     let path = tmp.path().parent().unwrap().join("amendments.md");
     fs::write(&path, "   \n").unwrap();
-    let result = verify_suite_author(&[path.as_path()]);
+    let result = verify_suite_create(&[path.as_path()]);
     assert_eq!(result.decision, Decision::Deny);
     let _ = fs::remove_file(&path);
 }
 
 #[test]
-fn verify_suite_author_nonempty_amendments_allows() {
+fn verify_suite_create_nonempty_amendments_allows() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("amendments.md");
     fs::write(&path, "real content here\n").unwrap();
-    let result = verify_suite_author(&[path.as_path()]);
+    let result = verify_suite_create(&[path.as_path()]);
     assert_eq!(result.decision, Decision::Allow);
 }
 

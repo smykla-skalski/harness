@@ -13,7 +13,7 @@ use std::sync::PoisonError;
 
 use harness::setup::{PreCompactArgs, SessionStartArgs, SessionStopArgs};
 use harness::workspace::compact::{
-    self, AuthoringHandoff, FileFingerprint, HandoffStatus, RunnerHandoff,
+    self, CreateHandoff, FileFingerprint, HandoffStatus, RunnerHandoff,
 };
 
 use super::helpers::*;
@@ -40,12 +40,12 @@ fn test_runner() -> RunnerHandoff<'static> {
     }
 }
 
-// Build an authoring handoff for testing.
-fn test_authoring() -> AuthoringHandoff<'static> {
-    AuthoringHandoff {
+// Build an create handoff for testing.
+fn test_create() -> CreateHandoff<'static> {
+    CreateHandoff {
         suite_dir: "/suites/s1".into(),
         next_action: "pre-write review loop".into(),
-        author_phase: Some("prewrite_review".into()),
+        create_phase: Some("prewrite_review".into()),
         suite_name: Some("motb-core".into()),
         feature: Some("motb".into()),
         mode: Some("interactive".into()),
@@ -171,34 +171,34 @@ fn check_build_compact_worktree_project(project: &Path) {
     assert_eq!(loaded.runner.as_ref().unwrap().run_id, "r1");
 }
 
-// Attach an authoring section, save, reload, verify payloads.
-fn check_build_compact_includes_author(project: &Path) {
+// Attach an create section, save, reload, verify payloads.
+fn check_build_compact_includes_create(project: &Path) {
     let mut handoff = compact::build_compact_handoff(project).expect("build");
-    handoff.authoring = Some(test_authoring());
+    handoff.create = Some(test_create());
     compact::save_compact_handoff(project, &handoff).expect("save");
 
     let loaded = compact::load_latest_compact_handoff(project)
         .expect("load")
         .expect("should exist");
     assert!(loaded.has_sections());
-    let auth = loaded.authoring.expect("authoring should be present");
+    let auth = loaded.create.expect("create should be present");
     assert_eq!(auth.suite_name.as_deref(), Some("motb-core"));
     assert_eq!(auth.saved_payloads, vec!["inventory", "proposal"]);
 }
 
-// Authoring round-trips with mode/feature set.
-fn check_build_compact_author_fallback(project: &Path) {
+// Create round-trips with mode/feature set.
+fn check_build_compact_create_fallback(project: &Path) {
     let mut handoff = compact::build_compact_handoff(project).expect("build");
-    let mut auth = test_authoring();
+    let mut auth = test_create();
     auth.mode = Some("bypass".into());
     auth.feature = Some("fallback-feature".into());
-    handoff.authoring = Some(auth);
+    handoff.create = Some(auth);
     compact::save_compact_handoff(project, &handoff).expect("save");
 
     let loaded = compact::load_latest_compact_handoff(project)
         .expect("load")
         .expect("should exist");
-    let auth = loaded.authoring.expect("authoring present");
+    let auth = loaded.create.expect("create present");
     assert_eq!(auth.mode.as_deref(), Some("bypass"));
     assert_eq!(auth.feature.as_deref(), Some("fallback-feature"));
 }
@@ -325,18 +325,18 @@ fn check_session_start_compact_aborted_resume(project: &Path) {
     assert!(after.is_none());
 }
 
-// Save handoff with authoring, verify hydration context
-//includes authoring details, session-start consumes it.
-fn check_session_start_compact_restores_author(project: &Path) {
+// Save handoff with create, verify hydration context
+//includes create details, session-start consumes it.
+fn check_session_start_compact_restores_create(project: &Path) {
     let mut handoff = compact::build_compact_handoff(project).expect("build");
-    handoff.authoring = Some(test_authoring());
+    handoff.create = Some(test_create());
     compact::save_compact_handoff(project, &handoff).expect("save");
 
     let pending = compact::pending_compact_handoff(project)
         .expect("load pending")
         .expect("should be pending");
     let ctx = compact::render_hydration_context(&pending, &[]);
-    assert!(ctx.contains("suite:new:"), "should have authoring section");
+    assert!(ctx.contains("suite:create:"), "should have create section");
     assert!(ctx.contains("motb-core"), "should mention suite name");
 
     let result = session_start_cmd(SessionStartArgs {
@@ -509,14 +509,14 @@ fn compact_handoff_lifecycle() {
         || {
             check_build_compact_includes_runner(project.path());
             check_build_compact_worktree_project(project.path());
-            check_build_compact_includes_author(project.path());
-            check_build_compact_author_fallback(project.path());
+            check_build_compact_includes_create(project.path());
+            check_build_compact_create_fallback(project.path());
             check_save_consume_compact_handoff(project.path());
             check_pre_compact_persists(project.path());
             check_session_start_compact_hydrates(project.path());
             check_session_start_compact_worktree(project.path());
             check_session_start_compact_aborted_resume(project.path());
-            check_session_start_compact_restores_author(project.path());
+            check_session_start_compact_restores_create(project.path());
             check_session_start_compact_divergence_warning(project.path());
             check_session_start_restores_project(project.path());
             check_session_start_restores_worktree(project.path());

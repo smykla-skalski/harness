@@ -10,7 +10,7 @@ A suite is a Markdown file with YAML frontmatter describing what to test - user 
 
 Runs move through phases: `bootstrap` -> `preflight` -> `execution` -> `triage` -> `closeout` -> `completed`. Runner state is persisted atomically in `suite-run-state.json` using schema version `2`, so interrupted runs can resume or be inspected after the fact.
 
-The CLI enforces this lifecycle. Direct use of `kubectl`, `helm`, `docker`, or `k3d` is blocked - all cluster access goes through harness commands. This lets you replay or audit exactly what happened during a run. Suite authoring uses a separate approval workflow stored in `.harness/suite-new-state.json`, also on schema version `2`.
+The CLI enforces this lifecycle. Direct use of `kubectl`, `helm`, `docker`, or `k3d` is blocked - all cluster access goes through harness commands. This lets you replay or audit exactly what happened during a run. Suite create uses a separate approval workflow stored in `.harness/suite-create-state.json`, also on schema version `2`.
 
 ## Install
 
@@ -58,16 +58,16 @@ run-report.md       human-readable summary
 
 Older `suite-run-state.json` files are rejected. Delete the file or re-run `harness run init` to regenerate the runner state.
 
-## Suite authoring
+## Suite create
 
-Harness has a two-part authoring flow for writing new suites: `authoring begin` creates the session workspace for `suite:new`, and `authoring approval-begin` initializes the approval workflow state that review hooks read.
+Harness has a two-part create flow for writing new suites: `create begin` creates the session workspace for `suite:create`, and `create approval-begin` initializes the approval workflow state that review hooks read.
 
 ```bash
-harness authoring begin --skill suite:new --repo-root /path/to/repo --feature my-feature --mode interactive --suite-dir /path/to/repo/suites/my-feature --suite-name my-feature
-harness authoring approval-begin --skill suite:new --mode interactive --suite-dir /path/to/repo/suites/my-feature
+harness create begin --skill suite:create --repo-root /path/to/repo --feature my-feature --mode interactive --suite-dir /path/to/repo/suites/my-feature --suite-name my-feature
+harness create approval-begin --skill suite:create --mode interactive --suite-dir /path/to/repo/suites/my-feature
 ```
 
-Authoring moves through `discovery` -> `prewrite_review` -> `writing` -> `postwrite_review` -> `complete`, with approval gates at each review step. Use `harness authoring save`, `harness authoring show`, `harness authoring reset`, and `harness authoring validate` during the session. The approval state lives in `.harness/suite-new-state.json` on schema version `2`; older files are rejected and must be regenerated with `harness authoring approval-begin`.
+Create moves through `discovery` -> `prewrite_review` -> `writing` -> `postwrite_review` -> `complete`, with approval gates at each review step. Use `harness create save`, `harness create show`, `harness create reset`, and `harness create validate` during the session. The approval state lives in `.harness/suite-create-state.json` on schema version `2`; older files are rejected and must be regenerated with `harness create approval-begin`.
 
 ## Hook system
 

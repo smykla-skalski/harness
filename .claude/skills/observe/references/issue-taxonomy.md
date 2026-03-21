@@ -32,7 +32,7 @@ Categories, severity, fix safety, ownership, and routing guidance for `harness o
 - Fix safety: auto_fix_safe
 - Owner: harness
 - Root cause: `harness` returned an unexpected error or bad arg handling
-- Fix target: `src/app/cli.rs` plus the owning domain under `src/run/`, `src/setup/`, `src/authoring/`, `src/observe/`, or `src/hooks/`
+- Fix target: `src/app/cli.rs` plus the owning domain under `src/run/`, `src/setup/`, `src/create/`, `src/observe/`, or `src/hooks/`
 - Validation: `mise run check` and `TMPDIR=/tmp mise run test`
 
 ### build_error
@@ -48,7 +48,7 @@ Categories, severity, fix safety, ownership, and routing guidance for `harness o
 - Fix safety: auto_fix_guarded
 - Owner: harness
 - Root cause: a workflow or state machine is in the wrong state
-- Fix target: the owning workflow under `src/run/`, `src/authoring/`, `src/hooks/`, or `src/workspace/`
+- Fix target: the owning workflow under `src/run/`, `src/create/`, `src/hooks/`, or `src/workspace/`
 - Validation: `mise run check` and `TMPDIR=/tmp mise run test`
 
 ### naming_error
@@ -72,7 +72,7 @@ Categories, severity, fix safety, ownership, and routing guidance for `harness o
 - Fix safety: triage_required
 - Owner: harness or product
 - Root cause: stale state, corrupted payloads, missing artifacts, or invalid persisted data
-- Fix target: `src/run/`, `src/authoring/`, `src/workspace/`, or `src/observe/`
+- Fix target: `src/run/`, `src/create/`, `src/workspace/`, or `src/observe/`
 - Validation: rerun the affected flow plus the repo gates if code changed
 
 ### subagent_issue
@@ -134,6 +134,6 @@ TMPDIR=/tmp mise run test
 
 **Build failure**: fix the Rust code, then run the repo gates.
 
-**Stale state**: check the owning state store under `src/run/`, `src/authoring/`, `src/workspace/`, or `src/observe/`.
+**Stale state**: check the owning state store under `src/run/`, `src/create/`, `src/workspace/`, or `src/observe/`.
 
 **Old names or old paths**: search for stale subcommands, stale skill names, or stale `kuma` storage paths and align them with the current `harness` contract.

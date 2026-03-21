@@ -7,6 +7,6 @@ pub(super) static ISSUE_CODE_METAS: &[IssueCodeMeta] = &[IssueCodeMeta {
     default_severity: IssueSeverity::Medium,
     default_confidence: Confidence::High,
     default_fix_safety: FixSafety::AutoFixSafe,
-    description: "Old skill name (suite-author/suite-runner) used in command",
+    description: "Old skill name (suite-create/suite-runner) used in command",
     owner: IssueOwner::Skill,
 }];

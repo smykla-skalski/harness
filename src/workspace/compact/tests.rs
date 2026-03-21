@@ -23,7 +23,7 @@ fn test_handoff(project_dir: &str) -> CompactHandoff<'static> {
         custom_instructions: None,
         consumed_at: None,
         runner: None,
-        authoring: None,
+        create: None,
         fingerprints: vec![],
     }
 }
@@ -224,11 +224,11 @@ fn render_hydration_context_includes_runner_section() {
 }
 
 #[test]
-fn render_hydration_context_includes_authoring_section() {
-    let authoring = AuthoringHandoff {
+fn render_hydration_context_includes_create_section() {
+    let create = CreateHandoff {
         suite_dir: "/suites/s1".into(),
         next_action: "pre-write review loop".into(),
-        author_phase: Some("prewrite_review".into()),
+        create_phase: Some("prewrite_review".into()),
         suite_name: Some("motb-core".into()),
         feature: Some("motb".into()),
         mode: Some("interactive".into()),
@@ -237,9 +237,9 @@ fn render_hydration_context_includes_authoring_section() {
         state_paths: vec![],
     };
     let mut handoff = test_handoff("/p");
-    handoff.authoring = Some(authoring);
+    handoff.create = Some(create);
     let ctx = render_hydration_context(&handoff, &[]);
-    assert!(ctx.contains("suite:new:"));
+    assert!(ctx.contains("suite:create:"));
     assert!(ctx.contains("Suite name: motb-core"));
     assert!(ctx.contains("Saved payloads: inventory, proposal"));
 }
@@ -417,10 +417,10 @@ fn ordered_sections_unfinished_first() {
         remaining_groups: vec![],
         state_paths: vec![],
     });
-    handoff.authoring = Some(AuthoringHandoff {
+    handoff.create = Some(CreateHandoff {
         suite_dir: "/s".into(),
         next_action: "write".into(),
-        author_phase: Some("writing".into()),
+        create_phase: Some("writing".into()),
         suite_name: None,
         feature: None,
         mode: None,
@@ -429,6 +429,6 @@ fn ordered_sections_unfinished_first() {
         state_paths: vec![],
     });
     let sections = ordered_sections(&handoff);
-    assert_eq!(sections[0], "authoring");
+    assert_eq!(sections[0], "create");
     assert_eq!(sections[1], "runner");
 }

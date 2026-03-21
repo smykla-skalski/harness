@@ -149,7 +149,7 @@ Read [references/agent-contract.md](references/agent-contract.md) in full before
 - **Relative paths only.** `g13/01.yaml` not `/full/path/...`. No `/tmp`, no `--validate=false`.
 - **Hard gate after each group** via `harness run report group`.
 - **No autonomous deviations.** AskUserQuestion before any unplanned change.
-- **Never create manifests during a run.** All manifests must exist in the suite before the run starts. If a missing manifest is discovered, this is a suite:new authoring defect - use the bug-found gate with classification "suite bug" and do not create the file.
+- **Never create manifests during a run.** All manifests must exist in the suite before the run starts. If a missing manifest is discovered, this is a suite:create defect - use the bug-found gate with classification "suite bug" and do not create the file.
 - **Preflight before apply.** Never run `harness run apply` until preflight has completed. Preflight materializes baselines and group YAML into prepared manifests. The verify-bash hook enforces this - `harness run apply` during bootstrap or before preflight completion is denied with KSR014.
 - **STOP AND TRIAGE EVERY FAILURE.** On ANY unexpected result, failure, or mismatch - STOP. Classify as suite bug, product bug, harness bug, or environment issue. Present classification to user via AskUserQuestion BEFORE continuing. Never say "known bug" and move on. See bug-found gate in Phase 4.
 - **Commit code fixes before continuing.** After editing product code during a run, commit before re-deploying or re-testing. Use `git add <files> && git commit -m 'fix: description'`. Never iterate on uncommitted edits.
@@ -164,7 +164,7 @@ Read [references/workflow.md](references/workflow.md) for the full procedure. Th
 0. Run `harness setup capabilities` and keep the JSON output as `CAPABILITIES` for all later phases. Validate suite profiles against available `cluster_topologies` and `platforms`. If the binary is too old or missing, assume all features available.
 
 1. Set `DATA_DIR` from "Preprocessed context". If missing, use AskUserQuestion with options:
-   - `Author suite with /suite:new`
+   - `Create suite with /suite:create`
    - `Provide a different suite path`
 
 2. Resolve `REPO_ROOT`: `--repo` flag > cwd `go.mod` with `kumahq/kuma` > AskUserQuestion with options:
@@ -189,7 +189,7 @@ After init or reattach, use only context-driven `harness` commands. Do not pass 
 **Error cases**: if the suite path does not exist, search `${DATA_DIR}/` with Glob for partial matches. Present matches via AskUserQuestion. If no matches, use AskUserQuestion with options:
 
 - `Provide suite path`
-- `Author new suite with /suite:new`
+- `Create new suite with /suite:create`
 
 **Gate**: `run-metadata.json` exists with profile, feature scope, and environment filled in.
 
@@ -246,7 +246,7 @@ Do not start tests until the worker returns `pass`.
 Read [references/workflow.md](references/workflow.md) Phase 4 section in full before starting tests - it has the complete step-by-step procedure with code blocks and per-group gates.
 
 Read [references/validation.md](references/validation.md) for the pre-apply checklist and safe apply flow before applying manifests.
-Read [references/mesh-policies.md](references/mesh-policies.md) for policy authoring rules when the suite tests any `Mesh*` policy.
+Read [references/mesh-policies.md](references/mesh-policies.md) for policy create rules when the suite tests any `Mesh*` policy.
 Read [examples/suite-template.md](examples/suite-template.md) when creating a new suite. Read [examples/example-motb-core-suite.md](examples/example-motb-core-suite.md) for a worked example of the expected format.
 
 Key principles (workflow.md has the details):
@@ -357,7 +357,7 @@ Hook codes:
 - [references/agent-contract.md](references/agent-contract.md) - agent rules, failure policy, artifacts
 - [references/workflow.md](references/workflow.md) - phase details with verification gates
 - [references/cluster-setup.md](references/cluster-setup.md) - k3d profiles, kubeconfig, deploy commands
-- [references/mesh-policies.md](references/mesh-policies.md) - Mesh\* policy authoring, targeting, debug flow
+- [references/mesh-policies.md](references/mesh-policies.md) - Mesh\* policy create, targeting, debug flow
 - [references/validation.md](references/validation.md) - pre-apply checklist, safe apply flow
 - [references/troubleshooting.md](references/troubleshooting.md) - known failure modes and fixes
 

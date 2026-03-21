@@ -1,7 +1,7 @@
 use crate::kernel::topology::Platform;
 
 use super::capabilities;
-use super::data::{authoring, cluster_topologies, features, platforms};
+use super::data::{cluster_topologies, create, features, platforms};
 use super::model::{CapabilitiesReport, Feature};
 
 #[test]
@@ -12,12 +12,12 @@ fn capabilities_returns_zero() {
 #[test]
 fn output_contains_expected_sections() {
     let caps = CapabilitiesReport {
-        authoring: authoring(),
+        create: create(),
         cluster_topologies: cluster_topologies(),
         features: features(),
         platforms: platforms(),
     };
-    assert!(caps.authoring.available);
+    assert!(caps.create.available);
     assert!(!caps.cluster_topologies.is_empty());
     assert!(!caps.features.is_empty());
     assert!(!caps.platforms.is_empty());
@@ -44,7 +44,7 @@ fn features_include_universal_only_items() {
 #[test]
 fn json_round_trip() {
     let caps = CapabilitiesReport {
-        authoring: authoring(),
+        create: create(),
         cluster_topologies: cluster_topologies(),
         features: features(),
         platforms: platforms(),

@@ -24,7 +24,7 @@ harness run validate \
 
 Validation is not optional. Never pass `--validate=false` to kubectl - validation failures indicate a bug in the manifest or missing CRDs. Fix the root cause instead.
 
-The exception is an intentional rejection test defined by the suite itself. When a group keeps a prepared manifest invalid on purpose so Phase 4 can prove the API rejects it, mark that 1-based `## Configure` ordinal in the group frontmatter `expected_rejection_orders`. `harness run preflight` and `harness authoring validate` will still materialize the manifest, but they will skip the up-front schema validation for that specific prepared entry.
+The exception is an intentional rejection test defined by the suite itself. When a group keeps a prepared manifest invalid on purpose so Phase 4 can prove the API rejects it, mark that 1-based `## Configure` ordinal in the group frontmatter `expected_rejection_orders`. `harness run preflight` and `harness create validate` will still materialize the manifest, but they will skip the up-front schema validation for that specific prepared entry.
 
 ## Safe apply flow
 
@@ -56,7 +56,7 @@ The prompt body must include:
 - `Suite target: <relative path within the suite>`
 - the validation or apply error message
 
-For baseline manifests (files under `baseline/`), the "Fix in suite and this run" option is NOT available. Baseline fixes are authoring-time decisions that belong in `suite:new`, not mid-run edits. If a baseline manifest fails validation, this indicates a `suite:new` authoring defect - record it as a product finding. For baseline manifests, the options must be exactly:
+For baseline manifests (files under `baseline/`), the "Fix in suite and this run" option is NOT available. Baseline fixes are create-time decisions that belong in `suite:create`, not mid-run edits. If a baseline manifest fails validation, this indicates a `suite:create` create defect - record it as a product finding. For baseline manifests, the options must be exactly:
 
 1. **"Fix for this run only"**
 2. **"Skip this step"**
@@ -85,7 +85,7 @@ For all other manifests (group manifests, runtime manifests), the full options a
 
 4. **"Stop run"** - Stop the tracked run immediately. Do not keep mutating suite files or harness code after the stop choice.
 
-Always include the validation/apply error message in the AskUserQuestion description so the user can make an informed decision. Do not attempt to fix manifests without asking first - the error might reveal a real product bug rather than a suite authoring mistake. `Fix in suite and this run` unlocks edits only for that exact suite file plus `amendments.md`. It never permits edits to harness code, `.claude/skills`, `.claude/agents`, or unrelated repo files.
+Always include the validation/apply error message in the AskUserQuestion description so the user can make an informed decision. Do not attempt to fix manifests without asking first - the error might reveal a real product bug rather than a suite create mistake. `Fix in suite and this run` unlocks edits only for that exact suite file plus `amendments.md`. It never permits edits to harness code, `.claude/skills`, `.claude/agents`, or unrelated repo files.
 
 ## Tracked apply example
 

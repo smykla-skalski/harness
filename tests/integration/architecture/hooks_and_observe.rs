@@ -178,10 +178,10 @@ fn hook_application_owns_guard_context_hydration() {
             "pub struct GuardContext",
             "RunContext",
             "RunnerWorkflowState",
-            "AuthorWorkflowState",
+            "CreateWorkflowState",
             "load_run_context",
             "load_runner_state",
-            "load_author_state",
+            "load_create_state",
         ],
     );
 

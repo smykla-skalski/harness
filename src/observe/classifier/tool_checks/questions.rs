@@ -85,7 +85,7 @@ fn check_validator_install_prompt(
                 "Validator install prompt when binary may already exist",
             )
             .with_guidance(Guidance::fix_target_hint(
-                "skills/new/SKILL.md",
+                "skills/create/SKILL.md",
                 "Step 0 should check if binary exists first",
             ))
             .with_confidence(Confidence::Medium)
@@ -136,8 +136,8 @@ fn check_question_deviations(
                 "Runtime deviation - authored suite needs runtime correction",
             )
             .with_guidance(Guidance::fix_target_hint(
-                "skills/new/SKILL.md",
-                "suite:new should produce suites that don't require runtime deviations",
+                "skills/create/SKILL.md",
+                "suite:create should produce suites that don't require runtime deviations",
             ))
             .with_confidence(Confidence::High)
             .with_fix_safety(FixSafety::TriageRequired)
@@ -163,17 +163,17 @@ fn check_wrong_skill_crossref(
             .as_str()
             .or_else(|| option.as_str())
             .unwrap_or("");
-        if label.to_lowercase().contains("suite:new") && question_lower.contains("suite:run") {
+        if label.to_lowercase().contains("suite:create") && question_lower.contains("suite:run") {
             let details = format!("Question: {question_text}, Option: {label}");
             emitter.emit(
                 issues,
                 IssueBlueprint::from_code(
                     IssueCode::WrongSkillCrossReference,
-                    "suite:run offering suite:new as structured choice",
+                    "suite:run offering suite:create as structured choice",
                 )
                 .with_guidance(Guidance::fix_target_hint(
                     "skills/run/SKILL.md",
-                    "suite:run should not offer suite:new as a structured option",
+                    "suite:run should not offer suite:create as a structured option",
                 ))
                 .with_confidence(Confidence::Medium)
                 .with_fix_safety(FixSafety::AdvisoryOnly)

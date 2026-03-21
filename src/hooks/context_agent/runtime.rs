@@ -5,8 +5,8 @@ use crate::run::workflow::{PreflightStatus, RunnerPhase, RunnerWorkflowState};
 
 /// Execute the context-agent hook.
 ///
-/// For suite:new, emits a format warning reminding workers to save
-/// structured results through `harness authoring-save`.
+/// For suite:create, emits a format warning reminding workers to save
+/// structured results through `harness create-save`.
 /// For suite:run, validates that the preflight worker can start by
 /// checking runner workflow state.
 ///
@@ -16,7 +16,7 @@ pub fn execute(ctx: &HookContext) -> Result<HookOutcome, CliError> {
     if !ctx.skill_active {
         return Ok(HookOutcome::allow());
     }
-    if ctx.is_suite_author() {
+    if ctx.is_suite_create() {
         return Ok(HookOutcome::allow().with_effect(HookEffect::InjectContext(
             HookMessage::CodeReaderFormat.to_string(),
         )));

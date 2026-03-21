@@ -1,6 +1,6 @@
 # Contents
 
-1. [Authoring model](#1-authoring-model)
+1. [Create model](#1-create-model)
 1b. [Policy spec nesting](#1b-policy-spec-nesting)
 1c. [targetRef constraints](#1c-targetref-constraints)
 2. [Policy role checks](#2-policy-role-checks)
@@ -12,7 +12,7 @@
 
 ---
 
-# Mesh\* policies: authoring, apply, debug
+# Mesh\* policies: create, apply, debug
 
 Use this reference when a test run includes any `Mesh*` policy.
 
@@ -28,7 +28,7 @@ This file is based on Kuma docs `2.13.x` pages. Check kuma.io/docs/ for newer ve
 - https://kuma.io/docs/2.13.x/policies/meshmetric/
 - https://kuma.io/docs/2.13.x/policies/meshtrace/
 
-## 1) Authoring model
+## 1) Create model
 
 - Use only new `Mesh*` policies for a given feature area.
 - Do not combine old and new policy families for the same feature in one test.

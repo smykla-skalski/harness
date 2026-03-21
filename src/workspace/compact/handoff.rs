@@ -33,13 +33,13 @@ pub struct RunnerHandoff<'a> {
     pub state_paths: Vec<Cow<'a, str>>,
 }
 
-/// Authoring handoff state for compaction.
+/// Create handoff state for compaction.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct AuthoringHandoff<'a> {
+pub struct CreateHandoff<'a> {
     pub suite_dir: Cow<'a, str>,
     pub next_action: Cow<'a, str>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub author_phase: Option<Cow<'a, str>>,
+    pub create_phase: Option<Cow<'a, str>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub suite_name: Option<Cow<'a, str>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -96,7 +96,7 @@ pub struct CompactHandoff<'a> {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub runner: Option<RunnerHandoff<'a>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub authoring: Option<AuthoringHandoff<'a>>,
+    pub create: Option<CreateHandoff<'a>>,
     #[serde(default)]
     pub fingerprints: Vec<FileFingerprint<'a>>,
 }
@@ -105,6 +105,6 @@ impl CompactHandoff<'_> {
     /// Whether the handoff has any active section.
     #[must_use]
     pub fn has_sections(&self) -> bool {
-        self.runner.is_some() || self.authoring.is_some()
+        self.runner.is_some() || self.create.is_some()
     }
 }

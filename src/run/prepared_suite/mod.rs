@@ -47,7 +47,7 @@ impl PreparedSuiteArtifact {
             return Ok(None);
         }
         let artifact: Self = read_json_typed(path).map_err(|e| {
-            CliErrorKind::authoring_payload_invalid("prepared suite", path.display().to_string())
+            CliErrorKind::create_payload_invalid("prepared suite", path.display().to_string())
                 .with_details(e.to_string())
         })?;
         Ok(Some(artifact))

@@ -2,9 +2,7 @@ use std::collections::BTreeMap;
 
 use crate::kernel::topology::Platform;
 
-use super::model::{
-    AuthoringInfo, ClusterTopology, Feature, FeatureInfo, PlatformInfo, TopologyMode,
-};
+use super::model::{ClusterTopology, CreateInfo, Feature, FeatureInfo, PlatformInfo, TopologyMode};
 
 pub(super) fn platforms() -> Vec<PlatformInfo> {
     vec![
@@ -247,17 +245,17 @@ fn operational_features() -> BTreeMap<Feature, FeatureInfo> {
     ])
 }
 
-pub(super) fn authoring() -> AuthoringInfo {
-    AuthoringInfo {
+pub(super) fn create() -> CreateInfo {
+    CreateInfo {
         available: true,
         commands: vec![
-            "harness authoring begin".into(),
-            "harness authoring save".into(),
-            "harness authoring show".into(),
-            "harness authoring reset".into(),
-            "harness authoring validate".into(),
-            "harness authoring approval-begin".into(),
+            "harness create begin".into(),
+            "harness create save".into(),
+            "harness create show".into(),
+            "harness create reset".into(),
+            "harness create validate".into(),
+            "harness create approval-begin".into(),
         ],
-        description: "interactive suite authoring with discovery workers and approval gates".into(),
+        description: "interactive suite create with discovery workers and approval gates".into(),
     }
 }

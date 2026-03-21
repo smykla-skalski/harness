@@ -1,9 +1,9 @@
 #![deny(unsafe_code)]
 
 pub mod app;
-pub mod authoring;
 #[cfg(test)]
 mod codec;
+pub mod create;
 pub mod errors;
 pub mod hooks;
 pub mod infra;

@@ -52,8 +52,7 @@ pub(crate) fn check_exit_code_issues(context: &mut TextCheckContext<'_>, issues:
         return;
     }
 
-    let is_harness_authoring =
-        context.lower.contains("harness") && context.lower.contains("authoring");
+    let is_harness_create = context.lower.contains("harness") && context.lower.contains("create");
 
     if is_harness_operation {
         let summary = format!(
@@ -69,17 +68,16 @@ pub(crate) fn check_exit_code_issues(context: &mut TextCheckContext<'_>, issues:
             .with_fix_safety(FixSafety::TriageRequired)
             .with_source_tool(context.source_tool);
         context.emit_current(issues, blueprint);
-    } else if is_harness_authoring {
-        let summary = format!("Harness authoring command failed (exit {exit_code})");
-        let blueprint =
-            IssueBlueprint::from_code(IssueCode::HarnessAuthoringCommandFailure, summary)
-                .with_fingerprint("harness_authoring_failure")
-                .with_guidance(Guidance::fix_hint(
-                    "Harness authoring command returned non-zero - check payload or arguments",
-                ))
-                .with_confidence(Confidence::High)
-                .with_fix_safety(FixSafety::AutoFixGuarded)
-                .with_source_tool(context.source_tool);
+    } else if is_harness_create {
+        let summary = format!("Harness create command failed (exit {exit_code})");
+        let blueprint = IssueBlueprint::from_code(IssueCode::HarnessCreateCommandFailure, summary)
+            .with_fingerprint("harness_create_failure")
+            .with_guidance(Guidance::fix_hint(
+                "Harness create command returned non-zero - check payload or arguments",
+            ))
+            .with_confidence(Confidence::High)
+            .with_fix_safety(FixSafety::AutoFixGuarded)
+            .with_source_tool(context.source_tool);
         context.emit_current(issues, blueprint);
     } else if exit_code != 1 {
         let summary = format!("Non-zero exit code {exit_code}");

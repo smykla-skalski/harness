@@ -20,7 +20,7 @@ fn detects_ksa_code_in_bash() {
     let issues = check_text_for_issues(
         20,
         MessageRole::User,
-        "ERROR [KSA001] Write path is outside the suite:new surface",
+        "ERROR [KSA001] Write path is outside the suite:create surface",
         Some(SourceTool::Bash),
         &mut state,
     );

@@ -109,7 +109,7 @@ impl FeatureInfo {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct AuthoringInfo {
+pub struct CreateInfo {
     pub available: bool,
     pub commands: Vec<String>,
     pub description: String,
@@ -117,7 +117,7 @@ pub struct AuthoringInfo {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CapabilitiesReport {
-    pub authoring: AuthoringInfo,
+    pub create: CreateInfo,
     pub cluster_topologies: Vec<ClusterTopology>,
     pub features: BTreeMap<Feature, FeatureInfo>,
     pub platforms: Vec<PlatformInfo>,

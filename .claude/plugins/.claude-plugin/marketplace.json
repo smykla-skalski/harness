@@ -7,7 +7,7 @@
     {
       "name": "suite",
       "source": "./suite",
-      "description": "Kuma test suite authoring and execution"
+      "description": "Kuma test suite create and execution"
     }
   ]
 }

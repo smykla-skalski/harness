@@ -85,7 +85,7 @@ fn semantic_fallback_span<'a>(words: &'a [String], span_indices: &[usize]) -> Ve
         .iter()
         .map(|&span_index| words[span_index].as_str())
         .collect();
-    if matches!(span.first(), Some(&"run" | &"setup" | &"authoring")) && span.len() > 1 {
+    if matches!(span.first(), Some(&"run" | &"setup" | &"create")) && span.len() > 1 {
         span.remove(0);
     }
     if matches!(span.first(), Some(&"kuma")) && span.len() > 1 {

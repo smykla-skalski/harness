@@ -67,7 +67,7 @@ pub(super) fn check_write_edit_tool_use(
 
     // Inverted skill name rule: flag colon-prefixed names in SKILL.md files.
     // The actual convention in checked-in skills IS short names (e.g. "new", "run").
-    // The colon-prefixed form (e.g. "suite:new") is for CLI invocations only.
+    // The colon-prefixed form (e.g. "suite:create") is for CLI invocations only.
     if path.contains("SKILL.md") {
         let content = if tool_name == "Write" {
             input["content"].as_str().unwrap_or("")
@@ -89,7 +89,7 @@ pub(super) fn check_write_edit_tool_use(
                     .with_fingerprint(format!("{path}:{skill_name}"))
                     .with_guidance(Guidance::fix_target_hint(
                         path.to_string(),
-                        "Name should be the short form like 'new' or 'run', not 'suite:new'",
+                        "Name should be the short form like 'new' or 'run', not 'suite:create'",
                     ))
                     .with_confidence(Confidence::High)
                     .with_fix_safety(FixSafety::AutoFixSafe)
@@ -104,7 +104,7 @@ pub(super) fn check_write_edit_tool_use(
 /// Detect when Write/Edit creates a YAML file inside a `manifests/` directory.
 ///
 /// During suite:run, all manifests must already exist in the suite. Creating
-/// new manifests on the fly is a suite:new authoring defect.
+/// new manifests on the fly is a suite:create defect.
 pub(super) fn check_manifest_created_during_run(
     line_num: usize,
     input: &Value,
@@ -127,13 +127,13 @@ pub(super) fn check_manifest_created_during_run(
         issues,
         IssueBlueprint::from_code(
             IssueCode::ManifestCreatedDuringRun,
-            "Manifest created during run - should be authored in suite:new",
+            "Manifest created during run - should be authored in suite:create",
         )
         .with_fingerprint(path.to_string())
         .with_guidance(Guidance::fix_target_hint(
-            "skills/new/SKILL.md",
+            "skills/create/SKILL.md",
             "All manifests must exist before the run starts. \
-             A missing manifest means suite:new failed to author it.",
+             A missing manifest means suite:create failed to create it.",
         ))
         .with_confidence(Confidence::High)
         .with_fix_safety(FixSafety::TriageRequired)

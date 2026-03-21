@@ -8,11 +8,9 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::{Mutex, PoisonError};
 
-use harness::authoring;
-use harness::authoring::{
-    ApprovalBeginArgs, AuthoringBeginArgs, AuthoringSaveArgs, AuthoringValidateArgs,
-};
-use harness::authoring::{AuthorPhase, read_author_state};
+use harness::create;
+use harness::create::{ApprovalBeginArgs, CreateBeginArgs, CreateSaveArgs, CreateValidateArgs};
+use harness::create::{CreatePhase, read_create_state};
 use harness::run::RunDirArgs;
 use harness::run::Verdict;
 use harness::run::workflow::{self as runner_workflow, RunnerPhase};
@@ -430,11 +428,11 @@ fn cluster_up_rejects_finalized_run_reuse() {
 }
 
 // ============================================================================
-// Authoring validate tests (no env mutation)
+// Create validate tests (no env mutation)
 // ============================================================================
 
 #[test]
-fn authoring_validate_accepts_valid_meshmetric_group() {
+fn create_validate_accepts_valid_meshmetric_group() {
     let tmp = tempfile::tempdir().unwrap();
     let repo_root = tmp.path().join("repo");
     fs::create_dir_all(&repo_root).unwrap();
@@ -447,7 +445,7 @@ fn authoring_validate_accepts_valid_meshmetric_group() {
     .unwrap();
 
     let paths = vec![yaml.to_string_lossy().to_string()];
-    let result = authoring_validate_cmd(AuthoringValidateArgs {
+    let result = create_validate_cmd(CreateValidateArgs {
         path: paths,
         repo_root: Some(repo_root.to_string_lossy().to_string()),
     })
@@ -456,7 +454,7 @@ fn authoring_validate_accepts_valid_meshmetric_group() {
 }
 
 #[test]
-fn authoring_validate_rejects_invalid_meshmetric_group() {
+fn create_validate_rejects_invalid_meshmetric_group() {
     let tmp = tempfile::tempdir().unwrap();
     let repo_root = tmp.path().join("repo");
     fs::create_dir_all(&repo_root).unwrap();
@@ -465,7 +463,7 @@ fn authoring_validate_rejects_invalid_meshmetric_group() {
     fs::write(&md, "# Not yaml").unwrap();
 
     let paths = vec![md.to_string_lossy().to_string()];
-    let result = authoring_validate_cmd(AuthoringValidateArgs {
+    let result = create_validate_cmd(CreateValidateArgs {
         path: paths,
         repo_root: Some(repo_root.to_string_lossy().to_string()),
     })
@@ -475,7 +473,7 @@ fn authoring_validate_rejects_invalid_meshmetric_group() {
 }
 
 #[test]
-fn authoring_validate_ignores_universal_format() {
+fn create_validate_ignores_universal_format() {
     let tmp = tempfile::tempdir().unwrap();
     let repo_root = tmp.path().join("repo");
     fs::create_dir_all(&repo_root).unwrap();
@@ -484,7 +482,7 @@ fn authoring_validate_ignores_universal_format() {
     fs::write(&txt, "universal format block").unwrap();
 
     let paths = vec![txt.to_string_lossy().to_string()];
-    let result = authoring_validate_cmd(AuthoringValidateArgs {
+    let result = create_validate_cmd(CreateValidateArgs {
         path: paths,
         repo_root: Some(repo_root.to_string_lossy().to_string()),
     })
@@ -493,7 +491,7 @@ fn authoring_validate_ignores_universal_format() {
 }
 
 #[test]
-fn authoring_validate_skips_expected_rejection_manifests() {
+fn create_validate_skips_expected_rejection_manifests() {
     let tmp = tempfile::tempdir().unwrap();
     let repo_root = tmp.path().join("repo");
     fs::create_dir_all(&repo_root).unwrap();
@@ -506,7 +504,7 @@ fn authoring_validate_skips_expected_rejection_manifests() {
     .unwrap();
 
     let paths = vec![yaml.to_string_lossy().to_string()];
-    let result = authoring_validate_cmd(AuthoringValidateArgs {
+    let result = create_validate_cmd(CreateValidateArgs {
         path: paths,
         repo_root: Some(repo_root.to_string_lossy().to_string()),
     })
@@ -528,15 +526,15 @@ fn approval_begin_initializes_interactive_state() {
     env::set_current_dir(&work_dir).unwrap();
 
     let result = approval_begin_cmd(ApprovalBeginArgs {
-        skill: "suite:new".to_string(),
+        skill: "suite:create".to_string(),
         mode: "interactive".to_string(),
         suite_dir: None,
     })
     .execute();
     assert!(result.is_ok(), "approval_begin should succeed: {result:?}");
 
-    let state = read_author_state().unwrap().unwrap();
-    assert_eq!(state.phase, AuthorPhase::Discovery);
+    let state = read_create_state().unwrap().unwrap();
+    assert_eq!(state.phase, CreatePhase::Discovery);
 
     env::set_current_dir(&prev_dir).unwrap();
 }
@@ -909,7 +907,7 @@ fn check_record_isolates_run_context_by_session_id() {
     );
 }
 
-fn check_authoring_begin_persists_suite_default_repo_root() {
+fn check_create_begin_persists_suite_default_repo_root() {
     let tmp = tempfile::tempdir().unwrap();
     let repo_root = tmp.path().join("repo");
     fs::create_dir_all(&repo_root).unwrap();
@@ -921,11 +919,11 @@ fn check_authoring_begin_persists_suite_default_repo_root() {
     temp_env::with_vars(
         [
             ("XDG_DATA_HOME", Some(xdg.to_str().unwrap())),
-            ("CLAUDE_SESSION_ID", Some("authoring-begin-integ")),
+            ("CLAUDE_SESSION_ID", Some("create-begin-integ")),
         ],
         || {
-            let result = authoring_begin_cmd(AuthoringBeginArgs {
-                skill: "suite:new".to_string(),
+            let result = create_begin_cmd(CreateBeginArgs {
+                skill: "suite:create".to_string(),
                 repo_root: repo_root.to_string_lossy().to_string(),
                 feature: "mesh".to_string(),
                 mode: "interactive".to_string(),
@@ -933,9 +931,9 @@ fn check_authoring_begin_persists_suite_default_repo_root() {
                 suite_name: "install".to_string(),
             })
             .execute();
-            assert!(result.is_ok(), "authoring_begin should succeed: {result:?}");
+            assert!(result.is_ok(), "create_begin should succeed: {result:?}");
 
-            let session = authoring::load_authoring_session().unwrap().unwrap();
+            let session = create::load_create_session().unwrap().unwrap();
             assert_eq!(session.feature, "mesh");
             assert_eq!(session.suite_name, "install");
             assert!(!session.repo_root.is_empty());
@@ -943,7 +941,7 @@ fn check_authoring_begin_persists_suite_default_repo_root() {
     );
 }
 
-fn check_authoring_save_accepts_inline_payload() {
+fn check_create_save_accepts_inline_payload() {
     let tmp = tempfile::tempdir().unwrap();
     let xdg = tmp.path().join("xdg-save");
     let repo_root = tmp.path().join("repo");
@@ -954,11 +952,11 @@ fn check_authoring_save_accepts_inline_payload() {
     temp_env::with_vars(
         [
             ("XDG_DATA_HOME", Some(xdg.to_str().unwrap())),
-            ("CLAUDE_SESSION_ID", Some("authoring-save-inline")),
+            ("CLAUDE_SESSION_ID", Some("create-save-inline")),
         ],
         || {
-            let _ = authoring_begin_cmd(AuthoringBeginArgs {
-                skill: "suite:new".to_string(),
+            let _ = create_begin_cmd(CreateBeginArgs {
+                skill: "suite:create".to_string(),
                 repo_root: repo_root.to_string_lossy().to_string(),
                 feature: "mesh".to_string(),
                 mode: "interactive".to_string(),
@@ -967,7 +965,7 @@ fn check_authoring_save_accepts_inline_payload() {
             })
             .execute();
 
-            let result = authoring_save_cmd(AuthoringSaveArgs {
+            let result = create_save_cmd(CreateSaveArgs {
                 kind: "inventory".to_string(),
                 payload: Some(r#"{"files":[]}"#.to_string()),
                 input: None,
@@ -978,14 +976,14 @@ fn check_authoring_save_accepts_inline_payload() {
                 "save with inline payload should succeed: {result:?}"
             );
 
-            let workspace = authoring::authoring_workspace_dir().unwrap();
+            let workspace = create::create_workspace_dir().unwrap();
             let saved = workspace.join("inventory.json");
             assert!(saved.exists(), "inventory.json should be saved");
         },
     );
 }
 
-fn check_authoring_save_accepts_stdin() {
+fn check_create_save_accepts_stdin() {
     let tmp = tempfile::tempdir().unwrap();
     let xdg = tmp.path().join("xdg-stdin");
     let repo_root = tmp.path().join("repo");
@@ -998,11 +996,11 @@ fn check_authoring_save_accepts_stdin() {
     temp_env::with_vars(
         [
             ("XDG_DATA_HOME", Some(xdg.to_str().unwrap())),
-            ("CLAUDE_SESSION_ID", Some("authoring-save-stdin")),
+            ("CLAUDE_SESSION_ID", Some("create-save-stdin")),
         ],
         || {
-            let _ = authoring_begin_cmd(AuthoringBeginArgs {
-                skill: "suite:new".to_string(),
+            let _ = create_begin_cmd(CreateBeginArgs {
+                skill: "suite:create".to_string(),
                 repo_root: repo_root.to_string_lossy().to_string(),
                 feature: "mesh".to_string(),
                 mode: "interactive".to_string(),
@@ -1011,7 +1009,7 @@ fn check_authoring_save_accepts_stdin() {
             })
             .execute();
 
-            let result = authoring_save_cmd(AuthoringSaveArgs {
+            let result = create_save_cmd(CreateSaveArgs {
                 kind: "inventory".to_string(),
                 payload: None,
                 input: Some(input_file.to_str().unwrap().to_string()),
@@ -1022,7 +1020,7 @@ fn check_authoring_save_accepts_stdin() {
     );
 }
 
-fn check_authoring_save_rejects_schema_missing_fields() {
+fn check_create_save_rejects_schema_missing_fields() {
     let tmp = tempfile::tempdir().unwrap();
     let xdg = tmp.path().join("xdg-reject");
     let repo_root = tmp.path().join("repo");
@@ -1033,11 +1031,11 @@ fn check_authoring_save_rejects_schema_missing_fields() {
     temp_env::with_vars(
         [
             ("XDG_DATA_HOME", Some(xdg.to_str().unwrap())),
-            ("CLAUDE_SESSION_ID", Some("authoring-save-reject")),
+            ("CLAUDE_SESSION_ID", Some("create-save-reject")),
         ],
         || {
-            let _ = authoring_begin_cmd(AuthoringBeginArgs {
-                skill: "suite:new".to_string(),
+            let _ = create_begin_cmd(CreateBeginArgs {
+                skill: "suite:create".to_string(),
                 repo_root: repo_root.to_string_lossy().to_string(),
                 feature: "mesh".to_string(),
                 mode: "interactive".to_string(),
@@ -1046,7 +1044,7 @@ fn check_authoring_save_rejects_schema_missing_fields() {
             })
             .execute();
 
-            let result = authoring_save_cmd(AuthoringSaveArgs {
+            let result = create_save_cmd(CreateSaveArgs {
                 kind: "schema".to_string(),
                 payload: Some(String::new()),
                 input: None,
@@ -1073,8 +1071,8 @@ fn env_dependent_tests() {
     check_bootstrap_command_runs_gateway_api_crd_install();
     check_capture_uses_current_run_context();
     check_record_isolates_run_context_by_session_id();
-    check_authoring_begin_persists_suite_default_repo_root();
-    check_authoring_save_accepts_inline_payload();
-    check_authoring_save_accepts_stdin();
-    check_authoring_save_rejects_schema_missing_fields();
+    check_create_begin_persists_suite_default_repo_root();
+    check_create_save_accepts_inline_payload();
+    check_create_save_accepts_stdin();
+    check_create_save_rejects_schema_missing_fields();
 }

@@ -2,7 +2,7 @@ use super::{
     classify_canonical_gate, is_install_prompt, is_manifest_fix_prompt,
     matches_kubectl_validate_question, matches_manifest_fix_question,
 };
-use crate::authoring::{COPY_GATE, POSTWRITE_GATE, PREWRITE_GATE, ReviewGate};
+use crate::create::{COPY_GATE, POSTWRITE_GATE, PREWRITE_GATE, ReviewGate};
 use crate::hooks::protocol::payloads::{AskUserQuestionOption, AskUserQuestionPrompt};
 
 fn prompt(question: &str, options: &[&str]) -> AskUserQuestionPrompt {
@@ -55,7 +55,7 @@ fn install_prompt_detects_kubectl_validate() {
 }
 
 #[test]
-fn canonical_gate_classification_matches_authoring_prompts() {
+fn canonical_gate_classification_matches_create_prompts() {
     let prompts = vec![
         prompt(PREWRITE_GATE.question, PREWRITE_GATE.options),
         prompt(POSTWRITE_GATE.question, POSTWRITE_GATE.options),

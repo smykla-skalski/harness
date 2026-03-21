@@ -123,7 +123,7 @@ fn allows_kubectl_without_tracked_run() {
 
 #[test]
 fn denies_direct_kubectl_for_suite_author() {
-    let c = ctx("suite:new", "kubectl get pods");
+    let c = ctx("suite:create", "kubectl get pods");
     let r = execute(&c).unwrap();
     assert_eq!(r.decision, Decision::Deny);
 }
@@ -131,7 +131,7 @@ fn denies_direct_kubectl_for_suite_author() {
 #[test]
 fn denies_rm_rf_suite_dir_for_suite_author() {
     let c = ctx(
-        "suite:new",
+        "suite:create",
         "rm -rf ~/.local/share/harness/suites/motb-compliance",
     );
     let r = execute(&c).unwrap();
@@ -141,7 +141,7 @@ fn denies_rm_rf_suite_dir_for_suite_author() {
 
 #[test]
 fn allows_harness_wrapper_for_suite_author() {
-    let c = ctx("suite:new", "harness authoring-show --kind session");
+    let c = ctx("suite:create", "harness create-show --kind session");
     let r = execute(&c).unwrap();
     assert_eq!(r.decision, Decision::Allow);
 }
@@ -306,7 +306,7 @@ fn is_tracked_harness_command_negative() {
         .collect();
     assert!(!is_tracked_harness_command(&words));
 
-    let words: Vec<String> = vec!["harness", "authoring-show", "--kind", "session"]
+    let words: Vec<String> = vec!["harness", "create-show", "--kind", "session"]
         .into_iter()
         .map(String::from)
         .collect();
@@ -347,10 +347,10 @@ fn allows_harness_service_command() {
 }
 
 #[test]
-fn denies_python_inline_in_suite_new() {
+fn denies_python_inline_in_suite_create() {
     let c = ctx(
-        "suite:new",
-        "harness authoring-show --kind coverage | python3 -c \"import json, sys; print(json.load(sys.stdin))\"",
+        "suite:create",
+        "harness create-show --kind coverage | python3 -c \"import json, sys; print(json.load(sys.stdin))\"",
     );
     let r = execute(&c).unwrap();
     assert_eq!(r.decision, Decision::Deny);
@@ -378,7 +378,7 @@ fn denies_python_stdin_pipe() {
 
 #[test]
 fn denies_python_without_version_suffix() {
-    let c = ctx("suite:new", "echo '{}' | python -c \"import json\"");
+    let c = ctx("suite:create", "echo '{}' | python -c \"import json\"");
     let r = execute(&c).unwrap();
     assert_eq!(r.decision, Decision::Deny);
     assert!(r.message.contains("do not use python"));
@@ -393,7 +393,7 @@ fn allows_python_version_check() {
 
 #[test]
 fn allows_python_script_file() {
-    let c = ctx("suite:new", "python3 script.py");
+    let c = ctx("suite:create", "python3 script.py");
     let r = execute(&c).unwrap();
     assert_eq!(r.decision, Decision::Allow);
 }
@@ -495,7 +495,7 @@ fn denies_k3d_in_subshell() {
 
 #[test]
 fn denies_subshell_kubectl_in_suite_author() {
-    let c = ctx("suite:new", "echo $(kubectl get pods)");
+    let c = ctx("suite:create", "echo $(kubectl get pods)");
     let r = execute(&c).unwrap();
     assert_eq!(r.decision, Decision::Deny);
     assert_eq!(r.code, "KSR017");

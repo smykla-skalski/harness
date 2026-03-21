@@ -27,12 +27,12 @@ Commands:
   session-start       Handle session start hook
   session-stop        Handle session stop cleanup
   pre-compact         Save compact handoff before compaction
-  authoring-begin     Begin a suite:new workspace session
-  authoring-save      Save a suite:new payload
-  authoring-show      Show saved suite:new payloads
-  authoring-reset     Reset suite:new workspace
-  authoring-validate  Validate authored manifests against local CRDs
-  approval-begin      Begin suite:new approval flow
+  create-begin     Begin a suite:create workspace session
+  create-save      Save a suite:create payload
+  create-show      Show saved suite:create payloads
+  create-reset     Reset suite:create workspace
+  create-validate  Validate authored manifests against local CRDs
+  approval-begin      Begin suite:create approval flow
   api                 Call the Kuma control plane REST API directly
   token               Generate a dataplane token from the control plane (universal mode)
   service             Manage universal mode test service containers

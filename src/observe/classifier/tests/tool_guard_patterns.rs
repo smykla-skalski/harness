@@ -212,11 +212,11 @@ fn manifest_created_during_run_output_shape() {
     assert_eq!(issues.len(), 1);
     let issue = &issues[0];
     assert!(!issue.fix_safety.is_fixable());
-    assert_eq!(issue.fix_target.as_deref(), Some("skills/new/SKILL.md"));
+    assert_eq!(issue.fix_target.as_deref(), Some("skills/create/SKILL.md"));
     assert!(
         issue
             .fix_hint
             .as_deref()
-            .is_some_and(|hint| hint.contains("suite:new"))
+            .is_some_and(|hint| hint.contains("suite:create"))
     );
 }
