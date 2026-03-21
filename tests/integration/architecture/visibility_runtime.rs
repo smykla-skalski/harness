@@ -1,6 +1,12 @@
 use std::fs;
 use std::path::Path;
 
+fn assert_split_modules_exist(root: &Path, paths: &[&str], message: &str) {
+    for path in paths {
+        assert!(root.join(path).exists(), "{message}: {path}");
+    }
+}
+
 #[test]
 fn docker_block_root_stays_a_facade() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
@@ -241,6 +247,9 @@ fn kernel_topology_root_stays_prod_only() {
     for needle in [
         "fn platform_display_roundtrip(",
         "fn current_deploy_round_trip(",
+        "pub enum Platform {",
+        "pub enum ClusterMode {",
+        "pub struct ClusterSpec {",
         "pub fn from_object(",
         "pub fn from_mode_with_platform(",
         "CurrentDeployPayload",
@@ -252,17 +261,16 @@ fn kernel_topology_root_stays_prod_only() {
         );
     }
 
-    assert!(
-        root.join("src/kernel/topology/tests.rs").exists(),
-        "kernel topology split test module should exist"
-    );
-    assert!(
-        root.join("src/kernel/topology/parsing.rs").exists(),
-        "kernel topology parsing split module should exist"
-    );
-    assert!(
-        root.join("src/kernel/topology/current_deploy.rs").exists(),
-        "kernel topology current_deploy split module should exist"
+    assert_split_modules_exist(
+        root,
+        &[
+            "src/kernel/topology/tests.rs",
+            "src/kernel/topology/parsing.rs",
+            "src/kernel/topology/current_deploy.rs",
+            "src/kernel/topology/model.rs",
+            "src/kernel/topology/spec.rs",
+        ],
+        "kernel topology split module should exist",
     );
 }
 
