@@ -197,6 +197,9 @@ fn errors_root_stays_a_transport_facade() {
         "src/errors/cli_kind/run_setup.rs",
         "src/errors/cli_kind/authoring_observe.rs",
         "src/errors/cli_kind/workflow.rs",
+        "src/errors/hook_message/mod.rs",
+        "src/errors/hook_message/constructors.rs",
+        "src/errors/hook_message/mapping.rs",
         "src/errors/run_setup/mod.rs",
         "src/errors/run_setup/constructors.rs",
         "src/errors/run_setup/hints.rs",
@@ -241,6 +244,23 @@ fn errors_run_setup_root_stays_a_facade() {
         assert!(
             !run_setup.contains(needle),
             "src/errors/run_setup/mod.rs should stay a thin facade instead of owning `{needle}`"
+        );
+    }
+}
+
+#[test]
+fn errors_hook_message_root_stays_a_facade() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let hook_message = fs::read_to_string(root.join("src/errors/hook_message/mod.rs")).unwrap();
+
+    for needle in [
+        "pub fn write_outside_run(",
+        "pub fn code(&self)",
+        "pub fn decision(&self)",
+    ] {
+        assert!(
+            !hook_message.contains(needle),
+            "src/errors/hook_message/mod.rs should stay a thin facade instead of owning `{needle}`"
         );
     }
 }

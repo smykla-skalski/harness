@@ -99,9 +99,3 @@ pub fn contract_modes_non_empty(kuma: &dyn MeshControlPlane) {
     assert!(!kuma.global_mode().is_empty());
     assert!(!kuma.universal_environment().is_empty());
 }
-
-#[cfg(test)]
-mod tests {
-    // Production tests require Kuma infrastructure - no production tests here.
-    // Fake-based contract tests live in src/blocks/kuma/ within the harness crate.
-}

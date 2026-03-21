@@ -5,7 +5,6 @@ use std::path::Path;
 use std::thread;
 use std::time::Duration;
 
-use super::docker_run_detached;
 use super::runner::{describe_command, run_command};
 use super::*;
 
