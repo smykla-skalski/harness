@@ -1,15 +1,12 @@
-use std::borrow::Cow;
 use std::path::{Path, PathBuf};
 
 use serde_json::Value;
 
 use crate::authoring::AuthorWorkflowState;
-use crate::errors::CliError;
 use crate::hooks::protocol::context::{
     AgentContext, NormalizedEvent, NormalizedHookContext, SessionContext, SkillContext,
 };
 use crate::hooks::protocol::payloads::{AskUserAnswer, AskUserQuestionPrompt, HookEnvelopePayload};
-use crate::kernel::command_intent::ParsedCommand;
 use crate::kernel::tooling::ToolContext;
 use crate::run::context::RunContext;
 use crate::run::workflow::RunnerWorkflowState;
@@ -22,6 +19,10 @@ use self::hydration::{HydratedHookState, hydrate_normalized_context};
 use self::interaction::{
     HookInteraction, deserialize_value_list, normalized_from_envelope, render_tool_response_text,
 };
+#[path = "context/command.rs"]
+mod command;
+#[path = "context/view.rs"]
+mod view;
 
 /// Guard-facing context derived from the normalized adapter context.
 ///
@@ -89,29 +90,6 @@ impl GuardContext {
             interaction,
         }
     }
-
-    #[must_use]
-    pub fn effective_run_dir(&self) -> Option<Cow<'_, Path>> {
-        if let Some(run_directory) = &self.run_dir {
-            return Some(Cow::Borrowed(run_directory.as_path()));
-        }
-        self.run
-            .as_ref()
-            .map(|run_context| Cow::Owned(run_context.layout.run_dir()))
-    }
-
-    #[must_use]
-    pub fn suite_dir(&self) -> Option<Cow<'_, Path>> {
-        self.run.as_ref().map(|run_context| {
-            Path::new(&run_context.metadata.suite_dir)
-                .canonicalize()
-                .map_or_else(
-                    |_| Cow::Borrowed(Path::new(&run_context.metadata.suite_dir)),
-                    Cow::Owned,
-                )
-        })
-    }
-
     #[must_use]
     pub fn tool_name(&self) -> &str {
         &self.interaction.tool_name
@@ -125,21 +103,6 @@ impl GuardContext {
     #[must_use]
     pub fn tool_response(&self) -> &Value {
         &self.interaction.tool_response
-    }
-
-    #[must_use]
-    pub fn command_text(&self) -> Option<&str> {
-        self.tool
-            .as_ref()
-            .and_then(|tool| tool.input.command_text())
-            .or_else(|| self.tool_input().get("command").and_then(Value::as_str))
-    }
-
-    /// # Errors
-    /// Returns `CliError` when shell tokenization of the command text fails.
-    pub fn command_words(&self) -> Result<&[String], CliError> {
-        self.parsed_command()
-            .map(|command| command.map_or(&[][..], ParsedCommand::words))
     }
 
     #[must_use]
@@ -201,27 +164,6 @@ impl GuardContext {
     #[must_use]
     pub fn is_suite_author(&self) -> bool {
         self.skill.is_author
-    }
-
-    /// # Errors
-    /// Returns `CliError` when shell tokenization of the command text fails.
-    pub fn significant_words(&self) -> Result<Vec<&str>, CliError> {
-        self.parsed_command().map(|command| {
-            command.map_or_else(Vec::new, |parsed| parsed.significant_words().collect())
-        })
-    }
-
-    /// # Errors
-    /// Returns `CliError` when shell tokenization of the command text fails.
-    pub fn command_heads(&self) -> Result<&[String], CliError> {
-        self.parsed_command()
-            .map(|command| command.map_or(&[][..], ParsedCommand::heads))
-    }
-
-    /// # Errors
-    /// Returns `CliError` when shell tokenization of the command text fails.
-    pub fn parsed_command(&self) -> Result<Option<&ParsedCommand>, CliError> {
-        self.interaction.parsed_command()
     }
 }
 
