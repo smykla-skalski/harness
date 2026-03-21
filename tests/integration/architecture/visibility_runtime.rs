@@ -64,6 +64,9 @@ fn helm_block_root_stays_prod_only() {
     let helm = fs::read_to_string(root.join("src/infra/blocks/helm.rs")).unwrap();
 
     for needle in [
+        "pub struct HelmSetting {",
+        "pub struct HelmDeployer {",
+        "pub struct FakePackageDeployer {",
         "fn helm_setting_parses_cli_arg(",
         "fn fake_package_deployer_tracks_release_state(",
         "mod tests {",
@@ -78,6 +81,16 @@ fn helm_block_root_stays_prod_only() {
         root.join("src/infra/blocks/helm/tests.rs").exists(),
         "helm block split test module should exist"
     );
+    for path in [
+        "src/infra/blocks/helm/contract.rs",
+        "src/infra/blocks/helm/runtime.rs",
+        "src/infra/blocks/helm/fake.rs",
+    ] {
+        assert!(
+            root.join(path).exists(),
+            "helm block split module should exist: {path}"
+        );
+    }
 }
 
 #[test]
