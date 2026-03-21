@@ -43,9 +43,21 @@ fn observe_transport_stays_transport_only() {
     );
 
     let maintenance = read_repo_file(root, "src/observe/application/maintenance.rs");
-    assert_file_contains_needles(
+    assert_file_lacks_needles(
         &maintenance,
-        "src/observe/application/maintenance.rs should own",
+        "src/observe/application/maintenance.rs should stay a facade instead of owning",
+        &[
+            "fn load_observer_state(",
+            "fn execute_cycle(",
+            "#[derive(Serialize)]",
+        ],
+    );
+    assert_docs_contain_needles(
+        &[
+            &read_repo_file(root, "src/observe/application/maintenance/storage.rs"),
+            &read_repo_file(root, "src/observe/application/maintenance/scan.rs"),
+        ],
+        "observe maintenance split modules should own",
         &["fn load_observer_state(", "fn execute_cycle("],
     );
 }
@@ -179,10 +191,7 @@ fn hook_protocol_output_uses_typed_serialization() {
     );
 }
 
-#[test]
-fn transport_outputs_use_typed_serialization_helpers() {
-    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-
+fn assert_transport_outputs_avoid_manual_json(root: &Path) {
     for path in [
         "src/hooks/adapters/claude.rs",
         "src/hooks/adapters/gemini.rs",
@@ -202,7 +211,9 @@ fn transport_outputs_use_typed_serialization_helpers() {
             &["use serde_json::json;", "json!(", "serde_json::json!("],
         );
     }
+}
 
+fn assert_hook_adapters_use_typed_serialization(root: &Path) {
     let codex = read_repo_file(root, "src/hooks/adapters/codex.rs");
     assert_file_contains_needles(
         &codex,
@@ -238,6 +249,28 @@ fn transport_outputs_use_typed_serialization_helpers() {
             "fn render_json<T: Serialize>(",
         ],
     );
+}
+
+fn assert_observe_outputs_use_typed_serialization(root: &Path) {
+    let maintenance_render = read_repo_file(root, "src/observe/application/maintenance/render.rs");
+    assert_file_contains_needles(
+        &maintenance_render,
+        "src/observe/application/maintenance/render.rs should provide typed serialization helpers via",
+        &[
+            "use serde::Serialize;",
+            "fn render_json<T: Serialize>(",
+            "fn render_pretty_json<T: Serialize>(",
+        ],
+    );
+
+    let maintenance_inspection =
+        read_repo_file(root, "src/observe/application/maintenance/inspection.rs");
+    let maintenance_status = read_repo_file(root, "src/observe/application/maintenance/status.rs");
+    assert_docs_contain_needles(
+        &[&maintenance_inspection, &maintenance_status],
+        "observe maintenance split modules should render typed maintenance output via",
+        &["#[derive(Serialize)]"],
+    );
 
     let watch = read_repo_file(root, "src/observe/watch.rs");
     assert_file_contains_needles(
@@ -259,24 +292,24 @@ fn transport_outputs_use_typed_serialization_helpers() {
         "src/observe/compare.rs should render typed compare output via",
         &["#[derive(Serialize)]", "struct CompareResult"],
     );
+}
 
-    let maintenance = read_repo_file(root, "src/observe/application/maintenance.rs");
-    assert_file_contains_needles(
-        &maintenance,
-        "src/observe/application/maintenance.rs should render typed maintenance output via",
-        &[
-            "#[derive(Serialize)]",
-            "struct ObserverStatus",
-            "fn render_pretty_json<T: Serialize>(",
-        ],
-    );
-
+fn assert_wrapper_outputs_use_typed_serialization(root: &Path) {
     let wrapper = read_repo_file(root, "src/setup/wrapper/registrations.rs");
     assert_file_contains_needles(
         &wrapper,
         "src/setup/wrapper/registrations.rs should serialize bridge bindings from typed structs via",
         &["#[derive(Serialize)]", "struct OpenCodeToolBindings"],
     );
+}
+
+#[test]
+fn transport_outputs_use_typed_serialization_helpers() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    assert_transport_outputs_avoid_manual_json(root);
+    assert_hook_adapters_use_typed_serialization(root);
+    assert_observe_outputs_use_typed_serialization(root);
+    assert_wrapper_outputs_use_typed_serialization(root);
 }
 
 #[test]
