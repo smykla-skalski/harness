@@ -51,6 +51,10 @@ fn authoring_workflow_root_stays_focused_on_runtime_state() {
         "pub fn author_state_path()",
         "pub fn read_author_state()",
         "pub fn write_author_state(",
+        "pub fn can_write(",
+        "pub fn can_request_gate(",
+        "pub enum AuthorNextAction",
+        "pub fn next_action(",
     ] {
         assert!(
             !workflow.contains(needle),
@@ -61,6 +65,10 @@ fn authoring_workflow_root_stays_focused_on_runtime_state() {
     assert!(
         root.join("src/authoring/workflow/storage.rs").exists(),
         "authoring workflow storage split module should exist"
+    );
+    assert!(
+        root.join("src/authoring/workflow/policy.rs").exists(),
+        "authoring workflow policy split module should exist"
     );
 }
 
