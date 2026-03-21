@@ -37,23 +37,5 @@ pub fn cluster_check(run_dir_args: &RunDirArgs) -> Result<i32, CliError> {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use std::path::PathBuf;
-
-    #[test]
-    fn cluster_check_errors_on_nonexistent_run_dir() {
-        let args = RunDirArgs {
-            run_dir: Some(PathBuf::from("/tmp/harness-test-nonexistent-xyz")),
-            run_id: None,
-            run_root: None,
-        };
-        let err = cluster_check(&args).unwrap_err();
-        // Should fail when trying to read run metadata from missing dir
-        assert!(
-            err.code() == "KSRCLI014" || err.code() == "KSRCLI009",
-            "unexpected error code: {}",
-            err.code()
-        );
-    }
-}
+#[path = "cluster_check/tests.rs"]
+mod tests;
