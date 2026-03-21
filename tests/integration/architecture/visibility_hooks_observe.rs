@@ -49,6 +49,35 @@ fn hooks_application_context_root_stays_prod_only() {
 }
 
 #[test]
+fn context_agent_root_stays_a_facade() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let context_agent = fs::read_to_string(root.join("src/hooks/context_agent.rs")).unwrap();
+
+    for needle in [
+        "use crate::errors::{CliError, HookMessage};",
+        "use crate::hooks::application::GuardContext as HookContext;",
+        "use crate::run::workflow::{PreflightStatus, RunnerPhase, RunnerWorkflowState};",
+        "use super::effects::{HookEffect, HookOutcome};",
+        "fn can_start_preflight_worker(",
+        "mod tests {",
+    ] {
+        assert!(
+            !context_agent.contains(needle),
+            "src/hooks/context_agent.rs should stay a thin facade instead of owning `{needle}`"
+        );
+    }
+
+    assert_split_modules_exist(
+        root,
+        &[
+            "src/hooks/context_agent/runtime.rs",
+            "src/hooks/context_agent/tests.rs",
+        ],
+        "context-agent split module should exist",
+    );
+}
+
+#[test]
 fn authoring_workflow_root_stays_focused_on_runtime_state() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
     let workflow = fs::read_to_string(root.join("src/authoring/workflow.rs")).unwrap();
@@ -128,6 +157,43 @@ fn question_and_stop_hooks_root_stay_prod_only() {
 }
 
 #[test]
+fn validate_agent_root_stays_prod_only() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let validate_agent = fs::read_to_string(root.join("src/hooks/validate_agent.rs")).unwrap();
+
+    assert!(
+        !validate_agent.contains("mod tests {"),
+        "src/hooks/validate_agent.rs should stay focused on production hook logic instead of owning embedded tests"
+    );
+    assert!(
+        root.join("src/hooks/validate_agent/tests.rs").exists(),
+        "validate_agent split test module should exist"
+    );
+}
+
+#[test]
+fn guard_write_root_stays_prod_only() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let guard_write = fs::read_to_string(root.join("src/hooks/guard_write.rs")).unwrap();
+
+    for needle in [
+        "fn allowed_path_for_run_metadata(",
+        "fn file_label_with_filename(",
+        "mod tests {",
+    ] {
+        assert!(
+            !guard_write.contains(needle),
+            "src/hooks/guard_write.rs should stay focused on production write-guard logic instead of owning `{needle}`"
+        );
+    }
+
+    assert!(
+        root.join("src/hooks/guard_write/tests.rs").exists(),
+        "guard-write split test module should exist"
+    );
+}
+
+#[test]
 fn runner_guards_root_stays_a_facade() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
     let runner_guards =
@@ -184,6 +250,52 @@ fn observe_tool_checks_root_stays_a_facade() {
         assert!(
             root.join(path).exists(),
             "observe tool-check split module should exist: {path}"
+        );
+    }
+}
+
+#[test]
+fn observe_maintenance_root_stays_a_facade() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let maintenance =
+        fs::read_to_string(root.join("src/observe/application/maintenance.rs")).unwrap();
+
+    for needle in [
+        "struct RecentCycle {",
+        "struct ActiveWorkerView<'a> {",
+        "struct ObserverStatus<'a> {",
+        "struct IssueVerification {",
+        "struct ResolveStartResult {",
+        "fn render_json<T: Serialize>(",
+        "fn render_pretty_json<T: Serialize>(",
+        "fn state_file_path(",
+        "fn execute_cycle(",
+        "fn execute_status(",
+        "fn execute_verify(",
+        "fn execute_resolve_start(",
+        "fn execute_list_categories(",
+        "fn execute_list_focus_presets(",
+        "fn execute_mute(",
+        "fn execute_unmute(",
+    ] {
+        assert!(
+            !maintenance.contains(needle),
+            "src/observe/application/maintenance.rs should stay focused on delegation instead of owning `{needle}`"
+        );
+    }
+
+    for path in [
+        "src/observe/application/maintenance/render.rs",
+        "src/observe/application/maintenance/storage.rs",
+        "src/observe/application/maintenance/scan.rs",
+        "src/observe/application/maintenance/status.rs",
+        "src/observe/application/maintenance/inspection.rs",
+        "src/observe/application/maintenance/catalog.rs",
+        "src/observe/application/maintenance/mutations.rs",
+    ] {
+        assert!(
+            root.join(path).exists(),
+            "observe maintenance split module should exist: {path}"
         );
     }
 }

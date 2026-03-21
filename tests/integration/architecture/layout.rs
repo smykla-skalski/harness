@@ -79,9 +79,12 @@ fn cluster_topology_is_owned_by_kernel() {
         "src/setup/services/cluster.rs",
         "src/setup/capabilities/data.rs",
         "src/setup/capabilities/model.rs",
-        "src/setup/cluster/kubernetes.rs",
+        "src/setup/cluster/kubernetes/runtime.rs",
+        "src/setup/cluster/kubernetes/modes.rs",
         "src/setup/cluster/universal.rs",
-        "src/platform/runtime.rs",
+        "src/platform/runtime/kubernetes.rs",
+        "src/platform/runtime/profile.rs",
+        "src/platform/runtime/universal.rs",
         "src/hooks/verify_bash.rs",
         "tests/integration/cluster.rs",
         "tests/integration/universal.rs",
@@ -124,6 +127,29 @@ fn platform_compose_root_is_thin() {
     assert!(
         root.join("src/platform/compose/tests.rs").exists(),
         "platform compose split test module should exist"
+    );
+}
+
+#[test]
+fn run_specs_root_is_thin() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let specs_mod = fs::read_to_string(root.join("src/run/specs/mod.rs")).unwrap();
+
+    for needle in [
+        "fn effective_requires(",
+        "fn deserialize_baseline_files(",
+        "fn deserialize_skipped_groups(",
+        "mod tests {",
+    ] {
+        assert!(
+            !specs_mod.contains(needle),
+            "src/run/specs/mod.rs should stay focused on public exports instead of owning `{needle}`"
+        );
+    }
+
+    assert!(
+        root.join("src/run/specs/tests.rs").exists(),
+        "run specs split test module should exist"
     );
 }
 

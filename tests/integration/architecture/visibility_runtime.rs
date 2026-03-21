@@ -8,6 +8,24 @@ fn assert_split_modules_exist(root: &Path, paths: &[&str], message: &str) {
 }
 
 #[test]
+fn infra_environment_root_stays_prod_only() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let environment = fs::read_to_string(root.join("src/infra/environment.rs")).unwrap();
+
+    for needle in ["merge_env_prepends_build_artifacts_to_path", "mod tests {"] {
+        assert!(
+            !environment.contains(needle),
+            "src/infra/environment.rs should stay focused on production environment helpers instead of owning `{needle}`"
+        );
+    }
+
+    assert!(
+        root.join("src/infra/environment/tests.rs").exists(),
+        "infra environment split test module should exist"
+    );
+}
+
+#[test]
 fn docker_block_root_stays_a_facade() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
     let docker_mod = fs::read_to_string(root.join("src/infra/blocks/docker/mod.rs")).unwrap();
@@ -113,6 +131,28 @@ fn codec_root_stays_prod_only() {
     assert!(
         root.join("src/codec/tests.rs").exists(),
         "codec split test module should exist"
+    );
+}
+
+#[test]
+fn manifests_root_stays_prod_only() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let manifests = fs::read_to_string(root.join("src/manifests.rs")).unwrap();
+
+    for needle in [
+        "fn default_validation_output_changes_extension(",
+        "fn default_validation_output_no_extension(",
+        "mod tests {",
+    ] {
+        assert!(
+            !manifests.contains(needle),
+            "src/manifests.rs should stay focused on production manifest helpers instead of owning `{needle}`"
+        );
+    }
+
+    assert!(
+        root.join("src/manifests/tests.rs").exists(),
+        "manifests split test module should exist"
     );
 }
 
@@ -235,8 +275,10 @@ fn run_report_root_stays_prod_only() {
     let report = fs::read_to_string(root.join("src/run/report.rs")).unwrap();
 
     for needle in [
-        "fn render_frontmatter_list_into(",
-        "fn yaml_quote_if_needed(",
+        "pub enum Verdict",
+        "pub enum GroupVerdict",
+        "pub struct RunReportFrontmatter",
+        "pub struct RunReport",
         "mod tests {",
     ] {
         assert!(
@@ -245,7 +287,12 @@ fn run_report_root_stays_prod_only() {
         );
     }
 
-    for path in ["src/run/report/markdown.rs", "src/run/report/tests.rs"] {
+    for path in [
+        "src/run/report/model.rs",
+        "src/run/report/verdict.rs",
+        "src/run/report/markdown.rs",
+        "src/run/report/tests.rs",
+    ] {
         assert!(
             root.join(path).exists(),
             "run report split module should exist: {path}"
@@ -313,6 +360,37 @@ fn setup_cluster_root_stays_prod_only() {
         root.join("src/setup/cluster/tests.rs").exists(),
         "setup cluster split test module should exist"
     );
+}
+
+#[test]
+fn setup_cluster_kubernetes_root_stays_a_facade() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let kubernetes = fs::read_to_string(root.join("src/setup/cluster/kubernetes.rs")).unwrap();
+
+    for needle in [
+        "fn resolve_kds_address(",
+        "fn start_and_deploy(",
+        "fn cluster_stop(",
+        "fn dispatch_k8s_mode(",
+        "fn cluster_k8s(",
+    ] {
+        assert!(
+            !kubernetes.contains(needle),
+            "src/setup/cluster/kubernetes.rs should stay a thin facade instead of owning `{needle}`"
+        );
+    }
+
+    for path in [
+        "src/setup/cluster/kubernetes/address.rs",
+        "src/setup/cluster/kubernetes/deploy.rs",
+        "src/setup/cluster/kubernetes/modes.rs",
+        "src/setup/cluster/kubernetes/runtime.rs",
+    ] {
+        assert!(
+            root.join(path).exists(),
+            "setup cluster kubernetes split module should exist: {path}"
+        );
+    }
 }
 
 #[test]
@@ -926,6 +1004,28 @@ fn suite_defaults_root_stays_prod_only() {
     assert!(
         root.join("src/suite_defaults/tests.rs").exists(),
         "suite_defaults split test module should exist"
+    );
+}
+
+#[test]
+fn workspace_paths_root_stays_prod_only() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let paths = fs::read_to_string(root.join("src/workspace/paths.rs")).unwrap();
+
+    for needle in [
+        "fn utc_now_ends_with_z()",
+        "fn dirs_home_prefers_home_env()",
+        "mod tests {",
+    ] {
+        assert!(
+            !paths.contains(needle),
+            "src/workspace/paths.rs should stay focused on production path helpers instead of owning `{needle}`"
+        );
+    }
+
+    assert!(
+        root.join("src/workspace/paths/tests.rs").exists(),
+        "workspace paths split test module should exist"
     );
 }
 
