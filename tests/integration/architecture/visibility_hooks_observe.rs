@@ -284,6 +284,89 @@ fn runner_guards_root_stays_a_facade() {
 }
 
 #[test]
+fn hook_guards_roots_stay_prod_only() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+
+    for (path, needles, split_path) in [
+        (
+            "src/hooks/guards/admin_endpoint.rs",
+            &[
+                "fn denies_direct_admin_endpoint()",
+                "fn allows_harness_envoy_capture()",
+                "mod tests {",
+            ][..],
+            "src/hooks/guards/admin_endpoint/tests.rs",
+        ),
+        (
+            "src/hooks/guards/denied_binary.rs",
+            &[
+                "fn runner_denies_kubectl()",
+                "fn author_denies_rm_rf_suite_dir()",
+                "mod tests {",
+            ][..],
+            "src/hooks/guards/denied_binary/tests.rs",
+        ),
+        (
+            "src/hooks/guards/make_target.rs",
+            &[
+                "fn denies_k3d_make_target()",
+                "fn allows_safe_make_target()",
+                "mod tests {",
+            ][..],
+            "src/hooks/guards/make_target/tests.rs",
+        ),
+        (
+            "src/hooks/guards/run_phase.rs",
+            &[
+                "fn allows_when_no_runner_state()",
+                "fn allows_plain_command()",
+                "mod tests {",
+            ][..],
+            "src/hooks/guards/run_phase/tests.rs",
+        ),
+        (
+            "src/hooks/guards/structural.rs",
+            &[
+                "fn denies_batched_tracked_harness_in_loop()",
+                "fn allows_single_kuma_delete()",
+                "mod tests {",
+            ][..],
+            "src/hooks/guards/structural/tests.rs",
+        ),
+        (
+            "src/hooks/guards/subshell.rs",
+            &[
+                "fn denies_kubectl_in_subshell()",
+                "fn allows_safe_subshell()",
+                "mod tests {",
+            ][..],
+            "src/hooks/guards/subshell/tests.rs",
+        ),
+        (
+            "src/hooks/guards/mod.rs",
+            &[
+                "fn empty_chain_allows()",
+                "fn subshell_smuggling_caught_before_binary_check()",
+                "mod tests {",
+            ][..],
+            "src/hooks/guards/tests.rs",
+        ),
+    ] {
+        let contents = fs::read_to_string(root.join(path)).unwrap();
+        for needle in needles {
+            assert!(
+                !contents.contains(needle),
+                "{path} should stay focused on production hook guard logic instead of owning `{needle}`"
+            );
+        }
+        assert!(
+            root.join(split_path).exists(),
+            "hook guard split test module should exist: {split_path}"
+        );
+    }
+}
+
+#[test]
 fn observe_tool_checks_root_stays_a_facade() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
     let tool_checks_mod =
