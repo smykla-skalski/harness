@@ -65,6 +65,36 @@ fn compose_block_root_stays_a_facade() {
 }
 
 #[test]
+fn build_block_root_stays_a_facade() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let build_mod = fs::read_to_string(root.join("src/infra/blocks/build.rs")).unwrap();
+
+    for needle in [
+        "pub struct BuildTarget {",
+        "pub struct ProcessBuildSystem {",
+        "pub struct FakeBuildSystem {",
+        "mod tests {",
+    ] {
+        assert!(
+            !build_mod.contains(needle),
+            "src/infra/blocks/build.rs should stay a thin facade instead of owning `{needle}`"
+        );
+    }
+
+    for path in [
+        "src/infra/blocks/build/contract.rs",
+        "src/infra/blocks/build/runtime.rs",
+        "src/infra/blocks/build/fake.rs",
+        "src/infra/blocks/build/tests.rs",
+    ] {
+        assert!(
+            root.join(path).exists(),
+            "build block split module should exist: {path}"
+        );
+    }
+}
+
+#[test]
 fn helm_block_root_stays_prod_only() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
     let helm = fs::read_to_string(root.join("src/infra/blocks/helm.rs")).unwrap();
@@ -573,6 +603,29 @@ fn platform_ephemeral_metallb_root_stays_prod_only() {
 }
 
 #[test]
+fn platform_kubectl_validate_root_stays_prod_only() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let kubectl_validate =
+        fs::read_to_string(root.join("src/platform/kubectl_validate.rs")).unwrap();
+
+    for needle in [
+        "fn state_path_ends_with_expected_segments(",
+        "fn resolve_binary_uses_env_override(",
+        "mod tests {",
+    ] {
+        assert!(
+            !kubectl_validate.contains(needle),
+            "src/platform/kubectl_validate.rs should stay focused on production kubectl-validate state and resolution instead of owning `{needle}`"
+        );
+    }
+
+    assert!(
+        root.join("src/platform/kubectl_validate/tests.rs").exists(),
+        "platform kubectl_validate split test module should exist"
+    );
+}
+
+#[test]
 fn kubernetes_block_root_stays_a_facade() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
     let kubernetes_mod = fs::read_to_string(root.join("src/infra/blocks/kubernetes.rs")).unwrap();
@@ -785,4 +838,34 @@ fn infra_io_root_stays_prod_only() {
         root.join("src/infra/io/tests.rs").exists(),
         "infra io split test module should exist"
     );
+}
+
+#[test]
+fn http_block_root_stays_a_facade() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let http_mod = fs::read_to_string(root.join("src/infra/blocks/http.rs")).unwrap();
+
+    for needle in [
+        "impl HttpClient for ReqwestHttpClient",
+        "pub struct FakeHttpClient {",
+        "fn reqwest_http_client_get_returns_body()",
+        "mod tests {",
+    ] {
+        assert!(
+            !http_mod.contains(needle),
+            "src/infra/blocks/http.rs should stay a thin facade instead of owning `{needle}`"
+        );
+    }
+
+    for path in [
+        "src/infra/blocks/http/client.rs",
+        "src/infra/blocks/http/fake.rs",
+        "src/infra/blocks/http/tests.rs",
+        "src/infra/blocks/http/types.rs",
+    ] {
+        assert!(
+            root.join(path).exists(),
+            "http block split module should exist: {path}"
+        );
+    }
 }
