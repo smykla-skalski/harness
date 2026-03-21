@@ -498,6 +498,9 @@ fn platform_runtime_root_stays_prod_only() {
     let runtime = fs::read_to_string(root.join("src/platform/runtime.rs")).unwrap();
 
     for needle in [
+        "pub struct ControlPlaneAccess<'a>",
+        "pub struct KubernetesRuntime<'a>",
+        "pub struct UniversalRuntime<'a>",
         "fn universal_runtime_exposes_control_plane_access(",
         "fn profile_platform_detects_universal_variants(",
         "mod tests {",
@@ -512,6 +515,17 @@ fn platform_runtime_root_stays_prod_only() {
         root.join("src/platform/runtime/tests.rs").exists(),
         "platform runtime split test module should exist"
     );
+    for path in [
+        "src/platform/runtime/access.rs",
+        "src/platform/runtime/kubernetes.rs",
+        "src/platform/runtime/universal.rs",
+        "src/platform/runtime/profile.rs",
+    ] {
+        assert!(
+            root.join(path).exists(),
+            "platform runtime split module should exist: {path}"
+        );
+    }
 }
 
 #[test]
