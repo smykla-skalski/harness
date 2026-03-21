@@ -728,6 +728,31 @@ fn observe_classifier_rules_root_stays_prod_only() {
 }
 
 #[test]
+fn observe_dump_root_stays_a_facade() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let dump = fs::read_to_string(root.join("src/observe/dump.rs")).unwrap();
+
+    for needle in [
+        "pub(super) fn execute_dump(",
+        "pub(super) fn format_dump_block(",
+        "fn parse_dump_line(",
+        "fn dump_message_content(",
+        "fn dump_content_blocks(",
+    ] {
+        assert!(
+            !dump.contains(needle),
+            "src/observe/dump.rs should stay a thin facade instead of owning `{needle}`"
+        );
+    }
+
+    assert_split_modules_exist(
+        root,
+        &["src/observe/dump/execute.rs", "src/observe/dump/format.rs"],
+        "observe dump split module should exist",
+    );
+}
+
+#[test]
 fn observe_output_root_stays_focused_on_render_entrypoints() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
     let output = fs::read_to_string(root.join("src/observe/output.rs")).unwrap();
