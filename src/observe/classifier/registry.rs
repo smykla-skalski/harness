@@ -31,6 +31,7 @@ impl fmt::Display for IssueOwner {
 }
 
 /// Static metadata for a single issue code.
+#[derive(Clone, Copy)]
 pub struct IssueCodeMeta {
     pub code: IssueCode,
     pub default_category: IssueCategory,
@@ -46,7 +47,10 @@ pub struct IssueCodeMeta {
 /// Returns `None` only if the code is missing from the registry (a bug).
 #[must_use]
 pub fn issue_code_meta(code: IssueCode) -> Option<&'static IssueCodeMeta> {
-    ISSUE_CODE_REGISTRY.iter().find(|entry| entry.code == code)
+    ISSUE_CODE_REGISTRY
+        .as_ref()
+        .iter()
+        .find(|entry| entry.code == code)
 }
 
 #[cfg(test)]
