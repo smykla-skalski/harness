@@ -1,8 +1,8 @@
 use crate::kernel::topology::Platform;
 
-use super::{
-    CapabilitiesReport, Feature, authoring, capabilities, cluster_topologies, features, platforms,
-};
+use super::capabilities;
+use super::data::{authoring, cluster_topologies, features, platforms};
+use super::model::{CapabilitiesReport, Feature};
 
 #[test]
 fn capabilities_returns_zero() {

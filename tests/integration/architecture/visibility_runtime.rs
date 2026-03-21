@@ -130,6 +130,9 @@ fn setup_capabilities_root_stays_prod_only() {
     let capabilities = fs::read_to_string(root.join("src/setup/capabilities.rs")).unwrap();
 
     for needle in [
+        "pub enum Feature {",
+        "fn core_features()",
+        "fn operational_features()",
         "fn capabilities_returns_zero(",
         "fn feature_count_is_current(",
         "mod tests {",
@@ -144,6 +147,15 @@ fn setup_capabilities_root_stays_prod_only() {
         root.join("src/setup/capabilities/tests.rs").exists(),
         "setup capabilities split test module should exist"
     );
+    for path in [
+        "src/setup/capabilities/model.rs",
+        "src/setup/capabilities/data.rs",
+    ] {
+        assert!(
+            root.join(path).exists(),
+            "setup capabilities split module should exist: {path}"
+        );
+    }
 }
 
 #[test]
