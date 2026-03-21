@@ -192,13 +192,35 @@ fn errors_root_stays_a_transport_facade() {
     }
 
     for path in [
-        "src/errors/cli_kind.rs",
+        "src/errors/cli_kind/mod.rs",
+        "src/errors/cli_kind/common.rs",
+        "src/errors/cli_kind/run_setup.rs",
+        "src/errors/cli_kind/authoring_observe.rs",
+        "src/errors/cli_kind/workflow.rs",
         "src/errors/cli_error.rs",
         "src/errors/tests.rs",
     ] {
         assert!(
             root.join(path).exists(),
             "errors split module should exist: {path}"
+        );
+    }
+}
+
+#[test]
+fn errors_cli_kind_root_stays_a_facade() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let cli_kind = fs::read_to_string(root.join("src/errors/cli_kind/mod.rs")).unwrap();
+
+    for needle in [
+        "pub fn missing_tools(",
+        "pub fn report_line_limit(",
+        "pub fn session_parse_error(",
+        "pub fn workflow_io(",
+    ] {
+        assert!(
+            !cli_kind.contains(needle),
+            "src/errors/cli_kind/mod.rs should stay a thin facade instead of owning `{needle}`"
         );
     }
 }
