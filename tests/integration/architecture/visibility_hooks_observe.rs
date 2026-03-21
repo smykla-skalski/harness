@@ -172,6 +172,66 @@ fn validate_agent_root_stays_prod_only() {
 }
 
 #[test]
+fn hooks_debug_root_stays_prod_only() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let debug = fs::read_to_string(root.join("src/hooks/debug.rs")).unwrap();
+
+    for needle in [
+        "fn allow_returns_zero_exit_code()",
+        "fn log_and_exit_writes_jsonl_debug_file()",
+        "mod tests {",
+    ] {
+        assert!(
+            !debug.contains(needle),
+            "src/hooks/debug.rs should stay focused on production debug logging instead of owning `{needle}`"
+        );
+    }
+
+    assert!(
+        root.join("src/hooks/debug/tests.rs").exists(),
+        "hooks debug split test module should exist"
+    );
+}
+
+#[test]
+fn hook_protocol_roots_stay_prod_only() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+
+    for (path, needles, split_path) in [
+        (
+            "src/hooks/protocol/output.rs",
+            &[
+                "fn render_hook_message_deny()",
+                "fn hook_output_allow_is_always_empty()",
+                "mod tests {",
+            ][..],
+            "src/hooks/protocol/output/tests.rs",
+        ),
+        (
+            "src/hooks/protocol/payloads.rs",
+            &[
+                "fn envelope_from_str_parses()",
+                "fn response_text_renders_bash_output()",
+                "mod tests {",
+            ][..],
+            "src/hooks/protocol/payloads/tests.rs",
+        ),
+    ] {
+        let contents = fs::read_to_string(root.join(path)).unwrap();
+        for needle in needles {
+            assert!(
+                !contents.contains(needle),
+                "{path} should stay focused on production hook protocol logic instead of owning `{needle}`"
+            );
+        }
+        assert!(
+            root.join(split_path).exists(),
+            "hook protocol split test module should exist: {split_path}"
+        );
+    }
+}
+
+#[test]
 fn guard_write_root_stays_prod_only() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
     let guard_write = fs::read_to_string(root.join("src/hooks/guard_write.rs")).unwrap();
