@@ -18,7 +18,7 @@ use super::super::helpers::*;
 // validate-agent tests
 // ============================================================================
 
-// validate-agent for suite:new checks last_assistant_message ends with "saved"
+// validate-agent for suite:create checks last_assistant_message ends with "saved"
 #[test]
 fn validate_agent_rejects_not_at_end() {
     let payload = HookEnvelopePayload {
@@ -32,7 +32,7 @@ fn validate_agent_rejects_not_at_end() {
         stop_hook_active: false,
         raw_keys: vec![],
     };
-    let ctx = make_hook_context("suite:new", payload);
+    let ctx = make_hook_context("suite:create", payload);
     let r = validate_agent::execute(&ctx).unwrap().to_hook_result();
     // "saved" is not at the end, so should warn
     assert_warn(&r);
@@ -49,7 +49,7 @@ fn validate_agent_accepts_at_end() {
         stop_hook_active: false,
         raw_keys: vec![],
     };
-    let ctx = make_hook_context("suite:new", payload);
+    let ctx = make_hook_context("suite:create", payload);
     let r = validate_agent::execute(&ctx).unwrap().to_hook_result();
     assert_allow(&r);
 }
@@ -65,7 +65,7 @@ fn validate_agent_trailing_period() {
         stop_hook_active: false,
         raw_keys: vec![],
     };
-    let ctx = make_hook_context("suite:new", payload);
+    let ctx = make_hook_context("suite:create", payload);
     let r = validate_agent::execute(&ctx).unwrap().to_hook_result();
     assert_allow(&r);
 }

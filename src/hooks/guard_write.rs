@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use crate::authoring::{can_write, suite_author_path_allowed};
+use crate::create::{can_write, suite_create_path_allowed};
 use crate::errors::{CliError, HookMessage};
 use crate::hooks::application::GuardContext as HookContext;
 use crate::hooks::protocol::hook_result::HookResult;
@@ -20,12 +20,12 @@ pub fn execute(ctx: &HookContext) -> Result<HookResult, CliError> {
     super::dispatch_by_skill(
         ctx,
         |ctx| Ok(guard_suite_runner(ctx, &paths)),
-        |ctx| Ok(guard_suite_author(ctx, &paths)),
+        |ctx| Ok(guard_suite_create(ctx, &paths)),
     )
 }
 
-fn guard_suite_author(ctx: &HookContext, paths: &[&Path]) -> HookResult {
-    let Some(state) = &ctx.author_state else {
+fn guard_suite_create(ctx: &HookContext, paths: &[&Path]) -> HookResult {
+    let Some(state) = &ctx.create_state else {
         return HookResult::allow();
     };
     let suite_dir = state.suite_path();
@@ -36,14 +36,14 @@ fn guard_suite_author(ctx: &HookContext, paths: &[&Path]) -> HookResult {
     if !has_suite_output {
         return HookResult::allow();
     }
-    // Validate paths are within the suite:new surface.
+    // Validate paths are within the suite:create surface.
     if let Some(ref sdn) = sd_norm {
         for raw_path in paths {
             let norm = normalize_path(raw_path);
             if !norm.starts_with(sdn) {
                 continue;
             }
-            if !suite_author_path_allowed(&norm, sdn) {
+            if !suite_create_path_allowed(&norm, sdn) {
                 return HookMessage::write_outside_suite(raw_path.display().to_string())
                     .into_result();
             }

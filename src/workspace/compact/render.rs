@@ -1,8 +1,8 @@
 use std::path::{Path, PathBuf};
 
-use crate::kernel::skills::{SKILL_NEW, SKILL_RUN};
+use crate::kernel::skills::{SKILL_CREATE, SKILL_RUN};
 
-use super::handoff::{AuthoringHandoff, CompactHandoff, RunnerHandoff};
+use super::handoff::{CompactHandoff, CreateHandoff, RunnerHandoff};
 use super::{CHAR_LIMIT, SECTION_CHAR_LIMIT, SECTION_LINE_LIMIT};
 
 /// Render the hydration context for a compact handoff.
@@ -41,9 +41,9 @@ pub fn render_hydration_context(handoff: &CompactHandoff<'_>, diverged_paths: &[
     let sections = ordered_sections(handoff);
     for section in &sections {
         match *section {
-            "authoring" => {
-                if let Some(ref auth) = handoff.authoring {
-                    lines.extend(render_authoring_section(auth).lines().map(String::from));
+            "create" => {
+                if let Some(ref auth) = handoff.create {
+                    lines.extend(render_create_section(auth).lines().map(String::from));
                 }
             }
             "runner" => {
@@ -185,9 +185,9 @@ pub(super) fn render_runner_section(handoff: &RunnerHandoff<'_>) -> String {
     truncate_lines(&lines, SECTION_CHAR_LIMIT, SECTION_LINE_LIMIT)
 }
 
-fn render_authoring_section(handoff: &AuthoringHandoff<'_>) -> String {
+fn render_create_section(handoff: &CreateHandoff<'_>) -> String {
     let lines = vec![
-        format!("{SKILL_NEW}:"),
+        format!("{SKILL_CREATE}:"),
         format!("- Suite dir: {}", handoff.suite_dir),
         format!(
             "- Suite name: {}",
@@ -199,7 +199,7 @@ fn render_authoring_section(handoff: &AuthoringHandoff<'_>) -> String {
         ),
         format!(
             "- Phase: {}",
-            handoff.author_phase.as_deref().unwrap_or("missing")
+            handoff.create_phase.as_deref().unwrap_or("missing")
         ),
         format!(
             "- Saved payloads: {}",
@@ -228,9 +228,9 @@ fn render_authoring_section(handoff: &AuthoringHandoff<'_>) -> String {
 
 pub(super) fn ordered_sections<'a>(handoff: &'a CompactHandoff<'_>) -> Vec<&'a str> {
     let mut sections: Vec<(&str, bool)> = Vec::new();
-    if let Some(ref a) = handoff.authoring {
-        let unfinished = !matches!(a.author_phase.as_deref(), Some("complete" | "cancelled"));
-        sections.push(("authoring", unfinished));
+    if let Some(ref a) = handoff.create {
+        let unfinished = !matches!(a.create_phase.as_deref(), Some("complete" | "cancelled"));
+        sections.push(("create", unfinished));
     }
     if let Some(ref r) = handoff.runner {
         let unfinished = r.verdict.as_deref().is_none()

@@ -10,7 +10,7 @@ Usage: harness [OPTIONS] <COMMAND>
 Commands:
   hook           Run a harness hook for a skill
   run            Suite:run commands grouped by domain
-  authoring      Suite:new commands grouped by domain
+  create         Suite:create commands grouped by domain
   setup          Setup and session lifecycle commands
   session-start  Handle session start hook
   session-stop   Handle session stop cleanup

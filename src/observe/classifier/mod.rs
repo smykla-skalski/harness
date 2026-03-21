@@ -29,7 +29,7 @@ static EXIT_CODE_REGEX: LazyLock<Regex> =
 static AGENT_NAME_REGEX: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r#"Agent "([^"]+)""#).expect("valid regex"));
 static OLD_SKILL_REGEX: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"--skill\s+(suite-author|suite-runner)\b").expect("valid regex"));
+    LazyLock::new(|| Regex::new(r"--skill\s+(suite-create|suite-runner)\b").expect("valid regex"));
 static RM_RECURSIVE_REGEX: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"\brm\s+(-\w+\s+)*.*-r").expect("valid regex"));
 static SKILL_NAME_REGEX: LazyLock<Regex> =

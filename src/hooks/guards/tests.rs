@@ -70,17 +70,17 @@ fn chain_allows_safe_commands() {
 }
 
 #[test]
-fn author_chain_denies_kubectl() {
-    let chain = author_bash_chain();
-    let c = ctx("suite:new", "kubectl get pods");
+fn create_chain_denies_kubectl() {
+    let chain = create_bash_chain();
+    let c = ctx("suite:create", "kubectl get pods");
     let result = chain.evaluate(&c);
     assert_eq!(result.decision, NormalizedDecision::Deny);
 }
 
 #[test]
-fn author_chain_allows_harness_command() {
-    let chain = author_bash_chain();
-    let c = ctx("suite:new", "harness authoring-show --kind session");
+fn create_chain_allows_harness_command() {
+    let chain = create_bash_chain();
+    let c = ctx("suite:create", "harness create-show --kind session");
     let result = chain.evaluate(&c);
     assert_eq!(result.decision, NormalizedDecision::Allow);
 }

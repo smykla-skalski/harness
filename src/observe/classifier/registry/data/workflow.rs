@@ -12,12 +12,12 @@ pub(super) static ISSUE_CODE_METAS: &[IssueCodeMeta] = &[
         owner: IssueOwner::Harness,
     },
     IssueCodeMeta {
-        code: IssueCode::HarnessAuthoringCommandFailure,
+        code: IssueCode::HarnessCreateCommandFailure,
         default_category: IssueCategory::WorkflowError,
         default_severity: IssueSeverity::Medium,
         default_confidence: Confidence::High,
         default_fix_safety: FixSafety::AutoFixGuarded,
-        description: "Harness authoring command returned non-zero exit",
+        description: "Harness create command returned non-zero exit",
         owner: IssueOwner::Harness,
     },
     IssueCodeMeta {

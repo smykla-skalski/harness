@@ -51,7 +51,7 @@ const KUMA_DELETE_RESOURCE_KINDS: &[&str] = &[
     "meshaccesslogs",
 ];
 
-pub(crate) fn deny_author_suite_storage_mutation(words: &[String]) -> HookResult {
+pub(crate) fn deny_create_suite_storage_mutation(words: &[String]) -> HookResult {
     let heads = command_heads(words);
     if !heads
         .iter()
@@ -65,7 +65,7 @@ pub(crate) fn deny_author_suite_storage_mutation(words: &[String]) -> HookResult
             return HookMessage::approval_required(
                 "mutate suite storage",
                 "do not delete or overwrite existing suite directories; \
-                 use `harness authoring begin` which handles conflicts",
+                 use `harness create begin` which handles conflicts",
             )
             .into_result();
         }

@@ -101,12 +101,12 @@ const GUARD_BASH_PAYLOAD_CASES: &[(&str, &str, bool)] = &[
     ),
     ("suite:run", "", true),
     ("suite:run", "wget -qO- localhost:9901/config_dump", false),
-    ("suite:new", "kubectl get pods", false),
-    ("suite:new", "harness authoring show --kind session", true),
-    ("suite:new", "curl localhost:9901/config_dump", false),
-    ("suite:new", "helm install kuma kuma/kuma", false),
-    ("suite:new", "docker ps", false),
-    ("suite:new", "k3d cluster list", false),
+    ("suite:create", "kubectl get pods", false),
+    ("suite:create", "harness create show --kind session", true),
+    ("suite:create", "curl localhost:9901/config_dump", false),
+    ("suite:create", "helm install kuma kuma/kuma", false),
+    ("suite:create", "docker ps", false),
+    ("suite:create", "k3d cluster list", false),
 ];
 
 fn execute_payload_case(skill: &str, command: &str, case_idx: usize) -> HookResult {

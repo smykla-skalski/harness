@@ -6,7 +6,7 @@ use crate::hooks::guard_bash::predicates::{
     is_tracked_harness_command,
 };
 use crate::hooks::guard_bash::runner_guards::{
-    deny_author_suite_storage_mutation, has_tracked_run_context,
+    deny_create_suite_storage_mutation, has_tracked_run_context,
 };
 use crate::hooks::protocol::result::NormalizedHookResult;
 use crate::hooks::registry::Guard;
@@ -18,7 +18,7 @@ use super::parsed_parts;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Mode {
     Runner,
-    Author,
+    Create,
 }
 
 /// Denies direct use of blocked cluster binaries, runner binaries,
@@ -28,7 +28,7 @@ enum Mode {
 /// - **Runner**: full set of checks including runner-binary, task output,
 ///   python inline, legacy scripts, and cluster binary (with tracked-command
 ///   exemption).
-/// - **Author**: cluster binary, python inline, and suite storage mutation
+/// - **Create**: cluster binary, python inline, and suite storage mutation
 ///   checks only.
 pub struct DeniedBinaryGuard {
     mode: Mode,
@@ -41,8 +41,8 @@ impl DeniedBinaryGuard {
     }
 
     #[must_use]
-    pub fn author() -> Self {
-        Self { mode: Mode::Author }
+    pub fn create() -> Self {
+        Self { mode: Mode::Create }
     }
 }
 
@@ -51,7 +51,7 @@ impl Guard for DeniedBinaryGuard {
         let (_, words, heads) = parsed_parts(ctx)?;
         match self.mode {
             Mode::Runner => check_runner(ctx, words, heads),
-            Mode::Author => check_author(ctx, words, heads),
+            Mode::Create => check_create(ctx, words, heads),
         }
     }
 }
@@ -106,7 +106,7 @@ fn check_runner(
     None
 }
 
-fn check_author(
+fn check_create(
     _ctx: &GuardContext,
     words: &[String],
     heads: &[String],
@@ -122,7 +122,7 @@ fn check_author(
         return Some(NormalizedHookResult::from_hook_result(deny_python()));
     }
     // Suite storage mutation
-    let suite_mutation = deny_author_suite_storage_mutation(words);
+    let suite_mutation = deny_create_suite_storage_mutation(words);
     if !suite_mutation.code.is_empty() {
         return Some(NormalizedHookResult::from_hook_result(suite_mutation));
     }

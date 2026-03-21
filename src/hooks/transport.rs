@@ -112,7 +112,7 @@ pub struct HookArgs {
     /// Hook transport/agent protocol.
     #[arg(long, value_enum, default_value_t = HookAgent::ClaudeCode)]
     pub agent: HookAgent,
-    /// Skill name (suite:run or suite:new).
+    /// Skill name (suite:run or suite:create).
     #[arg(value_parser = clap::builder::PossibleValuesParser::new(SKILL_NAMES))]
     pub skill: String,
     /// Hook to run.

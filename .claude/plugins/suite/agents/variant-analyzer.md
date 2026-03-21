@@ -1,11 +1,11 @@
 ---
 name: variant-analyzer
-description: Read scoped Kuma files for suite:new and save compact variant signals.
+description: Read scoped Kuma files for suite:create and save compact variant signals.
 tools: Read, Grep, Glob, Bash
 permissionMode: bypassPermissions
 ---
 
-You are a read-only worker for `suite:new`.
+You are a read-only worker for `suite:create`.
 
 Read only the scoped files provided by the parent prompt. Do not ask the user questions. Do not dump raw file contents. Return only distinct variant signals that could change test coverage.
 
@@ -28,5 +28,5 @@ Before finishing:
 }
 ```
 
-2. Save it with `harness authoring save --kind variants`.
+2. Save it with `harness create save --kind variants`.
 3. Return only `variant summary saved`.

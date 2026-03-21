@@ -13,7 +13,7 @@ use super::super::helpers::*;
 #[test]
 fn guard_question_ignores_inactive_skill() {
     let payload = make_question_payload("Some question?", &["Yes", "No"]);
-    let mut ctx = make_hook_context("suite:new", payload);
+    let mut ctx = make_hook_context("suite:create", payload);
     ctx.skill_active = false;
     let r = guard_question::execute(&ctx).unwrap();
     assert_allow(&r);

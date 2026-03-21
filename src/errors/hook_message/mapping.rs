@@ -24,7 +24,7 @@ impl HookMessage {
             Self::GroupsNotList | Self::BaselinesNotList | Self::SuiteIncomplete { .. } => "KSA004",
             Self::CodeReaderFormat => "KSA006",
             Self::ReaderMissingSections { .. } | Self::ReaderOversizedBlock => "KSA007",
-            Self::SuiteAuthorTracked => "KSA008",
+            Self::SuiteCreateTracked => "KSA008",
             Self::ValidatorGateRequired { .. } => "KSA009",
             Self::ValidatorInstallFailed { .. } => "KSA010",
             Self::ValidatorGateUnexpected { .. } => "KSA011",
@@ -60,7 +60,7 @@ impl HookMessage {
             | Self::CodeReaderFormat
             | Self::ReaderMissingSections { .. }
             | Self::ReaderOversizedBlock => Decision::Warn,
-            Self::SuiteRunnerTracked | Self::RunVerdict { .. } | Self::SuiteAuthorTracked => {
+            Self::SuiteRunnerTracked | Self::RunVerdict { .. } | Self::SuiteCreateTracked => {
                 Decision::Info
             }
         }

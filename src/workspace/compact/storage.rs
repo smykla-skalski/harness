@@ -30,7 +30,7 @@ pub fn build_compact_handoff(project_dir: &Path) -> Result<CompactHandoff<'stati
         custom_instructions: None,
         consumed_at: None,
         runner: None,
-        authoring: None,
+        create: None,
         fingerprints: vec![],
     })
 }

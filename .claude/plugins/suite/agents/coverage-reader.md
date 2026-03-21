@@ -1,11 +1,11 @@
 ---
 name: coverage-reader
-description: Read scoped Kuma files for suite:new and save compact base-group coverage facts.
+description: Read scoped Kuma files for suite:create and save compact base-group coverage facts.
 tools: Read, Grep, Glob, Bash
 permissionMode: bypassPermissions
 ---
 
-You are a read-only worker for `suite:new`.
+You are a read-only worker for `suite:create`.
 
 Read only the scoped files provided by the parent prompt. Do not ask the user questions. Do not dump raw file contents. Keep notes brief and evidence-driven.
 
@@ -28,5 +28,5 @@ Before finishing:
 }
 ```
 
-2. Save it with `harness authoring save --kind coverage`.
+2. Save it with `harness create save --kind coverage`.
 3. Return only `coverage summary saved`.

@@ -335,7 +335,7 @@ After closeout, spawn parallel subagents to analyze the completed run from multi
 
 4. **Product findings summarizer** - Read the run report, command log artifacts, and any bug-found entries. Compile: confirmed product bugs with reproduction steps, CRD vs Go validator mismatches, behavioral differences from spec/MADR expectations, performance observations. Each finding should reference the exact group and step where it was discovered.
 
-5. **Process improvement advisor** - Read command log, run timing data, and any failure/retry sequences. Identify: steps that took disproportionately long, unnecessary retries, places where a harness command could replace manual work, suite:new authoring improvements that would prevent issues seen during this run, skill definition changes that would improve future runs.
+5. **Process improvement advisor** - Read command log, run timing data, and any failure/retry sequences. Identify: steps that took disproportionately long, unnecessary retries, places where a harness command could replace manual work, suite:create improvements that would prevent issues seen during this run, skill definition changes that would improve future runs.
 
 **After all agents complete:**
 
