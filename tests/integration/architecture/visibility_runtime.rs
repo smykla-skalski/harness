@@ -253,6 +253,33 @@ fn kuma_block_roots_stay_prod_only() {
             ][..],
             "src/infra/blocks/kuma/fake/tests.rs",
         ),
+        (
+            "src/infra/blocks/kuma/compose.rs",
+            &[
+                "fn single_zone_recipe_builds_topology()",
+                "fn postgres_recipe_adds_postgres_service()",
+                "mod tests {",
+            ][..],
+            "src/infra/blocks/kuma/compose/tests.rs",
+        ),
+        (
+            "src/infra/blocks/kuma/service.rs",
+            &[
+                "fn files_for_uses_standard_temp_paths()",
+                "fn render_dataplane_uses_standard_template_without_transparent_proxy()",
+                "mod tests {",
+            ][..],
+            "src/infra/blocks/kuma/service/tests.rs",
+        ),
+        (
+            "src/infra/blocks/kuma/token.rs",
+            &[
+                "fn token_kind_maps_to_api_values()",
+                "fn parse_token_response_rejects_empty_body()",
+                "mod tests {",
+            ][..],
+            "src/infra/blocks/kuma/token/tests.rs",
+        ),
     ] {
         let contents = fs::read_to_string(root.join(path)).unwrap();
         for needle in needles {
