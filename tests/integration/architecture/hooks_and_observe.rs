@@ -251,6 +251,26 @@ fn assert_hook_adapters_use_typed_serialization(root: &Path) {
     );
 }
 
+#[test]
+fn codex_adapter_root_stays_prod_only() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let codex = read_repo_file(root, "src/hooks/adapters/codex.rs");
+    assert_file_lacks_needles(
+        &codex,
+        "src/hooks/adapters/codex.rs should stay focused on production adapter logic instead of owning",
+        &[
+            "fn assert_notify_context(",
+            "fn assert_notify_agent(",
+            "fn parse_notify_payload_into_notification_context()",
+            "mod tests {",
+        ],
+    );
+    assert!(
+        root.join("src/hooks/adapters/codex/tests.rs").exists(),
+        "codex adapter split test module should exist"
+    );
+}
+
 fn assert_observe_outputs_use_typed_serialization(root: &Path) {
     let maintenance_render = read_repo_file(root, "src/observe/application/maintenance/render.rs");
     assert_file_contains_needles(
