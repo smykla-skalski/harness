@@ -31,14 +31,46 @@ fn observe_transport_stays_transport_only() {
     );
 
     let application = read_repo_file(root, "src/observe/application/mod.rs");
-    assert_file_contains_needles(
-        &application,
-        "src/observe/application/mod.rs should own",
-        &["pub(crate) fn execute(", "pub(crate) enum ObserveRequest"],
-    );
     assert_file_lacks_needles(
         &application,
-        "src/observe/application/mod.rs should not depend on transport enum",
+        "src/observe/application/mod.rs should stay a facade instead of owning",
+        &[
+            "pub(crate) fn execute(",
+            "pub(crate) enum ObserveRequest",
+            "fn execute_scan_mode(",
+            "enum ObserveScanAction",
+            "fn resolve_scan_action(",
+        ],
+    );
+
+    let request = read_repo_file(root, "src/observe/application/request.rs");
+    assert_file_contains_needles(
+        &request,
+        "src/observe/application/request.rs should own",
+        &[
+            "pub(crate) enum ObserveRequest",
+            "pub(crate) struct ObserveScanRequest",
+        ],
+    );
+    assert_file_lacks_needles(
+        &request,
+        "src/observe/application/request.rs should stay request-only instead of owning",
+        &["fn execute(", "fn resolve_scan_action("],
+    );
+
+    let execute = read_repo_file(root, "src/observe/application/execute.rs");
+    assert_file_contains_needles(
+        &execute,
+        "src/observe/application/execute.rs should own",
+        &[
+            "pub(crate) fn execute(",
+            "fn resolve_scan_action(",
+            "enum ObserveScanAction",
+        ],
+    );
+    assert_file_lacks_needles(
+        &execute,
+        "src/observe/application/execute.rs should not depend on transport enum",
         &["ObserveMode", "ObserveScanActionKind"],
     );
 

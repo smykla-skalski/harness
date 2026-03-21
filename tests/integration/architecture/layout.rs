@@ -71,7 +71,8 @@ fn cluster_topology_is_owned_by_kernel() {
     for path in [
         "src/run/context/current.rs",
         "src/run/context/aggregate.rs",
-        "src/run/application/mod.rs",
+        "src/run/application/current.rs",
+        "src/run/application/access.rs",
         "src/run/application/preflight.rs",
         "src/run/application/inspection.rs",
         "src/run/application/capture.rs",

@@ -119,6 +119,36 @@ fn run_context_root_stays_a_facade() {
 }
 
 #[test]
+fn run_application_root_stays_a_facade() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let application_mod = fs::read_to_string(root.join("src/run/application/mod.rs")).unwrap();
+
+    for needle in [
+        "pub fn current_run_dir()",
+        "pub fn from_current()",
+        "pub fn cluster_spec(&self)",
+        "pub fn list_managed_service_containers()",
+        "pub fn remove_managed_service_container(",
+    ] {
+        assert!(
+            !application_mod.contains(needle),
+            "src/run/application/mod.rs should stay a thin facade instead of owning `{needle}`"
+        );
+    }
+
+    for path in [
+        "src/run/application/current.rs",
+        "src/run/application/access.rs",
+        "src/run/application/managed_services.rs",
+    ] {
+        assert!(
+            root.join(path).exists(),
+            "run/application split module should exist: {path}"
+        );
+    }
+}
+
+#[test]
 fn run_small_roots_stay_prod_only() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
 
