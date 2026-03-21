@@ -584,6 +584,12 @@ fn infra_exec_root_stays_a_facade() {
 
     for path in [
         "src/infra/exec/runner.rs",
+        "src/infra/exec/docker/mod.rs",
+        "src/infra/exec/docker/command.rs",
+        "src/infra/exec/docker/compose.rs",
+        "src/infra/exec/docker/container.rs",
+        "src/infra/exec/docker/network.rs",
+        "src/infra/exec/docker/token.rs",
         "src/infra/exec/tools.rs",
         "src/infra/exec/tests.rs",
     ] {

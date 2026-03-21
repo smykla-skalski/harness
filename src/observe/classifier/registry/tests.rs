@@ -14,7 +14,7 @@ fn registry_covers_all_codes() {
 #[test]
 fn registry_has_no_duplicates() {
     let mut seen = HashSet::new();
-    for entry in ISSUE_CODE_REGISTRY {
+    for entry in ISSUE_CODE_REGISTRY.as_ref() {
         assert!(
             seen.insert(entry.code),
             "IssueCode::{:?} appears more than once in the registry",
@@ -44,7 +44,7 @@ fn issue_owner_display() {
 
 #[test]
 fn all_descriptions_non_empty() {
-    for entry in ISSUE_CODE_REGISTRY {
+    for entry in ISSUE_CODE_REGISTRY.as_ref() {
         assert!(
             !entry.description.is_empty(),
             "IssueCode::{:?} has an empty description",

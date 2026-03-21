@@ -1,0 +1,68 @@
+use super::super::IssueCodeMeta;
+use super::super::{Confidence, FixSafety, IssueCategory, IssueCode, IssueOwner, IssueSeverity};
+
+pub(super) static ISSUE_CODE_METAS: &[IssueCodeMeta] = &[
+    IssueCodeMeta {
+        code: IssueCode::PodContainerRuntimeFailure,
+        default_category: IssueCategory::DataIntegrity,
+        default_severity: IssueSeverity::Medium,
+        default_confidence: Confidence::Medium,
+        default_fix_safety: FixSafety::TriageRequired,
+        description: "Pod or container failure at runtime - possible product bug",
+        owner: IssueOwner::Product,
+    },
+    IssueCodeMeta {
+        code: IssueCode::PayloadWrappedInJsonTags,
+        default_category: IssueCategory::DataIntegrity,
+        default_severity: IssueSeverity::Medium,
+        default_confidence: Confidence::High,
+        default_fix_safety: FixSafety::AutoFixGuarded,
+        description: "Payload wrapped in XML-style <json> tags by subagent",
+        owner: IssueOwner::Model,
+    },
+    IssueCodeMeta {
+        code: IssueCode::ManifestRuntimeFailure,
+        default_category: IssueCategory::DataIntegrity,
+        default_severity: IssueSeverity::Medium,
+        default_confidence: Confidence::High,
+        default_fix_safety: FixSafety::TriageRequired,
+        description: "Manifest operation failed at runtime - possible product bug",
+        owner: IssueOwner::Product,
+    },
+    IssueCodeMeta {
+        code: IssueCode::MissingClaudeSessionId,
+        default_category: IssueCategory::DataIntegrity,
+        default_severity: IssueSeverity::Critical,
+        default_confidence: Confidence::High,
+        default_fix_safety: FixSafety::AutoFixSafe,
+        description: "CLAUDE_SESSION_ID env var is unset",
+        owner: IssueOwner::Harness,
+    },
+    IssueCodeMeta {
+        code: IssueCode::ManifestFixPromptShown,
+        default_category: IssueCategory::DataIntegrity,
+        default_severity: IssueSeverity::Medium,
+        default_confidence: Confidence::High,
+        default_fix_safety: FixSafety::TriageRequired,
+        description: "Manifest rejected by cluster - CRD/webhook mismatch",
+        owner: IssueOwner::Product,
+    },
+    IssueCodeMeta {
+        code: IssueCode::JqErrorInCommandOutput,
+        default_category: IssueCategory::DataIntegrity,
+        default_severity: IssueSeverity::Medium,
+        default_confidence: Confidence::High,
+        default_fix_safety: FixSafety::AdvisoryOnly,
+        description: "jq parse or iteration error in command output",
+        owner: IssueOwner::Model,
+    },
+    IssueCodeMeta {
+        code: IssueCode::MissingConnectionOrEnvVar,
+        default_category: IssueCategory::DataIntegrity,
+        default_severity: IssueSeverity::Medium,
+        default_confidence: Confidence::Medium,
+        default_fix_safety: FixSafety::AdvisoryOnly,
+        description: "Missing configuration or connection acknowledged by assistant",
+        owner: IssueOwner::Harness,
+    },
+];
