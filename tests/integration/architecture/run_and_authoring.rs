@@ -166,6 +166,79 @@ fn run_small_roots_stay_prod_only() {
 }
 
 #[test]
+fn run_command_roots_stay_prod_only() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+
+    for (path, needles, split_path) in [
+        (
+            "src/run/commands/api.rs",
+            &[
+                "fn parse_json_body_valid()",
+                "fn method_run_dir_and_path_delete()",
+                "mod tests {",
+            ][..],
+            "src/run/commands/api/tests.rs",
+        ),
+        (
+            "src/run/commands/apply.rs",
+            &[
+                "fn kuma_api_path_mesh_resource()",
+                "fn kuma_api_path_defaults_to_default_mesh()",
+                "mod tests {",
+            ][..],
+            "src/run/commands/apply/tests.rs",
+        ),
+        (
+            "src/run/commands/closeout.rs",
+            &[
+                "fn compute_verdict_all_passed()",
+                "fn compute_verdict_no_groups()",
+                "mod tests {",
+            ][..],
+            "src/run/commands/closeout/tests.rs",
+        ),
+        (
+            "src/run/commands/cluster_check.rs",
+            &[
+                "fn cluster_check_errors_on_nonexistent_run_dir()",
+                "mod tests {",
+            ][..],
+            "src/run/commands/cluster_check/tests.rs",
+        ),
+        (
+            "src/run/commands/logs.rs",
+            &[
+                "fn resolve_direct_container_single_zone()",
+                "fn resolve_service_container_passthrough()",
+                "mod tests {",
+            ][..],
+            "src/run/commands/logs/tests.rs",
+        ),
+        (
+            "src/run/commands/service.rs",
+            &[
+                "fn resolve_image_explicit_wins()",
+                "fn resolve_image_errors_when_no_cp_image()",
+                "mod tests {",
+            ][..],
+            "src/run/commands/service/tests.rs",
+        ),
+    ] {
+        let contents = fs::read_to_string(root.join(path)).unwrap();
+        for needle in needles {
+            assert!(
+                !contents.contains(needle),
+                "{path} should stay focused on production command logic instead of owning `{needle}`"
+            );
+        }
+        assert!(
+            root.join(split_path).exists(),
+            "run command split test module should exist: {split_path}"
+        );
+    }
+}
+
+#[test]
 fn run_services_do_not_load_their_own_context() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
     let contents = fs::read_to_string(root.join("src/run/services/mod.rs")).unwrap();
