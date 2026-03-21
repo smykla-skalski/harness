@@ -1,4 +1,4 @@
-use crate::authoring::{ApprovalMode, can_request_gate};
+use crate::create::{ApprovalMode, can_request_gate};
 use crate::errors::{CliError, HookMessage};
 use crate::hooks::application::GuardContext as HookContext;
 use crate::hooks::protocol::hook_result::HookResult;
@@ -19,7 +19,7 @@ pub fn execute(ctx: &HookContext) -> Result<HookResult, CliError> {
     super::dispatch_by_skill(
         ctx,
         |ctx| Ok(guard_suite_runner(ctx, &prompts)),
-        |ctx| guard_suite_author(ctx, &prompts),
+        |ctx| guard_suite_create(ctx, &prompts),
     )
 }
 
@@ -43,7 +43,7 @@ fn guard_suite_runner(ctx: &HookContext, prompts: &[AskUserQuestionPrompt]) -> H
     HookResult::allow()
 }
 
-fn guard_suite_author(
+fn guard_suite_create(
     ctx: &HookContext,
     prompts: &[AskUserQuestionPrompt],
 ) -> Result<HookResult, CliError> {
@@ -67,9 +67,9 @@ fn guard_suite_author(
     }
     // Check canonical review gate prompts.
     if let Some(gate) = runner_rules::classify_canonical_gate(prompts) {
-        let Some(state) = &ctx.author_state else {
+        let Some(state) = &ctx.create_state else {
             return Ok(
-                HookMessage::approval_state_invalid("author state is missing").into_result(),
+                HookMessage::approval_state_invalid("create state is missing").into_result(),
             );
         };
         if state.mode() == ApprovalMode::Bypass {

@@ -7,7 +7,7 @@ fn application_submodules_are_not_public_library_surface() {
 
     for (path, needle) in [
         ("src/run/mod.rs", "pub mod application;"),
-        ("src/authoring/mod.rs", "pub mod application;"),
+        ("src/create/mod.rs", "pub mod application;"),
         ("src/hooks/mod.rs", "pub mod application;"),
     ] {
         let contents = fs::read_to_string(root.join(path)).unwrap();
@@ -44,7 +44,7 @@ fn transport_command_modules_stay_internal_to_domains() {
 
     for (path, needle) in [
         ("src/run/mod.rs", "pub mod commands;"),
-        ("src/authoring/mod.rs", "pub mod commands;"),
+        ("src/create/mod.rs", "pub mod commands;"),
     ] {
         let contents = fs::read_to_string(root.join(path)).unwrap();
         assert!(
@@ -195,7 +195,7 @@ fn errors_root_stays_a_transport_facade() {
         "src/errors/cli_kind/mod.rs",
         "src/errors/cli_kind/common.rs",
         "src/errors/cli_kind/run_setup.rs",
-        "src/errors/cli_kind/authoring_observe.rs",
+        "src/errors/cli_kind/create_observe.rs",
         "src/errors/cli_kind/workflow.rs",
         "src/errors/hook_message/mod.rs",
         "src/errors/hook_message/constructors.rs",

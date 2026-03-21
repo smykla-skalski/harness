@@ -127,12 +127,12 @@ pub(crate) static TEXT_RULES: &[TextRule] = &[
         match_mode: MatchMode::FirstMatch,
         fingerprint_mode: FingerprintMode::Static,
         summary: SummaryTemplate::Static(
-            "kubectl-validate used directly instead of harness authoring-validate",
+            "kubectl-validate used directly instead of harness create-validate",
         ),
         guidance: RuleGuidance::Fix {
-            target: Some("skills/new/SKILL.md"),
+            target: Some("skills/create/SKILL.md"),
             hint: Some(
-                "Use harness authoring-validate, not kubectl-validate. kubectl-validate can reach real clusters.",
+                "Use harness create-validate, not kubectl-validate. kubectl-validate can reach real clusters.",
             ),
         },
         skip_if_matched: &[],
@@ -198,9 +198,9 @@ pub(crate) static TEXT_RULES: &[TextRule] = &[
             "Suite deviation - baselines/manifests not distributed to all required clusters",
         ),
         guidance: RuleGuidance::Fix {
-            target: Some("skills/new/SKILL.md"),
+            target: Some("skills/create/SKILL.md"),
             hint: Some(
-                "suite:new must distribute baselines to all clusters in multi-zone profiles",
+                "suite:create must distribute baselines to all clusters in multi-zone profiles",
             ),
         },
         skip_if_matched: &[],

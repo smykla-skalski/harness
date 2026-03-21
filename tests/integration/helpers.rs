@@ -6,10 +6,8 @@
 use std::borrow::Borrow;
 use std::sync::Mutex;
 
-use harness::app::cli::{self, AuthoringCommand, Command, RunCommand, SetupCommand};
-use harness::authoring::{
-    ApprovalBeginArgs, AuthoringBeginArgs, AuthoringSaveArgs, AuthoringValidateArgs,
-};
+use harness::app::cli::{self, Command, CreateCommand, RunCommand, SetupCommand};
+use harness::create::{ApprovalBeginArgs, CreateBeginArgs, CreateSaveArgs, CreateValidateArgs};
 use harness::errors::CliError;
 use harness::run::{
     ApiArgs, ApplyArgs, CaptureArgs, CloseoutArgs, EnvoyArgs, KumaArgs, KumaCommand, KumactlArgs,
@@ -44,8 +42,8 @@ pub fn setup_cmd(command: SetupCommand) -> Command {
     Command::Setup { command }
 }
 
-pub fn authoring_cmd(command: AuthoringCommand) -> Command {
-    Command::Authoring { command }
+pub fn create_cmd(command: CreateCommand) -> Command {
+    Command::Create { command }
 }
 
 pub fn api_cmd(args: ApiArgs) -> Command {
@@ -58,20 +56,20 @@ pub fn apply_cmd(args: ApplyArgs) -> Command {
     run_cmd(RunCommand::Apply(args))
 }
 
-pub fn authoring_begin_cmd(args: AuthoringBeginArgs) -> Command {
-    authoring_cmd(AuthoringCommand::Begin(args))
+pub fn create_begin_cmd(args: CreateBeginArgs) -> Command {
+    create_cmd(CreateCommand::Begin(args))
 }
 
-pub fn authoring_save_cmd(args: AuthoringSaveArgs) -> Command {
-    authoring_cmd(AuthoringCommand::Save(args))
+pub fn create_save_cmd(args: CreateSaveArgs) -> Command {
+    create_cmd(CreateCommand::Save(args))
 }
 
-pub fn authoring_validate_cmd(args: AuthoringValidateArgs) -> Command {
-    authoring_cmd(AuthoringCommand::Validate(args))
+pub fn create_validate_cmd(args: CreateValidateArgs) -> Command {
+    create_cmd(CreateCommand::Validate(args))
 }
 
 pub fn approval_begin_cmd(args: ApprovalBeginArgs) -> Command {
-    authoring_cmd(AuthoringCommand::ApprovalBegin(args))
+    create_cmd(CreateCommand::ApprovalBegin(args))
 }
 
 pub fn capabilities_cmd() -> Command {

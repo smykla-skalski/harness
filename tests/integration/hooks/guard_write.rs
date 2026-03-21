@@ -1,5 +1,5 @@
 // Tests for the guard-write hook.
-// Verifies path restrictions for suite:run and suite:new skills,
+// Verifies path restrictions for suite:run and suite:create skills,
 // control file protection (run-report, command-log, runner-state),
 // artifact path allowance, multi-write validation, suite-fix approved paths,
 // and basename-outside-run denial.
@@ -28,12 +28,12 @@ fn guard_write_denies_external_runner() {
 }
 
 #[test]
-fn guard_write_denies_external_author() {
-    // Without any authoring state, writes to external paths are allowed
+fn guard_write_denies_external_create() {
+    // Without any create state, writes to external paths are allowed
     // because there's no suite context to restrict to
-    let ctx = make_hook_context("suite:new", make_write_payload("/etc/passwd"));
+    let ctx = make_hook_context("suite:create", make_write_payload("/etc/passwd"));
     let r = guard_write::execute(&ctx).unwrap();
-    // Without author state, suite:new allows any path (no suite context)
+    // Without create state, suite:create allows any path (no suite context)
     assert_allow(&r);
 }
 

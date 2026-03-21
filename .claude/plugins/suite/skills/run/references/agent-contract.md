@@ -52,7 +52,7 @@ All run artifacts and authored suites are stored in a persistent data directory 
 ```
 ${XDG_DATA_HOME:-$HOME/.local/share}/harness/
 ├── contexts/                # Session-scoped current-run and hook snapshots
-└── suites/                  # Authored test suites (by suite:new)
+└── suites/                  # Created test suites (by suite:create)
     └── motb-core/           # Directory-format suite
         ├── suite.md
         ├── baseline/
@@ -72,7 +72,7 @@ harness run record --repo-root "${REPO_ROOT}" --phase setup --label kumactl-vers
 
 Record `kumactl version` output in the run report. Before the control plane exists, `kumactl version` may print a server connection warning on stderr; use the `Client:` line to verify the local binary version.
 
-For Mesh\* policy authoring, matching, and debug commands, follow
+For Mesh\* policy create, matching, and debug commands, follow
 [mesh-policies.md](mesh-policies.md).
 
 ## Run status tracking

@@ -9,7 +9,7 @@ flowchart LR
     App["app\nCLI transport and wiring"]
 
     Run["run\nsuite:run domain"]
-    Authoring["authoring\nsuite:new domain"]
+    Create["create\nsuite:create domain"]
     Observe["observe\nsession observation"]
     Setup["setup\nbootstrap and session lifecycle"]
     Hooks["hooks\nagent-facing policy and protocol"]
@@ -21,7 +21,7 @@ flowchart LR
     Errors["errors\ntyped error families"]
 
     App --> Run
-    App --> Authoring
+    App --> Create
     App --> Observe
     App --> Setup
     App --> Hooks
@@ -32,10 +32,10 @@ flowchart LR
     Run --> Infra
     Run --> Errors
 
-    Authoring --> Kernel
-    Authoring --> Workspace
-    Authoring --> Infra
-    Authoring --> Errors
+    Create --> Kernel
+    Create --> Workspace
+    Create --> Infra
+    Create --> Errors
 
     Observe --> Kernel
     Observe --> Workspace
@@ -64,7 +64,7 @@ flowchart LR
 | --- | --- |
 | `src/app/` | Clap entrypoints, top-level command grouping, wiring into domain APIs |
 | `src/run/` | tracked run lifecycle, specs, prepared artifacts, reporting, run workflow |
-| `src/authoring/` | `suite:new` payloads, approval workflow, validation, authoring session state |
+| `src/create/` | `suite:create` payloads, approval workflow, validation, create session state |
 | `src/observe/` | session scanning, watch/dump flows, classifier output, observer state |
 | `src/setup/` | bootstrap, wrapper/session lifecycle, cluster setup entrypoints |
 | `src/hooks/` | hook protocol, normalization, policy input hydration, guards, effects |
@@ -101,7 +101,7 @@ sequenceDiagram
 - `workspace` is the only owner of ambient harness state. Domains should not rebuild XDG/session/current-run logic on their own.
 - `platform` is adapter logic only. Generic topology lives in `kernel`, not `platform`.
 - `infra` stays generic. It must not depend on product domains.
-- `run`, `authoring`, `observe`, `setup`, and `hooks` own their own workflows and persistence-facing models.
+- `run`, `create`, `observe`, `setup`, and `hooks` own their own workflows and persistence-facing models.
 - The public crate surface is domain-oriented. `platform` is intentionally crate-internal.
 - Shared abstractions must have a real owner. If a concept is cross-domain and pure, it belongs in `kernel`; if it is ambient state, it belongs in `workspace`.
 
@@ -109,7 +109,7 @@ sequenceDiagram
 
 The intended public shape is app-first and domain-first:
 
-- public: `app`, `run`, `authoring`, `observe`, `setup`, `hooks`, `kernel`, `workspace`, `infra`, `errors`
+- public: `app`, `run`, `create`, `observe`, `setup`, `hooks`, `kernel`, `workspace`, `infra`, `errors`
 - internal: `platform`, manifest plumbing, suite defaults, test-only codec helpers
 
 ## State Boundaries
@@ -118,12 +118,12 @@ The intended public shape is app-first and domain-first:
 flowchart TD
     Workspace["workspace\ncurrent session and ambient pointers"]
     Run["run\ntracked run state and reports"]
-    Authoring["authoring\nsuite:new state"]
+    Create["create\nsuite:create state"]
     Observe["observe\nobserver state"]
     Hooks["hooks\nnormalized hook context"]
 
     Workspace --> Run
-    Workspace --> Authoring
+    Workspace --> Create
     Workspace --> Observe
     Workspace --> Hooks
 ```

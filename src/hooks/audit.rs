@@ -6,7 +6,7 @@ use super::effects::{HookEffect, HookOutcome};
 
 /// Execute the audit hook.
 ///
-/// Logs suite:new hook debug info without affecting the main hook decision.
+/// Logs suite:create hook debug info without affecting the main hook decision.
 /// For suite:run or inactive contexts, allow unconditionally.
 ///
 /// # Errors

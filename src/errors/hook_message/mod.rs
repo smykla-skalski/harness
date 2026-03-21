@@ -46,7 +46,7 @@ pub enum HookMessage {
     #[error("Preflight worker reply is invalid: {details}")]
     PreflightReplyInvalid { details: Cow<'static, str> },
 
-    #[error("Write path is outside the suite:new surface: {path}")]
+    #[error("Write path is outside the suite:create surface: {path}")]
     WriteOutsideSuite { path: Cow<'static, str> },
 
     #[error("Suite:new approval state is missing or invalid: {details}")]
@@ -97,7 +97,7 @@ pub enum HookMessage {
 
     #[error(
         "Suite:new workers must save structured results through \
-         `harness authoring save` and return only a short acknowledgement."
+         `harness create save` and return only a short acknowledgement."
     )]
     CodeReaderFormat,
 
@@ -123,7 +123,7 @@ pub enum HookMessage {
     RunVerdict { verdict: Cow<'static, str> },
 
     #[error("Suites must stay user-story-first with concrete variant evidence.")]
-    SuiteAuthorTracked,
+    SuiteCreateTracked,
 }
 
 impl HookMessage {

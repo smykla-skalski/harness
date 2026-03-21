@@ -24,15 +24,15 @@ fn skill_name_short_does_not_fire() {
 
 #[test]
 fn skill_name_colon_prefixed_fires() {
-    // Colon-prefixed names (suite:new) are wrong in SKILL.md files
+    // Colon-prefixed names (suite:create) are wrong in SKILL.md files
     let mut state = make_state();
     let block = serde_json::json!({
         "type": "tool_use",
         "id": "t1",
         "name": "Write",
         "input": {
-            "file_path": "/data/.claude/skills/new/SKILL.md",
-            "content": "---\nname: suite:new\n---\nSome content"
+            "file_path": "/data/.claude/skills/create/SKILL.md",
+            "content": "---\nname: suite:create\n---\nSome content"
         }
     });
     let issues = check_tool_use_for_issues(10, &block, &mut state);
@@ -40,13 +40,13 @@ fn skill_name_colon_prefixed_fires() {
         issues
             .iter()
             .any(|i| i.code == IssueCode::ShortSkillNameInSkillFile),
-        "colon-prefixed 'suite:new' should trigger ShortSkillNameInSkillFile"
+        "colon-prefixed 'suite:create' should trigger ShortSkillNameInSkillFile"
     );
     let issue = issues
         .iter()
         .find(|i| i.code == IssueCode::ShortSkillNameInSkillFile)
         .unwrap();
-    assert!(issue.summary.contains("suite:new"));
+    assert!(issue.summary.contains("suite:create"));
 }
 
 #[test]

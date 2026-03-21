@@ -3,7 +3,7 @@ use std::path::PathBuf;
 
 use tracing::warn;
 
-use crate::authoring::{AuthorWorkflowState, read_author_state};
+use crate::create::{CreateWorkflowState, read_create_state};
 use crate::hooks::protocol::context::{
     NormalizedEvent, NormalizedHookContext, SessionContext, SkillContext,
 };
@@ -15,7 +15,7 @@ pub(super) struct HydratedHookState {
     pub(super) run_dir: Option<PathBuf>,
     pub(super) run: Option<RunContext>,
     pub(super) runner_state: Option<RunnerWorkflowState>,
-    pub(super) author_state: Option<AuthorWorkflowState>,
+    pub(super) create_state: Option<CreateWorkflowState>,
 }
 
 impl HydratedHookState {
@@ -23,7 +23,7 @@ impl HydratedHookState {
         let mut state = Self::default();
         state.load_run_context();
         state.load_runner_state();
-        state.load_author_state(skill);
+        state.load_create_state(skill);
         state
     }
 
@@ -62,13 +62,13 @@ impl HydratedHookState {
         }
     }
 
-    fn load_author_state(&mut self, skill: &SkillContext) {
-        if !skill.is_author {
+    fn load_create_state(&mut self, skill: &SkillContext) {
+        if !skill.is_create {
             return;
         }
-        match read_author_state() {
-            Ok(author_state) => self.author_state = author_state,
-            Err(error) => warn!(%error, "failed to load author state"),
+        match read_create_state() {
+            Ok(create_state) => self.create_state = create_state,
+            Err(error) => warn!(%error, "failed to load create state"),
         }
     }
 }

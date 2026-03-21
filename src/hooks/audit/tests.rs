@@ -34,7 +34,7 @@ fn is_silent_suite_runner() {
 
 #[test]
 fn is_silent_suite_author() {
-    let context = ctx_audit("suite:new");
+    let context = ctx_audit("suite:create");
     let result = execute(&context).unwrap().to_hook_result();
     assert_eq!(result.decision, Decision::Allow);
     assert!(result.code.is_empty());

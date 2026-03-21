@@ -72,11 +72,11 @@ fn extended_error_kinds() -> Vec<CliErrorKind> {
     vec![
         CliErrorKind::report_line_limit("", ""),
         CliErrorKind::report_code_block_limit("", ""),
-        CliErrorKind::AuthoringSessionMissing,
-        CliErrorKind::AuthoringPayloadMissing,
-        CliErrorKind::authoring_payload_invalid("", ""),
-        CliErrorKind::authoring_show_kind_missing(""),
-        CliErrorKind::authoring_validate_failed(""),
+        CliErrorKind::CreateSessionMissing,
+        CliErrorKind::CreatePayloadMissing,
+        CliErrorKind::create_payload_invalid("", ""),
+        CliErrorKind::create_show_kind_missing(""),
+        CliErrorKind::create_validate_failed(""),
         CliErrorKind::KubectlValidateDecisionRequired,
         CliErrorKind::KubectlValidateUnavailable,
         CliErrorKind::TrackedKubectlRequired,
@@ -90,7 +90,7 @@ fn extended_error_kinds() -> Vec<CliErrorKind> {
         CliErrorKind::evidence_label_not_found(""),
         CliErrorKind::ReportGroupEvidenceRequired,
         CliErrorKind::amendments_required(""),
-        CliErrorKind::authoring_suite_dir_exists(""),
+        CliErrorKind::create_suite_dir_exists(""),
         CliErrorKind::run_dir_exists(""),
         CliErrorKind::unsafe_name(""),
         CliErrorKind::MissingRunStatus,
@@ -327,7 +327,7 @@ fn hook_message_count() {
         HookMessage::ReaderOversizedBlock,
         HookMessage::SuiteRunnerTracked,
         HookMessage::run_verdict(""),
-        HookMessage::SuiteAuthorTracked,
+        HookMessage::SuiteCreateTracked,
     ];
     assert_eq!(all_hooks.len(), 27);
 }

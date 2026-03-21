@@ -8,7 +8,7 @@ use crate::run::workflow::RunnerPhase;
 ///
 /// Processes `AskUserQuestion` answers and validates them against workflow
 /// state. For suite:run, validates manifest-fix decisions. For
-/// suite:new, validates kubectl-validate install and canonical gate
+/// suite:create, validates kubectl-validate install and canonical gate
 /// answers.
 ///
 /// # Errors
@@ -55,9 +55,9 @@ fn handle_suite_author(ctx: &HookContext) -> HookResult {
     if is_install {
         return HookResult::allow();
     }
-    if ctx.author_state.is_none() {
+    if ctx.create_state.is_none() {
         return HookMessage::approval_state_invalid(
-            "author state is missing; cannot apply gate answer",
+            "create state is missing; cannot apply gate answer",
         )
         .into_result();
     }

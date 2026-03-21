@@ -1,5 +1,5 @@
 {
   "name": "suite",
-  "description": "Harness suite authoring and execution",
+  "description": "Harness suite create and execution",
   "version": "2.1.0"
 }

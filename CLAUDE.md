@@ -29,7 +29,7 @@ Harness is a test orchestration framework for Kubernetes/Kuma. It enforces track
 
 **suite:run** (`workflow/runner.rs`): orchestrates test runs through phases `bootstrap` -> `ready` -> `approved` -> `running` -> `verdict`. State persisted as versioned JSON via `VersionedJsonRepository` (atomic tmp-file -> rename saves).
 
-**suite:new** (`workflow/author.rs`): manages interactive suite creation with multi-step proposals and manifest validation.
+**suite:create** (`workflow/create.rs`): manages interactive suite creation with multi-step proposals and manifest validation.
 
 ### Hook system (`src/hooks/`, `src/cli.rs`)
 

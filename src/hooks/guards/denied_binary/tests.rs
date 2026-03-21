@@ -93,24 +93,24 @@ fn runner_allows_kubectl_without_tracked_run() {
 }
 
 #[test]
-fn author_denies_kubectl() {
-    let guard = DeniedBinaryGuard::author();
-    let c = ctx("suite:new", "kubectl get pods");
+fn create_denies_kubectl() {
+    let guard = DeniedBinaryGuard::create();
+    let c = ctx("suite:create", "kubectl get pods");
     assert!(guard.check(&c).is_some());
 }
 
 #[test]
-fn author_allows_harness() {
-    let guard = DeniedBinaryGuard::author();
-    let c = ctx("suite:new", "harness authoring-show --kind session");
+fn create_allows_harness() {
+    let guard = DeniedBinaryGuard::create();
+    let c = ctx("suite:create", "harness create-show --kind session");
     assert!(guard.check(&c).is_none());
 }
 
 #[test]
-fn author_denies_rm_rf_suite_dir() {
-    let guard = DeniedBinaryGuard::author();
+fn create_denies_rm_rf_suite_dir() {
+    let guard = DeniedBinaryGuard::create();
     let c = ctx(
-        "suite:new",
+        "suite:create",
         "rm -rf ~/.local/share/harness/suites/motb-compliance",
     );
     let result = guard.check(&c);

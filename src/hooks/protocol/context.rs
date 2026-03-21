@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use crate::kernel::skills::{SKILL_NEW, SKILL_RUN};
+use crate::kernel::skills::{SKILL_CREATE, SKILL_RUN};
 use crate::kernel::tooling::ToolContext;
 use serde_json::Value;
 
@@ -74,7 +74,7 @@ pub struct SkillContext {
     pub active: bool,
     pub name: Option<String>,
     pub is_runner: bool,
-    pub is_author: bool,
+    pub is_create: bool,
 }
 
 impl SkillContext {
@@ -84,7 +84,7 @@ impl SkillContext {
             active: false,
             name: None,
             is_runner: false,
-            is_author: false,
+            is_create: false,
         }
     }
 
@@ -94,7 +94,7 @@ impl SkillContext {
             active: !skill.is_empty(),
             name: (!skill.is_empty()).then(|| skill.to_string()),
             is_runner: skill == SKILL_RUN,
-            is_author: skill == SKILL_NEW,
+            is_create: skill == SKILL_CREATE,
         }
     }
 }

@@ -85,7 +85,7 @@ impl<'a> HarnessCommandInvocationRef<'a> {
     #[must_use]
     pub fn semantic_words(self) -> Vec<&'a str> {
         let mut words = self.span_words();
-        if matches!(words.first(), Some(&"run" | &"setup" | &"authoring")) && words.len() > 1 {
+        if matches!(words.first(), Some(&"run" | &"setup" | &"create")) && words.len() > 1 {
             words.remove(0);
         }
         if matches!(words.first(), Some(&"kuma")) && words.len() > 1 {
@@ -234,7 +234,7 @@ fn extract_flag_value_location(
 }
 
 fn is_harness_scope_group(word: &str) -> bool {
-    matches!(word, "run" | "setup" | "authoring")
+    matches!(word, "run" | "setup" | "create")
 }
 
 fn is_harness_namespace(word: &str) -> bool {

@@ -1,4 +1,4 @@
-use crate::authoring::can_stop;
+use crate::create::can_stop;
 use crate::errors::{CliError, HookMessage};
 use crate::hooks::application::GuardContext as HookContext;
 use crate::hooks::protocol::hook_result::HookResult;
@@ -12,16 +12,16 @@ pub fn execute(ctx: &HookContext) -> Result<HookResult, CliError> {
     super::dispatch_by_skill(
         ctx,
         |ctx| Ok(guard_suite_runner_stop(ctx)),
-        |ctx| Ok(guard_suite_author_stop(ctx)),
+        |ctx| Ok(guard_suite_create_stop(ctx)),
     )
 }
 
-fn guard_suite_author_stop(ctx: &HookContext) -> HookResult {
-    let Some(state) = &ctx.author_state else {
+fn guard_suite_create_stop(ctx: &HookContext) -> HookResult {
+    let Some(state) = &ctx.create_state else {
         return HookResult::allow();
     };
     if let Err(reason) = can_stop(state) {
-        return HookMessage::approval_required("stop suite:new", reason).into_result();
+        return HookMessage::approval_required("stop suite:create", reason).into_result();
     }
     HookResult::allow()
 }

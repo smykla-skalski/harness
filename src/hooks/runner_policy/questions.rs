@@ -1,4 +1,4 @@
-use crate::authoring::{
+use crate::create::{
     COPY_GATE as AUTHOR_COPY_GATE, POSTWRITE_GATE as AUTHOR_POSTWRITE_GATE,
     PREWRITE_GATE as AUTHOR_PREWRITE_GATE, ReviewGate,
 };

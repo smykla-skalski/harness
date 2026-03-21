@@ -4,9 +4,9 @@ use std::time::Duration;
 use clap::{Parser, Subcommand};
 
 use crate::app::command_context::{AppContext, Execute};
-use crate::authoring::{
-    ApprovalBeginArgs, AuthoringBeginArgs, AuthoringResetArgs, AuthoringSaveArgs,
-    AuthoringShowArgs, AuthoringValidateArgs,
+use crate::create::{
+    ApprovalBeginArgs, CreateBeginArgs, CreateResetArgs, CreateSaveArgs, CreateShowArgs,
+    CreateValidateArgs,
 };
 use crate::errors::CliError;
 use crate::hooks::{self, HookArgs};
@@ -57,15 +57,15 @@ pub enum RunCommand {
     Task(TaskArgs),
 }
 
-/// Grouped `authoring` commands.
+/// Grouped `create` commands.
 #[derive(Debug, Clone, Subcommand)]
 #[non_exhaustive]
-pub enum AuthoringCommand {
-    Begin(AuthoringBeginArgs),
-    Save(AuthoringSaveArgs),
-    Show(AuthoringShowArgs),
-    Reset(AuthoringResetArgs),
-    Validate(AuthoringValidateArgs),
+pub enum CreateCommand {
+    Begin(CreateBeginArgs),
+    Save(CreateSaveArgs),
+    Show(CreateShowArgs),
+    Reset(CreateResetArgs),
+    Validate(CreateValidateArgs),
     ApprovalBegin(ApprovalBeginArgs),
 }
 
@@ -95,10 +95,10 @@ pub enum Command {
         command: RunCommand,
     },
 
-    /// Suite:new commands grouped by domain.
-    Authoring {
+    /// Suite:create commands grouped by domain.
+    Create {
         #[command(subcommand)]
-        command: AuthoringCommand,
+        command: CreateCommand,
     },
 
     /// Setup and session lifecycle commands.
@@ -129,7 +129,7 @@ pub fn dispatch(command: &Command) -> Result<i32, CliError> {
     match command {
         Command::Hook(_) => unreachable!("hooks are handled separately"),
         Command::Run { command } => dispatch_run(&ctx, command),
-        Command::Authoring { command } => dispatch_authoring(&ctx, command),
+        Command::Create { command } => dispatch_create(&ctx, command),
         Command::Setup { command } => dispatch_setup(&ctx, command),
         Command::SessionStart(args) => args.execute(&ctx),
         Command::SessionStop(args) => args.execute(&ctx),
@@ -160,14 +160,14 @@ fn dispatch_run(ctx: &AppContext, command: &RunCommand) -> Result<i32, CliError>
     }
 }
 
-fn dispatch_authoring(ctx: &AppContext, command: &AuthoringCommand) -> Result<i32, CliError> {
+fn dispatch_create(ctx: &AppContext, command: &CreateCommand) -> Result<i32, CliError> {
     match command {
-        AuthoringCommand::Begin(args) => args.execute(ctx),
-        AuthoringCommand::Save(args) => args.execute(ctx),
-        AuthoringCommand::Show(args) => args.execute(ctx),
-        AuthoringCommand::Reset(args) => args.execute(ctx),
-        AuthoringCommand::Validate(args) => args.execute(ctx),
-        AuthoringCommand::ApprovalBegin(args) => args.execute(ctx),
+        CreateCommand::Begin(args) => args.execute(ctx),
+        CreateCommand::Save(args) => args.execute(ctx),
+        CreateCommand::Show(args) => args.execute(ctx),
+        CreateCommand::Reset(args) => args.execute(ctx),
+        CreateCommand::Validate(args) => args.execute(ctx),
+        CreateCommand::ApprovalBegin(args) => args.execute(ctx),
     }
 }
 
