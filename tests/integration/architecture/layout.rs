@@ -104,6 +104,30 @@ fn cluster_topology_is_owned_by_kernel() {
 }
 
 #[test]
+fn platform_compose_root_is_thin() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let compose_mod = fs::read_to_string(root.join("src/platform/compose/mod.rs")).unwrap();
+
+    for needle in [
+        "fn bridge_network(",
+        "fn cp_env(",
+        "fn cp_command(",
+        "fn postgres_depends(",
+        "mod tests {",
+    ] {
+        assert!(
+            !compose_mod.contains(needle),
+            "src/platform/compose/mod.rs should stay focused on compose types and exports instead of owning `{needle}`"
+        );
+    }
+
+    assert!(
+        root.join("src/platform/compose/tests.rs").exists(),
+        "platform compose split test module should exist"
+    );
+}
+
+#[test]
 fn platform_module_stays_internal_to_the_crate() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
     let lib_rs = fs::read_to_string(root.join("src/lib.rs")).unwrap();
