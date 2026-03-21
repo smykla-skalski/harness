@@ -238,6 +238,24 @@ fn app_context_stays_app_wiring_only() {
 }
 
 #[test]
+fn workspace_session_root_stays_prod_only() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let session = fs::read_to_string(root.join("src/workspace/session.rs")).unwrap();
+
+    for needle in ["fn data_root_prefers_xdg_data_home()", "mod tests {"] {
+        assert!(
+            !session.contains(needle),
+            "src/workspace/session.rs should stay focused on production workspace scope logic instead of owning `{needle}`"
+        );
+    }
+
+    assert!(
+        root.join("src/workspace/session/tests.rs").exists(),
+        "workspace session split test module should exist"
+    );
+}
+
+#[test]
 fn bespoke_frontmatter_paths_are_gone() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
     let denylist = ["extract_raw_frontmatter(", "serde_yml::Mapping"];
