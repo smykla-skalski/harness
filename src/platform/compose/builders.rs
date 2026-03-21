@@ -1,8 +1,8 @@
 use std::collections::BTreeMap;
 
 use super::{
-    ComposeDependsOn, ComposeDependsOnEntry, ComposeFile, ComposeService, bridge_network,
-    cp_command, cp_entrypoint, cp_env, postgres_cp_env, postgres_service,
+    ComposeDependsOn, ComposeDependsOnEntry, ComposeFile, ComposeHealthcheck, ComposeIpam,
+    ComposeIpamConfig, ComposeNetwork, ComposeService,
 };
 
 /// Generate a compose file for single-zone universal topology.
@@ -202,4 +202,65 @@ fn postgres_depends(
         },
     );
     (ComposeDependsOn::Conditional(deps), true)
+}
+
+fn bridge_network(subnet: &str) -> ComposeNetwork {
+    ComposeNetwork {
+        driver: "bridge".into(),
+        ipam: Some(ComposeIpam {
+            config: vec![ComposeIpamConfig {
+                subnet: subnet.into(),
+            }],
+        }),
+    }
+}
+
+fn cp_env(kuma_mode: &str, store_type: &str) -> BTreeMap<String, String> {
+    let mut env = BTreeMap::new();
+    env.insert("KUMA_ENVIRONMENT".into(), "universal".into());
+    env.insert("KUMA_MODE".into(), kuma_mode.into());
+    env.insert("KUMA_STORE_TYPE".into(), store_type.into());
+    env
+}
+
+fn postgres_cp_env(env: &mut BTreeMap<String, String>) {
+    env.insert("KUMA_STORE_POSTGRES_HOST".into(), "postgres".into());
+    env.insert("KUMA_STORE_POSTGRES_PORT".into(), "5432".into());
+    env.insert("KUMA_STORE_POSTGRES_USER".into(), "kuma".into());
+    env.insert("KUMA_STORE_POSTGRES_PASSWORD".into(), "kuma".into());
+    env.insert("KUMA_STORE_POSTGRES_DB_NAME".into(), "kuma".into());
+}
+
+/// Command args for a CP service. Postgres needs migration before run.
+fn cp_command(store_type: &str) -> Vec<String> {
+    if store_type == "postgres" {
+        vec!["kuma-cp migrate up && kuma-cp run".into()]
+    } else {
+        vec!["run".into()]
+    }
+}
+
+/// Entrypoint override for CP services. Postgres needs sh to chain commands.
+fn cp_entrypoint(store_type: &str) -> Option<Vec<String>> {
+    if store_type == "postgres" {
+        Some(vec!["sh".into(), "-c".into()])
+    } else {
+        None
+    }
+}
+
+fn postgres_service(network_name: &str) -> ComposeService {
+    let mut env = BTreeMap::new();
+    env.insert("POSTGRES_USER".into(), "kuma".into());
+    env.insert("POSTGRES_PASSWORD".into(), "kuma".into());
+    env.insert("POSTGRES_DB".into(), "kuma".into());
+    ComposeService::new("postgres:16-alpine", network_name)
+        .with_environment(env)
+        .with_ports(vec!["5432:5432".into()])
+        .with_healthcheck(ComposeHealthcheck {
+            test: vec!["CMD-SHELL".into(), "pg_isready -U kuma -d kuma".into()],
+            interval: "2s".into(),
+            timeout: "5s".into(),
+            retries: 10,
+        })
 }
