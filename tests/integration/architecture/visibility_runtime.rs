@@ -213,6 +213,62 @@ fn infra_small_roots_stay_prod_only() {
 }
 
 #[test]
+fn kuma_block_roots_stay_prod_only() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+
+    for (path, needles, split_path) in [
+        (
+            "src/infra/blocks/kuma/mod.rs",
+            &[
+                "fn api_path_preserves_leading_slash()",
+                "fn derives_universal_image_from_cp_image()",
+                "mod tests {",
+            ][..],
+            "src/infra/blocks/kuma/tests.rs",
+        ),
+        (
+            "src/infra/blocks/kuma/defaults.rs",
+            &[
+                "fn default_cp_addr_uses_api_port()",
+                "fn derive_universal_service_image_rewrites_cp_name()",
+                "mod tests {",
+            ][..],
+            "src/infra/blocks/kuma/defaults/tests.rs",
+        ),
+        (
+            "src/infra/blocks/kuma/manifest.rs",
+            &[
+                "fn mesh_resource_uses_top_level_path()",
+                "fn mesh_scoped_resource_defaults_mesh()",
+                "mod tests {",
+            ][..],
+            "src/infra/blocks/kuma/manifest/tests.rs",
+        ),
+        (
+            "src/infra/blocks/kuma/fake.rs",
+            &[
+                "fn fake_returns_expected_defaults()",
+                "fn fake_satisfies_modes_non_empty()",
+                "mod tests {",
+            ][..],
+            "src/infra/blocks/kuma/fake/tests.rs",
+        ),
+    ] {
+        let contents = fs::read_to_string(root.join(path)).unwrap();
+        for needle in needles {
+            assert!(
+                !contents.contains(needle),
+                "{path} should stay focused on production Kuma block logic instead of owning `{needle}`"
+            );
+        }
+        assert!(
+            root.join(split_path).exists(),
+            "kuma block split test module should exist: {split_path}"
+        );
+    }
+}
+
+#[test]
 fn helm_block_root_stays_prod_only() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
     let helm = fs::read_to_string(root.join("src/infra/blocks/helm.rs")).unwrap();
