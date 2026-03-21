@@ -26,43 +26,5 @@ impl Guard for MakeTargetGuard {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::hooks::protocol::payloads::HookEnvelopePayload;
-
-    fn ctx(command: &str) -> GuardContext {
-        GuardContext::from_test_envelope(
-            "suite:run",
-            HookEnvelopePayload {
-                tool_name: "Bash".to_string(),
-                tool_input: serde_json::json!({ "command": command }),
-                tool_response: serde_json::Value::Null,
-                last_assistant_message: None,
-                transcript_path: None,
-                stop_hook_active: false,
-                raw_keys: vec![],
-            },
-        )
-    }
-
-    #[test]
-    fn denies_k3d_make_target() {
-        let guard = MakeTargetGuard;
-        let c = ctx("make k3d/stop");
-        assert!(guard.check(&c).is_some());
-    }
-
-    #[test]
-    fn allows_safe_make_target() {
-        let guard = MakeTargetGuard;
-        let c = ctx("make test");
-        assert!(guard.check(&c).is_none());
-    }
-
-    #[test]
-    fn allows_non_make_command() {
-        let guard = MakeTargetGuard;
-        let c = ctx("echo hello");
-        assert!(guard.check(&c).is_none());
-    }
-}
+#[path = "make_target/tests.rs"]
+mod tests;
