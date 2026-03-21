@@ -157,6 +157,62 @@ fn manifests_root_stays_prod_only() {
 }
 
 #[test]
+fn infra_small_roots_stay_prod_only() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+
+    for (path, needles, split_path) in [
+        (
+            "src/infra/blocks/clock.rs",
+            &[
+                "fn system_clock_produces_valid_iso8601()",
+                "fn clock_is_send_sync()",
+                "mod tests {",
+            ][..],
+            "src/infra/blocks/clock/tests.rs",
+        ),
+        (
+            "src/infra/blocks/error.rs",
+            &[
+                "fn block_error_new_preserves_fields()",
+                "fn block_error_is_send_sync()",
+                "mod tests {",
+            ][..],
+            "src/infra/blocks/error/tests.rs",
+        ),
+        (
+            "src/infra/blocks/registry.rs",
+            &[
+                "fn denied_binaries_cover_managed_cluster_tools()",
+                "fn parse_rejects_unknown_requirement()",
+                "mod tests {",
+            ][..],
+            "src/infra/blocks/registry/tests.rs",
+        ),
+        (
+            "src/infra/blocks/envoy.rs",
+            &[
+                "fn fake_proxy_returns_canned_dump()",
+                "fn proxy_introspector_is_send_sync()",
+                "mod tests {",
+            ][..],
+            "src/infra/blocks/envoy/tests.rs",
+        ),
+    ] {
+        let contents = fs::read_to_string(root.join(path)).unwrap();
+        for needle in needles {
+            assert!(
+                !contents.contains(needle),
+                "{path} should stay focused on production block logic instead of owning `{needle}`"
+            );
+        }
+        assert!(
+            root.join(split_path).exists(),
+            "infra split test module should exist: {split_path}"
+        );
+    }
+}
+
+#[test]
 fn helm_block_root_stays_prod_only() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
     let helm = fs::read_to_string(root.join("src/infra/blocks/helm.rs")).unwrap();
