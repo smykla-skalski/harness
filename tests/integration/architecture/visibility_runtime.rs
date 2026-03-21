@@ -683,8 +683,12 @@ fn observe_types_root_stays_prod_only() {
     let types_mod = fs::read_to_string(root.join("src/observe/types/mod.rs")).unwrap();
 
     for needle in [
-        "fn render_format_displays_stable_names(",
-        "fn focus_presets_static(",
+        "pub enum IssueCategory {",
+        "pub enum IssueSeverity {",
+        "pub enum MessageRole {",
+        "pub enum SourceTool {",
+        "pub enum Confidence {",
+        "pub enum FixSafety {",
         "mod tests {",
     ] {
         assert!(
@@ -693,6 +697,10 @@ fn observe_types_root_stays_prod_only() {
         );
     }
 
+    assert!(
+        root.join("src/observe/types/classification.rs").exists(),
+        "observe types classification split module should exist"
+    );
     assert!(
         root.join("src/observe/types/tests.rs").exists(),
         "observe types split test module should exist"
@@ -788,10 +796,27 @@ fn observe_registry_root_stays_prod_only() {
         "observe classifier registry split test module should exist"
     );
     assert!(
-        root.join("src/observe/classifier/registry/data.rs")
+        root.join("src/observe/classifier/registry/data/mod.rs")
             .exists(),
-        "observe classifier registry data module should exist"
+        "observe classifier registry data facade should exist"
     );
+    for path in [
+        "src/observe/classifier/registry/data/hook.rs",
+        "src/observe/classifier/registry/data/build.rs",
+        "src/observe/classifier/registry/data/cli.rs",
+        "src/observe/classifier/registry/data/integrity.rs",
+        "src/observe/classifier/registry/data/naming.rs",
+        "src/observe/classifier/registry/data/skill.rs",
+        "src/observe/classifier/registry/data/subagent.rs",
+        "src/observe/classifier/registry/data/unexpected.rs",
+        "src/observe/classifier/registry/data/user.rs",
+        "src/observe/classifier/registry/data/workflow.rs",
+    ] {
+        assert!(
+            root.join(path).exists(),
+            "observe classifier registry split module should exist: {path}"
+        );
+    }
 }
 
 #[test]
