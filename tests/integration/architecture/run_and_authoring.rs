@@ -150,6 +150,42 @@ fn run_small_roots_stay_prod_only() {
             ][..],
             "src/run/services/reporting/tests.rs",
         ),
+        (
+            "src/run/application/recording.rs",
+            &[
+                "fn validate_gid_usage_requires_gid_for_execution_phase()",
+                "fn log_group_id_uses_dash_outside_execution_phase()",
+                "mod tests {",
+            ][..],
+            "src/run/application/recording/tests.rs",
+        ),
+        (
+            "src/run/audit/scrub.rs",
+            &[
+                "fn scrubs_pem_certificate()",
+                "fn scrubs_multiple_patterns_in_one_pass()",
+                "mod tests {",
+            ][..],
+            "src/run/audit/scrub/tests.rs",
+        ),
+        (
+            "src/run/status.rs",
+            &[
+                "fn test_load_run_status()",
+                "fn test_load_run_status_accepts_structured_group_entries()",
+                "mod tests {",
+            ][..],
+            "src/run/status/tests.rs",
+        ),
+        (
+            "src/run/workflow/persistence.rs",
+            &[
+                "fn read_runner_state_rejects_legacy_flat_state()",
+                "fn write_runner_state_if_current_rejects_conflict()",
+                "mod tests {",
+            ][..],
+            "src/run/workflow/persistence/tests.rs",
+        ),
     ] {
         let contents = fs::read_to_string(root.join(path)).unwrap();
         for needle in needles {
