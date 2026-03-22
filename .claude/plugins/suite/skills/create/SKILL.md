@@ -117,6 +117,7 @@ harness setup capabilities
 Parse the JSON output and keep it as the `CAPABILITIES` context for all later steps. Use it to:
 
 - Prefer `readiness.profiles` when it exists. Only offer profiles whose `ready` field is `true`. If a requested profile is not ready, summarize its `blocking_checks` instead of proposing it anyway.
+- `readiness.profiles` may list multiple provider variants for the same Kubernetes profile name. For suite authoring, treat a profile as usable when any entry with that profile name is ready.
 - Scope `required_dependencies` to features that are both supported and ready now. Static support still comes from `features.<name>.available`, but live usability comes from `readiness.features.<name>.ready` when present.
 - When building the proposal (step 7), only propose universal-mode groups if the `universal` platform is listed and the matching `readiness.platforms.universal.ready` is `true`.
 - Only propose envoy admin validation steps if `features.envoy_admin.available` is true and `readiness.features.envoy_admin.ready` is either true or absent.

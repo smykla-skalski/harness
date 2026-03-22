@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 
-use crate::kernel::topology::Platform;
+use crate::kernel::topology::{ClusterProvider, Platform};
 
 /// Cluster topology mode (single-zone vs multi-zone).
 ///
@@ -60,6 +60,14 @@ pub struct PlatformInfo {
     pub aliases: Vec<String>,
     pub description: String,
     pub name: Platform,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ProviderInfo {
+    pub aliases: Vec<String>,
+    pub description: String,
+    pub name: ClusterProvider,
+    pub platform: Platform,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -166,6 +174,7 @@ pub struct PlatformReadiness {
 pub struct ProfileReadiness {
     pub name: String,
     pub platform: Platform,
+    pub provider: ClusterProvider,
     pub topology: TopologyMode,
     pub ready: bool,
     pub blocking_checks: Vec<String>,
@@ -177,6 +186,7 @@ pub struct ReadinessReport {
     pub checks: Vec<ReadinessCheck>,
     pub create: ReadinessSummary,
     pub platforms: BTreeMap<String, PlatformReadiness>,
+    pub providers: BTreeMap<String, ReadinessSummary>,
     pub features: BTreeMap<Feature, ReadinessSummary>,
     pub profiles: Vec<ProfileReadiness>,
 }
@@ -187,5 +197,6 @@ pub struct CapabilitiesReport {
     pub cluster_topologies: Vec<ClusterTopology>,
     pub features: BTreeMap<Feature, FeatureInfo>,
     pub platforms: Vec<PlatformInfo>,
+    pub providers: Vec<ProviderInfo>,
     pub readiness: ReadinessReport,
 }

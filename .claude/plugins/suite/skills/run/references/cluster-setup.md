@@ -11,15 +11,19 @@
 
 # Cluster setup
 
-Cluster lifecycle commands for local manual testing with k3d.
+Cluster lifecycle commands for harness-managed Kubernetes and universal test environments.
 
 ## Prerequisites
 
 - Docker daemon running
-- `k3d`, `kubectl`, `helm`, `make` installed
+- `kubectl`, `helm`, `make` installed
+- `k3d` installed for local Kubernetes provider runs
 - `REPO_ROOT` resolved (via `--repo` flag or auto-detected from cwd)
+- Remote Kubernetes provider runs also need explicit `--remote` mappings plus `--push-prefix` and `--push-tag`
 
 ## Kubeconfig mapping
+
+Local k3d provider:
 
 | Cluster | Role | Kubeconfig file |
 | ------- | ---- | --------------- |
@@ -27,7 +31,11 @@ Cluster lifecycle commands for local manual testing with k3d.
 | `kuma-2` | zone-1 | `${HOME}/.kube/k3d-kuma-2.yaml` |
 | `kuma-3` | zone-2 | `${HOME}/.kube/k3d-kuma-3.yaml` |
 
-After `harness run start`, rely on the active run context for repo root and the primary kubeconfig. Use explicit kubeconfig paths only for manual checks that target a non-primary cluster.
+Remote provider:
+
+- pass source kubeconfigs with repeatable `--remote name=<cluster>,kubeconfig=<path>[,context=<ctx>]`
+- harness flattens them into tracked generated kubeconfigs under its session state
+- after `harness run start`, rely on the active run context instead of exporting `KUBECONFIG` manually
 
 ## Profiles
 
@@ -35,6 +43,17 @@ After `harness run start`, rely on the active run context for repo root and the 
 
 ```bash
 harness setup kuma cluster single-up kuma-1
+```
+
+Remote equivalent:
+
+```bash
+harness setup kuma cluster \
+  --provider remote \
+  --remote name=kuma-1,kubeconfig=/path/to/kuma-1.yaml[,context=kuma-1] \
+  --push-prefix ghcr.io/acme/kuma \
+  --push-tag branch-dev \
+  single-up kuma-1
 ```
 
 Manual equivalent:
@@ -54,6 +73,18 @@ CLUSTER=kuma-1 make k3d/cluster/stop
 
 ```bash
 harness setup kuma cluster global-zone-up kuma-1 kuma-2 zone-1
+```
+
+Remote equivalent:
+
+```bash
+harness setup kuma cluster \
+  --provider remote \
+  --remote name=kuma-1,kubeconfig=/path/to/kuma-1.yaml[,context=global] \
+  --remote name=kuma-2,kubeconfig=/path/to/kuma-2.yaml[,context=zone-1] \
+  --push-prefix ghcr.io/acme/kuma \
+  --push-tag branch-dev \
+  global-zone-up kuma-1 kuma-2 zone-1
 ```
 
 Manual equivalent for global:
@@ -95,6 +126,19 @@ KUBECONFIG="${HOME}/.kube/k3d-kuma-2.yaml" \
 harness setup kuma cluster global-two-zones-up kuma-1 kuma-2 kuma-3 zone-1 zone-2
 ```
 
+Remote equivalent:
+
+```bash
+harness setup kuma cluster \
+  --provider remote \
+  --remote name=kuma-1,kubeconfig=/path/to/kuma-1.yaml[,context=global] \
+  --remote name=kuma-2,kubeconfig=/path/to/kuma-2.yaml[,context=zone-1] \
+  --remote name=kuma-3,kubeconfig=/path/to/kuma-3.yaml[,context=zone-2] \
+  --push-prefix ghcr.io/acme/kuma \
+  --push-tag branch-dev \
+  global-two-zones-up kuma-1 kuma-2 kuma-3 zone-1 zone-2
+```
+
 Stop all:
 
 ```bash
@@ -106,6 +150,8 @@ CLUSTER=kuma-3 make k3d/cluster/stop
 ## Build and deploy local code changes
 
 The lifecycle script handles build, image load, and helm deploy in one step.
+
+For remote provider runs, harness uses the Kuma repo publish contract to build and push images, then deploys them with Helm against the tracked generated kubeconfigs.
 
 For manual control:
 
@@ -132,11 +178,14 @@ harness setup gateway --check-only
 
 # Install (idempotent - skips if already present)
 harness setup gateway
+
+# Uninstall what harness installed
+harness setup gateway --uninstall
 ```
 
 The script extracts the version from `go.mod` (`sigs.k8s.io/gateway-api`) to stay in sync with the Kuma codebase. It installs the standard CRDs: GatewayClass, Gateway, HTTPRoute, ReferenceGrant.
 
-Install on every cluster that needs it (in multi-zone setups, zones running builtin gateways need the CRDs).
+Install on every cluster that needs it (in multi-zone setups, zones running builtin gateways need the CRDs). In remote mode, pass `--kubeconfig <generated-path>` so harness can record that it owns the install and remove it during teardown if needed.
 
 ## Baseline readiness validation
 

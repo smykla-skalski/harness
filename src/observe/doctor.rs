@@ -15,6 +15,8 @@ use crate::workspace::{current_run_context_path_for_project, harness_data_root};
 #[derive(Debug, Clone, Serialize)]
 struct DoctorTarget {
     project_dir: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    repo_root: Option<String>,
     current_run_pointer: String,
     compact_handoff: String,
 }
@@ -75,6 +77,7 @@ fn resolve_project_dir(raw: Option<&str>) -> Result<PathBuf, CliError> {
 }
 
 fn build_report(project_dir: &Path) -> DoctorReport {
+    let repo_root = auto_detect_kuma_repo_root(project_dir);
     let pointer_path = current_run_context_path_for_project(project_dir);
     let compact_path = compact_latest_path(project_dir);
 
@@ -83,12 +86,13 @@ fn build_report(project_dir: &Path) -> DoctorReport {
     checks.push(check_project_plugin_root(project_dir));
     checks.push(check_project_plugin_wrapper(project_dir));
     checks.extend(check_lifecycle_contract(project_dir));
+    checks.extend(check_repo_provider_contract(repo_root.as_deref()));
     checks.push(check_current_run_pointer(&pointer_path));
     checks.push(check_compact_handoff(project_dir, &compact_path));
 
     let remaining_findings: Vec<DoctorCheck> = checks
         .iter()
-        .filter(|check| check.status != "ok")
+        .filter(|check| check.status == "error")
         .cloned()
         .collect();
 
@@ -97,6 +101,7 @@ fn build_report(project_dir: &Path) -> DoctorReport {
         command: "observe doctor",
         target: DoctorTarget {
             project_dir: project_dir.display().to_string(),
+            repo_root: repo_root.as_ref().map(|path| path.display().to_string()),
             current_run_pointer: pointer_path.display().to_string(),
             compact_handoff: compact_path.display().to_string(),
         },
@@ -109,6 +114,9 @@ fn build_report(project_dir: &Path) -> DoctorReport {
 fn render_human(report: &DoctorReport) {
     println!("observe doctor");
     println!("project: {}", report.target.project_dir);
+    if let Some(repo_root) = &report.target.repo_root {
+        println!("repo: {repo_root}");
+    }
     println!("pointer: {}", report.target.current_run_pointer);
     println!("compact: {}", report.target.compact_handoff);
     for check in &report.checks {
@@ -125,6 +133,18 @@ fn render_human(report: &DoctorReport) {
             println!("hint: {hint}");
         }
     }
+}
+
+fn auto_detect_kuma_repo_root(start: &Path) -> Option<PathBuf> {
+    start.ancestors().find_map(|ancestor| {
+        let go_mod = ancestor.join("go.mod");
+        let text = fs::read_to_string(&go_mod).ok()?;
+        if text.contains("github.com/kumahq/kuma") {
+            Some(ancestor.to_path_buf())
+        } else {
+            None
+        }
+    })
 }
 
 fn check_global_install() -> Vec<DoctorCheck> {
@@ -265,6 +285,98 @@ fn check_project_plugin_wrapper(project_dir: &Path) -> DoctorCheck {
             ),
         )
     }
+}
+
+fn check_repo_provider_contract(repo_root: Option<&Path>) -> Vec<DoctorCheck> {
+    let Some(repo_root) = repo_root else {
+        return vec![
+            skipped_check(
+                "observe_repo_make_contract",
+                "repo",
+                "Kuma provider-contract check skipped because no Kuma repo root was detected.",
+                None,
+                Some(
+                    "Run observe doctor from a Kuma checkout to verify k3d and remote provider contracts.",
+                ),
+            ),
+            skipped_check(
+                "observe_repo_remote_publish_contract",
+                "repo",
+                "Remote publish-contract check skipped because no Kuma repo root was detected.",
+                None,
+                Some(
+                    "Run observe doctor from a Kuma checkout to verify remote image publish targets.",
+                ),
+            ),
+        ];
+    };
+
+    vec![
+        if repo_has_current_make_contract(repo_root) {
+            ok_check(
+                "observe_repo_make_contract",
+                "repo",
+                "Kuma repo exposes the current cluster make contract.",
+                Some(repo_root),
+            )
+        } else {
+            error_check(
+                "observe_repo_make_contract",
+                "repo",
+                "Kuma repo is missing the current cluster make contract required by harness.",
+                Some(repo_root),
+                false,
+                Some("Expected mk/k3d.mk + mk/k8s.mk with CLUSTER and k3d/cluster/* targets."),
+            )
+        },
+        if repo_has_remote_publish_contract(repo_root) {
+            ok_check(
+                "observe_repo_remote_publish_contract",
+                "repo",
+                "Kuma repo exposes the remote image publish contract required by harness.",
+                Some(repo_root),
+            )
+        } else {
+            error_check(
+                "observe_repo_remote_publish_contract",
+                "repo",
+                "Kuma repo is missing the remote image publish contract required by harness.",
+                Some(repo_root),
+                false,
+                Some(
+                    "Expected mk/docker.mk targets for images/release, docker/push, and manifests/json/release.",
+                ),
+            )
+        },
+    ]
+}
+
+fn repo_has_current_make_contract(repo_root: &Path) -> bool {
+    let k3d = repo_root.join("mk").join("k3d.mk");
+    let k8s = repo_root.join("mk").join("k8s.mk");
+    file_contains_all(
+        &k3d,
+        &[
+            "k3d/cluster/start:",
+            "k3d/cluster/deploy/helm:",
+            "k3d/cluster/stop:",
+        ],
+    ) && file_contains_all(&k8s, &["CLUSTER"])
+}
+
+fn repo_has_remote_publish_contract(repo_root: &Path) -> bool {
+    let docker = repo_root.join("mk").join("docker.mk");
+    file_contains_all(
+        &docker,
+        &["images/release:", "docker/push:", "manifests/json/release:"],
+    )
+}
+
+fn file_contains_all(path: &Path, needles: &[&str]) -> bool {
+    let Ok(text) = fs::read_to_string(path) else {
+        return false;
+    };
+    needles.iter().all(|needle| text.contains(needle))
 }
 
 fn check_lifecycle_contract(project_dir: &Path) -> Vec<DoctorCheck> {
@@ -509,6 +621,24 @@ fn error_check(
         summary: summary.into(),
         path: path.map(|value| value.display().to_string()),
         repairable,
+        hint: hint.map(str::to_string),
+    }
+}
+
+fn skipped_check(
+    code: &'static str,
+    kind: &'static str,
+    summary: impl Into<String>,
+    path: Option<&Path>,
+    hint: Option<&str>,
+) -> DoctorCheck {
+    DoctorCheck {
+        code,
+        kind,
+        status: "skipped",
+        summary: summary.into(),
+        path: path.map(|value| value.display().to_string()),
+        repairable: false,
         hint: hint.map(str::to_string),
     }
 }

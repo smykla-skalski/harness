@@ -5,7 +5,7 @@ use std::process::{Command, Stdio};
 
 use fs_err as fs;
 
-use crate::kernel::topology::Platform;
+use crate::kernel::topology::{ClusterProvider, Platform};
 use crate::setup::wrapper::choose_install_dir_with_home;
 use crate::workspace::{dirs_home, harness_data_root};
 
@@ -60,36 +60,27 @@ pub(super) fn evaluate(
         .map(|raw| resolve_scope_path(Some(raw), &cwd))
         .or_else(|| auto_detect_kuma_repo_root(&project_dir));
 
-    let scope = ReadinessScope {
-        cwd: cwd.display().to_string(),
-        project_dir: project_dir.display().to_string(),
-        repo_root: repo_root.as_ref().map(|path| path.display().to_string()),
-        explicit_project_dir: raw_project_dir.is_some(),
-        explicit_repo_root: raw_repo_root.is_some(),
-    };
-
+    let scope = build_scope(
+        &cwd,
+        &project_dir,
+        repo_root.as_deref(),
+        raw_project_dir.is_some(),
+        raw_repo_root.is_some(),
+    );
     let checks = build_checks(&project_dir, repo_root.as_deref(), probe);
     let statuses = checks
         .iter()
         .map(|check| (check.code.as_str(), check.status))
         .collect::<BTreeMap<_, _>>();
-
-    let create = summary_from_codes(&statuses, CREATE_REQUIREMENTS);
-    let kubernetes = summary_from_codes(&statuses, KUBERNETES_REQUIREMENTS);
-    let universal = summary_from_codes(&statuses, UNIVERSAL_REQUIREMENTS);
-    let project = summary_from_codes(&statuses, PROJECT_REQUIREMENTS);
-    let bootstrap = summary_from_codes(&statuses, BOOTSTRAP_REQUIREMENTS);
-    let repo = summary_from_codes(&statuses, REPO_REQUIREMENTS);
-    let either_platform = any_of(&[&kubernetes, &universal]);
+    let summaries = build_summaries(&statuses);
     let feature_inputs = FeatureReadinessInputs {
-        project: &project,
-        bootstrap: &bootstrap,
-        repo: &repo,
-        kubernetes: &kubernetes,
-        universal: &universal,
-        either_platform: &either_platform,
+        project: &summaries.project,
+        bootstrap: &summaries.bootstrap,
+        repo: &summaries.repo,
+        kubernetes: &summaries.kubernetes,
+        universal: &summaries.universal,
+        either_platform: &summaries.either_platform,
     };
-
     let features = feature_map
         .keys()
         .copied()
@@ -99,65 +90,168 @@ pub(super) fn evaluate(
         })
         .collect();
 
-    let kubernetes_ready = kubernetes.ready;
-    let universal_ready = universal.ready;
-    let kubernetes_blocking_checks = kubernetes.blocking_checks;
-    let universal_blocking_checks = universal.blocking_checks;
-    let platforms = BTreeMap::from([
+    ReadinessReport {
+        scope,
+        checks,
+        create: summaries.create.clone(),
+        platforms: build_platform_readiness(&summaries),
+        providers: build_provider_readiness(&summaries),
+        features,
+        profiles: build_profile_readiness(&summaries),
+    }
+}
+
+struct CapabilitySummaries {
+    create: ReadinessSummary,
+    project: ReadinessSummary,
+    bootstrap: ReadinessSummary,
+    repo: ReadinessSummary,
+    k3d: ReadinessSummary,
+    remote: ReadinessSummary,
+    kubernetes: ReadinessSummary,
+    universal: ReadinessSummary,
+    either_platform: ReadinessSummary,
+}
+
+fn build_scope(
+    cwd: &Path,
+    project_dir: &Path,
+    repo_root: Option<&Path>,
+    explicit_project_dir: bool,
+    explicit_repo_root: bool,
+) -> ReadinessScope {
+    ReadinessScope {
+        cwd: cwd.display().to_string(),
+        project_dir: project_dir.display().to_string(),
+        repo_root: repo_root.map(|path| path.display().to_string()),
+        explicit_project_dir,
+        explicit_repo_root,
+    }
+}
+
+fn build_summaries(statuses: &BTreeMap<&str, ReadinessStatus>) -> CapabilitySummaries {
+    let create = summary_from_codes(statuses, CREATE_REQUIREMENTS);
+    let project = summary_from_codes(statuses, PROJECT_REQUIREMENTS);
+    let bootstrap = summary_from_codes(statuses, BOOTSTRAP_REQUIREMENTS);
+    let repo = summary_from_codes(statuses, REPO_REQUIREMENTS);
+    let k3d = summary_from_codes(statuses, K3D_REQUIREMENTS);
+    let remote = summary_from_codes(statuses, REMOTE_REQUIREMENTS);
+    let kubernetes = any_of(&[&k3d, &remote]);
+    let universal = summary_from_codes(statuses, UNIVERSAL_REQUIREMENTS);
+    let either_platform = any_of(&[&kubernetes, &universal]);
+
+    CapabilitySummaries {
+        create,
+        project,
+        bootstrap,
+        repo,
+        k3d,
+        remote,
+        kubernetes,
+        universal,
+        either_platform,
+    }
+}
+
+fn build_platform_readiness(
+    summaries: &CapabilitySummaries,
+) -> BTreeMap<String, PlatformReadiness> {
+    BTreeMap::from([
         (
             Platform::Kubernetes.as_str().to_string(),
             PlatformReadiness {
-                ready: kubernetes_ready,
-                blocking_checks: kubernetes_blocking_checks.clone(),
+                ready: summaries.kubernetes.ready,
+                blocking_checks: summaries.kubernetes.blocking_checks.clone(),
             },
         ),
         (
             Platform::Universal.as_str().to_string(),
             PlatformReadiness {
-                ready: universal_ready,
-                blocking_checks: universal_blocking_checks.clone(),
+                ready: summaries.universal.ready,
+                blocking_checks: summaries.universal.blocking_checks.clone(),
             },
         ),
-    ]);
+    ])
+}
 
-    let profiles = vec![
-        ProfileReadiness {
-            name: "single-zone".into(),
-            platform: Platform::Kubernetes,
-            topology: TopologyMode::SingleZone,
-            ready: kubernetes_ready,
-            blocking_checks: kubernetes_blocking_checks.clone(),
-        },
-        ProfileReadiness {
-            name: "multi-zone".into(),
-            platform: Platform::Kubernetes,
-            topology: TopologyMode::MultiZone,
-            ready: kubernetes_ready,
-            blocking_checks: kubernetes_blocking_checks,
-        },
-        ProfileReadiness {
-            name: "single-zone-universal".into(),
-            platform: Platform::Universal,
-            topology: TopologyMode::SingleZone,
-            ready: universal_ready,
-            blocking_checks: universal_blocking_checks.clone(),
-        },
-        ProfileReadiness {
-            name: "multi-zone-universal".into(),
-            platform: Platform::Universal,
-            topology: TopologyMode::MultiZone,
-            ready: universal_ready,
-            blocking_checks: universal_blocking_checks,
-        },
-    ];
+fn build_provider_readiness(summaries: &CapabilitySummaries) -> BTreeMap<String, ReadinessSummary> {
+    BTreeMap::from([
+        (
+            ClusterProvider::K3d.as_str().to_string(),
+            summaries.k3d.clone(),
+        ),
+        (
+            ClusterProvider::Remote.as_str().to_string(),
+            summaries.remote.clone(),
+        ),
+        (
+            ClusterProvider::Compose.as_str().to_string(),
+            summaries.universal.clone(),
+        ),
+    ])
+}
 
-    ReadinessReport {
-        scope,
-        checks,
-        create,
-        platforms,
-        features,
-        profiles,
+fn build_profile_readiness(summaries: &CapabilitySummaries) -> Vec<ProfileReadiness> {
+    vec![
+        profile_readiness(
+            "single-zone",
+            Platform::Kubernetes,
+            ClusterProvider::K3d,
+            TopologyMode::SingleZone,
+            &summaries.k3d,
+        ),
+        profile_readiness(
+            "multi-zone",
+            Platform::Kubernetes,
+            ClusterProvider::K3d,
+            TopologyMode::MultiZone,
+            &summaries.k3d,
+        ),
+        profile_readiness(
+            "single-zone",
+            Platform::Kubernetes,
+            ClusterProvider::Remote,
+            TopologyMode::SingleZone,
+            &summaries.remote,
+        ),
+        profile_readiness(
+            "multi-zone",
+            Platform::Kubernetes,
+            ClusterProvider::Remote,
+            TopologyMode::MultiZone,
+            &summaries.remote,
+        ),
+        profile_readiness(
+            "single-zone-universal",
+            Platform::Universal,
+            ClusterProvider::Compose,
+            TopologyMode::SingleZone,
+            &summaries.universal,
+        ),
+        profile_readiness(
+            "multi-zone-universal",
+            Platform::Universal,
+            ClusterProvider::Compose,
+            TopologyMode::MultiZone,
+            &summaries.universal,
+        ),
+    ]
+}
+
+fn profile_readiness(
+    name: &str,
+    platform: Platform,
+    provider: ClusterProvider,
+    topology: TopologyMode,
+    summary: &ReadinessSummary,
+) -> ProfileReadiness {
+    ProfileReadiness {
+        name: name.into(),
+        platform,
+        provider,
+        topology,
+        ready: summary.ready,
+        blocking_checks: summary.blocking_checks.clone(),
     }
 }
 
@@ -181,7 +275,7 @@ const REPO_REQUIREMENTS: &[&str] = &[
     "repo_root_exists",
     "repo_is_kuma_checkout",
 ];
-const KUBERNETES_REQUIREMENTS: &[&str] = &[
+const K3D_REQUIREMENTS: &[&str] = &[
     "docker_binary_present",
     "docker_running",
     "make_binary_present",
@@ -192,6 +286,18 @@ const KUBERNETES_REQUIREMENTS: &[&str] = &[
     "repo_root_exists",
     "repo_is_kuma_checkout",
     "repo_make_contract_present",
+];
+const REMOTE_REQUIREMENTS: &[&str] = &[
+    "docker_binary_present",
+    "docker_running",
+    "make_binary_present",
+    "kubectl_binary_present",
+    "helm_binary_present",
+    "repo_root_resolved",
+    "repo_root_exists",
+    "repo_is_kuma_checkout",
+    "repo_make_contract_present",
+    "repo_remote_publish_contract_present",
 ];
 const UNIVERSAL_REQUIREMENTS: &[&str] = &[
     "docker_binary_present",
@@ -295,6 +401,7 @@ fn build_checks(
         check_repo_root_exists(repo_root),
         check_repo_is_kuma_checkout(repo_root, repo_exists),
         check_repo_make_contract(repo_root, repo_is_kuma),
+        check_repo_remote_publish_contract(repo_root, repo_is_kuma),
     ]
 }
 
@@ -681,6 +788,82 @@ fn check_repo_make_contract(repo_root: Option<&Path>, repo_is_kuma: bool) -> Rea
         ReadinessCheckScope::Repo,
         "Kuma Make contract matches the current `k3d/cluster/*` layout.",
         Some(root),
+        None,
+    )
+}
+
+fn check_repo_remote_publish_contract(
+    repo_root: Option<&Path>,
+    repo_is_kuma: bool,
+) -> ReadinessCheck {
+    let Some(root) = repo_root else {
+        return skipped(
+            "repo_remote_publish_contract_present",
+            ReadinessCheckScope::Repo,
+            "Remote publish contract check skipped because the repo root is not resolved.",
+            None,
+            Some("Resolve the repo root first."),
+        );
+    };
+
+    if !repo_is_kuma {
+        return skipped(
+            "repo_remote_publish_contract_present",
+            ReadinessCheckScope::Repo,
+            "Remote publish contract check skipped because the repo root is not a verified Kuma checkout.",
+            Some(root),
+            Some("Use a current Kuma checkout before attempting remote setup."),
+        );
+    }
+
+    let docker_makefile = root.join("mk").join("docker.mk");
+    if !docker_makefile.is_file() {
+        return fail(
+            "repo_remote_publish_contract_present",
+            ReadinessCheckScope::Repo,
+            "Remote publish contract is missing `mk/docker.mk`.",
+            Some(&docker_makefile),
+            Some("Update the Kuma checkout to the current image publish contract."),
+        );
+    }
+
+    let text = match fs::read_to_string(&docker_makefile) {
+        Ok(text) => text,
+        Err(error) => {
+            return fail(
+                "repo_remote_publish_contract_present",
+                ReadinessCheckScope::Repo,
+                format!("Unable to read `mk/docker.mk`: {error}"),
+                Some(&docker_makefile),
+                Some("Ensure the Kuma Make files are readable."),
+            );
+        }
+    };
+
+    let required = ["images/release:", "docker/push:", "manifests/json/release:"];
+    let missing = required
+        .iter()
+        .copied()
+        .filter(|needle| !text.contains(needle))
+        .collect::<Vec<_>>();
+    if !missing.is_empty() {
+        return fail(
+            "repo_remote_publish_contract_present",
+            ReadinessCheckScope::Repo,
+            format!(
+                "Remote publish contract is missing required targets: {}.",
+                missing.join(", ")
+            ),
+            Some(&docker_makefile),
+            Some("Update the Kuma checkout so release image build/push targets are present."),
+        );
+    }
+
+    pass(
+        "repo_remote_publish_contract_present",
+        ReadinessCheckScope::Repo,
+        "Kuma repo exposes the current remote image publish contract.",
+        Some(&docker_makefile),
         None,
     )
 }

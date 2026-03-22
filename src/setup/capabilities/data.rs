@@ -1,21 +1,51 @@
 use std::collections::BTreeMap;
 
-use crate::kernel::topology::Platform;
+use crate::kernel::topology::{ClusterProvider, Platform};
 
-use super::model::{ClusterTopology, CreateInfo, Feature, FeatureInfo, PlatformInfo, TopologyMode};
+use super::model::{
+    ClusterTopology, CreateInfo, Feature, FeatureInfo, PlatformInfo, ProviderInfo, TopologyMode,
+};
 
 pub(super) fn platforms() -> Vec<PlatformInfo> {
     vec![
         PlatformInfo {
             name: Platform::Kubernetes,
             aliases: vec!["k8s".into()],
-            description: "k3d-based local Kubernetes clusters with Helm-deployed Kuma".into(),
+            description:
+                "Kubernetes clusters managed locally with k3d or attached remotely through kubeconfig"
+                    .into(),
         },
         PlatformInfo {
             name: Platform::Universal,
             aliases: vec![],
             description: "Docker-based universal mode with CP containers and dataplane tokens"
                 .into(),
+        },
+    ]
+}
+
+pub(super) fn providers() -> Vec<ProviderInfo> {
+    vec![
+        ProviderInfo {
+            name: ClusterProvider::K3d,
+            aliases: vec!["local".into()],
+            description: "local k3d-backed Kubernetes clusters created and torn down by harness"
+                .into(),
+            platform: Platform::Kubernetes,
+        },
+        ProviderInfo {
+            name: ClusterProvider::Remote,
+            aliases: vec!["external".into()],
+            description:
+                "remote kubeconfig-backed Kubernetes clusters that harness attaches to without creating or deleting"
+                    .into(),
+            platform: Platform::Kubernetes,
+        },
+        ProviderInfo {
+            name: ClusterProvider::Compose,
+            aliases: vec![],
+            description: "Docker Compose-managed universal control plane containers".into(),
+            platform: Platform::Universal,
         },
     ]
 }
@@ -67,7 +97,9 @@ fn core_features() -> BTreeMap<Feature, FeatureInfo> {
         ),
         (
             Feature::ClusterManagement,
-            FeatureInfo::new("create and tear down local k3d or universal Docker clusters")
+            FeatureInfo::new(
+                "create local k3d clusters, attach remote kubeconfig-backed clusters, or manage universal Docker clusters",
+            )
                 .command("harness setup kuma cluster"),
         ),
         (

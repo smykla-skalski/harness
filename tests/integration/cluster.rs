@@ -6,17 +6,50 @@
 use std::env;
 use std::fs;
 use std::os::unix::fs::PermissionsExt;
+use std::path::Path;
 use std::sync::PoisonError;
 
 // Use the shared ENV_LOCK from helpers so all integration test modules that
 // modify PATH serialize against each other (not just within this module).
 use super::helpers::ENV_LOCK;
 
-use harness::kernel::topology::{ClusterMode, ClusterSpec, HelmSetting, Platform};
+use harness::kernel::topology::{ClusterMode, ClusterProvider, ClusterSpec, HelmSetting, Platform};
 use harness::run::{KumactlArgs, KumactlCommand};
 use harness::setup::ClusterArgs;
 
 use super::helpers::*;
+
+fn k3d_cluster_args(
+    mode: &str,
+    cluster_name: &str,
+    extra_cluster_names: Vec<&str>,
+    repo_root: &Path,
+    run_dir: Option<&Path>,
+) -> ClusterArgs {
+    ClusterArgs {
+        mode: mode.into(),
+        cluster_name: cluster_name.into(),
+        extra_cluster_names: extra_cluster_names
+            .into_iter()
+            .map(str::to_string)
+            .collect(),
+        repo_root: Some(repo_root.to_str().unwrap().into()),
+        run_dir: run_dir.map(|path| path.to_str().unwrap().into()),
+        platform: "kubernetes".into(),
+        provider: None,
+        remote: vec![],
+        helm_setting: vec![],
+        restart_namespace: vec![],
+        store: "memory".into(),
+        image: None,
+        no_build: false,
+        no_load: false,
+        push_prefix: None,
+        push_tag: None,
+        namespace: "kuma-system".into(),
+        release_name: "kuma".into(),
+    }
+}
 
 // ============================================================================
 // ClusterSpec payload tests
@@ -90,6 +123,7 @@ fn cluster_spec_serialization_roundtrip() {
     let spec = ClusterSpec {
         mode: ClusterMode::SingleUp,
         platform: Platform::default(),
+        provider: ClusterProvider::K3d,
         mode_args: vec!["kuma-1".to_string()],
         members: vec![],
         helm_settings: vec![HelmSetting {
@@ -196,20 +230,13 @@ fn global_zone_up_orchestration() {
             ("HOME", Some(tmp.path().to_str().unwrap())),
         ],
         || {
-            let result = cluster_cmd(ClusterArgs {
-                mode: "global-zone-up".into(),
-                cluster_name: "kuma-global".into(),
-                extra_cluster_names: vec!["kuma-zone".into(), "zone-1".into()],
-                repo_root: Some(repo.to_str().unwrap().into()),
-                run_dir: None,
-                platform: "kubernetes".into(),
-                helm_setting: vec![],
-                restart_namespace: vec![],
-                store: "memory".into(),
-                image: None,
-                no_build: false,
-                no_load: false,
-            })
+            let result = cluster_cmd(k3d_cluster_args(
+                "global-zone-up",
+                "kuma-global",
+                vec!["kuma-zone", "zone-1"],
+                &repo,
+                None,
+            ))
             .execute();
             assert!(result.is_ok(), "global-zone-up failed: {result:?}");
             assert_eq!(result.unwrap(), 0);
@@ -254,20 +281,13 @@ fn single_up_logs_stage_updates() {
             ("HOME", Some(tmp.path().to_str().unwrap())),
         ],
         || {
-            let result = cluster_cmd(ClusterArgs {
-                mode: "single-up".into(),
-                cluster_name: "kuma-test".into(),
-                extra_cluster_names: vec![],
-                repo_root: Some(repo.to_str().unwrap().into()),
-                run_dir: None,
-                platform: "kubernetes".into(),
-                helm_setting: vec![],
-                restart_namespace: vec![],
-                store: "memory".into(),
-                image: None,
-                no_build: false,
-                no_load: false,
-            })
+            let result = cluster_cmd(k3d_cluster_args(
+                "single-up",
+                "kuma-test",
+                vec![],
+                &repo,
+                None,
+            ))
             .execute();
             assert!(result.is_ok(), "single-up failed: {result:?}");
             assert_eq!(result.unwrap(), 0);
@@ -302,20 +322,13 @@ fn single_up_metallb_template() {
             ("HOME", Some(tmp.path().to_str().unwrap())),
         ],
         || {
-            let result = cluster_cmd(ClusterArgs {
-                mode: "single-up".into(),
-                cluster_name: "kuma-metallb".into(),
-                extra_cluster_names: vec![],
-                repo_root: Some(repo.to_str().unwrap().into()),
-                run_dir: None,
-                platform: "kubernetes".into(),
-                helm_setting: vec![],
-                restart_namespace: vec![],
-                store: "memory".into(),
-                image: None,
-                no_build: false,
-                no_load: false,
-            })
+            let result = cluster_cmd(k3d_cluster_args(
+                "single-up",
+                "kuma-metallb",
+                vec![],
+                &repo,
+                None,
+            ))
             .execute();
             assert!(result.is_ok(), "single-up metallb failed: {result:?}");
             assert_eq!(result.unwrap(), 0);
@@ -366,20 +379,13 @@ fn single_up_restores_context() {
             ("HOME", Some(tmp.path().to_str().unwrap())),
         ],
         || {
-            let result = cluster_cmd(ClusterArgs {
-                mode: "single-up".into(),
-                cluster_name: "kuma-ctx".into(),
-                extra_cluster_names: vec![],
-                repo_root: Some(repo.to_str().unwrap().into()),
-                run_dir: Some(run_dir.to_str().unwrap().into()),
-                platform: "kubernetes".into(),
-                helm_setting: vec![],
-                restart_namespace: vec![],
-                store: "memory".into(),
-                image: None,
-                no_build: false,
-                no_load: false,
-            })
+            let result = cluster_cmd(k3d_cluster_args(
+                "single-up",
+                "kuma-ctx",
+                vec![],
+                &repo,
+                Some(&run_dir),
+            ))
             .execute();
             assert!(result.is_ok(), "single-up with context failed: {result:?}");
             assert_eq!(result.unwrap(), 0);
@@ -415,20 +421,13 @@ fn cluster_context_up_down() {
             ("HOME", Some(tmp.path().to_str().unwrap())),
         ],
         || {
-            let up_result = cluster_cmd(ClusterArgs {
-                mode: "single-up".into(),
-                cluster_name: "kuma-updown".into(),
-                extra_cluster_names: vec![],
-                repo_root: Some(repo.to_str().unwrap().into()),
-                run_dir: None,
-                platform: "kubernetes".into(),
-                helm_setting: vec![],
-                restart_namespace: vec![],
-                store: "memory".into(),
-                image: None,
-                no_build: false,
-                no_load: false,
-            })
+            let up_result = cluster_cmd(k3d_cluster_args(
+                "single-up",
+                "kuma-updown",
+                vec![],
+                &repo,
+                None,
+            ))
             .execute();
             assert!(up_result.is_ok(), "single-up failed: {up_result:?}");
             assert_eq!(up_result.unwrap(), 0);
@@ -445,20 +444,13 @@ fn cluster_context_up_down() {
             ("HOME", Some(tmp.path().to_str().unwrap())),
         ],
         || {
-            let down_result = cluster_cmd(ClusterArgs {
-                mode: "single-down".into(),
-                cluster_name: "kuma-updown".into(),
-                extra_cluster_names: vec![],
-                repo_root: Some(repo.to_str().unwrap().into()),
-                run_dir: None,
-                platform: "kubernetes".into(),
-                helm_setting: vec![],
-                restart_namespace: vec![],
-                store: "memory".into(),
-                image: None,
-                no_build: false,
-                no_load: false,
-            })
+            let down_result = cluster_cmd(k3d_cluster_args(
+                "single-down",
+                "kuma-updown",
+                vec![],
+                &repo,
+                None,
+            ))
             .execute();
             assert!(down_result.is_ok(), "single-down failed: {down_result:?}");
             assert_eq!(down_result.unwrap(), 0);
@@ -500,20 +492,13 @@ fn cluster_uses_saved_repo_root() {
             ("HOME", Some(tmp.path().to_str().unwrap())),
         ],
         || {
-            let result = cluster_cmd(ClusterArgs {
-                mode: "single-up".into(),
-                cluster_name: "kuma-saved".into(),
-                extra_cluster_names: vec![],
-                repo_root: Some(repo.to_str().unwrap().into()),
-                run_dir: None,
-                platform: "kubernetes".into(),
-                helm_setting: vec![],
-                restart_namespace: vec![],
-                store: "memory".into(),
-                image: None,
-                no_build: false,
-                no_load: false,
-            })
+            let result = cluster_cmd(k3d_cluster_args(
+                "single-up",
+                "kuma-saved",
+                vec![],
+                &repo,
+                None,
+            ))
             .execute();
             assert!(
                 result.is_ok(),

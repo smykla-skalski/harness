@@ -1,6 +1,8 @@
 use std::path::Path;
 
-use crate::kernel::topology::{ClusterMember, ClusterMode, ClusterSpec, HelmSetting, Platform};
+use crate::kernel::topology::{
+    ClusterMember, ClusterMode, ClusterProvider, ClusterSpec, HelmSetting, Platform,
+};
 
 use super::{ClusterRuntime, profile_platform};
 
@@ -36,6 +38,7 @@ fn kubernetes_runtime_resolves_named_cluster() {
     let spec = ClusterSpec {
         mode: spec_mode(),
         platform: Platform::Kubernetes,
+        provider: ClusterProvider::K3d,
         members: vec![
             ClusterMember::named("g", "global", Some("/tmp/g"), None),
             ClusterMember::named("z", "zone", Some("/tmp/z"), Some("zone-1")),

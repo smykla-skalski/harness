@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 
 use super::parsing;
 
-/// Deployment platform for a cluster: Kubernetes (k3d) or Universal (Docker).
+/// Deployment platform for a cluster: Kubernetes or Universal.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "kebab-case")]
 #[non_exhaustive]
@@ -39,6 +39,55 @@ impl FromStr for Platform {
             "kubernetes" | "k8s" => Ok(Self::Kubernetes),
             "universal" => Ok(Self::Universal),
             _ => Err(format!("unsupported platform: {s}")),
+        }
+    }
+}
+
+/// Concrete runtime/provider used for a tracked cluster.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "kebab-case")]
+#[non_exhaustive]
+pub enum ClusterProvider {
+    #[default]
+    K3d,
+    Remote,
+    Compose,
+}
+
+impl fmt::Display for ClusterProvider {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+impl ClusterProvider {
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::K3d => "k3d",
+            Self::Remote => "remote",
+            Self::Compose => "compose",
+        }
+    }
+
+    #[must_use]
+    pub const fn default_for_platform(platform: Platform) -> Self {
+        match platform {
+            Platform::Kubernetes => Self::K3d,
+            Platform::Universal => Self::Compose,
+        }
+    }
+}
+
+impl FromStr for ClusterProvider {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "k3d" => Ok(Self::K3d),
+            "remote" => Ok(Self::Remote),
+            "compose" => Ok(Self::Compose),
+            _ => Err(format!("unsupported cluster provider: {s}")),
         }
     }
 }

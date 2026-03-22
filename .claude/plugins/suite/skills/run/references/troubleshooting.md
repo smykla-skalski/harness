@@ -131,7 +131,18 @@ CLUSTER=kuma-3 make k3d/cluster/start
 
 Do not create or patch `mk/metallb-k3d-*.yaml` files by hand.
 
-## 11) Disk pressure on k3d node
+## 11) Remote Kubernetes setup fails before Helm deploy
+
+Symptoms: `harness setup kuma cluster --provider remote ...` fails before deploy with missing push flags, missing repo publish targets, or kubeconfig flatten/reachability errors.
+
+Fix:
+
+- verify `harness setup capabilities` reports `readiness.providers.remote.ready=true`
+- confirm the Kuma checkout still exposes `images/release`, `docker/push`, and `manifests/json/release`
+- rerun with explicit `--remote`, `--push-prefix`, and `--push-tag`
+- validate each source kubeconfig and context with `kubectl --kubeconfig <path> config get-contexts`
+
+## 12) Disk pressure on k3d node
 
 Symptoms: pods stuck in Pending/Evicted, node shows `DiskPressure=True`, `kubectl describe node` reports kubelet disk pressure.
 
@@ -154,7 +165,7 @@ This triggers a full build cycle (images + load + helm upgrade). After the deplo
 
 Prevention: `HARNESS_DOCKER_PRUNE=1` (default) in `harness setup kuma cluster` prunes old kumahq/* images before each build. The preflight script also warns when >30 kumahq/* images or >50 dangling volumes exist.
 
-## 12) Prepared manifest stale after suite-fix
+## 13) Prepared manifest stale after suite-fix
 
 Symptoms: after choosing "Fix in suite and this run", the re-applied manifest still has the old broken content. The suite source file is correct but the prepared copy in `runs/<run-id>/manifests/prepared/` was not updated.
 
@@ -164,7 +175,7 @@ Fix: re-materialize the prepared manifest before re-applying. Use `harness run a
 cp <fixed-suite-source-file> runs/<run-id>/manifests/prepared/<matching-path>
 ```
 
-## 13) Run state looks stale or contradictory
+## 14) Run state looks stale or contradictory
 
 Symptoms: `resume` cannot attach, `run-status.json` disagrees with the report, the current-run pointer targets the wrong run, or harness reports a final verdict with a non-final workflow phase.
 
@@ -177,7 +188,7 @@ harness run repair --run-dir runs/<run-id>
 
 Use `doctor` first to inspect what is wrong. Use `repair` only for deterministic state fixes that harness can rebuild safely. Do not edit `run-status.json`, `suite-run-state.json`, or `current-run.json` by hand.
 
-## 15. ContainerPatch value must be JSON string
+## 16. ContainerPatch value must be JSON string
 
 ContainerPatch `sidecarPatch` entries use JSON patch format. The `value` field must be a JSON string, not a YAML object:
 

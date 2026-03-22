@@ -13,6 +13,7 @@ pub mod cli;
 pub mod compose;
 pub mod defaults;
 pub mod manifest;
+pub mod repo;
 pub mod service;
 pub mod token;
 

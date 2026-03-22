@@ -524,6 +524,7 @@ fn setup_cluster_kubernetes_root_stays_a_facade() {
         "src/setup/cluster/kubernetes/address.rs",
         "src/setup/cluster/kubernetes/deploy.rs",
         "src/setup/cluster/kubernetes/modes.rs",
+        "src/setup/cluster/kubernetes/remote.rs",
         "src/setup/cluster/kubernetes/runtime.rs",
     ] {
         assert!(

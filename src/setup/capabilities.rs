@@ -10,7 +10,7 @@ mod model;
 #[path = "capabilities/readiness.rs"]
 mod readiness;
 
-use data::{cluster_topologies, create, features, platforms};
+use data::{cluster_topologies, create, features, platforms, providers};
 use model::CapabilitiesReport;
 
 impl Execute for CapabilitiesArgs {
@@ -58,6 +58,7 @@ fn build_report_with_probe(
         cluster_topologies: cluster_topologies(),
         features: feature_map,
         platforms: platforms(),
+        providers: providers(),
         readiness,
     }
 }

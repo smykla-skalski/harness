@@ -13,7 +13,10 @@ fn resolve_direct_container_single_zone() {
     )
     .unwrap();
     let runtime = ClusterRuntime::from_spec(&spec);
-    assert_eq!(runtime.resolve_container_name("test-cp"), "test-cp");
+    assert_eq!(
+        runtime.resolve_container_name("test-cp"),
+        "harness-test-cp-test-cp-1"
+    );
 }
 
 #[test]

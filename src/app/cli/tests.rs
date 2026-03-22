@@ -4,9 +4,52 @@ use crate::run::{
     ApiArgs, ApiMethod, DoctorArgs, EnvoyCommand, FinishArgs, KumaCommand, KumactlArgs,
     KumactlCommand, RepairArgs, ReportCommand, ResumeArgs, StartArgs,
 };
-use crate::setup::{CapabilitiesArgs, ClusterArgs, KumaSetupCommand};
+use crate::setup::{CapabilitiesArgs, ClusterArgs, GatewayArgs, KumaSetupCommand};
 use clap::{CommandFactory, error::ErrorKind};
 use std::path::Path;
+
+fn expect_cluster_args(command: Command) -> ClusterArgs {
+    match command {
+        Command::Setup {
+            command: SetupCommand::Kuma(args),
+        } => match args.command {
+            KumaSetupCommand::Cluster(args) => args,
+        },
+        _ => panic!("expected Cluster command"),
+    }
+}
+
+fn assert_remote_cluster_args(args: &ClusterArgs) {
+    assert_remote_cluster_core(args);
+    assert_remote_cluster_targets(args);
+}
+
+fn assert_remote_cluster_core(args: &ClusterArgs) {
+    assert_eq!(args.provider.as_deref(), Some("remote"));
+    assert_eq!(args.push_prefix.as_deref(), Some("ghcr.io/acme/kuma"));
+    assert_eq!(args.push_tag.as_deref(), Some("pr-123"));
+    assert_eq!(args.mode, "global-zone-up");
+    assert_eq!(args.cluster_name, "kuma-1");
+    assert_eq!(args.extra_cluster_names, vec!["kuma-2", "zone-1"]);
+}
+
+fn assert_remote_cluster_targets(args: &ClusterArgs) {
+    assert_eq!(args.remote.len(), 2);
+    assert_first_remote_cluster_target(args);
+    assert_second_remote_cluster_target(args);
+}
+
+fn assert_first_remote_cluster_target(args: &ClusterArgs) {
+    assert_eq!(args.remote[0].name, "kuma-1");
+    assert_eq!(args.remote[0].kubeconfig, "/tmp/global.yaml");
+    assert_eq!(args.remote[0].context.as_deref(), Some("global"));
+}
+
+fn assert_second_remote_cluster_target(args: &ClusterArgs) {
+    assert_eq!(args.remote[1].name, "kuma-2");
+    assert_eq!(args.remote[1].kubeconfig, "/tmp/zone.yaml");
+    assert!(args.remote[1].context.is_none());
+}
 
 #[test]
 fn all_expected_subcommands_registered() {
@@ -256,24 +299,66 @@ fn parse_cluster_with_extra_names() {
         "zone2",
     ])
     .unwrap();
+    let args = expect_cluster_args(cli.command);
+    assert_eq!(args.mode, "global-zone-up");
+    assert_eq!(args.cluster_name, "global");
+    assert_eq!(args.extra_cluster_names, vec!["zone1", "zone2"]);
+}
+
+#[test]
+fn parse_remote_cluster_provider_with_targets() {
+    let cli = Cli::try_parse_from([
+        "harness",
+        "setup",
+        "kuma",
+        "cluster",
+        "--provider",
+        "remote",
+        "--remote",
+        "name=kuma-1,kubeconfig=/tmp/global.yaml,context=global",
+        "--remote",
+        "name=kuma-2,kubeconfig=/tmp/zone.yaml",
+        "--push-prefix",
+        "ghcr.io/acme/kuma",
+        "--push-tag",
+        "pr-123",
+        "global-zone-up",
+        "kuma-1",
+        "kuma-2",
+        "zone-1",
+    ])
+    .unwrap();
+    let args = expect_cluster_args(cli.command);
+    assert_remote_cluster_args(&args);
+}
+
+#[test]
+fn parse_setup_gateway_uninstall() {
+    let cli = Cli::try_parse_from([
+        "harness",
+        "setup",
+        "gateway",
+        "--kubeconfig",
+        "/tmp/kubeconfig.yaml",
+        "--uninstall",
+    ])
+    .unwrap();
     match cli.command {
         Command::Setup {
             command:
-                SetupCommand::Kuma(KumaSetupArgs {
-                    command:
-                        KumaSetupCommand::Cluster(ClusterArgs {
-                            mode,
-                            cluster_name,
-                            extra_cluster_names,
-                            ..
-                        }),
+                SetupCommand::Gateway(GatewayArgs {
+                    kubeconfig,
+                    repo_root,
+                    check_only,
+                    uninstall,
                 }),
         } => {
-            assert_eq!(mode, "global-zone-up");
-            assert_eq!(cluster_name, "global");
-            assert_eq!(extra_cluster_names, vec!["zone1", "zone2"]);
+            assert_eq!(kubeconfig.as_deref(), Some("/tmp/kubeconfig.yaml"));
+            assert!(repo_root.is_none());
+            assert!(!check_only);
+            assert!(uninstall);
         }
-        _ => panic!("expected Cluster command"),
+        _ => panic!("expected Gateway command"),
     }
 }
 

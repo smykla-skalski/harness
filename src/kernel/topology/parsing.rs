@@ -5,7 +5,7 @@ use serde_json::Value;
 
 use crate::workspace::HARNESS_PREFIX;
 
-use super::{ClusterMember, ClusterMode, ClusterSpec, HelmSetting, Platform};
+use super::{ClusterMember, ClusterMode, ClusterProvider, ClusterSpec, HelmSetting, Platform};
 
 impl ClusterMember {
     pub(super) fn from_value(value: &Value) -> Result<Self, String> {
@@ -61,6 +61,11 @@ impl ClusterSpec {
             .unwrap_or("kubernetes")
             .parse()
             .unwrap_or_default();
+        let provider = obj
+            .get("provider")
+            .and_then(Value::as_str)
+            .and_then(|value| value.parse::<ClusterProvider>().ok())
+            .unwrap_or_else(|| ClusterProvider::default_for_platform(platform));
         let mode_args = parse_string_vec(obj.get("mode_args"));
         let members = obj
             .get("members")
@@ -81,6 +86,7 @@ impl ClusterSpec {
         Ok(Self {
             mode,
             platform,
+            provider,
             members,
             mode_args,
             helm_settings,
@@ -135,6 +141,28 @@ impl ClusterSpec {
         restart_namespaces: Vec<String>,
         platform: Platform,
     ) -> Result<Self, String> {
+        Self::from_mode_with_platform_and_provider(
+            mode,
+            mode_args,
+            repo_root,
+            helm_settings,
+            restart_namespaces,
+            platform,
+            ClusterProvider::default_for_platform(platform),
+        )
+    }
+
+    /// # Errors
+    /// Returns an error if the mode or arguments are invalid.
+    pub fn from_mode_with_platform_and_provider(
+        mode: &str,
+        mode_args: &[String],
+        repo_root: &str,
+        helm_settings: Vec<HelmSetting>,
+        restart_namespaces: Vec<String>,
+        platform: Platform,
+        provider: ClusterProvider,
+    ) -> Result<Self, String> {
         let mode: ClusterMode = mode.parse()?;
         let members = match platform {
             Platform::Kubernetes => members_for_mode(mode, mode_args)?,
@@ -151,6 +179,7 @@ impl ClusterSpec {
         Ok(Self {
             mode,
             platform,
+            provider,
             members,
             mode_args: mode_args.to_vec(),
             helm_settings,

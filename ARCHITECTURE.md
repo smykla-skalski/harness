@@ -65,10 +65,10 @@ flowchart LR
 | Path             | Owns                                                                               |
 | ---------------- | ---------------------------------------------------------------------------------- |
 | `src/app/`       | Clap CLI, top-level command grouping, transport mapping, domain wiring             |
-| `src/run/`       | tracked runs, run workflow, prepared artifacts, reporting, run diagnostics, repair |
+| `src/run/`       | tracked runs, run workflow, prepared artifacts, reporting, run diagnostics, repair, provider-aware run checks |
 | `src/create/`    | `suite:create` workflow, approval state, create validation, create session state   |
 | `src/observe/`   | log/session scanning, doctor diagnostics, classifiers, dump/scan flows, output     |
-| `src/setup/`     | environment bootstrap, capabilities/readiness evaluation, wrapper/session lifecycle, cluster setup entrypoints |
+| `src/setup/`     | environment bootstrap, capabilities/readiness evaluation, wrapper/session lifecycle, provider-aware cluster setup entrypoints, remote kubeconfig materialization, setup install-state tracking |
 | `src/hooks/`     | hook payload handling, guard policy, protocol normalization, hook effects          |
 | `src/kernel/`    | pure shared concepts such as command intent, topology, skill ids, gates            |
 | `src/workspace/` | XDG paths, current session pointers, compact handoff, ambient harness files        |

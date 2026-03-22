@@ -35,7 +35,7 @@ pub(super) static ISSUE_CODE_METAS: &[IssueCodeMeta] = &[
         default_severity: IssueSeverity::Critical,
         default_confidence: Confidence::High,
         default_fix_safety: FixSafety::AutoFixSafe,
-        description: "Corporate or remote cluster context detected instead of local k3d",
+        description: "Unexpected external cluster context detected outside harness-managed kubeconfig",
         owner: IssueOwner::Skill,
     },
     IssueCodeMeta {

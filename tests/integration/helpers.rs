@@ -89,9 +89,9 @@ pub fn closeout_cmd(args: CloseoutArgs) -> Command {
 }
 
 pub fn cluster_cmd(args: ClusterArgs) -> Command {
-    setup_cmd(SetupCommand::Kuma(KumaSetupArgs {
+    setup_cmd(SetupCommand::Kuma(Box::new(KumaSetupArgs {
         command: KumaSetupCommand::Cluster(args),
-    }))
+    })))
 }
 
 pub fn envoy_cmd(args: EnvoyArgs) -> Command {

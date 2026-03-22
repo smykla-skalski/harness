@@ -1,10 +1,11 @@
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 use serde::Serialize;
 
 use crate::errors::{CliError, CliErrorKind};
 use crate::infra::io::read_json_typed;
-use crate::kernel::topology::ClusterSpec;
+use crate::kernel::topology::{ClusterProvider, ClusterSpec};
 use crate::run::args::RunDirArgs;
 use crate::run::audit::write_run_status_with_audit;
 use crate::run::context::{CurrentRunPointer, RunLayout, RunMetadata, RunRepository};
@@ -13,6 +14,10 @@ use crate::run::workflow::{
     runner_state_path, write_runner_state,
 };
 use crate::run::{RunCounts, RunStatus};
+use crate::workspace::{
+    RemoteKubernetesInstallState, load_remote_install_state_for_spec,
+    remote_install_state_path_for_spec,
+};
 use crate::workspace::{current_run_context_path, utc_now};
 
 #[derive(Debug, Clone, Serialize)]
@@ -57,6 +62,13 @@ struct ResolvedRunTarget {
     requested_run_dir: Option<PathBuf>,
     pointer_path: PathBuf,
     pointer_state: PointerState,
+}
+
+struct LoadedRunArtifacts {
+    metadata: Option<RunMetadata>,
+    status: Option<RunStatus>,
+    workflow: Option<RunnerWorkflowState>,
+    cluster: Option<ClusterSpec>,
 }
 
 impl ResolvedRunTarget {
@@ -395,7 +407,41 @@ fn append_run_checks(
     ));
 
     let layout = RunLayout::from_run_dir(run_dir);
-    let metadata = match load_required_metadata(&layout) {
+    let loaded = load_run_artifacts(&layout, checks);
+
+    if let (Some(metadata), Some(status)) = (loaded.metadata.as_ref(), loaded.status.as_ref()) {
+        append_status_identity_checks(metadata, status, &layout, checks);
+        append_status_derivation_checks(status, &layout, checks);
+        append_capture_reference_checks(status, run_dir, checks);
+    }
+
+    if let (Some(status), Some(workflow)) = (loaded.status.as_ref(), loaded.workflow.as_ref()) {
+        append_phase_artifact_checks(status, workflow, &layout, checks);
+        append_completion_checks(status, workflow, &layout, checks);
+    }
+
+    if let Some(cluster) = loaded.cluster.as_ref() {
+        append_provider_checks(cluster, checks);
+    }
+}
+
+fn load_run_artifacts(
+    layout: &RunLayout,
+    checks: &mut Vec<RunDiagnosticCheck>,
+) -> LoadedRunArtifacts {
+    LoadedRunArtifacts {
+        metadata: load_metadata_with_check(layout, checks),
+        status: load_status_with_check(layout, checks),
+        workflow: load_workflow_with_check(layout, checks),
+        cluster: load_cluster_with_check(layout, checks),
+    }
+}
+
+fn load_metadata_with_check(
+    layout: &RunLayout,
+    checks: &mut Vec<RunDiagnosticCheck>,
+) -> Option<RunMetadata> {
+    match load_required_metadata(layout) {
         Ok(metadata) => {
             checks.push(ok_check(
                 "run_metadata_present",
@@ -409,9 +455,14 @@ fn append_run_checks(
             checks.push(*check);
             None
         }
-    };
+    }
+}
 
-    let status = match load_required_status(&layout) {
+fn load_status_with_check(
+    layout: &RunLayout,
+    checks: &mut Vec<RunDiagnosticCheck>,
+) -> Option<RunStatus> {
+    match load_required_status(layout) {
         Ok(status) => {
             checks.push(ok_check(
                 "run_status_present",
@@ -425,15 +476,20 @@ fn append_run_checks(
             checks.push(*check);
             None
         }
-    };
+    }
+}
 
-    let workflow = match load_workflow(&layout) {
+fn load_workflow_with_check(
+    layout: &RunLayout,
+    checks: &mut Vec<RunDiagnosticCheck>,
+) -> Option<RunnerWorkflowState> {
+    match load_workflow(layout) {
         Ok(workflow) => {
             checks.push(ok_check(
                 "run_workflow_present",
                 "workflow",
                 "Runner workflow state is readable.",
-                Some(&runner_state_path(run_dir)),
+                Some(&runner_state_path(&layout.run_dir())),
             ));
             Some(workflow)
         }
@@ -441,17 +497,27 @@ fn append_run_checks(
             checks.push(*check);
             None
         }
-    };
-
-    if let (Some(metadata), Some(status)) = (metadata.as_ref(), status.as_ref()) {
-        append_status_identity_checks(metadata, status, &layout, checks);
-        append_status_derivation_checks(status, &layout, checks);
-        append_capture_reference_checks(status, run_dir, checks);
     }
+}
 
-    if let (Some(status), Some(workflow)) = (status.as_ref(), workflow.as_ref()) {
-        append_phase_artifact_checks(status, workflow, &layout, checks);
-        append_completion_checks(status, workflow, &layout, checks);
+fn load_cluster_with_check(
+    layout: &RunLayout,
+    checks: &mut Vec<RunDiagnosticCheck>,
+) -> Option<ClusterSpec> {
+    match load_cluster_spec(layout) {
+        Ok(Some(cluster)) => Some(cluster),
+        Ok(None) => None,
+        Err(error) => {
+            checks.push(error_check(
+                "run_cluster_spec_invalid",
+                "cluster",
+                format!("Cluster spec could not be read: {error}"),
+                Some(&layout.state_dir().join("cluster.json")),
+                false,
+                None,
+            ));
+            None
+        }
     }
 }
 
@@ -690,6 +756,108 @@ fn append_completion_checks(
             false,
             None,
         ));
+    }
+}
+
+fn append_provider_checks(cluster: &ClusterSpec, checks: &mut Vec<RunDiagnosticCheck>) {
+    if cluster.provider != ClusterProvider::Remote {
+        return;
+    }
+
+    for member in &cluster.members {
+        let kubeconfig = Path::new(&member.kubeconfig);
+        if kubeconfig.exists() {
+            checks.push(ok_check(
+                "run_remote_kubeconfig_present",
+                "cluster",
+                format!("Remote kubeconfig for `{}` is present.", member.name),
+                Some(kubeconfig),
+            ));
+        } else {
+            checks.push(error_check(
+                "run_remote_kubeconfig_missing",
+                "cluster",
+                format!(
+                    "Tracked remote kubeconfig for `{}` is missing.",
+                    member.name
+                ),
+                Some(kubeconfig),
+                false,
+                Some("Re-run `harness setup kuma cluster ... --provider remote` to regenerate the tracked kubeconfig."),
+            ));
+        }
+    }
+
+    let state_path = remote_install_state_path_for_spec(cluster);
+    match load_remote_install_state_for_spec(cluster) {
+        Ok(Some(state)) => {
+            checks.push(ok_check(
+                "run_remote_install_state_present",
+                "cluster",
+                "Remote install state is present.",
+                Some(&state_path),
+            ));
+            append_remote_install_state_consistency(cluster, &state, &state_path, checks);
+        }
+        Ok(None) => checks.push(error_check(
+            "run_remote_install_state_missing",
+            "cluster",
+            "Remote install state is missing for a remote provider cluster.",
+            Some(&state_path),
+            false,
+            Some("Re-run remote cluster setup so harness can rebuild its tracked remote install state."),
+        )),
+        Err(error) => checks.push(error_check(
+            "run_remote_install_state_invalid",
+            "cluster",
+            format!("Remote install state could not be read: {error}"),
+            Some(&state_path),
+            false,
+            None,
+        )),
+    }
+}
+
+fn append_remote_install_state_consistency(
+    cluster: &ClusterSpec,
+    state: &RemoteKubernetesInstallState,
+    state_path: &Path,
+    checks: &mut Vec<RunDiagnosticCheck>,
+) {
+    let state_by_name = state
+        .members
+        .iter()
+        .map(|member| (member.name.as_str(), member))
+        .collect::<BTreeMap<_, _>>();
+
+    for member in &cluster.members {
+        let Some(saved) = state_by_name.get(member.name.as_str()) else {
+            checks.push(error_check(
+                "run_remote_install_state_member_missing",
+                "cluster",
+                format!(
+                    "Remote install state does not include tracked member `{}`.",
+                    member.name
+                ),
+                Some(state_path),
+                false,
+                None,
+            ));
+            continue;
+        };
+        if saved.generated_kubeconfig != member.kubeconfig {
+            checks.push(error_check(
+                "run_remote_install_state_kubeconfig_mismatch",
+                "cluster",
+                format!(
+                    "Remote install state kubeconfig for `{}` is `{}`, expected `{}`.",
+                    member.name, saved.generated_kubeconfig, member.kubeconfig
+                ),
+                Some(state_path),
+                false,
+                None,
+            ));
+        }
     }
 }
 
