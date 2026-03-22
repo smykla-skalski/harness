@@ -891,26 +891,17 @@ fn platform_runtime_root_stays_prod_only() {
 }
 
 #[test]
-fn platform_ephemeral_metallb_root_stays_prod_only() {
+fn platform_ephemeral_metallb_module_is_gone() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let metallb = fs::read_to_string(root.join("src/platform/ephemeral_metallb.rs")).unwrap();
-
-    for needle in [
-        "fn state_path_includes_state_dir(",
-        "fn ensure_templates_fails_when_no_source(",
-        "mod tests {",
+    for path in [
+        "src/platform/ephemeral_metallb.rs",
+        "src/platform/ephemeral_metallb/tests.rs",
     ] {
         assert!(
-            !metallb.contains(needle),
-            "src/platform/ephemeral_metallb.rs should stay focused on production template state handling instead of owning `{needle}`"
+            !root.join(path).exists(),
+            "retired MetalLB template bookkeeping should be gone: {path}"
         );
     }
-
-    assert!(
-        root.join("src/platform/ephemeral_metallb/tests.rs")
-            .exists(),
-        "platform ephemeral_metallb split test module should exist"
-    );
 }
 
 #[test]
