@@ -17,6 +17,7 @@ const UNIVERSAL_SUBNET: &str = "172.57.0.0/16";
 /// Result from a universal cluster up operation.
 pub(super) struct UniversalUpResult {
     admin_token: String,
+    docker_network: String,
     members: Vec<UniversalMemberRuntime>,
 }
 
@@ -183,6 +184,7 @@ fn apply_universal_up_result(
     spec.cp_image = Some(cp_image.to_string());
     spec.store_type = Some(effective_store.to_string());
     spec.admin_token = Some(result.admin_token);
+    spec.docker_network = Some(result.docker_network);
     for runtime in result.members {
         if let Some(member) = spec
             .members
@@ -275,6 +277,7 @@ fn build_universal_up_result(
     let admin_token = token::extract_admin_token(docker, cp_name)?;
     Ok(UniversalUpResult {
         admin_token,
+        docker_network: network.to_string(),
         members: vec![UniversalMemberRuntime {
             name: cp_name.to_string(),
             container_ip: ip,
@@ -283,3 +286,7 @@ fn build_universal_up_result(
         }],
     })
 }
+
+#[cfg(test)]
+#[path = "runtime/tests.rs"]
+mod tests;
