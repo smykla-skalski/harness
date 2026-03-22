@@ -113,15 +113,16 @@ impl RunApplication {
     }
 
     fn capture_universal_dataplanes(&self) -> (UniversalDataplaneCollection, Option<String>) {
-        match self.query_dataplanes("default") {
-            Ok(dataplanes) => (dataplanes, None),
-            Err(error) => {
-                warn!(%error, "CP API dataplanes query failed");
-                (
-                    UniversalDataplaneCollection::default(),
-                    Some(error.to_string()),
-                )
-            }
-        }
+        self.query_dataplanes("default")
+            .inspect_err(|error| warn!(%error, "CP API dataplanes query failed"))
+            .map_or_else(
+                |error| {
+                    (
+                        UniversalDataplaneCollection::default(),
+                        Some(error.to_string()),
+                    )
+                },
+                |dataplanes| (dataplanes, None),
+            )
     }
 }
