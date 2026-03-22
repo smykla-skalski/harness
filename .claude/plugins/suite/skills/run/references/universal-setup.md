@@ -18,6 +18,8 @@
 Universal mode runs Kuma components as Docker containers instead of Kubernetes pods.
 Policies use REST API format (type/name/mesh) instead of K8s resources (apiVersion/kind/metadata).
 
+Harness routes universal container work through `ContainerRuntime`. The default backend is Bollard (`HARNESS_CONTAINER_RUNTIME=bollard` or unset). `HARNESS_CONTAINER_RUNTIME=docker-cli` keeps the CLI-backed fallback for debugging or rollout safety.
+
 ## Topologies
 
 All topologies supported on K8s are also available on universal:
@@ -64,6 +66,8 @@ By default, harness looks for a locally-built `kuma-cp` Docker image. To overrid
 ```
 harness setup kuma cluster --platform universal --image kumahq/kuma-cp:2.9.0 single-up <cp-name>
 ```
+
+If the selected image is missing locally, harness auto-pulls it through the active container runtime backend before starting the container.
 
 ## Token generation
 
@@ -129,7 +133,11 @@ Both are combined into a single JSON capture file.
 
 ## Docker network
 
-Harness creates a bridge network named `harness-<cp-name>` with subnet 172.57.0.0/16. All CP and service containers are attached to this network for direct IP connectivity.
+Single-container universal runs create a bridge network named `harness-<cp-name>` with subnet `172.57.0.0/16`.
+
+Compose-backed universal runs keep the logical harness network name in the compose spec, but the actual Engine network name follows Docker Compose naming: `<project>_<network>`, for example `harness-global-cp_harness-global-cp`.
+
+Harness now persists that real runtime network name in run state. Use `harness run status` or `harness run cluster-check` instead of guessing the Engine network name from the cluster name.
 
 ## Templates
 

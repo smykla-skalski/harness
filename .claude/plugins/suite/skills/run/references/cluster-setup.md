@@ -15,11 +15,14 @@ Cluster lifecycle commands for harness-managed Kubernetes and universal test env
 
 ## Prerequisites
 
-- Docker daemon running
+- `harness setup capabilities` reports the requested profile as ready
+- Docker Engine reachable for universal profiles and Docker-backed local workflows
 - `kubectl`, `helm`, `make` installed
 - `k3d` installed for local Kubernetes provider runs
 - `REPO_ROOT` resolved (via `--repo` flag or auto-detected from cwd)
 - Remote Kubernetes provider runs also need explicit `--remote` mappings plus `--push-prefix` and `--push-tag`
+
+`HARNESS_CONTAINER_RUNTIME` defaults to `bollard`. Leave it unset for the normal Engine API backend. Set `HARNESS_CONTAINER_RUNTIME=docker-cli` only to force the CLI-backed fallback. When using the default backend, missing `docker` on `PATH` does not block universal readiness by itself.
 
 ## Kubeconfig mapping
 

@@ -67,6 +67,8 @@ Important difference:
 - `providers` tells you which cluster backends exist (`k3d`, `remote`, `compose`)
 - `readiness.providers` tells you which of those backends are usable right now
 
+For Docker-backed work, `harness setup capabilities` is the source of truth. Harness defaults to the Bollard-backed container runtime when `HARNESS_CONTAINER_RUNTIME` is unset. Set `HARNESS_CONTAINER_RUNTIME=docker-cli` only if you explicitly want the CLI-backed fallback. With the default backend, Docker Engine reachability matters; the Docker CLI itself does not.
+
 Use `--project-dir` or `--repo-root` only when you are debugging broken cwd or project state. Normal usage should stay zero-arg.
 
 ## A normal run
