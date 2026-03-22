@@ -4,7 +4,7 @@ description: >-
   Session observer for harness and skill testing. Use it to scan, watch, or dump
   another Claude Code session with the current `harness observe` contract.
 argument-hint: "<session-id> [--from-line N] [--from <line|timestamp|prose>] [--focus harness|skills|all]"
-allowed-tools: AskUserQuestion, Bash, Edit, Read
+allowed-tools: AskUserQuestion, Bash, Edit, Glob, Grep, Read
 disable-model-invocation: true
 user-invocable: true
 ---
@@ -112,7 +112,7 @@ Read [references/issue-taxonomy.md](references/issue-taxonomy.md) for category o
 
 Read [references/overrides.md](references/overrides.md) for mutes, focus presets, and overrides-file behavior.
 
-When a fix is approved, use Edit to apply the change to the identified fix target. For Rust changes in this repo, validate with:
+When a fix is approved, use Grep and Glob to locate the fix target in the codebase, then use Edit to apply the change. For Rust changes in this repo, validate with:
 
 ```bash
 mise run check
@@ -137,6 +137,16 @@ For watch mode:
 
 For dump mode:
 - use it to inspect raw context before deciding whether a classifier finding is real
+
+## Scope
+
+This skill is for observing and triaging Claude Code session recordings through the `harness observe` pipeline. It is not a general-purpose log viewer, live debugger, or log aggregation tool.
+
+## Common failures
+
+- **Missing session**: the session ID does not match any JSONL file. Verify the ID with `ls $XDG_DATA_HOME/harness/sessions/`.
+- **Empty scan**: scan returns zero issues. Check whether `--focus` or `--severity` filters are too narrow, or the session has no tool-use events yet.
+- **Stale observer state**: `scan --action status` shows a cursor far behind the session length. Run `scan --action cycle` to advance the cursor.
 
 ## Example invocations
 
