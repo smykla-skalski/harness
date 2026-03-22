@@ -1,8 +1,6 @@
 use std::collections::HashMap;
 use std::path::Path;
 
-use tracing::{debug, info};
-
 use crate::errors::{CliError, CliErrorKind};
 use crate::infra::exec::{run_command, run_command_streaming};
 use crate::kernel::topology::{ClusterSpec, Platform};
@@ -53,14 +51,14 @@ pub(crate) fn execute_cluster(args: &ClusterArgs) -> Result<i32, CliError> {
 
 /// Persist cluster spec to the session context and run directory if available.
 pub(crate) fn persist_cluster_spec(spec: &ClusterSpec) -> Result<(), CliError> {
-    if RunApplication::current_run_dir()?.is_some() {
-        RunApplication::persist_current_cluster_spec(spec)?;
-        info!("spec saved to state/cluster.json");
+    persist_cluster_spec_to_run(spec)?;
+    Ok(())
+}
+
+fn persist_cluster_spec_to_run(spec: &ClusterSpec) -> Result<(), CliError> {
+    if RunApplication::current_run_dir()?.is_none() {
+        return Ok(());
     }
-
-    let spec_json = serde_json::to_string_pretty(&spec.to_json_dict())
-        .map_err(|error| CliErrorKind::serialize(format!("cluster spec json: {error}")))?;
-    debug!("{spec_json}");
-
+    RunApplication::persist_current_cluster_spec(spec)?;
     Ok(())
 }

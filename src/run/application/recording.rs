@@ -3,9 +3,6 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::LazyLock;
 
-use regex::Regex;
-use tracing::warn;
-
 use crate::errors::{CliError, CliErrorKind};
 use crate::infra::blocks::kuma::cli::primary_kumactl_dir;
 use crate::infra::io::{ensure_dir, write_text};
@@ -14,6 +11,7 @@ use crate::run::context::RunLayout;
 use crate::run::services::RecordCommandRequest;
 use crate::run::workflow::{RunnerPhase, read_runner_state};
 use crate::workspace::{shorten_path, utc_now};
+use regex::Regex;
 
 use super::RunApplication;
 
@@ -105,19 +103,10 @@ fn execute_command(
 }
 
 fn inject_run_env(cmd: &mut Command, run_dir: &Path, cluster: Option<&str>) {
-    let run = match RunApplication::from_run_dir(run_dir) {
-        Ok(run) => run,
-        Err(error) => {
-            warn!(%error, "failed to load run application");
-            return;
-        }
+    let Ok(run) = RunApplication::from_run_dir(run_dir) else {
+        return;
     };
-    let is_universal = run
-        .context()
-        .cluster
-        .as_ref()
-        .map(|spec| spec.platform)
-        .is_some_and(|platform| platform == Platform::Universal);
+    let is_universal = run_platform(&run) == Some(Platform::Universal);
     inject_kubeconfig_env(cmd, &run, is_universal, cluster);
     inject_repo_env(cmd, &run.context().metadata.repo_root);
 }
@@ -131,12 +120,13 @@ fn inject_kubeconfig_env(
     if is_universal {
         return;
     }
-    match run.resolve_kubeconfig(None, cluster) {
-        Ok(kubeconfig) => {
-            cmd.env("KUBECONFIG", kubeconfig.as_ref());
-        }
-        Err(error) => warn!(%error, "failed to resolve kubeconfig"),
+    if let Ok(kubeconfig) = run.resolve_kubeconfig(None, cluster) {
+        cmd.env("KUBECONFIG", kubeconfig.as_ref());
     }
+}
+
+fn run_platform(run: &RunApplication) -> Option<Platform> {
+    run.context().cluster.as_ref().map(|spec| spec.platform)
 }
 
 fn inject_repo_env(cmd: &mut Command, repo_root: &str) {

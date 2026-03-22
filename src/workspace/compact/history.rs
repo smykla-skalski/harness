@@ -1,8 +1,8 @@
 use std::path::Path;
+use std::path::PathBuf;
 use std::result;
 
 use fs_err as fs;
-use tracing::warn;
 
 use super::HISTORY_LIMIT;
 
@@ -14,17 +14,22 @@ pub(super) fn trim_history(history_dir: &Path) {
     let Ok(entries) = fs::read_dir(history_dir) else {
         return;
     };
-    let mut files: Vec<_> = entries
+    let mut files = history_files(entries);
+    files.sort();
+    remove_excess_history_files(files);
+}
+
+fn history_files(entries: fs::ReadDir) -> Vec<PathBuf> {
+    entries
         .filter_map(result::Result::ok)
         .map(|entry| entry.path())
         .filter(|path| path.is_file())
-        .collect();
-    files.sort();
+        .collect()
+}
 
+fn remove_excess_history_files(files: Vec<PathBuf>) {
     let excess = files.len().saturating_sub(HISTORY_LIMIT);
     for path in files.into_iter().take(excess) {
-        if let Err(error) = fs::remove_file(&path) {
-            warn!(path = %path.display(), %error, "failed to remove history file");
-        }
+        let _ = fs::remove_file(&path);
     }
 }

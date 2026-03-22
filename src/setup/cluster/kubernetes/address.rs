@@ -2,13 +2,13 @@ use std::env;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use tracing::info;
-
 use crate::errors::{CliError, CliErrorKind};
 use crate::infra::blocks::{
     ContainerRuntime, KubernetesRuntime, StdProcessExecutor, container_runtime_from_env,
     kubernetes_runtime_from_env,
 };
+
+type ClusterRuntimes = (Arc<dyn ContainerRuntime>, Arc<dyn KubernetesRuntime>);
 
 /// Resolve the KDS address for a global CP running in a k3d cluster.
 ///
@@ -17,17 +17,12 @@ use crate::infra::blocks::{
 /// returns `grpcs://<node-ip>:<node-port>`.
 pub(super) fn resolve_kds_address(global_cluster: &str) -> Result<String, CliError> {
     let (docker, kubernetes) = resolve_cluster_runtimes()?;
-    let node_container = k3d_server_node(global_cluster);
-    let node_ip = resolve_node_ip(docker.inspect_primary_ip(&node_container)?, &node_container)?;
-    let kubeconfig = tracked_k3d_kubeconfig(global_cluster);
-    let node_port = resolve_kds_node_port(kubernetes.as_ref(), &kubeconfig, global_cluster)?;
-    let address = format!("grpcs://{node_ip}:{node_port}");
-    info!(%address, "resolved global KDS address");
-    Ok(address)
+    let node_ip = resolve_cluster_node_ip(docker.as_ref(), global_cluster)?;
+    let node_port = resolve_cluster_node_port(kubernetes.as_ref(), global_cluster)?;
+    Ok(format_kds_address(&node_ip, &node_port))
 }
 
-fn resolve_cluster_runtimes()
--> Result<(Arc<dyn ContainerRuntime>, Arc<dyn KubernetesRuntime>), CliError> {
+fn resolve_cluster_runtimes() -> Result<ClusterRuntimes, CliError> {
     let process = Arc::new(StdProcessExecutor);
     let docker = container_runtime_from_env(process.clone())?;
     let kubernetes = kubernetes_runtime_from_env(process)?;
@@ -45,6 +40,14 @@ fn tracked_k3d_kubeconfig(global_cluster: &str) -> PathBuf {
         .join(format!("k3d-{global_cluster}.yaml"))
 }
 
+fn resolve_cluster_node_ip(
+    docker: &dyn ContainerRuntime,
+    global_cluster: &str,
+) -> Result<String, CliError> {
+    let node_container = k3d_server_node(global_cluster);
+    resolve_node_ip(docker.inspect_primary_ip(&node_container)?, &node_container)
+}
+
 fn resolve_node_ip(node_ip: String, node_container: &str) -> Result<String, CliError> {
     if node_ip.is_empty() {
         return Err(CliErrorKind::cluster_error(format!(
@@ -53,6 +56,14 @@ fn resolve_node_ip(node_ip: String, node_container: &str) -> Result<String, CliE
         .into());
     }
     Ok(node_ip)
+}
+
+fn resolve_cluster_node_port(
+    kubernetes: &dyn KubernetesRuntime,
+    global_cluster: &str,
+) -> Result<String, CliError> {
+    let kubeconfig = tracked_k3d_kubeconfig(global_cluster);
+    resolve_kds_node_port(kubernetes, &kubeconfig, global_cluster)
 }
 
 fn resolve_kds_node_port(
@@ -75,4 +86,8 @@ fn resolve_kds_node_port(
             ))
             .into()
         })
+}
+
+fn format_kds_address(node_ip: &str, node_port: &str) -> String {
+    format!("grpcs://{node_ip}:{node_port}")
 }
