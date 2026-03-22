@@ -15,6 +15,9 @@ pub struct DockerContainerRuntime {
 }
 
 impl DockerContainerRuntime {
+    const REMOVE_TIMEOUT: Duration = Duration::from_secs(5);
+    const REMOVE_POLL_INTERVAL: Duration = Duration::from_millis(100);
+
     #[must_use]
     pub fn new(process: Arc<dyn ProcessExecutor>) -> Self {
         Self { process }
@@ -24,6 +27,56 @@ impl DockerContainerRuntime {
         let mut command: Vec<&str> = vec!["docker"];
         command.extend_from_slice(args);
         self.process.run(&command, None, None, ok_exit_codes)
+    }
+
+    fn inspect_exists(&self, name: &str) -> Result<bool, BlockError> {
+        let result = self.docker(&["inspect", "-f", "{{.Id}}", name], &[0, 1])?;
+        Ok(result.returncode == 0)
+    }
+
+    fn wait_removed(&self, name: &str) -> Result<(), BlockError> {
+        let deadline = Instant::now() + Self::REMOVE_TIMEOUT;
+        loop {
+            if !self.inspect_exists(name)? {
+                return Ok(());
+            }
+            if Instant::now() >= deadline {
+                return Err(BlockError::message(
+                    "docker",
+                    &format!("remove {name}"),
+                    format!(
+                        "timed out waiting for container `{name}` to be removed after {}s",
+                        Self::REMOVE_TIMEOUT.as_secs()
+                    ),
+                ));
+            }
+            thread::sleep(Self::REMOVE_POLL_INTERVAL);
+        }
+    }
+
+    fn output_contains(result: &CommandResult, needle: &str) -> bool {
+        result.stdout.to_ascii_lowercase().contains(needle)
+            || result.stderr.to_ascii_lowercase().contains(needle)
+    }
+
+    fn is_not_found_result(result: &CommandResult) -> bool {
+        result.returncode != 0 && Self::output_contains(result, "no such container")
+    }
+
+    fn is_removal_in_progress_result(result: &CommandResult) -> bool {
+        result.returncode != 0 && Self::output_contains(result, "already in progress")
+    }
+
+    fn command_failure_details(result: &CommandResult) -> String {
+        let stderr = result.stderr.trim();
+        if !stderr.is_empty() {
+            return stderr.to_string();
+        }
+        let stdout = result.stdout.trim();
+        if !stdout.is_empty() {
+            return stdout.to_string();
+        }
+        format!("exit code {}", result.returncode)
     }
 }
 
@@ -68,7 +121,21 @@ impl ContainerRuntime for DockerContainerRuntime {
     }
 
     fn remove(&self, name: &str) -> Result<CommandResult, BlockError> {
-        self.docker(&["rm", "-f", name], &[0, 1])
+        let result = self.docker(&["rm", "-f", name], &[0, 1])?;
+        if result.returncode != 0
+            && !Self::is_not_found_result(&result)
+            && !Self::is_removal_in_progress_result(&result)
+        {
+            return Err(BlockError::message(
+                "docker",
+                &format!("remove {name}"),
+                Self::command_failure_details(&result),
+            ));
+        }
+        if !Self::is_not_found_result(&result) {
+            self.wait_removed(name)?;
+        }
+        Ok(result)
     }
 
     fn remove_by_label(&self, label: &str) -> Result<Vec<String>, BlockError> {
