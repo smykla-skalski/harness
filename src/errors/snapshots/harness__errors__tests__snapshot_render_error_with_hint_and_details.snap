@@ -3,6 +3,6 @@ source: src/errors/mod.rs
 expression: rendered
 ---
 ERROR [KSRCLI005] missing current run pointer
-Hint: Run init first.
+Hint: Run `harness run start` first.
 Details:
 checked /tmp/ctx/current-run.json

@@ -55,7 +55,7 @@ Worked suite example showing the structure expected by `suite:run`. Group files 
 
 - `harness run preflight` materializes baseline manifests and group `## Configure` YAML once, validates them, applies baselines once, and writes the prepared-suite artifact for the active run.
 - All manifests are applied through `harness run apply`.
-- After `harness run init`, use context-driven commands only. Prepared manifests are referenced as `harness run apply --manifest "<group-id>/<file>"`.
+- After `harness run start`, use context-driven commands only. Prepared manifests are referenced as `harness run apply --manifest "<group-id>/<file>"`.
 - All cluster-interacting verification and cleanup commands are executed through `harness run record`.
 - Group files stay authoritative for `## Consume`, `## Debug`, and expected outcomes.
 - State is captured after each completed group with `harness run capture`.

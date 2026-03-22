@@ -102,11 +102,11 @@ Repo-local skill package. Hooks run through `harness hook --skill suite:run <hoo
 
 ## Compact recovery
 
-After compaction, trust the `SessionStart(compact)` handoff as authoritative. Continue from the saved run directory and next-action guidance. Do not rerun `harness run init` or `harness run preflight` unless the handoff says to.
+After compaction, trust the `SessionStart(compact)` handoff as authoritative. Continue from the saved run directory and next-action guidance. Do not rerun `harness run start` or `harness run preflight` unless the handoff says to.
 
 After resume, keep using tracked wrappers such as `harness run apply`, `harness run record`, `harness run report`, and `harness run envoy`. Never switch to raw `kubectl --kubeconfig ...`.
 
-If a Stop hook summary appears with `preventedContinuation: false`, treat it as advisory. If a run was accidentally `aborted` while `next_planned_group` exists, use `harness run runner-state --event resume-run --message "Recovered from unexpected stop"` and continue.
+If a Stop hook summary appears with `preventedContinuation: false`, treat it as advisory. If a run was accidentally `aborted` while `next_planned_group` exists, use `harness run resume --message "Recovered from unexpected stop"` and continue.
 
 ## Arguments
 
@@ -143,7 +143,7 @@ Parse from `$ARGUMENTS`:
 
 Read [references/agent-contract.md](references/agent-contract.md) in full before starting any run. Top-level summary:
 
-- **No shell variables.** `harness run apply --manifest g02/04.yaml`, not `SD=...`. Exception: Phase 0/1 init.
+- **No shell variables.** `harness run apply --manifest g02/04.yaml`, not `SD=...`. Exception: the Phase 0/1 `harness run start` setup block.
 - **Harness wrappers only.** Use `harness run record` for kubectl, kumactl, curl, and other cluster-touching shell commands; use the dedicated `harness run apply`, `harness run report`, and `harness run envoy` subcommands where they fit. No raw binaries, no `python3 -c`.
 - **`--delay` not `sleep`.** `harness run apply --delay 8 --manifest ...` not `sleep 8 && harness run apply`.
 - **Relative paths only.** `g13/01.yaml` not `/full/path/...`. No `/tmp`, no `--validate=false`.
@@ -174,24 +174,24 @@ Read [references/workflow.md](references/workflow.md) for the full procedure. Th
 3. If Docker is "not running" or any tool is "MISSING" per Preprocessed context, stop and report.
 4. All cluster commands go through tracked wrappers, never raw `kubectl` or `kumactl`.
 
-### Phase 1: Initialize or resume run
+### Phase 1: Resolve or resume run
 
-Read [references/workflow.md](references/workflow.md) Phase 1 for the full init and resume code blocks.
+Read [references/workflow.md](references/workflow.md) Phase 1 for the full start and resume flow.
 
 Resolve `SUITE_PATH` using the suite resolution order: bare names check `${DATA_DIR}/${name}/suite.md` first, then literal path.
 
-**Fresh run**: call `harness run init --suite <path> --run-id <id> --profile <profile> --repo-root <repo>`. This writes `current-run.json` and saves the active run in project state.
+**Fresh run**: resolve `RUN_ID`, `SUITE_PATH`, `SUITE_DIR`, and `PROFILE` now. Keep them for Phase 3, where `harness run start --suite <path> --run-id <id> --profile <profile> --repo-root <repo>` will initialize the run, save `current-run.json`, and complete preflight for the active run after cluster bootstrap is ready.
 
-**Resume** (via `--resume`): if SessionStart already restored the matching active run, skip init entirely. Otherwise reattach with `harness run record --run-id <id> --run-root <suite-dir>/runs --repo-root <repo> --phase setup --label kumactl-version -- kumactl version`. Only unfinished runs can resume - start a new `RUN_ID` if the saved run has a final verdict.
+**Resume** (via `--resume`): if SessionStart already restored the matching active run, keep that run id for Phase 3 and use `harness run resume` once the cluster context is ready. Otherwise plan to reattach with `harness run resume --run-id <id> --run-root <suite-dir>/runs`. Only unfinished runs can resume - start a new `RUN_ID` if the saved run has a final verdict.
 
-After init or reattach, use only context-driven `harness` commands. Do not pass `--run-dir`, `--run-root`, `--repo-root`, or `--kubeconfig` again unless debugging. Never switch to raw `kubectl --kubeconfig ...`.
+After start or resume, use only context-driven `harness` commands. Do not pass `--run-dir`, `--run-root`, `--repo-root`, or `--kubeconfig` again unless debugging. Never switch to raw `kubectl --kubeconfig ...`.
 
 **Error cases**: if the suite path does not exist, search `${DATA_DIR}/` with Glob for partial matches. Present matches via AskUserQuestion. If no matches, use AskUserQuestion with options:
 
 - `Provide suite path`
 - `Create new suite with /suite:create`
 
-**Gate**: `run-metadata.json` exists with profile, feature scope, and environment filled in.
+**Gate**: suite path, repo root, run id, and profile are resolved for the selected run path.
 
 ### Phase 2: Bootstrap cluster
 
@@ -225,21 +225,23 @@ harness setup kuma cluster --platform universal global-zone-up global-cp zone-cp
 
 Read [references/universal-setup.md](references/universal-setup.md) for the universal mode lifecycle, including Docker container management, `harness run kuma token`, and `harness run kuma service` for service containers.
 
-If changes modify CRDs, re-run Phase 2 bootstrap and Phase 3 preflight. If the suite references gateways (MeshGateway, GatewayClass, HTTPRoute, Gateway), install CRDs with `harness setup gateway` and verify with `harness setup gateway --check-only`.
+If changes modify CRDs, re-run Phase 2 bootstrap and then re-run `harness run preflight` plus `harness run capture --label "preflight"` for the active run before continuing. If the suite references gateways (MeshGateway, GatewayClass, HTTPRoute, Gateway), install CRDs with `harness setup gateway` and verify with `harness setup gateway --check-only`.
 
-**Gate**: Phase 3 preflight must pass before test execution starts.
+**Gate**: cluster bootstrap is ready for `harness run start` or `harness run resume`.
 
-### Phase 3: Preflight (spawned agent)
+### Phase 3: Start or resume tracked run
 
-Mark the run as guarded preflight (`harness run runner-state --event preflight-started`), then spawn the dedicated `preflight-worker` (tools: `Read`, `Bash` only). The worker runs `harness run preflight` and `harness run capture --label "preflight"`, returning a canonical pass/fail summary. See [references/workflow.md](references/workflow.md) Phase 3 for the full worker prompt and reply shapes.
+**Fresh run**: call `harness run start --suite <path> --run-id <id> --profile <profile> --repo-root <repo>`, then save the preflight snapshot with `harness run capture --label "preflight"`.
 
-If the worker returns `fail`, use AskUserQuestion with options:
+**Resume**: if SessionStart already restored the matching active run, use `harness run resume` directly. Otherwise reattach with `harness run resume --run-id <id> --run-root <suite-dir>/runs`. If the cluster topology was rebuilt or CRDs changed since the saved run last preflighted, re-run `harness run preflight` and `harness run capture --label "preflight"` before execution resumes.
+
+If start, resume, or refresh preflight fails, use AskUserQuestion with options:
 
 - `Retry preflight`
 - `Fix the issue manually`
 - `Stop the run`
 
-Do not start tests until the worker returns `pass`.
+Do not start tests until the active run is attached, the prepared-suite artifact exists, and the preflight snapshot is saved.
 
 ### Phase 4: Execute tests
 
@@ -301,14 +303,14 @@ harness run capture \
 
 harness run report check
 
-harness run closeout
+harness run finish
 ```
 
 **Gate**: command log complete, manifest index complete, all tests have pass/fail, every artifact path resolves to an existing file, `run-status.json` has correct final counts, state captures exist for preflight + each group + postrun, compactness check passes.
 
 After all gates pass, proceed to Phase 7 (retrospective) before tearing down clusters.
 
-After `harness run closeout`, that run is final. Do not reuse it for another cluster bootstrap or execution step. Start a new run with a new `RUN_ID` instead.
+After `harness run finish`, that run is final. Do not reuse it for another cluster bootstrap or execution step. Start a new run with a new `RUN_ID` instead.
 
 ### Phase 7: Retrospective
 
@@ -361,7 +363,7 @@ Hook codes:
 - [references/validation.md](references/validation.md) - pre-apply checklist, safe apply flow
 - [references/troubleshooting.md](references/troubleshooting.md) - known failure modes and fixes
 
-**harness commands** (context-aware after `run init`): `setup capabilities`, `setup kuma cluster`, `setup gateway`, `run init`, `run preflight`, `run runner-state`, `run apply`, `run validate`, `run capture`, `run record`, `run report group`, `run envoy {capture,route-body,bootstrap}`, `run diff`, `run kuma cli {find,build}`, and `hook`. All commands accept `--delay <seconds>` to wait before executing. Run `harness --help` for details.
+**harness commands** (context-aware after `run start` or `run resume`): `setup capabilities`, `setup kuma cluster`, `setup gateway`, `run start`, `run finish`, `run resume`, `run init`, `run preflight`, `run runner-state`, `run apply`, `run validate`, `run capture`, `run record`, `run report group`, `run envoy {capture,route-body,bootstrap}`, `run diff`, `run kuma cli {find,build}`, and `hook`. All commands accept `--delay <seconds>` to wait before executing. Run `harness --help` for details.
 
 **Templates** (in `assets/`): `run-metadata.template.json`, `run-status.template.json`, `command-log.template.md`, `manifest-index.template.md`, `run-report.template.md`
 

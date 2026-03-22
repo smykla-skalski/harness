@@ -128,7 +128,7 @@ If a prepared manifest is intentionally invalid and the test must prove the API 
 ## Consume
 
 - `harness run record` commands and expected outputs
-- After `harness run init`, use context-driven commands only. Prepared group manifests must be referenced via `harness run apply --manifest "<group-id>/<file>"`.
+- After `harness run start`, use context-driven commands only. Prepared group manifests must be referenced via `harness run apply --manifest "<group-id>/<file>"`.
 
 ## Debug
 

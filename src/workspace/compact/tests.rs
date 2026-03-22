@@ -285,7 +285,7 @@ fn render_runner_restore_context_aborted_with_remaining_groups() {
         state_paths: vec![],
     };
     let ctx = render_runner_restore_context(Path::new("/p"), &runner);
-    assert!(ctx.contains("harness run runner-state --event resume-run"));
+    assert!(ctx.contains("harness run resume"));
     assert!(ctx.contains("do not edit control files"));
 }
 

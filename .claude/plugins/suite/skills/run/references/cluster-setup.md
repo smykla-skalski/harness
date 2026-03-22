@@ -27,7 +27,7 @@ Cluster lifecycle commands for local manual testing with k3d.
 | `kuma-2` | zone-1 | `${HOME}/.kube/kind-kuma-2-config` |
 | `kuma-3` | zone-2 | `${HOME}/.kube/kind-kuma-3-config` |
 
-After `harness run init`, rely on the active run context for repo root and the primary kubeconfig. Use explicit kubeconfig paths only for manual checks that target a non-primary cluster.
+After `harness run start`, rely on the active run context for repo root and the primary kubeconfig. Use explicit kubeconfig paths only for manual checks that target a non-primary cluster.
 
 ## Profiles
 
@@ -118,7 +118,7 @@ K3D_HELM_DEPLOY_NO_CNI=true KIND_CLUSTER_NAME=kuma-1 make k3d/deploy/helm
 
 After CRD/schema changes, force-update CRDs:
 
-Do not refresh CRDs with a bare `kubectl apply` during a tracked run. If CRDs changed, recreate the affected cluster profile with `harness setup kuma cluster` and rerun `harness run preflight`.
+Do not refresh CRDs with a bare `kubectl apply` during a tracked run. If CRDs changed, recreate the affected cluster profile with `harness setup kuma cluster` and rerun `harness run preflight` plus `harness run capture --label preflight`.
 
 ## Gateway API CRDs
 
@@ -140,7 +140,7 @@ Install on every cluster that needs it (in multi-zone setups, zones running buil
 
 ## Baseline readiness validation
 
-Before test execution, run `harness run preflight` and `harness run capture --label preflight` as described in [workflow.md](workflow.md). `harness run preflight` now prepares the suite once for the active run: it materializes baseline manifests and group `## Configure` YAML into the active run's prepared manifests directory, validates them, applies baselines, and writes the prepared-suite artifact before the readiness checks complete. For multi-zone profiles, baselines with `clusters: all` in the suite frontmatter are applied to every cluster in the topology (global + zones), not just the primary cluster. This ensures zone clusters have demo workloads and collectors present for xDS inspection. Use those tracked artifacts instead of ad-hoc `kubectl` readiness checks or per-group manifest copying.
+Before test execution on a fresh run, use `harness run start` and then `harness run capture --label preflight` as described in [workflow.md](workflow.md). If cluster/bootstrap drift forces a refresh on an already-created run, use `harness run preflight` and then `harness run capture --label preflight`. These commands prepare the suite once for the active run: they materialize baseline manifests and group `## Configure` YAML into the active run's prepared manifests directory, validate them, apply baselines, and write the prepared-suite artifact before the readiness checks complete. For multi-zone profiles, baselines with `clusters: all` in the suite frontmatter are applied to every cluster in the topology (global + zones), not just the primary cluster. This ensures zone clusters have demo workloads and collectors present for xDS inspection. Use those tracked artifacts instead of ad-hoc `kubectl` readiness checks or per-group manifest copying.
 
 ## Notes
 

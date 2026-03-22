@@ -28,7 +28,7 @@ impl RunFile {
     ];
 
     pub const CONTROL_HINT: &str =
-        "use `harness run report group`, `harness run runner-state`, or `harness run closeout`";
+        "use `harness run report group`, `harness run runner-state`, or `harness run finish`";
 
     pub const COMMAND_LOG_HINT: &str =
         "use `harness run record` or recorded command artifacts instead";

@@ -1,9 +1,11 @@
 use super::*;
 use crate::run::{
-    ApiArgs, ApiMethod, EnvoyCommand, KumaCommand, KumactlArgs, KumactlCommand, ReportCommand,
+    ApiArgs, ApiMethod, EnvoyCommand, FinishArgs, KumaCommand, KumactlArgs, KumactlCommand,
+    ReportCommand, ResumeArgs, StartArgs,
 };
 use crate::setup::{ClusterArgs, KumaSetupCommand};
 use clap::{CommandFactory, error::ErrorKind};
+use std::path::Path;
 
 #[test]
 fn all_expected_subcommands_registered() {
@@ -99,6 +101,41 @@ fn parse_init_command() {
 }
 
 #[test]
+fn parse_start_command() {
+    let cli = Cli::try_parse_from([
+        "harness",
+        "run",
+        "start",
+        "--suite",
+        "suite.md",
+        "--profile",
+        "single-zone",
+        "--repo-root",
+        "/repo",
+    ])
+    .unwrap();
+    match cli.command {
+        Command::Run {
+            command:
+                RunCommand::Start(StartArgs {
+                    suite,
+                    run_id,
+                    profile,
+                    repo_root,
+                    run_root,
+                }),
+        } => {
+            assert_eq!(suite, "suite.md");
+            assert!(run_id.is_none());
+            assert_eq!(profile, "single-zone");
+            assert_eq!(repo_root.as_deref(), Some("/repo"));
+            assert!(run_root.is_none());
+        }
+        _ => panic!("expected Start command"),
+    }
+}
+
+#[test]
 fn parse_record_with_trailing_command() {
     let cli = Cli::try_parse_from([
         "harness",
@@ -122,6 +159,47 @@ fn parse_record_with_trailing_command() {
             assert_eq!(command, vec!["kubectl", "get", "pods", "-n", "kuma-system"]);
         }
         _ => panic!("expected Record command"),
+    }
+}
+
+#[test]
+fn parse_finish_command() {
+    let cli = Cli::try_parse_from(["harness", "run", "finish", "--run-dir", "/tmp/run"]).unwrap();
+    match cli.command {
+        Command::Run {
+            command: RunCommand::Finish(FinishArgs { run_dir }),
+        } => {
+            assert_eq!(run_dir.run_dir.as_deref(), Some(Path::new("/tmp/run")));
+            assert!(run_dir.run_id.is_none());
+            assert!(run_dir.run_root.is_none());
+        }
+        _ => panic!("expected Finish command"),
+    }
+}
+
+#[test]
+fn parse_resume_command() {
+    let cli = Cli::try_parse_from([
+        "harness",
+        "run",
+        "resume",
+        "--message",
+        "Recovered from stop",
+        "--run-id",
+        "r01",
+        "--run-root",
+        "/tmp/runs",
+    ])
+    .unwrap();
+    match cli.command {
+        Command::Run {
+            command: RunCommand::Resume(ResumeArgs { message, run_dir }),
+        } => {
+            assert_eq!(message.as_deref(), Some("Recovered from stop"));
+            assert_eq!(run_dir.run_id.as_deref(), Some("r01"));
+            assert_eq!(run_dir.run_root.as_deref(), Some(Path::new("/tmp/runs")));
+        }
+        _ => panic!("expected Resume command"),
     }
 }
 

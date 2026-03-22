@@ -311,7 +311,7 @@ fn check_session_start_compact_aborted_resume(project: &Path) {
     let diverged = compact::verify_fingerprints(&pending);
     let ctx = compact::render_hydration_context(&pending, &diverged);
     assert!(
-        ctx.contains("harness runner-state --event resume-run"),
+        ctx.contains("harness run resume"),
         "should include resume guidance: {ctx}"
     );
 

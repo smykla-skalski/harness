@@ -4,19 +4,19 @@ impl RunSetupError {
     #[must_use]
     pub fn hint(&self) -> Option<String> {
         match self {
-            Self::MissingRunPointer => Some("Run init first.".into()),
+            Self::MissingRunPointer => Some("Run `harness run start` first.".into()),
             Self::MissingRunContextValue { .. } => {
-                Some("Run `harness run init` and the required setup step first.".into())
+                Some("Run `harness run start` and the required setup step first.".into())
             }
             Self::MissingRunLocation { .. } => {
-                Some("Pass `--run-root` or `--run-dir`, or run `harness run init` first.".into())
+                Some("Pass `--run-root` or `--run-dir`, or run `harness run start` first.".into())
             }
             Self::GatewayDownloadEmpty { .. } => {
                 Some("Check the URL and network connectivity.".into())
             }
             Self::KumactlNotFound => Some("Build kumactl first.".into()),
             Self::TrackedKubectlRequired => {
-                Some("Run `harness run init` and `harness setup kuma cluster ...` first.".into())
+                Some("Run `harness run start` and `harness setup kuma cluster ...` first.".into())
             }
             Self::KubectlTargetOverrideForbidden { .. } => Some(
                 "Use `harness run record --cluster <name> -- kubectl ...` for another tracked member.".into(),
@@ -33,11 +33,11 @@ impl RunSetupError {
                 Some("Pass `--evidence-label <label>` or `--evidence <path>`.".into())
             }
             Self::RunDirExists { .. } => Some(
-                "Use a new run id or resume the existing run instead of re-running `harness run init`."
+                "Use a new run id or resume the existing run instead of re-running `harness run start`."
                     .into(),
             ),
             Self::MissingRunStatus => Some(
-                "The run-status.json file could not be loaded. Re-run `harness run init` or check the run directory."
+                "The run-status.json file could not be loaded. Re-run `harness run start` or check the run directory."
                     .into(),
             ),
             Self::ServiceReadinessTimeout { name } => Some(format!(
