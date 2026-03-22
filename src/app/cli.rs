@@ -12,9 +12,9 @@ use crate::errors::CliError;
 use crate::hooks::{self, HookArgs};
 use crate::observe::ObserveArgs;
 use crate::run::{
-    ApplyArgs, CaptureArgs, CloseoutArgs, ClusterCheckArgs, DiffArgs, EnvoyArgs, InitArgs,
-    KumaArgs, LogsArgs, PreflightArgs, RecordArgs, ReportArgs, RestartNamespaceArgs,
-    RunnerStateArgs, StatusArgs, TaskArgs, ValidateArgs,
+    ApplyArgs, CaptureArgs, CloseoutArgs, ClusterCheckArgs, DiffArgs, EnvoyArgs, FinishArgs,
+    InitArgs, KumaArgs, LogsArgs, PreflightArgs, RecordArgs, ReportArgs, RestartNamespaceArgs,
+    ResumeArgs, RunnerStateArgs, StartArgs, StatusArgs, TaskArgs, ValidateArgs,
 };
 use crate::setup;
 use crate::setup::{
@@ -38,6 +38,7 @@ pub struct Cli {
 #[derive(Debug, Clone, Subcommand)]
 #[non_exhaustive]
 pub enum RunCommand {
+    Start(StartArgs),
     Init(InitArgs),
     Preflight(PreflightArgs),
     Capture(CaptureArgs),
@@ -46,6 +47,8 @@ pub enum RunCommand {
     Apply(ApplyArgs),
     Validate(ValidateArgs),
     RunnerState(RunnerStateArgs),
+    Resume(ResumeArgs),
+    Finish(FinishArgs),
     Closeout(CloseoutArgs),
     Report(ReportArgs),
     Diff(DiffArgs),
@@ -137,6 +140,7 @@ pub fn dispatch(command: &Command) -> Result<i32, CliError> {
 
 fn dispatch_run(ctx: &AppContext, command: &RunCommand) -> Result<i32, CliError> {
     match command {
+        RunCommand::Start(args) => args.execute(ctx),
         RunCommand::Init(args) => args.execute(ctx),
         RunCommand::Preflight(args) => args.execute(ctx),
         RunCommand::Capture(args) => args.execute(ctx),
@@ -145,6 +149,8 @@ fn dispatch_run(ctx: &AppContext, command: &RunCommand) -> Result<i32, CliError>
         RunCommand::Apply(args) => args.execute(ctx),
         RunCommand::Validate(args) => args.execute(ctx),
         RunCommand::RunnerState(args) => args.execute(ctx),
+        RunCommand::Resume(args) => args.execute(ctx),
+        RunCommand::Finish(args) => args.execute(ctx),
         RunCommand::Closeout(args) => args.execute(ctx),
         RunCommand::Report(args) => args.execute(ctx),
         RunCommand::Diff(args) => args.execute(ctx),

@@ -2,9 +2,9 @@
 
 1. [Resuming a partial run](#resuming-a-partial-run)
 2. [Phase 0 - environment check](#phase-0---environment-check)
-3. [Phase 1 - initialize run](#phase-1---initialize-run)
+3. [Phase 1 - resolve or resume run](#phase-1---resolve-or-resume-run)
 4. [Phase 2 - bootstrap cluster](#phase-2---bootstrap-cluster)
-5. [Phase 3 - preflight](#phase-3---preflight)
+5. [Phase 3 - start or resume tracked run](#phase-3---start-or-resume-tracked-run)
 6. [Phase 4 - execute tests](#phase-4---execute-tests)
 7. [Phase 5 - failure handling](#phase-5---failure-handling)
 8. [Phase 6 - closeout](#phase-6---closeout)
@@ -20,9 +20,9 @@ Supplementary detail for the nine-phase execution flow in `SKILL.md`. Each phase
 
 ## Resuming a partial run
 
-If a previous run was interrupted, do not re-run `harness run init` for that existing run. Reattach the saved run context, then check `runs/<run-id>/run-status.json` for `last_completed_group` and `next_planned_group`. Skip to the next planned group and continue from there. Do not re-run already-passed groups unless investigating a failure.
+If a previous run was interrupted, do not re-run `harness run start` for that existing run. Reattach the saved run context with `harness run resume`, then check `runs/<run-id>/run-status.json` for `last_completed_group` and `next_planned_group`. Skip to the next planned group and continue from there. Do not re-run already-passed groups unless investigating a failure.
 
-If SessionStart already restored the matching active run for `--resume <run-id>`, skip the reattach command too. Read the restored run's `run-status.json` and continue from `next_planned_group`.
+If SessionStart already restored the matching active run for `--resume <run-id>`, `harness run resume` can use the active pointer directly. Read the restored run's `run-status.json` and continue from `next_planned_group`.
 
 Only unfinished runs can resume. If the saved run already has a final `pass` or `fail` verdict, start a new run ID instead of reattaching it.
 
@@ -47,52 +47,34 @@ harness run record --repo-root "${REPO_ROOT}" --phase setup --label kumactl-vers
   -- kumactl version
 ```
 
-## Phase 1 - initialize or resume run
+## Phase 1 - resolve or resume run
 
 If SessionStart already restored the matching active run for `--resume <run-id>`, skip this phase entirely.
 
-For a fresh run:
+For a fresh run, resolve and keep the run identity for Phase 3:
 
 ```bash
 RUN_ID="$(date +%Y%m%d-%H%M%S)-manual"
 PROFILE="<resolved --profile value>"
 SUITE_PATH="<resolved suite path>"
 SUITE_DIR="$(dirname "${SUITE_PATH}")"
-harness run init \
-  --suite "${SUITE_PATH}" \
-  --run-id "${RUN_ID}" \
-  --profile "${PROFILE}" \
-  --repo-root "${REPO_ROOT}"
 RUN_DIR="${SUITE_DIR}/runs/${RUN_ID}"
 ```
 
-For `--resume <run-id>`, reattach the existing run instead of reinitializing it:
+For `--resume <run-id>`, plan the reattach target for Phase 3:
 
 ```bash
 RUN_ID="<resume run id>"
-PROFILE="<resolved --profile value>"
-SUITE_PATH="<resolved suite path>"
-SUITE_DIR="$(dirname "${SUITE_PATH}")"
-RUN_DIR="${SUITE_DIR}/runs/${RUN_ID}"
-test -f "${RUN_DIR}/run-status.json"
-harness run record \
-  --run-id "${RUN_ID}" \
-  --run-root "${SUITE_DIR}/runs" \
-  --repo-root "${REPO_ROOT}" \
-  --phase setup \
-  --label kumactl-version \
-  -- kumactl version
+SUITE_DIR="<resolved suite dir>"
 ```
 
 Suite resolution uses the two-step order (managed directory suite, literal path). Set `SUITE_DIR` and `SUITE_FILE` accordingly.
 
-After fresh `harness run init` or the explicit resume reattach command, rely on the active `current-run.json` shim for run path, suite path, profile, and later cluster context. The harness also saves that active run in project state, so fresh sessions can restore it automatically. The remaining commands must omit repeated `--run-dir`, `--run-root`, `--repo-root`, and `--kubeconfig` flags unless debugging a broken run context. Do not switch to raw `kubectl --kubeconfig ...`; the canonical tracked forms remain `harness run record --phase <phase> --label <label> --gid <group-id> -- kubectl <args>` for kubectl and `harness run record --phase <phase> --label <label> --gid <group-id> -- kumactl <args>` for kumactl during execution groups.
+After Phase 3 attaches the run with `harness run start` or `harness run resume`, rely on the active `current-run.json` shim for run path, suite path, profile, and later cluster context. The harness also saves that active run in project state, so fresh sessions can restore it automatically. The remaining commands must omit repeated `--run-dir`, `--run-root`, `--repo-root`, and `--kubeconfig` flags unless debugging a broken run context. Do not switch to raw `kubectl --kubeconfig ...`; the canonical tracked forms remain `harness run record --phase <phase> --label <label> --gid <group-id> -- kubectl <args>` for kubectl and `harness run record --phase <phase> --label <label> --gid <group-id> -- kumactl <args>` for kumactl during execution groups.
 
 **Gate**: the `Client:` line in the recorded `kumactl version` output matches the repo HEAD. A server connection warning on stderr is expected until the control plane exists.
 
-Fill `run-metadata.json` before touching the cluster.
-
-**Gate**: `run-metadata.json` exists and has profile, feature scope, and environment filled in.
+**Gate**: suite path, repo root, run id, and profile are resolved for the selected run path.
 
 ## Phase 2 - bootstrap cluster
 
@@ -108,20 +90,36 @@ harness setup kuma cluster single-up kuma-1
 harness setup kuma cluster global-two-zones-up kuma-1 kuma-2 kuma-3 zone-1 zone-2
 ```
 
-If changes modify CRDs, re-run Phase 2 bootstrap for the affected cluster profile and then rerun Phase 3 preflight. Do not use a bare `kubectl apply` during a tracked run.
+If changes modify CRDs, re-run Phase 2 bootstrap for the affected cluster profile and then rerun `harness run preflight` plus `harness run capture --label "preflight"` for the active run. Do not use a bare `kubectl apply` during a tracked run.
 
-**Gate**: Phase 3 preflight must pass before test execution starts.
+**Gate**: cluster bootstrap is ready for `harness run start` or `harness run resume`.
 
-## Phase 3 - preflight
+## Phase 3 - start or resume tracked run
 
-Before spawning the preflight worker, mark the run as guarded preflight:
+For a fresh run:
 
 ```bash
-harness run runner-state \
-  --event preflight-started
+harness run start \
+  --suite "${SUITE_PATH}" \
+  --run-id "${RUN_ID}" \
+  --profile "${PROFILE}" \
+  --repo-root "${REPO_ROOT}"
+
+harness run capture \
+  --label "preflight"
 ```
 
-Use the dedicated `preflight-worker`, not a generic subagent. The worker may only run:
+For `--resume <run-id>`, reattach the existing run instead of reinitializing it:
+
+```bash
+harness run resume \
+  --run-id "${RUN_ID}" \
+  --run-root "${SUITE_DIR}/runs"
+```
+
+If SessionStart already restored the matching active run, `harness run resume` can omit explicit lookup flags and use the active pointer directly.
+
+If the cluster topology was rebuilt or CRDs changed after the saved run was created, refresh the prepared-suite outputs before continuing:
 
 ```bash
 harness run preflight
@@ -130,13 +128,13 @@ harness run capture \
   --label "preflight"
 ```
 
-The worker must return only the canonical summary documented in `SKILL.md`. It must not inspect harness internals, CI, GitHub state, or raw context files. `harness run preflight` prepares the suite once for this run. It materializes baseline manifests and group `## Configure` YAML into the active run's prepared manifests directory, validates every prepared manifest, applies baselines, writes the prepared-suite artifact, and then runs readiness checks.
+`harness run start` prepares the suite once for a fresh run. It initializes the run, materializes baseline manifests and group `## Configure` YAML into the active run's prepared manifests directory, validates every prepared manifest, applies baselines, writes the prepared-suite artifact, and marks preflight complete. `harness run preflight` is the recovery tool when an already-created run needs those artifacts refreshed after cluster/bootstrap drift.
 
 For multi-zone profiles, `harness run preflight` reads each baseline's `clusters` field from the suite frontmatter. Baselines with `clusters: all` are applied to every cluster in the topology (global + all zones) using `harness run apply --cluster <name>` for each non-primary cluster. Baselines without a `clusters` field or with `clusters: global` are applied to the primary cluster only. This ensures zone clusters have the workloads (demo apps, collectors, test namespaces) needed for xDS inspection during Phase 4.
 
-Do not start tests until preflight is green and the prepared-suite artifact exists.
+Do not start tests until the run is attached, preflight is green, and the prepared-suite artifact exists.
 
-**Gate**: preflight exits 0, the prepared-suite artifact exists, and the preflight state snapshot is saved.
+**Gate**: `run-metadata.json` exists, the prepared-suite artifact exists, and the preflight state snapshot is saved.
 
 ## Phase 4 - execute tests
 
@@ -303,7 +301,7 @@ harness run capture \
 
 harness run report check
 
-harness run closeout
+harness run finish
 ```
 
 **Gate**: all of these are true before marking the run complete:
@@ -319,7 +317,7 @@ harness run closeout
 
 After all gates pass, proceed to Phase 7 (retrospective) before tearing down clusters.
 
-After `harness run closeout`, that run is final. Do not reuse it for another cluster bootstrap or execution step. Start a new run with a new run ID instead.
+After `harness run finish`, that run is final. Do not reuse it for another cluster bootstrap or execution step. Start a new run with a new run ID instead.
 
 ## Phase 7 - retrospective
 

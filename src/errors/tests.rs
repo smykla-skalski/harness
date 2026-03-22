@@ -18,7 +18,10 @@ fn cli_err_with_hint() {
     let err: CliError = CliErrorKind::MissingRunPointer.into();
     assert_eq!(err.code(), "KSRCLI005");
     assert_eq!(err.message(), "missing current run pointer");
-    assert_eq!(err.hint().as_deref(), Some("Run init first."));
+    assert_eq!(
+        err.hint().as_deref(),
+        Some("Run `harness run start` first.")
+    );
 }
 
 #[test]
@@ -189,7 +192,7 @@ fn render_error_includes_hint_and_details() {
     let err = CliErrorKind::MissingRunPointer.with_details("stack");
     let rendered = render_error(&err);
     assert!(rendered.contains("ERROR [KSRCLI005] missing current run pointer"));
-    assert!(rendered.contains("Hint: Run init first."));
+    assert!(rendered.contains("Hint: Run `harness run start` first."));
     assert!(rendered.contains("stack"));
 }
 

@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use crate::errors::CliError;
 use crate::infra::io::write_json_pretty;
 use crate::kernel::topology::ClusterSpec;
-use crate::run::context::{RunContext, RunRepository};
+use crate::run::context::{CurrentRunPointer, RunContext, RunRepository};
 
 use super::RunApplication;
 
@@ -59,6 +59,20 @@ impl RunApplication {
             }
         }
         Ok(())
+    }
+
+    /// Persist this run as the active current-run pointer.
+    ///
+    /// # Errors
+    /// Returns `CliError` when pointer persistence fails.
+    pub fn save_as_current(&self) -> Result<(), CliError> {
+        let pointer = CurrentRunPointer::from_metadata(
+            self.layout().clone(),
+            self.metadata(),
+            self.context().cluster.clone(),
+        );
+        let repo = RunRepository;
+        repo.save_current_pointer(&pointer)
     }
 
     /// Build the application boundary from a loaded run context.

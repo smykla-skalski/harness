@@ -495,12 +495,12 @@ impl fmt::Display for RunnerNextAction {
                 "The run already reached a final verdict. Review the saved report and closeout artifacts."
             }
             Self::ResumeRun => {
-                "Run is suspended. Resume with `harness run runner-state --event resume-run` \
+                "Run is suspended. Resume with `harness run resume` \
                  and continue from the saved `next_planned_group`."
             }
             Self::HandleAbort => {
                 "Do not blame the user for `guard-stop` feedback. If the stop was unexpected, \
-                 run `harness run runner-state --event resume-run`, do not edit `run-status.json` \
+                 run `harness run resume`, do not edit `run-status.json` \
                  or `run-report.md`, and continue from the saved `next_planned_group`. \
                  If the run was intentionally halted, keep the aborted report as-is."
             }

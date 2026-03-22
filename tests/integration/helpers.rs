@@ -10,8 +10,9 @@ use harness::app::cli::{self, Command, CreateCommand, RunCommand, SetupCommand};
 use harness::create::{ApprovalBeginArgs, CreateBeginArgs, CreateSaveArgs, CreateValidateArgs};
 use harness::errors::CliError;
 use harness::run::{
-    ApiArgs, ApplyArgs, CaptureArgs, CloseoutArgs, EnvoyArgs, KumaArgs, KumaCommand, KumactlArgs,
-    PreflightArgs, RecordArgs, ReportArgs, ServiceArgs, ValidateArgs,
+    ApiArgs, ApplyArgs, CaptureArgs, CloseoutArgs, EnvoyArgs, FinishArgs, KumaArgs, KumaCommand,
+    KumactlArgs, PreflightArgs, RecordArgs, ReportArgs, ResumeArgs, ServiceArgs, StartArgs,
+    ValidateArgs,
 };
 use harness::setup::{
     ClusterArgs, GatewayArgs, KumaSetupArgs, KumaSetupCommand, PreCompactArgs, SessionStartArgs,
@@ -94,6 +95,10 @@ pub fn envoy_cmd(args: EnvoyArgs) -> Command {
     run_cmd(RunCommand::Envoy(args))
 }
 
+pub fn finish_cmd(args: FinishArgs) -> Command {
+    run_cmd(RunCommand::Finish(args))
+}
+
 pub fn gateway_cmd(args: GatewayArgs) -> Command {
     setup_cmd(SetupCommand::Gateway(args))
 }
@@ -120,10 +125,18 @@ pub fn report_cmd(args: ReportArgs) -> Command {
     run_cmd(RunCommand::Report(args))
 }
 
+pub fn resume_cmd(args: ResumeArgs) -> Command {
+    run_cmd(RunCommand::Resume(args))
+}
+
 pub fn service_cmd(args: ServiceArgs) -> Command {
     run_cmd(RunCommand::Kuma(KumaArgs {
         command: KumaCommand::Service(args),
     }))
+}
+
+pub fn start_cmd(args: StartArgs) -> Command {
+    run_cmd(RunCommand::Start(args))
 }
 
 pub fn session_start_cmd(args: SessionStartArgs) -> Command {
