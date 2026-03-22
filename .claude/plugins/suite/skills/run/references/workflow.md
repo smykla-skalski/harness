@@ -410,15 +410,16 @@ harness setup kuma cluster --platform universal global-zone-down global-cp zone-
 
 ## Performance toggles
 
-| Profile | `HARNESS_BUILD_IMAGES` | `HARNESS_LOAD_IMAGES` | `HARNESS_HELM_CLEAN` | Use when |
+| Profile | Preferred harness flags | Lower-level env overrides | Use when |
 | --- | --- | --- | --- | --- |
-| default (fastest functional) | 1 | 1 | 0 | Normal test runs |
-| strict clean-state | 1 | 1 | 1 | Need full isolation between deploys |
-| image-stable fast | 0 | 0 | 0 | Images already match code under test |
+| default (fastest functional) | none | `HARNESS_HELM_CLEAN=0` | Normal test runs |
+| strict clean-state | none | `HARNESS_HELM_CLEAN=1` | Need full isolation between deploys |
+| image-stable fast | `--no-build --no-load` | `HARNESS_BUILD_IMAGES=0 HARNESS_LOAD_IMAGES=0` | Images already match code under test |
 
 Example:
 
 ```bash
-HARNESS_BUILD_IMAGES=0 HARNESS_LOAD_IMAGES=0 \
-  harness setup kuma cluster single-up kuma-1
+harness setup kuma cluster --no-build --no-load single-up kuma-1
 ```
+
+Prefer the CLI flags for normal harness usage. Harness translates local k3d `--no-load` to Kuma's current `K3D_DONT_LOAD=1` contract internally. Keep the env vars for lower-level debugging or compatibility shims.

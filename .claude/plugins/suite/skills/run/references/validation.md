@@ -7,7 +7,7 @@ For `Mesh*` policy specifics (roles, `targetRef` rules, inspect flow), read
 
 ## Pre-apply checklist
 
-- Confirm all `kind` values exist in the live API (`harness run record --phase verify --label explain-kind -- kubectl explain <kind>`)
+- Confirm all `apiVersion` / `kind` pairs exist in the live API by running `harness run validate --manifest "<manifest-file>"` against the prepared manifest. The default native `kube` backend resolves discovery and server-side dry-run without shelling out to `kubectl`.
 - Confirm namespace and labels match test intent
 - Confirm required fields and enum values are valid for the cluster's CRDs
 - If the manifest references other resources, confirm those names exist in the same mesh and expected namespace
@@ -22,7 +22,7 @@ harness run validate \
   --manifest "<manifest-file>"
 ```
 
-Validation is not optional. Never pass `--validate=false` to kubectl - validation failures indicate a bug in the manifest or missing CRDs. Fix the root cause instead.
+Validation is not optional. Never bypass it with ad-hoc `kubectl --validate=false` or similar shortcuts. Validation failures indicate a bug in the manifest or missing CRDs. Fix the root cause instead.
 
 The exception is an intentional rejection test defined by the suite itself. When a group keeps a prepared manifest invalid on purpose so Phase 4 can prove the API rejects it, mark that 1-based `## Configure` ordinal in the group frontmatter `expected_rejection_orders`. `harness run preflight` and `harness create validate` will still materialize the manifest, but they will skip the up-front schema validation for that specific prepared entry.
 
