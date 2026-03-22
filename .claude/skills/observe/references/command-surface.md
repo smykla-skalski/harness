@@ -7,13 +7,19 @@ Supported invocation shapes for `harness observe`.
 - one-shot scan:
   `harness observe scan <session-id> --project-hint <hint> --json --summary`
 - filtered scan:
-  `harness observe scan <session-id> --project-hint <hint> --from-line <n> --focus <preset> --severity <level> --category <csv> --exclude <csv> --fixable --json --summary`
+  `harness observe scan <session-id> --project-hint <hint> --from-line <n> --until-line <n> --from <line|timestamp|prose> --focus <preset> --severity <level> --category <csv> --exclude <csv> --fixable --since-timestamp <iso> --until-timestamp <iso> --json --summary`
+- output control:
+  `harness observe scan <session-id> --format <json|markdown|sarif> --output <path> --output-details --top-causes <n> --json --summary`
 - watch mode:
   `harness observe watch <session-id> --project-hint <hint> --from-line <n> --poll-interval 3 --timeout 90 --json --summary`
 - raw dump:
   `harness observe dump <session-id> --project-hint <hint> --from-line <n> --to-line <m>`
+- filtered dump:
+  `harness observe dump <session-id> --project-hint <hint> --from-line <n> --to-line <m> --filter <substring> --role <assistant|user|tool> --tool-name <name>`
 - context dump:
   `harness observe dump <session-id> --project-hint <hint> --context-line <line> --context-window 20`
+- raw JSON dump:
+  `harness observe dump <session-id> --project-hint <hint> --from-line <n> --to-line <m> --raw-json`
 
 ## Maintenance actions
 

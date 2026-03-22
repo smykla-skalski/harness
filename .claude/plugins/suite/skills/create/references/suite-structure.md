@@ -1,19 +1,20 @@
 # Contents
 
-1. [Suite naming](#suite-naming)
-2. [Suite directory layout](#suite-directory-layout)
-3. [suite.md structure](#suitemd-structure)
-4. [Baseline directory](#baseline-directory)
-5. [Groups directory](#groups-directory)
-6. [Group file structure](#group-file-structure)
-7. [Standard group structure](#standard-group-structure)
-8. [Amendments log](#amendments-log)
-9. [Manifest conventions](#manifest-conventions)
-10. [Command create defaults](#command-create-defaults)
-11. [Validation step patterns](#validation-step-patterns)
-12. [Artifact capture patterns](#artifact-capture-patterns)
-13. [Execution contract](#execution-contract)
-14. [Reference](#reference)
+1. [Manifest completeness rule](#manifest-completeness-rule)
+2. [Suite naming](#suite-naming)
+3. [Suite directory layout](#suite-directory-layout)
+4. [suite.md structure](#suitemd-structure)
+5. [Baseline directory](#baseline-directory)
+6. [Groups directory](#groups-directory)
+7. [Group file structure](#group-file-structure)
+8. [Standard group structure](#standard-group-structure)
+9. [Amendments log](#amendments-log)
+10. [Manifest conventions](#manifest-conventions)
+11. [Command create defaults](#command-create-defaults)
+12. [Validation step patterns](#validation-step-patterns)
+13. [Artifact capture patterns](#artifact-capture-patterns)
+14. [Execution contract](#execution-contract)
+15. [Reference](#reference)
 
 ---
 
@@ -261,6 +262,17 @@ Changes applied to suite files during test runs.
 Each entry has: date, run ID, group, file path, what changed, and why. Entries are appended chronologically with `---` separators. The runner updates both the suite file (inline YAML or baseline YAML) AND amendments.md in a single operation.
 
 Amendments are permanent fixes to the suite. Future runs use the corrected manifests. This is different from run-only deviations which are recorded only in the run report and don't change the suite.
+
+## Manifest completeness rule
+
+Every Kubernetes resource that any test group references during its steps must exist as a YAML file in the suite before create finishes. This includes:
+
+- ContainerPatch resources for sidecar environment variables or proxy configuration
+- MeshTrafficPermission, MeshRetry, MeshTimeout, or any other Mesh* policy that groups apply
+- Gateway API CRDs (GatewayClass, Gateway, HTTPRoute) if groups reference them
+- Any resource that a group's `## Configure` or `## Execute` steps apply but that does not yet exist as a manifest file
+
+If a group step references applying a resource that has no corresponding YAML file in `groups/{group-id}/`, the create process must create it. The suite:run runner must never need to create manifests on the fly - all manifests ship with the suite.
 
 ## Manifest conventions
 

@@ -6,7 +6,9 @@
 4. [Variant summary](#variant-summary)
 5. [Schema summary](#schema-summary)
 6. [Writer workers](#writer-workers)
-7. [Output constraints](#output-constraints)
+7. [Writer launch contract](#writer-launch-contract)
+8. [Writer recovery (partial completion)](#writer-recovery-partial-completion)
+9. [Output constraints](#output-constraints)
 
 ---
 
@@ -89,6 +91,24 @@ Writer workers must:
 - if the local validator is enabled for this environment, validate owned manifests with `harness create validate` before stopping
 - use the current repo checkout as the schema source of truth; the required schemas and CRDs are already checked into this repo
 - return only a short acknowledgement such as `suite draft saved`
+
+## Writer launch contract
+
+- Pass only the saved proposal, schema facts, and the exact file ownership for that worker.
+- Keep writer fan-out bounded. Do not start more than four writer workers at once.
+- Launch all writer workers with `mode: "auto"` so they can write files without interactive approval. Background workers cannot prompt the user, so writes are denied without this mode.
+- The group-writer must create a `groups/{group-id}/` directory for each group and write the group's test manifests there as individual YAML files (e.g., `groups/g01/01-create.yaml`, `groups/g01/02-update.yaml`). The group markdown's `## Configure` section must NOT contain inline YAML blocks. Instead it should contain only `harness run apply` commands that reference the manifest directory (e.g., `harness run apply --manifest g01` for the whole directory or `harness run apply --manifest g01/01-create.yaml` for a single file). The YAML lives only in the `groups/g{NN}/` directory.
+- Require every writer that emits manifests to run `harness create validate --path <file>` on its owned outputs before it stops. Use the current repo checkout as the schema source of truth; all required schemas, including CRDs, are already in this repo. Do not substitute a live-cluster check.
+- When the proposal includes multi-zone profiles, pass the baseline cluster distribution from the proposal to the baseline-writer and suite-writer so they emit the object form (`- path:` with `clusters:`) in `baseline_files` frontmatter and include the Clusters column in the baseline manifests table.
+
+## Writer recovery (partial completion)
+
+When a writer worker finishes but some expected files are missing (partial failure or timeout), the main context must recover without re-launching a full worker. Before writing any file that may already exist on disk from a partial worker run, Read it first. Claude Code tracks file state internally - writing a file that exists on disk but was never Read in the current context triggers "File has been modified since read" errors. The recovery sequence is:
+
+1. Run `ls "${SUITE_DIR}/groups/"` to see which files the worker already created.
+2. For every file that exists on disk but still needs to be written or overwritten, Read it first, then Write the corrected content.
+3. For files that do not exist yet, Write them directly (no Read needed).
+4. Never attempt to Write a batch of files without checking which ones already exist. The subagent's writes are invisible to the parent context's file tracker.
 
 ## Output constraints
 

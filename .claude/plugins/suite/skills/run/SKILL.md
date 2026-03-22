@@ -151,7 +151,7 @@ Read [references/agent-contract.md](references/agent-contract.md) in full before
 - **No autonomous deviations.** AskUserQuestion before any unplanned change.
 - **Never create manifests during a run.** All manifests must exist in the suite before the run starts. If a missing manifest is discovered, this is a suite:create defect - use the bug-found gate with classification "suite bug" and do not create the file.
 - **Preflight before apply.** Never run `harness run apply` until preflight has completed. Preflight materializes baselines and group YAML into prepared manifests. The verify-bash hook enforces this - `harness run apply` during bootstrap or before preflight completion is denied with KSR014.
-- **STOP AND TRIAGE EVERY FAILURE.** On ANY unexpected result, failure, or mismatch - STOP. Classify as suite bug, product bug, harness bug, or environment issue. Present classification to user via AskUserQuestion BEFORE continuing. Never say "known bug" and move on. See bug-found gate in Phase 4.
+- **Stop and triage every failure.** On any unexpected result, failure, or mismatch, stop. Classify as suite bug, product bug, harness bug, or environment issue. Present classification to user via AskUserQuestion before continuing because unclassified failures corrupt the audit trail. See bug-found gate in Phase 4.
 - **Commit code fixes before continuing.** After editing product code during a run, commit before re-deploying or re-testing. Use `git add <files> && git commit -m 'fix: description'`. Never iterate on uncommitted edits.
 - **Never truncate verification output.** Do not pipe `make test`, `make check`, `cargo test`, `cargo clippy`, or any verification command through `tail -N` or `head -N`. Use full output or grep for specific markers (`FAIL`, `error`, `PASS`). Drawing conclusions from truncated output is unreliable - failures can be hidden above the truncation point.
 
@@ -182,7 +182,7 @@ Resolve `SUITE_PATH` using the suite resolution order: bare names check `${DATA_
 
 **Fresh run**: call `harness run init --suite <path> --run-id <id> --profile <profile> --repo-root <repo>`. This writes `current-run.json` and saves the active run in project state.
 
-**Resume**: if SessionStart already restored the matching active run, skip init entirely. Otherwise reattach with `harness run record --run-id <id> --run-root <suite-dir>/runs --repo-root <repo> --phase setup --label kumactl-version -- kumactl version`. Only unfinished runs can resume - start a new `RUN_ID` if the saved run has a final verdict.
+**Resume** (via `--resume`): if SessionStart already restored the matching active run, skip init entirely. Otherwise reattach with `harness run record --run-id <id> --run-root <suite-dir>/runs --repo-root <repo> --phase setup --label kumactl-version -- kumactl version`. Only unfinished runs can resume - start a new `RUN_ID` if the saved run has a final verdict.
 
 After init or reattach, use only context-driven `harness` commands. Do not pass `--run-dir`, `--run-root`, `--repo-root`, or `--kubeconfig` again unless debugging. Never switch to raw `kubectl --kubeconfig ...`.
 
@@ -223,7 +223,7 @@ harness setup kuma cluster --platform universal single-up test-cp
 harness setup kuma cluster --platform universal global-zone-up global-cp zone-cp zone-1
 ```
 
-Universal mode uses Docker containers instead of k3d. See [references/universal-setup.md](references/universal-setup.md) for the full lifecycle, including `harness run kuma token` and `harness run kuma service` for service containers.
+Read [references/universal-setup.md](references/universal-setup.md) for the universal mode lifecycle, including Docker container management, `harness run kuma token`, and `harness run kuma service` for service containers.
 
 If changes modify CRDs, re-run Phase 2 bootstrap and Phase 3 preflight. If the suite references gateways (MeshGateway, GatewayClass, HTTPRoute, Gateway), install CRDs with `harness setup gateway` and verify with `harness setup gateway --check-only`.
 
@@ -251,7 +251,7 @@ Read [examples/suite-template.md](examples/suite-template.md) when creating a ne
 
 Key principles (workflow.md has the details):
 
-1. **The test groups table is authoritative.** Execute every listed group. **NEVER mark a group as skip without first calling AskUserQuestion** with options:
+1. **The test groups table is authoritative.** Execute every listed group. Do not mark a group as skip without first calling AskUserQuestion with options:
    - `Switch cluster profile`
    - `Fix prerequisites`
    - `Skip group`
@@ -264,9 +264,9 @@ Key principles (workflow.md has the details):
    - `Stop run`
 5. **Hard gate after each group** via `harness run report group --group-id <id> --status <pass|fail|skip> --capture-label "after-<id>"`. Use `--evidence-label` for tracked artifacts.
 
-### Bug-found gate (mandatory)
+### Bug-found gate
 
-**BLOCKING REQUIREMENT**: On ANY unexpected result or failure, the runner MUST stop and triage. No exceptions.
+On any unexpected result or failure, stop and triage before continuing. This gate is mandatory because unclassified failures corrupt the run's audit trail.
 
 **Step 1 - Classify** as: **suite bug** (wrong manifest/expectations), **product bug** (Kuma vs spec), **harness bug** (infra misconfiguration), or **environment issue** (timing/resources).
 
@@ -276,7 +276,7 @@ Key principles (workflow.md has the details):
 - `Continue and fix later` - record with classification, mark group failed, continue
 - `Stop run`
 
-Never say "known bug" and continue without asking. On first failure, go to Phase 5.
+Do not continue past a failure without presenting it to the user first. On first failure, go to Phase 5.
 
 **Gate**: all planned tests have pass/fail entries in the report. Every artifact path in the report resolves to an existing file. `run-status.json` reflects final counts.
 
@@ -315,7 +315,7 @@ After `harness run closeout`, that run is final. Do not reuse it for another clu
 After closeout, spawn parallel subagents (compliance auditor, manifest reviewer, coverage analyzer, findings summarizer, process advisor) to analyze the completed run. Present the assembled retrospective to the user via AskUserQuestion with options:
 
 - `Save as-is` - save to `{run_dir}/retrospective.md`
-- `Request changes` - user provides feedback, regenerate specific sections (max 3 iterations, then save current draft)
+- `Request changes` - user provides feedback, regenerate specific sections. Loop until user confirms or 3 iterations are reached, then save current draft
 - `Discard` - do not save
 
 Read [references/workflow.md](references/workflow.md) Phase 7 section for the full agent specifications and assembly procedure.

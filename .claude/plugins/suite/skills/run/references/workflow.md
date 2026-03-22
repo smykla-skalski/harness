@@ -226,7 +226,7 @@ Prefer `--evidence-label` whenever the artifact came from `harness run record --
 
 ### Bug-found gate (mandatory, per-group)
 
-During any group's verification steps, if the output reveals that actual implementation behavior differs from suite expectations, the runner MUST pause before finalizing the group. This gate fires for any of these signals:
+During any group's verification steps, if the output reveals that actual implementation behavior differs from suite expectations, the runner must pause before finalizing the group. This gate fires for any of these signals:
 
 - "Finding:" appears in test output
 - A check result shows "expected X, actual Y" (implementation does not match suite expectations)
@@ -327,9 +327,9 @@ After closeout, spawn parallel subagents to analyze the completed run from multi
 
 **Spawn these agents in parallel (all background, mode: auto):**
 
-1. **Skill compliance auditor** - Read the run report, command log, and run-status.json. Check whether the runner followed the skill contract: were all groups executed or properly approved for skip? Were AskUserQuestion gates respected? Were env vars or python used? Were harness wrappers used for all cluster access? Score compliance 0-100 with specific violations listed.
+1. **Skill compliance auditor** - Read the run report, command log, and run-status.json. Check whether the runner followed the skill contract: were all groups executed or properly approved for skip? Were AskUserQuestion gates respected? Were env vars or python used? Were harness wrappers used for all cluster access? List specific violations found.
 
-2. **Manifest quality reviewer** - Read all manifests in the suite (baseline + groups). Check for: missing fields that CRDs require (appProtocol, labels, namespace), resources that should have defaults but don't, manifests that duplicate baseline without changes, overly broad targetRef (kind: Mesh when more specific would work). Rate each group's manifest quality.
+2. **Manifest quality reviewer** - Read all manifests in the suite (baseline + groups). Check for: missing fields that CRDs require (appProtocol, labels, namespace), resources that should have defaults but don't, manifests that duplicate baseline without changes, overly broad targetRef (kind: Mesh when more specific would work). List issues per group.
 
 3. **Test coverage analyzer** - Read suite.md, all group files, and the run report. Identify: which user stories are fully covered vs partially tested, which edge cases were tested (error paths, deletion, reapply), which combinations of features were tested together, gaps where a group exists but verification was shallow (just "apply and check pod ready" without deeper validation).
 
@@ -345,7 +345,7 @@ After closeout, spawn parallel subagents to analyze the completed run from multi
    - `Save as-is` - save to `{run_dir}/retrospective.md`
    - `Request changes` - user provides feedback, regenerate specific sections
    - `Discard` - do not save
-4. If the user requests changes, apply them and re-present. Allow at most 3 revision iterations. After the third revision, save the current draft as final.
+4. If the user requests changes, apply them and re-present. Loop until user confirms or 3 iterations are reached. After the third iteration, save the current draft as final.
 5. After saving, also copy improvement suggestions to `{suite_dir}/improvements.md` (append, not overwrite) so they accumulate across runs.
 
 **Gate**: retrospective saved or explicitly discarded by user before proceeding to cluster teardown.
@@ -356,11 +356,11 @@ Tear down the clusters created in Phase 2. This is the default - always clean up
 
 When running multiple profiles (`--profile all`), overlap teardown and setup at profile transitions. Run the old cluster's teardown with `run_in_background: true` while starting the next cluster's setup in foreground. All artifacts from the completed profile are already captured, so the background teardown won't lose data.
 
-Use AskUserQuestion if the teardown situation is unclear:
+Use AskUserQuestion if the teardown situation is unclear, with options:
 
-- `Tear down now` - proceed with teardown
-- `Keep clusters running` - skip teardown, user wants to inspect
-- `Stop run` - abort without teardown
+- "Tear down now" - proceed with teardown
+- "Keep clusters running" - skip teardown, user wants to inspect
+- "Stop run" - abort without teardown
 
 Use the matching teardown command for the active profile:
 
