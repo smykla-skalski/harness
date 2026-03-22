@@ -166,7 +166,7 @@ impl ClusterSpec {
 
 pub(super) fn kubeconfig_for_cluster(cluster: &str) -> String {
     let home = env::var("HOME").unwrap_or_else(|_| "/tmp".into());
-    format!("{home}/.kube/kind-{cluster}-config")
+    format!("{home}/.kube/k3d-{cluster}.yaml")
 }
 
 pub(super) fn parse_string_vec(value: Option<&Value>) -> Vec<String> {

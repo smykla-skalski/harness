@@ -39,7 +39,7 @@ fn setup_session_transport_stays_transport_only() {
             "pending_compact_handoff(",
             "render_hydration_context(",
             "consume_compact_handoff(",
-            "ephemeral_metallb::cleanup_templates(",
+            "ephemeral_metallb::cleanup_resources(",
             "RunApplication::current_run_dir(",
             "RunApplication::clear_current_pointer(",
         ],
