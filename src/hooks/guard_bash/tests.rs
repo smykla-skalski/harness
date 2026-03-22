@@ -263,11 +263,11 @@ fn allows_kubectl_in_harness_record_pipe() {
 
 #[test]
 fn make_target_extracts() {
-    let words: Vec<String> = vec!["make", "k3d/stop"]
+    let words: Vec<String> = vec!["make", "k3d/cluster/stop"]
         .into_iter()
         .map(String::from)
         .collect();
-    assert_eq!(make_target(&words), Some("k3d/stop"));
+    assert_eq!(make_target(&words), Some("k3d/cluster/stop"));
 }
 
 #[test]

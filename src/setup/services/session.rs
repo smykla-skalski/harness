@@ -36,9 +36,9 @@ pub(crate) fn cleanup_current_run_context() -> Result<(), CliError> {
     };
 
     if run_dir.is_dir()
-        && let Err(error) = ephemeral_metallb::cleanup_templates(&run_dir)
+        && let Err(error) = ephemeral_metallb::cleanup_resources(&run_dir)
     {
-        warn!(%error, "cleanup templates failed");
+        warn!(%error, "cleanup MetalLB resources failed");
     }
 
     if let Err(error) = RunApplication::clear_current_pointer() {

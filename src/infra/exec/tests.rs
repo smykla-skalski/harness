@@ -185,8 +185,8 @@ fn filter_progress_k3d_loading_images() {
 #[test]
 fn describe_command_make_target() {
     assert_eq!(
-        describe_command(&["make", "k3d/deploy/helm"]),
-        "k3d/deploy/helm"
+        describe_command(&["make", "k3d/cluster/deploy/helm"]),
+        "k3d/cluster/deploy/helm"
     );
 }
 

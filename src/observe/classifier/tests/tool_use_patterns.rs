@@ -55,7 +55,7 @@ fn details_truncated_at_construction() {
 fn detects_raw_make_k3d_target() {
     let mut state = make_state();
     let block =
-        bash_tool_use("K3D_HELM_DEPLOY_NO_CNI=true KIND_CLUSTER_NAME=kuma-1 make k3d/deploy/helm");
+        bash_tool_use("K3D_HELM_DEPLOY_NO_CNI=true CLUSTER=kuma-1 make k3d/cluster/deploy/helm");
     let issues = check_tool_use_for_issues(10, &block, &mut state);
     assert!(
         issues

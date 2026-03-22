@@ -19,7 +19,7 @@ fn ctx(command: &str) -> GuardContext {
 #[test]
 fn denies_k3d_make_target() {
     let guard = MakeTargetGuard;
-    let c = ctx("make k3d/stop");
+    let c = ctx("make k3d/cluster/stop");
     assert!(guard.check(&c).is_some());
 }
 

@@ -69,7 +69,7 @@ const GUARD_BASH_PAYLOAD_CASES: &[(&str, &str, bool)] = &[
         "mkdir -p /tmp/suites/my-new-suite/groups",
         false,
     ),
-    ("suite:run", "make k3d/stop", false),
+    ("suite:run", "make k3d/cluster/stop", false),
     ("suite:run", "gh run view 12345", false),
     (
         "suite:run",

@@ -146,7 +146,7 @@ fn run_dir_recovers_cluster() {
         "mode": "single-up",
         "mode_args": ["kuma-test"],
         "members": [
-            {"name": "kuma-test", "role": "primary", "kubeconfig": "/tmp/kind-kuma-test-config"}
+            {"name": "kuma-test", "role": "primary", "kubeconfig": "/tmp/k3d-kuma-test.yaml"}
         ],
         "updated_at": "2026-03-13T00:00:00Z"
     });
@@ -215,7 +215,8 @@ fn global_zone_up_orchestration() {
             assert_eq!(result.unwrap(), 0);
 
             // global-zone-up calls start_and_deploy twice (global + zone),
-            // each calling make k3d/start and make k3d/deploy/helm = 4 make calls
+            // each calling make k3d/cluster/start and make
+            // k3d/cluster/deploy/helm = 4 make calls
             let make_calls = tc.invocations("make");
             assert!(
                 make_calls.len() >= 2,
@@ -345,7 +346,7 @@ fn single_up_restores_context() {
         "mode": "single-up",
         "mode_args": ["kuma-ctx"],
         "members": [
-            {"name": "kuma-ctx", "role": "primary", "kubeconfig": "/tmp/kind-kuma-ctx-config"}
+            {"name": "kuma-ctx", "role": "primary", "kubeconfig": "/tmp/k3d-kuma-ctx.yaml"}
         ],
         "updated_at": "2026-03-13T00:00:00Z"
     });
@@ -462,11 +463,11 @@ fn cluster_context_up_down() {
             assert!(down_result.is_ok(), "single-down failed: {down_result:?}");
             assert_eq!(down_result.unwrap(), 0);
 
-            // single-down should have called make k3d/stop
+            // single-down should have called make k3d/cluster/stop
             let make_calls = tc2.invocations("make");
             assert!(
-                make_calls.iter().any(|c| c.contains("k3d/stop")),
-                "expected make k3d/stop invocation, got: {make_calls:?}"
+                make_calls.iter().any(|c| c.contains("k3d/cluster/stop")),
+                "expected make k3d/cluster/stop invocation, got: {make_calls:?}"
             );
         },
     );

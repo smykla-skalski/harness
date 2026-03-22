@@ -2,124 +2,20 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use crate::errors::{CliError, CliErrorKind};
-#[cfg(test)]
-use crate::infra::io::{is_safe_name, write_json_pretty};
-#[cfg(test)]
-use crate::workspace::utc_now;
-#[cfg(test)]
-use walkdir::WalkDir;
 
 const STATE_FILE: &str = "ephemeral-metallb-templates.json";
-#[cfg(test)]
-const DEFAULT_TEMPLATE_BASENAME: &str = "metallb-k3d-kuma.yaml";
 
-/// State path for ephemeral `MetalLB` config.
+/// State path for tracked ephemeral `MetalLB` resources.
 #[must_use]
 pub fn state_path(run_dir: &Path) -> PathBuf {
     run_dir.join("state").join(STATE_FILE)
 }
 
-/// Template path for a cluster.
-///
-/// # Errors
-/// Returns `CliError` if `cluster_name` contains path separators or `..`.
-#[cfg(test)]
-pub fn template_path(root: &Path, cluster_name: &str) -> Result<PathBuf, CliError> {
-    if !is_safe_name(cluster_name) {
-        return Err(CliErrorKind::unsafe_name(cluster_name.to_string()).into());
-    }
-    Ok(root
-        .join("mk")
-        .join(format!("metallb-k3d-{cluster_name}.yaml")))
-}
-
-/// Default source template path.
-#[cfg(test)]
-fn default_source_template(root: &Path) -> Result<PathBuf, CliError> {
-    let default = root.join("mk").join(DEFAULT_TEMPLATE_BASENAME);
-    if default.is_file() {
-        return Ok(default);
-    }
-    // Try any metallb-k3d-*.yaml in mk/
-    let mk_dir = root.join("mk");
-    if mk_dir.is_dir() {
-        let mut templates: Vec<PathBuf> = WalkDir::new(&mk_dir)
-            .min_depth(1)
-            .max_depth(1)
-            .sort_by_file_name()
-            .into_iter()
-            .filter_map(Result::ok)
-            .map(walkdir::DirEntry::into_path)
-            .filter(|p| {
-                p.file_name().and_then(|n| n.to_str()).is_some_and(|n| {
-                    n.starts_with("metallb-k3d-")
-                        && Path::new(n)
-                            .extension()
-                            .is_some_and(|ext| ext.eq_ignore_ascii_case("yaml"))
-                })
-            })
-            .collect();
-        templates.sort();
-        if let Some(first) = templates.into_iter().next() {
-            return Ok(first);
-        }
-    }
-    Err(CliErrorKind::missing_file(default.to_string_lossy().into_owned()).into())
-}
-
-/// Ensure `MetalLB` templates exist for the given clusters.
-///
-/// Copies the default template for each missing cluster-specific template.
-/// Records created entries in the run state file.
-///
-/// # Errors
-/// Returns `CliError` if the default source template is missing or on IO failure.
-#[cfg(test)]
-pub fn ensure_templates(
-    root: &Path,
-    cluster_names: &[&str],
-    run_dir: Option<&Path>,
-) -> Result<Vec<PathBuf>, CliError> {
-    let mut created = Vec::new();
-    let mut entries = load_entries(run_dir)?;
-    let source = default_source_template(root)?;
-
-    for cluster_name in cluster_names {
-        let target = template_path(root, cluster_name)?;
-        if target.exists() {
-            continue;
-        }
-        if let Some(parent) = target.parent() {
-            fs::create_dir_all(parent)?;
-        }
-        fs::copy(&source, &target)?;
-        created.push(target.clone());
-
-        let entry = serde_json::json!({
-            "cluster_name": cluster_name,
-            "created_at": utc_now(),
-            "source_path": source.to_string_lossy(),
-            "template_path": target.to_string_lossy(),
-        });
-        entries.push(entry);
-    }
-
-    if let Some(rd) = run_dir
-        && !entries.is_empty()
-    {
-        save_entries(rd, &entries)?;
-    }
-
-    Ok(created)
-}
-
-/// Cleanup `MetalLB` templates that were created by `ensure_templates`.
-///
-/// Removes the template files and optionally removes the state file.
+/// Cleanup tracked generated `MetalLB` resource files.
 ///
 /// # Errors
 /// Returns `CliError` on IO failure.
-pub fn cleanup_templates(run_dir: &Path) -> Result<Vec<PathBuf>, CliError> {
+pub fn cleanup_resources(run_dir: &Path) -> Result<Vec<PathBuf>, CliError> {
     let entries = load_entries(Some(run_dir))?;
     if entries.is_empty() {
         return Ok(vec![]);
@@ -128,58 +24,15 @@ pub fn cleanup_templates(run_dir: &Path) -> Result<Vec<PathBuf>, CliError> {
     let mut removed = Vec::new();
     for entry in &entries {
         if let Some(tp) = entry.get("template_path").and_then(|v| v.as_str()) {
-            let template = PathBuf::from(tp);
-            if template.exists() {
-                fs::remove_file(&template)?;
-                removed.push(template);
+            let resource = PathBuf::from(tp);
+            if resource.exists() {
+                fs::remove_file(&resource)?;
+                removed.push(resource);
             }
         }
     }
 
     Ok(removed)
-}
-
-/// Restore `MetalLB` templates from state for a pending run.
-///
-/// # Errors
-/// Returns `CliError` on IO failure or missing source.
-#[cfg(test)]
-pub fn restore_templates(run_dir: &Path) -> Result<Vec<PathBuf>, CliError> {
-    let entries = load_entries(Some(run_dir))?;
-    if entries.is_empty() {
-        return Ok(vec![]);
-    }
-
-    let mut restored = Vec::new();
-    for entry in &entries {
-        let source_str = entry
-            .get("source_path")
-            .and_then(|v| v.as_str())
-            .unwrap_or("");
-        let target_str = entry
-            .get("template_path")
-            .and_then(|v| v.as_str())
-            .unwrap_or("");
-        if source_str.is_empty() || target_str.is_empty() {
-            continue;
-        }
-        let source = PathBuf::from(source_str);
-        let target = PathBuf::from(target_str);
-
-        if target.exists() {
-            continue;
-        }
-        if !source.is_file() {
-            return Err(CliErrorKind::missing_file(source_str.to_string()).into());
-        }
-        if let Some(parent) = target.parent() {
-            fs::create_dir_all(parent)?;
-        }
-        fs::copy(&source, &target)?;
-        restored.push(target);
-    }
-
-    Ok(restored)
 }
 
 fn load_entries(run_dir: Option<&Path>) -> Result<Vec<serde_json::Value>, CliError> {
@@ -200,16 +53,6 @@ fn load_entries(run_dir: Option<&Path>) -> Result<Vec<serde_json::Value>, CliErr
         .and_then(|v| v.as_array())
         .cloned()
         .unwrap_or_default())
-}
-
-#[cfg(test)]
-fn save_entries(run_dir: &Path, entries: &[serde_json::Value]) -> Result<(), CliError> {
-    let path = state_path(run_dir);
-    let payload = serde_json::json!({
-        "schema_version": 1,
-        "entries": entries,
-    });
-    write_json_pretty(&path, &payload)
 }
 
 #[cfg(test)]
