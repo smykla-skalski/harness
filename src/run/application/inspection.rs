@@ -54,7 +54,10 @@ impl RunApplication {
                 name: network,
                 role: "network",
                 container: None,
-                running: docker_network_exists(network),
+                running: self
+                    .services
+                    .docker_if_available()
+                    .is_some_and(|docker| docker.network_exists(network).unwrap_or(false)),
             });
         }
         let healthy = members.iter().all(|member| member.running);
@@ -114,22 +117,6 @@ impl RunApplication {
             dataplanes,
         })
     }
-}
-
-fn docker_network_exists(network: &str) -> bool {
-    exec::docker(
-        &[
-            "network",
-            "ls",
-            "--filter",
-            &format!("name=^{network}$"),
-            "--format",
-            "{{.Name}}",
-        ],
-        &[0],
-    )
-    .ok()
-    .is_some_and(|result| result.stdout.trim() == network)
 }
 
 fn mask_token(token: &str) -> String {

@@ -1,28 +1,15 @@
-use crate::errors::CliError;
+use std::sync::Arc;
 
-use super::command::docker;
+use crate::errors::CliError;
+use crate::infra::blocks::{StdProcessExecutor, container_runtime_from_env};
 
 /// Create a Docker network if it does not already exist.
 ///
 /// # Errors
 /// Returns `CliError` on command failure.
 pub fn docker_network_create(name: &str, subnet: &str) -> Result<(), CliError> {
-    let check = docker(
-        &[
-            "network",
-            "ls",
-            "--filter",
-            &format!("name=^{name}$"),
-            "--format",
-            "{{.Name}}",
-        ],
-        &[0],
-    )?;
-    if check.stdout.trim() == name {
-        return Ok(());
-    }
-    docker(&["network", "create", "--subnet", subnet, name], &[0])?;
-    Ok(())
+    let docker = container_runtime_from_env(Arc::new(StdProcessExecutor))?;
+    docker.create_network(name, subnet).map_err(Into::into)
 }
 
 /// Remove a Docker network.
@@ -30,6 +17,6 @@ pub fn docker_network_create(name: &str, subnet: &str) -> Result<(), CliError> {
 /// # Errors
 /// Returns `CliError` on command failure.
 pub fn docker_network_rm(name: &str) -> Result<(), CliError> {
-    docker(&["network", "rm", name], &[0, 1])?;
-    Ok(())
+    let docker = container_runtime_from_env(Arc::new(StdProcessExecutor))?;
+    docker.remove_network(name).map_err(Into::into)
 }

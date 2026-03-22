@@ -3,7 +3,8 @@ use std::sync::Arc;
 
 use super::*;
 use crate::infra::blocks::{
-    FakeComposeOrchestrator, FakeProcessExecutor, FakeProcessMethod, FakeResponse,
+    ContainerRuntime, FakeComposeOrchestrator, FakeContainerRuntime, FakeProcessExecutor,
+    FakeProcessMethod, FakeResponse,
 };
 
 fn success_result(args: &[&str]) -> CommandResult {
@@ -286,10 +287,65 @@ fn fake_compose_orchestrator_tracks_project_state() {
 fn compose_types_are_send_sync() {
     fn assert_send_sync<T: Send + Sync>() {}
 
+    assert_send_sync::<BollardComposeOrchestrator>();
     assert_send_sync::<ComposeFile>();
     assert_send_sync::<ComposeTopology>();
     assert_send_sync::<DockerComposeOrchestrator>();
     assert_send_sync::<FakeComposeOrchestrator>();
+}
+
+#[test]
+fn bollard_compose_orchestrator_up_and_down_use_container_runtime() {
+    let docker = Arc::new(FakeContainerRuntime::new());
+    let orchestrator = BollardComposeOrchestrator::new(docker.clone());
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let compose_path = tmp.path().join("docker-compose.yaml");
+
+    sample_topology_with_service()
+        .to_compose_file()
+        .write_to(&compose_path)
+        .expect("expected compose file write");
+
+    let up = orchestrator
+        .up(&compose_path, "mesh", Duration::from_secs(60))
+        .expect("expected compose up to succeed");
+    assert_eq!(up.returncode, 0);
+    assert!(
+        docker
+            .network_exists("mesh_mesh-net")
+            .expect("expected created network")
+    );
+    assert!(
+        docker
+            .is_running("mesh-cp-1")
+            .expect("expected running container")
+    );
+
+    let down = orchestrator
+        .down(&compose_path, "mesh")
+        .expect("expected compose down to succeed");
+    assert_eq!(down.returncode, 0);
+    assert!(
+        !docker
+            .is_running("mesh-cp-1")
+            .expect("expected removed container")
+    );
+    assert!(
+        !docker
+            .network_exists("mesh_mesh-net")
+            .expect("expected removed network")
+    );
+}
+
+#[test]
+fn bollard_compose_orchestrator_down_project_is_idempotent() {
+    let orchestrator = BollardComposeOrchestrator::new(Arc::new(FakeContainerRuntime::new()));
+
+    let result = orchestrator
+        .down_project("nonexistent-contract-test-project")
+        .expect("expected idempotent down_project");
+
+    assert_eq!(result.returncode, 0);
 }
 
 // -- Contract tests: fake satisfies the same invariants as production --

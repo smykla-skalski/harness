@@ -62,6 +62,10 @@ impl CapabilityProbe for FakeProbe {
         }
         self.successful_invocations.contains(&invocation)
     }
+
+    fn docker_engine_reachable(&self) -> bool {
+        self.successful_invocations.contains("docker info")
+    }
 }
 
 fn write_suite_plugin(project_dir: &Path) {
@@ -378,11 +382,13 @@ fn readiness_blocks_platforms_when_docker_is_missing() {
     write_current_kuma_contract(&repo_root);
 
     let report = with_data_root(tmp.path(), || {
-        build_report(
-            Some(project_dir.to_str().unwrap()),
-            Some(repo_root.to_str().unwrap()),
-            &FakeProbe::ready(&home).without_command("docker"),
-        )
+        with_vars([("HARNESS_CONTAINER_RUNTIME", Some("docker-cli"))], || {
+            build_report(
+                Some(project_dir.to_str().unwrap()),
+                Some(repo_root.to_str().unwrap()),
+                &FakeProbe::ready(&home).without_command("docker"),
+            )
+        })
     });
 
     assert!(report.readiness.create.ready);
@@ -393,6 +399,11 @@ fn readiness_blocks_platforms_when_docker_is_missing() {
             .blocking_checks
             .contains(&"docker_binary_present".to_string())
     );
+    assert!(
+        report.readiness.platforms["universal"]
+            .blocking_checks
+            .is_empty()
+    );
     assert_eq!(
         report
             .readiness
@@ -402,6 +413,42 @@ fn readiness_blocks_platforms_when_docker_is_missing() {
             .unwrap()
             .status,
         ReadinessStatus::Skipped
+    );
+}
+
+#[test]
+fn readiness_keeps_universal_ready_with_bollard_when_docker_cli_is_missing() {
+    let tmp = tempfile::tempdir().unwrap();
+    let home = tmp.path().join("home");
+    let repo_root = tmp.path().join("repo-root");
+    let project_dir = tmp.path().join("project");
+    fs::create_dir_all(&home).unwrap();
+    fs::create_dir_all(home.join("bin")).unwrap();
+    fs::create_dir_all(&project_dir).unwrap();
+    write_suite_plugin(&project_dir);
+    write_current_kuma_contract(&repo_root);
+
+    let report = with_data_root(tmp.path(), || {
+        with_vars([("HARNESS_CONTAINER_RUNTIME", Some("bollard"))], || {
+            build_report(
+                Some(project_dir.to_str().unwrap()),
+                Some(repo_root.to_str().unwrap()),
+                &FakeProbe::ready(&home).without_command("docker"),
+            )
+        })
+    });
+
+    assert!(!report.readiness.platforms["kubernetes"].ready);
+    assert!(report.readiness.platforms["universal"].ready);
+    assert_eq!(
+        report
+            .readiness
+            .checks
+            .iter()
+            .find(|check| check.code == "docker_running")
+            .unwrap()
+            .status,
+        ReadinessStatus::Pass
     );
 }
 

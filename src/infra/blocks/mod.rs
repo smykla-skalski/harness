@@ -14,12 +14,16 @@ mod registry;
 pub use build::{BuildSystem, BuildTarget, ProcessBuildSystem};
 pub use clock::{Clock, SystemClock};
 #[cfg(feature = "compose")]
-pub use compose::DockerComposeOrchestrator;
+pub use compose::{BollardComposeOrchestrator, DockerComposeOrchestrator};
 pub use compose::{
     ComposeFile, ComposeOrchestrator, ComposeTopology, HealthcheckSpec, NetworkSpec,
     ServiceDependency, ServiceSpec,
 };
-pub use docker::{ContainerConfig, ContainerRuntime, ContainerSnapshot, DockerContainerRuntime};
+pub use docker::{
+    BollardContainerRuntime, ContainerConfig, ContainerRuntime, ContainerRuntimeBackend,
+    ContainerSnapshot, DockerContainerRuntime, container_backend_from_env,
+    container_backends_from_env, container_runtime_from_env,
+};
 pub use envoy::{CaptureRequest, EnvoyIntrospector, ProxyIntrospector};
 pub use error::BlockError;
 #[cfg(feature = "helm")]

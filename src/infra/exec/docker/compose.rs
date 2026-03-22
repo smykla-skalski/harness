@@ -1,10 +1,11 @@
 use std::path::Path;
+use std::sync::Arc;
+use std::time::Duration;
 
 use crate::errors::CliError;
+use crate::infra::blocks::{StdProcessExecutor, container_backends_from_env};
 
 use super::super::CommandResult;
-use super::super::run_command;
-use super::super::run_command_streaming;
 
 /// Start services from a compose file with a wait timeout.
 ///
@@ -18,26 +19,15 @@ pub fn compose_up(
     project: &str,
     timeout_seconds: u32,
 ) -> Result<CommandResult, CliError> {
-    let file_str = file.to_string_lossy();
-    let timeout_str = timeout_seconds.to_string();
-    run_command_streaming(
-        &[
-            "docker",
-            "compose",
-            "-f",
-            &file_str,
-            "-p",
+    let runtimes = container_backends_from_env(Arc::new(StdProcessExecutor))?;
+    runtimes
+        .compose_orchestrator
+        .up(
+            file,
             project,
-            "up",
-            "-d",
-            "--wait",
-            "--wait-timeout",
-            &timeout_str,
-        ],
-        None,
-        None,
-        &[0],
-    )
+            Duration::from_secs(u64::from(timeout_seconds)),
+        )
+        .map_err(Into::into)
 }
 
 /// Stop and remove compose services using a compose file.
@@ -45,15 +35,11 @@ pub fn compose_up(
 /// # Errors
 /// Returns `CliError` on command failure.
 pub fn compose_down(file: &Path, project: &str) -> Result<CommandResult, CliError> {
-    let file_str = file.to_string_lossy();
-    run_command(
-        &[
-            "docker", "compose", "-f", &file_str, "-p", project, "down", "-v",
-        ],
-        None,
-        None,
-        &[0],
-    )
+    let runtimes = container_backends_from_env(Arc::new(StdProcessExecutor))?;
+    runtimes
+        .compose_orchestrator
+        .down(file, project)
+        .map_err(Into::into)
 }
 
 /// Stop and remove compose services by project name only.
@@ -63,10 +49,9 @@ pub fn compose_down(file: &Path, project: &str) -> Result<CommandResult, CliErro
 /// # Errors
 /// Returns `CliError` on command failure.
 pub fn compose_down_project(project: &str) -> Result<CommandResult, CliError> {
-    run_command(
-        &["docker", "compose", "-p", project, "down", "-v"],
-        None,
-        None,
-        &[0],
-    )
+    let runtimes = container_backends_from_env(Arc::new(StdProcessExecutor))?;
+    runtimes
+        .compose_orchestrator
+        .down_project(project)
+        .map_err(Into::into)
 }

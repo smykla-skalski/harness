@@ -10,6 +10,8 @@ pub fn sample_container_config() -> ContainerConfig {
         env: vec![],
         ports: vec![],
         labels: vec![("contract-test".to_string(), "true".to_string())],
+        entrypoint: None,
+        restart_policy: None,
         extra_args: vec![],
         command: vec!["sleep".to_string(), "10".to_string()],
     }
