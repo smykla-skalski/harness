@@ -4,7 +4,7 @@ use std::sync::Arc;
 use serde_json::Value;
 
 use super::error::BlockError;
-use super::kubernetes::KubernetesOperator;
+use super::kubernetes::{ExecRequest, KubernetesRuntime};
 
 /// Parameters for an Envoy config dump capture request.
 pub struct CaptureRequest<'a> {
@@ -45,14 +45,14 @@ pub trait ProxyIntrospector: Send + Sync {
     fn extract_bootstrap(&self, payload: &str, grep: Option<&str>) -> String;
 }
 
-/// Production Envoy introspector backed by `KubernetesOperator::run`.
+/// Production Envoy introspector backed by `KubernetesRuntime::exec`.
 pub struct EnvoyIntrospector {
-    kubernetes: Arc<dyn KubernetesOperator>,
+    kubernetes: Arc<dyn KubernetesRuntime>,
 }
 
 impl EnvoyIntrospector {
     #[must_use]
-    pub fn new(kubernetes: Arc<dyn KubernetesOperator>) -> Self {
+    pub fn new(kubernetes: Arc<dyn KubernetesRuntime>) -> Self {
         Self { kubernetes }
     }
 }
@@ -63,21 +63,15 @@ impl ProxyIntrospector for EnvoyIntrospector {
             "http://{}:{}{}",
             request.admin_host, request.admin_port, request.admin_path
         );
-        let args = [
-            "exec",
-            request.workload,
-            "-n",
-            request.namespace,
-            "-c",
-            request.container,
-            "--",
-            "curl",
-            "-s",
-            &url,
-        ];
+        let args = ["curl", "-s", &url];
         let kube_path = request.kubeconfig.map(Path::new);
-        let result = self.kubernetes.run(kube_path, &args, &[0])?;
-        Ok(result.stdout)
+        self.kubernetes.exec(&ExecRequest {
+            kubeconfig: kube_path,
+            namespace: request.namespace,
+            workload: request.workload,
+            container: Some(request.container),
+            command: &args,
+        })
     }
 
     fn find_route(&self, payload: &str, match_path: &str) -> Option<String> {

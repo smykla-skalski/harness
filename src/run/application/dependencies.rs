@@ -4,13 +4,15 @@ use std::sync::Arc;
 
 use crate::errors::{CliError, CliErrorKind};
 use crate::infra::blocks::{
-    BlockError, BlockRequirement, ContainerRuntime, StdProcessExecutor, container_runtime_from_env,
+    BlockError, BlockRequirement, ContainerRuntime, KubernetesRuntime, StdProcessExecutor,
+    container_runtime_from_env, kubernetes_runtime_from_env,
 };
 
 /// Explicit infrastructure required by tracked-run use cases.
 #[derive(Clone)]
 pub(crate) struct RunDependencies {
     docker: Option<Arc<dyn ContainerRuntime>>,
+    kubernetes: Option<Arc<dyn KubernetesRuntime>>,
     requirements: RequirementSupport,
 }
 
@@ -18,6 +20,7 @@ impl fmt::Debug for RunDependencies {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("RunDependencies")
             .field("has_docker", &self.docker.is_some())
+            .field("has_kubernetes", &self.kubernetes.is_some())
             .field("requirements", &self.requirements)
             .finish()
     }
@@ -27,9 +30,11 @@ impl RunDependencies {
     #[must_use]
     pub(crate) fn production() -> Self {
         let process = Arc::new(StdProcessExecutor);
-        let docker = container_runtime_from_env(process).ok();
+        let docker = container_runtime_from_env(process.clone()).ok();
+        let kubernetes = kubernetes_runtime_from_env(process).ok();
         Self {
             docker,
+            kubernetes,
             requirements: RequirementSupport::production(),
         }
     }
@@ -44,6 +49,11 @@ impl RunDependencies {
         self.docker.as_deref()
     }
 
+    #[must_use]
+    pub(crate) fn has_kubernetes(&self) -> bool {
+        self.kubernetes.is_some()
+    }
+
     /// Return docker or a typed missing-context error.
     ///
     /// # Errors
@@ -52,6 +62,16 @@ impl RunDependencies {
         self.docker
             .as_deref()
             .ok_or_else(|| CliErrorKind::missing_run_context_value("docker").into())
+    }
+
+    /// Return Kubernetes runtime or a typed missing-context error.
+    ///
+    /// # Errors
+    /// Returns `CliError` when Kubernetes support is unavailable.
+    pub(crate) fn kubernetes_required(&self) -> Result<&dyn KubernetesRuntime, CliError> {
+        self.kubernetes
+            .as_deref()
+            .ok_or_else(|| CliErrorKind::missing_run_context_value("kubernetes_runtime").into())
     }
 
     /// Validate suite-declared requirement names against supported run capabilities.

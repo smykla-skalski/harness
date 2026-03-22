@@ -1,15 +1,32 @@
 use std::path::Path;
-use std::sync::Arc;
+use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
 
 use crate::infra::blocks::BlockError;
-use crate::infra::blocks::ProcessExecutor;
-use crate::infra::exec::CommandResult;
 
+mod backend;
+mod diff;
+mod dynamic;
+mod kubeconfig;
+mod local_cluster;
 mod pods;
+mod runtime_cli;
+mod runtime_kube;
 
-/// Snapshot of a Kubernetes pod from `kubectl get pods -o json`.
+pub const KUBERNETES_RUNTIME_ENV: &str = "HARNESS_KUBERNETES_RUNTIME";
+
+pub use backend::{
+    KubernetesRuntimeBackend, SelectedKubernetesBackends, kubernetes_backend_from_env,
+    kubernetes_backends_from_env, kubernetes_runtime_from_env,
+};
+#[cfg(feature = "k3d")]
+pub use local_cluster::K3dClusterManager;
+pub use local_cluster::LocalClusterManager;
+pub use runtime_cli::KubectlRuntime;
+pub use runtime_kube::KubeRuntime;
+
+/// Snapshot of a Kubernetes pod.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct PodSnapshot {
     pub namespace: Option<String>,
@@ -20,156 +37,205 @@ pub struct PodSnapshot {
     pub node: Option<String>,
 }
 
-/// Kubernetes cluster operations backed by `kubectl`.
-pub trait KubernetesOperator: Send + Sync {
-    /// Run `kubectl` with optional kubeconfig, capturing output.
+/// Result of comparing a manifest to live cluster state.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ManifestDiff {
+    NoDiff,
+    HasDiff,
+}
+
+/// Parameters for executing a command inside a Kubernetes workload.
+pub struct ExecRequest<'a> {
+    pub kubeconfig: Option<&'a Path>,
+    pub namespace: &'a str,
+    pub workload: &'a str,
+    pub container: Option<&'a str>,
+    pub command: &'a [&'a str],
+}
+
+/// Centralized Kubernetes operations for Harness.
+pub trait KubernetesRuntime: Send + Sync {
+    /// List pod snapshots across all namespaces.
     ///
     /// # Errors
     ///
-    /// Returns `BlockError` if the command fails.
-    fn run(
-        &self,
-        kubeconfig: Option<&Path>,
-        args: &[&str],
-        ok_exit_codes: &[i32],
-    ) -> Result<CommandResult, BlockError>;
+    /// Returns `BlockError` when the backend query fails.
+    fn list_pods(&self, kubeconfig: Option<&Path>) -> Result<Vec<PodSnapshot>, BlockError>;
 
     /// Restart deployments in the given namespaces.
     ///
     /// # Errors
     ///
-    /// Returns `BlockError` if any restart command fails.
+    /// Returns `BlockError` if any restart operation fails.
     fn rollout_restart(
         &self,
         kubeconfig: Option<&Path>,
         namespaces: &[String],
     ) -> Result<(), BlockError>;
 
-    /// List pod snapshots across all namespaces.
+    /// Run a command in a workload and return stdout.
     ///
     /// # Errors
     ///
-    /// Returns `BlockError` if the kubectl call or JSON parsing fails.
-    fn list_pods(&self, kubeconfig: Option<&Path>) -> Result<Vec<PodSnapshot>, BlockError>;
-}
+    /// Returns `BlockError` if pod resolution or command execution fails.
+    fn exec(&self, request: &ExecRequest<'_>) -> Result<String, BlockError>;
 
-/// Production Kubernetes operator backed by the `kubectl` binary.
-pub struct KubectlOperator {
-    process: Arc<dyn ProcessExecutor>,
-}
+    /// Apply the manifest to the cluster.
+    ///
+    /// # Errors
+    ///
+    /// Returns `BlockError` when the apply fails.
+    fn apply_manifest(&self, kubeconfig: Option<&Path>, manifest: &Path) -> Result<(), BlockError>;
 
-impl KubectlOperator {
-    #[must_use]
-    pub fn new(process: Arc<dyn ProcessExecutor>) -> Self {
-        Self { process }
-    }
-
-    fn kubectl_args(kubeconfig: Option<&Path>, args: &[&str]) -> Vec<String> {
-        let mut command = vec!["kubectl".to_string()];
-        if let Some(path) = kubeconfig {
-            command.push("--kubeconfig".to_string());
-            command.push(path.to_string_lossy().into_owned());
-        }
-        command.extend(args.iter().map(|arg| (*arg).to_string()));
-        command
-    }
-}
-
-impl KubernetesOperator for KubectlOperator {
-    fn run(
+    /// Validate the manifest with a server-side dry-run apply.
+    ///
+    /// # Errors
+    ///
+    /// Returns `BlockError` when the dry-run fails.
+    fn dry_run_manifest(
         &self,
         kubeconfig: Option<&Path>,
-        args: &[&str],
-        ok_exit_codes: &[i32],
-    ) -> Result<CommandResult, BlockError> {
-        let owned = Self::kubectl_args(kubeconfig, args);
-        let refs = owned.iter().map(String::as_str).collect::<Vec<_>>();
-        self.process.run(&refs, None, None, ok_exit_codes)
-    }
+        manifest: &Path,
+    ) -> Result<(), BlockError>;
 
-    fn rollout_restart(
+    /// Compare the manifest against live cluster state.
+    ///
+    /// # Errors
+    ///
+    /// Returns `BlockError` when the diff operation fails.
+    fn diff_manifest(
         &self,
         kubeconfig: Option<&Path>,
-        namespaces: &[String],
-    ) -> Result<(), BlockError> {
-        for namespace in namespaces {
-            self.run(
-                kubeconfig,
-                &["rollout", "restart", "deployment", "-n", namespace],
-                &[0],
-            )?;
-        }
-        Ok(())
-    }
+        manifest: &Path,
+    ) -> Result<ManifestDiff, BlockError>;
 
-    fn list_pods(&self, kubeconfig: Option<&Path>) -> Result<Vec<PodSnapshot>, BlockError> {
-        let result = self.run(
-            kubeconfig,
-            &["get", "pods", "--all-namespaces", "-o", "json"],
-            &[0],
-        )?;
-        pods::pod_snapshots_from_json(&result.stdout)
-    }
-}
-
-/// Local disposable cluster operations backed by `k3d`.
-pub trait LocalClusterManager: Send + Sync {
-    /// Run `k3d`, capturing output.
+    /// Delete all resources described by the manifest.
     ///
     /// # Errors
     ///
-    /// Returns `BlockError` if the command fails.
-    fn run(&self, args: &[&str], ok_exit_codes: &[i32]) -> Result<CommandResult, BlockError>;
+    /// Returns `BlockError` when any delete operation fails.
+    fn delete_manifest(
+        &self,
+        kubeconfig: Option<&Path>,
+        manifest: &Path,
+        ok_not_found: bool,
+    ) -> Result<(), BlockError>;
 
-    /// Check whether a named local cluster exists.
+    /// Confirm that the referenced resource kinds exist on the cluster.
     ///
     /// # Errors
     ///
-    /// Returns `BlockError` if the `k3d` command fails.
-    fn cluster_exists(&self, name: &str) -> Result<bool, BlockError>;
+    /// Returns `BlockError` when discovery fails or a kind is missing.
+    fn validate_resources(
+        &self,
+        kubeconfig: Option<&Path>,
+        resources: &[(String, String)],
+    ) -> Result<(), BlockError>;
 
-    /// Delete or stop a named local cluster.
+    /// Flatten a kubeconfig into a single selected context.
     ///
     /// # Errors
     ///
-    /// Returns `BlockError` if the operation fails.
-    fn stop_cluster(&self, name: &str) -> Result<(), BlockError>;
-}
+    /// Returns `BlockError` when the kubeconfig cannot be loaded or serialized.
+    fn flatten_kubeconfig(
+        &self,
+        kubeconfig: &Path,
+        context: Option<&str>,
+    ) -> Result<String, BlockError>;
 
-/// Production local-cluster manager backed by `k3d`.
-#[cfg(feature = "k3d")]
-pub struct K3dClusterManager {
-    process: Arc<dyn ProcessExecutor>,
-}
+    /// Probe cluster reachability.
+    ///
+    /// # Errors
+    ///
+    /// Returns `BlockError` when the API server cannot be reached.
+    fn probe_cluster(&self, kubeconfig: &Path) -> Result<(), BlockError>;
 
-#[cfg(feature = "k3d")]
-impl K3dClusterManager {
-    #[must_use]
-    pub fn new(process: Arc<dyn ProcessExecutor>) -> Self {
-        Self { process }
-    }
-}
+    /// Return the configured API server URL for the kubeconfig.
+    ///
+    /// # Errors
+    ///
+    /// Returns `BlockError` when the server cannot be resolved.
+    fn cluster_server(&self, kubeconfig: &Path) -> Result<String, BlockError>;
 
-#[cfg(feature = "k3d")]
-impl LocalClusterManager for K3dClusterManager {
-    fn run(&self, args: &[&str], ok_exit_codes: &[i32]) -> Result<CommandResult, BlockError> {
-        let mut command = vec!["k3d"];
-        command.extend_from_slice(args);
-        self.process.run(&command, None, None, ok_exit_codes)
-    }
+    /// Check whether a namespace exists.
+    ///
+    /// # Errors
+    ///
+    /// Returns `BlockError` when the lookup fails.
+    fn namespace_exists(&self, kubeconfig: &Path, namespace: &str) -> Result<bool, BlockError>;
 
-    fn cluster_exists(&self, name: &str) -> Result<bool, BlockError> {
-        let result = self.run(&["cluster", "list", "--no-headers"], &[0])?;
-        Ok(result
-            .stdout
-            .lines()
-            .any(|line| line.split_whitespace().next() == Some(name)))
-    }
+    /// Check whether a CRD exists.
+    ///
+    /// # Errors
+    ///
+    /// Returns `BlockError` when the lookup fails.
+    fn crd_exists(&self, kubeconfig: Option<&Path>, name: &str) -> Result<bool, BlockError>;
 
-    fn stop_cluster(&self, name: &str) -> Result<(), BlockError> {
-        self.run(&["cluster", "stop", name], &[0])?;
-        Ok(())
-    }
+    /// Resolve a service `NodePort` by named service port.
+    ///
+    /// # Errors
+    ///
+    /// Returns `BlockError` when the lookup fails.
+    fn service_node_port(
+        &self,
+        kubeconfig: &Path,
+        namespace: &str,
+        service: &str,
+        port_name: &str,
+    ) -> Result<Option<u16>, BlockError>;
+
+    /// Check whether a named resource exists.
+    ///
+    /// # Errors
+    ///
+    /// Returns `BlockError` when discovery or lookup fails.
+    fn resource_exists(
+        &self,
+        kubeconfig: &Path,
+        namespace: Option<&str>,
+        api_version: &str,
+        kind: &str,
+        name: &str,
+    ) -> Result<bool, BlockError>;
+
+    /// Delete a namespace.
+    ///
+    /// # Errors
+    ///
+    /// Returns `BlockError` when the delete fails.
+    fn delete_namespace(
+        &self,
+        kubeconfig: &Path,
+        namespace: &str,
+        wait: bool,
+        ok_not_found: bool,
+    ) -> Result<(), BlockError>;
+
+    /// Wait for deployments matching a selector to become available.
+    ///
+    /// # Errors
+    ///
+    /// Returns `BlockError` on timeout or backend failure.
+    fn wait_for_deployments_available(
+        &self,
+        kubeconfig: &Path,
+        namespace: &str,
+        selector: &str,
+        timeout: Duration,
+    ) -> Result<(), BlockError>;
+
+    /// Wait for pods matching a selector to become ready.
+    ///
+    /// # Errors
+    ///
+    /// Returns `BlockError` on timeout or backend failure.
+    fn wait_for_pods_ready(
+        &self,
+        kubeconfig: &Path,
+        namespace: &str,
+        selector: &str,
+        timeout: Duration,
+    ) -> Result<(), BlockError>;
 }
 
 #[cfg(test)]
@@ -177,7 +243,7 @@ impl LocalClusterManager for K3dClusterManager {
 mod fake;
 #[cfg(test)]
 pub use fake::{
-    FakeK3dInvocation, FakeKubectlInvocation, FakeKubernetesOperator, FakeLocalClusterManager,
+    FakeK3dInvocation, FakeKubernetesInvocation, FakeKubernetesRuntime, FakeLocalClusterManager,
 };
 
 #[cfg(test)]

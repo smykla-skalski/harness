@@ -566,3 +566,73 @@ fn readiness_keeps_remote_provider_ready_when_k3d_is_missing() {
                 && profile.ready)
     );
 }
+
+#[test]
+fn readiness_keeps_kubernetes_ready_with_native_runtime_when_kubectl_is_missing() {
+    let tmp = tempfile::tempdir().unwrap();
+    let (home_dir, project_dir) = prepare_project_root_with_contract(tmp.path());
+
+    let report = with_data_root(tmp.path(), || {
+        build_report(
+            Some(project_dir.to_str().unwrap()),
+            None,
+            &FakeProbe::ready(&home_dir).without_command("kubectl"),
+        )
+    });
+
+    assert!(report.readiness.platforms["kubernetes"].ready);
+    assert!(report.readiness.providers["k3d"].ready);
+    assert!(report.readiness.providers["remote"].ready);
+
+    let kubectl_check = report
+        .readiness
+        .checks
+        .iter()
+        .find(|check| check.code == "kubectl_binary_present")
+        .unwrap();
+    assert_eq!(kubectl_check.status, ReadinessStatus::Fail);
+
+    let runtime_check = report
+        .readiness
+        .checks
+        .iter()
+        .find(|check| check.code == "kubernetes_runtime_ready")
+        .unwrap();
+    assert_eq!(runtime_check.status, ReadinessStatus::Pass);
+}
+
+#[test]
+fn readiness_blocks_kubernetes_when_kubectl_cli_backend_is_selected_without_kubectl() {
+    let tmp = tempfile::tempdir().unwrap();
+    let (home_dir, project_dir) = prepare_project_root_with_contract(tmp.path());
+
+    let report = with_data_root(tmp.path(), || {
+        with_vars(
+            [("HARNESS_KUBERNETES_RUNTIME", Some("kubectl-cli"))],
+            || {
+                build_report(
+                    Some(project_dir.to_str().unwrap()),
+                    None,
+                    &FakeProbe::ready(&home_dir).without_command("kubectl"),
+                )
+            },
+        )
+    });
+
+    assert!(!report.readiness.platforms["kubernetes"].ready);
+    assert!(!report.readiness.providers["k3d"].ready);
+    assert!(!report.readiness.providers["remote"].ready);
+    assert!(
+        report.readiness.platforms["kubernetes"]
+            .blocking_checks
+            .contains(&"kubernetes_runtime_ready".to_string())
+    );
+
+    let runtime_check = report
+        .readiness
+        .checks
+        .iter()
+        .find(|check| check.code == "kubernetes_runtime_ready")
+        .unwrap();
+    assert_eq!(runtime_check.status, ReadinessStatus::Fail);
+}

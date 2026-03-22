@@ -10,7 +10,7 @@ use std::fmt;
 use std::path::Path;
 
 use crate::errors::{CliError, CliErrorKind};
-use crate::infra::blocks::ContainerRuntime;
+use crate::infra::blocks::{ContainerRuntime, KubernetesRuntime};
 use crate::infra::exec::{self, HttpMethod};
 use crate::kernel::topology::ClusterSpec;
 use crate::platform::runtime::{ClusterRuntime, ControlPlaneAccess, XdsAccess};
@@ -35,6 +35,7 @@ impl fmt::Debug for RunServices {
         f.debug_struct("RunServices")
             .field("ctx", &self.ctx)
             .field("has_docker", &self.dependencies.has_docker())
+            .field("has_kubernetes", &self.dependencies.has_kubernetes())
             .finish()
     }
 }
@@ -101,6 +102,10 @@ impl RunServices {
 
     pub(crate) fn docker_if_available(&self) -> Option<&dyn ContainerRuntime> {
         self.dependencies.docker()
+    }
+
+    pub(crate) fn kubernetes(&self) -> Result<&dyn KubernetesRuntime, CliError> {
+        self.dependencies.kubernetes_required()
     }
 
     /// Return the persisted cluster spec.
