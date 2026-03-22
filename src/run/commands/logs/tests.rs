@@ -13,10 +13,7 @@ fn resolve_direct_container_single_zone() {
     )
     .unwrap();
     let runtime = ClusterRuntime::from_spec(&spec);
-    assert_eq!(
-        runtime.resolve_container_name("test-cp"),
-        "harness-test-cp-test-cp-1"
-    );
+    assert_eq!(runtime.resolve_container_name("test-cp"), "test-cp");
 }
 
 #[test]
@@ -32,6 +29,25 @@ fn resolve_compose_container_multi_zone() {
     .unwrap();
     let runtime = ClusterRuntime::from_spec(&spec);
     assert_eq!(runtime.resolve_container_name("g"), "harness-g-g-1");
+}
+
+#[test]
+fn resolve_compose_container_single_zone_postgres() {
+    let mut spec = ClusterSpec::from_mode_with_platform(
+        "single-up",
+        &["test-cp".into()],
+        "/r",
+        vec![],
+        vec![],
+        Platform::Universal,
+    )
+    .unwrap();
+    spec.store_type = Some("postgres".into());
+    let runtime = ClusterRuntime::from_spec(&spec);
+    assert_eq!(
+        runtime.resolve_container_name("test-cp"),
+        "harness-test-cp-test-cp-1"
+    );
 }
 
 #[test]

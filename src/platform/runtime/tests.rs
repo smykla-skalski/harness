@@ -87,6 +87,13 @@ fn universal_runtime_exposes_control_plane_access() {
 }
 
 #[test]
+fn universal_runtime_resolves_direct_member_container_name_for_single_zone_memory() {
+    let spec = universal_spec();
+    let runtime = ClusterRuntime::from_spec(&spec);
+    assert_eq!(runtime.resolve_container_name("cp").as_ref(), "cp");
+}
+
+#[test]
 fn universal_runtime_resolves_compose_member_container_name() {
     let spec = compose_universal_spec();
     let runtime = ClusterRuntime::from_spec(&spec);

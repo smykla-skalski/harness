@@ -155,6 +155,7 @@ impl ClusterSpec {
     #[must_use]
     pub fn is_compose_managed(&self) -> bool {
         self.provider == ClusterProvider::Compose
+            && (!self.mode.is_single() || self.store_type.as_deref() == Some("postgres"))
     }
 
     #[must_use]
