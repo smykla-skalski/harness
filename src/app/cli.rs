@@ -80,7 +80,7 @@ pub enum CreateCommand {
 #[non_exhaustive]
 pub enum SetupCommand {
     Bootstrap(BootstrapArgs),
-    Kuma(KumaSetupArgs),
+    Kuma(Box<KumaSetupArgs>),
     Gateway(GatewayArgs),
     Capabilities(CapabilitiesArgs),
 }

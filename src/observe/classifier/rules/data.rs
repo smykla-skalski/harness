@@ -249,13 +249,14 @@ pub(crate) static TEXT_RULES: &[TextRule] = &[
         match_mode: MatchMode::FirstMatch,
         fingerprint_mode: FingerprintMode::Static,
         summary: SummaryTemplate::Static(
-            "Corporate/remote cluster context detected - should use local k3d",
+            "Unexpected external cluster context detected outside harness-managed kubeconfig",
         ),
         guidance: RuleGuidance::Fix {
             target: Some("skills/run/SKILL.md"),
             hint: Some(
-                "Commands are hitting a remote cluster. Set KUBECONFIG to \
-                 the local k3d config before running kubectl/harness commands.",
+                "Commands are hitting a non-harness kubeconfig. Use the kubeconfig tracked by \
+                 `harness setup kuma cluster` instead. Remote providers are supported only when \
+                 harness materialized the kubeconfig for the active cluster.",
             ),
         },
         skip_if_matched: &[],

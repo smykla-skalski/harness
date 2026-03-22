@@ -61,3 +61,9 @@ fn install_url_embeds_arbitrary_version() {
     assert!(url.contains("v0.99.0-rc.1"));
     assert!(url.ends_with("/standard-install.yaml"));
 }
+
+#[test]
+fn gateway_rejects_check_only_and_uninstall_together() {
+    let err = gateway(None, None, true, true).unwrap_err();
+    assert_eq!(err.code(), "USAGE");
+}

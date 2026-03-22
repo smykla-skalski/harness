@@ -1,18 +1,21 @@
 use std::borrow::Cow;
 use std::collections::HashMap;
 
+use serde::de::Deserializer;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use super::current_deploy;
-use super::{ClusterMember, ClusterMode, HelmSetting, Platform};
+use super::{ClusterMember, ClusterMode, ClusterProvider, HelmSetting, Platform};
 
 /// Full cluster specification describing a deployment topology.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct ClusterSpec {
     pub mode: ClusterMode,
     #[serde(default)]
     pub platform: Platform,
+    #[serde(default)]
+    pub provider: ClusterProvider,
     pub members: Vec<ClusterMember>,
     pub mode_args: Vec<String>,
     pub helm_settings: Vec<HelmSetting>,
@@ -26,6 +29,57 @@ pub struct ClusterSpec {
     pub cp_image: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub admin_token: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+struct ClusterSpecSerde {
+    pub mode: ClusterMode,
+    #[serde(default)]
+    pub platform: Platform,
+    #[serde(default)]
+    pub provider: Option<ClusterProvider>,
+    pub members: Vec<ClusterMember>,
+    #[serde(default)]
+    pub mode_args: Vec<String>,
+    #[serde(default)]
+    pub helm_settings: Vec<HelmSetting>,
+    #[serde(default)]
+    pub restart_namespaces: Vec<String>,
+    #[serde(default)]
+    pub repo_root: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub docker_network: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub store_type: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cp_image: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub admin_token: Option<String>,
+}
+
+impl<'de> Deserialize<'de> for ClusterSpec {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let raw = ClusterSpecSerde::deserialize(deserializer)?;
+        Ok(Self {
+            mode: raw.mode,
+            platform: raw.platform,
+            provider: raw
+                .provider
+                .unwrap_or_else(|| ClusterProvider::default_for_platform(raw.platform)),
+            members: raw.members,
+            mode_args: raw.mode_args,
+            helm_settings: raw.helm_settings,
+            restart_namespaces: raw.restart_namespaces,
+            repo_root: raw.repo_root,
+            docker_network: raw.docker_network,
+            store_type: raw.store_type,
+            cp_image: raw.cp_image,
+            admin_token: raw.admin_token,
+        })
+    }
 }
 
 impl ClusterSpec {
@@ -98,11 +152,7 @@ impl ClusterSpec {
 
     #[must_use]
     pub fn is_compose_managed(&self) -> bool {
-        self.members.len() > 1
-            || self
-                .store_type
-                .as_deref()
-                .is_some_and(|store| store == "postgres")
+        self.provider == ClusterProvider::Compose
     }
 
     #[must_use]

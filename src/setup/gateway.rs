@@ -11,6 +11,7 @@ use crate::errors::{CliError, CliErrorKind};
 use crate::infra::exec::{kubectl, run_command};
 use crate::infra::io::ensure_dir;
 use crate::workspace::HARNESS_PREFIX;
+use crate::workspace::sync_gateway_api_install_state;
 
 impl Execute for GatewayArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
@@ -18,6 +19,7 @@ impl Execute for GatewayArgs {
             self.kubeconfig.as_deref(),
             self.repo_root.as_deref(),
             self.check_only,
+            self.uninstall,
         )
     }
 }
@@ -28,10 +30,10 @@ impl Execute for GatewayArgs {
 
 const GATEWAY_CLASS_CRD: &str = "gatewayclasses.gateway.networking.k8s.io";
 
-/// Arguments for `harness gateway`.
+/// Arguments for `harness setup gateway`.
 #[derive(Debug, Clone, Args)]
 pub struct GatewayArgs {
-    /// Use this kubeconfig for the target local cluster.
+    /// Use this kubeconfig for the target cluster.
     #[arg(long)]
     pub kubeconfig: Option<String>,
     /// Repo root to resolve the pinned Gateway API version.
@@ -40,6 +42,9 @@ pub struct GatewayArgs {
     /// Only check whether the Gateway API CRDs are already installed.
     #[arg(long)]
     pub check_only: bool,
+    /// Uninstall the Gateway API CRDs previously installed by harness.
+    #[arg(long)]
+    pub uninstall: bool,
 }
 
 static GATEWAY_RE: LazyLock<Regex> =
@@ -74,7 +79,14 @@ pub fn gateway(
     kubeconfig: Option<&str>,
     repo_root: Option<&str>,
     check_only: bool,
+    uninstall: bool,
 ) -> Result<i32, CliError> {
+    if check_only && uninstall {
+        return Err(CliErrorKind::usage_error(
+            "--check-only and --uninstall cannot be used together",
+        )
+        .into());
+    }
     let root = resolve_repo_root(repo_root);
     let version = detect_gateway_version(&root)?;
     // `Path::new` borrows from the caller's `&str` - no heap allocation needed.
@@ -111,7 +123,19 @@ pub fn gateway(
         return Err(CliErrorKind::gateway_download_empty(temp_str).into());
     }
 
+    if uninstall {
+        kubectl(kc, &["delete", "-f", &temp_str], &[0, 1])?;
+        if let Some(kubeconfig) = kc {
+            sync_gateway_api_install_state(&root, kubeconfig, false)?;
+        }
+        println!("Gateway API {version} CRDs uninstalled");
+        return Ok(0);
+    }
+
     kubectl(kc, &["apply", "-f", &temp_str], &[0])?;
+    if let Some(kubeconfig) = kc {
+        sync_gateway_api_install_state(&root, kubeconfig, true)?;
+    }
     println!("Gateway API {version} CRDs installed");
     Ok(0)
 }

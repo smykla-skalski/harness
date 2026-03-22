@@ -5,6 +5,7 @@ use std::path::Path;
 use super::universal::{
     KUMA_CP_IMAGE_FILTERS, load_persisted_cluster_spec, resolve_cp_image, resolve_effective_store,
 };
+use super::{RemoteClusterTarget, parse_remote_target};
 
 fn scope_key_for_session(session_id: &str) -> String {
     use sha2::{Digest, Sha256};
@@ -171,4 +172,27 @@ fn resolve_cp_image_returns_explicit_even_with_skip_build() {
     let tmp = tempfile::tempdir().unwrap();
     let result = resolve_cp_image(tmp.path(), Some("kumahq/kuma-cp:latest"), true);
     assert_eq!(result.unwrap(), "kumahq/kuma-cp:latest");
+}
+
+#[test]
+fn parse_remote_target_accepts_context() {
+    let target =
+        parse_remote_target("name=kuma-1,kubeconfig=/tmp/global.yaml,context=global").unwrap();
+    assert_eq!(
+        target,
+        RemoteClusterTarget {
+            name: "kuma-1".into(),
+            kubeconfig: "/tmp/global.yaml".into(),
+            context: Some("global".into()),
+        }
+    );
+}
+
+#[test]
+fn parse_remote_target_requires_name_and_kubeconfig() {
+    let missing_name = parse_remote_target("kubeconfig=/tmp/global.yaml").unwrap_err();
+    assert!(missing_name.contains("missing `name`"));
+
+    let missing_kubeconfig = parse_remote_target("name=kuma-1").unwrap_err();
+    assert!(missing_kubeconfig.contains("missing `kubeconfig`"));
 }
