@@ -65,9 +65,9 @@ flowchart LR
 | Path             | Owns                                                                               |
 | ---------------- | ---------------------------------------------------------------------------------- |
 | `src/app/`       | Clap CLI, top-level command grouping, transport mapping, domain wiring             |
-| `src/run/`       | tracked runs, run workflow, prepared artifacts, reporting, run-specific state      |
+| `src/run/`       | tracked runs, run workflow, prepared artifacts, reporting, run diagnostics, repair |
 | `src/create/`    | `suite:create` workflow, approval state, create validation, create session state   |
-| `src/observe/`   | log/session scanning, classifiers, dump/scan flows, observe output                 |
+| `src/observe/`   | log/session scanning, doctor diagnostics, classifiers, dump/scan flows, output     |
 | `src/setup/`     | environment bootstrap, wrapper/session lifecycle, cluster setup entrypoints        |
 | `src/hooks/`     | hook payload handling, guard policy, protocol normalization, hook effects          |
 | `src/kernel/`    | pure shared concepts such as command intent, topology, skill ids, gates            |

@@ -14,11 +14,12 @@ user-invocable: true
 Use this skill when the user wants to inspect or monitor another Claude Code session and `harness observe` is the source of truth.
 
 This skill must follow the current observe contract to prevent drift between the skill instructions and the CLI binary:
-- top-level subcommands are `scan`, `watch`, and `dump`
-- maintenance operations are routed through `harness observe scan <session-id> --action ...`
+- top-level subcommands are `doctor`, `scan`, `watch`, and `dump`
+- `harness observe doctor` is the direct project-health command
+- stateful observer maintenance stays under `harness observe scan <session-id> --action ...`
 - observer state is stored automatically at `$XDG_DATA_HOME/harness/observe/<SESSION_ID>.state`
 
-Do not use the removed top-level observe maintenance commands because they were consolidated under `scan --action ...` and the old entry points no longer resolve.
+Do not use the removed `scan --action doctor` form. Use `harness observe doctor` directly. Do not use removed top-level observe maintenance commands.
 
 Do not assume autonomous fixing because misidentified classifier findings can cause regressions if applied without triage. Observe first, summarize clearly, and ask the user before applying fixes or spawning deeper analysis.
 
@@ -60,6 +61,8 @@ Resolve:
 - optional start from `--from` or `--from-line`
 - optional `--focus` preset
 
+If the user asked whether harness itself is wired correctly, or you suspect stale wrapper, pointer, or compact-handoff state, start with `harness observe doctor`.
+
 If the user did not request continuous monitoring, start with a one-shot scan.
 
 Read [references/command-surface.md](references/command-surface.md) for the full list of supported invocation shapes and maintenance actions.
@@ -73,6 +76,12 @@ harness observe scan <session-id> --project-hint <hint> --json --summary
 ```
 
 If the user requested a narrower slice, add the filters up front instead of scanning wide and triaging noise later.
+
+Project-health baseline when the issue may be environment or state drift:
+
+```bash
+harness observe doctor --project-dir "$CLAUDE_PROJECT_DIR" --json
+```
 
 ### 3. Triage before fixing
 
@@ -146,9 +155,18 @@ This skill is for observing and triaging Claude Code session recordings through 
 
 - **Missing session**: the session ID does not match any JSONL file. Verify the ID with `ls $XDG_DATA_HOME/harness/sessions/`.
 - **Empty scan**: scan returns zero issues. Check whether `--focus` or `--severity` filters are too narrow, or the session has no tool-use events yet.
+- **Broken harness wiring**: run `harness observe doctor` first. It checks the local install, active project plugin wiring, lifecycle command drift, current-run pointer readability, and compact handoff readability.
 - **Stale observer state**: `scan --action status` shows a cursor far behind the session length. Run `scan --action cycle` to advance the cursor.
 
 ## Example invocations
+
+<example>
+Check harness wiring for the current project:
+
+```bash
+harness observe doctor --project-dir "$CLAUDE_PROJECT_DIR" --json
+```
+</example>
 
 <example>
 Scan a session with default settings:

@@ -5,6 +5,6 @@ pub mod session_event;
 
 pub(crate) use execute::execute;
 pub(crate) use request::{
-    ObserveActionKind, ObserveDumpRequest, ObserveFilter, ObserveRequest, ObserveScanRequest,
-    ObserveWatchRequest,
+    ObserveActionKind, ObserveDoctorRequest, ObserveDumpRequest, ObserveFilter, ObserveRequest,
+    ObserveScanRequest, ObserveWatchRequest,
 };

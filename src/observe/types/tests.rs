@@ -232,7 +232,7 @@ fn issue_code_display_roundtrip() {
 
 #[test]
 fn issue_code_all_count() {
-    assert_eq!(IssueCode::ALL.len(), 57);
+    assert_eq!(IssueCode::ALL.len(), 56);
 }
 
 #[test]
