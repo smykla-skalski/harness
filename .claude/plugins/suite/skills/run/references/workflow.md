@@ -96,14 +96,22 @@ After Phase 3 attaches the run with `harness run start` or `harness run resume`,
 
 Read [cluster-setup.md](cluster-setup.md) before starting this phase.
 
-Pick a profile and start the cluster:
+Pick a profile and start the cluster. For Kubernetes profiles, also choose a provider:
 
 ```bash
-# Single-zone:
+# Single-zone, local k3d:
 harness setup kuma cluster single-up kuma-1
 
-# Or multi-zone:
+# Multi-zone, local k3d:
 harness setup kuma cluster global-two-zones-up kuma-1 kuma-2 kuma-3 zone-1 zone-2
+
+# Single-zone, remote kubeconfig-backed Kubernetes:
+harness setup kuma cluster \
+  --provider remote \
+  --remote name=kuma-1,kubeconfig=/path/to/kuma-1.yaml[,context=kuma-1] \
+  --push-prefix ghcr.io/acme/kuma \
+  --push-tag branch-dev \
+  single-up kuma-1
 ```
 
 If changes modify CRDs, re-run Phase 2 bootstrap for the affected cluster profile and then rerun `harness run preflight` plus `harness run capture --label "preflight"` for the active run. Do not use a bare `kubectl apply` during a tracked run.
@@ -381,11 +389,17 @@ Use AskUserQuestion if the teardown situation is unclear, with options:
 Use the matching teardown command for the active profile:
 
 ```bash
-# Kubernetes single-zone
+# Kubernetes single-zone, local k3d
 harness setup kuma cluster single-down kuma-1
 
-# Kubernetes multi-zone (global + 2 zones)
+# Kubernetes multi-zone, local k3d (global + 2 zones)
 harness setup kuma cluster global-two-zones-down kuma-1 kuma-2 kuma-3
+
+# Kubernetes single-zone, remote
+harness setup kuma cluster --provider remote single-down kuma-1
+
+# Kubernetes multi-zone, remote
+harness setup kuma cluster --provider remote global-two-zones-down kuma-1 kuma-2 kuma-3
 
 # Universal single-zone
 harness setup kuma cluster --platform universal single-down test-cp

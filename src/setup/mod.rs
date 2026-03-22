@@ -1,7 +1,7 @@
 mod bootstrap;
 pub(crate) mod build_info;
 mod capabilities;
-mod cluster;
+pub(crate) mod cluster;
 mod gateway;
 mod kuma;
 mod pre_compact;

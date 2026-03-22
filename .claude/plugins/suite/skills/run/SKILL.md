@@ -1,11 +1,10 @@
 ---
 name: run
 description: >-
-  Execute reproducible suite runs on local k3d or universal Docker infrastructure for Kuma
-  service mesh features. Use when running manual verification, testing policy changes on real
-  clusters or universal mode containers, validating xDS config generation, or doing tracked
-  verification runs for any Kuma feature area.
-argument-hint: "[suite-path] [--profile single-zone|multi-zone] [--repo /path/to/kuma] [--run-id ID] [--resume RUN_ID]"
+  Execute reproducible suite runs on harness-managed Kubernetes or universal Docker infrastructure
+  for Kuma service mesh features. Supports local k3d Kubernetes, remote kubeconfig-backed
+  Kubernetes, and universal mode containers for tracked verification runs.
+argument-hint: "[suite-path] [--profile single-zone|multi-zone] [--provider local|remote] [--repo /path/to/kuma] [--run-id ID] [--resume RUN_ID]"
 allowed-tools: Agent, AskUserQuestion, Bash, Edit, Glob, Read, Write
 user-invocable: true
 hooks:
@@ -90,7 +89,7 @@ hooks:
 
 # Kuma suite runner
 
-Execute reproducible suite runs on local k3d clusters for any Kuma feature. Cluster creation and teardown are managed through `harness setup kuma cluster` in Phase 2 and Phase 8. Before any unplanned cluster operation, use AskUserQuestion with options:
+Execute reproducible suite runs on harness-managed Kubernetes or universal environments for any Kuma feature. Cluster creation, remote attachment, and teardown are managed through `harness setup kuma cluster` in Phase 2 and Phase 8. Before any unplanned cluster operation, use AskUserQuestion with options:
 
 - `Approve operation` - proceed with the cluster change
 - `Reject` - skip the operation
@@ -118,6 +117,7 @@ Parse from `$ARGUMENTS`:
 | --- | --- | --- |
 | (positional) | - | Suite path or bare name. Bare names (no `/`) are looked up in `${DATA_DIR}/` first. Prompt with AskUserQuestion if omitted |
 | `--profile` | `all` | Cluster profile: `single-zone`, `multi-zone`, `single-zone-universal`, `multi-zone-universal`, or `all`. When `all`, runs one full run per required profile. |
+| `--provider` | auto | Kubernetes provider: `local` maps to k3d, `remote` maps to kubeconfig-backed remote clusters. Only applies to Kubernetes profiles. |
 | `--repo` | auto-detect cwd | Path to Kuma repo checkout |
 | `--run-id` | timestamp-based | Override run identifier |
 | `--resume` | - | Resume a partial run by its run ID |
@@ -133,7 +133,7 @@ Parse from `$ARGUMENTS`:
 - kubectl: !`command -v kubectl >/dev/null 2>&1 && echo "installed" || echo "MISSING"`
 - helm: !`command -v helm >/dev/null 2>&1 && echo "installed" || echo "MISSING"`
 
-`DATA_DIR` is the suites directory. The timestamp is the default `RUN_ID` suffix. If session ID is empty or literal `${`, use `standalone`. If Docker is "not running" or any tool is "MISSING", stop immediately.
+`DATA_DIR` is the suites directory. The timestamp is the default `RUN_ID` suffix. If session ID is empty or literal `${`, use `standalone`. Docker must be running for Kubernetes or universal profiles. `k3d` is required only for local Kubernetes provider runs.
 
 <!-- justify: I23 harness on PATH via SessionStart hooks -->
 <!-- justify: HK-stdin harness reads hook stdin internally -->
@@ -167,6 +167,7 @@ Read [references/workflow.md](references/workflow.md) for the full procedure. Th
 
    - Prefer `readiness.profiles` when present. Only run profiles whose `ready` field is `true`.
    - If the requested profile is not ready, stop before cluster work and surface the matching `blocking_checks`.
+   - `readiness.profiles` may contain both `k3d` and `remote` variants for the same Kubernetes profile name. If both are ready and the user did not pass `--provider`, ask which provider to use before Phase 2.
    - Use `readiness.platforms` and `readiness.features` to decide whether the environment is usable now.
    - Keep the normal call zero-arg. Only use `--project-dir` or `--repo-root` as a last-resort debug override when state or cwd resolution is broken.
    - If `readiness` is absent (older harness binary), fall back to the older static logic based on `cluster_topologies`, `platforms`, and `features.*.available`.
@@ -180,7 +181,7 @@ Read [references/workflow.md](references/workflow.md) for the full procedure. Th
    - `Provide repo path`
    - `Cancel run`
 
-3. If Docker is "not running" or any tool is "MISSING" per Preprocessed context, stop and report.
+3. If Docker is "not running", stop and report. For Kubernetes local provider runs, `k3d`, `kubectl`, and `helm` must all be installed. For Kubernetes remote provider runs, `kubectl` and `helm` must be installed. For universal runs, Docker must be usable.
 4. All cluster commands go through tracked wrappers, never raw `kubectl` or `kumactl`.
 
 ### Phase 1: Resolve or resume run
@@ -218,14 +219,32 @@ Present the execution plan via AskUserQuestion with options:
 - `Select profiles` - user picks which profiles to run
 - `Single profile only` - run only the first required profile
 
-Select the cluster topology based on the profile being executed:
+Select the cluster topology based on the profile being executed. For Kubernetes profiles, also select the provider:
 
 ```bash
-# Kubernetes single-zone (--profile single-zone):
+# Kubernetes single-zone, local k3d (--profile single-zone --provider local):
 harness setup kuma cluster single-up kuma-1
 
-# Kubernetes multi-zone (--profile multi-zone):
+# Kubernetes multi-zone, local k3d (--profile multi-zone --provider local):
 harness setup kuma cluster global-two-zones-up kuma-1 kuma-2 kuma-3 zone-1 zone-2
+
+# Kubernetes single-zone, remote kubeconfigs (--profile single-zone --provider remote):
+harness setup kuma cluster \
+  --provider remote \
+  --remote name=kuma-1,kubeconfig=/path/to/kuma-1.yaml[,context=kuma-1] \
+  --push-prefix ghcr.io/acme/kuma \
+  --push-tag branch-dev \
+  single-up kuma-1
+
+# Kubernetes multi-zone, remote kubeconfigs (--profile multi-zone --provider remote):
+harness setup kuma cluster \
+  --provider remote \
+  --remote name=kuma-1,kubeconfig=/path/to/kuma-1.yaml[,context=global] \
+  --remote name=kuma-2,kubeconfig=/path/to/kuma-2.yaml[,context=zone-1] \
+  --remote name=kuma-3,kubeconfig=/path/to/kuma-3.yaml[,context=zone-2] \
+  --push-prefix ghcr.io/acme/kuma \
+  --push-tag branch-dev \
+  global-two-zones-up kuma-1 kuma-2 kuma-3 zone-1 zone-2
 
 # Universal single-zone (--profile single-zone-universal):
 harness setup kuma cluster --platform universal single-up test-cp
@@ -236,7 +255,7 @@ harness setup kuma cluster --platform universal global-zone-up global-cp zone-cp
 
 Read [references/universal-setup.md](references/universal-setup.md) for the universal mode lifecycle, including Docker container management, `harness run kuma token`, and `harness run kuma service` for service containers.
 
-If changes modify CRDs, re-run Phase 2 bootstrap and then re-run `harness run preflight` plus `harness run capture --label "preflight"` for the active run before continuing. If the suite references gateways (MeshGateway, GatewayClass, HTTPRoute, Gateway), install CRDs with `harness setup gateway` and verify with `harness setup gateway --check-only`.
+If changes modify CRDs, re-run Phase 2 bootstrap and then re-run `harness run preflight` plus `harness run capture --label "preflight"` for the active run before continuing. If the suite references gateways (MeshGateway, GatewayClass, HTTPRoute, Gateway), install CRDs with `harness setup gateway` and verify with `harness setup gateway --check-only`. In remote mode, pass the tracked generated kubeconfig path to `harness setup gateway --kubeconfig ...` so teardown can uninstall what harness installed later.
 
 **Gate**: cluster bootstrap is ready for `harness run start` or `harness run resume`.
 
@@ -343,7 +362,7 @@ Tear down the clusters created in Phase 2. Use the matching `harness setup kuma 
 
 ## Performance toggles
 
-Override env vars on `harness setup kuma cluster` calls: `HARNESS_BUILD_IMAGES=0 HARNESS_LOAD_IMAGES=0` skips rebuilds, `HARNESS_HELM_CLEAN=1` adds full isolation, `HARNESS_DOCKER_PRUNE=0` skips image cleanup (not recommended).
+Override env vars on `harness setup kuma cluster` calls: `HARNESS_BUILD_IMAGES=0 HARNESS_LOAD_IMAGES=0` skips rebuilds, `HARNESS_HELM_CLEAN=1` adds full isolation, `HARNESS_DOCKER_PRUNE=0` skips image cleanup (not recommended). Remote provider runs do not support `--no-load`.
 
 ## Report compactness thresholds
 
@@ -371,7 +390,7 @@ Hook codes:
 
 - [references/agent-contract.md](references/agent-contract.md) - agent rules, failure policy, artifacts
 - [references/workflow.md](references/workflow.md) - phase details with verification gates
-- [references/cluster-setup.md](references/cluster-setup.md) - k3d profiles, kubeconfig, deploy commands
+- [references/cluster-setup.md](references/cluster-setup.md) - local k3d and remote Kubernetes profiles, kubeconfig handling, deploy commands
 - [references/mesh-policies.md](references/mesh-policies.md) - Mesh\* policy create, targeting, debug flow
 - [references/validation.md](references/validation.md) - pre-apply checklist, safe apply flow
 - [references/troubleshooting.md](references/troubleshooting.md) - known failure modes and fixes
@@ -393,6 +412,12 @@ Hook codes:
 <example description="Run with explicit repo and multi-zone profile">
 ```bash
 /suite:run my-suite.md --profile multi-zone --repo ~/Projects/kuma
+```
+</example>
+
+<example description="Run a Kubernetes suite against remote clusters">
+```bash
+/suite:run my-suite.md --profile multi-zone --provider remote --repo ~/Projects/kuma
 ```
 </example>
 

@@ -64,6 +64,8 @@ Important difference:
 
 - `available` means harness supports that feature or platform in general
 - `readiness` means your current machine, project, and repo are ready for it now
+- `providers` tells you which cluster backends exist (`k3d`, `remote`, `compose`)
+- `readiness.providers` tells you which of those backends are usable right now
 
 Use `--project-dir` or `--repo-root` only when you are debugging broken cwd or project state. Normal usage should stay zero-arg.
 
@@ -93,6 +95,19 @@ harness run finish
 Harness stores the run state on disk, so you can inspect it later and the command history stays attached to the run instead of disappearing into shell history.
 
 If you need to pick an unfinished run back up, use `harness run resume --run-id <id> --run-root <path>` or just `harness run resume` when the current run pointer is already active.
+
+For an existing remote Kubernetes cluster, use the same flow but attach with `--provider remote` and explicit kubeconfig mappings:
+
+```bash
+harness setup kuma cluster \
+  --provider remote \
+  --remote name=dev,kubeconfig=/path/to/dev.yaml \
+  --push-prefix ghcr.io/acme/kuma \
+  --push-tag branch-dev \
+  single-up dev
+```
+
+Harness will materialize tracked kubeconfigs, push branch images through the Kuma repo contract, and deploy or upgrade Kuma without creating or deleting the cluster itself.
 
 ## Creating a suite
 
@@ -155,7 +170,7 @@ The create approval state lives in `.harness/suite-create-state.json`.
 
 Start here:
 
-- `harness observe doctor` to check wrapper wiring, lifecycle commands, current-run pointers, and compact handoff state
+- `harness observe doctor` to check wrapper wiring, lifecycle commands, current-run pointers, compact handoff state, and the active Kuma repo contract
 - `harness setup capabilities` to see which profiles and features are ready on this machine right now
 - `harness observe scan` to classify problems in session logs
 - `harness run doctor` to inspect one tracked run and its pointer state

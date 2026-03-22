@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 
 use temp_env::with_vars;
 
-use crate::kernel::topology::Platform;
+use crate::kernel::topology::{ClusterProvider, Platform};
 
 use super::capabilities;
 use super::data::{features, platforms};
@@ -81,6 +81,11 @@ fn write_current_kuma_contract(repo_root: &Path) {
     )
     .unwrap();
     fs::write(repo_root.join("mk/k8s.mk"), "CLUSTER ?= kuma-1\n").unwrap();
+    fs::write(
+        repo_root.join("mk/docker.mk"),
+        "images/release:\n\t@echo build\n\ndocker/push:\n\t@echo push\n\nmanifests/json/release:\n\t@echo []\n",
+    )
+    .unwrap();
 }
 
 fn create_home_dir(tmp: &Path) -> PathBuf {
@@ -125,26 +130,61 @@ fn assert_report_has_static_sections(caps: &CapabilitiesReport) {
     assert!(!caps.cluster_topologies.is_empty());
     assert!(!caps.features.is_empty());
     assert!(!caps.platforms.is_empty());
+    assert!(!caps.providers.is_empty());
 }
 
 fn assert_report_has_readiness_sections(caps: &CapabilitiesReport) {
     assert!(caps.readiness.create.ready);
     assert!(!caps.readiness.checks.is_empty());
+    assert!(!caps.readiness.providers.is_empty());
     assert!(!caps.readiness.profiles.is_empty());
 }
 
 fn assert_ready_profiles(report: &CapabilitiesReport) {
+    assert_ready_platforms_and_providers(report);
+    assert_ready_feature_sections(report);
+    assert_ready_profile_variants(report);
+}
+
+fn assert_ready_platforms_and_providers(report: &CapabilitiesReport) {
     assert!(report.readiness.platforms["kubernetes"].ready);
     assert!(report.readiness.platforms["universal"].ready);
+    assert!(report.readiness.providers["k3d"].ready);
+    assert!(report.readiness.providers["remote"].ready);
+    assert!(report.readiness.providers["compose"].ready);
+}
+
+fn assert_ready_feature_sections(report: &CapabilitiesReport) {
     assert!(report.readiness.features[&Feature::Bootstrap].ready);
     assert!(report.readiness.features[&Feature::GatewayApi].ready);
     assert!(report.readiness.features[&Feature::DataplaneTokens].ready);
+}
+
+fn assert_ready_profile_variants(report: &CapabilitiesReport) {
     assert!(
         report
             .readiness
             .profiles
             .iter()
             .all(|profile| profile.ready)
+    );
+    assert!(
+        report
+            .readiness
+            .profiles
+            .iter()
+            .any(|profile| profile.name == "single-zone"
+                && profile.provider == ClusterProvider::K3d
+                && profile.ready)
+    );
+    assert!(
+        report
+            .readiness
+            .profiles
+            .iter()
+            .any(|profile| profile.name == "single-zone"
+                && profile.provider == ClusterProvider::Remote
+                && profile.ready)
     );
 }
 
@@ -181,6 +221,17 @@ fn platforms_lists_both() {
     let names: Vec<Platform> = platform_list.iter().map(|info| info.name).collect();
     assert!(names.contains(&Platform::Kubernetes));
     assert!(names.contains(&Platform::Universal));
+}
+
+#[test]
+fn capabilities_report_lists_all_providers() {
+    let tmp = tempfile::tempdir().unwrap();
+    let home_dir = create_home_dir(tmp.path());
+    let caps = super::build_report_with_probe(None, None, &FakeProbe::ready(&home_dir));
+    let names: Vec<ClusterProvider> = caps.providers.iter().map(|info| info.name).collect();
+    assert!(names.contains(&ClusterProvider::K3d));
+    assert!(names.contains(&ClusterProvider::Remote));
+    assert!(names.contains(&ClusterProvider::Compose));
 }
 
 #[test]
@@ -372,6 +423,11 @@ fn readiness_marks_repo_contract_unready_when_targets_are_missing() {
     .unwrap();
     fs::write(repo_root.join("mk/k3d.mk"), "k3d/start:\n\t@echo old\n").unwrap();
     fs::write(repo_root.join("mk/k8s.mk"), "KIND_CLUSTER_NAME ?= kuma-1\n").unwrap();
+    fs::write(
+        repo_root.join("mk/docker.mk"),
+        "docker/push:\n\t@echo old\n",
+    )
+    .unwrap();
 
     let report = with_data_root(tmp.path(), || {
         build_report(
@@ -386,6 +442,14 @@ fn readiness_marks_repo_contract_unready_when_targets_are_missing() {
         report.readiness.platforms["kubernetes"]
             .blocking_checks
             .contains(&"repo_make_contract_present".to_string())
+    );
+    assert!(
+        report.readiness.providers["remote"]
+            .blocking_checks
+            .contains(&"repo_remote_publish_contract_present".to_string())
+            || report.readiness.providers["remote"]
+                .blocking_checks
+                .contains(&"repo_make_contract_present".to_string())
     );
 }
 
@@ -419,4 +483,39 @@ fn readiness_distinguishes_platform_specific_features() {
     assert!(!report.readiness.features[&Feature::GatewayApi].ready);
     assert!(report.readiness.features[&Feature::DataplaneTokens].ready);
     assert!(report.readiness.features[&Feature::ManifestApply].ready);
+}
+
+#[test]
+fn readiness_keeps_remote_provider_ready_when_k3d_is_missing() {
+    let tmp = tempfile::tempdir().unwrap();
+    let home = tmp.path().join("home");
+    let repo_root = tmp.path().join("repo-root");
+    let project_dir = tmp.path().join("project");
+    fs::create_dir_all(&home).unwrap();
+    fs::create_dir_all(home.join("bin")).unwrap();
+    fs::create_dir_all(&project_dir).unwrap();
+    write_suite_plugin(&project_dir);
+    write_current_kuma_contract(&repo_root);
+
+    let probe = FakeProbe::ready(&home).without_command("k3d");
+    let report = with_data_root(tmp.path(), || {
+        build_report(
+            Some(project_dir.to_str().unwrap()),
+            Some(repo_root.to_str().unwrap()),
+            &probe,
+        )
+    });
+
+    assert!(!report.readiness.providers["k3d"].ready);
+    assert!(report.readiness.providers["remote"].ready);
+    assert!(report.readiness.platforms["kubernetes"].ready);
+    assert!(
+        report
+            .readiness
+            .profiles
+            .iter()
+            .any(|profile| profile.name == "single-zone"
+                && profile.provider == ClusterProvider::Remote
+                && profile.ready)
+    );
 }

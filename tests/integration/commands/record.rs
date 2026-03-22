@@ -825,6 +825,7 @@ fn check_bootstrap_command_runs_gateway_api_crd_install() {
             kubeconfig: None,
             repo_root: Some(repo_root.to_string_lossy().to_string()),
             check_only: true,
+            uninstall: false,
         })
         .execute();
         assert!(result.is_ok(), "gateway check should succeed: {result:?}");

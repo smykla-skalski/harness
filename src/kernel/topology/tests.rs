@@ -167,3 +167,33 @@ fn cluster_spec_roundtrips_via_json_value() {
     let back = ClusterSpec::from_object(&json).unwrap();
     assert_eq!(back, spec);
 }
+
+#[test]
+fn legacy_kubernetes_spec_defaults_provider_to_k3d() {
+    let spec: ClusterSpec = serde_json::from_value(json!({
+        "mode": "single-up",
+        "platform": "kubernetes",
+        "mode_args": ["cp"],
+        "members": [{"name": "cp", "role": "primary", "kubeconfig": "/tmp/k3d-cp.yaml"}],
+        "helm_settings": [],
+        "restart_namespaces": [],
+        "repo_root": "/repo"
+    }))
+    .unwrap();
+    assert_eq!(spec.provider, ClusterProvider::K3d);
+}
+
+#[test]
+fn legacy_universal_spec_defaults_provider_to_compose() {
+    let spec: ClusterSpec = serde_json::from_value(json!({
+        "mode": "single-up",
+        "platform": "universal",
+        "mode_args": ["cp"],
+        "members": [{"name": "cp", "role": "cp", "kubeconfig": ""}],
+        "helm_settings": [],
+        "restart_namespaces": [],
+        "repo_root": "/repo"
+    }))
+    .unwrap();
+    assert_eq!(spec.provider, ClusterProvider::Compose);
+}
