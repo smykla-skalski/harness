@@ -54,9 +54,8 @@ pub fn session_start(project_dir: Option<&str>) -> Result<i32, CliError> {
 
 /// Handle session stop cleanup.
 ///
-/// Reads the current run pointer, cleans up ephemeral `MetalLB` templates
-/// for that run, and removes the pointer file. All steps degrade
-/// gracefully - a missing or stale pointer is not an error.
+/// Reads the current run pointer and removes the pointer file.
+/// A missing or stale pointer is not an error.
 ///
 /// # Errors
 /// Returns `CliError` on failure.

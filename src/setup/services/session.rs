@@ -4,7 +4,6 @@ use std::path::Path;
 use tracing::warn;
 
 use crate::errors::CliError;
-use crate::platform::ephemeral_metallb;
 use crate::run::application::RunApplication;
 use crate::setup::wrapper;
 use crate::workspace::compact;
@@ -31,14 +30,8 @@ pub(crate) fn restore_compact_handoff(project_dir: &Path) -> Result<Option<Strin
 }
 
 pub(crate) fn cleanup_current_run_context() -> Result<(), CliError> {
-    let Some(run_dir) = RunApplication::current_run_dir()? else {
+    if RunApplication::current_run_dir()?.is_none() {
         return Ok(());
-    };
-
-    if run_dir.is_dir()
-        && let Err(error) = ephemeral_metallb::cleanup_resources(&run_dir)
-    {
-        warn!(%error, "cleanup MetalLB resources failed");
     }
 
     if let Err(error) = RunApplication::clear_current_pointer() {

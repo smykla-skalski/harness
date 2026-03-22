@@ -444,7 +444,7 @@ fn check_session_start_cross_project(project: &Path) {
 }
 
 // No pending handoff - session-start returns Ok(0).
-fn check_session_start_metallb_templates(project: &Path) {
+fn check_session_start_without_pending_handoff(project: &Path) {
     let result = session_start_cmd(SessionStartArgs {
         project_dir: Some(project.to_string_lossy().to_string()),
     })
@@ -453,8 +453,8 @@ fn check_session_start_metallb_templates(project: &Path) {
     assert_eq!(result.unwrap(), 0);
 }
 
-// session_stop is currently a no-op. Verify Ok(0).
-fn check_session_stop_metallb_cleanup(project: &Path) {
+// With no current-run pointer, session-stop returns Ok(0).
+fn check_session_stop_without_pointer(project: &Path) {
     let result = session_stop_cmd(SessionStopArgs {
         project_dir: Some(project.to_string_lossy().to_string()),
     })
@@ -521,8 +521,8 @@ fn compact_handoff_lifecycle() {
             check_session_start_restores_project(project.path());
             check_session_start_restores_worktree(project.path());
             check_session_start_cross_project(project.path());
-            check_session_start_metallb_templates(project.path());
-            check_session_stop_metallb_cleanup(project.path());
+            check_session_start_without_pending_handoff(project.path());
+            check_session_stop_without_pointer(project.path());
             check_session_start_no_replay(project.path());
         },
     );

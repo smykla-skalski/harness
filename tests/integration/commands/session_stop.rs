@@ -1,5 +1,5 @@
 // Tests for session stop cleanup.
-// Verifies ephemeral MetalLB template cleanup and pointer file removal.
+// Verifies current-run pointer removal and error handling.
 
 use std::fs;
 
@@ -10,35 +10,10 @@ use harness::workspace::current_run_context_path;
 use super::super::helpers::*;
 
 #[test]
-fn session_stop_cleans_up_templates_and_removes_pointer() {
+fn session_stop_removes_pointer() {
     let tmp = tempfile::tempdir().unwrap();
     let xdg = tmp.path().join("xdg");
     let run_dir = init_run(tmp.path(), "run-stop", "single-zone");
-
-    // Create ephemeral templates
-    let generated_dir = tmp.path().join(".kuma-dev");
-    fs::create_dir_all(&generated_dir).unwrap();
-    let source = generated_dir.join("metallb-kuma.yaml");
-    fs::write(&source, "generated").unwrap();
-    let template = generated_dir.join("metallb-kuma-local.yaml");
-    fs::write(&template, "generated").unwrap();
-    let state_dir = run_dir.join("state");
-    fs::create_dir_all(&state_dir).unwrap();
-    fs::write(
-        state_dir.join("ephemeral-metallb-templates.json"),
-        serde_json::json!({
-            "schema_version": 1,
-            "entries": [{
-                "cluster_name": "local",
-                "created_at": "2026-03-19T00:00:00Z",
-                "source_path": source,
-                "template_path": template,
-            }],
-        })
-        .to_string(),
-    )
-    .unwrap();
-    assert!(template.exists());
 
     // Write a current-run pointer
     let record = CurrentRunRecord {
@@ -71,8 +46,6 @@ fn session_stop_cleans_up_templates_and_removes_pointer() {
                 run_command(session_stop_cmd(SessionStopArgs { project_dir: None })).unwrap();
             assert_eq!(code, 0);
 
-            // Template should be cleaned up
-            assert!(!template.exists(), "template should have been removed");
             // Pointer should be removed
             assert!(!ctx_path.exists(), "pointer should have been removed");
         },
