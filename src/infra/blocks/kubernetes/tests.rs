@@ -1,3 +1,4 @@
+use std::fs;
 use std::path::Path;
 use std::sync::Arc;
 
@@ -180,6 +181,45 @@ fn kubernetes_block_types_are_send_sync() {
     assert_send_sync::<KubectlRuntime>();
     assert_send_sync::<K3dClusterManager>();
     assert_send_sync::<PodSnapshot>();
+}
+
+#[test]
+fn kube_runtime_dead_kubeconfig_returns_error_without_panicking() {
+    let temp_dir = tempfile::tempdir().expect("expected temp dir");
+    let kubeconfig = temp_dir.path().join("dead-kubeconfig.yaml");
+    fs::write(
+        &kubeconfig,
+        r#"apiVersion: v1
+kind: Config
+clusters:
+  - name: dead
+    cluster:
+      server: https://127.0.0.1:65535
+      insecure-skip-tls-verify: true
+contexts:
+  - name: dead
+    context:
+      cluster: dead
+      user: dead
+current-context: dead
+preferences: {}
+users:
+  - name: dead
+    user:
+      token: dead-token
+"#,
+    )
+    .expect("expected kubeconfig write to succeed");
+
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        KubeRuntime::new().list_pods(Some(kubeconfig.as_path()))
+    }));
+
+    assert!(result.is_ok(), "native kube runtime should not panic");
+    assert!(
+        result.expect("catch_unwind should return result").is_err(),
+        "dead kubeconfig should still return an error"
+    );
 }
 
 #[test]
