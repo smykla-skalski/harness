@@ -11,7 +11,7 @@ pub(crate) mod wrapper;
 
 pub use bootstrap::BootstrapArgs;
 pub use bootstrap::bootstrap;
-pub use capabilities::capabilities;
+pub use capabilities::{CapabilitiesArgs, capabilities};
 pub use cluster::ClusterArgs;
 pub use cluster::cluster;
 pub use gateway::GatewayArgs;

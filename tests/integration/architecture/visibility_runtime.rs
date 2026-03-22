@@ -400,6 +400,7 @@ fn setup_capabilities_root_stays_prod_only() {
     for path in [
         "src/setup/capabilities/model.rs",
         "src/setup/capabilities/data.rs",
+        "src/setup/capabilities/readiness.rs",
     ] {
         assert!(
             root.join(path).exists(),

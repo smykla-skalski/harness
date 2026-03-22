@@ -115,10 +115,77 @@ pub struct CreateInfo {
     pub description: String,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ReadinessCheckScope {
+    Machine,
+    Project,
+    Repo,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ReadinessStatus {
+    Pass,
+    Fail,
+    Skipped,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ReadinessScope {
+    pub cwd: String,
+    pub project_dir: String,
+    pub repo_root: Option<String>,
+    pub explicit_project_dir: bool,
+    pub explicit_repo_root: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ReadinessCheck {
+    pub code: String,
+    pub scope: ReadinessCheckScope,
+    pub status: ReadinessStatus,
+    pub summary: String,
+    pub path: Option<String>,
+    pub hint: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ReadinessSummary {
+    pub ready: bool,
+    pub blocking_checks: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PlatformReadiness {
+    pub ready: bool,
+    pub blocking_checks: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ProfileReadiness {
+    pub name: String,
+    pub platform: Platform,
+    pub topology: TopologyMode,
+    pub ready: bool,
+    pub blocking_checks: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ReadinessReport {
+    pub scope: ReadinessScope,
+    pub checks: Vec<ReadinessCheck>,
+    pub create: ReadinessSummary,
+    pub platforms: BTreeMap<String, PlatformReadiness>,
+    pub features: BTreeMap<Feature, ReadinessSummary>,
+    pub profiles: Vec<ProfileReadiness>,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CapabilitiesReport {
     pub create: CreateInfo,
     pub cluster_topologies: Vec<ClusterTopology>,
     pub features: BTreeMap<Feature, FeatureInfo>,
     pub platforms: Vec<PlatformInfo>,
+    pub readiness: ReadinessReport,
 }

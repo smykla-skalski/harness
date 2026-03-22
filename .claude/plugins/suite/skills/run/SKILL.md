@@ -163,7 +163,14 @@ Read [references/workflow.md](references/workflow.md) for the full procedure. Th
 
 ### Phase 0: Environment check
 
-0. Run `harness setup capabilities` and keep the JSON output as `CAPABILITIES` for all later phases. Validate suite profiles against available `cluster_topologies` and `platforms`. If the binary is too old or missing, assume all features available.
+0. Run `harness setup capabilities` and keep the JSON output as `CAPABILITIES` for all later phases.
+
+   - Prefer `readiness.profiles` when present. Only run profiles whose `ready` field is `true`.
+   - If the requested profile is not ready, stop before cluster work and surface the matching `blocking_checks`.
+   - Use `readiness.platforms` and `readiness.features` to decide whether the environment is usable now.
+   - Keep the normal call zero-arg. Only use `--project-dir` or `--repo-root` as a last-resort debug override when state or cwd resolution is broken.
+   - If `readiness` is absent (older harness binary), fall back to the older static logic based on `cluster_topologies`, `platforms`, and `features.*.available`.
+   - If the binary is too old or missing, assume all features available.
 
 1. Set `DATA_DIR` from "Preprocessed context". If missing, use AskUserQuestion with options:
    - `Create suite with /suite:create`
