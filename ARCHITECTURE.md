@@ -68,7 +68,7 @@ flowchart LR
 | `src/run/`       | tracked runs, run workflow, prepared artifacts, reporting, run diagnostics, repair |
 | `src/create/`    | `suite:create` workflow, approval state, create validation, create session state   |
 | `src/observe/`   | log/session scanning, doctor diagnostics, classifiers, dump/scan flows, output     |
-| `src/setup/`     | environment bootstrap, wrapper/session lifecycle, cluster setup entrypoints        |
+| `src/setup/`     | environment bootstrap, capabilities/readiness evaluation, wrapper/session lifecycle, cluster setup entrypoints |
 | `src/hooks/`     | hook payload handling, guard policy, protocol normalization, hook effects          |
 | `src/kernel/`    | pure shared concepts such as command intent, topology, skill ids, gates            |
 | `src/workspace/` | XDG paths, current session pointers, compact handoff, ambient harness files        |

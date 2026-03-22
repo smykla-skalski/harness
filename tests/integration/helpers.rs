@@ -15,8 +15,8 @@ use harness::run::{
     ServiceArgs, StartArgs, ValidateArgs,
 };
 use harness::setup::{
-    ClusterArgs, GatewayArgs, KumaSetupArgs, KumaSetupCommand, PreCompactArgs, SessionStartArgs,
-    SessionStopArgs,
+    CapabilitiesArgs, ClusterArgs, GatewayArgs, KumaSetupArgs, KumaSetupCommand, PreCompactArgs,
+    SessionStartArgs, SessionStopArgs,
 };
 
 // Re-export everything from the testkit so integration tests can use
@@ -74,7 +74,10 @@ pub fn approval_begin_cmd(args: ApprovalBeginArgs) -> Command {
 }
 
 pub fn capabilities_cmd() -> Command {
-    setup_cmd(SetupCommand::Capabilities)
+    setup_cmd(SetupCommand::Capabilities(CapabilitiesArgs {
+        project_dir: None,
+        repo_root: None,
+    }))
 }
 
 pub fn capture_cmd(args: CaptureArgs) -> Command {

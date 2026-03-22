@@ -17,9 +17,9 @@ use crate::run::{
     RestartNamespaceArgs, ResumeArgs, RunnerStateArgs, StartArgs, StatusArgs, TaskArgs,
     ValidateArgs,
 };
-use crate::setup;
 use crate::setup::{
-    BootstrapArgs, GatewayArgs, KumaSetupArgs, PreCompactArgs, SessionStartArgs, SessionStopArgs,
+    BootstrapArgs, CapabilitiesArgs, GatewayArgs, KumaSetupArgs, PreCompactArgs, SessionStartArgs,
+    SessionStopArgs,
 };
 
 /// Harness CLI.
@@ -82,7 +82,7 @@ pub enum SetupCommand {
     Bootstrap(BootstrapArgs),
     Kuma(KumaSetupArgs),
     Gateway(GatewayArgs),
-    Capabilities,
+    Capabilities(CapabilitiesArgs),
 }
 
 /// Top-level commands.
@@ -184,7 +184,7 @@ fn dispatch_setup(ctx: &AppContext, command: &SetupCommand) -> Result<i32, CliEr
         SetupCommand::Bootstrap(args) => args.execute(ctx),
         SetupCommand::Kuma(args) => args.execute(ctx),
         SetupCommand::Gateway(args) => args.execute(ctx),
-        SetupCommand::Capabilities => setup::capabilities(),
+        SetupCommand::Capabilities(args) => args.execute(ctx),
     }
 }
 
