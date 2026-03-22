@@ -1046,6 +1046,7 @@ dependencies = [
  "rayon",
  "regex",
  "reqwest",
+ "rustls",
  "serde",
  "serde-sarif",
  "serde_json",

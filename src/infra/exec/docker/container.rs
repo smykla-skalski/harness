@@ -1,7 +1,9 @@
 use std::sync::Arc;
 
 use crate::errors::CliError;
-use crate::infra::blocks::{ContainerConfig, StdProcessExecutor, container_runtime_from_env};
+use crate::infra::blocks::{
+    ContainerConfig, ContainerPort, StdProcessExecutor, container_runtime_from_env,
+};
 
 use super::super::CommandResult;
 
@@ -28,7 +30,10 @@ pub fn docker_run_detached(
                 .iter()
                 .map(|(key, value)| ((*key).to_string(), (*value).to_string()))
                 .collect(),
-            ports: ports.to_vec(),
+            ports: ports
+                .iter()
+                .map(|(host, container)| ContainerPort::fixed(*host, *container))
+                .collect(),
             labels: vec![],
             entrypoint: None,
             restart_policy: None,

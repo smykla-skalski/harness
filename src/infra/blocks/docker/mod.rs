@@ -29,12 +29,37 @@ pub struct ContainerConfig {
     pub name: String,
     pub network: String,
     pub env: Vec<(String, String)>,
-    pub ports: Vec<(u16, u16)>,
+    pub ports: Vec<ContainerPort>,
     pub labels: Vec<(String, String)>,
     pub entrypoint: Option<Vec<String>>,
     pub restart_policy: Option<String>,
     pub extra_args: Vec<String>,
     pub command: Vec<String>,
+}
+
+/// Published host port mapping for a container port.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ContainerPort {
+    pub host_port: Option<u16>,
+    pub container_port: u16,
+}
+
+impl ContainerPort {
+    #[must_use]
+    pub const fn fixed(host_port: u16, container_port: u16) -> Self {
+        Self {
+            host_port: Some(host_port),
+            container_port,
+        }
+    }
+
+    #[must_use]
+    pub const fn ephemeral(container_port: u16) -> Self {
+        Self {
+            host_port: None,
+            container_port,
+        }
+    }
 }
 
 /// Snapshot of a container from formatted `docker ps` output.
@@ -90,6 +115,13 @@ pub trait ContainerRuntime: Send + Sync {
     ///
     /// Returns `BlockError` if the container has no network IP.
     fn inspect_primary_ip(&self, container: &str) -> Result<String, BlockError>;
+
+    /// Resolve the published host port for a container port.
+    ///
+    /// # Errors
+    ///
+    /// Returns `BlockError` if the container port is not published.
+    fn inspect_host_port(&self, container: &str, container_port: u16) -> Result<u16, BlockError>;
 
     /// List containers using formatted `docker ps` output.
     ///

@@ -1,5 +1,6 @@
 use std::error::Error;
 use std::path::Path;
+use std::sync::OnceLock;
 use std::thread;
 use std::time::{Duration, Instant};
 
@@ -11,6 +12,7 @@ use kube::api::{Api, AttachParams, DeleteParams, DynamicObject, ListParams, Patc
 use kube::config::{Config, KubeConfigOptions, Kubeconfig};
 use kube::discovery::Scope;
 use kube::{Client, Error as KubeError};
+use rustls::crypto::ring::default_provider;
 use serde_json::json;
 use tokio::io::AsyncReadExt;
 
@@ -27,6 +29,8 @@ use super::{ExecRequest, KubernetesRuntime, ManifestDiff, PodSnapshot};
 /// Production Kubernetes runtime backed by the native `kube` client.
 pub struct KubeRuntime;
 
+static RUSTLS_PROVIDER: OnceLock<()> = OnceLock::new();
+
 impl KubeRuntime {
     #[must_use]
     pub const fn new() -> Self {
@@ -34,6 +38,7 @@ impl KubeRuntime {
     }
 
     fn client_bundle(kubeconfig: Option<&Path>) -> Result<ClientBundle, BlockError> {
+        Self::ensure_rustls_provider();
         let config = if let Some(path) = kubeconfig {
             let kubeconfig = Kubeconfig::read_from(path)
                 .map_err(|error| BlockError::new("kubernetes", "read kubeconfig", error))?;
@@ -51,7 +56,8 @@ impl KubeRuntime {
 
         let cluster_server = config.cluster_url.to_string();
         let default_namespace = config.default_namespace.clone();
-        let client = Client::try_from(config)
+        let client = RUNTIME
+            .block_on(async move { Client::try_from(config) })
             .map_err(|error| BlockError::new("kubernetes", "build client", error))?;
 
         Ok(ClientBundle {
@@ -59,6 +65,12 @@ impl KubeRuntime {
             default_namespace,
             cluster_server,
         })
+    }
+
+    fn ensure_rustls_provider() {
+        RUSTLS_PROVIDER.get_or_init(|| {
+            let _ = default_provider().install_default();
+        });
     }
 
     fn deployment_available(deployment: &Deployment) -> bool {

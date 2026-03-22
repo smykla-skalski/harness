@@ -154,6 +154,9 @@ impl FromStr for ClusterMode {
     }
 }
 
+/// Loopback host used for published universal container ports.
+pub const UNIVERSAL_PUBLISHED_HOST: &str = "127.0.0.1";
+
 /// A member of a cluster deployment (zone or global).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ClusterMember {

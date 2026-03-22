@@ -6,7 +6,9 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use super::current_deploy;
-use super::{ClusterMember, ClusterMode, ClusterProvider, HelmSetting, Platform};
+use super::{
+    ClusterMember, ClusterMode, ClusterProvider, HelmSetting, Platform, UNIVERSAL_PUBLISHED_HOST,
+};
 
 /// Full cluster specification describing a deployment topology.
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -89,9 +91,9 @@ impl ClusterSpec {
             return None;
         }
         let member = self.primary_member();
-        let ip = member.container_ip.as_deref()?;
+        member.container_ip.as_deref()?;
         Some(format!(
-            "http://{ip}:{}",
+            "http://{UNIVERSAL_PUBLISHED_HOST}:{}",
             member.cp_api_port.unwrap_or(5681)
         ))
     }
@@ -102,8 +104,8 @@ impl ClusterSpec {
             return None;
         }
         let member = self.primary_member();
-        let ip = member.container_ip.as_deref()?;
-        Some((ip, member.cp_api_port.unwrap_or(5681)))
+        member.container_ip.as_deref()?;
+        Some((UNIVERSAL_PUBLISHED_HOST, member.cp_api_port.unwrap_or(5681)))
     }
 
     #[must_use]
