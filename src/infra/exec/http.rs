@@ -1,9 +1,19 @@
+use std::sync::LazyLock;
 use std::time::{Duration, Instant};
 use std::{cmp, thread};
 
 use crate::errors::{CliError, CliErrorKind};
 
-use super::run_command;
+use super::RUNTIME;
+
+const HTTP_READY_TIMEOUT: Duration = Duration::from_secs(2);
+const CP_API_TIMEOUT: Duration = Duration::from_secs(30);
+
+static HTTP_CLIENT: LazyLock<reqwest::Client> = LazyLock::new(|| {
+    reqwest::Client::builder()
+        .build()
+        .expect("failed to initialize reqwest client")
+});
 
 /// HTTP method for CP API requests.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -52,12 +62,12 @@ fn cp_api_error(url: &str, error: &impl ToString) -> CliError {
     CliErrorKind::cp_api_unreachable(url.to_string()).with_details(error.to_string())
 }
 
-fn curl_method(method: HttpMethod) -> &'static str {
+fn reqwest_method(method: HttpMethod) -> reqwest::Method {
     match method {
-        HttpMethod::Get => "GET",
-        HttpMethod::Post => "POST",
-        HttpMethod::Put => "PUT",
-        HttpMethod::Delete => "DELETE",
+        HttpMethod::Get => reqwest::Method::GET,
+        HttpMethod::Post => reqwest::Method::POST,
+        HttpMethod::Put => reqwest::Method::PUT,
+        HttpMethod::Delete => reqwest::Method::DELETE,
     }
 }
 
@@ -67,27 +77,35 @@ fn cp_api_send(
     body: Option<&serde_json::Value>,
     token: Option<&str>,
 ) -> Result<String, CliError> {
-    let mut args = vec![
-        "curl".to_string(),
-        "-fsS".to_string(),
-        "-X".to_string(),
-        curl_method(method).to_string(),
-    ];
-    if let Some(tok) = token {
-        args.push("-H".to_string());
-        args.push(format!("Authorization: Bearer {tok}"));
-    }
-    if let Some(json) = body {
-        args.push("-H".to_string());
-        args.push("Content-Type: application/json".to_string());
-        args.push("--data".to_string());
-        args.push(json.to_string());
-    }
-    args.push(url.to_string());
-    let arg_refs = args.iter().map(String::as_str).collect::<Vec<_>>();
-    run_command(&arg_refs, None, None, &[0])
-        .map(|result| result.stdout)
-        .map_err(|error| cp_api_error(url, &error))
+    RUNTIME.block_on(async {
+        let mut request = HTTP_CLIENT
+            .request(reqwest_method(method), url)
+            .timeout(CP_API_TIMEOUT);
+        if let Some(tok) = token {
+            request = request.bearer_auth(tok);
+        }
+        if let Some(json) = body {
+            request = request.json(json);
+        }
+        let response = request
+            .send()
+            .await
+            .map_err(|error| cp_api_error(url, &error))?;
+        let status = response.status();
+        let body_text = response
+            .text()
+            .await
+            .map_err(|error| cp_api_error(url, &error))?;
+        if !status.is_success() {
+            let detail = if body_text.trim().is_empty() {
+                format!("HTTP {status}")
+            } else {
+                format!("HTTP {status}: {}", body_text.trim())
+            };
+            return Err(cp_api_error(url, &detail));
+        }
+        Ok(body_text)
+    })
 }
 
 /// Wait for an HTTP endpoint to return 200, with exponential backoff.
@@ -116,8 +134,14 @@ pub fn wait_for_http(url: &str, timeout: Duration) -> Result<(), CliError> {
 }
 
 fn http_ready(url: &str) -> bool {
-    let args = ["curl", "-fsS", "-o", "/dev/null", url];
-    run_command(&args, None, None, &[0]).is_ok()
+    RUNTIME.block_on(async {
+        HTTP_CLIENT
+            .get(url)
+            .timeout(HTTP_READY_TIMEOUT)
+            .send()
+            .await
+            .is_ok_and(|response| response.status().is_success())
+    })
 }
 
 fn timed_out(start: Instant, timeout: Duration) -> bool {

@@ -667,7 +667,7 @@ fn primary_api_url_returns_url_for_universal_with_ip() {
     spec.members[0].cp_api_port = Some(5681);
     assert_eq!(
         spec.primary_api_url().as_deref(),
-        Some("http://172.57.0.10:5681")
+        Some("http://127.0.0.1:5681")
     );
 }
 

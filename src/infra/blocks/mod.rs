@@ -20,8 +20,8 @@ pub use compose::{
     ServiceDependency, ServiceSpec,
 };
 pub use docker::{
-    BollardContainerRuntime, ContainerConfig, ContainerRuntime, ContainerRuntimeBackend,
-    ContainerSnapshot, DockerContainerRuntime, container_backend_from_env,
+    BollardContainerRuntime, ContainerConfig, ContainerPort, ContainerRuntime,
+    ContainerRuntimeBackend, ContainerSnapshot, DockerContainerRuntime, container_backend_from_env,
     container_backends_from_env, container_runtime_from_env,
 };
 pub use envoy::{CaptureRequest, EnvoyIntrospector, ProxyIntrospector};

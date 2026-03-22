@@ -21,7 +21,7 @@ fn sample_config() -> ContainerConfig {
         name: "example".to_string(),
         network: "mesh-net".to_string(),
         env: vec![("MODE".to_string(), "test".to_string())],
-        ports: vec![(8080, 80)],
+        ports: vec![ContainerPort::fixed(8080, 80)],
         labels: vec![("suite".to_string(), "mesh".to_string())],
         entrypoint: None,
         restart_policy: Some("unless-stopped".to_string()),
@@ -88,6 +88,64 @@ fn docker_container_runtime_run_detached_builds_expected_command() {
 
     let result = runtime
         .run_detached(&sample_config())
+        .expect("expected docker run to succeed");
+
+    assert_eq!(result.stdout, "container-id\n");
+}
+
+#[test]
+fn docker_container_runtime_run_detached_supports_ephemeral_host_ports() {
+    let fake = Arc::new(FakeProcessExecutor::new(vec![FakeResponse {
+        expected_program: "docker".to_string(),
+        expected_args: Some(vec![
+            "docker".into(),
+            "run".into(),
+            "-d".into(),
+            "--name".into(),
+            "example".into(),
+            "--network".into(),
+            "mesh-net".into(),
+            "-e".into(),
+            "MODE=test".into(),
+            "-p".into(),
+            "9902".into(),
+            "--label".into(),
+            "suite=mesh".into(),
+            "--restart".into(),
+            "unless-stopped".into(),
+            "example:latest".into(),
+            "server".into(),
+        ]),
+        expected_method: Some(FakeProcessMethod::Run),
+        result: Ok(success_result(
+            &[
+                "docker",
+                "run",
+                "-d",
+                "--name",
+                "example",
+                "--network",
+                "mesh-net",
+                "-e",
+                "MODE=test",
+                "-p",
+                "9902",
+                "--label",
+                "suite=mesh",
+                "--restart",
+                "unless-stopped",
+                "example:latest",
+                "server",
+            ],
+            "container-id\n",
+        )),
+    }]));
+    let runtime = DockerContainerRuntime::new(fake);
+    let mut config = sample_config();
+    config.ports = vec![ContainerPort::ephemeral(9902)];
+
+    let result = runtime
+        .run_detached(&config)
         .expect("expected docker run to succeed");
 
     assert_eq!(result.stdout, "container-id\n");
@@ -204,6 +262,31 @@ fn docker_container_runtime_is_running_reflects_inspect_output() {
             .is_running("example")
             .expect("expected inspect to succeed")
     );
+}
+
+#[test]
+fn docker_container_runtime_inspect_host_port_parses_docker_port_output() {
+    let fake = Arc::new(FakeProcessExecutor::new(vec![FakeResponse {
+        expected_program: "docker".to_string(),
+        expected_args: Some(vec![
+            "docker".into(),
+            "port".into(),
+            "example".into(),
+            "9902/tcp".into(),
+        ]),
+        expected_method: Some(FakeProcessMethod::Run),
+        result: Ok(success_result(
+            &["docker", "port", "example", "9902/tcp"],
+            "0.0.0.0:31234\n",
+        )),
+    }]));
+    let runtime = DockerContainerRuntime::new(fake);
+
+    let port = runtime
+        .inspect_host_port("example", 9902)
+        .expect("expected host port lookup");
+
+    assert_eq!(port, 31_234);
 }
 
 #[test]

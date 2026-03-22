@@ -5,8 +5,9 @@ use crate::errors::{CliError, CliErrorKind};
 use crate::infra::blocks::kuma::defaults;
 use crate::infra::blocks::kuma::service::{KumaService, KumaServiceSpec};
 use crate::infra::blocks::kuma::token::parse_token_response;
-use crate::infra::blocks::{ContainerConfig, ContainerRuntime};
+use crate::infra::blocks::{ContainerConfig, ContainerPort, ContainerRuntime};
 use crate::infra::exec::{self, CommandResult};
+use crate::kernel::topology::UNIVERSAL_PUBLISHED_HOST;
 use crate::platform::runtime::ControlPlaneAccess;
 use crate::platform::runtime::XdsAccess;
 
@@ -94,7 +95,10 @@ pub(crate) fn start_tracked_service_container(
         name: request.name.to_string(),
         network: network.to_string(),
         env: vec![],
-        ports: vec![(request.port, request.port)],
+        ports: vec![
+            ContainerPort::fixed(request.port, request.port),
+            ContainerPort::ephemeral(defaults::DATAPLANE_READY_PORT),
+        ],
         labels: vec![
             ("io.harness.service".to_string(), "true".to_string()),
             ("io.harness.run-id".to_string(), run_id.to_string()),
@@ -160,7 +164,7 @@ fn service_up_inner(setup: &ServiceSetup<'_>) -> Result<(), CliError> {
         &KumaServiceSpec {
             name: setup.name.to_string(),
             mesh: setup.mesh.to_string(),
-            address: container_address.clone(),
+            address: container_address,
             port: setup.port,
             transparent_proxy: setup.transparent_proxy,
         },
@@ -178,7 +182,7 @@ fn service_up_inner(setup: &ServiceSetup<'_>) -> Result<(), CliError> {
                 .docker
                 .write_file(setup.name, &files.dataplane_path, &dataplane_yaml)
         });
-        let cert_extract = scope.spawn(|| extract_cp_ca_cert(setup.xds.ip, setup.xds.port));
+        let cert_extract = scope.spawn(|| extract_cp_ca_cert(setup.xds));
         token_write.join().expect("token write thread panicked")?;
         yaml_write.join().expect("yaml write thread panicked")?;
         cert_extract.join().expect("cert extract thread panicked")
@@ -199,7 +203,10 @@ fn service_up_inner(setup: &ServiceSetup<'_>) -> Result<(), CliError> {
     let launch_args = launch.args.iter().map(String::as_str).collect::<Vec<_>>();
     setup.docker.exec_detached(setup.name, &launch_args)?;
 
-    let readiness_url = KumaService::readiness_url(&container_address);
+    let readiness_port = setup
+        .docker
+        .inspect_host_port(setup.name, defaults::DATAPLANE_READY_PORT)?;
+    let readiness_url = KumaService::readiness_url(UNIVERSAL_PUBLISHED_HOST, readiness_port);
     exec::wait_for_http(&readiness_url, Duration::from_secs(setup.timeout))
         .map_err(|_| CliErrorKind::service_readiness_timeout(setup.name.to_string()).into())
 }
@@ -229,8 +236,8 @@ fn token_via_api(
         .map_err(|error| CliErrorKind::token_generation_failed(error.to_string()).into())
 }
 
-fn extract_cp_ca_cert(cp_ip: &str, xds_port: u16) -> Result<String, CliError> {
-    let connect_arg = format!("{cp_ip}:{xds_port}");
+fn extract_cp_ca_cert(xds: XdsAccess<'_>) -> Result<String, CliError> {
+    let connect_arg = format!("{UNIVERSAL_PUBLISHED_HOST}:{}", xds.host_port);
     let result = exec::run_command(
         &[
             "openssl",

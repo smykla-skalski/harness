@@ -41,9 +41,12 @@ impl ContainerRuntime for DockerContainerRuntime {
             args.push("-e".into());
             args.push(format!("{key}={value}"));
         }
-        for (host, container) in &config.ports {
+        for port in &config.ports {
             args.push("-p".into());
-            args.push(format!("{host}:{container}"));
+            args.push(port.host_port.map_or_else(
+                || port.container_port.to_string(),
+                |host_port| format!("{host_port}:{}", port.container_port),
+            ));
         }
         for (key, value) in &config.labels {
             args.push("--label".into());
@@ -132,6 +135,36 @@ impl ContainerRuntime for DockerContainerRuntime {
             ));
         }
         Ok(ip)
+    }
+
+    fn inspect_host_port(&self, container: &str, container_port: u16) -> Result<u16, BlockError> {
+        let port_ref = format!("{container_port}/tcp");
+        let result = self.docker(&["port", container, &port_ref], &[0])?;
+        let binding = result
+            .stdout
+            .lines()
+            .find(|line| !line.trim().is_empty())
+            .ok_or_else(|| {
+                BlockError::message(
+                    "docker",
+                    &format!("inspect_host_port {container}"),
+                    format!("container port {container_port} is not published"),
+                )
+            })?;
+        let (_, host_port) = binding.rsplit_once(':').ok_or_else(|| {
+            BlockError::message(
+                "docker",
+                &format!("inspect_host_port {container}"),
+                format!("unexpected docker port output `{binding}`"),
+            )
+        })?;
+        host_port.parse::<u16>().map_err(|error| {
+            BlockError::message(
+                "docker",
+                &format!("inspect_host_port {container}"),
+                format!("invalid published port `{host_port}`: {error}"),
+            )
+        })
     }
 
     fn list_formatted(

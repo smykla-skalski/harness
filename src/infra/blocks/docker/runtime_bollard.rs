@@ -255,6 +255,10 @@ impl BollardContainerRuntime {
         format!("exit code {returncode}")
     }
 
+    fn container_port_key(container_port: u16) -> String {
+        format!("{container_port}/tcp")
+    }
+
     fn exec_output_to_result(
         &self,
         operation: &str,
@@ -307,17 +311,20 @@ impl BollardContainerRuntime {
         let exposed_ports = config
             .ports
             .iter()
-            .map(|(_, container)| format!("{container}/tcp"))
+            .map(|port| Self::container_port_key(port.container_port))
             .collect::<Vec<_>>();
         let port_bindings = config
             .ports
             .iter()
-            .map(|(host, container)| {
+            .map(|port| {
                 (
-                    format!("{container}/tcp"),
+                    Self::container_port_key(port.container_port),
                     Some(vec![PortBinding {
                         host_ip: Some("0.0.0.0".to_string()),
-                        host_port: Some(host.to_string()),
+                        host_port: Some(
+                            port.host_port
+                                .map_or_else(String::new, |host_port| host_port.to_string()),
+                        ),
                     }]),
                 )
             })
@@ -532,6 +539,37 @@ impl ContainerRuntime for BollardContainerRuntime {
             ));
         }
         Ok(ip)
+    }
+
+    fn inspect_host_port(&self, container: &str, container_port: u16) -> Result<u16, BlockError> {
+        let details = Self::block_on(
+            &format!("inspect_container {container}"),
+            self.docker
+                .inspect_container(container, None::<InspectContainerOptions>),
+        )?;
+        let key = Self::container_port_key(container_port);
+        let host_port = details
+            .network_settings
+            .as_ref()
+            .and_then(|settings| settings.ports.as_ref())
+            .and_then(|ports| ports.get(&key))
+            .and_then(Option::as_ref)
+            .and_then(|bindings| bindings.first())
+            .and_then(|binding| binding.host_port.as_deref())
+            .ok_or_else(|| {
+                BlockError::message(
+                    "docker",
+                    &format!("inspect_host_port {container}"),
+                    format!("container port {container_port} is not published"),
+                )
+            })?;
+        host_port.parse::<u16>().map_err(|error| {
+            BlockError::message(
+                "docker",
+                &format!("inspect_host_port {container}"),
+                format!("invalid published port `{host_port}`: {error}"),
+            )
+        })
     }
 
     fn list_formatted(

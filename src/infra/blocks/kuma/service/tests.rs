@@ -12,16 +12,17 @@ fn files_for_uses_standard_temp_paths() {
 #[test]
 fn readiness_url_uses_envoy_ready_port() {
     assert_eq!(
-        KumaService::readiness_url("172.57.0.10"),
-        "http://172.57.0.10:9902/ready"
+        KumaService::readiness_url("127.0.0.1", 31_234),
+        "http://127.0.0.1:31234/ready"
     );
 }
 
 #[test]
 fn xds_cp_address_formats_https_endpoint() {
     let xds = XdsAccess {
-        ip: "172.57.0.2",
-        port: 5678,
+        container_ip: "172.57.0.2",
+        container_port: 5678,
+        host_port: 15_678,
     };
 
     assert_eq!(KumaService::xds_cp_address(xds), "https://172.57.0.2:5678");
@@ -93,8 +94,9 @@ fn launch_for_builds_kuma_dp_args() {
         "demo",
         &files,
         XdsAccess {
-            ip: "172.57.0.2",
-            port: 5678,
+            container_ip: "172.57.0.2",
+            container_port: 5678,
+            host_port: 15_678,
         },
     );
 

@@ -2,12 +2,20 @@ use std::path::PathBuf;
 use std::time::Duration;
 
 use crate::errors::{CliError, CliErrorKind};
+use crate::infra::blocks::kuma::defaults;
 use crate::infra::blocks::kuma::token;
 use crate::infra::blocks::{ComposeOrchestrator, ContainerRuntime};
 use crate::infra::exec::wait_for_http;
+use crate::kernel::topology::UNIVERSAL_PUBLISHED_HOST;
 use crate::platform::compose::{self, ComposeFile};
 
-use super::{UNIVERSAL_SUBNET, UniversalUpResult};
+use super::{UNIVERSAL_SUBNET, UniversalMemberRuntime, UniversalUpResult};
+
+struct ComposeMemberBinding<'a> {
+    name: &'a str,
+    cp_api_port: u16,
+    xds_port: Option<u16>,
+}
 
 fn write_compose_file(
     compose_file: &ComposeFile,
@@ -30,7 +38,17 @@ pub(super) fn universal_single_up_compose(
     let compose_file = compose::single_zone(image, network, UNIVERSAL_SUBNET, store, cp_name);
     let project = format!("harness-{cp_name}");
     start_compose_project(&compose_file, &project, compose_runtime)?;
-    compose_up_result(docker, &project, network, cp_name)
+    compose_up_result(
+        docker,
+        &project,
+        network,
+        cp_name,
+        &[ComposeMemberBinding {
+            name: cp_name,
+            cp_api_port: defaults::CP_API_PORT,
+            xds_port: Some(defaults::XDS_PORT),
+        }],
+    )
 }
 
 pub(super) fn universal_global_zone_up(
@@ -61,7 +79,24 @@ pub(super) fn universal_global_zone_up(
     );
     let project = format!("harness-{global_name}");
     start_compose_project(&compose_file, &project, compose_runtime)?;
-    compose_up_result(docker, &project, network, global_name)
+    compose_up_result(
+        docker,
+        &project,
+        network,
+        global_name,
+        &[
+            ComposeMemberBinding {
+                name: global_name,
+                cp_api_port: defaults::CP_API_PORT,
+                xds_port: None,
+            },
+            ComposeMemberBinding {
+                name: zone_name,
+                cp_api_port: 15_681,
+                xds_port: Some(15_678),
+            },
+        ],
+    )
 }
 
 pub(super) fn universal_global_two_zones_up(
@@ -100,7 +135,29 @@ pub(super) fn universal_global_two_zones_up(
     });
     let project = format!("harness-{global_name}");
     start_compose_project(&compose_file, &project, compose_runtime)?;
-    compose_up_result(docker, &project, network, global_name)
+    compose_up_result(
+        docker,
+        &project,
+        network,
+        global_name,
+        &[
+            ComposeMemberBinding {
+                name: global_name,
+                cp_api_port: defaults::CP_API_PORT,
+                xds_port: None,
+            },
+            ComposeMemberBinding {
+                name: zone1_name,
+                cp_api_port: 15_681,
+                xds_port: Some(15_678),
+            },
+            ComposeMemberBinding {
+                name: zone2_name,
+                cp_api_port: 25_681,
+                xds_port: Some(25_678),
+            },
+        ],
+    )
 }
 
 pub(super) fn universal_global_zone_down(
@@ -140,17 +197,38 @@ fn compose_up_result(
     docker: &dyn ContainerRuntime,
     project: &str,
     network: &str,
-    global_name: &str,
+    primary_name: &str,
+    members: &[ComposeMemberBinding<'_>],
 ) -> Result<UniversalUpResult, CliError> {
     let compose_network = format!("{project}_{network}");
-    let container = format!("{project}-{global_name}-1");
-    let ip = docker.inspect_ip(&container, &compose_network)?;
-    let health_url = format!("http://{ip}:5681");
+    let primary = members
+        .iter()
+        .find(|member| member.name == primary_name)
+        .ok_or_else(|| {
+            CliErrorKind::usage_error(format!(
+                "missing primary universal member `{primary_name}` for compose project"
+            ))
+        })?;
+    let container = format!("{project}-{primary_name}-1");
+    let health_url = format!("http://{UNIVERSAL_PUBLISHED_HOST}:{}", primary.cp_api_port);
     wait_for_http(&health_url, Duration::from_mins(1))?;
     let admin_token = token::extract_admin_token(docker, &container)?;
     Ok(UniversalUpResult {
         admin_token,
-        cp_ip: ip,
+        members: members
+            .iter()
+            .map(|member| {
+                let container = format!("{project}-{}-1", member.name);
+                docker
+                    .inspect_ip(&container, &compose_network)
+                    .map(|container_ip| UniversalMemberRuntime {
+                        name: member.name.to_string(),
+                        container_ip,
+                        cp_api_port: member.cp_api_port,
+                        xds_port: member.xds_port,
+                    })
+            })
+            .collect::<Result<Vec<_>, _>>()?,
     })
 }
 

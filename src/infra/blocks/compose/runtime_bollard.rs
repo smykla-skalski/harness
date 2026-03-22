@@ -7,7 +7,7 @@ use std::time::Duration;
 use compose_spec::Compose;
 
 use super::{ComposeDependsOn, ComposeFile, ComposeHealthcheck, ComposeOrchestrator};
-use crate::infra::blocks::{BlockError, ContainerConfig, ContainerRuntime};
+use crate::infra::blocks::{BlockError, ContainerConfig, ContainerPort, ContainerRuntime};
 use crate::infra::exec::CommandResult;
 
 const COMPOSE_PROJECT_LABEL: &str = "io.harness.compose-project";
@@ -37,7 +37,7 @@ impl BollardComposeOrchestrator {
             .map_err(|error| BlockError::new("compose", "deserialize compose file", error))
     }
 
-    fn parse_ports(ports: &[String]) -> Result<Vec<(u16, u16)>, BlockError> {
+    fn parse_ports(ports: &[String]) -> Result<Vec<ContainerPort>, BlockError> {
         ports
             .iter()
             .map(|port| {
@@ -62,7 +62,7 @@ impl BollardComposeOrchestrator {
                         format!("invalid container port `{container}`: {error}"),
                     )
                 })?;
-                Ok((host, container))
+                Ok(ContainerPort::fixed(host, container))
             })
             .collect()
     }

@@ -1,10 +1,12 @@
 use std::time::Duration;
 
 use crate::errors::CliError;
+use crate::infra::blocks::ContainerPort;
+use crate::infra::blocks::kuma::defaults;
 use crate::infra::blocks::kuma::token;
 use crate::infra::blocks::{ComposeOrchestrator, ContainerConfig, ContainerRuntime};
 use crate::infra::exec::wait_for_http;
-use crate::kernel::topology::{ClusterMode, ClusterSpec};
+use crate::kernel::topology::{ClusterMode, ClusterSpec, UNIVERSAL_PUBLISHED_HOST};
 use crate::workspace::HARNESS_PREFIX;
 
 #[path = "runtime/compose.rs"]
@@ -15,7 +17,14 @@ const UNIVERSAL_SUBNET: &str = "172.57.0.0/16";
 /// Result from a universal cluster up operation.
 pub(super) struct UniversalUpResult {
     admin_token: String,
-    cp_ip: String,
+    members: Vec<UniversalMemberRuntime>,
+}
+
+pub(super) struct UniversalMemberRuntime {
+    name: String,
+    container_ip: String,
+    cp_api_port: u16,
+    xds_port: Option<u16>,
 }
 
 pub(super) struct UniversalModeContext<'a> {
@@ -174,7 +183,17 @@ fn apply_universal_up_result(
     spec.cp_image = Some(cp_image.to_string());
     spec.store_type = Some(effective_store.to_string());
     spec.admin_token = Some(result.admin_token);
-    spec.members[0].container_ip = Some(result.cp_ip);
+    for runtime in result.members {
+        if let Some(member) = spec
+            .members
+            .iter_mut()
+            .find(|member| member.name == runtime.name)
+        {
+            member.container_ip = Some(runtime.container_ip);
+            member.cp_api_port = Some(runtime.cp_api_port);
+            member.xds_port = runtime.xds_port;
+        }
+    }
 }
 
 fn universal_single_up(
@@ -230,7 +249,10 @@ fn single_zone_container_config(
             ("KUMA_MODE".to_string(), "zone".to_string()),
             ("KUMA_STORE_TYPE".to_string(), store.to_string()),
         ],
-        ports: vec![(5681, 5681), (5678, 5678)],
+        ports: vec![
+            ContainerPort::fixed(defaults::CP_API_PORT, defaults::CP_API_PORT),
+            ContainerPort::fixed(defaults::XDS_PORT, defaults::XDS_PORT),
+        ],
         labels: vec![],
         entrypoint: None,
         restart_policy: None,
@@ -245,11 +267,19 @@ fn build_universal_up_result(
     network: &str,
 ) -> Result<UniversalUpResult, CliError> {
     let ip = docker.inspect_ip(cp_name, network)?;
-    let health_url = format!("http://{ip}:5681");
+    let health_url = format!(
+        "http://{UNIVERSAL_PUBLISHED_HOST}:{}",
+        defaults::CP_API_PORT
+    );
     wait_for_http(&health_url, Duration::from_mins(1))?;
     let admin_token = token::extract_admin_token(docker, cp_name)?;
     Ok(UniversalUpResult {
         admin_token,
-        cp_ip: ip,
+        members: vec![UniversalMemberRuntime {
+            name: cp_name.to_string(),
+            container_ip: ip,
+            cp_api_port: defaults::CP_API_PORT,
+            xds_port: Some(defaults::XDS_PORT),
+        }],
     })
 }
