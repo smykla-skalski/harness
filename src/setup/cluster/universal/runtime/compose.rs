@@ -215,6 +215,7 @@ fn compose_up_result(
     let admin_token = token::extract_admin_token(docker, &container)?;
     Ok(UniversalUpResult {
         admin_token,
+        docker_network: compose_network.clone(),
         members: members
             .iter()
             .map(|member| {
