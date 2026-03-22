@@ -158,7 +158,7 @@ fn extended_features() -> BTreeMap<Feature, FeatureInfo> {
         (
             Feature::PreCompactHandoff,
             FeatureInfo::new("context compaction before session handoff")
-                .command("harness setup pre-compact"),
+                .command("harness pre-compact"),
         ),
         (
             Feature::ProgressHeartbeat,
@@ -187,7 +187,7 @@ fn extended_features() -> BTreeMap<Feature, FeatureInfo> {
             FeatureInfo::new(
                 "start and stop session boundaries for observation and state tracking",
             )
-            .commands(&["harness setup session-start", "harness setup session-stop"]),
+            .commands(&["harness session-start", "harness session-stop"]),
         ),
         (
             Feature::StateCapture,

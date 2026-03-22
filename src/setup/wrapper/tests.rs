@@ -1,4 +1,5 @@
 use std::os::unix::fs::PermissionsExt;
+use std::path::Path;
 use std::{thread, time::Duration};
 
 use fs_err as fs;
@@ -315,16 +316,50 @@ fn sync_plugin_cache_skips_when_no_cache_dir() {
 fn lifecycle_commands_include_project_dirs() {
     assert_eq!(
         lifecycle_command(HookAgent::ClaudeCode, "session-start"),
-        "harness setup session-start --project-dir \"$CLAUDE_PROJECT_DIR\""
+        "harness session-start --project-dir \"$CLAUDE_PROJECT_DIR\""
     );
     assert_eq!(
         lifecycle_command(HookAgent::GeminiCli, "pre-compact"),
-        "harness setup pre-compact --project-dir \"${CLAUDE_PROJECT_DIR:-$GEMINI_PROJECT_DIR}\""
+        "harness pre-compact --project-dir \"${CLAUDE_PROJECT_DIR:-$GEMINI_PROJECT_DIR}\""
     );
     assert_eq!(
         lifecycle_command(HookAgent::Codex, "session-stop"),
-        "harness setup session-stop --project-dir \"$PWD\""
+        "harness session-stop --project-dir \"$PWD\""
     );
+}
+
+#[test]
+fn claude_lifecycle_commands_match_hook_template() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let hook_template =
+        fs::read_to_string(root.join(".claude/plugins/suite/hooks/hooks.json")).unwrap();
+    let hooks: serde_json::Value = serde_json::from_str(&hook_template).unwrap();
+
+    let commands = [
+        (
+            "PreCompact",
+            lifecycle_command(HookAgent::ClaudeCode, "pre-compact"),
+        ),
+        (
+            "SessionStart",
+            lifecycle_command(HookAgent::ClaudeCode, "session-start"),
+        ),
+        (
+            "Stop",
+            lifecycle_command(HookAgent::ClaudeCode, "session-stop"),
+        ),
+    ];
+
+    for (event, expected) in commands {
+        let actual = hooks["hooks"][event][0]["hooks"][0]["command"]
+            .as_str()
+            .unwrap();
+        let normalized_actual = actual.replace("${CLAUDE_PLUGIN_ROOT}/", "");
+        assert_eq!(
+            normalized_actual, expected,
+            "{event} lifecycle command drifted"
+        );
+    }
 }
 
 #[test]
