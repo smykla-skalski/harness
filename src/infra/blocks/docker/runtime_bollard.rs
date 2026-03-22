@@ -35,6 +35,9 @@ pub struct BollardContainerRuntime {
 }
 
 impl BollardContainerRuntime {
+    const REMOVE_TIMEOUT: Duration = Duration::from_secs(5);
+    const REMOVE_POLL_INTERVAL: Duration = Duration::from_millis(100);
+
     /// Create a runtime connected to the local Docker Engine API.
     ///
     /// # Errors
@@ -89,6 +92,21 @@ impl BollardContainerRuntime {
                         status_code: 404,
                         message,
                     } if message.to_ascii_lowercase().contains("no such image")
+                )
+            })
+    }
+
+    fn is_removal_in_progress(error: &BlockError) -> bool {
+        error
+            .cause
+            .downcast_ref::<BollardError>()
+            .is_some_and(|error| {
+                matches!(
+                    error,
+                    BollardError::DockerResponseServerError {
+                        status_code: 409,
+                        message,
+                    } if message.to_ascii_lowercase().contains("already in progress")
                 )
             })
     }
@@ -390,6 +408,32 @@ impl BollardContainerRuntime {
             .map(|_| ())
             .map_err(|error| BlockError::new("docker", &operation, error))
     }
+
+    fn wait_removed(&self, name: &str) -> Result<(), BlockError> {
+        let deadline = Instant::now() + Self::REMOVE_TIMEOUT;
+        loop {
+            match Self::block_on(
+                &format!("inspect_container {name}"),
+                self.docker
+                    .inspect_container(name, None::<InspectContainerOptions>),
+            ) {
+                Ok(_) => {}
+                Err(error) if Self::is_not_found(&error) => return Ok(()),
+                Err(error) => return Err(error),
+            }
+            if Instant::now() >= deadline {
+                return Err(BlockError::message(
+                    "docker",
+                    &format!("remove_container {name}"),
+                    format!(
+                        "timed out waiting for container `{name}` to be removed after {}s",
+                        Self::REMOVE_TIMEOUT.as_secs()
+                    ),
+                ));
+            }
+            thread::sleep(Self::REMOVE_POLL_INTERVAL);
+        }
+    }
 }
 
 impl ContainerRuntime for BollardContainerRuntime {
@@ -432,10 +476,11 @@ impl ContainerRuntime for BollardContainerRuntime {
                 }),
             ),
         );
-        if let Err(error) = result
-            && !Self::is_not_found(&error)
-        {
-            return Err(error);
+        match result {
+            Ok(()) => self.wait_removed(name)?,
+            Err(error) if Self::is_not_found(&error) => {}
+            Err(error) if Self::is_removal_in_progress(&error) => self.wait_removed(name)?,
+            Err(error) => return Err(error),
         }
         Ok(Self::command_result(
             &[
@@ -902,5 +947,33 @@ mod tests {
         );
 
         assert!(!BollardContainerRuntime::is_missing_local_image(&error));
+    }
+
+    #[test]
+    fn removal_in_progress_detection_matches_engine_error() {
+        let error = BlockError::new(
+            "docker",
+            "remove_container example",
+            BollardError::DockerResponseServerError {
+                status_code: 409,
+                message: "removal of container example is already in progress".to_string(),
+            },
+        );
+
+        assert!(BollardContainerRuntime::is_removal_in_progress(&error));
+    }
+
+    #[test]
+    fn removal_in_progress_detection_ignores_other_conflicts() {
+        let error = BlockError::new(
+            "docker",
+            "remove_container example",
+            BollardError::DockerResponseServerError {
+                status_code: 409,
+                message: "conflict: endpoint is in use".to_string(),
+            },
+        );
+
+        assert!(!BollardContainerRuntime::is_removal_in_progress(&error));
     }
 }

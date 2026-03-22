@@ -153,17 +153,42 @@ fn docker_container_runtime_run_detached_supports_ephemeral_host_ports() {
 
 #[test]
 fn docker_container_runtime_remove_invokes_rm_force() {
-    let fake = Arc::new(FakeProcessExecutor::new(vec![FakeResponse {
-        expected_program: "docker".to_string(),
-        expected_args: Some(vec![
-            "docker".into(),
-            "rm".into(),
-            "-f".into(),
-            "example".into(),
-        ]),
-        expected_method: Some(FakeProcessMethod::Run),
-        result: Ok(success_result(&["docker", "rm", "-f", "example"], "")),
-    }]));
+    let fake = Arc::new(FakeProcessExecutor::new(vec![
+        FakeResponse {
+            expected_program: "docker".to_string(),
+            expected_args: Some(vec![
+                "docker".into(),
+                "rm".into(),
+                "-f".into(),
+                "example".into(),
+            ]),
+            expected_method: Some(FakeProcessMethod::Run),
+            result: Ok(success_result(&["docker", "rm", "-f", "example"], "")),
+        },
+        FakeResponse {
+            expected_program: "docker".to_string(),
+            expected_args: Some(vec![
+                "docker".into(),
+                "inspect".into(),
+                "-f".into(),
+                "{{.Id}}".into(),
+                "example".into(),
+            ]),
+            expected_method: Some(FakeProcessMethod::Run),
+            result: Ok(CommandResult {
+                args: vec![
+                    "docker".into(),
+                    "inspect".into(),
+                    "-f".into(),
+                    "{{.Id}}".into(),
+                    "example".into(),
+                ],
+                returncode: 1,
+                stdout: String::new(),
+                stderr: "Error: No such container: example".to_string(),
+            }),
+        },
+    ]));
     let runtime = DockerContainerRuntime::new(fake);
 
     let result = runtime
@@ -171,6 +196,73 @@ fn docker_container_runtime_remove_invokes_rm_force() {
         .expect("expected remove to succeed");
 
     assert_eq!(result.returncode, 0);
+}
+
+#[test]
+fn docker_container_runtime_remove_waits_for_removal_in_progress() {
+    let fake = Arc::new(FakeProcessExecutor::new(vec![
+        FakeResponse {
+            expected_program: "docker".to_string(),
+            expected_args: Some(vec![
+                "docker".into(),
+                "rm".into(),
+                "-f".into(),
+                "example".into(),
+            ]),
+            expected_method: Some(FakeProcessMethod::Run),
+            result: Ok(CommandResult {
+                args: vec!["docker".into(), "rm".into(), "-f".into(), "example".into()],
+                returncode: 1,
+                stdout: String::new(),
+                stderr: "removal of container example is already in progress".to_string(),
+            }),
+        },
+        FakeResponse {
+            expected_program: "docker".to_string(),
+            expected_args: Some(vec![
+                "docker".into(),
+                "inspect".into(),
+                "-f".into(),
+                "{{.Id}}".into(),
+                "example".into(),
+            ]),
+            expected_method: Some(FakeProcessMethod::Run),
+            result: Ok(success_result(
+                &["docker", "inspect", "-f", "{{.Id}}", "example"],
+                "container-id\n",
+            )),
+        },
+        FakeResponse {
+            expected_program: "docker".to_string(),
+            expected_args: Some(vec![
+                "docker".into(),
+                "inspect".into(),
+                "-f".into(),
+                "{{.Id}}".into(),
+                "example".into(),
+            ]),
+            expected_method: Some(FakeProcessMethod::Run),
+            result: Ok(CommandResult {
+                args: vec![
+                    "docker".into(),
+                    "inspect".into(),
+                    "-f".into(),
+                    "{{.Id}}".into(),
+                    "example".into(),
+                ],
+                returncode: 1,
+                stdout: String::new(),
+                stderr: "Error: No such container: example".to_string(),
+            }),
+        },
+    ]));
+    let runtime = DockerContainerRuntime::new(fake);
+
+    let result = runtime
+        .remove("example")
+        .expect("expected remove to succeed");
+
+    assert_eq!(result.returncode, 1);
 }
 
 #[test]
@@ -450,12 +542,58 @@ fn docker_container_runtime_remove_by_label_removes_each_match() {
             expected_program: "docker".to_string(),
             expected_args: Some(vec![
                 "docker".into(),
+                "inspect".into(),
+                "-f".into(),
+                "{{.Id}}".into(),
+                "cp-1".into(),
+            ]),
+            expected_method: Some(FakeProcessMethod::Run),
+            result: Ok(CommandResult {
+                args: vec![
+                    "docker".into(),
+                    "inspect".into(),
+                    "-f".into(),
+                    "{{.Id}}".into(),
+                    "cp-1".into(),
+                ],
+                returncode: 1,
+                stdout: String::new(),
+                stderr: "Error: No such container: cp-1".to_string(),
+            }),
+        },
+        FakeResponse {
+            expected_program: "docker".to_string(),
+            expected_args: Some(vec![
+                "docker".into(),
                 "rm".into(),
                 "-f".into(),
                 "dp-1".into(),
             ]),
             expected_method: Some(FakeProcessMethod::Run),
             result: Ok(success_result(&["docker", "rm", "-f", "dp-1"], "")),
+        },
+        FakeResponse {
+            expected_program: "docker".to_string(),
+            expected_args: Some(vec![
+                "docker".into(),
+                "inspect".into(),
+                "-f".into(),
+                "{{.Id}}".into(),
+                "dp-1".into(),
+            ]),
+            expected_method: Some(FakeProcessMethod::Run),
+            result: Ok(CommandResult {
+                args: vec![
+                    "docker".into(),
+                    "inspect".into(),
+                    "-f".into(),
+                    "{{.Id}}".into(),
+                    "dp-1".into(),
+                ],
+                returncode: 1,
+                stdout: String::new(),
+                stderr: "Error: No such container: dp-1".to_string(),
+            }),
         },
     ]));
     let runtime = DockerContainerRuntime::new(fake);
