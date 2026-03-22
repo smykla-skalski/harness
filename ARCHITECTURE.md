@@ -1,22 +1,24 @@
-# Harness Architecture
+# Harness architecture
 
-Harness is organized by domain, with a small pure kernel and an explicit workspace layer for ambient state.
+This file is the short ownership map for the current `9.x` layout.
 
-## Shape
+Use [README.md](README.md) for day-to-day usage. Use this file when you need to answer a different question: "where should this code live?"
+
+## High-level shape
 
 ```mermaid
 flowchart LR
     App["app\nCLI transport and wiring"]
 
-    Run["run\nsuite:run domain"]
-    Create["create\nsuite:create domain"]
-    Observe["observe\nsession observation"]
+    Run["run\ntracked suite execution"]
+    Create["create\nsuite creation workflow"]
+    Observe["observe\nsession analysis and reporting"]
     Setup["setup\nbootstrap and session lifecycle"]
     Hooks["hooks\nagent-facing policy and protocol"]
 
     Kernel["kernel\npure shared primitives"]
     Workspace["workspace\nambient harness state"]
-    Platform["platform\nruntime and provider adapters"]
+    Platform["platform\nruntime-specific adapters"]
     Infra["infra\ngeneric side effects"]
     Errors["errors\ntyped error families"]
 
@@ -52,80 +54,92 @@ flowchart LR
     Hooks --> Infra
     Hooks --> Errors
 
-    Platform --> Kernel
-    Platform --> Infra
     Workspace --> Kernel
     Workspace --> Infra
+    Platform --> Kernel
+    Platform --> Infra
 ```
 
-## Ownership
+## What each root owns
 
-| Area | Owns |
-| --- | --- |
-| `src/app/` | Clap entrypoints, top-level command grouping, wiring into domain APIs |
-| `src/run/` | tracked run lifecycle, specs, prepared artifacts, reporting, run workflow |
-| `src/create/` | `suite:create` payloads, approval workflow, validation, create session state |
-| `src/observe/` | session scanning, watch/dump flows, classifier output, observer state |
-| `src/setup/` | bootstrap, wrapper/session lifecycle, cluster setup entrypoints |
-| `src/hooks/` | hook protocol, normalization, policy input hydration, guards, effects |
-| `src/kernel/` | pure shared concepts such as command intent, tool facts, run surface, topology, gates, skill ids |
-| `src/workspace/` | XDG paths, session context, current-run pointers, compact handoff, harness-owned ambient files |
-| `src/platform/` | provider-specific runtime helpers such as `kubectl_validate`, runtime access, ephemeral `MetalLB` |
-| `src/infra/` | generic execution, HTTP, process, persistence, environment, and block abstractions |
-| `src/errors/` | typed error families and transport-safe rendering |
+| Path             | Owns                                                                               |
+| ---------------- | ---------------------------------------------------------------------------------- |
+| `src/app/`       | Clap CLI, top-level command grouping, transport mapping, domain wiring             |
+| `src/run/`       | tracked runs, run workflow, prepared artifacts, reporting, run-specific state      |
+| `src/create/`    | `suite:create` workflow, approval state, create validation, create session state   |
+| `src/observe/`   | log/session scanning, classifiers, dump/scan flows, observe output                 |
+| `src/setup/`     | environment bootstrap, wrapper/session lifecycle, cluster setup entrypoints        |
+| `src/hooks/`     | hook payload handling, guard policy, protocol normalization, hook effects          |
+| `src/kernel/`    | pure shared concepts such as command intent, topology, skill ids, gates            |
+| `src/workspace/` | XDG paths, current session pointers, compact handoff, ambient harness files        |
+| `src/infra/`     | generic execution, persistence, environment, HTTP, process, and block abstractions |
+| `src/errors/`    | typed error families plus transport-safe rendering                                 |
 
-## Runtime Flow
+## Internal support roots
+
+These are real roots in the repo, but they are not part of the main public domain map:
+
+- `src/platform/` is crate-internal adapter code for runtime-specific behavior.
+- `src/manifests/` is crate-internal manifest plumbing.
+- `src/suite_defaults/` is crate-internal suite scaffolding and defaults.
+- `src/codec/` is test-only support code and is not part of the public library surface.
+
+## Public crate surface
+
+The current `src/lib.rs` surface is:
+
+- public: `app`, `create`, `errors`, `hooks`, `infra`, `kernel`, `observe`, `run`, `setup`, `workspace`
+- crate-internal: `platform`, `manifests`, `suite_defaults`
+- test-only: `codec`
+
+That means `platform` is intentionally not a stable library API even though it is a first-class internal root.
+
+## Runtime flow
 
 ```mermaid
 sequenceDiagram
     participant U as User or Hook Event
     participant A as app
-    participant D as domain
+    participant D as Domain
     participant W as workspace
     participant P as platform
     participant I as infra
 
     U->>A: CLI args or hook payload
     A->>D: typed request
-    D->>W: resolve ambient state if needed
-    D->>P: ask for runtime-specific translation
-    D->>I: execute side effects
+    D->>W: load session or ambient state if needed
+    D->>P: ask for runtime-specific behavior if needed
+    D->>I: perform side effects
     D-->>A: typed result or typed error
     A-->>U: CLI output or hook response
 ```
 
-## Rules
-
-- `app` is transport only. It may wire domains together, but domains must not depend on `app`.
-- `kernel` is pure. It must not depend on product domains, `platform`, or `infra`.
-- `workspace` is the only owner of ambient harness state. Domains should not rebuild XDG/session/current-run logic on their own.
-- `platform` is adapter logic only. Generic topology lives in `kernel`, not `platform`.
-- `infra` stays generic. It must not depend on product domains.
-- `run`, `create`, `observe`, `setup`, and `hooks` own their own workflows and persistence-facing models.
-- The public crate surface is domain-oriented. `platform` is intentionally crate-internal.
-- Shared abstractions must have a real owner. If a concept is cross-domain and pure, it belongs in `kernel`; if it is ambient state, it belongs in `workspace`.
-
-## Public Surface
-
-The intended public shape is app-first and domain-first:
-
-- public: `app`, `run`, `create`, `observe`, `setup`, `hooks`, `kernel`, `workspace`, `infra`, `errors`
-- internal: `platform`, manifest plumbing, suite defaults, test-only codec helpers
-
-## State Boundaries
+## State boundaries
 
 ```mermaid
 flowchart TD
     Workspace["workspace\ncurrent session and ambient pointers"]
-    Run["run\ntracked run state and reports"]
+    Run["run\nrunner state, metadata, reports"]
     Create["create\nsuite:create state"]
     Observe["observe\nobserver state"]
+    Setup["setup\nsession and bootstrap state"]
     Hooks["hooks\nnormalized hook context"]
 
     Workspace --> Run
     Workspace --> Create
     Workspace --> Observe
+    Workspace --> Setup
     Workspace --> Hooks
 ```
 
-Use this document as the short contract. If a module does not clearly fit one of these ownership buckets, it is probably in the wrong place.
+## Rules
+
+- `app` is transport only. It wires domains together, but domains must not depend on `app`.
+- `kernel` is pure. It must not depend on product domains, `platform`, or `infra`.
+- `workspace` is the only owner of ambient harness state.
+- `platform` is adapter code, not a public crate surface.
+- `infra` stays generic and must not depend on product domains.
+- `run`, `create`, `observe`, `setup`, and `hooks` own their own workflows and persistence-facing models.
+- Shared pure concepts belong in `kernel`. Shared ambient state belongs in `workspace`.
+
+If a module does not fit one of these buckets, it is probably in the wrong place.
