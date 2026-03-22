@@ -10,15 +10,11 @@ impl Execute for CreateResetArgs {
     }
 }
 
-/// Arguments for `harness create-reset`.
-#[derive(Debug, Clone, Args)]
-pub struct CreateResetArgs {
-    /// Managed skill whose saved workspace should be cleared.
-    #[arg(long, value_parser = clap::builder::PossibleValuesParser::new([crate::kernel::skills::SKILL_CREATE]))]
-    pub skill: String,
-}
+/// Arguments for `harness create reset`.
+#[derive(Debug, Clone, Args, Default)]
+pub struct CreateResetArgs;
 
-/// Reset suite:create workspace.
+/// Reset `suite:create` workspace.
 ///
 /// # Errors
 /// Returns `CliError` on failure.
