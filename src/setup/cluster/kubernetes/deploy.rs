@@ -2,8 +2,6 @@ use std::collections::HashMap;
 use std::env;
 use std::path::Path;
 
-use tracing::info;
-
 use crate::errors::CliError;
 use crate::infra::exec::cluster_exists;
 use crate::setup::services::cluster::{make_target, make_target_live};
@@ -26,40 +24,57 @@ pub(super) fn start_and_deploy(
     kuma_mode: &str,
     extra_settings: &[String],
 ) -> Result<(), CliError> {
+    let env = deploy_env(base_env, cluster_name, kuma_mode, extra_settings);
+    ensure_cluster_started(root, &env, cluster_name)?;
+    make_target_live(root, "k3d/cluster/deploy/helm", &env)
+}
+
+fn deploy_env(
+    base_env: &HashMap<String, String>,
+    cluster_name: &str,
+    kuma_mode: &str,
+    extra_settings: &[String],
+) -> HashMap<String, String> {
     let mut env = base_env.clone();
     env.insert("CLUSTER".to_string(), cluster_name.to_string());
-    if !cluster_exists(cluster_name)? {
-        info!(%cluster_name, "starting k3d cluster");
-        make_target_live(root, "k3d/cluster/start", &env)?;
-        info!(%cluster_name, "k3d cluster ready");
-    }
-    let home = env::var("HOME").unwrap_or_else(|_| "/tmp".into());
-    let kubeconfig = format!("{home}/.kube/k3d-{cluster_name}.yaml");
-    env.insert("KUBECONFIG".to_string(), kubeconfig);
+    env.insert("KUBECONFIG".to_string(), cluster_kubeconfig(cluster_name));
     env.insert("K3D_HELM_DEPLOY_NO_CNI".to_string(), "true".to_string());
     env.insert("KUMA_MODE".to_string(), kuma_mode.to_string());
-
-    // Merge existing settings, init container throttle fix, and caller extras.
-    let existing = env
-        .get("K3D_HELM_DEPLOY_ADDITIONAL_SETTINGS")
-        .cloned()
-        .unwrap_or_default();
-    let mut all: Vec<String> = if existing.is_empty() {
-        vec![]
-    } else {
-        existing.split_whitespace().map(String::from).collect()
-    };
-    all.extend(INIT_CONTAINER_THROTTLE_FIX.iter().map(|s| (*s).to_string()));
-    all.extend(extra_settings.iter().cloned());
     env.insert(
         "K3D_HELM_DEPLOY_ADDITIONAL_SETTINGS".to_string(),
-        all.join(" "),
+        merged_deploy_settings(&env, extra_settings).join(" "),
     );
+    env
+}
 
-    info!(%cluster_name, %kuma_mode, "deploying Kuma");
-    make_target_live(root, "k3d/cluster/deploy/helm", &env)?;
-    info!(%cluster_name, "Kuma deployed");
-    Ok(())
+fn cluster_kubeconfig(cluster_name: &str) -> String {
+    let home = env::var("HOME").unwrap_or_else(|_| "/tmp".into());
+    format!("{home}/.kube/k3d-{cluster_name}.yaml")
+}
+
+fn merged_deploy_settings(env: &HashMap<String, String>, extra_settings: &[String]) -> Vec<String> {
+    let mut all = existing_deploy_settings(env);
+    all.extend(INIT_CONTAINER_THROTTLE_FIX.iter().map(|s| (*s).to_string()));
+    all.extend(extra_settings.iter().cloned());
+    all
+}
+
+fn existing_deploy_settings(env: &HashMap<String, String>) -> Vec<String> {
+    env.get("K3D_HELM_DEPLOY_ADDITIONAL_SETTINGS")
+        .map_or_else(Vec::new, |existing| {
+            existing.split_whitespace().map(String::from).collect()
+        })
+}
+
+fn ensure_cluster_started(
+    root: &Path,
+    env: &HashMap<String, String>,
+    cluster_name: &str,
+) -> Result<(), CliError> {
+    if cluster_exists(cluster_name)? {
+        return Ok(());
+    }
+    make_target_live(root, "k3d/cluster/start", env)
 }
 
 pub(super) fn cluster_stop(

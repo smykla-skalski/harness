@@ -1,7 +1,6 @@
 use std::env;
+use std::path::Path;
 use std::path::PathBuf;
-
-use tracing::warn;
 
 use crate::create::{CreateWorkflowState, read_create_state};
 use crate::hooks::protocol::context::{
@@ -28,48 +27,54 @@ impl HydratedHookState {
     }
 
     fn load_run_context(&mut self) {
-        if let Some(run_directory) = &self.run_dir {
-            match RunContext::from_run_dir(run_directory) {
-                Ok(run_context) => self.run = Some(run_context),
-                Err(error) => warn!(%error, "failed to load run context"),
-            }
+        if let Some(run_directory) = self.run_dir.clone() {
+            self.load_run_context_from_dir(&run_directory);
             return;
         }
-        match RunContext::from_current() {
-            Ok(Some(run_context)) => {
-                self.run_dir = Some(run_context.layout.run_dir());
-                self.run = Some(run_context);
-            }
-            Ok(None) => {}
-            Err(error) => warn!(%error, "failed to load current run context"),
-        }
+        self.load_current_run_context();
     }
 
     fn load_runner_state(&mut self) {
-        let run_directory = self
-            .run
-            .as_ref()
-            .map(|run_context| run_context.layout.run_dir())
-            .or_else(|| self.run_dir.clone());
-
+        let run_directory = self.runner_state_dir();
         let Some(run_directory) = run_directory else {
             return;
         };
 
-        match runner_workflow::read_runner_state(&run_directory) {
-            Ok(runner_state) => self.runner_state = runner_state,
-            Err(error) => warn!(%error, "failed to load runner state"),
-        }
+        self.read_runner_state(&run_directory);
     }
 
     fn load_create_state(&mut self, skill: &SkillContext) {
-        if !skill.is_create {
-            return;
+        if skill.is_create {
+            self.read_create_state();
         }
-        match read_create_state() {
-            Ok(create_state) => self.create_state = create_state,
-            Err(error) => warn!(%error, "failed to load create state"),
+    }
+
+    fn load_run_context_from_dir(&mut self, run_directory: &Path) {
+        self.run = RunContext::from_run_dir(run_directory).ok();
+    }
+
+    fn load_current_run_context(&mut self) {
+        if let Ok(Some(run_context)) = RunContext::from_current() {
+            self.run_dir = Some(run_context.layout.run_dir());
+            self.run = Some(run_context);
         }
+    }
+
+    fn runner_state_dir(&self) -> Option<PathBuf> {
+        self.run
+            .as_ref()
+            .map(|run_context| run_context.layout.run_dir())
+            .or_else(|| self.run_dir.clone())
+    }
+
+    fn read_runner_state(&mut self, run_directory: &Path) {
+        self.runner_state = runner_workflow::read_runner_state(run_directory)
+            .ok()
+            .flatten();
+    }
+
+    fn read_create_state(&mut self) {
+        self.create_state = read_create_state().ok().flatten();
     }
 }
 

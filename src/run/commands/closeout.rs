@@ -1,13 +1,15 @@
-use clap::Args;
+use std::path::Path;
 
-use tracing::info;
+use clap::Args;
 
 use crate::app::command_context::{AppContext, Execute};
 use crate::errors::{CliError, CliErrorKind};
+use crate::run::RunStatus;
 use crate::run::Verdict;
 use crate::run::application::RunApplication;
 use crate::run::args::RunDirArgs;
 use crate::run::audit::write_run_status_with_audit;
+use crate::run::context::RunContext;
 use crate::run::workflow::{RunnerEvent, apply_event, ensure_execution_phase, read_runner_state};
 use crate::workspace::utc_now;
 
@@ -45,7 +47,15 @@ pub fn closeout(run_dir_args: &RunDirArgs) -> Result<i32, CliError> {
 pub(crate) fn closeout_run(run: &RunApplication) -> Result<(), CliError> {
     let ctx = run.context();
     let run_dir = run.layout().run_dir();
+    ensure_closeout_artifacts(&run_dir)?;
+    let mut status = load_closeout_status(ctx)?;
+    ensure_closeout_state_capture(&status)?;
+    maybe_compute_closeout_verdict(ctx, &mut status)?;
+    advance_closeout_runner_state(&run_dir)?;
+    Ok(())
+}
 
+fn ensure_closeout_artifacts(run_dir: &Path) -> Result<(), CliError> {
     let required = [
         "commands/command-log.md",
         "manifests/manifest-index.md",
@@ -58,17 +68,26 @@ pub(crate) fn closeout_run(run: &RunApplication) -> Result<(), CliError> {
             return Err(CliErrorKind::missing_closeout_artifact(*rel).into());
         }
     }
+    Ok(())
+}
 
-    let mut status = ctx
-        .status
+fn load_closeout_status(ctx: &RunContext) -> Result<RunStatus, CliError> {
+    ctx.status
         .clone()
-        .ok_or_else(|| -> CliError { CliErrorKind::MissingRunStatus.into() })?;
+        .ok_or_else(|| -> CliError { CliErrorKind::MissingRunStatus.into() })
+}
 
+fn ensure_closeout_state_capture(status: &RunStatus) -> Result<(), CliError> {
     if status.last_state_capture.is_none() {
         return Err(CliErrorKind::MissingStateCapture.into());
     }
+    Ok(())
+}
 
-    // Auto-compute verdict from counts when still pending.
+fn maybe_compute_closeout_verdict(
+    ctx: &RunContext,
+    status: &mut RunStatus,
+) -> Result<(), CliError> {
     if status.overall_verdict == Verdict::Pending {
         let computed = compute_verdict_from_counts(
             status.counts.passed,
@@ -80,35 +99,29 @@ pub(crate) fn closeout_run(run: &RunApplication) -> Result<(), CliError> {
             status.completed_at = Some(utc_now());
             write_run_status_with_audit(
                 &ctx.layout.run_dir(),
-                &status,
+                status,
                 None,
                 Some("closeout"),
                 None,
             )?;
-            info!(
-                %verdict,
-                passed = status.counts.passed,
-                failed = status.counts.failed,
-                skipped = status.counts.skipped,
-                "auto-computed verdict from counts"
-            );
         } else {
             return Err(CliErrorKind::VerdictPending.into());
         }
     }
+    Ok(())
+}
 
-    // Advance runner state to closeout then completed.
-    ensure_execution_phase(&run_dir)?;
-    if let Some(runner) = read_runner_state(&run_dir)? {
+fn advance_closeout_runner_state(run_dir: &Path) -> Result<(), CliError> {
+    ensure_execution_phase(run_dir)?;
+    if let Some(runner) = read_runner_state(run_dir)? {
         let phase_str = runner.phase().to_string();
         if phase_str == "execution" {
-            apply_event(&run_dir, RunnerEvent::CloseoutStarted, None, None)?;
-            apply_event(&run_dir, RunnerEvent::RunCompleted, None, None)?;
+            apply_event(run_dir, RunnerEvent::CloseoutStarted, None, None)?;
+            apply_event(run_dir, RunnerEvent::RunCompleted, None, None)?;
         } else if phase_str == "closeout" {
-            apply_event(&run_dir, RunnerEvent::RunCompleted, None, None)?;
+            apply_event(run_dir, RunnerEvent::RunCompleted, None, None)?;
         }
     }
-
     Ok(())
 }
 

@@ -3,8 +3,6 @@ use std::path::PathBuf;
 
 use clap::Args;
 
-use tracing::warn;
-
 use crate::app::command_context::{AppContext, Execute};
 use crate::errors::{CliError, CliErrorKind};
 use crate::infra::blocks::kuma::token::parse_token_response;
@@ -68,33 +66,56 @@ pub fn token(
     let access = run.control_plane_access()?;
     let addr = cp_addr.map_or(access.addr, Cow::Borrowed);
     let admin_token = access.admin_token;
-
-    // Try REST API first
-    match token_via_api(addr.as_ref(), kind, name, mesh, valid_for, admin_token) {
-        Ok(tok) => {
-            println!("{tok}");
-            return Ok(0);
-        }
-        Err(api_err) => {
-            warn!(%api_err, "token API failed, trying kumactl");
-        }
-    }
-
-    // Fallback to kumactl
-    let root = PathBuf::from(&run.metadata().repo_root);
-    let binary = find_kumactl_binary(&root)?;
-
-    let mut args = vec!["generate", "dataplane-token"];
-    args.extend_from_slice(&["--name", name]);
-    args.extend_from_slice(&["--mesh", mesh]);
-    args.extend_from_slice(&["--type", kind]);
-    args.extend_from_slice(&["--valid-for", valid_for]);
-
-    let result = exec::kumactl_run(&binary, addr.as_ref(), &args, &[0])?;
-    let token = parse_token_response(&result.stdout)
-        .map_err(|error| CliErrorKind::token_generation_failed(error.to_string()))?;
-    println!("{}", token.token);
+    let token =
+        token_via_api(addr.as_ref(), kind, name, mesh, valid_for, admin_token).or_else(|_| {
+            token_via_kumactl(
+                &run.metadata().repo_root,
+                addr.as_ref(),
+                kind,
+                name,
+                mesh,
+                valid_for,
+            )
+        })?;
+    println!("{token}");
     Ok(0)
+}
+
+fn token_via_kumactl(
+    repo_root: &str,
+    addr: &str,
+    kind: &str,
+    name: &str,
+    mesh: &str,
+    valid_for: &str,
+) -> Result<String, CliError> {
+    let root = PathBuf::from(repo_root);
+    let binary = find_kumactl_binary(&root)?;
+    let args = kumactl_token_args(kind, name, mesh, valid_for);
+    let result = exec::kumactl_run(&binary, addr, &args, &[0])?;
+    parse_token_response(&result.stdout)
+        .map(|response| response.token)
+        .map_err(|error| CliErrorKind::token_generation_failed(error.to_string()).into())
+}
+
+fn kumactl_token_args<'a>(
+    kind: &'a str,
+    name: &'a str,
+    mesh: &'a str,
+    valid_for: &'a str,
+) -> Vec<&'a str> {
+    vec![
+        "generate",
+        "dataplane-token",
+        "--name",
+        name,
+        "--mesh",
+        mesh,
+        "--type",
+        kind,
+        "--valid-for",
+        valid_for,
+    ]
 }
 
 pub(crate) fn token_via_api(

@@ -1,7 +1,5 @@
 use std::path::Path;
 
-use tracing::{info, warn};
-
 use crate::errors::{CliError, CliErrorKind};
 use crate::infra::exec::run_command;
 use crate::kernel::topology::ClusterSpec;
@@ -59,10 +57,17 @@ pub(crate) fn resolve_cp_image(
         .into());
     }
 
-    info!("building kuma images");
+    build_kuma_images(root)?;
+    require_built_cp_image()
+}
+
+fn build_kuma_images(root: &Path) -> Result<(), CliError> {
     run_command(&["make", "images"], Some(root), None, &[0])
         .map_err(|e| CliErrorKind::image_build_failed("make images").with_details(e.message()))?;
+    Ok(())
+}
 
+fn require_built_cp_image() -> Result<String, CliError> {
     find_local_kuma_cp_image()?.ok_or_else(|| {
         CliErrorKind::image_build_failed("kuma-cp image not found after build").into()
     })
@@ -76,14 +81,14 @@ pub(crate) fn resolve_effective_store(is_up: bool, cli_store: &str) -> String {
     if is_up {
         return cli_store.to_string();
     }
-    match load_persisted_cluster_spec() {
-        Ok(Some(spec)) => spec.store_type.unwrap_or_else(|| cli_store.to_string()),
-        Ok(None) => cli_store.to_string(),
-        Err(error) => {
-            warn!(%error, "failed to load persisted cluster spec");
-            cli_store.to_string()
-        }
+    match persisted_store_type() {
+        Ok(Some(store)) => store,
+        Ok(None) | Err(_) => cli_store.to_string(),
     }
+}
+
+fn persisted_store_type() -> Result<Option<String>, CliError> {
+    Ok(load_persisted_cluster_spec()?.and_then(|spec| spec.store_type))
 }
 
 /// Load persisted cluster spec from the session context file.

@@ -1,7 +1,5 @@
 use std::time::Duration;
 
-use tracing::info;
-
 use crate::errors::CliError;
 use crate::infra::blocks::kuma::token;
 use crate::infra::blocks::{ComposeOrchestrator, ContainerConfig, ContainerRuntime};
@@ -118,14 +116,9 @@ fn handle_single_down(
     docker: &dyn ContainerRuntime,
     compose_runtime: &dyn ComposeOrchestrator,
 ) -> Result<(), CliError> {
-    let removed = docker.remove_by_label("io.harness.service=true")?;
-    for name in &removed {
-        info!(%name, "removed service container");
-    }
+    remove_service_containers(docker)?;
     if effective_store == "postgres" {
-        let project = format!("{HARNESS_PREFIX}{cluster_name}");
-        compose_runtime.down_project(&project)?;
-        return Ok(());
+        return down_compose_project(compose_runtime, cluster_name);
     }
     universal_single_down(network_name, cluster_name, docker)
 }
@@ -192,8 +185,43 @@ fn universal_single_up(
     docker: &dyn ContainerRuntime,
 ) -> Result<UniversalUpResult, CliError> {
     docker.create_network(network, UNIVERSAL_SUBNET)?;
+    docker.run_detached(&single_zone_container_config(
+        image, network, store, cp_name,
+    ))?;
+    build_universal_up_result(docker, cp_name, network)
+}
 
-    docker.run_detached(&ContainerConfig {
+fn universal_single_down(
+    network: &str,
+    cp_name: &str,
+    docker: &dyn ContainerRuntime,
+) -> Result<(), CliError> {
+    docker.remove(cp_name)?;
+    docker.remove_network(network)?;
+    Ok(())
+}
+
+fn remove_service_containers(docker: &dyn ContainerRuntime) -> Result<(), CliError> {
+    let _ = docker.remove_by_label("io.harness.service=true")?;
+    Ok(())
+}
+
+fn down_compose_project(
+    compose_runtime: &dyn ComposeOrchestrator,
+    cluster_name: &str,
+) -> Result<(), CliError> {
+    let project = format!("{HARNESS_PREFIX}{cluster_name}");
+    compose_runtime.down_project(&project)?;
+    Ok(())
+}
+
+fn single_zone_container_config(
+    image: &str,
+    network: &str,
+    store: &str,
+    cp_name: &str,
+) -> ContainerConfig {
+    ContainerConfig {
         image: image.to_string(),
         name: cp_name.to_string(),
         network: network.to_string(),
@@ -208,28 +236,20 @@ fn universal_single_up(
         restart_policy: None,
         extra_args: vec![],
         command: vec!["run".to_string()],
-    })?;
+    }
+}
 
+fn build_universal_up_result(
+    docker: &dyn ContainerRuntime,
+    cp_name: &str,
+    network: &str,
+) -> Result<UniversalUpResult, CliError> {
     let ip = docker.inspect_ip(cp_name, network)?;
     let health_url = format!("http://{ip}:5681");
-    info!(%health_url, "waiting for CP");
     wait_for_http(&health_url, Duration::from_mins(1))?;
-
-    info!("extracting admin token");
     let admin_token = token::extract_admin_token(docker, cp_name)?;
-    info!(%health_url, "CP ready (admin token extracted)");
     Ok(UniversalUpResult {
         admin_token,
         cp_ip: ip,
     })
-}
-
-fn universal_single_down(
-    network: &str,
-    cp_name: &str,
-    docker: &dyn ContainerRuntime,
-) -> Result<(), CliError> {
-    docker.remove(cp_name)?;
-    docker.remove_network(network)?;
-    Ok(())
 }

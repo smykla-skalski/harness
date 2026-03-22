@@ -1,7 +1,5 @@
 use std::path::{Path, PathBuf};
 
-use tracing::warn;
-
 use crate::errors::CliError;
 #[cfg(test)]
 use crate::errors::CliErrorKind;
@@ -59,20 +57,13 @@ pub fn load_suite_defaults(suite_dir: &Path) -> Result<Option<SuiteDefaults>, Cl
 /// Reads the `.harness.json` file and returns the `repo_root` value if present.
 #[must_use]
 pub fn default_repo_root_for_suite(suite_dir: &Path) -> Option<PathBuf> {
-    let payload = match load_suite_defaults(suite_dir) {
-        Ok(Some(v)) => v,
-        Ok(None) => return None,
-        Err(e) => {
-            warn!(path = %suite_defaults_path(suite_dir).display(), %e, "failed to load suite defaults");
-            return None;
-        }
-    };
-    let raw = payload.repo_root.as_deref()?;
-    let trimmed = raw.trim();
-    if trimmed.is_empty() {
-        return None;
-    }
-    Some(PathBuf::from(trimmed))
+    load_suite_defaults(suite_dir)
+        .ok()
+        .flatten()
+        .and_then(|payload| payload.repo_root)
+        .map(|repo_root| repo_root.trim().to_string())
+        .filter(|repo_root| !repo_root.is_empty())
+        .map(PathBuf::from)
 }
 
 #[cfg(test)]

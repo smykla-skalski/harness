@@ -4,8 +4,6 @@ use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
 
-use tracing::info;
-
 use crate::errors::{CliError, CliErrorKind};
 use crate::infra::blocks::kuma::repo::{
     REMOTE_IMAGE_BUILD_TARGET, REMOTE_IMAGE_MANIFEST_TARGET, REMOTE_IMAGE_PUSH_TARGET,
@@ -21,7 +19,7 @@ use crate::setup::services::cluster::make_target_live;
 use crate::workspace::{
     RemoteKubernetesInstallMemberState, RemoteKubernetesInstallState, cleanup_remote_install_state,
     load_remote_install_state_for_spec, persist_remote_install_state,
-    remote_install_state_path_for_spec, shorten_path, utc_now,
+    remote_install_state_path_for_spec, utc_now,
 };
 
 struct InstallMemberPlan<'a> {
@@ -495,7 +493,7 @@ fn state_member_mut<'a>(
 fn install_member(
     kubernetes: &dyn KubernetesRuntime,
     root: &Path,
-    spec: &ClusterSpec,
+    _spec: &ClusterSpec,
     state: &mut RemoteKubernetesInstallState,
     cluster_name: &str,
     plan: &InstallMemberPlan<'_>,
@@ -503,15 +501,7 @@ fn install_member(
     let member = state_member_mut(state, cluster_name)?;
     prepare_member_namespace(kubernetes, member)?;
     let settings = install_member_settings(plan);
-    install_member_release(root, kubernetes, member, &settings)?;
-    let kubeconfig = shorten_path(Path::new(&member.generated_kubeconfig));
-    info!(
-        cluster = %cluster_name,
-        provider = %spec.provider,
-        kubeconfig = %kubeconfig,
-        "remote Kuma control plane ready"
-    );
-    Ok(())
+    install_member_release(root, kubernetes, member, &settings)
 }
 
 fn prepare_member_namespace(
@@ -712,13 +702,13 @@ fn wait_for_control_plane(
         kubeconfig,
         namespace,
         app_label.as_str(),
-        Duration::from_secs(60),
+        Duration::from_mins(1),
     )?;
     kubernetes.wait_for_pods_ready(
         kubeconfig,
         namespace,
         app_label.as_str(),
-        Duration::from_secs(60),
+        Duration::from_mins(1),
     )?;
 
     for _ in 0..60 {

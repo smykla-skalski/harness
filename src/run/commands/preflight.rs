@@ -1,7 +1,5 @@
 use clap::Args;
 
-use tracing::info;
-
 use crate::app::command_context::{AppContext, Execute};
 use crate::errors::CliError;
 use crate::run::args::RunDirArgs;
@@ -50,7 +48,6 @@ pub fn preflight(
     let _ = run.save_preflight_outputs(&checked_at)?;
     run.record_preflight_complete()?;
 
-    info!("preflight complete");
     println!("{}", shorten_path(&run.layout().artifacts_dir()));
     Ok(0)
 }
