@@ -35,7 +35,9 @@ pub const XDS_PORT: u16 = 5678;
 /// Default Envoy admin port used by sidecars.
 pub const ENVOY_ADMIN_PORT: u16 = 9901;
 
-/// Default Envoy readiness/admin probe port used by universal service helpers.
+/// Default internal kuma-dp readiness reporter port.
+///
+/// Host-side probes should use `/ready` on [`ENVOY_ADMIN_PORT`].
 pub const DATAPLANE_READY_PORT: u16 = 9902;
 
 /// Default mesh name for local harness flows.

@@ -3,11 +3,14 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use super::*;
-use crate::infra::blocks::{ContainerConfig, FakeContainerRuntime};
+use crate::infra::blocks::kuma::defaults;
+use crate::infra::blocks::{ContainerConfig, ContainerPort, FakeContainerRuntime};
 use crate::infra::io::read_json_typed;
 use crate::run::application::RunApplication;
 use crate::run::context::{PreflightArtifact, RunLayout};
-use crate::run::services::service_lifecycle::{read_service_container_rows, run_service_filter};
+use crate::run::services::service_lifecycle::{
+    read_service_container_rows, run_service_filter, service_container_ports, service_probe_port,
+};
 use crate::run::workflow::{
     PreflightStatus, RunnerPhase, initialize_runner_state, read_runner_state,
 };
@@ -237,6 +240,18 @@ fn mark_manifest_applied_updates_prepared_suite_artifact() {
 #[test]
 fn service_container_filter_uses_run_id_label() {
     assert_eq!(run_service_filter("run-4"), "label=io.harness.run-id=run-4");
+}
+
+#[test]
+fn service_container_ports_publish_envoy_admin_probe_port() {
+    assert_eq!(service_probe_port(), defaults::ENVOY_ADMIN_PORT);
+    assert_eq!(
+        service_container_ports(18_080),
+        vec![
+            ContainerPort::fixed(18_080, 18_080),
+            ContainerPort::ephemeral(defaults::ENVOY_ADMIN_PORT),
+        ]
+    );
 }
 
 #[test]
