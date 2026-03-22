@@ -166,8 +166,11 @@ fn extended_features() -> BTreeMap<Feature, FeatureInfo> {
         ),
         (
             Feature::RunLifecycle,
-            FeatureInfo::new("full run lifecycle: init, preflight, execute, report, closeout")
+            FeatureInfo::new("full run lifecycle: start, resume, execute, report, finish")
                 .commands(&[
+                    "harness run start",
+                    "harness run resume",
+                    "harness run finish",
                     "harness run init",
                     "harness run preflight",
                     "harness run runner-state",

@@ -69,7 +69,7 @@ pub fn render_runner_restore_context(project_dir: &Path, runner: &RunnerHandoff<
     lines.push(format!(
         "If the user passed `--resume {}`, treat this run as already initialized. \
          Read `{}` and continue from its next planned group instead of rerunning \
-         `harness run init`.",
+         `harness run start`.",
         runner.run_id,
         PathBuf::from(&*runner.run_dir)
             .join("run-status.json")
@@ -91,14 +91,14 @@ pub fn render_runner_restore_context(project_dir: &Path, runner: &RunnerHandoff<
     {
         lines.push(
             "If this saved run was paused unexpectedly mid-run, do not edit control files \
-             manually. Run `harness run runner-state --event resume-run` once, then continue \
+             manually. Run `harness run resume` once, then continue \
              from the saved `next_planned_group`."
                 .to_string(),
         );
     }
     lines.push(
         "Continue from the restored harness state. \
-         Do not rerun `harness run init` unless the run directory is missing or corrupt."
+         Do not rerun `harness run start` unless the run directory is missing or corrupt."
             .to_string(),
     );
 
@@ -163,7 +163,7 @@ pub(super) fn render_runner_section(handoff: &RunnerHandoff<'_>) -> String {
             );
         } else {
             lines.push("- Resume: Do not blame the user for `guard-stop` feedback.".to_string());
-            lines.push("- Resume: run `harness run runner-state --event resume-run`.".to_string());
+            lines.push("- Resume: run `harness run resume`.".to_string());
             lines.push(
                 "- Resume: do not edit `run-status.json`, `run-report.md`, or reset verdict \
                  fields manually."

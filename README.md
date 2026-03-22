@@ -60,26 +60,24 @@ This is the usual flow when you already have a suite.
 REPO=/path/to/repo
 SUITE=$REPO/suites/my-feature
 RUN_ID=my-feature-001
-RUN_DIR=$XDG_DATA_HOME/harness/runs/$RUN_ID
 
 # 1. Start a disposable cluster
 harness setup kuma cluster single-up dev --repo-root "$REPO"
 
-# 2. Create the tracked run
-harness run init --suite "$SUITE" --run-id "$RUN_ID" --profile single-zone --repo-root "$REPO"
+# 2. Start the tracked run and prepare it
+harness run start --suite "$SUITE" --run-id "$RUN_ID" --profile single-zone --repo-root "$REPO"
 
-# 3. Prepare manifests and run preflight checks
-harness run preflight --run-dir "$RUN_DIR"
+# 3. Apply or record work through harness
+harness run apply --manifest manifests/app.yaml
+harness run record -- kubectl get pods -A
 
-# 4. Apply or record work through harness
-harness run apply --manifest manifests/app.yaml --run-dir "$RUN_DIR"
-harness run record --run-dir "$RUN_DIR" -- kubectl get pods -A
-
-# 5. Finish the run
-harness run closeout --run-dir "$RUN_DIR"
+# 4. Finish the run
+harness run finish
 ```
 
 Harness stores the run state on disk, so you can inspect it later and the command history stays attached to the run instead of disappearing into shell history.
+
+If you need to pick an unfinished run back up, use `harness run resume --run-id <id> --run-root <path>` or just `harness run resume` when the current run pointer is already active.
 
 ## Creating a suite
 
@@ -148,7 +146,7 @@ Start here:
 - `run-report.md` in the run directory for the high-level result
 - `commands/` in the run directory for the exact command history
 
-If the run state is stale or broken, re-create the run with `harness run init` instead of trying to patch state files by hand.
+If the run state is stale or broken, start a fresh tracked run with `harness run start` instead of trying to patch state files by hand.
 
 ## For contributors
 

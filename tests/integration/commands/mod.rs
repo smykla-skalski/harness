@@ -8,6 +8,7 @@ mod init_run;
 mod observe;
 mod record;
 mod report;
+mod run_flow;
 mod runner_state;
 mod schema;
 mod service;

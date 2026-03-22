@@ -5,6 +5,7 @@ use tracing::info;
 use crate::app::command_context::{AppContext, Execute};
 use crate::errors::{CliError, CliErrorKind};
 use crate::run::Verdict;
+use crate::run::application::RunApplication;
 use crate::run::args::RunDirArgs;
 use crate::run::audit::write_run_status_with_audit;
 use crate::run::workflow::{RunnerEvent, apply_event, ensure_execution_phase, read_runner_state};
@@ -36,6 +37,12 @@ pub struct CloseoutArgs {
 /// Returns `CliError` on failure.
 pub fn closeout(run_dir_args: &RunDirArgs) -> Result<i32, CliError> {
     let run = resolve_run_application(run_dir_args)?;
+    closeout_run(&run)?;
+    println!("run closeout is complete; start a new run id for any further bootstrap or execution");
+    Ok(0)
+}
+
+pub(crate) fn closeout_run(run: &RunApplication) -> Result<(), CliError> {
     let ctx = run.context();
     let run_dir = run.layout().run_dir();
 
@@ -102,8 +109,7 @@ pub fn closeout(run_dir_args: &RunDirArgs) -> Result<i32, CliError> {
         }
     }
 
-    println!("run closeout is complete; start a new run id for any further bootstrap or execution");
-    Ok(0)
+    Ok(())
 }
 
 /// Compute a verdict from run counts.

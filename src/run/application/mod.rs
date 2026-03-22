@@ -4,6 +4,7 @@ mod current;
 pub(crate) mod dependencies;
 mod inspection;
 mod managed_services;
+mod orchestration;
 mod preflight;
 mod recording;
 mod reporting;
@@ -28,6 +29,7 @@ impl fmt::Debug for RunApplication {
 pub use crate::run::services::{
     RecordCommandRequest, StartServiceRequest, tail_task_output, wait_for_task_output,
 };
+pub(crate) use orchestration::StartRunRequest;
 pub(crate) use recording::record_command;
 pub(crate) use reporting::check_report_compactness;
 pub use reporting::{GroupReportRequest, ReportCheckOutcome};

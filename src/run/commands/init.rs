@@ -1,6 +1,7 @@
 use std::fs;
 use std::path::Path;
 
+use chrono::Utc;
 use clap::Args;
 
 use crate::app::command_context::{AppContext, Execute};
@@ -68,6 +69,23 @@ pub fn init_run(
     repo_root: Option<&str>,
     run_root: Option<&str>,
 ) -> Result<i32, CliError> {
+    let layout = init_run_internal(suite, run_id, profile, repo_root, run_root)?;
+    println!("{}", shorten_path(&layout.run_dir()));
+    Ok(0)
+}
+
+#[must_use]
+pub(crate) fn default_run_id() -> String {
+    Utc::now().format("%Y%m%d-%H%M%S-manual").to_string()
+}
+
+pub(crate) fn init_run_internal(
+    suite: &str,
+    run_id: &str,
+    profile: &str,
+    repo_root: Option<&str>,
+    run_root: Option<&str>,
+) -> Result<RunLayout, CliError> {
     validate_safe_segment(run_id)?;
     let suite_path = resolve_suite_path(suite)?;
     let spec = SuiteSpec::from_markdown(&suite_path)?;
@@ -103,7 +121,8 @@ pub fn init_run(
     if result.is_err() {
         let _ = fs::remove_dir_all(layout.run_dir());
     }
-    result
+    result?;
+    Ok(layout)
 }
 
 fn populate_run_dir(
@@ -179,6 +198,5 @@ fn populate_run_dir(
     repo.save_current_pointer(&pointer)
         .map_err(|e| CliErrorKind::serialize(format!("run context record: {e}")))?;
 
-    println!("{}", shorten_path(&layout.run_dir()));
     Ok(0)
 }
