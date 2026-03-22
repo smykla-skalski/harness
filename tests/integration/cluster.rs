@@ -297,7 +297,7 @@ fn single_up_logs_stage_updates() {
 
 #[test]
 #[ignore = "slow: spawns fake toolchain processes"]
-fn single_up_metallb_template() {
+fn single_up_dynamic_metallb_bootstrap() {
     let _lock = ENV_LOCK.lock().unwrap_or_else(PoisonError::into_inner);
     let tmp = tempfile::tempdir().unwrap();
     let repo = tmp.path().join("repo");
@@ -330,7 +330,10 @@ fn single_up_metallb_template() {
                 None,
             ))
             .execute();
-            assert!(result.is_ok(), "single-up metallb failed: {result:?}");
+            assert!(
+                result.is_ok(),
+                "single-up dynamic metallb failed: {result:?}"
+            );
             assert_eq!(result.unwrap(), 0);
         },
     );
