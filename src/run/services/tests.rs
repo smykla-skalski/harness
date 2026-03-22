@@ -250,6 +250,8 @@ fn list_service_containers_parses_docker_rows() {
             env: vec![],
             ports: vec![],
             labels: vec![("io.harness.run-id".to_string(), "run-5".to_string())],
+            entrypoint: None,
+            restart_policy: None,
             extra_args: vec![],
             command: vec![],
         })
@@ -262,6 +264,8 @@ fn list_service_containers_parses_docker_rows() {
             env: vec![],
             ports: vec![],
             labels: vec![("io.harness.run-id".to_string(), "other-run".to_string())],
+            entrypoint: None,
+            restart_policy: None,
             extra_args: vec![],
             command: vec![],
         })

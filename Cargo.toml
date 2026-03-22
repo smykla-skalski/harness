@@ -3,12 +3,15 @@ members = [".", "testkit"]
 
 [package]
 name = "harness"
-version = "12.2.0"
+version = "12.3.0"
 edition = "2024"
 rust-version = "1.94"
 
 [dependencies]
+bollard = "0.20.2"
+bytes = "1.10.1"
 clap = { version = "4.6.0", features = ["derive", "env"] }
+compose_spec = "0.3.0"
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.149"
 serde_yml = "0.0.12"
@@ -28,11 +31,13 @@ backoff = { version = "0.4.0", features = ["tokio"] }
 minijinja = "2.17.1"
 rayon = "1.11.0"
 base64 = "0.22.1"
+futures-util = "0.3.31"
 tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.23", features = ["chrono", "env-filter"] }
 fs2 = "0.4.3"
 fs-err = "3.3.0"
 gray_matter = { version = "0.3.2", default-features = false, features = ["yaml"] }
+tar = "0.4.44"
 user_dirs = "0.2.0"
 walkdir = "2.5.0"
 serde-sarif = "0.8.0"

@@ -9,7 +9,7 @@ use tracing::info;
 
 use crate::app::command_context::resolve_repo_root;
 use crate::errors::{CliError, CliErrorKind};
-use crate::infra::blocks::{DockerComposeOrchestrator, DockerContainerRuntime, StdProcessExecutor};
+use crate::infra::blocks::{StdProcessExecutor, container_backends_from_env};
 use crate::kernel::topology::{ClusterSpec, Platform};
 use crate::setup::services::cluster::persist_cluster_spec;
 
@@ -48,8 +48,7 @@ pub(crate) fn cluster_universal(args: &ClusterArgs) -> Result<i32, CliError> {
     let cp_image =
         config::resolve_universal_cp_image(is_up, &root, args.image.as_deref(), args.no_build)?;
     let process = Arc::new(StdProcessExecutor);
-    let docker = DockerContainerRuntime::new(process.clone());
-    let compose_runtime = DockerComposeOrchestrator::new(process);
+    let runtimes = container_backends_from_env(process)?;
 
     info!(%mode, names = %all_names.join(" "), "starting universal cluster");
 
@@ -62,8 +61,8 @@ pub(crate) fn cluster_universal(args: &ClusterArgs) -> Result<i32, CliError> {
             cp_image: &cp_image,
         },
         &mut spec,
-        &docker,
-        &compose_runtime,
+        runtimes.container_runtime.as_ref(),
+        runtimes.compose_orchestrator.as_ref(),
     )?;
 
     if is_up {

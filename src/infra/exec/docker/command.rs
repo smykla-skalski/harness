@@ -1,18 +1,5 @@
-use crate::errors::CliError;
-
-use super::super::CommandResult;
 use super::super::k3d;
-use super::super::run_command;
-
-/// Run docker.
-///
-/// # Errors
-/// Returns `CliError` on command failure.
-pub fn docker(args: &[&str], ok_exit_codes: &[i32]) -> Result<CommandResult, CliError> {
-    let mut command: Vec<&str> = vec!["docker"];
-    command.extend_from_slice(args);
-    run_command(&command, None, None, ok_exit_codes)
-}
+use crate::errors::CliError;
 
 /// Check if a k3d cluster exists.
 ///

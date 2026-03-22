@@ -1,10 +1,12 @@
 use std::env;
 use std::path::Path;
+use std::sync::Arc;
 
 use tracing::info;
 
 use crate::errors::{CliError, CliErrorKind};
-use crate::infra::exec::{docker, kubectl};
+use crate::infra::blocks::{StdProcessExecutor, container_runtime_from_env};
+use crate::infra::exec::kubectl;
 
 /// Resolve the KDS address for a global CP running in a k3d cluster.
 ///
@@ -13,9 +15,8 @@ use crate::infra::exec::{docker, kubectl};
 /// returns `grpcs://<node-ip>:<node-port>`.
 pub(super) fn resolve_kds_address(global_cluster: &str) -> Result<String, CliError> {
     let node_container = format!("k3d-{global_cluster}-server-0");
-    let format_string = "{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}";
-    let ip_result = docker(&["inspect", "-f", format_string, &node_container], &[0])?;
-    let node_ip = ip_result.stdout.trim().to_string();
+    let docker = container_runtime_from_env(Arc::new(StdProcessExecutor))?;
+    let node_ip = docker.inspect_primary_ip(&node_container)?;
     if node_ip.is_empty() {
         return Err(CliErrorKind::cluster_error(format!(
             "could not resolve IP for k3d node {node_container}"

@@ -1,14 +1,23 @@
+use std::time::Duration;
+
 use crate::infra::blocks::BlockError;
 use crate::infra::exec::CommandResult;
 
-mod runtime;
+mod backend;
+mod runtime_bollard;
+mod runtime_cli;
 
 #[cfg(test)]
 mod fake;
 #[cfg(test)]
 mod tests;
 
-pub use runtime::DockerContainerRuntime;
+pub use backend::{
+    ContainerRuntimeBackend, container_backend_from_env, container_backends_from_env,
+    container_runtime_from_env,
+};
+pub use runtime_bollard::BollardContainerRuntime;
+pub use runtime_cli::DockerContainerRuntime;
 
 #[cfg(test)]
 pub use fake::FakeContainerRuntime;
@@ -22,6 +31,8 @@ pub struct ContainerConfig {
     pub env: Vec<(String, String)>,
     pub ports: Vec<(u16, u16)>,
     pub labels: Vec<(String, String)>,
+    pub entrypoint: Option<Vec<String>>,
+    pub restart_policy: Option<String>,
     pub extra_args: Vec<String>,
     pub command: Vec<String>,
 }
@@ -73,6 +84,13 @@ pub trait ContainerRuntime: Send + Sync {
     /// Returns `BlockError` if the container has no IP on that network.
     fn inspect_ip(&self, container: &str, network: &str) -> Result<String, BlockError>;
 
+    /// Get the first available container IP across attached networks.
+    ///
+    /// # Errors
+    ///
+    /// Returns `BlockError` if the container has no network IP.
+    fn inspect_primary_ip(&self, container: &str) -> Result<String, BlockError>;
+
     /// List containers using formatted `docker ps` output.
     ///
     /// # Errors
@@ -111,7 +129,28 @@ pub trait ContainerRuntime: Send + Sync {
     /// # Errors
     ///
     /// Returns `BlockError` if the docker command fails.
-    fn create_network(&self, name: &str, subnet: &str) -> Result<(), BlockError>;
+    fn create_network_labeled(
+        &self,
+        name: &str,
+        subnet: &str,
+        labels: &[(String, String)],
+    ) -> Result<(), BlockError>;
+
+    /// Create a Docker network without extra labels.
+    ///
+    /// # Errors
+    ///
+    /// Returns `BlockError` if the docker command fails.
+    fn create_network(&self, name: &str, subnet: &str) -> Result<(), BlockError> {
+        self.create_network_labeled(name, subnet, &[])
+    }
+
+    /// Check whether a named network exists.
+    ///
+    /// # Errors
+    ///
+    /// Returns `BlockError` if the backend query fails.
+    fn network_exists(&self, name: &str) -> Result<bool, BlockError>;
 
     /// Remove a Docker network.
     ///
@@ -119,6 +158,20 @@ pub trait ContainerRuntime: Send + Sync {
     ///
     /// Returns `BlockError` if the docker command fails.
     fn remove_network(&self, name: &str) -> Result<(), BlockError>;
+
+    /// Remove all networks matching a label.
+    ///
+    /// # Errors
+    ///
+    /// Returns `BlockError` if listing or removal fails.
+    fn remove_networks_by_label(&self, label: &str) -> Result<Vec<String>, BlockError>;
+
+    /// Wait for a container to become healthy or, if no healthcheck exists, running.
+    ///
+    /// # Errors
+    ///
+    /// Returns `BlockError` if inspection fails or the timeout expires.
+    fn wait_healthy(&self, container: &str, timeout: Duration) -> Result<(), BlockError>;
 
     /// Get container logs.
     ///

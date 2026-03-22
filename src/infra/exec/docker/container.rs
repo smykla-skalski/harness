@@ -1,9 +1,9 @@
-use std::io::Write as _;
+use std::sync::Arc;
 
-use crate::errors::{CliError, CliErrorKind};
+use crate::errors::CliError;
+use crate::infra::blocks::{ContainerConfig, StdProcessExecutor, container_runtime_from_env};
 
 use super::super::CommandResult;
-use super::command::docker;
 
 /// Start a named Docker container in detached mode. Returns container ID.
 ///
@@ -18,21 +18,24 @@ pub fn docker_run_detached(
     extra_args: &[&str],
     cmd: &[&str],
 ) -> Result<CommandResult, CliError> {
-    let mut args: Vec<&str> = vec!["run", "-d", "--name", name, "--network", network];
-    let env_strs: Vec<String> = env.iter().map(|(k, v)| format!("{k}={v}")).collect();
-    for e in &env_strs {
-        args.push("-e");
-        args.push(e);
-    }
-    let port_strs: Vec<String> = ports.iter().map(|(h, c)| format!("{h}:{c}")).collect();
-    for p in &port_strs {
-        args.push("-p");
-        args.push(p);
-    }
-    args.extend_from_slice(extra_args);
-    args.push(image);
-    args.extend_from_slice(cmd);
-    docker(&args, &[0])
+    let docker = container_runtime_from_env(Arc::new(StdProcessExecutor))?;
+    docker
+        .run_detached(&ContainerConfig {
+            image: image.to_string(),
+            name: name.to_string(),
+            network: network.to_string(),
+            env: env
+                .iter()
+                .map(|(key, value)| ((*key).to_string(), (*value).to_string()))
+                .collect(),
+            ports: ports.to_vec(),
+            labels: vec![],
+            entrypoint: None,
+            restart_policy: None,
+            extra_args: extra_args.iter().map(|arg| (*arg).to_string()).collect(),
+            command: cmd.iter().map(|arg| (*arg).to_string()).collect(),
+        })
+        .map_err(Into::into)
 }
 
 /// Stop and remove a named container.
@@ -40,7 +43,8 @@ pub fn docker_run_detached(
 /// # Errors
 /// Returns `CliError` on command failure.
 pub fn docker_rm(name: &str) -> Result<CommandResult, CliError> {
-    docker(&["rm", "-f", name], &[0, 1])
+    let docker = container_runtime_from_env(Arc::new(StdProcessExecutor))?;
+    docker.remove(name).map_err(Into::into)
 }
 
 /// Get the IP address of a container on a given Docker network.
@@ -48,14 +52,8 @@ pub fn docker_rm(name: &str) -> Result<CommandResult, CliError> {
 /// # Errors
 /// Returns `CliError` on command failure or if the IP cannot be extracted.
 pub fn docker_inspect_ip(container: &str, network: &str) -> Result<String, CliError> {
-    let format_str = format!("{{{{(index .NetworkSettings.Networks \"{network}\").IPAddress}}}}");
-    let result = docker(&["inspect", "-f", &format_str, container], &[0])?;
-    let ip = result.stdout.trim().to_string();
-    if ip.is_empty() {
-        return Err(CliErrorKind::container_not_found(container.to_string())
-            .with_details(format!("no IP on network {network}")));
-    }
-    Ok(ip)
+    let docker = container_runtime_from_env(Arc::new(StdProcessExecutor))?;
+    docker.inspect_ip(container, network).map_err(Into::into)
 }
 
 /// Check if a named container exists and is running.
@@ -63,8 +61,8 @@ pub fn docker_inspect_ip(container: &str, network: &str) -> Result<String, CliEr
 /// # Errors
 /// Returns `CliError` on command failure.
 pub fn container_running(name: &str) -> Result<bool, CliError> {
-    let result = docker(&["inspect", "-f", "{{.State.Running}}", name], &[0, 1])?;
-    Ok(result.returncode == 0 && result.stdout.trim() == "true")
+    let docker = container_runtime_from_env(Arc::new(StdProcessExecutor))?;
+    docker.is_running(name).map_err(Into::into)
 }
 
 /// Remove all containers matching a label. Returns the list of removed names.
@@ -72,27 +70,8 @@ pub fn container_running(name: &str) -> Result<bool, CliError> {
 /// # Errors
 /// Returns `CliError` on command failure.
 pub fn docker_rm_by_label(label: &str) -> Result<Vec<String>, CliError> {
-    let result = docker(
-        &[
-            "ps",
-            "-a",
-            "--filter",
-            &format!("label={label}"),
-            "--format",
-            "{{.Names}}",
-        ],
-        &[0],
-    )?;
-    let names: Vec<String> = result
-        .stdout
-        .lines()
-        .filter(|l| !l.trim().is_empty())
-        .map(|l| l.trim().to_string())
-        .collect();
-    for name in &names {
-        docker_rm(name)?;
-    }
-    Ok(names)
+    let docker = container_runtime_from_env(Arc::new(StdProcessExecutor))?;
+    docker.remove_by_label(label).map_err(Into::into)
 }
 
 /// Run a command inside a running container.
@@ -100,9 +79,8 @@ pub fn docker_rm_by_label(label: &str) -> Result<Vec<String>, CliError> {
 /// # Errors
 /// Returns `CliError` on command failure.
 pub fn docker_exec_cmd(container: &str, cmd: &[&str]) -> Result<CommandResult, CliError> {
-    let mut args: Vec<&str> = vec!["exec", container];
-    args.extend_from_slice(cmd);
-    docker(&args, &[0])
+    let docker = container_runtime_from_env(Arc::new(StdProcessExecutor))?;
+    docker.exec_command(container, cmd).map_err(Into::into)
 }
 
 /// Run a command inside a running container in detached mode.
@@ -113,9 +91,8 @@ pub fn docker_exec_cmd(container: &str, cmd: &[&str]) -> Result<CommandResult, C
 /// # Errors
 /// Returns `CliError` on command failure.
 pub fn docker_exec_detached(container: &str, cmd: &[&str]) -> Result<CommandResult, CliError> {
-    let mut args: Vec<&str> = vec!["exec", "-d", container];
-    args.extend_from_slice(cmd);
-    docker(&args, &[0])
+    let docker = container_runtime_from_env(Arc::new(StdProcessExecutor))?;
+    docker.exec_detached(container, cmd).map_err(Into::into)
 }
 
 /// Write `content` to `container_path` inside a running container using `docker cp`.
@@ -130,12 +107,8 @@ pub fn docker_write_file(
     container_path: &str,
     content: &str,
 ) -> Result<(), CliError> {
-    let mut tmp =
-        tempfile::NamedTempFile::new().map_err(|e| CliErrorKind::io(format!("temp file: {e}")))?;
-    tmp.write_all(content.as_bytes())
-        .map_err(|e| CliErrorKind::io(format!("write temp file: {e}")))?;
-    let src = tmp.path().to_string_lossy();
-    let dest = format!("{container}:{container_path}");
-    docker(&["cp", &src, &dest], &[0])?;
-    Ok(())
+    let docker = container_runtime_from_env(Arc::new(StdProcessExecutor))?;
+    docker
+        .write_file(container, container_path, content)
+        .map_err(Into::into)
 }

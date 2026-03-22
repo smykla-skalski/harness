@@ -1,5 +1,6 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::sync;
+use std::time::Duration;
 
 use super::{ContainerConfig, ContainerRuntime};
 use crate::infra::blocks::BlockError;
@@ -17,10 +18,15 @@ struct FakeContainer {
     logs: String,
 }
 
+#[derive(Debug)]
+struct FakeNetwork {
+    labels: HashMap<String, String>,
+}
+
 #[derive(Debug, Default)]
 pub struct FakeContainerRuntime {
     containers: sync::Mutex<HashMap<String, FakeContainer>>,
-    networks: sync::Mutex<HashSet<String>>,
+    networks: sync::Mutex<HashMap<String, FakeNetwork>>,
 }
 
 #[cfg(test)]
@@ -48,10 +54,12 @@ impl ContainerRuntime for FakeContainerRuntime {
             logs: String::new(),
         };
         containers.insert(config.name.clone(), container);
-        self.networks
-            .lock()
-            .expect("lock poisoned")
-            .insert(config.network.clone());
+        self.networks.lock().expect("lock poisoned").insert(
+            config.network.clone(),
+            FakeNetwork {
+                labels: HashMap::new(),
+            },
+        );
         Ok(CommandResult {
             args: vec!["docker".into(), "run".into(), "-d".into()],
             returncode: 0,
@@ -113,6 +121,25 @@ impl ContainerRuntime for FakeContainerRuntime {
                 "docker",
                 &format!("inspect_ip {container}"),
                 format!("no IP on network {network}"),
+            ));
+        }
+        Ok(found.ip.clone())
+    }
+
+    fn inspect_primary_ip(&self, container: &str) -> Result<String, BlockError> {
+        let containers = self.containers.lock().expect("lock poisoned");
+        let Some(found) = containers.get(container) else {
+            return Err(BlockError::message(
+                "docker",
+                &format!("inspect_primary_ip {container}"),
+                "container has no network IP",
+            ));
+        };
+        if found.ip.is_empty() {
+            return Err(BlockError::message(
+                "docker",
+                &format!("inspect_primary_ip {container}"),
+                "container has no network IP",
             ));
         }
         Ok(found.ip.clone())
@@ -243,17 +270,63 @@ impl ContainerRuntime for FakeContainerRuntime {
         Ok(())
     }
 
-    fn create_network(&self, name: &str, _subnet: &str) -> Result<(), BlockError> {
-        self.networks
+    fn create_network_labeled(
+        &self,
+        name: &str,
+        _subnet: &str,
+        labels: &[(String, String)],
+    ) -> Result<(), BlockError> {
+        self.networks.lock().expect("lock poisoned").insert(
+            name.to_string(),
+            FakeNetwork {
+                labels: labels.iter().cloned().collect(),
+            },
+        );
+        Ok(())
+    }
+
+    fn network_exists(&self, name: &str) -> Result<bool, BlockError> {
+        Ok(self
+            .networks
             .lock()
             .expect("lock poisoned")
-            .insert(name.to_string());
-        Ok(())
+            .contains_key(name))
+    }
+
+    fn remove_networks_by_label(&self, label: &str) -> Result<Vec<String>, BlockError> {
+        let names = {
+            let networks = self.networks.lock().expect("lock poisoned");
+            networks
+                .iter()
+                .filter_map(|(name, network)| {
+                    if label_matches(&network.labels, label) {
+                        Some(name.clone())
+                    } else {
+                        None
+                    }
+                })
+                .collect::<Vec<_>>()
+        };
+        for name in &names {
+            self.remove_network(name)?;
+        }
+        Ok(names)
     }
 
     fn remove_network(&self, name: &str) -> Result<(), BlockError> {
         self.networks.lock().expect("lock poisoned").remove(name);
         Ok(())
+    }
+
+    fn wait_healthy(&self, container: &str, _timeout: Duration) -> Result<(), BlockError> {
+        if self.is_running(container)? {
+            return Ok(());
+        }
+        Err(BlockError::message(
+            "docker",
+            &format!("wait_healthy {container}"),
+            "container is not running",
+        ))
     }
 
     fn logs(&self, container: &str, args: &[&str]) -> Result<CommandResult, BlockError> {
