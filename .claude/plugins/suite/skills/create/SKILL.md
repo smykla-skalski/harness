@@ -116,12 +116,21 @@ harness setup capabilities
 
 Parse the JSON output and keep it as the `CAPABILITIES` context for all later steps. Use it to:
 
-- Decide which `profiles` to offer (only include profiles whose platform and topology appear in `cluster_topologies` and `platforms`).
-- Scope `required_dependencies` to features that are actually available (e.g. only add `gateway-api-crds` if `features.gateway_api.available` is true).
-- When building the proposal (step 7), only propose universal-mode groups if the `universal` platform is listed, and only propose envoy admin validation steps if `features.envoy_admin.available` is true.
+- Prefer `readiness.profiles` when it exists. Only offer profiles whose `ready` field is `true`. If a requested profile is not ready, summarize its `blocking_checks` instead of proposing it anyway.
+- Scope `required_dependencies` to features that are both supported and ready now. Static support still comes from `features.<name>.available`, but live usability comes from `readiness.features.<name>.ready` when present.
+- When building the proposal (step 7), only propose universal-mode groups if the `universal` platform is listed and the matching `readiness.platforms.universal.ready` is `true`.
+- Only propose envoy admin validation steps if `features.envoy_admin.available` is true and `readiness.features.envoy_admin.ready` is either true or absent.
 - Pass relevant capability facts to discovery workers so they don't suggest groups the harness can't execute.
 
-If `harness setup capabilities` fails (binary too old, not installed), fall back to the hardcoded default assumption: both platforms available, all features available.
+Interpretation rules:
+
+- `available` means harness knows how to do it in principle.
+- `readiness` means the current machine, project, and repo are ready to do it now.
+- Keep the normal call zero-arg. Do not add `--project-dir` or `--repo-root` here unless you are explicitly debugging broken state.
+
+If `readiness` is absent (older harness binary), fall back to the older static logic based on `cluster_topologies`, `platforms`, and `features.*.available`.
+
+If `harness setup capabilities` fails completely (binary too old, not installed), fall back to the hardcoded default assumption: both platforms available, all features available.
 
 ### Step 1: Local validation
 

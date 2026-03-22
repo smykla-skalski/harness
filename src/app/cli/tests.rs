@@ -4,7 +4,7 @@ use crate::run::{
     ApiArgs, ApiMethod, DoctorArgs, EnvoyCommand, FinishArgs, KumaCommand, KumactlArgs,
     KumactlCommand, RepairArgs, ReportCommand, ResumeArgs, StartArgs,
 };
-use crate::setup::{ClusterArgs, KumaSetupCommand};
+use crate::setup::{CapabilitiesArgs, ClusterArgs, KumaSetupCommand};
 use clap::{CommandFactory, error::ErrorKind};
 use std::path::Path;
 
@@ -274,6 +274,33 @@ fn parse_cluster_with_extra_names() {
             assert_eq!(extra_cluster_names, vec!["zone1", "zone2"]);
         }
         _ => panic!("expected Cluster command"),
+    }
+}
+
+#[test]
+fn parse_setup_capabilities_with_scope_overrides() {
+    let cli = Cli::try_parse_from([
+        "harness",
+        "setup",
+        "capabilities",
+        "--project-dir",
+        "/tmp/project",
+        "--repo-root",
+        "/tmp/repo",
+    ])
+    .unwrap();
+    match cli.command {
+        Command::Setup {
+            command:
+                SetupCommand::Capabilities(CapabilitiesArgs {
+                    project_dir,
+                    repo_root,
+                }),
+        } => {
+            assert_eq!(project_dir.as_deref(), Some("/tmp/project"));
+            assert_eq!(repo_root.as_deref(), Some("/tmp/repo"));
+        }
+        _ => panic!("expected Capabilities command"),
     }
 }
 

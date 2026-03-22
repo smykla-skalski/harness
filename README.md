@@ -52,6 +52,21 @@ Requirements:
 
 - Rust `1.94+`
 
+## Check what is usable
+
+Before `create` or `run`, you can ask harness what it supports and what is actually ready right now:
+
+```bash
+harness setup capabilities
+```
+
+Important difference:
+
+- `available` means harness supports that feature or platform in general
+- `readiness` means your current machine, project, and repo are ready for it now
+
+Use `--project-dir` or `--repo-root` only when you are debugging broken cwd or project state. Normal usage should stay zero-arg.
+
 ## A normal run
 
 This is the usual flow when you already have a suite.
@@ -141,6 +156,7 @@ The create approval state lives in `.harness/suite-create-state.json`.
 Start here:
 
 - `harness observe doctor` to check wrapper wiring, lifecycle commands, current-run pointers, and compact handoff state
+- `harness setup capabilities` to see which profiles and features are ready on this machine right now
 - `harness observe scan` to classify problems in session logs
 - `harness run doctor` to inspect one tracked run and its pointer state
 - `harness run repair` to apply safe repairs to broken run metadata, status, or current-run pointers
