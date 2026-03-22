@@ -41,6 +41,19 @@ const TEMPLATE_TRANSPARENT_PROXY: &str =
     include_str!("../../../resources/universal/templates/transparent-proxy.yaml.j2");
 
 #[must_use]
+pub(crate) const fn service_probe_port() -> u16 {
+    defaults::ENVOY_ADMIN_PORT
+}
+
+#[must_use]
+pub(crate) fn service_container_ports(service_port: u16) -> Vec<ContainerPort> {
+    vec![
+        ContainerPort::fixed(service_port, service_port),
+        ContainerPort::ephemeral(service_probe_port()),
+    ]
+}
+
+#[must_use]
 pub(crate) fn run_service_filter(run_id: &str) -> String {
     format!("label=io.harness.run-id={run_id}")
 }
@@ -95,10 +108,7 @@ pub(crate) fn start_tracked_service_container(
         name: request.name.to_string(),
         network: network.to_string(),
         env: vec![],
-        ports: vec![
-            ContainerPort::fixed(request.port, request.port),
-            ContainerPort::ephemeral(defaults::DATAPLANE_READY_PORT),
-        ],
+        ports: service_container_ports(request.port),
         labels: vec![
             ("io.harness.service".to_string(), "true".to_string()),
             ("io.harness.run-id".to_string(), run_id.to_string()),
@@ -205,7 +215,7 @@ fn service_up_inner(setup: &ServiceSetup<'_>) -> Result<(), CliError> {
 
     let readiness_port = setup
         .docker
-        .inspect_host_port(setup.name, defaults::DATAPLANE_READY_PORT)?;
+        .inspect_host_port(setup.name, service_probe_port())?;
     let readiness_url = KumaService::readiness_url(UNIVERSAL_PUBLISHED_HOST, readiness_port);
     exec::wait_for_http(&readiness_url, Duration::from_secs(setup.timeout))
         .map_err(|_| CliErrorKind::service_readiness_timeout(setup.name.to_string()).into())
