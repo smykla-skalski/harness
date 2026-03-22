@@ -10,10 +10,9 @@ use crate::app::command_context::{AppContext, Execute};
 use crate::errors::{CliError, CliErrorKind};
 use crate::infra::blocks::kuma::manifest::resource_api_path;
 use crate::infra::exec;
-use crate::infra::exec::kubectl;
 use crate::infra::io::{ensure_dir, validate_safe_segment, write_text};
 use crate::kernel::topology::Platform;
-use crate::platform::runtime::ClusterRuntime;
+use crate::platform::runtime::{ClusterRuntime, ControlPlaneAccess};
 use crate::run::args::RunDirArgs;
 use crate::run::resolve::resolve_manifest_path;
 use crate::workspace::{shorten_path, utc_now};
@@ -78,7 +77,8 @@ pub fn apply(
         match runtime.platform() {
             Platform::Kubernetes => {
                 let kc = run.resolve_kubeconfig(kubeconfig, cluster_arg)?;
-                kubectl(Some(kc.as_ref()), &["apply", "-f", &manifest_str], &[0])?;
+                run.kubernetes_runtime()?
+                    .apply_manifest(Some(kc.as_ref()), &manifest)?;
             }
             Platform::Universal => {
                 apply_universal(&run.metadata().repo_root, &runtime, &manifest_str)?;
@@ -120,36 +120,52 @@ fn apply_universal(
     manifest: &str,
 ) -> Result<(), CliError> {
     let access = runtime.control_plane_access()?;
+    let resource = parse_universal_resource(manifest)?;
 
-    // Try REST API first - parse manifest YAML and PUT to CP
-    let content = fs::read_to_string(manifest)
-        .map_err(|e| CliErrorKind::io(format!("read manifest {manifest}: {e}")))?;
-    let resource: serde_json::Value = serde_yml::from_str(&content)
-        .map_err(|e| CliErrorKind::io(format!("parse manifest {manifest}: {e}")))?;
-
-    if let (Some(resource_type), Some(name)) =
-        (resource["type"].as_str(), resource["name"].as_str())
-    {
-        let mesh = resource["mesh"].as_str();
-        let path = resource_api_path(resource_type, name, mesh)
-            .map_err(|error| CliErrorKind::usage_error(error.to_string()))?;
-        match exec::cp_api_json(
-            access.addr.as_ref(),
-            &path,
-            exec::HttpMethod::Put,
-            Some(&resource),
-            access.admin_token,
-        ) {
-            Ok(_) => return Ok(()),
-            Err(e) => warn!(%e, "REST API failed, falling back to kumactl"),
-        }
+    if try_apply_universal_via_cp_api(&access, &resource)? {
+        return Ok(());
     }
 
-    // Fallback to kumactl
     let root = PathBuf::from(repo_root);
     let binary = find_kumactl_binary(&root)?;
     exec::kumactl_run(&binary, &access.addr, &["apply", "-f", manifest], &[0])?;
     Ok(())
+}
+
+fn parse_universal_resource(manifest: &str) -> Result<serde_json::Value, CliError> {
+    let content = fs::read_to_string(manifest)
+        .map_err(|e| CliErrorKind::io(format!("read manifest {manifest}: {e}")))?;
+    serde_yml::from_str(&content)
+        .map_err(|e| CliErrorKind::io(format!("parse manifest {manifest}: {e}")).into())
+}
+
+fn try_apply_universal_via_cp_api(
+    access: &ControlPlaneAccess<'_>,
+    resource: &serde_json::Value,
+) -> Result<bool, CliError> {
+    let Some(resource_type) = resource["type"].as_str() else {
+        return Ok(false);
+    };
+    let Some(name) = resource["name"].as_str() else {
+        return Ok(false);
+    };
+
+    let mesh = resource["mesh"].as_str();
+    let path = resource_api_path(resource_type, name, mesh)
+        .map_err(|error| CliErrorKind::usage_error(error.to_string()))?;
+    match exec::cp_api_json(
+        access.addr.as_ref(),
+        &path,
+        exec::HttpMethod::Put,
+        Some(resource),
+        access.admin_token,
+    ) {
+        Ok(_) => Ok(true),
+        Err(error) => {
+            warn!(%error, "REST API failed, falling back to kumactl");
+            Ok(false)
+        }
+    }
 }
 
 #[cfg(test)]

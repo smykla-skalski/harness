@@ -1,29 +1,11 @@
-use harness::infra::blocks::KubernetesOperator;
-
-/// `run` with a simple kubectl subcommand returns a result.
-///
-/// # Panics
-/// Panics if the kubectl command fails.
-pub fn contract_run_returns_result(
-    operator: &dyn KubernetesOperator,
-    kubeconfig: Option<&std::path::Path>,
-) {
-    let result = operator
-        .run(kubeconfig, &["version", "--client", "-o", "json"], &[0])
-        .expect("kubectl version --client should succeed");
-    assert_eq!(result.returncode, 0);
-    assert!(
-        !result.stdout.is_empty(),
-        "kubectl version output should not be empty"
-    );
-}
+use harness::infra::blocks::KubernetesRuntime;
 
 /// `list_pods` returns a (possibly empty) list without error.
 ///
 /// # Panics
 /// Panics if `list_pods` returns an error.
 pub fn contract_list_pods_returns_list(
-    operator: &dyn KubernetesOperator,
+    operator: &dyn KubernetesRuntime,
     kubeconfig: Option<&std::path::Path>,
 ) {
     let pods = operator
@@ -37,7 +19,7 @@ pub fn contract_list_pods_returns_list(
 /// # Panics
 /// Panics if the no-op restart returns an error.
 pub fn contract_rollout_restart_empty_namespaces(
-    operator: &dyn KubernetesOperator,
+    operator: &dyn KubernetesRuntime,
     kubeconfig: Option<&std::path::Path>,
 ) {
     operator

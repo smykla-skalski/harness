@@ -2,6 +2,7 @@ use std::borrow::Cow;
 use std::path::Path;
 
 use crate::errors::CliError;
+use crate::infra::blocks::KubernetesRuntime;
 use crate::infra::exec::HttpMethod;
 use crate::kernel::topology::ClusterSpec;
 use crate::platform::runtime::{ClusterRuntime, ControlPlaneAccess, XdsAccess};
@@ -90,6 +91,14 @@ impl RunApplication {
     #[must_use]
     pub fn resolve_container_name<'a>(&'a self, requested: &'a str) -> Cow<'a, str> {
         self.services.resolve_container_name(requested)
+    }
+
+    /// Resolve the configured Kubernetes runtime.
+    ///
+    /// # Errors
+    /// Returns `CliError` when Kubernetes runtime support is unavailable.
+    pub fn kubernetes_runtime(&self) -> Result<&dyn KubernetesRuntime, CliError> {
+        self.services.kubernetes()
     }
 
     /// Resolve the image used for ad-hoc service containers.

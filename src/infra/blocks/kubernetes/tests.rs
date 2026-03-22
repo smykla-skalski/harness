@@ -1,8 +1,12 @@
 use std::path::Path;
 use std::sync::Arc;
 
+use temp_env::with_vars;
+
+use super::fake::FakeKubernetesResponse;
 use super::*;
 use crate::infra::blocks::{FakeProcessExecutor, FakeProcessMethod, FakeResponse};
+use crate::infra::exec::CommandResult;
 
 fn success_result(args: &[&str], stdout: &str) -> CommandResult {
     CommandResult {
@@ -14,7 +18,7 @@ fn success_result(args: &[&str], stdout: &str) -> CommandResult {
 }
 
 #[test]
-fn kubectl_operator_includes_kubeconfig() {
+fn kubectl_runtime_includes_kubeconfig() {
     let fake = Arc::new(FakeProcessExecutor::new(vec![FakeResponse {
         expected_program: "kubectl".to_string(),
         expected_args: Some(vec![
@@ -23,20 +27,32 @@ fn kubectl_operator_includes_kubeconfig() {
             "/tmp/kubeconfig".into(),
             "get".into(),
             "pods".into(),
+            "--all-namespaces".into(),
+            "-o".into(),
+            "json".into(),
         ]),
         expected_method: Some(FakeProcessMethod::Run),
         result: Ok(success_result(
-            &["kubectl", "--kubeconfig", "/tmp/kubeconfig", "get", "pods"],
-            "",
+            &[
+                "kubectl",
+                "--kubeconfig",
+                "/tmp/kubeconfig",
+                "get",
+                "pods",
+                "--all-namespaces",
+                "-o",
+                "json",
+            ],
+            r#"{"items":[]}"#,
         )),
     }]));
-    let operator = KubectlOperator::new(fake);
+    let runtime = KubectlRuntime::new(fake);
 
-    let result = operator
-        .run(Some(Path::new("/tmp/kubeconfig")), &["get", "pods"], &[0])
-        .expect("expected kubectl run to succeed");
+    let pods = runtime
+        .list_pods(Some(Path::new("/tmp/kubeconfig")))
+        .expect("expected kubectl pod list to succeed");
 
-    assert_eq!(result.returncode, 0);
+    assert!(pods.is_empty());
 }
 
 fn assert_demo_pod(pod: &PodSnapshot) {
@@ -49,7 +65,7 @@ fn assert_demo_pod(pod: &PodSnapshot) {
 }
 
 #[test]
-fn kubectl_operator_list_pods_parses_json() {
+fn kubectl_runtime_list_pods_parses_json() {
     let fake = Arc::new(FakeProcessExecutor::new(vec![FakeResponse {
         expected_program: "kubectl".to_string(),
         expected_args: None,
@@ -73,9 +89,9 @@ fn kubectl_operator_list_pods_parses_json() {
             }"#,
         )),
     }]));
-    let operator = KubectlOperator::new(fake);
+    let runtime = KubectlRuntime::new(fake);
 
-    let pods = operator.list_pods(None).expect("expected pod list");
+    let pods = runtime.list_pods(None).expect("expected pod list");
     assert_eq!(pods.len(), 1);
     assert_demo_pod(&pods[0]);
 }
@@ -133,16 +149,14 @@ fn k3d_cluster_manager_detects_existing_cluster() {
 }
 
 #[test]
-fn fake_kubernetes_operator_records_invocations() {
-    let fake =
-        FakeKubernetesOperator::new(vec![Ok(success_result(&["kubectl", "get", "pods"], ""))]);
+fn fake_kubernetes_runtime_records_invocations() {
+    let fake = FakeKubernetesRuntime::new(vec![FakeKubernetesResponse::Pods(Ok(vec![]))]);
 
-    fake.run(None, &["get", "pods"], &[0])
-        .expect("expected success");
+    fake.list_pods(None).expect("expected success");
 
     let invocations = fake.invocations();
     assert_eq!(invocations.len(), 1);
-    assert_eq!(invocations[0].args, vec!["get", "pods"]);
+    assert_eq!(invocations[0].operation, "list_pods");
 }
 
 #[test]
@@ -163,28 +177,58 @@ fn fake_local_cluster_manager_records_invocations() {
 fn kubernetes_block_types_are_send_sync() {
     fn assert_send_sync<T: Send + Sync>() {}
 
-    assert_send_sync::<KubectlOperator>();
+    assert_send_sync::<KubectlRuntime>();
     assert_send_sync::<K3dClusterManager>();
     assert_send_sync::<PodSnapshot>();
+}
+
+#[test]
+fn kubernetes_backend_defaults_to_kube() {
+    with_vars([(KUBERNETES_RUNTIME_ENV, None::<&str>)], || {
+        assert_eq!(
+            kubernetes_backend_from_env().expect("expected default backend"),
+            KubernetesRuntimeBackend::Kube
+        );
+    });
+}
+
+#[test]
+fn kubernetes_backend_parses_kubectl_cli() {
+    with_vars([(KUBERNETES_RUNTIME_ENV, Some("kubectl-cli"))], || {
+        assert_eq!(
+            kubernetes_backend_from_env().expect("expected kubectl-cli backend"),
+            KubernetesRuntimeBackend::KubectlCli
+        );
+    });
+}
+
+#[test]
+fn kubernetes_backend_rejects_invalid_value() {
+    with_vars([(KUBERNETES_RUNTIME_ENV, Some("bad"))], || {
+        let error = kubernetes_backend_from_env().expect_err("expected invalid selector");
+        assert!(
+            error
+                .to_string()
+                .contains("expected `kube` or `kubectl-cli`"),
+            "unexpected error: {error}"
+        );
+    });
 }
 
 mod contracts {
     use super::*;
 
     fn contract_rollout_restart_empty_namespaces(
-        operator: &dyn KubernetesOperator,
+        runtime: &dyn KubernetesRuntime,
         kubeconfig: Option<&Path>,
     ) {
-        operator
+        runtime
             .rollout_restart(kubeconfig, &[])
             .expect("rollout_restart with empty namespaces should be a no-op");
     }
 
-    fn contract_list_pods_returns_list(
-        operator: &dyn KubernetesOperator,
-        kubeconfig: Option<&Path>,
-    ) {
-        let pods = operator
+    fn contract_list_pods_returns_list(runtime: &dyn KubernetesRuntime, kubeconfig: Option<&Path>) {
+        let pods = runtime
             .list_pods(kubeconfig)
             .expect("list_pods should succeed");
         let _ = pods.len();
@@ -192,16 +236,13 @@ mod contracts {
 
     #[test]
     fn fake_satisfies_rollout_restart_empty_namespaces() {
-        let fake = FakeKubernetesOperator::new(vec![]);
+        let fake = FakeKubernetesRuntime::new(vec![]);
         contract_rollout_restart_empty_namespaces(&fake, None);
     }
 
     #[test]
     fn fake_satisfies_list_pods_returns_list() {
-        let fake = FakeKubernetesOperator::new(vec![Ok(success_result(
-            &["kubectl", "get", "pods", "--all-namespaces", "-o", "json"],
-            r#"{"items":[]}"#,
-        ))]);
+        let fake = FakeKubernetesRuntime::new(vec![FakeKubernetesResponse::Pods(Ok(vec![]))]);
         contract_list_pods_returns_list(&fake, None);
     }
 }

@@ -1,5 +1,6 @@
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::Path;
+use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
 
@@ -10,7 +11,8 @@ use crate::infra::blocks::kuma::repo::{
     REMOTE_IMAGE_BUILD_TARGET, REMOTE_IMAGE_MANIFEST_TARGET, REMOTE_IMAGE_PUSH_TARGET,
     helm_chart_path,
 };
-use crate::infra::exec::{kubectl, run_command, run_command_streaming};
+use crate::infra::blocks::{KubernetesRuntime, StdProcessExecutor, kubernetes_runtime_from_env};
+use crate::infra::exec::{run_command, run_command_streaming};
 use crate::infra::io::write_text;
 use crate::kernel::topology::{ClusterMode, ClusterSpec, HelmSetting};
 use crate::setup::cluster::{ClusterArgs, RemoteClusterTarget};
@@ -36,6 +38,7 @@ pub(super) fn cluster_remote_k8s(
     mut spec: ClusterSpec,
     helm_settings: &[HelmSetting],
 ) -> Result<ClusterSpec, CliError> {
+    let kubernetes = kubernetes_runtime_from_env(Arc::new(StdProcessExecutor))?;
     if args.no_load {
         return Err(
             CliErrorKind::usage_error("--no-load is not valid with --provider remote").into(),
@@ -44,9 +47,9 @@ pub(super) fn cluster_remote_k8s(
 
     if spec.mode.is_up() {
         let mut state = build_install_state(args, &spec)?;
-        materialize_generated_kubeconfigs(&state)?;
+        materialize_generated_kubeconfigs(kubernetes.as_ref(), &state)?;
         apply_generated_kubeconfigs(&mut spec, &state);
-        validate_cluster_reachability(&state)?;
+        validate_cluster_reachability(kubernetes.as_ref(), &state)?;
         let push_prefix = args.push_prefix.as_deref().ok_or_else(|| {
             CliError::from(CliErrorKind::usage_error(
                 "--push-prefix is required for --provider remote",
@@ -65,6 +68,7 @@ pub(super) fn cluster_remote_k8s(
                 .clone_from(&published_image_refs);
         }
         execute_remote_up(
+            kubernetes.as_ref(),
             root,
             &spec,
             &mut state,
@@ -82,7 +86,7 @@ pub(super) fn cluster_remote_k8s(
         ))
     })?;
     apply_generated_kubeconfigs(&mut spec, &state);
-    execute_remote_down(root, &spec, &state)?;
+    execute_remote_down(kubernetes.as_ref(), root, &spec, &state)?;
     cleanup_remote_install_state(&spec, &state)?;
     Ok(spec)
 }
@@ -181,31 +185,32 @@ fn validate_remote_targets<'a>(
     Ok(by_name)
 }
 
-fn materialize_generated_kubeconfigs(state: &RemoteKubernetesInstallState) -> Result<(), CliError> {
+fn materialize_generated_kubeconfigs(
+    kubernetes: &dyn KubernetesRuntime,
+    state: &RemoteKubernetesInstallState,
+) -> Result<(), CliError> {
     for member in &state.members {
-        materialize_generated_kubeconfig(member)?;
+        materialize_generated_kubeconfig(kubernetes, member)?;
     }
     Ok(())
 }
 
 fn materialize_generated_kubeconfig(
+    kubernetes: &dyn KubernetesRuntime,
     member: &RemoteKubernetesInstallMemberState,
 ) -> Result<(), CliError> {
-    let mut args = vec!["kubectl", "--kubeconfig", member.source_kubeconfig.as_str()];
-    if let Some(context) = member.source_context.as_deref() {
-        args.push("--context");
-        args.push(context);
-    }
-    args.extend(["config", "view", "--raw", "--flatten"]);
-    let result = run_command(&args, None, None, &[0])?;
-    if result.stdout.trim().is_empty() {
+    let flattened = kubernetes.flatten_kubeconfig(
+        Path::new(&member.source_kubeconfig),
+        member.source_context.as_deref(),
+    )?;
+    if flattened.trim().is_empty() {
         return Err(CliErrorKind::cluster_error(format!(
             "flattened kubeconfig for `{}` is empty",
             member.name
         ))
         .into());
     }
-    write_text(Path::new(&member.generated_kubeconfig), &result.stdout)?;
+    write_text(Path::new(&member.generated_kubeconfig), &flattened)?;
     Ok(())
 }
 
@@ -223,13 +228,12 @@ fn apply_generated_kubeconfigs(spec: &mut ClusterSpec, state: &RemoteKubernetesI
     }
 }
 
-fn validate_cluster_reachability(state: &RemoteKubernetesInstallState) -> Result<(), CliError> {
+fn validate_cluster_reachability(
+    kubernetes: &dyn KubernetesRuntime,
+    state: &RemoteKubernetesInstallState,
+) -> Result<(), CliError> {
     for member in &state.members {
-        kubectl(
-            Some(Path::new(&member.generated_kubeconfig)),
-            &["cluster-info"],
-            &[0],
-        )?;
+        kubernetes.probe_cluster(Path::new(&member.generated_kubeconfig))?;
     }
     Ok(())
 }
@@ -263,6 +267,7 @@ fn publish_release_images(
 }
 
 fn execute_remote_up(
+    kubernetes: &dyn KubernetesRuntime,
     root: &Path,
     spec: &ClusterSpec,
     state: &mut RemoteKubernetesInstallState,
@@ -272,6 +277,7 @@ fn execute_remote_up(
 ) -> Result<(), CliError> {
     match spec.mode {
         ClusterMode::SingleUp => install_member(
+            kubernetes,
             root,
             spec,
             state,
@@ -283,10 +289,17 @@ fn execute_remote_up(
                 mode_settings: &[],
             },
         ),
-        ClusterMode::GlobalZoneUp => {
-            execute_remote_global_zone_up(root, spec, state, push_prefix, push_tag, helm_settings)
-        }
+        ClusterMode::GlobalZoneUp => execute_remote_global_zone_up(
+            kubernetes,
+            root,
+            spec,
+            state,
+            push_prefix,
+            push_tag,
+            helm_settings,
+        ),
         ClusterMode::GlobalTwoZonesUp => execute_remote_global_two_zones_up(
+            kubernetes,
             root,
             spec,
             state,
@@ -301,6 +314,7 @@ fn execute_remote_up(
 }
 
 fn execute_remote_global_zone_up(
+    kubernetes: &dyn KubernetesRuntime,
     root: &Path,
     spec: &ClusterSpec,
     state: &mut RemoteKubernetesInstallState,
@@ -310,6 +324,7 @@ fn execute_remote_global_zone_up(
 ) -> Result<(), CliError> {
     let global = spec.members[0].name.as_str();
     install_member(
+        kubernetes,
         root,
         spec,
         state,
@@ -325,10 +340,11 @@ fn execute_remote_global_zone_up(
         },
     )?;
     let global_state = state_member(state, global)?;
-    let kds_address = resolve_remote_kds_address(global_state)?;
+    let kds_address = resolve_remote_kds_address(kubernetes, global_state)?;
     let zone = spec.members[1].name.as_str();
     let zone_name = spec.members[1].zone_name.as_deref().unwrap_or(zone);
     install_member(
+        kubernetes,
         root,
         spec,
         state,
@@ -348,6 +364,7 @@ fn execute_remote_global_zone_up(
 }
 
 fn execute_remote_global_two_zones_up(
+    kubernetes: &dyn KubernetesRuntime,
     root: &Path,
     spec: &ClusterSpec,
     state: &mut RemoteKubernetesInstallState,
@@ -357,6 +374,7 @@ fn execute_remote_global_two_zones_up(
 ) -> Result<(), CliError> {
     let global = spec.members[0].name.as_str();
     install_member(
+        kubernetes,
         root,
         spec,
         state,
@@ -372,7 +390,7 @@ fn execute_remote_global_two_zones_up(
         },
     )?;
     let global_state = state_member(state, global)?;
-    let kds_address = resolve_remote_kds_address(global_state)?;
+    let kds_address = resolve_remote_kds_address(kubernetes, global_state)?;
     for zone_index in [1usize, 2usize] {
         let zone = spec.members[zone_index].name.as_str();
         let zone_name = spec.members[zone_index]
@@ -380,6 +398,7 @@ fn execute_remote_global_two_zones_up(
             .as_deref()
             .unwrap_or(zone);
         install_member(
+            kubernetes,
             root,
             spec,
             state,
@@ -401,23 +420,45 @@ fn execute_remote_global_two_zones_up(
 }
 
 fn execute_remote_down(
+    kubernetes: &dyn KubernetesRuntime,
     root: &Path,
     spec: &ClusterSpec,
     state: &RemoteKubernetesInstallState,
 ) -> Result<(), CliError> {
     match spec.mode {
         ClusterMode::SingleDown => uninstall_member(
+            kubernetes,
             root,
             state_member(state, spec.primary_member().name.as_str())?,
         ),
         ClusterMode::GlobalZoneDown => {
-            uninstall_member(root, state_member(state, spec.members[1].name.as_str())?)?;
-            uninstall_member(root, state_member(state, spec.members[0].name.as_str())?)
+            uninstall_member(
+                kubernetes,
+                root,
+                state_member(state, spec.members[1].name.as_str())?,
+            )?;
+            uninstall_member(
+                kubernetes,
+                root,
+                state_member(state, spec.members[0].name.as_str())?,
+            )
         }
         ClusterMode::GlobalTwoZonesDown => {
-            uninstall_member(root, state_member(state, spec.members[2].name.as_str())?)?;
-            uninstall_member(root, state_member(state, spec.members[1].name.as_str())?)?;
-            uninstall_member(root, state_member(state, spec.members[0].name.as_str())?)
+            uninstall_member(
+                kubernetes,
+                root,
+                state_member(state, spec.members[2].name.as_str())?,
+            )?;
+            uninstall_member(
+                kubernetes,
+                root,
+                state_member(state, spec.members[1].name.as_str())?,
+            )?;
+            uninstall_member(
+                kubernetes,
+                root,
+                state_member(state, spec.members[0].name.as_str())?,
+            )
         }
         ClusterMode::SingleUp | ClusterMode::GlobalZoneUp | ClusterMode::GlobalTwoZonesUp => {
             Err(CliErrorKind::cluster_error("remote down flow called for up mode").into())
@@ -452,6 +493,7 @@ fn state_member_mut<'a>(
 }
 
 fn install_member(
+    kubernetes: &dyn KubernetesRuntime,
     root: &Path,
     spec: &ClusterSpec,
     state: &mut RemoteKubernetesInstallState,
@@ -459,19 +501,8 @@ fn install_member(
     plan: &InstallMemberPlan<'_>,
 ) -> Result<(), CliError> {
     let member = state_member_mut(state, cluster_name)?;
-    member.namespace_created_by_harness =
-        !namespace_exists(Path::new(&member.generated_kubeconfig), &member.namespace)?;
-
-    let mut settings = vec![
-        format!("global.image.registry={}", plan.push_prefix),
-        format!("controlPlane.image.tag={}", plan.push_tag),
-        format!("cni.image.tag={}", plan.push_tag),
-        format!("dataPlane.image.tag={}", plan.push_tag),
-        format!("dataPlane.initImage.tag={}", plan.push_tag),
-        format!("kumactl.image.tag={}", plan.push_tag),
-    ];
-    settings.extend(plan.mode_settings.iter().cloned());
-    settings.extend(plan.helm_settings.iter().map(HelmSetting::to_cli_arg));
+    member.namespace_created_by_harness = member_requires_namespace_creation(kubernetes, member)?;
+    let settings = install_member_settings(plan);
 
     run_helm_upgrade(
         root,
@@ -481,6 +512,7 @@ fn install_member(
         &settings,
     )?;
     wait_for_control_plane(
+        kubernetes,
         Path::new(&member.generated_kubeconfig),
         &member.namespace,
         &member.release_name,
@@ -495,7 +527,34 @@ fn install_member(
     Ok(())
 }
 
+fn member_requires_namespace_creation(
+    kubernetes: &dyn KubernetesRuntime,
+    member: &RemoteKubernetesInstallMemberState,
+) -> Result<bool, CliError> {
+    namespace_exists(
+        kubernetes,
+        Path::new(&member.generated_kubeconfig),
+        &member.namespace,
+    )
+    .map(|exists| !exists)
+}
+
+fn install_member_settings(plan: &InstallMemberPlan<'_>) -> Vec<String> {
+    let mut settings = vec![
+        format!("global.image.registry={}", plan.push_prefix),
+        format!("controlPlane.image.tag={}", plan.push_tag),
+        format!("cni.image.tag={}", plan.push_tag),
+        format!("dataPlane.image.tag={}", plan.push_tag),
+        format!("dataPlane.initImage.tag={}", plan.push_tag),
+        format!("kumactl.image.tag={}", plan.push_tag),
+    ];
+    settings.extend(plan.mode_settings.iter().cloned());
+    settings.extend(plan.helm_settings.iter().map(HelmSetting::to_cli_arg));
+    settings
+}
+
 fn uninstall_member(
+    kubernetes: &dyn KubernetesRuntime,
     root: &Path,
     member: &RemoteKubernetesInstallMemberState,
 ) -> Result<(), CliError> {
@@ -513,56 +572,42 @@ fn uninstall_member(
         )?;
     }
     if member.namespace_created_by_harness {
-        kubectl(
-            Some(Path::new(&member.generated_kubeconfig)),
-            &[
-                "delete",
-                "namespace",
-                member.namespace.as_str(),
-                "--wait=false",
-            ],
-            &[0, 1],
+        kubernetes.delete_namespace(
+            Path::new(&member.generated_kubeconfig),
+            &member.namespace,
+            false,
+            true,
         )?;
     }
     Ok(())
 }
 
-fn namespace_exists(kubeconfig: &Path, namespace: &str) -> Result<bool, CliError> {
-    let result = kubectl(Some(kubeconfig), &["get", "namespace", namespace], &[0, 1])?;
-    Ok(result.returncode == 0)
+fn namespace_exists(
+    kubernetes: &dyn KubernetesRuntime,
+    kubeconfig: &Path,
+    namespace: &str,
+) -> Result<bool, CliError> {
+    kubernetes
+        .namespace_exists(kubeconfig, namespace)
+        .map_err(Into::into)
 }
 
 fn resolve_remote_kds_address(
+    kubernetes: &dyn KubernetesRuntime,
     global_member: &RemoteKubernetesInstallMemberState,
 ) -> Result<String, CliError> {
     let kubeconfig = Path::new(&global_member.generated_kubeconfig);
-    let server = kubectl(
-        Some(kubeconfig),
-        &[
-            "config",
-            "view",
-            "--minify",
-            "-o",
-            "jsonpath={.clusters[0].cluster.server}",
-        ],
-        &[0],
-    )?;
-    let host = host_from_server(server.stdout.trim())?;
+    let host = host_from_server(&kubernetes.cluster_server(kubeconfig)?)?;
     let service_name = format!("{}-global-zone-sync", global_member.release_name);
-    let port = kubectl(
-        Some(kubeconfig),
-        &[
-            "get",
-            "svc",
-            "-n",
+    let node_port = kubernetes
+        .service_node_port(
+            kubeconfig,
             global_member.namespace.as_str(),
             service_name.as_str(),
-            "-o",
-            "jsonpath={.spec.ports[?(@.name==\"global-zone-sync\")].nodePort}",
-        ],
-        &[0],
-    )?;
-    let node_port = port.stdout.trim();
+            "global-zone-sync",
+        )?
+        .map(|port| port.to_string())
+        .unwrap_or_default();
     if node_port.is_empty() {
         return Err(CliErrorKind::cluster_error(format!(
             "could not resolve KDS NodePort for remote cluster `{}`",
@@ -641,45 +686,27 @@ fn run_helm_uninstall(
 }
 
 fn wait_for_control_plane(
+    kubernetes: &dyn KubernetesRuntime,
     kubeconfig: &Path,
     namespace: &str,
     release_name: &str,
 ) -> Result<(), CliError> {
     let app_label = format!("app={release_name}-control-plane");
-    kubectl(
-        Some(kubeconfig),
-        &[
-            "wait",
-            "--timeout=60s",
-            "--namespace",
-            namespace,
-            "--for",
-            "condition=Available",
-            "--selector",
-            app_label.as_str(),
-            "deployments",
-        ],
-        &[0],
+    kubernetes.wait_for_deployments_available(
+        kubeconfig,
+        namespace,
+        app_label.as_str(),
+        Duration::from_secs(60),
     )?;
-    kubectl(
-        Some(kubeconfig),
-        &[
-            "wait",
-            "--timeout=60s",
-            "--namespace",
-            namespace,
-            "--for",
-            "condition=Ready",
-            "--selector",
-            app_label.as_str(),
-            "pods",
-        ],
-        &[0],
+    kubernetes.wait_for_pods_ready(
+        kubeconfig,
+        namespace,
+        app_label.as_str(),
+        Duration::from_secs(60),
     )?;
 
     for _ in 0..60 {
-        let result = kubectl(Some(kubeconfig), &["get", "mesh", "default"], &[0, 1])?;
-        if result.returncode == 0 {
+        if kubernetes.resource_exists(kubeconfig, None, "kuma.io/v1alpha1", "Mesh", "default")? {
             return Ok(());
         }
         thread::sleep(Duration::from_secs(1));

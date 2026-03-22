@@ -1,6 +1,7 @@
 use std::env;
 use std::fs;
 use std::path::Path;
+use std::sync::Arc;
 use std::sync::LazyLock;
 
 use clap::Args;
@@ -8,7 +9,8 @@ use regex::Regex;
 
 use crate::app::command_context::{AppContext, Execute, resolve_repo_root};
 use crate::errors::{CliError, CliErrorKind};
-use crate::infra::exec::{kubectl, run_command};
+use crate::infra::blocks::{StdProcessExecutor, kubernetes_runtime_from_env};
+use crate::infra::exec::run_command;
 use crate::infra::io::ensure_dir;
 use crate::workspace::HARNESS_PREFIX;
 use crate::workspace::sync_gateway_api_install_state;
@@ -91,10 +93,10 @@ pub fn gateway(
     let version = detect_gateway_version(&root)?;
     // `Path::new` borrows from the caller's `&str` - no heap allocation needed.
     let kc = kubeconfig.map(Path::new);
+    let runtime = kubernetes_runtime_from_env(Arc::new(StdProcessExecutor))?;
 
     if check_only {
-        let result = kubectl(kc, &["get", "crd", GATEWAY_CLASS_CRD], &[0, 1])?;
-        if result.returncode != 0 {
+        if !runtime.crd_exists(kc, GATEWAY_CLASS_CRD)? {
             return Err(CliErrorKind::GatewayCrdsMissing.into());
         }
         println!("Gateway API CRDs are installed");
@@ -124,7 +126,7 @@ pub fn gateway(
     }
 
     if uninstall {
-        kubectl(kc, &["delete", "-f", &temp_str], &[0, 1])?;
+        runtime.delete_manifest(kc, &temp_manifest, true)?;
         if let Some(kubeconfig) = kc {
             sync_gateway_api_install_state(&root, kubeconfig, false)?;
         }
@@ -132,7 +134,7 @@ pub fn gateway(
         return Ok(0);
     }
 
-    kubectl(kc, &["apply", "-f", &temp_str], &[0])?;
+    runtime.apply_manifest(kc, &temp_manifest)?;
     if let Some(kubeconfig) = kc {
         sync_gateway_api_install_state(&root, kubeconfig, true)?;
     }

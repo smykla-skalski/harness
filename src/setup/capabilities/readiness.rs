@@ -6,7 +6,8 @@ use std::process::{Command, Stdio};
 use fs_err as fs;
 
 use crate::infra::blocks::{
-    BollardContainerRuntime, ContainerRuntimeBackend, container_backend_from_env,
+    BollardContainerRuntime, ContainerRuntimeBackend, KubernetesRuntimeBackend,
+    container_backend_from_env, kubernetes_backend_from_env,
 };
 use crate::kernel::topology::{ClusterProvider, Platform};
 use crate::setup::wrapper::choose_install_dir_with_home;
@@ -288,7 +289,7 @@ const K3D_REQUIREMENTS: &[&str] = &[
     "docker_running",
     "make_binary_present",
     "k3d_binary_present",
-    "kubectl_binary_present",
+    "kubernetes_runtime_ready",
     "helm_binary_present",
     "repo_root_resolved",
     "repo_root_exists",
@@ -299,7 +300,7 @@ const REMOTE_REQUIREMENTS: &[&str] = &[
     "docker_binary_present",
     "docker_running",
     "make_binary_present",
-    "kubectl_binary_present",
+    "kubernetes_runtime_ready",
     "helm_binary_present",
     "repo_root_resolved",
     "repo_root_exists",
@@ -352,7 +353,10 @@ fn build_checks(
     let plugin_root = project_dir.join(".claude").join("plugins").join("suite");
     let data_root = harness_data_root();
     let backend = container_backend_from_env().unwrap_or(ContainerRuntimeBackend::Bollard);
+    let kubernetes_backend =
+        kubernetes_backend_from_env().unwrap_or(KubernetesRuntimeBackend::Kube);
     let docker_present = probe.command_on_path("docker");
+    let kubectl_present = probe.command_on_path("kubectl");
     let repo_exists = repo_root.is_some_and(Path::is_dir);
     let repo_is_kuma = repo_root
         .filter(|path| path.is_dir())
@@ -396,6 +400,7 @@ fn build_checks(
             "kubectl",
             probe,
         ),
+        check_kubernetes_runtime_ready(kubectl_present, kubernetes_backend),
         check_binary_present(
             "helm_binary_present",
             "Helm is available.",
@@ -531,6 +536,35 @@ fn check_binary_present(
             None,
             Some(hint),
         )
+    }
+}
+
+fn check_kubernetes_runtime_ready(
+    kubectl_present: bool,
+    backend: KubernetesRuntimeBackend,
+) -> ReadinessCheck {
+    match backend {
+        KubernetesRuntimeBackend::Kube => pass(
+            "kubernetes_runtime_ready",
+            ReadinessCheckScope::Machine,
+            "Native Kubernetes runtime is available.",
+            None,
+            None,
+        ),
+        KubernetesRuntimeBackend::KubectlCli if kubectl_present => pass(
+            "kubernetes_runtime_ready",
+            ReadinessCheckScope::Machine,
+            "kubectl-backed Kubernetes runtime is available.",
+            None,
+            None,
+        ),
+        KubernetesRuntimeBackend::KubectlCli => fail(
+            "kubernetes_runtime_ready",
+            ReadinessCheckScope::Machine,
+            "kubectl-backed Kubernetes runtime is unavailable because kubectl is missing.",
+            None,
+            Some("Install `kubectl` or switch HARNESS_KUBERNETES_RUNTIME to `kube`."),
+        ),
     }
 }
 

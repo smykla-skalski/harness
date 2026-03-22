@@ -32,7 +32,9 @@ pub use harness_testkit::*;
 pub static ENV_LOCK: Mutex<()> = Mutex::new(());
 
 pub fn run_command(command: impl Borrow<Command>) -> Result<i32, CliError> {
-    cli::dispatch(command.borrow())
+    temp_env::with_var("HARNESS_KUBERNETES_RUNTIME", Some("kubectl-cli"), || {
+        cli::dispatch(command.borrow())
+    })
 }
 
 pub fn run_cmd(command: RunCommand) -> Command {

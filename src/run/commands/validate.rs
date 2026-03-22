@@ -1,11 +1,11 @@
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use clap::Args;
-use rayon::prelude::*;
 
 use crate::app::command_context::{AppContext, Execute};
 use crate::errors::{CliError, CliErrorKind};
-use crate::infra::exec::kubectl;
+use crate::infra::blocks::{ManifestDiff, StdProcessExecutor, kubernetes_runtime_from_env};
 use crate::infra::io::{read_text, write_text};
 use crate::manifests::default_validation_output;
 use crate::workspace::shorten_path;
@@ -53,7 +53,7 @@ pub fn validate(
     }
 
     let kc = kubeconfig.map(PathBuf::from);
-    validate_kubernetes(kc.as_deref(), manifest, &manifest_path, &output_path)
+    validate_kubernetes(kc.as_deref(), &manifest_path, &output_path)
 }
 
 fn extract_resources(manifest: &Path) -> Result<Vec<(String, String)>, CliError> {
@@ -94,11 +94,11 @@ fn extract_resources(manifest: &Path) -> Result<Vec<(String, String)>, CliError>
 
 fn validate_kubernetes(
     kc: Option<&Path>,
-    manifest: &str,
     manifest_path: &Path,
     output_path: &Path,
 ) -> Result<i32, CliError> {
     let resources = extract_resources(manifest_path)?;
+    let runtime = kubernetes_runtime_from_env(Arc::new(StdProcessExecutor))?;
 
     // Write all "running" entries before spawning parallel explain calls.
     let mut log_lines: Vec<String> = resources
@@ -107,18 +107,10 @@ fn validate_kubernetes(
         .collect();
     write_text(output_path, &format!("{}\n", log_lines.join("\n")))?;
 
-    // Run kubectl explain for all resources in parallel.
-    let explain_results: Vec<_> = resources
-        .par_iter()
-        .map(|(kind, api_version)| {
-            kubectl(kc, &["explain", kind, "--api-version", api_version], &[0])
-        })
-        .collect();
-
-    // Update log lines in declaration order, stopping on first failure.
-    for (index, result) in explain_results.into_iter().enumerate() {
+    for (index, _) in resources.iter().enumerate() {
         let (kind, api_version) = &resources[index];
         let label = format!("{kind} ({api_version})");
+        let result = runtime.validate_resources(kc, &[(kind.clone(), api_version.clone())]);
         log_lines[index] = if result.is_ok() {
             format!("explain {label}: ok")
         } else {
@@ -131,18 +123,17 @@ fn validate_kubernetes(
     log_lines.push("dry-run: running".to_string());
     write_text(output_path, &format!("{}\n", log_lines.join("\n")))?;
 
-    kubectl(
-        kc,
-        &["apply", "--server-side", "--dry-run=server", "-f", manifest],
-        &[0],
-    )?;
+    runtime.dry_run_manifest(kc, manifest_path)?;
     if let Some(last) = log_lines.last_mut() {
         *last = "dry-run: ok".to_string();
     }
     write_text(output_path, &format!("{}\n", log_lines.join("\n")))?;
 
-    let diff_result = kubectl(kc, &["diff", "-f", manifest], &[0, 1])?;
-    log_lines.push(format!("diff exit code: {}", diff_result.returncode));
+    let diff_exit_code = match runtime.diff_manifest(kc, manifest_path)? {
+        ManifestDiff::NoDiff => 0,
+        ManifestDiff::HasDiff => 1,
+    };
+    log_lines.push(format!("diff exit code: {diff_exit_code}"));
     write_text(output_path, &format!("{}\n", log_lines.join("\n")))?;
 
     println!("{}", shorten_path(output_path));
