@@ -88,7 +88,6 @@ REPO=/path/to/repo
 SUITE_DIR=$REPO/suites/my-feature
 
 harness create begin \
-  --skill suite:create \
   --repo-root "$REPO" \
   --feature my-feature \
   --mode interactive \
@@ -96,7 +95,6 @@ harness create begin \
   --suite-name my-feature
 
 harness create approval-begin \
-  --skill suite:create \
   --mode interactive \
   --suite-dir "$SUITE_DIR"
 

@@ -135,7 +135,7 @@ Before resolving paths, check for stale create state from a previous session:
 harness create show --kind session 2>/dev/null
 ```
 
-If state exists from a different feature or a previous day, run `harness create reset --skill suite:create` to clear it before proceeding. If state exists for the same feature being authored, continue without reset.
+If state exists from a different feature or a previous day, run `harness create reset` to clear it before proceeding. If state exists for the same feature being authored, continue without reset.
 
 Use the pre-resolved data directory and repo root from the preprocessed context above. Do not eagerly create `DATA_DIR` here; `harness create begin` creates the concrete suite directory when create starts.
 
@@ -191,7 +191,6 @@ Immediately initialize the internal create workspace:
 
 ```bash
 harness create begin \
-  --skill suite:create \
   --repo-root "${REPO_ROOT}" \
   --feature "${FEATURE}" \
   --mode "${APPROVAL_MODE}" \
@@ -275,7 +274,7 @@ Review loop rules:
 - Never present the proposal as a text block followed by an approval question. The group list IS the approval question - each option is a group the user can include or exclude.
 - After selection, gather one comment per selected group and one general suite-level comment, save them with `harness create save --kind edit-request`, and rebuild the proposal from cached worker outputs.
 - Re-run only the affected discovery worker when feedback invalidates earlier coverage, variant, or schema assumptions, then resave the proposal and show the loop again until approval.
-- Immediately initialize the approval state with `harness create approval-begin --skill suite:create --mode interactive --suite-dir "${SUITE_DIR}"`. If `--yes` or `-y` is set, use `--mode bypass` instead. If the suite name or directory changes during the pre-write review loop, rerun `harness create approval-begin` with the updated `SUITE_DIR` before asking the canonical pre-write approval question.
+- Immediately initialize the approval state with `harness create approval-begin --mode interactive --suite-dir "${SUITE_DIR}"`. If `--yes` or `-y` is set, use `--mode bypass` instead. If the suite name or directory changes during the pre-write review loop, rerun `harness create approval-begin` with the updated `SUITE_DIR` before asking the canonical pre-write approval question.
 - The approval gate question must be exactly `suite:create/prewrite: approve current proposal?` with options `Approve proposal`, `Request changes`, and `Cancel`. `Approve proposal` is the only answer that unlocks writes to `${SUITE_DIR}`.
 - Suite files are only written after this loop approves. `--yes` and `-y` are the only bypass.
 

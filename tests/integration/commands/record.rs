@@ -526,7 +526,6 @@ fn approval_begin_initializes_interactive_state() {
     env::set_current_dir(&work_dir).unwrap();
 
     let result = approval_begin_cmd(ApprovalBeginArgs {
-        skill: "suite:create".to_string(),
         mode: "interactive".to_string(),
         suite_dir: None,
     })
@@ -923,7 +922,6 @@ fn check_create_begin_persists_suite_default_repo_root() {
         ],
         || {
             let result = create_begin_cmd(CreateBeginArgs {
-                skill: "suite:create".to_string(),
                 repo_root: repo_root.to_string_lossy().to_string(),
                 feature: "mesh".to_string(),
                 mode: "interactive".to_string(),
@@ -956,7 +954,6 @@ fn check_create_save_accepts_inline_payload() {
         ],
         || {
             let _ = create_begin_cmd(CreateBeginArgs {
-                skill: "suite:create".to_string(),
                 repo_root: repo_root.to_string_lossy().to_string(),
                 feature: "mesh".to_string(),
                 mode: "interactive".to_string(),
@@ -1000,7 +997,6 @@ fn check_create_save_accepts_stdin() {
         ],
         || {
             let _ = create_begin_cmd(CreateBeginArgs {
-                skill: "suite:create".to_string(),
                 repo_root: repo_root.to_string_lossy().to_string(),
                 feature: "mesh".to_string(),
                 mode: "interactive".to_string(),
@@ -1035,7 +1031,6 @@ fn check_create_save_rejects_schema_missing_fields() {
         ],
         || {
             let _ = create_begin_cmd(CreateBeginArgs {
-                skill: "suite:create".to_string(),
                 repo_root: repo_root.to_string_lossy().to_string(),
                 feature: "mesh".to_string(),
                 mode: "interactive".to_string(),

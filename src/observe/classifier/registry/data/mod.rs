@@ -4,7 +4,6 @@ mod build;
 mod cli;
 mod hook;
 mod integrity;
-mod naming;
 mod skill;
 mod subagent;
 mod tool;
@@ -20,7 +19,6 @@ pub(super) static ISSUE_CODE_REGISTRY: LazyLock<Box<[IssueCodeMeta]>> = LazyLock
     registry.extend_from_slice(build::ISSUE_CODE_METAS);
     registry.extend_from_slice(cli::ISSUE_CODE_METAS);
     registry.extend_from_slice(integrity::ISSUE_CODE_METAS);
-    registry.extend_from_slice(naming::ISSUE_CODE_METAS);
     registry.extend_from_slice(skill::ISSUE_CODE_METAS);
     registry.extend_from_slice(subagent::ISSUE_CODE_METAS);
     registry.extend_from_slice(tool::ISSUE_CODE_METAS);

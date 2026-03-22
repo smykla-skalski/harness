@@ -195,6 +195,55 @@ fn repo_contains_no_legacy_grouped_lifecycle_commands() {
 }
 
 #[test]
+fn repo_contains_no_legacy_public_create_skill_flags() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let begin = ["harness", " create", " begin", " --skill", " suite:create"].concat();
+    let approval = [
+        "harness",
+        " create",
+        " approval-begin",
+        " --skill",
+        " suite:create",
+    ]
+    .concat();
+    let reset = ["harness", " create", " reset", " --skill", " suite:create"].concat();
+    let needles = [begin.as_str(), approval.as_str(), reset.as_str()];
+    let mut hits = Vec::new();
+
+    for start in [root.join("src"), root.join("tests")] {
+        hits.extend(collect_hits_in_tree(
+            &start,
+            root,
+            None,
+            &needles,
+            |path, needle| {
+                format!("{path} still contains legacy public create flag contract `{needle}`")
+            },
+        ));
+    }
+
+    hits.extend(collect_hits_in_paths(
+        root,
+        &[
+            ".claude/plugins/suite/skills/create/SKILL.md",
+            ".claude/plugins/suite/skills/create/references/operational-guide.md",
+            "README.md",
+            "ARCHITECTURE.md",
+        ],
+        &needles,
+        |path, needle| {
+            format!("{path} still contains legacy public create flag contract `{needle}`")
+        },
+    ));
+
+    assert!(
+        hits.is_empty(),
+        "found legacy public create skill flags:\n{}",
+        hits.join("\n")
+    );
+}
+
+#[test]
 fn repo_contains_no_clippy_allow_attributes() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
     let needle = ["allow", "(clippy::"].concat();

@@ -127,7 +127,7 @@ impl CreateObserveError {
     pub fn hint(&self) -> Option<String> {
         match self {
             Self::CreateSessionMissing => Some(
-                "Run `harness create begin --skill suite:create --repo-root <path> --feature <name> --mode <interactive|bypass> --suite-dir <path> --suite-name <name>` first."
+                "Run `harness create begin --repo-root <path> --feature <name> --mode <interactive|bypass> --suite-dir <path> --suite-name <name>` first."
                     .into(),
             ),
             Self::CreatePayloadMissing => Some(

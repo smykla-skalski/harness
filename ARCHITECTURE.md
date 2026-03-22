@@ -1,6 +1,6 @@
 # Harness architecture
 
-This file is the short ownership map for the current `9.x` layout.
+This file is the short ownership map for the current layout.
 
 Use [README.md](README.md) for day-to-day usage. Use this file when you need to answer a different question: "where should this code live?"
 

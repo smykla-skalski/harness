@@ -805,7 +805,6 @@ fn observe_registry_root_stays_prod_only() {
         "src/observe/classifier/registry/data/build.rs",
         "src/observe/classifier/registry/data/cli.rs",
         "src/observe/classifier/registry/data/integrity.rs",
-        "src/observe/classifier/registry/data/naming.rs",
         "src/observe/classifier/registry/data/skill.rs",
         "src/observe/classifier/registry/data/subagent.rs",
         "src/observe/classifier/registry/data/unexpected.rs",
