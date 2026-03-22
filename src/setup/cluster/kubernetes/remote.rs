@@ -501,29 +501,24 @@ fn install_member(
     plan: &InstallMemberPlan<'_>,
 ) -> Result<(), CliError> {
     let member = state_member_mut(state, cluster_name)?;
-    member.namespace_created_by_harness = member_requires_namespace_creation(kubernetes, member)?;
+    prepare_member_namespace(kubernetes, member)?;
     let settings = install_member_settings(plan);
-
-    run_helm_upgrade(
-        root,
-        Path::new(&member.generated_kubeconfig),
-        &member.namespace,
-        &member.release_name,
-        &settings,
-    )?;
-    wait_for_control_plane(
-        kubernetes,
-        Path::new(&member.generated_kubeconfig),
-        &member.namespace,
-        &member.release_name,
-    )?;
-
+    install_member_release(root, kubernetes, member, &settings)?;
+    let kubeconfig = shorten_path(Path::new(&member.generated_kubeconfig));
     info!(
         cluster = %cluster_name,
         provider = %spec.provider,
-        kubeconfig = %shorten_path(Path::new(&member.generated_kubeconfig)),
+        kubeconfig = %kubeconfig,
         "remote Kuma control plane ready"
     );
+    Ok(())
+}
+
+fn prepare_member_namespace(
+    kubernetes: &dyn KubernetesRuntime,
+    member: &mut RemoteKubernetesInstallMemberState,
+) -> Result<(), CliError> {
+    member.namespace_created_by_harness = member_requires_namespace_creation(kubernetes, member)?;
     Ok(())
 }
 
@@ -537,6 +532,27 @@ fn member_requires_namespace_creation(
         &member.namespace,
     )
     .map(|exists| !exists)
+}
+
+fn install_member_release(
+    root: &Path,
+    kubernetes: &dyn KubernetesRuntime,
+    member: &RemoteKubernetesInstallMemberState,
+    settings: &[String],
+) -> Result<(), CliError> {
+    run_helm_upgrade(
+        root,
+        Path::new(&member.generated_kubeconfig),
+        &member.namespace,
+        &member.release_name,
+        settings,
+    )?;
+    wait_for_control_plane(
+        kubernetes,
+        Path::new(&member.generated_kubeconfig),
+        &member.namespace,
+        &member.release_name,
+    )
 }
 
 fn install_member_settings(plan: &InstallMemberPlan<'_>) -> Vec<String> {
