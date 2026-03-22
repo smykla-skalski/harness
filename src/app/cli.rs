@@ -76,9 +76,6 @@ pub enum SetupCommand {
     Bootstrap(BootstrapArgs),
     Kuma(KumaSetupArgs),
     Gateway(GatewayArgs),
-    SessionStart(SessionStartArgs),
-    SessionStop(SessionStopArgs),
-    PreCompact(PreCompactArgs),
     Capabilities,
 }
 
@@ -101,7 +98,7 @@ pub enum Command {
         command: CreateCommand,
     },
 
-    /// Setup and session lifecycle commands.
+    /// Setup environment and cluster commands.
     Setup {
         #[command(subcommand)]
         command: SetupCommand,
@@ -176,9 +173,6 @@ fn dispatch_setup(ctx: &AppContext, command: &SetupCommand) -> Result<i32, CliEr
         SetupCommand::Bootstrap(args) => args.execute(ctx),
         SetupCommand::Kuma(args) => args.execute(ctx),
         SetupCommand::Gateway(args) => args.execute(ctx),
-        SetupCommand::SessionStart(args) => args.execute(ctx),
-        SetupCommand::SessionStop(args) => args.execute(ctx),
-        SetupCommand::PreCompact(args) => args.execute(ctx),
         SetupCommand::Capabilities => setup::capabilities(),
     }
 }

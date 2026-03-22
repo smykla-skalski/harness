@@ -1,6 +1,8 @@
 use std::path::Path;
 
-use super::helpers::{assert_file_lacks_needles, collect_hits_in_tree, read_repo_file};
+use super::helpers::{
+    assert_file_lacks_needles, collect_hits_in_paths, collect_hits_in_tree, read_repo_file,
+};
 
 #[test]
 fn setup_does_not_mutate_run_repository_directly() {
@@ -146,6 +148,49 @@ fn docs_do_not_reference_legacy_kuma_storage_paths() {
         &readme,
         "README.md should not reference legacy Kuma storage paths via",
         &["$XDG_DATA_HOME/kuma", ".local/share/kuma"],
+    );
+}
+
+#[test]
+fn repo_contains_no_legacy_grouped_lifecycle_commands() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let session_start = ["harness", " setup", " session-start"].concat();
+    let session_stop = ["harness", " setup", " session-stop"].concat();
+    let pre_compact = ["harness", " setup", " pre-compact"].concat();
+    let needles = [
+        session_start.as_str(),
+        session_stop.as_str(),
+        pre_compact.as_str(),
+    ];
+    let mut hits = Vec::new();
+
+    for start in [root.join("src"), root.join("tests")] {
+        hits.extend(collect_hits_in_tree(
+            &start,
+            root,
+            None,
+            &needles,
+            |path, needle| {
+                format!("{path} still contains legacy grouped lifecycle command `{needle}`")
+            },
+        ));
+    }
+
+    hits.extend(collect_hits_in_paths(
+        root,
+        &[
+            ".claude/plugins/suite/hooks/hooks.json",
+            "README.md",
+            "ARCHITECTURE.md",
+        ],
+        &needles,
+        |path, needle| format!("{path} still contains legacy grouped lifecycle command `{needle}`"),
+    ));
+
+    assert!(
+        hits.is_empty(),
+        "found legacy grouped lifecycle commands:\n{}",
+        hits.join("\n")
     );
 }
 

@@ -11,7 +11,7 @@ Commands:
   hook           Run a harness hook for a skill
   run            Suite:run commands grouped by domain
   create         Suite:create commands grouped by domain
-  setup          Setup and session lifecycle commands
+  setup          Setup environment and cluster commands
   session-start  Handle session start hook
   session-stop   Handle session stop cleanup
   pre-compact    Save compact handoff before compaction

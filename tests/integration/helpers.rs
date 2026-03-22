@@ -105,7 +105,7 @@ pub fn kumactl_cmd(args: KumactlArgs) -> Command {
 }
 
 pub fn pre_compact_cmd(args: PreCompactArgs) -> Command {
-    setup_cmd(SetupCommand::PreCompact(args))
+    Command::PreCompact(args)
 }
 
 pub fn preflight_cmd(args: PreflightArgs) -> Command {
@@ -127,11 +127,11 @@ pub fn service_cmd(args: ServiceArgs) -> Command {
 }
 
 pub fn session_start_cmd(args: SessionStartArgs) -> Command {
-    setup_cmd(SetupCommand::SessionStart(args))
+    Command::SessionStart(args)
 }
 
 pub fn session_stop_cmd(args: SessionStopArgs) -> Command {
-    setup_cmd(SetupCommand::SessionStop(args))
+    Command::SessionStop(args)
 }
 
 pub fn validate_cmd(args: ValidateArgs) -> Command {
