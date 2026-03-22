@@ -37,7 +37,7 @@ K3D_HELM_DEPLOY_NO_CNI=true CLUSTER=kuma-1 make k3d/cluster/deploy/helm
 
 ## 2) Resource schema rejected before business validation
 
-Symptoms: `kubectl apply` fails with CRD required-field or enum errors.
+Symptoms: `harness run validate` or `harness run apply` fails with CRD required-field or enum errors.
 
 Fix:
 

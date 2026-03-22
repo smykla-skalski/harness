@@ -69,6 +69,8 @@ Important difference:
 
 For Docker-backed work, `harness setup capabilities` is the source of truth. Harness defaults to the Bollard-backed container runtime when `HARNESS_CONTAINER_RUNTIME` is unset. Set `HARNESS_CONTAINER_RUNTIME=docker-cli` only if you explicitly want the CLI-backed fallback. With the default backend, Docker Engine reachability matters; the Docker CLI itself does not.
 
+For Kubernetes-backed work, `harness setup capabilities` is also the source of truth. Harness defaults to the native `kube` runtime when `HARNESS_KUBERNETES_RUNTIME` is unset. Set `HARNESS_KUBERNETES_RUNTIME=kubectl-cli` only if you explicitly want the CLI-backed fallback. With the default backend, missing `kubectl` alone does not block native `harness run validate`, `harness run apply`, `harness run capture`, or Kubernetes readiness checks. `kubectl` is still required for tracked `harness run record -- kubectl ...` commands and any flow that explicitly selects the CLI backend.
+
 Use `--project-dir` or `--repo-root` only when you are debugging broken cwd or project state. Normal usage should stay zero-arg.
 
 ## A normal run
@@ -110,6 +112,8 @@ harness setup kuma cluster \
 ```
 
 Harness will materialize tracked kubeconfigs, push branch images through the Kuma repo contract, and deploy or upgrade Kuma without creating or deleting the cluster itself.
+
+For local k3d bootstrap, prefer `harness setup kuma cluster --no-build` and `--no-load` over raw build/load env vars. Harness translates those flags to the current Kuma-side contract internally. Long-running cluster setup commands also emit info-level progress lines such as `started`, `still running`, `command progress`, and `completed` so you can see that bootstrap is moving.
 
 ## Creating a suite
 
