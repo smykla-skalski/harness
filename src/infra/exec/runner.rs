@@ -2,10 +2,11 @@ use std::collections::HashMap;
 use std::iter;
 use std::path::Path;
 use std::process::{Command, Output, Stdio};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
-use tokio::io::{AsyncBufReadExt as _, AsyncReadExt as _};
+use tokio::io::{AsyncBufReadExt as _, AsyncRead, BufReader};
 use tokio::process::Command as TokioCommand;
+use tokio::sync::mpsc;
 use tokio::time::sleep;
 use tracing::info;
 
@@ -48,7 +49,7 @@ pub(crate) fn run_command(
     Err(CliErrorKind::command_failed(cmd_string).with_details(failure_details(&result)))
 }
 
-/// Run a command, capturing all output silently.
+/// Run a command, surfacing progress while still capturing stdout/stderr.
 ///
 /// # Errors
 /// Returns `CliError` if the exit code is not in `ok_exit_codes`.
@@ -66,51 +67,34 @@ pub(crate) fn run_command_streaming(
     let args_owned: Vec<String> = args.iter().map(|segment| (*segment).to_string()).collect();
 
     let result = RUNTIME.block_on(async move {
-        use tokio::io::BufReader;
-
         let mut cmd = build_tokio_command(program, cmd_args, cwd, env);
         cmd.stdout(Stdio::piped()).stderr(Stdio::piped());
         let mut child = cmd.spawn().map_err(|error| {
             CliErrorKind::command_failed(cmd_string.clone()).with_details(error.to_string())
         })?;
+        let started_at = Instant::now();
+        info!("{heartbeat_label} started");
 
+        let heartbeat_started_at = started_at;
         let heartbeat_task = tokio::spawn(async move {
             loop {
                 sleep(HEARTBEAT_INTERVAL).await;
-                info!("{heartbeat_label} still running...");
+                info!(
+                    "{} still running ({}s elapsed)",
+                    heartbeat_label,
+                    heartbeat_started_at.elapsed().as_secs()
+                );
             }
         });
 
-        let stderr_pipe = child.stderr.take();
-        let stderr_task = tokio::spawn(async move {
-            let mut captured = String::new();
-            if let Some(pipe) = stderr_pipe {
-                let mut reader = BufReader::new(pipe);
-                let mut line = String::new();
-                loop {
-                    line.clear();
-                    let bytes = reader.read_line(&mut line).await.unwrap_or(0);
-                    if bytes == 0 {
-                        break;
-                    }
-                    let trimmed = line.trim_end_matches(['\n', '\r']);
-                    if let Some(message) = filter_progress_line(trimmed) {
-                        info!("{message}");
-                    }
-                    captured.push_str(trimmed);
-                    captured.push('\n');
-                }
+        let (progress_tx, mut progress_rx) = mpsc::unbounded_channel();
+        let stdout_task = tokio::spawn(capture_stream(child.stdout.take(), progress_tx.clone()));
+        let stderr_task = tokio::spawn(capture_stream(child.stderr.take(), progress_tx));
+        let progress_task = tokio::spawn(async move {
+            while let Some(message) = progress_rx.recv().await {
+                info!(progress = %message, "command progress");
             }
-            captured
         });
-
-        let stdout = {
-            let mut buf = Vec::new();
-            if let Some(mut pipe) = child.stdout.take() {
-                pipe.read_to_end(&mut buf).await.ok();
-            }
-            String::from_utf8_lossy(&buf).into_owned()
-        };
 
         let status = child.wait().await.map_err(|error| {
             CliErrorKind::command_failed(cmd_string.clone()).with_details(error.to_string())
@@ -118,7 +102,14 @@ pub(crate) fn run_command_streaming(
 
         heartbeat_task.abort();
         heartbeat_task.await.ok();
+        let stdout = stdout_task.await.unwrap_or_default();
         let stderr = stderr_task.await.unwrap_or_default();
+        progress_task.await.ok();
+        info!(
+            "{} completed in {}s",
+            describe_command_from_owned_args(&args_owned),
+            started_at.elapsed().as_secs()
+        );
 
         Ok::<CommandResult, CliError>(CommandResult {
             args: args_owned,
@@ -221,4 +212,57 @@ pub(super) fn describe_command(args: &[&str]) -> String {
         return format!("compose {}", subcommand.unwrap_or(&"operation"));
     }
     args.iter().take(2).copied().collect::<Vec<_>>().join(" ")
+}
+
+async fn capture_stream<T>(pipe: Option<T>, progress_tx: mpsc::UnboundedSender<String>) -> String
+where
+    T: AsyncRead + Unpin,
+{
+    let Some(pipe) = pipe else {
+        return String::new();
+    };
+
+    capture_stream_from_pipe(pipe, progress_tx).await
+}
+
+async fn capture_stream_from_pipe<T>(pipe: T, progress_tx: mpsc::UnboundedSender<String>) -> String
+where
+    T: AsyncRead + Unpin,
+{
+    let mut reader = BufReader::new(pipe);
+    let mut chunk = Vec::new();
+    let mut captured = String::new();
+    while let Some(text) = read_stream_chunk(&mut reader, &mut chunk).await {
+        send_progress_message(&progress_tx, &text);
+        captured.push_str(&text);
+    }
+    captured
+}
+
+fn describe_command_from_owned_args(args: &[String]) -> String {
+    let borrowed = args.iter().map(String::as_str).collect::<Vec<_>>();
+    describe_command(&borrowed)
+}
+
+async fn read_stream_chunk<T>(reader: &mut BufReader<T>, chunk: &mut Vec<u8>) -> Option<String>
+where
+    T: AsyncRead + Unpin,
+{
+    chunk.clear();
+    let bytes = reader.read_until(b'\n', chunk).await.unwrap_or(0);
+    if bytes == 0 {
+        return None;
+    }
+    Some(String::from_utf8_lossy(chunk).into_owned())
+}
+
+fn stream_progress_message(text: &str) -> Option<String> {
+    let trimmed = text.trim_end_matches(['\n', '\r']);
+    filter_progress_line(trimmed)
+}
+
+fn send_progress_message(progress_tx: &mpsc::UnboundedSender<String>, text: &str) {
+    if let Some(message) = stream_progress_message(text) {
+        let _ = progress_tx.send(message);
+    }
 }

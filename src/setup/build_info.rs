@@ -19,6 +19,13 @@ impl BuildInfo {
     }
 }
 
+fn parse_version_script_output(stdout: &[u8]) -> Option<String> {
+    String::from_utf8_lossy(stdout)
+        .split_whitespace()
+        .next()
+        .map(str::to_owned)
+}
+
 /// Resolve build info from a repo path.
 ///
 /// # Errors
@@ -28,11 +35,9 @@ pub fn resolve_build_info(repo: &Path) -> Result<BuildInfo, CliError> {
     if version_script.exists()
         && let Ok(output) = Command::new(&version_script).current_dir(repo).output()
         && output.status.success()
+        && let Some(version) = parse_version_script_output(&output.stdout)
     {
-        let version = String::from_utf8_lossy(&output.stdout).trim().to_string();
-        if !version.is_empty() {
-            return Ok(BuildInfo { version });
-        }
+        return Ok(BuildInfo { version });
     }
 
     let dirty_output = Command::new("git")
