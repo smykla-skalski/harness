@@ -1,5 +1,5 @@
 ---
-name: new
+name: create
 description: >-
   Generate test suites for suite:run by reading Kuma source code.
   Produces ready-to-run suites with manifests, validation steps, and expected outcomes
@@ -207,7 +207,7 @@ If the suite name or directory changes later, rerun `harness create begin` and t
 
 Read [references/code-reading-guide.md](references/code-reading-guide.md) for source navigation paths, [references/variant-detection.md](references/variant-detection.md) for signal taxonomy, and [references/agent-output-format.md](references/agent-output-format.md) for payload contracts before constructing worker prompts.
 
-Launch these workers in parallel:
+Use the Agent tool to launch these workers in parallel:
 
 - [../../agents/coverage-reader.md](../../agents/coverage-reader.md) for G1-G7 group material and evidence coverage
 - [../../agents/variant-analyzer.md](../../agents/variant-analyzer.md) for S1-S7 variant signals
@@ -222,17 +222,6 @@ Worker contract:
 After all workers finish, load the saved payloads with `harness create show --kind inventory|coverage|variants|schema`.
 
 If any worker result is missing, malformed, or clearly incomplete, rerun only that worker instead of continuing with gaps.
-
-### Manifest completeness rule
-
-Every Kubernetes resource that any test group references during its steps must exist as a YAML file in the suite before create finishes. This includes:
-
-- ContainerPatch resources for sidecar environment variables or proxy configuration
-- MeshTrafficPermission, MeshRetry, MeshTimeout, or any other Mesh* policy that groups apply
-- Gateway API CRDs (GatewayClass, Gateway, HTTPRoute) if groups reference them
-- Any resource that a group's `## Configure` or `## Execute` steps apply but that does not yet exist as a manifest file
-
-If a group step references applying a resource that has no corresponding YAML file in `groups/{group-id}/`, the create process must create it. The suite:run runner must never need to create manifests on the fly - all manifests ship with the suite.
 
 ### Step 7: Build the proposal from saved worker outputs
 
@@ -304,24 +293,7 @@ Launch these workers after approval:
 - [../../agents/baseline-writer.md](../../agents/baseline-writer.md) for `${SUITE_DIR}/baseline/*.yaml` - the baseline-writer must validate that Service manifests have `appProtocol` set on all ports (catches missing `appProtocol: http` on demo-app services and similar). Baseline manifests must pass `kubectl dry-run` validation (via `harness create validate`) before the suite is marked complete.
 - [../../agents/group-writer.md](../../agents/group-writer.md) for `${SUITE_DIR}/groups/g{NN}-*.md` and `${SUITE_DIR}/groups/g{NN}/*.yaml`
 
-Writer contract:
-
-- Pass only the saved proposal, schema facts, and the exact file ownership for that worker.
-- Keep writer fan-out bounded. Do not start more than four writer workers at once.
-- Launch all writer workers with `mode: "auto"` so they can write files without interactive approval. Background workers cannot prompt the user, so writes are denied without this mode.
-- The group-writer must create a `groups/{group-id}/` directory for each group and write the group's test manifests there as individual YAML files (e.g., `groups/g01/01-create.yaml`, `groups/g01/02-update.yaml`). The group markdown's `## Configure` section must NOT contain inline YAML blocks. Instead it should contain only `harness run apply` commands that reference the manifest directory (e.g., `harness run apply --manifest g01` for the whole directory or `harness run apply --manifest g01/01-create.yaml` for a single file). The YAML lives only in the `groups/g{NN}/` directory.
-- Require every writer that emits manifests to run `harness create validate --path <file>` on its owned outputs before it stops. Use the current repo checkout as the schema source of truth; all required schemas, including CRDs, are already in this repo. Do not substitute a live-cluster check.
-- When the proposal includes multi-zone profiles, pass the baseline cluster distribution from the proposal to the baseline-writer and suite-writer so they emit the object form (`- path:` with `clusters:`) in `baseline_files` frontmatter and include the Clusters column in the baseline manifests table.
-- Follow [references/agent-output-format.md](references/agent-output-format.md) for `harness create show` usage and acknowledgement rules, and [references/suite-structure.md](references/suite-structure.md) for file content requirements.
-
-Writer recovery (partial completion):
-
-When a writer worker finishes but some expected files are missing (partial failure or timeout), the main context must recover without re-launching a full worker. Before writing any file that may already exist on disk from a partial worker run, Read it first. Claude Code tracks file state internally - writing a file that exists on disk but was never Read in the current context triggers "File has been modified since read" errors. The recovery sequence is:
-
-1. Run `ls "${SUITE_DIR}/groups/"` to see which files the worker already created.
-2. For every file that exists on disk but still needs to be written or overwritten, Read it first, then Write the corrected content.
-3. For files that do not exist yet, Write them directly (no Read needed).
-4. Never attempt to Write a batch of files without checking which ones already exist. The subagent's writes are invisible to the parent context's file tracker.
+Read [references/agent-output-format.md](references/agent-output-format.md) for the writer launch contract, fan-out limits, manifest validation rules, recovery sequence, and [references/suite-structure.md](references/suite-structure.md) for the manifest completeness rule and file content requirements.
 
 ### Step 10: Post-write review gate
 
