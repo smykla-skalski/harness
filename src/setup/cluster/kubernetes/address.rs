@@ -24,7 +24,7 @@ pub(super) fn resolve_kds_address(global_cluster: &str) -> Result<String, CliErr
     }
 
     let home = env::var("HOME").unwrap_or_else(|_| "/tmp".into());
-    let kubeconfig = format!("{home}/.kube/kind-{global_cluster}-config");
+    let kubeconfig = format!("{home}/.kube/k3d-{global_cluster}.yaml");
     let kubeconfig_path = Path::new(&kubeconfig);
     let port_result = kubectl(
         Some(kubeconfig_path),

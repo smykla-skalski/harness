@@ -32,7 +32,7 @@ Symptoms: workloads stay Pending, CNI-related scheduling issues.
 Fix:
 
 ```bash
-K3D_HELM_DEPLOY_NO_CNI=true KIND_CLUSTER_NAME=kuma-1 make k3d/deploy/helm
+K3D_HELM_DEPLOY_NO_CNI=true CLUSTER=kuma-1 make k3d/cluster/deploy/helm
 ```
 
 ## 2) Resource schema rejected before business validation
@@ -117,11 +117,19 @@ Root cause: using global cluster service ClusterIP in `controlPlane.kdsGlobalAdd
 
 Fix: expose global sync service as NodePort and use `grpcs://<global-node-ip>:<node-port>` instead of the service ClusterIP.
 
-## 10) k3d/start fails for kuma-3 with missing MetalLB file
+## 10) k3d cluster bootstrap fails around MetalLB networking
 
-Symptoms: error references missing `mk/metallb-k3d-kuma-3.yaml`.
+Symptoms: `k3d/cluster/start` fails while rendering or applying MetalLB resources.
 
-Fix: use `harness setup kuma cluster`, which auto-generates a temporary manifest for numeric names `kuma-<n>`.
+Root cause: Kuma no longer uses static `mk/metallb-k3d-*.yaml` files. MetalLB is rendered dynamically from the shared Docker network and the cluster number.
+
+Fix: use `harness setup kuma cluster` or the new manual contract:
+
+```bash
+CLUSTER=kuma-3 make k3d/cluster/start
+```
+
+Do not create or patch `mk/metallb-k3d-*.yaml` files by hand.
 
 ## 11) Disk pressure on k3d node
 
@@ -138,7 +146,7 @@ docker system prune -a --volumes -f
 After pruning, all kumahq/* images are gone. The k3d cluster nodes will show `ImagePullBackOff` because they reference images that no longer exist in Docker. You must rebuild and reload images into the cluster before continuing:
 
 ```bash
-K3D_HELM_DEPLOY_NO_CNI=true make k3d/deploy/helm KIND_CLUSTER_NAME=kuma-1 \
+K3D_HELM_DEPLOY_NO_CNI=true make k3d/cluster/deploy/helm CLUSTER=kuma-1 \
   K3D_HELM_DEPLOY_ADDITIONAL_SETTINGS="<your helm settings>"
 ```
 

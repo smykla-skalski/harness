@@ -27,14 +27,14 @@ pub(super) fn start_and_deploy(
     extra_settings: &[String],
 ) -> Result<(), CliError> {
     let mut env = base_env.clone();
-    env.insert("KIND_CLUSTER_NAME".to_string(), cluster_name.to_string());
+    env.insert("CLUSTER".to_string(), cluster_name.to_string());
     if !cluster_exists(cluster_name)? {
         info!(%cluster_name, "starting k3d cluster");
-        make_target_live(root, "k3d/start", &env)?;
+        make_target_live(root, "k3d/cluster/start", &env)?;
         info!(%cluster_name, "k3d cluster ready");
     }
     let home = env::var("HOME").unwrap_or_else(|_| "/tmp".into());
-    let kubeconfig = format!("{home}/.kube/kind-{cluster_name}-config");
+    let kubeconfig = format!("{home}/.kube/k3d-{cluster_name}.yaml");
     env.insert("KUBECONFIG".to_string(), kubeconfig);
     env.insert("K3D_HELM_DEPLOY_NO_CNI".to_string(), "true".to_string());
     env.insert("KUMA_MODE".to_string(), kuma_mode.to_string());
@@ -57,7 +57,7 @@ pub(super) fn start_and_deploy(
     );
 
     info!(%cluster_name, %kuma_mode, "deploying Kuma");
-    make_target_live(root, "k3d/deploy/helm", &env)?;
+    make_target_live(root, "k3d/cluster/deploy/helm", &env)?;
     info!(%cluster_name, "Kuma deployed");
     Ok(())
 }
@@ -72,7 +72,7 @@ pub(super) fn cluster_stop(
         return Ok(());
     }
     let mut env = base_env.clone();
-    env.insert("KIND_CLUSTER_NAME".to_string(), cluster_name.to_string());
-    make_target(root, "k3d/stop", &env)?;
+    env.insert("CLUSTER".to_string(), cluster_name.to_string());
+    make_target(root, "k3d/cluster/stop", &env)?;
     Ok(())
 }

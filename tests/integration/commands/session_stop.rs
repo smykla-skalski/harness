@@ -16,12 +16,12 @@ fn session_stop_cleans_up_templates_and_removes_pointer() {
     let run_dir = init_run(tmp.path(), "run-stop", "single-zone");
 
     // Create ephemeral templates
-    let mk_dir = tmp.path().join("mk");
-    fs::create_dir_all(&mk_dir).unwrap();
-    let source = mk_dir.join("metallb-k3d-kuma.yaml");
-    fs::write(&source, "template").unwrap();
-    let template = mk_dir.join("metallb-k3d-local.yaml");
-    fs::write(&template, "template").unwrap();
+    let generated_dir = tmp.path().join(".kuma-dev");
+    fs::create_dir_all(&generated_dir).unwrap();
+    let source = generated_dir.join("metallb-kuma.yaml");
+    fs::write(&source, "generated").unwrap();
+    let template = generated_dir.join("metallb-kuma-local.yaml");
+    fs::write(&template, "generated").unwrap();
     let state_dir = run_dir.join("state");
     fs::create_dir_all(&state_dir).unwrap();
     fs::write(
