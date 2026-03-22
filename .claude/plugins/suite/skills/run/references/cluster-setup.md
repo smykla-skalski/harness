@@ -17,12 +17,14 @@ Cluster lifecycle commands for harness-managed Kubernetes and universal test env
 
 - `harness setup capabilities` reports the requested profile as ready
 - Docker Engine reachable for universal profiles and Docker-backed local workflows
-- `kubectl`, `helm`, `make` installed
+- `helm` and `make` installed
 - `k3d` installed for local Kubernetes provider runs
 - `REPO_ROOT` resolved (via `--repo` flag or auto-detected from cwd)
 - Remote Kubernetes provider runs also need explicit `--remote` mappings plus `--push-prefix` and `--push-tag`
 
 `HARNESS_CONTAINER_RUNTIME` defaults to `bollard`. Leave it unset for the normal Engine API backend. Set `HARNESS_CONTAINER_RUNTIME=docker-cli` only to force the CLI-backed fallback. When using the default backend, missing `docker` on `PATH` does not block universal readiness by itself.
+
+`HARNESS_KUBERNETES_RUNTIME` defaults to `kube`. Leave it unset for the normal native backend. Set `HARNESS_KUBERNETES_RUNTIME=kubectl-cli` only to force the CLI-backed fallback. With the default backend, missing `kubectl` alone does not block native `harness run validate`, `harness run apply`, `harness run capture`, or Kubernetes readiness checks. `kubectl` is still required for tracked `harness run record -- kubectl ...` flows and any run that explicitly selects the CLI backend.
 
 ## Kubeconfig mapping
 
@@ -162,6 +164,8 @@ For manual control:
 make build
 K3D_HELM_DEPLOY_NO_CNI=true CLUSTER=kuma-1 make k3d/cluster/deploy/helm
 ```
+
+Prefer `harness setup kuma cluster --no-build` and `--no-load` over raw build/load env vars when using harness-managed bootstrap. Harness translates local k3d `--no-load` to Kuma's current `K3D_DONT_LOAD=1` contract internally.
 
 ## CRD updates
 

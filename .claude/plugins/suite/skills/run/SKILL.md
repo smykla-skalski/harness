@@ -129,6 +129,7 @@ Parse from `$ARGUMENTS`:
 - Timestamp: !`date +%Y%m%d-%H%M%S`
 - Session ID: ${CLAUDE_SESSION_ID}
 - Container runtime backend: !`printf '%s\n' "${HARNESS_CONTAINER_RUNTIME:-bollard}"`
+- Kubernetes runtime backend: !`printf '%s\n' "${HARNESS_KUBERNETES_RUNTIME:-kube}"`
 - k3d: !`command -v k3d >/dev/null 2>&1 && echo "installed" || echo "MISSING"`
 - kubectl: !`command -v kubectl >/dev/null 2>&1 && echo "installed" || echo "MISSING"`
 - helm: !`command -v helm >/dev/null 2>&1 && echo "installed" || echo "MISSING"`
@@ -181,7 +182,7 @@ Read [references/workflow.md](references/workflow.md) for the full procedure. Th
    - `Provide repo path`
    - `Cancel run`
 
-3. Treat `harness setup capabilities` as authoritative for container readiness. Do not infer universal readiness from `docker info` alone. For Kubernetes local provider runs, `k3d`, `kubectl`, and `helm` must all be installed. For Kubernetes remote provider runs, `kubectl` and `helm` must be installed. For universal runs, the Docker Engine must be reachable; the Docker CLI is only required when `HARNESS_CONTAINER_RUNTIME=docker-cli`.
+3. Treat `harness setup capabilities` as authoritative for Kubernetes and container readiness. Do not infer universal readiness from `docker info` alone. With the default `HARNESS_KUBERNETES_RUNTIME=kube`, missing `kubectl` alone does not block native Kubernetes operations such as `harness run validate`, `harness run apply`, `harness run capture`, or readiness checks. `kubectl` is still required when `HARNESS_KUBERNETES_RUNTIME=kubectl-cli` and whenever the run plan includes tracked `harness run record -- kubectl ...` commands. For local Kubernetes provider runs, `k3d`, `helm`, and the Kuma repo make contract must be ready. For remote Kubernetes provider runs, Helm plus the remote publish contract must be ready. For universal runs, the Docker Engine must be reachable; the Docker CLI is only required when `HARNESS_CONTAINER_RUNTIME=docker-cli`.
 4. All cluster commands go through tracked wrappers, never raw `kubectl` or `kumactl`.
 
 ### Phase 1: Resolve or resume run
@@ -362,7 +363,7 @@ Tear down the clusters created in Phase 2. Use the matching `harness setup kuma 
 
 ## Performance toggles
 
-Override env vars on `harness setup kuma cluster` calls: `HARNESS_BUILD_IMAGES=0 HARNESS_LOAD_IMAGES=0` skips rebuilds, `HARNESS_HELM_CLEAN=1` adds full isolation, `HARNESS_DOCKER_PRUNE=0` skips image cleanup (not recommended). Remote provider runs do not support `--no-load`.
+Prefer `harness setup kuma cluster --no-build` and `--no-load` for normal build/load skips. Harness maps local k3d `--no-load` to Kuma's current `K3D_DONT_LOAD=1` contract internally. Keep env vars for lower-level overrides only: `HARNESS_HELM_CLEAN=1` adds full isolation, `HARNESS_DOCKER_PRUNE=0` skips image cleanup (not recommended), and `HARNESS_BUILD_IMAGES=0` / `HARNESS_LOAD_IMAGES=0` remain escape hatches. Remote provider runs do not support `--no-load`.
 
 ## Report compactness thresholds
 
