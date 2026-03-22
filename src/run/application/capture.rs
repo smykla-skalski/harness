@@ -1,8 +1,7 @@
 use rayon::prelude::*;
 use tracing::warn;
 
-use crate::errors::{CliError, CliErrorKind};
-use crate::infra::exec;
+use crate::errors::CliError;
 use crate::infra::io::write_json_pretty;
 use crate::kernel::topology::Platform;
 use crate::run::audit::write_run_status_with_audit;
@@ -58,46 +57,37 @@ impl RunApplication {
         kubeconfig: Option<&str>,
     ) -> Result<StateCaptureSnapshot, CliError> {
         let resolved = self.resolve_kubeconfig(kubeconfig, None)?;
-        let result = exec::kubectl(
-            Some(resolved.as_ref()),
-            &["get", "pods", "--all-namespaces", "-o", "json"],
-            &[0],
-        )?;
-        let value: serde_json::Value = serde_json::from_str(&result.stdout)
-            .map_err(|error| CliErrorKind::serialize(format!("capture kubernetes: {error}")))?;
-        let pods = value["items"]
-            .as_array()
-            .map(|items| {
-                items
-                    .par_iter()
-                    .map(|item| KubernetesPodSnapshot {
-                        namespace: item["metadata"]["namespace"]
-                            .as_str()
-                            .unwrap_or_default()
-                            .to_string(),
-                        name: item["metadata"]["name"]
-                            .as_str()
-                            .unwrap_or_default()
-                            .to_string(),
-                        phase: item["status"]["phase"].as_str().map(str::to_string),
-                        ready: item["status"]["containerStatuses"].as_array().is_some_and(
-                            |statuses| {
-                                !statuses.is_empty()
-                                    && statuses
-                                        .iter()
-                                        .all(|status| status["ready"].as_bool().unwrap_or(false))
-                            },
-                        ),
-                    })
-                    .collect()
+        let pods = self
+            .kubernetes_runtime()?
+            .list_pods(Some(resolved.as_ref()))?
+            .par_iter()
+            .map(|pod| KubernetesPodSnapshot {
+                namespace: pod.namespace.clone().unwrap_or_default(),
+                name: pod.name.clone().unwrap_or_default(),
+                phase: pod.status.clone(),
+                ready: pod
+                    .ready
+                    .as_deref()
+                    .and_then(|value| value.split_once('/'))
+                    .is_some_and(|(ready, total)| ready == total && total != "0"),
             })
-            .unwrap_or_default();
+            .collect();
         Ok(StateCaptureSnapshot::Kubernetes(
             KubernetesCaptureSnapshot { pods },
         ))
     }
 
     fn capture_universal_snapshot(&self) -> Result<StateCaptureSnapshot, CliError> {
+        let container_rows = self.capture_universal_containers()?;
+        let (dataplanes, dataplanes_error) = self.capture_universal_dataplanes();
+        Ok(StateCaptureSnapshot::Universal(UniversalCaptureSnapshot {
+            containers: container_rows,
+            dataplanes,
+            dataplanes_error,
+        }))
+    }
+
+    fn capture_universal_containers(&self) -> Result<Vec<DockerContainerSnapshot>, CliError> {
         let network = self
             .docker_network()
             .ok()
@@ -107,7 +97,7 @@ impl RunApplication {
             .services
             .docker()?
             .list_formatted(&["--filter", &filter], "{{json .}}")?;
-        let container_rows = containers
+        Ok(containers
             .stdout
             .lines()
             .filter(|line| !line.trim().is_empty())
@@ -119,8 +109,11 @@ impl RunApplication {
                 status: row["Status"].as_str().map(str::to_string),
                 networks: row["Networks"].as_str().map(str::to_string),
             })
-            .collect();
-        let (dataplanes, dataplanes_error) = match self.query_dataplanes("default") {
+            .collect())
+    }
+
+    fn capture_universal_dataplanes(&self) -> (UniversalDataplaneCollection, Option<String>) {
+        match self.query_dataplanes("default") {
             Ok(dataplanes) => (dataplanes, None),
             Err(error) => {
                 warn!(%error, "CP API dataplanes query failed");
@@ -129,11 +122,6 @@ impl RunApplication {
                     Some(error.to_string()),
                 )
             }
-        };
-        Ok(StateCaptureSnapshot::Universal(UniversalCaptureSnapshot {
-            containers: container_rows,
-            dataplanes,
-            dataplanes_error,
-        }))
+        }
     }
 }

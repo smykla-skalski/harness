@@ -3,7 +3,7 @@ members = [".", "testkit"]
 
 [package]
 name = "harness"
-version = "12.3.0"
+version = "13.0.0"
 edition = "2024"
 rust-version = "1.94"
 
@@ -41,6 +41,8 @@ tar = "0.4.44"
 user_dirs = "0.2.0"
 walkdir = "2.5.0"
 serde-sarif = "0.8.0"
+k8s-openapi = { version = "0.27.1", features = ["v1_31"] }
+kube = { version = "3.1.0", features = ["runtime", "ws"] }
 
 [dev-dependencies]
 assert_cmd = "2.2.0"

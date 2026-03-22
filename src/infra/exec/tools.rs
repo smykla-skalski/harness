@@ -1,5 +1,6 @@
 use std::path::Path;
 
+#[cfg(test)]
 use tracing::info;
 
 use crate::errors::{CliError, CliErrorKind};
@@ -10,7 +11,8 @@ use super::{CommandResult, run_command};
 ///
 /// # Errors
 /// Returns `CliError` if any restart command fails.
-pub fn kubectl_rollout_restart(
+#[cfg(test)]
+pub(crate) fn kubectl_rollout_restart(
     kubeconfig: Option<&Path>,
     namespaces: &[String],
 ) -> Result<(), CliError> {
@@ -29,7 +31,8 @@ pub fn kubectl_rollout_restart(
 ///
 /// # Errors
 /// Returns `CliError` on command failure.
-pub fn kubectl(
+#[cfg(test)]
+pub(crate) fn kubectl(
     kubeconfig: Option<&Path>,
     args: &[&str],
     ok_exit_codes: &[i32],

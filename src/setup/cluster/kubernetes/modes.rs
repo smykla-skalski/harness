@@ -1,11 +1,12 @@
 use std::collections::HashMap;
 use std::path::Path;
+use std::sync::Arc;
 use std::thread;
 
 use tracing::info;
 
 use crate::errors::{CliError, CliErrorKind};
-use crate::infra::exec::kubectl_rollout_restart;
+use crate::infra::blocks::{StdProcessExecutor, kubernetes_runtime_from_env};
 use crate::kernel::topology::{ClusterMode, ClusterSpec};
 
 use super::address::resolve_kds_address;
@@ -28,12 +29,13 @@ pub(super) fn dispatch_k8s_mode(
 }
 
 pub(super) fn restart_cluster_namespaces(spec: &ClusterSpec) -> Result<(), CliError> {
+    let kubernetes = kubernetes_runtime_from_env(Arc::new(StdProcessExecutor))?;
     for member in &spec.members {
         if member.kubeconfig.is_empty() {
             continue;
         }
         let kubeconfig = Path::new(&member.kubeconfig);
-        kubectl_rollout_restart(Some(kubeconfig), &spec.restart_namespaces)?;
+        kubernetes.rollout_restart(Some(kubeconfig), &spec.restart_namespaces)?;
     }
     Ok(())
 }

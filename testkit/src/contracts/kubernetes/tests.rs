@@ -1,16 +1,10 @@
 use super::*;
-use harness::infra::blocks::KubectlOperator;
+use harness::infra::blocks::KubectlRuntime;
 
-fn production_operator() -> KubectlOperator {
+fn production_operator() -> KubectlRuntime {
     use harness::infra::blocks::StdProcessExecutor;
     use std::sync::Arc;
-    KubectlOperator::new(Arc::new(StdProcessExecutor))
-}
-
-#[test]
-#[ignore] // needs kubectl on PATH
-fn production_run_returns_result() {
-    contract_run_returns_result(&production_operator(), None);
+    KubectlRuntime::new(Arc::new(StdProcessExecutor))
 }
 
 #[test]
