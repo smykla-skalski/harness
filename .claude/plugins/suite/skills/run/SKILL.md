@@ -128,12 +128,12 @@ Parse from `$ARGUMENTS`:
 - Home: !`echo "$HOME"`
 - Timestamp: !`date +%Y%m%d-%H%M%S`
 - Session ID: ${CLAUDE_SESSION_ID}
-- Docker: !`docker info >/dev/null 2>&1 && echo "running" || echo "not running"`
+- Container runtime backend: !`printf '%s\n' "${HARNESS_CONTAINER_RUNTIME:-bollard}"`
 - k3d: !`command -v k3d >/dev/null 2>&1 && echo "installed" || echo "MISSING"`
 - kubectl: !`command -v kubectl >/dev/null 2>&1 && echo "installed" || echo "MISSING"`
 - helm: !`command -v helm >/dev/null 2>&1 && echo "installed" || echo "MISSING"`
 
-`DATA_DIR` is the suites directory. The timestamp is the default `RUN_ID` suffix. If session ID is empty or literal `${`, use `standalone`. Docker must be running for Kubernetes or universal profiles. `k3d` is required only for local Kubernetes provider runs.
+`DATA_DIR` is the suites directory. The timestamp is the default `RUN_ID` suffix. If session ID is empty or literal `${`, use `standalone`. Assume the effective container runtime backend is `bollard` unless `HARNESS_CONTAINER_RUNTIME` overrides it. `k3d` is required only for local Kubernetes provider runs.
 
 <!-- justify: I23 harness on PATH via SessionStart hooks -->
 <!-- justify: HK-stdin harness reads hook stdin internally -->
@@ -181,7 +181,7 @@ Read [references/workflow.md](references/workflow.md) for the full procedure. Th
    - `Provide repo path`
    - `Cancel run`
 
-3. If Docker is "not running", stop and report. For Kubernetes local provider runs, `k3d`, `kubectl`, and `helm` must all be installed. For Kubernetes remote provider runs, `kubectl` and `helm` must be installed. For universal runs, Docker must be usable.
+3. Treat `harness setup capabilities` as authoritative for container readiness. Do not infer universal readiness from `docker info` alone. For Kubernetes local provider runs, `k3d`, `kubectl`, and `helm` must all be installed. For Kubernetes remote provider runs, `kubectl` and `helm` must be installed. For universal runs, the Docker Engine must be reachable; the Docker CLI is only required when `HARNESS_CONTAINER_RUNTIME=docker-cli`.
 4. All cluster commands go through tracked wrappers, never raw `kubectl` or `kumactl`.
 
 ### Phase 1: Resolve or resume run
