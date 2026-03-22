@@ -12,16 +12,16 @@ use bollard::container::LogOutput;
 use bollard::errors::Error as BollardError;
 use bollard::exec::{CreateExecOptions, StartExecOptions, StartExecResults};
 use bollard::models::{
-    ContainerCreateBody, ContainerSummary, HealthStatusEnum, HostConfig, Ipam, IpamConfig,
-    NetworkCreateRequest, PortBinding, RestartPolicy, RestartPolicyNameEnum,
+    ContainerCreateBody, ContainerCreateResponse, ContainerSummary, HealthStatusEnum, HostConfig,
+    Ipam, IpamConfig, NetworkCreateRequest, PortBinding, RestartPolicy, RestartPolicyNameEnum,
 };
 use bollard::query_parameters::{
-    CreateContainerOptionsBuilder, InspectContainerOptions, ListContainersOptionsBuilder,
-    ListNetworksOptionsBuilder, LogsOptionsBuilder, RemoveContainerOptions, StartContainerOptions,
-    UploadToContainerOptionsBuilder,
+    CreateContainerOptionsBuilder, CreateImageOptionsBuilder, InspectContainerOptions,
+    ListContainersOptionsBuilder, ListNetworksOptionsBuilder, LogsOptionsBuilder,
+    RemoveContainerOptions, StartContainerOptions, UploadToContainerOptionsBuilder,
 };
 use bytes::Bytes;
-use futures_util::StreamExt;
+use futures_util::{StreamExt, TryStreamExt};
 use tar::{Builder, Header};
 
 use super::{ContainerConfig, ContainerRuntime};
@@ -74,6 +74,21 @@ impl BollardContainerRuntime {
                         status_code: 404,
                         ..
                     }
+                )
+            })
+    }
+
+    fn is_missing_local_image(error: &BlockError) -> bool {
+        error
+            .cause
+            .downcast_ref::<BollardError>()
+            .is_some_and(|error| {
+                matches!(
+                    error,
+                    BollardError::DockerResponseServerError {
+                        status_code: 404,
+                        message,
+                    } if message.to_ascii_lowercase().contains("no such image")
                 )
             })
     }
@@ -281,10 +296,8 @@ impl BollardContainerRuntime {
         }
         "all".to_string()
     }
-}
 
-impl ContainerRuntime for BollardContainerRuntime {
-    fn run_detached(&self, config: &ContainerConfig) -> Result<CommandResult, BlockError> {
+    fn container_create_body(config: &ContainerConfig) -> Result<ContainerCreateBody, BlockError> {
         let labels = config.labels.iter().cloned().collect::<HashMap<_, _>>();
         let env = config
             .env
@@ -314,7 +327,8 @@ impl ContainerRuntime for BollardContainerRuntime {
             .as_deref()
             .map(Self::restart_policy)
             .transpose()?;
-        let container_config = ContainerCreateBody {
+
+        Ok(ContainerCreateBody {
             image: Some(config.image.clone()),
             env: (!env.is_empty()).then_some(env),
             cmd: (!config.command.is_empty()).then_some(config.command.clone()),
@@ -328,8 +342,15 @@ impl ContainerRuntime for BollardContainerRuntime {
                 ..Default::default()
             }),
             ..Default::default()
-        };
-        let create = Self::block_on(
+        })
+    }
+
+    fn create_container_request(
+        &self,
+        config: &ContainerConfig,
+    ) -> Result<ContainerCreateResponse, BlockError> {
+        let container_config = Self::container_create_body(config)?;
+        Self::block_on(
             &format!("create_container {}", config.name),
             self.docker.create_container(
                 Some(
@@ -339,7 +360,41 @@ impl ContainerRuntime for BollardContainerRuntime {
                 ),
                 container_config,
             ),
-        )?;
+        )
+    }
+
+    fn pull_image(&self, image: &str) -> Result<(), BlockError> {
+        let operation = format!("pull_image {image}");
+        RUNTIME
+            .block_on(async {
+                self.docker
+                    .create_image(
+                        Some(
+                            CreateImageOptionsBuilder::default()
+                                .from_image(image)
+                                .build(),
+                        ),
+                        None,
+                        None,
+                    )
+                    .try_collect::<Vec<_>>()
+                    .await
+            })
+            .map(|_| ())
+            .map_err(|error| BlockError::new("docker", &operation, error))
+    }
+}
+
+impl ContainerRuntime for BollardContainerRuntime {
+    fn run_detached(&self, config: &ContainerConfig) -> Result<CommandResult, BlockError> {
+        let create = match self.create_container_request(config) {
+            Ok(create) => create,
+            Err(error) if Self::is_missing_local_image(&error) => {
+                self.pull_image(&config.image)?;
+                self.create_container_request(config)?
+            }
+            Err(error) => return Err(error),
+        };
         Self::block_on(
             &format!("start_container {}", config.name),
             self.docker
@@ -773,5 +828,41 @@ impl ContainerRuntime for BollardContainerRuntime {
             }
             Ok::<_, BlockError>(0)
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use bollard::errors::Error as BollardError;
+
+    use super::BollardContainerRuntime;
+    use crate::infra::blocks::BlockError;
+
+    #[test]
+    fn missing_local_image_detection_matches_engine_error() {
+        let error = BlockError::new(
+            "docker",
+            "create_container example",
+            BollardError::DockerResponseServerError {
+                status_code: 404,
+                message: "No such image: missing:latest".to_string(),
+            },
+        );
+
+        assert!(BollardContainerRuntime::is_missing_local_image(&error));
+    }
+
+    #[test]
+    fn missing_local_image_detection_ignores_other_404s() {
+        let error = BlockError::new(
+            "docker",
+            "create_container example",
+            BollardError::DockerResponseServerError {
+                status_code: 404,
+                message: "network mesh-net not found".to_string(),
+            },
+        );
+
+        assert!(!BollardContainerRuntime::is_missing_local_image(&error));
     }
 }
