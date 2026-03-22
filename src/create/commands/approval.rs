@@ -14,12 +14,9 @@ impl Execute for ApprovalBeginArgs {
 // approval_begin
 // =========================================================================
 
-/// Arguments for `harness approval-begin`.
+/// Arguments for `harness create approval-begin`.
 #[derive(Debug, Clone, Args)]
 pub struct ApprovalBeginArgs {
-    /// Managed skill to initialize.
-    #[arg(long, value_parser = clap::builder::PossibleValuesParser::new([crate::kernel::skills::SKILL_CREATE]))]
-    pub skill: String,
     /// Approval mode.
     #[arg(long, value_parser = ["interactive", "bypass"])]
     pub mode: String,
@@ -28,7 +25,7 @@ pub struct ApprovalBeginArgs {
     pub suite_dir: Option<String>,
 }
 
-/// Begin suite:create approval flow.
+/// Begin `suite:create` approval flow.
 ///
 /// # Errors
 /// Returns `CliError` on failure.

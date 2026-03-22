@@ -7,8 +7,8 @@ use crate::observe::types::{
     Confidence, FixSafety, Issue, IssueCode, MessageRole, ScanState, SourceTool,
 };
 
+use super::super::RM_RECURSIVE_REGEX;
 use super::super::emitter::{Guidance, IssueBlueprint, IssueEmitter};
-use super::super::{OLD_SKILL_REGEX, RM_RECURSIVE_REGEX};
 use super::lifecycle::{track_capture_between_groups, track_resource_lifecycle};
 
 /// Verification keywords that indicate a command whose output should not
@@ -36,23 +36,6 @@ pub(super) fn check_bash_tool_use(
 
     {
         let mut emitter = IssueEmitter::new(line_num, MessageRole::Assistant, state);
-
-        if OLD_SKILL_REGEX.is_match(command) {
-            emitter.emit(
-                issues,
-                IssueBlueprint::from_code(
-                    IssueCode::OldSkillNameUsedInCommand,
-                    "Old skill name used in harness command",
-                )
-                .with_guidance(Guidance::fix_hint(
-                    "SKILL.md or model still references old skill names",
-                ))
-                .with_confidence(Confidence::High)
-                .with_fix_safety(FixSafety::AutoFixSafe)
-                .with_source_tool(Some(SourceTool::Bash)),
-                &details,
-            );
-        }
 
         check_harness_command_patterns(&observed, &details, &mut emitter, issues);
         check_destructive_patterns(command, &details, &mut emitter, issues);

@@ -38,8 +38,8 @@ Hooks emit these codes during suite create:
 
 - If repo resolution is ambiguous, stop and re-ask before reading code because a suite authored from the wrong worktree or branch is misleading.
 - If the local-validator question is still unresolved, ask it before doing Bash work, writing files, or opening the canonical approval gates because the hooks fail closed until that one-time decision is recorded.
-- If `harness create begin` was not run after deriving `SUITE_DIR`, stop and run `harness create begin --skill suite:create --repo-root "${REPO_ROOT}" --feature "${FEATURE}" --mode interactive|bypass --suite-dir "${SUITE_DIR}" --suite-name "${SUITE_NAME}"` before launching workers because the compact worker state must exist before caching results.
-- If `harness create approval-begin` was not run after deriving `SUITE_DIR`, stop and run `harness create approval-begin --skill suite:create --mode interactive|bypass --suite-dir "${SUITE_DIR}"` before the canonical approval gates because the hooks fail closed on missing approval state.
+- If `harness create begin` was not run after deriving `SUITE_DIR`, stop and run `harness create begin --repo-root "${REPO_ROOT}" --feature "${FEATURE}" --mode interactive|bypass --suite-dir "${SUITE_DIR}" --suite-name "${SUITE_NAME}"` before launching workers because the compact worker state must exist before caching results.
+- If `harness create approval-begin` was not run after deriving `SUITE_DIR`, stop and run `harness create approval-begin --mode interactive|bypass --suite-dir "${SUITE_DIR}"` before the canonical approval gates because the hooks fail closed on missing approval state.
 - If a worker payload fails validation or is missing after a run, rerun only that worker and re-save its compact result instead of rereading the whole repo.
 - If a worker returns raw file dumps or long prose, stop and rerun it with the compact-output contract because returning the heavy transcript defeats the architecture.
 - If local manifest verification keeps failing, go back to the checked-in CRD or Go struct before saving because a broken suite wastes runner time and hides whether the bug is in Kuma or in the suite.

@@ -161,18 +161,6 @@ fn detects_auth_flow() {
 }
 
 #[test]
-fn detects_old_skill_name_in_bash() {
-    let mut state = make_state();
-    let block = bash_tool_use("harness hook --skill suite-runner guard-bash");
-    let issues = check_tool_use_for_issues(10, &block, &mut state);
-    assert!(
-        issues
-            .iter()
-            .any(|i| i.category == IssueCategory::NamingError)
-    );
-}
-
-#[test]
 fn tracks_tool_use_for_correlation() {
     let mut state = make_state();
     let block = serde_json::json!({
