@@ -28,6 +28,22 @@ Only unfinished runs can resume. If the saved run already has a final `pass` or 
 
 After restore, do not treat a remembered kubeconfig path as permission to run raw `kubectl` or `kubectl --kubeconfig ...`. Keep using `harness run record --phase <phase> --label <label> --gid <group-id> -- kubectl <args>` for kubectl checks and `harness run record --phase <phase> --label <label> --gid <group-id> -- kumactl <args>` for kumactl checks during execution groups.
 
+If the saved run looks stale or contradictory, diagnose it before retrying:
+
+```bash
+harness run doctor \
+  --run-id "${RUN_ID}" \
+  --run-root "${SUITE_DIR}/runs"
+```
+
+If the findings are deterministic pointer or derived-status drift, repair them through the harness instead of editing JSON by hand:
+
+```bash
+harness run repair \
+  --run-id "${RUN_ID}" \
+  --run-root "${SUITE_DIR}/runs"
+```
+
 ## Phase 0 - environment check
 
 Resolve persistent storage and repo root first:
@@ -118,6 +134,8 @@ harness run resume \
 ```
 
 If SessionStart already restored the matching active run, `harness run resume` can omit explicit lookup flags and use the active pointer directly.
+
+If `harness run resume` fails because the pointer or saved state is stale, run `harness run doctor` first. Use `harness run repair` only for deterministic state repair, then retry resume or preflight.
 
 If the cluster topology was rebuilt or CRDs changed after the saved run was created, refresh the prepared-suite outputs before continuing:
 

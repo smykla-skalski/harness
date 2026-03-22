@@ -56,6 +56,14 @@ fn hex_encode_prefix(bytes: &[u8], n: usize) -> String {
         })
 }
 
+fn project_scope_key_for(project_dir: &Path) -> String {
+    let resolved = project_dir
+        .canonicalize()
+        .unwrap_or_else(|_| project_dir.to_path_buf());
+    let scope = format!("project:{}", resolved.display());
+    format!("project-{}", scope_digest(&scope))
+}
+
 /// Compute a context scope key from environment (session > project > cwd).
 ///
 /// # Errors
@@ -66,9 +74,7 @@ pub fn session_scope_key() -> Result<String, CliError> {
         return Ok(format!("session-{}", scope_digest(&scope)));
     }
     if let Some(project_dir) = context_scope_value("CLAUDE_PROJECT_DIR") {
-        let resolved = PathBuf::from(project_dir).canonicalize()?;
-        let scope = format!("project:{}", resolved.display());
-        return Ok(format!("project-{}", scope_digest(&scope)));
+        return Ok(project_scope_key_for(Path::new(&project_dir)));
     }
     let cwd = env::current_dir()?;
     let resolved = cwd.canonicalize().unwrap_or(cwd);
@@ -86,12 +92,26 @@ pub fn session_context_dir() -> Result<PathBuf, CliError> {
         .join(session_scope_key()?))
 }
 
+/// Session context directory for an explicit project path.
+#[must_use]
+pub fn session_context_dir_for_project(project_dir: &Path) -> PathBuf {
+    harness_data_root()
+        .join("contexts")
+        .join(project_scope_key_for(project_dir))
+}
+
 /// Path to the current run context JSON file.
 ///
 /// # Errors
 /// Returns `CliError` if the current directory cannot be determined.
 pub fn current_run_context_path() -> Result<PathBuf, CliError> {
     Ok(session_context_dir()?.join("current-run.json"))
+}
+
+/// Path to the current run context JSON file for an explicit project path.
+#[must_use]
+pub fn current_run_context_path_for_project(project_dir: &Path) -> PathBuf {
+    session_context_dir_for_project(project_dir).join("current-run.json")
 }
 
 /// Project context directory (hashed from project path).

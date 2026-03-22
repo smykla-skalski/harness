@@ -19,8 +19,8 @@ pub use application::RunApplication;
 pub use args::RunDirArgs;
 pub use commands::{
     ApiArgs, ApiMethod, ApplyArgs, CaptureArgs, CloseoutArgs, ClusterCheckArgs, DiffArgs,
-    EnvoyArgs, EnvoyCommand, FinishArgs, InitArgs, KumaArgs, KumaCommand, KumactlArgs,
-    KumactlCommand, LogsArgs, PreflightArgs, RecordArgs, ReportArgs, ReportCommand,
+    DoctorArgs, EnvoyArgs, EnvoyCommand, FinishArgs, InitArgs, KumaArgs, KumaCommand, KumactlArgs,
+    KumactlCommand, LogsArgs, PreflightArgs, RecordArgs, RepairArgs, ReportArgs, ReportCommand,
     RestartNamespaceArgs, ResumeArgs, RunnerStateArgs, ServiceArgs, StartArgs, StatusArgs,
     TaskArgs, TaskCommand, TokenArgs, ValidateArgs,
 };

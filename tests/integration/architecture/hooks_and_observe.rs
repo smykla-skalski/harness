@@ -410,11 +410,19 @@ fn observe_skill_matches_current_cli_surface() {
         &all_docs,
         "observe skill docs should not use legacy observe contract",
         &[
-            "harness observe cycle",
-            "harness observe status",
-            "harness observe resume",
-            "harness observe compare",
-            "harness observe doctor",
+            &["harness", " observe", " cycle"].concat(),
+            &["harness", " observe", " status"].concat(),
+            &["harness", " observe", " resume"].concat(),
+            &["harness", " observe", " compare"].concat(),
+            &[
+                "harness",
+                " observe",
+                " scan",
+                " <session-id>",
+                " --action",
+                " doctor",
+            ]
+            .concat(),
             "$XDG_DATA_HOME/kuma/observe",
         ],
     );
@@ -422,6 +430,7 @@ fn observe_skill_matches_current_cli_surface() {
         &all_docs,
         "observe skill docs should describe current observe contract via",
         &[
+            "harness observe doctor",
             "harness observe scan <session-id> --action cycle",
             "harness observe scan <session-id> --action status",
             "$XDG_DATA_HOME/harness/observe/<SESSION_ID>.state",

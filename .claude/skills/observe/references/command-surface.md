@@ -2,6 +2,13 @@
 
 Supported invocation shapes for `harness observe`.
 
+## Doctor
+
+- project health and contract drift:
+  `harness observe doctor --project-dir <path> --json`
+- default current project resolution:
+  `harness observe doctor`
+
 ## Scan and watch
 
 - one-shot scan:
@@ -23,7 +30,7 @@ Supported invocation shapes for `harness observe`.
 
 ## Maintenance actions
 
-Maintenance actions go through `scan --action`:
+Observer maintenance actions go through `scan --action`:
 
 - canonical cycle form:
   `harness observe scan <session-id> --action cycle`
@@ -45,8 +52,6 @@ Maintenance actions go through `scan --action`:
   `harness observe scan <session-id> --action list-categories`
 - list focus presets:
   `harness observe scan <session-id> --action list-focus-presets`
-- doctor:
-  `harness observe scan <session-id> --action doctor`
 - mute:
   `harness observe scan <session-id> --project-hint <hint> --action mute --codes <csv>`
 - unmute:

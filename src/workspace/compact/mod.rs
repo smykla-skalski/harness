@@ -22,3 +22,8 @@ pub(super) const HISTORY_LIMIT: usize = 10;
 pub(super) const CHAR_LIMIT: usize = 3500;
 pub(super) const SECTION_CHAR_LIMIT: usize = 1600;
 pub(super) const SECTION_LINE_LIMIT: usize = 25;
+
+#[must_use]
+pub(crate) const fn handoff_version() -> u32 {
+    HANDOFF_VERSION
+}

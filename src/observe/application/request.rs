@@ -31,7 +31,6 @@ pub(crate) enum ObserveActionKind {
     Compare,
     ListCategories,
     ListFocusPresets,
-    Doctor,
     Mute,
     Unmute,
 }
@@ -41,6 +40,7 @@ pub(crate) enum ObserveRequest {
     Scan(ObserveScanRequest),
     Watch(ObserveWatchRequest),
     Dump(ObserveDumpRequest),
+    Doctor(ObserveDoctorRequest),
 }
 
 #[derive(Debug, Clone)]
@@ -76,4 +76,10 @@ pub(crate) struct ObserveDumpRequest {
     pub(crate) tool_name: Option<String>,
     pub(crate) raw_json: bool,
     pub(crate) project_hint: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct ObserveDoctorRequest {
+    pub(crate) json: bool,
+    pub(crate) project_dir: Option<String>,
 }

@@ -146,14 +146,14 @@ fn extended_features() -> BTreeMap<Feature, FeatureInfo> {
         ),
         (
             Feature::Observation,
-            FeatureInfo::new(
-                "session monitoring through scan, watch, and dump with flag-driven observer actions",
-            )
-            .commands(&[
-                "harness observe scan",
-                "harness observe watch",
-                "harness observe dump",
-            ]),
+            FeatureInfo::new("session monitoring through doctor, scan, watch, and dump").commands(
+                &[
+                    "harness observe doctor",
+                    "harness observe scan",
+                    "harness observe watch",
+                    "harness observe dump",
+                ],
+            ),
         ),
         (
             Feature::PreCompactHandoff,
@@ -171,6 +171,8 @@ fn extended_features() -> BTreeMap<Feature, FeatureInfo> {
                     "harness run start",
                     "harness run resume",
                     "harness run finish",
+                    "harness run doctor",
+                    "harness run repair",
                     "harness run init",
                     "harness run preflight",
                     "harness run runner-state",
