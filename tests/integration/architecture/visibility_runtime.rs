@@ -43,7 +43,8 @@ fn docker_block_root_stays_a_facade() {
     }
 
     for path in [
-        "src/infra/blocks/docker/runtime.rs",
+        "src/infra/blocks/docker/runtime_cli.rs",
+        "src/infra/blocks/docker/runtime_bollard.rs",
         "src/infra/blocks/docker/fake.rs",
         "src/infra/blocks/docker/tests.rs",
     ] {
@@ -71,7 +72,8 @@ fn compose_block_root_stays_a_facade() {
     }
 
     for path in [
-        "src/infra/blocks/compose/runtime.rs",
+        "src/infra/blocks/compose/runtime_cli.rs",
+        "src/infra/blocks/compose/runtime_bollard.rs",
         "src/infra/blocks/compose/fake.rs",
         "src/infra/blocks/compose/tests.rs",
     ] {

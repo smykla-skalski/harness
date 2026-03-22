@@ -12,7 +12,7 @@ mod tests;
 pub(crate) use runtime::RUNTIME;
 
 pub use docker::{
-    cluster_exists, compose_down, compose_down_project, compose_up, container_running, docker,
+    cluster_exists, compose_down, compose_down_project, compose_up, container_running,
     docker_exec_cmd, docker_exec_detached, docker_inspect_ip, docker_network_create,
     docker_network_rm, docker_rm, docker_rm_by_label, docker_run_detached, docker_write_file,
     extract_admin_token,

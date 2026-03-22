@@ -4,8 +4,9 @@ use std::time::Duration;
 use tracing::info;
 
 use crate::errors::{CliError, CliErrorKind};
+use crate::infra::blocks::kuma::token;
 use crate::infra::blocks::{ComposeOrchestrator, ContainerRuntime};
-use crate::infra::exec::{extract_admin_token, wait_for_http};
+use crate::infra::exec::wait_for_http;
 use crate::platform::compose::{self, ComposeFile};
 
 use super::{UNIVERSAL_SUBNET, UniversalUpResult};
@@ -45,7 +46,7 @@ pub(super) fn universal_single_up_compose(
     wait_for_http(&health_url, Duration::from_mins(1))?;
 
     info!("extracting admin token");
-    let admin_token = extract_admin_token(&container)?;
+    let admin_token = token::extract_admin_token(docker, &container)?;
     info!(%health_url, "CP ready (admin token extracted)");
     Ok(UniversalUpResult {
         admin_token,
@@ -96,7 +97,7 @@ pub(super) fn universal_global_zone_up(
     wait_for_http(&global_url, Duration::from_mins(1))?;
 
     info!("extracting admin token");
-    let admin_token = extract_admin_token(&global_container)?;
+    let admin_token = token::extract_admin_token(docker, &global_container)?;
     info!("global CP ready (admin token extracted)");
 
     Ok(UniversalUpResult {
@@ -156,7 +157,7 @@ pub(super) fn universal_global_two_zones_up(
     wait_for_http(&global_url, Duration::from_mins(1))?;
 
     info!("extracting admin token");
-    let admin_token = extract_admin_token(&global_container)?;
+    let admin_token = token::extract_admin_token(docker, &global_container)?;
     info!("global CP ready (admin token extracted)");
 
     Ok(UniversalUpResult {

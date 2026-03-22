@@ -3,7 +3,7 @@ use std::fs;
 use std::path::Path;
 use std::time::Duration;
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use crate::infra::blocks::BlockError;
 use crate::infra::exec::CommandResult;
@@ -11,12 +11,16 @@ use crate::infra::exec::CommandResult;
 #[cfg(test)]
 mod fake;
 #[cfg(feature = "compose")]
-mod runtime;
+mod runtime_bollard;
+#[cfg(feature = "compose")]
+mod runtime_cli;
 #[cfg(test)]
 mod tests;
 
 #[cfg(feature = "compose")]
-pub use runtime::DockerComposeOrchestrator;
+pub use runtime_bollard::BollardComposeOrchestrator;
+#[cfg(feature = "compose")]
+pub use runtime_cli::DockerComposeOrchestrator;
 
 #[cfg(test)]
 pub use fake::FakeComposeOrchestrator;
@@ -68,7 +72,7 @@ pub struct ComposeTopology {
 }
 
 /// Serialized Docker Compose file.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ComposeFile {
     #[serde(skip_serializing_if = "BTreeMap::is_empty")]
     services: BTreeMap<String, ComposeService>,
@@ -162,7 +166,7 @@ pub trait ComposeOrchestrator: Send + Sync {
     fn down_project(&self, project_name: &str) -> Result<CommandResult, BlockError>;
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 struct ComposeNetwork {
     driver: String,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -182,26 +186,31 @@ impl ComposeNetwork {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 struct ComposeIpam {
     config: Vec<ComposeIpamConfig>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 struct ComposeIpamConfig {
     subnet: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 struct ComposeService {
     image: String,
+    #[serde(default)]
     #[serde(skip_serializing_if = "BTreeMap::is_empty")]
     environment: BTreeMap<String, String>,
+    #[serde(default)]
     #[serde(skip_serializing_if = "Vec::is_empty")]
     ports: Vec<String>,
+    #[serde(default)]
     #[serde(skip_serializing_if = "ComposeDependsOn::is_empty")]
     depends_on: ComposeDependsOn,
+    #[serde(default)]
     networks: Vec<String>,
+    #[serde(default)]
     #[serde(skip_serializing_if = "Vec::is_empty")]
     command: Vec<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -232,7 +241,8 @@ impl ComposeService {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(untagged)]
 enum ComposeDependsOn {
     Simple(Vec<String>),
     Conditional(BTreeMap<String, ComposeDependsOnEntry>),
@@ -282,6 +292,12 @@ impl ComposeDependsOn {
     }
 }
 
+impl Default for ComposeDependsOn {
+    fn default() -> Self {
+        Self::Simple(vec![])
+    }
+}
+
 impl Serialize for ComposeDependsOn {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         match self {
@@ -291,12 +307,12 @@ impl Serialize for ComposeDependsOn {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 struct ComposeDependsOnEntry {
     condition: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 struct ComposeHealthcheck {
     test: Vec<String>,
     #[serde(skip_serializing_if = "Option::is_none")]

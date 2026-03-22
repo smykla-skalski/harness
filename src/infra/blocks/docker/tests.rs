@@ -4,6 +4,7 @@ use super::*;
 use crate::infra::blocks::{
     FakeContainerRuntime, FakeInvocation, FakeProcessExecutor, FakeProcessMethod, FakeResponse,
 };
+use temp_env::with_var;
 
 fn success_result(args: &[&str], stdout: &str) -> CommandResult {
     CommandResult {
@@ -22,7 +23,9 @@ fn sample_config() -> ContainerConfig {
         env: vec![("MODE".to_string(), "test".to_string())],
         ports: vec![(8080, 80)],
         labels: vec![("suite".to_string(), "mesh".to_string())],
-        extra_args: vec!["--restart".to_string(), "unless-stopped".to_string()],
+        entrypoint: None,
+        restart_policy: Some("unless-stopped".to_string()),
+        extra_args: vec![],
         command: vec!["server".to_string()],
     }
 }
@@ -422,8 +425,103 @@ fn fake_container_runtime_tracks_container_lifecycle() {
 fn docker_types_are_send_sync() {
     fn assert_send_sync<T: Send + Sync>() {}
 
+    assert_send_sync::<BollardContainerRuntime>();
     assert_send_sync::<DockerContainerRuntime>();
     assert_send_sync::<FakeContainerRuntime>();
+}
+
+#[test]
+fn container_runtime_backend_defaults_to_bollard() {
+    with_var(super::backend::CONTAINER_RUNTIME_ENV, None::<&str>, || {
+        assert_eq!(
+            container_backend_from_env().expect("expected default backend"),
+            ContainerRuntimeBackend::Bollard
+        );
+    });
+}
+
+#[test]
+fn container_runtime_backend_accepts_docker_cli_selector() {
+    with_var(
+        super::backend::CONTAINER_RUNTIME_ENV,
+        Some("docker-cli"),
+        || {
+            assert_eq!(
+                container_backend_from_env().expect("expected docker-cli backend"),
+                ContainerRuntimeBackend::DockerCli
+            );
+        },
+    );
+}
+
+#[test]
+fn container_runtime_backend_rejects_invalid_selector() {
+    with_var(super::backend::CONTAINER_RUNTIME_ENV, Some("nope"), || {
+        let error = container_backend_from_env().expect_err("expected invalid selector to fail");
+        assert!(
+            error
+                .to_string()
+                .contains("expected `bollard` or `docker-cli`"),
+            "unexpected error: {error}"
+        );
+    });
+}
+
+#[test]
+fn container_backends_from_env_builds_cli_runtime_and_compose_pair() {
+    let fake = Arc::new(FakeProcessExecutor::new(vec![
+        FakeResponse {
+            expected_program: "docker".to_string(),
+            expected_args: Some(vec![
+                "docker".into(),
+                "ps".into(),
+                "--format".into(),
+                "{{.Names}}".into(),
+            ]),
+            expected_method: Some(FakeProcessMethod::Run),
+            result: Ok(success_result(
+                &["docker", "ps", "--format", "{{.Names}}"],
+                "svc-1\n",
+            )),
+        },
+        FakeResponse {
+            expected_program: "docker".to_string(),
+            expected_args: Some(vec![
+                "docker".into(),
+                "compose".into(),
+                "-p".into(),
+                "mesh".into(),
+                "down".into(),
+                "-v".into(),
+            ]),
+            expected_method: Some(FakeProcessMethod::Run),
+            result: Ok(success_result(
+                &["docker", "compose", "-p", "mesh", "down", "-v"],
+                "",
+            )),
+        },
+    ]));
+
+    with_var(
+        super::backend::CONTAINER_RUNTIME_ENV,
+        Some("docker-cli"),
+        || {
+            let selected = container_backends_from_env(fake.clone()).expect("expected backends");
+            assert_eq!(selected.backend, ContainerRuntimeBackend::DockerCli);
+
+            let listed = selected
+                .container_runtime
+                .list_formatted(&[], "{{.Names}}")
+                .expect("expected docker ps");
+            assert_eq!(listed.stdout, "svc-1\n");
+
+            let down = selected
+                .compose_orchestrator
+                .down_project("mesh")
+                .expect("expected docker compose down");
+            assert_eq!(down.returncode, 0);
+        },
+    );
 }
 
 // -- Contract tests: fake satisfies the same invariants as production --

@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use crate::errors::{CliError, CliErrorKind};
 use crate::infra::blocks::{
-    BlockError, BlockRequirement, ContainerRuntime, DockerContainerRuntime, StdProcessExecutor,
+    BlockError, BlockRequirement, ContainerRuntime, StdProcessExecutor, container_runtime_from_env,
 };
 
 /// Explicit infrastructure required by tracked-run use cases.
@@ -27,9 +27,9 @@ impl RunDependencies {
     #[must_use]
     pub(crate) fn production() -> Self {
         let process = Arc::new(StdProcessExecutor);
-        let docker: Arc<dyn ContainerRuntime> = Arc::new(DockerContainerRuntime::new(process));
+        let docker = container_runtime_from_env(process).ok();
         Self {
-            docker: Some(docker),
+            docker,
             requirements: RequirementSupport::production(),
         }
     }

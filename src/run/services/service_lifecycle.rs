@@ -99,6 +99,8 @@ pub(crate) fn start_tracked_service_container(
             ("io.harness.service".to_string(), "true".to_string()),
             ("io.harness.run-id".to_string(), run_id.to_string()),
         ],
+        entrypoint: None,
+        restart_policy: None,
         extra_args: vec![],
         command: vec!["sleep".to_string(), "infinity".to_string()],
     })?;

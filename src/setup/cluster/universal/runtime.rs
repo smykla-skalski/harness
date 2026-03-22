@@ -3,8 +3,9 @@ use std::time::Duration;
 use tracing::info;
 
 use crate::errors::CliError;
+use crate::infra::blocks::kuma::token;
 use crate::infra::blocks::{ComposeOrchestrator, ContainerConfig, ContainerRuntime};
-use crate::infra::exec::{extract_admin_token, wait_for_http};
+use crate::infra::exec::wait_for_http;
 use crate::kernel::topology::{ClusterMode, ClusterSpec};
 use crate::workspace::HARNESS_PREFIX;
 
@@ -203,6 +204,8 @@ fn universal_single_up(
         ],
         ports: vec![(5681, 5681), (5678, 5678)],
         labels: vec![],
+        entrypoint: None,
+        restart_policy: None,
         extra_args: vec![],
         command: vec!["run".to_string()],
     })?;
@@ -213,7 +216,7 @@ fn universal_single_up(
     wait_for_http(&health_url, Duration::from_mins(1))?;
 
     info!("extracting admin token");
-    let admin_token = extract_admin_token(cp_name)?;
+    let admin_token = token::extract_admin_token(docker, cp_name)?;
     info!(%health_url, "CP ready (admin token extracted)");
     Ok(UniversalUpResult {
         admin_token,

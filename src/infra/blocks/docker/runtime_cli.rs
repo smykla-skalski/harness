@@ -1,5 +1,7 @@
 use std::io::Write as _;
 use std::sync::Arc;
+use std::thread;
+use std::time::{Duration, Instant};
 
 use tempfile::NamedTempFile;
 
@@ -46,6 +48,14 @@ impl ContainerRuntime for DockerContainerRuntime {
         for (key, value) in &config.labels {
             args.push("--label".into());
             args.push(format!("{key}={value}"));
+        }
+        if let Some(entrypoint) = &config.entrypoint {
+            args.push("--entrypoint".into());
+            args.push(shell_words::join(entrypoint));
+        }
+        if let Some(restart_policy) = &config.restart_policy {
+            args.push("--restart".into());
+            args.push(restart_policy.clone());
         }
         args.extend(config.extra_args.iter().cloned());
         args.push(config.image.clone());
@@ -103,6 +113,27 @@ impl ContainerRuntime for DockerContainerRuntime {
         Ok(ip)
     }
 
+    fn inspect_primary_ip(&self, container: &str) -> Result<String, BlockError> {
+        let result = self.docker(
+            &[
+                "inspect",
+                "-f",
+                "{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}",
+                container,
+            ],
+            &[0],
+        )?;
+        let ip = result.stdout.trim().to_string();
+        if ip.is_empty() {
+            return Err(BlockError::message(
+                "docker",
+                &format!("inspect_primary_ip {container}"),
+                "container has no network IP",
+            ));
+        }
+        Ok(ip)
+    }
+
     fn list_formatted(
         &self,
         filter_args: &[&str],
@@ -142,7 +173,12 @@ impl ContainerRuntime for DockerContainerRuntime {
         Ok(())
     }
 
-    fn create_network(&self, name: &str, subnet: &str) -> Result<(), BlockError> {
+    fn create_network_labeled(
+        &self,
+        name: &str,
+        subnet: &str,
+        labels: &[(String, String)],
+    ) -> Result<(), BlockError> {
         let filter = format!("name=^{name}$");
         let result = self.docker(
             &[
@@ -158,13 +194,100 @@ impl ContainerRuntime for DockerContainerRuntime {
         if result.stdout.trim() == name {
             return Ok(());
         }
-        self.docker(&["network", "create", "--subnet", subnet, name], &[0])?;
+        let mut args = vec![
+            "network".to_string(),
+            "create".to_string(),
+            "--subnet".to_string(),
+            subnet.to_string(),
+        ];
+        for (key, value) in labels {
+            args.push("--label".to_string());
+            args.push(format!("{key}={value}"));
+        }
+        args.push(name.to_string());
+        let refs = args.iter().map(String::as_str).collect::<Vec<_>>();
+        self.docker(&refs, &[0])?;
         Ok(())
+    }
+
+    fn network_exists(&self, name: &str) -> Result<bool, BlockError> {
+        let filter = format!("name=^{name}$");
+        let result = self.docker(
+            &[
+                "network",
+                "ls",
+                "--filter",
+                &filter,
+                "--format",
+                "{{.Name}}",
+            ],
+            &[0],
+        )?;
+        Ok(result.stdout.trim() == name)
     }
 
     fn remove_network(&self, name: &str) -> Result<(), BlockError> {
         self.docker(&["network", "rm", name], &[0, 1])?;
         Ok(())
+    }
+
+    fn remove_networks_by_label(&self, label: &str) -> Result<Vec<String>, BlockError> {
+        let filter_arg = format!("label={label}");
+        let result = self.docker(
+            &[
+                "network",
+                "ls",
+                "--filter",
+                &filter_arg,
+                "--format",
+                "{{.Name}}",
+            ],
+            &[0],
+        )?;
+        let names = result
+            .stdout
+            .lines()
+            .filter(|line| !line.trim().is_empty())
+            .map(|line| line.trim().to_string())
+            .collect::<Vec<_>>();
+        for name in &names {
+            self.remove_network(name)?;
+        }
+        Ok(names)
+    }
+
+    fn wait_healthy(&self, container: &str, timeout: Duration) -> Result<(), BlockError> {
+        let deadline = Instant::now() + timeout;
+        loop {
+            let result = self.docker(
+                &[
+                    "inspect",
+                    "-f",
+                    "{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}",
+                    container,
+                ],
+                &[0],
+            )?;
+            match result.stdout.trim() {
+                "healthy" | "running" => return Ok(()),
+                "unhealthy" => {
+                    return Err(BlockError::message(
+                        "docker",
+                        &format!("wait_healthy {container}"),
+                        "container reported unhealthy",
+                    ));
+                }
+                _ => {}
+            }
+            if Instant::now() >= deadline {
+                return Err(BlockError::message(
+                    "docker",
+                    &format!("wait_healthy {container}"),
+                    format!("timed out after {}s", timeout.as_secs()),
+                ));
+            }
+            thread::sleep(Duration::from_millis(200));
+        }
     }
 
     fn logs(&self, container: &str, args: &[&str]) -> Result<CommandResult, BlockError> {

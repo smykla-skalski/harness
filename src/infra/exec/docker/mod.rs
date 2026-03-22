@@ -4,7 +4,7 @@ mod container;
 mod network;
 mod token;
 
-pub use command::{cluster_exists, docker};
+pub use command::cluster_exists;
 pub use compose::{compose_down, compose_down_project, compose_up};
 pub use container::{
     container_running, docker_exec_cmd, docker_exec_detached, docker_inspect_ip, docker_rm,

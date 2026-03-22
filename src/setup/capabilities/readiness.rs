@@ -5,6 +5,9 @@ use std::process::{Command, Stdio};
 
 use fs_err as fs;
 
+use crate::infra::blocks::{
+    BollardContainerRuntime, ContainerRuntimeBackend, container_backend_from_env,
+};
 use crate::kernel::topology::{ClusterProvider, Platform};
 use crate::setup::wrapper::choose_install_dir_with_home;
 use crate::workspace::{dirs_home, harness_data_root};
@@ -19,6 +22,7 @@ pub(super) trait CapabilityProbe {
     fn home_dir(&self) -> PathBuf;
     fn command_on_path(&self, command: &str) -> bool;
     fn run_command_success(&self, program: &str, args: &[&str]) -> bool;
+    fn docker_engine_reachable(&self) -> bool;
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -45,6 +49,10 @@ impl CapabilityProbe for SystemProbe {
             .stderr(Stdio::null())
             .status()
             .is_ok_and(|status| status.success())
+    }
+
+    fn docker_engine_reachable(&self) -> bool {
+        BollardContainerRuntime::daemon_reachable()
     }
 }
 
@@ -300,7 +308,6 @@ const REMOTE_REQUIREMENTS: &[&str] = &[
     "repo_remote_publish_contract_present",
 ];
 const UNIVERSAL_REQUIREMENTS: &[&str] = &[
-    "docker_binary_present",
     "docker_running",
     "docker_compose_available",
     "repo_root_resolved",
@@ -344,6 +351,7 @@ fn build_checks(
     let project_exists = project_dir.is_dir();
     let plugin_root = project_dir.join(".claude").join("plugins").join("suite");
     let data_root = harness_data_root();
+    let backend = container_backend_from_env().unwrap_or(ContainerRuntimeBackend::Bollard);
     let docker_present = probe.command_on_path("docker");
     let repo_exists = repo_root.is_some_and(Path::is_dir);
     let repo_is_kuma = repo_root
@@ -363,7 +371,7 @@ fn build_checks(
             "docker",
             probe,
         ),
-        check_docker_running(docker_present, probe),
+        check_docker_running(docker_present, backend, probe),
         check_binary_present(
             "make_binary_present",
             "`make` is available.",
@@ -396,7 +404,7 @@ fn build_checks(
             "helm",
             probe,
         ),
-        check_docker_compose_available(docker_present, probe),
+        check_docker_compose_available(docker_present, backend, probe),
         check_repo_root_resolved(repo_root),
         check_repo_root_exists(repo_root),
         check_repo_is_kuma_checkout(repo_root, repo_exists),
@@ -526,8 +534,12 @@ fn check_binary_present(
     }
 }
 
-fn check_docker_running(docker_present: bool, probe: &dyn CapabilityProbe) -> ReadinessCheck {
-    if !docker_present {
+fn check_docker_running(
+    docker_present: bool,
+    backend: ContainerRuntimeBackend,
+    probe: &dyn CapabilityProbe,
+) -> ReadinessCheck {
+    if backend == ContainerRuntimeBackend::DockerCli && !docker_present {
         return skipped(
             "docker_running",
             ReadinessCheckScope::Machine,
@@ -537,7 +549,12 @@ fn check_docker_running(docker_present: bool, probe: &dyn CapabilityProbe) -> Re
         );
     }
 
-    if probe.run_command_success("docker", &["info"]) {
+    let daemon_ready = match backend {
+        ContainerRuntimeBackend::DockerCli => probe.run_command_success("docker", &["info"]),
+        ContainerRuntimeBackend::Bollard => probe.docker_engine_reachable(),
+    };
+
+    if daemon_ready {
         pass(
             "docker_running",
             ReadinessCheckScope::Machine,
@@ -558,9 +575,10 @@ fn check_docker_running(docker_present: bool, probe: &dyn CapabilityProbe) -> Re
 
 fn check_docker_compose_available(
     docker_present: bool,
+    backend: ContainerRuntimeBackend,
     probe: &dyn CapabilityProbe,
 ) -> ReadinessCheck {
-    if !docker_present {
+    if backend == ContainerRuntimeBackend::DockerCli && !docker_present {
         return skipped(
             "docker_compose_available",
             ReadinessCheckScope::Machine,
@@ -570,11 +588,23 @@ fn check_docker_compose_available(
         );
     }
 
-    if probe.run_command_success("docker", &["compose", "version"]) {
+    let compose_ready = match backend {
+        ContainerRuntimeBackend::DockerCli => {
+            probe.run_command_success("docker", &["compose", "version"])
+        }
+        ContainerRuntimeBackend::Bollard => probe.docker_engine_reachable(),
+    };
+
+    if compose_ready {
         pass(
             "docker_compose_available",
             ReadinessCheckScope::Machine,
-            "Docker Compose is available.",
+            match backend {
+                ContainerRuntimeBackend::DockerCli => "Docker Compose is available.",
+                ContainerRuntimeBackend::Bollard => {
+                    "Harness compose runtime is available through the Docker Engine API."
+                }
+            },
             None,
             None,
         )
@@ -582,9 +612,21 @@ fn check_docker_compose_available(
         fail(
             "docker_compose_available",
             ReadinessCheckScope::Machine,
-            "Docker Compose is unavailable.",
+            match backend {
+                ContainerRuntimeBackend::DockerCli => "Docker Compose is unavailable.",
+                ContainerRuntimeBackend::Bollard => {
+                    "Harness compose runtime cannot reach the Docker Engine API."
+                }
+            },
             None,
-            Some("Install Docker Compose support for universal profile setup."),
+            Some(match backend {
+                ContainerRuntimeBackend::DockerCli => {
+                    "Install Docker Compose support for universal profile setup."
+                }
+                ContainerRuntimeBackend::Bollard => {
+                    "Start Docker Desktop or the local Docker daemon."
+                }
+            }),
         )
     }
 }
