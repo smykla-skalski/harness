@@ -250,6 +250,17 @@ fn wait_for_http_fails_on_invalid_url() {
 }
 
 #[test]
+fn wait_for_http_succeeds_on_mock_server() {
+    let (port, _handle) = mock_http_server("ok", "text/plain");
+    let url = format!("http://127.0.0.1:{port}");
+    let result = wait_for_http(&url, Duration::from_secs(2));
+    assert!(
+        result.is_ok(),
+        "expected wait_for_http to succeed: {result:?}"
+    );
+}
+
+#[test]
 fn kumactl_run_injects_cp_addr() {
     let result = kumactl_run(
         Path::new("/nonexistent/kumactl"),

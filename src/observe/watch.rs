@@ -1,5 +1,5 @@
 use std::fs;
-use std::io::{BufRead, BufReader, Seek, SeekFrom, Write};
+use std::io::{self, BufRead, BufReader, Seek, SeekFrom, Write};
 use std::path::Path;
 use std::time::{Duration, Instant};
 
@@ -7,8 +7,6 @@ use notify::{RecommendedWatcher, RecursiveMode, Watcher};
 use serde::Serialize;
 use tokio::sync::mpsc;
 use tokio::time::sleep;
-
-use tracing::warn;
 
 use crate::errors::{CliError, CliErrorKind};
 use crate::infra::exec::RUNTIME;
@@ -55,33 +53,43 @@ fn poll_session_lines(
     last_line: &mut usize,
     state: &mut ScanState,
 ) -> Vec<Issue> {
-    let Ok(mut file) = fs::File::open(path) else {
+    let Ok(file) = open_session_file(path, *byte_offset) else {
         return Vec::new();
     };
-    if let Err(e) = file.seek(SeekFrom::Start(*byte_offset)) {
-        warn!(%e, "seek failed on session file");
-        return Vec::new();
-    }
     let reader = BufReader::new(file);
     let mut issues = Vec::new();
     for line_result in reader.lines() {
-        let Ok(line) = line_result else { continue };
-        *byte_offset += line.len() as u64 + 1;
-        let index = *last_line;
-        *last_line += 1;
-        issues.extend(classifier::classify_line(index, &line, state));
+        append_classified_line(line_result, byte_offset, last_line, state, &mut issues);
     }
     issues
 }
 
+fn open_session_file(path: &Path, byte_offset: u64) -> Result<fs::File, io::Error> {
+    let mut file = fs::File::open(path)?;
+    file.seek(SeekFrom::Start(byte_offset))?;
+    Ok(file)
+}
+
+fn append_classified_line(
+    line_result: Result<String, io::Error>,
+    byte_offset: &mut u64,
+    last_line: &mut usize,
+    state: &mut ScanState,
+    issues: &mut Vec<Issue>,
+) {
+    let Ok(line) = line_result else {
+        return;
+    };
+    *byte_offset += line.len() as u64 + 1;
+    let index = *last_line;
+    *last_line += 1;
+    issues.extend(classifier::classify_line(index, &line, state));
+}
+
 /// Write a line to a file and flush, printing a warning on failure.
-fn write_and_flush(file: &mut fs::File, line: &str, label: &str) {
-    if let Err(e) = writeln!(file, "{line}") {
-        warn!(%label, %e, "failed to write");
-    }
-    if let Err(e) = file.flush() {
-        warn!(%label, %e, "failed to flush");
-    }
+fn write_and_flush(file: &mut fs::File, line: &str) {
+    let _ = writeln!(file, "{line}");
+    let _ = file.flush();
 }
 
 /// Write an issue to the appropriate outputs (details file, output file, or stdout).
@@ -94,7 +102,7 @@ fn emit_watch_issue(
     if let Some(detail_out) = details_writer
         && let Ok(json_str) = serde_json::to_string(issue)
     {
-        write_and_flush(detail_out, &json_str, "issue details");
+        write_and_flush(detail_out, &json_str);
     }
     let rendered = if json_mode {
         output::render_json(issue)
@@ -102,7 +110,7 @@ fn emit_watch_issue(
         output::render_human(issue)
     };
     if let Some(file_out) = output_writer {
-        write_and_flush(file_out, &rendered, "issue output");
+        write_and_flush(file_out, &rendered);
     } else {
         println!("{rendered}");
     }

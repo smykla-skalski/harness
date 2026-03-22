@@ -1,10 +1,9 @@
 use std::time::{Duration, Instant};
-
-use tracing::info;
+use std::{cmp, thread};
 
 use crate::errors::{CliError, CliErrorKind};
 
-use super::runtime::RUNTIME;
+use super::run_command;
 
 /// HTTP method for CP API requests.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -27,7 +26,7 @@ pub fn cp_api_json(
     token: Option<&str>,
 ) -> Result<serde_json::Value, CliError> {
     let url = format!("{base_url}{path}");
-    let text = RUNTIME.block_on(cp_api_send(&url, method, body, token))?;
+    let text = cp_api_send(&url, method, body, token)?;
     serde_json::from_str(&text)
         .map_err(|e| CliErrorKind::cp_api_unreachable(url).with_details(e.to_string()))
 }
@@ -46,42 +45,49 @@ pub fn cp_api_text(
     token: Option<&str>,
 ) -> Result<String, CliError> {
     let url = format!("{base_url}{path}");
-    RUNTIME.block_on(cp_api_send(&url, method, body, token))
+    cp_api_send(&url, method, body, token)
 }
 
 fn cp_api_error(url: &str, error: &impl ToString) -> CliError {
     CliErrorKind::cp_api_unreachable(url.to_string()).with_details(error.to_string())
 }
 
-async fn cp_api_send(
+fn curl_method(method: HttpMethod) -> &'static str {
+    match method {
+        HttpMethod::Get => "GET",
+        HttpMethod::Post => "POST",
+        HttpMethod::Put => "PUT",
+        HttpMethod::Delete => "DELETE",
+    }
+}
+
+fn cp_api_send(
     url: &str,
     method: HttpMethod,
     body: Option<&serde_json::Value>,
     token: Option<&str>,
 ) -> Result<String, CliError> {
-    let client = reqwest::Client::new();
-    let mut builder = match method {
-        HttpMethod::Get => client.get(url),
-        HttpMethod::Delete => client.delete(url),
-        HttpMethod::Post => client.post(url),
-        HttpMethod::Put => client.put(url),
-    };
+    let mut args = vec![
+        "curl".to_string(),
+        "-fsS".to_string(),
+        "-X".to_string(),
+        curl_method(method).to_string(),
+    ];
     if let Some(tok) = token {
-        builder = builder.bearer_auth(tok);
+        args.push("-H".to_string());
+        args.push(format!("Authorization: Bearer {tok}"));
     }
     if let Some(json) = body {
-        builder = builder
-            .header("Content-Type", "application/json")
-            .json(json);
+        args.push("-H".to_string());
+        args.push("Content-Type: application/json".to_string());
+        args.push("--data".to_string());
+        args.push(json.to_string());
     }
-    let text = builder
-        .send()
-        .await
-        .map_err(|e| cp_api_error(url, &e))?
-        .text()
-        .await
-        .map_err(|e| cp_api_error(url, &e))?;
-    Ok(text)
+    args.push(url.to_string());
+    let arg_refs = args.iter().map(String::as_str).collect::<Vec<_>>();
+    run_command(&arg_refs, None, None, &[0])
+        .map(|result| result.stdout)
+        .map_err(|error| cp_api_error(url, &error))
 }
 
 /// Wait for an HTTP endpoint to return 200, with exponential backoff.
@@ -93,46 +99,32 @@ async fn cp_api_send(
 /// # Errors
 /// Returns `CpApiUnreachable` if the endpoint does not respond within the timeout.
 pub fn wait_for_http(url: &str, timeout: Duration) -> Result<(), CliError> {
-    RUNTIME.block_on(wait_for_http_async(url, timeout))
+    let start = Instant::now();
+    let mut backoff = Duration::from_millis(500);
+
+    loop {
+        if http_ready(url) {
+            return Ok(());
+        }
+        if timed_out(start, timeout) {
+            return Err(CliError::from(CliErrorKind::cp_api_unreachable(
+                url.to_string(),
+            )));
+        }
+        sleep_with_backoff(&mut backoff);
+    }
 }
 
-async fn wait_for_http_async(url: &str, timeout: Duration) -> Result<(), CliError> {
-    use backoff::ExponentialBackoff;
-    use backoff::future::retry;
+fn http_ready(url: &str) -> bool {
+    let args = ["curl", "-fsS", "-o", "/dev/null", url];
+    run_command(&args, None, None, &[0]).is_ok()
+}
 
-    use std::sync::{Arc, Mutex};
-    let client = reqwest::Client::new();
-    let start = Instant::now();
-    let last_progress: Arc<Mutex<Instant>> = Arc::new(Mutex::new(Instant::now()));
-    let cfg = ExponentialBackoff {
-        max_elapsed_time: Some(timeout),
-        ..ExponentialBackoff::default()
-    };
-    let url_owned = url.to_string();
-    retry(cfg, || {
-        let client = client.clone();
-        let url = url_owned.clone();
-        let elapsed = start.elapsed();
-        let last_progress = last_progress.clone();
-        async move {
-            {
-                let mut last = last_progress.lock().expect("lock poisoned");
-                if last.elapsed() >= Duration::from_secs(10) {
-                    info!(
-                        elapsed_seconds = elapsed.as_secs_f64(),
-                        "waiting for health check"
-                    );
-                    *last = Instant::now();
-                }
-            }
-            client
-                .get(&url)
-                .send()
-                .await
-                .map(|_| ())
-                .map_err(backoff::Error::transient)
-        }
-    })
-    .await
-    .map_err(|_| CliError::from(CliErrorKind::cp_api_unreachable(url.to_string())))
+fn timed_out(start: Instant, timeout: Duration) -> bool {
+    start.elapsed() >= timeout
+}
+
+fn sleep_with_backoff(backoff: &mut Duration) {
+    thread::sleep(*backoff);
+    *backoff = cmp::min(backoff.saturating_mul(2), Duration::from_secs(5));
 }

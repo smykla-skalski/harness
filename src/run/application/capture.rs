@@ -1,6 +1,3 @@
-use rayon::prelude::*;
-use tracing::warn;
-
 use crate::errors::CliError;
 use crate::infra::io::write_json_pretty;
 use crate::kernel::topology::Platform;
@@ -11,6 +8,7 @@ use crate::run::state_capture::{
 };
 use crate::run::workflow::read_runner_state;
 use crate::workspace::utc_now;
+use rayon::prelude::*;
 
 use super::RunApplication;
 
@@ -113,16 +111,12 @@ impl RunApplication {
     }
 
     fn capture_universal_dataplanes(&self) -> (UniversalDataplaneCollection, Option<String>) {
-        self.query_dataplanes("default")
-            .inspect_err(|error| warn!(%error, "CP API dataplanes query failed"))
-            .map_or_else(
-                |error| {
-                    (
-                        UniversalDataplaneCollection::default(),
-                        Some(error.to_string()),
-                    )
-                },
-                |dataplanes| (dataplanes, None),
-            )
+        match self.query_dataplanes("default") {
+            Ok(dataplanes) => (dataplanes, None),
+            Err(error) => (
+                UniversalDataplaneCollection::default(),
+                Some(error.to_string()),
+            ),
+        }
     }
 }
