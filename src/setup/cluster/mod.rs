@@ -67,10 +67,10 @@ pub struct ClusterArgs {
     /// CP container image override for universal mode.
     #[arg(long)]
     pub image: Option<String>,
-    /// Skip building images (replaces `HARNESS_BUILD_IMAGES=0`).
+    /// Skip building images.
     #[arg(long, default_value_t = false)]
     pub no_build: bool,
-    /// Skip loading images into k3d clusters (replaces `HARNESS_LOAD_IMAGES=0`).
+    /// Skip loading images into k3d clusters.
     #[arg(long, default_value_t = false)]
     pub no_load: bool,
 }

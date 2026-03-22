@@ -18,7 +18,7 @@ pub(crate) fn cluster_k8s(args: &ClusterArgs) -> Result<i32, CliError> {
     let build_info = resolve_build_info(&root)?;
     let mut base_env = build_info.env();
     let provider = parse_kubernetes_provider(args)?;
-    apply_build_flags(args, &mut base_env);
+    apply_build_flags(provider, args, &mut base_env);
     let helm_settings = parse_helm_settings(&args.helm_setting)?;
     ensure_kubernetes_provider_is_valid(provider, args)?;
     apply_k3d_helm_settings(provider, &helm_settings, &mut base_env);
@@ -45,12 +45,21 @@ fn parse_kubernetes_provider(args: &ClusterArgs) -> Result<ClusterProvider, CliE
         .map_err(|error: String| CliError::from(CliErrorKind::usage_error(error)))
 }
 
-fn apply_build_flags(args: &ClusterArgs, base_env: &mut HashMap<String, String>) {
+fn apply_build_flags(
+    provider: ClusterProvider,
+    args: &ClusterArgs,
+    base_env: &mut HashMap<String, String>,
+) {
     if args.no_build {
         base_env.insert("HARNESS_BUILD_IMAGES".into(), "0".into());
     }
     if args.no_load {
         base_env.insert("HARNESS_LOAD_IMAGES".into(), "0".into());
+    }
+    if provider == ClusterProvider::K3d && (args.no_build || args.no_load) {
+        // Kuma's current k3d deploy contract folds local build/tag/import under
+        // one switch, so either CLI flag must disable the combined load step.
+        base_env.insert("K3D_DONT_LOAD".into(), "1".into());
     }
 }
 
@@ -151,4 +160,77 @@ fn persist_kubernetes_spec_if_needed(spec: &ClusterSpec) -> Result<(), CliError>
         persist_cluster_spec(spec)?;
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn cluster_args() -> ClusterArgs {
+        ClusterArgs {
+            mode: "single-up".into(),
+            cluster_name: "kuma-1".into(),
+            extra_cluster_names: vec![],
+            platform: "kubernetes".into(),
+            provider: Some("k3d".into()),
+            repo_root: None,
+            run_dir: None,
+            helm_setting: vec![],
+            remote: vec![],
+            push_prefix: None,
+            push_tag: None,
+            namespace: "kuma-system".into(),
+            release_name: "kuma".into(),
+            restart_namespace: vec![],
+            store: "memory".into(),
+            image: None,
+            no_build: false,
+            no_load: false,
+        }
+    }
+
+    #[test]
+    fn k3d_no_build_sets_dont_load_for_current_make_contract() {
+        let mut env = HashMap::new();
+        let mut args = cluster_args();
+        args.no_build = true;
+
+        apply_build_flags(ClusterProvider::K3d, &args, &mut env);
+
+        assert_eq!(
+            env.get("HARNESS_BUILD_IMAGES").map(String::as_str),
+            Some("0")
+        );
+        assert_eq!(env.get("K3D_DONT_LOAD").map(String::as_str), Some("1"));
+    }
+
+    #[test]
+    fn k3d_no_load_sets_dont_load_for_current_make_contract() {
+        let mut env = HashMap::new();
+        let mut args = cluster_args();
+        args.no_load = true;
+
+        apply_build_flags(ClusterProvider::K3d, &args, &mut env);
+
+        assert_eq!(
+            env.get("HARNESS_LOAD_IMAGES").map(String::as_str),
+            Some("0")
+        );
+        assert_eq!(env.get("K3D_DONT_LOAD").map(String::as_str), Some("1"));
+    }
+
+    #[test]
+    fn remote_no_build_does_not_set_k3d_specific_flags() {
+        let mut env = HashMap::new();
+        let mut args = cluster_args();
+        args.no_build = true;
+
+        apply_build_flags(ClusterProvider::Remote, &args, &mut env);
+
+        assert_eq!(
+            env.get("HARNESS_BUILD_IMAGES").map(String::as_str),
+            Some("0")
+        );
+        assert!(!env.contains_key("K3D_DONT_LOAD"));
+    }
 }

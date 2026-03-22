@@ -5,7 +5,7 @@ use std::path::Path;
 use std::thread;
 use std::time::Duration;
 
-use super::runner::{describe_command, run_command};
+use super::runner::{describe_command, run_command, run_command_streaming};
 use super::*;
 
 #[test]
@@ -39,6 +39,30 @@ fn run_command_with_env() {
     env.insert("TEST_VAR_XYZ".to_string(), "harness_test".to_string());
     let result = run_command(&["sh", "-c", "echo $TEST_VAR_XYZ"], None, Some(&env), &[0]).unwrap();
     assert_eq!(result.stdout.trim(), "harness_test");
+}
+
+#[test]
+fn run_command_streaming_captures_stdout_and_stderr() {
+    let result = run_command_streaming(
+        &[
+            "sh",
+            "-c",
+            "printf 'stdout-line\\n'; printf 'stderr-line\\n' >&2",
+        ],
+        None,
+        None,
+        &[0],
+    )
+    .unwrap();
+    assert_eq!(result.stdout, "stdout-line\n");
+    assert_eq!(result.stderr, "stderr-line\n");
+}
+
+#[test]
+fn run_command_streaming_preserves_stdout_without_trailing_newline() {
+    let result = run_command_streaming(&["sh", "-c", "printf 'hello'"], None, None, &[0]).unwrap();
+    assert_eq!(result.stdout, "hello");
+    assert!(result.stderr.is_empty());
 }
 
 #[test]
