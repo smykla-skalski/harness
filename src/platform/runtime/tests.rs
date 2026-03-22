@@ -8,8 +8,8 @@ use super::{ClusterRuntime, profile_platform};
 
 fn universal_spec() -> ClusterSpec {
     let mut spec = ClusterSpec::from_mode_with_platform(
-        "global-zone-up",
-        &["g".into(), "z".into(), "zone-1".into()],
+        "single-up",
+        &["cp".into()],
         "/repo",
         vec![HelmSetting {
             key: "a".into(),
@@ -21,6 +21,26 @@ fn universal_spec() -> ClusterSpec {
     .unwrap();
     spec.admin_token = Some("admin-token".into());
     spec.members[0].container_ip = Some("172.57.0.2".into());
+    spec.members[0].cp_api_port = Some(5681);
+    spec.members[0].xds_port = Some(5678);
+    spec
+}
+
+fn compose_universal_spec() -> ClusterSpec {
+    ClusterSpec::from_mode_with_platform(
+        "global-zone-up",
+        &["g".into(), "z".into(), "zone-1".into()],
+        "/repo",
+        vec![],
+        vec![],
+        Platform::Universal,
+    )
+    .unwrap()
+}
+
+fn service_host_spec() -> ClusterSpec {
+    let mut spec = universal_spec();
+    spec.cp_image = Some("docker.io/kumahq/kuma-cp:2.12.0".into());
     spec
 }
 
@@ -62,13 +82,13 @@ fn universal_runtime_exposes_control_plane_access() {
     let spec = universal_spec();
     let runtime = ClusterRuntime::from_spec(&spec);
     let access = runtime.control_plane_access().unwrap();
-    assert_eq!(access.addr.as_ref(), "http://172.57.0.2:5681");
+    assert_eq!(access.addr.as_ref(), "http://127.0.0.1:5681");
     assert_eq!(access.admin_token, Some("admin-token"));
 }
 
 #[test]
 fn universal_runtime_resolves_compose_member_container_name() {
-    let spec = universal_spec();
+    let spec = compose_universal_spec();
     let runtime = ClusterRuntime::from_spec(&spec);
     assert_eq!(
         runtime.resolve_container_name("g").as_ref(),
@@ -85,14 +105,14 @@ fn universal_runtime_exposes_xds_access() {
     let spec = universal_spec();
     let runtime = ClusterRuntime::from_spec(&spec);
     let access = runtime.xds_access().unwrap();
-    assert_eq!(access.ip, "172.57.0.2");
-    assert_eq!(access.port, 5678);
+    assert_eq!(access.container_ip, "172.57.0.2");
+    assert_eq!(access.container_port, 5678);
+    assert_eq!(access.host_port, 5678);
 }
 
 #[test]
 fn universal_runtime_derives_service_image() {
-    let mut spec = universal_spec();
-    spec.cp_image = Some("docker.io/kumahq/kuma-cp:2.12.0".into());
+    let spec = service_host_spec();
     let runtime = ClusterRuntime::from_spec(&spec);
     assert_eq!(
         runtime.service_image(None).unwrap().as_ref(),

@@ -7,7 +7,9 @@ mod parsing;
 #[path = "topology/spec.rs"]
 mod spec;
 
-pub use model::{ClusterMember, ClusterMode, ClusterProvider, HelmSetting, Platform};
+pub use model::{
+    ClusterMember, ClusterMode, ClusterProvider, HelmSetting, Platform, UNIVERSAL_PUBLISHED_HOST,
+};
 pub use spec::ClusterSpec;
 
 #[cfg(test)]

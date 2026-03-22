@@ -13,6 +13,7 @@ struct FakeContainer {
     running: bool,
     ip: String,
     network: String,
+    ports: HashMap<u16, u16>,
     labels: HashMap<String, String>,
     files: HashMap<String, String>,
     logs: String,
@@ -43,12 +44,24 @@ impl ContainerRuntime for FakeContainerRuntime {
         let mut containers = self.containers.lock().expect("lock poisoned");
         let next_id = containers.len() + 1;
         let labels = config.labels.iter().cloned().collect::<HashMap<_, _>>();
+        let ports = config
+            .ports
+            .iter()
+            .enumerate()
+            .map(|(index, port)| {
+                let host_port = port
+                    .host_port
+                    .unwrap_or(u16::try_from(30_000 + next_id * 100 + index).unwrap_or(30_000));
+                (port.container_port, host_port)
+            })
+            .collect::<HashMap<_, _>>();
         let container = FakeContainer {
             id: format!("fake-container-{next_id}"),
             image: config.image.clone(),
             running: true,
             ip: format!("172.18.0.{}", next_id + 1),
             network: config.network.clone(),
+            ports,
             labels,
             files: HashMap::new(),
             logs: String::new(),
@@ -143,6 +156,24 @@ impl ContainerRuntime for FakeContainerRuntime {
             ));
         }
         Ok(found.ip.clone())
+    }
+
+    fn inspect_host_port(&self, container: &str, container_port: u16) -> Result<u16, BlockError> {
+        let containers = self.containers.lock().expect("lock poisoned");
+        let Some(found) = containers.get(container) else {
+            return Err(BlockError::message(
+                "docker",
+                &format!("inspect_host_port {container}"),
+                format!("container port {container_port} is not published"),
+            ));
+        };
+        found.ports.get(&container_port).copied().ok_or_else(|| {
+            BlockError::message(
+                "docker",
+                &format!("inspect_host_port {container}"),
+                format!("container port {container_port} is not published"),
+            )
+        })
     }
 
     fn list_formatted(

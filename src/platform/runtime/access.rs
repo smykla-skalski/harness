@@ -10,6 +10,7 @@ pub struct ControlPlaneAccess<'a> {
 /// Borrowed access details for the universal XDS endpoint.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct XdsAccess<'a> {
-    pub ip: &'a str,
-    pub port: u16,
+    pub container_ip: &'a str,
+    pub container_port: u16,
+    pub host_port: u16,
 }

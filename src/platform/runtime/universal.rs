@@ -2,7 +2,7 @@ use std::borrow::Cow;
 
 use crate::errors::{CliError, CliErrorKind};
 use crate::infra::blocks::kuma::defaults;
-use crate::kernel::topology::ClusterSpec;
+use crate::kernel::topology::{ClusterSpec, UNIVERSAL_PUBLISHED_HOST};
 
 use super::access::{ControlPlaneAccess, XdsAccess};
 
@@ -39,11 +39,11 @@ impl<'a> UniversalRuntime<'a> {
     /// # Errors
     /// Returns `CliError` when the control plane endpoint is unavailable.
     pub fn control_plane(self) -> Result<ControlPlaneAccess<'a>, CliError> {
-        let Some((ip, port)) = self.spec.primary_api_parts() else {
+        let Some((_host, port)) = self.spec.primary_api_parts() else {
             return Err(CliErrorKind::missing_run_context_value("cp_api_url").into());
         };
         Ok(ControlPlaneAccess {
-            addr: Cow::Owned(format!("http://{ip}:{port}")),
+            addr: Cow::Owned(format!("http://{UNIVERSAL_PUBLISHED_HOST}:{port}")),
             admin_token: self.spec.admin_token(),
         })
     }
@@ -54,12 +54,18 @@ impl<'a> UniversalRuntime<'a> {
     /// Returns `CliError` when the XDS endpoint is unavailable.
     pub fn xds(self) -> Result<XdsAccess<'a>, CliError> {
         let member = self.spec.primary_member();
-        let Some(ip) = member.container_ip.as_deref() else {
+        let Some(container_ip) = member.container_ip.as_deref() else {
             return Err(CliErrorKind::missing_run_context_value("container_ip").into());
         };
+        let host_port = match member.xds_port {
+            Some(port) => port,
+            None if self.spec.mode.is_single() => defaults::XDS_PORT,
+            None => return Err(CliErrorKind::missing_run_context_value("xds_port").into()),
+        };
         Ok(XdsAccess {
-            ip,
-            port: member.xds_port.unwrap_or(defaults::XDS_PORT),
+            container_ip,
+            container_port: defaults::XDS_PORT,
+            host_port,
         })
     }
 

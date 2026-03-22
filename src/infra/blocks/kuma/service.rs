@@ -3,8 +3,6 @@ use std::borrow::Cow;
 use crate::infra::blocks::BlockError;
 use crate::platform::runtime::XdsAccess;
 
-use super::defaults;
-
 /// Parameters required to render and start a universal service dataplane.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct KumaServiceSpec {
@@ -82,7 +80,7 @@ impl KumaService {
         files: &KumaServiceFiles,
         xds: XdsAccess<'_>,
     ) -> KumaServiceLaunch {
-        let cp_address = format!("https://{}:{}", xds.ip, xds.port);
+        let cp_address = format!("https://{}:{}", xds.container_ip, xds.container_port);
         let args = vec![
             "kuma-dp".to_string(),
             "run".to_string(),
@@ -98,14 +96,14 @@ impl KumaService {
 
     /// Derive the readiness URL for a started universal service container.
     #[must_use]
-    pub fn readiness_url(address: &str) -> String {
-        format!("http://{address}:{}/ready", defaults::DATAPLANE_READY_PORT)
+    pub fn readiness_url(host: &str, port: u16) -> String {
+        format!("http://{host}:{port}/ready")
     }
 
     /// Derive the XDS control-plane URL from resolved access details.
     #[must_use]
     pub fn xds_cp_address(xds: XdsAccess<'_>) -> String {
-        format!("https://{}:{}", xds.ip, xds.port)
+        format!("https://{}:{}", xds.container_ip, xds.container_port)
     }
 
     /// Derive a service image from a control-plane image.
