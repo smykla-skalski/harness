@@ -142,20 +142,14 @@ pub(super) fn build_codex_config() -> String {
 }
 
 pub(super) fn lifecycle_command(agent: HookAgent, subcommand: &str) -> String {
-    let command_path = match subcommand {
-        "session-start" => "setup session-start",
-        "pre-compact" => "setup pre-compact",
-        "session-stop" => "setup session-stop",
-        _ => subcommand,
-    };
     match agent {
         HookAgent::ClaudeCode => {
-            format!("harness {command_path} --project-dir \"$CLAUDE_PROJECT_DIR\"")
+            format!("harness {subcommand} --project-dir \"$CLAUDE_PROJECT_DIR\"")
         }
         HookAgent::GeminiCli => format!(
-            "harness {command_path} --project-dir \"${{CLAUDE_PROJECT_DIR:-$GEMINI_PROJECT_DIR}}\""
+            "harness {subcommand} --project-dir \"${{CLAUDE_PROJECT_DIR:-$GEMINI_PROJECT_DIR}}\""
         ),
-        HookAgent::Codex => format!("harness {command_path} --project-dir \"$PWD\""),
+        HookAgent::Codex => format!("harness {subcommand} --project-dir \"$PWD\""),
         HookAgent::OpenCode => unreachable!("opencode lifecycle is handled by the bridge"),
     }
 }

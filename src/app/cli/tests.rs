@@ -3,7 +3,7 @@ use crate::run::{
     ApiArgs, ApiMethod, EnvoyCommand, KumaCommand, KumactlArgs, KumactlCommand, ReportCommand,
 };
 use crate::setup::{ClusterArgs, KumaSetupCommand};
-use clap::CommandFactory;
+use clap::{CommandFactory, error::ErrorKind};
 
 #[test]
 fn all_expected_subcommands_registered() {
@@ -160,7 +160,7 @@ fn parse_cluster_with_extra_names() {
 }
 
 #[test]
-fn parse_legacy_top_level_session_start() {
+fn parse_top_level_session_start() {
     let cli =
         Cli::try_parse_from(["harness", "session-start", "--project-dir", "/tmp/project"]).unwrap();
     match cli.command {
@@ -172,7 +172,7 @@ fn parse_legacy_top_level_session_start() {
 }
 
 #[test]
-fn parse_legacy_top_level_session_stop() {
+fn parse_top_level_session_stop() {
     let cli =
         Cli::try_parse_from(["harness", "session-stop", "--project-dir", "/tmp/project"]).unwrap();
     match cli.command {
@@ -184,7 +184,7 @@ fn parse_legacy_top_level_session_stop() {
 }
 
 #[test]
-fn parse_legacy_top_level_pre_compact() {
+fn parse_top_level_pre_compact() {
     let cli =
         Cli::try_parse_from(["harness", "pre-compact", "--project-dir", "/tmp/project"]).unwrap();
     match cli.command {
@@ -192,6 +192,36 @@ fn parse_legacy_top_level_pre_compact() {
             assert_eq!(project_dir.as_deref(), Some("/tmp/project"));
         }
         _ => panic!("expected top-level PreCompact command"),
+    }
+}
+
+#[test]
+fn reject_grouped_lifecycle_commands_under_setup() {
+    for argv in [
+        vec![
+            "harness",
+            "setup",
+            "session-start",
+            "--project-dir",
+            "/tmp/project",
+        ],
+        vec![
+            "harness",
+            "setup",
+            "session-stop",
+            "--project-dir",
+            "/tmp/project",
+        ],
+        vec![
+            "harness",
+            "setup",
+            "pre-compact",
+            "--project-dir",
+            "/tmp/project",
+        ],
+    ] {
+        let error = Cli::try_parse_from(argv).expect_err("grouped lifecycle form should fail");
+        assert_eq!(error.kind(), ErrorKind::InvalidSubcommand);
     }
 }
 
