@@ -10,9 +10,9 @@ use harness::app::cli::{self, Command, CreateCommand, RunCommand, SetupCommand};
 use harness::create::{ApprovalBeginArgs, CreateBeginArgs, CreateSaveArgs, CreateValidateArgs};
 use harness::errors::CliError;
 use harness::run::{
-    ApiArgs, ApplyArgs, CaptureArgs, CloseoutArgs, EnvoyArgs, FinishArgs, KumaArgs, KumaCommand,
-    KumactlArgs, PreflightArgs, RecordArgs, ReportArgs, ResumeArgs, ServiceArgs, StartArgs,
-    ValidateArgs,
+    ApiArgs, ApplyArgs, CaptureArgs, CloseoutArgs, DoctorArgs, EnvoyArgs, FinishArgs, KumaArgs,
+    KumaCommand, KumactlArgs, PreflightArgs, RecordArgs, RepairArgs, ReportArgs, ResumeArgs,
+    ServiceArgs, StartArgs, ValidateArgs,
 };
 use harness::setup::{
     ClusterArgs, GatewayArgs, KumaSetupArgs, KumaSetupCommand, PreCompactArgs, SessionStartArgs,
@@ -95,6 +95,10 @@ pub fn envoy_cmd(args: EnvoyArgs) -> Command {
     run_cmd(RunCommand::Envoy(args))
 }
 
+pub fn doctor_cmd(args: DoctorArgs) -> Command {
+    run_cmd(RunCommand::Doctor(args))
+}
+
 pub fn finish_cmd(args: FinishArgs) -> Command {
     run_cmd(RunCommand::Finish(args))
 }
@@ -119,6 +123,10 @@ pub fn preflight_cmd(args: PreflightArgs) -> Command {
 
 pub fn record_cmd(args: RecordArgs) -> Command {
     run_cmd(RunCommand::Record(args))
+}
+
+pub fn repair_cmd(args: RepairArgs) -> Command {
+    run_cmd(RunCommand::Repair(args))
 }
 
 pub fn report_cmd(args: ReportArgs) -> Command {

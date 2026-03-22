@@ -1,7 +1,8 @@
 use clap::{Subcommand, ValueEnum};
 
 use super::super::application::{
-    ObserveActionKind, ObserveDumpRequest, ObserveRequest, ObserveScanRequest, ObserveWatchRequest,
+    ObserveActionKind, ObserveDoctorRequest, ObserveDumpRequest, ObserveRequest,
+    ObserveScanRequest, ObserveWatchRequest,
 };
 use super::args::ObserveFilterArgs;
 
@@ -84,6 +85,15 @@ pub enum ObserveMode {
         #[arg(long)]
         project_hint: Option<String>,
     },
+    /// Validate observe wiring, session pointers, and compact handoff state.
+    Doctor {
+        /// Output machine-readable JSON.
+        #[arg(long)]
+        json: bool,
+        /// Project directory to inspect instead of the active environment project.
+        #[arg(long)]
+        project_dir: Option<String>,
+    },
 }
 
 impl ObserveMode {
@@ -144,6 +154,9 @@ impl ObserveMode {
                 raw_json,
                 project_hint,
             }),
+            Self::Doctor { json, project_dir } => {
+                ObserveRequest::Doctor(ObserveDoctorRequest { json, project_dir })
+            }
         }
     }
 }
@@ -158,7 +171,6 @@ pub enum ObserveScanActionKind {
     Compare,
     ListCategories,
     ListFocusPresets,
-    Doctor,
     Mute,
     Unmute,
 }
@@ -174,7 +186,6 @@ impl From<ObserveScanActionKind> for ObserveActionKind {
             ObserveScanActionKind::Compare => Self::Compare,
             ObserveScanActionKind::ListCategories => Self::ListCategories,
             ObserveScanActionKind::ListFocusPresets => Self::ListFocusPresets,
-            ObserveScanActionKind::Doctor => Self::Doctor,
             ObserveScanActionKind::Mute => Self::Mute,
             ObserveScanActionKind::Unmute => Self::Unmute,
         }

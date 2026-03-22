@@ -20,7 +20,7 @@ Most people only need these four command groups:
 - `harness setup` prepares local environments and session state
 - `harness create` helps you build a new suite
 - `harness run` executes a suite
-- `harness observe` scans logs and points out mistakes or failures
+- `harness observe` checks project health and scans logs for mistakes or failures
 
 You will also see `hook`, `session-start`, `session-stop`, and `pre-compact`. Those are mostly for editor and hook integration. You usually do not run them by hand.
 
@@ -140,11 +140,14 @@ The create approval state lives in `.harness/suite-create-state.json`.
 
 Start here:
 
+- `harness observe doctor` to check wrapper wiring, lifecycle commands, current-run pointers, and compact handoff state
 - `harness observe scan` to classify problems in session logs
+- `harness run doctor` to inspect one tracked run and its pointer state
+- `harness run repair` to apply safe repairs to broken run metadata, status, or current-run pointers
 - `run-report.md` in the run directory for the high-level result
 - `commands/` in the run directory for the exact command history
 
-If the run state is stale or broken, start a fresh tracked run with `harness run start` instead of trying to patch state files by hand.
+If `harness run repair` still leaves blocking findings, start a fresh tracked run with `harness run start` instead of editing state files by hand.
 
 ## For contributors
 

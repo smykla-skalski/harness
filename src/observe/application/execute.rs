@@ -2,7 +2,8 @@ use crate::errors::{CliError, CliErrorKind};
 
 use super::maintenance;
 use super::request::{
-    ObserveActionKind, ObserveDumpRequest, ObserveFilter, ObserveRequest, ObserveScanRequest,
+    ObserveActionKind, ObserveDoctorRequest, ObserveDumpRequest, ObserveFilter, ObserveRequest,
+    ObserveScanRequest,
 };
 use crate::observe::{compare, context_cmd, doctor, dump, scan, watch};
 
@@ -44,7 +45,6 @@ enum ObserveScanAction<'a> {
     },
     ListCategories,
     ListFocusPresets,
-    Doctor,
     Mute {
         session_id: &'a str,
         codes: &'a str,
@@ -67,6 +67,7 @@ pub(crate) fn execute(request: ObserveRequest) -> Result<i32, CliError> {
             &request.filter,
         ),
         ObserveRequest::Dump(request) => execute_dump_mode(&request),
+        ObserveRequest::Doctor(request) => execute_doctor_mode(&request),
     }
 }
 
@@ -105,7 +106,6 @@ fn execute_scan_mode(request: &ObserveScanRequest) -> Result<i32, CliError> {
         } => compare::execute_compare(session_id, from_a, to_a, from_b, to_b, project_hint),
         ObserveScanAction::ListCategories => maintenance::execute_list_categories(),
         ObserveScanAction::ListFocusPresets => maintenance::execute_list_focus_presets(),
-        ObserveScanAction::Doctor => doctor::execute_doctor(),
         ObserveScanAction::Mute {
             session_id,
             codes,
@@ -117,6 +117,10 @@ fn execute_scan_mode(request: &ObserveScanRequest) -> Result<i32, CliError> {
             project_hint,
         } => maintenance::execute_unmute(session_id, codes, project_hint),
     }
+}
+
+fn execute_doctor_mode(request: &ObserveDoctorRequest) -> Result<i32, CliError> {
+    doctor::execute_doctor(request.json, request.project_dir.as_deref())
 }
 
 fn execute_dump_mode(request: &ObserveDumpRequest) -> Result<i32, CliError> {
@@ -238,7 +242,6 @@ fn resolve_scan_action(request: &ObserveScanRequest) -> Result<ObserveScanAction
         }
         Some(ObserveActionKind::ListCategories) => Ok(ObserveScanAction::ListCategories),
         Some(ObserveActionKind::ListFocusPresets) => Ok(ObserveScanAction::ListFocusPresets),
-        Some(ObserveActionKind::Doctor) => Ok(ObserveScanAction::Doctor),
         Some(ObserveActionKind::Mute) => Ok(ObserveScanAction::Mute {
             session_id: require_scan_session_id(request.session_id.as_deref(), "--action mute")?,
             codes: request.codes.as_deref().ok_or_else(|| {

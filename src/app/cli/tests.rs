@@ -1,7 +1,8 @@
 use super::*;
+use crate::observe::{ObserveArgs, ObserveMode};
 use crate::run::{
-    ApiArgs, ApiMethod, EnvoyCommand, FinishArgs, KumaCommand, KumactlArgs, KumactlCommand,
-    ReportCommand, ResumeArgs, StartArgs,
+    ApiArgs, ApiMethod, DoctorArgs, EnvoyCommand, FinishArgs, KumaCommand, KumactlArgs,
+    KumactlCommand, RepairArgs, ReportCommand, ResumeArgs, StartArgs,
 };
 use crate::setup::{ClusterArgs, KumaSetupCommand};
 use clap::{CommandFactory, error::ErrorKind};
@@ -204,6 +205,45 @@ fn parse_resume_command() {
 }
 
 #[test]
+fn parse_run_doctor_command() {
+    let cli = Cli::try_parse_from([
+        "harness",
+        "run",
+        "doctor",
+        "--json",
+        "--run-id",
+        "r01",
+        "--run-root",
+        "/tmp/runs",
+    ])
+    .unwrap();
+    match cli.command {
+        Command::Run {
+            command: RunCommand::Doctor(DoctorArgs { json, run_dir }),
+        } => {
+            assert!(json);
+            assert_eq!(run_dir.run_id.as_deref(), Some("r01"));
+            assert_eq!(run_dir.run_root.as_deref(), Some(Path::new("/tmp/runs")));
+        }
+        _ => panic!("expected Doctor command"),
+    }
+}
+
+#[test]
+fn parse_run_repair_command() {
+    let cli = Cli::try_parse_from(["harness", "run", "repair", "--run-dir", "/tmp/run"]).unwrap();
+    match cli.command {
+        Command::Run {
+            command: RunCommand::Repair(RepairArgs { json, run_dir }),
+        } => {
+            assert!(!json);
+            assert_eq!(run_dir.run_dir.as_deref(), Some(Path::new("/tmp/run")));
+        }
+        _ => panic!("expected Repair command"),
+    }
+}
+
+#[test]
 fn parse_cluster_with_extra_names() {
     let cli = Cli::try_parse_from([
         "harness",
@@ -235,6 +275,35 @@ fn parse_cluster_with_extra_names() {
         }
         _ => panic!("expected Cluster command"),
     }
+}
+
+#[test]
+fn parse_observe_doctor() {
+    let cli = Cli::try_parse_from([
+        "harness",
+        "observe",
+        "doctor",
+        "--json",
+        "--project-dir",
+        "/tmp/project",
+    ])
+    .unwrap();
+    match cli.command {
+        Command::Observe(ObserveArgs {
+            mode: ObserveMode::Doctor { json, project_dir },
+        }) => {
+            assert!(json);
+            assert_eq!(project_dir.as_deref(), Some("/tmp/project"));
+        }
+        _ => panic!("expected Observe Doctor command"),
+    }
+}
+
+#[test]
+fn reject_legacy_observe_scan_doctor_action() {
+    let error = Cli::try_parse_from(["harness", "observe", "scan", "--action", "doctor"])
+        .expect_err("legacy doctor action should fail");
+    assert_eq!(error.kind(), ErrorKind::InvalidValue);
 }
 
 #[test]

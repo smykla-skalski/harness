@@ -244,6 +244,54 @@ fn repo_contains_no_legacy_public_create_skill_flags() {
 }
 
 #[test]
+fn repo_contains_no_legacy_observe_doctor_scan_action() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let doctor = [
+        "harness",
+        " observe",
+        " scan",
+        " <session-id>",
+        " --action",
+        " doctor",
+    ]
+    .concat();
+    let needles = [doctor.as_str()];
+    let mut hits = Vec::new();
+
+    for start in [root.join("src"), root.join("tests")] {
+        hits.extend(collect_hits_in_tree(
+            &start,
+            root,
+            None,
+            &needles,
+            |path, needle| {
+                format!("{path} still contains legacy observe doctor action contract `{needle}`")
+            },
+        ));
+    }
+
+    hits.extend(collect_hits_in_paths(
+        root,
+        &[
+            ".claude/skills/observe/SKILL.md",
+            ".claude/skills/observe/references/command-surface.md",
+            "README.md",
+            "ARCHITECTURE.md",
+        ],
+        &needles,
+        |path, needle| {
+            format!("{path} still contains legacy observe doctor action contract `{needle}`")
+        },
+    ));
+
+    assert!(
+        hits.is_empty(),
+        "found legacy observe doctor action contract:\n{}",
+        hits.join("\n")
+    );
+}
+
+#[test]
 fn repo_contains_no_clippy_allow_attributes() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
     let needle = ["allow", "(clippy::"].concat();

@@ -12,9 +12,10 @@ use crate::errors::CliError;
 use crate::hooks::{self, HookArgs};
 use crate::observe::ObserveArgs;
 use crate::run::{
-    ApplyArgs, CaptureArgs, CloseoutArgs, ClusterCheckArgs, DiffArgs, EnvoyArgs, FinishArgs,
-    InitArgs, KumaArgs, LogsArgs, PreflightArgs, RecordArgs, ReportArgs, RestartNamespaceArgs,
-    ResumeArgs, RunnerStateArgs, StartArgs, StatusArgs, TaskArgs, ValidateArgs,
+    ApplyArgs, CaptureArgs, CloseoutArgs, ClusterCheckArgs, DiffArgs, DoctorArgs, EnvoyArgs,
+    FinishArgs, InitArgs, KumaArgs, LogsArgs, PreflightArgs, RecordArgs, RepairArgs, ReportArgs,
+    RestartNamespaceArgs, ResumeArgs, RunnerStateArgs, StartArgs, StatusArgs, TaskArgs,
+    ValidateArgs,
 };
 use crate::setup;
 use crate::setup::{
@@ -46,6 +47,8 @@ pub enum RunCommand {
     RestartNamespace(RestartNamespaceArgs),
     Apply(ApplyArgs),
     Validate(ValidateArgs),
+    Doctor(DoctorArgs),
+    Repair(RepairArgs),
     RunnerState(RunnerStateArgs),
     Resume(ResumeArgs),
     Finish(FinishArgs),
@@ -148,6 +151,8 @@ fn dispatch_run(ctx: &AppContext, command: &RunCommand) -> Result<i32, CliError>
         RunCommand::RestartNamespace(args) => args.execute(ctx),
         RunCommand::Apply(args) => args.execute(ctx),
         RunCommand::Validate(args) => args.execute(ctx),
+        RunCommand::Doctor(args) => args.execute(ctx),
+        RunCommand::Repair(args) => args.execute(ctx),
         RunCommand::RunnerState(args) => args.execute(ctx),
         RunCommand::Resume(args) => args.execute(ctx),
         RunCommand::Finish(args) => args.execute(ctx),

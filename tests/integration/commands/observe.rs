@@ -3,9 +3,12 @@
 
 use std::fs::{self, File};
 use std::io::Write;
+use std::path::Path;
 
 use harness::app::cli::Command;
 use harness::observe::{ObserveArgs, ObserveFilterArgs, ObserveMode};
+use harness::run::context::{CurrentRunRecord, RunLayout};
+use harness::workspace::current_run_context_path_for_project;
 
 use super::super::helpers::*;
 
@@ -135,6 +138,29 @@ fn write_session_fixture(tmp: &tempfile::TempDir, session_id: &str, lines: &[&st
     }
 }
 
+fn write_doctor_project(project_dir: &Path, legacy_lifecycle: bool) {
+    let suite_dir = project_dir.join(".claude").join("plugins").join("suite");
+    let hooks_dir = suite_dir.join("hooks");
+    fs::create_dir_all(&hooks_dir).unwrap();
+    fs::write(suite_dir.join("harness"), "").unwrap();
+    let hooks_json = if legacy_lifecycle {
+        let session_start = [
+            "harness",
+            " setup",
+            " session-start",
+            " --project-dir \\\"$CLAUDE_PROJECT_DIR\\\"",
+        ]
+        .concat();
+        format!(
+            r#"{{"hooks":{{"SessionStart":[{{"hooks":[{{"type":"command","command":"{session_start}"}}]}}]}}}}"#
+        )
+    } else {
+        r#"{"hooks":{"PreCompact":[{"hooks":[{"type":"command","command":"harness pre-compact --project-dir \"$CLAUDE_PROJECT_DIR\""}]}],"SessionStart":[{"hooks":[{"type":"command","command":"harness session-start --project-dir \"$CLAUDE_PROJECT_DIR\""}]}],"Stop":[{"hooks":[{"type":"command","command":"harness session-stop --project-dir \"$CLAUDE_PROJECT_DIR\""}]}]}}"#
+            .to_string()
+    };
+    fs::write(hooks_dir.join("hooks.json"), hooks_json).unwrap();
+}
+
 #[test]
 fn scan_finds_build_error() {
     let tmp = tempfile::tempdir().unwrap();
@@ -181,6 +207,87 @@ fn scan_finds_build_error() {
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), 0);
     });
+}
+
+#[test]
+fn observe_doctor_accepts_current_project_wiring() {
+    let tmp = tempfile::tempdir().unwrap();
+    let project_dir = tmp.path().join("project");
+    write_doctor_project(&project_dir, false);
+    let home = tmp.path().join("home");
+    fs::create_dir_all(home.join(".claude").join("projects")).unwrap();
+    let bin_dir = home.join(".local").join("bin");
+    fs::create_dir_all(&bin_dir).unwrap();
+    fs::write(bin_dir.join("harness"), "").unwrap();
+    let xdg = tmp.path().join("xdg");
+
+    let cmd = Command::Observe(ObserveArgs {
+        mode: ObserveMode::Doctor {
+            json: true,
+            project_dir: Some(project_dir.to_string_lossy().to_string()),
+        },
+    });
+
+    temp_env::with_vars(
+        [
+            ("HOME", Some(home.to_str().unwrap())),
+            ("XDG_DATA_HOME", Some(xdg.to_str().unwrap())),
+        ],
+        || {
+            let result = run_command(cmd);
+            assert_eq!(result.unwrap(), 0);
+        },
+    );
+}
+
+#[test]
+fn observe_doctor_reports_legacy_lifecycle_and_stale_pointer() {
+    let tmp = tempfile::tempdir().unwrap();
+    let project_dir = tmp.path().join("project");
+    write_doctor_project(&project_dir, true);
+    let home = tmp.path().join("home");
+    fs::create_dir_all(home.join(".claude").join("projects")).unwrap();
+    let bin_dir = home.join(".local").join("bin");
+    fs::create_dir_all(&bin_dir).unwrap();
+    fs::write(bin_dir.join("harness"), "").unwrap();
+    let xdg = tmp.path().join("xdg");
+
+    temp_env::with_vars(
+        [
+            ("HOME", Some(home.to_str().unwrap())),
+            ("XDG_DATA_HOME", Some(xdg.to_str().unwrap())),
+        ],
+        || {
+            let pointer_path = current_run_context_path_for_project(&project_dir);
+            fs::create_dir_all(pointer_path.parent().unwrap()).unwrap();
+            let pointer = CurrentRunRecord {
+                layout: RunLayout::from_run_dir(&tmp.path().join("runs").join("missing-run")),
+                profile: Some("single-zone".into()),
+                repo_root: None,
+                suite_dir: None,
+                suite_id: None,
+                suite_path: None,
+                cluster: None,
+                keep_clusters: false,
+                user_stories: vec![],
+                requires: vec![],
+            };
+            fs::write(
+                pointer_path,
+                serde_json::to_string_pretty(&pointer).unwrap(),
+            )
+            .unwrap();
+
+            let cmd = Command::Observe(ObserveArgs {
+                mode: ObserveMode::Doctor {
+                    json: true,
+                    project_dir: Some(project_dir.to_string_lossy().to_string()),
+                },
+            });
+            let result = run_command(cmd);
+            assert_eq!(result.unwrap(), 2);
+        },
+    );
 }
 
 #[test]

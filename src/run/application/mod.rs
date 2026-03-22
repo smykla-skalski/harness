@@ -2,6 +2,7 @@ mod access;
 mod capture;
 mod current;
 pub(crate) mod dependencies;
+pub(crate) mod diagnostics;
 mod inspection;
 mod managed_services;
 mod orchestration;
@@ -29,6 +30,7 @@ impl fmt::Debug for RunApplication {
 pub use crate::run::services::{
     RecordCommandRequest, StartServiceRequest, tail_task_output, wait_for_task_output,
 };
+pub(crate) use diagnostics::{doctor, repair};
 pub(crate) use orchestration::StartRunRequest;
 pub(crate) use recording::record_command;
 pub(crate) use reporting::check_report_compactness;

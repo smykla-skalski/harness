@@ -12,9 +12,10 @@
 10. [MetalLB file missing](#10-k3dstart-fails-for-kuma-3-with-missing-metallb-file)
 11. [Disk pressure on k3d node](#11-disk-pressure-on-k3d-node)
 12. [Prepared manifest stale after suite-fix](#12-prepared-manifest-stale-after-suite-fix)
-13. [Failure triage checklist](#failure-triage-checklist)
-14. [ContainerPatch value must be JSON string](#14-containerpatch-value-must-be-json-string)
-15. [Init container CPU throttling on k3d](#15-init-container-cpu-throttling-on-k3d-auto-fixed)
+13. [Run state looks stale or contradictory](#13-run-state-looks-stale-or-contradictory)
+14. [Failure triage checklist](#failure-triage-checklist)
+15. [ContainerPatch value must be JSON string](#15-containerpatch-value-must-be-json-string)
+16. [Init container CPU throttling on k3d](#16-init-container-cpu-throttling-on-k3d-auto-fixed)
 
 ---
 
@@ -155,7 +156,20 @@ Fix: re-materialize the prepared manifest before re-applying. Use `harness run a
 cp <fixed-suite-source-file> runs/<run-id>/manifests/prepared/<matching-path>
 ```
 
-## 14. ContainerPatch value must be JSON string
+## 13) Run state looks stale or contradictory
+
+Symptoms: `resume` cannot attach, `run-status.json` disagrees with the report, the current-run pointer targets the wrong run, or harness reports a final verdict with a non-final workflow phase.
+
+Fix:
+
+```bash
+harness run doctor --run-dir runs/<run-id>
+harness run repair --run-dir runs/<run-id>
+```
+
+Use `doctor` first to inspect what is wrong. Use `repair` only for deterministic state fixes that harness can rebuild safely. Do not edit `run-status.json`, `suite-run-state.json`, or `current-run.json` by hand.
+
+## 15. ContainerPatch value must be JSON string
 
 ContainerPatch `sidecarPatch` entries use JSON patch format. The `value` field must be a JSON string, not a YAML object:
 
@@ -177,7 +191,7 @@ Correct:
 
 This applies to all Kuma resources that use JSON patch operations (ContainerPatch, ProxyTemplate). The CRD enforces strict decoding - nested YAML objects under `value` produce "unknown field" errors even though the intent is clear.
 
-## 15) Init container CPU throttling on k3d (auto-fixed)
+## 16) Init container CPU throttling on k3d (auto-fixed)
 
 Symptoms: pods stuck at `Init:0/1` for 2-4 minutes, `kuma-init` container shows high CPU throttle count in `kubectl describe pod`.
 
@@ -208,4 +222,5 @@ When a test fails:
 2. Record exact failing command in command log.
 3. Record expected vs observed behavior.
 4. Classify root cause: **suite bug** (wrong manifest/expectations), **product bug** (Kuma vs spec), **harness bug** (infra misconfiguration), or **environment issue** (timing/resources).
-5. Do not continue until classification is explicit and user approves via AskUserQuestion.
+5. If the symptoms look like run-state drift instead of product behavior, run `harness run doctor` before making a manual fix.
+6. Do not continue until classification is explicit and user approves via AskUserQuestion.

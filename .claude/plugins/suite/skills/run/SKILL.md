@@ -106,6 +106,8 @@ After compaction, trust the `SessionStart(compact)` handoff as authoritative. Co
 
 After resume, keep using tracked wrappers such as `harness run apply`, `harness run record`, `harness run report`, and `harness run envoy`. Never switch to raw `kubectl --kubeconfig ...`.
 
+If the active run looks stale, mismatched, or partially broken, use `harness run doctor` first and `harness run repair` second. Do not hand-edit `run-status.json`, `suite-run-state.json`, or `current-run.json`.
+
 If a Stop hook summary appears with `preventedContinuation: false`, treat it as advisory. If a run was accidentally `aborted` while `next_planned_group` exists, use `harness run resume --message "Recovered from unexpected stop"` and continue.
 
 ## Arguments
@@ -186,6 +188,8 @@ Resolve `SUITE_PATH` using the suite resolution order: bare names check `${DATA_
 
 After start or resume, use only context-driven `harness` commands. Do not pass `--run-dir`, `--run-root`, `--repo-root`, or `--kubeconfig` again unless debugging. Never switch to raw `kubectl --kubeconfig ...`.
 
+If the saved run cannot be attached cleanly, inspect it with `harness run doctor` before retrying. Use `harness run repair` only for deterministic state fixes such as stale pointers or derived status drift.
+
 **Error cases**: if the suite path does not exist, search `${DATA_DIR}/` with Glob for partial matches. Present matches via AskUserQuestion. If no matches, use AskUserQuestion with options:
 
 - `Provide suite path`
@@ -240,6 +244,8 @@ If start, resume, or refresh preflight fails, use AskUserQuestion with options:
 - `Retry preflight`
 - `Fix the issue manually`
 - `Stop the run`
+
+Before choosing manual fixes for suspected run-state drift, check `harness run doctor`. If the findings are deterministic, run `harness run repair` and then retry the failing harness command.
 
 Do not start tests until the active run is attached, the prepared-suite artifact exists, and the preflight snapshot is saved.
 
@@ -363,7 +369,7 @@ Hook codes:
 - [references/validation.md](references/validation.md) - pre-apply checklist, safe apply flow
 - [references/troubleshooting.md](references/troubleshooting.md) - known failure modes and fixes
 
-**harness commands** (context-aware after `run start` or `run resume`): `setup capabilities`, `setup kuma cluster`, `setup gateway`, `run start`, `run finish`, `run resume`, `run init`, `run preflight`, `run runner-state`, `run apply`, `run validate`, `run capture`, `run record`, `run report group`, `run envoy {capture,route-body,bootstrap}`, `run diff`, `run kuma cli {find,build}`, and `hook`. All commands accept `--delay <seconds>` to wait before executing. Run `harness --help` for details.
+**harness commands** (context-aware after `run start` or `run resume`): `setup capabilities`, `setup kuma cluster`, `setup gateway`, `run start`, `run finish`, `run resume`, `run doctor`, `run repair`, `run init`, `run preflight`, `run runner-state`, `run apply`, `run validate`, `run capture`, `run record`, `run report group`, `run envoy {capture,route-body,bootstrap}`, `run diff`, `run kuma cli {find,build}`, and `hook`. All commands accept `--delay <seconds>` to wait before executing. Run `harness --help` for details.
 
 **Templates** (in `assets/`): `run-metadata.template.json`, `run-status.template.json`, `command-log.template.md`, `manifest-index.template.md`, `run-report.template.md`
 
