@@ -9,11 +9,18 @@ use crate::run::Verdict;
 /// # Errors
 /// Returns `CliError` on failure.
 pub fn execute(ctx: &HookContext) -> Result<HookResult, CliError> {
+    if ctx.is_observe() {
+        return Ok(guard_observe_stop());
+    }
     super::dispatch_by_skill(
         ctx,
         |ctx| Ok(guard_suite_runner_stop(ctx)),
         |ctx| Ok(guard_suite_create_stop(ctx)),
     )
+}
+
+fn guard_observe_stop() -> HookResult {
+    HookMessage::ObserveLoopsActive.into_result()
 }
 
 fn guard_suite_create_stop(ctx: &HookContext) -> HookResult {

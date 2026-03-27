@@ -1,7 +1,7 @@
 use super::super::emitter::{Guidance, IssueBlueprint};
 use super::super::{EXIT_CODE_REGEX, TextCheckContext};
 use crate::observe::patterns;
-use crate::observe::types::{Confidence, FixSafety, Issue, IssueCategory, IssueCode};
+use crate::observe::types::{Confidence, FixSafety, Issue, IssueCategory, IssueCode, IssueSeverity};
 
 /// Check for KSA hook codes in Bash output.
 /// Caller guarantees: `source_tool` == Bash.
@@ -77,6 +77,18 @@ pub(crate) fn check_exit_code_issues(context: &mut TextCheckContext<'_>, issues:
             ))
             .with_confidence(Confidence::High)
             .with_fix_safety(FixSafety::AutoFixGuarded)
+            .with_source_tool(context.source_tool);
+        context.emit_current(issues, blueprint);
+    } else if context.lower.contains("ksrcli") || context.lower.contains("error [") {
+        let summary = format!("Harness CLI command failed (exit {exit_code})");
+        let blueprint = IssueBlueprint::from_code(IssueCode::HarnessCliErrorOutput, summary)
+            .with_fingerprint("harness_cli_error")
+            .with_severity(IssueSeverity::Critical)
+            .with_guidance(Guidance::fix_hint(
+                "Harness command returned a structured error. Check the KSRCLI code and fix the root cause before continuing.",
+            ))
+            .with_confidence(Confidence::High)
+            .with_fix_safety(FixSafety::TriageRequired)
             .with_source_tool(context.source_tool);
         context.emit_current(issues, blueprint);
     } else if exit_code != 1 {

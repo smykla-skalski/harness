@@ -29,6 +29,7 @@ impl HookMessage {
             Self::ValidatorInstallFailed { .. } => "KSA010",
             Self::ValidatorGateUnexpected { .. } => "KSA011",
             Self::BugFoundGateRequired { .. } => "KSR016",
+            Self::ObserveLoopsActive => "KOB001",
         }
     }
 
@@ -53,7 +54,8 @@ impl HookMessage {
             | Self::ValidatorGateRequired { .. }
             | Self::ValidatorInstallFailed { .. }
             | Self::ValidatorGateUnexpected { .. }
-            | Self::BugFoundGateRequired { .. } => Decision::Deny,
+            | Self::BugFoundGateRequired { .. }
+            | Self::ObserveLoopsActive => Decision::Deny,
             Self::MissingArtifact { .. }
             | Self::RunPreflight
             | Self::PreflightMissing

@@ -41,11 +41,11 @@ pub(super) static ISSUE_CODE_METAS: &[IssueCodeMeta] = &[
     IssueCodeMeta {
         code: IssueCode::PythonUsedInBashToolUse,
         default_category: IssueCategory::UnexpectedBehavior,
-        default_severity: IssueSeverity::Medium,
+        default_severity: IssueSeverity::Critical,
         default_confidence: Confidence::High,
-        default_fix_safety: FixSafety::AutoFixSafe,
-        description: "Python invoked in Bash tool_use command",
-        owner: IssueOwner::Model,
+        default_fix_safety: FixSafety::TriageRequired,
+        description: "Python invoked in Bash tool_use command - guard-bash bypass",
+        owner: IssueOwner::Harness,
     },
     IssueCodeMeta {
         code: IssueCode::UnverifiedRecursiveRemove,
