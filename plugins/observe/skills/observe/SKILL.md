@@ -5,11 +5,6 @@ argument-hint: <session-id> [--from-line N] [--from <line|timestamp|prose>] [--f
 allowed-tools: Agent, Bash, Edit, Glob, Grep, Read, Skill
 disable-model-invocation: true
 user-invocable: true
-hooks:
-  Stop:
-  - hooks:
-    - command: harness hook --agent copilot observe guard-stop
-      type: command
 ---
 
 # Observe

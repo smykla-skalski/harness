@@ -12,10 +12,10 @@
 
 Interactive step-by-step suite generation. Uses the same create state, workers, approval gates, and final report as generate mode. The only differences are:
 
-1. After step 3, ask for feature name, target environment (`kubernetes`, `universal`, `both`), and scope (`full surface`, `focused aspect`) with AskUserQuestion.
-2. Run the same discovery workers as generate step 6, but review variant signals one by one with AskUserQuestion options such as `Include`, `Exclude`, and `Need more evidence` instead of the batch multiSelect.
+1. After step 3, ask for feature name, target environment (`kubernetes`, `universal`, `both`), and scope (`full surface`, `focused aspect`) with a user approval prompt.
+2. Run the same discovery workers as generate step 6, but review variant signals one by one with a user approval prompt options such as `Include`, `Exclude`, and `Need more evidence` instead of the batch multiSelect.
 3. Present G1-G7 as a selectable list, then review each selected group in order with its cached worker evidence.
-4. For each group, use AskUserQuestion with `Approve`, `Edit manifests`, `Edit validation commands`, and `Skip this group`. Save every edit round with `harness create save --kind edit-request` and rerun only the affected writer or discovery worker.
+4. For each group, ask the user with `Approve`, `Edit manifests`, `Edit validation commands`, and `Skip this group`. Save every edit round with `harness create save --kind edit-request` and rerun only the affected writer or discovery worker.
 5. After individual group review completes, run the same pre-write gate, writing workers, post-write gate, and final report as generate mode.
 
 ## Hook messages
@@ -44,4 +44,4 @@ Hooks emit these codes during suite create:
 - If a worker returns raw file dumps or long prose, stop and rerun it with the compact-output contract because returning the heavy transcript defeats the architecture.
 - If local manifest verification keeps failing, go back to the checked-in CRD or Go struct before saving because a broken suite wastes runner time and hides whether the bug is in Kuma or in the suite.
 - If a write would land outside `${DATA_DIR}/${SUITE_NAME}`, stop and fix the target path because `suite:create` must only mutate the selected suite surface.
-- If a writer worker partially completes (some group files exist, others are missing), do not blindly Write the remaining files. List the suite directory first with `ls`, Read any files that already exist on disk before overwriting them, then Write only the truly missing files directly. Subagent writes are invisible to the parent context's file tracker, so writing an existing file without reading it first triggers "File has been modified since read" errors from Claude Code.
+- If a writer worker partially completes (some group files exist, others are missing), do not blindly Write the remaining files. List the suite directory first with `ls`, Read any files that already exist on disk before overwriting them, then Write only the truly missing files directly. Subagent writes are invisible to the parent context's file tracker, so writing an existing file without reading it first can trigger file-state errors from the current agent.

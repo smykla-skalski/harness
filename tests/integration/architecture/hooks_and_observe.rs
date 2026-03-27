@@ -443,7 +443,7 @@ fn observe_skill_matches_current_cli_surface() {
             "harness observe doctor",
             "harness observe scan <session-id> --action cycle",
             "harness observe scan <session-id> --action status",
-            "$XDG_DATA_HOME/harness/observe/<SESSION_ID>.state",
+            "~harness/projects/project-<digest>/agents/observe/<observe-id>/snapshot.json",
         ],
     );
 }

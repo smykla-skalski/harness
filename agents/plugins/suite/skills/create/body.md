@@ -9,11 +9,11 @@ Generate test suites for `suite:run` by reading Kuma source code and emitting re
 
 Avoid using for running suites (use `/suite:run`), editing existing suites, or generating non-Kuma test plans, because create and execution need different guardrails.
 
-All hooks route through `harness hook --skill suite:create <hook-name>`, using the bare `harness` command installed by project `SessionStart` hooks.
+All hooks route through harness-owned hook entrypoints installed by project `SessionStart` hooks, using the bare `harness` command on `PATH`.
 
 ## Compact recovery
 
-If Claude Code resumes this skill after compaction, trust the injected `SessionStart(compact)` handoff as the authoritative summary of the saved create workspace, approval phase, and cached worker outputs. Resume the exact review gate or writer/edit round described there. Do not rerun discovery or reinitialize approval unless the handoff explicitly says the saved state diverged and names the files that must be reloaded first.
+If this skill resumes after compaction, trust the injected `SessionStart(compact)` handoff as the authoritative summary of the saved create workspace, approval phase, and cached worker outputs. Resume the exact review gate or writer/edit round described there. Do not rerun discovery or reinitialize approval unless the handoff explicitly says the saved state diverged and names the files that must be reloaded first.
 
 ## Arguments
 

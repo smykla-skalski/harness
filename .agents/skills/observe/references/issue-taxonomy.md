@@ -16,7 +16,7 @@ Categories, severity, fix safety, ownership, and routing guidance for `harness o
 - Fix safety: triage_required
 - Owner: harness
 - Root cause: guard or verify hook denied or errored unexpectedly
-- Fix target: `src/hooks/`, `.claude/plugins/suite/skills/`, or hook transport wiring
+- Fix target: `src/hooks/`, `agents/plugins/suite/skills/`, or hook transport wiring
 - Validation: `mise run check` and `TMPDIR=/tmp mise run test`
 
 ### skill_behavior
@@ -24,7 +24,7 @@ Categories, severity, fix safety, ownership, and routing guidance for `harness o
 - Fix safety: triage_required or auto_fix_guarded
 - Owner: skill
 - Root cause: the skill drifted from its contract or examples
-- Fix target: `.claude/skills/*/SKILL.md`, `.claude/plugins/suite/skills/*/SKILL.md`, references, or agent descriptors
+- Fix target: `agents/skills/*/SKILL.md`, `agents/plugins/suite/skills/*/SKILL.md`, references, or agent descriptors
 - Validation: re-run the affected skill path and the repo gates when code changed
 
 ### cli_error
@@ -56,7 +56,7 @@ Categories, severity, fix safety, ownership, and routing guidance for `harness o
 - Fix safety: auto_fix_safe
 - Owner: skill
 - Root cause: old or wrong command names, skill names, or path roots are still used
-- Fix target: SKILL.md files, `.claude/plugins/suite/skills/`, `src/kernel/skills.rs`, or `src/app/cli.rs`
+- Fix target: SKILL.md files, `agents/plugins/suite/skills/`, `src/kernel/skills.rs`, or `src/app/cli.rs`
 - Validation: grep for stale names and re-check the current command surface in source
 
 ### tool_error
