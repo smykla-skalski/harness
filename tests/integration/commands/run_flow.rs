@@ -171,6 +171,55 @@ fn run_finish_closes_out_and_checks_report() {
 }
 
 #[test]
+fn run_finish_clears_current_run_pointer() {
+    let tmp = tempfile::tempdir().unwrap();
+    let xdg = tmp.path().join("xdg");
+    let run_root = tmp.path().join("runs");
+    let suite_path = write_started_suite(tmp.path());
+
+    run_start(
+        StartArgs {
+            suite: suite_path.to_string_lossy().to_string(),
+            run_id: Some("run-finish-pointer".to_string()),
+            profile: "single-zone".to_string(),
+            repo_root: Some(tmp.path().to_string_lossy().to_string()),
+            run_root: Some(run_root.to_string_lossy().to_string()),
+        },
+        &xdg,
+        "run-finish-pointer",
+    )
+    .unwrap();
+
+    let run_dir = run_root.join("run-finish-pointer");
+    let mut status = read_run_status(&run_dir);
+    status.counts.passed = 1;
+    status.last_state_capture = Some("artifacts/state/preflight.json".to_string());
+    write_run_status(&run_dir, &status);
+
+    with_run_env(&xdg, "run-finish-pointer", || {
+        let pointer_path = current_run_context_path().unwrap();
+        assert!(
+            pointer_path.exists(),
+            "pointer should exist before finish"
+        );
+
+        let result = run_command(finish_cmd(FinishArgs {
+            run_dir: RunDirArgs {
+                run_dir: Some(run_dir.clone()),
+                run_id: None,
+                run_root: None,
+            },
+        }));
+        assert_eq!(result.unwrap(), 0);
+
+        assert!(
+            !pointer_path.exists(),
+            "current-run pointer should be deleted after finish"
+        );
+    });
+}
+
+#[test]
 fn run_finish_keeps_closeout_state_when_report_check_fails() {
     let tmp = tempfile::tempdir().unwrap();
     let xdg = tmp.path().join("xdg");

@@ -75,6 +75,10 @@ impl RunApplication {
         let report_path = self.layout().report_path();
         let report = report_path.to_string_lossy().into_owned();
         let _ = check_report_compactness(Some(&report))?;
+        // Best-effort cleanup - the pointer is stale after a successful finish.
+        // `clear_current_pointer` already treats not-found as success; any
+        // remaining error is a rare filesystem issue not worth blocking on.
+        let _ = Self::clear_current_pointer();
         Ok(FinishRunResult { report_path })
     }
 
