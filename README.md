@@ -41,6 +41,19 @@ Treat those rendered directories as generated output.
 - A **run** is one execution of a suite against a real cluster.
 - **observe** helps inspect live sessions, route fixes, and improve skills or suites without leaving the tracked workflow.
 
+The core loop looks like this:
+
+```mermaid
+flowchart LR
+    Agents["Claude / Codex / Gemini / Copilot"] --> Harness["harness"]
+    Harness --> Setup["setup\nbootstrap environments and wrappers"]
+    Harness --> Create["create\nwrite or refine suites"]
+    Harness --> Run["run\nexecute tracked work"]
+    Harness --> Observe["observe\ninspect live sessions and route fixes"]
+    Observe --> Create
+    Observe --> Run
+```
+
 In order:
 
 1. `setup`
