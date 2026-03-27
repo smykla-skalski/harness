@@ -30,6 +30,7 @@ impl HookMessage {
             Self::ValidatorGateUnexpected { .. } => "KSA011",
             Self::BugFoundGateRequired { .. } => "KSR016",
             Self::ObserveLoopsActive => "KOB001",
+            Self::SuiteAmendmentRequired { .. } => "KSR018",
         }
     }
 
@@ -61,7 +62,8 @@ impl HookMessage {
             | Self::PreflightMissing
             | Self::CodeReaderFormat
             | Self::ReaderMissingSections { .. }
-            | Self::ReaderOversizedBlock => Decision::Warn,
+            | Self::ReaderOversizedBlock
+            | Self::SuiteAmendmentRequired { .. } => Decision::Warn,
             Self::SuiteRunnerTracked | Self::RunVerdict { .. } | Self::SuiteCreateTracked => {
                 Decision::Info
             }
