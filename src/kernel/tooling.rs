@@ -119,11 +119,7 @@ pub fn legacy_tool_context(name: &str, input_raw: Value, response: Option<Value>
 pub fn normalize_tool_input(category: &ToolCategory, input: &Value) -> ToolInput {
     match category {
         ToolCategory::Shell => ToolInput::Shell {
-            command: input
-                .get("command")
-                .and_then(Value::as_str)
-                .unwrap_or_default()
-                .to_string(),
+            command: shell_command_text(input),
             description: input
                 .get("description")
                 .and_then(Value::as_str)
@@ -183,6 +179,38 @@ fn read_primary_path(input: &Value) -> PathBuf {
         .map_or_else(PathBuf::new, PathBuf::from)
 }
 
+fn shell_command_text(input: &Value) -> String {
+    if let Some(command) = input.get("command").and_then(Value::as_str) {
+        return command.to_string();
+    }
+    if let Some(command) = input
+        .get("params")
+        .and_then(|value| value.get("command"))
+        .and_then(shell_command_from_value)
+    {
+        return command;
+    }
+    if let Some(command) = input.get("arguments").and_then(shell_command_from_value) {
+        return command;
+    }
+    String::new()
+}
+
+fn shell_command_from_value(value: &Value) -> Option<String> {
+    match value {
+        Value::String(text) => Some(text.clone()),
+        Value::Array(parts) => {
+            let joined = parts
+                .iter()
+                .filter_map(Value::as_str)
+                .collect::<Vec<_>>()
+                .join(" ");
+            (!joined.is_empty()).then_some(joined)
+        }
+        _ => None,
+    }
+}
+
 fn read_tool_paths(input: &Value) -> Vec<PathBuf> {
     let mut paths = Vec::new();
 
@@ -206,4 +234,25 @@ fn read_tool_paths(input: &Value) -> Vec<PathBuf> {
     }
 
     paths
+}
+
+#[cfg(test)]
+mod tests {
+    use serde_json::json;
+
+    use super::{ToolCategory, normalize_tool_input};
+
+    #[test]
+    fn shell_tool_input_reads_codex_local_shell_command_arrays() {
+        let input = json!({
+            "input_type": "local_shell",
+            "params": {
+                "command": ["cargo", "test", "--lib"]
+            }
+        });
+
+        let normalized = normalize_tool_input(&ToolCategory::Shell, &input);
+
+        assert_eq!(normalized.command_text(), Some("cargo test --lib"));
+    }
 }

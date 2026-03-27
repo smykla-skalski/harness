@@ -1,4 +1,6 @@
 use super::*;
+use crate::agents::transport::AgentPromptSubmitArgs;
+use crate::hooks::adapters::HookAgent;
 use crate::observe::{ObserveArgs, ObserveMode};
 use crate::run::{
     ApiArgs, ApiMethod, DoctorArgs, EnvoyCommand, FinishArgs, KumaCommand, KumactlArgs,
@@ -402,12 +404,44 @@ fn parse_observe_doctor() {
     .unwrap();
     match cli.command {
         Command::Observe(ObserveArgs {
+            agent,
+            observe_id,
             mode: ObserveMode::Doctor { json, project_dir },
         }) => {
+            assert!(agent.is_none());
+            assert_eq!(observe_id, "project-default");
             assert!(json);
             assert_eq!(project_dir.as_deref(), Some("/tmp/project"));
         }
         _ => panic!("expected Observe Doctor command"),
+    }
+}
+
+#[test]
+fn parse_observe_scope_flags() {
+    let cli = Cli::try_parse_from([
+        "harness",
+        "observe",
+        "--agent",
+        "codex",
+        "--observe-id",
+        "shared-ledger",
+        "doctor",
+        "--json",
+    ])
+    .unwrap();
+    match cli.command {
+        Command::Observe(ObserveArgs {
+            agent,
+            observe_id,
+            mode: ObserveMode::Doctor { json, project_dir },
+        }) => {
+            assert_eq!(agent, Some(HookAgent::Codex));
+            assert_eq!(observe_id, "shared-ledger");
+            assert!(json);
+            assert!(project_dir.is_none());
+        }
+        _ => panic!("expected Observe Doctor command with scope flags"),
     }
 }
 
@@ -451,6 +485,35 @@ fn parse_top_level_pre_compact() {
             assert_eq!(project_dir.as_deref(), Some("/tmp/project"));
         }
         _ => panic!("expected top-level PreCompact command"),
+    }
+}
+
+#[test]
+fn parse_agents_prompt_submit() {
+    let cli = Cli::try_parse_from([
+        "harness",
+        "agents",
+        "prompt-submit",
+        "--agent",
+        "codex",
+        "--project-dir",
+        "/tmp/project",
+    ])
+    .unwrap();
+    match cli.command {
+        Command::Agents {
+            command:
+                AgentsCommand::PromptSubmit(AgentPromptSubmitArgs {
+                    agent,
+                    project_dir,
+                    session_id,
+                }),
+        } => {
+            assert_eq!(agent, HookAgent::Codex);
+            assert_eq!(project_dir.as_deref(), Some("/tmp/project"));
+            assert!(session_id.is_none());
+        }
+        _ => panic!("expected agents prompt-submit command"),
     }
 }
 

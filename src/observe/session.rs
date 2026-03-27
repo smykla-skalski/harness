@@ -4,6 +4,7 @@ use walkdir::WalkDir;
 
 use crate::agents::storage::find_canonical_session;
 use crate::errors::{CliError, CliErrorKind};
+use crate::hooks::adapters::HookAgent;
 use crate::workspace::dirs_home;
 
 /// Locate a session JSONL file, preferring the canonical harness agent ledger.
@@ -14,8 +15,22 @@ use crate::workspace::dirs_home;
 ///
 /// # Errors
 /// Returns `SessionNotFound` when the session file cannot be located.
+#[allow(dead_code)]
 pub fn find_session(session_id: &str, project_hint: Option<&str>) -> Result<PathBuf, CliError> {
-    if let Some(path) = find_canonical_session(session_id, project_hint)? {
+    find_session_for_agent(session_id, project_hint, None)
+}
+
+/// Locate a session JSONL file, optionally narrowing the canonical lookup by
+/// agent before falling back to legacy Claude transcript storage.
+///
+/// # Errors
+/// Returns `SessionNotFound` when the session file cannot be located.
+pub fn find_session_for_agent(
+    session_id: &str,
+    project_hint: Option<&str>,
+    agent_hint: Option<HookAgent>,
+) -> Result<PathBuf, CliError> {
+    if let Some(path) = find_canonical_session(session_id, project_hint, agent_hint)? {
         return Ok(path);
     }
 

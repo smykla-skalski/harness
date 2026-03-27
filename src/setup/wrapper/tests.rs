@@ -30,6 +30,12 @@ fn wrapper_content_references_git_rev_parse() {
 }
 
 #[test]
+fn project_plugin_launcher_prefers_repo_build_then_path() {
+    assert!(PROJECT_PLUGIN_LAUNCHER.contains("target/debug/harness"));
+    assert!(PROJECT_PLUGIN_LAUNCHER.contains("command -v harness"));
+}
+
+#[test]
 fn choose_install_dir_prefers_local_bin_on_path() {
     let dir = tempfile::tempdir().unwrap();
     let local_bin = dir.path().join(".local").join("bin");
@@ -258,6 +264,7 @@ fn sync_plugin_cache_updates_agents_in_cache() {
     let source_agents = plugin_dir.join("agents");
     fs::create_dir_all(&source_agents).unwrap();
     fs::write(source_agents.join("writer.md"), "new agent def").unwrap();
+    fs::write(plugin_dir.join("harness"), "#!/bin/sh\necho launcher\n").unwrap();
 
     let plugin_json_dir = plugin_dir.join(".claude-plugin");
     fs::create_dir_all(&plugin_json_dir).unwrap();
@@ -277,12 +284,25 @@ fn sync_plugin_cache_updates_agents_in_cache() {
         .join("agents");
     fs::create_dir_all(&cache_agents).unwrap();
     fs::write(cache_agents.join("writer.md"), "old agent def").unwrap();
+    let cache_launcher = home
+        .join(".claude")
+        .join("plugins")
+        .join("cache")
+        .join("harness")
+        .join("suite")
+        .join("1.0.0")
+        .join("harness");
+    fs::write(&cache_launcher, "#!/bin/sh\necho stale\n").unwrap();
 
     sync_plugin_cache(&plugin_dir, &home).unwrap();
 
     assert_eq!(
         fs::read_to_string(cache_agents.join("writer.md")).unwrap(),
         "new agent def"
+    );
+    assert_eq!(
+        fs::read_to_string(cache_launcher).unwrap(),
+        "#!/bin/sh\necho launcher\n"
     );
 }
 
@@ -326,6 +346,10 @@ fn lifecycle_commands_include_project_dirs() {
         lifecycle_command(HookAgent::Codex, "session-stop"),
         "harness agents session-stop --agent codex --project-dir \"$PWD\""
     );
+    assert_eq!(
+        lifecycle_command(HookAgent::Copilot, "prompt-submit"),
+        "harness agents prompt-submit --agent copilot --project-dir \"$PWD\""
+    );
 }
 
 #[test]
@@ -344,10 +368,7 @@ fn claude_lifecycle_commands_match_hook_template() {
             "SessionStart",
             lifecycle_command(HookAgent::Claude, "session-start"),
         ),
-        (
-            "Stop",
-            lifecycle_command(HookAgent::Claude, "session-stop"),
-        ),
+        ("Stop", lifecycle_command(HookAgent::Claude, "session-stop")),
     ];
 
     for (event, expected) in commands {
@@ -367,12 +388,24 @@ fn build_codex_config_includes_notify_and_hooks_flag() {
     let config = build_codex_config();
     assert!(config.contains("\"audit-turn\""));
     assert!(config.contains("codex_hooks = true"));
+    assert!(config.contains("[hooks]"));
+    assert!(config.contains(
+        "session_start = [\"harness\", \"agents\", \"session-start\", \"--agent\", \"codex\"]"
+    ));
+    assert!(config.contains("pre_compact = [\"harness\", \"pre-compact\"]"));
+    assert!(config.contains(
+        "session_end = [\"harness\", \"agents\", \"session-stop\", \"--agent\", \"codex\"]"
+    ));
 }
 
 fn assert_codex_hooks(hooks: &str) {
-    assert!(hooks.contains("\"SessionStart\""));
     assert!(hooks.contains("\"Stop\""));
-    assert!(!hooks.contains("guard-bash"));
+    assert!(hooks.contains("\"UserPromptSubmit\""));
+    assert!(hooks.contains("\"PreToolUse\""));
+    assert!(hooks.contains("\"PostToolUse\""));
+    assert!(hooks.contains("\"SubagentStart\""));
+    assert!(hooks.contains("\"SubagentStop\""));
+    assert!(hooks.contains("guard-bash"));
 }
 
 #[test]
@@ -390,6 +423,7 @@ fn write_agent_bootstrap_writes_codex_notify_config() {
     let config = fs::read_to_string(config_path).unwrap();
     assert!(config.contains("\"audit-turn\""));
     assert!(config.contains("codex_hooks = true"));
+    assert!(config.contains("[hooks]"));
 }
 
 #[test]
@@ -397,11 +431,20 @@ fn write_agent_bootstrap_writes_copilot_hook_config() {
     let dir = tempfile::tempdir().unwrap();
     let written = write_agent_bootstrap(dir.path(), HookAgent::Copilot).unwrap();
 
-    let config_path = dir.path().join(".github").join("hooks").join("harness.json");
+    let config_path = dir
+        .path()
+        .join(".github")
+        .join("hooks")
+        .join("harness.json");
 
     assert!(written.contains(&config_path));
     let config = fs::read_to_string(config_path).unwrap();
     assert!(config.contains("\"version\": 1"));
     assert!(config.contains("\"preToolUse\""));
-    assert!(config.contains("\"harness agents session-start --agent copilot --project-dir \\\"$PWD\\\"\""));
+    assert!(config.contains("\"userPromptSubmitted\""));
+    assert!(
+        config.contains(
+            "\"harness agents session-start --agent copilot --project-dir \\\"$PWD\\\"\""
+        )
+    );
 }

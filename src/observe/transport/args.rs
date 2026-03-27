@@ -2,6 +2,7 @@ use clap::Args;
 
 use crate::app::command_context::{AppContext, Execute};
 use crate::errors::CliError;
+use crate::hooks::adapters::HookAgent;
 
 use super::super::application::execute;
 use super::mode::ObserveMode;
@@ -71,6 +72,12 @@ pub struct ObserveFilterArgs {
 /// Arguments for `harness observe`.
 #[derive(Debug, Clone, Args)]
 pub struct ObserveArgs {
+    /// Narrow canonical session resolution to a specific agent runtime.
+    #[arg(long, value_enum)]
+    pub agent: Option<HookAgent>,
+    /// Shared observer state ID under the harness project ledger.
+    #[arg(long, default_value = "project-default")]
+    pub observe_id: String,
     /// Observe subcommand.
     #[command(subcommand)]
     pub mode: ObserveMode,
@@ -78,32 +85,48 @@ pub struct ObserveArgs {
 
 impl Execute for ObserveArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
-        execute(self.mode.clone().into_request())
+        execute(
+            self.mode
+                .clone()
+                .into_request(self.agent, self.observe_id.clone()),
+        )
+    }
+}
+
+impl ObserveFilterArgs {
+    pub(crate) fn into_filter(
+        self,
+        agent: Option<HookAgent>,
+        observe_id: String,
+    ) -> super::super::application::ObserveFilter {
+        super::super::application::ObserveFilter {
+            from_line: self.from_line,
+            from: self.from,
+            focus: self.focus,
+            project_hint: self.project_hint,
+            json: self.json,
+            summary: self.summary,
+            severity: self.severity,
+            category: self.category,
+            exclude: self.exclude,
+            fixable: self.fixable,
+            mute: self.mute,
+            until_line: self.until_line,
+            since_timestamp: self.since_timestamp,
+            until_timestamp: self.until_timestamp,
+            format: self.format,
+            overrides: self.overrides,
+            top_causes: self.top_causes,
+            output: self.output,
+            output_details: self.output_details,
+            agent,
+            observe_id,
+        }
     }
 }
 
 impl From<ObserveFilterArgs> for super::super::application::ObserveFilter {
     fn from(value: ObserveFilterArgs) -> Self {
-        Self {
-            from_line: value.from_line,
-            from: value.from,
-            focus: value.focus,
-            project_hint: value.project_hint,
-            json: value.json,
-            summary: value.summary,
-            severity: value.severity,
-            category: value.category,
-            exclude: value.exclude,
-            fixable: value.fixable,
-            mute: value.mute,
-            until_line: value.until_line,
-            since_timestamp: value.since_timestamp,
-            until_timestamp: value.until_timestamp,
-            format: value.format,
-            overrides: value.overrides,
-            top_causes: value.top_causes,
-            output: value.output,
-            output_details: value.output_details,
-        }
+        value.into_filter(None, "project-default".to_string())
     }
 }

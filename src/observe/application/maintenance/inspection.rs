@@ -1,4 +1,5 @@
 use crate::errors::CliError;
+use crate::hooks::adapters::HookAgent;
 use crate::observe::application::maintenance::{load_observer_state, render_json};
 use crate::observe::scan;
 use crate::observe::session;
@@ -21,8 +22,12 @@ pub(in crate::observe::application) fn execute_verify(
     issue_id: &str,
     since_line: Option<usize>,
     project_hint: Option<&str>,
+    observe_id: &str,
+    agent: Option<HookAgent>,
 ) -> Result<i32, CliError> {
-    let observer_state = load_observer_state(session_id)?;
+    let path = session::find_session_for_agent(session_id, project_hint, agent)?;
+    let project_context_root = super::storage::project_context_root_for_session_path(&path);
+    let observer_state = load_observer_state(&project_context_root, observe_id, session_id)?;
     let open_issue = observer_state
         .open_issues
         .iter()
@@ -31,7 +36,6 @@ pub(in crate::observe::application) fn execute_verify(
     let from_line =
         since_line.unwrap_or_else(|| open_issue.map_or(0, |issue| issue.first_seen_line));
 
-    let path = session::find_session(session_id, project_hint)?;
     let (issues, _last_line) = scan::scan(&path, from_line)?;
 
     let still_reproducing = open_issue.is_some_and(|open_issue| {
@@ -73,8 +77,9 @@ pub(in crate::observe::application) fn execute_resolve_start(
     session_id: &str,
     value: &str,
     project_hint: Option<&str>,
+    agent: Option<HookAgent>,
 ) -> Result<i32, CliError> {
-    let path = session::find_session(session_id, project_hint)?;
+    let path = session::find_session_for_agent(session_id, project_hint, agent)?;
     let resolved = scan::resolve_from(&path, value)?;
 
     let method = if value.parse::<usize>().is_ok() {

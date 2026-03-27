@@ -24,6 +24,7 @@ impl RawPayload {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum NormalizedEvent {
+    UserPromptSubmit,
     BeforeToolUse,
     AfterToolUse,
     AfterToolUseFailure,

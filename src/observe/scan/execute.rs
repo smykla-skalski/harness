@@ -26,7 +26,8 @@ pub(crate) fn scan(path: &Path, from_line: usize) -> Result<(Vec<Issue>, usize),
 
 /// Execute scan mode.
 pub(crate) fn execute_scan(session_id: &str, filter: &ObserveFilter) -> Result<i32, CliError> {
-    let path = session::find_session(session_id, filter.project_hint.as_deref())?;
+    let path =
+        session::find_session_for_agent(session_id, filter.project_hint.as_deref(), filter.agent)?;
     let from_line = resolve_effective_from_line(filter, &path)?;
 
     if filter.json {

@@ -75,6 +75,7 @@ impl AgentAdapter for ClaudeAdapter {
             NormalizedEvent::BeforeToolUse => Some("PreToolUse"),
             NormalizedEvent::AfterToolUse => Some("PostToolUse"),
             NormalizedEvent::AfterToolUseFailure => Some("PostToolUseFailure"),
+            NormalizedEvent::Notification => Some("Notification"),
             NormalizedEvent::SessionStart => Some("SessionStart"),
             NormalizedEvent::SessionEnd => Some("SessionEnd"),
             NormalizedEvent::AgentStop => Some("Stop"),

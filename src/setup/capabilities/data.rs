@@ -224,7 +224,10 @@ fn extended_features() -> BTreeMap<Feature, FeatureInfo> {
             FeatureInfo::new(
                 "start and stop session boundaries for observation and state tracking",
             )
-            .commands(&["harness session-start", "harness session-stop"]),
+            .commands(&[
+                "harness agents session-start",
+                "harness agents session-stop",
+            ]),
         ),
         (
             Feature::StateCapture,

@@ -5,12 +5,15 @@ use std::path::{Path, PathBuf};
 use serde::Serialize;
 
 use crate::errors::CliError;
+use crate::hooks::adapters::HookAgent;
 use crate::infra::io::read_json_typed;
 use crate::run::context::CurrentRunPointer;
 use crate::workspace::compact::{
     compact_latest_path, handoff_version, load_latest_compact_handoff,
 };
-use crate::workspace::{current_run_context_path_for_project, harness_data_root};
+use crate::workspace::{
+    current_run_context_path_for_project, harness_data_root, project_context_dir,
+};
 
 #[derive(Debug, Clone, Serialize)]
 struct DoctorTarget {
@@ -45,7 +48,11 @@ struct DoctorReport {
 }
 
 /// Validate observer setup, project wiring, and ambient harness state.
-pub(super) fn execute_doctor(json: bool, project_dir: Option<&str>) -> Result<i32, CliError> {
+pub(super) fn execute_doctor(
+    json: bool,
+    project_dir: Option<&str>,
+    _agent: Option<HookAgent>,
+) -> Result<i32, CliError> {
     let project_dir = resolve_project_dir(project_dir)?;
     let report = build_report(&project_dir);
     if json {
@@ -82,7 +89,7 @@ fn build_report(project_dir: &Path) -> DoctorReport {
     let compact_path = compact_latest_path(project_dir);
 
     let mut checks = vec![];
-    checks.extend(check_global_install());
+    checks.extend(check_global_install(project_dir));
     checks.push(check_project_plugin_root(project_dir));
     checks.push(check_project_plugin_wrapper(project_dir));
     checks.extend(check_lifecycle_contract(project_dir));
@@ -147,7 +154,7 @@ fn auto_detect_kuma_repo_root(start: &Path) -> Option<PathBuf> {
     })
 }
 
-fn check_global_install() -> Vec<DoctorCheck> {
+fn check_global_install(project_dir: &Path) -> Vec<DoctorCheck> {
     let mut checks = vec![];
     let Some(home) = env::var_os("HOME").map(PathBuf::from) else {
         checks.push(error_check(
@@ -216,7 +223,9 @@ fn check_global_install() -> Vec<DoctorCheck> {
         ));
     }
 
-    let observe_dir = data_root.join("observe");
+    let observe_dir = project_context_dir(project_dir)
+        .join("agents")
+        .join("observe");
     match fs::create_dir_all(&observe_dir) {
         Ok(()) => checks.push(ok_check(
             "observe_state_dir",
@@ -281,7 +290,7 @@ fn check_project_plugin_wrapper(project_dir: &Path) -> DoctorCheck {
             Some(&wrapper),
             false,
             Some(
-                "Reinstall the suite plugin so `.claude/plugins/suite/harness` points at the current binary.",
+                "Reinstall the suite plugin so `.claude/plugins/suite/harness` resolves the current harness CLI.",
             ),
         )
     }
@@ -409,14 +418,30 @@ fn check_lifecycle_contract(project_dir: &Path) -> Vec<DoctorCheck> {
         ));
     }
 
+    let codex_config_path = project_dir.join(".codex").join("config.toml");
+    if codex_config_path.exists() {
+        checks.push(check_codex_lifecycle_file(
+            &codex_config_path,
+            "observe_lifecycle_codex_config",
+            "project",
+        ));
+    } else {
+        checks.push(ok_check(
+            "observe_lifecycle_codex_config_absent",
+            "project",
+            "Project .codex/config.toml is absent. No Codex lifecycle drift was detected there.",
+            Some(&codex_config_path),
+        ));
+    }
+
     checks
 }
 
 fn check_lifecycle_file(path: &Path, code: &'static str, kind: &'static str) -> DoctorCheck {
     let expected = [
         "harness pre-compact --project-dir",
-        "harness session-start --project-dir",
-        "harness session-stop --project-dir",
+        "harness agents session-start --agent claude --project-dir",
+        "harness agents session-stop --agent claude --project-dir",
     ];
     let legacy = legacy_lifecycle_needles();
 
@@ -441,7 +466,7 @@ fn check_lifecycle_file(path: &Path, code: &'static str, kind: &'static str) -> 
                     Some(path),
                     true,
                     Some(
-                        "Replace grouped `harness setup ...` lifecycle commands with top-level commands.",
+                        "Replace grouped `harness setup ...` lifecycle commands with `harness agents ...` or other current top-level lifecycle commands.",
                     ),
                 );
             }
@@ -486,6 +511,52 @@ fn legacy_lifecycle_needles() -> [String; 3] {
         ["harness", " setup", " session-start"].concat(),
         ["harness", " setup", " session-stop"].concat(),
     ]
+}
+
+fn check_codex_lifecycle_file(path: &Path, code: &'static str, kind: &'static str) -> DoctorCheck {
+    let expected = [
+        r#"session_start = ["harness", "agents", "session-start", "--agent", "codex"]"#,
+        r#"pre_compact = ["harness", "pre-compact"]"#,
+        r#"session_end = ["harness", "agents", "session-stop", "--agent", "codex"]"#,
+    ];
+
+    match fs::read_to_string(path) {
+        Ok(text) => {
+            let missing: Vec<&str> = expected
+                .into_iter()
+                .filter(|needle| !text.contains(needle))
+                .collect();
+            if !missing.is_empty() {
+                return error_check(
+                    code,
+                    kind,
+                    format!(
+                        "Codex lifecycle configuration is missing expected commands: {}.",
+                        missing.join(", ")
+                    ),
+                    Some(path),
+                    true,
+                    Some(
+                        "Run `harness setup bootstrap --agent codex` to regenerate the current Codex lifecycle hooks.",
+                    ),
+                );
+            }
+            ok_check(
+                code,
+                kind,
+                "Codex lifecycle configuration matches the current CLI contract.",
+                Some(path),
+            )
+        }
+        Err(error) => error_check(
+            code,
+            kind,
+            format!("Codex lifecycle configuration cannot be read: {error}"),
+            Some(path),
+            false,
+            None,
+        ),
+    }
 }
 
 fn check_current_run_pointer(pointer_path: &Path) -> DoctorCheck {

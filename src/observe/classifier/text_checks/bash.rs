@@ -1,7 +1,9 @@
 use super::super::emitter::{Guidance, IssueBlueprint};
 use super::super::{EXIT_CODE_REGEX, TextCheckContext};
 use crate::observe::patterns;
-use crate::observe::types::{Confidence, FixSafety, Issue, IssueCategory, IssueCode, IssueSeverity};
+use crate::observe::types::{
+    Confidence, FixSafety, Issue, IssueCategory, IssueCode, IssueSeverity,
+};
 
 /// Check for KSA hook codes in Bash output.
 /// Caller guarantees: `source_tool` == Bash.

@@ -1,3 +1,5 @@
+use crate::hooks::adapters::HookAgent;
+
 #[derive(Debug, Clone)]
 pub(crate) struct ObserveFilter {
     pub(crate) from_line: usize,
@@ -19,6 +21,8 @@ pub(crate) struct ObserveFilter {
     pub(crate) top_causes: Option<usize>,
     pub(crate) output: Option<String>,
     pub(crate) output_details: Option<String>,
+    pub(crate) agent: Option<HookAgent>,
+    pub(crate) observe_id: String,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -76,10 +80,12 @@ pub(crate) struct ObserveDumpRequest {
     pub(crate) tool_name: Option<String>,
     pub(crate) raw_json: bool,
     pub(crate) project_hint: Option<String>,
+    pub(crate) agent: Option<HookAgent>,
 }
 
 #[derive(Debug, Clone)]
 pub(crate) struct ObserveDoctorRequest {
     pub(crate) json: bool,
     pub(crate) project_dir: Option<String>,
+    pub(crate) agent: Option<HookAgent>,
 }

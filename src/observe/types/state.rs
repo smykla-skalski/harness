@@ -75,6 +75,8 @@ pub struct IssueAttempt {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ObserverState {
     pub schema_version: u32,
+    #[serde(default)]
+    pub state_version: u64,
     pub session_id: String,
     pub project_hint: Option<String>,
     pub cursor: usize,
@@ -107,6 +109,7 @@ impl ObserverState {
     pub fn default_for_session(session_id: impl Into<String>) -> Self {
         Self {
             schema_version: Self::CURRENT_VERSION,
+            state_version: 0,
             session_id: session_id.into(),
             project_hint: None,
             cursor: 0,
