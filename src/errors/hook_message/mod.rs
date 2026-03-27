@@ -130,6 +130,11 @@ pub enum HookMessage {
          then CronDelete each one before stopping. Do not rely on session cleanup."
     )]
     ObserveLoopsActive,
+
+    #[error(
+        "Suite file edited during run. Log this change in amendments.md before continuing."
+    )]
+    SuiteAmendmentRequired { path: Cow<'static, str> },
 }
 
 impl HookMessage {
