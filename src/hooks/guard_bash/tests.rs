@@ -115,8 +115,68 @@ fn allows_github_without_tracked_run() {
 }
 
 #[test]
-fn allows_kubectl_without_tracked_run() {
+fn denies_kubectl_without_tracked_run() {
     let c = ctx_without_run("suite:run", "kubectl get pods");
+    let r = execute(&c).unwrap();
+    assert_eq!(r.decision, Decision::Deny);
+}
+
+#[test]
+fn denies_kubectl_logs_without_tracked_run() {
+    let c = ctx_without_run(
+        "suite:run",
+        "kubectl logs -n kuma-demo deploy/otel-collector --tail=10 2>&1",
+    );
+    let r = execute(&c).unwrap();
+    assert_eq!(r.decision, Decision::Deny);
+}
+
+#[test]
+fn denies_python_piped_after_harness_without_tracked_run() {
+    let c = ctx_without_run(
+        "suite:run",
+        "harness run record --gid g03 --phase verify --label check \
+         -- kubectl exec deploy/demo-client -- wget -qO- localhost:9901/config_dump \
+         2>&1 | python3 -c \"import json, sys; print(json.load(sys.stdin))\"",
+    );
+    let r = execute(&c).unwrap();
+    assert_eq!(r.decision, Decision::Deny);
+}
+
+#[test]
+fn denies_docker_without_tracked_run() {
+    let c = ctx_without_run("suite:run", "docker ps");
+    let r = execute(&c).unwrap();
+    assert_eq!(r.decision, Decision::Deny);
+}
+
+#[test]
+fn denies_helm_without_tracked_run() {
+    let c = ctx_without_run("suite:run", "helm install kuma kuma/kuma");
+    let r = execute(&c).unwrap();
+    assert_eq!(r.decision, Decision::Deny);
+}
+
+#[test]
+fn denies_admin_endpoint_without_tracked_run() {
+    let c = ctx_without_run("suite:run", "curl localhost:9901/config_dump");
+    let r = execute(&c).unwrap();
+    assert_eq!(r.decision, Decision::Deny);
+}
+
+#[test]
+fn allows_safe_commands_without_tracked_run() {
+    let c = ctx_without_run("suite:run", "echo hello world");
+    let r = execute(&c).unwrap();
+    assert_eq!(r.decision, Decision::Allow);
+}
+
+#[test]
+fn allows_harness_wrapper_without_tracked_run() {
+    let c = ctx_without_run(
+        "suite:run",
+        "harness run record --phase verify --label pods -- kubectl get pods",
+    );
     let r = execute(&c).unwrap();
     assert_eq!(r.decision, Decision::Allow);
 }
@@ -247,7 +307,6 @@ fn denies_chained_tracked_harness() {
     );
     let r = execute(&c).unwrap();
     assert_eq!(r.decision, Decision::Deny);
-    assert!(r.message.contains("run the tracked harness step directly"));
 }
 
 #[test]
@@ -382,6 +441,19 @@ fn denies_python_without_version_suffix() {
     let r = execute(&c).unwrap();
     assert_eq!(r.decision, Decision::Deny);
     assert!(r.message.contains("do not use python"));
+}
+
+#[test]
+fn denies_python_piped_after_harness_record() {
+    let c = ctx(
+        "suite:run",
+        "harness run record --gid g03 --phase verify --label check \
+         -- kubectl exec -n kuma-demo deploy/demo-client -c kuma-sidecar \
+         -- wget -qO- localhost:9901/config_dump 2>&1 | python3 -c \"\
+         import json, sys; print(json.load(sys.stdin))\"",
+    );
+    let r = execute(&c).unwrap();
+    assert_eq!(r.decision, Decision::Deny, "python piped after harness record must be denied");
 }
 
 #[test]

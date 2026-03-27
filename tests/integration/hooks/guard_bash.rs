@@ -141,13 +141,21 @@ fn guard_bash_payloads() {
 }
 
 #[test]
-fn guard_bash_allows_suite_run_bash_when_no_run_exists() {
+fn guard_bash_denies_cluster_binaries_even_without_tracked_run() {
     for command in [
         "kubectl get pods",
-        "gh pr checks 12345",
         "curl localhost:9901/config_dump",
         "python3 -c 'print(1)'",
     ] {
+        let ctx = make_hook_context("suite:run", make_bash_payload(command));
+        let r = guard_bash::execute(&ctx).unwrap();
+        assert_deny(&r);
+    }
+}
+
+#[test]
+fn guard_bash_allows_safe_commands_without_tracked_run() {
+    for command in ["gh pr checks 12345", "echo hello", "ls -la"] {
         let ctx = make_hook_context("suite:run", make_bash_payload(command));
         let r = guard_bash::execute(&ctx).unwrap();
         assert_allow(&r);
