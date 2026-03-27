@@ -2,14 +2,18 @@ use crate::hooks::adapters::{HookAgent, HookRegistration, adapter_for};
 use crate::hooks::protocol::context::NormalizedEvent;
 
 pub(super) fn process_agent_registrations(agent: HookAgent) -> Vec<HookRegistration> {
-    let mut registrations = vec![command_registration(
-        "session-start",
-        lifecycle_command(agent, "session-start"),
-        NormalizedEvent::SessionStart,
-        None,
-    )];
+    let mut registrations = Vec::new();
 
-    if matches!(agent, HookAgent::Claude | HookAgent::Gemini | HookAgent::Copilot) {
+    if matches!(
+        agent,
+        HookAgent::Claude | HookAgent::Gemini | HookAgent::Copilot
+    ) {
+        registrations.push(command_registration(
+            "session-start",
+            lifecycle_command(agent, "session-start"),
+            NormalizedEvent::SessionStart,
+            None,
+        ));
         registrations.push(command_registration(
             "pre-compact",
             lifecycle_command(agent, "pre-compact"),
@@ -26,17 +30,55 @@ pub(super) fn process_agent_registrations(agent: HookAgent) -> Vec<HookRegistrat
 
     match agent {
         HookAgent::Claude => registrations.extend(claude_hooks(agent)),
+        HookAgent::Codex => registrations.extend(codex_hooks(agent)),
         HookAgent::Copilot => registrations.extend(copilot_hooks(agent)),
-        HookAgent::Codex => registrations.push(hook_registration(
-            agent,
-            "guard-stop",
-            NormalizedEvent::AgentStop,
-            None,
-        )),
         HookAgent::Gemini => registrations.extend(gemini_hooks(agent)),
     }
 
     registrations
+}
+
+fn codex_hooks(agent: HookAgent) -> Vec<HookRegistration> {
+    vec![
+        command_registration(
+            "prompt-submit",
+            lifecycle_command(agent, "prompt-submit"),
+            NormalizedEvent::UserPromptSubmit,
+            None,
+        ),
+        hook_registration(
+            agent,
+            "guard-bash",
+            NormalizedEvent::BeforeToolUse,
+            Some("exec_command|shell_command|local_shell"),
+        ),
+        hook_registration(
+            agent,
+            "guard-write",
+            NormalizedEvent::BeforeToolUse,
+            Some(
+                "apply_patch|edit_file|replace_in_file|write_file|create_file|edit|replace|write|create",
+            ),
+        ),
+        hook_registration(agent, "guard-stop", NormalizedEvent::AgentStop, None),
+        hook_registration(
+            agent,
+            "verify-bash",
+            NormalizedEvent::AfterToolUse,
+            Some("exec_command|shell_command|local_shell"),
+        ),
+        hook_registration(
+            agent,
+            "verify-write",
+            NormalizedEvent::AfterToolUse,
+            Some(
+                "apply_patch|edit_file|replace_in_file|write_file|create_file|edit|replace|write|create",
+            ),
+        ),
+        hook_registration(agent, "audit", NormalizedEvent::AfterToolUse, Some(".*")),
+        hook_registration(agent, "context-agent", NormalizedEvent::SubagentStart, None),
+        hook_registration(agent, "validate-agent", NormalizedEvent::SubagentStop, None),
+    ]
 }
 
 fn claude_hooks(agent: HookAgent) -> Vec<HookRegistration> {
@@ -129,13 +171,29 @@ fn gemini_hooks(agent: HookAgent) -> Vec<HookRegistration> {
 
 fn copilot_hooks(agent: HookAgent) -> Vec<HookRegistration> {
     vec![
+        command_registration(
+            "prompt-submit",
+            lifecycle_command(agent, "prompt-submit"),
+            NormalizedEvent::UserPromptSubmit,
+            None,
+        ),
         hook_registration(agent, "guard-bash", NormalizedEvent::BeforeToolUse, None),
         hook_registration(agent, "guard-write", NormalizedEvent::BeforeToolUse, None),
-        hook_registration(agent, "guard-question", NormalizedEvent::BeforeToolUse, None),
+        hook_registration(
+            agent,
+            "guard-question",
+            NormalizedEvent::BeforeToolUse,
+            None,
+        ),
         hook_registration(agent, "guard-stop", NormalizedEvent::AgentStop, None),
         hook_registration(agent, "verify-bash", NormalizedEvent::AfterToolUse, None),
         hook_registration(agent, "verify-write", NormalizedEvent::AfterToolUse, None),
-        hook_registration(agent, "verify-question", NormalizedEvent::AfterToolUse, None),
+        hook_registration(
+            agent,
+            "verify-question",
+            NormalizedEvent::AfterToolUse,
+            None,
+        ),
         hook_registration(agent, "audit", NormalizedEvent::AfterToolUse, None),
         hook_registration(
             agent,
@@ -150,8 +208,16 @@ pub(super) fn build_codex_config() -> String {
     concat!(
         "notify = [\"harness\", \"hook\", \"--agent\", \"codex\", \"suite:run\", \"audit-turn\"]\n",
         "\n",
+        "# Project .codex/hooks.json entries are trust-gated and may be skipped when Codex\n",
+        "# runs with allow_managed_hooks_only enabled. Keep lifecycle state ingestion here\n",
+        "# so harness remains the source of truth for shared sessions and observe state.\n",
         "[features]\n",
-        "codex_hooks = true\n"
+        "codex_hooks = true\n",
+        "\n",
+        "[hooks]\n",
+        "session_start = [\"harness\", \"agents\", \"session-start\", \"--agent\", \"codex\"]\n",
+        "pre_compact = [\"harness\", \"pre-compact\"]\n",
+        "session_end = [\"harness\", \"agents\", \"session-stop\", \"--agent\", \"codex\"]\n"
     )
     .to_string()
 }
@@ -164,9 +230,9 @@ pub(super) fn lifecycle_command(agent: HookAgent, subcommand: &str) -> String {
         HookAgent::Copilot => ("\"$PWD\"", "copilot"),
     };
     match subcommand {
-        "session-start" | "session-stop" => format!(
-            "harness agents {subcommand} --agent {agent_name} --project-dir {project_dir}"
-        ),
+        "session-start" | "session-stop" | "prompt-submit" => {
+            format!("harness agents {subcommand} --agent {agent_name} --project-dir {project_dir}")
+        }
         _ => format!("harness {subcommand} --project-dir {project_dir}"),
     }
 }

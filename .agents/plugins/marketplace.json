@@ -1,0 +1,13 @@
+{
+  "name": "harness",
+  "plugins": [
+    {
+      "name": "observe",
+      "source": "./observe"
+    },
+    {
+      "name": "suite",
+      "source": "./suite"
+    }
+  ]
+}

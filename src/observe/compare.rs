@@ -3,6 +3,7 @@ use std::collections::HashSet;
 use serde::Serialize;
 
 use crate::errors::CliError;
+use crate::hooks::adapters::HookAgent;
 
 use super::scan::scan_range;
 use super::session;
@@ -41,8 +42,9 @@ pub(super) fn execute_compare(
     from_b: usize,
     to_b: usize,
     project_hint: Option<&str>,
+    agent: Option<HookAgent>,
 ) -> Result<i32, CliError> {
-    let path = session::find_session(session_id, project_hint)?;
+    let path = session::find_session_for_agent(session_id, project_hint, agent)?;
 
     let (issues_a, _) = scan_range(&path, from_a, to_a)?;
     let (issues_b, _) = scan_range(&path, from_b, to_b)?;

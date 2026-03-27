@@ -32,8 +32,8 @@ pub(super) fn read_plugin_version(plugin_dir: &Path) -> Result<Option<String>, C
 ///
 /// Copies `agents/`, `hooks/`, and `skills/` from the project source
 /// into `~/.claude/plugins/cache/harness/suite/{version}/`, creating
-/// or overwriting files as needed. Skips the binary (`harness`) since
-/// it is already current.
+/// or overwriting files as needed. Also syncs the `harness` launcher
+/// so Claude cache entries keep following the current CLI.
 ///
 /// # Errors
 /// Returns `CliError` if the manifest is invalid or the cache sync fails.
@@ -60,6 +60,11 @@ pub(super) fn sync_plugin_cache(plugin_dir: &Path, home: &Path) -> Result<(), Cl
             let target = cache_dir.join(subdir);
             sync_directory(&source, &target).map_err(CliError::from)?;
         }
+    }
+
+    let launcher = plugin_dir.join("harness");
+    if launcher.is_file() {
+        sync_file(&launcher, &cache_dir.join("harness")).map_err(CliError::from)?;
     }
 
     Ok(())
@@ -93,6 +98,23 @@ pub(super) fn sync_directory(source: &Path, target: &Path) -> io::Result<()> {
                 fs::copy(entry.path(), &dest)?;
             }
         }
+    }
+    Ok(())
+}
+
+fn sync_file(source: &Path, target: &Path) -> io::Result<()> {
+    if let Some(parent) = target.parent() {
+        fs::create_dir_all(parent)?;
+    }
+
+    let source_content = fs::read(source)?;
+    let needs_write = if let Ok(existing) = fs::read(target) {
+        existing != source_content
+    } else {
+        true
+    };
+    if needs_write {
+        fs::copy(source, target)?;
     }
     Ok(())
 }

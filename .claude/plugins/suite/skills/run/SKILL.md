@@ -1,88 +1,80 @@
 ---
-name: run
-description: >-
-  Execute reproducible suite runs on harness-managed Kubernetes or universal Docker infrastructure
-  for Kuma service mesh features. Supports local k3d Kubernetes, remote kubeconfig-backed
-  Kubernetes, and universal mode containers for tracked verification runs.
-argument-hint: "[suite-path] [--profile single-zone|multi-zone] [--provider local|remote] [--repo /path/to/kuma] [--run-id ID] [--resume RUN_ID]"
-allowed-tools: Agent, AskUserQuestion, Bash, Edit, Glob, Read, Write
 user-invocable: true
 hooks:
-  PreToolUse:
-    - matcher: "Bash"
-      hooks:
-        - type: command
-          command: "harness hook --skill suite:run guard-bash"
-    - matcher: "AskUserQuestion"
-      hooks:
-        - type: command
-          command: "harness hook --skill suite:run guard-question"
-    - matcher: "Write"
-      hooks:
-        - type: command
-          command: "harness hook --skill suite:run guard-write"
-    - matcher: "Edit"
-      hooks:
-        - type: command
-          command: "harness hook --skill suite:run guard-write"
-  PostToolUse:
-    - matcher: "Bash"
-      hooks:
-        - type: command
-          command: "harness hook --skill suite:run verify-bash"
-        - type: command
-          command: "harness hook --skill suite:run audit"
-    - matcher: "AskUserQuestion"
-      hooks:
-        - type: command
-          command: "harness hook --skill suite:run verify-question"
-        - type: command
-          command: "harness hook --skill suite:run audit"
-    - matcher: "Write"
-      hooks:
-        - type: command
-          command: "harness hook --skill suite:run verify-write"
-        - type: command
-          command: "harness hook --skill suite:run audit"
-    - matcher: "Edit"
-      hooks:
-        - type: command
-          command: "harness hook --skill suite:run verify-write"
-        - type: command
-          command: "harness hook --skill suite:run audit"
-    - matcher: "Read"
-      hooks:
-        - type: command
-          command: "harness hook --skill suite:run audit"
-    - matcher: "Glob"
-      hooks:
-        - type: command
-          command: "harness hook --skill suite:run audit"
-    - matcher: "Agent"
-      hooks:
-        - type: command
-          command: "harness hook --skill suite:run audit"
+  - hooks:
+    - command: harness hook --agent claude suite:run verify-bash
+      type: command
+    - command: harness hook --agent claude suite:run audit
+      type: command
+    matcher: Bash
+  - hooks:
+    - command: harness hook --agent claude suite:run verify-question
+      type: command
+    - command: harness hook --agent claude suite:run audit
+      type: command
+    matcher: AskUserQuestion
+  - hooks:
+    - command: harness hook --agent claude suite:run verify-write
+      type: command
+    - command: harness hook --agent claude suite:run audit
+      type: command
+    matcher: Write
+  - hooks:
+    - command: harness hook --agent claude suite:run verify-write
+      type: command
+    - command: harness hook --agent claude suite:run audit
+      type: command
+    matcher: Edit
+  - hooks:
+    - command: harness hook --agent claude suite:run audit
+      type: command
+    matcher: Read
+  - hooks:
+    - command: harness hook --agent claude suite:run audit
+      type: command
+    matcher: Glob
+  - hooks:
+    - command: harness hook --agent claude suite:run audit
+      type: command
+    matcher: Agent
   PostToolUseFailure:
-    - matcher: "Bash"
-      hooks:
-        - type: command
-          command: "harness hook --skill suite:run enrich-failure"
-        - type: command
-          command: "harness hook --skill suite:run audit"
-  SubagentStart:
-    - matcher: "preflight-worker"
-      hooks:
-        - type: command
-          command: "harness hook --skill suite:run context-agent"
-  SubagentStop:
-    - matcher: "preflight-worker"
-      hooks:
-        - type: command
-          command: "harness hook --skill suite:run validate-agent"
+  - hooks:
+    - command: harness hook --agent claude suite:run enrich-failure
+      type: command
+    - command: harness hook --agent claude suite:run audit
+      type: command
+    matcher: Bash
+  PreToolUse:
+  - hooks:
+    - command: harness hook --agent claude suite:run guard-bash
+      type: command
+    matcher: Bash
+  - hooks:
+    - command: harness hook --agent claude suite:run guard-question
+      type: command
+    matcher: AskUserQuestion
+  - hooks:
+    - command: harness hook --agent claude suite:run guard-write
+      type: command
+    matcher: Write
+  - hooks:
+    - command: harness hook --agent claude suite:run guard-write
+      type: command
+    matcher: Edit
   Stop:
-    - hooks:
-        - type: command
-          command: "harness hook --skill suite:run guard-stop"
+  - hooks:
+    - command: harness hook --agent claude suite:run guard-stop
+      type: command
+  SubagentStart:
+  - hooks:
+    - command: harness hook --agent claude suite:run context-agent
+      type: command
+    matcher: preflight-worker
+  SubagentStop:
+  - hooks:
+    - command: harness hook --agent claude suite:run validate-agent
+      type: command
+    matcher: preflight-worker
 ---
 
 <!-- justify: CF-side-effect Hook-enforced runner guards and AskUserQuestion gates make auto-invocation acceptable here -->
@@ -97,7 +89,7 @@ Execute reproducible suite runs on harness-managed Kubernetes or universal envir
 
 Track every manifest, command, and artifact for full run reproducibility.
 
-Repo-local skill package. Hooks run through `harness hook --skill suite:run <hook-name>`. `SessionStart` hooks install a repo-aware `harness` wrapper on `PATH`. Run `harness --help` for all subcommands.
+Repo-local skill package. Hooks run through `harness hook --agent claude suite:run <hook-name>`. `SessionStart` hooks install a repo-aware `harness` wrapper on `PATH`. Run `harness --help` for all subcommands.
 
 ## Compact recovery
 

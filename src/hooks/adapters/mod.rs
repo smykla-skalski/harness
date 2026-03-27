@@ -1,6 +1,6 @@
 mod claude;
-mod copilot;
 mod codex;
+mod copilot;
 mod gemini;
 
 use std::path::PathBuf;
@@ -17,8 +17,8 @@ use crate::hooks::protocol::result::NormalizedHookResult;
 use crate::kernel::tooling::{ToolCategory, ToolContext};
 
 pub use claude::ClaudeAdapter;
-pub use copilot::CopilotAdapter;
 pub use codex::CodexAdapter;
+pub use copilot::CopilotAdapter;
 pub use gemini::GeminiAdapter;
 
 /// Supported hook transports/adapters.
@@ -85,6 +85,8 @@ pub(crate) struct ProcessHookPayload {
     pub directory: Option<PathBuf>,
     #[serde(default)]
     pub hook_event_name: Option<String>,
+    #[serde(default, alias = "turn-id")]
+    pub turn_id: Option<String>,
     #[serde(default)]
     pub agent_id: Option<String>,
     #[serde(default)]
@@ -107,6 +109,7 @@ pub(crate) fn parse_process_payload(raw: &[u8]) -> Result<(ProcessHookPayload, V
 
 pub(crate) fn payload_event(payload: &ProcessHookPayload) -> NormalizedEvent {
     match payload.hook_event_name.as_deref() {
+        Some("UserPromptSubmit" | "userPromptSubmitted") => NormalizedEvent::UserPromptSubmit,
         Some("PreToolUse" | "BeforeTool" | "BeforeToolUse" | "tool.execute.before") => {
             NormalizedEvent::BeforeToolUse
         }
@@ -161,7 +164,7 @@ where
         },
         tool,
         agent: Some(AgentContext {
-            agent_id: payload.agent_id,
+            agent_id: payload.agent_id.or(payload.turn_id),
             agent_type: payload.agent_type,
             prompt: payload.prompt,
             response: payload.last_assistant_message,

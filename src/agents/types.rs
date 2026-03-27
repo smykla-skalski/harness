@@ -1,10 +1,12 @@
+use std::collections::BTreeMap;
+
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub(crate) struct AgentSessionRegistry {
     pub(crate) updated_at: String,
-    pub(crate) current: std::collections::BTreeMap<String, String>,
+    pub(crate) current: BTreeMap<String, String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

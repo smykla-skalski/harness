@@ -52,6 +52,7 @@ fn assert_scan_state_flags_default(state: &ScanState) {
 
 fn assert_observer_state_identity(state: &ObserverState) {
     assert_eq!(state.schema_version, ObserverState::CURRENT_VERSION);
+    assert_eq!(state.state_version, 0);
     assert_eq!(state.session_id, "test-session");
     assert_eq!(state.cursor, 0);
 }

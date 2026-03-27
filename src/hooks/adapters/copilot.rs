@@ -6,7 +6,7 @@ use serde_json::Value;
 
 use crate::errors::{CliError, CliErrorKind};
 use crate::hooks::adapters::{
-    AgentAdapter, HookRegistration, RenderedHookResponse, payload_context,
+    AgentAdapter, HookRegistration, ProcessHookPayload, RenderedHookResponse, payload_context,
 };
 use crate::hooks::protocol::context::{NormalizedEvent, NormalizedHookContext};
 use crate::hooks::protocol::result::NormalizedHookResult;
@@ -67,15 +67,16 @@ impl AgentAdapter for CopilotAdapter {
         let value: Value = serde_json::from_slice(raw).map_err(|error| {
             CliErrorKind::hook_payload_invalid(format!("invalid hook payload: {error}"))
         })?;
-        let payload: CopilotHookPayload = serde_json::from_value(value.clone()).map_err(|error| {
-            CliErrorKind::hook_payload_invalid(format!("invalid hook payload: {error}"))
-        })?;
+        let payload: CopilotHookPayload =
+            serde_json::from_value(value.clone()).map_err(|error| {
+                CliErrorKind::hook_payload_invalid(format!("invalid hook payload: {error}"))
+            })?;
         let tool_input = payload
             .tool_args
             .as_deref()
             .and_then(|input| serde_json::from_str::<Value>(input).ok())
             .unwrap_or_else(|| Value::String(payload.tool_args.unwrap_or_default()));
-        let process_payload = crate::hooks::adapters::ProcessHookPayload {
+        let process_payload = ProcessHookPayload {
             tool_name: payload.tool_name,
             tool_input,
             tool_response: payload.tool_result,
@@ -85,6 +86,7 @@ impl AgentAdapter for CopilotAdapter {
             cwd: payload.cwd,
             directory: None,
             hook_event_name: None,
+            turn_id: None,
             agent_id: None,
             agent_type: Some("copilot".to_string()),
             prompt: payload.prompt.or(payload.initial_prompt),
@@ -130,12 +132,12 @@ impl AgentAdapter for CopilotAdapter {
 
     fn event_name(&self, event: &NormalizedEvent) -> Option<&str> {
         match event {
+            NormalizedEvent::UserPromptSubmit => Some("userPromptSubmitted"),
             NormalizedEvent::BeforeToolUse => Some("preToolUse"),
             NormalizedEvent::AfterToolUse => Some("postToolUse"),
             NormalizedEvent::AfterToolUseFailure => Some("errorOccurred"),
             NormalizedEvent::SessionStart => Some("sessionStart"),
             NormalizedEvent::SessionEnd | NormalizedEvent::AgentStop => Some("sessionEnd"),
-            NormalizedEvent::Notification => Some("userPromptSubmitted"),
             _ => None,
         }
     }
@@ -156,7 +158,10 @@ impl AgentAdapter for CopilotAdapter {
                     timeout_sec: 30,
                 });
         }
-        serde_json::to_string_pretty(&CopilotConfig { version: 1, hooks: events })
-            .expect("typed hook JSON serializes")
+        serde_json::to_string_pretty(&CopilotConfig {
+            version: 1,
+            hooks: events,
+        })
+        .expect("typed hook JSON serializes")
     }
 }

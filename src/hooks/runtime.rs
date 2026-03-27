@@ -1,3 +1,4 @@
+use crate::agents::service::record_hook_event;
 use crate::errors::{CliError, CliErrorKind};
 
 use super::adapters::{HookAgent, adapter_for};
@@ -164,17 +165,12 @@ pub fn run_hook_command(agent: HookAgent, skill: &str, hook: &HookCommand) -> i3
         }
     };
 
-    if should_record_hook_event(hook) {
-        if let Err(error) = crate::agents::service::record_hook_event(
-            agent,
-            skill,
-            hook_name,
-            &normalized_for_record,
-            &result,
-        ) {
-            let message = format!("`{hook_name}` failed to record agent event: {error}");
-            return render_runtime_error(agent, hook_impl, &render_event, "KSH003", &message);
-        }
+    if should_record_hook_event(hook)
+        && let Err(error) =
+            record_hook_event(agent, skill, hook_name, &normalized_for_record, &result)
+    {
+        let message = format!("`{hook_name}` failed to record agent event: {error}");
+        return render_runtime_error(agent, hook_impl, &render_event, "KSH003", &message);
     }
 
     let rendered = adapter.render_output(&result, &render_event);

@@ -347,11 +347,15 @@ fn assert_observe_outputs_use_typed_serialization(root: &Path) {
 }
 
 fn assert_wrapper_outputs_use_typed_serialization(root: &Path) {
-    let wrapper = read_repo_file(root, "src/setup/wrapper/registrations.rs");
+    let copilot = read_repo_file(root, "src/hooks/adapters/copilot.rs");
     assert_file_contains_needles(
-        &wrapper,
-        "src/setup/wrapper/registrations.rs should serialize bridge bindings from typed structs via",
-        &["#[derive(Serialize)]", "struct OpenCodeToolBindings"],
+        &copilot,
+        "src/hooks/adapters/copilot.rs should serialize typed hook config DTOs via",
+        &[
+            "#[derive(Serialize)]",
+            "struct CopilotConfig",
+            "struct CopilotCommandHook",
+        ],
     );
 }
 
@@ -401,8 +405,14 @@ fn observe_skill_matches_current_cli_surface() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
     let docs = [
         read_repo_file(root, ".claude/plugins/observe/skills/observe/SKILL.md"),
-        read_repo_file(root, ".claude/plugins/observe/skills/observe/references/overrides.md"),
-        read_repo_file(root, ".claude/plugins/observe/skills/observe/references/command-surface.md"),
+        read_repo_file(
+            root,
+            ".claude/plugins/observe/skills/observe/references/overrides.md",
+        ),
+        read_repo_file(
+            root,
+            ".claude/plugins/observe/skills/observe/references/command-surface.md",
+        ),
     ];
     let all_docs: Vec<&str> = docs.iter().map(String::as_str).collect();
 

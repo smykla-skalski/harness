@@ -79,9 +79,12 @@ impl AgentAdapter for CodexAdapter {
             serde_json::from_value(raw_value.clone()).map_err(|error| {
                 CliErrorKind::hook_payload_invalid(format!("invalid hook payload: {error}"))
             })?;
-        Ok(payload_context(payload, raw_value, |tool_name| {
-            self.normalize_tool(tool_name)
-        }))
+        Ok(finalize_payload_context(
+            &raw_value,
+            payload_context(payload, raw_value.clone(), |tool_name| {
+                self.normalize_tool(tool_name)
+            }),
+        ))
     }
 
     fn render_output(
@@ -106,13 +109,32 @@ impl AgentAdapter for CodexAdapter {
     }
 
     fn normalize_tool(&self, tool_name: &str) -> ToolCategory {
-        ToolCategory::Custom(tool_name.to_string())
+        match tool_name {
+            "exec_command" | "shell_command" | "local_shell" => ToolCategory::Shell,
+            "read_file" | "view" | "read" => ToolCategory::FileRead,
+            "write_file" | "create_file" | "write" | "create" => ToolCategory::FileWrite,
+            "apply_patch" | "edit_file" | "replace_in_file" | "edit" | "replace" => {
+                ToolCategory::FileEdit
+            }
+            "search_files" | "search" | "glob" | "grep" => ToolCategory::FileSearch,
+            "spawn_agent" | "agent" | "subagent" => ToolCategory::Agent,
+            "web_fetch" | "fetch_url" => ToolCategory::WebFetch,
+            "web_search" | "search_web" => ToolCategory::WebSearch,
+            other => ToolCategory::Custom(other.to_string()),
+        }
     }
 
     fn event_name(&self, event: &NormalizedEvent) -> Option<&str> {
         match event {
+            NormalizedEvent::UserPromptSubmit => Some("UserPromptSubmit"),
+            NormalizedEvent::BeforeToolUse => Some("PreToolUse"),
+            NormalizedEvent::AfterToolUse => Some("PostToolUse"),
             NormalizedEvent::SessionStart => Some("SessionStart"),
-            NormalizedEvent::AgentStop | NormalizedEvent::SessionEnd => Some("Stop"),
+            NormalizedEvent::SessionEnd => Some("SessionEnd"),
+            NormalizedEvent::AgentStop => Some("Stop"),
+            NormalizedEvent::SubagentStart => Some("SubagentStart"),
+            NormalizedEvent::SubagentStop => Some("SubagentStop"),
+            NormalizedEvent::BeforeCompaction => Some("PreCompact"),
             _ => None,
         }
     }
@@ -212,6 +234,35 @@ fn notify_payload_context(raw_value: Value) -> Result<NormalizedHookContext, Cli
         skill: SkillContext::inactive(),
         raw: RawPayload::new(raw_value),
     })
+}
+
+fn prompt_from_user_submit(raw_value: &Value) -> Option<String> {
+    raw_value
+        .get("prompt")
+        .and_then(Value::as_str)
+        .filter(|value| !value.trim().is_empty())
+        .map(ToString::to_string)
+        .or_else(|| {
+            raw_value
+                .get("event")
+                .and_then(|event| event.get("user_prompt"))
+                .and_then(Value::as_str)
+                .filter(|value| !value.trim().is_empty())
+                .map(ToString::to_string)
+        })
+}
+
+fn finalize_payload_context(
+    raw_value: &Value,
+    mut context: NormalizedHookContext,
+) -> NormalizedHookContext {
+    if matches!(context.event, NormalizedEvent::UserPromptSubmit)
+        && let Some(agent) = context.agent.as_mut()
+        && agent.prompt.is_none()
+    {
+        agent.prompt = prompt_from_user_submit(raw_value);
+    }
+    context
 }
 
 #[cfg(test)]

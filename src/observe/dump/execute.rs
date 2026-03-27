@@ -2,6 +2,7 @@ use std::fs;
 use std::io::{BufRead, BufReader};
 
 use crate::errors::{CliError, CliErrorKind};
+use crate::hooks::adapters::HookAgent;
 
 use super::super::session;
 use super::super::{DUMP_TRUNCATE_LENGTH, MIN_DUMP_TEXT_LENGTH, truncate_at};
@@ -19,6 +20,7 @@ pub(crate) fn execute_dump(
     session_id: &str,
     options: &DumpOptions<'_>,
     project_hint: Option<&str>,
+    agent: Option<HookAgent>,
 ) -> Result<i32, CliError> {
     let DumpOptions {
         from_line,
@@ -28,7 +30,7 @@ pub(crate) fn execute_dump(
         tool_name,
         raw_json,
     } = *options;
-    let path = session::find_session(session_id, project_hint)?;
+    let path = session::find_session_for_agent(session_id, project_hint, agent)?;
     let file = fs::File::open(&path)
         .map_err(|e| CliErrorKind::session_parse_error(format!("cannot open session file: {e}")))?;
     let reader = BufReader::new(file);

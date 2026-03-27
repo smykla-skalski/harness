@@ -5,9 +5,14 @@
   },
   "plugins": [
     {
+      "description": "Harness observe workflow",
+      "name": "observe",
+      "source": "./observe"
+    },
+    {
+      "description": "Harness suite workflow",
       "name": "suite",
-      "source": "./suite",
-      "description": "Kuma test suite create and execution"
+      "source": "./suite"
     }
   ]
 }

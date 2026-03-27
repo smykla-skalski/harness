@@ -1,66 +1,55 @@
 ---
-name: create
-description: >-
-  Generate test suites for suite:run by reading Kuma source code.
-  Produces ready-to-run suites with manifests, validation steps, and expected outcomes
-  for both Kubernetes and universal mode deployments.
-  Use when creating a new test suite for a Kuma feature, converting a PR into a test plan,
-  building regression tests from source code, or when the user asks for test coverage,
-  a test plan, or wants to write tests for any Kuma policy or feature.
-argument-hint: "<feature-name> [--repo /path/to/kuma] [--mode generate|wizard] [--from-pr PR_URL] [--from-branch BRANCH] [--suite-name NAME] [--yes|-y]"
-allowed-tools: Agent, AskUserQuestion, Bash, Edit, Glob, Grep, Read, Write
-user-invocable: true
 disable-model-invocation: true
+user-invocable: true
 hooks:
-  PreToolUse:
-    - matcher: "AskUserQuestion"
-      hooks:
-        - type: command
-          command: "harness hook --skill suite:create guard-question"
-    - matcher: "Bash"
-      hooks:
-        - type: command
-          command: "harness hook --skill suite:create guard-bash"
-    - matcher: "Edit"
-      hooks:
-        - type: command
-          command: "harness hook --skill suite:create guard-write"
-    - matcher: "Write"
-      hooks:
-        - type: command
-          command: "harness hook --skill suite:create guard-write"
-  PostToolUse:
-    - matcher: "AskUserQuestion"
-      hooks:
-        - type: command
-          command: "harness hook --skill suite:create verify-question"
-        - type: command
-          command: "harness hook --skill suite:create audit"
-    - matcher: "Bash"
-      hooks:
-        - type: command
-          command: "harness hook --skill suite:create audit"
-    - matcher: "Edit"
-      hooks:
-        - type: command
-          command: "harness hook --skill suite:create verify-write"
-        - type: command
-          command: "harness hook --skill suite:create audit"
-    - matcher: "Write"
-      hooks:
-        - type: command
-          command: "harness hook --skill suite:create verify-write"
-        - type: command
-          command: "harness hook --skill suite:create audit"
+  - hooks:
+    - command: harness hook --agent claude suite:create verify-question
+      type: command
+    - command: harness hook --agent claude suite:create audit
+      type: command
+    matcher: AskUserQuestion
+  - hooks:
+    - command: harness hook --agent claude suite:create audit
+      type: command
+    matcher: Bash
+  - hooks:
+    - command: harness hook --agent claude suite:create verify-write
+      type: command
+    - command: harness hook --agent claude suite:create audit
+      type: command
+    matcher: Edit
+  - hooks:
+    - command: harness hook --agent claude suite:create verify-write
+      type: command
+    - command: harness hook --agent claude suite:create audit
+      type: command
+    matcher: Write
   PostToolUseFailure:
-    - matcher: "Bash"
-      hooks:
-        - type: command
-          command: "harness hook --skill suite:create audit"
+  - hooks:
+    - command: harness hook --agent claude suite:create audit
+      type: command
+    matcher: Bash
+  PreToolUse:
+  - hooks:
+    - command: harness hook --agent claude suite:create guard-question
+      type: command
+    matcher: AskUserQuestion
+  - hooks:
+    - command: harness hook --agent claude suite:create guard-bash
+      type: command
+    matcher: Bash
+  - hooks:
+    - command: harness hook --agent claude suite:create guard-write
+      type: command
+    matcher: Edit
+  - hooks:
+    - command: harness hook --agent claude suite:create guard-write
+      type: command
+    matcher: Write
   Stop:
-    - hooks:
-        - type: command
-          command: "harness hook --skill suite:create guard-stop"
+  - hooks:
+    - command: harness hook --agent claude suite:create guard-stop
+      type: command
 ---
 
 <!-- justify: I23 harness is installed on PATH by project SessionStart hooks, not bundled as a script -->
@@ -74,7 +63,7 @@ Generate test suites for `suite:run` by reading Kuma source code and emitting re
 
 Avoid using for running suites (use `/suite:run`), editing existing suites, or generating non-Kuma test plans, because create and execution need different guardrails.
 
-All hooks route through `harness hook --skill suite:create <hook-name>`, using the bare `harness` command installed by project `SessionStart` hooks.
+All hooks route through `harness hook --agent claude suite:create <hook-name>`, using the bare `harness` command installed by project `SessionStart` hooks.
 
 ## Compact recovery
 

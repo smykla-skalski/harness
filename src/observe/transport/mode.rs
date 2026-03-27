@@ -1,5 +1,7 @@
 use clap::{Subcommand, ValueEnum};
 
+use crate::hooks::adapters::HookAgent;
+
 use super::super::application::{
     ObserveActionKind, ObserveDoctorRequest, ObserveDumpRequest, ObserveRequest,
     ObserveScanRequest, ObserveWatchRequest,
@@ -97,7 +99,11 @@ pub enum ObserveMode {
 }
 
 impl ObserveMode {
-    pub(crate) fn into_request(self) -> ObserveRequest {
+    pub(crate) fn into_request(
+        self,
+        agent: Option<HookAgent>,
+        observe_id: String,
+    ) -> ObserveRequest {
         match self {
             Self::Scan {
                 session_id,
@@ -118,7 +124,7 @@ impl ObserveMode {
                 range_a,
                 range_b,
                 codes,
-                filter: filter.into(),
+                filter: filter.into_filter(agent, observe_id),
             }),
             Self::Watch {
                 session_id,
@@ -129,7 +135,7 @@ impl ObserveMode {
                 session_id,
                 poll_interval,
                 timeout,
-                filter: filter.into(),
+                filter: filter.into_filter(agent, observe_id),
             }),
             Self::Dump {
                 session_id,
@@ -153,10 +159,13 @@ impl ObserveMode {
                 tool_name,
                 raw_json,
                 project_hint,
+                agent,
             }),
-            Self::Doctor { json, project_dir } => {
-                ObserveRequest::Doctor(ObserveDoctorRequest { json, project_dir })
-            }
+            Self::Doctor { json, project_dir } => ObserveRequest::Doctor(ObserveDoctorRequest {
+                json,
+                project_dir,
+                agent,
+            }),
         }
     }
 }

@@ -95,4 +95,3 @@ pub(crate) fn runner_binary_and_pattern_guards(
     }
     None
 }
-

@@ -3,6 +3,7 @@ use std::collections::BTreeMap;
 use serde::Serialize;
 
 use crate::errors::CliError;
+use crate::hooks::adapters::HookAgent;
 use crate::observe::application::maintenance::{load_observer_state, render_pretty_json};
 
 #[derive(Serialize)]
@@ -38,9 +39,13 @@ struct ObserverStatus<'a> {
 
 pub(in crate::observe::application) fn execute_status(
     session_id: &str,
-    _project_hint: Option<&str>,
+    project_hint: Option<&str>,
+    observe_id: &str,
+    agent: Option<HookAgent>,
 ) -> Result<i32, CliError> {
-    let state = load_observer_state(session_id)?;
+    let project_context_root =
+        super::storage::resolve_project_context_root(session_id, project_hint, agent)?;
+    let state = load_observer_state(&project_context_root, observe_id, session_id)?;
 
     let by_severity: BTreeMap<String, usize> = {
         let mut map = BTreeMap::new();

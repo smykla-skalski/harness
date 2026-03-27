@@ -2,6 +2,7 @@ use std::fs;
 use std::io::{BufRead, BufReader};
 
 use crate::errors::{CliError, CliErrorKind};
+use crate::hooks::adapters::HookAgent;
 
 use super::dump::{format_dump_block, timestamp_suffix};
 use super::session;
@@ -57,10 +58,11 @@ pub(super) fn execute_context(
     target_line: usize,
     window: usize,
     project_hint: Option<&str>,
+    agent: Option<HookAgent>,
 ) -> Result<i32, CliError> {
     let start = target_line.saturating_sub(window);
     let end = target_line + window;
-    let path = session::find_session(session_id, project_hint)?;
+    let path = session::find_session_for_agent(session_id, project_hint, agent)?;
     let file = fs::File::open(&path)
         .map_err(|e| CliErrorKind::session_parse_error(format!("cannot open session file: {e}")))?;
     let reader = BufReader::new(file);

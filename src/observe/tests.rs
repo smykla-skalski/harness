@@ -6,6 +6,7 @@ use super::application::ObserveFilter;
 use super::application::maintenance::{load_observer_state, save_observer_state};
 use super::types::{Issue, IssueCode, IssueSeverity, ObserverState};
 use super::{ObserveFilterArgs, classifier, output, redact_details, scan, types};
+use crate::workspace::project_context_dir;
 
 fn write_session_file(dir: &Path, lines: &[&str]) -> PathBuf {
     let path = dir.join("test-session.jsonl");
@@ -220,26 +221,83 @@ fn state_file_lifecycle_two_cycles() {
             ("HOME", Some(tmp_dir.path().to_str().unwrap())),
         ],
         || {
+            let project_context_root = project_context_dir(tmp_dir.path());
             let (issues, last_line) = scan::scan(&session_file, 0).unwrap();
             assert_eq!(last_line, 2);
 
             let mut state = ObserverState::default_for_session(session_id);
             state.cursor = last_line;
             state.last_scan_time = "2026-03-15T10:02:00Z".to_string();
-            save_observer_state(session_id, &state).unwrap();
+            let state =
+                save_observer_state(&project_context_root, "project-default", &state).unwrap();
 
-            let loaded = load_observer_state(session_id).unwrap();
+            let loaded =
+                load_observer_state(&project_context_root, "project-default", session_id).unwrap();
             assert_eq!(loaded.cursor, 2);
             assert_eq!(loaded.session_id, session_id);
+            assert_eq!(loaded.state_version, state.state_version);
 
             let (issues2, last_line2) = scan::scan(&session_file, loaded.cursor).unwrap();
             assert!(issues2.is_empty());
             assert_eq!(last_line2, 2);
 
-            let loaded2 = load_observer_state(session_id).unwrap();
+            let loaded2 =
+                load_observer_state(&project_context_root, "project-default", session_id).unwrap();
             assert_eq!(loaded2.cursor, 2);
+            assert!(
+                project_context_root
+                    .join("agents")
+                    .join("observe")
+                    .join("project-default")
+                    .join("events.jsonl")
+                    .exists()
+            );
+            assert!(
+                project_context_root
+                    .join("agents")
+                    .join("observe")
+                    .join("project-default")
+                    .join("snapshot.json")
+                    .exists()
+            );
 
             drop(issues);
+        },
+    );
+}
+
+#[test]
+fn state_file_save_detects_conflict() {
+    let session_id = "conflict-test-session";
+    let tmp_dir = tempfile::tempdir().unwrap();
+    let data_dir = tmp_dir.path().join("xdg_data");
+    fs::create_dir_all(&data_dir).unwrap();
+
+    temp_env::with_vars(
+        [
+            ("XDG_DATA_HOME", Some(data_dir.to_str().unwrap())),
+            ("HOME", Some(tmp_dir.path().to_str().unwrap())),
+        ],
+        || {
+            let project_context_root = project_context_dir(tmp_dir.path());
+            let initial = ObserverState::default_for_session(session_id);
+            let saved =
+                save_observer_state(&project_context_root, "project-default", &initial).unwrap();
+            assert_eq!(saved.state_version, 1);
+
+            let mut stale = ObserverState::default_for_session(session_id);
+            stale.cursor = 99;
+            let err = save_observer_state(&project_context_root, "project-default", &stale)
+                .expect_err("stale observer state should conflict");
+            assert!(
+                err.details()
+                    .is_some_and(|details| details.contains("observer state conflict"))
+            );
+
+            let loaded =
+                load_observer_state(&project_context_root, "project-default", session_id).unwrap();
+            assert_eq!(loaded.cursor, 0);
+            assert_eq!(loaded.state_version, 1);
         },
     );
 }
