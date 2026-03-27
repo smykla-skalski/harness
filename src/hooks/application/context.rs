@@ -158,12 +158,17 @@ impl GuardContext {
 
     #[must_use]
     pub fn is_suite_runner(&self) -> bool {
-        self.skill.is_runner
+        self.skill.is_runner()
     }
 
     #[must_use]
     pub fn is_suite_create(&self) -> bool {
-        self.skill.is_create
+        self.skill.is_create()
+    }
+
+    #[must_use]
+    pub fn is_observe(&self) -> bool {
+        self.skill.is_observe()
     }
 }
 

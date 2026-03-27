@@ -44,7 +44,7 @@ impl HydratedHookState {
     }
 
     fn load_create_state(&mut self, skill: &SkillContext) {
-        if skill.is_create {
+        if skill.is_create() {
             self.read_create_state();
         }
     }
