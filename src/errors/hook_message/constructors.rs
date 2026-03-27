@@ -100,4 +100,8 @@ impl HookMessage {
             command: command.into(),
         }
     }
+
+    pub fn suite_amendment_required(path: impl Into<Cow<'static, str>>) -> Self {
+        Self::SuiteAmendmentRequired { path: path.into() }
+    }
 }
