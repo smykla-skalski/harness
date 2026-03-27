@@ -31,6 +31,7 @@ fn wrapper_content_references_git_rev_parse() {
 
 #[test]
 fn project_plugin_launcher_prefers_repo_build_then_path() {
+    assert!(PROJECT_PLUGIN_LAUNCHER.contains("CLAUDE_PROJECT_DIR"));
     assert!(PROJECT_PLUGIN_LAUNCHER.contains("target/debug/harness"));
     assert!(PROJECT_PLUGIN_LAUNCHER.contains("command -v harness"));
 }

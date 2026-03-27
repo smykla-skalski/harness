@@ -1,6 +1,16 @@
 #!/bin/sh
 set -eu
 
+if [ "${CLAUDE_PROJECT_DIR:-}" ]; then
+  candidate="${CLAUDE_PROJECT_DIR}/.claude/plugins/suite/harness"
+  if [ -x "${candidate}" ]; then
+    current=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)/$(basename -- "$0")
+    if [ "$(cd -- "$(dirname -- "${candidate}")" && pwd)/$(basename -- "${candidate}")" != "${current}" ]; then
+      exec "${candidate}" "$@"
+    fi
+  fi
+fi
+
 script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 repo_root=$(CDPATH= cd -- "${script_dir}/../../.." && pwd)
 
