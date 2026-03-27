@@ -32,7 +32,8 @@ fn validate_agent_rejects_not_at_end() {
         stop_hook_active: false,
         raw_keys: vec![],
     };
-    let ctx = make_hook_context("suite:create", payload);
+    let mut ctx = make_hook_context("suite:create", payload);
+    ctx.skill_active = true;
     let r = validate_agent::execute(&ctx).unwrap().to_hook_result();
     // "saved" is not at the end, so should warn
     assert_warn(&r);
@@ -49,7 +50,8 @@ fn validate_agent_accepts_at_end() {
         stop_hook_active: false,
         raw_keys: vec![],
     };
-    let ctx = make_hook_context("suite:create", payload);
+    let mut ctx = make_hook_context("suite:create", payload);
+    ctx.skill_active = true;
     let r = validate_agent::execute(&ctx).unwrap().to_hook_result();
     assert_allow(&r);
 }
@@ -65,7 +67,8 @@ fn validate_agent_trailing_period() {
         stop_hook_active: false,
         raw_keys: vec![],
     };
-    let ctx = make_hook_context("suite:create", payload);
+    let mut ctx = make_hook_context("suite:create", payload);
+    ctx.skill_active = true;
     let r = validate_agent::execute(&ctx).unwrap().to_hook_result();
     assert_allow(&r);
 }
@@ -170,8 +173,19 @@ fn hook_context_stop_hook_active() {
 }
 
 #[test]
-fn hook_context_skill_active_default() {
+fn hook_context_skill_active_without_run() {
+    // session_confirms_skill sets skill_active=false when no run context
+    // exists, so a bare suite:run context has skill_active=false.
     let ctx = make_hook_context("suite:run", make_empty_payload());
+    assert!(!ctx.skill_active);
+    assert_eq!(ctx.skill.name.as_deref(), Some("suite:run"));
+}
+
+#[test]
+fn hook_context_skill_active_with_run() {
+    let tmp = tempfile::tempdir().unwrap();
+    let run_dir = init_run(tmp.path(), "run-active", "single-zone");
+    let ctx = make_hook_context_with_run("suite:run", make_empty_payload(), &run_dir);
     assert!(ctx.skill_active);
     assert_eq!(ctx.skill.name.as_deref(), Some("suite:run"));
 }

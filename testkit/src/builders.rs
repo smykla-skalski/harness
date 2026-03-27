@@ -1742,6 +1742,7 @@ pub fn make_hook_context_with_run(
             .ok()
             .flatten();
         ctx.run = Some(run_ctx);
+        ctx.skill_active = true;
     }
     ctx
 }

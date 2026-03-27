@@ -4,7 +4,7 @@ use serde_json::Value;
 
 use crate::create::CreateWorkflowState;
 use crate::hooks::protocol::context::{
-    AgentContext, NormalizedEvent, NormalizedHookContext, SessionContext, SkillContext,
+    AgentContext, NormalizedEvent, NormalizedHookContext, SessionContext, SkillContext, SkillKind,
 };
 use crate::hooks::protocol::payloads::{AskUserAnswer, AskUserQuestionPrompt, HookEnvelopePayload};
 use crate::kernel::tooling::ToolContext;
@@ -48,8 +48,9 @@ impl GuardContext {
     pub fn from_normalized(normalized: NormalizedHookContext) -> Self {
         let normalized = hydrate_normalized_context(normalized);
         let interaction = HookInteraction::from_normalized(&normalized);
-        let skill_active = normalized.skill.active;
         let hydrated = HydratedHookState::from_skill(&normalized.skill);
+        let skill_active =
+            normalized.skill.active && session_confirms_skill(&normalized.skill, &hydrated);
         Self {
             event: normalized.event,
             session: normalized.session,
@@ -169,6 +170,24 @@ impl GuardContext {
     #[must_use]
     pub fn is_observe(&self) -> bool {
         self.skill.is_observe()
+    }
+}
+
+/// Check whether the session has evidence that the claimed skill is actually
+/// running. Hooks are registered at the project level with a hardcoded skill
+/// name, so they fire in every session. Without this gate, sessions that have
+/// nothing to do with suite:run would still enforce runner guards.
+///
+/// For the Runner skill, the session must have a run pointer (created during
+/// bootstrap). For Create, a create-workflow state must exist. Other skill
+/// kinds pass through unconditionally.
+fn session_confirms_skill(skill: &SkillContext, hydrated: &HydratedHookState) -> bool {
+    match skill.kind {
+        SkillKind::Runner => hydrated.run.is_some() || hydrated.runner_state.is_some(),
+        SkillKind::Create => hydrated.create_state.is_some(),
+        // Observe and None pass through - observe checks are gated separately,
+        // and None means no skill was claimed.
+        SkillKind::Observe | SkillKind::None => true,
     }
 }
 
