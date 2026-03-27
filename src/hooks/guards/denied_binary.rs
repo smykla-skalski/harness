@@ -67,14 +67,11 @@ fn check_runner(
     words: &[String],
     heads: &[String],
 ) -> Option<NormalizedHookResult> {
-    if !has_tracked_run_context(ctx) {
-        return None;
-    }
     // Task output access
     if has_task_output_access(words, ctx.command_text()) {
         return Some(deny_runner_flow(TaskOutputPattern::DENY_MESSAGE));
     }
-    // Runner binary (gh, etc.)
+    // Runner binary (gh, etc.) - only when a tracked run is active
     if has_tracked_run_context(ctx) && has_denied_runner_binary(heads) {
         return Some(deny_runner_flow(
             "suite runs must stay on the tracked run; \
