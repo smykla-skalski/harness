@@ -86,10 +86,10 @@ fn runner_allows_gh_without_tracked_run() {
 }
 
 #[test]
-fn runner_allows_kubectl_without_tracked_run() {
+fn runner_denies_kubectl_without_tracked_run() {
     let guard = DeniedBinaryGuard::runner();
     let c = ctx_without_run("suite:run", "kubectl get pods");
-    assert!(guard.check(&c).is_none());
+    assert!(guard.check(&c).is_some());
 }
 
 #[test]
