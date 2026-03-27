@@ -123,6 +123,11 @@ impl IssueBlueprint {
         self
     }
 
+    pub(super) fn with_severity(mut self, severity: IssueSeverity) -> Self {
+        self.severity = severity;
+        self
+    }
+
     pub(super) fn with_source_tool(mut self, source_tool: Option<SourceTool>) -> Self {
         self.source_tool = source_tool;
         self

@@ -124,6 +124,12 @@ pub enum HookMessage {
 
     #[error("Suites must stay user-story-first with concrete variant evidence.")]
     SuiteCreateTracked,
+
+    #[error(
+        "Observe loops are still active. Run CronList to find active observe jobs, \
+         then CronDelete each one before stopping. Do not rely on session cleanup."
+    )]
+    ObserveLoopsActive,
 }
 
 impl HookMessage {
