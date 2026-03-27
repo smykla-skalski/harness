@@ -120,7 +120,11 @@ fn execute_payload_case(skill: &str, command: &str, case_idx: usize) -> HookResu
         let ctx = make_hook_context_with_run(skill, make_bash_payload(command), &run_dir);
         return guard_bash::execute(&ctx).unwrap();
     }
-    let ctx = make_hook_context(skill, make_bash_payload(command));
+    // For non-runner skills (e.g. suite:create), session_confirms_skill may
+    // set skill_active=false when no workflow state exists.  Force it true
+    // so the payload table tests exercise guard logic, not session isolation.
+    let mut ctx = make_hook_context(skill, make_bash_payload(command));
+    ctx.skill_active = true;
     guard_bash::execute(&ctx).unwrap()
 }
 
@@ -142,12 +146,16 @@ fn guard_bash_payloads() {
 
 #[test]
 fn guard_bash_denies_cluster_binaries_even_without_tracked_run() {
+    // session_confirms_skill sets skill_active=false when no run context
+    // exists, so force skill_active=true to test the security guards in
+    // guard_suite_runner that fire before the tracked-run gate.
     for command in [
         "kubectl get pods",
         "curl localhost:9901/config_dump",
         "python3 -c 'print(1)'",
     ] {
-        let ctx = make_hook_context("suite:run", make_bash_payload(command));
+        let mut ctx = make_hook_context("suite:run", make_bash_payload(command));
+        ctx.skill_active = true;
         let r = guard_bash::execute(&ctx).unwrap();
         assert_deny(&r);
     }
@@ -155,8 +163,11 @@ fn guard_bash_denies_cluster_binaries_even_without_tracked_run() {
 
 #[test]
 fn guard_bash_allows_safe_commands_without_tracked_run() {
+    // Force skill_active so the guards actually evaluate the command
+    // rather than short-circuiting on session isolation.
     for command in ["gh pr checks 12345", "echo hello", "ls -la"] {
-        let ctx = make_hook_context("suite:run", make_bash_payload(command));
+        let mut ctx = make_hook_context("suite:run", make_bash_payload(command));
+        ctx.skill_active = true;
         let r = guard_bash::execute(&ctx).unwrap();
         assert_allow(&r);
     }
