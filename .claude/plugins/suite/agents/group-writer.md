@@ -28,4 +28,6 @@ If the local validator is enabled for this environment, run `harness create vali
 
 After writing all group files, read suite.md and check the `groups` list. Every entry must match an actual file in the groups/ directory. Run `ls groups/` and compare. If any suite.md group reference doesn't match a real filename (wrong slug, different numbering, typo), fix the suite.md reference to match the actual file on disk.
 
+Group markdown steps must never include `python3` one-liners for JSON parsing. Use `jq` for JSON filtering or `harness run envoy capture` for Envoy admin data instead.
+
 When you finish writing, do not add extra prose. Return only `group draft saved`.
