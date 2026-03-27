@@ -246,6 +246,18 @@ Build the proposal from the saved worker outputs:
 - Run `harness create validate --path <file>` on authored manifests before stopping. Do not defer to a live cluster.
 - When `profiles` includes `multi-zone`, set `clusters: all` on workload-deploying baselines per [references/suite-structure.md](references/suite-structure.md).
 - Save the merged proposal with `harness create save --kind proposal`.
+- After saving, print a full group summary so the user can review before the approval picker. For each proposed group, print:
+
+```
+## G{NN} {title}
+Profile: {profile} | Platform: {platform}
+Preconditions: {list}
+What it tests: {2-3 sentence description of scope and method}
+Manifests: {count} files ({filenames})
+Success criteria: {list}
+```
+
+This summary is mandatory and must appear before the step 8 AskUserQuestion. The AskUserQuestion multiselect UI truncates descriptions, so the user needs the full picture printed as readable output first. Do not skip this summary or fold it into the AskUserQuestion options.
 
 Group ordering rule - groups MUST be ordered by infrastructure complexity to avoid unnecessary cluster rebuilds:
 
@@ -267,6 +279,7 @@ If no variants survive review, continue with G1-G7 only.
 
 Proposal rules:
 
+- `required_dependencies` must only contain harness infrastructure block names: `docker`, `compose`, `kubernetes`, `k3d`, `helm`, `envoy`, `kuma`, `build`. Application resources (otel-collector, demo-workload, postgres, redis, etc.) belong in `baseline/` manifests, not in `required_dependencies`. The runner will reject unknown requirement names at startup.
 - Default every cluster-interacting command to full `harness` invocations. Only keep raw `kubectl`, `kumactl`, `curl`, or similar commands when the user explicitly asked for raw commands.
 - Follow [references/suite-structure.md](references/suite-structure.md) for file ownership, naming, and manifest conventions.
 - Add `gateway-api-crds` when proposed groups touch `MeshGateway`, `GatewayClass`, `Gateway`, or `HTTPRoute`.
@@ -312,6 +325,19 @@ Every AskUserQuestion in this loop must include the suite path and runner comman
 
 - `Suite path: ${SUITE_DIR}/`
 - `Run command: /suite:run ${SUITE_NAME}`
+
+Before the AskUserQuestion approval picker, print a full readable summary of the saved suite so the user can review what they are approving. For each group, print:
+
+```
+## G{NN} {title}
+Profile: {profile} | Platform: {platform}
+Preconditions: {list}
+What it tests: {2-3 sentence description of scope and method}
+Manifests: {count} files ({filenames})
+Success criteria: {list}
+```
+
+Also include the suite metadata (name, feature, profiles, dependencies) and baseline files. This summary is mandatory and must appear before the post-write AskUserQuestion. The AskUserQuestion picker truncates descriptions, so the user needs the full picture printed as readable output first. Do not skip this summary or fold it into the AskUserQuestion options.
 
 Post-write loop rules:
 
