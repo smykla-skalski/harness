@@ -1,7 +1,12 @@
 ---
+name: observe
+description: Session observer for harness-managed agent sessions. Use it to scan, watch, or dump another session through the current `harness observe` contract.
+argument-hint: <session-id> [--from-line N] [--from <line|timestamp|prose>] [--focus harness|skills|all]
+allowed-tools: Agent, Bash, Edit, Glob, Grep, Read, Skill
 disable-model-invocation: true
 user-invocable: true
 hooks:
+  Stop:
   - hooks:
     - command: harness hook --agent claude observe guard-stop
       type: command

@@ -7,7 +7,7 @@ use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 
 use clap::ValueEnum;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use walkdir::WalkDir;
 
@@ -428,11 +428,10 @@ fn render_skill_markdown(
     }
     if let Some(hooks) = hooks {
         out.push_str("hooks:\n");
-        let hooks_yaml = serde_yml::to_string(&hooks)
-            .map_err(|error| CliErrorKind::serialize(format!("skill hooks: {error}")))?;
-        for line in hooks_yaml.lines().skip(1) {
+        let hooks_yaml = yaml_serialized_lines(&hooks, "skill hooks")?;
+        for line in hooks_yaml {
             out.push_str("  ");
-            out.push_str(line);
+            out.push_str(&line);
             out.push('\n');
         }
     }
@@ -767,13 +766,31 @@ fn path_is_executable(path: &Path) -> bool {
 }
 
 fn append_yaml_line(out: &mut String, key: &str, value: &str) {
-    let rendered = serde_yml::to_string(value).expect("yaml scalar serializes");
-    if let Some(line) = rendered.lines().nth(1) {
+    let rendered = yaml_serialized_lines(value, "yaml scalar").expect("yaml scalar serializes");
+    if let Some((first, rest)) = rendered.split_first() {
         out.push_str(key);
         out.push_str(": ");
-        out.push_str(line);
+        out.push_str(first);
         out.push('\n');
+        for line in rest {
+            out.push_str("  ");
+            out.push_str(line);
+            out.push('\n');
+        }
     }
+}
+
+fn yaml_serialized_lines<T: Serialize + ?Sized>(
+    value: &T,
+    what: &str,
+) -> Result<Vec<String>, CliError> {
+    let rendered = serde_yml::to_string(value)
+        .map_err(|error| CliErrorKind::serialize(format!("{what}: {error}")))?;
+    Ok(rendered
+        .lines()
+        .skip(usize::from(matches!(rendered.lines().next(), Some("---"))))
+        .map(ToOwned::to_owned)
+        .collect())
 }
 
 fn toml_string(value: &str) -> String {
@@ -782,4 +799,77 @@ fn toml_string(value: &str) -> String {
 
 fn io_err(error: &impl ToString) -> CliError {
     CliErrorKind::workflow_io(error.to_string()).into()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    fn sample_skill() -> SkillDefinition {
+        SkillDefinition {
+            root: PathBuf::from("agents/plugins/suite/skills/run"),
+            source: SkillSource {
+                name: "run".to_string(),
+                description: "Execute suite runs through harness.".to_string(),
+                argument_hint: Some("[suite-path]".to_string()),
+                allowed_tools: Some(
+                    "Agent, AskUserQuestion, Bash, Edit, Glob, Read, Write".to_string(),
+                ),
+                disable_model_invocation: Some(true),
+                user_invocable: Some(true),
+                hooks: Some(json!({
+                    "PreToolUse": [
+                        {
+                            "matcher": "Bash",
+                            "hooks": [
+                                {
+                                    "type": "command",
+                                    "command": "harness hook --skill suite:run guard-bash"
+                                }
+                            ]
+                        }
+                    ],
+                    "PostToolUse": [
+                        {
+                            "matcher": "Read",
+                            "hooks": [
+                                {
+                                    "type": "command",
+                                    "command": "harness hook --skill suite:run audit"
+                                }
+                            ]
+                        }
+                    ]
+                })),
+            },
+            body: "Run the suite through harness.".to_string(),
+        }
+    }
+
+    #[test]
+    fn render_skill_markdown_keeps_first_scalar_and_hook_entries() {
+        let rendered =
+            render_skill_markdown(RenderTarget::Claude, &sample_skill()).expect("skill renders");
+
+        assert!(rendered.starts_with("---\nname: run\n"));
+        assert!(rendered.contains("description: Execute suite runs through harness.\n"));
+        assert!(rendered.contains("argument-hint:"));
+        assert!(rendered.contains("[suite-path]"));
+        assert!(rendered.contains("allowed-tools:"));
+        assert!(rendered.contains("AskUserQuestion"));
+        assert!(rendered.contains("hooks:\n"));
+        assert!(rendered.contains("PreToolUse"));
+        assert!(rendered.contains("PostToolUse"));
+        assert!(rendered.contains("---\n\n"));
+        assert!(rendered.contains("Run the suite through harness."));
+    }
+
+    #[test]
+    fn yaml_serialized_lines_drops_only_optional_document_marker() {
+        let rendered =
+            yaml_serialized_lines(&json!({"PreToolUse": []}), "hooks").expect("yaml serializes");
+
+        assert_eq!(rendered.first().map(String::as_str), Some("PreToolUse: []"));
+    }
 }
