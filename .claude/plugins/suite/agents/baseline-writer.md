@@ -15,4 +15,8 @@ OTel collector ConfigMap baselines must use the `debug` exporter, not `logging`.
 
 If the local validator is enabled for this environment, run `harness create validate` on the baseline manifests you wrote before stopping. Use the current repo checkout as the schema source of truth; the required schemas and CRDs are already in this repo.
 
+## Post-write validation
+
+After writing all baseline files, read suite.md and check the `baseline_files` list. Every entry must match a file you actually wrote. If suite.md references a filename that doesn't exist on disk (e.g. suite.md says `baseline/demo-app.yaml` but the file you wrote is `baseline/demo-workload.yaml`), fix the suite.md reference to match the actual filename. Never silently create a file with a different name than what suite.md references without correcting the reference.
+
 When you finish writing, do not add extra prose. Return only `baseline draft saved`.

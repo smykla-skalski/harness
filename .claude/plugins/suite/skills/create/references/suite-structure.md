@@ -67,9 +67,9 @@ feature: <primary feature>
 scope: <what this suite covers>
 profiles:
   - single-zone
-required_dependencies:
-  - otel-collector
-user_stories:
+required_dependencies:           # harness infrastructure blocks only
+  - helm                         # valid: docker, compose, kubernetes, k3d, helm, envoy, kuma, build
+user_stories:                    # do NOT put application resources here (otel-collector, demo-workload, etc.)
   - <story written from the operator or user point of view>
 variant_decisions:
   - <why a variant group was included or skipped>
@@ -306,6 +306,10 @@ If a group step references applying a resource that has no corresponding YAML fi
 - Every manifest field must be verified against the CRD or Go API spec before inclusion. See [code-reading-guide.md](code-reading-guide.md) (Schema verification sources) for the full checklist.
 - Check the policy spec nesting pattern (from/to/rules) before writing manifests. Config like `action` lives at `spec.from[].default.action`, NOT `spec.default.action`. See [code-reading-guide.md](code-reading-guide.md) (Policy spec nesting patterns) for the full pattern table and correct/incorrect examples.
 - `targetRef.name` and `targetRef.labels` are mutually exclusive - never use both in the same targetRef, because mixed selectors create ambiguous targeting and often fail validation. Use `name` to target a specific resource, `labels` to target a group.
+
+### Kuma backendRef qualified names
+
+In Kubernetes mode, Kuma stores resources with qualified internal names in the form `<metadata.name>.<metadata.namespace>`. When a policy (MeshMetric, MeshTrace, MeshAccessLog, etc.) uses a `backendRef` to reference another Kuma resource (MeshOpenTelemetryBackend, MeshExternalService, etc.), the `name` field must use this qualified form - e.g. `demo-collector.kuma-system`, not just `demo-collector`. Bare names silently fail to match at runtime.
 
 ### OTel collector configuration
 

@@ -9,6 +9,8 @@ You are a read-only worker for `suite:create`.
 
 Read only the scoped files provided by the parent prompt. Do not ask the user questions. Do not dump raw file contents. Keep notes brief and evidence-driven.
 
+**Critical:** `required_dependencies` in suite metadata refers only to harness infrastructure blocks. The only valid values are: `docker`, `compose`, `kubernetes`, `k3d`, `helm`, `envoy`, `kuma`, `build`. Application-level resources like otel-collector, demo-workload, postgres, or redis are baseline manifests, NOT required dependencies. Never put application resource names in `required_dependencies`.
+
 Before finishing:
 
 1. Build a compact JSON payload with this shape:
