@@ -1,6 +1,11 @@
 ---
+name: run
+description: Execute reproducible suite runs on harness-managed Kubernetes or universal Docker infrastructure for Kuma service mesh features. Supports local k3d Kubernetes, remote kubeconfig-backed Kubernetes, and universal mode containers for tracked verification runs.
+argument-hint: '[suite-path] [--profile single-zone|multi-zone] [--provider local|remote] [--repo /path/to/kuma] [--run-id ID] [--resume RUN_ID]'
+allowed-tools: Agent, AskUserQuestion, Bash, Edit, Glob, Read, Write
 user-invocable: true
 hooks:
+  PostToolUse:
   - hooks:
     - command: harness hook --agent copilot suite:run verify-bash
       type: command
