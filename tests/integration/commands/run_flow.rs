@@ -198,10 +198,7 @@ fn run_finish_clears_current_run_pointer() {
 
     with_run_env(&xdg, "run-finish-pointer", || {
         let pointer_path = current_run_context_path().unwrap();
-        assert!(
-            pointer_path.exists(),
-            "pointer should exist before finish"
-        );
+        assert!(pointer_path.exists(), "pointer should exist before finish");
 
         let result = run_command(finish_cmd(FinishArgs {
             run_dir: RunDirArgs {

@@ -453,7 +453,11 @@ fn denies_python_piped_after_harness_record() {
          import json, sys; print(json.load(sys.stdin))\"",
     );
     let r = execute(&c).unwrap();
-    assert_eq!(r.decision, Decision::Deny, "python piped after harness record must be denied");
+    assert_eq!(
+        r.decision,
+        Decision::Deny,
+        "python piped after harness record must be denied"
+    );
 }
 
 #[test]

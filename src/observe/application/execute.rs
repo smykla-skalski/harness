@@ -77,11 +77,21 @@ fn execute_scan_mode(request: &ObserveScanRequest) -> Result<i32, CliError> {
         ObserveScanAction::Cycle {
             session_id,
             project_hint,
-        } => maintenance::execute_cycle(session_id, project_hint),
+        } => maintenance::execute_cycle(
+            session_id,
+            project_hint,
+            request.filter.observe_id.as_str(),
+            request.filter.agent,
+        ),
         ObserveScanAction::Status {
             session_id,
             project_hint,
-        } => maintenance::execute_status(session_id, project_hint),
+        } => maintenance::execute_status(
+            session_id,
+            project_hint,
+            request.filter.observe_id.as_str(),
+            request.filter.agent,
+        ),
         ObserveScanAction::Resume { session_id, filter } => {
             maintenance::execute_resume(session_id, filter)
         }
@@ -90,12 +100,24 @@ fn execute_scan_mode(request: &ObserveScanRequest) -> Result<i32, CliError> {
             issue_id,
             since_line,
             project_hint,
-        } => maintenance::execute_verify(session_id, issue_id, since_line, project_hint),
+        } => maintenance::execute_verify(
+            session_id,
+            issue_id,
+            since_line,
+            project_hint,
+            request.filter.observe_id.as_str(),
+            request.filter.agent,
+        ),
         ObserveScanAction::ResolveFrom {
             session_id,
             value,
             project_hint,
-        } => maintenance::execute_resolve_start(session_id, value, project_hint),
+        } => maintenance::execute_resolve_start(
+            session_id,
+            value,
+            project_hint,
+            request.filter.agent,
+        ),
         ObserveScanAction::Compare {
             session_id,
             from_a,
@@ -103,24 +125,44 @@ fn execute_scan_mode(request: &ObserveScanRequest) -> Result<i32, CliError> {
             from_b,
             to_b,
             project_hint,
-        } => compare::execute_compare(session_id, from_a, to_a, from_b, to_b, project_hint),
+        } => compare::execute_compare(
+            session_id,
+            from_a,
+            to_a,
+            from_b,
+            to_b,
+            project_hint,
+            request.filter.agent,
+        ),
         ObserveScanAction::ListCategories => maintenance::execute_list_categories(),
         ObserveScanAction::ListFocusPresets => maintenance::execute_list_focus_presets(),
         ObserveScanAction::Mute {
             session_id,
             codes,
             project_hint,
-        } => maintenance::execute_mute(session_id, codes, project_hint),
+        } => maintenance::execute_mute(
+            session_id,
+            codes,
+            project_hint,
+            request.filter.observe_id.as_str(),
+            request.filter.agent,
+        ),
         ObserveScanAction::Unmute {
             session_id,
             codes,
             project_hint,
-        } => maintenance::execute_unmute(session_id, codes, project_hint),
+        } => maintenance::execute_unmute(
+            session_id,
+            codes,
+            project_hint,
+            request.filter.observe_id.as_str(),
+            request.filter.agent,
+        ),
     }
 }
 
 fn execute_doctor_mode(request: &ObserveDoctorRequest) -> Result<i32, CliError> {
-    doctor::execute_doctor(request.json, request.project_dir.as_deref())
+    doctor::execute_doctor(request.json, request.project_dir.as_deref(), request.agent)
 }
 
 fn execute_dump_mode(request: &ObserveDumpRequest) -> Result<i32, CliError> {
@@ -130,6 +172,7 @@ fn execute_dump_mode(request: &ObserveDumpRequest) -> Result<i32, CliError> {
             line,
             request.context_window,
             request.project_hint.as_deref(),
+            request.agent,
         )
     } else {
         dump::execute_dump(
@@ -143,6 +186,7 @@ fn execute_dump_mode(request: &ObserveDumpRequest) -> Result<i32, CliError> {
                 raw_json: request.raw_json,
             },
             request.project_hint.as_deref(),
+            request.agent,
         )
     }
 }

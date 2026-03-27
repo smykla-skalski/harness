@@ -42,6 +42,10 @@ echo "harness: unable to resolve .claude/plugins/suite/harness" >&2
 exit 1
 "#;
 
+/// Claude plugin launcher that always resolves the current harness CLI.
+pub(crate) const PROJECT_PLUGIN_LAUNCHER: &str =
+    include_str!("../../../agents/shared/claude-plugin-harness.sh");
+
 /// Bootstrap main entry point.
 ///
 /// Verifies the project source wrapper exists, chooses an install dir,
@@ -104,7 +108,10 @@ fn write_process_agent_bootstrap(
 ) -> Result<Vec<PathBuf>, CliError> {
     let path = match agent {
         HookAgent::Claude => project_dir.join(".claude").join("settings.json"),
-        HookAgent::Copilot => project_dir.join(".github").join("hooks").join("harness.json"),
+        HookAgent::Copilot => project_dir
+            .join(".github")
+            .join("hooks")
+            .join("harness.json"),
         HookAgent::Codex => project_dir.join(".codex").join("hooks.json"),
         HookAgent::Gemini => project_dir.join(".gemini").join("settings.json"),
     };

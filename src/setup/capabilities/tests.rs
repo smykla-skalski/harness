@@ -259,8 +259,8 @@ fn lifecycle_features_use_top_level_commands() {
         session.commands.as_deref(),
         Some(
             &[
-                "harness session-start".to_string(),
-                "harness session-stop".to_string(),
+                "harness agents session-start".to_string(),
+                "harness agents session-stop".to_string(),
             ][..]
         )
     );

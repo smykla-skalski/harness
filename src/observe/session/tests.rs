@@ -1,6 +1,9 @@
 use std::fs;
 
-use super::find_session;
+use crate::hooks::adapters::HookAgent;
+use crate::workspace::project_context_dir;
+
+use super::{find_session, find_session_for_agent};
 
 #[test]
 fn find_session_in_temp_dir() {
@@ -78,4 +81,39 @@ fn find_session_ambiguous_without_hint() {
         let err = result.unwrap_err();
         assert_eq!(err.code(), "KSRCLI085");
     });
+}
+
+#[test]
+fn find_session_prefers_canonical_agent_log() {
+    let tmp = tempfile::tempdir().unwrap();
+    let project_dir = tmp.path().join("repo");
+    fs::create_dir_all(&project_dir).unwrap();
+
+    let data_dir = tmp.path().join("xdg_data");
+    let legacy_dir = tmp
+        .path()
+        .join(".claude")
+        .join("projects")
+        .join("test-project");
+    fs::create_dir_all(&legacy_dir).unwrap();
+    fs::write(legacy_dir.join("abc123.jsonl"), "{}\n").unwrap();
+
+    temp_env::with_vars(
+        [
+            ("HOME", Some(tmp.path().to_str().unwrap())),
+            ("XDG_DATA_HOME", Some(data_dir.to_str().unwrap())),
+        ],
+        || {
+            let canonical = project_context_dir(&project_dir)
+                .join("agents")
+                .join("sessions")
+                .join("claude")
+                .join("abc123")
+                .join("raw.jsonl");
+            fs::create_dir_all(canonical.parent().unwrap()).unwrap();
+            fs::write(&canonical, "{}\n").unwrap();
+            let result = find_session_for_agent("abc123", None, Some(HookAgent::Claude)).unwrap();
+            assert_eq!(result, canonical);
+        },
+    );
 }

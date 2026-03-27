@@ -65,15 +65,21 @@ fn dump_mode(session_id: &str) -> ObserveMode {
     }
 }
 
+fn observe_args(mode: ObserveMode) -> ObserveArgs {
+    ObserveArgs {
+        agent: None,
+        observe_id: "project-default".to_string(),
+        mode,
+    }
+}
+
 #[test]
 fn scan_missing_session_returns_error() {
     let tmp = tempfile::tempdir().unwrap();
     let mut filter = default_filter();
     filter.project_hint = Some("nonexistent".into());
 
-    let cmd = Command::Observe(ObserveArgs {
-        mode: scan_mode("does-not-exist-ever", filter),
-    });
+    let cmd = Command::Observe(observe_args(scan_mode("does-not-exist-ever", filter)));
 
     temp_env::with_vars([("HOME", Some(tmp.path().to_str().unwrap()))], || {
         let result = run_command(cmd);
@@ -87,9 +93,7 @@ fn scan_missing_session_returns_error() {
 fn dump_missing_session_returns_error() {
     let tmp = tempfile::tempdir().unwrap();
 
-    let cmd = Command::Observe(ObserveArgs {
-        mode: dump_mode("no-such-session"),
-    });
+    let cmd = Command::Observe(observe_args(dump_mode("no-such-session")));
 
     temp_env::with_vars([("HOME", Some(tmp.path().to_str().unwrap()))], || {
         let result = run_command(cmd);
@@ -103,20 +107,18 @@ fn dump_missing_session_returns_error() {
 fn context_missing_session_returns_error() {
     let tmp = tempfile::tempdir().unwrap();
 
-    let cmd = Command::Observe(ObserveArgs {
-        mode: ObserveMode::Dump {
-            session_id: "no-such-session".into(),
-            context_line: Some(10),
-            context_window: 5,
-            from_line: None,
-            to_line: None,
-            filter: None,
-            role: None,
-            tool_name: None,
-            raw_json: false,
-            project_hint: None,
-        },
-    });
+    let cmd = Command::Observe(observe_args(ObserveMode::Dump {
+        session_id: "no-such-session".into(),
+        context_line: Some(10),
+        context_window: 5,
+        from_line: None,
+        to_line: None,
+        filter: None,
+        role: None,
+        tool_name: None,
+        raw_json: false,
+        project_hint: None,
+    }));
 
     temp_env::with_vars([("HOME", Some(tmp.path().to_str().unwrap()))], || {
         let result = run_command(cmd);
@@ -155,7 +157,7 @@ fn write_doctor_project(project_dir: &Path, legacy_lifecycle: bool) {
             r#"{{"hooks":{{"SessionStart":[{{"hooks":[{{"type":"command","command":"{session_start}"}}]}}]}}}}"#
         )
     } else {
-        r#"{"hooks":{"PreCompact":[{"hooks":[{"type":"command","command":"harness pre-compact --project-dir \"$CLAUDE_PROJECT_DIR\""}]}],"SessionStart":[{"hooks":[{"type":"command","command":"harness session-start --project-dir \"$CLAUDE_PROJECT_DIR\""}]}],"Stop":[{"hooks":[{"type":"command","command":"harness session-stop --project-dir \"$CLAUDE_PROJECT_DIR\""}]}]}}"#
+        r#"{"hooks":{"PreCompact":[{"hooks":[{"type":"command","command":"harness pre-compact --project-dir \"$CLAUDE_PROJECT_DIR\""}]}],"SessionStart":[{"hooks":[{"type":"command","command":"harness agents session-start --agent claude --project-dir \"$CLAUDE_PROJECT_DIR\""}]}],"Stop":[{"hooks":[{"type":"command","command":"harness agents session-stop --agent claude --project-dir \"$CLAUDE_PROJECT_DIR\""}]}]}}"#
             .to_string()
     };
     fs::write(hooks_dir.join("hooks.json"), hooks_json).unwrap();
@@ -198,9 +200,7 @@ fn scan_finds_build_error() {
     filter.json = true;
     filter.summary = true;
 
-    let cmd = Command::Observe(ObserveArgs {
-        mode: scan_mode("build-err-sess", filter),
-    });
+    let cmd = Command::Observe(observe_args(scan_mode("build-err-sess", filter)));
 
     temp_env::with_vars([("HOME", Some(tmp.path().to_str().unwrap()))], || {
         let result = run_command(cmd);
@@ -221,12 +221,10 @@ fn observe_doctor_accepts_current_project_wiring() {
     fs::write(bin_dir.join("harness"), "").unwrap();
     let xdg = tmp.path().join("xdg");
 
-    let cmd = Command::Observe(ObserveArgs {
-        mode: ObserveMode::Doctor {
-            json: true,
-            project_dir: Some(project_dir.to_string_lossy().to_string()),
-        },
-    });
+    let cmd = Command::Observe(observe_args(ObserveMode::Doctor {
+        json: true,
+        project_dir: Some(project_dir.to_string_lossy().to_string()),
+    }));
 
     temp_env::with_vars(
         [
@@ -278,12 +276,10 @@ fn observe_doctor_reports_legacy_lifecycle_and_stale_pointer() {
             )
             .unwrap();
 
-            let cmd = Command::Observe(ObserveArgs {
-                mode: ObserveMode::Doctor {
-                    json: true,
-                    project_dir: Some(project_dir.to_string_lossy().to_string()),
-                },
-            });
+            let cmd = Command::Observe(observe_args(ObserveMode::Doctor {
+                json: true,
+                project_dir: Some(project_dir.to_string_lossy().to_string()),
+            }));
             let result = run_command(cmd);
             assert_eq!(result.unwrap(), 2);
         },
@@ -313,9 +309,7 @@ fn scan_severity_filter_excludes_low() {
     filter.severity = Some("medium".into());
     filter.json = true;
 
-    let cmd = Command::Observe(ObserveArgs {
-        mode: scan_mode("sev-filter-sess", filter),
-    });
+    let cmd = Command::Observe(observe_args(scan_mode("sev-filter-sess", filter)));
 
     temp_env::with_vars([("HOME", Some(tmp.path().to_str().unwrap()))], || {
         let result = run_command(cmd);
@@ -342,9 +336,7 @@ fn scan_category_filter() {
     filter.category = Some("build_error".into());
     filter.json = true;
 
-    let cmd = Command::Observe(ObserveArgs {
-        mode: scan_mode("cat-filter-sess", filter),
-    });
+    let cmd = Command::Observe(observe_args(scan_mode("cat-filter-sess", filter)));
 
     temp_env::with_vars([("HOME", Some(tmp.path().to_str().unwrap()))], || {
         let result = run_command(cmd);
@@ -371,9 +363,7 @@ fn scan_exclude_filter() {
     filter.exclude = Some("user_frustration".into());
     filter.json = true;
 
-    let cmd = Command::Observe(ObserveArgs {
-        mode: scan_mode("excl-filter-sess", filter),
-    });
+    let cmd = Command::Observe(observe_args(scan_mode("excl-filter-sess", filter)));
 
     temp_env::with_vars([("HOME", Some(tmp.path().to_str().unwrap()))], || {
         let result = run_command(cmd);
@@ -401,9 +391,7 @@ fn scan_fixable_filter() {
     filter.fixable = true;
     filter.json = true;
 
-    let cmd = Command::Observe(ObserveArgs {
-        mode: scan_mode("fix-filter-sess", filter),
-    });
+    let cmd = Command::Observe(observe_args(scan_mode("fix-filter-sess", filter)));
 
     temp_env::with_vars([("HOME", Some(tmp.path().to_str().unwrap()))], || {
         let result = cmd.execute();
@@ -422,20 +410,18 @@ fn dump_returns_ok_with_session() {
     });
     write_session_fixture(&tmp, "dump-sess", &[&serde_json::to_string(&line).unwrap()]);
 
-    let cmd = Command::Observe(ObserveArgs {
-        mode: ObserveMode::Dump {
-            session_id: "dump-sess".into(),
-            context_line: None,
-            context_window: 10,
-            from_line: Some(0),
-            to_line: Some(10),
-            filter: None,
-            role: Some("user".into()),
-            tool_name: None,
-            raw_json: false,
-            project_hint: None,
-        },
-    });
+    let cmd = Command::Observe(observe_args(ObserveMode::Dump {
+        session_id: "dump-sess".into(),
+        context_line: None,
+        context_window: 10,
+        from_line: Some(0),
+        to_line: Some(10),
+        filter: None,
+        role: Some("user".into()),
+        tool_name: None,
+        raw_json: false,
+        project_hint: None,
+    }));
 
     temp_env::with_vars([("HOME", Some(tmp.path().to_str().unwrap()))], || {
         let result = cmd.execute();
@@ -455,20 +441,18 @@ fn context_returns_ok_with_session() {
     });
     write_session_fixture(&tmp, "ctx-sess", &[&serde_json::to_string(&line).unwrap()]);
 
-    let cmd = Command::Observe(ObserveArgs {
-        mode: ObserveMode::Dump {
-            session_id: "ctx-sess".into(),
-            context_line: Some(0),
-            context_window: 5,
-            from_line: None,
-            to_line: None,
-            filter: None,
-            role: None,
-            tool_name: None,
-            raw_json: false,
-            project_hint: None,
-        },
-    });
+    let cmd = Command::Observe(observe_args(ObserveMode::Dump {
+        session_id: "ctx-sess".into(),
+        context_line: Some(0),
+        context_window: 5,
+        from_line: None,
+        to_line: None,
+        filter: None,
+        role: None,
+        tool_name: None,
+        raw_json: false,
+        project_hint: None,
+    }));
 
     temp_env::with_vars([("HOME", Some(tmp.path().to_str().unwrap()))], || {
         let result = cmd.execute();
@@ -498,9 +482,7 @@ fn scan_output_details_written() {
     filter.json = true;
     filter.output_details = Some(details_path.to_string_lossy().to_string());
 
-    let cmd = Command::Observe(ObserveArgs {
-        mode: scan_mode("details-sess", filter),
-    });
+    let cmd = Command::Observe(observe_args(scan_mode("details-sess", filter)));
 
     temp_env::with_vars([("HOME", Some(tmp.path().to_str().unwrap()))], || {
         let result = cmd.execute();

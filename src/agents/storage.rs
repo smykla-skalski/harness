@@ -2,8 +2,8 @@ use std::fs::{File, OpenOptions};
 use std::io::{BufRead, BufReader, Write as _};
 use std::path::{Path, PathBuf};
 
-use fs2::FileExt;
 use fs_err as fs;
+use fs2::FileExt;
 use serde::Serialize;
 use serde_json::Value;
 
@@ -12,7 +12,7 @@ use crate::hooks::adapters::HookAgent;
 use crate::hooks::protocol::context::{NormalizedEvent, NormalizedHookContext};
 use crate::hooks::protocol::result::NormalizedHookResult;
 use crate::infra::io::{read_json_typed, write_json_pretty};
-use crate::workspace::{project_context_dir, utc_now};
+use crate::workspace::{harness_data_root, project_context_dir, utc_now};
 
 use super::types::{AgentLedgerEvent, AgentSessionRegistry};
 
@@ -40,7 +40,9 @@ fn session_file_path(project_dir: &Path, agent: HookAgent, session_id: &str) -> 
 }
 
 fn lock_path(project_dir: &Path, name: &str) -> PathBuf {
-    agents_root(project_dir).join(".locks").join(format!("{name}.lock"))
+    agents_root(project_dir)
+        .join(".locks")
+        .join(format!("{name}.lock"))
 }
 
 fn agent_name(agent: HookAgent) -> &'static str {
@@ -54,7 +56,7 @@ fn agent_name(agent: HookAgent) -> &'static str {
 
 fn open_lock_file(path: &Path) -> Result<File, CliError> {
     if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent).map_err(io_err)?;
+        fs::create_dir_all(parent).map_err(|error| io_err(&error))?;
     }
     OpenOptions::new()
         .create(true)
@@ -62,7 +64,7 @@ fn open_lock_file(path: &Path) -> Result<File, CliError> {
         .write(true)
         .truncate(false)
         .open(path)
-        .map_err(io_err)
+        .map_err(|error| io_err(&error))
 }
 
 fn with_lock<T>(
@@ -71,9 +73,9 @@ fn with_lock<T>(
     action: impl FnOnce() -> Result<T, CliError>,
 ) -> Result<T, CliError> {
     let file = open_lock_file(&lock_path(project_dir, name))?;
-    file.lock_exclusive().map_err(io_err)?;
+    file.lock_exclusive().map_err(|error| io_err(&error))?;
     let result = action();
-    let unlock = file.unlock().map_err(io_err);
+    let unlock = file.unlock().map_err(|error| io_err(&error));
     match (result, unlock) {
         (Ok(value), Ok(())) => Ok(value),
         (Err(error), Ok(()) | Err(_)) | (Ok(_), Err(error)) => Err(error),
@@ -104,16 +106,18 @@ pub(crate) fn set_current_session_id(
         } else {
             AgentSessionRegistry::default()
         };
-        registry.current.insert(
-            agent_name(agent).to_string(),
-            session_id.to_string(),
-        );
+        registry
+            .current
+            .insert(agent_name(agent).to_string(), session_id.to_string());
         registry.updated_at = utc_now();
         write_json_pretty(&path, &registry)
     })
 }
 
-pub(crate) fn clear_current_session_id(project_dir: &Path, agent: HookAgent) -> Result<(), CliError> {
+pub(crate) fn clear_current_session_id(
+    project_dir: &Path,
+    agent: HookAgent,
+) -> Result<(), CliError> {
     with_lock(project_dir, "sessions", || {
         let path = session_registry_path(project_dir);
         let mut registry = if path.exists() {
@@ -213,37 +217,13 @@ pub(crate) fn append_session_marker(
 pub(crate) fn find_canonical_session(
     session_id: &str,
     project_hint: Option<&str>,
+    agent_hint: Option<HookAgent>,
 ) -> Result<Option<PathBuf>, CliError> {
-    let root = crate::workspace::harness_data_root().join("projects");
+    let root = harness_data_root().join("projects");
     if !root.is_dir() {
         return Ok(None);
     }
-    let mut matches = Vec::new();
-    for entry in walkdir::WalkDir::new(&root).min_depth(4).max_depth(6) {
-        let entry = match entry {
-            Ok(entry) => entry,
-            Err(_) => continue,
-        };
-        if !entry.file_type().is_file() || entry.file_name() != "raw.jsonl" {
-            continue;
-        }
-        let Some(session_dir) = entry.path().parent() else {
-            continue;
-        };
-        let Some(found_session_id) = session_dir.file_name().and_then(|name| name.to_str()) else {
-            continue;
-        };
-        if found_session_id != session_id {
-            continue;
-        }
-        if let Some(hint) = project_hint {
-            let path_text = entry.path().display().to_string();
-            if !path_text.contains(hint) {
-                continue;
-            }
-        }
-        matches.push(entry.path().to_path_buf());
-    }
+    let matches = matching_canonical_sessions(&root, session_id, project_hint, agent_hint);
     if matches.is_empty() {
         return Ok(None);
     }
@@ -256,15 +236,73 @@ pub(crate) fn find_canonical_session(
     .into())
 }
 
+fn matching_canonical_sessions(
+    root: &Path,
+    session_id: &str,
+    project_hint: Option<&str>,
+    agent_hint: Option<HookAgent>,
+) -> Vec<PathBuf> {
+    let mut matches = Vec::new();
+    for entry in walkdir::WalkDir::new(root).min_depth(4).max_depth(6) {
+        let Ok(entry) = entry else {
+            continue;
+        };
+        if canonical_session_matches(&entry, session_id, project_hint, agent_hint) {
+            matches.push(entry.path().to_path_buf());
+        }
+    }
+    matches
+}
+
+fn canonical_session_matches(
+    entry: &walkdir::DirEntry,
+    session_id: &str,
+    project_hint: Option<&str>,
+    agent_hint: Option<HookAgent>,
+) -> bool {
+    if !entry.file_type().is_file() || entry.file_name() != "raw.jsonl" {
+        return false;
+    }
+    let Some(session_dir) = entry.path().parent() else {
+        return false;
+    };
+    let Some(found_session_id) = session_dir.file_name().and_then(|name| name.to_str()) else {
+        return false;
+    };
+    if found_session_id != session_id {
+        return false;
+    }
+    if let Some(agent_hint) = agent_hint {
+        let Some(agent_dir) = session_dir.parent().and_then(|path| path.file_name()) else {
+            return false;
+        };
+        if agent_dir != agent_name(agent_hint) {
+            return false;
+        }
+    }
+    project_hint.is_none_or(|hint| entry.path().display().to_string().contains(hint))
+}
+
+pub(crate) fn project_context_root_from_session_path(path: &Path) -> Option<PathBuf> {
+    if path.file_name().and_then(|name| name.to_str()) != Some("raw.jsonl") {
+        return None;
+    }
+    let path_text = path.to_string_lossy();
+    if !path_text.contains("/agents/sessions/") {
+        return None;
+    }
+    path.ancestors().nth(5).map(Path::to_path_buf)
+}
+
 fn next_sequence(path: &Path) -> Result<u64, CliError> {
     if !path.exists() {
         return Ok(1);
     }
-    let file = File::open(path).map_err(io_err)?;
+    let file = File::open(path).map_err(|error| io_err(&error))?;
     let reader = BufReader::new(file);
     let mut last = 0;
     for line in reader.lines() {
-        let line = line.map_err(io_err)?;
+        let line = line.map_err(|error| io_err(&error))?;
         if line.trim().is_empty() {
             continue;
         }
@@ -287,18 +325,19 @@ where
 
 fn append_text_line(path: &Path, line: &str) -> Result<(), CliError> {
     if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent).map_err(io_err)?;
+        fs::create_dir_all(parent).map_err(|error| io_err(&error))?;
     }
     let mut file = OpenOptions::new()
         .create(true)
         .append(true)
         .open(path)
-        .map_err(io_err)?;
-    writeln!(file, "{line}").map_err(io_err)
+        .map_err(|error| io_err(&error))?;
+    writeln!(file, "{line}").map_err(|error| io_err(&error))
 }
 
 fn normalized_event_name(event: &NormalizedEvent) -> &'static str {
     match event {
+        NormalizedEvent::UserPromptSubmit => "user_prompt_submit",
         NormalizedEvent::BeforeToolUse => "before_tool_use",
         NormalizedEvent::AfterToolUse => "after_tool_use",
         NormalizedEvent::AfterToolUseFailure => "after_tool_use_failure",
@@ -322,6 +361,17 @@ fn render_canonical_line(
     result: &NormalizedHookResult,
 ) -> Result<Value, CliError> {
     let message = match (&context.event, context.tool.as_ref()) {
+        (NormalizedEvent::UserPromptSubmit, _) => serde_json::json!({
+            "role": "user",
+            "content": [{
+                "type": "text",
+                "text": context
+                    .agent
+                    .as_ref()
+                    .and_then(|agent| agent.prompt.clone())
+                    .unwrap_or_else(|| normalized_event_name(&context.event).to_string()),
+            }],
+        }),
         (NormalizedEvent::BeforeToolUse, Some(tool)) => serde_json::json!({
             "role": "assistant",
             "content": [{
@@ -370,6 +420,6 @@ fn render_canonical_line(
     }))
 }
 
-fn io_err(error: impl ToString) -> CliError {
+fn io_err(error: &impl ToString) -> CliError {
     CliErrorKind::workflow_io(error.to_string()).into()
 }

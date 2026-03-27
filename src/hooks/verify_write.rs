@@ -97,7 +97,11 @@ fn try_track_suite_fix(
 /// Check whether this path needs an amendment log entry.
 /// Returns true for suite source files that are not `amendments.md` and not
 /// inside the run directory.
-fn needs_amendment(path: &Path, suite_dir_norm: Option<&Path>, run_dir_norm: Option<&Path>) -> bool {
+fn needs_amendment(
+    path: &Path,
+    suite_dir_norm: Option<&Path>,
+    run_dir_norm: Option<&Path>,
+) -> bool {
     let name = path.file_name().map_or("", |n| n.to_str().unwrap_or(""));
     name != "amendments.md" && is_suite_source_write(path, suite_dir_norm, run_dir_norm)
 }
@@ -129,9 +133,7 @@ fn verify_suite_runner(ctx: &HookContext, paths: &[&Path]) -> HookOutcome {
         }
     }
     let mut outcome = if let Some(path) = amendment_needed {
-        HookOutcome::from_hook_result(
-            HookMessage::suite_amendment_required(path).into_result(),
-        )
+        HookOutcome::from_hook_result(HookMessage::suite_amendment_required(path).into_result())
     } else {
         HookOutcome::allow()
     };
