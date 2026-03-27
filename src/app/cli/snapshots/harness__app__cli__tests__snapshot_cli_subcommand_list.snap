@@ -3,6 +3,7 @@ source: src/app/cli/tests.rs
 assertion_line: 427
 expression: "names.join(\"\\n\")"
 ---
+agents
 create
 hook
 observe

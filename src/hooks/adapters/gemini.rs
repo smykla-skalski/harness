@@ -11,7 +11,7 @@ use crate::hooks::protocol::context::{NormalizedEvent, NormalizedHookContext};
 use crate::hooks::protocol::result::{NormalizedDecision, NormalizedHookResult};
 use crate::kernel::tooling::ToolCategory;
 
-pub struct GeminiCliAdapter;
+pub struct GeminiAdapter;
 
 #[derive(Serialize)]
 struct GeminiConfig<'a> {
@@ -63,9 +63,9 @@ fn render_json<T: Serialize>(payload: &T) -> String {
     serde_json::to_string(payload).expect("typed hook JSON serializes")
 }
 
-impl AgentAdapter for GeminiCliAdapter {
+impl AgentAdapter for GeminiAdapter {
     fn name(&self) -> &'static str {
-        "gemini-cli"
+        "gemini"
     }
 
     fn parse_input(&self, raw: &[u8]) -> Result<NormalizedHookContext, CliError> {

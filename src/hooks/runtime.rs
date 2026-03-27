@@ -81,6 +81,20 @@ fn default_event_for_command(hook: &HookCommand) -> NormalizedEvent {
     }
 }
 
+fn should_record_hook_event(hook: &HookCommand) -> bool {
+    matches!(
+        hook,
+        HookCommand::GuardBash
+            | HookCommand::GuardWrite
+            | HookCommand::GuardQuestion
+            | HookCommand::GuardStop
+            | HookCommand::Audit
+            | HookCommand::AuditTurn(_)
+            | HookCommand::ContextAgent
+            | HookCommand::ValidateAgent
+    )
+}
+
 fn render_runtime_error(
     agent: HookAgent,
     hook: &dyn Hook,
@@ -137,6 +151,7 @@ pub fn run_hook_command(agent: HookAgent, skill: &str, hook: &HookCommand) -> i3
             return render_runtime_error(agent, hook_impl, &event, "KSH001", &message);
         }
     };
+    let normalized_for_record = normalized.clone();
     let render_event = normalized.event.clone();
 
     let result = match HookEngine::execute(hook_impl, normalized) {
@@ -148,6 +163,19 @@ pub fn run_hook_command(agent: HookAgent, skill: &str, hook: &HookCommand) -> i3
             ))
         }
     };
+
+    if should_record_hook_event(hook) {
+        if let Err(error) = crate::agents::service::record_hook_event(
+            agent,
+            skill,
+            hook_name,
+            &normalized_for_record,
+            &result,
+        ) {
+            let message = format!("`{hook_name}` failed to record agent event: {error}");
+            return render_runtime_error(agent, hook_impl, &render_event, "KSH003", &message);
+        }
+    }
 
     let rendered = adapter.render_output(&result, &render_event);
     if !rendered.stdout.is_empty() {

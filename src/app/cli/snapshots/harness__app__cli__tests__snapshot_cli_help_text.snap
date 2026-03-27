@@ -8,15 +8,13 @@ Harness CLI
 Usage: harness [OPTIONS] <COMMAND>
 
 Commands:
-  hook           Run a harness hook for a skill
-  run            Suite:run commands grouped by domain
-  create         Suite:create commands grouped by domain
-  setup          Setup environment and cluster commands
-  session-start  Handle session start hook
-  session-stop   Handle session stop cleanup
-  pre-compact    Save compact handoff before compaction
-  observe        Observe and classify Claude Code session logs
-  help           Print this message or the help of the given subcommand(s)
+  hook     Run a harness hook for a skill
+  run      Suite:run commands grouped by domain
+  create   Suite:create commands grouped by domain
+  setup    Setup environment and cluster commands
+  agents   Shared harness-managed agent lifecycle commands
+  observe  Observe and classify harness-managed agent session logs
+  help     Print this message or the help of the given subcommand(s)
 
 Options:
       --delay <DELAY>  Seconds to wait before executing the command. Accepts fractional values (e.g. 0.5). Use instead of `sleep N && harness ...` [default: 0]
