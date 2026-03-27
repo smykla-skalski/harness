@@ -2,59 +2,9 @@
 name: create
 description: Generate test suites for suite:run by reading Kuma source code. Produces ready-to-run suites with manifests, validation steps, and expected outcomes for both Kubernetes and universal mode deployments. Use when creating a new test suite for a Kuma feature, converting a PR into a test plan, building regression tests from source code, or when the user asks for test coverage, a test plan, or wants to write tests for any Kuma policy or feature.
 argument-hint: <feature-name> [--repo /path/to/kuma] [--mode generate|wizard] [--from-pr PR_URL] [--from-branch BRANCH] [--suite-name NAME] [--yes|-y]
-allowed-tools: Agent, AskUserQuestion, Bash, Edit, Glob, Grep, Read, Write
+allowed-tools: Agent, Bash, Edit, Glob, Grep, Read, Write
 disable-model-invocation: true
 user-invocable: true
-hooks:
-  PostToolUse:
-  - hooks:
-    - command: harness hook --agent copilot suite:create verify-question
-      type: command
-    - command: harness hook --agent copilot suite:create audit
-      type: command
-    matcher: AskUserQuestion
-  - hooks:
-    - command: harness hook --agent copilot suite:create audit
-      type: command
-    matcher: Bash
-  - hooks:
-    - command: harness hook --agent copilot suite:create verify-write
-      type: command
-    - command: harness hook --agent copilot suite:create audit
-      type: command
-    matcher: Edit
-  - hooks:
-    - command: harness hook --agent copilot suite:create verify-write
-      type: command
-    - command: harness hook --agent copilot suite:create audit
-      type: command
-    matcher: Write
-  PostToolUseFailure:
-  - hooks:
-    - command: harness hook --agent copilot suite:create audit
-      type: command
-    matcher: Bash
-  PreToolUse:
-  - hooks:
-    - command: harness hook --agent copilot suite:create guard-question
-      type: command
-    matcher: AskUserQuestion
-  - hooks:
-    - command: harness hook --agent copilot suite:create guard-bash
-      type: command
-    matcher: Bash
-  - hooks:
-    - command: harness hook --agent copilot suite:create guard-write
-      type: command
-    matcher: Edit
-  - hooks:
-    - command: harness hook --agent copilot suite:create guard-write
-      type: command
-    matcher: Write
-  Stop:
-  - hooks:
-    - command: harness hook --agent copilot suite:create guard-stop
-      type: command
 ---
 
 <!-- justify: I23 harness is installed on PATH by project SessionStart hooks, not bundled as a script -->
@@ -68,11 +18,11 @@ Generate test suites for `suite:run` by reading Kuma source code and emitting re
 
 Avoid using for running suites (use `/suite:run`), editing existing suites, or generating non-Kuma test plans, because create and execution need different guardrails.
 
-All hooks route through `harness hook --agent copilot suite:create <hook-name>`, using the bare `harness` command installed by project `SessionStart` hooks.
+All hooks route through harness-owned hook entrypoints installed by project `SessionStart` hooks, using the bare `harness` command on `PATH`.
 
 ## Compact recovery
 
-If Claude Code resumes this skill after compaction, trust the injected `SessionStart(compact)` handoff as the authoritative summary of the saved create workspace, approval phase, and cached worker outputs. Resume the exact review gate or writer/edit round described there. Do not rerun discovery or reinitialize approval unless the handoff explicitly says the saved state diverged and names the files that must be reloaded first.
+If this skill resumes after compaction, trust the injected `SessionStart(compact)` handoff as the authoritative summary of the saved create workspace, approval phase, and cached worker outputs. Resume the exact review gate or writer/edit round described there. Do not rerun discovery or reinitialize approval unless the handoff explicitly says the saved state diverged and names the files that must be reloaded first.
 
 ## Arguments
 
@@ -86,7 +36,7 @@ Parse from `$ARGUMENTS`:
 | `--from-pr` | - | GitHub PR URL to scope the feature from |
 | `--from-branch` | - | Git branch to diff against master for scope |
 | `--suite-name` | derived from feature | Override suite name (must follow `{feature}-{scope}` pattern) |
-| `--yes`, `-y` | false | Run approval state in bypass mode, skip all AskUserQuestion review loops, and skip the final copy prompt |
+| `--yes`, `-y` | false | Run approval state in bypass mode, skip all user approval prompt review loops, and skip the final copy prompt |
 
 ## Preprocessed context
 
@@ -149,12 +99,12 @@ Resolve `REPO_ROOT`: `--repo` flag > pre-resolved repo root (if in a git repo) >
 
 Run `git rev-parse --show-toplevel` and `git branch --show-current` in `REPO_ROOT`.
 
-Use AskUserQuestion showing the detected path and branch in the description (e.g., `~/Projects/kuma on feat/meshretry`). Options:
+Ask the user showing the detected path and branch in the description (e.g., `~/Projects/kuma on feat/meshretry`). Options:
 
 - "Yes, correct"
 - "Switch to a different worktree or branch"
 
-If wrong location: run `git worktree list` and `git branch --list`, then present available worktrees and branches via AskUserQuestion. After selection, update `REPO_ROOT` or run `git checkout` accordingly.
+If wrong location: run `git worktree list` and `git branch --list`, then present available worktrees and branches via a user approval prompt. After selection, update `REPO_ROOT` or run `git checkout` accordingly.
 
 ### Step 4: Scope the feature
 
@@ -164,7 +114,7 @@ Identify what code to read based on the input:
 - **From PR URL** (`--from-pr`): run `gh pr diff <number> --repo kumahq/kuma` to identify changed files.
 - **From branch** (`--from-branch`): run `git diff master...<branch> --name-only` to identify changed files.
 
-Handle ambiguity with AskUserQuestion:
+Handle ambiguity with a user approval prompt:
 
 - Multiple policy dirs match the feature name - ask which one to use.
 - Feature type unclear (policy vs non-policy) - ask the user.
@@ -251,7 +201,7 @@ Manifests: {count} files ({filenames})
 Success criteria: {list}
 ```
 
-This summary is mandatory and must appear before the step 8 AskUserQuestion. The AskUserQuestion multiselect UI truncates descriptions, so the user needs the full picture printed as readable output first. Do not skip this summary or fold it into the AskUserQuestion options.
+This summary is mandatory and must appear before the step 8 user approval prompt. The user approval prompt multiselect UI truncates descriptions, so the user needs the full picture printed as readable output first. Do not skip this summary or fold it into the user approval prompt options.
 
 Group ordering rule - groups MUST be ordered by infrastructure complexity to avoid unnecessary cluster rebuilds:
 
@@ -281,13 +231,13 @@ Proposal rules:
 
 ### Step 8: Pre-write review gate
 
-Build the full proposed suite in memory and, unless `--yes` or `-y` is set, run a mandatory AskUserQuestion review loop before creating `${SUITE_DIR}` or writing any files.
+Build the full proposed suite in memory and, unless `--yes` or `-y` is set, run a mandatory user approval prompt review loop before creating `${SUITE_DIR}` or writing any files.
 
-Use the same AskUserQuestion header as step 8 so the suite path and runner command stay visible in every review round.
+Use the same user approval prompt header as step 8 so the suite path and runner command stay visible in every review round.
 
 Review loop rules:
 
-- Present **every single group** as a structured AskUserQuestion option with multiSelect. Each option must use the `label` + `description` form so the user sees the group ID and title on the left, with profiles, preconditions, and success criteria in the description preview on the right. Do NOT summarize groups in prose text. If one prompt is too small, split across multiple AskUserQuestion passes. Every page must include an `All suggested groups` option.
+- Present **every single group** as a structured user approval prompt option with multiSelect. Each option must use the `label` + `description` form so the user sees the group ID and title on the left, with profiles, preconditions, and success criteria in the description preview on the right. Do NOT summarize groups in prose text. If one prompt is too small, split across multiple user approval prompt passes. Every page must include an `All suggested groups` option.
 - Never present the proposal as a text block followed by an approval question. The group list IS the approval question - each option is a group the user can include or exclude.
 - After selection, gather one comment per selected group and one general suite-level comment, save them with `harness create save --kind edit-request`, and rebuild the proposal from cached worker outputs.
 - Re-run only the affected discovery worker when feedback invalidates earlier coverage, variant, or schema assumptions, then resave the proposal and show the loop again until approval.
@@ -313,14 +263,14 @@ Read [references/agent-output-format.md](references/agent-output-format.md) for 
 
 ### Step 10: Post-write review gate
 
-Unless `--yes` or `-y` is set, immediately re-open AskUserQuestion after the suite is saved.
+Unless `--yes` or `-y` is set, immediately re-open the user approval prompt after the suite is saved.
 
-Every AskUserQuestion in this loop must include the suite path and runner command in the description:
+Every user approval prompt in this loop must include the suite path and runner command in the description:
 
 - `Suite path: ${SUITE_DIR}/`
 - `Run command: /suite:run ${SUITE_NAME}`
 
-Before the AskUserQuestion approval picker, print a full readable summary of the saved suite so the user can review what they are approving. For each group, print:
+Before the user approval prompt approval picker, print a full readable summary of the saved suite so the user can review what they are approving. For each group, print:
 
 ```
 ## G{NN} {title}
@@ -331,7 +281,7 @@ Manifests: {count} files ({filenames})
 Success criteria: {list}
 ```
 
-Also include the suite metadata (name, feature, profiles, dependencies) and baseline files. This summary is mandatory and must appear before the post-write AskUserQuestion. The AskUserQuestion picker truncates descriptions, so the user needs the full picture printed as readable output first. Do not skip this summary or fold it into the AskUserQuestion options.
+Also include the suite metadata (name, feature, profiles, dependencies) and baseline files. This summary is mandatory and must appear before the post-write user approval prompt. The user approval prompt picker truncates descriptions, so the user needs the full picture printed as readable output first. Do not skip this summary or fold it into the user approval prompt options.
 
 Post-write loop rules:
 
@@ -340,9 +290,9 @@ Post-write loop rules:
 - If the user requests changes, collect targeted comments plus one general suite-level comment, save them with `harness create save --kind edit-request`, and rerun only the affected writer workers. Rerun a discovery worker only if the requested change invalidates the cached evidence.
 - Apply tiny deterministic single-file fixes directly with `Edit` instead of respawning a writer worker. Keep broader or multi-file changes in the writer-worker path.
 - Reuse the saved create payloads for edit rounds. Do not reread the whole repo when the existing cached summaries are still valid.
-- Re-open the same AskUserQuestion flow after every edit round until the user explicitly approves the suite.
+- Re-open the same user approval prompt flow after every edit round until the user explicitly approves the suite.
 - The approval gate question must be exactly `suite:create/postwrite: approve saved suite?` with options `Approve suite`, `Request changes`, and `Cancel`. `Approve suite` is the only answer that unlocks a successful stop after suite files were written.
-- After final approval, show one last AskUserQuestion with the exact question `suite:create/copy: copy run command?` and the exact options `Copy command` and `Skip`. Do not offer the suite path as a copy target because the prompt already exposes it for manual copying.
+- After final approval, show one last user approval prompt with the exact question `suite:create/copy: copy run command?` and the exact options `Copy command` and `Skip`. Do not offer the suite path as a copy target because the prompt already exposes it for manual copying.
 
 ### Step 11: Report
 

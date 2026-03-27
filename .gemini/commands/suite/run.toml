@@ -1,10 +1,10 @@
 description = "Execute reproducible suite runs on harness-managed Kubernetes or universal Docker infrastructure for Kuma service mesh features. Supports local k3d Kubernetes, remote kubeconfig-backed Kubernetes, and universal mode containers for tracked verification runs."
 prompt = '''
-<!-- justify: CF-side-effect Hook-enforced runner guards and AskUserQuestion gates make auto-invocation acceptable here -->
+<!-- justify: CF-side-effect Hook-enforced runner guards and user approval prompt gates make auto-invocation acceptable here -->
 
 # Kuma suite runner
 
-Execute reproducible suite runs on harness-managed Kubernetes or universal environments for any Kuma feature. Cluster creation, remote attachment, and teardown are managed through `harness setup kuma cluster` in Phase 2 and Phase 8. Before any unplanned cluster operation, use AskUserQuestion with options:
+Execute reproducible suite runs on harness-managed Kubernetes or universal environments for any Kuma feature. Cluster creation, remote attachment, and teardown are managed through `harness setup kuma cluster` in Phase 2 and Phase 8. Before any unplanned cluster operation, ask the user with options:
 
 - `Approve operation` - proceed with the cluster change
 - `Reject` - skip the operation
@@ -12,7 +12,7 @@ Execute reproducible suite runs on harness-managed Kubernetes or universal envir
 
 Track every manifest, command, and artifact for full run reproducibility.
 
-Repo-local skill package. Hooks run through `harness hook --agent gemini suite:run <hook-name>`. `SessionStart` hooks install a repo-aware `harness` wrapper on `PATH`. Run `harness --help` for all subcommands.
+Repo-local skill package. Hooks run through harness-owned entrypoints installed by `SessionStart` hooks. `SessionStart` also installs a repo-aware `harness` wrapper on `PATH`. Run `harness --help` for all subcommands.
 
 ## Compact recovery
 
@@ -30,7 +30,7 @@ Parse from `$ARGUMENTS`:
 
 | Argument | Default | Purpose |
 | --- | --- | --- |
-| (positional) | - | Suite path or bare name. Bare names (no `/`) are looked up in `${DATA_DIR}/` first. Prompt with AskUserQuestion if omitted |
+| (positional) | - | Suite path or bare name. Bare names (no `/`) are looked up in `${DATA_DIR}/` first. Prompt the user if omitted |
 | `--profile` | `all` | Cluster profile: `single-zone`, `multi-zone`, `single-zone-universal`, `multi-zone-universal`, or `all`. When `all`, runs one full run per required profile. |
 | `--provider` | auto | Kubernetes provider: `local` maps to k3d, `remote` maps to kubeconfig-backed remote clusters. Only applies to Kubernetes profiles. |
 | `--repo` | auto-detect cwd | Path to Kuma repo checkout |
@@ -67,10 +67,10 @@ Read [references/agent-contract.md](references/agent-contract.md) in full before
 - **`--delay` not `sleep`.** `harness run apply --delay 8 --manifest ...` not `sleep 8 && harness run apply`.
 - **Relative paths only.** `g13/01.yaml` not `/full/path/...`. No `/tmp`, no `--validate=false`.
 - **Hard gate after each group** via `harness run report group`.
-- **No autonomous deviations.** AskUserQuestion before any unplanned change.
+- **No autonomous deviations.** user approval prompt before any unplanned change.
 - **Never create manifests during a run.** All manifests must exist in the suite before the run starts. If a missing manifest is discovered, this is a suite:create defect - use the bug-found gate with classification "suite bug" and do not create the file.
 - **Preflight before apply.** Never run `harness run apply` until preflight has completed. Preflight materializes baselines and group YAML into prepared manifests. The verify-bash hook enforces this - `harness run apply` during bootstrap or before preflight completion is denied with KSR014.
-- **Stop and triage every failure.** On any unexpected result, failure, or mismatch, stop. Classify as suite bug, product bug, harness bug, or environment issue. Present classification to user via AskUserQuestion before continuing because unclassified failures corrupt the audit trail. See bug-found gate in Phase 4.
+- **Stop and triage every failure.** On any unexpected result, failure, or mismatch, stop. Classify as suite bug, product bug, harness bug, or environment issue. Present classification to user via a user approval prompt before continuing because unclassified failures corrupt the audit trail. See bug-found gate in Phase 4.
 - **Commit code fixes before continuing.** After editing product code during a run, commit before re-deploying or re-testing. Use `git add <files> && git commit -m 'fix: description'`. Never iterate on uncommitted edits.
 - **Never truncate verification output.** Do not pipe `make test`, `make check`, `cargo test`, `cargo clippy`, harness commands, or any verification command through `tail -N` or `head -N`. Use full output or `grep` for specific markers (`FAIL`, `error`, `PASS`). Drawing conclusions from truncated output is unreliable - failures can be hidden above the truncation point.
 - **Use TaskOutput for background results.** When reading output from background tasks, use the `TaskOutput` tool. Do not `tail` or `cat` the output file paths directly.
@@ -91,11 +91,11 @@ Read [references/workflow.md](references/workflow.md) for the full procedure. Th
    - If `readiness` is absent (older harness binary), fall back to the older static logic based on `cluster_topologies`, `platforms`, and `features.*.available`.
    - If the binary is too old or missing, assume all features available.
 
-1. Set `DATA_DIR` from "Preprocessed context". If missing, use AskUserQuestion with options:
+1. Set `DATA_DIR` from "Preprocessed context". If missing, ask the user with options:
    - `Create suite with /suite:create`
    - `Provide a different suite path`
 
-2. Resolve `REPO_ROOT`: `--repo` flag > cwd `go.mod` with `kumahq/kuma` > AskUserQuestion with options:
+2. Resolve `REPO_ROOT`: `--repo` flag > cwd `go.mod` with `kumahq/kuma` > user approval prompt with options:
    - `Provide repo path`
    - `Cancel run`
 
@@ -116,7 +116,7 @@ After start or resume, use only context-driven `harness` commands. Do not pass `
 
 If the saved run cannot be attached cleanly, inspect it with `harness run doctor` before retrying. Use `harness run repair` only for deterministic state fixes such as stale pointers or derived status drift.
 
-**Error cases**: if the suite path does not exist, search `${DATA_DIR}/` with Glob for partial matches. Present matches via AskUserQuestion. If no matches, use AskUserQuestion with options:
+**Error cases**: if the suite path does not exist, search `${DATA_DIR}/` with Glob for partial matches. Present matches via a user approval prompt. If no matches, ask the user with options:
 
 - `Provide suite path`
 - `Create new suite with /suite:create`
@@ -131,7 +131,7 @@ When `--profile all` (the default), read all group files and collect the set of 
 
 For each profile, execute a full run (Phase 1-8) with only the groups matching that profile. When transitioning between profiles, wait for the old cluster's teardown to complete before starting the next cluster bootstrap. Do not run teardown and bootstrap in parallel - the teardown must finish first to avoid port conflicts and resource contention.
 
-Present the execution plan via AskUserQuestion with options:
+Present the execution plan via a user approval prompt with options:
 
 - `Run all profiles` - execute every required profile sequentially
 - `Select profiles` - user picks which profiles to run
@@ -183,7 +183,7 @@ If changes modify CRDs, re-run Phase 2 bootstrap and then re-run `harness run pr
 
 **Resume**: if SessionStart already restored the matching active run, use `harness run resume` directly. Otherwise reattach with `harness run resume --run-id <id> --run-root <suite-dir>/runs`. If the cluster topology was rebuilt or CRDs changed since the saved run last preflighted, re-run `harness run preflight` and `harness run capture --label "preflight"` before execution resumes.
 
-If start, resume, or refresh preflight fails, use AskUserQuestion with options:
+If start, resume, or refresh preflight fails, ask the user with options:
 
 - `Retry preflight`
 - `Fix the issue manually`
@@ -203,14 +203,14 @@ Read [examples/suite-template.md](examples/suite-template.md) when creating a ne
 
 Key principles (workflow.md has the details):
 
-1. **The test groups table is authoritative.** Execute every listed group. Do not mark a group as skip without first calling AskUserQuestion with options:
+1. **The test groups table is authoritative.** Execute every listed group. Do not mark a group as skip without first calling user approval prompt with options:
    - `Switch cluster profile`
    - `Fix prerequisites`
    - `Skip group`
    - `Stop run`
 2. **Prepared-suite artifact** from Phase 3 is the runtime source of truth for manifest paths and cluster deltas. Do not re-parse group frontmatter.
 3. **Group files remain authoritative** for `## Consume`, `## Debug`, and expected outcomes. Read before executing, drop after completing.
-4. **Apply through `harness run apply`**, verify/cleanup through `harness run record`. `harness run apply` does NOT support `--gid`. The group context comes from the manifest path, not a flag - use `--manifest g01/01-file.yaml` only. During Phase 4 execution, every `harness run record` command must include `--gid <group-id>` so the command log and audit trail stay group-scoped. Use `harness run report group --group-id <id> ...` to finalize a group and `harness run envoy` for Envoy admin captures. Batch manifests with repeated `--manifest` or pass the group directory. Never mix resource kinds in one `kubectl delete` command. Always clean up group resources before reporting the group result - delete created CRDs in reverse order. If the suite does not specify cleanup, use AskUserQuestion with options:
+4. **Apply through `harness run apply`**, verify/cleanup through `harness run record`. `harness run apply` does NOT support `--gid`. The group context comes from the manifest path, not a flag - use `--manifest g01/01-file.yaml` only. During Phase 4 execution, every `harness run record` command must include `--gid <group-id>` so the command log and audit trail stay group-scoped. Use `harness run report group --group-id <id> ...` to finalize a group and `harness run envoy` for Envoy admin captures. Batch manifests with repeated `--manifest` or pass the group directory. Never mix resource kinds in one `kubectl delete` command. Always clean up group resources before reporting the group result - delete created CRDs in reverse order. If the suite does not specify cleanup, ask the user with options:
    - `Run proposed cleanup`
    - `Skip cleanup`
    - `Stop run`
@@ -222,7 +222,7 @@ On any unexpected result or failure, stop and triage before continuing. This gat
 
 **Step 1 - Classify** as: **suite bug** (wrong manifest/expectations), **product bug** (Kuma vs spec), **harness bug** (infra misconfiguration), or **environment issue** (timing/resources).
 
-**Step 2 - Report.** `harness run runner-state --event failure-manifest`, then AskUserQuestion with `suite:run/bug-found: [classification] - [description]`. Options:
+**Step 2 - Report.** `harness run runner-state --event failure-manifest`, then user approval prompt with `suite:run/bug-found: [classification] - [description]`. Options:
 
 - `Fix now` - pause run, fix based on classification, resume
 - `Continue and fix later` - record with classification, mark group failed, continue
@@ -237,7 +237,7 @@ Do not continue past a failure without presenting it to the user first. On first
 Read [references/troubleshooting.md](references/troubleshooting.md) for known failure modes.
 
 1. Stop progression, capture state with `harness run capture`, classify as manifest/environment/product bug.
-2. For manifest failures, enter triage (`harness run runner-state --event failure-manifest`), then AskUserQuestion with first line `suite:run/manifest-fix: how should this failure be handled?`. Include suite target path and error message. Options:
+2. For manifest failures, enter triage (`harness run runner-state --event failure-manifest`), then user approval prompt with first line `suite:run/manifest-fix: how should this failure be handled?`. Include suite target path and error message. Options:
    - `Fix for this run only`
    - `Fix in suite and this run`
    - `Skip this step`
@@ -264,7 +264,7 @@ After `harness run finish`, that run is final. Do not reuse it for another clust
 
 ### Phase 7: Retrospective
 
-After closeout, spawn parallel subagents (compliance auditor, manifest reviewer, coverage analyzer, findings summarizer, process advisor) to analyze the completed run. Present the assembled retrospective to the user via AskUserQuestion with options:
+After closeout, spawn parallel subagents (compliance auditor, manifest reviewer, coverage analyzer, findings summarizer, process advisor) to analyze the completed run. Present the assembled retrospective to the user via a user approval prompt with options:
 
 - `Save as-is` - save to `{run_dir}/retrospective.md`
 - `Request changes` - user provides feedback, regenerate specific sections. Loop until user confirms or 3 iterations are reached, then save current draft

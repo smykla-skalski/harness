@@ -94,7 +94,7 @@ Execute reproducible suite runs on harness-managed Kubernetes or universal envir
 
 Track every manifest, command, and artifact for full run reproducibility.
 
-Repo-local skill package. Hooks run through `harness hook --agent claude suite:run <hook-name>`. `SessionStart` hooks install a repo-aware `harness` wrapper on `PATH`. Run `harness --help` for all subcommands.
+Repo-local skill package. Hooks run through harness-owned entrypoints installed by `SessionStart` hooks. `SessionStart` also installs a repo-aware `harness` wrapper on `PATH`. Run `harness --help` for all subcommands.
 
 ## Compact recovery
 

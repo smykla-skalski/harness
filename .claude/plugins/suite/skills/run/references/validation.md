@@ -85,7 +85,7 @@ For all other manifests (group manifests, runtime manifests), the full options a
 
 4. **"Stop run"** - Stop the tracked run immediately. Do not keep mutating suite files or harness code after the stop choice.
 
-Always include the validation/apply error message in the AskUserQuestion description so the user can make an informed decision. Do not attempt to fix manifests without asking first - the error might reveal a real product bug rather than a suite create mistake. `Fix in suite and this run` unlocks edits only for that exact suite file plus `amendments.md`. It never permits edits to harness code, `.claude/skills`, `.claude/agents`, or unrelated repo files.
+Always include the validation/apply error message in the AskUserQuestion description so the user can make an informed decision. Do not attempt to fix manifests without asking first - the error might reveal a real product bug rather than a suite create mistake. `Fix in suite and this run` unlocks edits only for that exact suite file plus `amendments.md`. It never permits edits to harness code, `agents/skills`, generated agent assets, or unrelated repo files.
 
 ## Tracked apply example
 

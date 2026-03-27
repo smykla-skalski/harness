@@ -1,0 +1,89 @@
+{
+  "version": 1,
+  "hooks": {
+    "errorOccurred": [
+      {
+        "type": "command",
+        "bash": "harness hook --agent copilot suite:run enrich-failure",
+        "cwd": ".",
+        "timeoutSec": 30
+      }
+    ],
+    "postToolUse": [
+      {
+        "type": "command",
+        "bash": "harness hook --agent copilot suite:run verify-bash",
+        "cwd": ".",
+        "timeoutSec": 30
+      },
+      {
+        "type": "command",
+        "bash": "harness hook --agent copilot suite:run verify-write",
+        "cwd": ".",
+        "timeoutSec": 30
+      },
+      {
+        "type": "command",
+        "bash": "harness hook --agent copilot suite:run verify-question",
+        "cwd": ".",
+        "timeoutSec": 30
+      },
+      {
+        "type": "command",
+        "bash": "harness hook --agent copilot suite:run audit",
+        "cwd": ".",
+        "timeoutSec": 30
+      }
+    ],
+    "preToolUse": [
+      {
+        "type": "command",
+        "bash": "harness hook --agent copilot suite:run guard-bash",
+        "cwd": ".",
+        "timeoutSec": 30
+      },
+      {
+        "type": "command",
+        "bash": "harness hook --agent copilot suite:run guard-write",
+        "cwd": ".",
+        "timeoutSec": 30
+      },
+      {
+        "type": "command",
+        "bash": "harness hook --agent copilot suite:run guard-question",
+        "cwd": ".",
+        "timeoutSec": 30
+      }
+    ],
+    "sessionEnd": [
+      {
+        "type": "command",
+        "bash": "harness agents session-stop --agent copilot --project-dir \"$PWD\"",
+        "cwd": ".",
+        "timeoutSec": 30
+      },
+      {
+        "type": "command",
+        "bash": "harness hook --agent copilot suite:run guard-stop",
+        "cwd": ".",
+        "timeoutSec": 30
+      }
+    ],
+    "sessionStart": [
+      {
+        "type": "command",
+        "bash": "harness agents session-start --agent copilot --project-dir \"$PWD\"",
+        "cwd": ".",
+        "timeoutSec": 30
+      }
+    ],
+    "userPromptSubmitted": [
+      {
+        "type": "command",
+        "bash": "harness agents prompt-submit --agent copilot --project-dir \"$PWD\"",
+        "cwd": ".",
+        "timeoutSec": 30
+      }
+    ]
+  }
+}

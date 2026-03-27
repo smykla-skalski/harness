@@ -291,6 +291,62 @@ fn repo_contains_no_legacy_observe_doctor_scan_action() {
 }
 
 #[test]
+fn canonical_observe_sources_avoid_host_owned_runtime_paths() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let needles = [
+        "$XDG_DATA_HOME/harness/observe/<SESSION_ID>.state",
+        ".claude/plugins/suite/skills/",
+        "~/.claude/projects/",
+        "~/.Codex/projects/",
+    ];
+    let hits = collect_hits_in_paths(
+        root,
+        &[
+            "agents/skills/observe/body.md",
+            "agents/skills/observe/agents/deep-analyst.md",
+            "agents/skills/observe/references/issue-taxonomy.md",
+            "agents/skills/observe/references/overrides.md",
+        ],
+        &needles,
+        |path, needle| {
+            format!("{path} still contains host-owned observe source-of-truth path `{needle}`")
+        },
+    );
+
+    assert!(
+        hits.is_empty(),
+        "canonical observe sources still reference host-owned paths:\n{}",
+        hits.join("\n")
+    );
+}
+
+#[test]
+fn shared_plugin_outputs_stay_portable() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let hits = collect_hits_in_paths(
+        root,
+        &[
+            "plugins/suite/skills/create/SKILL.md",
+            "plugins/suite/skills/run/SKILL.md",
+        ],
+        &[
+            "--agent codex",
+            "--agent copilot",
+            "matcher: AskUserQuestion",
+        ],
+        |path, needle| {
+            format!("{path} still contains host-specific shared-plugin content `{needle}`")
+        },
+    );
+
+    assert!(
+        hits.is_empty(),
+        "shared plugin outputs are still host-specific:\n{}",
+        hits.join("\n")
+    );
+}
+
+#[test]
 fn repo_contains_no_clippy_allow_attributes() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
     let needle = ["allow", "(clippy::"].concat();

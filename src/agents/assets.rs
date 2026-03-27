@@ -12,8 +12,9 @@ use serde_json::Value;
 use walkdir::WalkDir;
 
 use crate::errors::{CliError, CliErrorKind};
+use crate::hooks::adapters::HookAgent;
 use crate::infra::io::{read_text, validate_safe_segment, write_text};
-use crate::setup::wrapper::PROJECT_PLUGIN_LAUNCHER;
+use crate::setup::wrapper::{PROJECT_PLUGIN_LAUNCHER, planned_agent_bootstrap_files};
 
 const SKILLS_ROOT: &str = "agents/skills";
 const PLUGINS_ROOT: &str = "agents/plugins";
@@ -34,6 +35,7 @@ enum RenderTarget {
     Codex,
     Gemini,
     Copilot,
+    Portable,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -145,6 +147,13 @@ fn plan_outputs(
                     .insert(path, content);
             }
         }
+        for (path, content) in render_runtime_outputs(repo_root, *target) {
+            let managed_root = managed_root_for_path(repo_root, &path)?;
+            grouped
+                .entry(managed_root)
+                .or_default()
+                .insert(path, content);
+        }
     }
 
     Ok(grouped
@@ -154,6 +163,16 @@ fn plan_outputs(
             files,
         })
         .collect())
+}
+
+fn render_runtime_outputs(repo_root: &Path, target: RenderTarget) -> Vec<(PathBuf, String)> {
+    match target {
+        RenderTarget::Copilot => planned_agent_bootstrap_files(repo_root, HookAgent::Copilot),
+        RenderTarget::Claude
+        | RenderTarget::Codex
+        | RenderTarget::Gemini
+        | RenderTarget::Portable => Vec::new(),
+    }
 }
 
 fn load_skill_sources(repo_root: &Path) -> Result<Vec<SkillDefinition>, CliError> {
@@ -259,7 +278,14 @@ fn render_skill_outputs(
                 .join("skills")
                 .join(&skill.source.name);
             files.insert(base.join("SKILL.md"), render_skill_markdown(target, skill)?);
-            copy_extra_text_files(&skill.root, &base, &mut files, &["skill.yaml", "body.md"])?;
+            copy_extra_text_files(
+                &skill.root,
+                &base,
+                &mut files,
+                &["skill.yaml", "body.md"],
+                target,
+                &skill.source.name,
+            )?;
         }
         RenderTarget::Codex => {
             let base = repo_root
@@ -267,7 +293,14 @@ fn render_skill_outputs(
                 .join("skills")
                 .join(&skill.source.name);
             files.insert(base.join("SKILL.md"), render_skill_markdown(target, skill)?);
-            copy_extra_text_files(&skill.root, &base, &mut files, &["skill.yaml", "body.md"])?;
+            copy_extra_text_files(
+                &skill.root,
+                &base,
+                &mut files,
+                &["skill.yaml", "body.md"],
+                target,
+                &skill.source.name,
+            )?;
         }
         RenderTarget::Gemini => {
             let path = repo_root
@@ -276,7 +309,7 @@ fn render_skill_outputs(
                 .join(format!("{}.toml", gemini_command_name(&skill.source.name)));
             files.insert(path, render_gemini_command(skill));
         }
-        RenderTarget::Copilot => {}
+        RenderTarget::Copilot | RenderTarget::Portable => {}
     }
     Ok(files)
 }
@@ -292,6 +325,9 @@ fn render_plugin_outputs(
         RenderTarget::Codex => render_codex_plugin_outputs(repo_root, plugin, &mut files)?,
         RenderTarget::Gemini => render_gemini_plugin_outputs(repo_root, plugin, &mut files),
         RenderTarget::Copilot => render_copilot_plugin_outputs(repo_root, plugin, &mut files)?,
+        RenderTarget::Portable => {
+            unreachable!("portable plugin output is selected by host renderers")
+        }
     }
     Ok(files)
 }
@@ -315,7 +351,7 @@ fn render_claude_plugin_outputs(
     if plugin.source.name == "suite" {
         files.insert(base.join("harness"), PROJECT_PLUGIN_LAUNCHER.to_string());
     }
-    copy_plugin_assets(plugin, &base, files)?;
+    copy_plugin_assets(plugin, &base, files, RenderTarget::Claude)?;
     render_plugin_skill_markdown(RenderTarget::Claude, plugin, &base, files)?;
     files.insert(
         repo_root
@@ -338,8 +374,8 @@ fn render_codex_plugin_outputs(
         base.join(".codex-plugin").join("plugin.json"),
         render_plugin_manifest(&plugin.source),
     );
-    copy_plugin_assets(plugin, &base, files)?;
-    render_plugin_skill_markdown(RenderTarget::Codex, plugin, &base, files)?;
+    copy_plugin_assets(plugin, &base, files, RenderTarget::Portable)?;
+    render_plugin_skill_markdown(RenderTarget::Portable, plugin, &base, files)?;
     files.insert(
         repo_root
             .join(".agents")
@@ -375,8 +411,8 @@ fn render_copilot_plugin_outputs(
         base.join("plugin.json"),
         render_plugin_manifest(&plugin.source),
     );
-    copy_plugin_assets(plugin, &base, files)?;
-    render_plugin_skill_markdown(RenderTarget::Copilot, plugin, &base, files)
+    copy_plugin_assets(plugin, &base, files, RenderTarget::Portable)?;
+    render_plugin_skill_markdown(RenderTarget::Portable, plugin, &base, files)
 }
 
 fn render_plugin_skill_markdown(
@@ -391,7 +427,14 @@ fn render_plugin_skill_markdown(
             skill_base.join("SKILL.md"),
             render_skill_markdown(target, skill)?,
         );
-        copy_extra_text_files(&skill.root, &skill_base, files, &["skill.yaml", "body.md"])?;
+        copy_extra_text_files(
+            &skill.root,
+            &skill_base,
+            files,
+            &["skill.yaml", "body.md"],
+            target,
+            &skill.source.name,
+        )?;
     }
     Ok(())
 }
@@ -400,18 +443,37 @@ fn render_skill_markdown(
     target: RenderTarget,
     skill: &SkillDefinition,
 ) -> Result<String, CliError> {
-    let hooks = skill
-        .source
-        .hooks
-        .as_ref()
-        .map(|value| rewrite_skill_hooks(value, target))
-        .transpose()?;
+    let mut out = render_skill_frontmatter(target, skill)?;
+    out.push_str(&rewrite_text_for_target(
+        &skill.body,
+        target,
+        &skill.source.name,
+    ));
+    Ok(out)
+}
+
+fn render_skill_frontmatter(
+    target: RenderTarget,
+    skill: &SkillDefinition,
+) -> Result<String, CliError> {
+    let hooks = if matches!(target, RenderTarget::Portable) {
+        None
+    } else {
+        skill
+            .source
+            .hooks
+            .as_ref()
+            .map(|value| rewrite_skill_hooks(value, target))
+            .transpose()?
+    };
     let mut out = String::from("---\n");
     append_yaml_line(&mut out, "name", &skill.source.name);
     append_yaml_line(&mut out, "description", &skill.source.description);
-    if let Some(argument_hint) = skill.source.argument_hint.as_deref() {
-        append_yaml_line(&mut out, "argument-hint", argument_hint);
-    }
+    append_optional_yaml_line(
+        &mut out,
+        "argument-hint",
+        skill.source.argument_hint.as_deref(),
+    );
     if let Some(allowed_tools) = skill.source.allowed_tools.as_deref() {
         append_yaml_line(
             &mut out,
@@ -426,26 +488,13 @@ fn render_skill_markdown(
     if let Some(invocable) = skill.source.user_invocable {
         writeln!(out, "user-invocable: {invocable}").expect("writing to a string cannot fail");
     }
-    if let Some(hooks) = hooks {
-        out.push_str("hooks:\n");
-        let hooks_yaml = yaml_serialized_lines(&hooks, "skill hooks")?;
-        for line in hooks_yaml {
-            out.push_str("  ");
-            out.push_str(&line);
-            out.push('\n');
-        }
-    }
+    append_optional_hooks(&mut out, hooks)?;
     out.push_str("---\n\n");
-    out.push_str(&rewrite_body_for_target(
-        &skill.body,
-        target,
-        &skill.source.name,
-    ));
     Ok(out)
 }
 
 fn render_gemini_command(skill: &SkillDefinition) -> String {
-    let prompt = rewrite_body_for_target(&skill.body, RenderTarget::Gemini, &skill.source.name);
+    let prompt = rewrite_text_for_target(&skill.body, RenderTarget::Gemini, &skill.source.name);
     format!(
         "description = {}\nprompt = '''\n{}'''\n",
         toml_string(&skill.source.description),
@@ -522,6 +571,7 @@ fn rewrite_allowed_tools(value: &str, target: RenderTarget) -> String {
             continue;
         }
         let rewritten = match (target, trimmed) {
+            (_, "AskUserQuestion") if !matches!(target, RenderTarget::Claude) => continue,
             (RenderTarget::Gemini, "Bash") => "run_shell_command",
             (RenderTarget::Gemini, "Read") => "read_file",
             (RenderTarget::Gemini, "Write") => "write_file",
@@ -563,21 +613,30 @@ fn rewrite_hook_command(text: &str, target: RenderTarget) -> String {
     text.to_string()
 }
 
-fn rewrite_body_for_target(body: &str, target: RenderTarget, skill_name: &str) -> String {
-    let mut text = body
-        .replace(
+fn rewrite_text_for_target(text: &str, target: RenderTarget, source_name: &str) -> String {
+    let mut text = match target {
+        RenderTarget::Portable => text.to_string(),
+        _ => text.replace(
             "harness hook --skill ",
             &format!("harness hook --agent {} ", target_name(target)),
-        )
+        ),
+    };
+
+    text = text
         .replace(
             "another Claude Code session",
-            &format!("another {} session", target_label(target)),
+            &format!("another {} session", target_session_label(target)),
         )
         .replace(
             "another Codex session",
-            &format!("another {} session", target_label(target)),
+            &format!("another {} session", target_session_label(target)),
         );
-    if skill_name == "observe" {
+
+    if !matches!(target, RenderTarget::Claude) {
+        text = rewrite_non_claude_text(text);
+    }
+
+    if source_name == "observe" {
         text = text
             .replace(
                 "`$XDG_DATA_HOME/harness/observe/<SESSION_ID>.state`",
@@ -591,7 +650,48 @@ fn rewrite_body_for_target(body: &str, target: RenderTarget, skill_name: &str) -
                 "~/.Codex/projects/",
                 "~harness/projects/project-<digest>/agents/sessions/",
             )
+            .replace(".claude/plugins/suite/skills/", "plugins/suite/skills/")
+            .replace(".claude/skills/", "agents/skills/")
             .replace("\"$CLAUDE_PROJECT_DIR\"", "\"$PWD\"");
+    }
+
+    text
+}
+
+fn rewrite_non_claude_text(mut text: String) -> String {
+    for (from, to) in [
+        (
+            "If Claude Code resumes this skill after compaction",
+            "If this skill resumes after compaction",
+        ),
+        (
+            "errors from Claude Code.",
+            "file-state errors from the current agent.",
+        ),
+        (
+            "Claude Code tracks file state internally -",
+            "The current agent tracks file state internally -",
+        ),
+        ("Use AskUserQuestion", "Ask the user"),
+        ("use AskUserQuestion", "ask the user"),
+        ("Prompt with AskUserQuestion", "Prompt the user"),
+        ("The AskUserQuestion", "The user approval prompt"),
+        ("via AskUserQuestion", "via a user approval prompt"),
+        ("with AskUserQuestion", "with a user approval prompt"),
+        (
+            "show one last AskUserQuestion",
+            "show one last user approval prompt",
+        ),
+        (
+            "re-open AskUserQuestion",
+            "re-open the user approval prompt",
+        ),
+        ("AskUserQuestion", "user approval prompt"),
+        (".claude/plugins/suite/skills/", "plugins/suite/skills/"),
+        (".claude/skills/", "agents/skills/"),
+        (".claude/agents", "agents/"),
+    ] {
+        text = text.replace(from, to);
     }
     text
 }
@@ -602,6 +702,7 @@ fn target_label(target: RenderTarget) -> &'static str {
         RenderTarget::Codex => "Codex",
         RenderTarget::Gemini => "Gemini",
         RenderTarget::Copilot => "Copilot",
+        RenderTarget::Portable => "current agent",
     }
 }
 
@@ -611,6 +712,14 @@ fn target_name(target: RenderTarget) -> &'static str {
         RenderTarget::Codex => "codex",
         RenderTarget::Gemini => "gemini",
         RenderTarget::Copilot => "copilot",
+        RenderTarget::Portable => "portable",
+    }
+}
+
+fn target_session_label(target: RenderTarget) -> &'static str {
+    match target {
+        RenderTarget::Portable => "harness-managed",
+        _ => target_label(target),
     }
 }
 
@@ -622,12 +731,15 @@ fn copy_plugin_assets(
     plugin: &PluginDefinition,
     dest_root: &Path,
     files: &mut BTreeMap<PathBuf, String>,
+    target: RenderTarget,
 ) -> Result<(), CliError> {
     copy_extra_text_files(
         &plugin.root,
         dest_root,
         files,
         &["plugin.yaml", "hooks.yaml", "skills"],
+        target,
+        &plugin.source.name,
     )
 }
 
@@ -636,6 +748,8 @@ fn copy_extra_text_files(
     dest_root: &Path,
     files: &mut BTreeMap<PathBuf, String>,
     excludes: &[&str],
+    target: RenderTarget,
+    source_name: &str,
 ) -> Result<(), CliError> {
     let exclude_set: BTreeSet<&str> = excludes.iter().copied().collect();
     for entry in WalkDir::new(source_root).min_depth(1) {
@@ -655,13 +769,13 @@ fn copy_extra_text_files(
         if entry.file_type().is_dir() {
             continue;
         }
-        if path.extension() == Some(OsStr::new("json"))
-            || path.extension() == Some(OsStr::new("md"))
-        {
-            files.insert(dest_root.join(relative), read_text(path)?);
-            continue;
-        }
-        files.insert(dest_root.join(relative), read_text(path)?);
+        let content = read_text(path)?;
+        let content = if path.extension() == Some(OsStr::new("md")) {
+            rewrite_text_for_target(&content, target, source_name)
+        } else {
+            content
+        };
+        files.insert(dest_root.join(relative), content);
     }
     Ok(())
 }
@@ -673,6 +787,7 @@ fn managed_root_for_path(repo_root: &Path, path: &Path) -> Result<PathBuf, CliEr
         ".agents/skills",
         ".agents/plugins",
         ".gemini/commands",
+        ".github/hooks",
         "plugins",
     ] {
         let root = repo_root.join(managed);
@@ -780,6 +895,25 @@ fn append_yaml_line(out: &mut String, key: &str, value: &str) {
     }
 }
 
+fn append_optional_yaml_line(out: &mut String, key: &str, value: Option<&str>) {
+    if let Some(value) = value {
+        append_yaml_line(out, key, value);
+    }
+}
+
+fn append_optional_hooks(out: &mut String, hooks: Option<Value>) -> Result<(), CliError> {
+    if let Some(hooks) = hooks {
+        out.push_str("hooks:\n");
+        let hooks_yaml = yaml_serialized_lines(&hooks, "skill hooks")?;
+        for line in hooks_yaml {
+            out.push_str("  ");
+            out.push_str(&line);
+            out.push('\n');
+        }
+    }
+    Ok(())
+}
+
 fn yaml_serialized_lines<T: Serialize + ?Sized>(
     value: &T,
     what: &str,
@@ -871,5 +1005,59 @@ mod tests {
             yaml_serialized_lines(&json!({"PreToolUse": []}), "hooks").expect("yaml serializes");
 
         assert_eq!(rendered.first().map(String::as_str), Some("PreToolUse: []"));
+    }
+
+    #[test]
+    fn portable_plugin_skill_omits_host_specific_hooks_and_question_tool() {
+        let rendered =
+            render_skill_markdown(RenderTarget::Portable, &sample_skill()).expect("skill renders");
+
+        assert!(rendered.starts_with("---\nname: run\n"));
+        assert!(rendered.contains("allowed-tools: Agent, Bash, Edit, Glob, Read, Write\n"));
+        assert!(!rendered.contains("AskUserQuestion"));
+        assert!(!rendered.contains("\nhooks:\n"));
+        assert!(!rendered.contains("--agent copilot"));
+        assert!(!rendered.contains("--agent codex"));
+    }
+
+    #[test]
+    fn copilot_generation_includes_repo_hook_config() {
+        let planned =
+            plan_outputs(&repo_root(), AgentAssetTarget::Copilot).expect("assets plan succeeds");
+        let hook_path = repo_root()
+            .join(".github")
+            .join("hooks")
+            .join("harness.json");
+        let hook_output = planned
+            .iter()
+            .find_map(|output| output.files.get(&hook_path))
+            .expect("copilot hook config should be generated");
+
+        assert!(hook_output.contains("\"version\": 1"));
+        assert!(hook_output.contains("\"userPromptSubmitted\""));
+        assert!(hook_output.contains(
+            "\"harness agents session-start --agent copilot --project-dir \\\"$PWD\\\"\""
+        ));
+    }
+
+    #[test]
+    fn shared_plugin_outputs_stay_portable_across_codex_and_copilot() {
+        let planned =
+            plan_outputs(&repo_root(), AgentAssetTarget::All).expect("assets plan succeeds");
+        let shared_skill = repo_root()
+            .join("plugins")
+            .join("suite")
+            .join("skills")
+            .join("create")
+            .join("SKILL.md");
+        let rendered = planned
+            .iter()
+            .find_map(|output| output.files.get(&shared_skill))
+            .expect("shared plugin skill should be planned");
+
+        assert!(!rendered.contains("--agent codex"));
+        assert!(!rendered.contains("--agent copilot"));
+        assert!(!rendered.contains("matcher: AskUserQuestion"));
+        assert!(rendered.contains("user approval prompt"));
     }
 }
