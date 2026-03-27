@@ -19,7 +19,7 @@ Most people only need these command groups:
 - `harness setup` prepares local environments and session state
 - `harness create` helps you build a new suite
 - `harness run` executes a suite
-- `harness observe` checks project health and scans logs for mistakes or failures
+- `harness observe` is the live feedback loop for improving skills, hooks, and test suites while sessions are still in flight
 - `harness agents` is the shared lifecycle and state API used by generated skills, plugins, and hooks
 
 You will also see `hook`, `session-start`, `session-stop`, and `pre-compact`. Those are mostly for editor and hook integration. You usually do not run them by hand.
@@ -39,7 +39,7 @@ Treat those rendered directories as generated output.
 - A **suite** is the test definition. It usually lives in a `suite.md` file.
 - A **create session** is the guided flow for writing a new suite.
 - A **run** is one execution of a suite against a real cluster.
-- **observe** helps explain what went wrong after or during a session and can follow the same project across multiple agents.
+- **observe** helps inspect live sessions, route fixes, and improve skills or suites without leaving the tracked workflow.
 
 In order:
 
