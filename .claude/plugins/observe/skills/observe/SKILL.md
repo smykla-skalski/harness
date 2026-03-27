@@ -110,7 +110,7 @@ Run harness observe scan <session-id> --from-line <cursor> --json --summary, rep
 
 **Loop B - deep analyst agent (every 5 minutes):**
 
-Start with `/loop 5m` spawning a subagent using [agents/deep-analyst.md](agents/deep-analyst.md). Each iteration:
+Start with `/loop 5m` spawning a subagent using [agents/deep-analyst.md](../../agents/deep-analyst.md). Each iteration:
 1. Determine the line range: from the cursor 5 minutes ago to the current cursor
 2. Spawn the deep-analyst agent with the session ID and line range
 3. Report the agent's findings if any issues are flagged
@@ -118,7 +118,7 @@ Start with `/loop 5m` spawning a subagent using [agents/deep-analyst.md](agents/
 
 The prompt for the loop should be:
 ```
-Read .claude/skills/observe/agents/deep-analyst.md and spawn a deep-analyst subagent for session <session-id> covering lines <range_start> to <range_end>.
+Read .claude/plugins/observe/agents/deep-analyst.md and spawn a deep-analyst subagent for session <session-id> covering lines <range_start> to <range_end>.
 ```
 
 Both loops run until the user tells you to stop. Do not terminate them early. Do not ask whether to continue.
