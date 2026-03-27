@@ -5,10 +5,8 @@ use crate::hooks::runner_policy::{MakeTargetPrefix, SuiteMutationBinary, TaskOut
 use crate::kernel::command_intent::{command_heads, normalized_binary_name, path_like_words};
 
 use super::predicates::{
-    allows_wrapped_envoy_admin, deny_python, deny_runner_flow, has_admin_endpoint_hint,
-    has_denied_cluster_binary, has_denied_cluster_binary_anywhere, has_denied_legacy_script,
-    has_denied_runner_binary, has_python_inline, has_task_output_access, is_harness_head,
-    is_tracked_harness_command, make_target,
+    deny_python, deny_runner_flow, has_denied_runner_binary, has_python_inline,
+    has_task_output_access, make_target,
 };
 
 #[path = "runner_guards/phase.rs"]
@@ -98,20 +96,3 @@ pub(crate) fn runner_binary_and_pattern_guards(
     None
 }
 
-pub(crate) fn runner_tail_guards(words: &[String], heads: &[String]) -> HookResult {
-    if has_denied_legacy_script(words) {
-        return HookMessage::ClusterBinary.into_result();
-    }
-    if has_denied_cluster_binary(heads)
-        || (!is_tracked_harness_command(words) && has_denied_cluster_binary_anywhere(words))
-    {
-        return HookMessage::ClusterBinary.into_result();
-    }
-    if has_admin_endpoint_hint(words)
-        && !is_harness_head(heads)
-        && !allows_wrapped_envoy_admin(words)
-    {
-        return HookMessage::AdminEndpoint.into_result();
-    }
-    HookResult::allow()
-}
