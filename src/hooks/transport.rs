@@ -110,7 +110,7 @@ impl HookCommand {
 #[derive(Debug, Clone, Args)]
 pub struct HookArgs {
     /// Hook transport/agent protocol.
-    #[arg(long, value_enum, default_value_t = HookAgent::ClaudeCode)]
+    #[arg(long, value_enum, default_value_t = HookAgent::Claude)]
     pub agent: HookAgent,
     /// Skill name (suite:run or suite:create).
     #[arg(value_parser = clap::builder::PossibleValuesParser::new(SKILL_NAMES))]

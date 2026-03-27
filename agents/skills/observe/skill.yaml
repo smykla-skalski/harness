@@ -1,0 +1,13 @@
+name: observe
+description: >-
+  Session observer for harness and skill testing. Use it to scan, watch, or dump
+  another Claude Code session with the current `harness observe` contract.
+argument-hint: "<session-id> [--from-line N] [--from <line|timestamp|prose>] [--focus harness|skills|all]"
+allowed-tools: Agent, AskUserQuestion, Bash, CronDelete, CronList, Edit, Glob, Grep, Read, Skill
+disable-model-invocation: true
+user-invocable: true
+hooks:
+  Stop:
+    - hooks:
+        - type: command
+          command: "harness hook --skill observe guard-stop"

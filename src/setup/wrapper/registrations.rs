@@ -1,9 +1,5 @@
-use serde::Serialize;
-
-use crate::errors::{CliError, CliErrorKind};
 use crate::hooks::adapters::{HookAgent, HookRegistration, adapter_for};
 use crate::hooks::protocol::context::NormalizedEvent;
-use crate::hooks::runner_policy::managed_cluster_binaries;
 
 pub(super) fn process_agent_registrations(agent: HookAgent) -> Vec<HookRegistration> {
     let mut registrations = vec![command_registration(
@@ -13,7 +9,7 @@ pub(super) fn process_agent_registrations(agent: HookAgent) -> Vec<HookRegistrat
         None,
     )];
 
-    if matches!(agent, HookAgent::ClaudeCode | HookAgent::GeminiCli) {
+    if matches!(agent, HookAgent::Claude | HookAgent::Gemini | HookAgent::Copilot) {
         registrations.push(command_registration(
             "pre-compact",
             lifecycle_command(agent, "pre-compact"),
@@ -29,21 +25,21 @@ pub(super) fn process_agent_registrations(agent: HookAgent) -> Vec<HookRegistrat
     }
 
     match agent {
-        HookAgent::ClaudeCode => registrations.extend(claude_code_hooks(agent)),
-        HookAgent::GeminiCli => registrations.extend(gemini_cli_hooks(agent)),
+        HookAgent::Claude => registrations.extend(claude_hooks(agent)),
+        HookAgent::Copilot => registrations.extend(copilot_hooks(agent)),
         HookAgent::Codex => registrations.push(hook_registration(
             agent,
             "guard-stop",
             NormalizedEvent::AgentStop,
             None,
         )),
-        HookAgent::OpenCode => unreachable!("handled separately"),
+        HookAgent::Gemini => registrations.extend(gemini_hooks(agent)),
     }
 
     registrations
 }
 
-fn claude_code_hooks(agent: HookAgent) -> Vec<HookRegistration> {
+fn claude_hooks(agent: HookAgent) -> Vec<HookRegistration> {
     vec![
         hook_registration(
             agent,
@@ -94,7 +90,7 @@ fn claude_code_hooks(agent: HookAgent) -> Vec<HookRegistration> {
     ]
 }
 
-fn gemini_cli_hooks(agent: HookAgent) -> Vec<HookRegistration> {
+fn gemini_hooks(agent: HookAgent) -> Vec<HookRegistration> {
     vec![
         hook_registration(
             agent,
@@ -131,6 +127,25 @@ fn gemini_cli_hooks(agent: HookAgent) -> Vec<HookRegistration> {
     ]
 }
 
+fn copilot_hooks(agent: HookAgent) -> Vec<HookRegistration> {
+    vec![
+        hook_registration(agent, "guard-bash", NormalizedEvent::BeforeToolUse, None),
+        hook_registration(agent, "guard-write", NormalizedEvent::BeforeToolUse, None),
+        hook_registration(agent, "guard-question", NormalizedEvent::BeforeToolUse, None),
+        hook_registration(agent, "guard-stop", NormalizedEvent::AgentStop, None),
+        hook_registration(agent, "verify-bash", NormalizedEvent::AfterToolUse, None),
+        hook_registration(agent, "verify-write", NormalizedEvent::AfterToolUse, None),
+        hook_registration(agent, "verify-question", NormalizedEvent::AfterToolUse, None),
+        hook_registration(agent, "audit", NormalizedEvent::AfterToolUse, None),
+        hook_registration(
+            agent,
+            "enrich-failure",
+            NormalizedEvent::AfterToolUseFailure,
+            None,
+        ),
+    ]
+}
+
 pub(super) fn build_codex_config() -> String {
     concat!(
         "notify = [\"harness\", \"hook\", \"--agent\", \"codex\", \"suite:run\", \"audit-turn\"]\n",
@@ -142,15 +157,17 @@ pub(super) fn build_codex_config() -> String {
 }
 
 pub(super) fn lifecycle_command(agent: HookAgent, subcommand: &str) -> String {
-    match agent {
-        HookAgent::ClaudeCode => {
-            format!("harness {subcommand} --project-dir \"$CLAUDE_PROJECT_DIR\"")
-        }
-        HookAgent::GeminiCli => format!(
-            "harness {subcommand} --project-dir \"${{CLAUDE_PROJECT_DIR:-$GEMINI_PROJECT_DIR}}\""
+    let (project_dir, agent_name) = match agent {
+        HookAgent::Claude => ("\"$CLAUDE_PROJECT_DIR\"", "claude"),
+        HookAgent::Gemini => ("\"${CLAUDE_PROJECT_DIR:-$GEMINI_PROJECT_DIR}\"", "gemini"),
+        HookAgent::Codex => ("\"$PWD\"", "codex"),
+        HookAgent::Copilot => ("\"$PWD\"", "copilot"),
+    };
+    match subcommand {
+        "session-start" | "session-stop" => format!(
+            "harness agents {subcommand} --agent {agent_name} --project-dir {project_dir}"
         ),
-        HookAgent::Codex => format!("harness {subcommand} --project-dir \"$PWD\""),
-        HookAgent::OpenCode => unreachable!("opencode lifecycle is handled by the bridge"),
+        _ => format!("harness {subcommand} --project-dir {project_dir}"),
     }
 }
 
@@ -183,36 +200,4 @@ fn command_registration(
         matcher: matcher.map(ToString::to_string),
         command: command.into(),
     }
-}
-
-#[derive(Serialize)]
-struct OpenCodeToolBindings<'a> {
-    bash: &'a str,
-    write: &'a str,
-    edit: &'a str,
-}
-
-pub(super) fn build_opencode_bridge() -> Result<String, CliError> {
-    let denied_binaries = managed_cluster_binaries().into_iter().collect::<Vec<_>>();
-    let denied_binaries_json = serde_json::to_string(&denied_binaries)
-        .map_err(|error| CliErrorKind::serialize(format!("opencode denied binaries: {error}")))?;
-    let tool_guards = serde_json::to_string(&OpenCodeToolBindings {
-        bash: "guard-bash",
-        write: "guard-write",
-        edit: "guard-write",
-    })
-    .map_err(|error| CliErrorKind::serialize(format!("opencode tool guards: {error}")))?;
-    let tool_verifiers = serde_json::to_string(&OpenCodeToolBindings {
-        bash: "verify-bash",
-        write: "verify-write",
-        edit: "verify-write",
-    })
-    .map_err(|error| CliErrorKind::serialize(format!("opencode tool verifiers: {error}")))?;
-
-    let bridge = include_str!("../../../resources/opencode/harness-bridge.ts")
-        .replace("__DENIED_BINARY_HINTS__", &denied_binaries_json)
-        .replace("__TOOL_GUARDS__", &tool_guards)
-        .replace("__TOOL_VERIFIERS__", &tool_verifiers);
-
-    Ok(bridge)
 }

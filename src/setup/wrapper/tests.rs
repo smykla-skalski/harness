@@ -6,7 +6,7 @@ use fs_err as fs;
 
 use super::install::{install_wrapper, path_candidates};
 use super::plugin_cache::{read_plugin_version, sync_directory, sync_plugin_cache};
-use super::registrations::{build_codex_config, build_opencode_bridge, lifecycle_command};
+use super::registrations::{build_codex_config, lifecycle_command};
 use super::*;
 
 #[test]
@@ -315,16 +315,16 @@ fn sync_plugin_cache_skips_when_no_cache_dir() {
 #[test]
 fn lifecycle_commands_include_project_dirs() {
     assert_eq!(
-        lifecycle_command(HookAgent::ClaudeCode, "session-start"),
-        "harness session-start --project-dir \"$CLAUDE_PROJECT_DIR\""
+        lifecycle_command(HookAgent::Claude, "session-start"),
+        "harness agents session-start --agent claude --project-dir \"$CLAUDE_PROJECT_DIR\""
     );
     assert_eq!(
-        lifecycle_command(HookAgent::GeminiCli, "pre-compact"),
+        lifecycle_command(HookAgent::Gemini, "pre-compact"),
         "harness pre-compact --project-dir \"${CLAUDE_PROJECT_DIR:-$GEMINI_PROJECT_DIR}\""
     );
     assert_eq!(
         lifecycle_command(HookAgent::Codex, "session-stop"),
-        "harness session-stop --project-dir \"$PWD\""
+        "harness agents session-stop --agent codex --project-dir \"$PWD\""
     );
 }
 
@@ -338,15 +338,15 @@ fn claude_lifecycle_commands_match_hook_template() {
     let commands = [
         (
             "PreCompact",
-            lifecycle_command(HookAgent::ClaudeCode, "pre-compact"),
+            lifecycle_command(HookAgent::Claude, "pre-compact"),
         ),
         (
             "SessionStart",
-            lifecycle_command(HookAgent::ClaudeCode, "session-start"),
+            lifecycle_command(HookAgent::Claude, "session-start"),
         ),
         (
             "Stop",
-            lifecycle_command(HookAgent::ClaudeCode, "session-stop"),
+            lifecycle_command(HookAgent::Claude, "session-stop"),
         ),
     ];
 
@@ -367,38 +367,6 @@ fn build_codex_config_includes_notify_and_hooks_flag() {
     let config = build_codex_config();
     assert!(config.contains("\"audit-turn\""));
     assert!(config.contains("codex_hooks = true"));
-}
-
-#[test]
-fn build_opencode_bridge_replaces_placeholders_and_uses_directory() {
-    let bridge = build_opencode_bridge().unwrap();
-    assert!(!bridge.contains("__DENIED_BINARY_HINTS__"));
-    assert!(!bridge.contains("__TOOL_GUARDS__"));
-    assert!(!bridge.contains("__TOOL_VERIFIERS__"));
-    assert!(bridge.contains("[\"session-start\", \"--project-dir\", directory]"));
-    assert!(bridge.contains("[\"pre-compact\", \"--project-dir\", directory]"));
-    assert!(bridge.contains("[\"session-stop\", \"--project-dir\", directory]"));
-}
-
-#[test]
-fn write_agent_bootstrap_writes_opencode_bridge_and_package() {
-    let dir = tempfile::tempdir().unwrap();
-    let written = write_agent_bootstrap(dir.path(), HookAgent::OpenCode).unwrap();
-
-    let bridge_path = dir
-        .path()
-        .join(".opencode")
-        .join("plugins")
-        .join("harness-bridge.ts");
-    let package_path = dir.path().join(".opencode").join("package.json");
-
-    assert!(written.contains(&bridge_path));
-    assert!(written.contains(&package_path));
-    assert!(bridge_path.exists());
-    assert!(package_path.exists());
-
-    let bridge = fs::read_to_string(bridge_path).unwrap();
-    assert!(bridge.contains("[\"session-start\", \"--project-dir\", directory]"));
 }
 
 fn assert_codex_hooks(hooks: &str) {
@@ -422,4 +390,18 @@ fn write_agent_bootstrap_writes_codex_notify_config() {
     let config = fs::read_to_string(config_path).unwrap();
     assert!(config.contains("\"audit-turn\""));
     assert!(config.contains("codex_hooks = true"));
+}
+
+#[test]
+fn write_agent_bootstrap_writes_copilot_hook_config() {
+    let dir = tempfile::tempdir().unwrap();
+    let written = write_agent_bootstrap(dir.path(), HookAgent::Copilot).unwrap();
+
+    let config_path = dir.path().join(".github").join("hooks").join("harness.json");
+
+    assert!(written.contains(&config_path));
+    let config = fs::read_to_string(config_path).unwrap();
+    assert!(config.contains("\"version\": 1"));
+    assert!(config.contains("\"preToolUse\""));
+    assert!(config.contains("\"harness agents session-start --agent copilot --project-dir \\\"$PWD\\\"\""));
 }

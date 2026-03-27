@@ -1,0 +1,84 @@
+name: run
+description: >-
+  Execute reproducible suite runs on harness-managed Kubernetes or universal Docker infrastructure
+  for Kuma service mesh features. Supports local k3d Kubernetes, remote kubeconfig-backed
+  Kubernetes, and universal mode containers for tracked verification runs.
+argument-hint: "[suite-path] [--profile single-zone|multi-zone] [--provider local|remote] [--repo /path/to/kuma] [--run-id ID] [--resume RUN_ID]"
+allowed-tools: Agent, AskUserQuestion, Bash, Edit, Glob, Read, Write
+user-invocable: true
+hooks:
+  PreToolUse:
+    - matcher: "Bash"
+      hooks:
+        - type: command
+          command: "harness hook --skill suite:run guard-bash"
+    - matcher: "AskUserQuestion"
+      hooks:
+        - type: command
+          command: "harness hook --skill suite:run guard-question"
+    - matcher: "Write"
+      hooks:
+        - type: command
+          command: "harness hook --skill suite:run guard-write"
+    - matcher: "Edit"
+      hooks:
+        - type: command
+          command: "harness hook --skill suite:run guard-write"
+  PostToolUse:
+    - matcher: "Bash"
+      hooks:
+        - type: command
+          command: "harness hook --skill suite:run verify-bash"
+        - type: command
+          command: "harness hook --skill suite:run audit"
+    - matcher: "AskUserQuestion"
+      hooks:
+        - type: command
+          command: "harness hook --skill suite:run verify-question"
+        - type: command
+          command: "harness hook --skill suite:run audit"
+    - matcher: "Write"
+      hooks:
+        - type: command
+          command: "harness hook --skill suite:run verify-write"
+        - type: command
+          command: "harness hook --skill suite:run audit"
+    - matcher: "Edit"
+      hooks:
+        - type: command
+          command: "harness hook --skill suite:run verify-write"
+        - type: command
+          command: "harness hook --skill suite:run audit"
+    - matcher: "Read"
+      hooks:
+        - type: command
+          command: "harness hook --skill suite:run audit"
+    - matcher: "Glob"
+      hooks:
+        - type: command
+          command: "harness hook --skill suite:run audit"
+    - matcher: "Agent"
+      hooks:
+        - type: command
+          command: "harness hook --skill suite:run audit"
+  PostToolUseFailure:
+    - matcher: "Bash"
+      hooks:
+        - type: command
+          command: "harness hook --skill suite:run enrich-failure"
+        - type: command
+          command: "harness hook --skill suite:run audit"
+  SubagentStart:
+    - matcher: "preflight-worker"
+      hooks:
+        - type: command
+          command: "harness hook --skill suite:run context-agent"
+  SubagentStop:
+    - matcher: "preflight-worker"
+      hooks:
+        - type: command
+          command: "harness hook --skill suite:run validate-agent"
+  Stop:
+    - hooks:
+        - type: command
+          command: "harness hook --skill suite:run guard-stop"

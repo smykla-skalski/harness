@@ -20,7 +20,7 @@ pub struct BootstrapArgs {
     #[arg(long, env = "CLAUDE_PROJECT_DIR")]
     pub project_dir: Option<String>,
     /// Agent configuration to generate.
-    #[arg(long, value_enum, default_value_t = HookAgent::ClaudeCode)]
+    #[arg(long, value_enum, default_value_t = HookAgent::Claude)]
     pub agent: HookAgent,
 }
 

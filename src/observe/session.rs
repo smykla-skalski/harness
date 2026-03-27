@@ -2,18 +2,23 @@ use std::path::PathBuf;
 
 use walkdir::WalkDir;
 
+use crate::agents::storage::find_canonical_session;
 use crate::errors::{CliError, CliErrorKind};
 use crate::workspace::dirs_home;
 
-/// Locate a session JSONL file under `~/.claude/projects/*/`.
+/// Locate a session JSONL file, preferring the canonical harness agent ledger.
 ///
-/// Walks all project directories and returns the path to `{session_id}.jsonl`.
-/// If `project_hint` is set, narrows the search to directories whose name
-/// contains the hint.
+/// The shared harness ledger is the source of truth for cross-agent sessions.
+/// Legacy Claude transcript lookup remains as a compatibility fallback while
+/// older sessions are still present on disk.
 ///
 /// # Errors
 /// Returns `SessionNotFound` when the session file cannot be located.
 pub fn find_session(session_id: &str, project_hint: Option<&str>) -> Result<PathBuf, CliError> {
+    if let Some(path) = find_canonical_session(session_id, project_hint)? {
+        return Ok(path);
+    }
+
     let claude_dir = dirs_home().join(".claude").join("projects");
 
     if !claude_dir.is_dir() {
