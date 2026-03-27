@@ -272,8 +272,8 @@ fn repo_contains_no_legacy_observe_doctor_scan_action() {
     hits.extend(collect_hits_in_paths(
         root,
         &[
-            ".claude/skills/observe/SKILL.md",
-            ".claude/skills/observe/references/command-surface.md",
+            ".claude/plugins/observe/skills/observe/SKILL.md",
+            ".claude/plugins/observe/skills/observe/references/command-surface.md",
             "README.md",
             "ARCHITECTURE.md",
         ],

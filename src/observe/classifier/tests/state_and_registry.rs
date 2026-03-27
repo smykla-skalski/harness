@@ -9,7 +9,7 @@ fn skill_name_short_does_not_fire() {
         "id": "t1",
         "name": "Write",
         "input": {
-            "file_path": "/data/.claude/skills/observe/SKILL.md",
+            "file_path": "/data/.claude/plugins/observe/skills/observe/SKILL.md",
             "content": "---\nname: observe\n---\nSome content"
         }
     });

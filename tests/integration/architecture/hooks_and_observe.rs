@@ -400,9 +400,9 @@ fn observe_scan_root_stays_prod_only() {
 fn observe_skill_matches_current_cli_surface() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
     let docs = [
-        read_repo_file(root, ".claude/skills/observe/SKILL.md"),
-        read_repo_file(root, ".claude/skills/observe/references/overrides.md"),
-        read_repo_file(root, ".claude/skills/observe/references/command-surface.md"),
+        read_repo_file(root, ".claude/plugins/observe/skills/observe/SKILL.md"),
+        read_repo_file(root, ".claude/plugins/observe/skills/observe/references/overrides.md"),
+        read_repo_file(root, ".claude/plugins/observe/skills/observe/references/command-surface.md"),
     ];
     let all_docs: Vec<&str> = docs.iter().map(String::as_str).collect();
 
