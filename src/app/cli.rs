@@ -4,6 +4,7 @@ use std::time::Duration;
 use clap::{Parser, Subcommand};
 
 use crate::app::command_context::{AppContext, Execute};
+use crate::agents::transport::AgentsCommand;
 use crate::create::{
     ApprovalBeginArgs, CreateBeginArgs, CreateResetArgs, CreateSaveArgs, CreateShowArgs,
     CreateValidateArgs,
@@ -18,8 +19,8 @@ use crate::run::{
     ValidateArgs,
 };
 use crate::setup::{
-    BootstrapArgs, CapabilitiesArgs, GatewayArgs, KumaSetupArgs, PreCompactArgs, SessionStartArgs,
-    SessionStopArgs,
+    AgentsSetupCommand, BootstrapArgs, CapabilitiesArgs, GatewayArgs, KumaSetupArgs,
+    PreCompactArgs, SessionStartArgs, SessionStopArgs,
 };
 
 /// Harness CLI.
@@ -80,6 +81,10 @@ pub enum CreateCommand {
 #[non_exhaustive]
 pub enum SetupCommand {
     Bootstrap(BootstrapArgs),
+    Agents {
+        #[command(subcommand)]
+        command: AgentsSetupCommand,
+    },
     Kuma(Box<KumaSetupArgs>),
     Gateway(GatewayArgs),
     Capabilities(CapabilitiesArgs),
@@ -110,16 +115,25 @@ pub enum Command {
         command: SetupCommand,
     },
 
+    /// Shared harness-managed agent lifecycle commands.
+    Agents {
+        #[command(subcommand)]
+        command: AgentsCommand,
+    },
+
     /// Handle session start hook.
+    #[command(hide = true)]
     SessionStart(SessionStartArgs),
 
     /// Handle session stop cleanup.
+    #[command(hide = true)]
     SessionStop(SessionStopArgs),
 
     /// Save compact handoff before compaction.
+    #[command(hide = true)]
     PreCompact(PreCompactArgs),
 
-    /// Observe and classify Claude Code session logs.
+    /// Observe and classify harness-managed agent session logs.
     Observe(ObserveArgs),
 }
 
@@ -134,6 +148,7 @@ pub fn dispatch(command: &Command) -> Result<i32, CliError> {
         Command::Run { command } => dispatch_run(&ctx, command),
         Command::Create { command } => dispatch_create(&ctx, command),
         Command::Setup { command } => dispatch_setup(&ctx, command),
+        Command::Agents { command } => command.execute(&ctx),
         Command::SessionStart(args) => args.execute(&ctx),
         Command::SessionStop(args) => args.execute(&ctx),
         Command::PreCompact(args) => args.execute(&ctx),
@@ -182,6 +197,7 @@ fn dispatch_create(ctx: &AppContext, command: &CreateCommand) -> Result<i32, Cli
 fn dispatch_setup(ctx: &AppContext, command: &SetupCommand) -> Result<i32, CliError> {
     match command {
         SetupCommand::Bootstrap(args) => args.execute(ctx),
+        SetupCommand::Agents { command } => command.execute(ctx),
         SetupCommand::Kuma(args) => args.execute(ctx),
         SetupCommand::Gateway(args) => args.execute(ctx),
         SetupCommand::Capabilities(args) => args.execute(ctx),

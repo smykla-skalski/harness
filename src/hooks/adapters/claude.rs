@@ -12,7 +12,7 @@ use crate::hooks::protocol::output;
 use crate::hooks::protocol::result::NormalizedHookResult;
 use crate::kernel::tooling::ToolCategory;
 
-pub struct ClaudeCodeAdapter;
+pub struct ClaudeAdapter;
 
 #[derive(Serialize)]
 struct ClaudeConfig<'a> {
@@ -33,9 +33,9 @@ struct ClaudeCommandHook<'a> {
     command: &'a str,
 }
 
-impl AgentAdapter for ClaudeCodeAdapter {
+impl AgentAdapter for ClaudeAdapter {
     fn name(&self) -> &'static str {
-        "claude-code"
+        "claude"
     }
 
     fn parse_input(&self, raw: &[u8]) -> Result<NormalizedHookContext, CliError> {

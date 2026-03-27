@@ -16,7 +16,7 @@ pub use install::{choose_install_dir_with_home, install_wrapper};
 
 use install::path_candidates;
 use plugin_cache::sync_plugin_cache;
-use registrations::{build_codex_config, build_opencode_bridge, process_agent_registrations};
+use registrations::{build_codex_config, process_agent_registrations};
 
 /// Shell wrapper script that delegates to the project-local harness binary.
 pub const WRAPPER: &str = r#"#!/bin/sh
@@ -87,12 +87,7 @@ pub fn write_agent_bootstrap(
     project_dir: &Path,
     agent: HookAgent,
 ) -> Result<Vec<PathBuf>, CliError> {
-    match agent {
-        HookAgent::ClaudeCode | HookAgent::GeminiCli | HookAgent::Codex => {
-            write_process_agent_bootstrap(project_dir, agent)
-        }
-        HookAgent::OpenCode => write_opencode_bootstrap(project_dir),
-    }
+    write_process_agent_bootstrap(project_dir, agent)
 }
 
 /// Returns whether `harness` resolves from the provided PATH.
@@ -108,10 +103,10 @@ fn write_process_agent_bootstrap(
     agent: HookAgent,
 ) -> Result<Vec<PathBuf>, CliError> {
     let path = match agent {
-        HookAgent::ClaudeCode => project_dir.join(".claude").join("settings.json"),
-        HookAgent::GeminiCli => project_dir.join(".gemini").join("settings.json"),
+        HookAgent::Claude => project_dir.join(".claude").join("settings.json"),
+        HookAgent::Copilot => project_dir.join(".github").join("hooks").join("harness.json"),
         HookAgent::Codex => project_dir.join(".codex").join("hooks.json"),
-        HookAgent::OpenCode => unreachable!("handled separately"),
+        HookAgent::Gemini => project_dir.join(".gemini").join("settings.json"),
     };
     let registrations = process_agent_registrations(agent);
     let config = adapter_for(agent).generate_config(&registrations);
@@ -125,22 +120,4 @@ fn write_process_agent_bootstrap(
     }
 
     Ok(written)
-}
-
-fn write_opencode_bootstrap(project_dir: &Path) -> Result<Vec<PathBuf>, CliError> {
-    let plugin_path = project_dir
-        .join(".opencode")
-        .join("plugins")
-        .join("harness-bridge.ts");
-    let package_path = project_dir.join(".opencode").join("package.json");
-
-    write_text(&plugin_path, &build_opencode_bridge()?)?;
-    if !package_path.exists() {
-        write_text(
-            &package_path,
-            "{\n  \"name\": \"harness-opencode\",\n  \"private\": true,\n  \"type\": \"module\"\n}\n",
-        )?;
-    }
-
-    Ok(vec![plugin_path, package_path])
 }

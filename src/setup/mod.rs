@@ -1,3 +1,4 @@
+mod agents;
 mod bootstrap;
 pub(crate) mod build_info;
 mod capabilities;
@@ -5,10 +6,11 @@ pub(crate) mod cluster;
 mod gateway;
 mod kuma;
 mod pre_compact;
-mod services;
+pub(crate) mod services;
 mod session;
 pub(crate) mod wrapper;
 
+pub use agents::{AgentsSetupCommand, GenerateAgentAssetsArgs};
 pub use bootstrap::BootstrapArgs;
 pub use bootstrap::bootstrap;
 pub use capabilities::{CapabilitiesArgs, capabilities};

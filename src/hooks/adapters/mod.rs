@@ -1,7 +1,7 @@
 mod claude;
+mod copilot;
 mod codex;
 mod gemini;
-pub mod opencode;
 
 use std::path::PathBuf;
 
@@ -16,19 +16,19 @@ use crate::hooks::protocol::context::{
 use crate::hooks::protocol::result::NormalizedHookResult;
 use crate::kernel::tooling::{ToolCategory, ToolContext};
 
-pub use claude::ClaudeCodeAdapter;
+pub use claude::ClaudeAdapter;
+pub use copilot::CopilotAdapter;
 pub use codex::CodexAdapter;
-pub use gemini::GeminiCliAdapter;
-pub use opencode::OpenCodeAdapter;
+pub use gemini::GeminiAdapter;
 
 /// Supported hook transports/adapters.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
 #[value(rename_all = "kebab-case")]
 pub enum HookAgent {
-    ClaudeCode,
-    GeminiCli,
+    Claude,
+    Copilot,
     Codex,
-    OpenCode,
+    Gemini,
 }
 
 /// Adapter-rendered process response.
@@ -173,15 +173,15 @@ where
 
 #[must_use]
 pub fn adapter_for(agent: HookAgent) -> &'static dyn AgentAdapter {
-    static CLAUDE: ClaudeCodeAdapter = ClaudeCodeAdapter;
-    static GEMINI: GeminiCliAdapter = GeminiCliAdapter;
+    static CLAUDE: ClaudeAdapter = ClaudeAdapter;
+    static COPILOT: CopilotAdapter = CopilotAdapter;
     static CODEX: CodexAdapter = CodexAdapter;
-    static OPENCODE: OpenCodeAdapter = OpenCodeAdapter;
+    static GEMINI: GeminiAdapter = GeminiAdapter;
 
     match agent {
-        HookAgent::ClaudeCode => &CLAUDE,
-        HookAgent::GeminiCli => &GEMINI,
+        HookAgent::Claude => &CLAUDE,
+        HookAgent::Copilot => &COPILOT,
         HookAgent::Codex => &CODEX,
-        HookAgent::OpenCode => &OPENCODE,
+        HookAgent::Gemini => &GEMINI,
     }
 }

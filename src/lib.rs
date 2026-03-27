@@ -1,5 +1,6 @@
 #![deny(unsafe_code)]
 
+pub mod agents;
 pub mod app;
 #[cfg(test)]
 mod codec;
