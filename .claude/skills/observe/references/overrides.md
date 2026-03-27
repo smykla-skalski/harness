@@ -2,7 +2,9 @@
 
 Configure classifier behavior through CLI flags or the persisted observer state.
 
-Observer state is stored automatically at `$XDG_DATA_HOME/harness/observe/<SESSION_ID>.state`.
+Observer state is stored automatically at `~harness/projects/project-<digest>/agents/observe/<observe-id>/snapshot.json`.
+
+Do not edit that file manually. Use `harness observe scan <session-id> --action ...` to inspect or mutate observer state.
 
 ## Mute list
 

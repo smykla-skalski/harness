@@ -172,7 +172,7 @@ Select a suite that matches the feature area, or copy [../examples/suite-templat
 For directory suites (`SUITE_DIR` is set):
 
 1. Read the suite's `suite.md` for overview, group table, baseline table, and execution contract.
-2. **The test groups table is authoritative.** Every group listed in the table must be executed. Do not skip groups because they need a different cluster profile. If a group requires multi-zone but the current profile is single-zone, tear down the current cluster and bring up a multi-zone cluster before that group. If profile switching is impractical, use AskUserQuestion - do not silently skip.
+2. **The test groups table is authoritative.** Every group listed in the table must be executed. Do not skip groups because they need a different cluster profile. If a group requires multi-zone but the current profile is single-zone, tear down the current cluster and bring up a multi-zone cluster before that group. If profile switching is impractical, ask the user - do not silently skip.
 3. Phase 3 already prepared the suite. Do not re-copy baseline manifests and do not re-parse group frontmatter during each group. Use the active run's prepared-suite artifact as the runtime source of truth for prepared manifests plus cluster deltas.
 4. Before each group, read the group file from the suite's `groups/` directory using the file path in the group table. The group file stays authoritative for `## Consume`, `## Debug`, validation commands, and expected outcomes. The prepared-suite artifact is authoritative for prepared manifest paths plus `helm_values` and `restart_namespaces`.
 5. If the prepared-suite entry for the current group includes `helm_values` or `restart_namespaces`, rerun the active Phase 2 cluster command with repeated `--helm-setting key=value` and `--restart-namespace <ns>` flags derived from the prepared-suite artifact. `harness setup kuma cluster` compares the desired deploy state against the active run's `current-deploy.json`; if mode, mode args, and Helm values already match, it prints a no-op message and skips redeploy. Otherwise it redeploys, performs rollout restarts in the listed namespaces, and rewrites the deploy state.
@@ -182,7 +182,7 @@ For directory suites (`SUITE_DIR` is set):
 
 For single-file suites: read the entire suite file, but require the same frontmatter contract as `suite.md`.
 
-**Deviation rule**: if any step requires diverging from the suite definition (different values, skipped step, reordered steps, extra steps, changed expected outcome), use AskUserQuestion for approval before making the change. Record every deviation in the report with what changed, why, and whether user-approved or suite-allowed.
+**Deviation rule**: if any step requires diverging from the suite definition (different values, skipped step, reordered steps, extra steps, changed expected outcome), ask the user for approval before making the change. Record every deviation in the report with what changed, why, and whether user-approved or suite-allowed.
 
 All manifest paths passed to `harness run apply` are relative - harness resolves them from the suite and run directories automatically. Never construct shell variables (`SD=`, `SUITE_DIR=`, etc.) to build manifest paths. Use `harness run apply --manifest g02/04.yaml`, not `SD=... && harness run apply --manifest ${SD}/g02/04.yaml`.
 
@@ -191,7 +191,7 @@ For each test step:
 1. Use prepared manifest entries from the active run's prepared-suite artifact whenever the suite already defines the manifest. Only write a new manifest to the active run's `manifests/` directory when the suite does not already provide one or the user explicitly approved a deviation. Never use `/tmp`.
 2. Apply through `harness run apply`. Prepared manifests reuse the preflight validation/cache; non-prepared manifests are copied, validated, and applied by the command. When a step needs more than one manifest, prefer one batched `harness run apply` call over shell loops: repeat `--manifest` in the exact apply order, or pass the manifest directory to apply its immediate `.json/.yaml/.yml` files in lexicographic filename order.
 3. Run kubectl verification commands through `harness run record ... -- kubectl ...`, kumactl verification commands through `harness run record ... -- kumactl ...`, Envoy admin captures through `harness run envoy capture`, and other cluster-touching commands such as `curl` through `harness run record`. During Phase 4 execution, every `harness run record` command must include `--gid <group-id>`. Do not run these bare. These wrappers are part of the tracked run, not post-hoc loggers. For raw `kubectl`, `harness run record` injects the tracked local `--kubeconfig`, fails closed if the active run has no tracked local kubeconfig yet, and rejects kubeconfig or cluster-target override flags. Even after resume or compaction, do not replace it with raw `kubectl --kubeconfig ...`. Prefer `harness run envoy route-body` or `harness run envoy bootstrap` when you want the inspected Envoy output directly; omit `--file` to capture live first. Save output to `artifacts/`.
-4. Run kubectl cleanup commands through `harness run record ... -- kubectl ...`. Prefer `kubectl delete -f` against the prepared manifest files for the current group, one recorded command per manifest or resource kind. Never mix resource kinds in one `kubectl delete` command such as `kubectl delete kind-a name-a kind-b name-b`; kubectl interprets the later kinds as names of the first kind. If the suite doesn't specify the cleanup, confirm with AskUserQuestion (options: run as proposed, skip, stop). Every command that touches the cluster goes through a tracked harness wrapper.
+4. Run kubectl cleanup commands through `harness run record ... -- kubectl ...`. Prefer `kubectl delete -f` against the prepared manifest files for the current group, one recorded command per manifest or resource kind. Never mix resource kinds in one `kubectl delete` command such as `kubectl delete kind-a name-a kind-b name-b`; kubectl interprets the later kinds as names of the first kind. If the suite doesn't specify the cleanup, confirm with a user approval prompt (options: run as proposed, skip, stop). Every command that touches the cluster goes through a tracked harness wrapper.
 5. Write result into the report. Every artifact path referenced must point to an existing file.
 
 ```bash
@@ -265,7 +265,7 @@ When any signal fires:
 harness run runner-state --event failure-manifest
 ```
 
-2. Present an AskUserQuestion with this exact first line:
+2. Present an user approval prompt with this exact first line:
 
 ```text
 suite:run/bug-found: actual behavior differs from suite expectations
@@ -351,7 +351,7 @@ After closeout, spawn parallel subagents to analyze the completed run from multi
 
 **Spawn these agents in parallel (all background, mode: auto):**
 
-1. **Skill compliance auditor** - Read the run report, command log, and run-status.json. Check whether the runner followed the skill contract: were all groups executed or properly approved for skip? Were AskUserQuestion gates respected? Were env vars or python used? Were harness wrappers used for all cluster access? List specific violations found.
+1. **Skill compliance auditor** - Read the run report, command log, and run-status.json. Check whether the runner followed the skill contract: were all groups executed or properly approved for skip? Were user approval prompt gates respected? Were env vars or python used? Were harness wrappers used for all cluster access? List specific violations found.
 
 2. **Manifest quality reviewer** - Read all manifests in the suite (baseline + groups). Check for: missing fields that CRDs require (appProtocol, labels, namespace), resources that should have defaults but don't, manifests that duplicate baseline without changes, overly broad targetRef (kind: Mesh when more specific would work). List issues per group.
 
@@ -365,7 +365,7 @@ After closeout, spawn parallel subagents to analyze the completed run from multi
 
 1. Assemble their outputs into a single retrospective document with sections matching the agent roles above
 2. Save as a draft: `{run_dir}/retrospective-draft.md`
-3. Present the FULL retrospective to the user via AskUserQuestion with options:
+3. Present the FULL retrospective to the user via a user approval prompt with options:
    - `Save as-is` - save to `{run_dir}/retrospective.md`
    - `Request changes` - user provides feedback, regenerate specific sections
    - `Discard` - do not save
@@ -380,7 +380,7 @@ Tear down the clusters created in Phase 2. This is the default - always clean up
 
 When running multiple profiles (`--profile all`), overlap teardown and setup at profile transitions. Run the old cluster's teardown with `run_in_background: true` while starting the next cluster's setup in foreground. All artifacts from the completed profile are already captured, so the background teardown won't lose data.
 
-Use AskUserQuestion if the teardown situation is unclear, with options:
+Ask the user if the teardown situation is unclear, with options:
 
 - "Tear down now" - proceed with teardown
 - "Keep clusters running" - skip teardown, user wants to inspect

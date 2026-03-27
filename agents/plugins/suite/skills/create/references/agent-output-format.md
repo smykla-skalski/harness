@@ -103,7 +103,7 @@ Writer workers must:
 
 ## Writer recovery (partial completion)
 
-When a writer worker finishes but some expected files are missing (partial failure or timeout), the main context must recover without re-launching a full worker. Before writing any file that may already exist on disk from a partial worker run, Read it first. Claude Code tracks file state internally - writing a file that exists on disk but was never Read in the current context triggers "File has been modified since read" errors. The recovery sequence is:
+When a writer worker finishes but some expected files are missing (partial failure or timeout), the main context must recover without re-launching a full worker. Before writing any file that may already exist on disk from a partial worker run, Read it first. The current agent tracks file state internally - writing a file that exists on disk but was never Read in the current context can trigger "File has been modified since read" style errors. The recovery sequence is:
 
 1. Run `ls "${SUITE_DIR}/groups/"` to see which files the worker already created.
 2. For every file that exists on disk but still needs to be written or overwritten, Read it first, then Write the corrected content.

@@ -106,6 +106,20 @@ fn write_process_agent_bootstrap(
     project_dir: &Path,
     agent: HookAgent,
 ) -> Result<Vec<PathBuf>, CliError> {
+    let planned = planned_agent_bootstrap_files(project_dir, agent);
+    let mut written = Vec::with_capacity(planned.len());
+    for (path, content) in planned {
+        write_text(&path, &content)?;
+        written.push(path);
+    }
+
+    Ok(written)
+}
+
+pub(crate) fn planned_agent_bootstrap_files(
+    project_dir: &Path,
+    agent: HookAgent,
+) -> Vec<(PathBuf, String)> {
     let path = match agent {
         HookAgent::Claude => project_dir.join(".claude").join("settings.json"),
         HookAgent::Copilot => project_dir
@@ -117,14 +131,12 @@ fn write_process_agent_bootstrap(
     };
     let registrations = process_agent_registrations(agent);
     let config = adapter_for(agent).generate_config(&registrations);
-    write_text(&path, &config)?;
-
-    let mut written = vec![path];
+    let mut planned = vec![(path, config)];
     if agent == HookAgent::Codex {
-        let config_path = project_dir.join(".codex").join("config.toml");
-        write_text(&config_path, &build_codex_config())?;
-        written.push(config_path);
+        planned.push((
+            project_dir.join(".codex").join("config.toml"),
+            build_codex_config(),
+        ));
     }
-
-    Ok(written)
+    planned
 }

@@ -242,4 +242,4 @@ When a test fails:
 3. Record expected vs observed behavior.
 4. Classify root cause: **suite bug** (wrong manifest/expectations), **product bug** (Kuma vs spec), **harness bug** (infra misconfiguration), or **environment issue** (timing/resources).
 5. If the symptoms look like run-state drift instead of product behavior, run `harness run doctor` before making a manual fix.
-6. Do not continue until classification is explicit and user approves via AskUserQuestion.
+6. Do not continue until classification is explicit and user approves via a user approval prompt.
