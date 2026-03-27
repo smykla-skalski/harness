@@ -148,6 +148,7 @@ Read [references/agent-contract.md](references/agent-contract.md) in full before
 
 - **No shell variables.** `harness run apply --manifest g02/04.yaml`, not `SD=...`. Exception: the Phase 0/1 `harness run start` setup block.
 - **Harness wrappers only.** Use `harness run record` for kubectl, kumactl, curl, and other cluster-touching shell commands; use the dedicated `harness run apply`, `harness run report`, and `harness run envoy` subcommands where they fit. No raw binaries, no `python3 -c`.
+- **No python3 for JSON parsing.** Never pipe harness command output through `python3`. Use `jq` for JSON filtering or `harness run envoy capture` for Envoy admin data.
 - **`--delay` not `sleep`.** `harness run apply --delay 8 --manifest ...` not `sleep 8 && harness run apply`.
 - **Relative paths only.** `g13/01.yaml` not `/full/path/...`. No `/tmp`, no `--validate=false`.
 - **Hard gate after each group** via `harness run report group`.
@@ -156,7 +157,8 @@ Read [references/agent-contract.md](references/agent-contract.md) in full before
 - **Preflight before apply.** Never run `harness run apply` until preflight has completed. Preflight materializes baselines and group YAML into prepared manifests. The verify-bash hook enforces this - `harness run apply` during bootstrap or before preflight completion is denied with KSR014.
 - **Stop and triage every failure.** On any unexpected result, failure, or mismatch, stop. Classify as suite bug, product bug, harness bug, or environment issue. Present classification to user via AskUserQuestion before continuing because unclassified failures corrupt the audit trail. See bug-found gate in Phase 4.
 - **Commit code fixes before continuing.** After editing product code during a run, commit before re-deploying or re-testing. Use `git add <files> && git commit -m 'fix: description'`. Never iterate on uncommitted edits.
-- **Never truncate verification output.** Do not pipe `make test`, `make check`, `cargo test`, `cargo clippy`, or any verification command through `tail -N` or `head -N`. Use full output or grep for specific markers (`FAIL`, `error`, `PASS`). Drawing conclusions from truncated output is unreliable - failures can be hidden above the truncation point.
+- **Never truncate verification output.** Do not pipe `make test`, `make check`, `cargo test`, `cargo clippy`, harness commands, or any verification command through `tail -N` or `head -N`. Use full output or `grep` for specific markers (`FAIL`, `error`, `PASS`). Drawing conclusions from truncated output is unreliable - failures can be hidden above the truncation point.
+- **Use TaskOutput for background results.** When reading output from background tasks, use the `TaskOutput` tool. Do not `tail` or `cat` the output file paths directly.
 
 ## Workflow
 
@@ -212,7 +214,7 @@ Read [references/cluster-setup.md](references/cluster-setup.md) before starting 
 
 When `--profile all` (the default), read all group files and collect the set of required profiles. Sort groups by profile tier: standalone, single-zone Kubernetes, single-zone universal, multi-zone Kubernetes, multi-zone universal. Execute all groups for one profile before tearing down and moving to the next. Parallelizable groups within a profile can run concurrently. If suite profile ordering is non-contiguous, warn and propose a reorder.
 
-For each profile, execute a full run (Phase 1-8) with only the groups matching that profile. When transitioning between profiles, overlap teardown and setup: run the old cluster's teardown with `run_in_background: true` while starting the next cluster in foreground. Artifacts are already captured so teardown is safe to background.
+For each profile, execute a full run (Phase 1-8) with only the groups matching that profile. When transitioning between profiles, wait for the old cluster's teardown to complete before starting the next cluster bootstrap. Do not run teardown and bootstrap in parallel - the teardown must finish first to avoid port conflicts and resource contention.
 
 Present the execution plan via AskUserQuestion with options:
 
@@ -293,7 +295,7 @@ Key principles (workflow.md has the details):
    - `Stop run`
 2. **Prepared-suite artifact** from Phase 3 is the runtime source of truth for manifest paths and cluster deltas. Do not re-parse group frontmatter.
 3. **Group files remain authoritative** for `## Consume`, `## Debug`, and expected outcomes. Read before executing, drop after completing.
-4. **Apply through `harness run apply`**, verify/cleanup through `harness run record`. During Phase 4 execution, every `harness run record` command must include `--gid <group-id>` so the command log and audit trail stay group-scoped. Use `harness run report group --group-id <id> ...` to finalize a group and `harness run envoy` for Envoy admin captures. Batch manifests with repeated `--manifest` or pass the group directory. Never mix resource kinds in one `kubectl delete` command. If the suite does not specify cleanup, use AskUserQuestion with options:
+4. **Apply through `harness run apply`**, verify/cleanup through `harness run record`. `harness run apply` does NOT support `--gid`. The group context comes from the manifest path, not a flag - use `--manifest g01/01-file.yaml` only. During Phase 4 execution, every `harness run record` command must include `--gid <group-id>` so the command log and audit trail stay group-scoped. Use `harness run report group --group-id <id> ...` to finalize a group and `harness run envoy` for Envoy admin captures. Batch manifests with repeated `--manifest` or pass the group directory. Never mix resource kinds in one `kubectl delete` command. Always clean up group resources before reporting the group result - delete created CRDs in reverse order. If the suite does not specify cleanup, use AskUserQuestion with options:
    - `Run proposed cleanup`
    - `Skip cleanup`
    - `Stop run`
