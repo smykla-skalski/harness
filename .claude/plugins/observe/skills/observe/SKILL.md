@@ -14,7 +14,7 @@ hooks:
 
 # Observe
 
-Use this skill when the user wants to inspect, monitor, or triage another agent session through `harness observe`.
+Use this skill when the user wants to inspect, monitor, or triage another agent session through `harness observe`, especially to improve a live skill, hook, or test suite while the session is still active.
 
 `harness` is the source of truth. Do not read or mutate host-owned session/state paths directly unless you are debugging a legacy fallback. The shared runtime state lives under:
 
@@ -108,6 +108,7 @@ Summarize briefly:
 - counts by severity and category
 - critical issues first
 - whether the observer state is now established for this `observe-id`
+- which fix target is most likely: skill, hook, suite, or harness code
 
 Do not apply fixes automatically. Observe and triage first.
 
@@ -179,7 +180,7 @@ For dump mode:
 
 ## Scope
 
-This skill is for observing and triaging harness-managed agent session recordings through the `harness observe` pipeline. It is not a general-purpose log viewer or a replacement for the harness workflow state machines.
+This skill is for observing and improving harness-managed agent session recordings through the `harness observe` pipeline. It is the live feedback loop for fixing skills, hooks, and suites, not a general-purpose log viewer or a replacement for the harness workflow state machines.
 
 ## Common failures
 
