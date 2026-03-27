@@ -1,35 +1,45 @@
 # harness
 
-`harness` is a CLI for running Kubernetes and Kuma tests.
+`harness` is the workflow engine and source of truth for tracked test work, shared agent state, and repo-aware automation in Kubernetes and Kuma projects.
 
 It helps you:
 
 - start a disposable test environment
 - create a test suite
 - run that suite step by step
-- keep a record of what happened
-
-If you use it with Claude Code, harness also installs hooks that block unsafe shortcuts, such as talking to a cluster directly outside the tracked workflow.
+- keep a durable record of what happened
+- let Claude, Codex, Gemini, and Copilot work against the same harness-managed state
 
 If you want the internal structure, see [ARCHITECTURE.md](ARCHITECTURE.md). This README is about day-to-day use.
 
 ## What the main commands do
 
-Most people only need these four command groups:
+Most people only need these command groups:
 
 - `harness setup` prepares local environments and session state
 - `harness create` helps you build a new suite
 - `harness run` executes a suite
 - `harness observe` checks project health and scans logs for mistakes or failures
+- `harness agents` is the shared lifecycle and state API used by generated skills, plugins, and hooks
 
 You will also see `hook`, `session-start`, `session-stop`, and `pre-compact`. Those are mostly for editor and hook integration. You usually do not run them by hand.
+
+Author agent-facing assets once under `agents/`, then render them into:
+
+- `.claude/`
+- `.agents/`
+- `.gemini/`
+- `plugins/`
+- `.github/hooks/`
+
+Treat those rendered directories as generated output.
 
 ## The basic idea
 
 - A **suite** is the test definition. It usually lives in a `suite.md` file.
 - A **create session** is the guided flow for writing a new suite.
 - A **run** is one execution of a suite against a real cluster.
-- **observe** helps explain what went wrong after or during a session.
+- **observe** helps explain what went wrong after or during a session and can follow the same project across multiple agents.
 
 In order:
 
@@ -147,6 +157,28 @@ Useful create commands:
 - `harness create validate` checks the suite content
 - `harness create reset` clears the current create state
 
+## Cross-agent sessions
+
+Bootstrap editor integration with one of the supported agent names:
+
+- `claude`
+- `codex`
+- `gemini`
+- `copilot`
+
+Generated hooks and plugins call back into `harness agents ...`, `harness create ...`, `harness run ...`, and `harness observe ...`. They should not keep their own durable workflow state.
+
+```bash
+harness setup bootstrap --agent claude
+```
+
+`observe` can follow the same investigation across agents:
+
+```bash
+harness observe --agent claude --observe-id project-default doctor
+harness observe --agent codex --observe-id project-default scan <session-id> --summary
+```
+
 ## Rules
 
 - Use harness commands for cluster work. Do not go around it with direct `kubectl`, `helm`, `docker`, `k3d`, or similar calls.
@@ -161,6 +193,9 @@ Harness uses XDG-style state directories.
 - suites: `$XDG_DATA_HOME/harness/suites/`
 - runs: `$XDG_DATA_HOME/harness/runs/<run-id>/`
 - session context: `$XDG_DATA_HOME/harness/contexts/<session-hash>/`
+- shared agent ledger: `~harness/projects/project-<digest>/agents/ledger/events.jsonl`
+- shared raw agent sessions: `~harness/projects/project-<digest>/agents/sessions/<agent>/<session-id>/raw.jsonl`
+- shared observe state: `~harness/projects/project-<digest>/agents/observe/<observe-id>/`
 
 A run directory usually contains:
 
@@ -170,13 +205,14 @@ A run directory usually contains:
 - `suite-run-state.json` for runner state
 - `run-report.md` for the human-readable report
 
-The create approval state lives in `.harness/suite-create-state.json`.
+The create approval state lives in harness-managed project state and hook-enforced workflow files. Do not edit those files by hand.
 
 ## When you get stuck
 
 Start here:
 
 - `harness observe doctor` to check wrapper wiring, lifecycle commands, current-run pointers, compact handoff state, and the active Kuma repo contract
+- `harness setup agents generate --check` to verify generated agent assets are in sync with `agents/`
 - `harness setup capabilities` to see which profiles and features are ready on this machine right now
 - `harness observe scan` to classify problems in session logs
 - `harness run doctor` to inspect one tracked run and its pointer state
