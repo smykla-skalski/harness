@@ -1,3 +1,4 @@
+use std::cmp::Reverse;
 use std::collections::BTreeMap;
 use std::path::Path;
 
@@ -431,7 +432,7 @@ pub fn list_tasks(
         .into_values()
         .filter(|task| status_filter.is_none_or(|status| task.status == status))
         .collect();
-    items.sort_unstable_by(|a, b| b.severity.cmp(&a.severity));
+    items.sort_unstable_by_key(|item| Reverse(item.severity));
     Ok(items)
 }
 

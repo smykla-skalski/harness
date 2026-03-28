@@ -59,10 +59,7 @@ pub enum ConversationEventKind {
     /// Session lifecycle marker (start, stop, resume).
     SessionMarker { marker: String },
     /// Signal received and processed by the agent.
-    SignalReceived {
-        signal_id: String,
-        command: String,
-    },
+    SignalReceived { signal_id: String, command: String },
     /// Catch-all for runtime-specific events.
     Other { label: String, data: Value },
 }

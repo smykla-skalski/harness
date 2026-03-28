@@ -78,12 +78,15 @@ impl Execute for SessionTaskCommand {
 }
 
 fn resolve_project_dir(hint: Option<&str>) -> String {
-    hint.filter(|value| !value.trim().is_empty())
-        .map_or_else(
-            || env::current_dir()
-                .map_or_else(|_| ".".to_string(), |path| path.to_string_lossy().to_string()),
-            ToString::to_string,
-        )
+    hint.filter(|value| !value.trim().is_empty()).map_or_else(
+        || {
+            env::current_dir().map_or_else(
+                |_| ".".to_string(),
+                |path| path.to_string_lossy().to_string(),
+            )
+        },
+        ToString::to_string,
+    )
 }
 
 #[derive(Debug, Clone, Args)]
@@ -105,7 +108,7 @@ pub struct SessionStartArgs {
 impl Execute for SessionStartArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
         let project = resolve_project_dir(self.project_dir.as_deref());
-        let runtime_str = self.runtime.map(|agent| agent_to_str(agent));
+        let runtime_str = self.runtime.map(agent_to_str);
         let state = service::start_session(
             &self.context,
             project.as_ref(),
@@ -362,9 +365,8 @@ impl Execute for TaskListArgs {
         let project = resolve_project_dir(self.project_dir.as_deref());
         let items = service::list_tasks(&self.session_id, self.status, project.as_ref())?;
         if self.json {
-            let json = serde_json::to_string_pretty(&items).map_err(|error| {
-                CliErrorKind::workflow_serialize(error.to_string())
-            })?;
+            let json = serde_json::to_string_pretty(&items)
+                .map_err(|error| CliErrorKind::workflow_serialize(error.to_string()))?;
             println!("{json}");
         } else {
             for item in &items {
@@ -454,9 +456,8 @@ impl Execute for SessionListArgs {
         let project = resolve_project_dir(self.project_dir.as_deref());
         let sessions = service::list_sessions(project.as_ref())?;
         if self.json {
-            let json = serde_json::to_string_pretty(&sessions).map_err(|error| {
-                CliErrorKind::workflow_serialize(error.to_string())
-            })?;
+            let json = serde_json::to_string_pretty(&sessions)
+                .map_err(|error| CliErrorKind::workflow_serialize(error.to_string()))?;
             println!("{json}");
         } else {
             for session in &sessions {

@@ -74,16 +74,16 @@ mod tests {
     fn leader_has_all_permissions() {
         let perms = permissions_for(SessionRole::Leader);
         for action in ALL_ACTIONS {
-            assert!(
-                perms.contains(action),
-                "leader should have {action:?}",
-            );
+            assert!(perms.contains(action), "leader should have {action:?}",);
         }
     }
 
     #[test]
     fn worker_cannot_end_session() {
-        assert!(!is_permitted(SessionRole::Worker, SessionAction::EndSession));
+        assert!(!is_permitted(
+            SessionRole::Worker,
+            SessionAction::EndSession
+        ));
     }
 
     #[test]

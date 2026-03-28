@@ -79,7 +79,10 @@ fn scan_missing_session_returns_error() {
     let mut filter = default_filter();
     filter.project_hint = Some("nonexistent".into());
 
-    let cmd = Command::Observe(Box::new(observe_args(scan_mode("does-not-exist-ever", filter))));
+    let cmd = Command::Observe(Box::new(observe_args(scan_mode(
+        "does-not-exist-ever",
+        filter,
+    ))));
 
     temp_env::with_vars([("HOME", Some(tmp.path().to_str().unwrap()))], || {
         let result = run_command(cmd);
@@ -363,7 +366,10 @@ fn scan_exclude_filter() {
     filter.exclude = Some("user_frustration".into());
     filter.json = true;
 
-    let cmd = Command::Observe(Box::new(observe_args(scan_mode("excl-filter-sess", filter))));
+    let cmd = Command::Observe(Box::new(observe_args(scan_mode(
+        "excl-filter-sess",
+        filter,
+    ))));
 
     temp_env::with_vars([("HOME", Some(tmp.path().to_str().unwrap()))], || {
         let result = run_command(cmd);

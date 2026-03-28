@@ -34,12 +34,10 @@ impl AgentRuntime for ClaudeRuntime {
         project_dir: &Path,
     ) -> Result<Option<PathBuf>, CliError> {
         // Claude transcripts: ~/.claude/projects/{project_hash}/{session_id}.jsonl
-        let candidates = [
-            project_context_dir(project_dir)
-                .join("agents/sessions/claude")
-                .join(session_id)
-                .join("raw.jsonl"),
-        ];
+        let candidates = [project_context_dir(project_dir)
+            .join("agents/sessions/claude")
+            .join(session_id)
+            .join("raw.jsonl")];
         Ok(candidates.into_iter().find(|path| path.is_file()))
     }
 
@@ -118,10 +116,7 @@ pub(super) fn parse_common_jsonl(raw_line: &str, agent: &str) -> Option<Conversa
     })
 }
 
-fn parse_first_block(
-    blocks: &[serde_json::Value],
-    role: &str,
-) -> Option<ConversationEventKind> {
+fn parse_first_block(blocks: &[serde_json::Value], role: &str) -> Option<ConversationEventKind> {
     let block = blocks.first()?;
     match block.get("type")?.as_str()? {
         "text" => {
