@@ -161,6 +161,30 @@ pub fn read_acknowledgments(signal_dir: &Path) -> Result<Vec<SignalAck>, CliErro
     read_json_files_from_dir::<SignalAck>(&acknowledged_dir(signal_dir))
 }
 
+/// Read acknowledged signal payloads that have already been moved out of pending.
+///
+/// # Errors
+/// Returns `CliError` on filesystem failures.
+pub fn read_acknowledged_signals(signal_dir: &Path) -> Result<Vec<Signal>, CliError> {
+    let dir = acknowledged_dir(signal_dir);
+    if !dir.is_dir() {
+        return Ok(Vec::new());
+    }
+    let items = fs::read_dir(dir)
+        .map_err(|error| CliErrorKind::workflow_io(format!("read dir: {error}")))?
+        .filter_map(|entry| entry.ok().map(|entry| entry.path()))
+        .filter(|path| {
+            path.extension().is_some_and(|ext| ext == "json")
+                && !path
+                    .file_name()
+                    .and_then(|name| name.to_str())
+                    .is_some_and(|name| name.ends_with(".ack.json"))
+        })
+        .filter_map(|path| try_parse_json_file(&path))
+        .collect();
+    Ok(items)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
