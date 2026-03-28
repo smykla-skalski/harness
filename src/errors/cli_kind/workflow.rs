@@ -32,4 +32,19 @@ impl CliErrorKind {
     pub fn workflow_serialize(detail: impl Into<Cow<'static, str>>) -> Self {
         Self::Workflow(WorkflowError::workflow_serialize(detail))
     }
+
+    #[must_use]
+    pub fn session_not_active(detail: impl Into<Cow<'static, str>>) -> Self {
+        Self::Workflow(WorkflowError::session_not_active(detail))
+    }
+
+    #[must_use]
+    pub fn session_permission_denied(detail: impl Into<Cow<'static, str>>) -> Self {
+        Self::Workflow(WorkflowError::session_permission_denied(detail))
+    }
+
+    #[must_use]
+    pub fn session_agent_conflict(detail: impl Into<Cow<'static, str>>) -> Self {
+        Self::Workflow(WorkflowError::session_agent_conflict(detail))
+    }
 }
