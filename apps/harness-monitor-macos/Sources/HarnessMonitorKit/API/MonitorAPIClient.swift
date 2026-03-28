@@ -2,6 +2,7 @@ import Foundation
 
 public protocol MonitorClientProtocol: Sendable {
   func health() async throws -> HealthResponse
+  func diagnostics() async throws -> DaemonDiagnosticsReport
   func projects() async throws -> [ProjectSummary]
   func sessions() async throws -> [SessionSummary]
   func sessionDetail(id: String) async throws -> SessionDetail
@@ -92,6 +93,10 @@ public final class MonitorAPIClient: MonitorClientProtocol {
 
   public func health() async throws -> HealthResponse {
     try await get("/v1/health")
+  }
+
+  public func diagnostics() async throws -> DaemonDiagnosticsReport {
+    try await get("/v1/diagnostics")
   }
 
   public func projects() async throws -> [ProjectSummary] {

@@ -3,8 +3,9 @@ import Observation
 import SwiftUI
 
 @main
+@MainActor
 struct HarnessMonitorApp: App {
-  @State private var store = MonitorStore(daemonController: DaemonController())
+  @State private var store = HarnessMonitorAppStoreFactory.makeStore()
 
   var body: some Scene {
     WindowGroup {

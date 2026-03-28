@@ -26,6 +26,9 @@ targets:
           "$SRCROOT/Scripts/lint-swift.sh" kit
     settings:
       base:
+        CODE_SIGN_IDENTITY: "-"
+        CODE_SIGN_STYLE: Manual
+        CODE_SIGNING_ALLOWED: YES
         PRODUCT_BUNDLE_IDENTIFIER: io.harness.monitor.kit
   HarnessMonitor:
     type: application
@@ -40,8 +43,24 @@ targets:
         basedOnDependencyAnalysis: false
         script: |
           "$SRCROOT/Scripts/lint-swift.sh" app
+    postBuildScripts:
+      - name: Clear Gatekeeper Metadata
+        basedOnDependencyAnalysis: false
+        script: |
+          strip_attrs() {
+            local target_path="$1"
+            if [ -e "$target_path" ]; then
+              /usr/bin/xattr -dr com.apple.provenance "$target_path" 2>/dev/null || true
+              /usr/bin/xattr -dr com.apple.quarantine "$target_path" 2>/dev/null || true
+            fi
+          }
+
+          strip_attrs "$TARGET_BUILD_DIR/$FULL_PRODUCT_NAME"
     settings:
       base:
+        CODE_SIGN_IDENTITY: "-"
+        CODE_SIGN_STYLE: Manual
+        CODE_SIGNING_ALLOWED: YES
         INFOPLIST_KEY_CFBundleDisplayName: Harness Monitor
         INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.developer-tools
         PRODUCT_BUNDLE_IDENTIFIER: io.harness.monitor.app
@@ -61,6 +80,45 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: io.harness.monitor.kit-tests
+  HarnessMonitorUITests:
+    type: bundle.ui-testing
+    platform: macOS
+    deploymentTarget: "14.0"
+    sources:
+      - Tests/HarnessMonitorUITests
+    dependencies:
+      - target: HarnessMonitor
+    preBuildScripts:
+      - name: Swift Quality Gate
+        basedOnDependencyAnalysis: false
+        script: |
+          "$SRCROOT/Scripts/lint-swift.sh" ui-tests
+    postBuildScripts:
+      - name: Clear Gatekeeper Metadata
+        basedOnDependencyAnalysis: false
+        script: |
+          strip_attrs() {
+            local target_path="$1"
+            if [ -e "$target_path" ]; then
+              /usr/bin/xattr -dr com.apple.provenance "$target_path" 2>/dev/null || true
+              /usr/bin/xattr -dr com.apple.quarantine "$target_path" 2>/dev/null || true
+            fi
+          }
+
+          strip_attrs "$TARGET_BUILD_DIR/$FULL_PRODUCT_NAME"
+
+          for runner in "$BUILT_PRODUCTS_DIR"/*-Runner.app; do
+            if [ -e "$runner" ]; then
+              strip_attrs "$runner"
+            fi
+          done
+    settings:
+      base:
+        CODE_SIGN_IDENTITY: "-"
+        CODE_SIGN_STYLE: Manual
+        CODE_SIGNING_ALLOWED: YES
+        PRODUCT_BUNDLE_IDENTIFIER: io.harness.monitor.ui-tests
+        TEST_TARGET_NAME: HarnessMonitor
 schemes:
   HarnessMonitor:
     build:
@@ -71,3 +129,4 @@ schemes:
       gatherCoverageData: true
       targets:
         - name: HarnessMonitorKitTests
+        - name: HarnessMonitorUITests
