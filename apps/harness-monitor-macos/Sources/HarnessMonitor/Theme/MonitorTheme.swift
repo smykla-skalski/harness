@@ -83,12 +83,22 @@ func taskStatusColor(for status: TaskStatus) -> Color {
   }
 }
 
+nonisolated(unsafe) private let iso8601Formatter: ISO8601DateFormatter = {
+  let formatter = ISO8601DateFormatter()
+  formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+  return formatter
+}()
+
+nonisolated(unsafe) private let relativeFormatter: RelativeDateTimeFormatter = {
+  let formatter = RelativeDateTimeFormatter()
+  formatter.unitsStyle = .short
+  return formatter
+}()
+
 func formatTimestamp(_ value: String?) -> String {
-  guard let value, let date = ISO8601DateFormatter().date(from: value) else {
+  guard let value, let date = iso8601Formatter.date(from: value) else {
     return value ?? "n/a"
   }
 
-  let formatter = RelativeDateTimeFormatter()
-  formatter.unitsStyle = .short
-  return formatter.localizedString(for: date, relativeTo: Date())
+  return relativeFormatter.localizedString(for: date, relativeTo: Date())
 }
