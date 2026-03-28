@@ -30,7 +30,7 @@ pub(super) fn process_agent_registrations(agent: HookAgent) -> Vec<HookRegistrat
 
     match agent {
         HookAgent::Claude => registrations.extend(claude_hooks(agent)),
-        HookAgent::Codex => registrations.extend(codex_hooks(agent)),
+        HookAgent::Codex | HookAgent::OpenCode => registrations.extend(codex_hooks(agent)),
         HookAgent::Copilot => registrations.extend(copilot_hooks(agent)),
         HookAgent::Gemini => registrations.extend(gemini_hooks(agent)),
     }
@@ -228,6 +228,7 @@ pub(super) fn lifecycle_command(agent: HookAgent, subcommand: &str) -> String {
         HookAgent::Gemini => ("\"${CLAUDE_PROJECT_DIR:-$GEMINI_PROJECT_DIR}\"", "gemini"),
         HookAgent::Codex => ("\"$PWD\"", "codex"),
         HookAgent::Copilot => ("\"$PWD\"", "copilot"),
+        HookAgent::OpenCode => ("\"$PWD\"", "opencode"),
     };
     match subcommand {
         "session-start" | "session-stop" | "prompt-submit" => {

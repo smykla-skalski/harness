@@ -211,6 +211,7 @@ fn session_id_from_env(agent: HookAgent) -> Option<String> {
         HookAgent::Codex => &["CODEX_SESSION_ID", "CODEX_THREAD_ID"][..],
         HookAgent::Gemini => &["GEMINI_SESSION_ID", "CLAUDE_SESSION_ID"][..],
         HookAgent::Copilot => &["COPILOT_SESSION_ID"][..],
+        HookAgent::OpenCode => &["OPENCODE_SESSION_ID"][..],
     };
     candidates
         .iter()
@@ -225,6 +226,7 @@ fn default_session_id(agent: HookAgent) -> String {
             HookAgent::Codex => "codex",
             HookAgent::Gemini => "gemini",
             HookAgent::Copilot => "copilot",
+            HookAgent::OpenCode => "opencode",
         },
         utc_now().replace([':', '-'], "")
     )
