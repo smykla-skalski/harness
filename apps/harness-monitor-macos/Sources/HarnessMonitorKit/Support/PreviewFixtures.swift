@@ -78,7 +78,7 @@ public enum PreviewFixtures {
           )
         ]
       )
-    )
+    ),
   ]
 
   public static let tasks = [
@@ -128,7 +128,7 @@ public enum PreviewFixtures {
       blockedReason: "Waiting on local validation against the crate implementation.",
       completedAt: nil,
       checkpointSummary: nil
-    )
+    ),
   ]
 
   public static let signals = [
@@ -210,7 +210,7 @@ public enum PreviewFixtures {
       taskId: nil,
       summary: "sig-ui-1 sent to worker-codex: inject_context",
       payload: .object(["command": .string("inject_context")])
-    )
+    ),
   ]
 
   public static let projects = [
