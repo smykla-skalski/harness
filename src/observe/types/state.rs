@@ -90,6 +90,22 @@ pub struct ObserverState {
     pub baseline_issue_ids: Vec<String>,
     #[serde(default)]
     pub active_workers: Vec<ActiveWorker>,
+    /// Per-agent observation records for multi-agent sessions.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub agent_sessions: Vec<AgentObserveRecord>,
+}
+
+/// Tracks per-agent cursor and metadata in multi-agent observation.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AgentObserveRecord {
+    pub agent_id: String,
+    pub runtime: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub log_path: Option<String>,
+    #[serde(default)]
+    pub cursor: usize,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last_activity: Option<String>,
 }
 
 /// A currently running fix worker tracked in observer state.
@@ -98,6 +114,9 @@ pub struct ActiveWorker {
     pub issue_id: String,
     pub target_file: String,
     pub started_at: String,
+    /// Which agent is executing the fix (multi-agent sessions).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub agent_id: Option<String>,
 }
 
 impl ObserverState {
@@ -121,6 +140,7 @@ impl ObserverState {
             cycle_history: Vec::new(),
             baseline_issue_ids: Vec::new(),
             active_workers: Vec::new(),
+            agent_sessions: Vec::new(),
         }
     }
 

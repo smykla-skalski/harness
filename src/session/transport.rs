@@ -30,6 +30,8 @@ pub enum SessionCommand {
         #[command(subcommand)]
         command: SessionTaskCommand,
     },
+    /// Observe all agents in a session.
+    Observe(SessionObserveArgs),
     /// Show current session status.
     Status(SessionStatusArgs),
     /// List all active sessions.
@@ -60,6 +62,7 @@ impl Execute for SessionCommand {
             Self::Remove(args) => args.execute(context),
             Self::TransferLeader(args) => args.execute(context),
             Self::Task { command } => command.execute(context),
+            Self::Observe(args) => args.execute(context),
             Self::Status(args) => args.execute(context),
             Self::List(args) => args.execute(context),
         }
@@ -415,6 +418,25 @@ impl Execute for TaskUpdateArgs {
             project.as_ref(),
         )?;
         Ok(0)
+    }
+}
+
+#[derive(Debug, Clone, Args)]
+pub struct SessionObserveArgs {
+    /// Session ID.
+    pub session_id: String,
+    /// Output as JSON.
+    #[arg(long)]
+    pub json: bool,
+    /// Project directory.
+    #[arg(long, env = "CLAUDE_PROJECT_DIR")]
+    pub project_dir: Option<String>,
+}
+
+impl Execute for SessionObserveArgs {
+    fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
+        let project = resolve_project_dir(self.project_dir.as_deref());
+        super::observe::execute_session_observe(&self.session_id, project.as_ref(), self.json)
     }
 }
 

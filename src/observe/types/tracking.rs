@@ -107,4 +107,6 @@ pub struct ScanState {
     /// distinguish the first group (no preceding capture obligation) from
     /// subsequent groups.
     pub seen_any_group_report: bool,
+    /// Agent ID when scanning in multi-agent orchestration context.
+    pub agent_id: Option<String>,
 }
