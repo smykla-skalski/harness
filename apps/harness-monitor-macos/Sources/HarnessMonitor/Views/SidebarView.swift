@@ -5,6 +5,10 @@ import SwiftUI
 struct SidebarView: View {
   @Bindable var store: MonitorStore
 
+  private var isLoading: Bool {
+    store.isBusy || store.isRefreshing || store.connectionState == .connecting
+  }
+
   var body: some View {
     ZStack(alignment: .topLeading) {
       MonitorTheme.sidebarBackground
@@ -18,7 +22,9 @@ struct SidebarView: View {
       .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
       .padding(22)
     }
-    .foregroundStyle(MonitorTheme.ink)
+    .animation(.snappy(duration: 0.24), value: store.groupedSessions)
+    .animation(.snappy(duration: 0.24), value: store.isRefreshing)
+    .scrollIndicators(.hidden)
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(MonitorAccessibility.sidebarRoot)
   }
@@ -37,36 +43,34 @@ struct SidebarView: View {
         statusPill
       }
 
-      if let daemonStatus = store.daemonStatus {
-        HStack(spacing: 12) {
-          statBadge(title: "Projects", value: "\(daemonStatus.projectCount)")
-          statBadge(title: "Sessions", value: "\(daemonStatus.sessionCount)")
-          statBadge(
-            title: "Launchd",
-            value: daemonStatus.launchAgent.installed ? "Installed" : "Manual"
-          )
-        }
+      if store.isRefreshing || store.connectionState == .connecting {
+        MonitorLoadingStateView(title: loadingTitle)
+          .transition(.move(edge: .top).combined(with: .opacity))
       }
 
-      HStack(spacing: 10) {
-        Button("Start Daemon") {
-          Task {
-            await store.startDaemon()
-          }
-        }
-        .buttonStyle(.borderedProminent)
-        .tint(MonitorTheme.accent)
+      MonitorAdaptiveGridLayout(
+        minimumColumnWidth: 88,
+        maximumColumns: 3,
+        spacing: 10
+      ) {
+        daemonProjectsBadge
+        daemonSessionsBadge
+        daemonLaunchdBadge
+      }
 
-        Button("Install Launch Agent") {
-          Task {
-            await store.installLaunchAgent()
-          }
-        }
-        .buttonStyle(.bordered)
+      MonitorAdaptiveGridLayout(
+        minimumColumnWidth: 104,
+        maximumColumns: 2,
+        spacing: 8
+      ) {
+        sidebarStartDaemonButton
+        sidebarInstallLaunchAgentButton
       }
     }
-    .monitorCard()
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .monitorCard(contentPadding: 14)
     .accessibilityIdentifier(MonitorAccessibility.daemonCard)
+    .accessibilityFrameMarker(MonitorAccessibility.daemonCardFrame)
   }
 
   private var filterStrip: some View {
@@ -81,7 +85,7 @@ struct SidebarView: View {
       .accessibilityElement(children: .contain)
       .accessibilityIdentifier(MonitorAccessibility.sessionFilterGroup)
     }
-    .monitorCard()
+    .monitorCard(contentPadding: 16)
   }
 
   private var sessionList: some View {
@@ -94,7 +98,7 @@ struct SidebarView: View {
             .font(.system(.footnote, design: .rounded, weight: .medium))
             .foregroundStyle(.secondary)
         }
-        .monitorCard()
+        .monitorCard(contentPadding: 16)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier(MonitorAccessibility.sidebarEmptyState)
       } else {
@@ -105,24 +109,41 @@ struct SidebarView: View {
                 HStack {
                   Text(group.project.name)
                     .font(.system(.headline, design: .serif, weight: .semibold))
+                    .foregroundStyle(MonitorTheme.ink.opacity(0.96))
                   Spacer()
                   Text("\(group.sessions.count)")
                     .font(.caption.monospacedDigit())
                     .foregroundStyle(.secondary)
                 }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(
+                  RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .fill(MonitorTheme.surface)
+                    .overlay(
+                      RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .stroke(MonitorTheme.controlBorder, lineWidth: 1)
+                    )
+                )
+                .accessibilityIdentifier(
+                  MonitorAccessibility.projectHeader(group.project.projectId)
+                )
+                .accessibilityFrameMarker(
+                  MonitorAccessibility.projectHeaderFrame(group.project.projectId)
+                )
 
                 ForEach(group.sessions) { session in
                   Button {
-                    Task {
-                      await store.selectSession(session.sessionId)
-                    }
+                    select(sessionID: session.sessionId)
                   } label: {
                     VStack(alignment: .leading, spacing: 8) {
-                      HStack {
+                      HStack(alignment: .top, spacing: 10) {
                         Text(session.context)
                           .font(.system(.body, design: .rounded, weight: .semibold))
                           .multilineTextAlignment(.leading)
-                        Spacer()
+                          .lineLimit(2)
+                        Spacer(minLength: 12)
                         Circle()
                           .fill(statusColor(for: session.status))
                           .frame(width: 10, height: 10)
@@ -136,13 +157,18 @@ struct SidebarView: View {
                         labelChip(formatTimestamp(session.lastActivityAt))
                       }
                     }
+                    .foregroundStyle(MonitorTheme.ink)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(14)
                     .background(
                       RoundedRectangle(cornerRadius: 18, style: .continuous)
                         .fill(
                           store.selectedSessionID == session.sessionId
-                            ? Color.white.opacity(0.82) : Color.white.opacity(0.46)
+                            ? MonitorTheme.surfaceHover : MonitorTheme.surface
+                        )
+                        .overlay(
+                          RoundedRectangle(cornerRadius: 18, style: .continuous)
+                            .stroke(MonitorTheme.controlBorder.opacity(0.7), lineWidth: 1)
                         )
                     )
                   }
@@ -153,6 +179,7 @@ struct SidebarView: View {
             }
           }
           .frame(maxWidth: .infinity, alignment: .leading)
+          .accessibilityFrameMarker(MonitorAccessibility.sidebarSessionListContent)
         }
         .accessibilityIdentifier(MonitorAccessibility.sidebarSessionList)
       }
@@ -172,11 +199,11 @@ struct SidebarView: View {
         .foregroundStyle(isSelected ? Color.white : MonitorTheme.ink)
         .background(
           RoundedRectangle(cornerRadius: 14, style: .continuous)
-            .fill(isSelected ? MonitorTheme.accent : Color.white.opacity(0.86))
+            .fill(isSelected ? MonitorTheme.accent : MonitorTheme.surfaceHover)
             .overlay(
               RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .stroke(
-                  isSelected ? MonitorTheme.accent : MonitorTheme.panelBorder,
+                  isSelected ? MonitorTheme.accent : MonitorTheme.controlBorder,
                   lineWidth: 1
                 )
             )
@@ -189,7 +216,45 @@ struct SidebarView: View {
     )
   }
 
-  private var connectionLabel: String {
+  private func select(sessionID: String) {
+    Task {
+      await store.selectSession(sessionID)
+    }
+  }
+}
+
+extension SidebarView {
+  fileprivate var sidebarStartDaemonButton: some View {
+    sidebarLayoutProbe(MonitorAccessibility.sidebarStartDaemonButtonFrame) {
+      MonitorAsyncActionButton(
+        title: "Start Daemon",
+        tint: MonitorTheme.accent,
+        variant: .prominent,
+        isLoading: isLoading,
+        accessibilityIdentifier: MonitorAccessibility.sidebarStartDaemonButton,
+        fillsWidth: true
+      ) {
+        await store.startDaemon()
+      }
+    }
+  }
+
+  fileprivate var sidebarInstallLaunchAgentButton: some View {
+    sidebarLayoutProbe(MonitorAccessibility.sidebarInstallLaunchAgentButtonFrame) {
+      MonitorAsyncActionButton(
+        title: "Install Agent",
+        tint: MonitorTheme.ink,
+        variant: .bordered,
+        isLoading: isLoading,
+        accessibilityIdentifier: MonitorAccessibility.sidebarInstallLaunchAgentButton,
+        fillsWidth: true
+      ) {
+        await store.installLaunchAgent()
+      }
+    }
+  }
+
+  fileprivate var connectionLabel: String {
     switch store.connectionState {
     case .idle:
       "Waiting for bootstrap"
@@ -202,16 +267,25 @@ struct SidebarView: View {
     }
   }
 
-  private var statusPill: some View {
+  fileprivate var loadingTitle: String {
+    switch store.connectionState {
+    case .connecting:
+      "Connecting to the control plane"
+    default:
+      "Refreshing session index"
+    }
+  }
+
+  fileprivate var statusPill: some View {
     Text(statusTitle)
       .font(.caption.bold())
-      .padding(.horizontal, 10)
-      .padding(.vertical, 6)
+      .padding(.horizontal, 9)
+      .padding(.vertical, 5)
       .background(statusBackground, in: Capsule())
       .foregroundStyle(.white)
   }
 
-  private var statusTitle: String {
+  fileprivate var statusTitle: String {
     switch store.connectionState {
     case .online:
       "Online"
@@ -224,7 +298,7 @@ struct SidebarView: View {
     }
   }
 
-  private var statusBackground: Color {
+  fileprivate var statusBackground: Color {
     switch store.connectionState {
     case .online:
       MonitorTheme.success
@@ -237,24 +311,82 @@ struct SidebarView: View {
     }
   }
 
-  private func statBadge(title: String, value: String) -> some View {
-    VStack(alignment: .leading, spacing: 3) {
+  fileprivate var daemonProjectCount: Int {
+    store.daemonStatus?.projectCount ?? store.projects.count
+  }
+
+  fileprivate var daemonSessionCount: Int {
+    store.daemonStatus?.sessionCount ?? store.sessions.count
+  }
+
+  fileprivate var daemonLaunchdState: String {
+    store.daemonStatus?.launchAgent.installed == true ? "Installed" : "Manual"
+  }
+
+  fileprivate var daemonProjectsBadge: some View {
+    sidebarLayoutProbe(MonitorAccessibility.sidebarDaemonBadgeFrame("Projects")) {
+      statBadge(title: "Projects", value: "\(daemonProjectCount)")
+    }
+  }
+
+  fileprivate var daemonSessionsBadge: some View {
+    sidebarLayoutProbe(MonitorAccessibility.sidebarDaemonBadgeFrame("Sessions")) {
+      statBadge(title: "Sessions", value: "\(daemonSessionCount)")
+    }
+  }
+
+  fileprivate var daemonLaunchdBadge: some View {
+    sidebarLayoutProbe(MonitorAccessibility.sidebarDaemonBadgeFrame("Launchd")) {
+      statBadge(title: "Launchd", value: daemonLaunchdState)
+    }
+  }
+
+  fileprivate func statBadge(title: String, value: String) -> some View {
+    VStack(alignment: .leading, spacing: 4) {
       Text(title.uppercased())
         .font(.caption2.weight(.semibold))
         .foregroundStyle(.secondary)
       Text(value)
-        .font(.system(.body, design: .rounded, weight: .bold))
+        .font(.system(.callout, design: .rounded, weight: .bold))
+        .lineLimit(1)
+        .minimumScaleFactor(0.82)
+        .contentTransition(.numericText())
     }
-    .padding(.vertical, 8)
+    .frame(maxWidth: .infinity, alignment: .topLeading)
+    .frame(minHeight: 50, alignment: .topLeading)
+    .padding(.vertical, 5)
     .padding(.horizontal, 10)
-    .background(Color.white.opacity(0.55), in: RoundedRectangle(cornerRadius: 14))
+    .background(
+      MonitorTheme.surface,
+      in: RoundedRectangle(cornerRadius: 14, style: .continuous)
+    )
+    .overlay(
+      RoundedRectangle(cornerRadius: 14, style: .continuous)
+        .stroke(MonitorTheme.controlBorder, lineWidth: 1)
+    )
+    .accessibilityElement(children: .ignore)
+    .accessibilityLabel(title)
+    .accessibilityValue(value)
+    .accessibilityIdentifier(MonitorAccessibility.sidebarDaemonBadge(title))
   }
 
-  private func labelChip(_ title: String) -> some View {
+  fileprivate func labelChip(_ title: String) -> some View {
     Text(title)
       .font(.caption.weight(.semibold))
       .padding(.horizontal, 8)
       .padding(.vertical, 4)
-      .background(Color.white.opacity(0.62), in: Capsule())
+      .background(MonitorTheme.surface, in: Capsule())
+  }
+
+  fileprivate func sidebarLayoutProbe<Content: View>(
+    _ identifier: String,
+    @ViewBuilder content: () -> Content
+  ) -> some View {
+    ZStack {
+      content()
+    }
+    .frame(maxWidth: .infinity, alignment: .topLeading)
+    .accessibilityElement(children: .contain)
+    .accessibilityIdentifier(identifier)
   }
 }

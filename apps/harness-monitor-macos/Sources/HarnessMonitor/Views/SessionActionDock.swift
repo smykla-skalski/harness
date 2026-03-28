@@ -80,7 +80,7 @@ struct SessionActionDock: View {
       }
       .frame(maxWidth: .infinity, alignment: .leading)
       .padding(14)
-      .background(Color.white.opacity(0.56), in: RoundedRectangle(cornerRadius: 18))
+      .background(MonitorTheme.surface, in: RoundedRectangle(cornerRadius: 18))
     }
     .buttonStyle(.plain)
   }

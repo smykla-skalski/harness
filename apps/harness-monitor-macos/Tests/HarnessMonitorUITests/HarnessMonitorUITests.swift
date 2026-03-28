@@ -1,31 +1,11 @@
 import XCTest
 
+private typealias Accessibility = HarnessMonitorUITestAccessibility
+
 @MainActor
 final class HarnessMonitorUITests: XCTestCase {
-  private enum Accessibility {
-    static let sidebarToggleButton = "monitor.toolbar.sidebar-toggle"
-    static let preferencesButton = "monitor.toolbar.preferences"
-    static let refreshButton = "monitor.toolbar.refresh"
-    static let sidebarRoot = "monitor.sidebar.root"
-    static let previewSessionRow = "monitor.sidebar.session.sess-monitor"
-    static let sidebarEmptyState = "monitor.sidebar.empty-state"
-    static let sidebarSessionList = "monitor.sidebar.session-list"
-    static let activeFilterButton = "monitor.sidebar.filter.active"
-    static let allFilterButton = "monitor.sidebar.filter.all"
-    static let endedFilterButton = "monitor.sidebar.filter.ended"
-    static let onboardingCard = "monitor.board.onboarding-card"
-    static let sessionsBoardRoot = "monitor.board.root"
-    static let recentSessionsCard = "monitor.board.recent-sessions-card"
-    static let contentRoot = "monitor.content.root"
-    static let inspectorRoot = "monitor.inspector.root"
-    static let inspectorEmptyState = "monitor.inspector.empty-state"
-    static let sessionInspectorCard = "monitor.inspector.session-card"
-    static let observerInspectorCard = "monitor.inspector.observer-card"
-    static let observeSummaryButton = "monitor.session.observe.summary"
-  }
-
-  private static let launchModeKey = "HARNESS_MONITOR_LAUNCH_MODE"
-  private static let uiTimeout: TimeInterval = 10
+  static let launchModeKey = "HARNESS_MONITOR_LAUNCH_MODE"
+  static let uiTimeout: TimeInterval = 10
 
   override func setUpWithError() throws {
     continueAfterFailure = false
@@ -35,8 +15,7 @@ final class HarnessMonitorUITests: XCTestCase {
     let app = launch(mode: "preview")
 
     let sessionRow = app.buttons.matching(identifier: Accessibility.previewSessionRow).firstMatch
-    let sessionRowExists = sessionRow.waitForExistence(timeout: Self.uiTimeout)
-    XCTAssertTrue(sessionRowExists)
+    XCTAssertTrue(sessionRow.waitForExistence(timeout: Self.uiTimeout))
 
     tapButton(in: app, identifier: Accessibility.previewSessionRow)
 
@@ -49,9 +28,9 @@ final class HarnessMonitorUITests: XCTestCase {
   func testEmptyModeShowsOnboardingCard() throws {
     let app = launch(mode: "empty")
 
-    let onboardingTitleExists = app.staticTexts["Bring The Monitor Online"]
-      .waitForExistence(timeout: Self.uiTimeout)
-    XCTAssertTrue(onboardingTitleExists)
+    XCTAssertTrue(
+      app.staticTexts["Bring The Monitor Online"].waitForExistence(timeout: Self.uiTimeout)
+    )
     XCTAssertTrue(app.buttons["Start Daemon"].exists)
 
     let sidebarEmptyState = element(in: app, identifier: Accessibility.sidebarEmptyState)
@@ -79,14 +58,14 @@ final class HarnessMonitorUITests: XCTestCase {
     let app = launch(mode: "preview")
 
     let preferencesButton = toolbarButton(in: app, identifier: Accessibility.preferencesButton)
-    let preferencesButtonExists = preferencesButton.waitForExistence(timeout: Self.uiTimeout)
-    XCTAssertTrue(preferencesButtonExists)
+    XCTAssertTrue(preferencesButton.waitForExistence(timeout: Self.uiTimeout))
 
     preferencesButton.tap()
 
-    let preferencesTitleExists = app.staticTexts["Daemon Preferences"]
-      .waitForExistence(timeout: Self.uiTimeout)
-    XCTAssertTrue(preferencesTitleExists)
+    XCTAssertTrue(
+      app.staticTexts["Daemon Preferences"].waitForExistence(timeout: Self.uiTimeout)
+    )
+    XCTAssertTrue(element(in: app, identifier: Accessibility.preferencesRoot).exists)
   }
 
   func testObserveSummaryIsAvailableInSessionCockpit() throws {
@@ -114,21 +93,20 @@ final class HarnessMonitorUITests: XCTestCase {
   func testToolbarSurvivesSidebarToggle() throws {
     let app = launch(mode: "preview")
 
-    let sidebarToggle = toolbarButton(
-      in: app,
-      identifier: Accessibility.sidebarToggleButton
-    )
+    let sidebarToggle = sidebarToggleButton(in: app)
     let refreshButton = toolbarButton(in: app, identifier: Accessibility.refreshButton)
-    let preferencesButton = toolbarButton(
-      in: app,
-      identifier: Accessibility.preferencesButton
-    )
+    let preferencesButton = toolbarButton(in: app, identifier: Accessibility.preferencesButton)
     let sessionRow = app.buttons.matching(identifier: Accessibility.previewSessionRow).firstMatch
 
     XCTAssertTrue(sidebarToggle.waitForExistence(timeout: Self.uiTimeout))
     XCTAssertTrue(refreshButton.waitForExistence(timeout: Self.uiTimeout))
     XCTAssertTrue(preferencesButton.waitForExistence(timeout: Self.uiTimeout))
     XCTAssertTrue(sessionRow.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertEqual(app.toolbars.buttons.matching(identifier: Accessibility.refreshButton).count, 1)
+    XCTAssertEqual(
+      app.toolbars.buttons.matching(identifier: Accessibility.preferencesButton).count,
+      1
+    )
     XCTAssertTrue(refreshButton.isHittable)
     XCTAssertTrue(preferencesButton.isHittable)
 
@@ -147,6 +125,23 @@ final class HarnessMonitorUITests: XCTestCase {
     XCTAssertTrue(preferencesButton.isHittable)
     refreshButton.tap()
     XCTAssertTrue(preferencesButton.exists)
+  }
+
+  func testPreviewRecentSessionsCardFillsColumn() throws {
+    let app = launch(mode: "preview")
+
+    let boardRoot = element(in: app, identifier: Accessibility.sessionsBoardRoot)
+    let recentSessionsCard = element(in: app, identifier: Accessibility.recentSessionsCard)
+
+    XCTAssertTrue(boardRoot.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(recentSessionsCard.waitForExistence(timeout: Self.uiTimeout))
+
+    assertFillsColumn(
+      child: recentSessionsCard,
+      in: boardRoot,
+      expectedHorizontalInset: 24,
+      tolerance: 8
+    )
   }
 
   func testEmptyModeCardsSpanTheirColumns() throws {
@@ -185,6 +180,24 @@ final class HarnessMonitorUITests: XCTestCase {
     )
   }
 
+  func testEmptyModeDashboardMetricsStayOnSingleRow() throws {
+    let app = launch(mode: "empty")
+
+    let trackedProjects = element(in: app, identifier: Accessibility.trackedProjectsCard)
+    let indexedSessions = element(in: app, identifier: Accessibility.indexedSessionsCard)
+    let openWork = element(in: app, identifier: Accessibility.openWorkCard)
+    let blocked = element(in: app, identifier: Accessibility.blockedCard)
+
+    XCTAssertTrue(trackedProjects.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(indexedSessions.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(openWork.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(blocked.waitForExistence(timeout: Self.uiTimeout))
+
+    assertSameRow([trackedProjects, indexedSessions, openWork, blocked], tolerance: 10)
+    assertEqualHeights([trackedProjects, indexedSessions, openWork, blocked], tolerance: 10)
+    XCTAssertLessThan(trackedProjects.frame.height, 112)
+  }
+
   func testInspectorCardsFillTheirColumn() throws {
     let app = launch(mode: "preview")
 
@@ -206,75 +219,138 @@ final class HarnessMonitorUITests: XCTestCase {
     )
   }
 
-  private func launch(mode: String) -> XCUIApplication {
-    let app = XCUIApplication()
-    app.launchEnvironment[Self.launchModeKey] = mode
-    app.launch()
-    XCTAssertTrue(waitUntil(timeout: Self.uiTimeout) { app.state == .runningForeground })
-    app.activate()
-    XCTAssertTrue(waitUntil(timeout: Self.uiTimeout) { app.state == .runningForeground })
-    return app
-  }
+  func testSidebarDaemonBadgesShareWidth() throws {
+    let app = launch(mode: "empty")
 
-  private func tapButton(in app: XCUIApplication, identifier: String) {
-    let deadline = Date().addingTimeInterval(Self.uiTimeout)
+    let sidebarRoot = element(in: app, identifier: Accessibility.sidebarRoot)
+    let daemonCard = frameElement(in: app, identifier: Accessibility.daemonCardFrame)
 
-    while Date() < deadline {
-      app.activate()
-
-      let button = app.buttons.matching(identifier: identifier).firstMatch
-      if button.waitForExistence(timeout: 0.5), button.isHittable {
-        button.tap()
-        return
-      }
-
-      RunLoop.current.run(until: Date().addingTimeInterval(0.2))
-    }
-
-    XCTFail("Failed to tap button \(identifier)")
-  }
-
-  private func element(in app: XCUIApplication, identifier: String) -> XCUIElement {
-    app.descendants(matching: .any)
-      .matching(identifier: identifier)
-      .firstMatch
-  }
-
-  private func toolbarButton(in app: XCUIApplication, identifier: String) -> XCUIElement {
-    app.buttons.matching(identifier: identifier).firstMatch
-  }
-
-  private func waitUntil(
-    timeout: TimeInterval = 5,
-    pollInterval: TimeInterval = 0.1,
-    condition: @escaping () -> Bool
-  ) -> Bool {
-    let deadline = Date().addingTimeInterval(timeout)
-    while Date() < deadline {
-      if condition() {
-        return true
-      }
-      RunLoop.current.run(until: Date().addingTimeInterval(pollInterval))
-    }
-    return condition()
-  }
-
-  private func assertFillsColumn(
-    child: XCUIElement,
-    in container: XCUIElement,
-    expectedHorizontalInset: CGFloat,
-    tolerance: CGFloat
-  ) {
-    XCTAssertGreaterThan(child.frame.width, container.frame.width * 0.9)
-    XCTAssertEqual(
-      child.frame.minX,
-      container.frame.minX + expectedHorizontalInset,
-      accuracy: tolerance
+    XCTAssertTrue(sidebarRoot.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(daemonCard.waitForExistence(timeout: Self.uiTimeout))
+    assertFillsColumn(
+      child: daemonCard,
+      in: sidebarRoot,
+      expectedHorizontalInset: 22,
+      tolerance: 12
     )
-    XCTAssertEqual(
-      child.frame.maxX,
-      container.frame.maxX - expectedHorizontalInset,
-      accuracy: tolerance
+    XCTAssertLessThan(daemonCard.frame.height, 320)
+  }
+
+  func testSidebarProjectHeaderFillsAvailableWidth() throws {
+    let app = launch(mode: "preview")
+
+    let sessionList = frameElement(in: app, identifier: Accessibility.sidebarSessionListContent)
+    let projectHeader = frameElement(in: app, identifier: Accessibility.previewProjectHeaderFrame)
+
+    XCTAssertTrue(sessionList.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(projectHeader.waitForExistence(timeout: Self.uiTimeout))
+
+    assertFillsColumn(
+      child: projectHeader,
+      in: sessionList,
+      expectedHorizontalInset: 0,
+      tolerance: 10
     )
+  }
+
+  func testSessionCockpitTaskAndAgentCardsShareHeight() throws {
+    let app = launch(mode: "preview")
+
+    let sessionRow = app.buttons.matching(identifier: Accessibility.previewSessionRow).firstMatch
+    XCTAssertTrue(sessionRow.waitForExistence(timeout: Self.uiTimeout))
+    tapButton(in: app, identifier: Accessibility.previewSessionRow)
+
+    let taskUI = element(in: app, identifier: Accessibility.taskUICard)
+    let taskRouting = element(in: app, identifier: Accessibility.taskRoutingCard)
+    let leaderCard = element(in: app, identifier: Accessibility.leaderAgentCard)
+    let workerCard = element(in: app, identifier: Accessibility.workerAgentCard)
+
+    XCTAssertTrue(taskUI.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(taskRouting.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(leaderCard.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(workerCard.waitForExistence(timeout: Self.uiTimeout))
+
+    assertEqualHeights([taskUI, taskRouting], tolerance: 10)
+    assertEqualHeights([leaderCard, workerCard], tolerance: 10)
+  }
+
+  func testPreferencesBackdropDismissesOverlay() throws {
+    let app = launch(mode: "preview")
+
+    let preferencesButton = toolbarButton(in: app, identifier: Accessibility.preferencesButton)
+    XCTAssertTrue(preferencesButton.waitForExistence(timeout: Self.uiTimeout))
+    preferencesButton.tap()
+
+    let preferencesRoot = element(in: app, identifier: Accessibility.preferencesRoot)
+    let preferencesPanel = frameElement(in: app, identifier: Accessibility.preferencesPanel)
+
+    XCTAssertTrue(preferencesRoot.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(preferencesPanel.waitForExistence(timeout: Self.uiTimeout))
+
+    tapOutsidePreferencesPanel(in: app)
+
+    XCTAssertTrue(waitUntil { !preferencesRoot.exists })
+  }
+
+  func testPreferencesOverviewCardsAndActionButtonsShareHeights() throws {
+    let app = launch(mode: "preview")
+
+    let preferencesButton = toolbarButton(in: app, identifier: Accessibility.preferencesButton)
+    XCTAssertTrue(preferencesButton.waitForExistence(timeout: Self.uiTimeout))
+    preferencesButton.tap()
+
+    let endpointCard = element(in: app, identifier: Accessibility.preferencesEndpointCard)
+    let versionCard = element(in: app, identifier: Accessibility.preferencesVersionCard)
+    let launchdCard = element(in: app, identifier: Accessibility.preferencesLaunchdCard)
+    let cachedSessionsCard = element(
+      in: app, identifier: Accessibility.preferencesCachedSessionsCard)
+
+    XCTAssertTrue(endpointCard.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(versionCard.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(launchdCard.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(cachedSessionsCard.waitForExistence(timeout: Self.uiTimeout))
+
+    assertSameRow([endpointCard, versionCard, launchdCard, cachedSessionsCard], tolerance: 10)
+    assertEqualHeights(
+      [endpointCard, versionCard, launchdCard, cachedSessionsCard],
+      tolerance: 10
+    )
+
+    let reconnect = element(in: app, identifier: Accessibility.reconnectButton)
+    let refresh = element(in: app, identifier: Accessibility.refreshDiagnosticsButton)
+    let start = element(in: app, identifier: Accessibility.startDaemonButton)
+    let install = element(in: app, identifier: Accessibility.installLaunchAgentButton)
+    let remove = element(in: app, identifier: Accessibility.removeLaunchAgentButton)
+
+    XCTAssertTrue(reconnect.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(refresh.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(start.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(install.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(remove.waitForExistence(timeout: Self.uiTimeout))
+
+    assertEqualHeights([reconnect, refresh, start, install, remove], tolerance: 10)
+    XCTAssertLessThan(start.frame.height, 62)
+    XCTAssertLessThan(refresh.frame.height, 62)
+  }
+
+  func testSidebarAndBoardActionButtonsStayCompact() throws {
+    let app = launch(mode: "empty")
+
+    let sidebarStart = frameElement(in: app, identifier: Accessibility.sidebarStartButtonFrame)
+    let sidebarInstall = frameElement(in: app, identifier: Accessibility.sidebarInstallButtonFrame)
+    let boardStart = frameElement(in: app, identifier: Accessibility.onboardingStartButtonFrame)
+    let boardInstall = frameElement(in: app, identifier: Accessibility.onboardingInstallButtonFrame)
+    let boardRefresh = frameElement(in: app, identifier: Accessibility.onboardingRefreshButtonFrame)
+
+    XCTAssertTrue(sidebarStart.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(sidebarInstall.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(boardStart.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(boardInstall.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(boardRefresh.waitForExistence(timeout: Self.uiTimeout))
+
+    assertEqualHeights([sidebarStart, sidebarInstall], tolerance: 10)
+    assertEqualHeights([boardStart, boardInstall, boardRefresh], tolerance: 10)
+    XCTAssertLessThan(sidebarStart.frame.height, 62)
+    XCTAssertLessThan(boardStart.frame.height, 62)
   }
 }

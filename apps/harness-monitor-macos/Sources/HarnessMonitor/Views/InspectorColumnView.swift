@@ -50,7 +50,8 @@ struct InspectorColumnView: View {
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     .foregroundStyle(MonitorTheme.ink)
-    .accessibilityFrameMarker(MonitorAccessibility.inspectorRoot)
+    .accessibilityElement(children: .contain)
+    .accessibilityIdentifier(MonitorAccessibility.inspectorRoot)
   }
 
   private func sessionInspector(_ detail: SessionDetail) -> some View {
@@ -122,8 +123,7 @@ struct InspectorColumnView: View {
           )
         }
       }
-      .buttonStyle(.borderedProminent)
-      .tint(MonitorTheme.accent)
+      .buttonStyle(MonitorActionButtonStyle(variant: .prominent, tint: MonitorTheme.accent))
       .disabled(signalCommand.isEmpty || signalMessage.isEmpty)
     }
     .textFieldStyle(.roundedBorder)
@@ -189,7 +189,7 @@ struct InspectorColumnView: View {
               }
               .padding(.horizontal, 12)
               .padding(.vertical, 10)
-              .background(Color.white.opacity(0.55), in: RoundedRectangle(cornerRadius: 14))
+              .background(MonitorTheme.surface, in: RoundedRectangle(cornerRadius: 14))
             }
           }
         }
@@ -214,7 +214,7 @@ struct InspectorColumnView: View {
               }
               .padding(.horizontal, 12)
               .padding(.vertical, 10)
-              .background(Color.white.opacity(0.55), in: RoundedRectangle(cornerRadius: 14))
+              .background(MonitorTheme.surface, in: RoundedRectangle(cornerRadius: 14))
             }
           }
         }
@@ -269,7 +269,7 @@ struct InspectorColumnView: View {
           .font(.caption.weight(.semibold))
           .padding(.horizontal, 10)
           .padding(.vertical, 5)
-          .background(Color.white.opacity(0.68), in: Capsule())
+          .background(MonitorTheme.surfaceHover, in: Capsule())
       }
     }
   }
