@@ -147,3 +147,8 @@ pub struct SignalSendRequest {
     pub message: String,
     pub action_hint: Option<String>,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ObserveSessionRequest {
+    pub actor: Option<String>,
+}
