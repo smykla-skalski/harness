@@ -73,4 +73,8 @@ impl AgentRuntime for CopilotRuntime {
     fn hook_integration_points(&self) -> &[HookIntegrationPoint] {
         HOOK_POINTS
     }
+
+    fn supports_native_transcript(&self) -> bool {
+        false
+    }
 }
