@@ -60,7 +60,6 @@ impl ToolUseWindow {
     }
 
     #[must_use]
-    #[cfg(test)]
     pub fn is_empty(&self) -> bool {
         self.records.is_empty()
     }
