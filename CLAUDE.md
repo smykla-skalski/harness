@@ -51,12 +51,16 @@ Hooks intercept Claude Code tool usage. Classified in `cli.rs` as constants:
 - `core_defs.rs` - build info, timestamps, XDG paths, session scope (SHA256-hashed)
 - `rules.rs` - declarative denied-binary lists, make targets, etc.
 - `commands/` - 33 command handlers dispatched from CLI
+- `session/` - multi-agent orchestration: `types.rs` (SessionState, AgentRegistration, WorkItem, SessionRole), `roles.rs` (permission matrix), `storage.rs` (VersionedJsonRepository + JSONL audit log), `service.rs` (12 orchestration functions), `transport.rs` (13 CLI commands), `observe.rs` (cross-agent observation with periodic sweep)
+- `agents/runtime/` - AgentRuntime trait with 5 implementations (claude, codex, gemini, copilot, opencode), ConversationEvent types, signal protocol (write/read/acknowledge), liveness detection
 
 ### Data directories (XDG)
 
-- `$XDG_DATA_HOME/kuma/suites/` - suite library
-- `$XDG_DATA_HOME/kuma/runs/` - run directories (`{run_id}/{artifacts,commands,state,manifests,reports}`)
-- `$XDG_DATA_HOME/kuma/contexts/{session-hash}/` - session context
+- `$XDG_DATA_HOME/harness/suites/` - suite library
+- `$XDG_DATA_HOME/harness/runs/` - run directories (`{run_id}/{artifacts,commands,state,manifests,reports}`)
+- `$XDG_DATA_HOME/harness/contexts/{session-hash}/` - session context
+- `$XDG_DATA_HOME/harness/projects/project-{digest}/orchestration/` - multi-agent session state
+- `$XDG_DATA_HOME/harness/projects/project-{digest}/agents/signals/` - file-based agent signaling
 
 ## Code conventions
 
