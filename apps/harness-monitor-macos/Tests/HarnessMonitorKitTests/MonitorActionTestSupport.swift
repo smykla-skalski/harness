@@ -2,9 +2,15 @@
 
 actor RecordingDaemonController: DaemonControlling {
   private let client: any MonitorClientProtocol
+  private var launchAgentInstalled: Bool
+  private var lastEventMessage = "daemon ready"
 
-  init(client: any MonitorClientProtocol = PreviewMonitorClient()) {
+  init(
+    client: any MonitorClientProtocol = PreviewMonitorClient(),
+    launchAgentInstalled: Bool = true
+  ) {
     self.client = client
+    self.launchAgentInstalled = launchAgentInstalled
   }
 
   func bootstrapClient() async throws -> any MonitorClientProtocol {
@@ -25,21 +31,39 @@ actor RecordingDaemonController: DaemonControlling {
         tokenPath: "/tmp/token"
       ),
       launchAgent: LaunchAgentStatus(
-        installed: true,
+        installed: launchAgentInstalled,
         label: "io.harness.monitor.daemon",
         path: "/tmp/io.harness.monitor.daemon.plist"
       ),
       projectCount: 1,
-      sessionCount: 1
+      sessionCount: 1,
+      diagnostics: DaemonDiagnostics(
+        daemonRoot: "/tmp/harness/daemon",
+        manifestPath: "/tmp/harness/daemon/manifest.json",
+        authTokenPath: "/tmp/token",
+        authTokenPresent: true,
+        eventsPath: "/tmp/harness/daemon/events.jsonl",
+        cacheRoot: "/tmp/harness/daemon/cache/projects",
+        cacheEntryCount: 2,
+        lastEvent: DaemonAuditEvent(
+          recordedAt: "2026-03-28T14:00:00Z",
+          level: "info",
+          message: lastEventMessage
+        )
+      )
     )
   }
 
   func installLaunchAgent() async throws -> String {
-    "/tmp/io.harness.monitor.daemon.plist"
+    launchAgentInstalled = true
+    lastEventMessage = "launch agent installed"
+    return "/tmp/io.harness.monitor.daemon.plist"
   }
 
   func removeLaunchAgent() async throws -> String {
-    "removed"
+    launchAgentInstalled = false
+    lastEventMessage = "launch agent removed"
+    return "removed"
   }
 }
 

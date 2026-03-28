@@ -34,8 +34,13 @@ impl Execute for DaemonCommand {
     fn execute(&self, context: &AppContext) -> Result<i32, CliError> {
         match self {
             Self::Serve(args) => args.execute(context),
-            Self::Status | Self::Doctor => {
+            Self::Status => {
                 let report = service::status_report()?;
+                print_json(&report)?;
+                Ok(0)
+            }
+            Self::Doctor => {
+                let report = service::diagnostics_report()?;
                 print_json(&report)?;
                 Ok(0)
             }

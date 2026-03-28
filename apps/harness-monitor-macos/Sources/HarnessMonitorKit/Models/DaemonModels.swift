@@ -14,6 +14,49 @@ public struct DaemonManifest: Codable, Equatable, Sendable {
   }
 }
 
+public struct DaemonAuditEvent: Codable, Equatable, Sendable {
+  public let recordedAt: String
+  public let level: String
+  public let message: String
+
+  public init(recordedAt: String, level: String, message: String) {
+    self.recordedAt = recordedAt
+    self.level = level
+    self.message = message
+  }
+}
+
+public struct DaemonDiagnostics: Codable, Equatable, Sendable {
+  public let daemonRoot: String
+  public let manifestPath: String
+  public let authTokenPath: String
+  public let authTokenPresent: Bool
+  public let eventsPath: String
+  public let cacheRoot: String
+  public let cacheEntryCount: Int
+  public let lastEvent: DaemonAuditEvent?
+
+  public init(
+    daemonRoot: String,
+    manifestPath: String,
+    authTokenPath: String,
+    authTokenPresent: Bool,
+    eventsPath: String,
+    cacheRoot: String,
+    cacheEntryCount: Int,
+    lastEvent: DaemonAuditEvent?
+  ) {
+    self.daemonRoot = daemonRoot
+    self.manifestPath = manifestPath
+    self.authTokenPath = authTokenPath
+    self.authTokenPresent = authTokenPresent
+    self.eventsPath = eventsPath
+    self.cacheRoot = cacheRoot
+    self.cacheEntryCount = cacheEntryCount
+    self.lastEvent = lastEvent
+  }
+}
+
 public struct LaunchAgentStatus: Codable, Equatable, Sendable {
   public let installed: Bool
   public let label: String
@@ -31,17 +74,20 @@ public struct DaemonStatusReport: Codable, Equatable, Sendable {
   public let launchAgent: LaunchAgentStatus
   public let projectCount: Int
   public let sessionCount: Int
+  public let diagnostics: DaemonDiagnostics
 
   public init(
     manifest: DaemonManifest?,
     launchAgent: LaunchAgentStatus,
     projectCount: Int,
-    sessionCount: Int
+    sessionCount: Int,
+    diagnostics: DaemonDiagnostics
   ) {
     self.manifest = manifest
     self.launchAgent = launchAgent
     self.projectCount = projectCount
     self.sessionCount = sessionCount
+    self.diagnostics = diagnostics
   }
 }
 

@@ -37,4 +37,46 @@ final class MonitorStoreTests: XCTestCase {
       [PreviewFixtures.summary.sessionId]
     )
   }
+
+  func testInstallLaunchAgentRefreshesDaemonDiagnostics() async throws {
+    let controller = RecordingDaemonController(launchAgentInstalled: false)
+    let store = MonitorStore(daemonController: controller)
+
+    await store.bootstrap()
+    XCTAssertFalse(store.daemonStatus?.launchAgent.installed ?? true)
+
+    await store.installLaunchAgent()
+
+    XCTAssertTrue(store.daemonStatus?.launchAgent.installed ?? false)
+    XCTAssertEqual(store.daemonStatus?.diagnostics.lastEvent?.message, "launch agent installed")
+    XCTAssertEqual(store.lastAction, "Install launch agent")
+  }
+
+  func testRemoveLaunchAgentRefreshesDaemonDiagnostics() async throws {
+    let controller = RecordingDaemonController(launchAgentInstalled: true)
+    let store = MonitorStore(daemonController: controller)
+
+    await store.bootstrap()
+    XCTAssertTrue(store.daemonStatus?.launchAgent.installed ?? false)
+
+    await store.removeLaunchAgent()
+
+    XCTAssertFalse(store.daemonStatus?.launchAgent.installed ?? true)
+    XCTAssertEqual(store.daemonStatus?.diagnostics.lastEvent?.message, "launch agent removed")
+    XCTAssertEqual(store.lastAction, "Remove launch agent")
+  }
+
+  func testReconnectRefreshesHealthAndStatus() async throws {
+    let store = await makeBootstrappedStore()
+
+    store.health = nil
+    store.daemonStatus = nil
+    store.connectionState = .offline("stale")
+
+    await store.reconnect()
+
+    XCTAssertEqual(store.connectionState, .online)
+    XCTAssertEqual(store.health?.status, "ok")
+    XCTAssertEqual(store.daemonStatus?.diagnostics.cacheEntryCount, 2)
+  }
 }

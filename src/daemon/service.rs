@@ -14,12 +14,13 @@ use super::http::{self, DaemonHttpState};
 use super::index::{self, ResolvedSession};
 use super::launchd::{self, LaunchAgentStatus};
 use super::protocol::{
-    HealthResponse, LeaderTransferRequest, ProjectSummary, RoleChangeRequest, SessionDetail,
-    SessionEndRequest, SessionSummary, SignalSendRequest, StreamEvent, TaskAssignRequest,
-    TaskCheckpointRequest, TaskCreateRequest, TaskUpdateRequest, TimelineEntry,
+    DaemonDiagnosticsReport, HealthResponse, LeaderTransferRequest, ProjectSummary,
+    RoleChangeRequest, SessionDetail, SessionEndRequest, SessionSummary, SignalSendRequest,
+    StreamEvent, TaskAssignRequest, TaskCheckpointRequest, TaskCreateRequest, TaskUpdateRequest,
+    TimelineEntry,
 };
 use super::snapshot;
-use super::state::{self, DaemonManifest};
+use super::state::{self, DaemonDiagnostics, DaemonManifest};
 use super::timeline;
 use super::watch;
 
@@ -29,6 +30,7 @@ pub struct DaemonStatusReport {
     pub launch_agent: LaunchAgentStatus,
     pub project_count: usize,
     pub session_count: usize,
+    pub diagnostics: DaemonDiagnostics,
 }
 
 #[derive(Debug, Clone)]
@@ -97,6 +99,7 @@ pub fn status_report() -> Result<DaemonStatusReport, CliError> {
         launch_agent: launchd::launch_agent_status(),
         project_count: projects.len(),
         session_count: sessions.len(),
+        diagnostics: state::diagnostics()?,
     })
 }
 
@@ -115,6 +118,22 @@ pub fn health_response(manifest: &DaemonManifest) -> Result<HealthResponse, CliE
         started_at: manifest.started_at.clone(),
         project_count: projects.len(),
         session_count: sessions.len(),
+    })
+}
+
+/// Build a richer diagnostics report for the daemon preferences screen.
+///
+/// # Errors
+/// Returns `CliError` when daemon state cannot be loaded.
+pub fn diagnostics_report() -> Result<DaemonDiagnosticsReport, CliError> {
+    let manifest = state::load_manifest()?;
+    let health = manifest.as_ref().map(health_response).transpose()?;
+    Ok(DaemonDiagnosticsReport {
+        health,
+        manifest,
+        launch_agent: launchd::launch_agent_status(),
+        workspace: state::diagnostics()?,
+        recent_events: state::read_recent_events(16)?,
     })
 }
 
@@ -340,4 +359,47 @@ fn require_project_dir(resolved: &ResolvedSession) -> Result<&Path, CliError> {
             resolved.state.session_id, resolved.project.project_id
         )))
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use tempfile::tempdir;
+
+    #[test]
+    fn diagnostics_report_includes_workspace_and_recent_events() {
+        let tmp = tempdir().expect("tempdir");
+        let home = tempdir().expect("tempdir");
+        temp_env::with_vars(
+            [
+                (
+                    "XDG_DATA_HOME",
+                    Some(tmp.path().to_str().expect("utf8 path")),
+                ),
+                ("HOME", Some(home.path().to_str().expect("utf8 path"))),
+            ],
+            || {
+                let manifest = DaemonManifest {
+                    version: "14.5.0".into(),
+                    pid: 42,
+                    endpoint: "http://127.0.0.1:9999".into(),
+                    started_at: "2026-03-28T12:00:00Z".into(),
+                    token_path: state::auth_token_path().display().to_string(),
+                };
+                state::write_manifest(&manifest).expect("manifest");
+                state::append_event("info", "daemon booted").expect("append event");
+
+                let report = diagnostics_report().expect("diagnostics");
+
+                assert_eq!(
+                    report.manifest.expect("manifest").endpoint,
+                    manifest.endpoint
+                );
+                assert_eq!(report.health.expect("health").session_count, 0);
+                assert!(report.workspace.events_path.ends_with("events.jsonl"));
+                assert_eq!(report.recent_events.len(), 1);
+            },
+        );
+    }
 }
