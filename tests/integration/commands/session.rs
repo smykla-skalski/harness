@@ -157,7 +157,7 @@ fn session_list_shows_active_sessions() {
             service::start_session("goal one", &project, Some("claude"), Some("list-a")).unwrap();
             service::start_session("goal two", &project, Some("codex"), Some("list-b")).unwrap();
 
-            let sessions = service::list_sessions(&project).unwrap();
+            let sessions = service::list_sessions(&project, false).unwrap();
             assert_eq!(sessions.len(), 2);
         },
     );
