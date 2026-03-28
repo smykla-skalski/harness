@@ -1,8 +1,9 @@
 use std::collections::BTreeMap;
 use std::fmt;
-use std::fs::{File, OpenOptions};
+use std::fs::{File, FileType, OpenOptions};
 use std::io::Write as _;
 use std::path::{Path, PathBuf};
+use std::result::Result as StdResult;
 
 use fs_err as fs;
 use fs2::FileExt;
@@ -230,13 +231,17 @@ pub(crate) fn append_task_checkpoint(
     task_id: &str,
     checkpoint: &TaskCheckpoint,
 ) -> Result<(), CliError> {
-    with_lock(project_dir, &format!("checkpoint-{session_id}-{task_id}"), || {
-        let path = checkpoints_path(project_dir, session_id, task_id)?;
-        if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent).map_err(|error| io_err(&error))?;
-        }
-        append_json_line(&path, checkpoint)
-    })
+    with_lock(
+        project_dir,
+        &format!("checkpoint-{session_id}-{task_id}"),
+        || {
+            let path = checkpoints_path(project_dir, session_id, task_id)?;
+            if let Some(parent) = path.parent() {
+                fs::create_dir_all(parent).map_err(|error| io_err(&error))?;
+            }
+            append_json_line(&path, checkpoint)
+        },
+    )
 }
 
 /// Load checkpoints for a single task.
@@ -267,12 +272,12 @@ pub(crate) fn list_known_session_ids(project_dir: &Path) -> Result<Vec<String>, 
 
     let mut session_ids: Vec<String> = fs::read_dir(root)
         .map_err(|error| io_err(&error))?
-        .filter_map(|entry| entry.ok())
+        .filter_map(StdResult::ok)
         .filter_map(|entry| {
             entry
                 .file_type()
                 .ok()
-                .filter(|file_type| file_type.is_dir())
+                .filter(FileType::is_dir)
                 .and_then(|_| entry.file_name().into_string().ok())
         })
         .collect();
@@ -335,12 +340,14 @@ fn migrate_v1_to_v2(mut value: Value) -> Result<Value, CliError> {
     object
         .entry("last_activity_at".to_string())
         .or_insert(Value::Null);
-    object.entry("observe_id".to_string()).or_insert(Value::Null);
     object
-        .entry("metrics".to_string())
-        .or_insert(serde_json::to_value(SessionMetrics::default()).map_err(|error| {
+        .entry("observe_id".to_string())
+        .or_insert(Value::Null);
+    object.entry("metrics".to_string()).or_insert(
+        serde_json::to_value(SessionMetrics::default()).map_err(|error| {
             CliErrorKind::workflow_serialize(format!("session metrics migration: {error}"))
-        })?);
+        })?,
+    );
 
     if let Some(agents) = object.get_mut("agents").and_then(Value::as_object_mut) {
         for agent in agents.values_mut() {
@@ -356,16 +363,16 @@ fn migrate_v1_to_v2(mut value: Value) -> Result<Value, CliError> {
                 agent_object
                     .entry("current_task_id".to_string())
                     .or_insert(Value::Null);
-                agent_object.entry("runtime_capabilities".to_string()).or_insert(
-                    json!({
+                agent_object
+                    .entry("runtime_capabilities".to_string())
+                    .or_insert(json!({
                         "runtime": runtime_name,
                         "supports_native_transcript": false,
                         "supports_signal_delivery": false,
                         "supports_context_injection": false,
                         "typical_signal_latency_seconds": 0,
                         "hook_points": [],
-                    }),
-                );
+                    }));
             }
         }
     }
@@ -504,7 +511,10 @@ mod tests {
         let tmp = tempfile::tempdir().expect("tempdir");
         temp_env::with_vars(
             [
-                ("XDG_DATA_HOME", Some(tmp.path().to_str().expect("utf8 path"))),
+                (
+                    "XDG_DATA_HOME",
+                    Some(tmp.path().to_str().expect("utf8 path")),
+                ),
                 ("CLAUDE_SESSION_ID", Some("test-storage")),
             ],
             || {
@@ -525,7 +535,10 @@ mod tests {
         let tmp = tempfile::tempdir().expect("tempdir");
         temp_env::with_vars(
             [
-                ("XDG_DATA_HOME", Some(tmp.path().to_str().expect("utf8 path"))),
+                (
+                    "XDG_DATA_HOME",
+                    Some(tmp.path().to_str().expect("utf8 path")),
+                ),
                 ("CLAUDE_SESSION_ID", Some("test-log")),
             ],
             || {
@@ -586,7 +599,10 @@ mod tests {
         let tmp = tempfile::tempdir().expect("tempdir");
         temp_env::with_vars(
             [
-                ("XDG_DATA_HOME", Some(tmp.path().to_str().expect("utf8 path"))),
+                (
+                    "XDG_DATA_HOME",
+                    Some(tmp.path().to_str().expect("utf8 path")),
+                ),
                 ("CLAUDE_SESSION_ID", Some("test-checkpoints")),
             ],
             || {
@@ -614,7 +630,10 @@ mod tests {
         let tmp = tempfile::tempdir().expect("tempdir");
         temp_env::with_vars(
             [
-                ("XDG_DATA_HOME", Some(tmp.path().to_str().expect("utf8 path"))),
+                (
+                    "XDG_DATA_HOME",
+                    Some(tmp.path().to_str().expect("utf8 path")),
+                ),
                 ("CLAUDE_SESSION_ID", Some("test-registry")),
             ],
             || {

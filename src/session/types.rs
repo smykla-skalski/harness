@@ -76,7 +76,8 @@ impl SessionMetrics {
     pub fn recalculate(state: &SessionState) -> Self {
         let agent_count = saturating_len(state.agents.len());
         let active_agent_count = saturating_len(
-            state.agents
+            state
+                .agents
                 .values()
                 .filter(|agent| agent.status == AgentStatus::Active)
                 .count(),
@@ -432,7 +433,10 @@ mod tests {
         let parsed: WorkItem = serde_json::from_str(&json).expect("deserializes");
         assert_eq!(parsed.task_id, "task-1");
         assert_eq!(parsed.severity, TaskSeverity::High);
-        assert_eq!(parsed.suggested_fix.as_deref(), Some("check the failing watch path"));
+        assert_eq!(
+            parsed.suggested_fix.as_deref(),
+            Some("check the failing watch path")
+        );
     }
 
     #[test]

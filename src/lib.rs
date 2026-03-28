@@ -5,6 +5,7 @@ pub mod app;
 #[cfg(test)]
 mod codec;
 pub mod create;
+pub mod daemon;
 pub mod errors;
 pub mod hooks;
 pub mod infra;

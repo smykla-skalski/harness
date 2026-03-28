@@ -9,6 +9,7 @@ use crate::create::{
     ApprovalBeginArgs, CreateBeginArgs, CreateResetArgs, CreateSaveArgs, CreateShowArgs,
     CreateValidateArgs,
 };
+use crate::daemon::transport::DaemonCommand;
 use crate::errors::CliError;
 use crate::hooks::{self, HookArgs};
 use crate::observe::ObserveArgs;
@@ -142,6 +143,12 @@ pub enum Command {
         #[command(subcommand)]
         command: SessionCommand,
     },
+
+    /// Local daemon for the Harness Monitor app.
+    Daemon {
+        #[command(subcommand)]
+        command: DaemonCommand,
+    },
 }
 
 /// Dispatch a parsed command to its owning subsystem.
@@ -161,6 +168,7 @@ pub fn dispatch(command: &Command) -> Result<i32, CliError> {
         Command::PreCompact(args) => args.execute(&ctx),
         Command::Observe(args) => args.execute(&ctx),
         Command::Session { command } => command.execute(&ctx),
+        Command::Daemon { command } => command.execute(&ctx),
     }
 }
 
