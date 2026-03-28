@@ -1,6 +1,6 @@
 # harness
 
-Workflow engine for tracked test work against Kubernetes and Kuma clusters. Harness manages disposable environments, suite authoring, tracked execution, live session inspection, and cross-agent coordination for Claude, Codex, Gemini, and Copilot.
+Workflow engine for tracked test work against Kubernetes and Kuma clusters. Harness manages disposable environments, suite authoring, tracked execution, live session inspection, and cross-agent coordination for Claude, Codex, Gemini, Copilot, and OpenCode.
 
 For the internal module map, see [ARCHITECTURE.md](ARCHITECTURE.md).
 
@@ -94,6 +94,26 @@ harness agents prompt-submit --agent <agent>
 
 Runtime API for cross-agent coordination. Generated hooks call these commands to register sessions, record prompt events, and clean up state. The shared agent ledger lives under the harness project directory, not in host-native transcript storage.
 
+### session - multi-agent orchestration
+
+```
+harness session start --context "goal" --runtime <runtime> [--session-id <id>]
+harness session join <session-id> --role <role> --runtime <runtime> [--capabilities "x,y"]
+harness session end <session-id> --actor <agent-id>
+harness session assign <session-id> <agent-id> --role <role> --actor <agent-id>
+harness session remove <session-id> <agent-id> --actor <agent-id>
+harness session transfer-leader <session-id> <new-leader-id> --actor <agent-id> [--reason "..."]
+harness session task create <session-id> --title "..." --actor <agent-id> [--severity <level>]
+harness session task assign <session-id> <task-id> <agent-id> --actor <agent-id>
+harness session task list <session-id> [--status <status>] [--json]
+harness session task update <session-id> <task-id> --status <status> --actor <agent-id>
+harness session observe <session-id> [--poll-interval <s>] [--json] [--actor <agent-id>]
+harness session status <session-id> [--json]
+harness session list [--json]
+```
+
+Coordinates multiple AI agents within a shared session. `start` creates a session and registers the caller as leader. `join` adds agents with roles (leader, observer, worker, reviewer, improver). Each role has a permission set controlling which commands it can invoke. `observe` scans all agent logs through the existing classifier pipeline and creates work items for detected issues. With `--poll-interval`, it runs continuously with periodic sweeps that create dual work items (one for the issue, one to improve heuristics that missed it). Signals between agents use file-based delivery picked up during hook callbacks.
+
 ### Hidden commands
 
 `session-start`, `session-stop`, and `pre-compact` are top-level commands that hooks and lifecycle integrations call. You do not run them by hand.
@@ -106,6 +126,7 @@ The typical order:
 2. `harness create` - author a suite (skip if you already have one)
 3. `harness run` - execute the suite against a real cluster
 4. `harness observe` - inspect live sessions, classify issues, route fixes
+5. `harness session` - orchestrate multiple agents with roles, tasks, and cross-agent observation
 
 ```mermaid
 flowchart LR
@@ -114,6 +135,8 @@ flowchart LR
     Run --> Observe["observe\nscan, watch,\ndump, doctor"]
     Observe -->|"route fixes"| Create
     Observe -->|"route fixes"| Run
+    Session["session\norchestrate agents,\ntasks, observe"] --> Observe
+    Session -->|"assign work"| Run
 ```
 
 ## Running a suite
@@ -172,7 +195,7 @@ harness create validate
 
 ## Cross-agent sessions
 
-Harness supports Claude, Codex, Gemini, and Copilot through a shared authoring and runtime model.
+Harness supports Claude, Codex, Gemini, Copilot, and OpenCode through a shared authoring and runtime model.
 
 ### Authoring
 
@@ -181,6 +204,7 @@ Skills and plugins are written once under `agents/` and rendered into host-speci
 - `.claude/` - Claude hooks, skills, settings
 - `.agents/` - cross-agent assets
 - `.gemini/` - Gemini wrapper
+- `.opencode/` - OpenCode skills and plugins
 - `plugins/` - agent plugin definitions
 - `.github/hooks/` - GitHub integration hooks
 
@@ -202,6 +226,19 @@ Generated hooks call back into `harness agents session-start`, `session-stop`, a
 harness observe --agent claude doctor
 harness observe --agent codex scan <session-id>
 ```
+
+### Multi-agent orchestration
+
+```bash
+harness session start --context "fix mesh retry feature" --runtime claude
+harness session join <session-id> --role worker --runtime codex
+harness session join <session-id> --role observer --runtime gemini
+harness session observe <session-id> --poll-interval 3 --json --actor claude-leader
+harness session task list <session-id> --json
+harness session end <session-id> --actor claude-leader
+```
+
+The session system coordinates multiple agents with role-based access control. Five roles are supported: leader, observer, worker, reviewer, and improver. The observer scans all agent logs using the same classifier pipeline as `harness observe`, extended with coordination-specific checks for stalled progress, guard denial loops, rate limits, and cross-agent file conflicts.
 
 ## Hook guards
 
@@ -246,10 +283,17 @@ $XDG_DATA_HOME/harness/
 Cross-agent state lives under the harness project directory:
 
 ```
-$XDG_DATA_HOME/harness/projects/project-<digest>/agents/
-  ledger/events.jsonl                            # normalized cross-agent events
-  sessions/<agent>/<session-id>/raw.jsonl        # raw per-session payloads
-  observe/<observe-id>/                          # shared observer state
+$XDG_DATA_HOME/harness/projects/project-<digest>/
+  agents/
+    ledger/events.jsonl                          # normalized cross-agent events
+    sessions/<agent>/<session-id>/raw.jsonl      # raw per-session payloads
+    observe/<observe-id>/                        # shared observer state
+    signals/<agent>/<session-id>/pending/        # file-based agent signals
+    signals/<agent>/<session-id>/acknowledged/   # processed signal acks
+  orchestration/
+    sessions/<session-id>/state.json             # multi-agent session state
+    sessions/<session-id>/log.jsonl              # session audit trail
+    active.json                                  # active session registry
 ```
 
 The create approval state lives in harness-managed project state. Do not edit those files by hand.

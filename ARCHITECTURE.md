@@ -10,7 +10,8 @@ Use [README.md](README.md) for day-to-day usage. Use this file when you need to 
 flowchart LR
     App["app\nCLI transport and wiring"]
 
-    Agents["agents\nshared agent lifecycle, ledger, asset rendering"]
+    Agents["agents\nshared agent lifecycle, ledger, asset rendering,\nruntime adapters"]
+    Session["session\nmulti-agent orchestration"]
     Run["run\ntracked suite execution"]
     Create["create\nsuite creation workflow"]
     Observe["observe\nlive session inspection and fix routing"]
@@ -25,10 +26,17 @@ flowchart LR
 
     App --> Run
     App --> Agents
+    App --> Session
     App --> Create
     App --> Observe
     App --> Setup
     App --> Hooks
+
+    Session --> Agents
+    Session --> Observe
+    Session --> Workspace
+    Session --> Infra
+    Session --> Errors
 
     Agents --> Hooks
     Agents --> Setup
@@ -84,7 +92,8 @@ flowchart LR
 
 | Path             | Owns                                                                               |
 | ---------------- | ---------------------------------------------------------------------------------- |
-| `src/agents/`    | shared agent lifecycle commands, canonical agent ledger/session storage, project-scoped agent state, checked-in asset rendering from `agents/` |
+| `src/agents/`    | shared agent lifecycle commands, canonical agent ledger/session storage, project-scoped agent state, checked-in asset rendering from `agents/`, runtime adapters for log discovery, signal delivery, and liveness detection |
+| `src/session/`   | multi-agent orchestration: session lifecycle, role-based permissions, work items, cross-agent observation with periodic sweep |
 | `src/app/`       | Clap CLI, top-level command grouping, transport mapping, domain wiring             |
 | `src/run/`       | tracked runs, run workflow, prepared artifacts, reporting, run diagnostics, repair, provider-aware run checks |
 | `src/create/`    | `suite:create` workflow, approval state, create validation, create session state   |
@@ -108,13 +117,13 @@ These are real roots in the repo, but they are not part of the main public domai
 These repo roots matter too even though they are not Rust module roots:
 
 - `agents/` is the canonical authoring source for shared skills and plugins.
-- `.claude/`, `.agents/`, `.gemini/`, `plugins/`, and `.github/hooks/` are generated host outputs.
+- `.claude/`, `.agents/`, `.gemini/`, `.opencode/`, `plugins/`, and `.github/hooks/` are generated host outputs.
 
 ## Public crate surface
 
 The current `src/lib.rs` surface is:
 
-- public: `agents`, `app`, `create`, `errors`, `hooks`, `infra`, `kernel`, `observe`, `run`, `setup`, `workspace`
+- public: `agents`, `app`, `create`, `errors`, `hooks`, `infra`, `kernel`, `observe`, `run`, `session`, `setup`, `workspace`
 - crate-internal: `platform`, `manifests`, `suite_defaults`
 - test-only: `codec`
 
@@ -163,7 +172,8 @@ sequenceDiagram
 ```mermaid
 flowchart TD
     Workspace["workspace\ncurrent session and ambient pointers"]
-    Agents["agents\nshared project agent ledger and session registry"]
+    Agents["agents\nshared project agent ledger,\nsession registry, runtime adapters"]
+    Session["session\norchestration state, work items,\nrole permissions"]
     Run["run\nrunner state, metadata, reports"]
     Create["create\nsuite:create state"]
     Observe["observe\nobserver state"]
@@ -176,6 +186,8 @@ flowchart TD
     Workspace --> Observe
     Workspace --> Setup
     Workspace --> Hooks
+    Session --> Agents
+    Session --> Observe
     Agents --> Observe
     Agents --> Hooks
 ```
@@ -188,10 +200,20 @@ The main cross-agent path now looks like this:
 
 1. Author a shared skill or plugin under `agents/`.
 2. Render checked-in host outputs with `harness setup agents generate`.
-3. Bootstrap one host with `harness setup bootstrap --agent <claude|codex|gemini|copilot>`.
+3. Bootstrap one host with `harness setup bootstrap --agent <claude|codex|gemini|copilot|opencode>`.
 4. Let lifecycle hooks call back into `harness agents session-start`, `session-stop`, or `prompt-submit`.
 5. Use `observe` to inspect live sessions, route fixes, and improve skills or suites while the shared state is still active.
 6. Read the resulting shared agent state back through `observe`, hooks, or other harness commands.
+
+For multi-agent orchestration, there is also the session orchestration path:
+
+1. A leader starts a session with `harness session start --context "goal" --runtime claude`.
+2. Other agents join with `harness session join <session-id> --role worker --runtime codex`.
+3. The leader creates work items with `harness session task create` and assigns them.
+4. An observer runs `harness session observe <session-id> --poll-interval 3` to classify issues across all agent logs and auto-create work items.
+5. The leader ends the session with `harness session end` when all tasks are done.
+
+Signal delivery between agents uses file-based signaling through `agents/signals/`. Signals are picked up during `PreToolUse` hook callbacks and injected as `additional_context`.
 
 That keeps host wrappers thin. They translate local hook payloads, but harness owns the real workflow state.
 
@@ -205,7 +227,8 @@ That keeps host wrappers thin. They translate local hook payloads, but harness o
 - `infra` stays generic and must not depend on product domains.
 - `setup` bootstraps wrappers and readiness. It should not become the source of truth for agent ledgers or rendered assets. It reads `run`, `agents`, and `hooks` types for cluster provisioning and session coordination.
 - `hooks` normalizes and enforces policy. It reads `run` workflow state, `create` workflow state, and `agents` services to make guard decisions and record events. It should feed shared state through `agents`, not own separate durable copies.
-- `observe` is the live inspection and improvement loop for skills and suites. It reads the shared harness ledger through `agents` storage and checks run pointers from `run`. It falls back to legacy host transcript storage for compatibility.
-- Shared pure concepts belong in `kernel`. Shared path/state discovery belongs in `workspace`. Shared durable multi-agent state belongs in `agents`.
+- `observe` is the live inspection and improvement loop for skills and suites. It reads the shared harness ledger through `agents` storage and checks run pointers from `run`. It falls back to legacy host transcript storage for compatibility. The classifier pipeline is extended with coordination checks for multi-agent sessions.
+- `session` owns multi-agent orchestration: session lifecycle, role-based permissions, work items, and cross-agent observation. It delegates log scanning to `observe` classifiers and runtime discovery to `agents/runtime`. It must not bypass the existing observation pipeline.
+- Shared pure concepts belong in `kernel`. Shared path/state discovery belongs in `workspace`. Shared durable multi-agent state belongs in `agents`. Orchestration state (sessions, roles, tasks) belongs in `session`.
 
 If a module does not fit one of these buckets, it is probably in the wrong place.
