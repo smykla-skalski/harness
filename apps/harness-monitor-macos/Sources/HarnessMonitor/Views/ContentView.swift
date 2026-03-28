@@ -1,3 +1,4 @@
+import Foundation
 import HarnessMonitorKit
 import Observation
 import SwiftUI
@@ -5,6 +6,7 @@ import SwiftUI
 struct ContentView: View {
   @Bindable var store: MonitorStore
   @State private var showsPreferences = false
+  @State private var actionCenter = CockpitActionCenter()
 
   private var selectedDetail: SessionDetail? {
     guard let sessionID = store.selectedSessionID,
@@ -23,14 +25,19 @@ struct ContentView: View {
     } content: {
       Group {
         if let detail = selectedDetail {
-          SessionCockpitView(store: store, detail: detail, timeline: store.timeline)
+          SessionCockpitView(
+            store: store,
+            actions: actionCenter,
+            detail: detail,
+            timeline: store.timeline
+          )
         } else {
           SessionsBoardView(store: store)
         }
       }
       .navigationSplitViewColumnWidth(min: 600, ideal: 840)
     } detail: {
-      InspectorColumnView(store: store)
+      InspectorColumnView(store: store, actions: actionCenter)
         .navigationSplitViewColumnWidth(min: 320, ideal: 380)
     }
     .background(MonitorTheme.canvas.ignoresSafeArea())
@@ -360,4 +367,145 @@ private struct SessionsBoardView: View {
 
 #Preview("Dashboard") {
   ContentView(store: MonitorStore(daemonController: PreviewDaemonController()))
+}
+
+@MainActor
+@Observable
+final class CockpitActionCenter {
+  var isBusy = false
+  var lastAction = ""
+  var lastError: String?
+
+  private let daemonController: any DaemonControlling
+  private var client: (any MonitorClientProtocol)?
+
+  init(daemonController: any DaemonControlling = DaemonController()) {
+    self.daemonController = daemonController
+  }
+
+  func createTask(
+    sessionID: String,
+    title: String,
+    context: String?,
+    severity: TaskSeverity,
+    actor: String = "monitor-app"
+  ) async -> SessionDetail? {
+    await run("Create task") { client in
+      try await client.createTask(
+        sessionID: sessionID,
+        request: TaskCreateRequest(
+          actor: actor,
+          title: title,
+          context: context,
+          severity: severity
+        )
+      )
+    }
+  }
+
+  func assignTask(
+    sessionID: String,
+    taskID: String,
+    agentID: String,
+    actor: String = "monitor-app"
+  ) async -> SessionDetail? {
+    await run("Assign task") { client in
+      try await client.assignTask(
+        sessionID: sessionID,
+        taskID: taskID,
+        request: TaskAssignRequest(actor: actor, agentId: agentID)
+      )
+    }
+  }
+
+  func updateTask(
+    sessionID: String,
+    taskID: String,
+    status: TaskStatus,
+    note: String?,
+    actor: String = "monitor-app"
+  ) async -> SessionDetail? {
+    await run("Update task") { client in
+      try await client.updateTask(
+        sessionID: sessionID,
+        taskID: taskID,
+        request: TaskUpdateRequest(actor: actor, status: status, note: note)
+      )
+    }
+  }
+
+  func checkpointTask(
+    sessionID: String,
+    taskID: String,
+    summary: String,
+    progress: Int,
+    actor: String = "monitor-app"
+  ) async -> SessionDetail? {
+    await run("Checkpoint task") { client in
+      try await client.checkpointTask(
+        sessionID: sessionID,
+        taskID: taskID,
+        request: TaskCheckpointRequest(actor: actor, summary: summary, progress: progress)
+      )
+    }
+  }
+
+  func changeRole(
+    sessionID: String,
+    agentID: String,
+    role: SessionRole,
+    actor: String = "monitor-app"
+  ) async -> SessionDetail? {
+    await run("Change role") { client in
+      try await client.changeRole(
+        sessionID: sessionID,
+        agentID: agentID,
+        request: RoleChangeRequest(actor: actor, role: role)
+      )
+    }
+  }
+
+  func transferLeader(
+    sessionID: String,
+    newLeaderID: String,
+    reason: String?,
+    actor: String = "monitor-app"
+  ) async -> SessionDetail? {
+    await run("Transfer leader") { client in
+      try await client.transferLeader(
+        sessionID: sessionID,
+        request: LeaderTransferRequest(actor: actor, newLeaderId: newLeaderID, reason: reason)
+      )
+    }
+  }
+
+  private func run(
+    _ actionName: String,
+    operation: @escaping @Sendable (any MonitorClientProtocol) async throws -> SessionDetail
+  ) async -> SessionDetail? {
+    isBusy = true
+    defer { isBusy = false }
+
+    lastError = nil
+
+    do {
+      let client = try await loadClient()
+      let detail = try await operation(client)
+      lastAction = actionName
+      return detail
+    } catch {
+      lastError = error.localizedDescription
+      return nil
+    }
+  }
+
+  private func loadClient() async throws -> any MonitorClientProtocol {
+    if let client {
+      return client
+    }
+
+    let client = try await daemonController.bootstrapClient()
+    self.client = client
+    return client
+  }
 }
