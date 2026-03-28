@@ -220,25 +220,6 @@ extension InspectorActionSections {
     }
     .monitorCard()
   }
-
-  fileprivate func observerSummary(observer: ObserverSummary) -> some View {
-    VStack(alignment: .leading, spacing: 8) {
-      actionHeader(
-        title: "Observe",
-        subtitle: "The observer loop keeps the session moving and surfaces drift."
-      )
-      HStack {
-        badge("Open \(observer.openIssueCount)")
-        badge("Muted \(observer.mutedCodeCount)")
-        badge("Workers \(observer.activeWorkerCount)")
-      }
-      Text("Last sweep \(formatTimestamp(observer.lastScanTime))")
-        .font(.caption.monospaced())
-        .foregroundStyle(.secondary)
-    }
-    .monitorCard()
-  }
-
   fileprivate func actionHeader(title: String, subtitle: String) -> some View {
     VStack(alignment: .leading, spacing: 4) {
       Text(title)

@@ -217,18 +217,20 @@ struct SessionCockpitView: View {
             VStack(alignment: .trailing, spacing: 6) {
               Text(signal.status.rawValue.capitalized)
                 .font(.caption.bold())
-                .foregroundStyle(taskStatusColor(for: signalStatusTaskValue(signal.status)))
+                .foregroundStyle(signalStatusColor(for: signal.status))
               Text(formatTimestamp(signal.signal.createdAt))
                 .font(.caption.monospaced())
                 .foregroundStyle(.secondary)
             }
           }
+          .frame(maxWidth: .infinity, alignment: .leading)
           .padding(14)
           .background(Color.white.opacity(0.55), in: RoundedRectangle(cornerRadius: 18))
         }
         .buttonStyle(.plain)
       }
     }
+    .frame(maxWidth: .infinity, alignment: .leading)
     .monitorCard()
   }
 
@@ -294,14 +296,14 @@ struct SessionCockpitView: View {
   }
 }
 
-private func signalStatusTaskValue(_ status: SessionSignalStatus) -> TaskStatus {
+func signalStatusColor(for status: SessionSignalStatus) -> Color {
   switch status {
   case .pending, .deferred:
-    .inProgress
+    MonitorTheme.caution
   case .acknowledged:
-    .done
+    MonitorTheme.success
   case .rejected, .expired:
-    .blocked
+    MonitorTheme.danger
   }
 }
 

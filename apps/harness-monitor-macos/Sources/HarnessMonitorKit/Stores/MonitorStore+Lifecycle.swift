@@ -50,6 +50,10 @@ extension MonitorStore {
     }
   }
 
+  private static let streamReconnectDelays: [Duration] = [
+    .milliseconds(500), .seconds(1), .seconds(2), .seconds(4), .seconds(8),
+  ]
+
   func startGlobalStream(using client: any MonitorClientProtocol) {
     globalStreamTask?.cancel()
     globalStreamTask = Task { [weak self] in
@@ -57,17 +61,36 @@ extension MonitorStore {
         return
       }
 
-      do {
-        for try await event in client.globalStream() {
-          if event.event == "ready" {
-            continue
+      var attempt = 0
+      while !Task.isCancelled {
+        do {
+          var pendingRefresh: Task<Void, Never>?
+          for try await event in client.globalStream() {
+            attempt = 0
+            if event.event == "ready" {
+              continue
+            }
+            pendingRefresh?.cancel()
+            pendingRefresh = Task { [weak self] in
+              try? await Task.sleep(for: .milliseconds(500))
+              guard !Task.isCancelled, let self else { return }
+              await self.refresh(using: client, preserveSelection: true)
+            }
           }
-          await refresh(using: client, preserveSelection: true)
+          pendingRefresh?.cancel()
+        } catch {
+          if Task.isCancelled { return }
+          await MainActor.run {
+            self.lastError = error.localizedDescription
+          }
         }
-      } catch {
-        await MainActor.run {
-          self.lastError = error.localizedDescription
-        }
+
+        if Task.isCancelled { return }
+        let delay = Self.streamReconnectDelays[
+          min(attempt, Self.streamReconnectDelays.count - 1)
+        ]
+        attempt += 1
+        try? await Task.sleep(for: delay)
       }
     }
   }
@@ -79,17 +102,36 @@ extension MonitorStore {
         return
       }
 
-      do {
-        for try await event in client.sessionStream(sessionID: sessionID) {
-          if event.event == "ready" {
-            continue
+      var attempt = 0
+      while !Task.isCancelled {
+        do {
+          var pendingRefresh: Task<Void, Never>?
+          for try await event in client.sessionStream(sessionID: sessionID) {
+            attempt = 0
+            if event.event == "ready" {
+              continue
+            }
+            pendingRefresh?.cancel()
+            pendingRefresh = Task { [weak self] in
+              try? await Task.sleep(for: .milliseconds(500))
+              guard !Task.isCancelled, let self else { return }
+              await self.loadSession(using: client, sessionID: sessionID)
+            }
           }
-          await loadSession(using: client, sessionID: sessionID)
+          pendingRefresh?.cancel()
+        } catch {
+          if Task.isCancelled { return }
+          await MainActor.run {
+            self.lastError = error.localizedDescription
+          }
         }
-      } catch {
-        await MainActor.run {
-          self.lastError = error.localizedDescription
-        }
+
+        if Task.isCancelled { return }
+        let delay = Self.streamReconnectDelays[
+          min(attempt, Self.streamReconnectDelays.count - 1)
+        ]
+        attempt += 1
+        try? await Task.sleep(for: delay)
       }
     }
   }

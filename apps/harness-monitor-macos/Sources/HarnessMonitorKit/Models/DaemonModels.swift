@@ -1,3 +1,5 @@
+import Foundation
+
 public struct DaemonManifest: Codable, Equatable, Sendable {
   public let version: String
   public let pid: Int
@@ -18,13 +20,19 @@ public struct DaemonAuditEvent: Codable, Equatable, Identifiable, Sendable {
   public let recordedAt: String
   public let level: String
   public let message: String
+  private let stableID = UUID()
 
-  public var id: String { "\(recordedAt)-\(level)-\(message)" }
+  public var id: UUID { stableID }
+  enum CodingKeys: String, CodingKey { case recordedAt, level, message }
 
   public init(recordedAt: String, level: String, message: String) {
     self.recordedAt = recordedAt
     self.level = level
     self.message = message
+  }
+
+  public static func == (lhs: Self, rhs: Self) -> Bool {
+    lhs.recordedAt == rhs.recordedAt && lhs.level == rhs.level && lhs.message == rhs.message
   }
 }
 
