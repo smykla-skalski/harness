@@ -81,3 +81,83 @@ fn coordination_checks_only_fire_with_agent_context() {
     // At least the TextRule should match
     assert!(count >= 1);
 }
+
+#[test]
+fn stalled_agent_fires_when_no_tool_uses() {
+    let mut state = make_state();
+    state.agent_id = Some("codex-stall".into());
+    state.orchestration_session_id = Some("sess-1".into());
+    // Simulate being past line 50 with empty tool use window
+    let issues = check_text_for_issues(
+        60,
+        MessageRole::Assistant,
+        "I am still thinking about this problem and considering options...",
+        None,
+        &mut state,
+    );
+    let stalled: Vec<_> = issues
+        .iter()
+        .filter(|issue| issue.code == IssueCode::AgentStalledProgress)
+        .collect();
+    assert!(!stalled.is_empty(), "should detect stalled agent");
+}
+
+#[test]
+fn stalled_agent_does_not_fire_before_line_50() {
+    let mut state = make_state();
+    state.agent_id = Some("codex-early".into());
+    let issues = check_text_for_issues(
+        10,
+        MessageRole::Assistant,
+        "thinking...",
+        None,
+        &mut state,
+    );
+    let stalled: Vec<_> = issues
+        .iter()
+        .filter(|issue| issue.code == IssueCode::AgentStalledProgress)
+        .collect();
+    assert!(stalled.is_empty(), "should not fire early in session");
+}
+
+#[test]
+fn cross_agent_file_conflict_detected() {
+    let mut state = make_state();
+    state.agent_id = Some("codex-1".into());
+    state.orchestration_session_id = Some("sess-1".into());
+    // Simulate a file already edited by 2 agents
+    state.edit_counts.insert("src/main.rs".into(), 2);
+    let issues = check_text_for_issues(
+        10,
+        MessageRole::Assistant,
+        "The file src/main.rs has been updated successfully",
+        Some(SourceTool::Write),
+        &mut state,
+    );
+    let conflicts: Vec<_> = issues
+        .iter()
+        .filter(|issue| issue.code == IssueCode::CrossAgentFileConflict)
+        .collect();
+    assert!(
+        !conflicts.is_empty(),
+        "should detect cross-agent file conflict"
+    );
+}
+
+#[test]
+fn cross_agent_file_conflict_not_triggered_without_session() {
+    let mut state = make_state();
+    state.edit_counts.insert("src/lib.rs".into(), 3);
+    let issues = check_text_for_issues(
+        10,
+        MessageRole::Assistant,
+        "The file src/lib.rs has been updated successfully",
+        Some(SourceTool::Write),
+        &mut state,
+    );
+    let conflicts: Vec<_> = issues
+        .iter()
+        .filter(|issue| issue.code == IssueCode::CrossAgentFileConflict)
+        .collect();
+    assert!(conflicts.is_empty(), "should not fire without orchestration context");
+}

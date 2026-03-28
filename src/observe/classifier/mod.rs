@@ -134,6 +134,8 @@ const ASSISTANT_TEXT_CHECKS: &[TextCheckFn] = &[
 
 const COORDINATION_TEXT_CHECKS: &[TextCheckFn] = &[
     text_checks::coordination::check_api_rate_limit,
+    text_checks::coordination::check_stalled_agent,
+    text_checks::coordination::check_cross_agent_file_conflict,
     text_checks::coordination::check_guard_denial_loop,
 ];
 
