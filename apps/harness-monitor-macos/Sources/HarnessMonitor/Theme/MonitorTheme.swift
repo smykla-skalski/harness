@@ -80,6 +80,24 @@ extension View {
   }
 }
 
+func monitorActionHeader(title: String, subtitle: String) -> some View {
+  VStack(alignment: .leading, spacing: 4) {
+    Text(title)
+      .font(.system(.headline, design: .rounded, weight: .semibold))
+    Text(subtitle)
+      .font(.system(.subheadline, design: .rounded, weight: .medium))
+      .foregroundStyle(.secondary)
+  }
+}
+
+func monitorBadge(_ value: String) -> some View {
+  Text(value)
+    .font(.caption.bold())
+    .padding(.horizontal, 10)
+    .padding(.vertical, 5)
+    .background(Color.white.opacity(0.68), in: Capsule())
+}
+
 func statusColor(for status: SessionStatus) -> Color {
   switch status {
   case .active:

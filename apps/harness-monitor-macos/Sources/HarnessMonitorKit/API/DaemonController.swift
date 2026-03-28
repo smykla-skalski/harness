@@ -150,7 +150,8 @@ public struct DaemonController: DaemonControlling {
     throw DaemonControlError.harnessBinaryNotFound
   }
 
-  private func startDetachedDaemon(binary: URL) throws {
+  @discardableResult
+  private func startDetachedDaemon(binary: URL) throws -> Process {
     let process = Process()
     process.executableURL = binary
     process.arguments = ["daemon", "serve", "--host", "127.0.0.1", "--port", "0"]
@@ -158,6 +159,7 @@ public struct DaemonController: DaemonControlling {
     process.standardOutput = nullSink
     process.standardError = nullSink
     try process.run()
+    return process
   }
 
   private func run(executable: URL, arguments: [String]) async throws -> CommandResult {
