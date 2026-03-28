@@ -316,6 +316,9 @@ If `harness run repair` still leaves blocking findings, start a fresh tracked ru
 ```bash
 mise run check    # type-check + clippy
 mise run test     # unit + integration
+mise run monitor:test  # generate + lint + test the macOS monitor app
 ```
+
+The macOS monitor app lives under `apps/harness-monitor-macos/`. Its Xcode project is generated from `project.yml`; use `mise run monitor:generate` if you need to open it in Xcode.
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for the internal module map.
