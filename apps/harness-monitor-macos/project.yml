@@ -1,0 +1,73 @@
+name: HarnessMonitor
+options:
+  bundleIdPrefix: io.harness.monitor
+  createIntermediateGroups: true
+settings:
+  base:
+    CODE_SIGNING_ALLOWED: NO
+    CLANG_TREAT_WARNINGS_AS_ERRORS: YES
+    GCC_TREAT_WARNINGS_AS_ERRORS: YES
+    GENERATE_INFOPLIST_FILE: YES
+    MACOSX_DEPLOYMENT_TARGET: "14.0"
+    SWIFT_STRICT_CONCURRENCY: complete
+    SWIFT_TREAT_WARNINGS_AS_ERRORS: YES
+    SWIFT_VERSION: "6.0"
+targets:
+  HarnessMonitorKit:
+    type: framework
+    platform: macOS
+    deploymentTarget: "14.0"
+    sources:
+      - Sources/HarnessMonitorKit
+    preBuildScripts:
+      - name: Swift Quality Gate
+        basedOnDependencyAnalysis: false
+        script: |
+          "$SRCROOT/Scripts/lint-swift.sh" kit
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: io.harness.monitor.kit
+  HarnessMonitor:
+    type: application
+    platform: macOS
+    deploymentTarget: "14.0"
+    sources:
+      - Sources/HarnessMonitor
+    dependencies:
+      - target: HarnessMonitorKit
+    preBuildScripts:
+      - name: Swift Quality Gate
+        basedOnDependencyAnalysis: false
+        script: |
+          "$SRCROOT/Scripts/lint-swift.sh" app
+    settings:
+      base:
+        INFOPLIST_KEY_CFBundleDisplayName: Harness Monitor
+        INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.developer-tools
+        PRODUCT_BUNDLE_IDENTIFIER: io.harness.monitor.app
+  HarnessMonitorKitTests:
+    type: bundle.unit-test
+    platform: macOS
+    deploymentTarget: "14.0"
+    sources:
+      - Tests/HarnessMonitorKitTests
+    dependencies:
+      - target: HarnessMonitorKit
+    preBuildScripts:
+      - name: Swift Quality Gate
+        basedOnDependencyAnalysis: false
+        script: |
+          "$SRCROOT/Scripts/lint-swift.sh" tests
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: io.harness.monitor.kit-tests
+schemes:
+  HarnessMonitor:
+    build:
+      targets:
+        HarnessMonitor: all
+        HarnessMonitorKit: all
+    test:
+      gatherCoverageData: true
+      targets:
+        - name: HarnessMonitorKitTests

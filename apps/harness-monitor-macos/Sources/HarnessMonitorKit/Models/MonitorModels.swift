@@ -1,36 +1,5 @@
 import Foundation
 
-public struct DaemonManifest: Codable, Equatable, Sendable {
-  public let version: String
-  public let pid: Int
-  public let endpoint: String
-  public let startedAt: String
-  public let tokenPath: String
-}
-
-public struct LaunchAgentStatus: Codable, Equatable, Sendable {
-  public let installed: Bool
-  public let label: String
-  public let path: String
-}
-
-public struct DaemonStatusReport: Codable, Equatable, Sendable {
-  public let manifest: DaemonManifest?
-  public let launchAgent: LaunchAgentStatus
-  public let projectCount: Int
-  public let sessionCount: Int
-}
-
-public struct HealthResponse: Codable, Equatable, Sendable {
-  public let status: String
-  public let version: String
-  public let pid: Int
-  public let endpoint: String
-  public let startedAt: String
-  public let projectCount: Int
-  public let sessionCount: Int
-}
-
 public struct ProjectSummary: Codable, Equatable, Identifiable, Sendable {
   public let projectId: String
   public let name: String
