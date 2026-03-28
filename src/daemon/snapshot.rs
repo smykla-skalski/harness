@@ -184,3 +184,213 @@ fn load_signals(
     signals.sort_by(|left, right| right.signal.created_at.cmp(&left.signal.created_at));
     Ok(signals)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::BTreeMap;
+    use std::path::Path;
+
+    use fs_err as fs;
+    use tempfile::tempdir;
+
+    use crate::agents::runtime::signal::{
+        AckResult, DeliveryConfig, Signal, SignalAck, SignalPayload, SignalPriority,
+        acknowledge_signal, write_signal_file,
+    };
+    use crate::observe::types::{
+        ActiveWorker, CycleRecord, FixSafety, IssueCategory, IssueCode, IssueSeverity,
+        ObserverState, OpenIssue,
+    };
+    use crate::session::types::{
+        AgentRegistration, AgentStatus, CURRENT_VERSION, SessionMetrics, SessionRole,
+        SessionSignalStatus, SessionState, SessionStatus,
+    };
+
+    fn write_json(path: &Path, value: &impl serde::Serialize) {
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent).expect("create parent");
+        }
+        fs::write(
+            path,
+            serde_json::to_string_pretty(value).expect("serialize"),
+        )
+        .expect("write");
+    }
+
+    fn sample_state(session_id: &str) -> SessionState {
+        let mut agents = BTreeMap::new();
+        agents.insert(
+            "codex-worker".into(),
+            AgentRegistration {
+                agent_id: "codex-worker".into(),
+                name: "Codex Worker".into(),
+                runtime: "codex".into(),
+                role: SessionRole::Worker,
+                capabilities: vec!["general".into()],
+                joined_at: "2026-03-28T14:00:00Z".into(),
+                updated_at: "2026-03-28T14:05:00Z".into(),
+                status: AgentStatus::Active,
+                agent_session_id: Some("codex-session-1".into()),
+                last_activity_at: Some("2026-03-28T14:05:00Z".into()),
+                current_task_id: None,
+                runtime_capabilities: crate::agents::runtime::RuntimeCapabilities::default(),
+            },
+        );
+
+        let mut state = SessionState {
+            schema_version: CURRENT_VERSION,
+            state_version: 0,
+            session_id: session_id.into(),
+            context: "test goal".into(),
+            status: SessionStatus::Active,
+            created_at: "2026-03-28T14:00:00Z".into(),
+            updated_at: "2026-03-28T14:05:00Z".into(),
+            agents,
+            tasks: BTreeMap::new(),
+            leader_id: Some("codex-worker".into()),
+            archived_at: None,
+            last_activity_at: Some("2026-03-28T14:05:00Z".into()),
+            observe_id: Some("observe-sess-merge".into()),
+            metrics: SessionMetrics::default(),
+        };
+        state.metrics = SessionMetrics::recalculate(&state);
+        state
+    }
+
+    fn sample_signal(signal_id: &str, message: &str) -> Signal {
+        Signal {
+            signal_id: signal_id.into(),
+            version: 1,
+            created_at: "2026-03-28T14:03:00Z".into(),
+            expires_at: "2026-03-28T14:13:00Z".into(),
+            source_agent: "leader-claude".into(),
+            command: "inject_context".into(),
+            priority: SignalPriority::High,
+            payload: SignalPayload {
+                message: message.into(),
+                action_hint: Some("refresh the cockpit".into()),
+                related_files: vec!["src/daemon/snapshot.rs".into()],
+                metadata: serde_json::json!({"source": "test"}),
+            },
+            delivery: DeliveryConfig {
+                max_retries: 3,
+                retry_count: 0,
+                idempotency_key: None,
+            },
+        }
+    }
+
+    fn observer_state(session_id: &str) -> ObserverState {
+        ObserverState {
+            schema_version: 1,
+            state_version: 0,
+            session_id: session_id.into(),
+            project_hint: Some("project-alpha".into()),
+            cursor: 42,
+            last_scan_time: "2026-03-28T14:04:00Z".into(),
+            open_issues: vec![OpenIssue {
+                issue_id: "issue-1".into(),
+                code: IssueCode::AgentStalledProgress,
+                fingerprint: "fingerprint".into(),
+                first_seen_line: 8,
+                last_seen_line: 10,
+                occurrence_count: 2,
+                severity: IssueSeverity::Critical,
+                category: IssueCategory::AgentCoordination,
+                summary: "worker stalled".into(),
+                fix_safety: FixSafety::TriageRequired,
+            }],
+            resolved_issue_ids: vec!["issue-0".into()],
+            issue_attempts: Vec::new(),
+            muted_codes: vec![IssueCode::AgentRepeatedError],
+            cycle_history: vec![CycleRecord {
+                timestamp: "2026-03-28T14:04:00Z".into(),
+                from_line: 0,
+                to_line: 42,
+                new_issues: 1,
+                resolved: 0,
+            }],
+            baseline_issue_ids: Vec::new(),
+            active_workers: vec![ActiveWorker {
+                issue_id: "issue-1".into(),
+                target_file: "src/daemon/snapshot.rs".into(),
+                started_at: "2026-03-28T14:04:30Z".into(),
+                agent_id: Some("codex-worker".into()),
+            }],
+            agent_sessions: Vec::new(),
+        }
+    }
+
+    #[test]
+    fn session_detail_includes_signals_observer_and_cache() {
+        let tmp = tempdir().expect("tempdir");
+        temp_env::with_vars(
+            [(
+                "XDG_DATA_HOME",
+                Some(tmp.path().to_str().expect("utf8 path")),
+            )],
+            || {
+                let context_root = tmp.path().join("harness/projects/project-alpha");
+                let session_id = "sess-merge";
+                let state_path = context_root
+                    .join("orchestration")
+                    .join("sessions")
+                    .join(session_id)
+                    .join("state.json");
+                write_json(&state_path, &sample_state(session_id));
+
+                let signal_dir = context_root.join("agents/signals/codex/sess-merge");
+                write_signal_file(&signal_dir, &sample_signal("sig-pending", "keep going"))
+                    .expect("write pending signal");
+
+                let signal = sample_signal("sig-acked", "merged timeline");
+                write_signal_file(&signal_dir, &signal).expect("write acked signal");
+                acknowledge_signal(
+                    &signal_dir,
+                    &SignalAck {
+                        signal_id: "sig-acked".into(),
+                        acknowledged_at: "2026-03-28T14:03:10Z".into(),
+                        result: AckResult::Accepted,
+                        agent: "codex-worker".into(),
+                        session_id: session_id.into(),
+                        details: Some("loaded".into()),
+                    },
+                )
+                .expect("ack signal");
+
+                let observer_path =
+                    context_root.join("agents/observe/observe-sess-merge/snapshot.json");
+                write_json(&observer_path, &observer_state(session_id));
+
+                let detail = session_detail(session_id).expect("detail");
+                assert_eq!(detail.session.session_id, session_id);
+                assert_eq!(detail.agents.len(), 1);
+                assert_eq!(detail.signals.len(), 2);
+                assert_eq!(
+                    detail
+                        .signals
+                        .iter()
+                        .filter(|record| record.status == SessionSignalStatus::Acknowledged)
+                        .count(),
+                    1
+                );
+                assert_eq!(
+                    detail.observer.as_ref().expect("observer").open_issue_count,
+                    1
+                );
+                assert_eq!(
+                    detail
+                        .observer
+                        .as_ref()
+                        .expect("observer")
+                        .active_worker_count,
+                    1
+                );
+
+                let cache_path = state::session_cache_path("project-alpha", session_id);
+                assert!(cache_path.is_file());
+            },
+        );
+    }
+}

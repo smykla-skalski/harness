@@ -165,3 +165,146 @@ fn transition_summary(transition: &SessionTransition) -> (&'static str, Option<S
         ),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::BTreeMap;
+
+    use fs_err as fs;
+    use tempfile::tempdir;
+
+    use crate::session::types::{
+        CURRENT_VERSION, SessionMetrics, SessionState, SessionStatus, TaskSeverity, TaskStatus,
+        WorkItem,
+    };
+
+    fn write_json(path: &std::path::Path, value: &impl serde::Serialize) {
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent).expect("create parent");
+        }
+        fs::write(
+            path,
+            serde_json::to_string_pretty(value).expect("serialize"),
+        )
+        .expect("write");
+    }
+
+    fn write_json_line(path: &std::path::Path, value: &impl serde::Serialize) {
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent).expect("create parent");
+        }
+        fs::write(
+            path,
+            format!("{}\n", serde_json::to_string(value).expect("serialize")),
+        )
+        .expect("write");
+    }
+
+    fn sample_state(session_id: &str) -> SessionState {
+        let mut tasks = BTreeMap::new();
+        tasks.insert(
+            "task-1".into(),
+            WorkItem {
+                task_id: "task-1".into(),
+                title: "finish cockpit".into(),
+                context: Some("merge timeline entries".into()),
+                severity: TaskSeverity::High,
+                status: TaskStatus::InProgress,
+                assigned_to: Some("worker-codex".into()),
+                created_at: "2026-03-28T14:00:00Z".into(),
+                updated_at: "2026-03-28T14:05:00Z".into(),
+                created_by: Some("leader-claude".into()),
+                notes: Vec::new(),
+                suggested_fix: None,
+                source: crate::session::types::TaskSource::Manual,
+                blocked_reason: None,
+                completed_at: None,
+                checkpoint_summary: None,
+            },
+        );
+
+        SessionState {
+            schema_version: CURRENT_VERSION,
+            state_version: 0,
+            session_id: session_id.into(),
+            context: "test goal".into(),
+            status: SessionStatus::Active,
+            created_at: "2026-03-28T14:00:00Z".into(),
+            updated_at: "2026-03-28T14:05:00Z".into(),
+            agents: BTreeMap::new(),
+            tasks,
+            leader_id: Some("leader-claude".into()),
+            archived_at: None,
+            last_activity_at: Some("2026-03-28T14:05:00Z".into()),
+            observe_id: None,
+            metrics: SessionMetrics::default(),
+        }
+    }
+
+    #[test]
+    fn session_timeline_merges_log_and_checkpoint_entries() {
+        let tmp = tempdir().expect("tempdir");
+        temp_env::with_vars(
+            [(
+                "XDG_DATA_HOME",
+                Some(tmp.path().to_str().expect("utf8 path")),
+            )],
+            || {
+                let context_root = tmp.path().join("harness/projects/project-alpha");
+                let session_id = "sess-merge";
+                let state_path = context_root
+                    .join("orchestration")
+                    .join("sessions")
+                    .join(session_id)
+                    .join("state.json");
+                write_json(&state_path, &sample_state(session_id));
+
+                let log_entry = crate::session::types::SessionLogEntry {
+                    sequence: 1,
+                    recorded_at: "2026-03-28T14:01:00Z".into(),
+                    session_id: session_id.into(),
+                    transition: SessionTransition::TaskCreated {
+                        task_id: "task-1".into(),
+                        title: "finish cockpit".into(),
+                        severity: TaskSeverity::High,
+                    },
+                    actor_id: Some("leader-claude".into()),
+                    reason: None,
+                };
+                let log_path = context_root
+                    .join("orchestration")
+                    .join("sessions")
+                    .join(session_id)
+                    .join("log.jsonl");
+                write_json_line(&log_path, &log_entry);
+
+                let checkpoint = TaskCheckpoint {
+                    checkpoint_id: "task-1-cp-1".into(),
+                    task_id: "task-1".into(),
+                    recorded_at: "2026-03-28T14:06:00Z".into(),
+                    actor_id: Some("worker-codex".into()),
+                    summary: "timeline rows are live-backed".into(),
+                    progress: 70,
+                };
+                let checkpoint_path = context_root
+                    .join("orchestration")
+                    .join("sessions")
+                    .join(session_id)
+                    .join("tasks")
+                    .join("task-1")
+                    .join("checkpoints.jsonl");
+                write_json_line(&checkpoint_path, &checkpoint);
+
+                let entries = session_timeline(session_id).expect("timeline");
+                assert_eq!(entries.len(), 2);
+                assert_eq!(entries[0].kind, "task_checkpoint");
+                assert_eq!(
+                    entries[0].summary,
+                    "Checkpoint 70%: timeline rows are live-backed"
+                );
+                assert_eq!(entries[1].kind, "task_created");
+            },
+        );
+    }
+}
