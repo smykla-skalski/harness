@@ -1,6 +1,7 @@
 use std::env;
 
 use clap::{Args, Subcommand};
+use serde::Serialize;
 
 use crate::app::command_context::{AppContext, Execute};
 use crate::errors::{CliError, CliErrorKind};
@@ -30,15 +31,20 @@ pub enum SessionCommand {
         #[command(subcommand)]
         command: SessionTaskCommand,
     },
+    /// Signal management.
+    Signal {
+        #[command(subcommand)]
+        command: SessionSignalCommand,
+    },
     /// Observe all agents in a session.
     Observe(SessionObserveArgs),
     /// Show current session status.
     Status(SessionStatusArgs),
-    /// List all active sessions.
+    /// List sessions.
     List(SessionListArgs),
 }
 
-/// Session task sub-commands.
+/// Session task subcommands.
 #[derive(Debug, Clone, Subcommand)]
 #[non_exhaustive]
 pub enum SessionTaskCommand {
@@ -50,6 +56,18 @@ pub enum SessionTaskCommand {
     List(TaskListArgs),
     /// Update a work item's status.
     Update(TaskUpdateArgs),
+    /// Record an append-only task checkpoint.
+    Checkpoint(TaskCheckpointArgs),
+}
+
+/// Session signal subcommands.
+#[derive(Debug, Clone, Subcommand)]
+#[non_exhaustive]
+pub enum SessionSignalCommand {
+    /// Send a file-backed signal to an agent runtime.
+    Send(SignalSendArgs),
+    /// List known signals for a session.
+    List(SignalListArgs),
 }
 
 impl Execute for SessionCommand {
@@ -62,6 +80,7 @@ impl Execute for SessionCommand {
             Self::Remove(args) => args.execute(context),
             Self::TransferLeader(args) => args.execute(context),
             Self::Task { command } => command.execute(context),
+            Self::Signal { command } => command.execute(context),
             Self::Observe(args) => args.execute(context),
             Self::Status(args) => args.execute(context),
             Self::List(args) => args.execute(context),
@@ -76,6 +95,16 @@ impl Execute for SessionTaskCommand {
             Self::Assign(args) => args.execute(context),
             Self::List(args) => args.execute(context),
             Self::Update(args) => args.execute(context),
+            Self::Checkpoint(args) => args.execute(context),
+        }
+    }
+}
+
+impl Execute for SessionSignalCommand {
+    fn execute(&self, context: &AppContext) -> Result<i32, CliError> {
+        match self {
+            Self::Send(args) => args.execute(context),
+            Self::List(args) => args.execute(context),
         }
     }
 }
@@ -90,6 +119,13 @@ fn resolve_project_dir(hint: Option<&str>) -> String {
         },
         ToString::to_string,
     )
+}
+
+fn print_json<T: Serialize>(value: &T) -> Result<(), CliError> {
+    let json = serde_json::to_string_pretty(value)
+        .map_err(|error| CliErrorKind::workflow_serialize(error.to_string()))?;
+    println!("{json}");
+    Ok(())
 }
 
 #[derive(Debug, Clone, Args)]
@@ -111,16 +147,13 @@ pub struct SessionStartArgs {
 impl Execute for SessionStartArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
         let project = resolve_project_dir(self.project_dir.as_deref());
-        let runtime_str = self.runtime.map(agent_to_str);
         let state = service::start_session(
             &self.context,
             project.as_ref(),
-            runtime_str,
+            self.runtime.map(agent_to_str),
             self.session_id.as_deref(),
         )?;
-        let json = serde_json::to_string_pretty(&state)
-            .map_err(|error| CliErrorKind::workflow_serialize(error.to_string()))?;
-        println!("{json}");
+        print_json(&state)?;
         Ok(0)
     }
 }
@@ -152,7 +185,14 @@ impl Execute for SessionJoinArgs {
         let capabilities: Vec<String> = self
             .capabilities
             .as_deref()
-            .map(|value| value.split(',').map(|s| s.trim().to_string()).collect())
+            .map(|value| {
+                value
+                    .split(',')
+                    .map(str::trim)
+                    .filter(|item| !item.is_empty())
+                    .map(ToString::to_string)
+                    .collect::<Vec<_>>()
+            })
             .unwrap_or_default();
         let state = service::join_session(
             &self.session_id,
@@ -162,9 +202,7 @@ impl Execute for SessionJoinArgs {
             self.name.as_deref(),
             project.as_ref(),
         )?;
-        let json = serde_json::to_string_pretty(&state)
-            .map_err(|error| CliErrorKind::workflow_serialize(error.to_string()))?;
-        println!("{json}");
+        print_json(&state)?;
         Ok(0)
     }
 }
@@ -311,9 +349,7 @@ impl Execute for TaskCreateArgs {
             &self.actor,
             project.as_ref(),
         )?;
-        let json = serde_json::to_string_pretty(&item)
-            .map_err(|error| CliErrorKind::workflow_serialize(error.to_string()))?;
-        println!("{json}");
+        print_json(&item)?;
         Ok(0)
     }
 }
@@ -368,17 +404,18 @@ impl Execute for TaskListArgs {
         let project = resolve_project_dir(self.project_dir.as_deref());
         let items = service::list_tasks(&self.session_id, self.status, project.as_ref())?;
         if self.json {
-            let json = serde_json::to_string_pretty(&items)
-                .map_err(|error| CliErrorKind::workflow_serialize(error.to_string()))?;
-            println!("{json}");
+            print_json(&items)?;
         } else {
             for item in &items {
                 println!(
-                    "[{:?}] {} - {} (assigned: {})",
+                    "[{:?}] {} - {} (assigned: {}, progress: {})",
                     item.severity,
                     item.task_id,
                     item.title,
                     item.assigned_to.as_deref().unwrap_or("unassigned"),
+                    item.checkpoint_summary
+                        .as_ref()
+                        .map_or_else(|| "-".to_string(), |summary| format!("{}%", summary.progress)),
                 );
             }
         }
@@ -417,6 +454,120 @@ impl Execute for TaskUpdateArgs {
             &self.actor,
             project.as_ref(),
         )?;
+        Ok(0)
+    }
+}
+
+#[derive(Debug, Clone, Args)]
+pub struct TaskCheckpointArgs {
+    /// Session ID.
+    pub session_id: String,
+    /// Task ID.
+    pub task_id: String,
+    /// Agent ID of the caller.
+    #[arg(long)]
+    pub actor: String,
+    /// Human-readable checkpoint summary.
+    #[arg(long)]
+    pub summary: String,
+    /// Progress percentage.
+    #[arg(long, value_parser = clap::value_parser!(u8).range(0..=100))]
+    pub progress: u8,
+    /// Project directory.
+    #[arg(long, env = "CLAUDE_PROJECT_DIR")]
+    pub project_dir: Option<String>,
+}
+
+impl Execute for TaskCheckpointArgs {
+    fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
+        let project = resolve_project_dir(self.project_dir.as_deref());
+        let checkpoint = service::record_task_checkpoint(
+            &self.session_id,
+            &self.task_id,
+            &self.actor,
+            &self.summary,
+            self.progress,
+            project.as_ref(),
+        )?;
+        print_json(&checkpoint)?;
+        Ok(0)
+    }
+}
+
+#[derive(Debug, Clone, Args)]
+pub struct SignalSendArgs {
+    /// Session ID.
+    pub session_id: String,
+    /// Agent ID receiving the signal.
+    pub agent_id: String,
+    /// Runtime command name for the signal.
+    #[arg(long)]
+    pub command: String,
+    /// Human-readable message payload.
+    #[arg(long)]
+    pub message: String,
+    /// Optional action hint for the target agent.
+    #[arg(long)]
+    pub action_hint: Option<String>,
+    /// Agent ID of the caller.
+    #[arg(long)]
+    pub actor: String,
+    /// Project directory.
+    #[arg(long, env = "CLAUDE_PROJECT_DIR")]
+    pub project_dir: Option<String>,
+}
+
+impl Execute for SignalSendArgs {
+    fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
+        let project = resolve_project_dir(self.project_dir.as_deref());
+        let signal = service::send_signal(
+            &self.session_id,
+            &self.agent_id,
+            &self.command,
+            &self.message,
+            self.action_hint.as_deref(),
+            &self.actor,
+            project.as_ref(),
+        )?;
+        print_json(&signal)?;
+        Ok(0)
+    }
+}
+
+#[derive(Debug, Clone, Args)]
+pub struct SignalListArgs {
+    /// Session ID.
+    pub session_id: String,
+    /// Filter to a single agent.
+    #[arg(long)]
+    pub agent: Option<String>,
+    /// Output as JSON.
+    #[arg(long)]
+    pub json: bool,
+    /// Project directory.
+    #[arg(long, env = "CLAUDE_PROJECT_DIR")]
+    pub project_dir: Option<String>,
+}
+
+impl Execute for SignalListArgs {
+    fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
+        let project = resolve_project_dir(self.project_dir.as_deref());
+        let signals =
+            service::list_signals(&self.session_id, self.agent.as_deref(), project.as_ref())?;
+        if self.json {
+            print_json(&signals)?;
+        } else {
+            for signal in &signals {
+                println!(
+                    "[{:?}] {} -> {} ({}) {}",
+                    signal.status,
+                    signal.signal.source_agent,
+                    signal.agent_id,
+                    signal.runtime,
+                    signal.signal.command,
+                );
+            }
+        }
         Ok(0)
     }
 }
@@ -477,15 +628,30 @@ impl Execute for SessionStatusArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
         let project = resolve_project_dir(self.project_dir.as_deref());
         let state = service::session_status(&self.session_id, project.as_ref())?;
-        let json = serde_json::to_string_pretty(&state)
-            .map_err(|error| CliErrorKind::workflow_serialize(error.to_string()))?;
-        println!("{json}");
+        if self.json {
+            print_json(&state)?;
+        } else {
+            println!(
+                "{} [{:?}] - {} (agents: {}, active: {}, tasks: {} open / {} in flight / {} done)",
+                state.session_id,
+                state.status,
+                state.context,
+                state.metrics.agent_count,
+                state.metrics.active_agent_count,
+                state.metrics.open_task_count,
+                state.metrics.in_progress_task_count + state.metrics.blocked_task_count,
+                state.metrics.completed_task_count,
+            );
+        }
         Ok(0)
     }
 }
 
 #[derive(Debug, Clone, Args)]
 pub struct SessionListArgs {
+    /// Include archived sessions.
+    #[arg(long)]
+    pub all: bool,
     /// Output as JSON.
     #[arg(long)]
     pub json: bool,
@@ -497,20 +663,21 @@ pub struct SessionListArgs {
 impl Execute for SessionListArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
         let project = resolve_project_dir(self.project_dir.as_deref());
-        let sessions = service::list_sessions(project.as_ref())?;
+        let sessions = service::list_sessions(project.as_ref(), self.all)?;
         if self.json {
-            let json = serde_json::to_string_pretty(&sessions)
-                .map_err(|error| CliErrorKind::workflow_serialize(error.to_string()))?;
-            println!("{json}");
+            print_json(&sessions)?;
         } else {
             for session in &sessions {
                 println!(
-                    "{} [{:?}] - {} ({} agents, {} tasks)",
+                    "{} [{:?}] - {} (agents: {}, active: {}, tasks: {} open / {} in flight / {} done)",
                     session.session_id,
                     session.status,
                     session.context,
-                    session.agents.len(),
-                    session.tasks.len(),
+                    session.metrics.agent_count,
+                    session.metrics.active_agent_count,
+                    session.metrics.open_task_count,
+                    session.metrics.in_progress_task_count + session.metrics.blocked_task_count,
+                    session.metrics.completed_task_count,
                 );
             }
         }

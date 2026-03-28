@@ -13,6 +13,7 @@ pub enum SessionAction {
     CreateTask,
     AssignTask,
     UpdateTaskStatus,
+    SendSignal,
     ObserveSession,
     ViewStatus,
 }
@@ -27,6 +28,7 @@ const ALL_ACTIONS: &[SessionAction] = &[
     SessionAction::CreateTask,
     SessionAction::AssignTask,
     SessionAction::UpdateTaskStatus,
+    SessionAction::SendSignal,
     SessionAction::ObserveSession,
     SessionAction::ViewStatus,
 ];
@@ -35,7 +37,8 @@ const ALL_ACTIONS: &[SessionAction] = &[
 #[must_use]
 pub fn permissions_for(role: SessionRole) -> HashSet<SessionAction> {
     use SessionAction::{
-        AssignTask, CreateTask, ObserveSession, TransferLeader, UpdateTaskStatus, ViewStatus,
+        AssignTask, CreateTask, ObserveSession, SendSignal, TransferLeader, UpdateTaskStatus,
+        ViewStatus,
     };
 
     let actions: &[SessionAction] = match role {
@@ -46,6 +49,7 @@ pub fn permissions_for(role: SessionRole) -> HashSet<SessionAction> {
             CreateTask,
             AssignTask,
             UpdateTaskStatus,
+            SendSignal,
             ObserveSession,
             ViewStatus,
         ],
@@ -53,6 +57,7 @@ pub fn permissions_for(role: SessionRole) -> HashSet<SessionAction> {
             CreateTask,
             UpdateTaskStatus,
             AssignTask,
+            SendSignal,
             ObserveSession,
             ViewStatus,
         ],
@@ -120,6 +125,22 @@ mod tests {
         assert!(is_permitted(
             SessionRole::Improver,
             SessionAction::AssignTask
+        ));
+    }
+
+    #[test]
+    fn reviewer_can_send_signals() {
+        assert!(is_permitted(
+            SessionRole::Reviewer,
+            SessionAction::SendSignal
+        ));
+    }
+
+    #[test]
+    fn worker_cannot_send_signals() {
+        assert!(!is_permitted(
+            SessionRole::Worker,
+            SessionAction::SendSignal
         ));
     }
 

@@ -6,14 +6,19 @@ use std::path::{Path, PathBuf};
 
 use fs_err as fs;
 use fs2::FileExt;
+use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
+use serde_json::{Value, json};
 
 use crate::errors::{CliError, CliErrorKind};
 use crate::infra::io::{read_json_typed, validate_safe_segment, write_json_pretty};
 use crate::infra::persistence::versioned_json::VersionedJsonRepository;
 use crate::workspace::{project_context_dir, utc_now};
 
-use super::types::{CURRENT_VERSION, SessionLogEntry, SessionState, SessionTransition};
+use super::types::{
+    CURRENT_VERSION, SessionLogEntry, SessionMetrics, SessionState, SessionTransition,
+    TaskCheckpoint,
+};
 
 fn orchestration_root(project_dir: &Path) -> PathBuf {
     project_context_dir(project_dir).join("orchestration")
@@ -38,6 +43,22 @@ fn state_path(project_dir: &Path, session_id: &str) -> Result<PathBuf, CliError>
 
 fn log_path(project_dir: &Path, session_id: &str) -> Result<PathBuf, CliError> {
     Ok(session_dir(project_dir, session_id)?.join("log.jsonl"))
+}
+
+fn tasks_root(project_dir: &Path, session_id: &str) -> Result<PathBuf, CliError> {
+    Ok(session_dir(project_dir, session_id)?.join("tasks"))
+}
+
+fn task_dir(project_dir: &Path, session_id: &str, task_id: &str) -> Result<PathBuf, CliError> {
+    Ok(tasks_root(project_dir, session_id)?.join(task_id))
+}
+
+fn checkpoints_path(
+    project_dir: &Path,
+    session_id: &str,
+    task_id: &str,
+) -> Result<PathBuf, CliError> {
+    Ok(task_dir(project_dir, session_id, task_id)?.join("checkpoints.jsonl"))
 }
 
 fn active_registry_path(project_dir: &Path) -> PathBuf {
@@ -87,10 +108,10 @@ pub(crate) fn state_repository(
     project_dir: &Path,
     session_id: &str,
 ) -> Result<VersionedJsonRepository<SessionState>, CliError> {
-    Ok(VersionedJsonRepository::new(
-        state_path(project_dir, session_id)?,
-        CURRENT_VERSION,
-    ))
+    Ok(
+        VersionedJsonRepository::new(state_path(project_dir, session_id)?, CURRENT_VERSION)
+            .with_migrations(vec![Box::new(migrate_v1_to_v2)]),
+    )
 }
 
 /// Load session state, returning `None` if the state file does not exist.
@@ -187,6 +208,78 @@ pub(crate) fn append_log_entry(
     })
 }
 
+/// Load the append-only session audit log.
+///
+/// # Errors
+/// Returns `CliError` on parse or I/O failure.
+#[allow(dead_code)]
+pub(crate) fn load_log_entries(
+    project_dir: &Path,
+    session_id: &str,
+) -> Result<Vec<SessionLogEntry>, CliError> {
+    read_json_lines(&log_path(project_dir, session_id)?, "session log")
+}
+
+/// Append a checkpoint entry for a task.
+///
+/// # Errors
+/// Returns `CliError` on I/O or serialization failures.
+pub(crate) fn append_task_checkpoint(
+    project_dir: &Path,
+    session_id: &str,
+    task_id: &str,
+    checkpoint: &TaskCheckpoint,
+) -> Result<(), CliError> {
+    with_lock(project_dir, &format!("checkpoint-{session_id}-{task_id}"), || {
+        let path = checkpoints_path(project_dir, session_id, task_id)?;
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent).map_err(|error| io_err(&error))?;
+        }
+        append_json_line(&path, checkpoint)
+    })
+}
+
+/// Load checkpoints for a single task.
+///
+/// # Errors
+/// Returns `CliError` on parse or I/O failure.
+#[allow(dead_code)]
+pub(crate) fn load_task_checkpoints(
+    project_dir: &Path,
+    session_id: &str,
+    task_id: &str,
+) -> Result<Vec<TaskCheckpoint>, CliError> {
+    read_json_lines(
+        &checkpoints_path(project_dir, session_id, task_id)?,
+        "task checkpoints",
+    )
+}
+
+/// List all known session IDs in a project, active or archived.
+///
+/// # Errors
+/// Returns `CliError` on I/O failures.
+pub(crate) fn list_known_session_ids(project_dir: &Path) -> Result<Vec<String>, CliError> {
+    let root = sessions_root(project_dir);
+    if !root.is_dir() {
+        return Ok(Vec::new());
+    }
+
+    let mut session_ids: Vec<String> = fs::read_dir(root)
+        .map_err(|error| io_err(&error))?
+        .filter_map(|entry| entry.ok())
+        .filter_map(|entry| {
+            entry
+                .file_type()
+                .ok()
+                .filter(|file_type| file_type.is_dir())
+                .and_then(|_| entry.file_name().into_string().ok())
+        })
+        .collect();
+    session_ids.sort_unstable();
+    Ok(session_ids)
+}
+
 fn next_log_sequence(path: &Path) -> u64 {
     let Ok(content) = fs::read_to_string(path) else {
         return 1;
@@ -208,6 +301,98 @@ fn append_json_line<T: Serialize>(path: &Path, value: &T) -> Result<(), CliError
         .map_err(|error| io_err(&error))?;
     writeln!(file, "{line}").map_err(|error| io_err(&error))?;
     Ok(())
+}
+
+#[allow(dead_code)]
+fn read_json_lines<T>(path: &Path, label: &str) -> Result<Vec<T>, CliError>
+where
+    T: DeserializeOwned,
+{
+    if !path.is_file() {
+        return Ok(Vec::new());
+    }
+
+    fs::read_to_string(path)
+        .map_err(|error| io_err(&error))?
+        .lines()
+        .filter(|line| !line.trim().is_empty())
+        .map(|line| {
+            serde_json::from_str(line)
+                .map_err(|error| CliErrorKind::workflow_parse(format!("{label}: {error}")).into())
+        })
+        .collect()
+}
+
+fn migrate_v1_to_v2(mut value: Value) -> Result<Value, CliError> {
+    let Some(object) = value.as_object_mut() else {
+        return Err(CliErrorKind::workflow_version("session state is not a JSON object").into());
+    };
+
+    object.insert("schema_version".to_string(), json!(CURRENT_VERSION));
+    object
+        .entry("archived_at".to_string())
+        .or_insert(Value::Null);
+    object
+        .entry("last_activity_at".to_string())
+        .or_insert(Value::Null);
+    object.entry("observe_id".to_string()).or_insert(Value::Null);
+    object
+        .entry("metrics".to_string())
+        .or_insert(serde_json::to_value(SessionMetrics::default()).map_err(|error| {
+            CliErrorKind::workflow_serialize(format!("session metrics migration: {error}"))
+        })?);
+
+    if let Some(agents) = object.get_mut("agents").and_then(Value::as_object_mut) {
+        for agent in agents.values_mut() {
+            if let Some(agent_object) = agent.as_object_mut() {
+                let runtime_name = agent_object
+                    .get("runtime")
+                    .and_then(Value::as_str)
+                    .unwrap_or("unknown")
+                    .to_string();
+                agent_object
+                    .entry("last_activity_at".to_string())
+                    .or_insert(Value::Null);
+                agent_object
+                    .entry("current_task_id".to_string())
+                    .or_insert(Value::Null);
+                agent_object.entry("runtime_capabilities".to_string()).or_insert(
+                    json!({
+                        "runtime": runtime_name,
+                        "supports_native_transcript": false,
+                        "supports_signal_delivery": false,
+                        "supports_context_injection": false,
+                        "typical_signal_latency_seconds": 0,
+                        "hook_points": [],
+                    }),
+                );
+            }
+        }
+    }
+
+    if let Some(tasks) = object.get_mut("tasks").and_then(Value::as_object_mut) {
+        for task in tasks.values_mut() {
+            if let Some(task_object) = task.as_object_mut() {
+                task_object
+                    .entry("suggested_fix".to_string())
+                    .or_insert(Value::Null);
+                task_object
+                    .entry("source".to_string())
+                    .or_insert(json!("manual"));
+                task_object
+                    .entry("blocked_reason".to_string())
+                    .or_insert(Value::Null);
+                task_object
+                    .entry("completed_at".to_string())
+                    .or_insert(Value::Null);
+                task_object
+                    .entry("checkpoint_summary".to_string())
+                    .or_insert(Value::Null);
+            }
+        }
+    }
+
+    Ok(value)
 }
 
 /// Active session registry: maps session IDs to creation timestamps.
@@ -257,43 +442,90 @@ fn load_active_registry(path: &Path) -> ActiveRegistry {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::session::types::{SessionState, SessionStatus, SessionTransition};
+    use crate::agents::runtime::RuntimeCapabilities;
+    use crate::session::types::{AgentStatus, SessionRole, SessionStatus, TaskSource, WorkItem};
+
+    fn sample_state(session_id: &str) -> SessionState {
+        SessionState {
+            schema_version: CURRENT_VERSION,
+            state_version: 0,
+            session_id: session_id.to_string(),
+            context: "test".into(),
+            status: SessionStatus::Active,
+            created_at: "2026-01-01T00:00:00Z".into(),
+            updated_at: "2026-01-01T00:00:00Z".into(),
+            agents: BTreeMap::from([(
+                "claude-leader".into(),
+                super::super::types::AgentRegistration {
+                    agent_id: "claude-leader".into(),
+                    name: "claude leader".into(),
+                    runtime: "claude".into(),
+                    role: SessionRole::Leader,
+                    capabilities: Vec::new(),
+                    joined_at: "2026-01-01T00:00:00Z".into(),
+                    updated_at: "2026-01-01T00:00:00Z".into(),
+                    status: AgentStatus::Active,
+                    agent_session_id: None,
+                    last_activity_at: Some("2026-01-01T00:00:00Z".into()),
+                    current_task_id: None,
+                    runtime_capabilities: RuntimeCapabilities::default(),
+                },
+            )]),
+            tasks: BTreeMap::from([(
+                "task-1".into(),
+                WorkItem {
+                    task_id: "task-1".into(),
+                    title: "task".into(),
+                    context: None,
+                    severity: super::super::types::TaskSeverity::Medium,
+                    status: super::super::types::TaskStatus::Open,
+                    assigned_to: None,
+                    created_at: "2026-01-01T00:00:00Z".into(),
+                    updated_at: "2026-01-01T00:00:00Z".into(),
+                    created_by: None,
+                    notes: Vec::new(),
+                    suggested_fix: None,
+                    source: TaskSource::Manual,
+                    blocked_reason: None,
+                    completed_at: None,
+                    checkpoint_summary: None,
+                },
+            )]),
+            leader_id: Some("claude-leader".into()),
+            archived_at: None,
+            last_activity_at: Some("2026-01-01T00:00:00Z".into()),
+            observe_id: Some(format!("observe-{session_id}")),
+            metrics: SessionMetrics::default(),
+        }
+    }
 
     #[test]
     fn state_round_trip_via_repository() {
-        let tmp = tempfile::tempdir().unwrap();
+        let tmp = tempfile::tempdir().expect("tempdir");
         temp_env::with_vars(
             [
-                ("XDG_DATA_HOME", Some(tmp.path().to_str().unwrap())),
+                ("XDG_DATA_HOME", Some(tmp.path().to_str().expect("utf8 path"))),
                 ("CLAUDE_SESSION_ID", Some("test-storage")),
             ],
             || {
                 let project = tmp.path().join("project");
-                let state = SessionState {
-                    schema_version: CURRENT_VERSION,
-                    state_version: 0,
-                    session_id: "sess-1".into(),
-                    context: "test".into(),
-                    status: SessionStatus::Active,
-                    created_at: "2026-01-01T00:00:00Z".into(),
-                    updated_at: "2026-01-01T00:00:00Z".into(),
-                    agents: Default::default(),
-                    tasks: Default::default(),
-                    leader_id: None,
-                };
-                assert!(create_state(&project, "sess-1", &state).unwrap());
-                let loaded = load_state(&project, "sess-1").unwrap().unwrap();
+                let state = sample_state("sess-1");
+                assert!(create_state(&project, "sess-1", &state).expect("create"));
+                let loaded = load_state(&project, "sess-1")
+                    .expect("load")
+                    .expect("state");
                 assert_eq!(loaded.session_id, "sess-1");
+                assert_eq!(loaded.observe_id.as_deref(), Some("observe-sess-1"));
             },
         );
     }
 
     #[test]
-    fn append_and_count_log_entries() {
-        let tmp = tempfile::tempdir().unwrap();
+    fn append_and_load_log_entries() {
+        let tmp = tempfile::tempdir().expect("tempdir");
         temp_env::with_vars(
             [
-                ("XDG_DATA_HOME", Some(tmp.path().to_str().unwrap())),
+                ("XDG_DATA_HOME", Some(tmp.path().to_str().expect("utf8 path"))),
                 ("CLAUDE_SESSION_ID", Some("test-log")),
             ],
             || {
@@ -307,7 +539,7 @@ mod tests {
                     Some("leader"),
                     None,
                 )
-                .unwrap();
+                .expect("append started");
                 append_log_entry(
                     &project,
                     "sess-1",
@@ -315,41 +547,33 @@ mod tests {
                     Some("leader"),
                     None,
                 )
-                .unwrap();
-                let path = log_path(&project, "sess-1").unwrap();
-                let content = std::fs::read_to_string(&path).unwrap();
-                let lines: Vec<_> = content.lines().filter(|l| !l.trim().is_empty()).collect();
-                assert_eq!(lines.len(), 2);
+                .expect("append ended");
+
+                let entries = load_log_entries(&project, "sess-1").expect("load log");
+                assert_eq!(entries.len(), 2);
+                assert_eq!(entries[1].sequence, 2);
             },
         );
     }
 
     #[test]
     fn create_state_rejects_unsafe_session_id() {
-        let tmp = tempfile::tempdir().unwrap();
+        let tmp = tempfile::tempdir().expect("tempdir");
         temp_env::with_vars(
             [
-                ("XDG_DATA_HOME", Some(tmp.path().to_str().unwrap())),
+                (
+                    "XDG_DATA_HOME",
+                    Some(tmp.path().to_str().expect("utf8 path")),
+                ),
                 ("CLAUDE_SESSION_ID", Some("test-unsafe-session-id")),
             ],
             || {
                 let project = tmp.path().join("project");
                 let escape_dir = tmp.path().join("escape");
                 let unsafe_id = escape_dir.to_string_lossy().into_owned();
-                let state = SessionState {
-                    schema_version: CURRENT_VERSION,
-                    state_version: 0,
-                    session_id: unsafe_id.clone(),
-                    context: "test".into(),
-                    status: SessionStatus::Active,
-                    created_at: "2026-01-01T00:00:00Z".into(),
-                    updated_at: "2026-01-01T00:00:00Z".into(),
-                    agents: Default::default(),
-                    tasks: Default::default(),
-                    leader_id: None,
-                };
+                let state = sample_state(&unsafe_id);
 
-                let error = create_state(&project, &unsafe_id, &state).unwrap_err();
+                let error = create_state(&project, &unsafe_id, &state).expect_err("unsafe id");
 
                 assert_eq!(error.code(), "KSRCLI059");
                 assert!(!escape_dir.join("state.json").exists());
@@ -358,20 +582,48 @@ mod tests {
     }
 
     #[test]
-    fn active_registry_round_trip() {
-        let tmp = tempfile::tempdir().unwrap();
+    fn checkpoint_round_trip_is_append_only() {
+        let tmp = tempfile::tempdir().expect("tempdir");
         temp_env::with_vars(
             [
-                ("XDG_DATA_HOME", Some(tmp.path().to_str().unwrap())),
+                ("XDG_DATA_HOME", Some(tmp.path().to_str().expect("utf8 path"))),
+                ("CLAUDE_SESSION_ID", Some("test-checkpoints")),
+            ],
+            || {
+                let project = tmp.path().join("project");
+                let checkpoint = TaskCheckpoint {
+                    checkpoint_id: "task-1-cp-1".into(),
+                    task_id: "task-1".into(),
+                    recorded_at: "2026-03-28T12:00:00Z".into(),
+                    actor_id: Some("claude-leader".into()),
+                    summary: "watch attached".into(),
+                    progress: 40,
+                };
+                append_task_checkpoint(&project, "sess-1", "task-1", &checkpoint)
+                    .expect("append checkpoint");
+                let checkpoints =
+                    load_task_checkpoints(&project, "sess-1", "task-1").expect("load");
+                assert_eq!(checkpoints.len(), 1);
+                assert_eq!(checkpoints[0].progress, 40);
+            },
+        );
+    }
+
+    #[test]
+    fn active_registry_round_trip() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        temp_env::with_vars(
+            [
+                ("XDG_DATA_HOME", Some(tmp.path().to_str().expect("utf8 path"))),
                 ("CLAUDE_SESSION_ID", Some("test-registry")),
             ],
             || {
                 let project = tmp.path().join("project");
-                register_active(&project, "sess-a").unwrap();
-                register_active(&project, "sess-b").unwrap();
+                register_active(&project, "sess-a").expect("register a");
+                register_active(&project, "sess-b").expect("register b");
                 let registry = load_active_registry_for(&project);
                 assert_eq!(registry.sessions.len(), 2);
-                deregister_active(&project, "sess-a").unwrap();
+                deregister_active(&project, "sess-a").expect("remove a");
                 let registry = load_active_registry_for(&project);
                 assert_eq!(registry.sessions.len(), 1);
                 assert!(registry.sessions.contains_key("sess-b"));

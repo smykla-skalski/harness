@@ -11,7 +11,7 @@ use crate::observe::classifier::classify_line;
 use crate::observe::types::{Issue, IssueSeverity, ScanState};
 
 use super::service;
-use super::types::{SessionState, TaskSeverity};
+use super::types::{SessionState, TaskSeverity, TaskSource};
 
 /// Run a one-shot multi-agent observation scan.
 ///
@@ -132,11 +132,14 @@ fn run_periodic_sweep(
 
         // Work item 1: the issue itself
         let title = format!("[{}] {}", issue.code, issue.summary);
-        let _ = service::create_task(
+        let _ = service::create_task_with_source(
             session_id,
             &title,
             Some(&issue.details),
             severity,
+            issue.fix_hint.as_deref(),
+            TaskSource::Observe,
+            Some(&issue.id),
             actor,
             project_dir,
         );
@@ -152,11 +155,14 @@ fn run_periodic_sweep(
              classification path missed this pattern and add a rule or check.",
             issue.summary, issue.code, issue.line,
         );
-        let _ = service::create_task(
+        let _ = service::create_task_with_source(
             session_id,
             &heuristic_title,
             Some(&heuristic_context),
             TaskSeverity::Low,
+            None,
+            TaskSource::Observe,
+            None,
             actor,
             project_dir,
         );
@@ -320,11 +326,14 @@ fn create_work_items_for_issues(
             IssueSeverity::Medium => TaskSeverity::Medium,
             IssueSeverity::Low => TaskSeverity::Low,
         };
-        service::create_task(
+        let _ = service::create_task_with_source(
             session_id,
             &title,
             Some(&issue.details),
             severity,
+            issue.fix_hint.as_deref(),
+            TaskSource::Observe,
+            Some(&issue.id),
             actor_id,
             project_dir,
         )?;

@@ -9,6 +9,8 @@ pub mod signal;
 
 use std::path::{Path, PathBuf};
 
+use serde::{Deserialize, Serialize};
+
 use crate::errors::CliError;
 use crate::hooks::adapters::HookAgent;
 
@@ -28,6 +30,26 @@ pub struct HookIntegrationPoint {
     /// Typical latency before signal pickup in seconds.
     pub typical_latency_seconds: u64,
     /// Whether this point can inject context into the agent.
+    pub supports_context_injection: bool,
+}
+
+/// Serializable runtime capability metadata exposed to session state and the daemon.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RuntimeCapabilities {
+    pub runtime: String,
+    pub supports_native_transcript: bool,
+    pub supports_signal_delivery: bool,
+    pub supports_context_injection: bool,
+    pub typical_signal_latency_seconds: u64,
+    #[serde(default)]
+    pub hook_points: Vec<HookIntegrationDescriptor>,
+}
+
+/// One user-visible hook interception point for signal pickup.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct HookIntegrationDescriptor {
+    pub name: String,
+    pub typical_latency_seconds: u64,
     pub supports_context_injection: bool,
 }
 
@@ -88,6 +110,41 @@ pub trait AgentRuntime: Send + Sync {
 
     /// Hook integration points available for this runtime.
     fn hook_integration_points(&self) -> &[HookIntegrationPoint];
+
+    /// Whether this runtime can produce a parseable native transcript.
+    fn supports_native_transcript(&self) -> bool {
+        true
+    }
+
+    /// Serializable capability snapshot for UI and daemon clients.
+    fn capabilities(&self) -> RuntimeCapabilities {
+        let hook_points: Vec<HookIntegrationDescriptor> = self
+            .hook_integration_points()
+            .iter()
+            .map(|point| HookIntegrationDescriptor {
+                name: point.name.to_string(),
+                typical_latency_seconds: point.typical_latency_seconds,
+                supports_context_injection: point.supports_context_injection,
+            })
+            .collect();
+        let typical_signal_latency_seconds = hook_points
+            .iter()
+            .map(|point| point.typical_latency_seconds)
+            .min()
+            .unwrap_or(0);
+        let supports_context_injection = hook_points
+            .iter()
+            .any(|point| point.supports_context_injection);
+
+        RuntimeCapabilities {
+            runtime: self.name().to_string(),
+            supports_native_transcript: self.supports_native_transcript(),
+            supports_signal_delivery: true,
+            supports_context_injection,
+            typical_signal_latency_seconds,
+            hook_points,
+        }
+    }
 }
 
 /// Return the runtime adapter for a given agent.
@@ -105,5 +162,18 @@ pub fn runtime_for(agent: HookAgent) -> &'static dyn AgentRuntime {
         HookAgent::Gemini => &GEMINI,
         HookAgent::Copilot => &COPILOT,
         HookAgent::OpenCode => &OPENCODE,
+    }
+}
+
+/// Resolve a runtime adapter from its stored string identifier.
+#[must_use]
+pub fn runtime_for_name(name: &str) -> Option<&'static dyn AgentRuntime> {
+    match name {
+        "claude" => Some(runtime_for(HookAgent::Claude)),
+        "codex" => Some(runtime_for(HookAgent::Codex)),
+        "gemini" => Some(runtime_for(HookAgent::Gemini)),
+        "copilot" => Some(runtime_for(HookAgent::Copilot)),
+        "opencode" => Some(runtime_for(HookAgent::OpenCode)),
+        _ => None,
     }
 }
