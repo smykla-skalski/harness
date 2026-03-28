@@ -32,8 +32,15 @@ pub fn execute_session_observe(
 
 /// Run the continuous multi-agent observation loop.
 ///
-/// Polls each agent's log at the given interval, classifying new lines
-/// and creating work items for detected issues. Runs until interrupted.
+/// Two modes work together:
+/// - **Real-time**: polls each agent's log at `poll_interval_seconds`,
+///   running the classifier on new lines and creating work items.
+/// - **Periodic sweep**: every `SWEEP_CYCLE_COUNT` polls, runs a full
+///   re-scan. If the sweep catches issues the real-time watcher missed,
+///   it creates two work items: one for the issue itself, and one to
+///   improve the heuristic that missed it during real-time detection.
+///
+/// Runs until the session ends or is no longer reachable.
 ///
 /// # Errors
 /// Returns `CliError` if the session is not found or on I/O failures.
@@ -43,8 +50,9 @@ pub fn execute_session_watch(
     poll_interval_seconds: u64,
     json: bool,
 ) -> Result<i32, CliError> {
-    let mut cursors: HashSet<String> = HashSet::new();
+    let mut realtime_seen: HashSet<String> = HashSet::new();
     let mut total_issues = 0_usize;
+    let mut cycle_count = 0_u64;
 
     loop {
         let Ok(state) = service::session_status(session_id, project_dir) else {
@@ -57,31 +65,132 @@ pub fn execute_session_watch(
         let issues = scan_all_agents(&state, session_id, project_dir)?;
         let new_issues: Vec<Issue> = issues
             .into_iter()
-            .filter(|issue| cursors.insert(issue.fingerprint.clone()))
+            .filter(|issue| realtime_seen.insert(issue.fingerprint.clone()))
             .collect();
 
         if !new_issues.is_empty() {
             total_issues += new_issues.len();
             create_work_items_for_issues(&new_issues, session_id, &state, project_dir);
-            if json {
-                for issue in &new_issues {
-                    let line = serde_json::to_string(issue).unwrap_or_default();
-                    println!("{line}");
-                }
-            } else {
-                for issue in &new_issues {
-                    println!(
-                        "[{:?}] {} - {} (line {})",
-                        issue.severity, issue.code, issue.summary, issue.line,
-                    );
-                }
-            }
+            emit_watch_issues(&new_issues, json);
+        }
+
+        cycle_count += 1;
+        if cycle_count % SWEEP_CYCLE_COUNT == 0 {
+            run_periodic_sweep(
+                session_id,
+                project_dir,
+                &state,
+                &realtime_seen,
+                &mut total_issues,
+                json,
+            )?;
         }
 
         thread::sleep(Duration::from_secs(poll_interval_seconds));
     }
 
     Ok(i32::from(total_issues > 0))
+}
+
+/// How many polling cycles between periodic sweeps.
+/// With default 3s poll interval, sweep runs every ~5 minutes.
+const SWEEP_CYCLE_COUNT: u64 = 100;
+
+/// Periodic sweep: re-scans all agents from scratch and compares with
+/// what real-time detection found. Issues caught only by the sweep
+/// get two work items: one for the issue, one to improve the heuristic.
+fn run_periodic_sweep(
+    session_id: &str,
+    project_dir: &Path,
+    state: &SessionState,
+    realtime_seen: &HashSet<String>,
+    total_issues: &mut usize,
+    json: bool,
+) -> Result<(), CliError> {
+    let sweep_issues = scan_all_agents(state, session_id, project_dir)?;
+    let missed: Vec<&Issue> = sweep_issues
+        .iter()
+        .filter(|issue| !realtime_seen.contains(&issue.fingerprint))
+        .collect();
+
+    if missed.is_empty() {
+        return Ok(());
+    }
+
+    let leader_id = state.leader_id.as_deref().unwrap_or("observer");
+    for issue in &missed {
+        *total_issues += 1;
+        // Work item 1: the issue itself
+        let title = format!("[{}] {}", issue.code, issue.summary);
+        let _ = service::create_task(
+            session_id,
+            &title,
+            Some(&issue.details),
+            map_severity(issue.severity),
+            leader_id,
+            project_dir,
+        );
+
+        // Work item 2: improve the heuristic that missed it
+        let heuristic_title = format!(
+            "[heuristic_gap] Real-time missed {} at line {}",
+            issue.code, issue.line,
+        );
+        let heuristic_context = format!(
+            "The periodic sweep caught issue '{}' (code: {}) at line {} that the \
+             real-time watcher did not detect. Investigate why the real-time \
+             classification path missed this pattern and add a rule or check.",
+            issue.summary, issue.code, issue.line,
+        );
+        let _ = service::create_task(
+            session_id,
+            &heuristic_title,
+            Some(&heuristic_context),
+            TaskSeverity::Low,
+            leader_id,
+            project_dir,
+        );
+    }
+
+    if json {
+        for issue in &missed {
+            let line = serde_json::to_string(issue).unwrap_or_default();
+            println!("{line}");
+        }
+    } else {
+        for issue in &missed {
+            println!(
+                "[sweep] [{:?}] {} - {} (line {})",
+                issue.severity, issue.code, issue.summary, issue.line,
+            );
+        }
+    }
+
+    Ok(())
+}
+
+fn emit_watch_issues(issues: &[Issue], json: bool) {
+    if json {
+        for issue in issues {
+            let line = serde_json::to_string(issue).unwrap_or_default();
+            println!("{line}");
+        }
+    } else {
+        for issue in issues {
+            println!(
+                "[{:?}] {} - {} (line {})",
+                issue.severity, issue.code, issue.summary, issue.line,
+            );
+        }
+    }
+}
+
+fn map_severity(severity: IssueSeverity) -> TaskSeverity {
+    match severity {
+        IssueSeverity::Critical => TaskSeverity::Critical,
+        IssueSeverity::Medium => TaskSeverity::Medium,
+        IssueSeverity::Low => TaskSeverity::Low,
+    }
 }
 
 fn scan_all_agents(
@@ -193,16 +302,11 @@ fn create_work_items_for_issues(
         if existing {
             continue;
         }
-        let severity = match issue.severity {
-            IssueSeverity::Critical => TaskSeverity::Critical,
-            IssueSeverity::Medium => TaskSeverity::Medium,
-            IssueSeverity::Low => TaskSeverity::Low,
-        };
         let _ = service::create_task(
             session_id,
             &title,
             Some(&issue.details),
-            severity,
+            map_severity(issue.severity),
             leader_id,
             project_dir,
         );
