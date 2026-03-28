@@ -15,6 +15,12 @@ pub enum WorkflowError {
     ConcurrentModification { detail: Cow<'static, str> },
     #[error("serialization failed: {detail}")]
     WorkflowSerialize { detail: Cow<'static, str> },
+    #[error("session not active: {detail}")]
+    SessionNotActive { detail: Cow<'static, str> },
+    #[error("session permission denied: {detail}")]
+    SessionPermissionDenied { detail: Cow<'static, str> },
+    #[error("session agent conflict: {detail}")]
+    SessionAgentConflict { detail: Cow<'static, str> },
 }
 
 impl WorkflowError {
@@ -27,6 +33,9 @@ impl WorkflowError {
             Self::WorkflowVersion { .. } => "WORKFLOW_VERSION",
             Self::ConcurrentModification { .. } => "WORKFLOW_CONCURRENT",
             Self::WorkflowSerialize { .. } => "WORKFLOW_SERIALIZE",
+            Self::SessionNotActive { .. } => "KSRCLI090",
+            Self::SessionPermissionDenied { .. } => "KSRCLI091",
+            Self::SessionAgentConflict { .. } => "KSRCLI092",
         }
     }
 
@@ -73,6 +82,27 @@ impl WorkflowError {
     #[must_use]
     pub fn workflow_serialize(detail: impl Into<Cow<'static, str>>) -> Self {
         Self::WorkflowSerialize {
+            detail: detail.into(),
+        }
+    }
+
+    #[must_use]
+    pub fn session_not_active(detail: impl Into<Cow<'static, str>>) -> Self {
+        Self::SessionNotActive {
+            detail: detail.into(),
+        }
+    }
+
+    #[must_use]
+    pub fn session_permission_denied(detail: impl Into<Cow<'static, str>>) -> Self {
+        Self::SessionPermissionDenied {
+            detail: detail.into(),
+        }
+    }
+
+    #[must_use]
+    pub fn session_agent_conflict(detail: impl Into<Cow<'static, str>>) -> Self {
+        Self::SessionAgentConflict {
             detail: detail.into(),
         }
     }
