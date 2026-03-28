@@ -139,7 +139,7 @@ public struct DaemonController: DaemonControlling {
     let candidates = [
       environment.homeDirectory.appendingPathComponent(".local/bin/harness"),
       URL(fileURLWithPath: "/opt/homebrew/bin/harness"),
-      URL(fileURLWithPath: "/usr/local/bin/harness")
+      URL(fileURLWithPath: "/usr/local/bin/harness"),
     ]
 
     let match = candidates.first(where: { FileManager.default.isExecutableFile(atPath: $0.path) })

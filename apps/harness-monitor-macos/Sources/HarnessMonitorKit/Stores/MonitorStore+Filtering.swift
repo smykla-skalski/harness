@@ -49,7 +49,7 @@ extension MonitorStore {
       summary.projectName,
       summary.sessionId,
       summary.context,
-      summary.leaderId ?? ""
+      summary.leaderId ?? "",
     ].joined(separator: " ").lowercased()
 
     return haystack.contains(needle.lowercased())
