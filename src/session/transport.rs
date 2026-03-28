@@ -431,6 +431,9 @@ pub struct SessionObserveArgs {
     /// Output as JSON.
     #[arg(long)]
     pub json: bool,
+    /// Actor ID used for task creation; omit to keep observe read-only.
+    #[arg(long)]
+    pub actor: Option<String>,
     /// Project directory.
     #[arg(long, env = "CLAUDE_PROJECT_DIR")]
     pub project_dir: Option<String>,
@@ -445,12 +448,14 @@ impl Execute for SessionObserveArgs {
                 project.as_ref(),
                 self.poll_interval,
                 self.json,
+                self.actor.as_deref(),
             )
         } else {
             super::observe::execute_session_observe(
                 &self.session_id,
                 project.as_ref(),
                 self.json,
+                self.actor.as_deref(),
             )
         }
     }

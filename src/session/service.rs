@@ -3,14 +3,16 @@ use std::path::Path;
 
 use chrono::Utc;
 
+use crate::agents::service as agents_service;
 use crate::errors::{CliError, CliErrorKind};
+use crate::hooks::adapters::HookAgent;
 use crate::workspace::utc_now;
 
-use super::roles::{is_permitted, SessionAction};
+use super::roles::{SessionAction, is_permitted};
 use super::storage;
 use super::types::{
-    AgentRegistration, AgentStatus, SessionRole, SessionState, SessionStatus, SessionTransition,
-    TaskNote, TaskSeverity, TaskStatus, WorkItem, CURRENT_VERSION,
+    AgentRegistration, AgentStatus, CURRENT_VERSION, SessionRole, SessionState, SessionStatus,
+    SessionTransition, TaskNote, TaskSeverity, TaskStatus, WorkItem,
 };
 
 /// Start a new orchestration session and register the caller as leader.
@@ -30,10 +32,27 @@ pub fn start_session(
     let requested_session_id = session_id
         .filter(|value| !value.trim().is_empty())
         .map(ToString::to_string);
-    let runtime_name = runtime.unwrap_or("unknown");
+    let runtime_name = runtime.ok_or_else(|| {
+        CliError::from(CliErrorKind::session_agent_conflict(
+            "session start requires --runtime for leader session tracking".to_string(),
+        ))
+    })?;
+    let leader_runtime = resolve_registered_runtime(runtime_name).ok_or_else(|| {
+        CliError::from(CliErrorKind::session_agent_conflict(format!(
+            "session start requires a known runtime, got '{runtime_name}'"
+        )))
+    })?;
+    let leader_agent_session_id =
+        agents_service::resolve_known_session_id(leader_runtime, project_dir, None)?;
 
     let state = if let Some(session_id) = requested_session_id {
-        let candidate = build_initial_state(context, &session_id, runtime_name, &now);
+        let candidate = build_initial_state(
+            context,
+            &session_id,
+            runtime_name,
+            leader_agent_session_id.as_deref(),
+            &now,
+        );
         if !storage::create_state(project_dir, &session_id, &candidate)? {
             return Err(CliErrorKind::session_agent_conflict(format!(
                 "session '{session_id}' already exists"
@@ -45,7 +64,13 @@ pub fn start_session(
         let mut created = None;
         for _ in 0..8 {
             let candidate_id = generate_session_id();
-            let candidate = build_initial_state(context, &candidate_id, runtime_name, &now);
+            let candidate = build_initial_state(
+                context,
+                &candidate_id,
+                runtime_name,
+                leader_agent_session_id.as_deref(),
+                &now,
+            );
             if storage::create_state(project_dir, &candidate_id, &candidate)? {
                 created = Some(candidate);
                 break;
@@ -97,6 +122,13 @@ pub fn join_session(
         || format!("{runtime} {role:?}").to_lowercase(),
         ToString::to_string,
     );
+    let joined_runtime = resolve_registered_runtime(runtime).ok_or_else(|| {
+        CliError::from(CliErrorKind::session_agent_conflict(format!(
+            "agent join requires a known runtime, got '{runtime}'"
+        )))
+    })?;
+    let agent_session_id =
+        agents_service::resolve_known_session_id(joined_runtime, project_dir, None)?;
     let mut joined_agent_id = None;
 
     let state = storage::update_state(project_dir, session_id, |state| {
@@ -114,7 +146,7 @@ pub fn join_session(
                 joined_at: now.clone(),
                 updated_at: now,
                 status: AgentStatus::Active,
-                agent_session_id: None,
+                agent_session_id: agent_session_id.clone(),
             },
         );
         joined_agent_id = Some(agent_id);
@@ -572,6 +604,7 @@ fn build_initial_state(
     context: &str,
     session_id: &str,
     runtime_name: &str,
+    agent_session_id: Option<&str>,
     now: &str,
 ) -> SessionState {
     let leader_id = format!("{runtime_name}-leader");
@@ -588,7 +621,7 @@ fn build_initial_state(
             joined_at: now.to_string(),
             updated_at: now.to_string(),
             status: AgentStatus::Active,
-            agent_session_id: None,
+            agent_session_id: agent_session_id.map(ToString::to_string),
         },
     );
 
@@ -620,6 +653,17 @@ fn require_active_target_agent(state: &SessionState, agent_id: &str) -> Result<(
         .into());
     }
     Ok(())
+}
+
+fn resolve_registered_runtime(runtime_name: &str) -> Option<HookAgent> {
+    match runtime_name {
+        "claude" => Some(HookAgent::Claude),
+        "copilot" => Some(HookAgent::Copilot),
+        "codex" => Some(HookAgent::Codex),
+        "gemini" => Some(HookAgent::Gemini),
+        "opencode" => Some(HookAgent::OpenCode),
+        _ => None,
+    }
 }
 
 fn agent_status_label(status: AgentStatus) -> &'static str {
@@ -677,6 +721,7 @@ mod tests {
             let leader = state.agents.values().next().unwrap();
             assert_eq!(leader.role, SessionRole::Leader);
             assert_eq!(leader.runtime, "claude");
+            assert_eq!(leader.agent_session_id.as_deref(), Some("test-service"));
         });
     }
 
@@ -727,6 +772,19 @@ mod tests {
     }
 
     #[test]
+    fn start_session_requires_known_runtime() {
+        with_temp_project(|project| {
+            let missing_runtime = start_session("goal", project, None, Some("no-runtime"))
+                .expect_err("runtime is required");
+            assert_eq!(missing_runtime.code(), "KSRCLI092");
+
+            let unknown_runtime = start_session("goal", project, Some("unknown"), Some("bad"))
+                .expect_err("unknown runtime should be rejected");
+            assert_eq!(unknown_runtime.code(), "KSRCLI092");
+        });
+    }
+
+    #[test]
     fn auto_generated_session_ids_are_unique() {
         with_temp_project(|project| {
             let first = start_session("goal1", project, Some("claude"), None).unwrap();
@@ -741,24 +799,28 @@ mod tests {
         with_temp_project(|project| {
             start_session("test", project, Some("claude"), Some("join-unique")).unwrap();
 
-            let first = join_session(
-                "join-unique",
-                SessionRole::Worker,
-                "codex",
-                &[],
-                None,
-                project,
-            )
-            .unwrap();
-            let second = join_session(
-                "join-unique",
-                SessionRole::Reviewer,
-                "codex",
-                &[],
-                None,
-                project,
-            )
-            .unwrap();
+            let (first, second) =
+                temp_env::with_vars([("CODEX_SESSION_ID", Some("codex-worker"))], || {
+                    let first = join_session(
+                        "join-unique",
+                        SessionRole::Worker,
+                        "codex",
+                        &[],
+                        None,
+                        project,
+                    )
+                    .unwrap();
+                    let second = join_session(
+                        "join-unique",
+                        SessionRole::Reviewer,
+                        "codex",
+                        &[],
+                        None,
+                        project,
+                    )
+                    .unwrap();
+                    (first, second)
+                });
 
             assert_eq!(first.agents.len(), 2);
             assert_eq!(second.agents.len(), 3);
@@ -768,6 +830,35 @@ mod tests {
                 .filter(|id| id.starts_with("codex-"))
                 .collect();
             assert_eq!(codex_ids.len(), 2);
+        });
+    }
+
+    #[test]
+    fn join_records_runtime_session_id_when_available() {
+        with_temp_project(|project| {
+            start_session("test", project, Some("claude"), Some("join-runtime")).unwrap();
+
+            let joined = temp_env::with_vars([("CODEX_SESSION_ID", Some("codex-worker"))], || {
+                join_session(
+                    "join-runtime",
+                    SessionRole::Worker,
+                    "codex",
+                    &[],
+                    None,
+                    project,
+                )
+                .unwrap()
+            });
+
+            let codex_worker = joined
+                .agents
+                .values()
+                .find(|agent| agent.runtime == "codex")
+                .expect("codex worker should be present");
+            assert_eq!(
+                codex_worker.agent_session_id.as_deref(),
+                Some("codex-worker")
+            );
         });
     }
 
