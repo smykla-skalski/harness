@@ -1,34 +1,76 @@
 import Foundation
 
 public final class PreviewMonitorClient: MonitorClientProtocol, @unchecked Sendable {
-  public init() {}
+  public struct Fixtures: Sendable {
+    let health: HealthResponse
+    let projects: [ProjectSummary]
+    let sessions: [SessionSummary]
+    let detail: SessionDetail?
+    let timeline: [TimelineEntry]
+    let readySessionID: String?
 
-  public func health() async throws -> HealthResponse {
-    HealthResponse(
-      status: "ok",
-      version: "14.5.0",
-      pid: 4242,
-      endpoint: "http://127.0.0.1:9999",
-      startedAt: "2026-03-28T14:00:00Z",
-      projectCount: 1,
-      sessionCount: 1
+    static let populated = Self(
+      health: HealthResponse(
+        status: "ok",
+        version: "14.5.0",
+        pid: 4242,
+        endpoint: "http://127.0.0.1:9999",
+        startedAt: "2026-03-28T14:00:00Z",
+        projectCount: 1,
+        sessionCount: 1
+      ),
+      projects: PreviewFixtures.projects,
+      sessions: [PreviewFixtures.summary],
+      detail: PreviewFixtures.detail,
+      timeline: PreviewFixtures.timeline,
+      readySessionID: PreviewFixtures.summary.sessionId
+    )
+
+    static let empty = Self(
+      health: HealthResponse(
+        status: "ok",
+        version: "14.5.0",
+        pid: 4242,
+        endpoint: "http://127.0.0.1:9999",
+        startedAt: "2026-03-28T14:00:00Z",
+        projectCount: 0,
+        sessionCount: 0
+      ),
+      projects: [],
+      sessions: [],
+      detail: nil,
+      timeline: [],
+      readySessionID: nil
     )
   }
 
+  private let fixtures: Fixtures
+
+  public init(fixtures: Fixtures = .populated) {
+    self.fixtures = fixtures
+  }
+
+  public func health() async throws -> HealthResponse {
+    fixtures.health
+  }
+
   public func projects() async throws -> [ProjectSummary] {
-    PreviewFixtures.projects
+    fixtures.projects
   }
 
   public func sessions() async throws -> [SessionSummary] {
-    [PreviewFixtures.summary]
+    fixtures.sessions
   }
 
   public func sessionDetail(id _: String) async throws -> SessionDetail {
-    PreviewFixtures.detail
+    guard let detail = fixtures.detail else {
+      throw MonitorAPIError.server(code: 404, message: "No preview session detail available.")
+    }
+    return detail
   }
 
   public func timeline(sessionID _: String) async throws -> [TimelineEntry] {
-    PreviewFixtures.timeline
+    fixtures.timeline
   }
 
   public func globalStream() -> AsyncThrowingStream<StreamEvent, Error> {
@@ -51,7 +93,7 @@ public final class PreviewMonitorClient: MonitorClientProtocol, @unchecked Senda
         StreamEvent(
           event: "ready",
           recordedAt: "2026-03-28T14:00:00Z",
-          sessionId: PreviewFixtures.summary.sessionId,
+          sessionId: fixtures.readySessionID,
           payload: .object([:])
         )
       )
@@ -63,7 +105,7 @@ public final class PreviewMonitorClient: MonitorClientProtocol, @unchecked Senda
     sessionID _: String,
     request _: TaskCreateRequest
   ) async throws -> SessionDetail {
-    PreviewFixtures.detail
+    try await sessionDetail(id: "")
   }
 
   public func assignTask(
@@ -71,7 +113,7 @@ public final class PreviewMonitorClient: MonitorClientProtocol, @unchecked Senda
     taskID _: String,
     request _: TaskAssignRequest
   ) async throws -> SessionDetail {
-    PreviewFixtures.detail
+    try await sessionDetail(id: "")
   }
 
   public func updateTask(
@@ -79,7 +121,7 @@ public final class PreviewMonitorClient: MonitorClientProtocol, @unchecked Senda
     taskID _: String,
     request _: TaskUpdateRequest
   ) async throws -> SessionDetail {
-    PreviewFixtures.detail
+    try await sessionDetail(id: "")
   }
 
   public func checkpointTask(
@@ -87,7 +129,7 @@ public final class PreviewMonitorClient: MonitorClientProtocol, @unchecked Senda
     taskID _: String,
     request _: TaskCheckpointRequest
   ) async throws -> SessionDetail {
-    PreviewFixtures.detail
+    try await sessionDetail(id: "")
   }
 
   public func changeRole(
@@ -95,39 +137,79 @@ public final class PreviewMonitorClient: MonitorClientProtocol, @unchecked Senda
     agentID _: String,
     request _: RoleChangeRequest
   ) async throws -> SessionDetail {
-    PreviewFixtures.detail
+    try await sessionDetail(id: "")
   }
 
   public func transferLeader(
     sessionID _: String,
     request _: LeaderTransferRequest
   ) async throws -> SessionDetail {
-    PreviewFixtures.detail
+    try await sessionDetail(id: "")
   }
 
   public func endSession(
     sessionID _: String,
     request _: SessionEndRequest
   ) async throws -> SessionDetail {
-    PreviewFixtures.detail
+    try await sessionDetail(id: "")
   }
 
   public func sendSignal(
     sessionID _: String,
     request _: SignalSendRequest
   ) async throws -> SessionDetail {
-    PreviewFixtures.detail
+    try await sessionDetail(id: "")
   }
 
   public func observeSession(sessionID _: String) async throws -> SessionDetail {
-    PreviewFixtures.detail
+    try await sessionDetail(id: "")
   }
 }
 
 public actor PreviewDaemonController: DaemonControlling {
-  private let client = PreviewMonitorClient()
+  public enum Mode: Sendable {
+    case populated
+    case empty
+  }
 
-  public init() {}
+  private let client: PreviewMonitorClient
+  private let statusReport: DaemonStatusReport
+
+  public init(mode: Mode = .populated) {
+    let fixtures = mode == .empty ? PreviewMonitorClient.Fixtures.empty : .populated
+    self.client = PreviewMonitorClient(fixtures: fixtures)
+    self.statusReport = DaemonStatusReport(
+      manifest: DaemonManifest(
+        version: "14.5.0",
+        pid: 4242,
+        endpoint: "http://127.0.0.1:9999",
+        startedAt: "2026-03-28T14:00:00Z",
+        tokenPath: "/Users/example/Library/Application Support/harness/daemon/auth-token"
+      ),
+      launchAgent: LaunchAgentStatus(
+        installed: mode == .populated,
+        label: "io.harness.monitor.daemon",
+        path: "/Users/example/Library/LaunchAgents/io.harness.monitor.daemon.plist"
+      ),
+      projectCount: fixtures.projects.count,
+      sessionCount: fixtures.sessions.count,
+      diagnostics: DaemonDiagnostics(
+        daemonRoot: "/Users/example/Library/Application Support/harness/daemon",
+        manifestPath: "/Users/example/Library/Application Support/harness/daemon/manifest.json",
+        authTokenPath: "/Users/example/Library/Application Support/harness/daemon/auth-token",
+        authTokenPresent: true,
+        eventsPath: "/Users/example/Library/Application Support/harness/daemon/events.jsonl",
+        cacheRoot: "/Users/example/Library/Application Support/harness/daemon/cache/projects",
+        cacheEntryCount: mode == .populated ? 4 : 0,
+        lastEvent: mode == .populated
+          ? DaemonAuditEvent(
+            recordedAt: "2026-03-28T14:18:00Z",
+            level: "info",
+            message: "indexed session sess-monitor"
+          ) : nil
+      )
+    )
+  }
 
   public func bootstrapClient() async throws -> any MonitorClientProtocol {
     client
@@ -138,22 +220,7 @@ public actor PreviewDaemonController: DaemonControlling {
   }
 
   public func daemonStatus() async throws -> DaemonStatusReport {
-    DaemonStatusReport(
-      manifest: DaemonManifest(
-        version: "14.5.0",
-        pid: 4242,
-        endpoint: "http://127.0.0.1:9999",
-        startedAt: "2026-03-28T14:00:00Z",
-        tokenPath: "/Users/example/Library/Application Support/harness/daemon/auth-token"
-      ),
-      launchAgent: LaunchAgentStatus(
-        installed: true,
-        label: "io.harness.monitor.daemon",
-        path: "/Users/example/Library/LaunchAgents/io.harness.monitor.daemon.plist"
-      ),
-      projectCount: 1,
-      sessionCount: 1
-    )
+    statusReport
   }
 
   public func installLaunchAgent() async throws -> String {

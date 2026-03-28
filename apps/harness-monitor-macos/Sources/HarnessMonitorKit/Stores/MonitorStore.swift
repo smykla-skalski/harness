@@ -118,7 +118,8 @@ public final class MonitorStore {
 
     do {
       _ = try await daemonController.installLaunchAgent()
-      daemonStatus = try? await daemonController.daemonStatus()
+      await refreshDaemonStatus()
+      lastAction = "Install launch agent"
     } catch {
       lastError = error.localizedDescription
     }
@@ -130,10 +131,24 @@ public final class MonitorStore {
 
     do {
       _ = try await daemonController.removeLaunchAgent()
-      daemonStatus = try? await daemonController.daemonStatus()
+      await refreshDaemonStatus()
+      lastAction = "Remove launch agent"
     } catch {
       lastError = error.localizedDescription
     }
+  }
+
+  public func refreshDaemonStatus() async {
+    do {
+      daemonStatus = try await daemonController.daemonStatus()
+    } catch {
+      lastError = error.localizedDescription
+    }
+  }
+
+  public func reconnect() async {
+    hasBootstrapped = true
+    await bootstrap()
   }
 
   public func refresh() async {
