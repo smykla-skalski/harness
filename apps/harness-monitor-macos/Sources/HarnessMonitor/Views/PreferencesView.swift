@@ -5,6 +5,16 @@ import SwiftUI
 struct PreferencesView: View {
   @Bindable var store: MonitorStore
 
+  private var effectiveHealth: HealthResponse? {
+    store.diagnostics?.health ?? store.health
+  }
+
+  private var cacheEntryCount: Int {
+    store.diagnostics?.workspace.cacheEntryCount
+      ?? store.daemonStatus?.diagnostics.cacheEntryCount
+      ?? 0
+  }
+
   var body: some View {
     ScrollView {
       VStack(alignment: .leading, spacing: 18) {
@@ -12,6 +22,7 @@ struct PreferencesView: View {
         overviewRow
         pathsCard
         diagnosticsCard
+        recentEventsCard
         footer
       }
       .padding(24)
@@ -20,6 +31,9 @@ struct PreferencesView: View {
     .background(MonitorTheme.canvas.ignoresSafeArea())
     .foregroundStyle(MonitorTheme.ink)
     .accessibilityIdentifier(MonitorAccessibility.preferencesRoot)
+    .task {
+      await store.refreshDiagnostics()
+    }
   }
 
   private var header: some View {
@@ -45,7 +59,7 @@ struct PreferencesView: View {
           await store.reconnect()
         }
         actionButton("Refresh Diagnostics", tint: MonitorTheme.ink) {
-          await store.refreshDaemonStatus()
+          await store.refreshDiagnostics()
         }
         actionButton("Start Daemon", tint: MonitorTheme.success) {
           await store.startDaemon()
@@ -65,22 +79,22 @@ struct PreferencesView: View {
     HStack(alignment: .top, spacing: 14) {
       overviewMetric(
         title: "Endpoint",
-        value: store.health?.endpoint ?? store.daemonStatus?.manifest?.endpoint ?? "Unavailable",
+        value: effectiveHealth?.endpoint ?? store.daemonStatus?.manifest?.endpoint ?? "Unavailable",
         caption: "Local control plane"
       )
       overviewMetric(
         title: "Version",
-        value: store.health?.version ?? store.daemonStatus?.manifest?.version ?? "Unavailable",
+        value: effectiveHealth?.version ?? store.daemonStatus?.manifest?.version ?? "Unavailable",
         caption: "Daemon build"
       )
       overviewMetric(
         title: "Launchd",
-        value: store.daemonStatus?.launchAgent.installed == true ? "Installed" : "Manual",
+        value: launchAgentState,
         caption: store.daemonStatus?.launchAgent.label ?? "Launch agent"
       )
       overviewMetric(
         title: "Cached Sessions",
-        value: "\(store.daemonStatus?.diagnostics.cacheEntryCount ?? 0)",
+        value: "\(cacheEntryCount)",
         caption: "\(store.daemonStatus?.sessionCount ?? 0) indexed live sessions"
       )
     }
@@ -96,19 +110,27 @@ struct PreferencesView: View {
       )
       pathRow(
         title: "Manifest",
-        value: store.daemonStatus?.diagnostics.manifestPath ?? "Unavailable"
+        value: store.diagnostics?.workspace.manifestPath
+          ?? store.daemonStatus?.diagnostics.manifestPath
+          ?? "Unavailable"
       )
       pathRow(
         title: "Auth Token",
-        value: store.daemonStatus?.diagnostics.authTokenPath ?? "Unavailable"
+        value: store.diagnostics?.workspace.authTokenPath
+          ?? store.daemonStatus?.diagnostics.authTokenPath
+          ?? "Unavailable"
       )
       pathRow(
         title: "Events Log",
-        value: store.daemonStatus?.diagnostics.eventsPath ?? "Unavailable"
+        value: store.diagnostics?.workspace.eventsPath
+          ?? store.daemonStatus?.diagnostics.eventsPath
+          ?? "Unavailable"
       )
       pathRow(
         title: "Cache Root",
-        value: store.daemonStatus?.diagnostics.cacheRoot ?? "Unavailable"
+        value: store.diagnostics?.workspace.cacheRoot
+          ?? store.daemonStatus?.diagnostics.cacheRoot
+          ?? "Unavailable"
       )
     }
     .monitorCard()
@@ -121,8 +143,8 @@ struct PreferencesView: View {
       HStack(alignment: .top, spacing: 14) {
         diagnosticBadge(
           title: "Token",
-          value: store.daemonStatus?.diagnostics.authTokenPresent == true ? "Present" : "Missing",
-          tint: store.daemonStatus?.diagnostics.authTokenPresent == true
+          value: effectiveTokenPresent ? "Present" : "Missing",
+          tint: effectiveTokenPresent
             ? MonitorTheme.success : MonitorTheme.danger
         )
         diagnosticBadge(
@@ -137,7 +159,7 @@ struct PreferencesView: View {
         )
       }
 
-      if let lastEvent = store.daemonStatus?.diagnostics.lastEvent {
+      if let lastEvent = effectiveLastEvent {
         VStack(alignment: .leading, spacing: 8) {
           Text("Latest Event")
             .font(.headline)
@@ -158,9 +180,42 @@ struct PreferencesView: View {
     .monitorCard()
   }
 
+  private var recentEventsCard: some View {
+    VStack(alignment: .leading, spacing: 14) {
+      Text("Recent Events")
+        .font(.system(.title3, design: .serif, weight: .semibold))
+
+      if (store.diagnostics?.recentEvents ?? []).isEmpty {
+        Text("No daemon events available from the live diagnostics stream yet.")
+          .font(.system(.body, design: .rounded, weight: .medium))
+          .foregroundStyle(.secondary)
+      } else {
+        ForEach(store.diagnostics?.recentEvents ?? []) { event in
+          VStack(alignment: .leading, spacing: 6) {
+            HStack {
+              Text(event.level.uppercased())
+                .font(.caption.bold())
+                .foregroundStyle(event.level == "warn" ? MonitorTheme.caution : MonitorTheme.accent)
+              Spacer()
+              Text(formatTimestamp(event.recordedAt))
+                .font(.caption.monospaced())
+                .foregroundStyle(.secondary)
+            }
+            Text(event.message)
+              .font(.system(.body, design: .rounded, weight: .semibold))
+          }
+          .frame(maxWidth: .infinity, alignment: .leading)
+          .padding(12)
+          .background(Color.white.opacity(0.5), in: RoundedRectangle(cornerRadius: 18))
+        }
+      }
+    }
+    .monitorCard()
+  }
+
   private var footer: some View {
     VStack(alignment: .leading, spacing: 8) {
-      if let startedAt = store.health?.startedAt ?? store.daemonStatus?.manifest?.startedAt {
+      if let startedAt = effectiveHealth?.startedAt ?? store.daemonStatus?.manifest?.startedAt {
         Text("Started \(formatTimestamp(startedAt))")
           .font(.caption.weight(.semibold))
           .foregroundStyle(.secondary)
@@ -187,6 +242,20 @@ struct PreferencesView: View {
         in: Capsule()
       )
       .foregroundStyle(.white)
+  }
+
+  private var effectiveLastEvent: DaemonAuditEvent? {
+    store.diagnostics?.workspace.lastEvent ?? store.daemonStatus?.diagnostics.lastEvent
+  }
+
+  private var effectiveTokenPresent: Bool {
+    store.diagnostics?.workspace.authTokenPresent
+      ?? store.daemonStatus?.diagnostics.authTokenPresent
+      ?? false
+  }
+
+  private var launchAgentState: String {
+    store.daemonStatus?.launchAgent.installed == true ? "Installed" : "Manual"
   }
 
   private func actionButton(

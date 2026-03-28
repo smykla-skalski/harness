@@ -47,6 +47,7 @@ public final class MonitorStore {
 
   public var connectionState: ConnectionState = .idle
   public var daemonStatus: DaemonStatusReport?
+  public var diagnostics: DaemonDiagnosticsReport?
   public var health: HealthResponse?
   public var projects: [ProjectSummary] = []
   public var sessions: [SessionSummary] = []
@@ -147,8 +148,28 @@ public final class MonitorStore {
   }
 
   public func reconnect() async {
+    globalStreamTask?.cancel()
+    sessionStreamTask?.cancel()
+    globalStreamTask = nil
+    sessionStreamTask = nil
+    client = nil
     hasBootstrapped = true
     await bootstrap()
+  }
+
+  public func refreshDiagnostics() async {
+    guard let client else {
+      await refreshDaemonStatus()
+      diagnostics = nil
+      return
+    }
+
+    do {
+      diagnostics = try await client.diagnostics()
+      daemonStatus = try? await daemonController.daemonStatus()
+    } catch {
+      lastError = error.localizedDescription
+    }
   }
 
   public func refresh() async {

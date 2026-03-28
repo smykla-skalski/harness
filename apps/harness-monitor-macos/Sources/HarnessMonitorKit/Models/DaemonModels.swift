@@ -14,10 +14,12 @@ public struct DaemonManifest: Codable, Equatable, Sendable {
   }
 }
 
-public struct DaemonAuditEvent: Codable, Equatable, Sendable {
+public struct DaemonAuditEvent: Codable, Equatable, Identifiable, Sendable {
   public let recordedAt: String
   public let level: String
   public let message: String
+
+  public var id: String { "\(recordedAt)-\(level)-\(message)" }
 
   public init(recordedAt: String, level: String, message: String) {
     self.recordedAt = recordedAt
@@ -99,4 +101,12 @@ public struct HealthResponse: Codable, Equatable, Sendable {
   public let startedAt: String
   public let projectCount: Int
   public let sessionCount: Int
+}
+
+public struct DaemonDiagnosticsReport: Codable, Equatable, Sendable {
+  public let health: HealthResponse?
+  public let manifest: DaemonManifest?
+  public let launchAgent: LaunchAgentStatus
+  public let workspace: DaemonDiagnostics
+  public let recentEvents: [DaemonAuditEvent]
 }
