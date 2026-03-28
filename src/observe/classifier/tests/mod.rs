@@ -7,6 +7,7 @@ use crate::observe::types::{
 };
 
 mod assistant_diagnostics;
+mod coordination;
 mod query_tracking;
 mod resource_tracking;
 mod state_and_registry;

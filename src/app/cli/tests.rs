@@ -860,3 +860,107 @@ fn snapshot_cli_subcommand_list() {
     names.sort_unstable();
     insta::assert_snapshot!(names.join("\n"));
 }
+
+#[test]
+fn parse_session_start() {
+    let cli = Cli::try_parse_from([
+        "harness",
+        "session",
+        "start",
+        "--context",
+        "test goal",
+        "--runtime",
+        "claude",
+    ])
+    .unwrap();
+    match cli.command {
+        Command::Session {
+            command: crate::session::transport::SessionCommand::Start(args),
+        } => {
+            assert_eq!(args.context, "test goal");
+            assert_eq!(args.runtime, Some(crate::hooks::adapters::HookAgent::Claude));
+        }
+        _ => panic!("expected Session Start"),
+    }
+}
+
+#[test]
+fn parse_session_join() {
+    let cli = Cli::try_parse_from([
+        "harness",
+        "session",
+        "join",
+        "sess-123",
+        "--role",
+        "worker",
+        "--runtime",
+        "codex",
+        "--capabilities",
+        "general,testing",
+    ])
+    .unwrap();
+    match cli.command {
+        Command::Session {
+            command: crate::session::transport::SessionCommand::Join(args),
+        } => {
+            assert_eq!(args.session_id, "sess-123");
+            assert_eq!(args.role, crate::session::types::SessionRole::Worker);
+            assert_eq!(args.capabilities, Some("general,testing".into()));
+        }
+        _ => panic!("expected Session Join"),
+    }
+}
+
+#[test]
+fn parse_session_task_create() {
+    let cli = Cli::try_parse_from([
+        "harness",
+        "session",
+        "task",
+        "create",
+        "sess-abc",
+        "--title",
+        "fix bug",
+        "--severity",
+        "high",
+        "--actor",
+        "leader-1",
+    ])
+    .unwrap();
+    match cli.command {
+        Command::Session {
+            command: crate::session::transport::SessionCommand::Task {
+                command: crate::session::transport::SessionTaskCommand::Create(args),
+            },
+        } => {
+            assert_eq!(args.session_id, "sess-abc");
+            assert_eq!(args.title, "fix bug");
+            assert_eq!(args.severity, crate::session::types::TaskSeverity::High);
+        }
+        _ => panic!("expected Session Task Create"),
+    }
+}
+
+#[test]
+fn parse_session_observe_with_poll() {
+    let cli = Cli::try_parse_from([
+        "harness",
+        "session",
+        "observe",
+        "sess-watch",
+        "--poll-interval",
+        "5",
+        "--json",
+    ])
+    .unwrap();
+    match cli.command {
+        Command::Session {
+            command: crate::session::transport::SessionCommand::Observe(args),
+        } => {
+            assert_eq!(args.session_id, "sess-watch");
+            assert_eq!(args.poll_interval, 5);
+            assert!(args.json);
+        }
+        _ => panic!("expected Session Observe"),
+    }
+}
