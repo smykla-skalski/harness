@@ -86,7 +86,7 @@ extension InspectorActionSections {
   }
   fileprivate func taskActions(task: WorkItem) -> some View {
     VStack(alignment: .leading, spacing: 12) {
-      actionHeader(
+      monitorActionHeader(
         title: "Task Actions",
         subtitle: "Reassign, update status, or checkpoint the selected task."
       )
@@ -150,7 +150,7 @@ extension InspectorActionSections {
   }
   fileprivate var sessionTaskActions: some View {
     VStack(alignment: .leading, spacing: 12) {
-      actionHeader(
+      monitorActionHeader(
         title: "Create Task",
         subtitle: "Capture new work directly into the active session."
       )
@@ -173,7 +173,7 @@ extension InspectorActionSections {
   }
   fileprivate func roleActions(agent: AgentRegistration) -> some View {
     VStack(alignment: .leading, spacing: 12) {
-      actionHeader(
+      monitorActionHeader(
         title: "Role Actions",
         subtitle: "Change the selected agent role without leaving the inspector."
       )
@@ -194,7 +194,7 @@ extension InspectorActionSections {
   }
   fileprivate var leaderActions: some View {
     VStack(alignment: .leading, spacing: 12) {
-      actionHeader(
+      monitorActionHeader(
         title: "Leader Transfer",
         subtitle: "Promote a live agent to leader when the current leader needs to step away."
       )
@@ -213,22 +213,6 @@ extension InspectorActionSections {
       .disabled(transferLeaderID.isEmpty)
     }
     .monitorCard()
-  }
-  fileprivate func actionHeader(title: String, subtitle: String) -> some View {
-    VStack(alignment: .leading, spacing: 4) {
-      Text(title)
-        .font(.system(.headline, design: .rounded, weight: .semibold))
-      Text(subtitle)
-        .font(.system(.subheadline, design: .rounded, weight: .medium))
-        .foregroundStyle(.secondary)
-    }
-  }
-  fileprivate func badge(_ value: String) -> some View {
-    Text(value)
-      .font(.caption.bold())
-      .padding(.horizontal, 10)
-      .padding(.vertical, 5)
-      .background(Color.white.opacity(0.68), in: Capsule())
   }
   fileprivate var checkpointBinding: Binding<Double> {
     Binding(

@@ -183,8 +183,16 @@ public struct ObserverWorkerSummary: Codable, Equatable, Identifiable, Sendable 
   public let startedAt: String
   public let agentId: String?
   public let runtime: String?
+  private let stableID = UUID()
 
-  public var id: String { "\(issueId)-\(targetFile)-\(agentId ?? runtime ?? "worker")" }
+  public var id: UUID { stableID }
+  enum CodingKeys: String, CodingKey { case issueId, targetFile, startedAt, agentId, runtime }
+
+  public static func == (lhs: Self, rhs: Self) -> Bool {
+    lhs.issueId == rhs.issueId && lhs.targetFile == rhs.targetFile
+      && lhs.startedAt == rhs.startedAt && lhs.agentId == rhs.agentId
+      && lhs.runtime == rhs.runtime
+  }
 }
 
 public struct ObserverSummary: Codable, Equatable, Sendable {

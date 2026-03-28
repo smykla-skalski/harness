@@ -1,3 +1,5 @@
+import Foundation
+
 @testable import HarnessMonitorKit
 
 actor RecordingDaemonController: DaemonControlling {
@@ -98,11 +100,22 @@ final class RecordingMonitorClient: MonitorClientProtocol, @unchecked Sendable {
     )
   }
 
-  var calls: [Call] = []
-  var detail: SessionDetail
+  private let lock = NSLock()
+  private var _calls: [Call] = []
+  private var _detail: SessionDetail
+
+  var calls: [Call] {
+    get { lock.withLock { _calls } }
+    set { lock.withLock { _calls = newValue } }
+  }
+
+  var detail: SessionDetail {
+    get { lock.withLock { _detail } }
+    set { lock.withLock { _detail = newValue } }
+  }
 
   init(detail: SessionDetail = PreviewFixtures.detail) {
-    self.detail = detail
+    self._detail = detail
   }
 
   func recordedCalls() -> [Call] {
