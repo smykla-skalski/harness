@@ -1,4 +1,5 @@
 mod bash;
+pub(crate) mod coordination;
 
 pub(crate) use self::bash::{
     check_closeout_verdict_pending, check_exit_code_issues, check_jq_errors, check_ksa_codes,
