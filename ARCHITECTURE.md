@@ -30,11 +30,13 @@ flowchart LR
     App --> Setup
     App --> Hooks
 
-    Agents --> Kernel
+    Agents --> Hooks
+    Agents --> Setup
     Agents --> Workspace
     Agents --> Infra
     Agents --> Errors
 
+    Run --> Hooks
     Run --> Kernel
     Run --> Workspace
     Run --> Platform
@@ -46,16 +48,27 @@ flowchart LR
     Create --> Infra
     Create --> Errors
 
+    Observe --> Hooks
+    Observe --> Agents
+    Observe --> Run
     Observe --> Kernel
     Observe --> Workspace
     Observe --> Infra
     Observe --> Errors
 
+    Setup --> Hooks
+    Setup --> Agents
+    Setup --> Run
+    Setup --> Kernel
     Setup --> Workspace
     Setup --> Platform
     Setup --> Infra
     Setup --> Errors
 
+    Hooks --> Run
+    Hooks --> Create
+    Hooks --> Agents
+    Hooks --> Platform
     Hooks --> Kernel
     Hooks --> Workspace
     Hooks --> Infra
@@ -184,15 +197,15 @@ That keeps host wrappers thin. They translate local hook payloads, but harness o
 
 ## Rules
 
-- `app` is transport only. It wires domains together, but domains must not depend on `app`.
+- `app` is transport only. It wires domains together, but domains must not depend on `app`. The one exception is `app::command_context::Execute`, which all command handlers implement as the transport trait.
 - `agents` owns cross-agent lifecycle, shared session state, and checked-in asset rendering. Do not hide those concerns in `setup`, `hooks`, or host-specific generated files.
-- `kernel` is pure. It must not depend on product domains, `platform`, or `infra`.
+- `kernel` is pure. It must not depend on product domains, `platform`, or `infra`. Known violation: `kernel::topology::parsing` imports `HARNESS_PREFIX` from `workspace`.
 - `workspace` owns path resolution and ambient harness files, not cross-agent workflow state.
 - `platform` is adapter code, not a public crate surface.
 - `infra` stays generic and must not depend on product domains.
-- `setup` bootstraps wrappers and readiness. It should not become the source of truth for agent ledgers or rendered assets.
-- `hooks` normalizes and enforces policy. It should feed shared state through `agents`, not own separate durable copies.
-- `observe` is the live inspection and improvement loop for skills and suites. It reads the shared harness ledger first and only falls back to legacy host transcript storage for compatibility.
+- `setup` bootstraps wrappers and readiness. It should not become the source of truth for agent ledgers or rendered assets. It reads `run`, `agents`, and `hooks` types for cluster provisioning and session coordination.
+- `hooks` normalizes and enforces policy. It reads `run` workflow state, `create` workflow state, and `agents` services to make guard decisions and record events. It should feed shared state through `agents`, not own separate durable copies.
+- `observe` is the live inspection and improvement loop for skills and suites. It reads the shared harness ledger through `agents` storage and checks run pointers from `run`. It falls back to legacy host transcript storage for compatibility.
 - Shared pure concepts belong in `kernel`. Shared path/state discovery belongs in `workspace`. Shared durable multi-agent state belongs in `agents`.
 
 If a module does not fit one of these buckets, it is probably in the wrong place.
