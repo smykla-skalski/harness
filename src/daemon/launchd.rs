@@ -104,6 +104,7 @@ pub fn launch_agent_status() -> LaunchAgentStatus {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use tempfile::tempdir;
 
     #[test]
     fn render_launch_agent_plist_contains_expected_fields() {
@@ -111,5 +112,38 @@ mod tests {
         assert!(plist.contains(LAUNCH_AGENT_LABEL));
         assert!(plist.contains("<string>daemon</string>"));
         assert!(plist.contains("<string>serve</string>"));
+    }
+
+    #[test]
+    fn launch_agent_install_and_remove_round_trip() {
+        let tmp = tempdir().expect("tempdir");
+        temp_env::with_vars(
+            [
+                ("HOME", Some(tmp.path().to_str().expect("utf8 path"))),
+                (
+                    "XDG_DATA_HOME",
+                    Some(tmp.path().to_str().expect("utf8 path")),
+                ),
+            ],
+            || {
+                let path = install_launch_agent(Path::new("/tmp/harness-bin"))
+                    .expect("install launch agent");
+                assert_eq!(path, state::launch_agent_path());
+                assert!(path.is_file());
+
+                let status = launch_agent_status();
+                assert!(status.installed);
+                assert_eq!(status.label, LAUNCH_AGENT_LABEL);
+
+                let plist = fs::read_to_string(&path).expect("read plist");
+                assert!(plist.contains("/tmp/harness-bin"));
+                assert!(plist.contains("daemon"));
+                assert!(plist.contains("serve"));
+
+                assert!(remove_launch_agent().expect("remove launch agent"));
+                assert!(!path.exists());
+                assert!(!remove_launch_agent().expect("remove missing launch agent"));
+            },
+        );
     }
 }
