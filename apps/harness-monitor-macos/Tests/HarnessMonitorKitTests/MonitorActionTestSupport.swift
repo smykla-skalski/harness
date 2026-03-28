@@ -86,7 +86,7 @@ final class RecordingMonitorClient: MonitorClientProtocol, @unchecked Sendable {
       actor: String
     )
     case endSession(sessionID: String, actor: String)
-    case observeSession(sessionID: String)
+    case observeSession(sessionID: String, actor: String)
     case sendSignal(sessionID: String, agentID: String, command: String, actor: String)
     case transferLeader(sessionID: String, newLeaderID: String, reason: String?, actor: String)
     case updateTask(

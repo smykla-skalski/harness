@@ -200,7 +200,15 @@ final class MonitorStoreActionTests: XCTestCase {
     await store.observeSelectedSession(actor: "observer-gwen")
 
     let calls = client.recordedCalls()
-    XCTAssertEqual(calls, [.observeSession(sessionID: PreviewFixtures.summary.sessionId)])
+    XCTAssertEqual(
+      calls,
+      [
+        .observeSession(
+          sessionID: PreviewFixtures.summary.sessionId,
+          actor: "observer-gwen"
+        )
+      ]
+    )
     XCTAssertEqual(store.lastAction, "Observe session")
   }
 

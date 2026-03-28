@@ -42,7 +42,10 @@ public protocol MonitorClientProtocol: Sendable {
     sessionID: String,
     request: SignalSendRequest
   ) async throws -> SessionDetail
-  func observeSession(sessionID: String) async throws -> SessionDetail
+  func observeSession(
+    sessionID: String,
+    request: ObserveSessionRequest
+  ) async throws -> SessionDetail
 }
 
 public struct MonitorConnection: Equatable, Sendable {
@@ -183,8 +186,11 @@ public final class MonitorAPIClient: MonitorClientProtocol {
     try await post("/v1/sessions/\(sessionID)/signal", body: request)
   }
 
-  public func observeSession(sessionID: String) async throws -> SessionDetail {
-    try await post("/v1/sessions/\(sessionID)/observe", body: EmptyRequest())
+  public func observeSession(
+    sessionID: String,
+    request: ObserveSessionRequest
+  ) async throws -> SessionDetail {
+    try await post("/v1/sessions/\(sessionID)/observe", body: request)
   }
 
   private func get<Response: Decodable>(_ path: String) async throws -> Response {
@@ -277,8 +283,6 @@ public final class MonitorAPIClient: MonitorClientProtocol {
     return .server(code: statusCode, message: message)
   }
 }
-
-private struct EmptyRequest: Encodable {}
 
 private struct AnyEncodable: Encodable {
   private let encodeClosure: (Encoder) throws -> Void
