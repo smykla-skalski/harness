@@ -202,6 +202,24 @@ fn cleanup_stale_signals(agent: HookAgent, project_dir: &Path, session_id: &str)
     }
 }
 
+/// Resolve a known session ID for a hook or lifecycle event.
+///
+/// # Errors
+/// Returns `CliError` when the existing session registry cannot be read.
+pub fn resolve_known_session_id(
+    agent: HookAgent,
+    project_dir: &Path,
+    session_id_hint: Option<&str>,
+) -> Result<Option<String>, CliError> {
+    if let Some(session_id) = session_id_hint.filter(|value| !value.trim().is_empty()) {
+        return Ok(Some(session_id.to_string()));
+    }
+    if let Some(session_id) = session_id_from_env(agent) {
+        return Ok(Some(session_id));
+    }
+    storage::current_session_id(project_dir, agent)
+}
+
 /// Resolve the effective session ID for a hook or lifecycle event.
 ///
 /// # Errors
@@ -211,13 +229,7 @@ pub fn resolve_or_create_session_id(
     project_dir: &Path,
     session_id_hint: Option<&str>,
 ) -> Result<String, CliError> {
-    if let Some(session_id) = session_id_hint.filter(|value| !value.trim().is_empty()) {
-        return Ok(session_id.to_string());
-    }
-    if let Some(session_id) = session_id_from_env(agent) {
-        return Ok(session_id);
-    }
-    if let Some(existing) = storage::current_session_id(project_dir, agent)? {
+    if let Some(existing) = resolve_known_session_id(agent, project_dir, session_id_hint)? {
         return Ok(existing);
     }
     Ok(default_session_id(agent))

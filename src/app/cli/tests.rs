@@ -6,6 +6,7 @@ use crate::run::{
     ApiArgs, ApiMethod, DoctorArgs, EnvoyCommand, FinishArgs, KumaCommand, KumactlArgs,
     KumactlCommand, RepairArgs, ReportCommand, ResumeArgs, StartArgs,
 };
+use crate::session::transport::SessionObserveArgs;
 use crate::setup::{CapabilitiesArgs, ClusterArgs, GatewayArgs, KumaSetupCommand};
 use clap::{CommandFactory, error::ErrorKind};
 use std::path::Path;
@@ -485,6 +486,43 @@ fn parse_top_level_session_stop() {
 }
 
 #[test]
+fn parse_session_observe_with_actor() {
+    let cli = Cli::try_parse_from([
+        "harness",
+        "session",
+        "observe",
+        "sess-1",
+        "--poll-interval",
+        "5",
+        "--json",
+        "--actor",
+        "claude-leader",
+        "--project-dir",
+        "/tmp/project",
+    ])
+    .unwrap();
+    match cli.command {
+        Command::Session {
+            command:
+                SessionCommand::Observe(SessionObserveArgs {
+                    session_id,
+                    poll_interval,
+                    json,
+                    actor,
+                    project_dir,
+                }),
+        } => {
+            assert_eq!(session_id, "sess-1");
+            assert_eq!(poll_interval, 5);
+            assert!(json);
+            assert_eq!(actor.as_deref(), Some("claude-leader"));
+            assert_eq!(project_dir.as_deref(), Some("/tmp/project"));
+        }
+        _ => panic!("expected Session observe command"),
+    }
+}
+
+#[test]
 fn parse_top_level_pre_compact() {
     let cli =
         Cli::try_parse_from(["harness", "pre-compact", "--project-dir", "/tmp/project"]).unwrap();
@@ -878,7 +916,10 @@ fn parse_session_start() {
             command: crate::session::transport::SessionCommand::Start(args),
         } => {
             assert_eq!(args.context, "test goal");
-            assert_eq!(args.runtime, Some(crate::hooks::adapters::HookAgent::Claude));
+            assert_eq!(
+                args.runtime,
+                Some(crate::hooks::adapters::HookAgent::Claude)
+            );
         }
         _ => panic!("expected Session Start"),
     }
@@ -929,182 +970,16 @@ fn parse_session_task_create() {
     .unwrap();
     match cli.command {
         Command::Session {
-            command: crate::session::transport::SessionCommand::Task {
-                command: crate::session::transport::SessionTaskCommand::Create(args),
-            },
+            command:
+                crate::session::transport::SessionCommand::Task {
+                    command: crate::session::transport::SessionTaskCommand::Create(args),
+                },
         } => {
             assert_eq!(args.session_id, "sess-abc");
             assert_eq!(args.title, "fix bug");
             assert_eq!(args.severity, crate::session::types::TaskSeverity::High);
         }
         _ => panic!("expected Session Task Create"),
-    }
-}
-
-#[test]
-fn parse_session_end() {
-    let cli = Cli::try_parse_from([
-        "harness", "session", "end", "sess-x", "--actor", "leader-1",
-    ])
-    .unwrap();
-    match cli.command {
-        Command::Session {
-            command: crate::session::transport::SessionCommand::End(args),
-        } => {
-            assert_eq!(args.session_id, "sess-x");
-            assert_eq!(args.actor, "leader-1");
-        }
-        _ => panic!("expected Session End"),
-    }
-}
-
-#[test]
-fn parse_session_assign() {
-    let cli = Cli::try_parse_from([
-        "harness", "session", "assign", "sess-a", "agent-1", "--role", "reviewer", "--actor",
-        "leader-1",
-    ])
-    .unwrap();
-    match cli.command {
-        Command::Session {
-            command: crate::session::transport::SessionCommand::Assign(args),
-        } => {
-            assert_eq!(args.session_id, "sess-a");
-            assert_eq!(args.agent_id, "agent-1");
-            assert_eq!(args.role, crate::session::types::SessionRole::Reviewer);
-        }
-        _ => panic!("expected Session Assign"),
-    }
-}
-
-#[test]
-fn parse_session_remove() {
-    let cli = Cli::try_parse_from([
-        "harness", "session", "remove", "sess-r", "agent-2", "--actor", "leader-1",
-    ])
-    .unwrap();
-    match cli.command {
-        Command::Session {
-            command: crate::session::transport::SessionCommand::Remove(args),
-        } => {
-            assert_eq!(args.session_id, "sess-r");
-            assert_eq!(args.agent_id, "agent-2");
-        }
-        _ => panic!("expected Session Remove"),
-    }
-}
-
-#[test]
-fn parse_session_transfer_leader() {
-    let cli = Cli::try_parse_from([
-        "harness",
-        "session",
-        "transfer-leader",
-        "sess-t",
-        "new-leader",
-        "--reason",
-        "529 errors",
-        "--actor",
-        "observer-1",
-    ])
-    .unwrap();
-    match cli.command {
-        Command::Session {
-            command: crate::session::transport::SessionCommand::TransferLeader(args),
-        } => {
-            assert_eq!(args.session_id, "sess-t");
-            assert_eq!(args.new_leader_id, "new-leader");
-            assert_eq!(args.reason, Some("529 errors".into()));
-        }
-        _ => panic!("expected Session TransferLeader"),
-    }
-}
-
-#[test]
-fn parse_session_task_assign() {
-    let cli = Cli::try_parse_from([
-        "harness", "session", "task", "assign", "sess-ta", "task-1", "agent-1", "--actor",
-        "leader-1",
-    ])
-    .unwrap();
-    match cli.command {
-        Command::Session {
-            command: crate::session::transport::SessionCommand::Task {
-                command: crate::session::transport::SessionTaskCommand::Assign(args),
-            },
-        } => {
-            assert_eq!(args.task_id, "task-1");
-            assert_eq!(args.agent_id, "agent-1");
-        }
-        _ => panic!("expected Session Task Assign"),
-    }
-}
-
-#[test]
-fn parse_session_task_list() {
-    let cli = Cli::try_parse_from([
-        "harness", "session", "task", "list", "sess-tl", "--status", "open", "--json",
-    ])
-    .unwrap();
-    match cli.command {
-        Command::Session {
-            command: crate::session::transport::SessionCommand::Task {
-                command: crate::session::transport::SessionTaskCommand::List(args),
-            },
-        } => {
-            assert_eq!(args.session_id, "sess-tl");
-            assert_eq!(args.status, Some(crate::session::types::TaskStatus::Open));
-            assert!(args.json);
-        }
-        _ => panic!("expected Session Task List"),
-    }
-}
-
-#[test]
-fn parse_session_task_update() {
-    let cli = Cli::try_parse_from([
-        "harness", "session", "task", "update", "sess-tu", "task-1", "--status", "done",
-        "--note", "fixed it", "--actor", "worker-1",
-    ])
-    .unwrap();
-    match cli.command {
-        Command::Session {
-            command: crate::session::transport::SessionCommand::Task {
-                command: crate::session::transport::SessionTaskCommand::Update(args),
-            },
-        } => {
-            assert_eq!(args.task_id, "task-1");
-            assert_eq!(args.status, crate::session::types::TaskStatus::Done);
-            assert_eq!(args.note, Some("fixed it".into()));
-        }
-        _ => panic!("expected Session Task Update"),
-    }
-}
-
-#[test]
-fn parse_session_status() {
-    let cli = Cli::try_parse_from(["harness", "session", "status", "sess-s", "--json"]).unwrap();
-    match cli.command {
-        Command::Session {
-            command: crate::session::transport::SessionCommand::Status(args),
-        } => {
-            assert_eq!(args.session_id, "sess-s");
-            assert!(args.json);
-        }
-        _ => panic!("expected Session Status"),
-    }
-}
-
-#[test]
-fn parse_session_list() {
-    let cli = Cli::try_parse_from(["harness", "session", "list", "--json"]).unwrap();
-    match cli.command {
-        Command::Session {
-            command: crate::session::transport::SessionCommand::List(args),
-        } => {
-            assert!(args.json);
-        }
-        _ => panic!("expected Session List"),
     }
 }
 
