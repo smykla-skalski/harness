@@ -1,5 +1,9 @@
+use std::path::Path;
+
+use crate::agents::runtime;
 use crate::agents::service::record_hook_event;
 use crate::errors::{CliError, CliErrorKind};
+use crate::workspace::utc_now;
 
 use super::adapters::{HookAgent, adapter_for};
 use super::application::{GuardContext, prepare_normalized_context};
@@ -165,6 +169,8 @@ pub fn run_hook_command(agent: HookAgent, skill: &str, hook: &HookCommand) -> i3
         }
     };
 
+    let result = inject_pending_signals(agent, &normalized_for_record, result);
+
     if should_record_hook_event(hook)
         && let Err(error) =
             record_hook_event(agent, skill, hook_name, &normalized_for_record, &result)
@@ -178,4 +184,75 @@ pub fn run_hook_command(agent: HookAgent, skill: &str, hook: &HookCommand) -> i3
         print!("{}", rendered.stdout);
     }
     rendered.exit_code
+}
+
+/// Check for pending signals on `BeforeToolUse` events and inject context.
+///
+/// Non-blocking and failure-tolerant: signal delivery failure is logged but
+/// never breaks the hook.
+fn inject_pending_signals(
+    agent: HookAgent,
+    context: &super::protocol::context::NormalizedHookContext,
+    mut result: NormalizedHookResult,
+) -> NormalizedHookResult {
+    if !matches!(context.event, NormalizedEvent::BeforeToolUse) {
+        return result;
+    }
+    if let Some(text) = collect_signal_context(agent, context) {
+        result.additional_context = Some(match result.additional_context {
+            Some(existing) => format!("{existing}\n{text}"),
+            None => text,
+        });
+    }
+    result
+}
+
+fn collect_signal_context(
+    agent: HookAgent,
+    context: &super::protocol::context::NormalizedHookContext,
+) -> Option<String> {
+    let session_id = &context.session.session_id;
+    if session_id.trim().is_empty() {
+        return None;
+    }
+    let project_dir = context
+        .session
+        .cwd
+        .as_deref()
+        .unwrap_or_else(|| Path::new("."));
+
+    let agent_runtime = runtime::runtime_for(agent);
+    let signal_dir = agent_runtime.signal_dir(project_dir, session_id);
+    let signals = match runtime::signal::read_pending_signals(&signal_dir) {
+        Ok(list) if !list.is_empty() => list,
+        _ => return None,
+    };
+
+    let now = utc_now();
+    let lines: Vec<String> = signals
+        .iter()
+        .map(|signal| {
+            acknowledge_signal(&signal_dir, signal, agent_runtime.name(), session_id, &now);
+            format!("[signal:{}] {}", signal.command, signal.payload.message)
+        })
+        .collect();
+    Some(lines.join("\n"))
+}
+
+fn acknowledge_signal(
+    signal_dir: &Path,
+    signal: &runtime::signal::Signal,
+    agent_name: &str,
+    session_id: &str,
+    now: &str,
+) {
+    let ack = runtime::signal::SignalAck {
+        signal_id: signal.signal_id.clone(),
+        acknowledged_at: now.to_string(),
+        result: runtime::signal::AckResult::Accepted,
+        agent: agent_name.to_string(),
+        session_id: session_id.to_string(),
+        details: None,
+    };
+    let _ = runtime::signal::acknowledge_signal(signal_dir, &ack);
 }
