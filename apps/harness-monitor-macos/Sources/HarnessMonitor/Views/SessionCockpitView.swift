@@ -4,6 +4,7 @@ import SwiftUI
 
 struct SessionCockpitView: View {
   @Bindable var store: MonitorStore
+  @Bindable var actions: CockpitActionCenter
   let detail: SessionDetail
   let timeline: [TimelineEntry]
 
@@ -12,6 +13,7 @@ struct SessionCockpitView: View {
       VStack(alignment: .leading, spacing: 20) {
         header
         metrics
+        SessionActionDock(store: store, actions: actions, detail: detail)
         HStack(alignment: .top, spacing: 16) {
           tasksColumn
           agentsColumn
@@ -293,6 +295,109 @@ struct SessionCockpitView: View {
   }
 }
 
+struct SessionActionDock: View {
+  @Bindable var store: MonitorStore
+  @Bindable var actions: CockpitActionCenter
+  let detail: SessionDetail
+
+  private var firstTaskID: String? {
+    detail.tasks.first?.taskId
+  }
+
+  private var firstAgentID: String? {
+    detail.agents.first?.agentId
+  }
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 12) {
+      HStack(alignment: .top) {
+        VStack(alignment: .leading, spacing: 4) {
+          Text("Action Flow")
+            .font(.system(.headline, design: .rounded, weight: .semibold))
+          Text("Pick a lane, then use the inspector to submit the change.")
+            .font(.system(.subheadline, design: .rounded, weight: .medium))
+            .foregroundStyle(.secondary)
+        }
+        Spacer()
+        VStack(alignment: .trailing, spacing: 4) {
+          if actions.isBusy {
+            ProgressView()
+              .controlSize(.small)
+          } else if !actions.lastAction.isEmpty {
+            Text(actions.lastAction)
+              .font(.caption.bold())
+              .foregroundStyle(MonitorTheme.success)
+          }
+          Text("\(detail.tasks.count) tasks · \(detail.agents.count) agents")
+            .font(.caption.monospacedDigit())
+            .foregroundStyle(.secondary)
+        }
+      }
+
+      HStack(spacing: 12) {
+        flowButton(
+          title: "Task Flow",
+          subtitle: "Create, reassign, checkpoint",
+          symbol: "checklist",
+          action: focusFirstTask
+        )
+        flowButton(
+          title: "People Flow",
+          subtitle: "Change roles and leadership",
+          symbol: "person.2",
+          action: focusFirstAgent
+        )
+        flowButton(
+          title: "Observe Flow",
+          subtitle: "Surface and triage issues",
+          symbol: "eye",
+          action: focusObserver
+        )
+      }
+    }
+    .monitorCard()
+  }
+
+  private func flowButton(
+    title: String,
+    subtitle: String,
+    symbol: String,
+    action: @escaping () -> Void
+  ) -> some View {
+    Button(action: action) {
+      VStack(alignment: .leading, spacing: 8) {
+        Label(title, systemImage: symbol)
+          .font(.system(.headline, design: .rounded, weight: .semibold))
+        Text(subtitle)
+          .font(.caption)
+          .foregroundStyle(.secondary)
+      }
+      .frame(maxWidth: .infinity, alignment: .leading)
+      .padding(14)
+      .background(Color.white.opacity(0.56), in: RoundedRectangle(cornerRadius: 18))
+    }
+    .buttonStyle(.plain)
+  }
+
+  private func focusFirstTask() {
+    guard let taskID = firstTaskID else {
+      return
+    }
+    store.inspect(taskID: taskID)
+  }
+
+  private func focusFirstAgent() {
+    guard let agentID = firstAgentID else {
+      return
+    }
+    store.inspect(agentID: agentID)
+  }
+
+  private func focusObserver() {
+    store.inspectObserver()
+  }
+}
+
 private func signalStatusTaskValue(_ status: SessionSignalStatus) -> TaskStatus {
   switch status {
   case .pending, .deferred:
@@ -307,6 +412,7 @@ private func signalStatusTaskValue(_ status: SessionSignalStatus) -> TaskStatus 
 #Preview("Cockpit") {
   SessionCockpitView(
     store: MonitorStore(daemonController: PreviewDaemonController()),
+    actions: CockpitActionCenter(),
     detail: PreviewFixtures.detail,
     timeline: PreviewFixtures.timeline
   )
