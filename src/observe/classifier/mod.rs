@@ -132,6 +132,11 @@ const ASSISTANT_TEXT_CHECKS: &[TextCheckFn] = &[
     text_checks::check_missing_connection_or_env_var,
 ];
 
+const COORDINATION_TEXT_CHECKS: &[TextCheckFn] = &[
+    text_checks::coordination::check_api_rate_limit,
+    text_checks::coordination::check_guard_denial_loop,
+];
+
 fn run_text_checks(
     checks: &[TextCheckFn],
     context: &mut TextCheckContext<'_>,
@@ -190,6 +195,10 @@ pub fn check_text_for_issues(
 
     if role == MessageRole::Assistant && source_tool.is_none() {
         run_text_checks(ASSISTANT_TEXT_CHECKS, &mut context, &mut issues);
+    }
+
+    if context.state.agent_id.is_some() || context.state.orchestration_session_id.is_some() {
+        run_text_checks(COORDINATION_TEXT_CHECKS, &mut context, &mut issues);
     }
 
     issues

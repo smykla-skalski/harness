@@ -425,6 +425,9 @@ impl Execute for TaskUpdateArgs {
 pub struct SessionObserveArgs {
     /// Session ID.
     pub session_id: String,
+    /// Poll interval in seconds for watch mode (0 = one-shot scan).
+    #[arg(long, default_value = "0")]
+    pub poll_interval: u64,
     /// Output as JSON.
     #[arg(long)]
     pub json: bool,
@@ -436,7 +439,20 @@ pub struct SessionObserveArgs {
 impl Execute for SessionObserveArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
         let project = resolve_project_dir(self.project_dir.as_deref());
-        super::observe::execute_session_observe(&self.session_id, project.as_ref(), self.json)
+        if self.poll_interval > 0 {
+            super::observe::execute_session_watch(
+                &self.session_id,
+                project.as_ref(),
+                self.poll_interval,
+                self.json,
+            )
+        } else {
+            super::observe::execute_session_observe(
+                &self.session_id,
+                project.as_ref(),
+                self.json,
+            )
+        }
     }
 }
 
