@@ -6,7 +6,7 @@ struct SessionsBoardView: View {
   @Bindable var store: MonitorStore
 
   var body: some View {
-    ScrollView {
+    MonitorColumnScrollView {
       VStack(alignment: .leading, spacing: 22) {
         hero
         if store.sessions.isEmpty {
@@ -34,6 +34,7 @@ struct SessionsBoardView: View {
             tint: MonitorTheme.danger
           )
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
 
         VStack(alignment: .leading, spacing: 14) {
           Text("Recent Sessions")
@@ -68,6 +69,7 @@ struct SessionsBoardView: View {
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.secondary)
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(14)
                 .background(Color.white.opacity(0.55), in: RoundedRectangle(cornerRadius: 18))
               }
@@ -75,12 +77,15 @@ struct SessionsBoardView: View {
             }
           }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .monitorCard()
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier(MonitorAccessibility.recentSessionsCard)
       }
-      .padding(24)
+      .frame(maxWidth: .infinity, alignment: .leading)
     }
     .foregroundStyle(MonitorTheme.ink)
-    .background(MonitorTheme.canvas.ignoresSafeArea())
+    .accessibilityFrameMarker(MonitorAccessibility.sessionsBoardRoot)
   }
 
   private var hero: some View {
@@ -166,7 +171,9 @@ struct SessionsBoardView: View {
         .buttonStyle(.bordered)
       }
     }
+    .frame(maxWidth: .infinity, alignment: .leading)
     .monitorCard()
+    .accessibilityElement(children: .contain)
     .accessibilityIdentifier(MonitorAccessibility.onboardingCard)
   }
 

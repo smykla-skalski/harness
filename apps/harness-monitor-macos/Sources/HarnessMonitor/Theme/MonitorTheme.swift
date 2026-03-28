@@ -11,6 +11,22 @@ enum MonitorTheme {
     startPoint: .topLeading,
     endPoint: .bottomTrailing
   )
+  static let sidebarBackground = LinearGradient(
+    colors: [
+      Color(red: 0.28, green: 0.28, blue: 0.26),
+      Color(red: 0.34, green: 0.35, blue: 0.37),
+    ],
+    startPoint: .top,
+    endPoint: .bottom
+  )
+  static let inspectorBackground = LinearGradient(
+    colors: [
+      Color(red: 0.98, green: 0.97, blue: 0.95),
+      Color(red: 0.95, green: 0.93, blue: 0.89),
+    ],
+    startPoint: .topLeading,
+    endPoint: .bottomTrailing
+  )
 
   static let ink = Color(red: 0.12, green: 0.15, blue: 0.19)
   static let accent = Color(red: 0.14, green: 0.43, blue: 0.60)
@@ -18,14 +34,16 @@ enum MonitorTheme {
   static let success = Color(red: 0.22, green: 0.54, blue: 0.31)
   static let caution = Color(red: 0.74, green: 0.47, blue: 0.14)
   static let danger = Color(red: 0.73, green: 0.21, blue: 0.22)
-  static let panel = Color.white.opacity(0.72)
-  static let panelBorder = Color.white.opacity(0.55)
+  static let panel = Color.white.opacity(0.82)
+  static let panelBorder = Color.white.opacity(0.78)
 }
 
 struct MonitorCardModifier: ViewModifier {
   func body(content: Content) -> some View {
     content
+      .frame(maxWidth: .infinity, alignment: .leading)
       .padding(18)
+      .frame(maxWidth: .infinity, alignment: .leading)
       .background(
         RoundedRectangle(cornerRadius: 24, style: .continuous)
           .fill(MonitorTheme.panel)
@@ -35,12 +53,30 @@ struct MonitorCardModifier: ViewModifier {
           )
           .shadow(color: .black.opacity(0.08), radius: 14, x: 0, y: 10)
       )
+      .frame(maxWidth: .infinity, alignment: .leading)
+  }
+}
+
+private struct AccessibilityFrameMarker: View {
+  let identifier: String
+
+  var body: some View {
+    Color.clear
+      .allowsHitTesting(false)
+      .accessibilityElement()
+      .accessibilityIdentifier(identifier)
   }
 }
 
 extension View {
   func monitorCard() -> some View {
     modifier(MonitorCardModifier())
+  }
+
+  func accessibilityFrameMarker(_ identifier: String) -> some View {
+    overlay {
+      AccessibilityFrameMarker(identifier: identifier)
+    }
   }
 }
 

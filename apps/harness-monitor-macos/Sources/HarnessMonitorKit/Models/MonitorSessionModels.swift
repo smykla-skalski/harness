@@ -118,8 +118,20 @@ public struct TaskNote: Codable, Equatable, Identifiable, Sendable {
   public let timestamp: String
   public let agentId: String?
   public let text: String
+  private let stableID = UUID()
 
-  public var id: String { "\(timestamp)-\(text)" }
+  public var id: UUID { stableID }
+  enum CodingKeys: String, CodingKey { case timestamp, agentId, text }
+
+  public init(timestamp: String, agentId: String?, text: String) {
+    self.timestamp = timestamp
+    self.agentId = agentId
+    self.text = text
+  }
+
+  public static func == (lhs: Self, rhs: Self) -> Bool {
+    lhs.timestamp == rhs.timestamp && lhs.agentId == rhs.agentId && lhs.text == rhs.text
+  }
 }
 
 public struct TaskCheckpointSummary: Codable, Equatable, Sendable {
@@ -150,124 +162,29 @@ public struct WorkItem: Codable, Equatable, Identifiable, Sendable {
   public var id: String { taskId }
 }
 
-public enum SignalPriority: String, Codable, CaseIterable, Sendable {
-  case low
-  case normal
-  case high
-  case urgent
+public struct ObserverIssueSummary: Codable, Equatable, Identifiable, Sendable {
+  public let issueId: String
+  public let code: String
+  public let summary: String
+  public let severity: String
+  public let fingerprint: String?
+  public let firstSeenLine: Int?
+  public let lastSeenLine: Int?
+  public let occurrenceCount: Int?
+  public let fixSafety: String?
+  public let evidenceExcerpt: String?
+
+  public var id: String { issueId }
 }
 
-public struct DeliveryConfig: Codable, Equatable, Sendable {
-  public let maxRetries: Int
-  public let retryCount: Int
-  public let idempotencyKey: String?
-}
+public struct ObserverWorkerSummary: Codable, Equatable, Identifiable, Sendable {
+  public let issueId: String
+  public let targetFile: String
+  public let startedAt: String
+  public let agentId: String?
+  public let runtime: String?
 
-public enum JSONValue: Codable, Equatable, Sendable {
-  case array([Self])
-  case bool(Bool)
-  case null
-  case number(Double)
-  case object([String: Self])
-  case string(String)
-
-  public init(from decoder: Decoder) throws {
-    let container = try decoder.singleValueContainer()
-    if let value = try? container.decode(String.self) {
-      self = .string(value)
-    } else if let value = try? container.decode(Bool.self) {
-      self = .bool(value)
-    } else if let value = try? container.decode(Double.self) {
-      self = .number(value)
-    } else if let value = try? container.decode([String: Self].self) {
-      self = .object(value)
-    } else if let value = try? container.decode([Self].self) {
-      self = .array(value)
-    } else if container.decodeNil() {
-      self = .null
-    } else {
-      throw DecodingError.dataCorruptedError(
-        in: container,
-        debugDescription: "Unsupported JSON payload",
-      )
-    }
-  }
-
-  public func encode(to encoder: Encoder) throws {
-    var container = encoder.singleValueContainer()
-    switch self {
-    case .array(let value):
-      try container.encode(value)
-    case .bool(let value):
-      try container.encode(value)
-    case .null:
-      try container.encodeNil()
-    case .number(let value):
-      try container.encode(value)
-    case .object(let value):
-      try container.encode(value)
-    case .string(let value):
-      try container.encode(value)
-    }
-  }
-}
-
-public struct SignalPayload: Codable, Equatable, Sendable {
-  public let message: String
-  public let actionHint: String?
-  public let relatedFiles: [String]
-  public let metadata: JSONValue
-}
-
-public struct Signal: Codable, Equatable, Identifiable, Sendable {
-  public let signalId: String
-  public let version: Int
-  public let createdAt: String
-  public let expiresAt: String
-  public let sourceAgent: String
-  public let command: String
-  public let priority: SignalPriority
-  public let payload: SignalPayload
-  public let delivery: DeliveryConfig
-
-  public var id: String { signalId }
-}
-
-public enum AckResult: String, Codable, CaseIterable, Sendable {
-  case accepted
-  case rejected
-  case deferred
-  case expired
-}
-
-public struct SignalAck: Codable, Equatable, Identifiable, Sendable {
-  public let signalId: String
-  public let acknowledgedAt: String
-  public let result: AckResult
-  public let agent: String
-  public let sessionId: String
-  public let details: String?
-
-  public var id: String { signalId }
-}
-
-public enum SessionSignalStatus: String, Codable, CaseIterable, Sendable {
-  case pending
-  case acknowledged
-  case rejected
-  case deferred
-  case expired
-}
-
-public struct SessionSignalRecord: Codable, Equatable, Identifiable, Sendable {
-  public let runtime: String
-  public let agentId: String
-  public let sessionId: String
-  public let status: SessionSignalStatus
-  public let signal: Signal
-  public let acknowledgment: SignalAck?
-
-  public var id: String { signal.signalId }
+  public var id: String { "\(issueId)-\(targetFile)-\(agentId ?? runtime ?? "worker")" }
 }
 
 public struct ObserverSummary: Codable, Equatable, Sendable {
@@ -276,6 +193,9 @@ public struct ObserverSummary: Codable, Equatable, Sendable {
   public let openIssueCount: Int
   public let mutedCodeCount: Int
   public let activeWorkerCount: Int
+  public let openIssues: [ObserverIssueSummary]?
+  public let mutedCodes: [String]?
+  public let activeWorkers: [ObserverWorkerSummary]?
 }
 
 public struct SessionDetail: Codable, Equatable, Sendable {
@@ -284,28 +204,6 @@ public struct SessionDetail: Codable, Equatable, Sendable {
   public let tasks: [WorkItem]
   public let signals: [SessionSignalRecord]
   public let observer: ObserverSummary?
-}
-
-public struct TimelineEntry: Codable, Equatable, Identifiable, Sendable {
-  public let entryId: String
-  public let recordedAt: String
-  public let kind: String
-  public let sessionId: String
-  public let agentId: String?
-  public let taskId: String?
-  public let summary: String
-  public let payload: JSONValue
-
-  public var id: String { entryId }
-}
-
-public struct StreamEvent: Codable, Equatable, Identifiable, Sendable {
-  public let event: String
-  public let recordedAt: String
-  public let sessionId: String?
-  public let payload: JSONValue
-
-  public var id: String { "\(event)-\(recordedAt)-\(sessionId ?? "global")" }
 }
 
 public struct RoleChangeRequest: Codable, Equatable, Sendable {

@@ -11,7 +11,10 @@ use crate::session::types::{
 };
 
 use super::index::{self, DiscoveredProject, ResolvedSession};
-use super::protocol::{ObserverSummary, ProjectSummary, SessionDetail, SessionSummary};
+use super::protocol::{
+    ObserverActiveWorker, ObserverOpenIssue, ObserverSummary, ProjectSummary, SessionDetail,
+    SessionSummary,
+};
 use super::state;
 
 /// Build summaries for all discovered projects.
@@ -134,6 +137,31 @@ fn load_observer_summary(
         open_issue_count: observer.open_issues.len(),
         muted_code_count: observer.muted_codes.len(),
         active_worker_count: observer.active_workers.len(),
+        open_issues: observer
+            .open_issues
+            .into_iter()
+            .map(|issue| ObserverOpenIssue {
+                issue_id: issue.issue_id,
+                code: issue.code,
+                severity: issue.severity,
+                category: issue.category,
+                summary: issue.summary,
+                occurrence_count: issue.occurrence_count,
+                last_seen_line: issue.last_seen_line,
+                fix_safety: issue.fix_safety,
+            })
+            .collect(),
+        muted_codes: observer.muted_codes,
+        active_workers: observer
+            .active_workers
+            .into_iter()
+            .map(|worker| ObserverActiveWorker {
+                issue_id: worker.issue_id,
+                target_file: worker.target_file,
+                started_at: worker.started_at,
+                agent_id: worker.agent_id,
+            })
+            .collect(),
     }))
 }
 
@@ -386,6 +414,31 @@ mod tests {
                         .expect("observer")
                         .active_worker_count,
                     1
+                );
+                assert_eq!(
+                    detail
+                        .observer
+                        .as_ref()
+                        .expect("observer")
+                        .open_issues
+                        .first()
+                        .expect("open issue")
+                        .summary,
+                    "worker stalled"
+                );
+                assert_eq!(
+                    detail.observer.as_ref().expect("observer").muted_codes,
+                    vec![IssueCode::AgentRepeatedError]
+                );
+                assert_eq!(
+                    detail
+                        .observer
+                        .as_ref()
+                        .expect("observer")
+                        .active_workers
+                        .first()
+                        .and_then(|worker| worker.agent_id.as_deref()),
+                    Some("codex-worker")
                 );
 
                 let cache_path = state::session_cache_path("project-alpha", session_id);

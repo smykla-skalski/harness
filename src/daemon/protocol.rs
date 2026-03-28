@@ -3,6 +3,7 @@ use serde_json::Value;
 
 use super::launchd::LaunchAgentStatus;
 use super::state::{DaemonAuditEvent, DaemonDiagnostics, DaemonManifest};
+use crate::observe::types::{FixSafety, IssueCategory, IssueCode, IssueSeverity};
 use crate::session::types::{
     AgentRegistration, SessionMetrics, SessionRole, SessionSignalRecord, SessionStatus,
     TaskSeverity, TaskStatus, WorkItem,
@@ -62,6 +63,29 @@ pub struct ObserverSummary {
     pub open_issue_count: usize,
     pub muted_code_count: usize,
     pub active_worker_count: usize,
+    pub open_issues: Vec<ObserverOpenIssue>,
+    pub muted_codes: Vec<IssueCode>,
+    pub active_workers: Vec<ObserverActiveWorker>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ObserverOpenIssue {
+    pub issue_id: String,
+    pub code: IssueCode,
+    pub severity: IssueSeverity,
+    pub category: IssueCategory,
+    pub summary: String,
+    pub occurrence_count: usize,
+    pub last_seen_line: usize,
+    pub fix_safety: FixSafety,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ObserverActiveWorker {
+    pub issue_id: String,
+    pub target_file: String,
+    pub started_at: String,
+    pub agent_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -4,6 +4,7 @@ import SwiftUI
 
 struct ContentView: View {
   @Bindable var store: MonitorStore
+  @State private var columnVisibility: NavigationSplitViewVisibility = .all
   @State private var showsPreferences = false
 
   private var selectedDetail: SessionDetail? {
@@ -17,52 +18,79 @@ struct ContentView: View {
   }
 
   var body: some View {
-    NavigationSplitView {
-      SidebarView(store: store)
-        .navigationSplitViewColumnWidth(min: 300, ideal: 350)
-    } content: {
-      Group {
-        if let detail = selectedDetail {
-          SessionCockpitView(
-            store: store,
-            detail: detail,
-            timeline: store.timeline
-          )
-        } else {
-          SessionsBoardView(store: store)
-        }
-      }
-      .navigationSplitViewColumnWidth(min: 600, ideal: 840)
-    } detail: {
-      InspectorColumnView(store: store)
-        .navigationSplitViewColumnWidth(min: 320, ideal: 380)
-    }
-    .background(MonitorTheme.canvas.ignoresSafeArea())
-    .searchable(text: $store.searchText, prompt: "Search sessions, projects, leaders")
-    .navigationTitle("Harness Monitor")
-    .toolbar {
-      ToolbarItemGroup {
-        Button {
-          Task {
-            await store.refresh()
-          }
-        } label: {
-          Label("Refresh", systemImage: "arrow.clockwise")
-        }
-        .keyboardShortcut("r", modifiers: [.command])
-        .accessibilityIdentifier(MonitorAccessibility.refreshButton)
+    ZStack {
+      MonitorTheme.canvas
 
-        Button {
-          showsPreferences.toggle()
-        } label: {
-          Label("Daemon", systemImage: "gearshape.2")
+      NavigationSplitView(columnVisibility: $columnVisibility) {
+        SidebarView(store: store)
+          .navigationSplitViewColumnWidth(min: 300, ideal: 350)
+      } content: {
+        NavigationStack {
+          Group {
+            if let detail = selectedDetail {
+              SessionCockpitView(
+                store: store,
+                detail: detail,
+                timeline: store.timeline
+              )
+            } else {
+              SessionsBoardView(store: store)
+            }
+          }
+          .frame(maxWidth: .infinity, maxHeight: .infinity)
+          .accessibilityFrameMarker(MonitorAccessibility.contentRoot)
         }
-        .accessibilityIdentifier(MonitorAccessibility.daemonPreferencesButton)
+        .searchable(text: $store.searchText, prompt: "Search sessions, projects, leaders")
+        .navigationTitle("Harness Monitor")
+        .toolbar {
+          ToolbarItem(placement: .navigation) {
+            Button(action: toggleSidebar) {
+              Label("Toggle Sidebar", systemImage: "sidebar.leading")
+            }
+            .help(columnVisibility == .all ? "Hide Sidebar" : "Show Sidebar")
+            .accessibilityIdentifier(MonitorAccessibility.sidebarToggleButton)
+          }
+
+          ToolbarItemGroup {
+            Button {
+              Task {
+                await store.refresh()
+              }
+            } label: {
+              Label("Refresh", systemImage: "arrow.clockwise")
+            }
+            .keyboardShortcut("r", modifiers: [.command])
+            .accessibilityIdentifier(MonitorAccessibility.refreshButton)
+
+            Button {
+              showsPreferences.toggle()
+            } label: {
+              Label("Daemon", systemImage: "gearshape.2")
+            }
+            .accessibilityIdentifier(MonitorAccessibility.daemonPreferencesButton)
+          }
+        }
+        .navigationSplitViewColumnWidth(min: 600, ideal: 840)
+      } detail: {
+        InspectorColumnView(store: store)
+          .navigationSplitViewColumnWidth(min: 320, ideal: 380)
       }
+      .navigationSplitViewStyle(.balanced)
     }
+    .frame(maxWidth: .infinity, maxHeight: .infinity)
     .sheet(isPresented: $showsPreferences) {
       PreferencesView(store: store)
         .frame(minWidth: 620, minHeight: 420)
+    }
+  }
+
+  private func toggleSidebar() {
+    withAnimation(.easeInOut(duration: 0.2)) {
+      if columnVisibility == .all {
+        columnVisibility = .doubleColumn
+      } else {
+        columnVisibility = .all
+      }
     }
   }
 }

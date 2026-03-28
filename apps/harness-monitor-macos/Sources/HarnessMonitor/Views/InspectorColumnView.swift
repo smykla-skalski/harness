@@ -16,36 +16,41 @@ struct InspectorColumnView: View {
   }
 
   var body: some View {
-    ScrollView {
-      VStack(alignment: .leading, spacing: 18) {
-        if let task = store.selectedTask {
-          taskInspector(task)
-        } else if let agent = store.selectedAgent {
-          agentInspector(agent)
-        } else if let signal = store.selectedSignal {
-          signalInspector(signal)
-        } else if let observer = selectedObserver {
-          observerInspector(observer)
-        } else if let detail = store.selectedSession {
-          sessionInspector(detail)
-        } else {
-          emptyState
-        }
+    ZStack(alignment: .topLeading) {
+      MonitorTheme.inspectorBackground
 
-        if let detail = store.selectedSession {
-          InspectorActionSections(
-            store: store,
-            detail: detail,
-            selectedTask: store.selectedTask,
-            selectedAgent: store.selectedAgent,
-            selectedObserver: selectedObserver
-          )
+      MonitorColumnScrollView(horizontalPadding: 18, verticalPadding: 22) {
+        VStack(alignment: .leading, spacing: 18) {
+          if let task = store.selectedTask {
+            taskInspector(task)
+          } else if let agent = store.selectedAgent {
+            agentInspector(agent)
+          } else if let signal = store.selectedSignal {
+            signalInspector(signal)
+          } else if let observer = selectedObserver {
+            observerInspector(observer)
+          } else if let detail = store.selectedSession {
+            sessionInspector(detail)
+          } else {
+            emptyState
+          }
+
+          if let detail = store.selectedSession {
+            InspectorActionSections(
+              store: store,
+              detail: detail,
+              selectedTask: store.selectedTask,
+              selectedAgent: store.selectedAgent,
+              selectedObserver: selectedObserver
+            )
+          }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
       }
-      .padding(22)
     }
-    .background(MonitorTheme.canvas.ignoresSafeArea())
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     .foregroundStyle(MonitorTheme.ink)
+    .accessibilityFrameMarker(MonitorAccessibility.inspectorRoot)
   }
 
   private func sessionInspector(_ detail: SessionDetail) -> some View {
@@ -61,7 +66,10 @@ struct InspectorColumnView: View {
         keyValue("Last Activity", formatTimestamp(detail.session.lastActivityAt))
       }
     }
+    .frame(maxWidth: .infinity, alignment: .leading)
     .monitorCard()
+    .accessibilityElement(children: .contain)
+    .accessibilityIdentifier(MonitorAccessibility.sessionInspectorCard)
   }
 
   private func taskInspector(_ task: WorkItem) -> some View {
@@ -152,8 +160,70 @@ struct InspectorColumnView: View {
       keyValue("Muted Codes", "\(observer.mutedCodeCount)")
       keyValue("Active Workers", "\(observer.activeWorkerCount)")
       keyValue("Last Sweep", formatTimestamp(observer.lastScanTime))
+      if let mutedCodes = observer.mutedCodes, !mutedCodes.isEmpty {
+        detailSection(title: "Muted Codes") {
+          flowBadges(mutedCodes.map { $0.replacingOccurrences(of: "_", with: " ") })
+        }
+      }
+      if let openIssues = observer.openIssues, !openIssues.isEmpty {
+        detailSection(title: "Open Issues") {
+          VStack(alignment: .leading, spacing: 8) {
+            ForEach(openIssues) { issue in
+              VStack(alignment: .leading, spacing: 4) {
+                HStack(alignment: .firstTextBaseline) {
+                  Text(issue.code)
+                    .font(.caption.bold())
+                    .textCase(.uppercase)
+                  Spacer()
+                  Text(issue.severity.capitalized)
+                    .font(.caption2.bold())
+                }
+                Text(issue.summary)
+                  .font(.subheadline)
+                if let evidenceExcerpt = issue.evidenceExcerpt {
+                  Text(evidenceExcerpt)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+                }
+              }
+              .padding(.horizontal, 12)
+              .padding(.vertical, 10)
+              .background(Color.white.opacity(0.55), in: RoundedRectangle(cornerRadius: 14))
+            }
+          }
+        }
+      }
+      if let activeWorkers = observer.activeWorkers, !activeWorkers.isEmpty {
+        detailSection(title: "Active Workers") {
+          VStack(alignment: .leading, spacing: 8) {
+            ForEach(activeWorkers) { worker in
+              VStack(alignment: .leading, spacing: 4) {
+                HStack {
+                  Text(worker.agentId ?? "worker")
+                    .font(.subheadline.bold())
+                  Spacer()
+                  Text(worker.startedAt)
+                    .font(.caption.monospaced())
+                    .foregroundStyle(.secondary)
+                }
+                Text(worker.targetFile)
+                  .font(.caption)
+                  .foregroundStyle(.secondary)
+                  .lineLimit(2)
+              }
+              .padding(.horizontal, 12)
+              .padding(.vertical, 10)
+              .background(Color.white.opacity(0.55), in: RoundedRectangle(cornerRadius: 14))
+            }
+          }
+        }
+      }
     }
+    .frame(maxWidth: .infinity, alignment: .leading)
     .monitorCard()
+    .accessibilityElement(children: .contain)
+    .accessibilityIdentifier(MonitorAccessibility.observerInspectorCard)
   }
 
   private var emptyState: some View {
@@ -163,7 +233,10 @@ struct InspectorColumnView: View {
       Text("Select a session to inspect live task, agent, and signal detail.")
         .foregroundStyle(.secondary)
     }
+    .frame(maxWidth: .infinity, alignment: .leading)
     .monitorCard()
+    .accessibilityElement(children: .contain)
+    .accessibilityIdentifier(MonitorAccessibility.inspectorEmptyState)
   }
 
   private func keyValue(_ title: String, _ value: String) -> some View {
@@ -174,5 +247,111 @@ struct InspectorColumnView: View {
       Text(value)
         .font(.system(.body, design: .rounded, weight: .semibold))
     }
+  }
+
+  private func detailSection<Content: View>(
+    title: String,
+    @ViewBuilder content: () -> Content
+  ) -> some View {
+    VStack(alignment: .leading, spacing: 8) {
+      Text(title)
+        .font(.caption.bold())
+        .textCase(.uppercase)
+        .foregroundStyle(.secondary)
+      content()
+    }
+  }
+
+  private func flowBadges(_ values: [String]) -> some View {
+    VStack(alignment: .leading, spacing: 8) {
+      ForEach(values, id: \.self) { value in
+        Text(value)
+          .font(.caption.weight(.semibold))
+          .padding(.horizontal, 10)
+          .padding(.vertical, 5)
+          .background(Color.white.opacity(0.68), in: Capsule())
+      }
+    }
+  }
+}
+
+struct InspectorObserverSummarySection: View {
+  let observer: ObserverSummary
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 8) {
+      actionHeader(
+        title: "Observe",
+        subtitle: "The observer loop keeps the session moving and surfaces drift."
+      )
+      HStack {
+        badge("Open \(observer.openIssueCount)")
+        badge("Muted \(observer.mutedCodeCount)")
+        badge("Workers \(observer.activeWorkerCount)")
+      }
+      Text("Last sweep \(formatTimestamp(observer.lastScanTime))")
+        .font(.caption.monospaced())
+        .foregroundStyle(.secondary)
+      if let mutedCodes = observer.mutedCodes, !mutedCodes.isEmpty {
+        Text("Muted codes")
+          .font(.caption.bold())
+          .foregroundStyle(.secondary)
+        Text(mutedCodes.prefix(3).joined(separator: " · "))
+          .font(.caption)
+          .foregroundStyle(.secondary)
+      }
+      if let openIssues = observer.openIssues, !openIssues.isEmpty {
+        Text("Open issues")
+          .font(.caption.bold())
+          .foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: 6) {
+          ForEach(openIssues.prefix(2)) { issue in
+            VStack(alignment: .leading, spacing: 2) {
+              Text("\(issue.code) · \(issue.summary)")
+                .font(.caption)
+              Text("Severity \(issue.severity.capitalized)")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+            }
+          }
+        }
+      }
+      if let activeWorkers = observer.activeWorkers, !activeWorkers.isEmpty {
+        Text("Active workers")
+          .font(.caption.bold())
+          .foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: 6) {
+          ForEach(activeWorkers.prefix(2)) { worker in
+            VStack(alignment: .leading, spacing: 2) {
+              Text(worker.agentId ?? "worker")
+                .font(.caption)
+              Text(worker.targetFile)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+            }
+          }
+        }
+      }
+    }
+    .monitorCard()
+  }
+
+  private func actionHeader(title: String, subtitle: String) -> some View {
+    VStack(alignment: .leading, spacing: 4) {
+      Text(title)
+        .font(.system(.headline, design: .rounded, weight: .semibold))
+      Text(subtitle)
+        .font(.system(.subheadline, design: .rounded, weight: .medium))
+        .foregroundStyle(.secondary)
+    }
+  }
+
+  private func badge(_ value: String) -> some View {
+    Text(value)
+      .font(.caption.bold())
+      .padding(.horizontal, 10)
+      .padding(.vertical, 5)
+      .background(Color.white.opacity(0.68), in: Capsule())
   }
 }
