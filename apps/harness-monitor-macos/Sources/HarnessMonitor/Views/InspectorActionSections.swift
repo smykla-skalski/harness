@@ -21,7 +21,6 @@ struct InspectorActionSections: View {
   @State private var role: SessionRole = .worker
   @State private var transferLeaderID = ""
   @State private var transferReason = ""
-
   private var selectionKey: String {
     [
       detail.session.sessionId,
@@ -47,7 +46,7 @@ struct InspectorActionSections: View {
       leaderActions
 
       if let selectedObserver {
-        observerSummary(observer: selectedObserver)
+        InspectorObserverSummarySection(observer: selectedObserver)
       }
     }
     .textFieldStyle(.roundedBorder)
@@ -56,7 +55,6 @@ struct InspectorActionSections: View {
     }
   }
 }
-
 extension InspectorActionSections {
   fileprivate var statusBanner: some View {
     VStack(alignment: .leading, spacing: 8) {
@@ -86,7 +84,6 @@ extension InspectorActionSections {
     }
     .monitorCard()
   }
-
   fileprivate func taskActions(task: WorkItem) -> some View {
     VStack(alignment: .leading, spacing: 12) {
       actionHeader(
@@ -151,7 +148,6 @@ extension InspectorActionSections {
     }
     .monitorCard()
   }
-
   fileprivate var sessionTaskActions: some View {
     VStack(alignment: .leading, spacing: 12) {
       actionHeader(
@@ -175,7 +171,6 @@ extension InspectorActionSections {
     }
     .monitorCard()
   }
-
   fileprivate func roleActions(agent: AgentRegistration) -> some View {
     VStack(alignment: .leading, spacing: 12) {
       actionHeader(
@@ -197,7 +192,6 @@ extension InspectorActionSections {
     }
     .monitorCard()
   }
-
   fileprivate var leaderActions: some View {
     VStack(alignment: .leading, spacing: 12) {
       actionHeader(
@@ -229,7 +223,6 @@ extension InspectorActionSections {
         .foregroundStyle(.secondary)
     }
   }
-
   fileprivate func badge(_ value: String) -> some View {
     Text(value)
       .font(.caption.bold())
@@ -237,14 +230,12 @@ extension InspectorActionSections {
       .padding(.vertical, 5)
       .background(Color.white.opacity(0.68), in: Capsule())
   }
-
   fileprivate var checkpointBinding: Binding<Double> {
     Binding(
       get: { Double(checkpointProgress) },
       set: { checkpointProgress = Int($0) }
     )
   }
-
   fileprivate func configureDefaults() {
     if let selectedTask {
       taskID = selectedTask.taskId
@@ -264,7 +255,6 @@ extension InspectorActionSections {
       transferLeaderID = detail.agents.first?.agentId ?? ""
     }
   }
-
   fileprivate func createTask() async {
     let title = createTitle.trimmingCharacters(in: .whitespacesAndNewlines)
     let context = createContext.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -282,7 +272,6 @@ extension InspectorActionSections {
     createSeverity = .medium
     configureDefaults()
   }
-
   fileprivate func assignSelectedTask() async {
     guard !taskID.isEmpty, !assigneeID.isEmpty else {
       return
@@ -291,7 +280,6 @@ extension InspectorActionSections {
     await store.assignTask(taskID: taskID, agentID: assigneeID)
     configureDefaults()
   }
-
   fileprivate func updateSelectedTask() async {
     guard !taskID.isEmpty else {
       return
@@ -306,7 +294,6 @@ extension InspectorActionSections {
     statusNote = ""
     configureDefaults()
   }
-
   fileprivate func checkpointSelectedTask() async {
     let summary = checkpointSummary.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !taskID.isEmpty, !summary.isEmpty else {
@@ -321,7 +308,6 @@ extension InspectorActionSections {
     checkpointSummary = ""
     configureDefaults()
   }
-
   fileprivate func changeSelectedRole() async {
     guard let agentID = selectedAgent?.agentId else {
       return
@@ -330,7 +316,6 @@ extension InspectorActionSections {
     await store.changeRole(agentID: agentID, role: role)
     configureDefaults()
   }
-
   fileprivate func transferLeader() async {
     let reason = transferReason.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !transferLeaderID.isEmpty else {

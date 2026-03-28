@@ -169,7 +169,62 @@ public enum PreviewFixtures {
     lastScanTime: "2026-03-28T14:17:45Z",
     openIssueCount: 3,
     mutedCodeCount: 1,
-    activeWorkerCount: 2
+    activeWorkerCount: 2,
+    openIssues: [
+      ObserverIssueSummary(
+        issueId: "issue-1",
+        code: "agent_stalled_progress",
+        summary: "worker-codex stalled while waiting on the signal ack",
+        severity: "critical",
+        fingerprint: "issue-1-fingerprint",
+        firstSeenLine: 42,
+        lastSeenLine: 48,
+        occurrenceCount: 2,
+        fixSafety: "triage_required",
+        evidenceExcerpt: "No progress checkpoint after 12 minutes."
+      ),
+      ObserverIssueSummary(
+        issueId: "issue-2",
+        code: "tool_misuse",
+        summary: "agent used shell tooling for a pure daemon read",
+        severity: "medium",
+        fingerprint: "issue-2-fingerprint",
+        firstSeenLine: 76,
+        lastSeenLine: 76,
+        occurrenceCount: 1,
+        fixSafety: "safe",
+        evidenceExcerpt: "Prefer the monitor daemon API for session detail."
+      ),
+      ObserverIssueSummary(
+        issueId: "issue-3",
+        code: "repeated_error",
+        summary: "observer keeps seeing the same 529 daemon failure",
+        severity: "low",
+        fingerprint: "issue-3-fingerprint",
+        firstSeenLine: 91,
+        lastSeenLine: 94,
+        occurrenceCount: 3,
+        fixSafety: "safe",
+        evidenceExcerpt: "Retry pattern needs a softer heuristic."
+      ),
+    ],
+    mutedCodes: ["agent_repeated_error"],
+    activeWorkers: [
+      ObserverWorkerSummary(
+        issueId: "issue-1",
+        targetFile: "src/daemon/timeline.rs",
+        startedAt: "2026-03-28T14:16:30Z",
+        agentId: "worker-codex",
+        runtime: "codex"
+      ),
+      ObserverWorkerSummary(
+        issueId: "issue-2",
+        targetFile: "Sources/HarnessMonitor/Views/InspectorColumnView.swift",
+        startedAt: "2026-03-28T14:16:55Z",
+        agentId: "worker-gemini",
+        runtime: "gemini"
+      ),
+    ]
   )
 
   public static let detail = SessionDetail(

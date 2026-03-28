@@ -8,7 +8,7 @@ struct SessionCockpitView: View {
   let timeline: [TimelineEntry]
 
   var body: some View {
-    ScrollView {
+    MonitorColumnScrollView {
       VStack(alignment: .leading, spacing: 20) {
         header
         metrics
@@ -20,10 +20,9 @@ struct SessionCockpitView: View {
         signalsSection
         timelineSection
       }
-      .padding(24)
+      .frame(maxWidth: .infinity, alignment: .leading)
     }
     .foregroundStyle(MonitorTheme.ink)
-    .background(MonitorTheme.canvas.ignoresSafeArea())
   }
 
   private var header: some View {
@@ -64,20 +63,37 @@ struct SessionCockpitView: View {
         Button {
           store.inspectObserver()
         } label: {
-          HStack(spacing: 16) {
-            label("Observe", value: observer.observeId)
-            label("Open Issues", value: "\(observer.openIssueCount)")
-            label("Muted", value: "\(observer.mutedCodeCount)")
-            label("Workers", value: "\(observer.activeWorkerCount)")
-            Spacer()
-            label("Last Sweep", value: formatTimestamp(observer.lastScanTime))
+          VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 16) {
+              label("Observe", value: observer.observeId)
+              label("Open Issues", value: "\(observer.openIssueCount)")
+              label("Muted", value: "\(observer.mutedCodeCount)")
+              label("Workers", value: "\(observer.activeWorkerCount)")
+              Spacer()
+              label("Last Sweep", value: formatTimestamp(observer.lastScanTime))
+            }
+            if let openIssues = observer.openIssues, !openIssues.isEmpty {
+              Text(openIssues.prefix(2).map(\.summary).joined(separator: " · "))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+            }
+            if let mutedCodes = observer.mutedCodes, !mutedCodes.isEmpty {
+              Text("Muted: \(mutedCodes.prefix(3).joined(separator: ", "))")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+            }
           }
+          .frame(maxWidth: .infinity, alignment: .leading)
         }
         .buttonStyle(.plain)
+        .accessibilityIdentifier("monitor.session.observe.summary")
         .padding(14)
         .background(Color.white.opacity(0.55), in: RoundedRectangle(cornerRadius: 18))
       }
     }
+    .frame(maxWidth: .infinity, alignment: .leading)
     .monitorCard()
   }
 
@@ -257,10 +273,12 @@ struct SessionCockpitView: View {
               .foregroundStyle(.secondary)
           }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(12)
         .background(Color.white.opacity(0.48), in: RoundedRectangle(cornerRadius: 16))
       }
     }
+    .frame(maxWidth: .infinity, alignment: .leading)
     .monitorCard()
   }
 
