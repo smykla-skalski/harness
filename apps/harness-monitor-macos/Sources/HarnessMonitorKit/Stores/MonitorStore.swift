@@ -58,6 +58,7 @@ public final class MonitorStore {
   public var sessionFilter: SessionFilter = .active
   public var isRefreshing = false
   public var isBusy = false
+  public var lastAction = ""
   public var lastError: String?
 
   let daemonController: any DaemonControlling
@@ -181,11 +182,13 @@ public final class MonitorStore {
 
     isBusy = true
     defer { isBusy = false }
+    lastError = nil
 
     do {
       _ = actor
       selectedSession = try await client.observeSession(sessionID: sessionID)
       timeline = try await client.timeline(sessionID: sessionID)
+      lastAction = "Observe session"
     } catch {
       lastError = error.localizedDescription
     }
@@ -198,6 +201,7 @@ public final class MonitorStore {
 
     isBusy = true
     defer { isBusy = false }
+    lastError = nil
 
     do {
       selectedSession = try await client.endSession(
@@ -206,6 +210,7 @@ public final class MonitorStore {
       )
       timeline = try await client.timeline(sessionID: sessionID)
       await refresh(using: client, preserveSelection: true)
+      lastAction = "End session"
     } catch {
       lastError = error.localizedDescription
     }
@@ -224,6 +229,7 @@ public final class MonitorStore {
 
     isBusy = true
     defer { isBusy = false }
+    lastError = nil
 
     do {
       selectedSession = try await client.sendSignal(
@@ -237,6 +243,7 @@ public final class MonitorStore {
         )
       )
       timeline = try await client.timeline(sessionID: sessionID)
+      lastAction = "Send signal"
     } catch {
       lastError = error.localizedDescription
     }
