@@ -4,8 +4,8 @@ use std::fs::{File, OpenOptions};
 use std::io::Write as _;
 use std::path::{Path, PathBuf};
 
-use fs2::FileExt;
 use fs_err as fs;
+use fs2::FileExt;
 use serde::{Deserialize, Serialize};
 
 use crate::errors::{CliError, CliErrorKind};
@@ -13,7 +13,7 @@ use crate::infra::io::{read_json_typed, validate_safe_segment, write_json_pretty
 use crate::infra::persistence::versioned_json::VersionedJsonRepository;
 use crate::workspace::{project_context_dir, utc_now};
 
-use super::types::{SessionLogEntry, SessionState, SessionTransition, CURRENT_VERSION};
+use super::types::{CURRENT_VERSION, SessionLogEntry, SessionState, SessionTransition};
 
 fn orchestration_root(project_dir: &Path) -> PathBuf {
     project_context_dir(project_dir).join("orchestration")

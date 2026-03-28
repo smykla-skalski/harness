@@ -49,10 +49,7 @@ fn coordination_codes_in_registry() {
     ];
     for code in codes {
         let meta = issue_code_meta(code);
-        assert!(
-            meta.is_some(),
-            "{code:?} should be in the registry",
-        );
+        assert!(meta.is_some(), "{code:?} should be in the registry",);
         assert_eq!(
             meta.unwrap().default_category,
             IssueCategory::AgentCoordination,
@@ -106,13 +103,7 @@ fn stalled_agent_fires_when_no_tool_uses() {
 fn stalled_agent_does_not_fire_before_line_50() {
     let mut state = make_state();
     state.agent_id = Some("codex-early".into());
-    let issues = check_text_for_issues(
-        10,
-        MessageRole::Assistant,
-        "thinking...",
-        None,
-        &mut state,
-    );
+    let issues = check_text_for_issues(10, MessageRole::Assistant, "thinking...", None, &mut state);
     let stalled: Vec<_> = issues
         .iter()
         .filter(|issue| issue.code == IssueCode::AgentStalledProgress)
@@ -125,8 +116,12 @@ fn cross_agent_file_conflict_detected() {
     let mut state = make_state();
     state.agent_id = Some("codex-1".into());
     state.orchestration_session_id = Some("sess-1".into());
-    // Simulate a file already edited by 2 agents
-    state.edit_counts.insert("src/main.rs".into(), 2);
+    let editors = state
+        .cross_agent_editors
+        .entry("src/main.rs".into())
+        .or_default();
+    editors.insert("claude-1".into());
+    editors.insert("codex-1".into());
     let issues = check_text_for_issues(
         10,
         MessageRole::Assistant,
@@ -147,7 +142,12 @@ fn cross_agent_file_conflict_detected() {
 #[test]
 fn cross_agent_file_conflict_not_triggered_without_session() {
     let mut state = make_state();
-    state.edit_counts.insert("src/lib.rs".into(), 3);
+    let editors = state
+        .cross_agent_editors
+        .entry("src/lib.rs".into())
+        .or_default();
+    editors.insert("claude-1".into());
+    editors.insert("codex-1".into());
     let issues = check_text_for_issues(
         10,
         MessageRole::Assistant,
@@ -159,5 +159,44 @@ fn cross_agent_file_conflict_not_triggered_without_session() {
         .iter()
         .filter(|issue| issue.code == IssueCode::CrossAgentFileConflict)
         .collect();
-    assert!(conflicts.is_empty(), "should not fire without orchestration context");
+    assert!(
+        conflicts.is_empty(),
+        "should not fire without orchestration context"
+    );
+}
+
+#[test]
+fn guard_denial_loop_detected_after_three_denials() {
+    let mut state = make_state();
+    state.agent_id = Some("codex-1".into());
+    state.agent_role = Some("worker".into());
+
+    for line in [10, 20] {
+        let issues = check_text_for_issues(
+            line,
+            MessageRole::Assistant,
+            "The system denied this tool call because it violates policy",
+            None,
+            &mut state,
+        );
+        assert!(
+            issues
+                .iter()
+                .all(|issue| issue.code != IssueCode::AgentGuardDenialLoop)
+        );
+    }
+
+    let issues = check_text_for_issues(
+        30,
+        MessageRole::Assistant,
+        "The system denied this tool call because it violates policy",
+        None,
+        &mut state,
+    );
+    assert!(
+        issues
+            .iter()
+            .any(|issue| issue.code == IssueCode::AgentGuardDenialLoop),
+        "third denial should trigger the guard loop detector",
+    );
 }

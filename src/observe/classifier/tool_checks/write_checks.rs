@@ -45,6 +45,7 @@ pub(super) fn check_write_edit_tool_use(
         *count += 1;
         *count
     };
+    track_cross_agent_editor(state, path);
 
     if current_count == 10 || current_count == 20 {
         let details = format!("Path: {path}");
@@ -173,4 +174,18 @@ pub(super) fn check_managed_file_writes(
             break;
         }
     }
+}
+
+fn track_cross_agent_editor(state: &mut ScanState, path: &str) {
+    if state.orchestration_session_id.is_none() {
+        return;
+    }
+    let Some(agent_id) = state.agent_id.clone() else {
+        return;
+    };
+    state
+        .cross_agent_editors
+        .entry(path.to_string())
+        .or_default()
+        .insert(agent_id);
 }

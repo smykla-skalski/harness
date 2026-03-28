@@ -38,7 +38,9 @@ pub fn run_command(command: impl Borrow<Command>) -> Result<i32, CliError> {
 }
 
 pub fn run_cmd(command: RunCommand) -> Command {
-    Command::Run { command: Box::new(command) }
+    Command::Run {
+        command: Box::new(command),
+    }
 }
 
 pub fn setup_cmd(command: SetupCommand) -> Command {

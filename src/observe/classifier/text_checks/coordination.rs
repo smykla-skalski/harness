@@ -1,5 +1,7 @@
-use super::super::emitter::{Guidance, IssueBlueprint};
+use std::collections::HashSet;
+
 use super::super::TextCheckContext;
+use super::super::emitter::{Guidance, IssueBlueprint};
 use crate::observe::types::{Confidence, FixSafety, Issue, IssueCode};
 
 /// Detect API rate limit or overload errors (429, 529) in tool output.
@@ -85,13 +87,12 @@ pub(crate) fn check_cross_agent_file_conflict(
     let Some(path) = path else {
         return;
     };
-    let agent_id = context
+    let agent_id = context.state.agent_id.as_deref().unwrap_or("unknown");
+    let count = context
         .state
-        .agent_id
-        .as_deref()
-        .unwrap_or("unknown");
-    // edit_counts tracks how many agents have touched each file
-    let count = context.state.edit_counts.get(path).copied().unwrap_or(0);
+        .cross_agent_editors
+        .get(path)
+        .map_or(0, HashSet::len);
     if count > 1 {
         let blueprint = IssueBlueprint::from_code(
             IssueCode::CrossAgentFileConflict,
@@ -128,25 +129,19 @@ fn extract_written_file_path(text: &str) -> Option<&str> {
 /// Detect guard denial loops - agent hitting the same guard repeatedly.
 /// Fires when orchestration context is set and the agent has been denied
 /// multiple times in the current scan window.
-pub(crate) fn check_guard_denial_loop(
-    context: &mut TextCheckContext<'_>,
-    issues: &mut Vec<Issue>,
-) {
+pub(crate) fn check_guard_denial_loop(context: &mut TextCheckContext<'_>, issues: &mut Vec<Issue>) {
     if context.state.agent_id.is_none() {
         return;
     }
-    let key = (IssueCode::HookDeniedToolCall, "hook_denied".to_string());
-    let count = context
+    let count: usize = context
         .state
         .issue_occurrences
-        .get(&key)
-        .map_or(0, |tracker| tracker.count);
+        .iter()
+        .filter(|((code, _), _)| *code == IssueCode::HookDeniedToolCall)
+        .map(|(_, tracker)| tracker.count)
+        .sum();
     if count >= 3 {
-        let role_hint = context
-            .state
-            .agent_role
-            .as_deref()
-            .unwrap_or("unknown");
+        let role_hint = context.state.agent_role.as_deref().unwrap_or("unknown");
         let blueprint = IssueBlueprint::from_code(
             IssueCode::AgentGuardDenialLoop,
             format!("Agent ({role_hint}) hit guard denials {count} times"),

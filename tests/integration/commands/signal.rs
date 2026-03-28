@@ -57,8 +57,7 @@ fn signal_write_acknowledge_round_trip() {
                 harness::agents::runtime::signal::read_pending_signals(&signal_dir).unwrap();
             assert!(pending.is_empty());
 
-            let acks =
-                harness::agents::runtime::signal::read_acknowledgments(&signal_dir).unwrap();
+            let acks = harness::agents::runtime::signal::read_acknowledgments(&signal_dir).unwrap();
             assert_eq!(acks.len(), 1);
             assert_eq!(acks[0].result, AckResult::Accepted);
         },

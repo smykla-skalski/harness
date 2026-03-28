@@ -80,6 +80,8 @@ pub struct ScanState {
     pub last_tool_uses: ToolUseWindow,
     /// Track file edit churn: path -> edit count.
     pub edit_counts: HashMap<String, usize>,
+    /// Track which agents have edited each file during a multi-agent scan.
+    pub cross_agent_editors: HashMap<String, HashSet<String>>,
     /// Dedup key: (stable issue family, semantic fingerprint).
     pub seen_issues: HashSet<(IssueCode, String)>,
     /// Session start timestamp from the first event.
