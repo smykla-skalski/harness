@@ -12,6 +12,7 @@ use crate::create::{
 use crate::errors::CliError;
 use crate::hooks::{self, HookArgs};
 use crate::observe::ObserveArgs;
+use crate::session::transport::SessionCommand;
 use crate::run::{
     ApplyArgs, CaptureArgs, CloseoutArgs, ClusterCheckArgs, DiffArgs, DoctorArgs, EnvoyArgs,
     FinishArgs, InitArgs, KumaArgs, LogsArgs, PreflightArgs, RecordArgs, RepairArgs, ReportArgs,
@@ -135,6 +136,12 @@ pub enum Command {
 
     /// Observe and classify harness-managed agent session logs.
     Observe(Box<ObserveArgs>),
+
+    /// Multi-agent session orchestration.
+    Session {
+        #[command(subcommand)]
+        command: SessionCommand,
+    },
 }
 
 /// Dispatch a parsed command to its owning subsystem.
@@ -153,6 +160,7 @@ pub fn dispatch(command: &Command) -> Result<i32, CliError> {
         Command::SessionStop(args) => args.execute(&ctx),
         Command::PreCompact(args) => args.execute(&ctx),
         Command::Observe(args) => args.execute(&ctx),
+        Command::Session { command } => command.execute(&ctx),
     }
 }
 

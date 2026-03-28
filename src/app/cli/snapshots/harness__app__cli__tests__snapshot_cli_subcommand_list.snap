@@ -1,6 +1,5 @@
 ---
 source: src/app/cli/tests.rs
-assertion_line: 427
 expression: "names.join(\"\\n\")"
 ---
 agents
@@ -9,6 +8,7 @@ hook
 observe
 pre-compact
 run
+session
 session-start
 session-stop
 setup
