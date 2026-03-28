@@ -16,7 +16,7 @@ final class MonitorStoreActionTests: XCTestCase {
       actor: "leader-claude"
     )
 
-    let calls = await client.recordedCalls()
+    let calls = client.recordedCalls()
     XCTAssertEqual(
       calls,
       [
@@ -44,7 +44,7 @@ final class MonitorStoreActionTests: XCTestCase {
       actor: "leader-claude"
     )
 
-    let calls = await client.recordedCalls()
+    let calls = client.recordedCalls()
     XCTAssertEqual(
       calls,
       [
@@ -77,7 +77,7 @@ final class MonitorStoreActionTests: XCTestCase {
       actor: "worker-codex"
     )
 
-    let calls = await client.recordedCalls()
+    let calls = client.recordedCalls()
     XCTAssertEqual(
       calls,
       [
@@ -111,7 +111,7 @@ final class MonitorStoreActionTests: XCTestCase {
       actor: "worker-codex"
     )
 
-    let calls = await client.recordedCalls()
+    let calls = client.recordedCalls()
     XCTAssertEqual(
       calls,
       [
@@ -144,7 +144,7 @@ final class MonitorStoreActionTests: XCTestCase {
       actor: "leader-claude"
     )
 
-    let calls = await client.recordedCalls()
+    let calls = client.recordedCalls()
     XCTAssertEqual(
       calls,
       [
@@ -176,7 +176,7 @@ final class MonitorStoreActionTests: XCTestCase {
       actor: "observer-gwen"
     )
 
-    let calls = await client.recordedCalls()
+    let calls = client.recordedCalls()
     XCTAssertEqual(
       calls,
       [
@@ -199,7 +199,7 @@ final class MonitorStoreActionTests: XCTestCase {
 
     await store.observeSelectedSession(actor: "observer-gwen")
 
-    let calls = await client.recordedCalls()
+    let calls = client.recordedCalls()
     XCTAssertEqual(calls, [.observeSession(sessionID: PreviewFixtures.summary.sessionId)])
     XCTAssertEqual(store.lastAction, "Observe session")
   }
@@ -211,7 +211,7 @@ final class MonitorStoreActionTests: XCTestCase {
 
     await store.endSelectedSession(actor: "leader-claude")
 
-    let calls = await client.recordedCalls()
+    let calls = client.recordedCalls()
     XCTAssertEqual(
       calls,
       [.endSession(sessionID: PreviewFixtures.summary.sessionId, actor: "leader-claude")]
@@ -232,7 +232,7 @@ final class MonitorStoreActionTests: XCTestCase {
       actionHint: "task:review"
     )
 
-    let calls = await client.recordedCalls()
+    let calls = client.recordedCalls()
     XCTAssertEqual(
       calls,
       [
