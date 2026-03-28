@@ -207,7 +207,10 @@ public final class PreviewMonitorClient: MonitorClientProtocol, @unchecked Senda
     try await sessionDetail(id: "")
   }
 
-  public func observeSession(sessionID _: String) async throws -> SessionDetail {
+  public func observeSession(
+    sessionID _: String,
+    request _: ObserveSessionRequest
+  ) async throws -> SessionDetail {
     try await sessionDetail(id: "")
   }
 }
