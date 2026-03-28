@@ -16,7 +16,7 @@ struct PreferencesView: View {
   }
 
   var body: some View {
-    ScrollView {
+    ScrollView(showsIndicators: false) {
       VStack(alignment: .leading, spacing: 18) {
         header
         overviewRow
@@ -28,7 +28,7 @@ struct PreferencesView: View {
       .padding(24)
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-    .background(MonitorTheme.canvas.ignoresSafeArea())
+    .background(MonitorTheme.canvas)
     .foregroundStyle(MonitorTheme.ink)
     .accessibilityIdentifier(MonitorAccessibility.preferencesRoot)
     .task {

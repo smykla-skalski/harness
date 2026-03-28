@@ -6,13 +6,21 @@ struct SidebarView: View {
   @Bindable var store: MonitorStore
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 18) {
-      daemonStatusCard
-      filterStrip
-      sessionList
+    ZStack(alignment: .topLeading) {
+      MonitorTheme.sidebarBackground
+
+      VStack(alignment: .leading, spacing: 18) {
+        daemonStatusCard
+        filterStrip
+        sessionList
+          .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+      }
+      .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+      .padding(22)
     }
-    .padding(22)
     .foregroundStyle(MonitorTheme.ink)
+    .accessibilityElement(children: .contain)
+    .accessibilityIdentifier(MonitorAccessibility.sidebarRoot)
   }
 
   private var daemonStatusCard: some View {
@@ -65,73 +73,120 @@ struct SidebarView: View {
     VStack(alignment: .leading, spacing: 10) {
       Text("Scope")
         .font(.system(.headline, design: .rounded, weight: .semibold))
-      Picker("Session Filter", selection: $store.sessionFilter) {
+      HStack(spacing: 8) {
         ForEach(MonitorStore.SessionFilter.allCases) { filter in
-          Text(filter.rawValue.capitalized).tag(filter)
+          filterButton(filter)
         }
       }
-      .pickerStyle(.segmented)
+      .accessibilityElement(children: .contain)
+      .accessibilityIdentifier(MonitorAccessibility.sessionFilterGroup)
     }
     .monitorCard()
   }
 
   private var sessionList: some View {
-    ScrollView {
-      VStack(alignment: .leading, spacing: 16) {
-        ForEach(store.groupedSessions) { group in
-          VStack(alignment: .leading, spacing: 10) {
-            HStack {
-              Text(group.project.name)
-                .font(.system(.headline, design: .serif, weight: .semibold))
-              Spacer()
-              Text("\(group.sessions.count)")
-                .font(.caption.monospacedDigit())
-                .foregroundStyle(.secondary)
-            }
-
-            ForEach(group.sessions) { session in
-              Button {
-                Task {
-                  await store.selectSession(session.sessionId)
-                }
-              } label: {
-                VStack(alignment: .leading, spacing: 8) {
-                  HStack {
-                    Text(session.context)
-                      .font(.system(.body, design: .rounded, weight: .semibold))
-                      .multilineTextAlignment(.leading)
-                    Spacer()
-                    Circle()
-                      .fill(statusColor(for: session.status))
-                      .frame(width: 10, height: 10)
-                  }
-                  Text(session.sessionId)
-                    .font(.caption.monospaced())
+    Group {
+      if store.groupedSessions.isEmpty {
+        VStack(alignment: .leading, spacing: 8) {
+          Text("No sessions indexed yet")
+            .font(.system(.headline, design: .rounded, weight: .semibold))
+          Text("Start the daemon or refresh after launching a harness session.")
+            .font(.system(.footnote, design: .rounded, weight: .medium))
+            .foregroundStyle(.secondary)
+        }
+        .monitorCard()
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier(MonitorAccessibility.sidebarEmptyState)
+      } else {
+        ScrollView(showsIndicators: false) {
+          VStack(alignment: .leading, spacing: 16) {
+            ForEach(store.groupedSessions) { group in
+              VStack(alignment: .leading, spacing: 10) {
+                HStack {
+                  Text(group.project.name)
+                    .font(.system(.headline, design: .serif, weight: .semibold))
+                  Spacer()
+                  Text("\(group.sessions.count)")
+                    .font(.caption.monospacedDigit())
                     .foregroundStyle(.secondary)
-                  HStack(spacing: 12) {
-                    labelChip("\(session.metrics.activeAgentCount) active")
-                    labelChip("\(session.metrics.inProgressTaskCount) moving")
-                    labelChip(formatTimestamp(session.lastActivityAt))
-                  }
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(14)
-                .background(
-                  RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .fill(
-                      store.selectedSessionID == session.sessionId
-                        ? Color.white.opacity(0.82) : Color.white.opacity(0.46)
+
+                ForEach(group.sessions) { session in
+                  Button {
+                    Task {
+                      await store.selectSession(session.sessionId)
+                    }
+                  } label: {
+                    VStack(alignment: .leading, spacing: 8) {
+                      HStack {
+                        Text(session.context)
+                          .font(.system(.body, design: .rounded, weight: .semibold))
+                          .multilineTextAlignment(.leading)
+                        Spacer()
+                        Circle()
+                          .fill(statusColor(for: session.status))
+                          .frame(width: 10, height: 10)
+                      }
+                      Text(session.sessionId)
+                        .font(.caption.monospaced())
+                        .foregroundStyle(.secondary)
+                      HStack(spacing: 12) {
+                        labelChip("\(session.metrics.activeAgentCount) active")
+                        labelChip("\(session.metrics.inProgressTaskCount) moving")
+                        labelChip(formatTimestamp(session.lastActivityAt))
+                      }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(14)
+                    .background(
+                      RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .fill(
+                          store.selectedSessionID == session.sessionId
+                            ? Color.white.opacity(0.82) : Color.white.opacity(0.46)
+                        )
                     )
-                )
+                  }
+                  .accessibilityIdentifier(MonitorAccessibility.sessionRow(session.sessionId))
+                  .buttonStyle(.plain)
+                }
               }
-              .accessibilityIdentifier(MonitorAccessibility.sessionRow(session.sessionId))
-              .buttonStyle(.plain)
             }
           }
+          .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .accessibilityIdentifier(MonitorAccessibility.sidebarSessionList)
       }
     }
-    .monitorCard()
+  }
+
+  private func filterButton(_ filter: MonitorStore.SessionFilter) -> some View {
+    let isSelected = store.sessionFilter == filter
+
+    return Button {
+      store.sessionFilter = filter
+    } label: {
+      Text(filter.rawValue.capitalized)
+        .font(.system(.subheadline, design: .rounded, weight: .semibold))
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 10)
+        .foregroundStyle(isSelected ? Color.white : MonitorTheme.ink)
+        .background(
+          RoundedRectangle(cornerRadius: 14, style: .continuous)
+            .fill(isSelected ? MonitorTheme.accent : Color.white.opacity(0.86))
+            .overlay(
+              RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(
+                  isSelected ? MonitorTheme.accent : MonitorTheme.panelBorder,
+                  lineWidth: 1
+                )
+            )
+        )
+    }
+    .buttonStyle(.plain)
+    .accessibilityIdentifier(MonitorAccessibility.sessionFilterButton(filter.rawValue))
+    .accessibilityValue(
+      isSelected ? "selected accent-on-light" : "not selected ink-on-panel"
+    )
   }
 
   private var connectionLabel: String {
