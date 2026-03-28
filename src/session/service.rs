@@ -5,12 +5,12 @@ use std::path::Path;
 use chrono::{Duration, Utc};
 use serde_json::Value;
 
-use crate::agents::service as agents_service;
 use crate::agents::runtime;
 use crate::agents::runtime::signal::{
     DeliveryConfig, Signal, SignalPayload, SignalPriority, read_acknowledged_signals,
     read_acknowledgments, read_pending_signals,
 };
+use crate::agents::service as agents_service;
 use crate::errors::{CliError, CliErrorKind};
 use crate::hooks::adapters::HookAgent;
 use crate::workspace::utc_now;
@@ -229,7 +229,7 @@ pub fn assign_role(
         })?;
         from_role = agent.role;
         agent.role = role;
-        agent.updated_at = now.clone();
+        agent.updated_at.clone_from(&now);
         agent.last_activity_at = Some(now.clone());
         touch_agent(state, actor_id, &now);
         refresh_session(state, &now);
@@ -279,7 +279,7 @@ pub fn remove_agent(
             )))
         })?;
         agent.status = AgentStatus::Removed;
-        agent.updated_at = now.clone();
+        agent.updated_at.clone_from(&now);
         agent.last_activity_at = Some(now.clone());
         agent.current_task_id = None;
 
@@ -292,7 +292,7 @@ pub fn remove_agent(
             {
                 task.status = TaskStatus::Open;
                 task.assigned_to = None;
-                task.updated_at = now.clone();
+                task.updated_at.clone_from(&now);
                 task.blocked_reason = None;
                 task.completed_at = None;
             }
@@ -338,12 +338,12 @@ pub fn transfer_leader(
         old_leader = state.leader_id.clone().unwrap_or_default();
         if let Some(old) = state.agents.get_mut(&old_leader) {
             old.role = SessionRole::Worker;
-            old.updated_at = now.clone();
+            old.updated_at.clone_from(&now);
             old.last_activity_at = Some(now.clone());
         }
         if let Some(new) = state.agents.get_mut(new_leader_id) {
             new.role = SessionRole::Leader;
-            new.updated_at = now.clone();
+            new.updated_at.clone_from(&now);
             new.last_activity_at = Some(now.clone());
         }
         state.leader_id = Some(new_leader_id.to_string());
@@ -425,6 +425,7 @@ pub fn create_task_with_source(
         require_permission(state, actor_id, SessionAction::CreateTask)?;
 
         let task_id = next_task_id(&state.tasks);
+        let item_timestamps = now.clone();
         let item = WorkItem {
             task_id: task_id.clone(),
             title: title.to_string(),
@@ -432,8 +433,8 @@ pub fn create_task_with_source(
             severity,
             status: TaskStatus::Open,
             assigned_to: None,
-            created_at: now.clone(),
-            updated_at: now.clone(),
+            created_at: item_timestamps.clone(),
+            updated_at: item_timestamps,
             created_by: Some(actor_id.to_string()),
             notes: Vec::new(),
             suggested_fix: suggested_fix.map(ToString::to_string),
@@ -449,7 +450,11 @@ pub fn create_task_with_source(
         Ok(())
     })?;
 
-    let item = created_item.expect("task was created");
+    let item = created_item.ok_or_else(|| {
+        CliError::from(CliErrorKind::workflow_io(
+            "task creation did not persist state".to_string(),
+        ))
+    })?;
     let transition = if source == TaskSource::Observe {
         SessionTransition::ObserveTaskCreated {
             task_id: item.task_id.clone(),
@@ -497,16 +502,19 @@ pub fn assign_task(
             clear_agent_current_task(state, previous_assignee, task_id, &now);
         }
 
-        let task = state.tasks.get_mut(task_id).ok_or_else(|| task_not_found(task_id))?;
+        let task = state
+            .tasks
+            .get_mut(task_id)
+            .ok_or_else(|| task_not_found(task_id))?;
         task.assigned_to = Some(agent_id.to_string());
         task.status = TaskStatus::InProgress;
-        task.updated_at = now.clone();
+        task.updated_at.clone_from(&now);
         task.blocked_reason = None;
         task.completed_at = None;
 
         if let Some(agent) = state.agents.get_mut(agent_id) {
             agent.current_task_id = Some(task_id.to_string());
-            agent.updated_at = now.clone();
+            agent.updated_at.clone_from(&now);
             agent.last_activity_at = Some(now.clone());
         }
 
@@ -573,11 +581,14 @@ pub fn update_task(
             .ok_or_else(|| task_not_found(task_id))?
             .assigned_to
             .clone();
-        let task = state.tasks.get_mut(task_id).ok_or_else(|| task_not_found(task_id))?;
+        let task = state
+            .tasks
+            .get_mut(task_id)
+            .ok_or_else(|| task_not_found(task_id))?;
 
         from_status = task.status;
         task.status = status;
-        task.updated_at = now.clone();
+        task.updated_at.clone_from(&now);
         if let Some(text) = note {
             task.notes.push(TaskNote {
                 timestamp: now.clone(),
@@ -605,7 +616,7 @@ pub fn update_task(
             if status == TaskStatus::InProgress {
                 if let Some(agent) = state.agents.get_mut(assigned_to) {
                     agent.current_task_id = Some(task_id.to_string());
-                    agent.updated_at = now.clone();
+                    agent.updated_at.clone_from(&now);
                     agent.last_activity_at = Some(now.clone());
                 }
             } else {
@@ -669,18 +680,21 @@ pub fn record_task_checkpoint(
             progress,
         };
 
-        let task = state.tasks.get_mut(task_id).ok_or_else(|| task_not_found(task_id))?;
+        let task = state
+            .tasks
+            .get_mut(task_id)
+            .ok_or_else(|| task_not_found(task_id))?;
         if task.status == TaskStatus::Open {
             task.status = TaskStatus::InProgress;
         }
-        task.updated_at = now.clone();
+        task.updated_at.clone_from(&now);
         task.checkpoint_summary = Some(TaskCheckpointSummary::from(&created));
 
         if let Some(assigned_to) = assigned_to.as_deref()
             && let Some(agent) = state.agents.get_mut(assigned_to)
         {
             agent.current_task_id = Some(task_id.to_string());
-            agent.updated_at = now.clone();
+            agent.updated_at.clone_from(&now);
             agent.last_activity_at = Some(now.clone());
         }
 
@@ -690,7 +704,11 @@ pub fn record_task_checkpoint(
         Ok(())
     })?;
 
-    let checkpoint = checkpoint.expect("checkpoint should be created");
+    let checkpoint = checkpoint.ok_or_else(|| {
+        CliError::from(CliErrorKind::workflow_io(
+            "task checkpoint did not persist state".to_string(),
+        ))
+    })?;
     storage::append_task_checkpoint(project_dir, session_id, task_id, &checkpoint)?;
     storage::append_log_entry(
         project_dir,
@@ -754,7 +772,7 @@ pub fn send_signal(
     let signal = Signal {
         signal_id: generate_signal_id(),
         version: 1,
-        created_at: now.clone(),
+        created_at: now,
         expires_at: (Utc::now() + Duration::minutes(15))
             .format("%Y-%m-%dT%H:%M:%SZ")
             .to_string(),
@@ -839,10 +857,11 @@ pub fn list_signals(
         }
         for signal in acknowledged {
             let acknowledgment = acknowledgment_by_id.get(&signal.signal_id).cloned();
-            let status = acknowledgment.as_ref().map_or(
-                SessionSignalStatus::Pending,
-                |ack| SessionSignalStatus::from_ack_result(ack.result),
-            );
+            let status = acknowledgment
+                .as_ref()
+                .map_or(SessionSignalStatus::Pending, |ack| {
+                    SessionSignalStatus::from_ack_result(ack.result)
+                });
             signals.push(SessionSignalRecord {
                 runtime: agent.runtime.clone(),
                 agent_id: agent_id.clone(),
@@ -925,10 +944,10 @@ fn create_initial_session(
         }
     }
 
-    Err(CliErrorKind::session_agent_conflict(
-        "failed to allocate a unique session ID".to_string(),
+    Err(
+        CliErrorKind::session_agent_conflict("failed to allocate a unique session ID".to_string())
+            .into(),
     )
-    .into())
 }
 
 fn require_active(state: &SessionState) -> Result<(), CliError> {
@@ -1075,12 +1094,13 @@ fn clear_agent_current_task(state: &mut SessionState, agent_id: &str, task_id: &
 }
 
 fn runtime_capabilities(runtime_name: &str) -> runtime::RuntimeCapabilities {
-    runtime::runtime_for_name(runtime_name)
-        .map(|runtime| runtime.capabilities())
-        .unwrap_or_else(|| runtime::RuntimeCapabilities {
+    runtime::runtime_for_name(runtime_name).map_or_else(
+        || runtime::RuntimeCapabilities {
             runtime: runtime_name.to_string(),
             ..runtime::RuntimeCapabilities::default()
-        })
+        },
+        super::super::agents::runtime::AgentRuntime::capabilities,
+    )
 }
 
 fn task_not_found(task_id: &str) -> CliError {
@@ -1089,12 +1109,10 @@ fn task_not_found(task_id: &str) -> CliError {
 
 fn ensure_valid_progress(progress: u8) -> Result<(), CliError> {
     if progress > 100 {
-        return Err(
-            CliErrorKind::workflow_parse(format!(
-                "task checkpoint progress '{progress}' must be between 0 and 100"
-            ))
-            .into(),
-        );
+        return Err(CliErrorKind::workflow_parse(format!(
+            "task checkpoint progress '{progress}' must be between 0 and 100"
+        ))
+        .into());
     }
     Ok(())
 }
@@ -1122,7 +1140,10 @@ fn generate_session_id() -> String {
     format!("sess-{}", Utc::now().format("%Y%m%d%H%M%S%f"))
 }
 
-fn next_available_agent_id(runtime_name: &str, agents: &BTreeMap<String, AgentRegistration>) -> String {
+fn next_available_agent_id(
+    runtime_name: &str,
+    agents: &BTreeMap<String, AgentRegistration>,
+) -> String {
     let base = format!("{runtime_name}-{}", Utc::now().format("%Y%m%d%H%M%S%f"));
     if !agents.contains_key(&base) {
         return base;
@@ -1154,7 +1175,10 @@ mod tests {
         let tmp = tempfile::tempdir().expect("tempdir");
         temp_env::with_vars(
             [
-                ("XDG_DATA_HOME", Some(tmp.path().to_str().expect("utf8 path"))),
+                (
+                    "XDG_DATA_HOME",
+                    Some(tmp.path().to_str().expect("utf8 path")),
+                ),
                 ("CLAUDE_SESSION_ID", Some("test-service")),
             ],
             || {
@@ -1417,8 +1441,8 @@ mod tests {
             let state =
                 start_session("test", project, Some("claude"), Some("perm")).expect("start");
             let leader_id = state.leader_id.expect("leader id");
-            let joined =
-                join_session("perm", SessionRole::Worker, "codex", &[], None, project).expect("join");
+            let joined = join_session("perm", SessionRole::Worker, "codex", &[], None, project)
+                .expect("join");
             let worker_id = joined
                 .agents
                 .keys()
@@ -1456,8 +1480,8 @@ mod tests {
             let state =
                 start_session("test", project, Some("claude"), Some("roles")).expect("start");
             let leader_id = state.leader_id.expect("leader id");
-            let joined =
-                join_session("roles", SessionRole::Worker, "codex", &[], None, project).expect("join");
+            let joined = join_session("roles", SessionRole::Worker, "codex", &[], None, project)
+                .expect("join");
             let worker_id = joined
                 .agents
                 .keys()
@@ -1483,8 +1507,8 @@ mod tests {
             let state =
                 start_session("test", project, Some("claude"), Some("assign")).expect("start");
             let leader_id = state.leader_id.expect("leader id");
-            let joined =
-                join_session("assign", SessionRole::Worker, "codex", &[], None, project).expect("join");
+            let joined = join_session("assign", SessionRole::Worker, "codex", &[], None, project)
+                .expect("join");
             let worker_id = joined
                 .agents
                 .keys()
@@ -1503,8 +1527,8 @@ mod tests {
 
             remove_agent("assign", &worker_id, &leader_id, project).expect("remove");
 
-            let error =
-                assign_task("assign", &task.task_id, &worker_id, &leader_id, project).expect_err("assign");
+            let error = assign_task("assign", &task.task_id, &worker_id, &leader_id, project)
+                .expect_err("assign");
             assert_eq!(error.code(), "KSRCLI092");
         });
     }
@@ -1515,15 +1539,8 @@ mod tests {
             let state =
                 start_session("test", project, Some("claude"), Some("transfer")).expect("start");
             let leader_id = state.leader_id.expect("leader id");
-            let joined = join_session(
-                "transfer",
-                SessionRole::Worker,
-                "codex",
-                &[],
-                None,
-                project,
-            )
-            .expect("join");
+            let joined = join_session("transfer", SessionRole::Worker, "codex", &[], None, project)
+                .expect("join");
             let worker_id = joined
                 .agents
                 .keys()
@@ -1533,8 +1550,8 @@ mod tests {
 
             remove_agent("transfer", &worker_id, &leader_id, project).expect("remove");
 
-            let error =
-                transfer_leader("transfer", &worker_id, None, &leader_id, project).expect_err("transfer");
+            let error = transfer_leader("transfer", &worker_id, None, &leader_id, project)
+                .expect_err("transfer");
             assert_eq!(error.code(), "KSRCLI092");
         });
     }
@@ -1545,8 +1562,7 @@ mod tests {
             let first =
                 start_session("goal1", project, Some("claude"), Some("ls1")).expect("start one");
             start_session("goal2", project, Some("codex"), Some("ls2")).expect("start two");
-            end_session("ls1", first.leader_id.as_deref().expect("leader"), project)
-                .expect("end");
+            end_session("ls1", first.leader_id.as_deref().expect("leader"), project).expect("end");
 
             let active_only = list_sessions(project, false).expect("active list");
             let all_sessions = list_sessions(project, true).expect("all list");

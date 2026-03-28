@@ -413,9 +413,10 @@ impl Execute for TaskListArgs {
                     item.task_id,
                     item.title,
                     item.assigned_to.as_deref().unwrap_or("unassigned"),
-                    item.checkpoint_summary
-                        .as_ref()
-                        .map_or_else(|| "-".to_string(), |summary| format!("{}%", summary.progress)),
+                    item.checkpoint_summary.as_ref().map_or_else(
+                        || "-".to_string(),
+                        |summary| format!("{}%", summary.progress)
+                    ),
                 );
             }
         }
