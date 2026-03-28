@@ -1064,7 +1064,7 @@ dependencies = [
 
 [[package]]
 name = "harness"
-version = "14.4.0"
+version = "14.4.1"
 dependencies = [
  "assert_cmd",
  "backoff",
@@ -1111,7 +1111,7 @@ dependencies = [
 
 [[package]]
 name = "harness-testkit"
-version = "14.4.0"
+version = "14.4.1"
 dependencies = [
  "assert_cmd",
  "harness",
