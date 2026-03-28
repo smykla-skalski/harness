@@ -17,6 +17,7 @@ pub enum IssueCategory {
     DataIntegrity,
     NamingError,
     UserFrustration,
+    AgentCoordination,
 }
 
 impl fmt::Display for IssueCategory {
@@ -33,6 +34,7 @@ impl fmt::Display for IssueCategory {
             Self::DataIntegrity => "data_integrity",
             Self::NamingError => "naming_error",
             Self::UserFrustration => "user_frustration",
+            Self::AgentCoordination => "agent_coordination",
         };
         f.write_str(label)
     }
@@ -54,6 +56,7 @@ impl IssueCategory {
             "data_integrity" => Some(Self::DataIntegrity),
             "naming_error" => Some(Self::NamingError),
             "user_frustration" => Some(Self::UserFrustration),
+            "agent_coordination" => Some(Self::AgentCoordination),
             _ => None,
         }
     }
@@ -71,6 +74,7 @@ impl IssueCategory {
         Self::DataIntegrity,
         Self::NamingError,
         Self::UserFrustration,
+        Self::AgentCoordination,
     ];
 
     /// Short description for listing.
@@ -88,6 +92,7 @@ impl IssueCategory {
             Self::DataIntegrity => "Data corruption or integrity violation",
             Self::NamingError => "Naming convention violation",
             Self::UserFrustration => "User frustration signal detected",
+            Self::AgentCoordination => "Multi-agent coordination issue",
         }
     }
 }

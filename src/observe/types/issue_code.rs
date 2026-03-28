@@ -63,6 +63,12 @@ pub enum IssueCode {
     RepeatedKubectlQueryForSameResource,
     GroupReportedWithoutCapture,
     VerificationOutputTruncated,
+    AgentStalledProgress,
+    AgentRepeatedError,
+    AgentGuardDenialLoop,
+    ApiRateLimitDetected,
+    AgentSkillMisuse,
+    CrossAgentFileConflict,
 }
 
 impl fmt::Display for IssueCode {
@@ -126,6 +132,12 @@ impl fmt::Display for IssueCode {
             Self::RepeatedKubectlQueryForSameResource => "repeated_kubectl_query_for_same_resource",
             Self::GroupReportedWithoutCapture => "group_reported_without_capture",
             Self::VerificationOutputTruncated => "verification_output_truncated",
+            Self::AgentStalledProgress => "agent_stalled_progress",
+            Self::AgentRepeatedError => "agent_repeated_error",
+            Self::AgentGuardDenialLoop => "agent_guard_denial_loop",
+            Self::ApiRateLimitDetected => "api_rate_limit_detected",
+            Self::AgentSkillMisuse => "agent_skill_misuse",
+            Self::CrossAgentFileConflict => "cross_agent_file_conflict",
         };
         f.write_str(label)
     }
@@ -198,6 +210,12 @@ impl IssueCode {
             }
             "group_reported_without_capture" => Some(Self::GroupReportedWithoutCapture),
             "verification_output_truncated" => Some(Self::VerificationOutputTruncated),
+            "agent_stalled_progress" => Some(Self::AgentStalledProgress),
+            "agent_repeated_error" => Some(Self::AgentRepeatedError),
+            "agent_guard_denial_loop" => Some(Self::AgentGuardDenialLoop),
+            "api_rate_limit_detected" => Some(Self::ApiRateLimitDetected),
+            "agent_skill_misuse" => Some(Self::AgentSkillMisuse),
+            "cross_agent_file_conflict" => Some(Self::CrossAgentFileConflict),
             _ => None,
         }
     }
@@ -260,6 +278,12 @@ impl IssueCode {
         Self::RepeatedKubectlQueryForSameResource,
         Self::GroupReportedWithoutCapture,
         Self::VerificationOutputTruncated,
+        Self::AgentStalledProgress,
+        Self::AgentRepeatedError,
+        Self::AgentGuardDenialLoop,
+        Self::ApiRateLimitDetected,
+        Self::AgentSkillMisuse,
+        Self::CrossAgentFileConflict,
     ];
 }
 

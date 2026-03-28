@@ -508,6 +508,7 @@ fn observer_state_active_workers_tracks() {
         issue_id: "abc".into(),
         target_file: "src/main.rs".into(),
         started_at: "2026-03-16T00:00:00Z".into(),
+        agent_id: None,
     });
     assert!(!state.handoff_safe());
 }

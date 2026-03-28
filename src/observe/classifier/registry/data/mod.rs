@@ -2,6 +2,7 @@ use std::sync::LazyLock;
 
 mod build;
 mod cli;
+mod coordination;
 mod hook;
 mod integrity;
 mod skill;
@@ -25,5 +26,6 @@ pub(super) static ISSUE_CODE_REGISTRY: LazyLock<Box<[IssueCodeMeta]>> = LazyLock
     registry.extend_from_slice(unexpected::ISSUE_CODE_METAS);
     registry.extend_from_slice(user::ISSUE_CODE_METAS);
     registry.extend_from_slice(workflow::ISSUE_CODE_METAS);
+    registry.extend_from_slice(coordination::ISSUE_CODE_METAS);
     registry.into_boxed_slice()
 });
