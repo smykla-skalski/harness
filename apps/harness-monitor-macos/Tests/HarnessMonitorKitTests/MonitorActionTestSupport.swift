@@ -123,6 +123,110 @@ final class RecordingMonitorClient: MonitorClientProtocol, @unchecked Sendable {
   }
 }
 
+actor FailingDaemonController: DaemonControlling {
+  private let bootstrapError: (any Error)?
+  private let actionError: (any Error)?
+
+  init(
+    bootstrapError: (any Error)? = nil,
+    actionError: (any Error)? = nil
+  ) {
+    self.bootstrapError = bootstrapError
+    self.actionError = actionError
+  }
+
+  func bootstrapClient() async throws -> any MonitorClientProtocol {
+    if let bootstrapError {
+      throw bootstrapError
+    }
+    return PreviewMonitorClient()
+  }
+
+  func startDaemonClient() async throws -> any MonitorClientProtocol {
+    if let bootstrapError {
+      throw bootstrapError
+    }
+    return PreviewMonitorClient()
+  }
+
+  func daemonStatus() async throws -> DaemonStatusReport {
+    throw DaemonControlError.manifestMissing
+  }
+
+  func installLaunchAgent() async throws -> String {
+    if let actionError {
+      throw actionError
+    }
+    return "/tmp/test.plist"
+  }
+
+  func removeLaunchAgent() async throws -> String {
+    if let actionError {
+      throw actionError
+    }
+    return "removed"
+  }
+}
+
+final class FailingMonitorClient: MonitorClientProtocol, @unchecked Sendable {
+  private let error: any Error
+
+  init(error: any Error = MonitorAPIError.server(code: 500, message: "internal error")) {
+    self.error = error
+  }
+
+  func health() async throws -> HealthResponse { throw error }
+  func diagnostics() async throws -> DaemonDiagnosticsReport { throw error }
+  func projects() async throws -> [ProjectSummary] { throw error }
+  func sessions() async throws -> [SessionSummary] { throw error }
+  func sessionDetail(id _: String) async throws -> SessionDetail { throw error }
+  func timeline(sessionID _: String) async throws -> [TimelineEntry] { throw error }
+
+  nonisolated func globalStream() -> AsyncThrowingStream<StreamEvent, Error> {
+    AsyncThrowingStream { $0.finish(throwing: self.error) }
+  }
+
+  nonisolated func sessionStream(sessionID _: String) -> AsyncThrowingStream<StreamEvent, Error> {
+    AsyncThrowingStream { $0.finish(throwing: self.error) }
+  }
+
+  func createTask(sessionID _: String, request _: TaskCreateRequest) async throws -> SessionDetail {
+    throw error
+  }
+
+  func assignTask(
+    sessionID _: String, taskID _: String, request _: TaskAssignRequest
+  ) async throws -> SessionDetail { throw error }
+
+  func updateTask(
+    sessionID _: String, taskID _: String, request _: TaskUpdateRequest
+  ) async throws -> SessionDetail { throw error }
+
+  func checkpointTask(
+    sessionID _: String, taskID _: String, request _: TaskCheckpointRequest
+  ) async throws -> SessionDetail { throw error }
+
+  func changeRole(
+    sessionID _: String, agentID _: String, request _: RoleChangeRequest
+  ) async throws -> SessionDetail { throw error }
+
+  func transferLeader(
+    sessionID _: String, request _: LeaderTransferRequest
+  ) async throws -> SessionDetail { throw error }
+
+  func endSession(
+    sessionID _: String, request _: SessionEndRequest
+  ) async throws -> SessionDetail { throw error }
+
+  func sendSignal(
+    sessionID _: String, request _: SignalSendRequest
+  ) async throws -> SessionDetail { throw error }
+
+  func observeSession(
+    sessionID _: String, request _: ObserveSessionRequest
+  ) async throws -> SessionDetail { throw error }
+}
+
 @MainActor
 func makeBootstrappedStore(
   client: any MonitorClientProtocol = RecordingMonitorClient()
