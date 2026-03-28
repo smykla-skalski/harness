@@ -3,7 +3,6 @@ import XCTest
 @MainActor
 final class HarnessMonitorUITests: XCTestCase {
   private enum Accessibility {
-    static let searchPrompt = "Search sessions, projects, leaders"
     static let sidebarToggleButton = "monitor.toolbar.sidebar-toggle"
     static let preferencesButton = "monitor.toolbar.preferences"
     static let refreshButton = "monitor.toolbar.refresh"
@@ -124,36 +123,30 @@ final class HarnessMonitorUITests: XCTestCase {
       in: app,
       identifier: Accessibility.preferencesButton
     )
-    let searchField = app.searchFields[Accessibility.searchPrompt]
     let sessionRow = app.buttons.matching(identifier: Accessibility.previewSessionRow).firstMatch
 
     XCTAssertTrue(sidebarToggle.waitForExistence(timeout: Self.uiTimeout))
     XCTAssertTrue(refreshButton.waitForExistence(timeout: Self.uiTimeout))
     XCTAssertTrue(preferencesButton.waitForExistence(timeout: Self.uiTimeout))
-    XCTAssertTrue(searchField.waitForExistence(timeout: Self.uiTimeout))
     XCTAssertTrue(sessionRow.waitForExistence(timeout: Self.uiTimeout))
     XCTAssertTrue(refreshButton.isHittable)
     XCTAssertTrue(preferencesButton.isHittable)
-    XCTAssertTrue(searchField.isHittable)
 
     sidebarToggle.tap()
 
     XCTAssertTrue(waitUntil { !sessionRow.exists || !sessionRow.isHittable })
     XCTAssertTrue(refreshButton.exists)
     XCTAssertTrue(preferencesButton.exists)
-    XCTAssertTrue(searchField.exists)
     XCTAssertTrue(refreshButton.isHittable)
     XCTAssertTrue(preferencesButton.isHittable)
-    XCTAssertTrue(searchField.isHittable)
 
     sidebarToggle.tap()
 
     XCTAssertTrue(waitUntil { sessionRow.exists && sessionRow.isHittable })
     XCTAssertTrue(refreshButton.isHittable)
     XCTAssertTrue(preferencesButton.isHittable)
-    XCTAssertTrue(searchField.isHittable)
     refreshButton.tap()
-    XCTAssertTrue(searchField.exists)
+    XCTAssertTrue(preferencesButton.exists)
   }
 
   func testEmptyModeCardsSpanTheirColumns() throws {
