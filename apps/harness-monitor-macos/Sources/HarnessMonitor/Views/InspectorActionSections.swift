@@ -109,14 +109,13 @@ extension InspectorActionSections {
         Button("Assign") {
           Task { await assignSelectedTask() }
         }
-        .buttonStyle(.borderedProminent)
-        .tint(MonitorTheme.accent)
+        .buttonStyle(MonitorActionButtonStyle(variant: .prominent, tint: MonitorTheme.accent))
       }
       HStack {
         Button("Update Status") {
           Task { await updateSelectedTask() }
         }
-        .buttonStyle(.bordered)
+        .buttonStyle(MonitorActionButtonStyle(variant: .bordered, tint: MonitorTheme.ink))
         TextField("Update note", text: $statusNote, axis: .vertical)
           .lineLimit(2, reservesSpace: true)
       }
@@ -136,8 +135,9 @@ extension InspectorActionSections {
         Button("Save Checkpoint") {
           Task { await checkpointSelectedTask() }
         }
-        .buttonStyle(.borderedProminent)
-        .tint(MonitorTheme.warmAccent)
+        .buttonStyle(
+          MonitorActionButtonStyle(variant: .prominent, tint: MonitorTheme.warmAccent)
+        )
       }
 
       if let checkpoint = task.checkpointSummary {
@@ -165,8 +165,7 @@ extension InspectorActionSections {
       Button("Create Task") {
         Task { await createTask() }
       }
-      .buttonStyle(.borderedProminent)
-      .tint(MonitorTheme.accent)
+      .buttonStyle(MonitorActionButtonStyle(variant: .prominent, tint: MonitorTheme.accent))
       .disabled(createTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
     }
     .monitorCard()
@@ -187,8 +186,7 @@ extension InspectorActionSections {
       Button("Change Role") {
         Task { await changeSelectedRole() }
       }
-      .buttonStyle(.borderedProminent)
-      .tint(MonitorTheme.accent)
+      .buttonStyle(MonitorActionButtonStyle(variant: .prominent, tint: MonitorTheme.accent))
     }
     .monitorCard()
   }
@@ -208,8 +206,9 @@ extension InspectorActionSections {
       Button("Transfer Leadership") {
         Task { await transferLeader() }
       }
-      .buttonStyle(.borderedProminent)
-      .tint(MonitorTheme.warmAccent)
+      .buttonStyle(
+        MonitorActionButtonStyle(variant: .prominent, tint: MonitorTheme.warmAccent)
+      )
       .disabled(transferLeaderID.isEmpty)
     }
     .monitorCard()
