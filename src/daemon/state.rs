@@ -26,6 +26,18 @@ pub struct DaemonAuditEvent {
     pub message: String,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DaemonDiagnostics {
+    pub daemon_root: String,
+    pub manifest_path: String,
+    pub auth_token_path: String,
+    pub auth_token_present: bool,
+    pub events_path: String,
+    pub cache_root: String,
+    pub cache_entry_count: usize,
+    pub last_event: Option<DaemonAuditEvent>,
+}
+
 #[must_use]
 pub fn daemon_root() -> PathBuf {
     harness_data_root().join("daemon")
@@ -151,6 +163,43 @@ pub fn append_event(level: &str, message: &str) -> Result<(), CliError> {
         .map_err(|error| CliErrorKind::workflow_io(format!("append daemon event: {error}")).into())
 }
 
+/// Read the newest daemon audit events from disk.
+///
+/// # Errors
+/// Returns `CliError` when the audit log cannot be read or parsed.
+pub fn read_recent_events(limit: usize) -> Result<Vec<DaemonAuditEvent>, CliError> {
+    let path = events_path();
+    if limit == 0 || !path.is_file() {
+        return Ok(Vec::new());
+    }
+
+    let content = fs_err::read_to_string(&path).map_err(|error| {
+        CliError::from(CliErrorKind::workflow_io(format!(
+            "read daemon events {}: {error}",
+            path.display()
+        )))
+    })?;
+    let mut events = Vec::new();
+    for line in content.lines().rev() {
+        let trimmed = line.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+        let event = serde_json::from_str(trimmed).map_err(|error| {
+            CliError::from(CliErrorKind::workflow_parse(format!(
+                "parse daemon event {}: {error}",
+                path.display()
+            )))
+        })?;
+        events.push(event);
+        if events.len() == limit {
+            break;
+        }
+    }
+    events.reverse();
+    Ok(events)
+}
+
 /// Write a cached session snapshot for faster UI bootstrap.
 ///
 /// # Errors
@@ -169,6 +218,58 @@ pub fn write_session_cache<T: Serialize>(
     }
     write_json_pretty(&path, snapshot)?;
     Ok(path)
+}
+
+/// Build a derived diagnostics snapshot for the local daemon workspace.
+///
+/// # Errors
+/// Returns `CliError` on filesystem or parse failures.
+pub fn diagnostics() -> Result<DaemonDiagnostics, CliError> {
+    Ok(DaemonDiagnostics {
+        daemon_root: daemon_root().display().to_string(),
+        manifest_path: manifest_path().display().to_string(),
+        auth_token_path: auth_token_path().display().to_string(),
+        auth_token_present: auth_token_path().is_file(),
+        events_path: events_path().display().to_string(),
+        cache_root: cache_root().display().to_string(),
+        cache_entry_count: cache_entry_count()?,
+        last_event: latest_event()?,
+    })
+}
+
+fn cache_entry_count() -> Result<usize, CliError> {
+    if !cache_root().is_dir() {
+        return Ok(0);
+    }
+
+    let mut pending = vec![cache_root()];
+    let mut count = 0usize;
+    while let Some(path) = pending.pop() {
+        for entry in fs_err::read_dir(&path).map_err(|error| {
+            CliError::from(CliErrorKind::workflow_io(format!(
+                "read daemon cache directory {}: {error}",
+                path.display()
+            )))
+        })? {
+            let entry = entry.map_err(|error| {
+                CliError::from(CliErrorKind::workflow_io(format!(
+                    "read daemon cache entry {}: {error}",
+                    path.display()
+                )))
+            })?;
+            let entry_path = entry.path();
+            if entry.file_type().is_ok_and(|kind| kind.is_dir()) {
+                pending.push(entry_path);
+            } else if entry.file_type().is_ok_and(|kind| kind.is_file()) {
+                count += 1;
+            }
+        }
+    }
+    Ok(count)
+}
+
+fn latest_event() -> Result<Option<DaemonAuditEvent>, CliError> {
+    Ok(read_recent_events(1)?.pop())
 }
 
 #[cfg(test)]
@@ -233,6 +334,56 @@ mod tests {
                 )
                 .expect("cache");
                 assert!(path.is_file());
+            },
+        );
+    }
+
+    #[test]
+    fn diagnostics_include_latest_event_and_cache_count() {
+        let tmp = tempdir().expect("tempdir");
+        temp_env::with_vars(
+            [(
+                "XDG_DATA_HOME",
+                Some(tmp.path().to_str().expect("utf8 path")),
+            )],
+            || {
+                append_event("info", "daemon booted").expect("append event");
+                write_session_cache(
+                    "project-abc",
+                    "sess-1",
+                    &serde_json::json!({"session_id":"sess-1"}),
+                )
+                .expect("cache");
+
+                let diagnostics = diagnostics().expect("diagnostics");
+                assert!(diagnostics.auth_token_path.ends_with("auth-token"));
+                assert_eq!(diagnostics.cache_entry_count, 1);
+                assert_eq!(
+                    diagnostics.last_event.expect("latest event").message,
+                    "daemon booted"
+                );
+            },
+        );
+    }
+
+    #[test]
+    fn read_recent_events_returns_last_entries_in_order() {
+        let tmp = tempdir().expect("tempdir");
+        temp_env::with_vars(
+            [(
+                "XDG_DATA_HOME",
+                Some(tmp.path().to_str().expect("utf8 path")),
+            )],
+            || {
+                append_event("info", "daemon booted").expect("append event");
+                append_event("warn", "stalled session").expect("append event");
+                append_event("info", "refresh complete").expect("append event");
+
+                let events = read_recent_events(2).expect("recent events");
+
+                assert_eq!(events.len(), 2);
+                assert_eq!(events[0].message, "stalled session");
+                assert_eq!(events[1].message, "refresh complete");
             },
         );
     }

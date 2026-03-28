@@ -1,6 +1,8 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+use super::launchd::LaunchAgentStatus;
+use super::state::{DaemonAuditEvent, DaemonDiagnostics, DaemonManifest};
 use crate::session::types::{
     AgentRegistration, SessionMetrics, SessionRole, SessionSignalRecord, SessionStatus,
     TaskSeverity, TaskStatus, WorkItem,
@@ -15,6 +17,15 @@ pub struct HealthResponse {
     pub started_at: String,
     pub project_count: usize,
     pub session_count: usize,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DaemonDiagnosticsReport {
+    pub health: Option<HealthResponse>,
+    pub manifest: Option<DaemonManifest>,
+    pub launch_agent: LaunchAgentStatus,
+    pub workspace: DaemonDiagnostics,
+    pub recent_events: Vec<DaemonAuditEvent>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
