@@ -1,5 +1,4 @@
 use std::env;
-use std::fs;
 use std::path::{Path, PathBuf};
 
 use tokio::task;
@@ -30,7 +29,6 @@ pub async fn session_start(
             resolve_or_create_session_id(agent, &project_dir, session_id_hint.as_deref())?;
         storage::set_current_session_id(&project_dir, agent, &session_id)?;
         storage::append_session_marker(&project_dir, agent, &session_id, "session_start")?;
-        cleanup_stale_signals(agent, &project_dir, &session_id);
         session_service::restore_compact_handoff(&project_dir)
     })
     .await
@@ -186,22 +184,6 @@ pub fn project_dir_for_context(context: &NormalizedHookContext) -> Result<PathBu
         )
 }
 
-/// Remove stale signal files from previous sessions.
-fn cleanup_stale_signals(agent: HookAgent, project_dir: &Path, session_id: &str) {
-    let runtime = super::runtime::runtime_for(agent);
-    let signal_dir = runtime.signal_dir(project_dir, session_id);
-    let pending = signal_dir.join("pending");
-    if !pending.is_dir() {
-        return;
-    }
-    let Ok(entries) = fs::read_dir(&pending) else {
-        return;
-    };
-    for entry in entries.flatten() {
-        let _ = fs::remove_file(entry.path());
-    }
-}
-
 /// Resolve a known session ID for a hook or lifecycle event.
 ///
 /// # Errors
@@ -260,4 +242,99 @@ fn default_session_id(agent: HookAgent) -> String {
         },
         utc_now().replace([':', '-'], "")
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use std::path::Path;
+
+    use serde_json::json;
+
+    use super::*;
+    use crate::agents::runtime::signal::{
+        DeliveryConfig, Signal, SignalPayload, SignalPriority, read_pending_signals,
+    };
+
+    fn with_temp_project<F: FnOnce(&Path)>(test_fn: F) {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        temp_env::with_vars(
+            [
+                (
+                    "XDG_DATA_HOME",
+                    Some(tmp.path().to_str().expect("xdg data path")),
+                ),
+                ("CLAUDE_SESSION_ID", Some("agent-service-session")),
+            ],
+            || {
+                let project = tmp.path().join("project");
+                std::fs::create_dir_all(&project).expect("create project directory");
+                test_fn(&project);
+            },
+        );
+    }
+
+    fn sample_signal() -> Signal {
+        Signal {
+            signal_id: "sig-preserve-001".into(),
+            version: 1,
+            created_at: "2026-03-28T12:00:00Z".into(),
+            expires_at: "2026-03-28T12:05:00Z".into(),
+            source_agent: "leader".into(),
+            command: "inject_context".into(),
+            priority: SignalPriority::Normal,
+            payload: SignalPayload {
+                message: "preserve pending signal".into(),
+                action_hint: None,
+                related_files: vec![],
+                metadata: json!(null),
+            },
+            delivery: DeliveryConfig {
+                max_retries: 3,
+                retry_count: 0,
+                idempotency_key: None,
+            },
+        }
+    }
+
+    #[test]
+    fn session_start_preserves_pending_signals() {
+        with_temp_project(|project| {
+            RUNTIME
+                .block_on(session_start(
+                    HookAgent::Claude,
+                    project.to_path_buf(),
+                    Some("sess-preserve".to_string()),
+                ))
+                .expect("initial session start");
+
+            let runtime = super::super::runtime::runtime_for(HookAgent::Claude);
+            runtime
+                .write_signal(project, "sess-preserve", &sample_signal())
+                .expect("write pending signal");
+
+            let signal_dir = runtime.signal_dir(project, "sess-preserve");
+            assert_eq!(
+                read_pending_signals(&signal_dir)
+                    .expect("read pending signals before restart")
+                    .len(),
+                1,
+            );
+
+            RUNTIME
+                .block_on(session_start(
+                    HookAgent::Claude,
+                    project.to_path_buf(),
+                    Some("sess-preserve".to_string()),
+                ))
+                .expect("resume session");
+
+            assert_eq!(
+                read_pending_signals(&signal_dir)
+                    .expect("read pending signals after restart")
+                    .len(),
+                1,
+                "session restart must not drop queued signals",
+            );
+        });
+    }
 }

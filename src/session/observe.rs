@@ -1,4 +1,5 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
+use std::mem;
 use std::path::Path;
 use std::thread;
 use std::time::Duration;
@@ -161,10 +162,7 @@ fn run_periodic_sweep(
         );
     }
 
-    emit_watch_issues(
-        &missed.iter().copied().cloned().collect::<Vec<_>>(),
-        json,
-    );
+    emit_watch_issues(&missed.iter().copied().cloned().collect::<Vec<_>>(), json);
     Ok(())
 }
 
@@ -196,6 +194,7 @@ fn scan_all_agents(
     project_dir: &Path,
 ) -> Result<Vec<Issue>, CliError> {
     let mut all_issues: Vec<Issue> = Vec::new();
+    let mut shared_cross_agent_editors: HashMap<String, HashSet<String>> = HashMap::new();
     for agent in state.agents.values() {
         let Some(agent_runtime) = resolve_agent_runtime(&agent.runtime) else {
             continue;
@@ -211,6 +210,7 @@ fn scan_all_agents(
             session_id,
             Some(&role_label),
             project_dir,
+            &mut shared_cross_agent_editors,
         )?;
         all_issues.extend(issues);
     }
@@ -261,6 +261,7 @@ fn scan_agent_log(
     session_id: &str,
     agent_role: Option<&str>,
     project_dir: &Path,
+    shared_cross_agent_editors: &mut HashMap<String, HashSet<String>>,
 ) -> Result<Vec<Issue>, CliError> {
     let Some(log_path) = agent_runtime.discover_native_log(agent_session_id, project_dir)? else {
         return Ok(Vec::new());
@@ -275,6 +276,7 @@ fn scan_agent_log(
         orchestration_session_id: Some(session_id.to_string()),
         ..ScanState::default()
     };
+    scan_state.cross_agent_editors = mem::take(shared_cross_agent_editors);
 
     let mut issues = Vec::new();
     for (index, line) in content.lines().enumerate() {
@@ -283,6 +285,7 @@ fn scan_agent_log(
         }
         issues.extend(classify_line(index, line, &mut scan_state));
     }
+    *shared_cross_agent_editors = scan_state.cross_agent_editors;
     Ok(issues)
 }
 
@@ -357,7 +360,12 @@ mod tests {
         );
     }
 
-    fn write_agent_log(project_dir: &Path, runtime: HookAgent, session_id: &str, text: &str) {
+    fn write_agent_log_lines(
+        project_dir: &Path,
+        runtime: HookAgent,
+        session_id: &str,
+        lines: &[serde_json::Value],
+    ) {
         let log_path = project_context_dir(project_dir)
             .join("agents/sessions")
             .join(runtime::runtime_for(runtime).name())
@@ -369,19 +377,28 @@ mod tests {
                 .expect("raw agent log should always have a parent"),
         )
         .expect("create agent log directory");
-        fs::write(
-            &log_path,
-            serde_json::json!({
+        let content = lines
+            .iter()
+            .map(serde_json::Value::to_string)
+            .collect::<Vec<_>>()
+            .join("\n")
+            + "\n";
+        fs::write(&log_path, content).expect("write agent log");
+    }
+
+    fn write_agent_log(project_dir: &Path, runtime: HookAgent, session_id: &str, text: &str) {
+        write_agent_log_lines(
+            project_dir,
+            runtime,
+            session_id,
+            &[serde_json::json!({
                 "timestamp": "2026-03-28T12:00:00Z",
                 "message": {
                     "role": "assistant",
                     "content": text,
                 }
-            })
-            .to_string()
-                + "\n",
-        )
-        .expect("write agent log");
+            })],
+        );
     }
 
     fn infrastructure_issue(fingerprint: &str) -> Issue {
@@ -492,6 +509,98 @@ mod tests {
                 tasks[0].severity,
                 TaskSeverity::Critical,
                 "task severity should follow the issue severity",
+            );
+        });
+    }
+
+    #[test]
+    fn observe_detects_cross_agent_file_conflicts_across_agents() {
+        with_temp_project(|project| {
+            let state =
+                service::start_session("observe test", project, Some("claude"), Some("sess-4"))
+                    .expect("start session");
+
+            temp_env::with_vars([("CODEX_SESSION_ID", Some("worker-session"))], || {
+                service::join_session(
+                    &state.session_id,
+                    SessionRole::Worker,
+                    "codex",
+                    &[],
+                    None,
+                    project,
+                )
+                .expect("join codex worker");
+            });
+
+            write_agent_log_lines(
+                project,
+                HookAgent::Claude,
+                "leader-session",
+                &[
+                    serde_json::json!({
+                        "timestamp": "2026-03-28T12:00:00Z",
+                        "message": {
+                            "role": "assistant",
+                            "content": [{
+                                "type": "tool_use",
+                                "id": "write-1",
+                                "name": "Write",
+                                "input": { "file_path": "src/shared.rs", "content": "leader edit" }
+                            }]
+                        }
+                    }),
+                    serde_json::json!({
+                        "timestamp": "2026-03-28T12:00:01Z",
+                        "message": {
+                            "role": "assistant",
+                            "content": [{
+                                "type": "tool_result",
+                                "tool_use_id": "write-1",
+                                "content": "The file src/shared.rs has been updated successfully"
+                            }]
+                        }
+                    }),
+                ],
+            );
+            write_agent_log_lines(
+                project,
+                HookAgent::Codex,
+                "worker-session",
+                &[
+                    serde_json::json!({
+                        "timestamp": "2026-03-28T12:00:02Z",
+                        "message": {
+                            "role": "assistant",
+                            "content": [{
+                                "type": "tool_use",
+                                "id": "write-2",
+                                "name": "Write",
+                                "input": { "file_path": "src/shared.rs", "content": "worker edit" }
+                            }]
+                        }
+                    }),
+                    serde_json::json!({
+                        "timestamp": "2026-03-28T12:00:03Z",
+                        "message": {
+                            "role": "assistant",
+                            "content": [{
+                                "type": "tool_result",
+                                "tool_use_id": "write-2",
+                                "content": "The file src/shared.rs has been updated successfully"
+                            }]
+                        }
+                    }),
+                ],
+            );
+
+            let observed = service::session_status("sess-4", project).expect("load session");
+            let issues = scan_all_agents(&observed, "sess-4", project).expect("scan logs");
+
+            assert!(
+                issues
+                    .iter()
+                    .any(|issue| issue.code == IssueCode::CrossAgentFileConflict),
+                "expected cross-agent conflict issue from shared editor state",
             );
         });
     }
