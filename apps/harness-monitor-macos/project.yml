@@ -10,7 +10,7 @@ settings:
     ENABLE_HARDENED_RUNTIME: YES
     GCC_TREAT_WARNINGS_AS_ERRORS: YES
     GENERATE_INFOPLIST_FILE: YES
-    MACOSX_DEPLOYMENT_TARGET: "14.0"
+    MACOSX_DEPLOYMENT_TARGET: "15.0"
     SWIFT_EMIT_LOC_STRINGS: YES
     SWIFT_STRICT_CONCURRENCY: complete
     SWIFT_TREAT_WARNINGS_AS_ERRORS: YES
@@ -19,7 +19,7 @@ targets:
   HarnessMonitorKit:
     type: framework
     platform: macOS
-    deploymentTarget: "14.0"
+    deploymentTarget: "15.0"
     sources:
       - Sources/HarnessMonitorKit
     preBuildScripts:
@@ -38,7 +38,7 @@ targets:
   HarnessMonitor:
     type: application
     platform: macOS
-    deploymentTarget: "14.0"
+    deploymentTarget: "15.0"
     sources:
       - Sources/HarnessMonitor
     dependencies:
@@ -78,7 +78,7 @@ targets:
   HarnessMonitorKitTests:
     type: bundle.unit-test
     platform: macOS
-    deploymentTarget: "14.0"
+    deploymentTarget: "15.0"
     sources:
       - Tests/HarnessMonitorKitTests
     dependencies:
@@ -94,7 +94,7 @@ targets:
   HarnessMonitorUITests:
     type: bundle.ui-testing
     platform: macOS
-    deploymentTarget: "14.0"
+    deploymentTarget: "15.0"
     sources:
       - Tests/HarnessMonitorUITests
     dependencies:

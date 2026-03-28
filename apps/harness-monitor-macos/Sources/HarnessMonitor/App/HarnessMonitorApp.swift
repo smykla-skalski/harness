@@ -2,19 +2,42 @@ import HarnessMonitorKit
 import Observation
 import SwiftUI
 
+enum MonitorThemeMode: String, CaseIterable, Identifiable {
+  case auto
+  case light
+  case dark
+
+  var id: String { rawValue }
+
+  var colorScheme: ColorScheme? {
+    switch self {
+    case .auto: nil
+    case .light: .light
+    case .dark: .dark
+    }
+  }
+
+  var label: String {
+    switch self {
+    case .auto: "Auto"
+    case .light: "Light"
+    case .dark: "Dark"
+    }
+  }
+}
+
 @main
 @MainActor
 struct HarnessMonitorApp: App {
   @State private var store = HarnessMonitorAppStoreFactory.makeStore()
+  @AppStorage("monitorThemeMode") private var themeMode = MonitorThemeMode.auto
 
   var body: some Scene {
-    WindowGroup {
-      ContentView(store: store)
-        .task {
-          await store.bootstrapIfNeeded()
-        }
+    Window("Harness Monitor", id: "main") {
+      rootContent
     }
     .windowStyle(.titleBar)
+    .defaultLaunchBehavior(.presented)
     .defaultSize(width: 1640, height: 980)
     .commands {
       SidebarCommands()
@@ -59,5 +82,14 @@ struct HarnessMonitorApp: App {
         .disabled(store.selectedSessionID == nil)
       }
     }
+  }
+
+  @ViewBuilder
+  private var rootContent: some View {
+    ContentView(store: store, themeMode: $themeMode)
+      .preferredColorScheme(themeMode.colorScheme)
+      .task {
+        await store.bootstrapIfNeeded()
+      }
   }
 }
