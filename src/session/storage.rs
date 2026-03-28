@@ -9,11 +9,11 @@ use fs_err as fs;
 use serde::{Deserialize, Serialize};
 
 use crate::errors::{CliError, CliErrorKind};
-use crate::infra::io::{read_json_typed, write_json_pretty};
+use crate::infra::io::{read_json_typed, validate_safe_segment, write_json_pretty};
 use crate::infra::persistence::versioned_json::VersionedJsonRepository;
 use crate::workspace::{project_context_dir, utc_now};
 
-use super::types::{CURRENT_VERSION, SessionLogEntry, SessionState, SessionTransition};
+use super::types::{SessionLogEntry, SessionState, SessionTransition, CURRENT_VERSION};
 
 fn orchestration_root(project_dir: &Path) -> PathBuf {
     project_context_dir(project_dir).join("orchestration")
@@ -23,16 +23,21 @@ fn sessions_root(project_dir: &Path) -> PathBuf {
     orchestration_root(project_dir).join("sessions")
 }
 
-pub(crate) fn session_dir(project_dir: &Path, session_id: &str) -> PathBuf {
-    sessions_root(project_dir).join(session_id)
+fn validate_session_id(session_id: &str) -> Result<(), CliError> {
+    validate_safe_segment(session_id)
 }
 
-fn state_path(project_dir: &Path, session_id: &str) -> PathBuf {
-    session_dir(project_dir, session_id).join("state.json")
+pub(crate) fn session_dir(project_dir: &Path, session_id: &str) -> Result<PathBuf, CliError> {
+    validate_session_id(session_id)?;
+    Ok(sessions_root(project_dir).join(session_id))
 }
 
-fn log_path(project_dir: &Path, session_id: &str) -> PathBuf {
-    session_dir(project_dir, session_id).join("log.jsonl")
+fn state_path(project_dir: &Path, session_id: &str) -> Result<PathBuf, CliError> {
+    Ok(session_dir(project_dir, session_id)?.join("state.json"))
+}
+
+fn log_path(project_dir: &Path, session_id: &str) -> Result<PathBuf, CliError> {
+    Ok(session_dir(project_dir, session_id)?.join("log.jsonl"))
 }
 
 fn active_registry_path(project_dir: &Path) -> PathBuf {
@@ -81,8 +86,11 @@ fn io_err(error: &dyn fmt::Display) -> CliError {
 pub(crate) fn state_repository(
     project_dir: &Path,
     session_id: &str,
-) -> VersionedJsonRepository<SessionState> {
-    VersionedJsonRepository::new(state_path(project_dir, session_id), CURRENT_VERSION)
+) -> Result<VersionedJsonRepository<SessionState>, CliError> {
+    Ok(VersionedJsonRepository::new(
+        state_path(project_dir, session_id)?,
+        CURRENT_VERSION,
+    ))
 }
 
 /// Load session state, returning `None` if the state file does not exist.
@@ -93,19 +101,28 @@ pub(crate) fn load_state(
     project_dir: &Path,
     session_id: &str,
 ) -> Result<Option<SessionState>, CliError> {
-    state_repository(project_dir, session_id).load()
+    state_repository(project_dir, session_id)?.load()
 }
 
-/// Save session state atomically.
+/// Save session state only when the session does not already exist.
 ///
 /// # Errors
 /// Returns `CliError` on I/O or serialization failures.
-pub(crate) fn save_state(
+pub(crate) fn create_state(
     project_dir: &Path,
     session_id: &str,
     state: &SessionState,
-) -> Result<(), CliError> {
-    state_repository(project_dir, session_id).save(state)
+) -> Result<bool, CliError> {
+    let repository = state_repository(project_dir, session_id)?;
+    let mut created = false;
+    let _ = repository.update(|current| {
+        if current.is_some() {
+            return Ok(current);
+        }
+        created = true;
+        Ok(Some(state.clone()))
+    })?;
+    Ok(created)
 }
 
 /// Load, modify, and save session state under an exclusive lock.
@@ -120,7 +137,7 @@ pub(crate) fn update_state<F>(
 where
     F: FnOnce(&mut SessionState) -> Result<(), CliError>,
 {
-    state_repository(project_dir, session_id)
+    state_repository(project_dir, session_id)?
         .update(|state| {
             let Some(mut state) = state else {
                 return Err(CliErrorKind::session_not_active(format!(
@@ -151,8 +168,9 @@ pub(crate) fn append_log_entry(
     actor_id: Option<&str>,
     reason: Option<&str>,
 ) -> Result<(), CliError> {
+    validate_session_id(session_id)?;
     with_lock(project_dir, &format!("log-{session_id}"), || {
-        let path = log_path(project_dir, session_id);
+        let path = log_path(project_dir, session_id)?;
         if let Some(parent) = path.parent() {
             fs::create_dir_all(parent).map_err(|error| io_err(&error))?;
         }
@@ -173,7 +191,10 @@ fn next_log_sequence(path: &Path) -> u64 {
     let Ok(content) = fs::read_to_string(path) else {
         return 1;
     };
-    let count = content.lines().filter(|line| !line.trim().is_empty()).count();
+    let count = content
+        .lines()
+        .filter(|line| !line.trim().is_empty())
+        .count();
     (count as u64) + 1
 }
 
@@ -201,12 +222,11 @@ pub(crate) struct ActiveRegistry {
 /// # Errors
 /// Returns `CliError` on I/O failures.
 pub(crate) fn register_active(project_dir: &Path, session_id: &str) -> Result<(), CliError> {
+    validate_session_id(session_id)?;
     with_lock(project_dir, "active-registry", || {
         let path = active_registry_path(project_dir);
         let mut registry = load_active_registry(&path);
-        registry
-            .sessions
-            .insert(session_id.to_string(), utc_now());
+        registry.sessions.insert(session_id.to_string(), utc_now());
         write_json_pretty(&path, &registry)
     })
 }
@@ -216,6 +236,7 @@ pub(crate) fn register_active(project_dir: &Path, session_id: &str) -> Result<()
 /// # Errors
 /// Returns `CliError` on I/O failures.
 pub(crate) fn deregister_active(project_dir: &Path, session_id: &str) -> Result<(), CliError> {
+    validate_session_id(session_id)?;
     with_lock(project_dir, "active-registry", || {
         let path = active_registry_path(project_dir);
         let mut registry = load_active_registry(&path);
@@ -260,7 +281,7 @@ mod tests {
                     tasks: Default::default(),
                     leader_id: None,
                 };
-                save_state(&project, "sess-1", &state).unwrap();
+                assert!(create_state(&project, "sess-1", &state).unwrap());
                 let loaded = load_state(&project, "sess-1").unwrap().unwrap();
                 assert_eq!(loaded.session_id, "sess-1");
             },
@@ -295,11 +316,43 @@ mod tests {
                     None,
                 )
                 .unwrap();
-                let path = log_path(&project, "sess-1");
+                let path = log_path(&project, "sess-1").unwrap();
                 let content = std::fs::read_to_string(&path).unwrap();
-                let lines: Vec<_> =
-                    content.lines().filter(|l| !l.trim().is_empty()).collect();
+                let lines: Vec<_> = content.lines().filter(|l| !l.trim().is_empty()).collect();
                 assert_eq!(lines.len(), 2);
+            },
+        );
+    }
+
+    #[test]
+    fn create_state_rejects_unsafe_session_id() {
+        let tmp = tempfile::tempdir().unwrap();
+        temp_env::with_vars(
+            [
+                ("XDG_DATA_HOME", Some(tmp.path().to_str().unwrap())),
+                ("CLAUDE_SESSION_ID", Some("test-unsafe-session-id")),
+            ],
+            || {
+                let project = tmp.path().join("project");
+                let escape_dir = tmp.path().join("escape");
+                let unsafe_id = escape_dir.to_string_lossy().into_owned();
+                let state = SessionState {
+                    schema_version: CURRENT_VERSION,
+                    state_version: 0,
+                    session_id: unsafe_id.clone(),
+                    context: "test".into(),
+                    status: SessionStatus::Active,
+                    created_at: "2026-01-01T00:00:00Z".into(),
+                    updated_at: "2026-01-01T00:00:00Z".into(),
+                    agents: Default::default(),
+                    tasks: Default::default(),
+                    leader_id: None,
+                };
+
+                let error = create_state(&project, &unsafe_id, &state).unwrap_err();
+
+                assert_eq!(error.code(), "KSRCLI059");
+                assert!(!escape_dir.join("state.json").exists());
             },
         );
     }
