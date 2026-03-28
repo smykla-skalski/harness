@@ -1,6 +1,7 @@
 import Foundation
-import HarnessMonitorKit
 import XCTest
+
+@testable import HarnessMonitorKit
 
 @MainActor
 final class MonitorStoreTests: XCTestCase {
@@ -43,7 +44,11 @@ final class MonitorStoreTests: XCTestCase {
 }
 
 private actor MockDaemonController: DaemonControlling {
-  private let client = PreviewMonitorClient()
+  private let client: any MonitorClientProtocol
+
+  init(client: any MonitorClientProtocol = PreviewMonitorClient()) {
+    self.client = client
+  }
 
   func bootstrapClient() async throws -> any MonitorClientProtocol {
     client
