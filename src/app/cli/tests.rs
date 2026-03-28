@@ -403,11 +403,15 @@ fn parse_observe_doctor() {
     ])
     .unwrap();
     match cli.command {
-        Command::Observe(ObserveArgs {
-            agent,
-            observe_id,
-            mode: ObserveMode::Doctor { json, project_dir },
-        }) => {
+        Command::Observe(args) => {
+            let ObserveArgs {
+                agent,
+                observe_id,
+                mode: ObserveMode::Doctor { json, project_dir },
+            } = *args
+            else {
+                panic!("expected Doctor mode");
+            };
             assert!(agent.is_none());
             assert_eq!(observe_id, "project-default");
             assert!(json);
@@ -431,11 +435,15 @@ fn parse_observe_scope_flags() {
     ])
     .unwrap();
     match cli.command {
-        Command::Observe(ObserveArgs {
-            agent,
-            observe_id,
-            mode: ObserveMode::Doctor { json, project_dir },
-        }) => {
+        Command::Observe(args) => {
+            let ObserveArgs {
+                agent,
+                observe_id,
+                mode: ObserveMode::Doctor { json, project_dir },
+            } = *args
+            else {
+                panic!("expected Doctor mode");
+            };
             assert_eq!(agent, Some(HookAgent::Codex));
             assert_eq!(observe_id, "shared-ledger");
             assert!(json);

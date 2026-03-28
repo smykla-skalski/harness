@@ -134,7 +134,7 @@ pub enum Command {
     PreCompact(PreCompactArgs),
 
     /// Observe and classify harness-managed agent session logs.
-    Observe(ObserveArgs),
+    Observe(Box<ObserveArgs>),
 }
 
 /// Dispatch a parsed command to its owning subsystem.
