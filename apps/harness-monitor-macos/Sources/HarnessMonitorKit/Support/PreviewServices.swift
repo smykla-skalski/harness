@@ -59,7 +59,9 @@ public final class PreviewMonitorClient: MonitorClientProtocol, @unchecked Senda
     }
   }
 
-  public func createTask(sessionID _: String, request _: TaskCreateRequest) async throws -> SessionDetail { PreviewFixtures.detail }
+  public func createTask(sessionID _: String, request _: TaskCreateRequest) async throws
+    -> SessionDetail
+  { PreviewFixtures.detail }
 
   public func assignTask(
     sessionID _: String,
