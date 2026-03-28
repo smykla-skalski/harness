@@ -101,7 +101,7 @@ pub enum Command {
     /// Suite:run commands grouped by domain.
     Run {
         #[command(subcommand)]
-        command: RunCommand,
+        command: Box<RunCommand>,
     },
 
     /// Suite:create commands grouped by domain.
