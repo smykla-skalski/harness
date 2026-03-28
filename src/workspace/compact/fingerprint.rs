@@ -89,5 +89,5 @@ pub(crate) fn file_sha256(path: &Path) -> Option<String> {
     use sha2::{Digest, Sha256};
     let data = fs::read(path).ok()?;
     let hash = Sha256::digest(&data);
-    Some(format!("{hash:x}"))
+    Some(hex::encode(hash))
 }

@@ -875,9 +875,7 @@ fn is_executable_generated_output(path: &Path) -> bool {
 }
 
 fn path_is_executable(path: &Path) -> bool {
-    metadata(path)
-        .map(|meta| meta.permissions().mode() & 0o111 != 0)
-        .unwrap_or(false)
+    metadata(path).is_ok_and(|meta| meta.permissions().mode() & 0o111 != 0)
 }
 
 fn append_yaml_line(out: &mut String, key: &str, value: &str) {
