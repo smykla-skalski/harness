@@ -4,8 +4,9 @@ options:
   createIntermediateGroups: true
 settings:
   base:
-    CODE_SIGNING_ALLOWED: NO
     CLANG_TREAT_WARNINGS_AS_ERRORS: YES
+    CODE_SIGNING_ALLOWED: YES
+    ENABLE_HARDENED_RUNTIME: YES
     GCC_TREAT_WARNINGS_AS_ERRORS: YES
     GENERATE_INFOPLIST_FILE: YES
     MACOSX_DEPLOYMENT_TARGET: "14.0"
@@ -38,6 +39,12 @@ targets:
       - Sources/HarnessMonitor
     dependencies:
       - target: HarnessMonitorKit
+    entitlements:
+      path: HarnessMonitor.entitlements
+      properties:
+        com.apple.security.network.client: true
+        com.apple.security.network.server: true
+        com.apple.security.cs.disable-library-validation: true
     preBuildScripts:
       - name: Swift Quality Gate
         basedOnDependencyAnalysis: false
@@ -58,9 +65,9 @@ targets:
           strip_attrs "$TARGET_BUILD_DIR/$FULL_PRODUCT_NAME"
     settings:
       base:
-        CODE_SIGN_IDENTITY: "-"
+        CODE_SIGN_ENTITLEMENTS: HarnessMonitor.entitlements
+        CODE_SIGN_IDENTITY: "Monitor Development"
         CODE_SIGN_STYLE: Manual
-        CODE_SIGNING_ALLOWED: YES
         INFOPLIST_KEY_CFBundleDisplayName: Harness Monitor
         INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.developer-tools
         PRODUCT_BUNDLE_IDENTIFIER: io.harness.monitor.app
@@ -116,7 +123,7 @@ targets:
       base:
         CODE_SIGN_IDENTITY: "-"
         CODE_SIGN_STYLE: Manual
-        CODE_SIGNING_ALLOWED: YES
+        ENABLE_HARDENED_RUNTIME: NO
         PRODUCT_BUNDLE_IDENTIFIER: io.harness.monitor.ui-tests
         TEST_TARGET_NAME: HarnessMonitor
 schemes:
