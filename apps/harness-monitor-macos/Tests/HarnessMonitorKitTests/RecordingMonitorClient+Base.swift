@@ -15,6 +15,45 @@ extension RecordingMonitorClient {
     )
   }
 
+  func diagnostics() async throws -> DaemonDiagnosticsReport {
+    DaemonDiagnosticsReport(
+      health: try await health(),
+      manifest: DaemonManifest(
+        version: "14.5.0",
+        pid: 111,
+        endpoint: "http://127.0.0.1:9999",
+        startedAt: "2026-03-28T14:00:00Z",
+        tokenPath: "/tmp/token"
+      ),
+      launchAgent: LaunchAgentStatus(
+        installed: true,
+        label: "io.harness.monitor.daemon",
+        path: "/tmp/io.harness.monitor.daemon.plist"
+      ),
+      workspace: DaemonDiagnostics(
+        daemonRoot: "/tmp/harness/daemon",
+        manifestPath: "/tmp/harness/daemon/manifest.json",
+        authTokenPath: "/tmp/token",
+        authTokenPresent: true,
+        eventsPath: "/tmp/harness/daemon/events.jsonl",
+        cacheRoot: "/tmp/harness/daemon/cache/projects",
+        cacheEntryCount: 2,
+        lastEvent: DaemonAuditEvent(
+          recordedAt: "2026-03-28T14:00:00Z",
+          level: "info",
+          message: "daemon ready"
+        )
+      ),
+      recentEvents: [
+        DaemonAuditEvent(
+          recordedAt: "2026-03-28T14:00:00Z",
+          level: "info",
+          message: "daemon ready"
+        )
+      ]
+    )
+  }
+
   func projects() async throws -> [ProjectSummary] {
     [
       ProjectSummary(

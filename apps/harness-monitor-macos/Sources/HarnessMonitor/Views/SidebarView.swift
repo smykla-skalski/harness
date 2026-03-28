@@ -58,6 +58,7 @@ struct SidebarView: View {
       }
     }
     .monitorCard()
+    .accessibilityIdentifier(MonitorAccessibility.daemonCard)
   }
 
   private var filterStrip: some View {
@@ -123,6 +124,7 @@ struct SidebarView: View {
                     )
                 )
               }
+              .accessibilityIdentifier(MonitorAccessibility.sessionRow(session.sessionId))
               .buttonStyle(.plain)
             }
           }

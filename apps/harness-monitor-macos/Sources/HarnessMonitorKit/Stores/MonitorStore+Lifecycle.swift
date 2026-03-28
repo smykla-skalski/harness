@@ -17,10 +17,12 @@ extension MonitorStore {
 
     do {
       async let healthResponse = client.health()
+      async let diagnosticsResponse = client.diagnostics()
       async let projectResponse = client.projects()
       async let sessionResponse = client.sessions()
 
       health = try await healthResponse
+      diagnostics = try await diagnosticsResponse
       projects = try await projectResponse
       sessions = try await sessionResponse
       daemonStatus = try? await daemonController.daemonStatus()

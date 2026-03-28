@@ -167,6 +167,7 @@ struct SessionsBoardView: View {
       }
     }
     .monitorCard()
+    .accessibilityIdentifier(MonitorAccessibility.onboardingCard)
   }
 
   private func dashboardMetric(title: String, value: String, tint: Color) -> some View {

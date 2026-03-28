@@ -11,6 +11,10 @@ final class MonitorStoreTests: XCTestCase {
     XCTAssertEqual(store.projects, PreviewFixtures.projects)
     XCTAssertEqual(store.sessions.map(\.sessionId), [PreviewFixtures.summary.sessionId])
     XCTAssertEqual(store.health?.status, "ok")
+    XCTAssertEqual(
+      store.diagnostics?.recentEvents.first?.message,
+      "daemon ready"
+    )
   }
 
   func testSelectSessionLoadsDetailAndTimeline() async throws {
@@ -78,5 +82,17 @@ final class MonitorStoreTests: XCTestCase {
     XCTAssertEqual(store.connectionState, .online)
     XCTAssertEqual(store.health?.status, "ok")
     XCTAssertEqual(store.daemonStatus?.diagnostics.cacheEntryCount, 2)
+    XCTAssertEqual(store.diagnostics?.workspace.cacheEntryCount, 2)
+  }
+
+  func testRefreshDiagnosticsLoadsLiveDaemonDiagnostics() async throws {
+    let store = await makeBootstrappedStore()
+
+    store.diagnostics = nil
+
+    await store.refreshDiagnostics()
+
+    XCTAssertEqual(store.diagnostics?.workspace.cacheEntryCount, 2)
+    XCTAssertEqual(store.diagnostics?.recentEvents.count, 1)
   }
 }

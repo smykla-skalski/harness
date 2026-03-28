@@ -50,12 +50,14 @@ struct ContentView: View {
           Label("Refresh", systemImage: "arrow.clockwise")
         }
         .keyboardShortcut("r", modifiers: [.command])
+        .accessibilityIdentifier(MonitorAccessibility.refreshButton)
 
         Button {
           showsPreferences.toggle()
         } label: {
           Label("Daemon", systemImage: "gearshape.2")
         }
+        .accessibilityIdentifier(MonitorAccessibility.daemonPreferencesButton)
       }
     }
     .sheet(isPresented: $showsPreferences) {

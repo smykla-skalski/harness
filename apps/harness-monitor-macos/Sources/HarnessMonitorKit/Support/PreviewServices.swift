@@ -9,7 +9,7 @@ public final class PreviewMonitorClient: MonitorClientProtocol, @unchecked Senda
     let timeline: [TimelineEntry]
     let readySessionID: String?
 
-    static let populated = Self(
+    public static let populated = Self(
       health: HealthResponse(
         status: "ok",
         version: "14.5.0",
@@ -26,7 +26,7 @@ public final class PreviewMonitorClient: MonitorClientProtocol, @unchecked Senda
       readySessionID: PreviewFixtures.summary.sessionId
     )
 
-    static let empty = Self(
+    public static let empty = Self(
       health: HealthResponse(
         status: "ok",
         version: "14.5.0",
@@ -46,12 +46,58 @@ public final class PreviewMonitorClient: MonitorClientProtocol, @unchecked Senda
 
   private let fixtures: Fixtures
 
-  public init(fixtures: Fixtures = .populated) {
+  public init(fixtures: Fixtures) {
     self.fixtures = fixtures
+  }
+
+  public convenience init() {
+    self.init(fixtures: .populated)
   }
 
   public func health() async throws -> HealthResponse {
     fixtures.health
+  }
+
+  public func diagnostics() async throws -> DaemonDiagnosticsReport {
+    let manifest = DaemonManifest(
+      version: fixtures.health.version,
+      pid: fixtures.health.pid,
+      endpoint: fixtures.health.endpoint,
+      startedAt: fixtures.health.startedAt,
+      tokenPath: "/Users/example/Library/Application Support/harness/daemon/auth-token"
+    )
+
+    let lastEvent: DaemonAuditEvent?
+    if let session = fixtures.sessions.first {
+      lastEvent = DaemonAuditEvent(
+        recordedAt: "2026-03-28T14:18:00Z",
+        level: "info",
+        message: "indexed session \(session.sessionId)"
+      )
+    } else {
+      lastEvent = nil
+    }
+    let recentEvents = lastEvent.map { [$0] } ?? []
+    return DaemonDiagnosticsReport(
+      health: fixtures.health,
+      manifest: manifest,
+      launchAgent: LaunchAgentStatus(
+        installed: !fixtures.sessions.isEmpty,
+        label: "io.harness.monitor.daemon",
+        path: "/Users/example/Library/LaunchAgents/io.harness.monitor.daemon.plist"
+      ),
+      workspace: DaemonDiagnostics(
+        daemonRoot: "/Users/example/Library/Application Support/harness/daemon",
+        manifestPath: "/Users/example/Library/Application Support/harness/daemon/manifest.json",
+        authTokenPath: "/Users/example/Library/Application Support/harness/daemon/auth-token",
+        authTokenPresent: true,
+        eventsPath: "/Users/example/Library/Application Support/harness/daemon/events.jsonl",
+        cacheRoot: "/Users/example/Library/Application Support/harness/daemon/cache/projects",
+        cacheEntryCount: fixtures.sessions.isEmpty ? 0 : 4,
+        lastEvent: lastEvent
+      ),
+      recentEvents: recentEvents
+    )
   }
 
   public func projects() async throws -> [ProjectSummary] {

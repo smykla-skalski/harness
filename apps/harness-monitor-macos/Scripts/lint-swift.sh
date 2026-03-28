@@ -14,8 +14,11 @@ case "$TARGET_KIND" in
   tests)
     set -- "$ROOT/Tests/HarnessMonitorKitTests"
     ;;
+  ui-tests)
+    set -- "$ROOT/Tests/HarnessMonitorUITests"
+    ;;
   all)
-    set -- "$ROOT/Sources" "$ROOT/Tests"
+    set -- "$ROOT/Sources" "$ROOT/Tests/HarnessMonitorKitTests" "$ROOT/Tests/HarnessMonitorUITests"
     ;;
   *)
     echo "unknown lint target: $TARGET_KIND" >&2
