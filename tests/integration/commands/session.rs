@@ -359,6 +359,7 @@ fn multi_agent_observation_merges_issues() {
                 "obs-1",
                 &project,
                 true,
+                None,
             );
             assert!(result.is_ok());
             // Exit code 0 means no issues found (no logs to scan)

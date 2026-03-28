@@ -113,10 +113,10 @@ fn extract_written_file_path(text: &str) -> Option<&str> {
     // Match patterns like "The file /path/to/file.rs has been updated successfully"
     // or "File created successfully at: /path/to/file.rs"
     for line in text.lines() {
-        if let Some(rest) = line.strip_prefix("The file ") {
-            if let Some(path) = rest.split(" has been").next() {
-                return Some(path.trim());
-            }
+        if let Some(rest) = line.strip_prefix("The file ")
+            && let Some(path) = rest.split(" has been").next()
+        {
+            return Some(path.trim());
         }
         if let Some(rest) = line.strip_prefix("File created successfully at: ") {
             return Some(rest.trim());

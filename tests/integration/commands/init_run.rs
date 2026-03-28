@@ -17,7 +17,7 @@ fn run_init(args: InitArgs, xdg_root: &Path) -> Result<i32, CliError> {
         [("XDG_DATA_HOME", Some(xdg_root.to_str().unwrap()))],
         || {
             run_command(Command::Run {
-                command: RunCommand::Init(args),
+                command: Box::new(RunCommand::Init(args)),
             })
         },
     )
