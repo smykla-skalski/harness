@@ -208,14 +208,8 @@ fn cannot_end_session_with_active_tasks() {
                 &project,
             )
             .unwrap();
-            service::assign_task(
-                "active-1",
-                &task.task_id,
-                &worker_id,
-                &leader_id,
-                &project,
-            )
-            .unwrap();
+            service::assign_task("active-1", &task.task_id, &worker_id, &leader_id, &project)
+                .unwrap();
 
             let result = service::end_session("active-1", &leader_id, &project);
             assert!(result.is_err());
@@ -244,15 +238,9 @@ fn concurrent_task_creation_from_multiple_agents() {
             .unwrap();
             let leader_id = state.leader_id.unwrap();
 
-            let joined1 = service::join_session(
-                "conc-1",
-                SessionRole::Worker,
-                "codex",
-                &[],
-                None,
-                &project,
-            )
-            .unwrap();
+            let joined1 =
+                service::join_session("conc-1", SessionRole::Worker, "codex", &[], None, &project)
+                    .unwrap();
             let worker1 = joined1
                 .agents
                 .keys()
@@ -334,33 +322,18 @@ fn multi_agent_observation_merges_issues() {
         ],
         || {
             let project = tmp.path().join("project");
-            let state = service::start_session(
-                "observe test",
-                &project,
-                Some("claude"),
-                Some("obs-1"),
-            )
-            .unwrap();
+            let state =
+                service::start_session("observe test", &project, Some("claude"), Some("obs-1"))
+                    .unwrap();
             let _leader_id = state.leader_id.unwrap();
 
-            service::join_session(
-                "obs-1",
-                SessionRole::Worker,
-                "codex",
-                &[],
-                None,
-                &project,
-            )
-            .unwrap();
+            service::join_session("obs-1", SessionRole::Worker, "codex", &[], None, &project)
+                .unwrap();
 
             // The observe command will try to find agent logs via runtime
             // adapters. With no actual logs, it should return 0 issues.
-            let result = harness::session::observe::execute_session_observe(
-                "obs-1",
-                &project,
-                true,
-                None,
-            );
+            let result =
+                harness::session::observe::execute_session_observe("obs-1", &project, true, None);
             assert!(result.is_ok());
             // Exit code 0 means no issues found (no logs to scan)
             assert_eq!(result.unwrap(), 0);
@@ -378,13 +351,9 @@ fn transfer_leader_and_role_reassignment() {
         ],
         || {
             let project = tmp.path().join("project");
-            let state = service::start_session(
-                "transfer test",
-                &project,
-                Some("claude"),
-                Some("xfer-1"),
-            )
-            .unwrap();
+            let state =
+                service::start_session("transfer test", &project, Some("claude"), Some("xfer-1"))
+                    .unwrap();
             let leader_id = state.leader_id.unwrap();
 
             let joined = service::join_session(

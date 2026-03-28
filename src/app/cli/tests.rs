@@ -659,10 +659,9 @@ fn parse_report_group() {
         panic!("expected Run command");
     };
     let RunCommand::Report(ReportArgs {
-        cmd:
-            ReportCommand::Group {
-                group_id, status, ..
-            },
+        cmd: ReportCommand::Group {
+            group_id, status, ..
+        },
     }) = *command
     else {
         panic!("expected Report Group command");
@@ -999,9 +998,8 @@ fn parse_session_observe_with_poll() {
 
 #[test]
 fn parse_session_end() {
-    let cli =
-        Cli::try_parse_from(["harness", "session", "end", "sess-x", "--actor", "leader-1"])
-            .unwrap();
+    let cli = Cli::try_parse_from(["harness", "session", "end", "sess-x", "--actor", "leader-1"])
+        .unwrap();
     let Command::Session {
         command: crate::session::transport::SessionCommand::End(args),
     } = cli.command
@@ -1047,8 +1045,15 @@ fn parse_session_remove() {
 #[test]
 fn parse_session_transfer_leader() {
     let cli = Cli::try_parse_from([
-        "harness", "session", "transfer-leader", "sess-t", "new-leader", "--reason",
-        "529 errors", "--actor", "obs-1",
+        "harness",
+        "session",
+        "transfer-leader",
+        "sess-t",
+        "new-leader",
+        "--reason",
+        "529 errors",
+        "--actor",
+        "obs-1",
     ])
     .unwrap();
     let Command::Session {
@@ -1103,8 +1108,8 @@ fn parse_session_task_list() {
 #[test]
 fn parse_session_task_update() {
     let cli = Cli::try_parse_from([
-        "harness", "session", "task", "update", "sess-tu", "task-1", "--status", "done",
-        "--note", "fixed it", "--actor", "worker-1",
+        "harness", "session", "task", "update", "sess-tu", "task-1", "--status", "done", "--note",
+        "fixed it", "--actor", "worker-1",
     ])
     .unwrap();
     let Command::Session {
@@ -1122,8 +1127,7 @@ fn parse_session_task_update() {
 
 #[test]
 fn parse_session_status() {
-    let cli =
-        Cli::try_parse_from(["harness", "session", "status", "sess-s", "--json"]).unwrap();
+    let cli = Cli::try_parse_from(["harness", "session", "status", "sess-s", "--json"]).unwrap();
     let Command::Session {
         command: crate::session::transport::SessionCommand::Status(args),
     } = cli.command
