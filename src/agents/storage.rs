@@ -51,6 +51,7 @@ fn agent_name(agent: HookAgent) -> &'static str {
         HookAgent::Codex => "codex",
         HookAgent::Gemini => "gemini",
         HookAgent::Copilot => "copilot",
+        HookAgent::OpenCode => "opencode",
     }
 }
 

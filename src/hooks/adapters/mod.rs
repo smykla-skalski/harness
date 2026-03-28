@@ -2,6 +2,7 @@ mod claude;
 mod codex;
 mod copilot;
 mod gemini;
+mod opencode;
 
 use std::path::PathBuf;
 
@@ -20,6 +21,7 @@ pub use claude::ClaudeAdapter;
 pub use codex::CodexAdapter;
 pub use copilot::CopilotAdapter;
 pub use gemini::GeminiAdapter;
+pub use opencode::OpenCodeAdapter;
 
 /// Supported hook transports/adapters.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
@@ -29,6 +31,7 @@ pub enum HookAgent {
     Copilot,
     Codex,
     Gemini,
+    OpenCode,
 }
 
 /// Adapter-rendered process response.
@@ -180,11 +183,13 @@ pub fn adapter_for(agent: HookAgent) -> &'static dyn AgentAdapter {
     static COPILOT: CopilotAdapter = CopilotAdapter;
     static CODEX: CodexAdapter = CodexAdapter;
     static GEMINI: GeminiAdapter = GeminiAdapter;
+    static OPENCODE: OpenCodeAdapter = OpenCodeAdapter;
 
     match agent {
         HookAgent::Claude => &CLAUDE,
         HookAgent::Copilot => &COPILOT,
         HookAgent::Codex => &CODEX,
         HookAgent::Gemini => &GEMINI,
+        HookAgent::OpenCode => &OPENCODE,
     }
 }

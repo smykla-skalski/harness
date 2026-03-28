@@ -128,6 +128,7 @@ pub(crate) fn planned_agent_bootstrap_files(
             .join("harness.json"),
         HookAgent::Codex => project_dir.join(".codex").join("hooks.json"),
         HookAgent::Gemini => project_dir.join(".gemini").join("settings.json"),
+        HookAgent::OpenCode => project_dir.join(".opencode").join("hooks.json"),
     };
     let registrations = process_agent_registrations(agent);
     let config = adapter_for(agent).generate_config(&registrations);
