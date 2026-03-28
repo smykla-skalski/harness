@@ -14,10 +14,10 @@ use super::http::{self, DaemonHttpState};
 use super::index::{self, ResolvedSession};
 use super::launchd::{self, LaunchAgentStatus};
 use super::protocol::{
-    DaemonDiagnosticsReport, HealthResponse, LeaderTransferRequest, ProjectSummary,
-    RoleChangeRequest, SessionDetail, SessionEndRequest, SessionSummary, SignalSendRequest,
-    StreamEvent, TaskAssignRequest, TaskCheckpointRequest, TaskCreateRequest, TaskUpdateRequest,
-    TimelineEntry,
+    DaemonDiagnosticsReport, HealthResponse, LeaderTransferRequest, ObserveSessionRequest,
+    ProjectSummary, RoleChangeRequest, SessionDetail, SessionEndRequest, SessionSummary,
+    SignalSendRequest, StreamEvent, TaskAssignRequest, TaskCheckpointRequest, TaskCreateRequest,
+    TaskUpdateRequest, TimelineEntry,
 };
 use super::snapshot;
 use super::state::{self, DaemonDiagnostics, DaemonManifest};
@@ -336,10 +336,14 @@ pub fn send_signal(
 ///
 /// # Errors
 /// Returns `CliError` when the session cannot be resolved or observe fails.
-pub fn observe_session(session_id: &str) -> Result<SessionDetail, CliError> {
+pub fn observe_session(
+    session_id: &str,
+    request: Option<&ObserveSessionRequest>,
+) -> Result<SessionDetail, CliError> {
     let resolved = index::resolve_session(session_id)?;
     let project_dir = require_project_dir(&resolved)?;
-    let _ = session_observe::execute_session_observe(session_id, project_dir, true, None)?;
+    let actor_id = request.and_then(|request| request.actor.as_deref());
+    let _ = session_observe::run_session_observe(session_id, project_dir, actor_id)?;
     snapshot::session_detail(session_id)
 }
 
@@ -365,7 +369,65 @@ fn require_project_dir(resolved: &ResolvedSession) -> Result<&Path, CliError> {
 mod tests {
     use super::*;
 
+    use std::path::Path;
+
+    use fs_err as fs;
     use tempfile::tempdir;
+
+    use crate::agents::runtime;
+    use crate::hooks::adapters::HookAgent;
+    use crate::session::{service as session_service, types::SessionRole};
+    use crate::workspace::project_context_dir;
+
+    fn with_temp_project<F: FnOnce(&Path)>(test_fn: F) {
+        let tmp = tempdir().expect("tempdir");
+        temp_env::with_vars(
+            [
+                (
+                    "XDG_DATA_HOME",
+                    Some(tmp.path().to_str().expect("xdg path")),
+                ),
+                ("CLAUDE_SESSION_ID", Some("leader-session")),
+            ],
+            || {
+                let project = tmp.path().join("project");
+                fs::create_dir_all(&project).expect("create project dir");
+                test_fn(&project);
+            },
+        );
+    }
+
+    fn append_project_ledger_entry(project_dir: &Path) {
+        let ledger_path = project_context_dir(project_dir)
+            .join("agents")
+            .join("ledger")
+            .join("events.jsonl");
+        fs::create_dir_all(ledger_path.parent().expect("ledger dir")).expect("create ledger dir");
+        fs::write(
+            &ledger_path,
+            format!(
+                "{{\"sequence\":1,\"recorded_at\":\"2026-03-28T12:00:00Z\",\"cwd\":\"{}\"}}\n",
+                project_dir.display()
+            ),
+        )
+        .expect("write ledger");
+    }
+
+    fn write_agent_log(project_dir: &Path, runtime: HookAgent, session_id: &str, text: &str) {
+        let log_path = project_context_dir(project_dir)
+            .join("agents/sessions")
+            .join(runtime::runtime_for(runtime).name())
+            .join(session_id)
+            .join("raw.jsonl");
+        fs::create_dir_all(log_path.parent().expect("agent log dir")).expect("create log dir");
+        fs::write(
+            log_path,
+            format!(
+                "{{\"timestamp\":\"2026-03-28T12:00:00Z\",\"message\":{{\"role\":\"assistant\",\"content\":\"{text}\"}}}}\n"
+            ),
+        )
+        .expect("write log");
+    }
 
     #[test]
     fn diagnostics_report_includes_workspace_and_recent_events() {
@@ -401,5 +463,53 @@ mod tests {
                 assert_eq!(report.recent_events.len(), 1);
             },
         );
+    }
+
+    #[test]
+    fn observe_session_with_actor_creates_tasks() {
+        with_temp_project(|project| {
+            let state = session_service::start_session(
+                "observe test",
+                project,
+                Some("claude"),
+                Some("daemon-observe"),
+            )
+            .expect("start session");
+            let leader_id = state.leader_id.clone().expect("leader id");
+
+            temp_env::with_vars([("CODEX_SESSION_ID", Some("worker-session"))], || {
+                session_service::join_session(
+                    &state.session_id,
+                    SessionRole::Worker,
+                    "codex",
+                    &[],
+                    None,
+                    project,
+                )
+                .expect("join codex worker");
+            });
+
+            append_project_ledger_entry(project);
+            write_agent_log(
+                project,
+                HookAgent::Codex,
+                "worker-session",
+                "This is a harness infrastructure issue - the KDS port wasn't forwarded",
+            );
+
+            let detail = observe_session(
+                &state.session_id,
+                Some(&ObserveSessionRequest {
+                    actor: Some(leader_id),
+                }),
+            )
+            .expect("observe session");
+
+            assert_eq!(detail.tasks.len(), 1);
+            assert_eq!(
+                detail.tasks[0].source,
+                crate::session::types::TaskSource::Observe
+            );
+        });
     }
 }
