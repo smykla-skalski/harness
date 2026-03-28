@@ -13,8 +13,9 @@ use tokio::sync::broadcast;
 use crate::errors::{CliError, CliErrorKind};
 
 use super::protocol::{
-    LeaderTransferRequest, RoleChangeRequest, SessionEndRequest, SignalSendRequest, StreamEvent,
-    TaskAssignRequest, TaskCheckpointRequest, TaskCreateRequest, TaskUpdateRequest,
+    LeaderTransferRequest, ObserveSessionRequest, RoleChangeRequest, SessionEndRequest,
+    SignalSendRequest, StreamEvent, TaskAssignRequest, TaskCheckpointRequest, TaskCreateRequest,
+    TaskUpdateRequest,
 };
 use super::service;
 use super::state::DaemonManifest;
@@ -255,11 +256,13 @@ async fn post_observe_session(
     Path(session_id): Path<String>,
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
+    request: Option<Json<ObserveSessionRequest>>,
 ) -> Response {
     if let Err(response) = require_auth(&headers, &state) {
         return *response;
     }
-    let response = map_json(service::observe_session(&session_id));
+    let request = request.map(|Json(request)| request);
+    let response = map_json(service::observe_session(&session_id, request.as_ref()));
     let _ = state
         .sender
         .send(service::refresh_event("session_updated", Some(&session_id)));

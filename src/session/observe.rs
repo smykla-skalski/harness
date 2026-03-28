@@ -27,9 +27,23 @@ pub fn execute_session_observe(
     json: bool,
     actor_id: Option<&str>,
 ) -> Result<i32, CliError> {
+    let all_issues = run_session_observe(session_id, project_dir, actor_id)?;
+    emit_results(&all_issues, json)
+}
+
+/// Run a one-shot observe scan and persist any new work items without emitting CLI output.
+///
+/// # Errors
+/// Returns `CliError` if the session is not found or on I/O failures.
+pub(crate) fn run_session_observe(
+    session_id: &str,
+    project_dir: &Path,
+    actor_id: Option<&str>,
+) -> Result<Vec<Issue>, CliError> {
     let state = service::session_status(session_id, project_dir)?;
     let all_issues = scan_all_agents(&state, session_id, project_dir)?;
-    emit_results(&all_issues, session_id, &state, project_dir, json, actor_id)
+    create_work_items_for_issues(&all_issues, session_id, &state, project_dir, actor_id)?;
+    Ok(all_issues)
 }
 
 /// Run the continuous multi-agent observation loop.
@@ -224,15 +238,7 @@ fn scan_all_agents(
     Ok(all_issues)
 }
 
-fn emit_results(
-    issues: &[Issue],
-    session_id: &str,
-    state: &SessionState,
-    project_dir: &Path,
-    json: bool,
-    actor_id: Option<&str>,
-) -> Result<i32, CliError> {
-    create_work_items_for_issues(issues, session_id, state, project_dir, actor_id)?;
+fn emit_results(issues: &[Issue], json: bool) -> Result<i32, CliError> {
     if json {
         let json_output = serde_json::to_string_pretty(issues)
             .map_err(|error| CliErrorKind::workflow_serialize(error.to_string()))?;
