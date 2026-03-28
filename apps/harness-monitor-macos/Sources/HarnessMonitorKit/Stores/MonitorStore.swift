@@ -221,8 +221,10 @@ public final class MonitorStore {
     lastError = nil
 
     do {
-      _ = actor
-      selectedSession = try await client.observeSession(sessionID: sessionID)
+      selectedSession = try await client.observeSession(
+        sessionID: sessionID,
+        request: ObserveSessionRequest(actor: actor)
+      )
       timeline = try await client.timeline(sessionID: sessionID)
       lastAction = "Observe session"
     } catch {

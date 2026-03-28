@@ -91,8 +91,11 @@ extension RecordingMonitorClient {
     }
   }
 
-  func observeSession(sessionID: String) async throws -> SessionDetail {
-    calls.append(.observeSession(sessionID: sessionID))
+  func observeSession(
+    sessionID: String,
+    request: ObserveSessionRequest
+  ) async throws -> SessionDetail {
+    calls.append(.observeSession(sessionID: sessionID, actor: request.actor))
     return detail
   }
 

@@ -347,6 +347,10 @@ public struct SessionEndRequest: Codable, Equatable, Sendable {
   public let actor: String
 }
 
+public struct ObserveSessionRequest: Codable, Equatable, Sendable {
+  public let actor: String
+}
+
 public struct SignalSendRequest: Codable, Equatable, Sendable {
   public let actor: String
   public let agentId: String
