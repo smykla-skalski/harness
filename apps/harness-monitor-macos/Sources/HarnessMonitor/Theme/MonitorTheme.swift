@@ -1,47 +1,131 @@
+import AppKit
 import HarnessMonitorKit
 import SwiftUI
 
+private func adaptive(light: NSColor, dark: NSColor) -> Color {
+  let resolved = NSColor(
+    name: nil,
+    dynamicProvider: { appearance in
+      let isDark =
+        appearance.bestMatch(
+          from: [.darkAqua, .accessibilityHighContrastDarkAqua]
+        ) != nil
+      return isDark ? dark : light
+    })
+  return Color(nsColor: resolved)
+}
+
+private func adaptiveGradient(
+  lightColors: [NSColor],
+  darkColors: [NSColor],
+  startPoint: UnitPoint,
+  endPoint: UnitPoint
+) -> LinearGradient {
+  LinearGradient(
+    colors: zip(lightColors, darkColors).map { light, dark in
+      adaptive(light: light, dark: dark)
+    },
+    startPoint: startPoint,
+    endPoint: endPoint
+  )
+}
+
 enum MonitorTheme {
-  static let canvas = LinearGradient(
-    colors: [
-      Color(red: 0.97, green: 0.95, blue: 0.90),
-      Color(red: 0.88, green: 0.92, blue: 0.96),
-      Color(red: 0.96, green: 0.88, blue: 0.79),
+  static let canvas = adaptiveGradient(
+    lightColors: [
+      NSColor(red: 0.97, green: 0.95, blue: 0.90, alpha: 1),
+      NSColor(red: 0.88, green: 0.92, blue: 0.96, alpha: 1),
+      NSColor(red: 0.96, green: 0.88, blue: 0.79, alpha: 1),
+    ],
+    darkColors: [
+      NSColor(red: 0.10, green: 0.10, blue: 0.12, alpha: 1),
+      NSColor(red: 0.12, green: 0.13, blue: 0.16, alpha: 1),
+      NSColor(red: 0.11, green: 0.11, blue: 0.13, alpha: 1),
     ],
     startPoint: .topLeading,
     endPoint: .bottomTrailing
   )
-  static let sidebarBackground = LinearGradient(
-    colors: [
-      Color(red: 0.28, green: 0.28, blue: 0.26),
-      Color(red: 0.34, green: 0.35, blue: 0.37),
+  static let sidebarBackground = adaptiveGradient(
+    lightColors: [
+      NSColor(red: 0.28, green: 0.28, blue: 0.26, alpha: 1),
+      NSColor(red: 0.34, green: 0.35, blue: 0.37, alpha: 1),
+    ],
+    darkColors: [
+      NSColor(red: 0.08, green: 0.08, blue: 0.10, alpha: 1),
+      NSColor(red: 0.12, green: 0.12, blue: 0.14, alpha: 1),
     ],
     startPoint: .top,
     endPoint: .bottom
   )
-  static let inspectorBackground = LinearGradient(
-    colors: [
-      Color(red: 0.98, green: 0.97, blue: 0.95),
-      Color(red: 0.95, green: 0.93, blue: 0.89),
+  static let inspectorBackground = adaptiveGradient(
+    lightColors: [
+      NSColor(red: 0.98, green: 0.97, blue: 0.95, alpha: 1),
+      NSColor(red: 0.95, green: 0.93, blue: 0.89, alpha: 1),
+    ],
+    darkColors: [
+      NSColor(red: 0.13, green: 0.13, blue: 0.15, alpha: 1),
+      NSColor(red: 0.11, green: 0.11, blue: 0.13, alpha: 1),
     ],
     startPoint: .topLeading,
     endPoint: .bottomTrailing
   )
 
-  static let ink = Color(red: 0.12, green: 0.15, blue: 0.19)
-  static let accent = Color(red: 0.14, green: 0.43, blue: 0.60)
-  static let warmAccent = Color(red: 0.78, green: 0.38, blue: 0.16)
-  static let success = Color(red: 0.22, green: 0.54, blue: 0.31)
-  static let caution = Color(red: 0.74, green: 0.47, blue: 0.14)
-  static let danger = Color(red: 0.73, green: 0.21, blue: 0.22)
-  static let panel = Color.white.opacity(0.82)
-  static let panelBorder = Color.white.opacity(0.78)
+  static let ink = adaptive(
+    light: NSColor(red: 0.12, green: 0.15, blue: 0.19, alpha: 1),
+    dark: NSColor(red: 0.90, green: 0.91, blue: 0.93, alpha: 1)
+  )
+  static let accent = adaptive(
+    light: NSColor(red: 0.14, green: 0.43, blue: 0.60, alpha: 1),
+    dark: NSColor(red: 0.35, green: 0.62, blue: 0.82, alpha: 1)
+  )
+  static let warmAccent = adaptive(
+    light: NSColor(red: 0.78, green: 0.38, blue: 0.16, alpha: 1),
+    dark: NSColor(red: 0.90, green: 0.55, blue: 0.30, alpha: 1)
+  )
+  static let success = adaptive(
+    light: NSColor(red: 0.22, green: 0.54, blue: 0.31, alpha: 1),
+    dark: NSColor(red: 0.35, green: 0.72, blue: 0.45, alpha: 1)
+  )
+  static let caution = adaptive(
+    light: NSColor(red: 0.74, green: 0.47, blue: 0.14, alpha: 1),
+    dark: NSColor(red: 0.88, green: 0.62, blue: 0.28, alpha: 1)
+  )
+  static let danger = adaptive(
+    light: NSColor(red: 0.73, green: 0.21, blue: 0.22, alpha: 1),
+    dark: NSColor(red: 0.90, green: 0.38, blue: 0.38, alpha: 1)
+  )
+  static let panel = adaptive(
+    light: NSColor(white: 1.0, alpha: 0.82),
+    dark: NSColor(white: 1.0, alpha: 0.08)
+  )
+  static let panelBorder = adaptive(
+    light: NSColor(white: 1.0, alpha: 0.78),
+    dark: NSColor(white: 1.0, alpha: 0.12)
+  )
+  static let sidebarHeader = adaptive(
+    light: NSColor(red: 0.97, green: 0.97, blue: 0.95, alpha: 1),
+    dark: NSColor(red: 0.94, green: 0.95, blue: 0.97, alpha: 1)
+  )
+  static let sidebarMuted = adaptive(
+    light: NSColor(red: 0.82, green: 0.84, blue: 0.87, alpha: 1),
+    dark: NSColor(red: 0.70, green: 0.72, blue: 0.76, alpha: 1)
+  )
+  static let overlayScrim = adaptive(
+    light: NSColor(white: 0.04, alpha: 0.18),
+    dark: NSColor(white: 0.0, alpha: 0.34)
+  )
 }
 
 struct MonitorCardModifier: ViewModifier {
+  let minHeight: CGFloat?
+
   func body(content: Content) -> some View {
     content
-      .frame(maxWidth: .infinity, alignment: .leading)
+      .frame(
+        maxWidth: .infinity,
+        minHeight: minHeight,
+        alignment: .topLeading
+      )
       .padding(18)
       .frame(maxWidth: .infinity, alignment: .leading)
       .background(
@@ -95,7 +179,7 @@ func monitorBadge(_ value: String) -> some View {
     .font(.caption.bold())
     .padding(.horizontal, 10)
     .padding(.vertical, 5)
-    .background(Color.white.opacity(0.68), in: Capsule())
+    .background(MonitorTheme.panel, in: Capsule())
 }
 
 func statusColor(for status: SessionStatus) -> Color {

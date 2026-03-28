@@ -95,4 +95,69 @@ final class MonitorStoreTests: XCTestCase {
     XCTAssertEqual(store.diagnostics?.workspace.cacheEntryCount, 2)
     XCTAssertEqual(store.diagnostics?.recentEvents.count, 1)
   }
+
+  func testBootstrapFailureSetsOfflineStateAndError() async throws {
+    let daemon = FailingDaemonController(
+      bootstrapError: DaemonControlError.harnessBinaryNotFound
+    )
+    let store = MonitorStore(daemonController: daemon)
+
+    await store.bootstrap()
+
+    XCTAssertEqual(
+      store.connectionState, .offline(DaemonControlError.harnessBinaryNotFound.localizedDescription)
+    )
+    XCTAssertNotNil(store.lastError)
+    XCTAssertNil(store.health)
+  }
+
+  func testCreateTaskFailureSetsLastError() async throws {
+    let client = FailingMonitorClient()
+    let daemon = RecordingDaemonController(client: client)
+    let store = MonitorStore(daemonController: daemon)
+    await store.bootstrap()
+    await store.selectSession("sess-1")
+
+    await store.createTask(title: "broken", context: nil, severity: .high)
+
+    XCTAssertNotNil(store.lastError)
+    XCTAssertFalse(store.isBusy)
+  }
+
+  func testRefreshWithNoClientTriggersBootstrap() async throws {
+    let daemon = FailingDaemonController(
+      bootstrapError: DaemonControlError.daemonDidNotStart
+    )
+    let store = MonitorStore(daemonController: daemon)
+
+    await store.refresh()
+
+    XCTAssertNotNil(store.lastError)
+  }
+
+  func testInstallLaunchAgentFailureSetsLastError() async throws {
+    let daemon = FailingDaemonController(
+      actionError: DaemonControlError.commandFailed("install failed")
+    )
+    let store = MonitorStore(daemonController: daemon)
+
+    await store.installLaunchAgent()
+
+    XCTAssertEqual(
+      store.lastError, DaemonControlError.commandFailed("install failed").localizedDescription)
+    XCTAssertFalse(store.isBusy)
+  }
+
+  func testRemoveLaunchAgentFailureSetsLastError() async throws {
+    let daemon = FailingDaemonController(
+      actionError: DaemonControlError.commandFailed("remove failed")
+    )
+    let store = MonitorStore(daemonController: daemon)
+
+    await store.removeLaunchAgent()
+
+    XCTAssertEqual(
+      store.lastError, DaemonControlError.commandFailed("remove failed").localizedDescription)
+    XCTAssertFalse(store.isBusy)
+  }
 }
