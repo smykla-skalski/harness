@@ -1,9 +1,11 @@
 ---
 source: src/app/cli/tests.rs
+assertion_line: 889
 expression: "names.join(\"\\n\")"
 ---
 agents
 create
+daemon
 hook
 observe
 pre-compact

@@ -1,5 +1,4 @@
 use std::collections::HashSet;
-
 use super::super::TextCheckContext;
 use super::super::emitter::{Guidance, IssueBlueprint};
 use crate::observe::types::{Confidence, FixSafety, Issue, IssueCode};
