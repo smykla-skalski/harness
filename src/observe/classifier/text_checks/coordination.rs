@@ -1,7 +1,7 @@
-use std::collections::HashSet;
 use super::super::TextCheckContext;
 use super::super::emitter::{Guidance, IssueBlueprint};
 use crate::observe::types::{Confidence, FixSafety, Issue, IssueCode};
+use std::collections::HashSet;
 
 /// Detect API rate limit or overload errors (429, 529) in tool output.
 /// Runs on all roles and source tools since rate limits surface everywhere.
