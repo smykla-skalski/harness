@@ -1,4 +1,5 @@
 use std::env;
+use std::fs;
 use std::path::{Path, PathBuf};
 
 use tokio::task;
@@ -29,6 +30,7 @@ pub async fn session_start(
             resolve_or_create_session_id(agent, &project_dir, session_id_hint.as_deref())?;
         storage::set_current_session_id(&project_dir, agent, &session_id)?;
         storage::append_session_marker(&project_dir, agent, &session_id, "session_start")?;
+        cleanup_stale_signals(agent, &project_dir, &session_id);
         session_service::restore_compact_handoff(&project_dir)
     })
     .await
@@ -182,6 +184,22 @@ pub fn project_dir_for_context(context: &NormalizedHookContext) -> Result<PathBu
             },
             Ok,
         )
+}
+
+/// Remove stale signal files from previous sessions.
+fn cleanup_stale_signals(agent: HookAgent, project_dir: &Path, session_id: &str) {
+    let runtime = super::runtime::runtime_for(agent);
+    let signal_dir = runtime.signal_dir(project_dir, session_id);
+    let pending = signal_dir.join("pending");
+    if !pending.is_dir() {
+        return;
+    }
+    let Ok(entries) = fs::read_dir(&pending) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let _ = fs::remove_file(entry.path());
+    }
 }
 
 /// Resolve the effective session ID for a hook or lifecycle event.

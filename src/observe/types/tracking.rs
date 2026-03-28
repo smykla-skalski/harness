@@ -109,4 +109,8 @@ pub struct ScanState {
     pub seen_any_group_report: bool,
     /// Agent ID when scanning in multi-agent orchestration context.
     pub agent_id: Option<String>,
+    /// Agent role in the orchestration session.
+    pub agent_role: Option<String>,
+    /// Orchestration session ID when scanning across agents.
+    pub orchestration_session_id: Option<String>,
 }

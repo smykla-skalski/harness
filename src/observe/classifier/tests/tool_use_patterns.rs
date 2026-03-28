@@ -154,7 +154,7 @@ fn skips_env_detection_for_plain_commands() {
 
 #[test]
 fn rule_table_has_expected_count() {
-    assert_eq!(rules::TEXT_RULES.len(), 15);
+    assert_eq!(rules::TEXT_RULES.len(), 16);
 }
 
 #[test]

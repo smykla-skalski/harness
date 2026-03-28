@@ -261,4 +261,25 @@ pub(crate) static TEXT_RULES: &[TextRule] = &[
         },
         skip_if_matched: &[],
     },
+    TextRule {
+        code: IssueCode::ApiRateLimitDetected,
+        role_filter: RoleFilter::Any,
+        source_tool_filter: ToolFilter::Any,
+        guard: Guard::None,
+        patterns: &[
+            "429 too many requests",
+            "rate limit exceeded",
+            "overloaded_error",
+            "rate_limit_error",
+            "529 overloaded",
+        ],
+        match_mode: MatchMode::FirstMatch,
+        fingerprint_mode: FingerprintMode::MatchedPattern,
+        summary: SummaryTemplate::PrefixWithPattern("API rate limit: "),
+        guidance: RuleGuidance::Advisory {
+            target: None,
+            hint: "Back off and retry. Reduce concurrency if persistent.",
+        },
+        skip_if_matched: &[],
+    },
 ];
