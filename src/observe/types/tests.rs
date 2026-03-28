@@ -165,7 +165,7 @@ fn source_tool_unknown_returns_none() {
 
 #[test]
 fn category_count() {
-    assert_eq!(IssueCategory::ALL.len(), 11);
+    assert_eq!(IssueCategory::ALL.len(), 12);
 }
 
 #[test]
@@ -233,7 +233,7 @@ fn issue_code_display_roundtrip() {
 
 #[test]
 fn issue_code_all_count() {
-    assert_eq!(IssueCode::ALL.len(), 56);
+    assert_eq!(IssueCode::ALL.len(), 62);
 }
 
 #[test]
