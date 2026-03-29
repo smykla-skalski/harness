@@ -59,6 +59,10 @@ struct PreferencesView: View {
           cacheEntryCount: cacheEntryCount,
           sessionCount: store.daemonStatus?.sessionCount ?? 0
         )
+        PreferencesConnectionCard(
+          metrics: store.connectionMetrics,
+          events: store.connectionEvents
+        )
         PreferencesPathsCard(
           launchAgentPath: store.daemonStatus?.launchAgent.path ?? "Unavailable",
           manifestPath: store.diagnostics?.workspace.manifestPath
