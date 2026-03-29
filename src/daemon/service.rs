@@ -13,6 +13,7 @@ use crate::session::{observe as session_observe, service as session_service};
 use crate::workspace::utc_now;
 
 use super::http::{self, DaemonHttpState};
+use super::websocket::ReplayBuffer;
 use super::index::{self, ResolvedSession};
 use super::launchd::{self, LaunchAgentStatus};
 use super::protocol::{
@@ -95,11 +96,15 @@ pub async fn serve(config: DaemonServeConfig) -> Result<(), CliError> {
         poll_interval: config.observe_interval,
         running_sessions: Arc::default(),
     });
+    let replay_buffer = Arc::new(Mutex::new(ReplayBuffer::new(512)));
     let _watch = watch::spawn_watch_loop(sender.clone(), config.poll_interval);
+    let daemon_epoch = manifest.started_at.clone();
     let app_state = DaemonHttpState {
         token,
         sender,
         manifest,
+        daemon_epoch,
+        replay_buffer,
     };
 
     http::serve(listener, app_state).await

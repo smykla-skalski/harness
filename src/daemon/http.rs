@@ -1,4 +1,5 @@
 use std::convert::Infallible;
+use std::sync::{Arc, Mutex};
 
 use async_stream::stream;
 use axum::extract::{Path, State};
@@ -19,12 +20,15 @@ use super::protocol::{
 };
 use super::service;
 use super::state::DaemonManifest;
+use super::websocket::ReplayBuffer;
 
 #[derive(Debug, Clone)]
 pub struct DaemonHttpState {
     pub token: String,
     pub sender: broadcast::Sender<StreamEvent>,
     pub manifest: DaemonManifest,
+    pub daemon_epoch: String,
+    pub replay_buffer: Arc<Mutex<ReplayBuffer>>,
 }
 
 /// Serve the daemon's HTTP API.
@@ -39,6 +43,7 @@ pub async fn serve(listener: TcpListener, state: DaemonHttpState) -> Result<(), 
         .route("/v1/sessions", get(get_sessions))
         .route("/v1/sessions/{session_id}", get(get_session))
         .route("/v1/sessions/{session_id}/timeline", get(get_timeline))
+        .route("/v1/ws", get(super::websocket::ws_upgrade_handler))
         .route("/v1/stream", get(stream_global))
         .route("/v1/sessions/{session_id}/stream", get(stream_session))
         .route("/v1/sessions/{session_id}/task", post(post_task_create))
@@ -354,7 +359,7 @@ fn map_json<T: serde::Serialize>(result: Result<T, CliError>) -> Response {
     }
 }
 
-fn require_auth(headers: &HeaderMap, state: &DaemonHttpState) -> Result<(), Box<Response>> {
+pub(super) fn require_auth(headers: &HeaderMap, state: &DaemonHttpState) -> Result<(), Box<Response>> {
     let provided = headers
         .get(AUTHORIZATION)
         .and_then(|value| value.to_str().ok())
