@@ -1,15 +1,27 @@
 use std::path::{Path, PathBuf};
 
 use fs_err as fs;
+use serde::Deserialize;
 use serde::de::DeserializeOwned;
 use serde_json::Value;
 
-use crate::agents::runtime::{event::ConversationEvent, runtime_for_name};
+use crate::agents::runtime::{
+    event::ConversationEvent, parse_canonical_conversation_line, runtime_for_name,
+};
 use crate::errors::{CliError, CliErrorKind};
 use crate::infra::io::read_json_typed;
 use crate::session::storage;
 use crate::session::types::{SessionLogEntry, SessionState, TaskCheckpoint};
 use crate::workspace::harness_data_root;
+
+#[derive(Debug, Deserialize)]
+struct LedgerEventLine {
+    sequence: u64,
+    recorded_at: String,
+    agent: String,
+    session_id: String,
+    payload: Value,
+}
 
 #[derive(Debug, Clone)]
 pub struct DiscoveredProject {
@@ -186,6 +198,21 @@ pub fn load_conversation_events(
     let Some(adapter) = runtime_for_name(runtime) else {
         return Ok(Vec::new());
     };
+    let native_events =
+        load_native_conversation_events(project, adapter, runtime, session_id, agent_id)?;
+    if !native_events.is_empty() {
+        return Ok(native_events);
+    }
+    load_ledger_conversation_events(project, runtime, session_id, agent_id)
+}
+
+fn load_native_conversation_events(
+    project: &DiscoveredProject,
+    adapter: &dyn crate::agents::runtime::AgentRuntime,
+    runtime: &str,
+    session_id: &str,
+    agent_id: &str,
+) -> Result<Vec<ConversationEvent>, CliError> {
     let path = agent_transcript_path(&project.context_root, runtime, session_id);
     if !path.is_file() {
         return Ok(Vec::new());
@@ -200,6 +227,43 @@ pub fn load_conversation_events(
         .filter_map(|(index, line)| {
             let mut event = adapter.parse_log_entry(line)?;
             event.sequence = u64::try_from(index.saturating_add(1)).unwrap_or(u64::MAX);
+            event.agent = agent_id.to_string();
+            event.session_id = session_id.to_string();
+            Some(event)
+        })
+        .collect())
+}
+
+fn load_ledger_conversation_events(
+    project: &DiscoveredProject,
+    runtime: &str,
+    session_id: &str,
+    agent_id: &str,
+) -> Result<Vec<ConversationEvent>, CliError> {
+    let path = project
+        .context_root
+        .join("agents")
+        .join("ledger")
+        .join("events.jsonl");
+    if !path.is_file() {
+        return Ok(Vec::new());
+    }
+
+    Ok(fs::read_to_string(&path)
+        .map_err(|error| CliErrorKind::workflow_io(format!("read agent ledger: {error}")))?
+        .lines()
+        .filter(|line| !line.trim().is_empty())
+        .filter_map(|line| {
+            let entry = serde_json::from_str::<LedgerEventLine>(line).ok()?;
+            if entry.agent != runtime || entry.session_id != session_id {
+                return None;
+            }
+            let payload = serde_json::to_string(&entry.payload).ok()?;
+            let mut event = parse_canonical_conversation_line(&payload, runtime)?;
+            if event.timestamp.is_none() {
+                event.timestamp = Some(entry.recorded_at);
+            }
+            event.sequence = entry.sequence;
             event.agent = agent_id.to_string();
             event.session_id = session_id.to_string();
             Some(event)
@@ -391,4 +455,115 @@ where
                 .map_err(|error| CliErrorKind::workflow_parse(format!("{label}: {error}")).into())
         })
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::Path;
+
+    use fs_err as fs;
+    use tempfile::tempdir;
+
+    fn write_text(path: &Path, contents: &str) {
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent).expect("create parent");
+        }
+        fs::write(path, contents).expect("write file");
+    }
+
+    #[test]
+    fn load_conversation_events_falls_back_to_ledger_for_copilot() {
+        let tmp = tempdir().expect("tempdir");
+        let context_root = tmp.path().join("context");
+        let ledger_path = context_root.join("agents/ledger/events.jsonl");
+        let make_payload = |timestamp: &str, block: serde_json::Value| {
+            serde_json::json!({
+                "timestamp": timestamp,
+                "message": {
+                    "role": "assistant",
+                    "content": [block],
+                }
+            })
+        };
+        let entries = [
+            serde_json::json!({
+                "sequence": 1,
+                "recorded_at": "2026-03-29T10:00:00Z",
+                "agent": "copilot",
+                "session_id": "copilot-session-1",
+                "skill": "suite",
+                "event": "before_tool_use",
+                "hook": "guard-write",
+                "decision": "allow",
+                "cwd": "/tmp/project",
+                "payload": make_payload(
+                    "2026-03-29T10:00:00Z",
+                    serde_json::json!({
+                        "type": "tool_use",
+                        "name": "Read",
+                        "input": {"path": "README.md"},
+                        "id": "call-1",
+                    }),
+                ),
+            }),
+            serde_json::json!({
+                "sequence": 2,
+                "recorded_at": "2026-03-29T10:00:02Z",
+                "agent": "copilot",
+                "session_id": "copilot-session-1",
+                "skill": "suite",
+                "event": "after_tool_use",
+                "hook": "verify-write",
+                "decision": "allow",
+                "cwd": "/tmp/project",
+                "payload": make_payload(
+                    "2026-03-29T10:00:02Z",
+                    serde_json::json!({
+                        "type": "tool_result",
+                        "tool_name": "Read",
+                        "tool_use_id": "call-1",
+                        "content": {"line_count": 12},
+                        "is_error": false,
+                    }),
+                ),
+            }),
+        ];
+        let contents = entries
+            .iter()
+            .map(|entry| serde_json::to_string(entry).expect("serialize"))
+            .collect::<Vec<_>>()
+            .join("\n");
+        write_text(&ledger_path, &contents);
+
+        let project = DiscoveredProject {
+            project_id: "project-alpha".into(),
+            name: "project-alpha".into(),
+            project_dir: None,
+            context_root,
+        };
+
+        let events =
+            load_conversation_events(&project, "copilot", "copilot-session-1", "copilot-worker")
+                .expect("events");
+
+        assert_eq!(events.len(), 2);
+        assert_eq!(events[0].sequence, 1);
+        assert_eq!(events[0].agent, "copilot-worker");
+        assert_eq!(events[0].session_id, "copilot-session-1");
+        assert!(matches!(
+            events[0].kind,
+            crate::agents::runtime::event::ConversationEventKind::ToolInvocation {
+                ref tool_name,
+                ..
+            } if tool_name == "Read"
+        ));
+        assert!(matches!(
+            events[1].kind,
+            crate::agents::runtime::event::ConversationEventKind::ToolResult {
+                ref tool_name,
+                ..
+            } if tool_name == "Read"
+        ));
+    }
 }

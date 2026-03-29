@@ -22,6 +22,8 @@ use self::gemini::GeminiRuntime;
 use self::opencode::OpenCodeRuntime;
 use self::signal::{Signal, SignalAck};
 
+pub(crate) use self::claude::parse_common_jsonl as parse_canonical_conversation_line;
+
 /// Describes when during an agent's tool-use cycle signals can be intercepted.
 #[derive(Debug, Clone)]
 pub struct HookIntegrationPoint {

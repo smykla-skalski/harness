@@ -82,7 +82,7 @@ impl AgentRuntime for ClaudeRuntime {
 }
 
 /// Parse a JSONL line using the common transcript format shared by all runtimes.
-pub(super) fn parse_common_jsonl(raw_line: &str, agent: &str) -> Option<ConversationEvent> {
+pub(crate) fn parse_common_jsonl(raw_line: &str, agent: &str) -> Option<ConversationEvent> {
     let obj: serde_json::Value = serde_json::from_str(raw_line.trim()).ok()?;
     let message = obj.get("message")?;
     let role = message.get("role")?.as_str()?;
