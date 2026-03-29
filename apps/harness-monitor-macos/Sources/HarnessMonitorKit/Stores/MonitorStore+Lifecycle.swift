@@ -4,8 +4,24 @@ extension MonitorStore {
   func connect(using client: any MonitorClientProtocol) async {
     self.client = client
     connectionState = .online
+
+    let transport: TransportKind = client is WebSocketTransport ? .webSocket : .httpSSE
+    activeTransport = transport
+    connectionMetrics.transportKind = transport
+    connectionMetrics.connectedSince = Date()
+    connectionMetrics.isFallback = transport == .httpSSE
+    appendConnectionEvent(kind: .connected, detail: "Connected via \(transport.rawValue)")
+
     await refresh(using: client, preserveSelection: true)
     startGlobalStream(using: client)
+  }
+
+  func appendConnectionEvent(kind: ConnectionEventKind, detail: String) {
+    let event = ConnectionEvent(kind: kind, detail: detail, transportKind: activeTransport)
+    connectionEvents.append(event)
+    if connectionEvents.count > 50 {
+      connectionEvents.removeFirst(connectionEvents.count - 50)
+    }
   }
 
   func refresh(
