@@ -84,10 +84,10 @@ extension HarnessMonitorUITests {
           identifier: HarnessMonitorUITestAccessibility.sessionsBoardRoot
         )
         return
-          (window.exists && window.frame.width > 0 && window.frame.height > 0)
-          || title.exists
-          || sidebarRoot.exists
-          || sessionsBoardRoot.exists
+          window.exists
+          && window.frame.width > 0
+          && window.frame.height > 0
+          && (title.exists || sidebarRoot.exists || sessionsBoardRoot.exists)
       }
     )
     return app
@@ -104,10 +104,7 @@ extension HarnessMonitorUITests {
     let titlebarPoint = window.coordinate(
       withNormalizedOffset: CGVector(dx: 0.5, dy: 0.04)
     )
-
-    if window.isHittable {
-      titlebarPoint.tap()
-    }
+    titlebarPoint.tap()
   }
 
   func tapButton(in app: XCUIApplication, identifier: String) {
@@ -117,9 +114,16 @@ extension HarnessMonitorUITests {
       app.activate()
 
       let button = app.buttons.matching(identifier: identifier).firstMatch
-      if button.waitForExistence(timeout: 0.5), button.isHittable {
-        button.tap()
-        return
+      if button.waitForExistence(timeout: 0.5) {
+        if let coordinate = centerCoordinate(in: app, for: button) {
+          coordinate.tap()
+          return
+        }
+
+        if button.isHittable {
+          button.tap()
+          return
+        }
       }
 
       RunLoop.current.run(until: Date().addingTimeInterval(0.2))
@@ -136,17 +140,13 @@ extension HarnessMonitorUITests {
 
       let target = element(in: app, identifier: identifier)
       if target.waitForExistence(timeout: 0.5) {
-        if target.isHittable {
-          target.tap()
+        if let coordinate = centerCoordinate(in: app, for: target) {
+          coordinate.tap()
           return
         }
 
-        let window = app.windows.firstMatch
-        if window.waitForExistence(timeout: 0.5) {
-          let origin = window.coordinate(withNormalizedOffset: CGVector(dx: 0, dy: 0))
-          let dx = target.frame.midX - window.frame.minX
-          let dy = target.frame.midY - window.frame.minY
-          origin.withOffset(CGVector(dx: dx, dy: dy)).tap()
+        if target.isHittable {
+          target.tap()
           return
         }
       }
@@ -230,13 +230,29 @@ extension HarnessMonitorUITests {
     return condition()
   }
 
+  private func centerCoordinate(
+    in app: XCUIApplication,
+    for element: XCUIElement
+  ) -> XCUICoordinate? {
+    let window = app.windows.firstMatch
+    guard window.waitForExistence(timeout: 0.5) else {
+      return nil
+    }
+
+    let origin = window.coordinate(withNormalizedOffset: CGVector(dx: 0, dy: 0))
+    let dx = element.frame.midX - window.frame.minX
+    let dy = element.frame.midY - window.frame.minY
+    return origin.withOffset(CGVector(dx: dx, dy: dy))
+  }
+
   func assertFillsColumn(
     child: XCUIElement,
     in container: XCUIElement,
     expectedHorizontalInset: CGFloat,
     tolerance: CGFloat
   ) {
-    XCTAssertGreaterThan(child.frame.width, container.frame.width * 0.9)
+    let expectedWidth = container.frame.width - (expectedHorizontalInset * 2)
+    XCTAssertEqual(child.frame.width, expectedWidth, accuracy: tolerance * 2)
     XCTAssertEqual(
       child.frame.minX,
       container.frame.minX + expectedHorizontalInset,

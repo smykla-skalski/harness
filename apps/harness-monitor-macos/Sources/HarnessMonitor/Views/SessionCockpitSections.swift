@@ -29,11 +29,11 @@ struct SessionMetricGrid: View {
         .contentTransition(.numericText())
     }
     .frame(maxWidth: .infinity, alignment: .leading)
-    .monitorCard(minHeight: 96)
+    .monitorCard(minHeight: 80)
   }
 }
 
-private let sessionLaneCardHeight: CGFloat = 148
+private let sessionLaneCardHeight: CGFloat = 116
 
 struct SessionTaskListSection: View {
   let tasks: [WorkItem]
@@ -64,7 +64,7 @@ struct SessionTaskSummaryCard: View {
         HStack(alignment: .top) {
           Text(task.title)
             .font(.system(.headline, design: .rounded, weight: .semibold))
-            .lineLimit(2, reservesSpace: true)
+            .lineLimit(2)
           Spacer()
           Text(task.severity.rawValue.capitalized)
             .font(.caption.bold())
@@ -77,7 +77,7 @@ struct SessionTaskSummaryCard: View {
           .font(.subheadline)
           .foregroundStyle(.secondary)
           .multilineTextAlignment(.leading)
-          .lineLimit(2, reservesSpace: true)
+          .lineLimit(2)
         Spacer(minLength: 0)
         HStack(alignment: .firstTextBaseline) {
           Text(task.status.rawValue)
@@ -128,7 +128,7 @@ struct SessionAgentSummaryCard: View {
         HStack(alignment: .top) {
           Text(agent.name)
             .font(.system(.headline, design: .rounded, weight: .semibold))
-            .lineLimit(2, reservesSpace: true)
+            .lineLimit(2)
           Spacer()
           Text(agent.role.rawValue.capitalized)
             .font(.caption.bold())

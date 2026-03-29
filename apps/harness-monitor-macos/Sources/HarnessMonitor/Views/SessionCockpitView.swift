@@ -9,7 +9,7 @@ struct SessionCockpitView: View {
 
   var body: some View {
     MonitorColumnScrollView {
-      VStack(alignment: .leading, spacing: 20) {
+      VStack(alignment: .leading, spacing: 18) {
         header
         SessionMetricGrid(metrics: detail.session.metrics)
         SessionActionDock(store: store, detail: detail)
@@ -47,7 +47,7 @@ struct SessionCockpitView: View {
             .foregroundStyle(.secondary)
         }
         Spacer()
-        VStack(alignment: .trailing, spacing: 10) {
+        HStack(spacing: 10) {
           observeButton
           endSessionButton
         }

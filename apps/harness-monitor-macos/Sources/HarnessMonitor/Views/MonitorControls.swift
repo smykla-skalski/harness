@@ -36,6 +36,7 @@ struct MonitorAsyncActionButton: View {
     Button(action: launchAction) {
       label
     }
+    .frame(maxWidth: fillsWidth ? .infinity : nil, alignment: .center)
     .buttonStyle(MonitorActionButtonStyle(variant: variant, tint: tint))
     .disabled(isLoading)
     .accessibilityIdentifier(accessibilityIdentifier)
@@ -43,34 +44,29 @@ struct MonitorAsyncActionButton: View {
   }
 
   private var label: some View {
-    HStack(spacing: 8) {
-      if isLoading {
-        progressSlot
+    titleView
+      .frame(maxWidth: fillsWidth ? .infinity : nil, alignment: .center)
+      .overlay(alignment: .leading) {
+        if isLoading {
+          progressSlot
+            .padding(.leading, fillsWidth ? 10 : 8)
+        }
       }
-      titleView
-        .frame(maxWidth: fillsWidth ? .infinity : nil, alignment: .center)
-    }
-    .frame(maxWidth: fillsWidth ? .infinity : nil, alignment: .center)
-    .multilineTextAlignment(.center)
-    .font(.system(.callout, design: .rounded, weight: .semibold))
-    .padding(.horizontal, fillsWidth ? 11 : 13)
-    .padding(.vertical, 5)
-    .frame(maxWidth: fillsWidth ? .infinity : nil, minHeight: 34)
-    .modifier(FillWidthButtonSizing(isEnabled: fillsWidth))
+      .frame(maxWidth: fillsWidth ? .infinity : nil, alignment: .center)
+      .multilineTextAlignment(.center)
+      .font(.system(.subheadline, design: .rounded, weight: .semibold))
+      .padding(.horizontal, fillsWidth ? 12 : 11)
+      .padding(.vertical, fillsWidth ? 7 : 4)
+      .frame(maxWidth: fillsWidth ? .infinity : nil, minHeight: fillsWidth ? 38 : 32)
+      .modifier(FillWidthButtonSizing(isEnabled: fillsWidth))
   }
 
   private var titleView: some View {
-    ViewThatFits(in: .horizontal) {
-      buttonTitle(singleLine: true)
-      buttonTitle(singleLine: false)
-    }
-  }
-
-  private func buttonTitle(singleLine: Bool) -> some View {
     Text(title)
-      .lineLimit(singleLine ? 1 : 2)
-      .minimumScaleFactor(singleLine ? 0.8 : 0.92)
-      .fixedSize(horizontal: false, vertical: !singleLine)
+      .lineLimit(1)
+      .minimumScaleFactor(0.78)
+      .allowsTightening(true)
+      .truncationMode(.tail)
   }
 
   private func launchAction() {
@@ -83,6 +79,7 @@ struct MonitorAsyncActionButton: View {
     ProgressView()
       .controlSize(.small)
       .fixedSize()
+      .accessibilityHidden(true)
   }
 }
 

@@ -15,6 +15,10 @@ struct InspectorColumnView: View {
     return store.selectedSession?.observer
   }
 
+  private var selectedSessionSummary: SessionSummary? {
+    store.selectedSessionSummary
+  }
+
   var body: some View {
     ZStack(alignment: .topLeading) {
       MonitorTheme.inspectorBackground
@@ -31,6 +35,8 @@ struct InspectorColumnView: View {
             observerInspector(observer)
           } else if let detail = store.selectedSession {
             sessionInspector(detail)
+          } else if let summary = selectedSessionSummary {
+            sessionLoadingInspector(summary)
           } else {
             emptyState
           }
@@ -71,6 +77,24 @@ struct InspectorColumnView: View {
     .monitorCard()
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(MonitorAccessibility.sessionInspectorCard)
+    .accessibilityFrameMarker(MonitorAccessibility.sessionInspectorCard)
+  }
+
+  private func sessionLoadingInspector(_ summary: SessionSummary) -> some View {
+    VStack(alignment: .leading, spacing: 14) {
+      Text("Inspector")
+        .font(.system(.title3, design: .serif, weight: .semibold))
+      Text(summary.context)
+        .font(.system(.headline, design: .rounded, weight: .semibold))
+      Text("Loading live task, agent, and signal detail for the selected session.")
+        .foregroundStyle(.secondary)
+      MonitorLoadingStateView(title: "Loading session detail")
+    }
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .monitorCard()
+    .accessibilityElement(children: .contain)
+    .accessibilityIdentifier(MonitorAccessibility.sessionInspectorCard)
+    .accessibilityFrameMarker(MonitorAccessibility.sessionInspectorCard)
   }
 
   private func taskInspector(_ task: WorkItem) -> some View {

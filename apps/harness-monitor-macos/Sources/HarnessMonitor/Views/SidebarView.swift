@@ -48,24 +48,18 @@ struct SidebarView: View {
           .transition(.move(edge: .top).combined(with: .opacity))
       }
 
-      MonitorAdaptiveGridLayout(
-        minimumColumnWidth: 88,
-        maximumColumns: 3,
-        spacing: 10
-      ) {
+      HStack(spacing: 10) {
         daemonProjectsBadge
         daemonSessionsBadge
         daemonLaunchdBadge
       }
+      .frame(maxWidth: .infinity, alignment: .leading)
 
-      MonitorAdaptiveGridLayout(
-        minimumColumnWidth: 104,
-        maximumColumns: 2,
-        spacing: 8
-      ) {
+      VStack(spacing: 8) {
         sidebarStartDaemonButton
         sidebarInstallLaunchAgentButton
       }
+      .frame(maxWidth: .infinity, alignment: .leading)
     }
     .frame(maxWidth: .infinity, alignment: .leading)
     .monitorCard(contentPadding: 14)
@@ -109,11 +103,11 @@ struct SidebarView: View {
                 HStack {
                   Text(group.project.name)
                     .font(.system(.headline, design: .serif, weight: .semibold))
-                    .foregroundStyle(MonitorTheme.ink.opacity(0.96))
+                    .foregroundStyle(MonitorTheme.sidebarHeader)
                   Spacer()
                   Text("\(group.sessions.count)")
                     .font(.caption.monospacedDigit())
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(MonitorTheme.sidebarMuted)
                 }
                 .padding(.horizontal, 12)
                 .padding(.vertical, 10)
@@ -171,6 +165,7 @@ struct SidebarView: View {
                             .stroke(MonitorTheme.controlBorder.opacity(0.7), lineWidth: 1)
                         )
                     )
+                    .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
                   }
                   .accessibilityIdentifier(MonitorAccessibility.sessionRow(session.sessionId))
                   .buttonStyle(.plain)
@@ -217,6 +212,7 @@ struct SidebarView: View {
   }
 
   private func select(sessionID: String) {
+    store.primeSessionSelection(sessionID)
     Task {
       await store.selectSession(sessionID)
     }
@@ -242,7 +238,7 @@ extension SidebarView {
   fileprivate var sidebarInstallLaunchAgentButton: some View {
     sidebarLayoutProbe(MonitorAccessibility.sidebarInstallLaunchAgentButtonFrame) {
       MonitorAsyncActionButton(
-        title: "Install Agent",
+        title: "Install Launch Agent",
         tint: MonitorTheme.ink,
         variant: .bordered,
         isLoading: isLoading,
@@ -353,8 +349,8 @@ extension SidebarView {
         .contentTransition(.numericText())
     }
     .frame(maxWidth: .infinity, alignment: .topLeading)
-    .frame(minHeight: 50, alignment: .topLeading)
-    .padding(.vertical, 5)
+    .frame(minHeight: 44, alignment: .topLeading)
+    .padding(.vertical, 4)
     .padding(.horizontal, 10)
     .background(
       MonitorTheme.surface,
@@ -382,7 +378,7 @@ extension SidebarView {
     _ identifier: String,
     @ViewBuilder content: () -> Content
   ) -> some View {
-    ZStack {
+    ZStack(alignment: .topLeading) {
       content()
     }
     .frame(maxWidth: .infinity, alignment: .topLeading)

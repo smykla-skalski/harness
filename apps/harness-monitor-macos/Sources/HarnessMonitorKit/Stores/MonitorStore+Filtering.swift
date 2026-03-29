@@ -18,6 +18,14 @@ extension MonitorStore {
     }
   }
 
+  public var selectedSessionSummary: SessionSummary? {
+    guard let selectedSessionID else {
+      return nil
+    }
+
+    return sessions.first(where: { $0.sessionId == selectedSessionID })
+  }
+
   public var selectedTask: WorkItem? {
     guard case .task(let taskID) = inspectorSelection else {
       return nil

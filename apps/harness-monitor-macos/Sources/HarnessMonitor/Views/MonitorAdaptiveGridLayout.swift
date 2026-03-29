@@ -21,14 +21,17 @@ struct MonitorAdaptiveGridLayout: Layout {
     cache _: inout ()
   ) -> CGSize {
     let columns = resolvedColumnCount(width: proposal.width, itemCount: subviews.count)
-    let columnWidth = resolvedColumnWidth(width: proposal.width, columns: columns)
     let rowHeights = measuredRowHeights(
-      subviews: subviews, columns: columns, columnWidth: columnWidth)
+      subviews: subviews,
+      width: proposal.width,
+      columns: columns
+    )
     let rowSpacing = CGFloat(max(rowHeights.count - 1, 0)) * spacing
     let height = rowHeights.reduce(0, +) + rowSpacing
     let width =
       proposal.width
-      ?? (CGFloat(columns) * columnWidth) + (CGFloat(max(columns - 1, 0)) * spacing)
+      ?? resolvedColumnWidth(width: nil, columns: columns) * CGFloat(columns)
+      + CGFloat(max(columns - 1, 0)) * spacing
 
     return CGSize(width: width, height: height)
   }
@@ -40,15 +43,19 @@ struct MonitorAdaptiveGridLayout: Layout {
     cache _: inout ()
   ) {
     let columns = resolvedColumnCount(width: bounds.width, itemCount: subviews.count)
-    let columnWidth = resolvedColumnWidth(width: bounds.width, columns: columns)
     let rowHeights = measuredRowHeights(
-      subviews: subviews, columns: columns, columnWidth: columnWidth)
+      subviews: subviews,
+      width: bounds.width,
+      columns: columns
+    )
     var y = bounds.minY
 
     for rowIndex in 0..<rowHeights.count {
       let rowHeight = rowHeights[rowIndex]
       let rowStart = rowIndex * columns
       let rowEnd = min(rowStart + columns, subviews.count)
+      let rowColumns = rowEnd - rowStart
+      let columnWidth = resolvedColumnWidth(width: bounds.width, columns: rowColumns)
 
       for index in rowStart..<rowEnd {
         let columnIndex = index - rowStart
@@ -88,25 +95,31 @@ struct MonitorAdaptiveGridLayout: Layout {
 
   private func measuredRowHeights(
     subviews: Subviews,
+    width: CGFloat?,
     columns: Int,
-    columnWidth: CGFloat
   ) -> [CGFloat] {
     guard !subviews.isEmpty else {
       return []
     }
 
     var rowHeights: [CGFloat] = []
-    var currentRowHeight: CGFloat = 0
+    var rowStart = 0
 
-    for (index, subview) in subviews.enumerated() {
-      let size = subview.sizeThatFits(ProposedViewSize(width: columnWidth, height: nil))
-      currentRowHeight = max(currentRowHeight, size.height)
+    while rowStart < subviews.count {
+      let rowEnd = min(rowStart + columns, subviews.count)
+      let rowColumns = rowEnd - rowStart
+      let columnWidth = resolvedColumnWidth(width: width, columns: rowColumns)
+      var rowHeight: CGFloat = 0
 
-      let isRowEnd = ((index + 1) % columns) == 0 || index == (subviews.count - 1)
-      if isRowEnd {
-        rowHeights.append(currentRowHeight)
-        currentRowHeight = 0
+      for index in rowStart..<rowEnd {
+        let size = subviews[index].sizeThatFits(
+          ProposedViewSize(width: columnWidth, height: nil)
+        )
+        rowHeight = max(rowHeight, size.height)
       }
+
+      rowHeights.append(rowHeight)
+      rowStart = rowEnd
     }
 
     return rowHeights
