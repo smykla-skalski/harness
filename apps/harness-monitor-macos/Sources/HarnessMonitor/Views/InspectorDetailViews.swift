@@ -20,7 +20,7 @@ struct SessionInspectorSummaryCard: View {
       Text(
         "Pick a task, agent, signal, or observe card from the cockpit to focus actions and detail here."
       )
-      .foregroundStyle(.secondary)
+      .foregroundStyle(MonitorTheme.secondaryInk)
       InspectorFactGrid(facts: facts)
       if !detail.agentActivity.isEmpty {
         InspectorSection(title: "Recent Agent Activity") {
@@ -33,11 +33,11 @@ struct SessionInspectorSummaryCard: View {
                   Spacer()
                   Text(activity.latestEventAt.map(formatTimestamp) ?? "No events")
                     .font(.caption.monospaced())
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(MonitorTheme.secondaryInk)
                 }
                 Text(activity.recentTools.joined(separator: " · "))
                   .font(.caption)
-                  .foregroundStyle(.secondary)
+                  .foregroundStyle(MonitorTheme.secondaryInk)
                   .lineLimit(2)
               }
               .padding(.horizontal, 12)
@@ -58,7 +58,7 @@ struct SessionInspectorSummaryCard: View {
     .monitorCard()
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(MonitorAccessibility.sessionInspectorCard)
-    .accessibilityFrameMarker(MonitorAccessibility.sessionInspectorCard)
+    .accessibilityFrameMarker("\(MonitorAccessibility.sessionInspectorCard).frame")
   }
 }
 
@@ -67,10 +67,10 @@ struct TaskInspectorCard: View {
 
   private var facts: [InspectorFact] {
     [
-      .init(title: "Severity", value: task.severity.rawValue.capitalized),
-      .init(title: "Status", value: task.status.rawValue.capitalized),
+      .init(title: "Severity", value: task.severity.title),
+      .init(title: "Status", value: task.status.title),
       .init(title: "Assignee", value: task.assignedTo ?? "Unassigned"),
-      .init(title: "Source", value: task.source.rawValue.capitalized),
+      .init(title: "Source", value: task.source.title),
     ]
   }
 
@@ -79,7 +79,7 @@ struct TaskInspectorCard: View {
       Text(task.title)
         .font(.system(.title3, design: .serif, weight: .bold))
       Text(task.context ?? "No task context provided.")
-        .foregroundStyle(.secondary)
+        .foregroundStyle(MonitorTheme.secondaryInk)
       InspectorFactGrid(facts: facts)
       if let checkpoint = task.checkpointSummary {
         InspectorSection(title: "Checkpoint") {
@@ -91,13 +91,13 @@ struct TaskInspectorCard: View {
           )
           Text(checkpoint.summary)
             .font(.subheadline)
-            .foregroundStyle(.secondary)
+            .foregroundStyle(MonitorTheme.secondaryInk)
         }
       }
       if let suggestion = task.suggestedFix {
         InspectorSection(title: "Suggested Fix") {
           Text(suggestion)
-            .foregroundStyle(.secondary)
+            .foregroundStyle(MonitorTheme.secondaryInk)
         }
       }
       if !task.notes.isEmpty {
@@ -111,11 +111,11 @@ struct TaskInspectorCard: View {
                   Spacer()
                   Text(formatTimestamp(note.timestamp))
                     .font(.caption.monospaced())
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(MonitorTheme.secondaryInk)
                 }
                 Text(note.text)
                   .font(.subheadline)
-                  .foregroundStyle(.secondary)
+                  .foregroundStyle(MonitorTheme.secondaryInk)
               }
               .padding(.horizontal, 12)
               .padding(.vertical, 10)
@@ -141,7 +141,7 @@ struct TaskInspectorCard: View {
         InspectorSection(title: "Completed") {
           Text(formatTimestamp(completedAt))
             .font(.subheadline.monospaced())
-            .foregroundStyle(.secondary)
+            .foregroundStyle(MonitorTheme.secondaryInk)
         }
       }
     }
@@ -149,7 +149,7 @@ struct TaskInspectorCard: View {
     .monitorCard()
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(MonitorAccessibility.taskInspectorCard)
-    .accessibilityFrameMarker(MonitorAccessibility.taskInspectorCard)
+    .accessibilityFrameMarker("\(MonitorAccessibility.taskInspectorCard).frame")
   }
 }
 
@@ -163,7 +163,7 @@ struct AgentInspectorCard: View {
 
   private var facts: [InspectorFact] {
     [
-      .init(title: "Role", value: agent.role.rawValue.capitalized),
+      .init(title: "Role", value: agent.role.title),
       .init(title: "Current Task", value: agent.currentTaskId ?? "Idle"),
       .init(title: "Last Activity", value: formatTimestamp(agent.lastActivityAt)),
       .init(
@@ -181,8 +181,8 @@ struct AgentInspectorCard: View {
     VStack(alignment: .leading, spacing: 12) {
       Text(agent.name)
         .font(.system(.title3, design: .serif, weight: .bold))
-      Text("\(agent.runtime) • \(agent.role.rawValue.capitalized)")
-        .foregroundStyle(.secondary)
+      Text("\(agent.runtime) • \(agent.role.title)")
+        .foregroundStyle(MonitorTheme.secondaryInk)
       InspectorFactGrid(facts: facts)
       InspectorSection(title: "Runtime Capabilities") {
         InspectorFactGrid(
@@ -229,10 +229,10 @@ struct AgentInspectorCard: View {
           if !activity.recentTools.isEmpty {
             Text("Recent Tools")
               .font(.caption.bold())
-              .foregroundStyle(.secondary)
+              .foregroundStyle(MonitorTheme.secondaryInk)
             Text(activity.recentTools.joined(separator: " · "))
               .font(.caption)
-              .foregroundStyle(.secondary)
+              .foregroundStyle(MonitorTheme.secondaryInk)
           }
         }
       }
@@ -251,7 +251,7 @@ struct AgentInspectorCard: View {
     .monitorCard()
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(MonitorAccessibility.agentInspectorCard)
-    .accessibilityFrameMarker(MonitorAccessibility.agentInspectorCard)
+    .accessibilityFrameMarker("\(MonitorAccessibility.agentInspectorCard).frame")
   }
 }
 
@@ -260,10 +260,10 @@ struct SignalInspectorCard: View {
 
   private var facts: [InspectorFact] {
     [
-      .init(title: "Status", value: signal.status.rawValue.capitalized),
+      .init(title: "Status", value: signal.status.title),
       .init(title: "Agent", value: signal.agentId),
       .init(title: "Runtime", value: signal.runtime),
-      .init(title: "Priority", value: signal.signal.priority.rawValue.capitalized),
+      .init(title: "Priority", value: signal.signal.priority.title),
       .init(title: "Created", value: formatTimestamp(signal.signal.createdAt)),
       .init(title: "Expires", value: formatTimestamp(signal.signal.expiresAt)),
     ]
@@ -316,7 +316,7 @@ struct SignalInspectorCard: View {
         InspectorSection(title: "Acknowledgment") {
           InspectorFactGrid(
             facts: [
-              .init(title: "Result", value: acknowledgment.result.rawValue.capitalized),
+              .init(title: "Result", value: acknowledgment.result.title),
               .init(title: "Agent", value: acknowledgment.agent),
               .init(title: "At", value: formatTimestamp(acknowledgment.acknowledgedAt)),
             ]
@@ -332,6 +332,6 @@ struct SignalInspectorCard: View {
     .monitorCard()
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(MonitorAccessibility.signalInspectorCard)
-    .accessibilityFrameMarker(MonitorAccessibility.signalInspectorCard)
+    .accessibilityFrameMarker("\(MonitorAccessibility.signalInspectorCard).frame")
   }
 }

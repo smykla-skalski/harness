@@ -9,14 +9,8 @@ struct InspectorColumnView: View {
   @State private var signalActionHint = ""
 
   private var selectedObserver: ObserverSummary? {
-    guard case .observer = store.inspectorSelection else {
-      return nil
-    }
+    guard case .observer = store.inspectorSelection else { return nil }
     return store.selectedSession?.observer
-  }
-
-  private var selectedSessionSummary: SessionSummary? {
-    store.selectedSessionSummary
   }
 
   private var selectedAgentActivity: AgentToolActivitySummary? {
@@ -27,13 +21,22 @@ struct InspectorColumnView: View {
   }
 
   private var selectionKey: String {
-    [
-      store.selectedSession?.session.sessionId ?? "-",
-      store.selectedTask?.taskId ?? "-",
-      store.selectedAgent?.agentId ?? "-",
-      store.selectedSignal?.signal.signalId ?? "-",
-      selectedObserver?.observeId ?? "-",
-    ].joined(separator: "|")
+    "\(store.selectedSession?.session.sessionId ?? "-")|\(selectionIdentifier)"
+  }
+
+  private var selectionIdentifier: String {
+    switch store.inspectorSelection {
+    case .none:
+      "session"
+    case .task(let taskID):
+      "task:\(taskID)"
+    case .agent(let agentID):
+      "agent:\(agentID)"
+    case .signal(let signalID):
+      "signal:\(signalID)"
+    case .observer:
+      "observer"
+    }
   }
 
   var body: some View {
@@ -42,21 +45,7 @@ struct InspectorColumnView: View {
 
       MonitorColumnScrollView(horizontalPadding: 18, verticalPadding: 22) {
         VStack(alignment: .leading, spacing: 18) {
-          if let task = store.selectedTask {
-            taskInspector(task)
-          } else if let agent = store.selectedAgent {
-            agentInspector(agent)
-          } else if let signal = store.selectedSignal {
-            signalInspector(signal)
-          } else if let observer = selectedObserver {
-            observerInspector(observer)
-          } else if let detail = store.selectedSession {
-            sessionInspector(detail)
-          } else if let summary = selectedSessionSummary {
-            sessionLoadingInspector(summary)
-          } else {
-            emptyState
-          }
+          inspectorContent
 
           if let detail = store.selectedSession {
             InspectorActionSections(
@@ -81,6 +70,43 @@ struct InspectorColumnView: View {
     }
   }
 
+  @ViewBuilder private var inspectorContent: some View {
+    if let detail = store.selectedSession {
+      switch store.inspectorSelection {
+      case .none:
+        sessionInspector(detail)
+      case .task(let taskID):
+        if let task = detail.tasks.first(where: { $0.taskId == taskID }) {
+          taskInspector(task)
+        } else {
+          sessionInspector(detail)
+        }
+      case .agent(let agentID):
+        if let agent = detail.agents.first(where: { $0.agentId == agentID }) {
+          agentInspector(agent)
+        } else {
+          sessionInspector(detail)
+        }
+      case .signal(let signalID):
+        if let signal = detail.signals.first(where: { $0.signal.signalId == signalID }) {
+          signalInspector(signal)
+        } else {
+          sessionInspector(detail)
+        }
+      case .observer:
+        if let observer = detail.observer {
+          observerInspector(observer)
+        } else {
+          sessionInspector(detail)
+        }
+      }
+    } else if let summary = store.selectedSessionSummary {
+      sessionLoadingInspector(summary)
+    } else {
+      emptyState
+    }
+  }
+
   private func sessionLoadingInspector(_ summary: SessionSummary) -> some View {
     VStack(alignment: .leading, spacing: 14) {
       Text("Inspector")
@@ -88,14 +114,14 @@ struct InspectorColumnView: View {
       Text(summary.context)
         .font(.system(.headline, design: .rounded, weight: .semibold))
       Text("Loading live task, agent, and signal detail for the selected session.")
-        .foregroundStyle(.secondary)
+        .foregroundStyle(MonitorTheme.secondaryInk)
       MonitorLoadingStateView(title: "Loading session detail")
     }
     .frame(maxWidth: .infinity, alignment: .leading)
     .monitorCard()
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(MonitorAccessibility.sessionInspectorCard)
-    .accessibilityFrameMarker(MonitorAccessibility.sessionInspectorCard)
+    .accessibilityFrameMarker("\(MonitorAccessibility.sessionInspectorCard).frame")
   }
 
   private var emptyState: some View {
@@ -103,7 +129,7 @@ struct InspectorColumnView: View {
       Text("Inspector")
         .font(.system(.title3, design: .serif, weight: .semibold))
       Text("Select a session to inspect live task, agent, and signal detail.")
-        .foregroundStyle(.secondary)
+        .foregroundStyle(MonitorTheme.secondaryInk)
     }
     .frame(maxWidth: .infinity, alignment: .leading)
     .monitorCard()

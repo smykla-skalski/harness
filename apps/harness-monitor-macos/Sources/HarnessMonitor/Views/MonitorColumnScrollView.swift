@@ -16,20 +16,15 @@ struct MonitorColumnScrollView<Content: View>: View {
   }
 
   var body: some View {
-    GeometryReader { proxy in
-      ScrollView(showsIndicators: false) {
-        VStack(spacing: 0) {
-          content()
-            .frame(maxWidth: .infinity, alignment: .topLeading)
-        }
-        .frame(
-          width: max(proxy.size.width - (horizontalPadding * 2), 1),
-          alignment: .topLeading
-        )
-        .padding(.horizontal, horizontalPadding)
-        .padding(.vertical, verticalPadding)
+    ScrollView(showsIndicators: false) {
+      VStack(spacing: 0) {
+        content()
+          .frame(maxWidth: .infinity, alignment: .topLeading)
       }
-      .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+      .frame(maxWidth: .infinity, alignment: .topLeading)
+      .padding(.horizontal, horizontalPadding)
+      .padding(.vertical, verticalPadding)
     }
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
   }
 }

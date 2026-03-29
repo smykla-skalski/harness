@@ -3,6 +3,24 @@ import Foundation
 public enum TransportKind: String, Equatable, Sendable {
   case webSocket
   case httpSSE
+
+  public var title: String {
+    switch self {
+    case .webSocket:
+      "WebSocket"
+    case .httpSSE:
+      "Server-Sent Events"
+    }
+  }
+
+  public var shortTitle: String {
+    switch self {
+    case .webSocket:
+      "WS"
+    case .httpSSE:
+      "SSE"
+    }
+  }
 }
 
 public enum ConnectionQuality: String, Equatable, Sendable {
@@ -22,6 +40,21 @@ public enum ConnectionQuality: String, Equatable, Sendable {
     case ..<150: self = .good
     case ..<500: self = .degraded
     default: self = .poor
+    }
+  }
+
+  public var title: String {
+    switch self {
+    case .excellent:
+      "Excellent"
+    case .good:
+      "Good"
+    case .degraded:
+      "Degraded"
+    case .poor:
+      "Poor"
+    case .disconnected:
+      "Disconnected"
     }
   }
 }
@@ -84,4 +117,19 @@ public enum ConnectionEventKind: String, Equatable, Sendable {
   case reconnecting
   case fallback
   case error
+
+  public var title: String {
+    switch self {
+    case .connected:
+      "Connected"
+    case .disconnected:
+      "Disconnected"
+    case .reconnecting:
+      "Reconnecting"
+    case .fallback:
+      "Fallback"
+    case .error:
+      "Error"
+    }
+  }
 }

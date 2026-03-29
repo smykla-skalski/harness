@@ -40,8 +40,8 @@ description = "Generate the Harness Monitor macOS Xcode project"
 run = "apps/harness-monitor-macos/Scripts/generate-project.sh"
 
 [tasks."monitor:lint"]
-description = "Run strict Swift format and lint checks for the Harness Monitor macOS app"
-run = "apps/harness-monitor-macos/Scripts/lint-swift.sh all"
+description = "Run the strict Swift format and build-tool-plugin quality gates for the Harness Monitor macOS app"
+run = "apps/harness-monitor-macos/Scripts/run-quality-gates.sh"
 
 [tasks."monitor:test"]
 description = "Generate, lint, and test the Harness Monitor macOS app"

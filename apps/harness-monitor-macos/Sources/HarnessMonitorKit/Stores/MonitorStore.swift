@@ -89,7 +89,13 @@ public final class MonitorStore {
   }
   public var selectedSavedSearchID: String?
   public var isRefreshing = false
-  public var isBusy = false
+  public var isDiagnosticsRefreshInFlight = false
+  public var isDaemonActionInFlight = false
+  public var isSelectionLoading = false
+  public var isSessionActionInFlight = false
+  public var isBusy: Bool {
+    isDaemonActionInFlight || isSessionActionInFlight
+  }
   public var lastAction = ""
   public var lastError: String?
   public var pendingConfirmation: PendingConfirmation?
@@ -97,12 +103,22 @@ public final class MonitorStore {
   public var connectionMetrics: ConnectionMetrics = .initial
   public var connectionEvents: [ConnectionEvent] = []
   public var subscribedSessionIDs: Set<String> = []
-  public var dataReceivedPulse = false
+  public var dataReceivedPulse: Bool {
+    guard connectionState == .online,
+      let lastMessageAt = connectionMetrics.lastMessageAt
+    else {
+      return false
+    }
+
+    return Date().timeIntervalSince(lastMessageAt) < 1.5
+  }
 
   let daemonController: any DaemonControlling
   var client: (any MonitorClientProtocol)?
   var globalStreamTask: Task<Void, Never>?
   var sessionStreamTask: Task<Void, Never>?
+  private var activeSessionLoadRequest: UInt64 = 0
+  private var sessionLoadSequence: UInt64 = 0
   private var hasBootstrapped = false
 
   public init(daemonController: any DaemonControlling) {
@@ -137,8 +153,8 @@ public final class MonitorStore {
   }
 
   public func startDaemon() async {
-    isBusy = true
-    defer { isBusy = false }
+    isDaemonActionInFlight = true
+    defer { isDaemonActionInFlight = false }
 
     do {
       let client = try await daemonController.startDaemonClient()
@@ -151,8 +167,8 @@ public final class MonitorStore {
   }
 
   public func installLaunchAgent() async {
-    isBusy = true
-    defer { isBusy = false }
+    isDaemonActionInFlight = true
+    defer { isDaemonActionInFlight = false }
 
     do {
       _ = try await daemonController.installLaunchAgent()
@@ -164,8 +180,8 @@ public final class MonitorStore {
   }
 
   public func removeLaunchAgent() async {
-    isBusy = true
-    defer { isBusy = false }
+    isDaemonActionInFlight = true
+    defer { isDaemonActionInFlight = false }
 
     do {
       _ = try await daemonController.removeLaunchAgent()
@@ -195,6 +211,9 @@ public final class MonitorStore {
   }
 
   public func refreshDiagnostics() async {
+    isDiagnosticsRefreshInFlight = true
+    defer { isDiagnosticsRefreshInFlight = false }
+
     guard let client else {
       await refreshDaemonStatus()
       diagnostics = nil
@@ -223,6 +242,8 @@ public final class MonitorStore {
     lastError = nil
 
     guard let sessionID else {
+      activeSessionLoadRequest = 0
+      isSelectionLoading = false
       selectedSession = nil
       timeline = []
       subscribedSessionIDs.removeAll()
@@ -235,6 +256,7 @@ public final class MonitorStore {
       return
     }
 
+    isSelectionLoading = true
     selectedSession = nil
     timeline = []
   }
@@ -247,7 +269,11 @@ public final class MonitorStore {
       return
     }
 
-    await loadSession(using: client, sessionID: sessionID)
+    let requestID = beginSessionLoad()
+    await loadSession(using: client, sessionID: sessionID, requestID: requestID)
+    guard isCurrentSessionLoad(requestID, sessionID: sessionID) else {
+      return
+    }
     startSessionStream(using: client, sessionID: sessionID)
   }
 
@@ -283,5 +309,23 @@ public final class MonitorStore {
       return leaderID
     }
     return availableActionActors.first?.agentId
+  }
+
+  func beginSessionLoad() -> UInt64 {
+    sessionLoadSequence &+= 1
+    activeSessionLoadRequest = sessionLoadSequence
+    isSelectionLoading = true
+    return sessionLoadSequence
+  }
+
+  func completeSessionLoad(_ requestID: UInt64) {
+    guard activeSessionLoadRequest == requestID else {
+      return
+    }
+    isSelectionLoading = false
+  }
+
+  func isCurrentSessionLoad(_ requestID: UInt64, sessionID: String) -> Bool {
+    activeSessionLoadRequest == requestID && selectedSessionID == sessionID
   }
 }

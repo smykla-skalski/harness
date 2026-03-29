@@ -110,14 +110,14 @@ struct PreferencesOverviewGrid: View {
     VStack(alignment: .leading, spacing: 6) {
       Text(title.uppercased())
         .font(.caption2.weight(.bold))
-        .foregroundStyle(.secondary)
+        .foregroundStyle(MonitorTheme.secondaryInk)
       Text(value)
         .font(.system(.headline, design: .rounded, weight: .semibold))
         .textSelection(.enabled)
         .contentTransition(.numericText())
       Text(caption)
         .font(.caption)
-        .foregroundStyle(.secondary)
+        .foregroundStyle(MonitorTheme.secondaryInk)
         .lineLimit(2, reservesSpace: true)
     }
     .frame(maxWidth: .infinity, alignment: .leading)
@@ -190,7 +190,7 @@ struct PreferencesPathsCard: View {
     VStack(alignment: .leading, spacing: 4) {
       Text(title.uppercased())
         .font(.caption2.weight(.bold))
-        .foregroundStyle(.secondary)
+        .foregroundStyle(MonitorTheme.secondaryInk)
       Text(value)
         .font(.caption.monospaced())
         .textSelection(.enabled)
@@ -236,7 +236,7 @@ struct PreferencesDiagnosticsCard: View {
             .foregroundStyle(launchAgent.pid == nil ? MonitorTheme.accent : MonitorTheme.success)
           Text(launchAgent.lifecycleCaption)
             .font(.caption)
-            .foregroundStyle(.secondary)
+            .foregroundStyle(MonitorTheme.secondaryInk)
             .lineLimit(2)
         }
         .padding(14)
@@ -257,7 +257,7 @@ struct PreferencesDiagnosticsCard: View {
             .font(.system(.body, design: .rounded, weight: .semibold))
           Text("\(lastEvent.level.uppercased()) • \(formatTimestamp(lastEvent.recordedAt))")
             .font(.caption.monospaced())
-            .foregroundStyle(.secondary)
+            .foregroundStyle(MonitorTheme.secondaryInk)
         }
         .padding(14)
         .background {
@@ -270,7 +270,7 @@ struct PreferencesDiagnosticsCard: View {
       } else {
         Text("No daemon audit events have been recorded yet.")
           .font(.system(.body, design: .rounded, weight: .medium))
-          .foregroundStyle(.secondary)
+          .foregroundStyle(MonitorTheme.secondaryInk)
       }
     }
     .monitorCard()
@@ -280,7 +280,7 @@ struct PreferencesDiagnosticsCard: View {
     VStack(alignment: .leading, spacing: 4) {
       Text(title.uppercased())
         .font(.caption2.weight(.bold))
-        .foregroundStyle(.secondary)
+        .foregroundStyle(MonitorTheme.secondaryInk)
       Text(value)
         .font(.system(.body, design: .rounded, weight: .bold))
         .foregroundStyle(tint)
@@ -309,7 +309,7 @@ struct PreferencesRecentEventsCard: View {
       if events.isEmpty {
         Text("No daemon events available from the live diagnostics stream yet.")
           .font(.system(.body, design: .rounded, weight: .medium))
-          .foregroundStyle(.secondary)
+          .foregroundStyle(MonitorTheme.secondaryInk)
       } else {
         MonitorGlassContainer(spacing: 12) {
           ForEach(events) { event in
@@ -323,7 +323,7 @@ struct PreferencesRecentEventsCard: View {
                 Spacer()
                 Text(formatTimestamp(event.recordedAt))
                   .font(.caption.monospaced())
-                  .foregroundStyle(.secondary)
+                  .foregroundStyle(MonitorTheme.secondaryInk)
               }
               Text(event.message)
                 .font(.system(.body, design: .rounded, weight: .semibold))

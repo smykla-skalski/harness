@@ -22,7 +22,8 @@ struct SidebarView: View {
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     .background {
-      sidebarChromeBackground
+      MonitorTheme.sidebarBackground
+        .ignoresSafeArea()
     }
     .contentShape(Rectangle())
     .accessibilityFrameMarker(MonitorAccessibility.sidebarShellFrame)
@@ -40,7 +41,7 @@ struct SidebarView: View {
             .font(.system(.title3, design: .rounded, weight: .bold))
           Text(connectionLabel)
             .font(.system(.subheadline, design: .rounded, weight: .medium))
-            .foregroundStyle(.secondary)
+            .foregroundStyle(MonitorTheme.secondaryInk)
         }
         Spacer()
         statusPill
@@ -86,25 +87,6 @@ struct SidebarView: View {
 }
 
 extension SidebarView {
-  fileprivate var sidebarChromeBackground: some View {
-    Rectangle()
-      .fill(.windowBackground)
-      .overlay {
-        MonitorTheme.sidebarBackground.opacity(0.32)
-      }
-      .overlay(alignment: .top) {
-        LinearGradient(
-          colors: [
-            MonitorTheme.glassHighlight,
-            Color.white.opacity(0.03),
-            .clear,
-          ],
-          startPoint: .top,
-          endPoint: .bottom
-        )
-      }
-  }
-
   fileprivate var sidebarStartDaemonButton: some View {
     sidebarLayoutProbe(MonitorAccessibility.sidebarStartDaemonButtonFrame) {
       MonitorAsyncActionButton(

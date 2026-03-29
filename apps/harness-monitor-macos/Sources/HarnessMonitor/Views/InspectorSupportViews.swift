@@ -44,7 +44,7 @@ struct ObserverInspectorCard: View {
                 if let evidenceExcerpt = issue.evidenceExcerpt {
                   Text(evidenceExcerpt)
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(MonitorTheme.secondaryInk)
                     .lineLimit(2)
                 }
               }
@@ -72,11 +72,11 @@ struct ObserverInspectorCard: View {
                   Spacer()
                   Text(formatTimestamp(worker.startedAt))
                     .font(.caption.monospaced())
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(MonitorTheme.secondaryInk)
                 }
                 Text(worker.targetFile)
                   .font(.caption)
-                  .foregroundStyle(.secondary)
+                  .foregroundStyle(MonitorTheme.secondaryInk)
                   .lineLimit(2)
               }
               .padding(.horizontal, 12)
@@ -103,11 +103,11 @@ struct ObserverInspectorCard: View {
                   Spacer()
                   Text("+\(cycle.newIssues) / -\(cycle.resolved)")
                     .font(.caption.bold())
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(MonitorTheme.secondaryInk)
                 }
                 Text("Lines \(cycle.fromLine) - \(cycle.toLine)")
                   .font(.caption)
-                  .foregroundStyle(.secondary)
+                  .foregroundStyle(MonitorTheme.secondaryInk)
               }
               .padding(.horizontal, 12)
               .padding(.vertical, 10)
@@ -133,19 +133,19 @@ struct ObserverInspectorCard: View {
                   Spacer()
                   Text(session.runtime.uppercased())
                     .font(.caption2.bold())
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(MonitorTheme.secondaryInk)
                 }
                 Text("Cursor \(session.cursor)")
                   .font(.caption.monospaced())
                 if let lastActivity = session.lastActivity {
                   Text("Last activity \(formatTimestamp(lastActivity))")
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(MonitorTheme.secondaryInk)
                 }
                 if let logPath = session.logPath {
                   Text(logPath)
                     .font(.caption.monospaced())
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(MonitorTheme.secondaryInk)
                     .lineLimit(2)
                 }
               }
@@ -167,7 +167,7 @@ struct ObserverInspectorCard: View {
     .monitorCard()
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(MonitorAccessibility.observerInspectorCard)
-    .accessibilityFrameMarker(MonitorAccessibility.observerInspectorCard)
+    .accessibilityFrameMarker("\(MonitorAccessibility.observerInspectorCard).frame")
   }
 }
 
@@ -187,7 +187,7 @@ struct InspectorFactGrid: View {
         VStack(alignment: .leading, spacing: 3) {
           Text(fact.title.uppercased())
             .font(.caption2.weight(.bold))
-            .foregroundStyle(.secondary)
+            .foregroundStyle(MonitorTheme.secondaryInk)
           Text(fact.value)
             .font(.system(.body, design: .rounded, weight: .semibold))
             .lineLimit(2)
@@ -215,7 +215,7 @@ struct InspectorSection<Content: View>: View {
     VStack(alignment: .leading, spacing: 8) {
       Text(title)
         .font(.caption.bold())
-        .foregroundStyle(.secondary)
+        .foregroundStyle(MonitorTheme.secondaryInk)
       content
     }
   }

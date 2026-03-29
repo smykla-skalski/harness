@@ -22,11 +22,11 @@ struct SessionActionDock: View {
             .font(.system(.headline, design: .rounded, weight: .semibold))
           Text("Pick a lane, then use the inspector to submit the change.")
             .font(.system(.subheadline, design: .rounded, weight: .medium))
-            .foregroundStyle(.secondary)
+            .foregroundStyle(MonitorTheme.secondaryInk)
         }
         Spacer()
         VStack(alignment: .trailing, spacing: 4) {
-          if store.isBusy {
+          if store.isSessionActionInFlight {
             MonitorSpinner()
           } else if !store.lastAction.isEmpty {
             Text(store.lastAction)
@@ -35,7 +35,7 @@ struct SessionActionDock: View {
           }
           Text("\(detail.tasks.count) tasks · \(detail.agents.count) agents")
             .font(.caption.monospacedDigit())
-            .foregroundStyle(.secondary)
+            .foregroundStyle(MonitorTheme.secondaryInk)
         }
       }
 
@@ -77,7 +77,7 @@ struct SessionActionDock: View {
           .font(.system(.headline, design: .rounded, weight: .semibold))
         Text(subtitle)
           .font(.caption)
-          .foregroundStyle(.secondary)
+          .foregroundStyle(MonitorTheme.secondaryInk)
       }
       .frame(maxWidth: .infinity, alignment: .leading)
       .padding(14)

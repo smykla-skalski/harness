@@ -140,14 +140,18 @@ extension WebSocketTransport {
   }
 
   func wsEndpoint() -> URL {
-    var components = URLComponents(
-      url: connection.endpoint,
-      resolvingAgainstBaseURL: false
-    )!
+    guard
+      var components = URLComponents(
+        url: connection.endpoint,
+        resolvingAgainstBaseURL: false
+      )
+    else {
+      return connection.endpoint
+    }
     components.scheme =
       connection.endpoint.scheme == "https" ? "wss" : "ws"
     components.path = "/v1/ws"
-    return components.url!
+    return components.url ?? connection.endpoint
   }
 
   func decode<T: Decodable>(_ value: JSONValue) throws -> T {

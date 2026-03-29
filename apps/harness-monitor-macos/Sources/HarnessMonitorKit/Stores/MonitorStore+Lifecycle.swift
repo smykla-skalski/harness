@@ -10,7 +10,7 @@ extension MonitorStore {
     connectionMetrics.transportKind = transport
     connectionMetrics.connectedSince = Date()
     connectionMetrics.isFallback = transport == .httpSSE
-    appendConnectionEvent(kind: .connected, detail: "Connected via \(transport.rawValue)")
+    appendConnectionEvent(kind: .connected, detail: "Connected via \(transport.title)")
 
     await refresh(using: client, preserveSelection: true)
     startGlobalStream(using: client)
@@ -43,16 +43,17 @@ extension MonitorStore {
       sessions = try await sessionResponse
       daemonStatus = try? await daemonController.daemonStatus()
 
-      fireDataReceivedPulse()
       if preserveSelection, let selectedSessionID {
-        await loadSession(using: client, sessionID: selectedSessionID)
+        let requestID = beginSessionLoad()
+        await loadSession(using: client, sessionID: selectedSessionID, requestID: requestID)
       } else {
         synchronizeActionActor()
         if shouldAutoSelectPreviewSession(
           client: client,
           sessions: sessions
         ) {
-          await loadSession(using: client, sessionID: sessions[0].sessionId)
+          let requestID = beginSessionLoad()
+          await loadSession(using: client, sessionID: sessions[0].sessionId, requestID: requestID)
         }
       }
     } catch {
@@ -63,15 +64,28 @@ extension MonitorStore {
 
   func loadSession(
     using client: any MonitorClientProtocol,
-    sessionID: String
+    sessionID: String,
+    requestID: UInt64
   ) async {
+    defer {
+      completeSessionLoad(requestID)
+    }
+
     do {
       async let detail = client.sessionDetail(id: sessionID)
       async let timeline = client.timeline(sessionID: sessionID)
-      selectedSession = try await detail
-      self.timeline = try await timeline
+      let loadedDetail = try await detail
+      let loadedTimeline = try await timeline
+      guard isCurrentSessionLoad(requestID, sessionID: sessionID) else {
+        return
+      }
+      selectedSession = loadedDetail
+      self.timeline = loadedTimeline
       synchronizeActionActor()
     } catch {
+      guard isCurrentSessionLoad(requestID, sessionID: sessionID) else {
+        return
+      }
       lastError = error.localizedDescription
     }
   }
@@ -121,14 +135,6 @@ extension MonitorStore {
     }
   }
 
-  func fireDataReceivedPulse() {
-    dataReceivedPulse = true
-    Task { @MainActor in
-      try? await Task.sleep(for: .milliseconds(800))
-      dataReceivedPulse = false
-    }
-  }
-
   func startSessionStream(using client: any MonitorClientProtocol, sessionID: String) {
     subscribedSessionIDs.insert(sessionID)
     sessionStreamTask?.cancel()
@@ -150,7 +156,8 @@ extension MonitorStore {
             pendingRefresh = Task { [weak self] in
               try? await Task.sleep(for: .milliseconds(500))
               guard !Task.isCancelled, let self else { return }
-              await self.loadSession(using: client, sessionID: sessionID)
+              let requestID = self.beginSessionLoad()
+              await self.loadSession(using: client, sessionID: sessionID, requestID: requestID)
             }
           }
           pendingRefresh?.cancel()
