@@ -62,11 +62,14 @@ pub struct ObserverSummary {
     pub observe_id: String,
     pub last_scan_time: String,
     pub open_issue_count: usize,
+    pub resolved_issue_count: usize,
     pub muted_code_count: usize,
     pub active_worker_count: usize,
     pub open_issues: Vec<ObserverOpenIssue>,
     pub muted_codes: Vec<IssueCode>,
     pub active_workers: Vec<ObserverActiveWorker>,
+    pub cycle_history: Vec<ObserverCycleSummary>,
+    pub agent_sessions: Vec<ObserverAgentSessionSummary>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -76,6 +79,8 @@ pub struct ObserverOpenIssue {
     pub severity: IssueSeverity,
     pub category: IssueCategory,
     pub summary: String,
+    pub fingerprint: String,
+    pub first_seen_line: usize,
     pub occurrence_count: usize,
     pub last_seen_line: usize,
     pub fix_safety: FixSafety,
@@ -87,6 +92,37 @@ pub struct ObserverActiveWorker {
     pub target_file: String,
     pub started_at: String,
     pub agent_id: Option<String>,
+    pub runtime: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ObserverCycleSummary {
+    pub timestamp: String,
+    pub from_line: usize,
+    pub to_line: usize,
+    pub new_issues: usize,
+    pub resolved: usize,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ObserverAgentSessionSummary {
+    pub agent_id: String,
+    pub runtime: String,
+    pub log_path: Option<String>,
+    pub cursor: usize,
+    pub last_activity: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AgentToolActivitySummary {
+    pub agent_id: String,
+    pub runtime: String,
+    pub tool_invocation_count: usize,
+    pub tool_result_count: usize,
+    pub tool_error_count: usize,
+    pub latest_tool_name: Option<String>,
+    pub latest_event_at: Option<String>,
+    pub recent_tools: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -96,6 +132,7 @@ pub struct SessionDetail {
     pub tasks: Vec<WorkItem>,
     pub signals: Vec<SessionSignalRecord>,
     pub observer: Option<ObserverSummary>,
+    pub agent_activity: Vec<AgentToolActivitySummary>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

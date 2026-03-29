@@ -7,11 +7,14 @@ private struct ObserverSummaryPayload: Encodable {
   let observeId: String
   let lastScanTime: String
   let openIssueCount: Int
+  let resolvedIssueCount: Int
   let mutedCodeCount: Int
   let activeWorkerCount: Int
   let openIssues: [ObserverIssuePayload]?
   let mutedCodes: [String]?
   let activeWorkers: [ObserverWorkerPayload]?
+  let cycleHistory: [ObserverCyclePayload]?
+  let agentSessions: [ObserverAgentSessionPayload]?
 }
 
 private struct ObserverIssuePayload: Encodable {
@@ -35,17 +38,36 @@ private struct ObserverWorkerPayload: Encodable {
   let runtime: String?
 }
 
+private struct ObserverCyclePayload: Encodable {
+  let timestamp: String
+  let fromLine: Int
+  let toLine: Int
+  let newIssues: Int
+  let resolved: Int
+}
+
+private struct ObserverAgentSessionPayload: Encodable {
+  let agentId: String
+  let runtime: String
+  let logPath: String?
+  let cursor: Int
+  let lastActivity: String?
+}
+
 final class ObserverSummaryTests: XCTestCase {
   func testObserverSummaryDecodesWithoutRichDetail() throws {
     let payload = ObserverSummaryPayload(
       observeId: "observe-sess-1",
       lastScanTime: "2026-03-28T14:17:45Z",
       openIssueCount: 3,
+      resolvedIssueCount: 1,
       mutedCodeCount: 1,
       activeWorkerCount: 2,
       openIssues: nil,
       mutedCodes: nil,
-      activeWorkers: nil
+      activeWorkers: nil,
+      cycleHistory: nil,
+      agentSessions: nil
     )
 
     let summary = try decodeObserverSummary(from: payload)
@@ -54,6 +76,8 @@ final class ObserverSummaryTests: XCTestCase {
     XCTAssertNil(summary.openIssues)
     XCTAssertNil(summary.mutedCodes)
     XCTAssertNil(summary.activeWorkers)
+    XCTAssertNil(summary.cycleHistory)
+    XCTAssertNil(summary.agentSessions)
   }
 
   func testObserverSummaryDecodesRichDetail() throws {
@@ -61,6 +85,7 @@ final class ObserverSummaryTests: XCTestCase {
       observeId: "observe-sess-1",
       lastScanTime: "2026-03-28T14:17:45Z",
       openIssueCount: 3,
+      resolvedIssueCount: 2,
       mutedCodeCount: 1,
       activeWorkerCount: 2,
       openIssues: [
@@ -86,21 +111,45 @@ final class ObserverSummaryTests: XCTestCase {
           agentId: "worker-codex",
           runtime: "codex"
         )
+      ],
+      cycleHistory: [
+        ObserverCyclePayload(
+          timestamp: "2026-03-28T14:17:45Z",
+          fromLine: 0,
+          toLine: 42,
+          newIssues: 1,
+          resolved: 1
+        )
+      ],
+      agentSessions: [
+        ObserverAgentSessionPayload(
+          agentId: "worker-codex",
+          runtime: "codex",
+          logPath: "/tmp/raw.jsonl",
+          cursor: 42,
+          lastActivity: "2026-03-28T14:17:40Z"
+        )
       ]
     )
 
     let summary = try decodeObserverSummary(from: payload)
 
     XCTAssertEqual(summary.openIssues?.count, 1)
+    XCTAssertEqual(summary.resolvedIssueCount, 2)
     XCTAssertEqual(summary.openIssues?.first?.code, "agent_stalled_progress")
     XCTAssertEqual(summary.mutedCodes, ["agent_repeated_error"])
     XCTAssertEqual(summary.activeWorkers?.first?.agentId, "worker-codex")
+    XCTAssertEqual(summary.cycleHistory?.first?.resolved, 1)
+    XCTAssertEqual(summary.agentSessions?.first?.runtime, "codex")
   }
 
   func testPreviewObserverIncludesRichObserveDetail() throws {
     XCTAssertEqual(PreviewFixtures.observer.openIssues?.count, 3)
+    XCTAssertEqual(PreviewFixtures.observer.resolvedIssueCount, 4)
     XCTAssertEqual(PreviewFixtures.observer.mutedCodes, ["agent_repeated_error"])
     XCTAssertEqual(PreviewFixtures.observer.activeWorkers?.count, 2)
+    XCTAssertEqual(PreviewFixtures.observer.cycleHistory?.count, 2)
+    XCTAssertEqual(PreviewFixtures.observer.agentSessions?.count, 2)
   }
 
   private func decodeObserverSummary(

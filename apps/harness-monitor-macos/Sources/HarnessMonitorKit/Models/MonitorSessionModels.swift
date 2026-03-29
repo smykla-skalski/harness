@@ -204,15 +204,51 @@ public struct ObserverWorkerSummary: Codable, Equatable, Identifiable, Sendable 
   }
 }
 
+public struct ObserverCycleSummary: Codable, Equatable, Identifiable, Sendable {
+  public let timestamp: String
+  public let fromLine: Int
+  public let toLine: Int
+  public let newIssues: Int
+  public let resolved: Int
+
+  public var id: String { timestamp }
+}
+
+public struct ObserverAgentSessionSummary: Codable, Equatable, Identifiable, Sendable {
+  public let agentId: String
+  public let runtime: String
+  public let logPath: String?
+  public let cursor: Int
+  public let lastActivity: String?
+
+  public var id: String { agentId }
+}
+
 public struct ObserverSummary: Codable, Equatable, Sendable {
   public let observeId: String
   public let lastScanTime: String
   public let openIssueCount: Int
+  public let resolvedIssueCount: Int
   public let mutedCodeCount: Int
   public let activeWorkerCount: Int
   public let openIssues: [ObserverIssueSummary]?
   public let mutedCodes: [String]?
   public let activeWorkers: [ObserverWorkerSummary]?
+  public let cycleHistory: [ObserverCycleSummary]?
+  public let agentSessions: [ObserverAgentSessionSummary]?
+}
+
+public struct AgentToolActivitySummary: Codable, Equatable, Identifiable, Sendable {
+  public let agentId: String
+  public let runtime: String
+  public let toolInvocationCount: Int
+  public let toolResultCount: Int
+  public let toolErrorCount: Int
+  public let latestToolName: String?
+  public let latestEventAt: String?
+  public let recentTools: [String]
+
+  public var id: String { agentId }
 }
 
 public struct SessionDetail: Codable, Equatable, Sendable {
@@ -221,6 +257,7 @@ public struct SessionDetail: Codable, Equatable, Sendable {
   public let tasks: [WorkItem]
   public let signals: [SessionSignalRecord]
   public let observer: ObserverSummary?
+  public let agentActivity: [AgentToolActivitySummary]
 }
 
 public struct RoleChangeRequest: Codable, Equatable, Sendable {
