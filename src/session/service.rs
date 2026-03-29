@@ -1,5 +1,6 @@
 use std::cmp::Reverse;
 use std::collections::BTreeMap;
+use std::env;
 use std::path::Path;
 
 use chrono::{Duration, Utc};
@@ -18,11 +19,13 @@ use crate::workspace::utc_now;
 use super::roles::{SessionAction, is_permitted};
 use super::storage;
 use super::types::{
-    AgentRegistration, AgentStatus, CURRENT_VERSION, SessionMetrics, SessionRole,
-    SessionSignalRecord, SessionSignalStatus, SessionState, SessionStatus, SessionTransition,
-    TaskCheckpoint, TaskCheckpointSummary, TaskNote, TaskSeverity, TaskSource, TaskStatus,
-    WorkItem,
+    AgentRegistration, AgentStatus, CURRENT_VERSION, PendingLeaderTransfer, SessionMetrics,
+    SessionRole, SessionSignalRecord, SessionSignalStatus, SessionState, SessionStatus,
+    SessionTransition, TaskCheckpoint, TaskCheckpointSummary, TaskNote, TaskSeverity, TaskSource,
+    TaskStatus, WorkItem,
 };
+
+const DEFAULT_LEADER_UNRESPONSIVE_TIMEOUT_SECONDS: i64 = 300;
 
 /// Start a new orchestration session and register the caller as leader.
 ///
@@ -273,15 +276,18 @@ pub fn remove_agent(
             .into());
         }
 
-        let agent = state.agents.get_mut(agent_id).ok_or_else(|| {
-            CliError::from(CliErrorKind::session_agent_conflict(format!(
-                "agent '{agent_id}' not found"
-            )))
-        })?;
-        agent.status = AgentStatus::Removed;
-        agent.updated_at.clone_from(&now);
-        agent.last_activity_at = Some(now.clone());
-        agent.current_task_id = None;
+        {
+            let agent = state.agents.get_mut(agent_id).ok_or_else(|| {
+                CliError::from(CliErrorKind::session_agent_conflict(format!(
+                    "agent '{agent_id}' not found"
+                )))
+            })?;
+            agent.status = AgentStatus::Removed;
+            agent.updated_at.clone_from(&now);
+            agent.last_activity_at = Some(now.clone());
+            agent.current_task_id = None;
+        }
+        clear_pending_leader_transfer(state, agent_id);
 
         for task in state.tasks.values_mut() {
             if task.assigned_to.as_deref() == Some(agent_id)
@@ -328,52 +334,51 @@ pub fn transfer_leader(
     project_dir: &Path,
 ) -> Result<(), CliError> {
     let now = utc_now();
-    let mut old_leader = String::new();
+    let mut transfer = None;
 
     storage::update_state(project_dir, session_id, |state| {
         require_active(state)?;
         require_permission(state, actor_id, SessionAction::TransferLeader)?;
-        require_active_target_agent(state, new_leader_id)?;
-
-        old_leader = state.leader_id.clone().unwrap_or_default();
-        if let Some(old) = state.agents.get_mut(&old_leader) {
-            old.role = SessionRole::Worker;
-            old.updated_at.clone_from(&now);
-            old.last_activity_at = Some(now.clone());
-        }
-        if let Some(new) = state.agents.get_mut(new_leader_id) {
-            new.role = SessionRole::Leader;
-            new.updated_at.clone_from(&now);
-            new.last_activity_at = Some(now.clone());
-        }
-        state.leader_id = Some(new_leader_id.to_string());
-        touch_agent(state, actor_id, &now);
-        refresh_session(state, &now);
+        transfer = Some(plan_leader_transfer(
+            state,
+            new_leader_id,
+            actor_id,
+            reason,
+            &now,
+        )?);
         Ok(())
     })?;
 
-    storage::append_log_entry(
-        project_dir,
-        session_id,
-        SessionTransition::LeaderTransferRequested {
-            from: old_leader.clone(),
-            to: new_leader_id.to_string(),
-        },
-        Some(actor_id),
-        reason,
-    )?;
-    storage::append_log_entry(
-        project_dir,
-        session_id,
-        SessionTransition::LeaderTransferred {
-            from: old_leader,
-            to: new_leader_id.to_string(),
-        },
-        Some(actor_id),
-        reason,
-    )?;
+    let transfer = transfer.ok_or_else(|| {
+        CliError::from(CliErrorKind::workflow_io(
+            "leader transfer did not persist state".to_string(),
+        ))
+    })?;
 
-    Ok(())
+    if let Some(request) = transfer.pending_request {
+        storage::append_log_entry(
+            project_dir,
+            session_id,
+            SessionTransition::LeaderTransferRequested {
+                from: request.current_leader_id,
+                to: request.new_leader_id,
+            },
+            Some(actor_id),
+            request.reason.as_deref(),
+        )?;
+        return Ok(());
+    }
+
+    append_leader_transfer_logs(
+        project_dir,
+        session_id,
+        actor_id,
+        transfer.outcome.as_ref().ok_or_else(|| {
+            CliError::from(CliErrorKind::workflow_io(
+                "leader transfer did not persist outcome".to_string(),
+            ))
+        })?,
+    )
 }
 
 /// Create a work item in the session.
@@ -1031,6 +1036,7 @@ fn build_initial_state(
         archived_at: None,
         last_activity_at: Some(now.to_string()),
         observe_id: Some(format!("observe-{session_id}")),
+        pending_leader_transfer: None,
         metrics: SessionMetrics::default(),
     };
     refresh_session(&mut state, now);
@@ -1081,6 +1087,208 @@ fn touch_agent(state: &mut SessionState, agent_id: &str, now: &str) {
         agent.updated_at = now.to_string();
         agent.last_activity_at = Some(now.to_string());
     }
+}
+
+fn clear_pending_leader_transfer(state: &mut SessionState, agent_id: &str) {
+    if state
+        .pending_leader_transfer
+        .as_ref()
+        .is_some_and(|request| {
+            request.requested_by == agent_id
+                || request.current_leader_id == agent_id
+                || request.new_leader_id == agent_id
+        })
+    {
+        state.pending_leader_transfer = None;
+    }
+}
+
+fn leader_unresponsive_timeout_seconds() -> i64 {
+    env::var("HARNESS_SESSION_LEADER_UNRESPONSIVE_TIMEOUT_SECONDS")
+        .ok()
+        .and_then(|value| value.parse::<i64>().ok())
+        .filter(|value| *value > 0)
+        .unwrap_or(DEFAULT_LEADER_UNRESPONSIVE_TIMEOUT_SECONDS)
+}
+
+fn agent_is_unresponsive(state: &SessionState, agent_id: &str, now: &str) -> bool {
+    let Some(last_activity_at) = state
+        .agents
+        .get(agent_id)
+        .and_then(|agent| agent.last_activity_at.as_deref())
+    else {
+        return true;
+    };
+    let Ok(now) = chrono::DateTime::parse_from_rfc3339(now) else {
+        return false;
+    };
+    let Ok(last_activity_at) = chrono::DateTime::parse_from_rfc3339(last_activity_at) else {
+        return false;
+    };
+    (now - last_activity_at).num_seconds() >= leader_unresponsive_timeout_seconds()
+}
+
+#[derive(Debug)]
+struct LeaderTransferOutcome {
+    old_leader: String,
+    new_leader_id: String,
+    confirmed_by: Option<String>,
+    reason: Option<String>,
+    log_request_before_transfer: bool,
+}
+
+#[derive(Debug)]
+struct LeaderTransferPlan {
+    pending_request: Option<PendingLeaderTransfer>,
+    outcome: Option<LeaderTransferOutcome>,
+}
+
+fn plan_leader_transfer(
+    state: &mut SessionState,
+    new_leader_id: &str,
+    actor_id: &str,
+    reason: Option<&str>,
+    now: &str,
+) -> Result<LeaderTransferPlan, CliError> {
+    require_active_target_agent(state, new_leader_id)?;
+    let old_leader = state.leader_id.clone().unwrap_or_default();
+    reject_redundant_leader_transfer(state, &old_leader, new_leader_id)?;
+
+    if should_defer_leader_transfer(state, &old_leader, actor_id, now) {
+        let request = PendingLeaderTransfer {
+            requested_by: actor_id.to_string(),
+            current_leader_id: old_leader,
+            new_leader_id: new_leader_id.to_string(),
+            requested_at: now.to_string(),
+            reason: reason.map(ToString::to_string),
+        };
+        state.pending_leader_transfer = Some(request.clone());
+        touch_agent(state, actor_id, now);
+        refresh_session(state, now);
+        return Ok(LeaderTransferPlan {
+            pending_request: Some(request),
+            outcome: None,
+        });
+    }
+
+    let outcome = apply_leader_transfer(state, old_leader, new_leader_id, actor_id, reason, now);
+    Ok(LeaderTransferPlan {
+        pending_request: None,
+        outcome: Some(outcome),
+    })
+}
+
+fn reject_redundant_leader_transfer(
+    state: &SessionState,
+    old_leader: &str,
+    new_leader_id: &str,
+) -> Result<(), CliError> {
+    if old_leader == new_leader_id {
+        return Err(CliErrorKind::session_agent_conflict(format!(
+            "agent '{new_leader_id}' already leads session '{}'",
+            state.session_id
+        ))
+        .into());
+    }
+    Ok(())
+}
+
+fn should_defer_leader_transfer(
+    state: &SessionState,
+    old_leader: &str,
+    actor_id: &str,
+    now: &str,
+) -> bool {
+    old_leader != actor_id
+        && !old_leader.is_empty()
+        && !agent_is_unresponsive(state, old_leader, now)
+}
+
+fn apply_leader_transfer(
+    state: &mut SessionState,
+    old_leader: String,
+    new_leader_id: &str,
+    actor_id: &str,
+    reason: Option<&str>,
+    now: &str,
+) -> LeaderTransferOutcome {
+    let leader_is_actor = old_leader == actor_id;
+    let prior_request = state.pending_leader_transfer.take();
+    update_leader_roles(state, &old_leader, new_leader_id, now);
+    state.leader_id = Some(new_leader_id.to_string());
+    touch_agent(state, actor_id, now);
+    refresh_session(state, now);
+
+    LeaderTransferOutcome {
+        old_leader,
+        new_leader_id: new_leader_id.to_string(),
+        confirmed_by: if leader_is_actor && prior_request.is_some() {
+            Some(actor_id.to_string())
+        } else {
+            None
+        },
+        reason: reason
+            .map(ToString::to_string)
+            .or_else(|| prior_request.and_then(|request| request.reason)),
+        log_request_before_transfer: !leader_is_actor,
+    }
+}
+
+fn update_leader_roles(state: &mut SessionState, old_leader: &str, new_leader_id: &str, now: &str) {
+    if let Some(old) = state.agents.get_mut(old_leader) {
+        old.role = SessionRole::Worker;
+        old.updated_at = now.to_string();
+        old.last_activity_at = Some(now.to_string());
+    }
+    if let Some(new) = state.agents.get_mut(new_leader_id) {
+        new.role = SessionRole::Leader;
+        new.updated_at = now.to_string();
+        new.last_activity_at = Some(now.to_string());
+    }
+}
+
+fn append_leader_transfer_logs(
+    project_dir: &Path,
+    session_id: &str,
+    actor_id: &str,
+    outcome: &LeaderTransferOutcome,
+) -> Result<(), CliError> {
+    if outcome.log_request_before_transfer {
+        storage::append_log_entry(
+            project_dir,
+            session_id,
+            SessionTransition::LeaderTransferRequested {
+                from: outcome.old_leader.clone(),
+                to: outcome.new_leader_id.clone(),
+            },
+            Some(actor_id),
+            outcome.reason.as_deref(),
+        )?;
+    }
+    if let Some(confirmed_by) = outcome.confirmed_by.as_deref() {
+        storage::append_log_entry(
+            project_dir,
+            session_id,
+            SessionTransition::LeaderTransferConfirmed {
+                from: outcome.old_leader.clone(),
+                to: outcome.new_leader_id.clone(),
+                confirmed_by: confirmed_by.to_string(),
+            },
+            Some(confirmed_by),
+            outcome.reason.as_deref(),
+        )?;
+    }
+    storage::append_log_entry(
+        project_dir,
+        session_id,
+        SessionTransition::LeaderTransferred {
+            from: outcome.old_leader.clone(),
+            to: outcome.new_leader_id.clone(),
+        },
+        Some(actor_id),
+        outcome.reason.as_deref(),
+    )?;
+    Ok(())
 }
 
 fn clear_agent_current_task(state: &mut SessionState, agent_id: &str, task_id: &str, now: &str) {
@@ -1553,6 +1761,169 @@ mod tests {
             let error = transfer_leader("transfer", &worker_id, None, &leader_id, project)
                 .expect_err("transfer");
             assert_eq!(error.code(), "KSRCLI092");
+        });
+    }
+
+    #[test]
+    fn observer_transfer_leader_creates_pending_request() {
+        with_temp_project(|project| {
+            let state = start_session("test", project, Some("claude"), Some("transfer-pending"))
+                .expect("start");
+            let leader_id = state.leader_id.expect("leader id");
+            let observer =
+                temp_env::with_vars([("CODEX_SESSION_ID", Some("observer-session"))], || {
+                    join_session(
+                        "transfer-pending",
+                        SessionRole::Observer,
+                        "codex",
+                        &[],
+                        Some("observer"),
+                        project,
+                    )
+                    .expect("join observer")
+                });
+            let observer_id = observer
+                .agents
+                .keys()
+                .find(|id| id.starts_with("codex-"))
+                .expect("observer id")
+                .clone();
+
+            transfer_leader(
+                "transfer-pending",
+                &observer_id,
+                Some("leader is overloaded"),
+                &observer_id,
+                project,
+            )
+            .expect("request transfer");
+
+            let updated = session_status("transfer-pending", project).expect("status");
+            assert_eq!(updated.leader_id.as_deref(), Some(leader_id.as_str()));
+            let request = updated
+                .pending_leader_transfer
+                .as_ref()
+                .expect("pending request");
+            assert_eq!(request.requested_by, observer_id);
+            assert_eq!(request.current_leader_id, leader_id);
+            assert_eq!(request.new_leader_id, request.requested_by);
+        });
+    }
+
+    #[test]
+    fn current_leader_confirms_pending_transfer() {
+        with_temp_project(|project| {
+            let state = start_session("test", project, Some("claude"), Some("transfer-confirm"))
+                .expect("start");
+            let leader_id = state.leader_id.expect("leader id");
+            let observer =
+                temp_env::with_vars([("CODEX_SESSION_ID", Some("observer-session"))], || {
+                    join_session(
+                        "transfer-confirm",
+                        SessionRole::Observer,
+                        "codex",
+                        &[],
+                        Some("observer"),
+                        project,
+                    )
+                    .expect("join observer")
+                });
+            let observer_id = observer
+                .agents
+                .keys()
+                .find(|id| id.starts_with("codex-"))
+                .expect("observer id")
+                .clone();
+
+            transfer_leader(
+                "transfer-confirm",
+                &observer_id,
+                Some("codex is ready"),
+                &observer_id,
+                project,
+            )
+            .expect("request transfer");
+            transfer_leader(
+                "transfer-confirm",
+                &observer_id,
+                Some("approved"),
+                &leader_id,
+                project,
+            )
+            .expect("confirm transfer");
+
+            let updated = session_status("transfer-confirm", project).expect("status");
+            assert_eq!(updated.leader_id.as_deref(), Some(observer_id.as_str()));
+            assert!(updated.pending_leader_transfer.is_none());
+
+            let entries = storage::load_log_entries(project, "transfer-confirm").expect("entries");
+            assert!(entries.iter().any(|entry| {
+                matches!(
+                    entry.transition,
+                    SessionTransition::LeaderTransferRequested { .. }
+                )
+            }));
+            assert!(entries.iter().any(|entry| {
+                matches!(
+                    entry.transition,
+                    SessionTransition::LeaderTransferConfirmed { .. }
+                )
+            }));
+            assert!(entries.iter().any(|entry| {
+                matches!(
+                    entry.transition,
+                    SessionTransition::LeaderTransferred { .. }
+                )
+            }));
+        });
+    }
+
+    #[test]
+    fn observer_transfer_leader_succeeds_when_current_leader_is_unresponsive() {
+        with_temp_project(|project| {
+            let state = start_session("test", project, Some("claude"), Some("transfer-timeout"))
+                .expect("start");
+            let leader_id = state.leader_id.expect("leader id");
+            let observer =
+                temp_env::with_vars([("CODEX_SESSION_ID", Some("observer-session"))], || {
+                    join_session(
+                        "transfer-timeout",
+                        SessionRole::Observer,
+                        "codex",
+                        &[],
+                        Some("observer"),
+                        project,
+                    )
+                    .expect("join observer")
+                });
+            let observer_id = observer
+                .agents
+                .keys()
+                .find(|id| id.starts_with("codex-"))
+                .expect("observer id")
+                .clone();
+
+            storage::update_state(project, "transfer-timeout", |state| {
+                let stale = (Utc::now() - Duration::seconds(600)).to_rfc3339();
+                let leader = state.agents.get_mut(&leader_id).expect("leader");
+                leader.last_activity_at = Some(stale.clone());
+                state.last_activity_at = Some(stale);
+                Ok(())
+            })
+            .expect("mark stale");
+
+            transfer_leader(
+                "transfer-timeout",
+                &observer_id,
+                Some("leader timed out"),
+                &observer_id,
+                project,
+            )
+            .expect("forced transfer");
+
+            let updated = session_status("transfer-timeout", project).expect("status");
+            assert_eq!(updated.leader_id.as_deref(), Some(observer_id.as_str()));
+            assert!(updated.pending_leader_transfer.is_none());
         });
     }
 

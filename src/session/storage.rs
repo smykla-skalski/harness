@@ -111,7 +111,7 @@ pub(crate) fn state_repository(
 ) -> Result<VersionedJsonRepository<SessionState>, CliError> {
     Ok(
         VersionedJsonRepository::new(state_path(project_dir, session_id)?, CURRENT_VERSION)
-            .with_migrations(vec![Box::new(migrate_v1_to_v2)]),
+            .with_migrations(vec![Box::new(migrate_v1_to_v2), Box::new(migrate_v2_to_v3)]),
     )
 }
 
@@ -402,6 +402,19 @@ fn migrate_v1_to_v2(mut value: Value) -> Result<Value, CliError> {
     Ok(value)
 }
 
+fn migrate_v2_to_v3(mut value: Value) -> Result<Value, CliError> {
+    let Some(object) = value.as_object_mut() else {
+        return Err(CliErrorKind::workflow_version("session state is not a JSON object").into());
+    };
+
+    object.insert("schema_version".to_string(), json!(CURRENT_VERSION));
+    object
+        .entry("pending_leader_transfer".to_string())
+        .or_insert(Value::Null);
+
+    Ok(value)
+}
+
 /// Active session registry: maps session IDs to creation timestamps.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub(crate) struct ActiveRegistry {
@@ -502,6 +515,7 @@ mod tests {
             archived_at: None,
             last_activity_at: Some("2026-01-01T00:00:00Z".into()),
             observe_id: Some(format!("observe-{session_id}")),
+            pending_leader_transfer: None,
             metrics: SessionMetrics::default(),
         }
     }
