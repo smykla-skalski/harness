@@ -221,7 +221,8 @@ extension RecordingMonitorClient {
         )
       },
       signals: detail.signals.filter { $0.agentId != agentID },
-      observer: detail.observer
+      observer: detail.observer,
+      agentActivity: detail.agentActivity.filter { $0.agentId != agentID }
     )
     return detail
   }
@@ -258,7 +259,8 @@ extension RecordingMonitorClient {
       agents: detail.agents,
       tasks: detail.tasks,
       signals: detail.signals,
-      observer: detail.observer
+      observer: detail.observer,
+      agentActivity: detail.agentActivity
     )
     return detail
   }
@@ -271,7 +273,8 @@ extension RecordingMonitorClient {
       agents: detail.agents,
       tasks: tasks,
       signals: detail.signals,
-      observer: detail.observer
+      observer: detail.observer,
+      agentActivity: detail.agentActivity
     )
   }
 
@@ -287,7 +290,8 @@ extension RecordingMonitorClient {
       agents: detail.agents,
       tasks: tasks,
       signals: detail.signals,
-      observer: detail.observer
+      observer: detail.observer,
+      agentActivity: detail.agentActivity
     )
   }
 
@@ -298,12 +302,27 @@ extension RecordingMonitorClient {
     let agents = detail.agents.map { agent in
       agent.agentId == agentID ? transform(agent) : agent
     }
+    let updatedAgent = agents.first { $0.agentId == agentID }
     return SessionDetail(
       session: updatedSession(),
       agents: agents,
       tasks: detail.tasks,
       signals: detail.signals,
-      observer: detail.observer
+      observer: detail.observer,
+      agentActivity: detail.agentActivity.map { activity in
+        activity.agentId == agentID
+          ? AgentToolActivitySummary(
+            agentId: updatedAgent?.agentId ?? activity.agentId,
+            runtime: updatedAgent?.runtime ?? activity.runtime,
+            toolInvocationCount: activity.toolInvocationCount,
+            toolResultCount: activity.toolResultCount,
+            toolErrorCount: activity.toolErrorCount,
+            latestToolName: activity.latestToolName,
+            latestEventAt: activity.latestEventAt,
+            recentTools: activity.recentTools
+          )
+          : activity
+      }
     )
   }
 

@@ -124,7 +124,8 @@ extension RecordingMonitorClient {
       agents: detail.agents,
       tasks: detail.tasks,
       signals: detail.signals,
-      observer: detail.observer
+      observer: detail.observer,
+      agentActivity: detail.agentActivity
     )
     return detail
   }

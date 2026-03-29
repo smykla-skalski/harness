@@ -1,9 +1,10 @@
 use std::collections::BTreeMap;
 
-use crate::agents::runtime::signal_session_keys;
+use crate::agents::runtime::event::ConversationEventKind;
 use crate::agents::runtime::signal::{
     read_acknowledged_signals, read_acknowledgments, read_pending_signals,
 };
+use crate::agents::runtime::signal_session_keys;
 use crate::errors::{CliError, CliErrorKind};
 use crate::infra::io::read_json_typed;
 use crate::observe::types::ObserverState;
@@ -13,7 +14,8 @@ use crate::session::types::{
 
 use super::index::{self, DiscoveredProject, ResolvedSession};
 use super::protocol::{
-    ObserverActiveWorker, ObserverOpenIssue, ObserverSummary, ProjectSummary, SessionDetail,
+    AgentToolActivitySummary, ObserverActiveWorker, ObserverAgentSessionSummary,
+    ObserverCycleSummary, ObserverOpenIssue, ObserverSummary, ProjectSummary, SessionDetail,
     SessionSummary,
 };
 use super::state;
@@ -90,6 +92,7 @@ fn build_session_detail(resolved: &ResolvedSession) -> Result<SessionDetail, Cli
         tasks,
         signals: load_signals(&resolved.project, &resolved.state)?,
         observer: load_observer_summary(&resolved.project, &resolved.state)?,
+        agent_activity: load_agent_activity(&resolved.project, &resolved.state)?,
     })
 }
 
@@ -137,6 +140,7 @@ fn load_observer_summary(
         observe_id: observe_id.to_string(),
         last_scan_time: observer.last_scan_time,
         open_issue_count: observer.open_issues.len(),
+        resolved_issue_count: observer.resolved_issue_ids.len(),
         muted_code_count: observer.muted_codes.len(),
         active_worker_count: observer.active_workers.len(),
         open_issues: observer
@@ -148,6 +152,8 @@ fn load_observer_summary(
                 severity: issue.severity,
                 category: issue.category,
                 summary: issue.summary,
+                fingerprint: issue.fingerprint,
+                first_seen_line: issue.first_seen_line,
                 occurrence_count: issue.occurrence_count,
                 last_seen_line: issue.last_seen_line,
                 fix_safety: issue.fix_safety,
@@ -161,10 +167,115 @@ fn load_observer_summary(
                 issue_id: worker.issue_id,
                 target_file: worker.target_file,
                 started_at: worker.started_at,
+                runtime: worker
+                    .agent_id
+                    .as_ref()
+                    .and_then(|agent_id| state.agents.get(agent_id))
+                    .map(|agent| agent.runtime.clone()),
                 agent_id: worker.agent_id,
             })
             .collect(),
+        cycle_history: observer
+            .cycle_history
+            .into_iter()
+            .map(|cycle| ObserverCycleSummary {
+                timestamp: cycle.timestamp,
+                from_line: cycle.from_line,
+                to_line: cycle.to_line,
+                new_issues: cycle.new_issues,
+                resolved: cycle.resolved,
+            })
+            .collect(),
+        agent_sessions: observer
+            .agent_sessions
+            .into_iter()
+            .map(|agent| ObserverAgentSessionSummary {
+                agent_id: agent.agent_id,
+                runtime: agent.runtime,
+                log_path: agent.log_path,
+                cursor: agent.cursor,
+                last_activity: agent.last_activity,
+            })
+            .collect(),
     }))
+}
+
+fn load_agent_activity(
+    project: &DiscoveredProject,
+    state: &SessionState,
+) -> Result<Vec<AgentToolActivitySummary>, CliError> {
+    let mut summaries = Vec::new();
+    for (agent_id, agent) in &state.agents {
+        let session_key = agent
+            .agent_session_id
+            .as_deref()
+            .unwrap_or(&state.session_id);
+        let events =
+            index::load_conversation_events(project, &agent.runtime, session_key, agent_id)?;
+        let mut summary = AgentToolActivitySummary {
+            agent_id: agent_id.clone(),
+            runtime: agent.runtime.clone(),
+            tool_invocation_count: 0,
+            tool_result_count: 0,
+            tool_error_count: 0,
+            latest_tool_name: None,
+            latest_event_at: agent.last_activity_at.clone(),
+            recent_tools: Vec::new(),
+        };
+
+        for event in events {
+            match event.kind {
+                ConversationEventKind::ToolInvocation { tool_name, .. } => {
+                    summary.tool_invocation_count += 1;
+                    record_tool_event(&mut summary, &tool_name, event.timestamp);
+                }
+                ConversationEventKind::ToolResult {
+                    tool_name,
+                    is_error,
+                    ..
+                } => {
+                    summary.tool_result_count += 1;
+                    if is_error {
+                        summary.tool_error_count += 1;
+                    }
+                    record_tool_event(&mut summary, &tool_name, event.timestamp);
+                }
+                ConversationEventKind::Error { .. } => {
+                    summary.tool_error_count += 1;
+                    if let Some(timestamp) = event.timestamp {
+                        summary.latest_event_at = Some(timestamp);
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        summaries.push(summary);
+    }
+    summaries.sort_by(|left, right| left.agent_id.cmp(&right.agent_id));
+    Ok(summaries)
+}
+
+fn record_tool_event(
+    summary: &mut AgentToolActivitySummary,
+    tool_name: &str,
+    timestamp: Option<String>,
+) {
+    if let Some(timestamp) = timestamp {
+        summary.latest_event_at = Some(timestamp);
+    }
+    if tool_name.is_empty() || tool_name == "unknown" {
+        return;
+    }
+
+    summary.latest_tool_name = Some(tool_name.to_string());
+    summary
+        .recent_tools
+        .retain(|existing| existing != tool_name);
+    summary.recent_tools.insert(0, tool_name.to_string());
+    if summary.recent_tools.len() > 5 {
+        summary.recent_tools.truncate(5);
+    }
 }
 
 fn load_signals(
@@ -176,7 +287,8 @@ fn load_signals(
     for (agent_id, agent) in &state.agents {
         let mut signals_by_id = BTreeMap::new();
         let mut acknowledgments_by_id = BTreeMap::new();
-        for signal_session_id in signal_session_keys(&state.session_id, agent.agent_session_id.as_deref())
+        for signal_session_id in
+            signal_session_keys(&state.session_id, agent.agent_session_id.as_deref())
         {
             let signal_dir = root.join(&agent.runtime).join(signal_session_id);
             for signal in read_pending_signals(&signal_dir)? {
@@ -252,6 +364,20 @@ mod tests {
             serde_json::to_string_pretty(value).expect("serialize"),
         )
         .expect("write");
+    }
+
+    fn write_json_line(path: &Path, value: &impl serde::Serialize) {
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent).expect("create parent");
+        }
+        use std::io::Write as _;
+
+        let mut file = fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(path)
+            .expect("open jsonl");
+        writeln!(file, "{}", serde_json::to_string(value).expect("serialize")).expect("write");
     }
 
     fn sample_state(session_id: &str) -> SessionState {
@@ -400,10 +526,58 @@ mod tests {
                     context_root.join("agents/observe/observe-sess-merge/snapshot.json");
                 write_json(&observer_path, &observer_state(session_id));
 
+                let transcript_path = context_root
+                    .join("agents")
+                    .join("sessions")
+                    .join("codex")
+                    .join("codex-session-1")
+                    .join("raw.jsonl");
+                write_json_line(
+                    &transcript_path,
+                    &serde_json::json!({
+                        "timestamp": "2026-03-28T14:04:45Z",
+                        "message": {
+                            "role": "assistant",
+                            "content": [{
+                                "type": "tool_use",
+                                "name": "Read",
+                                "input": {"path": "src/daemon/snapshot.rs"},
+                                "id": "call-read-1"
+                            }]
+                        }
+                    }),
+                );
+                write_json_line(
+                    &transcript_path,
+                    &serde_json::json!({
+                        "timestamp": "2026-03-28T14:04:46Z",
+                        "message": {
+                            "role": "assistant",
+                            "content": [{
+                                "type": "tool_result",
+                                "tool_name": "Read",
+                                "tool_use_id": "call-read-1",
+                                "content": {"line_count": 32},
+                                "is_error": false
+                            }]
+                        }
+                    }),
+                );
+
                 let detail = session_detail(session_id).expect("detail");
                 assert_eq!(detail.session.session_id, session_id);
                 assert_eq!(detail.agents.len(), 1);
                 assert_eq!(detail.signals.len(), 2);
+                assert_eq!(detail.agent_activity.len(), 1);
+                assert_eq!(detail.agent_activity[0].agent_id, "codex-worker");
+                assert_eq!(detail.agent_activity[0].tool_invocation_count, 1);
+                assert_eq!(detail.agent_activity[0].tool_result_count, 1);
+                assert_eq!(detail.agent_activity[0].tool_error_count, 0);
+                assert_eq!(
+                    detail.agent_activity[0].latest_tool_name.as_deref(),
+                    Some("Read")
+                );
+                assert_eq!(detail.agent_activity[0].recent_tools, vec!["Read"]);
                 assert_eq!(
                     detail
                         .signals
@@ -429,6 +603,14 @@ mod tests {
                         .observer
                         .as_ref()
                         .expect("observer")
+                        .resolved_issue_count,
+                    1
+                );
+                assert_eq!(
+                    detail
+                        .observer
+                        .as_ref()
+                        .expect("observer")
                         .open_issues
                         .first()
                         .expect("open issue")
@@ -436,8 +618,40 @@ mod tests {
                     "worker stalled"
                 );
                 assert_eq!(
+                    detail
+                        .observer
+                        .as_ref()
+                        .expect("observer")
+                        .open_issues
+                        .first()
+                        .expect("open issue")
+                        .fingerprint,
+                    "fingerprint"
+                );
+                assert_eq!(
+                    detail
+                        .observer
+                        .as_ref()
+                        .expect("observer")
+                        .open_issues
+                        .first()
+                        .expect("open issue")
+                        .first_seen_line,
+                    8
+                );
+                assert_eq!(
                     detail.observer.as_ref().expect("observer").muted_codes,
                     vec![IssueCode::AgentRepeatedError]
+                );
+                assert_eq!(
+                    detail
+                        .observer
+                        .as_ref()
+                        .expect("observer")
+                        .active_workers
+                        .first()
+                        .and_then(|worker| worker.runtime.as_deref()),
+                    Some("codex")
                 );
                 assert_eq!(
                     detail

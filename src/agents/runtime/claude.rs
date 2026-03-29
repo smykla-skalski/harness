@@ -152,7 +152,11 @@ fn parse_first_block(blocks: &[serde_json::Value], role: &str) -> Option<Convers
                 .and_then(serde_json::Value::as_bool)
                 .unwrap_or(false);
             Some(ConversationEventKind::ToolResult {
-                tool_name: "unknown".to_string(),
+                tool_name: block
+                    .get("tool_name")
+                    .and_then(serde_json::Value::as_str)
+                    .unwrap_or("unknown")
+                    .to_string(),
                 invocation_id: block
                     .get("tool_use_id")
                     .and_then(serde_json::Value::as_str)
@@ -186,4 +190,42 @@ pub(super) fn last_activity_from_log(
     };
     let datetime: chrono::DateTime<chrono::Utc> = modified.into();
     Ok(Some(datetime.to_rfc3339()))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{ConversationEventKind, parse_common_jsonl};
+
+    #[test]
+    fn parse_common_jsonl_keeps_tool_name_for_tool_result_blocks() {
+        let raw = serde_json::json!({
+            "timestamp": "2026-03-28T14:05:00Z",
+            "message": {
+                "role": "assistant",
+                "content": [{
+                    "type": "tool_result",
+                    "tool_name": "Read",
+                    "tool_use_id": "call-1",
+                    "content": {"line_count": 8},
+                    "is_error": false
+                }]
+            }
+        })
+        .to_string();
+
+        let event = parse_common_jsonl(&raw, "claude").expect("event");
+        match event.kind {
+            ConversationEventKind::ToolResult {
+                tool_name,
+                invocation_id,
+                is_error,
+                ..
+            } => {
+                assert_eq!(tool_name, "Read");
+                assert_eq!(invocation_id.as_deref(), Some("call-1"));
+                assert!(!is_error);
+            }
+            other => panic!("unexpected event kind: {other:?}"),
+        }
+    }
 }

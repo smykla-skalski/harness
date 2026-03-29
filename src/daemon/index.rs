@@ -4,6 +4,7 @@ use fs_err as fs;
 use serde::de::DeserializeOwned;
 use serde_json::Value;
 
+use crate::agents::runtime::{event::ConversationEvent, runtime_for_name};
 use crate::errors::{CliError, CliErrorKind};
 use crate::infra::io::read_json_typed;
 use crate::session::storage;
@@ -172,9 +173,53 @@ pub fn load_task_checkpoints(
     )
 }
 
+/// Load normalized conversation events from a canonical harness agent log.
+///
+/// # Errors
+/// Returns `CliError` when the transcript cannot be read.
+pub fn load_conversation_events(
+    project: &DiscoveredProject,
+    runtime: &str,
+    session_id: &str,
+    agent_id: &str,
+) -> Result<Vec<ConversationEvent>, CliError> {
+    let Some(adapter) = runtime_for_name(runtime) else {
+        return Ok(Vec::new());
+    };
+    let path = agent_transcript_path(&project.context_root, runtime, session_id);
+    if !path.is_file() {
+        return Ok(Vec::new());
+    }
+
+    let content = fs::read_to_string(&path).map_err(|error| {
+        CliErrorKind::workflow_io(format!("read agent transcript {}: {error}", path.display()))
+    })?;
+    Ok(content
+        .lines()
+        .enumerate()
+        .filter_map(|(index, line)| {
+            let mut event = adapter.parse_log_entry(line)?;
+            event.sequence = u64::try_from(index.saturating_add(1)).unwrap_or(u64::MAX);
+            event.agent = agent_id.to_string();
+            event.session_id = session_id.to_string();
+            Some(event)
+        })
+        .collect())
+}
+
 #[must_use]
 pub fn signals_root(context_root: &Path) -> PathBuf {
     context_root.join("agents").join("signals")
+}
+
+#[must_use]
+pub fn agent_transcript_path(context_root: &Path, runtime: &str, session_id: &str) -> PathBuf {
+    context_root
+        .join("agents")
+        .join("sessions")
+        .join(runtime)
+        .join(session_id)
+        .join("raw.jsonl")
 }
 
 /// Resolve an orchestration session ID from a runtime session key within one

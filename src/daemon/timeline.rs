@@ -1,10 +1,11 @@
 use std::collections::{BTreeMap, HashSet};
 use std::path::Path;
 
-use crate::agents::runtime::signal_session_keys;
+use crate::agents::runtime::event::{ConversationEvent, ConversationEventKind};
 use crate::agents::runtime::signal::{
     AckResult, Signal, SignalAck, read_acknowledged_signals, read_acknowledgments,
 };
+use crate::agents::runtime::signal_session_keys;
 use serde_json::to_value;
 
 use crate::errors::{CliError, CliErrorKind};
@@ -59,6 +60,8 @@ pub fn session_timeline(session_id: &str) -> Result<Vec<TimelineEntry>, CliError
         });
     }
 
+    entries.extend(conversation_entries(&resolved.project, &resolved.state)?);
+
     for task_id in resolved.state.tasks.keys() {
         for checkpoint in index::load_task_checkpoints(&resolved.project, session_id, task_id)? {
             entries.push(checkpoint_entry(session_id, &checkpoint)?);
@@ -82,6 +85,29 @@ pub fn session_timeline(session_id: &str) -> Result<Vec<TimelineEntry>, CliError
     Ok(entries)
 }
 
+fn conversation_entries(
+    project: &index::DiscoveredProject,
+    state: &SessionState,
+) -> Result<Vec<TimelineEntry>, CliError> {
+    let mut entries = Vec::new();
+    for (agent_id, agent) in &state.agents {
+        let session_key = agent
+            .agent_session_id
+            .as_deref()
+            .unwrap_or(&state.session_id);
+        let events =
+            index::load_conversation_events(project, &agent.runtime, session_key, agent_id)?;
+        for event in events {
+            if let Some(entry) =
+                conversation_entry(&state.session_id, agent_id, &agent.runtime, &event)?
+            {
+                entries.push(entry);
+            }
+        }
+    }
+    Ok(entries)
+}
+
 fn checkpoint_entry(
     session_id: &str,
     checkpoint: &TaskCheckpoint,
@@ -102,6 +128,80 @@ fn checkpoint_entry(
     })
 }
 
+fn conversation_entry(
+    session_id: &str,
+    agent_id: &str,
+    runtime: &str,
+    event: &ConversationEvent,
+) -> Result<Option<TimelineEntry>, CliError> {
+    let Some(recorded_at) = event.timestamp.clone() else {
+        return Ok(None);
+    };
+
+    let (entry_kind, summary) = match &event.kind {
+        ConversationEventKind::ToolInvocation { tool_name, .. } => {
+            ("tool_invocation", format!("{agent_id} invoked {tool_name}"))
+        }
+        ConversationEventKind::ToolResult {
+            tool_name,
+            is_error,
+            ..
+        } => {
+            let kind = if *is_error {
+                "tool_result_error"
+            } else {
+                "tool_result"
+            };
+            let summary = if *is_error {
+                format!("{agent_id} received an error from {tool_name}")
+            } else {
+                format!("{agent_id} received a result from {tool_name}")
+            };
+            (kind, summary)
+        }
+        ConversationEventKind::Error { message, .. } => {
+            ("agent_error", format!("{agent_id} error: {message}"))
+        }
+        ConversationEventKind::SignalReceived { signal_id, command } => (
+            "signal_received",
+            format!("{agent_id} picked up {signal_id} ({command})"),
+        ),
+        ConversationEventKind::StateChange { from, to } => (
+            "agent_state_change",
+            format!("{agent_id} state changed {from} -> {to}"),
+        ),
+        ConversationEventKind::FileModification { path, operation } => (
+            "file_modification",
+            format!("{agent_id} {operation} {}", path.display()),
+        ),
+        ConversationEventKind::SessionMarker { marker } => (
+            "agent_session_marker",
+            format!("{agent_id} marked {marker}"),
+        ),
+        ConversationEventKind::UserPrompt { .. }
+        | ConversationEventKind::AssistantText { .. }
+        | ConversationEventKind::Other { .. } => return Ok(None),
+    };
+    let payload = timeline_payload(
+        &serde_json::json!({
+            "runtime": runtime,
+            "event": event.kind,
+        }),
+        "agent conversation event",
+    )?;
+
+    Ok(Some(TimelineEntry {
+        entry_id: format!("{runtime}-{agent_id}-{entry_kind}-{}", event.sequence),
+        recorded_at,
+        kind: entry_kind.into(),
+        session_id: session_id.to_string(),
+        agent_id: Some(agent_id.to_string()),
+        task_id: None,
+        summary,
+        payload,
+    }))
+}
+
 fn signal_ack_entries(
     state: &SessionState,
     context_root: &Path,
@@ -114,7 +214,8 @@ fn signal_ack_entries(
     let mut signals_by_id = BTreeMap::new();
 
     for agent in state.agents.values() {
-        for signal_session_id in signal_session_keys(&state.session_id, agent.agent_session_id.as_deref())
+        for signal_session_id in
+            signal_session_keys(&state.session_id, agent.agent_session_id.as_deref())
         {
             let signal_dir = signals_root.join(&agent.runtime).join(signal_session_id);
             for acknowledgment in read_acknowledgments(&signal_dir)? {
@@ -714,25 +815,70 @@ mod tests {
                     context_root.join("agents/observe/observe-sess-merge/snapshot.json");
                 write_json(&observer_path, &observer_state(session_id));
 
+                let transcript_path = context_root
+                    .join("agents")
+                    .join("sessions")
+                    .join("codex")
+                    .join("codex-session-1")
+                    .join("raw.jsonl");
+                write_json_line(
+                    &transcript_path,
+                    &serde_json::json!({
+                        "timestamp": "2026-03-28T14:05:30Z",
+                        "message": {
+                            "role": "assistant",
+                            "content": [{
+                                "type": "tool_use",
+                                "name": "Read",
+                                "input": {"path": "src/daemon/timeline.rs"},
+                                "id": "call-read-1"
+                            }]
+                        }
+                    }),
+                );
+                write_json_line(
+                    &transcript_path,
+                    &serde_json::json!({
+                        "timestamp": "2026-03-28T14:05:45Z",
+                        "message": {
+                            "role": "assistant",
+                            "content": [{
+                                "type": "tool_result",
+                                "tool_name": "Read",
+                                "tool_use_id": "call-read-1",
+                                "content": {"line_count": 48},
+                                "is_error": false
+                            }]
+                        }
+                    }),
+                );
+
                 let entries = session_timeline(session_id).expect("timeline");
-                assert_eq!(entries.len(), 5);
+                assert_eq!(entries.len(), 7);
                 assert_eq!(entries[0].kind, "task_checkpoint");
                 assert_eq!(
                     entries[0].summary,
                     "Checkpoint 70%: timeline rows are live-backed"
                 );
-                assert_eq!(entries[1].kind, "observe_snapshot");
+                assert_eq!(entries[1].kind, "tool_result");
                 assert_eq!(
                     entries[1].summary,
+                    "codex-worker received a result from Read"
+                );
+                assert_eq!(entries[2].kind, "tool_invocation");
+                assert_eq!(entries[2].summary, "codex-worker invoked Read");
+                assert_eq!(entries[3].kind, "observe_snapshot");
+                assert_eq!(
+                    entries[3].summary,
                     "Observe scan: 1 open, 1 active workers, 1 muted codes"
                 );
-                assert_eq!(entries[2].kind, "signal_acknowledged");
+                assert_eq!(entries[4].kind, "signal_acknowledged");
                 assert_eq!(
-                    entries[2].summary,
+                    entries[4].summary,
                     "sig-acked acknowledged by codex-worker: Accepted (inject_context)"
                 );
-                assert_eq!(entries[3].kind, "signal_sent");
-                assert_eq!(entries[4].kind, "task_created");
+                assert_eq!(entries[5].kind, "signal_sent");
+                assert_eq!(entries[6].kind, "task_created");
             },
         );
     }
