@@ -11,7 +11,7 @@ struct PreferencesConnectionCard: View {
         .font(.system(.title3, design: .serif, weight: .semibold))
 
       MonitorAdaptiveGridLayout(minimumColumnWidth: 140, maximumColumns: 4, spacing: 14) {
-        connectionMetric("Transport", value: metrics.transportKind.rawValue, tint: qualityColor)
+        connectionMetric("Transport", value: metrics.transportKind.title, tint: qualityColor)
         connectionMetric("Latency", value: latencyText, tint: qualityColor)
         connectionMetric(
           "Messages in", value: "\(metrics.messagesReceived)", tint: MonitorTheme.accent
@@ -22,7 +22,7 @@ struct PreferencesConnectionCard: View {
         connectionMetric("Uptime", value: uptimeText, tint: MonitorTheme.success)
         connectionMetric("Reconnects", value: "\(metrics.reconnectCount)", tint: reconnectTint)
         connectionMetric("Msg/sec", value: rateText, tint: MonitorTheme.accent)
-        connectionMetric("Quality", value: metrics.quality.rawValue, tint: qualityColor)
+        connectionMetric("Quality", value: metrics.quality.title, tint: qualityColor)
       }
 
       if !events.isEmpty {
@@ -69,7 +69,7 @@ struct PreferencesConnectionCard: View {
     VStack(alignment: .leading, spacing: 6) {
       Text(title.uppercased())
         .font(.caption2.weight(.bold))
-        .foregroundStyle(.secondary)
+        .foregroundStyle(MonitorTheme.secondaryInk)
       Text(value)
         .font(.system(.headline, design: .rounded, weight: .semibold))
         .foregroundStyle(tint)
@@ -96,7 +96,7 @@ struct PreferencesConnectionCard: View {
             Spacer()
             Text(formatTimestamp(event.timestamp))
               .font(.caption.monospaced())
-              .foregroundStyle(.secondary)
+              .foregroundStyle(MonitorTheme.secondaryInk)
           }
           .padding(10)
           .background {

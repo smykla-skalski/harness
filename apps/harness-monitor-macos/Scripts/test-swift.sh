@@ -25,14 +25,7 @@ clear_gatekeeper_metadata() {
   done
 }
 
-"$ROOT/Scripts/generate-project.sh"
-"$ROOT/Scripts/lint-swift.sh" all
-xcodebuild \
-  -project "$ROOT/HarnessMonitor.xcodeproj" \
-  -scheme HarnessMonitor \
-  -destination "$DESTINATION" \
-  -derivedDataPath "$DERIVED_DATA_PATH" \
-  build-for-testing
+"$ROOT/Scripts/run-quality-gates.sh"
 
 clear_gatekeeper_metadata
 

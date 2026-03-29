@@ -320,5 +320,6 @@ mise run monitor:test  # generate + lint + test the macOS monitor app
 ```
 
 The macOS monitor app lives under `apps/harness-monitor-macos/`. Its Xcode project is generated from `project.yml`; use `mise run monitor:generate` if you need to open it in Xcode.
+Its strict style gate runs `swift format` directly and uses `SwiftLintBuildToolPlugin` during `xcodebuild`, so local builds and CI share the same sandbox-safe lint path.
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for the internal module map.

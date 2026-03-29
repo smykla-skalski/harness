@@ -305,4 +305,30 @@ final class MonitorStoreActionTests: XCTestCase {
       ]
     )
   }
+
+  func testCreateTaskUsesScopedSessionActionLoading() async throws {
+    let client = RecordingMonitorClient()
+    client.configureMutationDelay(.milliseconds(150))
+    let store = await makeBootstrappedStore(client: client)
+    await store.selectSession(PreviewFixtures.summary.sessionId)
+
+    let createTask = Task {
+      await store.createTask(
+        title: "Scoped loading",
+        context: "Diagnostics refresh should not impersonate a mutation spinner.",
+        severity: .low
+      )
+    }
+    await Task.yield()
+
+    XCTAssertTrue(store.isSessionActionInFlight)
+    XCTAssertTrue(store.isBusy)
+    XCTAssertFalse(store.isDaemonActionInFlight)
+    XCTAssertFalse(store.isDiagnosticsRefreshInFlight)
+
+    await createTask.value
+
+    XCTAssertFalse(store.isSessionActionInFlight)
+    XCTAssertFalse(store.isBusy)
+  }
 }

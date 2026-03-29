@@ -1,0 +1,31 @@
+name: Harness Monitor
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/monitor.yml"
+      - ".mise.toml"
+      - "apps/harness-monitor-macos/**"
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/monitor.yml"
+      - ".mise.toml"
+      - "apps/harness-monitor-macos/**"
+  workflow_dispatch:
+
+jobs:
+  monitor:
+    name: Monitor Quality Gates
+    runs-on: macos-26
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Run monitor quality gates and tests
+        run: apps/harness-monitor-macos/Scripts/test-swift.sh

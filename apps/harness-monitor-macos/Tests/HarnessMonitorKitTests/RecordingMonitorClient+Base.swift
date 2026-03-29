@@ -16,7 +16,8 @@ extension RecordingMonitorClient {
   }
 
   func diagnostics() async throws -> DaemonDiagnosticsReport {
-    DaemonDiagnosticsReport(
+    try await sleepIfNeeded(configuredDiagnosticsDelay())
+    return DaemonDiagnosticsReport(
       health: try await health(),
       manifest: DaemonManifest(
         version: "14.5.0",
@@ -74,15 +75,17 @@ extension RecordingMonitorClient {
   }
 
   func sessions() async throws -> [SessionSummary] {
-    [detail.session]
+    configuredSessions() ?? [detail.session]
   }
 
-  func sessionDetail(id _: String) async throws -> SessionDetail {
-    detail
+  func sessionDetail(id: String) async throws -> SessionDetail {
+    try await sleepIfNeeded(configuredDetailDelay(for: id))
+    return configuredSessionDetail(id: id) ?? detail
   }
 
-  func timeline(sessionID _: String) async throws -> [TimelineEntry] {
-    PreviewFixtures.timeline
+  func timeline(sessionID: String) async throws -> [TimelineEntry] {
+    try await sleepIfNeeded(configuredTimelineDelay(for: sessionID))
+    return configuredTimeline(for: sessionID) ?? PreviewFixtures.timeline
   }
 
   nonisolated func globalStream() -> AsyncThrowingStream<StreamEvent, Error> {
@@ -101,6 +104,7 @@ extension RecordingMonitorClient {
     sessionID: String,
     request: ObserveSessionRequest
   ) async throws -> SessionDetail {
+    try await sleepIfNeeded(configuredMutationDelay())
     calls.append(.observeSession(sessionID: sessionID, actor: request.actor))
     return detail
   }
@@ -109,6 +113,7 @@ extension RecordingMonitorClient {
     sessionID: String,
     request: SessionEndRequest
   ) async throws -> SessionDetail {
+    try await sleepIfNeeded(configuredMutationDelay())
     calls.append(.endSession(sessionID: sessionID, actor: request.actor))
     detail = SessionDetail(
       session: SessionSummary(
@@ -140,6 +145,7 @@ extension RecordingMonitorClient {
     sessionID: String,
     request: SignalSendRequest
   ) async throws -> SessionDetail {
+    try await sleepIfNeeded(configuredMutationDelay())
     calls.append(
       .sendSignal(
         sessionID: sessionID,
@@ -149,5 +155,12 @@ extension RecordingMonitorClient {
       )
     )
     return detail
+  }
+
+  func sleepIfNeeded(_ delay: Duration?) async throws {
+    guard let delay else {
+      return
+    }
+    try await Task.sleep(for: delay)
   }
 }

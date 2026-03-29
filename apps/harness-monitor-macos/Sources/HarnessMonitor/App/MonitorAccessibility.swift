@@ -33,8 +33,6 @@ enum MonitorAccessibility {
   static let removeAgentButton = "monitor.inspector.remove-agent"
   static let signalSendButton = "monitor.inspector.signal-send"
   static let preferencesRoot = "monitor.preferences.root"
-  static let preferencesBackdrop = "monitor.preferences.backdrop"
-  static let preferencesCloseButton = "monitor.preferences.close"
   static let preferencesPanel = "monitor.preferences.panel"
   static let refreshButton = "monitor.toolbar.refresh"
   static let daemonPreferencesButton = "monitor.toolbar.preferences"

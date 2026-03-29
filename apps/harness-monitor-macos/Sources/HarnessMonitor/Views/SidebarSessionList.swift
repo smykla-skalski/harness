@@ -30,9 +30,9 @@ struct SidebarSessionList: View {
     VStack(alignment: .leading, spacing: 14) {
       filterSlice
       sessionList
+      savedSearchSlice
     }
     .frame(maxWidth: .infinity, alignment: .topLeading)
-    .accessibilityIdentifier(MonitorAccessibility.sidebarSessionList)
   }
 
   private var filterSlice: some View {
@@ -43,7 +43,7 @@ struct SidebarSessionList: View {
             .font(.system(.headline, design: .rounded, weight: .semibold))
           Text(activeFilterSummary)
             .font(.caption)
-            .foregroundStyle(.secondary)
+            .foregroundStyle(MonitorTheme.secondaryInk)
         }
         Spacer()
         if isFiltered {
@@ -56,6 +56,10 @@ struct SidebarSessionList: View {
           .accessibilityIdentifier(MonitorAccessibility.sidebarClearFiltersButton)
         }
       }
+
+      TextField("Search sessions, projects, leaders", text: $store.searchText)
+        .textFieldStyle(.roundedBorder)
+        .accessibilityIdentifier("monitor.sidebar.search")
 
       filterSection(title: "Status") {
         MonitorGlassContainer(spacing: 8) {
@@ -90,16 +94,6 @@ struct SidebarSessionList: View {
           }
         }
       }
-
-      filterSection(title: "Saved Searches") {
-        MonitorGlassContainer(spacing: 10) {
-          MonitorAdaptiveGridLayout(minimumColumnWidth: 156, maximumColumns: 2, spacing: 10) {
-            ForEach(store.savedSearches) { search in
-              savedSearchButton(search)
-            }
-          }
-        }
-      }
     }
     .padding(14)
     .background {
@@ -110,8 +104,23 @@ struct SidebarSessionList: View {
       )
     }
     .accessibilityElement(children: .contain)
-    .accessibilityIdentifier(MonitorAccessibility.sidebarFiltersCard)
-    .accessibilityFrameMarker(MonitorAccessibility.sidebarFiltersCard)
+    .accessibilityFrameMarker("\(MonitorAccessibility.sidebarFiltersCard).frame")
+  }
+
+  private var savedSearchSlice: some View {
+    VStack(alignment: .leading, spacing: 10) {
+      Text("Saved Searches")
+        .font(.caption.weight(.bold))
+        .foregroundStyle(MonitorTheme.secondaryInk)
+
+      MonitorGlassContainer(spacing: 8) {
+        MonitorWrapLayout(spacing: 8, lineSpacing: 8) {
+          ForEach(store.savedSearches) { search in
+            savedSearchButton(search)
+          }
+        }
+      }
+    }
   }
 
   private var sessionList: some View {
@@ -171,7 +180,7 @@ struct SidebarSessionList: View {
                     }
                     Text(session.sessionId)
                       .font(.caption.monospaced())
-                      .foregroundStyle(.secondary)
+                      .foregroundStyle(MonitorTheme.secondaryInk)
                     HStack(spacing: 12) {
                       labelChip("\(session.metrics.activeAgentCount) active")
                       labelChip("\(session.metrics.inProgressTaskCount) moving")
@@ -190,7 +199,9 @@ struct SidebarSessionList: View {
                   .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
                 }
                 .accessibilityIdentifier(MonitorAccessibility.sessionRow(session.sessionId))
-                .accessibilityFrameMarker(MonitorAccessibility.sessionRow(session.sessionId))
+                .accessibilityFrameMarker(
+                  "\(MonitorAccessibility.sessionRow(session.sessionId)).frame"
+                )
                 .buttonStyle(.plain)
               }
             }
@@ -209,7 +220,7 @@ struct SidebarSessionList: View {
     VStack(alignment: .leading, spacing: 8) {
       Text(title.uppercased())
         .font(.caption2.weight(.bold))
-        .foregroundStyle(.secondary)
+        .foregroundStyle(MonitorTheme.secondaryInk)
       content()
     }
   }
@@ -235,7 +246,7 @@ struct SidebarSessionList: View {
     .controlSize(MonitorControlMetrics.compactControlSize)
     .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
     .accessibilityIdentifier(identifier)
-    .accessibilityFrameMarker(identifier)
+    .accessibilityFrameMarker("\(identifier).frame")
     .accessibilityValue(isSelected ? "selected" : "not selected")
   }
 
@@ -243,57 +254,35 @@ struct SidebarSessionList: View {
     Button {
       store.applySavedSearch(search)
     } label: {
-      VStack(alignment: .leading, spacing: 4) {
-        HStack(alignment: .firstTextBaseline) {
-          Text(search.title)
-            .font(.system(.body, design: .rounded, weight: .semibold))
-            .lineLimit(2)
-            .foregroundStyle(
-              store.selectedSavedSearchID == search.id ? Color.white : MonitorTheme.sidebarHeader
-            )
-          Spacer()
-          if store.selectedSavedSearchID == search.id {
-            Circle()
-              .fill(MonitorTheme.success)
-              .frame(width: 8, height: 8)
-          }
-        }
-        Text(search.summary)
-          .font(.system(.footnote, design: .rounded, weight: .medium))
-          .foregroundStyle(
-            store.selectedSavedSearchID == search.id
-              ? Color.white.opacity(0.84) : MonitorTheme.sidebarMuted
-          )
-          .lineLimit(2, reservesSpace: true)
-      }
-      .frame(maxWidth: .infinity, minHeight: 72, alignment: .topLeading)
-      .padding(12)
-      .background {
-        if store.selectedSavedSearchID == search.id {
-          RoundedRectangle(cornerRadius: 16, style: .continuous)
-            .fill(MonitorTheme.accent)
-            .overlay {
-              RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .stroke(MonitorTheme.accent.opacity(0.32), lineWidth: 1)
-            }
-        } else {
-          RoundedRectangle(cornerRadius: 16, style: .continuous)
-            .fill(MonitorTheme.surface)
-            .overlay {
-              RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .stroke(MonitorTheme.controlBorder, lineWidth: 1)
-            }
-        }
-      }
+      Label(search.title, systemImage: savedSearchSymbol(for: search))
+        .font(.system(.callout, design: .rounded, weight: .semibold))
+        .lineLimit(1)
+        .minimumScaleFactor(0.88)
+        .padding(.horizontal, MonitorControlMetrics.chipHorizontalPadding)
+        .padding(.vertical, MonitorControlMetrics.chipVerticalPadding)
+        .frame(minHeight: MonitorControlMetrics.chipMinHeight)
+        .fixedSize(horizontal: true, vertical: true)
     }
-    .buttonStyle(.plain)
-    .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+    .buttonBorderShape(.roundedRectangle(radius: 12))
+    .monitorFilterChipButtonStyle(isSelected: store.selectedSavedSearchID == search.id)
+    .controlSize(MonitorControlMetrics.compactControlSize)
+    .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+    .help(search.summary)
     .accessibilityLabel(search.title)
     .accessibilityIdentifier(MonitorAccessibility.sidebarSavedSearchButton(search.id))
-    .accessibilityFrameMarker(MonitorAccessibility.sidebarSavedSearchButton(search.id))
+    .accessibilityFrameMarker(
+      "\(MonitorAccessibility.sidebarSavedSearchButton(search.id)).frame"
+    )
     .accessibilityValue(
       store.selectedSavedSearchID == search.id ? "selected" : "not selected"
     )
+  }
+
+  private func savedSearchSymbol(for search: SessionSavedSearch) -> String {
+    if store.selectedSavedSearchID == search.id {
+      return "checkmark.circle.fill"
+    }
+    return "line.3.horizontal.decrease.circle"
   }
 }
 

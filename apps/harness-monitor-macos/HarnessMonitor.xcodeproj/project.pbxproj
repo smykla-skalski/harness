@@ -18,6 +18,7 @@
 		24C46B54B9FE44B6F90472AD /* PreferencesConnectionCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 841E256D3F297D8AB3EB47B3 /* PreferencesConnectionCard.swift */; };
 		27ED39318D6A8ADF7D04725F /* MonitorGlass.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39821C8FF4D19DD9D1AA7643 /* MonitorGlass.swift */; };
 		2F17892802C1804874984B20 /* PreviewServices.swift in Sources */ = {isa = PBXBuildFile; fileRef = 44861023A11A393ECA8859C2 /* PreviewServices.swift */; };
+		330CE6720E9E3323FDB6471D /* MonitorStoreSelectionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50D017CED6567DE47E141AA2 /* MonitorStoreSelectionTests.swift */; };
 		41401A6514EFB8357AA86C57 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 48D7A0C2C9A39D6FA90D2E93 /* ContentView.swift */; };
 		4385D1FD5C454F83E1145460 /* InspectorDetailViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E9D83F764A4895A9FC5FDA9 /* InspectorDetailViews.swift */; };
 		44181B00E8431CAEB250897A /* MonitorLaunchModeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 627772ED486834D5A8B92BC4 /* MonitorLaunchModeTests.swift */; };
@@ -26,6 +27,7 @@
 		52DACA904B863FDFF5EBCC35 /* MonitorSessionModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = D51E70A63168903D8D9E8782 /* MonitorSessionModels.swift */; };
 		53B4BAAEBC1308A04779823C /* HarnessMonitorKit.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 09069D489D24200773820893 /* HarnessMonitorKit.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		553E9390AA5A4F0DBF7A06FA /* HarnessMonitorUITestSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6DDA38CC2299204ED9CA160D /* HarnessMonitorUITestSupport.swift */; };
+		59E5E8AF46B86C556113E27E /* MonitorStoreTestFixtures.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2CD3BEB2E5749184BAF5C96D /* MonitorStoreTestFixtures.swift */; };
 		616DD8C34CC0151BD79FF4D3 /* ConnectionModelsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 447650C240AC036E1222DB52 /* ConnectionModelsTests.swift */; };
 		646E0BBF0F305BB58A0EFA08 /* PreferencesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A09EEB9DE36A1149700875EA /* PreferencesView.swift */; };
 		781C6FAE84664972EF599820 /* InspectorColumnView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA60A60D5527BADCA0473688 /* InspectorColumnView.swift */; };
@@ -136,6 +138,7 @@
 		2447F124535B2753426DF2ED /* PreviewFixtures+Cockpit.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PreviewFixtures+Cockpit.swift"; sourceTree = "<group>"; };
 		2575C3B6A4DC136109EEF39A /* MonitorStore+Lifecycle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "MonitorStore+Lifecycle.swift"; sourceTree = "<group>"; };
 		2C17A4DA08915471ACF63AEA /* RecordingMonitorClient+Base.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "RecordingMonitorClient+Base.swift"; sourceTree = "<group>"; };
+		2CD3BEB2E5749184BAF5C96D /* MonitorStoreTestFixtures.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MonitorStoreTestFixtures.swift; sourceTree = "<group>"; };
 		2E3822E9348EC89425B61F60 /* MonitorSignalModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MonitorSignalModels.swift; sourceTree = "<group>"; };
 		2F564FD7A8CB53803326BFDC /* MonitorStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MonitorStore.swift; sourceTree = "<group>"; };
 		39821C8FF4D19DD9D1AA7643 /* MonitorGlass.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MonitorGlass.swift; sourceTree = "<group>"; };
@@ -145,6 +148,7 @@
 		49365A908BA3CA81FD3FE6FB /* ConnectionViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionViews.swift; sourceTree = "<group>"; };
 		4D9C241BBB2AB7A5FC03A3EB /* RecordingMonitorClient+Mutations.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "RecordingMonitorClient+Mutations.swift"; sourceTree = "<group>"; };
 		4E2A80A66410AA188E86DBB8 /* HarnessMonitorLayoutUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HarnessMonitorLayoutUITests.swift; sourceTree = "<group>"; };
+		50D017CED6567DE47E141AA2 /* MonitorStoreSelectionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MonitorStoreSelectionTests.swift; sourceTree = "<group>"; };
 		553B2A067F2E1A2C8788BD13 /* MonitorControls.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MonitorControls.swift; sourceTree = "<group>"; };
 		562C6CA742C4370EEE862D01 /* ServerSentEvents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerSentEvents.swift; sourceTree = "<group>"; };
 		5AC4EB1A966E1AF49FA70FD1 /* MonitorPathsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MonitorPathsTests.swift; sourceTree = "<group>"; };
@@ -298,6 +302,8 @@
 				627772ED486834D5A8B92BC4 /* MonitorLaunchModeTests.swift */,
 				5AC4EB1A966E1AF49FA70FD1 /* MonitorPathsTests.swift */,
 				0E1890AEFF98831D7D4C17E3 /* MonitorStoreActionTests.swift */,
+				50D017CED6567DE47E141AA2 /* MonitorStoreSelectionTests.swift */,
+				2CD3BEB2E5749184BAF5C96D /* MonitorStoreTestFixtures.swift */,
 				025494A17CF762E5115EE9B8 /* MonitorStoreTests.swift */,
 				0143A1BACAAE538108C311B0 /* ObserverSummaryTests.swift */,
 				2C17A4DA08915471ACF63AEA /* RecordingMonitorClient+Base.swift */,
@@ -623,6 +629,8 @@
 				44181B00E8431CAEB250897A /* MonitorLaunchModeTests.swift in Sources */,
 				45FAAD28283A8F28FE8845C9 /* MonitorPathsTests.swift in Sources */,
 				E9DDB4D2FE1231D2F1C57BE4 /* MonitorStoreActionTests.swift in Sources */,
+				330CE6720E9E3323FDB6471D /* MonitorStoreSelectionTests.swift in Sources */,
+				59E5E8AF46B86C556113E27E /* MonitorStoreTestFixtures.swift in Sources */,
 				0D6F9B181F94FC1DFD964612 /* MonitorStoreTests.swift in Sources */,
 				0C36F4CDDC06F57582B3D38D /* ObserverSummaryTests.swift in Sources */,
 				CE6D47B29A5F7BDE21D56C8E /* RecordingMonitorClient+Base.swift in Sources */,

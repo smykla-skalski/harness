@@ -62,7 +62,7 @@ extension InspectorActionSections {
         Label("Action Console", systemImage: "dial.high")
           .font(.system(.headline, design: .rounded, weight: .semibold))
         Spacer()
-        if store.isBusy {
+        if store.isSessionActionInFlight {
           MonitorSpinner()
         } else if !store.lastAction.isEmpty {
           Text(store.lastAction)
@@ -74,7 +74,7 @@ extension InspectorActionSections {
         "Task creation, reassignments, checkpoints, and leadership changes flow through the daemon."
       )
       .font(.system(.footnote, design: .rounded, weight: .medium))
-      .foregroundStyle(.secondary)
+      .foregroundStyle(MonitorTheme.secondaryInk)
       if !store.availableActionActors.isEmpty {
         Picker("Act As", selection: actionActorBinding) {
           ForEach(store.availableActionActors) { agent in
@@ -112,7 +112,7 @@ extension InspectorActionSections {
       }
       Picker("Status", selection: $taskStatus) {
         ForEach(TaskStatus.allCases, id: \.self) { status in
-          Text(status.rawValue.capitalized).tag(status)
+          Text(status.title).tag(status)
         }
       }
       HStack {
@@ -140,7 +140,7 @@ extension InspectorActionSections {
       HStack {
         Text("\(checkpointProgress)%")
           .font(.caption.bold())
-          .foregroundStyle(.secondary)
+          .foregroundStyle(MonitorTheme.secondaryInk)
         Spacer()
         Button("Save Checkpoint") {
           Task { await checkpointSelectedTask() }
@@ -151,7 +151,7 @@ extension InspectorActionSections {
       if let checkpoint = task.checkpointSummary {
         Text("Latest: \(checkpoint.progress)% · \(checkpoint.summary)")
           .font(.caption)
-          .foregroundStyle(.secondary)
+          .foregroundStyle(MonitorTheme.secondaryInk)
       }
     }
     .monitorCard()
@@ -167,7 +167,7 @@ extension InspectorActionSections {
         .lineLimit(4, reservesSpace: true)
       Picker("Severity", selection: $createSeverity) {
         ForEach(TaskSeverity.allCases, id: \.self) { severity in
-          Text(severity.rawValue.capitalized).tag(severity)
+          Text(severity.title).tag(severity)
         }
       }
       Button("Create Task") {
@@ -187,8 +187,8 @@ extension InspectorActionSections {
       Text(agent.name)
         .font(.system(.headline, design: .rounded, weight: .semibold))
       Picker("Role", selection: $role) {
-        ForEach(SessionRole.allCases, id: \.self) { role in
-          Text(role.rawValue.capitalized).tag(role)
+        ForEach(SessionRole.allCases.filter { $0 != .leader }, id: \.self) { role in
+          Text(role.title).tag(role)
         }
       }
       Button("Change Role") {
@@ -216,7 +216,7 @@ extension InspectorActionSections {
           "\(pendingTransfer.requestedBy) requested \(pendingTransfer.newLeaderId) at \(timestamp)."
         )
         .font(.caption)
-        .foregroundStyle(.secondary)
+        .foregroundStyle(MonitorTheme.secondaryInk)
       }
       Picker("New Leader", selection: $transferLeaderID) {
         ForEach(detail.agents) { agent in

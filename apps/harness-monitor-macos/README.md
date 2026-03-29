@@ -22,14 +22,16 @@ Direct scripts:
 
 ```bash
 apps/harness-monitor-macos/Scripts/generate-project.sh
-apps/harness-monitor-macos/Scripts/lint-swift.sh all
+apps/harness-monitor-macos/Scripts/run-quality-gates.sh
 apps/harness-monitor-macos/Scripts/test-swift.sh
 ```
 
-`monitor:test` regenerates the project, runs the mandatory strict Swift format and SwiftLint gates, and executes:
+`monitor:lint` regenerates the project, runs strict `swift format` over Sources and Tests, then runs `xcodebuild build-for-testing` so the sandboxed `SwiftLintBuildToolPlugin` enforces the in-build lint rules.
+
+`monitor:test` runs the same quality gates first, then executes:
 
 ```bash
-xcodebuild -project apps/harness-monitor-macos/HarnessMonitor.xcodeproj -scheme HarnessMonitor -destination platform=macOS test
+xcodebuild -project apps/harness-monitor-macos/HarnessMonitor.xcodeproj -scheme HarnessMonitor -destination platform=macOS test-without-building
 ```
 
-The pre-build quality gates in `project.yml` make the strict lint step non-optional inside Xcode builds as well.
+The generated project uses `SwiftLintBuildToolPlugin`, so the SwiftLint rules also run inside local Xcode builds and CI without restoring the older shell-wrapper lint path.

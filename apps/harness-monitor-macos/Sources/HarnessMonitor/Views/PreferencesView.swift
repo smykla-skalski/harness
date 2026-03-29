@@ -5,17 +5,6 @@ import SwiftUI
 struct PreferencesView: View {
   @Bindable var store: MonitorStore
   @Binding var themeMode: MonitorThemeMode
-  let onDismiss: (() -> Void)?
-
-  init(
-    store: MonitorStore,
-    themeMode: Binding<MonitorThemeMode> = .constant(.auto),
-    onDismiss: (() -> Void)? = nil
-  ) {
-    self.store = store
-    _themeMode = themeMode
-    self.onDismiss = onDismiss
-  }
 
   private var effectiveHealth: HealthResponse? {
     store.diagnostics?.health ?? store.health
@@ -25,10 +14,6 @@ struct PreferencesView: View {
     store.diagnostics?.workspace.cacheEntryCount
       ?? store.daemonStatus?.diagnostics.cacheEntryCount
       ?? 0
-  }
-
-  private var isLoading: Bool {
-    store.isBusy || store.isRefreshing || store.connectionState == .connecting
   }
 
   private var effectiveLastEvent: DaemonAuditEvent? {
@@ -52,99 +37,33 @@ struct PreferencesView: View {
   }
 
   var body: some View {
-    MonitorColumnScrollView(horizontalPadding: 24, verticalPadding: 24) {
-      VStack(alignment: .leading, spacing: 18) {
-        header
-        PreferencesOverviewGrid(
-          endpoint: effectiveHealth?.endpoint ?? store.daemonStatus?.manifest?.endpoint
-            ?? "Unavailable",
-          version: effectiveHealth?.version ?? store.daemonStatus?.manifest?.version
-            ?? "Unavailable",
-          launchAgentState: launchAgentState,
-          launchAgentCaption: launchAgentCaption,
-          cacheEntryCount: cacheEntryCount,
-          sessionCount: store.daemonStatus?.sessionCount ?? 0
-        )
-        PreferencesConnectionCard(
-          metrics: store.connectionMetrics,
-          events: store.connectionEvents
-        )
-        PreferencesPathsCard(
-          launchAgentPath: store.daemonStatus?.launchAgent.path ?? "Unavailable",
-          launchAgentDomain: store.daemonStatus?.launchAgent.domainTarget,
-          launchAgentService: store.daemonStatus?.launchAgent.serviceTarget,
-          manifestPath: store.diagnostics?.workspace.manifestPath
-            ?? store.daemonStatus?.diagnostics.manifestPath
-            ?? "Unavailable",
-          authTokenPath: store.diagnostics?.workspace.authTokenPath
-            ?? store.daemonStatus?.diagnostics.authTokenPath
-            ?? "Unavailable",
-          eventsPath: store.diagnostics?.workspace.eventsPath
-            ?? store.daemonStatus?.diagnostics.eventsPath
-            ?? "Unavailable",
-          cacheRoot: store.diagnostics?.workspace.cacheRoot
-            ?? store.daemonStatus?.diagnostics.cacheRoot
-            ?? "Unavailable"
-        )
-        PreferencesDiagnosticsCard(
-          launchAgent: store.daemonStatus?.launchAgent,
-          tokenPresent: effectiveTokenPresent,
-          projectCount: store.daemonStatus?.projectCount ?? 0,
-          sessionCount: store.daemonStatus?.sessionCount ?? 0,
-          lastEvent: effectiveLastEvent
-        )
-        PreferencesRecentEventsCard(events: store.diagnostics?.recentEvents ?? [])
-        footer
-      }
+    TabView {
+      generalTab
+        .tabItem {
+          Label("General", systemImage: "gearshape")
+        }
+
+      connectionTab
+        .tabItem {
+          Label("Connection", systemImage: "bolt.horizontal.circle")
+        }
+
+      diagnosticsTab
+        .tabItem {
+          Label("Diagnostics", systemImage: "stethoscope")
+        }
     }
-    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    .frame(maxWidth: .infinity, maxHeight: .infinity)
     .background(MonitorTheme.canvas)
     .foregroundStyle(MonitorTheme.ink)
-    .task {
-      await store.refreshDiagnostics()
-    }
+    .accessibilityIdentifier(MonitorAccessibility.preferencesRoot)
+    .accessibilityFrameMarker(MonitorAccessibility.preferencesPanel)
   }
 
-  private var header: some View {
-    VStack(alignment: .leading, spacing: 14) {
-      HStack(alignment: .top) {
-        VStack(alignment: .leading, spacing: 6) {
-          Text("Daemon Preferences")
-            .font(.system(.largeTitle, design: .serif, weight: .bold))
-          Text(
-            "The monitor only reads live session state from the local harness daemon. "
-              + "Use this panel to validate residency, launchd persistence, auth token presence, "
-              + "and local cache health."
-          )
-          .font(.system(.body, design: .rounded, weight: .medium))
-          .foregroundStyle(.secondary)
-        }
-        Spacer()
-        HStack(spacing: 10) {
-          statePill
-          if let onDismiss {
-            Button(action: onDismiss) {
-              Label("Close", systemImage: "xmark")
-                .labelStyle(.iconOnly)
-                .font(.system(size: 12, weight: .bold))
-                .frame(width: 32, height: 32)
-            }
-            .monitorAccessoryButtonStyle()
-            .accessibilityIdentifier(MonitorAccessibility.preferencesCloseButton)
-          }
-        }
-      }
-
-      if isLoading {
-        MonitorLoadingStateView(title: loadingTitle)
-          .transition(.move(edge: .top).combined(with: .opacity))
-      }
-
-      VStack(alignment: .leading, spacing: 8) {
-        Text("Appearance")
-          .font(.caption.weight(.bold))
-          .foregroundStyle(.secondary)
-        Picker("Appearance", selection: $themeMode) {
+  private var generalTab: some View {
+    Form {
+      Section("Appearance") {
+        Picker("Theme", selection: $themeMode) {
           ForEach(MonitorThemeMode.allCases) { mode in
             Text(mode.label).tag(mode)
           }
@@ -152,56 +71,303 @@ struct PreferencesView: View {
         .pickerStyle(.segmented)
       }
 
-      PreferencesActionGrid(
-        isLoading: isLoading,
-        reconnect: store.reconnect,
-        refreshDiagnostics: store.refreshDiagnostics,
-        startDaemon: store.startDaemon,
-        installLaunchAgent: store.installLaunchAgent,
-        requestRemoveLaunchAgentConfirmation: store.requestRemoveLaunchAgentConfirmation
-      )
-    }
-    .monitorCard(contentPadding: 16)
-  }
-
-  private var footer: some View {
-    VStack(alignment: .leading, spacing: 8) {
-      if let startedAt = effectiveHealth?.startedAt ?? store.daemonStatus?.manifest?.startedAt {
-        Text("Started \(formatTimestamp(startedAt))")
-          .font(.caption.weight(.semibold))
-          .foregroundStyle(.secondary)
+      Section("Daemon") {
+        LabeledContent("Endpoint") {
+          Text(
+            effectiveHealth?.endpoint ?? store.daemonStatus?.manifest?.endpoint ?? "Unavailable"
+          )
+          .textSelection(.enabled)
+        }
+        LabeledContent("Version") {
+          Text(
+            effectiveHealth?.version ?? store.daemonStatus?.manifest?.version ?? "Unavailable"
+          )
+          .textSelection(.enabled)
+        }
+        LabeledContent("Launch Agent") {
+          VStack(alignment: .trailing, spacing: 2) {
+            Text(launchAgentState)
+            Text(launchAgentCaption)
+              .font(.caption)
+              .foregroundStyle(.secondary)
+          }
+        }
+        LabeledContent("Cached Sessions") {
+          Text("\(cacheEntryCount)")
+        }
+        generalActions
       }
-      if let lastError = store.lastError, !lastError.isEmpty {
-        Text(lastError)
-          .font(.system(.body, design: .rounded, weight: .medium))
-          .foregroundStyle(MonitorTheme.danger)
-      } else if !store.lastAction.isEmpty {
-        Text("Last action: \(store.lastAction)")
-          .font(.system(.body, design: .rounded, weight: .medium))
-          .foregroundStyle(.secondary)
+
+      Section("Status") {
+        if let startedAt = effectiveHealth?.startedAt ?? store.daemonStatus?.manifest?.startedAt {
+          LabeledContent("Started") {
+            Text(formatTimestamp(startedAt))
+          }
+        }
+        if let lastError = store.lastError, !lastError.isEmpty {
+          LabeledContent("Latest Error") {
+            Text(lastError)
+              .foregroundStyle(MonitorTheme.danger)
+              .multilineTextAlignment(.trailing)
+          }
+        } else if !store.lastAction.isEmpty {
+          LabeledContent("Last Action") {
+            Text(store.lastAction)
+          }
+        }
+      }
+    }
+    .formStyle(.grouped)
+  }
+
+  private var connectionTab: some View {
+    Form {
+      Section("Transport") {
+        LabeledContent("Mode") {
+          Text(store.connectionMetrics.transportKind.title)
+        }
+        LabeledContent("Quality") {
+          Text(store.connectionMetrics.quality.title)
+            .foregroundStyle(qualityColor)
+        }
+        LabeledContent("Latency") {
+          Text(store.connectionMetrics.latencyMs.map { "\($0) ms" } ?? "Unavailable")
+        }
+        LabeledContent("Average Latency") {
+          Text(store.connectionMetrics.averageLatencyMs.map { "\($0) ms" } ?? "Unavailable")
+        }
+        LabeledContent("Connected Since") {
+          Text(store.connectionMetrics.connectedSince.map(connectionTimestamp) ?? "Unavailable")
+        }
+      }
+
+      Section("Traffic") {
+        LabeledContent("Messages Received") {
+          Text("\(store.connectionMetrics.messagesReceived)")
+        }
+        LabeledContent("Messages Sent") {
+          Text("\(store.connectionMetrics.messagesSent)")
+        }
+        LabeledContent("Throughput") {
+          Text(throughputText)
+        }
+      }
+
+      Section("Actions") {
+        HStack(spacing: 12) {
+          MonitorAsyncActionButton(
+            title: "Reconnect",
+            tint: MonitorTheme.accent,
+            variant: .prominent,
+            isLoading: store.connectionState == .connecting,
+            accessibilityIdentifier: MonitorAccessibility.preferencesActionButton("Reconnect")
+          ) {
+            await store.reconnect()
+          }
+          MonitorAsyncActionButton(
+            title: "Refresh Diagnostics",
+            tint: MonitorTheme.ink,
+            variant: .bordered,
+            isLoading: store.isDiagnosticsRefreshInFlight,
+            accessibilityIdentifier: MonitorAccessibility.preferencesActionButton(
+              "Refresh Diagnostics"
+            )
+          ) {
+            await store.refreshDiagnostics()
+          }
+        }
+      }
+
+      if !store.connectionEvents.isEmpty {
+        Section("Recent Connection Events") {
+          ForEach(store.connectionEvents.reversed().prefix(10)) { event in
+            VStack(alignment: .leading, spacing: 4) {
+              HStack {
+                Text(event.kind.title)
+                  .font(.headline)
+                Spacer()
+                Text(connectionTimestamp(event.timestamp))
+                  .font(.caption.monospaced())
+                  .foregroundStyle(.secondary)
+              }
+              Text(event.detail)
+                .foregroundStyle(.secondary)
+            }
+            .padding(.vertical, 2)
+          }
+        }
+      }
+    }
+    .formStyle(.grouped)
+  }
+
+  private var diagnosticsTab: some View {
+    Form {
+      Section("Workspace") {
+        LabeledContent("Token") {
+          Text(effectiveTokenPresent ? "Present" : "Missing")
+            .foregroundStyle(effectiveTokenPresent ? MonitorTheme.success : MonitorTheme.danger)
+        }
+        LabeledContent("Projects") {
+          Text("\(store.daemonStatus?.projectCount ?? 0)")
+        }
+        LabeledContent("Sessions") {
+          Text("\(store.daemonStatus?.sessionCount ?? 0)")
+        }
+        if let lastEvent = effectiveLastEvent {
+          LabeledContent("Latest Event") {
+            VStack(alignment: .trailing, spacing: 2) {
+              Text(lastEvent.message)
+                .multilineTextAlignment(.trailing)
+              Text(
+                "\(lastEvent.level.uppercased()) • \(formatTimestamp(lastEvent.recordedAt))"
+              )
+              .font(.caption.monospaced())
+              .foregroundStyle(.secondary)
+            }
+          }
+        }
+      }
+
+      Section("Paths") {
+        pathRow("Launch Agent", value: store.daemonStatus?.launchAgent.path)
+        pathRow(
+          "Manifest",
+          value: store.diagnostics?.workspace.manifestPath
+            ?? store.daemonStatus?.diagnostics.manifestPath
+        )
+        pathRow(
+          "Auth Token",
+          value: store.diagnostics?.workspace.authTokenPath
+            ?? store.daemonStatus?.diagnostics.authTokenPath
+        )
+        pathRow(
+          "Events Log",
+          value: store.diagnostics?.workspace.eventsPath
+            ?? store.daemonStatus?.diagnostics.eventsPath
+        )
+        pathRow(
+          "Cache Root",
+          value: store.diagnostics?.workspace.cacheRoot
+            ?? store.daemonStatus?.diagnostics.cacheRoot
+        )
+      }
+
+      Section("Daemon Actions") {
+        HStack(spacing: 12) {
+          MonitorAsyncActionButton(
+            title: "Start Daemon",
+            tint: MonitorTheme.success,
+            variant: .prominent,
+            isLoading: store.isDaemonActionInFlight,
+            accessibilityIdentifier: MonitorAccessibility.preferencesActionButton("Start Daemon")
+          ) {
+            await store.startDaemon()
+          }
+          MonitorAsyncActionButton(
+            title: "Install Launch Agent",
+            tint: MonitorTheme.warmAccent,
+            variant: .bordered,
+            isLoading: store.isDaemonActionInFlight,
+            accessibilityIdentifier: MonitorAccessibility.preferencesActionButton(
+              "Install Launch Agent"
+            )
+          ) {
+            await store.installLaunchAgent()
+          }
+          MonitorAsyncActionButton(
+            title: "Remove Launch Agent",
+            tint: MonitorTheme.danger,
+            variant: .bordered,
+            isLoading: store.isDaemonActionInFlight,
+            accessibilityIdentifier: MonitorAccessibility.preferencesActionButton(
+              "Remove Launch Agent"
+            )
+          ) {
+            await store.removeLaunchAgent()
+          }
+        }
+      }
+
+      if let diagnostics = store.diagnostics, !diagnostics.recentEvents.isEmpty {
+        Section("Recent Daemon Events") {
+          ForEach(diagnostics.recentEvents.prefix(10)) { event in
+            VStack(alignment: .leading, spacing: 4) {
+              HStack {
+                Text(event.level.uppercased())
+                  .font(.headline)
+                Spacer()
+                Text(formatTimestamp(event.recordedAt))
+                  .font(.caption.monospaced())
+                  .foregroundStyle(.secondary)
+              }
+              Text(event.message)
+                .foregroundStyle(.secondary)
+            }
+            .padding(.vertical, 2)
+          }
+        }
+      }
+    }
+    .formStyle(.grouped)
+  }
+
+  private var generalActions: some View {
+    HStack(spacing: 12) {
+      MonitorAsyncActionButton(
+        title: "Start Daemon",
+        tint: MonitorTheme.success,
+        variant: .prominent,
+        isLoading: store.isDaemonActionInFlight,
+        accessibilityIdentifier: MonitorAccessibility.preferencesActionButton("Start Daemon")
+      ) {
+        await store.startDaemon()
+      }
+      MonitorAsyncActionButton(
+        title: "Install Launch Agent",
+        tint: MonitorTheme.warmAccent,
+        variant: .bordered,
+        isLoading: store.isDaemonActionInFlight,
+        accessibilityIdentifier: MonitorAccessibility.preferencesActionButton(
+          "Install Launch Agent"
+        )
+      ) {
+        await store.installLaunchAgent()
       }
     }
   }
 
-  private var loadingTitle: String {
-    if store.connectionState == .connecting {
-      return "Connecting to the daemon bridge"
+  private var qualityColor: Color {
+    switch store.connectionMetrics.quality {
+    case .excellent, .good:
+      MonitorTheme.success
+    case .degraded:
+      MonitorTheme.caution
+    case .poor, .disconnected:
+      MonitorTheme.danger
     }
-    if store.isRefreshing {
-      return "Refreshing live diagnostics"
-    }
-    return "Submitting daemon action"
   }
 
-  private var statePill: some View {
-    Text(store.connectionState == .online ? "Live" : "Needs Attention")
-      .font(.caption.bold())
-      .padding(.horizontal, 10)
-      .padding(.vertical, 6)
-      .background(
-        store.connectionState == .online ? MonitorTheme.success : MonitorTheme.caution,
-        in: Capsule()
-      )
-      .foregroundStyle(.white)
+  private var throughputText: String {
+    guard store.connectionMetrics.messagesPerSecond != 0 else {
+      return "Idle"
+    }
+    let formattedRate = store.connectionMetrics.messagesPerSecond.formatted(
+      .number.precision(.fractionLength(1))
+    )
+    return "\(formattedRate) msg/s"
+  }
+
+  @ViewBuilder
+  private func pathRow(_ title: String, value: String?) -> some View {
+    LabeledContent(title) {
+      Text(value ?? "Unavailable")
+        .font(.body.monospaced())
+        .textSelection(.enabled)
+    }
+  }
+
+  private func connectionTimestamp(_ value: Date) -> String {
+    value.formatted(date: .abbreviated, time: .standard)
   }
 }

@@ -80,12 +80,12 @@ final class HarnessMonitorLayoutUITests: HarnessMonitorUITestCase {
 
     let inspectorRoot = element(in: app, identifier: Accessibility.inspectorRoot)
     let sessionInspectorCard = element(in: app, identifier: Accessibility.sessionInspectorCard)
-    let sessionRow = app.buttons.matching(identifier: Accessibility.previewSessionRow).firstMatch
+    let sessionRow = element(in: app, identifier: Accessibility.previewSessionRow)
 
     XCTAssertTrue(inspectorRoot.waitForExistence(timeout: Self.uiTimeout))
     XCTAssertTrue(sessionRow.waitForExistence(timeout: Self.uiTimeout))
 
-    tapButton(in: app, identifier: Accessibility.previewSessionRow)
+    tapElement(in: app, identifier: Accessibility.previewSessionRow)
 
     XCTAssertTrue(sessionInspectorCard.waitForExistence(timeout: Self.uiTimeout))
     assertFillsColumn(
@@ -100,12 +100,12 @@ final class HarnessMonitorLayoutUITests: HarnessMonitorUITestCase {
     let app = launch(mode: "preview")
 
     let inspectorRoot = element(in: app, identifier: Accessibility.inspectorRoot)
-    let sessionRow = app.buttons.matching(identifier: Accessibility.previewSessionRow).firstMatch
+    let sessionRow = element(in: app, identifier: Accessibility.previewSessionRow)
 
     XCTAssertTrue(inspectorRoot.waitForExistence(timeout: Self.uiTimeout))
     XCTAssertTrue(sessionRow.waitForExistence(timeout: Self.uiTimeout))
 
-    tapButton(in: app, identifier: Accessibility.previewSessionRow)
+    tapElement(in: app, identifier: Accessibility.previewSessionRow)
     tapButton(in: app, identifier: Accessibility.taskUICard)
 
     let taskInspector = element(in: app, identifier: Accessibility.taskInspectorCard)
@@ -160,7 +160,7 @@ final class HarnessMonitorLayoutUITests: HarnessMonitorUITestCase {
   func testSidebarContentStartsBelowToolbarChrome() throws {
     let app = launch(mode: "preview")
 
-    let window = app.windows.firstMatch
+    let window = mainWindow(in: app)
     let sidebarContent = frameElement(in: app, identifier: Accessibility.sidebarShellFrame)
     let daemonCard = frameElement(in: app, identifier: Accessibility.daemonCardFrame)
 
@@ -215,7 +215,7 @@ final class HarnessMonitorLayoutUITests: HarnessMonitorUITestCase {
     let app = launch(mode: "preview")
 
     let scrollView = app.descendants(matching: .scrollView).firstMatch
-    let sessionRow = app.buttons.matching(identifier: Accessibility.previewSessionRow).firstMatch
+    let sessionRow = element(in: app, identifier: Accessibility.previewSessionRow)
 
     XCTAssertTrue(scrollView.waitForExistence(timeout: Self.uiTimeout))
     XCTAssertTrue(sessionRow.waitForExistence(timeout: Self.uiTimeout))
@@ -246,7 +246,7 @@ final class HarnessMonitorLayoutUITests: HarnessMonitorUITestCase {
     XCTAssertTrue(savedSearch.waitForExistence(timeout: Self.uiTimeout))
     XCTAssertEqual(savedSearch.value as? String, "not selected")
 
-    savedSearch.tap()
+    tapElement(in: app, identifier: Accessibility.blockedFollowupsSearchButton)
 
     XCTAssertEqual(savedSearch.value as? String, "selected")
     XCTAssertTrue(
@@ -259,9 +259,9 @@ final class HarnessMonitorLayoutUITests: HarnessMonitorUITestCase {
   func testSessionCockpitTaskAndAgentCardsShareHeight() throws {
     let app = launch(mode: "preview")
 
-    let sessionRow = app.buttons.matching(identifier: Accessibility.previewSessionRow).firstMatch
+    let sessionRow = element(in: app, identifier: Accessibility.previewSessionRow)
     XCTAssertTrue(sessionRow.waitForExistence(timeout: Self.uiTimeout))
-    tapButton(in: app, identifier: Accessibility.previewSessionRow)
+    tapElement(in: app, identifier: Accessibility.previewSessionRow)
 
     let taskUI = element(in: app, identifier: Accessibility.taskUICard)
     let taskRouting = element(in: app, identifier: Accessibility.taskRoutingCard)

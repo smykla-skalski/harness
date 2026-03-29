@@ -119,37 +119,19 @@ extension View {
   ) -> some View {
     switch variant {
     case .prominent:
-      if #available(macOS 26, *) {
-        self
-          .buttonStyle(.glassProminent)
-          .tint(tint)
-      } else {
-        self
-          .buttonStyle(.borderedProminent)
-          .tint(tint)
-      }
+      self
+        .buttonStyle(.glassProminent)
+        .tint(tint)
     case .bordered:
-      if #available(macOS 26, *) {
-        self
-          .buttonStyle(.glass(.regular.tint(tint)))
-      } else {
-        self
-          .buttonStyle(.bordered)
-          .tint(tint)
-      }
+      self
+        .buttonStyle(.glass(.regular.tint(tint)))
     }
   }
 
   @ViewBuilder
   func monitorAccessoryButtonStyle(tint: Color = MonitorTheme.ink) -> some View {
-    if #available(macOS 26, *) {
-      self
-        .buttonStyle(.glass(.regular.tint(tint)))
-    } else {
-      self
-        .buttonStyle(.borderless)
-        .tint(tint)
-    }
+    self
+      .buttonStyle(.glass(.regular.tint(tint)))
   }
 
   @ViewBuilder
@@ -157,25 +139,13 @@ extension View {
     isSelected: Bool,
     tint: Color = MonitorTheme.accent
   ) -> some View {
-    if #available(macOS 26, *) {
-      if isSelected {
-        self
-          .buttonStyle(.glassProminent)
-          .tint(tint)
-      } else {
-        self
-          .buttonStyle(.glass)
-      }
+    if isSelected {
+      self
+        .buttonStyle(.glassProminent)
+        .tint(tint)
     } else {
-      if isSelected {
-        self
-          .buttonStyle(.borderedProminent)
-          .tint(tint)
-      } else {
-        self
-          .buttonStyle(.bordered)
-          .tint(MonitorTheme.ink)
-      }
+      self
+        .buttonStyle(.glass)
     }
   }
 }

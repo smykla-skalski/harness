@@ -44,7 +44,7 @@ struct SessionCockpitView: View {
           }
           Text("\(detail.session.projectName) • \(detail.session.sessionId)")
             .font(.system(.subheadline, design: .rounded, weight: .medium))
-            .foregroundStyle(.secondary)
+            .foregroundStyle(MonitorTheme.secondaryInk)
         }
         Spacer()
         HStack(spacing: 10) {
@@ -53,7 +53,7 @@ struct SessionCockpitView: View {
         }
       }
 
-      if store.isBusy || store.isRefreshing {
+      if store.isSessionActionInFlight || store.isSelectionLoading {
         MonitorLoadingStateView(title: "Refreshing live session detail")
           .transition(.move(edge: .top).combined(with: .opacity))
       }
@@ -68,7 +68,6 @@ struct SessionCockpitView: View {
     }
     .frame(maxWidth: .infinity, alignment: .leading)
     .monitorCard()
-    .liveActivityBorder(isActive: store.dataReceivedPulse)
   }
 
   private var observeButton: some View {
@@ -108,13 +107,13 @@ struct SessionCockpitView: View {
         if let openIssues = observer.openIssues, !openIssues.isEmpty {
           Text(openIssues.prefix(2).map(\.summary).joined(separator: " · "))
             .font(.caption)
-            .foregroundStyle(.secondary)
+            .foregroundStyle(MonitorTheme.secondaryInk)
             .lineLimit(1)
         }
         if let mutedCodes = observer.mutedCodes, !mutedCodes.isEmpty {
           Text("Muted: \(mutedCodes.prefix(3).joined(separator: ", "))")
             .font(.caption)
-            .foregroundStyle(.secondary)
+            .foregroundStyle(MonitorTheme.secondaryInk)
             .lineLimit(1)
         }
       }
@@ -144,17 +143,17 @@ struct SessionCockpitView: View {
                   .font(.system(.headline, design: .rounded, weight: .semibold))
                 Text(signal.signal.payload.message)
                   .font(.subheadline)
-                  .foregroundStyle(.secondary)
+                  .foregroundStyle(MonitorTheme.secondaryInk)
                   .multilineTextAlignment(.leading)
               }
               Spacer()
               VStack(alignment: .trailing, spacing: 6) {
-                Text(signal.status.rawValue.capitalized)
+                Text(signal.status.title)
                   .font(.caption.bold())
                   .foregroundStyle(signalStatusColor(for: signal.status))
                 Text(formatTimestamp(signal.signal.createdAt))
                   .font(.caption.monospaced())
-                  .foregroundStyle(.secondary)
+                  .foregroundStyle(MonitorTheme.secondaryInk)
               }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -190,13 +189,13 @@ struct SessionCockpitView: View {
               .font(.system(.body, design: .rounded, weight: .semibold))
             Text("\(entry.kind) • \(formatTimestamp(entry.recordedAt))")
               .font(.caption.monospaced())
-              .foregroundStyle(.secondary)
+              .foregroundStyle(MonitorTheme.secondaryInk)
           }
           Spacer()
           if let taskID = entry.taskId {
             Text(taskID)
               .font(.caption.monospaced())
-              .foregroundStyle(.secondary)
+              .foregroundStyle(MonitorTheme.secondaryInk)
           }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -227,14 +226,14 @@ struct SessionCockpitView: View {
         Spacer()
         Text(formatTimestamp(pendingTransfer.requestedAt))
           .font(.caption.monospaced())
-          .foregroundStyle(.secondary)
+          .foregroundStyle(MonitorTheme.secondaryInk)
       }
       let requested = pendingTransfer.requestedBy
       let newLeader = pendingTransfer.newLeaderId
       let current = pendingTransfer.currentLeaderId
       Text("\(requested) requested \(newLeader) to replace \(current).")
         .font(.system(.body, design: .rounded, weight: .medium))
-        .foregroundStyle(.secondary)
+        .foregroundStyle(MonitorTheme.secondaryInk)
       if let reason = pendingTransfer.reason, !reason.isEmpty {
         Text(reason)
           .font(.system(.footnote, design: .rounded, weight: .semibold))
@@ -257,7 +256,7 @@ struct SessionCockpitView: View {
     VStack(alignment: .leading, spacing: 2) {
       Text(title.uppercased())
         .font(.caption2.weight(.bold))
-        .foregroundStyle(.secondary)
+        .foregroundStyle(MonitorTheme.secondaryInk)
       Text(value)
         .font(.system(.callout, design: .rounded, weight: .semibold))
     }

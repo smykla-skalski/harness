@@ -7,10 +7,13 @@ final class HarnessMonitorUITests: HarnessMonitorUITestCase {
   func testPreviewModeLoadsDashboardAndOpensCockpit() throws {
     let app = launch(mode: "preview")
 
-    let sessionRow = app.buttons.matching(identifier: Accessibility.previewSessionRow).firstMatch
+    let sessionRow = element(in: app, identifier: Accessibility.previewSessionRow)
+    if !sessionRow.waitForExistence(timeout: Self.uiTimeout) {
+      attachWindowScreenshot(in: app, named: "preview-session-row-missing")
+    }
     XCTAssertTrue(sessionRow.waitForExistence(timeout: Self.uiTimeout))
 
-    tapButton(in: app, identifier: Accessibility.previewSessionRow)
+    tapElement(in: app, identifier: Accessibility.previewSessionRow)
 
     let observeSummaryButton = app.buttons
       .matching(identifier: Accessibility.observeSummaryButton)
@@ -47,7 +50,7 @@ final class HarnessMonitorUITests: HarnessMonitorUITestCase {
     )
   }
 
-  func testToolbarOpensPreferencesSheet() throws {
+  func testToolbarOpensSettingsWindow() throws {
     let app = launch(mode: "preview")
 
     let preferencesButton = toolbarButton(in: app, identifier: Accessibility.preferencesButton)
@@ -56,7 +59,7 @@ final class HarnessMonitorUITests: HarnessMonitorUITestCase {
     preferencesButton.tap()
 
     XCTAssertTrue(
-      app.staticTexts["Daemon Preferences"].waitForExistence(timeout: Self.uiTimeout)
+      app.staticTexts["Appearance"].waitForExistence(timeout: Self.uiTimeout)
     )
     XCTAssertTrue(element(in: app, identifier: Accessibility.preferencesRoot).exists)
   }
@@ -64,9 +67,9 @@ final class HarnessMonitorUITests: HarnessMonitorUITestCase {
   func testObserveSummaryIsAvailableInSessionCockpit() throws {
     let app = launch(mode: "preview")
 
-    let sessionRow = app.buttons.matching(identifier: Accessibility.previewSessionRow).firstMatch
+    let sessionRow = element(in: app, identifier: Accessibility.previewSessionRow)
     XCTAssertTrue(sessionRow.waitForExistence(timeout: Self.uiTimeout))
-    tapButton(in: app, identifier: Accessibility.previewSessionRow)
+    tapElement(in: app, identifier: Accessibility.previewSessionRow)
 
     let tasks = app.staticTexts["Tasks"]
     let signals = app.staticTexts["Signals"]
@@ -150,9 +153,9 @@ final class HarnessMonitorUITests: HarnessMonitorUITestCase {
   func testSessionActionsExposeActorPickerAndRemoveAgentFlow() throws {
     let app = launch(mode: "preview")
 
-    let sessionRow = app.buttons.matching(identifier: Accessibility.previewSessionRow).firstMatch
+    let sessionRow = element(in: app, identifier: Accessibility.previewSessionRow)
     XCTAssertTrue(sessionRow.waitForExistence(timeout: Self.uiTimeout))
-    tapButton(in: app, identifier: Accessibility.previewSessionRow)
+    tapElement(in: app, identifier: Accessibility.previewSessionRow)
     tapButton(in: app, identifier: Accessibility.workerAgentCard)
 
     let actorPicker = element(in: app, identifier: Accessibility.actionActorPicker)
@@ -165,9 +168,9 @@ final class HarnessMonitorUITests: HarnessMonitorUITestCase {
   func testTaskInspectorShowsCheckpointNotesAndSuggestedFix() throws {
     let app = launch(mode: "preview")
 
-    let sessionRow = app.buttons.matching(identifier: Accessibility.previewSessionRow).firstMatch
+    let sessionRow = element(in: app, identifier: Accessibility.previewSessionRow)
     XCTAssertTrue(sessionRow.waitForExistence(timeout: Self.uiTimeout))
-    tapButton(in: app, identifier: Accessibility.previewSessionRow)
+    tapElement(in: app, identifier: Accessibility.previewSessionRow)
     tapButton(in: app, identifier: Accessibility.taskUICard)
 
     let inspectorCard = element(in: app, identifier: Accessibility.taskInspectorCard)
@@ -183,9 +186,9 @@ final class HarnessMonitorUITests: HarnessMonitorUITestCase {
   func testAgentInspectorShowsRuntimeCapabilitiesAndToolActivity() throws {
     let app = launch(mode: "preview")
 
-    let sessionRow = app.buttons.matching(identifier: Accessibility.previewSessionRow).firstMatch
+    let sessionRow = element(in: app, identifier: Accessibility.previewSessionRow)
     XCTAssertTrue(sessionRow.waitForExistence(timeout: Self.uiTimeout))
-    tapButton(in: app, identifier: Accessibility.previewSessionRow)
+    tapElement(in: app, identifier: Accessibility.previewSessionRow)
     tapButton(in: app, identifier: Accessibility.workerAgentCard)
 
     let inspectorCard = element(in: app, identifier: Accessibility.agentInspectorCard)
@@ -202,9 +205,9 @@ final class HarnessMonitorUITests: HarnessMonitorUITestCase {
   func testObserverInspectorShowsCycleHistoryAndTrackedSessions() throws {
     let app = launch(mode: "preview")
 
-    let sessionRow = app.buttons.matching(identifier: Accessibility.previewSessionRow).firstMatch
+    let sessionRow = element(in: app, identifier: Accessibility.previewSessionRow)
     XCTAssertTrue(sessionRow.waitForExistence(timeout: Self.uiTimeout))
-    tapButton(in: app, identifier: Accessibility.previewSessionRow)
+    tapElement(in: app, identifier: Accessibility.previewSessionRow)
     tapButton(in: app, identifier: Accessibility.observeSummaryButton)
 
     let inspectorCard = element(in: app, identifier: Accessibility.observerInspectorCard)
@@ -218,9 +221,9 @@ final class HarnessMonitorUITests: HarnessMonitorUITestCase {
   func testEndSessionRequiresConfirmation() throws {
     let app = launch(mode: "preview")
 
-    let sessionRow = app.buttons.matching(identifier: Accessibility.previewSessionRow).firstMatch
+    let sessionRow = element(in: app, identifier: Accessibility.previewSessionRow)
     XCTAssertTrue(sessionRow.waitForExistence(timeout: Self.uiTimeout))
-    tapButton(in: app, identifier: Accessibility.previewSessionRow)
+    tapElement(in: app, identifier: Accessibility.previewSessionRow)
 
     let endSessionButton = element(in: app, identifier: Accessibility.endSessionButton)
     XCTAssertTrue(endSessionButton.waitForExistence(timeout: Self.uiTimeout))
@@ -231,22 +234,23 @@ final class HarnessMonitorUITests: HarnessMonitorUITestCase {
     dismissConfirmationDialog(in: app)
   }
 
-  func testPreferencesBackdropDismissesOverlay() throws {
+  func testSidebarSearchFieldIsInTheFiltersCard() throws {
     let app = launch(mode: "preview")
 
-    let preferencesButton = toolbarButton(in: app, identifier: Accessibility.preferencesButton)
-    XCTAssertTrue(preferencesButton.waitForExistence(timeout: Self.uiTimeout))
-    preferencesButton.tap()
+    let searchField = element(in: app, identifier: Accessibility.sidebarSearchField)
+    let filtersHeading = app.staticTexts["Search & Filters"]
+    let noMatches = app.staticTexts["No sessions match"]
 
-    let preferencesRoot = element(in: app, identifier: Accessibility.preferencesRoot)
-    let preferencesPanel = frameElement(in: app, identifier: Accessibility.preferencesPanel)
+    XCTAssertTrue(filtersHeading.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(searchField.waitForExistence(timeout: Self.uiTimeout))
 
-    XCTAssertTrue(preferencesRoot.waitForExistence(timeout: Self.uiTimeout))
-    XCTAssertTrue(preferencesPanel.waitForExistence(timeout: Self.uiTimeout))
+    tapElement(in: app, identifier: Accessibility.sidebarSearchField)
+    app.typeText("zzznomatch")
 
-    tapOutsidePreferencesPanel(in: app)
-
-    XCTAssertTrue(waitUntil { !preferencesRoot.exists })
+    if !noMatches.waitForExistence(timeout: Self.uiTimeout) {
+      attachWindowScreenshot(in: app, named: "sidebar-search-not-hittable")
+    }
+    XCTAssertTrue(noMatches.exists)
   }
 
   func testRemoveLaunchAgentRequiresConfirmation() throws {

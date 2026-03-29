@@ -7,6 +7,7 @@ extension RecordingMonitorClient {
     sessionID: String,
     request: TaskCreateRequest
   ) async throws -> SessionDetail {
+    try await sleepIfNeeded(configuredMutationDelay())
     calls.append(
       .createTask(
         sessionID: sessionID,
@@ -43,6 +44,7 @@ extension RecordingMonitorClient {
     taskID: String,
     request: TaskAssignRequest
   ) async throws -> SessionDetail {
+    try await sleepIfNeeded(configuredMutationDelay())
     calls.append(
       .assignTask(
         sessionID: sessionID,
@@ -78,6 +80,7 @@ extension RecordingMonitorClient {
     taskID: String,
     request: TaskUpdateRequest
   ) async throws -> SessionDetail {
+    try await sleepIfNeeded(configuredMutationDelay())
     calls.append(
       .updateTask(
         sessionID: sessionID,
@@ -114,6 +117,7 @@ extension RecordingMonitorClient {
     taskID: String,
     request: TaskCheckpointRequest
   ) async throws -> SessionDetail {
+    try await sleepIfNeeded(configuredMutationDelay())
     calls.append(
       .checkpointTask(
         sessionID: sessionID,
@@ -156,6 +160,7 @@ extension RecordingMonitorClient {
     agentID: String,
     request: RoleChangeRequest
   ) async throws -> SessionDetail {
+    try await sleepIfNeeded(configuredMutationDelay())
     calls.append(
       .changeRole(
         sessionID: sessionID,
@@ -188,6 +193,7 @@ extension RecordingMonitorClient {
     agentID: String,
     request: AgentRemoveRequest
   ) async throws -> SessionDetail {
+    try await sleepIfNeeded(configuredMutationDelay())
     calls.append(
       .removeAgent(
         sessionID: sessionID,
@@ -231,6 +237,7 @@ extension RecordingMonitorClient {
     sessionID: String,
     request: LeaderTransferRequest
   ) async throws -> SessionDetail {
+    try await sleepIfNeeded(configuredMutationDelay())
     calls.append(
       .transferLeader(
         sessionID: sessionID,

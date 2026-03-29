@@ -323,13 +323,17 @@ extension MonitorStore {
     sessionID: String,
     mutation: () async throws -> SessionDetail
   ) async {
-    isBusy = true
-    defer { isBusy = false }
+    isSessionActionInFlight = true
+    defer { isSessionActionInFlight = false }
     lastError = nil
 
     do {
       selectedSession = try await mutation()
-      timeline = try await client.timeline(sessionID: sessionID)
+      let updatedTimeline = try await client.timeline(sessionID: sessionID)
+      guard selectedSessionID == sessionID else {
+        return
+      }
+      timeline = updatedTimeline
       await refresh(using: client, preserveSelection: true)
       lastAction = actionName
     } catch {

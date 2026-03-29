@@ -8,10 +8,6 @@ struct TransportBadge: View {
     kind == .webSocket ? "bolt.horizontal.fill" : "arrow.down.circle.fill"
   }
 
-  private var label: String {
-    kind == .webSocket ? "WebSocket" : "SSE"
-  }
-
   private var tint: Color {
     kind == .webSocket ? MonitorTheme.success : MonitorTheme.caution
   }
@@ -20,7 +16,7 @@ struct TransportBadge: View {
     HStack(spacing: 5) {
       Image(systemName: icon)
         .font(.caption2.weight(.semibold))
-      Text(label)
+      Text(kind.title)
         .font(.system(.caption, design: .rounded, weight: .semibold))
         .lineLimit(1)
         .fixedSize()
@@ -66,7 +62,6 @@ struct LatencyBadge: View {
 
 struct ActivityPulse: View {
   let isActive: Bool
-  @State private var animates = false
 
   private var baseColor: Color {
     isActive ? MonitorTheme.success : MonitorTheme.sidebarMuted
@@ -74,30 +69,18 @@ struct ActivityPulse: View {
 
   var body: some View {
     ZStack {
-      if isActive {
-        Circle()
-          .fill(baseColor.opacity(0.14))
-          .frame(width: 16, height: 16)
-          .scaleEffect(animates ? 1.25 : 0.92)
-          .opacity(animates ? 1.0 : 0.72)
-          .animation(
-            .easeInOut(duration: 1.1).repeatForever(autoreverses: true),
-            value: animates
-          )
-      }
+      Circle()
+        .fill(baseColor.opacity(0.14))
+        .frame(width: 16, height: 16)
       Circle()
         .fill(baseColor)
         .frame(width: 7, height: 7)
         .overlay(
           Circle()
-            .stroke(MonitorTheme.panel.opacity(0.9), lineWidth: 1)
+            .stroke(MonitorTheme.glassStroke, lineWidth: 1)
         )
     }
     .frame(width: 16, height: 16)
-    .onAppear { animates = isActive }
-    .onChange(of: isActive) { _, active in
-      animates = active
-    }
   }
 }
 
@@ -124,7 +107,7 @@ struct ConnectionStatusStrip: View {
           .font(.system(.footnote, design: .rounded, weight: .semibold))
         Text(subtitle)
           .font(.caption)
-          .foregroundStyle(.secondary)
+          .foregroundStyle(MonitorTheme.secondaryInk)
       }
 
       Spacer(minLength: 8)
@@ -150,10 +133,9 @@ struct ConnectionToolbarBadge: View {
 
   private var label: String {
     if let latency = metrics.latencyMs {
-      return metrics.transportKind == .webSocket
-        ? "WS \(latency)ms" : "SSE \(latency)ms"
+      return "\(metrics.transportKind.shortTitle) \(latency)ms"
     }
-    return metrics.transportKind == .webSocket ? "WebSocket" : "SSE"
+    return metrics.transportKind.title
   }
 
   private var qualityColor: Color {
@@ -200,7 +182,7 @@ struct ReconnectionProgressView: View {
         Spacer()
         Text("Attempt \(attempt)")
           .font(.caption.monospacedDigit())
-          .foregroundStyle(.secondary)
+          .foregroundStyle(MonitorTheme.secondaryInk)
       }
       GeometryReader { proxy in
         Capsule()
@@ -240,7 +222,7 @@ struct FallbackBanner: View {
           .font(.system(.footnote, design: .rounded, weight: .semibold))
         Text(reason ?? "WebSocket unavailable, using HTTP streaming")
           .font(.caption)
-          .foregroundStyle(.secondary)
+          .foregroundStyle(MonitorTheme.secondaryInk)
       }
       Spacer(minLength: 8)
       Button(action: onRetry) {
