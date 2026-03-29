@@ -1,18 +1,24 @@
 import Foundation
 
 public final class WebSocketTransport: MonitorClientProtocol, @unchecked Sendable {
-  private let connection: MonitorConnection
-  private let encoder: JSONEncoder
-  private let decoder: JSONDecoder
-  private let session: URLSession
-  private let pending = PendingRequestStore()
-  private var webSocketTask: URLSessionWebSocketTask?
-  private var receiveTask: Task<Void, Never>?
-  private var heartbeatTask: Task<Void, Never>?
-  private var globalStreamContinuation: AsyncThrowingStream<StreamEvent, Error>.Continuation?
-  private var sessionStreamContinuations:
-    [String: AsyncThrowingStream<StreamEvent, Error>.Continuation] = [:]
-  private let lock = NSLock()
+  let connection: MonitorConnection
+  let encoder: JSONEncoder
+  let decoder: JSONDecoder
+  let session: URLSession
+  let pending = PendingRequestStore()
+  var webSocketTask: URLSessionWebSocketTask?
+  var receiveTask: Task<Void, Never>?
+  var heartbeatTask: Task<Void, Never>?
+  var globalStreamContinuation: AsyncThrowingStream<StreamEvent, Error>.Continuation?
+  var sessionStreamContinuations: [String: AsyncThrowingStream<StreamEvent, Error>.Continuation] =
+    [:]
+  let lock = NSLock()
+  var activeSubscriptions: Set<String> = []
+  var globalSubscriptionActive = false
+
+  static let reconnectDelays: [Duration] = [
+    .milliseconds(500), .seconds(1), .seconds(2), .seconds(4), .seconds(8),
+  ]
 
   public init(connection: MonitorConnection) {
     self.connection = connection
@@ -89,10 +95,16 @@ extension WebSocketTransport {
 
   public func globalStream() -> AsyncThrowingStream<StreamEvent, Error> {
     AsyncThrowingStream { continuation in
-      lock.withLock { globalStreamContinuation = continuation }
+      lock.withLock {
+        globalStreamContinuation = continuation
+        globalSubscriptionActive = true
+      }
       continuation.onTermination = { [weak self] _ in
         guard let self else { return }
-        self.lock.withLock { self.globalStreamContinuation = nil }
+        self.lock.withLock {
+          self.globalStreamContinuation = nil
+          self.globalSubscriptionActive = false
+        }
         Task {
           try? await self.send(
             method: "stream.unsubscribe",
@@ -115,10 +127,16 @@ extension WebSocketTransport {
 
   public func sessionStream(sessionID: String) -> AsyncThrowingStream<StreamEvent, Error> {
     AsyncThrowingStream { continuation in
-      lock.withLock { sessionStreamContinuations[sessionID] = continuation }
+      lock.withLock {
+        sessionStreamContinuations[sessionID] = continuation
+        activeSubscriptions.insert(sessionID)
+      }
       continuation.onTermination = { [weak self] _ in
         guard let self else { return }
-        self.lock.withLock { self.sessionStreamContinuations[sessionID] = nil }
+        self.lock.withLock {
+          self.sessionStreamContinuations[sessionID] = nil
+          self.activeSubscriptions.remove(sessionID)
+        }
         Task {
           try? await self.send(
             method: "session.unsubscribe",
@@ -251,136 +269,5 @@ extension WebSocketTransport {
     let params = try encodeParams(request, extra: ["session_id": .string(sessionID)])
     let value = try await send(method: "session.observe", params: params)
     return try decode(value)
-  }
-}
-
-// MARK: - Internal transport mechanics
-
-extension WebSocketTransport {
-  @discardableResult
-  func send(method: String, params: JSONValue? = nil) async throws -> JSONValue {
-    guard let webSocketTask else {
-      throw WebSocketTransportError.connectionClosed
-    }
-    let id = UUID().uuidString
-    let request = WsRequest(id: id, method: method, params: params)
-    let data = try encoder.encode(request)
-    let text = String(data: data, encoding: .utf8) ?? "{}"
-    return try await withCheckedThrowingContinuation { continuation in
-      pending.register(id: id, continuation: continuation)
-      webSocketTask.send(.string(text)) { [weak self] error in
-        if let error {
-          self?.pending.fail(id: id, error: error)
-        }
-      }
-    }
-  }
-
-  func startReceiveLoop() {
-    receiveTask?.cancel()
-    receiveTask = Task { [weak self] in
-      guard let self else { return }
-      while !Task.isCancelled {
-        guard let webSocketTask = self.webSocketTask else { break }
-        do {
-          let message = try await webSocketTask.receive()
-          self.handleMessage(message)
-        } catch {
-          if !Task.isCancelled {
-            self.pending.failAll(error: error)
-            self.terminateAllStreams()
-          }
-          break
-        }
-      }
-    }
-  }
-
-  func handleMessage(_ message: URLSessionWebSocketTask.Message) {
-    guard case .string(let text) = message else { return }
-    guard let data = text.data(using: .utf8) else { return }
-    guard let frame = try? decoder.decode(WsFrame.self, from: data) else { return }
-
-    switch frame.kind {
-    case .response(let id, let result, let error):
-      if let error {
-        pending.fail(
-          id: id,
-          error: WebSocketTransportError.serverError(code: error.code, message: error.message)
-        )
-      } else if let result {
-        pending.resume(id: id, result: result)
-      } else {
-        pending.resume(id: id, result: .null)
-      }
-
-    case .push(let event, let recordedAt, let sessionId, let payload, _):
-      let streamEvent = StreamEvent(
-        event: event,
-        recordedAt: recordedAt,
-        sessionId: sessionId,
-        payload: payload
-      )
-      lock.withLock {
-        globalStreamContinuation?.yield(streamEvent)
-        if let sessionId, let continuation = sessionStreamContinuations[sessionId] {
-          continuation.yield(streamEvent)
-        }
-      }
-
-    case .unknown:
-      break
-    }
-  }
-
-  func startHeartbeat() {
-    heartbeatTask?.cancel()
-    heartbeatTask = Task { [weak self] in
-      while !Task.isCancelled {
-        try? await Task.sleep(for: .seconds(15))
-        guard !Task.isCancelled, let self else { break }
-        _ = try? await self.send(method: "ping")
-      }
-    }
-  }
-
-  func terminateAllStreams() {
-    lock.withLock {
-      globalStreamContinuation?.finish()
-      globalStreamContinuation = nil
-      for (_, continuation) in sessionStreamContinuations {
-        continuation.finish()
-      }
-      sessionStreamContinuations.removeAll()
-    }
-  }
-
-  func wsEndpoint() -> URL {
-    var components = URLComponents(url: connection.endpoint, resolvingAgainstBaseURL: false)!
-    components.scheme = connection.endpoint.scheme == "https" ? "wss" : "ws"
-    components.path = "/v1/ws"
-    return components.url!
-  }
-
-  func decode<T: Decodable>(_ value: JSONValue) throws -> T {
-    let data = try JSONEncoder().encode(value)
-    return try decoder.decode(T.self, from: data)
-  }
-
-  func encodeParams<T: Encodable>(
-    _ body: T,
-    extra: [String: JSONValue]
-  ) throws -> JSONValue {
-    let data = try encoder.encode(body)
-    guard var object = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-      return .null
-    }
-    for (key, value) in extra {
-      if case .string(let stringValue) = value {
-        object[key] = stringValue
-      }
-    }
-    let merged = try JSONSerialization.data(withJSONObject: object)
-    return try JSONDecoder().decode(JSONValue.self, from: merged)
   }
 }
