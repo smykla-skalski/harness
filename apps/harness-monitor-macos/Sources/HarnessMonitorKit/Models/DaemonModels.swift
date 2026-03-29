@@ -103,6 +103,25 @@ public struct LaunchAgentStatus: Codable, Equatable, Sendable {
     self.statusError = statusError
   }
 
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    installed = try container.decode(Bool.self, forKey: .installed)
+    loaded = try container.decodeIfPresent(Bool.self, forKey: .loaded) ?? false
+    label = try container.decode(String.self, forKey: .label)
+    path = try container.decode(String.self, forKey: .path)
+    domainTarget = try container.decodeIfPresent(String.self, forKey: .domainTarget) ?? ""
+    serviceTarget = try container.decodeIfPresent(String.self, forKey: .serviceTarget) ?? ""
+    state = try container.decodeIfPresent(String.self, forKey: .state)
+    pid = try container.decodeIfPresent(Int.self, forKey: .pid)
+    lastExitStatus = try container.decodeIfPresent(Int.self, forKey: .lastExitStatus)
+    statusError = try container.decodeIfPresent(String.self, forKey: .statusError)
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case installed, loaded, label, path, domainTarget, serviceTarget
+    case state, pid, lastExitStatus, statusError
+  }
+
   public var lifecycleTitle: String {
     if pid != nil {
       return "Running"
