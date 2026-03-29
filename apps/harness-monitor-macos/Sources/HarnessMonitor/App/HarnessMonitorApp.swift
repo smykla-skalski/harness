@@ -38,7 +38,6 @@ struct HarnessMonitorApp: App {
       rootContent
     }
     .windowStyle(.titleBar)
-    .windowToolbarStyle(.unified(showsTitle: true))
     .defaultLaunchBehavior(.presented)
     .defaultSize(width: 1640, height: 980)
     .commands {

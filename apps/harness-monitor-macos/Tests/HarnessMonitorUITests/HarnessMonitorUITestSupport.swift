@@ -24,6 +24,7 @@ enum HarnessMonitorUITestAccessibility {
   static let sidebarSessionList = "monitor.sidebar.session-list"
   static let sidebarSessionListContent = "monitor.sidebar.session-list.content"
   static let sidebarFiltersCard = "monitor.sidebar.filters"
+  static let sidebarSearchField = "monitor.sidebar.search"
   static let sidebarClearFiltersButton = "monitor.sidebar.filters.clear"
   static let activeFilterButton = "monitor.sidebar.filter.active"
   static let allFilterButton = "monitor.sidebar.filter.all"
@@ -69,7 +70,6 @@ enum HarnessMonitorUITestAccessibility {
   static let workerAgentCard = "monitor.session.agent.worker-codex"
   static let preferencesRoot = "monitor.preferences.root"
   static let preferencesPanel = "monitor.preferences.panel"
-  static let preferencesBackdrop = "monitor.preferences.backdrop"
   static let preferencesEndpointCard = "monitor.preferences.metric.endpoint"
   static let preferencesVersionCard = "monitor.preferences.metric.version"
   static let preferencesLaunchdCard = "monitor.preferences.metric.launchd"
@@ -92,8 +92,17 @@ class HarnessMonitorUITestCase: XCTestCase {
 }
 
 extension HarnessMonitorUITestCase {
+  func mainWindow(in app: XCUIApplication) -> XCUIElement {
+    let mainWindow = app.windows.matching(identifier: "main").firstMatch
+    if mainWindow.exists {
+      return mainWindow
+    }
+    return app.windows.firstMatch
+  }
+
   func launch(mode: String) -> XCUIApplication {
     let app = XCUIApplication()
+    terminateIfRunning(app)
     app.launchEnvironment["HARNESS_MONITOR_UI_TESTS"] = "1"
     app.launchEnvironment[Self.launchModeKey] = mode
     app.launch()
@@ -103,12 +112,12 @@ extension HarnessMonitorUITestCase {
           app.activate()
         }
 
-        return app.state == .runningForeground || app.windows.firstMatch.exists
+        return app.state == .runningForeground || self.mainWindow(in: app).exists
       }
     )
     XCTAssertTrue(
       waitUntil(timeout: Self.uiTimeout) {
-        let window = app.windows.firstMatch
+        let window = self.mainWindow(in: app)
         app.activate()
         let title = app.staticTexts["Harness Monitor"]
         let sidebarRoot = self.element(
@@ -129,21 +138,37 @@ extension HarnessMonitorUITestCase {
     return app
   }
 
+  func terminateIfRunning(_ app: XCUIApplication) {
+    switch app.state {
+    case .runningForeground, .runningBackground:
+      app.terminate()
+      XCTAssertTrue(
+        waitUntil(timeout: Self.uiTimeout) {
+          app.state == .notRunning
+        }
+      )
+    case .notRunning, .unknown:
+      break
+    @unknown default:
+      break
+    }
+  }
+
   func tapButton(in app: XCUIApplication, identifier: String) {
     let deadline = Date().addingTimeInterval(Self.uiTimeout)
 
     while Date() < deadline {
       app.activate()
 
-      let button = app.buttons.matching(identifier: identifier).firstMatch
+      let button = button(in: app, identifier: identifier)
       if button.waitForExistence(timeout: 0.5) {
-        if let coordinate = centerCoordinate(in: app, for: button) {
-          coordinate.tap()
+        if button.isHittable {
+          button.tap()
           return
         }
 
-        if button.isHittable {
-          button.tap()
+        if let coordinate = centerCoordinate(in: app, for: button) {
+          coordinate.tap()
           return
         }
       }
@@ -162,13 +187,13 @@ extension HarnessMonitorUITestCase {
 
       let target = element(in: app, identifier: identifier)
       if target.waitForExistence(timeout: 0.5) {
-        if let coordinate = centerCoordinate(in: app, for: target) {
-          coordinate.tap()
+        if target.isHittable {
+          target.tap()
           return
         }
 
-        if target.isHittable {
-          target.tap()
+        if let coordinate = centerCoordinate(in: app, for: target) {
+          coordinate.tap()
           return
         }
       }
@@ -185,20 +210,43 @@ extension HarnessMonitorUITestCase {
       .firstMatch
   }
 
+  func button(in app: XCUIApplication, identifier: String) -> XCUIElement {
+    let mainWindowButton = mainWindow(in: app)
+      .descendants(matching: .button)
+      .matching(identifier: identifier)
+      .firstMatch
+    if mainWindowButton.exists {
+      return mainWindowButton
+    }
+    return app.buttons.matching(identifier: identifier).firstMatch
+  }
+
   func frameElement(in app: XCUIApplication, identifier: String) -> XCUIElement {
     app.otherElements.matching(identifier: identifier).firstMatch
   }
 
   func toolbarButton(in app: XCUIApplication, identifier: String) -> XCUIElement {
-    app.toolbars.buttons.matching(identifier: identifier).firstMatch
+    let mainWindowToolbarButton = mainWindow(in: app)
+      .toolbars
+      .buttons
+      .matching(identifier: identifier)
+      .firstMatch
+    if mainWindowToolbarButton.exists {
+      return mainWindowToolbarButton
+    }
+    return app.toolbars.buttons.matching(identifier: identifier).firstMatch
   }
 
   func toolbarButton(in app: XCUIApplication, index: Int) -> XCUIElement {
-    app.toolbars.buttons.element(boundBy: index)
+    let windowToolbarButtons = mainWindow(in: app).toolbars.buttons
+    if windowToolbarButtons.count > index {
+      return windowToolbarButtons.element(boundBy: index)
+    }
+    return app.toolbars.buttons.element(boundBy: index)
   }
 
   func sidebarToggleButton(in app: XCUIApplication) -> XCUIElement {
-    let toolbarButtons = app.toolbars.buttons.allElementsBoundByIndex
+    let toolbarButtons = mainWindow(in: app).toolbars.buttons.allElementsBoundByIndex
     if let button = toolbarButtons.first(where: { button in
       let identifier = button.identifier
       return
@@ -208,37 +256,11 @@ extension HarnessMonitorUITestCase {
       return button
     }
 
-    return app.toolbars.buttons.element(boundBy: 0)
-  }
-
-  func tapOutsidePreferencesPanel(in app: XCUIApplication) {
-    let window = app.windows.firstMatch
-    let panel = frameElement(
-      in: app,
-      identifier: HarnessMonitorUITestAccessibility.preferencesPanel
-    )
-    XCTAssertTrue(window.waitForExistence(timeout: Self.uiTimeout))
-    XCTAssertTrue(panel.waitForExistence(timeout: Self.uiTimeout))
-
-    let origin = window.coordinate(withNormalizedOffset: CGVector(dx: 0, dy: 0))
-    let leftSpace = panel.frame.minX - window.frame.minX
-    let rightSpace = window.frame.maxX - panel.frame.maxX
-    let preferredTapX: CGFloat =
-      if leftSpace > 32 {
-        leftSpace - 18
-      } else if rightSpace > 32 {
-        panel.frame.maxX - window.frame.minX + 18
-      } else {
-        18
-      }
-    let tapX = min(max(preferredTapX, 18), window.frame.width - 18)
-    let tapY = min(max(panel.frame.midY - window.frame.minY, 18), window.frame.height - 18)
-
-    origin.withOffset(CGVector(dx: tapX, dy: tapY)).tap()
+    return toolbarButton(in: app, index: 0)
   }
 
   func dragUp(in app: XCUIApplication, element: XCUIElement, distanceRatio: CGFloat = 0.32) {
-    let window = app.windows.firstMatch
+    let window = mainWindow(in: app)
     XCTAssertTrue(window.waitForExistence(timeout: Self.uiTimeout))
 
     let origin = window.coordinate(withNormalizedOffset: CGVector(dx: 0, dy: 0))
@@ -267,6 +289,18 @@ extension HarnessMonitorUITestCase {
     cancelButton.tap()
   }
 
+  func attachWindowScreenshot(
+    in app: XCUIApplication,
+    named name: String,
+    file: StaticString = #filePath,
+    line: UInt = #line
+  ) {
+    let attachment = XCTAttachment(screenshot: mainWindow(in: app).screenshot())
+    attachment.name = name
+    attachment.lifetime = .keepAlways
+    add(attachment)
+  }
+
   func waitUntil(
     timeout: TimeInterval = 5,
     pollInterval: TimeInterval = 0.1,
@@ -286,7 +320,7 @@ extension HarnessMonitorUITestCase {
     in app: XCUIApplication,
     for element: XCUIElement
   ) -> XCUICoordinate? {
-    let window = app.windows.firstMatch
+    let window = mainWindow(in: app)
     guard window.waitForExistence(timeout: 0.5) else {
       return nil
     }

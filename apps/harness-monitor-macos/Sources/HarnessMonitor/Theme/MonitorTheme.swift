@@ -46,6 +46,8 @@ enum MonitorTheme {
   static let sidebarHeader = monitorColor("MonitorSidebarHeader")
   static let sidebarMuted = monitorColor("MonitorSidebarMuted")
   static let overlayScrim = monitorColor("MonitorOverlayScrim")
+  static let secondaryInk = ink.opacity(0.78)
+  static let tertiaryInk = ink.opacity(0.64)
   static let glassStroke = Color.white.opacity(0.18)
   static let glassHighlight = Color.white.opacity(0.10)
   static let glassShadow = Color.black.opacity(0.16)
@@ -67,10 +69,9 @@ struct MonitorCardModifier: ViewModifier {
       .background {
         MonitorRoundedGlassBackground(
           cornerRadius: 22,
-          tint: nil,
+          tint: MonitorTheme.panel,
           interactive: false,
-          fallbackMaterial: .regularMaterial,
-          fallbackOverlay: MonitorTheme.panel.opacity(0.18),
+          fillOpacity: 0.10,
           strokeColor: MonitorTheme.panelBorder,
           shadowColor: .black.opacity(0.07),
           shadowRadius: 12,
@@ -173,7 +174,7 @@ func monitorActionHeader(title: String, subtitle: String) -> some View {
       .font(.system(.headline, design: .rounded, weight: .semibold))
     Text(subtitle)
       .font(.system(.subheadline, design: .rounded, weight: .medium))
-      .foregroundStyle(.secondary)
+      .foregroundStyle(MonitorTheme.secondaryInk)
   }
 }
 

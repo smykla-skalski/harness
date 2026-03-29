@@ -15,6 +15,17 @@ public enum SessionStatus: String, Codable, CaseIterable, Sendable {
   case active
   case paused
   case ended
+
+  public var title: String {
+    switch self {
+    case .active:
+      "Active"
+    case .paused:
+      "Paused"
+    case .ended:
+      "Ended"
+    }
+  }
 }
 
 public struct SessionMetrics: Codable, Equatable, Sendable {
@@ -76,12 +87,38 @@ public enum SessionRole: String, Codable, CaseIterable, Sendable {
   case worker
   case reviewer
   case improver
+
+  public var title: String {
+    switch self {
+    case .leader:
+      "Leader"
+    case .observer:
+      "Observer"
+    case .worker:
+      "Worker"
+    case .reviewer:
+      "Reviewer"
+    case .improver:
+      "Improver"
+    }
+  }
 }
 
 public enum AgentStatus: String, Codable, CaseIterable, Sendable {
   case active
   case disconnected
   case removed
+
+  public var title: String {
+    switch self {
+    case .active:
+      "Active"
+    case .disconnected:
+      "Disconnected"
+    case .removed:
+      "Removed"
+    }
+  }
 }
 
 public struct AgentRegistration: Codable, Equatable, Identifiable, Sendable {
@@ -106,6 +143,19 @@ public enum TaskSeverity: String, Codable, CaseIterable, Sendable {
   case medium
   case high
   case critical
+
+  public var title: String {
+    switch self {
+    case .low:
+      "Low"
+    case .medium:
+      "Medium"
+    case .high:
+      "High"
+    case .critical:
+      "Critical"
+    }
+  }
 }
 
 public enum TaskStatus: String, Codable, CaseIterable, Sendable {
@@ -114,6 +164,21 @@ public enum TaskStatus: String, Codable, CaseIterable, Sendable {
   case inReview
   case done
   case blocked
+
+  public var title: String {
+    switch self {
+    case .open:
+      "Open"
+    case .inProgress:
+      "In Progress"
+    case .inReview:
+      "In Review"
+    case .done:
+      "Done"
+    case .blocked:
+      "Blocked"
+    }
+  }
 }
 
 public enum TaskSource: String, Codable, CaseIterable, Sendable {
@@ -121,6 +186,19 @@ public enum TaskSource: String, Codable, CaseIterable, Sendable {
   case observe
   case signal
   case system
+
+  public var title: String {
+    switch self {
+    case .manual:
+      "Manual"
+    case .observe:
+      "Observe"
+    case .signal:
+      "Signal"
+    case .system:
+      "System"
+    }
+  }
 }
 
 public struct TaskNote: Codable, Equatable, Identifiable, Sendable {
@@ -258,91 +336,4 @@ public struct SessionDetail: Codable, Equatable, Sendable {
   public let signals: [SessionSignalRecord]
   public let observer: ObserverSummary?
   public let agentActivity: [AgentToolActivitySummary]
-}
-
-public struct RoleChangeRequest: Codable, Equatable, Sendable {
-  public let actor: String
-  public let role: SessionRole
-  public let reason: String?
-
-  public init(actor: String, role: SessionRole, reason: String? = nil) {
-    self.actor = actor
-    self.role = role
-    self.reason = reason
-  }
-}
-
-public struct AgentRemoveRequest: Codable, Equatable, Sendable {
-  public let actor: String
-}
-
-public struct LeaderTransferRequest: Codable, Equatable, Sendable {
-  public let actor: String
-  public let newLeaderId: String
-  public let reason: String?
-}
-
-public struct TaskCreateRequest: Codable, Equatable, Sendable {
-  public let actor: String
-  public let title: String
-  public let context: String?
-  public let severity: TaskSeverity
-  public let suggestedFix: String?
-
-  public init(
-    actor: String,
-    title: String,
-    context: String?,
-    severity: TaskSeverity,
-    suggestedFix: String? = nil
-  ) {
-    self.actor = actor
-    self.title = title
-    self.context = context
-    self.severity = severity
-    self.suggestedFix = suggestedFix
-  }
-}
-
-public struct TaskAssignRequest: Codable, Equatable, Sendable {
-  public let actor: String
-  public let agentId: String
-}
-
-public struct TaskUpdateRequest: Codable, Equatable, Sendable {
-  public let actor: String
-  public let status: TaskStatus
-  public let note: String?
-}
-
-public struct TaskCheckpointRequest: Codable, Equatable, Sendable {
-  public let actor: String
-  public let summary: String
-  public let progress: Int
-}
-
-public struct SessionEndRequest: Codable, Equatable, Sendable {
-  public let actor: String
-}
-
-public struct ObserveSessionRequest: Codable, Equatable, Sendable {
-  public let actor: String
-}
-
-public struct SignalSendRequest: Codable, Equatable, Sendable {
-  public let actor: String
-  public let agentId: String
-  public let command: String
-  public let message: String
-  public let actionHint: String?
-}
-
-public struct ErrorEnvelope: Codable, Equatable, Sendable {
-  public struct ErrorDetail: Codable, Equatable, Sendable {
-    public let code: String
-    public let message: String
-    public let details: [String]
-  }
-
-  public let error: ErrorDetail
 }

@@ -5,6 +5,19 @@ public enum SignalPriority: String, Codable, CaseIterable, Sendable {
   case normal
   case high
   case urgent
+
+  public var title: String {
+    switch self {
+    case .low:
+      "Low"
+    case .normal:
+      "Normal"
+    case .high:
+      "High"
+    case .urgent:
+      "Urgent"
+    }
+  }
 }
 
 public struct DeliveryConfig: Codable, Equatable, Sendable {
@@ -88,6 +101,19 @@ public enum AckResult: String, Codable, CaseIterable, Sendable {
   case rejected
   case deferred
   case expired
+
+  public var title: String {
+    switch self {
+    case .accepted:
+      "Accepted"
+    case .rejected:
+      "Rejected"
+    case .deferred:
+      "Deferred"
+    case .expired:
+      "Expired"
+    }
+  }
 }
 
 public struct SignalAck: Codable, Equatable, Identifiable, Sendable {
@@ -107,6 +133,21 @@ public enum SessionSignalStatus: String, Codable, CaseIterable, Sendable {
   case rejected
   case deferred
   case expired
+
+  public var title: String {
+    switch self {
+    case .pending:
+      "Pending"
+    case .acknowledged:
+      "Acknowledged"
+    case .rejected:
+      "Rejected"
+    case .deferred:
+      "Deferred"
+    case .expired:
+      "Expired"
+    }
+  }
 }
 
 public struct SessionSignalRecord: Codable, Equatable, Identifiable, Sendable {

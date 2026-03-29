@@ -67,10 +67,7 @@ struct ContentView: View {
       InspectorColumnView(store: store)
         .navigationSplitViewColumnWidth(min: 320, ideal: 380)
     }
-    .toolbarRole(.editor)
     .navigationSplitViewStyle(.balanced)
-    .toolbarBackgroundVisibility(.visible, for: .windowToolbar)
-    .containerBackground(.windowBackground, for: .window)
     .frame(maxWidth: .infinity, maxHeight: .infinity)
     .confirmationDialog(
       confirmationTitle,

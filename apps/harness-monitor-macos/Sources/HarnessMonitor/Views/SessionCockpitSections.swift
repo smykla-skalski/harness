@@ -22,7 +22,7 @@ struct SessionMetricGrid: View {
     VStack(alignment: .leading, spacing: 6) {
       Text(title.uppercased())
         .font(.caption.weight(.semibold))
-        .foregroundStyle(.secondary)
+        .foregroundStyle(MonitorTheme.secondaryInk)
       Text(value)
         .font(.system(size: 28, weight: .heavy, design: .rounded))
         .foregroundStyle(tint)
@@ -68,7 +68,7 @@ struct SessionTaskSummaryCard: View {
             .font(.system(.headline, design: .rounded, weight: .semibold))
             .lineLimit(2)
           Spacer()
-          Text(task.severity.rawValue.capitalized)
+          Text(task.severity.title)
             .font(.caption.bold())
             .padding(.horizontal, 8)
             .padding(.vertical, 4)
@@ -77,18 +77,18 @@ struct SessionTaskSummaryCard: View {
         }
         Text(task.context ?? "No extra context")
           .font(.subheadline)
-          .foregroundStyle(.secondary)
+          .foregroundStyle(MonitorTheme.secondaryInk)
           .multilineTextAlignment(.leading)
           .lineLimit(2)
         Spacer(minLength: 0)
         HStack(alignment: .firstTextBaseline) {
-          Text(task.status.rawValue)
+          Text(task.status.title)
             .font(.caption.weight(.bold))
             .foregroundStyle(taskStatusColor(for: task.status))
           Spacer()
           Text(task.assignedTo ?? "unassigned")
             .font(.caption.monospaced())
-            .foregroundStyle(.secondary)
+            .foregroundStyle(MonitorTheme.secondaryInk)
             .lineLimit(1)
         }
       }
@@ -101,7 +101,7 @@ struct SessionTaskSummaryCard: View {
     .buttonStyle(.plain)
     .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
     .accessibilityIdentifier(MonitorAccessibility.sessionTaskCard(task.taskId))
-    .accessibilityFrameMarker(MonitorAccessibility.sessionTaskCard(task.taskId))
+    .accessibilityFrameMarker("\(MonitorAccessibility.sessionTaskCard(task.taskId)).frame")
     .transition(
       .asymmetric(
         insertion: .scale(scale: 0.95).combined(with: .opacity),
@@ -143,7 +143,7 @@ struct SessionAgentSummaryCard: View {
             .font(.system(.headline, design: .rounded, weight: .semibold))
             .lineLimit(2)
           Spacer()
-          Text(agent.role.rawValue.capitalized)
+          Text(agent.role.title)
             .font(.caption.bold())
             .padding(.horizontal, 8)
             .padding(.vertical, 4)
@@ -152,7 +152,7 @@ struct SessionAgentSummaryCard: View {
         }
         Text("\(agent.runtime) • \(agent.agentId)")
           .font(.caption.monospaced())
-          .foregroundStyle(.secondary)
+          .foregroundStyle(MonitorTheme.secondaryInk)
           .lineLimit(1)
         Spacer(minLength: 0)
         HStack(spacing: 10) {
@@ -170,7 +170,7 @@ struct SessionAgentSummaryCard: View {
     .buttonStyle(.plain)
     .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
     .accessibilityIdentifier(MonitorAccessibility.sessionAgentCard(agent.agentId))
-    .accessibilityFrameMarker(MonitorAccessibility.sessionAgentCard(agent.agentId))
+    .accessibilityFrameMarker("\(MonitorAccessibility.sessionAgentCard(agent.agentId)).frame")
     .transition(
       .asymmetric(
         insertion: .scale(scale: 0.95).combined(with: .opacity),

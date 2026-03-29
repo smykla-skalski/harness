@@ -110,6 +110,13 @@ final class RecordingMonitorClient: MonitorClientProtocol, @unchecked Sendable {
   private let lock = NSLock()
   private var _calls: [Call] = []
   private var _detail: SessionDetail
+  private var _diagnosticsDelay: Duration?
+  private var _mutationDelay: Duration?
+  private var _sessionSummaries: [SessionSummary]?
+  private var _sessionDetailsByID: [String: SessionDetail] = [:]
+  private var _detailDelays: [String: Duration] = [:]
+  private var _timelinesBySessionID: [String: [TimelineEntry]] = [:]
+  private var _timelineDelays: [String: Duration] = [:]
 
   var calls: [Call] {
     get { lock.withLock { _calls } }
@@ -127,6 +134,78 @@ final class RecordingMonitorClient: MonitorClientProtocol, @unchecked Sendable {
 
   func recordedCalls() -> [Call] {
     calls
+  }
+
+  func configureDiagnosticsDelay(_ delay: Duration?) {
+    lock.withLock {
+      _diagnosticsDelay = delay
+    }
+  }
+
+  func configureMutationDelay(_ delay: Duration?) {
+    lock.withLock {
+      _mutationDelay = delay
+    }
+  }
+
+  func configureSessions(
+    summaries: [SessionSummary],
+    detailsByID: [String: SessionDetail],
+    timelinesBySessionID: [String: [TimelineEntry]] = [:]
+  ) {
+    lock.withLock {
+      _sessionSummaries = summaries
+      _sessionDetailsByID = detailsByID
+      _timelinesBySessionID = timelinesBySessionID
+    }
+  }
+
+  func configureDetailDelay(_ delay: Duration?, for sessionID: String) {
+    lock.withLock {
+      if let delay {
+        _detailDelays[sessionID] = delay
+      } else {
+        _detailDelays.removeValue(forKey: sessionID)
+      }
+    }
+  }
+
+  func configureTimelineDelay(_ delay: Duration?, for sessionID: String) {
+    lock.withLock {
+      if let delay {
+        _timelineDelays[sessionID] = delay
+      } else {
+        _timelineDelays.removeValue(forKey: sessionID)
+      }
+    }
+  }
+
+  func configuredDiagnosticsDelay() -> Duration? {
+    lock.withLock { _diagnosticsDelay }
+  }
+
+  func configuredMutationDelay() -> Duration? {
+    lock.withLock { _mutationDelay }
+  }
+
+  func configuredSessions() -> [SessionSummary]? {
+    lock.withLock { _sessionSummaries }
+  }
+
+  func configuredSessionDetail(id: String) -> SessionDetail? {
+    lock.withLock { _sessionDetailsByID[id] }
+  }
+
+  func configuredDetailDelay(for sessionID: String) -> Duration? {
+    lock.withLock { _detailDelays[sessionID] }
+  }
+
+  func configuredTimeline(for sessionID: String) -> [TimelineEntry]? {
+    lock.withLock { _timelinesBySessionID[sessionID] }
+  }
+
+  func configuredTimelineDelay(for sessionID: String) -> Duration? {
+    lock.withLock { _timelineDelays[sessionID] }
   }
 }
 

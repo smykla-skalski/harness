@@ -6,13 +6,12 @@ struct SessionsBoardView: View {
   @Bindable var store: MonitorStore
 
   private var isLoading: Bool {
-    store.isBusy || store.isRefreshing || store.connectionState == .connecting
+    store.isDaemonActionInFlight || store.isRefreshing || store.connectionState == .connecting
   }
 
   var body: some View {
     MonitorColumnScrollView {
       VStack(alignment: .leading, spacing: 22) {
-        hero
         if store.sessions.isEmpty {
           onboardingCard
         }
@@ -28,32 +27,6 @@ struct SessionsBoardView: View {
     .accessibilityIdentifier(MonitorAccessibility.sessionsBoardRoot)
   }
 
-  private var hero: some View {
-    VStack(alignment: .leading, spacing: 12) {
-      Text("Harness Monitor")
-        .font(.system(size: 42, weight: .black, design: .serif))
-      Text(
-        "A live control deck for harness daemon sessions, task flow, runtimes, and signal latency."
-      )
-      .font(.system(.title3, design: .rounded, weight: .medium))
-      .foregroundStyle(.secondary)
-
-      if store.isRefreshing || store.connectionState == .connecting {
-        MonitorLoadingStateView(title: loadingTitle)
-          .transition(.move(edge: .top).combined(with: .opacity))
-      }
-
-      if let lastError = store.lastError {
-        Text(lastError)
-          .font(.system(.footnote, design: .rounded, weight: .semibold))
-          .foregroundStyle(MonitorTheme.danger)
-      }
-    }
-    .frame(maxWidth: .infinity, alignment: .leading)
-    .monitorCard(contentPadding: 16)
-    .liveActivityBorder(isActive: store.dataReceivedPulse)
-  }
-
   private var onboardingCard: some View {
     VStack(alignment: .leading, spacing: 16) {
       HStack(alignment: .top) {
@@ -65,7 +38,7 @@ struct SessionsBoardView: View {
               + "Start the control plane once, then keep it resident with a launch agent."
           )
           .font(.system(.body, design: .rounded, weight: .medium))
-          .foregroundStyle(.secondary)
+          .foregroundStyle(MonitorTheme.secondaryInk)
         }
         Spacer()
         Text(store.daemonStatus?.launchAgent.installed == true ? "Persistent" : "Manual")
@@ -97,8 +70,7 @@ struct SessionsBoardView: View {
     .frame(maxWidth: .infinity, alignment: .leading)
   }
 
-  @ViewBuilder
-  private var metricCards: some View {
+  @ViewBuilder private var metricCards: some View {
     trackedProjectsMetricCard
     indexedSessionsMetricCard
     openWorkMetricCard
@@ -114,7 +86,7 @@ struct SessionsBoardView: View {
           "No sessions indexed yet. Bring the daemon online or refresh after starting a harness session."
         )
         .font(.system(.body, design: .rounded, weight: .medium))
-        .foregroundStyle(.secondary)
+        .foregroundStyle(MonitorTheme.secondaryInk)
       } else {
         MonitorGlassContainer(spacing: 12) {
           ForEach(store.sessions.prefix(8)) { session in
@@ -128,15 +100,16 @@ struct SessionsBoardView: View {
                 VStack(alignment: .leading, spacing: 4) {
                   Text(session.context)
                     .font(.system(.headline, design: .rounded, weight: .semibold))
+                    .foregroundStyle(MonitorTheme.ink)
                     .multilineTextAlignment(.leading)
                   Text("\(session.projectName) • \(session.sessionId)")
                     .font(.caption.monospaced())
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(MonitorTheme.secondaryInk)
                 }
                 Spacer()
                 Text(formatTimestamp(session.updatedAt))
                   .font(.caption.weight(.semibold))
-                  .foregroundStyle(.secondary)
+                  .foregroundStyle(MonitorTheme.secondaryInk)
               }
               .frame(maxWidth: .infinity, alignment: .leading)
               .padding(14)
@@ -155,20 +128,11 @@ struct SessionsBoardView: View {
     .accessibilityIdentifier(MonitorAccessibility.recentSessionsCard)
   }
 
-  private var loadingTitle: String {
-    switch store.connectionState {
-    case .connecting:
-      "Connecting to the live daemon stream"
-    default:
-      "Refreshing the indexed session board"
-    }
-  }
-
   private func metricCard(title: String, value: String, tint: Color) -> some View {
     VStack(alignment: .leading, spacing: 8) {
       Text(title.uppercased())
         .font(.caption.weight(.semibold))
-        .foregroundStyle(.secondary)
+        .foregroundStyle(MonitorTheme.secondaryInk)
       Text(value)
         .font(.system(size: 34, weight: .heavy, design: .rounded))
         .foregroundStyle(tint)
@@ -195,7 +159,7 @@ struct SessionsBoardView: View {
       }
       Text(detail)
         .font(.system(.footnote, design: .rounded, weight: .medium))
-        .foregroundStyle(.secondary)
+        .foregroundStyle(MonitorTheme.secondaryInk)
         .lineLimit(2)
       Text(isReady ? "Ready" : "Pending")
         .font(.caption.bold())
@@ -289,8 +253,7 @@ struct SessionsBoardView: View {
 }
 
 extension SessionsBoardView {
-  @ViewBuilder
-  fileprivate var onboardingActionButtons: some View {
+  @ViewBuilder fileprivate var onboardingActionButtons: some View {
     MonitorGlassContainer(spacing: 10) {
       MonitorWrapLayout(spacing: 10, lineSpacing: 10) {
         startDaemonButton
@@ -332,7 +295,7 @@ extension SessionsBoardView {
       title: "Refresh Index",
       tint: MonitorTheme.ink,
       variant: .bordered,
-      isLoading: isLoading,
+      isLoading: store.isRefreshing,
       accessibilityIdentifier: "monitor.board.action.refresh",
       fillsWidth: false
     ) {
