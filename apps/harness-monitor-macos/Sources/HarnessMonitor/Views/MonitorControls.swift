@@ -1,5 +1,16 @@
 import SwiftUI
 
+enum MonitorControlMetrics {
+  static let compactControlSize: ControlSize = .small
+  static let actionHorizontalPadding: CGFloat = 10
+  static let actionVerticalPadding: CGFloat = 2
+  static let actionMinHeight: CGFloat = 26
+  static let fullWidthActionMinHeight: CGFloat = 30
+  static let chipHorizontalPadding: CGFloat = 8
+  static let chipVerticalPadding: CGFloat = 2
+  static let chipMinHeight: CGFloat = 26
+}
+
 struct MonitorAsyncActionButton: View {
   enum Variant: Equatable {
     case prominent
@@ -38,7 +49,7 @@ struct MonitorAsyncActionButton: View {
     }
     .frame(maxWidth: fillsWidth ? .infinity : nil, alignment: .center)
     .monitorActionButtonStyle(variant: variant, tint: tint)
-    .controlSize(fillsWidth ? .large : .regular)
+    .controlSize(MonitorControlMetrics.compactControlSize)
     .disabled(isLoading)
     .accessibilityIdentifier(accessibilityIdentifier)
     .accessibilityFrameMarker("\(accessibilityIdentifier).frame")
@@ -50,15 +61,21 @@ struct MonitorAsyncActionButton: View {
       .overlay(alignment: .leading) {
         if isLoading {
           progressSlot
-            .padding(.leading, fillsWidth ? 10 : 8)
+            .padding(.leading, fillsWidth ? 8 : 6)
         }
       }
       .frame(maxWidth: fillsWidth ? .infinity : nil, alignment: .center)
       .multilineTextAlignment(.center)
-      .font(.system(.subheadline, design: .rounded, weight: .semibold))
-      .padding(.horizontal, fillsWidth ? 12 : 11)
-      .padding(.vertical, fillsWidth ? 7 : 4)
-      .frame(maxWidth: fillsWidth ? .infinity : nil, minHeight: fillsWidth ? 38 : 32)
+      .font(.system(.callout, design: .rounded, weight: .semibold))
+      .padding(.horizontal, MonitorControlMetrics.actionHorizontalPadding)
+      .padding(.vertical, MonitorControlMetrics.actionVerticalPadding)
+      .frame(
+        maxWidth: fillsWidth ? .infinity : nil,
+        minHeight:
+          fillsWidth
+          ? MonitorControlMetrics.fullWidthActionMinHeight
+          : MonitorControlMetrics.actionMinHeight
+      )
       .modifier(FillWidthButtonSizing(isEnabled: fillsWidth))
   }
 
@@ -132,6 +149,33 @@ extension View {
       self
         .buttonStyle(.borderless)
         .tint(tint)
+    }
+  }
+
+  @ViewBuilder
+  func monitorFilterChipButtonStyle(
+    isSelected: Bool,
+    tint: Color = MonitorTheme.accent
+  ) -> some View {
+    if #available(macOS 26, *) {
+      if isSelected {
+        self
+          .buttonStyle(.glassProminent)
+          .tint(tint)
+      } else {
+        self
+          .buttonStyle(.glass)
+      }
+    } else {
+      if isSelected {
+        self
+          .buttonStyle(.borderedProminent)
+          .tint(tint)
+      } else {
+        self
+          .buttonStyle(.bordered)
+          .tint(MonitorTheme.ink)
+      }
     }
   }
 }

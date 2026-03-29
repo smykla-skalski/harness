@@ -27,8 +27,14 @@ extension RecordingMonitorClient {
       ),
       launchAgent: LaunchAgentStatus(
         installed: true,
+        loaded: true,
         label: "io.harness.monitor.daemon",
-        path: "/tmp/io.harness.monitor.daemon.plist"
+        path: "/tmp/io.harness.monitor.daemon.plist",
+        domainTarget: "gui/501",
+        serviceTarget: "gui/501/io.harness.monitor.daemon",
+        state: "running",
+        pid: 4_242,
+        lastExitStatus: 0
       ),
       workspace: DaemonDiagnostics(
         daemonRoot: "/tmp/harness/daemon",

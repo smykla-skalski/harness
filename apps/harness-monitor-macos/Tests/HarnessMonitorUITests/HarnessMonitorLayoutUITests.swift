@@ -157,6 +157,24 @@ final class HarnessMonitorLayoutUITests: HarnessMonitorUITestCase {
     XCTAssertLessThan(daemonCard.frame.height, 360)
   }
 
+  func testSidebarContentStartsBelowToolbarChrome() throws {
+    let app = launch(mode: "preview")
+
+    let window = app.windows.firstMatch
+    let sidebarContent = frameElement(in: app, identifier: Accessibility.sidebarShellFrame)
+    let daemonCard = frameElement(in: app, identifier: Accessibility.daemonCardFrame)
+
+    XCTAssertTrue(window.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(sidebarContent.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(daemonCard.waitForExistence(timeout: Self.uiTimeout))
+
+    let toolbarOffset = sidebarContent.frame.minY - window.frame.minY
+    XCTAssertGreaterThan(toolbarOffset, 40)
+    XCTAssertLessThan(toolbarOffset, 84)
+    XCTAssertGreaterThanOrEqual(daemonCard.frame.minY - sidebarContent.frame.minY, 0)
+    XCTAssertLessThan(daemonCard.frame.minY - sidebarContent.frame.minY, 28)
+  }
+
   func testSidebarProjectHeaderFillsAvailableWidth() throws {
     let app = launch(mode: "preview")
 
@@ -171,6 +189,70 @@ final class HarnessMonitorLayoutUITests: HarnessMonitorUITestCase {
       in: sessionList,
       expectedHorizontalInset: 0,
       tolerance: 10
+    )
+  }
+
+  func testSidebarFilterSliceFillsColumnAndShowsSavedSearches() throws {
+    let app = launch(mode: "preview")
+
+    let sidebarRoot = element(in: app, identifier: Accessibility.sidebarRoot)
+    let filtersCard = app.staticTexts["Search & Filters"]
+    let savedSearch = element(
+      in: app,
+      identifier: Accessibility.sidebarSavedSearchButton("blocked-followups")
+    )
+    let clearButton = element(in: app, identifier: Accessibility.sidebarClearFiltersButton)
+
+    XCTAssertTrue(sidebarRoot.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(filtersCard.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(savedSearch.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertFalse(clearButton.exists)
+    XCTAssertTrue(sidebarRoot.exists)
+    XCTAssertTrue(filtersCard.exists)
+  }
+
+  func testEmptyModeSidebarScrollRevealsLowerSavedSearches() throws {
+    let app = launch(mode: "preview")
+
+    let scrollView = app.descendants(matching: .scrollView).firstMatch
+    let sessionRow = app.buttons.matching(identifier: Accessibility.previewSessionRow).firstMatch
+
+    XCTAssertTrue(scrollView.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(sessionRow.waitForExistence(timeout: Self.uiTimeout))
+
+    let initialMinY = sessionRow.frame.minY
+
+    for _ in 0..<3 {
+      dragUp(in: app, element: scrollView, distanceRatio: 0.44)
+      if sessionRow.frame.minY < initialMinY - 20 {
+        break
+      }
+    }
+
+    XCTAssertTrue(
+      waitUntil {
+        sessionRow.frame.minY < initialMinY - 20
+      }
+    )
+  }
+
+  func testSavedSearchSelectionTogglesAccessibilityState() throws {
+    let app = launch(mode: "preview")
+
+    let savedSearch = element(
+      in: app,
+      identifier: Accessibility.sidebarSavedSearchButton("blocked-followups")
+    )
+    XCTAssertTrue(savedSearch.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertEqual(savedSearch.value as? String, "not selected")
+
+    savedSearch.tap()
+
+    XCTAssertEqual(savedSearch.value as? String, "selected")
+    XCTAssertTrue(
+      element(in: app, identifier: Accessibility.sidebarClearFiltersButton).waitForExistence(
+        timeout: Self.uiTimeout
+      )
     )
   }
 
@@ -214,6 +296,12 @@ final class HarnessMonitorLayoutUITests: HarnessMonitorUITestCase {
     XCTAssertTrue(versionCard.waitForExistence(timeout: Self.uiTimeout))
     XCTAssertTrue(launchdCard.waitForExistence(timeout: Self.uiTimeout))
     XCTAssertTrue(cachedSessionsCard.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(app.staticTexts["Running"].waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(
+      app.staticTexts["gui/501/io.harness.monitor.daemon"].waitForExistence(
+        timeout: Self.uiTimeout
+      )
+    )
 
     assertSameRow([endpointCard, versionCard, launchdCard, cachedSessionsCard], tolerance: 10)
     assertEqualHeights(

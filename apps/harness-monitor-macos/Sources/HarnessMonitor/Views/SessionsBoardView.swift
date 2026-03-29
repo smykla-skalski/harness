@@ -280,52 +280,63 @@ struct SessionsBoardView: View {
     )
   }
 
-  @ViewBuilder
-  private var onboardingActionButtons: some View {
-    MonitorAdaptiveGridLayout(
-      minimumColumnWidth: 180,
-      maximumColumns: 3,
-      spacing: 12
-    ) {
-      MonitorAsyncActionButton(
-        title: "Start Daemon",
-        tint: MonitorTheme.accent,
-        variant: .prominent,
-        isLoading: isLoading,
-        accessibilityIdentifier: "monitor.board.action.start",
-        fillsWidth: true
-      ) {
-        await store.startDaemon()
-      }
-
-      MonitorAsyncActionButton(
-        title: "Install Launch Agent",
-        tint: MonitorTheme.ink,
-        variant: .bordered,
-        isLoading: isLoading,
-        accessibilityIdentifier: "monitor.board.action.install",
-        fillsWidth: true
-      ) {
-        await store.installLaunchAgent()
-      }
-
-      MonitorAsyncActionButton(
-        title: "Refresh Index",
-        tint: MonitorTheme.ink,
-        variant: .bordered,
-        isLoading: isLoading,
-        accessibilityIdentifier: "monitor.board.action.refresh",
-        fillsWidth: true
-      ) {
-        await store.refresh()
-      }
-    }
-  }
-
   private func select(sessionID: String) {
     store.primeSessionSelection(sessionID)
     Task {
       await store.selectSession(sessionID)
+    }
+  }
+}
+
+extension SessionsBoardView {
+  @ViewBuilder
+  fileprivate var onboardingActionButtons: some View {
+    MonitorGlassContainer(spacing: 10) {
+      MonitorWrapLayout(spacing: 10, lineSpacing: 10) {
+        startDaemonButton
+        installLaunchAgentButton
+        refreshIndexButton
+      }
+    }
+    .frame(maxWidth: .infinity, alignment: .leading)
+  }
+
+  fileprivate var startDaemonButton: some View {
+    MonitorAsyncActionButton(
+      title: "Start Daemon",
+      tint: MonitorTheme.accent,
+      variant: .prominent,
+      isLoading: isLoading,
+      accessibilityIdentifier: "monitor.board.action.start",
+      fillsWidth: false
+    ) {
+      await store.startDaemon()
+    }
+  }
+
+  fileprivate var installLaunchAgentButton: some View {
+    MonitorAsyncActionButton(
+      title: "Install Launch Agent",
+      tint: MonitorTheme.ink,
+      variant: .bordered,
+      isLoading: isLoading,
+      accessibilityIdentifier: "monitor.board.action.install",
+      fillsWidth: false
+    ) {
+      await store.installLaunchAgent()
+    }
+  }
+
+  fileprivate var refreshIndexButton: some View {
+    MonitorAsyncActionButton(
+      title: "Refresh Index",
+      tint: MonitorTheme.ink,
+      variant: .bordered,
+      isLoading: isLoading,
+      accessibilityIdentifier: "monitor.board.action.refresh",
+      fillsWidth: false
+    ) {
+      await store.refresh()
     }
   }
 }

@@ -73,11 +73,7 @@ struct SidebarView: View {
       }
       .frame(maxWidth: .infinity, alignment: .leading)
 
-      VStack(spacing: 5) {
-        sidebarStartDaemonButton
-        sidebarInstallLaunchAgentButton
-      }
-      .frame(maxWidth: .infinity, alignment: .leading)
+      daemonActionButtons
     }
     .frame(maxWidth: .infinity, alignment: .leading)
     .padding(12)
@@ -126,7 +122,7 @@ extension SidebarView {
         variant: .prominent,
         isLoading: isLoading,
         accessibilityIdentifier: MonitorAccessibility.sidebarStartDaemonButton,
-        fillsWidth: true
+        fillsWidth: false
       ) {
         await store.startDaemon()
       }
@@ -141,11 +137,21 @@ extension SidebarView {
         variant: .bordered,
         isLoading: isLoading,
         accessibilityIdentifier: MonitorAccessibility.sidebarInstallLaunchAgentButton,
-        fillsWidth: true
+        fillsWidth: false
       ) {
         await store.installLaunchAgent()
       }
     }
+  }
+
+  fileprivate var daemonActionButtons: some View {
+    MonitorGlassContainer(spacing: 8) {
+      MonitorWrapLayout(spacing: 8, lineSpacing: 8) {
+        sidebarStartDaemonButton
+        sidebarInstallLaunchAgentButton
+      }
+    }
+    .frame(maxWidth: .infinity, alignment: .leading)
   }
 
   fileprivate var connectionLabel: String {
@@ -270,7 +276,6 @@ extension SidebarView {
     ZStack(alignment: .topLeading) {
       content()
     }
-    .frame(maxWidth: .infinity, alignment: .topLeading)
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(identifier)
   }

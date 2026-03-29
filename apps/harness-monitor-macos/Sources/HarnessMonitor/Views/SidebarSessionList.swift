@@ -59,7 +59,7 @@ struct SidebarSessionList: View {
 
       filterSection(title: "Status") {
         MonitorGlassContainer(spacing: 8) {
-          MonitorAdaptiveGridLayout(minimumColumnWidth: 86, maximumColumns: 3, spacing: 8) {
+          MonitorWrapLayout(spacing: 6, lineSpacing: 6) {
             ForEach(MonitorStore.SessionFilter.allCases) { filter in
               filterChip(
                 title: filter.title,
@@ -76,7 +76,7 @@ struct SidebarSessionList: View {
 
       filterSection(title: "Focus") {
         MonitorGlassContainer(spacing: 8) {
-          MonitorAdaptiveGridLayout(minimumColumnWidth: 112, maximumColumns: 3, spacing: 8) {
+          MonitorWrapLayout(spacing: 6, lineSpacing: 6) {
             ForEach(SessionFocusFilter.allCases) { filter in
               filterChip(
                 title: filter.title,
@@ -222,19 +222,17 @@ struct SidebarSessionList: View {
   ) -> some View {
     Button(action: action) {
       Text(title)
-        .font(.system(.caption, design: .rounded, weight: .semibold))
+        .font(.system(.callout, design: .rounded, weight: .semibold))
         .lineLimit(1)
-        .frame(maxWidth: .infinity, minHeight: 34)
-        .padding(.horizontal, 10)
-        .foregroundStyle(isSelected ? Color.white : MonitorTheme.ink)
-        .background {
-          MonitorInteractiveCardBackground(
-            cornerRadius: 12,
-            tint: isSelected ? MonitorTheme.accent : nil
-          )
-        }
+        .minimumScaleFactor(0.88)
+        .padding(.horizontal, MonitorControlMetrics.chipHorizontalPadding)
+        .padding(.vertical, MonitorControlMetrics.chipVerticalPadding)
+        .frame(minHeight: MonitorControlMetrics.chipMinHeight)
+        .fixedSize(horizontal: true, vertical: true)
     }
-    .buttonStyle(.plain)
+    .buttonBorderShape(.roundedRectangle(radius: 12))
+    .monitorFilterChipButtonStyle(isSelected: isSelected)
+    .controlSize(MonitorControlMetrics.compactControlSize)
     .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
     .accessibilityIdentifier(identifier)
     .accessibilityFrameMarker(identifier)
@@ -250,6 +248,9 @@ struct SidebarSessionList: View {
           Text(search.title)
             .font(.system(.body, design: .rounded, weight: .semibold))
             .lineLimit(2)
+            .foregroundStyle(
+              store.selectedSavedSearchID == search.id ? Color.white : MonitorTheme.ink
+            )
           Spacer()
           if store.selectedSavedSearchID == search.id {
             Circle()
@@ -258,18 +259,28 @@ struct SidebarSessionList: View {
           }
         }
         Text(search.summary)
-          .font(.caption)
-          .foregroundStyle(.secondary)
+          .font(.system(.footnote, design: .rounded, weight: .medium))
+          .foregroundStyle(
+            store.selectedSavedSearchID == search.id
+              ? Color.white.opacity(0.84) : MonitorTheme.ink.opacity(0.72)
+          )
           .lineLimit(2, reservesSpace: true)
       }
       .frame(maxWidth: .infinity, minHeight: 72, alignment: .topLeading)
       .padding(12)
-      .foregroundStyle(MonitorTheme.ink)
       .background {
-        MonitorInteractiveCardBackground(
-          cornerRadius: 16,
-          tint: store.selectedSavedSearchID == search.id ? MonitorTheme.accent : nil
-        )
+        if store.selectedSavedSearchID == search.id {
+          MonitorInteractiveCardBackground(
+            cornerRadius: 16,
+            tint: MonitorTheme.accent
+          )
+        } else {
+          MonitorInsetPanelBackground(
+            cornerRadius: 16,
+            fillOpacity: 0.10,
+            strokeOpacity: 0.16
+          )
+        }
       }
     }
     .buttonStyle(.plain)

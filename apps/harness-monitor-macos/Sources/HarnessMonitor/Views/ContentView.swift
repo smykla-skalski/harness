@@ -66,7 +66,7 @@ struct ContentView: View {
               .accessibilityIdentifier(MonitorAccessibility.daemonPreferencesButton)
             }
           }
-          .toolbarBackground(.regularMaterial, for: .windowToolbar)
+          .toolbarBackground(.visible, for: .windowToolbar)
           .navigationSplitViewColumnWidth(min: 600, ideal: 840)
         } detail: {
           InspectorColumnView(store: store)

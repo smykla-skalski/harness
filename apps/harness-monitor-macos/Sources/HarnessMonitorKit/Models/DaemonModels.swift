@@ -69,13 +69,78 @@ public struct DaemonDiagnostics: Codable, Equatable, Sendable {
 
 public struct LaunchAgentStatus: Codable, Equatable, Sendable {
   public let installed: Bool
+  public let loaded: Bool
   public let label: String
   public let path: String
+  public let domainTarget: String
+  public let serviceTarget: String
+  public let state: String?
+  public let pid: Int?
+  public let lastExitStatus: Int?
+  public let statusError: String?
 
-  public init(installed: Bool, label: String, path: String) {
+  public init(
+    installed: Bool,
+    loaded: Bool = false,
+    label: String,
+    path: String,
+    domainTarget: String = "",
+    serviceTarget: String = "",
+    state: String? = nil,
+    pid: Int? = nil,
+    lastExitStatus: Int? = nil,
+    statusError: String? = nil
+  ) {
     self.installed = installed
+    self.loaded = loaded
     self.label = label
     self.path = path
+    self.domainTarget = domainTarget
+    self.serviceTarget = serviceTarget
+    self.state = state
+    self.pid = pid
+    self.lastExitStatus = lastExitStatus
+    self.statusError = statusError
+  }
+
+  public var lifecycleTitle: String {
+    if pid != nil {
+      return "Running"
+    }
+    if loaded {
+      return state?.replacingOccurrences(of: "_", with: " ").capitalized ?? "Loaded"
+    }
+    if installed {
+      return "Installed"
+    }
+    return "Manual"
+  }
+
+  public var lifecycleCaption: String {
+    if let statusError, !statusError.isEmpty {
+      return statusError
+    }
+
+    var parts: [String] = []
+    if !serviceTarget.isEmpty {
+      parts.append(serviceTarget)
+    } else if !label.isEmpty {
+      parts.append(label)
+    }
+
+    if let pid {
+      parts.append("pid " + String(pid))
+    } else if let state, loaded {
+      parts.append(state.replacingOccurrences(of: "_", with: " "))
+    } else if loaded {
+      parts.append("loaded")
+    }
+
+    if let lastExitStatus {
+      parts.append("exit \(lastExitStatus)")
+    }
+
+    return parts.joined(separator: " • ")
   }
 }
 

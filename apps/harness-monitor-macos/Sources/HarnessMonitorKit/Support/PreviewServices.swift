@@ -245,8 +245,14 @@ public actor PreviewDaemonController: DaemonControlling {
       ),
       launchAgent: LaunchAgentStatus(
         installed: mode == .populated,
+        loaded: mode == .populated,
         label: "io.harness.monitor.daemon",
-        path: "/Users/example/Library/LaunchAgents/io.harness.monitor.daemon.plist"
+        path: "/Users/example/Library/LaunchAgents/io.harness.monitor.daemon.plist",
+        domainTarget: "gui/501",
+        serviceTarget: "gui/501/io.harness.monitor.daemon",
+        state: mode == .populated ? "running" : nil,
+        pid: mode == .populated ? 4_242 : nil,
+        lastExitStatus: mode == .populated ? 0 : nil
       ),
       projectCount: fixtures.projects.count,
       sessionCount: fixtures.sessions.count,

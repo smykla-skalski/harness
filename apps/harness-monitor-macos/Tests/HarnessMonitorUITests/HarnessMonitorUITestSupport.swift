@@ -3,6 +3,7 @@ import XCTest
 enum HarnessMonitorUITestAccessibility {
   static let daemonCard = "monitor.sidebar.daemon-card"
   static let daemonCardFrame = "monitor.sidebar.daemon-card.frame"
+  static let sidebarShellFrame = "monitor.sidebar.shell.frame"
   static let preferencesButton = "monitor.toolbar.preferences"
   static let refreshButton = "monitor.toolbar.refresh"
   static let sidebarStartButton = "monitor.sidebar.action.start"
@@ -22,9 +23,20 @@ enum HarnessMonitorUITestAccessibility {
   static let sidebarEmptyState = "monitor.sidebar.empty-state"
   static let sidebarSessionList = "monitor.sidebar.session-list"
   static let sidebarSessionListContent = "monitor.sidebar.session-list.content"
+  static let sidebarFiltersCard = "monitor.sidebar.filters"
+  static let sidebarClearFiltersButton = "monitor.sidebar.filters.clear"
   static let activeFilterButton = "monitor.sidebar.filter.active"
   static let allFilterButton = "monitor.sidebar.filter.all"
   static let endedFilterButton = "monitor.sidebar.filter.ended"
+  static let openWorkChip = "monitor.sidebar.focus-chip.openwork"
+  static let blockedChip = "monitor.sidebar.focus-chip.blocked"
+  static let observedChip = "monitor.sidebar.focus-chip.observed"
+  static let idleChip = "monitor.sidebar.focus-chip.idle"
+  static let activeOpenSearchButton = "monitor.sidebar.saved-search.active-open-work"
+  static let blockedFollowupsSearchButton = "monitor.sidebar.saved-search.blocked-followups"
+  static func sidebarSavedSearchButton(_ key: String) -> String {
+    "monitor.sidebar.saved-search.\(key)"
+  }
   static let onboardingCard = "monitor.board.onboarding-card"
   static let onboardingStartButton = "monitor.board.action.start"
   static let onboardingInstallButton = "monitor.board.action.install"
@@ -91,21 +103,13 @@ extension HarnessMonitorUITestCase {
           app.activate()
         }
 
-        let window = app.windows.firstMatch
-        if window.exists {
-          self.raiseWindow(in: app)
-        }
-
-        return app.state == .runningForeground || window.exists
+        return app.state == .runningForeground || app.windows.firstMatch.exists
       }
     )
     XCTAssertTrue(
       waitUntil(timeout: Self.uiTimeout) {
         let window = app.windows.firstMatch
         app.activate()
-        if window.exists {
-          self.raiseWindow(in: app)
-        }
         let title = app.staticTexts["Harness Monitor"]
         let sidebarRoot = self.element(
           in: app,
@@ -123,20 +127,6 @@ extension HarnessMonitorUITestCase {
       }
     )
     return app
-  }
-
-  func raiseWindow(in app: XCUIApplication) {
-    app.activate()
-
-    let window = app.windows.firstMatch
-    guard window.exists else {
-      return
-    }
-
-    let titlebarPoint = window.coordinate(
-      withNormalizedOffset: CGVector(dx: 0.5, dy: 0.04)
-    )
-    titlebarPoint.tap()
   }
 
   func tapButton(in app: XCUIApplication, identifier: String) {
@@ -245,6 +235,22 @@ extension HarnessMonitorUITestCase {
     let tapY = min(max(panel.frame.midY - window.frame.minY, 18), window.frame.height - 18)
 
     origin.withOffset(CGVector(dx: tapX, dy: tapY)).tap()
+  }
+
+  func dragUp(in app: XCUIApplication, element: XCUIElement, distanceRatio: CGFloat = 0.32) {
+    let window = app.windows.firstMatch
+    XCTAssertTrue(window.waitForExistence(timeout: Self.uiTimeout))
+
+    let origin = window.coordinate(withNormalizedOffset: CGVector(dx: 0, dy: 0))
+    let x = element.frame.midX - window.frame.minX
+    let startY = element.frame.maxY - window.frame.minY - 36
+    let minimumEndY = element.frame.minY - window.frame.minY + 36
+    let targetEndY = startY - (element.frame.height * distanceRatio)
+    let endY = max(minimumEndY, targetEndY)
+
+    let start = origin.withOffset(CGVector(dx: x, dy: startY))
+    let end = origin.withOffset(CGVector(dx: x, dy: endY))
+    start.press(forDuration: 0.05, thenDragTo: end)
   }
 
   func confirmationDialogButton(in app: XCUIApplication, title: String) -> XCUIElement {
