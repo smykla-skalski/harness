@@ -119,13 +119,13 @@ extension InspectorActionSections {
         Button("Assign") {
           Task { await assignSelectedTask() }
         }
-        .buttonStyle(MonitorActionButtonStyle(variant: .prominent, tint: MonitorTheme.accent))
+        .monitorActionButtonStyle(variant: .prominent, tint: MonitorTheme.accent)
       }
       HStack {
         Button("Update Status") {
           Task { await updateSelectedTask() }
         }
-        .buttonStyle(MonitorActionButtonStyle(variant: .bordered, tint: MonitorTheme.ink))
+        .monitorActionButtonStyle(variant: .bordered, tint: MonitorTheme.ink)
         TextField("Update note", text: $statusNote, axis: .vertical)
           .lineLimit(2, reservesSpace: true)
       }
@@ -145,9 +145,7 @@ extension InspectorActionSections {
         Button("Save Checkpoint") {
           Task { await checkpointSelectedTask() }
         }
-        .buttonStyle(
-          MonitorActionButtonStyle(variant: .prominent, tint: MonitorTheme.warmAccent)
-        )
+        .monitorActionButtonStyle(variant: .prominent, tint: MonitorTheme.warmAccent)
       }
 
       if let checkpoint = task.checkpointSummary {
@@ -175,7 +173,7 @@ extension InspectorActionSections {
       Button("Create Task") {
         Task { await createTask() }
       }
-      .buttonStyle(MonitorActionButtonStyle(variant: .prominent, tint: MonitorTheme.accent))
+      .monitorActionButtonStyle(variant: .prominent, tint: MonitorTheme.accent)
       .disabled(createTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
     }
     .monitorCard()
@@ -196,11 +194,11 @@ extension InspectorActionSections {
       Button("Change Role") {
         Task { await changeSelectedRole() }
       }
-      .buttonStyle(MonitorActionButtonStyle(variant: .prominent, tint: MonitorTheme.accent))
+      .monitorActionButtonStyle(variant: .prominent, tint: MonitorTheme.accent)
       Button("Remove Agent") {
         store.requestRemoveAgentConfirmation(agentID: agent.agentId)
       }
-      .buttonStyle(MonitorActionButtonStyle(variant: .bordered, tint: MonitorTheme.danger))
+      .monitorActionButtonStyle(variant: .bordered, tint: MonitorTheme.danger)
       .disabled(agent.agentId == detail.session.leaderId)
       .accessibilityIdentifier(MonitorAccessibility.removeAgentButton)
     }
@@ -230,9 +228,7 @@ extension InspectorActionSections {
       Button(transferLeaderButtonTitle) {
         Task { await transferLeader() }
       }
-      .buttonStyle(
-        MonitorActionButtonStyle(variant: .prominent, tint: MonitorTheme.warmAccent)
-      )
+      .monitorActionButtonStyle(variant: .prominent, tint: MonitorTheme.warmAccent)
       .disabled(transferLeaderID.isEmpty || transferLeaderID == detail.session.leaderId)
     }
     .monitorCard()

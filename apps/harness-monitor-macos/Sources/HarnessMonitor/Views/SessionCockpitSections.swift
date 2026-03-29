@@ -43,9 +43,11 @@ struct SessionTaskListSection: View {
     VStack(alignment: .leading, spacing: 12) {
       Text("Tasks")
         .font(.system(.title3, design: .serif, weight: .semibold))
-      ForEach(tasks) { task in
-        SessionTaskSummaryCard(task: task) {
-          onSelect(task.taskId)
+      MonitorGlassContainer(spacing: 12) {
+        ForEach(tasks) { task in
+          SessionTaskSummaryCard(task: task) {
+            onSelect(task.taskId)
+          }
         }
       }
     }
@@ -92,10 +94,14 @@ struct SessionTaskSummaryCard: View {
       }
       .frame(maxWidth: .infinity, minHeight: sessionLaneCardHeight, alignment: .topLeading)
       .padding(14)
-      .background(MonitorTheme.surface, in: RoundedRectangle(cornerRadius: 18))
+      .background {
+        MonitorInteractiveCardBackground(cornerRadius: 18, tint: nil)
+      }
     }
     .buttonStyle(.plain)
+    .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
     .accessibilityIdentifier(MonitorAccessibility.sessionTaskCard(task.taskId))
+    .accessibilityFrameMarker(MonitorAccessibility.sessionTaskCard(task.taskId))
     .transition(
       .asymmetric(
         insertion: .scale(scale: 0.95).combined(with: .opacity),
@@ -112,9 +118,11 @@ struct SessionAgentListSection: View {
     VStack(alignment: .leading, spacing: 12) {
       Text("Agents")
         .font(.system(.title3, design: .serif, weight: .semibold))
-      ForEach(agents) { agent in
-        SessionAgentSummaryCard(agent: agent) {
-          onSelect(agent.agentId)
+      MonitorGlassContainer(spacing: 12) {
+        ForEach(agents) { agent in
+          SessionAgentSummaryCard(agent: agent) {
+            onSelect(agent.agentId)
+          }
         }
       }
     }
@@ -155,10 +163,14 @@ struct SessionAgentSummaryCard: View {
       }
       .frame(maxWidth: .infinity, minHeight: sessionLaneCardHeight, alignment: .topLeading)
       .padding(14)
-      .background(MonitorTheme.surface, in: RoundedRectangle(cornerRadius: 18))
+      .background {
+        MonitorInteractiveCardBackground(cornerRadius: 18, tint: nil)
+      }
     }
     .buttonStyle(.plain)
+    .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
     .accessibilityIdentifier(MonitorAccessibility.sessionAgentCard(agent.agentId))
+    .accessibilityFrameMarker(MonitorAccessibility.sessionAgentCard(agent.agentId))
     .transition(
       .asymmetric(
         insertion: .scale(scale: 0.95).combined(with: .opacity),
@@ -172,6 +184,8 @@ struct SessionAgentSummaryCard: View {
       .lineLimit(1)
       .padding(.horizontal, 8)
       .padding(.vertical, 4)
-      .background(MonitorTheme.surfaceHover, in: Capsule())
+      .background {
+        MonitorGlassCapsuleBackground()
+      }
   }
 }

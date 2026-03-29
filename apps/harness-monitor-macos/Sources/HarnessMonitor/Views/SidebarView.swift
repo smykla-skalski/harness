@@ -11,20 +11,31 @@ struct SidebarView: View {
 
   var body: some View {
     ZStack(alignment: .topLeading) {
-      MonitorTheme.sidebarBackground
+      sidebarChromeBackground
 
-      VStack(alignment: .leading, spacing: 18) {
-        daemonStatusCard
-        filterStrip
-        sessionList
-          .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+      VStack(spacing: 0) {
+        Color.clear
+          .frame(height: 8)
+          .accessibilityHidden(true)
+
+        ScrollView(showsIndicators: false) {
+          VStack(alignment: .leading, spacing: 18) {
+            daemonStatusCard
+            sessionList
+          }
+          .frame(maxWidth: .infinity, alignment: .topLeading)
+          .padding(.horizontal, 18)
+          .padding(.top, 8)
+          .padding(.bottom, 18)
+        }
+        .contentShape(Rectangle())
+        .accessibilityFrameMarker(MonitorAccessibility.sidebarShellFrame)
       }
       .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-      .padding(22)
     }
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     .animation(.snappy(duration: 0.24), value: store.groupedSessions)
     .animation(.snappy(duration: 0.24), value: store.isRefreshing)
-    .scrollIndicators(.hidden)
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(MonitorAccessibility.sidebarRoot)
   }
@@ -69,60 +80,44 @@ struct SidebarView: View {
       .frame(maxWidth: .infinity, alignment: .leading)
     }
     .frame(maxWidth: .infinity, alignment: .leading)
-    .monitorCard(contentPadding: 11)
+    .padding(12)
+    .background {
+      MonitorInsetPanelBackground(
+        cornerRadius: 22,
+        fillOpacity: 0.05,
+        strokeOpacity: 0.09
+      )
+    }
     .accessibilityIdentifier(MonitorAccessibility.daemonCard)
     .accessibilityFrameMarker(MonitorAccessibility.daemonCardFrame)
-  }
-  private var filterStrip: some View {
-    VStack(alignment: .leading, spacing: 10) {
-      Text("Scope")
-        .font(.system(.headline, design: .rounded, weight: .semibold))
-      HStack(spacing: 8) {
-        ForEach(MonitorStore.SessionFilter.allCases) { filter in
-          filterButton(filter)
-        }
-      }
-      .accessibilityElement(children: .contain)
-      .accessibilityIdentifier(MonitorAccessibility.sessionFilterGroup)
-    }
-    .monitorCard(contentPadding: 16)
   }
 
   private var sessionList: some View {
     SidebarSessionList(store: store)
   }
-
-  private func filterButton(_ filter: MonitorStore.SessionFilter) -> some View {
-    let isSelected = store.sessionFilter == filter
-    return Button {
-      store.sessionFilter = filter
-    } label: {
-      Text(filter.rawValue.capitalized)
-        .font(.system(.subheadline, design: .rounded, weight: .semibold))
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 10)
-        .foregroundStyle(isSelected ? Color.white : MonitorTheme.ink)
-        .background(
-          RoundedRectangle(cornerRadius: 14, style: .continuous)
-            .fill(isSelected ? MonitorTheme.accent : MonitorTheme.surfaceHover)
-            .overlay(
-              RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .stroke(
-                  isSelected ? MonitorTheme.accent : MonitorTheme.controlBorder,
-                  lineWidth: 1
-                )
-            )
-        )
-    }
-    .buttonStyle(.plain)
-    .accessibilityIdentifier(MonitorAccessibility.sessionFilterButton(filter.rawValue))
-    .accessibilityValue(
-      isSelected ? "selected accent-on-light" : "not selected ink-on-panel"
-    )
-  }
 }
 
 extension SidebarView {
+  fileprivate var sidebarChromeBackground: some View {
+    Rectangle()
+      .fill(.regularMaterial)
+      .overlay {
+        MonitorTheme.sidebarBackground.opacity(0.22)
+      }
+      .overlay(alignment: .top) {
+        LinearGradient(
+          colors: [
+            MonitorTheme.glassHighlight,
+            Color.white.opacity(0.03),
+            .clear,
+          ],
+          startPoint: .top,
+          endPoint: .bottom
+        )
+      }
+      .ignoresSafeArea(edges: .top)
+  }
+
   fileprivate var sidebarStartDaemonButton: some View {
     sidebarLayoutProbe(MonitorAccessibility.sidebarStartDaemonButtonFrame) {
       MonitorAsyncActionButton(
@@ -255,14 +250,13 @@ extension SidebarView {
     .frame(minHeight: 36, alignment: .topLeading)
     .padding(.vertical, 2)
     .padding(.horizontal, 8)
-    .background(
-      MonitorTheme.surface,
-      in: RoundedRectangle(cornerRadius: 14, style: .continuous)
-    )
-    .overlay(
-      RoundedRectangle(cornerRadius: 14, style: .continuous)
-        .stroke(MonitorTheme.controlBorder, lineWidth: 1)
-    )
+    .background {
+      MonitorInsetPanelBackground(
+        cornerRadius: 14,
+        fillOpacity: 0.03,
+        strokeOpacity: 0.08
+      )
+    }
     .accessibilityElement(children: .ignore)
     .accessibilityLabel(title)
     .accessibilityValue(value)

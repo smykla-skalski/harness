@@ -37,7 +37,8 @@ struct MonitorAsyncActionButton: View {
       label
     }
     .frame(maxWidth: fillsWidth ? .infinity : nil, alignment: .center)
-    .buttonStyle(MonitorActionButtonStyle(variant: variant, tint: tint))
+    .monitorActionButtonStyle(variant: variant, tint: tint)
+    .controlSize(fillsWidth ? .large : .regular)
     .disabled(isLoading)
     .accessibilityIdentifier(accessibilityIdentifier)
     .accessibilityFrameMarker("\(accessibilityIdentifier).frame")
@@ -93,99 +94,44 @@ private struct FillWidthButtonSizing: ViewModifier {
   }
 }
 
-struct MonitorActionButtonStyle: ButtonStyle {
-  @Environment(\.isEnabled) private var isEnabled
-
-  let variant: MonitorAsyncActionButton.Variant
-  let tint: Color
-
-  func makeBody(configuration: Configuration) -> some View {
-    configuration.label
-      .foregroundStyle(foregroundColor)
-      .background(background(isPressed: configuration.isPressed))
-      .overlay(border)
-      .overlay(highlight)
-      .clipShape(shape)
-      .shadow(
-        color: shadowColor(isPressed: configuration.isPressed),
-        radius: configuration.isPressed ? 3 : 7,
-        x: 0,
-        y: configuration.isPressed ? 1 : 4
-      )
-      .scaleEffect(configuration.isPressed ? 0.996 : 1)
-      .opacity(isEnabled ? 1 : 0.62)
-      .contentShape(shape)
-      .focusEffectDisabled()
-      .animation(.easeOut(duration: 0.14), value: configuration.isPressed)
-  }
-
-  private var foregroundColor: Color {
+extension View {
+  @ViewBuilder
+  func monitorActionButtonStyle(
+    variant: MonitorAsyncActionButton.Variant,
+    tint: Color
+  ) -> some View {
     switch variant {
     case .prominent:
-      .white
+      if #available(macOS 26, *) {
+        self
+          .buttonStyle(.glassProminent)
+          .tint(tint)
+      } else {
+        self
+          .buttonStyle(.borderedProminent)
+          .tint(tint)
+      }
     case .bordered:
-      MonitorTheme.ink
+      if #available(macOS 26, *) {
+        self
+          .buttonStyle(.glass(.regular.tint(tint)))
+      } else {
+        self
+          .buttonStyle(.bordered)
+          .tint(tint)
+      }
     }
-  }
-
-  private var shape: RoundedRectangle {
-    RoundedRectangle(cornerRadius: 13, style: .continuous)
   }
 
   @ViewBuilder
-  private func background(isPressed: Bool) -> some View {
-    shape
-      .fill(.ultraThinMaterial)
-      .overlay {
-        switch variant {
-        case .prominent:
-          LinearGradient(
-            colors: [
-              tint.opacity(isPressed ? 0.82 : 0.90),
-              tint.opacity(isPressed ? 0.68 : 0.78),
-            ],
-            startPoint: .top,
-            endPoint: .bottom
-          )
-        case .bordered:
-          LinearGradient(
-            colors: [
-              MonitorTheme.surfaceHover.opacity(isPressed ? 0.78 : 0.90),
-              MonitorTheme.surface.opacity(isPressed ? 0.84 : 0.94),
-            ],
-            startPoint: .top,
-            endPoint: .bottom
-          )
-        }
-      }
-      .clipShape(shape)
-  }
-
-  private var border: some View {
-    shape
-      .stroke(borderColor, lineWidth: 1)
-  }
-
-  private var highlight: some View {
-    shape
-      .stroke(.white.opacity(0.05), lineWidth: 1)
-      .blur(radius: 0.2)
-  }
-
-  private var borderColor: Color {
-    switch variant {
-    case .prominent:
-      tint.opacity(0.35)
-    case .bordered:
-      MonitorTheme.controlBorder
+  func monitorAccessoryButtonStyle(tint: Color = MonitorTheme.ink) -> some View {
+    if #available(macOS 26, *) {
+      self
+        .buttonStyle(.glass(.regular.tint(tint)))
+    } else {
+      self
+        .buttonStyle(.borderless)
+        .tint(tint)
     }
-  }
-
-  private func shadowColor(isPressed: Bool) -> Color {
-    guard variant == .prominent else {
-      return .black.opacity(isPressed ? 0.04 : 0.08)
-    }
-
-    return tint.opacity(isPressed ? 0.10 : 0.18)
   }
 }
