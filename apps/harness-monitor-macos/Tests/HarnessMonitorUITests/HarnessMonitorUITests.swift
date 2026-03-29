@@ -144,6 +144,59 @@ final class HarnessMonitorUITests: HarnessMonitorUITestCase {
     XCTAssertTrue(removeAgentButton.waitForExistence(timeout: Self.uiTimeout))
   }
 
+  func testTaskInspectorShowsCheckpointNotesAndSuggestedFix() throws {
+    let app = launch(mode: "preview")
+
+    let sessionRow = app.buttons.matching(identifier: Accessibility.previewSessionRow).firstMatch
+    XCTAssertTrue(sessionRow.waitForExistence(timeout: Self.uiTimeout))
+    tapButton(in: app, identifier: Accessibility.previewSessionRow)
+    tapButton(in: app, identifier: Accessibility.taskUICard)
+
+    let inspectorCard = element(in: app, identifier: Accessibility.taskInspectorCard)
+
+    XCTAssertTrue(inspectorCard.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(app.staticTexts["Checkpoint"].exists)
+    XCTAssertTrue(app.staticTexts["Suggested Fix"].exists)
+    XCTAssertTrue(
+      app.staticTexts["Merged daemon timeline entries with session checkpoints."].exists
+    )
+  }
+
+  func testAgentInspectorShowsRuntimeCapabilitiesAndToolActivity() throws {
+    let app = launch(mode: "preview")
+
+    let sessionRow = app.buttons.matching(identifier: Accessibility.previewSessionRow).firstMatch
+    XCTAssertTrue(sessionRow.waitForExistence(timeout: Self.uiTimeout))
+    tapButton(in: app, identifier: Accessibility.previewSessionRow)
+    tapButton(in: app, identifier: Accessibility.workerAgentCard)
+
+    let inspectorCard = element(in: app, identifier: Accessibility.agentInspectorCard)
+    let sendSignalButton = element(in: app, identifier: Accessibility.signalSendButton)
+
+    XCTAssertTrue(inspectorCard.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(sendSignalButton.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(app.staticTexts["Runtime Capabilities"].exists)
+    XCTAssertTrue(app.staticTexts["Tool Activity"].exists)
+    XCTAssertTrue(app.staticTexts["PreToolUse · 5s · context"].exists)
+    XCTAssertTrue(app.staticTexts["Edit"].exists)
+  }
+
+  func testObserverInspectorShowsCycleHistoryAndTrackedSessions() throws {
+    let app = launch(mode: "preview")
+
+    let sessionRow = app.buttons.matching(identifier: Accessibility.previewSessionRow).firstMatch
+    XCTAssertTrue(sessionRow.waitForExistence(timeout: Self.uiTimeout))
+    tapButton(in: app, identifier: Accessibility.previewSessionRow)
+    tapButton(in: app, identifier: Accessibility.observeSummaryButton)
+
+    let inspectorCard = element(in: app, identifier: Accessibility.observerInspectorCard)
+
+    XCTAssertTrue(inspectorCard.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(app.staticTexts["Cycle History"].exists)
+    XCTAssertTrue(app.staticTexts["Tracked Agent Sessions"].exists)
+    XCTAssertTrue(app.staticTexts["Cursor 104"].exists)
+  }
+
   func testEndSessionRequiresConfirmation() throws {
     let app = launch(mode: "preview")
 

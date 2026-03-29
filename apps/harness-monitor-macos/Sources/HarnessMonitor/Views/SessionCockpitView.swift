@@ -119,11 +119,12 @@ struct SessionCockpitView: View {
         }
       }
       .frame(maxWidth: .infinity, alignment: .leading)
+      .padding(14)
+      .background(MonitorTheme.surface, in: RoundedRectangle(cornerRadius: 18))
+      .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
     .buttonStyle(.plain)
     .accessibilityIdentifier("monitor.session.observe.summary")
-    .padding(14)
-    .background(MonitorTheme.surface, in: RoundedRectangle(cornerRadius: 18))
   }
 
   private var signalsSection: some View {

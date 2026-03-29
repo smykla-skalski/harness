@@ -41,8 +41,13 @@ enum HarnessMonitorUITestAccessibility {
   static let inspectorRoot = "monitor.inspector.root"
   static let inspectorEmptyState = "monitor.inspector.empty-state"
   static let sessionInspectorCard = "monitor.inspector.session-card"
+  static let taskInspectorCard = "monitor.inspector.task-card"
+  static let agentInspectorCard = "monitor.inspector.agent-card"
+  static let signalInspectorCard = "monitor.inspector.signal-card"
+  static let observerInspectorCard = "monitor.inspector.observer-card"
   static let actionActorPicker = "monitor.inspector.action-actor"
   static let removeAgentButton = "monitor.inspector.remove-agent"
+  static let signalSendButton = "monitor.inspector.signal-send"
   static let observeSummaryButton = "monitor.session.observe.summary"
   static let endSessionButton = "monitor.session.action.end"
   static let pendingLeaderTransferCard = "monitor.session.pending-transfer"
@@ -80,11 +85,24 @@ extension HarnessMonitorUITestCase {
     app.launchEnvironment["HARNESS_MONITOR_UI_TESTS"] = "1"
     app.launchEnvironment[Self.launchModeKey] = mode
     app.launch()
-    XCTAssertTrue(app.wait(for: .runningForeground, timeout: Self.uiTimeout))
-    app.activate()
+    XCTAssertTrue(
+      waitUntil(timeout: Self.uiTimeout) {
+        if app.state != .runningForeground {
+          app.activate()
+        }
+
+        let window = app.windows.firstMatch
+        if window.exists {
+          self.raiseWindow(in: app)
+        }
+
+        return app.state == .runningForeground || window.exists
+      }
+    )
     XCTAssertTrue(
       waitUntil(timeout: Self.uiTimeout) {
         let window = app.windows.firstMatch
+        app.activate()
         if window.exists {
           self.raiseWindow(in: app)
         }

@@ -40,9 +40,10 @@ struct ContentView: View {
           .searchable(text: $store.searchText, prompt: "Search sessions, projects, leaders")
           .navigationTitle("Harness Monitor")
           .toolbar {
-            ToolbarItemGroup(placement: .primaryAction) {
+            ToolbarItem(placement: .secondaryAction) {
               ConnectionToolbarBadge(metrics: store.connectionMetrics)
-
+            }
+            ToolbarItemGroup(placement: .primaryAction) {
               Button(action: refresh) {
                 HStack(spacing: 8) {
                   Image(systemName: "arrow.clockwise")

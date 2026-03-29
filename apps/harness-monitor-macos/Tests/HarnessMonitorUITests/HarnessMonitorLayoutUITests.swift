@@ -96,6 +96,50 @@ final class HarnessMonitorLayoutUITests: HarnessMonitorUITestCase {
     )
   }
 
+  func testSelectedInspectorCardsFillTheirColumn() throws {
+    let app = launch(mode: "preview")
+
+    let inspectorRoot = element(in: app, identifier: Accessibility.inspectorRoot)
+    let sessionRow = app.buttons.matching(identifier: Accessibility.previewSessionRow).firstMatch
+
+    XCTAssertTrue(inspectorRoot.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(sessionRow.waitForExistence(timeout: Self.uiTimeout))
+
+    tapButton(in: app, identifier: Accessibility.previewSessionRow)
+    tapButton(in: app, identifier: Accessibility.taskUICard)
+
+    let taskInspector = element(in: app, identifier: Accessibility.taskInspectorCard)
+    XCTAssertTrue(taskInspector.waitForExistence(timeout: Self.uiTimeout))
+    assertFillsColumn(
+      child: taskInspector,
+      in: inspectorRoot,
+      expectedHorizontalInset: 18,
+      tolerance: 8
+    )
+
+    tapButton(in: app, identifier: Accessibility.workerAgentCard)
+
+    let agentInspector = element(in: app, identifier: Accessibility.agentInspectorCard)
+    XCTAssertTrue(agentInspector.waitForExistence(timeout: Self.uiTimeout))
+    assertFillsColumn(
+      child: agentInspector,
+      in: inspectorRoot,
+      expectedHorizontalInset: 18,
+      tolerance: 8
+    )
+
+    tapButton(in: app, identifier: Accessibility.observeSummaryButton)
+
+    let observerInspector = element(in: app, identifier: Accessibility.observerInspectorCard)
+    XCTAssertTrue(observerInspector.waitForExistence(timeout: Self.uiTimeout))
+    assertFillsColumn(
+      child: observerInspector,
+      in: inspectorRoot,
+      expectedHorizontalInset: 18,
+      tolerance: 8
+    )
+  }
+
   func testSidebarDaemonBadgesShareWidth() throws {
     let app = launch(mode: "empty")
 
