@@ -116,32 +116,36 @@ struct SessionsBoardView: View {
         .font(.system(.body, design: .rounded, weight: .medium))
         .foregroundStyle(.secondary)
       } else {
-        ForEach(store.sessions.prefix(8)) { session in
-          Button {
-            select(sessionID: session.sessionId)
-          } label: {
-            HStack(alignment: .top, spacing: 14) {
-              RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(statusColor(for: session.status))
-                .frame(width: 10)
-              VStack(alignment: .leading, spacing: 4) {
-                Text(session.context)
-                  .font(.system(.headline, design: .rounded, weight: .semibold))
-                  .multilineTextAlignment(.leading)
-                Text("\(session.projectName) • \(session.sessionId)")
-                  .font(.caption.monospaced())
+        MonitorGlassContainer(spacing: 12) {
+          ForEach(store.sessions.prefix(8)) { session in
+            Button {
+              select(sessionID: session.sessionId)
+            } label: {
+              HStack(alignment: .top, spacing: 14) {
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                  .fill(statusColor(for: session.status))
+                  .frame(width: 10)
+                VStack(alignment: .leading, spacing: 4) {
+                  Text(session.context)
+                    .font(.system(.headline, design: .rounded, weight: .semibold))
+                    .multilineTextAlignment(.leading)
+                  Text("\(session.projectName) • \(session.sessionId)")
+                    .font(.caption.monospaced())
+                    .foregroundStyle(.secondary)
+                }
+                Spacer()
+                Text(formatTimestamp(session.updatedAt))
+                  .font(.caption.weight(.semibold))
                   .foregroundStyle(.secondary)
               }
-              Spacer()
-              Text(formatTimestamp(session.updatedAt))
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.secondary)
+              .frame(maxWidth: .infinity, alignment: .leading)
+              .padding(14)
+              .background {
+                MonitorInteractiveCardBackground(cornerRadius: 18, tint: nil)
+              }
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(14)
-            .background(MonitorTheme.surface, in: RoundedRectangle(cornerRadius: 18))
+            .buttonStyle(.plain)
           }
-          .buttonStyle(.plain)
         }
       }
     }
@@ -199,7 +203,13 @@ struct SessionsBoardView: View {
     }
     .frame(maxWidth: .infinity, minHeight: 72, alignment: .topLeading)
     .padding(11)
-    .background(MonitorTheme.surface, in: RoundedRectangle(cornerRadius: 18))
+    .background {
+      MonitorInsetPanelBackground(
+        cornerRadius: 18,
+        fillOpacity: 0.05,
+        strokeOpacity: 0.10
+      )
+    }
   }
 
   private var onboardingStepsSection: some View {

@@ -46,6 +46,9 @@ enum MonitorTheme {
   static let sidebarHeader = monitorColor("MonitorSidebarHeader")
   static let sidebarMuted = monitorColor("MonitorSidebarMuted")
   static let overlayScrim = monitorColor("MonitorOverlayScrim")
+  static let glassStroke = Color.white.opacity(0.18)
+  static let glassHighlight = Color.white.opacity(0.10)
+  static let glassShadow = Color.black.opacity(0.16)
 }
 
 struct MonitorCardModifier: ViewModifier {
@@ -61,15 +64,19 @@ struct MonitorCardModifier: ViewModifier {
         minHeight: minHeight,
         alignment: .topLeading
       )
-      .background(
-        RoundedRectangle(cornerRadius: 22, style: .continuous)
-          .fill(MonitorTheme.panel)
-          .overlay(
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
-              .stroke(MonitorTheme.panelBorder, lineWidth: 1)
-          )
-          .shadow(color: .black.opacity(0.07), radius: 12, x: 0, y: 8)
-      )
+      .background {
+        MonitorRoundedGlassBackground(
+          cornerRadius: 22,
+          tint: nil,
+          interactive: false,
+          fallbackMaterial: .regularMaterial,
+          fallbackOverlay: MonitorTheme.panel.opacity(0.18),
+          strokeColor: MonitorTheme.panelBorder,
+          shadowColor: .black.opacity(0.07),
+          shadowRadius: 12,
+          shadowY: 8
+        )
+      }
       .frame(maxWidth: .infinity, alignment: .leading)
   }
 }
@@ -115,7 +122,9 @@ struct MonitorLoadingStateView: View {
     }
     .padding(.horizontal, 12)
     .padding(.vertical, 8)
-    .background(MonitorTheme.surfaceHover, in: Capsule())
+    .background {
+      MonitorGlassCapsuleBackground()
+    }
     .opacity(animates ? 1 : 0.82)
     .scaleEffect(animates ? 1 : 0.985)
     .animation(
@@ -173,7 +182,9 @@ func monitorBadge(_ value: String) -> some View {
     .font(.caption.bold())
     .padding(.horizontal, 10)
     .padding(.vertical, 5)
-    .background(MonitorTheme.panel, in: Capsule())
+    .background {
+      MonitorGlassCapsuleBackground()
+    }
 }
 
 func statusColor(for status: SessionStatus) -> Color {

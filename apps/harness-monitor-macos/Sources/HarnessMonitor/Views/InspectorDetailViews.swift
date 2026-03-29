@@ -24,7 +24,7 @@ struct SessionInspectorSummaryCard: View {
       InspectorFactGrid(facts: facts)
       if !detail.agentActivity.isEmpty {
         InspectorSection(title: "Recent Agent Activity") {
-          VStack(alignment: .leading, spacing: 8) {
+          MonitorGlassContainer(spacing: 8) {
             ForEach(detail.agentActivity.prefix(2)) { activity in
               VStack(alignment: .leading, spacing: 4) {
                 HStack {
@@ -42,7 +42,13 @@ struct SessionInspectorSummaryCard: View {
               }
               .padding(.horizontal, 12)
               .padding(.vertical, 10)
-              .background(MonitorTheme.surface, in: RoundedRectangle(cornerRadius: 14))
+              .background {
+                MonitorInsetPanelBackground(
+                  cornerRadius: 14,
+                  fillOpacity: 0.05,
+                  strokeOpacity: 0.10
+                )
+              }
             }
           }
         }
@@ -96,7 +102,7 @@ struct TaskInspectorCard: View {
       }
       if !task.notes.isEmpty {
         InspectorSection(title: "Notes") {
-          VStack(alignment: .leading, spacing: 8) {
+          MonitorGlassContainer(spacing: 8) {
             ForEach(task.notes) { note in
               VStack(alignment: .leading, spacing: 4) {
                 HStack {
@@ -113,7 +119,13 @@ struct TaskInspectorCard: View {
               }
               .padding(.horizontal, 12)
               .padding(.vertical, 10)
-              .background(MonitorTheme.surface, in: RoundedRectangle(cornerRadius: 14))
+              .background {
+                MonitorInsetPanelBackground(
+                  cornerRadius: 14,
+                  fillOpacity: 0.05,
+                  strokeOpacity: 0.10
+                )
+              }
             }
           }
         }
@@ -230,7 +242,7 @@ struct AgentInspectorCard: View {
           .lineLimit(3, reservesSpace: true)
         TextField("Action Hint", text: $signalActionHint)
         Button("Send Signal", action: sendSignal)
-          .buttonStyle(MonitorActionButtonStyle(variant: .prominent, tint: MonitorTheme.accent))
+          .monitorActionButtonStyle(variant: .prominent, tint: MonitorTheme.accent)
           .disabled(signalCommand.isEmpty || signalMessage.isEmpty)
           .accessibilityIdentifier(MonitorAccessibility.signalSendButton)
       }

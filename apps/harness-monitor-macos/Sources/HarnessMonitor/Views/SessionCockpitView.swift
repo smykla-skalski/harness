@@ -79,7 +79,7 @@ struct SessionCockpitView: View {
     } label: {
       actionLabel("Observe")
     }
-    .buttonStyle(MonitorActionButtonStyle(variant: .prominent, tint: MonitorTheme.accent))
+    .monitorActionButtonStyle(variant: .prominent, tint: MonitorTheme.accent)
   }
 
   private var endSessionButton: some View {
@@ -88,7 +88,7 @@ struct SessionCockpitView: View {
     } label: {
       actionLabel("End Session")
     }
-    .buttonStyle(MonitorActionButtonStyle(variant: .bordered, tint: MonitorTheme.ink))
+    .monitorActionButtonStyle(variant: .bordered, tint: MonitorTheme.ink)
     .accessibilityIdentifier(MonitorAccessibility.endSessionButton)
   }
 
@@ -120,7 +120,9 @@ struct SessionCockpitView: View {
       }
       .frame(maxWidth: .infinity, alignment: .leading)
       .padding(14)
-      .background(MonitorTheme.surface, in: RoundedRectangle(cornerRadius: 18))
+      .background {
+        MonitorInteractiveCardBackground(cornerRadius: 18, tint: nil)
+      }
       .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
     .buttonStyle(.plain)
@@ -131,39 +133,43 @@ struct SessionCockpitView: View {
     VStack(alignment: .leading, spacing: 12) {
       Text("Signals")
         .font(.system(.title3, design: .serif, weight: .semibold))
-      ForEach(detail.signals) { signal in
-        Button {
-          store.inspect(signalID: signal.signal.signalId)
-        } label: {
-          HStack(alignment: .top) {
-            VStack(alignment: .leading, spacing: 6) {
-              Text(signal.signal.command)
-                .font(.system(.headline, design: .rounded, weight: .semibold))
-              Text(signal.signal.payload.message)
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.leading)
+      MonitorGlassContainer(spacing: 12) {
+        ForEach(detail.signals) { signal in
+          Button {
+            store.inspect(signalID: signal.signal.signalId)
+          } label: {
+            HStack(alignment: .top) {
+              VStack(alignment: .leading, spacing: 6) {
+                Text(signal.signal.command)
+                  .font(.system(.headline, design: .rounded, weight: .semibold))
+                Text(signal.signal.payload.message)
+                  .font(.subheadline)
+                  .foregroundStyle(.secondary)
+                  .multilineTextAlignment(.leading)
+              }
+              Spacer()
+              VStack(alignment: .trailing, spacing: 6) {
+                Text(signal.status.rawValue.capitalized)
+                  .font(.caption.bold())
+                  .foregroundStyle(signalStatusColor(for: signal.status))
+                Text(formatTimestamp(signal.signal.createdAt))
+                  .font(.caption.monospaced())
+                  .foregroundStyle(.secondary)
+              }
             }
-            Spacer()
-            VStack(alignment: .trailing, spacing: 6) {
-              Text(signal.status.rawValue.capitalized)
-                .font(.caption.bold())
-                .foregroundStyle(signalStatusColor(for: signal.status))
-              Text(formatTimestamp(signal.signal.createdAt))
-                .font(.caption.monospaced())
-                .foregroundStyle(.secondary)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(14)
+            .background {
+              MonitorInteractiveCardBackground(cornerRadius: 18, tint: nil)
             }
           }
-          .frame(maxWidth: .infinity, alignment: .leading)
-          .padding(14)
-          .background(MonitorTheme.surface, in: RoundedRectangle(cornerRadius: 18))
+          .buttonStyle(.plain)
+          .transition(
+            .asymmetric(
+              insertion: .scale(scale: 0.95).combined(with: .opacity),
+              removal: .opacity
+            ))
         }
-        .buttonStyle(.plain)
-        .transition(
-          .asymmetric(
-            insertion: .scale(scale: 0.95).combined(with: .opacity),
-            removal: .opacity
-          ))
       }
     }
     .frame(maxWidth: .infinity, alignment: .leading)
@@ -195,7 +201,13 @@ struct SessionCockpitView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(12)
-        .background(MonitorTheme.surface, in: RoundedRectangle(cornerRadius: 16))
+        .background {
+          MonitorInsetPanelBackground(
+            cornerRadius: 16,
+            fillOpacity: 0.05,
+            strokeOpacity: 0.10
+          )
+        }
         .transition(
           .asymmetric(
             insertion: .scale(scale: 0.95).combined(with: .opacity),
@@ -231,7 +243,13 @@ struct SessionCockpitView: View {
     }
     .frame(maxWidth: .infinity, alignment: .leading)
     .padding(14)
-    .background(MonitorTheme.surface, in: RoundedRectangle(cornerRadius: 18))
+    .background {
+      MonitorInsetPanelBackground(
+        cornerRadius: 18,
+        fillOpacity: 0.06,
+        strokeOpacity: 0.12
+      )
+    }
     .accessibilityIdentifier(MonitorAccessibility.pendingLeaderTransferCard)
   }
 

@@ -162,6 +162,8 @@ struct PreferencesOverviewGrid: View {
 
 struct PreferencesPathsCard: View {
   let launchAgentPath: String
+  let launchAgentDomain: String?
+  let launchAgentService: String?
   let manifestPath: String
   let authTokenPath: String
   let eventsPath: String
@@ -171,6 +173,12 @@ struct PreferencesPathsCard: View {
     VStack(alignment: .leading, spacing: 14) {
       Text("Paths")
         .font(.system(.title3, design: .serif, weight: .semibold))
+      if let launchAgentDomain, !launchAgentDomain.isEmpty {
+        pathRow(title: "Launchd Domain", value: launchAgentDomain)
+      }
+      if let launchAgentService, !launchAgentService.isEmpty {
+        pathRow(title: "Service Target", value: launchAgentService)
+      }
       pathRow(title: "Launch Agent", value: launchAgentPath)
       pathRow(title: "Manifest", value: manifestPath)
       pathRow(title: "Auth Token", value: authTokenPath)
@@ -193,6 +201,7 @@ struct PreferencesPathsCard: View {
 }
 
 struct PreferencesDiagnosticsCard: View {
+  let launchAgent: LaunchAgentStatus?
   let tokenPresent: Bool
   let projectCount: Int
   let sessionCount: Int
@@ -220,6 +229,28 @@ struct PreferencesDiagnosticsCard: View {
         )
       }
 
+      if let launchAgent {
+        VStack(alignment: .leading, spacing: 8) {
+          Text("Launch Agent")
+            .font(.headline)
+          Text(launchAgent.lifecycleTitle)
+            .font(.system(.body, design: .rounded, weight: .bold))
+            .foregroundStyle(launchAgent.pid == nil ? MonitorTheme.accent : MonitorTheme.success)
+          Text(launchAgent.lifecycleCaption)
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .lineLimit(2)
+        }
+        .padding(14)
+        .background {
+          MonitorInsetPanelBackground(
+            cornerRadius: 18,
+            fillOpacity: 0.05,
+            strokeOpacity: 0.10
+          )
+        }
+      }
+
       if let lastEvent {
         VStack(alignment: .leading, spacing: 8) {
           Text("Latest Event")
@@ -231,7 +262,13 @@ struct PreferencesDiagnosticsCard: View {
             .foregroundStyle(.secondary)
         }
         .padding(14)
-        .background(MonitorTheme.surface, in: RoundedRectangle(cornerRadius: 18))
+        .background {
+          MonitorInsetPanelBackground(
+            cornerRadius: 18,
+            fillOpacity: 0.05,
+            strokeOpacity: 0.10
+          )
+        }
       } else {
         Text("No daemon audit events have been recorded yet.")
           .font(.system(.body, design: .rounded, weight: .medium))
@@ -253,7 +290,13 @@ struct PreferencesDiagnosticsCard: View {
     }
     .frame(maxWidth: .infinity, alignment: .leading)
     .padding(14)
-    .background(MonitorTheme.surface, in: RoundedRectangle(cornerRadius: 18))
+    .background {
+      MonitorInsetPanelBackground(
+        cornerRadius: 18,
+        fillOpacity: 0.05,
+        strokeOpacity: 0.10
+      )
+    }
   }
 }
 
@@ -270,23 +313,33 @@ struct PreferencesRecentEventsCard: View {
           .font(.system(.body, design: .rounded, weight: .medium))
           .foregroundStyle(.secondary)
       } else {
-        ForEach(events) { event in
-          VStack(alignment: .leading, spacing: 6) {
-            HStack {
-              Text(event.level.uppercased())
-                .font(.caption.bold())
-                .foregroundStyle(event.level == "warn" ? MonitorTheme.caution : MonitorTheme.accent)
-              Spacer()
-              Text(formatTimestamp(event.recordedAt))
-                .font(.caption.monospaced())
-                .foregroundStyle(.secondary)
+        MonitorGlassContainer(spacing: 12) {
+          ForEach(events) { event in
+            VStack(alignment: .leading, spacing: 6) {
+              HStack {
+                Text(event.level.uppercased())
+                  .font(.caption.bold())
+                  .foregroundStyle(
+                    event.level == "warn" ? MonitorTheme.caution : MonitorTheme.accent
+                  )
+                Spacer()
+                Text(formatTimestamp(event.recordedAt))
+                  .font(.caption.monospaced())
+                  .foregroundStyle(.secondary)
+              }
+              Text(event.message)
+                .font(.system(.body, design: .rounded, weight: .semibold))
             }
-            Text(event.message)
-              .font(.system(.body, design: .rounded, weight: .semibold))
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(12)
+            .background {
+              MonitorInsetPanelBackground(
+                cornerRadius: 18,
+                fillOpacity: 0.05,
+                strokeOpacity: 0.10
+              )
+            }
           }
-          .frame(maxWidth: .infinity, alignment: .leading)
-          .padding(12)
-          .background(MonitorTheme.surface, in: RoundedRectangle(cornerRadius: 18))
         }
       }
     }
