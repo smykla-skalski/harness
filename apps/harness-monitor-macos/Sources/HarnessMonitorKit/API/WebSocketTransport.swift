@@ -42,7 +42,9 @@ public final class WebSocketTransport: MonitorClientProtocol, @unchecked Sendabl
     pending.failAll(error: WebSocketTransportError.connectionClosed)
     terminateAllStreams()
   }
+}
 
+extension WebSocketTransport {
   // MARK: - MonitorClientProtocol queries
 
   public func health() async throws -> HealthResponse {
@@ -66,8 +68,10 @@ public final class WebSocketTransport: MonitorClientProtocol, @unchecked Sendabl
   }
 
   public func sessionDetail(id: String) async throws -> SessionDetail {
-    let params = JSONValue.object(["session_id": .string(id)])
-    let value = try await send(method: "session.detail", params: params)
+    let value = try await send(
+      method: "session.detail",
+      params: .object(["session_id": .string(id)])
+    )
     return try decode(value)
   }
 
@@ -78,7 +82,9 @@ public final class WebSocketTransport: MonitorClientProtocol, @unchecked Sendabl
     )
     return try decode(value)
   }
+}
 
+extension WebSocketTransport {
   // MARK: - Streams
 
   public func globalStream() -> AsyncThrowingStream<StreamEvent, Error> {
@@ -112,7 +118,7 @@ public final class WebSocketTransport: MonitorClientProtocol, @unchecked Sendabl
       lock.withLock { sessionStreamContinuations[sessionID] = continuation }
       continuation.onTermination = { [weak self] _ in
         guard let self else { return }
-        self.lock.withLock { _ = self.sessionStreamContinuations.removeValue(forKey: sessionID) }
+        self.lock.withLock { self.sessionStreamContinuations[sessionID] = nil }
         Task {
           try? await self.send(
             method: "session.unsubscribe",
@@ -132,7 +138,9 @@ public final class WebSocketTransport: MonitorClientProtocol, @unchecked Sendabl
       }
     }
   }
+}
 
+extension WebSocketTransport {
   // MARK: - Mutations
 
   public func createTask(
@@ -244,7 +252,6 @@ public final class WebSocketTransport: MonitorClientProtocol, @unchecked Sendabl
     let value = try await send(method: "session.observe", params: params)
     return try decode(value)
   }
-
 }
 
 // MARK: - Internal transport mechanics
