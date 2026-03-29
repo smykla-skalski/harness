@@ -34,8 +34,14 @@ actor RecordingDaemonController: DaemonControlling {
       ),
       launchAgent: LaunchAgentStatus(
         installed: launchAgentInstalled,
+        loaded: launchAgentInstalled,
         label: "io.harness.monitor.daemon",
-        path: "/tmp/io.harness.monitor.daemon.plist"
+        path: "/tmp/io.harness.monitor.daemon.plist",
+        domainTarget: "gui/501",
+        serviceTarget: "gui/501/io.harness.monitor.daemon",
+        state: launchAgentInstalled ? "running" : nil,
+        pid: launchAgentInstalled ? 4_242 : nil,
+        lastExitStatus: launchAgentInstalled ? 0 : nil
       ),
       projectCount: 1,
       sessionCount: 1,
