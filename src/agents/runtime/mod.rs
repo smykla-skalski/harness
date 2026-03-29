@@ -74,7 +74,7 @@ pub trait AgentRuntime: Send + Sync {
     /// Parse a single raw JSONL line into a `ConversationEvent`.
     fn parse_log_entry(&self, raw_line: &str) -> Option<ConversationEvent>;
 
-    /// Directory where signal files are written for this agent session.
+    /// Directory where signal files are written for this agent runtime session.
     fn signal_dir(&self, project_dir: &Path, session_id: &str) -> PathBuf;
 
     /// Write a signal file that the agent picks up on its next hook cycle.
@@ -176,4 +176,27 @@ pub fn runtime_for_name(name: &str) -> Option<&'static dyn AgentRuntime> {
         "opencode" => Some(runtime_for(HookAgent::OpenCode)),
         _ => None,
     }
+}
+
+/// Candidate session keys to inspect for signal delivery.
+///
+/// New signal delivery is keyed by the target agent's runtime session ID. The
+/// orchestration session ID stays as a legacy fallback so older queued signals
+/// remain visible until they are drained.
+#[must_use]
+pub fn signal_session_keys(
+    orchestration_session_id: &str,
+    agent_session_id: Option<&str>,
+) -> Vec<String> {
+    let mut keys = Vec::new();
+    if let Some(agent_session_id) = agent_session_id.filter(|value| !value.trim().is_empty()) {
+        keys.push(agent_session_id.to_string());
+    }
+    if keys
+        .last()
+        .is_none_or(|last| last.as_str() != orchestration_session_id)
+    {
+        keys.push(orchestration_session_id.to_string());
+    }
+    keys
 }

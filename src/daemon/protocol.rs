@@ -122,6 +122,7 @@ pub struct StreamEvent {
 pub struct RoleChangeRequest {
     pub actor: String,
     pub role: SessionRole,
+    pub reason: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -142,6 +143,7 @@ pub struct TaskCreateRequest {
     pub title: String,
     pub context: Option<String>,
     pub severity: TaskSeverity,
+    pub suggested_fix: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
