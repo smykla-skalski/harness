@@ -10,16 +10,14 @@ struct PreferencesActionGrid: View {
   let requestRemoveLaunchAgentConfirmation: @Sendable @MainActor () -> Void
 
   var body: some View {
-    MonitorAdaptiveGridLayout(
-      minimumColumnWidth: 176,
-      maximumColumns: 3,
-      spacing: 12
-    ) {
-      preferenceReconnectButton
-      preferenceRefreshDiagnosticsButton
-      preferenceStartDaemonButton
-      preferenceInstallLaunchAgentButton
-      preferenceRemoveLaunchAgentButton
+    MonitorGlassContainer(spacing: 10) {
+      MonitorWrapLayout(spacing: 10, lineSpacing: 10) {
+        preferenceReconnectButton
+        preferenceRefreshDiagnosticsButton
+        preferenceStartDaemonButton
+        preferenceInstallLaunchAgentButton
+        preferenceRemoveLaunchAgentButton
+      }
     }
     .frame(maxWidth: .infinity, alignment: .leading)
   }
@@ -31,7 +29,7 @@ struct PreferencesActionGrid: View {
       variant: .bordered,
       isLoading: isLoading,
       accessibilityIdentifier: MonitorAccessibility.preferencesActionButton("Reconnect"),
-      fillsWidth: true,
+      fillsWidth: false,
       action: reconnect
     )
   }
@@ -43,7 +41,7 @@ struct PreferencesActionGrid: View {
       variant: .bordered,
       isLoading: isLoading,
       accessibilityIdentifier: MonitorAccessibility.preferencesActionButton("Refresh Diagnostics"),
-      fillsWidth: true,
+      fillsWidth: false,
       action: refreshDiagnostics
     )
   }
@@ -55,7 +53,7 @@ struct PreferencesActionGrid: View {
       variant: .prominent,
       isLoading: isLoading,
       accessibilityIdentifier: MonitorAccessibility.preferencesActionButton("Start Daemon"),
-      fillsWidth: true,
+      fillsWidth: false,
       action: startDaemon
     )
   }
@@ -67,7 +65,7 @@ struct PreferencesActionGrid: View {
       variant: .bordered,
       isLoading: isLoading,
       accessibilityIdentifier: MonitorAccessibility.preferencesActionButton("Install Launch Agent"),
-      fillsWidth: true,
+      fillsWidth: false,
       action: installLaunchAgent
     )
   }
@@ -79,7 +77,7 @@ struct PreferencesActionGrid: View {
       variant: .bordered,
       isLoading: isLoading,
       accessibilityIdentifier: MonitorAccessibility.preferencesActionButton("Remove Launch Agent"),
-      fillsWidth: true,
+      fillsWidth: false,
       action: {
         await requestRemoveLaunchAgentConfirmation()
       }

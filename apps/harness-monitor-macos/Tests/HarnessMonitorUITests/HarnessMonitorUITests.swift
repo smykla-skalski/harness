@@ -31,7 +31,7 @@ final class HarnessMonitorUITests: HarnessMonitorUITestCase {
     XCTAssertTrue(sidebarEmptyState.waitForExistence(timeout: Self.uiTimeout))
     XCTAssertTrue(sidebarRoot.waitForExistence(timeout: Self.uiTimeout))
     XCTAssertFalse(element(in: app, identifier: Accessibility.sidebarSessionList).exists)
-    XCTAssertEqual(sidebarRoot.descendants(matching: .scrollView).count, 0)
+    XCTAssertEqual(sidebarRoot.descendants(matching: .scrollView).count, 1)
     XCTAssertEqual(sidebarRoot.descendants(matching: .scrollBar).count, 0)
 
     let activeFilter = element(in: app, identifier: Accessibility.activeFilterButton)
@@ -89,12 +89,16 @@ final class HarnessMonitorUITests: HarnessMonitorUITestCase {
     let sidebarToggle = sidebarToggleButton(in: app)
     let refreshButton = toolbarButton(in: app, identifier: Accessibility.refreshButton)
     let preferencesButton = toolbarButton(in: app, identifier: Accessibility.preferencesButton)
-    let sessionRow = app.buttons.matching(identifier: Accessibility.previewSessionRow).firstMatch
+    let sidebarShellQuery = app.otherElements
+      .matching(identifier: Accessibility.sidebarShellFrame)
+    let sidebarShell = sidebarShellQuery.firstMatch
 
     XCTAssertTrue(sidebarToggle.waitForExistence(timeout: Self.uiTimeout))
     XCTAssertTrue(refreshButton.waitForExistence(timeout: Self.uiTimeout))
     XCTAssertTrue(preferencesButton.waitForExistence(timeout: Self.uiTimeout))
-    XCTAssertTrue(sessionRow.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(sidebarShell.waitForExistence(timeout: Self.uiTimeout))
+    let initialSidebarWidth = sidebarShell.frame.width
+    XCTAssertGreaterThan(initialSidebarWidth, 200)
     let refreshToolbarButtons = app.toolbars.buttons.matching(
       identifier: Accessibility.refreshButton
     )
@@ -114,7 +118,14 @@ final class HarnessMonitorUITests: HarnessMonitorUITestCase {
 
     sidebarToggle.tap()
 
-    XCTAssertTrue(waitUntil { !sessionRow.exists || !sessionRow.isHittable })
+    XCTAssertTrue(
+      waitUntil {
+        guard let collapsedSidebar = sidebarShellQuery.allElementsBoundByIndex.first else {
+          return true
+        }
+        return collapsedSidebar.frame.width < max(120, initialSidebarWidth * 0.5)
+      }
+    )
     XCTAssertTrue(refreshButton.exists)
     XCTAssertTrue(preferencesButton.exists)
     XCTAssertTrue(refreshButton.isHittable)
@@ -122,7 +133,14 @@ final class HarnessMonitorUITests: HarnessMonitorUITestCase {
 
     sidebarToggle.tap()
 
-    XCTAssertTrue(waitUntil { sessionRow.exists && sessionRow.isHittable })
+    XCTAssertTrue(
+      waitUntil {
+        guard let restoredSidebar = sidebarShellQuery.allElementsBoundByIndex.first else {
+          return false
+        }
+        return restoredSidebar.frame.width > (initialSidebarWidth * 0.75)
+      }
+    )
     XCTAssertTrue(refreshButton.isHittable)
     XCTAssertTrue(preferencesButton.isHittable)
     refreshButton.tap()

@@ -2,10 +2,22 @@ enum MonitorAccessibility {
   static let daemonCard = "monitor.sidebar.daemon-card"
   static let daemonCardFrame = "monitor.sidebar.daemon-card.frame"
   static let sidebarRoot = "monitor.sidebar.root"
+  static let sidebarShellFrame = "monitor.sidebar.shell.frame"
   static let sidebarEmptyState = "monitor.sidebar.empty-state"
   static let sidebarSessionList = "monitor.sidebar.session-list"
   static let sidebarSessionListContent = "monitor.sidebar.session-list.content"
+  static let sidebarFiltersCard = "monitor.sidebar.filters"
+  static let sidebarClearFiltersButton = "monitor.sidebar.filters.clear"
   static let sessionFilterGroup = "monitor.sidebar.filter-group"
+  static func sidebarFilterChip(_ filter: String) -> String {
+    "monitor.sidebar.filter-chip.\(slug(filter))"
+  }
+  static func sidebarFocusChip(_ filter: String) -> String {
+    "monitor.sidebar.focus-chip.\(slug(filter))"
+  }
+  static func sidebarSavedSearchButton(_ key: String) -> String {
+    "monitor.sidebar.saved-search.\(slug(key))"
+  }
   static let onboardingCard = "monitor.board.onboarding-card"
   static let sessionsBoardRoot = "monitor.board.root"
   static let recentSessionsCard = "monitor.board.recent-sessions-card"

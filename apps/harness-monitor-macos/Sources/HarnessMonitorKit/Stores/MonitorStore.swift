@@ -18,6 +18,10 @@ public final class MonitorStore {
 
     public var id: String { rawValue }
 
+    public var title: String {
+      rawValue.capitalized
+    }
+
     func includes(_ status: SessionStatus) -> Bool {
       switch self {
       case .active:
@@ -62,8 +66,28 @@ public final class MonitorStore {
   public var timeline: [TimelineEntry] = []
   public var inspectorSelection: InspectorSelection = .none
   public var actionActorID: String?
-  public var searchText = ""
-  public var sessionFilter: SessionFilter = .active
+  public var searchText = "" {
+    didSet {
+      if searchText != oldValue {
+        selectedSavedSearchID = nil
+      }
+    }
+  }
+  public var sessionFilter: SessionFilter = .active {
+    didSet {
+      if sessionFilter != oldValue {
+        selectedSavedSearchID = nil
+      }
+    }
+  }
+  public var sessionFocusFilter: SessionFocusFilter = .all {
+    didSet {
+      if sessionFocusFilter != oldValue {
+        selectedSavedSearchID = nil
+      }
+    }
+  }
+  public var selectedSavedSearchID: String?
   public var isRefreshing = false
   public var isBusy = false
   public var lastAction = ""

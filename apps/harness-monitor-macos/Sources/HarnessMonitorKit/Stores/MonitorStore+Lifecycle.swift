@@ -48,6 +48,12 @@ extension MonitorStore {
         await loadSession(using: client, sessionID: selectedSessionID)
       } else {
         synchronizeActionActor()
+        if shouldAutoSelectPreviewSession(
+          client: client,
+          sessions: sessions
+        ) {
+          await loadSession(using: client, sessionID: sessions[0].sessionId)
+        }
       }
     } catch {
       connectionState = .offline(error.localizedDescription)
@@ -163,5 +169,12 @@ extension MonitorStore {
         try? await Task.sleep(for: delay)
       }
     }
+  }
+
+  private func shouldAutoSelectPreviewSession(
+    client: any MonitorClientProtocol,
+    sessions: [SessionSummary]
+  ) -> Bool {
+    selectedSessionID == nil && client is PreviewMonitorClient && !sessions.isEmpty
   }
 }
