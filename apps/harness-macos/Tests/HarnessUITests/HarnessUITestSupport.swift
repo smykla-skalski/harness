@@ -301,6 +301,18 @@ extension HarnessUITestCase {
     add(attachment)
   }
 
+  func attachAppHierarchy(
+    in app: XCUIApplication,
+    named name: String,
+    file: StaticString = #filePath,
+    line: UInt = #line
+  ) {
+    let attachment = XCTAttachment(string: app.debugDescription)
+    attachment.name = name
+    attachment.lifetime = .keepAlways
+    add(attachment)
+  }
+
   func waitUntil(
     timeout: TimeInterval = 5,
     pollInterval: TimeInterval = 0.1,
