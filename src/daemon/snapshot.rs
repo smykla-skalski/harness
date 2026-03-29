@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 
+use crate::agents::runtime::signal_session_keys;
 use crate::agents::runtime::signal::{
     read_acknowledged_signals, read_acknowledgments, read_pending_signals,
 };
@@ -173,32 +174,38 @@ fn load_signals(
     let mut signals = Vec::new();
     let root = index::signals_root(&project.context_root);
     for (agent_id, agent) in &state.agents {
-        let signal_dir = root.join(&agent.runtime).join(&state.session_id);
-        let pending = read_pending_signals(&signal_dir)?;
-        let acknowledged = read_acknowledged_signals(&signal_dir)?;
-        let acknowledgments = read_acknowledgments(&signal_dir)?;
-        let acknowledgment_by_id: BTreeMap<String, _> = acknowledgments
-            .into_iter()
-            .map(|ack| (ack.signal_id.clone(), ack))
-            .collect();
-
-        for signal in pending {
-            signals.push(SessionSignalRecord {
-                runtime: agent.runtime.clone(),
-                agent_id: agent_id.clone(),
-                session_id: state.session_id.clone(),
-                status: SessionSignalStatus::Pending,
-                signal,
-                acknowledgment: None,
-            });
+        let mut signals_by_id = BTreeMap::new();
+        let mut acknowledgments_by_id = BTreeMap::new();
+        for signal_session_id in signal_session_keys(&state.session_id, agent.agent_session_id.as_deref())
+        {
+            let signal_dir = root.join(&agent.runtime).join(signal_session_id);
+            for signal in read_pending_signals(&signal_dir)? {
+                signals_by_id
+                    .entry(signal.signal_id.clone())
+                    .or_insert((signal, false));
+            }
+            for signal in read_acknowledged_signals(&signal_dir)? {
+                signals_by_id.insert(signal.signal_id.clone(), (signal, true));
+            }
+            for acknowledgment in read_acknowledgments(&signal_dir)? {
+                acknowledgments_by_id
+                    .entry(acknowledgment.signal_id.clone())
+                    .or_insert(acknowledgment);
+            }
         }
-        for signal in acknowledged {
-            let acknowledgment = acknowledgment_by_id.get(&signal.signal_id).cloned();
-            let status = acknowledgment
-                .as_ref()
-                .map_or(SessionSignalStatus::Pending, |ack| {
-                    SessionSignalStatus::from_ack_result(ack.result)
-                });
+
+        for (signal, was_acknowledged) in signals_by_id.into_values() {
+            let acknowledgment = acknowledgments_by_id.remove(&signal.signal_id);
+            let status = acknowledgment.as_ref().map_or_else(
+                || {
+                    if was_acknowledged {
+                        SessionSignalStatus::Acknowledged
+                    } else {
+                        SessionSignalStatus::Pending
+                    }
+                },
+                |ack| SessionSignalStatus::from_ack_result(ack.result),
+            );
             signals.push(SessionSignalRecord {
                 runtime: agent.runtime.clone(),
                 agent_id: agent_id.clone(),

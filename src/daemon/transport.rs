@@ -66,6 +66,9 @@ pub struct DaemonServeArgs {
     /// Periodic refresh interval in seconds.
     #[arg(long, default_value_t = 2)]
     pub refresh_seconds: u64,
+    /// Poll interval in seconds for daemon-owned observe loops.
+    #[arg(long, default_value_t = 5)]
+    pub observe_seconds: u64,
 }
 
 impl Execute for DaemonServeArgs {
@@ -79,6 +82,7 @@ impl Execute for DaemonServeArgs {
             host: self.host.clone(),
             port: self.port,
             poll_interval: Duration::from_secs(self.refresh_seconds.max(1)),
+            observe_interval: Duration::from_secs(self.observe_seconds.max(1)),
         }))?;
         Ok(0)
     }
