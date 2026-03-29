@@ -43,6 +43,19 @@ struct SidebarView: View {
         statusPill
       }
 
+      if store.connectionState == .online {
+        HStack(spacing: 8) {
+          TransportBadge(kind: store.activeTransport)
+          LatencyBadge(latencyMs: store.connectionMetrics.latencyMs)
+          ActivityPulse(isActive: true)
+        }
+        .transition(.move(edge: .top).combined(with: .opacity))
+      }
+      if store.connectionMetrics.isFallback {
+        FallbackBanner(reason: store.connectionMetrics.fallbackReason) {
+          Task { await store.reconnect() }
+        }
+      }
       if store.isRefreshing || store.connectionState == .connecting {
         MonitorLoadingStateView(title: loadingTitle)
           .transition(.move(edge: .top).combined(with: .opacity))
@@ -66,7 +79,6 @@ struct SidebarView: View {
     .accessibilityIdentifier(MonitorAccessibility.daemonCard)
     .accessibilityFrameMarker(MonitorAccessibility.daemonCardFrame)
   }
-
   private var filterStrip: some View {
     VStack(alignment: .leading, spacing: 10) {
       Text("Scope")

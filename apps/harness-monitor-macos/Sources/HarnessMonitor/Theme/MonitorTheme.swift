@@ -74,6 +74,29 @@ struct MonitorCardModifier: ViewModifier {
   }
 }
 
+struct LiveActivityBorderModifier: ViewModifier {
+  let isActive: Bool
+  @State private var highlight = false
+
+  func body(content: Content) -> some View {
+    content
+      .overlay(
+        RoundedRectangle(cornerRadius: 22, style: .continuous)
+          .stroke(
+            MonitorTheme.success.opacity(highlight ? 0.4 : 0),
+            lineWidth: 1.5
+          )
+      )
+      .onChange(of: isActive) { _, active in
+        guard active else { return }
+        withAnimation(.easeIn(duration: 0.15)) { highlight = true }
+        withAnimation(.easeOut(duration: 0.6).delay(0.15)) {
+          highlight = false
+        }
+      }
+  }
+}
+
 struct MonitorLoadingStateView: View {
   let title: String
   @State private var animates = false
@@ -116,6 +139,10 @@ extension View {
     contentPadding: CGFloat = 16
   ) -> some View {
     modifier(MonitorCardModifier(minHeight: minHeight, contentPadding: contentPadding))
+  }
+
+  func liveActivityBorder(isActive: Bool) -> some View {
+    modifier(LiveActivityBorderModifier(isActive: isActive))
   }
 
   func accessibilityFrameMarker(_ identifier: String) -> some View {
