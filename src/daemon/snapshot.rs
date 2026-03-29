@@ -110,6 +110,7 @@ fn summary_from_resolved(resolved: &ResolvedSession) -> SessionSummary {
         last_activity_at: resolved.state.last_activity_at.clone(),
         leader_id: resolved.state.leader_id.clone(),
         observe_id: resolved.state.observe_id.clone(),
+        pending_leader_transfer: resolved.state.pending_leader_transfer.clone(),
         metrics: resolved.state.metrics.clone(),
     }
 }
@@ -280,6 +281,7 @@ mod tests {
             archived_at: None,
             last_activity_at: Some("2026-03-28T14:05:00Z".into()),
             observe_id: Some("observe-sess-merge".into()),
+            pending_leader_transfer: None,
             metrics: SessionMetrics::default(),
         };
         state.metrics = SessionMetrics::recalculate(&state);

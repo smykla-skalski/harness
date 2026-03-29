@@ -5,8 +5,8 @@ use super::launchd::LaunchAgentStatus;
 use super::state::{DaemonAuditEvent, DaemonDiagnostics, DaemonManifest};
 use crate::observe::types::{FixSafety, IssueCategory, IssueCode, IssueSeverity};
 use crate::session::types::{
-    AgentRegistration, SessionMetrics, SessionRole, SessionSignalRecord, SessionStatus,
-    TaskSeverity, TaskStatus, WorkItem,
+    AgentRegistration, PendingLeaderTransfer, SessionMetrics, SessionRole, SessionSignalRecord,
+    SessionStatus, TaskSeverity, TaskStatus, WorkItem,
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -53,6 +53,7 @@ pub struct SessionSummary {
     pub last_activity_at: Option<String>,
     pub leader_id: Option<String>,
     pub observe_id: Option<String>,
+    pub pending_leader_transfer: Option<PendingLeaderTransfer>,
     pub metrics: SessionMetrics,
 }
 
@@ -121,6 +122,11 @@ pub struct StreamEvent {
 pub struct RoleChangeRequest {
     pub actor: String,
     pub role: SessionRole,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AgentRemoveRequest {
+    pub actor: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -7,7 +7,7 @@ use crate::agents::runtime::RuntimeCapabilities;
 use crate::agents::runtime::signal::{AckResult, Signal, SignalAck};
 
 /// Current schema version for session state files.
-pub const CURRENT_VERSION: u32 = 2;
+pub const CURRENT_VERSION: u32 = 3;
 
 /// Main versioned state document for a multi-agent orchestration session.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -40,6 +40,9 @@ pub struct SessionState {
     /// Observe state identifier associated with this session.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub observe_id: Option<String>,
+    /// Pending leadership transfer request awaiting confirmation.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pending_leader_transfer: Option<PendingLeaderTransfer>,
     /// Cached counts for fast daemon and UI list rendering.
     #[serde(default)]
     pub metrics: SessionMetrics,
@@ -134,6 +137,17 @@ pub struct AgentRegistration {
     /// Runtime delivery and transcript features for UI badges.
     #[serde(default)]
     pub runtime_capabilities: RuntimeCapabilities,
+}
+
+/// A pending leadership transfer initiated by a non-leader actor.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PendingLeaderTransfer {
+    pub requested_by: String,
+    pub current_leader_id: String,
+    pub new_leader_id: String,
+    pub requested_at: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reason: Option<String>,
 }
 
 /// Role an agent holds within a session.
@@ -334,6 +348,11 @@ pub enum SessionTransition {
         from: String,
         to: String,
     },
+    LeaderTransferConfirmed {
+        from: String,
+        to: String,
+        confirmed_by: String,
+    },
     LeaderTransferred {
         from: String,
         to: String,
@@ -400,6 +419,7 @@ mod tests {
             archived_at: None,
             last_activity_at: Some("2026-03-28T12:00:00Z".into()),
             observe_id: Some("observe-sess-test".into()),
+            pending_leader_transfer: None,
             metrics: SessionMetrics::default(),
         };
         let json = serde_json::to_string(&state).expect("serializes");
@@ -542,6 +562,7 @@ mod tests {
             archived_at: None,
             last_activity_at: None,
             observe_id: None,
+            pending_leader_transfer: None,
             metrics: SessionMetrics::default(),
         };
 
