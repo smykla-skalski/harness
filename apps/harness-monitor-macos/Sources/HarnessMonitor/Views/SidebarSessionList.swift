@@ -249,7 +249,7 @@ struct SidebarSessionList: View {
             .font(.system(.body, design: .rounded, weight: .semibold))
             .lineLimit(2)
             .foregroundStyle(
-              store.selectedSavedSearchID == search.id ? Color.white : MonitorTheme.ink
+              store.selectedSavedSearchID == search.id ? Color.white : MonitorTheme.sidebarHeader
             )
           Spacer()
           if store.selectedSavedSearchID == search.id {
@@ -262,7 +262,7 @@ struct SidebarSessionList: View {
           .font(.system(.footnote, design: .rounded, weight: .medium))
           .foregroundStyle(
             store.selectedSavedSearchID == search.id
-              ? Color.white.opacity(0.84) : MonitorTheme.ink.opacity(0.72)
+              ? Color.white.opacity(0.84) : MonitorTheme.sidebarMuted
           )
           .lineLimit(2, reservesSpace: true)
       }
@@ -270,16 +270,19 @@ struct SidebarSessionList: View {
       .padding(12)
       .background {
         if store.selectedSavedSearchID == search.id {
-          MonitorInteractiveCardBackground(
-            cornerRadius: 16,
-            tint: MonitorTheme.accent
-          )
+          RoundedRectangle(cornerRadius: 16, style: .continuous)
+            .fill(MonitorTheme.accent)
+            .overlay {
+              RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(MonitorTheme.accent.opacity(0.32), lineWidth: 1)
+            }
         } else {
-          MonitorInsetPanelBackground(
-            cornerRadius: 16,
-            fillOpacity: 0.10,
-            strokeOpacity: 0.16
-          )
+          RoundedRectangle(cornerRadius: 16, style: .continuous)
+            .fill(MonitorTheme.surface)
+            .overlay {
+              RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(MonitorTheme.controlBorder, lineWidth: 1)
+            }
         }
       }
     }
