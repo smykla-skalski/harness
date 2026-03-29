@@ -73,6 +73,7 @@ public final class MonitorStore {
   public var connectionMetrics: ConnectionMetrics = .initial
   public var connectionEvents: [ConnectionEvent] = []
   public var subscribedSessionIDs: Set<String> = []
+  public var dataReceivedPulse = false
 
   let daemonController: any DaemonControlling
   var client: (any MonitorClientProtocol)?
@@ -200,6 +201,7 @@ public final class MonitorStore {
     guard let sessionID else {
       selectedSession = nil
       timeline = []
+      subscribedSessionIDs.removeAll()
       sessionStreamTask?.cancel()
       sessionStreamTask = nil
       return
