@@ -10,30 +10,22 @@ struct SidebarView: View {
   }
 
   var body: some View {
-    ZStack(alignment: .topLeading) {
-      sidebarChromeBackground
-
-      VStack(spacing: 0) {
-        Color.clear
-          .frame(height: 8)
-          .accessibilityHidden(true)
-
-        ScrollView(showsIndicators: false) {
-          VStack(alignment: .leading, spacing: 18) {
-            daemonStatusCard
-            sessionList
-          }
-          .frame(maxWidth: .infinity, alignment: .topLeading)
-          .padding(.horizontal, 18)
-          .padding(.top, 8)
-          .padding(.bottom, 18)
-        }
-        .contentShape(Rectangle())
-        .accessibilityFrameMarker(MonitorAccessibility.sidebarShellFrame)
+    ScrollView(showsIndicators: false) {
+      VStack(alignment: .leading, spacing: 18) {
+        daemonStatusCard
+        sessionList
       }
-      .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+      .frame(maxWidth: .infinity, alignment: .topLeading)
+      .padding(.horizontal, 18)
+      .padding(.top, 8)
+      .padding(.bottom, 18)
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    .background {
+      sidebarChromeBackground
+    }
+    .contentShape(Rectangle())
+    .accessibilityFrameMarker(MonitorAccessibility.sidebarShellFrame)
     .animation(.snappy(duration: 0.24), value: store.groupedSessions)
     .animation(.snappy(duration: 0.24), value: store.isRefreshing)
     .accessibilityElement(children: .contain)
@@ -96,9 +88,9 @@ struct SidebarView: View {
 extension SidebarView {
   fileprivate var sidebarChromeBackground: some View {
     Rectangle()
-      .fill(.regularMaterial)
+      .fill(.windowBackground)
       .overlay {
-        MonitorTheme.sidebarBackground.opacity(0.22)
+        MonitorTheme.sidebarBackground.opacity(0.32)
       }
       .overlay(alignment: .top) {
         LinearGradient(
@@ -111,7 +103,6 @@ extension SidebarView {
           endPoint: .bottom
         )
       }
-      .ignoresSafeArea(edges: .top)
   }
 
   fileprivate var sidebarStartDaemonButton: some View {

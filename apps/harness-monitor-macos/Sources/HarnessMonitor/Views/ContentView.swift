@@ -4,9 +4,6 @@ import SwiftUI
 
 struct ContentView: View {
   @Bindable var store: MonitorStore
-  @Binding var themeMode: MonitorThemeMode
-  @FocusState private var preferencesFocused: Bool
-  @State private var showsPreferences = false
 
   private var selectedDetail: SessionDetail? {
     guard let sessionID = store.selectedSessionID,
@@ -23,73 +20,58 @@ struct ContentView: View {
   }
 
   var body: some View {
-    GeometryReader { proxy in
-      ZStack {
-        MonitorTheme.canvas
-
-        NavigationSplitView {
-          SidebarView(store: store)
-            .navigationSplitViewColumnWidth(min: 300, ideal: 350)
-        } content: {
-          NavigationStack {
-            contentColumn
-              .frame(maxWidth: .infinity, maxHeight: .infinity)
-              .id(store.selectedSessionID ?? "board")
-              .accessibilityFrameMarker(MonitorAccessibility.contentRoot)
-          }
-          .searchable(text: $store.searchText, prompt: "Search sessions, projects, leaders")
-          .navigationTitle("Harness Monitor")
-          .toolbar {
-            ToolbarItem(placement: .secondaryAction) {
-              ConnectionToolbarBadge(metrics: store.connectionMetrics)
-            }
-            ToolbarItemGroup(placement: .primaryAction) {
-              Button(action: refresh) {
-                HStack(spacing: 8) {
-                  Image(systemName: "arrow.clockwise")
-                    .rotationEffect(.degrees(store.isRefreshing ? 360 : 0))
-                    .animation(
-                      store.isRefreshing
-                        ? .linear(duration: 0.9).repeatForever(autoreverses: false)
-                        : .easeOut(duration: 0.2),
-                      value: store.isRefreshing
-                    )
-                  Text("Refresh")
-                }
-              }
-              .keyboardShortcut("r", modifiers: [.command])
-              .accessibilityIdentifier(MonitorAccessibility.refreshButton)
-
-              Button(action: togglePreferences) {
-                Label("Daemon", systemImage: "gearshape.2")
-              }
-              .accessibilityIdentifier(MonitorAccessibility.daemonPreferencesButton)
-            }
-          }
-          .toolbarBackground(.visible, for: .windowToolbar)
-          .navigationSplitViewColumnWidth(min: 600, ideal: 840)
-        } detail: {
-          InspectorColumnView(store: store)
-            .navigationSplitViewColumnWidth(min: 320, ideal: 380)
+    NavigationSplitView {
+      SidebarView(store: store)
+        .navigationSplitViewColumnWidth(min: 300, ideal: 350)
+    } content: {
+      NavigationStack {
+        SessionContentContainer(
+          store: store,
+          detail: selectedDetail,
+          summary: selectedSessionSummary,
+          timeline: store.timeline
+        )
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .accessibilityFrameMarker("\(MonitorAccessibility.contentRoot).frame")
+      }
+      .navigationTitle("Harness Monitor")
+      .toolbar {
+        ToolbarItem(placement: .secondaryAction) {
+          ConnectionToolbarBadge(metrics: store.connectionMetrics)
         }
-        .navigationSplitViewStyle(.balanced)
-        .blur(radius: showsPreferences ? 1.5 : 0)
-        .animation(.easeInOut(duration: 0.18), value: showsPreferences)
+        ToolbarItemGroup(placement: .primaryAction) {
+          Button(action: refresh) {
+            HStack(spacing: 8) {
+              Image(systemName: "arrow.clockwise")
+                .rotationEffect(.degrees(store.isRefreshing ? 360 : 0))
+                .animation(
+                  store.isRefreshing
+                    ? .linear(duration: 0.9).repeatForever(autoreverses: false)
+                    : .easeOut(duration: 0.2),
+                  value: store.isRefreshing
+                )
+              Text("Refresh")
+            }
+          }
+          .keyboardShortcut("r", modifiers: [.command])
+          .accessibilityIdentifier(MonitorAccessibility.refreshButton)
 
-        if showsPreferences {
-          preferencesOverlay(in: proxy.size)
-            .transition(.opacity.combined(with: .scale(scale: 0.98)))
-            .zIndex(1)
+          SettingsLink {
+            Label("Settings", systemImage: "gearshape.2")
+          }
+          .accessibilityIdentifier(MonitorAccessibility.daemonPreferencesButton)
         }
       }
+      .navigationSplitViewColumnWidth(min: 600, ideal: 840)
+    } detail: {
+      InspectorColumnView(store: store)
+        .navigationSplitViewColumnWidth(min: 320, ideal: 380)
     }
+    .toolbarRole(.editor)
+    .navigationSplitViewStyle(.balanced)
+    .toolbarBackgroundVisibility(.visible, for: .windowToolbar)
+    .containerBackground(.windowBackground, for: .window)
     .frame(maxWidth: .infinity, maxHeight: .infinity)
-    .onExitCommand {
-      guard showsPreferences else {
-        return
-      }
-      togglePreferences()
-    }
     .confirmationDialog(
       confirmationTitle,
       isPresented: confirmationBinding,
@@ -118,24 +100,6 @@ struct ContentView: View {
       if !confirmationMessage.isEmpty {
         Text(confirmationMessage)
       }
-    }
-  }
-
-  @ViewBuilder
-  private var contentColumn: some View {
-    if let detail = selectedDetail {
-      SessionCockpitView(
-        store: store,
-        detail: detail,
-        timeline: store.timeline
-      )
-      .transition(.opacity.combined(with: .move(edge: .trailing)))
-    } else if let summary = selectedSessionSummary {
-      sessionLoadingView(summary: summary)
-        .transition(.opacity)
-    } else {
-      SessionsBoardView(store: store)
-        .transition(.opacity.combined(with: .move(edge: .leading)))
     }
   }
 
@@ -181,14 +145,40 @@ struct ContentView: View {
       ""
     }
   }
+}
 
-  private func togglePreferences() {
-    withAnimation(.spring(response: 0.26, dampingFraction: 0.9)) {
-      showsPreferences.toggle()
+private struct SessionContentContainer: View {
+  @Bindable var store: MonitorStore
+  let detail: SessionDetail?
+  let summary: SessionSummary?
+  let timeline: [TimelineEntry]
+
+  var body: some View {
+    ZStack {
+      SessionsBoardView(store: store)
+        .opacity(detail == nil && summary == nil ? 1 : 0)
+        .allowsHitTesting(detail == nil && summary == nil)
+
+      if let summary, detail == nil {
+        SessionLoadingView(summary: summary)
+          .transition(.opacity)
+      }
+
+      if let detail {
+        SessionCockpitView(store: store, detail: detail, timeline: timeline)
+          .transition(.opacity)
+      }
     }
+    .animation(.easeInOut(duration: 0.18), value: detail?.session.sessionId)
+    .animation(.easeInOut(duration: 0.18), value: summary?.sessionId)
+    .background(MonitorTheme.canvas)
   }
+}
 
-  private func sessionLoadingView(summary: SessionSummary) -> some View {
+private struct SessionLoadingView: View {
+  let summary: SessionSummary
+
+  var body: some View {
     MonitorColumnScrollView {
       VStack(alignment: .leading, spacing: 18) {
         VStack(alignment: .leading, spacing: 12) {
@@ -219,45 +209,8 @@ struct ContentView: View {
     }
     .foregroundStyle(MonitorTheme.ink)
   }
-
-  @ViewBuilder
-  private func preferencesOverlay(in size: CGSize) -> some View {
-    ZStack {
-      Button(action: togglePreferences) {
-        Rectangle()
-          .fill(MonitorTheme.overlayScrim)
-          .contentShape(Rectangle())
-          .ignoresSafeArea()
-      }
-      .buttonStyle(.plain)
-      .accessibilityIdentifier(MonitorAccessibility.preferencesBackdrop)
-
-      PreferencesView(store: store, themeMode: $themeMode, onDismiss: togglePreferences)
-        .frame(
-          width: min(max(700, size.width * 0.72), 960),
-          height: min(max(520, size.height * 0.78), 820)
-        )
-        .clipShape(RoundedRectangle(cornerRadius: 32, style: .continuous))
-        .overlay(
-          RoundedRectangle(cornerRadius: 32, style: .continuous)
-            .stroke(MonitorTheme.panelBorder, lineWidth: 1)
-        )
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier(MonitorAccessibility.preferencesRoot)
-        .accessibilityFrameMarker(MonitorAccessibility.preferencesPanel)
-        .shadow(color: .black.opacity(0.16), radius: 24, x: 0, y: 18)
-        .padding(24)
-        .focused($preferencesFocused)
-        .onAppear {
-          preferencesFocused = true
-        }
-    }
-  }
 }
 
 #Preview("Dashboard") {
-  ContentView(
-    store: MonitorStore(daemonController: PreviewDaemonController()),
-    themeMode: .constant(.auto)
-  )
+  ContentView(store: MonitorStore(daemonController: PreviewDaemonController()))
 }
