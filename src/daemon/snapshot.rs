@@ -381,19 +381,27 @@ mod tests {
     }
 
     fn sample_state(session_id: &str) -> SessionState {
+        sample_state_for_runtime(session_id, "codex", "codex-session-1")
+    }
+
+    fn sample_state_for_runtime(
+        session_id: &str,
+        runtime: &str,
+        runtime_session_id: &str,
+    ) -> SessionState {
         let mut agents = BTreeMap::new();
         agents.insert(
-            "codex-worker".into(),
+            format!("{runtime}-worker"),
             AgentRegistration {
-                agent_id: "codex-worker".into(),
-                name: "Codex Worker".into(),
-                runtime: "codex".into(),
+                agent_id: format!("{runtime}-worker"),
+                name: format!("{} Worker", runtime.to_uppercase()),
+                runtime: runtime.into(),
                 role: SessionRole::Worker,
                 capabilities: vec!["general".into()],
                 joined_at: "2026-03-28T14:00:00Z".into(),
                 updated_at: "2026-03-28T14:05:00Z".into(),
                 status: AgentStatus::Active,
-                agent_session_id: Some("codex-session-1".into()),
+                agent_session_id: Some(runtime_session_id.into()),
                 last_activity_at: Some("2026-03-28T14:05:00Z".into()),
                 current_task_id: None,
                 runtime_capabilities: crate::agents::runtime::RuntimeCapabilities::default(),
@@ -410,7 +418,7 @@ mod tests {
             updated_at: "2026-03-28T14:05:00Z".into(),
             agents,
             tasks: BTreeMap::new(),
-            leader_id: Some("codex-worker".into()),
+            leader_id: Some(format!("{runtime}-worker")),
             archived_at: None,
             last_activity_at: Some("2026-03-28T14:05:00Z".into()),
             observe_id: Some("observe-sess-merge".into()),
@@ -666,6 +674,95 @@ mod tests {
 
                 let cache_path = state::session_cache_path("project-alpha", session_id);
                 assert!(cache_path.is_file());
+            },
+        );
+    }
+
+    #[test]
+    fn session_detail_agent_activity_falls_back_to_ledger_for_copilot() {
+        let tmp = tempdir().expect("tempdir");
+        temp_env::with_vars(
+            [(
+                "XDG_DATA_HOME",
+                Some(tmp.path().to_str().expect("utf8 path")),
+            )],
+            || {
+                let context_root = tmp.path().join("harness/projects/project-alpha");
+                let session_id = "sess-copilot";
+                let state_path = context_root
+                    .join("orchestration")
+                    .join("sessions")
+                    .join(session_id)
+                    .join("state.json");
+                write_json(
+                    &state_path,
+                    &sample_state_for_runtime(session_id, "copilot", "copilot-session-1"),
+                );
+
+                let ledger_path = context_root.join("agents/ledger/events.jsonl");
+                write_json_line(
+                    &ledger_path,
+                    &serde_json::json!({
+                        "sequence": 1,
+                        "recorded_at": "2026-03-28T14:04:45Z",
+                        "agent": "copilot",
+                        "session_id": "copilot-session-1",
+                        "skill": "suite",
+                        "event": "before_tool_use",
+                        "hook": "guard-write",
+                        "decision": "allow",
+                        "payload": serde_json::json!({
+                            "timestamp": "2026-03-28T14:04:45Z",
+                            "message": {
+                                "role": "assistant",
+                                "content": [{
+                                    "type": "tool_use",
+                                    "name": "Read",
+                                    "input": {"path": "README.md"},
+                                    "id": "call-read-1",
+                                }]
+                            }
+                        }),
+                    }),
+                );
+                write_json_line(
+                    &ledger_path,
+                    &serde_json::json!({
+                        "sequence": 2,
+                        "recorded_at": "2026-03-28T14:04:46Z",
+                        "agent": "copilot",
+                        "session_id": "copilot-session-1",
+                        "skill": "suite",
+                        "event": "after_tool_use",
+                        "hook": "verify-write",
+                        "decision": "allow",
+                        "payload": serde_json::json!({
+                            "timestamp": "2026-03-28T14:04:46Z",
+                            "message": {
+                                "role": "assistant",
+                                "content": [{
+                                    "type": "tool_result",
+                                    "tool_name": "Read",
+                                    "tool_use_id": "call-read-1",
+                                    "content": {"line_count": 12},
+                                    "is_error": false,
+                                }]
+                            }
+                        }),
+                    }),
+                );
+
+                let detail = session_detail(session_id).expect("detail");
+                assert_eq!(detail.agent_activity.len(), 1);
+                assert_eq!(detail.agent_activity[0].agent_id, "copilot-worker");
+                assert_eq!(detail.agent_activity[0].runtime, "copilot");
+                assert_eq!(detail.agent_activity[0].tool_invocation_count, 1);
+                assert_eq!(detail.agent_activity[0].tool_result_count, 1);
+                assert_eq!(detail.agent_activity[0].tool_error_count, 0);
+                assert_eq!(
+                    detail.agent_activity[0].latest_tool_name.as_deref(),
+                    Some("Read")
+                );
             },
         );
     }
