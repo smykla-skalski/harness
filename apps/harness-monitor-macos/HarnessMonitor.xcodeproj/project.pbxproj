@@ -398,7 +398,6 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = 3EBD5BF49D9D4D4E46962781 /* Build configuration list for PBXNativeTarget "HarnessMonitor" */;
 			buildPhases = (
-				C4131215100096216B1E9226 /* Swift Quality Gate */,
 				07422E5B4CD2DD1A121902E1 /* Sources */,
 				794E3ED501C01CC1F425FDFF /* Resources */,
 				D7ADD664BB66A22A819C5094 /* Frameworks */,
@@ -409,6 +408,7 @@
 			);
 			dependencies = (
 				5ACCB03BD538AA821C12253D /* PBXTargetDependency */,
+				B6199EC2E22477896DC98463 /* PBXTargetDependency */,
 			);
 			name = HarnessMonitor;
 			packageProductDependencies = (
@@ -421,12 +421,12 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = EBED8272467ECE0E29B1C854 /* Build configuration list for PBXNativeTarget "HarnessMonitorKit" */;
 			buildPhases = (
-				E85E61772995E34E7998086E /* Swift Quality Gate */,
 				776E283C8702D7B8FA738BB1 /* Sources */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				43B60BDBC6CE1F7413CCA2B7 /* PBXTargetDependency */,
 			);
 			name = HarnessMonitorKit;
 			packageProductDependencies = (
@@ -439,7 +439,6 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = 08869D70BCC6521615A60F74 /* Build configuration list for PBXNativeTarget "HarnessMonitorKitTests" */;
 			buildPhases = (
-				350D7D19A20A238A8B269335 /* Swift Quality Gate */,
 				085F0713CDFEF67FB4354459 /* Sources */,
 				60D2989E0270802F7DB6A7BB /* Frameworks */,
 				7664530A9A476C5151E2966F /* Embed Frameworks */,
@@ -448,6 +447,7 @@
 			);
 			dependencies = (
 				A8815CD9CE142EE9927E65CC /* PBXTargetDependency */,
+				5478A102BB460F3D764ACD05 /* PBXTargetDependency */,
 			);
 			name = HarnessMonitorKitTests;
 			packageProductDependencies = (
@@ -460,7 +460,6 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = 5E76059FD3E7699C1BD7E838 /* Build configuration list for PBXNativeTarget "HarnessMonitorUITests" */;
 			buildPhases = (
-				DD4888C9AE114C577035A9D3 /* Swift Quality Gate */,
 				D30147E0764203FBD7178436 /* Sources */,
 				8D380C1A18375B364AD27E7F /* Clear Gatekeeper Metadata */,
 			);
@@ -468,6 +467,7 @@
 			);
 			dependencies = (
 				F584E4375EFC175F492D00FC /* PBXTargetDependency */,
+				5EACDD818DA857CEF05E5DD9 /* PBXTargetDependency */,
 			);
 			name = HarnessMonitorUITests;
 			packageProductDependencies = (
@@ -513,6 +513,9 @@
 			);
 			mainGroup = 21F7EC70EA4D821CB2655835;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				F831C62C7C16772B9BA1B590 /* XCRemoteSwiftPackageReference "SwiftLintPlugins" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 74DC590F949A5775E777835B /* Products */;
 			projectDirPath = "";
@@ -538,25 +541,6 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXShellScriptBuildPhase section */
-		350D7D19A20A238A8B269335 /* Swift Quality Gate */ = {
-			isa = PBXShellScriptBuildPhase;
-			alwaysOutOfDate = 1;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputFileListPaths = (
-			);
-			inputPaths = (
-			);
-			name = "Swift Quality Gate";
-			outputFileListPaths = (
-			);
-			outputPaths = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "\"$SRCROOT/Scripts/lint-swift.sh\" tests\n";
-		};
 		761668FE234D068F7E69F4B7 /* Clear Gatekeeper Metadata */ = {
 			isa = PBXShellScriptBuildPhase;
 			alwaysOutOfDate = 1;
@@ -594,63 +578,6 @@
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
 			shellScript = "strip_attrs() {\n  local target_path=\"$1\"\n  if [ -e \"$target_path\" ]; then\n    /usr/bin/xattr -dr com.apple.provenance \"$target_path\" 2>/dev/null || true\n    /usr/bin/xattr -dr com.apple.quarantine \"$target_path\" 2>/dev/null || true\n  fi\n}\n\nstrip_attrs \"$TARGET_BUILD_DIR/$FULL_PRODUCT_NAME\"\n\nfor runner in \"$BUILT_PRODUCTS_DIR\"/*-Runner.app; do\n  if [ -e \"$runner\" ]; then\n    strip_attrs \"$runner\"\n  fi\ndone\n";
-		};
-		C4131215100096216B1E9226 /* Swift Quality Gate */ = {
-			isa = PBXShellScriptBuildPhase;
-			alwaysOutOfDate = 1;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputFileListPaths = (
-			);
-			inputPaths = (
-			);
-			name = "Swift Quality Gate";
-			outputFileListPaths = (
-			);
-			outputPaths = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "\"$SRCROOT/Scripts/lint-swift.sh\" app\n";
-		};
-		DD4888C9AE114C577035A9D3 /* Swift Quality Gate */ = {
-			isa = PBXShellScriptBuildPhase;
-			alwaysOutOfDate = 1;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputFileListPaths = (
-			);
-			inputPaths = (
-			);
-			name = "Swift Quality Gate";
-			outputFileListPaths = (
-			);
-			outputPaths = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "\"$SRCROOT/Scripts/lint-swift.sh\" ui-tests\n";
-		};
-		E85E61772995E34E7998086E /* Swift Quality Gate */ = {
-			isa = PBXShellScriptBuildPhase;
-			alwaysOutOfDate = 1;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputFileListPaths = (
-			);
-			inputPaths = (
-			);
-			name = "Swift Quality Gate";
-			outputFileListPaths = (
-			);
-			outputPaths = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "\"$SRCROOT/Scripts/lint-swift.sh\" kit\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
@@ -745,15 +672,31 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
+		43B60BDBC6CE1F7413CCA2B7 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			productRef = 3431FE6DBF0FEA37B25C8FEF /* SwiftLintBuildToolPlugin */;
+		};
+		5478A102BB460F3D764ACD05 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			productRef = 106C4BA1CB2D928DC550AB0B /* SwiftLintBuildToolPlugin */;
+		};
 		5ACCB03BD538AA821C12253D /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = 4FA94D124B8AEDED3C2831AA /* HarnessMonitorKit */;
 			targetProxy = 5D64288AFB4F21867A81E082 /* PBXContainerItemProxy */;
 		};
+		5EACDD818DA857CEF05E5DD9 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			productRef = 04050F9AE517F7FA07008208 /* SwiftLintBuildToolPlugin */;
+		};
 		A8815CD9CE142EE9927E65CC /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = 4FA94D124B8AEDED3C2831AA /* HarnessMonitorKit */;
 			targetProxy = 037E28E2591F9A07413CF1D6 /* PBXContainerItemProxy */;
+		};
+		B6199EC2E22477896DC98463 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			productRef = 49B978D685137F4A5E52E1BB /* SwiftLintBuildToolPlugin */;
 		};
 		F584E4375EFC175F492D00FC /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
@@ -814,7 +757,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				MACOSX_DEPLOYMENT_TARGET = 15.0;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -840,7 +783,7 @@
 					"@executable_path/Frameworks",
 					"@loader_path/Frameworks",
 				);
-				MACOSX_DEPLOYMENT_TARGET = 15.0;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "io.harness.monitor.ui-tests";
 				SDKROOT = macosx;
 				TEST_TARGET_NAME = HarnessMonitor;
@@ -904,7 +847,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				MACOSX_DEPLOYMENT_TARGET = 15.0;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
@@ -933,7 +876,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MACOSX_DEPLOYMENT_TARGET = 15.0;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
 				PRODUCT_BUNDLE_IDENTIFIER = io.harness.monitor.app;
 				SDKROOT = macosx;
 			};
@@ -951,7 +894,7 @@
 					"@executable_path/../Frameworks",
 					"@loader_path/../Frameworks",
 				);
-				MACOSX_DEPLOYMENT_TARGET = 15.0;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "io.harness.monitor.kit-tests";
 				SDKROOT = macosx;
 			};
@@ -971,7 +914,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MACOSX_DEPLOYMENT_TARGET = 15.0;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
 				PRODUCT_BUNDLE_IDENTIFIER = io.harness.monitor.app;
 				SDKROOT = macosx;
 			};
@@ -996,7 +939,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MACOSX_DEPLOYMENT_TARGET = 15.0;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
 				MODULE_VERIFIER_SUPPORTED_LANGUAGES = "objective-c objective-c++";
 				PRODUCT_BUNDLE_IDENTIFIER = io.harness.monitor.kit;
 				SDKROOT = macosx;
@@ -1017,7 +960,7 @@
 					"@executable_path/Frameworks",
 					"@loader_path/Frameworks",
 				);
-				MACOSX_DEPLOYMENT_TARGET = 15.0;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "io.harness.monitor.ui-tests";
 				SDKROOT = macosx;
 				TEST_TARGET_NAME = HarnessMonitor;
@@ -1036,7 +979,7 @@
 					"@executable_path/../Frameworks",
 					"@loader_path/../Frameworks",
 				);
-				MACOSX_DEPLOYMENT_TARGET = 15.0;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "io.harness.monitor.kit-tests";
 				SDKROOT = macosx;
 			};
@@ -1061,7 +1004,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MACOSX_DEPLOYMENT_TARGET = 15.0;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
 				MODULE_VERIFIER_SUPPORTED_LANGUAGES = "objective-c objective-c++";
 				PRODUCT_BUNDLE_IDENTIFIER = io.harness.monitor.kit;
 				SDKROOT = macosx;
@@ -1119,6 +1062,40 @@
 			defaultConfigurationName = Debug;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		F831C62C7C16772B9BA1B590 /* XCRemoteSwiftPackageReference "SwiftLintPlugins" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/SimplyDanny/SwiftLintPlugins";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.58.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		04050F9AE517F7FA07008208 /* SwiftLintBuildToolPlugin */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = F831C62C7C16772B9BA1B590 /* XCRemoteSwiftPackageReference "SwiftLintPlugins" */;
+			productName = "plugin:SwiftLintBuildToolPlugin";
+		};
+		106C4BA1CB2D928DC550AB0B /* SwiftLintBuildToolPlugin */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = F831C62C7C16772B9BA1B590 /* XCRemoteSwiftPackageReference "SwiftLintPlugins" */;
+			productName = "plugin:SwiftLintBuildToolPlugin";
+		};
+		3431FE6DBF0FEA37B25C8FEF /* SwiftLintBuildToolPlugin */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = F831C62C7C16772B9BA1B590 /* XCRemoteSwiftPackageReference "SwiftLintPlugins" */;
+			productName = "plugin:SwiftLintBuildToolPlugin";
+		};
+		49B978D685137F4A5E52E1BB /* SwiftLintBuildToolPlugin */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = F831C62C7C16772B9BA1B590 /* XCRemoteSwiftPackageReference "SwiftLintPlugins" */;
+			productName = "plugin:SwiftLintBuildToolPlugin";
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 2B221152410A999F1866F91D /* Project object */;
 }

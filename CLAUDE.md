@@ -21,13 +21,13 @@ Unit tests are in-crate `#[test]` blocks. Integration tests live in `tests/integ
 
 Pre-commit: `cargo fmt --check && cargo clippy --lib && mise run test`
 
-For `apps/harness-monitor-macos`, treat `HarnessMonitor.xcodeproj` as tracked source. If you add, remove, or rename Swift files under the monitor app, update the Xcode project in the same change instead of relying on local-only project state.
+For `apps/harness-monitor-macos`, the Xcode project is generated from `project.yml` via XcodeGen. If you add, remove, or rename Swift files, update `project.yml` and regenerate with `Scripts/generate-project.sh`. Treat the generated `HarnessMonitor.xcodeproj` as tracked source.
 
 Monitor app validation expectations:
 
-- `xcodebuild -project apps/harness-monitor-macos/HarnessMonitor.xcodeproj -scheme HarnessMonitor -configuration Debug -derivedDataPath tmp/xcode-derived build CODE_SIGNING_ALLOWED=NO`
-- `xcodebuild -project apps/harness-monitor-macos/HarnessMonitor.xcodeproj -scheme HarnessMonitor -configuration Debug -derivedDataPath tmp/xcode-derived test CODE_SIGNING_ALLOWED=NO -destination 'platform=macOS' -skip-testing:HarnessMonitorUITests`
-- The monitor targets run a strict Swift Quality Gate on every build with warnings-as-errors. Expect style/lint failures such as oversized view bodies and fix the source instead of bypassing the gate.
+- `xcodebuild -project apps/harness-monitor-macos/HarnessMonitor.xcodeproj -scheme HarnessMonitor -configuration Debug -destination 'platform=macOS' -skipPackagePluginValidation build`
+- `xcodebuild -project apps/harness-monitor-macos/HarnessMonitor.xcodeproj -scheme HarnessMonitor -configuration Debug -destination 'platform=macOS' -skipPackagePluginValidation test -skip-testing:HarnessMonitorUITests`
+- SwiftLint runs as an SPM build tool plugin (SwiftLintPlugins) on every target. Config lives in `.swiftlint.yml`. No shell script build phases - the plugin works within Xcode's user script sandbox.
 - Prefer shared layout and control primitives for monitor UI density/readability work so button sizing and glass treatment stay consistent across screens.
 
 ## Architecture
