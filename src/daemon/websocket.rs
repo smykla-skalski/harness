@@ -309,14 +309,18 @@ fn dispatch(
             let body: TaskCreateRequest = serde_json::from_value(params)?;
             service::create_task(&session_id, &body).map_err(Into::into)
         }),
-        "task.assign" => dispatch_mutation_with_task(request, state, |session_id, task_id, params| {
-            let body: TaskAssignRequest = serde_json::from_value(params)?;
-            service::assign_task(&session_id, &task_id, &body).map_err(Into::into)
-        }),
-        "task.update" => dispatch_mutation_with_task(request, state, |session_id, task_id, params| {
-            let body: TaskUpdateRequest = serde_json::from_value(params)?;
-            service::update_task(&session_id, &task_id, &body).map_err(Into::into)
-        }),
+        "task.assign" => {
+            dispatch_mutation_with_task(request, state, |session_id, task_id, params| {
+                let body: TaskAssignRequest = serde_json::from_value(params)?;
+                service::assign_task(&session_id, &task_id, &body).map_err(Into::into)
+            })
+        }
+        "task.update" => {
+            dispatch_mutation_with_task(request, state, |session_id, task_id, params| {
+                let body: TaskUpdateRequest = serde_json::from_value(params)?;
+                service::update_task(&session_id, &task_id, &body).map_err(Into::into)
+            })
+        }
         "task.checkpoint" => {
             dispatch_mutation_with_task(request, state, |session_id, task_id, params| {
                 let body: TaskCheckpointRequest = serde_json::from_value(params)?;
@@ -382,11 +386,9 @@ fn handle_session_subscribe(
                 "timeline": timeline,
             }),
         ),
-        (Err(error), _) | (_, Err(error)) => error_response(
-            &request.id,
-            error.code(),
-            &error.message(),
-        ),
+        (Err(error), _) | (_, Err(error)) => {
+            error_response(&request.id, error.code(), &error.message())
+        }
     }
 }
 
@@ -475,11 +477,7 @@ fn dispatch_mutation(
 fn dispatch_mutation_with_task(
     request: &WsRequest,
     state: &DaemonHttpState,
-    handler: impl FnOnce(
-        String,
-        String,
-        Value,
-    ) -> Result<super::protocol::SessionDetail, MutationError>,
+    handler: impl FnOnce(String, String, Value) -> Result<super::protocol::SessionDetail, MutationError>,
 ) -> WsResponse {
     let Some(session_id) = extract_session_id(&request.params) else {
         return error_response(&request.id, "MISSING_PARAM", "missing session_id");
@@ -509,11 +507,7 @@ fn dispatch_mutation_with_task(
 fn dispatch_mutation_with_agent(
     request: &WsRequest,
     state: &DaemonHttpState,
-    handler: impl FnOnce(
-        String,
-        String,
-        Value,
-    ) -> Result<super::protocol::SessionDetail, MutationError>,
+    handler: impl FnOnce(String, String, Value) -> Result<super::protocol::SessionDetail, MutationError>,
 ) -> WsResponse {
     let Some(session_id) = extract_session_id(&request.params) else {
         return error_response(&request.id, "MISSING_PARAM", "missing session_id");

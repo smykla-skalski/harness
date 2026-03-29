@@ -13,7 +13,6 @@ use crate::session::{observe as session_observe, service as session_service};
 use crate::workspace::utc_now;
 
 use super::http::{self, DaemonHttpState};
-use super::websocket::ReplayBuffer;
 use super::index::{self, ResolvedSession};
 use super::launchd::{self, LaunchAgentStatus};
 use super::protocol::{
@@ -26,6 +25,7 @@ use super::snapshot;
 use super::state::{self, DaemonDiagnostics, DaemonManifest};
 use super::timeline;
 use super::watch;
+use super::websocket::ReplayBuffer;
 
 #[derive(Debug, Clone)]
 struct DaemonObserveRuntime {
@@ -409,11 +409,7 @@ fn require_project_dir(resolved: &ResolvedSession) -> Result<&Path, CliError> {
     })
 }
 
-fn start_daemon_observe_loop(
-    session_id: &str,
-    project_dir: &Path,
-    actor_id: Option<&str>,
-) -> bool {
+fn start_daemon_observe_loop(session_id: &str, project_dir: &Path, actor_id: Option<&str>) -> bool {
     let Some(runtime) = OBSERVE_RUNTIME.get().cloned() else {
         return false;
     };
@@ -604,18 +600,17 @@ mod tests {
             )
             .expect("start session");
             let leader_id = state.leader_id.expect("leader id");
-            let joined =
-                temp_env::with_vars([("CODEX_SESSION_ID", Some("role-worker"))], || {
-                    session_service::join_session(
-                        "daemon-role",
-                        SessionRole::Worker,
-                        "codex",
-                        &[],
-                        None,
-                        project,
-                    )
-                    .expect("join worker")
-                });
+            let joined = temp_env::with_vars([("CODEX_SESSION_ID", Some("role-worker"))], || {
+                session_service::join_session(
+                    "daemon-role",
+                    SessionRole::Worker,
+                    "codex",
+                    &[],
+                    None,
+                    project,
+                )
+                .expect("join worker")
+            });
             let worker_id = joined
                 .agents
                 .keys()

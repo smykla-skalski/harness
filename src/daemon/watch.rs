@@ -148,7 +148,8 @@ fn session_id_from_path(path: &Path) -> Result<Option<String>, CliError> {
     if let Some(session_id) = orchestration_session_id_from_path(path) {
         return Ok(Some(session_id));
     }
-    if let Some((context_root, runtime_name, runtime_session_id)) = runtime_session_target_from_path(path)
+    if let Some((context_root, runtime_name, runtime_session_id)) =
+        runtime_session_target_from_path(path)
     {
         return index::resolve_session_id_for_runtime_session(
             &context_root,
@@ -176,7 +177,8 @@ fn orchestration_session_id_from_path(path: &Path) -> Option<String> {
 }
 
 fn runtime_session_target_from_path(path: &Path) -> Option<(PathBuf, String, String)> {
-    runtime_session_target_from_transcript(path).or_else(|| runtime_session_target_from_signal(path))
+    runtime_session_target_from_transcript(path)
+        .or_else(|| runtime_session_target_from_signal(path))
 }
 
 fn runtime_session_target_from_transcript(path: &Path) -> Option<(PathBuf, String, String)> {
@@ -191,11 +193,22 @@ fn runtime_session_target_from_transcript(path: &Path) -> Option<(PathBuf, Strin
         .to_string_lossy()
         .to_string();
     if path.parent()?.parent()?.parent()?.file_name()?.to_str() != Some("sessions")
-        || path.parent()?.parent()?.parent()?.parent()?.file_name()?.to_str() != Some("agents")
+        || path
+            .parent()?
+            .parent()?
+            .parent()?
+            .parent()?
+            .file_name()?
+            .to_str()
+            != Some("agents")
     {
         return None;
     }
-    Some((path.ancestors().nth(5)?.to_path_buf(), runtime_name, runtime_session_id))
+    Some((
+        path.ancestors().nth(5)?.to_path_buf(),
+        runtime_name,
+        runtime_session_id,
+    ))
 }
 
 fn runtime_session_target_from_signal(path: &Path) -> Option<(PathBuf, String, String)> {
@@ -203,7 +216,12 @@ fn runtime_session_target_from_signal(path: &Path) -> Option<(PathBuf, String, S
     if !matches!(signal_bucket, "pending" | "acknowledged") {
         return None;
     }
-    let runtime_session_id = path.parent()?.parent()?.file_name()?.to_string_lossy().to_string();
+    let runtime_session_id = path
+        .parent()?
+        .parent()?
+        .file_name()?
+        .to_string_lossy()
+        .to_string();
     let runtime_name = path
         .parent()?
         .parent()?
@@ -211,13 +229,31 @@ fn runtime_session_target_from_signal(path: &Path) -> Option<(PathBuf, String, S
         .file_name()?
         .to_string_lossy()
         .to_string();
-    if path.parent()?.parent()?.parent()?.parent()?.file_name()?.to_str() != Some("signals")
-        || path.parent()?.parent()?.parent()?.parent()?.parent()?.file_name()?.to_str()
+    if path
+        .parent()?
+        .parent()?
+        .parent()?
+        .parent()?
+        .file_name()?
+        .to_str()
+        != Some("signals")
+        || path
+            .parent()?
+            .parent()?
+            .parent()?
+            .parent()?
+            .parent()?
+            .file_name()?
+            .to_str()
             != Some("agents")
     {
         return None;
     }
-    Some((path.ancestors().nth(6)?.to_path_buf(), runtime_name, runtime_session_id))
+    Some((
+        path.ancestors().nth(6)?.to_path_buf(),
+        runtime_name,
+        runtime_session_id,
+    ))
 }
 
 fn refresh_watch_snapshot(

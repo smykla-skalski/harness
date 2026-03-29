@@ -23,7 +23,7 @@ pub enum DaemonCommand {
     /// Install the per-user `LaunchAgent` plist.
     InstallLaunchAgent(DaemonInstallLaunchAgentArgs),
     /// Remove the per-user `LaunchAgent` plist.
-    RemoveLaunchAgent,
+    RemoveLaunchAgent(DaemonRemoveLaunchAgentArgs),
     /// Run a local daemon diagnostics summary.
     Doctor,
     /// Print a single session snapshot for contract debugging.
@@ -45,11 +45,7 @@ impl Execute for DaemonCommand {
                 Ok(0)
             }
             Self::InstallLaunchAgent(args) => args.execute(context),
-            Self::RemoveLaunchAgent => {
-                let removed = launchd::remove_launch_agent()?;
-                println!("{}", if removed { "removed" } else { "not installed" });
-                Ok(0)
-            }
+            Self::RemoveLaunchAgent(args) => args.execute(context),
             Self::Snapshot(args) => args.execute(context),
         }
     }
@@ -93,6 +89,9 @@ pub struct DaemonInstallLaunchAgentArgs {
     /// Explicit path to the harness binary. Defaults to the current executable.
     #[arg(long)]
     pub binary_path: Option<PathBuf>,
+    /// Print the full post-install `launchd` status as JSON.
+    #[arg(long)]
+    pub json: bool,
 }
 
 impl Execute for DaemonInstallLaunchAgentArgs {
@@ -107,7 +106,30 @@ impl Execute for DaemonInstallLaunchAgentArgs {
                 )))
             })?;
         let path = launchd::install_launch_agent(&binary)?;
-        println!("{}", path.display());
+        if self.json {
+            print_json(&launchd::launch_agent_status())?;
+        } else {
+            println!("{}", path.display());
+        }
+        Ok(0)
+    }
+}
+
+#[derive(Debug, Clone, Args)]
+pub struct DaemonRemoveLaunchAgentArgs {
+    /// Print the full post-remove `launchd` status as JSON.
+    #[arg(long)]
+    pub json: bool,
+}
+
+impl Execute for DaemonRemoveLaunchAgentArgs {
+    fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
+        let removed = launchd::remove_launch_agent()?;
+        if self.json {
+            print_json(&launchd::launch_agent_status())?;
+        } else {
+            println!("{}", if removed { "removed" } else { "not installed" });
+        }
         Ok(0)
     }
 }

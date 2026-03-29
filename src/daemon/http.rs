@@ -359,7 +359,10 @@ fn map_json<T: serde::Serialize>(result: Result<T, CliError>) -> Response {
     }
 }
 
-pub(super) fn require_auth(headers: &HeaderMap, state: &DaemonHttpState) -> Result<(), Box<Response>> {
+pub(super) fn require_auth(
+    headers: &HeaderMap,
+    state: &DaemonHttpState,
+) -> Result<(), Box<Response>> {
     let provided = headers
         .get(AUTHORIZATION)
         .and_then(|value| value.to_str().ok())
