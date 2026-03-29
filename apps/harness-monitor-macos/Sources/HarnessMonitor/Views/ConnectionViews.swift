@@ -28,7 +28,9 @@ struct TransportBadge: View {
     .foregroundStyle(tint)
     .padding(.horizontal, 9)
     .padding(.vertical, 5)
-    .monitorGlassCapsule()
+    .background {
+      MonitorGlassCapsuleBackground()
+    }
     .fixedSize()
   }
 }
@@ -56,7 +58,9 @@ struct LatencyBadge: View {
       .fixedSize()
       .padding(.horizontal, 9)
       .padding(.vertical, 5)
-      .monitorGlassCapsule()
+      .background {
+        MonitorGlassCapsuleBackground()
+      }
   }
 }
 
@@ -131,7 +135,13 @@ struct ConnectionStatusStrip: View {
       }
     }
     .padding(10)
-    .monitorInsetPanel(cornerRadius: 16, fillOpacity: 0.08, strokeOpacity: 0.12)
+    .background {
+      MonitorInsetPanelBackground(
+        cornerRadius: 16,
+        fillOpacity: 0.08,
+        strokeOpacity: 0.12
+      )
+    }
   }
 }
 
@@ -236,12 +246,9 @@ struct FallbackBanner: View {
       Button(action: onRetry) {
         Label("Retry", systemImage: "arrow.clockwise")
           .font(.system(.caption, design: .rounded, weight: .semibold))
-          .padding(.horizontal, 9)
-          .padding(.vertical, 6)
-          .background(MonitorTheme.surfaceHover, in: Capsule())
       }
-      .buttonStyle(.plain)
-      .foregroundStyle(MonitorTheme.caution)
+      .monitorAccessoryButtonStyle(tint: MonitorTheme.caution)
+      .controlSize(.small)
     }
     .padding(10)
     .background(

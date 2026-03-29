@@ -83,22 +83,30 @@ struct PreferencesConnectionCard: View {
       Text("Recent events")
         .font(.system(.headline, design: .rounded, weight: .semibold))
 
-      ForEach(events.suffix(10)) { event in
-        HStack(spacing: 8) {
-          Image(systemName: eventIcon(for: event.kind))
-            .foregroundStyle(eventColor(for: event.kind))
-            .font(.caption)
-            .frame(width: 16)
-          Text(event.detail)
-            .font(.system(.body, design: .rounded, weight: .medium))
-            .lineLimit(1)
-          Spacer()
-          Text(formatTimestamp(event.timestamp))
-            .font(.caption.monospaced())
-            .foregroundStyle(.secondary)
+      MonitorGlassContainer(spacing: 8) {
+        ForEach(events.suffix(10)) { event in
+          HStack(spacing: 8) {
+            Image(systemName: eventIcon(for: event.kind))
+              .foregroundStyle(eventColor(for: event.kind))
+              .font(.caption)
+              .frame(width: 16)
+            Text(event.detail)
+              .font(.system(.body, design: .rounded, weight: .medium))
+              .lineLimit(1)
+            Spacer()
+            Text(formatTimestamp(event.timestamp))
+              .font(.caption.monospaced())
+              .foregroundStyle(.secondary)
+          }
+          .padding(10)
+          .background {
+            MonitorInsetPanelBackground(
+              cornerRadius: 14,
+              fillOpacity: 0.05,
+              strokeOpacity: 0.10
+            )
+          }
         }
-        .padding(10)
-        .background(MonitorTheme.surface, in: RoundedRectangle(cornerRadius: 14))
       }
     }
   }

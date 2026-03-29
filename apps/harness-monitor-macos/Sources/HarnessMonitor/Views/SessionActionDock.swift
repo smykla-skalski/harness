@@ -39,25 +39,27 @@ struct SessionActionDock: View {
         }
       }
 
-      HStack(spacing: 12) {
-        flowButton(
-          title: "Task Flow",
-          subtitle: "Create, reassign, checkpoint",
-          symbol: "checklist",
-          action: focusFirstTask
-        )
-        flowButton(
-          title: "People Flow",
-          subtitle: "Change roles and leadership",
-          symbol: "person.2",
-          action: focusFirstAgent
-        )
-        flowButton(
-          title: "Observe Flow",
-          subtitle: "Surface and triage issues",
-          symbol: "eye",
-          action: focusObserver
-        )
+      MonitorGlassContainer(spacing: 12) {
+        HStack(spacing: 12) {
+          flowButton(
+            title: "Task Flow",
+            subtitle: "Create, reassign, checkpoint",
+            symbol: "checklist",
+            action: focusFirstTask
+          )
+          flowButton(
+            title: "People Flow",
+            subtitle: "Change roles and leadership",
+            symbol: "person.2",
+            action: focusFirstAgent
+          )
+          flowButton(
+            title: "Observe Flow",
+            subtitle: "Surface and triage issues",
+            symbol: "eye",
+            action: focusObserver
+          )
+        }
       }
     }
     .monitorCard()
@@ -79,7 +81,9 @@ struct SessionActionDock: View {
       }
       .frame(maxWidth: .infinity, alignment: .leading)
       .padding(14)
-      .background(MonitorTheme.surface, in: RoundedRectangle(cornerRadius: 18))
+      .background {
+        MonitorInteractiveCardBackground(cornerRadius: 18, tint: nil)
+      }
     }
     .buttonStyle(.plain)
   }

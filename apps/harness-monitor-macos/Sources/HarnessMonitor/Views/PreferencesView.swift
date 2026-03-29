@@ -42,7 +42,13 @@ struct PreferencesView: View {
   }
 
   private var launchAgentState: String {
-    store.daemonStatus?.launchAgent.installed == true ? "Installed" : "Manual"
+    store.daemonStatus?.launchAgent.lifecycleTitle ?? "Manual"
+  }
+
+  private var launchAgentCaption: String {
+    let fallback = store.daemonStatus?.launchAgent.label ?? "Launch agent"
+    let caption = store.daemonStatus?.launchAgent.lifecycleCaption ?? fallback
+    return caption.isEmpty ? fallback : caption
   }
 
   var body: some View {
@@ -55,7 +61,7 @@ struct PreferencesView: View {
           version: effectiveHealth?.version ?? store.daemonStatus?.manifest?.version
             ?? "Unavailable",
           launchAgentState: launchAgentState,
-          launchAgentCaption: store.daemonStatus?.launchAgent.label ?? "Launch agent",
+          launchAgentCaption: launchAgentCaption,
           cacheEntryCount: cacheEntryCount,
           sessionCount: store.daemonStatus?.sessionCount ?? 0
         )
@@ -65,6 +71,8 @@ struct PreferencesView: View {
         )
         PreferencesPathsCard(
           launchAgentPath: store.daemonStatus?.launchAgent.path ?? "Unavailable",
+          launchAgentDomain: store.daemonStatus?.launchAgent.domainTarget,
+          launchAgentService: store.daemonStatus?.launchAgent.serviceTarget,
           manifestPath: store.diagnostics?.workspace.manifestPath
             ?? store.daemonStatus?.diagnostics.manifestPath
             ?? "Unavailable",
@@ -79,6 +87,7 @@ struct PreferencesView: View {
             ?? "Unavailable"
         )
         PreferencesDiagnosticsCard(
+          launchAgent: store.daemonStatus?.launchAgent,
           tokenPresent: effectiveTokenPresent,
           projectCount: store.daemonStatus?.projectCount ?? 0,
           sessionCount: store.daemonStatus?.sessionCount ?? 0,
@@ -115,12 +124,12 @@ struct PreferencesView: View {
           statePill
           if let onDismiss {
             Button(action: onDismiss) {
-              Image(systemName: "xmark")
+              Label("Close", systemImage: "xmark")
+                .labelStyle(.iconOnly)
                 .font(.system(size: 12, weight: .bold))
                 .frame(width: 32, height: 32)
-                .background(MonitorTheme.surfaceHover, in: Circle())
             }
-            .buttonStyle(.plain)
+            .monitorAccessoryButtonStyle()
             .accessibilityIdentifier(MonitorAccessibility.preferencesCloseButton)
           }
         }
