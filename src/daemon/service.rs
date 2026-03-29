@@ -14,10 +14,10 @@ use super::http::{self, DaemonHttpState};
 use super::index::{self, ResolvedSession};
 use super::launchd::{self, LaunchAgentStatus};
 use super::protocol::{
-    DaemonDiagnosticsReport, HealthResponse, LeaderTransferRequest, ObserveSessionRequest,
-    ProjectSummary, RoleChangeRequest, SessionDetail, SessionEndRequest, SessionSummary,
-    SignalSendRequest, StreamEvent, TaskAssignRequest, TaskCheckpointRequest, TaskCreateRequest,
-    TaskUpdateRequest, TimelineEntry,
+    AgentRemoveRequest, DaemonDiagnosticsReport, HealthResponse, LeaderTransferRequest,
+    ObserveSessionRequest, ProjectSummary, RoleChangeRequest, SessionDetail, SessionEndRequest,
+    SessionSummary, SignalSendRequest, StreamEvent, TaskAssignRequest, TaskCheckpointRequest,
+    TaskCreateRequest, TaskUpdateRequest, TimelineEntry,
 };
 use super::snapshot;
 use super::state::{self, DaemonDiagnostics, DaemonManifest};
@@ -273,6 +273,21 @@ pub fn change_role(
         &request.actor,
         project_dir,
     )?;
+    snapshot::session_detail(session_id)
+}
+
+/// Remove an agent through the shared session service.
+///
+/// # Errors
+/// Returns `CliError` when the session cannot be resolved or the removal fails.
+pub fn remove_agent(
+    session_id: &str,
+    agent_id: &str,
+    request: &AgentRemoveRequest,
+) -> Result<SessionDetail, CliError> {
+    let resolved = index::resolve_session(session_id)?;
+    let project_dir = require_project_dir(&resolved)?;
+    session_service::remove_agent(session_id, agent_id, &request.actor, project_dir)?;
     snapshot::session_detail(session_id)
 }
 

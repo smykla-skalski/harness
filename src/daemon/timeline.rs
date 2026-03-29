@@ -2,14 +2,16 @@ use std::collections::{BTreeMap, HashSet};
 use std::path::Path;
 
 use crate::agents::runtime::signal::{
-    Signal, SignalAck, read_acknowledged_signals, read_acknowledgments,
+    AckResult, Signal, SignalAck, read_acknowledged_signals, read_acknowledgments,
 };
 use serde_json::to_value;
 
 use crate::errors::{CliError, CliErrorKind};
 use crate::infra::io::read_json_typed;
 use crate::observe::types::ObserverState;
-use crate::session::types::{SessionState, SessionTransition, TaskCheckpoint};
+use crate::session::types::{
+    SessionRole, SessionState, SessionTransition, TaskCheckpoint, TaskSeverity, TaskStatus,
+};
 
 use super::index;
 use super::protocol::TimelineEntry;
@@ -255,91 +257,196 @@ fn transition_summary(transition: &SessionTransition) -> (&'static str, Option<S
             agent_id,
             role,
             runtime,
-        } => (
-            "agent_joined",
-            None,
-            format!("{agent_id} joined as {role:?} ({runtime})"),
-        ),
-        SessionTransition::AgentRemoved { agent_id } => {
-            ("agent_removed", None, format!("{agent_id} removed"))
+        } => agent_joined_summary(agent_id, *role, runtime),
+        SessionTransition::AgentRemoved { agent_id } => agent_removed_summary(agent_id),
+        SessionTransition::RoleChanged { agent_id, from, to } => {
+            role_changed_summary(agent_id, *from, *to)
         }
-        SessionTransition::RoleChanged { agent_id, from, to } => (
-            "role_changed",
-            None,
-            format!("{agent_id}: {from:?} -> {to:?}"),
-        ),
-        SessionTransition::LeaderTransferRequested { from, to } => (
-            "leader_transfer_requested",
-            None,
-            format!("Leadership transfer requested: {from} -> {to}"),
-        ),
-        SessionTransition::LeaderTransferred { from, to } => (
-            "leader_transferred",
-            None,
-            format!("Leadership transferred: {from} -> {to}"),
-        ),
+        SessionTransition::LeaderTransferRequested { from, to } => {
+            leader_transfer_requested_summary(from, to)
+        }
+        SessionTransition::LeaderTransferConfirmed {
+            from,
+            to,
+            confirmed_by,
+        } => leader_transfer_confirmed_summary(from, to, confirmed_by),
+        SessionTransition::LeaderTransferred { from, to } => leader_transferred_summary(from, to),
         SessionTransition::TaskCreated {
             task_id,
             title,
             severity,
-        } => (
-            "task_created",
-            Some(task_id.clone()),
-            format!("{task_id} created [{severity:?}]: {title}"),
-        ),
+        } => task_created_summary(task_id, title, *severity),
         SessionTransition::ObserveTaskCreated {
             task_id,
             title,
             severity,
             issue_id,
-        } => (
-            "observe_task_created",
-            Some(task_id.clone()),
-            format!(
-                "{task_id} created from observe [{severity:?}]: {title}{}",
-                issue_id
-                    .as_deref()
-                    .map_or_else(String::new, |id| format!(" ({id})"))
-            ),
-        ),
-        SessionTransition::TaskAssigned { task_id, agent_id } => (
-            "task_assigned",
-            Some(task_id.clone()),
-            format!("{task_id} assigned to {agent_id}"),
-        ),
-        SessionTransition::TaskStatusChanged { task_id, from, to } => (
-            "task_status_changed",
-            Some(task_id.clone()),
-            format!("{task_id}: {from:?} -> {to:?}"),
-        ),
+        } => observe_task_created_summary(task_id, title, *severity, issue_id.as_deref()),
+        SessionTransition::TaskAssigned { task_id, agent_id } => {
+            task_assigned_summary(task_id, agent_id)
+        }
+        SessionTransition::TaskStatusChanged { task_id, from, to } => {
+            task_status_changed_summary(task_id, *from, *to)
+        }
         SessionTransition::TaskCheckpointRecorded {
             task_id,
             checkpoint_id,
             progress,
-        } => (
-            "task_checkpoint_recorded",
-            Some(task_id.clone()),
-            format!("{task_id} checkpoint {checkpoint_id} at {progress}%"),
-        ),
+        } => task_checkpoint_recorded_summary(task_id, checkpoint_id, *progress),
         SessionTransition::SignalSent {
             signal_id,
             agent_id,
             command,
-        } => (
-            "signal_sent",
-            None,
-            format!("{signal_id} sent to {agent_id}: {command}"),
-        ),
+        } => signal_sent_summary(signal_id, agent_id, command),
         SessionTransition::SignalAcknowledged {
             signal_id,
             agent_id,
             result,
-        } => (
-            "signal_acknowledged",
-            None,
-            format!("{signal_id} acknowledged by {agent_id}: {result:?}"),
-        ),
+        } => signal_acknowledged_summary(signal_id, agent_id, *result),
     }
+}
+
+fn agent_joined_summary(
+    agent_id: &str,
+    role: SessionRole,
+    runtime: &str,
+) -> (&'static str, Option<String>, String) {
+    (
+        "agent_joined",
+        None,
+        format!("{agent_id} joined as {role:?} ({runtime})"),
+    )
+}
+
+fn agent_removed_summary(agent_id: &str) -> (&'static str, Option<String>, String) {
+    ("agent_removed", None, format!("{agent_id} removed"))
+}
+
+fn role_changed_summary(
+    agent_id: &str,
+    from: SessionRole,
+    to: SessionRole,
+) -> (&'static str, Option<String>, String) {
+    (
+        "role_changed",
+        None,
+        format!("{agent_id}: {from:?} -> {to:?}"),
+    )
+}
+
+fn leader_transfer_requested_summary(
+    from: &str,
+    to: &str,
+) -> (&'static str, Option<String>, String) {
+    (
+        "leader_transfer_requested",
+        None,
+        format!("Leadership transfer requested: {from} -> {to}"),
+    )
+}
+
+fn leader_transfer_confirmed_summary(
+    from: &str,
+    to: &str,
+    confirmed_by: &str,
+) -> (&'static str, Option<String>, String) {
+    (
+        "leader_transfer_confirmed",
+        None,
+        format!("Leadership transfer confirmed by {confirmed_by}: {from} -> {to}"),
+    )
+}
+
+fn leader_transferred_summary(from: &str, to: &str) -> (&'static str, Option<String>, String) {
+    (
+        "leader_transferred",
+        None,
+        format!("Leadership transferred: {from} -> {to}"),
+    )
+}
+
+fn task_created_summary(
+    task_id: &str,
+    title: &str,
+    severity: TaskSeverity,
+) -> (&'static str, Option<String>, String) {
+    (
+        "task_created",
+        Some(task_id.to_string()),
+        format!("{task_id} created [{severity:?}]: {title}"),
+    )
+}
+
+fn observe_task_created_summary(
+    task_id: &str,
+    title: &str,
+    severity: TaskSeverity,
+    issue_id: Option<&str>,
+) -> (&'static str, Option<String>, String) {
+    (
+        "observe_task_created",
+        Some(task_id.to_string()),
+        format!(
+            "{task_id} created from observe [{severity:?}]: {title}{}",
+            issue_id.map_or_else(String::new, |id| format!(" ({id})"))
+        ),
+    )
+}
+
+fn task_assigned_summary(task_id: &str, agent_id: &str) -> (&'static str, Option<String>, String) {
+    (
+        "task_assigned",
+        Some(task_id.to_string()),
+        format!("{task_id} assigned to {agent_id}"),
+    )
+}
+
+fn task_status_changed_summary(
+    task_id: &str,
+    from: TaskStatus,
+    to: TaskStatus,
+) -> (&'static str, Option<String>, String) {
+    (
+        "task_status_changed",
+        Some(task_id.to_string()),
+        format!("{task_id}: {from:?} -> {to:?}"),
+    )
+}
+
+fn task_checkpoint_recorded_summary(
+    task_id: &str,
+    checkpoint_id: &str,
+    progress: u8,
+) -> (&'static str, Option<String>, String) {
+    (
+        "task_checkpoint_recorded",
+        Some(task_id.to_string()),
+        format!("{task_id} checkpoint {checkpoint_id} at {progress}%"),
+    )
+}
+
+fn signal_sent_summary(
+    signal_id: &str,
+    agent_id: &str,
+    command: &str,
+) -> (&'static str, Option<String>, String) {
+    (
+        "signal_sent",
+        None,
+        format!("{signal_id} sent to {agent_id}: {command}"),
+    )
+}
+
+fn signal_acknowledged_summary(
+    signal_id: &str,
+    agent_id: &str,
+    result: AckResult,
+) -> (&'static str, Option<String>, String) {
+    (
+        "signal_acknowledged",
+        None,
+        format!("{signal_id} acknowledged by {agent_id}: {result:?}"),
+    )
 }
 
 #[cfg(test)]
@@ -443,6 +550,7 @@ mod tests {
             archived_at: None,
             last_activity_at: Some("2026-03-28T14:05:00Z".into()),
             observe_id: Some("observe-sess-merge".into()),
+            pending_leader_transfer: None,
             metrics: SessionMetrics::default(),
         }
     }

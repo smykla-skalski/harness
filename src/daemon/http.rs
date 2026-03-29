@@ -13,9 +13,9 @@ use tokio::sync::broadcast;
 use crate::errors::{CliError, CliErrorKind};
 
 use super::protocol::{
-    LeaderTransferRequest, ObserveSessionRequest, RoleChangeRequest, SessionEndRequest,
-    SignalSendRequest, StreamEvent, TaskAssignRequest, TaskCheckpointRequest, TaskCreateRequest,
-    TaskUpdateRequest,
+    AgentRemoveRequest, LeaderTransferRequest, ObserveSessionRequest, RoleChangeRequest,
+    SessionEndRequest, SignalSendRequest, StreamEvent, TaskAssignRequest, TaskCheckpointRequest,
+    TaskCreateRequest, TaskUpdateRequest,
 };
 use super::service;
 use super::state::DaemonManifest;
@@ -57,6 +57,10 @@ pub async fn serve(listener: TcpListener, state: DaemonHttpState) -> Result<(), 
         .route(
             "/v1/sessions/{session_id}/agents/{agent_id}/role",
             post(post_role_change),
+        )
+        .route(
+            "/v1/sessions/{session_id}/agents/{agent_id}/remove",
+            post(post_remove_agent),
         )
         .route(
             "/v1/sessions/{session_id}/leader",
@@ -198,6 +202,22 @@ async fn post_role_change(
         return *response;
     }
     let response = map_json(service::change_role(&session_id, &agent_id, &request));
+    let _ = state
+        .sender
+        .send(service::refresh_event("session_updated", Some(&session_id)));
+    response
+}
+
+async fn post_remove_agent(
+    Path((session_id, agent_id)): Path<(String, String)>,
+    headers: HeaderMap,
+    State(state): State<DaemonHttpState>,
+    Json(request): Json<AgentRemoveRequest>,
+) -> Response {
+    if let Err(response) = require_auth(&headers, &state) {
+        return *response;
+    }
+    let response = map_json(service::remove_agent(&session_id, &agent_id, &request));
     let _ = state
         .sender
         .send(service::refresh_event("session_updated", Some(&session_id)));
