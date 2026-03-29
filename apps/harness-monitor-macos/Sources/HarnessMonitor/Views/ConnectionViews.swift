@@ -22,6 +22,8 @@ struct TransportBadge: View {
         .font(.caption2.weight(.semibold))
       Text(label)
         .font(.system(.caption, design: .rounded, weight: .semibold))
+        .lineLimit(1)
+        .fixedSize()
     }
     .foregroundStyle(tint)
     .padding(.horizontal, 9)
@@ -31,6 +33,7 @@ struct TransportBadge: View {
       Capsule()
         .stroke(tint.opacity(0.2), lineWidth: 1)
     )
+    .fixedSize()
   }
 }
 
@@ -50,20 +53,18 @@ struct LatencyBadge: View {
   }
 
   var body: some View {
-    HStack(spacing: 5) {
-      Image(systemName: "timer")
-        .font(.caption2.weight(.semibold))
-      Text(latencyMs.map { "\($0)ms" } ?? "--ms")
-        .font(.system(.caption, design: .rounded, weight: .semibold).monospacedDigit())
-    }
-    .foregroundStyle(tint)
-    .padding(.horizontal, 9)
-    .padding(.vertical, 5)
-    .background(MonitorTheme.surfaceHover, in: Capsule())
-    .overlay(
-      Capsule()
-        .stroke(tint.opacity(0.18), lineWidth: 1)
-    )
+    Text(latencyMs.map { "\($0)ms" } ?? "n/a")
+      .font(.system(.caption, design: .rounded, weight: .semibold).monospacedDigit())
+      .foregroundStyle(tint)
+      .lineLimit(1)
+      .fixedSize()
+      .padding(.horizontal, 9)
+      .padding(.vertical, 5)
+      .background(MonitorTheme.surfaceHover, in: Capsule())
+      .overlay(
+        Capsule()
+          .stroke(tint.opacity(0.18), lineWidth: 1)
+      )
   }
 }
 
@@ -152,40 +153,42 @@ struct ConnectionStatusStrip: View {
 struct ConnectionToolbarBadge: View {
   let metrics: ConnectionMetrics
 
-  private var icon: String {
-    metrics.transportKind == .webSocket
-      ? "bolt.horizontal.fill"
-      : "arrow.down.circle.fill"
+  private var label: String {
+    if let latency = metrics.latencyMs {
+      return metrics.transportKind == .webSocket
+        ? "WS \(latency)ms" : "SSE \(latency)ms"
+    }
+    return metrics.transportKind == .webSocket ? "WebSocket" : "SSE"
   }
 
   private var qualityColor: Color {
+    if metrics.connectedSince != nil, metrics.latencyMs == nil {
+      return MonitorTheme.success
+    }
     switch metrics.quality {
-    case .excellent, .good: MonitorTheme.success
-    case .degraded: MonitorTheme.caution
-    case .poor, .disconnected: MonitorTheme.danger
+    case .excellent, .good: return MonitorTheme.success
+    case .degraded: return MonitorTheme.caution
+    case .poor, .disconnected: return MonitorTheme.danger
     }
   }
 
   var body: some View {
-    HStack(spacing: 6) {
-      Image(systemName: icon)
-        .font(.caption2)
-        .foregroundStyle(qualityColor)
-      Text(metrics.latencyMs.map { "\($0)ms" } ?? "--")
-        .font(.caption.monospacedDigit())
-        .foregroundStyle(.secondary)
+    HStack(spacing: 5) {
       Circle()
         .fill(qualityColor)
         .frame(width: 6, height: 6)
+      Text(label)
+        .font(.system(.caption, design: .rounded, weight: .semibold).monospacedDigit())
+        .foregroundStyle(qualityColor)
+        .lineLimit(1)
+        .fixedSize()
     }
-    .padding(.horizontal, 10)
+    .padding(.horizontal, 9)
     .padding(.vertical, 5)
-    .background(MonitorTheme.surface, in: Capsule())
-    .overlay(
-      Capsule()
-        .stroke(MonitorTheme.controlBorder, lineWidth: 1)
-    )
+    .background(qualityColor.opacity(0.1), in: Capsule())
+    .fixedSize()
     .accessibilityIdentifier(MonitorAccessibility.connectionBadge)
+    .accessibilityLabel("Connection: \(label)")
   }
 }
 

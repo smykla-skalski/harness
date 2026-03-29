@@ -30,7 +30,7 @@ struct SidebarView: View {
   }
 
   private var daemonStatusCard: some View {
-    VStack(alignment: .leading, spacing: 12) {
+    VStack(alignment: .leading, spacing: 8) {
       HStack(alignment: .top) {
         VStack(alignment: .leading, spacing: 4) {
           Text("Harness Daemon")
@@ -50,31 +50,26 @@ struct SidebarView: View {
         )
         .transition(.move(edge: .top).combined(with: .opacity))
       }
-      if store.connectionMetrics.isFallback {
-        FallbackBanner(reason: store.connectionMetrics.fallbackReason) {
-          Task { await store.reconnect() }
-        }
-      }
       if store.isRefreshing || store.connectionState == .connecting {
         MonitorLoadingStateView(title: loadingTitle)
           .transition(.move(edge: .top).combined(with: .opacity))
       }
 
-      HStack(spacing: 10) {
+      HStack(spacing: 8) {
         daemonProjectsBadge
         daemonSessionsBadge
         daemonLaunchdBadge
       }
       .frame(maxWidth: .infinity, alignment: .leading)
 
-      VStack(spacing: 8) {
+      VStack(spacing: 5) {
         sidebarStartDaemonButton
         sidebarInstallLaunchAgentButton
       }
       .frame(maxWidth: .infinity, alignment: .leading)
     }
     .frame(maxWidth: .infinity, alignment: .leading)
-    .monitorCard(contentPadding: 14)
+    .monitorCard(contentPadding: 11)
     .accessibilityIdentifier(MonitorAccessibility.daemonCard)
     .accessibilityFrameMarker(MonitorAccessibility.daemonCardFrame)
   }
@@ -257,9 +252,9 @@ extension SidebarView {
         .contentTransition(.numericText())
     }
     .frame(maxWidth: .infinity, alignment: .topLeading)
-    .frame(minHeight: 44, alignment: .topLeading)
-    .padding(.vertical, 4)
-    .padding(.horizontal, 10)
+    .frame(minHeight: 36, alignment: .topLeading)
+    .padding(.vertical, 2)
+    .padding(.horizontal, 8)
     .background(
       MonitorTheme.surface,
       in: RoundedRectangle(cornerRadius: 14, style: .continuous)

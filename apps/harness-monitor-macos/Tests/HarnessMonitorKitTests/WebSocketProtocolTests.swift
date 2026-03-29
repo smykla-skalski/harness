@@ -101,10 +101,14 @@ struct WebSocketProtocolTests {
   func pendingStoreFail() async {
     let store = PendingRequestStore()
     do {
-      let _: JSONValue = try await withCheckedThrowingContinuation { continuation in
-        store.register(id: "test-2", continuation: continuation)
-        store.fail(id: "test-2", error: WebSocketTransportError.connectionClosed)
-      }
+      let _: JSONValue =
+        try await withCheckedThrowingContinuation { continuation in
+          store.register(id: "test-2", continuation: continuation)
+          store.fail(
+            id: "test-2",
+            error: WebSocketTransportError.connectionClosed
+          )
+        }
       Issue.record("Expected error to be thrown")
     } catch {
       #expect(error is WebSocketTransportError)
