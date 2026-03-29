@@ -1,0 +1,113 @@
+excluded:
+  - Harness.xcodeproj
+  - .build
+  - build
+  - DerivedData
+reporter: xcode
+strict: true
+lenient: false
+disabled_rules:
+  - trailing_comma
+  - trailing_whitespace
+opt_in_rules:
+  - attributes
+  - array_init
+  - closure_spacing
+  - collection_alignment
+  - convenience_type
+  - contains_over_filter_count
+  - contains_over_filter_is_empty
+  - empty_count
+  - empty_string
+  - explicit_init
+  - file_name_no_space
+  - first_where
+  - implicit_return
+  - joined_default_parameter
+  - modifier_order
+  - multiline_arguments
+  - multiline_parameters
+  - operator_usage_whitespace
+  - private_swiftui_state
+  - prefer_self_in_static_references
+  - redundant_nil_coalescing
+  - redundant_type_annotation
+  - sorted_imports
+  - sorted_first_last
+  - toggle_bool
+  - vertical_parameter_alignment_on_call
+custom_rules:
+  no_faux_glass_materials:
+    name: "No Faux Glass Materials"
+    regex: '\.(regularMaterial|thinMaterial|ultraThinMaterial)\b'
+    message: "Use native Glass APIs instead of material-based faux glass in app UI code."
+    severity: error
+    included:
+      - "Sources/Harness"
+  no_focus_effect_disabled:
+    name: "No Focus Effect Disable"
+    regex: 'focusEffectDisabled\('
+    message: "Do not disable native focus treatment."
+    severity: error
+    included:
+      - "Sources/Harness"
+  no_selection_root_identity_churn:
+    name: "No Selection Root Identity Churn"
+    regex: '\.id\(store\.selectedSessionID'
+    message: "Do not reintroduce selection-driven root identity churn."
+    severity: error
+    included:
+      - "Sources/Harness/Views"
+  no_preferences_overlay_flow:
+    name: "No Preferences Overlay Flow"
+    regex: '(showsPreferences|preferencesOverlay|preferencesBackdrop|preferencesFocused|onExitCommand)'
+    message: "Use the native Settings scene instead of a custom preferences overlay."
+    severity: error
+    included:
+      - "Sources/Harness/Views/ContentView.swift"
+  no_macos_26_availability_checks:
+    name: "No macOS 26 Availability Checks"
+    regex: 'if #available\(macOS 26'
+    message: "Do not keep macOS 26 availability fallbacks inside the Harness app."
+    severity: error
+    included:
+      - "Sources/Harness"
+  no_raw_value_text:
+    name: "No Raw Value Text"
+    regex: 'Text\([^\n]*rawValue'
+    message: "Do not render enum rawValue directly in user-facing Text."
+    severity: error
+    included:
+      - "Sources/Harness/Views"
+  no_local_swiftlint_disable:
+    name: "No Local SwiftLint Disable"
+    regex: 'swiftlint:disable'
+    message: "Do not add local SwiftLint suppression escapes in the Harness app."
+    severity: error
+    included:
+      - "Sources/Harness"
+file_length:
+  warning: 420
+  error: 520
+identifier_name:
+  min_length:
+    warning: 2
+  excluded:
+    - id
+    - ui
+    - x
+    - y
+line_length:
+  warning: 110
+  error: 130
+  ignores_comments: true
+  ignores_function_declarations: true
+function_body_length:
+  warning: 90
+  error: 130
+type_body_length:
+  warning: 380
+  error: 520
+nesting:
+  function_level: 2
+  type_level: 2

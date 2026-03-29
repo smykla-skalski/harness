@@ -11,7 +11,8 @@ use crate::infra::io::write_text;
 
 use super::state;
 
-pub const LAUNCH_AGENT_LABEL: &str = "io.harness.monitor.daemon";
+pub const LAUNCH_AGENT_LABEL: &str = "io.harness.daemon";
+const LEGACY_LAUNCH_AGENT_LABEL: &str = "io.harness.monitor.daemon";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LaunchAgentStatus {
@@ -92,6 +93,7 @@ where
     F: Fn(&[String]) -> Result<CommandOutput, CliError>,
 {
     state::ensure_daemon_dirs()?;
+    remove_legacy_launch_agent_with(runner)?;
     let path = state::launch_agent_path();
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent).map_err(|error| {
@@ -121,15 +123,15 @@ fn remove_launch_agent_with<F>(runner: &F) -> Result<bool, CliError>
 where
     F: Fn(&[String]) -> Result<CommandOutput, CliError>,
 {
+    let mut removed = remove_legacy_launch_agent_with(runner)?;
     let path = state::launch_agent_path();
-    let had_plist = path.exists();
-    let unloaded = if cfg!(target_os = "macos") {
+    removed |= if cfg!(target_os = "macos") {
         best_effort_bootout(runner)?
     } else {
         false
     };
-    if !had_plist {
-        return Ok(unloaded);
+    if !path.exists() {
+        return Ok(removed);
     }
     fs::remove_file(path).map_err(|error| {
         CliError::from(CliErrorKind::workflow_io(format!(
@@ -148,26 +150,55 @@ fn launch_agent_status_with<F>(runner: &F) -> LaunchAgentStatus
 where
     F: Fn(&[String]) -> Result<CommandOutput, CliError>,
 {
-    let path = state::launch_agent_path();
-    let domain_target = launchd_domain_target();
-    let service_target = launchd_service_target();
-    let mut status = LaunchAgentStatus {
-        installed: path.is_file(),
-        loaded: false,
-        label: LAUNCH_AGENT_LABEL.to_string(),
-        path: path.display().to_string(),
-        domain_target,
-        service_target: service_target.clone(),
-        state: None,
-        pid: None,
-        last_exit_status: None,
-        status_error: None,
-    };
+    let current_path = state::launch_agent_path();
+    let mut status = launch_agent_status_template(LAUNCH_AGENT_LABEL, &current_path);
     if !cfg!(target_os = "macos") {
         status.status_error = Some("launchd is only supported on macOS".to_string());
         return status;
     }
-    let args = vec!["print".to_string(), service_target];
+
+    let current_status = inspect_launch_agent_status(LAUNCH_AGENT_LABEL, &current_path, runner);
+    if current_status.loaded || current_status.installed || current_status.status_error.is_some() {
+        return current_status;
+    }
+
+    let legacy_status =
+        inspect_launch_agent_status(LEGACY_LAUNCH_AGENT_LABEL, &state::legacy_launch_agent_path(), runner);
+    if legacy_status.loaded || legacy_status.installed || legacy_status.status_error.is_some() {
+        status.installed = legacy_status.installed;
+        status.loaded = legacy_status.loaded;
+        status.state = legacy_status.state;
+        status.pid = legacy_status.pid;
+        status.last_exit_status = legacy_status.last_exit_status;
+        status.status_error = legacy_status.status_error;
+    }
+
+    status
+}
+
+fn launch_agent_status_template(label: &str, path: &Path) -> LaunchAgentStatus {
+    let domain_target = launchd_domain_target();
+    let service_target = launchd_service_target_for(label);
+    LaunchAgentStatus {
+        installed: path.is_file(),
+        loaded: false,
+        label: label.to_string(),
+        path: path.display().to_string(),
+        domain_target,
+        service_target,
+        state: None,
+        pid: None,
+        last_exit_status: None,
+        status_error: None,
+    }
+}
+
+fn inspect_launch_agent_status<F>(label: &str, path: &Path, runner: &F) -> LaunchAgentStatus
+where
+    F: Fn(&[String]) -> Result<CommandOutput, CliError>,
+{
+    let mut status = launch_agent_status_template(label, path);
+    let args = vec!["print".to_string(), launchd_service_target_for(label)];
     match runner(&args) {
         Ok(output) => apply_launchctl_status(&mut status, &output),
         Err(error) => {
@@ -216,7 +247,8 @@ where
         launchd_domain_target(),
         path.display().to_string(),
     ];
-    ensure_launchctl_success("bootstrap launch agent", runner(&args)?)
+    let output = runner(&args)?;
+    ensure_launchctl_success("bootstrap launch agent", &output)
 }
 
 fn kickstart_launch_agent<F>(runner: &F) -> Result<(), CliError>
@@ -228,14 +260,46 @@ where
         "-k".to_string(),
         launchd_service_target(),
     ];
-    ensure_launchctl_success("kickstart launch agent", runner(&args)?)
+    let output = runner(&args)?;
+    ensure_launchctl_success("kickstart launch agent", &output)
+}
+
+fn remove_legacy_launch_agent_with<F>(runner: &F) -> Result<bool, CliError>
+where
+    F: Fn(&[String]) -> Result<CommandOutput, CliError>,
+{
+    let mut removed = if cfg!(target_os = "macos") {
+        best_effort_bootout_for(LEGACY_LAUNCH_AGENT_LABEL, runner)?
+    } else {
+        false
+    };
+
+    let path = state::legacy_launch_agent_path();
+    if !path.exists() {
+        return Ok(removed);
+    }
+
+    fs::remove_file(path).map_err(|error| {
+        CliError::from(CliErrorKind::workflow_io(format!(
+            "remove legacy launch agent plist: {error}"
+        )))
+    })?;
+    removed = true;
+    Ok(removed)
 }
 
 fn best_effort_bootout<F>(runner: &F) -> Result<bool, CliError>
 where
     F: Fn(&[String]) -> Result<CommandOutput, CliError>,
 {
-    let args = vec!["bootout".to_string(), launchd_service_target()];
+    best_effort_bootout_for(LAUNCH_AGENT_LABEL, runner)
+}
+
+fn best_effort_bootout_for<F>(label: &str, runner: &F) -> Result<bool, CliError>
+where
+    F: Fn(&[String]) -> Result<CommandOutput, CliError>,
+{
+    let args = vec!["bootout".to_string(), launchd_service_target_for(label)];
     let output = runner(&args)?;
     if output.exit_code == 0 {
         return Ok(true);
@@ -249,7 +313,7 @@ where
     ))))
 }
 
-fn ensure_launchctl_success(action: &str, output: CommandOutput) -> Result<(), CliError> {
+fn ensure_launchctl_success(action: &str, output: &CommandOutput) -> Result<(), CliError> {
     if output.exit_code == 0 {
         return Ok(());
     }
@@ -301,7 +365,11 @@ fn launchd_domain_target() -> String {
 }
 
 fn launchd_service_target() -> String {
-    format!("{}/{}", launchd_domain_target(), LAUNCH_AGENT_LABEL)
+    launchd_service_target_for(LAUNCH_AGENT_LABEL)
+}
+
+fn launchd_service_target_for(label: &str) -> String {
+    format!("{}/{}", launchd_domain_target(), label)
 }
 
 #[cfg(test)]
@@ -407,9 +475,60 @@ mod tests {
     }
 
     #[test]
+    fn install_launch_agent_removes_legacy_plist() {
+        let tmp = tempdir().expect("tempdir");
+        let calls = Arc::new(Mutex::new(Vec::<Vec<String>>::new()));
+        let runner = {
+            let calls = Arc::clone(&calls);
+            move |args: &[String]| -> Result<CommandOutput, CliError> {
+                calls.lock().expect("lock").push(args.to_vec());
+                Ok(CommandOutput {
+                    exit_code: 0,
+                    stdout: String::new(),
+                    stderr: String::new(),
+                })
+            }
+        };
+        temp_env::with_vars(
+            [
+                ("HOME", Some(tmp.path().to_str().expect("utf8 path"))),
+                (
+                    "XDG_DATA_HOME",
+                    Some(tmp.path().to_str().expect("utf8 path")),
+                ),
+            ],
+            || {
+                let legacy_path = state::legacy_launch_agent_path();
+                fs::create_dir_all(legacy_path.parent().expect("legacy parent"))
+                    .expect("create legacy launch agent dir");
+                fs::write(&legacy_path, "legacy plist").expect("write legacy plist");
+
+                let path = install_launch_agent_with(Path::new("/tmp/harness-bin"), &runner)
+                    .expect("install launch agent");
+
+                assert!(path.is_file());
+                assert!(!legacy_path.exists());
+                assert!(
+                    calls
+                        .lock()
+                        .expect("lock")
+                        .iter()
+                        .any(|args| {
+                            args
+                                == &vec![
+                                    "bootout".to_string(),
+                                    launchd_service_target_for(LEGACY_LAUNCH_AGENT_LABEL),
+                                ]
+                        })
+                );
+            },
+        );
+    }
+
+    #[test]
     fn parse_launchctl_print_extracts_runtime_fields() {
         let parsed = parse_launchctl_print(
-            r#"gui/501/io.harness.monitor.daemon = {
+            r#"gui/501/io.harness.daemon = {
     state = waiting
     pid = 98321
     last exit code = 78
@@ -432,10 +551,68 @@ mod tests {
             Ok(CommandOutput {
                 exit_code: 1,
                 stdout: String::new(),
-                stderr: "Could not find service \"io.harness.monitor.daemon\"".to_string(),
+                stderr: "Could not find service \"io.harness.daemon\"".to_string(),
             })
         });
         assert!(!status.loaded);
         assert!(status.status_error.is_none());
+    }
+
+    #[test]
+    fn launch_agent_status_coalesces_legacy_runtime_into_current_contract() {
+        let tmp = tempdir().expect("tempdir");
+        temp_env::with_vars(
+            [
+                ("HOME", Some(tmp.path().to_str().expect("utf8 path"))),
+                (
+                    "XDG_DATA_HOME",
+                    Some(tmp.path().to_str().expect("utf8 path")),
+                ),
+            ],
+            || {
+                let legacy_path = state::legacy_launch_agent_path();
+                fs::create_dir_all(legacy_path.parent().expect("legacy parent"))
+                    .expect("create legacy launch agent dir");
+                fs::write(&legacy_path, "legacy plist").expect("write legacy plist");
+
+                let status = launch_agent_status_with(&|args| {
+                    assert_eq!(args.first().map(String::as_str), Some("print"));
+
+                    if args.get(1).is_some_and(|value| value == &launchd_service_target()) {
+                        return Ok(CommandOutput {
+                            exit_code: 1,
+                            stdout: String::new(),
+                            stderr: "Could not find service".to_string(),
+                        });
+                    }
+
+                    assert_eq!(
+                        args.get(1),
+                        Some(&launchd_service_target_for(LEGACY_LAUNCH_AGENT_LABEL))
+                    );
+                    Ok(CommandOutput {
+                        exit_code: 0,
+                        stdout: format!(
+                            r#"{service} = {{
+    state = running
+    pid = 4242
+    last exit code = 0
+}}"#,
+                            service = launchd_service_target_for(LEGACY_LAUNCH_AGENT_LABEL)
+                        ),
+                        stderr: String::new(),
+                    })
+                });
+
+                assert!(status.installed);
+                assert!(status.loaded);
+                assert_eq!(status.label, LAUNCH_AGENT_LABEL);
+                assert_eq!(status.path, state::launch_agent_path().display().to_string());
+                assert_eq!(status.service_target, launchd_service_target());
+                assert_eq!(status.state.as_deref(), Some("running"));
+                assert_eq!(status.pid, Some(4242));
+                assert_eq!(status.last_exit_status, Some(0));
+            },
+        );
     }
 }

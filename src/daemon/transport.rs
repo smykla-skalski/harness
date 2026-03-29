@@ -12,7 +12,7 @@ use super::launchd;
 use super::service::{self, DaemonServeConfig};
 use super::snapshot;
 
-/// Local daemon commands used by the macOS monitor app.
+/// Local daemon commands used by the macOS Harness app.
 #[derive(Debug, Clone, Subcommand)]
 #[non_exhaustive]
 pub enum DaemonCommand {

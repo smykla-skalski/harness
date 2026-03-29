@@ -1,0 +1,140 @@
+name: Harness
+packages:
+  SwiftLintPlugins:
+    url: https://github.com/SimplyDanny/SwiftLintPlugins
+    from: "0.58.0"
+options:
+  bundleIdPrefix: io.harness
+  createIntermediateGroups: true
+settings:
+  base:
+    CLANG_TREAT_WARNINGS_AS_ERRORS: YES
+    CODE_SIGNING_ALLOWED: YES
+    DEAD_CODE_STRIPPING: YES
+    ENABLE_HARDENED_RUNTIME: YES
+    GCC_TREAT_WARNINGS_AS_ERRORS: YES
+    GENERATE_INFOPLIST_FILE: YES
+    MACOSX_DEPLOYMENT_TARGET: "26.0"
+    SWIFT_EMIT_LOC_STRINGS: YES
+    SWIFT_STRICT_CONCURRENCY: complete
+    SWIFT_TREAT_WARNINGS_AS_ERRORS: YES
+    SWIFT_VERSION: "6.0"
+targets:
+  HarnessKit:
+    type: framework
+    platform: macOS
+    deploymentTarget: "26.0"
+    sources:
+      - Sources/HarnessKit
+    buildToolPlugins:
+      - plugin: SwiftLintBuildToolPlugin
+        package: SwiftLintPlugins
+    settings:
+      base:
+        CODE_SIGN_STYLE: Automatic
+        CODE_SIGNING_ALLOWED: YES
+        DEVELOPMENT_TEAM: Q498EB36N4
+        ENABLE_MODULE_VERIFIER: YES
+        MODULE_VERIFIER_SUPPORTED_LANGUAGES: "objective-c objective-c++"
+        PRODUCT_BUNDLE_IDENTIFIER: io.harness.kit
+  Harness:
+    type: application
+    platform: macOS
+    deploymentTarget: "26.0"
+    sources:
+      - Sources/Harness
+    dependencies:
+      - target: HarnessKit
+    entitlements:
+      path: Harness.entitlements
+      properties:
+        com.apple.security.network.client: true
+        com.apple.security.network.server: true
+        com.apple.security.cs.disable-library-validation: true
+    buildToolPlugins:
+      - plugin: SwiftLintBuildToolPlugin
+        package: SwiftLintPlugins
+    postBuildScripts:
+      - name: Clear Gatekeeper Metadata
+        basedOnDependencyAnalysis: false
+        script: |
+          strip_attrs() {
+            local target_path="$1"
+            if [ -e "$target_path" ]; then
+              /usr/bin/xattr -dr com.apple.provenance "$target_path" 2>/dev/null || true
+              /usr/bin/xattr -dr com.apple.quarantine "$target_path" 2>/dev/null || true
+            fi
+          }
+
+          strip_attrs "$TARGET_BUILD_DIR/$FULL_PRODUCT_NAME"
+    settings:
+      base:
+        CODE_SIGN_ENTITLEMENTS: Harness.entitlements
+        CODE_SIGN_STYLE: Automatic
+        DEVELOPMENT_TEAM: Q498EB36N4
+        INFOPLIST_KEY_CFBundleDisplayName: Harness
+        INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.developer-tools
+        PRODUCT_BUNDLE_IDENTIFIER: io.harness.app
+  HarnessKitTests:
+    type: bundle.unit-test
+    platform: macOS
+    deploymentTarget: "26.0"
+    sources:
+      - Tests/HarnessKitTests
+    dependencies:
+      - target: HarnessKit
+    buildToolPlugins:
+      - plugin: SwiftLintBuildToolPlugin
+        package: SwiftLintPlugins
+    settings:
+      base:
+        CODE_SIGN_STYLE: Automatic
+        DEVELOPMENT_TEAM: Q498EB36N4
+        PRODUCT_BUNDLE_IDENTIFIER: io.harness.kit-tests
+  HarnessUITests:
+    type: bundle.ui-testing
+    platform: macOS
+    deploymentTarget: "26.0"
+    sources:
+      - Tests/HarnessUITests
+    dependencies:
+      - target: Harness
+    buildToolPlugins:
+      - plugin: SwiftLintBuildToolPlugin
+        package: SwiftLintPlugins
+    postBuildScripts:
+      - name: Clear Gatekeeper Metadata
+        basedOnDependencyAnalysis: false
+        script: |
+          strip_attrs() {
+            local target_path="$1"
+            if [ -e "$target_path" ]; then
+              /usr/bin/xattr -dr com.apple.provenance "$target_path" 2>/dev/null || true
+              /usr/bin/xattr -dr com.apple.quarantine "$target_path" 2>/dev/null || true
+            fi
+          }
+
+          strip_attrs "$TARGET_BUILD_DIR/$FULL_PRODUCT_NAME"
+
+          for runner in "$BUILT_PRODUCTS_DIR"/*-Runner.app; do
+            if [ -e "$runner" ]; then
+              strip_attrs "$runner"
+            fi
+          done
+    settings:
+      base:
+        CODE_SIGN_STYLE: Automatic
+        DEVELOPMENT_TEAM: Q498EB36N4
+        PRODUCT_BUNDLE_IDENTIFIER: io.harness.ui-tests
+        TEST_TARGET_NAME: Harness
+schemes:
+  Harness:
+    build:
+      targets:
+        Harness: all
+        HarnessKit: all
+    test:
+      gatherCoverageData: true
+      targets:
+        - name: HarnessKitTests
+        - name: HarnessUITests

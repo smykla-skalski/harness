@@ -10,6 +10,10 @@ use crate::errors::{CliError, CliErrorKind};
 use crate::infra::io::{read_json_typed, write_json_pretty, write_text};
 use crate::workspace::{dirs_home, harness_data_root, utc_now};
 
+const LAUNCH_AGENTS_DIR: &str = "LaunchAgents";
+const CURRENT_LAUNCH_AGENT_PLIST: &str = "io.harness.daemon.plist";
+const LEGACY_LAUNCH_AGENT_PLIST: &str = "io.harness.monitor.daemon.plist";
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DaemonManifest {
     pub version: String,
@@ -75,10 +79,16 @@ pub fn session_cache_path(project_id: &str, session_id: &str) -> PathBuf {
 
 #[must_use]
 pub fn launch_agent_path() -> PathBuf {
-    dirs_home()
-        .join("Library")
-        .join("LaunchAgents")
-        .join("io.harness.monitor.daemon.plist")
+    launch_agents_dir().join(CURRENT_LAUNCH_AGENT_PLIST)
+}
+
+#[must_use]
+pub fn legacy_launch_agent_path() -> PathBuf {
+    launch_agents_dir().join(LEGACY_LAUNCH_AGENT_PLIST)
+}
+
+fn launch_agents_dir() -> PathBuf {
+    dirs_home().join("Library").join(LAUNCH_AGENTS_DIR)
 }
 
 /// Ensure the daemon directory structure exists.
