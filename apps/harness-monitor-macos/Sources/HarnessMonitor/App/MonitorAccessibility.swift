@@ -28,6 +28,13 @@ enum MonitorAccessibility {
   static let sidebarInstallLaunchAgentButton = "monitor.sidebar.action.install"
   static let sidebarStartDaemonButtonFrame = "monitor.sidebar.action.start.frame"
   static let sidebarInstallLaunchAgentButtonFrame = "monitor.sidebar.action.install.frame"
+  static let connectionBadge = "monitor.toolbar.connection-badge"
+  static let transportBadge = "monitor.sidebar.transport-badge"
+  static let latencyBadge = "monitor.sidebar.latency-badge"
+  static let activityPulse = "monitor.sidebar.activity-pulse"
+  static let reconnectionProgress = "monitor.sidebar.reconnection-progress"
+  static let fallbackBanner = "monitor.sidebar.fallback-banner"
+  static let connectionCard = "monitor.preferences.connection-card"
 
   static func sessionRow(_ sessionID: String) -> String {
     "monitor.sidebar.session.\(sessionID)"
