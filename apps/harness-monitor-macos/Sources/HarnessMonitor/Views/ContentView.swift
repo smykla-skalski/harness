@@ -18,6 +18,10 @@ struct ContentView: View {
     return detail
   }
 
+  private var selectedSessionSummary: SessionSummary? {
+    store.selectedSessionSummary
+  }
+
   var body: some View {
     GeometryReader { proxy in
       ZStack {
@@ -28,19 +32,10 @@ struct ContentView: View {
             .navigationSplitViewColumnWidth(min: 300, ideal: 350)
         } content: {
           NavigationStack {
-            Group {
-              if let detail = selectedDetail {
-                SessionCockpitView(
-                  store: store,
-                  detail: detail,
-                  timeline: store.timeline
-                )
-              } else {
-                SessionsBoardView(store: store)
-              }
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .accessibilityFrameMarker(MonitorAccessibility.contentRoot)
+            contentColumn
+              .frame(maxWidth: .infinity, maxHeight: .infinity)
+              .id(store.selectedSessionID ?? "board")
+              .accessibilityFrameMarker(MonitorAccessibility.contentRoot)
           }
           .searchable(text: $store.searchText, prompt: "Search sessions, projects, leaders")
           .navigationTitle("Harness Monitor")
@@ -94,6 +89,24 @@ struct ContentView: View {
     }
   }
 
+  @ViewBuilder
+  private var contentColumn: some View {
+    if let detail = selectedDetail {
+      SessionCockpitView(
+        store: store,
+        detail: detail,
+        timeline: store.timeline
+      )
+      .transition(.opacity.combined(with: .move(edge: .trailing)))
+    } else if let summary = selectedSessionSummary {
+      sessionLoadingView(summary: summary)
+        .transition(.opacity)
+    } else {
+      SessionsBoardView(store: store)
+        .transition(.opacity.combined(with: .move(edge: .leading)))
+    }
+  }
+
   private func refresh() {
     Task {
       await store.refresh()
@@ -104,6 +117,38 @@ struct ContentView: View {
     withAnimation(.spring(response: 0.26, dampingFraction: 0.9)) {
       showsPreferences.toggle()
     }
+  }
+
+  private func sessionLoadingView(summary: SessionSummary) -> some View {
+    MonitorColumnScrollView {
+      VStack(alignment: .leading, spacing: 18) {
+        VStack(alignment: .leading, spacing: 12) {
+          HStack(alignment: .top) {
+            VStack(alignment: .leading, spacing: 6) {
+              HStack(spacing: 10) {
+                Circle()
+                  .fill(statusColor(for: summary.status))
+                  .frame(width: 12, height: 12)
+                Text(summary.context)
+                  .font(.system(size: 30, weight: .black, design: .serif))
+                  .lineLimit(2)
+              }
+              Text("\(summary.projectName) • \(summary.sessionId)")
+                .font(.system(.subheadline, design: .rounded, weight: .medium))
+                .foregroundStyle(.secondary)
+            }
+            Spacer()
+          }
+
+          MonitorLoadingStateView(title: "Loading live session detail")
+            .transition(.opacity)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .monitorCard()
+      }
+      .frame(maxWidth: .infinity, alignment: .leading)
+    }
+    .foregroundStyle(MonitorTheme.ink)
   }
 
   @ViewBuilder

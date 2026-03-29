@@ -87,7 +87,7 @@ struct SessionsBoardView: View {
 
   private var metricsSection: some View {
     MonitorAdaptiveGridLayout(
-      minimumColumnWidth: 140,
+      minimumColumnWidth: 160,
       maximumColumns: 4,
       spacing: 16
     ) {
@@ -117,9 +117,7 @@ struct SessionsBoardView: View {
       } else {
         ForEach(store.sessions.prefix(8)) { session in
           Button {
-            Task {
-              await store.selectSession(session.sessionId)
-            }
+            select(sessionID: session.sessionId)
           } label: {
             HStack(alignment: .top, spacing: 14) {
               RoundedRectangle(cornerRadius: 14, style: .continuous)
@@ -172,7 +170,7 @@ struct SessionsBoardView: View {
         .contentTransition(.numericText())
     }
     .frame(maxWidth: .infinity, alignment: .leading)
-    .monitorCard(minHeight: 76, contentPadding: 14)
+    .monitorCard(minHeight: 80, contentPadding: 14)
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(MonitorAccessibility.boardMetricCard(title))
   }
@@ -198,7 +196,7 @@ struct SessionsBoardView: View {
         .font(.caption.bold())
         .foregroundStyle(isReady ? MonitorTheme.success : MonitorTheme.caution)
     }
-    .frame(maxWidth: .infinity, minHeight: 68, alignment: .topLeading)
+    .frame(maxWidth: .infinity, minHeight: 72, alignment: .topLeading)
     .padding(11)
     .background(MonitorTheme.surface, in: RoundedRectangle(cornerRadius: 18))
   }
@@ -274,7 +272,7 @@ struct SessionsBoardView: View {
   @ViewBuilder
   private var onboardingActionButtons: some View {
     MonitorAdaptiveGridLayout(
-      minimumColumnWidth: 154,
+      minimumColumnWidth: 180,
       maximumColumns: 3,
       spacing: 12
     ) {
@@ -310,6 +308,13 @@ struct SessionsBoardView: View {
       ) {
         await store.refresh()
       }
+    }
+  }
+
+  private func select(sessionID: String) {
+    store.primeSessionSelection(sessionID)
+    Task {
+      await store.selectSession(sessionID)
     }
   }
 }
