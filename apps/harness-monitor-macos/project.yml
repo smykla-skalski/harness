@@ -1,4 +1,8 @@
 name: HarnessMonitor
+packages:
+  SwiftLintPlugins:
+    url: https://github.com/SimplyDanny/SwiftLintPlugins
+    from: "0.58.0"
 options:
   bundleIdPrefix: io.harness.monitor
   createIntermediateGroups: true
@@ -10,7 +14,7 @@ settings:
     ENABLE_HARDENED_RUNTIME: YES
     GCC_TREAT_WARNINGS_AS_ERRORS: YES
     GENERATE_INFOPLIST_FILE: YES
-    MACOSX_DEPLOYMENT_TARGET: "15.0"
+    MACOSX_DEPLOYMENT_TARGET: "26.0"
     SWIFT_EMIT_LOC_STRINGS: YES
     SWIFT_STRICT_CONCURRENCY: complete
     SWIFT_TREAT_WARNINGS_AS_ERRORS: YES
@@ -19,14 +23,12 @@ targets:
   HarnessMonitorKit:
     type: framework
     platform: macOS
-    deploymentTarget: "15.0"
+    deploymentTarget: "26.0"
     sources:
       - Sources/HarnessMonitorKit
-    preBuildScripts:
-      - name: Swift Quality Gate
-        basedOnDependencyAnalysis: false
-        script: |
-          "$SRCROOT/Scripts/lint-swift.sh" kit
+    buildToolPlugins:
+      - plugin: SwiftLintBuildToolPlugin
+        package: SwiftLintPlugins
     settings:
       base:
         CODE_SIGN_STYLE: Automatic
@@ -38,7 +40,7 @@ targets:
   HarnessMonitor:
     type: application
     platform: macOS
-    deploymentTarget: "15.0"
+    deploymentTarget: "26.0"
     sources:
       - Sources/HarnessMonitor
     dependencies:
@@ -49,11 +51,9 @@ targets:
         com.apple.security.network.client: true
         com.apple.security.network.server: true
         com.apple.security.cs.disable-library-validation: true
-    preBuildScripts:
-      - name: Swift Quality Gate
-        basedOnDependencyAnalysis: false
-        script: |
-          "$SRCROOT/Scripts/lint-swift.sh" app
+    buildToolPlugins:
+      - plugin: SwiftLintBuildToolPlugin
+        package: SwiftLintPlugins
     postBuildScripts:
       - name: Clear Gatekeeper Metadata
         basedOnDependencyAnalysis: false
@@ -78,16 +78,14 @@ targets:
   HarnessMonitorKitTests:
     type: bundle.unit-test
     platform: macOS
-    deploymentTarget: "15.0"
+    deploymentTarget: "26.0"
     sources:
       - Tests/HarnessMonitorKitTests
     dependencies:
       - target: HarnessMonitorKit
-    preBuildScripts:
-      - name: Swift Quality Gate
-        basedOnDependencyAnalysis: false
-        script: |
-          "$SRCROOT/Scripts/lint-swift.sh" tests
+    buildToolPlugins:
+      - plugin: SwiftLintBuildToolPlugin
+        package: SwiftLintPlugins
     settings:
       base:
         CODE_SIGN_STYLE: Automatic
@@ -96,16 +94,14 @@ targets:
   HarnessMonitorUITests:
     type: bundle.ui-testing
     platform: macOS
-    deploymentTarget: "15.0"
+    deploymentTarget: "26.0"
     sources:
       - Tests/HarnessMonitorUITests
     dependencies:
       - target: HarnessMonitor
-    preBuildScripts:
-      - name: Swift Quality Gate
-        basedOnDependencyAnalysis: false
-        script: |
-          "$SRCROOT/Scripts/lint-swift.sh" ui-tests
+    buildToolPlugins:
+      - plugin: SwiftLintBuildToolPlugin
+        package: SwiftLintPlugins
     postBuildScripts:
       - name: Clear Gatekeeper Metadata
         basedOnDependencyAnalysis: false
