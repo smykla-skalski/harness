@@ -248,33 +248,32 @@ fn collect_signal_context(
             }),
         Some(runtime_session_id),
     );
-    let (signal_dir, signals) = signal_sources
-        .into_iter()
-        .find_map(|signal_session_id| {
-            let signal_dir = agent_runtime.signal_dir(project_dir, &signal_session_id);
-            match runtime::signal::read_pending_signals(&signal_dir) {
-                Ok(list) if !list.is_empty() => Some((signal_dir, list)),
-                Ok(_) => None,
-                Err(error) => {
-                    warn!(
-                        %error,
-                        runtime = agent_runtime.name(),
-                        signal_session_id,
-                        "failed to read pending signals"
-                    );
-                    None
-                }
+    let (signal_dir, signals) = signal_sources.into_iter().find_map(|signal_session_id| {
+        let signal_dir = agent_runtime.signal_dir(project_dir, &signal_session_id);
+        match runtime::signal::read_pending_signals(&signal_dir) {
+            Ok(list) if !list.is_empty() => Some((signal_dir, list)),
+            Ok(_) => None,
+            Err(error) => {
+                warn!(
+                    %error,
+                    runtime = agent_runtime.name(),
+                    signal_session_id,
+                    "failed to read pending signals"
+                );
+                None
             }
-        })?;
+        }
+    })?;
 
     let now = utc_now();
     let orchestration_session_id = resolved_session.as_ref().map_or_else(
         || runtime_session_id.to_string(),
         |resolved| resolved.orchestration_session_id.clone(),
     );
-    let agent_id = resolved_session
-        .as_ref()
-        .map_or_else(|| agent_runtime.name().to_string(), |resolved| resolved.agent_id.clone());
+    let agent_id = resolved_session.as_ref().map_or_else(
+        || agent_runtime.name().to_string(),
+        |resolved| resolved.agent_id.clone(),
+    );
     let lines: Vec<String> = signals
         .iter()
         .map(|signal| {
