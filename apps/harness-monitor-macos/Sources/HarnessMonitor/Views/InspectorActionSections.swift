@@ -63,8 +63,7 @@ extension InspectorActionSections {
           .font(.system(.headline, design: .rounded, weight: .semibold))
         Spacer()
         if store.isBusy {
-          ProgressView()
-            .controlSize(.small)
+          MonitorSpinner()
         } else if !store.lastAction.isEmpty {
           Text(store.lastAction)
             .font(.caption.bold())
