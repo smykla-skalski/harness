@@ -21,14 +21,16 @@ Unit tests are in-crate `#[test]` blocks. Integration tests live in `tests/integ
 
 Pre-commit: `cargo fmt --check && cargo clippy --lib && mise run test`
 
-For `apps/harness-monitor-macos`, treat `HarnessMonitor.xcodeproj` as tracked source. If you add, remove, or rename Swift files under the monitor app, update the Xcode project in the same change instead of relying on local-only project state.
+For `apps/harness-macos`, treat `Harness.xcodeproj` as tracked source. If you add, remove, or rename Swift files under the Harness app, update the Xcode project in the same change instead of relying on local-only project state.
 
 Monitor app validation expectations:
 
-- `xcodebuild -project apps/harness-monitor-macos/HarnessMonitor.xcodeproj -scheme HarnessMonitor -configuration Debug -derivedDataPath tmp/xcode-derived build CODE_SIGNING_ALLOWED=NO`
-- `xcodebuild -project apps/harness-monitor-macos/HarnessMonitor.xcodeproj -scheme HarnessMonitor -configuration Debug -derivedDataPath tmp/xcode-derived test CODE_SIGNING_ALLOWED=NO -destination 'platform=macOS' -skip-testing:HarnessMonitorUITests`
-- The monitor targets run a strict Swift Quality Gate on every build with warnings-as-errors. Expect style/lint failures such as oversized view bodies and fix the source instead of bypassing the gate.
-- Prefer shared layout and control primitives for monitor UI density/readability work so button sizing and glass treatment stay consistent across screens.
+- `xcodebuild -project apps/harness-macos/Harness.xcodeproj -scheme Harness -configuration Debug -derivedDataPath tmp/xcode-derived build CODE_SIGNING_ALLOWED=NO`
+- `xcodebuild -project apps/harness-macos/Harness.xcodeproj -scheme Harness -configuration Debug -derivedDataPath tmp/xcode-derived test CODE_SIGNING_ALLOWED=NO -destination 'platform=macOS' -skip-testing:HarnessUITests`
+- Hard requirement: do not run the full macOS UI suite by default. Run only the smallest targeted build/test command needed for the current change, such as a single XCTest case, a single XCTest class, or a non-UI build lane.
+- Only run the full macOS app validation lane or the full `HarnessUITests` suite after the user explicitly asks for the full suite.
+- The Harness targets run a strict Swift Quality Gate on every build with warnings-as-errors. Expect style/lint failures such as oversized view bodies and fix the source instead of bypassing the gate.
+- Prefer shared layout and control primitives for Harness UI density/readability work so button sizing and glass treatment stay consistent across screens.
 
 ## Architecture
 
@@ -112,4 +114,4 @@ All diagnostic output uses `tracing` macros. Never use `eprintln!` for new diagn
 - `guard-bash` denies direct use of `kubectl`, `kumactl`, `helm`, `docker`, `k3d` - all cluster access must go through harness commands (see `rules.rs:26`)
 - `VersionedJsonRepository` saves atomically via tmp-file rename - don't read state files by path while a save is in progress, use the repository's `load()` method
 - If using XcodeBuildMCP, use the installed XcodeBuildMCP skill before calling XcodeBuildMCP tools.
-- `apps/harness-monitor-macos/HarnessMonitor.xcodeproj` is repo-owned metadata; keep `project.pbxproj`, shared workspace/scheme files, and Swift source membership in sync.
+- `apps/harness-macos/Harness.xcodeproj` is repo-owned metadata; keep `project.pbxproj`, shared workspace/scheme files, and Swift source membership in sync.
