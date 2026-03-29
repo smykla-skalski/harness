@@ -184,3 +184,40 @@ pub struct SignalSendRequest {
 pub struct ObserveSessionRequest {
     pub actor: Option<String>,
 }
+
+// --- WebSocket wire protocol ---
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WsRequest {
+    pub id: String,
+    pub method: String,
+    #[serde(default)]
+    pub params: Value,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WsResponse {
+    pub id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub result: Option<Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<WsErrorPayload>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WsErrorPayload {
+    pub code: String,
+    pub message: String,
+    #[serde(default)]
+    pub details: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WsPushEvent {
+    pub event: String,
+    pub recorded_at: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub session_id: Option<String>,
+    pub payload: Value,
+    pub seq: u64,
+}

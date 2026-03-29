@@ -8,3 +8,4 @@ pub mod state;
 pub mod timeline;
 pub mod transport;
 pub mod watch;
+pub mod websocket;
