@@ -29,9 +29,9 @@ targets:
           "$SRCROOT/Scripts/lint-swift.sh" kit
     settings:
       base:
-        CODE_SIGN_IDENTITY: "-"
-        CODE_SIGN_STYLE: Manual
+        CODE_SIGN_STYLE: Automatic
         CODE_SIGNING_ALLOWED: YES
+        DEVELOPMENT_TEAM: Q498EB36N4
         ENABLE_MODULE_VERIFIER: YES
         MODULE_VERIFIER_SUPPORTED_LANGUAGES: "objective-c objective-c++"
         PRODUCT_BUNDLE_IDENTIFIER: io.harness.monitor.kit
@@ -70,8 +70,8 @@ targets:
     settings:
       base:
         CODE_SIGN_ENTITLEMENTS: HarnessMonitor.entitlements
-        CODE_SIGN_IDENTITY: "Monitor Development"
-        CODE_SIGN_STYLE: Manual
+        CODE_SIGN_STYLE: Automatic
+        DEVELOPMENT_TEAM: Q498EB36N4
         INFOPLIST_KEY_CFBundleDisplayName: Harness Monitor
         INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.developer-tools
         PRODUCT_BUNDLE_IDENTIFIER: io.harness.monitor.app
@@ -90,6 +90,8 @@ targets:
           "$SRCROOT/Scripts/lint-swift.sh" tests
     settings:
       base:
+        CODE_SIGN_STYLE: Automatic
+        DEVELOPMENT_TEAM: Q498EB36N4
         PRODUCT_BUNDLE_IDENTIFIER: io.harness.monitor.kit-tests
   HarnessMonitorUITests:
     type: bundle.ui-testing
@@ -125,9 +127,8 @@ targets:
           done
     settings:
       base:
-        CODE_SIGN_IDENTITY: "-"
-        CODE_SIGN_STYLE: Manual
-        ENABLE_HARDENED_RUNTIME: NO
+        CODE_SIGN_STYLE: Automatic
+        DEVELOPMENT_TEAM: Q498EB36N4
         PRODUCT_BUNDLE_IDENTIFIER: io.harness.monitor.ui-tests
         TEST_TARGET_NAME: HarnessMonitor
 schemes:
