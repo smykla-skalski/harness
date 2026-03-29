@@ -69,6 +69,10 @@ public final class MonitorStore {
   public var lastAction = ""
   public var lastError: String?
   public var pendingConfirmation: PendingConfirmation?
+  public var activeTransport: TransportKind = .httpSSE
+  public var connectionMetrics: ConnectionMetrics = .initial
+  public var connectionEvents: [ConnectionEvent] = []
+  public var subscribedSessionIDs: Set<String> = []
 
   let daemonController: any DaemonControlling
   var client: (any MonitorClientProtocol)?

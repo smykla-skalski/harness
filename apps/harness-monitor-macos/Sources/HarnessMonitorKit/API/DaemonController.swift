@@ -31,31 +31,58 @@ public enum DaemonControlError: Error, LocalizedError, Equatable {
   }
 }
 
+public enum TransportPreference: Sendable {
+  case auto
+  case webSocket
+  case http
+}
+
 public struct DaemonController: DaemonControlling {
   private let environment: MonitorEnvironment
   private let sessionFactory: @Sendable (MonitorConnection) -> any MonitorClientProtocol
+  private let transportPreference: TransportPreference
 
   public init(
     environment: MonitorEnvironment = .current,
+    transportPreference: TransportPreference = .auto,
     sessionFactory: @escaping @Sendable (MonitorConnection) -> any MonitorClientProtocol = {
       MonitorAPIClient(connection: $0)
     }
   ) {
     self.environment = environment
+    self.transportPreference = transportPreference
     self.sessionFactory = sessionFactory
   }
 
   public func bootstrapClient() async throws -> any MonitorClientProtocol {
     let manifest = try loadManifest()
     let token = try loadToken(path: manifest.tokenPath)
-    let client = sessionFactory(
-      MonitorConnection(
-        endpoint: try endpointURL(from: manifest.endpoint),
-        token: token
-      )
+    let connection = MonitorConnection(
+      endpoint: try endpointURL(from: manifest.endpoint),
+      token: token
     )
+
+    if transportPreference != .http {
+      if let wsClient = try? await bootstrapWebSocket(connection: connection) {
+        return wsClient
+      }
+      if transportPreference == .webSocket {
+        throw DaemonControlError.commandFailed("WebSocket connection failed")
+      }
+    }
+
+    let client = sessionFactory(connection)
     _ = try await client.health()
     return client
+  }
+
+  private func bootstrapWebSocket(
+    connection: MonitorConnection
+  ) async throws -> WebSocketTransport {
+    let transport = WebSocketTransport(connection: connection)
+    try await transport.connect()
+    _ = try await transport.health()
+    return transport
   }
 
   public func startDaemonClient() async throws -> any MonitorClientProtocol {
