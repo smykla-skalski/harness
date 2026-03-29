@@ -177,6 +177,60 @@ pub fn signals_root(context_root: &Path) -> PathBuf {
     context_root.join("agents").join("signals")
 }
 
+/// Resolve an orchestration session ID from a runtime session key within one
+/// discovered project context.
+///
+/// # Errors
+/// Returns `CliError` when session state cannot be loaded or when the runtime
+/// session key is ambiguous.
+pub fn resolve_session_id_for_runtime_session(
+    context_root: &Path,
+    runtime_name: &str,
+    runtime_session_id: &str,
+) -> Result<Option<String>, CliError> {
+    if list_session_ids_from_context_root(context_root)?
+        .iter()
+        .any(|session_id| session_id == runtime_session_id)
+    {
+        return Ok(Some(runtime_session_id.to_string()));
+    }
+
+    let project = DiscoveredProject {
+        project_id: context_root
+            .file_name()
+            .map_or_else(String::new, |name| name.to_string_lossy().to_string()),
+        name: context_root
+            .file_name()
+            .map_or_else(String::new, |name| name.to_string_lossy().to_string()),
+        project_dir: infer_project_dir(context_root),
+        context_root: context_root.to_path_buf(),
+    };
+    let mut matches = Vec::new();
+
+    for session_id in list_active_session_ids_from_context_root(context_root)? {
+        let Some(state) = load_session_state(&project, &session_id)? else {
+            continue;
+        };
+        let matched = state.agents.values().any(|agent| {
+            agent.runtime == runtime_name
+                && (agent.agent_session_id.as_deref() == Some(runtime_session_id)
+                    || (agent.agent_session_id.is_none() && state.session_id == runtime_session_id))
+        });
+        if matched {
+            matches.push(state.session_id);
+        }
+    }
+
+    match matches.len() {
+        0 => Ok(None),
+        1 => Ok(matches.into_iter().next()),
+        _ => Err(CliErrorKind::session_ambiguous(format!(
+            "runtime session '{runtime_session_id}' for runtime '{runtime_name}' maps to multiple orchestration sessions"
+        ))
+        .into()),
+    }
+}
+
 #[must_use]
 pub fn observe_snapshot_path(context_root: &Path, observe_id: &str) -> PathBuf {
     context_root

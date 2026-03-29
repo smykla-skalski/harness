@@ -140,11 +140,26 @@ fn merge_watch_event(
 fn extract_session_ids(paths: &[PathBuf]) -> BTreeSet<String> {
     paths
         .iter()
-        .filter_map(|path| session_id_from_path(path))
+        .filter_map(|path| session_id_from_path(path).ok().flatten())
         .collect()
 }
 
-fn session_id_from_path(path: &Path) -> Option<String> {
+fn session_id_from_path(path: &Path) -> Result<Option<String>, CliError> {
+    if let Some(session_id) = orchestration_session_id_from_path(path) {
+        return Ok(Some(session_id));
+    }
+    if let Some((context_root, runtime_name, runtime_session_id)) = runtime_session_target_from_path(path)
+    {
+        return index::resolve_session_id_for_runtime_session(
+            &context_root,
+            &runtime_name,
+            &runtime_session_id,
+        );
+    }
+    Ok(None)
+}
+
+fn orchestration_session_id_from_path(path: &Path) -> Option<String> {
     let components: Vec<_> = path
         .components()
         .filter_map(|component| match component {
@@ -152,25 +167,57 @@ fn session_id_from_path(path: &Path) -> Option<String> {
             _ => None,
         })
         .collect();
-
-    components.windows(3).find_map(window_session_id)
-}
-
-fn window_session_id(window: &[String]) -> Option<String> {
-    match window {
-        [first, second, session_id]
-            if (first == "orchestration" && second == "sessions")
-                || (first == "sessions" && second == "signals") =>
-        {
-            Some(session_id.clone())
-        }
-        [first, runtime, session_id]
-            if (first == "signals" || first == "sessions") && !runtime.is_empty() =>
-        {
+    components.windows(3).find_map(|window| match window {
+        [first, second, session_id] if first == "orchestration" && second == "sessions" => {
             Some(session_id.clone())
         }
         _ => None,
+    })
+}
+
+fn runtime_session_target_from_path(path: &Path) -> Option<(PathBuf, String, String)> {
+    runtime_session_target_from_transcript(path).or_else(|| runtime_session_target_from_signal(path))
+}
+
+fn runtime_session_target_from_transcript(path: &Path) -> Option<(PathBuf, String, String)> {
+    if path.file_name().and_then(|name| name.to_str()) != Some("raw.jsonl") {
+        return None;
     }
+    let runtime_session_id = path.parent()?.file_name()?.to_string_lossy().to_string();
+    let runtime_name = path
+        .parent()?
+        .parent()?
+        .file_name()?
+        .to_string_lossy()
+        .to_string();
+    if path.parent()?.parent()?.parent()?.file_name()?.to_str() != Some("sessions")
+        || path.parent()?.parent()?.parent()?.parent()?.file_name()?.to_str() != Some("agents")
+    {
+        return None;
+    }
+    Some((path.ancestors().nth(5)?.to_path_buf(), runtime_name, runtime_session_id))
+}
+
+fn runtime_session_target_from_signal(path: &Path) -> Option<(PathBuf, String, String)> {
+    let signal_bucket = path.parent()?.file_name()?.to_str()?;
+    if !matches!(signal_bucket, "pending" | "acknowledged") {
+        return None;
+    }
+    let runtime_session_id = path.parent()?.parent()?.file_name()?.to_string_lossy().to_string();
+    let runtime_name = path
+        .parent()?
+        .parent()?
+        .parent()?
+        .file_name()?
+        .to_string_lossy()
+        .to_string();
+    if path.parent()?.parent()?.parent()?.parent()?.file_name()?.to_str() != Some("signals")
+        || path.parent()?.parent()?.parent()?.parent()?.parent()?.file_name()?.to_str()
+            != Some("agents")
+    {
+        return None;
+    }
+    Some((path.ancestors().nth(6)?.to_path_buf(), runtime_name, runtime_session_id))
 }
 
 fn refresh_watch_snapshot(
@@ -342,30 +389,71 @@ mod tests {
 
     #[test]
     fn session_id_from_path_extracts_known_layouts() {
-        assert_eq!(
-            session_id_from_path(Path::new(
-                "/tmp/projects/proj/orchestration/sessions/sess-1/state.json"
-            )),
-            Some("sess-1".to_string())
-        );
-        assert_eq!(
-            session_id_from_path(Path::new(
-                "/tmp/projects/proj/agents/sessions/codex/sess-2/raw.jsonl"
-            )),
-            Some("sess-2".to_string())
-        );
-        assert_eq!(
-            session_id_from_path(Path::new(
-                "/tmp/projects/proj/agents/signals/claude/sess-3/pending/sig.json"
-            )),
-            Some("sess-3".to_string())
-        );
-        assert_eq!(
-            session_id_from_path(Path::new(
-                "/tmp/projects/proj/agents/observe/observe-sess-3/snapshot.json"
-            )),
-            None
-        );
+        with_temp_project(|project| {
+            let state = session_service::start_session(
+                "watch mapping",
+                project,
+                Some("claude"),
+                Some("watch-map"),
+            )
+            .expect("start session");
+            let joined =
+                temp_env::with_vars([("CODEX_SESSION_ID", Some("worker-session"))], || {
+                    session_service::join_session(
+                        "watch-map",
+                        SessionRole::Worker,
+                        "codex",
+                        &[],
+                        None,
+                        project,
+                    )
+                    .expect("join worker")
+                });
+            let worker = joined
+                .agents
+                .values()
+                .find(|agent| agent.agent_id.starts_with("codex-"))
+                .expect("worker");
+            let context_root = crate::workspace::project_context_dir(project);
+
+            assert_eq!(
+                session_id_from_path(
+                    &context_root.join("orchestration/sessions/watch-map/state.json")
+                )
+                .expect("orchestration path"),
+                Some("watch-map".to_string())
+            );
+            assert_eq!(
+                session_id_from_path(
+                    &context_root.join("agents/sessions/codex/worker-session/raw.jsonl")
+                )
+                .expect("runtime transcript path"),
+                Some("watch-map".to_string())
+            );
+            assert_eq!(
+                session_id_from_path(
+                    &context_root.join("agents/signals/codex/worker-session/pending/sig.json")
+                )
+                .expect("runtime signal path"),
+                Some("watch-map".to_string())
+            );
+            assert_eq!(
+                session_id_from_path(
+                    &context_root.join("agents/signals/codex/watch-map/pending/sig.json")
+                )
+                .expect("legacy signal path"),
+                Some("watch-map".to_string())
+            );
+            assert_eq!(
+                session_id_from_path(
+                    &context_root.join("agents/observe/observe-watch-map/snapshot.json")
+                )
+                .expect("observe path"),
+                None
+            );
+            assert_eq!(worker.agent_session_id.as_deref(), Some("worker-session"));
+            assert_eq!(state.session_id, "watch-map");
+        });
     }
 
     #[test]
@@ -398,6 +486,11 @@ mod tests {
                 .find(|agent_id| agent_id.starts_with("codex-"))
                 .expect("worker id")
                 .clone();
+            let worker_session_id = joined
+                .agents
+                .get(&worker_id)
+                .and_then(|agent| agent.agent_session_id.clone())
+                .expect("worker session id");
             session_service::create_task(
                 "watch-sess",
                 "watch timeline",
@@ -428,7 +521,7 @@ mod tests {
 
             let signal_dir = runtime::runtime_for_name("codex")
                 .expect("codex runtime")
-                .signal_dir(project, "watch-sess");
+                .signal_dir(project, &worker_session_id);
             acknowledge_signal(
                 &signal_dir,
                 &SignalAck {

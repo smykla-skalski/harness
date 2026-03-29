@@ -1,6 +1,8 @@
 use harness::app::cli::Command;
 use harness::session::service;
-use harness::session::transport::{SessionCommand, SessionTaskCommand, TaskListArgs};
+use harness::session::transport::{
+    SessionAssignArgs, SessionCommand, SessionTaskCommand, TaskCreateArgs, TaskListArgs,
+};
 use harness::session::types::{SessionRole, SessionStatus, TaskSeverity, TaskStatus};
 
 use super::super::helpers::*;
@@ -159,6 +161,109 @@ fn session_list_shows_active_sessions() {
 
             let sessions = service::list_sessions(&project, false).unwrap();
             assert_eq!(sessions.len(), 2);
+        },
+    );
+}
+
+#[test]
+fn session_task_create_supports_suggested_fix_via_cli_command() {
+    let tmp = tempfile::tempdir().unwrap();
+    temp_env::with_vars(
+        [
+            ("XDG_DATA_HOME", Some(tmp.path().to_str().unwrap())),
+            ("CLAUDE_SESSION_ID", Some("integ-suggested-fix")),
+        ],
+        || {
+            let project = tmp.path().join("project");
+            let project_str = project.to_string_lossy().to_string();
+            let state = service::start_session(
+                "suggested fix test",
+                &project,
+                Some("claude"),
+                Some("task-fix-1"),
+            )
+            .unwrap();
+            let leader_id = state.leader_id.unwrap();
+
+            let cmd = session_cmd(SessionCommand::Task {
+                command: SessionTaskCommand::Create(TaskCreateArgs {
+                    session_id: "task-fix-1".into(),
+                    title: "stabilize signal watch".into(),
+                    context: Some("watch paths use the wrong key".into()),
+                    severity: TaskSeverity::High,
+                    suggested_fix: Some("resolve runtime-session ids before refreshing".into()),
+                    actor: leader_id,
+                    project_dir: Some(project_str),
+                }),
+            });
+            let result = run_command(cmd);
+            assert!(result.is_ok());
+            assert_eq!(result.unwrap(), 0);
+
+            let tasks = service::list_tasks("task-fix-1", None, &project).unwrap();
+            assert_eq!(tasks.len(), 1);
+            assert_eq!(
+                tasks[0].suggested_fix.as_deref(),
+                Some("resolve runtime-session ids before refreshing")
+            );
+        },
+    );
+}
+
+#[test]
+fn session_assign_supports_reason_via_cli_command() {
+    let tmp = tempfile::tempdir().unwrap();
+    temp_env::with_vars(
+        [
+            ("XDG_DATA_HOME", Some(tmp.path().to_str().unwrap())),
+            ("CLAUDE_SESSION_ID", Some("integ-role-reason")),
+        ],
+        || {
+            let project = tmp.path().join("project");
+            let project_str = project.to_string_lossy().to_string();
+            let state = service::start_session(
+                "role reason test",
+                &project,
+                Some("claude"),
+                Some("role-reason-1"),
+            )
+            .unwrap();
+            let leader_id = state.leader_id.unwrap();
+            let joined = temp_env::with_vars([("CODEX_SESSION_ID", Some("role-session"))], || {
+                service::join_session(
+                    "role-reason-1",
+                    SessionRole::Worker,
+                    "codex",
+                    &[],
+                    None,
+                    &project,
+                )
+                .unwrap()
+            });
+            let worker_id = joined
+                .agents
+                .keys()
+                .find(|id| id.starts_with("codex"))
+                .unwrap()
+                .clone();
+
+            let cmd = session_cmd(SessionCommand::Assign(SessionAssignArgs {
+                session_id: "role-reason-1".into(),
+                agent_id: worker_id.clone(),
+                role: SessionRole::Reviewer,
+                reason: Some("route final validation through review".into()),
+                actor: leader_id,
+                project_dir: Some(project_str),
+            }));
+            let result = run_command(cmd);
+            assert!(result.is_ok());
+            assert_eq!(result.unwrap(), 0);
+
+            let log_path = harness::workspace::project_context_dir(&project)
+                .join("orchestration/sessions/role-reason-1/log.jsonl");
+            let log_text = std::fs::read_to_string(log_path).unwrap();
+            assert!(log_text.contains("\"reason\":\"route final validation through review\""));
+            assert!(log_text.contains(&format!("\"agent_id\":\"{worker_id}\"")));
         },
     );
 }

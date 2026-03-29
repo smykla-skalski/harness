@@ -1,6 +1,7 @@
 use std::collections::{BTreeMap, HashSet};
 use std::path::Path;
 
+use crate::agents::runtime::signal_session_keys;
 use crate::agents::runtime::signal::{
     AckResult, Signal, SignalAck, read_acknowledged_signals, read_acknowledgments,
 };
@@ -109,34 +110,39 @@ fn signal_ack_entries(
 ) -> Result<Vec<TimelineEntry>, CliError> {
     let mut entries = Vec::new();
     let signals_root = index::signals_root(context_root);
-    let runtimes: HashSet<_> = state
-        .agents
-        .values()
-        .map(|agent| agent.runtime.as_str())
-        .collect();
+    let mut acknowledgments_by_id = BTreeMap::new();
+    let mut signals_by_id = BTreeMap::new();
 
-    for runtime in runtimes {
-        let signal_dir = signals_root.join(runtime).join(&state.session_id);
-        let acknowledgments = read_acknowledgments(&signal_dir)?;
-        let signals: BTreeMap<String, Signal> = read_acknowledged_signals(&signal_dir)?
-            .into_iter()
-            .map(|signal| (signal.signal_id.clone(), signal))
-            .collect();
-
-        for acknowledgment in acknowledgments {
-            if logged_signal_acks.contains(&acknowledgment.signal_id) {
-                continue;
+    for agent in state.agents.values() {
+        for signal_session_id in signal_session_keys(&state.session_id, agent.agent_session_id.as_deref())
+        {
+            let signal_dir = signals_root.join(&agent.runtime).join(signal_session_id);
+            for acknowledgment in read_acknowledgments(&signal_dir)? {
+                acknowledgments_by_id
+                    .entry(acknowledgment.signal_id.clone())
+                    .or_insert((agent.runtime.clone(), acknowledgment));
             }
-            let signal = signals.get(&acknowledgment.signal_id);
-            let logged_signal = sent_signals.get(&acknowledgment.signal_id);
-            entries.push(signal_ack_entry(
-                &state.session_id,
-                runtime,
-                logged_signal,
-                signal,
-                &acknowledgment,
-            )?);
+            for signal in read_acknowledged_signals(&signal_dir)? {
+                signals_by_id
+                    .entry(signal.signal_id.clone())
+                    .or_insert(signal);
+            }
         }
+    }
+
+    for (signal_id, (runtime, acknowledgment)) in acknowledgments_by_id {
+        if logged_signal_acks.contains(&signal_id) {
+            continue;
+        }
+        let signal = signals_by_id.get(&signal_id);
+        let logged_signal = sent_signals.get(&signal_id);
+        entries.push(signal_ack_entry(
+            &state.session_id,
+            &runtime,
+            logged_signal,
+            signal,
+            &acknowledgment,
+        )?);
     }
 
     Ok(entries)

@@ -237,6 +237,9 @@ pub struct SessionAssignArgs {
     /// New role.
     #[arg(long, value_enum)]
     pub role: SessionRole,
+    /// Reason for the role change.
+    #[arg(long)]
+    pub reason: Option<String>,
     /// Agent ID of the caller.
     #[arg(long)]
     pub actor: String,
@@ -252,6 +255,7 @@ impl Execute for SessionAssignArgs {
             &self.session_id,
             &self.agent_id,
             self.role,
+            self.reason.as_deref(),
             &self.actor,
             project.as_ref(),
         )?;
@@ -330,6 +334,9 @@ pub struct TaskCreateArgs {
     /// Severity level.
     #[arg(long, value_enum, default_value = "medium")]
     pub severity: TaskSeverity,
+    /// Suggested fix, if already known.
+    #[arg(long)]
+    pub suggested_fix: Option<String>,
     /// Agent ID of the caller.
     #[arg(long)]
     pub actor: String,
@@ -341,11 +348,14 @@ pub struct TaskCreateArgs {
 impl Execute for TaskCreateArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
         let project = resolve_project_dir(self.project_dir.as_deref());
-        let item = service::create_task(
+        let item = service::create_task_with_source(
             &self.session_id,
             &self.title,
             self.context.as_deref(),
             self.severity,
+            self.suggested_fix.as_deref(),
+            super::types::TaskSource::Manual,
+            None,
             &self.actor,
             project.as_ref(),
         )?;

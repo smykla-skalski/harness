@@ -1,5 +1,7 @@
+use std::collections::BTreeSet;
 use std::path::Path;
 use std::process::id as process_id;
+use std::sync::{Arc, Mutex, OnceLock};
 use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
@@ -24,6 +26,15 @@ use super::state::{self, DaemonDiagnostics, DaemonManifest};
 use super::timeline;
 use super::watch;
 
+#[derive(Debug, Clone)]
+struct DaemonObserveRuntime {
+    sender: broadcast::Sender<StreamEvent>,
+    poll_interval: Duration,
+    running_sessions: Arc<Mutex<BTreeSet<String>>>,
+}
+
+static OBSERVE_RUNTIME: OnceLock<DaemonObserveRuntime> = OnceLock::new();
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DaemonStatusReport {
     pub manifest: Option<DaemonManifest>,
@@ -38,6 +49,7 @@ pub struct DaemonServeConfig {
     pub host: String,
     pub port: u16,
     pub poll_interval: Duration,
+    pub observe_interval: Duration,
 }
 
 impl Default for DaemonServeConfig {
@@ -46,6 +58,7 @@ impl Default for DaemonServeConfig {
             host: "127.0.0.1".into(),
             port: 0,
             poll_interval: Duration::from_secs(2),
+            observe_interval: Duration::from_secs(5),
         }
     }
 }
@@ -77,6 +90,11 @@ pub async fn serve(config: DaemonServeConfig) -> Result<(), CliError> {
     state::append_event("info", &format!("daemon listening on {endpoint}"))?;
 
     let (sender, _) = broadcast::channel(64);
+    let _ = OBSERVE_RUNTIME.set(DaemonObserveRuntime {
+        sender: sender.clone(),
+        poll_interval: config.observe_interval,
+        running_sessions: Arc::default(),
+    });
     let _watch = watch::spawn_watch_loop(sender.clone(), config.poll_interval);
     let app_state = DaemonHttpState {
         token,
@@ -179,11 +197,14 @@ pub fn create_task(
 ) -> Result<SessionDetail, CliError> {
     let resolved = index::resolve_session(session_id)?;
     let project_dir = require_project_dir(&resolved)?;
-    let _ = session_service::create_task(
+    let _ = session_service::create_task_with_source(
         session_id,
         &request.title,
         request.context.as_deref(),
         request.severity,
+        request.suggested_fix.as_deref(),
+        crate::session::types::TaskSource::Manual,
+        None,
         &request.actor,
         project_dir,
     )?;
@@ -270,6 +291,7 @@ pub fn change_role(
         session_id,
         agent_id,
         request.role,
+        request.reason.as_deref(),
         &request.actor,
         project_dir,
     )?;
@@ -347,7 +369,7 @@ pub fn send_signal(
     snapshot::session_detail(session_id)
 }
 
-/// Trigger a one-shot session observation pass.
+/// Start or refresh the daemon-owned session observation loop.
 ///
 /// # Errors
 /// Returns `CliError` when the session cannot be resolved or observe fails.
@@ -358,7 +380,9 @@ pub fn observe_session(
     let resolved = index::resolve_session(session_id)?;
     let project_dir = require_project_dir(&resolved)?;
     let actor_id = request.and_then(|request| request.actor.as_deref());
-    let _ = session_observe::run_session_observe(session_id, project_dir, actor_id)?;
+    if !start_daemon_observe_loop(session_id, project_dir, actor_id) {
+        let _ = session_observe::run_session_observe(session_id, project_dir, actor_id)?;
+    }
     snapshot::session_detail(session_id)
 }
 
@@ -378,6 +402,57 @@ fn require_project_dir(resolved: &ResolvedSession) -> Result<&Path, CliError> {
             resolved.state.session_id, resolved.project.project_id
         )))
     })
+}
+
+fn start_daemon_observe_loop(
+    session_id: &str,
+    project_dir: &Path,
+    actor_id: Option<&str>,
+) -> bool {
+    let Some(runtime) = OBSERVE_RUNTIME.get().cloned() else {
+        return false;
+    };
+
+    {
+        let Ok(mut running_sessions) = runtime.running_sessions.lock() else {
+            return false;
+        };
+        if !running_sessions.insert(session_id.to_string()) {
+            return true;
+        }
+    }
+
+    let session_id = session_id.to_string();
+    let project_dir = project_dir.to_path_buf();
+    let actor_id = actor_id.map(ToString::to_string);
+    tokio::spawn(async move {
+        let poll_interval_seconds = runtime.poll_interval.as_secs().max(1);
+        let session_id_for_watch = session_id.clone();
+        let project_dir_for_watch = project_dir.clone();
+        let actor_id_for_watch = actor_id.clone();
+        let result = tokio::task::spawn_blocking(move || {
+            session_observe::execute_session_watch(
+                &session_id_for_watch,
+                &project_dir_for_watch,
+                poll_interval_seconds,
+                false,
+                actor_id_for_watch.as_deref(),
+            )
+        })
+        .await;
+        if let Err(error) = result {
+            tracing::warn!(%error, session_id, "daemon observe loop task failed");
+        } else if let Ok(Err(error)) = result {
+            tracing::warn!(%error, session_id, "daemon observe loop exited with error");
+        }
+        if let Ok(mut running_sessions) = runtime.running_sessions.lock() {
+            running_sessions.remove(&session_id);
+        }
+        let _ = runtime
+            .sender
+            .send(refresh_event("session_updated", Some(&session_id)));
+    });
+    true
 }
 
 #[cfg(test)]
@@ -478,6 +553,98 @@ mod tests {
                 assert_eq!(report.recent_events.len(), 1);
             },
         );
+    }
+
+    #[test]
+    fn create_task_uses_suggested_fix_from_request() {
+        with_temp_project(|project| {
+            let state = session_service::start_session(
+                "daemon task request",
+                project,
+                Some("claude"),
+                Some("daemon-task"),
+            )
+            .expect("start session");
+            let leader_id = state.leader_id.expect("leader id");
+
+            append_project_ledger_entry(project);
+            let detail = create_task(
+                &state.session_id,
+                &TaskCreateRequest {
+                    actor: leader_id,
+                    title: "Patch the watch mapper".into(),
+                    context: Some("watch loop uses the wrong session key".into()),
+                    severity: crate::session::types::TaskSeverity::High,
+                    suggested_fix: Some("resolve runtime-session ids through daemon index".into()),
+                },
+            )
+            .expect("create task");
+
+            assert_eq!(detail.tasks.len(), 1);
+            assert_eq!(
+                detail.tasks[0].suggested_fix.as_deref(),
+                Some("resolve runtime-session ids through daemon index")
+            );
+        });
+    }
+
+    #[test]
+    fn change_role_records_reason_from_request() {
+        with_temp_project(|project| {
+            let state = session_service::start_session(
+                "daemon role request",
+                project,
+                Some("claude"),
+                Some("daemon-role"),
+            )
+            .expect("start session");
+            let leader_id = state.leader_id.expect("leader id");
+            let joined =
+                temp_env::with_vars([("CODEX_SESSION_ID", Some("role-worker"))], || {
+                    session_service::join_session(
+                        "daemon-role",
+                        SessionRole::Worker,
+                        "codex",
+                        &[],
+                        None,
+                        project,
+                    )
+                    .expect("join worker")
+                });
+            let worker_id = joined
+                .agents
+                .keys()
+                .find(|agent_id| agent_id.starts_with("codex-"))
+                .expect("worker id")
+                .clone();
+            append_project_ledger_entry(project);
+
+            let _ = change_role(
+                "daemon-role",
+                &worker_id,
+                &RoleChangeRequest {
+                    actor: leader_id,
+                    role: SessionRole::Reviewer,
+                    reason: Some("route triage through a reviewer".into()),
+                },
+            )
+            .expect("change role");
+
+            let entries = session_service::session_status("daemon-role", project)
+                .expect("status")
+                .tasks;
+            assert!(entries.is_empty());
+            let log_entries =
+                crate::session::storage::load_log_entries(project, "daemon-role").expect("log");
+            assert!(log_entries.into_iter().any(|entry| {
+                entry.reason.as_deref() == Some("route triage through a reviewer")
+                    && matches!(
+                        entry.transition,
+                        crate::session::types::SessionTransition::RoleChanged { ref agent_id, .. }
+                            if agent_id == &worker_id
+                    )
+            }));
+        });
     }
 
     #[test]

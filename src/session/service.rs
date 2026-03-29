@@ -27,6 +27,12 @@ use super::types::{
 
 const DEFAULT_LEADER_UNRESPONSIVE_TIMEOUT_SECONDS: i64 = 300;
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ResolvedRuntimeSessionAgent {
+    pub orchestration_session_id: String,
+    pub agent_id: String,
+}
+
 /// Start a new orchestration session and register the caller as leader.
 ///
 /// # Errors
@@ -202,6 +208,7 @@ pub fn assign_role(
     session_id: &str,
     agent_id: &str,
     role: SessionRole,
+    reason: Option<&str>,
     actor_id: &str,
     project_dir: &Path,
 ) -> Result<(), CliError> {
@@ -248,7 +255,7 @@ pub fn assign_role(
             to: role,
         },
         Some(actor_id),
-        None,
+        reason,
     )?;
 
     Ok(())
@@ -745,6 +752,7 @@ pub fn send_signal(
 ) -> Result<SessionSignalRecord, CliError> {
     let now = utc_now();
     let mut runtime_name = String::new();
+    let mut target_agent_session_id = None;
 
     storage::update_state(project_dir, session_id, |state| {
         require_active(state)?;
@@ -763,6 +771,7 @@ pub fn send_signal(
         }
 
         runtime_name.clone_from(&target_agent.runtime);
+        target_agent_session_id.clone_from(&target_agent.agent_session_id);
         touch_agent(state, actor_id, &now);
         refresh_session(state, &now);
         Ok(())
@@ -797,7 +806,8 @@ pub fn send_signal(
         },
     };
 
-    runtime.write_signal(project_dir, session_id, &signal)?;
+    let signal_session_id = target_agent_session_id.as_deref().unwrap_or(session_id);
+    runtime.write_signal(project_dir, signal_session_id, &signal)?;
     storage::append_log_entry(
         project_dir,
         session_id,
@@ -840,46 +850,155 @@ pub fn list_signals(
         let Some(runtime) = runtime::runtime_for_name(&agent.runtime) else {
             continue;
         };
-
-        let signal_dir = runtime.signal_dir(project_dir, session_id);
-        let pending = read_pending_signals(&signal_dir)?;
-        let acknowledged = read_acknowledged_signals(&signal_dir)?;
-        let acknowledgments = read_acknowledgments(&signal_dir)?;
-        let acknowledgment_by_id: BTreeMap<String, _> = acknowledgments
-            .into_iter()
-            .map(|ack| (ack.signal_id.clone(), ack))
-            .collect();
-
-        for signal in pending {
-            signals.push(SessionSignalRecord {
-                runtime: agent.runtime.clone(),
-                agent_id: agent_id.clone(),
-                session_id: session_id.to_string(),
-                status: SessionSignalStatus::Pending,
-                signal,
-                acknowledgment: None,
-            });
-        }
-        for signal in acknowledged {
-            let acknowledgment = acknowledgment_by_id.get(&signal.signal_id).cloned();
-            let status = acknowledgment
-                .as_ref()
-                .map_or(SessionSignalStatus::Pending, |ack| {
-                    SessionSignalStatus::from_ack_result(ack.result)
-                });
-            signals.push(SessionSignalRecord {
-                runtime: agent.runtime.clone(),
-                agent_id: agent_id.clone(),
-                session_id: session_id.to_string(),
-                status,
-                signal,
-                acknowledgment,
-            });
-        }
+        let signal_dirs: Vec<_> =
+            runtime::signal_session_keys(session_id, agent.agent_session_id.as_deref())
+                .into_iter()
+                .map(|signal_session_id| runtime.signal_dir(project_dir, &signal_session_id))
+                .collect();
+        signals.extend(signal_records_for_dirs(
+            &agent.runtime,
+            &agent_id,
+            session_id,
+            &signal_dirs,
+        )?);
     }
 
     signals.sort_by(|left, right| right.signal.created_at.cmp(&left.signal.created_at));
     Ok(signals)
+}
+
+/// Resolve the orchestration session and agent owning a runtime session ID.
+///
+/// # Errors
+/// Returns `CliError` when the active session registry cannot be read or the
+/// runtime session is ambiguous across active sessions.
+pub fn resolve_session_agent_for_runtime_session(
+    project_dir: &Path,
+    runtime_name: &str,
+    runtime_session_id: &str,
+) -> Result<Option<ResolvedRuntimeSessionAgent>, CliError> {
+    let active_session_ids: Vec<_> = storage::load_active_registry_for(project_dir)
+        .sessions
+        .into_keys()
+        .collect();
+    let mut matches = Vec::new();
+
+    for session_id in active_session_ids {
+        let Some(state) = storage::load_state(project_dir, &session_id)? else {
+            continue;
+        };
+        for (agent_id, agent) in &state.agents {
+            if agent.status != AgentStatus::Active || agent.runtime != runtime_name {
+                continue;
+            }
+            let matches_runtime_session = agent.agent_session_id.as_deref()
+                == Some(runtime_session_id)
+                || (agent.agent_session_id.is_none() && state.session_id == runtime_session_id);
+            if matches_runtime_session {
+                matches.push(ResolvedRuntimeSessionAgent {
+                    orchestration_session_id: state.session_id.clone(),
+                    agent_id: agent_id.clone(),
+                });
+            }
+        }
+    }
+
+    match matches.len() {
+        0 => Ok(None),
+        1 => Ok(matches.into_iter().next()),
+        _ => Err(CliErrorKind::session_ambiguous(format!(
+            "runtime session '{runtime_session_id}' for runtime '{runtime_name}' maps to multiple orchestration sessions"
+        ))
+        .into()),
+    }
+}
+
+/// Persist a signal acknowledgment into the authoritative session audit log.
+///
+/// # Errors
+/// Returns `CliError` if the session log cannot be read or updated.
+pub fn record_signal_acknowledgment(
+    session_id: &str,
+    agent_id: &str,
+    signal_id: &str,
+    result: crate::agents::runtime::signal::AckResult,
+    project_dir: &Path,
+) -> Result<(), CliError> {
+    let already_logged = storage::load_log_entries(project_dir, session_id)?
+        .into_iter()
+        .any(|entry| {
+            matches!(
+                entry.transition,
+                SessionTransition::SignalAcknowledged { signal_id: ref existing, .. }
+                    if existing == signal_id
+            )
+        });
+    if already_logged {
+        return Ok(());
+    }
+
+    storage::append_log_entry(
+        project_dir,
+        session_id,
+        SessionTransition::SignalAcknowledged {
+            signal_id: signal_id.to_string(),
+            agent_id: agent_id.to_string(),
+            result,
+        },
+        Some(agent_id),
+        None,
+    )
+}
+
+fn signal_records_for_dirs(
+    runtime_name: &str,
+    agent_id: &str,
+    session_id: &str,
+    signal_dirs: &[std::path::PathBuf],
+) -> Result<Vec<SessionSignalRecord>, CliError> {
+    let mut signals_by_id = BTreeMap::new();
+    let mut acknowledgments_by_id = BTreeMap::new();
+
+    for signal_dir in signal_dirs {
+        for signal in read_pending_signals(signal_dir)? {
+            signals_by_id
+                .entry(signal.signal_id.clone())
+                .or_insert((signal, false));
+        }
+        for signal in read_acknowledged_signals(signal_dir)? {
+            signals_by_id.insert(signal.signal_id.clone(), (signal, true));
+        }
+        for acknowledgment in read_acknowledgments(signal_dir)? {
+            acknowledgments_by_id
+                .entry(acknowledgment.signal_id.clone())
+                .or_insert(acknowledgment);
+        }
+    }
+
+    Ok(signals_by_id
+        .into_values()
+        .map(|(signal, was_acknowledged)| {
+            let acknowledgment = acknowledgments_by_id.remove(&signal.signal_id);
+            let status = acknowledgment.as_ref().map_or_else(
+                || {
+                    if was_acknowledged {
+                        SessionSignalStatus::Acknowledged
+                    } else {
+                        SessionSignalStatus::Pending
+                    }
+                },
+                |ack| SessionSignalStatus::from_ack_result(ack.result),
+            );
+            SessionSignalRecord {
+                runtime: runtime_name.to_string(),
+                agent_id: agent_id.to_string(),
+                session_id: session_id.to_string(),
+                status,
+                signal,
+                acknowledgment,
+            }
+        })
+        .collect())
 }
 
 /// Load the current session state.
@@ -1701,6 +1820,7 @@ mod tests {
                 "roles",
                 &worker_id,
                 SessionRole::Leader,
+                None,
                 &leader_id,
                 project,
             )
