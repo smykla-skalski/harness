@@ -76,6 +76,17 @@ extension InspectorActionSections {
       )
       .font(.system(.footnote, design: .rounded, weight: .medium))
       .foregroundStyle(.secondary)
+      if !store.availableActionActors.isEmpty {
+        Picker("Act As", selection: actionActorBinding) {
+          ForEach(store.availableActionActors) { agent in
+            Text(agent.name).tag(agent.agentId)
+          }
+        }
+        .pickerStyle(.menu)
+        .labelsHidden()
+        .accessibilityLabel("Act As")
+        .accessibilityIdentifier(MonitorAccessibility.actionActorPicker)
+      }
       if let error = store.lastError {
         Text(error)
           .font(.system(.footnote, design: .rounded, weight: .semibold))
@@ -187,6 +198,12 @@ extension InspectorActionSections {
         Task { await changeSelectedRole() }
       }
       .buttonStyle(MonitorActionButtonStyle(variant: .prominent, tint: MonitorTheme.accent))
+      Button("Remove Agent") {
+        store.requestRemoveAgentConfirmation(agentID: agent.agentId)
+      }
+      .buttonStyle(MonitorActionButtonStyle(variant: .bordered, tint: MonitorTheme.danger))
+      .disabled(agent.agentId == detail.session.leaderId)
+      .accessibilityIdentifier(MonitorAccessibility.removeAgentButton)
     }
     .monitorCard()
   }
@@ -196,6 +213,14 @@ extension InspectorActionSections {
         title: "Leader Transfer",
         subtitle: "Promote a live agent to leader when the current leader needs to step away."
       )
+      if let pendingTransfer = detail.session.pendingLeaderTransfer {
+        let timestamp = formatTimestamp(pendingTransfer.requestedAt)
+        Text(
+          "\(pendingTransfer.requestedBy) requested \(pendingTransfer.newLeaderId) at \(timestamp)."
+        )
+        .font(.caption)
+        .foregroundStyle(.secondary)
+      }
       Picker("New Leader", selection: $transferLeaderID) {
         ForEach(detail.agents) { agent in
           Text(agent.name).tag(agent.agentId)
@@ -203,13 +228,13 @@ extension InspectorActionSections {
       }
       TextField("Reason", text: $transferReason, axis: .vertical)
         .lineLimit(3, reservesSpace: true)
-      Button("Transfer Leadership") {
+      Button(transferLeaderButtonTitle) {
         Task { await transferLeader() }
       }
       .buttonStyle(
         MonitorActionButtonStyle(variant: .prominent, tint: MonitorTheme.warmAccent)
       )
-      .disabled(transferLeaderID.isEmpty)
+      .disabled(transferLeaderID.isEmpty || transferLeaderID == detail.session.leaderId)
     }
     .monitorCard()
   }
@@ -311,5 +336,25 @@ extension InspectorActionSections {
     )
     transferReason = ""
     configureDefaults()
+  }
+
+  fileprivate var actionActorBinding: Binding<String> {
+    Binding(
+      get: {
+        store.actionActorID
+          ?? store.availableActionActors.first?.agentId
+          ?? detail.session.leaderId
+          ?? ""
+      },
+      set: { store.actionActorID = $0 }
+    )
+  }
+
+  fileprivate var transferLeaderButtonTitle: String {
+    let actingAgentID = store.actionActorID ?? detail.session.leaderId
+    if detail.session.pendingLeaderTransfer != nil && actingAgentID == detail.session.leaderId {
+      return "Confirm Leadership Transfer"
+    }
+    return "Transfer Leadership"
   }
 }

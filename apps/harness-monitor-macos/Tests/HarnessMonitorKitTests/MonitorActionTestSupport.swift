@@ -89,6 +89,7 @@ final class RecordingMonitorClient: MonitorClientProtocol, @unchecked Sendable {
     )
     case endSession(sessionID: String, actor: String)
     case observeSession(sessionID: String, actor: String)
+    case removeAgent(sessionID: String, agentID: String, actor: String)
     case sendSignal(sessionID: String, agentID: String, command: String, actor: String)
     case transferLeader(sessionID: String, newLeaderID: String, reason: String?, actor: String)
     case updateTask(
@@ -208,6 +209,10 @@ final class FailingMonitorClient: MonitorClientProtocol, @unchecked Sendable {
 
   func changeRole(
     sessionID _: String, agentID _: String, request _: RoleChangeRequest
+  ) async throws -> SessionDetail { throw error }
+
+  func removeAgent(
+    sessionID _: String, agentID _: String, request _: AgentRemoveRequest
   ) async throws -> SessionDetail { throw error }
 
   func transferLeader(

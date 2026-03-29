@@ -29,6 +29,8 @@ extension MonitorStore {
 
       if preserveSelection, let selectedSessionID {
         await loadSession(using: client, sessionID: selectedSessionID)
+      } else {
+        synchronizeActionActor()
       }
     } catch {
       connectionState = .offline(error.localizedDescription)
@@ -45,6 +47,7 @@ extension MonitorStore {
       async let timeline = client.timeline(sessionID: sessionID)
       selectedSession = try await detail
       self.timeline = try await timeline
+      synchronizeActionActor()
     } catch {
       lastError = error.localizedDescription
     }

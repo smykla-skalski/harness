@@ -145,7 +145,7 @@ struct PreferencesView: View {
         refreshDiagnostics: store.refreshDiagnostics,
         startDaemon: store.startDaemon,
         installLaunchAgent: store.installLaunchAgent,
-        removeLaunchAgent: store.removeLaunchAgent
+        requestRemoveLaunchAgentConfirmation: store.requestRemoveLaunchAgentConfirmation
       )
     }
     .monitorCard(contentPadding: 16)

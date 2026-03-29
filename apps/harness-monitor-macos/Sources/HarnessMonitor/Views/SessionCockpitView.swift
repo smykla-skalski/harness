@@ -61,6 +61,10 @@ struct SessionCockpitView: View {
       if let observer = detail.observer {
         observerSummary(observer)
       }
+
+      if let pendingTransfer = detail.session.pendingLeaderTransfer {
+        pendingTransferSummary(pendingTransfer)
+      }
     }
     .frame(maxWidth: .infinity, alignment: .leading)
     .monitorCard()
@@ -79,13 +83,12 @@ struct SessionCockpitView: View {
 
   private var endSessionButton: some View {
     Button {
-      Task {
-        await store.endSelectedSession()
-      }
+      store.requestEndSelectedSessionConfirmation()
     } label: {
       actionLabel("End Session")
     }
     .buttonStyle(MonitorActionButtonStyle(variant: .bordered, tint: MonitorTheme.ink))
+    .accessibilityIdentifier(MonitorAccessibility.endSessionButton)
   }
 
   private func observerSummary(_ observer: ObserverSummary) -> some View {
@@ -190,6 +193,34 @@ struct SessionCockpitView: View {
     }
     .frame(maxWidth: .infinity, alignment: .leading)
     .monitorCard()
+  }
+
+  private func pendingTransferSummary(_ pendingTransfer: PendingLeaderTransfer) -> some View {
+    VStack(alignment: .leading, spacing: 8) {
+      HStack {
+        Label("Pending Leader Transfer", systemImage: "arrow.left.arrow.right")
+          .font(.system(.headline, design: .rounded, weight: .semibold))
+        Spacer()
+        Text(formatTimestamp(pendingTransfer.requestedAt))
+          .font(.caption.monospaced())
+          .foregroundStyle(.secondary)
+      }
+      let requested = pendingTransfer.requestedBy
+      let newLeader = pendingTransfer.newLeaderId
+      let current = pendingTransfer.currentLeaderId
+      Text("\(requested) requested \(newLeader) to replace \(current).")
+        .font(.system(.body, design: .rounded, weight: .medium))
+        .foregroundStyle(.secondary)
+      if let reason = pendingTransfer.reason, !reason.isEmpty {
+        Text(reason)
+          .font(.system(.footnote, design: .rounded, weight: .semibold))
+          .foregroundStyle(MonitorTheme.warmAccent)
+      }
+    }
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .padding(14)
+    .background(MonitorTheme.surface, in: RoundedRectangle(cornerRadius: 18))
+    .accessibilityIdentifier(MonitorAccessibility.pendingLeaderTransferCard)
   }
 
   private func label(_ title: String, value: String) -> some View {

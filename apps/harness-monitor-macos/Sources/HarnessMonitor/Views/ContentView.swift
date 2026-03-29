@@ -87,6 +87,35 @@ struct ContentView: View {
       }
       togglePreferences()
     }
+    .confirmationDialog(
+      confirmationTitle,
+      isPresented: confirmationBinding,
+      titleVisibility: .visible,
+    ) {
+      switch store.pendingConfirmation {
+      case .endSession:
+        Button("End Session Now", role: .destructive) {
+          Task { await store.confirmPendingAction() }
+        }
+      case .removeAgent:
+        Button("Remove Agent Now", role: .destructive) {
+          Task { await store.confirmPendingAction() }
+        }
+      case .removeLaunchAgent:
+        Button("Remove Launch Agent Now", role: .destructive) {
+          Task { await store.confirmPendingAction() }
+        }
+      case nil:
+        EmptyView()
+      }
+      Button("Cancel", role: .cancel) {
+        store.cancelConfirmation()
+      }
+    } message: {
+      if !confirmationMessage.isEmpty {
+        Text(confirmationMessage)
+      }
+    }
   }
 
   @ViewBuilder
@@ -110,6 +139,43 @@ struct ContentView: View {
   private func refresh() {
     Task {
       await store.refresh()
+    }
+  }
+
+  private var confirmationBinding: Binding<Bool> {
+    Binding(
+      get: { store.pendingConfirmation != nil },
+      set: { isPresented in
+        if !isPresented {
+          store.cancelConfirmation()
+        }
+      }
+    )
+  }
+
+  private var confirmationTitle: String {
+    switch store.pendingConfirmation {
+    case .endSession:
+      "End Session?"
+    case .removeAgent:
+      "Remove Agent?"
+    case .removeLaunchAgent:
+      "Remove Launch Agent?"
+    case nil:
+      ""
+    }
+  }
+
+  private var confirmationMessage: String {
+    switch store.pendingConfirmation {
+    case .endSession(let sessionID, let actorID):
+      "This ends \(sessionID) using \(actorID). Active task work must already be closed."
+    case .removeAgent(_, let agentID, let actorID):
+      "This removes \(agentID) using \(actorID) and returns any active work to the queue."
+    case .removeLaunchAgent:
+      "This disables launchd residency for the harness daemon on this Mac."
+    case nil:
+      ""
     }
   }
 

@@ -30,6 +30,11 @@ public protocol MonitorClientProtocol: Sendable {
     agentID: String,
     request: RoleChangeRequest
   ) async throws -> SessionDetail
+  func removeAgent(
+    sessionID: String,
+    agentID: String,
+    request: AgentRemoveRequest
+  ) async throws -> SessionDetail
   func transferLeader(
     sessionID: String,
     request: LeaderTransferRequest
@@ -163,6 +168,14 @@ public final class MonitorAPIClient: MonitorClientProtocol {
     request: RoleChangeRequest
   ) async throws -> SessionDetail {
     try await post("/v1/sessions/\(sessionID)/agents/\(agentID)/role", body: request)
+  }
+
+  public func removeAgent(
+    sessionID: String,
+    agentID: String,
+    request: AgentRemoveRequest
+  ) async throws -> SessionDetail {
+    try await post("/v1/sessions/\(sessionID)/agents/\(agentID)/remove", body: request)
   }
 
   public func transferLeader(
