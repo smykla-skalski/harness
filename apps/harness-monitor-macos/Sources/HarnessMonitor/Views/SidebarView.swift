@@ -10,21 +10,22 @@ struct SidebarView: View {
   }
 
   var body: some View {
-    ScrollView(showsIndicators: false) {
-      VStack(alignment: .leading, spacing: 18) {
-        daemonStatusCard
-        sessionList
+    ZStack(alignment: .topLeading) {
+      MonitorTheme.sidebarBackground
+
+      ScrollView(showsIndicators: false) {
+        VStack(alignment: .leading, spacing: 18) {
+          daemonStatusCard
+          sessionList
+        }
+        .frame(maxWidth: .infinity, alignment: .topLeading)
+        .padding(.horizontal, 18)
+        .padding(.top, 8)
+        .padding(.bottom, 18)
       }
-      .frame(maxWidth: .infinity, alignment: .topLeading)
-      .padding(.horizontal, 18)
-      .padding(.top, 8)
-      .padding(.bottom, 18)
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-    .background {
-      MonitorTheme.sidebarBackground
-        .ignoresSafeArea()
-    }
+    .scrollContentBackground(.hidden)
     .contentShape(Rectangle())
     .accessibilityFrameMarker(MonitorAccessibility.sidebarShellFrame)
     .animation(.snappy(duration: 0.24), value: store.groupedSessions)
