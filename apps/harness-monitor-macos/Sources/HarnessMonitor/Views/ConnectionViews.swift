@@ -28,11 +28,7 @@ struct TransportBadge: View {
     .foregroundStyle(tint)
     .padding(.horizontal, 9)
     .padding(.vertical, 5)
-    .background(MonitorTheme.surfaceHover, in: Capsule())
-    .overlay(
-      Capsule()
-        .stroke(tint.opacity(0.2), lineWidth: 1)
-    )
+    .monitorGlassCapsule()
     .fixedSize()
   }
 }
@@ -60,11 +56,7 @@ struct LatencyBadge: View {
       .fixedSize()
       .padding(.horizontal, 9)
       .padding(.vertical, 5)
-      .background(MonitorTheme.surfaceHover, in: Capsule())
-      .overlay(
-        Capsule()
-          .stroke(tint.opacity(0.18), lineWidth: 1)
-      )
+      .monitorGlassCapsule()
   }
 }
 
@@ -139,14 +131,7 @@ struct ConnectionStatusStrip: View {
       }
     }
     .padding(10)
-    .background(
-      RoundedRectangle(cornerRadius: 16, style: .continuous)
-        .fill(MonitorTheme.surface)
-        .overlay(
-          RoundedRectangle(cornerRadius: 16, style: .continuous)
-            .stroke(MonitorTheme.controlBorder, lineWidth: 1)
-        )
-    )
+    .monitorInsetPanel(cornerRadius: 16, fillOpacity: 0.08, strokeOpacity: 0.12)
   }
 }
 
@@ -183,9 +168,8 @@ struct ConnectionToolbarBadge: View {
         .lineLimit(1)
         .fixedSize()
     }
-    .padding(.horizontal, 9)
+    .padding(.horizontal, 8)
     .padding(.vertical, 5)
-    .background(qualityColor.opacity(0.1), in: Capsule())
     .fixedSize()
     .accessibilityIdentifier(MonitorAccessibility.connectionBadge)
     .accessibilityLabel("Connection: \(label)")
