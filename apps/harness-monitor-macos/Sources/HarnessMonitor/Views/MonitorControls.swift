@@ -78,7 +78,6 @@ struct MonitorAsyncActionButton: View {
   private var progressSlot: some View {
     ProgressView()
       .controlSize(.small)
-      .fixedSize()
       .accessibilityHidden(true)
   }
 }

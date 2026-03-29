@@ -14,6 +14,7 @@ public enum PreviewFixtures {
     lastActivityAt: "2026-03-28T14:18:00Z",
     leaderId: "leader-claude",
     observeId: "observe-sess-monitor",
+    pendingLeaderTransfer: nil,
     metrics: SessionMetrics(
       agentCount: 4,
       activeAgentCount: 3,

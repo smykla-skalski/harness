@@ -186,6 +186,14 @@ public final class PreviewMonitorClient: MonitorClientProtocol, @unchecked Senda
     try await sessionDetail(id: "")
   }
 
+  public func removeAgent(
+    sessionID _: String,
+    agentID _: String,
+    request _: AgentRemoveRequest
+  ) async throws -> SessionDetail {
+    try await sessionDetail(id: "")
+  }
+
   public func transferLeader(
     sessionID _: String,
     request _: LeaderTransferRequest

@@ -24,6 +24,7 @@ final class MonitorStoreTests: XCTestCase {
 
     XCTAssertEqual(store.selectedSession?.session.sessionId, PreviewFixtures.summary.sessionId)
     XCTAssertEqual(store.timeline, PreviewFixtures.timeline)
+    XCTAssertEqual(store.actionActorID, PreviewFixtures.summary.leaderId)
   }
 
   func testGroupedSessionsFiltersBySearchTextAndStatus() async throws {
@@ -159,5 +160,41 @@ final class MonitorStoreTests: XCTestCase {
     XCTAssertEqual(
       store.lastError, DaemonControlError.commandFailed("remove failed").localizedDescription)
     XCTAssertFalse(store.isBusy)
+  }
+
+  func testRequestEndConfirmationUsesResolvedActor() async throws {
+    let store = await makeBootstrappedStore()
+    await store.selectSession(PreviewFixtures.summary.sessionId)
+
+    store.requestEndSelectedSessionConfirmation()
+
+    XCTAssertEqual(
+      store.pendingConfirmation,
+      .endSession(
+        sessionID: PreviewFixtures.summary.sessionId,
+        actorID: PreviewFixtures.agents[0].agentId
+      )
+    )
+  }
+
+  func testConfirmPendingRemoveAgentExecutesMutation() async throws {
+    let client = RecordingMonitorClient()
+    let store = await makeBootstrappedStore(client: client)
+    await store.selectSession(PreviewFixtures.summary.sessionId)
+
+    store.requestRemoveAgentConfirmation(agentID: PreviewFixtures.agents[1].agentId)
+    await store.confirmPendingAction()
+
+    XCTAssertNil(store.pendingConfirmation)
+    XCTAssertEqual(
+      client.recordedCalls(),
+      [
+        .removeAgent(
+          sessionID: PreviewFixtures.summary.sessionId,
+          agentID: PreviewFixtures.agents[1].agentId,
+          actor: PreviewFixtures.agents[0].agentId
+        )
+      ]
+    )
   }
 }

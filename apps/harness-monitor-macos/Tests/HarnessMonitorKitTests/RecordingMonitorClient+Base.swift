@@ -118,6 +118,7 @@ extension RecordingMonitorClient {
         lastActivityAt: "2026-03-28T14:25:00Z",
         leaderId: detail.session.leaderId,
         observeId: detail.session.observeId,
+        pendingLeaderTransfer: detail.session.pendingLeaderTransfer,
         metrics: detail.session.metrics
       ),
       agents: detail.agents,

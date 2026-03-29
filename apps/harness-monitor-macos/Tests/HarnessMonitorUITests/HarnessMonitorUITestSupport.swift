@@ -41,7 +41,11 @@ enum HarnessMonitorUITestAccessibility {
   static let inspectorRoot = "monitor.inspector.root"
   static let inspectorEmptyState = "monitor.inspector.empty-state"
   static let sessionInspectorCard = "monitor.inspector.session-card"
+  static let actionActorPicker = "monitor.inspector.action-actor"
+  static let removeAgentButton = "monitor.inspector.remove-agent"
   static let observeSummaryButton = "monitor.session.observe.summary"
+  static let endSessionButton = "monitor.session.action.end"
+  static let pendingLeaderTransferCard = "monitor.session.pending-transfer"
   static let taskUICard = "monitor.session.task.task-ui"
   static let taskRoutingCard = "monitor.session.task.task-routing"
   static let leaderAgentCard = "monitor.session.agent.leader-claude"
@@ -60,7 +64,17 @@ enum HarnessMonitorUITestAccessibility {
   static let removeLaunchAgentButton = "monitor.preferences.action.remove-launch-agent"
 }
 
-extension HarnessMonitorUITests {
+@MainActor
+class HarnessMonitorUITestCase: XCTestCase {
+  static let launchModeKey = "HARNESS_MONITOR_LAUNCH_MODE"
+  static let uiTimeout: TimeInterval = 10
+
+  override func setUpWithError() throws {
+    continueAfterFailure = false
+  }
+}
+
+extension HarnessMonitorUITestCase {
   func launch(mode: String) -> XCUIApplication {
     let app = XCUIApplication()
     app.launchEnvironment["HARNESS_MONITOR_UI_TESTS"] = "1"
@@ -213,6 +227,20 @@ extension HarnessMonitorUITests {
     let tapY = min(max(panel.frame.midY - window.frame.minY, 18), window.frame.height - 18)
 
     origin.withOffset(CGVector(dx: tapX, dy: tapY)).tap()
+  }
+
+  func confirmationDialogButton(in app: XCUIApplication, title: String) -> XCUIElement {
+    let alertButton = app.sheets.buttons[title]
+    if alertButton.exists {
+      return alertButton
+    }
+    return app.dialogs.buttons[title]
+  }
+
+  func dismissConfirmationDialog(in app: XCUIApplication) {
+    let cancelButton = confirmationDialogButton(in: app, title: "Cancel")
+    XCTAssertTrue(cancelButton.waitForExistence(timeout: Self.uiTimeout))
+    cancelButton.tap()
   }
 
   func waitUntil(

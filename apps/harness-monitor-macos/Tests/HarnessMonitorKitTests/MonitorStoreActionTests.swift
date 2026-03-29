@@ -192,6 +192,32 @@ final class MonitorStoreActionTests: XCTestCase {
     XCTAssertEqual(store.lastAction, "Transfer leader")
   }
 
+  func testRemoveAgentSendsRequestAndRefreshesSession() async throws {
+    let client = RecordingMonitorClient()
+    let store = await makeBootstrappedStore(client: client)
+    await store.selectSession(PreviewFixtures.summary.sessionId)
+
+    await store.removeAgent(agentID: PreviewFixtures.agents[1].agentId, actor: "leader-claude")
+
+    let calls = client.recordedCalls()
+    XCTAssertEqual(
+      calls,
+      [
+        .removeAgent(
+          sessionID: PreviewFixtures.summary.sessionId,
+          agentID: PreviewFixtures.agents[1].agentId,
+          actor: "leader-claude"
+        )
+      ]
+    )
+    XCTAssertFalse(
+      store.selectedSession?.agents.contains(where: {
+        $0.agentId == PreviewFixtures.agents[1].agentId
+      }) ?? true
+    )
+    XCTAssertEqual(store.lastAction, "Remove agent")
+  }
+
   func testObserveSelectedSessionTracksLastAction() async throws {
     let client = RecordingMonitorClient()
     let store = await makeBootstrappedStore(client: client)
@@ -248,10 +274,35 @@ final class MonitorStoreActionTests: XCTestCase {
           sessionID: PreviewFixtures.summary.sessionId,
           agentID: PreviewFixtures.agents[0].agentId,
           command: "inject_context",
-          actor: "monitor-app"
+          actor: "leader-claude"
         )
       ]
     )
     XCTAssertEqual(store.lastAction, "Send signal")
+  }
+
+  func testDefaultActionActorFallsBackToSessionLeader() async throws {
+    let client = RecordingMonitorClient()
+    let store = await makeBootstrappedStore(client: client)
+    await store.selectSession(PreviewFixtures.summary.sessionId)
+
+    await store.createTask(
+      title: "Use the live leader",
+      context: "Default actor resolution should not send monitor-app.",
+      severity: .medium
+    )
+
+    XCTAssertEqual(
+      client.recordedCalls(),
+      [
+        .createTask(
+          sessionID: PreviewFixtures.summary.sessionId,
+          title: "Use the live leader",
+          context: "Default actor resolution should not send monitor-app.",
+          severity: .medium,
+          actor: "leader-claude"
+        )
+      ]
+    )
   }
 }

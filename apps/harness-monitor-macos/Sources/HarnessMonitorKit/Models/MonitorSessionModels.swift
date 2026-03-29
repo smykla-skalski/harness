@@ -39,9 +39,18 @@ public struct SessionSummary: Codable, Equatable, Identifiable, Sendable {
   public let lastActivityAt: String?
   public let leaderId: String?
   public let observeId: String?
+  public let pendingLeaderTransfer: PendingLeaderTransfer?
   public let metrics: SessionMetrics
 
   public var id: String { sessionId }
+}
+
+public struct PendingLeaderTransfer: Codable, Equatable, Sendable {
+  public let requestedBy: String
+  public let currentLeaderId: String
+  public let newLeaderId: String
+  public let requestedAt: String
+  public let reason: String?
 }
 
 public struct HookIntegrationDescriptor: Codable, Equatable, Identifiable, Sendable {
@@ -217,6 +226,10 @@ public struct SessionDetail: Codable, Equatable, Sendable {
 public struct RoleChangeRequest: Codable, Equatable, Sendable {
   public let actor: String
   public let role: SessionRole
+}
+
+public struct AgentRemoveRequest: Codable, Equatable, Sendable {
+  public let actor: String
 }
 
 public struct LeaderTransferRequest: Codable, Equatable, Sendable {

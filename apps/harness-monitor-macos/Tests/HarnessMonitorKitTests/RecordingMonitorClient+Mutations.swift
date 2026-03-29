@@ -183,6 +183,49 @@ extension RecordingMonitorClient {
     return detail
   }
 
+  func removeAgent(
+    sessionID: String,
+    agentID: String,
+    request: AgentRemoveRequest
+  ) async throws -> SessionDetail {
+    calls.append(
+      .removeAgent(
+        sessionID: sessionID,
+        agentID: agentID,
+        actor: request.actor
+      )
+    )
+    detail = SessionDetail(
+      session: updatedSession(),
+      agents: detail.agents.filter { $0.agentId != agentID },
+      tasks: detail.tasks.map { task in
+        guard task.assignedTo == agentID else {
+          return task
+        }
+        return WorkItem(
+          taskId: task.taskId,
+          title: task.title,
+          context: task.context,
+          severity: task.severity,
+          status: .open,
+          assignedTo: nil,
+          createdAt: task.createdAt,
+          updatedAt: "2026-03-28T14:23:30Z",
+          createdBy: task.createdBy,
+          notes: task.notes,
+          suggestedFix: task.suggestedFix,
+          source: task.source,
+          blockedReason: nil,
+          completedAt: nil,
+          checkpointSummary: task.checkpointSummary
+        )
+      },
+      signals: detail.signals.filter { $0.agentId != agentID },
+      observer: detail.observer
+    )
+    return detail
+  }
+
   func transferLeader(
     sessionID: String,
     request: LeaderTransferRequest
@@ -209,6 +252,7 @@ extension RecordingMonitorClient {
         lastActivityAt: detail.session.lastActivityAt,
         leaderId: request.newLeaderId,
         observeId: detail.session.observeId,
+        pendingLeaderTransfer: nil,
         metrics: detail.session.metrics
       ),
       agents: detail.agents,
@@ -277,6 +321,7 @@ extension RecordingMonitorClient {
       lastActivityAt: "2026-03-28T14:24:00Z",
       leaderId: detail.session.leaderId,
       observeId: detail.session.observeId,
+      pendingLeaderTransfer: detail.session.pendingLeaderTransfer,
       metrics: detail.session.metrics
     )
   }
