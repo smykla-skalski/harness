@@ -261,7 +261,10 @@ final class HarnessUITests: HarnessUITestCase {
     preferencesButton.tap()
 
     let remove = element(in: app, identifier: Accessibility.removeLaunchAgentButton)
-    XCTAssertTrue(remove.waitForExistence(timeout: Self.uiTimeout))
+    if !remove.waitForExistence(timeout: Self.uiTimeout) {
+      attachAppHierarchy(in: app, named: "remove-launch-agent-hierarchy")
+    }
+    XCTAssertTrue(remove.exists)
     tapElement(in: app, identifier: Accessibility.removeLaunchAgentButton)
 
     XCTAssertTrue(
