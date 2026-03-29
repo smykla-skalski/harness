@@ -44,20 +44,22 @@ public struct ConnectionMetrics: Equatable, Sendable {
     ConnectionQuality(latencyMs: latencyMs)
   }
 
-  public static let initial = Self(
-    transportKind: .httpSSE,
-    latencyMs: nil,
-    averageLatencyMs: nil,
-    messagesReceived: 0,
-    messagesSent: 0,
-    messagesPerSecond: 0,
-    connectedSince: nil,
-    lastMessageAt: nil,
-    reconnectAttempt: 0,
-    reconnectCount: 0,
-    isFallback: false,
-    fallbackReason: nil
-  )
+  public static let initial: Self = {
+    Self(
+      transportKind: .httpSSE,
+      latencyMs: nil,
+      averageLatencyMs: nil,
+      messagesReceived: 0,
+      messagesSent: 0,
+      messagesPerSecond: 0,
+      connectedSince: nil,
+      lastMessageAt: nil,
+      reconnectAttempt: 0,
+      reconnectCount: 0,
+      isFallback: false,
+      fallbackReason: nil
+    )
+  }()
 }
 
 public struct ConnectionEvent: Identifiable, Equatable, Sendable {
