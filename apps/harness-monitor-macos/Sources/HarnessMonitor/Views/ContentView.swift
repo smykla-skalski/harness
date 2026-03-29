@@ -41,6 +41,8 @@ struct ContentView: View {
           .navigationTitle("Harness Monitor")
           .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
+              ConnectionToolbarBadge(metrics: store.connectionMetrics)
+
               Button(action: refresh) {
                 HStack(spacing: 8) {
                   Image(systemName: "arrow.clockwise")
