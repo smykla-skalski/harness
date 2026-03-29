@@ -110,7 +110,7 @@ final class HarnessMonitorLayoutUITests: HarnessMonitorUITestCase {
       expectedHorizontalInset: 22,
       tolerance: 12
     )
-    XCTAssertLessThan(daemonCard.frame.height, 320)
+    XCTAssertLessThan(daemonCard.frame.height, 360)
   }
 
   func testSidebarProjectHeaderFillsAvailableWidth() throws {

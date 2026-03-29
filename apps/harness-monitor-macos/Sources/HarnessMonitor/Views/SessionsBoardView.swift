@@ -51,6 +51,7 @@ struct SessionsBoardView: View {
     }
     .frame(maxWidth: .infinity, alignment: .leading)
     .monitorCard(contentPadding: 16)
+    .liveActivityBorder(isActive: store.dataReceivedPulse)
   }
 
   private var onboardingCard: some View {
