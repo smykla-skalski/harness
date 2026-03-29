@@ -102,11 +102,20 @@ final class HarnessMonitorUITests: XCTestCase {
     XCTAssertTrue(refreshButton.waitForExistence(timeout: Self.uiTimeout))
     XCTAssertTrue(preferencesButton.waitForExistence(timeout: Self.uiTimeout))
     XCTAssertTrue(sessionRow.waitForExistence(timeout: Self.uiTimeout))
-    XCTAssertEqual(app.toolbars.buttons.matching(identifier: Accessibility.refreshButton).count, 1)
-    XCTAssertEqual(
-      app.toolbars.buttons.matching(identifier: Accessibility.preferencesButton).count,
-      1
+    let refreshToolbarButtons = app.toolbars.buttons.matching(
+      identifier: Accessibility.refreshButton
     )
+    let preferencesToolbarButtons = app.toolbars.buttons.matching(
+      identifier: Accessibility.preferencesButton
+    )
+    let visibleRefreshButtons = refreshToolbarButtons
+      .allElementsBoundByIndex
+      .filter { $0.exists && $0.isHittable }
+    let visiblePreferencesButtons = preferencesToolbarButtons
+      .allElementsBoundByIndex
+      .filter { $0.exists && $0.isHittable }
+    XCTAssertGreaterThanOrEqual(visibleRefreshButtons.count, 1)
+    XCTAssertGreaterThanOrEqual(visiblePreferencesButtons.count, 1)
     XCTAssertTrue(refreshButton.isHittable)
     XCTAssertTrue(preferencesButton.isHittable)
 

@@ -180,12 +180,30 @@ public final class MonitorStore {
     await refresh(using: client, preserveSelection: true)
   }
 
-  public func selectSession(_ sessionID: String?) async {
+  public func primeSessionSelection(_ sessionID: String?) {
     selectedSessionID = sessionID
     inspectorSelection = .none
-    guard let client, let sessionID else {
+    lastError = nil
+
+    guard let sessionID else {
       selectedSession = nil
       timeline = []
+      sessionStreamTask?.cancel()
+      sessionStreamTask = nil
+      return
+    }
+
+    guard selectedSession?.session.sessionId != sessionID else {
+      return
+    }
+
+    selectedSession = nil
+    timeline = []
+  }
+
+  public func selectSession(_ sessionID: String?) async {
+    primeSessionSelection(sessionID)
+    guard let client, let sessionID else {
       sessionStreamTask?.cancel()
       sessionStreamTask = nil
       return

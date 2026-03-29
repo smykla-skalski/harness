@@ -11,7 +11,7 @@ struct PreferencesActionGrid: View {
 
   var body: some View {
     MonitorAdaptiveGridLayout(
-      minimumColumnWidth: 158,
+      minimumColumnWidth: 176,
       maximumColumns: 3,
       spacing: 12
     ) {
@@ -118,10 +118,10 @@ struct PreferencesOverviewGrid: View {
       Text(caption)
         .font(.caption)
         .foregroundStyle(.secondary)
-        .lineLimit(2)
+        .lineLimit(2, reservesSpace: true)
     }
     .frame(maxWidth: .infinity, alignment: .leading)
-    .monitorCard(minHeight: 82, contentPadding: 14)
+    .monitorCard(minHeight: 88, contentPadding: 14)
     .accessibilityIdentifier(MonitorAccessibility.preferencesMetricCard(title))
   }
 
