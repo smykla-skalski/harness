@@ -15,7 +15,7 @@ Commands:
   agents   Shared harness-managed agent lifecycle commands
   observe  Observe and classify harness-managed agent session logs
   session  Multi-agent session orchestration
-  daemon   Local daemon for the Harness Monitor app
+  daemon   Local daemon for the Harness app
   help     Print this message or the help of the given subcommand(s)
 
 Options:

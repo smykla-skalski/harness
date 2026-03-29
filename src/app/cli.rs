@@ -144,7 +144,7 @@ pub enum Command {
         command: SessionCommand,
     },
 
-    /// Local daemon for the Harness Monitor app.
+    /// Local daemon for the Harness app.
     Daemon {
         #[command(subcommand)]
         command: DaemonCommand,
