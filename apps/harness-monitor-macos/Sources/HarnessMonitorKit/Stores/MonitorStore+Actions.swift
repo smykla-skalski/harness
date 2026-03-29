@@ -10,6 +10,9 @@ extension MonitorStore {
     guard let client, let sessionID = selectedSessionID else {
       return
     }
+    guard let actor = actionActor(for: actor) else {
+      return
+    }
 
     await mutateSelectedSession(
       actionName: "Create task",
@@ -37,6 +40,9 @@ extension MonitorStore {
     guard let client, let sessionID = selectedSessionID else {
       return
     }
+    guard let actor = actionActor(for: actor) else {
+      return
+    }
 
     await mutateSelectedSession(
       actionName: "Assign task",
@@ -61,6 +67,9 @@ extension MonitorStore {
     guard let client, let sessionID = selectedSessionID else {
       return
     }
+    guard let actor = actionActor(for: actor) else {
+      return
+    }
 
     await mutateSelectedSession(
       actionName: "Update task",
@@ -83,6 +92,9 @@ extension MonitorStore {
     actor: String = "monitor-app"
   ) async {
     guard let client, let sessionID = selectedSessionID else {
+      return
+    }
+    guard let actor = actionActor(for: actor) else {
       return
     }
 
@@ -112,6 +124,9 @@ extension MonitorStore {
     guard let client, let sessionID = selectedSessionID else {
       return
     }
+    guard let actor = actionActor(for: actor) else {
+      return
+    }
 
     await mutateSelectedSession(
       actionName: "Change role",
@@ -127,12 +142,40 @@ extension MonitorStore {
     )
   }
 
+  public func removeAgent(
+    agentID: String,
+    actor: String = "monitor-app"
+  ) async {
+    guard let client, let sessionID = selectedSessionID else {
+      return
+    }
+    guard let actor = actionActor(for: actor) else {
+      return
+    }
+
+    await mutateSelectedSession(
+      actionName: "Remove agent",
+      using: client,
+      sessionID: sessionID,
+      mutation: {
+        try await client.removeAgent(
+          sessionID: sessionID,
+          agentID: agentID,
+          request: AgentRemoveRequest(actor: actor)
+        )
+      }
+    )
+  }
+
   public func transferLeader(
     newLeaderID: String,
     reason: String? = nil,
     actor: String = "monitor-app"
   ) async {
     guard let client, let sessionID = selectedSessionID else {
+      return
+    }
+    guard let actor = actionActor(for: actor) else {
       return
     }
 
@@ -151,6 +194,127 @@ extension MonitorStore {
         )
       }
     )
+  }
+
+  public func observeSelectedSession(actor: String = "monitor-app") async {
+    guard let client, let sessionID = selectedSessionID else {
+      return
+    }
+    guard let actor = actionActor(for: actor) else {
+      return
+    }
+
+    await mutateSelectedSession(
+      actionName: "Observe session",
+      using: client,
+      sessionID: sessionID,
+      mutation: {
+        try await client.observeSession(
+          sessionID: sessionID,
+          request: ObserveSessionRequest(actor: actor)
+        )
+      }
+    )
+  }
+
+  public func endSelectedSession(actor: String = "monitor-app") async {
+    guard let client, let sessionID = selectedSessionID else {
+      return
+    }
+    guard let actor = actionActor(for: actor) else {
+      return
+    }
+
+    await mutateSelectedSession(
+      actionName: "End session",
+      using: client,
+      sessionID: sessionID,
+      mutation: {
+        try await client.endSession(
+          sessionID: sessionID,
+          request: SessionEndRequest(actor: actor)
+        )
+      }
+    )
+    await refresh(using: client, preserveSelection: true)
+  }
+
+  public func sendSignal(
+    agentID: String,
+    command: String,
+    message: String,
+    actionHint: String?,
+    actor: String = "monitor-app"
+  ) async {
+    guard let client, let sessionID = selectedSessionID else {
+      return
+    }
+    guard let actor = actionActor(for: actor) else {
+      return
+    }
+
+    await mutateSelectedSession(
+      actionName: "Send signal",
+      using: client,
+      sessionID: sessionID,
+      mutation: {
+        try await client.sendSignal(
+          sessionID: sessionID,
+          request: SignalSendRequest(
+            actor: actor,
+            agentId: agentID,
+            command: command,
+            message: message,
+            actionHint: actionHint
+          )
+        )
+      }
+    )
+  }
+
+  public func requestEndSelectedSessionConfirmation() {
+    guard let sessionID = selectedSessionID, let actorID = resolvedActionActor() else {
+      return
+    }
+    pendingConfirmation = .endSession(sessionID: sessionID, actorID: actorID)
+  }
+
+  public func requestRemoveAgentConfirmation(agentID: String) {
+    guard let sessionID = selectedSessionID, let actorID = resolvedActionActor() else {
+      return
+    }
+    pendingConfirmation = .removeAgent(sessionID: sessionID, agentID: agentID, actorID: actorID)
+  }
+
+  public func requestRemoveLaunchAgentConfirmation() {
+    pendingConfirmation = .removeLaunchAgent
+  }
+
+  public func cancelConfirmation() {
+    pendingConfirmation = nil
+  }
+
+  public func confirmPendingAction() async {
+    guard let pendingConfirmation else {
+      return
+    }
+    self.pendingConfirmation = nil
+
+    switch pendingConfirmation {
+    case .endSession(_, let actorID):
+      await endSelectedSession(actor: actorID)
+    case .removeAgent(_, let agentID, let actorID):
+      await removeAgent(agentID: agentID, actor: actorID)
+    case .removeLaunchAgent:
+      await removeLaunchAgent()
+    }
+  }
+
+  func actionActor(for actor: String) -> String? {
+    if actor != "monitor-app" {
+      return actor
+    }
+    return resolvedActionActor()
   }
 
   private func mutateSelectedSession(

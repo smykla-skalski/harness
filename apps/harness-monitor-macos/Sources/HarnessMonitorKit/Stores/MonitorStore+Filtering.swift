@@ -26,6 +26,11 @@ extension MonitorStore {
     return sessions.first(where: { $0.sessionId == selectedSessionID })
   }
 
+  public var availableActionActors: [AgentRegistration] {
+    let agents = selectedSession?.agents ?? []
+    return agents.filter { $0.status == .active }
+  }
+
   public var selectedTask: WorkItem? {
     guard case .task(let taskID) = inspectorSelection else {
       return nil

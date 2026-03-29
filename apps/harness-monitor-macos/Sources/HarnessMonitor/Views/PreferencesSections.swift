@@ -7,7 +7,7 @@ struct PreferencesActionGrid: View {
   let refreshDiagnostics: @Sendable () async -> Void
   let startDaemon: @Sendable () async -> Void
   let installLaunchAgent: @Sendable () async -> Void
-  let removeLaunchAgent: @Sendable () async -> Void
+  let requestRemoveLaunchAgentConfirmation: @Sendable @MainActor () -> Void
 
   var body: some View {
     MonitorAdaptiveGridLayout(
@@ -80,7 +80,9 @@ struct PreferencesActionGrid: View {
       isLoading: isLoading,
       accessibilityIdentifier: MonitorAccessibility.preferencesActionButton("Remove Launch Agent"),
       fillsWidth: true,
-      action: removeLaunchAgent
+      action: {
+        await requestRemoveLaunchAgentConfirmation()
+      }
     )
   }
 }

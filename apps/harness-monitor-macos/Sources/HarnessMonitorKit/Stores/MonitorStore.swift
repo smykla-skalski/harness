@@ -38,6 +38,12 @@ public final class MonitorStore {
     case observer
   }
 
+  public enum PendingConfirmation: Equatable {
+    case endSession(sessionID: String, actorID: String)
+    case removeAgent(sessionID: String, agentID: String, actorID: String)
+    case removeLaunchAgent
+  }
+
   public struct SessionGroup: Identifiable, Equatable {
     public let project: ProjectSummary
     public let sessions: [SessionSummary]
@@ -55,12 +61,14 @@ public final class MonitorStore {
   public var selectedSession: SessionDetail?
   public var timeline: [TimelineEntry] = []
   public var inspectorSelection: InspectorSelection = .none
+  public var actionActorID: String?
   public var searchText = ""
   public var sessionFilter: SessionFilter = .active
   public var isRefreshing = false
   public var isBusy = false
   public var lastAction = ""
   public var lastError: String?
+  public var pendingConfirmation: PendingConfirmation?
 
   let daemonController: any DaemonControlling
   var client: (any MonitorClientProtocol)?
@@ -229,79 +237,21 @@ public final class MonitorStore {
     inspectorSelection = .observer
   }
 
-  public func observeSelectedSession(actor: String = "monitor-app") async {
-    guard let client, let sessionID = selectedSessionID else {
+  func synchronizeActionActor() {
+    let available = availableActionActors
+    if available.contains(where: { $0.agentId == actionActorID }) {
       return
     }
-
-    isBusy = true
-    defer { isBusy = false }
-    lastError = nil
-
-    do {
-      selectedSession = try await client.observeSession(
-        sessionID: sessionID,
-        request: ObserveSessionRequest(actor: actor)
-      )
-      timeline = try await client.timeline(sessionID: sessionID)
-      lastAction = "Observe session"
-    } catch {
-      lastError = error.localizedDescription
-    }
+    actionActorID = selectedSession?.session.leaderId ?? available.first?.agentId
   }
 
-  public func endSelectedSession(actor: String = "monitor-app") async {
-    guard let client, let sessionID = selectedSessionID else {
-      return
+  func resolvedActionActor() -> String? {
+    if let actionActorID, !actionActorID.isEmpty {
+      return actionActorID
     }
-
-    isBusy = true
-    defer { isBusy = false }
-    lastError = nil
-
-    do {
-      selectedSession = try await client.endSession(
-        sessionID: sessionID,
-        request: SessionEndRequest(actor: actor)
-      )
-      timeline = try await client.timeline(sessionID: sessionID)
-      await refresh(using: client, preserveSelection: true)
-      lastAction = "End session"
-    } catch {
-      lastError = error.localizedDescription
+    if let leaderID = selectedSession?.session.leaderId, !leaderID.isEmpty {
+      return leaderID
     }
-  }
-
-  public func sendSignal(
-    agentID: String,
-    command: String,
-    message: String,
-    actionHint: String?,
-    actor: String = "monitor-app"
-  ) async {
-    guard let client, let sessionID = selectedSessionID else {
-      return
-    }
-
-    isBusy = true
-    defer { isBusy = false }
-    lastError = nil
-
-    do {
-      selectedSession = try await client.sendSignal(
-        sessionID: sessionID,
-        request: SignalSendRequest(
-          actor: actor,
-          agentId: agentID,
-          command: command,
-          message: message,
-          actionHint: actionHint
-        )
-      )
-      timeline = try await client.timeline(sessionID: sessionID)
-      lastAction = "Send signal"
-    } catch {
-      lastError = error.localizedDescription
-    }
+    return availableActionActors.first?.agentId
   }
 }
