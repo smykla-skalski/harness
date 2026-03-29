@@ -96,6 +96,11 @@ struct SessionTaskSummaryCard: View {
     }
     .buttonStyle(.plain)
     .accessibilityIdentifier(MonitorAccessibility.sessionTaskCard(task.taskId))
+    .transition(
+      .asymmetric(
+        insertion: .scale(scale: 0.95).combined(with: .opacity),
+        removal: .opacity
+      ))
   }
 }
 
@@ -154,6 +159,11 @@ struct SessionAgentSummaryCard: View {
     }
     .buttonStyle(.plain)
     .accessibilityIdentifier(MonitorAccessibility.sessionAgentCard(agent.agentId))
+    .transition(
+      .asymmetric(
+        insertion: .scale(scale: 0.95).combined(with: .opacity),
+        removal: .opacity
+      ))
   }
 
   private func badge(_ value: String) -> some View {

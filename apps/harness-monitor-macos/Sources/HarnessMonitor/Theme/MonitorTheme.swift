@@ -83,14 +83,20 @@ struct LiveActivityBorderModifier: ViewModifier {
       .overlay(
         RoundedRectangle(cornerRadius: 22, style: .continuous)
           .stroke(
-            MonitorTheme.success.opacity(highlight ? 0.4 : 0),
-            lineWidth: 1.5
+            MonitorTheme.success.opacity(highlight ? 0.18 : 0),
+            lineWidth: 1
           )
+      )
+      .shadow(
+        color: MonitorTheme.success.opacity(highlight ? 0.08 : 0),
+        radius: highlight ? 12 : 0,
+        x: 0,
+        y: 0
       )
       .onChange(of: isActive) { _, active in
         guard active else { return }
         withAnimation(.easeIn(duration: 0.15)) { highlight = true }
-        withAnimation(.easeOut(duration: 0.6).delay(0.15)) {
+        withAnimation(.easeOut(duration: 0.75).delay(0.15)) {
           highlight = false
         }
       }

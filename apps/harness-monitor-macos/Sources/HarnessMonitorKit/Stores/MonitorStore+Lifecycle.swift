@@ -43,6 +43,7 @@ extension MonitorStore {
       sessions = try await sessionResponse
       daemonStatus = try? await daemonController.daemonStatus()
 
+      fireDataReceivedPulse()
       if preserveSelection, let selectedSessionID {
         await loadSession(using: client, sessionID: selectedSessionID)
       } else {
@@ -114,7 +115,16 @@ extension MonitorStore {
     }
   }
 
+  func fireDataReceivedPulse() {
+    dataReceivedPulse = true
+    Task { @MainActor in
+      try? await Task.sleep(for: .milliseconds(800))
+      dataReceivedPulse = false
+    }
+  }
+
   func startSessionStream(using client: any MonitorClientProtocol, sessionID: String) {
+    subscribedSessionIDs.insert(sessionID)
     sessionStreamTask?.cancel()
     sessionStreamTask = Task { [weak self] in
       guard let self else {

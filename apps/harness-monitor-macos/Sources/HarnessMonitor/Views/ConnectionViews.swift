@@ -17,16 +17,20 @@ struct TransportBadge: View {
   }
 
   var body: some View {
-    HStack(spacing: 4) {
+    HStack(spacing: 5) {
       Image(systemName: icon)
-        .font(.caption2)
+        .font(.caption2.weight(.semibold))
       Text(label)
-        .font(.caption.bold())
+        .font(.system(.caption, design: .rounded, weight: .semibold))
     }
-    .foregroundStyle(.white)
-    .padding(.horizontal, 8)
-    .padding(.vertical, 4)
-    .background(tint, in: Capsule())
+    .foregroundStyle(tint)
+    .padding(.horizontal, 9)
+    .padding(.vertical, 5)
+    .background(MonitorTheme.surfaceHover, in: Capsule())
+    .overlay(
+      Capsule()
+        .stroke(tint.opacity(0.2), lineWidth: 1)
+    )
   }
 }
 
@@ -46,12 +50,20 @@ struct LatencyBadge: View {
   }
 
   var body: some View {
-    Text(latencyMs.map { "\($0)ms" } ?? "--ms")
-      .font(.caption.bold().monospacedDigit())
-      .foregroundStyle(tint)
-      .padding(.horizontal, 8)
-      .padding(.vertical, 4)
-      .background(tint.opacity(0.15), in: Capsule())
+    HStack(spacing: 5) {
+      Image(systemName: "timer")
+        .font(.caption2.weight(.semibold))
+      Text(latencyMs.map { "\($0)ms" } ?? "--ms")
+        .font(.system(.caption, design: .rounded, weight: .semibold).monospacedDigit())
+    }
+    .foregroundStyle(tint)
+    .padding(.horizontal, 9)
+    .padding(.vertical, 5)
+    .background(MonitorTheme.surfaceHover, in: Capsule())
+    .overlay(
+      Capsule()
+        .stroke(tint.opacity(0.18), lineWidth: 1)
+    )
   }
 }
 
@@ -67,24 +79,73 @@ struct ActivityPulse: View {
     ZStack {
       if isActive {
         Circle()
-          .stroke(baseColor.opacity(0.4), lineWidth: 1)
-          .frame(width: 20, height: 20)
-          .scaleEffect(animates ? 1.8 : 1.0)
-          .opacity(animates ? 0.0 : 0.6)
+          .fill(baseColor.opacity(0.14))
+          .frame(width: 16, height: 16)
+          .scaleEffect(animates ? 1.25 : 0.92)
+          .opacity(animates ? 1.0 : 0.72)
           .animation(
-            .easeOut(duration: 1.2).repeatForever(autoreverses: false),
+            .easeInOut(duration: 1.1).repeatForever(autoreverses: true),
             value: animates
           )
       }
       Circle()
         .fill(baseColor)
-        .frame(width: 10, height: 10)
+        .frame(width: 7, height: 7)
+        .overlay(
+          Circle()
+            .stroke(MonitorTheme.panel.opacity(0.9), lineWidth: 1)
+        )
     }
-    .frame(width: 20, height: 20)
+    .frame(width: 16, height: 16)
     .onAppear { animates = isActive }
     .onChange(of: isActive) { _, active in
       animates = active
     }
+  }
+}
+
+struct ConnectionStatusStrip: View {
+  let metrics: ConnectionMetrics
+  let isActive: Bool
+
+  private var title: String {
+    metrics.transportKind == .webSocket ? "Live transport" : "Fallback transport"
+  }
+
+  private var subtitle: String {
+    metrics.transportKind == .webSocket
+      ? "Persistent socket updates"
+      : "Streaming over HTTP events"
+  }
+
+  var body: some View {
+    HStack(spacing: 10) {
+      ActivityPulse(isActive: isActive)
+
+      VStack(alignment: .leading, spacing: 2) {
+        Text(title)
+          .font(.system(.footnote, design: .rounded, weight: .semibold))
+        Text(subtitle)
+          .font(.caption)
+          .foregroundStyle(.secondary)
+      }
+
+      Spacer(minLength: 8)
+
+      HStack(spacing: 8) {
+        TransportBadge(kind: metrics.transportKind)
+        LatencyBadge(latencyMs: metrics.latencyMs)
+      }
+    }
+    .padding(10)
+    .background(
+      RoundedRectangle(cornerRadius: 16, style: .continuous)
+        .fill(MonitorTheme.surface)
+        .overlay(
+          RoundedRectangle(cornerRadius: 16, style: .continuous)
+            .stroke(MonitorTheme.controlBorder, lineWidth: 1)
+        )
+    )
   }
 }
 
@@ -117,9 +178,9 @@ struct ConnectionToolbarBadge: View {
         .fill(qualityColor)
         .frame(width: 6, height: 6)
     }
-    .padding(.horizontal, 8)
-    .padding(.vertical, 4)
-    .background(MonitorTheme.surfaceHover, in: Capsule())
+    .padding(.horizontal, 10)
+    .padding(.vertical, 5)
+    .background(MonitorTheme.surface, in: Capsule())
     .overlay(
       Capsule()
         .stroke(MonitorTheme.controlBorder, lineWidth: 1)
@@ -172,9 +233,11 @@ struct FallbackBanner: View {
   let onRetry: () -> Void
 
   var body: some View {
-    HStack(spacing: 8) {
-      Image(systemName: "exclamationmark.triangle.fill")
-        .foregroundStyle(MonitorTheme.caution)
+    HStack(spacing: 10) {
+      RoundedRectangle(cornerRadius: 999, style: .continuous)
+        .fill(MonitorTheme.caution)
+        .frame(width: 5)
+
       VStack(alignment: .leading, spacing: 2) {
         Text("Running in fallback mode")
           .font(.system(.footnote, design: .rounded, weight: .semibold))
@@ -182,19 +245,25 @@ struct FallbackBanner: View {
           .font(.caption)
           .foregroundStyle(.secondary)
       }
-      Spacer()
-      Button("Retry", action: onRetry)
-        .font(.caption.bold())
-        .buttonStyle(.bordered)
+      Spacer(minLength: 8)
+      Button(action: onRetry) {
+        Label("Retry", systemImage: "arrow.clockwise")
+          .font(.system(.caption, design: .rounded, weight: .semibold))
+          .padding(.horizontal, 9)
+          .padding(.vertical, 6)
+          .background(MonitorTheme.surfaceHover, in: Capsule())
+      }
+      .buttonStyle(.plain)
+      .foregroundStyle(MonitorTheme.caution)
     }
     .padding(10)
     .background(
-      MonitorTheme.caution.opacity(0.08),
+      MonitorTheme.surface,
       in: RoundedRectangle(cornerRadius: 14, style: .continuous)
     )
     .overlay(
       RoundedRectangle(cornerRadius: 14, style: .continuous)
-        .stroke(MonitorTheme.caution.opacity(0.2), lineWidth: 1)
+        .stroke(MonitorTheme.controlBorder, lineWidth: 1)
     )
     .accessibilityIdentifier(MonitorAccessibility.fallbackBanner)
   }
@@ -248,6 +317,21 @@ struct SparklineView: View {
   }
 }
 
+private func previewConnectionMetrics() -> ConnectionMetrics {
+  var metrics = ConnectionMetrics.initial
+  metrics.transportKind = .webSocket
+  metrics.latencyMs = 34
+  metrics.averageLatencyMs = 38
+  metrics.messagesReceived = 18
+  metrics.messagesSent = 7
+  metrics.messagesPerSecond = 3.2
+  metrics.connectedSince = .now.addingTimeInterval(-320)
+  metrics.lastMessageAt = .now.addingTimeInterval(-4)
+  metrics.reconnectAttempt = 0
+  metrics.reconnectCount = 0
+  return metrics
+}
+
 #Preview("Transport badges") {
   HStack(spacing: 12) {
     TransportBadge(kind: .webSocket)
@@ -258,5 +342,13 @@ struct SparklineView: View {
     ActivityPulse(isActive: true)
     ActivityPulse(isActive: false)
   }
+  .padding()
+}
+
+#Preview("Connection status strip") {
+  ConnectionStatusStrip(
+    metrics: previewConnectionMetrics(),
+    isActive: true
+  )
   .padding()
 }

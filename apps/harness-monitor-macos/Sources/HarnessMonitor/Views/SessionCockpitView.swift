@@ -68,6 +68,7 @@ struct SessionCockpitView: View {
     }
     .frame(maxWidth: .infinity, alignment: .leading)
     .monitorCard()
+    .liveActivityBorder(isActive: store.dataReceivedPulse)
   }
 
   private var observeButton: some View {
@@ -157,6 +158,11 @@ struct SessionCockpitView: View {
           .background(MonitorTheme.surface, in: RoundedRectangle(cornerRadius: 18))
         }
         .buttonStyle(.plain)
+        .transition(
+          .asymmetric(
+            insertion: .scale(scale: 0.95).combined(with: .opacity),
+            removal: .opacity
+          ))
       }
     }
     .frame(maxWidth: .infinity, alignment: .leading)
@@ -189,6 +195,11 @@ struct SessionCockpitView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(12)
         .background(MonitorTheme.surface, in: RoundedRectangle(cornerRadius: 16))
+        .transition(
+          .asymmetric(
+            insertion: .scale(scale: 0.95).combined(with: .opacity),
+            removal: .opacity
+          ))
       }
     }
     .frame(maxWidth: .infinity, alignment: .leading)
