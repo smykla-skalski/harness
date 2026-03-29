@@ -80,8 +80,7 @@ struct MonitorLoadingStateView: View {
 
   var body: some View {
     HStack(spacing: 10) {
-      ProgressView()
-        .controlSize(.small)
+      MonitorSpinner(size: 14)
       Text(title)
         .font(.system(.footnote, design: .rounded, weight: .semibold))
     }

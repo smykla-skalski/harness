@@ -31,6 +31,7 @@ pub enum HookAgent {
     Copilot,
     Codex,
     Gemini,
+    #[value(name = "opencode")]
     OpenCode,
 }
 

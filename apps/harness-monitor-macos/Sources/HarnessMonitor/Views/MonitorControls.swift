@@ -76,9 +76,7 @@ struct MonitorAsyncActionButton: View {
   }
 
   private var progressSlot: some View {
-    ProgressView()
-      .controlSize(.small)
-      .accessibilityHidden(true)
+    MonitorSpinner()
   }
 }
 
