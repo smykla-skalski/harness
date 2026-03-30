@@ -366,14 +366,23 @@ final class HarnessLayoutUITests: HarnessUITestCase {
     let rowLeadingInset = generalSection.frame.minX - settingsWindow.frame.minX
     let rowInsetInsideSidebar = generalSection.frame.minY - preferencesSidebar.frame.minY
 
-    XCTAssertLessThan(sidebarTopInset, 24, "Sidebar should extend into the titlebar region")
+    XCTAssertGreaterThan(
+      sidebarTopInset,
+      44,
+      "Native sidebar list content should start below the traffic lights"
+    )
+    XCTAssertLessThan(
+      sidebarTopInset,
+      120,
+      "Native sidebar list content should stay reasonably close to the titlebar"
+    )
     XCTAssertGreaterThan(rowTopInset, 44, "Sidebar content should start below the traffic lights")
     XCTAssertLessThan(rowTopInset, 120, "Sidebar content should not be pushed too far down")
     XCTAssertGreaterThan(rowLeadingInset, 10, "Sidebar content should stay inset from the leading edge")
     XCTAssertGreaterThan(
       rowInsetInsideSidebar,
-      28,
-      "Sidebar content should have visible top padding inside the sidebar chrome"
+      0,
+      "Sidebar content should appear inside the native sidebar list container"
     )
   }
 
