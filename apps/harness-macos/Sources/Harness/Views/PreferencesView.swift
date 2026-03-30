@@ -30,9 +30,6 @@ struct PreferencesView: View {
   @Binding var themeMode: HarnessThemeMode
   @Binding var themeStyle: HarnessThemeStyle
   @State private var selectedSection: PreferencesSection? = .general
-  @State private var backHistory: [PreferencesSection] = []
-  @State private var forwardHistory: [PreferencesSection] = []
-  @State private var suppressHistoryRecording = false
 
   private var effectiveHealth: HealthResponse? {
     store.diagnostics?.health ?? store.health
@@ -80,7 +77,7 @@ struct PreferencesView: View {
   }
 
   var body: some View {
-    NavigationSplitView {
+    NavigationSplitView(columnVisibility: .constant(.all)) {
       PreferencesSidebar(selection: $selectedSection)
         .navigationSplitViewColumnWidth(
           min: 180, ideal: 210, max: 240
@@ -91,38 +88,8 @@ struct PreferencesView: View {
         .toolbarTitleDisplayMode(.inline)
     }
     .navigationSplitViewStyle(.balanced)
-    .toolbar {
-      ToolbarItemGroup(placement: .navigation) {
-        Button(action: goBack) {
-          Label("Back", systemImage: "chevron.left")
-        }
-        .disabled(backHistory.isEmpty)
-        .accessibilityIdentifier(
-          HarnessAccessibility.preferencesBackButton
-        )
-        Button(action: goForward) {
-          Label("Forward", systemImage: "chevron.right")
-        }
-        .disabled(forwardHistory.isEmpty)
-        .accessibilityIdentifier(
-          HarnessAccessibility.preferencesForwardButton
-        )
-      }
-    }
     .toolbar(removing: .sidebarToggle)
-    .toolbarRole(.editor)
     .frame(maxWidth: .infinity, maxHeight: .infinity)
-    .onChange(of: selectedSection) { oldValue, newValue in
-      guard let oldValue, let newValue,
-        oldValue != newValue
-      else { return }
-      if suppressHistoryRecording {
-        suppressHistoryRecording = false
-        return
-      }
-      backHistory.append(oldValue)
-      forwardHistory.removeAll()
-    }
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessAccessibility.preferencesRoot)
     .overlay {
@@ -158,23 +125,6 @@ struct PreferencesView: View {
     }
   }
 
-  private func goBack() {
-    guard let previousSection = backHistory.popLast() else {
-      return
-    }
-    suppressHistoryRecording = true
-    forwardHistory.append(currentSection)
-    selectedSection = previousSection
-  }
-
-  private func goForward() {
-    guard let nextSection = forwardHistory.popLast() else {
-      return
-    }
-    suppressHistoryRecording = true
-    backHistory.append(currentSection)
-    selectedSection = nextSection
-  }
 }
 
 // MARK: - Sidebar
