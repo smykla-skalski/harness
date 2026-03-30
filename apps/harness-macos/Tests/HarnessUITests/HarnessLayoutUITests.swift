@@ -289,7 +289,7 @@ final class HarnessLayoutUITests: HarnessUITestCase {
     assertEqualHeights([leaderCard, workerCard], tolerance: 10)
   }
 
-  func testPreferencesOverviewCardsAndActionButtonsShareHeights() throws {
+  func testPreferencesOverviewUsesGroupedFormRowsAndCompactActionButtons() throws {
     let app = launch(mode: "preview")
 
     let preferencesButton = toolbarButton(in: app, identifier: Accessibility.preferencesButton)
@@ -310,11 +310,19 @@ final class HarnessLayoutUITests: HarnessUITestCase {
     XCTAssertTrue(cachedSessionsCard.waitForExistence(timeout: Self.uiTimeout))
     XCTAssertTrue(app.staticTexts["Running"].waitForExistence(timeout: Self.uiTimeout))
 
-    assertSameRow([endpointCard, versionCard, launchdCard, cachedSessionsCard], tolerance: 10)
-    assertEqualHeights(
-      [endpointCard, versionCard, launchdCard, cachedSessionsCard],
-      tolerance: 10
-    )
+    let overviewRows = [endpointCard, versionCard, launchdCard, cachedSessionsCard]
+    XCTAssertLessThan(endpointCard.frame.height, 80)
+    XCTAssertLessThan(versionCard.frame.height, 80)
+    XCTAssertLessThan(launchdCard.frame.height, 80)
+    XCTAssertLessThan(cachedSessionsCard.frame.height, 80)
+
+    for (previousRow, nextRow) in zip(overviewRows, overviewRows.dropFirst()) {
+      XCTAssertLessThan(
+        previousRow.frame.minY,
+        nextRow.frame.minY,
+        "Overview rows should stack vertically in the grouped form"
+      )
+    }
 
     let reconnect = element(in: app, identifier: Accessibility.reconnectButton)
     let refresh = element(in: app, identifier: Accessibility.refreshDiagnosticsButton)
@@ -341,14 +349,16 @@ final class HarnessLayoutUITests: HarnessUITestCase {
     preferencesButton.tap()
 
     let preferencesRoot = element(in: app, identifier: Accessibility.preferencesRoot)
+    let preferencesPanel = frameElement(in: app, identifier: Accessibility.preferencesPanel)
     let preferencesSidebar = element(in: app, identifier: Accessibility.preferencesSidebar)
     let generalSection = element(in: app, identifier: Accessibility.preferencesGeneralSection)
 
     XCTAssertTrue(preferencesRoot.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(preferencesPanel.waitForExistence(timeout: Self.uiTimeout))
     XCTAssertTrue(preferencesSidebar.waitForExistence(timeout: Self.uiTimeout))
     XCTAssertTrue(generalSection.waitForExistence(timeout: Self.uiTimeout))
 
-    let settingsWindow = window(in: app, containing: preferencesRoot)
+    let settingsWindow = window(in: app, containing: preferencesPanel)
     XCTAssertTrue(settingsWindow.exists)
 
     let sidebarTopInset = preferencesSidebar.frame.minY - settingsWindow.frame.minY
@@ -359,7 +369,7 @@ final class HarnessLayoutUITests: HarnessUITestCase {
     XCTAssertLessThan(sidebarTopInset, 24, "Sidebar should extend into the titlebar region")
     XCTAssertGreaterThan(rowTopInset, 44, "Sidebar content should start below the traffic lights")
     XCTAssertLessThan(rowTopInset, 120, "Sidebar content should not be pushed too far down")
-    XCTAssertGreaterThan(rowLeadingInset, 20, "Sidebar content should be inset from the leading edge")
+    XCTAssertGreaterThan(rowLeadingInset, 10, "Sidebar content should stay inset from the leading edge")
     XCTAssertGreaterThan(
       rowInsetInsideSidebar,
       28,

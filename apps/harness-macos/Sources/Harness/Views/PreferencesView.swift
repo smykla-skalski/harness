@@ -231,6 +231,6 @@ private struct PreferencesGeneralSection: View {
         lastAction: store.lastAction
       )
     }
-    .formStyle(.grouped)
+    .preferencesDetailFormStyle()
   }
 }

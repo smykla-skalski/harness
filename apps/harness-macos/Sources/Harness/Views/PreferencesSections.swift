@@ -194,7 +194,7 @@ struct PreferencesConnectionSection: View {
         events: store.connectionEvents
       )
     }
-    .formStyle(.grouped)
+    .preferencesDetailFormStyle()
   }
 }
 
@@ -243,7 +243,7 @@ struct PreferencesDiagnosticsSection: View {
         )
       )
     }
-    .formStyle(.grouped)
+    .preferencesDetailFormStyle()
   }
 }
 
