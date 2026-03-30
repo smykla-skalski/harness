@@ -21,8 +21,6 @@ struct SidebarView: View {
     .foregroundStyle(HarnessTheme.ink)
     .contentShape(Rectangle())
     .accessibilityFrameMarker(HarnessAccessibility.sidebarShellFrame)
-    .animation(.snappy(duration: 0.24), value: store.groupedSessions)
-    .animation(.snappy(duration: 0.24), value: store.isRefreshing)
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessAccessibility.sidebarRoot)
   }

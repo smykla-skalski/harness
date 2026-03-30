@@ -255,6 +255,7 @@ private struct SessionListContent: View {
         .accessibilityFrameMarker(HarnessAccessibility.sidebarSessionListContent)
       }
     }
+    .animation(.snappy(duration: 0.24), value: store.groupedSessions)
   }
 
   private func sessionAccessibilityValue(
