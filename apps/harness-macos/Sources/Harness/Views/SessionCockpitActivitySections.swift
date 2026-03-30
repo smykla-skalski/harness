@@ -67,6 +67,7 @@ struct SessionCockpitTimelineSection: View {
           RoundedRectangle(cornerRadius: 999)
             .fill(HarnessTheme.accent(for: themeStyle).opacity(0.35))
             .frame(width: 8)
+            .accessibilityHidden(true)
           VStack(alignment: .leading, spacing: 4) {
             Text(entry.summary)
               .font(.system(.body, design: .rounded, weight: .semibold))
