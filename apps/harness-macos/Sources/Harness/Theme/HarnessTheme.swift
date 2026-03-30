@@ -7,8 +7,10 @@ private func harnessColor(_ name: String) -> Color {
 }
 
 enum HarnessTheme {
+  nonisolated(unsafe) static var cachedStyle: HarnessThemeStyle = resolvedStoredStyle()
+
   static var currentStyle: HarnessThemeStyle {
-    resolvedStoredStyle()
+    cachedStyle
   }
 
   static var usesGradientChrome: Bool {
