@@ -31,6 +31,7 @@ AI Harness app validation expectations:
 - Only run the full macOS app validation lane or the full `HarnessUITests` suite after the user explicitly asks for the full suite.
 - SwiftLint runs as an SPM build tool plugin (SwiftLintPlugins) on every target. Config lives in `.swiftlint.yml`. No shell script build phases - the plugin works within Xcode's user script sandbox.
 - Prefer shared layout and control primitives for AI Harness UI density/readability work so button sizing and glass treatment stay consistent across screens.
+- Liquid Glass (macOS 26): NavigationSplitView sidebar gets automatic Liquid Glass treatment. Use `.backgroundExtensionEffect()` on content columns so detail content extends behind the glass sidebar. Don't paint opaque backgrounds on the sidebar - use translucent tints so the system glass shows through. Use `.glassEffect(.regular.tint(color), in: shape)` for floating controls (tint takes `Color`, not `LinearGradient`). Never stack glass on glass. Glass belongs on the navigation/control layer, not on content. SwiftUI materials (`.ultraThinMaterial` etc.) blur behind the window, not sibling views. `GlassEffectContainer` groups glass elements with shared sampling; `spacing` controls morph threshold.
 
 ## Architecture
 
