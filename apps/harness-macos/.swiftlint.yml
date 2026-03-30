@@ -1,5 +1,5 @@
 excluded:
-  - Harness.xcodeproj
+  - AI Harness.xcodeproj
   - .build
   - build
   - DerivedData
@@ -68,7 +68,7 @@ custom_rules:
   no_macos_26_availability_checks:
     name: "No macOS 26 Availability Checks"
     regex: 'if #available\(macOS 26'
-    message: "Do not keep macOS 26 availability fallbacks inside the Harness app."
+    message: "Do not keep macOS 26 availability fallbacks inside the AI Harness app."
     severity: error
     included:
       - "Sources/Harness"
@@ -82,7 +82,7 @@ custom_rules:
   no_local_swiftlint_disable:
     name: "No Local SwiftLint Disable"
     regex: 'swiftlint:disable'
-    message: "Do not add local SwiftLint suppression escapes in the Harness app."
+    message: "Do not add local SwiftLint suppression escapes in the AI Harness app."
     severity: error
     included:
       - "Sources/Harness"

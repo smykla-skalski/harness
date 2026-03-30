@@ -31,8 +31,8 @@ clear_gatekeeper_metadata() {
 clear_gatekeeper_metadata
 
 xcodebuild \
-  -project "$ROOT/Harness.xcodeproj" \
-  -scheme Harness \
+  -project "$ROOT/AI Harness.xcodeproj" \
+  -scheme "AI Harness" \
   -destination "$DESTINATION" \
   -derivedDataPath "$DERIVED_DATA_PATH" \
   test-without-building

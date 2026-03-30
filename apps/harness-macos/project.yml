@@ -1,10 +1,10 @@
-name: Harness
+name: AI Harness
 packages:
   SwiftLintPlugins:
     url: https://github.com/SimplyDanny/SwiftLintPlugins
     from: "0.58.0"
 options:
-  bundleIdPrefix: io.harness
+  bundleIdPrefix: io.aiharness
   createIntermediateGroups: true
 settings:
   base:
@@ -19,7 +19,7 @@ settings:
     SWIFT_STRICT_CONCURRENCY: complete
     SWIFT_TREAT_WARNINGS_AS_ERRORS: YES
     SWIFT_VERSION: "6.0"
-    HARNESS_APP_BUNDLE_ID: io.harness.app
+    HARNESS_APP_BUNDLE_ID: io.aiharness.app
 targets:
   HarnessKit:
     type: framework
@@ -37,8 +37,9 @@ targets:
         DEVELOPMENT_TEAM: Q498EB36N4
         ENABLE_MODULE_VERIFIER: YES
         MODULE_VERIFIER_SUPPORTED_LANGUAGES: "objective-c objective-c++"
-        PRODUCT_BUNDLE_IDENTIFIER: io.harness.kit
+        PRODUCT_BUNDLE_IDENTIFIER: io.aiharness.kit
   Harness:
+    name: AI Harness
     type: application
     platform: macOS
     deploymentTarget: "26.0"
@@ -73,9 +74,11 @@ targets:
         CODE_SIGN_ENTITLEMENTS: Harness.entitlements
         CODE_SIGN_STYLE: Automatic
         DEVELOPMENT_TEAM: Q498EB36N4
-        INFOPLIST_KEY_CFBundleDisplayName: Harness
+        INFOPLIST_KEY_CFBundleDisplayName: AI Harness
+        INFOPLIST_KEY_CFBundleName: AI Harness
         INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.developer-tools
         PRODUCT_BUNDLE_IDENTIFIER: $(HARNESS_APP_BUNDLE_ID)
+        PRODUCT_NAME: AI Harness
   HarnessKitTests:
     type: bundle.unit-test
     platform: macOS
@@ -91,7 +94,7 @@ targets:
       base:
         CODE_SIGN_STYLE: Automatic
         DEVELOPMENT_TEAM: Q498EB36N4
-        PRODUCT_BUNDLE_IDENTIFIER: io.harness.kit-tests
+        PRODUCT_BUNDLE_IDENTIFIER: io.aiharness.kit-tests
   HarnessUITests:
     type: bundle.ui-testing
     platform: macOS
@@ -99,7 +102,7 @@ targets:
     sources:
       - Tests/HarnessUITests
     dependencies:
-      - target: Harness
+      - target: AI Harness
     buildToolPlugins:
       - plugin: SwiftLintBuildToolPlugin
         package: SwiftLintPlugins
@@ -126,13 +129,13 @@ targets:
       base:
         CODE_SIGN_STYLE: Automatic
         DEVELOPMENT_TEAM: Q498EB36N4
-        PRODUCT_BUNDLE_IDENTIFIER: io.harness.ui-tests
-        TEST_TARGET_NAME: Harness
+        PRODUCT_BUNDLE_IDENTIFIER: io.aiharness.ui-tests
+        TEST_TARGET_NAME: AI Harness
 schemes:
-  Harness:
+  "AI Harness":
     build:
       targets:
-        Harness: all
+        "AI Harness": all
         HarnessKit: all
     test:
       gatherCoverageData: true
