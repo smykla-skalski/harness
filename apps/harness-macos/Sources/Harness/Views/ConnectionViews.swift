@@ -60,6 +60,7 @@ struct ActivityPulse: View {
   @Environment(\.harnessThemeStyle)
   private var themeStyle
   let isActive: Bool
+  @State private var isPulsing = false
 
   private var baseColor: Color {
     isActive ? HarnessTheme.success : HarnessTheme.sidebarMuted(for: themeStyle)
@@ -68,8 +69,9 @@ struct ActivityPulse: View {
   var body: some View {
     ZStack {
       Circle()
-        .fill(baseColor.opacity(0.14))
+        .fill(baseColor.opacity(isPulsing ? 0.22 : 0.14))
         .frame(width: 16, height: 16)
+        .scaleEffect(isPulsing ? 1.3 : 1.0)
       Circle()
         .fill(baseColor)
         .frame(width: 7, height: 7)
@@ -79,6 +81,19 @@ struct ActivityPulse: View {
         )
     }
     .frame(width: 16, height: 16)
+    .animation(
+      isActive
+        ? .easeInOut(duration: 1.2).repeatForever(autoreverses: true)
+        : .default,
+      value: isPulsing
+    )
+    .animation(.spring(duration: 0.3), value: isActive)
+    .onChange(of: isActive) { _, active in
+      isPulsing = active
+    }
+    .onAppear {
+      isPulsing = isActive
+    }
   }
 }
 
@@ -163,6 +178,10 @@ struct ReconnectionProgressView: View {
   let attempt: Int
   let maxAttempts: Int
 
+  private var progress: Double {
+    min(Double(attempt) / Double(max(maxAttempts, 1)), 1.0)
+  }
+
   var body: some View {
     VStack(alignment: .leading, spacing: 6) {
       HStack(spacing: 10) {
@@ -174,6 +193,7 @@ struct ReconnectionProgressView: View {
         Text("Attempt \(attempt)")
           .font(.caption.monospacedDigit())
           .foregroundStyle(HarnessTheme.secondaryInk)
+          .contentTransition(.numericText())
       }
       Capsule()
         .fill(HarnessTheme.surface(for: themeStyle))
@@ -182,16 +202,15 @@ struct ReconnectionProgressView: View {
           Capsule()
             .fill(HarnessTheme.caution)
             .frame(height: 4)
-            .scaleEffect(
-              x: min(Double(attempt) / Double(maxAttempts), 1.0),
-              anchor: .leading
-            )
+            .scaleEffect(x: progress, anchor: .leading)
+            .animation(.spring(duration: 0.4), value: progress)
         }
         .clipShape(Capsule())
     }
     .padding(.horizontal, 12)
     .padding(.vertical, 8)
     .harnessInsetPanel(cornerRadius: 14, fillOpacity: 0.06, strokeOpacity: 0.50)
+    .animation(.spring(duration: 0.3), value: attempt)
     .accessibilityIdentifier(HarnessAccessibility.reconnectionProgress)
   }
 }
