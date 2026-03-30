@@ -26,7 +26,7 @@ enum PreferencesSection: String, CaseIterable, Identifiable, Hashable {
 
 enum PreferencesChromeMetrics {
   static let sidebarWidth: CGFloat = 238
-  static let sidebarLeadingInset: CGFloat = 20
+  static let sidebarLeadingInset: CGFloat = 24
   static let sidebarTrailingInset: CGFloat = 16
   static let sidebarTopInset: CGFloat = 28
   static let sidebarBottomInset: CGFloat = 20
@@ -51,24 +51,34 @@ struct PreferencesChromeLayout<Detail: View>: View {
   }
 
   var body: some View {
-    ZStack(alignment: .topLeading) {
-      PreferencesWindowBackground(themeStyle: themeStyle)
+    GeometryReader { proxy in
+      let topChromeInset = proxy.safeAreaInsets.top
 
-      PreferencesSidebarChrome(themeStyle: themeStyle)
+      ZStack(alignment: .topLeading) {
+        PreferencesWindowBackground(themeStyle: themeStyle)
 
-      HStack(spacing: 0) {
-        PreferencesSidebarContent(
-          selection: $selection,
-          themeStyle: themeStyle
-        )
-        .frame(width: PreferencesChromeMetrics.sidebarWidth)
-        .frame(maxHeight: .infinity, alignment: .topLeading)
+        PreferencesSidebarChrome(themeStyle: themeStyle)
 
-        detail
-          .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        HStack(spacing: 0) {
+          PreferencesSidebarContent(
+            selection: $selection,
+            themeStyle: themeStyle
+          )
+          .padding(
+            .top,
+            topChromeInset + PreferencesChromeMetrics.sidebarTopInset
+          )
+          .frame(width: PreferencesChromeMetrics.sidebarWidth)
+          .frame(maxHeight: .infinity, alignment: .topLeading)
+
+          detail
+            .padding(.top, topChromeInset)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        }
       }
+      .ignoresSafeArea(.container, edges: .top)
+      .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
-    .frame(maxWidth: .infinity, maxHeight: .infinity)
   }
 }
 
@@ -91,25 +101,19 @@ private struct PreferencesSidebarChrome: View {
   let themeStyle: HarnessThemeStyle
 
   var body: some View {
-    GeometryReader { proxy in
-      ZStack(alignment: .trailing) {
-        HarnessTheme.sidebarBackground(for: themeStyle)
+    ZStack(alignment: .trailing) {
+      HarnessTheme.sidebarBackground(for: themeStyle)
 
-        Rectangle()
-          .fill(
-            HarnessTheme.panelBorder(for: themeStyle)
-              .opacity(PreferencesChromeMetrics.shellDividerOpacity)
-          )
-          .frame(width: 1)
-      }
-      .frame(
-        width: PreferencesChromeMetrics.sidebarWidth,
-        height: proxy.size.height + proxy.safeAreaInsets.top,
-        alignment: .topLeading
-      )
-      .offset(y: -proxy.safeAreaInsets.top)
-      .accessibilityFrameMarker(HarnessAccessibility.preferencesSidebar)
+      Rectangle()
+        .fill(
+          HarnessTheme.panelBorder(for: themeStyle)
+            .opacity(PreferencesChromeMetrics.shellDividerOpacity)
+        )
+        .frame(width: 1)
     }
+    .frame(width: PreferencesChromeMetrics.sidebarWidth)
+    .frame(maxHeight: .infinity, alignment: .topLeading)
+    .accessibilityFrameMarker(HarnessAccessibility.preferencesSidebar)
     .allowsHitTesting(false)
   }
 }
@@ -132,7 +136,6 @@ private struct PreferencesSidebarContent: View {
         }
       }
       .frame(maxWidth: .infinity, alignment: .topLeading)
-      .padding(.top, PreferencesChromeMetrics.sidebarTopInset)
       .padding(.leading, PreferencesChromeMetrics.sidebarLeadingInset)
       .padding(.trailing, PreferencesChromeMetrics.sidebarTrailingInset)
       .padding(.bottom, PreferencesChromeMetrics.sidebarBottomInset)
