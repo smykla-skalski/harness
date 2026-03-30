@@ -5,7 +5,19 @@ import SwiftUI
 struct SessionsBoardView: View {
   @Environment(\.harnessThemeStyle)
   private var themeStyle
+  @Environment(\.isInsideGlassEffect)
+  private var isInsideGlassEffect
   @Bindable var store: HarnessStore
+
+  private var metricCardGlassState: String {
+    let isGradient = HarnessTheme.usesGradientChrome(for: themeStyle)
+    if !isGradient { return "glass=flat" }
+    if isInsideGlassEffect {
+      let fill = effectiveSuppressedGlassFill(0.10)
+      return "glass=suppressed, fill=\(String(format: "%.2f", fill))"
+    }
+    return "glass=active"
+  }
 
   private var isLoading: Bool {
     store.isDaemonActionInFlight || store.isRefreshing || store.connectionState == .connecting
@@ -66,17 +78,51 @@ struct SessionsBoardView: View {
   }
 
   private func metricCard(title: String, value: String, tint: Color) -> some View {
-    VStack(alignment: .leading, spacing: 8) {
-      Text(title.uppercased())
-        .font(.caption.weight(.semibold))
-        .foregroundStyle(HarnessTheme.secondaryInk)
-      Text(value)
-        .font(.system(size: 34, weight: .heavy, design: .rounded))
-        .foregroundStyle(tint)
-        .contentTransition(.numericText())
+    let useGradientChrome = HarnessTheme.usesGradientChrome(for: themeStyle)
+    let plaqueFill =
+      useGradientChrome
+      ? Color.white.opacity(0.74)
+      : HarnessTheme.surfaceHover(for: themeStyle).opacity(0.96)
+    let plaqueStroke =
+      useGradientChrome
+      ? Color.white.opacity(0.30)
+      : HarnessTheme.panelBorder(for: themeStyle).opacity(0.24)
+
+    return HStack(alignment: .top, spacing: 14) {
+      RoundedRectangle(cornerRadius: 999, style: .continuous)
+        .fill(tint)
+        .frame(width: 12)
+        .frame(minHeight: 68)
+        .accessibilityHidden(true)
+      VStack(alignment: .leading, spacing: 8) {
+        Text(title.uppercased())
+          .font(.caption.weight(.semibold))
+          .foregroundStyle(HarnessTheme.secondaryInk)
+        Text(value)
+          .font(.system(size: 34, weight: .heavy, design: .rounded))
+          .foregroundStyle(tint)
+          .contentTransition(.numericText())
+      }
+      .frame(maxWidth: .infinity, alignment: .leading)
+      .padding(.horizontal, 12)
+      .padding(.vertical, 10)
+      .background {
+        RoundedRectangle(cornerRadius: 18, style: .continuous)
+          .fill(plaqueFill)
+          .overlay {
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+              .stroke(plaqueStroke, lineWidth: 1)
+          }
+      }
     }
     .frame(maxWidth: .infinity, alignment: .leading)
     .harnessCard(minHeight: 80, contentPadding: 14)
+    .overlay {
+      AccessibilityTextMarker(
+        identifier: HarnessAccessibility.boardMetricGlassState(title),
+        text: metricCardGlassState
+      )
+    }
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessAccessibility.boardMetricCard(title))
   }

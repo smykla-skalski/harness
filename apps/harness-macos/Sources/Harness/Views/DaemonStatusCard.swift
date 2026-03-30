@@ -5,7 +5,19 @@ import SwiftUI
 struct DaemonStatusCard: View {
   @Environment(\.harnessThemeStyle)
   private var themeStyle
+  @Environment(\.isInsideGlassEffect)
+  private var isInsideGlassEffect
   @Bindable var store: HarnessStore
+
+  private var panelGlassState: String {
+    let isGradient = HarnessTheme.usesGradientChrome(for: themeStyle)
+    if !isGradient { return "glass=flat" }
+    if isInsideGlassEffect {
+      let fill = effectiveSuppressedGlassFill(0.08)
+      return "glass=suppressed, fill=\(String(format: "%.2f", fill))"
+    }
+    return "glass=active"
+  }
 
   private var isLoading: Bool {
     store.isBusy || store.isRefreshing || store.connectionState == .connecting
@@ -48,13 +60,14 @@ struct DaemonStatusCard: View {
     }
     .frame(maxWidth: .infinity, alignment: .leading)
     .padding(12)
-    .background {
-      HarnessInsetPanelBackground(
-        cornerRadius: 22,
-        fillOpacity: 0.05,
-        strokeOpacity: 0.09
+    .harnessInsetPanel(cornerRadius: 22, fillOpacity: 0.05, strokeOpacity: 0.09)
+    .overlay {
+      AccessibilityTextMarker(
+        identifier: HarnessAccessibility.daemonCardGlassState,
+        text: panelGlassState
       )
     }
+    .accessibilityValue(panelGlassState)
     .accessibilityIdentifier(HarnessAccessibility.daemonCard)
     .accessibilityFrameMarker(HarnessAccessibility.daemonCardFrame)
   }
@@ -203,13 +216,7 @@ extension DaemonStatusCard {
     .frame(minHeight: 36, alignment: .topLeading)
     .padding(.vertical, 2)
     .padding(.horizontal, 8)
-    .background {
-      HarnessInsetPanelBackground(
-        cornerRadius: 14,
-        fillOpacity: 0.03,
-        strokeOpacity: 0.08
-      )
-    }
+    .harnessInsetPanel(cornerRadius: 14, fillOpacity: 0.03, strokeOpacity: 0.08)
     .accessibilityElement(children: .ignore)
     .accessibilityLabel(title)
     .accessibilityValue(value)

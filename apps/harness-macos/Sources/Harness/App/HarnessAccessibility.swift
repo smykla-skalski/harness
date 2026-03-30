@@ -76,6 +76,12 @@ enum HarnessAccessibility {
     "harness.board.metric.\(slug(key))"
   }
 
+  static func boardMetricGlassState(_ key: String) -> String {
+    "harness.board.metric.\(slug(key)).glass-state"
+  }
+
+  static let daemonCardGlassState = "harness.sidebar.daemon-card.glass-state"
+
   static func sidebarDaemonBadge(_ key: String) -> String {
     "harness.sidebar.daemon-badge.\(slug(key))"
   }
