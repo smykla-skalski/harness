@@ -86,6 +86,33 @@ custom_rules:
     severity: error
     included:
       - "Sources/Harness"
+  no_direct_glass_effect:
+    name: "No Direct glassEffect Usage"
+    regex: '\.glassEffect\('
+    message: "Use Harness glass primitives instead of .glassEffect(). All glass goes through HarnessGlass.swift."
+    severity: error
+    included:
+      - "Sources/Harness"
+    excluded:
+      - "HarnessGlass\\.swift"
+  no_direct_glass_button_style:
+    name: "No Direct Glass Button Style"
+    regex: '\.buttonStyle\(\.glass'
+    message: "Use harnessActionButtonStyle or similar wrappers. All glass button styles go through HarnessControls.swift."
+    severity: error
+    included:
+      - "Sources/Harness"
+    excluded:
+      - "HarnessControls\\.swift"
+  no_direct_glass_container:
+    name: "No Direct GlassEffectContainer"
+    regex: 'GlassEffectContainer'
+    message: "Use HarnessGlassContainer instead. All glass grouping goes through HarnessGlass.swift."
+    severity: error
+    included:
+      - "Sources/Harness"
+    excluded:
+      - "HarnessGlass\\.swift"
 file_length:
   warning: 420
   error: 520
