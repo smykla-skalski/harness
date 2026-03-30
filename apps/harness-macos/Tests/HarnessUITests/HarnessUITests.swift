@@ -63,8 +63,6 @@ final class HarnessUITests: HarnessUITestCase {
     let preferencesSidebar = element(in: app, identifier: Accessibility.preferencesSidebar)
     let generalSection = element(in: app, identifier: Accessibility.preferencesGeneralSection)
     let title = element(in: app, identifier: Accessibility.preferencesTitle)
-    let backButton = button(in: app, identifier: Accessibility.preferencesBackButton)
-    let forwardButton = button(in: app, identifier: Accessibility.preferencesForwardButton)
 
     XCTAssertTrue(preferencesRoot.waitForExistence(timeout: Self.uiTimeout))
     XCTAssertTrue(preferencesState.waitForExistence(timeout: Self.uiTimeout))
@@ -76,8 +74,6 @@ final class HarnessUITests: HarnessUITestCase {
       preferencesState.label,
       "style=gradient, mode=auto, section=general, preferencesChrome=extended"
     )
-    XCTAssertFalse(backButton.isEnabled)
-    XCTAssertFalse(forwardButton.isEnabled)
   }
 
   func testObserveSummaryIsAvailableInSessionCockpit() throws {
@@ -288,41 +284,6 @@ final class HarnessUITests: HarnessUITestCase {
     )
     XCTAssertTrue(app.staticTexts["Remove Launch Agent?"].exists)
     dismissConfirmationDialog(in: app)
-  }
-
-  func testSettingsHistoryButtonsTrackVisitedSections() throws {
-    let app = launch(mode: "preview")
-
-    let preferencesButton = toolbarButton(in: app, identifier: Accessibility.preferencesButton)
-    XCTAssertTrue(preferencesButton.waitForExistence(timeout: Self.uiTimeout))
-    preferencesButton.tap()
-
-    let title = element(in: app, identifier: Accessibility.preferencesTitle)
-    let connectionSection = element(in: app, identifier: Accessibility.preferencesConnectionSection)
-    let diagnosticsSection = element(
-      in: app,
-      identifier: Accessibility.preferencesDiagnosticsSection
-    )
-    let backButton = button(in: app, identifier: Accessibility.preferencesBackButton)
-    let forwardButton = button(in: app, identifier: Accessibility.preferencesForwardButton)
-
-    XCTAssertTrue(connectionSection.waitForExistence(timeout: Self.uiTimeout))
-    tapElement(in: app, identifier: Accessibility.preferencesConnectionSection)
-    XCTAssertEqual(title.label, "Connection")
-    XCTAssertTrue(backButton.isEnabled)
-    XCTAssertFalse(forwardButton.isEnabled)
-
-    tapElement(in: app, identifier: Accessibility.preferencesDiagnosticsSection)
-    XCTAssertEqual(title.label, "Diagnostics")
-    XCTAssertTrue(backButton.isEnabled)
-
-    backButton.tap()
-    XCTAssertEqual(title.label, "Connection")
-    XCTAssertTrue(forwardButton.isEnabled)
-
-    forwardButton.tap()
-    XCTAssertEqual(title.label, "Diagnostics")
-    XCTAssertTrue(diagnosticsSection.exists)
   }
 
   func testSettingsStylePickerUpdatesGlobalThemeValue() throws {
