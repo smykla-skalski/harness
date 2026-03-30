@@ -12,7 +12,6 @@ struct SessionsBoardOnboardingCard: View {
     VStack(alignment: .leading, spacing: 16) {
       header
       onboardingStepsSection
-      actionButtons
     }
     .frame(maxWidth: .infinity, alignment: .leading)
     .harnessCard(contentPadding: 16)
@@ -52,23 +51,7 @@ struct SessionsBoardOnboardingCard: View {
         title: "1. Start the daemon",
         detail: "Boot the local HTTP and SSE bridge.",
         isReady: store.connectionState == .online
-      )
-      onboardingStep(
-        title: "2. Install launchd",
-        detail: "Keep the daemon available across app restarts.",
-        isReady: store.daemonStatus?.launchAgent.installed == true
-      )
-      onboardingStep(
-        title: "3. Start a harness session",
-        detail: "Sessions appear here as soon as the daemon indexes them.",
-        isReady: !store.sessions.isEmpty
-      )
-    }
-  }
-
-  private var actionButtons: some View {
-    HarnessGlassContainer(spacing: 10) {
-      HarnessWrapLayout(spacing: 10, lineSpacing: 10) {
+      ) {
         HarnessAsyncActionButton(
           title: "Start Daemon",
           tint: HarnessTheme.accent(for: themeStyle),
@@ -79,7 +62,12 @@ struct SessionsBoardOnboardingCard: View {
         ) {
           await store.startDaemon()
         }
-
+      }
+      onboardingStep(
+        title: "2. Install launchd",
+        detail: "Keep the daemon available across app restarts.",
+        isReady: store.daemonStatus?.launchAgent.installed == true
+      ) {
         HarnessAsyncActionButton(
           title: "Install Launch Agent",
           tint: HarnessTheme.ink,
@@ -90,7 +78,12 @@ struct SessionsBoardOnboardingCard: View {
         ) {
           await store.installLaunchAgent()
         }
-
+      }
+      onboardingStep(
+        title: "3. Start a harness session",
+        detail: "Sessions appear here as soon as the daemon indexes them.",
+        isReady: !store.sessions.isEmpty
+      ) {
         HarnessAsyncActionButton(
           title: "Refresh Index",
           tint: HarnessTheme.ink,
@@ -103,13 +96,13 @@ struct SessionsBoardOnboardingCard: View {
         }
       }
     }
-    .frame(maxWidth: .infinity, alignment: .leading)
   }
 
-  private func onboardingStep(
+  private func onboardingStep<Action: View>(
     title: String,
     detail: String,
-    isReady: Bool
+    isReady: Bool,
+    @ViewBuilder action: () -> Action
   ) -> some View {
     VStack(alignment: .leading, spacing: 8) {
       HStack {
@@ -124,9 +117,14 @@ struct SessionsBoardOnboardingCard: View {
         .font(.system(.footnote, design: .rounded, weight: .medium))
         .foregroundStyle(HarnessTheme.secondaryInk)
         .lineLimit(2)
-      Text(isReady ? "Ready" : "Pending")
-        .font(.caption.bold())
-        .foregroundStyle(isReady ? HarnessTheme.success : HarnessTheme.caution)
+      Spacer(minLength: 0)
+      HStack {
+        Text(isReady ? "Ready" : "Pending")
+          .font(.caption.bold())
+          .foregroundStyle(isReady ? HarnessTheme.success : HarnessTheme.caution)
+        Spacer()
+        action()
+      }
     }
     .frame(maxWidth: .infinity, minHeight: 72, alignment: .topLeading)
     .padding(11)
