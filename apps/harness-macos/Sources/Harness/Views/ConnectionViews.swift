@@ -157,9 +157,6 @@ struct ConnectionToolbarBadge: View {
     }
     .padding(.horizontal, 8)
     .padding(.vertical, 5)
-    .background {
-      HarnessGlassCapsuleBackground()
-    }
     .fixedSize()
     .accessibilityIdentifier(HarnessAccessibility.connectionBadge)
     .accessibilityLabel("Connection: \(label)")
