@@ -65,12 +65,15 @@ extension InspectorActionSections {
         Spacer()
         if store.isSessionActionInFlight {
           HarnessSpinner()
+            .transition(.opacity)
         } else if !store.lastAction.isEmpty {
           Text(store.lastAction)
             .font(.caption.bold())
             .foregroundStyle(HarnessTheme.success)
+            .transition(.opacity)
         }
       }
+      .animation(.spring(duration: 0.2), value: store.isSessionActionInFlight)
       Text(
         "Task creation, reassignments, checkpoints, and leadership changes flow through the daemon."
       )

@@ -28,15 +28,18 @@ struct SessionActionDock: View {
         VStack(alignment: .trailing, spacing: 4) {
           if store.isSessionActionInFlight {
             HarnessSpinner()
+              .transition(.opacity)
           } else if !store.lastAction.isEmpty {
             Text(store.lastAction)
               .font(.caption.bold())
               .foregroundStyle(HarnessTheme.success)
+              .transition(.opacity)
           }
           Text("\(detail.tasks.count) tasks · \(detail.agents.count) agents")
             .font(.caption.monospacedDigit())
             .foregroundStyle(HarnessTheme.secondaryInk)
         }
+        .animation(.spring(duration: 0.2), value: store.isSessionActionInFlight)
       }
 
       HarnessGlassContainer(spacing: 12) {
