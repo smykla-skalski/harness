@@ -15,6 +15,7 @@
 .gemini/
 .klaudiush/
 .opencode/
+.vibe/
 
 # IDE / language server
 .mcp.json
@@ -26,5 +27,9 @@ apps/harness-macos/.build/
 apps/harness-macos/build/
 apps/harness-macos/DerivedData/
 apps/harness-macos/DerivedData*
-apps/harness-macos/Harness.xcodeproj/xcuserdata/
-apps/harness-macos/Harness.xcodeproj/project.xcworkspace/xcuserdata/
+apps/harness-macos/*.xcodeproj/xcuserdata/
+apps/harness-macos/*.xcodeproj/project.xcworkspace/xcuserdata/
+
+.claude/skills/swift*
+.agents/skills/swift*
+skills-lock.json
