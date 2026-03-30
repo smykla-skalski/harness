@@ -1,5 +1,5 @@
 import Foundation
-import XCTest
+import Testing
 
 @testable import HarnessKit
 
@@ -54,8 +54,10 @@ private struct ObserverAgentSessionPayload: Encodable {
   let lastActivity: String?
 }
 
-final class ObserverSummaryTests: XCTestCase {
-  func testObserverSummaryDecodesWithoutRichDetail() throws {
+@Suite("Observer summary")
+struct ObserverSummaryTests {
+  @Test("Observer summary decodes without rich detail")
+  func observerSummaryDecodesWithoutRichDetail() throws {
     let payload = ObserverSummaryPayload(
       observeId: "observe-sess-1",
       lastScanTime: "2026-03-28T14:17:45Z",
@@ -72,15 +74,16 @@ final class ObserverSummaryTests: XCTestCase {
 
     let summary = try decodeObserverSummary(from: payload)
 
-    XCTAssertEqual(summary.observeId, "observe-sess-1")
-    XCTAssertNil(summary.openIssues)
-    XCTAssertNil(summary.mutedCodes)
-    XCTAssertNil(summary.activeWorkers)
-    XCTAssertNil(summary.cycleHistory)
-    XCTAssertNil(summary.agentSessions)
+    #expect(summary.observeId == "observe-sess-1")
+    #expect(summary.openIssues == nil)
+    #expect(summary.mutedCodes == nil)
+    #expect(summary.activeWorkers == nil)
+    #expect(summary.cycleHistory == nil)
+    #expect(summary.agentSessions == nil)
   }
 
-  func testObserverSummaryDecodesRichDetail() throws {
+  @Test("Observer summary decodes rich detail")
+  func observerSummaryDecodesRichDetail() throws {
     let payload = ObserverSummaryPayload(
       observeId: "observe-sess-1",
       lastScanTime: "2026-03-28T14:17:45Z",
@@ -133,23 +136,28 @@ final class ObserverSummaryTests: XCTestCase {
     )
 
     let summary = try decodeObserverSummary(from: payload)
+    let openIssue = try #require(summary.openIssues?.first)
+    let activeWorker = try #require(summary.activeWorkers?.first)
+    let cycle = try #require(summary.cycleHistory?.first)
+    let agentSession = try #require(summary.agentSessions?.first)
 
-    XCTAssertEqual(summary.openIssues?.count, 1)
-    XCTAssertEqual(summary.resolvedIssueCount, 2)
-    XCTAssertEqual(summary.openIssues?.first?.code, "agent_stalled_progress")
-    XCTAssertEqual(summary.mutedCodes, ["agent_repeated_error"])
-    XCTAssertEqual(summary.activeWorkers?.first?.agentId, "worker-codex")
-    XCTAssertEqual(summary.cycleHistory?.first?.resolved, 1)
-    XCTAssertEqual(summary.agentSessions?.first?.runtime, "codex")
+    #expect(summary.openIssues?.count == 1)
+    #expect(summary.resolvedIssueCount == 2)
+    #expect(openIssue.code == "agent_stalled_progress")
+    #expect(summary.mutedCodes == ["agent_repeated_error"])
+    #expect(activeWorker.agentId == "worker-codex")
+    #expect(cycle.resolved == 1)
+    #expect(agentSession.runtime == "codex")
   }
 
-  func testPreviewObserverIncludesRichObserveDetail() throws {
-    XCTAssertEqual(PreviewFixtures.observer.openIssues?.count, 3)
-    XCTAssertEqual(PreviewFixtures.observer.resolvedIssueCount, 4)
-    XCTAssertEqual(PreviewFixtures.observer.mutedCodes, ["agent_repeated_error"])
-    XCTAssertEqual(PreviewFixtures.observer.activeWorkers?.count, 2)
-    XCTAssertEqual(PreviewFixtures.observer.cycleHistory?.count, 2)
-    XCTAssertEqual(PreviewFixtures.observer.agentSessions?.count, 2)
+  @Test("Preview observer includes rich observe detail")
+  func previewObserverIncludesRichObserveDetail() {
+    #expect(PreviewFixtures.observer.openIssues?.count == 3)
+    #expect(PreviewFixtures.observer.resolvedIssueCount == 4)
+    #expect(PreviewFixtures.observer.mutedCodes == ["agent_repeated_error"])
+    #expect(PreviewFixtures.observer.activeWorkers?.count == 2)
+    #expect(PreviewFixtures.observer.cycleHistory?.count == 2)
+    #expect(PreviewFixtures.observer.agentSessions?.count == 2)
   }
 
   private func decodeObserverSummary(

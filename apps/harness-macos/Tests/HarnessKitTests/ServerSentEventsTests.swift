@@ -1,26 +1,29 @@
-import XCTest
+import Testing
 
 @testable import HarnessKit
 
-final class ServerSentEventsTests: XCTestCase {
-  func testParsesSingleEvent() {
+@Suite("Server-sent event parsing")
+struct ServerSentEventsTests {
+  @Test("Parses a single event frame")
+  func parsesSingleEvent() {
     var parser = ServerSentEventParser()
 
-    XCTAssertNil(parser.push(line: "event: session_updated"))
-    XCTAssertNil(parser.push(line: "data: {\"event\":\"session_updated\"}"))
+    #expect(parser.push(line: "event: session_updated") == nil)
+    #expect(parser.push(line: "data: {\"event\":\"session_updated\"}") == nil)
 
     let frame = parser.push(line: "")
-    XCTAssertEqual(frame?.event, "session_updated")
-    XCTAssertEqual(frame?.data, #"{"event":"session_updated"}"#)
+    #expect(frame?.event == "session_updated")
+    #expect(frame?.data == #"{"event":"session_updated"}"#)
   }
 
-  func testCombinesMultilinePayloads() {
+  @Test("Combines multiline payloads")
+  func combinesMultilinePayloads() {
     var parser = ServerSentEventParser()
 
-    XCTAssertNil(parser.push(line: "data: {"))
-    XCTAssertNil(parser.push(line: "data: \"event\":\"ready\""))
+    #expect(parser.push(line: "data: {") == nil)
+    #expect(parser.push(line: "data: \"event\":\"ready\"") == nil)
 
     let frame = parser.push(line: "")
-    XCTAssertEqual(frame?.data, "{\n\"event\":\"ready\"")
+    #expect(frame?.data == "{\n\"event\":\"ready\"")
   }
 }
