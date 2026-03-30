@@ -136,6 +136,12 @@ struct SessionsBoardOnboardingCard: View {
     }
     .frame(maxWidth: .infinity, minHeight: 72, alignment: .topLeading)
     .padding(11)
-    .harnessInsetPanel(cornerRadius: 18, fillOpacity: 0.05, strokeOpacity: 0.50)
+    .harnessInsetPanel(cornerRadius: 18, fillOpacity: 0.05, strokeOpacity: isReady ? 0 : 0.50)
+    .overlay {
+      if isReady {
+        RoundedRectangle(cornerRadius: 18, style: .continuous)
+          .stroke(HarnessTheme.success.opacity(0.50), lineWidth: 1)
+      }
+    }
   }
 }
