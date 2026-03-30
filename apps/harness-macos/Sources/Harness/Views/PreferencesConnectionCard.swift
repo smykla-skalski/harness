@@ -8,7 +8,7 @@ struct PreferencesConnectionCard: View {
   var body: some View {
     VStack(alignment: .leading, spacing: 14) {
       Text("Connection")
-        .font(.system(.title3, design: .serif, weight: .semibold))
+        .font(.system(.title3, weight: .semibold))
 
       HarnessAdaptiveGridLayout(minimumColumnWidth: 140, maximumColumns: 4, spacing: 14) {
         connectionMetric("Transport", value: metrics.transportKind.title, tint: qualityColor)
@@ -71,7 +71,7 @@ struct PreferencesConnectionCard: View {
         .font(.caption2.weight(.bold))
         .foregroundStyle(HarnessTheme.secondaryInk)
       Text(value)
-        .font(.system(.headline, design: .rounded, weight: .semibold))
+        .font(.system(.headline, weight: .semibold))
         .foregroundStyle(tint)
         .contentTransition(.numericText())
     }
@@ -81,7 +81,7 @@ struct PreferencesConnectionCard: View {
   private var connectionEventLog: some View {
     VStack(alignment: .leading, spacing: 8) {
       Text("Recent events")
-        .font(.system(.headline, design: .rounded, weight: .semibold))
+        .font(.system(.headline, weight: .semibold))
 
       HarnessGlassContainer(spacing: 8) {
         ForEach(events.suffix(10)) { event in

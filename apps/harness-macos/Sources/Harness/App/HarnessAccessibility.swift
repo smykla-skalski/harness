@@ -1,4 +1,5 @@
 enum HarnessAccessibility {
+  static let appChromeRoot = "harness.app.chrome"
   static let daemonCard = "harness.sidebar.daemon-card"
   static let daemonCardFrame = "harness.sidebar.daemon-card.frame"
   static let sidebarRoot = "harness.sidebar.root"
@@ -31,6 +32,12 @@ enum HarnessAccessibility {
   static let signalSendButton = "harness.inspector.signal-send"
   static let preferencesRoot = "harness.preferences.root"
   static let preferencesPanel = "harness.preferences.panel"
+  static let preferencesSidebar = "harness.preferences.sidebar"
+  static let preferencesBackButton = "harness.preferences.nav.back"
+  static let preferencesForwardButton = "harness.preferences.nav.forward"
+  static let preferencesTitle = "harness.preferences.title"
+  static let preferencesThemeModePicker = "harness.preferences.theme-mode"
+  static let preferencesThemeStylePicker = "harness.preferences.theme-style"
   static let refreshButton = "harness.toolbar.refresh"
   static let daemonPreferencesButton = "harness.toolbar.preferences"
   static let endSessionButton = "harness.session.action.end"
@@ -85,6 +92,10 @@ enum HarnessAccessibility {
 
   static func preferencesMetricCard(_ key: String) -> String {
     "harness.preferences.metric.\(slug(key))"
+  }
+
+  static func preferencesSectionButton(_ key: String) -> String {
+    "harness.preferences.section.\(slug(key))"
   }
 
   static func preferencesActionButton(_ key: String) -> String {
