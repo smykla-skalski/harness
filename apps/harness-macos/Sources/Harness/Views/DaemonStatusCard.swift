@@ -79,12 +79,20 @@ struct DaemonStatusCard: View {
 }
 
 extension DaemonStatusCard {
+  fileprivate var isDaemonOnline: Bool {
+    store.connectionState == .online
+  }
+
+  fileprivate var isLaunchAgentInstalled: Bool {
+    store.daemonStatus?.launchAgent.installed == true
+  }
+
   fileprivate var sidebarStartDaemonButton: some View {
     sidebarLayoutProbe(HarnessAccessibility.sidebarStartDaemonButtonFrame) {
       HarnessAsyncActionButton(
-        title: "Start Daemon",
-        tint: HarnessTheme.accent(for: themeStyle),
-        variant: .prominent,
+        title: isDaemonOnline ? "Restart Daemon" : "Start Daemon",
+        tint: isDaemonOnline ? HarnessTheme.warmAccent : HarnessTheme.accent(for: themeStyle),
+        variant: isDaemonOnline ? .bordered : .prominent,
         isLoading: isLoading,
         accessibilityIdentifier: HarnessAccessibility.sidebarStartDaemonButton,
         fillsWidth: false
@@ -113,7 +121,9 @@ extension DaemonStatusCard {
     HarnessGlassContainer(spacing: 8) {
       HarnessWrapLayout(spacing: 8, lineSpacing: 8) {
         sidebarStartDaemonButton
-        sidebarInstallLaunchAgentButton
+        if !isLaunchAgentInstalled {
+          sidebarInstallLaunchAgentButton
+        }
       }
     }
     .frame(maxWidth: .infinity, alignment: .leading)

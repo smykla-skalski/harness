@@ -53,8 +53,12 @@ struct SessionsBoardOnboardingCard: View {
         isReady: store.connectionState == .online
       ) {
         HarnessAsyncActionButton(
-          title: "Start Daemon",
-          tint: store.connectionState == .online ? HarnessTheme.ink : HarnessTheme.accent(for: themeStyle),
+          title: store.connectionState == .online
+            ? "Restart Daemon"
+            : "Start Daemon",
+          tint: store.connectionState == .online
+            ? HarnessTheme.warmAccent
+            : HarnessTheme.accent(for: themeStyle),
           variant: store.connectionState == .online ? .bordered : .prominent,
           isLoading: isLoading,
           accessibilityIdentifier: "harness.board.action.start",
@@ -62,26 +66,24 @@ struct SessionsBoardOnboardingCard: View {
         ) {
           await store.startDaemon()
         }
-        .disabled(store.connectionState == .online)
-        .focusable(store.connectionState != .online)
       }
       onboardingStep(
         title: "2. Install launchd",
         detail: "Keep the daemon available across app restarts.",
         isReady: store.daemonStatus?.launchAgent.installed == true
       ) {
-        HarnessAsyncActionButton(
-          title: "Install Launch Agent",
-          tint: HarnessTheme.ink,
-          variant: .bordered,
-          isLoading: isLoading,
-          accessibilityIdentifier: "harness.board.action.install",
-          fillsWidth: false
-        ) {
-          await store.installLaunchAgent()
+        if store.daemonStatus?.launchAgent.installed != true {
+          HarnessAsyncActionButton(
+            title: "Install Launch Agent",
+            tint: HarnessTheme.ink,
+            variant: .bordered,
+            isLoading: isLoading,
+            accessibilityIdentifier: "harness.board.action.install",
+            fillsWidth: false
+          ) {
+            await store.installLaunchAgent()
+          }
         }
-        .disabled(store.daemonStatus?.launchAgent.installed == true)
-        .focusable(store.daemonStatus?.launchAgent.installed != true)
       }
       onboardingStep(
         title: "3. Start a harness session",
