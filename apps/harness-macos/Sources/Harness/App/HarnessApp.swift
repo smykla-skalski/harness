@@ -1,8 +1,17 @@
+import AppKit
 import Foundation
 import HarnessKit
 import Observation
 import SwiftData
 import SwiftUI
+
+private final class HarnessAppDelegate: NSObject, NSApplicationDelegate {
+  func applicationShouldTerminateAfterLastWindowClosed(
+    _ sender: NSApplication
+  ) -> Bool {
+    true
+  }
+}
 
 enum HarnessThemeDefaults {
   static let modeKey = "harnessThemeMode"
@@ -50,6 +59,7 @@ enum HarnessThemeStyle: String, CaseIterable, Identifiable {
 @main
 @MainActor
 struct HarnessApp: App {
+  @NSApplicationDelegateAdaptor private var delegate: HarnessAppDelegate
   private let container: ModelContainer
   @State private var store: HarnessStore
   @AppStorage(HarnessThemeDefaults.modeKey)
