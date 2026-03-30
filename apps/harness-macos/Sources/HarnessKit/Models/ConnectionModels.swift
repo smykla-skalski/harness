@@ -104,7 +104,7 @@ public struct ConnectionEvent: Identifiable, Equatable, Sendable {
 
   public init(kind: ConnectionEventKind, detail: String, transportKind: TransportKind) {
     id = UUID()
-    timestamp = Date()
+    timestamp = .now
     self.kind = kind
     self.detail = detail
     self.transportKind = transportKind

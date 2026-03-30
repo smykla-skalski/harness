@@ -22,7 +22,7 @@ struct ObserverInspectorCard: View {
       InspectorFactGrid(facts: facts)
       if let mutedCodes = observer.mutedCodes, !mutedCodes.isEmpty {
         InspectorSection(title: "Muted Codes") {
-          let formatted = mutedCodes.map { $0.replacingOccurrences(of: "_", with: " ") }
+          let formatted = mutedCodes.map { $0.replacing("_", with: " ") }
           InspectorBadgeColumn(values: formatted)
         }
       }

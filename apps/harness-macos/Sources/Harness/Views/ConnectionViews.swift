@@ -181,18 +181,19 @@ struct ReconnectionProgressView: View {
           .font(.caption.monospacedDigit())
           .foregroundStyle(HarnessTheme.secondaryInk)
       }
-      GeometryReader { proxy in
-        Capsule()
-          .fill(HarnessTheme.surface(for: themeStyle))
-          .frame(height: 4)
-          .overlay(alignment: .leading) {
-            let progress = min(Double(attempt) / Double(maxAttempts), 1.0)
-            Capsule()
-              .fill(HarnessTheme.caution)
-              .frame(width: proxy.size.width * progress, height: 4)
-          }
-      }
-      .frame(height: 4)
+      Capsule()
+        .fill(HarnessTheme.surface(for: themeStyle))
+        .frame(height: 4)
+        .overlay(alignment: .leading) {
+          Capsule()
+            .fill(HarnessTheme.caution)
+            .frame(height: 4)
+            .scaleEffect(
+              x: min(Double(attempt) / Double(maxAttempts), 1.0),
+              anchor: .leading
+            )
+        }
+        .clipShape(Capsule())
     }
     .padding(.horizontal, 12)
     .padding(.vertical, 8)

@@ -133,93 +133,24 @@ struct PreferencesView: View {
   @ViewBuilder private var selectedSectionContent: some View {
     switch currentSection {
     case .general:
-      generalSection
+      PreferencesGeneralSection(
+        store: store,
+        themeMode: $themeMode,
+        themeStyle: $themeStyle,
+        effectiveHealth: effectiveHealth,
+        launchAgentState: launchAgentState,
+        launchAgentCaption: launchAgentCaption,
+        cacheEntryCount: cacheEntryCount,
+        isLoading: generalActionsAreLoading
+      )
     case .connection:
-      connectionSection
+      PreferencesConnectionSection(store: store)
     case .diagnostics:
-      diagnosticsSection
-    }
-  }
-
-  private var generalSection: some View {
-    PreferencesSectionScrollContainer {
-      VStack(alignment: .leading, spacing: 18) {
-        PreferencesAppearanceCard(themeMode: $themeMode, themeStyle: $themeStyle)
-        PreferencesActionGrid(
-          isLoading: generalActionsAreLoading,
-          reconnect: { await store.reconnect() },
-          refreshDiagnostics: { await store.refreshDiagnostics() },
-          startDaemon: { await store.startDaemon() },
-          installLaunchAgent: { await store.installLaunchAgent() },
-          requestRemoveLaunchAgentConfirmation: { store.requestRemoveLaunchAgentConfirmation() }
-        )
-        PreferencesOverviewGrid(
-          endpoint: effectiveHealth?.endpoint ?? store.daemonStatus?.manifest?.endpoint
-            ?? "Unavailable",
-          version: effectiveHealth?.version ?? store.daemonStatus?.manifest?.version
-            ?? "Unavailable",
-          launchAgentState: launchAgentState,
-          launchAgentCaption: launchAgentCaption,
-          cacheEntryCount: cacheEntryCount,
-          sessionCount: store.daemonStatus?.sessionCount ?? store.sessions.count
-        )
-        PreferencesStatusCard(
-          startedAt: effectiveHealth?.startedAt ?? store.daemonStatus?.manifest?.startedAt,
-          lastError: store.lastError,
-          lastAction: store.lastAction
-        )
-      }
-    }
-  }
-
-  private var connectionSection: some View {
-    PreferencesSectionScrollContainer {
-      VStack(alignment: .leading, spacing: 18) {
-        PreferencesConnectionActionsCard(
-          isReconnectLoading: store.connectionState == .connecting,
-          isRefreshLoading: store.isDiagnosticsRefreshInFlight,
-          reconnect: { await store.reconnect() },
-          refreshDiagnostics: { await store.refreshDiagnostics() }
-        )
-        PreferencesConnectionCard(
-          metrics: store.connectionMetrics,
-          events: store.connectionEvents
-        )
-      }
-    }
-  }
-
-  private var diagnosticsSection: some View {
-    PreferencesSectionScrollContainer {
-      VStack(alignment: .leading, spacing: 18) {
-        PreferencesDiagnosticsCard(
-          launchAgent: store.daemonStatus?.launchAgent,
-          tokenPresent: effectiveTokenPresent,
-          projectCount: store.daemonStatus?.projectCount ?? 0,
-          sessionCount: store.daemonStatus?.sessionCount ?? 0,
-          lastEvent: effectiveLastEvent
-        )
-        PreferencesPathsCard(
-          launchAgentPath: store.daemonStatus?.launchAgent.path ?? "Unavailable",
-          launchAgentDomain: store.daemonStatus?.launchAgent.domainTarget,
-          launchAgentService: store.daemonStatus?.launchAgent.serviceTarget,
-          manifestPath: store.diagnostics?.workspace.manifestPath
-            ?? store.daemonStatus?.diagnostics.manifestPath
-            ?? "Unavailable",
-          authTokenPath: store.diagnostics?.workspace.authTokenPath
-            ?? store.daemonStatus?.diagnostics.authTokenPath
-            ?? "Unavailable",
-          eventsPath: store.diagnostics?.workspace.eventsPath
-            ?? store.daemonStatus?.diagnostics.eventsPath
-            ?? "Unavailable",
-          cacheRoot: store.diagnostics?.workspace.cacheRoot
-            ?? store.daemonStatus?.diagnostics.cacheRoot
-            ?? "Unavailable"
-        )
-        PreferencesRecentEventsCard(
-          events: Array((store.diagnostics?.recentEvents ?? []).prefix(10))
-        )
-      }
+      PreferencesDiagnosticsSection(
+        store: store,
+        effectiveTokenPresent: effectiveTokenPresent,
+        effectiveLastEvent: effectiveLastEvent
+      )
     }
   }
 
@@ -362,5 +293,108 @@ private struct PreferencesPickerRow<Control: View>: View {
     }
     .padding(.horizontal, 16)
     .padding(.vertical, 12)
+  }
+}
+
+private struct PreferencesGeneralSection: View {
+  @Bindable var store: HarnessStore
+  @Binding var themeMode: HarnessThemeMode
+  @Binding var themeStyle: HarnessThemeStyle
+  let effectiveHealth: HealthResponse?
+  let launchAgentState: String
+  let launchAgentCaption: String
+  let cacheEntryCount: Int
+  let isLoading: Bool
+
+  var body: some View {
+    PreferencesSectionScrollContainer {
+      VStack(alignment: .leading, spacing: 18) {
+        PreferencesAppearanceCard(themeMode: $themeMode, themeStyle: $themeStyle)
+        PreferencesActionGrid(
+          isLoading: isLoading,
+          reconnect: { await store.reconnect() },
+          refreshDiagnostics: { await store.refreshDiagnostics() },
+          startDaemon: { await store.startDaemon() },
+          installLaunchAgent: { await store.installLaunchAgent() },
+          requestRemoveLaunchAgentConfirmation: { store.requestRemoveLaunchAgentConfirmation() }
+        )
+        PreferencesOverviewGrid(
+          endpoint: effectiveHealth?.endpoint ?? store.daemonStatus?.manifest?.endpoint
+            ?? "Unavailable",
+          version: effectiveHealth?.version ?? store.daemonStatus?.manifest?.version
+            ?? "Unavailable",
+          launchAgentState: launchAgentState,
+          launchAgentCaption: launchAgentCaption,
+          cacheEntryCount: cacheEntryCount,
+          sessionCount: store.daemonStatus?.sessionCount ?? store.sessions.count
+        )
+        PreferencesStatusCard(
+          startedAt: effectiveHealth?.startedAt ?? store.daemonStatus?.manifest?.startedAt,
+          lastError: store.lastError,
+          lastAction: store.lastAction
+        )
+      }
+    }
+  }
+}
+
+private struct PreferencesConnectionSection: View {
+  @Bindable var store: HarnessStore
+
+  var body: some View {
+    PreferencesSectionScrollContainer {
+      VStack(alignment: .leading, spacing: 18) {
+        PreferencesConnectionActionsCard(
+          isReconnectLoading: store.connectionState == .connecting,
+          isRefreshLoading: store.isDiagnosticsRefreshInFlight,
+          reconnect: { await store.reconnect() },
+          refreshDiagnostics: { await store.refreshDiagnostics() }
+        )
+        PreferencesConnectionCard(
+          metrics: store.connectionMetrics,
+          events: store.connectionEvents
+        )
+      }
+    }
+  }
+}
+
+private struct PreferencesDiagnosticsSection: View {
+  @Bindable var store: HarnessStore
+  let effectiveTokenPresent: Bool
+  let effectiveLastEvent: DaemonAuditEvent?
+
+  var body: some View {
+    PreferencesSectionScrollContainer {
+      VStack(alignment: .leading, spacing: 18) {
+        PreferencesDiagnosticsCard(
+          launchAgent: store.daemonStatus?.launchAgent,
+          tokenPresent: effectiveTokenPresent,
+          projectCount: store.daemonStatus?.projectCount ?? 0,
+          sessionCount: store.daemonStatus?.sessionCount ?? 0,
+          lastEvent: effectiveLastEvent
+        )
+        PreferencesPathsCard(
+          launchAgentPath: store.daemonStatus?.launchAgent.path ?? "Unavailable",
+          launchAgentDomain: store.daemonStatus?.launchAgent.domainTarget,
+          launchAgentService: store.daemonStatus?.launchAgent.serviceTarget,
+          manifestPath: store.diagnostics?.workspace.manifestPath
+            ?? store.daemonStatus?.diagnostics.manifestPath
+            ?? "Unavailable",
+          authTokenPath: store.diagnostics?.workspace.authTokenPath
+            ?? store.daemonStatus?.diagnostics.authTokenPath
+            ?? "Unavailable",
+          eventsPath: store.diagnostics?.workspace.eventsPath
+            ?? store.daemonStatus?.diagnostics.eventsPath
+            ?? "Unavailable",
+          cacheRoot: store.diagnostics?.workspace.cacheRoot
+            ?? store.daemonStatus?.diagnostics.cacheRoot
+            ?? "Unavailable"
+        )
+        PreferencesRecentEventsCard(
+          events: Array((store.diagnostics?.recentEvents ?? []).prefix(10))
+        )
+      }
+    }
   }
 }
