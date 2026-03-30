@@ -1,93 +1,5 @@
 import XCTest
 
-enum HarnessUITestAccessibility {
-  static let appChromeRoot = "harness.app.chrome"
-  static let appChromeState = "harness.app.chrome.state"
-  static let daemonCard = "harness.sidebar.daemon-card"
-  static let daemonCardFrame = "harness.sidebar.daemon-card.frame"
-  static let sidebarShellFrame = "harness.sidebar.shell.frame"
-  static let preferencesButton = "harness.toolbar.preferences"
-  static let refreshButton = "harness.toolbar.refresh"
-  static let sidebarStartButton = "harness.sidebar.action.start"
-  static let sidebarInstallButton = "harness.sidebar.action.install"
-  static let sidebarStartButtonFrame = "harness.sidebar.action.start.frame"
-  static let sidebarInstallButtonFrame = "harness.sidebar.action.install.frame"
-  static let sidebarRoot = "harness.sidebar.root"
-  static let sidebarProjectsBadge = "harness.sidebar.daemon-badge.projects"
-  static let sidebarSessionsBadge = "harness.sidebar.daemon-badge.sessions"
-  static let sidebarLaunchdBadge = "harness.sidebar.daemon-badge.launchd"
-  static let sidebarProjectsBadgeFrame = "harness.sidebar.daemon-badge.projects.frame"
-  static let sidebarSessionsBadgeFrame = "harness.sidebar.daemon-badge.sessions.frame"
-  static let sidebarLaunchdBadgeFrame = "harness.sidebar.daemon-badge.launchd.frame"
-  static let previewProjectHeader = "harness.sidebar.project-header.project-6ccf8d0a"
-  static let previewProjectHeaderFrame = "harness.sidebar.project-header.project-6ccf8d0a.frame"
-  static let previewSessionRow = "harness.sidebar.session.sess-harness"
-  static let sidebarEmptyState = "harness.sidebar.empty-state"
-  static let sidebarSessionList = "harness.sidebar.session-list"
-  static let sidebarSessionListContent = "harness.sidebar.session-list.content"
-  static let sidebarFiltersCard = "harness.sidebar.filters"
-  static let sidebarSearchField = "harness.sidebar.search"
-  static let sidebarClearFiltersButton = "harness.sidebar.filters.clear"
-  static let activeFilterButton = "harness.sidebar.filter.active"
-  static let allFilterButton = "harness.sidebar.filter.all"
-  static let endedFilterButton = "harness.sidebar.filter.ended"
-  static let openWorkChip = "harness.sidebar.focus-chip.openwork"
-  static let blockedChip = "harness.sidebar.focus-chip.blocked"
-  static let observedChip = "harness.sidebar.focus-chip.observed"
-  static let idleChip = "harness.sidebar.focus-chip.idle"
-  static let onboardingCard = "harness.board.onboarding-card"
-  static let onboardingStartButton = "harness.board.action.start"
-  static let onboardingInstallButton = "harness.board.action.install"
-  static let onboardingRefreshButton = "harness.board.action.refresh"
-  static let onboardingStartButtonFrame = "harness.board.action.start.frame"
-  static let onboardingInstallButtonFrame = "harness.board.action.install.frame"
-  static let onboardingRefreshButtonFrame = "harness.board.action.refresh.frame"
-  static let sessionsBoardRoot = "harness.board.root"
-  static let recentSessionsCard = "harness.board.recent-sessions-card"
-  static let trackedProjectsCard = "harness.board.metric.tracked-projects"
-  static let indexedSessionsCard = "harness.board.metric.indexed-sessions"
-  static let openWorkCard = "harness.board.metric.open-work"
-  static let blockedCard = "harness.board.metric.blocked"
-  static let inspectorRoot = "harness.inspector.root"
-  static let inspectorEmptyState = "harness.inspector.empty-state"
-  static let sessionInspectorCard = "harness.inspector.session-card"
-  static let taskInspectorCard = "harness.inspector.task-card"
-  static let agentInspectorCard = "harness.inspector.agent-card"
-  static let signalInspectorCard = "harness.inspector.signal-card"
-  static let observerInspectorCard = "harness.inspector.observer-card"
-  static let actionActorPicker = "harness.inspector.action-actor"
-  static let removeAgentButton = "harness.inspector.remove-agent"
-  static let signalSendButton = "harness.inspector.signal-send"
-  static let observeSummaryButton = "harness.session.observe.summary"
-  static let endSessionButton = "harness.session.action.end"
-  static let pendingLeaderTransferCard = "harness.session.pending-transfer"
-  static let taskUICard = "harness.session.task.task-ui"
-  static let taskRoutingCard = "harness.session.task.task-routing"
-  static let leaderAgentCard = "harness.session.agent.leader-claude"
-  static let workerAgentCard = "harness.session.agent.worker-codex"
-  static let preferencesRoot = "harness.preferences.root"
-  static let preferencesState = "harness.preferences.state"
-  static let preferencesPanel = "harness.preferences.panel"
-  static let preferencesSidebar = "harness.preferences.sidebar"
-  static let preferencesBackButton = "harness.preferences.nav.back"
-  static let preferencesForwardButton = "harness.preferences.nav.forward"
-  static let preferencesTitle = "harness.preferences.title"
-  static let preferencesThemeModePicker = "harness.preferences.theme-mode"
-  static let preferencesThemeStylePicker = "harness.preferences.theme-style"
-  static let preferencesGeneralSection = "harness.preferences.section.general"
-  static let preferencesConnectionSection = "harness.preferences.section.connection"
-  static let preferencesDiagnosticsSection = "harness.preferences.section.diagnostics"
-  static let preferencesEndpointCard = "harness.preferences.metric.endpoint"
-  static let preferencesVersionCard = "harness.preferences.metric.version"
-  static let preferencesLaunchdCard = "harness.preferences.metric.launchd"
-  static let preferencesCachedSessionsCard = "harness.preferences.metric.cached-sessions"
-  static let reconnectButton = "harness.preferences.action.reconnect"
-  static let refreshDiagnosticsButton = "harness.preferences.action.refresh-diagnostics"
-  static let startDaemonButton = "harness.preferences.action.start-daemon"
-  static let installLaunchAgentButton = "harness.preferences.action.install-launch-agent"
-  static let removeLaunchAgentButton = "harness.preferences.action.remove-launch-agent"
-}
-
 @MainActor
 class HarnessUITestCase: XCTestCase {
   static let launchModeKey = "HARNESS_LAUNCH_MODE"
@@ -96,6 +8,15 @@ class HarnessUITestCase: XCTestCase {
 
   override func setUpWithError() throws {
     continueAfterFailure = false
+  }
+
+  override func tearDown() async throws {
+    await MainActor.run {
+      let app = XCUIApplication(
+        bundleIdentifier: Self.uiTestHostBundleIdentifier
+      )
+      terminateIfRunning(app)
+    }
   }
 }
 
@@ -106,6 +27,14 @@ extension HarnessUITestCase {
       return mainWindow
     }
     return app.windows.firstMatch
+  }
+
+  func window(in app: XCUIApplication, containing element: XCUIElement) -> XCUIElement {
+    let windows = app.windows.allElementsBoundByIndex.filter(\.exists)
+    if let matchingWindow = windows.first(where: { $0.frame.contains(element.frame) }) {
+      return matchingWindow
+    }
+    return mainWindow(in: app)
   }
 
   func launch(mode: String) -> XCUIApplication {
@@ -351,7 +280,6 @@ extension HarnessUITestCase {
     guard window.waitForExistence(timeout: 0.5) else {
       return nil
     }
-
     let origin = window.coordinate(withNormalizedOffset: CGVector(dx: 0, dy: 0))
     let dx = element.frame.midX - window.frame.minX
     let dy = element.frame.midY - window.frame.minY
