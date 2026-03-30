@@ -50,13 +50,7 @@ struct ObserverInspectorCard: View {
               }
               .padding(.horizontal, 12)
               .padding(.vertical, 10)
-              .background {
-                HarnessInsetPanelBackground(
-                  cornerRadius: 14,
-                  fillOpacity: 0.05,
-                  strokeOpacity: 0.10
-                )
-              }
+              .harnessInsetPanel(cornerRadius: 14, fillOpacity: 0.05, strokeOpacity: 0.10)
             }
           }
         }
@@ -81,13 +75,7 @@ struct ObserverInspectorCard: View {
               }
               .padding(.horizontal, 12)
               .padding(.vertical, 10)
-              .background {
-                HarnessInsetPanelBackground(
-                  cornerRadius: 14,
-                  fillOpacity: 0.05,
-                  strokeOpacity: 0.10
-                )
-              }
+              .harnessInsetPanel(cornerRadius: 14, fillOpacity: 0.05, strokeOpacity: 0.10)
             }
           }
         }
@@ -111,13 +99,7 @@ struct ObserverInspectorCard: View {
               }
               .padding(.horizontal, 12)
               .padding(.vertical, 10)
-              .background {
-                HarnessInsetPanelBackground(
-                  cornerRadius: 14,
-                  fillOpacity: 0.05,
-                  strokeOpacity: 0.10
-                )
-              }
+              .harnessInsetPanel(cornerRadius: 14, fillOpacity: 0.05, strokeOpacity: 0.10)
             }
           }
         }
@@ -151,13 +133,7 @@ struct ObserverInspectorCard: View {
               }
               .padding(.horizontal, 12)
               .padding(.vertical, 10)
-              .background {
-                HarnessInsetPanelBackground(
-                  cornerRadius: 14,
-                  fillOpacity: 0.05,
-                  strokeOpacity: 0.10
-                )
-              }
+              .harnessInsetPanel(cornerRadius: 14, fillOpacity: 0.05, strokeOpacity: 0.10)
             }
           }
         }
@@ -195,13 +171,7 @@ struct InspectorFactGrid: View {
         .frame(maxWidth: .infinity, minHeight: 54, alignment: .leading)
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
-        .background {
-          HarnessInsetPanelBackground(
-            cornerRadius: 14,
-            fillOpacity: 0.05,
-            strokeOpacity: 0.10
-          )
-        }
+        .harnessInsetPanel(cornerRadius: 14, fillOpacity: 0.05, strokeOpacity: 0.10)
       }
     }
   }
