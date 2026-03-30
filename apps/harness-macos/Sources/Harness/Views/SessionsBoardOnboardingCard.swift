@@ -62,6 +62,7 @@ struct SessionsBoardOnboardingCard: View {
         ) {
           await store.startDaemon()
         }
+        .disabled(store.connectionState == .online)
       }
       onboardingStep(
         title: "2. Install launchd",
@@ -78,6 +79,7 @@ struct SessionsBoardOnboardingCard: View {
         ) {
           await store.installLaunchAgent()
         }
+        .disabled(store.daemonStatus?.launchAgent.installed == true)
       }
       onboardingStep(
         title: "3. Start a harness session",
