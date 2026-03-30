@@ -66,28 +66,9 @@ public final class HarnessStore {
   public var timeline: [TimelineEntry] = []
   public var inspectorSelection: InspectorSelection = .none
   public var actionActorID: String?
-  public var searchText = "" {
-    didSet {
-      if searchText != oldValue {
-        selectedSavedSearchID = nil
-      }
-    }
-  }
-  public var sessionFilter: SessionFilter = .active {
-    didSet {
-      if sessionFilter != oldValue {
-        selectedSavedSearchID = nil
-      }
-    }
-  }
-  public var sessionFocusFilter: SessionFocusFilter = .all {
-    didSet {
-      if sessionFocusFilter != oldValue {
-        selectedSavedSearchID = nil
-      }
-    }
-  }
-  public var selectedSavedSearchID: String?
+  public var searchText = ""
+  public var sessionFilter: SessionFilter = .active
+  public var sessionFocusFilter: SessionFocusFilter = .all
   public var isRefreshing = false
   public var isDiagnosticsRefreshInFlight = false
   public var isDaemonActionInFlight = false

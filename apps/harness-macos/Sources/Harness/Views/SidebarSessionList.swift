@@ -9,8 +9,7 @@ struct SidebarSessionList: View {
     let visibleCount = store.filteredSessionCount
     let totalCount = store.sessions.count
     let isAnyFilterActive =
-      store.selectedSavedSearchID != nil
-      || !store.searchText.isEmpty
+      !store.searchText.isEmpty
       || store.sessionFilter != .active
       || store.sessionFocusFilter != .all
     if isAnyFilterActive {
@@ -20,8 +19,7 @@ struct SidebarSessionList: View {
   }
 
   private var isFiltered: Bool {
-    store.selectedSavedSearchID != nil
-      || !store.searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    !store.searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
       || store.sessionFilter != .active
       || store.sessionFocusFilter != .all
   }
@@ -30,7 +28,6 @@ struct SidebarSessionList: View {
     VStack(alignment: .leading, spacing: 14) {
       filterSlice
       sessionList
-      savedSearchSlice
     }
     .frame(maxWidth: .infinity, alignment: .topLeading)
   }
@@ -71,7 +68,6 @@ struct SidebarSessionList: View {
                 identifier: HarnessAccessibility.sessionFilterButton(filter.rawValue)
               ) {
                 store.sessionFilter = filter
-                store.selectedSavedSearchID = nil
               }
             }
           }
@@ -88,7 +84,6 @@ struct SidebarSessionList: View {
                 identifier: HarnessAccessibility.sidebarFocusChip(filter.rawValue)
               ) {
                 store.sessionFocusFilter = filter
-                store.selectedSavedSearchID = nil
               }
             }
           }
@@ -105,22 +100,6 @@ struct SidebarSessionList: View {
     }
     .accessibilityElement(children: .contain)
     .accessibilityFrameMarker("\(HarnessAccessibility.sidebarFiltersCard).frame")
-  }
-
-  private var savedSearchSlice: some View {
-    VStack(alignment: .leading, spacing: 10) {
-      Text("Saved Searches")
-        .font(.caption.weight(.bold))
-        .foregroundStyle(HarnessTheme.secondaryInk)
-
-      HarnessGlassContainer(spacing: 8) {
-        HarnessWrapLayout(spacing: 8, lineSpacing: 8) {
-          ForEach(store.savedSearches) { search in
-            savedSearchButton(search)
-          }
-        }
-      }
-    }
   }
 
   private var sessionList: some View {
@@ -250,45 +229,9 @@ struct SidebarSessionList: View {
     .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
     .accessibilityIdentifier(identifier)
     .accessibilityFrameMarker("\(identifier).frame")
-    .accessibilityValue(
-      isSelected ? "selected accent-on-light" : "not selected ink-on-panel"
-    )
+    .accessibilityValue(isSelected ? "selected" : "not selected")
   }
 
-  private func savedSearchButton(_ search: SessionSavedSearch) -> some View {
-    Button {
-      store.applySavedSearch(search)
-    } label: {
-      Label(search.title, systemImage: savedSearchSymbol(for: search))
-        .font(.system(.callout, design: .rounded, weight: .semibold))
-        .lineLimit(1)
-        .minimumScaleFactor(0.88)
-        .padding(.horizontal, HarnessControlMetrics.chipHorizontalPadding)
-        .padding(.vertical, HarnessControlMetrics.chipVerticalPadding)
-        .frame(minHeight: HarnessControlMetrics.chipMinHeight)
-        .fixedSize(horizontal: true, vertical: true)
-    }
-    .buttonBorderShape(.roundedRectangle(radius: 12))
-    .harnessFilterChipButtonStyle(isSelected: store.selectedSavedSearchID == search.id)
-    .controlSize(HarnessControlMetrics.compactControlSize)
-    .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-    .help(search.summary)
-    .accessibilityLabel(search.title)
-    .accessibilityIdentifier(HarnessAccessibility.sidebarSavedSearchButton(search.id))
-    .accessibilityFrameMarker(
-      "\(HarnessAccessibility.sidebarSavedSearchButton(search.id)).frame"
-    )
-    .accessibilityValue(
-      store.selectedSavedSearchID == search.id ? "selected" : "not selected"
-    )
-  }
-
-  private func savedSearchSymbol(for search: SessionSavedSearch) -> String {
-    if store.selectedSavedSearchID == search.id {
-      return "checkmark.circle.fill"
-    }
-    return "line.3.horizontal.decrease.circle"
-  }
 }
 
 extension SidebarSessionList {

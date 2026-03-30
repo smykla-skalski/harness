@@ -15,9 +15,6 @@ enum HarnessAccessibility {
   static func sidebarFocusChip(_ filter: String) -> String {
     "harness.sidebar.focus-chip.\(slug(filter))"
   }
-  static func sidebarSavedSearchButton(_ key: String) -> String {
-    "harness.sidebar.saved-search.\(slug(key))"
-  }
   static let onboardingCard = "harness.board.onboarding-card"
   static let sessionsBoardRoot = "harness.board.root"
   static let recentSessionsCard = "harness.board.recent-sessions-card"

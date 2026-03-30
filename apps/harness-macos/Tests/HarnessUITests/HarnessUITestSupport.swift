@@ -33,11 +33,6 @@ enum HarnessUITestAccessibility {
   static let blockedChip = "harness.sidebar.focus-chip.blocked"
   static let observedChip = "harness.sidebar.focus-chip.observed"
   static let idleChip = "harness.sidebar.focus-chip.idle"
-  static let activeOpenSearchButton = "harness.sidebar.saved-search.active-open-work"
-  static let blockedFollowupsSearchButton = "harness.sidebar.saved-search.blocked-followups"
-  static func sidebarSavedSearchButton(_ key: String) -> String {
-    "harness.sidebar.saved-search.\(key)"
-  }
   static let onboardingCard = "harness.board.onboarding-card"
   static let onboardingStartButton = "harness.board.action.start"
   static let onboardingInstallButton = "harness.board.action.install"

@@ -192,26 +192,23 @@ final class HarnessLayoutUITests: HarnessUITestCase {
     )
   }
 
-  func testSidebarFilterSliceFillsColumnAndShowsSavedSearches() throws {
+  func testSidebarFilterSliceFillsColumnAndStartsUnfiltered() throws {
     let app = launch(mode: "preview")
 
     let sidebarRoot = element(in: app, identifier: Accessibility.sidebarRoot)
     let filtersCard = app.staticTexts["Search & Filters"]
-    let savedSearch = element(
-      in: app,
-      identifier: Accessibility.sidebarSavedSearchButton("blocked-followups")
-    )
+    let searchField = element(in: app, identifier: Accessibility.sidebarSearchField)
     let clearButton = element(in: app, identifier: Accessibility.sidebarClearFiltersButton)
 
     XCTAssertTrue(sidebarRoot.waitForExistence(timeout: Self.uiTimeout))
     XCTAssertTrue(filtersCard.waitForExistence(timeout: Self.uiTimeout))
-    XCTAssertTrue(savedSearch.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(searchField.waitForExistence(timeout: Self.uiTimeout))
     XCTAssertFalse(clearButton.exists)
     XCTAssertTrue(sidebarRoot.exists)
     XCTAssertTrue(filtersCard.exists)
   }
 
-  func testEmptyModeSidebarScrollRevealsLowerSavedSearches() throws {
+  func testSidebarScrollMovesSessionRowsWhenContentOverflows() throws {
     let app = launch(mode: "preview")
 
     let sidebarRoot = element(in: app, identifier: Accessibility.sidebarRoot)
@@ -238,19 +235,16 @@ final class HarnessLayoutUITests: HarnessUITestCase {
     )
   }
 
-  func testSavedSearchSelectionTogglesAccessibilityState() throws {
+  func testFocusFilterSelectionTogglesAccessibilityState() throws {
     let app = launch(mode: "preview")
 
-    let savedSearch = element(
-      in: app,
-      identifier: Accessibility.sidebarSavedSearchButton("blocked-followups")
-    )
-    XCTAssertTrue(savedSearch.waitForExistence(timeout: Self.uiTimeout))
-    XCTAssertEqual(savedSearch.value as? String, "not selected")
+    let blockedChip = element(in: app, identifier: Accessibility.blockedChip)
+    XCTAssertTrue(blockedChip.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertEqual(blockedChip.value as? String, "not selected")
 
-    tapElement(in: app, identifier: Accessibility.blockedFollowupsSearchButton)
+    tapElement(in: app, identifier: Accessibility.blockedChip)
 
-    XCTAssertEqual(savedSearch.value as? String, "selected")
+    XCTAssertEqual(blockedChip.value as? String, "selected")
     XCTAssertTrue(
       element(in: app, identifier: Accessibility.sidebarClearFiltersButton).waitForExistence(
         timeout: Self.uiTimeout
