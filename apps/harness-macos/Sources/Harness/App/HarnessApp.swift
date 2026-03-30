@@ -163,6 +163,20 @@ struct HarnessApp: App {
       }
       .keyboardShortcut("e", modifiers: [.command, .shift])
       .disabled(store.selectedSessionID == nil)
+
+      Divider()
+
+      Button("Inspect Session Overview") {
+        store.inspectorSelection = .none
+      }
+      .keyboardShortcut("1", modifiers: [.command, .option])
+      .disabled(store.selectedSessionID == nil)
+
+      Button("Inspect Observer") {
+        store.inspectObserver()
+      }
+      .keyboardShortcut("2", modifiers: [.command, .option])
+      .disabled(store.selectedSession?.observer == nil)
     }
   }
 
