@@ -81,13 +81,13 @@ struct ActivityPulse: View {
         )
     }
     .frame(width: 16, height: 16)
+    .animation(.spring(duration: 0.3), value: isActive)
     .animation(
       isActive
         ? .easeInOut(duration: 1.2).repeatForever(autoreverses: true)
         : .default,
       value: isPulsing
     )
-    .animation(.spring(duration: 0.3), value: isActive)
     .onChange(of: isActive) { _, active in
       isPulsing = active
     }

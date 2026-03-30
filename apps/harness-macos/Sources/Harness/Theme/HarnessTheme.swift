@@ -195,6 +195,7 @@ struct HarnessCardModifier: ViewModifier {
 struct LiveActivityBorderModifier: ViewModifier {
   let isActive: Bool
   @State private var highlight = false
+  @State private var flashTrigger = 0
 
   func body(content: Content) -> some View {
     content
@@ -213,6 +214,10 @@ struct LiveActivityBorderModifier: ViewModifier {
       )
       .onChange(of: isActive) { _, active in
         guard active else { return }
+        flashTrigger += 1
+      }
+      .onChange(of: flashTrigger) {
+        highlight = false
         withAnimation(.easeIn(duration: 0.15)) {
           highlight = true
         } completion: {
@@ -281,11 +286,11 @@ private struct HarnessSelectionOutlineModifier: ViewModifier {
 
   func body(content: Content) -> some View {
     content.overlay {
-      if isSelected {
-        RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-          .strokeBorder(.selection, lineWidth: lineWidth)
-      }
+      RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+        .strokeBorder(.selection, lineWidth: lineWidth)
+        .opacity(isSelected ? 1 : 0)
     }
+    .animation(.spring(duration: 0.2), value: isSelected)
   }
 }
 
