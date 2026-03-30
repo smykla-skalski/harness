@@ -21,18 +21,18 @@ struct SessionCockpitView: View {
             store.inspect(agentID: agentID)
           }
         }
+        .animation(.spring(duration: 0.3), value: detail.tasks)
+        .animation(.spring(duration: 0.3), value: detail.agents)
         SessionCockpitSignalsSection(signals: detail.signals) { signalID in
           store.inspect(signalID: signalID)
         }
+        .animation(.spring(duration: 0.3), value: detail.signals)
         SessionCockpitTimelineSection(timeline: timeline)
+          .animation(.spring(duration: 0.3), value: timeline)
       }
       .frame(maxWidth: .infinity, alignment: .leading)
     }
     .foregroundStyle(HarnessTheme.ink)
-    .animation(.spring(duration: 0.3), value: detail.tasks)
-    .animation(.spring(duration: 0.3), value: detail.agents)
-    .animation(.spring(duration: 0.3), value: detail.signals)
-    .animation(.spring(duration: 0.3), value: timeline)
   }
 }
 
