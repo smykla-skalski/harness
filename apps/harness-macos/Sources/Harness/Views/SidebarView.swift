@@ -1,10 +1,10 @@
-import AppKit
 import HarnessKit
 import Observation
 import SwiftUI
 
 struct SidebarView: View {
   @Bindable var store: HarnessStore
+  let themeStyle: HarnessThemeStyle
 
   private var isLoading: Bool {
     store.isBusy || store.isRefreshing || store.connectionState == .connecting
@@ -17,14 +17,10 @@ struct SidebarView: View {
         sessionList
       }
       .frame(maxWidth: .infinity, alignment: .topLeading)
-      .padding(.horizontal, 18)
-      .padding(.top, 8)
-      .padding(.bottom, 18)
+      .padding(22)
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-    .background {
-      SidebarVibrancyView()
-    }
+    .foregroundStyle(HarnessTheme.ink)
     .contentShape(Rectangle())
     .accessibilityFrameMarker(HarnessAccessibility.sidebarShellFrame)
     .animation(.snappy(duration: 0.24), value: store.groupedSessions)
@@ -84,19 +80,6 @@ struct SidebarView: View {
   private var sessionList: some View {
     SidebarSessionList(store: store)
   }
-}
-
-private struct SidebarVibrancyView: NSViewRepresentable {
-  func makeNSView(context: Context) -> NSVisualEffectView {
-    let view = NSVisualEffectView()
-    view.material = .sidebar
-    view.blendingMode = .behindWindow
-    view.state = .active
-    view.isEmphasized = true
-    return view
-  }
-
-  func updateNSView(_ nsView: NSVisualEffectView, context: Context) {}
 }
 
 extension SidebarView {
