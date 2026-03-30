@@ -95,26 +95,28 @@ struct PreferencesConnectionActionsCard: View {
       Text("Connection Actions")
         .font(.system(.title3, weight: .semibold))
 
-      HStack(spacing: 10) {
-        HarnessAsyncActionButton(
-          title: "Reconnect",
-          tint: HarnessTheme.accent,
-          variant: .prominent,
-          isLoading: isReconnectLoading,
-          accessibilityIdentifier: HarnessAccessibility.preferencesActionButton("Reconnect"),
-          action: reconnect
-        )
+      HarnessGlassContainer(spacing: 10) {
+        HarnessWrapLayout(spacing: 10, lineSpacing: 10) {
+          HarnessAsyncActionButton(
+            title: "Reconnect",
+            tint: HarnessTheme.accent,
+            variant: .prominent,
+            isLoading: isReconnectLoading,
+            accessibilityIdentifier: HarnessAccessibility.preferencesActionButton("Reconnect"),
+            action: reconnect
+          )
 
-        HarnessAsyncActionButton(
-          title: "Refresh Diagnostics",
-          tint: HarnessTheme.ink,
-          variant: .bordered,
-          isLoading: isRefreshLoading,
-          accessibilityIdentifier: HarnessAccessibility.preferencesActionButton(
-            "Refresh Diagnostics"
-          ),
-          action: refreshDiagnostics
-        )
+          HarnessAsyncActionButton(
+            title: "Refresh Diagnostics",
+            tint: HarnessTheme.ink,
+            variant: .bordered,
+            isLoading: isRefreshLoading,
+            accessibilityIdentifier: HarnessAccessibility.preferencesActionButton(
+              "Refresh Diagnostics"
+            ),
+            action: refreshDiagnostics
+          )
+        }
       }
     }
     .harnessCard()
@@ -129,15 +131,17 @@ struct PreferencesOverviewGrid: View {
   let cacheEntryCount: Int
   let sessionCount: Int
   var body: some View {
-    HarnessAdaptiveGridLayout(
-      minimumColumnWidth: 180,
-      maximumColumns: 4,
-      spacing: 14
-    ) {
-      endpointMetric
-      versionMetric
-      launchdMetric
-      cachedSessionsMetric
+    HarnessGlassContainer(spacing: 14) {
+      HarnessAdaptiveGridLayout(
+        minimumColumnWidth: 180,
+        maximumColumns: 4,
+        spacing: 14
+      ) {
+        endpointMetric
+        versionMetric
+        launchdMetric
+        cachedSessionsMetric
+      }
     }
   }
 

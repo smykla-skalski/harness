@@ -62,12 +62,8 @@ struct HarnessRoundedGlassBackground: View {
 
     if HarnessTheme.usesGradientChrome {
       shape
-        .fill(resolvedFillColor.opacity(fillOpacity))
-        .overlay {
-          shape
-            .fill(.clear)
-            .glassEffect(harnessGlass(tint: tint, interactive: interactive), in: shape)
-        }
+        .fill(.clear)
+        .glassEffect(harnessGlass(tint: tint, interactive: interactive), in: shape)
         .overlay {
           shape.stroke(strokeColor, lineWidth: 1)
         }
@@ -136,12 +132,8 @@ struct HarnessCapsuleGlassBackground: View {
 
     if HarnessTheme.usesGradientChrome {
       shape
-        .fill(resolvedFillColor.opacity(fillOpacity))
-        .overlay {
-          shape
-            .fill(.clear)
-            .glassEffect(harnessGlass(tint: tint, interactive: interactive), in: shape)
-        }
+        .fill(.clear)
+        .glassEffect(harnessGlass(tint: tint, interactive: interactive), in: shape)
         .overlay {
           shape.stroke(strokeColor, lineWidth: 1)
         }
