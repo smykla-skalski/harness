@@ -22,9 +22,8 @@ struct ContentView: View {
   }
 
   private var chromeAccessibilityValue: String {
-    let chrome = HarnessTheme.chromeAccessibilityValue(for: themeStyle)
-    let interactiveCards = HarnessTheme
-      .interactiveCardAccessibilityValue(for: themeStyle)
+    let chrome = harnessChromeAccessibilityValue(for: themeStyle)
+    let interactiveCards = harnessInteractiveCardAccessibilityValue(for: themeStyle)
     return [
       "style=\(themeStyle.rawValue)",
       "contentChrome=\(chrome)",

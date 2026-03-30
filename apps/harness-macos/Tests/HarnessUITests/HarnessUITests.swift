@@ -336,19 +336,28 @@ final class HarnessUITests: HarnessUITestCase {
     let preferencesState = element(in: app, identifier: Accessibility.preferencesState)
     let appChromeState = element(in: app, identifier: Accessibility.appChromeState)
     let stylePicker = element(in: app, identifier: Accessibility.preferencesThemeStylePicker)
+    let sessionRow = element(in: app, identifier: Accessibility.previewSessionRow)
+    let observeSummaryButton = app.buttons
+      .matching(identifier: Accessibility.observeSummaryButton)
+      .firstMatch
 
     XCTAssertTrue(preferencesRoot.waitForExistence(timeout: Self.uiTimeout))
     XCTAssertTrue(preferencesState.waitForExistence(timeout: Self.uiTimeout))
     XCTAssertTrue(appChromeState.waitForExistence(timeout: Self.uiTimeout))
     XCTAssertTrue(stylePicker.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(sessionRow.waitForExistence(timeout: Self.uiTimeout))
+    tapElement(in: app, identifier: Accessibility.previewSessionRow)
+    XCTAssertTrue(observeSummaryButton.waitForExistence(timeout: Self.uiTimeout))
     XCTAssertEqual(
       preferencesState.label,
       "style=gradient, mode=auto, section=general, preferencesChrome=extended"
     )
     XCTAssertEqual(
       appChromeState.label,
-      "style=gradient, contentChrome=extended, inspectorChrome=extended"
+      "style=gradient, contentChrome=extended, inspectorChrome=extended, interactiveCards=native-glass"
     )
+    XCTAssertEqual(sessionRow.value as? String, "selected, interactive=native-glass")
+    XCTAssertEqual(observeSummaryButton.value as? String, "interactive=native-glass")
 
     selectMenuOption(
       in: app,
@@ -358,12 +367,14 @@ final class HarnessUITests: HarnessUITestCase {
 
     XCTAssertEqual(
       preferencesState.label,
-      "style=flat, mode=auto, section=general, preferencesChrome=extended"
+      "style=flat, mode=auto, section=general, preferencesChrome=reduced"
     )
     XCTAssertEqual(
       appChromeState.label,
-      "style=flat, contentChrome=extended, inspectorChrome=extended"
+      "style=flat, contentChrome=reduced, inspectorChrome=reduced, interactiveCards=bordered-fallback"
     )
+    XCTAssertEqual(sessionRow.value as? String, "selected, interactive=bordered-fallback")
+    XCTAssertEqual(observeSummaryButton.value as? String, "interactive=bordered-fallback")
 
     selectMenuOption(
       in: app,
@@ -377,7 +388,9 @@ final class HarnessUITests: HarnessUITestCase {
     )
     XCTAssertEqual(
       appChromeState.label,
-      "style=gradient, contentChrome=extended, inspectorChrome=extended"
+      "style=gradient, contentChrome=extended, inspectorChrome=extended, interactiveCards=native-glass"
     )
+    XCTAssertEqual(sessionRow.value as? String, "selected, interactive=native-glass")
+    XCTAssertEqual(observeSummaryButton.value as? String, "interactive=native-glass")
   }
 }

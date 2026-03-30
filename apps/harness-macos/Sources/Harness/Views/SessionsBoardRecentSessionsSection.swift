@@ -42,11 +42,8 @@ struct SessionsBoardRecentSessionsSection: View {
               }
               .frame(maxWidth: .infinity, alignment: .leading)
               .padding(14)
-              .background {
-                HarnessInteractiveCardBackground(cornerRadius: 18, tint: nil)
-              }
             }
-            .buttonStyle(.plain)
+            .harnessInteractiveCardButtonStyle()
           }
         }
       }

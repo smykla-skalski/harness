@@ -92,13 +92,11 @@ struct SessionCockpitHeaderCard: View {
       .accessibilityElement(children: .combine)
       .frame(maxWidth: .infinity, alignment: .leading)
       .padding(14)
-      .background {
-        HarnessInteractiveCardBackground(cornerRadius: 18, tint: nil)
-      }
       .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
-    .buttonStyle(.plain)
+    .harnessInteractiveCardButtonStyle()
     .accessibilityIdentifier("harness.session.observe.summary")
+    .accessibilityValue("interactive=\(harnessInteractiveCardAccessibilityValue(for: themeStyle))")
   }
 
   private func pendingTransferSummary(_ pendingTransfer: PendingLeaderTransfer) -> some View {

@@ -157,6 +157,9 @@ struct ConnectionToolbarBadge: View {
     }
     .padding(.horizontal, 8)
     .padding(.vertical, 5)
+    .background {
+      HarnessGlassCapsuleBackground()
+    }
     .fixedSize()
     .accessibilityIdentifier(HarnessAccessibility.connectionBadge)
     .accessibilityLabel("Connection: \(label)")
@@ -197,10 +200,13 @@ struct ReconnectionProgressView: View {
     }
     .padding(.horizontal, 12)
     .padding(.vertical, 8)
-    .background(
-      HarnessTheme.caution.opacity(0.08),
-      in: RoundedRectangle(cornerRadius: 14)
-    )
+    .background {
+      HarnessInsetPanelBackground(
+        cornerRadius: 14,
+        fillOpacity: 0.07,
+        strokeOpacity: 0.10
+      )
+    }
     .accessibilityIdentifier(HarnessAccessibility.reconnectionProgress)
   }
 }
@@ -233,14 +239,13 @@ struct FallbackBanner: View {
       .controlSize(.small)
     }
     .padding(10)
-    .background(
-      HarnessTheme.surface(for: themeStyle),
-      in: RoundedRectangle(cornerRadius: 14, style: .continuous)
-    )
-    .overlay(
-      RoundedRectangle(cornerRadius: 14, style: .continuous)
-        .stroke(HarnessTheme.controlBorder, lineWidth: 1)
-    )
+    .background {
+      HarnessInsetPanelBackground(
+        cornerRadius: 14,
+        fillOpacity: 0.06,
+        strokeOpacity: 0.10
+      )
+    }
     .accessibilityIdentifier(HarnessAccessibility.fallbackBanner)
   }
 }

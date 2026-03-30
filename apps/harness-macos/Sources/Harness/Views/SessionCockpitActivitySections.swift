@@ -35,11 +35,8 @@ struct SessionCockpitSignalsSection: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(14)
-            .background {
-              HarnessInteractiveCardBackground(cornerRadius: 18, tint: nil)
-            }
           }
-          .buttonStyle(.plain)
+          .harnessInteractiveCardButtonStyle()
           .transition(
             .asymmetric(
               insertion: .scale(scale: 0.95).combined(with: .opacity),
