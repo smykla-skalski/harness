@@ -28,7 +28,8 @@ struct SessionsBoardView: View {
       VStack(alignment: .leading, spacing: 22) {
         if store.sessions.isEmpty {
           SessionsBoardOnboardingCard(store: store, isLoading: isLoading)
-            .animation(.spring(duration: 0.3), value: store.isRefreshing)
+            .animation(.spring(duration: 0.3), value: isLoading)
+            .animation(.spring(duration: 0.3), value: store.connectionState)
         }
         metricsSection
           .animation(.spring(duration: 0.3), value: store.sessions)
