@@ -200,11 +200,10 @@ struct HarnessStoreActionTests {
           )
         ]
     )
-    #expect(
-      !(store.selectedSession?.agents.contains(where: {
-        $0.agentId == PreviewFixtures.agents[1].agentId
-      }) ?? true)
-    )
+    let agentStillPresent = store.selectedSession?.agents.contains(where: {
+      $0.agentId == PreviewFixtures.agents[1].agentId
+    }) ?? true
+    #expect(agentStillPresent == false)
     #expect(store.lastAction == "Remove agent")
   }
 
@@ -315,13 +314,13 @@ struct HarnessStoreActionTests {
 
     #expect(store.isSessionActionInFlight)
     #expect(store.isBusy)
-    #expect(!store.isDaemonActionInFlight)
-    #expect(!store.isDiagnosticsRefreshInFlight)
+    #expect(store.isDaemonActionInFlight == false)
+    #expect(store.isDiagnosticsRefreshInFlight == false)
 
     await createTask.value
 
-    #expect(!store.isSessionActionInFlight)
-    #expect(!store.isBusy)
+    #expect(store.isSessionActionInFlight == false)
+    #expect(store.isBusy == false)
   }
 
   private func selectedStore(client: RecordingHarnessClient) async -> HarnessStore {
