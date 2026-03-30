@@ -25,6 +25,7 @@ struct SessionsBoardRecentSessionsSection: View {
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
                   .fill(statusColor(for: session.status))
                   .frame(width: 10)
+                  .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 4) {
                   Text(session.context)
                     .font(.system(.headline, design: .rounded, weight: .semibold))

@@ -108,8 +108,8 @@ enum HarnessAccessibility {
     let lowercased = value.lowercased()
     return
       lowercased
-      .replacingOccurrences(of: " ", with: "-")
-      .replacingOccurrences(of: "_", with: "-")
-      .replacingOccurrences(of: ".", with: "")
+      .replacing(" ", with: "-")
+      .replacing("_", with: "-")
+      .replacing(".", with: "")
   }
 }

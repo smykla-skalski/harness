@@ -19,7 +19,7 @@ struct InspectorActionSections: View {
   @State private var taskStatus: TaskStatus = .inProgress
   @State private var statusNote = ""
   @State private var checkpointSummary = ""
-  @State private var checkpointProgress = 50
+  @State private var checkpointProgress: Double = 50
   @State private var role: SessionRole = .worker
   @State private var transferLeaderID = ""
   @State private var transferReason = ""
@@ -138,9 +138,9 @@ extension InspectorActionSections {
         .font(.headline)
       TextField("Summary", text: $checkpointSummary, axis: .vertical)
         .lineLimit(3, reservesSpace: true)
-      Slider(value: checkpointBinding, in: 0...100, step: 5)
+      Slider(value: $checkpointProgress, in: 0...100, step: 5)
       HStack {
-        Text("\(checkpointProgress)%")
+        Text("\(Int(checkpointProgress))%")
           .font(.caption.bold())
           .foregroundStyle(HarnessTheme.secondaryInk)
         Spacer()
@@ -235,12 +235,6 @@ extension InspectorActionSections {
     }
     .harnessCard()
   }
-  fileprivate var checkpointBinding: Binding<Double> {
-    Binding(
-      get: { Double(checkpointProgress) },
-      set: { checkpointProgress = Int($0) }
-    )
-  }
   fileprivate func configureDefaults() {
     if let selectedTask {
       taskID = selectedTask.taskId
@@ -308,7 +302,7 @@ extension InspectorActionSections {
     await store.checkpointTask(
       taskID: taskID,
       summary: summary,
-      progress: checkpointProgress
+      progress: Int(checkpointProgress)
     )
     checkpointSummary = ""
     configureDefaults()

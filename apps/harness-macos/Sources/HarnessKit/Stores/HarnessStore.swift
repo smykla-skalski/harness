@@ -80,6 +80,10 @@ public final class HarnessStore {
   public var lastAction = ""
   public var lastError: String?
   public var pendingConfirmation: PendingConfirmation?
+  public var showConfirmation: Bool {
+    get { pendingConfirmation != nil }
+    set { if !newValue { cancelConfirmation() } }
+  }
   public var activeTransport: TransportKind = .httpSSE
   public var connectionMetrics: ConnectionMetrics = .initial
   public var connectionEvents: [ConnectionEvent] = []

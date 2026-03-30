@@ -101,7 +101,7 @@ struct ContentView: View {
     }
     .confirmationDialog(
       confirmationTitle,
-      isPresented: confirmationBinding,
+      isPresented: $store.showConfirmation,
       titleVisibility: .visible,
     ) {
       switch store.pendingConfirmation {
@@ -134,17 +134,6 @@ struct ContentView: View {
     Task {
       await store.refresh()
     }
-  }
-
-  private var confirmationBinding: Binding<Bool> {
-    Binding(
-      get: { store.pendingConfirmation != nil },
-      set: { isPresented in
-        if !isPresented {
-          store.cancelConfirmation()
-        }
-      }
-    )
   }
 
   private var confirmationTitle: String {

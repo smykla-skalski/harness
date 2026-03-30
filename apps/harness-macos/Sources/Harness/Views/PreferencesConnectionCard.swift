@@ -51,14 +51,16 @@ struct PreferencesConnectionCard: View {
 
   private var uptimeText: String {
     guard let since = metrics.connectedSince else { return "--" }
-    let seconds = Int(Date().timeIntervalSince(since))
+    let seconds = Int(Date.now.timeIntervalSince(since))
     if seconds < 60 { return "\(seconds)s" }
     if seconds < 3600 { return "\(seconds / 60)m" }
     return "\(seconds / 3600)h \((seconds % 3600) / 60)m"
   }
 
   private var rateText: String {
-    String(format: "%.1f", metrics.messagesPerSecond)
+    metrics.messagesPerSecond.formatted(
+      .number.precision(.fractionLength(1))
+    )
   }
 
   private func connectionMetric(

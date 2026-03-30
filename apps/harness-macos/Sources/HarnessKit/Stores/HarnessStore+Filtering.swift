@@ -57,7 +57,7 @@ extension HarnessStore {
   }
 
   public var filteredSessionCount: Int {
-    sessions.filter(matchesCurrentFilters).count
+    sessions.count(where: matchesCurrentFilters)
   }
 
   public var totalOpenWorkCount: Int {
@@ -130,12 +130,11 @@ extension HarnessStore {
       summary.leaderId ?? "",
       summary.observeId ?? "",
       summary.status.rawValue,
-    ].joined(separator: " ").lowercased()
+    ].joined(separator: " ")
 
     return
       needle
-      .lowercased()
       .split(whereSeparator: \.isWhitespace)
-      .allSatisfy { haystack.contains($0) }
+      .allSatisfy { haystack.localizedStandardContains($0) }
   }
 }
