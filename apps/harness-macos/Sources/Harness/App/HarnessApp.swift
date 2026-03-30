@@ -164,10 +164,7 @@ struct HarnessApp: App {
       themeMode: $themeMode,
       themeStyle: $themeStyle
     )
-    .environment(\.harnessThemeStyle, themeStyle)
     .preferredColorScheme(themeMode.colorScheme)
-    .tint(HarnessTheme.accent(for: themeStyle))
-    .frame(maxWidth: .infinity, maxHeight: .infinity)
   }
 
   private func refreshStore() {
