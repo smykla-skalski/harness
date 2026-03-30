@@ -271,17 +271,6 @@ struct SessionCockpitView: View {
   }
 }
 
-func signalStatusColor(for status: SessionSignalStatus) -> Color {
-  switch status {
-  case .pending, .deferred:
-    HarnessTheme.caution
-  case .acknowledged:
-    HarnessTheme.success
-  case .rejected, .expired:
-    HarnessTheme.danger
-  }
-}
-
 #Preview("Cockpit") {
   SessionCockpitView(
     store: HarnessStore(daemonController: PreviewDaemonController()),

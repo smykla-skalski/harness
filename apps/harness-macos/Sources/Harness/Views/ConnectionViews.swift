@@ -39,11 +39,7 @@ struct LatencyBadge: View {
   }
 
   private var tint: Color {
-    switch quality {
-    case .excellent, .good: HarnessTheme.success
-    case .degraded: HarnessTheme.caution
-    case .poor, .disconnected: HarnessTheme.danger
-    }
+    quality.themeColor
   }
 
   var body: some View {
@@ -142,11 +138,7 @@ struct ConnectionToolbarBadge: View {
     if metrics.connectedSince != nil, metrics.latencyMs == nil {
       return HarnessTheme.success
     }
-    switch metrics.quality {
-    case .excellent, .good: return HarnessTheme.success
-    case .degraded: return HarnessTheme.caution
-    case .poor, .disconnected: return HarnessTheme.danger
-    }
+    return metrics.quality.themeColor
   }
 
   var body: some View {
