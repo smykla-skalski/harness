@@ -156,6 +156,7 @@ struct SessionsBoardView: View {
         Circle()
           .fill(isReady ? HarnessTheme.success : HarnessTheme.caution)
           .frame(width: 10, height: 10)
+          .accessibilityHidden(true)
         Text(title)
           .font(.system(.headline, design: .rounded, weight: .semibold))
       }

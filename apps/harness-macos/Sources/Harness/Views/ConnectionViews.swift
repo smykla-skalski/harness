@@ -146,6 +146,7 @@ struct ConnectionToolbarBadge: View {
       Circle()
         .fill(qualityColor)
         .frame(width: 6, height: 6)
+        .accessibilityHidden(true)
       Text(label)
         .font(.system(.caption, design: .rounded, weight: .semibold).monospacedDigit())
         .foregroundStyle(qualityColor)
