@@ -39,19 +39,32 @@ struct ContentView: View {
         .navigationSplitViewColumnWidth(min: 300, ideal: 350)
     } detail: {
       NavigationStack {
-        VStack(spacing: 0) {
-          if store.isShowingCachedData {
-            CachedDataBanner()
+        HStack(spacing: 0) {
+          VStack(spacing: 0) {
+            if store.isShowingCachedData {
+              CachedDataBanner()
+            }
+            SessionContentContainer(
+              store: store,
+              detail: selectedDetail,
+              summary: selectedSessionSummary,
+              timeline: store.timeline
+            )
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
           }
-          SessionContentContainer(
-            store: store,
-            detail: selectedDetail,
-            summary: selectedSessionSummary,
-            timeline: store.timeline
-          )
-          .frame(maxWidth: .infinity, maxHeight: .infinity)
+          .accessibilityFrameMarker("\(HarnessAccessibility.contentRoot).frame")
+
+          if showInspector {
+            Divider()
+            InspectorColumnView(store: store, themeStyle: themeStyle)
+              .frame(minWidth: 320, idealWidth: 380, maxWidth: 500)
+              .background {
+                HarnessTheme.inspectorBackground(for: themeStyle)
+              }
+              .transition(.move(edge: .trailing).combined(with: .opacity))
+          }
         }
-        .accessibilityFrameMarker("\(HarnessAccessibility.contentRoot).frame")
+        .animation(.snappy(duration: 0.24), value: showInspector)
       }
       .navigationTitle("Harness")
       .toolbar {
@@ -77,7 +90,9 @@ struct ContentView: View {
         }
         ToolbarItem(placement: .primaryAction) {
           Button {
-            showInspector.toggle()
+            withAnimation(.snappy(duration: 0.24)) {
+              showInspector.toggle()
+            }
           } label: {
             Label("Inspector", systemImage: "info.circle")
           }
@@ -91,14 +106,6 @@ struct ContentView: View {
           }
           .accessibilityIdentifier(HarnessAccessibility.daemonPreferencesButton)
         }
-      }
-      .inspector(isPresented: $showInspector) {
-        InspectorColumnView(store: store, themeStyle: themeStyle)
-          .background {
-            HarnessTheme.inspectorBackground(for: themeStyle)
-              .ignoresSafeArea()
-          }
-          .inspectorColumnWidth(min: 320, ideal: 380, max: 500)
       }
       .harnessExtendedChromeBackground {
         HarnessTheme.canvas(for: themeStyle)
