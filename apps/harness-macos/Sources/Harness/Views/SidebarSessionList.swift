@@ -311,19 +311,11 @@ extension SidebarSessionList {
     identifier: String,
     action: @escaping () -> Void
   ) -> some View {
-    Button(action: action) {
-      Text(title)
-        .font(.system(.callout, design: .rounded, weight: .semibold))
-        .lineLimit(1)
-        .minimumScaleFactor(0.88)
-        .padding(.horizontal, HarnessControlMetrics.chipHorizontalPadding)
-        .padding(.vertical, HarnessControlMetrics.chipVerticalPadding)
-        .frame(minHeight: HarnessControlMetrics.chipMinHeight)
-        .fixedSize(horizontal: true, vertical: true)
-    }
-    .buttonBorderShape(.roundedRectangle(radius: 12))
-    .harnessFilterChipButtonStyle(isSelected: isSelected)
-    .controlSize(HarnessControlMetrics.compactControlSize)
+    Button(title, action: action)
+      .font(.system(.callout, design: .rounded, weight: .semibold))
+      .buttonBorderShape(.roundedRectangle(radius: 12))
+      .harnessFilterChipButtonStyle(isSelected: isSelected)
+      .controlSize(HarnessControlMetrics.compactControlSize)
     .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
     .accessibilityIdentifier(identifier)
     .accessibilityFrameMarker("\(identifier).frame")
