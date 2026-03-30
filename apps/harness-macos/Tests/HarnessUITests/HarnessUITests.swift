@@ -39,14 +39,14 @@ final class HarnessUITests: HarnessUITestCase {
 
     let activeFilter = element(in: app, identifier: Accessibility.activeFilterButton)
     XCTAssertTrue(activeFilter.waitForExistence(timeout: Self.uiTimeout))
-    XCTAssertEqual(activeFilter.value as? String, "selected accent-on-light")
+    XCTAssertEqual(activeFilter.value as? String, "selected")
     XCTAssertEqual(
       element(in: app, identifier: Accessibility.allFilterButton).value as? String,
-      "not selected ink-on-panel"
+      "not selected"
     )
     XCTAssertEqual(
       element(in: app, identifier: Accessibility.endedFilterButton).value as? String,
-      "not selected ink-on-panel"
+      "not selected"
     )
   }
 

@@ -43,7 +43,7 @@ final class HarnessStoreTests: XCTestCase {
     )
   }
 
-  func testSavedSearchAppliesRicherFilterSlice() async throws {
+  func testBlockedFocusFilterNarrowsSessionSlice() async throws {
     let store = HarnessStore(daemonController: RecordingDaemonController())
     store.projects = [makeProject(totalSessionCount: 3, activeSessionCount: 2)]
     var activeFixture = SessionFixture(
@@ -91,16 +91,10 @@ final class HarnessStoreTests: XCTestCase {
       makeSession(endedFixture),
     ]
 
-    let preset = store.savedSearches.first { $0.id == "blocked-followups" }
-    XCTAssertNotNil(preset)
-    guard let preset else {
-      return
-    }
-
-    store.applySavedSearch(preset)
-
-    XCTAssertEqual(store.selectedSavedSearchID, preset.id)
+    store.sessionFilter = .active
     XCTAssertEqual(store.sessionFilter, .active)
+
+    store.sessionFocusFilter = .blocked
     XCTAssertEqual(store.sessionFocusFilter, .blocked)
     XCTAssertEqual(store.searchText, "")
     XCTAssertEqual(store.groupedSessions.flatMap(\.sessions).map(\.sessionId), ["sess-blocked"])
@@ -145,7 +139,6 @@ final class HarnessStoreTests: XCTestCase {
 
     store.resetFilters()
 
-    XCTAssertEqual(store.selectedSavedSearchID, nil)
     XCTAssertEqual(store.searchText, "")
     XCTAssertEqual(store.sessionFilter, .active)
     XCTAssertEqual(store.sessionFocusFilter, .all)
