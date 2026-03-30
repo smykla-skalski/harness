@@ -4,6 +4,7 @@ import SwiftUI
 
 struct ContentView: View {
   @Bindable var store: HarnessStore
+  let themeStyle: HarnessThemeStyle
 
   private var selectedDetail: SessionDetail? {
     guard let sessionID = store.selectedSessionID,
@@ -21,7 +22,7 @@ struct ContentView: View {
 
   var body: some View {
     NavigationSplitView {
-      SidebarView(store: store)
+      SidebarView(store: store, themeStyle: themeStyle)
         .navigationSplitViewColumnWidth(min: 300, ideal: 350)
     } content: {
       NavigationStack {
@@ -29,7 +30,8 @@ struct ContentView: View {
           store: store,
           detail: selectedDetail,
           summary: selectedSessionSummary,
-          timeline: store.timeline
+          timeline: store.timeline,
+          themeStyle: themeStyle
         )
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .accessibilityFrameMarker("\(HarnessAccessibility.contentRoot).frame")
@@ -57,26 +59,44 @@ struct ContentView: View {
           .accessibilityIdentifier(HarnessAccessibility.refreshButton)
 
           SettingsLink {
-            Label("Settings", systemImage: "gearshape.2")
+            Label("Settings", systemImage: "gearshape")
           }
           .accessibilityIdentifier(HarnessAccessibility.daemonPreferencesButton)
         }
       }
+      .background {
+        if HarnessTheme.usesGradientChrome {
+          HarnessTheme.canvas
+            .backgroundExtensionEffect()
+            .ignoresSafeArea()
+        } else {
+          HarnessTheme.canvas
+            .ignoresSafeArea()
+        }
+      }
       .navigationSplitViewColumnWidth(min: 600, ideal: 840)
     } detail: {
-      InspectorColumnView(store: store)
+      InspectorColumnView(store: store, themeStyle: themeStyle)
+        .background {
+          if HarnessTheme.usesGradientChrome {
+            HarnessTheme.inspectorBackground
+              .backgroundExtensionEffect()
+              .ignoresSafeArea()
+          } else {
+            HarnessTheme.inspectorBackground
+              .ignoresSafeArea()
+          }
+        }
         .navigationSplitViewColumnWidth(min: 320, ideal: 380)
     }
     .toolbarRole(.editor)
     .navigationSplitViewStyle(.balanced)
     .toolbarBackgroundVisibility(.visible, for: .windowToolbar)
-    .overlay(alignment: .top) {
-      Rectangle()
-        .fill(HarnessTheme.glassStroke)
-        .frame(height: 1)
-    }
     .containerBackground(.windowBackground, for: .window)
     .frame(maxWidth: .infinity, maxHeight: .infinity)
+    .accessibilityElement(children: .contain)
+    .accessibilityIdentifier(HarnessAccessibility.appChromeRoot)
+    .accessibilityValue(themeStyle.rawValue)
     .confirmationDialog(
       confirmationTitle,
       isPresented: confirmationBinding,
@@ -157,6 +177,7 @@ private struct SessionContentContainer: View {
   let detail: SessionDetail?
   let summary: SessionSummary?
   let timeline: [TimelineEntry]
+  let themeStyle: HarnessThemeStyle
 
   var body: some View {
     ZStack {
@@ -176,7 +197,6 @@ private struct SessionContentContainer: View {
     }
     .animation(.easeInOut(duration: 0.18), value: detail?.session.sessionId)
     .animation(.easeInOut(duration: 0.18), value: summary?.sessionId)
-    .background(HarnessTheme.canvas)
   }
 }
 
@@ -217,5 +237,8 @@ private struct SessionLoadingView: View {
 }
 
 #Preview("Dashboard") {
-  ContentView(store: HarnessStore(daemonController: PreviewDaemonController()))
+  ContentView(
+    store: HarnessStore(daemonController: PreviewDaemonController()),
+    themeStyle: .gradient
+  )
 }

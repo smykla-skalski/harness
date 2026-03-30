@@ -4,6 +4,7 @@ import SwiftUI
 
 struct InspectorColumnView: View {
   @Bindable var store: HarnessStore
+  let themeStyle: HarnessThemeStyle
   @State private var signalCommand = "inject_context"
   @State private var signalMessage = ""
   @State private var signalActionHint = ""
@@ -40,25 +41,21 @@ struct InspectorColumnView: View {
   }
 
   var body: some View {
-    ZStack(alignment: .topLeading) {
-      HarnessTheme.inspectorBackground
+    HarnessColumnScrollView(horizontalPadding: 18, verticalPadding: 22) {
+      VStack(alignment: .leading, spacing: 18) {
+        inspectorContent
 
-      HarnessColumnScrollView(horizontalPadding: 18, verticalPadding: 22) {
-        VStack(alignment: .leading, spacing: 18) {
-          inspectorContent
-
-          if let detail = store.selectedSession {
-            InspectorActionSections(
-              store: store,
-              detail: detail,
-              selectedTask: store.selectedTask,
-              selectedAgent: store.selectedAgent,
-              selectedObserver: selectedObserver
-            )
-          }
+        if let detail = store.selectedSession {
+          InspectorActionSections(
+            store: store,
+            detail: detail,
+            selectedTask: store.selectedTask,
+            selectedAgent: store.selectedAgent,
+            selectedObserver: selectedObserver
+          )
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
       }
+      .frame(maxWidth: .infinity, alignment: .leading)
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     .foregroundStyle(HarnessTheme.ink)
