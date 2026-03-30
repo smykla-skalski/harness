@@ -42,6 +42,7 @@ struct PreferencesRecentEventsCard: View {
                 strokeOpacity: 0.10
               )
             }
+            .accessibilityElement(children: .combine)
           }
         }
       }

@@ -106,7 +106,9 @@ struct PreferencesConnectionActionsCard: View {
             tint: HarnessTheme.accent(for: themeStyle),
             variant: .prominent,
             isLoading: isReconnectLoading,
-            accessibilityIdentifier: HarnessAccessibility.preferencesActionButton("Reconnect"),
+            accessibilityIdentifier: HarnessAccessibility.preferencesActionButton(
+              "Connection Reconnect"
+            ),
             action: reconnect
           )
 
@@ -116,7 +118,7 @@ struct PreferencesConnectionActionsCard: View {
             variant: .bordered,
             isLoading: isRefreshLoading,
             accessibilityIdentifier: HarnessAccessibility.preferencesActionButton(
-              "Refresh Diagnostics"
+              "Connection Refresh Diagnostics"
             ),
             action: refreshDiagnostics
           )
@@ -177,6 +179,7 @@ private struct PreferencesOverviewMetric: View {
     }
     .frame(maxWidth: .infinity, alignment: .leading)
     .harnessCard(minHeight: 88, contentPadding: 14)
+    .accessibilityElement(children: .combine)
     .accessibilityIdentifier(HarnessAccessibility.preferencesMetricCard(title))
   }
 }
@@ -223,6 +226,7 @@ struct PreferencesStatusCard: View {
         .multilineTextAlignment(.leading)
         .textSelection(.enabled)
     }
+    .accessibilityElement(children: .combine)
   }
 }
 
@@ -263,6 +267,7 @@ struct PreferencesPathsCard: View {
         .font(.caption.monospaced())
         .textSelection(.enabled)
     }
+    .accessibilityElement(children: .combine)
   }
 }
 
@@ -369,5 +374,6 @@ struct PreferencesDiagnosticsCard: View {
         strokeOpacity: 0.10
       )
     }
+    .accessibilityElement(children: .combine)
   }
 }
