@@ -87,6 +87,6 @@ struct HarnessStoreInspectorTests {
 
     let actors = store.availableActionActors
     #expect(actors.allSatisfy { $0.status == .active })
-    #expect(!actors.isEmpty)
+    #expect(actors.isEmpty == false)
   }
 }

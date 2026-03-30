@@ -32,7 +32,7 @@ struct HarnessStoreLifecycleTests {
         == .offline(DaemonControlError.daemonDidNotStart.localizedDescription)
     )
     #expect(store.lastError != nil)
-    #expect(!store.isDaemonActionInFlight)
+    #expect(store.isDaemonActionInFlight == false)
   }
 
   @Test("Prime session selection clears detail and timeline")
@@ -40,7 +40,7 @@ struct HarnessStoreLifecycleTests {
     let store = await makeBootstrappedStore()
     await store.selectSession(PreviewFixtures.summary.sessionId)
     #expect(store.selectedSession != nil)
-    #expect(!store.timeline.isEmpty)
+    #expect(store.timeline.isEmpty == false)
 
     store.primeSessionSelection("different-session")
 
@@ -61,7 +61,7 @@ struct HarnessStoreLifecycleTests {
     #expect(store.selectedSessionID == nil)
     #expect(store.selectedSession == nil)
     #expect(store.timeline.isEmpty)
-    #expect(!store.isSelectionLoading)
+    #expect(store.isSelectionLoading == false)
   }
 
   @Test("Prime session selection with same session is a no-op")
@@ -73,7 +73,7 @@ struct HarnessStoreLifecycleTests {
     store.primeSessionSelection(PreviewFixtures.summary.sessionId)
 
     #expect(store.selectedSession == originalDetail)
-    #expect(!store.isSelectionLoading)
+    #expect(store.isSelectionLoading == false)
   }
 
   @Test("Refresh diagnostics without client falls back to daemon status")
@@ -84,14 +84,14 @@ struct HarnessStoreLifecycleTests {
     await store.refreshDiagnostics()
 
     #expect(store.diagnostics == nil)
-    #expect(!store.isDiagnosticsRefreshInFlight)
+    #expect(store.isDiagnosticsRefreshInFlight == false)
   }
 
   @Test("Selecting nil session stops session stream subscription")
   func selectingNilSessionStopsSubscription() async {
     let store = await makeBootstrappedStore()
     await store.selectSession(PreviewFixtures.summary.sessionId)
-    #expect(!store.subscribedSessionIDs.isEmpty)
+    #expect(store.subscribedSessionIDs.isEmpty == false)
 
     await store.selectSession(nil)
 

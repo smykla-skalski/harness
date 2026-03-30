@@ -154,9 +154,9 @@ extension HarnessUITestCase {
   }
 
   func tapButton(in app: XCUIApplication, identifier: String) {
-    let deadline = Date().addingTimeInterval(Self.uiTimeout)
+    let deadline = Date.now.addingTimeInterval(Self.uiTimeout)
 
-    while Date() < deadline {
+    while Date.now < deadline {
       app.activate()
 
       let button = button(in: app, identifier: identifier)
@@ -172,16 +172,16 @@ extension HarnessUITestCase {
         }
       }
 
-      RunLoop.current.run(until: Date().addingTimeInterval(0.2))
+      RunLoop.current.run(until: Date.now.addingTimeInterval(0.2))
     }
 
     XCTFail("Failed to tap button \(identifier)")
   }
 
   func tapElement(in app: XCUIApplication, identifier: String) {
-    let deadline = Date().addingTimeInterval(Self.uiTimeout)
+    let deadline = Date.now.addingTimeInterval(Self.uiTimeout)
 
-    while Date() < deadline {
+    while Date.now < deadline {
       app.activate()
 
       let target = element(in: app, identifier: identifier)
@@ -197,7 +197,7 @@ extension HarnessUITestCase {
         }
       }
 
-      RunLoop.current.run(until: Date().addingTimeInterval(0.2))
+      RunLoop.current.run(until: Date.now.addingTimeInterval(0.2))
     }
 
     XCTFail("Failed to tap element \(identifier)")
@@ -333,12 +333,12 @@ extension HarnessUITestCase {
     pollInterval: TimeInterval = 0.1,
     condition: @escaping () -> Bool
   ) -> Bool {
-    let deadline = Date().addingTimeInterval(timeout)
-    while Date() < deadline {
+    let deadline = Date.now.addingTimeInterval(timeout)
+    while Date.now < deadline {
       if condition() {
         return true
       }
-      RunLoop.current.run(until: Date().addingTimeInterval(pollInterval))
+      RunLoop.current.run(until: Date.now.addingTimeInterval(pollInterval))
     }
     return condition()
   }
