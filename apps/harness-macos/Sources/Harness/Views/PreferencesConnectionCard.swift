@@ -2,6 +2,8 @@ import HarnessKit
 import SwiftUI
 
 struct PreferencesConnectionCard: View {
+  @Environment(\.harnessThemeStyle)
+  private var themeStyle
   let metrics: ConnectionMetrics
   let events: [ConnectionEvent]
 
@@ -15,14 +17,14 @@ struct PreferencesConnectionCard: View {
           connectionMetric("Transport", value: metrics.transportKind.title, tint: qualityColor)
           connectionMetric("Latency", value: latencyText, tint: qualityColor)
           connectionMetric(
-            "Messages in", value: "\(metrics.messagesReceived)", tint: HarnessTheme.accent
+            "Messages in", value: "\(metrics.messagesReceived)", tint: HarnessTheme.accent(for: themeStyle)
           )
           connectionMetric(
             "Messages out", value: "\(metrics.messagesSent)", tint: HarnessTheme.warmAccent
           )
           connectionMetric("Uptime", value: uptimeText, tint: HarnessTheme.success)
           connectionMetric("Reconnects", value: "\(metrics.reconnectCount)", tint: reconnectTint)
-          connectionMetric("Msg/sec", value: rateText, tint: HarnessTheme.accent)
+          connectionMetric("Msg/sec", value: rateText, tint: HarnessTheme.accent(for: themeStyle))
           connectionMetric("Quality", value: metrics.quality.title, tint: qualityColor)
         }
       }

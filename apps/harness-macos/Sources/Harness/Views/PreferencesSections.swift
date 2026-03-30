@@ -2,6 +2,8 @@ import HarnessKit
 import SwiftUI
 
 struct PreferencesActionGrid: View {
+  @Environment(\.harnessThemeStyle)
+  private var themeStyle
   let isLoading: Bool
   let reconnect: @Sendable () async -> Void
   let refreshDiagnostics: @Sendable () async -> Void
@@ -25,7 +27,7 @@ struct PreferencesActionGrid: View {
   private var preferenceReconnectButton: some View {
     HarnessAsyncActionButton(
       title: "Reconnect",
-      tint: HarnessTheme.accent,
+      tint: HarnessTheme.accent(for: themeStyle),
       variant: .bordered,
       isLoading: isLoading,
       accessibilityIdentifier: HarnessAccessibility.preferencesActionButton("Reconnect"),
@@ -86,6 +88,8 @@ struct PreferencesActionGrid: View {
 }
 
 struct PreferencesConnectionActionsCard: View {
+  @Environment(\.harnessThemeStyle)
+  private var themeStyle
   let isReconnectLoading: Bool
   let isRefreshLoading: Bool
   let reconnect: @Sendable () async -> Void
@@ -99,7 +103,7 @@ struct PreferencesConnectionActionsCard: View {
         HarnessWrapLayout(spacing: 10, lineSpacing: 10) {
           HarnessAsyncActionButton(
             title: "Reconnect",
-            tint: HarnessTheme.accent,
+            tint: HarnessTheme.accent(for: themeStyle),
             variant: .prominent,
             isLoading: isReconnectLoading,
             accessibilityIdentifier: HarnessAccessibility.preferencesActionButton("Reconnect"),
@@ -283,6 +287,8 @@ struct PreferencesPathsCard: View {
 }
 
 struct PreferencesDiagnosticsCard: View {
+  @Environment(\.harnessThemeStyle)
+  private var themeStyle
   let launchAgent: LaunchAgentStatus?
   let tokenPresent: Bool
   let projectCount: Int
@@ -302,7 +308,7 @@ struct PreferencesDiagnosticsCard: View {
         diagnosticBadge(
           title: "Projects",
           value: "\(projectCount)",
-          tint: HarnessTheme.accent
+          tint: HarnessTheme.accent(for: themeStyle)
         )
         diagnosticBadge(
           title: "Sessions",
@@ -317,7 +323,11 @@ struct PreferencesDiagnosticsCard: View {
             .font(.headline)
           Text(launchAgent.lifecycleTitle)
             .font(.system(.body, design: .rounded, weight: .bold))
-            .foregroundStyle(launchAgent.pid == nil ? HarnessTheme.accent : HarnessTheme.success)
+            .foregroundStyle(
+              launchAgent.pid == nil
+                ? HarnessTheme.accent(for: themeStyle)
+                : HarnessTheme.success
+            )
           Text(launchAgent.lifecycleCaption)
             .font(.caption)
             .foregroundStyle(HarnessTheme.secondaryInk)

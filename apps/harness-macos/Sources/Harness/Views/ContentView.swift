@@ -69,13 +69,13 @@ struct ContentView: View {
         }
       }
       .harnessExtendedChromeBackground {
-        HarnessTheme.canvas
+        HarnessTheme.canvas(for: themeStyle)
       }
       .navigationSplitViewColumnWidth(min: 600, ideal: 840)
     } detail: {
       InspectorColumnView(store: store, themeStyle: themeStyle)
         .harnessExtendedChromeBackground {
-          HarnessTheme.inspectorBackground
+          HarnessTheme.inspectorBackground(for: themeStyle)
         }
         .navigationSplitViewColumnWidth(min: 320, ideal: 380)
     }

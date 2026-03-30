@@ -106,71 +106,103 @@ private struct FillWidthButtonSizing: ViewModifier {
   }
 }
 
-extension View {
+private struct HarnessActionButtonStyleModifier: ViewModifier {
+  @Environment(\.harnessThemeStyle)
+  private var themeStyle
+  let variant: HarnessAsyncActionButton.Variant
+  let tint: Color
+
   @ViewBuilder
-  func harnessActionButtonStyle(
-    variant: HarnessAsyncActionButton.Variant,
-    tint: Color
-  ) -> some View {
-    if HarnessTheme.usesGradientChrome {
+  func body(content: Content) -> some View {
+    if HarnessTheme.usesGradientChrome(for: themeStyle) {
       switch variant {
       case .prominent:
-        self
+        content
           .buttonStyle(.glassProminent)
           .tint(tint)
       case .bordered:
-        self
+        content
           .buttonStyle(.glass(.regular.tint(tint)))
       }
     } else {
       switch variant {
       case .prominent:
-        self
+        content
           .buttonStyle(.borderedProminent)
           .tint(tint)
       case .bordered:
-        self
+        content
           .buttonStyle(.bordered)
           .tint(tint)
       }
     }
   }
+}
+
+private struct HarnessAccessoryButtonStyleModifier: ViewModifier {
+  @Environment(\.harnessThemeStyle)
+  private var themeStyle
+  let tint: Color
 
   @ViewBuilder
-  func harnessAccessoryButtonStyle(tint: Color = HarnessTheme.ink) -> some View {
-    if HarnessTheme.usesGradientChrome {
-      self
+  func body(content: Content) -> some View {
+    if HarnessTheme.usesGradientChrome(for: themeStyle) {
+      content
         .buttonStyle(.glass(.regular.tint(tint)))
     } else {
-      self
+      content
         .buttonStyle(.bordered)
         .tint(tint)
     }
   }
+}
+
+private struct HarnessFilterChipButtonStyleModifier: ViewModifier {
+  @Environment(\.harnessThemeStyle)
+  private var themeStyle
+  let isSelected: Bool
 
   @ViewBuilder
-  func harnessFilterChipButtonStyle(
-    isSelected: Bool
-  ) -> some View {
-    if HarnessTheme.usesGradientChrome {
+  func body(content: Content) -> some View {
+    let isGradient = HarnessTheme.usesGradientChrome(for: themeStyle)
+    if isGradient {
       if isSelected {
-        self
+        content
           .buttonStyle(.glassProminent)
-          .tint(HarnessTheme.accent)
+          .tint(HarnessTheme.accent(for: themeStyle))
       } else {
-        self
-          .buttonStyle(.glass(.regular.tint(HarnessTheme.surface)))
+        content
+          .buttonStyle(
+            .glass(.regular.tint(HarnessTheme.surface(for: themeStyle)))
+          )
       }
     } else {
       if isSelected {
-        self
+        content
           .buttonStyle(.borderedProminent)
-          .tint(HarnessTheme.accent)
+          .tint(HarnessTheme.accent(for: themeStyle))
       } else {
-        self
+        content
           .buttonStyle(.bordered)
           .tint(HarnessTheme.ink)
       }
     }
+  }
+}
+
+extension View {
+  func harnessActionButtonStyle(
+    variant: HarnessAsyncActionButton.Variant,
+    tint: Color
+  ) -> some View {
+    modifier(HarnessActionButtonStyleModifier(variant: variant, tint: tint))
+  }
+
+  func harnessAccessoryButtonStyle(tint: Color = HarnessTheme.ink) -> some View {
+    modifier(HarnessAccessoryButtonStyleModifier(tint: tint))
+  }
+
+  func harnessFilterChipButtonStyle(isSelected: Bool) -> some View {
+    modifier(HarnessFilterChipButtonStyleModifier(isSelected: isSelected))
   }
 }

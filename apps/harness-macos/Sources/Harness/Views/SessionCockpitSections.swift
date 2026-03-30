@@ -2,11 +2,13 @@ import HarnessKit
 import SwiftUI
 
 struct SessionMetricGrid: View {
+  @Environment(\.harnessThemeStyle)
+  private var themeStyle
   let metrics: SessionMetrics
 
   var body: some View {
     HarnessAdaptiveGridLayout(minimumColumnWidth: 130, maximumColumns: 5, spacing: 14) {
-      metricCard(title: "Agents", value: "\(metrics.agentCount)", tint: HarnessTheme.accent)
+      metricCard(title: "Agents", value: "\(metrics.agentCount)", tint: HarnessTheme.accent(for: themeStyle))
       metricCard(title: "Active", value: "\(metrics.activeAgentCount)", tint: HarnessTheme.success)
       metricCard(
         title: "In Flight",
@@ -57,6 +59,8 @@ struct SessionTaskListSection: View {
 }
 
 struct SessionTaskSummaryCard: View {
+  @Environment(\.harnessThemeStyle)
+  private var themeStyle
   let task: WorkItem
   let onTap: () -> Void
 
@@ -72,7 +76,7 @@ struct SessionTaskSummaryCard: View {
             .font(.caption.bold())
             .padding(.horizontal, 8)
             .padding(.vertical, 4)
-            .background(severityColor(for: task.severity), in: Capsule())
+            .background(severityColor(for: task.severity, style: themeStyle), in: Capsule())
             .foregroundStyle(.white)
         }
         Text(task.context ?? "No extra context")
@@ -84,7 +88,7 @@ struct SessionTaskSummaryCard: View {
         HStack(alignment: .firstTextBaseline) {
           Text(task.status.title)
             .font(.caption.weight(.bold))
-            .foregroundStyle(taskStatusColor(for: task.status))
+            .foregroundStyle(taskStatusColor(for: task.status, style: themeStyle))
           Spacer()
           Text(task.assignedTo ?? "unassigned")
             .font(.caption.monospaced())
@@ -132,6 +136,8 @@ struct SessionAgentListSection: View {
 }
 
 struct SessionAgentSummaryCard: View {
+  @Environment(\.harnessThemeStyle)
+  private var themeStyle
   let agent: AgentRegistration
   let onTap: () -> Void
 
@@ -147,7 +153,7 @@ struct SessionAgentSummaryCard: View {
             .font(.caption.bold())
             .padding(.horizontal, 8)
             .padding(.vertical, 4)
-            .background(HarnessTheme.accent, in: Capsule())
+            .background(HarnessTheme.accent(for: themeStyle), in: Capsule())
             .foregroundStyle(.white)
         }
         Text("\(agent.runtime) • \(agent.agentId)")

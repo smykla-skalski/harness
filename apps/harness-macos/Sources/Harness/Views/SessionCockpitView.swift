@@ -3,6 +3,8 @@ import Observation
 import SwiftUI
 
 struct SessionCockpitView: View {
+  @Environment(\.harnessThemeStyle)
+  private var themeStyle
   @Bindable var store: HarnessStore
   let detail: SessionDetail
   let timeline: [TimelineEntry]
@@ -79,7 +81,7 @@ struct SessionCockpitView: View {
     } label: {
       actionLabel("Observe")
     }
-    .harnessActionButtonStyle(variant: .prominent, tint: HarnessTheme.accent)
+    .harnessActionButtonStyle(variant: .prominent, tint: HarnessTheme.accent(for: themeStyle))
   }
 
   private var endSessionButton: some View {
@@ -184,7 +186,7 @@ struct SessionCockpitView: View {
       ForEach(timeline) { entry in
         HStack(alignment: .top, spacing: 12) {
           RoundedRectangle(cornerRadius: 999)
-            .fill(HarnessTheme.accent.opacity(0.35))
+            .fill(HarnessTheme.accent(for: themeStyle).opacity(0.35))
             .frame(width: 8)
           VStack(alignment: .leading, spacing: 4) {
             Text(entry.summary)

@@ -3,6 +3,8 @@ import Observation
 import SwiftUI
 
 struct SidebarSessionList: View {
+  @Environment(\.harnessThemeStyle)
+  private var themeStyle
   @Bindable var store: HarnessStore
 
   private var activeFilterSummary: String {
@@ -48,7 +50,7 @@ struct SidebarSessionList: View {
             store.resetFilters()
           }
           .font(.caption.bold())
-          .harnessAccessoryButtonStyle(tint: HarnessTheme.accent)
+          .harnessAccessoryButtonStyle(tint: HarnessTheme.accent(for: themeStyle))
           .controlSize(.small)
           .accessibilityIdentifier(HarnessAccessibility.sidebarClearFiltersButton)
         }
@@ -121,11 +123,11 @@ struct SidebarSessionList: View {
               HStack {
                 Text(group.project.name)
                   .font(.system(.headline, design: .serif, weight: .semibold))
-                  .foregroundStyle(HarnessTheme.sidebarHeader)
+                  .foregroundStyle(HarnessTheme.sidebarHeader(for: themeStyle))
                 Spacer()
                 Text("\(group.sessions.count)")
                   .font(.caption.monospacedDigit())
-                  .foregroundStyle(HarnessTheme.sidebarMuted)
+                  .foregroundStyle(HarnessTheme.sidebarMuted(for: themeStyle))
               }
               .padding(.horizontal, 12)
               .padding(.vertical, 10)
@@ -178,7 +180,7 @@ struct SidebarSessionList: View {
                     HarnessInteractiveCardBackground(
                       cornerRadius: 18,
                       tint: store.selectedSessionID == session.sessionId
-                        ? HarnessTheme.surfaceHover
+                        ? HarnessTheme.surfaceHover(for: themeStyle)
                         : nil
                     )
                   }
