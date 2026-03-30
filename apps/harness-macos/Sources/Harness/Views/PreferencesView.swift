@@ -51,13 +51,16 @@ struct PreferencesView: View {
 
   var body: some View {
     PreferencesChromeLayout(
-      themeStyle: themeStyle,
       selection: $selectedSection
     ) {
       selectedSectionContent
     }
+    .harnessExtendedChromeBackground {
+      HarnessTheme.canvas(for: themeStyle)
+    }
     .toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
     .containerBackground(.windowBackground, for: .window)
+    .toolbar(removing: .sidebarToggle)
     .toolbar(removing: .title)
     .frame(maxWidth: .infinity, maxHeight: .infinity)
     .accessibilityElement(children: .contain)
