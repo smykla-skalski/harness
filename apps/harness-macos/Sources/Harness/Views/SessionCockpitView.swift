@@ -29,8 +29,10 @@ struct SessionCockpitView: View {
       .frame(maxWidth: .infinity, alignment: .leading)
     }
     .foregroundStyle(HarnessTheme.ink)
-    .animation(.easeInOut(duration: 0.18), value: detail.tasks)
-    .animation(.easeInOut(duration: 0.18), value: detail.agents)
+    .animation(.spring(duration: 0.3), value: detail.tasks)
+    .animation(.spring(duration: 0.3), value: detail.agents)
+    .animation(.spring(duration: 0.3), value: detail.signals)
+    .animation(.spring(duration: 0.3), value: timeline)
   }
 }
 
