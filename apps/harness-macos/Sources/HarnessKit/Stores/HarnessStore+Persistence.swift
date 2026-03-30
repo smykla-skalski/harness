@@ -267,8 +267,36 @@ extension HarnessStore {
       return
     }
 
+    let evictedProjectIds = Set(stale.map(\.projectId))
     for session in stale {
       context.delete(session)
+    }
+
+    try? context.save()
+    evictOrphanedProjects(candidateIds: evictedProjectIds, in: context)
+  }
+
+  private func evictOrphanedProjects(
+    candidateIds: Set<String>,
+    in context: ModelContext
+  ) {
+    for projectId in candidateIds {
+      var descriptor = FetchDescriptor<CachedSession>(
+        predicate: #Predicate { $0.projectId == projectId }
+      )
+      descriptor.fetchLimit = 1
+
+      let hasRemaining = (try? context.fetchCount(descriptor)) ?? 0
+      if hasRemaining == 0 {
+        let projectDescriptor = FetchDescriptor<CachedProject>(
+          predicate: #Predicate { $0.projectId == projectId }
+        )
+        if let orphaned = try? context.fetch(projectDescriptor) {
+          for project in orphaned {
+            context.delete(project)
+          }
+        }
+      }
     }
 
     try? context.save()
