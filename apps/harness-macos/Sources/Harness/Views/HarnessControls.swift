@@ -52,12 +52,14 @@ struct HarnessAsyncActionButton: View {
     HStack(spacing: 6) {
       if isLoading {
         HarnessSpinner()
+          .transition(.opacity)
       }
       Text(title)
         .lineLimit(1)
     }
     .font(.system(.callout, design: .rounded, weight: .semibold))
     .frame(maxWidth: fillsWidth ? .infinity : nil)
+    .animation(.spring(duration: 0.2), value: isLoading)
   }
 
   private func launchAction() {
