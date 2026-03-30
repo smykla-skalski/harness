@@ -196,7 +196,7 @@ struct InspectorBadgeColumn: View {
 
   var body: some View {
     VStack(alignment: .leading, spacing: 8) {
-      ForEach(Array(values.enumerated()), id: \.offset) { _, value in
+      ForEach(values, id: \.self) { value in
         Text(value)
           .font(.caption.weight(.semibold))
           .padding(.horizontal, 10)
