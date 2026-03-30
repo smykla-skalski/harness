@@ -105,6 +105,16 @@ struct SidebarSessionList: View {
   }
 
   private var sessionList: some View {
+    SessionListContent(store: store)
+  }
+}
+
+private struct SessionListContent: View {
+  @Environment(\.harnessThemeStyle)
+  private var themeStyle
+  @Bindable var store: HarnessStore
+
+  var body: some View {
     Group {
       if store.sessions.isEmpty {
         ContentUnavailableView {
@@ -205,7 +215,20 @@ struct SidebarSessionList: View {
     }
   }
 
-  private func filterSection<Content: View>(
+  fileprivate func labelChip(_ value: String) -> some View {
+    Text(value)
+      .font(.caption.weight(.semibold))
+      .lineLimit(1)
+      .padding(.horizontal, 8)
+      .padding(.vertical, 4)
+      .background {
+        HarnessGlassCapsuleBackground()
+      }
+  }
+}
+
+extension SidebarSessionList {
+  fileprivate func filterSection<Content: View>(
     title: String,
     @ViewBuilder content: () -> Content
   ) -> some View {
@@ -242,17 +265,4 @@ struct SidebarSessionList: View {
     .accessibilityValue(isSelected ? "selected" : "not selected")
   }
 
-}
-
-extension SidebarSessionList {
-  fileprivate func labelChip(_ value: String) -> some View {
-    Text(value)
-      .font(.caption.weight(.semibold))
-      .lineLimit(1)
-      .padding(.horizontal, 8)
-      .padding(.vertical, 4)
-      .background {
-        HarnessGlassCapsuleBackground()
-      }
-  }
 }
