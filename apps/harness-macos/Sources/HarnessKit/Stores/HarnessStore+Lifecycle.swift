@@ -9,7 +9,7 @@ extension HarnessStore {
     let transport: TransportKind = client is WebSocketTransport ? .webSocket : .httpSSE
     activeTransport = transport
     connectionMetrics.transportKind = transport
-    connectionMetrics.connectedSince = Date()
+    connectionMetrics.connectedSince = .now
     connectionMetrics.isFallback = transport == .httpSSE
     appendConnectionEvent(kind: .connected, detail: "Connected via \(transport.title)")
 
@@ -48,6 +48,8 @@ extension HarnessStore {
       projects = try await projectResponse
       sessions = try await sessionResponse
       daemonStatus = try? await daemonController.daemonStatus()
+      isShowingCachedData = false
+      cacheSessionList(sessions, projects: projects)
 
       if preserveSelection, let selectedSessionID {
         let requestID = beginSessionLoad()
@@ -65,6 +67,12 @@ extension HarnessStore {
     } catch {
       connectionState = .offline(error.localizedDescription)
       lastError = error.localizedDescription
+
+      if let cached = loadCachedSessionList() {
+        sessions = cached.sessions
+        projects = cached.projects
+        isShowingCachedData = true
+      }
     }
   }
 
@@ -87,12 +95,21 @@ extension HarnessStore {
       }
       selectedSession = loadedDetail
       self.timeline = loadedTimeline
+      isShowingCachedData = false
       synchronizeActionActor()
+      cacheSessionDetail(loadedDetail, timeline: loadedTimeline)
     } catch {
       guard isCurrentSessionLoad(requestID, sessionID: sessionID) else {
         return
       }
       lastError = error.localizedDescription
+
+      if let cached = loadCachedSessionDetail(sessionID: sessionID) {
+        selectedSession = cached.detail
+        timeline = cached.timeline
+        isShowingCachedData = true
+        synchronizeActionActor()
+      }
     }
   }
 

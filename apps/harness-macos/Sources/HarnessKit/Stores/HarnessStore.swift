@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import SwiftData
 
 @MainActor
 @Observable
@@ -88,6 +89,7 @@ public final class HarnessStore {
   public var connectionMetrics: ConnectionMetrics = .initial
   public var connectionEvents: [ConnectionEvent] = []
   public var subscribedSessionIDs: Set<String> = []
+  public var isShowingCachedData = false
   public var dataReceivedPulse: Bool {
     guard connectionState == .online,
       let lastMessageAt = connectionMetrics.lastMessageAt
@@ -95,10 +97,11 @@ public final class HarnessStore {
       return false
     }
 
-    return Date().timeIntervalSince(lastMessageAt) < 1.5
+    return Date.now.timeIntervalSince(lastMessageAt) < 1.5
   }
 
   let daemonController: any DaemonControlling
+  public let modelContext: ModelContext?
   var client: (any HarnessClientProtocol)?
   var globalStreamTask: Task<Void, Never>?
   var sessionStreamTask: Task<Void, Never>?
@@ -106,8 +109,12 @@ public final class HarnessStore {
   private var sessionLoadSequence: UInt64 = 0
   private var hasBootstrapped = false
 
-  public init(daemonController: any DaemonControlling) {
+  public init(
+    daemonController: any DaemonControlling,
+    modelContext: ModelContext? = nil
+  ) {
     self.daemonController = daemonController
+    self.modelContext = modelContext
   }
 
   public func bootstrapIfNeeded() async {

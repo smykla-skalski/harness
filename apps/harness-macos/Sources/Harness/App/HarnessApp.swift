@@ -1,6 +1,7 @@
 import Foundation
 import HarnessKit
 import Observation
+import SwiftData
 import SwiftUI
 
 enum HarnessThemeDefaults {
@@ -49,14 +50,25 @@ enum HarnessThemeStyle: String, CaseIterable, Identifiable {
 @main
 @MainActor
 struct HarnessApp: App {
-  @State private var store = HarnessAppStoreFactory.makeStore()
+  private let container: ModelContainer
+  @State private var store: HarnessStore
   @AppStorage(HarnessThemeDefaults.modeKey)
   private var storedThemeMode = HarnessThemeMode.auto.rawValue
   @AppStorage(HarnessThemeDefaults.styleKey)
   private var storedThemeStyle = HarnessThemeStyle.gradient.rawValue
+  @State private var themeMode: HarnessThemeMode = .auto
+  @State private var themeStyle: HarnessThemeStyle = .gradient
   private let isUITesting = ProcessInfo.processInfo.environment["HARNESS_UI_TESTS"] == "1"
 
   init() {
+    let resolvedContainer = (try? HarnessModelContainer.live())
+      ?? (try? HarnessModelContainer.preview())!
+    container = resolvedContainer
+    let resolvedStore = HarnessAppStoreFactory.makeStore(
+      modelContext: resolvedContainer.mainContext
+    )
+    _store = State(initialValue: resolvedStore)
+
     if ProcessInfo.processInfo.environment["HARNESS_UI_TESTS"] == "1" {
       UserDefaults.standard.set(
         HarnessThemeMode.auto.rawValue, forKey: HarnessThemeDefaults.modeKey)
@@ -67,31 +79,10 @@ struct HarnessApp: App {
     }
   }
 
-  private var themeMode: HarnessThemeMode {
-    HarnessThemeMode(rawValue: storedThemeMode) ?? .auto
-  }
-
-  private var themeStyle: HarnessThemeStyle {
-    HarnessThemeStyle(rawValue: storedThemeStyle) ?? .gradient
-  }
-
-  private var themeModeBinding: Binding<HarnessThemeMode> {
-    Binding(
-      get: { themeMode },
-      set: { storedThemeMode = $0.rawValue }
-    )
-  }
-
-  private var themeStyleBinding: Binding<HarnessThemeStyle> {
-    Binding(
-      get: { themeStyle },
-      set: { storedThemeStyle = $0.rawValue }
-    )
-  }
-
   var body: some Scene {
     WindowGroup("Harness") {
       rootContent
+        .modelContainer(container)
     }
     .windowStyle(.titleBar)
     .windowToolbarStyle(.unified(showsTitle: true))
@@ -109,11 +100,21 @@ struct HarnessApp: App {
     .restorationBehavior(isUITesting ? .disabled : .automatic)
   }
 
+  private func syncThemeFromStorage() {
+    themeMode = HarnessThemeMode(rawValue: storedThemeMode) ?? .auto
+    themeStyle = HarnessThemeStyle(rawValue: storedThemeStyle) ?? .gradient
+  }
+
   @ViewBuilder private var rootContent: some View {
     ContentView(store: store, themeStyle: themeStyle)
       .environment(\.harnessThemeStyle, themeStyle)
       .preferredColorScheme(themeMode.colorScheme)
       .tint(HarnessTheme.accent(for: themeStyle))
+      .onAppear { syncThemeFromStorage() }
+      .onChange(of: storedThemeMode) { _, _ in syncThemeFromStorage() }
+      .onChange(of: storedThemeStyle) { _, _ in syncThemeFromStorage() }
+      .onChange(of: themeMode) { _, new in storedThemeMode = new.rawValue }
+      .onChange(of: themeStyle) { _, new in storedThemeStyle = new.rawValue }
       .task {
         await store.bootstrapIfNeeded()
       }
@@ -160,8 +161,8 @@ struct HarnessApp: App {
   @ViewBuilder private var settingsContent: some View {
     PreferencesView(
       store: store,
-      themeMode: themeModeBinding,
-      themeStyle: themeStyleBinding
+      themeMode: $themeMode,
+      themeStyle: $themeStyle
     )
     .environment(\.harnessThemeStyle, themeStyle)
     .preferredColorScheme(themeMode.colorScheme)

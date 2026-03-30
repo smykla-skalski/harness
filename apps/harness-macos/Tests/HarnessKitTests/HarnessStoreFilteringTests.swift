@@ -5,20 +5,7 @@ import Testing
 @MainActor
 @Suite("Harness store filtering")
 struct HarnessStoreFilteringTests {
-  @Test(
-    "Session focus filter narrows to matching sessions",
-    arguments: [
-      (SessionFocusFilter.all, ["active", "blocked", "idle"]),
-      (.openWork, ["active"]),
-      (.blocked, ["blocked"]),
-      (.observed, ["active", "blocked"]),
-      (.idle, ["idle"]),
-    ] as [(SessionFocusFilter, [String])]
-  )
-  func sessionFocusFilterNarrows(
-    filter: SessionFocusFilter,
-    expectedIDs: [String]
-  ) {
+  private func storeWithFocusFixtures() -> HarnessStore {
     let store = HarnessStore(daemonController: RecordingDaemonController())
     store.projects = [makeProject(totalSessionCount: 3, activeSessionCount: 3)]
     store.sessions = [
@@ -63,27 +50,49 @@ struct HarnessStoreFilteringTests {
       ),
     ]
     store.sessionFilter = .active
-    store.sessionFocusFilter = filter
-
-    let resultIDs = store.groupedSessions
-      .flatMap(\.sessions)
-      .map(\.sessionId)
-      .sorted()
-    #expect(resultIDs == expectedIDs.sorted())
+    return store
   }
 
-  @Test(
-    "Session status filter includes the correct statuses",
-    arguments: [
-      (HarnessStore.SessionFilter.active, ["active", "paused"]),
-      (.all, ["active", "paused", "ended"]),
-      (.ended, ["ended"]),
-    ] as [(HarnessStore.SessionFilter, [String])]
-  )
-  func sessionStatusFilterIncludes(
-    filter: HarnessStore.SessionFilter,
-    expectedIDs: [String]
-  ) {
+  private func filteredIDs(from store: HarnessStore) -> [String] {
+    store.groupedSessions.flatMap(\.sessions).map(\.sessionId).sorted()
+  }
+
+  @Test("Focus filter .all shows all active sessions")
+  func focusFilterAll() {
+    let store = storeWithFocusFixtures()
+    store.sessionFocusFilter = .all
+    #expect(filteredIDs(from: store) == ["active", "blocked", "idle"])
+  }
+
+  @Test("Focus filter .openWork shows sessions with open or in-progress tasks")
+  func focusFilterOpenWork() {
+    let store = storeWithFocusFixtures()
+    store.sessionFocusFilter = .openWork
+    #expect(filteredIDs(from: store) == ["active", "blocked"])
+  }
+
+  @Test("Focus filter .blocked shows sessions with blocked tasks")
+  func focusFilterBlocked() {
+    let store = storeWithFocusFixtures()
+    store.sessionFocusFilter = .blocked
+    #expect(filteredIDs(from: store) == ["blocked"])
+  }
+
+  @Test("Focus filter .observed shows sessions with an observe ID")
+  func focusFilterObserved() {
+    let store = storeWithFocusFixtures()
+    store.sessionFocusFilter = .observed
+    #expect(filteredIDs(from: store) == ["active", "blocked"])
+  }
+
+  @Test("Focus filter .idle shows sessions with no active agents or open tasks")
+  func focusFilterIdle() {
+    let store = storeWithFocusFixtures()
+    store.sessionFocusFilter = .idle
+    #expect(filteredIDs(from: store) == ["idle"])
+  }
+
+  private func storeWithStatusFixtures() -> HarnessStore {
     let store = HarnessStore(daemonController: RecordingDaemonController())
     store.projects = [makeProject(totalSessionCount: 3, activeSessionCount: 2)]
     store.sessions = [
@@ -127,60 +136,33 @@ struct HarnessStoreFilteringTests {
         )
       ),
     ]
-    store.sessionFilter = filter
+    return store
+  }
 
-    let resultIDs = store.groupedSessions
-      .flatMap(\.sessions)
-      .map(\.sessionId)
-      .sorted()
-    #expect(resultIDs == expectedIDs.sorted())
+  @Test("Status filter .active includes active and paused sessions")
+  func statusFilterActive() {
+    let store = storeWithStatusFixtures()
+    store.sessionFilter = .active
+    #expect(filteredIDs(from: store) == ["active", "paused"])
+  }
+
+  @Test("Status filter .all includes every session")
+  func statusFilterAll() {
+    let store = storeWithStatusFixtures()
+    store.sessionFilter = .all
+    #expect(filteredIDs(from: store) == ["active", "ended", "paused"])
+  }
+
+  @Test("Status filter .ended includes only ended sessions")
+  func statusFilterEnded() {
+    let store = storeWithStatusFixtures()
+    store.sessionFilter = .ended
+    #expect(filteredIDs(from: store) == ["ended"])
   }
 
   @Test("Filtered session count uses count(where:) correctly")
   func filteredSessionCount() {
-    let store = HarnessStore(daemonController: RecordingDaemonController())
-    store.projects = [makeProject(totalSessionCount: 3, activeSessionCount: 2)]
-    store.sessions = [
-      makeSession(
-        .init(
-          sessionId: "a",
-          context: "Active",
-          status: .active,
-          leaderId: nil,
-          observeId: nil,
-          openTaskCount: 0,
-          inProgressTaskCount: 0,
-          blockedTaskCount: 0,
-          activeAgentCount: 0
-        )
-      ),
-      makeSession(
-        .init(
-          sessionId: "b",
-          context: "Active",
-          status: .active,
-          leaderId: nil,
-          observeId: nil,
-          openTaskCount: 0,
-          inProgressTaskCount: 0,
-          blockedTaskCount: 0,
-          activeAgentCount: 0
-        )
-      ),
-      makeSession(
-        .init(
-          sessionId: "c",
-          context: "Ended",
-          status: .ended,
-          leaderId: nil,
-          observeId: nil,
-          openTaskCount: 0,
-          inProgressTaskCount: 0,
-          blockedTaskCount: 0,
-          activeAgentCount: 0
-        )
-      ),
-    ]
+    let store = storeWithStatusFixtures()
 
     store.sessionFilter = .active
     #expect(store.filteredSessionCount == 2)
