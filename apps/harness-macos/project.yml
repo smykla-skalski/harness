@@ -27,6 +27,8 @@ targets:
     deploymentTarget: "26.0"
     sources:
       - Sources/HarnessKit
+    dependencies:
+      - sdk: SwiftData.framework
     buildToolPlugins:
       - plugin: SwiftLintBuildToolPlugin
         package: SwiftLintPlugins
