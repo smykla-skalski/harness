@@ -60,12 +60,14 @@ struct SessionsBoardView: View {
   }
 
   private var metricsSection: some View {
-    HarnessAdaptiveGridLayout(
-      minimumColumnWidth: 160,
-      maximumColumns: 4,
-      spacing: 16
-    ) {
-      metricCards
+    HarnessGlassContainer(spacing: 16) {
+      HarnessAdaptiveGridLayout(
+        minimumColumnWidth: 160,
+        maximumColumns: 4,
+        spacing: 16
+      ) {
+        metricCards
+      }
     }
     .frame(maxWidth: .infinity, alignment: .leading)
   }

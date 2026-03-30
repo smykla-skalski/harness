@@ -64,7 +64,8 @@ struct PreferencesView: View {
       || store.connectionState == .connecting
   }
   private var preferencesAccessibilityValue: String {
-    "style=\(themeStyle.rawValue), mode=\(themeMode.rawValue), section=\(currentSection.rawValue), preferencesChrome=extended"
+    "style=\(themeStyle.rawValue), mode=\(themeMode.rawValue), "
+      + "section=\(currentSection.rawValue), preferencesChrome=extended"
   }
 
   private var currentSection: PreferencesSection {
@@ -298,7 +299,6 @@ private struct PreferencesAppearanceCard: View {
         Divider()
         styleRow
       }
-      .background(HarnessTheme.surface, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
       Text("Both settings apply live to every Harness window on this Mac.")
         .font(.system(.subheadline, design: .rounded, weight: .medium))
         .foregroundStyle(HarnessTheme.secondaryInk)

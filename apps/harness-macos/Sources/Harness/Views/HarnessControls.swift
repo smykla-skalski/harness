@@ -111,43 +111,6 @@ private struct FillWidthButtonSizing: ViewModifier {
   }
 }
 
-private struct HarnessFilterChipButtonStyle: ButtonStyle {
-  let isSelected: Bool
-
-  func makeBody(configuration: Configuration) -> some View {
-    configuration.label
-      .foregroundStyle(HarnessTheme.ink)
-      .background {
-        RoundedRectangle(cornerRadius: 12, style: .continuous)
-          .fill(backgroundColor(isPressed: configuration.isPressed))
-      }
-      .overlay {
-        RoundedRectangle(cornerRadius: 12, style: .continuous)
-          .strokeBorder(strokeStyle, lineWidth: isSelected ? 1.5 : 1)
-      }
-      .scaleEffect(configuration.isPressed ? 0.985 : 1)
-      .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
-  }
-
-  private func backgroundColor(isPressed: Bool) -> Color {
-    if isSelected || isPressed {
-      return HarnessTheme.usesGradientChrome
-        ? HarnessTheme.surfaceHover.opacity(0.78)
-        : HarnessTheme.surfaceHover
-    }
-    return HarnessTheme.usesGradientChrome ? HarnessTheme.surface.opacity(0.55) : HarnessTheme.surface
-  }
-
-  private var strokeStyle: AnyShapeStyle {
-    if isSelected {
-      return AnyShapeStyle(.selection)
-    }
-    return AnyShapeStyle(
-      HarnessTheme.controlBorder.opacity(HarnessTheme.usesGradientChrome ? 0.35 : 0.9)
-    )
-  }
-}
-
 extension View {
   @ViewBuilder
   func harnessActionButtonStyle(
@@ -194,6 +157,25 @@ extension View {
   func harnessFilterChipButtonStyle(
     isSelected: Bool
   ) -> some View {
-    self.buttonStyle(HarnessFilterChipButtonStyle(isSelected: isSelected))
+    if HarnessTheme.usesGradientChrome {
+      if isSelected {
+        self
+          .buttonStyle(.glassProminent)
+          .tint(HarnessTheme.accent)
+      } else {
+        self
+          .buttonStyle(.glass(.regular.tint(HarnessTheme.surface)))
+      }
+    } else {
+      if isSelected {
+        self
+          .buttonStyle(.borderedProminent)
+          .tint(HarnessTheme.accent)
+      } else {
+        self
+          .buttonStyle(.bordered)
+          .tint(HarnessTheme.ink)
+      }
+    }
   }
 }
