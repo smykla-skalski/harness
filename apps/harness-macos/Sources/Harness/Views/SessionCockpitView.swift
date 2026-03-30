@@ -39,6 +39,7 @@ struct SessionCockpitView: View {
             Circle()
               .fill(statusColor(for: detail.session.status))
               .frame(width: 12, height: 12)
+              .accessibilityHidden(true)
             Text(detail.session.context)
               .font(.system(size: 32, weight: .black, design: .serif))
           }
@@ -117,6 +118,7 @@ struct SessionCockpitView: View {
             .lineLimit(1)
         }
       }
+      .accessibilityElement(children: .combine)
       .frame(maxWidth: .infinity, alignment: .leading)
       .padding(14)
       .background {

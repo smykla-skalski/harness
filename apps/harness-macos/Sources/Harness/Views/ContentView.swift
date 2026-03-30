@@ -208,6 +208,7 @@ private struct SessionLoadingView: View {
                 Circle()
                   .fill(statusColor(for: summary.status))
                   .frame(width: 12, height: 12)
+                  .accessibilityHidden(true)
                 Text(summary.context)
                   .font(.system(size: 30, weight: .black, design: .serif))
                   .lineLimit(2)
