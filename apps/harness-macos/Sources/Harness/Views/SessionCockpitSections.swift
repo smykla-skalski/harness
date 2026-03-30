@@ -81,7 +81,7 @@ struct SessionTaskListSection: View {
   var body: some View {
     VStack(alignment: .leading, spacing: 12) {
       Text("Tasks")
-        .font(.system(.title3, design: .serif, weight: .semibold))
+        .font(.system(.title3, design: .rounded, weight: .semibold))
       HarnessGlassContainer(spacing: 12) {
         ForEach(tasks) { task in
           SessionTaskSummaryCard(task: task) {
@@ -155,7 +155,7 @@ struct SessionAgentListSection: View {
   var body: some View {
     VStack(alignment: .leading, spacing: 12) {
       Text("Agents")
-        .font(.system(.title3, design: .serif, weight: .semibold))
+        .font(.system(.title3, design: .rounded, weight: .semibold))
       HarnessGlassContainer(spacing: 12) {
         ForEach(agents) { agent in
           SessionAgentSummaryCard(agent: agent) {

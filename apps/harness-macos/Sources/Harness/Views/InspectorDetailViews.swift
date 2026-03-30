@@ -16,7 +16,7 @@ struct SessionInspectorSummaryCard: View {
   var body: some View {
     VStack(alignment: .leading, spacing: 14) {
       Text("Inspector")
-        .font(.system(.title3, design: .serif, weight: .semibold))
+        .font(.system(.title3, design: .rounded, weight: .semibold))
       Text(
         "Pick a task, agent, signal, or observe card from the cockpit to focus actions and detail here."
       )
@@ -77,7 +77,7 @@ struct TaskInspectorCard: View {
   var body: some View {
     VStack(alignment: .leading, spacing: 12) {
       Text(task.title)
-        .font(.system(.title3, design: .serif, weight: .bold))
+        .font(.system(.title3, design: .rounded, weight: .bold))
       Text(task.context ?? "No task context provided.")
         .foregroundStyle(HarnessTheme.secondaryInk)
       InspectorFactGrid(facts: facts)
@@ -216,7 +216,7 @@ struct AgentInspectorCard: View {
   var body: some View {
     VStack(alignment: .leading, spacing: 12) {
       Text(agent.name)
-        .font(.system(.title3, design: .serif, weight: .bold))
+        .font(.system(.title3, design: .rounded, weight: .bold))
       Text("\(agent.runtime) • \(agent.role.title)")
         .foregroundStyle(HarnessTheme.secondaryInk)
       InspectorFactGrid(facts: facts)
@@ -308,7 +308,7 @@ struct SignalInspectorCard: View {
   var body: some View {
     VStack(alignment: .leading, spacing: 12) {
       Text(signal.signal.command)
-        .font(.system(.title3, design: .serif, weight: .bold))
+        .font(.system(.title3, design: .rounded, weight: .bold))
       Text(signal.signal.payload.message)
         .foregroundStyle(.secondary)
       InspectorFactGrid(facts: facts)
