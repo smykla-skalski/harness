@@ -59,6 +59,7 @@ final class HarnessUITests: HarnessUITestCase {
     preferencesButton.tap()
 
     let preferencesRoot = element(in: app, identifier: Accessibility.preferencesRoot)
+    let preferencesState = element(in: app, identifier: Accessibility.preferencesState)
     let preferencesSidebar = element(in: app, identifier: Accessibility.preferencesSidebar)
     let generalSection = element(in: app, identifier: Accessibility.preferencesGeneralSection)
     let title = element(in: app, identifier: Accessibility.preferencesTitle)
@@ -66,10 +67,15 @@ final class HarnessUITests: HarnessUITestCase {
     let forwardButton = button(in: app, identifier: Accessibility.preferencesForwardButton)
 
     XCTAssertTrue(preferencesRoot.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(preferencesState.waitForExistence(timeout: Self.uiTimeout))
     XCTAssertTrue(preferencesSidebar.exists)
     XCTAssertTrue(generalSection.exists)
     XCTAssertTrue(title.exists)
     XCTAssertEqual(title.label, "General")
+    XCTAssertEqual(
+      preferencesState.label,
+      "style=gradient, mode=auto, section=general, preferencesChrome=extended"
+    )
     XCTAssertFalse(backButton.isEnabled)
     XCTAssertFalse(forwardButton.isEnabled)
   }
@@ -327,25 +333,51 @@ final class HarnessUITests: HarnessUITestCase {
     preferencesButton.tap()
 
     let preferencesRoot = element(in: app, identifier: Accessibility.preferencesRoot)
-    let appChromeRoot = element(in: app, identifier: Accessibility.appChromeRoot)
-    let flatButton = app.buttons["Flat"].firstMatch
-    let gradientButton = app.buttons["Gradient"].firstMatch
+    let preferencesState = element(in: app, identifier: Accessibility.preferencesState)
+    let appChromeState = element(in: app, identifier: Accessibility.appChromeState)
+    let stylePicker = element(in: app, identifier: Accessibility.preferencesThemeStylePicker)
 
     XCTAssertTrue(preferencesRoot.waitForExistence(timeout: Self.uiTimeout))
-    XCTAssertTrue(appChromeRoot.waitForExistence(timeout: Self.uiTimeout))
-    XCTAssertEqual(preferencesRoot.value as? String, "style=gradient, mode=auto, section=general")
-    XCTAssertEqual(appChromeRoot.value as? String, "gradient")
+    XCTAssertTrue(preferencesState.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(appChromeState.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(stylePicker.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertEqual(
+      preferencesState.label,
+      "style=gradient, mode=auto, section=general, preferencesChrome=extended"
+    )
+    XCTAssertEqual(
+      appChromeState.label,
+      "style=gradient, contentChrome=extended, inspectorChrome=extended"
+    )
 
-    XCTAssertTrue(flatButton.waitForExistence(timeout: Self.uiTimeout))
-    flatButton.tap()
+    selectMenuOption(
+      in: app,
+      controlIdentifier: Accessibility.preferencesThemeStylePicker,
+      optionTitle: "Flat"
+    )
 
-    XCTAssertEqual(preferencesRoot.value as? String, "style=flat, mode=auto, section=general")
-    XCTAssertEqual(appChromeRoot.value as? String, "flat")
+    XCTAssertEqual(
+      preferencesState.label,
+      "style=flat, mode=auto, section=general, preferencesChrome=extended"
+    )
+    XCTAssertEqual(
+      appChromeState.label,
+      "style=flat, contentChrome=extended, inspectorChrome=extended"
+    )
 
-    XCTAssertTrue(gradientButton.waitForExistence(timeout: Self.uiTimeout))
-    gradientButton.tap()
+    selectMenuOption(
+      in: app,
+      controlIdentifier: Accessibility.preferencesThemeStylePicker,
+      optionTitle: "Gradient"
+    )
 
-    XCTAssertEqual(preferencesRoot.value as? String, "style=gradient, mode=auto, section=general")
-    XCTAssertEqual(appChromeRoot.value as? String, "gradient")
+    XCTAssertEqual(
+      preferencesState.label,
+      "style=gradient, mode=auto, section=general, preferencesChrome=extended"
+    )
+    XCTAssertEqual(
+      appChromeState.label,
+      "style=gradient, contentChrome=extended, inspectorChrome=extended"
+    )
   }
 }

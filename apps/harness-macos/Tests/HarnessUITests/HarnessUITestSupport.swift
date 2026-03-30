@@ -2,6 +2,7 @@ import XCTest
 
 enum HarnessUITestAccessibility {
   static let appChromeRoot = "harness.app.chrome"
+  static let appChromeState = "harness.app.chrome.state"
   static let daemonCard = "harness.sidebar.daemon-card"
   static let daemonCardFrame = "harness.sidebar.daemon-card.frame"
   static let sidebarShellFrame = "harness.sidebar.shell.frame"
@@ -65,6 +66,7 @@ enum HarnessUITestAccessibility {
   static let leaderAgentCard = "harness.session.agent.leader-claude"
   static let workerAgentCard = "harness.session.agent.worker-codex"
   static let preferencesRoot = "harness.preferences.root"
+  static let preferencesState = "harness.preferences.state"
   static let preferencesPanel = "harness.preferences.panel"
   static let preferencesSidebar = "harness.preferences.sidebar"
   static let preferencesBackButton = "harness.preferences.nav.back"
@@ -89,6 +91,7 @@ enum HarnessUITestAccessibility {
 @MainActor
 class HarnessUITestCase: XCTestCase {
   static let launchModeKey = "HARNESS_LAUNCH_MODE"
+  static let uiTestHostBundleIdentifier = "io.aiharness.app.ui-testing"
   static let uiTimeout: TimeInterval = 10
 
   override func setUpWithError() throws {
@@ -106,8 +109,9 @@ extension HarnessUITestCase {
   }
 
   func launch(mode: String) -> XCUIApplication {
-    let app = XCUIApplication()
+    let app = XCUIApplication(bundleIdentifier: Self.uiTestHostBundleIdentifier)
     terminateIfRunning(app)
+    app.launchArguments += ["-ApplePersistenceIgnoreState", "YES"]
     app.launchEnvironment["HARNESS_UI_TESTS"] = "1"
     app.launchEnvironment[Self.launchModeKey] = mode
     app.launch()
@@ -197,6 +201,22 @@ extension HarnessUITestCase {
     }
 
     XCTFail("Failed to tap element \(identifier)")
+  }
+
+  func selectMenuOption(
+    in app: XCUIApplication,
+    controlIdentifier: String,
+    optionTitle: String
+  ) {
+    let control = element(in: app, identifier: controlIdentifier)
+    XCTAssertTrue(control.waitForExistence(timeout: Self.uiTimeout))
+    tapElement(in: app, identifier: controlIdentifier)
+
+    let menuItem = app.descendants(matching: .menuItem).matching(
+      NSPredicate(format: "title == %@", optionTitle)
+    ).firstMatch
+    XCTAssertTrue(menuItem.waitForExistence(timeout: Self.uiTimeout))
+    menuItem.tap()
   }
 
   func element(in app: XCUIApplication, identifier: String) -> XCUIElement {

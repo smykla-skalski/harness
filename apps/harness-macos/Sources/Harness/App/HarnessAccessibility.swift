@@ -1,5 +1,6 @@
 enum HarnessAccessibility {
   static let appChromeRoot = "harness.app.chrome"
+  static let appChromeState = "harness.app.chrome.state"
   static let daemonCard = "harness.sidebar.daemon-card"
   static let daemonCardFrame = "harness.sidebar.daemon-card.frame"
   static let sidebarRoot = "harness.sidebar.root"
@@ -31,6 +32,7 @@ enum HarnessAccessibility {
   static let removeAgentButton = "harness.inspector.remove-agent"
   static let signalSendButton = "harness.inspector.signal-send"
   static let preferencesRoot = "harness.preferences.root"
+  static let preferencesState = "harness.preferences.state"
   static let preferencesPanel = "harness.preferences.panel"
   static let preferencesSidebar = "harness.preferences.sidebar"
   static let preferencesBackButton = "harness.preferences.nav.back"

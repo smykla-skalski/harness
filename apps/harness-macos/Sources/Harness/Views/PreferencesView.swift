@@ -121,9 +121,11 @@ struct PreferencesView: View {
     }
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessAccessibility.preferencesRoot)
-    .accessibilityValue(preferencesAccessibilityValue)
     .overlay {
-      PreferencesTitleAccessibilityMarker(title: currentSection.title)
+      PreferencesOverlayMarkers(
+        title: currentSection.title,
+        preferencesAccessibilityValue: preferencesAccessibilityValue
+      )
     }
     .accessibilityFrameMarker(HarnessAccessibility.preferencesPanel)
   }
@@ -275,15 +277,23 @@ private struct PreferencesSectionScrollContainer<Content: View>: View {
   }
 }
 
-private struct PreferencesTitleAccessibilityMarker: View {
+private struct PreferencesOverlayMarkers: View {
   let title: String
+  let preferencesAccessibilityValue: String
 
   var body: some View {
-    Color.clear
-      .allowsHitTesting(false)
-      .accessibilityElement()
-      .accessibilityLabel(title)
-      .accessibilityIdentifier(HarnessAccessibility.preferencesTitle)
+    ZStack {
+      Color.clear
+        .allowsHitTesting(false)
+        .accessibilityElement()
+        .accessibilityLabel(title)
+        .accessibilityIdentifier(HarnessAccessibility.preferencesTitle)
+
+      AccessibilityTextMarker(
+        identifier: HarnessAccessibility.preferencesState,
+        text: preferencesAccessibilityValue
+      )
+    }
   }
 }
 
