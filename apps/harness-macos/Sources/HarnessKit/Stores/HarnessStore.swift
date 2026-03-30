@@ -90,6 +90,7 @@ public final class HarnessStore {
   public var connectionEvents: [ConnectionEvent] = []
   public var subscribedSessionIDs: Set<String> = []
   public var isShowingCachedData = false
+  public var bookmarkedSessionIds: Set<String> = []
   public var dataReceivedPulse: Bool {
     guard connectionState == .online,
       let lastMessageAt = connectionMetrics.lastMessageAt
@@ -122,6 +123,7 @@ public final class HarnessStore {
       return
     }
     hasBootstrapped = true
+    refreshBookmarkedSessionIds()
     await bootstrap()
   }
 
