@@ -1,8 +1,12 @@
 import HarnessKit
+import SwiftData
 
 @MainActor
 enum HarnessAppStoreFactory {
-  static func makeStore(environment: HarnessEnvironment = .current) -> HarnessStore {
+  static func makeStore(
+    environment: HarnessEnvironment = .current,
+    modelContext: ModelContext? = nil
+  ) -> HarnessStore {
     let controller: any DaemonControlling
 
     switch HarnessLaunchMode(environment: environment) {
@@ -14,6 +18,6 @@ enum HarnessAppStoreFactory {
       controller = PreviewDaemonController(mode: .empty)
     }
 
-    return HarnessStore(daemonController: controller)
+    return HarnessStore(daemonController: controller, modelContext: modelContext)
   }
 }
