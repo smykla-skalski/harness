@@ -11,9 +11,15 @@ func harnessGlass(tint: Color? = nil, interactive: Bool = false) -> Glass {
   return glass
 }
 
+func harnessChromeAccessibilityValue(for style: HarnessThemeStyle) -> String {
+  HarnessTheme.usesGradientChrome(for: style) ? "extended" : "reduced"
+}
+
+func harnessInteractiveCardAccessibilityValue(for style: HarnessThemeStyle) -> String {
+  HarnessTheme.usesGradientChrome(for: style) ? "native-glass" : "bordered-fallback"
+}
+
 struct HarnessRoundedGlassBackground: View {
-  @Environment(\.colorScheme)
-  private var colorScheme
   @Environment(\.harnessThemeStyle)
   private var themeStyle
 
@@ -65,6 +71,10 @@ struct HarnessRoundedGlassBackground: View {
       : shadowColor.opacity(0.65)
   }
 
+  private var resolvedFillOpacity: Double {
+    fillOpacity.clamped(to: 0...1)
+  }
+
   var body: some View {
     let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
 
@@ -73,17 +83,20 @@ struct HarnessRoundedGlassBackground: View {
         .fill(.clear)
         .glassEffect(harnessGlass(tint: tint, interactive: interactive), in: shape)
         .overlay {
+          shape.fill(resolvedFillColor.opacity(resolvedFillOpacity))
+        }
+        .overlay {
           shape.stroke(strokeColor, lineWidth: 1)
         }
-        .shadow(color: shadowColor, radius: shadowRadius, x: 0, y: shadowY)
+        .shadow(color: resolvedShadowColor, radius: shadowRadius, x: 0, y: shadowY)
     } else {
       shape
-        .fill(resolvedFillColor)
+        .fill(resolvedFillColor.opacity(resolvedFillOpacity))
         .overlay {
           shape.stroke(strokeColor, lineWidth: 1)
         }
         .shadow(
-          color: shadowColor.opacity(0.65),
+          color: resolvedShadowColor,
           radius: max(4, shadowRadius * 0.35),
           x: 0,
           y: max(2, shadowY * 0.25)
@@ -93,8 +106,6 @@ struct HarnessRoundedGlassBackground: View {
 }
 
 struct HarnessCapsuleGlassBackground: View {
-  @Environment(\.colorScheme)
-  private var colorScheme
   @Environment(\.harnessThemeStyle)
   private var themeStyle
 
@@ -137,6 +148,10 @@ struct HarnessCapsuleGlassBackground: View {
     return HarnessTheme.surface(for: themeStyle)
   }
 
+  private var resolvedFillOpacity: Double {
+    fillOpacity.clamped(to: 0...1)
+  }
+
   var body: some View {
     let shape = Capsule()
 
@@ -145,12 +160,15 @@ struct HarnessCapsuleGlassBackground: View {
         .fill(.clear)
         .glassEffect(harnessGlass(tint: tint, interactive: interactive), in: shape)
         .overlay {
+          shape.fill(resolvedFillColor.opacity(resolvedFillOpacity))
+        }
+        .overlay {
           shape.stroke(strokeColor, lineWidth: 1)
         }
         .shadow(color: shadowColor, radius: shadowRadius, x: 0, y: shadowY)
     } else {
       shape
-        .fill(resolvedFillColor)
+        .fill(resolvedFillColor.opacity(resolvedFillOpacity))
         .overlay {
           shape.stroke(strokeColor, lineWidth: 1)
         }
@@ -190,10 +208,28 @@ extension View {
   func harnessExtendedChromeBackground<Background: View>(
     @ViewBuilder _ background: () -> Background
   ) -> some View {
-    self.background {
-      background()
-        .backgroundExtensionEffect()
-        .ignoresSafeArea()
+    modifier(HarnessExtendedChromeBackgroundModifier(background: background()))
+  }
+}
+
+private struct HarnessExtendedChromeBackgroundModifier<Background: View>: ViewModifier {
+  @Environment(\.harnessThemeStyle)
+  private var themeStyle
+  let background: Background
+
+  @ViewBuilder
+  func body(content: Content) -> some View {
+    if HarnessTheme.usesGradientChrome(for: themeStyle) {
+      content.background {
+        background
+          .backgroundExtensionEffect()
+          .ignoresSafeArea()
+      }
+    } else {
+      content.background {
+        background
+          .ignoresSafeArea()
+      }
     }
   }
 }
@@ -252,5 +288,11 @@ struct HarnessInteractiveCardBackground: View {
       fillOpacity: tint == nil ? 0.12 : 0.16,
       strokeColor: tint?.opacity(0.32) ?? Color.white.opacity(0.10)
     )
+  }
+}
+
+private extension Comparable {
+  func clamped(to limits: ClosedRange<Self>) -> Self {
+    min(max(self, limits.lowerBound), limits.upperBound)
   }
 }

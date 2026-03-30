@@ -63,7 +63,7 @@ struct PreferencesView: View {
       || store.connectionState == .connecting
   }
   private var preferencesAccessibilityValue: String {
-    let chrome = HarnessTheme.chromeAccessibilityValue(for: themeStyle)
+    let chrome = harnessChromeAccessibilityValue(for: themeStyle)
     return [
       "style=\(themeStyle.rawValue)",
       "mode=\(themeMode.rawValue)",
