@@ -168,6 +168,12 @@ private struct SessionListContent: View {
                         .multilineTextAlignment(.leading)
                         .lineLimit(2)
                       Spacer(minLength: 12)
+                      if store.isBookmarked(sessionId: session.sessionId) {
+                        Image(systemName: "bookmark.fill")
+                          .font(.caption2)
+                          .foregroundStyle(HarnessTheme.accent(for: themeStyle))
+                          .accessibilityLabel("Bookmarked")
+                      }
                       Circle()
                         .fill(statusColor(for: session.status))
                         .frame(width: 10, height: 10)
@@ -205,6 +211,20 @@ private struct SessionListContent: View {
                   "\(HarnessAccessibility.sessionRow(session.sessionId)).frame"
                 )
                 .buttonStyle(.plain)
+                .contextMenu {
+                  Button {
+                    store.toggleBookmark(
+                      sessionId: session.sessionId,
+                      projectId: session.projectId
+                    )
+                  } label: {
+                    if store.isBookmarked(sessionId: session.sessionId) {
+                      Label("Remove Bookmark", systemImage: "bookmark.slash")
+                    } else {
+                      Label("Bookmark", systemImage: "bookmark")
+                    }
+                  }
+                }
               }
             }
           }
