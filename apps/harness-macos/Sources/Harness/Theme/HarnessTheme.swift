@@ -415,5 +415,5 @@ func formatTimestamp(_ value: String?) -> String {
 }
 
 func formatTimestamp(_ date: Date) -> String {
-  relativeFormatter.localizedString(for: date, relativeTo: Date())
+  relativeFormatter.localizedString(for: date, relativeTo: .now)
 }
