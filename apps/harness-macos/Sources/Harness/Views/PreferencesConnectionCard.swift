@@ -36,11 +36,7 @@ struct PreferencesConnectionCard: View {
   }
 
   private var qualityColor: Color {
-    switch metrics.quality {
-    case .excellent, .good: HarnessTheme.success
-    case .degraded: HarnessTheme.caution
-    case .poor, .disconnected: HarnessTheme.danger
-    }
+    metrics.quality.themeColor
   }
 
   private var reconnectTint: Color {
@@ -141,9 +137,4 @@ struct PreferencesConnectionCard: View {
     }
   }
 
-  private func formatTimestamp(_ date: Date) -> String {
-    nonisolated(unsafe) let formatter = RelativeDateTimeFormatter()
-    formatter.unitsStyle = .abbreviated
-    return formatter.localizedString(for: date, relativeTo: Date())
-  }
 }

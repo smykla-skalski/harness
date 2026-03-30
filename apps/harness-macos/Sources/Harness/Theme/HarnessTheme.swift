@@ -332,6 +332,17 @@ func severityColor(for severity: TaskSeverity) -> Color {
   }
 }
 
+func signalStatusColor(for status: SessionSignalStatus) -> Color {
+  switch status {
+  case .pending, .deferred:
+    HarnessTheme.caution
+  case .acknowledged:
+    HarnessTheme.success
+  case .rejected, .expired:
+    HarnessTheme.danger
+  }
+}
+
 func taskStatusColor(for status: TaskStatus) -> Color {
   switch status {
   case .open:
@@ -365,4 +376,21 @@ func formatTimestamp(_ value: String?) -> String {
   }
 
   return relativeFormatter.localizedString(for: date, relativeTo: Date())
+}
+
+func formatTimestamp(_ date: Date) -> String {
+  relativeFormatter.localizedString(for: date, relativeTo: Date())
+}
+
+extension ConnectionQuality {
+  var themeColor: Color {
+    switch self {
+    case .excellent, .good:
+      HarnessTheme.success
+    case .degraded:
+      HarnessTheme.caution
+    case .poor, .disconnected:
+      HarnessTheme.danger
+    }
+  }
 }
