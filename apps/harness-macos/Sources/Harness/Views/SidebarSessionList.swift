@@ -175,9 +175,15 @@ struct SidebarSessionList: View {
                   .background {
                     HarnessInteractiveCardBackground(
                       cornerRadius: 18,
-                      tint: store.selectedSessionID == session.sessionId ? HarnessTheme.accent : nil
+                      tint: store.selectedSessionID == session.sessionId
+                        ? HarnessTheme.surfaceHover
+                        : nil
                     )
                   }
+                  .harnessSelectionOutline(
+                    isSelected: store.selectedSessionID == session.sessionId,
+                    cornerRadius: 18
+                  )
                   .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
                 }
                 .accessibilityIdentifier(HarnessAccessibility.sessionRow(session.sessionId))
