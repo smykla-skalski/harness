@@ -40,6 +40,7 @@
 		74613632974705CE5155526B /* InspectorActionSections.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD510E21E9E45360995EC271 /* InspectorActionSections.swift */; };
 		768309DF34B5B5A20ED4F19A /* HarnessKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = CF767A18B993447E4A46C261 /* HarnessKit.framework */; };
 		7B369277B2D0DE911CD6073B /* HarnessLaunchModeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 24022C7E6FD63F999D86235B /* HarnessLaunchModeTests.swift */; };
+		7B5DE7534EC96F6488F7594A /* DaemonModelsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C133C2A2A720D99FA343CCCB /* DaemonModelsTests.swift */; };
 		7C472E4D7EA03269121D45B7 /* SessionCockpitView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4B46E01C5E7248F1C706E535 /* SessionCockpitView.swift */; };
 		7D5D2B33C547EE7298319092 /* PreferencesConnectionCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA0C11FD389A7252A6DAD7DF /* PreferencesConnectionCard.swift */; };
 		7DAB8CDFFFBC12DFD1AD2BF4 /* HarnessUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7324B42107BA5165DF15EAA2 /* HarnessUITests.swift */; };
@@ -172,6 +173,7 @@
 		B8F578BA8ADBC7BF1C9BF08C /* DaemonModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DaemonModels.swift; sourceTree = "<group>"; };
 		BB9107E93C4949060851E0E5 /* HarnessAPIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HarnessAPIClient.swift; sourceTree = "<group>"; };
 		BE824C29BDB518CA868B8C72 /* ConnectionModelsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionModelsTests.swift; sourceTree = "<group>"; };
+		C133C2A2A720D99FA343CCCB /* DaemonModelsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DaemonModelsTests.swift; sourceTree = "<group>"; };
 		C596EC8A96E06BEBCEAC0B61 /* HarnessWrapLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HarnessWrapLayout.swift; sourceTree = "<group>"; };
 		C8370810904BBEA0B3C7D6F8 /* PreferencesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreferencesView.swift; sourceTree = "<group>"; };
 		CF767A18B993447E4A46C261 /* HarnessKit.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = HarnessKit.framework; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -244,6 +246,7 @@
 			isa = PBXGroup;
 			children = (
 				BE824C29BDB518CA868B8C72 /* ConnectionModelsTests.swift */,
+				C133C2A2A720D99FA343CCCB /* DaemonModelsTests.swift */,
 				58E61B1CB90808C7638EE5A2 /* HarnessActionTestSupport.swift */,
 				24022C7E6FD63F999D86235B /* HarnessLaunchModeTests.swift */,
 				7CBDED35552FAD52DCC98E08 /* HarnessPathsTests.swift */,
@@ -652,6 +655,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				1322E5808650ABDCC94F295F /* ConnectionModelsTests.swift in Sources */,
+				7B5DE7534EC96F6488F7594A /* DaemonModelsTests.swift in Sources */,
 				FB08A1BE3FB8973D3635BC2F /* HarnessActionTestSupport.swift in Sources */,
 				7B369277B2D0DE911CD6073B /* HarnessLaunchModeTests.swift in Sources */,
 				B5DFF3D51F6188D3195F12F9 /* HarnessPathsTests.swift in Sources */,
@@ -771,6 +775,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				HARNESS_APP_BUNDLE_ID = io.harness.app;
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
@@ -801,7 +806,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				PRODUCT_BUNDLE_IDENTIFIER = io.harness.app;
+				PRODUCT_BUNDLE_IDENTIFIER = "$(HARNESS_APP_BUNDLE_ID)";
 				SDKROOT = macosx;
 			};
 			name = Release;
@@ -921,6 +926,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				HARNESS_APP_BUNDLE_ID = io.harness.app;
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
@@ -950,7 +956,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				PRODUCT_BUNDLE_IDENTIFIER = io.harness.app;
+				PRODUCT_BUNDLE_IDENTIFIER = "$(HARNESS_APP_BUNDLE_ID)";
 				SDKROOT = macosx;
 			};
 			name = Debug;
