@@ -64,7 +64,7 @@ struct PreferencesView: View {
       || store.connectionState == .connecting
   }
   private var preferencesAccessibilityValue: String {
-    "style=\(themeStyle.rawValue), mode=\(themeMode.rawValue), section=\(currentSection.rawValue)"
+    "style=\(themeStyle.rawValue), mode=\(themeMode.rawValue), section=\(currentSection.rawValue), preferencesChrome=extended"
   }
 
   private var currentSection: PreferencesSection {
@@ -80,15 +80,8 @@ struct PreferencesView: View {
         .navigationTitle(currentSection.title)
         .toolbarTitleDisplayMode(.inline)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background {
-          if HarnessTheme.usesGradientChrome {
-            HarnessTheme.canvas
-              .backgroundExtensionEffect()
-              .ignoresSafeArea()
-          } else {
-            HarnessTheme.canvas
-              .ignoresSafeArea()
-          }
+        .harnessExtendedChromeBackground {
+          HarnessTheme.canvas
         }
     }
     .navigationSplitViewStyle(.balanced)
@@ -109,7 +102,7 @@ struct PreferencesView: View {
     }
     .toolbar(removing: .sidebarToggle)
     .toolbarRole(.editor)
-    .toolbarBackgroundVisibility(.automatic, for: .windowToolbar)
+    .toolbarBackgroundVisibility(.visible, for: .windowToolbar)
     .containerBackground(.windowBackground, for: .window)
     .foregroundStyle(HarnessTheme.ink)
     .tint(HarnessTheme.accent(for: themeStyle))

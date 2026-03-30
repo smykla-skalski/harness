@@ -20,6 +20,10 @@ struct ContentView: View {
     store.selectedSessionSummary
   }
 
+  private var chromeAccessibilityValue: String {
+    "style=\(themeStyle.rawValue), contentChrome=extended, inspectorChrome=extended"
+  }
+
   var body: some View {
     NavigationSplitView {
       SidebarView(store: store, themeStyle: themeStyle)
@@ -64,28 +68,14 @@ struct ContentView: View {
           .accessibilityIdentifier(HarnessAccessibility.daemonPreferencesButton)
         }
       }
-      .background {
-        if HarnessTheme.usesGradientChrome {
-          HarnessTheme.canvas
-            .backgroundExtensionEffect()
-            .ignoresSafeArea()
-        } else {
-          HarnessTheme.canvas
-            .ignoresSafeArea()
-        }
+      .harnessExtendedChromeBackground {
+        HarnessTheme.canvas
       }
       .navigationSplitViewColumnWidth(min: 600, ideal: 840)
     } detail: {
       InspectorColumnView(store: store, themeStyle: themeStyle)
-        .background {
-          if HarnessTheme.usesGradientChrome {
-            HarnessTheme.inspectorBackground
-              .backgroundExtensionEffect()
-              .ignoresSafeArea()
-          } else {
-            HarnessTheme.inspectorBackground
-              .ignoresSafeArea()
-          }
+        .harnessExtendedChromeBackground {
+          HarnessTheme.inspectorBackground
         }
         .navigationSplitViewColumnWidth(min: 320, ideal: 380)
     }
@@ -96,7 +86,7 @@ struct ContentView: View {
     .frame(maxWidth: .infinity, maxHeight: .infinity)
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessAccessibility.appChromeRoot)
-    .accessibilityValue(themeStyle.rawValue)
+    .accessibilityValue(chromeAccessibilityValue)
     .confirmationDialog(
       confirmationTitle,
       isPresented: confirmationBinding,

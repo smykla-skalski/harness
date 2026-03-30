@@ -182,6 +182,18 @@ struct HarnessGlassContainer<Content: View>: View {
   }
 }
 
+extension View {
+  func harnessExtendedChromeBackground<Background: View>(
+    @ViewBuilder _ background: () -> Background
+  ) -> some View {
+    self.background {
+      background()
+        .backgroundExtensionEffect()
+        .ignoresSafeArea()
+    }
+  }
+}
+
 struct HarnessInsetPanelBackground: View {
   let cornerRadius: CGFloat
   let fillOpacity: Double
