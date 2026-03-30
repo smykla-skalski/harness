@@ -34,4 +34,12 @@ apps/harness-macos/Scripts/test-swift.sh
 xcodebuild -project 'apps/harness-macos/AI Harness.xcodeproj' -scheme "AI Harness" -destination platform=macOS -derivedDataPath tmp/xcode-derived test-without-building
 ```
 
+For routine work, prefer the smallest targeted command instead of the full `harness:macos:test` lane. `HarnessUITests` run against the isolated `AI Harness UI Testing` host (`io.aiharness.app.ui-testing`) and launch with `-ApplePersistenceIgnoreState YES`, so targeted UI checks do not interfere with a manually running `AI Harness.app`.
+
+Example targeted UI regression:
+
+```bash
+xcodebuild -project 'apps/harness-macos/AI Harness.xcodeproj' -scheme "AI Harness" -configuration Debug -derivedDataPath tmp/xcode-derived -destination 'platform=macOS' test CODE_SIGNING_ALLOWED=NO -only-testing:HarnessUITests/HarnessUITests/testToolbarOpensSettingsWindow
+```
+
 The generated project uses `SwiftLintBuildToolPlugin`, so the SwiftLint rules also run inside local Xcode builds and CI without restoring the older shell-wrapper lint path.

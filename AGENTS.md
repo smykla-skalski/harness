@@ -29,6 +29,8 @@ AI Harness app validation expectations:
 - `xcodebuild -project 'apps/harness-macos/AI Harness.xcodeproj' -scheme "AI Harness" -configuration Debug -derivedDataPath tmp/xcode-derived test CODE_SIGNING_ALLOWED=NO -destination 'platform=macOS' -skip-testing:HarnessUITests`
 - Hard requirement: do not run the full macOS UI suite by default. Run only the smallest targeted build/test command needed for the current change, such as a single XCTest case, a single XCTest class, or a non-UI build lane.
 - Only run the full macOS app validation lane or the full `HarnessUITests` suite after the user explicitly asks for the full suite.
+- Targeted `HarnessUITests` runs must use the isolated `AI Harness UI Testing` host (`io.aiharness.app.ui-testing`) instead of the shipping `AI Harness.app` bundle so local manual app usage is not interrupted.
+- Keep the `-ApplePersistenceIgnoreState YES` UI-test launch argument in place for the isolated host so macOS window restoration does not make targeted UI runs flaky.
 - The AI Harness targets run a strict Swift Quality Gate on every build with warnings-as-errors. Expect style/lint failures such as oversized view bodies and fix the source instead of bypassing the gate.
 - Prefer shared layout and control primitives for AI Harness UI density/readability work so button sizing and glass treatment stay consistent across screens.
 
