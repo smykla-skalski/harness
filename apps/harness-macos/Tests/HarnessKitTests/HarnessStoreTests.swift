@@ -235,7 +235,7 @@ struct HarnessStoreTests {
     await store.createTask(title: "broken", context: nil, severity: .high)
 
     #expect(store.lastError != nil)
-    #expect(!store.isBusy)
+    #expect(store.isBusy == false)
   }
 
   @Test("Refresh with no client triggers bootstrap")
@@ -262,7 +262,7 @@ struct HarnessStoreTests {
     #expect(
       store.lastError == DaemonControlError.commandFailed("install failed").localizedDescription
     )
-    #expect(!store.isBusy)
+    #expect(store.isBusy == false)
   }
 
   @Test("Remove launch agent failure sets the last error")
@@ -277,7 +277,7 @@ struct HarnessStoreTests {
     #expect(
       store.lastError == DaemonControlError.commandFailed("remove failed").localizedDescription
     )
-    #expect(!store.isBusy)
+    #expect(store.isBusy == false)
   }
 
   @Test("Request end confirmation uses the resolved actor")

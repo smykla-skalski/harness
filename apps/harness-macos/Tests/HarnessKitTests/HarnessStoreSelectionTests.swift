@@ -18,13 +18,13 @@ struct HarnessStoreSelectionTests {
     await Task.yield()
 
     #expect(store.isDiagnosticsRefreshInFlight)
-    #expect(!store.isBusy)
-    #expect(!store.isDaemonActionInFlight)
-    #expect(!store.isSessionActionInFlight)
+    #expect(store.isBusy == false)
+    #expect(store.isDaemonActionInFlight == false)
+    #expect(store.isSessionActionInFlight == false)
 
     await refreshTask.value
 
-    #expect(!store.isDiagnosticsRefreshInFlight)
+    #expect(store.isDiagnosticsRefreshInFlight == false)
   }
 
   @Test("Latest session selection wins when older load completes last")
@@ -107,7 +107,7 @@ struct HarnessStoreSelectionTests {
     #expect(store.timeline.map(\.sessionId) == [secondSummary.sessionId])
     #expect(store.timeline.map(\.summary) == ["Second timeline"])
     #expect(store.actionActorID == secondSummary.leaderId)
-    #expect(!store.isSelectionLoading)
+    #expect(store.isSelectionLoading == false)
   }
 
   @Test("Selecting a new session replaces subscribed session IDs")
