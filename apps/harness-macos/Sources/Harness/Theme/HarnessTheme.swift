@@ -149,6 +149,7 @@ struct HarnessCardModifier: ViewModifier {
 
   func body(content: Content) -> some View {
     content
+      .environment(\.isInsideGlassEffect, true)
       .frame(maxWidth: .infinity, alignment: .leading)
       .padding(contentPadding)
       .frame(
