@@ -11,6 +11,7 @@
 		03178A0A7A720414E6D88DBB /* HarnessAccessibility.swift in Sources */ = {isa = PBXBuildFile; fileRef = 25E4352CA7C16E3C644348CB /* HarnessAccessibility.swift */; };
 		0718BB17309F76DD75F5A717 /* SidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7AD9E7386C4C61747C1EC3B3 /* SidebarView.swift */; };
 		07A210699600156DE03C98F4 /* HarnessColumnScrollView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 037CA58B47266F2DDAC6F2AB /* HarnessColumnScrollView.swift */; };
+		09727B95A46CA6667C21161D /* DaemonStatusCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4FFB9D6E2B1A61A65341DEF /* DaemonStatusCard.swift */; };
 		0B98023240CC053545C1640A /* HarnessApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B28345325F1C37AC897A9E7C /* HarnessApp.swift */; };
 		0C1497A810190588E60ADB8B /* InspectorSupportViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 72836BCB115319002391E32E /* InspectorSupportViews.swift */; };
 		0CC5EE84810ED05A55BD2663 /* SidebarSessionList.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74B7689F9A126003B047298C /* SidebarSessionList.swift */; };
@@ -62,6 +63,7 @@
 		79A5C12DB2CC3BD6D4DE4171 /* HarnessUITestSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA807E80E1B7F428A2C01D14 /* HarnessUITestSupport.swift */; };
 		84C976D060ED31EDCD0F86CA /* HarnessKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4374719F8DCC16C95C5B2E2E /* HarnessKit.framework */; };
 		8731493D220DA219BF45DEDF /* WebSocketProtocolTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28B7A538D1E254D4CA1B750A /* WebSocketProtocolTests.swift */; };
+		952B77F0949ABA3067BBC8DD /* DaemonStatusCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4FFB9D6E2B1A61A65341DEF /* DaemonStatusCard.swift */; };
 		95C6608755E2A3781104213B /* HarnessStoreSelectionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 316509CF0D8EF69C2ABE6C90 /* HarnessStoreSelectionTests.swift */; };
 		9886DAEC397CC7C60D23BF73 /* HarnessTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = ACDEFEB6A14B32143E436643 /* HarnessTheme.swift */; };
 		98EB77BDCBBDAB421F8A76B8 /* PreferencesSections.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4CFFC73ABA5AFF6864BEAA40 /* PreferencesSections.swift */; };
@@ -242,6 +244,7 @@
 		D88530D0BE973FFED62BE662 /* PreferencesRecentEventsCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreferencesRecentEventsCard.swift; sourceTree = "<group>"; };
 		E415E72596CC984D3DFEBCF7 /* HarnessStoreTestFixtures.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HarnessStoreTestFixtures.swift; sourceTree = "<group>"; };
 		E90C65B82956326E40FD0C97 /* HarnessWrapLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HarnessWrapLayout.swift; sourceTree = "<group>"; };
+		F4FFB9D6E2B1A61A65341DEF /* DaemonStatusCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DaemonStatusCard.swift; sourceTree = "<group>"; };
 		F61F42B1737B0D9A86E6E1FC /* WebSocketTransportInternal.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebSocketTransportInternal.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -383,6 +386,7 @@
 			children = (
 				A3DFA9160004A175AACFC8E3 /* ConnectionViews.swift */,
 				A928853A647AF778A4D217A8 /* ContentView.swift */,
+				F4FFB9D6E2B1A61A65341DEF /* DaemonStatusCard.swift */,
 				5D44FD74945DB93AAA68A740 /* HarnessAdaptiveGridLayout.swift */,
 				037CA58B47266F2DDAC6F2AB /* HarnessColumnScrollView.swift */,
 				59DEB08AB62416965FC6F948 /* HarnessControls.swift */,
@@ -749,6 +753,7 @@
 			files = (
 				9AE72B23AA033ABFD66DB014 /* ConnectionViews.swift in Sources */,
 				17133077F1DD805C568E8010 /* ContentView.swift in Sources */,
+				09727B95A46CA6667C21161D /* DaemonStatusCard.swift in Sources */,
 				03178A0A7A720414E6D88DBB /* HarnessAccessibility.swift in Sources */,
 				E1AE1F634F6EEA61CC0DA765 /* HarnessAdaptiveGridLayout.swift in Sources */,
 				4600D29FFE4ED79D48BD5320 /* HarnessApp.swift in Sources */,
@@ -803,6 +808,7 @@
 			files = (
 				FDCD53DE71BFF7CFE59B81B1 /* ConnectionViews.swift in Sources */,
 				1E914153D0842393D23A209E /* ContentView.swift in Sources */,
+				952B77F0949ABA3067BBC8DD /* DaemonStatusCard.swift in Sources */,
 				A5626778D3BB15F0FBEE02E6 /* HarnessAccessibility.swift in Sources */,
 				DB84F6EC682E3CEE74D7068B /* HarnessAdaptiveGridLayout.swift in Sources */,
 				0B98023240CC053545C1640A /* HarnessApp.swift in Sources */,
