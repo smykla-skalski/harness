@@ -12,7 +12,6 @@ struct SidebarView: View {
         DaemonStatusCard(store: store)
         SidebarSessionList(store: store)
       }
-      .environment(\.isInsideGlassEffect, true)
       .frame(maxWidth: .infinity, alignment: .topLeading)
       .padding(22)
     }

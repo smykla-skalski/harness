@@ -128,13 +128,7 @@ struct SidebarSessionList: View {
       }
     }
     .padding(14)
-    .background {
-      HarnessInsetPanelBackground(
-        cornerRadius: 22,
-        fillOpacity: 0.05,
-        strokeOpacity: 0.09
-      )
-    }
+    .harnessInsetPanel(cornerRadius: 22, fillOpacity: 0.05, strokeOpacity: 0.09)
     .accessibilityElement(children: .contain)
     .accessibilityFrameMarker("\(HarnessAccessibility.sidebarFiltersCard).frame")
   }
@@ -176,13 +170,7 @@ private struct SessionListContent: View {
               }
               .padding(.horizontal, 12)
               .padding(.vertical, 10)
-              .background {
-                HarnessInsetPanelBackground(
-                  cornerRadius: 16,
-                  fillOpacity: 0.04,
-                  strokeOpacity: 0.14
-                )
-              }
+              .harnessInsetPanel(cornerRadius: 16, fillOpacity: 0.04, strokeOpacity: 0.14)
               .accessibilityIdentifier(
                 HarnessAccessibility.projectHeader(group.project.projectId)
               )
@@ -316,10 +304,10 @@ extension SidebarSessionList {
       .buttonBorderShape(.roundedRectangle(radius: 12))
       .harnessFilterChipButtonStyle(isSelected: isSelected)
       .controlSize(HarnessControlMetrics.compactControlSize)
-    .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-    .accessibilityIdentifier(identifier)
-    .accessibilityFrameMarker("\(identifier).frame")
-    .accessibilityValue(isSelected ? "selected" : "not selected")
+      .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+      .accessibilityIdentifier(identifier)
+      .accessibilityFrameMarker("\(identifier).frame")
+      .accessibilityValue(isSelected ? "selected" : "not selected")
   }
 
 }

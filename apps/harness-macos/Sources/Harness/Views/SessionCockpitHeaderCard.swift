@@ -125,13 +125,7 @@ struct SessionCockpitHeaderCard: View {
     }
     .frame(maxWidth: .infinity, alignment: .leading)
     .padding(14)
-    .background {
-      HarnessInsetPanelBackground(
-        cornerRadius: 18,
-        fillOpacity: 0.06,
-        strokeOpacity: 0.12
-      )
-    }
+    .harnessInsetPanel(cornerRadius: 18, fillOpacity: 0.06, strokeOpacity: 0.12)
     .accessibilityIdentifier(HarnessAccessibility.pendingLeaderTransferCard)
   }
 

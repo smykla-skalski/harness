@@ -81,13 +81,7 @@ struct SessionCockpitTimelineSection: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(12)
-        .background {
-          HarnessInsetPanelBackground(
-            cornerRadius: 16,
-            fillOpacity: 0.05,
-            strokeOpacity: 0.10
-          )
-        }
+        .harnessInsetPanel(cornerRadius: 16, fillOpacity: 0.05, strokeOpacity: 0.10)
         .transition(
           .asymmetric(
             insertion: .scale(scale: 0.95).combined(with: .opacity),

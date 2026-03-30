@@ -7,7 +7,7 @@ extension EnvironmentValues {
 func harnessGlass(tint: Color? = nil, interactive: Bool = false) -> Glass {
   var glass = Glass.regular
   if let tint {
-    glass = glass.tint(tint)
+    glass = glass.tint(tint.opacity(0.35))
   }
   if interactive {
     glass = glass.interactive()
@@ -15,8 +15,41 @@ func harnessGlass(tint: Color? = nil, interactive: Bool = false) -> Glass {
   return glass
 }
 
+func effectiveSuppressedGlassFill(_ baseFill: Double) -> Double {
+  min(baseFill * 3, 0.35)
+}
+
 func harnessChromeAccessibilityValue(for style: HarnessThemeStyle) -> String {
   HarnessTheme.usesGradientChrome(for: style) ? "extended" : "reduced"
+}
+
+struct HarnessGlassRenderingMarker: View {
+  @Environment(\.harnessThemeStyle)
+  private var themeStyle
+  @Environment(\.isInsideGlassEffect)
+  private var isInsideGlassEffect
+  let identifier: String
+  let baseFill: Double
+
+  private var stateText: String {
+    let isGradient = HarnessTheme.usesGradientChrome(for: themeStyle)
+    if !isGradient {
+      return "glass=flat"
+    }
+    if isInsideGlassEffect {
+      let fill = effectiveSuppressedGlassFill(baseFill)
+      return "glass=suppressed, fill=\(String(format: "%.2f", fill))"
+    }
+    return "glass=active"
+  }
+
+  var body: some View {
+    Color.clear
+      .allowsHitTesting(false)
+      .accessibilityElement()
+      .accessibilityLabel(stateText)
+      .accessibilityIdentifier(identifier)
+  }
 }
 
 func harnessInteractiveCardAccessibilityValue(for style: HarnessThemeStyle) -> String {
@@ -85,6 +118,10 @@ struct HarnessRoundedGlassBackground: View {
     HarnessTheme.usesGradientChrome(for: themeStyle) && !isInsideGlassEffect
   }
 
+  private var suppressedGlass: Bool {
+    HarnessTheme.usesGradientChrome(for: themeStyle) && isInsideGlassEffect
+  }
+
   var body: some View {
     let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
 
@@ -95,6 +132,13 @@ struct HarnessRoundedGlassBackground: View {
         .overlay {
           shape.fill(resolvedFillColor.opacity(resolvedFillOpacity))
         }
+        .overlay {
+          shape.stroke(strokeColor, lineWidth: 1)
+        }
+        .shadow(color: resolvedShadowColor, radius: shadowRadius, x: 0, y: shadowY)
+    } else if suppressedGlass {
+      shape
+        .fill(resolvedFillColor.opacity(effectiveSuppressedGlassFill(resolvedFillOpacity)))
         .overlay {
           shape.stroke(strokeColor, lineWidth: 1)
         }
@@ -168,6 +212,10 @@ struct HarnessCapsuleGlassBackground: View {
     HarnessTheme.usesGradientChrome(for: themeStyle) && !isInsideGlassEffect
   }
 
+  private var suppressedGlass: Bool {
+    HarnessTheme.usesGradientChrome(for: themeStyle) && isInsideGlassEffect
+  }
+
   var body: some View {
     let shape = Capsule()
 
@@ -178,6 +226,13 @@ struct HarnessCapsuleGlassBackground: View {
         .overlay {
           shape.fill(resolvedFillColor.opacity(resolvedFillOpacity))
         }
+        .overlay {
+          shape.stroke(strokeColor, lineWidth: 1)
+        }
+        .shadow(color: shadowColor, radius: shadowRadius, x: 0, y: shadowY)
+    } else if suppressedGlass {
+      shape
+        .fill(resolvedFillColor.opacity(effectiveSuppressedGlassFill(resolvedFillOpacity)))
         .overlay {
           shape.stroke(strokeColor, lineWidth: 1)
         }
@@ -223,6 +278,20 @@ struct HarnessGlassContainer<Content: View>: View {
 }
 
 extension View {
+  func harnessInsetPanel(
+    cornerRadius: CGFloat,
+    fillOpacity: Double,
+    strokeOpacity: Double
+  ) -> some View {
+    modifier(
+      HarnessInsetPanelModifier(
+        cornerRadius: cornerRadius,
+        fillOpacity: fillOpacity,
+        strokeOpacity: strokeOpacity
+      )
+    )
+  }
+
   func harnessExtendedChromeBackground<Background: View>(
     @ViewBuilder _ background: () -> Background
   ) -> some View {
@@ -273,6 +342,26 @@ struct HarnessInsetPanelBackground: View {
   }
 }
 
+private struct HarnessInsetPanelModifier: ViewModifier {
+  let cornerRadius: CGFloat
+  let fillOpacity: Double
+  let strokeOpacity: Double
+
+  func body(content: Content) -> some View {
+    ZStack(alignment: .topLeading) {
+      content
+        .environment(\.isInsideGlassEffect, true)
+    }
+    .background {
+      HarnessInsetPanelBackground(
+        cornerRadius: cornerRadius,
+        fillOpacity: fillOpacity,
+        strokeOpacity: strokeOpacity
+      )
+    }
+  }
+}
+
 struct HarnessGlassCapsuleBackground: View {
   @Environment(\.harnessThemeStyle)
   private var themeStyle
@@ -309,8 +398,8 @@ struct HarnessInteractiveCardBackground: View {
   }
 }
 
-private extension Comparable {
-  func clamped(to limits: ClosedRange<Self>) -> Self {
+extension Comparable {
+  fileprivate func clamped(to limits: ClosedRange<Self>) -> Self {
     min(max(self, limits.lowerBound), limits.upperBound)
   }
 }

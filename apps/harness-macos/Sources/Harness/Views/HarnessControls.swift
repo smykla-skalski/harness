@@ -79,9 +79,15 @@ private struct HarnessActionButtonStyleModifier: ViewModifier {
   func body(content: Content) -> some View {
     switch variant {
     case .prominent:
-      content
-        .buttonStyle(.borderedProminent)
-        .tint(tint)
+      if HarnessTheme.usesGradientChrome(for: themeStyle) && !isInsideGlassEffect {
+        content
+          .buttonStyle(.glassProminent)
+          .tint(tint)
+      } else {
+        content
+          .buttonStyle(.borderedProminent)
+          .tint(tint)
+      }
     case .bordered:
       if HarnessTheme.usesGradientChrome(for: themeStyle) && !isInsideGlassEffect {
         content
@@ -126,12 +132,19 @@ private struct HarnessFilterChipButtonStyleModifier: ViewModifier {
 
   @ViewBuilder
   func body(content: Content) -> some View {
-    let isGlass = HarnessTheme.usesGradientChrome(for: themeStyle)
+    let isGlass =
+      HarnessTheme.usesGradientChrome(for: themeStyle)
       && !isInsideGlassEffect
     if isSelected {
-      content
-        .buttonStyle(.borderedProminent)
-        .tint(HarnessTheme.accent(for: themeStyle))
+      if isGlass {
+        content
+          .buttonStyle(.glassProminent)
+          .tint(HarnessTheme.accent(for: themeStyle))
+      } else {
+        content
+          .buttonStyle(.borderedProminent)
+          .tint(HarnessTheme.accent(for: themeStyle))
+      }
     } else if isGlass {
       content
         .buttonStyle(
@@ -160,6 +173,7 @@ private struct InteractiveCardModifier: ViewModifier {
 
     if HarnessTheme.usesGradientChrome(for: themeStyle) && !isInsideGlassEffect {
       content
+        .environment(\.isInsideGlassEffect, true)
         .buttonBorderShape(.roundedRectangle(radius: cornerRadius))
         .buttonStyle(.glass(.regular.tint(resolvedTint)))
     } else if let tint {

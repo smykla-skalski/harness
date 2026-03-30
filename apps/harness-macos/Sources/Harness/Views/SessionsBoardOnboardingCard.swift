@@ -130,12 +130,6 @@ struct SessionsBoardOnboardingCard: View {
     }
     .frame(maxWidth: .infinity, minHeight: 72, alignment: .topLeading)
     .padding(11)
-    .background {
-      HarnessInsetPanelBackground(
-        cornerRadius: 18,
-        fillOpacity: 0.05,
-        strokeOpacity: 0.10
-      )
-    }
+    .harnessInsetPanel(cornerRadius: 18, fillOpacity: 0.05, strokeOpacity: 0.10)
   }
 }

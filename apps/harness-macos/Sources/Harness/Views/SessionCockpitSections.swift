@@ -14,27 +14,58 @@ struct SessionMetricGrid: View {
           value: "\(metrics.agentCount)",
           tint: HarnessTheme.accent(for: themeStyle)
         )
-        metricCard(title: "Active", value: "\(metrics.activeAgentCount)", tint: HarnessTheme.success)
+        metricCard(
+          title: "Active", value: "\(metrics.activeAgentCount)", tint: HarnessTheme.success)
         metricCard(
           title: "In Flight",
           value: "\(metrics.inProgressTaskCount)",
           tint: HarnessTheme.warmAccent
         )
-        metricCard(title: "Blocked", value: "\(metrics.blockedTaskCount)", tint: HarnessTheme.danger)
-        metricCard(title: "Completed", value: "\(metrics.completedTaskCount)", tint: HarnessTheme.ink)
+        metricCard(
+          title: "Blocked", value: "\(metrics.blockedTaskCount)", tint: HarnessTheme.danger)
+        metricCard(
+          title: "Completed", value: "\(metrics.completedTaskCount)", tint: HarnessTheme.ink)
       }
     }
   }
 
   private func metricCard(title: String, value: String, tint: Color) -> some View {
-    VStack(alignment: .leading, spacing: 6) {
-      Text(title.uppercased())
-        .font(.caption.weight(.semibold))
-        .foregroundStyle(HarnessTheme.secondaryInk)
-      Text(value)
-        .font(.system(size: 28, weight: .heavy, design: .rounded))
-        .foregroundStyle(tint)
-        .contentTransition(.numericText())
+    let useGradientChrome = HarnessTheme.usesGradientChrome(for: themeStyle)
+    let plaqueFill =
+      useGradientChrome
+      ? Color.white.opacity(0.72)
+      : HarnessTheme.surfaceHover(for: themeStyle).opacity(0.96)
+    let plaqueStroke =
+      useGradientChrome
+      ? Color.white.opacity(0.28)
+      : HarnessTheme.panelBorder(for: themeStyle).opacity(0.22)
+
+    return HStack(alignment: .top, spacing: 12) {
+      RoundedRectangle(cornerRadius: 999, style: .continuous)
+        .fill(tint)
+        .frame(width: 10)
+        .frame(minHeight: 60)
+        .accessibilityHidden(true)
+      VStack(alignment: .leading, spacing: 6) {
+        Text(title.uppercased())
+          .font(.caption.weight(.semibold))
+          .foregroundStyle(HarnessTheme.secondaryInk)
+        Text(value)
+          .font(.system(size: 28, weight: .heavy, design: .rounded))
+          .foregroundStyle(tint)
+          .contentTransition(.numericText())
+      }
+      .frame(maxWidth: .infinity, alignment: .leading)
+      .padding(.horizontal, 10)
+      .padding(.vertical, 8)
+      .background {
+        RoundedRectangle(cornerRadius: 16, style: .continuous)
+          .fill(plaqueFill)
+          .overlay {
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+              .stroke(plaqueStroke, lineWidth: 1)
+          }
+      }
     }
     .frame(maxWidth: .infinity, alignment: .leading)
     .harnessCard(minHeight: 80)

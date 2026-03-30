@@ -89,6 +89,7 @@
 		AB5BEE5574C93AF1DDDC4C6E /* HarnessKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4374719F8DCC16C95C5B2E2E /* HarnessKit.framework */; };
 		AF8BA7822544491D76F1644E /* SessionsBoardOnboardingCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9998D7E02B6815476BFC4623 /* SessionsBoardOnboardingCard.swift */; };
 		B4C35EAFDF6F81F62DF7226D /* HarnessRequests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D485A89FA04846FAD1BC0AC /* HarnessRequests.swift */; };
+		B808CF2FC8DCA63E3D8243F4 /* HarnessGlassContrastUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 33777903FC6DD23DB9C9A8AD /* HarnessGlassContrastUITests.swift */; };
 		B95B5D25341719AC772D782B /* DaemonController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46BE1211445D10F89FB9C1A6 /* DaemonController.swift */; };
 		B9A66ADE9B75D40E1C0AF592 /* SessionsBoardRecentSessionsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEA42BE2636FC97FC00738F6 /* SessionsBoardRecentSessionsSection.swift */; };
 		BA99CEBC3D216F0F98585164 /* ConnectionModelsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3C170B54985778D0FC29612 /* ConnectionModelsTests.swift */; };
@@ -220,6 +221,7 @@
 		2F8F233D8A2877105C88C050 /* WebSocketProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebSocketProtocol.swift; sourceTree = "<group>"; };
 		316509CF0D8EF69C2ABE6C90 /* HarnessStoreSelectionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HarnessStoreSelectionTests.swift; sourceTree = "<group>"; };
 		331F53800549FA6925EBBE05 /* DaemonModelsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DaemonModelsTests.swift; sourceTree = "<group>"; };
+		33777903FC6DD23DB9C9A8AD /* HarnessGlassContrastUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HarnessGlassContrastUITests.swift; sourceTree = "<group>"; };
 		35BB3F2082CFF67A05FA4070 /* ServerSentEvents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerSentEvents.swift; sourceTree = "<group>"; };
 		38486867A857A11AAE481A27 /* HarnessStoreActionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HarnessStoreActionTests.swift; sourceTree = "<group>"; };
 		3A12FD010F2298DEC9D4C16B /* RecordingHarnessClient+Base.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "RecordingHarnessClient+Base.swift"; sourceTree = "<group>"; };
@@ -528,6 +530,7 @@
 		F08AEEA161877A56EA6063A2 /* HarnessUITests */ = {
 			isa = PBXGroup;
 			children = (
+				33777903FC6DD23DB9C9A8AD /* HarnessGlassContrastUITests.swift */,
 				A309E37EF93D4AD1E6886205 /* HarnessLayoutUITests.swift */,
 				A62226DF2875BDAF631D1622 /* HarnessUITests.swift */,
 				CA807E80E1B7F428A2C01D14 /* HarnessUITestSupport.swift */,
@@ -807,6 +810,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				B808CF2FC8DCA63E3D8243F4 /* HarnessGlassContrastUITests.swift in Sources */,
 				5F34A58BCE9660203B691112 /* HarnessLayoutUITests.swift in Sources */,
 				79A5C12DB2CC3BD6D4DE4171 /* HarnessUITestSupport.swift in Sources */,
 				DC19F2707605CBAC6400E0C4 /* HarnessUITests.swift in Sources */,
