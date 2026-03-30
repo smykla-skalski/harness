@@ -5,17 +5,23 @@ import Testing
 
 @Suite("Connection models")
 struct ConnectionModelsTests {
-  @Test("ConnectionQuality thresholds map correctly")
-  func qualityThresholds() {
-    #expect(ConnectionQuality(latencyMs: nil) == .disconnected)
-    #expect(ConnectionQuality(latencyMs: 10) == .excellent)
-    #expect(ConnectionQuality(latencyMs: 49) == .excellent)
-    #expect(ConnectionQuality(latencyMs: 50) == .good)
-    #expect(ConnectionQuality(latencyMs: 149) == .good)
-    #expect(ConnectionQuality(latencyMs: 150) == .degraded)
-    #expect(ConnectionQuality(latencyMs: 499) == .degraded)
-    #expect(ConnectionQuality(latencyMs: 500) == .poor)
-    #expect(ConnectionQuality(latencyMs: 5000) == .poor)
+  @Test(
+    "ConnectionQuality thresholds map correctly",
+    arguments: [
+      (nil, ConnectionQuality.disconnected),
+      (0, ConnectionQuality.excellent),
+      (10, ConnectionQuality.excellent),
+      (49, ConnectionQuality.excellent),
+      (50, ConnectionQuality.good),
+      (149, ConnectionQuality.good),
+      (150, ConnectionQuality.degraded),
+      (499, ConnectionQuality.degraded),
+      (500, ConnectionQuality.poor),
+      (5000, ConnectionQuality.poor),
+    ] as [(Int?, ConnectionQuality)]
+  )
+  func qualityThresholds(latencyMs: Int?, expected: ConnectionQuality) {
+    #expect(ConnectionQuality(latencyMs: latencyMs) == expected)
   }
 
   @Test("ConnectionMetrics initial state has sensible defaults")
@@ -41,13 +47,13 @@ struct ConnectionModelsTests {
 
   @Test("ConnectionEvent initializes with current timestamp")
   func eventInit() {
-    let before = Date()
+    let before = Date.now
     let event = ConnectionEvent(
       kind: .connected,
       detail: "test",
       transportKind: .webSocket
     )
-    let after = Date()
+    let after = Date.now
     #expect(event.kind == .connected)
     #expect(event.detail == "test")
     #expect(event.transportKind == .webSocket)

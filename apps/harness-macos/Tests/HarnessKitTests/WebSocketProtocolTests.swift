@@ -36,13 +36,13 @@ struct WebSocketProtocolTests {
       {"id":"req-1","result":{"status":"ok"},"error":null}
       """
     let frame = try decoder.decode(WsFrame.self, from: Data(json.utf8))
-    if case .response(let id, let result, let error) = frame.kind {
-      #expect(id == "req-1")
-      #expect(result != nil)
-      #expect(error == nil)
-    } else {
-      Issue.record("Expected response frame kind")
+    guard case .response(let id, let result, let error) = frame.kind else {
+      Issue.record("Expected response frame kind, got \(frame.kind)")
+      return
     }
+    #expect(id == "req-1")
+    #expect(result != nil)
+    #expect(error == nil)
   }
 
   @Test("WsFrame decodes response with error")
@@ -51,13 +51,14 @@ struct WebSocketProtocolTests {
       {"id":"req-2","result":null,"error":{"code":"NOT_FOUND","message":"session not found","details":[]}}
       """
     let frame = try decoder.decode(WsFrame.self, from: Data(json.utf8))
-    if case .response(let id, _, let error) = frame.kind {
-      #expect(id == "req-2")
-      #expect(error?.code == "NOT_FOUND")
-      #expect(error?.message == "session not found")
-    } else {
-      Issue.record("Expected response frame kind")
+    guard case .response(let id, _, let error) = frame.kind else {
+      Issue.record("Expected response frame kind, got \(frame.kind)")
+      return
     }
+    #expect(id == "req-2")
+    let resolvedError = try #require(error)
+    #expect(resolvedError.code == "NOT_FOUND")
+    #expect(resolvedError.message == "session not found")
   }
 
   @Test("WsFrame decodes push event")
@@ -67,23 +68,22 @@ struct WebSocketProtocolTests {
       "session_id":"sess-1","payload":{},"seq":42}
       """
     let frame = try decoder.decode(WsFrame.self, from: Data(json.utf8))
-    if case .push(let event, _, let sessionId, _, let seq) = frame.kind {
-      #expect(event == "session_updated")
-      #expect(sessionId == "sess-1")
-      #expect(seq == 42)
-    } else {
-      Issue.record("Expected push frame kind")
+    guard case .push(let event, _, let sessionId, _, let seq) = frame.kind else {
+      Issue.record("Expected push frame kind, got \(frame.kind)")
+      return
     }
+    #expect(event == "session_updated")
+    #expect(sessionId == "sess-1")
+    #expect(seq == 42)
   }
 
   @Test("WsFrame returns unknown for empty object")
   func unknownFrame() throws {
     let json = "{}"
     let frame = try decoder.decode(WsFrame.self, from: Data(json.utf8))
-    if case .unknown = frame.kind {
-      // expected
-    } else {
-      Issue.record("Expected unknown frame kind")
+    guard case .unknown = frame.kind else {
+      Issue.record("Expected unknown frame kind, got \(frame.kind)")
+      return
     }
   }
 
@@ -98,9 +98,9 @@ struct WebSocketProtocolTests {
   }
 
   @Test("PendingRequestStore fail delivers error")
-  func pendingStoreFail() async {
+  func pendingStoreFail() async throws {
     let store = PendingRequestStore()
-    do {
+    await #expect(throws: WebSocketTransportError.self) {
       let _: JSONValue =
         try await withCheckedThrowingContinuation { continuation in
           store.register(id: "test-2", continuation: continuation)
@@ -109,29 +109,17 @@ struct WebSocketProtocolTests {
             error: WebSocketTransportError.connectionClosed
           )
         }
-      Issue.record("Expected error to be thrown")
-    } catch {
-      #expect(error is WebSocketTransportError)
     }
   }
 
   @Test("PendingRequestStore failAll clears all pending")
-  func pendingStoreFailAll() async {
+  func pendingStoreFailAll() async throws {
     let store = PendingRequestStore()
-    async let first: Void = {
-      do {
-        let _: JSONValue = try await withCheckedThrowingContinuation { continuation in
-          store.register(id: "a", continuation: continuation)
-          Task {
-            try? await Task.sleep(for: .milliseconds(50))
-            store.failAll(error: WebSocketTransportError.connectionClosed)
-          }
-        }
-        Issue.record("Expected error")
-      } catch {
-        // expected
+    await #expect(throws: WebSocketTransportError.self) {
+      let _: JSONValue = try await withCheckedThrowingContinuation { continuation in
+        store.register(id: "a", continuation: continuation)
+        store.failAll(error: WebSocketTransportError.connectionClosed)
       }
-    }()
-    await first
+    }
   }
 }
