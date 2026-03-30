@@ -1,9 +1,11 @@
-import XCTest
+import Testing
 
 @testable import HarnessKit
 
-final class DaemonModelsTests: XCTestCase {
-  func testLaunchAgentLifecycleCaptionIncludesStableStatusParts() {
+@Suite("Daemon models")
+struct DaemonModelsTests {
+  @Test("Launch agent lifecycle caption includes stable status parts")
+  func launchAgentLifecycleCaptionIncludesStableStatusParts() {
     let status = LaunchAgentStatus(
       installed: true,
       loaded: true,
@@ -17,8 +19,8 @@ final class DaemonModelsTests: XCTestCase {
     )
 
     let caption = status.lifecycleCaption
-    XCTAssertTrue(caption.contains("gui/501/io.harness.daemon"))
-    XCTAssertTrue(caption.contains("pid 4242"))
-    XCTAssertTrue(caption.contains("exit 0"))
+    #expect(caption.contains("gui/501/io.harness.daemon"))
+    #expect(caption.contains("pid 4242"))
+    #expect(caption.contains("exit 0"))
   }
 }
