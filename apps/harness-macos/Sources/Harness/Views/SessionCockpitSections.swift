@@ -27,6 +27,7 @@ struct SessionMetricGrid: View {
           title: "Completed", value: "\(metrics.completedTaskCount)", tint: HarnessTheme.ink)
       }
     }
+    .animation(.spring(duration: 0.3), value: metrics)
   }
 
   private func metricCard(title: String, value: String, tint: Color) -> some View {
