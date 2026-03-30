@@ -7,7 +7,7 @@ public enum PreviewFixtures {
     projectDir: "/Users/example/Projects/harness",
     contextRoot: "/Users/example/Library/Application Support/harness/projects/project-6ccf8d0a",
     sessionId: "sess-harness",
-    context: "Monitor all live multi-agent harness sessions from a macOS cockpit",
+    context: "Track all live multi-agent harness sessions from a macOS cockpit",
     status: .active,
     createdAt: "2026-03-28T14:05:00Z",
     updatedAt: "2026-03-28T14:18:00Z",

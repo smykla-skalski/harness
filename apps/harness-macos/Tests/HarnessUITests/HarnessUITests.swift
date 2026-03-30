@@ -25,7 +25,7 @@ final class HarnessUITests: HarnessUITestCase {
     let app = launch(mode: "empty")
 
     XCTAssertTrue(
-      app.staticTexts["Bring The Monitor Online"].waitForExistence(timeout: Self.uiTimeout)
+      app.staticTexts["Bring Harness Online"].waitForExistence(timeout: Self.uiTimeout)
     )
     XCTAssertTrue(app.buttons["Start Daemon"].exists)
 
