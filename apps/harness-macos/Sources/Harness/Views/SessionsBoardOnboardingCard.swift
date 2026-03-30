@@ -105,26 +105,30 @@ struct SessionsBoardOnboardingCard: View {
     @ViewBuilder action: () -> Action
   ) -> some View {
     VStack(alignment: .leading, spacing: 8) {
-      HStack {
-        Circle()
-          .fill(isReady ? HarnessTheme.success : HarnessTheme.caution)
-          .frame(width: 10, height: 10)
-          .accessibilityHidden(true)
-        Text(title)
-          .font(.system(.headline, design: .rounded, weight: .semibold))
+      HStack(alignment: .top) {
+        HStack {
+          Circle()
+            .fill(isReady ? HarnessTheme.success : HarnessTheme.caution)
+            .frame(width: 10, height: 10)
+            .accessibilityHidden(true)
+          Text(title)
+            .font(.system(.headline, design: .rounded, weight: .semibold))
+        }
+        Spacer()
+        Text(isReady ? "Ready" : "Pending")
+          .font(.caption.bold())
+          .padding(.horizontal, 9)
+          .padding(.vertical, 5)
+          .background(isReady ? HarnessTheme.success : HarnessTheme.caution, in: Capsule())
+          .foregroundStyle(.white)
       }
       Text(detail)
         .font(.system(.footnote, design: .rounded, weight: .medium))
         .foregroundStyle(HarnessTheme.secondaryInk)
         .lineLimit(2)
       Spacer(minLength: 0)
-      HStack {
-        Text(isReady ? "Ready" : "Pending")
-          .font(.caption.bold())
-          .foregroundStyle(isReady ? HarnessTheme.success : HarnessTheme.caution)
-        Spacer()
-        action()
-      }
+      action()
+        .frame(maxWidth: .infinity, alignment: .trailing)
     }
     .frame(maxWidth: .infinity, minHeight: 72, alignment: .topLeading)
     .padding(11)
