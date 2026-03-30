@@ -25,14 +25,34 @@ enum PreferencesSection: String, CaseIterable, Identifiable, Hashable {
 }
 
 enum PreferencesChromeMetrics {
-  static let sidebarWidth: CGFloat = 238
-  static let sidebarLeadingInset: CGFloat = 24
-  static let sidebarTrailingInset: CGFloat = 16
+  static let sidebarWidth: CGFloat = 220
+  static let sidebarLeadingInset: CGFloat = 12
+  static let sidebarTrailingInset: CGFloat = 8
   static let sidebarTopInset: CGFloat = 28
   static let sidebarBottomInset: CGFloat = 20
+  static let sidebarButtonHorizontalInset: CGFloat = 6
+  static let detailContentHorizontalInset: CGFloat = 0
   static let sectionSpacing: CGFloat = 8
   static let sectionRowHeight: CGFloat = 48
   static let shellDividerOpacity: Double = 0.42
+}
+
+struct PreferencesDetailFormModifier: ViewModifier {
+  func body(content: Content) -> some View {
+    content
+      .formStyle(.grouped)
+      .contentMargins(
+        .horizontal,
+        PreferencesChromeMetrics.detailContentHorizontalInset,
+        for: .scrollContent
+      )
+  }
+}
+
+extension View {
+  func preferencesDetailFormStyle() -> some View {
+    modifier(PreferencesDetailFormModifier())
+  }
 }
 
 struct PreferencesChromeLayout<Detail: View>: View {
@@ -73,7 +93,11 @@ struct PreferencesChromeLayout<Detail: View>: View {
 
           detail
             .padding(.top, topChromeInset)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .frame(
+              maxWidth: .infinity,
+              maxHeight: .infinity,
+              alignment: .topLeading
+            )
         }
       }
       .ignoresSafeArea(.container, edges: .top)
@@ -161,7 +185,7 @@ private struct PreferencesSidebarButton: View {
           minHeight: PreferencesChromeMetrics.sectionRowHeight,
           alignment: .leading
         )
-        .padding(.horizontal, 14)
+        .padding(.horizontal, PreferencesChromeMetrics.sidebarButtonHorizontalInset)
         .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
     .buttonStyle(.plain)
