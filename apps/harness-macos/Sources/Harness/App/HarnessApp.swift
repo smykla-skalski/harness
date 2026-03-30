@@ -89,12 +89,11 @@ struct HarnessApp: App {
   }
 
   var body: some Scene {
-    Window("Harness", id: "main") {
+    WindowGroup("Harness") {
       rootContent
     }
     .windowStyle(.titleBar)
     .windowToolbarStyle(.unified(showsTitle: true))
-    .defaultLaunchBehavior(.presented)
     .defaultSize(width: 1640, height: 980)
     .restorationBehavior(isUITesting ? .disabled : .automatic)
     .commands {

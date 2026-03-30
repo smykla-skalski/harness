@@ -5,6 +5,7 @@ import SwiftUI
 struct ContentView: View {
   @Bindable var store: HarnessStore
   let themeStyle: HarnessThemeStyle
+  @State private var showInspector = true
 
   private var selectedDetail: SessionDetail? {
     guard let sessionID = store.selectedSessionID,
@@ -28,7 +29,7 @@ struct ContentView: View {
     NavigationSplitView {
       SidebarView(store: store, themeStyle: themeStyle)
         .navigationSplitViewColumnWidth(min: 300, ideal: 350)
-    } content: {
+    } detail: {
       NavigationStack {
         SessionContentContainer(
           store: store,
@@ -62,25 +63,31 @@ struct ContentView: View {
           .keyboardShortcut("r", modifiers: [.command])
           .accessibilityIdentifier(HarnessAccessibility.refreshButton)
 
+          Button {
+            showInspector.toggle()
+          } label: {
+            Label("Inspector", systemImage: "info.circle")
+          }
+          .keyboardShortcut("i", modifiers: [.command, .option])
+
           SettingsLink {
             Label("Settings", systemImage: "gearshape")
           }
           .accessibilityIdentifier(HarnessAccessibility.daemonPreferencesButton)
         }
       }
+      .inspector(isPresented: $showInspector) {
+        InspectorColumnView(store: store, themeStyle: themeStyle)
+          .harnessExtendedChromeBackground {
+            HarnessTheme.inspectorBackground(for: themeStyle)
+          }
+          .inspectorColumnWidth(min: 320, ideal: 380, max: 500)
+      }
       .harnessExtendedChromeBackground {
         HarnessTheme.canvas(for: themeStyle)
       }
-      .navigationSplitViewColumnWidth(min: 600, ideal: 840)
-    } detail: {
-      InspectorColumnView(store: store, themeStyle: themeStyle)
-        .harnessExtendedChromeBackground {
-          HarnessTheme.inspectorBackground(for: themeStyle)
-        }
-        .navigationSplitViewColumnWidth(min: 320, ideal: 380)
     }
-    .toolbarRole(.editor)
-    .navigationSplitViewStyle(.balanced)
+    .navigationSplitViewStyle(.prominentDetail)
     .toolbarBackgroundVisibility(.visible, for: .windowToolbar)
     .containerBackground(.windowBackground, for: .window)
     .frame(maxWidth: .infinity, maxHeight: .infinity)
