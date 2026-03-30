@@ -71,7 +71,8 @@ struct HarnessApp: App {
   private let isUITesting = ProcessInfo.processInfo.environment["HARNESS_UI_TESTS"] == "1"
 
   init() {
-    let resolvedContainer = (try? HarnessModelContainer.live())
+    let resolvedContainer =
+      (try? HarnessModelContainer.live())
       ?? (try? HarnessModelContainer.preview())!
     container = resolvedContainer
     let resolvedStore = HarnessAppStoreFactory.makeStore(
@@ -105,8 +106,9 @@ struct HarnessApp: App {
     Settings {
       settingsContent
     }
+    .windowStyle(.titleBar)
     .windowToolbarStyle(.unifiedCompact(showsTitle: false))
-    .defaultSize(width: 980, height: 680)
+    .defaultSize(width: 1180, height: 760)
     .restorationBehavior(isUITesting ? .disabled : .automatic)
   }
 
@@ -174,7 +176,9 @@ struct HarnessApp: App {
       themeMode: $themeMode,
       themeStyle: $themeStyle
     )
+    .environment(\.harnessThemeStyle, themeStyle)
     .preferredColorScheme(themeMode.colorScheme)
+    .tint(HarnessTheme.accent(for: themeStyle))
   }
 
   private func refreshStore() {

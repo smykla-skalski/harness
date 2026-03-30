@@ -5,6 +5,8 @@ import SwiftUI
 struct ContentView: View {
   @Bindable var store: HarnessStore
   let themeStyle: HarnessThemeStyle
+  @Environment(\.openSettings)
+  private var openSettings
   @State private var showInspector = true
 
   private var selectedDetail: SessionDetail? {
@@ -27,7 +29,6 @@ struct ContentView: View {
     return [
       "style=\(themeStyle.rawValue)",
       "contentChrome=\(chrome)",
-      "inspectorChrome=\(chrome)",
       "interactiveCards=\(interactiveCards)",
     ].joined(separator: ", ")
   }
@@ -57,7 +58,7 @@ struct ContentView: View {
         ToolbarItem(placement: .secondaryAction) {
           ConnectionToolbarBadge(metrics: store.connectionMetrics)
         }
-        ToolbarItemGroup(placement: .primaryAction) {
+        ToolbarItem(placement: .primaryAction) {
           Button(action: refresh) {
             HStack(spacing: 8) {
               Image(systemName: "arrow.clockwise")
@@ -73,15 +74,19 @@ struct ContentView: View {
           }
           .keyboardShortcut("r", modifiers: [.command])
           .accessibilityIdentifier(HarnessAccessibility.refreshButton)
-
+        }
+        ToolbarItem(placement: .primaryAction) {
           Button {
             showInspector.toggle()
           } label: {
             Label("Inspector", systemImage: "info.circle")
           }
           .keyboardShortcut("i", modifiers: [.command, .option])
-
-          SettingsLink {
+        }
+        ToolbarItem(placement: .primaryAction) {
+          Button {
+            openSettings()
+          } label: {
             Label("Settings", systemImage: "gearshape")
           }
           .accessibilityIdentifier(HarnessAccessibility.daemonPreferencesButton)
@@ -89,8 +94,9 @@ struct ContentView: View {
       }
       .inspector(isPresented: $showInspector) {
         InspectorColumnView(store: store, themeStyle: themeStyle)
-          .harnessExtendedChromeBackground {
+          .background {
             HarnessTheme.inspectorBackground(for: themeStyle)
+              .ignoresSafeArea()
           }
           .inspectorColumnWidth(min: 320, ideal: 380, max: 500)
       }

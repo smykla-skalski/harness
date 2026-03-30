@@ -76,6 +76,31 @@ final class HarnessUITests: HarnessUITestCase {
     )
   }
 
+  func testCommandCommaOpensSingletonSettingsWindow() throws {
+    let app = launch(mode: "preview")
+
+    app.typeKey(",", modifierFlags: .command)
+
+    let preferencesRoot = element(in: app, identifier: Accessibility.preferencesRoot)
+    XCTAssertTrue(preferencesRoot.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertEqual(
+      app.descendants(matching: .any)
+        .matching(identifier: Accessibility.preferencesRoot)
+        .count,
+      1
+    )
+
+    app.typeKey(",", modifierFlags: .command)
+
+    XCTAssertTrue(preferencesRoot.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertEqual(
+      app.descendants(matching: .any)
+        .matching(identifier: Accessibility.preferencesRoot)
+        .count,
+      1
+    )
+  }
+
   func testObserveSummaryIsAvailableInSessionCockpit() throws {
     let app = launch(mode: "preview")
 
@@ -315,7 +340,7 @@ final class HarnessUITests: HarnessUITestCase {
     )
     XCTAssertEqual(
       appChromeState.label,
-      "style=gradient, contentChrome=extended, inspectorChrome=extended, interactiveCards=native-glass"
+      "style=gradient, contentChrome=extended, interactiveCards=native-glass"
     )
     XCTAssertEqual(sessionRow.value as? String, "selected, interactive=native-glass")
     XCTAssertEqual(observeSummaryButton.value as? String, "interactive=native-glass")
@@ -332,7 +357,7 @@ final class HarnessUITests: HarnessUITestCase {
     )
     XCTAssertEqual(
       appChromeState.label,
-      "style=flat, contentChrome=reduced, inspectorChrome=reduced, interactiveCards=bordered-fallback"
+      "style=flat, contentChrome=reduced, interactiveCards=bordered-fallback"
     )
     XCTAssertEqual(sessionRow.value as? String, "selected, interactive=bordered-fallback")
     XCTAssertEqual(observeSummaryButton.value as? String, "interactive=bordered-fallback")
@@ -349,7 +374,7 @@ final class HarnessUITests: HarnessUITestCase {
     )
     XCTAssertEqual(
       appChromeState.label,
-      "style=gradient, contentChrome=extended, inspectorChrome=extended, interactiveCards=native-glass"
+      "style=gradient, contentChrome=extended, interactiveCards=native-glass"
     )
     XCTAssertEqual(sessionRow.value as? String, "selected, interactive=native-glass")
     XCTAssertEqual(observeSummaryButton.value as? String, "interactive=native-glass")

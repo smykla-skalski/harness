@@ -252,6 +252,22 @@ final class HarnessLayoutUITests: HarnessUITestCase {
     )
   }
 
+  func testInspectorContentStartsBelowToolbarChrome() throws {
+    let app = launch(mode: "empty")
+
+    let window = mainWindow(in: app)
+    let inspectorRoot = element(in: app, identifier: Accessibility.inspectorRoot)
+    let inspectorEmptyState = element(in: app, identifier: Accessibility.inspectorEmptyState)
+
+    XCTAssertTrue(window.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(inspectorRoot.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(inspectorEmptyState.waitForExistence(timeout: Self.uiTimeout))
+
+    let cardOffset = inspectorEmptyState.frame.minY - window.frame.minY
+    XCTAssertGreaterThan(cardOffset, 40, "Inspector content overlaps toolbar")
+    XCTAssertLessThan(cardOffset, 120, "Inspector content too far below toolbar")
+  }
+
   func testSessionCockpitTaskAndAgentCardsShareHeight() throws {
     let app = launch(mode: "preview")
 
@@ -315,6 +331,40 @@ final class HarnessLayoutUITests: HarnessUITestCase {
     assertEqualHeights([reconnect, refresh, start, install, remove], tolerance: 10)
     XCTAssertLessThan(start.frame.height, 62)
     XCTAssertLessThan(refresh.frame.height, 62)
+  }
+
+  func testPreferencesSidebarChromeMatchesNativeInsetLayout() throws {
+    let app = launch(mode: "preview")
+
+    let preferencesButton = toolbarButton(in: app, identifier: Accessibility.preferencesButton)
+    XCTAssertTrue(preferencesButton.waitForExistence(timeout: Self.uiTimeout))
+    preferencesButton.tap()
+
+    let preferencesRoot = element(in: app, identifier: Accessibility.preferencesRoot)
+    let preferencesSidebar = element(in: app, identifier: Accessibility.preferencesSidebar)
+    let generalSection = element(in: app, identifier: Accessibility.preferencesGeneralSection)
+
+    XCTAssertTrue(preferencesRoot.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(preferencesSidebar.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(generalSection.waitForExistence(timeout: Self.uiTimeout))
+
+    let settingsWindow = window(in: app, containing: preferencesRoot)
+    XCTAssertTrue(settingsWindow.exists)
+
+    let sidebarTopInset = preferencesSidebar.frame.minY - settingsWindow.frame.minY
+    let rowTopInset = generalSection.frame.minY - settingsWindow.frame.minY
+    let rowLeadingInset = generalSection.frame.minX - settingsWindow.frame.minX
+    let rowInsetInsideSidebar = generalSection.frame.minY - preferencesSidebar.frame.minY
+
+    XCTAssertLessThan(sidebarTopInset, 24, "Sidebar should extend into the titlebar region")
+    XCTAssertGreaterThan(rowTopInset, 44, "Sidebar content should start below the traffic lights")
+    XCTAssertLessThan(rowTopInset, 120, "Sidebar content should not be pushed too far down")
+    XCTAssertGreaterThan(rowLeadingInset, 20, "Sidebar content should be inset from the leading edge")
+    XCTAssertGreaterThan(
+      rowInsetInsideSidebar,
+      28,
+      "Sidebar content should have visible top padding inside the sidebar chrome"
+    )
   }
 
   func testSidebarAndBoardActionButtonsStayCompact() throws {
