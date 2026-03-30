@@ -31,7 +31,7 @@ struct SessionsBoardView: View {
     VStack(alignment: .leading, spacing: 16) {
       HStack(alignment: .top) {
         VStack(alignment: .leading, spacing: 6) {
-          Label("Bring The Monitor Online", systemImage: "dot.radiowaves.left.and.right")
+          Label("Bring Harness Online", systemImage: "dot.radiowaves.left.and.right")
             .font(.system(.title3, design: .rounded, weight: .bold))
           Text(
             "Harness only reads live state from the local daemon. "
