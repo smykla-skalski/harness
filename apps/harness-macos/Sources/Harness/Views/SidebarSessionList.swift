@@ -128,7 +128,7 @@ struct SidebarSessionList: View {
       }
     }
     .padding(14)
-    .harnessInsetPanel(cornerRadius: 22, fillOpacity: 0.05, strokeOpacity: 0.09)
+    .harnessInsetPanel(cornerRadius: 22, fillOpacity: 0.05, strokeOpacity: 0.50)
     .accessibilityElement(children: .contain)
     .accessibilityFrameMarker("\(HarnessAccessibility.sidebarFiltersCard).frame")
   }
@@ -170,7 +170,7 @@ private struct SessionListContent: View {
               }
               .padding(.horizontal, 12)
               .padding(.vertical, 10)
-              .harnessInsetPanel(cornerRadius: 16, fillOpacity: 0.04, strokeOpacity: 0.14)
+              .harnessInsetPanel(cornerRadius: 16, fillOpacity: 0.04, strokeOpacity: 0.50)
               .accessibilityIdentifier(
                 HarnessAccessibility.projectHeader(group.project.projectId)
               )
