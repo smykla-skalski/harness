@@ -58,10 +58,20 @@ final class HarnessUITests: HarnessUITestCase {
 
     preferencesButton.tap()
 
-    XCTAssertTrue(
-      app.staticTexts["Appearance"].waitForExistence(timeout: Self.uiTimeout)
-    )
-    XCTAssertTrue(element(in: app, identifier: Accessibility.preferencesRoot).exists)
+    let preferencesRoot = element(in: app, identifier: Accessibility.preferencesRoot)
+    let preferencesSidebar = element(in: app, identifier: Accessibility.preferencesSidebar)
+    let generalSection = element(in: app, identifier: Accessibility.preferencesGeneralSection)
+    let title = element(in: app, identifier: Accessibility.preferencesTitle)
+    let backButton = button(in: app, identifier: Accessibility.preferencesBackButton)
+    let forwardButton = button(in: app, identifier: Accessibility.preferencesForwardButton)
+
+    XCTAssertTrue(preferencesRoot.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(preferencesSidebar.exists)
+    XCTAssertTrue(generalSection.exists)
+    XCTAssertTrue(title.exists)
+    XCTAssertEqual(title.label, "General")
+    XCTAssertFalse(backButton.isEnabled)
+    XCTAssertFalse(forwardButton.isEnabled)
   }
 
   func testObserveSummaryIsAvailableInSessionCockpit() throws {
@@ -272,5 +282,70 @@ final class HarnessUITests: HarnessUITestCase {
     )
     XCTAssertTrue(app.staticTexts["Remove Launch Agent?"].exists)
     dismissConfirmationDialog(in: app)
+  }
+
+  func testSettingsHistoryButtonsTrackVisitedSections() throws {
+    let app = launch(mode: "preview")
+
+    let preferencesButton = toolbarButton(in: app, identifier: Accessibility.preferencesButton)
+    XCTAssertTrue(preferencesButton.waitForExistence(timeout: Self.uiTimeout))
+    preferencesButton.tap()
+
+    let title = element(in: app, identifier: Accessibility.preferencesTitle)
+    let connectionSection = element(in: app, identifier: Accessibility.preferencesConnectionSection)
+    let diagnosticsSection = element(
+      in: app,
+      identifier: Accessibility.preferencesDiagnosticsSection
+    )
+    let backButton = button(in: app, identifier: Accessibility.preferencesBackButton)
+    let forwardButton = button(in: app, identifier: Accessibility.preferencesForwardButton)
+
+    XCTAssertTrue(connectionSection.waitForExistence(timeout: Self.uiTimeout))
+    tapElement(in: app, identifier: Accessibility.preferencesConnectionSection)
+    XCTAssertEqual(title.label, "Connection")
+    XCTAssertTrue(backButton.isEnabled)
+    XCTAssertFalse(forwardButton.isEnabled)
+
+    tapElement(in: app, identifier: Accessibility.preferencesDiagnosticsSection)
+    XCTAssertEqual(title.label, "Diagnostics")
+    XCTAssertTrue(backButton.isEnabled)
+
+    backButton.tap()
+    XCTAssertEqual(title.label, "Connection")
+    XCTAssertTrue(forwardButton.isEnabled)
+
+    forwardButton.tap()
+    XCTAssertEqual(title.label, "Diagnostics")
+    XCTAssertTrue(diagnosticsSection.exists)
+  }
+
+  func testSettingsStylePickerUpdatesGlobalThemeValue() throws {
+    let app = launch(mode: "preview")
+
+    let preferencesButton = toolbarButton(in: app, identifier: Accessibility.preferencesButton)
+    XCTAssertTrue(preferencesButton.waitForExistence(timeout: Self.uiTimeout))
+    preferencesButton.tap()
+
+    let preferencesRoot = element(in: app, identifier: Accessibility.preferencesRoot)
+    let appChromeRoot = element(in: app, identifier: Accessibility.appChromeRoot)
+    let flatButton = app.buttons["Flat"].firstMatch
+    let gradientButton = app.buttons["Gradient"].firstMatch
+
+    XCTAssertTrue(preferencesRoot.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(appChromeRoot.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertEqual(preferencesRoot.value as? String, "style=gradient, mode=auto, section=general")
+    XCTAssertEqual(appChromeRoot.value as? String, "gradient")
+
+    XCTAssertTrue(flatButton.waitForExistence(timeout: Self.uiTimeout))
+    flatButton.tap()
+
+    XCTAssertEqual(preferencesRoot.value as? String, "style=flat, mode=auto, section=general")
+    XCTAssertEqual(appChromeRoot.value as? String, "flat")
+
+    XCTAssertTrue(gradientButton.waitForExistence(timeout: Self.uiTimeout))
+    gradientButton.tap()
+
+    XCTAssertEqual(preferencesRoot.value as? String, "style=gradient, mode=auto, section=general")
+    XCTAssertEqual(appChromeRoot.value as? String, "gradient")
   }
 }

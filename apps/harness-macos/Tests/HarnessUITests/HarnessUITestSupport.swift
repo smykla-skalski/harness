@@ -1,6 +1,7 @@
 import XCTest
 
 enum HarnessUITestAccessibility {
+  static let appChromeRoot = "harness.app.chrome"
   static let daemonCard = "harness.sidebar.daemon-card"
   static let daemonCardFrame = "harness.sidebar.daemon-card.frame"
   static let sidebarShellFrame = "harness.sidebar.shell.frame"
@@ -65,6 +66,15 @@ enum HarnessUITestAccessibility {
   static let workerAgentCard = "harness.session.agent.worker-codex"
   static let preferencesRoot = "harness.preferences.root"
   static let preferencesPanel = "harness.preferences.panel"
+  static let preferencesSidebar = "harness.preferences.sidebar"
+  static let preferencesBackButton = "harness.preferences.nav.back"
+  static let preferencesForwardButton = "harness.preferences.nav.forward"
+  static let preferencesTitle = "harness.preferences.title"
+  static let preferencesThemeModePicker = "harness.preferences.theme-mode"
+  static let preferencesThemeStylePicker = "harness.preferences.theme-style"
+  static let preferencesGeneralSection = "harness.preferences.section.general"
+  static let preferencesConnectionSection = "harness.preferences.section.connection"
+  static let preferencesDiagnosticsSection = "harness.preferences.section.diagnostics"
   static let preferencesEndpointCard = "harness.preferences.metric.endpoint"
   static let preferencesVersionCard = "harness.preferences.metric.version"
   static let preferencesLaunchdCard = "harness.preferences.metric.launchd"
@@ -114,20 +124,10 @@ extension HarnessUITestCase {
       waitUntil(timeout: Self.uiTimeout) {
         let window = self.mainWindow(in: app)
         app.activate()
-        let title = app.staticTexts["Harness"]
-        let sidebarRoot = self.element(
-          in: app,
-          identifier: HarnessUITestAccessibility.sidebarRoot
-        )
-        let sessionsBoardRoot = self.element(
-          in: app,
-          identifier: HarnessUITestAccessibility.sessionsBoardRoot
-        )
         return
           window.exists
           && window.frame.width > 0
           && window.frame.height > 0
-          && (title.exists || sidebarRoot.exists || sessionsBoardRoot.exists)
       }
     )
     return app
