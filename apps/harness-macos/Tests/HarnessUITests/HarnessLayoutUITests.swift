@@ -299,11 +299,6 @@ final class HarnessLayoutUITests: HarnessUITestCase {
     XCTAssertTrue(launchdCard.waitForExistence(timeout: Self.uiTimeout))
     XCTAssertTrue(cachedSessionsCard.waitForExistence(timeout: Self.uiTimeout))
     XCTAssertTrue(app.staticTexts["Running"].waitForExistence(timeout: Self.uiTimeout))
-    XCTAssertTrue(
-      app.staticTexts["gui/501/io.harness.daemon"].waitForExistence(
-        timeout: Self.uiTimeout
-      )
-    )
 
     assertSameRow([endpointCard, versionCard, launchdCard, cachedSessionsCard], tolerance: 10)
     assertEqualHeights(

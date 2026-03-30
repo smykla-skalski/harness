@@ -15,6 +15,24 @@ struct HarnessAdaptiveGridLayout: Layout {
     self.spacing = spacing
   }
 
+  private var safeMinimumColumnWidth: CGFloat {
+    guard minimumColumnWidth.isFinite, minimumColumnWidth > 0 else {
+      return 1
+    }
+    return minimumColumnWidth
+  }
+
+  private var safeMaximumColumns: Int {
+    max(maximumColumns, 1)
+  }
+
+  private var safeSpacing: CGFloat {
+    guard spacing.isFinite, spacing >= 0 else {
+      return 0
+    }
+    return spacing
+  }
+
   func sizeThatFits(
     proposal: ProposedViewSize,
     subviews: Subviews,
@@ -26,12 +44,12 @@ struct HarnessAdaptiveGridLayout: Layout {
       width: proposal.width,
       columns: columns
     )
-    let rowSpacing = CGFloat(max(rowHeights.count - 1, 0)) * spacing
+    let rowSpacing = CGFloat(max(rowHeights.count - 1, 0)) * safeSpacing
     let height = rowHeights.reduce(0, +) + rowSpacing
     let width =
       proposal.width
       ?? resolvedColumnWidth(width: nil, columns: columns) * CGFloat(columns)
-      + CGFloat(max(columns - 1, 0)) * spacing
+      + CGFloat(max(columns - 1, 0)) * safeSpacing
 
     return CGSize(width: width, height: height)
   }
@@ -59,7 +77,7 @@ struct HarnessAdaptiveGridLayout: Layout {
 
       for index in rowStart..<rowEnd {
         let columnIndex = index - rowStart
-        let x = bounds.minX + (CGFloat(columnIndex) * (columnWidth + spacing))
+        let x = bounds.minX + (CGFloat(columnIndex) * (columnWidth + safeSpacing))
         subviews[index].place(
           at: CGPoint(x: x, y: y),
           anchor: .topLeading,
@@ -67,7 +85,7 @@ struct HarnessAdaptiveGridLayout: Layout {
         )
       }
 
-      y += rowHeight + spacing
+      y += rowHeight + safeSpacing
     }
   }
 
@@ -76,21 +94,37 @@ struct HarnessAdaptiveGridLayout: Layout {
       return 1
     }
 
-    guard let width, width > 0 else {
-      return min(maximumColumns, itemCount)
+    guard let width, width.isFinite, width > 0 else {
+      return min(safeMaximumColumns, itemCount)
     }
 
-    let candidate = Int((width + spacing) / (minimumColumnWidth + spacing))
-    return max(1, min(min(candidate, itemCount), maximumColumns))
+    let columnStride = safeMinimumColumnWidth + safeSpacing
+    guard columnStride.isFinite, columnStride > 0 else {
+      return min(safeMaximumColumns, itemCount)
+    }
+
+    let candidate = ((width + safeSpacing) / columnStride).rounded(.down)
+    guard candidate.isFinite, candidate > 0 else {
+      return 1
+    }
+
+    return max(1, min(min(Int(candidate), itemCount), safeMaximumColumns))
   }
 
   private func resolvedColumnWidth(width: CGFloat?, columns: Int) -> CGFloat {
-    guard let width, width > 0 else {
-      return minimumColumnWidth
+    let safeColumns = max(columns, 1)
+
+    guard let width, width.isFinite, width > 0 else {
+      return safeMinimumColumnWidth
     }
 
-    let gutterWidth = CGFloat(max(columns - 1, 0)) * spacing
-    return (width - gutterWidth) / CGFloat(columns)
+    let gutterWidth = CGFloat(max(safeColumns - 1, 0)) * safeSpacing
+    let availableWidth = width - gutterWidth
+    guard availableWidth.isFinite, availableWidth > 0 else {
+      return safeMinimumColumnWidth
+    }
+
+    return availableWidth / CGFloat(safeColumns)
   }
 
   private func measuredRowHeights(
