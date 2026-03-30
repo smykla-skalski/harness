@@ -171,7 +171,6 @@ private struct PreferencesOverviewMetric: View {
       Text(value)
         .font(.system(.headline, design: .rounded, weight: .semibold))
         .textSelection(.enabled)
-        .contentTransition(.numericText())
       Text(caption)
         .font(.caption)
         .foregroundStyle(HarnessTheme.secondaryInk)
