@@ -159,18 +159,36 @@ struct HarnessCardModifier: ViewModifier {
       alignment: .topLeading
     )
     .background {
-      HarnessRoundedGlassBackground(
-        cornerRadius: 22,
-        tint: HarnessTheme.panel(for: themeStyle),
-        interactive: false,
-        fillOpacity: 0.10,
-        strokeColor: HarnessTheme.panelBorder(for: themeStyle),
-        shadowColor: .black.opacity(0.07),
-        shadowRadius: 12,
-        shadowY: 8
-      )
+      cardBackground
     }
     .frame(maxWidth: .infinity, alignment: .leading)
+  }
+
+  @ViewBuilder private var cardBackground: some View {
+    let shape = RoundedRectangle(cornerRadius: 22, style: .continuous)
+    let panelColor = HarnessTheme.panel(for: themeStyle)
+    let borderColor = HarnessTheme.panelBorder(for: themeStyle)
+
+    if HarnessTheme.usesGradientChrome(for: themeStyle) {
+      shape
+        .fill(panelColor.opacity(0.22))
+        .overlay {
+          shape.stroke(borderColor.opacity(0.18), lineWidth: 1)
+        }
+        .shadow(color: .black.opacity(0.07), radius: 12, x: 0, y: 8)
+    } else {
+      shape
+        .fill(panelColor.opacity(0.10))
+        .overlay {
+          shape.stroke(borderColor, lineWidth: 1)
+        }
+        .shadow(
+          color: .black.opacity(0.05),
+          radius: 4,
+          x: 0,
+          y: 2
+        )
+    }
   }
 }
 
@@ -203,5 +221,195 @@ struct LiveActivityBorderModifier: ViewModifier {
           }
         }
       }
+  }
+}
+
+struct HarnessLoadingStateView: View {
+  let title: String
+  @State private var animates = false
+
+  var body: some View {
+    HStack(spacing: 10) {
+      HarnessSpinner(size: 14)
+      Text(title)
+        .font(.system(.footnote, design: .rounded, weight: .semibold))
+    }
+    .padding(.horizontal, 12)
+    .padding(.vertical, 8)
+    .background {
+      HarnessGlassCapsuleBackground()
+    }
+    .opacity(animates ? 1 : 0.82)
+    .scaleEffect(animates ? 1 : 0.985)
+    .animation(
+      .easeInOut(duration: 0.9).repeatForever(autoreverses: true),
+      value: animates
+    )
+    .onAppear {
+      animates = true
+    }
+  }
+}
+
+private struct AccessibilityFrameMarker: View {
+  let identifier: String
+
+  var body: some View {
+    Color.clear
+      .allowsHitTesting(false)
+      .accessibilityElement()
+      .accessibilityIdentifier(identifier)
+  }
+}
+
+struct AccessibilityTextMarker: View {
+  let identifier: String
+  let text: String
+
+  var body: some View {
+    Color.clear
+      .allowsHitTesting(false)
+      .accessibilityElement()
+      .accessibilityLabel(text)
+      .accessibilityIdentifier(identifier)
+  }
+}
+
+private struct HarnessSelectionOutlineModifier: ViewModifier {
+  let isSelected: Bool
+  let cornerRadius: CGFloat
+  let lineWidth: CGFloat
+
+  func body(content: Content) -> some View {
+    content.overlay {
+      if isSelected {
+        RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+          .strokeBorder(.selection, lineWidth: lineWidth)
+      }
+    }
+  }
+}
+
+private struct AccessibilityFrameMarkerModifier: ViewModifier {
+  private static let isUITesting = ProcessInfo.processInfo.environment["HARNESS_UI_TESTS"] == "1"
+
+  let identifier: String
+
+  @ViewBuilder
+  func body(content: Content) -> some View {
+    if Self.isUITesting {
+      content.overlay {
+        AccessibilityFrameMarker(identifier: identifier)
+      }
+    } else {
+      content
+    }
+  }
+}
+
+extension View {
+  func harnessCard(
+    minHeight: CGFloat? = nil,
+    contentPadding: CGFloat = 16
+  ) -> some View {
+    modifier(HarnessCardModifier(minHeight: minHeight, contentPadding: contentPadding))
+  }
+
+  func liveActivityBorder(isActive: Bool) -> some View {
+    modifier(LiveActivityBorderModifier(isActive: isActive))
+  }
+
+  func accessibilityFrameMarker(_ identifier: String) -> some View {
+    modifier(AccessibilityFrameMarkerModifier(identifier: identifier))
+  }
+
+  func harnessSelectionOutline(
+    isSelected: Bool,
+    cornerRadius: CGFloat,
+    lineWidth: CGFloat = 1.5
+  ) -> some View {
+    modifier(
+      HarnessSelectionOutlineModifier(
+        isSelected: isSelected,
+        cornerRadius: cornerRadius,
+        lineWidth: lineWidth
+      )
+    )
+  }
+}
+
+func harnessActionHeader(title: String, subtitle: String) -> some View {
+  VStack(alignment: .leading, spacing: 4) {
+    Text(title)
+      .font(.system(.headline, design: .rounded, weight: .semibold))
+    Text(subtitle)
+      .font(.system(.subheadline, design: .rounded, weight: .medium))
+      .foregroundStyle(HarnessTheme.secondaryInk)
+  }
+}
+
+func harnessBadge(_ value: String) -> some View {
+  Text(value)
+    .font(.caption.bold())
+    .padding(.horizontal, 10)
+    .padding(.vertical, 5)
+    .background {
+      HarnessGlassCapsuleBackground()
+    }
+}
+
+func statusColor(for status: SessionStatus) -> Color {
+  switch status {
+  case .active:
+    HarnessTheme.success
+  case .paused:
+    HarnessTheme.caution
+  case .ended:
+    HarnessTheme.ink.opacity(0.55)
+  }
+}
+
+func severityColor(
+  for severity: TaskSeverity,
+  style: HarnessThemeStyle
+) -> Color {
+  switch severity {
+  case .low:
+    HarnessTheme.accent(for: style).opacity(0.7)
+  case .medium:
+    HarnessTheme.accent(for: style)
+  case .high:
+    HarnessTheme.warmAccent
+  case .critical:
+    HarnessTheme.danger
+  }
+}
+
+func signalStatusColor(for status: SessionSignalStatus) -> Color {
+  switch status {
+  case .pending, .deferred:
+    HarnessTheme.caution
+  case .acknowledged:
+    HarnessTheme.success
+  case .rejected, .expired:
+    HarnessTheme.danger
+  }
+}
+
+func taskStatusColor(
+  for status: TaskStatus,
+  style: HarnessThemeStyle
+) -> Color {
+  switch status {
+  case .open:
+    HarnessTheme.accent(for: style)
+  case .inProgress:
+    HarnessTheme.warmAccent
+  case .inReview:
+    HarnessTheme.caution
+  case .done:
+    HarnessTheme.success
+  case .blocked:
+    HarnessTheme.danger
   }
 }
