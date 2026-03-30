@@ -40,31 +40,6 @@ public enum SessionFocusFilter: String, CaseIterable, Identifiable {
   }
 }
 
-public struct SessionSavedSearch: Identifiable, Equatable {
-  public let id: String
-  public let title: String
-  public let query: String
-  public let status: HarnessStore.SessionFilter
-  public let focus: SessionFocusFilter
-  public let summary: String
-
-  public init(
-    id: String,
-    title: String,
-    query: String = "",
-    status: HarnessStore.SessionFilter = .all,
-    focus: SessionFocusFilter = .all,
-    summary: String
-  ) {
-    self.id = id
-    self.title = title
-    self.query = query
-    self.status = status
-    self.focus = focus
-    self.summary = summary
-  }
-}
-
 extension HarnessStore {
   public var groupedSessions: [SessionGroup] {
     let filteredSessions = sessions.filter { summary in
@@ -89,39 +64,6 @@ extension HarnessStore {
     groupedSessions.reduce(0) { total, group in
       total + group.sessions.count
     }
-  }
-
-  public var savedSearches: [SessionSavedSearch] {
-    [
-      SessionSavedSearch(
-        id: "active-open-work",
-        title: "Active open work",
-        status: .active,
-        focus: .openWork,
-        summary: "Show active sessions with work in progress."
-      ),
-      SessionSavedSearch(
-        id: "blocked-followups",
-        title: "Blocked follow-ups",
-        status: .active,
-        focus: .blocked,
-        summary: "Show sessions with blocker work items."
-      ),
-      SessionSavedSearch(
-        id: "observer-lanes",
-        title: "Observer lanes",
-        status: .all,
-        focus: .observed,
-        summary: "Sessions that already have observe coverage."
-      ),
-      SessionSavedSearch(
-        id: "inactive-queues",
-        title: "Inactive queues",
-        status: .ended,
-        focus: .all,
-        summary: "Ended sessions that are ready for review."
-      ),
-    ]
   }
 
   public var selectedSessionSummary: SessionSummary? {
@@ -158,15 +100,7 @@ extension HarnessStore {
     return selectedSession?.signals.first(where: { $0.signal.signalId == signalID })
   }
 
-  public func applySavedSearch(_ search: SessionSavedSearch) {
-    searchText = search.query
-    sessionFilter = search.status
-    sessionFocusFilter = search.focus
-    selectedSavedSearchID = search.id
-  }
-
   public func resetFilters() {
-    selectedSavedSearchID = nil
     searchText = ""
     sessionFilter = .active
     sessionFocusFilter = .all
