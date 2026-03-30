@@ -54,8 +54,8 @@ struct SessionsBoardOnboardingCard: View {
       ) {
         HarnessAsyncActionButton(
           title: "Start Daemon",
-          tint: HarnessTheme.accent(for: themeStyle),
-          variant: .prominent,
+          tint: store.connectionState == .online ? HarnessTheme.ink : HarnessTheme.accent(for: themeStyle),
+          variant: store.connectionState == .online ? .bordered : .prominent,
           isLoading: isLoading,
           accessibilityIdentifier: "harness.board.action.start",
           fillsWidth: false
