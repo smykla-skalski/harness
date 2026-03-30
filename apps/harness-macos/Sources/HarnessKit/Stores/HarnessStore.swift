@@ -182,10 +182,7 @@ public final class HarnessStore {
   }
 
   public func reconnect() async {
-    globalStreamTask?.cancel()
-    sessionStreamTask?.cancel()
-    globalStreamTask = nil
-    sessionStreamTask = nil
+    stopAllStreams()
     client = nil
     hasBootstrapped = true
     await bootstrap()
@@ -227,9 +224,7 @@ public final class HarnessStore {
       isSelectionLoading = false
       selectedSession = nil
       timeline = []
-      subscribedSessionIDs.removeAll()
-      sessionStreamTask?.cancel()
-      sessionStreamTask = nil
+      stopSessionStream()
       return
     }
 
@@ -245,8 +240,7 @@ public final class HarnessStore {
   public func selectSession(_ sessionID: String?) async {
     primeSessionSelection(sessionID)
     guard let client, let sessionID else {
-      sessionStreamTask?.cancel()
-      sessionStreamTask = nil
+      stopSessionStream()
       return
     }
 
@@ -297,6 +291,24 @@ public final class HarnessStore {
     activeSessionLoadRequest = sessionLoadSequence
     isSelectionLoading = true
     return sessionLoadSequence
+  }
+
+  func stopGlobalStream() {
+    globalStreamTask?.cancel()
+    globalStreamTask = nil
+  }
+
+  func stopSessionStream(resetSubscriptions: Bool = true) {
+    sessionStreamTask?.cancel()
+    sessionStreamTask = nil
+    if resetSubscriptions {
+      subscribedSessionIDs.removeAll()
+    }
+  }
+
+  func stopAllStreams(resetSubscriptions: Bool = true) {
+    stopGlobalStream()
+    stopSessionStream(resetSubscriptions: resetSubscriptions)
   }
 
   func completeSessionLoad(_ requestID: UInt64) {

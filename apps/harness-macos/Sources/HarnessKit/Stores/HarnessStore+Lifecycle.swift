@@ -1,6 +1,7 @@
 import Foundation
 
 extension HarnessStore {
+  private static let streamRefreshDebounce = Duration.milliseconds(500)
   func connect(using client: any HarnessClientProtocol) async {
     self.client = client
     connectionState = .online
@@ -14,6 +15,11 @@ extension HarnessStore {
 
     await refresh(using: client, preserveSelection: true)
     startGlobalStream(using: client)
+    if let selectedSessionID, selectedSession?.session.sessionId == selectedSessionID {
+      startSessionStream(using: client, sessionID: selectedSessionID)
+    } else {
+      stopSessionStream()
+    }
   }
 
   func appendConnectionEvent(kind: ConnectionEventKind, detail: String) {
@@ -94,41 +100,60 @@ extension HarnessStore {
     .milliseconds(500), .seconds(1), .seconds(2), .seconds(4), .seconds(8),
   ]
 
+  private func reconnectDelay(for attempt: Int) -> Duration {
+    Self.streamReconnectDelays[min(attempt, Self.streamReconnectDelays.count - 1)]
+  }
+
+  private func schedulePendingRefresh(
+    _ pendingRefresh: inout Task<Void, Never>?,
+    action: @escaping @MainActor () async -> Void
+  ) {
+    pendingRefresh?.cancel()
+    pendingRefresh = Task { @MainActor in
+      try? await Task.sleep(for: Self.streamRefreshDebounce)
+      guard !Task.isCancelled else {
+        return
+      }
+      await action()
+    }
+  }
+
   func startGlobalStream(using client: any HarnessClientProtocol) {
-    globalStreamTask?.cancel()
+    stopGlobalStream()
     globalStreamTask = Task { [weak self] in
       guard let self else {
         return
       }
 
       var attempt = 0
+      var pendingRefresh: Task<Void, Never>?
+      defer { pendingRefresh?.cancel() }
+
       while !Task.isCancelled {
         do {
-          var pendingRefresh: Task<Void, Never>?
           for try await event in client.globalStream() {
             attempt = 0
             if event.event == "ready" {
               continue
             }
-            pendingRefresh?.cancel()
-            pendingRefresh = Task { [weak self] in
-              try? await Task.sleep(for: .milliseconds(500))
-              guard !Task.isCancelled, let self else { return }
+            schedulePendingRefresh(&pendingRefresh) { [weak self] in
+              guard let self else {
+                return
+              }
               await self.refresh(using: client, preserveSelection: true)
             }
           }
-          pendingRefresh?.cancel()
         } catch {
-          if Task.isCancelled { return }
-          await MainActor.run {
-            self.lastError = error.localizedDescription
+          if Task.isCancelled {
+            return
           }
+          lastError = error.localizedDescription
         }
 
-        if Task.isCancelled { return }
-        let delay = Self.streamReconnectDelays[
-          min(attempt, Self.streamReconnectDelays.count - 1)
-        ]
+        if Task.isCancelled {
+          return
+        }
+        let delay = reconnectDelay(for: attempt)
         attempt += 1
         try? await Task.sleep(for: delay)
       }
@@ -136,42 +161,43 @@ extension HarnessStore {
   }
 
   func startSessionStream(using client: any HarnessClientProtocol, sessionID: String) {
-    subscribedSessionIDs.insert(sessionID)
-    sessionStreamTask?.cancel()
+    subscribedSessionIDs = [sessionID]
+    stopSessionStream(resetSubscriptions: false)
     sessionStreamTask = Task { [weak self] in
       guard let self else {
         return
       }
 
       var attempt = 0
+      var pendingRefresh: Task<Void, Never>?
+      defer { pendingRefresh?.cancel() }
+
       while !Task.isCancelled {
         do {
-          var pendingRefresh: Task<Void, Never>?
           for try await event in client.sessionStream(sessionID: sessionID) {
             attempt = 0
             if event.event == "ready" {
               continue
             }
-            pendingRefresh?.cancel()
-            pendingRefresh = Task { [weak self] in
-              try? await Task.sleep(for: .milliseconds(500))
-              guard !Task.isCancelled, let self else { return }
+            schedulePendingRefresh(&pendingRefresh) { [weak self] in
+              guard let self else {
+                return
+              }
               let requestID = self.beginSessionLoad()
               await self.loadSession(using: client, sessionID: sessionID, requestID: requestID)
             }
           }
-          pendingRefresh?.cancel()
         } catch {
-          if Task.isCancelled { return }
-          await MainActor.run {
-            self.lastError = error.localizedDescription
+          if Task.isCancelled {
+            return
           }
+          lastError = error.localizedDescription
         }
 
-        if Task.isCancelled { return }
-        let delay = Self.streamReconnectDelays[
-          min(attempt, Self.streamReconnectDelays.count - 1)
-        ]
+        if Task.isCancelled {
+          return
+        }
+        let delay = reconnectDelay(for: attempt)
         attempt += 1
         try? await Task.sleep(for: delay)
       }

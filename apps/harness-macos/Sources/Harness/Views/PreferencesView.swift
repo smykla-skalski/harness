@@ -353,12 +353,12 @@ private struct PreferencesPickerRow<Control: View>: View {
   }
 
   var body: some View {
-    HStack(alignment: .center, spacing: 16) {
-      Text(title)
-        .font(.system(.headline, design: .rounded, weight: .semibold))
-      Spacer(minLength: 12)
+    LabeledContent {
       control
         .labelsHidden()
+    } label: {
+      Text(title)
+        .font(.system(.headline, design: .rounded, weight: .semibold))
     }
     .padding(.horizontal, 16)
     .padding(.vertical, 12)
