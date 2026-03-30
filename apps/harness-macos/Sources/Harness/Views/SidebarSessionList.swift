@@ -161,7 +161,7 @@ private struct SessionListContent: View {
             VStack(alignment: .leading, spacing: 10) {
               HStack {
                 Text(group.project.name)
-                  .font(.system(.headline, design: .serif, weight: .semibold))
+                  .font(.system(.headline, design: .rounded, weight: .semibold))
                   .foregroundStyle(HarnessTheme.sidebarHeader(for: themeStyle))
                 Spacer()
                 Text("\(group.sessions.count)")

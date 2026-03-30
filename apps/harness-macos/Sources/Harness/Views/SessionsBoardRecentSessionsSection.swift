@@ -8,7 +8,7 @@ struct SessionsBoardRecentSessionsSection: View {
   var body: some View {
     VStack(alignment: .leading, spacing: 14) {
       Text("Recent Sessions")
-        .font(.system(.title3, design: .serif, weight: .semibold))
+        .font(.system(.title3, design: .rounded, weight: .semibold))
       if sessions.isEmpty {
         Text(
           "No sessions indexed yet. Bring the daemon online or refresh after starting a harness session."

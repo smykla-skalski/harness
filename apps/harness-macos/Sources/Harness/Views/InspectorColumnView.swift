@@ -109,7 +109,7 @@ struct InspectorColumnView: View {
   private func sessionLoadingInspector(_ summary: SessionSummary) -> some View {
     VStack(alignment: .leading, spacing: 14) {
       Text("Inspector")
-        .font(.system(.title3, design: .serif, weight: .semibold))
+        .font(.system(.title3, design: .rounded, weight: .semibold))
       Text(summary.context)
         .font(.system(.headline, design: .rounded, weight: .semibold))
       Text("Loading live task, agent, and signal detail for the selected session.")
@@ -126,7 +126,7 @@ struct InspectorColumnView: View {
   private var emptyState: some View {
     VStack(alignment: .leading, spacing: 12) {
       Text("Inspector")
-        .font(.system(.title3, design: .serif, weight: .semibold))
+        .font(.system(.title3, design: .rounded, weight: .semibold))
       Text("Select a session to inspect live task, agent, and signal detail.")
         .foregroundStyle(HarnessTheme.secondaryInk)
     }

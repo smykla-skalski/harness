@@ -8,7 +8,7 @@ struct SessionCockpitSignalsSection: View {
   var body: some View {
     VStack(alignment: .leading, spacing: 12) {
       Text("Signals")
-        .font(.system(.title3, design: .serif, weight: .semibold))
+        .font(.system(.title3, design: .rounded, weight: .semibold))
       HarnessGlassContainer(spacing: 12) {
         ForEach(signals) { signal in
           Button {
@@ -58,7 +58,7 @@ struct SessionCockpitTimelineSection: View {
   var body: some View {
     VStack(alignment: .leading, spacing: 12) {
       Text("Timeline")
-        .font(.system(.title3, design: .serif, weight: .semibold))
+        .font(.system(.title3, design: .rounded, weight: .semibold))
       ForEach(timeline) { entry in
         HStack(alignment: .top, spacing: 12) {
           RoundedRectangle(cornerRadius: 999)
