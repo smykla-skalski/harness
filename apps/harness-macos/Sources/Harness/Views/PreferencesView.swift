@@ -1,39 +1,13 @@
 import HarnessKit
 import SwiftUI
 
-private enum PreferencesSection: String, CaseIterable, Identifiable, Hashable {
-  case general
-  case connection
-  case diagnostics
-
-  var id: String { rawValue }
-
-  var title: String {
-    switch self {
-    case .general: "General"
-    case .connection: "Connection"
-    case .diagnostics: "Diagnostics"
-    }
-  }
-
-  var systemImage: String {
-    switch self {
-    case .general: "gearshape"
-    case .connection: "bolt.horizontal.circle"
-    case .diagnostics: "stethoscope"
-    }
-  }
-}
-
 struct PreferencesView: View {
   @Bindable var store: HarnessStore
   @Binding var themeMode: HarnessThemeMode
   @Binding var themeStyle: HarnessThemeStyle
-  @State private var selectedSection: PreferencesSection? = .general
+  @State private var selectedSection: PreferencesSection = .general
 
-  private var effectiveHealth: HealthResponse? {
-    store.diagnostics?.health ?? store.health
-  }
+  private var effectiveHealth: HealthResponse? { store.diagnostics?.health ?? store.health }
   private var cacheEntryCount: Int {
     store.diagnostics?.workspace.cacheEntryCount
       ?? store.daemonStatus?.diagnostics.cacheEntryCount
@@ -52,9 +26,11 @@ struct PreferencesView: View {
     store.daemonStatus?.launchAgent.lifecycleTitle ?? "Manual"
   }
   private var launchAgentCaption: String {
-    let fallback = store.daemonStatus?.launchAgent.label
+    let fallback =
+      store.daemonStatus?.launchAgent.label
       ?? "Launch agent"
-    let caption = store.daemonStatus?.launchAgent.lifecycleCaption
+    let caption =
+      store.daemonStatus?.launchAgent.lifecycleCaption
       ?? fallback
     return caption.isEmpty ? fallback : caption
   }
@@ -68,33 +44,27 @@ struct PreferencesView: View {
     return [
       "style=\(themeStyle.rawValue)",
       "mode=\(themeMode.rawValue)",
-      "section=\(currentSection.rawValue)",
+      "section=\(selectedSection.rawValue)",
       "preferencesChrome=\(chrome)",
     ].joined(separator: ", ")
   }
-  private var currentSection: PreferencesSection {
-    selectedSection ?? .general
-  }
 
   var body: some View {
-    NavigationSplitView(columnVisibility: .constant(.all)) {
-      PreferencesSidebar(selection: $selectedSection)
-        .navigationSplitViewColumnWidth(
-          min: 180, ideal: 210, max: 240
-        )
-    } detail: {
+    PreferencesChromeLayout(
+      themeStyle: themeStyle,
+      selection: $selectedSection
+    ) {
       selectedSectionContent
-        .navigationTitle(currentSection.title)
-        .toolbarTitleDisplayMode(.inline)
     }
-    .navigationSplitViewStyle(.balanced)
-    .toolbar(removing: .sidebarToggle)
+    .toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
+    .containerBackground(.windowBackground, for: .window)
+    .toolbar(removing: .title)
     .frame(maxWidth: .infinity, maxHeight: .infinity)
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessAccessibility.preferencesRoot)
     .overlay {
       PreferencesOverlayMarkers(
-        title: currentSection.title,
+        title: selectedSection.title,
         preferencesAccessibilityValue: preferencesAccessibilityValue
       )
     }
@@ -102,7 +72,7 @@ struct PreferencesView: View {
   }
 
   @ViewBuilder private var selectedSectionContent: some View {
-    switch currentSection {
+    switch selectedSection {
     case .general:
       PreferencesGeneralSection(
         store: store,
@@ -123,33 +93,6 @@ struct PreferencesView: View {
         effectiveLastEvent: effectiveLastEvent
       )
     }
-  }
-
-}
-
-// MARK: - Sidebar
-
-private struct PreferencesSidebar: View {
-  @Binding var selection: PreferencesSection?
-
-  var body: some View {
-    List(selection: $selection) {
-      ForEach(PreferencesSection.allCases) { section in
-        NavigationLink(value: section) {
-          Label(section.title, systemImage: section.systemImage)
-        }
-        .accessibilityIdentifier(
-          HarnessAccessibility.preferencesSectionButton(
-            section.rawValue
-          )
-        )
-        .accessibilityValue(
-          selection == section ? "selected" : "not selected"
-        )
-      }
-    }
-    .listStyle(.sidebar)
-    .accessibilityIdentifier(HarnessAccessibility.preferencesSidebar)
   }
 }
 
