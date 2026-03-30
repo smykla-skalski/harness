@@ -141,15 +141,27 @@ struct PreferencesOverviewGrid: View {
         maximumColumns: 4,
         spacing: 14
       ) {
-        endpointMetric
-        versionMetric
-        launchdMetric
-        cachedSessionsMetric
+        PreferencesOverviewMetric(title: "Endpoint", value: endpoint, caption: "Local control plane")
+        PreferencesOverviewMetric(title: "Version", value: version, caption: "Daemon build")
+        PreferencesOverviewMetric(
+          title: "Launchd", value: launchAgentState, caption: launchAgentCaption
+        )
+        PreferencesOverviewMetric(
+          title: "Cached Sessions",
+          value: "\(cacheEntryCount)",
+          caption: "\(sessionCount) indexed live sessions"
+        )
       }
     }
   }
+}
 
-  private func overviewMetric(title: String, value: String, caption: String) -> some View {
+private struct PreferencesOverviewMetric: View {
+  let title: String
+  let value: String
+  let caption: String
+
+  var body: some View {
     VStack(alignment: .leading, spacing: 6) {
       Text(title.uppercased())
         .font(.caption2.weight(.bold))
@@ -166,38 +178,6 @@ struct PreferencesOverviewGrid: View {
     .frame(maxWidth: .infinity, alignment: .leading)
     .harnessCard(minHeight: 88, contentPadding: 14)
     .accessibilityIdentifier(HarnessAccessibility.preferencesMetricCard(title))
-  }
-
-  private var endpointMetric: some View {
-    overviewMetric(
-      title: "Endpoint",
-      value: endpoint,
-      caption: "Local control plane"
-    )
-  }
-
-  private var versionMetric: some View {
-    overviewMetric(
-      title: "Version",
-      value: version,
-      caption: "Daemon build"
-    )
-  }
-
-  private var launchdMetric: some View {
-    overviewMetric(
-      title: "Launchd",
-      value: launchAgentState,
-      caption: launchAgentCaption
-    )
-  }
-
-  private var cachedSessionsMetric: some View {
-    overviewMetric(
-      title: "Cached Sessions",
-      value: "\(cacheEntryCount)",
-      caption: "\(sessionCount) indexed live sessions"
-    )
   }
 }
 

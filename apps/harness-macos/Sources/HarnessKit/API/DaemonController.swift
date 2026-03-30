@@ -119,8 +119,8 @@ public struct DaemonController: DaemonControlling {
   }
 
   private func waitForHealthyClient() async throws -> any HarnessClientProtocol {
-    let deadline = Date().addingTimeInterval(8)
-    while Date() < deadline {
+    let deadline = Date.now.addingTimeInterval(8)
+    while Date.now < deadline {
       if let client = try? await bootstrapClient() {
         return client
       }

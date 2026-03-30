@@ -7,7 +7,7 @@ struct SidebarView: View {
   let themeStyle: HarnessThemeStyle
 
   var body: some View {
-    ScrollView(showsIndicators: false) {
+    ScrollView {
       VStack(alignment: .leading, spacing: 18) {
         DaemonStatusCard(store: store)
         SidebarSessionList(store: store)
@@ -15,6 +15,7 @@ struct SidebarView: View {
       .frame(maxWidth: .infinity, alignment: .topLeading)
       .padding(22)
     }
+    .scrollIndicators(.hidden)
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     .foregroundStyle(HarnessTheme.ink)
     .contentShape(Rectangle())
