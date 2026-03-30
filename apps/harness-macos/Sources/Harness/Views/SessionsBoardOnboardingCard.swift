@@ -140,8 +140,13 @@ struct SessionsBoardOnboardingCard: View {
     .overlay {
       if isReady {
         RoundedRectangle(cornerRadius: 18, style: .continuous)
-          .stroke(HarnessTheme.success.opacity(0.50), lineWidth: 1)
+          .fill(HarnessTheme.success.opacity(0.04))
+          .overlay {
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+              .stroke(HarnessTheme.success.opacity(0.50), lineWidth: 1)
+          }
       }
     }
+    .opacity(isReady ? 0.65 : 1)
   }
 }
