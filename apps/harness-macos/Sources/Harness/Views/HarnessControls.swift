@@ -77,23 +77,17 @@ private struct HarnessActionButtonStyleModifier: ViewModifier {
 
   @ViewBuilder
   func body(content: Content) -> some View {
-    if HarnessTheme.usesGradientChrome(for: themeStyle) && !isInsideGlassEffect {
-      switch variant {
-      case .prominent:
-        content
-          .buttonStyle(.glassProminent)
-      case .bordered:
+    switch variant {
+    case .prominent:
+      content
+        .buttonStyle(.borderedProminent)
+        .tint(tint)
+    case .bordered:
+      if HarnessTheme.usesGradientChrome(for: themeStyle) && !isInsideGlassEffect {
         content
           .buttonStyle(.glass(.regular.tint(tint)))
           .tint(tint)
-      }
-    } else {
-      switch variant {
-      case .prominent:
-        content
-          .buttonStyle(.borderedProminent)
-          .tint(tint)
-      case .bordered:
+      } else {
         content
           .buttonStyle(.bordered)
           .tint(tint)
@@ -132,28 +126,22 @@ private struct HarnessFilterChipButtonStyleModifier: ViewModifier {
 
   @ViewBuilder
   func body(content: Content) -> some View {
-    let isGradient = HarnessTheme.usesGradientChrome(for: themeStyle) && !isInsideGlassEffect
-    if isGradient {
-      if isSelected {
-        content
-          .buttonStyle(.glassProminent)
-      } else {
-        content
-          .buttonStyle(
-            .glass(.regular.tint(HarnessTheme.surface(for: themeStyle)))
-          )
-          .tint(HarnessTheme.ink)
-      }
+    let isGlass = HarnessTheme.usesGradientChrome(for: themeStyle)
+      && !isInsideGlassEffect
+    if isSelected {
+      content
+        .buttonStyle(.borderedProminent)
+        .tint(HarnessTheme.accent(for: themeStyle))
+    } else if isGlass {
+      content
+        .buttonStyle(
+          .glass(.regular.tint(HarnessTheme.surface(for: themeStyle)))
+        )
+        .tint(HarnessTheme.ink)
     } else {
-      if isSelected {
-        content
-          .buttonStyle(.borderedProminent)
-          .tint(HarnessTheme.accent(for: themeStyle))
-      } else {
-        content
-          .buttonStyle(.bordered)
-          .tint(HarnessTheme.ink)
-      }
+      content
+        .buttonStyle(.bordered)
+        .tint(HarnessTheme.ink)
     }
   }
 }

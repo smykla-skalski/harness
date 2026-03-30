@@ -33,6 +33,7 @@ struct PreferencesView: View {
   @State private var backHistory: [PreferencesSection] = []
   @State private var forwardHistory: [PreferencesSection] = []
   @State private var suppressHistoryRecording = false
+
   private var effectiveHealth: HealthResponse? {
     store.diagnostics?.health ?? store.health
   }
@@ -42,7 +43,8 @@ struct PreferencesView: View {
       ?? 0
   }
   private var effectiveLastEvent: DaemonAuditEvent? {
-    store.diagnostics?.workspace.lastEvent ?? store.daemonStatus?.diagnostics.lastEvent
+    store.diagnostics?.workspace.lastEvent
+      ?? store.daemonStatus?.diagnostics.lastEvent
   }
   private var effectiveTokenPresent: Bool {
     store.diagnostics?.workspace.authTokenPresent
@@ -53,8 +55,10 @@ struct PreferencesView: View {
     store.daemonStatus?.launchAgent.lifecycleTitle ?? "Manual"
   }
   private var launchAgentCaption: String {
-    let fallback = store.daemonStatus?.launchAgent.label ?? "Launch agent"
-    let caption = store.daemonStatus?.launchAgent.lifecycleCaption ?? fallback
+    let fallback = store.daemonStatus?.launchAgent.label
+      ?? "Launch agent"
+    let caption = store.daemonStatus?.launchAgent.lifecycleCaption
+      ?? fallback
     return caption.isEmpty ? fallback : caption
   }
   private var generalActionsAreLoading: Bool {
@@ -71,7 +75,6 @@ struct PreferencesView: View {
       "preferencesChrome=\(chrome)",
     ].joined(separator: ", ")
   }
-
   private var currentSection: PreferencesSection {
     selectedSection ?? .general
   }
@@ -79,15 +82,13 @@ struct PreferencesView: View {
   var body: some View {
     NavigationSplitView {
       PreferencesSidebar(selection: $selectedSection)
-        .navigationSplitViewColumnWidth(min: 180, ideal: 210, max: 240)
+        .navigationSplitViewColumnWidth(
+          min: 180, ideal: 210, max: 240
+        )
     } detail: {
       selectedSectionContent
         .navigationTitle(currentSection.title)
         .toolbarTitleDisplayMode(.inline)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .harnessExtendedChromeBackground {
-          HarnessTheme.canvas(for: themeStyle)
-        }
     }
     .navigationSplitViewStyle(.balanced)
     .toolbar {
@@ -96,26 +97,25 @@ struct PreferencesView: View {
           Label("Back", systemImage: "chevron.left")
         }
         .disabled(backHistory.isEmpty)
-        .accessibilityIdentifier(HarnessAccessibility.preferencesBackButton)
-
+        .accessibilityIdentifier(
+          HarnessAccessibility.preferencesBackButton
+        )
         Button(action: goForward) {
           Label("Forward", systemImage: "chevron.right")
         }
         .disabled(forwardHistory.isEmpty)
-        .accessibilityIdentifier(HarnessAccessibility.preferencesForwardButton)
+        .accessibilityIdentifier(
+          HarnessAccessibility.preferencesForwardButton
+        )
       }
     }
     .toolbar(removing: .sidebarToggle)
     .toolbarRole(.editor)
-    .toolbarBackgroundVisibility(.visible, for: .windowToolbar)
-    .containerBackground(.windowBackground, for: .window)
-    .foregroundStyle(HarnessTheme.ink)
-    .tint(HarnessTheme.accent(for: themeStyle))
     .frame(maxWidth: .infinity, maxHeight: .infinity)
     .onChange(of: selectedSection) { oldValue, newValue in
-      guard let oldValue, let newValue, oldValue != newValue else {
-        return
-      }
+      guard let oldValue, let newValue,
+        oldValue != newValue
+      else { return }
       if suppressHistoryRecording {
         suppressHistoryRecording = false
         return
@@ -177,6 +177,8 @@ struct PreferencesView: View {
   }
 }
 
+// MARK: - Sidebar
+
 private struct PreferencesSidebar: View {
   @Binding var selection: PreferencesSection?
 
@@ -186,30 +188,22 @@ private struct PreferencesSidebar: View {
         NavigationLink(value: section) {
           Label(section.title, systemImage: section.systemImage)
         }
-        .accessibilityIdentifier(HarnessAccessibility.preferencesSectionButton(section.rawValue))
-        .accessibilityValue(selection == section ? "selected" : "not selected")
+        .accessibilityIdentifier(
+          HarnessAccessibility.preferencesSectionButton(
+            section.rawValue
+          )
+        )
+        .accessibilityValue(
+          selection == section ? "selected" : "not selected"
+        )
       }
     }
     .listStyle(.sidebar)
-    .scrollContentBackground(.hidden)
     .accessibilityIdentifier(HarnessAccessibility.preferencesSidebar)
   }
 }
 
-private struct PreferencesSectionScrollContainer<Content: View>: View {
-  private let content: Content
-  init(@ViewBuilder content: () -> Content) {
-    self.content = content()
-  }
-  var body: some View {
-    HarnessColumnScrollView(horizontalPadding: 28, verticalPadding: 16) {
-      content
-        .frame(maxWidth: 860, alignment: .leading)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.bottom, 28)
-    }
-  }
-}
+// MARK: - Overlay markers
 
 private struct PreferencesOverlayMarkers: View {
   let title: String
@@ -221,8 +215,9 @@ private struct PreferencesOverlayMarkers: View {
         .allowsHitTesting(false)
         .accessibilityElement()
         .accessibilityLabel(title)
-        .accessibilityIdentifier(HarnessAccessibility.preferencesTitle)
-
+        .accessibilityIdentifier(
+          HarnessAccessibility.preferencesTitle
+        )
       AccessibilityTextMarker(
         identifier: HarnessAccessibility.preferencesState,
         text: preferencesAccessibilityValue
@@ -231,73 +226,7 @@ private struct PreferencesOverlayMarkers: View {
   }
 }
 
-private struct PreferencesAppearanceCard: View {
-  @Binding var themeMode: HarnessThemeMode
-  @Binding var themeStyle: HarnessThemeStyle
-  var body: some View {
-    VStack(alignment: .leading, spacing: 16) {
-      Text("Themes")
-        .font(.system(.title3, weight: .semibold))
-      VStack(spacing: 0) {
-        appearanceRow
-        Divider()
-        styleRow
-      }
-      Text("Both settings apply live to every Harness window on this Mac.")
-        .font(.system(.subheadline, design: .rounded, weight: .medium))
-        .foregroundStyle(HarnessTheme.secondaryInk)
-    }
-    .harnessCard()
-  }
-
-  private var appearanceRow: some View {
-    PreferencesPickerRow(title: "Appearance") {
-      Picker("Appearance", selection: $themeMode) {
-        ForEach(HarnessThemeMode.allCases) { mode in
-          Text(mode.label).tag(mode)
-        }
-      }
-      .pickerStyle(.menu)
-      .frame(width: 160, alignment: .trailing)
-      .accessibilityIdentifier(HarnessAccessibility.preferencesThemeModePicker)
-    }
-  }
-
-  private var styleRow: some View {
-    PreferencesPickerRow(title: "Style") {
-      Picker("Style", selection: $themeStyle) {
-        ForEach(HarnessThemeStyle.allCases) { style in
-          Text(style.label).tag(style)
-        }
-      }
-      .pickerStyle(.menu)
-      .frame(width: 160, alignment: .trailing)
-      .accessibilityIdentifier(HarnessAccessibility.preferencesThemeStylePicker)
-    }
-  }
-}
-
-private struct PreferencesPickerRow<Control: View>: View {
-  let title: String
-  let control: Control
-
-  init(title: String, @ViewBuilder control: () -> Control) {
-    self.title = title
-    self.control = control()
-  }
-
-  var body: some View {
-    LabeledContent {
-      control
-        .labelsHidden()
-    } label: {
-      Text(title)
-        .font(.system(.headline, design: .rounded, weight: .semibold))
-    }
-    .padding(.horizontal, 16)
-    .padding(.vertical, 12)
-  }
-}
+// MARK: - General
 
 private struct PreferencesGeneralSection: View {
   @Bindable var store: HarnessStore
@@ -309,95 +238,106 @@ private struct PreferencesGeneralSection: View {
   let cacheEntryCount: Int
   let isLoading: Bool
 
+  private var endpoint: String {
+    effectiveHealth?.endpoint
+      ?? store.daemonStatus?.manifest?.endpoint
+      ?? "Unavailable"
+  }
+  private var version: String {
+    effectiveHealth?.version
+      ?? store.daemonStatus?.manifest?.version
+      ?? "Unavailable"
+  }
+  private var sessionCount: Int {
+    store.daemonStatus?.sessionCount ?? store.sessions.count
+  }
+
   var body: some View {
-    PreferencesSectionScrollContainer {
-      VStack(alignment: .leading, spacing: 18) {
-        PreferencesAppearanceCard(themeMode: $themeMode, themeStyle: $themeStyle)
-        PreferencesActionGrid(
+    Form {
+      Section {
+        Picker("Mode", selection: $themeMode) {
+          ForEach(HarnessThemeMode.allCases) {
+            Text($0.label).tag($0)
+          }
+        }
+        .accessibilityIdentifier(
+          HarnessAccessibility.preferencesThemeModePicker
+        )
+        Picker("Style", selection: $themeStyle) {
+          ForEach(HarnessThemeStyle.allCases) {
+            Text($0.label).tag($0)
+          }
+        }
+        .accessibilityIdentifier(
+          HarnessAccessibility.preferencesThemeStylePicker
+        )
+      } header: {
+        Text("Appearance")
+      } footer: {
+        Text("Applies to every Harness window on this Mac.")
+      }
+
+      Section("Actions") {
+        PreferencesActionButtons(
           isLoading: isLoading,
           reconnect: { await store.reconnect() },
-          refreshDiagnostics: { await store.refreshDiagnostics() },
+          refreshDiagnostics: {
+            await store.refreshDiagnostics()
+          },
           startDaemon: { await store.startDaemon() },
-          installLaunchAgent: { await store.installLaunchAgent() },
-          requestRemoveLaunchAgentConfirmation: { store.requestRemoveLaunchAgentConfirmation() }
-        )
-        PreferencesOverviewGrid(
-          endpoint: effectiveHealth?.endpoint ?? store.daemonStatus?.manifest?.endpoint
-            ?? "Unavailable",
-          version: effectiveHealth?.version ?? store.daemonStatus?.manifest?.version
-            ?? "Unavailable",
-          launchAgentState: launchAgentState,
-          launchAgentCaption: launchAgentCaption,
-          cacheEntryCount: cacheEntryCount,
-          sessionCount: store.daemonStatus?.sessionCount ?? store.sessions.count
-        )
-        PreferencesStatusCard(
-          startedAt: effectiveHealth?.startedAt ?? store.daemonStatus?.manifest?.startedAt,
-          lastError: store.lastError,
-          lastAction: store.lastAction
+          installLaunchAgent: {
+            await store.installLaunchAgent()
+          },
+          requestRemoveLaunchAgentConfirmation: {
+            store.requestRemoveLaunchAgentConfirmation()
+          }
         )
       }
-    }
-  }
-}
 
-private struct PreferencesConnectionSection: View {
-  @Bindable var store: HarnessStore
-
-  var body: some View {
-    PreferencesSectionScrollContainer {
-      VStack(alignment: .leading, spacing: 18) {
-        PreferencesConnectionActionsCard(
-          isReconnectLoading: store.connectionState == .connecting,
-          isRefreshLoading: store.isDiagnosticsRefreshInFlight,
-          reconnect: { await store.reconnect() },
-          refreshDiagnostics: { await store.refreshDiagnostics() }
+      Section("Overview") {
+        LabeledContent("Endpoint", value: endpoint)
+          .textSelection(.enabled)
+          .accessibilityIdentifier(
+            HarnessAccessibility.preferencesMetricCard(
+              "Endpoint"
+            )
+          )
+        LabeledContent("Version", value: version)
+          .textSelection(.enabled)
+          .accessibilityIdentifier(
+            HarnessAccessibility.preferencesMetricCard("Version")
+          )
+        LabeledContent("Launchd") {
+          VStack(alignment: .trailing, spacing: 2) {
+            Text(launchAgentState)
+            Text(launchAgentCaption)
+              .font(.caption)
+              .foregroundStyle(.secondary)
+          }
+        }
+        .accessibilityIdentifier(
+          HarnessAccessibility.preferencesMetricCard("Launchd")
         )
-        PreferencesConnectionCard(
-          metrics: store.connectionMetrics,
-          events: store.connectionEvents
+        LabeledContent("Cached Sessions") {
+          Text("\(cacheEntryCount)")
+        }
+        .accessibilityIdentifier(
+          HarnessAccessibility.preferencesMetricCard(
+            "Cached Sessions"
+          )
         )
+        LabeledContent("Live Sessions") {
+          Text("\(sessionCount)")
+        }
       }
-    }
-  }
-}
 
-private struct PreferencesDiagnosticsSection: View {
-  @Bindable var store: HarnessStore
-  let effectiveTokenPresent: Bool
-  let effectiveLastEvent: DaemonAuditEvent?
-
-  var body: some View {
-    PreferencesSectionScrollContainer {
-      VStack(alignment: .leading, spacing: 18) {
-        PreferencesDiagnosticsCard(
-          launchAgent: store.daemonStatus?.launchAgent,
-          tokenPresent: effectiveTokenPresent,
-          projectCount: store.daemonStatus?.projectCount ?? 0,
-          sessionCount: store.daemonStatus?.sessionCount ?? 0,
-          lastEvent: effectiveLastEvent
-        )
-        PreferencesPathsCard(
-          launchAgentPath: store.daemonStatus?.launchAgent.path ?? "Unavailable",
-          launchAgentDomain: store.daemonStatus?.launchAgent.domainTarget,
-          launchAgentService: store.daemonStatus?.launchAgent.serviceTarget,
-          manifestPath: store.diagnostics?.workspace.manifestPath
-            ?? store.daemonStatus?.diagnostics.manifestPath
-            ?? "Unavailable",
-          authTokenPath: store.diagnostics?.workspace.authTokenPath
-            ?? store.daemonStatus?.diagnostics.authTokenPath
-            ?? "Unavailable",
-          eventsPath: store.diagnostics?.workspace.eventsPath
-            ?? store.daemonStatus?.diagnostics.eventsPath
-            ?? "Unavailable",
-          cacheRoot: store.diagnostics?.workspace.cacheRoot
-            ?? store.daemonStatus?.diagnostics.cacheRoot
-            ?? "Unavailable"
-        )
-        PreferencesRecentEventsCard(
-          events: Array((store.diagnostics?.recentEvents ?? []).prefix(10))
-        )
-      }
+      PreferencesStatusSection(
+        startedAt: effectiveHealth?.startedAt
+          ?? store.daemonStatus?.manifest?.startedAt,
+        lastError: store.lastError,
+        lastAction: store.lastAction
+      )
     }
+    .formStyle(.grouped)
   }
 }
