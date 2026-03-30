@@ -251,10 +251,19 @@ public final class HarnessStore {
   }
 
   public func selectSession(_ sessionID: String?) async {
+    let previousProjectId = selectedSessionSummary?.projectId
     primeSessionSelection(sessionID)
     guard let client, let sessionID else {
       stopSessionStream()
       return
+    }
+
+    let newProjectId = sessions.first(where: { $0.sessionId == sessionID })?.projectId
+    if let previousProjectId, newProjectId != previousProjectId {
+      saveFilterPreference(for: previousProjectId)
+    }
+    if let newProjectId, newProjectId != previousProjectId {
+      loadFilterPreference(for: newProjectId)
     }
 
     let requestID = beginSessionLoad()

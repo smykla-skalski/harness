@@ -22,7 +22,15 @@ struct ContentView: View {
   }
 
   private var chromeAccessibilityValue: String {
-    "style=\(themeStyle.rawValue), contentChrome=extended, inspectorChrome=extended"
+    let chrome = HarnessTheme.chromeAccessibilityValue(for: themeStyle)
+    let interactiveCards = HarnessTheme
+      .interactiveCardAccessibilityValue(for: themeStyle)
+    return [
+      "style=\(themeStyle.rawValue)",
+      "contentChrome=\(chrome)",
+      "inspectorChrome=\(chrome)",
+      "interactiveCards=\(interactiveCards)",
+    ].joined(separator: ", ")
   }
 
   var body: some View {
@@ -31,14 +39,18 @@ struct ContentView: View {
         .navigationSplitViewColumnWidth(min: 300, ideal: 350)
     } detail: {
       NavigationStack {
-        SessionContentContainer(
-          store: store,
-          detail: selectedDetail,
-          summary: selectedSessionSummary,
-          timeline: store.timeline,
-          themeStyle: themeStyle
-        )
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        VStack(spacing: 0) {
+          if store.isShowingCachedData {
+            CachedDataBanner()
+          }
+          SessionContentContainer(
+            store: store,
+            detail: selectedDetail,
+            summary: selectedSessionSummary,
+            timeline: store.timeline
+          )
+          .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
         .accessibilityFrameMarker("\(HarnessAccessibility.contentRoot).frame")
       }
       .navigationTitle("Harness")
@@ -163,27 +175,38 @@ struct ContentView: View {
   }
 }
 
+private struct CachedDataBanner: View {
+  var body: some View {
+    HStack(spacing: 8) {
+      Image(systemName: "cloud.bolt")
+        .font(.caption)
+      Text("Showing cached data - daemon is offline")
+        .font(.caption.weight(.medium))
+      Spacer()
+    }
+    .padding(.horizontal, 14)
+    .padding(.vertical, 8)
+    .background(.orange.opacity(0.12))
+    .foregroundStyle(.orange)
+  }
+}
+
 private struct SessionContentContainer: View {
   @Bindable var store: HarnessStore
   let detail: SessionDetail?
   let summary: SessionSummary?
   let timeline: [TimelineEntry]
-  let themeStyle: HarnessThemeStyle
 
   var body: some View {
-    ZStack {
-      SessionsBoardView(store: store)
-        .opacity(detail == nil && summary == nil ? 1 : 0)
-        .allowsHitTesting(detail == nil && summary == nil)
-
-      if let summary, detail == nil {
-        SessionLoadingView(summary: summary)
-          .transition(.opacity)
-      }
-
+    Group {
       if let detail {
         SessionCockpitView(store: store, detail: detail, timeline: timeline)
           .transition(.opacity)
+      } else if let summary {
+        SessionLoadingView(summary: summary)
+          .transition(.opacity)
+      } else {
+        SessionsBoardView(store: store)
       }
     }
     .animation(.easeInOut(duration: 0.18), value: detail?.session.sessionId)

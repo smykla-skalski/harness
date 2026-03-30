@@ -42,20 +42,22 @@ struct InspectorColumnView: View {
 
   var body: some View {
     HarnessColumnScrollView(horizontalPadding: 18, verticalPadding: 22) {
-      VStack(alignment: .leading, spacing: 18) {
-        inspectorContent
+      HarnessGlassContainer(spacing: 18) {
+        VStack(alignment: .leading, spacing: 18) {
+          inspectorContent
 
-        if let detail = store.selectedSession {
-          InspectorActionSections(
-            store: store,
-            detail: detail,
-            selectedTask: store.selectedTask,
-            selectedAgent: store.selectedAgent,
-            selectedObserver: selectedObserver
-          )
+          if let detail = store.selectedSession {
+            InspectorActionSections(
+              store: store,
+              detail: detail,
+              selectedTask: store.selectedTask,
+              selectedAgent: store.selectedAgent,
+              selectedObserver: selectedObserver
+            )
+          }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
       }
-      .frame(maxWidth: .infinity, alignment: .leading)
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     .foregroundStyle(HarnessTheme.ink)
@@ -141,7 +143,7 @@ struct InspectorColumnView: View {
 
   @ViewBuilder
   private func taskInspector(_ task: WorkItem) -> some View {
-    TaskInspectorCard(task: task)
+    TaskInspectorCard(task: task, store: store)
   }
 
   @ViewBuilder

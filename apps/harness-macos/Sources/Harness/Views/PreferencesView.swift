@@ -64,8 +64,12 @@ struct PreferencesView: View {
   }
   private var preferencesAccessibilityValue: String {
     let chrome = HarnessTheme.chromeAccessibilityValue(for: themeStyle)
-    "style=\(themeStyle.rawValue), mode=\(themeMode.rawValue), "
-      + "section=\(currentSection.rawValue), preferencesChrome=\(chrome)"
+    return [
+      "style=\(themeStyle.rawValue)",
+      "mode=\(themeMode.rawValue)",
+      "section=\(currentSection.rawValue)",
+      "preferencesChrome=\(chrome)",
+    ].joined(separator: ", ")
   }
 
   private var currentSection: PreferencesSection {
