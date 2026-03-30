@@ -55,6 +55,9 @@ struct DaemonStatusCard: View {
         daemonLaunchdBadge
       }
       .frame(maxWidth: .infinity, alignment: .leading)
+      .animation(.spring(duration: 0.3), value: daemonProjectCount)
+      .animation(.spring(duration: 0.3), value: daemonSessionCount)
+      .animation(.spring(duration: 0.3), value: daemonLaunchdState)
 
       daemonActionButtons
     }
