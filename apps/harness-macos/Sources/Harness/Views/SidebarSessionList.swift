@@ -59,6 +59,41 @@ struct SidebarSessionList: View {
       TextField("Search sessions, projects, leaders", text: $store.searchText)
         .textFieldStyle(.roundedBorder)
         .accessibilityIdentifier("harness.sidebar.search")
+        .onSubmit {
+          store.recordSearch(store.searchText)
+        }
+
+      if store.searchText.isEmpty {
+        let recent = store.recentSearches
+        if !recent.isEmpty {
+          HStack(spacing: 6) {
+            ForEach(recent.prefix(5), id: \.query) { search in
+              Button {
+                store.searchText = search.query
+              } label: {
+                Text(search.query)
+                  .font(.caption)
+                  .lineLimit(1)
+              }
+              .buttonStyle(.plain)
+              .padding(.horizontal, 8)
+              .padding(.vertical, 3)
+              .background {
+                HarnessGlassCapsuleBackground()
+              }
+            }
+            Spacer()
+            Button {
+              store.clearSearchHistory()
+            } label: {
+              Image(systemName: "xmark.circle")
+                .font(.caption2)
+                .foregroundStyle(HarnessTheme.secondaryInk)
+            }
+            .buttonStyle(.plain)
+          }
+        }
+      }
 
       filterSection(title: "Status") {
         HarnessGlassContainer(spacing: 8) {
@@ -192,14 +227,6 @@ private struct SessionListContent: View {
                   .foregroundStyle(HarnessTheme.ink)
                   .frame(maxWidth: .infinity, alignment: .leading)
                   .padding(14)
-                  .background {
-                    HarnessInteractiveCardBackground(
-                      cornerRadius: 18,
-                      tint: store.selectedSessionID == session.sessionId
-                        ? HarnessTheme.surfaceHover(for: themeStyle)
-                        : nil
-                    )
-                  }
                   .harnessSelectionOutline(
                     isSelected: store.selectedSessionID == session.sessionId,
                     cornerRadius: 18
@@ -210,7 +237,14 @@ private struct SessionListContent: View {
                 .accessibilityFrameMarker(
                   "\(HarnessAccessibility.sessionRow(session.sessionId)).frame"
                 )
-                .buttonStyle(.plain)
+                .accessibilityValue(
+                  sessionAccessibilityValue(for: session)
+                )
+                .harnessInteractiveCardButtonStyle(
+                  tint: store.selectedSessionID == session.sessionId
+                    ? HarnessTheme.surfaceHover(for: themeStyle)
+                    : nil
+                )
                 .contextMenu {
                   Button {
                     store.toggleBookmark(
@@ -233,6 +267,18 @@ private struct SessionListContent: View {
         .accessibilityFrameMarker(HarnessAccessibility.sidebarSessionListContent)
       }
     }
+  }
+
+  private func sessionAccessibilityValue(
+    for session: SessionSummary
+  ) -> String {
+    let card = HarnessTheme
+      .interactiveCardAccessibilityValue(for: themeStyle)
+    let selected = store.selectedSessionID == session.sessionId
+    if selected {
+      return "selected, interactive=\(card)"
+    }
+    return "interactive=\(card)"
   }
 
   fileprivate func labelChip(_ value: String) -> some View {

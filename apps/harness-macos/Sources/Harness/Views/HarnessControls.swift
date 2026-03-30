@@ -190,6 +190,34 @@ private struct HarnessFilterChipButtonStyleModifier: ViewModifier {
   }
 }
 
+private struct InteractiveCardModifier: ViewModifier {
+  @Environment(\.harnessThemeStyle)
+  private var themeStyle
+  let cornerRadius: CGFloat
+  let tint: Color?
+
+  @ViewBuilder
+  func body(content: Content) -> some View {
+    let resolvedTint = tint ?? HarnessTheme.surface(for: themeStyle)
+
+    if HarnessTheme.usesGradientChrome(for: themeStyle) {
+      content
+        .buttonBorderShape(.roundedRectangle(radius: cornerRadius))
+        .buttonStyle(.glass(.regular.tint(resolvedTint)))
+    } else if let tint {
+      content
+        .buttonBorderShape(.roundedRectangle(radius: cornerRadius))
+        .buttonStyle(.borderedProminent)
+        .tint(tint)
+    } else {
+      content
+        .buttonBorderShape(.roundedRectangle(radius: cornerRadius))
+        .buttonStyle(.bordered)
+        .tint(HarnessTheme.ink)
+    }
+  }
+}
+
 extension View {
   func harnessActionButtonStyle(
     variant: HarnessAsyncActionButton.Variant,
@@ -204,5 +232,17 @@ extension View {
 
   func harnessFilterChipButtonStyle(isSelected: Bool) -> some View {
     modifier(HarnessFilterChipButtonStyleModifier(isSelected: isSelected))
+  }
+
+  func harnessInteractiveCardButtonStyle(
+    cornerRadius: CGFloat = 18,
+    tint: Color? = nil
+  ) -> some View {
+    modifier(
+      InteractiveCardModifier(
+        cornerRadius: cornerRadius,
+        tint: tint
+      )
+    )
   }
 }

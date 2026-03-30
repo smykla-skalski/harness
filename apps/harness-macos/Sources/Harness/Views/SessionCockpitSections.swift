@@ -7,16 +7,22 @@ struct SessionMetricGrid: View {
   let metrics: SessionMetrics
 
   var body: some View {
-    HarnessAdaptiveGridLayout(minimumColumnWidth: 130, maximumColumns: 5, spacing: 14) {
-      metricCard(title: "Agents", value: "\(metrics.agentCount)", tint: HarnessTheme.accent(for: themeStyle))
-      metricCard(title: "Active", value: "\(metrics.activeAgentCount)", tint: HarnessTheme.success)
-      metricCard(
-        title: "In Flight",
-        value: "\(metrics.inProgressTaskCount)",
-        tint: HarnessTheme.warmAccent
-      )
-      metricCard(title: "Blocked", value: "\(metrics.blockedTaskCount)", tint: HarnessTheme.danger)
-      metricCard(title: "Completed", value: "\(metrics.completedTaskCount)", tint: HarnessTheme.ink)
+    HarnessGlassContainer(spacing: 14) {
+      HarnessAdaptiveGridLayout(minimumColumnWidth: 130, maximumColumns: 5, spacing: 14) {
+        metricCard(
+          title: "Agents",
+          value: "\(metrics.agentCount)",
+          tint: HarnessTheme.accent(for: themeStyle)
+        )
+        metricCard(title: "Active", value: "\(metrics.activeAgentCount)", tint: HarnessTheme.success)
+        metricCard(
+          title: "In Flight",
+          value: "\(metrics.inProgressTaskCount)",
+          tint: HarnessTheme.warmAccent
+        )
+        metricCard(title: "Blocked", value: "\(metrics.blockedTaskCount)", tint: HarnessTheme.danger)
+        metricCard(title: "Completed", value: "\(metrics.completedTaskCount)", tint: HarnessTheme.ink)
+      }
     }
   }
 
@@ -98,11 +104,8 @@ struct SessionTaskSummaryCard: View {
       }
       .frame(maxWidth: .infinity, minHeight: sessionLaneCardHeight, alignment: .topLeading)
       .padding(14)
-      .background {
-        HarnessInteractiveCardBackground(cornerRadius: 18, tint: nil)
-      }
     }
-    .buttonStyle(.plain)
+    .harnessInteractiveCardButtonStyle()
     .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
     .accessibilityIdentifier(HarnessAccessibility.sessionTaskCard(task.taskId))
     .accessibilityFrameMarker("\(HarnessAccessibility.sessionTaskCard(task.taskId)).frame")
@@ -169,11 +172,8 @@ struct SessionAgentSummaryCard: View {
       }
       .frame(maxWidth: .infinity, minHeight: sessionLaneCardHeight, alignment: .topLeading)
       .padding(14)
-      .background {
-        HarnessInteractiveCardBackground(cornerRadius: 18, tint: nil)
-      }
     }
-    .buttonStyle(.plain)
+    .harnessInteractiveCardButtonStyle()
     .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
     .accessibilityIdentifier(HarnessAccessibility.sessionAgentCard(agent.agentId))
     .accessibilityFrameMarker("\(HarnessAccessibility.sessionAgentCard(agent.agentId)).frame")
