@@ -42,11 +42,7 @@ public enum SessionFocusFilter: String, CaseIterable, Identifiable {
 
 extension HarnessStore {
   public var groupedSessions: [SessionGroup] {
-    let filteredSessions = sessions.filter { summary in
-      sessionFilter.includes(summary.status)
-        && sessionFocusFilter.includes(summary)
-        && searchMatches(summary)
-    }
+    let filteredSessions = sessions.filter(matchesCurrentFilters)
     let sessionsByProject = Dictionary(grouping: filteredSessions, by: \.projectId)
 
     return projects.compactMap { project in
@@ -61,9 +57,15 @@ extension HarnessStore {
   }
 
   public var filteredSessionCount: Int {
-    groupedSessions.reduce(0) { total, group in
-      total + group.sessions.count
-    }
+    sessions.filter(matchesCurrentFilters).count
+  }
+
+  public var totalOpenWorkCount: Int {
+    sessions.reduce(0) { $0 + $1.metrics.openTaskCount }
+  }
+
+  public var totalBlockedCount: Int {
+    sessions.reduce(0) { $0 + $1.metrics.blockedTaskCount }
   }
 
   public var selectedSessionSummary: SessionSummary? {
@@ -104,6 +106,12 @@ extension HarnessStore {
     searchText = ""
     sessionFilter = .active
     sessionFocusFilter = .all
+  }
+
+  private func matchesCurrentFilters(_ summary: SessionSummary) -> Bool {
+    sessionFilter.includes(summary.status)
+      && sessionFocusFilter.includes(summary)
+      && searchMatches(summary)
   }
 
   private func searchMatches(_ summary: SessionSummary) -> Bool {
