@@ -252,7 +252,7 @@ private struct PreferencesSidebar: View {
           Label(section.title, systemImage: section.systemImage)
         }
         .tag(section)
-          .accessibilityIdentifier(HarnessAccessibility.preferencesSectionButton(section.rawValue))
+        .accessibilityIdentifier(HarnessAccessibility.preferencesSectionButton(section.rawValue))
         .accessibilityValue(selection == section ? "selected" : "not selected")
       }
     }

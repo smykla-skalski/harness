@@ -101,13 +101,8 @@ struct HarnessAsyncActionButton: View {
 private struct FillWidthButtonSizing: ViewModifier {
   let isEnabled: Bool
 
-  @ViewBuilder
   func body(content: Content) -> some View {
-    if isEnabled {
-      content
-    } else {
-      content.fixedSize(horizontal: true, vertical: true)
-    }
+    content.fixedSize(horizontal: !isEnabled, vertical: !isEnabled)
   }
 }
 
