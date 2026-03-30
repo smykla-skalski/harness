@@ -3,22 +3,22 @@ import SwiftUI
 struct HarnessColumnScrollView<Content: View>: View {
   let horizontalPadding: CGFloat
   let verticalPadding: CGFloat
-  @ViewBuilder private let content: () -> Content
+  private let content: Content
 
   init(
     horizontalPadding: CGFloat = 24,
     verticalPadding: CGFloat = 24,
-    @ViewBuilder content: @escaping () -> Content
+    @ViewBuilder content: () -> Content
   ) {
     self.horizontalPadding = horizontalPadding
     self.verticalPadding = verticalPadding
-    self.content = content
+    self.content = content()
   }
 
   var body: some View {
     ScrollView(showsIndicators: false) {
       VStack(spacing: 0) {
-        content()
+        content
           .frame(maxWidth: .infinity, alignment: .topLeading)
       }
       .frame(maxWidth: .infinity, alignment: .topLeading)

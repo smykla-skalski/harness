@@ -233,7 +233,7 @@ struct SessionsBoardView: View {
   private var openWorkMetricCard: some View {
     metricCard(
       title: "Open Work",
-      value: "\(store.sessions.reduce(0) { $0 + $1.metrics.openTaskCount })",
+      value: "\(store.totalOpenWorkCount)",
       tint: HarnessTheme.warmAccent
     )
   }
@@ -241,7 +241,7 @@ struct SessionsBoardView: View {
   private var blockedMetricCard: some View {
     metricCard(
       title: "Blocked",
-      value: "\(store.sessions.reduce(0) { $0 + $1.metrics.blockedTaskCount })",
+      value: "\(store.totalBlockedCount)",
       tint: HarnessTheme.danger
     )
   }
