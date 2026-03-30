@@ -69,6 +69,6 @@ struct HarnessStoreConfirmationTests {
 
     await store.confirmPendingAction()
 
-    #expect(store.lastAction == "")
+    #expect(store.lastAction.isEmpty)
   }
 }
