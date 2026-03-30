@@ -84,6 +84,7 @@ private struct HarnessActionButtonStyleModifier: ViewModifier {
       case .bordered:
         content
           .buttonStyle(.glass(.regular.tint(tint)))
+          .tint(tint)
       }
     } else {
       switch variant {
@@ -110,6 +111,7 @@ private struct HarnessAccessoryButtonStyleModifier: ViewModifier {
     if HarnessTheme.usesGradientChrome(for: themeStyle) {
       content
         .buttonStyle(.glass(.regular.tint(tint)))
+        .tint(tint)
     } else {
       content
         .buttonStyle(.bordered)
@@ -136,6 +138,7 @@ private struct HarnessFilterChipButtonStyleModifier: ViewModifier {
           .buttonStyle(
             .glass(.regular.tint(HarnessTheme.surface(for: themeStyle)))
           )
+          .tint(HarnessTheme.ink)
       }
     } else {
       if isSelected {
