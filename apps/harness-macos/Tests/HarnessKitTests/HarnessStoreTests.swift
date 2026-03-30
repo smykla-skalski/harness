@@ -1,51 +1,50 @@
-import XCTest
+import Testing
 
 @testable import HarnessKit
 
 @MainActor
-final class HarnessStoreTests: XCTestCase {
-  func testBootstrapLoadsDashboardData() async throws {
+@Suite("Harness store")
+struct HarnessStoreTests {
+  @Test("Bootstrap loads the dashboard data")
+  func bootstrapLoadsDashboardData() async {
     let store = await makeBootstrappedStore()
 
-    XCTAssertEqual(store.connectionState, .online)
-    XCTAssertEqual(store.projects, PreviewFixtures.projects)
-    XCTAssertEqual(store.sessions.map(\.sessionId), [PreviewFixtures.summary.sessionId])
-    XCTAssertEqual(store.health?.status, "ok")
-    XCTAssertEqual(
-      store.diagnostics?.recentEvents.first?.message,
-      "daemon ready"
-    )
+    #expect(store.connectionState == .online)
+    #expect(store.projects == PreviewFixtures.projects)
+    #expect(store.sessions.map(\.sessionId) == [PreviewFixtures.summary.sessionId])
+    #expect(store.health?.status == "ok")
+    #expect(store.diagnostics?.recentEvents.first?.message == "daemon ready")
   }
 
-  func testSelectSessionLoadsDetailAndTimeline() async throws {
+  @Test("Selecting a session loads detail and timeline")
+  func selectSessionLoadsDetailAndTimeline() async {
     let store = await makeBootstrappedStore()
 
     await store.selectSession(PreviewFixtures.summary.sessionId)
 
-    XCTAssertEqual(store.selectedSession?.session.sessionId, PreviewFixtures.summary.sessionId)
-    XCTAssertEqual(store.timeline, PreviewFixtures.timeline)
-    XCTAssertEqual(store.actionActorID, PreviewFixtures.summary.leaderId)
+    #expect(store.selectedSession?.session.sessionId == PreviewFixtures.summary.sessionId)
+    #expect(store.timeline == PreviewFixtures.timeline)
+    #expect(store.actionActorID == PreviewFixtures.summary.leaderId)
   }
 
-  func testGroupedSessionsFiltersBySearchTextAndStatus() async throws {
+  @Test("Grouped sessions filter by search text and status")
+  func groupedSessionsFiltersBySearchTextAndStatus() async {
     let store = await makeBootstrappedStore()
 
     store.searchText = "cockpit"
     store.sessionFilter = .active
 
-    XCTAssertEqual(
-      store.groupedSessions.map(\.project.projectId),
-      [PreviewFixtures.summary.projectId]
-    )
-    XCTAssertEqual(
-      store.groupedSessions.first?.sessions.map(\.sessionId),
-      [PreviewFixtures.summary.sessionId]
+    #expect(store.groupedSessions.map(\.project.projectId) == [PreviewFixtures.summary.projectId])
+    #expect(
+      store.groupedSessions.first?.sessions.map(\.sessionId) == [PreviewFixtures.summary.sessionId]
     )
   }
 
-  func testBlockedFocusFilterNarrowsSessionSlice() async throws {
+  @Test("Blocked focus filter narrows the session slice")
+  func blockedFocusFilterNarrowsSessionSlice() {
     let store = HarnessStore(daemonController: RecordingDaemonController())
     store.projects = [makeProject(totalSessionCount: 3, activeSessionCount: 2)]
+
     var activeFixture = SessionFixture(
       sessionId: "sess-active",
       context: "Track live cockpit",
@@ -92,15 +91,16 @@ final class HarnessStoreTests: XCTestCase {
     ]
 
     store.sessionFilter = .active
-    XCTAssertEqual(store.sessionFilter, .active)
+    #expect(store.sessionFilter == .active)
 
     store.sessionFocusFilter = .blocked
-    XCTAssertEqual(store.sessionFocusFilter, .blocked)
-    XCTAssertEqual(store.searchText, "")
-    XCTAssertEqual(store.groupedSessions.flatMap(\.sessions).map(\.sessionId), ["sess-blocked"])
+    #expect(store.sessionFocusFilter == .blocked)
+    #expect(store.searchText.isEmpty)
+    #expect(store.groupedSessions.flatMap(\.sessions).map(\.sessionId) == ["sess-blocked"])
   }
 
-  func testSearchMatchesAcrossTokensAndResetFiltersRestoresDefaults() async throws {
+  @Test("Search matches across tokens and reset filters restores defaults")
+  func searchMatchesAcrossTokensAndResetFiltersRestoresDefaults() {
     let store = HarnessStore(daemonController: RecordingDaemonController())
     store.projects = [makeProject(totalSessionCount: 2, activeSessionCount: 1)]
     store.sessions = [
@@ -135,49 +135,52 @@ final class HarnessStoreTests: XCTestCase {
     store.searchText = "harness leader-alpha"
     store.sessionFilter = .all
 
-    XCTAssertEqual(store.groupedSessions.flatMap(\.sessions).map(\.sessionId), ["sess-a"])
+    #expect(store.groupedSessions.flatMap(\.sessions).map(\.sessionId) == ["sess-a"])
 
     store.resetFilters()
 
-    XCTAssertEqual(store.searchText, "")
-    XCTAssertEqual(store.sessionFilter, .active)
-    XCTAssertEqual(store.sessionFocusFilter, .all)
-    XCTAssertEqual(store.groupedSessions.flatMap(\.sessions).map(\.sessionId), ["sess-a"])
+    #expect(store.searchText.isEmpty)
+    #expect(store.sessionFilter == .active)
+    #expect(store.sessionFocusFilter == .all)
+    #expect(store.groupedSessions.flatMap(\.sessions).map(\.sessionId) == ["sess-a"])
   }
 
-  func testInstallLaunchAgentRefreshesDaemonDiagnostics() async throws {
+  @Test("Installing the launch agent refreshes daemon diagnostics")
+  func installLaunchAgentRefreshesDaemonDiagnostics() async {
     let controller = RecordingDaemonController(launchAgentInstalled: false)
     let store = HarnessStore(daemonController: controller)
 
     await store.bootstrap()
-    XCTAssertFalse(store.daemonStatus?.launchAgent.installed ?? true)
+    #expect(store.daemonStatus?.launchAgent.installed == false)
 
     await store.installLaunchAgent()
 
-    XCTAssertTrue(store.daemonStatus?.launchAgent.installed ?? false)
-    XCTAssertTrue(store.daemonStatus?.launchAgent.loaded ?? false)
-    XCTAssertEqual(store.daemonStatus?.launchAgent.pid, 4_242)
-    XCTAssertEqual(store.daemonStatus?.diagnostics.lastEvent?.message, "launch agent installed")
-    XCTAssertEqual(store.lastAction, "Install launch agent")
+    #expect(store.daemonStatus?.launchAgent.installed == true)
+    #expect(store.daemonStatus?.launchAgent.loaded == true)
+    #expect(store.daemonStatus?.launchAgent.pid == 4_242)
+    #expect(store.daemonStatus?.diagnostics.lastEvent?.message == "launch agent installed")
+    #expect(store.lastAction == "Install launch agent")
   }
 
-  func testRemoveLaunchAgentRefreshesDaemonDiagnostics() async throws {
+  @Test("Removing the launch agent refreshes daemon diagnostics")
+  func removeLaunchAgentRefreshesDaemonDiagnostics() async {
     let controller = RecordingDaemonController(launchAgentInstalled: true)
     let store = HarnessStore(daemonController: controller)
 
     await store.bootstrap()
-    XCTAssertTrue(store.daemonStatus?.launchAgent.installed ?? false)
+    #expect(store.daemonStatus?.launchAgent.installed == true)
 
     await store.removeLaunchAgent()
 
-    XCTAssertFalse(store.daemonStatus?.launchAgent.installed ?? true)
-    XCTAssertFalse(store.daemonStatus?.launchAgent.loaded ?? true)
-    XCTAssertNil(store.daemonStatus?.launchAgent.pid)
-    XCTAssertEqual(store.daemonStatus?.diagnostics.lastEvent?.message, "launch agent removed")
-    XCTAssertEqual(store.lastAction, "Remove launch agent")
+    #expect(store.daemonStatus?.launchAgent.installed == false)
+    #expect(store.daemonStatus?.launchAgent.loaded == false)
+    #expect(store.daemonStatus?.launchAgent.pid == nil)
+    #expect(store.daemonStatus?.diagnostics.lastEvent?.message == "launch agent removed")
+    #expect(store.lastAction == "Remove launch agent")
   }
 
-  func testReconnectRefreshesHealthAndStatus() async throws {
+  @Test("Reconnect refreshes health and status")
+  func reconnectRefreshesHealthAndStatus() async {
     let store = await makeBootstrappedStore()
 
     store.health = nil
@@ -186,24 +189,26 @@ final class HarnessStoreTests: XCTestCase {
 
     await store.reconnect()
 
-    XCTAssertEqual(store.connectionState, .online)
-    XCTAssertEqual(store.health?.status, "ok")
-    XCTAssertEqual(store.daemonStatus?.diagnostics.cacheEntryCount, 2)
-    XCTAssertEqual(store.diagnostics?.workspace.cacheEntryCount, 2)
+    #expect(store.connectionState == .online)
+    #expect(store.health?.status == "ok")
+    #expect(store.daemonStatus?.diagnostics.cacheEntryCount == 2)
+    #expect(store.diagnostics?.workspace.cacheEntryCount == 2)
   }
 
-  func testRefreshDiagnosticsLoadsLiveDaemonDiagnostics() async throws {
+  @Test("Refreshing diagnostics loads live daemon diagnostics")
+  func refreshDiagnosticsLoadsLiveDaemonDiagnostics() async {
     let store = await makeBootstrappedStore()
 
     store.diagnostics = nil
 
     await store.refreshDiagnostics()
 
-    XCTAssertEqual(store.diagnostics?.workspace.cacheEntryCount, 2)
-    XCTAssertEqual(store.diagnostics?.recentEvents.count, 1)
+    #expect(store.diagnostics?.workspace.cacheEntryCount == 2)
+    #expect(store.diagnostics?.recentEvents.count == 1)
   }
 
-  func testBootstrapFailureSetsOfflineStateAndError() async throws {
+  @Test("Bootstrap failure sets the offline state and error")
+  func bootstrapFailureSetsOfflineStateAndError() async {
     let daemon = FailingDaemonController(
       bootstrapError: DaemonControlError.harnessBinaryNotFound
     )
@@ -211,14 +216,16 @@ final class HarnessStoreTests: XCTestCase {
 
     await store.bootstrap()
 
-    XCTAssertEqual(
-      store.connectionState, .offline(DaemonControlError.harnessBinaryNotFound.localizedDescription)
+    #expect(
+      store.connectionState
+        == .offline(DaemonControlError.harnessBinaryNotFound.localizedDescription)
     )
-    XCTAssertNotNil(store.lastError)
-    XCTAssertNil(store.health)
+    #expect(store.lastError != nil)
+    #expect(store.health == nil)
   }
 
-  func testCreateTaskFailureSetsLastError() async throws {
+  @Test("Create task failure sets the last error")
+  func createTaskFailureSetsLastError() async {
     let client = FailingHarnessClient()
     let daemon = RecordingDaemonController(client: client)
     let store = HarnessStore(daemonController: daemon)
@@ -227,11 +234,12 @@ final class HarnessStoreTests: XCTestCase {
 
     await store.createTask(title: "broken", context: nil, severity: .high)
 
-    XCTAssertNotNil(store.lastError)
-    XCTAssertFalse(store.isBusy)
+    #expect(store.lastError != nil)
+    #expect(!store.isBusy)
   }
 
-  func testRefreshWithNoClientTriggersBootstrap() async throws {
+  @Test("Refresh with no client triggers bootstrap")
+  func refreshWithNoClientTriggersBootstrap() async {
     let daemon = FailingDaemonController(
       bootstrapError: DaemonControlError.daemonDidNotStart
     )
@@ -239,10 +247,11 @@ final class HarnessStoreTests: XCTestCase {
 
     await store.refresh()
 
-    XCTAssertNotNil(store.lastError)
+    #expect(store.lastError != nil)
   }
 
-  func testInstallLaunchAgentFailureSetsLastError() async throws {
+  @Test("Install launch agent failure sets the last error")
+  func installLaunchAgentFailureSetsLastError() async {
     let daemon = FailingDaemonController(
       actionError: DaemonControlError.commandFailed("install failed")
     )
@@ -250,12 +259,14 @@ final class HarnessStoreTests: XCTestCase {
 
     await store.installLaunchAgent()
 
-    XCTAssertEqual(
-      store.lastError, DaemonControlError.commandFailed("install failed").localizedDescription)
-    XCTAssertFalse(store.isBusy)
+    #expect(
+      store.lastError == DaemonControlError.commandFailed("install failed").localizedDescription
+    )
+    #expect(!store.isBusy)
   }
 
-  func testRemoveLaunchAgentFailureSetsLastError() async throws {
+  @Test("Remove launch agent failure sets the last error")
+  func removeLaunchAgentFailureSetsLastError() async {
     let daemon = FailingDaemonController(
       actionError: DaemonControlError.commandFailed("remove failed")
     )
@@ -263,27 +274,30 @@ final class HarnessStoreTests: XCTestCase {
 
     await store.removeLaunchAgent()
 
-    XCTAssertEqual(
-      store.lastError, DaemonControlError.commandFailed("remove failed").localizedDescription)
-    XCTAssertFalse(store.isBusy)
+    #expect(
+      store.lastError == DaemonControlError.commandFailed("remove failed").localizedDescription
+    )
+    #expect(!store.isBusy)
   }
 
-  func testRequestEndConfirmationUsesResolvedActor() async throws {
+  @Test("Request end confirmation uses the resolved actor")
+  func requestEndConfirmationUsesResolvedActor() async {
     let store = await makeBootstrappedStore()
     await store.selectSession(PreviewFixtures.summary.sessionId)
 
     store.requestEndSelectedSessionConfirmation()
 
-    XCTAssertEqual(
-      store.pendingConfirmation,
-      .endSession(
-        sessionID: PreviewFixtures.summary.sessionId,
-        actorID: PreviewFixtures.agents[0].agentId
-      )
+    #expect(
+      store.pendingConfirmation
+        == .endSession(
+          sessionID: PreviewFixtures.summary.sessionId,
+          actorID: PreviewFixtures.agents[0].agentId
+        )
     )
   }
 
-  func testConfirmPendingRemoveAgentExecutesMutation() async throws {
+  @Test("Confirm pending remove-agent action executes the mutation")
+  func confirmPendingRemoveAgentExecutesMutation() async {
     let client = RecordingHarnessClient()
     let store = await makeBootstrappedStore(client: client)
     await store.selectSession(PreviewFixtures.summary.sessionId)
@@ -291,16 +305,16 @@ final class HarnessStoreTests: XCTestCase {
     store.requestRemoveAgentConfirmation(agentID: PreviewFixtures.agents[1].agentId)
     await store.confirmPendingAction()
 
-    XCTAssertNil(store.pendingConfirmation)
-    XCTAssertEqual(
-      client.recordedCalls(),
-      [
-        .removeAgent(
-          sessionID: PreviewFixtures.summary.sessionId,
-          agentID: PreviewFixtures.agents[1].agentId,
-          actor: PreviewFixtures.agents[0].agentId
-        )
-      ]
+    #expect(store.pendingConfirmation == nil)
+    #expect(
+      client.recordedCalls()
+        == [
+          .removeAgent(
+            sessionID: PreviewFixtures.summary.sessionId,
+            agentID: PreviewFixtures.agents[1].agentId,
+            actor: PreviewFixtures.agents[0].agentId
+          )
+        ]
     )
   }
 }

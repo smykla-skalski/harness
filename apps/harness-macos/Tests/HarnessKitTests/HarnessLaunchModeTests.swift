@@ -1,27 +1,32 @@
-import XCTest
+import Testing
 
 @testable import HarnessKit
 
-final class HarnessLaunchModeTests: XCTestCase {
-  func testDefaultsToLiveWhenEnvironmentValueIsMissing() {
-    XCTAssertEqual(HarnessLaunchMode(environment: [:]), .live)
+@Suite("Harness launch mode")
+struct HarnessLaunchModeTests {
+  @Test("Missing environment defaults to live")
+  func defaultsToLiveWhenEnvironmentValueIsMissing() {
+    #expect(HarnessLaunchMode(environment: [:]) == .live)
   }
 
-  func testParsesPreviewAndEmptyModes() {
-    XCTAssertEqual(
-      HarnessLaunchMode(environment: [HarnessLaunchMode.environmentKey: "preview"]),
-      .preview
-    )
-    XCTAssertEqual(
-      HarnessLaunchMode(environment: [HarnessLaunchMode.environmentKey: "empty"]),
-      .empty
+  @Test("Preview environment value maps to preview mode")
+  func parsesPreviewMode() {
+    #expect(
+      HarnessLaunchMode(environment: [HarnessLaunchMode.environmentKey: "preview"]) == .preview
     )
   }
 
-  func testFallsBackToLiveForUnknownMode() {
-    XCTAssertEqual(
-      HarnessLaunchMode(environment: [HarnessLaunchMode.environmentKey: "mystery"]),
-      .live
+  @Test("Empty environment value maps to empty mode")
+  func parsesEmptyMode() {
+    #expect(
+      HarnessLaunchMode(environment: [HarnessLaunchMode.environmentKey: "empty"]) == .empty
+    )
+  }
+
+  @Test("Unknown environment values fall back to live mode")
+  func fallsBackToLiveForUnknownMode() {
+    #expect(
+      HarnessLaunchMode(environment: [HarnessLaunchMode.environmentKey: "mystery"]) == .live
     )
   }
 }
