@@ -51,23 +51,40 @@ struct HarnessRoundedGlassBackground: View {
     if let fillColor {
       return fillColor
     }
-    return colorScheme == .dark ? .black : .white
+    if let tint {
+      return tint
+    }
+    return colorScheme == .dark ? HarnessTheme.panel : HarnessTheme.panel
   }
 
   var body: some View {
     let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
 
-    shape
-      .fill(resolvedFillColor.opacity(fillOpacity))
-      .overlay {
-        shape
-          .fill(.clear)
-          .glassEffect(harnessGlass(tint: tint, interactive: interactive), in: shape)
-      }
-      .overlay {
-        shape.stroke(strokeColor, lineWidth: 1)
-      }
-      .shadow(color: shadowColor, radius: shadowRadius, x: 0, y: shadowY)
+    if HarnessTheme.usesGradientChrome {
+      shape
+        .fill(resolvedFillColor.opacity(fillOpacity))
+        .overlay {
+          shape
+            .fill(.clear)
+            .glassEffect(harnessGlass(tint: tint, interactive: interactive), in: shape)
+        }
+        .overlay {
+          shape.stroke(strokeColor, lineWidth: 1)
+        }
+        .shadow(color: shadowColor, radius: shadowRadius, x: 0, y: shadowY)
+    } else {
+      shape
+        .fill(resolvedFillColor)
+        .overlay {
+          shape.stroke(strokeColor, lineWidth: 1)
+        }
+        .shadow(
+          color: shadowColor.opacity(0.65),
+          radius: max(4, shadowRadius * 0.35),
+          x: 0,
+          y: max(2, shadowY * 0.25)
+        )
+    }
   }
 }
 
@@ -108,23 +125,40 @@ struct HarnessCapsuleGlassBackground: View {
     if let fillColor {
       return fillColor
     }
-    return colorScheme == .dark ? .black : .white
+    if let tint {
+      return tint
+    }
+    return colorScheme == .dark ? HarnessTheme.surface : HarnessTheme.surface
   }
 
   var body: some View {
     let shape = Capsule()
 
-    shape
-      .fill(resolvedFillColor.opacity(fillOpacity))
-      .overlay {
-        shape
-          .fill(.clear)
-          .glassEffect(harnessGlass(tint: tint, interactive: interactive), in: shape)
-      }
-      .overlay {
-        shape.stroke(strokeColor, lineWidth: 1)
-      }
-      .shadow(color: shadowColor, radius: shadowRadius, x: 0, y: shadowY)
+    if HarnessTheme.usesGradientChrome {
+      shape
+        .fill(resolvedFillColor.opacity(fillOpacity))
+        .overlay {
+          shape
+            .fill(.clear)
+            .glassEffect(harnessGlass(tint: tint, interactive: interactive), in: shape)
+        }
+        .overlay {
+          shape.stroke(strokeColor, lineWidth: 1)
+        }
+        .shadow(color: shadowColor, radius: shadowRadius, x: 0, y: shadowY)
+    } else {
+      shape
+        .fill(resolvedFillColor)
+        .overlay {
+          shape.stroke(strokeColor, lineWidth: 1)
+        }
+        .shadow(
+          color: shadowColor.opacity(0.55),
+          radius: max(3, shadowRadius * 0.3),
+          x: 0,
+          y: max(1, shadowY * 0.2)
+        )
+    }
   }
 }
 
@@ -138,7 +172,11 @@ struct HarnessGlassContainer<Content: View>: View {
   }
 
   var body: some View {
-    GlassEffectContainer(spacing: spacing) {
+    if HarnessTheme.usesGradientChrome {
+      GlassEffectContainer(spacing: spacing) {
+        content
+      }
+    } else {
       content
     }
   }

@@ -1,3 +1,4 @@
+import Foundation
 import HarnessKit
 import SwiftUI
 
@@ -6,51 +7,113 @@ private func harnessColor(_ name: String) -> Color {
 }
 
 enum HarnessTheme {
-  static let canvas = LinearGradient(
-    colors: [
-      harnessColor("HarnessCanvasStart"),
-      harnessColor("HarnessCanvasMiddle"),
-      harnessColor("HarnessCanvasEnd"),
-    ],
-    startPoint: .topLeading,
-    endPoint: .bottomTrailing
-  )
-  static let sidebarBackground = LinearGradient(
-    colors: [
-      harnessColor("HarnessSidebarStart"),
-      harnessColor("HarnessSidebarEnd"),
-    ],
-    startPoint: .top,
-    endPoint: .bottom
-  )
-  static let inspectorBackground = LinearGradient(
-    colors: [
-      harnessColor("HarnessInspectorStart"),
-      harnessColor("HarnessInspectorEnd"),
-    ],
-    startPoint: .topLeading,
-    endPoint: .bottomTrailing
-  )
+  static var currentStyle: HarnessThemeStyle {
+    resolvedStoredStyle()
+  }
+
+  static var usesGradientChrome: Bool {
+    currentStyle == .gradient
+  }
+
+  @ViewBuilder static var canvas: some View {
+    if usesGradientChrome {
+      LinearGradient(
+        colors: [
+          harnessColor("HarnessCanvasStart"),
+          harnessColor("HarnessCanvasMiddle"),
+          harnessColor("HarnessCanvasEnd"),
+        ],
+        startPoint: .topLeading,
+        endPoint: .bottomTrailing
+      )
+    } else {
+      harnessColor("HarnessFlatCanvas")
+    }
+  }
+
+  @ViewBuilder static var sidebarBackground: some View {
+    if usesGradientChrome {
+      LinearGradient(
+        colors: [
+          harnessColor("HarnessSidebarStart"),
+          harnessColor("HarnessSidebarEnd"),
+        ],
+        startPoint: .top,
+        endPoint: .bottom
+      )
+    } else {
+      harnessColor("HarnessFlatSidebar")
+    }
+  }
+
+  @ViewBuilder static var inspectorBackground: some View {
+    if usesGradientChrome {
+      LinearGradient(
+        colors: [
+          harnessColor("HarnessInspectorStart"),
+          harnessColor("HarnessInspectorEnd"),
+        ],
+        startPoint: .topLeading,
+        endPoint: .bottomTrailing
+      )
+    } else {
+      harnessColor("HarnessFlatInspector")
+    }
+  }
 
   static let ink = harnessColor("HarnessInk")
-  static let accent = harnessColor("HarnessAccent")
+  static var accent: Color {
+    accent(for: currentStyle)
+  }
   static let warmAccent = harnessColor("HarnessWarmAccent")
   static let success = harnessColor("HarnessSuccess")
   static let caution = harnessColor("HarnessCaution")
   static let danger = harnessColor("HarnessDanger")
-  static let panel = harnessColor("HarnessPanel")
-  static let panelBorder = harnessColor("HarnessPanelBorder")
-  static let surface = harnessColor("HarnessSurface")
-  static let surfaceHover = harnessColor("HarnessSurfaceHover")
+  static var panel: Color {
+    themedColor(gradient: "HarnessPanel", flat: "HarnessFlatPanel")
+  }
+  static var panelBorder: Color {
+    themedColor(gradient: "HarnessPanelBorder", flat: "HarnessFlatPanelBorder")
+  }
+  static var surface: Color {
+    themedColor(gradient: "HarnessSurface", flat: "HarnessFlatSurface")
+  }
+  static var surfaceHover: Color {
+    themedColor(gradient: "HarnessSurfaceHover", flat: "HarnessFlatSurfaceHover")
+  }
   static let controlBorder = harnessColor("HarnessControlBorder")
-  static let sidebarHeader = harnessColor("HarnessSidebarHeader")
-  static let sidebarMuted = harnessColor("HarnessSidebarMuted")
+  static var sidebarHeader: Color {
+    themedColor(gradient: "HarnessSidebarHeader", flat: "HarnessFlatSidebarHeader")
+  }
+  static var sidebarMuted: Color {
+    themedColor(gradient: "HarnessSidebarMuted", flat: "HarnessFlatSidebarMuted")
+  }
   static let overlayScrim = harnessColor("HarnessOverlayScrim")
   static let secondaryInk = ink.opacity(0.78)
   static let tertiaryInk = ink.opacity(0.64)
-  static let glassStroke = Color.white.opacity(0.18)
-  static let glassHighlight = Color.white.opacity(0.10)
-  static let glassShadow = Color.black.opacity(0.16)
+  static var glassStroke: Color {
+    usesGradientChrome ? Color.white.opacity(0.18) : panelBorder.opacity(0.9)
+  }
+  static var glassHighlight: Color {
+    usesGradientChrome ? Color.white.opacity(0.10) : Color.white.opacity(0.03)
+  }
+  static var glassShadow: Color {
+    usesGradientChrome ? Color.black.opacity(0.16) : Color.black.opacity(0.10)
+  }
+
+  static func accent(for style: HarnessThemeStyle) -> Color {
+    style == .gradient ? harnessColor("HarnessAccent") : harnessColor("HarnessFlatAccent")
+  }
+
+  private static func themedColor(gradient: String, flat: String) -> Color {
+    currentStyle == .gradient ? harnessColor(gradient) : harnessColor(flat)
+  }
+
+  private static func resolvedStoredStyle() -> HarnessThemeStyle {
+    HarnessThemeStyle(
+      rawValue: UserDefaults.standard.string(forKey: HarnessThemeDefaults.styleKey) ?? ""
+    ) ?? .gradient
+  }
 }
 
 struct HarnessCardModifier: ViewModifier {
@@ -149,6 +212,21 @@ private struct AccessibilityFrameMarker: View {
   }
 }
 
+private struct HarnessSelectionOutlineModifier: ViewModifier {
+  let isSelected: Bool
+  let cornerRadius: CGFloat
+  let lineWidth: CGFloat
+
+  func body(content: Content) -> some View {
+    content.overlay {
+      if isSelected {
+        RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+          .strokeBorder(.selection, lineWidth: lineWidth)
+      }
+    }
+  }
+}
+
 extension View {
   func harnessCard(
     minHeight: CGFloat? = nil,
@@ -165,6 +243,20 @@ extension View {
     overlay {
       AccessibilityFrameMarker(identifier: identifier)
     }
+  }
+
+  func harnessSelectionOutline(
+    isSelected: Bool,
+    cornerRadius: CGFloat,
+    lineWidth: CGFloat = 1.5
+  ) -> some View {
+    modifier(
+      HarnessSelectionOutlineModifier(
+        isSelected: isSelected,
+        cornerRadius: cornerRadius,
+        lineWidth: lineWidth
+      )
+    )
   }
 }
 

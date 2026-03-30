@@ -85,6 +85,42 @@ struct PreferencesActionGrid: View {
   }
 }
 
+struct PreferencesConnectionActionsCard: View {
+  let isReconnectLoading: Bool
+  let isRefreshLoading: Bool
+  let reconnect: @Sendable () async -> Void
+  let refreshDiagnostics: @Sendable () async -> Void
+  var body: some View {
+    VStack(alignment: .leading, spacing: 14) {
+      Text("Connection Actions")
+        .font(.system(.title3, weight: .semibold))
+
+      HStack(spacing: 10) {
+        HarnessAsyncActionButton(
+          title: "Reconnect",
+          tint: HarnessTheme.accent,
+          variant: .prominent,
+          isLoading: isReconnectLoading,
+          accessibilityIdentifier: HarnessAccessibility.preferencesActionButton("Reconnect"),
+          action: reconnect
+        )
+
+        HarnessAsyncActionButton(
+          title: "Refresh Diagnostics",
+          tint: HarnessTheme.ink,
+          variant: .bordered,
+          isLoading: isRefreshLoading,
+          accessibilityIdentifier: HarnessAccessibility.preferencesActionButton(
+            "Refresh Diagnostics"
+          ),
+          action: refreshDiagnostics
+        )
+      }
+    }
+    .harnessCard()
+  }
+}
+
 struct PreferencesOverviewGrid: View {
   let endpoint: String
   let version: String
@@ -92,7 +128,6 @@ struct PreferencesOverviewGrid: View {
   let launchAgentCaption: String
   let cacheEntryCount: Int
   let sessionCount: Int
-
   var body: some View {
     HarnessAdaptiveGridLayout(
       minimumColumnWidth: 180,
@@ -158,6 +193,51 @@ struct PreferencesOverviewGrid: View {
   }
 }
 
+struct PreferencesStatusCard: View {
+  let startedAt: String?
+  let lastError: String?
+  let lastAction: String
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 14) {
+      Text("Status")
+        .font(.system(.title3, weight: .semibold))
+
+      if let startedAt {
+        statusRow(title: "Started", value: formatTimestamp(startedAt))
+      }
+
+      if let lastError, !lastError.isEmpty {
+        statusRow(title: "Latest Error", value: lastError, valueColor: HarnessTheme.danger)
+      } else if !lastAction.isEmpty {
+        statusRow(title: "Last Action", value: lastAction)
+      } else {
+        Text("No recent daemon actions yet.")
+          .font(.system(.body, design: .rounded, weight: .medium))
+          .foregroundStyle(HarnessTheme.secondaryInk)
+      }
+    }
+    .harnessCard()
+  }
+
+  private func statusRow(
+    title: String,
+    value: String,
+    valueColor: Color = HarnessTheme.ink
+  ) -> some View {
+    VStack(alignment: .leading, spacing: 4) {
+      Text(title.uppercased())
+        .font(.caption2.weight(.bold))
+        .foregroundStyle(HarnessTheme.secondaryInk)
+      Text(value)
+        .font(.system(.body, design: .rounded, weight: .medium))
+        .foregroundStyle(valueColor)
+        .multilineTextAlignment(.leading)
+        .textSelection(.enabled)
+    }
+  }
+}
+
 struct PreferencesPathsCard: View {
   let launchAgentPath: String
   let launchAgentDomain: String?
@@ -170,7 +250,7 @@ struct PreferencesPathsCard: View {
   var body: some View {
     VStack(alignment: .leading, spacing: 14) {
       Text("Paths")
-        .font(.system(.title3, design: .serif, weight: .semibold))
+        .font(.system(.title3, weight: .semibold))
       if let launchAgentDomain, !launchAgentDomain.isEmpty {
         pathRow(title: "Launchd Domain", value: launchAgentDomain)
       }
@@ -208,7 +288,7 @@ struct PreferencesDiagnosticsCard: View {
   var body: some View {
     VStack(alignment: .leading, spacing: 14) {
       Text("Diagnostics")
-        .font(.system(.title3, design: .serif, weight: .semibold))
+        .font(.system(.title3, weight: .semibold))
       HarnessAdaptiveGridLayout(minimumColumnWidth: 120, maximumColumns: 3, spacing: 14) {
         diagnosticBadge(
           title: "Token",
@@ -295,52 +375,5 @@ struct PreferencesDiagnosticsCard: View {
         strokeOpacity: 0.10
       )
     }
-  }
-}
-
-struct PreferencesRecentEventsCard: View {
-  let events: [DaemonAuditEvent]
-
-  var body: some View {
-    VStack(alignment: .leading, spacing: 14) {
-      Text("Recent Events")
-        .font(.system(.title3, design: .serif, weight: .semibold))
-
-      if events.isEmpty {
-        Text("No daemon events available from the live diagnostics stream yet.")
-          .font(.system(.body, design: .rounded, weight: .medium))
-          .foregroundStyle(HarnessTheme.secondaryInk)
-      } else {
-        HarnessGlassContainer(spacing: 12) {
-          ForEach(events) { event in
-            VStack(alignment: .leading, spacing: 6) {
-              HStack {
-                Text(event.level.uppercased())
-                  .font(.caption.bold())
-                  .foregroundStyle(
-                    event.level == "warn" ? HarnessTheme.caution : HarnessTheme.accent
-                  )
-                Spacer()
-                Text(formatTimestamp(event.recordedAt))
-                  .font(.caption.monospaced())
-                  .foregroundStyle(HarnessTheme.secondaryInk)
-              }
-              Text(event.message)
-                .font(.system(.body, design: .rounded, weight: .semibold))
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(12)
-            .background {
-              HarnessInsetPanelBackground(
-                cornerRadius: 18,
-                fillOpacity: 0.05,
-                strokeOpacity: 0.10
-              )
-            }
-          }
-        }
-      }
-    }
-    .harnessCard()
   }
 }
