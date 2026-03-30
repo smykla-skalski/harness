@@ -26,14 +26,13 @@ enum PreferencesSection: String, CaseIterable, Identifiable, Hashable {
 
 enum PreferencesChromeMetrics {
   static let sidebarWidth: CGFloat = 220
-  static let sidebarLeadingInset: CGFloat = 12
-  static let sidebarTrailingInset: CGFloat = 8
-  static let sidebarTopInset: CGFloat = 28
+  static let sidebarTopInset: CGFloat = 8
   static let sidebarBottomInset: CGFloat = 20
-  static let sidebarButtonHorizontalInset: CGFloat = 6
-  static let detailContentHorizontalInset: CGFloat = 0
-  static let sectionSpacing: CGFloat = 8
-  static let sectionRowHeight: CGFloat = 48
+  static let sidebarRowLeadingInset: CGFloat = 10
+  static let sidebarRowTrailingInset: CGFloat = 10
+  static let sidebarRowVerticalInset: CGFloat = 2
+  static let sidebarMinRowHeight: CGFloat = 30
+  static let detailContentHorizontalInset: CGFloat = -18
   static let shellDividerOpacity: Double = 0.42
 }
 
@@ -81,8 +80,7 @@ struct PreferencesChromeLayout<Detail: View>: View {
 
         HStack(spacing: 0) {
           PreferencesSidebarContent(
-            selection: $selection,
-            themeStyle: themeStyle
+            selection: $selection
           )
           .padding(
             .top,
@@ -144,70 +142,52 @@ private struct PreferencesSidebarChrome: View {
 
 private struct PreferencesSidebarContent: View {
   @Binding var selection: PreferencesSection
-  let themeStyle: HarnessThemeStyle
 
   var body: some View {
-    ScrollView {
-      VStack(alignment: .leading, spacing: PreferencesChromeMetrics.sectionSpacing) {
-        ForEach(PreferencesSection.allCases) { section in
-          PreferencesSidebarButton(
-            section: section,
-            isSelected: selection == section,
-            themeStyle: themeStyle
-          ) {
-            selection = section
-          }
-        }
+    List(selection: $selection) {
+      ForEach(PreferencesSection.allCases) { section in
+        PreferencesSidebarRow(
+          section: section,
+          isSelected: selection == section
+        )
+        .tag(section)
+        .listRowInsets(
+          EdgeInsets(
+            top: PreferencesChromeMetrics.sidebarRowVerticalInset,
+            leading: PreferencesChromeMetrics.sidebarRowLeadingInset,
+            bottom: PreferencesChromeMetrics.sidebarRowVerticalInset,
+            trailing: PreferencesChromeMetrics.sidebarRowTrailingInset
+          )
+        )
+        .accessibilityIdentifier(
+          HarnessAccessibility.preferencesSectionButton(section.rawValue)
+        )
+        .accessibilityValue(
+          selection == section ? "selected" : "not selected"
+        )
       }
-      .frame(maxWidth: .infinity, alignment: .topLeading)
-      .padding(.leading, PreferencesChromeMetrics.sidebarLeadingInset)
-      .padding(.trailing, PreferencesChromeMetrics.sidebarTrailingInset)
-      .padding(.bottom, PreferencesChromeMetrics.sidebarBottomInset)
     }
-    .scrollIndicators(.hidden)
+    .listStyle(.sidebar)
+    .controlSize(.small)
+    .environment(\.sidebarRowSize, .small)
+    .environment(\.defaultMinListRowHeight, PreferencesChromeMetrics.sidebarMinRowHeight)
+    .contentMargins(.top, 0, for: .scrollContent)
+    .scrollContentBackground(.hidden)
+    .safeAreaPadding(.bottom, PreferencesChromeMetrics.sidebarBottomInset)
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     .foregroundStyle(HarnessTheme.ink)
+    .background(Color.clear)
   }
 }
 
-private struct PreferencesSidebarButton: View {
+private struct PreferencesSidebarRow: View {
   let section: PreferencesSection
   let isSelected: Bool
-  let themeStyle: HarnessThemeStyle
-  let select: () -> Void
 
   var body: some View {
-    Button(action: select) {
-      Label(section.title, systemImage: section.systemImage)
-        .font(.system(.headline, design: .rounded, weight: .semibold))
-        .frame(
-          maxWidth: .infinity,
-          minHeight: PreferencesChromeMetrics.sectionRowHeight,
-          alignment: .leading
-        )
-        .padding(.horizontal, PreferencesChromeMetrics.sidebarButtonHorizontalInset)
-        .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-    }
-    .buttonStyle(.plain)
-    .foregroundStyle(isSelected ? HarnessTheme.ink : HarnessTheme.secondaryInk)
-    .background {
-      if isSelected {
-        RoundedRectangle(cornerRadius: 16, style: .continuous)
-          .fill(HarnessTheme.surface(for: themeStyle).opacity(0.28))
-          .overlay {
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-              .stroke(
-                HarnessTheme.panelBorder(for: themeStyle).opacity(0.26),
-                lineWidth: 1
-              )
-          }
-      }
-    }
-    .accessibilityIdentifier(
-      HarnessAccessibility.preferencesSectionButton(section.rawValue)
-    )
-    .accessibilityValue(
-      isSelected ? "selected" : "not selected"
-    )
+    Label(section.title, systemImage: section.systemImage)
+      .font(.system(.body, design: .rounded, weight: .semibold))
+      .frame(maxWidth: .infinity, alignment: .leading)
+      .foregroundStyle(isSelected ? HarnessTheme.ink : HarnessTheme.secondaryInk)
   }
 }
