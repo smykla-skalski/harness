@@ -239,15 +239,14 @@ struct HarnessLoadingStateView: View {
     .background {
       HarnessGlassCapsuleBackground()
     }
-    .opacity(animates ? 1 : 0.82)
-    .scaleEffect(animates ? 1 : 0.985)
+    .opacity(animates ? 1 : 0.62)
+    .scaleEffect(animates ? 1 : 0.97)
     .animation(
-      .easeInOut(duration: 0.9).repeatForever(autoreverses: true),
+      .easeInOut(duration: 1.1).repeatForever(autoreverses: true),
       value: animates
     )
-    .onAppear {
-      animates = true
-    }
+    .onAppear { animates = true }
+    .onDisappear { animates = false }
   }
 }
 
