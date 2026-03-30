@@ -1,5 +1,9 @@
 import SwiftUI
 
+extension EnvironmentValues {
+  @Entry var isInsideGlassEffect: Bool = false
+}
+
 func harnessGlass(tint: Color? = nil, interactive: Bool = false) -> Glass {
   var glass = Glass.regular
   if let tint {
@@ -22,6 +26,8 @@ func harnessInteractiveCardAccessibilityValue(for style: HarnessThemeStyle) -> S
 struct HarnessRoundedGlassBackground: View {
   @Environment(\.harnessThemeStyle)
   private var themeStyle
+  @Environment(\.isInsideGlassEffect)
+  private var isInsideGlassEffect
 
   let cornerRadius: CGFloat
   let tint: Color?
@@ -75,10 +81,14 @@ struct HarnessRoundedGlassBackground: View {
     fillOpacity.clamped(to: 0...1)
   }
 
+  private var useGlass: Bool {
+    HarnessTheme.usesGradientChrome(for: themeStyle) && !isInsideGlassEffect
+  }
+
   var body: some View {
     let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
 
-    if HarnessTheme.usesGradientChrome(for: themeStyle) {
+    if useGlass {
       shape
         .fill(.clear)
         .glassEffect(harnessGlass(tint: tint, interactive: interactive), in: shape)
@@ -108,6 +118,8 @@ struct HarnessRoundedGlassBackground: View {
 struct HarnessCapsuleGlassBackground: View {
   @Environment(\.harnessThemeStyle)
   private var themeStyle
+  @Environment(\.isInsideGlassEffect)
+  private var isInsideGlassEffect
 
   let tint: Color?
   let interactive: Bool
@@ -152,10 +164,14 @@ struct HarnessCapsuleGlassBackground: View {
     fillOpacity.clamped(to: 0...1)
   }
 
+  private var useGlass: Bool {
+    HarnessTheme.usesGradientChrome(for: themeStyle) && !isInsideGlassEffect
+  }
+
   var body: some View {
     let shape = Capsule()
 
-    if HarnessTheme.usesGradientChrome(for: themeStyle) {
+    if useGlass {
       shape
         .fill(.clear)
         .glassEffect(harnessGlass(tint: tint, interactive: interactive), in: shape)
@@ -185,6 +201,8 @@ struct HarnessCapsuleGlassBackground: View {
 struct HarnessGlassContainer<Content: View>: View {
   @Environment(\.harnessThemeStyle)
   private var themeStyle
+  @Environment(\.isInsideGlassEffect)
+  private var isInsideGlassEffect
   let spacing: CGFloat?
   private let content: Content
 
@@ -194,7 +212,7 @@ struct HarnessGlassContainer<Content: View>: View {
   }
 
   var body: some View {
-    if HarnessTheme.usesGradientChrome(for: themeStyle) {
+    if HarnessTheme.usesGradientChrome(for: themeStyle) && !isInsideGlassEffect {
       GlassEffectContainer(spacing: spacing) {
         content
       }
