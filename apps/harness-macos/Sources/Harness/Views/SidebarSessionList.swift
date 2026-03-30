@@ -105,15 +105,15 @@ struct SidebarSessionList: View {
   private var sessionList: some View {
     Group {
       if store.sessions.isEmpty {
-        emptyState(
-          title: "No sessions indexed yet",
-          message: "Start the daemon or refresh after launching a harness session."
-        )
+        ContentUnavailableView {
+          Label("No sessions indexed yet", systemImage: "tray")
+        } description: {
+          Text("Start the daemon or refresh after launching a harness session.")
+        }
+        .accessibilityIdentifier(HarnessAccessibility.sidebarEmptyState)
       } else if store.groupedSessions.isEmpty {
-        emptyState(
-          title: "No sessions match",
-          message: "Clear or adjust the current search and filter slice."
-        )
+        ContentUnavailableView.search(text: store.searchText)
+          .accessibilityIdentifier(HarnessAccessibility.sidebarEmptyState)
       } else {
         VStack(alignment: .leading, spacing: 16) {
           ForEach(store.groupedSessions) { group in
@@ -159,6 +159,7 @@ struct SidebarSessionList: View {
                       Circle()
                         .fill(statusColor(for: session.status))
                         .frame(width: 10, height: 10)
+                        .accessibilityHidden(true)
                     }
                     Text(session.sessionId)
                       .font(.caption.monospaced())
@@ -169,6 +170,7 @@ struct SidebarSessionList: View {
                       labelChip(formatTimestamp(session.lastActivityAt))
                     }
                   }
+                  .accessibilityElement(children: .combine)
                   .foregroundStyle(HarnessTheme.ink)
                   .frame(maxWidth: .infinity, alignment: .leading)
                   .padding(14)
@@ -241,27 +243,6 @@ struct SidebarSessionList: View {
 }
 
 extension SidebarSessionList {
-  fileprivate func emptyState(title: String, message: String) -> some View {
-    VStack(alignment: .leading, spacing: 8) {
-      Text(title)
-        .font(.system(.headline, design: .rounded, weight: .semibold))
-      Text(message)
-        .font(.system(.footnote, design: .rounded, weight: .medium))
-        .foregroundStyle(.secondary)
-    }
-    .frame(maxWidth: .infinity, alignment: .topLeading)
-    .padding(14)
-    .background {
-      HarnessInsetPanelBackground(
-        cornerRadius: 22,
-        fillOpacity: 0.07,
-        strokeOpacity: 0.10
-      )
-    }
-    .accessibilityElement(children: .contain)
-    .accessibilityIdentifier(HarnessAccessibility.sidebarEmptyState)
-  }
-
   fileprivate func labelChip(_ value: String) -> some View {
     Text(value)
       .font(.caption.weight(.semibold))
