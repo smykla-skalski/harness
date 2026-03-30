@@ -1,5 +1,4 @@
 import HarnessKit
-import Observation
 import SwiftUI
 
 struct InspectorActionSections: View {

@@ -2,13 +2,6 @@ import SwiftUI
 
 enum HarnessControlMetrics {
   static let compactControlSize: ControlSize = .small
-  static let actionHorizontalPadding: CGFloat = 10
-  static let actionVerticalPadding: CGFloat = 2
-  static let actionMinHeight: CGFloat = 26
-  static let fullWidthActionMinHeight: CGFloat = 30
-  static let chipHorizontalPadding: CGFloat = 8
-  static let chipVerticalPadding: CGFloat = 2
-  static let chipMinHeight: CGFloat = 26
 }
 
 struct HarnessAsyncActionButton: View {
@@ -47,7 +40,7 @@ struct HarnessAsyncActionButton: View {
     Button(action: launchAction) {
       label
     }
-    .frame(maxWidth: fillsWidth ? .infinity : nil, alignment: .center)
+    .frame(maxWidth: fillsWidth ? .infinity : nil)
     .harnessActionButtonStyle(variant: variant, tint: tint)
     .controlSize(HarnessControlMetrics.compactControlSize)
     .disabled(isLoading)
@@ -56,53 +49,21 @@ struct HarnessAsyncActionButton: View {
   }
 
   private var label: some View {
-    titleView
-      .frame(maxWidth: fillsWidth ? .infinity : nil, alignment: .center)
-      .overlay(alignment: .leading) {
-        if isLoading {
-          progressSlot
-            .padding(.leading, fillsWidth ? 8 : 6)
-        }
+    HStack(spacing: 6) {
+      if isLoading {
+        HarnessSpinner()
       }
-      .frame(maxWidth: fillsWidth ? .infinity : nil, alignment: .center)
-      .multilineTextAlignment(.center)
-      .font(.system(.callout, design: .rounded, weight: .semibold))
-      .padding(.horizontal, HarnessControlMetrics.actionHorizontalPadding)
-      .padding(.vertical, HarnessControlMetrics.actionVerticalPadding)
-      .frame(
-        maxWidth: fillsWidth ? .infinity : nil,
-        minHeight:
-          fillsWidth
-          ? HarnessControlMetrics.fullWidthActionMinHeight
-          : HarnessControlMetrics.actionMinHeight
-      )
-      .modifier(FillWidthButtonSizing(isEnabled: fillsWidth))
-  }
-
-  private var titleView: some View {
-    Text(title)
-      .lineLimit(1)
-      .minimumScaleFactor(0.78)
-      .allowsTightening(true)
-      .truncationMode(.tail)
+      Text(title)
+        .lineLimit(1)
+    }
+    .font(.system(.callout, design: .rounded, weight: .semibold))
+    .frame(maxWidth: fillsWidth ? .infinity : nil)
   }
 
   private func launchAction() {
     Task {
       await action()
     }
-  }
-
-  private var progressSlot: some View {
-    HarnessSpinner()
-  }
-}
-
-private struct FillWidthButtonSizing: ViewModifier {
-  let isEnabled: Bool
-
-  func body(content: Content) -> some View {
-    content.fixedSize(horizontal: !isEnabled, vertical: !isEnabled)
   }
 }
 
@@ -226,7 +187,9 @@ extension View {
     modifier(HarnessActionButtonStyleModifier(variant: variant, tint: tint))
   }
 
-  func harnessAccessoryButtonStyle(tint: Color = HarnessTheme.ink) -> some View {
+  func harnessAccessoryButtonStyle(
+    tint: Color = HarnessTheme.ink
+  ) -> some View {
     modifier(HarnessAccessoryButtonStyleModifier(tint: tint))
   }
 

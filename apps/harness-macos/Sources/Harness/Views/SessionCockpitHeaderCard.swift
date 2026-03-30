@@ -1,5 +1,4 @@
 import HarnessKit
-import Observation
 import SwiftUI
 
 struct SessionCockpitHeaderCard: View {
@@ -49,18 +48,21 @@ struct SessionCockpitHeaderCard: View {
   }
 
   private var observeButton: some View {
-    Button(action: observeSelectedSession) {
-      actionLabel("Observe")
-    }
-    .harnessActionButtonStyle(variant: .prominent, tint: HarnessTheme.accent(for: themeStyle))
+    Button("Observe", action: observeSelectedSession)
+      .font(.system(.subheadline, design: .rounded, weight: .semibold))
+      .harnessActionButtonStyle(
+        variant: .prominent,
+        tint: HarnessTheme.accent(for: themeStyle)
+      )
+      .controlSize(HarnessControlMetrics.compactControlSize)
   }
 
   private var endSessionButton: some View {
-    Button(action: store.requestEndSelectedSessionConfirmation) {
-      actionLabel("End Session")
-    }
-    .harnessActionButtonStyle(variant: .bordered, tint: HarnessTheme.ink)
-    .accessibilityIdentifier(HarnessAccessibility.endSessionButton)
+    Button("End Session", action: store.requestEndSelectedSessionConfirmation)
+      .font(.system(.subheadline, design: .rounded, weight: .semibold))
+      .harnessActionButtonStyle(variant: .bordered, tint: HarnessTheme.ink)
+      .controlSize(HarnessControlMetrics.compactControlSize)
+      .accessibilityIdentifier(HarnessAccessibility.endSessionButton)
   }
 
   private func observerSummary(_ observer: ObserverSummary) -> some View {
@@ -141,14 +143,6 @@ struct SessionCockpitHeaderCard: View {
       Text(value)
         .font(.system(.callout, design: .rounded, weight: .semibold))
     }
-  }
-
-  private func actionLabel(_ title: String) -> some View {
-    Text(title)
-      .font(.system(.subheadline, design: .rounded, weight: .semibold))
-      .multilineTextAlignment(.center)
-      .lineLimit(1)
-      .frame(minWidth: 110, minHeight: 38)
   }
 
   private func observeSelectedSession() {
