@@ -23,7 +23,7 @@ Pre-commit: `cargo fmt --check && cargo clippy --lib && mise run test`
 
 For `apps/harness-macos`, the Xcode project is generated from `project.yml` via XcodeGen. If you add, remove, or rename Swift files, update `project.yml` and regenerate with `Scripts/generate-project.sh`. Treat the generated `Harness.xcodeproj` as tracked source.
 
-Monitor app validation expectations:
+Harness app validation expectations:
 
 - `xcodebuild -project apps/harness-macos/Harness.xcodeproj -scheme Harness -configuration Debug -destination 'platform=macOS' -skipPackagePluginValidation build`
 - `xcodebuild -project apps/harness-macos/Harness.xcodeproj -scheme Harness -configuration Debug -destination 'platform=macOS' -skipPackagePluginValidation test -skip-testing:HarnessUITests`
