@@ -45,6 +45,8 @@ struct SessionCockpitHeaderCard: View {
     }
     .frame(maxWidth: .infinity, alignment: .leading)
     .harnessCard()
+    .animation(.spring(duration: 0.3), value: store.isSessionActionInFlight)
+    .animation(.spring(duration: 0.3), value: store.isSelectionLoading)
   }
 
   private var observeButton: some View {

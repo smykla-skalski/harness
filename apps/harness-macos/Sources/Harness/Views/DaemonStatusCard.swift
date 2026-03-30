@@ -61,6 +61,8 @@ struct DaemonStatusCard: View {
     .frame(maxWidth: .infinity, alignment: .leading)
     .padding(12)
     .harnessInsetPanel(cornerRadius: 22, fillOpacity: 0.05, strokeOpacity: 0.50)
+    .animation(.spring(duration: 0.3), value: store.connectionState)
+    .animation(.spring(duration: 0.3), value: store.isRefreshing)
     .overlay {
       AccessibilityTextMarker(
         identifier: HarnessAccessibility.daemonCardGlassState,
