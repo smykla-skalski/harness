@@ -28,14 +28,15 @@ struct SessionsBoardView: View {
       VStack(alignment: .leading, spacing: 22) {
         if store.sessions.isEmpty {
           SessionsBoardOnboardingCard(store: store, isLoading: isLoading)
+            .animation(.spring(duration: 0.3), value: store.isRefreshing)
         }
         metricsSection
+          .animation(.spring(duration: 0.3), value: store.sessions)
         SessionsBoardRecentSessionsSection(sessions: store.sessions, onSelect: select)
+          .animation(.spring(duration: 0.3), value: store.sessions)
       }
       .frame(maxWidth: .infinity, alignment: .leading)
     }
-    .animation(.easeInOut(duration: 0.18), value: store.isRefreshing)
-    .animation(.easeInOut(duration: 0.18), value: store.sessions)
     .foregroundStyle(HarnessTheme.ink)
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessAccessibility.sessionsBoardRoot)
