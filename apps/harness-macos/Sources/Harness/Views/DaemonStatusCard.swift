@@ -3,6 +3,8 @@ import Observation
 import SwiftUI
 
 struct DaemonStatusCard: View {
+  @Environment(\.harnessThemeStyle)
+  private var themeStyle
   @Bindable var store: HarnessStore
 
   private var isLoading: Bool {
@@ -63,7 +65,7 @@ extension DaemonStatusCard {
     sidebarLayoutProbe(HarnessAccessibility.sidebarStartDaemonButtonFrame) {
       HarnessAsyncActionButton(
         title: "Start Daemon",
-        tint: HarnessTheme.accent,
+        tint: HarnessTheme.accent(for: themeStyle),
         variant: .prominent,
         isLoading: isLoading,
         accessibilityIdentifier: HarnessAccessibility.sidebarStartDaemonButton,
@@ -150,7 +152,7 @@ extension DaemonStatusCard {
     case .connecting:
       HarnessTheme.caution
     case .idle:
-      HarnessTheme.accent
+      HarnessTheme.accent(for: themeStyle)
     case .offline:
       HarnessTheme.danger
     }

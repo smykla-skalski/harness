@@ -2,6 +2,8 @@ import HarnessKit
 import SwiftUI
 
 struct PreferencesRecentEventsCard: View {
+  @Environment(\.harnessThemeStyle)
+  private var themeStyle
   let events: [DaemonAuditEvent]
 
   var body: some View {
@@ -21,7 +23,7 @@ struct PreferencesRecentEventsCard: View {
                 Text(event.level.uppercased())
                   .font(.caption.bold())
                   .foregroundStyle(
-                    event.level == "warn" ? HarnessTheme.caution : HarnessTheme.accent
+                    event.level == "warn" ? HarnessTheme.caution : HarnessTheme.accent(for: themeStyle)
                   )
                 Spacer()
                 Text(formatTimestamp(event.recordedAt))

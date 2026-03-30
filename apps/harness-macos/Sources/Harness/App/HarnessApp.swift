@@ -111,12 +111,9 @@ struct HarnessApp: App {
 
   @ViewBuilder private var rootContent: some View {
     ContentView(store: store, themeStyle: themeStyle)
+      .environment(\.harnessThemeStyle, themeStyle)
       .preferredColorScheme(themeMode.colorScheme)
       .tint(HarnessTheme.accent(for: themeStyle))
-      .id("root-\(themeMode.rawValue)-\(themeStyle.rawValue)")
-      .onChange(of: themeStyle, initial: true) { _, newStyle in
-        HarnessTheme.cachedStyle = newStyle
-      }
       .task {
         await store.bootstrapIfNeeded()
       }
@@ -186,12 +183,9 @@ struct HarnessApp: App {
       themeMode: themeModeBinding,
       themeStyle: themeStyleBinding
     )
+    .environment(\.harnessThemeStyle, themeStyle)
     .preferredColorScheme(themeMode.colorScheme)
     .tint(HarnessTheme.accent(for: themeStyle))
-    .id("settings-\(themeMode.rawValue)-\(themeStyle.rawValue)")
-    .onChange(of: themeStyle, initial: true) { _, newStyle in
-      HarnessTheme.cachedStyle = newStyle
-    }
     .frame(maxWidth: .infinity, maxHeight: .infinity)
   }
 }
