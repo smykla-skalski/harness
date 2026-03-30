@@ -19,6 +19,7 @@ settings:
     SWIFT_STRICT_CONCURRENCY: complete
     SWIFT_TREAT_WARNINGS_AS_ERRORS: YES
     SWIFT_VERSION: "6.0"
+    HARNESS_APP_BUNDLE_ID: io.harness.app
 targets:
   HarnessKit:
     type: framework
@@ -74,7 +75,7 @@ targets:
         DEVELOPMENT_TEAM: Q498EB36N4
         INFOPLIST_KEY_CFBundleDisplayName: Harness
         INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.developer-tools
-        PRODUCT_BUNDLE_IDENTIFIER: io.harness.app
+        PRODUCT_BUNDLE_IDENTIFIER: $(HARNESS_APP_BUNDLE_ID)
   HarnessKitTests:
     type: bundle.unit-test
     platform: macOS
