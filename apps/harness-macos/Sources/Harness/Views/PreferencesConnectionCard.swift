@@ -10,19 +10,21 @@ struct PreferencesConnectionCard: View {
       Text("Connection")
         .font(.system(.title3, weight: .semibold))
 
-      HarnessAdaptiveGridLayout(minimumColumnWidth: 140, maximumColumns: 4, spacing: 14) {
-        connectionMetric("Transport", value: metrics.transportKind.title, tint: qualityColor)
-        connectionMetric("Latency", value: latencyText, tint: qualityColor)
-        connectionMetric(
-          "Messages in", value: "\(metrics.messagesReceived)", tint: HarnessTheme.accent
-        )
-        connectionMetric(
-          "Messages out", value: "\(metrics.messagesSent)", tint: HarnessTheme.warmAccent
-        )
-        connectionMetric("Uptime", value: uptimeText, tint: HarnessTheme.success)
-        connectionMetric("Reconnects", value: "\(metrics.reconnectCount)", tint: reconnectTint)
-        connectionMetric("Msg/sec", value: rateText, tint: HarnessTheme.accent)
-        connectionMetric("Quality", value: metrics.quality.title, tint: qualityColor)
+      HarnessGlassContainer(spacing: 14) {
+        HarnessAdaptiveGridLayout(minimumColumnWidth: 140, maximumColumns: 4, spacing: 14) {
+          connectionMetric("Transport", value: metrics.transportKind.title, tint: qualityColor)
+          connectionMetric("Latency", value: latencyText, tint: qualityColor)
+          connectionMetric(
+            "Messages in", value: "\(metrics.messagesReceived)", tint: HarnessTheme.accent
+          )
+          connectionMetric(
+            "Messages out", value: "\(metrics.messagesSent)", tint: HarnessTheme.warmAccent
+          )
+          connectionMetric("Uptime", value: uptimeText, tint: HarnessTheme.success)
+          connectionMetric("Reconnects", value: "\(metrics.reconnectCount)", tint: reconnectTint)
+          connectionMetric("Msg/sec", value: rateText, tint: HarnessTheme.accent)
+          connectionMetric("Quality", value: metrics.quality.title, tint: qualityColor)
+        }
       }
 
       if !events.isEmpty {
@@ -75,7 +77,15 @@ struct PreferencesConnectionCard: View {
         .foregroundStyle(tint)
         .contentTransition(.numericText())
     }
-    .harnessCard(minHeight: 72, contentPadding: 12)
+    .frame(maxWidth: .infinity, minHeight: 72, alignment: .topLeading)
+    .padding(12)
+    .background {
+      HarnessInsetPanelBackground(
+        cornerRadius: 18,
+        fillOpacity: 0.05,
+        strokeOpacity: 0.10
+      )
+    }
   }
 
   private var connectionEventLog: some View {
