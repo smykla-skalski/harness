@@ -2,7 +2,7 @@ import HarnessKit
 import Observation
 import SwiftUI
 
-private enum PreferencesSection: String, CaseIterable, Identifiable {
+private enum PreferencesSection: String, CaseIterable, Identifiable, Hashable {
   case general
   case connection
   case diagnostics
@@ -30,7 +30,7 @@ struct PreferencesView: View {
   @Bindable var store: HarnessStore
   @Binding var themeMode: HarnessThemeMode
   @Binding var themeStyle: HarnessThemeStyle
-  @State private var selectedSection = PreferencesSection.general
+  @State private var selectedSection: PreferencesSection? = .general
   @State private var backHistory: [PreferencesSection] = []
   @State private var forwardHistory: [PreferencesSection] = []
   @State private var suppressHistoryRecording = false
@@ -64,44 +64,58 @@ struct PreferencesView: View {
       || store.connectionState == .connecting
   }
   private var preferencesAccessibilityValue: String {
-    "style=\(themeStyle.rawValue), mode=\(themeMode.rawValue), section=\(selectedSection.rawValue)"
+    "style=\(themeStyle.rawValue), mode=\(themeMode.rawValue), section=\(currentSection.rawValue)"
   }
-  private var selectionBinding: Binding<PreferencesSection?> {
-    Binding(
-      get: { selectedSection },
-      set: { newSelection in
-        guard let newSelection else {
-          return
-        }
-        selectedSection = newSelection
-      }
-    )
+
+  private var currentSection: PreferencesSection {
+    selectedSection ?? .general
   }
 
   var body: some View {
     NavigationSplitView {
-      PreferencesSidebar(selection: selectionBinding)
+      PreferencesSidebar(selection: $selectedSection)
         .navigationSplitViewColumnWidth(min: 180, ideal: 210, max: 240)
     } detail: {
-      PreferencesDetailContainer(
-        title: selectedSection.title,
-        canGoBack: !backHistory.isEmpty,
-        canGoForward: !forwardHistory.isEmpty,
-        goBack: goBack,
-        goForward: goForward
-      ) {
-        selectedSectionContent
-      }
+      selectedSectionContent
+        .navigationTitle(currentSection.title)
+        .toolbarTitleDisplayMode(.inline)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .background {
+          if HarnessTheme.usesGradientChrome {
+            HarnessTheme.canvas
+              .backgroundExtensionEffect()
+              .ignoresSafeArea()
+          } else {
+            HarnessTheme.canvas
+              .ignoresSafeArea()
+          }
+        }
     }
     .navigationSplitViewStyle(.balanced)
+    .toolbar {
+      ToolbarItemGroup(placement: .navigation) {
+        Button(action: goBack) {
+          Label("Back", systemImage: "chevron.left")
+        }
+        .disabled(backHistory.isEmpty)
+        .accessibilityIdentifier(HarnessAccessibility.preferencesBackButton)
+
+        Button(action: goForward) {
+          Label("Forward", systemImage: "chevron.right")
+        }
+        .disabled(forwardHistory.isEmpty)
+        .accessibilityIdentifier(HarnessAccessibility.preferencesForwardButton)
+      }
+    }
     .toolbar(removing: .sidebarToggle)
+    .toolbarRole(.editor)
+    .toolbarBackgroundVisibility(.automatic, for: .windowToolbar)
     .containerBackground(.windowBackground, for: .window)
-    .background(.windowBackground)
     .foregroundStyle(HarnessTheme.ink)
     .tint(HarnessTheme.accent(for: themeStyle))
     .frame(maxWidth: .infinity, maxHeight: .infinity)
     .onChange(of: selectedSection) { oldValue, newValue in
-      guard oldValue != newValue else {
+      guard let oldValue, let newValue, oldValue != newValue else {
         return
       }
       if suppressHistoryRecording {
@@ -114,11 +128,14 @@ struct PreferencesView: View {
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessAccessibility.preferencesRoot)
     .accessibilityValue(preferencesAccessibilityValue)
+    .overlay {
+      PreferencesTitleAccessibilityMarker(title: currentSection.title)
+    }
     .accessibilityFrameMarker(HarnessAccessibility.preferencesPanel)
   }
 
   @ViewBuilder private var selectedSectionContent: some View {
-    switch selectedSection {
+    switch currentSection {
     case .general:
       generalSection
     case .connection:
@@ -215,7 +232,7 @@ struct PreferencesView: View {
       return
     }
     suppressHistoryRecording = true
-    forwardHistory.append(selectedSection)
+    forwardHistory.append(currentSection)
     selectedSection = previousSection
   }
 
@@ -224,7 +241,7 @@ struct PreferencesView: View {
       return
     }
     suppressHistoryRecording = true
-    backHistory.append(selectedSection)
+    backHistory.append(currentSection)
     selectedSection = nextSection
   }
 }
@@ -235,87 +252,17 @@ private struct PreferencesSidebar: View {
   var body: some View {
     List(selection: $selection) {
       ForEach(PreferencesSection.allCases) { section in
-        Label(section.title, systemImage: section.systemImage)
-          .tag(section as PreferencesSection?)
+        NavigationLink(value: section) {
+          Label(section.title, systemImage: section.systemImage)
+        }
+        .tag(section)
           .accessibilityIdentifier(HarnessAccessibility.preferencesSectionButton(section.rawValue))
-          .accessibilityValue(selection == section ? "selected" : "not selected")
+        .accessibilityValue(selection == section ? "selected" : "not selected")
       }
     }
     .listStyle(.sidebar)
+    .scrollContentBackground(.hidden)
     .accessibilityIdentifier(HarnessAccessibility.preferencesSidebar)
-  }
-}
-
-private struct PreferencesDetailContainer<Content: View>: View {
-  let title: String
-  let canGoBack: Bool
-  let canGoForward: Bool
-  let goBack: () -> Void
-  let goForward: () -> Void
-  private let content: Content
-  init(
-    title: String,
-    canGoBack: Bool,
-    canGoForward: Bool,
-    goBack: @escaping () -> Void,
-    goForward: @escaping () -> Void,
-    @ViewBuilder content: () -> Content
-  ) {
-    self.title = title
-    self.canGoBack = canGoBack
-    self.canGoForward = canGoForward
-    self.goBack = goBack
-    self.goForward = goForward
-    self.content = content()
-  }
-
-  var body: some View {
-    VStack(alignment: .leading, spacing: 0) {
-      HStack(spacing: 14) {
-        PreferencesNavigationButton(
-          systemImage: "chevron.left",
-          accessibilityIdentifier: HarnessAccessibility.preferencesBackButton,
-          isEnabled: canGoBack,
-          action: goBack
-        )
-        PreferencesNavigationButton(
-          systemImage: "chevron.right",
-          accessibilityIdentifier: HarnessAccessibility.preferencesForwardButton,
-          isEnabled: canGoForward,
-          action: goForward
-        )
-        Text(title)
-          .font(.system(size: 20, weight: .semibold))
-          .accessibilityIdentifier(HarnessAccessibility.preferencesTitle)
-        Spacer(minLength: 0)
-      }
-      .padding(.horizontal, 28)
-      .padding(.top, 18)
-      .padding(.bottom, 8)
-      content
-    }
-    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-    .background(.windowBackground)
-  }
-}
-
-private struct PreferencesNavigationButton: View {
-  let systemImage: String
-  let accessibilityIdentifier: String
-  let isEnabled: Bool
-  let action: () -> Void
-
-  var body: some View {
-    Button(action: action) {
-      Image(systemName: systemImage)
-        .font(.system(size: 15, weight: .semibold))
-        .frame(width: 36, height: 36)
-    }
-    .buttonBorderShape(.circle)
-    .harnessAccessoryButtonStyle()
-    .controlSize(.regular)
-    .disabled(!isEnabled)
-    .accessibilityIdentifier(accessibilityIdentifier)
   }
 }
 
@@ -331,6 +278,18 @@ private struct PreferencesSectionScrollContainer<Content: View>: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.bottom, 28)
     }
+  }
+}
+
+private struct PreferencesTitleAccessibilityMarker: View {
+  let title: String
+
+  var body: some View {
+    Color.clear
+      .allowsHitTesting(false)
+      .accessibilityElement()
+      .accessibilityLabel(title)
+      .accessibilityIdentifier(HarnessAccessibility.preferencesTitle)
   }
 }
 
