@@ -175,7 +175,7 @@ struct InspectorFact: Identifiable {
   let title: String
   let value: String
 
-  var id: String { title }
+  var id: String { "\(title):\(value)" }
 }
 
 struct InspectorFactGrid: View {
@@ -226,7 +226,7 @@ struct InspectorBadgeColumn: View {
 
   var body: some View {
     VStack(alignment: .leading, spacing: 8) {
-      ForEach(values, id: \.self) { value in
+      ForEach(Array(values.enumerated()), id: \.offset) { _, value in
         Text(value)
           .font(.caption.weight(.semibold))
           .padding(.horizontal, 10)
