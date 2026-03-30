@@ -39,7 +39,7 @@ struct ContentView: View {
         .navigationSplitViewColumnWidth(min: 300, ideal: 350)
     } detail: {
       NavigationStack {
-        HStack(spacing: 0) {
+        HSplitView {
           VStack(spacing: 0) {
             if store.isShowingCachedData {
               CachedDataBanner()
@@ -55,16 +55,13 @@ struct ContentView: View {
           .accessibilityFrameMarker("\(HarnessAccessibility.contentRoot).frame")
 
           if showInspector {
-            Divider()
             InspectorColumnView(store: store, themeStyle: themeStyle)
               .frame(minWidth: 320, idealWidth: 380, maxWidth: 500)
               .background {
                 HarnessTheme.inspectorBackground(for: themeStyle)
               }
-              .transition(.move(edge: .trailing).combined(with: .opacity))
           }
         }
-        .animation(.snappy(duration: 0.24), value: showInspector)
       }
       .navigationTitle("Harness")
       .toolbar {
