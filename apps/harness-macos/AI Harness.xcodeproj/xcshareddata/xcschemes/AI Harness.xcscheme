@@ -29,6 +29,20 @@
             buildForAnalyzing = "YES">
             <BuildableReference
                BuildableIdentifier = "primary"
+               BlueprintIdentifier = "6200B2B095EE1E8D12039A65"
+               BuildableName = "AI Harness UI Testing.app"
+               BlueprintName = "AI Harness UI Testing"
+               ReferencedContainer = "container:AI Harness.xcodeproj">
+            </BuildableReference>
+         </BuildActionEntry>
+         <BuildActionEntry
+            buildForTesting = "YES"
+            buildForRunning = "YES"
+            buildForProfiling = "YES"
+            buildForArchiving = "YES"
+            buildForAnalyzing = "YES">
+            <BuildableReference
+               BuildableIdentifier = "primary"
                BlueprintIdentifier = "3943D6DDC773D7BF65FA1D52"
                BuildableName = "HarnessKit.framework"
                BlueprintName = "HarnessKit"

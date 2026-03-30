@@ -86,7 +86,12 @@ struct ContentView: View {
     .frame(maxWidth: .infinity, maxHeight: .infinity)
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessAccessibility.appChromeRoot)
-    .accessibilityValue(chromeAccessibilityValue)
+    .overlay {
+      AccessibilityTextMarker(
+        identifier: HarnessAccessibility.appChromeState,
+        text: chromeAccessibilityValue
+      )
+    }
     .confirmationDialog(
       confirmationTitle,
       isPresented: confirmationBinding,

@@ -212,6 +212,19 @@ private struct AccessibilityFrameMarker: View {
   }
 }
 
+struct AccessibilityTextMarker: View {
+  let identifier: String
+  let text: String
+
+  var body: some View {
+    Color.clear
+      .allowsHitTesting(false)
+      .accessibilityElement()
+      .accessibilityLabel(text)
+      .accessibilityIdentifier(identifier)
+  }
+}
+
 private struct HarnessSelectionOutlineModifier: ViewModifier {
   let isSelected: Bool
   let cornerRadius: CGFloat
@@ -240,9 +253,7 @@ extension View {
   }
 
   func accessibilityFrameMarker(_ identifier: String) -> some View {
-    overlay {
-      AccessibilityFrameMarker(identifier: identifier)
-    }
+    modifier(AccessibilityFrameMarkerModifier(identifier: identifier))
   }
 
   func harnessSelectionOutline(
@@ -257,6 +268,23 @@ extension View {
         lineWidth: lineWidth
       )
     )
+  }
+}
+
+private struct AccessibilityFrameMarkerModifier: ViewModifier {
+  private static let isUITesting = ProcessInfo.processInfo.environment["HARNESS_UI_TESTS"] == "1"
+
+  let identifier: String
+
+  @ViewBuilder
+  func body(content: Content) -> some View {
+    if Self.isUITesting {
+      content.overlay {
+        AccessibilityFrameMarker(identifier: identifier)
+      }
+    } else {
+      content
+    }
   }
 }
 
