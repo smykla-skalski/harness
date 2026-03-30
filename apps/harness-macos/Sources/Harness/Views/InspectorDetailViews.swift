@@ -64,6 +64,12 @@ struct SessionInspectorSummaryCard: View {
 
 struct TaskInspectorCard: View {
   let task: WorkItem
+  @Bindable var store: HarnessStore
+  @State private var newNoteText = ""
+
+  private var userNotes: [UserNote] {
+    store.notes(for: task.taskId)
+  }
 
   private var facts: [InspectorFact] {
     [
@@ -144,12 +150,58 @@ struct TaskInspectorCard: View {
             .foregroundStyle(HarnessTheme.secondaryInk)
         }
       }
+      InspectorSection(title: "Your Notes") {
+        if !userNotes.isEmpty {
+          HarnessGlassContainer(spacing: 8) {
+            ForEach(userNotes, id: \.persistentModelID) { note in
+              HStack(alignment: .top) {
+                Text(note.text)
+                  .font(.subheadline)
+                  .foregroundStyle(HarnessTheme.secondaryInk)
+                  .frame(maxWidth: .infinity, alignment: .leading)
+                Button {
+                  store.deleteNote(note)
+                } label: {
+                  Image(systemName: "xmark.circle.fill")
+                    .font(.caption)
+                    .foregroundStyle(HarnessTheme.secondaryInk)
+                }
+                .buttonStyle(.plain)
+              }
+              .padding(.horizontal, 12)
+              .padding(.vertical, 8)
+              .background {
+                HarnessInsetPanelBackground(
+                  cornerRadius: 14,
+                  fillOpacity: 0.05,
+                  strokeOpacity: 0.10
+                )
+              }
+            }
+          }
+        }
+        HStack(spacing: 8) {
+          TextField("Add a note", text: $newNoteText)
+            .textFieldStyle(.roundedBorder)
+            .onSubmit { submitNote() }
+          Button("Add") { submitNote() }
+            .disabled(newNoteText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+        }
+      }
     }
     .frame(maxWidth: .infinity, alignment: .leading)
     .harnessCard()
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessAccessibility.taskInspectorCard)
     .accessibilityFrameMarker("\(HarnessAccessibility.taskInspectorCard).frame")
+  }
+
+  private func submitNote() {
+    let text = newNoteText.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !text.isEmpty else { return }
+    guard let sessionId = store.selectedSession?.session.sessionId else { return }
+    store.addNote(text: text, targetKind: "task", targetId: task.taskId, sessionId: sessionId)
+    newNoteText = ""
   }
 }
 
