@@ -95,8 +95,7 @@ struct HarnessApp: App {
       rootContent
         .modelContainer(container)
     }
-    .windowStyle(.titleBar)
-    .windowToolbarStyle(.unified(showsTitle: true))
+    .windowToolbarStyle(.unified)
     .defaultSize(width: 1640, height: 980)
     .restorationBehavior(isUITesting ? .disabled : .automatic)
     .commands {
