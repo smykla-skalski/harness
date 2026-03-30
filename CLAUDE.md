@@ -21,16 +21,16 @@ Unit tests are in-crate `#[test]` blocks. Integration tests live in `tests/integ
 
 Pre-commit: `cargo fmt --check && cargo clippy --lib && mise run test`
 
-For `apps/harness-macos`, the Xcode project is generated from `project.yml` via XcodeGen. If you add, remove, or rename Swift files, update `project.yml` and regenerate with `Scripts/generate-project.sh`. Treat the generated `Harness.xcodeproj` as tracked source.
+For `apps/harness-macos`, the Xcode project is generated from `project.yml` via XcodeGen. If you add, remove, or rename Swift files, update `project.yml` and regenerate with `Scripts/generate-project.sh`. Treat the generated `AI Harness.xcodeproj` as tracked source.
 
-Harness app validation expectations:
+AI Harness app validation expectations:
 
-- `xcodebuild -project apps/harness-macos/Harness.xcodeproj -scheme Harness -configuration Debug -destination 'platform=macOS' -skipPackagePluginValidation build`
-- `xcodebuild -project apps/harness-macos/Harness.xcodeproj -scheme Harness -configuration Debug -destination 'platform=macOS' -skipPackagePluginValidation test -skip-testing:HarnessUITests`
+- `xcodebuild -project 'apps/harness-macos/AI Harness.xcodeproj' -scheme "AI Harness" -configuration Debug -destination 'platform=macOS' -skipPackagePluginValidation build`
+- `xcodebuild -project 'apps/harness-macos/AI Harness.xcodeproj' -scheme "AI Harness" -configuration Debug -destination 'platform=macOS' -skipPackagePluginValidation test -skip-testing:HarnessUITests`
 - Hard requirement: do not run the full macOS UI suite by default. Run only the smallest targeted build/test command needed for the current change, such as a single XCTest case, a single XCTest class, or a non-UI build lane.
 - Only run the full macOS app validation lane or the full `HarnessUITests` suite after the user explicitly asks for the full suite.
 - SwiftLint runs as an SPM build tool plugin (SwiftLintPlugins) on every target. Config lives in `.swiftlint.yml`. No shell script build phases - the plugin works within Xcode's user script sandbox.
-- Prefer shared layout and control primitives for Harness UI density/readability work so button sizing and glass treatment stay consistent across screens.
+- Prefer shared layout and control primitives for AI Harness UI density/readability work so button sizing and glass treatment stay consistent across screens.
 
 ## Architecture
 
@@ -118,4 +118,4 @@ All diagnostic output uses `tracing` macros. Never use `eprintln!` for new diagn
 
 - `guard-bash` denies direct use of `kubectl`, `kumactl`, `helm`, `docker`, `k3d` - all cluster access must go through harness commands (see `rules.rs:26`)
 - `VersionedJsonRepository` saves atomically via tmp-file rename - don't read state files by path while a save is in progress, use the repository's `load()` method
-- `apps/harness-macos/Harness.xcodeproj` is repo-owned metadata; keep `project.pbxproj`, shared workspace/scheme files, and Swift source membership in sync.
+- `apps/harness-macos/AI Harness.xcodeproj` is repo-owned metadata; keep `project.pbxproj`, shared workspace/scheme files, and Swift source membership in sync.

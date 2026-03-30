@@ -1,4 +1,4 @@
-name: Harness
+name: AI Harness
 
 on:
   pull_request:
@@ -17,7 +17,7 @@ on:
 
 jobs:
   harness:
-    name: Harness Quality Gates
+    name: AI Harness Quality Gates
     runs-on: macos-26
 
     steps:
@@ -27,5 +27,5 @@ jobs:
       - name: Install XcodeGen
         run: brew install xcodegen
 
-      - name: Run Harness quality gates and tests
+      - name: Run AI Harness quality gates and tests
         run: apps/harness-macos/Scripts/test-swift.sh

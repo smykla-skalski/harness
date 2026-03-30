@@ -1,6 +1,6 @@
-# Harness macOS App
+# AI Harness macOS App
 
-Native SwiftUI control deck for live harness daemon sessions. `project.yml` is the generator input, and the generated `Harness.xcodeproj` is checked in as tracked source.
+Native SwiftUI control deck for live harness daemon sessions. `project.yml` is the generator input, and the generated `AI Harness.xcodeproj` is checked in as tracked source.
 
 ## Prerequisites
 
@@ -31,7 +31,7 @@ apps/harness-macos/Scripts/test-swift.sh
 `harness:macos:test` runs the same quality gates first, then executes:
 
 ```bash
-xcodebuild -project apps/harness-macos/Harness.xcodeproj -scheme Harness -destination platform=macOS -derivedDataPath tmp/xcode-derived test-without-building
+xcodebuild -project 'apps/harness-macos/AI Harness.xcodeproj' -scheme "AI Harness" -destination platform=macOS -derivedDataPath tmp/xcode-derived test-without-building
 ```
 
 The generated project uses `SwiftLintBuildToolPlugin`, so the SwiftLint rules also run inside local Xcode builds and CI without restoring the older shell-wrapper lint path.

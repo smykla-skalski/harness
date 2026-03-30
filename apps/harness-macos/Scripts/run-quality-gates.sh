@@ -25,8 +25,8 @@ fi
   "$ROOT/Tests/HarnessUITests"
 
 xcodebuild \
-  -project "$ROOT/Harness.xcodeproj" \
-  -scheme Harness \
+  -project "$ROOT/AI Harness.xcodeproj" \
+  -scheme "AI Harness" \
   -destination "$DESTINATION" \
   -derivedDataPath "$DERIVED_DATA_PATH" \
   build-for-testing
