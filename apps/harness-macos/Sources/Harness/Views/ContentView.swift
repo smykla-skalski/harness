@@ -234,7 +234,7 @@ private struct SessionLoadingView: View {
                   .frame(width: 12, height: 12)
                   .accessibilityHidden(true)
                 Text(summary.context)
-                  .font(.system(size: 30, weight: .black, design: .serif))
+                  .font(.system(size: 30, weight: .black, design: .rounded))
                   .lineLimit(2)
               }
               Text("\(summary.projectName) • \(summary.sessionId)")

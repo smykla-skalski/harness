@@ -17,7 +17,7 @@ struct SessionCockpitHeaderCard: View {
               .frame(width: 12, height: 12)
               .accessibilityHidden(true)
             Text(detail.session.context)
-              .font(.system(size: 32, weight: .black, design: .serif))
+              .font(.system(size: 32, weight: .black, design: .rounded))
           }
           Text("\(detail.session.projectName) • \(detail.session.sessionId)")
             .font(.system(.subheadline, design: .rounded, weight: .medium))
