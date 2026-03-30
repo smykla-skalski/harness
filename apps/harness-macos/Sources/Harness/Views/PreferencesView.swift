@@ -1,5 +1,4 @@
 import HarnessKit
-import Observation
 import SwiftUI
 
 private enum PreferencesSection: String, CaseIterable, Identifiable, Hashable {
@@ -64,8 +63,9 @@ struct PreferencesView: View {
       || store.connectionState == .connecting
   }
   private var preferencesAccessibilityValue: String {
+    let chrome = HarnessTheme.chromeAccessibilityValue(for: themeStyle)
     "style=\(themeStyle.rawValue), mode=\(themeMode.rawValue), "
-      + "section=\(currentSection.rawValue), preferencesChrome=extended"
+      + "section=\(currentSection.rawValue), preferencesChrome=\(chrome)"
   }
 
   private var currentSection: PreferencesSection {
@@ -182,7 +182,6 @@ private struct PreferencesSidebar: View {
         NavigationLink(value: section) {
           Label(section.title, systemImage: section.systemImage)
         }
-        .tag(section)
         .accessibilityIdentifier(HarnessAccessibility.preferencesSectionButton(section.rawValue))
         .accessibilityValue(selection == section ? "selected" : "not selected")
       }

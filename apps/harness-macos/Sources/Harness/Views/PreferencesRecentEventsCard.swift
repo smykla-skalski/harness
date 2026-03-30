@@ -22,9 +22,7 @@ struct PreferencesRecentEventsCard: View {
               HStack {
                 Text(event.level.uppercased())
                   .font(.caption.bold())
-                  .foregroundStyle(
-                    event.level == "warn" ? HarnessTheme.caution : HarnessTheme.accent(for: themeStyle)
-                  )
+                  .foregroundStyle(eventLevelColor(event.level))
                 Spacer()
                 Text(formatTimestamp(event.recordedAt))
                   .font(.caption.monospaced())
@@ -48,5 +46,13 @@ struct PreferencesRecentEventsCard: View {
       }
     }
     .harnessCard()
+  }
+
+  private func eventLevelColor(_ level: String) -> Color {
+    switch level {
+    case "warn": HarnessTheme.caution
+    case "error": HarnessTheme.danger
+    default: HarnessTheme.accent(for: themeStyle)
+    }
   }
 }
