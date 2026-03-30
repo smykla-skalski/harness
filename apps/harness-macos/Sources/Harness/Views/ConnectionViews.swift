@@ -116,7 +116,7 @@ struct ConnectionStatusStrip: View {
       }
     }
     .padding(10)
-    .harnessInsetPanel(cornerRadius: 16, fillOpacity: 0.08, strokeOpacity: 0.12)
+    .harnessInsetPanel(cornerRadius: 16, fillOpacity: 0.08, strokeOpacity: 0.50)
   }
 }
 
@@ -191,7 +191,7 @@ struct ReconnectionProgressView: View {
     }
     .padding(.horizontal, 12)
     .padding(.vertical, 8)
-    .harnessInsetPanel(cornerRadius: 14, fillOpacity: 0.07, strokeOpacity: 0.10)
+    .harnessInsetPanel(cornerRadius: 14, fillOpacity: 0.06, strokeOpacity: 0.50)
     .accessibilityIdentifier(HarnessAccessibility.reconnectionProgress)
   }
 }
@@ -224,7 +224,7 @@ struct FallbackBanner: View {
       .controlSize(.small)
     }
     .padding(10)
-    .harnessInsetPanel(cornerRadius: 14, fillOpacity: 0.06, strokeOpacity: 0.10)
+    .harnessInsetPanel(cornerRadius: 14, fillOpacity: 0.06, strokeOpacity: 0.50)
     .accessibilityIdentifier(HarnessAccessibility.fallbackBanner)
   }
 }

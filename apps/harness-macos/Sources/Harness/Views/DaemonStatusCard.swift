@@ -60,7 +60,7 @@ struct DaemonStatusCard: View {
     }
     .frame(maxWidth: .infinity, alignment: .leading)
     .padding(12)
-    .harnessInsetPanel(cornerRadius: 22, fillOpacity: 0.05, strokeOpacity: 0.09)
+    .harnessInsetPanel(cornerRadius: 22, fillOpacity: 0.05, strokeOpacity: 0.50)
     .overlay {
       AccessibilityTextMarker(
         identifier: HarnessAccessibility.daemonCardGlassState,
@@ -216,7 +216,7 @@ extension DaemonStatusCard {
     .frame(minHeight: 36, alignment: .topLeading)
     .padding(.vertical, 2)
     .padding(.horizontal, 8)
-    .harnessInsetPanel(cornerRadius: 14, fillOpacity: 0.03, strokeOpacity: 0.08)
+    .harnessInsetPanel(cornerRadius: 14, fillOpacity: 0.03, strokeOpacity: 0.50)
     .accessibilityElement(children: .ignore)
     .accessibilityLabel(title)
     .accessibilityValue(value)
