@@ -138,7 +138,9 @@ extension InspectorActionSections {
         .font(.headline)
       TextField("Summary", text: $checkpointSummary, axis: .vertical)
         .lineLimit(3, reservesSpace: true)
-      Slider(value: $checkpointProgress, in: 0...100, step: 5)
+      LabeledContent("Progress") {
+        Slider(value: $checkpointProgress, in: 0...100, step: 5)
+      }
       HStack {
         Text("\(Int(checkpointProgress))%")
           .font(.caption.bold())
@@ -253,6 +255,13 @@ extension InspectorActionSections {
     if transferLeaderID.isEmpty || missingLeader {
       transferLeaderID = detail.agents.first?.agentId ?? ""
     }
+
+    let currentActor = store.actionActorID ?? ""
+    let actorValid = store.availableActionActors.contains(where: { $0.agentId == currentActor })
+    if currentActor.isEmpty || !actorValid {
+      store.actionActorID = store.availableActionActors.first?.agentId
+        ?? detail.session.leaderId
+    }
   }
   fileprivate func createTask() async {
     let title = createTitle.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -331,12 +340,7 @@ extension InspectorActionSections {
 
   fileprivate var actionActorBinding: Binding<String> {
     Binding(
-      get: {
-        store.actionActorID
-          ?? store.availableActionActors.first?.agentId
-          ?? detail.session.leaderId
-          ?? ""
-      },
+      get: { store.actionActorID ?? "" },
       set: { store.actionActorID = $0 }
     )
   }

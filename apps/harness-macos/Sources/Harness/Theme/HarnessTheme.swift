@@ -193,9 +193,12 @@ struct LiveActivityBorderModifier: ViewModifier {
       )
       .onChange(of: isActive) { _, active in
         guard active else { return }
-        withAnimation(.easeIn(duration: 0.15)) { highlight = true }
-        withAnimation(.easeOut(duration: 0.75).delay(0.15)) {
-          highlight = false
+        withAnimation(.easeIn(duration: 0.15)) {
+          highlight = true
+        } completion: {
+          withAnimation(.easeOut(duration: 0.75)) {
+            highlight = false
+          }
         }
       }
   }
@@ -408,7 +411,7 @@ func formatTimestamp(_ value: String?) -> String {
     return value ?? "n/a"
   }
 
-  return relativeFormatter.localizedString(for: date, relativeTo: Date())
+  return relativeFormatter.localizedString(for: date, relativeTo: .now)
 }
 
 func formatTimestamp(_ date: Date) -> String {

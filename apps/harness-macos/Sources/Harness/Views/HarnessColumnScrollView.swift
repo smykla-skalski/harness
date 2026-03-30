@@ -16,7 +16,7 @@ struct HarnessColumnScrollView<Content: View>: View {
   }
 
   var body: some View {
-    ScrollView(showsIndicators: false) {
+    ScrollView {
       VStack(spacing: 0) {
         content
           .frame(maxWidth: .infinity, alignment: .topLeading)
@@ -25,6 +25,7 @@ struct HarnessColumnScrollView<Content: View>: View {
       .padding(.horizontal, horizontalPadding)
       .padding(.vertical, verticalPadding)
     }
+    .scrollIndicators(.hidden)
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
   }
 }
