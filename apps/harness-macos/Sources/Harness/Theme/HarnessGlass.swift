@@ -329,16 +329,16 @@ struct HarnessInsetPanelBackground: View {
   let strokeOpacity: Double
 
   var body: some View {
-    let resolvedFillOpacity = max(fillOpacity, 0.06)
-    let resolvedStrokeOpacity = max(strokeOpacity, 0.10)
+    let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+    let surfaceColor = HarnessTheme.surface(for: themeStyle)
+    let resolvedFill = max(fillOpacity, 0.08)
+    let resolvedStroke = max(strokeOpacity, 0.10)
 
-    HarnessRoundedGlassBackground(
-      cornerRadius: cornerRadius,
-      tint: HarnessTheme.surface(for: themeStyle),
-      interactive: false,
-      fillOpacity: max(resolvedFillOpacity, 0.08),
-      strokeColor: Color.white.opacity(resolvedStrokeOpacity)
-    )
+    shape
+      .fill(surfaceColor.opacity(resolvedFill))
+      .overlay {
+        shape.stroke(Color.white.opacity(resolvedStroke), lineWidth: 1)
+      }
   }
 }
 
@@ -367,15 +367,17 @@ struct HarnessGlassCapsuleBackground: View {
   private var themeStyle
 
   var body: some View {
-    HarnessCapsuleGlassBackground(
-      tint: HarnessTheme.surface(for: themeStyle),
-      interactive: false,
-      fillOpacity: 0.10,
-      strokeColor: HarnessTheme.glassStroke(for: themeStyle),
-      shadowColor: HarnessTheme.glassShadow(for: themeStyle).opacity(0.55),
-      shadowRadius: 14,
-      shadowY: 8
-    )
+    let shape = Capsule()
+    let surfaceColor = HarnessTheme.surface(for: themeStyle)
+    let strokeColor = HarnessTheme.glassStroke(for: themeStyle)
+    let shadowColor = HarnessTheme.glassShadow(for: themeStyle)
+
+    shape
+      .fill(surfaceColor.opacity(0.12))
+      .overlay {
+        shape.stroke(strokeColor, lineWidth: 1)
+      }
+      .shadow(color: shadowColor.opacity(0.55), radius: 14, x: 0, y: 8)
   }
 }
 
@@ -386,15 +388,16 @@ struct HarnessInteractiveCardBackground: View {
   let tint: Color?
 
   var body: some View {
+    let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
     let resolvedTint = tint ?? HarnessTheme.surface(for: themeStyle)
+    let fillOpacity = tint == nil ? 0.12 : 0.16
+    let strokeColor = tint?.opacity(0.32) ?? Color.white.opacity(0.10)
 
-    HarnessRoundedGlassBackground(
-      cornerRadius: cornerRadius,
-      tint: resolvedTint,
-      interactive: true,
-      fillOpacity: tint == nil ? 0.12 : 0.16,
-      strokeColor: tint?.opacity(0.32) ?? Color.white.opacity(0.10)
-    )
+    shape
+      .fill(resolvedTint.opacity(fillOpacity))
+      .overlay {
+        shape.stroke(strokeColor, lineWidth: 1)
+      }
   }
 }
 

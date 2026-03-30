@@ -81,11 +81,11 @@ struct SessionsBoardView: View {
     let useGradientChrome = HarnessTheme.usesGradientChrome(for: themeStyle)
     let plaqueFill =
       useGradientChrome
-      ? Color.white.opacity(0.74)
+      ? HarnessTheme.surface(for: themeStyle).opacity(0.18)
       : HarnessTheme.surfaceHover(for: themeStyle).opacity(0.96)
     let plaqueStroke =
       useGradientChrome
-      ? Color.white.opacity(0.30)
+      ? Color.white.opacity(0.10)
       : HarnessTheme.panelBorder(for: themeStyle).opacity(0.24)
 
     return HStack(alignment: .top, spacing: 14) {
