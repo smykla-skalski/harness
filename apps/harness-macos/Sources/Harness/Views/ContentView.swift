@@ -90,9 +90,7 @@ struct ContentView: View {
         }
         ToolbarItem(placement: .primaryAction) {
           Button {
-            withAnimation(.snappy(duration: 0.24)) {
-              showInspector.toggle()
-            }
+            showInspector.toggle()
           } label: {
             Label("Inspector", systemImage: "info.circle")
           }
@@ -252,7 +250,6 @@ private struct SessionLoadingView: View {
           }
 
           HarnessLoadingStateView(title: "Loading live session detail")
-            .transition(.opacity)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .harnessCard()
