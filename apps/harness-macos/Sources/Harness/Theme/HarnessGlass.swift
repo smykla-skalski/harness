@@ -332,12 +332,15 @@ struct HarnessInsetPanelBackground: View {
     let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
     let surfaceColor = HarnessTheme.surface(for: themeStyle)
     let resolvedFill = max(fillOpacity, 0.08)
-    let resolvedStroke = max(strokeOpacity, 0.10)
+
+    let strokeColor = HarnessTheme.panelBorder(for: themeStyle)
 
     shape
       .fill(surfaceColor.opacity(resolvedFill))
       .overlay {
-        shape.stroke(Color.white.opacity(resolvedStroke), lineWidth: 1)
+        if strokeOpacity > 0 {
+          shape.stroke(strokeColor.opacity(strokeOpacity), lineWidth: 1)
+        }
       }
   }
 }
