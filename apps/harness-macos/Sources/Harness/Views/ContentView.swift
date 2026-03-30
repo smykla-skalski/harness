@@ -66,7 +66,7 @@ struct ContentView: View {
                 .animation(
                   store.isRefreshing
                     ? .linear(duration: 0.9).repeatForever(autoreverses: false)
-                    : .easeOut(duration: 0.2),
+                    : .spring(duration: 0.3),
                   value: store.isRefreshing
                 )
               Text("Refresh")
@@ -214,8 +214,8 @@ private struct SessionContentContainer: View {
         SessionsBoardView(store: store)
       }
     }
-    .animation(.easeInOut(duration: 0.18), value: detail?.session.sessionId)
-    .animation(.easeInOut(duration: 0.18), value: summary?.sessionId)
+    .animation(.spring(duration: 0.3), value: detail?.session.sessionId)
+    .animation(.spring(duration: 0.3), value: summary?.sessionId)
   }
 }
 
