@@ -272,8 +272,7 @@ private struct SessionListContent: View {
   private func sessionAccessibilityValue(
     for session: SessionSummary
   ) -> String {
-    let card = HarnessTheme
-      .interactiveCardAccessibilityValue(for: themeStyle)
+    let card = harnessInteractiveCardAccessibilityValue(for: themeStyle)
     let selected = store.selectedSessionID == session.sessionId
     if selected {
       return "selected, interactive=\(card)"
