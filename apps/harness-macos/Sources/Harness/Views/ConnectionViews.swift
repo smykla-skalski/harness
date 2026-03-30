@@ -57,10 +57,12 @@ struct LatencyBadge: View {
 }
 
 struct ActivityPulse: View {
+  @Environment(\.harnessThemeStyle)
+  private var themeStyle
   let isActive: Bool
 
   private var baseColor: Color {
-    isActive ? HarnessTheme.success : HarnessTheme.sidebarMuted
+    isActive ? HarnessTheme.success : HarnessTheme.sidebarMuted(for: themeStyle)
   }
 
   var body: some View {
@@ -73,7 +75,7 @@ struct ActivityPulse: View {
         .frame(width: 7, height: 7)
         .overlay(
           Circle()
-            .stroke(HarnessTheme.glassStroke, lineWidth: 1)
+            .stroke(HarnessTheme.glassStroke(for: themeStyle), lineWidth: 1)
         )
     }
     .frame(width: 16, height: 16)
@@ -162,6 +164,8 @@ struct ConnectionToolbarBadge: View {
 }
 
 struct ReconnectionProgressView: View {
+  @Environment(\.harnessThemeStyle)
+  private var themeStyle
   let attempt: Int
   let maxAttempts: Int
 
@@ -179,7 +183,7 @@ struct ReconnectionProgressView: View {
       }
       GeometryReader { proxy in
         Capsule()
-          .fill(HarnessTheme.surface)
+          .fill(HarnessTheme.surface(for: themeStyle))
           .frame(height: 4)
           .overlay(alignment: .leading) {
             let progress = min(Double(attempt) / Double(maxAttempts), 1.0)
@@ -201,6 +205,8 @@ struct ReconnectionProgressView: View {
 }
 
 struct FallbackBanner: View {
+  @Environment(\.harnessThemeStyle)
+  private var themeStyle
   let reason: String?
   let onRetry: () -> Void
 
@@ -227,7 +233,7 @@ struct FallbackBanner: View {
     }
     .padding(10)
     .background(
-      HarnessTheme.surface,
+      HarnessTheme.surface(for: themeStyle),
       in: RoundedRectangle(cornerRadius: 14, style: .continuous)
     )
     .overlay(
@@ -283,6 +289,19 @@ struct SparklineView: View {
       x: Double(index) * stepX,
       y: size.height - (data[index] / maxValue) * size.height
     )
+  }
+}
+
+extension ConnectionQuality {
+  var themeColor: Color {
+    switch self {
+    case .excellent, .good:
+      HarnessTheme.success
+    case .degraded:
+      HarnessTheme.caution
+    case .poor, .disconnected:
+      HarnessTheme.danger
+    }
   }
 }
 

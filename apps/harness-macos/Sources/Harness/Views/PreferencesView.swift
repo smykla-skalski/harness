@@ -82,7 +82,7 @@ struct PreferencesView: View {
         .toolbarTitleDisplayMode(.inline)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .harnessExtendedChromeBackground {
-          HarnessTheme.canvas
+          HarnessTheme.canvas(for: themeStyle)
         }
     }
     .navigationSplitViewStyle(.balanced)

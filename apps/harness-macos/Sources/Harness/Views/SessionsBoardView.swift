@@ -3,6 +3,8 @@ import Observation
 import SwiftUI
 
 struct SessionsBoardView: View {
+  @Environment(\.harnessThemeStyle)
+  private var themeStyle
   @Bindable var store: HarnessStore
 
   private var isLoading: Bool {
@@ -45,7 +47,7 @@ struct SessionsBoardView: View {
           .font(.caption.bold())
           .padding(.horizontal, 10)
           .padding(.vertical, 6)
-          .background(HarnessTheme.accent, in: Capsule())
+          .background(HarnessTheme.accent(for: themeStyle), in: Capsule())
           .foregroundStyle(.white)
       }
 
@@ -219,7 +221,7 @@ struct SessionsBoardView: View {
     metricCard(
       title: "Tracked Projects",
       value: "\(store.projects.count)",
-      tint: HarnessTheme.accent
+      tint: HarnessTheme.accent(for: themeStyle)
     )
   }
 
@@ -270,7 +272,7 @@ extension SessionsBoardView {
   fileprivate var startDaemonButton: some View {
     HarnessAsyncActionButton(
       title: "Start Daemon",
-      tint: HarnessTheme.accent,
+      tint: HarnessTheme.accent(for: themeStyle),
       variant: .prominent,
       isLoading: isLoading,
       accessibilityIdentifier: "harness.board.action.start",

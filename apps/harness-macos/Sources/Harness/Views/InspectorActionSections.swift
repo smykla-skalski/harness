@@ -3,6 +3,8 @@ import Observation
 import SwiftUI
 
 struct InspectorActionSections: View {
+  @Environment(\.harnessThemeStyle)
+  private var themeStyle
   @Bindable var store: HarnessStore
   let detail: SessionDetail
   let selectedTask: WorkItem?
@@ -119,7 +121,7 @@ extension InspectorActionSections {
         Button("Assign") {
           Task { await assignSelectedTask() }
         }
-        .harnessActionButtonStyle(variant: .prominent, tint: HarnessTheme.accent)
+        .harnessActionButtonStyle(variant: .prominent, tint: HarnessTheme.accent(for: themeStyle))
       }
       HStack {
         Button("Update Status") {
@@ -173,7 +175,7 @@ extension InspectorActionSections {
       Button("Create Task") {
         Task { await createTask() }
       }
-      .harnessActionButtonStyle(variant: .prominent, tint: HarnessTheme.accent)
+      .harnessActionButtonStyle(variant: .prominent, tint: HarnessTheme.accent(for: themeStyle))
       .disabled(createTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
     }
     .harnessCard()
@@ -194,7 +196,7 @@ extension InspectorActionSections {
       Button("Change Role") {
         Task { await changeSelectedRole() }
       }
-      .harnessActionButtonStyle(variant: .prominent, tint: HarnessTheme.accent)
+      .harnessActionButtonStyle(variant: .prominent, tint: HarnessTheme.accent(for: themeStyle))
       Button("Remove Agent") {
         store.requestRemoveAgentConfirmation(agentID: agent.agentId)
       }

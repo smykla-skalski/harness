@@ -14,6 +14,8 @@ func harnessGlass(tint: Color? = nil, interactive: Bool = false) -> Glass {
 struct HarnessRoundedGlassBackground: View {
   @Environment(\.colorScheme)
   private var colorScheme
+  @Environment(\.harnessThemeStyle)
+  private var themeStyle
 
   let cornerRadius: CGFloat
   let tint: Color?
@@ -32,7 +34,7 @@ struct HarnessRoundedGlassBackground: View {
     fillColor: Color? = nil,
     fillOpacity: Double = 0.18,
     strokeColor: Color,
-    shadowColor: Color = HarnessTheme.glassShadow,
+    shadowColor: Color = .black.opacity(0.16),
     shadowRadius: CGFloat = 18,
     shadowY: CGFloat = 12
   ) {
@@ -54,13 +56,19 @@ struct HarnessRoundedGlassBackground: View {
     if let tint {
       return tint
     }
-    return colorScheme == .dark ? HarnessTheme.panel : HarnessTheme.panel
+    return HarnessTheme.panel(for: themeStyle)
+  }
+
+  private var resolvedShadowColor: Color {
+    HarnessTheme.usesGradientChrome(for: themeStyle)
+      ? shadowColor
+      : shadowColor.opacity(0.65)
   }
 
   var body: some View {
     let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
 
-    if HarnessTheme.usesGradientChrome {
+    if HarnessTheme.usesGradientChrome(for: themeStyle) {
       shape
         .fill(.clear)
         .glassEffect(harnessGlass(tint: tint, interactive: interactive), in: shape)
@@ -87,6 +95,8 @@ struct HarnessRoundedGlassBackground: View {
 struct HarnessCapsuleGlassBackground: View {
   @Environment(\.colorScheme)
   private var colorScheme
+  @Environment(\.harnessThemeStyle)
+  private var themeStyle
 
   let tint: Color?
   let interactive: Bool
@@ -103,7 +113,7 @@ struct HarnessCapsuleGlassBackground: View {
     fillColor: Color? = nil,
     fillOpacity: Double = 0.16,
     strokeColor: Color,
-    shadowColor: Color = HarnessTheme.glassShadow.opacity(0.55),
+    shadowColor: Color = .black.opacity(0.09),
     shadowRadius: CGFloat = 14,
     shadowY: CGFloat = 8
   ) {
@@ -124,13 +134,13 @@ struct HarnessCapsuleGlassBackground: View {
     if let tint {
       return tint
     }
-    return colorScheme == .dark ? HarnessTheme.surface : HarnessTheme.surface
+    return HarnessTheme.surface(for: themeStyle)
   }
 
   var body: some View {
     let shape = Capsule()
 
-    if HarnessTheme.usesGradientChrome {
+    if HarnessTheme.usesGradientChrome(for: themeStyle) {
       shape
         .fill(.clear)
         .glassEffect(harnessGlass(tint: tint, interactive: interactive), in: shape)
@@ -155,6 +165,8 @@ struct HarnessCapsuleGlassBackground: View {
 }
 
 struct HarnessGlassContainer<Content: View>: View {
+  @Environment(\.harnessThemeStyle)
+  private var themeStyle
   let spacing: CGFloat?
   private let content: Content
 
@@ -164,7 +176,7 @@ struct HarnessGlassContainer<Content: View>: View {
   }
 
   var body: some View {
-    if HarnessTheme.usesGradientChrome {
+    if HarnessTheme.usesGradientChrome(for: themeStyle) {
       GlassEffectContainer(spacing: spacing) {
         content
       }
@@ -187,6 +199,8 @@ extension View {
 }
 
 struct HarnessInsetPanelBackground: View {
+  @Environment(\.harnessThemeStyle)
+  private var themeStyle
   let cornerRadius: CGFloat
   let fillOpacity: Double
   let strokeOpacity: Double
@@ -197,7 +211,7 @@ struct HarnessInsetPanelBackground: View {
 
     HarnessRoundedGlassBackground(
       cornerRadius: cornerRadius,
-      tint: HarnessTheme.surface,
+      tint: HarnessTheme.surface(for: themeStyle),
       interactive: false,
       fillOpacity: max(resolvedFillOpacity, 0.08),
       strokeColor: Color.white.opacity(resolvedStrokeOpacity)
@@ -206,13 +220,16 @@ struct HarnessInsetPanelBackground: View {
 }
 
 struct HarnessGlassCapsuleBackground: View {
+  @Environment(\.harnessThemeStyle)
+  private var themeStyle
+
   var body: some View {
     HarnessCapsuleGlassBackground(
-      tint: HarnessTheme.surface,
+      tint: HarnessTheme.surface(for: themeStyle),
       interactive: false,
       fillOpacity: 0.10,
-      strokeColor: HarnessTheme.glassStroke,
-      shadowColor: HarnessTheme.glassShadow.opacity(0.55),
+      strokeColor: HarnessTheme.glassStroke(for: themeStyle),
+      shadowColor: HarnessTheme.glassShadow(for: themeStyle).opacity(0.55),
       shadowRadius: 14,
       shadowY: 8
     )
@@ -220,11 +237,13 @@ struct HarnessGlassCapsuleBackground: View {
 }
 
 struct HarnessInteractiveCardBackground: View {
+  @Environment(\.harnessThemeStyle)
+  private var themeStyle
   let cornerRadius: CGFloat
   let tint: Color?
 
   var body: some View {
-    let resolvedTint = tint ?? HarnessTheme.surface
+    let resolvedTint = tint ?? HarnessTheme.surface(for: themeStyle)
 
     HarnessRoundedGlassBackground(
       cornerRadius: cornerRadius,

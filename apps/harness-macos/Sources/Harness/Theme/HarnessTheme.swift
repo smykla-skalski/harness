@@ -6,19 +6,18 @@ private func harnessColor(_ name: String) -> Color {
   Color(name, bundle: .main)
 }
 
+extension EnvironmentValues {
+  @Entry var harnessThemeStyle: HarnessThemeStyle = .gradient
+}
+
 enum HarnessTheme {
-  nonisolated(unsafe) static var cachedStyle: HarnessThemeStyle = resolvedStoredStyle()
-
-  static var currentStyle: HarnessThemeStyle {
-    cachedStyle
+  static func usesGradientChrome(for style: HarnessThemeStyle) -> Bool {
+    style == .gradient
   }
 
-  static var usesGradientChrome: Bool {
-    currentStyle == .gradient
-  }
-
-  @ViewBuilder static var canvas: some View {
-    if usesGradientChrome {
+  @ViewBuilder
+  static func canvas(for style: HarnessThemeStyle) -> some View {
+    if style == .gradient {
       LinearGradient(
         colors: [
           harnessColor("HarnessCanvasStart"),
@@ -33,8 +32,11 @@ enum HarnessTheme {
     }
   }
 
-  @ViewBuilder static var sidebarBackground: some View {
-    if usesGradientChrome {
+  @ViewBuilder
+  static func sidebarBackground(
+    for style: HarnessThemeStyle
+  ) -> some View {
+    if style == .gradient {
       LinearGradient(
         colors: [
           harnessColor("HarnessSidebarStart"),
@@ -48,8 +50,11 @@ enum HarnessTheme {
     }
   }
 
-  @ViewBuilder static var inspectorBackground: some View {
-    if usesGradientChrome {
+  @ViewBuilder
+  static func inspectorBackground(
+    for style: HarnessThemeStyle
+  ) -> some View {
+    if style == .gradient {
       LinearGradient(
         colors: [
           harnessColor("HarnessInspectorStart"),
@@ -64,61 +69,81 @@ enum HarnessTheme {
   }
 
   static let ink = harnessColor("HarnessInk")
-  static var accent: Color {
-    accent(for: currentStyle)
-  }
   static let warmAccent = harnessColor("HarnessWarmAccent")
   static let success = harnessColor("HarnessSuccess")
   static let caution = harnessColor("HarnessCaution")
   static let danger = harnessColor("HarnessDanger")
-  static var panel: Color {
-    themedColor(gradient: "HarnessPanel", flat: "HarnessFlatPanel")
-  }
-  static var panelBorder: Color {
-    themedColor(gradient: "HarnessPanelBorder", flat: "HarnessFlatPanelBorder")
-  }
-  static var surface: Color {
-    themedColor(gradient: "HarnessSurface", flat: "HarnessFlatSurface")
-  }
-  static var surfaceHover: Color {
-    themedColor(gradient: "HarnessSurfaceHover", flat: "HarnessFlatSurfaceHover")
-  }
   static let controlBorder = harnessColor("HarnessControlBorder")
-  static var sidebarHeader: Color {
-    themedColor(gradient: "HarnessSidebarHeader", flat: "HarnessFlatSidebarHeader")
-  }
-  static var sidebarMuted: Color {
-    themedColor(gradient: "HarnessSidebarMuted", flat: "HarnessFlatSidebarMuted")
-  }
   static let overlayScrim = harnessColor("HarnessOverlayScrim")
   static let secondaryInk = ink.opacity(0.78)
   static let tertiaryInk = ink.opacity(0.64)
-  static var glassStroke: Color {
-    usesGradientChrome ? Color.white.opacity(0.18) : panelBorder.opacity(0.9)
-  }
-  static var glassHighlight: Color {
-    usesGradientChrome ? Color.white.opacity(0.10) : Color.white.opacity(0.03)
-  }
-  static var glassShadow: Color {
-    usesGradientChrome ? Color.black.opacity(0.16) : Color.black.opacity(0.10)
-  }
 
   static func accent(for style: HarnessThemeStyle) -> Color {
     style == .gradient ? harnessColor("HarnessAccent") : harnessColor("HarnessFlatAccent")
   }
 
-  private static func themedColor(gradient: String, flat: String) -> Color {
-    currentStyle == .gradient ? harnessColor(gradient) : harnessColor(flat)
+  static func panel(for style: HarnessThemeStyle) -> Color {
+    themedColor(gradient: "HarnessPanel", flat: "HarnessFlatPanel", style: style)
   }
 
-  private static func resolvedStoredStyle() -> HarnessThemeStyle {
-    HarnessThemeStyle(
-      rawValue: UserDefaults.standard.string(forKey: HarnessThemeDefaults.styleKey) ?? ""
-    ) ?? .gradient
+  static func panelBorder(for style: HarnessThemeStyle) -> Color {
+    themedColor(
+      gradient: "HarnessPanelBorder",
+      flat: "HarnessFlatPanelBorder",
+      style: style
+    )
+  }
+
+  static func surface(for style: HarnessThemeStyle) -> Color {
+    themedColor(gradient: "HarnessSurface", flat: "HarnessFlatSurface", style: style)
+  }
+
+  static func surfaceHover(for style: HarnessThemeStyle) -> Color {
+    themedColor(
+      gradient: "HarnessSurfaceHover",
+      flat: "HarnessFlatSurfaceHover",
+      style: style
+    )
+  }
+
+  static func sidebarHeader(for style: HarnessThemeStyle) -> Color {
+    themedColor(
+      gradient: "HarnessSidebarHeader",
+      flat: "HarnessFlatSidebarHeader",
+      style: style
+    )
+  }
+
+  static func sidebarMuted(for style: HarnessThemeStyle) -> Color {
+    themedColor(
+      gradient: "HarnessSidebarMuted",
+      flat: "HarnessFlatSidebarMuted",
+      style: style
+    )
+  }
+
+  static func glassStroke(for style: HarnessThemeStyle) -> Color {
+    style == .gradient
+      ? Color.white.opacity(0.18)
+      : panelBorder(for: style).opacity(0.9)
+  }
+
+  static func glassShadow(for style: HarnessThemeStyle) -> Color {
+    style == .gradient ? Color.black.opacity(0.16) : Color.black.opacity(0.10)
+  }
+
+  private static func themedColor(
+    gradient: String,
+    flat: String,
+    style: HarnessThemeStyle
+  ) -> Color {
+    style == .gradient ? harnessColor(gradient) : harnessColor(flat)
   }
 }
 
 struct HarnessCardModifier: ViewModifier {
+  @Environment(\.harnessThemeStyle)
+  private var themeStyle
   let minHeight: CGFloat?
   let contentPadding: CGFloat
 
@@ -134,10 +159,10 @@ struct HarnessCardModifier: ViewModifier {
       .background {
         HarnessRoundedGlassBackground(
           cornerRadius: 22,
-          tint: HarnessTheme.panel,
+          tint: HarnessTheme.panel(for: themeStyle),
           interactive: false,
           fillOpacity: 0.10,
-          strokeColor: HarnessTheme.panelBorder,
+          strokeColor: HarnessTheme.panelBorder(for: themeStyle),
           shadowColor: .black.opacity(0.07),
           shadowRadius: 12,
           shadowY: 8
@@ -321,12 +346,15 @@ func statusColor(for status: SessionStatus) -> Color {
   }
 }
 
-func severityColor(for severity: TaskSeverity) -> Color {
+func severityColor(
+  for severity: TaskSeverity,
+  style: HarnessThemeStyle
+) -> Color {
   switch severity {
   case .low:
-    HarnessTheme.accent.opacity(0.7)
+    HarnessTheme.accent(for: style).opacity(0.7)
   case .medium:
-    HarnessTheme.accent
+    HarnessTheme.accent(for: style)
   case .high:
     HarnessTheme.warmAccent
   case .critical:
@@ -345,10 +373,13 @@ func signalStatusColor(for status: SessionSignalStatus) -> Color {
   }
 }
 
-func taskStatusColor(for status: TaskStatus) -> Color {
+func taskStatusColor(
+  for status: TaskStatus,
+  style: HarnessThemeStyle
+) -> Color {
   switch status {
   case .open:
-    HarnessTheme.accent
+    HarnessTheme.accent(for: style)
   case .inProgress:
     HarnessTheme.warmAccent
   case .inReview:
@@ -382,17 +413,4 @@ func formatTimestamp(_ value: String?) -> String {
 
 func formatTimestamp(_ date: Date) -> String {
   relativeFormatter.localizedString(for: date, relativeTo: Date())
-}
-
-extension ConnectionQuality {
-  var themeColor: Color {
-    switch self {
-    case .excellent, .good:
-      HarnessTheme.success
-    case .degraded:
-      HarnessTheme.caution
-    case .poor, .disconnected:
-      HarnessTheme.danger
-    }
-  }
 }

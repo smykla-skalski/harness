@@ -154,6 +154,8 @@ struct TaskInspectorCard: View {
 }
 
 struct AgentInspectorCard: View {
+  @Environment(\.harnessThemeStyle)
+  private var themeStyle
   let agent: AgentRegistration
   let activity: AgentToolActivitySummary?
   @Binding var signalCommand: String
@@ -242,7 +244,7 @@ struct AgentInspectorCard: View {
           .lineLimit(3, reservesSpace: true)
         TextField("Action Hint", text: $signalActionHint)
         Button("Send Signal", action: sendSignal)
-          .harnessActionButtonStyle(variant: .prominent, tint: HarnessTheme.accent)
+          .harnessActionButtonStyle(variant: .prominent, tint: HarnessTheme.accent(for: themeStyle))
           .disabled(signalCommand.isEmpty || signalMessage.isEmpty)
           .accessibilityIdentifier(HarnessAccessibility.signalSendButton)
       }
