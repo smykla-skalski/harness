@@ -58,7 +58,8 @@ struct HarnessApp: App {
 
   init() {
     if ProcessInfo.processInfo.environment["HARNESS_UI_TESTS"] == "1" {
-      UserDefaults.standard.set(HarnessThemeMode.auto.rawValue, forKey: HarnessThemeDefaults.modeKey)
+      UserDefaults.standard.set(
+        HarnessThemeMode.auto.rawValue, forKey: HarnessThemeDefaults.modeKey)
       UserDefaults.standard.set(
         HarnessThemeStyle.gradient.rawValue,
         forKey: HarnessThemeDefaults.styleKey
@@ -121,44 +122,24 @@ struct HarnessApp: App {
   @CommandsBuilder private var appCommands: some Commands {
     SidebarCommands()
     CommandMenu("Harness") {
-      Button("Refresh") {
-        Task {
-          await store.refresh()
-        }
-      }
-      .keyboardShortcut("r", modifiers: [.command, .shift])
+      Button("Refresh", action: refreshStore)
+        .keyboardShortcut("r", modifiers: [.command, .shift])
 
       Divider()
 
-      Button("Start Daemon") {
-        Task {
-          await store.startDaemon()
-        }
-      }
+      Button("Start Daemon", action: startDaemon)
 
-      Button("Install Launch Agent") {
-        Task {
-          await store.installLaunchAgent()
-        }
-      }
+      Button("Install Launch Agent", action: installLaunchAgent)
 
       Divider()
 
-      Button("Observe Selected Session") {
-        Task {
-          await store.observeSelectedSession()
-        }
-      }
-      .keyboardShortcut("o", modifiers: [.command, .shift])
-      .disabled(store.selectedSessionID == nil)
+      Button("Observe Selected Session", action: observeSelectedSession)
+        .keyboardShortcut("o", modifiers: [.command, .shift])
+        .disabled(store.selectedSessionID == nil)
 
-      Button("End Selected Session") {
-        Task {
-          await store.endSelectedSession()
-        }
-      }
-      .keyboardShortcut("e", modifiers: [.command, .shift])
-      .disabled(store.selectedSessionID == nil)
+      Button("End Selected Session", action: endSelectedSession)
+        .keyboardShortcut("e", modifiers: [.command, .shift])
+        .disabled(store.selectedSessionID == nil)
 
       Divider()
 
@@ -186,5 +167,35 @@ struct HarnessApp: App {
     .preferredColorScheme(themeMode.colorScheme)
     .tint(HarnessTheme.accent(for: themeStyle))
     .frame(maxWidth: .infinity, maxHeight: .infinity)
+  }
+
+  private func refreshStore() {
+    Task {
+      await store.refresh()
+    }
+  }
+
+  private func startDaemon() {
+    Task {
+      await store.startDaemon()
+    }
+  }
+
+  private func installLaunchAgent() {
+    Task {
+      await store.installLaunchAgent()
+    }
+  }
+
+  private func observeSelectedSession() {
+    Task {
+      await store.observeSelectedSession()
+    }
+  }
+
+  private func endSelectedSession() {
+    Task {
+      await store.endSelectedSession()
+    }
   }
 }

@@ -1,0 +1,141 @@
+import HarnessKit
+import Observation
+import SwiftUI
+
+struct SessionsBoardOnboardingCard: View {
+  @Environment(\.harnessThemeStyle)
+  private var themeStyle
+  @Bindable var store: HarnessStore
+  let isLoading: Bool
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 16) {
+      header
+      onboardingStepsSection
+      actionButtons
+    }
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .harnessCard(contentPadding: 16)
+    .accessibilityElement(children: .contain)
+    .accessibilityIdentifier(HarnessAccessibility.onboardingCard)
+  }
+
+  private var header: some View {
+    HStack(alignment: .top) {
+      VStack(alignment: .leading, spacing: 6) {
+        Label("Bring Harness Online", systemImage: "dot.radiowaves.left.and.right")
+          .font(.system(.title3, design: .rounded, weight: .bold))
+        Text(
+          "Harness only reads live state from the local daemon. "
+            + "Start the control plane once, then keep it resident with a launch agent."
+        )
+        .font(.system(.body, design: .rounded, weight: .medium))
+        .foregroundStyle(HarnessTheme.secondaryInk)
+      }
+      Spacer()
+      Text(store.daemonStatus?.launchAgent.installed == true ? "Persistent" : "Manual")
+        .font(.caption.bold())
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(HarnessTheme.accent(for: themeStyle), in: Capsule())
+        .foregroundStyle(.white)
+    }
+  }
+
+  private var onboardingStepsSection: some View {
+    HarnessAdaptiveGridLayout(
+      minimumColumnWidth: 200,
+      maximumColumns: 3,
+      spacing: 14
+    ) {
+      onboardingStep(
+        title: "1. Start the daemon",
+        detail: "Boot the local HTTP and SSE bridge.",
+        isReady: store.connectionState == .online
+      )
+      onboardingStep(
+        title: "2. Install launchd",
+        detail: "Keep the daemon available across app restarts.",
+        isReady: store.daemonStatus?.launchAgent.installed == true
+      )
+      onboardingStep(
+        title: "3. Start a harness session",
+        detail: "Sessions appear here as soon as the daemon indexes them.",
+        isReady: !store.sessions.isEmpty
+      )
+    }
+  }
+
+  private var actionButtons: some View {
+    HarnessGlassContainer(spacing: 10) {
+      HarnessWrapLayout(spacing: 10, lineSpacing: 10) {
+        HarnessAsyncActionButton(
+          title: "Start Daemon",
+          tint: HarnessTheme.accent(for: themeStyle),
+          variant: .prominent,
+          isLoading: isLoading,
+          accessibilityIdentifier: "harness.board.action.start",
+          fillsWidth: false
+        ) {
+          await store.startDaemon()
+        }
+
+        HarnessAsyncActionButton(
+          title: "Install Launch Agent",
+          tint: HarnessTheme.ink,
+          variant: .bordered,
+          isLoading: isLoading,
+          accessibilityIdentifier: "harness.board.action.install",
+          fillsWidth: false
+        ) {
+          await store.installLaunchAgent()
+        }
+
+        HarnessAsyncActionButton(
+          title: "Refresh Index",
+          tint: HarnessTheme.ink,
+          variant: .bordered,
+          isLoading: store.isRefreshing,
+          accessibilityIdentifier: "harness.board.action.refresh",
+          fillsWidth: false
+        ) {
+          await store.refresh()
+        }
+      }
+    }
+    .frame(maxWidth: .infinity, alignment: .leading)
+  }
+
+  private func onboardingStep(
+    title: String,
+    detail: String,
+    isReady: Bool
+  ) -> some View {
+    VStack(alignment: .leading, spacing: 8) {
+      HStack {
+        Circle()
+          .fill(isReady ? HarnessTheme.success : HarnessTheme.caution)
+          .frame(width: 10, height: 10)
+          .accessibilityHidden(true)
+        Text(title)
+          .font(.system(.headline, design: .rounded, weight: .semibold))
+      }
+      Text(detail)
+        .font(.system(.footnote, design: .rounded, weight: .medium))
+        .foregroundStyle(HarnessTheme.secondaryInk)
+        .lineLimit(2)
+      Text(isReady ? "Ready" : "Pending")
+        .font(.caption.bold())
+        .foregroundStyle(isReady ? HarnessTheme.success : HarnessTheme.caution)
+    }
+    .frame(maxWidth: .infinity, minHeight: 72, alignment: .topLeading)
+    .padding(11)
+    .background {
+      HarnessInsetPanelBackground(
+        cornerRadius: 18,
+        fillOpacity: 0.05,
+        strokeOpacity: 0.10
+      )
+    }
+  }
+}

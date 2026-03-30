@@ -34,6 +34,7 @@
 		2F27BD8B2B3268781DFCD85A /* HarnessStore+Actions.swift in Sources */ = {isa = PBXBuildFile; fileRef = B031D618E459C9C3A3102382 /* HarnessStore+Actions.swift */; };
 		3854DC755AE843CBF2E92EAE /* HarnessStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 70C79D72EA5AB7EA5EEC94DD /* HarnessStore.swift */; };
 		38D6668C2A474095F2439AE7 /* HarnessStoreActionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 38486867A857A11AAE481A27 /* HarnessStoreActionTests.swift */; };
+		39B6230C6A72A8650F02456A /* SessionCockpitHeaderCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC99D6A2720C13E1EFED711B /* SessionCockpitHeaderCard.swift */; };
 		39EDA980C40836D7ECDBD627 /* HarnessLaunchMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2705DBA188F215A85B978C82 /* HarnessLaunchMode.swift */; };
 		3D372FF052C0C644512CFA4E /* ConnectionModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3CA1BB33EF78DF81C534CA2D /* ConnectionModels.swift */; };
 		3D5EEAD1AABE2803FEBEB0DD /* HarnessAppStoreFactory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 545F62822966454541A69C2E /* HarnessAppStoreFactory.swift */; };
@@ -48,6 +49,7 @@
 		53BCC42AF9337B12AE3768B8 /* HarnessSpinner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F996D0BCEF67740B1357E10 /* HarnessSpinner.swift */; };
 		54516B232D13DF3D423F0409 /* PreferencesSections.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4CFFC73ABA5AFF6864BEAA40 /* PreferencesSections.swift */; };
 		599CB34EAA0F1FB387EDCB2D /* SessionActionDock.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA2AD797BA99C7BBA1C9D716 /* SessionActionDock.swift */; };
+		5A95F6445A450E0972902F85 /* SessionCockpitActivitySections.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCDE7B6C154033AF1CF627DC /* SessionCockpitActivitySections.swift */; };
 		5F34A58BCE9660203B691112 /* HarnessLayoutUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A309E37EF93D4AD1E6886205 /* HarnessLayoutUITests.swift */; };
 		60887CA6083751961088C619 /* WebSocketTransportInternal.swift in Sources */ = {isa = PBXBuildFile; fileRef = F61F42B1737B0D9A86E6E1FC /* WebSocketTransportInternal.swift */; };
 		6184A77CA26B12B0952A32D6 /* InspectorActionSections.swift in Sources */ = {isa = PBXBuildFile; fileRef = 836776F87F6CAA6F17CDCCEE /* InspectorActionSections.swift */; };
@@ -66,6 +68,7 @@
 		952B77F0949ABA3067BBC8DD /* DaemonStatusCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4FFB9D6E2B1A61A65341DEF /* DaemonStatusCard.swift */; };
 		95C6608755E2A3781104213B /* HarnessStoreSelectionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 316509CF0D8EF69C2ABE6C90 /* HarnessStoreSelectionTests.swift */; };
 		9886DAEC397CC7C60D23BF73 /* HarnessTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = ACDEFEB6A14B32143E436643 /* HarnessTheme.swift */; };
+		98BEF0FA67ECED7B93BC1549 /* SessionsBoardOnboardingCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9998D7E02B6815476BFC4623 /* SessionsBoardOnboardingCard.swift */; };
 		98EB77BDCBBDAB421F8A76B8 /* PreferencesSections.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4CFFC73ABA5AFF6864BEAA40 /* PreferencesSections.swift */; };
 		9AE72B23AA033ABFD66DB014 /* ConnectionViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3DFA9160004A175AACFC8E3 /* ConnectionViews.swift */; };
 		9E49B1E18060D96897B98FAC /* HarnessKit.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 4374719F8DCC16C95C5B2E2E /* HarnessKit.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
@@ -73,8 +76,10 @@
 		A861371D0A168EDC90453A53 /* InspectorColumnView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB1BDE814259DE0C1875CE23 /* InspectorColumnView.swift */; };
 		A9C04B1F10D3DEA841604AA3 /* HarnessColumnScrollView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 037CA58B47266F2DDAC6F2AB /* HarnessColumnScrollView.swift */; };
 		AB5BEE5574C93AF1DDDC4C6E /* HarnessKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4374719F8DCC16C95C5B2E2E /* HarnessKit.framework */; };
+		AF8BA7822544491D76F1644E /* SessionsBoardOnboardingCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9998D7E02B6815476BFC4623 /* SessionsBoardOnboardingCard.swift */; };
 		B4C35EAFDF6F81F62DF7226D /* HarnessRequests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D485A89FA04846FAD1BC0AC /* HarnessRequests.swift */; };
 		B95B5D25341719AC772D782B /* DaemonController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46BE1211445D10F89FB9C1A6 /* DaemonController.swift */; };
+		B9A66ADE9B75D40E1C0AF592 /* SessionsBoardRecentSessionsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEA42BE2636FC97FC00738F6 /* SessionsBoardRecentSessionsSection.swift */; };
 		BA99CEBC3D216F0F98585164 /* ConnectionModelsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3C170B54985778D0FC29612 /* ConnectionModelsTests.swift */; };
 		C1DDDDEE1095F979B7F4CA3F /* HarnessLaunchModeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 084125DFBAC988E0391BC89D /* HarnessLaunchModeTests.swift */; };
 		C30FEE5DF05BD3E48C55AE8B /* SessionCockpitView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF77DABC57AE717CEA851E09 /* SessionCockpitView.swift */; };
@@ -91,13 +96,16 @@
 		DC19F2707605CBAC6400E0C4 /* HarnessUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A62226DF2875BDAF631D1622 /* HarnessUITests.swift */; };
 		DCD4C985E34F8C18CE47621C /* ServerSentEventsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0DC35F7DD6E1A28ED82D2E9C /* ServerSentEventsTests.swift */; };
 		DFB22096E9EC966527136F6C /* HarnessKit.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 4374719F8DCC16C95C5B2E2E /* HarnessKit.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		E14D4CA1F2A60B75A3FF491F /* SessionCockpitActivitySections.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCDE7B6C154033AF1CF627DC /* SessionCockpitActivitySections.swift */; };
 		E1AE1F634F6EEA61CC0DA765 /* HarnessAdaptiveGridLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D44FD74945DB93AAA68A740 /* HarnessAdaptiveGridLayout.swift */; };
+		E5FF8D1D767B4136E53604A7 /* SessionsBoardRecentSessionsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEA42BE2636FC97FC00738F6 /* SessionsBoardRecentSessionsSection.swift */; };
 		E7815252100E93A2213A9536 /* SidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7AD9E7386C4C61747C1EC3B3 /* SidebarView.swift */; };
 		E9343C02BED7FB853C524F9F /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 8680C2C216DF42B2A1A31307 /* Assets.xcassets */; };
 		E9F1DC61C5B03F8CC0AC90F5 /* SessionCockpitSections.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C893C07CBC03D03E74C7AAC /* SessionCockpitSections.swift */; };
 		EA64BBB0F9ED68ED7E8B5EED /* InspectorDetailViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1BD4BDA927E6F219129F0AB8 /* InspectorDetailViews.swift */; };
 		EC9B7C0A0D8924D6E46F392A /* ServerSentEvents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35BB3F2082CFF67A05FA4070 /* ServerSentEvents.swift */; };
 		EECE6DC2F93709D73FA68462 /* InspectorColumnView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB1BDE814259DE0C1875CE23 /* InspectorColumnView.swift */; };
+		EF9684BCBD4BD07023A740D5 /* SessionCockpitHeaderCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC99D6A2720C13E1EFED711B /* SessionCockpitHeaderCard.swift */; };
 		F334751822AD512B64B0668D /* HarnessWrapLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = E90C65B82956326E40FD0C97 /* HarnessWrapLayout.swift */; };
 		F3AEB5554F9954E826E55D81 /* InspectorDetailViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1BD4BDA927E6F219129F0AB8 /* InspectorDetailViews.swift */; };
 		F8A90BD2439DC6A0A972A6F8 /* HarnessStoreTestFixtures.swift in Sources */ = {isa = PBXBuildFile; fileRef = E415E72596CC984D3DFEBCF7 /* HarnessStoreTestFixtures.swift */; };
@@ -226,20 +234,24 @@
 		8CD18C0829A58E01027D4CD7 /* PreferencesConnectionCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreferencesConnectionCard.swift; sourceTree = "<group>"; };
 		8E45E153F8123DBBE607C2BB /* PreferencesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreferencesView.swift; sourceTree = "<group>"; };
 		919D22F077EA7CF943F5470E /* HarnessPaths.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HarnessPaths.swift; sourceTree = "<group>"; };
+		9998D7E02B6815476BFC4623 /* SessionsBoardOnboardingCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionsBoardOnboardingCard.swift; sourceTree = "<group>"; };
 		A309E37EF93D4AD1E6886205 /* HarnessLayoutUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HarnessLayoutUITests.swift; sourceTree = "<group>"; };
 		A3DFA9160004A175AACFC8E3 /* ConnectionViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionViews.swift; sourceTree = "<group>"; };
 		A62226DF2875BDAF631D1622 /* HarnessUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HarnessUITests.swift; sourceTree = "<group>"; };
 		A928853A647AF778A4D217A8 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		ACDEFEB6A14B32143E436643 /* HarnessTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HarnessTheme.swift; sourceTree = "<group>"; };
+		AEA42BE2636FC97FC00738F6 /* SessionsBoardRecentSessionsSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionsBoardRecentSessionsSection.swift; sourceTree = "<group>"; };
 		B031D618E459C9C3A3102382 /* HarnessStore+Actions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HarnessStore+Actions.swift"; sourceTree = "<group>"; };
 		B28345325F1C37AC897A9E7C /* HarnessApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HarnessApp.swift; sourceTree = "<group>"; };
 		B70301F10B50DD3835036733 /* HarnessUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = HarnessUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		B744DFF0B52DD0B781934EB4 /* DaemonModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DaemonModels.swift; sourceTree = "<group>"; };
+		BC99D6A2720C13E1EFED711B /* SessionCockpitHeaderCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionCockpitHeaderCard.swift; sourceTree = "<group>"; };
 		BF77DABC57AE717CEA851E09 /* SessionCockpitView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionCockpitView.swift; sourceTree = "<group>"; };
 		C970D0D5CA90B5AC6BC013A8 /* AI Harness UI Testing.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "AI Harness UI Testing.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		CA2AD797BA99C7BBA1C9D716 /* SessionActionDock.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionActionDock.swift; sourceTree = "<group>"; };
 		CA807E80E1B7F428A2C01D14 /* HarnessUITestSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HarnessUITestSupport.swift; sourceTree = "<group>"; };
 		CB1BDE814259DE0C1875CE23 /* InspectorColumnView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InspectorColumnView.swift; sourceTree = "<group>"; };
+		CCDE7B6C154033AF1CF627DC /* SessionCockpitActivitySections.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionCockpitActivitySections.swift; sourceTree = "<group>"; };
 		D3C170B54985778D0FC29612 /* ConnectionModelsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionModelsTests.swift; sourceTree = "<group>"; };
 		D88530D0BE973FFED62BE662 /* PreferencesRecentEventsCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreferencesRecentEventsCard.swift; sourceTree = "<group>"; };
 		E415E72596CC984D3DFEBCF7 /* HarnessStoreTestFixtures.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HarnessStoreTestFixtures.swift; sourceTree = "<group>"; };
@@ -401,8 +413,12 @@
 				4CFFC73ABA5AFF6864BEAA40 /* PreferencesSections.swift */,
 				8E45E153F8123DBBE607C2BB /* PreferencesView.swift */,
 				CA2AD797BA99C7BBA1C9D716 /* SessionActionDock.swift */,
+				CCDE7B6C154033AF1CF627DC /* SessionCockpitActivitySections.swift */,
+				BC99D6A2720C13E1EFED711B /* SessionCockpitHeaderCard.swift */,
 				4C893C07CBC03D03E74C7AAC /* SessionCockpitSections.swift */,
 				BF77DABC57AE717CEA851E09 /* SessionCockpitView.swift */,
+				9998D7E02B6815476BFC4623 /* SessionsBoardOnboardingCard.swift */,
+				AEA42BE2636FC97FC00738F6 /* SessionsBoardRecentSessionsSection.swift */,
 				631C9B665A8D2CB19CA8748C /* SessionsBoardView.swift */,
 				74B7689F9A126003B047298C /* SidebarSessionList.swift */,
 				7AD9E7386C4C61747C1EC3B3 /* SidebarView.swift */,
@@ -773,8 +789,12 @@
 				54516B232D13DF3D423F0409 /* PreferencesSections.swift in Sources */,
 				2B9D0F76A1C4A530C068BB91 /* PreferencesView.swift in Sources */,
 				4D6952BDAAD0CFAA4369CC8D /* SessionActionDock.swift in Sources */,
+				5A95F6445A450E0972902F85 /* SessionCockpitActivitySections.swift in Sources */,
+				39B6230C6A72A8650F02456A /* SessionCockpitHeaderCard.swift in Sources */,
 				258DDE4D5A93525EB41F8C92 /* SessionCockpitSections.swift in Sources */,
 				6722EEACEE4F9B835208A4E6 /* SessionCockpitView.swift in Sources */,
+				98BEF0FA67ECED7B93BC1549 /* SessionsBoardOnboardingCard.swift in Sources */,
+				E5FF8D1D767B4136E53604A7 /* SessionsBoardRecentSessionsSection.swift in Sources */,
 				6F27618DDCA3C16588C620DA /* SessionsBoardView.swift in Sources */,
 				DBD9512B65640BD4032DC380 /* SidebarSessionList.swift in Sources */,
 				0718BB17309F76DD75F5A717 /* SidebarView.swift in Sources */,
@@ -828,8 +848,12 @@
 				98EB77BDCBBDAB421F8A76B8 /* PreferencesSections.swift in Sources */,
 				112FBF07FD02576918E77D38 /* PreferencesView.swift in Sources */,
 				599CB34EAA0F1FB387EDCB2D /* SessionActionDock.swift in Sources */,
+				E14D4CA1F2A60B75A3FF491F /* SessionCockpitActivitySections.swift in Sources */,
+				EF9684BCBD4BD07023A740D5 /* SessionCockpitHeaderCard.swift in Sources */,
 				E9F1DC61C5B03F8CC0AC90F5 /* SessionCockpitSections.swift in Sources */,
 				C30FEE5DF05BD3E48C55AE8B /* SessionCockpitView.swift in Sources */,
+				AF8BA7822544491D76F1644E /* SessionsBoardOnboardingCard.swift in Sources */,
+				B9A66ADE9B75D40E1C0AF592 /* SessionsBoardRecentSessionsSection.swift in Sources */,
 				4C2C4F2A9D0FA5B48B585E7E /* SessionsBoardView.swift in Sources */,
 				0CC5EE84810ED05A55BD2663 /* SidebarSessionList.swift in Sources */,
 				E7815252100E93A2213A9536 /* SidebarView.swift in Sources */,
