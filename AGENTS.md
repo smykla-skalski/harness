@@ -23,7 +23,7 @@ Pre-commit: `cargo fmt --check && cargo clippy --lib && mise run test`
 
 For `apps/harness-macos`, treat `Harness.xcodeproj` as tracked source. If you add, remove, or rename Swift files under the Harness app, update the Xcode project in the same change instead of relying on local-only project state.
 
-Monitor app validation expectations:
+Harness app validation expectations:
 
 - `xcodebuild -project apps/harness-macos/Harness.xcodeproj -scheme Harness -configuration Debug -derivedDataPath tmp/xcode-derived build CODE_SIGNING_ALLOWED=NO`
 - `xcodebuild -project apps/harness-macos/Harness.xcodeproj -scheme Harness -configuration Debug -derivedDataPath tmp/xcode-derived test CODE_SIGNING_ALLOWED=NO -destination 'platform=macOS' -skip-testing:HarnessUITests`

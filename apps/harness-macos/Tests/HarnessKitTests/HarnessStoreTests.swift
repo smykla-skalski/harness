@@ -48,7 +48,7 @@ final class HarnessStoreTests: XCTestCase {
     store.projects = [makeProject(totalSessionCount: 3, activeSessionCount: 2)]
     var activeFixture = SessionFixture(
       sessionId: "sess-active",
-      context: "Monitor live cockpit",
+      context: "Track live cockpit",
       status: .active,
       leaderId: "leader-claude",
       observeId: "observe-active",
