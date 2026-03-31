@@ -70,6 +70,7 @@ public final class HarnessStore {
   public var searchText = ""
   public var sessionFilter: SessionFilter = .active
   public var sessionFocusFilter: SessionFocusFilter = .all
+  public var sessionSortOrder: SessionSortOrder = .recentActivity
   public var isRefreshing = false
   public var isDiagnosticsRefreshInFlight = false
   public var isDaemonActionInFlight = false

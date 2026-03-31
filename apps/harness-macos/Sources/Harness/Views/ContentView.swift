@@ -37,6 +37,16 @@ struct ContentView: View {
     store.selectedSessionSummary
   }
 
+  private var navigationTitle: String {
+    if let detail = selectedDetail {
+      return detail.session.context
+    }
+    if let summary = selectedSessionSummary {
+      return summary.context
+    }
+    return "Harness"
+  }
+
   private var chromeAccessibilityValue: String {
     [
       "contentChrome=native",
@@ -48,7 +58,7 @@ struct ContentView: View {
   var body: some View {
     NavigationSplitView(columnVisibility: $columnVisibility) {
       SidebarView(store: store)
-        .navigationSplitViewColumnWidth(min: 300, ideal: 350, max: 500)
+        .navigationSplitViewColumnWidth(min: 220, ideal: 260, max: 380)
     } detail: {
       VStack(spacing: 0) {
         if store.isShowingCachedData {
@@ -71,28 +81,35 @@ struct ContentView: View {
         }
         return .ignored
       }
-      .navigationTitle("Harness")
+      .navigationTitle(navigationTitle)
       .toolbar {
         ToolbarItem(placement: .status) {
           ConnectionToolbarBadge(metrics: store.connectionMetrics)
         }
-        ToolbarItem(placement: .primaryAction) {
+      }
+      .toolbar(id: "harness.main") {
+        ToolbarItem(id: "refresh", placement: .primaryAction) {
           RefreshToolbarButton(store: store)
+            .help("Refresh sessions")
         }
-        ToolbarItem(placement: .primaryAction) {
+        ToolbarItem(id: "inspector", placement: .secondaryAction) {
           Button {
             showInspector.toggle()
           } label: {
-            Label("Inspector", systemImage: "info.circle")
+            Label(
+              showInspector ? "Hide Inspector" : "Show Inspector",
+              systemImage: showInspector ? "info.circle.fill" : "info.circle"
+            )
           }
-          .help("Toggle inspector (Cmd+Option+I)")
+          .help(showInspector ? "Hide inspector" : "Show inspector")
         }
-        ToolbarItem(placement: .primaryAction) {
+        ToolbarItem(id: "settings", placement: .secondaryAction) {
           Button {
             openSettings()
           } label: {
             Label("Settings", systemImage: "gearshape")
           }
+          .help("Open settings")
           .accessibilityIdentifier(HarnessAccessibility.daemonPreferencesButton)
         }
       }
@@ -214,7 +231,9 @@ struct RefreshToolbarButton: View {
 
   var body: some View {
     Button { Task { await store.refresh() } } label: {
-      HStack(spacing: HarnessTheme.itemSpacing) {
+      Label {
+        Text("Refresh")
+      } icon: {
         Image(systemName: "arrow.clockwise")
           .rotationEffect(.degrees(reduceMotion ? 0 : (isSpinning ? 360 : 0)))
           .animation(
@@ -225,7 +244,6 @@ struct RefreshToolbarButton: View {
               : .easeOut(duration: 0.4),
             value: isSpinning
           )
-        Text("Refresh")
       }
     }
     .accessibilityIdentifier(HarnessAccessibility.refreshButton)

@@ -64,15 +64,26 @@ struct HarnessAsyncActionButton: View {
     self.storeAction = storeAction
   }
 
+  private var effectiveVariant: Variant {
+    isLoading ? .bordered : variant
+  }
+
+  private var effectiveTint: Color? {
+    isLoading ? .secondary : tint
+  }
+
   var body: some View {
-    Button(action: isLoading ? cancelAction : performAction) {
+    Button {
+      if isLoading {
+        cancelAction()
+      } else {
+        performAction()
+      }
+    } label: {
       label
     }
     .frame(maxWidth: fillsWidth ? .infinity : nil)
-    .harnessActionButtonStyle(
-      variant: isLoading ? .bordered : variant,
-      tint: isLoading ? .secondary : tint
-    )
+    .harnessActionButtonStyle(variant: effectiveVariant, tint: effectiveTint)
     .controlSize(HarnessControlMetrics.compactControlSize)
     .accessibilityIdentifier(accessibilityIdentifier)
     .accessibilityFrameMarker("\(accessibilityIdentifier).frame")
