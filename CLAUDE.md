@@ -124,6 +124,7 @@ Glob-scoped rules in `.claude/rules/` enforce patterns learned from three review
 - `.claude/rules/swiftui-state-management.md` - @Bindable vs let, @State privacy, no closure properties, owned state over @Binding+closure combos, @Binding only for mutation
 - `.claude/rules/swiftui-view-structure.md` - structs over free functions, stable ForEach identity, no identity-breaking modifier branches, @ViewBuilder usage, no wrapper containers, accessibility probe patterns, dead code
 - `.claude/rules/swiftui-performance.md` - no object creation in body, @MainActor formatters, animation scoping
+- `.claude/rules/swiftui-button-styling.md` - no .plain, ButtonStyle over ViewModifier, no redundant .contentShape, native glass styles
 
 These rules auto-activate when editing `apps/harness-macos/Sources/**/*.swift`.
 
