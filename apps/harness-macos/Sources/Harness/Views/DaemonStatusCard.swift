@@ -78,7 +78,7 @@ extension DaemonStatusCard {
     Button {
       Task { await store.startDaemon() }
     } label: {
-      Image(systemName: "restart.circle")
+      Image(systemName: "arrow.clockwise.circle")
         .resizable()
         .aspectRatio(contentMode: .fit)
     }
@@ -261,9 +261,10 @@ private struct DaemonRestartButtonStyle: ButtonStyle {
     configuration.label
       .frame(width: Self.iconSize, height: Self.iconSize)
       .foregroundStyle(foreground)
+      .rotationEffect(.degrees(isHovered ? 75 : 0))
       .scaleEffect(configuration.isPressed ? 0.85 : 1)
       .animation(.easeOut(duration: 0.1), value: configuration.isPressed)
-      .animation(.easeOut(duration: 0.15), value: isHovered)
+      .animation(.spring(duration: 0.3, bounce: 0.2), value: isHovered)
       .contentShape(Circle())
       .onContinuousHover { phase in
         switch phase {
