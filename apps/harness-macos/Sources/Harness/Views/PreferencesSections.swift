@@ -10,7 +10,7 @@ struct PreferencesActionButtons: View {
       HarnessWrapLayout(spacing: 8, lineSpacing: 8) {
         HarnessAsyncActionButton(
           title: "Reconnect",
-          tint: .accentColor,
+          tint: nil,
           variant: .bordered,
           isLoading: isLoading,
           accessibilityIdentifier: HarnessAccessibility.preferencesActionButton("Reconnect"),
@@ -30,7 +30,7 @@ struct PreferencesActionButtons: View {
         )
         HarnessAsyncActionButton(
           title: "Start Daemon",
-          tint: .accentColor,
+          tint: nil,
           variant: .prominent,
           isLoading: isLoading,
           accessibilityIdentifier: HarnessAccessibility.preferencesActionButton("Start Daemon"),
@@ -138,7 +138,7 @@ struct PreferencesConnectionSection: View {
           HarnessWrapLayout(spacing: 8, lineSpacing: 8) {
             HarnessAsyncActionButton(
               title: "Reconnect",
-              tint: .accentColor,
+              tint: nil,
               variant: .prominent,
               isLoading: store.connectionState == .connecting,
               accessibilityIdentifier: HarnessAccessibility.preferencesActionButton(

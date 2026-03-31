@@ -48,7 +48,7 @@ struct SidebarSessionList: View {
             store.resetFilters()
           }
           .font(.caption.bold())
-          .harnessAccessoryButtonStyle(tint: .accentColor)
+          .harnessAccessoryButtonStyle()
           .controlSize(.small)
           .accessibilityIdentifier(HarnessAccessibility.sidebarClearFiltersButton)
         }
