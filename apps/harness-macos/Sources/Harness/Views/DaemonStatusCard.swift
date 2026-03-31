@@ -76,7 +76,7 @@ extension DaemonStatusCard {
     sidebarLayoutProbe(HarnessAccessibility.sidebarStartDaemonButtonFrame) {
       HarnessAsyncActionButton(
         title: isDaemonOnline ? "Restart Daemon" : "Start Daemon",
-        tint: isDaemonOnline ? HarnessTheme.warmAccent : HarnessTheme.accent,
+        tint: isDaemonOnline ? .orange : .accentColor,
         variant: isDaemonOnline ? .bordered : .prominent,
         isLoading: isLoading,
         accessibilityIdentifier: HarnessAccessibility.sidebarStartDaemonButton,
@@ -91,7 +91,7 @@ extension DaemonStatusCard {
     sidebarLayoutProbe(HarnessAccessibility.sidebarInstallLaunchAgentButtonFrame) {
       HarnessAsyncActionButton(
         title: "Install Launch Agent",
-        tint: HarnessTheme.ink,
+        tint: .secondary,
         variant: .bordered,
         isLoading: isLoading,
         accessibilityIdentifier: HarnessAccessibility.sidebarInstallLaunchAgentButton,
