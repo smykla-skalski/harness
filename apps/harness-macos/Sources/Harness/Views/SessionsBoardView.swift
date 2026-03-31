@@ -19,7 +19,7 @@ struct SessionsBoardView: View {
         }
         metricsSection
           .animation(.spring(duration: 0.3), value: store.sessions)
-        SessionsBoardRecentSessionsSection(sessions: store.sessions, onSelect: select)
+        SessionsBoardRecentSessionsSection(sessions: store.sessions, store: store)
           .animation(.spring(duration: 0.3), value: store.sessions)
       }
       .frame(maxWidth: .infinity, alignment: .leading)
@@ -83,14 +83,11 @@ struct SessionsBoardView: View {
     }
     .frame(maxWidth: .infinity, alignment: .leading)
     .padding(.vertical, 8)
-    .accessibilityElement(children: .contain)
-    .accessibilityIdentifier(HarnessAccessibility.boardMetricCard(title))
+    .accessibilityTestProbe(
+      HarnessAccessibility.boardMetricCard(title),
+      label: title,
+      value: value
+    )
   }
 
-  private func select(sessionID: String) {
-    store.primeSessionSelection(sessionID)
-    Task {
-      await store.selectSession(sessionID)
-    }
-  }
 }
