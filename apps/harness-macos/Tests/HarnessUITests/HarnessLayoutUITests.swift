@@ -350,39 +350,44 @@ final class HarnessLayoutUITests: HarnessUITestCase {
 
     let preferencesRoot = element(in: app, identifier: Accessibility.preferencesRoot)
     let preferencesPanel = frameElement(in: app, identifier: Accessibility.preferencesPanel)
-    let preferencesSidebar = element(in: app, identifier: Accessibility.preferencesSidebar)
-    let generalSection = element(in: app, identifier: Accessibility.preferencesGeneralSection)
 
     XCTAssertTrue(preferencesRoot.waitForExistence(timeout: Self.uiTimeout))
     XCTAssertTrue(preferencesPanel.waitForExistence(timeout: Self.uiTimeout))
-    XCTAssertTrue(preferencesSidebar.waitForExistence(timeout: Self.uiTimeout))
-    XCTAssertTrue(generalSection.waitForExistence(timeout: Self.uiTimeout))
 
     let settingsWindow = window(in: app, containing: preferencesPanel)
     XCTAssertTrue(settingsWindow.exists)
-
-    let sidebarTopInset = preferencesSidebar.frame.minY - settingsWindow.frame.minY
-    let rowTopInset = generalSection.frame.minY - settingsWindow.frame.minY
-    let rowLeadingInset = generalSection.frame.minX - settingsWindow.frame.minX
-    let rowInsetInsideSidebar = generalSection.frame.minY - preferencesSidebar.frame.minY
-
+    let settingsToolbar = settingsWindow.toolbars.firstMatch
+    XCTAssertTrue(settingsToolbar.waitForExistence(timeout: Self.uiTimeout))
     XCTAssertGreaterThan(
-      sidebarTopInset,
-      44,
-      "Native sidebar list content should start below the traffic lights"
+      settingsToolbar.buttons.count,
+      0,
+      "Settings split view should expose toolbar controls in native window chrome"
+    )
+    let leadingToolbarButton = settingsToolbar.buttons.element(boundBy: 0)
+    XCTAssertTrue(leadingToolbarButton.exists)
+    let generalSection = sidebarSectionElement(
+      in: app,
+      title: "General",
+      within: settingsWindow
+    )
+    XCTAssertTrue(generalSection.waitForExistence(timeout: Self.uiTimeout))
+    let toolbarLeadingInset = leadingToolbarButton.frame.minX - settingsWindow.frame.minX
+    let rowTopInset = generalSection.frame.minY - settingsWindow.frame.minY
+
+    XCTAssertLessThan(
+      toolbarLeadingInset,
+      170,
+      "Settings sidebar toggle should stay near the leading window chrome"
+    )
+    XCTAssertGreaterThan(
+      rowTopInset,
+      70,
+      "Sidebar content should start below the native toolbar controls"
     )
     XCTAssertLessThan(
-      sidebarTopInset,
+      rowTopInset,
       120,
-      "Native sidebar list content should stay reasonably close to the titlebar"
-    )
-    XCTAssertGreaterThan(rowTopInset, 44, "Sidebar content should start below the traffic lights")
-    XCTAssertLessThan(rowTopInset, 120, "Sidebar content should not be pushed too far down")
-    XCTAssertGreaterThan(rowLeadingInset, 10, "Sidebar content should stay inset from the leading edge")
-    XCTAssertGreaterThan(
-      rowInsetInsideSidebar,
-      0,
-      "Sidebar content should appear inside the native sidebar list container"
+      "Sidebar content should stay visually close to the toolbar"
     )
   }
 

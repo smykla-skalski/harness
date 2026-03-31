@@ -25,8 +25,9 @@ enum PreferencesSection: String, CaseIterable, Identifiable, Hashable {
 }
 
 enum PreferencesChromeMetrics {
-  static let sidebarWidth: CGFloat = 220
-  static let sidebarBottomInset: CGFloat = 20
+  static let sidebarMinWidth: CGFloat = 180
+  static let sidebarIdealWidth: CGFloat = 210
+  static let sidebarMaxWidth: CGFloat = 240
   static let sidebarMinRowHeight: CGFloat = 30
   static let detailContentHorizontalInset: CGFloat = -18
 }
@@ -49,50 +50,12 @@ extension View {
   }
 }
 
-struct PreferencesChromeLayout<Detail: View>: View {
-  @Binding var selection: PreferencesSection
-  private let detail: Detail
-
-  init(
-    selection: Binding<PreferencesSection>,
-    @ViewBuilder detail: () -> Detail
-  ) {
-    _selection = selection
-    self.detail = detail()
-  }
-
-  var body: some View {
-    NavigationSplitView {
-      PreferencesSidebarContent(selection: $selection)
-        .navigationSplitViewColumnWidth(
-          min: PreferencesChromeMetrics.sidebarWidth,
-          ideal: PreferencesChromeMetrics.sidebarWidth,
-          max: PreferencesChromeMetrics.sidebarWidth
-        )
-        .accessibilityFrameMarker(HarnessAccessibility.preferencesSidebar)
-    } detail: {
-      detail
-        .frame(
-          maxWidth: .infinity,
-          maxHeight: .infinity,
-          alignment: .topLeading
-        )
-    }
-    .navigationSplitViewStyle(.balanced)
-    .frame(maxWidth: .infinity, maxHeight: .infinity)
-  }
-}
-
-private struct PreferencesSidebarContent: View {
+struct PreferencesSidebarList: View {
   @Binding var selection: PreferencesSection
 
   var body: some View {
-    List(selection: $selection) {
-      ForEach(PreferencesSection.allCases) { section in
-        PreferencesSidebarRow(
-          section: section,
-          isSelected: selection == section
-        )
+    List(PreferencesSection.allCases, selection: $selection) { section in
+      Label(section.title, systemImage: section.systemImage)
         .tag(section)
         .accessibilityIdentifier(
           HarnessAccessibility.preferencesSectionButton(section.rawValue)
@@ -100,25 +63,11 @@ private struct PreferencesSidebarContent: View {
         .accessibilityValue(
           selection == section ? "selected" : "not selected"
         )
-      }
     }
     .listStyle(.sidebar)
     .controlSize(.small)
     .environment(\.sidebarRowSize, .small)
     .environment(\.defaultMinListRowHeight, PreferencesChromeMetrics.sidebarMinRowHeight)
-    .safeAreaPadding(.bottom, PreferencesChromeMetrics.sidebarBottomInset)
-  }
-}
-
-private struct PreferencesSidebarRow: View {
-  let section: PreferencesSection
-  let isSelected: Bool
-
-  var body: some View {
-    Label(section.title, systemImage: section.systemImage)
-      .frame(maxWidth: .infinity, alignment: .leading)
-      .foregroundStyle(
-        isSelected ? Color.primary : Color.primary.opacity(0.82)
-      )
+    .accessibilityFrameMarker(HarnessAccessibility.preferencesSidebar)
   }
 }
