@@ -140,8 +140,11 @@ struct ObserverInspectorCard: View {
       }
     }
     .frame(maxWidth: .infinity, alignment: .leading)
-    .accessibilityElement(children: .contain)
-    .accessibilityIdentifier(HarnessAccessibility.observerInspectorCard)
+    .accessibilityTestProbe(
+      HarnessAccessibility.observerInspectorCard,
+      label: "Observe",
+      value: "\(observer.openIssueCount)"
+    )
     .accessibilityFrameMarker("\(HarnessAccessibility.observerInspectorCard).frame")
   }
 }
@@ -191,15 +194,15 @@ struct InspectorBadgeColumn: View {
   let values: [String]
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 8) {
-      ForEach(Array(values.enumerated()), id: \.offset) { _, value in
-        Text(value)
-          .font(.caption.weight(.semibold))
-          .padding(.horizontal, 10)
-          .padding(.vertical, 6)
-          .background {
-            HarnessGlassCapsuleBackground()
-          }
+    HarnessGlassContainer(spacing: 8) {
+      VStack(alignment: .leading, spacing: 8) {
+        ForEach(Array(values.enumerated()), id: \.offset) { _, value in
+          Text(value)
+            .font(.caption.weight(.semibold))
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .harnessCapsuleGlass()
+        }
       }
     }
   }
@@ -214,10 +217,12 @@ struct InspectorObserverSummarySection: View {
         title: "Observe",
         subtitle: "The observer loop keeps the session moving and surfaces drift."
       )
-      HStack {
-        HarnessBadge(value: "Open \(observer.openIssueCount)")
-        HarnessBadge(value: "Muted \(observer.mutedCodeCount)")
-        HarnessBadge(value: "Workers \(observer.activeWorkerCount)")
+      HarnessGlassContainer(spacing: 8) {
+        HStack(spacing: 8) {
+          HarnessBadge(value: "Open \(observer.openIssueCount)")
+          HarnessBadge(value: "Muted \(observer.mutedCodeCount)")
+          HarnessBadge(value: "Workers \(observer.activeWorkerCount)")
+        }
       }
       Text("Last sweep \(formatTimestamp(observer.lastScanTime))")
         .font(.caption.monospaced())

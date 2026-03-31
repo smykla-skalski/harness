@@ -164,10 +164,12 @@ struct SessionAgentSummaryCard: View {
           .foregroundStyle(HarnessTheme.secondaryInk)
           .lineLimit(1)
         Spacer(minLength: 0)
-        HStack(spacing: 10) {
-          badge(agent.runtimeCapabilities.supportsContextInjection ? "Context" : "Watch")
-          badge("\(agent.runtimeCapabilities.typicalSignalLatencySeconds)s")
-          badge(formatTimestamp(agent.lastActivityAt))
+        HarnessGlassContainer(spacing: 10) {
+          HStack(spacing: 10) {
+            badge(agent.runtimeCapabilities.supportsContextInjection ? "Context" : "Watch")
+            badge("\(agent.runtimeCapabilities.typicalSignalLatencySeconds)s")
+            badge(formatTimestamp(agent.lastActivityAt))
+          }
         }
       }
       .frame(maxWidth: .infinity, minHeight: sessionLaneCardHeight, alignment: .topLeading)
@@ -190,6 +192,6 @@ struct SessionAgentSummaryCard: View {
       .lineLimit(1)
       .padding(.horizontal, 8)
       .padding(.vertical, 4)
-      .glassEffect(.regular, in: .capsule)
+      .harnessCapsuleGlass()
   }
 }

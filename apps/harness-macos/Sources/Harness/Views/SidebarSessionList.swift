@@ -203,10 +203,12 @@ private struct SessionListContent: View {
                     Text(session.sessionId)
                       .font(.caption.monospaced())
                       .foregroundStyle(HarnessTheme.secondaryInk)
-                    HStack(spacing: 12) {
-                      labelChip("\(session.metrics.activeAgentCount) active")
-                      labelChip("\(session.metrics.inProgressTaskCount) moving")
-                      labelChip(formatTimestamp(session.lastActivityAt))
+                    HarnessGlassContainer(spacing: 12) {
+                      HStack(spacing: 12) {
+                        labelChip("\(session.metrics.activeAgentCount) active")
+                        labelChip("\(session.metrics.inProgressTaskCount) moving")
+                        labelChip(formatTimestamp(session.lastActivityAt))
+                      }
                     }
                 }
                 .foregroundStyle(HarnessTheme.ink)

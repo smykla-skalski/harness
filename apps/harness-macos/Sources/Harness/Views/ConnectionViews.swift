@@ -119,9 +119,11 @@ struct ConnectionStatusStrip: View {
 
       Spacer(minLength: 8)
 
-      HStack(spacing: 8) {
-        TransportBadge(kind: metrics.transportKind)
-        LatencyBadge(latencyMs: metrics.latencyMs)
+      HarnessGlassContainer(spacing: 8) {
+        HStack(spacing: 8) {
+          TransportBadge(kind: metrics.transportKind)
+          LatencyBadge(latencyMs: metrics.latencyMs)
+        }
       }
     }
   }
