@@ -50,17 +50,19 @@ struct PreferencesView: View {
   }
 
   var body: some View {
-    PreferencesChromeLayout(
-      selection: $selectedSection
-    ) {
-      selectedSectionContent
+    NavigationSplitView {
+      PreferencesSidebarList(selection: $selectedSection)
+      .navigationSplitViewColumnWidth(
+        min: PreferencesChromeMetrics.sidebarMinWidth,
+        ideal: PreferencesChromeMetrics.sidebarIdealWidth,
+        max: PreferencesChromeMetrics.sidebarMaxWidth
+      )
+    } detail: {
+      detailContent
     }
-    .harnessExtendedChromeBackground {
-      HarnessTheme.canvas(for: themeStyle)
-    }
+    .navigationSplitViewStyle(.balanced)
     .toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
     .containerBackground(.windowBackground, for: .window)
-    .toolbar(removing: .sidebarToggle)
     .toolbar(removing: .title)
     .frame(maxWidth: .infinity, maxHeight: .infinity)
     .accessibilityElement(children: .contain)
@@ -73,8 +75,10 @@ struct PreferencesView: View {
     }
     .accessibilityFrameMarker(HarnessAccessibility.preferencesPanel)
   }
+}
 
-  @ViewBuilder private var selectedSectionContent: some View {
+private extension PreferencesView {
+  @ViewBuilder var detailContent: some View {
     switch selectedSection {
     case .general:
       PreferencesGeneralSection(

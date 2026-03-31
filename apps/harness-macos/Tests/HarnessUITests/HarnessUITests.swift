@@ -60,13 +60,18 @@ final class HarnessUITests: HarnessUITestCase {
 
     let preferencesRoot = element(in: app, identifier: Accessibility.preferencesRoot)
     let preferencesState = element(in: app, identifier: Accessibility.preferencesState)
-    let preferencesSidebar = element(in: app, identifier: Accessibility.preferencesSidebar)
-    let generalSection = element(in: app, identifier: Accessibility.preferencesGeneralSection)
+    let preferencesPanel = frameElement(in: app, identifier: Accessibility.preferencesPanel)
     let title = element(in: app, identifier: Accessibility.preferencesTitle)
 
     XCTAssertTrue(preferencesRoot.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(preferencesPanel.waitForExistence(timeout: Self.uiTimeout))
     XCTAssertTrue(preferencesState.waitForExistence(timeout: Self.uiTimeout))
-    XCTAssertTrue(preferencesSidebar.exists)
+    let settingsWindow = window(in: app, containing: preferencesPanel)
+    let generalSection = sidebarSectionElement(
+      in: app,
+      title: "General",
+      within: settingsWindow
+    )
     XCTAssertTrue(generalSection.exists)
     XCTAssertTrue(title.exists)
     XCTAssertEqual(title.label, "General")
