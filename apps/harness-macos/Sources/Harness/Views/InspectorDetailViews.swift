@@ -49,8 +49,11 @@ struct SessionInspectorSummaryCard: View {
       }
     }
     .frame(maxWidth: .infinity, alignment: .leading)
-    .accessibilityElement(children: .contain)
-    .accessibilityIdentifier(HarnessAccessibility.sessionInspectorCard)
+    .accessibilityTestProbe(
+      HarnessAccessibility.sessionInspectorCard,
+      label: "Inspector",
+      value: detail.session.sessionId
+    )
     .accessibilityFrameMarker("\(HarnessAccessibility.sessionInspectorCard).frame")
   }
 }
@@ -171,8 +174,11 @@ struct TaskInspectorCard: View {
       }
     }
     .frame(maxWidth: .infinity, alignment: .leading)
-    .accessibilityElement(children: .contain)
-    .accessibilityIdentifier(HarnessAccessibility.taskInspectorCard)
+    .accessibilityTestProbe(
+      HarnessAccessibility.taskInspectorCard,
+      label: task.title,
+      value: task.taskId
+    )
     .accessibilityFrameMarker("\(HarnessAccessibility.taskInspectorCard).frame")
   }
 
@@ -188,10 +194,10 @@ struct TaskInspectorCard: View {
 struct AgentInspectorCard: View {
   let agent: AgentRegistration
   let activity: AgentToolActivitySummary?
-  @Binding var signalCommand: String
-  @Binding var signalMessage: String
-  @Binding var signalActionHint: String
-  let sendSignal: () -> Void
+  let store: HarnessStore
+  @State private var signalCommand = "inject_context"
+  @State private var signalMessage = ""
+  @State private var signalActionHint = ""
 
   private var facts: [InspectorFact] {
     [
@@ -273,15 +279,27 @@ struct AgentInspectorCard: View {
         TextField("Message", text: $signalMessage, axis: .vertical)
           .lineLimit(3, reservesSpace: true)
         TextField("Action Hint", text: $signalActionHint)
-        Button("Send Signal", action: sendSignal)
-          .harnessActionButtonStyle(variant: .prominent, tint: HarnessTheme.accent)
-          .disabled(signalCommand.isEmpty || signalMessage.isEmpty)
-          .accessibilityIdentifier(HarnessAccessibility.signalSendButton)
+        Button("Send Signal") {
+          Task {
+            await store.sendSignal(
+              agentID: agent.agentId,
+              command: signalCommand,
+              message: signalMessage,
+              actionHint: signalActionHint.isEmpty ? nil : signalActionHint
+            )
+          }
+        }
+        .harnessActionButtonStyle(variant: .prominent, tint: HarnessTheme.accent)
+        .disabled(signalCommand.isEmpty || signalMessage.isEmpty)
+        .accessibilityIdentifier(HarnessAccessibility.signalSendButton)
       }
     }
     .frame(maxWidth: .infinity, alignment: .leading)
-    .accessibilityElement(children: .contain)
-    .accessibilityIdentifier(HarnessAccessibility.agentInspectorCard)
+    .accessibilityTestProbe(
+      HarnessAccessibility.agentInspectorCard,
+      label: agent.name,
+      value: agent.agentId
+    )
     .accessibilityFrameMarker("\(HarnessAccessibility.agentInspectorCard).frame")
   }
 }
@@ -360,8 +378,11 @@ struct SignalInspectorCard: View {
       }
     }
     .frame(maxWidth: .infinity, alignment: .leading)
-    .accessibilityElement(children: .contain)
-    .accessibilityIdentifier(HarnessAccessibility.signalInspectorCard)
+    .accessibilityTestProbe(
+      HarnessAccessibility.signalInspectorCard,
+      label: signal.signal.command,
+      value: signal.signal.signalId
+    )
     .accessibilityFrameMarker("\(HarnessAccessibility.signalInspectorCard).frame")
   }
 }
