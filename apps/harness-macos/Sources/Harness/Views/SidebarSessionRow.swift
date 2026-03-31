@@ -9,23 +9,23 @@ struct SidebarSessionRow: View {
     VStack(alignment: .leading, spacing: HarnessTheme.itemSpacing) {
       HStack(alignment: .top, spacing: HarnessTheme.itemSpacing) {
         Text(session.context)
-          .font(.system(.body, design: .rounded, weight: .semibold))
+          .scaledFont(.system(.body, design: .rounded, weight: .semibold))
           .multilineTextAlignment(.leading)
           .lineLimit(2)
         Spacer(minLength: 12)
         if store.isBookmarked(sessionId: session.sessionId) {
           Image(systemName: "bookmark.fill")
-            .font(.caption2)
+            .scaledFont(.caption2)
             .foregroundStyle(HarnessTheme.accent)
             .accessibilityLabel("Bookmarked")
         }
         Text(session.status.title)
-          .font(.caption2.weight(.bold))
+          .scaledFont(.caption2.weight(.bold))
           .foregroundStyle(statusColor(for: session.status))
           .accessibilityHidden(true)
       }
       Text(session.sessionId)
-        .font(.caption.monospaced())
+        .scaledFont(.caption.monospaced())
         .truncationMode(.middle)
         .foregroundStyle(HarnessTheme.secondaryInk)
       HStack(spacing: HarnessTheme.sectionSpacing) {
@@ -41,7 +41,7 @@ struct SidebarSessionRow: View {
 
   private func labelChip(_ value: String) -> some View {
     Text(value)
-      .font(.caption.weight(.semibold))
+      .scaledFont(.caption.weight(.semibold))
       .lineLimit(1)
       .harnessPillPadding()
       .harnessInfoPill()

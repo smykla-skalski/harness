@@ -110,7 +110,7 @@ struct HarnessAsyncActionButton: View {
         Text(isLoading ? "Cancel" : title)
           .lineLimit(1)
       }
-      .font(.system(.callout, design: .rounded, weight: .semibold))
+      .scaledFont(.system(.callout, design: .rounded, weight: .semibold))
       .frame(maxWidth: fillsWidth ? .infinity : nil)
       .animation(.spring(duration: 0.2), value: isLoading)
     }

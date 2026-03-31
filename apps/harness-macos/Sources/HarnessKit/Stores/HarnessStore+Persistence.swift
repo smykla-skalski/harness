@@ -8,120 +8,150 @@ extension HarnessStore {
     _ sessions: [SessionSummary],
     projects: [ProjectSummary]
   ) {
-    guard let modelContext else { return }
+    guard let modelContext, persistenceError == nil else { return }
 
-    for project in projects {
-      let projectId = project.projectId
-      var descriptor = FetchDescriptor<CachedProject>(
-        predicate: #Predicate { $0.projectId == projectId }
-      )
-      descriptor.fetchLimit = 1
+    do {
+      for project in projects {
+        let projectId = project.projectId
+        var descriptor = FetchDescriptor<CachedProject>(
+          predicate: #Predicate { $0.projectId == projectId }
+        )
+        descriptor.fetchLimit = 1
 
-      if let existing = try? modelContext.fetch(descriptor).first {
-        existing.update(from: project)
-      } else {
-        modelContext.insert(project.toCachedProject())
+        if let existing = try modelContext.fetch(descriptor).first {
+          existing.update(from: project)
+        } else {
+          modelContext.insert(project.toCachedProject())
+        }
       }
-    }
 
-    for session in sessions {
-      let sessionId = session.sessionId
-      var descriptor = FetchDescriptor<CachedSession>(
-        predicate: #Predicate { $0.sessionId == sessionId }
-      )
-      descriptor.fetchLimit = 1
+      for session in sessions {
+        let sessionId = session.sessionId
+        var descriptor = FetchDescriptor<CachedSession>(
+          predicate: #Predicate { $0.sessionId == sessionId }
+        )
+        descriptor.fetchLimit = 1
 
-      if let existing = try? modelContext.fetch(descriptor).first {
-        existing.update(from: session)
-      } else {
-        modelContext.insert(session.toCachedSession())
+        if let existing = try modelContext.fetch(descriptor).first {
+          existing.update(from: session)
+        } else {
+          modelContext.insert(session.toCachedSession())
+        }
       }
-    }
 
-    try? modelContext.save()
+      try modelContext.save()
+    } catch {
+      modelContext.rollback()
+      recordPersistenceFailure(
+        action: "Cached session summaries could not be updated.",
+        underlyingError: error
+      )
+    }
   }
 
   func cacheSessionDetail(
     _ detail: SessionDetail,
     timeline: [TimelineEntry]
   ) {
-    guard let modelContext else { return }
+    guard let modelContext, persistenceError == nil else { return }
 
-    let sessionId = detail.session.sessionId
-    var descriptor = FetchDescriptor<CachedSession>(
-      predicate: #Predicate { $0.sessionId == sessionId }
-    )
-    descriptor.fetchLimit = 1
+    do {
+      let sessionId = detail.session.sessionId
+      var descriptor = FetchDescriptor<CachedSession>(
+        predicate: #Predicate { $0.sessionId == sessionId }
+      )
+      descriptor.fetchLimit = 1
 
-    let cached: CachedSession
-    if let existing = try? modelContext.fetch(descriptor).first {
-      existing.update(from: detail.session)
-      cached = existing
-    } else {
-      cached = detail.session.toCachedSession()
-      modelContext.insert(cached)
+      let cached: CachedSession
+      if let existing = try modelContext.fetch(descriptor).first {
+        existing.update(from: detail.session)
+        cached = existing
+      } else {
+        cached = detail.session.toCachedSession()
+        modelContext.insert(cached)
+      }
+
+      cached.lastViewedAt = .now
+
+      syncAgents(detail.agents, on: cached, in: modelContext)
+      syncTasks(detail.tasks, on: cached, in: modelContext)
+      syncSignals(detail.signals, on: cached, in: modelContext)
+      syncTimeline(timeline, on: cached, in: modelContext)
+      syncActivity(detail.agentActivity, on: cached, in: modelContext)
+      syncObserver(detail.observer, on: cached, in: modelContext)
+
+      try modelContext.save()
+      try evictStaleSessions(in: modelContext)
+    } catch {
+      modelContext.rollback()
+      recordPersistenceFailure(
+        action: "Cached session detail could not be updated.",
+        underlyingError: error
+      )
     }
-
-    cached.lastViewedAt = .now
-
-    syncAgents(detail.agents, on: cached, in: modelContext)
-    syncTasks(detail.tasks, on: cached, in: modelContext)
-    syncSignals(detail.signals, on: cached, in: modelContext)
-    syncTimeline(timeline, on: cached, in: modelContext)
-    syncActivity(detail.agentActivity, on: cached, in: modelContext)
-    syncObserver(detail.observer, on: cached, in: modelContext)
-
-    try? modelContext.save()
-    evictStaleSessions(in: modelContext)
   }
 
   func loadCachedSessionList() -> (
     sessions: [SessionSummary],
     projects: [ProjectSummary]
   )? {
-    guard let modelContext else { return nil }
+    guard let modelContext, persistenceError == nil else { return nil }
 
-    let sessionDescriptor = FetchDescriptor<CachedSession>(
-      sortBy: [SortDescriptor(\.lastCachedAt, order: .reverse)]
-    )
-    let projectDescriptor = FetchDescriptor<CachedProject>(
-      sortBy: [SortDescriptor(\.lastCachedAt, order: .reverse)]
-    )
+    do {
+      let sessionDescriptor = FetchDescriptor<CachedSession>(
+        sortBy: [SortDescriptor(\.lastCachedAt, order: .reverse)]
+      )
+      let projectDescriptor = FetchDescriptor<CachedProject>(
+        sortBy: [SortDescriptor(\.lastCachedAt, order: .reverse)]
+      )
 
-    guard
-      let sessions = try? modelContext.fetch(sessionDescriptor),
-      let projects = try? modelContext.fetch(projectDescriptor),
-      !sessions.isEmpty
-    else {
+      let sessions = try modelContext.fetch(sessionDescriptor)
+      let projects = try modelContext.fetch(projectDescriptor)
+      guard !sessions.isEmpty else {
+        return nil
+      }
+
+      return (
+        sessions: sessions.map { $0.toSessionSummary() },
+        projects: projects.map { $0.toProjectSummary() }
+      )
+    } catch {
+      recordPersistenceFailure(
+        action: "Cached session summaries could not be loaded.",
+        underlyingError: error
+      )
       return nil
     }
-
-    return (
-      sessions: sessions.map { $0.toSessionSummary() },
-      projects: projects.map { $0.toProjectSummary() }
-    )
   }
 
   func loadCachedSessionDetail(
     sessionID: String
   ) -> (detail: SessionDetail, timeline: [TimelineEntry])? {
-    guard let modelContext else { return nil }
+    guard let modelContext, persistenceError == nil else { return nil }
 
-    var descriptor = FetchDescriptor<CachedSession>(
-      predicate: #Predicate { $0.sessionId == sessionID }
-    )
-    descriptor.fetchLimit = 1
+    do {
+      var descriptor = FetchDescriptor<CachedSession>(
+        predicate: #Predicate { $0.sessionId == sessionID }
+      )
+      descriptor.fetchLimit = 1
 
-    guard let cached = try? modelContext.fetch(descriptor).first,
-      cached.lastViewedAt != nil
-    else {
+      guard let cached = try modelContext.fetch(descriptor).first,
+        cached.lastViewedAt != nil
+      else {
+        return nil
+      }
+
+      return (
+        detail: cached.toSessionDetail(),
+        timeline: cached.timelineEntries.map { $0.toTimelineEntry() }
+      )
+    } catch {
+      recordPersistenceFailure(
+        action: "Cached session detail could not be loaded.",
+        underlyingError: error
+      )
       return nil
     }
-
-    return (
-      detail: cached.toSessionDetail(),
-      timeline: cached.timelineEntries.map { $0.toTimelineEntry() }
-    )
   }
 }
 
@@ -257,13 +287,14 @@ extension HarnessStore {
     }
   }
 
-  private func evictStaleSessions(in context: ModelContext) {
+  private func evictStaleSessions(in context: ModelContext) throws {
     var descriptor = FetchDescriptor<CachedSession>(
       sortBy: [SortDescriptor(\.lastViewedAt, order: .reverse)]
     )
     descriptor.fetchOffset = Self.maxCachedSessions
 
-    guard let stale = try? context.fetch(descriptor), !stale.isEmpty else {
+    let stale = try context.fetch(descriptor)
+    guard !stale.isEmpty else {
       return
     }
 
@@ -272,33 +303,32 @@ extension HarnessStore {
       context.delete(session)
     }
 
-    try? context.save()
-    evictOrphanedProjects(candidateIds: evictedProjectIds, in: context)
+    try context.save()
+    try evictOrphanedProjects(candidateIds: evictedProjectIds, in: context)
   }
 
   private func evictOrphanedProjects(
     candidateIds: Set<String>,
     in context: ModelContext
-  ) {
+  ) throws {
     for projectId in candidateIds {
       var descriptor = FetchDescriptor<CachedSession>(
         predicate: #Predicate { $0.projectId == projectId }
       )
       descriptor.fetchLimit = 1
 
-      let hasRemaining = (try? context.fetchCount(descriptor)) ?? 0
+      let hasRemaining = try context.fetchCount(descriptor)
       if hasRemaining == 0 {
         let projectDescriptor = FetchDescriptor<CachedProject>(
           predicate: #Predicate { $0.projectId == projectId }
         )
-        if let orphaned = try? context.fetch(projectDescriptor) {
-          for project in orphaned {
-            context.delete(project)
-          }
+        let orphaned = try context.fetch(projectDescriptor)
+        for project in orphaned {
+          context.delete(project)
         }
       }
     }
 
-    try? context.save()
+    try context.save()
   }
 }

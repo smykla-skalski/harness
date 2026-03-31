@@ -22,7 +22,6 @@ struct SessionsBoardView: View {
         metricsSection
         SessionsBoardRecentSessionsSection(sessions: store.sessions, store: store)
       }
-      .animation(.spring(duration: 0.3), value: store.sessions)
       .frame(maxWidth: .infinity, alignment: .leading)
     }
     .foregroundStyle(HarnessTheme.ink)
@@ -47,25 +46,21 @@ struct SessionsBoardView: View {
       value: "\(store.projects.count)",
       tint: HarnessTheme.accent
     )
-    .animation(.spring(duration: 0.3), value: store.projects.count)
     metricCard(
       title: "Indexed Sessions",
       value: "\(store.sessions.count)",
       tint: HarnessTheme.success
     )
-    .animation(.spring(duration: 0.3), value: store.sessions.count)
     metricCard(
       title: "Open Work",
       value: "\(store.totalOpenWorkCount)",
       tint: HarnessTheme.warmAccent
     )
-    .animation(.spring(duration: 0.3), value: store.totalOpenWorkCount)
     metricCard(
       title: "Blocked",
       value: "\(store.totalBlockedCount)",
       tint: HarnessTheme.danger
     )
-    .animation(.spring(duration: 0.3), value: store.totalBlockedCount)
   }
 
   private func metricCard(title: String, value: String, tint: Color) -> some View {
@@ -77,11 +72,11 @@ struct SessionsBoardView: View {
         .accessibilityHidden(true)
       VStack(alignment: .leading, spacing: HarnessTheme.itemSpacing) {
         Text(title.uppercased())
-          .font(.caption.weight(.semibold))
+          .scaledFont(.caption.weight(.semibold))
           .tracking(HarnessTheme.uppercaseTracking)
           .foregroundStyle(HarnessTheme.secondaryInk)
         Text(value)
-          .font(.system(.largeTitle, design: .rounded, weight: .heavy))
+          .scaledFont(.system(.largeTitle, design: .rounded, weight: .heavy))
           .foregroundStyle(tint)
           .contentTransition(.numericText())
       }
@@ -96,5 +91,4 @@ struct SessionsBoardView: View {
       value: value
     )
   }
-
 }

@@ -1,7 +1,11 @@
 import Foundation
 
 extension HarnessStore {
-  private static let streamRefreshDebounce = Duration.milliseconds(500)
+  private static let sessionPushFallbackDelay = Duration.milliseconds(900)
+  private static let streamReconnectDelays: [Duration] = [
+    .milliseconds(500), .seconds(1), .seconds(2), .seconds(4), .seconds(8),
+  ]
+
   func connect(using client: any HarnessClientProtocol) async {
     self.client = client
     connectionState = .online
@@ -17,7 +21,7 @@ extension HarnessStore {
     }
     startConnectionProbe(using: client)
     startGlobalStream(using: client)
-    if let selectedSessionID, selectedSession?.session.sessionId == selectedSessionID {
+    if let selectedSessionID {
       startSessionStream(using: client, sessionID: selectedSessionID)
     } else {
       stopSessionStream()
@@ -61,8 +65,6 @@ extension HarnessStore {
 
       health = measuredHealth.value
       diagnostics = measuredDiagnostics.value
-      projects = measuredProjects.value
-      sessions = measuredSessions.value
       daemonStatus = await daemonStatusResponse
       recordRequestSuccess(
         latencyMs: measuredHealth.latencyMs,
@@ -71,28 +73,37 @@ extension HarnessStore {
       recordRequestSuccess()
       recordRequestSuccess()
       recordRequestSuccess()
-      isShowingCachedData = false
-      cacheSessionList(sessions, projects: projects)
 
-      if preserveSelection, let selectedSessionID {
+      applySessionIndexSnapshot(
+        projects: measuredProjects.value,
+        sessions: measuredSessions.value
+      )
+
+      if preserveSelection, let selectedSessionID, selectedSessionSummary != nil {
         let requestID = beginSessionLoad()
         await loadSession(using: client, sessionID: selectedSessionID, requestID: requestID)
       } else {
         synchronizeActionActor()
         if shouldAutoSelectPreviewSession(
           client: client,
-          sessions: sessions
+          sessions: measuredSessions.value
         ) {
           let requestID = beginSessionLoad()
-          await loadSession(using: client, sessionID: sessions[0].sessionId, requestID: requestID)
+          await loadSession(
+            using: client,
+            sessionID: measuredSessions.value[0].sessionId,
+            requestID: requestID
+          )
         }
       }
     } catch {
       markConnectionOffline(error.localizedDescription)
 
       if let cached = loadCachedSessionList() {
-        sessions = cached.sessions
-        projects = cached.projects
+        sessionIndex.replaceSnapshot(
+          projects: cached.projects,
+          sessions: cached.sessions
+        )
         isShowingCachedData = true
       }
     }
@@ -108,26 +119,27 @@ extension HarnessStore {
     }
 
     do {
-      async let detail = Self.measureOperation {
+      async let detailResponse = Self.measureOperation {
         try await client.sessionDetail(id: sessionID)
       }
-      async let timeline = Self.measureOperation {
+      async let timelineResponse = Self.measureOperation {
         try await client.timeline(sessionID: sessionID)
       }
-      let measuredDetail = try await detail
-      let measuredTimeline = try await timeline
-      let loadedDetail = measuredDetail.value
-      let loadedTimeline = measuredTimeline.value
+      let measuredDetail = try await detailResponse
+      let measuredTimeline = try await timelineResponse
       guard isCurrentSessionLoad(requestID, sessionID: sessionID) else {
         return
       }
+
       recordRequestSuccess()
       recordRequestSuccess()
-      selectedSession = loadedDetail
-      self.timeline = loadedTimeline
-      isShowingCachedData = false
-      synchronizeActionActor()
-      cacheSessionDetail(loadedDetail, timeline: loadedTimeline)
+      applySelectedSessionSnapshot(
+        sessionID: sessionID,
+        detail: measuredDetail.value,
+        timeline: measuredTimeline.value,
+        showingCachedData: false
+      )
+      cacheSessionDetail(measuredDetail.value, timeline: measuredTimeline.value)
     } catch {
       guard isCurrentSessionLoad(requestID, sessionID: sessionID) else {
         return
@@ -135,34 +147,94 @@ extension HarnessStore {
       lastError = error.localizedDescription
 
       if let cached = loadCachedSessionDetail(sessionID: sessionID) {
-        selectedSession = cached.detail
-        timeline = cached.timeline
-        isShowingCachedData = true
-        synchronizeActionActor()
+        applySelectedSessionSnapshot(
+          sessionID: sessionID,
+          detail: cached.detail,
+          timeline: cached.timeline,
+          showingCachedData: true
+        )
       }
     }
   }
 
-  private static let streamReconnectDelays: [Duration] = [
-    .milliseconds(500), .seconds(1), .seconds(2), .seconds(4), .seconds(8),
-  ]
+  private func applySessionIndexSnapshot(
+    projects: [ProjectSummary],
+    sessions: [SessionSummary]
+  ) {
+    sessionIndex.replaceSnapshot(projects: projects, sessions: sessions)
+    isShowingCachedData = false
+    cacheSessionList(sessions, projects: projects)
+
+    if let selectedSessionID, sessionIndex.sessionSummary(for: selectedSessionID) == nil {
+      primeSessionSelection(nil)
+      stopSessionStream()
+    }
+  }
+
+  func applySelectedSessionSnapshot(
+    sessionID: String,
+    detail: SessionDetail,
+    timeline: [TimelineEntry],
+    showingCachedData: Bool
+  ) {
+    guard selectedSessionID == sessionID else {
+      return
+    }
+
+    selectedSession = detail
+    self.timeline = timeline
+    sessionIndex.applySessionSummary(detail.session)
+    isShowingCachedData = showingCachedData
+    synchronizeActionActor()
+    refreshNotes(for: sessionID)
+    cancelSessionPushFallback(for: sessionID)
+  }
+
+  private func applyGlobalPushEvent(_ event: DaemonPushEvent) {
+    switch event.kind {
+    case .ready:
+      break
+    case .sessionsUpdated(let payload):
+      applySessionIndexSnapshot(
+        projects: payload.projects,
+        sessions: payload.sessions
+      )
+    case .sessionUpdated(let payload):
+      guard let sessionID = event.sessionId, sessionID == selectedSessionID else {
+        return
+      }
+      applySelectedSessionSnapshot(
+        sessionID: sessionID,
+        detail: payload.detail,
+        timeline: payload.timeline,
+        showingCachedData: false
+      )
+      cacheSessionDetail(payload.detail, timeline: payload.timeline)
+    case .unknown:
+      break
+    }
+  }
+
+  private func applySessionPushEvent(_ event: DaemonPushEvent) {
+    switch event.kind {
+    case .ready, .sessionsUpdated, .unknown:
+      break
+    case .sessionUpdated(let payload):
+      guard let sessionID = event.sessionId else {
+        return
+      }
+      applySelectedSessionSnapshot(
+        sessionID: sessionID,
+        detail: payload.detail,
+        timeline: payload.timeline,
+        showingCachedData: false
+      )
+      cacheSessionDetail(payload.detail, timeline: payload.timeline)
+    }
+  }
 
   private func reconnectDelay(for attempt: Int) -> Duration {
     Self.streamReconnectDelays[min(attempt, Self.streamReconnectDelays.count - 1)]
-  }
-
-  private func schedulePendingRefresh(
-    _ pendingRefresh: inout Task<Void, Never>?,
-    action: @escaping @MainActor () async -> Void
-  ) {
-    pendingRefresh?.cancel()
-    pendingRefresh = Task { @MainActor in
-      try? await Task.sleep(for: Self.streamRefreshDebounce)
-      guard !Task.isCancelled else {
-        return
-      }
-      await action()
-    }
   }
 
   func startGlobalStream(using client: any HarnessClientProtocol) {
@@ -173,24 +245,16 @@ extension HarnessStore {
       }
 
       var attempt = 0
-      var pendingRefresh: Task<Void, Never>?
-      defer { pendingRefresh?.cancel() }
-
       while !Task.isCancelled {
         do {
           for try await event in await client.globalStream() {
             recordReconnectRecovery(detail: "Global stream restored")
             attempt = 0
-            if event.event == "ready" {
+            if case .ready = event.kind {
               continue
             }
             recordStreamEvent(countedInTraffic: true)
-            schedulePendingRefresh(&pendingRefresh) { [weak self] in
-              guard let self else {
-                return
-              }
-              await self.refresh(using: client, preserveSelection: true)
-            }
+            applyGlobalPushEvent(event)
           }
         } catch {
           if Task.isCancelled {
@@ -218,26 +282,17 @@ extension HarnessStore {
       }
 
       var attempt = 0
-      var pendingRefresh: Task<Void, Never>?
-      defer { pendingRefresh?.cancel() }
-
       while !Task.isCancelled {
         do {
           for try await event in await client.sessionStream(sessionID: sessionID) {
             recordReconnectRecovery(detail: "Session stream restored")
             attempt = 0
-            if event.event == "ready" {
+            if case .ready = event.kind {
               continue
             }
             let countedInTraffic = activeTransport == .httpSSE
             recordStreamEvent(countedInTraffic: countedInTraffic)
-            schedulePendingRefresh(&pendingRefresh) { [weak self] in
-              guard let self else {
-                return
-              }
-              let requestID = self.beginSessionLoad()
-              await self.loadSession(using: client, sessionID: sessionID, requestID: requestID)
-            }
+            applySessionPushEvent(event)
           }
         } catch {
           if Task.isCancelled {
@@ -254,6 +309,60 @@ extension HarnessStore {
         try? await Task.sleep(for: delay)
       }
     }
+  }
+
+  func scheduleSessionPushFallback(
+    using client: any HarnessClientProtocol,
+    sessionID: String
+  ) {
+    sessionPushFallbackSequence &+= 1
+    let token = sessionPushFallbackSequence
+    pendingSessionPushFallback = (sessionID: sessionID, token: token)
+    sessionPushFallbackTask?.cancel()
+    sessionPushFallbackTask = Task { @MainActor [weak self] in
+      guard let self else {
+        return
+      }
+
+      try? await Task.sleep(for: Self.sessionPushFallbackDelay)
+      guard !Task.isCancelled else {
+        return
+      }
+      guard
+        pendingSessionPushFallback?.token == token,
+        pendingSessionPushFallback?.sessionID == sessionID,
+        selectedSessionID == sessionID
+      else {
+        return
+      }
+
+      pendingSessionPushFallback = nil
+      do {
+        let measuredTimeline = try await Self.measureOperation {
+          try await client.timeline(sessionID: sessionID)
+        }
+        recordRequestSuccess()
+        guard selectedSessionID == sessionID else {
+          return
+        }
+        timeline = measuredTimeline.value
+        if let selectedSession {
+          cacheSessionDetail(selectedSession, timeline: measuredTimeline.value)
+        }
+      } catch {
+        lastError = error.localizedDescription
+      }
+    }
+  }
+
+  func cancelSessionPushFallback(for sessionID: String? = nil) {
+    guard sessionID == nil || pendingSessionPushFallback?.sessionID == sessionID else {
+      return
+    }
+
+    pendingSessionPushFallback = nil
+    sessionPushFallbackTask?.cancel()
+    sessionPushFallbackTask = nil
   }
 
   private func shouldAutoSelectPreviewSession(

@@ -120,7 +120,7 @@ struct HarnessLoadingStateView: View {
     HStack(spacing: HarnessTheme.itemSpacing) {
       HarnessSpinner(size: 14)
       Text(title)
-        .font(.system(.footnote, design: .rounded, weight: .semibold))
+        .scaledFont(.system(.footnote, design: .rounded, weight: .semibold))
     }
     .harnessCellPadding()
     .harnessInfoPill(tint: HarnessTheme.accent)
@@ -322,10 +322,10 @@ struct HarnessActionHeader: View {
   var body: some View {
     VStack(alignment: .leading, spacing: 4) {
       Text(title)
-        .font(.system(.headline, design: .rounded, weight: .semibold))
+        .scaledFont(.system(.headline, design: .rounded, weight: .semibold))
         .accessibilityAddTraits(.isHeader)
       Text(subtitle)
-        .font(.system(.subheadline, design: .rounded, weight: .medium))
+        .scaledFont(.system(.subheadline, design: .rounded, weight: .medium))
         .foregroundStyle(HarnessTheme.secondaryInk)
     }
   }
@@ -336,7 +336,7 @@ struct HarnessBadge: View {
 
   var body: some View {
     Text(value)
-      .font(.caption.bold())
+      .scaledFont(.caption.bold())
       .harnessPillPadding()
       .harnessInfoPill(tint: HarnessTheme.accent)
   }

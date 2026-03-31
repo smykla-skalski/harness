@@ -15,9 +15,9 @@ struct TransportBadge: View {
   var body: some View {
     HStack(spacing: 4) {
       Image(systemName: icon)
-        .font(.caption2.weight(.semibold))
+        .scaledFont(.caption2.weight(.semibold))
       Text(kind.title)
-        .font(.system(.caption, design: .rounded, weight: .semibold))
+        .scaledFont(.system(.caption, design: .rounded, weight: .semibold))
         .lineLimit(1)
         .fixedSize()
     }
@@ -42,7 +42,7 @@ struct LatencyBadge: View {
 
   var body: some View {
     Text(latencyMs.map { "\($0)ms" } ?? "n/a")
-      .font(.system(.caption, design: .rounded, weight: .semibold).monospacedDigit())
+      .scaledFont(.system(.caption, design: .rounded, weight: .semibold).monospacedDigit())
       .foregroundStyle(tint)
       .lineLimit(1)
       .fixedSize()
@@ -152,12 +152,12 @@ struct ConnectionToolbarBadge: View {
       )
         .accessibilityHidden(true)
       Text(transportLabel)
-        .font(Self.badgeFont)
+        .scaledFont(Self.badgeFont)
         .foregroundStyle(qualityColor)
         .lineLimit(1)
         .fixedSize()
       Text(latencyLabel)
-        .font(Self.badgeFont)
+        .scaledFont(Self.badgeFont)
         .foregroundStyle(qualityColor.opacity(0.5))
         .lineLimit(1)
         .fixedSize()
@@ -184,10 +184,10 @@ struct ReconnectionProgressView: View {
         ProgressView()
           .controlSize(.small)
         Text("Reconnecting")
-          .font(.system(.footnote, design: .rounded, weight: .semibold))
+          .scaledFont(.system(.footnote, design: .rounded, weight: .semibold))
         Spacer()
         Text("Attempt \(attempt)")
-          .font(.caption.monospacedDigit())
+          .scaledFont(.caption.monospacedDigit())
           .foregroundStyle(HarnessTheme.secondaryInk)
           .contentTransition(.numericText())
       }

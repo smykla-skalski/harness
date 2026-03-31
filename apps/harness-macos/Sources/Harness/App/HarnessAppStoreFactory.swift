@@ -5,7 +5,8 @@ import SwiftData
 enum HarnessAppStoreFactory {
   static func makeStore(
     environment: HarnessEnvironment = .current,
-    modelContext: ModelContext? = nil
+    modelContext: ModelContext? = nil,
+    persistenceError: String? = nil
   ) -> HarnessStore {
     let controller: any DaemonControlling
 
@@ -18,6 +19,10 @@ enum HarnessAppStoreFactory {
       controller = PreviewDaemonController(mode: .empty)
     }
 
-    return HarnessStore(daemonController: controller, modelContext: modelContext)
+    return HarnessStore(
+      daemonController: controller,
+      modelContext: modelContext,
+      persistenceError: persistenceError
+    )
   }
 }

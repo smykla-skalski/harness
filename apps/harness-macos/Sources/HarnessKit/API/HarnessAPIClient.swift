@@ -7,8 +7,8 @@ public protocol HarnessClientProtocol: Sendable {
   func sessions() async throws -> [SessionSummary]
   func sessionDetail(id: String) async throws -> SessionDetail
   func timeline(sessionID: String) async throws -> [TimelineEntry]
-  func globalStream() async -> AsyncThrowingStream<StreamEvent, Error>
-  func sessionStream(sessionID: String) async -> AsyncThrowingStream<StreamEvent, Error>
+  func globalStream() async -> AsyncThrowingStream<DaemonPushEvent, Error>
+  func sessionStream(sessionID: String) async -> AsyncThrowingStream<DaemonPushEvent, Error>
   func createTask(sessionID: String, request: TaskCreateRequest) async throws -> SessionDetail
   func assignTask(
     sessionID: String,
@@ -123,11 +123,11 @@ public final class HarnessAPIClient: HarnessClientProtocol {
     try await get("/v1/sessions/\(sessionID)/timeline")
   }
 
-  public func globalStream() async -> AsyncThrowingStream<StreamEvent, Error> {
+  public func globalStream() async -> AsyncThrowingStream<DaemonPushEvent, Error> {
     stream("/v1/stream")
   }
 
-  public func sessionStream(sessionID: String) async -> AsyncThrowingStream<StreamEvent, Error> {
+  public func sessionStream(sessionID: String) async -> AsyncThrowingStream<DaemonPushEvent, Error> {
     stream("/v1/sessions/\(sessionID)/stream")
   }
 
@@ -236,7 +236,7 @@ public final class HarnessAPIClient: HarnessClientProtocol {
     return try decoder.decode(Response.self, from: data)
   }
 
-  private func stream(_ path: String) -> AsyncThrowingStream<StreamEvent, Error> {
+  private func stream(_ path: String) -> AsyncThrowingStream<DaemonPushEvent, Error> {
     AsyncThrowingStream { continuation in
       let task = Task {
         do {
@@ -255,13 +255,13 @@ public final class HarnessAPIClient: HarnessClientProtocol {
                 StreamEvent.self,
                 from: Data(frame.data.utf8)
               )
-              continuation.yield(event)
+              continuation.yield(try DaemonPushEvent(streamEvent: event))
             }
           }
 
           if let frame = parser.finish() {
             let event = try decoder.decode(StreamEvent.self, from: Data(frame.data.utf8))
-            continuation.yield(event)
+            continuation.yield(try DaemonPushEvent(streamEvent: event))
           }
 
           continuation.finish()

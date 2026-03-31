@@ -52,14 +52,14 @@ struct PreferencesConnectionMetrics: View {
           HStack(spacing: HarnessTheme.itemSpacing) {
             Image(systemName: eventIcon(for: event.kind))
               .foregroundStyle(eventColor(for: event.kind))
-              .font(.caption)
+              .scaledFont(.caption)
               .frame(width: 16)
               .accessibilityHidden(true)
             Text(event.detail)
               .lineLimit(1)
             Spacer()
             Text(formatTimestamp(event.timestamp))
-              .font(.caption.monospaced())
+              .scaledFont(.caption.monospaced())
               .foregroundStyle(.secondary)
           }
         }

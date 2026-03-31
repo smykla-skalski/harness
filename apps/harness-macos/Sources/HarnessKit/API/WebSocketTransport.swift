@@ -9,9 +9,10 @@ public actor WebSocketTransport: HarnessClientProtocol {
   var webSocketTask: URLSessionWebSocketTask?
   var receiveTask: Task<Void, Never>?
   var heartbeatTask: Task<Void, Never>?
-  var globalStreamContinuation: AsyncThrowingStream<StreamEvent, Error>.Continuation?
-  var sessionStreamContinuations: [String: AsyncThrowingStream<StreamEvent, Error>.Continuation] =
-    [:]
+  var globalStreamContinuation: AsyncThrowingStream<DaemonPushEvent, Error>.Continuation?
+  var sessionStreamContinuations: [
+    String: AsyncThrowingStream<DaemonPushEvent, Error>.Continuation
+  ] = [:]
   var activeSubscriptions: Set<String> = []
   var globalSubscriptionActive = false
 
@@ -92,8 +93,8 @@ extension WebSocketTransport {
 extension WebSocketTransport {
   // MARK: - Streams
 
-  public func globalStream() async -> AsyncThrowingStream<StreamEvent, Error> {
-    let (stream, continuation) = AsyncThrowingStream<StreamEvent, Error>.makeStream()
+  public func globalStream() async -> AsyncThrowingStream<DaemonPushEvent, Error> {
+    let (stream, continuation) = AsyncThrowingStream<DaemonPushEvent, Error>.makeStream()
     globalStreamContinuation = continuation
     globalSubscriptionActive = true
 
@@ -127,8 +128,8 @@ extension WebSocketTransport {
     }
   }
 
-  public func sessionStream(sessionID: String) async -> AsyncThrowingStream<StreamEvent, Error> {
-    let (stream, continuation) = AsyncThrowingStream<StreamEvent, Error>.makeStream()
+  public func sessionStream(sessionID: String) async -> AsyncThrowingStream<DaemonPushEvent, Error> {
+    let (stream, continuation) = AsyncThrowingStream<DaemonPushEvent, Error>.makeStream()
     sessionStreamContinuations[sessionID] = continuation
     activeSubscriptions.insert(sessionID)
 
