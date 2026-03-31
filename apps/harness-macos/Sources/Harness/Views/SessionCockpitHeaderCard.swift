@@ -15,11 +15,11 @@ struct SessionCockpitHeaderCard: View {
               .frame(width: 12, height: 12)
               .accessibilityHidden(true)
             Text(detail.session.context)
-              .font(.system(size: 32, weight: .black, design: .rounded))
+              .font(.system(.largeTitle, design: .rounded, weight: .black))
           }
           Text("\(detail.session.projectName) • \(detail.session.sessionId)")
             .font(.system(.subheadline, design: .rounded, weight: .medium))
-            .foregroundStyle(HarnessTheme.secondaryInk)
+            .foregroundStyle(.secondary)
         }
         Spacer()
         HStack(spacing: 10) {
@@ -60,6 +60,7 @@ struct SessionCockpitHeaderCard: View {
         tint: nil
       )
       .controlSize(HarnessControlMetrics.compactControlSize)
+      .disabled(store.isSessionActionInFlight)
   }
 
   private var endSessionButton: some View {
@@ -86,13 +87,13 @@ struct SessionCockpitHeaderCard: View {
         if let openIssues = observer.openIssues, !openIssues.isEmpty {
           Text(openIssues.prefix(2).map(\.summary).joined(separator: " · "))
             .font(.caption)
-            .foregroundStyle(HarnessTheme.secondaryInk)
+            .foregroundStyle(.secondary)
             .lineLimit(1)
         }
         if let mutedCodes = observer.mutedCodes, !mutedCodes.isEmpty {
           Text("Muted: \(mutedCodes.prefix(3).joined(separator: ", "))")
             .font(.caption)
-            .foregroundStyle(HarnessTheme.secondaryInk)
+            .foregroundStyle(.secondary)
             .lineLimit(1)
         }
       }
@@ -113,14 +114,14 @@ struct SessionCockpitHeaderCard: View {
         Spacer()
         Text(formatTimestamp(pendingTransfer.requestedAt))
           .font(.caption.monospaced())
-          .foregroundStyle(HarnessTheme.secondaryInk)
+          .foregroundStyle(.secondary)
       }
       let requested = pendingTransfer.requestedBy
       let newLeader = pendingTransfer.newLeaderId
       let current = pendingTransfer.currentLeaderId
       Text("\(requested) requested \(newLeader) to replace \(current).")
         .font(.system(.body, design: .rounded, weight: .medium))
-        .foregroundStyle(HarnessTheme.secondaryInk)
+        .foregroundStyle(.secondary)
       if let reason = pendingTransfer.reason, !reason.isEmpty {
         Text(reason)
           .font(.system(.footnote, design: .rounded, weight: .semibold))
@@ -141,7 +142,7 @@ struct SessionCockpitHeaderCard: View {
     VStack(alignment: .leading, spacing: 2) {
       Text(title.uppercased())
         .font(.caption2.weight(.bold))
-        .foregroundStyle(HarnessTheme.secondaryInk)
+        .foregroundStyle(.secondary)
       Text(value)
         .font(.system(.callout, design: .rounded, weight: .semibold))
     }

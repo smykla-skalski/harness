@@ -317,7 +317,7 @@ struct HarnessStoreActionTests {
     #expect(store.isDaemonActionInFlight == false)
     #expect(store.isDiagnosticsRefreshInFlight == false)
 
-    await createTask.value
+    _ = await createTask.value
 
     #expect(store.isSessionActionInFlight == false)
     #expect(store.isBusy == false)
