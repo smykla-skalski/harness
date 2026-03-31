@@ -77,7 +77,7 @@ extension DaemonStatusCard {
       HarnessAsyncActionButton(
         title: isDaemonOnline ? "Restart Daemon" : "Start Daemon",
         tint: isDaemonOnline ? .orange : nil,
-        variant: isDaemonOnline ? .bordered : .prominent,
+        variant: .prominent,
         isLoading: isLoading,
         accessibilityIdentifier: HarnessAccessibility.sidebarStartDaemonButton,
         fillsWidth: false,
