@@ -77,13 +77,26 @@ struct SessionCockpitHeaderCard: View {
       store.inspectObserver()
     } label: {
       VStack(alignment: .leading, spacing: HarnessTheme.itemSpacing) {
-        HStack(spacing: 16) {
-          summaryLabel("Observe", value: observer.observeId)
-          summaryLabel("Open Issues", value: "\(observer.openIssueCount)")
-          summaryLabel("Muted", value: "\(observer.mutedCodeCount)")
-          summaryLabel("Workers", value: "\(observer.activeWorkerCount)")
-          Spacer()
-          summaryLabel("Last Sweep", value: formatTimestamp(observer.lastScanTime))
+        ViewThatFits(in: .horizontal) {
+          HStack(spacing: HarnessTheme.spacingLG) {
+            summaryLabel("Observe", value: observer.observeId)
+            summaryLabel("Open Issues", value: "\(observer.openIssueCount)")
+            summaryLabel("Muted", value: "\(observer.mutedCodeCount)")
+            summaryLabel("Workers", value: "\(observer.activeWorkerCount)")
+            Spacer()
+            summaryLabel("Last Sweep", value: formatTimestamp(observer.lastScanTime))
+          }
+          VStack(alignment: .leading, spacing: HarnessTheme.itemSpacing) {
+            HStack(spacing: HarnessTheme.spacingLG) {
+              summaryLabel("Observe", value: observer.observeId)
+              summaryLabel("Open Issues", value: "\(observer.openIssueCount)")
+            }
+            HStack(spacing: HarnessTheme.spacingLG) {
+              summaryLabel("Muted", value: "\(observer.mutedCodeCount)")
+              summaryLabel("Workers", value: "\(observer.activeWorkerCount)")
+              summaryLabel("Last Sweep", value: formatTimestamp(observer.lastScanTime))
+            }
+          }
         }
         if let openIssues = observer.openIssues, !openIssues.isEmpty {
           Text(openIssues.prefix(2).map(\.summary).joined(separator: " · "))
