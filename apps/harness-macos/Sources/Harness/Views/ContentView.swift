@@ -4,7 +4,6 @@ import SwiftUI
 
 struct ContentView: View {
   @Bindable var store: HarnessStore
-  let themeStyle: HarnessThemeStyle
   @Environment(\.openSettings)
   private var openSettings
   @State private var showInspector = true
@@ -24,44 +23,32 @@ struct ContentView: View {
   }
 
   private var chromeAccessibilityValue: String {
-    let chrome = harnessChromeAccessibilityValue(for: themeStyle)
-    let interactiveCards = harnessInteractiveCardAccessibilityValue(for: themeStyle)
-    return [
-      "style=\(themeStyle.rawValue)",
-      "contentChrome=\(chrome)",
-      "interactiveCards=\(interactiveCards)",
+    [
+      "contentChrome=native",
+      "interactiveRows=plain",
+      "controlGlass=system",
     ].joined(separator: ", ")
   }
 
   var body: some View {
     NavigationSplitView {
-      SidebarView(store: store, themeStyle: themeStyle)
+      SidebarView(store: store)
         .navigationSplitViewColumnWidth(min: 300, ideal: 350)
     } detail: {
       NavigationStack {
-        HSplitView {
-          VStack(spacing: 0) {
-            if store.isShowingCachedData {
-              CachedDataBanner()
-            }
-            SessionContentContainer(
-              store: store,
-              detail: selectedDetail,
-              summary: selectedSessionSummary,
-              timeline: store.timeline
-            )
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        VStack(spacing: 0) {
+          if store.isShowingCachedData {
+            CachedDataBanner()
           }
-          .accessibilityFrameMarker("\(HarnessAccessibility.contentRoot).frame")
-
-          if showInspector {
-            InspectorColumnView(store: store, themeStyle: themeStyle)
-              .frame(minWidth: 320, idealWidth: 380, maxWidth: 500)
-              .background {
-                HarnessTheme.inspectorBackground(for: themeStyle)
-              }
-          }
+          SessionContentContainer(
+            store: store,
+            detail: selectedDetail,
+            summary: selectedSessionSummary,
+            timeline: store.timeline
+          )
+          .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
+        .accessibilityFrameMarker("\(HarnessAccessibility.contentRoot).frame")
       }
       .navigationTitle("Harness")
       .toolbar {
@@ -69,21 +56,7 @@ struct ContentView: View {
           ConnectionToolbarBadge(metrics: store.connectionMetrics)
         }
         ToolbarItem(placement: .primaryAction) {
-          Button(action: refresh) {
-            HStack(spacing: 8) {
-              Image(systemName: "arrow.clockwise")
-                .rotationEffect(.degrees(store.isRefreshing ? 360 : 0))
-                .animation(
-                  store.isRefreshing
-                    ? .linear(duration: 0.9).repeatForever(autoreverses: false)
-                    : .spring(duration: 0.3),
-                  value: store.isRefreshing
-                )
-              Text("Refresh")
-            }
-          }
-          .keyboardShortcut("r", modifiers: [.command])
-          .accessibilityIdentifier(HarnessAccessibility.refreshButton)
+          RefreshToolbarButton(isRefreshing: store.isRefreshing, action: refresh)
         }
         ToolbarItem(placement: .primaryAction) {
           Button {
@@ -102,8 +75,9 @@ struct ContentView: View {
           .accessibilityIdentifier(HarnessAccessibility.daemonPreferencesButton)
         }
       }
-      .harnessExtendedChromeBackground {
-        HarnessTheme.canvas(for: themeStyle)
+      .inspector(isPresented: $showInspector) {
+        InspectorColumnView(store: store)
+          .inspectorColumnWidth(min: 320, ideal: 380, max: 500)
       }
     }
     .navigationSplitViewStyle(.prominentDetail)
@@ -182,6 +156,37 @@ struct ContentView: View {
   }
 }
 
+private struct RefreshToolbarButton: View {
+  let isRefreshing: Bool
+  let action: () -> Void
+  @State private var isSpinning = false
+
+  var body: some View {
+    Button(action: action) {
+      HStack(spacing: 8) {
+        Image(systemName: "arrow.clockwise")
+          .rotationEffect(.degrees(isSpinning ? 360 : 0))
+          .animation(
+            .linear(duration: 0.9).repeatForever(autoreverses: false),
+            value: isSpinning
+          )
+        Text("Refresh")
+      }
+    }
+    .keyboardShortcut("r", modifiers: [.command])
+    .accessibilityIdentifier(HarnessAccessibility.refreshButton)
+    .onChange(of: isRefreshing) { _, refreshing in
+      if refreshing {
+        isSpinning = true
+      } else {
+        withAnimation(.easeOut(duration: 0.4)) {
+          isSpinning = false
+        }
+      }
+    }
+  }
+}
+
 private struct CachedDataBanner: View {
   var body: some View {
     HStack(spacing: 8) {
@@ -214,6 +219,7 @@ private struct SessionContentContainer: View {
           .transition(.opacity)
       } else {
         SessionsBoardView(store: store)
+          .transition(.opacity)
       }
     }
     .animation(.spring(duration: 0.3), value: detail?.session.sessionId)
@@ -249,7 +255,6 @@ private struct SessionLoadingView: View {
           HarnessLoadingStateView(title: "Loading live session detail")
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .harnessCard()
       }
       .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -258,8 +263,5 @@ private struct SessionLoadingView: View {
 }
 
 #Preview("Dashboard") {
-  ContentView(
-    store: HarnessStore(daemonController: PreviewDaemonController()),
-    themeStyle: .gradient
-  )
+  ContentView(store: HarnessStore(daemonController: PreviewDaemonController()))
 }
