@@ -1,0 +1,5 @@
+{
+  "description": "Harness multi-agent session orchestration",
+  "name": "session",
+  "version": "1.0.0"
+}
