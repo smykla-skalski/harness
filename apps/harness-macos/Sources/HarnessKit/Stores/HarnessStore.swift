@@ -91,6 +91,7 @@ public final class HarnessStore {
   public var subscribedSessionIDs: Set<String> = []
   public var isShowingCachedData = false
   public var bookmarkedSessionIds: Set<String> = []
+  var connectionProbeInterval: Duration = .seconds(10)
   public var dataReceivedPulse: Bool {
     guard connectionState == .online,
       let lastMessageAt = connectionMetrics.lastMessageAt
@@ -106,8 +107,11 @@ public final class HarnessStore {
   var client: (any HarnessClientProtocol)?
   var globalStreamTask: Task<Void, Never>?
   var sessionStreamTask: Task<Void, Never>?
-  private var activeSessionLoadRequest: UInt64 = 0
-  private var sessionLoadSequence: UInt64 = 0
+  var connectionProbeTask: Task<Void, Never>?
+  var latencySamplesMs: [Int] = []
+  var trafficSampleTimes: [Date] = []
+  var activeSessionLoadRequest: UInt64 = 0
+  var sessionLoadSequence: UInt64 = 0
   private var hasBootstrapped = false
 
   public init(
@@ -139,8 +143,7 @@ public final class HarnessStore {
       await connect(using: client)
     } catch {
       daemonStatus = await daemonStatusResponse
-      connectionState = .offline(error.localizedDescription)
-      lastError = error.localizedDescription
+      markConnectionOffline(error.localizedDescription)
     }
   }
 
@@ -153,8 +156,7 @@ public final class HarnessStore {
       try? await Task.sleep(for: .milliseconds(300))
       await connect(using: client)
     } catch {
-      connectionState = .offline(error.localizedDescription)
-      lastError = error.localizedDescription
+      markConnectionOffline(error.localizedDescription)
     }
   }
 
@@ -210,9 +212,13 @@ public final class HarnessStore {
     }
 
     do {
-      async let diagnosticsResponse = client.diagnostics()
+      async let diagnosticsResponse = Self.measureOperation {
+        try await client.diagnostics()
+      }
       async let daemonStatusResponse: DaemonStatusReport? = try? daemonController.daemonStatus()
-      diagnostics = try await diagnosticsResponse
+      let measuredDiagnostics = try await diagnosticsResponse
+      diagnostics = measuredDiagnostics.value
+      recordRequestSuccess()
       daemonStatus = await daemonStatusResponse
     } catch {
       lastError = error.localizedDescription
@@ -225,94 +231,6 @@ public final class HarnessStore {
       return
     }
     await refresh(using: client, preserveSelection: true)
-  }
-
-  public func primeSessionSelection(_ sessionID: String?) {
-    selectedSessionID = sessionID
-    inspectorSelection = .none
-    lastError = nil
-
-    guard let sessionID else {
-      activeSessionLoadRequest = 0
-      isSelectionLoading = false
-      selectedSession = nil
-      timeline = []
-      stopSessionStream()
-      return
-    }
-
-    guard selectedSession?.session.sessionId != sessionID else {
-      return
-    }
-
-    isSelectionLoading = true
-    selectedSession = nil
-    timeline = []
-  }
-
-  public func selectSession(_ sessionID: String?) async {
-    let previousProjectId = selectedSessionSummary?.projectId
-    primeSessionSelection(sessionID)
-    guard let client, let sessionID else {
-      stopSessionStream()
-      return
-    }
-
-    let newProjectId = sessions.first(where: { $0.sessionId == sessionID })?.projectId
-    if let previousProjectId, newProjectId != previousProjectId {
-      saveFilterPreference(for: previousProjectId)
-    }
-    if let newProjectId, newProjectId != previousProjectId {
-      loadFilterPreference(for: newProjectId)
-    }
-
-    let requestID = beginSessionLoad()
-    await loadSession(using: client, sessionID: sessionID, requestID: requestID)
-    guard isCurrentSessionLoad(requestID, sessionID: sessionID) else {
-      return
-    }
-    startSessionStream(using: client, sessionID: sessionID)
-  }
-
-  public func inspect(taskID: String) {
-    inspectorSelection = .task(taskID)
-  }
-
-  public func inspect(agentID: String) {
-    inspectorSelection = .agent(agentID)
-  }
-
-  public func inspect(signalID: String) {
-    inspectorSelection = .signal(signalID)
-  }
-
-  public func inspectObserver() {
-    inspectorSelection = .observer
-  }
-
-  func synchronizeActionActor() {
-    let available = availableActionActors
-    if available.contains(where: { $0.agentId == actionActorID }) {
-      return
-    }
-    actionActorID = selectedSession?.session.leaderId ?? available.first?.agentId
-  }
-
-  func resolvedActionActor() -> String? {
-    if let actionActorID, !actionActorID.isEmpty {
-      return actionActorID
-    }
-    if let leaderID = selectedSession?.session.leaderId, !leaderID.isEmpty {
-      return leaderID
-    }
-    return availableActionActors.first?.agentId
-  }
-
-  func beginSessionLoad() -> UInt64 {
-    sessionLoadSequence &+= 1
-    activeSessionLoadRequest = sessionLoadSequence
-    isSelectionLoading = true
-    return sessionLoadSequence
   }
 
   func stopGlobalStream() {
@@ -331,16 +249,6 @@ public final class HarnessStore {
   func stopAllStreams(resetSubscriptions: Bool = true) {
     stopGlobalStream()
     stopSessionStream(resetSubscriptions: resetSubscriptions)
-  }
-
-  func completeSessionLoad(_ requestID: UInt64) {
-    guard activeSessionLoadRequest == requestID else {
-      return
-    }
-    isSelectionLoading = false
-  }
-
-  func isCurrentSessionLoad(_ requestID: UInt64, sessionID: String) -> Bool {
-    activeSessionLoadRequest == requestID && selectedSessionID == sessionID
+    stopConnectionProbe()
   }
 }
