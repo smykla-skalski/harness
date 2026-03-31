@@ -21,7 +21,10 @@ struct DaemonStatusCard: View {
             .foregroundStyle(HarnessTheme.secondaryInk)
         }
         Spacer()
-        statusPill
+        HStack(spacing: HarnessTheme.itemSpacing) {
+          restartButton
+          statusPill
+        }
       }
 
       Group {
@@ -71,44 +74,56 @@ extension DaemonStatusCard {
     store.daemonStatus?.launchAgent.installed == true
   }
 
-  fileprivate var sidebarStartDaemonButton: some View {
-    sidebarLayoutProbe(HarnessAccessibility.sidebarStartDaemonButtonFrame) {
-      HarnessAsyncActionButton(
-        title: isDaemonOnline ? "Restart Daemon" : "Start Daemon",
-        tint: isDaemonOnline ? .orange : nil,
-        variant: .prominent,
-        isLoading: isLoading,
-        accessibilityIdentifier: HarnessAccessibility.sidebarStartDaemonButton,
-        fillsWidth: false,
-        store: store,
-        storeAction: .startDaemon
-      )
+  fileprivate var restartButton: some View {
+    Button {
+      Task { await store.startDaemon() }
+    } label: {
+      Image(systemName: "restart.circle")
+        .font(.caption.bold())
     }
-  }
-
-  fileprivate var sidebarInstallLaunchAgentButton: some View {
-    sidebarLayoutProbe(HarnessAccessibility.sidebarInstallLaunchAgentButtonFrame) {
-      HarnessAsyncActionButton(
-        title: "Install Launch Agent",
-        tint: .secondary,
-        variant: .bordered,
-        isLoading: isLoading,
-        accessibilityIdentifier: HarnessAccessibility.sidebarInstallLaunchAgentButton,
-        fillsWidth: false,
-        store: store,
-        storeAction: .installLaunchAgent
-      )
-    }
+    .buttonStyle(DaemonRestartButtonStyle())
+    .disabled(isLoading)
+    .help(isDaemonOnline ? "Restart daemon" : "Start daemon")
+    .accessibilityLabel(isDaemonOnline ? "Restart Daemon" : "Start Daemon")
+    .accessibilityIdentifier(HarnessAccessibility.sidebarStartDaemonButton)
   }
 
   fileprivate var daemonActionButtons: some View {
-    HarnessWrapLayout(spacing: HarnessTheme.itemSpacing, lineSpacing: HarnessTheme.itemSpacing) {
-      sidebarStartDaemonButton
-      if !isLaunchAgentInstalled {
-        sidebarInstallLaunchAgentButton
+    Group {
+      if !isDaemonOnline || !isLaunchAgentInstalled {
+        HarnessWrapLayout(spacing: HarnessTheme.itemSpacing, lineSpacing: HarnessTheme.itemSpacing) {
+          if !isDaemonOnline {
+            sidebarLayoutProbe(HarnessAccessibility.sidebarStartDaemonButtonFrame) {
+              HarnessAsyncActionButton(
+                title: "Start Daemon",
+                tint: nil,
+                variant: .prominent,
+                isLoading: isLoading,
+                accessibilityIdentifier: "harness.sidebar.action.start.full",
+                fillsWidth: false,
+                store: store,
+                storeAction: .startDaemon
+              )
+            }
+          }
+          if !isLaunchAgentInstalled {
+            sidebarLayoutProbe(HarnessAccessibility.sidebarInstallLaunchAgentButtonFrame) {
+              HarnessAsyncActionButton(
+                title: "Install Launch Agent",
+                tint: .secondary,
+                variant: .bordered,
+                isLoading: isLoading,
+                accessibilityIdentifier: HarnessAccessibility.sidebarInstallLaunchAgentButton,
+                fillsWidth: false,
+                store: store,
+                storeAction: .installLaunchAgent
+              )
+            }
+          }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
       }
     }
-    .frame(maxWidth: .infinity, alignment: .leading)
   }
 
   fileprivate var connectionLabel: String {
@@ -224,5 +239,36 @@ extension DaemonStatusCard {
     content()
       .accessibilityElement(children: .contain)
       .accessibilityIdentifier(identifier)
+  }
+}
+
+private struct DaemonRestartButtonStyle: ButtonStyle {
+  @State private var isHovered = false
+  @Environment(\.isEnabled)
+  private var isEnabled
+
+  private var foreground: Color {
+    if !isEnabled { return HarnessTheme.secondaryInk.opacity(0.5) }
+    if isHovered { return HarnessTheme.accent }
+    return HarnessTheme.secondaryInk
+  }
+
+  func makeBody(configuration: Configuration) -> some View {
+    configuration.label
+      .foregroundStyle(foreground)
+      .harnessPillPadding()
+      .background(
+        Capsule().fill(foreground.opacity(configuration.isPressed ? 0.18 : isHovered ? 0.1 : 0))
+      )
+      .contentShape(Capsule())
+      .scaleEffect(configuration.isPressed ? 0.92 : 1)
+      .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
+      .animation(.easeOut(duration: 0.15), value: isHovered)
+      .onContinuousHover { phase in
+        switch phase {
+        case .active: isHovered = true
+        case .ended: isHovered = false
+        }
+      }
   }
 }
