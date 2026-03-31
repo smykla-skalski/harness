@@ -127,6 +127,25 @@ Glob-scoped rules in `.claude/rules/` enforce patterns learned from three review
 
 These rules auto-activate when editing `apps/harness-macos/Sources/**/*.swift`.
 
+## UX rules (macOS and iOS apps)
+
+Enforceable UX requirements live in `.claude/rules/` and are automatically loaded when editing matching files. These are hard requirements - not optional guidelines.
+
+| Rule file | Scope | Covers |
+|---|---|---|
+| [ux-accessibility.md](.claude/rules/ux-accessibility.md) | `**/*.swift` | VoiceOver, Dynamic Type, contrast, keyboard nav, Reduce Motion, target sizes |
+| [ux-visual-design.md](.claude/rules/ux-visual-design.md) | `**/*.swift` | Typography, color, spacing (8pt grid), dark mode, icons, motion timing |
+| [ux-interaction.md](.claude/rules/ux-interaction.md) | `**/*.swift` | Feedback, errors, loading states, destructive actions, forms, data display |
+| [ux-swiftui.md](.claude/rules/ux-swiftui.md) | `**/*.swift` | State management, navigation, performance, animations, anti-patterns |
+| [ux-performance.md](.claude/rules/ux-performance.md) | `**/*.swift` | Response times, 60fps, launch time, scroll, memory, network UI, auto-save |
+| [ux-platform-macos.md](.claude/rules/ux-platform-macos.md) | `apps/harness-macos/**/*.swift` | Menu bar, windows, toolbar, settings, dock, keyboard shortcuts |
+| [ux-platform-ios.md](.claude/rules/ux-platform-ios.md) | `apps/*-ios/**/*.swift` | Tab bar, safe areas, gestures, navigation bar, permissions |
+| [swiftui-state-management.md](.claude/rules/swiftui-state-management.md) | `apps/harness-macos/Sources/**` | @Bindable vs let, @State privacy, no closures in views |
+| [swiftui-view-structure.md](.claude/rules/swiftui-view-structure.md) | `apps/harness-macos/Sources/**` | View composition, ForEach identity, modifier branches |
+| [swiftui-performance.md](.claude/rules/swiftui-performance.md) | `apps/harness-macos/Sources/**` | Formatter allocation, thread safety, animation scoping |
+
+Detailed research backing these rules is in `tmp/ux-research/` (10 documents, ~4900 lines). Consult for rationale or edge cases.
+
 ## Gotchas
 
 - `guard-bash` denies direct use of `kubectl`, `kumactl`, `helm`, `docker`, `k3d` - all cluster access must go through harness commands (see `rules.rs:26`)
