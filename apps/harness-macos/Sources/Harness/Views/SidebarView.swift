@@ -15,7 +15,6 @@ struct SidebarView: View {
       .padding(.vertical, HarnessTheme.spacingXL)
       .padding(.horizontal, HarnessTheme.sectionSpacing)
     }
-    .scrollIndicators(.hidden)
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     .foregroundStyle(HarnessTheme.ink)
     .contentShape(Rectangle())

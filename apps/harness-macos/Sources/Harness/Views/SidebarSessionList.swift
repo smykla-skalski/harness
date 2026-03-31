@@ -300,6 +300,7 @@ extension SidebarSessionList {
     VStack(alignment: .leading, spacing: HarnessTheme.itemSpacing) {
       Text(title.uppercased())
         .font(.caption2.weight(.bold))
+        .tracking(HarnessTheme.uppercaseTracking)
         .foregroundStyle(HarnessTheme.secondaryInk)
       content()
     }

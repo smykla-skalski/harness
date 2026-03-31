@@ -44,6 +44,11 @@ enum HarnessTheme {
   /// Vertical gap between items within a group.
   static let itemSpacing: CGFloat = spacingSM
 
+  // MARK: - Typography
+
+  /// Letter-spacing for ALL CAPS labels to improve readability per HIG.
+  static let uppercaseTracking: CGFloat = 0.5
+
   // MARK: - Corner radius
 
   static let cornerRadiusSM: CGFloat = 12

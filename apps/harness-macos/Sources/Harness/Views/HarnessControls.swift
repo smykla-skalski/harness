@@ -244,7 +244,7 @@ private struct InteractiveCardButtonStyle: ButtonStyle {
 
   func makeBody(configuration: Configuration) -> some View {
     let highlight = tint ?? .primary
-    let fillOpacity = configuration.isPressed ? 0.12 : isHovered ? 0.08 : 0
+    let fillOpacity = configuration.isPressed ? 0.12 : isHovered ? 0.08 : 0.04
     configuration.label
       .background {
         RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)

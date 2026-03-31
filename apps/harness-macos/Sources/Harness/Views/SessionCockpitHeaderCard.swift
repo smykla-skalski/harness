@@ -156,6 +156,7 @@ struct SessionCockpitHeaderCard: View {
     VStack(alignment: .leading, spacing: 2) {
       Text(title.uppercased())
         .font(.caption2.weight(.bold))
+        .tracking(HarnessTheme.uppercaseTracking)
         .foregroundStyle(HarnessTheme.secondaryInk)
       Text(value)
         .font(.system(.callout, design: .rounded, weight: .semibold))
