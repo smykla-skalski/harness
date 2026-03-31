@@ -35,6 +35,15 @@ struct SidebarView: View {
       sessionSections
     }
     .listStyle(.sidebar)
+    .safeAreaInset(edge: .bottom, spacing: 0) {
+      ConnectionToolbarBadge(metrics: store.connectionMetrics)
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, HarnessTheme.itemSpacing)
+        .padding(.horizontal, HarnessTheme.sectionSpacing)
+        .harnessRoundedRectGlass()
+        .padding(.horizontal, HarnessTheme.sectionSpacing)
+        .padding(.bottom, HarnessTheme.itemSpacing)
+    }
     .animation(.snappy(duration: 0.24), value: store.groupedSessions)
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     .foregroundStyle(HarnessTheme.ink)

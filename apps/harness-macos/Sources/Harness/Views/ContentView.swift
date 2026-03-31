@@ -91,6 +91,7 @@ struct ContentView: View {
           }
           .disabled(store.navigationBackStack.isEmpty)
           .help("Go back")
+          .accessibilityIdentifier(HarnessAccessibility.navigateBackButton)
         }
         ToolbarItem(placement: .navigation) {
           Button {
@@ -100,9 +101,7 @@ struct ContentView: View {
           }
           .disabled(store.navigationForwardStack.isEmpty)
           .help("Go forward")
-        }
-        ToolbarItem(placement: .status) {
-          ConnectionToolbarBadge(metrics: store.connectionMetrics)
+          .accessibilityIdentifier(HarnessAccessibility.navigateForwardButton)
         }
       }
       .toolbar(id: "harness.main") {
