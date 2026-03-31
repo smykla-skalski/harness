@@ -22,6 +22,7 @@ struct SidebarView: View {
 
       Section {
         SidebarFilterSection(store: store)
+          .environment(\.backgroundProminence, .standard)
       }
       .listRowInsets(EdgeInsets(
         top: HarnessTheme.sectionSpacing,
@@ -30,7 +31,6 @@ struct SidebarView: View {
         trailing: HarnessTheme.sectionSpacing
       ))
       .listRowSeparator(.hidden)
-      .listRowBackground(Color.clear)
 
       sessionSections
     }
