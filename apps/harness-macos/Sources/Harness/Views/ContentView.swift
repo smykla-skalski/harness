@@ -72,36 +72,38 @@ struct ContentView: View {
       }
       .navigationTitle("Harness")
       .toolbar {
-        ToolbarItem(placement: .secondaryAction) {
+        ToolbarItem(placement: .status) {
           ConnectionToolbarBadge(metrics: store.connectionMetrics)
         }
-        ToolbarItem(placement: .primaryAction) {
-          RefreshToolbarButton(store: store)
-        }
-        ToolbarItem(placement: .primaryAction) {
-          Button {
-            showInspector.toggle()
-          } label: {
-            Label("Inspector", systemImage: "info.circle")
+        if !showInspector {
+          ToolbarItem(placement: .primaryAction) {
+            RefreshToolbarButton(store: store)
           }
-          .help("Toggle inspector (Cmd+Option+I)")
-        }
-        ToolbarItem(placement: .primaryAction) {
-          Button {
-            openSettings()
-          } label: {
-            Label("Settings", systemImage: "gearshape")
+          ToolbarItem(placement: .primaryAction) {
+            Button {
+              showInspector.toggle()
+            } label: {
+              Label("Inspector", systemImage: "info.circle")
+            }
+            .help("Toggle inspector (Cmd+Option+I)")
           }
-          .accessibilityIdentifier(HarnessAccessibility.daemonPreferencesButton)
+          ToolbarItem(placement: .secondaryAction) {
+            Button {
+              openSettings()
+            } label: {
+              Label("Settings", systemImage: "gearshape")
+            }
+            .accessibilityIdentifier(HarnessAccessibility.daemonPreferencesButton)
+          }
         }
-      }
-      .inspector(isPresented: $showInspector) {
-        InspectorColumnView(store: store)
-          .inspectorColumnWidth(min: 320, ideal: 380, max: 500)
       }
     }
+    .inspector(isPresented: $showInspector) {
+      InspectorColumnView(store: store, isPresented: $showInspector)
+        .inspectorColumnWidth(min: 320, ideal: 380, max: 500)
+    }
     .navigationSplitViewStyle(.prominentDetail)
-    .toolbarBackgroundVisibility(.visible, for: .windowToolbar)
+    .toolbarBackgroundVisibility(.automatic, for: .windowToolbar)
     .containerBackground(.windowBackground, for: .window)
     .focusedSceneValue(\.inspectorVisibility, $showInspector)
     .onAppear {
@@ -205,7 +207,7 @@ private struct HarnessConfirmationDialogModifier: ViewModifier {
   }
 }
 
-private struct RefreshToolbarButton: View {
+struct RefreshToolbarButton: View {
   let store: HarnessStore
   @Environment(\.accessibilityReduceMotion)
   private var reduceMotion
@@ -227,7 +229,6 @@ private struct RefreshToolbarButton: View {
         Text("Refresh")
       }
     }
-    .keyboardShortcut("r", modifiers: [.command])
     .accessibilityIdentifier(HarnessAccessibility.refreshButton)
     .onChange(of: store.isRefreshing) { _, refreshing in
       isSpinning = refreshing

@@ -4,6 +4,9 @@ import SwiftUI
 
 struct InspectorColumnView: View {
   let store: HarnessStore
+  @Binding var isPresented: Bool
+  @Environment(\.openSettings)
+  private var openSettings
 
   private var selectedObserver: ObserverSummary? {
     guard case .observer = store.inspectorSelection else { return nil }
@@ -38,6 +41,27 @@ struct InspectorColumnView: View {
       .frame(maxWidth: .infinity, alignment: .leading)
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    .toolbar {
+      ToolbarItem(placement: .primaryAction) {
+        RefreshToolbarButton(store: store)
+      }
+      ToolbarItem(placement: .primaryAction) {
+        Button {
+          isPresented.toggle()
+        } label: {
+          Label("Inspector", systemImage: "info.circle")
+        }
+        .help("Toggle inspector (Cmd+Option+I)")
+      }
+      ToolbarItem(placement: .secondaryAction) {
+        Button {
+          openSettings()
+        } label: {
+          Label("Settings", systemImage: "gearshape")
+        }
+        .accessibilityIdentifier(HarnessAccessibility.daemonPreferencesButton)
+      }
+    }
     .foregroundStyle(HarnessTheme.ink)
     .textFieldStyle(.roundedBorder)
     .accessibilityElement(children: .contain)

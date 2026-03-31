@@ -132,7 +132,7 @@ struct HarnessApp: App {
     }
     CommandMenu("Harness") {
       Button("Refresh", action: refreshStore)
-        .keyboardShortcut("r", modifiers: [.command, .shift])
+        .keyboardShortcut("r", modifiers: [.command])
 
       Divider()
 
