@@ -6,60 +6,58 @@ struct PreferencesActionButtons: View {
   let isLoading: Bool
 
   var body: some View {
-    HarnessGlassContainer(spacing: 8) {
-      HarnessWrapLayout(spacing: 8, lineSpacing: 8) {
-        HarnessAsyncActionButton(
-          title: "Reconnect",
-          tint: nil,
-          variant: .bordered,
-          isLoading: isLoading,
-          accessibilityIdentifier: HarnessAccessibility.preferencesActionButton("Reconnect"),
-          store: store,
-          storeAction: .reconnect
-        )
-        HarnessAsyncActionButton(
-          title: "Refresh Diagnostics",
-          tint: .secondary,
-          variant: .bordered,
-          isLoading: isLoading,
-          accessibilityIdentifier: HarnessAccessibility.preferencesActionButton(
-            "Refresh Diagnostics"
-          ),
-          store: store,
-          storeAction: .refreshDiagnostics
-        )
-        HarnessAsyncActionButton(
-          title: "Start Daemon",
-          tint: nil,
-          variant: .prominent,
-          isLoading: isLoading,
-          accessibilityIdentifier: HarnessAccessibility.preferencesActionButton("Start Daemon"),
-          store: store,
-          storeAction: .startDaemon
-        )
-        HarnessAsyncActionButton(
-          title: "Install Launch Agent",
-          tint: .secondary,
-          variant: .bordered,
-          isLoading: isLoading,
-          accessibilityIdentifier: HarnessAccessibility.preferencesActionButton(
-            "Install Launch Agent"
-          ),
-          store: store,
-          storeAction: .installLaunchAgent
-        )
-        HarnessAsyncActionButton(
-          title: "Remove Launch Agent",
-          tint: .red,
-          variant: .bordered,
-          isLoading: isLoading,
-          accessibilityIdentifier: HarnessAccessibility.preferencesActionButton(
-            "Remove Launch Agent"
-          ),
-          store: store,
-          storeAction: .removeLaunchAgent
-        )
-      }
+    HarnessWrapLayout(spacing: 8, lineSpacing: 8) {
+      HarnessAsyncActionButton(
+        title: "Reconnect",
+        tint: nil,
+        variant: .bordered,
+        isLoading: isLoading,
+        accessibilityIdentifier: HarnessAccessibility.preferencesActionButton("Reconnect"),
+        store: store,
+        storeAction: .reconnect
+      )
+      HarnessAsyncActionButton(
+        title: "Refresh Diagnostics",
+        tint: .secondary,
+        variant: .bordered,
+        isLoading: isLoading,
+        accessibilityIdentifier: HarnessAccessibility.preferencesActionButton(
+          "Refresh Diagnostics"
+        ),
+        store: store,
+        storeAction: .refreshDiagnostics
+      )
+      HarnessAsyncActionButton(
+        title: "Start Daemon",
+        tint: nil,
+        variant: .prominent,
+        isLoading: isLoading,
+        accessibilityIdentifier: HarnessAccessibility.preferencesActionButton("Start Daemon"),
+        store: store,
+        storeAction: .startDaemon
+      )
+      HarnessAsyncActionButton(
+        title: "Install Launch Agent",
+        tint: .secondary,
+        variant: .bordered,
+        isLoading: isLoading,
+        accessibilityIdentifier: HarnessAccessibility.preferencesActionButton(
+          "Install Launch Agent"
+        ),
+        store: store,
+        storeAction: .installLaunchAgent
+      )
+      HarnessAsyncActionButton(
+        title: "Remove Launch Agent",
+        tint: .red,
+        variant: .bordered,
+        isLoading: isLoading,
+        accessibilityIdentifier: HarnessAccessibility.preferencesActionButton(
+          "Remove Launch Agent"
+        ),
+        store: store,
+        storeAction: .removeLaunchAgent
+      )
     }
     .frame(maxWidth: .infinity, alignment: .leading)
   }
@@ -134,31 +132,29 @@ struct PreferencesConnectionSection: View {
   var body: some View {
     Form {
       Section("Actions") {
-        HarnessGlassContainer(spacing: 8) {
-          HarnessWrapLayout(spacing: 8, lineSpacing: 8) {
-            HarnessAsyncActionButton(
-              title: "Reconnect",
-              tint: nil,
-              variant: .prominent,
-              isLoading: store.connectionState == .connecting,
-              accessibilityIdentifier: HarnessAccessibility.preferencesActionButton(
-                "Connection Reconnect"
-              ),
-              store: store,
-              storeAction: .reconnect
-            )
-            HarnessAsyncActionButton(
-              title: "Refresh Diagnostics",
-              tint: .secondary,
-              variant: .bordered,
-              isLoading: store.isDiagnosticsRefreshInFlight,
-              accessibilityIdentifier: HarnessAccessibility.preferencesActionButton(
-                "Connection Refresh Diagnostics"
-              ),
-              store: store,
-              storeAction: .refreshDiagnostics
-            )
-          }
+        HarnessWrapLayout(spacing: 8, lineSpacing: 8) {
+          HarnessAsyncActionButton(
+            title: "Reconnect",
+            tint: nil,
+            variant: .prominent,
+            isLoading: store.connectionState == .connecting,
+            accessibilityIdentifier: HarnessAccessibility.preferencesActionButton(
+              "Connection Reconnect"
+            ),
+            store: store,
+            storeAction: .reconnect
+          )
+          HarnessAsyncActionButton(
+            title: "Refresh Diagnostics",
+            tint: .secondary,
+            variant: .bordered,
+            isLoading: store.isDiagnosticsRefreshInFlight,
+            accessibilityIdentifier: HarnessAccessibility.preferencesActionButton(
+              "Connection Refresh Diagnostics"
+            ),
+            store: store,
+            storeAction: .refreshDiagnostics
+          )
         }
       }
       PreferencesConnectionMetrics(

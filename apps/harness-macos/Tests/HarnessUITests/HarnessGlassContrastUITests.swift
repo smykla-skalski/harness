@@ -51,6 +51,52 @@ final class HarnessGlassContrastUITests: HarnessUITestCase {
     )
   }
 
+  func testInspectorEmptyStateIsReadable() throws {
+    let app = launch(mode: "empty")
+
+    let emptyState = element(in: app, identifier: Accessibility.inspectorEmptyState)
+    XCTAssertTrue(emptyState.waitForExistence(timeout: Self.uiTimeout))
+
+    let stats = luminanceStats(of: emptyState)
+    let screenshot = XCTAttachment(screenshot: emptyState.screenshot())
+    screenshot.name = "inspector-empty-state"
+    screenshot.lifetime = .keepAlways
+    add(screenshot)
+
+    XCTAssertGreaterThan(
+      stats.stddev,
+      0.04,
+      "Section content washed out: stddev=\(stats.stddev), "
+        + "min=\(stats.min), max=\(stats.max), "
+        + "mean=\(stats.mean), samples=\(stats.count)"
+    )
+  }
+
+  func testSessionTaskCardContentIsReadable() throws {
+    let app = launch(mode: "preview")
+    let sessionRow = previewSessionTrigger(in: app)
+
+    XCTAssertTrue(sessionRow.waitForExistence(timeout: Self.uiTimeout))
+    tapPreviewSession(in: app)
+
+    let taskCard = element(in: app, identifier: Accessibility.taskUICard)
+    XCTAssertTrue(taskCard.waitForExistence(timeout: Self.uiTimeout))
+
+    let stats = luminanceStats(of: taskCard)
+    let screenshot = XCTAttachment(screenshot: taskCard.screenshot())
+    screenshot.name = "session-task-card"
+    screenshot.lifetime = .keepAlways
+    add(screenshot)
+
+    XCTAssertGreaterThan(
+      stats.stddev,
+      0.04,
+      "Section content washed out: stddev=\(stats.stddev), "
+        + "min=\(stats.min), max=\(stats.max), "
+        + "mean=\(stats.mean), samples=\(stats.count)"
+    )
+  }
+
   // MARK: - Pixel analysis
 
   private struct LuminanceStats {

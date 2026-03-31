@@ -62,7 +62,7 @@ struct HarnessAsyncActionButton: View {
   }
 
   private var label: some View {
-    HStack(spacing: 6) {
+    HStack(spacing: 8) {
       if isLoading {
         HarnessSpinner()
           .transition(.opacity)
@@ -146,16 +146,39 @@ private struct InteractiveCardButtonStyle: ButtonStyle {
   private var isEnabled
 
   func makeBody(configuration: Configuration) -> some View {
+    InteractiveCardButtonBody(
+      configuration: configuration,
+      cornerRadius: cornerRadius,
+      tint: tint,
+      isEnabled: isEnabled
+    )
+  }
+}
+
+private struct InteractiveCardButtonBody: View {
+  let configuration: ButtonStyleConfiguration
+  let cornerRadius: CGFloat
+  let tint: Color?
+  let isEnabled: Bool
+  @State private var isHovered = false
+
+  private var fillOpacity: Double {
+    if configuration.isPressed { return 0.12 }
+    if isHovered { return 0.07 }
+    return 0
+  }
+
+  var body: some View {
     configuration.label
       .background {
-        if let tint {
-          RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-            .fill(tint.opacity(configuration.isPressed ? 0.18 : 0.12))
-        }
+        RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+          .fill((tint ?? HarnessTheme.controlBorder).opacity(fillOpacity))
       }
       .contentShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
-      .opacity(isEnabled ? (configuration.isPressed ? 0.85 : 1) : 0.4)
+      .opacity(isEnabled ? (configuration.isPressed ? 0.92 : 1) : 0.4)
+      .onHover { isHovered = $0 }
       .animation(.easeOut(duration: 0.15), value: configuration.isPressed)
+      .animation(.easeOut(duration: 0.15), value: isHovered)
   }
 }
 
@@ -182,7 +205,7 @@ extension View {
   }
 
   func harnessInteractiveCardButtonStyle(
-    cornerRadius: CGFloat = 18,
+    cornerRadius: CGFloat = HarnessTheme.cornerRadiusMD,
     tint: Color? = nil
   ) -> some View {
     buttonStyle(

@@ -16,7 +16,7 @@ struct SessionCockpitSignalsSection: View {
             store.inspect(signalID: signal.signal.signalId)
           } label: {
             HStack(alignment: .top) {
-              VStack(alignment: .leading, spacing: 6) {
+              VStack(alignment: .leading, spacing: 8) {
                 Text(signal.signal.command)
                   .font(.system(.headline, design: .rounded, weight: .semibold))
                 Text(signal.signal.payload.message)
@@ -35,7 +35,7 @@ struct SessionCockpitSignalsSection: View {
               }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(14)
+            .padding(12)
           }
           .harnessInteractiveCardButtonStyle()
           .transition(
@@ -80,7 +80,7 @@ struct SessionCockpitTimelineSection: View {
           }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.leading, 18)
+        .padding(.leading, 16)
         .overlay(alignment: .leading) {
           RoundedRectangle(cornerRadius: 999, style: .continuous)
             .fill(HarnessTheme.accent.opacity(0.28))

@@ -23,7 +23,7 @@ struct SessionActionDock: View {
             .accessibilityAddTraits(.isHeader)
           Text("Pick a lane, then use the inspector to submit the change.")
             .font(.system(.subheadline, design: .rounded, weight: .medium))
-            .foregroundStyle(.secondary)
+            .foregroundStyle(HarnessTheme.secondaryInk)
         }
         Spacer()
         VStack(alignment: .trailing, spacing: 4) {
@@ -38,7 +38,7 @@ struct SessionActionDock: View {
           }
           Text("\(detail.tasks.count) tasks · \(detail.agents.count) agents")
             .font(.caption.monospacedDigit())
-            .foregroundStyle(.secondary)
+            .foregroundStyle(HarnessTheme.secondaryInk)
         }
         .animation(.spring(duration: 0.2), value: store.isSessionActionInFlight)
       }
@@ -78,10 +78,10 @@ struct SessionActionDock: View {
           .font(.system(.headline, design: .rounded, weight: .semibold))
         Text(subtitle)
           .font(.caption)
-          .foregroundStyle(.secondary)
+          .foregroundStyle(HarnessTheme.secondaryInk)
       }
       .frame(maxWidth: .infinity, alignment: .leading)
-      .padding(14)
+      .padding(12)
     }
     .harnessInteractiveCardButtonStyle()
   }

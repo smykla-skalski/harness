@@ -13,7 +13,7 @@ struct TransportBadge: View {
   }
 
   var body: some View {
-    HStack(spacing: 5) {
+    HStack(spacing: 4) {
       Image(systemName: icon)
         .font(.caption2.weight(.semibold))
       Text(kind.title)
@@ -22,9 +22,9 @@ struct TransportBadge: View {
         .fixedSize()
     }
     .foregroundStyle(tint)
-    .padding(.horizontal, 9)
-    .padding(.vertical, 5)
-    .harnessCapsuleGlass()
+    .padding(.horizontal, 8)
+    .padding(.vertical, 4)
+    .harnessInfoPill(tint: tint)
     .fixedSize()
     .accessibilityElement(children: .combine)
   }
@@ -47,9 +47,9 @@ struct LatencyBadge: View {
       .foregroundStyle(tint)
       .lineLimit(1)
       .fixedSize()
-      .padding(.horizontal, 9)
-      .padding(.vertical, 5)
-      .harnessCapsuleGlass()
+      .padding(.horizontal, 8)
+      .padding(.vertical, 4)
+      .harnessInfoPill(tint: tint)
   }
 }
 
@@ -107,7 +107,7 @@ struct ConnectionStatusStrip: View {
   }
 
   var body: some View {
-    HStack(spacing: 10) {
+    HStack(spacing: 8) {
       ActivityPulse(isActive: isActive)
 
       VStack(alignment: .leading, spacing: 2) {
@@ -120,11 +120,9 @@ struct ConnectionStatusStrip: View {
 
       Spacer(minLength: 8)
 
-      HarnessGlassContainer(spacing: 8) {
-        HStack(spacing: 8) {
-          TransportBadge(kind: metrics.transportKind)
-          LatencyBadge(latencyMs: metrics.latencyMs)
-        }
+      HStack(spacing: 8) {
+        TransportBadge(kind: metrics.transportKind)
+        LatencyBadge(latencyMs: metrics.latencyMs)
       }
     }
   }
@@ -148,10 +146,10 @@ struct ConnectionToolbarBadge: View {
   }
 
   var body: some View {
-    HStack(spacing: 5) {
+    HStack(spacing: 4) {
       Circle()
         .fill(qualityColor)
-        .frame(width: 6, height: 6)
+        .frame(width: 8, height: 8)
         .accessibilityHidden(true)
       Text(label)
         .font(.system(.caption, design: .rounded, weight: .semibold).monospacedDigit())
@@ -160,7 +158,7 @@ struct ConnectionToolbarBadge: View {
         .fixedSize()
     }
     .padding(.horizontal, 8)
-    .padding(.vertical, 5)
+    .padding(.vertical, 4)
     .fixedSize()
     .accessibilityIdentifier(HarnessAccessibility.connectionBadge)
     .accessibilityLabel("Connection: \(label)")
@@ -177,7 +175,7 @@ struct ReconnectionProgressView: View {
 
   var body: some View {
     VStack(alignment: .leading, spacing: 6) {
-      HStack(spacing: 10) {
+      HStack(spacing: 8) {
         ProgressView()
           .controlSize(.small)
         Text("Reconnecting")

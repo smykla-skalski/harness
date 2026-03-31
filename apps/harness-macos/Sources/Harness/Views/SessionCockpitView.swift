@@ -9,7 +9,7 @@ struct SessionCockpitView: View {
 
   var body: some View {
     HarnessColumnScrollView {
-      VStack(alignment: .leading, spacing: 18) {
+      VStack(alignment: .leading, spacing: 16) {
         SessionCockpitHeaderCard(store: store, detail: detail)
         SessionMetricGrid(metrics: detail.session.metrics)
         SessionActionDock(store: store, detail: detail)

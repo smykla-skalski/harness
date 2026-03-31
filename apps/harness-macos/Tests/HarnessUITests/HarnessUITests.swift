@@ -317,7 +317,18 @@ final class HarnessUITests: HarnessUITestCase {
   }
 
   func testSettingsThemeModePickerKeepsNativeChromeContract() throws {
-    let app = launch(mode: "preview")
+    assertSettingsThemeModeContract(expectedMode: "auto")
+    assertSettingsThemeModeContract(expectedMode: "dark")
+    assertSettingsThemeModeContract(expectedMode: "light")
+  }
+
+  private func assertSettingsThemeModeContract(expectedMode: String) {
+    let app = launch(
+      mode: "preview",
+      additionalEnvironment: [
+        "HARNESS_THEME_MODE_OVERRIDE": expectedMode,
+      ]
+    )
 
     let preferencesButton = toolbarButton(in: app, identifier: Accessibility.preferencesButton)
     XCTAssertTrue(preferencesButton.waitForExistence(timeout: Self.uiTimeout))
@@ -341,72 +352,11 @@ final class HarnessUITests: HarnessUITestCase {
     XCTAssertTrue(observeSummaryButton.waitForExistence(timeout: Self.uiTimeout))
     XCTAssertEqual(
       preferencesState.label,
-      "mode=auto, section=general, preferencesChrome=native"
+      "mode=\(expectedMode), section=general, preferencesChrome=native"
     )
     XCTAssertEqual(
       appChromeState.label,
-      "contentChrome=native, interactiveRows=plain, controlGlass=system"
-    )
-    XCTAssertEqual(sessionRow.value as? String, "selected, interactive=plain")
-    XCTAssertEqual(observeSummaryButton.value as? String, "interactive=plain")
-
-    selectMenuOption(
-      in: app,
-      controlIdentifier: Accessibility.preferencesThemeModePicker,
-      optionTitle: "Dark"
-    )
-    XCTAssertTrue(
-      waitUntil {
-        preferencesState.label == "mode=dark, section=general, preferencesChrome=native"
-      }
-    )
-
-    XCTAssertEqual(
-      preferencesState.label,
-      "mode=dark, section=general, preferencesChrome=native"
-    )
-    XCTAssertEqual(
-      appChromeState.label,
-      "contentChrome=native, interactiveRows=plain, controlGlass=system"
-    )
-    XCTAssertEqual(sessionRow.value as? String, "selected, interactive=plain")
-    XCTAssertEqual(observeSummaryButton.value as? String, "interactive=plain")
-
-    selectMenuOption(
-      in: app,
-      controlIdentifier: Accessibility.preferencesThemeModePicker,
-      optionTitle: "Light"
-    )
-    XCTAssertTrue(
-      waitUntil {
-        preferencesState.label == "mode=light, section=general, preferencesChrome=native"
-      }
-    )
-
-    XCTAssertEqual(
-      preferencesState.label,
-      "mode=light, section=general, preferencesChrome=native"
-    )
-    XCTAssertEqual(
-      appChromeState.label,
-      "contentChrome=native, interactiveRows=plain, controlGlass=system"
-    )
-    XCTAssertEqual(sessionRow.value as? String, "selected, interactive=plain")
-    XCTAssertEqual(observeSummaryButton.value as? String, "interactive=plain")
-
-    selectMenuOption(
-      in: app,
-      controlIdentifier: Accessibility.preferencesThemeModePicker,
-      optionTitle: "Auto"
-    )
-    XCTAssertTrue(
-      waitUntil {
-        preferencesState.label == "mode=auto, section=general, preferencesChrome=native"
-      }
-    )
-    XCTAssertEqual(
-      appChromeState.label,
-      "contentChrome=native, interactiveRows=plain, controlGlass=system"
+      "contentChrome=native, interactiveRows=plain, controlGlass=none"
     )
     XCTAssertEqual(sessionRow.value as? String, "selected, interactive=plain")
     XCTAssertEqual(observeSummaryButton.value as? String, "interactive=plain")

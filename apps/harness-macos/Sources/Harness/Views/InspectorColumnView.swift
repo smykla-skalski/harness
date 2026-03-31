@@ -18,8 +18,8 @@ struct InspectorColumnView: View {
   }
 
   var body: some View {
-    HarnessColumnScrollView(horizontalPadding: 18, verticalPadding: 22) {
-      VStack(alignment: .leading, spacing: 18) {
+    HarnessColumnScrollView(horizontalPadding: 16, verticalPadding: 20) {
+      VStack(alignment: .leading, spacing: 16) {
         Group {
           inspectorContent
         }
@@ -82,14 +82,14 @@ struct InspectorColumnView: View {
   }
 
   private func sessionLoadingInspector(_ summary: SessionSummary) -> some View {
-    VStack(alignment: .leading, spacing: 14) {
+    VStack(alignment: .leading, spacing: 12) {
       Text("Inspector")
         .font(.system(.title3, design: .rounded, weight: .semibold))
         .accessibilityAddTraits(.isHeader)
       Text(summary.context)
         .font(.system(.headline, design: .rounded, weight: .semibold))
       Text("Loading live task, agent, and signal detail for the selected session.")
-        .foregroundStyle(.secondary)
+        .foregroundStyle(HarnessTheme.secondaryInk)
       HarnessLoadingStateView(title: "Loading session detail")
     }
     .frame(maxWidth: .infinity, alignment: .leading)
@@ -107,7 +107,7 @@ struct InspectorColumnView: View {
         .font(.system(.title3, design: .rounded, weight: .semibold))
         .accessibilityAddTraits(.isHeader)
       Text("Select a session to inspect live task, agent, and signal detail.")
-        .foregroundStyle(.secondary)
+        .foregroundStyle(HarnessTheme.secondaryInk)
     }
     .frame(maxWidth: .infinity, alignment: .leading)
     .accessibilityTestProbe(

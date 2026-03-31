@@ -11,7 +11,7 @@ struct SessionsBoardView: View {
 
   var body: some View {
     HarnessColumnScrollView(constrainContentWidth: true) {
-      VStack(alignment: .leading, spacing: 22) {
+      VStack(alignment: .leading, spacing: 24) {
         if store.sessions.isEmpty {
           SessionsBoardOnboardingCard(store: store, isLoading: isLoading)
         }
@@ -65,7 +65,7 @@ struct SessionsBoardView: View {
   }
 
   private func metricCard(title: String, value: String, tint: Color) -> some View {
-    HStack(alignment: .top, spacing: 14) {
+    HStack(alignment: .top, spacing: 12) {
       RoundedRectangle(cornerRadius: 999, style: .continuous)
         .fill(tint)
         .frame(width: 12)

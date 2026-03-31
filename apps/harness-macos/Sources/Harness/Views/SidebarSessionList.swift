@@ -26,7 +26,7 @@ struct SidebarSessionList: View {
   }
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 14) {
+    VStack(alignment: .leading, spacing: 12) {
       filterSlice
       sessionList
     }
@@ -34,7 +34,7 @@ struct SidebarSessionList: View {
   }
 
   private var filterSlice: some View {
-    VStack(alignment: .leading, spacing: 14) {
+    VStack(alignment: .leading, spacing: 12) {
       HStack(alignment: .top) {
         VStack(alignment: .leading, spacing: 4) {
           Text("Search & Filters")
@@ -75,65 +75,59 @@ struct SidebarSessionList: View {
       if store.searchText.isEmpty {
         let recent = store.recentSearches
         if !recent.isEmpty {
-          HarnessGlassContainer(spacing: 6) {
-            HStack(spacing: 6) {
-              ForEach(recent.prefix(5), id: \.query) { search in
-                Button(search.query) {
-                  store.searchText = search.query
-                }
-                .font(.caption)
-                .lineLimit(1)
-                .harnessAccessoryButtonStyle()
-                .controlSize(.small)
+          HStack(spacing: 6) {
+            ForEach(recent.prefix(5), id: \.query) { search in
+              Button(search.query) {
+                store.searchText = search.query
               }
-              Spacer()
-              Button {
-                store.clearSearchHistory()
-              } label: {
-                Image(systemName: "xmark.circle")
-                  .font(.caption2)
-                  .foregroundStyle(HarnessTheme.secondaryInk)
-              }
+              .font(.caption)
+              .lineLimit(1)
               .harnessAccessoryButtonStyle()
               .controlSize(.small)
             }
+            Spacer()
+            Button {
+              store.clearSearchHistory()
+            } label: {
+              Image(systemName: "xmark.circle")
+                .font(.caption2)
+                .foregroundStyle(HarnessTheme.secondaryInk)
+            }
+            .harnessAccessoryButtonStyle()
+            .controlSize(.small)
           }
         }
       }
 
       filterSection(title: "Status") {
-        HarnessGlassContainer(spacing: 8) {
-          HarnessWrapLayout(spacing: 6, lineSpacing: 6) {
-            ForEach(HarnessStore.SessionFilter.allCases) { filter in
-              filterChip(
-                title: filter.title,
-                isSelected: store.sessionFilter == filter,
-                identifier: HarnessAccessibility.sessionFilterButton(filter.rawValue)
-              ) {
-                store.sessionFilter = filter
-              }
+        HarnessWrapLayout(spacing: 6, lineSpacing: 6) {
+          ForEach(HarnessStore.SessionFilter.allCases) { filter in
+            filterChip(
+              title: filter.title,
+              isSelected: store.sessionFilter == filter,
+              identifier: HarnessAccessibility.sessionFilterButton(filter.rawValue)
+            ) {
+              store.sessionFilter = filter
             }
           }
         }
       }
 
       filterSection(title: "Focus") {
-        HarnessGlassContainer(spacing: 8) {
-          HarnessWrapLayout(spacing: 6, lineSpacing: 6) {
-            ForEach(SessionFocusFilter.allCases) { filter in
-              filterChip(
-                title: filter.title,
-                isSelected: store.sessionFocusFilter == filter,
-                identifier: HarnessAccessibility.sidebarFocusChip(filter.rawValue)
-              ) {
-                store.sessionFocusFilter = filter
-              }
+        HarnessWrapLayout(spacing: 6, lineSpacing: 6) {
+          ForEach(SessionFocusFilter.allCases) { filter in
+            filterChip(
+              title: filter.title,
+              isSelected: store.sessionFocusFilter == filter,
+              identifier: HarnessAccessibility.sidebarFocusChip(filter.rawValue)
+            ) {
+              store.sessionFocusFilter = filter
             }
           }
         }
       }
     }
-    .padding(14)
+    .padding(12)
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessAccessibility.sidebarFiltersCard)
     .accessibilityFrameMarker("\(HarnessAccessibility.sidebarFiltersCard).frame")
@@ -195,7 +189,7 @@ private struct SessionListContent: View {
                   }
                 } label: {
                   VStack(alignment: .leading, spacing: 8) {
-                    HStack(alignment: .top, spacing: 10) {
+                    HStack(alignment: .top, spacing: 8) {
                       Text(session.context)
                         .font(.system(.body, design: .rounded, weight: .semibold))
                         .multilineTextAlignment(.leading)
@@ -215,20 +209,19 @@ private struct SessionListContent: View {
                     Text(session.sessionId)
                       .font(.caption.monospaced())
                       .foregroundStyle(HarnessTheme.secondaryInk)
-                    HarnessGlassContainer(spacing: 12) {
-                      HStack(spacing: 12) {
-                        labelChip("\(session.metrics.activeAgentCount) active")
-                        labelChip("\(session.metrics.inProgressTaskCount) moving")
-                        labelChip(formatTimestamp(session.lastActivityAt))
-                      }
+                    HStack(spacing: 12) {
+                      labelChip("\(session.metrics.activeAgentCount) active")
+                      labelChip("\(session.metrics.inProgressTaskCount) moving")
+                      labelChip(formatTimestamp(session.lastActivityAt))
                     }
-                }
-                .foregroundStyle(HarnessTheme.ink)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(14)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                  }
+                  .foregroundStyle(HarnessTheme.ink)
+                  .frame(maxWidth: .infinity, alignment: .leading)
+                  .padding(12)
                   .harnessSelectionOutline(
                     isSelected: store.selectedSessionID == session.sessionId,
-                    cornerRadius: 18
+                    cornerRadius: HarnessTheme.cornerRadiusMD
                   )
                 }
                 .accessibilityLabel(
@@ -239,11 +232,7 @@ private struct SessionListContent: View {
                 )
                 .accessibilityElement(children: .combine)
                 .accessibilityIdentifier(HarnessAccessibility.sessionRow(session.sessionId))
-                .harnessInteractiveCardButtonStyle(
-                  tint: store.selectedSessionID == session.sessionId
-                    ? HarnessTheme.accent
-                    : nil
-                )
+                .harnessInteractiveCardButtonStyle()
                 .contextMenu {
                   Button {
                     store.toggleBookmark(
@@ -294,7 +283,7 @@ private struct SessionListContent: View {
       .lineLimit(1)
       .padding(.horizontal, 8)
       .padding(.vertical, 4)
-      .harnessCapsuleGlass()
+      .harnessInfoPill()
   }
 }
 

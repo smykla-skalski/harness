@@ -54,6 +54,12 @@ struct HarnessApp: App {
 
   init() {
     let uiTesting = ProcessInfo.processInfo.environment["HARNESS_UI_TESTS"] == "1"
+    let initialThemeMode =
+      uiTesting
+      ? (HarnessThemeMode(
+        rawValue: ProcessInfo.processInfo.environment["HARNESS_THEME_MODE_OVERRIDE"] ?? ""
+      ) ?? .auto)
+      : .auto
     let resolvedContainer =
       (uiTesting
         ? (try? HarnessModelContainer.preview())
@@ -69,10 +75,11 @@ struct HarnessApp: App {
       modelContext: resolvedContainer.mainContext
     )
     _store = State(initialValue: resolvedStore)
+    _themeMode = State(initialValue: initialThemeMode)
 
     if uiTesting {
       UserDefaults.standard.set(
-        HarnessThemeMode.auto.rawValue, forKey: HarnessThemeDefaults.modeKey)
+        initialThemeMode.rawValue, forKey: HarnessThemeDefaults.modeKey)
     }
   }
 

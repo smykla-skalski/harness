@@ -28,7 +28,7 @@ struct ContentView: View {
     [
       "contentChrome=native",
       "interactiveRows=plain",
-      "controlGlass=grouped-controls",
+      "controlGlass=none",
     ].joined(separator: ", ")
   }
 
@@ -249,7 +249,7 @@ private struct SessionLoadingView: View {
               }
               Text("\(summary.projectName) • \(summary.sessionId)")
                 .font(.system(.subheadline, design: .rounded, weight: .medium))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(HarnessTheme.secondaryInk)
             }
             Spacer()
           }

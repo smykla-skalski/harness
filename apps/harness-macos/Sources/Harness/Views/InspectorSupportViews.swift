@@ -224,19 +224,19 @@ struct InspectorObserverSummarySection: View {
       }
       Text("Last sweep \(formatTimestamp(observer.lastScanTime))")
         .font(.caption.monospaced())
-        .foregroundStyle(.secondary)
+        .foregroundStyle(HarnessTheme.secondaryInk)
       if let mutedCodes = observer.mutedCodes, !mutedCodes.isEmpty {
         Text("Muted codes")
           .font(.caption.bold())
-          .foregroundStyle(.secondary)
+          .foregroundStyle(HarnessTheme.secondaryInk)
         Text(mutedCodes.prefix(3).joined(separator: " · "))
           .font(.caption)
-          .foregroundStyle(.secondary)
+          .foregroundStyle(HarnessTheme.secondaryInk)
       }
       if let openIssues = observer.openIssues, !openIssues.isEmpty {
         Text("Open issues")
           .font(.caption.bold())
-          .foregroundStyle(.secondary)
+          .foregroundStyle(HarnessTheme.secondaryInk)
         VStack(alignment: .leading, spacing: 6) {
           ForEach(openIssues.prefix(2)) { issue in
             VStack(alignment: .leading, spacing: 2) {
@@ -244,7 +244,7 @@ struct InspectorObserverSummarySection: View {
                 .font(.caption)
               Text("Severity \(issue.severity.capitalized)")
                 .font(.caption2)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(HarnessTheme.secondaryInk)
             }
           }
         }
@@ -252,7 +252,7 @@ struct InspectorObserverSummarySection: View {
       if let activeWorkers = observer.activeWorkers, !activeWorkers.isEmpty {
         Text("Active workers")
           .font(.caption.bold())
-          .foregroundStyle(.secondary)
+          .foregroundStyle(HarnessTheme.secondaryInk)
         VStack(alignment: .leading, spacing: 6) {
           ForEach(activeWorkers.prefix(2)) { worker in
             VStack(alignment: .leading, spacing: 2) {
@@ -260,7 +260,7 @@ struct InspectorObserverSummarySection: View {
                 .font(.caption)
               Text(worker.targetFile)
                 .font(.caption2)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(HarnessTheme.secondaryInk)
                 .lineLimit(1)
             }
           }

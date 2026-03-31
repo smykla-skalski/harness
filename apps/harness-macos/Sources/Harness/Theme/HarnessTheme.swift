@@ -67,7 +67,7 @@ struct LiveActivityBorderModifier: ViewModifier {
         .phaseAnimator(FlashPhase.allCases, trigger: flashTrigger) { view, phase in
           view
             .overlay(
-              RoundedRectangle(cornerRadius: 22, style: .continuous)
+              RoundedRectangle(cornerRadius: HarnessTheme.cornerRadiusLG, style: .continuous)
                 .stroke(
                   HarnessTheme.success.opacity(0.18 * phase.opacity),
                   lineWidth: 1
@@ -97,7 +97,7 @@ struct HarnessLoadingStateView: View {
   @State private var animates = false
 
   var body: some View {
-    HStack(spacing: 10) {
+    HStack(spacing: 8) {
       HarnessSpinner(size: 14)
       Text(title)
         .font(.system(.footnote, design: .rounded, weight: .semibold))
@@ -306,8 +306,8 @@ struct HarnessBadge: View {
   var body: some View {
     Text(value)
       .font(.caption.bold())
-      .padding(.horizontal, 10)
-      .padding(.vertical, 5)
+      .padding(.horizontal, 8)
+      .padding(.vertical, 4)
       .harnessInfoPill(tint: HarnessTheme.accent)
   }
 }

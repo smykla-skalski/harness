@@ -7,13 +7,13 @@ struct SidebarView: View {
 
   var body: some View {
     ScrollView {
-      VStack(alignment: .leading, spacing: 18) {
+      VStack(alignment: .leading, spacing: 16) {
         DaemonStatusCard(store: store)
         SidebarSessionList(store: store)
       }
       .frame(maxWidth: .infinity, alignment: .topLeading)
-      .padding(.vertical, 22)
-      .padding(.horizontal, 14)
+      .padding(.vertical, 20)
+      .padding(.horizontal, 12)
     }
     .scrollIndicators(.hidden)
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
