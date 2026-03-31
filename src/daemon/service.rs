@@ -5,6 +5,7 @@ use std::sync::{Arc, Mutex, OnceLock};
 use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use tokio::net::TcpListener;
 use tokio::sync::broadcast;
 
@@ -17,9 +18,10 @@ use super::index::{self, ResolvedSession};
 use super::launchd::{self, LaunchAgentStatus};
 use super::protocol::{
     AgentRemoveRequest, DaemonDiagnosticsReport, HealthResponse, LeaderTransferRequest,
-    ObserveSessionRequest, ProjectSummary, RoleChangeRequest, SessionDetail, SessionEndRequest,
-    SessionSummary, SignalSendRequest, StreamEvent, TaskAssignRequest, TaskCheckpointRequest,
-    TaskCreateRequest, TaskUpdateRequest, TimelineEntry,
+    ObserveSessionRequest, ProjectSummary, ReadyEventPayload, RoleChangeRequest, SessionDetail,
+    SessionEndRequest, SessionSummary, SessionUpdatedPayload, SessionsUpdatedPayload,
+    SignalSendRequest, StreamEvent, TaskAssignRequest, TaskCheckpointRequest, TaskCreateRequest,
+    TaskUpdateRequest, TimelineEntry,
 };
 use super::snapshot;
 use super::state::{self, DaemonDiagnostics, DaemonManifest};
@@ -391,12 +393,87 @@ pub fn observe_session(
     snapshot::session_detail(session_id)
 }
 
-pub fn refresh_event(event: &str, session_id: Option<&str>) -> StreamEvent {
+pub fn ready_event(session_id: Option<&str>) -> StreamEvent {
     StreamEvent {
+        event: "ready".to_string(),
+        recorded_at: utc_now(),
+        session_id: session_id.map(ToString::to_string),
+        payload: serde_json::to_value(ReadyEventPayload { ok: true })
+            .expect("serialize daemon ready payload"),
+    }
+}
+
+pub fn sessions_updated_event() -> Result<StreamEvent, CliError> {
+    let payload = SessionsUpdatedPayload {
+        projects: list_projects()?,
+        sessions: list_sessions(true)?,
+    };
+    stream_event("sessions_updated", None, payload)
+}
+
+pub fn session_updated_event(session_id: &str) -> Result<StreamEvent, CliError> {
+    let payload = SessionUpdatedPayload {
+        detail: session_detail(session_id)?,
+        timeline: session_timeline(session_id)?,
+    };
+    stream_event("session_updated", Some(session_id), payload)
+}
+
+pub fn broadcast_sessions_updated(sender: &broadcast::Sender<StreamEvent>) {
+    broadcast_event(sender, sessions_updated_event(), "sessions_updated", None);
+}
+
+pub fn broadcast_session_updated(sender: &broadcast::Sender<StreamEvent>, session_id: &str) {
+    broadcast_event(
+        sender,
+        session_updated_event(session_id),
+        "session_updated",
+        Some(session_id),
+    );
+}
+
+pub fn broadcast_session_snapshot(sender: &broadcast::Sender<StreamEvent>, session_id: &str) {
+    broadcast_sessions_updated(sender);
+    broadcast_session_updated(sender, session_id);
+}
+
+fn stream_event<T: Serialize>(
+    event: &str,
+    session_id: Option<&str>,
+    payload: T,
+) -> Result<StreamEvent, CliError> {
+    Ok(StreamEvent {
         event: event.to_string(),
         recorded_at: utc_now(),
         session_id: session_id.map(ToString::to_string),
-        payload: serde_json::json!({ "ok": true }),
+        payload: serialize_event_payload(payload, event)?,
+    })
+}
+
+fn serialize_event_payload<T: Serialize>(payload: T, event: &str) -> Result<Value, CliError> {
+    serde_json::to_value(payload).map_err(|error| {
+        CliErrorKind::workflow_io(format!("serialize daemon push '{event}': {error}")).into()
+    })
+}
+
+fn broadcast_event(
+    sender: &broadcast::Sender<StreamEvent>,
+    event: Result<StreamEvent, CliError>,
+    event_name: &str,
+    session_id: Option<&str>,
+) {
+    match event {
+        Ok(event) => {
+            let _ = sender.send(event);
+        }
+        Err(error) => {
+            tracing::warn!(
+                %error,
+                event = event_name,
+                session_id,
+                "failed to build daemon push event"
+            );
+        }
     }
 }
 
@@ -449,9 +526,7 @@ fn start_daemon_observe_loop(session_id: &str, project_dir: &Path, actor_id: Opt
         if let Ok(mut running_sessions) = runtime.running_sessions.lock() {
             running_sessions.remove(&session_id);
         }
-        let _ = runtime
-            .sender
-            .send(refresh_event("session_updated", Some(&session_id)));
+        broadcast_session_snapshot(&runtime.sender, &session_id);
     });
     true
 }
@@ -466,6 +541,7 @@ mod tests {
     use tempfile::tempdir;
 
     use crate::agents::runtime;
+    use crate::daemon::protocol::{SessionUpdatedPayload, SessionsUpdatedPayload};
     use crate::hooks::adapters::HookAgent;
     use crate::session::{service as session_service, types::SessionRole};
     use crate::workspace::project_context_dir;
@@ -586,6 +662,62 @@ mod tests {
                 detail.tasks[0].suggested_fix.as_deref(),
                 Some("resolve runtime-session ids through daemon index")
             );
+        });
+    }
+
+    #[test]
+    fn sessions_updated_event_includes_projects_and_sessions() {
+        with_temp_project(|project| {
+            let state = session_service::start_session(
+                "daemon stream index payload",
+                project,
+                Some("claude"),
+                Some("daemon-stream-index"),
+            )
+            .expect("start session");
+
+            let event = sessions_updated_event().expect("sessions updated event");
+            let payload: SessionsUpdatedPayload =
+                serde_json::from_value(event.payload).expect("deserialize payload");
+
+            assert_eq!(event.event, "sessions_updated");
+            assert!(event.session_id.is_none());
+            assert_eq!(payload.projects.len(), 1);
+            assert_eq!(payload.sessions.len(), 1);
+            assert_eq!(payload.sessions[0].session_id, state.session_id);
+        });
+    }
+
+    #[test]
+    fn session_updated_event_includes_detail_and_timeline() {
+        with_temp_project(|project| {
+            let state = session_service::start_session(
+                "daemon stream session payload",
+                project,
+                Some("claude"),
+                Some("daemon-stream-session"),
+            )
+            .expect("start session");
+            let leader_id = state.leader_id.expect("leader id");
+            append_project_ledger_entry(project);
+            session_service::create_task(
+                &state.session_id,
+                "materialize timeline",
+                None,
+                crate::session::types::TaskSeverity::Medium,
+                &leader_id,
+                project,
+            )
+            .expect("create task");
+
+            let event = session_updated_event(&state.session_id).expect("session updated event");
+            let payload: SessionUpdatedPayload =
+                serde_json::from_value(event.payload).expect("deserialize payload");
+
+            assert_eq!(event.event, "session_updated");
+            assert_eq!(event.session_id.as_deref(), Some(state.session_id.as_str()));
+            assert_eq!(payload.detail.session.session_id, state.session_id);
+            assert!(!payload.timeline.is_empty());
         });
     }
 
