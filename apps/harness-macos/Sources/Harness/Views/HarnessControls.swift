@@ -1,3 +1,4 @@
+import HarnessKit
 import SwiftUI
 
 enum HarnessControlMetrics {
@@ -10,13 +11,23 @@ struct HarnessAsyncActionButton: View {
     case bordered
   }
 
+  enum StoreAction: Equatable {
+    case startDaemon
+    case installLaunchAgent
+    case removeLaunchAgent
+    case refresh
+    case reconnect
+    case refreshDiagnostics
+  }
+
   let title: String
   let tint: Color
   let variant: Variant
   let isLoading: Bool
   let accessibilityIdentifier: String
   let fillsWidth: Bool
-  let action: @Sendable () async -> Void
+  let store: HarnessStore
+  let storeAction: StoreAction
 
   init(
     title: String,
@@ -25,7 +36,8 @@ struct HarnessAsyncActionButton: View {
     isLoading: Bool,
     accessibilityIdentifier: String,
     fillsWidth: Bool = false,
-    action: @escaping @Sendable () async -> Void
+    store: HarnessStore,
+    storeAction: StoreAction
   ) {
     self.title = title
     self.tint = tint
@@ -33,11 +45,12 @@ struct HarnessAsyncActionButton: View {
     self.isLoading = isLoading
     self.accessibilityIdentifier = accessibilityIdentifier
     self.fillsWidth = fillsWidth
-    self.action = action
+    self.store = store
+    self.storeAction = storeAction
   }
 
   var body: some View {
-    Button(action: launchAction) {
+    Button(action: performAction) {
       label
     }
     .frame(maxWidth: fillsWidth ? .infinity : nil)
@@ -62,9 +75,22 @@ struct HarnessAsyncActionButton: View {
     .animation(.spring(duration: 0.2), value: isLoading)
   }
 
-  private func launchAction() {
+  private func performAction() {
     Task {
-      await action()
+      switch storeAction {
+      case .startDaemon:
+        await store.startDaemon()
+      case .installLaunchAgent:
+        await store.installLaunchAgent()
+      case .removeLaunchAgent:
+        store.requestRemoveLaunchAgentConfirmation()
+      case .refresh:
+        await store.refresh()
+      case .reconnect:
+        await store.reconnect()
+      case .refreshDiagnostics:
+        await store.refreshDiagnostics()
+      }
     }
   }
 }

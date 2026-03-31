@@ -80,10 +80,10 @@ extension DaemonStatusCard {
         variant: isDaemonOnline ? .bordered : .prominent,
         isLoading: isLoading,
         accessibilityIdentifier: HarnessAccessibility.sidebarStartDaemonButton,
-        fillsWidth: false
-      ) {
-        await store.startDaemon()
-      }
+        fillsWidth: false,
+        store: store,
+        storeAction: .startDaemon
+      )
     }
   }
 
@@ -95,10 +95,10 @@ extension DaemonStatusCard {
         variant: .bordered,
         isLoading: isLoading,
         accessibilityIdentifier: HarnessAccessibility.sidebarInstallLaunchAgentButton,
-        fillsWidth: false
-      ) {
-        await store.installLaunchAgent()
-      }
+        fillsWidth: false,
+        store: store,
+        storeAction: .installLaunchAgent
+      )
     }
   }
 
