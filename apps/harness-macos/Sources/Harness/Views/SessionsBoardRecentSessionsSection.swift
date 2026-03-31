@@ -14,7 +14,7 @@ struct SessionsBoardRecentSessionsSection: View {
           "No sessions indexed yet. Bring the daemon online or refresh after starting a harness session."
         )
         .font(.system(.body, design: .rounded, weight: .medium))
-        .foregroundStyle(HarnessTheme.secondaryInk)
+        .foregroundStyle(.secondary)
         .frame(maxWidth: .infinity, alignment: .leading)
       } else {
         VStack(alignment: .leading, spacing: 12) {
@@ -35,12 +35,12 @@ struct SessionsBoardRecentSessionsSection: View {
                     .multilineTextAlignment(.leading)
                   Text("\(session.projectName) • \(session.sessionId)")
                     .font(.caption.monospaced())
-                    .foregroundStyle(HarnessTheme.secondaryInk)
+                    .foregroundStyle(.secondary)
                 }
                 Spacer()
                 Text(formatTimestamp(session.updatedAt))
                   .font(.caption.weight(.semibold))
-                  .foregroundStyle(HarnessTheme.secondaryInk)
+                  .foregroundStyle(.secondary)
               }
               .frame(maxWidth: .infinity, alignment: .leading)
               .padding(14)

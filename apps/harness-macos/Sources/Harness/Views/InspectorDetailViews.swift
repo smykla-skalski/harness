@@ -20,7 +20,7 @@ struct SessionInspectorSummaryCard: View {
       Text(
         "Pick a task, agent, signal, or observe card from the cockpit to focus actions and detail here."
       )
-      .foregroundStyle(HarnessTheme.secondaryInk)
+      .foregroundStyle(.secondary)
       InspectorFactGrid(facts: facts)
       if !detail.agentActivity.isEmpty {
         InspectorSection(title: "Recent Agent Activity") {
@@ -33,11 +33,11 @@ struct SessionInspectorSummaryCard: View {
                   Spacer()
                   Text(activity.latestEventAt.map(formatTimestamp) ?? "No events")
                     .font(.caption.monospaced())
-                    .foregroundStyle(HarnessTheme.secondaryInk)
+                    .foregroundStyle(.secondary)
                 }
                 Text(activity.recentTools.joined(separator: " · "))
                   .font(.caption)
-                  .foregroundStyle(HarnessTheme.secondaryInk)
+                  .foregroundStyle(.secondary)
                   .lineLimit(2)
               }
               .padding(.horizontal, 12)
@@ -156,6 +156,8 @@ struct TaskInspectorCard: View {
                     .font(.caption)
                     .foregroundStyle(HarnessTheme.secondaryInk)
                 }
+                .accessibilityLabel("Delete Note")
+                .accessibilityHint("Removes this note from the selected task.")
                 .buttonStyle(.borderless)
               }
               .padding(.horizontal, 12)
@@ -290,7 +292,9 @@ struct AgentInspectorCard: View {
           }
         }
         .harnessActionButtonStyle(variant: .prominent, tint: nil)
-        .disabled(signalCommand.isEmpty || signalMessage.isEmpty)
+        .disabled(
+          signalCommand.isEmpty || signalMessage.isEmpty || store.isSessionActionInFlight
+        )
         .accessibilityIdentifier(HarnessAccessibility.signalSendButton)
       }
     }

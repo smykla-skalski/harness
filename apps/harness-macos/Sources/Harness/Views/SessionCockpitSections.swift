@@ -38,7 +38,7 @@ struct SessionMetricGrid: View {
           .font(.caption.weight(.semibold))
           .foregroundStyle(HarnessTheme.secondaryInk)
         Text(value)
-          .font(.system(size: 28, weight: .heavy, design: .rounded))
+          .font(.system(.title, design: .rounded, weight: .heavy))
           .foregroundStyle(tint)
           .contentTransition(.numericText())
       }
@@ -91,7 +91,7 @@ struct SessionTaskSummaryCard: View {
         }
         Text(task.context ?? "No extra context")
           .font(.subheadline)
-          .foregroundStyle(HarnessTheme.secondaryInk)
+          .foregroundStyle(.secondary)
           .multilineTextAlignment(.leading)
           .lineLimit(2)
         Spacer(minLength: 0)
@@ -102,7 +102,7 @@ struct SessionTaskSummaryCard: View {
           Spacer()
           Text(task.assignedTo ?? "unassigned")
             .font(.caption.monospaced())
-            .foregroundStyle(HarnessTheme.secondaryInk)
+            .foregroundStyle(.secondary)
             .lineLimit(1)
         }
       }
@@ -160,15 +160,13 @@ struct SessionAgentSummaryCard: View {
         }
         Text("\(agent.runtime) • \(agent.agentId)")
           .font(.caption.monospaced())
-          .foregroundStyle(HarnessTheme.secondaryInk)
+          .foregroundStyle(.secondary)
           .lineLimit(1)
         Spacer(minLength: 0)
-        HarnessGlassContainer(spacing: 10) {
-          HStack(spacing: 10) {
-            badge(agent.runtimeCapabilities.supportsContextInjection ? "Context" : "Watch")
-            badge("\(agent.runtimeCapabilities.typicalSignalLatencySeconds)s")
-            badge(formatTimestamp(agent.lastActivityAt))
-          }
+        HStack(spacing: 10) {
+          badge(agent.runtimeCapabilities.supportsContextInjection ? "Context" : "Watch")
+          badge("\(agent.runtimeCapabilities.typicalSignalLatencySeconds)s")
+          badge(formatTimestamp(agent.lastActivityAt))
         }
       }
       .frame(maxWidth: .infinity, minHeight: sessionLaneCardHeight, alignment: .topLeading)
@@ -190,6 +188,6 @@ struct SessionAgentSummaryCard: View {
       .lineLimit(1)
       .padding(.horizontal, 8)
       .padding(.vertical, 4)
-      .harnessCapsuleGlass()
+      .harnessInfoPill()
   }
 }
