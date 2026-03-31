@@ -39,7 +39,6 @@ enum HarnessAccessibility {
   static let preferencesForwardButton = "harness.preferences.nav.forward"
   static let preferencesTitle = "harness.preferences.title"
   static let preferencesThemeModePicker = "harness.preferences.theme-mode"
-  static let preferencesThemeStylePicker = "harness.preferences.theme-style"
   static let refreshButton = "harness.toolbar.refresh"
   static let daemonPreferencesButton = "harness.toolbar.preferences"
   static let endSessionButton = "harness.session.action.end"
@@ -53,7 +52,6 @@ enum HarnessAccessibility {
   static let latencyBadge = "harness.sidebar.latency-badge"
   static let activityPulse = "harness.sidebar.activity-pulse"
   static let reconnectionProgress = "harness.sidebar.reconnection-progress"
-  static let fallbackBanner = "harness.sidebar.fallback-banner"
   static let connectionCard = "harness.preferences.connection-card"
 
   static func sessionRow(_ sessionID: String) -> String {
@@ -75,12 +73,6 @@ enum HarnessAccessibility {
   static func boardMetricCard(_ key: String) -> String {
     "harness.board.metric.\(slug(key))"
   }
-
-  static func boardMetricGlassState(_ key: String) -> String {
-    "harness.board.metric.\(slug(key)).glass-state"
-  }
-
-  static let daemonCardGlassState = "harness.sidebar.daemon-card.glass-state"
 
   static func sidebarDaemonBadge(_ key: String) -> String {
     "harness.sidebar.daemon-badge.\(slug(key))"

@@ -204,35 +204,6 @@ struct ReconnectionProgressView: View {
   }
 }
 
-struct FallbackBanner: View {
-  let reason: String?
-  let onRetry: () -> Void
-
-  var body: some View {
-    HStack(spacing: 10) {
-      RoundedRectangle(cornerRadius: 999, style: .continuous)
-        .fill(HarnessTheme.caution)
-        .frame(width: 5)
-
-      VStack(alignment: .leading, spacing: 2) {
-        Text("Running in fallback mode")
-          .font(.system(.footnote, design: .rounded, weight: .semibold))
-        Text(reason ?? "WebSocket unavailable, using HTTP streaming")
-          .font(.caption)
-          .foregroundStyle(HarnessTheme.secondaryInk)
-      }
-      Spacer(minLength: 8)
-      Button(action: onRetry) {
-        Label("Retry", systemImage: "arrow.clockwise")
-          .font(.system(.caption, design: .rounded, weight: .semibold))
-      }
-      .harnessAccessoryButtonStyle(tint: HarnessTheme.caution)
-      .controlSize(.small)
-    }
-    .accessibilityIdentifier(HarnessAccessibility.fallbackBanner)
-  }
-}
-
 struct SparklineView: View {
   let data: [Double]
   let tint: Color
