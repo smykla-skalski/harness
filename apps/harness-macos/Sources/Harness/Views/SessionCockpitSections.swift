@@ -110,7 +110,6 @@ struct SessionTaskSummaryCard: View {
       .padding(14)
     }
     .harnessInteractiveCardButtonStyle()
-    .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
     .accessibilityIdentifier(HarnessAccessibility.sessionTaskCard(task.taskId))
     .accessibilityFrameMarker("\(HarnessAccessibility.sessionTaskCard(task.taskId)).frame")
     .transition(
@@ -176,7 +175,6 @@ struct SessionAgentSummaryCard: View {
       .padding(14)
     }
     .harnessInteractiveCardButtonStyle()
-    .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
     .accessibilityIdentifier(HarnessAccessibility.sessionAgentCard(agent.agentId))
     .accessibilityFrameMarker("\(HarnessAccessibility.sessionAgentCard(agent.agentId)).frame")
     .transition(
