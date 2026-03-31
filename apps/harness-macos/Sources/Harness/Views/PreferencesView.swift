@@ -59,6 +59,7 @@ struct PreferencesView: View {
       detailContent
     }
     .navigationSplitViewStyle(.balanced)
+    .navigationTitle(selectedSection.title)
     .toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
     .containerBackground(.windowBackground, for: .window)
     .frame(maxWidth: .infinity, maxHeight: .infinity)
