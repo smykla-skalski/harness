@@ -143,6 +143,20 @@ struct HarnessApp: App {
 
       Divider()
 
+      Button("Back") {
+        Task { await store.navigateBack() }
+      }
+      .keyboardShortcut("[", modifiers: [.command])
+      .disabled(!store.canNavigateBack)
+
+      Button("Forward") {
+        Task { await store.navigateForward() }
+      }
+      .keyboardShortcut("]", modifiers: [.command])
+      .disabled(!store.canNavigateForward)
+
+      Divider()
+
       Button("Observe Selected Session", action: observeSelectedSession)
         .keyboardShortcut("o", modifiers: [.command, .shift])
         .disabled(store.selectedSessionID == nil)
