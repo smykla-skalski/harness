@@ -24,9 +24,7 @@ struct TransportBadge: View {
     .foregroundStyle(tint)
     .padding(.horizontal, 9)
     .padding(.vertical, 5)
-    .background {
-      HarnessGlassCapsuleBackground()
-    }
+    .harnessCapsuleGlass()
     .fixedSize()
   }
 }
@@ -50,20 +48,16 @@ struct LatencyBadge: View {
       .fixedSize()
       .padding(.horizontal, 9)
       .padding(.vertical, 5)
-      .background {
-        HarnessGlassCapsuleBackground()
-      }
+      .harnessCapsuleGlass()
   }
 }
 
 struct ActivityPulse: View {
-  @Environment(\.harnessThemeStyle)
-  private var themeStyle
   let isActive: Bool
   @State private var isPulsing = false
 
   private var baseColor: Color {
-    isActive ? HarnessTheme.success : HarnessTheme.sidebarMuted(for: themeStyle)
+    isActive ? HarnessTheme.success : HarnessTheme.secondaryInk.opacity(0.55)
   }
 
   var body: some View {
@@ -72,22 +66,22 @@ struct ActivityPulse: View {
         .fill(baseColor.opacity(isPulsing ? 0.22 : 0.14))
         .frame(width: 16, height: 16)
         .scaleEffect(isPulsing ? 1.3 : 1.0)
+        .animation(
+          isPulsing
+            ? .easeInOut(duration: 1.2).repeatForever(autoreverses: true)
+            : .easeOut(duration: 0.3),
+          value: isPulsing
+        )
       Circle()
         .fill(baseColor)
         .frame(width: 7, height: 7)
         .overlay(
           Circle()
-            .stroke(HarnessTheme.glassStroke(for: themeStyle), lineWidth: 1)
+            .stroke(Color.primary.opacity(0.14), lineWidth: 1)
         )
+        .animation(.easeOut(duration: 0.3), value: isActive)
     }
     .frame(width: 16, height: 16)
-    .animation(.spring(duration: 0.3), value: isActive)
-    .animation(
-      isActive
-        ? .easeInOut(duration: 1.2).repeatForever(autoreverses: true)
-        : .default,
-      value: isPulsing
-    )
     .onChange(of: isActive) { _, active in
       isPulsing = active
     }
@@ -130,8 +124,6 @@ struct ConnectionStatusStrip: View {
         LatencyBadge(latencyMs: metrics.latencyMs)
       }
     }
-    .padding(10)
-    .harnessInsetPanel(cornerRadius: 16, fillOpacity: 0.08, strokeOpacity: 0.50)
   }
 }
 
@@ -173,8 +165,6 @@ struct ConnectionToolbarBadge: View {
 }
 
 struct ReconnectionProgressView: View {
-  @Environment(\.harnessThemeStyle)
-  private var themeStyle
   let attempt: Int
   let maxAttempts: Int
 
@@ -196,7 +186,7 @@ struct ReconnectionProgressView: View {
           .contentTransition(.numericText())
       }
       Capsule()
-        .fill(HarnessTheme.surface(for: themeStyle))
+        .fill(Color.primary.opacity(0.10))
         .frame(height: 4)
         .overlay(alignment: .leading) {
           Capsule()
@@ -207,17 +197,12 @@ struct ReconnectionProgressView: View {
         }
         .clipShape(Capsule())
     }
-    .padding(.horizontal, 12)
-    .padding(.vertical, 8)
-    .harnessInsetPanel(cornerRadius: 14, fillOpacity: 0.06, strokeOpacity: 0.50)
     .animation(.spring(duration: 0.3), value: attempt)
     .accessibilityIdentifier(HarnessAccessibility.reconnectionProgress)
   }
 }
 
 struct FallbackBanner: View {
-  @Environment(\.harnessThemeStyle)
-  private var themeStyle
   let reason: String?
   let onRetry: () -> Void
 
@@ -242,8 +227,6 @@ struct FallbackBanner: View {
       .harnessAccessoryButtonStyle(tint: HarnessTheme.caution)
       .controlSize(.small)
     }
-    .padding(10)
-    .harnessInsetPanel(cornerRadius: 14, fillOpacity: 0.06, strokeOpacity: 0.50)
     .accessibilityIdentifier(HarnessAccessibility.fallbackBanner)
   }
 }

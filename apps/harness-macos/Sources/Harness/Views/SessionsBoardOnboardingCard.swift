@@ -12,8 +12,11 @@ struct SessionsBoardOnboardingCard: View {
       onboardingStepsSection
     }
     .frame(maxWidth: .infinity, alignment: .leading)
-    .accessibilityElement(children: .contain)
-    .accessibilityIdentifier(HarnessAccessibility.onboardingCard)
+    .accessibilityTestProbe(
+      HarnessAccessibility.onboardingCard,
+      label: "Bring Harness Online",
+      value: store.daemonStatus?.launchAgent.installed == true ? "persistent" : "manual"
+    )
     .accessibilityFrameMarker("\(HarnessAccessibility.onboardingCard).frame")
   }
 
@@ -142,5 +145,6 @@ struct SessionsBoardOnboardingCard: View {
         .fill(isReady ? HarnessTheme.success : HarnessTheme.caution)
         .frame(width: 4)
     }
+    .animation(.spring(duration: 0.3), value: isReady)
   }
 }
