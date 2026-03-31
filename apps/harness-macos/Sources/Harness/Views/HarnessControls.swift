@@ -3,6 +3,19 @@ import SwiftUI
 
 enum HarnessControlMetrics {
   static let compactControlSize: ControlSize = .small
+  static let disabledButtonChromeBehavior: HarnessDisabledButtonChromeBehavior = .regularize
+}
+
+private enum HarnessDisabledButtonChromeBehavior {
+  case regularize
+  case preserveConfiguredStyle
+}
+
+private enum HarnessSystemButtonChromeStyle {
+  case automatic
+  case borderless
+  case bordered
+  case borderedProminent
 }
 
 struct HarnessAsyncActionButton: View {
@@ -99,22 +112,17 @@ private struct HarnessActionButtonStyleModifier: ViewModifier {
   let variant: HarnessAsyncActionButton.Variant
   let tint: Color?
 
-  @ViewBuilder
-  func body(content: Content) -> some View {
+  private var style: HarnessSystemButtonChromeStyle {
     switch variant {
     case .prominent:
-      if let tint {
-        content.buttonStyle(.borderedProminent).tint(tint)
-      } else {
-        content.buttonStyle(.borderedProminent)
-      }
+      .borderedProminent
     case .bordered:
-      if let tint {
-        content.buttonStyle(.bordered).tint(tint)
-      } else {
-        content.buttonStyle(.bordered)
-      }
+      .bordered
     }
+  }
+
+  func body(content: Content) -> some View {
+    content.modifier(HarnessSystemButtonChromeModifier(style: style, tint: tint))
   }
 }
 
@@ -123,8 +131,7 @@ private struct HarnessAccessoryButtonStyleModifier: ViewModifier {
 
   func body(content: Content) -> some View {
     content
-      .buttonStyle(.bordered)
-      .tint(tint)
+      .modifier(HarnessSystemButtonChromeModifier(style: .bordered, tint: tint))
   }
 }
 
@@ -133,9 +140,71 @@ private struct HarnessFilterChipButtonStyleModifier: ViewModifier {
 
   func body(content: Content) -> some View {
     content
-      .buttonStyle(.borderedProminent)
-      .tint(isSelected ? nil : .secondary)
+      .modifier(
+        HarnessSystemButtonChromeModifier(
+          style: .borderedProminent,
+          tint: isSelected ? nil : .secondary
+        )
+      )
       .fontWeight(isSelected ? .bold : .semibold)
+  }
+}
+
+private struct HarnessSystemButtonChromeModifier: ViewModifier {
+  let style: HarnessSystemButtonChromeStyle
+  let tint: Color?
+
+  @Environment(\.isEnabled)
+  private var isEnabled
+
+  private var effectiveStyle: HarnessSystemButtonChromeStyle {
+    guard !isEnabled else { return style }
+    switch HarnessControlMetrics.disabledButtonChromeBehavior {
+    case .regularize:
+      .automatic
+    case .preserveConfiguredStyle:
+      style
+    }
+  }
+
+  private var effectiveTint: Color? {
+    guard !isEnabled else { return tint }
+    switch HarnessControlMetrics.disabledButtonChromeBehavior {
+    case .regularize:
+      nil
+    case .preserveConfiguredStyle:
+      tint
+    }
+  }
+
+  @ViewBuilder
+  func body(content: Content) -> some View {
+    switch effectiveStyle {
+    case .automatic:
+      if let effectiveTint {
+        content.buttonStyle(.automatic).tint(effectiveTint)
+      } else {
+        content.buttonStyle(.automatic)
+      }
+    case .borderless:
+      if let effectiveTint {
+        content.buttonStyle(.borderless).tint(effectiveTint)
+      } else {
+        content.buttonStyle(.borderless)
+      }
+    case .bordered:
+      if let effectiveTint {
+        content.buttonStyle(.bordered).tint(effectiveTint)
+      } else {
+        content.buttonStyle(.bordered)
+      }
+    case .borderedProminent:
+      if let effectiveTint {
+        content.buttonStyle(.borderedProminent).tint(effectiveTint)
+      } else {
+        content.buttonStyle(.borderedProminent)
+      }
+    }
   }
 }
 
@@ -163,27 +232,35 @@ private struct InteractiveCardButtonStyle: ButtonStyle {
 private struct InteractiveCardHoverModifier: ViewModifier {
   let cornerRadius: CGFloat
   let tint: Color?
+  @Environment(\.isEnabled)
+  private var isEnabled
   @State private var isHovered = false
 
+  @ViewBuilder
   func body(content: Content) -> some View {
-    content
-      .buttonStyle(
-        InteractiveCardButtonStyle(
-          cornerRadius: cornerRadius,
-          tint: tint,
-          isHovered: isHovered
+    switch HarnessControlMetrics.disabledButtonChromeBehavior {
+    case .regularize where !isEnabled:
+      content.buttonStyle(.automatic)
+    case .regularize, .preserveConfiguredStyle:
+      content
+        .buttonStyle(
+          InteractiveCardButtonStyle(
+            cornerRadius: cornerRadius,
+            tint: tint,
+            isHovered: isHovered
+          )
         )
-      )
-      .onContinuousHover { phase in
-        withAnimation(.easeOut(duration: 0.15)) {
-          switch phase {
-          case .active:
-            isHovered = true
-          case .ended:
-            isHovered = false
+        .onContinuousHover { phase in
+          withAnimation(.easeOut(duration: 0.15)) {
+            switch phase {
+            case .active:
+              isHovered = true
+            case .ended:
+              isHovered = false
+            }
           }
         }
-      }
+    }
   }
 }
 
@@ -206,7 +283,7 @@ extension View {
   }
 
   func harnessDismissButtonStyle() -> some View {
-    buttonStyle(.borderless)
+    modifier(HarnessSystemButtonChromeModifier(style: .borderless, tint: nil))
   }
 
   func harnessInteractiveCardButtonStyle(

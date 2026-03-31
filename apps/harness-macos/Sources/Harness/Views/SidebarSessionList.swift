@@ -280,7 +280,7 @@ private struct SessionListContent: View {
   private func sessionAccessibilityLabel(
     for session: SessionSummary
   ) -> String {
-    "\(session.context), \(session.projectName), \(session.sessionId)"
+    "\(session.context), \(session.projectName), \(session.status.title), \(session.sessionId)"
   }
 
   fileprivate func labelChip(_ value: String) -> some View {
