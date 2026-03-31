@@ -1,20 +1,32 @@
 import SwiftUI
 
+enum HarnessColumnTopScrollEdgeEffect {
+  case none
+  case soft
+  case hard
+}
+
 struct HarnessColumnScrollView<Content: View>: View {
   let horizontalPadding: CGFloat
   let verticalPadding: CGFloat
   let constrainContentWidth: Bool
+  let topScrollEdgeEffect: HarnessColumnTopScrollEdgeEffect
   private let content: Content
+
+  /// HIG readable content width for body text (~70 characters at body size).
+  private static var readableMaxWidth: CGFloat { 680 }
 
   init(
     horizontalPadding: CGFloat = 24,
     verticalPadding: CGFloat = 24,
     constrainContentWidth: Bool = false,
+    topScrollEdgeEffect: HarnessColumnTopScrollEdgeEffect = .none,
     @ViewBuilder content: () -> Content
   ) {
     self.horizontalPadding = horizontalPadding
     self.verticalPadding = verticalPadding
     self.constrainContentWidth = constrainContentWidth
+    self.topScrollEdgeEffect = topScrollEdgeEffect
     self.content = content()
   }
 
@@ -22,7 +34,9 @@ struct HarnessColumnScrollView<Content: View>: View {
     Group {
       if constrainContentWidth {
         GeometryReader { geometry in
-          scrollBody(contentWidth: max(geometry.size.width - (horizontalPadding * 2), 0))
+          let available = max(geometry.size.width - (horizontalPadding * 2), 0)
+          let clamped = min(available, Self.readableMaxWidth)
+          scrollBody(contentWidth: clamped)
         }
       } else {
         scrollBody()
@@ -45,6 +59,23 @@ struct HarnessColumnScrollView<Content: View>: View {
       .frame(maxWidth: .infinity, alignment: .topLeading)
       .padding(.horizontal, horizontalPadding)
       .padding(.vertical, verticalPadding)
+    }
+    .modifier(TopScrollEdgeEffectModifier(effect: topScrollEdgeEffect))
+  }
+}
+
+private struct TopScrollEdgeEffectModifier: ViewModifier {
+  let effect: HarnessColumnTopScrollEdgeEffect
+
+  @ViewBuilder
+  func body(content: Content) -> some View {
+    switch effect {
+    case .none:
+      content
+    case .soft:
+      content.scrollEdgeEffectStyle(.soft, for: .top)
+    case .hard:
+      content.scrollEdgeEffectStyle(.hard, for: .top)
     }
   }
 }
