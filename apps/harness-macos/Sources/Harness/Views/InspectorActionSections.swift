@@ -102,7 +102,7 @@ extension InspectorActionSections {
             Image(systemName: "xmark.circle.fill")
               .foregroundStyle(HarnessTheme.tertiaryInk)
           }
-          .buttonStyle(.plain)
+          .harnessDismissButtonStyle()
           .accessibilityLabel("Dismiss error")
         }
       }
