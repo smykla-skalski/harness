@@ -60,6 +60,9 @@ struct HarnessApp: App {
   private let isUITesting = ProcessInfo.processInfo.environment["HARNESS_UI_TESTS"] == "1"
 
   init() {
+    UserDefaults.standard.register(defaults: [
+      HarnessTextSize.storageKey: HarnessTextSize.defaultIndex,
+    ])
     let environment = HarnessEnvironment.current
     let uiTesting = environment.values["HARNESS_UI_TESTS"] == "1"
     let launchMode = HarnessLaunchMode(environment: environment)
