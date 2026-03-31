@@ -4,9 +4,6 @@ import SwiftUI
 
 struct InspectorColumnView: View {
   let store: HarnessStore
-  @State private var signalCommand = "inject_context"
-  @State private var signalMessage = ""
-  @State private var signalActionHint = ""
 
   private var selectedObserver: ObserverSummary? {
     guard case .observer = store.inspectorSelection else { return nil }
@@ -18,25 +15,6 @@ struct InspectorColumnView: View {
       return nil
     }
     return store.selectedSession?.agentActivity.first(where: { $0.agentId == agent.agentId })
-  }
-
-  private var selectionKey: String {
-    "\(store.selectedSession?.session.sessionId ?? "-")|\(selectionIdentifier)"
-  }
-
-  private var selectionIdentifier: String {
-    switch store.inspectorSelection {
-    case .none:
-      "session"
-    case .task(let taskID):
-      "task:\(taskID)"
-    case .agent(let agentID):
-      "agent:\(agentID)"
-    case .signal(let signalID):
-      "signal:\(signalID)"
-    case .observer:
-      "observer"
-    }
   }
 
   var body: some View {
@@ -61,9 +39,6 @@ struct InspectorColumnView: View {
     .textFieldStyle(.roundedBorder)
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessAccessibility.inspectorRoot)
-    .task(id: selectionKey) {
-      syncSignalDraft()
-    }
   }
 
   @ViewBuilder private var inspectorContent: some View {
@@ -114,8 +89,11 @@ struct InspectorColumnView: View {
       HarnessLoadingStateView(title: "Loading session detail")
     }
     .frame(maxWidth: .infinity, alignment: .leading)
-    .accessibilityElement(children: .contain)
-    .accessibilityIdentifier(HarnessAccessibility.sessionInspectorCard)
+    .accessibilityTestProbe(
+      HarnessAccessibility.sessionInspectorCard,
+      label: "Inspector",
+      value: "loading"
+    )
     .accessibilityFrameMarker("\(HarnessAccessibility.sessionInspectorCard).frame")
   }
 
@@ -127,8 +105,11 @@ struct InspectorColumnView: View {
         .foregroundStyle(HarnessTheme.secondaryInk)
     }
     .frame(maxWidth: .infinity, alignment: .leading)
-    .accessibilityElement(children: .contain)
-    .accessibilityIdentifier(HarnessAccessibility.inspectorEmptyState)
+    .accessibilityTestProbe(
+      HarnessAccessibility.inspectorEmptyState,
+      label: "Inspector",
+      value: "empty"
+    )
   }
 
   private func sessionInspector(_ detail: SessionDetail) -> some View {
@@ -143,10 +124,7 @@ struct InspectorColumnView: View {
     AgentInspectorCard(
       agent: agent,
       activity: selectedAgentActivity,
-      signalCommand: $signalCommand,
-      signalMessage: $signalMessage,
-      signalActionHint: $signalActionHint,
-      sendSignal: sendSignalToSelectedAgent
+      store: store
     )
   }
 
@@ -158,32 +136,4 @@ struct InspectorColumnView: View {
     ObserverInspectorCard(observer: observer)
   }
 
-  private func sendSignalToSelectedAgent() {
-    guard let agent = store.selectedAgent else {
-      return
-    }
-    Task {
-      await store.sendSignal(
-        agentID: agent.agentId,
-        command: signalCommand,
-        message: signalMessage,
-        actionHint: signalActionHint.isEmpty ? nil : signalActionHint
-      )
-    }
-  }
-
-  private func syncSignalDraft() {
-    if let signal = store.selectedSignal {
-      signalCommand = signal.signal.command
-      signalMessage = signal.signal.payload.message
-      signalActionHint = signal.signal.payload.actionHint ?? ""
-      return
-    }
-
-    if store.selectedAgent != nil {
-      signalCommand = "inject_context"
-      signalMessage = ""
-      signalActionHint = ""
-    }
-  }
 }
