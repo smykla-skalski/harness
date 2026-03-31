@@ -7,13 +7,13 @@ final class HarnessUITests: HarnessUITestCase {
   func testPreviewModeLoadsDashboardAndOpensCockpit() throws {
     let app = launch(mode: "preview")
 
-    let sessionRow = element(in: app, identifier: Accessibility.previewSessionRow)
+    let sessionRow = previewSessionTrigger(in: app)
     if !sessionRow.waitForExistence(timeout: Self.uiTimeout) {
       attachWindowScreenshot(in: app, named: "preview-session-row-missing")
     }
     XCTAssertTrue(sessionRow.waitForExistence(timeout: Self.uiTimeout))
 
-    tapElement(in: app, identifier: Accessibility.previewSessionRow)
+    tapPreviewSession(in: app)
 
     let observeSummaryButton = app.buttons
       .matching(identifier: Accessibility.observeSummaryButton)
@@ -29,7 +29,7 @@ final class HarnessUITests: HarnessUITestCase {
     )
     XCTAssertTrue(app.buttons["Start Daemon"].exists)
 
-    let sidebarEmptyState = element(in: app, identifier: Accessibility.sidebarEmptyState)
+    let sidebarEmptyState = sidebarEmptyStateElement(in: app)
     let sidebarRoot = element(in: app, identifier: Accessibility.sidebarRoot)
     XCTAssertTrue(sidebarEmptyState.waitForExistence(timeout: Self.uiTimeout))
     XCTAssertTrue(sidebarRoot.waitForExistence(timeout: Self.uiTimeout))
@@ -37,15 +37,15 @@ final class HarnessUITests: HarnessUITestCase {
     XCTAssertEqual(sidebarRoot.descendants(matching: .scrollView).count, 1)
     XCTAssertEqual(sidebarRoot.descendants(matching: .scrollBar).count, 0)
 
-    let activeFilter = element(in: app, identifier: Accessibility.activeFilterButton)
+    let activeFilter = button(in: app, title: "Active")
     XCTAssertTrue(activeFilter.waitForExistence(timeout: Self.uiTimeout))
     XCTAssertEqual(activeFilter.value as? String, "selected")
     XCTAssertEqual(
-      element(in: app, identifier: Accessibility.allFilterButton).value as? String,
+      button(in: app, title: "All").value as? String,
       "not selected"
     )
     XCTAssertEqual(
-      element(in: app, identifier: Accessibility.endedFilterButton).value as? String,
+      button(in: app, title: "Ended").value as? String,
       "not selected"
     )
   }
@@ -77,7 +77,7 @@ final class HarnessUITests: HarnessUITestCase {
     XCTAssertEqual(title.label, "General")
     XCTAssertEqual(
       preferencesState.label,
-      "style=gradient, mode=auto, section=general, preferencesChrome=extended"
+      "mode=auto, section=general, preferencesChrome=native"
     )
   }
 
@@ -109,9 +109,9 @@ final class HarnessUITests: HarnessUITestCase {
   func testObserveSummaryIsAvailableInSessionCockpit() throws {
     let app = launch(mode: "preview")
 
-    let sessionRow = element(in: app, identifier: Accessibility.previewSessionRow)
+    let sessionRow = previewSessionTrigger(in: app)
     XCTAssertTrue(sessionRow.waitForExistence(timeout: Self.uiTimeout))
-    tapElement(in: app, identifier: Accessibility.previewSessionRow)
+    tapPreviewSession(in: app)
 
     let tasks = app.staticTexts["Tasks"]
     let signals = app.staticTexts["Signals"]
@@ -195,9 +195,9 @@ final class HarnessUITests: HarnessUITestCase {
   func testSessionActionsExposeActorPickerAndRemoveAgentFlow() throws {
     let app = launch(mode: "preview")
 
-    let sessionRow = element(in: app, identifier: Accessibility.previewSessionRow)
+    let sessionRow = previewSessionTrigger(in: app)
     XCTAssertTrue(sessionRow.waitForExistence(timeout: Self.uiTimeout))
-    tapElement(in: app, identifier: Accessibility.previewSessionRow)
+    tapPreviewSession(in: app)
     tapButton(in: app, identifier: Accessibility.workerAgentCard)
 
     let actorPicker = element(in: app, identifier: Accessibility.actionActorPicker)
@@ -210,9 +210,9 @@ final class HarnessUITests: HarnessUITestCase {
   func testTaskInspectorShowsCheckpointNotesAndSuggestedFix() throws {
     let app = launch(mode: "preview")
 
-    let sessionRow = element(in: app, identifier: Accessibility.previewSessionRow)
+    let sessionRow = previewSessionTrigger(in: app)
     XCTAssertTrue(sessionRow.waitForExistence(timeout: Self.uiTimeout))
-    tapElement(in: app, identifier: Accessibility.previewSessionRow)
+    tapPreviewSession(in: app)
     tapButton(in: app, identifier: Accessibility.taskUICard)
 
     let inspectorCard = element(in: app, identifier: Accessibility.taskInspectorCard)
@@ -228,9 +228,9 @@ final class HarnessUITests: HarnessUITestCase {
   func testAgentInspectorShowsRuntimeCapabilitiesAndToolActivity() throws {
     let app = launch(mode: "preview")
 
-    let sessionRow = element(in: app, identifier: Accessibility.previewSessionRow)
+    let sessionRow = previewSessionTrigger(in: app)
     XCTAssertTrue(sessionRow.waitForExistence(timeout: Self.uiTimeout))
-    tapElement(in: app, identifier: Accessibility.previewSessionRow)
+    tapPreviewSession(in: app)
     tapButton(in: app, identifier: Accessibility.workerAgentCard)
 
     let inspectorCard = element(in: app, identifier: Accessibility.agentInspectorCard)
@@ -247,9 +247,9 @@ final class HarnessUITests: HarnessUITestCase {
   func testObserverInspectorShowsCycleHistoryAndTrackedSessions() throws {
     let app = launch(mode: "preview")
 
-    let sessionRow = element(in: app, identifier: Accessibility.previewSessionRow)
+    let sessionRow = previewSessionTrigger(in: app)
     XCTAssertTrue(sessionRow.waitForExistence(timeout: Self.uiTimeout))
-    tapElement(in: app, identifier: Accessibility.previewSessionRow)
+    tapPreviewSession(in: app)
     tapButton(in: app, identifier: Accessibility.observeSummaryButton)
 
     let inspectorCard = element(in: app, identifier: Accessibility.observerInspectorCard)
@@ -263,9 +263,9 @@ final class HarnessUITests: HarnessUITestCase {
   func testEndSessionRequiresConfirmation() throws {
     let app = launch(mode: "preview")
 
-    let sessionRow = element(in: app, identifier: Accessibility.previewSessionRow)
+    let sessionRow = previewSessionTrigger(in: app)
     XCTAssertTrue(sessionRow.waitForExistence(timeout: Self.uiTimeout))
-    tapElement(in: app, identifier: Accessibility.previewSessionRow)
+    tapPreviewSession(in: app)
 
     let endSessionButton = element(in: app, identifier: Accessibility.endSessionButton)
     XCTAssertTrue(endSessionButton.waitForExistence(timeout: Self.uiTimeout))
@@ -316,7 +316,7 @@ final class HarnessUITests: HarnessUITestCase {
     dismissConfirmationDialog(in: app)
   }
 
-  func testSettingsStylePickerUpdatesGlobalThemeValue() throws {
+  func testSettingsThemeModePickerKeepsNativeChromeContract() throws {
     let app = launch(mode: "preview")
 
     let preferencesButton = toolbarButton(in: app, identifier: Accessibility.preferencesButton)
@@ -326,8 +326,8 @@ final class HarnessUITests: HarnessUITestCase {
     let preferencesRoot = element(in: app, identifier: Accessibility.preferencesRoot)
     let preferencesState = element(in: app, identifier: Accessibility.preferencesState)
     let appChromeState = element(in: app, identifier: Accessibility.appChromeState)
-    let stylePicker = element(in: app, identifier: Accessibility.preferencesThemeStylePicker)
-    let sessionRow = element(in: app, identifier: Accessibility.previewSessionRow)
+    let modePicker = element(in: app, identifier: Accessibility.preferencesThemeModePicker)
+    let sessionRow = previewSessionTrigger(in: app)
     let observeSummaryButton = app.buttons
       .matching(identifier: Accessibility.observeSummaryButton)
       .firstMatch
@@ -335,53 +335,80 @@ final class HarnessUITests: HarnessUITestCase {
     XCTAssertTrue(preferencesRoot.waitForExistence(timeout: Self.uiTimeout))
     XCTAssertTrue(preferencesState.waitForExistence(timeout: Self.uiTimeout))
     XCTAssertTrue(appChromeState.waitForExistence(timeout: Self.uiTimeout))
-    XCTAssertTrue(stylePicker.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(modePicker.waitForExistence(timeout: Self.uiTimeout))
     XCTAssertTrue(sessionRow.waitForExistence(timeout: Self.uiTimeout))
-    tapElement(in: app, identifier: Accessibility.previewSessionRow)
+    tapPreviewSession(in: app)
     XCTAssertTrue(observeSummaryButton.waitForExistence(timeout: Self.uiTimeout))
     XCTAssertEqual(
       preferencesState.label,
-      "style=gradient, mode=auto, section=general, preferencesChrome=extended"
+      "mode=auto, section=general, preferencesChrome=native"
     )
     XCTAssertEqual(
       appChromeState.label,
-      "style=gradient, contentChrome=extended, interactiveCards=native-glass"
+      "contentChrome=native, interactiveRows=plain, controlGlass=system"
     )
-    XCTAssertEqual(sessionRow.value as? String, "selected, interactive=native-glass")
-    XCTAssertEqual(observeSummaryButton.value as? String, "interactive=native-glass")
+    XCTAssertEqual(sessionRow.value as? String, "selected, interactive=plain")
+    XCTAssertEqual(observeSummaryButton.value as? String, "interactive=plain")
 
     selectMenuOption(
       in: app,
-      controlIdentifier: Accessibility.preferencesThemeStylePicker,
-      optionTitle: "Flat"
+      controlIdentifier: Accessibility.preferencesThemeModePicker,
+      optionTitle: "Dark"
+    )
+    XCTAssertTrue(
+      waitUntil {
+        preferencesState.label == "mode=dark, section=general, preferencesChrome=native"
+      }
     )
 
     XCTAssertEqual(
       preferencesState.label,
-      "style=flat, mode=auto, section=general, preferencesChrome=reduced"
+      "mode=dark, section=general, preferencesChrome=native"
     )
     XCTAssertEqual(
       appChromeState.label,
-      "style=flat, contentChrome=reduced, interactiveCards=bordered-fallback"
+      "contentChrome=native, interactiveRows=plain, controlGlass=system"
     )
-    XCTAssertEqual(sessionRow.value as? String, "selected, interactive=bordered-fallback")
-    XCTAssertEqual(observeSummaryButton.value as? String, "interactive=bordered-fallback")
+    XCTAssertEqual(sessionRow.value as? String, "selected, interactive=plain")
+    XCTAssertEqual(observeSummaryButton.value as? String, "interactive=plain")
 
     selectMenuOption(
       in: app,
-      controlIdentifier: Accessibility.preferencesThemeStylePicker,
-      optionTitle: "Gradient"
+      controlIdentifier: Accessibility.preferencesThemeModePicker,
+      optionTitle: "Light"
+    )
+    XCTAssertTrue(
+      waitUntil {
+        preferencesState.label == "mode=light, section=general, preferencesChrome=native"
+      }
     )
 
     XCTAssertEqual(
       preferencesState.label,
-      "style=gradient, mode=auto, section=general, preferencesChrome=extended"
+      "mode=light, section=general, preferencesChrome=native"
     )
     XCTAssertEqual(
       appChromeState.label,
-      "style=gradient, contentChrome=extended, interactiveCards=native-glass"
+      "contentChrome=native, interactiveRows=plain, controlGlass=system"
     )
-    XCTAssertEqual(sessionRow.value as? String, "selected, interactive=native-glass")
-    XCTAssertEqual(observeSummaryButton.value as? String, "interactive=native-glass")
+    XCTAssertEqual(sessionRow.value as? String, "selected, interactive=plain")
+    XCTAssertEqual(observeSummaryButton.value as? String, "interactive=plain")
+
+    selectMenuOption(
+      in: app,
+      controlIdentifier: Accessibility.preferencesThemeModePicker,
+      optionTitle: "Auto"
+    )
+    XCTAssertTrue(
+      waitUntil {
+        preferencesState.label == "mode=auto, section=general, preferencesChrome=native"
+      }
+    )
+    XCTAssertEqual(
+      appChromeState.label,
+      "contentChrome=native, interactiveRows=plain, controlGlass=system"
+    )
+    XCTAssertEqual(sessionRow.value as? String, "selected, interactive=plain")
+    XCTAssertEqual(observeSummaryButton.value as? String, "interactive=plain")
   }
 }

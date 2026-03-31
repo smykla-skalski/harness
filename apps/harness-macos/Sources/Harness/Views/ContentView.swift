@@ -6,6 +6,7 @@ struct ContentView: View {
   @Bindable var store: HarnessStore
   @Environment(\.openSettings)
   private var openSettings
+  @State private var columnVisibility: NavigationSplitViewVisibility = .all
   @State private var showInspector = true
 
   private var selectedDetail: SessionDetail? {
@@ -31,7 +32,7 @@ struct ContentView: View {
   }
 
   var body: some View {
-    NavigationSplitView {
+    NavigationSplitView(columnVisibility: $columnVisibility) {
       SidebarView(store: store)
         .navigationSplitViewColumnWidth(min: 300, ideal: 350)
     } detail: {

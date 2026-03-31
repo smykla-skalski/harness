@@ -15,7 +15,6 @@ private final class HarnessAppDelegate: NSObject, NSApplicationDelegate {
 
 enum HarnessThemeDefaults {
   static let modeKey = "harnessThemeMode"
-  static let styleKey = "harnessThemeStyle"
 }
 
 enum HarnessThemeMode: String, CaseIterable, Identifiable {
@@ -42,20 +41,6 @@ enum HarnessThemeMode: String, CaseIterable, Identifiable {
   }
 }
 
-enum HarnessThemeStyle: String, CaseIterable, Identifiable {
-  case gradient
-  case flat
-
-  var id: String { rawValue }
-
-  var label: String {
-    switch self {
-    case .gradient: "Gradient"
-    case .flat: "Flat"
-    }
-  }
-}
-
 @main
 @MainActor
 struct HarnessApp: App {
@@ -64,15 +49,15 @@ struct HarnessApp: App {
   @State private var store: HarnessStore
   @AppStorage(HarnessThemeDefaults.modeKey)
   private var storedThemeMode = HarnessThemeMode.auto.rawValue
-  @AppStorage(HarnessThemeDefaults.styleKey)
-  private var storedThemeStyle = HarnessThemeStyle.gradient.rawValue
   @State private var themeMode: HarnessThemeMode = .auto
-  @State private var themeStyle: HarnessThemeStyle = .gradient
   private let isUITesting = ProcessInfo.processInfo.environment["HARNESS_UI_TESTS"] == "1"
 
   init() {
+    let uiTesting = ProcessInfo.processInfo.environment["HARNESS_UI_TESTS"] == "1"
     let resolvedContainer =
-      (try? HarnessModelContainer.live())
+      (uiTesting
+        ? (try? HarnessModelContainer.preview())
+        : (try? HarnessModelContainer.live()))
       ?? (try? HarnessModelContainer.preview())!
     container = resolvedContainer
     let resolvedStore = HarnessAppStoreFactory.makeStore(
@@ -80,13 +65,9 @@ struct HarnessApp: App {
     )
     _store = State(initialValue: resolvedStore)
 
-    if ProcessInfo.processInfo.environment["HARNESS_UI_TESTS"] == "1" {
+    if uiTesting {
       UserDefaults.standard.set(
         HarnessThemeMode.auto.rawValue, forKey: HarnessThemeDefaults.modeKey)
-      UserDefaults.standard.set(
-        HarnessThemeStyle.gradient.rawValue,
-        forKey: HarnessThemeDefaults.styleKey
-      )
     }
   }
 
@@ -113,19 +94,15 @@ struct HarnessApp: App {
 
   private func syncThemeFromStorage() {
     themeMode = HarnessThemeMode(rawValue: storedThemeMode) ?? .auto
-    themeStyle = HarnessThemeStyle(rawValue: storedThemeStyle) ?? .gradient
   }
 
   @ViewBuilder private var rootContent: some View {
-    ContentView(store: store, themeStyle: themeStyle)
-      .environment(\.harnessThemeStyle, themeStyle)
+    ContentView(store: store)
       .preferredColorScheme(themeMode.colorScheme)
-      .tint(HarnessTheme.accent(for: themeStyle))
+      .tint(HarnessTheme.accent)
       .onAppear { syncThemeFromStorage() }
       .onChange(of: storedThemeMode) { _, _ in syncThemeFromStorage() }
-      .onChange(of: storedThemeStyle) { _, _ in syncThemeFromStorage() }
       .onChange(of: themeMode) { _, new in storedThemeMode = new.rawValue }
-      .onChange(of: themeStyle) { _, new in storedThemeStyle = new.rawValue }
       .task {
         await store.bootstrapIfNeeded()
       }
@@ -172,12 +149,10 @@ struct HarnessApp: App {
   @ViewBuilder private var settingsContent: some View {
     PreferencesView(
       store: store,
-      themeMode: $themeMode,
-      themeStyle: $themeStyle
+      themeMode: $themeMode
     )
-    .environment(\.harnessThemeStyle, themeStyle)
     .preferredColorScheme(themeMode.colorScheme)
-    .tint(HarnessTheme.accent(for: themeStyle))
+    .tint(HarnessTheme.accent)
   }
 
   private func refreshStore() {
