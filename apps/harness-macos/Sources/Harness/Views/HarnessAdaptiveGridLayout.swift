@@ -81,7 +81,7 @@ struct HarnessAdaptiveGridLayout: Layout {
         subviews[index].place(
           at: CGPoint(x: x, y: y),
           anchor: .topLeading,
-          proposal: ProposedViewSize(width: columnWidth, height: rowHeight)
+          proposal: ProposedViewSize(width: columnWidth, height: nil)
         )
       }
 
