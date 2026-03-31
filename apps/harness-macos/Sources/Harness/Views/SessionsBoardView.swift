@@ -21,7 +21,7 @@ struct SessionsBoardView: View {
       .animation(.spring(duration: 0.3), value: store.sessions)
       .frame(maxWidth: .infinity, alignment: .leading)
     }
-    .foregroundStyle(HarnessTheme.ink)
+    .foregroundStyle(.primary)
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessAccessibility.sessionsBoardRoot)
   }
@@ -76,7 +76,7 @@ struct SessionsBoardView: View {
           .font(.caption.weight(.semibold))
           .foregroundStyle(HarnessTheme.secondaryInk)
         Text(value)
-          .font(.system(size: 34, weight: .heavy, design: .rounded))
+          .font(.system(.largeTitle, design: .rounded, weight: .heavy))
           .foregroundStyle(tint)
           .contentTransition(.numericText())
       }

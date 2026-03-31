@@ -38,7 +38,7 @@ struct InspectorColumnView: View {
       .frame(maxWidth: .infinity, alignment: .leading)
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-    .foregroundStyle(HarnessTheme.ink)
+    .foregroundStyle(.primary)
     .textFieldStyle(.roundedBorder)
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessAccessibility.inspectorRoot)

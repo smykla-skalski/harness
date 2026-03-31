@@ -17,7 +17,7 @@ struct SidebarView: View {
     }
     .scrollIndicators(.hidden)
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-    .foregroundStyle(HarnessTheme.ink)
+    .foregroundStyle(.primary)
     .contentShape(Rectangle())
     .accessibilityFrameMarker(HarnessAccessibility.sidebarShellFrame)
     .accessibilityElement(children: .contain)
