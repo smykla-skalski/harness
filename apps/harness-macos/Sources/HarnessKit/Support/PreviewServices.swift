@@ -26,6 +26,35 @@ public final class PreviewHarnessClient: HarnessClientProtocol, Sendable {
       readySessionID: PreviewFixtures.summary.sessionId
     )
 
+    public static let overflow: Self = {
+      let sessions = PreviewFixtures.overflowSessions
+      return Self(
+        health: HealthResponse(
+          status: "ok",
+          version: "14.5.0",
+          pid: 4242,
+          endpoint: "http://127.0.0.1:9999",
+          startedAt: "2026-03-28T14:00:00Z",
+          projectCount: 1,
+          sessionCount: sessions.count
+        ),
+        projects: [
+          ProjectSummary(
+            projectId: PreviewFixtures.summary.projectId,
+            name: PreviewFixtures.summary.projectName,
+            projectDir: PreviewFixtures.summary.projectDir,
+            contextRoot: PreviewFixtures.summary.contextRoot,
+            activeSessionCount: sessions.filter { $0.status == .active }.count,
+            totalSessionCount: sessions.count
+          )
+        ],
+        sessions: sessions,
+        detail: PreviewFixtures.detail,
+        timeline: PreviewFixtures.timeline,
+        readySessionID: PreviewFixtures.summary.sessionId
+      )
+    }()
+
     public static let empty = Self(
       health: HealthResponse(
         status: "ok",
@@ -219,6 +248,7 @@ public final class PreviewHarnessClient: HarnessClientProtocol, Sendable {
 public actor PreviewDaemonController: DaemonControlling {
   public enum Mode: Sendable {
     case populated
+    case overflow
     case empty
   }
 
@@ -226,7 +256,17 @@ public actor PreviewDaemonController: DaemonControlling {
   private let statusReport: DaemonStatusReport
 
   public init(mode: Mode = .populated) {
-    let fixtures = mode == .empty ? PreviewHarnessClient.Fixtures.empty : .populated
+    let fixtures =
+      switch mode {
+      case .populated:
+        PreviewHarnessClient.Fixtures.populated
+      case .overflow:
+        PreviewHarnessClient.Fixtures.overflow
+      case .empty:
+        PreviewHarnessClient.Fixtures.empty
+      }
+
+    let hasSessions = !fixtures.sessions.isEmpty
     self.client = PreviewHarnessClient(fixtures: fixtures)
     self.statusReport = DaemonStatusReport(
       manifest: DaemonManifest(
@@ -237,15 +277,15 @@ public actor PreviewDaemonController: DaemonControlling {
         tokenPath: "/Users/example/Library/Application Support/harness/daemon/auth-token"
       ),
       launchAgent: LaunchAgentStatus(
-        installed: mode == .populated,
-        loaded: mode == .populated,
+        installed: hasSessions,
+        loaded: hasSessions,
         label: "io.harness.daemon",
         path: "/Users/example/Library/LaunchAgents/io.harness.daemon.plist",
         domainTarget: "gui/501",
         serviceTarget: "gui/501/io.harness.daemon",
-        state: mode == .populated ? "running" : nil,
-        pid: mode == .populated ? 4_242 : nil,
-        lastExitStatus: mode == .populated ? 0 : nil
+        state: hasSessions ? "running" : nil,
+        pid: hasSessions ? 4_242 : nil,
+        lastExitStatus: hasSessions ? 0 : nil
       ),
       projectCount: fixtures.projects.count,
       sessionCount: fixtures.sessions.count,
@@ -256,12 +296,12 @@ public actor PreviewDaemonController: DaemonControlling {
         authTokenPresent: true,
         eventsPath: "/Users/example/Library/Application Support/harness/daemon/events.jsonl",
         cacheRoot: "/Users/example/Library/Application Support/harness/daemon/cache/projects",
-        cacheEntryCount: mode == .populated ? 4 : 0,
-        lastEvent: mode == .populated
+        cacheEntryCount: hasSessions ? max(4, fixtures.sessions.count) : 0,
+        lastEvent: hasSessions
           ? DaemonAuditEvent(
             recordedAt: "2026-03-28T14:18:00Z",
             level: "info",
-            message: "indexed session sess-harness"
+            message: "indexed session \(fixtures.sessions[0].sessionId)"
           ) : nil
       )
     )

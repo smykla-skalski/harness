@@ -18,19 +18,26 @@ class HarnessUITestCase: XCTestCase {
 
 extension HarnessUITestCase {
   func previewSessionTrigger(in app: XCUIApplication) -> XCUIElement {
+    sessionTrigger(in: app, identifier: HarnessUITestAccessibility.previewSessionRow)
+  }
+
+  func sessionTrigger(in app: XCUIApplication, identifier: String) -> XCUIElement {
     // List rows appear as cells in the accessibility tree.
-    let cell = app.cells.matching(identifier: HarnessUITestAccessibility.previewSessionRow).firstMatch
+    let cell = app.cells.matching(identifier: identifier).firstMatch
     if cell.exists { return cell }
-    // Fall back to button lookup for backwards compatibility.
-    let identifiedButton = button(in: app, identifier: HarnessUITestAccessibility.previewSessionRow)
+    // Fall back to button lookup for forwards/backwards compatibility.
+    let identifiedButton = button(in: app, identifier: identifier)
     if identifiedButton.exists { return identifiedButton }
     // Last resort: any element with the identifier.
-    return element(in: app, identifier: HarnessUITestAccessibility.previewSessionRow)
+    return element(in: app, identifier: identifier)
   }
 
   func sidebarEmptyStateElement(in app: XCUIApplication) -> XCUIElement { app.staticTexts[HarnessUITestAccessibility.sidebarEmptyStateTitle] }
 
-  func focusChip(in app: XCUIApplication, identifier _: String, title: String) -> XCUIElement { button(in: app, title: title) }
+  func focusChip(in app: XCUIApplication, identifier: String, title: String) -> XCUIElement {
+    let identifiedButton = button(in: app, identifier: identifier)
+    return identifiedButton.exists ? identifiedButton : button(in: app, title: title)
+  }
 
   func tapPreviewSession(in app: XCUIApplication) {
     let sessionRow = previewSessionTrigger(in: app)
@@ -303,19 +310,8 @@ extension HarnessUITestCase {
   }
 
   func dragUp(in app: XCUIApplication, element: XCUIElement, distanceRatio: CGFloat = 0.32) {
-    let window = mainWindow(in: app)
-    XCTAssertTrue(window.waitForExistence(timeout: Self.uiTimeout))
-
-    let origin = window.coordinate(withNormalizedOffset: CGVector(dx: 0, dy: 0))
-    let x = element.frame.midX - window.frame.minX
-    let startY = element.frame.maxY - window.frame.minY - 36
-    let minimumEndY = element.frame.minY - window.frame.minY + 36
-    let targetEndY = startY - (element.frame.height * distanceRatio)
-    let endY = max(minimumEndY, targetEndY)
-
-    let start = origin.withOffset(CGVector(dx: x, dy: startY))
-    let end = origin.withOffset(CGVector(dx: x, dy: endY))
-    start.press(forDuration: 0.05, thenDragTo: end)
+    let scrollDistance = max(120, element.frame.height * distanceRatio)
+    element.scroll(byDeltaX: 0, deltaY: -scrollDistance)
   }
 
   func confirmationDialogButton(in app: XCUIApplication, title: String) -> XCUIElement {

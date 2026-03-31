@@ -7,16 +7,18 @@ extension HarnessUITestCase {
     expectedHorizontalInset: CGFloat,
     tolerance: CGFloat
   ) {
-    let expectedWidth = container.frame.width - (expectedHorizontalInset * 2)
-    XCTAssertEqual(child.frame.width, expectedWidth, accuracy: tolerance * 2)
+    let containerFrame = container.frame
+    let childFrame = child.frame
+    let expectedWidth = containerFrame.width - (expectedHorizontalInset * 2)
+    XCTAssertEqual(childFrame.width, expectedWidth, accuracy: tolerance * 2)
     XCTAssertEqual(
-      child.frame.minX,
-      container.frame.minX + expectedHorizontalInset,
+      childFrame.minX,
+      containerFrame.minX + expectedHorizontalInset,
       accuracy: tolerance
     )
     XCTAssertEqual(
-      child.frame.maxX,
-      container.frame.maxX - expectedHorizontalInset,
+      childFrame.maxX,
+      containerFrame.maxX - expectedHorizontalInset,
       accuracy: tolerance
     )
   }
@@ -26,9 +28,10 @@ extension HarnessUITestCase {
       XCTFail("No elements provided")
       return
     }
+    let firstFrame = first.frame
 
     for element in elements.dropFirst() {
-      XCTAssertEqual(element.frame.minY, first.frame.minY, accuracy: tolerance)
+      XCTAssertEqual(element.frame.minY, firstFrame.minY, accuracy: tolerance)
     }
   }
 
@@ -37,9 +40,10 @@ extension HarnessUITestCase {
       XCTFail("No elements provided")
       return
     }
+    let firstFrame = first.frame
 
     for element in elements.dropFirst() {
-      XCTAssertEqual(element.frame.height, first.frame.height, accuracy: tolerance)
+      XCTAssertEqual(element.frame.height, firstFrame.height, accuracy: tolerance)
     }
   }
 }
