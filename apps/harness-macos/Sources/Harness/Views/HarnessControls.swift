@@ -130,7 +130,7 @@ private struct HarnessFilterChipButtonStyleModifier: ViewModifier {
   func body(content: Content) -> some View {
     content
       .buttonStyle(.glass)
-      .tint(isSelected ? HarnessTheme.accent : HarnessTheme.ink)
+      .tint(isSelected ? .accentColor : .secondary)
       .fontWeight(isSelected ? .bold : .semibold)
   }
 }
@@ -162,7 +162,7 @@ extension View {
   }
 
   func harnessAccessoryButtonStyle(
-    tint: Color = HarnessTheme.ink
+    tint: Color = .secondary
   ) -> some View {
     modifier(HarnessAccessoryButtonStyleModifier(tint: tint))
   }
