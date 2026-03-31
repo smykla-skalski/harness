@@ -1,13 +1,11 @@
 import HarnessKit
-import Observation
 import SwiftUI
 
 struct SidebarView: View {
   let store: HarnessStore
-  @State private var localSelection: String?
 
   var body: some View {
-    List(selection: $localSelection) {
+    List {
       Section {
         DaemonStatusCard(store: store)
       }
@@ -49,16 +47,6 @@ struct SidebarView: View {
     .accessibilityFrameMarker(HarnessAccessibility.sidebarShellFrame)
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessAccessibility.sidebarRoot)
-    .onAppear {
-      localSelection = store.selectedSessionID
-    }
-    .onChange(of: store.selectedSessionID) { _, newID in
-      if localSelection != newID { localSelection = newID }
-    }
-    .onChange(of: localSelection) { _, newID in
-      guard newID != store.selectedSessionID else { return }
-      Task { await store.selectSession(newID) }
-    }
   }
 
   @ViewBuilder private var sessionSections: some View {
@@ -127,15 +115,50 @@ struct SidebarView: View {
 
   @ViewBuilder
   private func sessionRow(_ session: SessionSummary) -> some View {
+    let isSelected = store.selectedSessionID == session.sessionId
+    let rowContentPadding = HarnessTheme.spacingLG
+    let rowOuterInset = HarnessTheme.sectionSpacing
     let baseRow =
-      SidebarSessionRow(session: session, store: store)
-      .tag(session.sessionId)
+      Button {
+        Task { await store.selectSession(session.sessionId) }
+      } label: {
+        SidebarSessionRow(session: session, store: store, isSelected: isSelected)
+          .padding(.horizontal, rowContentPadding)
+          .padding(.vertical, HarnessTheme.itemSpacing)
+          .frame(maxWidth: .infinity, alignment: .leading)
+          .background {
+            if isSelected {
+              RoundedRectangle(cornerRadius: HarnessTheme.cornerRadiusLG, style: .continuous)
+                .fill(
+                  LinearGradient(
+                    colors: [HarnessTheme.accent.opacity(0.96), HarnessTheme.accent.opacity(0.84)],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                  )
+                )
+            }
+          }
+          .overlay {
+            if isSelected {
+              RoundedRectangle(cornerRadius: HarnessTheme.cornerRadiusLG, style: .continuous)
+                .strokeBorder(HarnessTheme.onContrast.opacity(0.18), lineWidth: 1)
+            }
+          }
+          .contentShape(RoundedRectangle(cornerRadius: HarnessTheme.cornerRadiusLG, style: .continuous))
+          .animation(.snappy(duration: 0.2), value: isSelected)
+      }
+      .harnessInteractiveCardButtonStyle(
+        cornerRadius: HarnessTheme.cornerRadiusLG,
+        tint: .clear
+      )
       .listRowInsets(EdgeInsets(
         top: HarnessTheme.itemSpacing,
-        leading: HarnessTheme.sectionSpacing,
+        leading: rowOuterInset,
         bottom: HarnessTheme.itemSpacing,
-        trailing: HarnessTheme.sectionSpacing
+        trailing: rowOuterInset
       ))
+      .listRowSeparator(.hidden)
+      .listRowBackground(Color.clear)
       .accessibilityLabel(
         sessionAccessibilityLabel(for: session)
       )
