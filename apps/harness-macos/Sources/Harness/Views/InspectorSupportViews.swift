@@ -34,10 +34,18 @@ struct ObserverInspectorCard: View {
         ObserverWorkersSection(workers: activeWorkers)
       }
       if let cycleHistory = observer.cycleHistory, !cycleHistory.isEmpty {
-        ObserverCycleHistorySection(cycles: cycleHistory)
+        DisclosureGroup("Cycle History") {
+          ObserverCycleHistoryContent(cycles: cycleHistory)
+        }
+        .font(.caption.bold())
+        .foregroundStyle(HarnessTheme.secondaryInk)
       }
       if let agentSessions = observer.agentSessions, !agentSessions.isEmpty {
-        ObserverAgentSessionsSection(sessions: agentSessions)
+        DisclosureGroup("Tracked Agent Sessions") {
+          ObserverAgentSessionsContent(sessions: agentSessions)
+        }
+        .font(.caption.bold())
+        .foregroundStyle(HarnessTheme.secondaryInk)
       }
     }
     .frame(maxWidth: .infinity, alignment: .leading)
@@ -119,71 +127,67 @@ private struct ObserverWorkersSection: View {
   }
 }
 
-private struct ObserverCycleHistorySection: View {
+private struct ObserverCycleHistoryContent: View {
   let cycles: [ObserverCycleSummary]
 
   var body: some View {
-    InspectorSection(title: "Cycle History") {
-      VStack(alignment: .leading, spacing: HarnessTheme.itemSpacing) {
-        ForEach(cycles) { cycle in
-          VStack(alignment: .leading, spacing: 4) {
-            HStack {
-              Text(formatTimestamp(cycle.timestamp))
-                .font(.caption.monospaced())
-              Spacer()
-              Text("+\(cycle.newIssues) / -\(cycle.resolved)")
-                .font(.caption.bold())
-                .foregroundStyle(HarnessTheme.secondaryInk)
-            }
-            Text("Lines \(cycle.fromLine) - \(cycle.toLine)")
-              .font(.caption)
+    VStack(alignment: .leading, spacing: HarnessTheme.itemSpacing) {
+      ForEach(cycles) { cycle in
+        VStack(alignment: .leading, spacing: 4) {
+          HStack {
+            Text(formatTimestamp(cycle.timestamp))
+              .font(.caption.monospaced())
+            Spacer()
+            Text("+\(cycle.newIssues) / -\(cycle.resolved)")
+              .font(.caption.bold())
               .foregroundStyle(HarnessTheme.secondaryInk)
           }
-          .harnessCellPadding()
+          Text("Lines \(cycle.fromLine) - \(cycle.toLine)")
+            .font(.caption)
+            .foregroundStyle(HarnessTheme.secondaryInk)
         }
+        .harnessCellPadding()
       }
-      .frame(maxWidth: .infinity, alignment: .leading)
     }
+    .frame(maxWidth: .infinity, alignment: .leading)
   }
 }
 
-private struct ObserverAgentSessionsSection: View {
+private struct ObserverAgentSessionsContent: View {
   let sessions: [ObserverAgentSessionSummary]
 
   var body: some View {
-    InspectorSection(title: "Tracked Agent Sessions") {
-      VStack(alignment: .leading, spacing: HarnessTheme.itemSpacing) {
-        ForEach(sessions) { session in
-          VStack(alignment: .leading, spacing: 4) {
-            HStack {
-              Text(session.agentId)
-                .font(.subheadline.bold())
-              Spacer()
-              Text(session.runtime.uppercased())
-                .font(.caption2.bold())
-                .tracking(HarnessTheme.uppercaseTracking)
-                .foregroundStyle(HarnessTheme.secondaryInk)
-            }
-            Text("Cursor \(session.cursor)")
-              .font(.caption.monospaced())
-            if let lastActivity = session.lastActivity {
-              Text("Last activity \(formatTimestamp(lastActivity))")
-                .font(.caption)
-                .foregroundStyle(HarnessTheme.secondaryInk)
-            }
-            if let logPath = session.logPath {
-              Text(logPath)
-                .font(.caption.monospaced())
-                .truncationMode(.middle)
-                .foregroundStyle(HarnessTheme.secondaryInk)
-                .lineLimit(2)
-            }
+    VStack(alignment: .leading, spacing: HarnessTheme.itemSpacing) {
+      ForEach(sessions) { session in
+        VStack(alignment: .leading, spacing: 4) {
+          HStack {
+            Text(session.agentId)
+              .font(.subheadline.bold())
+            Spacer()
+            Text(session.runtime.uppercased())
+              .font(.caption2.bold())
+              .tracking(HarnessTheme.uppercaseTracking)
+              .foregroundStyle(HarnessTheme.secondaryInk)
           }
-          .harnessCellPadding()
+          Text("Cursor \(session.cursor)")
+            .font(.caption.monospaced())
+          if let lastActivity = session.lastActivity {
+            Text("Last activity \(formatTimestamp(lastActivity))")
+              .font(.caption)
+              .foregroundStyle(HarnessTheme.secondaryInk)
+          }
+          if let logPath = session.logPath {
+            Text(logPath)
+              .font(.caption.monospaced())
+              .truncationMode(.middle)
+              .foregroundStyle(HarnessTheme.secondaryInk)
+              .lineLimit(2)
+          }
         }
+        .harnessCellPadding()
       }
-      .frame(maxWidth: .infinity, alignment: .leading)
     }
+    .frame(maxWidth: .infinity, alignment: .leading)
   }
 }
 
