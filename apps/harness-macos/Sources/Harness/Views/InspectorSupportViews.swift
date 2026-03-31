@@ -28,112 +28,16 @@ struct ObserverInspectorCard: View {
         }
       }
       if let openIssues = observer.openIssues, !openIssues.isEmpty {
-        InspectorSection(title: "Open Issues") {
-          VStack(alignment: .leading, spacing: HarnessTheme.itemSpacing) {
-            ForEach(openIssues) { issue in
-              VStack(alignment: .leading, spacing: 4) {
-                HStack(alignment: .firstTextBaseline) {
-                  Text(issue.code)
-                    .font(.caption.bold())
-                    .textCase(.uppercase)
-                  Spacer()
-                  Text(issue.severity.capitalized)
-                    .font(.caption2.bold())
-                }
-                Text(issue.summary)
-                  .font(.subheadline)
-                if let evidenceExcerpt = issue.evidenceExcerpt {
-                  Text(evidenceExcerpt)
-                    .font(.caption)
-                    .foregroundStyle(HarnessTheme.secondaryInk)
-                    .lineLimit(2)
-                }
-              }
-              .harnessCellPadding()
-            }
-          }
-          .frame(maxWidth: .infinity, alignment: .leading)
-        }
+        ObserverOpenIssuesSection(issues: openIssues)
       }
       if let activeWorkers = observer.activeWorkers, !activeWorkers.isEmpty {
-        InspectorSection(title: "Active Workers") {
-          VStack(alignment: .leading, spacing: HarnessTheme.itemSpacing) {
-            ForEach(activeWorkers) { worker in
-              VStack(alignment: .leading, spacing: 4) {
-                HStack {
-                  Text(worker.agentId ?? "worker")
-                    .font(.subheadline.bold())
-                  Spacer()
-                  Text(formatTimestamp(worker.startedAt))
-                    .font(.caption.monospaced())
-                    .foregroundStyle(HarnessTheme.secondaryInk)
-                }
-                Text(worker.targetFile)
-                  .font(.caption)
-                  .foregroundStyle(HarnessTheme.secondaryInk)
-                  .lineLimit(2)
-              }
-              .harnessCellPadding()
-            }
-          }
-          .frame(maxWidth: .infinity, alignment: .leading)
-        }
+        ObserverWorkersSection(workers: activeWorkers)
       }
       if let cycleHistory = observer.cycleHistory, !cycleHistory.isEmpty {
-        InspectorSection(title: "Cycle History") {
-          VStack(alignment: .leading, spacing: HarnessTheme.itemSpacing) {
-            ForEach(cycleHistory) { cycle in
-              VStack(alignment: .leading, spacing: 4) {
-                HStack {
-                  Text(formatTimestamp(cycle.timestamp))
-                    .font(.caption.monospaced())
-                  Spacer()
-                  Text("+\(cycle.newIssues) / -\(cycle.resolved)")
-                    .font(.caption.bold())
-                    .foregroundStyle(HarnessTheme.secondaryInk)
-                }
-                Text("Lines \(cycle.fromLine) - \(cycle.toLine)")
-                  .font(.caption)
-                  .foregroundStyle(HarnessTheme.secondaryInk)
-              }
-              .harnessCellPadding()
-            }
-          }
-          .frame(maxWidth: .infinity, alignment: .leading)
-        }
+        ObserverCycleHistorySection(cycles: cycleHistory)
       }
       if let agentSessions = observer.agentSessions, !agentSessions.isEmpty {
-        InspectorSection(title: "Tracked Agent Sessions") {
-          VStack(alignment: .leading, spacing: HarnessTheme.itemSpacing) {
-            ForEach(agentSessions) { session in
-              VStack(alignment: .leading, spacing: 4) {
-                HStack {
-                  Text(session.agentId)
-                    .font(.subheadline.bold())
-                  Spacer()
-                  Text(session.runtime.uppercased())
-                    .font(.caption2.bold())
-                    .foregroundStyle(HarnessTheme.secondaryInk)
-                }
-                Text("Cursor \(session.cursor)")
-                  .font(.caption.monospaced())
-                if let lastActivity = session.lastActivity {
-                  Text("Last activity \(formatTimestamp(lastActivity))")
-                    .font(.caption)
-                    .foregroundStyle(HarnessTheme.secondaryInk)
-                }
-                if let logPath = session.logPath {
-                  Text(logPath)
-                    .font(.caption.monospaced())
-                    .foregroundStyle(HarnessTheme.secondaryInk)
-                    .lineLimit(2)
-                }
-              }
-              .harnessCellPadding()
-            }
-          }
-          .frame(maxWidth: .infinity, alignment: .leading)
-        }
+        ObserverAgentSessionsSection(sessions: agentSessions)
       }
     }
     .frame(maxWidth: .infinity, alignment: .leading)
@@ -150,6 +54,134 @@ struct InspectorFact: Identifiable {
   let title: String
   let value: String
   var id: String { title }
+}
+
+private struct ObserverOpenIssuesSection: View {
+  let issues: [ObserverIssueSummary]
+
+  var body: some View {
+    InspectorSection(title: "Open Issues") {
+      VStack(alignment: .leading, spacing: HarnessTheme.itemSpacing) {
+        ForEach(issues) { issue in
+          VStack(alignment: .leading, spacing: 4) {
+            HStack(alignment: .firstTextBaseline) {
+              Text(issue.code)
+                .font(.caption.bold())
+                .textCase(.uppercase)
+              Spacer()
+              Text(issue.severity.capitalized)
+                .font(.caption2.bold())
+            }
+            Text(issue.summary)
+              .font(.subheadline)
+            if let evidenceExcerpt = issue.evidenceExcerpt {
+              Text(evidenceExcerpt)
+                .font(.caption)
+                .foregroundStyle(HarnessTheme.secondaryInk)
+                .lineLimit(2)
+            }
+          }
+          .harnessCellPadding()
+        }
+      }
+      .frame(maxWidth: .infinity, alignment: .leading)
+    }
+  }
+}
+
+private struct ObserverWorkersSection: View {
+  let workers: [ObserverWorkerSummary]
+
+  var body: some View {
+    InspectorSection(title: "Active Workers") {
+      VStack(alignment: .leading, spacing: HarnessTheme.itemSpacing) {
+        ForEach(workers) { worker in
+          VStack(alignment: .leading, spacing: 4) {
+            HStack {
+              Text(worker.agentId ?? "worker")
+                .font(.subheadline.bold())
+              Spacer()
+              Text(formatTimestamp(worker.startedAt))
+                .font(.caption.monospaced())
+                .foregroundStyle(HarnessTheme.secondaryInk)
+            }
+            Text(worker.targetFile)
+              .font(.caption)
+              .foregroundStyle(HarnessTheme.secondaryInk)
+              .lineLimit(2)
+          }
+          .harnessCellPadding()
+        }
+      }
+      .frame(maxWidth: .infinity, alignment: .leading)
+    }
+  }
+}
+
+private struct ObserverCycleHistorySection: View {
+  let cycles: [ObserverCycleSummary]
+
+  var body: some View {
+    InspectorSection(title: "Cycle History") {
+      VStack(alignment: .leading, spacing: HarnessTheme.itemSpacing) {
+        ForEach(cycles) { cycle in
+          VStack(alignment: .leading, spacing: 4) {
+            HStack {
+              Text(formatTimestamp(cycle.timestamp))
+                .font(.caption.monospaced())
+              Spacer()
+              Text("+\(cycle.newIssues) / -\(cycle.resolved)")
+                .font(.caption.bold())
+                .foregroundStyle(HarnessTheme.secondaryInk)
+            }
+            Text("Lines \(cycle.fromLine) - \(cycle.toLine)")
+              .font(.caption)
+              .foregroundStyle(HarnessTheme.secondaryInk)
+          }
+          .harnessCellPadding()
+        }
+      }
+      .frame(maxWidth: .infinity, alignment: .leading)
+    }
+  }
+}
+
+private struct ObserverAgentSessionsSection: View {
+  let sessions: [ObserverAgentSessionSummary]
+
+  var body: some View {
+    InspectorSection(title: "Tracked Agent Sessions") {
+      VStack(alignment: .leading, spacing: HarnessTheme.itemSpacing) {
+        ForEach(sessions) { session in
+          VStack(alignment: .leading, spacing: 4) {
+            HStack {
+              Text(session.agentId)
+                .font(.subheadline.bold())
+              Spacer()
+              Text(session.runtime.uppercased())
+                .font(.caption2.bold())
+                .foregroundStyle(HarnessTheme.secondaryInk)
+            }
+            Text("Cursor \(session.cursor)")
+              .font(.caption.monospaced())
+            if let lastActivity = session.lastActivity {
+              Text("Last activity \(formatTimestamp(lastActivity))")
+                .font(.caption)
+                .foregroundStyle(HarnessTheme.secondaryInk)
+            }
+            if let logPath = session.logPath {
+              Text(logPath)
+                .font(.caption.monospaced())
+                .foregroundStyle(HarnessTheme.secondaryInk)
+                .lineLimit(2)
+            }
+          }
+          .harnessCellPadding()
+        }
+      }
+      .frame(maxWidth: .infinity, alignment: .leading)
+    }
+  }
 }
 
 struct InspectorFactGrid: View {
