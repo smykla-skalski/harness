@@ -17,14 +17,14 @@ final class HarnessGlassContrastUITests: HarnessUITestCase {
 
     let stats = luminanceStats(of: card)
     let screenshot = XCTAttachment(screenshot: card.screenshot())
-    screenshot.name = "board-metric-card"
+    screenshot.name = "board-metric-section"
     screenshot.lifetime = .keepAlways
     add(screenshot)
 
     XCTAssertGreaterThan(
       stats.stddev,
       0.04,
-      "Card content washed out: stddev=\(stats.stddev), "
+      "Section content washed out: stddev=\(stats.stddev), "
         + "min=\(stats.min), max=\(stats.max), "
         + "mean=\(stats.mean), samples=\(stats.count)"
     )
@@ -33,22 +33,19 @@ final class HarnessGlassContrastUITests: HarnessUITestCase {
   func testSidebarDaemonCardContentIsReadable() throws {
     let app = launch(mode: "empty")
 
-    let card = element(
-      in: app,
-      identifier: Accessibility.daemonCard
-    )
+    let card = frameElement(in: app, identifier: Accessibility.daemonCardFrame)
     XCTAssertTrue(card.waitForExistence(timeout: Self.uiTimeout))
 
     let stats = luminanceStats(of: card)
     let screenshot = XCTAttachment(screenshot: card.screenshot())
-    screenshot.name = "daemon-card"
+    screenshot.name = "daemon-section"
     screenshot.lifetime = .keepAlways
     add(screenshot)
 
     XCTAssertGreaterThan(
       stats.stddev,
       0.04,
-      "Card content washed out: stddev=\(stats.stddev), "
+      "Section content washed out: stddev=\(stats.stddev), "
         + "min=\(stats.min), max=\(stats.max), "
         + "mean=\(stats.mean), samples=\(stats.count)"
     )
