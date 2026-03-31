@@ -334,7 +334,7 @@ extension HarnessStore {
         return
       }
       timeline = updatedTimeline
-      await refresh(using: client, preserveSelection: true)
+      await refresh(using: client, preserveSelection: false)
       lastAction = actionName
     } catch {
       lastError = error.localizedDescription

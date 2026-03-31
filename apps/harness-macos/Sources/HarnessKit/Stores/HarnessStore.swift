@@ -212,8 +212,10 @@ public final class HarnessStore {
     }
 
     do {
-      diagnostics = try await client.diagnostics()
-      daemonStatus = try? await daemonController.daemonStatus()
+      async let diagnosticsResponse = client.diagnostics()
+      async let daemonStatusResponse: DaemonStatusReport? = try? daemonController.daemonStatus()
+      diagnostics = try await diagnosticsResponse
+      daemonStatus = await daemonStatusResponse
     } catch {
       lastError = error.localizedDescription
     }

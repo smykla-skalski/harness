@@ -42,12 +42,13 @@ extension HarnessStore {
       async let diagnosticsResponse = client.diagnostics()
       async let projectResponse = client.projects()
       async let sessionResponse = client.sessions()
+      async let daemonStatusResponse: DaemonStatusReport? = try? daemonController.daemonStatus()
 
       health = try await healthResponse
       diagnostics = try await diagnosticsResponse
       projects = try await projectResponse
       sessions = try await sessionResponse
-      daemonStatus = try? await daemonController.daemonStatus()
+      daemonStatus = await daemonStatusResponse
       isShowingCachedData = false
       cacheSessionList(sessions, projects: projects)
 
