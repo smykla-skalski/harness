@@ -108,7 +108,6 @@ struct SessionCockpitTimelineSection: View {
           }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.leading, HarnessTheme.spacingLG)
         .contextMenu {
           Button {
             NSPasteboard.general.clearContents()
