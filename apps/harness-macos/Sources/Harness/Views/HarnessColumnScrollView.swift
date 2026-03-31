@@ -18,17 +18,26 @@ struct HarnessColumnScrollView<Content: View>: View {
     self.content = content()
   }
 
-  @State private var availableWidth: CGFloat = 0
-
   var body: some View {
+    Group {
+      if constrainContentWidth {
+        GeometryReader { geometry in
+          scrollBody(contentWidth: max(geometry.size.width - (horizontalPadding * 2), 0))
+        }
+      } else {
+        scrollBody()
+      }
+    }
+    .scrollIndicators(.hidden)
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+  }
+
+  private func scrollBody(contentWidth: CGFloat? = nil) -> some View {
     ScrollView {
       VStack(spacing: 0) {
-        if constrainContentWidth, availableWidth > 0 {
+        if let contentWidth {
           content
-            .frame(
-              width: max(availableWidth - (horizontalPadding * 2), 0),
-              alignment: .topLeading
-            )
+            .frame(width: contentWidth, alignment: .topLeading)
         } else {
           content
             .frame(maxWidth: .infinity, alignment: .topLeading)
@@ -37,13 +46,6 @@ struct HarnessColumnScrollView<Content: View>: View {
       .frame(maxWidth: .infinity, alignment: .topLeading)
       .padding(.horizontal, horizontalPadding)
       .padding(.vertical, verticalPadding)
-    }
-    .scrollIndicators(.hidden)
-    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-    .onGeometryChange(for: CGFloat.self) { proxy in
-      proxy.size.width
-    } action: { newWidth in
-      availableWidth = newWidth
     }
   }
 }
