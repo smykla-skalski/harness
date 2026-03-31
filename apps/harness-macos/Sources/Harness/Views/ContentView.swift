@@ -56,7 +56,7 @@ struct ContentView: View {
           ConnectionToolbarBadge(metrics: store.connectionMetrics)
         }
         ToolbarItem(placement: .primaryAction) {
-          RefreshToolbarButton(isRefreshing: store.isRefreshing, action: refresh)
+          RefreshToolbarButton(store: store)
         }
         ToolbarItem(placement: .primaryAction) {
           Button {
@@ -123,12 +123,6 @@ struct ContentView: View {
     }
   }
 
-  private func refresh() {
-    Task {
-      await store.refresh()
-    }
-  }
-
   private var confirmationTitle: String {
     switch store.pendingConfirmation {
     case .endSession:
@@ -157,12 +151,11 @@ struct ContentView: View {
 }
 
 private struct RefreshToolbarButton: View {
-  let isRefreshing: Bool
-  let action: () -> Void
+  let store: HarnessStore
   @State private var isSpinning = false
 
   var body: some View {
-    Button(action: action) {
+    Button { Task { await store.refresh() } } label: {
       HStack(spacing: 8) {
         Image(systemName: "arrow.clockwise")
           .rotationEffect(.degrees(isSpinning ? 360 : 0))
@@ -175,7 +168,7 @@ private struct RefreshToolbarButton: View {
     }
     .keyboardShortcut("r", modifiers: [.command])
     .accessibilityIdentifier(HarnessAccessibility.refreshButton)
-    .onChange(of: isRefreshing) { _, refreshing in
+    .onChange(of: store.isRefreshing) { _, refreshing in
       if refreshing {
         isSpinning = true
       } else {
