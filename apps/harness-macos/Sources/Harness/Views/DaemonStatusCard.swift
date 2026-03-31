@@ -246,24 +246,33 @@ private struct DaemonRestartButtonStyle: ButtonStyle {
   @State private var isHovered = false
   @Environment(\.isEnabled)
   private var isEnabled
+  @Environment(\.accessibilityReduceMotion)
+  private var reduceMotion
 
-  /// Match the status pill height: caption.bold line height + pill padding top/bottom.
   private static let iconSize: CGFloat = 22
 
-  private var foreground: Color {
-    if !isEnabled { return HarnessTheme.secondaryInk.opacity(0.5) }
-    if isHovered { return HarnessTheme.accent }
-    return HarnessTheme.secondaryInk
-  }
-
   func makeBody(configuration: Configuration) -> some View {
+    let pressed = configuration.isPressed
+
     configuration.label
       .frame(width: Self.iconSize, height: Self.iconSize)
-      .foregroundStyle(foreground)
+      // Color: secondary at rest, accent on hover/press.
+      .foregroundStyle(iconColor(pressed: pressed))
+      // Opacity: 40% at rest, full on hover or press.
+      .opacity(iconOpacity(pressed: pressed))
+      .animation(.easeOut(duration: 0.15), value: isHovered)
+      .animation(.easeOut(duration: 0.15), value: isEnabled)
+      // Rotation: 75 degrees clockwise on hover. Instant when Reduce Motion is on.
       .rotationEffect(.degrees(isHovered ? 75 : 0))
-      .scaleEffect(configuration.isPressed ? 0.85 : 1)
-      .animation(.easeOut(duration: 0.1), value: configuration.isPressed)
-      .animation(.spring(duration: 0.3, bounce: 0.2), value: isHovered)
+      .animation(
+        reduceMotion ? .easeOut(duration: 0.1) : .spring(duration: 0.35, bounce: 0.15),
+        value: isHovered
+      )
+      // Scale: snap down on press, spring back on release. Cancelable mid-flight
+      // so rapid taps feel responsive - the spring always starts from the current
+      // render-tree position, never queuing stale sequences.
+      .scaleEffect(pressed ? 0.78 : 1)
+      .animation(.spring(duration: 0.2, bounce: 0.3), value: pressed)
       .contentShape(Circle())
       .onContinuousHover { phase in
         switch phase {
@@ -271,5 +280,17 @@ private struct DaemonRestartButtonStyle: ButtonStyle {
         case .ended: isHovered = false
         }
       }
+  }
+
+  private func iconColor(pressed: Bool) -> Color {
+    if !isEnabled { return HarnessTheme.secondaryInk }
+    if pressed || isHovered { return HarnessTheme.accent }
+    return HarnessTheme.secondaryInk
+  }
+
+  private func iconOpacity(pressed: Bool) -> Double {
+    if !isEnabled { return 0.3 }
+    if pressed || isHovered { return 1 }
+    return 0.4
   }
 }
