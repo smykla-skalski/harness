@@ -162,8 +162,11 @@ where
         return current_status;
     }
 
-    let legacy_status =
-        inspect_launch_agent_status(LEGACY_LAUNCH_AGENT_LABEL, &state::legacy_launch_agent_path(), runner);
+    let legacy_status = inspect_launch_agent_status(
+        LEGACY_LAUNCH_AGENT_LABEL,
+        &state::legacy_launch_agent_path(),
+        runner,
+    );
     if legacy_status.loaded || legacy_status.installed || legacy_status.status_error.is_some() {
         status.installed = legacy_status.installed;
         status.loaded = legacy_status.loaded;
@@ -508,19 +511,12 @@ mod tests {
 
                 assert!(path.is_file());
                 assert!(!legacy_path.exists());
-                assert!(
-                    calls
-                        .lock()
-                        .expect("lock")
-                        .iter()
-                        .any(|args| {
-                            args
-                                == &vec![
-                                    "bootout".to_string(),
-                                    launchd_service_target_for(LEGACY_LAUNCH_AGENT_LABEL),
-                                ]
-                        })
-                );
+                assert!(calls.lock().expect("lock").iter().any(|args| {
+                    args == &vec![
+                        "bootout".to_string(),
+                        launchd_service_target_for(LEGACY_LAUNCH_AGENT_LABEL),
+                    ]
+                }));
             },
         );
     }
@@ -578,7 +574,10 @@ mod tests {
                 let status = launch_agent_status_with(&|args| {
                     assert_eq!(args.first().map(String::as_str), Some("print"));
 
-                    if args.get(1).is_some_and(|value| value == &launchd_service_target()) {
+                    if args
+                        .get(1)
+                        .is_some_and(|value| value == &launchd_service_target())
+                    {
                         return Ok(CommandOutput {
                             exit_code: 1,
                             stdout: String::new(),
@@ -607,7 +606,10 @@ mod tests {
                 assert!(status.installed);
                 assert!(status.loaded);
                 assert_eq!(status.label, LAUNCH_AGENT_LABEL);
-                assert_eq!(status.path, state::launch_agent_path().display().to_string());
+                assert_eq!(
+                    status.path,
+                    state::launch_agent_path().display().to_string()
+                );
                 assert_eq!(status.service_target, launchd_service_target());
                 assert_eq!(status.state.as_deref(), Some("running"));
                 assert_eq!(status.pid, Some(4242));

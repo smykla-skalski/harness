@@ -9,12 +9,11 @@ use tokio::task::JoinHandle;
 use tokio::time::interval as tokio_interval;
 use tracing::warn;
 
-use crate::errors::{CliError, CliErrorKind};
-use crate::workspace::utc_now;
-
 use super::index;
 use super::protocol::{SessionSummary, StreamEvent};
+use super::service;
 use super::{snapshot, timeline};
+use crate::errors::{CliError, CliErrorKind};
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 struct SessionDigest {
@@ -357,21 +356,11 @@ fn prune_removed_sessions(
 
 fn emit_watch_changes(sender: &broadcast::Sender<StreamEvent>, changes: WatchChanges) {
     if changes.sessions_updated {
-        let _ = sender.send(StreamEvent {
-            event: "sessions_updated".into(),
-            recorded_at: utc_now(),
-            session_id: None,
-            payload: serde_json::json!([]),
-        });
+        service::broadcast_sessions_updated(sender);
     }
 
     for session_id in changes.session_ids {
-        let _ = sender.send(StreamEvent {
-            event: "session_updated".into(),
-            recorded_at: utc_now(),
-            session_id: Some(session_id),
-            payload: serde_json::json!({}),
-        });
+        service::broadcast_session_updated(sender, &session_id);
     }
 }
 
