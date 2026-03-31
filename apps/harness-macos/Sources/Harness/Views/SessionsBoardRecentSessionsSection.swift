@@ -6,7 +6,7 @@ struct SessionsBoardRecentSessionsSection: View {
   let store: HarnessStore
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 14) {
+    VStack(alignment: .leading, spacing: 12) {
       Text("Recent Sessions")
         .font(.system(.title3, design: .rounded, weight: .semibold))
         .accessibilityAddTraits(.isHeader)
@@ -15,7 +15,7 @@ struct SessionsBoardRecentSessionsSection: View {
           "No sessions indexed yet. Bring the daemon online or refresh after starting a harness session."
         )
         .font(.system(.body, design: .rounded, weight: .medium))
-        .foregroundStyle(.secondary)
+        .foregroundStyle(HarnessTheme.secondaryInk)
         .frame(maxWidth: .infinity, alignment: .leading)
       } else {
         VStack(alignment: .leading, spacing: 12) {
@@ -24,10 +24,10 @@ struct SessionsBoardRecentSessionsSection: View {
               store.primeSessionSelection(session.sessionId)
               Task { await store.selectSession(session.sessionId) }
             } label: {
-              HStack(alignment: .top, spacing: 14) {
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
+              HStack(alignment: .top, spacing: 12) {
+                RoundedRectangle(cornerRadius: HarnessTheme.cornerRadiusSM, style: .continuous)
                   .fill(statusColor(for: session.status))
-                  .frame(width: 10)
+                  .frame(width: 8)
                   .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 4) {
                   Text(session.context)
@@ -36,15 +36,15 @@ struct SessionsBoardRecentSessionsSection: View {
                     .multilineTextAlignment(.leading)
                   Text("\(session.projectName) • \(session.sessionId)")
                     .font(.caption.monospaced())
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(HarnessTheme.secondaryInk)
                 }
                 Spacer()
                 Text(formatTimestamp(session.updatedAt))
                   .font(.caption.weight(.semibold))
-                  .foregroundStyle(.secondary)
+                  .foregroundStyle(HarnessTheme.secondaryInk)
               }
               .frame(maxWidth: .infinity, alignment: .leading)
-              .padding(14)
+              .padding(12)
             }
             .harnessInteractiveCardButtonStyle()
           }

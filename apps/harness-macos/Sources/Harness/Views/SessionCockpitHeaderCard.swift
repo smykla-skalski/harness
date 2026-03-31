@@ -8,8 +8,8 @@ struct SessionCockpitHeaderCard: View {
   var body: some View {
     VStack(alignment: .leading, spacing: 12) {
       HStack(alignment: .top) {
-        VStack(alignment: .leading, spacing: 6) {
-          HStack(spacing: 10) {
+        VStack(alignment: .leading, spacing: 8) {
+          HStack(spacing: 8) {
             Circle()
               .fill(statusColor(for: detail.session.status))
               .frame(width: 12, height: 12)
@@ -20,10 +20,10 @@ struct SessionCockpitHeaderCard: View {
           }
           Text("\(detail.session.projectName) • \(detail.session.sessionId)")
             .font(.system(.subheadline, design: .rounded, weight: .medium))
-            .foregroundStyle(.secondary)
+            .foregroundStyle(HarnessTheme.secondaryInk)
         }
         Spacer()
-        HStack(spacing: 10) {
+        HStack(spacing: 8) {
           observeButton
           endSessionButton
         }
@@ -76,7 +76,7 @@ struct SessionCockpitHeaderCard: View {
     Button {
       store.inspectObserver()
     } label: {
-      VStack(alignment: .leading, spacing: 10) {
+      VStack(alignment: .leading, spacing: 8) {
         HStack(spacing: 16) {
           summaryLabel("Observe", value: observer.observeId)
           summaryLabel("Open Issues", value: "\(observer.openIssueCount)")
@@ -88,19 +88,19 @@ struct SessionCockpitHeaderCard: View {
         if let openIssues = observer.openIssues, !openIssues.isEmpty {
           Text(openIssues.prefix(2).map(\.summary).joined(separator: " · "))
             .font(.caption)
-            .foregroundStyle(.secondary)
+            .foregroundStyle(HarnessTheme.secondaryInk)
             .lineLimit(1)
         }
         if let mutedCodes = observer.mutedCodes, !mutedCodes.isEmpty {
           Text("Muted: \(mutedCodes.prefix(3).joined(separator: ", "))")
             .font(.caption)
-            .foregroundStyle(.secondary)
+            .foregroundStyle(HarnessTheme.secondaryInk)
             .lineLimit(1)
         }
       }
       .accessibilityElement(children: .combine)
       .frame(maxWidth: .infinity, alignment: .leading)
-      .padding(14)
+      .padding(12)
     }
     .harnessInteractiveCardButtonStyle()
     .accessibilityIdentifier("harness.session.observe.summary")
@@ -115,14 +115,14 @@ struct SessionCockpitHeaderCard: View {
         Spacer()
         Text(formatTimestamp(pendingTransfer.requestedAt))
           .font(.caption.monospaced())
-          .foregroundStyle(.secondary)
+          .foregroundStyle(HarnessTheme.secondaryInk)
       }
       let requested = pendingTransfer.requestedBy
       let newLeader = pendingTransfer.newLeaderId
       let current = pendingTransfer.currentLeaderId
       Text("\(requested) requested \(newLeader) to replace \(current).")
         .font(.system(.body, design: .rounded, weight: .medium))
-        .foregroundStyle(.secondary)
+        .foregroundStyle(HarnessTheme.secondaryInk)
       if let reason = pendingTransfer.reason, !reason.isEmpty {
         Text(reason)
           .font(.system(.footnote, design: .rounded, weight: .semibold))
@@ -130,7 +130,7 @@ struct SessionCockpitHeaderCard: View {
       }
     }
     .frame(maxWidth: .infinity, alignment: .leading)
-    .padding(.leading, 18)
+    .padding(.leading, 16)
     .overlay(alignment: .leading) {
       RoundedRectangle(cornerRadius: 999, style: .continuous)
         .fill(HarnessTheme.warmAccent)
@@ -143,7 +143,7 @@ struct SessionCockpitHeaderCard: View {
     VStack(alignment: .leading, spacing: 2) {
       Text(title.uppercased())
         .font(.caption2.weight(.bold))
-        .foregroundStyle(.secondary)
+        .foregroundStyle(HarnessTheme.secondaryInk)
       Text(value)
         .font(.system(.callout, design: .rounded, weight: .semibold))
     }

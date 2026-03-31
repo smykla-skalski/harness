@@ -5,7 +5,7 @@ struct SessionMetricGrid: View {
   let metrics: SessionMetrics
 
   var body: some View {
-    HarnessAdaptiveGridLayout(minimumColumnWidth: 130, maximumColumns: 5, spacing: 14) {
+    HarnessAdaptiveGridLayout(minimumColumnWidth: 130, maximumColumns: 5, spacing: 12) {
       metricCard(
         title: "Agents",
         value: "\(metrics.agentCount)",
@@ -30,10 +30,10 @@ struct SessionMetricGrid: View {
     HStack(alignment: .top, spacing: 12) {
       RoundedRectangle(cornerRadius: 999, style: .continuous)
         .fill(tint)
-        .frame(width: 10)
+        .frame(width: 8)
         .frame(minHeight: 60)
         .accessibilityHidden(true)
-      VStack(alignment: .leading, spacing: 6) {
+      VStack(alignment: .leading, spacing: 8) {
         Text(title.uppercased())
           .font(.caption.weight(.semibold))
           .foregroundStyle(HarnessTheme.secondaryInk)
@@ -92,7 +92,7 @@ struct SessionTaskSummaryCard: View {
         }
         Text(task.context ?? "No extra context")
           .font(.subheadline)
-          .foregroundStyle(.secondary)
+          .foregroundStyle(HarnessTheme.secondaryInk)
           .multilineTextAlignment(.leading)
           .lineLimit(2)
         Spacer(minLength: 0)
@@ -103,12 +103,12 @@ struct SessionTaskSummaryCard: View {
           Spacer()
           Text(task.assignedTo ?? "unassigned")
             .font(.caption.monospaced())
-            .foregroundStyle(.secondary)
+            .foregroundStyle(HarnessTheme.secondaryInk)
             .lineLimit(1)
         }
       }
       .frame(maxWidth: .infinity, minHeight: sessionLaneCardHeight, alignment: .topLeading)
-      .padding(14)
+      .padding(12)
     }
     .harnessInteractiveCardButtonStyle()
     .accessibilityIdentifier(HarnessAccessibility.sessionTaskCard(task.taskId))
@@ -162,17 +162,17 @@ struct SessionAgentSummaryCard: View {
         }
         Text("\(agent.runtime) • \(agent.agentId)")
           .font(.caption.monospaced())
-          .foregroundStyle(.secondary)
+          .foregroundStyle(HarnessTheme.secondaryInk)
           .lineLimit(1)
         Spacer(minLength: 0)
-        HStack(spacing: 10) {
+        HStack(spacing: 8) {
           badge(agent.runtimeCapabilities.supportsContextInjection ? "Context" : "Watch")
           badge("\(agent.runtimeCapabilities.typicalSignalLatencySeconds)s")
           badge(formatTimestamp(agent.lastActivityAt))
         }
       }
       .frame(maxWidth: .infinity, minHeight: sessionLaneCardHeight, alignment: .topLeading)
-      .padding(14)
+      .padding(12)
     }
     .harnessInteractiveCardButtonStyle()
     .accessibilityIdentifier(HarnessAccessibility.sessionAgentCard(agent.agentId))

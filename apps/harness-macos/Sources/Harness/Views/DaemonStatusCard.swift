@@ -104,12 +104,10 @@ extension DaemonStatusCard {
   }
 
   fileprivate var daemonActionButtons: some View {
-    HarnessGlassContainer(spacing: 8) {
-      HarnessWrapLayout(spacing: 8, lineSpacing: 8) {
-        sidebarStartDaemonButton
-        if !isLaunchAgentInstalled {
-          sidebarInstallLaunchAgentButton
-        }
+    HarnessWrapLayout(spacing: 8, lineSpacing: 8) {
+      sidebarStartDaemonButton
+      if !isLaunchAgentInstalled {
+        sidebarInstallLaunchAgentButton
       }
     }
     .frame(maxWidth: .infinity, alignment: .leading)
@@ -140,8 +138,8 @@ extension DaemonStatusCard {
   fileprivate var statusPill: some View {
     Text(statusTitle)
       .font(.caption.bold())
-      .padding(.horizontal, 9)
-      .padding(.vertical, 5)
+      .padding(.horizontal, 8)
+      .padding(.vertical, 4)
       .background(statusBackground, in: Capsule())
       .foregroundStyle(HarnessTheme.onContrast)
   }
@@ -206,7 +204,7 @@ extension DaemonStatusCard {
     VStack(alignment: .leading, spacing: 4) {
       Text(title.uppercased())
         .font(.caption2.weight(.semibold))
-        .foregroundStyle(.secondary)
+        .foregroundStyle(HarnessTheme.secondaryInk)
       Text(value)
         .font(.system(.callout, design: .rounded, weight: .bold))
         .lineLimit(1)
