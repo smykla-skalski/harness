@@ -3,7 +3,7 @@ import Observation
 import SwiftUI
 
 struct SessionActionDock: View {
-  @Bindable var store: HarnessStore
+  let store: HarnessStore
   let detail: SessionDetail
 
   private var firstTaskID: String? {
@@ -65,7 +65,6 @@ struct SessionActionDock: View {
         }
       }
     }
-    .harnessCard()
   }
 
   private func flowButton(

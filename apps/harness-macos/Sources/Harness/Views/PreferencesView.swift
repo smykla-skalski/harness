@@ -2,9 +2,8 @@ import HarnessKit
 import SwiftUI
 
 struct PreferencesView: View {
-  @Bindable var store: HarnessStore
+  let store: HarnessStore
   @Binding var themeMode: HarnessThemeMode
-  @Binding var themeStyle: HarnessThemeStyle
   @State private var selectedSection: PreferencesSection = .general
 
   private var effectiveHealth: HealthResponse? { store.diagnostics?.health ?? store.health }
@@ -40,12 +39,10 @@ struct PreferencesView: View {
       || store.connectionState == .connecting
   }
   private var preferencesAccessibilityValue: String {
-    let chrome = harnessChromeAccessibilityValue(for: themeStyle)
-    return [
-      "style=\(themeStyle.rawValue)",
+    [
       "mode=\(themeMode.rawValue)",
       "section=\(selectedSection.rawValue)",
-      "preferencesChrome=\(chrome)",
+      "preferencesChrome=native",
     ].joined(separator: ", ")
   }
 
@@ -84,7 +81,6 @@ private extension PreferencesView {
       PreferencesGeneralSection(
         store: store,
         themeMode: $themeMode,
-        themeStyle: $themeStyle,
         effectiveHealth: effectiveHealth,
         launchAgentState: launchAgentState,
         launchAgentCaption: launchAgentCaption,
@@ -129,9 +125,8 @@ private struct PreferencesOverlayMarkers: View {
 // MARK: - General
 
 private struct PreferencesGeneralSection: View {
-  @Bindable var store: HarnessStore
+  let store: HarnessStore
   @Binding var themeMode: HarnessThemeMode
-  @Binding var themeStyle: HarnessThemeStyle
   let effectiveHealth: HealthResponse?
   let launchAgentState: String
   let launchAgentCaption: String
@@ -162,14 +157,6 @@ private struct PreferencesGeneralSection: View {
         }
         .accessibilityIdentifier(
           HarnessAccessibility.preferencesThemeModePicker
-        )
-        Picker("Style", selection: $themeStyle) {
-          ForEach(HarnessThemeStyle.allCases) {
-            Text($0.label).tag($0)
-          }
-        }
-        .accessibilityIdentifier(
-          HarnessAccessibility.preferencesThemeStylePicker
         )
       } header: {
         Text("Appearance")

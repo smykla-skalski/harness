@@ -3,21 +3,7 @@ import Observation
 import SwiftUI
 
 struct DaemonStatusCard: View {
-  @Environment(\.harnessThemeStyle)
-  private var themeStyle
-  @Environment(\.isInsideGlassEffect)
-  private var isInsideGlassEffect
-  @Bindable var store: HarnessStore
-
-  private var panelGlassState: String {
-    let isGradient = HarnessTheme.usesGradientChrome(for: themeStyle)
-    if !isGradient { return "glass=flat" }
-    if isInsideGlassEffect {
-      let fill = effectiveSuppressedGlassFill(0.08)
-      return "glass=suppressed, fill=\(String(format: "%.2f", fill))"
-    }
-    return "glass=active"
-  }
+  let store: HarnessStore
 
   private var isLoading: Bool {
     store.isBusy || store.isRefreshing || store.connectionState == .connecting
@@ -62,18 +48,15 @@ struct DaemonStatusCard: View {
       daemonActionButtons
     }
     .frame(maxWidth: .infinity, alignment: .leading)
-    .padding(12)
-    .harnessInsetPanel(cornerRadius: 22, fillOpacity: 0.05, strokeOpacity: 0.50)
+    .padding(.bottom, 4)
     .animation(.spring(duration: 0.3), value: store.connectionState)
     .animation(.spring(duration: 0.3), value: store.isRefreshing)
-    .overlay {
-      AccessibilityTextMarker(
-        identifier: HarnessAccessibility.daemonCardGlassState,
-        text: panelGlassState
-      )
-    }
-    .accessibilityValue(panelGlassState)
-    .accessibilityIdentifier(HarnessAccessibility.daemonCard)
+    .accessibilityElement(children: .contain)
+    .accessibilityTestProbe(
+      HarnessAccessibility.daemonCard,
+      label: "Harness Daemon",
+      value: statusTitle
+    )
     .accessibilityFrameMarker(HarnessAccessibility.daemonCardFrame)
   }
 }
@@ -91,7 +74,7 @@ extension DaemonStatusCard {
     sidebarLayoutProbe(HarnessAccessibility.sidebarStartDaemonButtonFrame) {
       HarnessAsyncActionButton(
         title: isDaemonOnline ? "Restart Daemon" : "Start Daemon",
-        tint: isDaemonOnline ? HarnessTheme.warmAccent : HarnessTheme.accent(for: themeStyle),
+        tint: isDaemonOnline ? HarnessTheme.warmAccent : HarnessTheme.accent,
         variant: isDaemonOnline ? .bordered : .prominent,
         isLoading: isLoading,
         accessibilityIdentifier: HarnessAccessibility.sidebarStartDaemonButton,
@@ -180,7 +163,7 @@ extension DaemonStatusCard {
     case .connecting:
       HarnessTheme.caution
     case .idle:
-      HarnessTheme.accent(for: themeStyle)
+      HarnessTheme.accent
     case .offline:
       HarnessTheme.danger
     }
@@ -229,9 +212,6 @@ extension DaemonStatusCard {
     }
     .frame(maxWidth: .infinity, alignment: .topLeading)
     .frame(minHeight: 36, alignment: .topLeading)
-    .padding(.vertical, 2)
-    .padding(.horizontal, 8)
-    .harnessInsetPanel(cornerRadius: 14, fillOpacity: 0.03, strokeOpacity: 0.50)
     .accessibilityElement(children: .ignore)
     .accessibilityLabel(title)
     .accessibilityValue(value)

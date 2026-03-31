@@ -3,8 +3,7 @@ import Observation
 import SwiftUI
 
 struct InspectorColumnView: View {
-  @Bindable var store: HarnessStore
-  let themeStyle: HarnessThemeStyle
+  let store: HarnessStore
   @State private var signalCommand = "inject_context"
   @State private var signalMessage = ""
   @State private var signalActionHint = ""
@@ -42,22 +41,20 @@ struct InspectorColumnView: View {
 
   var body: some View {
     HarnessColumnScrollView(horizontalPadding: 18, verticalPadding: 22) {
-      HarnessGlassContainer(spacing: 18) {
-        VStack(alignment: .leading, spacing: 18) {
-          inspectorContent
+      VStack(alignment: .leading, spacing: 18) {
+        inspectorContent
 
-          if let detail = store.selectedSession {
-            InspectorActionSections(
-              store: store,
-              detail: detail,
-              selectedTask: store.selectedTask,
-              selectedAgent: store.selectedAgent,
-              selectedObserver: selectedObserver
-            )
-          }
+        if let detail = store.selectedSession {
+          InspectorActionSections(
+            store: store,
+            detail: detail,
+            selectedTask: store.selectedTask,
+            selectedAgent: store.selectedAgent,
+            selectedObserver: selectedObserver
+          )
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
       }
+      .frame(maxWidth: .infinity, alignment: .leading)
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     .foregroundStyle(HarnessTheme.ink)
@@ -117,7 +114,6 @@ struct InspectorColumnView: View {
       HarnessLoadingStateView(title: "Loading session detail")
     }
     .frame(maxWidth: .infinity, alignment: .leading)
-    .harnessCard()
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessAccessibility.sessionInspectorCard)
     .accessibilityFrameMarker("\(HarnessAccessibility.sessionInspectorCard).frame")
@@ -131,7 +127,6 @@ struct InspectorColumnView: View {
         .foregroundStyle(HarnessTheme.secondaryInk)
     }
     .frame(maxWidth: .infinity, alignment: .leading)
-    .harnessCard()
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessAccessibility.inspectorEmptyState)
   }

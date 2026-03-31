@@ -3,8 +3,7 @@ import Observation
 import SwiftUI
 
 struct SidebarView: View {
-  @Bindable var store: HarnessStore
-  let themeStyle: HarnessThemeStyle
+  let store: HarnessStore
 
   var body: some View {
     ScrollView {

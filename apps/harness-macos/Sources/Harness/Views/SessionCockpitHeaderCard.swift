@@ -2,9 +2,7 @@ import HarnessKit
 import SwiftUI
 
 struct SessionCockpitHeaderCard: View {
-  @Environment(\.harnessThemeStyle)
-  private var themeStyle
-  @Bindable var store: HarnessStore
+  let store: HarnessStore
   let detail: SessionDetail
 
   var body: some View {
@@ -44,7 +42,6 @@ struct SessionCockpitHeaderCard: View {
       }
     }
     .frame(maxWidth: .infinity, alignment: .leading)
-    .harnessCard()
     .animation(.spring(duration: 0.3), value: store.isSessionActionInFlight)
     .animation(.spring(duration: 0.3), value: store.isSelectionLoading)
   }
@@ -54,7 +51,7 @@ struct SessionCockpitHeaderCard: View {
       .font(.system(.subheadline, design: .rounded, weight: .semibold))
       .harnessActionButtonStyle(
         variant: .prominent,
-        tint: HarnessTheme.accent(for: themeStyle)
+        tint: HarnessTheme.accent
       )
       .controlSize(HarnessControlMetrics.compactControlSize)
   }
@@ -100,7 +97,7 @@ struct SessionCockpitHeaderCard: View {
     }
     .harnessInteractiveCardButtonStyle()
     .accessibilityIdentifier("harness.session.observe.summary")
-    .accessibilityValue("interactive=\(harnessInteractiveCardAccessibilityValue(for: themeStyle))")
+    .accessibilityValue("interactive=plain")
   }
 
   private func pendingTransferSummary(_ pendingTransfer: PendingLeaderTransfer) -> some View {
@@ -126,8 +123,12 @@ struct SessionCockpitHeaderCard: View {
       }
     }
     .frame(maxWidth: .infinity, alignment: .leading)
-    .padding(14)
-    .harnessInsetPanel(cornerRadius: 18, fillOpacity: 0.06, strokeOpacity: 0.12)
+    .padding(.leading, 18)
+    .overlay(alignment: .leading) {
+      RoundedRectangle(cornerRadius: 999, style: .continuous)
+        .fill(HarnessTheme.warmAccent)
+        .frame(width: 4)
+    }
     .accessibilityIdentifier(HarnessAccessibility.pendingLeaderTransferCard)
   }
 
