@@ -36,8 +36,21 @@ private struct HarnessCapsuleGlassModifier: ViewModifier {
   }
 }
 
+private struct HarnessRoundedRectGlassModifier: ViewModifier {
+  let cornerRadius: CGFloat
+
+  func body(content: Content) -> some View {
+    content
+      .glassEffect(.regular, in: .rect(cornerRadius: cornerRadius, style: .continuous))
+  }
+}
+
 extension View {
   func harnessCapsuleGlass() -> some View {
     modifier(HarnessCapsuleGlassModifier())
+  }
+
+  func harnessRoundedRectGlass(cornerRadius: CGFloat = HarnessTheme.cornerRadiusSM) -> some View {
+    modifier(HarnessRoundedRectGlassModifier(cornerRadius: cornerRadius))
   }
 }
