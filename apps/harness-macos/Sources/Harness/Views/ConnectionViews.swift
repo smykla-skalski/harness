@@ -60,6 +60,8 @@ struct ActivityPulse: View {
   @ScaledMetric(relativeTo: .caption)
   private var innerSize: CGFloat = 7
   @State private var isPulsing = false
+  @Environment(\.accessibilityReduceMotion)
+  private var reduceMotion
 
   init(
     isActive: Bool,
@@ -84,11 +86,13 @@ struct ActivityPulse: View {
       Circle()
         .fill(baseColor.opacity(isPulsing ? 0.22 : 0.14))
         .frame(width: outerSize, height: outerSize)
-        .scaleEffect(isPulsing ? 1.3 : 1.0)
+        .scaleEffect(reduceMotion ? 1.0 : (isPulsing ? 1.3 : 1.0))
         .animation(
-          isPulsing
-            ? .easeInOut(duration: 1.2).repeatForever(autoreverses: true)
-            : .easeOut(duration: 0.3),
+          reduceMotion
+            ? .easeOut(duration: 0.3)
+            : isPulsing
+              ? .easeInOut(duration: 1.2).repeatForever(autoreverses: true)
+              : .easeOut(duration: 0.3),
           value: isPulsing
         )
       Circle()
@@ -110,61 +114,18 @@ struct ActivityPulse: View {
   }
 }
 
-struct ConnectionStatusStrip: View {
-  let metrics: ConnectionMetrics
-  let isActive: Bool
-
-  private var title: String {
-    metrics.transportKind == .webSocket ? "Live transport" : "Fallback transport"
-  }
-
-  private var subtitle: String {
-    metrics.transportKind == .webSocket
-      ? "Persistent socket updates"
-      : "Streaming over HTTP events"
-  }
-
-  var body: some View {
-    ViewThatFits(in: .horizontal) {
-      HStack(spacing: HarnessTheme.itemSpacing) {
-        ActivityPulse(isActive: isActive)
-        transportInfo
-        Spacer(minLength: HarnessTheme.itemSpacing)
-        transportBadges
-      }
-      VStack(alignment: .leading, spacing: HarnessTheme.itemSpacing) {
-        HStack(spacing: HarnessTheme.itemSpacing) {
-          ActivityPulse(isActive: isActive)
-          transportInfo
-        }
-        transportBadges
-      }
-    }
-  }
-
-  private var transportInfo: some View {
-    VStack(alignment: .leading, spacing: 2) {
-      Text(title)
-        .font(.system(.footnote, design: .rounded, weight: .semibold))
-      Text(subtitle)
-        .font(.caption)
-        .foregroundStyle(HarnessTheme.secondaryInk)
-    }
-  }
-
-  private var transportBadges: some View {
-    HStack(spacing: HarnessTheme.itemSpacing) {
-      TransportBadge(kind: metrics.transportKind)
-      LatencyBadge(latencyMs: metrics.latencyMs)
-    }
-  }
-}
-
 struct ConnectionToolbarBadge: View {
   let metrics: ConnectionMetrics
 
+  private static let badgeFont = Font.system(.caption, design: .rounded, weight: .semibold)
+    .monospacedDigit()
+
   private var transportLabel: String {
     metrics.transportKind.shortTitle
+  }
+
+  private var latencyLabel: String {
+    metrics.latencyMs.map { "\($0)ms" } ?? "--ms"
   }
 
   private var accessibilityLabel: String {
@@ -182,33 +143,52 @@ struct ConnectionToolbarBadge: View {
   }
 
   var body: some View {
-    HStack(spacing: 4) {
-      ActivityPulse(
-        isActive: metrics.connectedSince != nil,
-        outerSize: 14,
-        innerSize: 6,
-        activeColor: qualityColor
-      )
-        .accessibilityHidden(true)
-      Text(transportLabel)
-        .font(.system(.caption, design: .rounded, weight: .semibold).monospacedDigit())
-        .foregroundStyle(qualityColor)
-        .lineLimit(1)
-        .fixedSize()
-      if let latency = metrics.latencyMs {
+    ZStack(alignment: .leading) {
+      // Reserve the maximum badge width so live telemetry updates do not churn window constraints.
+      HStack(spacing: 4) {
+        Color.clear
+          .frame(width: 14, height: 14)
+        Text("SSE")
+          .font(Self.badgeFont)
+          .lineLimit(1)
+          .fixedSize()
         Rectangle()
-          .fill(qualityColor.opacity(0.35))
+          .fill(.clear)
           .frame(width: 1, height: 12)
-          .accessibilityHidden(true)
-        Text("\(latency)ms")
-          .font(.system(.caption, design: .rounded, weight: .semibold).monospacedDigit())
-          .foregroundStyle(qualityColor)
+        Text("999ms")
+          .font(Self.badgeFont)
           .lineLimit(1)
           .fixedSize()
       }
+      .hidden()
+
+      HStack(spacing: 4) {
+        ActivityPulse(
+          isActive: metrics.connectedSince != nil,
+          outerSize: 14,
+          innerSize: 6,
+          activeColor: qualityColor
+        )
+          .accessibilityHidden(true)
+        Text(transportLabel)
+          .font(Self.badgeFont)
+          .foregroundStyle(qualityColor)
+          .lineLimit(1)
+          .fixedSize()
+        Rectangle()
+          .fill(qualityColor.opacity(metrics.latencyMs == nil ? 0 : 0.35))
+          .frame(width: 1, height: 12)
+          .accessibilityHidden(true)
+        Text(latencyLabel)
+          .font(Self.badgeFont)
+          .foregroundStyle(qualityColor)
+          .lineLimit(1)
+          .fixedSize()
+          .opacity(metrics.latencyMs == nil ? 0 : 1)
+      }
     }
     .harnessPillPadding()
-    .fixedSize()
+    .accessibilityElement(children: .ignore)
     .accessibilityIdentifier(HarnessAccessibility.connectionBadge)
     .accessibilityLabel(accessibilityLabel)
   }
@@ -313,21 +293,6 @@ extension ConnectionQuality {
   }
 }
 
-private func previewConnectionMetrics() -> ConnectionMetrics {
-  var metrics = ConnectionMetrics.initial
-  metrics.transportKind = .webSocket
-  metrics.latencyMs = 34
-  metrics.averageLatencyMs = 38
-  metrics.messagesReceived = 18
-  metrics.messagesSent = 7
-  metrics.messagesPerSecond = 3.2
-  metrics.connectedSince = .now.addingTimeInterval(-320)
-  metrics.lastMessageAt = .now.addingTimeInterval(-4)
-  metrics.reconnectAttempt = 0
-  metrics.reconnectCount = 0
-  return metrics
-}
-
 #Preview("Transport badges") {
   HStack(spacing: HarnessTheme.sectionSpacing) {
     TransportBadge(kind: .webSocket)
@@ -338,13 +303,5 @@ private func previewConnectionMetrics() -> ConnectionMetrics {
     ActivityPulse(isActive: true)
     ActivityPulse(isActive: false)
   }
-  .padding()
-}
-
-#Preview("Connection status strip") {
-  ConnectionStatusStrip(
-    metrics: previewConnectionMetrics(),
-    isActive: true
-  )
   .padding()
 }

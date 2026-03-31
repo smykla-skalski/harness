@@ -81,6 +81,7 @@ extension InspectorActionSections {
         }
       }
       .animation(.spring(duration: 0.2), value: store.isSessionActionInFlight)
+      .animation(.spring(duration: 0.2), value: store.lastAction.isEmpty)
       Text(
         "Task creation, reassignments, checkpoints, and leadership changes flow through the daemon."
       )

@@ -25,17 +25,6 @@ struct DaemonStatusCard: View {
       }
 
       Group {
-        if store.connectionState == .online {
-          ConnectionStatusStrip(
-            metrics: store.connectionMetrics,
-            isActive: store.dataReceivedPulse
-          )
-          .transition(.move(edge: .top).combined(with: .opacity))
-        }
-      }
-      .animation(.spring(duration: 0.3), value: store.connectionState)
-
-      Group {
         if store.isRefreshing || store.connectionState == .connecting {
           HarnessLoadingStateView(title: loadingTitle)
             .transition(.move(edge: .top).combined(with: .opacity))
