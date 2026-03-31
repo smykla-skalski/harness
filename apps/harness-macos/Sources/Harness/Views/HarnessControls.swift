@@ -2,6 +2,17 @@ import AppKit
 import HarnessKit
 import SwiftUI
 
+private struct ProminentButtonForegroundKey: EnvironmentKey {
+  static let defaultValue: Color? = nil
+}
+
+extension EnvironmentValues {
+  var prominentButtonForeground: Color? {
+    get { self[ProminentButtonForegroundKey.self] }
+    set { self[ProminentButtonForegroundKey.self] = newValue }
+  }
+}
+
 enum HarnessControlMetrics {
   static let compactControlSize: ControlSize = .small
   fileprivate static let disabledButtonChromeBehavior: HarnessDisabledButtonChromeBehavior =
@@ -90,17 +101,19 @@ struct HarnessAsyncActionButton: View {
   }
 
   private var label: some View {
-    HStack(spacing: HarnessTheme.itemSpacing) {
-      if isLoading {
-        HarnessSpinner()
-          .transition(.opacity)
+    ProminentAwareLabel {
+      HStack(spacing: HarnessTheme.itemSpacing) {
+        if isLoading {
+          HarnessSpinner()
+            .transition(.opacity)
+        }
+        Text(isLoading ? "Cancel" : title)
+          .lineLimit(1)
       }
-      Text(isLoading ? "Cancel" : title)
-        .lineLimit(1)
+      .font(.system(.callout, design: .rounded, weight: .semibold))
+      .frame(maxWidth: fillsWidth ? .infinity : nil)
+      .animation(.spring(duration: 0.2), value: isLoading)
     }
-    .font(.system(.callout, design: .rounded, weight: .semibold))
-    .frame(maxWidth: fillsWidth ? .infinity : nil)
-    .animation(.spring(duration: 0.2), value: isLoading)
   }
 
   private func performAction() {
@@ -126,6 +139,24 @@ struct HarnessAsyncActionButton: View {
   private func cancelAction() {
     runningTask?.cancel()
     runningTask = nil
+  }
+}
+
+private struct ProminentAwareLabel<Content: View>: View {
+  @Environment(\.prominentButtonForeground)
+  private var prominentForeground
+  private let content: Content
+
+  init(@ViewBuilder content: () -> Content) {
+    self.content = content()
+  }
+
+  var body: some View {
+    if let prominentForeground {
+      content.foregroundStyle(prominentForeground)
+    } else {
+      content
+    }
   }
 }
 
@@ -188,13 +219,6 @@ private struct HarnessSystemButtonChromeModifier: ViewModifier {
     }
   }
 
-  private var effectiveProminentForeground: Color? {
-    guard style == .borderedProminent, let effectiveTint else {
-      return nil
-    }
-    return HarnessProminentButtonContrast.foreground(for: effectiveTint)
-  }
-
   @ViewBuilder
   func body(content: Content) -> some View {
     // Keep the underlying AppKit button style stable across enabled-state changes.
@@ -213,14 +237,16 @@ private struct HarnessSystemButtonChromeModifier: ViewModifier {
       }
     case .borderedProminent:
       if let effectiveTint {
-        if let effectiveProminentForeground {
-          content
-            .buttonStyle(.borderedProminent)
-            .tint(effectiveTint)
-            .foregroundStyle(effectiveProminentForeground)
-        } else {
-          content.buttonStyle(.borderedProminent).tint(effectiveTint)
-        }
+        // Glass prominent buttons ignore .foregroundStyle() on the container.
+        // Apply contrast-safe foreground via .tint() on the label environment
+        // and override the label text color with a LabelStyle or environment.
+        content
+          .buttonStyle(.borderedProminent)
+          .tint(effectiveTint)
+          .environment(
+            \.prominentButtonForeground,
+            HarnessProminentButtonContrast.foreground(for: effectiveTint)
+          )
       } else {
         content.buttonStyle(.borderedProminent)
       }
