@@ -39,8 +39,7 @@ struct SidebarView: View {
       ConnectionToolbarBadge(metrics: store.connectionMetrics)
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.vertical, HarnessTheme.itemSpacing)
-        .padding(.leading, HarnessTheme.spacingXS)
-        .padding(.trailing, HarnessTheme.sectionSpacing)
+        .padding(.horizontal, HarnessTheme.itemSpacing)
         .harnessRoundedRectGlass()
         .padding(HarnessTheme.itemSpacing)
     }
