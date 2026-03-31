@@ -56,8 +56,8 @@ struct SessionsBoardOnboardingCard: View {
         HarnessAsyncActionButton(
           title: "Start Daemon",
           tint: store.connectionState == .online
-            ? HarnessTheme.ink
-            : HarnessTheme.accent,
+            ? .secondary
+            : .accentColor,
           variant: store.connectionState == .online
             ? .bordered : .prominent,
           isLoading: isLoading,
@@ -76,7 +76,7 @@ struct SessionsBoardOnboardingCard: View {
       ) {
         HarnessAsyncActionButton(
           title: "Install Launch Agent",
-          tint: HarnessTheme.ink,
+          tint: .secondary,
           variant: .bordered,
           isLoading: isLoading,
           accessibilityIdentifier: "harness.board.action.install",
@@ -94,7 +94,7 @@ struct SessionsBoardOnboardingCard: View {
       ) {
         HarnessAsyncActionButton(
           title: "Refresh Index",
-          tint: HarnessTheme.ink,
+          tint: .secondary,
           variant: .bordered,
           isLoading: store.isRefreshing,
           accessibilityIdentifier: "harness.board.action.refresh",
