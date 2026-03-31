@@ -75,8 +75,10 @@ Thin ViewModifier wrappers that bundle `.buttonStyle(.glass)` + `.tint()` are fi
 
 Glass buttons derive background appearance and text contrast from the `.tint()` color. Custom asset colors from `HarnessTheme` are not calibrated for glass contrast and produce opaque-looking buttons with unreadable text.
 
-Use system semantic colors for button tints:
-- **Primary action**: `.accentColor` (inherits app-level accent)
+For accent-colored buttons, pass `nil` tint so the button inherits the app-level `.tint(HarnessTheme.accent)` from the root view. `Color.accentColor` is the macOS *system* accent (user-configurable in System Preferences), not the app's custom accent - never use it as a button tint.
+
+For non-accent buttons, use system semantic colors:
+- **Primary/accent**: `nil` (inherit from environment)
 - **Neutral/secondary**: `.secondary` (translucent gray glass)
 - **Destructive**: `.red`
 - **Warning**: `.orange`
@@ -85,15 +87,16 @@ Use system semantic colors for button tints:
 `HarnessTheme` colors stay valid for non-button UI: status badges, indicator bars, text foreground, decorative accents.
 
 ```swift
-// correct - system colors calibrated for glass
+// correct - nil inherits app accent, system colors for overrides
+.harnessActionButtonStyle(variant: .prominent)
+.harnessActionButtonStyle(variant: .bordered, tint: .secondary)
+.harnessActionButtonStyle(variant: .bordered, tint: .red)
+
+// wrong - .accentColor is the macOS system accent, not the app's
 .tint(.accentColor)
-.tint(.secondary)
-.tint(.red)
-.tint(.orange)
 
 // wrong - custom asset colors fight glass contrast
 .tint(HarnessTheme.accent)
 .tint(HarnessTheme.ink)
 .tint(HarnessTheme.danger)
-.tint(HarnessTheme.warmAccent)
 ```
