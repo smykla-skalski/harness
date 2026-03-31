@@ -14,7 +14,7 @@ struct SessionInspectorSummaryCard: View {
   }
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 14) {
+    VStack(alignment: .leading, spacing: HarnessTheme.sectionSpacing) {
       Text("Inspector")
         .font(.system(.title3, design: .rounded, weight: .semibold))
         .accessibilityAddTraits(.isHeader)
@@ -25,7 +25,7 @@ struct SessionInspectorSummaryCard: View {
       InspectorFactGrid(facts: facts)
       if !detail.agentActivity.isEmpty {
         InspectorSection(title: "Recent Agent Activity") {
-          VStack(alignment: .leading, spacing: 8) {
+          VStack(alignment: .leading, spacing: HarnessTheme.itemSpacing) {
             ForEach(detail.agentActivity.prefix(2)) { activity in
               VStack(alignment: .leading, spacing: 4) {
                 HStack {
@@ -41,8 +41,7 @@ struct SessionInspectorSummaryCard: View {
                   .foregroundStyle(HarnessTheme.secondaryInk)
                   .lineLimit(2)
               }
-              .padding(.horizontal, 12)
-              .padding(.vertical, 10)
+              .harnessCellPadding()
             }
           }
           .frame(maxWidth: .infinity, alignment: .leading)
@@ -78,7 +77,7 @@ struct TaskInspectorCard: View {
   }
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 12) {
+    VStack(alignment: .leading, spacing: HarnessTheme.sectionSpacing) {
       Text(task.title)
         .font(.system(.title3, design: .rounded, weight: .bold))
       Text(task.context ?? "No task context provided.")
@@ -105,7 +104,7 @@ struct TaskInspectorCard: View {
       }
       if !task.notes.isEmpty {
         InspectorSection(title: "Notes") {
-          VStack(alignment: .leading, spacing: 8) {
+          VStack(alignment: .leading, spacing: HarnessTheme.itemSpacing) {
             ForEach(task.notes) { note in
               VStack(alignment: .leading, spacing: 4) {
                 HStack {
@@ -120,8 +119,7 @@ struct TaskInspectorCard: View {
                   .font(.subheadline)
                   .foregroundStyle(HarnessTheme.secondaryInk)
               }
-              .padding(.horizontal, 12)
-              .padding(.vertical, 10)
+              .harnessCellPadding()
             }
           }
           .frame(maxWidth: .infinity, alignment: .leading)
@@ -143,7 +141,7 @@ struct TaskInspectorCard: View {
       }
       InspectorSection(title: "Your Notes") {
         if !userNotes.isEmpty {
-          VStack(alignment: .leading, spacing: 8) {
+          VStack(alignment: .leading, spacing: HarnessTheme.itemSpacing) {
             ForEach(userNotes, id: \.persistentModelID) { note in
               HStack(alignment: .top) {
                 Text(note.text)
@@ -162,18 +160,18 @@ struct TaskInspectorCard: View {
                 .help("Delete note")
                 .harnessDismissButtonStyle()
               }
-              .padding(.horizontal, 12)
-              .padding(.vertical, 8)
+              .harnessCellPadding()
             }
           }
           .frame(maxWidth: .infinity, alignment: .leading)
         }
-        HStack(spacing: 8) {
+        HStack(spacing: HarnessTheme.itemSpacing) {
           TextField("Add a note", text: $newNoteText)
             .textFieldStyle(.roundedBorder)
             .submitLabel(.done)
             .onSubmit { submitNote() }
           Button("Add") { submitNote() }
+            .harnessActionButtonStyle(variant: .bordered)
             .disabled(newNoteText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
         }
       }
@@ -221,7 +219,7 @@ struct AgentInspectorCard: View {
   }
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 12) {
+    VStack(alignment: .leading, spacing: HarnessTheme.sectionSpacing) {
       Text(agent.name)
         .font(.system(.title3, design: .rounded, weight: .bold))
       Text("\(agent.runtime) • \(agent.role.title)")
@@ -329,7 +327,7 @@ struct SignalInspectorCard: View {
   }
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 12) {
+    VStack(alignment: .leading, spacing: HarnessTheme.sectionSpacing) {
       Text(signal.signal.command)
         .font(.system(.title3, design: .rounded, weight: .bold))
       Text(signal.signal.payload.message)
@@ -355,7 +353,7 @@ struct SignalInspectorCard: View {
       }
       if !signal.signal.payload.relatedFiles.isEmpty {
         InspectorSection(title: "Related Files") {
-          VStack(alignment: .leading, spacing: 6) {
+          VStack(alignment: .leading, spacing: HarnessTheme.itemSpacing) {
             ForEach(Array(signal.signal.payload.relatedFiles.enumerated()), id: \.offset) { _, path in
               Text(path)
                 .font(.caption.monospaced())

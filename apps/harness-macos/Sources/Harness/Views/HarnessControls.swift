@@ -62,7 +62,7 @@ struct HarnessAsyncActionButton: View {
   }
 
   private var label: some View {
-    HStack(spacing: 8) {
+    HStack(spacing: HarnessTheme.itemSpacing) {
       if isLoading {
         HarnessSpinner()
           .transition(.opacity)
@@ -142,43 +142,48 @@ private struct HarnessFilterChipButtonStyleModifier: ViewModifier {
 private struct InteractiveCardButtonStyle: ButtonStyle {
   let cornerRadius: CGFloat
   let tint: Color?
+  let isHovered: Bool
   @Environment(\.isEnabled)
   private var isEnabled
 
   func makeBody(configuration: Configuration) -> some View {
-    InteractiveCardButtonBody(
-      configuration: configuration,
-      cornerRadius: cornerRadius,
-      tint: tint,
-      isEnabled: isEnabled
-    )
-  }
-}
-
-private struct InteractiveCardButtonBody: View {
-  let configuration: ButtonStyleConfiguration
-  let cornerRadius: CGFloat
-  let tint: Color?
-  let isEnabled: Bool
-  @State private var isHovered = false
-
-  private var fillOpacity: Double {
-    if configuration.isPressed { return 0.12 }
-    if isHovered { return 0.07 }
-    return 0
-  }
-
-  var body: some View {
+    let highlight = tint ?? .primary
+    let fillOpacity = configuration.isPressed ? 0.12 : isHovered ? 0.08 : 0
     configuration.label
       .background {
         RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-          .fill((tint ?? HarnessTheme.controlBorder).opacity(fillOpacity))
+          .fill(highlight.opacity(fillOpacity))
       }
       .contentShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
       .opacity(isEnabled ? (configuration.isPressed ? 0.92 : 1) : 0.4)
-      .onHover { isHovered = $0 }
       .animation(.easeOut(duration: 0.15), value: configuration.isPressed)
-      .animation(.easeOut(duration: 0.15), value: isHovered)
+  }
+}
+
+private struct InteractiveCardHoverModifier: ViewModifier {
+  let cornerRadius: CGFloat
+  let tint: Color?
+  @State private var isHovered = false
+
+  func body(content: Content) -> some View {
+    content
+      .buttonStyle(
+        InteractiveCardButtonStyle(
+          cornerRadius: cornerRadius,
+          tint: tint,
+          isHovered: isHovered
+        )
+      )
+      .onContinuousHover { phase in
+        withAnimation(.easeOut(duration: 0.15)) {
+          switch phase {
+          case .active:
+            isHovered = true
+          case .ended:
+            isHovered = false
+          }
+        }
+      }
   }
 }
 
@@ -208,8 +213,8 @@ extension View {
     cornerRadius: CGFloat = HarnessTheme.cornerRadiusMD,
     tint: Color? = nil
   ) -> some View {
-    buttonStyle(
-      InteractiveCardButtonStyle(
+    modifier(
+      InteractiveCardHoverModifier(
         cornerRadius: cornerRadius,
         tint: tint
       )
