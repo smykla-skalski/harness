@@ -34,6 +34,7 @@ struct SessionActionDock: View {
             Text(store.lastAction)
               .font(.caption.bold())
               .foregroundStyle(HarnessTheme.success)
+              .accessibilityIdentifier(HarnessAccessibility.actionToast)
               .transition(.opacity)
           }
           Text("\(detail.tasks.count) tasks · \(detail.agents.count) agents")

@@ -76,6 +76,7 @@ extension InspectorActionSections {
           Text(store.lastAction)
             .font(.caption.bold())
             .foregroundStyle(HarnessTheme.success)
+            .accessibilityIdentifier(HarnessAccessibility.actionToast)
             .transition(.opacity)
         }
       }
