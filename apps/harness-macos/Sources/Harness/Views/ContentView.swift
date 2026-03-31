@@ -83,6 +83,23 @@ struct ContentView: View {
       }
       .navigationTitle(navigationTitle)
       .toolbar {
+        ToolbarItem(placement: .navigation) {
+          ControlGroup {
+            Button {
+              Task { await store.navigateBack() }
+            } label: {
+              Label("Back", systemImage: "chevron.backward")
+            }
+            .disabled(!store.canNavigateBack)
+            Button {
+              Task { await store.navigateForward() }
+            } label: {
+              Label("Forward", systemImage: "chevron.forward")
+            }
+            .disabled(!store.canNavigateForward)
+          }
+          .controlGroupStyle(.navigation)
+        }
         ToolbarItem(placement: .status) {
           ConnectionToolbarBadge(metrics: store.connectionMetrics)
         }
