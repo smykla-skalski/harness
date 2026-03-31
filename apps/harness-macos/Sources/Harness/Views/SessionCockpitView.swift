@@ -3,7 +3,7 @@ import Observation
 import SwiftUI
 
 struct SessionCockpitView: View {
-  @Bindable var store: HarnessStore
+  let store: HarnessStore
   let detail: SessionDetail
   let timeline: [TimelineEntry]
 

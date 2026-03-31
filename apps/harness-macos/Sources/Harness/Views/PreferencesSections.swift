@@ -2,8 +2,6 @@ import HarnessKit
 import SwiftUI
 
 struct PreferencesActionButtons: View {
-  @Environment(\.harnessThemeStyle)
-  private var themeStyle
   let isLoading: Bool
   let reconnect: @Sendable () async -> Void
   let refreshDiagnostics: @Sendable () async -> Void
@@ -12,78 +10,64 @@ struct PreferencesActionButtons: View {
   let requestRemoveLaunchAgentConfirmation: @Sendable @MainActor () -> Void
 
   var body: some View {
-    Group {
-      HStack(spacing: 8) {
-        Button("Reconnect") {
-          Task { await reconnect() }
-        }
-        .harnessActionButtonStyle(
+    HarnessGlassContainer(spacing: 8) {
+      HarnessWrapLayout(spacing: 8, lineSpacing: 8) {
+        HarnessAsyncActionButton(
+          title: "Reconnect",
+          tint: HarnessTheme.accent,
           variant: .bordered,
-          tint: HarnessTheme.accent(for: themeStyle)
-        )
-        .controlSize(HarnessControlMetrics.compactControlSize)
-        .accessibilityIdentifier(
-          HarnessAccessibility.preferencesActionButton(
-            "Reconnect"
-          )
-        )
-        Button("Refresh Diagnostics") {
-          Task { await refreshDiagnostics() }
+          isLoading: isLoading,
+          accessibilityIdentifier: HarnessAccessibility.preferencesActionButton("Reconnect")
+        ) {
+          await reconnect()
         }
-        .harnessActionButtonStyle(
+        HarnessAsyncActionButton(
+          title: "Refresh Diagnostics",
+          tint: HarnessTheme.ink,
           variant: .bordered,
-          tint: HarnessTheme.ink
-        )
-        .controlSize(HarnessControlMetrics.compactControlSize)
-        .accessibilityIdentifier(
-          HarnessAccessibility.preferencesActionButton(
+          isLoading: isLoading,
+          accessibilityIdentifier: HarnessAccessibility.preferencesActionButton(
             "Refresh Diagnostics"
           )
-        )
-        Button("Start Daemon") {
-          Task { await startDaemon() }
+        ) {
+          await refreshDiagnostics()
         }
-        .harnessActionButtonStyle(
+        HarnessAsyncActionButton(
+          title: "Start Daemon",
+          tint: HarnessTheme.accent,
           variant: .prominent,
-          tint: HarnessTheme.accent(for: themeStyle)
-        )
-        .controlSize(HarnessControlMetrics.compactControlSize)
-        .accessibilityIdentifier(
-          HarnessAccessibility.preferencesActionButton(
-            "Start Daemon"
-          )
-        )
-      }
-      HStack(spacing: 8) {
-        Button("Install Launch Agent") {
-          Task { await installLaunchAgent() }
+          isLoading: isLoading,
+          accessibilityIdentifier: HarnessAccessibility.preferencesActionButton("Start Daemon")
+        ) {
+          await startDaemon()
         }
-        .harnessActionButtonStyle(
+        HarnessAsyncActionButton(
+          title: "Install Launch Agent",
+          tint: HarnessTheme.ink,
           variant: .bordered,
-          tint: HarnessTheme.ink
-        )
-        .controlSize(HarnessControlMetrics.compactControlSize)
-        .accessibilityIdentifier(
-          HarnessAccessibility.preferencesActionButton(
+          isLoading: isLoading,
+          accessibilityIdentifier: HarnessAccessibility.preferencesActionButton(
             "Install Launch Agent"
           )
-        )
-        Button("Remove Launch Agent", role: .destructive) {
-          requestRemoveLaunchAgentConfirmation()
+        ) {
+          await installLaunchAgent()
         }
-        .harnessActionButtonStyle(
+        HarnessAsyncActionButton(
+          title: "Remove Launch Agent",
+          tint: HarnessTheme.danger,
           variant: .bordered,
-          tint: HarnessTheme.danger
-        )
-        .controlSize(HarnessControlMetrics.compactControlSize)
-        .accessibilityIdentifier(
-          HarnessAccessibility.preferencesActionButton(
+          isLoading: isLoading,
+          accessibilityIdentifier: HarnessAccessibility.preferencesActionButton(
             "Remove Launch Agent"
           )
-        )
+        ) {
+          await MainActor.run {
+            requestRemoveLaunchAgentConfirmation()
+          }
+        }
       }
     }
-    .disabled(isLoading)
+    .frame(maxWidth: .infinity, alignment: .leading)
   }
 }
 
@@ -151,42 +135,36 @@ struct PreferencesPathsSection: View {
 }
 
 struct PreferencesConnectionSection: View {
-  @Environment(\.harnessThemeStyle)
-  private var themeStyle
-  @Bindable var store: HarnessStore
+  let store: HarnessStore
 
   var body: some View {
     Form {
       Section("Actions") {
-        HStack(spacing: 8) {
-          Button("Reconnect") {
-            Task { await store.reconnect() }
+        HarnessGlassContainer(spacing: 8) {
+          HarnessWrapLayout(spacing: 8, lineSpacing: 8) {
+            HarnessAsyncActionButton(
+              title: "Reconnect",
+              tint: HarnessTheme.accent,
+              variant: .prominent,
+              isLoading: store.connectionState == .connecting,
+              accessibilityIdentifier: HarnessAccessibility.preferencesActionButton(
+                "Connection Reconnect"
+              )
+            ) {
+              await store.reconnect()
+            }
+            HarnessAsyncActionButton(
+              title: "Refresh Diagnostics",
+              tint: HarnessTheme.ink,
+              variant: .bordered,
+              isLoading: store.isDiagnosticsRefreshInFlight,
+              accessibilityIdentifier: HarnessAccessibility.preferencesActionButton(
+                "Connection Refresh Diagnostics"
+              )
+            ) {
+              await store.refreshDiagnostics()
+            }
           }
-          .harnessActionButtonStyle(
-            variant: .prominent,
-            tint: HarnessTheme.accent(for: themeStyle)
-          )
-          .controlSize(HarnessControlMetrics.compactControlSize)
-          .disabled(store.connectionState == .connecting)
-          .accessibilityIdentifier(
-            HarnessAccessibility.preferencesActionButton(
-              "Connection Reconnect"
-            )
-          )
-          Button("Refresh Diagnostics") {
-            Task { await store.refreshDiagnostics() }
-          }
-          .harnessActionButtonStyle(
-            variant: .bordered,
-            tint: HarnessTheme.ink
-          )
-          .controlSize(HarnessControlMetrics.compactControlSize)
-          .disabled(store.isDiagnosticsRefreshInFlight)
-          .accessibilityIdentifier(
-            HarnessAccessibility.preferencesActionButton(
-              "Connection Refresh Diagnostics"
-            )
-          )
         }
       }
       PreferencesConnectionMetrics(
@@ -199,7 +177,7 @@ struct PreferencesConnectionSection: View {
 }
 
 struct PreferencesDiagnosticsSection: View {
-  @Bindable var store: HarnessStore
+  let store: HarnessStore
   let effectiveTokenPresent: Bool
   let effectiveLastEvent: DaemonAuditEvent?
 

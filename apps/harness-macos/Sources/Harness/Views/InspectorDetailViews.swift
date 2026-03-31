@@ -24,7 +24,7 @@ struct SessionInspectorSummaryCard: View {
       InspectorFactGrid(facts: facts)
       if !detail.agentActivity.isEmpty {
         InspectorSection(title: "Recent Agent Activity") {
-          HarnessGlassContainer(spacing: 8) {
+          VStack(alignment: .leading, spacing: 8) {
             ForEach(detail.agentActivity.prefix(2)) { activity in
               VStack(alignment: .leading, spacing: 4) {
                 HStack {
@@ -42,14 +42,13 @@ struct SessionInspectorSummaryCard: View {
               }
               .padding(.horizontal, 12)
               .padding(.vertical, 10)
-              .harnessInsetPanel(cornerRadius: 14, fillOpacity: 0.05, strokeOpacity: 0.10)
             }
           }
+          .frame(maxWidth: .infinity, alignment: .leading)
         }
       }
     }
     .frame(maxWidth: .infinity, alignment: .leading)
-    .harnessCard()
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessAccessibility.sessionInspectorCard)
     .accessibilityFrameMarker("\(HarnessAccessibility.sessionInspectorCard).frame")
@@ -58,7 +57,7 @@ struct SessionInspectorSummaryCard: View {
 
 struct TaskInspectorCard: View {
   let task: WorkItem
-  @Bindable var store: HarnessStore
+  let store: HarnessStore
   @State private var newNoteText = ""
 
   private var userNotes: [UserNote] {
@@ -102,7 +101,7 @@ struct TaskInspectorCard: View {
       }
       if !task.notes.isEmpty {
         InspectorSection(title: "Notes") {
-          HarnessGlassContainer(spacing: 8) {
+          VStack(alignment: .leading, spacing: 8) {
             ForEach(task.notes) { note in
               VStack(alignment: .leading, spacing: 4) {
                 HStack {
@@ -119,9 +118,9 @@ struct TaskInspectorCard: View {
               }
               .padding(.horizontal, 12)
               .padding(.vertical, 10)
-              .harnessInsetPanel(cornerRadius: 14, fillOpacity: 0.05, strokeOpacity: 0.10)
             }
           }
+          .frame(maxWidth: .infinity, alignment: .leading)
         }
       }
       if let blockedReason = task.blockedReason, !blockedReason.isEmpty {
@@ -140,7 +139,7 @@ struct TaskInspectorCard: View {
       }
       InspectorSection(title: "Your Notes") {
         if !userNotes.isEmpty {
-          HarnessGlassContainer(spacing: 8) {
+          VStack(alignment: .leading, spacing: 8) {
             ForEach(userNotes, id: \.persistentModelID) { note in
               HStack(alignment: .top) {
                 Text(note.text)
@@ -158,9 +157,9 @@ struct TaskInspectorCard: View {
               }
               .padding(.horizontal, 12)
               .padding(.vertical, 8)
-              .harnessInsetPanel(cornerRadius: 14, fillOpacity: 0.05, strokeOpacity: 0.10)
             }
           }
+          .frame(maxWidth: .infinity, alignment: .leading)
         }
         HStack(spacing: 8) {
           TextField("Add a note", text: $newNoteText)
@@ -172,7 +171,6 @@ struct TaskInspectorCard: View {
       }
     }
     .frame(maxWidth: .infinity, alignment: .leading)
-    .harnessCard()
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessAccessibility.taskInspectorCard)
     .accessibilityFrameMarker("\(HarnessAccessibility.taskInspectorCard).frame")
@@ -188,8 +186,6 @@ struct TaskInspectorCard: View {
 }
 
 struct AgentInspectorCard: View {
-  @Environment(\.harnessThemeStyle)
-  private var themeStyle
   let agent: AgentRegistration
   let activity: AgentToolActivitySummary?
   @Binding var signalCommand: String
@@ -278,13 +274,12 @@ struct AgentInspectorCard: View {
           .lineLimit(3, reservesSpace: true)
         TextField("Action Hint", text: $signalActionHint)
         Button("Send Signal", action: sendSignal)
-          .harnessActionButtonStyle(variant: .prominent, tint: HarnessTheme.accent(for: themeStyle))
+          .harnessActionButtonStyle(variant: .prominent, tint: HarnessTheme.accent)
           .disabled(signalCommand.isEmpty || signalMessage.isEmpty)
           .accessibilityIdentifier(HarnessAccessibility.signalSendButton)
       }
     }
     .frame(maxWidth: .infinity, alignment: .leading)
-    .harnessCard()
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessAccessibility.agentInspectorCard)
     .accessibilityFrameMarker("\(HarnessAccessibility.agentInspectorCard).frame")
@@ -365,7 +360,6 @@ struct SignalInspectorCard: View {
       }
     }
     .frame(maxWidth: .infinity, alignment: .leading)
-    .harnessCard()
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessAccessibility.signalInspectorCard)
     .accessibilityFrameMarker("\(HarnessAccessibility.signalInspectorCard).frame")
