@@ -11,12 +11,8 @@ class HarnessUITestCase: XCTestCase {
   }
 
   override func tearDown() async throws {
-    await MainActor.run {
-      let app = XCUIApplication(
-        bundleIdentifier: Self.uiTestHostBundleIdentifier
-      )
-      terminateIfRunning(app)
-    }
+    let app = XCUIApplication(bundleIdentifier: Self.uiTestHostBundleIdentifier)
+    await MainActor.run { terminateIfRunning(app) }
   }
 }
 
@@ -50,26 +46,26 @@ extension HarnessUITestCase {
 
   func mainWindow(in app: XCUIApplication) -> XCUIElement {
     let mainWindow = app.windows.matching(identifier: "main").firstMatch
-    if mainWindow.exists {
-      return mainWindow
-    }
-    return app.windows.firstMatch
+    return mainWindow.exists ? mainWindow : app.windows.firstMatch
   }
 
   func window(in app: XCUIApplication, containing element: XCUIElement) -> XCUIElement {
     let windows = app.windows.allElementsBoundByIndex.filter(\.exists)
-    if let matchingWindow = windows.first(where: { $0.frame.contains(element.frame) }) {
+    if let matchingWindow = windows.filter({ $0.frame.contains(element.frame) }).min(by: {
+      ($0.frame.width * $0.frame.height) < ($1.frame.width * $1.frame.height)
+    }) {
       return matchingWindow
     }
     return mainWindow(in: app)
   }
 
-  func launch(mode: String) -> XCUIApplication {
+  func launch(mode: String, additionalEnvironment: [String: String] = [:]) -> XCUIApplication {
     let app = XCUIApplication(bundleIdentifier: Self.uiTestHostBundleIdentifier)
     terminateIfRunning(app)
     app.launchArguments += ["-ApplePersistenceIgnoreState", "YES"]
     app.launchEnvironment["HARNESS_UI_TESTS"] = "1"
     app.launchEnvironment[Self.launchModeKey] = mode
+    app.launchEnvironment.merge(additionalEnvironment) { _, new in new }
     app.launch()
     XCTAssertTrue(
       waitUntil(timeout: Self.uiTimeout) {
@@ -159,17 +155,22 @@ extension HarnessUITestCase {
     XCTFail("Failed to tap element \(identifier)")
   }
 
-  func selectMenuOption(
-    in app: XCUIApplication,
-    controlIdentifier: String,
-    optionTitle: String
-  ) {
-    let control = element(in: app, identifier: controlIdentifier)
+  func selectMenuOption(in app: XCUIApplication, controlIdentifier: String, optionTitle: String) {
+    let control = popUpButton(in: app, identifier: controlIdentifier)
     XCTAssertTrue(control.waitForExistence(timeout: Self.uiTimeout))
-    tapElement(in: app, identifier: controlIdentifier)
+
+    app.activate()
+    if control.isHittable {
+      control.tap()
+    } else if let coordinate = centerCoordinate(in: app, for: control) {
+      coordinate.tap()
+    } else {
+      XCTFail("Failed to open pop-up button \(controlIdentifier)")
+      return
+    }
 
     let menuItem = app.descendants(matching: .menuItem).matching(
-      NSPredicate(format: "title == %@", optionTitle)
+      NSPredicate(format: "label == %@ OR title == %@", optionTitle, optionTitle)
     ).firstMatch
     XCTAssertTrue(menuItem.waitForExistence(timeout: Self.uiTimeout))
     menuItem.tap()
@@ -270,12 +271,19 @@ extension HarnessUITestCase {
     return app.toolbars.buttons.matching(identifier: identifier).firstMatch
   }
 
+  func popUpButton(in app: XCUIApplication, identifier: String) -> XCUIElement {
+    let appMatch = app.popUpButtons.matching(identifier: identifier).firstMatch
+    return appMatch.exists
+      ? appMatch
+      : app.descendants(matching: .popUpButton).matching(identifier: identifier).firstMatch
+  }
+
   func toolbarButton(in app: XCUIApplication, index: Int) -> XCUIElement {
     let windowToolbarButtons = mainWindow(in: app).toolbars.buttons
-    if windowToolbarButtons.count > index {
-      return windowToolbarButtons.element(boundBy: index)
-    }
-    return app.toolbars.buttons.element(boundBy: index)
+    return
+      windowToolbarButtons.count > index
+      ? windowToolbarButtons.element(boundBy: index)
+      : app.toolbars.buttons.element(boundBy: index)
   }
 
   func sidebarToggleButton(in app: XCUIApplication) -> XCUIElement {
@@ -310,10 +318,7 @@ extension HarnessUITestCase {
 
   func confirmationDialogButton(in app: XCUIApplication, title: String) -> XCUIElement {
     let alertButton = app.sheets.buttons[title]
-    if alertButton.exists {
-      return alertButton
-    }
-    return app.dialogs.buttons[title]
+    return alertButton.exists ? alertButton : app.dialogs.buttons[title]
   }
 
   func dismissConfirmationDialog(in app: XCUIApplication) {
@@ -346,11 +351,7 @@ extension HarnessUITestCase {
     add(attachment)
   }
 
-  func waitUntil(
-    timeout: TimeInterval = 5,
-    pollInterval: TimeInterval = 0.1,
-    condition: @escaping () -> Bool
-  ) -> Bool {
+  func waitUntil(timeout: TimeInterval = 5, pollInterval: TimeInterval = 0.1, condition: @escaping () -> Bool) -> Bool {
     let deadline = Date.now.addingTimeInterval(timeout)
     while Date.now < deadline {
       if condition() {
@@ -365,7 +366,7 @@ extension HarnessUITestCase {
     in app: XCUIApplication,
     for element: XCUIElement
   ) -> XCUICoordinate? {
-    let window = mainWindow(in: app)
+    let window = window(in: app, containing: element)
     guard window.waitForExistence(timeout: 0.5) else {
       return nil
     }

@@ -7,6 +7,7 @@ struct PreferencesView: View {
   @State private var selectedSection: PreferencesSection = .general
 
   private var effectiveHealth: HealthResponse? { store.diagnostics?.health ?? store.health }
+
   private var cacheEntryCount: Int {
     store.diagnostics?.workspace.cacheEntryCount
       ?? store.daemonStatus?.diagnostics.cacheEntryCount

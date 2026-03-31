@@ -21,7 +21,7 @@ struct SessionInspectorSummaryCard: View {
       Text(
         "Pick a task, agent, signal, or observe card from the cockpit to focus actions and detail here."
       )
-      .foregroundStyle(.secondary)
+      .foregroundStyle(HarnessTheme.secondaryInk)
       InspectorFactGrid(facts: facts)
       if !detail.agentActivity.isEmpty {
         InspectorSection(title: "Recent Agent Activity") {
@@ -34,11 +34,11 @@ struct SessionInspectorSummaryCard: View {
                   Spacer()
                   Text(activity.latestEventAt.map(formatTimestamp) ?? "No events")
                     .font(.caption.monospaced())
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(HarnessTheme.secondaryInk)
                 }
                 Text(activity.recentTools.joined(separator: " · "))
                   .font(.caption)
-                  .foregroundStyle(.secondary)
+                  .foregroundStyle(HarnessTheme.secondaryInk)
                   .lineLimit(2)
               }
               .padding(.horizontal, 12)
@@ -333,7 +333,7 @@ struct SignalInspectorCard: View {
       Text(signal.signal.command)
         .font(.system(.title3, design: .rounded, weight: .bold))
       Text(signal.signal.payload.message)
-        .foregroundStyle(.secondary)
+        .foregroundStyle(HarnessTheme.secondaryInk)
       InspectorFactGrid(facts: facts)
       InspectorSection(title: "Delivery") {
         InspectorFactGrid(
@@ -350,7 +350,7 @@ struct SignalInspectorCard: View {
       if let actionHint = signal.signal.payload.actionHint, !actionHint.isEmpty {
         InspectorSection(title: "Action Hint") {
           Text(actionHint)
-            .foregroundStyle(.secondary)
+            .foregroundStyle(HarnessTheme.secondaryInk)
         }
       }
       if !signal.signal.payload.relatedFiles.isEmpty {
@@ -359,7 +359,7 @@ struct SignalInspectorCard: View {
             ForEach(Array(signal.signal.payload.relatedFiles.enumerated()), id: \.offset) { _, path in
               Text(path)
                 .font(.caption.monospaced())
-                .foregroundStyle(.secondary)
+                .foregroundStyle(HarnessTheme.secondaryInk)
                 .lineLimit(2)
             }
           }
@@ -368,7 +368,7 @@ struct SignalInspectorCard: View {
       InspectorSection(title: "Metadata") {
         Text(verbatim: signal.signal.payload.metadata.prettyPrintedJSONString())
           .font(.caption.monospaced())
-          .foregroundStyle(.secondary)
+          .foregroundStyle(HarnessTheme.secondaryInk)
           .textSelection(.enabled)
       }
       if let acknowledgment = signal.acknowledgment {
@@ -382,7 +382,7 @@ struct SignalInspectorCard: View {
           )
           if let details = acknowledgment.details, !details.isEmpty {
             Text(details)
-              .foregroundStyle(.secondary)
+              .foregroundStyle(HarnessTheme.secondaryInk)
           }
         }
       }

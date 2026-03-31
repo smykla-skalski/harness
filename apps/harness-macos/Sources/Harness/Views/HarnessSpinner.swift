@@ -2,6 +2,8 @@ import SwiftUI
 
 struct HarnessSpinner: View {
   let size: CGFloat
+  @Environment(\.accessibilityReduceMotion)
+  private var reduceMotion
   @State private var isSpinning = false
 
   init(size: CGFloat = 16) {
@@ -21,9 +23,9 @@ struct HarnessSpinner: View {
         style: StrokeStyle(lineWidth: 2, lineCap: .round)
       )
       .frame(width: size, height: size)
-      .rotationEffect(.degrees(isSpinning ? 360 : 0))
+      .rotationEffect(.degrees(reduceMotion ? 0 : (isSpinning ? 360 : 0)))
       .animation(
-        .linear(duration: 0.8).repeatForever(autoreverses: false),
+        reduceMotion ? nil : .linear(duration: 0.8).repeatForever(autoreverses: false),
         value: isSpinning
       )
       .onAppear { isSpinning = true }
