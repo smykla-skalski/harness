@@ -84,6 +84,7 @@ struct SessionsBoardView: View {
     }
     .frame(maxWidth: .infinity, alignment: .leading)
     .padding(.vertical, 8)
+    .accessibilityElement(children: .combine)
     .accessibilityTestProbe(
       HarnessAccessibility.boardMetricCard(title),
       label: title,

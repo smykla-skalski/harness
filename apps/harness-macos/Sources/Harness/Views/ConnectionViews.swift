@@ -26,6 +26,7 @@ struct TransportBadge: View {
     .padding(.vertical, 5)
     .harnessCapsuleGlass()
     .fixedSize()
+    .accessibilityElement(children: .combine)
   }
 }
 

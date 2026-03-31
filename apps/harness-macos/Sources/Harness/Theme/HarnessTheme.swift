@@ -39,6 +39,8 @@ enum HarnessTheme {
 struct LiveActivityBorderModifier: ViewModifier {
   let isActive: Bool
   @State private var flashTrigger = 0
+  @Environment(\.accessibilityReduceMotion)
+  private var reduceMotion
 
   private enum FlashPhase: CaseIterable {
     case idle, bright, fade
@@ -52,34 +54,39 @@ struct LiveActivityBorderModifier: ViewModifier {
     }
   }
 
+  @ViewBuilder
   func body(content: Content) -> some View {
-    content
-      .onChange(of: isActive) { _, active in
-        guard active else { return }
-        flashTrigger += 1
-      }
-      .phaseAnimator(FlashPhase.allCases, trigger: flashTrigger) { view, phase in
-        view
-          .overlay(
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
-              .stroke(
-                HarnessTheme.success.opacity(0.18 * phase.opacity),
-                lineWidth: 1
-              )
-          )
-          .shadow(
-            color: HarnessTheme.success.opacity(0.08 * phase.opacity),
-            radius: 12 * phase.opacity,
-            x: 0,
-            y: 0
-          )
-      } animation: { phase in
-        switch phase {
-        case .idle: .easeOut(duration: 0.75)
-        case .bright: .easeIn(duration: 0.15)
-        case .fade: .easeOut(duration: 0.75)
+    if reduceMotion {
+      content
+    } else {
+      content
+        .onChange(of: isActive) { _, active in
+          guard active else { return }
+          flashTrigger += 1
         }
-      }
+        .phaseAnimator(FlashPhase.allCases, trigger: flashTrigger) { view, phase in
+          view
+            .overlay(
+              RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .stroke(
+                  HarnessTheme.success.opacity(0.18 * phase.opacity),
+                  lineWidth: 1
+                )
+            )
+            .shadow(
+              color: HarnessTheme.success.opacity(0.08 * phase.opacity),
+              radius: 12 * phase.opacity,
+              x: 0,
+              y: 0
+            )
+        } animation: { phase in
+          switch phase {
+          case .idle: .easeOut(duration: 0.75)
+          case .bright: .easeIn(duration: 0.15)
+          case .fade: .easeOut(duration: 0.75)
+          }
+        }
+    }
   }
 }
 
@@ -285,6 +292,7 @@ struct HarnessActionHeader: View {
     VStack(alignment: .leading, spacing: 4) {
       Text(title)
         .font(.system(.headline, design: .rounded, weight: .semibold))
+        .accessibilityAddTraits(.isHeader)
       Text(subtitle)
         .font(.system(.subheadline, design: .rounded, weight: .medium))
         .foregroundStyle(HarnessTheme.secondaryInk)
