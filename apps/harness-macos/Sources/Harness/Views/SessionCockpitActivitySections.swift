@@ -16,6 +16,7 @@ struct SessionCockpitSignalsSection: View {
         } description: {
           Text("Signals appear when agents send or receive commands.")
         }
+        .frame(maxWidth: .infinity)
       }
       VStack(alignment: .leading, spacing: HarnessTheme.sectionSpacing) {
         ForEach(signals) { signal in
