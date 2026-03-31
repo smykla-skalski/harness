@@ -79,10 +79,10 @@ extension DaemonStatusCard {
       guard !isLoading else { return }
       Task { await store.startDaemon() }
     } label: {
-      Image(systemName: "arrow.clockwise")
+      Image(systemName: isDaemonOnline ? "arrow.clockwise" : "power")
         .font(.system(size: 14, weight: .semibold))
     }
-    .buttonStyle(DaemonRestartButtonStyle(isLoading: isLoading))
+    .buttonStyle(DaemonRestartButtonStyle(isLoading: isLoading, isOnline: isDaemonOnline))
     .help(isDaemonOnline ? "Restart daemon" : "Start daemon")
     .accessibilityLabel(isDaemonOnline ? "Restart Daemon" : "Start Daemon")
     .accessibilityIdentifier(HarnessAccessibility.sidebarStartDaemonButton)
@@ -244,6 +244,7 @@ extension DaemonStatusCard {
 
 private struct DaemonRestartButtonStyle: ButtonStyle {
   let isLoading: Bool
+  let isOnline: Bool
   @State private var isHovered = false
   @State private var isSpinning = false
   @Environment(\.accessibilityReduceMotion)
@@ -260,11 +261,16 @@ private struct DaemonRestartButtonStyle: ButtonStyle {
       .opacity(iconOpacity(pressed: pressed))
       .animation(.easeOut(duration: 0.15), value: isHovered)
       .animation(.easeOut(duration: 0.15), value: isLoading)
-      .rotationEffect(rotationAngle)
-      .animation(rotationAnimation, value: isHovered)
-      .animation(rotationAnimation, value: isSpinning)
-      .scaleEffect(pressed ? 0.78 : 1)
+      // Online: rotate on hover/spin on loading. Offline: scale pulse on hover.
+      .rotationEffect(isOnline ? rotationAngle : .zero)
+      .animation(isOnline ? rotationAnimation : nil, value: isHovered)
+      .animation(isOnline ? rotationAnimation : nil, value: isSpinning)
+      .scaleEffect(pressScale(pressed: pressed))
       .animation(.spring(duration: 0.2, bounce: 0.3), value: pressed)
+      .animation(
+        reduceMotion ? nil : .easeInOut(duration: 0.3),
+        value: isHovered
+      )
       .contentShape(Circle())
       .onContinuousHover { phase in
         switch phase {
@@ -277,13 +283,16 @@ private struct DaemonRestartButtonStyle: ButtonStyle {
       }
   }
 
+  private func pressScale(pressed: Bool) -> CGFloat {
+    if pressed { return 0.78 }
+    // Offline power icon: subtle scale-up on hover as a "ready to activate" cue.
+    if !isOnline && isHovered && !reduceMotion { return 1.12 }
+    return 1
+  }
+
   private var rotationAngle: Angle {
-    if isSpinning {
-      return .degrees(360)
-    }
-    if isHovered {
-      return .degrees(75)
-    }
+    if isSpinning { return .degrees(360) }
+    if isHovered { return .degrees(75) }
     return .zero
   }
 
@@ -297,7 +306,7 @@ private struct DaemonRestartButtonStyle: ButtonStyle {
 
   private func iconColor(pressed: Bool) -> Color {
     if isLoading { return HarnessTheme.accent }
-    if pressed || isHovered { return HarnessTheme.accent }
+    if pressed || isHovered { return isOnline ? HarnessTheme.accent : HarnessTheme.success }
     return HarnessTheme.secondaryInk
   }
 
