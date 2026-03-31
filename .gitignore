@@ -33,3 +33,4 @@ apps/harness-macos/*.xcodeproj/project.xcworkspace/xcuserdata/
 .claude/skills/swift*
 .agents/skills/swift*
 skills-lock.json
+.orphaned_at
