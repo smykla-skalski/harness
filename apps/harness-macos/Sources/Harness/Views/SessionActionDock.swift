@@ -22,7 +22,7 @@ struct SessionActionDock: View {
             .font(.system(.headline, design: .rounded, weight: .semibold))
           Text("Pick a lane, then use the inspector to submit the change.")
             .font(.system(.subheadline, design: .rounded, weight: .medium))
-            .foregroundStyle(HarnessTheme.secondaryInk)
+            .foregroundStyle(.secondary)
         }
         Spacer()
         VStack(alignment: .trailing, spacing: 4) {
@@ -37,32 +37,30 @@ struct SessionActionDock: View {
           }
           Text("\(detail.tasks.count) tasks · \(detail.agents.count) agents")
             .font(.caption.monospacedDigit())
-            .foregroundStyle(HarnessTheme.secondaryInk)
+            .foregroundStyle(.secondary)
         }
         .animation(.spring(duration: 0.2), value: store.isSessionActionInFlight)
       }
 
-      HarnessGlassContainer(spacing: 12) {
-        HStack(spacing: 12) {
-          flowButton(
-            title: "Task Flow",
-            subtitle: "Create, reassign, checkpoint",
-            symbol: "checklist",
-            action: focusFirstTask
-          )
-          flowButton(
-            title: "People Flow",
-            subtitle: "Change roles and leadership",
-            symbol: "person.2",
-            action: focusFirstAgent
-          )
-          flowButton(
-            title: "Observe Flow",
-            subtitle: "Surface and triage issues",
-            symbol: "eye",
-            action: focusObserver
-          )
-        }
+      HStack(spacing: 12) {
+        flowButton(
+          title: "Task Flow",
+          subtitle: "Create, reassign, checkpoint",
+          symbol: "checklist",
+          action: focusFirstTask
+        )
+        flowButton(
+          title: "People Flow",
+          subtitle: "Change roles and leadership",
+          symbol: "person.2",
+          action: focusFirstAgent
+        )
+        flowButton(
+          title: "Observe Flow",
+          subtitle: "Surface and triage issues",
+          symbol: "eye",
+          action: focusObserver
+        )
       }
     }
   }
@@ -79,7 +77,7 @@ struct SessionActionDock: View {
           .font(.system(.headline, design: .rounded, weight: .semibold))
         Text(subtitle)
           .font(.caption)
-          .foregroundStyle(HarnessTheme.secondaryInk)
+          .foregroundStyle(.secondary)
       }
       .frame(maxWidth: .infinity, alignment: .leading)
       .padding(14)
