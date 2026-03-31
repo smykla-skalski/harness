@@ -13,7 +13,7 @@ struct DaemonStatusCard: View {
     VStack(alignment: .leading, spacing: HarnessTheme.itemSpacing) {
       HStack(alignment: .top) {
         VStack(alignment: .leading, spacing: 4) {
-          Text("Harness Daemon")
+          Text("Daemon")
             .font(.system(.title3, design: .rounded, weight: .bold))
             .accessibilityAddTraits(.isHeader)
           Text(connectionLabel)
