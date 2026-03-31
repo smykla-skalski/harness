@@ -1,3 +1,4 @@
+import AppKit
 import HarnessKit
 import SwiftUI
 
@@ -167,6 +168,13 @@ private struct HarnessSystemButtonChromeModifier: ViewModifier {
     }
   }
 
+  private var effectiveProminentForeground: Color? {
+    guard style == .borderedProminent, let effectiveTint else {
+      return nil
+    }
+    return HarnessProminentButtonContrast.foreground(for: effectiveTint)
+  }
+
   @ViewBuilder
   func body(content: Content) -> some View {
     // Keep the underlying AppKit button style stable across enabled-state changes.
@@ -185,11 +193,45 @@ private struct HarnessSystemButtonChromeModifier: ViewModifier {
       }
     case .borderedProminent:
       if let effectiveTint {
-        content.buttonStyle(.borderedProminent).tint(effectiveTint)
+        if let effectiveProminentForeground {
+          content
+            .buttonStyle(.borderedProminent)
+            .tint(effectiveTint)
+            .foregroundStyle(effectiveProminentForeground)
+        } else {
+          content.buttonStyle(.borderedProminent).tint(effectiveTint)
+        }
       } else {
         content.buttonStyle(.borderedProminent)
       }
     }
+  }
+}
+
+private enum HarnessProminentButtonContrast {
+  static func foreground(for tint: Color) -> Color {
+    guard let rgbColor = NSColor(tint).usingColorSpace(NSColorSpace.deviceRGB)
+    else {
+      return HarnessTheme.onContrast
+    }
+
+    let luminance = relativeLuminance(
+      red: rgbColor.redComponent,
+      green: rgbColor.greenComponent,
+      blue: rgbColor.blueComponent
+    )
+    return luminance > 0.44 ? Color.black.opacity(0.82) : HarnessTheme.onContrast
+  }
+
+  private static func relativeLuminance(red: CGFloat, green: CGFloat, blue: CGFloat) -> CGFloat {
+    (0.2126 * linearized(red)) + (0.7152 * linearized(green)) + (0.0722 * linearized(blue))
+  }
+
+  private static func linearized(_ component: CGFloat) -> CGFloat {
+    if component <= 0.04045 {
+      return component / 12.92
+    }
+    return pow((component + 0.055) / 1.055, 2.4)
   }
 }
 
