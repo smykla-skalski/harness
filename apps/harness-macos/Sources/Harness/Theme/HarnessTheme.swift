@@ -16,8 +16,24 @@ enum HarnessTheme {
   static let danger = harnessColor("HarnessDanger")
   static let controlBorder = harnessColor("HarnessControlBorder")
   static let overlayScrim = harnessColor("HarnessOverlayScrim")
-  static let secondaryInk = ink.opacity(0.78)
-  static let tertiaryInk = ink.opacity(0.64)
+  static let secondaryInk = ink.opacity(0.88)
+  static let tertiaryInk = ink.opacity(0.76)
+  static let onContrast = Color.white
+
+  // MARK: - Spacing (4pt grid)
+
+  static let spacingXS: CGFloat = 4
+  static let spacingSM: CGFloat = 8
+  static let spacingMD: CGFloat = 12
+  static let spacingLG: CGFloat = 16
+  static let spacingXL: CGFloat = 20
+  static let spacingXXL: CGFloat = 24
+
+  // MARK: - Corner radius
+
+  static let cornerRadiusSM: CGFloat = 12
+  static let cornerRadiusMD: CGFloat = 16
+  static let cornerRadiusLG: CGFloat = 20
 }
 
 struct LiveActivityBorderModifier: ViewModifier {
@@ -69,6 +85,8 @@ struct LiveActivityBorderModifier: ViewModifier {
 
 struct HarnessLoadingStateView: View {
   let title: String
+  @Environment(\.accessibilityReduceMotion)
+  private var reduceMotion
   @State private var animates = false
 
   var body: some View {
@@ -79,14 +97,51 @@ struct HarnessLoadingStateView: View {
     }
     .padding(.horizontal, 12)
     .padding(.vertical, 8)
-    .harnessCapsuleGlass()
+    .harnessInfoPill(tint: HarnessTheme.accent)
     .opacity(animates ? 1 : 0.62)
-    .scaleEffect(animates ? 1 : 0.97)
+    .scaleEffect(reduceMotion ? 1 : (animates ? 1 : 0.97))
     .animation(
-      .easeInOut(duration: 1.1).repeatForever(autoreverses: true),
+      reduceMotion
+        ? .easeOut(duration: 0.2)
+        : .easeInOut(duration: 1.1).repeatForever(autoreverses: true),
       value: animates
     )
     .onAppear { animates = true }
+  }
+}
+
+private struct HarnessInfoPillModifier: ViewModifier {
+  let tint: Color
+  @Environment(\.accessibilityReduceTransparency)
+  private var reduceTransparency
+  @Environment(\.colorSchemeContrast)
+  private var colorSchemeContrast
+
+  private var fillOpacity: Double {
+    if reduceTransparency {
+      return colorSchemeContrast == .increased ? 0.34 : 0.26
+    }
+    return colorSchemeContrast == .increased ? 0.24 : 0.16
+  }
+
+  private var strokeOpacity: Double {
+    colorSchemeContrast == .increased ? 0.38 : 0.22
+  }
+
+  private var strokeWidth: CGFloat {
+    colorSchemeContrast == .increased ? 1.5 : 1
+  }
+
+  func body(content: Content) -> some View {
+    content
+      .background {
+        Capsule()
+          .fill(tint.opacity(fillOpacity))
+      }
+      .overlay {
+        Capsule()
+          .strokeBorder(tint.opacity(strokeOpacity), lineWidth: strokeWidth)
+      }
   }
 }
 
@@ -216,6 +271,10 @@ extension View {
       )
     )
   }
+
+  func harnessInfoPill(tint: Color = HarnessTheme.ink) -> some View {
+    modifier(HarnessInfoPillModifier(tint: tint))
+  }
 }
 
 struct HarnessActionHeader: View {
@@ -241,7 +300,7 @@ struct HarnessBadge: View {
       .font(.caption.bold())
       .padding(.horizontal, 10)
       .padding(.vertical, 5)
-      .harnessCapsuleGlass()
+      .harnessInfoPill(tint: HarnessTheme.accent)
   }
 }
 
