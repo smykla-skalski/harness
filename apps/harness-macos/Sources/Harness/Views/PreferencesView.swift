@@ -166,18 +166,8 @@ private struct PreferencesGeneralSection: View {
 
       Section("Actions") {
         PreferencesActionButtons(
-          isLoading: isLoading,
-          reconnect: { await store.reconnect() },
-          refreshDiagnostics: {
-            await store.refreshDiagnostics()
-          },
-          startDaemon: { await store.startDaemon() },
-          installLaunchAgent: {
-            await store.installLaunchAgent()
-          },
-          requestRemoveLaunchAgentConfirmation: {
-            store.requestRemoveLaunchAgentConfirmation()
-          }
+          store: store,
+          isLoading: isLoading
         )
       }
 

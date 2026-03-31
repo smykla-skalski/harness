@@ -2,46 +2,32 @@ import HarnessKit
 import SwiftUI
 
 struct SessionMetricGrid: View {
-  @Environment(\.harnessThemeStyle)
-  private var themeStyle
   let metrics: SessionMetrics
 
   var body: some View {
-    HarnessGlassContainer(spacing: 14) {
-      HarnessAdaptiveGridLayout(minimumColumnWidth: 130, maximumColumns: 5, spacing: 14) {
-        metricCard(
-          title: "Agents",
-          value: "\(metrics.agentCount)",
-          tint: HarnessTheme.accent(for: themeStyle)
-        )
-        metricCard(
-          title: "Active", value: "\(metrics.activeAgentCount)", tint: HarnessTheme.success)
-        metricCard(
-          title: "In Flight",
-          value: "\(metrics.inProgressTaskCount)",
-          tint: HarnessTheme.warmAccent
-        )
-        metricCard(
-          title: "Blocked", value: "\(metrics.blockedTaskCount)", tint: HarnessTheme.danger)
-        metricCard(
-          title: "Completed", value: "\(metrics.completedTaskCount)", tint: HarnessTheme.ink)
-      }
+    HarnessAdaptiveGridLayout(minimumColumnWidth: 130, maximumColumns: 5, spacing: 14) {
+      metricCard(
+        title: "Agents",
+        value: "\(metrics.agentCount)",
+        tint: HarnessTheme.accent
+      )
+      metricCard(
+        title: "Active", value: "\(metrics.activeAgentCount)", tint: HarnessTheme.success)
+      metricCard(
+        title: "In Flight",
+        value: "\(metrics.inProgressTaskCount)",
+        tint: HarnessTheme.warmAccent
+      )
+      metricCard(
+        title: "Blocked", value: "\(metrics.blockedTaskCount)", tint: HarnessTheme.danger)
+      metricCard(
+        title: "Completed", value: "\(metrics.completedTaskCount)", tint: HarnessTheme.ink)
     }
     .animation(.spring(duration: 0.3), value: metrics)
   }
 
   private func metricCard(title: String, value: String, tint: Color) -> some View {
-    let useGradientChrome = HarnessTheme.usesGradientChrome(for: themeStyle)
-    let plaqueFill =
-      useGradientChrome
-      ? Color.white.opacity(0.72)
-      : HarnessTheme.surfaceHover(for: themeStyle).opacity(0.96)
-    let plaqueStroke =
-      useGradientChrome
-      ? Color.white.opacity(0.28)
-      : HarnessTheme.panelBorder(for: themeStyle).opacity(0.22)
-
-    return HStack(alignment: .top, spacing: 12) {
+    HStack(alignment: .top, spacing: 12) {
       RoundedRectangle(cornerRadius: 999, style: .continuous)
         .fill(tint)
         .frame(width: 10)
@@ -57,19 +43,9 @@ struct SessionMetricGrid: View {
           .contentTransition(.numericText())
       }
       .frame(maxWidth: .infinity, alignment: .leading)
-      .padding(.horizontal, 10)
-      .padding(.vertical, 8)
-      .background {
-        RoundedRectangle(cornerRadius: 16, style: .continuous)
-          .fill(plaqueFill)
-          .overlay {
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-              .stroke(plaqueStroke, lineWidth: 1)
-          }
-      }
     }
     .frame(maxWidth: .infinity, alignment: .leading)
-    .harnessCard(minHeight: 80)
+    .padding(.vertical, 8)
   }
 }
 
@@ -77,33 +53,29 @@ private let sessionLaneCardHeight: CGFloat = 116
 
 struct SessionTaskListSection: View {
   let tasks: [WorkItem]
-  let onSelect: (String) -> Void
+  let store: HarnessStore
 
   var body: some View {
     VStack(alignment: .leading, spacing: 12) {
       Text("Tasks")
         .font(.system(.title3, design: .rounded, weight: .semibold))
-      HarnessGlassContainer(spacing: 12) {
+      VStack(alignment: .leading, spacing: 12) {
         ForEach(tasks) { task in
-          SessionTaskSummaryCard(task: task) {
-            onSelect(task.taskId)
-          }
+          SessionTaskSummaryCard(task: task, store: store)
         }
       }
+      .frame(maxWidth: .infinity, alignment: .leading)
     }
     .frame(maxWidth: .infinity, alignment: .topLeading)
-    .harnessCard()
   }
 }
 
 struct SessionTaskSummaryCard: View {
-  @Environment(\.harnessThemeStyle)
-  private var themeStyle
   let task: WorkItem
-  let onTap: () -> Void
+  let store: HarnessStore
 
   var body: some View {
-    Button(action: onTap) {
+    Button { store.inspect(taskID: task.taskId) } label: {
       VStack(alignment: .leading, spacing: 8) {
         HStack(alignment: .top) {
           Text(task.title)
@@ -114,7 +86,7 @@ struct SessionTaskSummaryCard: View {
             .font(.caption.bold())
             .padding(.horizontal, 8)
             .padding(.vertical, 4)
-            .background(severityColor(for: task.severity, style: themeStyle), in: Capsule())
+            .background(severityColor(for: task.severity), in: Capsule())
             .foregroundStyle(.white)
         }
         Text(task.context ?? "No extra context")
@@ -126,7 +98,7 @@ struct SessionTaskSummaryCard: View {
         HStack(alignment: .firstTextBaseline) {
           Text(task.status.title)
             .font(.caption.weight(.bold))
-            .foregroundStyle(taskStatusColor(for: task.status, style: themeStyle))
+            .foregroundStyle(taskStatusColor(for: task.status))
           Spacer()
           Text(task.assignedTo ?? "unassigned")
             .font(.caption.monospaced())
@@ -151,33 +123,29 @@ struct SessionTaskSummaryCard: View {
 
 struct SessionAgentListSection: View {
   let agents: [AgentRegistration]
-  let onSelect: (String) -> Void
+  let store: HarnessStore
 
   var body: some View {
     VStack(alignment: .leading, spacing: 12) {
       Text("Agents")
         .font(.system(.title3, design: .rounded, weight: .semibold))
-      HarnessGlassContainer(spacing: 12) {
+      VStack(alignment: .leading, spacing: 12) {
         ForEach(agents) { agent in
-          SessionAgentSummaryCard(agent: agent) {
-            onSelect(agent.agentId)
-          }
+          SessionAgentSummaryCard(agent: agent, store: store)
         }
       }
+      .frame(maxWidth: .infinity, alignment: .leading)
     }
     .frame(maxWidth: .infinity, alignment: .topLeading)
-    .harnessCard()
   }
 }
 
 struct SessionAgentSummaryCard: View {
-  @Environment(\.harnessThemeStyle)
-  private var themeStyle
   let agent: AgentRegistration
-  let onTap: () -> Void
+  let store: HarnessStore
 
   var body: some View {
-    Button(action: onTap) {
+    Button { store.inspect(agentID: agent.agentId) } label: {
       VStack(alignment: .leading, spacing: 8) {
         HStack(alignment: .top) {
           Text(agent.name)
@@ -188,7 +156,7 @@ struct SessionAgentSummaryCard: View {
             .font(.caption.bold())
             .padding(.horizontal, 8)
             .padding(.vertical, 4)
-            .background(HarnessTheme.accent(for: themeStyle), in: Capsule())
+            .background(HarnessTheme.accent, in: Capsule())
             .foregroundStyle(.white)
         }
         Text("\(agent.runtime) • \(agent.agentId)")
@@ -222,8 +190,6 @@ struct SessionAgentSummaryCard: View {
       .lineLimit(1)
       .padding(.horizontal, 8)
       .padding(.vertical, 4)
-      .background {
-        HarnessGlassCapsuleBackground()
-      }
+      .glassEffect(.regular, in: .capsule)
   }
 }

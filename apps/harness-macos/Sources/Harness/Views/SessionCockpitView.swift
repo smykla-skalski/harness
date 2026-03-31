@@ -14,18 +14,12 @@ struct SessionCockpitView: View {
         SessionMetricGrid(metrics: detail.session.metrics)
         SessionActionDock(store: store, detail: detail)
         HarnessAdaptiveGridLayout(minimumColumnWidth: 340, maximumColumns: 2, spacing: 16) {
-          SessionTaskListSection(tasks: detail.tasks) { taskID in
-            store.inspect(taskID: taskID)
-          }
-          SessionAgentListSection(agents: detail.agents) { agentID in
-            store.inspect(agentID: agentID)
-          }
+          SessionTaskListSection(tasks: detail.tasks, store: store)
+          SessionAgentListSection(agents: detail.agents, store: store)
         }
         .animation(.spring(duration: 0.3), value: detail.tasks)
         .animation(.spring(duration: 0.3), value: detail.agents)
-        SessionCockpitSignalsSection(signals: detail.signals) { signalID in
-          store.inspect(signalID: signalID)
-        }
+        SessionCockpitSignalsSection(signals: detail.signals, store: store)
         .animation(.spring(duration: 0.3), value: detail.signals)
         SessionCockpitTimelineSection(timeline: timeline)
           .animation(.spring(duration: 0.3), value: timeline)
