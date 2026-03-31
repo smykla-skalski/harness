@@ -98,6 +98,10 @@ For non-accent buttons, use system semantic colors:
 
 `HarnessTheme` colors stay valid for non-button UI: status badges, indicator bars, text foreground, decorative accents.
 
+## No container-level .foregroundStyle() with custom colors
+
+Never apply `.foregroundStyle(HarnessTheme.ink)` or other custom colors on container views (ScrollView, VStack, etc.). It cascades into button labels and overrides the native text colors that `.glass` and `.glassProminent` provide. Use `.foregroundStyle(.primary)` for containers - it adapts to color scheme without fighting button styles. Apply custom foreground colors only on specific Text views that need them.
+
 ```swift
 // correct - nil inherits app accent, system colors for overrides
 .harnessActionButtonStyle(variant: .prominent)
