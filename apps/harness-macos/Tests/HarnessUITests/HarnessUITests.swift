@@ -361,4 +361,26 @@ final class HarnessUITests: HarnessUITestCase {
     XCTAssertEqual(sessionRow.value as? String, "selected, interactive=plain")
     XCTAssertEqual(observeSummaryButton.value as? String, "interactive=plain")
   }
+
+  func testActionToastAppearsAndAutoDismisses() throws {
+    let app = launch(mode: "preview")
+
+    tapPreviewSession(in: app)
+
+    let observeButton = app.buttons["Observe"]
+    XCTAssertTrue(observeButton.waitForExistence(timeout: Self.uiTimeout))
+    observeButton.tap()
+
+    let toast = element(in: app, identifier: Accessibility.actionToast)
+    XCTAssertTrue(
+      toast.waitForExistence(timeout: Self.uiTimeout),
+      "Toast should appear after action"
+    )
+
+    let dismissed = XCTNSPredicateExpectation(
+      predicate: NSPredicate(format: "exists == false"),
+      object: toast
+    )
+    wait(for: [dismissed], timeout: 8)
+  }
 }
