@@ -1,5 +1,6 @@
 import HarnessKit
 import Observation
+import SwiftData
 import SwiftUI
 
 struct SidebarFilterSection: View {
@@ -117,9 +118,11 @@ struct SidebarFilterSection: View {
 
 private struct RecentSearchChipsSection: View {
   let store: HarnessStore
+  @Query(sort: \RecentSearch.lastUsedAt, order: .reverse)
+  private var recentSearches: [RecentSearch]
 
   private var visibleSearches: [RecentSearch] {
-    Array(store.recentSearches.prefix(5))
+    Array(recentSearches.prefix(5))
   }
 
   var body: some View {
