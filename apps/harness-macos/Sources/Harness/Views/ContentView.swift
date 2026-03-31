@@ -52,7 +52,7 @@ struct ContentView: View {
   private var chromeAccessibilityValue: String {
     [
       "contentChrome=native",
-      "interactiveRows=list",
+      "interactiveRows=button",
       "controlGlass=none",
     ].joined(separator: ", ")
   }

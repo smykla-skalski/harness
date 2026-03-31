@@ -205,7 +205,7 @@ func sessionAccessibilityValue(
   for session: SessionSummary,
   selectedSessionID: String?
 ) -> String {
-  let interactionStyle = "list"
+  let interactionStyle = "button"
   let selected = selectedSessionID == session.sessionId
   if selected {
     return "selected, interactive=\(interactionStyle)"

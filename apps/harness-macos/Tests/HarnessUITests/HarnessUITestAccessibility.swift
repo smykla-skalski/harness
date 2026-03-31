@@ -23,6 +23,7 @@ enum HarnessUITestAccessibility {
   static let previewProjectHeader = "harness.sidebar.project-header.project-6ccf8d0a"
   static let previewProjectHeaderFrame = "harness.sidebar.project-header.project-6ccf8d0a.frame"
   static let previewSessionRow = "harness.sidebar.session.sess-harness"
+  static let overflowSessionRow = "harness.sidebar.session.sess-harness-17"
   static let previewSessionTitle = "Track all live multi-agent harness sessions from a macOS cockpit"
   static let sidebarEmptyState = "harness.sidebar.empty-state"
   static let sidebarEmptyStateTitle = "No sessions indexed yet"

@@ -382,9 +382,9 @@ final class HarnessUITests: HarnessUITestCase {
     )
     XCTAssertEqual(
       appChromeState.label,
-      "contentChrome=native, interactiveRows=list, controlGlass=none"
+      "contentChrome=native, interactiveRows=button, controlGlass=none"
     )
-    XCTAssertEqual(sessionRow.value as? String, "selected, interactive=list")
+    XCTAssertEqual(sessionRow.value as? String, "selected, interactive=button")
     XCTAssertEqual(observeSummaryButton.value as? String, "interactive=plain")
   }
 

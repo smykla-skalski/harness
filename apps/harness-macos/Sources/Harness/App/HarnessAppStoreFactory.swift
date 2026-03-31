@@ -3,6 +3,18 @@ import SwiftData
 
 @MainActor
 enum HarnessAppStoreFactory {
+  private enum PreviewFixtureSet: String {
+    case standard
+    case overflow
+
+    init(environment: HarnessEnvironment) {
+      let rawValue = environment.values["HARNESS_PREVIEW_FIXTURE_SET"]?
+        .trimmingCharacters(in: .whitespacesAndNewlines)
+        .lowercased()
+      self = Self(rawValue: rawValue ?? "") ?? .standard
+    }
+  }
+
   static func makeStore(
     environment: HarnessEnvironment = .current,
     modelContext: ModelContext? = nil,
@@ -14,7 +26,13 @@ enum HarnessAppStoreFactory {
     case .live:
       controller = DaemonController(environment: environment)
     case .preview:
-      controller = PreviewDaemonController()
+      controller =
+        switch PreviewFixtureSet(environment: environment) {
+        case .standard:
+          PreviewDaemonController()
+        case .overflow:
+          PreviewDaemonController(mode: .overflow)
+        }
     case .empty:
       controller = PreviewDaemonController(mode: .empty)
     }

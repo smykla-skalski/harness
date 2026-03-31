@@ -4,6 +4,7 @@ import SwiftUI
 struct SidebarSessionRow: View {
   let session: SessionSummary
   let store: HarnessStore
+  let isSelected: Bool
 
   var body: some View {
     VStack(alignment: .leading, spacing: HarnessTheme.itemSpacing) {
@@ -16,18 +17,18 @@ struct SidebarSessionRow: View {
         if store.isBookmarked(sessionId: session.sessionId) {
           Image(systemName: "bookmark.fill")
             .scaledFont(.caption2)
-            .foregroundStyle(HarnessTheme.accent)
+            .foregroundStyle(isSelected ? HarnessTheme.onContrast : HarnessTheme.accent)
             .accessibilityLabel("Bookmarked")
         }
         Text(session.status.title)
           .scaledFont(.caption2.weight(.bold))
-          .foregroundStyle(statusColor(for: session.status))
+          .foregroundStyle(isSelected ? selectedSecondaryTextStyle : statusColor(for: session.status))
           .accessibilityHidden(true)
       }
       Text(session.sessionId)
         .scaledFont(.caption.monospaced())
         .truncationMode(.middle)
-        .foregroundStyle(HarnessTheme.secondaryInk)
+        .foregroundStyle(selectedSecondaryTextStyle)
       HStack(spacing: HarnessTheme.sectionSpacing) {
         labelChip("\(session.metrics.activeAgentCount) active")
         labelChip("\(session.metrics.inProgressTaskCount) moving")
@@ -35,7 +36,7 @@ struct SidebarSessionRow: View {
       }
       .frame(maxWidth: .infinity, alignment: .leading)
     }
-    .foregroundStyle(HarnessTheme.ink)
+    .foregroundStyle(isSelected ? HarnessTheme.onContrast : HarnessTheme.ink)
     .frame(maxWidth: .infinity, alignment: .leading)
   }
 
@@ -44,6 +45,11 @@ struct SidebarSessionRow: View {
       .scaledFont(.caption.weight(.semibold))
       .lineLimit(1)
       .harnessPillPadding()
-      .harnessInfoPill()
+      .foregroundStyle(isSelected ? HarnessTheme.onContrast : HarnessTheme.ink)
+      .harnessInfoPill(tint: isSelected ? HarnessTheme.onContrast : HarnessTheme.ink)
+  }
+
+  private var selectedSecondaryTextStyle: Color {
+    isSelected ? HarnessTheme.onContrast.opacity(0.82) : HarnessTheme.secondaryInk
   }
 }
