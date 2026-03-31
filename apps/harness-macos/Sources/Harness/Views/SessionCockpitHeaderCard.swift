@@ -28,22 +28,28 @@ struct SessionCockpitHeaderCard: View {
         }
       }
 
-      if store.isSessionActionInFlight || store.isSelectionLoading {
-        HarnessLoadingStateView(title: "Refreshing live session detail")
-          .transition(.move(edge: .top).combined(with: .opacity))
+      Group {
+        if store.isSessionActionInFlight || store.isSelectionLoading {
+          HarnessLoadingStateView(title: "Refreshing live session detail")
+            .transition(.move(edge: .top).combined(with: .opacity))
+        }
       }
+      .animation(.spring(duration: 0.3), value: store.isSessionActionInFlight)
+      .animation(.spring(duration: 0.3), value: store.isSelectionLoading)
 
       if let observer = detail.observer {
         observerSummary(observer)
+          .transition(.opacity)
       }
 
       if let pendingTransfer = detail.session.pendingLeaderTransfer {
         pendingTransferSummary(pendingTransfer)
+          .transition(.opacity)
       }
     }
     .frame(maxWidth: .infinity, alignment: .leading)
-    .animation(.spring(duration: 0.3), value: store.isSessionActionInFlight)
-    .animation(.spring(duration: 0.3), value: store.isSelectionLoading)
+    .animation(.spring(duration: 0.3), value: detail.observer != nil)
+    .animation(.spring(duration: 0.3), value: detail.session.pendingLeaderTransfer != nil)
   }
 
   private var observeButton: some View {

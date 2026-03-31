@@ -160,7 +160,9 @@ private struct RefreshToolbarButton: View {
         Image(systemName: "arrow.clockwise")
           .rotationEffect(.degrees(isSpinning ? 360 : 0))
           .animation(
-            .linear(duration: 0.9).repeatForever(autoreverses: false),
+            isSpinning
+              ? .linear(duration: 0.9).repeatForever(autoreverses: false)
+              : .easeOut(duration: 0.4),
             value: isSpinning
           )
         Text("Refresh")
@@ -169,13 +171,7 @@ private struct RefreshToolbarButton: View {
     .keyboardShortcut("r", modifiers: [.command])
     .accessibilityIdentifier(HarnessAccessibility.refreshButton)
     .onChange(of: store.isRefreshing) { _, refreshing in
-      if refreshing {
-        isSpinning = true
-      } else {
-        withAnimation(.easeOut(duration: 0.4)) {
-          isSpinning = false
-        }
-      }
+      isSpinning = refreshing
     }
   }
 }

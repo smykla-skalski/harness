@@ -20,7 +20,10 @@ struct InspectorColumnView: View {
   var body: some View {
     HarnessColumnScrollView(horizontalPadding: 18, verticalPadding: 22) {
       VStack(alignment: .leading, spacing: 18) {
-        inspectorContent
+        Group {
+          inspectorContent
+        }
+        .animation(.spring(duration: 0.25), value: store.inspectorSelection)
 
         if let detail = store.selectedSession {
           InspectorActionSections(
