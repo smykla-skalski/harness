@@ -218,7 +218,6 @@ private struct SessionListContent: View {
                     isSelected: store.selectedSessionID == session.sessionId,
                     cornerRadius: 18
                   )
-                  .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
                 }
                 .accessibilityLabel(
                   sessionAccessibilityLabel(for: session)
@@ -317,7 +316,6 @@ extension SidebarSessionList {
     .buttonBorderShape(.roundedRectangle(radius: 12))
     .harnessFilterChipButtonStyle(isSelected: isSelected)
     .controlSize(HarnessControlMetrics.compactControlSize)
-    .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
     .accessibilityLabel(title)
     .accessibilityValue(isSelected ? "selected" : "not selected")
     .accessibilityAddTraits(isSelected ? .isSelected : [])
