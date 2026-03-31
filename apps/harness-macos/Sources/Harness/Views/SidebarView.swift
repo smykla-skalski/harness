@@ -22,6 +22,7 @@ struct SidebarView: View {
 
       Section {
         SidebarFilterSection(store: store)
+          .compositingGroup()
       }
       .listRowInsets(EdgeInsets(
         top: HarnessTheme.sectionSpacing,
@@ -30,7 +31,7 @@ struct SidebarView: View {
         trailing: HarnessTheme.sectionSpacing
       ))
       .listRowSeparator(.hidden)
-      .listRowBackground(Color(.windowBackgroundColor).opacity(0.5))
+      .listRowBackground(Color.clear)
 
       sessionSections
     }
@@ -43,7 +44,6 @@ struct SidebarView: View {
         .harnessRoundedRectGlass()
         .padding(HarnessTheme.itemSpacing)
     }
-    .animation(.snappy(duration: 0.24), value: store.groupedSessions)
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     .foregroundStyle(HarnessTheme.ink)
     .accessibilityFrameMarker(HarnessAccessibility.sidebarShellFrame)
@@ -96,47 +96,7 @@ struct SidebarView: View {
             .listRowBackground(Color.clear)
 
           ForEach(group.sessions) { session in
-            SidebarSessionRow(session: session, store: store)
-              .tag(session.sessionId)
-              .listRowInsets(EdgeInsets(
-                top: HarnessTheme.itemSpacing,
-                leading: HarnessTheme.sectionSpacing,
-                bottom: HarnessTheme.itemSpacing,
-                trailing: HarnessTheme.sectionSpacing
-              ))
-              .accessibilityLabel(
-                sessionAccessibilityLabel(for: session)
-              )
-              .accessibilityValue(
-                sessionAccessibilityValue(
-                  for: session,
-                  selectedSessionID: store.selectedSessionID
-                )
-              )
-              .accessibilityElement(children: .combine)
-              .accessibilityAction(named: "Toggle Bookmark") {
-                store.toggleBookmark(
-                  sessionId: session.sessionId,
-                  projectId: session.projectId
-                )
-              }
-              .accessibilityIdentifier(
-                HarnessAccessibility.sessionRow(session.sessionId)
-              )
-              .contextMenu {
-                Button {
-                  store.toggleBookmark(
-                    sessionId: session.sessionId,
-                    projectId: session.projectId
-                  )
-                } label: {
-                  if store.isBookmarked(sessionId: session.sessionId) {
-                    Label("Remove Bookmark", systemImage: "bookmark.slash")
-                  } else {
-                    Label("Bookmark", systemImage: "bookmark")
-                  }
-                }
-              }
+            sessionRow(session)
           }
         }
       }
@@ -149,12 +109,12 @@ struct SidebarView: View {
   private func sessionProjectRow(for group: HarnessStore.SessionGroup) -> some View {
     HStack {
       Text(group.project.name)
-        .font(.system(.headline, design: .rounded, weight: .semibold))
+        .scaledFont(.system(.headline, design: .rounded, weight: .semibold))
         .foregroundStyle(HarnessTheme.ink)
         .accessibilityAddTraits(.isHeader)
       Spacer()
       Text("\(group.sessions.count)")
-        .font(.caption.monospacedDigit())
+        .scaledFont(.caption.monospacedDigit())
         .foregroundStyle(HarnessTheme.secondaryInk)
     }
     .accessibilityIdentifier(
@@ -163,5 +123,57 @@ struct SidebarView: View {
     .accessibilityFrameMarker(
       HarnessAccessibility.projectHeaderFrame(group.project.projectId)
     )
+  }
+
+  @ViewBuilder
+  private func sessionRow(_ session: SessionSummary) -> some View {
+    let baseRow =
+      SidebarSessionRow(session: session, store: store)
+      .tag(session.sessionId)
+      .listRowInsets(EdgeInsets(
+        top: HarnessTheme.itemSpacing,
+        leading: HarnessTheme.sectionSpacing,
+        bottom: HarnessTheme.itemSpacing,
+        trailing: HarnessTheme.sectionSpacing
+      ))
+      .accessibilityLabel(
+        sessionAccessibilityLabel(for: session)
+      )
+      .accessibilityValue(
+        sessionAccessibilityValue(
+          for: session,
+          selectedSessionID: store.selectedSessionID
+        )
+      )
+      .accessibilityElement(children: .combine)
+      .accessibilityIdentifier(
+        HarnessAccessibility.sessionRow(session.sessionId)
+      )
+
+    if store.isPersistenceAvailable {
+      baseRow
+        .accessibilityAction(named: "Toggle Bookmark") {
+          store.toggleBookmark(
+            sessionId: session.sessionId,
+            projectId: session.projectId
+          )
+        }
+        .contextMenu {
+          Button {
+            store.toggleBookmark(
+              sessionId: session.sessionId,
+              projectId: session.projectId
+            )
+          } label: {
+            if store.isBookmarked(sessionId: session.sessionId) {
+              Label("Remove Bookmark", systemImage: "bookmark.slash")
+            } else {
+              Label("Bookmark", systemImage: "bookmark")
+            }
+          }
+        }
+    } else {
+      baseRow
+    }
   }
 }
