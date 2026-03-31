@@ -21,6 +21,33 @@ class HarnessUITestCase: XCTestCase {
 }
 
 extension HarnessUITestCase {
+  func previewSessionTrigger(in app: XCUIApplication) -> XCUIElement {
+    let identifiedButton = button(in: app, identifier: HarnessUITestAccessibility.previewSessionRow)
+    if identifiedButton.exists { return identifiedButton }
+    let titledButton = button(in: app, title: HarnessUITestAccessibility.previewSessionTitle)
+    return titledButton.exists
+      ? titledButton
+      : app.staticTexts[HarnessUITestAccessibility.previewSessionTitle]
+  }
+
+  func sidebarEmptyStateElement(in app: XCUIApplication) -> XCUIElement { app.staticTexts[HarnessUITestAccessibility.sidebarEmptyStateTitle] }
+
+  func focusChip(in app: XCUIApplication, identifier _: String, title: String) -> XCUIElement { button(in: app, title: title) }
+
+  func tapPreviewSession(in app: XCUIApplication) {
+    let sessionRow = previewSessionTrigger(in: app)
+    XCTAssertTrue(sessionRow.waitForExistence(timeout: Self.uiTimeout))
+    if sessionRow.isHittable {
+      sessionRow.tap()
+      return
+    }
+    if let coordinate = centerCoordinate(in: app, for: sessionRow) {
+      coordinate.tap()
+      return
+    }
+    XCTFail("Failed to tap preview session row")
+  }
+
   func mainWindow(in app: XCUIApplication) -> XCUIElement {
     let mainWindow = app.windows.matching(identifier: "main").firstMatch
     if mainWindow.exists {
