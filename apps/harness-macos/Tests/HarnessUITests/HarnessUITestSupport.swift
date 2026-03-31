@@ -18,12 +18,14 @@ class HarnessUITestCase: XCTestCase {
 
 extension HarnessUITestCase {
   func previewSessionTrigger(in app: XCUIApplication) -> XCUIElement {
+    // List rows appear as cells in the accessibility tree.
+    let cell = app.cells.matching(identifier: HarnessUITestAccessibility.previewSessionRow).firstMatch
+    if cell.exists { return cell }
+    // Fall back to button lookup for backwards compatibility.
     let identifiedButton = button(in: app, identifier: HarnessUITestAccessibility.previewSessionRow)
     if identifiedButton.exists { return identifiedButton }
-    let titledButton = button(in: app, title: HarnessUITestAccessibility.previewSessionTitle)
-    return titledButton.exists
-      ? titledButton
-      : app.staticTexts[HarnessUITestAccessibility.previewSessionTitle]
+    // Last resort: any element with the identifier.
+    return element(in: app, identifier: HarnessUITestAccessibility.previewSessionRow)
   }
 
   func sidebarEmptyStateElement(in app: XCUIApplication) -> XCUIElement { app.staticTexts[HarnessUITestAccessibility.sidebarEmptyStateTitle] }

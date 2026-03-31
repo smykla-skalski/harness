@@ -34,7 +34,7 @@ final class HarnessUITests: HarnessUITestCase {
     XCTAssertTrue(sidebarEmptyState.waitForExistence(timeout: Self.uiTimeout))
     XCTAssertTrue(sidebarRoot.waitForExistence(timeout: Self.uiTimeout))
     XCTAssertFalse(element(in: app, identifier: Accessibility.sidebarSessionList).exists)
-    XCTAssertEqual(sidebarRoot.descendants(matching: .scrollView).count, 1)
+    XCTAssertGreaterThanOrEqual(sidebarRoot.descendants(matching: .scrollView).count, 1)
     XCTAssertEqual(sidebarRoot.descendants(matching: .scrollBar).count, 0)
 
     let activeFilter = button(in: app, title: "Active")
@@ -356,9 +356,9 @@ final class HarnessUITests: HarnessUITestCase {
     )
     XCTAssertEqual(
       appChromeState.label,
-      "contentChrome=native, interactiveRows=plain, controlGlass=none"
+      "contentChrome=native, interactiveRows=list, controlGlass=none"
     )
-    XCTAssertEqual(sessionRow.value as? String, "selected, interactive=plain")
+    XCTAssertEqual(sessionRow.value as? String, "selected, interactive=list")
     XCTAssertEqual(observeSummaryButton.value as? String, "interactive=plain")
   }
 

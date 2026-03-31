@@ -2,7 +2,7 @@ import HarnessKit
 import Observation
 import SwiftUI
 
-struct SidebarSessionList: View {
+struct SidebarFilterSection: View {
   @Bindable var store: HarnessStore
   @State private var localSearchText = ""
 
@@ -26,14 +26,6 @@ struct SidebarSessionList: View {
   }
 
   var body: some View {
-    VStack(alignment: .leading, spacing: HarnessTheme.sectionSpacing) {
-      filterSlice
-      sessionList
-    }
-    .frame(maxWidth: .infinity, alignment: .topLeading)
-  }
-
-  private var filterSlice: some View {
     VStack(alignment: .leading, spacing: HarnessTheme.sectionSpacing) {
       HStack(alignment: .top) {
         VStack(alignment: .leading, spacing: 4) {
@@ -141,173 +133,13 @@ struct SidebarSessionList: View {
         }
       }
     }
-    .padding(HarnessTheme.cardPadding)
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessAccessibility.sidebarFiltersCard)
     .accessibilityFrameMarker("\(HarnessAccessibility.sidebarFiltersCard).frame")
   }
-
-  private var sessionList: some View {
-    SessionListContent(store: store)
-  }
 }
 
-private struct SessionListContent: View {
-  let store: HarnessStore
-
-  var body: some View {
-    Group {
-      if store.sessions.isEmpty {
-        VStack(alignment: .leading, spacing: 0) {
-          ContentUnavailableView {
-            Label("No sessions indexed yet", systemImage: "tray")
-          } description: {
-            Text("Start the daemon or refresh after launching a harness session.")
-          }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier(HarnessAccessibility.sidebarEmptyState)
-      } else if store.groupedSessions.isEmpty {
-        VStack(alignment: .leading, spacing: 0) {
-          ContentUnavailableView.search(text: store.searchText)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier(HarnessAccessibility.sidebarEmptyState)
-      } else {
-        LazyVStack(alignment: .leading, spacing: 16) {
-          ForEach(store.groupedSessions) { group in
-            VStack(alignment: .leading, spacing: HarnessTheme.itemSpacing) {
-              HStack {
-                Text(group.project.name)
-                  .font(.system(.headline, design: .rounded, weight: .semibold))
-                  .foregroundStyle(HarnessTheme.ink)
-                  .accessibilityAddTraits(.isHeader)
-                Spacer()
-                Text("\(group.sessions.count)")
-                  .font(.caption.monospacedDigit())
-                  .foregroundStyle(HarnessTheme.secondaryInk)
-              }
-              .accessibilityIdentifier(
-                HarnessAccessibility.projectHeader(group.project.projectId)
-              )
-              .accessibilityFrameMarker(
-                HarnessAccessibility.projectHeaderFrame(group.project.projectId)
-              )
-
-              ForEach(group.sessions) { session in
-                Button {
-                  Task {
-                    await store.selectSession(session.sessionId)
-                  }
-                } label: {
-                  VStack(alignment: .leading, spacing: HarnessTheme.itemSpacing) {
-                    HStack(alignment: .top, spacing: HarnessTheme.itemSpacing) {
-                      Text(session.context)
-                        .font(.system(.body, design: .rounded, weight: .semibold))
-                        .multilineTextAlignment(.leading)
-                        .lineLimit(2)
-                      Spacer(minLength: 12)
-                      if store.isBookmarked(sessionId: session.sessionId) {
-                        Image(systemName: "bookmark.fill")
-                          .font(.caption2)
-                          .foregroundStyle(HarnessTheme.accent)
-                          .accessibilityLabel("Bookmarked")
-                      }
-                      Text(session.status.title)
-                        .font(.caption2.weight(.bold))
-                        .foregroundStyle(statusColor(for: session.status))
-                        .accessibilityHidden(true)
-                    }
-                    Text(session.sessionId)
-                      .font(.caption.monospaced())
-                      .truncationMode(.middle)
-                      .foregroundStyle(HarnessTheme.secondaryInk)
-                    HStack(spacing: HarnessTheme.sectionSpacing) {
-                      labelChip("\(session.metrics.activeAgentCount) active")
-                      labelChip("\(session.metrics.inProgressTaskCount) moving")
-                      labelChip(formatTimestamp(session.lastActivityAt))
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                  }
-                  .foregroundStyle(HarnessTheme.ink)
-                  .frame(maxWidth: .infinity, alignment: .leading)
-                  .padding(HarnessTheme.cardPadding)
-                  .harnessSelectionOutline(
-                    isSelected: store.selectedSessionID == session.sessionId,
-                    cornerRadius: HarnessTheme.cornerRadiusMD
-                  )
-                }
-                .accessibilityLabel(
-                  sessionAccessibilityLabel(for: session)
-                )
-                .accessibilityValue(
-                  sessionAccessibilityValue(for: session)
-                )
-                .accessibilityElement(children: .combine)
-                .accessibilityAction(named: "Toggle Bookmark") {
-                  store.toggleBookmark(
-                    sessionId: session.sessionId,
-                    projectId: session.projectId
-                  )
-                }
-                .accessibilityIdentifier(HarnessAccessibility.sessionRow(session.sessionId))
-                .harnessInteractiveCardButtonStyle()
-                .contextMenu {
-                  Button {
-                    store.toggleBookmark(
-                      sessionId: session.sessionId,
-                      projectId: session.projectId
-                    )
-                  } label: {
-                    if store.isBookmarked(sessionId: session.sessionId) {
-                      Label("Remove Bookmark", systemImage: "bookmark.slash")
-                    } else {
-                      Label("Bookmark", systemImage: "bookmark")
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier(HarnessAccessibility.sidebarSessionList)
-        .accessibilityFrameMarker(HarnessAccessibility.sidebarSessionListContent)
-      }
-    }
-    .animation(.snappy(duration: 0.24), value: store.groupedSessions)
-  }
-
-  private func sessionAccessibilityValue(
-    for session: SessionSummary
-  ) -> String {
-    let interactionStyle = "plain"
-    let selected = store.selectedSessionID == session.sessionId
-    if selected {
-      return "selected, interactive=\(interactionStyle)"
-    }
-    return "interactive=\(interactionStyle)"
-  }
-
-  private func sessionAccessibilityLabel(
-    for session: SessionSummary
-  ) -> String {
-    "\(session.context), \(session.projectName), \(session.status.title), \(session.sessionId)"
-  }
-
-  fileprivate func labelChip(_ value: String) -> some View {
-    Text(value)
-      .font(.caption.weight(.semibold))
-      .lineLimit(1)
-      .harnessPillPadding()
-      .harnessInfoPill()
-  }
-}
-
-extension SidebarSessionList {
+extension SidebarFilterSection {
   fileprivate func filterSection<Content: View>(
     title: String,
     @ViewBuilder content: () -> Content
@@ -321,7 +153,7 @@ extension SidebarSessionList {
     }
   }
 
-  private func filterChip(
+  fileprivate func filterChip(
     title: String,
     isSelected: Bool,
     identifier: String,
@@ -344,4 +176,22 @@ extension SidebarSessionList {
     .accessibilityIdentifier(identifier)
     .accessibilityFrameMarker("\(identifier).frame")
   }
+}
+
+// MARK: - Accessibility helpers used by SidebarView
+
+func sessionAccessibilityLabel(for session: SessionSummary) -> String {
+  "\(session.context), \(session.projectName), \(session.status.title), \(session.sessionId)"
+}
+
+func sessionAccessibilityValue(
+  for session: SessionSummary,
+  selectedSessionID: String?
+) -> String {
+  let interactionStyle = "list"
+  let selected = selectedSessionID == session.sessionId
+  if selected {
+    return "selected, interactive=\(interactionStyle)"
+  }
+  return "interactive=\(interactionStyle)"
 }
