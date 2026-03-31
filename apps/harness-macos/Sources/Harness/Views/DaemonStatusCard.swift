@@ -201,6 +201,7 @@ extension DaemonStatusCard {
     VStack(alignment: .leading, spacing: 4) {
       Text(title.uppercased())
         .font(.caption2.weight(.semibold))
+        .tracking(HarnessTheme.uppercaseTracking)
         .foregroundStyle(HarnessTheme.secondaryInk)
       Text(value)
         .font(.system(.callout, design: .rounded, weight: .bold))

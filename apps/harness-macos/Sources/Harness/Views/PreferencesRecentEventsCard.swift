@@ -15,6 +15,7 @@ struct PreferencesRecentEventsSection: View {
             HStack {
               Text(event.level.uppercased())
                 .font(.caption.bold())
+                .tracking(HarnessTheme.uppercaseTracking)
                 .foregroundStyle(
                   eventLevelColor(event.level)
                 )

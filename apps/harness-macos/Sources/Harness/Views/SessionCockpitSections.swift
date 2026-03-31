@@ -44,6 +44,7 @@ struct SessionMetricGrid: View {
       VStack(alignment: .leading, spacing: HarnessTheme.itemSpacing) {
         Text(title.uppercased())
           .font(.caption.weight(.semibold))
+          .tracking(HarnessTheme.uppercaseTracking)
           .foregroundStyle(HarnessTheme.secondaryInk)
         Text(value)
           .font(.system(.title, design: .rounded, weight: .heavy))

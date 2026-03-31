@@ -258,6 +258,7 @@ struct PreferencesDiagnosticsOverview: View {
       Section("Latest Event") {
         LabeledContent("Level") {
           Text(lastEvent.level.uppercased())
+            .tracking(HarnessTheme.uppercaseTracking)
         }
         Text(lastEvent.message)
         Text(formatTimestamp(lastEvent.recordedAt))
