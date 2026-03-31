@@ -120,13 +120,13 @@ extension InspectorActionSections {
         Button("Assign") {
           Task { await assignSelectedTask() }
         }
-        .harnessActionButtonStyle(variant: .prominent, tint: HarnessTheme.accent)
+        .harnessActionButtonStyle(variant: .prominent, tint: .accentColor)
       }
       HStack {
         Button("Update Status") {
           Task { await updateSelectedTask() }
         }
-        .harnessActionButtonStyle(variant: .bordered, tint: HarnessTheme.ink)
+        .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
         TextField("Update note", text: $statusNote, axis: .vertical)
           .lineLimit(2, reservesSpace: true)
       }
@@ -148,7 +148,7 @@ extension InspectorActionSections {
         Button("Save Checkpoint") {
           Task { await checkpointSelectedTask() }
         }
-        .harnessActionButtonStyle(variant: .prominent, tint: HarnessTheme.warmAccent)
+        .harnessActionButtonStyle(variant: .prominent, tint: .orange)
       }
 
       if let checkpoint = task.checkpointSummary {
@@ -175,7 +175,7 @@ extension InspectorActionSections {
       Button("Create Task") {
         Task { await createTask() }
       }
-      .harnessActionButtonStyle(variant: .prominent, tint: HarnessTheme.accent)
+      .harnessActionButtonStyle(variant: .prominent, tint: .accentColor)
       .disabled(createTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
     }
   }
@@ -195,11 +195,11 @@ extension InspectorActionSections {
       Button("Change Role") {
         Task { await changeSelectedRole() }
       }
-      .harnessActionButtonStyle(variant: .prominent, tint: HarnessTheme.accent)
+      .harnessActionButtonStyle(variant: .prominent, tint: .accentColor)
       Button("Remove Agent") {
         store.requestRemoveAgentConfirmation(agentID: agent.agentId)
       }
-      .harnessActionButtonStyle(variant: .bordered, tint: HarnessTheme.danger)
+      .harnessActionButtonStyle(variant: .bordered, tint: .red)
       .disabled(agent.agentId == detail.session.leaderId)
       .accessibilityIdentifier(HarnessAccessibility.removeAgentButton)
     }
@@ -228,7 +228,7 @@ extension InspectorActionSections {
       Button(transferLeaderButtonTitle) {
         Task { await transferLeader() }
       }
-      .harnessActionButtonStyle(variant: .prominent, tint: HarnessTheme.warmAccent)
+      .harnessActionButtonStyle(variant: .prominent, tint: .orange)
       .disabled(transferLeaderID.isEmpty || transferLeaderID == detail.session.leaderId)
     }
   }

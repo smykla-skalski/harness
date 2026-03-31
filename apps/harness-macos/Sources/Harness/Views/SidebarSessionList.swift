@@ -48,7 +48,7 @@ struct SidebarSessionList: View {
             store.resetFilters()
           }
           .font(.caption.bold())
-          .harnessAccessoryButtonStyle(tint: HarnessTheme.accent)
+          .harnessAccessoryButtonStyle(tint: .accentColor)
           .controlSize(.small)
           .accessibilityIdentifier(HarnessAccessibility.sidebarClearFiltersButton)
         }
@@ -72,7 +72,7 @@ struct SidebarSessionList: View {
                 }
                 .font(.caption)
                 .lineLimit(1)
-                .harnessAccessoryButtonStyle(tint: HarnessTheme.ink)
+                .harnessAccessoryButtonStyle()
                 .controlSize(.small)
               }
               Spacer()
@@ -83,7 +83,7 @@ struct SidebarSessionList: View {
                   .font(.caption2)
                   .foregroundStyle(HarnessTheme.secondaryInk)
               }
-              .harnessAccessoryButtonStyle(tint: HarnessTheme.ink)
+              .harnessAccessoryButtonStyle()
               .controlSize(.small)
             }
           }

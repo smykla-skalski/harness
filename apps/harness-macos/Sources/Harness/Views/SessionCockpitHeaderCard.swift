@@ -57,7 +57,7 @@ struct SessionCockpitHeaderCard: View {
       .font(.system(.subheadline, design: .rounded, weight: .semibold))
       .harnessActionButtonStyle(
         variant: .prominent,
-        tint: HarnessTheme.accent
+        tint: .accentColor
       )
       .controlSize(HarnessControlMetrics.compactControlSize)
   }
@@ -65,7 +65,7 @@ struct SessionCockpitHeaderCard: View {
   private var endSessionButton: some View {
     Button("End Session", action: store.requestEndSelectedSessionConfirmation)
       .font(.system(.subheadline, design: .rounded, weight: .semibold))
-      .harnessActionButtonStyle(variant: .bordered, tint: HarnessTheme.ink)
+      .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
       .controlSize(HarnessControlMetrics.compactControlSize)
       .accessibilityIdentifier(HarnessAccessibility.endSessionButton)
   }
