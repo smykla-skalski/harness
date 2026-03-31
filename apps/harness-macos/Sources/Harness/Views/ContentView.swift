@@ -166,7 +166,7 @@ private struct RefreshToolbarButton: View {
 
   var body: some View {
     Button { Task { await store.refresh() } } label: {
-      HStack(spacing: 8) {
+      HStack(spacing: HarnessTheme.itemSpacing) {
         Image(systemName: "arrow.clockwise")
           .rotationEffect(.degrees(reduceMotion ? 0 : (isSpinning ? 360 : 0)))
           .animation(
@@ -190,7 +190,7 @@ private struct RefreshToolbarButton: View {
 
 private struct CachedDataBanner: View {
   var body: some View {
-    HStack(spacing: 8) {
+    HStack(spacing: HarnessTheme.itemSpacing) {
       Image(systemName: "cloud.bolt")
         .font(.caption)
         .accessibilityHidden(true)
@@ -198,8 +198,7 @@ private struct CachedDataBanner: View {
         .font(.caption.weight(.medium))
       Spacer()
     }
-    .padding(.horizontal, 14)
-    .padding(.vertical, 8)
+    .harnessCellPadding()
     .background(HarnessTheme.caution.opacity(0.12))
     .foregroundStyle(HarnessTheme.caution)
   }
@@ -234,11 +233,11 @@ private struct SessionLoadingView: View {
 
   var body: some View {
     HarnessColumnScrollView {
-      VStack(alignment: .leading, spacing: 18) {
-        VStack(alignment: .leading, spacing: 12) {
+      VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: HarnessTheme.sectionSpacing) {
           HStack(alignment: .top) {
-            VStack(alignment: .leading, spacing: 6) {
-              HStack(spacing: 10) {
+            VStack(alignment: .leading, spacing: HarnessTheme.itemSpacing) {
+              HStack(spacing: HarnessTheme.itemSpacing) {
                 Circle()
                   .fill(statusColor(for: summary.status))
                   .frame(width: 12, height: 12)

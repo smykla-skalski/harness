@@ -16,7 +16,7 @@ struct ObserverInspectorCard: View {
   }
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 12) {
+    VStack(alignment: .leading, spacing: HarnessTheme.sectionSpacing) {
       Text("Observe")
         .font(.system(.title3, design: .rounded, weight: .bold))
         .accessibilityAddTraits(.isHeader)
@@ -29,7 +29,7 @@ struct ObserverInspectorCard: View {
       }
       if let openIssues = observer.openIssues, !openIssues.isEmpty {
         InspectorSection(title: "Open Issues") {
-          VStack(alignment: .leading, spacing: 8) {
+          VStack(alignment: .leading, spacing: HarnessTheme.itemSpacing) {
             ForEach(openIssues) { issue in
               VStack(alignment: .leading, spacing: 4) {
                 HStack(alignment: .firstTextBaseline) {
@@ -49,8 +49,7 @@ struct ObserverInspectorCard: View {
                     .lineLimit(2)
                 }
               }
-              .padding(.horizontal, 12)
-              .padding(.vertical, 10)
+              .harnessCellPadding()
             }
           }
           .frame(maxWidth: .infinity, alignment: .leading)
@@ -58,7 +57,7 @@ struct ObserverInspectorCard: View {
       }
       if let activeWorkers = observer.activeWorkers, !activeWorkers.isEmpty {
         InspectorSection(title: "Active Workers") {
-          VStack(alignment: .leading, spacing: 8) {
+          VStack(alignment: .leading, spacing: HarnessTheme.itemSpacing) {
             ForEach(activeWorkers) { worker in
               VStack(alignment: .leading, spacing: 4) {
                 HStack {
@@ -74,8 +73,7 @@ struct ObserverInspectorCard: View {
                   .foregroundStyle(HarnessTheme.secondaryInk)
                   .lineLimit(2)
               }
-              .padding(.horizontal, 12)
-              .padding(.vertical, 10)
+              .harnessCellPadding()
             }
           }
           .frame(maxWidth: .infinity, alignment: .leading)
@@ -83,7 +81,7 @@ struct ObserverInspectorCard: View {
       }
       if let cycleHistory = observer.cycleHistory, !cycleHistory.isEmpty {
         InspectorSection(title: "Cycle History") {
-          VStack(alignment: .leading, spacing: 8) {
+          VStack(alignment: .leading, spacing: HarnessTheme.itemSpacing) {
             ForEach(cycleHistory) { cycle in
               VStack(alignment: .leading, spacing: 4) {
                 HStack {
@@ -98,8 +96,7 @@ struct ObserverInspectorCard: View {
                   .font(.caption)
                   .foregroundStyle(HarnessTheme.secondaryInk)
               }
-              .padding(.horizontal, 12)
-              .padding(.vertical, 10)
+              .harnessCellPadding()
             }
           }
           .frame(maxWidth: .infinity, alignment: .leading)
@@ -107,7 +104,7 @@ struct ObserverInspectorCard: View {
       }
       if let agentSessions = observer.agentSessions, !agentSessions.isEmpty {
         InspectorSection(title: "Tracked Agent Sessions") {
-          VStack(alignment: .leading, spacing: 8) {
+          VStack(alignment: .leading, spacing: HarnessTheme.itemSpacing) {
             ForEach(agentSessions) { session in
               VStack(alignment: .leading, spacing: 4) {
                 HStack {
@@ -132,8 +129,7 @@ struct ObserverInspectorCard: View {
                     .lineLimit(2)
                 }
               }
-              .padding(.horizontal, 12)
-              .padding(.vertical, 10)
+              .harnessCellPadding()
             }
           }
           .frame(maxWidth: .infinity, alignment: .leading)
@@ -160,9 +156,9 @@ struct InspectorFactGrid: View {
   let facts: [InspectorFact]
 
   var body: some View {
-    HarnessAdaptiveGridLayout(minimumColumnWidth: 132, maximumColumns: 2, spacing: 10) {
+    HarnessAdaptiveGridLayout(minimumColumnWidth: 132, maximumColumns: 2, spacing: HarnessTheme.itemSpacing) {
       ForEach(facts) { fact in
-        VStack(alignment: .leading, spacing: 3) {
+        VStack(alignment: .leading, spacing: 4) {
           Text(fact.title.uppercased())
             .font(.caption2.weight(.bold))
             .foregroundStyle(HarnessTheme.secondaryInk)
@@ -170,9 +166,8 @@ struct InspectorFactGrid: View {
             .font(.system(.body, design: .rounded, weight: .semibold))
             .lineLimit(2)
         }
-        .frame(maxWidth: .infinity, minHeight: 54, alignment: .leading)
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
+        .frame(maxWidth: .infinity, minHeight: 52, alignment: .leading)
+        .harnessCellPadding()
       }
     }
   }
@@ -183,7 +178,7 @@ struct InspectorSection<Content: View>: View {
   @ViewBuilder let content: Content
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 8) {
+    VStack(alignment: .leading, spacing: HarnessTheme.itemSpacing) {
       Text(title)
         .font(.caption.bold())
         .foregroundStyle(HarnessTheme.secondaryInk)
@@ -196,12 +191,11 @@ struct InspectorBadgeColumn: View {
   let values: [String]
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 8) {
+    VStack(alignment: .leading, spacing: HarnessTheme.itemSpacing) {
       ForEach(Array(values.enumerated()), id: \.offset) { _, value in
         Text(value)
           .font(.caption.weight(.semibold))
-          .padding(.horizontal, 10)
-          .padding(.vertical, 6)
+          .harnessPillPadding()
           .harnessInfoPill()
       }
     }
@@ -212,12 +206,12 @@ struct InspectorObserverSummarySection: View {
   let observer: ObserverSummary
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 8) {
+    VStack(alignment: .leading, spacing: HarnessTheme.itemSpacing) {
       HarnessActionHeader(
         title: "Observe",
         subtitle: "The observer loop keeps the session moving and surfaces drift."
       )
-      HStack(spacing: 8) {
+      HStack(spacing: HarnessTheme.itemSpacing) {
         HarnessBadge(value: "Open \(observer.openIssueCount)")
         HarnessBadge(value: "Muted \(observer.mutedCodeCount)")
         HarnessBadge(value: "Workers \(observer.activeWorkerCount)")
@@ -237,7 +231,7 @@ struct InspectorObserverSummarySection: View {
         Text("Open issues")
           .font(.caption.bold())
           .foregroundStyle(HarnessTheme.secondaryInk)
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: HarnessTheme.itemSpacing) {
           ForEach(openIssues.prefix(2)) { issue in
             VStack(alignment: .leading, spacing: 2) {
               Text("\(issue.code) · \(issue.summary)")
@@ -253,7 +247,7 @@ struct InspectorObserverSummarySection: View {
         Text("Active workers")
           .font(.caption.bold())
           .foregroundStyle(HarnessTheme.secondaryInk)
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: HarnessTheme.itemSpacing) {
           ForEach(activeWorkers.prefix(2)) { worker in
             VStack(alignment: .leading, spacing: 2) {
               Text(worker.agentId ?? "worker")

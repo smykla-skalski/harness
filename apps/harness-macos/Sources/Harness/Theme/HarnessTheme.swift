@@ -29,6 +29,21 @@ enum HarnessTheme {
   static let spacingXL: CGFloat = 20
   static let spacingXXL: CGFloat = 24
 
+  // MARK: - Semantic layout tokens
+
+  /// Standard padding inside interactive cards and content cells.
+  static let cardPadding: CGFloat = spacingMD
+
+  /// Horizontal + vertical padding for small pills and badges.
+  static let pillPaddingH: CGFloat = spacingSM
+  static let pillPaddingV: CGFloat = spacingXS
+
+  /// Vertical gap between top-level sections (tasks, agents, timeline).
+  static let sectionSpacing: CGFloat = spacingMD
+
+  /// Vertical gap between items within a group.
+  static let itemSpacing: CGFloat = spacingSM
+
   // MARK: - Corner radius
 
   static let cornerRadiusSM: CGFloat = 12
@@ -97,13 +112,12 @@ struct HarnessLoadingStateView: View {
   @State private var animates = false
 
   var body: some View {
-    HStack(spacing: 8) {
+    HStack(spacing: HarnessTheme.itemSpacing) {
       HarnessSpinner(size: 14)
       Text(title)
         .font(.system(.footnote, design: .rounded, weight: .semibold))
     }
-    .padding(.horizontal, 12)
-    .padding(.vertical, 8)
+    .harnessCellPadding()
     .harnessInfoPill(tint: HarnessTheme.accent)
     .opacity(animates ? 1 : 0.62)
     .scaleEffect(reduceMotion ? 1 : (animates ? 1 : 0.97))
@@ -282,6 +296,18 @@ extension View {
   func harnessInfoPill(tint: Color = HarnessTheme.ink) -> some View {
     modifier(HarnessInfoPillModifier(tint: tint))
   }
+
+  func harnessPillPadding() -> some View {
+    self
+      .padding(.horizontal, HarnessTheme.pillPaddingH)
+      .padding(.vertical, HarnessTheme.pillPaddingV)
+  }
+
+  func harnessCellPadding() -> some View {
+    self
+      .padding(.horizontal, HarnessTheme.sectionSpacing)
+      .padding(.vertical, HarnessTheme.itemSpacing)
+  }
 }
 
 struct HarnessActionHeader: View {
@@ -306,8 +332,7 @@ struct HarnessBadge: View {
   var body: some View {
     Text(value)
       .font(.caption.bold())
-      .padding(.horizontal, 8)
-      .padding(.vertical, 4)
+      .harnessPillPadding()
       .harnessInfoPill(tint: HarnessTheme.accent)
   }
 }

@@ -10,7 +10,7 @@ struct DaemonStatusCard: View {
   }
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 8) {
+    VStack(alignment: .leading, spacing: HarnessTheme.itemSpacing) {
       HStack(alignment: .top) {
         VStack(alignment: .leading, spacing: 4) {
           Text("Harness Daemon")
@@ -44,7 +44,7 @@ struct DaemonStatusCard: View {
       .animation(.spring(duration: 0.3), value: store.isRefreshing)
       .animation(.spring(duration: 0.3), value: store.connectionState)
 
-      HStack(spacing: 8) {
+      HStack(spacing: HarnessTheme.itemSpacing) {
         daemonProjectsBadge
           .animation(.spring(duration: 0.3), value: daemonProjectCount)
         daemonSessionsBadge
@@ -104,7 +104,7 @@ extension DaemonStatusCard {
   }
 
   fileprivate var daemonActionButtons: some View {
-    HarnessWrapLayout(spacing: 8, lineSpacing: 8) {
+    HarnessWrapLayout(spacing: HarnessTheme.itemSpacing, lineSpacing: HarnessTheme.itemSpacing) {
       sidebarStartDaemonButton
       if !isLaunchAgentInstalled {
         sidebarInstallLaunchAgentButton
@@ -138,8 +138,7 @@ extension DaemonStatusCard {
   fileprivate var statusPill: some View {
     Text(statusTitle)
       .font(.caption.bold())
-      .padding(.horizontal, 8)
-      .padding(.vertical, 4)
+      .harnessPillPadding()
       .background(statusBackground, in: Capsule())
       .foregroundStyle(HarnessTheme.onContrast)
   }

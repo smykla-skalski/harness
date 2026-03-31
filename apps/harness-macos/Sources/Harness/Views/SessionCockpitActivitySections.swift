@@ -6,17 +6,17 @@ struct SessionCockpitSignalsSection: View {
   let store: HarnessStore
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 12) {
+    VStack(alignment: .leading, spacing: HarnessTheme.sectionSpacing) {
       Text("Signals")
         .font(.system(.title3, design: .rounded, weight: .semibold))
         .accessibilityAddTraits(.isHeader)
-      VStack(alignment: .leading, spacing: 12) {
+      VStack(alignment: .leading, spacing: HarnessTheme.sectionSpacing) {
         ForEach(signals) { signal in
           Button {
             store.inspect(signalID: signal.signal.signalId)
           } label: {
             HStack(alignment: .top) {
-              VStack(alignment: .leading, spacing: 8) {
+              VStack(alignment: .leading, spacing: HarnessTheme.itemSpacing) {
                 Text(signal.signal.command)
                   .font(.system(.headline, design: .rounded, weight: .semibold))
                 Text(signal.signal.payload.message)
@@ -25,7 +25,7 @@ struct SessionCockpitSignalsSection: View {
                   .multilineTextAlignment(.leading)
               }
               Spacer()
-              VStack(alignment: .trailing, spacing: 6) {
+              VStack(alignment: .trailing, spacing: HarnessTheme.itemSpacing) {
                 Text(signal.status.title)
                   .font(.caption.bold())
                   .foregroundStyle(signalStatusColor(for: signal.status))
@@ -35,7 +35,7 @@ struct SessionCockpitSignalsSection: View {
               }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(12)
+            .padding(HarnessTheme.cardPadding)
           }
           .harnessInteractiveCardButtonStyle()
           .transition(
@@ -55,12 +55,12 @@ struct SessionCockpitTimelineSection: View {
   let timeline: [TimelineEntry]
 
   var body: some View {
-    LazyVStack(alignment: .leading, spacing: 12) {
+    LazyVStack(alignment: .leading, spacing: HarnessTheme.sectionSpacing) {
       Text("Timeline")
         .font(.system(.title3, design: .rounded, weight: .semibold))
         .accessibilityAddTraits(.isHeader)
       ForEach(timeline) { entry in
-        HStack(alignment: .top, spacing: 12) {
+        HStack(alignment: .top, spacing: HarnessTheme.sectionSpacing) {
           RoundedRectangle(cornerRadius: 999)
             .fill(HarnessTheme.accent.opacity(0.35))
             .frame(width: 8)
@@ -80,7 +80,7 @@ struct SessionCockpitTimelineSection: View {
           }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.leading, 16)
+        .padding(.leading, HarnessTheme.spacingLG)
         .overlay(alignment: .leading) {
           RoundedRectangle(cornerRadius: 999, style: .continuous)
             .fill(HarnessTheme.accent.opacity(0.28))
