@@ -116,6 +116,17 @@ struct SidebarSessionList: View {
         }
       }
 
+      filterSection(title: "Sort") {
+        Picker("Sort", selection: $store.sessionSortOrder) {
+          ForEach(SessionSortOrder.allCases) { order in
+            Text(order.title).tag(order)
+          }
+        }
+        .pickerStyle(.segmented)
+        .labelsHidden()
+        .controlSize(.small)
+      }
+
       filterSection(title: "Focus") {
         HarnessWrapLayout(spacing: HarnessTheme.itemSpacing, lineSpacing: HarnessTheme.itemSpacing) {
           ForEach(SessionFocusFilter.allCases) { filter in

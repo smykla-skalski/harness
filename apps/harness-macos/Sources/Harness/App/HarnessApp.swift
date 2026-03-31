@@ -100,7 +100,8 @@ struct HarnessApp: App {
     }
     .windowStyle(.titleBar)
     .windowToolbarStyle(.unifiedCompact(showsTitle: false))
-    .defaultSize(width: 1180, height: 760)
+    .defaultSize(width: 640, height: 480)
+    .windowResizability(.contentSize)
     .restorationBehavior(isUITesting ? .disabled : .automatic)
   }
 

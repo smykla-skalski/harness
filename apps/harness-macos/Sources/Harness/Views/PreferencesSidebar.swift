@@ -25,7 +25,7 @@ enum PreferencesSection: String, CaseIterable, Identifiable, Hashable {
 }
 
 enum PreferencesChromeMetrics {
-  static let sidebarMinWidth: CGFloat = 180
+  static let sidebarMinWidth: CGFloat = 200
   static let sidebarIdealWidth: CGFloat = 210
   static let sidebarMaxWidth: CGFloat = 240
   static let sidebarMinRowHeight: CGFloat = 30
