@@ -117,6 +117,16 @@ All diagnostic output uses `tracing` macros. Never use `eprintln!` for new diagn
 - Subscriber is initialized in `main.rs` only - tests run without one (silent no-op)
 - Default filter: `RUST_LOG=harness=info`
 
+## SwiftUI rules (AI Harness macOS app)
+
+Glob-scoped rules in `.claude/rules/` enforce patterns learned from three review passes:
+
+- `.claude/rules/swiftui-state-management.md` - @Bindable vs let, @State privacy, no closure properties, owned state over @Binding+closure combos, @Binding only for mutation
+- `.claude/rules/swiftui-view-structure.md` - structs over free functions, stable ForEach identity, no identity-breaking modifier branches, @ViewBuilder usage, no wrapper containers, accessibility probe patterns, dead code
+- `.claude/rules/swiftui-performance.md` - no object creation in body, @MainActor formatters, animation scoping
+
+These rules auto-activate when editing `apps/harness-macos/Sources/**/*.swift`.
+
 ## Gotchas
 
 - `guard-bash` denies direct use of `kubectl`, `kumactl`, `helm`, `docker`, `k3d` - all cluster access must go through harness commands (see `rules.rs:26`)
