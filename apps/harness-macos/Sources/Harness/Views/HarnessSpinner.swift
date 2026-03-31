@@ -27,7 +27,6 @@ struct HarnessSpinner: View {
         value: isSpinning
       )
       .onAppear { isSpinning = true }
-      .onDisappear { isSpinning = false }
       .accessibilityHidden(true)
   }
 }
