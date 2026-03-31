@@ -44,15 +44,24 @@ struct DaemonStatusCard: View {
       .animation(.spring(duration: 0.3), value: store.isRefreshing)
       .animation(.spring(duration: 0.3), value: store.connectionState)
 
-      HStack(spacing: HarnessTheme.itemSpacing) {
-        daemonProjectsBadge
-          .animation(.spring(duration: 0.3), value: daemonProjectCount)
-        daemonSessionsBadge
-          .animation(.spring(duration: 0.3), value: daemonSessionCount)
-        daemonLaunchdBadge
-          .animation(.spring(duration: 0.3), value: daemonLaunchdState)
+      ViewThatFits(in: .horizontal) {
+        HStack(spacing: HarnessTheme.itemSpacing) {
+          daemonProjectsBadge
+          daemonSessionsBadge
+          daemonLaunchdBadge
+        }
+        VStack(alignment: .leading, spacing: HarnessTheme.itemSpacing) {
+          HStack(spacing: HarnessTheme.itemSpacing) {
+            daemonProjectsBadge
+            daemonSessionsBadge
+          }
+          daemonLaunchdBadge
+        }
       }
       .frame(maxWidth: .infinity, alignment: .leading)
+      .animation(.spring(duration: 0.3), value: daemonProjectCount)
+      .animation(.spring(duration: 0.3), value: daemonSessionCount)
+      .animation(.spring(duration: 0.3), value: daemonLaunchdState)
 
       daemonActionButtons
     }
