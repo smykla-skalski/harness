@@ -99,17 +99,21 @@ private struct HarnessActionButtonStyleModifier: ViewModifier {
   let variant: HarnessAsyncActionButton.Variant
   let tint: Color?
 
+  @ViewBuilder
   func body(content: Content) -> some View {
-    let styled = switch variant {
+    switch variant {
     case .prominent:
-      content.buttonStyle(.borderedProminent)
+      if let tint {
+        content.buttonStyle(.borderedProminent).tint(tint)
+      } else {
+        content.buttonStyle(.borderedProminent)
+      }
     case .bordered:
-      content.buttonStyle(.bordered)
-    }
-    if let tint {
-      styled.tint(tint)
-    } else {
-      styled
+      if let tint {
+        content.buttonStyle(.bordered).tint(tint)
+      } else {
+        content.buttonStyle(.bordered)
+      }
     }
   }
 }
