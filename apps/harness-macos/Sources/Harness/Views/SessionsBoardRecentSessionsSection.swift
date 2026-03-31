@@ -30,12 +30,18 @@ struct SessionsBoardRecentSessionsSection: View {
                   .frame(width: 8)
                   .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 4) {
-                  Text(session.context)
-                    .font(.system(.headline, design: .rounded, weight: .semibold))
-                    .foregroundStyle(HarnessTheme.ink)
-                    .multilineTextAlignment(.leading)
+                  HStack(spacing: HarnessTheme.itemSpacing) {
+                    Text(session.context)
+                      .font(.system(.headline, design: .rounded, weight: .semibold))
+                      .foregroundStyle(HarnessTheme.ink)
+                      .multilineTextAlignment(.leading)
+                    Text(session.status.title)
+                      .font(.caption2.weight(.bold))
+                      .foregroundStyle(statusColor(for: session.status))
+                  }
                   Text("\(session.projectName) • \(session.sessionId)")
                     .font(.caption.monospaced())
+                    .truncationMode(.middle)
                     .foregroundStyle(HarnessTheme.secondaryInk)
                 }
                 Spacer()

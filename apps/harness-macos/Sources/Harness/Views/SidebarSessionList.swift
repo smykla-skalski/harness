@@ -92,9 +92,12 @@ struct SidebarSessionList: View {
               Image(systemName: "xmark.circle")
                 .font(.caption2)
                 .foregroundStyle(HarnessTheme.secondaryInk)
+                .frame(minWidth: 24, minHeight: 24)
+                .contentShape(Rectangle())
             }
             .harnessAccessoryButtonStyle()
             .controlSize(.small)
+            .accessibilityLabel("Clear search history")
           }
         }
       }
@@ -201,13 +204,14 @@ private struct SessionListContent: View {
                           .foregroundStyle(HarnessTheme.accent)
                           .accessibilityLabel("Bookmarked")
                       }
-                      Circle()
-                        .fill(statusColor(for: session.status))
-                        .frame(width: 10, height: 10)
+                      Text(session.status.title)
+                        .font(.caption2.weight(.bold))
+                        .foregroundStyle(statusColor(for: session.status))
                         .accessibilityHidden(true)
                     }
                     Text(session.sessionId)
                       .font(.caption.monospaced())
+                      .truncationMode(.middle)
                       .foregroundStyle(HarnessTheme.secondaryInk)
                     HStack(spacing: HarnessTheme.sectionSpacing) {
                       labelChip("\(session.metrics.activeAgentCount) active")

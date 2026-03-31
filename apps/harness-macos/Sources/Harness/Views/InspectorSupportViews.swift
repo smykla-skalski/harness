@@ -107,6 +107,7 @@ private struct ObserverWorkersSection: View {
             }
             Text(worker.targetFile)
               .font(.caption)
+              .truncationMode(.middle)
               .foregroundStyle(HarnessTheme.secondaryInk)
               .lineLimit(2)
           }
@@ -173,6 +174,7 @@ private struct ObserverAgentSessionsSection: View {
             if let logPath = session.logPath {
               Text(logPath)
                 .font(.caption.monospaced())
+                .truncationMode(.middle)
                 .foregroundStyle(HarnessTheme.secondaryInk)
                 .lineLimit(2)
             }

@@ -121,6 +121,7 @@ struct PreferencesPathsSection: View {
     LabeledContent(title) {
       Text(value)
         .font(.caption.monospaced())
+        .truncationMode(.middle)
         .textSelection(.enabled)
     }
   }

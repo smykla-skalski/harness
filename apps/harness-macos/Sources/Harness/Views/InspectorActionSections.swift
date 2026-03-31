@@ -111,6 +111,8 @@ extension InspectorActionSections {
           } label: {
             Image(systemName: "xmark.circle.fill")
               .foregroundStyle(HarnessTheme.tertiaryInk)
+              .frame(minWidth: 24, minHeight: 24)
+              .contentShape(Rectangle())
           }
           .harnessDismissButtonStyle()
           .accessibilityLabel("Dismiss error")
