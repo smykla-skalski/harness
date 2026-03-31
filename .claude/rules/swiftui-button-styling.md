@@ -71,14 +71,26 @@ Action buttons use `.glass` or `.glassProminent` via `.harnessActionButtonStyle(
 
 Thin ViewModifier wrappers that bundle `.buttonStyle(.glass)` + `.tint()` are fine - they add convenience without fighting the system.
 
+## AccentColor asset required for .glassProminent
+
+`.glassProminent` reads the AppKit accent color (asset catalog `AccentColor`), NOT the SwiftUI `.tint()` environment. Without an `AccentColor.colorset`, `.glassProminent` falls back to the macOS system accent (user-configurable, often red on "Multicolor" default). The `AccentColor.colorset` must match `HarnessAccent` values so both resolution paths agree.
+
+The SwiftUI `.tint(HarnessTheme.accent)` on the root view only covers `.glass` (bordered) buttons. `.glassProminent` (filled) buttons require the asset catalog entry.
+
+## Use .glassProminent for selected/active states
+
+For toggle/chip/segmented controls, use `.glassProminent` for the selected state and `.glass` for unselected. This matches the Liquid Glass design language where prominence = selection.
+
+For tinted action buttons (`.orange`, `.red`), prefer `.glassProminent` (opaque fill) over `.glass` (translucent). The opaque fill gives the system enough room to pick a high-contrast text color.
+
 ## System colors for button tints
 
-Glass buttons derive background appearance and text contrast from the `.tint()` color. Custom asset colors from `HarnessTheme` are not calibrated for glass contrast and produce opaque-looking buttons with unreadable text.
+Glass buttons derive background appearance and text contrast from the `.tint()` color. Custom asset colors from `HarnessTheme` are not calibrated for glass contrast.
 
-For accent-colored buttons, pass `nil` tint so the button inherits the app-level `.tint(HarnessTheme.accent)` from the root view. `Color.accentColor` is the macOS *system* accent (user-configurable in System Preferences), not the app's custom accent - never use it as a button tint.
+For accent-colored buttons, pass `nil` tint so the button inherits from the environment and AccentColor asset. Never use `Color.accentColor` - it resolves to the macOS system accent, not the app's custom accent.
 
 For non-accent buttons, use system semantic colors:
-- **Primary/accent**: `nil` (inherit from environment)
+- **Primary/accent**: `nil` (inherit from environment + AccentColor asset)
 - **Neutral/secondary**: `.secondary` (translucent gray glass)
 - **Destructive**: `.red`
 - **Warning**: `.orange`
@@ -89,6 +101,7 @@ For non-accent buttons, use system semantic colors:
 ```swift
 // correct - nil inherits app accent, system colors for overrides
 .harnessActionButtonStyle(variant: .prominent)
+.harnessActionButtonStyle(variant: .prominent, tint: .orange)
 .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
 .harnessActionButtonStyle(variant: .bordered, tint: .red)
 
