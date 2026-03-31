@@ -458,9 +458,7 @@ fn dispatch_mutation(
 
     match handler(session_id.clone(), request.params.clone()) {
         Ok(detail) => {
-            let _ = state
-                .sender
-                .send(service::refresh_event("session_updated", Some(&session_id)));
+            service::broadcast_session_snapshot(&state.sender, &session_id);
             match serde_json::to_value(detail) {
                 Ok(json) => ok_response(&request.id, json),
                 Err(error) => error_response(
@@ -488,9 +486,7 @@ fn dispatch_mutation_with_task(
 
     match handler(session_id.clone(), task_id, request.params.clone()) {
         Ok(detail) => {
-            let _ = state
-                .sender
-                .send(service::refresh_event("session_updated", Some(&session_id)));
+            service::broadcast_session_snapshot(&state.sender, &session_id);
             match serde_json::to_value(detail) {
                 Ok(json) => ok_response(&request.id, json),
                 Err(error) => error_response(
@@ -518,9 +514,7 @@ fn dispatch_mutation_with_agent(
 
     match handler(session_id.clone(), agent_id, request.params.clone()) {
         Ok(detail) => {
-            let _ = state
-                .sender
-                .send(service::refresh_event("session_updated", Some(&session_id)));
+            service::broadcast_session_snapshot(&state.sender, &session_id);
             match serde_json::to_value(detail) {
                 Ok(json) => ok_response(&request.id, json),
                 Err(error) => error_response(

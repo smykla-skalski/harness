@@ -142,11 +142,11 @@ async fn post_task_create(
     if let Err(response) = require_auth(&headers, &state) {
         return *response;
     }
-    let response = map_json(service::create_task(&session_id, &request));
-    let _ = state
-        .sender
-        .send(service::refresh_event("session_updated", Some(&session_id)));
-    response
+    let result = service::create_task(&session_id, &request);
+    if result.is_ok() {
+        service::broadcast_session_snapshot(&state.sender, &session_id);
+    }
+    map_json(result)
 }
 
 async fn post_task_assign(
@@ -158,11 +158,11 @@ async fn post_task_assign(
     if let Err(response) = require_auth(&headers, &state) {
         return *response;
     }
-    let response = map_json(service::assign_task(&session_id, &task_id, &request));
-    let _ = state
-        .sender
-        .send(service::refresh_event("session_updated", Some(&session_id)));
-    response
+    let result = service::assign_task(&session_id, &task_id, &request);
+    if result.is_ok() {
+        service::broadcast_session_snapshot(&state.sender, &session_id);
+    }
+    map_json(result)
 }
 
 async fn post_task_update(
@@ -174,11 +174,11 @@ async fn post_task_update(
     if let Err(response) = require_auth(&headers, &state) {
         return *response;
     }
-    let response = map_json(service::update_task(&session_id, &task_id, &request));
-    let _ = state
-        .sender
-        .send(service::refresh_event("session_updated", Some(&session_id)));
-    response
+    let result = service::update_task(&session_id, &task_id, &request);
+    if result.is_ok() {
+        service::broadcast_session_snapshot(&state.sender, &session_id);
+    }
+    map_json(result)
 }
 
 async fn post_task_checkpoint(
@@ -190,11 +190,11 @@ async fn post_task_checkpoint(
     if let Err(response) = require_auth(&headers, &state) {
         return *response;
     }
-    let response = map_json(service::checkpoint_task(&session_id, &task_id, &request));
-    let _ = state
-        .sender
-        .send(service::refresh_event("session_updated", Some(&session_id)));
-    response
+    let result = service::checkpoint_task(&session_id, &task_id, &request);
+    if result.is_ok() {
+        service::broadcast_session_snapshot(&state.sender, &session_id);
+    }
+    map_json(result)
 }
 
 async fn post_role_change(
@@ -206,11 +206,11 @@ async fn post_role_change(
     if let Err(response) = require_auth(&headers, &state) {
         return *response;
     }
-    let response = map_json(service::change_role(&session_id, &agent_id, &request));
-    let _ = state
-        .sender
-        .send(service::refresh_event("session_updated", Some(&session_id)));
-    response
+    let result = service::change_role(&session_id, &agent_id, &request);
+    if result.is_ok() {
+        service::broadcast_session_snapshot(&state.sender, &session_id);
+    }
+    map_json(result)
 }
 
 async fn post_remove_agent(
@@ -222,11 +222,11 @@ async fn post_remove_agent(
     if let Err(response) = require_auth(&headers, &state) {
         return *response;
     }
-    let response = map_json(service::remove_agent(&session_id, &agent_id, &request));
-    let _ = state
-        .sender
-        .send(service::refresh_event("session_updated", Some(&session_id)));
-    response
+    let result = service::remove_agent(&session_id, &agent_id, &request);
+    if result.is_ok() {
+        service::broadcast_session_snapshot(&state.sender, &session_id);
+    }
+    map_json(result)
 }
 
 async fn post_transfer_leader(
@@ -238,11 +238,11 @@ async fn post_transfer_leader(
     if let Err(response) = require_auth(&headers, &state) {
         return *response;
     }
-    let response = map_json(service::transfer_leader(&session_id, &request));
-    let _ = state
-        .sender
-        .send(service::refresh_event("session_updated", Some(&session_id)));
-    response
+    let result = service::transfer_leader(&session_id, &request);
+    if result.is_ok() {
+        service::broadcast_session_snapshot(&state.sender, &session_id);
+    }
+    map_json(result)
 }
 
 async fn post_end_session(
@@ -254,11 +254,11 @@ async fn post_end_session(
     if let Err(response) = require_auth(&headers, &state) {
         return *response;
     }
-    let response = map_json(service::end_session(&session_id, &request));
-    let _ = state
-        .sender
-        .send(service::refresh_event("session_updated", Some(&session_id)));
-    response
+    let result = service::end_session(&session_id, &request);
+    if result.is_ok() {
+        service::broadcast_session_snapshot(&state.sender, &session_id);
+    }
+    map_json(result)
 }
 
 async fn post_send_signal(
@@ -270,11 +270,11 @@ async fn post_send_signal(
     if let Err(response) = require_auth(&headers, &state) {
         return *response;
     }
-    let response = map_json(service::send_signal(&session_id, &request));
-    let _ = state
-        .sender
-        .send(service::refresh_event("session_updated", Some(&session_id)));
-    response
+    let result = service::send_signal(&session_id, &request);
+    if result.is_ok() {
+        service::broadcast_session_snapshot(&state.sender, &session_id);
+    }
+    map_json(result)
 }
 
 async fn post_observe_session(
@@ -287,11 +287,11 @@ async fn post_observe_session(
         return *response;
     }
     let request = request.map(|Json(request)| request);
-    let response = map_json(service::observe_session(&session_id, request.as_ref()));
-    let _ = state
-        .sender
-        .send(service::refresh_event("session_updated", Some(&session_id)));
-    response
+    let result = service::observe_session(&session_id, request.as_ref());
+    if result.is_ok() {
+        service::broadcast_session_snapshot(&state.sender, &session_id);
+    }
+    map_json(result)
 }
 
 async fn stream_global(
@@ -301,7 +301,7 @@ async fn stream_global(
     require_auth(&headers, &state).map_err(|response| *response)?;
     let mut receiver = state.sender.subscribe();
     let stream = stream! {
-        yield Ok(Event::default().event("ready").json_data(service::refresh_event("ready", None)).expect("serialize ready event"));
+        yield Ok(Event::default().event("ready").json_data(service::ready_event(None)).expect("serialize ready event"));
         loop {
             match receiver.recv().await {
                 Ok(event) => {
@@ -324,7 +324,7 @@ async fn stream_session(
     require_auth(&headers, &state).map_err(|response| *response)?;
     let mut receiver = state.sender.subscribe();
     let stream = stream! {
-        yield Ok(Event::default().event("ready").json_data(service::refresh_event("ready", Some(&session_id))).expect("serialize ready event"));
+        yield Ok(Event::default().event("ready").json_data(service::ready_event(Some(&session_id))).expect("serialize ready event"));
         loop {
             match receiver.recv().await {
                 Ok(event) => {

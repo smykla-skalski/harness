@@ -148,6 +148,23 @@ pub struct TimelineEntry {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ReadyEventPayload {
+    pub ok: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SessionsUpdatedPayload {
+    pub projects: Vec<ProjectSummary>,
+    pub sessions: Vec<SessionSummary>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SessionUpdatedPayload {
+    pub detail: SessionDetail,
+    pub timeline: Vec<TimelineEntry>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StreamEvent {
     pub event: String,
     pub recorded_at: String,
