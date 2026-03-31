@@ -165,6 +165,68 @@ extension HarnessUITestCase {
     return app.buttons.matching(identifier: identifier).firstMatch
   }
 
+  func button(in app: XCUIApplication, title: String) -> XCUIElement {
+    let predicate = NSPredicate(format: "label == %@", title)
+
+    let roles: [XCUIElement.ElementType] = [
+      .button,
+      .radioButton,
+      .cell,
+    ]
+
+    for role in roles {
+      let mainWindowMatch = mainWindow(in: app)
+        .descendants(matching: role)
+        .matching(predicate)
+        .firstMatch
+      if mainWindowMatch.exists {
+        return mainWindowMatch
+      }
+
+      let appMatch = app.descendants(matching: role)
+        .matching(predicate)
+        .firstMatch
+      if appMatch.exists {
+        return appMatch
+      }
+    }
+
+    return app.descendants(matching: .any)
+      .matching(predicate)
+      .firstMatch
+  }
+
+  func sidebarSectionElement(
+    in app: XCUIApplication,
+    title: String,
+    within window: XCUIElement
+  ) -> XCUIElement {
+    let predicate = NSPredicate(format: "label == %@", title)
+    let sidebarMaxX = window.frame.minX + (window.frame.width * 0.4)
+    let candidates = app.descendants(matching: .any)
+      .matching(predicate)
+      .allElementsBoundByIndex
+      .filter { element in
+        let frame = element.frame
+        return
+          element.exists
+          && frame.width > 20
+          && frame.height > 20
+          && frame.width < window.frame.width * 0.4
+          && frame.height < 80
+          && frame.minY > window.frame.minY + 40
+          && frame.maxX <= sidebarMaxX
+      }
+
+    if let section = candidates.min(by: { $0.frame.minY < $1.frame.minY }) {
+      return section
+    }
+
+    return app.descendants(matching: .any)
+      .matching(predicate)
+      .firstMatch
+  }
+
   func frameElement(in app: XCUIApplication, identifier: String) -> XCUIElement {
     app.otherElements.matching(identifier: identifier).firstMatch
   }
