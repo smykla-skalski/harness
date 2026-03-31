@@ -12,11 +12,13 @@ extension WebSocketTransport {
     let request = WsRequest(id: id, method: method, params: params)
     let data = try encoder.encode(request)
     let text = String(data: data, encoding: .utf8) ?? "{}"
+    let task = webSocketTask
+    let store = pending
     return try await withCheckedThrowingContinuation { continuation in
-      pending.register(id: id, continuation: continuation)
-      webSocketTask.send(.string(text)) { [weak self] error in
+      store.register(id: id, continuation: continuation)
+      task.send(.string(text)) { error in
         if let error {
-          self?.pending.fail(id: id, error: error)
+          store.fail(id: id, error: error)
         }
       }
     }
@@ -28,15 +30,15 @@ extension WebSocketTransport {
       guard let self else { return }
       var attempt = 0
       while !Task.isCancelled {
-        guard let webSocketTask = self.webSocketTask else { break }
+        guard let webSocketTask = await self.webSocketTask else { break }
         do {
           let message = try await webSocketTask.receive()
           attempt = 0
-          self.handleMessage(message)
+          await self.handleMessage(message)
         } catch {
           if Task.isCancelled { return }
           self.pending.failAll(error: error)
-          self.terminateAllStreams()
+          await self.terminateAllStreams()
           let delay = Self.reconnectDelays[
             min(attempt, Self.reconnectDelays.count - 1)
           ]
@@ -105,11 +107,9 @@ extension WebSocketTransport {
         sessionId: sessionId,
         payload: payload
       )
-      lock.withLock {
-        globalStreamContinuation?.yield(streamEvent)
-        if let sessionId, let continuation = sessionStreamContinuations[sessionId] {
-          continuation.yield(streamEvent)
-        }
+      globalStreamContinuation?.yield(streamEvent)
+      if let sessionId, let continuation = sessionStreamContinuations[sessionId] {
+        continuation.yield(streamEvent)
       }
 
     case .unknown:
@@ -129,17 +129,15 @@ extension WebSocketTransport {
   }
 
   func terminateAllStreams() {
-    lock.withLock {
-      globalStreamContinuation?.finish()
-      globalStreamContinuation = nil
-      for (_, continuation) in sessionStreamContinuations {
-        continuation.finish()
-      }
-      sessionStreamContinuations.removeAll()
+    globalStreamContinuation?.finish()
+    globalStreamContinuation = nil
+    for (_, continuation) in sessionStreamContinuations {
+      continuation.finish()
     }
+    sessionStreamContinuations.removeAll()
   }
 
-  func wsEndpoint() -> URL {
+  nonisolated func wsEndpoint() -> URL {
     guard
       var components = URLComponents(
         url: connection.endpoint,
@@ -154,12 +152,12 @@ extension WebSocketTransport {
     return components.url ?? connection.endpoint
   }
 
-  func decode<T: Decodable>(_ value: JSONValue) throws -> T {
+  nonisolated func decode<T: Decodable>(_ value: JSONValue) throws -> T {
     let data = try JSONEncoder().encode(value)
     return try decoder.decode(T.self, from: data)
   }
 
-  func encodeParams<T: Encodable>(
+  nonisolated func encodeParams<T: Encodable>(
     _ body: T,
     extra: [String: JSONValue]
   ) throws -> JSONValue {
