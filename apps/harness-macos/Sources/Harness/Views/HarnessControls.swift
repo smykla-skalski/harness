@@ -173,6 +173,10 @@ extension View {
     modifier(HarnessFilterChipButtonStyleModifier(isSelected: isSelected))
   }
 
+  func harnessDismissButtonStyle() -> some View {
+    buttonStyle(.borderless)
+  }
+
   func harnessInteractiveCardButtonStyle(
     cornerRadius: CGFloat = 18,
     tint: Color? = nil

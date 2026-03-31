@@ -159,7 +159,7 @@ struct TaskInspectorCard: View {
                 .accessibilityLabel("Delete Note")
                 .accessibilityHint("Removes this note from the selected task.")
                 .help("Delete note")
-                .buttonStyle(.borderless)
+                .harnessDismissButtonStyle()
               }
               .padding(.horizontal, 12)
               .padding(.vertical, 8)
@@ -355,7 +355,7 @@ struct SignalInspectorCard: View {
       if !signal.signal.payload.relatedFiles.isEmpty {
         InspectorSection(title: "Related Files") {
           VStack(alignment: .leading, spacing: 6) {
-            ForEach(Array(signal.signal.payload.relatedFiles.enumerated()), id: \.offset) { _, path in
+            ForEach(signal.signal.payload.relatedFiles, id: \.self) { path in
               Text(path)
                 .font(.caption.monospaced())
                 .foregroundStyle(.secondary)
