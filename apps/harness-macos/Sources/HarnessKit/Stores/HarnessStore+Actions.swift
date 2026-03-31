@@ -1,20 +1,21 @@
 import Foundation
 
 extension HarnessStore {
+  @discardableResult
   public func createTask(
     title: String,
     context: String?,
     severity: TaskSeverity,
     actor: String = "harness-app"
-  ) async {
+  ) async -> Bool {
     guard let client, let sessionID = selectedSessionID else {
-      return
+      return false
     }
     guard let actor = actionActor(for: actor) else {
-      return
+      return false
     }
 
-    await mutateSelectedSession(
+    return await mutateSelectedSession(
       actionName: "Create task",
       using: client,
       sessionID: sessionID,
@@ -32,19 +33,20 @@ extension HarnessStore {
     )
   }
 
+  @discardableResult
   public func assignTask(
     taskID: String,
     agentID: String,
     actor: String = "harness-app"
-  ) async {
+  ) async -> Bool {
     guard let client, let sessionID = selectedSessionID else {
-      return
+      return false
     }
     guard let actor = actionActor(for: actor) else {
-      return
+      return false
     }
 
-    await mutateSelectedSession(
+    return await mutateSelectedSession(
       actionName: "Assign task",
       using: client,
       sessionID: sessionID,
@@ -58,20 +60,21 @@ extension HarnessStore {
     )
   }
 
+  @discardableResult
   public func updateTaskStatus(
     taskID: String,
     status: TaskStatus,
     note: String? = nil,
     actor: String = "harness-app"
-  ) async {
+  ) async -> Bool {
     guard let client, let sessionID = selectedSessionID else {
-      return
+      return false
     }
     guard let actor = actionActor(for: actor) else {
-      return
+      return false
     }
 
-    await mutateSelectedSession(
+    return await mutateSelectedSession(
       actionName: "Update task",
       using: client,
       sessionID: sessionID,
@@ -85,20 +88,21 @@ extension HarnessStore {
     )
   }
 
+  @discardableResult
   public func checkpointTask(
     taskID: String,
     summary: String,
     progress: Int,
     actor: String = "harness-app"
-  ) async {
+  ) async -> Bool {
     guard let client, let sessionID = selectedSessionID else {
-      return
+      return false
     }
     guard let actor = actionActor(for: actor) else {
-      return
+      return false
     }
 
-    await mutateSelectedSession(
+    return await mutateSelectedSession(
       actionName: "Save checkpoint",
       using: client,
       sessionID: sessionID,
@@ -116,19 +120,20 @@ extension HarnessStore {
     )
   }
 
+  @discardableResult
   public func changeRole(
     agentID: String,
     role: SessionRole,
     actor: String = "harness-app"
-  ) async {
+  ) async -> Bool {
     guard let client, let sessionID = selectedSessionID else {
-      return
+      return false
     }
     guard let actor = actionActor(for: actor) else {
-      return
+      return false
     }
 
-    await mutateSelectedSession(
+    return await mutateSelectedSession(
       actionName: "Change role",
       using: client,
       sessionID: sessionID,
@@ -142,18 +147,19 @@ extension HarnessStore {
     )
   }
 
+  @discardableResult
   public func removeAgent(
     agentID: String,
     actor: String = "harness-app"
-  ) async {
+  ) async -> Bool {
     guard let client, let sessionID = selectedSessionID else {
-      return
+      return false
     }
     guard let actor = actionActor(for: actor) else {
-      return
+      return false
     }
 
-    await mutateSelectedSession(
+    return await mutateSelectedSession(
       actionName: "Remove agent",
       using: client,
       sessionID: sessionID,
@@ -167,19 +173,20 @@ extension HarnessStore {
     )
   }
 
+  @discardableResult
   public func transferLeader(
     newLeaderID: String,
     reason: String? = nil,
     actor: String = "harness-app"
-  ) async {
+  ) async -> Bool {
     guard let client, let sessionID = selectedSessionID else {
-      return
+      return false
     }
     guard let actor = actionActor(for: actor) else {
-      return
+      return false
     }
 
-    await mutateSelectedSession(
+    return await mutateSelectedSession(
       actionName: "Transfer leader",
       using: client,
       sessionID: sessionID,
@@ -196,15 +203,16 @@ extension HarnessStore {
     )
   }
 
-  public func observeSelectedSession(actor: String = "harness-app") async {
+  @discardableResult
+  public func observeSelectedSession(actor: String = "harness-app") async -> Bool {
     guard let client, let sessionID = selectedSessionID else {
-      return
+      return false
     }
     guard let actor = actionActor(for: actor) else {
-      return
+      return false
     }
 
-    await mutateSelectedSession(
+    return await mutateSelectedSession(
       actionName: "Observe session",
       using: client,
       sessionID: sessionID,
@@ -217,15 +225,16 @@ extension HarnessStore {
     )
   }
 
-  public func endSelectedSession(actor: String = "harness-app") async {
+  @discardableResult
+  public func endSelectedSession(actor: String = "harness-app") async -> Bool {
     guard let client, let sessionID = selectedSessionID else {
-      return
+      return false
     }
     guard let actor = actionActor(for: actor) else {
-      return
+      return false
     }
 
-    await mutateSelectedSession(
+    return await mutateSelectedSession(
       actionName: "End session",
       using: client,
       sessionID: sessionID,
@@ -238,21 +247,22 @@ extension HarnessStore {
     )
   }
 
+  @discardableResult
   public func sendSignal(
     agentID: String,
     command: String,
     message: String,
     actionHint: String?,
     actor: String = "harness-app"
-  ) async {
+  ) async -> Bool {
     guard let client, let sessionID = selectedSessionID else {
-      return
+      return false
     }
     guard let actor = actionActor(for: actor) else {
-      return
+      return false
     }
 
-    await mutateSelectedSession(
+    return await mutateSelectedSession(
       actionName: "Send signal",
       using: client,
       sessionID: sessionID,
@@ -316,12 +326,13 @@ extension HarnessStore {
     return resolvedActionActor()
   }
 
+  @discardableResult
   private func mutateSelectedSession(
     actionName: String,
     using client: any HarnessClientProtocol,
     sessionID: String,
     mutation: () async throws -> SessionDetail
-  ) async {
+  ) async -> Bool {
     isSessionActionInFlight = true
     defer { isSessionActionInFlight = false }
     lastError = nil
@@ -330,13 +341,15 @@ extension HarnessStore {
       selectedSession = try await mutation()
       let updatedTimeline = try await client.timeline(sessionID: sessionID)
       guard selectedSessionID == sessionID else {
-        return
+        return true
       }
       timeline = updatedTimeline
       await refresh(using: client, preserveSelection: false)
       lastAction = actionName
+      return true
     } catch {
       lastError = error.localizedDescription
+      return false
     }
   }
 }
