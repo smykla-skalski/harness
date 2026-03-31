@@ -120,7 +120,7 @@ extension InspectorActionSections {
         Button("Assign") {
           Task { await assignSelectedTask() }
         }
-        .harnessActionButtonStyle(variant: .prominent, tint: .accentColor)
+        .harnessActionButtonStyle(variant: .prominent, tint: nil)
       }
       HStack {
         Button("Update Status") {
@@ -175,7 +175,7 @@ extension InspectorActionSections {
       Button("Create Task") {
         Task { await createTask() }
       }
-      .harnessActionButtonStyle(variant: .prominent, tint: .accentColor)
+      .harnessActionButtonStyle(variant: .prominent, tint: nil)
       .disabled(createTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
     }
   }
@@ -195,7 +195,7 @@ extension InspectorActionSections {
       Button("Change Role") {
         Task { await changeSelectedRole() }
       }
-      .harnessActionButtonStyle(variant: .prominent, tint: .accentColor)
+      .harnessActionButtonStyle(variant: .prominent, tint: nil)
       Button("Remove Agent") {
         store.requestRemoveAgentConfirmation(agentID: agent.agentId)
       }
