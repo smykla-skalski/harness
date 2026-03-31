@@ -170,23 +170,28 @@ final class HarnessLayoutUITests: HarnessUITestCase {
 
   func testSidebarProjectHeaderFillsAvailableWidth() throws {
     let app = launch(mode: "preview")
+    let filtersCard = frameElement(in: app, identifier: Accessibility.sidebarFiltersCardFrame)
     let sessionList = frameElement(in: app, identifier: Accessibility.sidebarSessionListContent)
     let projectHeader = frameElement(in: app, identifier: Accessibility.previewProjectHeaderFrame)
-
+    let sessionRow = previewSessionTrigger(in: app)
+    XCTAssertTrue(filtersCard.waitForExistence(timeout: Self.uiTimeout))
     XCTAssertTrue(sessionList.waitForExistence(timeout: Self.uiTimeout))
     XCTAssertTrue(projectHeader.waitForExistence(timeout: Self.uiTimeout))
-
+    XCTAssertTrue(sessionRow.waitForExistence(timeout: Self.uiTimeout))
     assertFillsColumn(
       child: projectHeader,
       in: sessionList,
       expectedHorizontalInset: 0,
       tolerance: 10
     )
+    XCTAssertEqual(projectHeader.frame.minX, filtersCard.frame.minX, accuracy: 10)
+    XCTAssertEqual(projectHeader.frame.maxX, filtersCard.frame.maxX, accuracy: 10)
+    XCTAssertEqual(sessionRow.frame.minX, filtersCard.frame.minX, accuracy: 10)
+    XCTAssertEqual(sessionRow.frame.maxX, filtersCard.frame.maxX, accuracy: 10)
   }
 
   func testSidebarFilterSliceFillsColumnAndStartsUnfiltered() throws {
     let app = launch(mode: "preview")
-
     let sidebarRoot = element(in: app, identifier: Accessibility.sidebarRoot)
     let filtersCard = app.staticTexts["Search & Filters"]
     let searchField = element(in: app, identifier: Accessibility.sidebarSearchField)
@@ -202,7 +207,6 @@ final class HarnessLayoutUITests: HarnessUITestCase {
 
   func testSidebarScrollMovesSessionRowsWhenContentOverflows() throws {
     let app = launch(mode: "preview")
-
     let sidebarRoot = element(in: app, identifier: Accessibility.sidebarRoot)
     let scrollView = sidebarRoot.descendants(matching: .scrollView).firstMatch
     let sessionRow = previewSessionTrigger(in: app)

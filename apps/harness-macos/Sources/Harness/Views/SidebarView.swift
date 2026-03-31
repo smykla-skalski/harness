@@ -85,14 +85,24 @@ struct SidebarView: View {
     } else {
       ForEach(store.groupedSessions) { group in
         Section {
+          sessionProjectRow(for: group)
+            .listRowInsets(EdgeInsets(
+              top: HarnessTheme.sectionSpacing,
+              leading: HarnessTheme.sectionSpacing,
+              bottom: 0,
+              trailing: HarnessTheme.sectionSpacing
+            ))
+            .listRowSeparator(.hidden)
+            .listRowBackground(Color.clear)
+
           ForEach(group.sessions) { session in
             SidebarSessionRow(session: session, store: store)
               .tag(session.sessionId)
               .listRowInsets(EdgeInsets(
                 top: HarnessTheme.itemSpacing,
-                leading: HarnessTheme.cardPadding,
+                leading: HarnessTheme.sectionSpacing,
                 bottom: HarnessTheme.itemSpacing,
-                trailing: HarnessTheme.cardPadding
+                trailing: HarnessTheme.sectionSpacing
               ))
               .accessibilityLabel(
                 sessionAccessibilityLabel(for: session)
@@ -128,28 +138,30 @@ struct SidebarView: View {
                 }
               }
           }
-        } header: {
-          HStack {
-            Text(group.project.name)
-              .font(.system(.headline, design: .rounded, weight: .semibold))
-              .foregroundStyle(HarnessTheme.ink)
-              .accessibilityAddTraits(.isHeader)
-            Spacer()
-            Text("\(group.sessions.count)")
-              .font(.caption.monospacedDigit())
-              .foregroundStyle(HarnessTheme.secondaryInk)
-          }
-          .accessibilityIdentifier(
-            HarnessAccessibility.projectHeader(group.project.projectId)
-          )
-          .accessibilityFrameMarker(
-            HarnessAccessibility.projectHeaderFrame(group.project.projectId)
-          )
         }
       }
       .accessibilityElement(children: .contain)
       .accessibilityIdentifier(HarnessAccessibility.sidebarSessionList)
       .accessibilityFrameMarker(HarnessAccessibility.sidebarSessionListContent)
     }
+  }
+
+  private func sessionProjectRow(for group: HarnessStore.SessionGroup) -> some View {
+    HStack {
+      Text(group.project.name)
+        .font(.system(.headline, design: .rounded, weight: .semibold))
+        .foregroundStyle(HarnessTheme.ink)
+        .accessibilityAddTraits(.isHeader)
+      Spacer()
+      Text("\(group.sessions.count)")
+        .font(.caption.monospacedDigit())
+        .foregroundStyle(HarnessTheme.secondaryInk)
+    }
+    .accessibilityIdentifier(
+      HarnessAccessibility.projectHeader(group.project.projectId)
+    )
+    .accessibilityFrameMarker(
+      HarnessAccessibility.projectHeaderFrame(group.project.projectId)
+    )
   }
 }
