@@ -85,6 +85,7 @@ struct InspectorColumnView: View {
     VStack(alignment: .leading, spacing: 14) {
       Text("Inspector")
         .font(.system(.title3, design: .rounded, weight: .semibold))
+        .accessibilityAddTraits(.isHeader)
       Text(summary.context)
         .font(.system(.headline, design: .rounded, weight: .semibold))
       Text("Loading live task, agent, and signal detail for the selected session.")
@@ -104,6 +105,7 @@ struct InspectorColumnView: View {
     VStack(alignment: .leading, spacing: 12) {
       Text("Inspector")
         .font(.system(.title3, design: .rounded, weight: .semibold))
+        .accessibilityAddTraits(.isHeader)
       Text("Select a session to inspect live task, agent, and signal detail.")
         .foregroundStyle(.secondary)
     }

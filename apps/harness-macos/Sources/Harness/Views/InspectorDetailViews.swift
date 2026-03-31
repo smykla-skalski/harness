@@ -17,6 +17,7 @@ struct SessionInspectorSummaryCard: View {
     VStack(alignment: .leading, spacing: 14) {
       Text("Inspector")
         .font(.system(.title3, design: .rounded, weight: .semibold))
+        .accessibilityAddTraits(.isHeader)
       Text(
         "Pick a task, agent, signal, or observe card from the cockpit to focus actions and detail here."
       )

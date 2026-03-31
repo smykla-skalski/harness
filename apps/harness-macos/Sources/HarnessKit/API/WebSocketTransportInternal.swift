@@ -152,8 +152,11 @@ extension WebSocketTransport {
     return components.url ?? connection.endpoint
   }
 
+  private static let reencodeEncoder = JSONEncoder()
+  private static let mergeDecoder = JSONDecoder()
+
   nonisolated func decode<T: Decodable>(_ value: JSONValue) throws -> T {
-    let data = try JSONEncoder().encode(value)
+    let data = try Self.reencodeEncoder.encode(value)
     return try decoder.decode(T.self, from: data)
   }
 
@@ -174,6 +177,6 @@ extension WebSocketTransport {
       }
     }
     let merged = try JSONSerialization.data(withJSONObject: object)
-    return try JSONDecoder().decode(JSONValue.self, from: merged)
+    return try Self.mergeDecoder.decode(JSONValue.self, from: merged)
   }
 }

@@ -5,7 +5,7 @@ import SwiftData
 
 extension CachedSignalRecord {
   public func toSessionSignalRecord() -> SessionSignalRecord {
-    let signal = (try? JSONDecoder().decode(Signal.self, from: signalData))
+    let signal = (try? Codecs.decoder.decode(Signal.self, from: signalData))
       ?? Signal(
         signalId: signalId,
         version: 0,
@@ -29,7 +29,7 @@ extension CachedSignalRecord {
 
     let acknowledgment: SignalAck? =
       if let data = acknowledgmentData {
-        try? JSONDecoder().decode(SignalAck.self, from: data)
+        try? Codecs.decoder.decode(SignalAck.self, from: data)
       } else {
         nil
       }
@@ -49,9 +49,9 @@ extension CachedSignalRecord {
     agentId = record.agentId
     sessionId = record.sessionId
     statusRaw = record.status.rawValue
-    signalData = (try? JSONEncoder().encode(record.signal)) ?? Data()
+    signalData = (try? Codecs.encoder.encode(record.signal)) ?? Data()
     acknowledgmentData = record.acknowledgment.flatMap {
-      try? JSONEncoder().encode($0)
+      try? Codecs.encoder.encode($0)
     }
   }
 }
@@ -64,9 +64,9 @@ extension SessionSignalRecord {
       agentId: agentId,
       sessionId: sessionId,
       statusRaw: status.rawValue,
-      signalData: (try? JSONEncoder().encode(signal)) ?? Data(),
+      signalData: (try? Codecs.encoder.encode(signal)) ?? Data(),
       acknowledgmentData: acknowledgment.flatMap {
-        try? JSONEncoder().encode($0)
+        try? Codecs.encoder.encode($0)
       }
     )
   }
@@ -76,7 +76,7 @@ extension SessionSignalRecord {
 
 extension CachedTimelineEntry {
   public func toTimelineEntry() -> TimelineEntry {
-    let payload = (try? JSONDecoder().decode(
+    let payload = (try? Codecs.decoder.decode(
       JSONValue.self,
       from: payloadData
     )) ?? .null
@@ -100,7 +100,7 @@ extension CachedTimelineEntry {
     agentId = entry.agentId
     taskId = entry.taskId
     summary = entry.summary
-    payloadData = (try? JSONEncoder().encode(entry.payload)) ?? Data()
+    payloadData = (try? Codecs.encoder.encode(entry.payload)) ?? Data()
   }
 }
 
@@ -114,7 +114,7 @@ extension TimelineEntry {
       agentId: agentId,
       taskId: taskId,
       summary: summary,
-      payloadData: (try? JSONEncoder().encode(payload)) ?? Data()
+      payloadData: (try? Codecs.encoder.encode(payload)) ?? Data()
     )
   }
 }
@@ -131,7 +131,7 @@ struct ObserverDetailBlob: Codable {
 
 extension CachedObserver {
   public func toObserverSummary() -> ObserverSummary {
-    let detail = (try? JSONDecoder().decode(
+    let detail = (try? Codecs.decoder.decode(
       ObserverDetailBlob.self,
       from: detailData
     )) ?? ObserverDetailBlob()
@@ -165,7 +165,7 @@ extension CachedObserver {
       cycleHistory: summary.cycleHistory,
       agentSessions: summary.agentSessions
     )
-    detailData = (try? JSONEncoder().encode(blob)) ?? Data()
+    detailData = (try? Codecs.encoder.encode(blob)) ?? Data()
   }
 }
 
@@ -185,7 +185,7 @@ extension ObserverSummary {
       resolvedIssueCount: resolvedIssueCount,
       mutedCodeCount: mutedCodeCount,
       activeWorkerCount: activeWorkerCount,
-      detailData: (try? JSONEncoder().encode(blob)) ?? Data()
+      detailData: (try? Codecs.encoder.encode(blob)) ?? Data()
     )
   }
 }
@@ -194,7 +194,7 @@ extension ObserverSummary {
 
 extension CachedAgentActivity {
   public func toAgentToolActivitySummary() -> AgentToolActivitySummary {
-    let recentTools = (try? JSONDecoder().decode(
+    let recentTools = (try? Codecs.decoder.decode(
       [String].self,
       from: recentToolsData
     )) ?? []
@@ -218,7 +218,7 @@ extension CachedAgentActivity {
     toolErrorCount = activity.toolErrorCount
     latestToolName = activity.latestToolName
     latestEventAt = activity.latestEventAt
-    recentToolsData = (try? JSONEncoder().encode(
+    recentToolsData = (try? Codecs.encoder.encode(
       activity.recentTools
     )) ?? Data()
   }
@@ -234,7 +234,7 @@ extension AgentToolActivitySummary {
       toolErrorCount: toolErrorCount,
       latestToolName: latestToolName,
       latestEventAt: latestEventAt,
-      recentToolsData: (try? JSONEncoder().encode(recentTools)) ?? Data()
+      recentToolsData: (try? Codecs.encoder.encode(recentTools)) ?? Data()
     )
   }
 }

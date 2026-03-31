@@ -9,6 +9,7 @@ struct SessionsBoardRecentSessionsSection: View {
     VStack(alignment: .leading, spacing: 14) {
       Text("Recent Sessions")
         .font(.system(.title3, design: .rounded, weight: .semibold))
+        .accessibilityAddTraits(.isHeader)
       if sessions.isEmpty {
         Text(
           "No sessions indexed yet. Bring the daemon online or refresh after starting a harness session."
