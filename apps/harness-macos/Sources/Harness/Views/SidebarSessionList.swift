@@ -231,6 +231,12 @@ private struct SessionListContent: View {
                   sessionAccessibilityValue(for: session)
                 )
                 .accessibilityElement(children: .combine)
+                .accessibilityAction(named: "Toggle Bookmark") {
+                  store.toggleBookmark(
+                    sessionId: session.sessionId,
+                    projectId: session.projectId
+                  )
+                }
                 .accessibilityIdentifier(HarnessAccessibility.sessionRow(session.sessionId))
                 .harnessInteractiveCardButtonStyle()
                 .contextMenu {

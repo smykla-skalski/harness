@@ -121,6 +121,9 @@ struct HarnessApp: App {
       }
   }
 
+  @FocusedValue(\.inspectorVisibility)
+  private var inspectorVisibility: Binding<Bool>?
+
   @CommandsBuilder private var appCommands: some Commands {
     SidebarCommands()
     TextEditingCommands()
@@ -160,6 +163,16 @@ struct HarnessApp: App {
       }
       .keyboardShortcut("2", modifiers: [.command, .option])
       .disabled(store.selectedSession?.observer == nil)
+
+      Divider()
+
+      Button {
+        inspectorVisibility?.wrappedValue.toggle()
+      } label: {
+        Text(inspectorVisibility?.wrappedValue == true ? "Hide Inspector" : "Show Inspector")
+      }
+      .keyboardShortcut("i", modifiers: [.command, .option])
+      .disabled(inspectorVisibility == nil)
     }
   }
 

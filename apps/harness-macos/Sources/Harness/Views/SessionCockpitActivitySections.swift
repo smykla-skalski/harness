@@ -10,6 +10,13 @@ struct SessionCockpitSignalsSection: View {
       Text("Signals")
         .font(.system(.title3, design: .rounded, weight: .semibold))
         .accessibilityAddTraits(.isHeader)
+      if signals.isEmpty {
+        ContentUnavailableView {
+          Label("No signals", systemImage: "antenna.radiowaves.left.and.right")
+        } description: {
+          Text("Signals appear when agents send or receive commands.")
+        }
+      }
       VStack(alignment: .leading, spacing: HarnessTheme.sectionSpacing) {
         ForEach(signals) { signal in
           Button {
@@ -38,6 +45,20 @@ struct SessionCockpitSignalsSection: View {
             .padding(HarnessTheme.cardPadding)
           }
           .harnessInteractiveCardButtonStyle()
+          .contextMenu {
+            Button {
+              store.inspect(signalID: signal.signal.signalId)
+            } label: {
+              Label("Inspect", systemImage: "info.circle")
+            }
+            Divider()
+            Button {
+              NSPasteboard.general.clearContents()
+              NSPasteboard.general.setString(signal.signal.signalId, forType: .string)
+            } label: {
+              Label("Copy Signal ID", systemImage: "doc.on.doc")
+            }
+          }
           .transition(
             .asymmetric(
               insertion: .scale(scale: 0.95).combined(with: .opacity),
@@ -59,6 +80,13 @@ struct SessionCockpitTimelineSection: View {
       Text("Timeline")
         .font(.system(.title3, design: .rounded, weight: .semibold))
         .accessibilityAddTraits(.isHeader)
+      if timeline.isEmpty {
+        ContentUnavailableView {
+          Label("No activity yet", systemImage: "clock")
+        } description: {
+          Text("Timeline entries appear as agents work on tasks.")
+        }
+      }
       ForEach(timeline) { entry in
         HStack(alignment: .top, spacing: HarnessTheme.sectionSpacing) {
           RoundedRectangle(cornerRadius: 999)
@@ -85,6 +113,22 @@ struct SessionCockpitTimelineSection: View {
           RoundedRectangle(cornerRadius: 999, style: .continuous)
             .fill(HarnessTheme.accent.opacity(0.28))
             .frame(width: 3)
+        }
+        .contextMenu {
+          Button {
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString(entry.summary, forType: .string)
+          } label: {
+            Label("Copy Summary", systemImage: "doc.on.doc")
+          }
+          if let taskID = entry.taskId {
+            Button {
+              NSPasteboard.general.clearContents()
+              NSPasteboard.general.setString(taskID, forType: .string)
+            } label: {
+              Label("Copy Task ID", systemImage: "doc.on.doc")
+            }
+          }
         }
         .transition(
           .asymmetric(
