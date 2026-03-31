@@ -78,9 +78,8 @@ extension DaemonStatusCard {
     Button {
       Task { await store.startDaemon() }
     } label: {
-      Image(systemName: "arrow.clockwise.circle")
-        .resizable()
-        .aspectRatio(contentMode: .fit)
+      Image(systemName: "arrow.clockwise")
+        .font(.system(size: 14, weight: .semibold))
     }
     .buttonStyle(DaemonRestartButtonStyle())
     .disabled(isLoading)
