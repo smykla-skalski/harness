@@ -2,6 +2,64 @@ import AppKit
 import Foundation
 
 extension HarnessStore {
+
+  // MARK: - Navigation history
+
+  public var canNavigateBack: Bool {
+    !navigationBackStack.isEmpty
+  }
+
+  public var canNavigateForward: Bool {
+    !navigationForwardStack.isEmpty
+  }
+
+  public func navigateBack() async {
+    guard let destination = navigationBackStack.popLast() else { return }
+    if let current = selectedSessionID {
+      navigationForwardStack.append(current)
+    }
+    await loadSessionWithoutHistory(destination)
+  }
+
+  public func navigateForward() async {
+    guard let destination = navigationForwardStack.popLast() else { return }
+    if let current = selectedSessionID {
+      navigationBackStack.append(current)
+    }
+    await loadSessionWithoutHistory(destination)
+  }
+
+  private func recordNavigation(to sessionID: String?) {
+    if let current = selectedSessionID, current != sessionID {
+      navigationBackStack.append(current)
+      navigationForwardStack.removeAll()
+    }
+  }
+
+  private func loadSessionWithoutHistory(_ sessionID: String) async {
+    primeSessionSelection(sessionID)
+    guard let client else {
+      stopSessionStream()
+      return
+    }
+
+    let newProjectId = sessions.first(where: { $0.sessionId == sessionID })?.projectId
+    let previousProjectId = selectedSessionSummary?.projectId
+    if let previousProjectId, newProjectId != previousProjectId {
+      saveFilterPreference(for: previousProjectId)
+    }
+    if let newProjectId, newProjectId != previousProjectId {
+      loadFilterPreference(for: newProjectId)
+    }
+
+    let requestID = beginSessionLoad()
+    await loadSession(using: client, sessionID: sessionID, requestID: requestID)
+    guard isCurrentSessionLoad(requestID, sessionID: sessionID) else { return }
+    startSessionStream(using: client, sessionID: sessionID)
+  }
+
+  // MARK: - Selection
+
   public func primeSessionSelection(_ sessionID: String?) {
     selectedSessionID = sessionID
     inspectorSelection = .none
@@ -26,6 +84,7 @@ extension HarnessStore {
   }
 
   public func selectSession(_ sessionID: String?) async {
+    recordNavigation(to: sessionID)
     let previousProjectId = selectedSessionSummary?.projectId
     primeSessionSelection(sessionID)
     guard let client, let sessionID else {
