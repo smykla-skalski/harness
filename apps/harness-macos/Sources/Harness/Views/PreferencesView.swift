@@ -128,6 +128,8 @@ private struct PreferencesOverlayMarkers: View {
 private struct PreferencesGeneralSection: View {
   let store: HarnessStore
   @Binding var themeMode: HarnessThemeMode
+  @AppStorage(HarnessTextSize.storageKey)
+  private var textSizeIndex = HarnessTextSize.defaultIndex
   let effectiveHealth: HealthResponse?
   let launchAgentState: String
   let launchAgentCaption: String
@@ -158,6 +160,16 @@ private struct PreferencesGeneralSection: View {
         }
         .accessibilityIdentifier(
           HarnessAccessibility.preferencesThemeModePicker
+        )
+        Picker("Text size", selection: $textSizeIndex) {
+          ForEach(
+            Array(HarnessTextSize.levels.enumerated()), id: \.offset
+          ) { index, size in
+            Text(HarnessTextSize.label(for: size)).tag(index)
+          }
+        }
+        .accessibilityIdentifier(
+          HarnessAccessibility.preferencesTextSizePicker
         )
       } header: {
         Text("Appearance")
