@@ -133,7 +133,7 @@ private struct HarnessFilterChipButtonStyleModifier: ViewModifier {
 
   func body(content: Content) -> some View {
     content
-      .buttonStyle(.borderedProminent)
+      .buttonStyle(isSelected ? .borderedProminent : .bordered)
       .tint(isSelected ? nil : .secondary)
       .fontWeight(isSelected ? .bold : .semibold)
   }
