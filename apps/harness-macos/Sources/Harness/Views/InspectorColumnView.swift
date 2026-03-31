@@ -23,7 +23,7 @@ struct InspectorColumnView: View {
         Group {
           inspectorContent
         }
-        .animation(.spring(duration: 0.25), value: store.inspectorSelection)
+        .animation(.spring(duration: 0.2), value: store.inspectorSelection)
 
         if let detail = store.selectedSession {
           InspectorActionSections(

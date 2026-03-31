@@ -42,6 +42,7 @@ struct SessionActionDock: View {
             .foregroundStyle(HarnessTheme.secondaryInk)
         }
         .animation(.spring(duration: 0.2), value: store.isSessionActionInFlight)
+        .animation(.spring(duration: 0.2), value: store.lastAction.isEmpty)
       }
 
       ViewThatFits(in: .horizontal) {

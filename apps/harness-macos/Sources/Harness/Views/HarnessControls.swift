@@ -3,7 +3,8 @@ import SwiftUI
 
 enum HarnessControlMetrics {
   static let compactControlSize: ControlSize = .small
-  static let disabledButtonChromeBehavior: HarnessDisabledButtonChromeBehavior = .regularize
+  fileprivate static let disabledButtonChromeBehavior: HarnessDisabledButtonChromeBehavior =
+    .regularize
 }
 
 private enum HarnessDisabledButtonChromeBehavior {
@@ -12,7 +13,6 @@ private enum HarnessDisabledButtonChromeBehavior {
 }
 
 private enum HarnessSystemButtonChromeStyle {
-  case automatic
   case borderless
   case bordered
   case borderedProminent
@@ -142,7 +142,7 @@ private struct HarnessFilterChipButtonStyleModifier: ViewModifier {
     content
       .modifier(
         HarnessSystemButtonChromeModifier(
-          style: .borderedProminent,
+          style: isSelected ? .borderedProminent : .bordered,
           tint: isSelected ? nil : .secondary
         )
       )
@@ -157,35 +157,20 @@ private struct HarnessSystemButtonChromeModifier: ViewModifier {
   @Environment(\.isEnabled)
   private var isEnabled
 
-  private var effectiveStyle: HarnessSystemButtonChromeStyle {
-    guard !isEnabled else { return style }
-    switch HarnessControlMetrics.disabledButtonChromeBehavior {
-    case .regularize:
-      .automatic
-    case .preserveConfiguredStyle:
-      style
-    }
-  }
-
   private var effectiveTint: Color? {
     guard !isEnabled else { return tint }
     switch HarnessControlMetrics.disabledButtonChromeBehavior {
     case .regularize:
-      nil
+      return nil
     case .preserveConfiguredStyle:
-      tint
+      return tint
     }
   }
 
   @ViewBuilder
   func body(content: Content) -> some View {
-    switch effectiveStyle {
-    case .automatic:
-      if let effectiveTint {
-        content.buttonStyle(.automatic).tint(effectiveTint)
-      } else {
-        content.buttonStyle(.automatic)
-      }
+    // Keep the underlying AppKit button style stable across enabled-state changes.
+    switch style {
     case .borderless:
       if let effectiveTint {
         content.buttonStyle(.borderless).tint(effectiveTint)
@@ -225,42 +210,34 @@ private struct InteractiveCardButtonStyle: ButtonStyle {
       }
       .contentShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
       .opacity(isEnabled ? (configuration.isPressed ? 0.92 : 1) : 0.4)
-      .animation(.easeOut(duration: 0.15), value: configuration.isPressed)
+      .animation(.easeOut(duration: 0.1), value: configuration.isPressed)
   }
 }
 
 private struct InteractiveCardHoverModifier: ViewModifier {
   let cornerRadius: CGFloat
   let tint: Color?
-  @Environment(\.isEnabled)
-  private var isEnabled
   @State private var isHovered = false
 
-  @ViewBuilder
   func body(content: Content) -> some View {
-    switch HarnessControlMetrics.disabledButtonChromeBehavior {
-    case .regularize where !isEnabled:
-      content.buttonStyle(.automatic)
-    case .regularize, .preserveConfiguredStyle:
-      content
-        .buttonStyle(
-          InteractiveCardButtonStyle(
-            cornerRadius: cornerRadius,
-            tint: tint,
-            isHovered: isHovered
-          )
+    content
+      .buttonStyle(
+        InteractiveCardButtonStyle(
+          cornerRadius: cornerRadius,
+          tint: tint,
+          isHovered: isHovered
         )
-        .onContinuousHover { phase in
-          withAnimation(.easeOut(duration: 0.15)) {
-            switch phase {
-            case .active:
-              isHovered = true
-            case .ended:
-              isHovered = false
-            }
+      )
+      .onContinuousHover { phase in
+        withAnimation(.easeOut(duration: 0.15)) {
+          switch phase {
+          case .active:
+            isHovered = true
+          case .ended:
+            isHovered = false
           }
         }
-    }
+      }
   }
 }
 
