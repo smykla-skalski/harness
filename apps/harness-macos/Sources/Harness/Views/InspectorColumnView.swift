@@ -82,7 +82,7 @@ struct InspectorColumnView: View {
   }
 
   private func sessionLoadingInspector(_ summary: SessionSummary) -> some View {
-    VStack(alignment: .leading, spacing: 12) {
+    VStack(alignment: .leading, spacing: HarnessTheme.sectionSpacing) {
       Text("Inspector")
         .font(.system(.title3, design: .rounded, weight: .semibold))
         .accessibilityAddTraits(.isHeader)
@@ -102,7 +102,7 @@ struct InspectorColumnView: View {
   }
 
   private var emptyState: some View {
-    VStack(alignment: .leading, spacing: 12) {
+    VStack(alignment: .leading, spacing: HarnessTheme.sectionSpacing) {
       Text("Inspector")
         .font(.system(.title3, design: .rounded, weight: .semibold))
         .accessibilityAddTraits(.isHeader)

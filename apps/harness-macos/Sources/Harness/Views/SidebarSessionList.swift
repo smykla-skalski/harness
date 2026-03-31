@@ -26,7 +26,7 @@ struct SidebarSessionList: View {
   }
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 12) {
+    VStack(alignment: .leading, spacing: HarnessTheme.sectionSpacing) {
       filterSlice
       sessionList
     }
@@ -34,7 +34,7 @@ struct SidebarSessionList: View {
   }
 
   private var filterSlice: some View {
-    VStack(alignment: .leading, spacing: 12) {
+    VStack(alignment: .leading, spacing: HarnessTheme.sectionSpacing) {
       HStack(alignment: .top) {
         VStack(alignment: .leading, spacing: 4) {
           Text("Search & Filters")
@@ -75,7 +75,7 @@ struct SidebarSessionList: View {
       if store.searchText.isEmpty {
         let recent = store.recentSearches
         if !recent.isEmpty {
-          HStack(spacing: 6) {
+          HStack(spacing: HarnessTheme.itemSpacing) {
             ForEach(recent.prefix(5), id: \.query) { search in
               Button(search.query) {
                 store.searchText = search.query
@@ -100,7 +100,7 @@ struct SidebarSessionList: View {
       }
 
       filterSection(title: "Status") {
-        HarnessWrapLayout(spacing: 6, lineSpacing: 6) {
+        HarnessWrapLayout(spacing: HarnessTheme.itemSpacing, lineSpacing: HarnessTheme.itemSpacing) {
           ForEach(HarnessStore.SessionFilter.allCases) { filter in
             filterChip(
               title: filter.title,
@@ -114,7 +114,7 @@ struct SidebarSessionList: View {
       }
 
       filterSection(title: "Focus") {
-        HarnessWrapLayout(spacing: 6, lineSpacing: 6) {
+        HarnessWrapLayout(spacing: HarnessTheme.itemSpacing, lineSpacing: HarnessTheme.itemSpacing) {
           ForEach(SessionFocusFilter.allCases) { filter in
             filterChip(
               title: filter.title,
@@ -127,7 +127,7 @@ struct SidebarSessionList: View {
         }
       }
     }
-    .padding(12)
+    .padding(HarnessTheme.cardPadding)
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessAccessibility.sidebarFiltersCard)
     .accessibilityFrameMarker("\(HarnessAccessibility.sidebarFiltersCard).frame")
@@ -164,7 +164,7 @@ private struct SessionListContent: View {
       } else {
         LazyVStack(alignment: .leading, spacing: 16) {
           ForEach(store.groupedSessions) { group in
-            VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: HarnessTheme.itemSpacing) {
               HStack {
                 Text(group.project.name)
                   .font(.system(.headline, design: .rounded, weight: .semibold))
@@ -188,8 +188,8 @@ private struct SessionListContent: View {
                     await store.selectSession(session.sessionId)
                   }
                 } label: {
-                  VStack(alignment: .leading, spacing: 8) {
-                    HStack(alignment: .top, spacing: 8) {
+                  VStack(alignment: .leading, spacing: HarnessTheme.itemSpacing) {
+                    HStack(alignment: .top, spacing: HarnessTheme.itemSpacing) {
                       Text(session.context)
                         .font(.system(.body, design: .rounded, weight: .semibold))
                         .multilineTextAlignment(.leading)
@@ -209,7 +209,7 @@ private struct SessionListContent: View {
                     Text(session.sessionId)
                       .font(.caption.monospaced())
                       .foregroundStyle(HarnessTheme.secondaryInk)
-                    HStack(spacing: 12) {
+                    HStack(spacing: HarnessTheme.sectionSpacing) {
                       labelChip("\(session.metrics.activeAgentCount) active")
                       labelChip("\(session.metrics.inProgressTaskCount) moving")
                       labelChip(formatTimestamp(session.lastActivityAt))
@@ -218,7 +218,7 @@ private struct SessionListContent: View {
                   }
                   .foregroundStyle(HarnessTheme.ink)
                   .frame(maxWidth: .infinity, alignment: .leading)
-                  .padding(12)
+                  .padding(HarnessTheme.cardPadding)
                   .harnessSelectionOutline(
                     isSelected: store.selectedSessionID == session.sessionId,
                     cornerRadius: HarnessTheme.cornerRadiusMD
@@ -281,8 +281,7 @@ private struct SessionListContent: View {
     Text(value)
       .font(.caption.weight(.semibold))
       .lineLimit(1)
-      .padding(.horizontal, 8)
-      .padding(.vertical, 4)
+      .harnessPillPadding()
       .harnessInfoPill()
   }
 }
@@ -292,7 +291,7 @@ extension SidebarSessionList {
     title: String,
     @ViewBuilder content: () -> Content
   ) -> some View {
-    VStack(alignment: .leading, spacing: 8) {
+    VStack(alignment: .leading, spacing: HarnessTheme.itemSpacing) {
       Text(title.uppercased())
         .font(.caption2.weight(.bold))
         .foregroundStyle(HarnessTheme.secondaryInk)

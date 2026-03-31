@@ -6,7 +6,7 @@ struct PreferencesActionButtons: View {
   let isLoading: Bool
 
   var body: some View {
-    HarnessWrapLayout(spacing: 8, lineSpacing: 8) {
+    HarnessWrapLayout(spacing: HarnessTheme.itemSpacing, lineSpacing: HarnessTheme.itemSpacing) {
       HarnessAsyncActionButton(
         title: "Reconnect",
         tint: nil,
@@ -132,7 +132,7 @@ struct PreferencesConnectionSection: View {
   var body: some View {
     Form {
       Section("Actions") {
-        HarnessWrapLayout(spacing: 8, lineSpacing: 8) {
+        HarnessWrapLayout(spacing: HarnessTheme.itemSpacing, lineSpacing: HarnessTheme.itemSpacing) {
           HarnessAsyncActionButton(
             title: "Reconnect",
             tint: nil,

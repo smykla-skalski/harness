@@ -49,7 +49,7 @@ struct PreferencesConnectionMetrics: View {
     if !events.isEmpty {
       Section("Recent Events") {
         ForEach(events.suffix(10)) { event in
-          HStack(spacing: 8) {
+          HStack(spacing: HarnessTheme.itemSpacing) {
             Image(systemName: eventIcon(for: event.kind))
               .foregroundStyle(eventColor(for: event.kind))
               .font(.caption)

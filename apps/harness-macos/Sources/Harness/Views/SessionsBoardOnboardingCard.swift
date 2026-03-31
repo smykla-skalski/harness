@@ -22,7 +22,7 @@ struct SessionsBoardOnboardingCard: View {
 
   private var header: some View {
     HStack(alignment: .top) {
-      VStack(alignment: .leading, spacing: 6) {
+      VStack(alignment: .leading, spacing: HarnessTheme.itemSpacing) {
         Label("Bring Harness Online", systemImage: "dot.radiowaves.left.and.right")
           .font(.system(.title3, design: .rounded, weight: .bold))
           .accessibilityAddTraits(.isHeader)
@@ -36,8 +36,7 @@ struct SessionsBoardOnboardingCard: View {
       Spacer()
       Text(store.daemonStatus?.launchAgent.installed == true ? "Persistent" : "Manual")
         .font(.caption.bold())
-        .padding(.horizontal, 10)
-        .padding(.vertical, 6)
+        .harnessPillPadding()
         .background(HarnessTheme.accent, in: Capsule())
         .foregroundStyle(HarnessTheme.onContrast)
     }
@@ -47,7 +46,7 @@ struct SessionsBoardOnboardingCard: View {
     HarnessAdaptiveGridLayout(
       minimumColumnWidth: 200,
       maximumColumns: 3,
-      spacing: 14
+      spacing: HarnessTheme.sectionSpacing
     ) {
       onboardingStep(
         title: "1. Start the daemon",
@@ -117,7 +116,7 @@ struct SessionsBoardOnboardingCard: View {
     isReady: Bool,
     @ViewBuilder action: () -> Action
   ) -> some View {
-    VStack(alignment: .leading, spacing: 8) {
+    VStack(alignment: .leading, spacing: HarnessTheme.itemSpacing) {
       HStack(alignment: .top) {
         HStack {
           Circle()
@@ -130,8 +129,7 @@ struct SessionsBoardOnboardingCard: View {
         Spacer()
         Text(isReady ? "Ready" : "Pending")
           .font(.caption.bold())
-          .padding(.horizontal, 9)
-          .padding(.vertical, 5)
+          .harnessPillPadding()
           .background(isReady ? HarnessTheme.success : HarnessTheme.caution, in: Capsule())
           .foregroundStyle(HarnessTheme.onContrast)
       }
@@ -144,7 +142,7 @@ struct SessionsBoardOnboardingCard: View {
         .frame(maxWidth: .infinity, alignment: .trailing)
     }
     .frame(maxWidth: .infinity, minHeight: 72, alignment: .topLeading)
-    .padding(.leading, 18)
+    .padding(.leading, HarnessTheme.spacingLG)
     .overlay(alignment: .leading) {
       RoundedRectangle(cornerRadius: 999, style: .continuous)
         .fill(isReady ? HarnessTheme.success : HarnessTheme.caution)

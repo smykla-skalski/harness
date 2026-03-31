@@ -22,8 +22,7 @@ struct TransportBadge: View {
         .fixedSize()
     }
     .foregroundStyle(tint)
-    .padding(.horizontal, 8)
-    .padding(.vertical, 4)
+    .harnessPillPadding()
     .harnessInfoPill(tint: tint)
     .fixedSize()
     .accessibilityElement(children: .combine)
@@ -47,8 +46,7 @@ struct LatencyBadge: View {
       .foregroundStyle(tint)
       .lineLimit(1)
       .fixedSize()
-      .padding(.horizontal, 8)
-      .padding(.vertical, 4)
+      .harnessPillPadding()
       .harnessInfoPill(tint: tint)
   }
 }
@@ -107,7 +105,7 @@ struct ConnectionStatusStrip: View {
   }
 
   var body: some View {
-    HStack(spacing: 8) {
+    HStack(spacing: HarnessTheme.itemSpacing) {
       ActivityPulse(isActive: isActive)
 
       VStack(alignment: .leading, spacing: 2) {
@@ -120,7 +118,7 @@ struct ConnectionStatusStrip: View {
 
       Spacer(minLength: 8)
 
-      HStack(spacing: 8) {
+      HStack(spacing: HarnessTheme.itemSpacing) {
         TransportBadge(kind: metrics.transportKind)
         LatencyBadge(latencyMs: metrics.latencyMs)
       }
@@ -131,11 +129,15 @@ struct ConnectionStatusStrip: View {
 struct ConnectionToolbarBadge: View {
   let metrics: ConnectionMetrics
 
-  private var label: String {
+  private var transportLabel: String {
+    metrics.transportKind.shortTitle
+  }
+
+  private var accessibilityLabel: String {
     if let latency = metrics.latencyMs {
-      return "\(metrics.transportKind.shortTitle) \(latency)ms"
+      return "Connection: \(metrics.transportKind.shortTitle), latency \(latency) milliseconds"
     }
-    return metrics.transportKind.title
+    return "Connection: \(metrics.transportKind.title)"
   }
 
   private var qualityColor: Color {
@@ -151,17 +153,27 @@ struct ConnectionToolbarBadge: View {
         .fill(qualityColor)
         .frame(width: 8, height: 8)
         .accessibilityHidden(true)
-      Text(label)
+      Text(transportLabel)
         .font(.system(.caption, design: .rounded, weight: .semibold).monospacedDigit())
         .foregroundStyle(qualityColor)
         .lineLimit(1)
         .fixedSize()
+      if let latency = metrics.latencyMs {
+        Rectangle()
+          .fill(qualityColor.opacity(0.35))
+          .frame(width: 1, height: 12)
+          .accessibilityHidden(true)
+        Text("\(latency)ms")
+          .font(.system(.caption, design: .rounded, weight: .semibold).monospacedDigit())
+          .foregroundStyle(qualityColor)
+          .lineLimit(1)
+          .fixedSize()
+      }
     }
-    .padding(.horizontal, 8)
-    .padding(.vertical, 4)
+    .harnessPillPadding()
     .fixedSize()
     .accessibilityIdentifier(HarnessAccessibility.connectionBadge)
-    .accessibilityLabel("Connection: \(label)")
+    .accessibilityLabel(accessibilityLabel)
   }
 }
 
@@ -174,8 +186,8 @@ struct ReconnectionProgressView: View {
   }
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 6) {
-      HStack(spacing: 8) {
+    VStack(alignment: .leading, spacing: HarnessTheme.itemSpacing) {
+      HStack(spacing: HarnessTheme.itemSpacing) {
         ProgressView()
           .controlSize(.small)
         Text("Reconnecting")
@@ -280,7 +292,7 @@ private func previewConnectionMetrics() -> ConnectionMetrics {
 }
 
 #Preview("Transport badges") {
-  HStack(spacing: 12) {
+  HStack(spacing: HarnessTheme.sectionSpacing) {
     TransportBadge(kind: .webSocket)
     TransportBadge(kind: .httpSSE)
     LatencyBadge(latencyMs: 24)
