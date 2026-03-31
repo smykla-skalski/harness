@@ -108,7 +108,6 @@ extension HarnessStore {
       isSelectionLoading = false
       selectedSession = nil
       timeline = []
-      refreshNotes(for: nil)
       stopSessionStream()
       return
     }

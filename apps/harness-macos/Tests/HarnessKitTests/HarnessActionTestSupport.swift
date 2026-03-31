@@ -107,6 +107,15 @@ final class RecordingHarnessClient: HarnessClientProtocol, @unchecked Sendable {
     )
   }
 
+  enum ReadCall {
+    case health
+    case diagnostics
+    case projects
+    case sessions
+    case sessionDetail(String)
+    case timeline(String)
+  }
+
   private let lock = NSLock()
   private var _calls: [Call] = []
   private var _detail: SessionDetail
@@ -122,6 +131,12 @@ final class RecordingHarnessClient: HarnessClientProtocol, @unchecked Sendable {
   private var _globalStreamError: (any Error)?
   private var _sessionStreamEventsByID: [String: [DaemonPushEvent]] = [:]
   private var _sessionStreamErrorsByID: [String: any Error] = [:]
+  private var _healthCallCount = 0
+  private var _diagnosticsCallCount = 0
+  private var _projectsCallCount = 0
+  private var _sessionsCallCount = 0
+  private var _sessionDetailCallCounts: [String: Int] = [:]
+  private var _timelineCallCounts: [String: Int] = [:]
 
   var calls: [Call] {
     get { lock.withLock { _calls } }
@@ -216,52 +231,55 @@ final class RecordingHarnessClient: HarnessClientProtocol, @unchecked Sendable {
     }
   }
 
-  func configuredHealthDelay() -> Duration? {
-    lock.withLock { _healthDelay }
+  func configuredHealthDelay() -> Duration? { lock.withLock { _healthDelay } }
+  func configuredDiagnosticsDelay() -> Duration? { lock.withLock { _diagnosticsDelay } }
+  func configuredMutationDelay() -> Duration? { lock.withLock { _mutationDelay } }
+  func configuredSessions() -> [SessionSummary]? { lock.withLock { _sessionSummaries } }
+  func configuredSessionDetail(id: String) -> SessionDetail? { lock.withLock { _sessionDetailsByID[id] } }
+  func configuredDetailDelay(for sessionID: String) -> Duration? { lock.withLock { _detailDelays[sessionID] } }
+  func configuredTimeline(for sessionID: String) -> [TimelineEntry]? { lock.withLock { _timelinesBySessionID[sessionID] } }
+  func configuredTimelineDelay(for sessionID: String) -> Duration? { lock.withLock { _timelineDelays[sessionID] } }
+  func configuredGlobalStreamEvents() -> [DaemonPushEvent] { lock.withLock { _globalStreamEvents } }
+  func configuredGlobalStreamError() -> (any Error)? { lock.withLock { _globalStreamError } }
+  func configuredSessionStreamEvents(for sessionID: String) -> [DaemonPushEvent] { lock.withLock { _sessionStreamEventsByID[sessionID] ?? [] } }
+  func configuredSessionStreamError(for sessionID: String) -> (any Error)? { lock.withLock { _sessionStreamErrorsByID[sessionID] } }
+
+  func recordReadCall(_ call: ReadCall) {
+    lock.withLock {
+      switch call {
+      case .health:
+        _healthCallCount += 1
+      case .diagnostics:
+        _diagnosticsCallCount += 1
+      case .projects:
+        _projectsCallCount += 1
+      case .sessions:
+        _sessionsCallCount += 1
+      case .sessionDetail(let sessionID):
+        _sessionDetailCallCounts[sessionID, default: 0] += 1
+      case .timeline(let sessionID):
+        _timelineCallCounts[sessionID, default: 0] += 1
+      }
+    }
   }
 
-  func configuredDiagnosticsDelay() -> Duration? {
-    lock.withLock { _diagnosticsDelay }
-  }
-
-  func configuredMutationDelay() -> Duration? {
-    lock.withLock { _mutationDelay }
-  }
-
-  func configuredSessions() -> [SessionSummary]? {
-    lock.withLock { _sessionSummaries }
-  }
-
-  func configuredSessionDetail(id: String) -> SessionDetail? {
-    lock.withLock { _sessionDetailsByID[id] }
-  }
-
-  func configuredDetailDelay(for sessionID: String) -> Duration? {
-    lock.withLock { _detailDelays[sessionID] }
-  }
-
-  func configuredTimeline(for sessionID: String) -> [TimelineEntry]? {
-    lock.withLock { _timelinesBySessionID[sessionID] }
-  }
-
-  func configuredTimelineDelay(for sessionID: String) -> Duration? {
-    lock.withLock { _timelineDelays[sessionID] }
-  }
-
-  func configuredGlobalStreamEvents() -> [DaemonPushEvent] {
-    lock.withLock { _globalStreamEvents }
-  }
-
-  func configuredGlobalStreamError() -> (any Error)? {
-    lock.withLock { _globalStreamError }
-  }
-
-  func configuredSessionStreamEvents(for sessionID: String) -> [DaemonPushEvent] {
-    lock.withLock { _sessionStreamEventsByID[sessionID] ?? [] }
-  }
-
-  func configuredSessionStreamError(for sessionID: String) -> (any Error)? {
-    lock.withLock { _sessionStreamErrorsByID[sessionID] }
+  func readCallCount(_ call: ReadCall) -> Int {
+    lock.withLock {
+      switch call {
+      case .health:
+        _healthCallCount
+      case .diagnostics:
+        _diagnosticsCallCount
+      case .projects:
+        _projectsCallCount
+      case .sessions:
+        _sessionsCallCount
+      case .sessionDetail(let sessionID):
+        _sessionDetailCallCounts[sessionID, default: 0]
+      case .timeline(let sessionID):
+        _timelineCallCounts[sessionID, default: 0]
+      }
+    }
   }
 }
 
