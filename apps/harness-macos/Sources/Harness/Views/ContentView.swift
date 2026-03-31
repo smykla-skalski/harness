@@ -7,10 +7,8 @@ struct ContentView: View {
   @Environment(\.openSettings)
   private var openSettings
   @State private var columnVisibility: NavigationSplitViewVisibility = .all
-  @State private var didAutoOpenSettings = false
-  @State private var showInspector = true
-  private let opensSettingsOnLaunch =
-    ProcessInfo.processInfo.environment["HARNESS_OPEN_SETTINGS_ON_LAUNCH"] == "1"
+  @SceneStorage("showInspector")
+  private var showInspector = true
 
   private var selectedDetail: SessionDetail? {
     guard let sessionID = store.selectedSessionID,
@@ -37,7 +35,7 @@ struct ContentView: View {
   var body: some View {
     NavigationSplitView(columnVisibility: $columnVisibility) {
       SidebarView(store: store)
-        .navigationSplitViewColumnWidth(min: 300, ideal: 350)
+        .navigationSplitViewColumnWidth(min: 300, ideal: 350, max: 500)
     } detail: {
       VStack(spacing: 0) {
         if store.isShowingCachedData {
@@ -52,6 +50,13 @@ struct ContentView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
       }
       .accessibilityFrameMarker("\(HarnessAccessibility.contentRoot).frame")
+      .onKeyPress(.escape) {
+        if store.inspectorSelection != .none {
+          store.inspectorSelection = .none
+          return .handled
+        }
+        return .ignored
+      }
       .navigationTitle("Harness")
       .toolbar {
         ToolbarItem(placement: .secondaryAction) {
@@ -123,13 +128,6 @@ struct ContentView: View {
       if !confirmationMessage.isEmpty {
         Text(confirmationMessage)
       }
-    }
-    .task(id: didAutoOpenSettings) {
-      guard opensSettingsOnLaunch, !didAutoOpenSettings else {
-        return
-      }
-      didAutoOpenSettings = true
-      openSettings()
     }
   }
 
