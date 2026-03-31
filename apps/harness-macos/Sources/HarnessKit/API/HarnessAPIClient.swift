@@ -7,8 +7,8 @@ public protocol HarnessClientProtocol: Sendable {
   func sessions() async throws -> [SessionSummary]
   func sessionDetail(id: String) async throws -> SessionDetail
   func timeline(sessionID: String) async throws -> [TimelineEntry]
-  func globalStream() -> AsyncThrowingStream<StreamEvent, Error>
-  func sessionStream(sessionID: String) -> AsyncThrowingStream<StreamEvent, Error>
+  func globalStream() async -> AsyncThrowingStream<StreamEvent, Error>
+  func sessionStream(sessionID: String) async -> AsyncThrowingStream<StreamEvent, Error>
   func createTask(sessionID: String, request: TaskCreateRequest) async throws -> SessionDetail
   func assignTask(
     sessionID: String,
@@ -123,11 +123,11 @@ public final class HarnessAPIClient: HarnessClientProtocol {
     try await get("/v1/sessions/\(sessionID)/timeline")
   }
 
-  public func globalStream() -> AsyncThrowingStream<StreamEvent, Error> {
+  public func globalStream() async -> AsyncThrowingStream<StreamEvent, Error> {
     stream("/v1/stream")
   }
 
-  public func sessionStream(sessionID: String) -> AsyncThrowingStream<StreamEvent, Error> {
+  public func sessionStream(sessionID: String) async -> AsyncThrowingStream<StreamEvent, Error> {
     stream("/v1/sessions/\(sessionID)/stream")
   }
 
