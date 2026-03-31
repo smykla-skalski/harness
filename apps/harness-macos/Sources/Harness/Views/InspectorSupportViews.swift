@@ -1,4 +1,5 @@
 import HarnessKit
+import SwiftData
 import SwiftUI
 
 struct ObserverInspectorCard: View {
@@ -18,7 +19,7 @@ struct ObserverInspectorCard: View {
   var body: some View {
     VStack(alignment: .leading, spacing: HarnessTheme.sectionSpacing) {
       Text("Observe")
-        .font(.system(.title3, design: .rounded, weight: .bold))
+        .scaledFont(.system(.title3, design: .rounded, weight: .bold))
         .accessibilityAddTraits(.isHeader)
       InspectorFactGrid(facts: facts)
       if let mutedCodes = observer.mutedCodes, !mutedCodes.isEmpty {
@@ -37,14 +38,14 @@ struct ObserverInspectorCard: View {
         DisclosureGroup("Cycle History") {
           ObserverCycleHistoryContent(cycles: cycleHistory)
         }
-        .font(.caption.bold())
+        .scaledFont(.caption.bold())
         .foregroundStyle(HarnessTheme.secondaryInk)
       }
       if let agentSessions = observer.agentSessions, !agentSessions.isEmpty {
         DisclosureGroup("Tracked Agent Sessions") {
           ObserverAgentSessionsContent(sessions: agentSessions)
         }
-        .font(.caption.bold())
+        .scaledFont(.caption.bold())
         .foregroundStyle(HarnessTheme.secondaryInk)
       }
     }
@@ -74,17 +75,17 @@ private struct ObserverOpenIssuesSection: View {
           VStack(alignment: .leading, spacing: 4) {
             HStack(alignment: .firstTextBaseline) {
               Text(issue.code)
-                .font(.caption.bold())
+                .scaledFont(.caption.bold())
                 .textCase(.uppercase)
               Spacer()
               Text(issue.severity.capitalized)
-                .font(.caption2.bold())
+                .scaledFont(.caption2.bold())
             }
             Text(issue.summary)
-              .font(.subheadline)
+              .scaledFont(.subheadline)
             if let evidenceExcerpt = issue.evidenceExcerpt {
               Text(evidenceExcerpt)
-                .font(.caption)
+                .scaledFont(.caption)
                 .foregroundStyle(HarnessTheme.secondaryInk)
                 .lineLimit(2)
             }
@@ -107,14 +108,14 @@ private struct ObserverWorkersSection: View {
           VStack(alignment: .leading, spacing: 4) {
             HStack {
               Text(worker.agentId ?? "worker")
-                .font(.subheadline.bold())
+                .scaledFont(.subheadline.bold())
               Spacer()
               Text(formatTimestamp(worker.startedAt))
-                .font(.caption.monospaced())
+                .scaledFont(.caption.monospaced())
                 .foregroundStyle(HarnessTheme.secondaryInk)
             }
             Text(worker.targetFile)
-              .font(.caption)
+              .scaledFont(.caption)
               .truncationMode(.middle)
               .foregroundStyle(HarnessTheme.secondaryInk)
               .lineLimit(2)
@@ -136,14 +137,14 @@ private struct ObserverCycleHistoryContent: View {
         VStack(alignment: .leading, spacing: 4) {
           HStack {
             Text(formatTimestamp(cycle.timestamp))
-              .font(.caption.monospaced())
+              .scaledFont(.caption.monospaced())
             Spacer()
             Text("+\(cycle.newIssues) / -\(cycle.resolved)")
-              .font(.caption.bold())
+              .scaledFont(.caption.bold())
               .foregroundStyle(HarnessTheme.secondaryInk)
           }
           Text("Lines \(cycle.fromLine) - \(cycle.toLine)")
-            .font(.caption)
+            .scaledFont(.caption)
             .foregroundStyle(HarnessTheme.secondaryInk)
         }
         .harnessCellPadding()
@@ -162,23 +163,23 @@ private struct ObserverAgentSessionsContent: View {
         VStack(alignment: .leading, spacing: 4) {
           HStack {
             Text(session.agentId)
-              .font(.subheadline.bold())
+              .scaledFont(.subheadline.bold())
             Spacer()
             Text(session.runtime.uppercased())
-              .font(.caption2.bold())
+              .scaledFont(.caption2.bold())
               .tracking(HarnessTheme.uppercaseTracking)
               .foregroundStyle(HarnessTheme.secondaryInk)
           }
           Text("Cursor \(session.cursor)")
-            .font(.caption.monospaced())
+            .scaledFont(.caption.monospaced())
           if let lastActivity = session.lastActivity {
             Text("Last activity \(formatTimestamp(lastActivity))")
-              .font(.caption)
+              .scaledFont(.caption)
               .foregroundStyle(HarnessTheme.secondaryInk)
           }
           if let logPath = session.logPath {
             Text(logPath)
-              .font(.caption.monospaced())
+              .scaledFont(.caption.monospaced())
               .truncationMode(.middle)
               .foregroundStyle(HarnessTheme.secondaryInk)
               .lineLimit(2)
@@ -199,11 +200,11 @@ struct InspectorFactGrid: View {
       ForEach(facts) { fact in
         VStack(alignment: .leading, spacing: 4) {
           Text(fact.title.uppercased())
-            .font(.caption2.weight(.bold))
+            .scaledFont(.caption2.weight(.bold))
             .tracking(HarnessTheme.uppercaseTracking)
             .foregroundStyle(HarnessTheme.secondaryInk)
           Text(fact.value)
-            .font(.system(.body, design: .rounded, weight: .semibold))
+            .scaledFont(.system(.body, design: .rounded, weight: .semibold))
             .lineLimit(2)
         }
         .frame(maxWidth: .infinity, minHeight: 52, alignment: .leading)
@@ -220,7 +221,7 @@ struct InspectorSection<Content: View>: View {
   var body: some View {
     VStack(alignment: .leading, spacing: HarnessTheme.itemSpacing) {
       Text(title)
-        .font(.caption.bold())
+        .scaledFont(.caption.bold())
         .foregroundStyle(HarnessTheme.secondaryInk)
       content
     }
@@ -234,7 +235,7 @@ struct InspectorBadgeColumn: View {
     VStack(alignment: .leading, spacing: HarnessTheme.itemSpacing) {
       ForEach(Array(values.enumerated()), id: \.offset) { _, value in
         Text(value)
-          .font(.caption.weight(.semibold))
+          .scaledFont(.caption.weight(.semibold))
           .harnessPillPadding()
           .harnessInfoPill()
       }
@@ -257,27 +258,27 @@ struct InspectorObserverSummarySection: View {
         HarnessBadge(value: "Workers \(observer.activeWorkerCount)")
       }
       Text("Last sweep \(formatTimestamp(observer.lastScanTime))")
-        .font(.caption.monospaced())
+        .scaledFont(.caption.monospaced())
         .foregroundStyle(HarnessTheme.secondaryInk)
       if let mutedCodes = observer.mutedCodes, !mutedCodes.isEmpty {
         Text("Muted codes")
-          .font(.caption.bold())
+          .scaledFont(.caption.bold())
           .foregroundStyle(HarnessTheme.secondaryInk)
         Text(mutedCodes.prefix(3).joined(separator: " · "))
-          .font(.caption)
+          .scaledFont(.caption)
           .foregroundStyle(HarnessTheme.secondaryInk)
       }
       if let openIssues = observer.openIssues, !openIssues.isEmpty {
         Text("Open issues")
-          .font(.caption.bold())
+          .scaledFont(.caption.bold())
           .foregroundStyle(HarnessTheme.secondaryInk)
         VStack(alignment: .leading, spacing: HarnessTheme.itemSpacing) {
           ForEach(openIssues.prefix(2)) { issue in
             VStack(alignment: .leading, spacing: 2) {
               Text("\(issue.code) · \(issue.summary)")
-                .font(.caption)
+                .scaledFont(.caption)
               Text("Severity \(issue.severity.capitalized)")
-                .font(.caption2)
+                .scaledFont(.caption2)
                 .foregroundStyle(HarnessTheme.secondaryInk)
             }
           }
@@ -285,15 +286,15 @@ struct InspectorObserverSummarySection: View {
       }
       if let activeWorkers = observer.activeWorkers, !activeWorkers.isEmpty {
         Text("Active workers")
-          .font(.caption.bold())
+          .scaledFont(.caption.bold())
           .foregroundStyle(HarnessTheme.secondaryInk)
         VStack(alignment: .leading, spacing: HarnessTheme.itemSpacing) {
           ForEach(activeWorkers.prefix(2)) { worker in
             VStack(alignment: .leading, spacing: 2) {
               Text(worker.agentId ?? "worker")
-                .font(.caption)
+                .scaledFont(.caption)
               Text(worker.targetFile)
-                .font(.caption2)
+                .scaledFont(.caption2)
                 .foregroundStyle(HarnessTheme.secondaryInk)
                 .lineLimit(1)
             }
@@ -301,6 +302,88 @@ struct InspectorObserverSummarySection: View {
         }
       }
     }
+  }
+}
+
+struct TaskUserNotesSection: View {
+  let store: HarnessStore
+  let taskID: String
+  let sessionID: String
+  @State private var newNoteText = ""
+  @FocusState private var isNoteFieldFocused: Bool
+
+  private var userNotes: [UserNote] {
+    store.notes(for: "task", targetId: taskID, sessionId: sessionID)
+  }
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: HarnessTheme.itemSpacing) {
+      if !userNotes.isEmpty {
+        VStack(alignment: .leading, spacing: HarnessTheme.itemSpacing) {
+          ForEach(userNotes, id: \.persistentModelID) { note in
+            HStack(alignment: .top) {
+              Text(note.text)
+                .scaledFont(.subheadline)
+                .foregroundStyle(HarnessTheme.secondaryInk)
+                .frame(maxWidth: .infinity, alignment: .leading)
+              Button {
+                store.deleteNote(note)
+              } label: {
+                Image(systemName: "xmark.circle.fill")
+                  .scaledFont(.caption)
+                  .foregroundStyle(HarnessTheme.danger)
+                  .frame(minWidth: 24, minHeight: 24)
+                  .contentShape(Rectangle())
+              }
+              .accessibilityLabel("Delete Note")
+              .accessibilityHint("Removes this note from the selected task.")
+              .help("Delete note")
+              .harnessDismissButtonStyle()
+            }
+            .harnessCellPadding()
+          }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+      }
+
+      HStack(spacing: HarnessTheme.itemSpacing) {
+        TextField("Add a note", text: $newNoteText)
+          .focused($isNoteFieldFocused)
+          .textFieldStyle(.roundedBorder)
+          .submitLabel(.done)
+          .accessibilityIdentifier(HarnessAccessibility.taskNoteField)
+          .onSubmit { submitNote() }
+        Button("Add") { submitNote() }
+          .harnessActionButtonStyle(variant: .bordered)
+          .accessibilityIdentifier(HarnessAccessibility.taskNoteAddButton)
+          .disabled(newNoteText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+      }
+    }
+  }
+
+  private func submitNote() {
+    let text = newNoteText.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !text.isEmpty else { return }
+    guard store.addNote(
+      text: text,
+      targetKind: "task",
+      targetId: taskID,
+      sessionId: sessionID
+    ) else {
+      return
+    }
+
+    newNoteText = ""
+    isNoteFieldFocused = false
+  }
+}
+
+struct PersistenceUnavailableNotesState: View {
+  var body: some View {
+    Text("Persistent notes are unavailable while the local store is offline.")
+      .scaledFont(.subheadline)
+      .foregroundStyle(HarnessTheme.secondaryInk)
+      .accessibilityIdentifier(HarnessAccessibility.taskNotesUnavailable)
   }
 }
 

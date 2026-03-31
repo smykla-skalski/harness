@@ -1,6 +1,23 @@
 import SwiftUI
 
 struct HarnessAdaptiveGridLayout: Layout {
+  struct Cache {
+    var measurement: Measurement?
+    var signature: Signature?
+  }
+
+  struct Measurement {
+    let columns: Int
+    let rowHeights: [CGFloat]
+    let rowRanges: [Range<Int>]
+    let width: CGFloat?
+  }
+
+  struct Signature: Equatable {
+    let intrinsicSizes: [CGSize]
+    let width: CGFloat?
+  }
+
   let minimumColumnWidth: CGFloat
   let maximumColumns: Int
   let spacing: CGFloat
@@ -33,23 +50,31 @@ struct HarnessAdaptiveGridLayout: Layout {
     return spacing
   }
 
+  func makeCache(subviews _: Subviews) -> Cache {
+    Cache()
+  }
+
+  func updateCache(_ cache: inout Cache, subviews _: Subviews) {
+    cache = Cache()
+  }
+
   func sizeThatFits(
     proposal: ProposedViewSize,
     subviews: Subviews,
-    cache _: inout ()
+    cache: inout Cache
   ) -> CGSize {
-    let columns = resolvedColumnCount(width: proposal.width, itemCount: subviews.count)
-    let rowHeights = measuredRowHeights(
-      subviews: subviews,
+    let measurement = measuredLayout(
       width: proposal.width,
-      columns: columns
+      subviews: subviews,
+      cache: &cache
     )
-    let rowSpacing = CGFloat(max(rowHeights.count - 1, 0)) * safeSpacing
-    let height = rowHeights.reduce(0, +) + rowSpacing
+    let rowSpacing = CGFloat(max(measurement.rowHeights.count - 1, 0)) * safeSpacing
+    let height = measurement.rowHeights.reduce(0, +) + rowSpacing
     let width =
       proposal.width
-      ?? resolvedColumnWidth(width: nil, columns: columns) * CGFloat(columns)
-      + CGFloat(max(columns - 1, 0)) * safeSpacing
+      ?? resolvedColumnWidth(width: nil, columns: measurement.columns)
+      * CGFloat(measurement.columns)
+      + CGFloat(max(measurement.columns - 1, 0)) * safeSpacing
 
     return CGSize(width: width, height: height)
   }
@@ -58,25 +83,22 @@ struct HarnessAdaptiveGridLayout: Layout {
     in bounds: CGRect,
     proposal _: ProposedViewSize,
     subviews: Subviews,
-    cache _: inout ()
+    cache: inout Cache
   ) {
-    let columns = resolvedColumnCount(width: bounds.width, itemCount: subviews.count)
-    let rowHeights = measuredRowHeights(
-      subviews: subviews,
+    let measurement = measuredLayout(
       width: bounds.width,
-      columns: columns
+      subviews: subviews,
+      cache: &cache
     )
     var y = bounds.minY
 
-    for rowIndex in 0..<rowHeights.count {
-      let rowHeight = rowHeights[rowIndex]
-      let rowStart = rowIndex * columns
-      let rowEnd = min(rowStart + columns, subviews.count)
-      let rowColumns = rowEnd - rowStart
+    for (rowIndex, rowRange) in measurement.rowRanges.enumerated() {
+      let rowHeight = measurement.rowHeights[rowIndex]
+      let rowColumns = rowRange.count
       let columnWidth = resolvedColumnWidth(width: bounds.width, columns: rowColumns)
 
-      for index in rowStart..<rowEnd {
-        let columnIndex = index - rowStart
+      for index in rowRange {
+        let columnIndex = index - rowRange.lowerBound
         let x = bounds.minX + (CGFloat(columnIndex) * (columnWidth + safeSpacing))
         subviews[index].place(
           at: CGPoint(x: x, y: y),
@@ -127,10 +149,67 @@ struct HarnessAdaptiveGridLayout: Layout {
     return availableWidth / CGFloat(safeColumns)
   }
 
+  private func intrinsicSizes(for subviews: Subviews) -> [CGSize] {
+    subviews.map { $0.sizeThatFits(.unspecified) }
+  }
+
+  private func measuredLayout(
+    width: CGFloat?,
+    subviews: Subviews,
+    cache: inout Cache
+  ) -> Measurement {
+    let signature = Signature(
+      intrinsicSizes: intrinsicSizes(for: subviews),
+      width: normalizedWidth(width)
+    )
+    if cache.signature == signature, let measurement = cache.measurement {
+      return measurement
+    }
+
+    let columns = resolvedColumnCount(width: width, itemCount: subviews.count)
+    let measurement = Measurement(
+      columns: columns,
+      rowHeights: measuredRowHeights(
+        subviews: subviews,
+        width: width,
+        columns: columns
+      ),
+      rowRanges: rowRanges(itemCount: subviews.count, columns: columns),
+      width: normalizedWidth(width)
+    )
+    cache.signature = signature
+    cache.measurement = measurement
+    return measurement
+  }
+
+  private func normalizedWidth(_ width: CGFloat?) -> CGFloat? {
+    guard let width, width.isFinite, width > 0 else {
+      return nil
+    }
+    return width
+  }
+
+  private func rowRanges(itemCount: Int, columns: Int) -> [Range<Int>] {
+    guard itemCount > 0 else {
+      return []
+    }
+
+    var ranges: [Range<Int>] = []
+    var rowStart = 0
+
+    while rowStart < itemCount {
+      let rowEnd = min(rowStart + columns, itemCount)
+      ranges.append(rowStart..<rowEnd)
+      rowStart = rowEnd
+    }
+
+    return ranges
+  }
+
   private func measuredRowHeights(
     subviews: Subviews,
     width: CGFloat?,
-    columns: Int,
+    columns: Int
   ) -> [CGFloat] {
     guard !subviews.isEmpty else {
       return []

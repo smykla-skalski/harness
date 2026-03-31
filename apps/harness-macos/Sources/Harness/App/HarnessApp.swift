@@ -44,8 +44,13 @@ enum HarnessThemeMode: String, CaseIterable, Identifiable {
 @main
 @MainActor
 struct HarnessApp: App {
+  private struct PersistenceSetup {
+    let container: ModelContainer?
+    let error: String?
+  }
+
   @NSApplicationDelegateAdaptor private var delegate: HarnessAppDelegate
-  private let container: ModelContainer
+  private let container: ModelContainer?
   @State private var store: HarnessStore
   @AppStorage(HarnessThemeDefaults.modeKey)
   private var storedThemeMode = HarnessThemeMode.auto.rawValue
@@ -55,26 +60,23 @@ struct HarnessApp: App {
   private let isUITesting = ProcessInfo.processInfo.environment["HARNESS_UI_TESTS"] == "1"
 
   init() {
-    let uiTesting = ProcessInfo.processInfo.environment["HARNESS_UI_TESTS"] == "1"
+    let environment = HarnessEnvironment.current
+    let uiTesting = environment.values["HARNESS_UI_TESTS"] == "1"
+    let launchMode = HarnessLaunchMode(environment: environment)
     let initialThemeMode =
       uiTesting
-      ? (HarnessThemeMode(
-        rawValue: ProcessInfo.processInfo.environment["HARNESS_THEME_MODE_OVERRIDE"] ?? ""
-      ) ?? .auto)
+      ? (HarnessThemeMode(rawValue: environment.values["HARNESS_THEME_MODE_OVERRIDE"] ?? "")
+        ?? .auto)
       : .auto
-    let resolvedContainer =
-      (uiTesting
-        ? (try? HarnessModelContainer.preview())
-        : (try? HarnessModelContainer.live()))
-      ?? {
-        guard let fallback = try? HarnessModelContainer.preview() else {
-          fatalError("Unable to create model container for live or preview store")
-        }
-        return fallback
-      }()
-    container = resolvedContainer
+    let persistenceSetup = Self.resolvePersistenceSetup(
+      environment: environment,
+      launchMode: launchMode
+    )
+    container = persistenceSetup.container
     let resolvedStore = HarnessAppStoreFactory.makeStore(
-      modelContext: resolvedContainer.mainContext
+      environment: environment,
+      modelContext: persistenceSetup.container?.mainContext,
+      persistenceError: persistenceSetup.error
     )
     _store = State(initialValue: resolvedStore)
     _themeMode = State(initialValue: initialThemeMode)
@@ -87,8 +89,12 @@ struct HarnessApp: App {
 
   var body: some Scene {
     WindowGroup("Harness") {
-      rootContent
-        .modelContainer(container)
+      if let container {
+        rootContent
+          .modelContainer(container)
+      } else {
+        rootContent
+      }
     }
     .windowToolbarStyle(.unified)
     .defaultSize(width: 1640, height: 980)
@@ -114,7 +120,7 @@ struct HarnessApp: App {
   @ViewBuilder private var rootContent: some View {
     ContentView(store: store)
       .frame(minWidth: 900, minHeight: 600)
-      .dynamicTypeSize(HarnessTextSize.level(at: textSizeIndex))
+      .environment(\.fontScale, HarnessTextSize.scale(at: textSizeIndex))
       .preferredColorScheme(themeMode.colorScheme)
       .tint(HarnessTheme.accent)
       .onAppear { syncThemeFromStorage() }
@@ -197,7 +203,7 @@ struct HarnessApp: App {
         store.toggleSelectedSessionBookmark()
       }
       .keyboardShortcut("b", modifiers: [.command, .shift])
-      .disabled(store.selectedSessionID == nil)
+      .disabled(store.selectedSessionID == nil || !store.isPersistenceAvailable)
 
       Button("Copy Selection ID") {
         store.copySelectedItemID()
@@ -237,7 +243,7 @@ struct HarnessApp: App {
       themeMode: $themeMode
     )
     .frame(minWidth: 600, minHeight: 400)
-    .dynamicTypeSize(HarnessTextSize.level(at: textSizeIndex))
+    .environment(\.fontScale, HarnessTextSize.scale(at: textSizeIndex))
     .preferredColorScheme(themeMode.colorScheme)
     .tint(HarnessTheme.accent)
   }
@@ -270,5 +276,41 @@ struct HarnessApp: App {
     Task {
       await store.endSelectedSession()
     }
+  }
+
+  private static func resolvePersistenceSetup(
+    environment: HarnessEnvironment,
+    launchMode: HarnessLaunchMode
+  ) -> PersistenceSetup {
+    if environment.values["HARNESS_FORCE_PERSISTENCE_FAILURE"] == "1" {
+      return PersistenceSetup(
+        container: nil,
+        error: persistenceUnavailableMessage(details: "Forced failure for testing.")
+      )
+    }
+
+    do {
+      let container =
+        switch launchMode {
+        case .live:
+          try HarnessModelContainer.live(using: environment)
+        case .preview, .empty:
+          try HarnessModelContainer.preview()
+        }
+
+      return PersistenceSetup(container: container, error: nil)
+    } catch {
+      return PersistenceSetup(
+        container: nil,
+        error: persistenceUnavailableMessage(details: error.localizedDescription)
+      )
+    }
+  }
+
+  private static func persistenceUnavailableMessage(details: String) -> String {
+    """
+    Local persistence is unavailable. Harness will keep running, but bookmarks,
+    notes, and search history are disabled. \(details)
+    """
   }
 }

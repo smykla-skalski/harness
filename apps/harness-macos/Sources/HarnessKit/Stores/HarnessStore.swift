@@ -56,54 +56,184 @@ public final class HarnessStore {
     public var id: String { project.id }
   }
 
-  public var connectionState: ConnectionState = .idle
-  public var daemonStatus: DaemonStatusReport?
-  public var diagnostics: DaemonDiagnosticsReport?
-  public var health: HealthResponse?
-  public var projects: [ProjectSummary] = []
-  public var sessions: [SessionSummary] = []
-  public var selectedSessionID: String?
-  public var selectedSession: SessionDetail?
-  public var timeline: [TimelineEntry] = []
-  public var inspectorSelection: InspectorSelection = .none
-  public var actionActorID: String?
-  public var searchText = ""
-  public var sessionFilter: SessionFilter = .active
-  public var sessionFocusFilter: SessionFocusFilter = .all
-  public var sessionSortOrder: SessionSortOrder = .recentActivity
-  public var isRefreshing = false
-  public var isDiagnosticsRefreshInFlight = false
-  public var isDaemonActionInFlight = false
-  public var isSelectionLoading = false
-  public var isSessionActionInFlight = false
-  public var isBusy: Bool {
-    isDaemonActionInFlight || isSessionActionInFlight
+  @MainActor
+  @Observable
+  public final class ConnectionSlice {
+    public var connectionState: ConnectionState = .idle
+    public var daemonStatus: DaemonStatusReport?
+    public var diagnostics: DaemonDiagnosticsReport?
+    public var health: HealthResponse?
+    public var isRefreshing = false
+    public var isDiagnosticsRefreshInFlight = false
+    public var isDaemonActionInFlight = false
+    public var activeTransport: TransportKind = .httpSSE
+    public var connectionMetrics: ConnectionMetrics = .initial
+    public var connectionEvents: [ConnectionEvent] = []
+    public var subscribedSessionIDs: Set<String> = []
+    public var isShowingCachedData = false
   }
+
+  @MainActor
+  @Observable
+  public final class SessionIndexSlice {
+    public var projects: [ProjectSummary] = [] {
+      didSet { refreshDerivedStateIfNeeded(oldValue != projects) }
+    }
+    public var sessions: [SessionSummary] = [] {
+      didSet { refreshDerivedStateIfNeeded(oldValue != sessions) }
+    }
+    public var searchText = "" {
+      didSet { refreshDerivedStateIfNeeded(oldValue != searchText) }
+    }
+    public var sessionFilter: SessionFilter = .active {
+      didSet { refreshDerivedStateIfNeeded(oldValue != sessionFilter) }
+    }
+    public var sessionFocusFilter: SessionFocusFilter = .all {
+      didSet { refreshDerivedStateIfNeeded(oldValue != sessionFocusFilter) }
+    }
+    public var sessionSortOrder: SessionSortOrder = .recentActivity {
+      didSet { refreshDerivedStateIfNeeded(oldValue != sessionSortOrder) }
+    }
+    public private(set) var groupedSessions: [SessionGroup] = []
+    public private(set) var filteredSessionCount = 0
+    public private(set) var totalOpenWorkCount = 0
+    public private(set) var totalBlockedCount = 0
+    public private(set) var sessionSummariesByID: [String: SessionSummary] = [:]
+
+    private var suppressDerivedStateRefresh = false
+
+    public init() {}
+
+    public func replaceSnapshot(
+      projects: [ProjectSummary],
+      sessions: [SessionSummary]
+    ) {
+      guard self.projects != projects || self.sessions != sessions else {
+        return
+      }
+
+      suppressDerivedStateRefresh = true
+      self.projects = projects
+      self.sessions = sessions
+      suppressDerivedStateRefresh = false
+      rebuildDerivedState()
+    }
+
+    public func applySessionSummary(_ summary: SessionSummary) {
+      var updated = sessions
+      if let index = updated.firstIndex(where: { $0.sessionId == summary.sessionId }) {
+        guard updated[index] != summary else {
+          return
+        }
+        updated[index] = summary
+      } else {
+        updated.append(summary)
+      }
+      sessions = updated
+    }
+
+    public func sessionSummary(for sessionID: String?) -> SessionSummary? {
+      guard let sessionID else {
+        return nil
+      }
+      return sessionSummariesByID[sessionID]
+    }
+
+    private func refreshDerivedStateIfNeeded(_ changed: Bool) {
+      guard changed, !suppressDerivedStateRefresh else {
+        return
+      }
+      rebuildDerivedState()
+    }
+
+    private func rebuildDerivedState() {
+      totalOpenWorkCount = sessions.reduce(0) { $0 + $1.metrics.openTaskCount }
+      totalBlockedCount = sessions.reduce(0) { $0 + $1.metrics.blockedTaskCount }
+      sessionSummariesByID = Dictionary(uniqueKeysWithValues: sessions.map { ($0.sessionId, $0) })
+
+      let filteredSessions = sessions.filter(matchesCurrentFilters)
+      filteredSessionCount = filteredSessions.count
+      let sessionsByProject = Dictionary(grouping: filteredSessions, by: \.projectId)
+
+      groupedSessions = projects.compactMap { project in
+        guard let sessions = sessionsByProject[project.projectId], !sessions.isEmpty else {
+          return nil
+        }
+        return SessionGroup(
+          project: project,
+          sessions: sessions.sorted(by: sessionSortOrder.compare)
+        )
+      }
+    }
+
+    private func matchesCurrentFilters(_ summary: SessionSummary) -> Bool {
+      sessionFilter.includes(summary.status)
+        && sessionFocusFilter.includes(summary)
+        && searchMatches(summary)
+    }
+
+    private func searchMatches(_ summary: SessionSummary) -> Bool {
+      let needle = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+      guard !needle.isEmpty else {
+        return true
+      }
+
+      let haystack = [
+        summary.projectName,
+        summary.projectId,
+        summary.sessionId,
+        summary.context,
+        summary.projectDir ?? "",
+        summary.contextRoot,
+        summary.leaderId ?? "",
+        summary.observeId ?? "",
+        summary.status.rawValue,
+      ].joined(separator: " ")
+
+      return needle
+        .split(whereSeparator: \.isWhitespace)
+        .allSatisfy { haystack.localizedStandardContains($0) }
+    }
+  }
+
+  @MainActor
+  @Observable
+  public final class SelectionSlice {
+    public var selectedSessionID: String?
+    public var selectedSession: SessionDetail?
+    public var timeline: [TimelineEntry] = []
+    public var inspectorSelection: InspectorSelection = .none
+    public var actionActorID: String?
+    public var isSelectionLoading = false
+    public var isSessionActionInFlight = false
+  }
+
+  @MainActor
+  @Observable
+  public final class UserDataSlice {
+    public var bookmarkedSessionIds: Set<String> = []
+    public var notesByTargetKey: [String: [UserNote]] = [:]
+    public var recentSearches: [RecentSearch] = []
+
+    public init() {}
+  }
+
+  public let connection = ConnectionSlice()
+  public let sessionIndex = SessionIndexSlice()
+  public let selection = SelectionSlice()
+  public let userData = UserDataSlice()
+
   public var lastAction = ""
   public var lastError: String?
+  public var persistenceError: String?
   public var pendingConfirmation: PendingConfirmation?
   public var showConfirmation: Bool {
     get { pendingConfirmation != nil }
     set { if !newValue { cancelConfirmation() } }
   }
-  public var activeTransport: TransportKind = .httpSSE
-  public var connectionMetrics: ConnectionMetrics = .initial
-  public var connectionEvents: [ConnectionEvent] = []
-  public var subscribedSessionIDs: Set<String> = []
-  public var isShowingCachedData = false
-  public var bookmarkedSessionIds: Set<String> = []
   public var navigationBackStack: [String?] = []
   public var navigationForwardStack: [String?] = []
   var connectionProbeInterval: Duration = .seconds(10)
-  public var dataReceivedPulse: Bool {
-    guard connectionState == .online,
-      let lastMessageAt = connectionMetrics.lastMessageAt
-    else {
-      return false
-    }
-
-    return Date.now.timeIntervalSince(lastMessageAt) < 1.5
-  }
 
   let daemonController: any DaemonControlling
   public let modelContext: ModelContext?
@@ -111,19 +241,26 @@ public final class HarnessStore {
   var globalStreamTask: Task<Void, Never>?
   var sessionStreamTask: Task<Void, Never>?
   var connectionProbeTask: Task<Void, Never>?
+  var sessionPushFallbackTask: Task<Void, Never>?
   var latencySamplesMs: [Int] = []
   var trafficSampleTimes: [Date] = []
   var activeSessionLoadRequest: UInt64 = 0
   var sessionLoadSequence: UInt64 = 0
+  var sessionPushFallbackSequence: UInt64 = 0
+  var pendingSessionPushFallback: (sessionID: String, token: UInt64)?
   var isNavigatingHistory = false
   private var hasBootstrapped = false
 
   public init(
     daemonController: any DaemonControlling,
-    modelContext: ModelContext? = nil
+    modelContext: ModelContext? = nil,
+    persistenceError: String? = nil
   ) {
     self.daemonController = daemonController
     self.modelContext = modelContext
+    self.persistenceError = persistenceError
+    refreshBookmarkedSessionIds()
+    refreshRecentSearches()
   }
 
   public func bootstrapIfNeeded() async {
@@ -132,6 +269,7 @@ public final class HarnessStore {
     }
     hasBootstrapped = true
     refreshBookmarkedSessionIds()
+    refreshRecentSearches()
     await bootstrap()
   }
 
@@ -254,5 +392,6 @@ public final class HarnessStore {
     stopGlobalStream()
     stopSessionStream(resetSubscriptions: resetSubscriptions)
     stopConnectionProbe()
+    cancelSessionPushFallback()
   }
 }

@@ -31,7 +31,6 @@ struct SessionMetricGrid: View {
       metricCard(
         title: "Completed", value: "\(metrics.completedTaskCount)", tint: HarnessTheme.ink)
     }
-    .animation(.spring(duration: 0.3), value: metrics)
   }
 
   private func metricCard(title: String, value: String, tint: Color) -> some View {
@@ -43,11 +42,11 @@ struct SessionMetricGrid: View {
         .accessibilityHidden(true)
       VStack(alignment: .leading, spacing: HarnessTheme.itemSpacing) {
         Text(title.uppercased())
-          .font(.caption.weight(.semibold))
+          .scaledFont(.caption.weight(.semibold))
           .tracking(HarnessTheme.uppercaseTracking)
           .foregroundStyle(HarnessTheme.secondaryInk)
         Text(value)
-          .font(.system(.title, design: .rounded, weight: .heavy))
+          .scaledFont(.system(.title, design: .rounded, weight: .heavy))
           .foregroundStyle(tint)
           .contentTransition(.numericText())
       }
@@ -67,7 +66,7 @@ struct SessionTaskListSection: View {
   var body: some View {
     VStack(alignment: .leading, spacing: HarnessTheme.sectionSpacing) {
       Text("Tasks")
-        .font(.system(.title3, design: .rounded, weight: .semibold))
+        .scaledFont(.system(.title3, design: .rounded, weight: .semibold))
         .accessibilityAddTraits(.isHeader)
       if tasks.isEmpty {
         ContentUnavailableView {
@@ -76,7 +75,7 @@ struct SessionTaskListSection: View {
           Text("Create a task from the Action Console in the inspector.")
         }
       } else {
-        VStack(alignment: .leading, spacing: HarnessTheme.sectionSpacing) {
+        LazyVStack(alignment: .leading, spacing: HarnessTheme.sectionSpacing) {
           ForEach(tasks) { task in
             SessionTaskSummaryCard(task: task, store: store)
           }
@@ -97,28 +96,28 @@ struct SessionTaskSummaryCard: View {
       VStack(alignment: .leading, spacing: HarnessTheme.itemSpacing) {
         HStack(alignment: .top) {
           Text(task.title)
-            .font(.system(.headline, design: .rounded, weight: .semibold))
+            .scaledFont(.system(.headline, design: .rounded, weight: .semibold))
             .lineLimit(2)
           Spacer()
           Text(task.severity.title)
-            .font(.caption.bold())
+            .scaledFont(.caption.bold())
             .harnessPillPadding()
             .background(severityColor(for: task.severity), in: Capsule())
             .foregroundStyle(HarnessTheme.onContrast)
         }
         Text(task.context ?? "No extra context")
-          .font(.subheadline)
+          .scaledFont(.subheadline)
           .foregroundStyle(HarnessTheme.secondaryInk)
           .multilineTextAlignment(.leading)
           .lineLimit(2)
         Spacer(minLength: 0)
         HStack(alignment: .firstTextBaseline) {
           Text(task.status.title)
-            .font(.caption.weight(.bold))
+            .scaledFont(.caption.weight(.bold))
             .foregroundStyle(taskStatusColor(for: task.status))
           Spacer()
           Text(task.assignedTo ?? "unassigned")
-            .font(.caption.monospaced())
+            .scaledFont(.caption.monospaced())
             .foregroundStyle(HarnessTheme.secondaryInk)
             .lineLimit(1)
         }
@@ -153,7 +152,7 @@ struct SessionAgentListSection: View {
   var body: some View {
     VStack(alignment: .leading, spacing: HarnessTheme.sectionSpacing) {
       Text("Agents")
-        .font(.system(.title3, design: .rounded, weight: .semibold))
+        .scaledFont(.system(.title3, design: .rounded, weight: .semibold))
         .accessibilityAddTraits(.isHeader)
       if agents.isEmpty {
         ContentUnavailableView {
@@ -162,7 +161,7 @@ struct SessionAgentListSection: View {
           Text("Agents appear here when they join the session.")
         }
       } else {
-        VStack(alignment: .leading, spacing: HarnessTheme.sectionSpacing) {
+        LazyVStack(alignment: .leading, spacing: HarnessTheme.sectionSpacing) {
           ForEach(agents) { agent in
             SessionAgentSummaryCard(agent: agent, store: store)
           }
@@ -183,17 +182,17 @@ struct SessionAgentSummaryCard: View {
       VStack(alignment: .leading, spacing: HarnessTheme.itemSpacing) {
         HStack(alignment: .top) {
           Text(agent.name)
-            .font(.system(.headline, design: .rounded, weight: .semibold))
+            .scaledFont(.system(.headline, design: .rounded, weight: .semibold))
             .lineLimit(2)
           Spacer()
           Text(agent.role.title)
-            .font(.caption.bold())
+            .scaledFont(.caption.bold())
             .harnessPillPadding()
             .background(HarnessTheme.accent, in: Capsule())
             .foregroundStyle(HarnessTheme.onContrast)
         }
         Text("\(agent.runtime) • \(agent.agentId)")
-          .font(.caption.monospaced())
+          .scaledFont(.caption.monospaced())
           .foregroundStyle(HarnessTheme.secondaryInk)
           .lineLimit(1)
         Spacer(minLength: 0)
@@ -227,7 +226,7 @@ struct SessionAgentSummaryCard: View {
 
   private func badge(_ value: String) -> some View {
     Text(value)
-      .font(.caption.weight(.semibold))
+      .scaledFont(.caption.weight(.semibold))
       .lineLimit(1)
       .harnessPillPadding()
       .harnessInfoPill()

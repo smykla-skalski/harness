@@ -8,13 +8,13 @@ struct SessionsBoardRecentSessionsSection: View {
   var body: some View {
     VStack(alignment: .leading, spacing: HarnessTheme.sectionSpacing) {
       Text("Recent Sessions")
-        .font(.system(.title3, design: .rounded, weight: .semibold))
+        .scaledFont(.system(.title3, design: .rounded, weight: .semibold))
         .accessibilityAddTraits(.isHeader)
       if sessions.isEmpty {
         Text(
           "No sessions indexed yet. Bring the daemon online or refresh after starting a harness session."
         )
-        .font(.system(.body, design: .rounded, weight: .medium))
+        .scaledFont(.system(.body, design: .rounded, weight: .medium))
         .foregroundStyle(HarnessTheme.secondaryInk)
         .frame(maxWidth: .infinity, alignment: .leading)
       } else {
@@ -32,21 +32,21 @@ struct SessionsBoardRecentSessionsSection: View {
                 VStack(alignment: .leading, spacing: 4) {
                   HStack(spacing: HarnessTheme.itemSpacing) {
                     Text(session.context)
-                      .font(.system(.headline, design: .rounded, weight: .semibold))
+                      .scaledFont(.system(.headline, design: .rounded, weight: .semibold))
                       .foregroundStyle(HarnessTheme.ink)
                       .multilineTextAlignment(.leading)
                     Text(session.status.title)
-                      .font(.caption2.weight(.bold))
+                      .scaledFont(.caption2.weight(.bold))
                       .foregroundStyle(statusColor(for: session.status))
                   }
                   Text("\(session.projectName) • \(session.sessionId)")
-                    .font(.caption.monospaced())
+                    .scaledFont(.caption.monospaced())
                     .truncationMode(.middle)
                     .foregroundStyle(HarnessTheme.secondaryInk)
                 }
                 Spacer()
                 Text(formatTimestamp(session.updatedAt))
-                  .font(.caption.weight(.semibold))
+                  .scaledFont(.caption.weight(.semibold))
                   .foregroundStyle(HarnessTheme.secondaryInk)
               }
               .frame(maxWidth: .infinity, alignment: .leading)

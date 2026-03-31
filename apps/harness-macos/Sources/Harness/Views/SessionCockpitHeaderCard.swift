@@ -15,15 +15,15 @@ struct SessionCockpitHeaderCard: View {
               .frame(width: 12, height: 12)
               .accessibilityHidden(true)
             Text(detail.session.status.title)
-              .font(.caption.weight(.bold))
+              .scaledFont(.caption.weight(.bold))
               .tracking(HarnessTheme.uppercaseTracking)
               .foregroundStyle(statusColor(for: detail.session.status))
             Text(detail.session.context)
-              .font(.system(.largeTitle, design: .rounded, weight: .black))
+              .scaledFont(.system(.largeTitle, design: .rounded, weight: .black))
               .lineLimit(2)
           }
           Text("\(detail.session.projectName) • \(detail.session.sessionId)")
-            .font(.system(.subheadline, design: .rounded, weight: .medium))
+            .scaledFont(.system(.subheadline, design: .rounded, weight: .medium))
             .foregroundStyle(HarnessTheme.secondaryInk)
         }
         Spacer()
@@ -59,7 +59,7 @@ struct SessionCockpitHeaderCard: View {
 
   private var observeButton: some View {
     Button("Observe", action: observeSelectedSession)
-      .font(.system(.subheadline, design: .rounded, weight: .semibold))
+      .scaledFont(.system(.subheadline, design: .rounded, weight: .semibold))
       .harnessActionButtonStyle(
         variant: .prominent,
         tint: nil
@@ -70,7 +70,7 @@ struct SessionCockpitHeaderCard: View {
 
   private var endSessionButton: some View {
     Button("End Session", action: store.requestEndSelectedSessionConfirmation)
-      .font(.system(.subheadline, design: .rounded, weight: .semibold))
+      .scaledFont(.system(.subheadline, design: .rounded, weight: .semibold))
       .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
       .controlSize(HarnessControlMetrics.compactControlSize)
       .accessibilityIdentifier(HarnessAccessibility.endSessionButton)
@@ -104,13 +104,13 @@ struct SessionCockpitHeaderCard: View {
         }
         if let openIssues = observer.openIssues, !openIssues.isEmpty {
           Text(openIssues.prefix(2).map(\.summary).joined(separator: " · "))
-            .font(.caption)
+            .scaledFont(.caption)
             .foregroundStyle(HarnessTheme.secondaryInk)
             .lineLimit(1)
         }
         if let mutedCodes = observer.mutedCodes, !mutedCodes.isEmpty {
           Text("Muted: \(mutedCodes.prefix(3).joined(separator: ", "))")
-            .font(.caption)
+            .scaledFont(.caption)
             .foregroundStyle(HarnessTheme.secondaryInk)
             .lineLimit(1)
         }
@@ -128,21 +128,21 @@ struct SessionCockpitHeaderCard: View {
     VStack(alignment: .leading, spacing: HarnessTheme.itemSpacing) {
       HStack {
         Label("Pending Leader Transfer", systemImage: "arrow.left.arrow.right")
-          .font(.system(.headline, design: .rounded, weight: .semibold))
+          .scaledFont(.system(.headline, design: .rounded, weight: .semibold))
         Spacer()
         Text(formatTimestamp(pendingTransfer.requestedAt))
-          .font(.caption.monospaced())
+          .scaledFont(.caption.monospaced())
           .foregroundStyle(HarnessTheme.secondaryInk)
       }
       let requested = pendingTransfer.requestedBy
       let newLeader = pendingTransfer.newLeaderId
       let current = pendingTransfer.currentLeaderId
       Text("\(requested) requested \(newLeader) to replace \(current).")
-        .font(.system(.body, design: .rounded, weight: .medium))
+        .scaledFont(.system(.body, design: .rounded, weight: .medium))
         .foregroundStyle(HarnessTheme.secondaryInk)
       if let reason = pendingTransfer.reason, !reason.isEmpty {
         Text(reason)
-          .font(.system(.footnote, design: .rounded, weight: .semibold))
+          .scaledFont(.system(.footnote, design: .rounded, weight: .semibold))
           .foregroundStyle(HarnessTheme.warmAccent)
       }
     }
@@ -159,11 +159,11 @@ struct SessionCockpitHeaderCard: View {
   private func summaryLabel(_ title: String, value: String) -> some View {
     VStack(alignment: .leading, spacing: 2) {
       Text(title.uppercased())
-        .font(.caption2.weight(.bold))
+        .scaledFont(.caption2.weight(.bold))
         .tracking(HarnessTheme.uppercaseTracking)
         .foregroundStyle(HarnessTheme.secondaryInk)
       Text(value)
-        .font(.system(.callout, design: .rounded, weight: .semibold))
+        .scaledFont(.system(.callout, design: .rounded, weight: .semibold))
     }
   }
 

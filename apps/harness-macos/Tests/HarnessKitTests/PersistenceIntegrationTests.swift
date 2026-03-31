@@ -19,6 +19,16 @@ struct PersistenceIntegrationTests {
     )
   }
 
+  private func fetchNotes(
+    targetId: String,
+    sessionId: String
+  ) throws -> [UserNote] {
+    let notes = try container.mainContext.fetch(FetchDescriptor<UserNote>())
+    return notes
+      .filter { $0.targetId == targetId && $0.sessionId == sessionId }
+      .sorted { $0.createdAt > $1.createdAt }
+  }
+
   @Test("cacheSessionList writes projects and sessions")
   func cacheSessionListWritesThenReads() throws {
     let store = makeStore()
@@ -192,21 +202,47 @@ struct PersistenceIntegrationTests {
   func userNotesCRUD() throws {
     let store = makeStore()
 
-    store.addNote(
+    #expect(store.addNote(
       text: "Fix this later",
       targetKind: "task",
       targetId: "task-42",
       sessionId: "sess-1"
-    )
+    ))
 
-    let notes = store.notes(for: "task-42")
+    let notes = try fetchNotes(targetId: "task-42", sessionId: "sess-1")
     #expect(notes.count == 1)
     #expect(notes.first?.text == "Fix this later")
 
     if let note = notes.first {
-      store.deleteNote(note)
+      #expect(store.deleteNote(note))
     }
-    #expect(store.notes(for: "task-42").isEmpty)
+    #expect(try fetchNotes(targetId: "task-42", sessionId: "sess-1").isEmpty)
+  }
+
+  @Test("User notes stay scoped to their session")
+  func userNotesStayScopedToSession() throws {
+    let store = makeStore()
+
+    #expect(store.addNote(
+      text: "Session one note",
+      targetKind: "task",
+      targetId: "task-42",
+      sessionId: "sess-1"
+    ))
+    #expect(store.addNote(
+      text: "Session two note",
+      targetKind: "task",
+      targetId: "task-42",
+      sessionId: "sess-2"
+    ))
+
+    let sessionOneNotes = try fetchNotes(targetId: "task-42", sessionId: "sess-1")
+    let sessionTwoNotes = try fetchNotes(targetId: "task-42", sessionId: "sess-2")
+
+    #expect(sessionOneNotes.count == 1)
+    #expect(sessionOneNotes.first?.text == "Session one note")
+    #expect(sessionTwoNotes.count == 1)
+    #expect(sessionTwoNotes.first?.text == "Session two note")
   }
 
   @Test("Recent search records and evicts")
@@ -240,5 +276,28 @@ struct PersistenceIntegrationTests {
     store.loadFilterPreference(for: "proj-1")
     #expect(store.sessionFilter == .ended)
     #expect(store.sessionFocusFilter == .blocked)
+  }
+
+  @Test("Degraded persistence mode fails safely")
+  func degradedPersistenceModeFailsSafely() {
+    let store = HarnessStore(
+      daemonController: RecordingDaemonController(),
+      persistenceError: "Local persistence is unavailable."
+    )
+
+    #expect(store.isPersistenceAvailable == false)
+    #expect(store.selectedSessionBookmarkTitle == "Bookmarks Unavailable")
+    #expect(store.toggleBookmark(sessionId: "sess-bm", projectId: "proj-1") == false)
+    #expect(store.addNote(
+      text: "Should not save",
+      targetKind: "task",
+      targetId: "task-42",
+      sessionId: "sess-1"
+    ) == false)
+    #expect(store.recordSearch("cockpit") == false)
+    #expect(store.clearSearchHistory() == false)
+    #expect(store.recentSearches.isEmpty)
+    #expect(store.isBookmarked(sessionId: "sess-bm") == false)
+    #expect(store.lastError == "Local persistence is unavailable.")
   }
 }

@@ -1,6 +1,16 @@
 import SwiftUI
 
 struct HarnessWrapLayout: Layout {
+  struct Cache {
+    var rows: [HarnessWrapLayoutRow] = []
+    var signature: Signature?
+  }
+
+  struct Signature: Equatable {
+    let intrinsicSizes: [CGSize]
+    let maxWidth: CGFloat
+  }
+
   let spacing: CGFloat
   let lineSpacing: CGFloat
 
@@ -9,14 +19,23 @@ struct HarnessWrapLayout: Layout {
     self.lineSpacing = lineSpacing ?? spacing
   }
 
+  func makeCache(subviews _: Subviews) -> Cache {
+    Cache()
+  }
+
+  func updateCache(_ cache: inout Cache, subviews _: Subviews) {
+    cache = Cache()
+  }
+
   func sizeThatFits(
     proposal: ProposedViewSize,
     subviews: Subviews,
-    cache _: inout ()
+    cache: inout Cache
   ) -> CGSize {
     let rows = arrangedRows(
       maxWidth: proposal.width ?? .greatestFiniteMagnitude,
-      subviews: subviews
+      subviews: subviews,
+      cache: &cache
     )
 
     guard !rows.isEmpty else {
@@ -38,9 +57,13 @@ struct HarnessWrapLayout: Layout {
     in bounds: CGRect,
     proposal _: ProposedViewSize,
     subviews: Subviews,
-    cache _: inout ()
+    cache: inout Cache
   ) {
-    let rows = arrangedRows(maxWidth: bounds.width, subviews: subviews)
+    let rows = arrangedRows(
+      maxWidth: bounds.width,
+      subviews: subviews,
+      cache: &cache
+    )
     var y = bounds.minY
 
     for row in rows {
@@ -61,7 +84,8 @@ struct HarnessWrapLayout: Layout {
 
   private func arrangedRows(
     maxWidth: CGFloat,
-    subviews: Subviews
+    subviews: Subviews,
+    cache: inout Cache
   ) -> [HarnessWrapLayoutRow] {
     guard !subviews.isEmpty else {
       return []
@@ -71,6 +95,14 @@ struct HarnessWrapLayout: Layout {
       maxWidth.isFinite && maxWidth > 0
       ? maxWidth
       : .greatestFiniteMagnitude
+    let intrinsicSizes = subviews.map { $0.sizeThatFits(.unspecified) }
+    let signature = Signature(
+      intrinsicSizes: intrinsicSizes,
+      maxWidth: clampedWidth
+    )
+    if cache.signature == signature {
+      return cache.rows
+    }
 
     var rows: [HarnessWrapLayoutRow] = []
     var currentItems: [HarnessWrapLayoutItem] = []
@@ -78,7 +110,11 @@ struct HarnessWrapLayout: Layout {
     var currentHeight: CGFloat = 0
 
     for index in subviews.indices {
-      let itemSize = measuredSize(for: subviews[index], maxWidth: clampedWidth)
+      let itemSize = measuredSize(
+        for: subviews[index],
+        intrinsicSize: intrinsicSizes[index],
+        maxWidth: clampedWidth
+      )
       let proposedWidth =
         currentItems.isEmpty
         ? itemSize.width
@@ -120,15 +156,16 @@ struct HarnessWrapLayout: Layout {
       )
     }
 
+    cache.signature = signature
+    cache.rows = rows
     return rows
   }
 
   private func measuredSize(
     for subview: LayoutSubview,
+    intrinsicSize: CGSize,
     maxWidth: CGFloat
   ) -> CGSize {
-    let intrinsicSize = subview.sizeThatFits(.unspecified)
-
     guard intrinsicSize.width > maxWidth else {
       return intrinsicSize
     }
@@ -139,13 +176,13 @@ struct HarnessWrapLayout: Layout {
   }
 }
 
-private struct HarnessWrapLayoutRow {
+struct HarnessWrapLayoutRow {
   let items: [HarnessWrapLayoutItem]
   let width: CGFloat
   let height: CGFloat
 }
 
-private struct HarnessWrapLayoutItem {
+struct HarnessWrapLayoutItem {
   let index: Int
   let size: CGSize
 }
