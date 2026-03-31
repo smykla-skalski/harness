@@ -229,18 +229,27 @@ private struct HarnessSystemButtonChromeModifier: ViewModifier {
 }
 
 private enum HarnessProminentButtonContrast {
+  private static let darkForeground = Color.black.opacity(0.82)
+  private static let lightForeground = HarnessTheme.onContrast
+
   static func foreground(for tint: Color) -> Color {
     guard let rgbColor = NSColor(tint).usingColorSpace(NSColorSpace.deviceRGB)
     else {
-      return HarnessTheme.onContrast
+      return lightForeground
     }
 
-    let luminance = relativeLuminance(
+    let bgLuminance = relativeLuminance(
       red: rgbColor.redComponent,
       green: rgbColor.greenComponent,
       blue: rgbColor.blueComponent
     )
-    return luminance > 0.44 ? Color.black.opacity(0.82) : HarnessTheme.onContrast
+
+    // WCAG contrast ratio: pick whichever foreground has better contrast.
+    // White luminance ~1.0, dark foreground luminance ~0.03.
+    let contrastWithWhite = (1.0 + 0.05) / (bgLuminance + 0.05)
+    let contrastWithDark = (bgLuminance + 0.05) / (0.03 + 0.05)
+
+    return contrastWithDark >= contrastWithWhite ? darkForeground : lightForeground
   }
 
   private static func relativeLuminance(red: CGFloat, green: CGFloat, blue: CGFloat) -> CGFloat {
