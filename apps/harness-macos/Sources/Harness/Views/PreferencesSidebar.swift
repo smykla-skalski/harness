@@ -29,7 +29,7 @@ enum PreferencesChromeMetrics {
   static let sidebarIdealWidth: CGFloat = 210
   static let sidebarMaxWidth: CGFloat = 240
   static let sidebarMinRowHeight: CGFloat = 30
-  static let detailContentHorizontalInset: CGFloat = -18
+  static let detailContentHorizontalInset: CGFloat = -16
 }
 
 struct PreferencesDetailFormModifier: ViewModifier {

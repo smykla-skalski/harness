@@ -56,7 +56,7 @@ struct InspectorActionSections: View {
 }
 extension InspectorActionSections {
   fileprivate var statusBanner: some View {
-    VStack(alignment: .leading, spacing: 8) {
+    VStack(alignment: .leading, spacing: HarnessTheme.itemSpacing) {
       HStack {
         Label("Action Console", systemImage: "dial.high")
           .font(.system(.headline, design: .rounded, weight: .semibold))
@@ -109,7 +109,7 @@ extension InspectorActionSections {
     }
   }
   fileprivate func taskActions(task: WorkItem) -> some View {
-    VStack(alignment: .leading, spacing: 12) {
+    VStack(alignment: .leading, spacing: HarnessTheme.sectionSpacing) {
       HarnessActionHeader(
         title: "Task Actions",
         subtitle: "Reassign, update status, or checkpoint the selected task."
@@ -177,7 +177,7 @@ extension InspectorActionSections {
     }
   }
   fileprivate var sessionTaskActions: some View {
-    VStack(alignment: .leading, spacing: 12) {
+    VStack(alignment: .leading, spacing: HarnessTheme.sectionSpacing) {
       HarnessActionHeader(
         title: "Create Task",
         subtitle: "Capture new work directly into the active session."
@@ -203,7 +203,7 @@ extension InspectorActionSections {
     }
   }
   fileprivate func roleActions(agent: AgentRegistration) -> some View {
-    VStack(alignment: .leading, spacing: 12) {
+    VStack(alignment: .leading, spacing: HarnessTheme.sectionSpacing) {
       HarnessActionHeader(
         title: "Role Actions",
         subtitle: "Change the selected agent role without leaving the inspector."
@@ -230,7 +230,7 @@ extension InspectorActionSections {
     }
   }
   fileprivate var leaderActions: some View {
-    VStack(alignment: .leading, spacing: 12) {
+    VStack(alignment: .leading, spacing: HarnessTheme.sectionSpacing) {
       HarnessActionHeader(
         title: "Leader Transfer",
         subtitle: "Promote a live agent to leader when the current leader needs to step away."

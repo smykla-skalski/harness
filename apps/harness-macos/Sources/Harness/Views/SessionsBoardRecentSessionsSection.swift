@@ -6,7 +6,7 @@ struct SessionsBoardRecentSessionsSection: View {
   let store: HarnessStore
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 12) {
+    VStack(alignment: .leading, spacing: HarnessTheme.sectionSpacing) {
       Text("Recent Sessions")
         .font(.system(.title3, design: .rounded, weight: .semibold))
         .accessibilityAddTraits(.isHeader)
@@ -18,13 +18,13 @@ struct SessionsBoardRecentSessionsSection: View {
         .foregroundStyle(HarnessTheme.secondaryInk)
         .frame(maxWidth: .infinity, alignment: .leading)
       } else {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: HarnessTheme.sectionSpacing) {
           ForEach(sessions.prefix(8)) { session in
             Button {
               store.primeSessionSelection(session.sessionId)
               Task { await store.selectSession(session.sessionId) }
             } label: {
-              HStack(alignment: .top, spacing: 12) {
+              HStack(alignment: .top, spacing: HarnessTheme.sectionSpacing) {
                 RoundedRectangle(cornerRadius: HarnessTheme.cornerRadiusSM, style: .continuous)
                   .fill(statusColor(for: session.status))
                   .frame(width: 8)
@@ -44,7 +44,7 @@ struct SessionsBoardRecentSessionsSection: View {
                   .foregroundStyle(HarnessTheme.secondaryInk)
               }
               .frame(maxWidth: .infinity, alignment: .leading)
-              .padding(12)
+              .padding(HarnessTheme.cardPadding)
             }
             .harnessInteractiveCardButtonStyle()
           }

@@ -5,7 +5,11 @@ struct SessionMetricGrid: View {
   let metrics: SessionMetrics
 
   var body: some View {
-    HarnessAdaptiveGridLayout(minimumColumnWidth: 130, maximumColumns: 5, spacing: 12) {
+    HarnessAdaptiveGridLayout(
+      minimumColumnWidth: 130,
+      maximumColumns: 5,
+      spacing: HarnessTheme.sectionSpacing
+    ) {
       metricCard(
         title: "Agents",
         value: "\(metrics.agentCount)",
@@ -27,13 +31,13 @@ struct SessionMetricGrid: View {
   }
 
   private func metricCard(title: String, value: String, tint: Color) -> some View {
-    HStack(alignment: .top, spacing: 12) {
+    HStack(alignment: .top, spacing: HarnessTheme.sectionSpacing) {
       RoundedRectangle(cornerRadius: 999, style: .continuous)
         .fill(tint)
         .frame(width: 8)
         .frame(minHeight: 60)
         .accessibilityHidden(true)
-      VStack(alignment: .leading, spacing: 8) {
+      VStack(alignment: .leading, spacing: HarnessTheme.itemSpacing) {
         Text(title.uppercased())
           .font(.caption.weight(.semibold))
           .foregroundStyle(HarnessTheme.secondaryInk)
@@ -45,7 +49,7 @@ struct SessionMetricGrid: View {
       .frame(maxWidth: .infinity, alignment: .leading)
     }
     .frame(maxWidth: .infinity, alignment: .leading)
-    .padding(.vertical, 8)
+    .padding(.vertical, HarnessTheme.itemSpacing)
   }
 }
 
@@ -56,11 +60,11 @@ struct SessionTaskListSection: View {
   let store: HarnessStore
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 12) {
+    VStack(alignment: .leading, spacing: HarnessTheme.sectionSpacing) {
       Text("Tasks")
         .font(.system(.title3, design: .rounded, weight: .semibold))
         .accessibilityAddTraits(.isHeader)
-      VStack(alignment: .leading, spacing: 12) {
+      VStack(alignment: .leading, spacing: HarnessTheme.sectionSpacing) {
         ForEach(tasks) { task in
           SessionTaskSummaryCard(task: task, store: store)
         }
@@ -77,7 +81,7 @@ struct SessionTaskSummaryCard: View {
 
   var body: some View {
     Button { store.inspect(taskID: task.taskId) } label: {
-      VStack(alignment: .leading, spacing: 8) {
+      VStack(alignment: .leading, spacing: HarnessTheme.itemSpacing) {
         HStack(alignment: .top) {
           Text(task.title)
             .font(.system(.headline, design: .rounded, weight: .semibold))
@@ -85,8 +89,7 @@ struct SessionTaskSummaryCard: View {
           Spacer()
           Text(task.severity.title)
             .font(.caption.bold())
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
+            .harnessPillPadding()
             .background(severityColor(for: task.severity), in: Capsule())
             .foregroundStyle(HarnessTheme.onContrast)
         }
@@ -108,7 +111,7 @@ struct SessionTaskSummaryCard: View {
         }
       }
       .frame(maxWidth: .infinity, minHeight: sessionLaneCardHeight, alignment: .topLeading)
-      .padding(12)
+      .padding(HarnessTheme.cardPadding)
     }
     .harnessInteractiveCardButtonStyle()
     .accessibilityIdentifier(HarnessAccessibility.sessionTaskCard(task.taskId))
@@ -126,11 +129,11 @@ struct SessionAgentListSection: View {
   let store: HarnessStore
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 12) {
+    VStack(alignment: .leading, spacing: HarnessTheme.sectionSpacing) {
       Text("Agents")
         .font(.system(.title3, design: .rounded, weight: .semibold))
         .accessibilityAddTraits(.isHeader)
-      VStack(alignment: .leading, spacing: 12) {
+      VStack(alignment: .leading, spacing: HarnessTheme.sectionSpacing) {
         ForEach(agents) { agent in
           SessionAgentSummaryCard(agent: agent, store: store)
         }
@@ -147,7 +150,7 @@ struct SessionAgentSummaryCard: View {
 
   var body: some View {
     Button { store.inspect(agentID: agent.agentId) } label: {
-      VStack(alignment: .leading, spacing: 8) {
+      VStack(alignment: .leading, spacing: HarnessTheme.itemSpacing) {
         HStack(alignment: .top) {
           Text(agent.name)
             .font(.system(.headline, design: .rounded, weight: .semibold))
@@ -155,8 +158,7 @@ struct SessionAgentSummaryCard: View {
           Spacer()
           Text(agent.role.title)
             .font(.caption.bold())
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
+            .harnessPillPadding()
             .background(HarnessTheme.accent, in: Capsule())
             .foregroundStyle(HarnessTheme.onContrast)
         }
@@ -165,14 +167,14 @@ struct SessionAgentSummaryCard: View {
           .foregroundStyle(HarnessTheme.secondaryInk)
           .lineLimit(1)
         Spacer(minLength: 0)
-        HStack(spacing: 8) {
+        HStack(spacing: HarnessTheme.itemSpacing) {
           badge(agent.runtimeCapabilities.supportsContextInjection ? "Context" : "Watch")
           badge("\(agent.runtimeCapabilities.typicalSignalLatencySeconds)s")
           badge(formatTimestamp(agent.lastActivityAt))
         }
       }
       .frame(maxWidth: .infinity, minHeight: sessionLaneCardHeight, alignment: .topLeading)
-      .padding(12)
+      .padding(HarnessTheme.cardPadding)
     }
     .harnessInteractiveCardButtonStyle()
     .accessibilityIdentifier(HarnessAccessibility.sessionAgentCard(agent.agentId))
@@ -188,8 +190,7 @@ struct SessionAgentSummaryCard: View {
     Text(value)
       .font(.caption.weight(.semibold))
       .lineLimit(1)
-      .padding(.horizontal, 8)
-      .padding(.vertical, 4)
+      .harnessPillPadding()
       .harnessInfoPill()
   }
 }

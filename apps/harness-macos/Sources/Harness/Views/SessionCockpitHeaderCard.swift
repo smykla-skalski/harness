@@ -6,10 +6,10 @@ struct SessionCockpitHeaderCard: View {
   let detail: SessionDetail
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 12) {
+    VStack(alignment: .leading, spacing: HarnessTheme.sectionSpacing) {
       HStack(alignment: .top) {
-        VStack(alignment: .leading, spacing: 8) {
-          HStack(spacing: 8) {
+        VStack(alignment: .leading, spacing: HarnessTheme.itemSpacing) {
+          HStack(spacing: HarnessTheme.itemSpacing) {
             Circle()
               .fill(statusColor(for: detail.session.status))
               .frame(width: 12, height: 12)
@@ -23,7 +23,7 @@ struct SessionCockpitHeaderCard: View {
             .foregroundStyle(HarnessTheme.secondaryInk)
         }
         Spacer()
-        HStack(spacing: 8) {
+        HStack(spacing: HarnessTheme.itemSpacing) {
           observeButton
           endSessionButton
         }
@@ -76,7 +76,7 @@ struct SessionCockpitHeaderCard: View {
     Button {
       store.inspectObserver()
     } label: {
-      VStack(alignment: .leading, spacing: 8) {
+      VStack(alignment: .leading, spacing: HarnessTheme.itemSpacing) {
         HStack(spacing: 16) {
           summaryLabel("Observe", value: observer.observeId)
           summaryLabel("Open Issues", value: "\(observer.openIssueCount)")
@@ -100,7 +100,7 @@ struct SessionCockpitHeaderCard: View {
       }
       .accessibilityElement(children: .combine)
       .frame(maxWidth: .infinity, alignment: .leading)
-      .padding(12)
+      .padding(HarnessTheme.cardPadding)
     }
     .harnessInteractiveCardButtonStyle()
     .accessibilityIdentifier("harness.session.observe.summary")
@@ -108,7 +108,7 @@ struct SessionCockpitHeaderCard: View {
   }
 
   private func pendingTransferSummary(_ pendingTransfer: PendingLeaderTransfer) -> some View {
-    VStack(alignment: .leading, spacing: 8) {
+    VStack(alignment: .leading, spacing: HarnessTheme.itemSpacing) {
       HStack {
         Label("Pending Leader Transfer", systemImage: "arrow.left.arrow.right")
           .font(.system(.headline, design: .rounded, weight: .semibold))
@@ -130,7 +130,7 @@ struct SessionCockpitHeaderCard: View {
       }
     }
     .frame(maxWidth: .infinity, alignment: .leading)
-    .padding(.leading, 16)
+    .padding(.leading, HarnessTheme.spacingLG)
     .overlay(alignment: .leading) {
       RoundedRectangle(cornerRadius: 999, style: .continuous)
         .fill(HarnessTheme.warmAccent)

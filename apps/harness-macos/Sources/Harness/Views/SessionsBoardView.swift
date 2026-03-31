@@ -65,13 +65,13 @@ struct SessionsBoardView: View {
   }
 
   private func metricCard(title: String, value: String, tint: Color) -> some View {
-    HStack(alignment: .top, spacing: 12) {
+    HStack(alignment: .top, spacing: HarnessTheme.sectionSpacing) {
       RoundedRectangle(cornerRadius: 999, style: .continuous)
         .fill(tint)
         .frame(width: 12)
         .frame(minHeight: 68)
         .accessibilityHidden(true)
-      VStack(alignment: .leading, spacing: 8) {
+      VStack(alignment: .leading, spacing: HarnessTheme.itemSpacing) {
         Text(title.uppercased())
           .font(.caption.weight(.semibold))
           .foregroundStyle(HarnessTheme.secondaryInk)
@@ -83,7 +83,7 @@ struct SessionsBoardView: View {
       .frame(maxWidth: .infinity, alignment: .leading)
     }
     .frame(maxWidth: .infinity, alignment: .leading)
-    .padding(.vertical, 8)
+    .padding(.vertical, HarnessTheme.itemSpacing)
     .accessibilityElement(children: .combine)
     .accessibilityTestProbe(
       HarnessAccessibility.boardMetricCard(title),

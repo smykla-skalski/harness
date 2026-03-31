@@ -15,7 +15,7 @@ struct SessionActionDock: View {
   }
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 12) {
+    VStack(alignment: .leading, spacing: HarnessTheme.sectionSpacing) {
       HStack(alignment: .top) {
         VStack(alignment: .leading, spacing: 4) {
           Text("Action Flow")
@@ -43,7 +43,7 @@ struct SessionActionDock: View {
         .animation(.spring(duration: 0.2), value: store.isSessionActionInFlight)
       }
 
-      HStack(spacing: 12) {
+      HStack(spacing: HarnessTheme.sectionSpacing) {
         flowButton(
           title: "Task Flow",
           subtitle: "Create, reassign, checkpoint",
@@ -73,7 +73,7 @@ struct SessionActionDock: View {
     action: @escaping () -> Void
   ) -> some View {
     Button(action: action) {
-      VStack(alignment: .leading, spacing: 8) {
+      VStack(alignment: .leading, spacing: HarnessTheme.itemSpacing) {
         Label(title, systemImage: symbol)
           .font(.system(.headline, design: .rounded, weight: .semibold))
         Text(subtitle)
@@ -81,7 +81,7 @@ struct SessionActionDock: View {
           .foregroundStyle(HarnessTheme.secondaryInk)
       }
       .frame(maxWidth: .infinity, alignment: .leading)
-      .padding(12)
+      .padding(HarnessTheme.cardPadding)
     }
     .harnessInteractiveCardButtonStyle()
   }

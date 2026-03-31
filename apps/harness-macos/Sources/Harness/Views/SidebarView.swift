@@ -12,8 +12,8 @@ struct SidebarView: View {
         SidebarSessionList(store: store)
       }
       .frame(maxWidth: .infinity, alignment: .topLeading)
-      .padding(.vertical, 20)
-      .padding(.horizontal, 12)
+      .padding(.vertical, HarnessTheme.spacingXL)
+      .padding(.horizontal, HarnessTheme.sectionSpacing)
     }
     .scrollIndicators(.hidden)
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
