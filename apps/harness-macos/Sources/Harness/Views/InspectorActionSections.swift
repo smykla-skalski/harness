@@ -2,7 +2,7 @@ import HarnessKit
 import SwiftUI
 
 struct InspectorActionSections: View {
-  @Bindable var store: HarnessStore
+  let store: HarnessStore
   let detail: SessionDetail
   let selectedTask: WorkItem?
   let selectedAgent: AgentRegistration?
