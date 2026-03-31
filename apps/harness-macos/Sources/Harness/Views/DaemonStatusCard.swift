@@ -80,7 +80,7 @@ extension DaemonStatusCard {
       Task { await store.startDaemon() }
     } label: {
       Image(systemName: isDaemonOnline ? "arrow.clockwise" : "power")
-        .font(.system(size: 14, weight: .semibold))
+        .font(.system(.body, weight: .semibold))
     }
     .buttonStyle(DaemonRestartButtonStyle(isLoading: isLoading, isOnline: isDaemonOnline))
     .help(isDaemonOnline ? "Restart daemon" : "Start daemon")
