@@ -149,9 +149,10 @@ struct ObserverInspectorCard: View {
   }
 }
 
-struct InspectorFact {
+struct InspectorFact: Identifiable {
   let title: String
   let value: String
+  var id: String { title }
 }
 
 struct InspectorFactGrid: View {
@@ -159,7 +160,7 @@ struct InspectorFactGrid: View {
 
   var body: some View {
     HarnessAdaptiveGridLayout(minimumColumnWidth: 132, maximumColumns: 2, spacing: 10) {
-      ForEach(Array(facts.enumerated()), id: \.offset) { _, fact in
+      ForEach(facts) { fact in
         VStack(alignment: .leading, spacing: 3) {
           Text(fact.title.uppercased())
             .font(.caption2.weight(.bold))
@@ -194,15 +195,13 @@ struct InspectorBadgeColumn: View {
   let values: [String]
 
   var body: some View {
-    HarnessGlassContainer(spacing: 8) {
-      VStack(alignment: .leading, spacing: 8) {
-        ForEach(Array(values.enumerated()), id: \.offset) { _, value in
-          Text(value)
-            .font(.caption.weight(.semibold))
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
-            .harnessCapsuleGlass()
-        }
+    VStack(alignment: .leading, spacing: 8) {
+      ForEach(Array(values.enumerated()), id: \.offset) { _, value in
+        Text(value)
+          .font(.caption.weight(.semibold))
+          .padding(.horizontal, 10)
+          .padding(.vertical, 6)
+          .harnessInfoPill()
       }
     }
   }
@@ -217,12 +216,10 @@ struct InspectorObserverSummarySection: View {
         title: "Observe",
         subtitle: "The observer loop keeps the session moving and surfaces drift."
       )
-      HarnessGlassContainer(spacing: 8) {
-        HStack(spacing: 8) {
-          HarnessBadge(value: "Open \(observer.openIssueCount)")
-          HarnessBadge(value: "Muted \(observer.mutedCodeCount)")
-          HarnessBadge(value: "Workers \(observer.activeWorkerCount)")
-        }
+      HStack(spacing: 8) {
+        HarnessBadge(value: "Open \(observer.openIssueCount)")
+        HarnessBadge(value: "Muted \(observer.mutedCodeCount)")
+        HarnessBadge(value: "Workers \(observer.activeWorkerCount)")
       }
       Text("Last sweep \(formatTimestamp(observer.lastScanTime))")
         .font(.caption.monospaced())
