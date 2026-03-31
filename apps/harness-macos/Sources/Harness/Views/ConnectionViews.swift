@@ -191,6 +191,7 @@ struct ConnectionToolbarBadge: View {
     .accessibilityElement(children: .ignore)
     .accessibilityIdentifier(HarnessAccessibility.connectionBadge)
     .accessibilityLabel(accessibilityLabel)
+    .help(accessibilityLabel)
   }
 }
 

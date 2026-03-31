@@ -160,6 +160,7 @@ private struct ObserverAgentSessionsSection: View {
               Spacer()
               Text(session.runtime.uppercased())
                 .font(.caption2.bold())
+                .tracking(HarnessTheme.uppercaseTracking)
                 .foregroundStyle(HarnessTheme.secondaryInk)
             }
             Text("Cursor \(session.cursor)")
@@ -193,6 +194,7 @@ struct InspectorFactGrid: View {
         VStack(alignment: .leading, spacing: 4) {
           Text(fact.title.uppercased())
             .font(.caption2.weight(.bold))
+            .tracking(HarnessTheme.uppercaseTracking)
             .foregroundStyle(HarnessTheme.secondaryInk)
           Text(fact.value)
             .font(.system(.body, design: .rounded, weight: .semibold))

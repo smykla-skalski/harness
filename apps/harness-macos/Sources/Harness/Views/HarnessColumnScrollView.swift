@@ -28,7 +28,6 @@ struct HarnessColumnScrollView<Content: View>: View {
         scrollBody()
       }
     }
-    .scrollIndicators(.hidden)
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
   }
 
