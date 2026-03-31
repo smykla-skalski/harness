@@ -61,7 +61,6 @@ struct PreferencesView: View {
     .navigationSplitViewStyle(.balanced)
     .toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
     .containerBackground(.windowBackground, for: .window)
-    .toolbar(removing: .title)
     .frame(maxWidth: .infinity, maxHeight: .infinity)
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessAccessibility.preferencesRoot)

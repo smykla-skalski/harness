@@ -20,6 +20,8 @@ struct ContentView: View {
   @State private var columnVisibility: NavigationSplitViewVisibility = .all
   @SceneStorage("showInspector")
   private var showInspector = true
+  @SceneStorage("selectedSessionID")
+  private var restoredSessionID: String?
 
   private var selectedDetail: SessionDetail? {
     guard let sessionID = store.selectedSessionID,
@@ -102,6 +104,14 @@ struct ContentView: View {
     .toolbarBackgroundVisibility(.visible, for: .windowToolbar)
     .containerBackground(.windowBackground, for: .window)
     .focusedSceneValue(\.inspectorVisibility, $showInspector)
+    .onAppear {
+      if let restoredSessionID, store.selectedSessionID == nil {
+        Task { await store.selectSession(restoredSessionID) }
+      }
+    }
+    .onChange(of: store.selectedSessionID) { _, newID in
+      restoredSessionID = newID
+    }
     .frame(maxWidth: .infinity, maxHeight: .infinity)
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessAccessibility.appChromeRoot)
@@ -111,35 +121,7 @@ struct ContentView: View {
         text: chromeAccessibilityValue
       )
     }
-    .confirmationDialog(
-      confirmationTitle,
-      isPresented: $store.showConfirmation,
-      titleVisibility: .visible,
-    ) {
-      switch store.pendingConfirmation {
-      case .endSession:
-        Button("End Session Now", role: .destructive) {
-          Task { await store.confirmPendingAction() }
-        }
-      case .removeAgent:
-        Button("Remove Agent Now", role: .destructive) {
-          Task { await store.confirmPendingAction() }
-        }
-      case .removeLaunchAgent:
-        Button("Remove Launch Agent Now", role: .destructive) {
-          Task { await store.confirmPendingAction() }
-        }
-      case nil:
-        EmptyView()
-      }
-      Button("Cancel", role: .cancel) {
-        store.cancelConfirmation()
-      }
-    } message: {
-      if !confirmationMessage.isEmpty {
-        Text(confirmationMessage)
-      }
-    }
+    .modifier(HarnessConfirmationDialogModifier(store: store))
     .onChange(of: store.connectionState) { _, newState in
       let message: String
       switch newState {
@@ -154,22 +136,62 @@ struct ContentView: View {
       guard !action.isEmpty else { return }
       AccessibilityNotification.Announcement(action).post()
     }
-  }
-
-  private var confirmationTitle: String {
-    switch store.pendingConfirmation {
-    case .endSession:
-      "End Session?"
-    case .removeAgent:
-      "Remove Agent?"
-    case .removeLaunchAgent:
-      "Remove Launch Agent?"
-    case nil:
-      ""
+    .task(id: store.lastAction) {
+      guard !store.lastAction.isEmpty else { return }
+      try? await Task.sleep(for: .seconds(4))
+      guard !Task.isCancelled else { return }
+      store.lastAction = ""
     }
   }
 
-  private var confirmationMessage: String {
+}
+
+private struct HarnessConfirmationDialogModifier: ViewModifier {
+  @Bindable var store: HarnessStore
+
+  func body(content: Content) -> some View {
+    content
+      .confirmationDialog(
+        title,
+        isPresented: $store.showConfirmation,
+        titleVisibility: .visible
+      ) {
+        switch store.pendingConfirmation {
+        case .endSession:
+          Button("End Session Now", role: .destructive) {
+            Task { await store.confirmPendingAction() }
+          }
+        case .removeAgent:
+          Button("Remove Agent Now", role: .destructive) {
+            Task { await store.confirmPendingAction() }
+          }
+        case .removeLaunchAgent:
+          Button("Remove Launch Agent Now", role: .destructive) {
+            Task { await store.confirmPendingAction() }
+          }
+        case nil:
+          EmptyView()
+        }
+        Button("Cancel", role: .cancel) {
+          store.cancelConfirmation()
+        }
+      } message: {
+        if !message.isEmpty {
+          Text(message)
+        }
+      }
+  }
+
+  private var title: String {
+    switch store.pendingConfirmation {
+    case .endSession: "End Session?"
+    case .removeAgent: "Remove Agent?"
+    case .removeLaunchAgent: "Remove Launch Agent?"
+    case nil: ""
+    }
+  }
+
+  private var message: String {
     switch store.pendingConfirmation {
     case .endSession(let sessionID, let actorID):
       "This ends \(sessionID) using \(actorID). Active task work must already be closed."
