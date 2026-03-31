@@ -87,7 +87,7 @@ struct SessionTaskSummaryCard: View {
             .padding(.horizontal, 8)
             .padding(.vertical, 4)
             .background(severityColor(for: task.severity), in: Capsule())
-            .foregroundStyle(.white)
+            .foregroundStyle(HarnessTheme.onContrast)
         }
         Text(task.context ?? "No extra context")
           .font(.subheadline)
@@ -156,7 +156,7 @@ struct SessionAgentSummaryCard: View {
             .padding(.horizontal, 8)
             .padding(.vertical, 4)
             .background(HarnessTheme.accent, in: Capsule())
-            .foregroundStyle(.white)
+            .foregroundStyle(HarnessTheme.onContrast)
         }
         Text("\(agent.runtime) • \(agent.agentId)")
           .font(.caption.monospaced())

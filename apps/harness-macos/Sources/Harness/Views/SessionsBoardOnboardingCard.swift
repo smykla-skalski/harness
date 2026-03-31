@@ -38,7 +38,7 @@ struct SessionsBoardOnboardingCard: View {
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
         .background(HarnessTheme.accent, in: Capsule())
-        .foregroundStyle(.white)
+        .foregroundStyle(HarnessTheme.onContrast)
     }
   }
 
@@ -128,7 +128,7 @@ struct SessionsBoardOnboardingCard: View {
           .padding(.horizontal, 9)
           .padding(.vertical, 5)
           .background(isReady ? HarnessTheme.success : HarnessTheme.caution, in: Capsule())
-          .foregroundStyle(.white)
+          .foregroundStyle(HarnessTheme.onContrast)
       }
       Text(detail)
         .font(.system(.footnote, design: .rounded, weight: .medium))

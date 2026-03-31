@@ -201,8 +201,8 @@ private struct CachedDataBanner: View {
     }
     .padding(.horizontal, 14)
     .padding(.vertical, 8)
-    .background(.orange.opacity(0.12))
-    .foregroundStyle(.orange)
+    .background(HarnessTheme.caution.opacity(0.12))
+    .foregroundStyle(HarnessTheme.caution)
   }
 }
 

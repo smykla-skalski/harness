@@ -142,7 +142,7 @@ extension DaemonStatusCard {
       .padding(.horizontal, 9)
       .padding(.vertical, 5)
       .background(statusBackground, in: Capsule())
-      .foregroundStyle(.white)
+      .foregroundStyle(HarnessTheme.onContrast)
   }
 
   fileprivate var statusTitle: String {

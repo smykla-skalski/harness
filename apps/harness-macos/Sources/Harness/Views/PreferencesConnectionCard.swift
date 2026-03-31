@@ -21,7 +21,7 @@ struct PreferencesConnectionMetrics: View {
     )
   }
   private var reconnectTint: Color {
-    metrics.reconnectCount > 0 ? .orange : .green
+    metrics.reconnectCount > 0 ? HarnessTheme.caution : HarnessTheme.success
   }
 
   var body: some View {
@@ -54,6 +54,7 @@ struct PreferencesConnectionMetrics: View {
               .foregroundStyle(eventColor(for: event.kind))
               .font(.caption)
               .frame(width: 16)
+              .accessibilityHidden(true)
             Text(event.detail)
               .lineLimit(1)
             Spacer()
@@ -82,11 +83,11 @@ struct PreferencesConnectionMetrics: View {
     for kind: ConnectionEventKind
   ) -> Color {
     switch kind {
-    case .connected: .green
-    case .disconnected: .red
-    case .reconnecting: .orange
-    case .fallback: .orange
-    case .error: .red
+    case .connected: HarnessTheme.success
+    case .disconnected: HarnessTheme.danger
+    case .reconnecting: HarnessTheme.caution
+    case .fallback: HarnessTheme.caution
+    case .error: HarnessTheme.danger
     }
   }
 }

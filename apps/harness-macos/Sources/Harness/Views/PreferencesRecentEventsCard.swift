@@ -33,8 +33,8 @@ struct PreferencesRecentEventsSection: View {
 
   private func eventLevelColor(_ level: String) -> Color {
     switch level {
-    case "warn": .orange
-    case "error": .red
+    case "warn": HarnessTheme.caution
+    case "error": HarnessTheme.danger
     default: .primary
     }
   }

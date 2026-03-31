@@ -80,7 +80,7 @@ struct PreferencesStatusSection: View {
       if let lastError, !lastError.isEmpty {
         LabeledContent("Latest Error") {
           Text(lastError)
-            .foregroundStyle(.red)
+            .foregroundStyle(HarnessTheme.danger)
         }
       } else if !lastAction.isEmpty {
         LabeledContent("Last Action", value: lastAction)
@@ -229,10 +229,13 @@ struct PreferencesDiagnosticsOverview: View {
   var body: some View {
     Section("Overview") {
       LabeledContent("Token") {
-        Text(tokenPresent ? "Present" : "Missing")
-          .foregroundStyle(
-            tokenPresent ? Color.green : Color.red
-          )
+        Label(
+          tokenPresent ? "Present" : "Missing",
+          systemImage: tokenPresent ? "checkmark.circle.fill" : "xmark.circle.fill"
+        )
+        .foregroundStyle(
+          tokenPresent ? HarnessTheme.success : HarnessTheme.danger
+        )
       }
       LabeledContent("Projects", value: "\(projectCount)")
       LabeledContent("Sessions", value: "\(sessionCount)")
@@ -244,7 +247,7 @@ struct PreferencesDiagnosticsOverview: View {
           Text(launchAgent.lifecycleTitle)
             .foregroundStyle(
               launchAgent.pid == nil
-                ? Color.primary : Color.green
+                ? HarnessTheme.ink : HarnessTheme.success
             )
         }
         if !launchAgent.lifecycleCaption.isEmpty {
