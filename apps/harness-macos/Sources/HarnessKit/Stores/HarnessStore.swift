@@ -131,16 +131,14 @@ public final class HarnessStore {
     connectionState = .connecting
     lastError = nil
 
-    do {
-      daemonStatus = try await daemonController.daemonStatus()
-    } catch {
-      daemonStatus = nil
-    }
+    async let daemonStatusResponse: DaemonStatusReport? = try? daemonController.daemonStatus()
 
     do {
       let client = try await daemonController.bootstrapClient()
+      daemonStatus = await daemonStatusResponse
       await connect(using: client)
     } catch {
+      daemonStatus = await daemonStatusResponse
       connectionState = .offline(error.localizedDescription)
       lastError = error.localizedDescription
     }

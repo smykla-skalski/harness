@@ -236,7 +236,6 @@ extension HarnessStore {
         )
       }
     )
-    await refresh(using: client, preserveSelection: true)
   }
 
   public func sendSignal(
