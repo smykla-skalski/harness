@@ -139,23 +139,23 @@ private struct SessionListContent: View {
   var body: some View {
     Group {
       if store.sessions.isEmpty {
-        ContentUnavailableView {
-          Label("No sessions indexed yet", systemImage: "tray")
-        } description: {
-          Text("Start the daemon or refresh after launching a harness session.")
+        VStack(alignment: .leading, spacing: 0) {
+          ContentUnavailableView {
+            Label("No sessions indexed yet", systemImage: "tray")
+          } description: {
+            Text("Start the daemon or refresh after launching a harness session.")
+          }
         }
-        .accessibilityTestProbe(
-          HarnessAccessibility.sidebarEmptyState,
-          label: "No sessions indexed yet",
-          value: "empty"
-        )
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier(HarnessAccessibility.sidebarEmptyState)
       } else if store.groupedSessions.isEmpty {
-        ContentUnavailableView.search(text: store.searchText)
-          .accessibilityTestProbe(
-            HarnessAccessibility.sidebarEmptyState,
-            label: "No Results",
-            value: store.searchText
-          )
+        VStack(alignment: .leading, spacing: 0) {
+          ContentUnavailableView.search(text: store.searchText)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier(HarnessAccessibility.sidebarEmptyState)
       } else {
         VStack(alignment: .leading, spacing: 16) {
           ForEach(store.groupedSessions) { group in
@@ -224,11 +224,8 @@ private struct SessionListContent: View {
                 .accessibilityValue(
                   sessionAccessibilityValue(for: session)
                 )
-                .accessibilityTestProbe(
-                  HarnessAccessibility.sessionRow(session.sessionId),
-                  label: sessionAccessibilityLabel(for: session),
-                  value: sessionAccessibilityValue(for: session)
-                )
+                .accessibilityElement(children: .combine)
+                .accessibilityIdentifier(HarnessAccessibility.sessionRow(session.sessionId))
                 .harnessInteractiveCardButtonStyle(
                   tint: store.selectedSessionID == session.sessionId
                     ? HarnessTheme.accent
@@ -253,11 +250,8 @@ private struct SessionListContent: View {
           }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .accessibilityTestProbe(
-          HarnessAccessibility.sidebarSessionList,
-          label: "Indexed Sessions",
-          value: "\(store.filteredSessionCount)"
-        )
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier(HarnessAccessibility.sidebarSessionList)
         .accessibilityFrameMarker(HarnessAccessibility.sidebarSessionListContent)
       }
     }
@@ -310,7 +304,11 @@ extension SidebarSessionList {
     identifier: String,
     action: @escaping () -> Void
   ) -> some View {
-    Button(action: action) {
+    Button {
+      withAnimation(.spring(duration: 0.2)) {
+        action()
+      }
+    } label: {
       Text(title)
         .font(.system(.callout, design: .rounded, weight: .semibold))
     }
@@ -321,11 +319,7 @@ extension SidebarSessionList {
     .accessibilityLabel(title)
     .accessibilityValue(isSelected ? "selected" : "not selected")
     .accessibilityAddTraits(isSelected ? .isSelected : [])
-    .accessibilityTestProbe(
-      identifier,
-      label: title,
-      value: isSelected ? "selected" : "not selected"
-    )
+    .accessibilityIdentifier(identifier)
     .accessibilityFrameMarker("\(identifier).frame")
   }
 }

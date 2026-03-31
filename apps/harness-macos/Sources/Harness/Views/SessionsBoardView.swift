@@ -14,14 +14,11 @@ struct SessionsBoardView: View {
       VStack(alignment: .leading, spacing: 22) {
         if store.sessions.isEmpty {
           SessionsBoardOnboardingCard(store: store, isLoading: isLoading)
-            .animation(.spring(duration: 0.3), value: isLoading)
-            .animation(.spring(duration: 0.3), value: store.connectionState)
         }
         metricsSection
-          .animation(.spring(duration: 0.3), value: store.sessions)
         SessionsBoardRecentSessionsSection(sessions: store.sessions, store: store)
-          .animation(.spring(duration: 0.3), value: store.sessions)
       }
+      .animation(.spring(duration: 0.3), value: store.sessions)
       .frame(maxWidth: .infinity, alignment: .leading)
     }
     .foregroundStyle(HarnessTheme.ink)
@@ -46,21 +43,25 @@ struct SessionsBoardView: View {
       value: "\(store.projects.count)",
       tint: HarnessTheme.accent
     )
+    .animation(.spring(duration: 0.3), value: store.projects.count)
     metricCard(
       title: "Indexed Sessions",
       value: "\(store.sessions.count)",
       tint: HarnessTheme.success
     )
+    .animation(.spring(duration: 0.3), value: store.sessions.count)
     metricCard(
       title: "Open Work",
       value: "\(store.totalOpenWorkCount)",
       tint: HarnessTheme.warmAccent
     )
+    .animation(.spring(duration: 0.3), value: store.totalOpenWorkCount)
     metricCard(
       title: "Blocked",
       value: "\(store.totalBlockedCount)",
       tint: HarnessTheme.danger
     )
+    .animation(.spring(duration: 0.3), value: store.totalBlockedCount)
   }
 
   private func metricCard(title: String, value: String, tint: Color) -> some View {
