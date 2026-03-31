@@ -1,0 +1,44 @@
+{
+  "name": "harness",
+  "owner": {
+    "name": "Smykla Skalski Labs"
+  },
+  "metadata": {
+    "description": "Harness test orchestration framework plugins for Kubernetes/Kuma"
+  },
+  "plugins": [
+    {
+      "name": "suite",
+      "source": "./plugins/suite",
+      "description": "Harness suite create and execution",
+      "author": {
+        "name": "Smykla Skalski Labs"
+      },
+      "license": "MIT",
+      "category": "productivity",
+      "tags": ["testing", "kubernetes", "kuma", "suite"]
+    },
+    {
+      "name": "observe",
+      "source": "./plugins/observe",
+      "description": "Harness session observer and classifier",
+      "author": {
+        "name": "Smykla Skalski Labs"
+      },
+      "license": "MIT",
+      "category": "productivity",
+      "tags": ["testing", "observation", "classifier"]
+    },
+    {
+      "name": "session",
+      "source": "./plugins/session",
+      "description": "Harness multi-agent session orchestration",
+      "author": {
+        "name": "Smykla Skalski Labs"
+      },
+      "license": "MIT",
+      "category": "productivity",
+      "tags": ["multi-agent", "orchestration", "session"]
+    }
+  ]
+}
