@@ -149,6 +149,8 @@ private struct HarnessFilterChipButtonStyleModifier: ViewModifier {
 private struct InteractiveCardButtonStyle: ButtonStyle {
   let cornerRadius: CGFloat
   let tint: Color?
+  @Environment(\.isEnabled)
+  private var isEnabled
 
   func makeBody(configuration: Configuration) -> some View {
     configuration.label
@@ -159,7 +161,7 @@ private struct InteractiveCardButtonStyle: ButtonStyle {
         }
       }
       .contentShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
-      .opacity(configuration.isPressed ? 0.85 : 1)
+      .opacity(isEnabled ? (configuration.isPressed ? 0.85 : 1) : 0.4)
       .animation(.easeOut(duration: 0.15), value: configuration.isPressed)
   }
 }
