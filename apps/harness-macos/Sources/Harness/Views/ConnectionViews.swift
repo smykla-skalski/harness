@@ -143,7 +143,7 @@ struct ConnectionToolbarBadge: View {
   }
 
   var body: some View {
-    ZStack(alignment: .leading) {
+    ZStack {
       // Reserve the maximum badge width so live telemetry updates do not churn window constraints.
       HStack(spacing: 4) {
         Color.clear
