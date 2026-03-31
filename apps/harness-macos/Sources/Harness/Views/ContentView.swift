@@ -7,7 +7,10 @@ struct ContentView: View {
   @Environment(\.openSettings)
   private var openSettings
   @State private var columnVisibility: NavigationSplitViewVisibility = .all
+  @State private var didAutoOpenSettings = false
   @State private var showInspector = true
+  private let opensSettingsOnLaunch =
+    ProcessInfo.processInfo.environment["HARNESS_OPEN_SETTINGS_ON_LAUNCH"] == "1"
 
   private var selectedDetail: SessionDetail? {
     guard let sessionID = store.selectedSessionID,
@@ -27,7 +30,7 @@ struct ContentView: View {
     [
       "contentChrome=native",
       "interactiveRows=plain",
-      "controlGlass=system",
+      "controlGlass=grouped-controls",
     ].joined(separator: ", ")
   }
 
@@ -36,21 +39,20 @@ struct ContentView: View {
       SidebarView(store: store)
         .navigationSplitViewColumnWidth(min: 300, ideal: 350)
     } detail: {
-      NavigationStack {
-        VStack(spacing: 0) {
-          if store.isShowingCachedData {
-            CachedDataBanner()
-          }
-          SessionContentContainer(
-            store: store,
-            detail: selectedDetail,
-            summary: selectedSessionSummary,
-            timeline: store.timeline
-          )
-          .frame(maxWidth: .infinity, maxHeight: .infinity)
+      VStack(spacing: 0) {
+        if store.isShowingCachedData {
+          CachedDataBanner()
         }
-        .accessibilityFrameMarker("\(HarnessAccessibility.contentRoot).frame")
+        SessionContentContainer(
+          store: store,
+          detail: selectedDetail,
+          summary: selectedSessionSummary,
+          timeline: store.timeline
+        )
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
       }
+      .backgroundExtensionEffect()
+      .accessibilityFrameMarker("\(HarnessAccessibility.contentRoot).frame")
       .navigationTitle("Harness")
       .toolbar {
         ToolbarItem(placement: .secondaryAction) {
@@ -122,6 +124,13 @@ struct ContentView: View {
         Text(confirmationMessage)
       }
     }
+    .task(id: didAutoOpenSettings) {
+      guard opensSettingsOnLaunch, !didAutoOpenSettings else {
+        return
+      }
+      didAutoOpenSettings = true
+      openSettings()
+    }
   }
 
   private var confirmationTitle: String {
@@ -153,15 +162,19 @@ struct ContentView: View {
 
 private struct RefreshToolbarButton: View {
   let store: HarnessStore
+  @Environment(\.accessibilityReduceMotion)
+  private var reduceMotion
   @State private var isSpinning = false
 
   var body: some View {
     Button { Task { await store.refresh() } } label: {
       HStack(spacing: 8) {
         Image(systemName: "arrow.clockwise")
-          .rotationEffect(.degrees(isSpinning ? 360 : 0))
+          .rotationEffect(.degrees(reduceMotion ? 0 : (isSpinning ? 360 : 0)))
           .animation(
-            isSpinning
+            reduceMotion
+              ? nil
+              : isSpinning
               ? .linear(duration: 0.9).repeatForever(autoreverses: false)
               : .easeOut(duration: 0.4),
             value: isSpinning
@@ -182,6 +195,7 @@ private struct CachedDataBanner: View {
     HStack(spacing: 8) {
       Image(systemName: "cloud.bolt")
         .font(.caption)
+        .accessibilityHidden(true)
       Text("Showing cached data - daemon is offline")
         .font(.caption.weight(.medium))
       Spacer()
@@ -232,7 +246,7 @@ private struct SessionLoadingView: View {
                   .frame(width: 12, height: 12)
                   .accessibilityHidden(true)
                 Text(summary.context)
-                  .font(.system(size: 30, weight: .black, design: .rounded))
+                  .font(.system(.largeTitle, design: .rounded, weight: .black))
                   .lineLimit(2)
               }
               Text("\(summary.projectName) • \(summary.sessionId)")
@@ -248,7 +262,7 @@ private struct SessionLoadingView: View {
       }
       .frame(maxWidth: .infinity, alignment: .leading)
     }
-    .foregroundStyle(HarnessTheme.ink)
+    .foregroundStyle(.primary)
   }
 }
 
