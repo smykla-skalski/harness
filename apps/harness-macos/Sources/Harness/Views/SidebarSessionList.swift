@@ -56,6 +56,7 @@ struct SidebarSessionList: View {
 
       TextField("Search sessions, projects, leaders", text: $store.searchText)
         .textFieldStyle(.roundedBorder)
+        .submitLabel(.search)
         .accessibilityIdentifier("harness.sidebar.search")
         .onSubmit {
           store.recordSearch(store.searchText)
@@ -83,6 +84,10 @@ struct SidebarSessionList: View {
                   .font(.caption2)
                   .foregroundStyle(HarnessTheme.secondaryInk)
               }
+              .frame(minWidth: 24, minHeight: 24)
+              .accessibilityLabel("Clear Recent Searches")
+              .accessibilityHint("Removes the stored session search history.")
+              .help("Clear search history")
               .harnessAccessoryButtonStyle()
               .controlSize(.small)
             }
@@ -203,12 +208,10 @@ private struct SessionListContent: View {
                     Text(session.sessionId)
                       .font(.caption.monospaced())
                       .foregroundStyle(HarnessTheme.secondaryInk)
-                    HarnessGlassContainer(spacing: 12) {
-                      HStack(spacing: 12) {
-                        labelChip("\(session.metrics.activeAgentCount) active")
-                        labelChip("\(session.metrics.inProgressTaskCount) moving")
-                        labelChip(formatTimestamp(session.lastActivityAt))
-                      }
+                    HStack(spacing: 12) {
+                      labelChip("\(session.metrics.activeAgentCount) active")
+                      labelChip("\(session.metrics.inProgressTaskCount) moving")
+                      labelChip(formatTimestamp(session.lastActivityAt))
                     }
                 }
                 .foregroundStyle(HarnessTheme.ink)
@@ -282,7 +285,7 @@ private struct SessionListContent: View {
       .lineLimit(1)
       .padding(.horizontal, 8)
       .padding(.vertical, 4)
-      .harnessCapsuleGlass()
+      .harnessInfoPill()
   }
 }
 

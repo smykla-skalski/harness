@@ -67,6 +67,7 @@ struct SessionsBoardOnboardingCard: View {
           storeAction: .startDaemon
         )
         .disabled(store.connectionState == .online)
+        .help(store.connectionState == .online ? "Daemon is already running" : "")
         .focusable(store.connectionState != .online)
       }
       onboardingStep(
@@ -85,6 +86,9 @@ struct SessionsBoardOnboardingCard: View {
           storeAction: .installLaunchAgent
         )
         .disabled(store.daemonStatus?.launchAgent.installed == true)
+        .help(
+          store.daemonStatus?.launchAgent.installed == true ? "Launch agent is already installed" : ""
+        )
         .focusable(store.daemonStatus?.launchAgent.installed != true)
       }
       onboardingStep(
