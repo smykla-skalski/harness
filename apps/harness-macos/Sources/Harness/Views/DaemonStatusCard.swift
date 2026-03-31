@@ -79,7 +79,8 @@ extension DaemonStatusCard {
       Task { await store.startDaemon() }
     } label: {
       Image(systemName: "restart.circle")
-        .font(.caption.bold())
+        .resizable()
+        .aspectRatio(contentMode: .fit)
     }
     .buttonStyle(DaemonRestartButtonStyle())
     .disabled(isLoading)
@@ -247,6 +248,9 @@ private struct DaemonRestartButtonStyle: ButtonStyle {
   @Environment(\.isEnabled)
   private var isEnabled
 
+  /// Match the status pill height: caption.bold line height + pill padding top/bottom.
+  private static let iconSize: CGFloat = 22
+
   private var foreground: Color {
     if !isEnabled { return HarnessTheme.secondaryInk.opacity(0.5) }
     if isHovered { return HarnessTheme.accent }
@@ -255,15 +259,12 @@ private struct DaemonRestartButtonStyle: ButtonStyle {
 
   func makeBody(configuration: Configuration) -> some View {
     configuration.label
+      .frame(width: Self.iconSize, height: Self.iconSize)
       .foregroundStyle(foreground)
-      .harnessPillPadding()
-      .background(
-        Capsule().fill(foreground.opacity(configuration.isPressed ? 0.18 : isHovered ? 0.1 : 0))
-      )
-      .contentShape(Capsule())
-      .scaleEffect(configuration.isPressed ? 0.92 : 1)
-      .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
+      .scaleEffect(configuration.isPressed ? 0.85 : 1)
+      .animation(.easeOut(duration: 0.1), value: configuration.isPressed)
       .animation(.easeOut(duration: 0.15), value: isHovered)
+      .contentShape(Circle())
       .onContinuousHover { phase in
         switch phase {
         case .active: isHovered = true
