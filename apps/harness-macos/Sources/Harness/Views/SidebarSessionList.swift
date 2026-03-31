@@ -3,8 +3,6 @@ import Observation
 import SwiftUI
 
 struct SidebarSessionList: View {
-  @Environment(\.harnessThemeStyle)
-  private var themeStyle
   @Bindable var store: HarnessStore
 
   private var activeFilterSummary: String {
@@ -50,7 +48,7 @@ struct SidebarSessionList: View {
             store.resetFilters()
           }
           .font(.caption.bold())
-          .harnessAccessoryButtonStyle(tint: HarnessTheme.accent(for: themeStyle))
+          .harnessAccessoryButtonStyle(tint: HarnessTheme.accent)
           .controlSize(.small)
           .accessibilityIdentifier(HarnessAccessibility.sidebarClearFiltersButton)
         }
@@ -66,31 +64,28 @@ struct SidebarSessionList: View {
       if store.searchText.isEmpty {
         let recent = store.recentSearches
         if !recent.isEmpty {
-          HStack(spacing: 6) {
-            ForEach(recent.prefix(5), id: \.query) { search in
+          HarnessGlassContainer(spacing: 6) {
+            HStack(spacing: 6) {
+              ForEach(recent.prefix(5), id: \.query) { search in
+                Button(search.query) {
+                  store.searchText = search.query
+                }
+                .font(.caption)
+                .lineLimit(1)
+                .harnessAccessoryButtonStyle(tint: HarnessTheme.ink)
+                .controlSize(.small)
+              }
+              Spacer()
               Button {
-                store.searchText = search.query
+                store.clearSearchHistory()
               } label: {
-                Text(search.query)
-                  .font(.caption)
-                  .lineLimit(1)
+                Image(systemName: "xmark.circle")
+                  .font(.caption2)
+                  .foregroundStyle(HarnessTheme.secondaryInk)
               }
-              .buttonStyle(.plain)
-              .padding(.horizontal, 8)
-              .padding(.vertical, 3)
-              .background {
-                HarnessGlassCapsuleBackground()
-              }
+              .harnessAccessoryButtonStyle(tint: HarnessTheme.ink)
+              .controlSize(.small)
             }
-            Spacer()
-            Button {
-              store.clearSearchHistory()
-            } label: {
-              Image(systemName: "xmark.circle")
-                .font(.caption2)
-                .foregroundStyle(HarnessTheme.secondaryInk)
-            }
-            .buttonStyle(.plain)
           }
         }
       }
@@ -128,8 +123,8 @@ struct SidebarSessionList: View {
       }
     }
     .padding(14)
-    .harnessInsetPanel(cornerRadius: 22, fillOpacity: 0.05, strokeOpacity: 0.50)
     .accessibilityElement(children: .contain)
+    .accessibilityIdentifier(HarnessAccessibility.sidebarFiltersCard)
     .accessibilityFrameMarker("\(HarnessAccessibility.sidebarFiltersCard).frame")
   }
 
@@ -139,9 +134,7 @@ struct SidebarSessionList: View {
 }
 
 private struct SessionListContent: View {
-  @Environment(\.harnessThemeStyle)
-  private var themeStyle
-  @Bindable var store: HarnessStore
+  let store: HarnessStore
 
   var body: some View {
     Group {
@@ -151,10 +144,18 @@ private struct SessionListContent: View {
         } description: {
           Text("Start the daemon or refresh after launching a harness session.")
         }
-        .accessibilityIdentifier(HarnessAccessibility.sidebarEmptyState)
+        .accessibilityTestProbe(
+          HarnessAccessibility.sidebarEmptyState,
+          label: "No sessions indexed yet",
+          value: "empty"
+        )
       } else if store.groupedSessions.isEmpty {
         ContentUnavailableView.search(text: store.searchText)
-          .accessibilityIdentifier(HarnessAccessibility.sidebarEmptyState)
+          .accessibilityTestProbe(
+            HarnessAccessibility.sidebarEmptyState,
+            label: "No Results",
+            value: store.searchText
+          )
       } else {
         VStack(alignment: .leading, spacing: 16) {
           ForEach(store.groupedSessions) { group in
@@ -162,15 +163,12 @@ private struct SessionListContent: View {
               HStack {
                 Text(group.project.name)
                   .font(.system(.headline, design: .rounded, weight: .semibold))
-                  .foregroundStyle(HarnessTheme.sidebarHeader(for: themeStyle))
+                  .foregroundStyle(HarnessTheme.ink)
                 Spacer()
                 Text("\(group.sessions.count)")
                   .font(.caption.monospacedDigit())
-                  .foregroundStyle(HarnessTheme.sidebarMuted(for: themeStyle))
+                  .foregroundStyle(HarnessTheme.secondaryInk)
               }
-              .padding(.horizontal, 12)
-              .padding(.vertical, 10)
-              .harnessInsetPanel(cornerRadius: 16, fillOpacity: 0.04, strokeOpacity: 0.50)
               .accessibilityIdentifier(
                 HarnessAccessibility.projectHeader(group.project.projectId)
               )
@@ -194,7 +192,7 @@ private struct SessionListContent: View {
                       if store.isBookmarked(sessionId: session.sessionId) {
                         Image(systemName: "bookmark.fill")
                           .font(.caption2)
-                          .foregroundStyle(HarnessTheme.accent(for: themeStyle))
+                          .foregroundStyle(HarnessTheme.accent)
                           .accessibilityLabel("Bookmarked")
                       }
                       Circle()
@@ -210,27 +208,30 @@ private struct SessionListContent: View {
                       labelChip("\(session.metrics.inProgressTaskCount) moving")
                       labelChip(formatTimestamp(session.lastActivityAt))
                     }
-                  }
-                  .accessibilityElement(children: .combine)
-                  .foregroundStyle(HarnessTheme.ink)
-                  .frame(maxWidth: .infinity, alignment: .leading)
-                  .padding(14)
+                }
+                .foregroundStyle(HarnessTheme.ink)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(14)
                   .harnessSelectionOutline(
                     isSelected: store.selectedSessionID == session.sessionId,
                     cornerRadius: 18
                   )
                   .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
                 }
-                .accessibilityIdentifier(HarnessAccessibility.sessionRow(session.sessionId))
-                .accessibilityFrameMarker(
-                  "\(HarnessAccessibility.sessionRow(session.sessionId)).frame"
+                .accessibilityLabel(
+                  sessionAccessibilityLabel(for: session)
                 )
                 .accessibilityValue(
                   sessionAccessibilityValue(for: session)
                 )
+                .accessibilityTestProbe(
+                  HarnessAccessibility.sessionRow(session.sessionId),
+                  label: sessionAccessibilityLabel(for: session),
+                  value: sessionAccessibilityValue(for: session)
+                )
                 .harnessInteractiveCardButtonStyle(
                   tint: store.selectedSessionID == session.sessionId
-                    ? HarnessTheme.surfaceHover(for: themeStyle)
+                    ? HarnessTheme.accent
                     : nil
                 )
                 .contextMenu {
@@ -252,6 +253,11 @@ private struct SessionListContent: View {
           }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityTestProbe(
+          HarnessAccessibility.sidebarSessionList,
+          label: "Indexed Sessions",
+          value: "\(store.filteredSessionCount)"
+        )
         .accessibilityFrameMarker(HarnessAccessibility.sidebarSessionListContent)
       }
     }
@@ -261,12 +267,18 @@ private struct SessionListContent: View {
   private func sessionAccessibilityValue(
     for session: SessionSummary
   ) -> String {
-    let card = harnessInteractiveCardAccessibilityValue(for: themeStyle)
+    let interactionStyle = "plain"
     let selected = store.selectedSessionID == session.sessionId
     if selected {
-      return "selected, interactive=\(card)"
+      return "selected, interactive=\(interactionStyle)"
     }
-    return "interactive=\(card)"
+    return "interactive=\(interactionStyle)"
+  }
+
+  private func sessionAccessibilityLabel(
+    for session: SessionSummary
+  ) -> String {
+    "\(session.context), \(session.projectName), \(session.sessionId)"
   }
 
   fileprivate func labelChip(_ value: String) -> some View {
@@ -275,9 +287,7 @@ private struct SessionListContent: View {
       .lineLimit(1)
       .padding(.horizontal, 8)
       .padding(.vertical, 4)
-      .background {
-        HarnessGlassCapsuleBackground()
-      }
+      .harnessCapsuleGlass()
   }
 }
 
@@ -300,15 +310,22 @@ extension SidebarSessionList {
     identifier: String,
     action: @escaping () -> Void
   ) -> some View {
-    Button(title, action: action)
-      .font(.system(.callout, design: .rounded, weight: .semibold))
-      .buttonBorderShape(.roundedRectangle(radius: 12))
-      .harnessFilterChipButtonStyle(isSelected: isSelected)
-      .controlSize(HarnessControlMetrics.compactControlSize)
-      .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-      .accessibilityIdentifier(identifier)
-      .accessibilityFrameMarker("\(identifier).frame")
-      .accessibilityValue(isSelected ? "selected" : "not selected")
+    Button(action: action) {
+      Text(title)
+        .font(.system(.callout, design: .rounded, weight: .semibold))
+    }
+    .buttonBorderShape(.roundedRectangle(radius: 12))
+    .harnessFilterChipButtonStyle(isSelected: isSelected)
+    .controlSize(HarnessControlMetrics.compactControlSize)
+    .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+    .accessibilityLabel(title)
+    .accessibilityValue(isSelected ? "selected" : "not selected")
+    .accessibilityAddTraits(isSelected ? .isSelected : [])
+    .accessibilityTestProbe(
+      identifier,
+      label: title,
+      value: isSelected ? "selected" : "not selected"
+    )
+    .accessibilityFrameMarker("\(identifier).frame")
   }
-
 }

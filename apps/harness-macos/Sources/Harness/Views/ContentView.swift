@@ -204,7 +204,7 @@ private struct CachedDataBanner: View {
 }
 
 private struct SessionContentContainer: View {
-  @Bindable var store: HarnessStore
+  let store: HarnessStore
   let detail: SessionDetail?
   let summary: SessionSummary?
   let timeline: [TimelineEntry]
