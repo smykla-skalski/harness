@@ -76,13 +76,13 @@ extension DaemonStatusCard {
 
   fileprivate var restartButton: some View {
     Button {
+      guard !isLoading else { return }
       Task { await store.startDaemon() }
     } label: {
       Image(systemName: "arrow.clockwise")
         .font(.system(size: 14, weight: .semibold))
     }
-    .buttonStyle(DaemonRestartButtonStyle())
-    .disabled(isLoading)
+    .buttonStyle(DaemonRestartButtonStyle(isLoading: isLoading))
     .help(isDaemonOnline ? "Restart daemon" : "Start daemon")
     .accessibilityLabel(isDaemonOnline ? "Restart Daemon" : "Start Daemon")
     .accessibilityIdentifier(HarnessAccessibility.sidebarStartDaemonButton)
@@ -243,9 +243,9 @@ extension DaemonStatusCard {
 }
 
 private struct DaemonRestartButtonStyle: ButtonStyle {
+  let isLoading: Bool
   @State private var isHovered = false
-  @Environment(\.isEnabled)
-  private var isEnabled
+  @State private var isSpinning = false
   @Environment(\.accessibilityReduceMotion)
   private var reduceMotion
 
@@ -256,21 +256,13 @@ private struct DaemonRestartButtonStyle: ButtonStyle {
 
     configuration.label
       .frame(width: Self.iconSize, height: Self.iconSize)
-      // Color: secondary at rest, accent on hover/press.
       .foregroundStyle(iconColor(pressed: pressed))
-      // Opacity: 40% at rest, full on hover or press.
       .opacity(iconOpacity(pressed: pressed))
       .animation(.easeOut(duration: 0.15), value: isHovered)
-      .animation(.easeOut(duration: 0.15), value: isEnabled)
-      // Rotation: 75 degrees clockwise on hover. Instant when Reduce Motion is on.
-      .rotationEffect(.degrees(isHovered ? 75 : 0))
-      .animation(
-        reduceMotion ? .easeOut(duration: 0.1) : .spring(duration: 0.35, bounce: 0.15),
-        value: isHovered
-      )
-      // Scale: snap down on press, spring back on release. Cancelable mid-flight
-      // so rapid taps feel responsive - the spring always starts from the current
-      // render-tree position, never queuing stale sequences.
+      .animation(.easeOut(duration: 0.15), value: isLoading)
+      .rotationEffect(rotationAngle)
+      .animation(rotationAnimation, value: isHovered)
+      .animation(rotationAnimation, value: isSpinning)
       .scaleEffect(pressed ? 0.78 : 1)
       .animation(.spring(duration: 0.2, bounce: 0.3), value: pressed)
       .contentShape(Circle())
@@ -280,16 +272,37 @@ private struct DaemonRestartButtonStyle: ButtonStyle {
         case .ended: isHovered = false
         }
       }
+      .onChange(of: isLoading) { _, loading in
+        isSpinning = loading && !reduceMotion
+      }
+  }
+
+  private var rotationAngle: Angle {
+    if isSpinning {
+      return .degrees(360)
+    }
+    if isHovered {
+      return .degrees(75)
+    }
+    return .zero
+  }
+
+  private var rotationAnimation: Animation? {
+    if reduceMotion { return .easeOut(duration: 0.1) }
+    if isSpinning {
+      return .linear(duration: 0.8).repeatForever(autoreverses: false)
+    }
+    return .spring(duration: 0.35, bounce: 0.15)
   }
 
   private func iconColor(pressed: Bool) -> Color {
-    if !isEnabled { return HarnessTheme.secondaryInk }
+    if isLoading { return HarnessTheme.accent }
     if pressed || isHovered { return HarnessTheme.accent }
     return HarnessTheme.secondaryInk
   }
 
   private func iconOpacity(pressed: Bool) -> Double {
-    if !isEnabled { return 0.3 }
+    if isLoading { return 0.6 }
     if pressed || isHovered { return 1 }
     return 0.4
   }
