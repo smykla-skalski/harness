@@ -84,21 +84,22 @@ struct ContentView: View {
       .navigationTitle(navigationTitle)
       .toolbar {
         ToolbarItem(placement: .navigation) {
-          ControlGroup {
-            Button {
-              Task { await store.navigateBack() }
-            } label: {
-              Label("Back", systemImage: "chevron.backward")
-            }
-            .disabled(!store.canNavigateBack)
-            Button {
-              Task { await store.navigateForward() }
-            } label: {
-              Label("Forward", systemImage: "chevron.forward")
-            }
-            .disabled(!store.canNavigateForward)
+          Button {
+            Task { await store.navigateBack() }
+          } label: {
+            Label("Back", systemImage: "chevron.backward")
           }
-          .controlGroupStyle(.navigation)
+          .disabled(store.navigationBackStack.isEmpty)
+          .help("Go back")
+        }
+        ToolbarItem(placement: .navigation) {
+          Button {
+            Task { await store.navigateForward() }
+          } label: {
+            Label("Forward", systemImage: "chevron.forward")
+          }
+          .disabled(store.navigationForwardStack.isEmpty)
+          .help("Go forward")
         }
         ToolbarItem(placement: .status) {
           ConnectionToolbarBadge(metrics: store.connectionMetrics)
@@ -109,18 +110,6 @@ struct ContentView: View {
           RefreshToolbarButton(store: store)
             .help("Refresh sessions")
         }
-        ToolbarItem(id: "inspector", placement: .primaryAction) {
-          Button {
-            showInspector.toggle()
-          } label: {
-            Label(
-              showInspector ? "Hide Inspector" : "Show Inspector",
-              systemImage: showInspector ? "info.circle.fill" : "info.circle"
-            )
-          }
-          .help(showInspector ? "Hide inspector" : "Show inspector")
-        }
-        ToolbarSpacer(.fixed)
         ToolbarItem(id: "settings", placement: .primaryAction) {
           Button {
             openSettings()
@@ -129,6 +118,18 @@ struct ContentView: View {
           }
           .help("Open settings")
           .accessibilityIdentifier(HarnessAccessibility.daemonPreferencesButton)
+        }
+        ToolbarSpacer(.fixed)
+        ToolbarItem(id: "inspector", placement: .primaryAction) {
+          Button {
+            showInspector.toggle()
+          } label: {
+            Label(
+              showInspector ? "Hide Inspector" : "Show Inspector",
+              systemImage: showInspector ? "sidebar.trailing" : "sidebar.trailing"
+            )
+          }
+          .help(showInspector ? "Hide inspector" : "Show inspector")
         }
       }
     }
