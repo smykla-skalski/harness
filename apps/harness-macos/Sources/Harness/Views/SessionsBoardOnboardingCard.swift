@@ -3,9 +3,7 @@ import Observation
 import SwiftUI
 
 struct SessionsBoardOnboardingCard: View {
-  @Environment(\.harnessThemeStyle)
-  private var themeStyle
-  @Bindable var store: HarnessStore
+  let store: HarnessStore
   let isLoading: Bool
 
   var body: some View {
@@ -14,9 +12,9 @@ struct SessionsBoardOnboardingCard: View {
       onboardingStepsSection
     }
     .frame(maxWidth: .infinity, alignment: .leading)
-    .harnessCard(contentPadding: 16)
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessAccessibility.onboardingCard)
+    .accessibilityFrameMarker("\(HarnessAccessibility.onboardingCard).frame")
   }
 
   private var header: some View {
@@ -36,7 +34,7 @@ struct SessionsBoardOnboardingCard: View {
         .font(.caption.bold())
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
-        .background(HarnessTheme.accent(for: themeStyle), in: Capsule())
+        .background(HarnessTheme.accent, in: Capsule())
         .foregroundStyle(.white)
     }
   }
@@ -56,7 +54,7 @@ struct SessionsBoardOnboardingCard: View {
           title: "Start Daemon",
           tint: store.connectionState == .online
             ? HarnessTheme.ink
-            : HarnessTheme.accent(for: themeStyle),
+            : HarnessTheme.accent,
           variant: store.connectionState == .online
             ? .bordered : .prominent,
           isLoading: isLoading,
@@ -138,18 +136,11 @@ struct SessionsBoardOnboardingCard: View {
         .frame(maxWidth: .infinity, alignment: .trailing)
     }
     .frame(maxWidth: .infinity, minHeight: 72, alignment: .topLeading)
-    .padding(11)
-    .harnessInsetPanel(cornerRadius: 18, fillOpacity: 0.05, strokeOpacity: isReady ? 0 : 0.50)
-    .overlay {
-      if isReady {
-        RoundedRectangle(cornerRadius: 18, style: .continuous)
-          .fill(HarnessTheme.success.opacity(0.04))
-          .overlay {
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-              .stroke(HarnessTheme.success.opacity(0.50), lineWidth: 1)
-          }
-      }
+    .padding(.leading, 18)
+    .overlay(alignment: .leading) {
+      RoundedRectangle(cornerRadius: 999, style: .continuous)
+        .fill(isReady ? HarnessTheme.success : HarnessTheme.caution)
+        .frame(width: 4)
     }
-    .opacity(isReady ? 0.65 : 1)
   }
 }
