@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 
 extension HarnessStore {
@@ -62,6 +63,38 @@ extension HarnessStore {
 
   public func inspectObserver() {
     inspectorSelection = .observer
+  }
+
+  public var selectedSessionBookmarkTitle: String {
+    guard let sessionID = selectedSessionID else { return "Bookmark Session" }
+    return isBookmarked(sessionId: sessionID) ? "Remove Bookmark" : "Bookmark Session"
+  }
+
+  public func toggleSelectedSessionBookmark() {
+    guard let sessionID = selectedSessionID else { return }
+    let projectID =
+      selectedSession?.session.projectId
+      ?? sessions.first(where: { $0.sessionId == sessionID })?.projectId
+      ?? ""
+    toggleBookmark(sessionId: sessionID, projectId: projectID)
+  }
+
+  public func copySelectedItemID() {
+    let text: String
+    switch inspectorSelection {
+    case .task(let taskID): text = taskID
+    case .agent(let agentID): text = agentID
+    case .signal(let signalID): text = signalID
+    case .observer:
+      text = selectedSession?.observer?.observeId ?? selectedSessionID ?? ""
+    case .none:
+      text = selectedSessionID ?? ""
+    }
+    guard !text.isEmpty else { return }
+    #if canImport(AppKit)
+    NSPasteboard.general.clearContents()
+    NSPasteboard.general.setString(text, forType: .string)
+    #endif
   }
 
   func synchronizeActionActor() {
