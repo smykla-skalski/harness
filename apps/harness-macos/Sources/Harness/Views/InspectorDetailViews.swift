@@ -229,7 +229,7 @@ struct AgentInspectorCard: View {
       Text("\(agent.runtime) • \(agent.role.title)")
         .foregroundStyle(HarnessTheme.secondaryInk)
       InspectorFactGrid(facts: facts)
-      InspectorSection(title: "Runtime Capabilities") {
+      DisclosureGroup("Runtime Capabilities") {
         InspectorFactGrid(
           facts: [
             .init(
@@ -248,11 +248,15 @@ struct AgentInspectorCard: View {
           ]
         )
       }
-      InspectorSection(title: "Declared Capabilities") {
+      .font(.caption.bold())
+      .foregroundStyle(HarnessTheme.secondaryInk)
+      DisclosureGroup("Declared Capabilities") {
         InspectorBadgeColumn(values: capabilityBadges)
       }
+      .font(.caption.bold())
+      .foregroundStyle(HarnessTheme.secondaryInk)
       if !agent.runtimeCapabilities.hookPoints.isEmpty {
-        InspectorSection(title: "Hook Points") {
+        DisclosureGroup("Hook Points") {
           InspectorBadgeColumn(
             values: agent.runtimeCapabilities.hookPoints.map { hook in
               let context = hook.supportsContextInjection ? "context" : "no-context"
@@ -260,9 +264,11 @@ struct AgentInspectorCard: View {
             }
           )
         }
+        .font(.caption.bold())
+        .foregroundStyle(HarnessTheme.secondaryInk)
       }
       if let activity {
-        InspectorSection(title: "Tool Activity") {
+        DisclosureGroup("Tool Activity") {
           InspectorFactGrid(
             facts: [
               .init(title: "Invocations", value: "\(activity.toolInvocationCount)"),
@@ -280,6 +286,8 @@ struct AgentInspectorCard: View {
               .foregroundStyle(HarnessTheme.secondaryInk)
           }
         }
+        .font(.caption.bold())
+        .foregroundStyle(HarnessTheme.secondaryInk)
       }
       InspectorSection(title: "Send Signal") {
         TextField("Command", text: $signalCommand)
@@ -337,7 +345,7 @@ struct SignalInspectorCard: View {
       Text(signal.signal.payload.message)
         .foregroundStyle(HarnessTheme.secondaryInk)
       InspectorFactGrid(facts: facts)
-      InspectorSection(title: "Delivery") {
+      DisclosureGroup("Delivery") {
         InspectorFactGrid(
           facts: [
             .init(title: "Retries", value: "\(signal.signal.delivery.retryCount)"),
@@ -349,6 +357,8 @@ struct SignalInspectorCard: View {
           ]
         )
       }
+      .font(.caption.bold())
+      .foregroundStyle(HarnessTheme.secondaryInk)
       if let actionHint = signal.signal.payload.actionHint, !actionHint.isEmpty {
         InspectorSection(title: "Action Hint") {
           Text(actionHint)
@@ -356,7 +366,7 @@ struct SignalInspectorCard: View {
         }
       }
       if !signal.signal.payload.relatedFiles.isEmpty {
-        InspectorSection(title: "Related Files") {
+        DisclosureGroup("Related Files") {
           VStack(alignment: .leading, spacing: HarnessTheme.itemSpacing) {
             ForEach(Array(signal.signal.payload.relatedFiles.enumerated()), id: \.offset) { _, path in
               Text(path)
@@ -367,13 +377,17 @@ struct SignalInspectorCard: View {
             }
           }
         }
+        .font(.caption.bold())
+        .foregroundStyle(HarnessTheme.secondaryInk)
       }
-      InspectorSection(title: "Metadata") {
+      DisclosureGroup("Metadata") {
         Text(verbatim: signal.signal.payload.metadata.prettyPrintedJSONString())
           .font(.caption.monospaced())
           .foregroundStyle(HarnessTheme.secondaryInk)
           .textSelection(.enabled)
       }
+      .font(.caption.bold())
+      .foregroundStyle(HarnessTheme.secondaryInk)
       if let acknowledgment = signal.acknowledgment {
         InspectorSection(title: "Acknowledgment") {
           InspectorFactGrid(
