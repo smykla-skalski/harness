@@ -177,7 +177,7 @@ extension InspectorActionSections {
         Button("Save Checkpoint") {
           Task { await checkpointSelectedTask() }
         }
-        .harnessActionButtonStyle(variant: .prominent, tint: .orange)
+        .harnessActionButtonStyle(variant: .prominent, tint: HarnessTheme.caution)
         .disabled(store.isSessionActionInFlight)
       }
 
@@ -270,7 +270,7 @@ extension InspectorActionSections {
       Button(transferLeaderButtonTitle) {
         Task { await transferLeader() }
       }
-      .harnessActionButtonStyle(variant: .prominent, tint: .orange)
+      .harnessActionButtonStyle(variant: .prominent, tint: HarnessTheme.caution)
       .disabled(
         transferLeaderID.isEmpty || transferLeaderID == detail.session.leaderId
           || store.isSessionActionInFlight
