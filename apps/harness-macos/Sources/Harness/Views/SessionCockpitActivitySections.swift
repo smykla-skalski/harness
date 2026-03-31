@@ -89,10 +89,6 @@ struct SessionCockpitTimelineSection: View {
       }
       ForEach(timeline) { entry in
         HStack(alignment: .top, spacing: HarnessTheme.sectionSpacing) {
-          RoundedRectangle(cornerRadius: 999)
-            .fill(HarnessTheme.accent.opacity(0.35))
-            .frame(width: 8)
-            .accessibilityHidden(true)
           VStack(alignment: .leading, spacing: 4) {
             Text(entry.summary)
               .font(.system(.body, design: .rounded, weight: .semibold))
