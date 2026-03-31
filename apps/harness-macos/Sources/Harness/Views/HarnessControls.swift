@@ -42,6 +42,7 @@ struct HarnessAsyncActionButton: View {
   let fillsWidth: Bool
   let store: HarnessStore
   let storeAction: StoreAction
+  @State private var runningTask: Task<Void, Never>?
 
   init(
     title: String,
@@ -64,13 +65,15 @@ struct HarnessAsyncActionButton: View {
   }
 
   var body: some View {
-    Button(action: performAction) {
+    Button(action: isLoading ? cancelAction : performAction) {
       label
     }
     .frame(maxWidth: fillsWidth ? .infinity : nil)
-    .harnessActionButtonStyle(variant: variant, tint: tint)
+    .harnessActionButtonStyle(
+      variant: isLoading ? .bordered : variant,
+      tint: isLoading ? .secondary : tint
+    )
     .controlSize(HarnessControlMetrics.compactControlSize)
-    .disabled(isLoading)
     .accessibilityIdentifier(accessibilityIdentifier)
     .accessibilityFrameMarker("\(accessibilityIdentifier).frame")
   }
@@ -81,7 +84,7 @@ struct HarnessAsyncActionButton: View {
         HarnessSpinner()
           .transition(.opacity)
       }
-      Text(title)
+      Text(isLoading ? "Cancel" : title)
         .lineLimit(1)
     }
     .font(.system(.callout, design: .rounded, weight: .semibold))
@@ -90,7 +93,7 @@ struct HarnessAsyncActionButton: View {
   }
 
   private func performAction() {
-    Task {
+    runningTask = Task {
       switch storeAction {
       case .startDaemon:
         await store.startDaemon()
@@ -105,7 +108,13 @@ struct HarnessAsyncActionButton: View {
       case .refreshDiagnostics:
         await store.refreshDiagnostics()
       }
+      runningTask = nil
     }
+  }
+
+  private func cancelAction() {
+    runningTask?.cancel()
+    runningTask = nil
   }
 }
 

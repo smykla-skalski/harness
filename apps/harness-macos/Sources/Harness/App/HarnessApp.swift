@@ -132,7 +132,7 @@ struct HarnessApp: App {
     }
     CommandMenu("Harness") {
       Button("Refresh", action: refreshStore)
-        .keyboardShortcut("r", modifiers: [.command])
+        .keyboardShortcut("r", modifiers: [.command, .shift])
 
       Divider()
 
@@ -149,6 +149,20 @@ struct HarnessApp: App {
       Button("End Selected Session", action: endSelectedSession)
         .keyboardShortcut("e", modifiers: [.command, .shift])
         .disabled(store.selectedSessionID == nil)
+
+      Divider()
+
+      Button(store.selectedSessionBookmarkTitle) {
+        store.toggleSelectedSessionBookmark()
+      }
+      .keyboardShortcut("b", modifiers: [.command, .shift])
+      .disabled(store.selectedSessionID == nil)
+
+      Button("Copy Selection ID") {
+        store.copySelectedItemID()
+      }
+      .keyboardShortcut("c", modifiers: [.command, .shift])
+      .disabled(store.selectedSessionID == nil)
 
       Divider()
 
