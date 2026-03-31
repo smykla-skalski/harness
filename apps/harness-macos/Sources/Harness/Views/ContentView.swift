@@ -51,7 +51,6 @@ struct ContentView: View {
         )
         .frame(maxWidth: .infinity, maxHeight: .infinity)
       }
-      .backgroundExtensionEffect()
       .accessibilityFrameMarker("\(HarnessAccessibility.contentRoot).frame")
       .navigationTitle("Harness")
       .toolbar {
@@ -262,7 +261,7 @@ private struct SessionLoadingView: View {
       }
       .frame(maxWidth: .infinity, alignment: .leading)
     }
-    .foregroundStyle(.primary)
+    .foregroundStyle(HarnessTheme.ink)
   }
 }
 

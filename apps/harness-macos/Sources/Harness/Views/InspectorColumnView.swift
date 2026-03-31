@@ -38,7 +38,7 @@ struct InspectorColumnView: View {
       .frame(maxWidth: .infinity, alignment: .leading)
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-    .foregroundStyle(.primary)
+    .foregroundStyle(HarnessTheme.ink)
     .textFieldStyle(.roundedBorder)
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessAccessibility.inspectorRoot)
@@ -88,7 +88,7 @@ struct InspectorColumnView: View {
       Text(summary.context)
         .font(.system(.headline, design: .rounded, weight: .semibold))
       Text("Loading live task, agent, and signal detail for the selected session.")
-        .foregroundStyle(HarnessTheme.secondaryInk)
+        .foregroundStyle(.secondary)
       HarnessLoadingStateView(title: "Loading session detail")
     }
     .frame(maxWidth: .infinity, alignment: .leading)
@@ -105,7 +105,7 @@ struct InspectorColumnView: View {
       Text("Inspector")
         .font(.system(.title3, design: .rounded, weight: .semibold))
       Text("Select a session to inspect live task, agent, and signal detail.")
-        .foregroundStyle(HarnessTheme.secondaryInk)
+        .foregroundStyle(.secondary)
     }
     .frame(maxWidth: .infinity, alignment: .leading)
     .accessibilityTestProbe(

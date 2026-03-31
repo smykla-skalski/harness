@@ -21,7 +21,7 @@ struct SessionsBoardView: View {
       .animation(.spring(duration: 0.3), value: store.sessions)
       .frame(maxWidth: .infinity, alignment: .leading)
     }
-    .foregroundStyle(.primary)
+    .foregroundStyle(HarnessTheme.ink)
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessAccessibility.sessionsBoardRoot)
   }
