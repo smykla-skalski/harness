@@ -99,7 +99,6 @@ struct SessionCockpitHeaderCard: View {
       .accessibilityElement(children: .combine)
       .frame(maxWidth: .infinity, alignment: .leading)
       .padding(14)
-      .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
     .harnessInteractiveCardButtonStyle()
     .accessibilityIdentifier("harness.session.observe.summary")

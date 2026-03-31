@@ -156,7 +156,7 @@ struct TaskInspectorCard: View {
                     .font(.caption)
                     .foregroundStyle(HarnessTheme.secondaryInk)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.borderless)
               }
               .padding(.horizontal, 12)
               .padding(.vertical, 8)

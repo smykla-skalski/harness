@@ -135,19 +135,21 @@ private struct HarnessFilterChipButtonStyleModifier: ViewModifier {
   }
 }
 
-private struct InteractiveCardModifier: ViewModifier {
+private struct InteractiveCardButtonStyle: ButtonStyle {
   let cornerRadius: CGFloat
   let tint: Color?
 
-  func body(content: Content) -> some View {
-    content
-      .buttonStyle(.plain)
+  func makeBody(configuration: Configuration) -> some View {
+    configuration.label
       .background {
         if let tint {
           RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-            .fill(tint.opacity(0.12))
+            .fill(tint.opacity(configuration.isPressed ? 0.18 : 0.12))
         }
       }
+      .contentShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+      .opacity(configuration.isPressed ? 0.85 : 1)
+      .animation(.easeOut(duration: 0.15), value: configuration.isPressed)
   }
 }
 
@@ -173,8 +175,8 @@ extension View {
     cornerRadius: CGFloat = 18,
     tint: Color? = nil
   ) -> some View {
-    modifier(
-      InteractiveCardModifier(
+    buttonStyle(
+      InteractiveCardButtonStyle(
         cornerRadius: cornerRadius,
         tint: tint
       )
