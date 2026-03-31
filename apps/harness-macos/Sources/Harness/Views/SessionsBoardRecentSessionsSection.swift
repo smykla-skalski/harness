@@ -3,7 +3,7 @@ import SwiftUI
 
 struct SessionsBoardRecentSessionsSection: View {
   let sessions: [SessionSummary]
-  let onSelect: (String) -> Void
+  let store: HarnessStore
 
   var body: some View {
     VStack(alignment: .leading, spacing: 14) {
@@ -15,11 +15,13 @@ struct SessionsBoardRecentSessionsSection: View {
         )
         .font(.system(.body, design: .rounded, weight: .medium))
         .foregroundStyle(HarnessTheme.secondaryInk)
+        .frame(maxWidth: .infinity, alignment: .leading)
       } else {
-        HarnessGlassContainer(spacing: 12) {
+        VStack(alignment: .leading, spacing: 12) {
           ForEach(sessions.prefix(8)) { session in
             Button {
-              onSelect(session.sessionId)
+              store.primeSessionSelection(session.sessionId)
+              Task { await store.selectSession(session.sessionId) }
             } label: {
               HStack(alignment: .top, spacing: 14) {
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
@@ -46,11 +48,15 @@ struct SessionsBoardRecentSessionsSection: View {
             .harnessInteractiveCardButtonStyle()
           }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
       }
     }
     .frame(maxWidth: .infinity, alignment: .leading)
-    .harnessCard(contentPadding: 16)
-    .accessibilityElement(children: .contain)
-    .accessibilityIdentifier(HarnessAccessibility.recentSessionsCard)
+    .accessibilityTestProbe(
+      HarnessAccessibility.recentSessionsCard,
+      label: "Recent Sessions",
+      value: sessions.isEmpty ? "empty" : "\(sessions.count)"
+    )
+    .accessibilityFrameMarker("\(HarnessAccessibility.recentSessionsCard).frame")
   }
 }

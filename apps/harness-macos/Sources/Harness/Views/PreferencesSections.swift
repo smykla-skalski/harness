@@ -2,12 +2,8 @@ import HarnessKit
 import SwiftUI
 
 struct PreferencesActionButtons: View {
+  let store: HarnessStore
   let isLoading: Bool
-  let reconnect: @Sendable () async -> Void
-  let refreshDiagnostics: @Sendable () async -> Void
-  let startDaemon: @Sendable () async -> Void
-  let installLaunchAgent: @Sendable () async -> Void
-  let requestRemoveLaunchAgentConfirmation: @Sendable @MainActor () -> Void
 
   var body: some View {
     HarnessGlassContainer(spacing: 8) {
@@ -19,7 +15,7 @@ struct PreferencesActionButtons: View {
           isLoading: isLoading,
           accessibilityIdentifier: HarnessAccessibility.preferencesActionButton("Reconnect")
         ) {
-          await reconnect()
+          await store.reconnect()
         }
         HarnessAsyncActionButton(
           title: "Refresh Diagnostics",
@@ -30,7 +26,7 @@ struct PreferencesActionButtons: View {
             "Refresh Diagnostics"
           )
         ) {
-          await refreshDiagnostics()
+          await store.refreshDiagnostics()
         }
         HarnessAsyncActionButton(
           title: "Start Daemon",
@@ -39,7 +35,7 @@ struct PreferencesActionButtons: View {
           isLoading: isLoading,
           accessibilityIdentifier: HarnessAccessibility.preferencesActionButton("Start Daemon")
         ) {
-          await startDaemon()
+          await store.startDaemon()
         }
         HarnessAsyncActionButton(
           title: "Install Launch Agent",
@@ -50,7 +46,7 @@ struct PreferencesActionButtons: View {
             "Install Launch Agent"
           )
         ) {
-          await installLaunchAgent()
+          await store.installLaunchAgent()
         }
         HarnessAsyncActionButton(
           title: "Remove Launch Agent",
@@ -62,7 +58,7 @@ struct PreferencesActionButtons: View {
           )
         ) {
           await MainActor.run {
-            requestRemoveLaunchAgentConfirmation()
+            store.requestRemoveLaunchAgentConfirmation()
           }
         }
       }
