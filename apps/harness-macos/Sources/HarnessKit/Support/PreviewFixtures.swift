@@ -164,4 +164,71 @@ public enum PreviewFixtures {
       )
     )
   ]
+
+  public static let overflowSessions: [SessionSummary] = {
+    let contexts = [
+      "Track sidebar live updates without invalidating the whole window",
+      "Verify task timeline diffs stay incremental under daemon push traffic",
+      "Audit session selection redraw cost when recent searches change",
+      "Confirm observer summaries remain readable at smaller text scales",
+      "Stress test sidebar filter chips against a larger active session set",
+      "Keep diagnostics cards responsive while the daemon reconnects",
+      "Measure session board metric recomputation after narrow updates",
+      "Review bookmark persistence when switching between many sessions",
+      "Exercise cockpit lazy sections with a wider mix of session states",
+      "Validate compact inspector cards when the agent roster grows",
+      "Check pending leader transfer rendering under rapid timeline churn",
+      "Confirm search result grouping stays stable with repeated refreshes",
+      "Benchmark sidebar scrolling when open work and blocked counts spike",
+      "Verify observed sessions remain reachable after repeated filter changes",
+      "Inspect transport badge updates during session stream reconnects",
+      "Compare idle and active session rendering in the grouped sidebar",
+      "Confirm recent-activity sorting preserves the most active session first",
+      "Review session focus filters with mixed observed and idle fixtures",
+    ]
+
+    return [summary] + contexts.enumerated().map { offset, context in
+      let index = offset + 1
+      let minute = 17 - min(offset, 15)
+      let status: SessionStatus =
+        switch index % 4 {
+        case 0:
+          .ended
+        case 1:
+          .active
+        case 2:
+          .paused
+        default:
+          .active
+        }
+      let activeAgentCount = status == .ended ? 0 : max(0, 3 - (index % 3))
+      let openTaskCount = (index % 4) + (status == .ended ? 0 : 1)
+      let inProgressTaskCount = status == .ended ? 0 : max(1, 3 - (index % 2))
+      let blockedTaskCount = index.isMultiple(of: 3) ? 1 : 0
+
+      return SessionSummary(
+        projectId: summary.projectId,
+        projectName: summary.projectName,
+        projectDir: summary.projectDir,
+        contextRoot: summary.contextRoot,
+        sessionId: String(format: "sess-harness-%02d", index),
+        context: context,
+        status: status,
+        createdAt: "2026-03-28T14:\(String(format: "%02d", max(minute - 1, 0))):00Z",
+        updatedAt: "2026-03-28T14:\(String(format: "%02d", minute)):00Z",
+        lastActivityAt: status == .ended ? nil : "2026-03-28T14:\(String(format: "%02d", minute)):30Z",
+        leaderId: summary.leaderId,
+        observeId: index.isMultiple(of: 2) ? "observe-sess-harness-\(index)" : nil,
+        pendingLeaderTransfer: nil,
+        metrics: SessionMetrics(
+          agentCount: 4,
+          activeAgentCount: activeAgentCount,
+          openTaskCount: openTaskCount,
+          inProgressTaskCount: inProgressTaskCount,
+          blockedTaskCount: blockedTaskCount,
+          completedTaskCount: 2 + index
+        ),
+      )
+    }
+  }()
 }
