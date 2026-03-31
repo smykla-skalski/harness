@@ -99,17 +99,21 @@ private struct HarnessActionButtonStyleModifier: ViewModifier {
   let variant: HarnessAsyncActionButton.Variant
   let tint: Color?
 
+  @ViewBuilder
   func body(content: Content) -> some View {
-    let styled = switch variant {
+    switch variant {
     case .prominent:
-      content.buttonStyle(.glassProminent)
+      if let tint {
+        content.buttonStyle(.glassProminent).tint(tint)
+      } else {
+        content.buttonStyle(.glassProminent)
+      }
     case .bordered:
-      content.buttonStyle(.glass)
-    }
-    if let tint {
-      styled.tint(tint)
-    } else {
-      styled
+      if let tint {
+        content.buttonStyle(.glass).tint(tint)
+      } else {
+        content.buttonStyle(.glass)
+      }
     }
   }
 }
@@ -127,11 +131,18 @@ private struct HarnessAccessoryButtonStyleModifier: ViewModifier {
 private struct HarnessFilterChipButtonStyleModifier: ViewModifier {
   let isSelected: Bool
 
+  @ViewBuilder
   func body(content: Content) -> some View {
-    content
-      .buttonStyle(.glass)
-      .tint(isSelected ? nil : .secondary)
-      .fontWeight(isSelected ? .bold : .semibold)
+    if isSelected {
+      content
+        .buttonStyle(.glassProminent)
+        .fontWeight(.bold)
+    } else {
+      content
+        .buttonStyle(.glass)
+        .tint(.secondary)
+        .fontWeight(.semibold)
+    }
   }
 }
 
