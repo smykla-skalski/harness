@@ -100,23 +100,11 @@ extension InspectorActionSections {
         .accessibilityIdentifier(HarnessAccessibility.actionActorPicker)
       }
       if let error = store.lastError {
-        HStack {
-          Text("Action failed: \(error)")
-            .font(.system(.footnote, design: .rounded, weight: .semibold))
-            .foregroundStyle(HarnessTheme.danger)
-            .lineLimit(3)
-          Spacer()
-          Button {
-            store.lastError = nil
-          } label: {
-            Image(systemName: "xmark.circle.fill")
-              .foregroundStyle(HarnessTheme.tertiaryInk)
-              .frame(minWidth: 24, minHeight: 24)
-              .contentShape(Rectangle())
-          }
-          .harnessDismissButtonStyle()
-          .accessibilityLabel("Dismiss error")
-        }
+        Text("Action failed: \(error)")
+          .font(.system(.footnote, design: .rounded, weight: .semibold))
+          .foregroundStyle(HarnessTheme.danger)
+          .lineLimit(3)
+          .frame(maxWidth: .infinity, alignment: .leading)
       }
     }
   }
