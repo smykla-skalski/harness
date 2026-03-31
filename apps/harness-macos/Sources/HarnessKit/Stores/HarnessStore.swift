@@ -92,8 +92,8 @@ public final class HarnessStore {
   public var subscribedSessionIDs: Set<String> = []
   public var isShowingCachedData = false
   public var bookmarkedSessionIds: Set<String> = []
-  public var navigationBackStack: [String] = []
-  public var navigationForwardStack: [String] = []
+  public var navigationBackStack: [String?] = []
+  public var navigationForwardStack: [String?] = []
   var connectionProbeInterval: Duration = .seconds(10)
   public var dataReceivedPulse: Bool {
     guard connectionState == .online,
@@ -115,6 +115,7 @@ public final class HarnessStore {
   var trafficSampleTimes: [Date] = []
   var activeSessionLoadRequest: UInt64 = 0
   var sessionLoadSequence: UInt64 = 0
+  var isNavigatingHistory = false
   private var hasBootstrapped = false
 
   public init(

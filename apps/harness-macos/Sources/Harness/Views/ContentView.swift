@@ -22,6 +22,8 @@ struct ContentView: View {
   private var showInspector = true
   @SceneStorage("selectedSessionID")
   private var restoredSessionID: String?
+  @State private var canGoBack = false
+  @State private var canGoForward = false
 
   private var selectedDetail: SessionDetail? {
     guard let sessionID = store.selectedSessionID,
@@ -89,7 +91,7 @@ struct ContentView: View {
           } label: {
             Label("Back", systemImage: "chevron.backward")
           }
-          .disabled(store.navigationBackStack.isEmpty)
+          .disabled(!canGoBack)
           .help("Go back")
           .accessibilityIdentifier(HarnessAccessibility.navigateBackButton)
         }
@@ -99,7 +101,7 @@ struct ContentView: View {
           } label: {
             Label("Forward", systemImage: "chevron.forward")
           }
-          .disabled(store.navigationForwardStack.isEmpty)
+          .disabled(!canGoForward)
           .help("Go forward")
           .accessibilityIdentifier(HarnessAccessibility.navigateForwardButton)
         }
@@ -147,6 +149,14 @@ struct ContentView: View {
     }
     .onChange(of: store.selectedSessionID) { _, newID in
       restoredSessionID = newID
+      canGoBack = !store.navigationBackStack.isEmpty
+      canGoForward = !store.navigationForwardStack.isEmpty
+    }
+    .onChange(of: store.navigationBackStack.count) { _, _ in
+      canGoBack = !store.navigationBackStack.isEmpty
+    }
+    .onChange(of: store.navigationForwardStack.count) { _, _ in
+      canGoForward = !store.navigationForwardStack.isEmpty
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity)
     .accessibilityElement(children: .contain)

@@ -4,6 +4,8 @@ enum HarnessUITestAccessibility {
   static let daemonCard = "harness.sidebar.daemon-card"
   static let daemonCardFrame = "harness.sidebar.daemon-card.frame"
   static let sidebarShellFrame = "harness.sidebar.shell.frame"
+  static let navigateBackButton = "harness.toolbar.navigate-back"
+  static let navigateForwardButton = "harness.toolbar.navigate-forward"
   static let preferencesButton = "harness.toolbar.preferences"
   static let refreshButton = "harness.toolbar.refresh"
   static let sidebarStartButton = "harness.sidebar.action.start"

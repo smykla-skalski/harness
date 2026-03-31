@@ -49,6 +49,8 @@ struct HarnessApp: App {
   @State private var store: HarnessStore
   @AppStorage(HarnessThemeDefaults.modeKey)
   private var storedThemeMode = HarnessThemeMode.auto.rawValue
+  @AppStorage(HarnessTextSize.storageKey)
+  private var textSizeIndex = HarnessTextSize.defaultIndex
   @State private var themeMode: HarnessThemeMode = .auto
   private let isUITesting = ProcessInfo.processInfo.environment["HARNESS_UI_TESTS"] == "1"
 
@@ -112,6 +114,7 @@ struct HarnessApp: App {
   @ViewBuilder private var rootContent: some View {
     ContentView(store: store)
       .frame(minWidth: 900, minHeight: 600)
+      .dynamicTypeSize(HarnessTextSize.level(at: textSizeIndex))
       .preferredColorScheme(themeMode.colorScheme)
       .tint(HarnessTheme.accent)
       .onAppear { syncThemeFromStorage() }
@@ -128,6 +131,29 @@ struct HarnessApp: App {
   @CommandsBuilder private var appCommands: some Commands {
     SidebarCommands()
     TextEditingCommands()
+    CommandGroup(after: .toolbar) {
+      Button("Increase Text Size") {
+        if HarnessTextSize.canIncrease(textSizeIndex) {
+          textSizeIndex += 1
+        }
+      }
+      .keyboardShortcut("+", modifiers: .command)
+      .disabled(!HarnessTextSize.canIncrease(textSizeIndex))
+
+      Button("Decrease Text Size") {
+        if HarnessTextSize.canDecrease(textSizeIndex) {
+          textSizeIndex -= 1
+        }
+      }
+      .keyboardShortcut("-", modifiers: .command)
+      .disabled(!HarnessTextSize.canDecrease(textSizeIndex))
+
+      Button("Reset Text Size") {
+        textSizeIndex = HarnessTextSize.defaultIndex
+      }
+      .keyboardShortcut("0", modifiers: .command)
+      .disabled(textSizeIndex == HarnessTextSize.defaultIndex)
+    }
     CommandGroup(replacing: .help) {
       Link("Harness Documentation", destination: URL(string: "https://github.com/smykla-skalski/harness")!)
     }
@@ -211,6 +237,7 @@ struct HarnessApp: App {
       themeMode: $themeMode
     )
     .frame(minWidth: 600, minHeight: 400)
+    .dynamicTypeSize(HarnessTextSize.level(at: textSizeIndex))
     .preferredColorScheme(themeMode.colorScheme)
     .tint(HarnessTheme.accent)
   }
