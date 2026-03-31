@@ -97,7 +97,129 @@ final class HarnessGlassContrastUITests: HarnessUITestCase {
     )
   }
 
+  func testSidebarFilterChipBackgroundIsVisible() throws {
+    let app = launch(mode: "preview")
+
+    // "Blocked" is unselected by default (default focus = .all).
+    // Its .bordered style should render a visible button background.
+    let chip = button(in: app, title: "Blocked")
+    let filtersCard = element(
+      in: app,
+      identifier: Accessibility.sidebarFiltersCard
+    )
+    XCTAssertTrue(
+      chip.waitForExistence(timeout: Self.uiTimeout),
+      "Blocked focus chip must exist"
+    )
+    XCTAssertTrue(filtersCard.exists, "Filters card must exist")
+
+    // Sample the chip's EDGE luminance (top 25% strip, above the text)
+    // and compare against the filter card background. If the button
+    // background is invisible (vibrancy washed out), the edge strip
+    // will have the same luminance as the sidebar card background.
+    let chipEdge = edgeLuminance(of: chip, region: .top)
+    let cardBg = edgeLuminance(of: filtersCard, region: .top)
+
+    let chipShot = XCTAttachment(screenshot: chip.screenshot())
+    chipShot.name = "filter-chip-blocked"
+    chipShot.lifetime = .keepAlways
+    add(chipShot)
+
+    let cardShot = XCTAttachment(screenshot: filtersCard.screenshot())
+    cardShot.name = "filter-card-background"
+    cardShot.lifetime = .keepAlways
+    add(cardShot)
+
+    print("CHIP_CONTRAST chipEdge=\(chipEdge) cardBg=\(cardBg)")
+
+    // A bordered button background should be BRIGHTER than the
+    // surrounding sidebar (the button adds a light fill). If the
+    // chip edge is darker than or equal to the card background,
+    // the button background is invisible.
+    XCTAssertGreaterThan(
+      chipEdge,
+      cardBg,
+      "Unselected chip background is not brighter than sidebar: "
+        + "chipEdge=\(chipEdge) must be > cardBg=\(cardBg). "
+        + "The bordered button fill is invisible against the sidebar."
+    )
+  }
+
   // MARK: - Pixel analysis
+
+  private enum SampleRegion {
+    case top
+    case center
+  }
+
+  private func edgeLuminance(
+    of element: XCUIElement,
+    region: SampleRegion
+  ) -> Double {
+    let screenshot = element.screenshot()
+    guard let cgImage = screenshot.image.cgImage(
+      forProposedRect: nil,
+      context: nil,
+      hints: nil
+    ) else {
+      return 0
+    }
+
+    let width = cgImage.width
+    let height = cgImage.height
+    guard width > 4, height > 4 else { return 0 }
+
+    let bytesPerPixel = 4
+    let bytesPerRow = width * bytesPerPixel
+    var pixels = [UInt8](repeating: 0, count: height * bytesPerRow)
+
+    guard let context = CGContext(
+      data: &pixels,
+      width: width,
+      height: height,
+      bitsPerComponent: 8,
+      bytesPerRow: bytesPerRow,
+      space: CGColorSpaceCreateDeviceRGB(),
+      bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+    ) else {
+      return 0
+    }
+
+    context.draw(
+      cgImage,
+      in: CGRect(x: 0, y: 0, width: width, height: height)
+    )
+
+    // Sample a horizontal strip in the requested region.
+    let stripHeight: Int
+    let startRow: Int
+    switch region {
+    case .top:
+      // Top 25% of the element - above any centered text.
+      stripHeight = max(height / 4, 2)
+      startRow = 2
+    case .center:
+      stripHeight = max(height / 4, 2)
+      startRow = height / 2 - stripHeight / 2
+    }
+
+    let edgeSkip = 4
+    var samples: [Double] = []
+    for row in startRow..<min(startRow + stripHeight, height - 2) {
+      for col in stride(from: edgeSkip, to: width - edgeSkip, by: 2) {
+        let offset = row * bytesPerRow + col * bytesPerPixel
+        let red = Double(pixels[offset]) / 255.0
+        let green = Double(pixels[offset + 1]) / 255.0
+        let blue = Double(pixels[offset + 2]) / 255.0
+        samples.append(
+          0.2126 * red + 0.7152 * green + 0.0722 * blue
+        )
+      }
+    }
+
+    guard !samples.isEmpty else { return 0 }
+    return samples.reduce(0, +) / Double(samples.count)
+  }
 
   private struct LuminanceStats {
     let min: Double
