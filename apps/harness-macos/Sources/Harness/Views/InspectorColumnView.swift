@@ -4,9 +4,6 @@ import SwiftUI
 
 struct InspectorColumnView: View {
   let store: HarnessStore
-  @Binding var isPresented: Bool
-  @Environment(\.openSettings)
-  private var openSettings
 
   private var selectedObserver: ObserverSummary? {
     guard case .observer = store.inspectorSelection else { return nil }
@@ -41,27 +38,6 @@ struct InspectorColumnView: View {
       .frame(maxWidth: .infinity, alignment: .leading)
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-    .toolbar {
-      ToolbarItem(placement: .primaryAction) {
-        RefreshToolbarButton(store: store)
-      }
-      ToolbarItem(placement: .primaryAction) {
-        Button {
-          isPresented.toggle()
-        } label: {
-          Label("Inspector", systemImage: "info.circle")
-        }
-        .help("Toggle inspector (Cmd+Option+I)")
-      }
-      ToolbarItem(placement: .secondaryAction) {
-        Button {
-          openSettings()
-        } label: {
-          Label("Settings", systemImage: "gearshape")
-        }
-        .accessibilityIdentifier(HarnessAccessibility.daemonPreferencesButton)
-      }
-    }
     .foregroundStyle(HarnessTheme.ink)
     .textFieldStyle(.roundedBorder)
     .accessibilityElement(children: .contain)
@@ -108,10 +84,10 @@ struct InspectorColumnView: View {
   private func sessionLoadingInspector(_ summary: SessionSummary) -> some View {
     VStack(alignment: .leading, spacing: HarnessTheme.sectionSpacing) {
       Text("Inspector")
-        .font(.system(.title3, design: .rounded, weight: .semibold))
+        .scaledFont(.system(.title3, design: .rounded, weight: .semibold))
         .accessibilityAddTraits(.isHeader)
       Text(summary.context)
-        .font(.system(.headline, design: .rounded, weight: .semibold))
+        .scaledFont(.system(.headline, design: .rounded, weight: .semibold))
       Text("Loading live task, agent, and signal detail for the selected session.")
         .foregroundStyle(HarnessTheme.secondaryInk)
       HarnessLoadingStateView(title: "Loading session detail")
@@ -128,7 +104,7 @@ struct InspectorColumnView: View {
   private var emptyState: some View {
     VStack(alignment: .leading, spacing: HarnessTheme.sectionSpacing) {
       Text("Inspector")
-        .font(.system(.title3, design: .rounded, weight: .semibold))
+        .scaledFont(.system(.title3, design: .rounded, weight: .semibold))
         .accessibilityAddTraits(.isHeader)
       Text("Select a session to inspect live task, agent, and signal detail.")
         .foregroundStyle(HarnessTheme.secondaryInk)
