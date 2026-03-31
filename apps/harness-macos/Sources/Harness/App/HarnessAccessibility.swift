@@ -52,6 +52,7 @@ enum HarnessAccessibility {
   static let latencyBadge = "harness.sidebar.latency-badge"
   static let activityPulse = "harness.sidebar.activity-pulse"
   static let reconnectionProgress = "harness.sidebar.reconnection-progress"
+  static let actionToast = "harness.action-toast"
   static let connectionCard = "harness.preferences.connection-card"
 
   static func sessionRow(_ sessionID: String) -> String {

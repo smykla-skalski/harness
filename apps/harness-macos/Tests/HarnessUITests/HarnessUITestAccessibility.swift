@@ -87,4 +87,5 @@ enum HarnessUITestAccessibility {
   static let startDaemonButton = "harness.preferences.action.start-daemon"
   static let installLaunchAgentButton = "harness.preferences.action.install-launch-agent"
   static let removeLaunchAgentButton = "harness.preferences.action.remove-launch-agent"
+  static let actionToast = "harness.action-toast"
 }
