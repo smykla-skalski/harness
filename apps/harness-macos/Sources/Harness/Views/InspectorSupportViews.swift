@@ -210,14 +210,14 @@ struct InspectorObserverSummarySection: View {
 
   var body: some View {
     VStack(alignment: .leading, spacing: 8) {
-      harnessActionHeader(
+      HarnessActionHeader(
         title: "Observe",
         subtitle: "The observer loop keeps the session moving and surfaces drift."
       )
       HStack {
-        harnessBadge("Open \(observer.openIssueCount)")
-        harnessBadge("Muted \(observer.mutedCodeCount)")
-        harnessBadge("Workers \(observer.activeWorkerCount)")
+        HarnessBadge(value: "Open \(observer.openIssueCount)")
+        HarnessBadge(value: "Muted \(observer.mutedCodeCount)")
+        HarnessBadge(value: "Workers \(observer.activeWorkerCount)")
       }
       Text("Last sweep \(formatTimestamp(observer.lastScanTime))")
         .font(.caption.monospaced())

@@ -2,8 +2,6 @@ import HarnessKit
 import SwiftUI
 
 struct InspectorActionSections: View {
-  @Environment(\.harnessThemeStyle)
-  private var themeStyle
   @Bindable var store: HarnessStore
   let detail: SessionDetail
   let selectedTask: WorkItem?
@@ -96,11 +94,10 @@ extension InspectorActionSections {
           .foregroundStyle(HarnessTheme.danger)
       }
     }
-    .harnessCard()
   }
   fileprivate func taskActions(task: WorkItem) -> some View {
     VStack(alignment: .leading, spacing: 12) {
-      harnessActionHeader(
+      HarnessActionHeader(
         title: "Task Actions",
         subtitle: "Reassign, update status, or checkpoint the selected task."
       )
@@ -123,7 +120,7 @@ extension InspectorActionSections {
         Button("Assign") {
           Task { await assignSelectedTask() }
         }
-        .harnessActionButtonStyle(variant: .prominent, tint: HarnessTheme.accent(for: themeStyle))
+        .harnessActionButtonStyle(variant: .prominent, tint: HarnessTheme.accent)
       }
       HStack {
         Button("Update Status") {
@@ -160,11 +157,10 @@ extension InspectorActionSections {
           .foregroundStyle(HarnessTheme.secondaryInk)
       }
     }
-    .harnessCard()
   }
   fileprivate var sessionTaskActions: some View {
     VStack(alignment: .leading, spacing: 12) {
-      harnessActionHeader(
+      HarnessActionHeader(
         title: "Create Task",
         subtitle: "Capture new work directly into the active session."
       )
@@ -179,14 +175,13 @@ extension InspectorActionSections {
       Button("Create Task") {
         Task { await createTask() }
       }
-      .harnessActionButtonStyle(variant: .prominent, tint: HarnessTheme.accent(for: themeStyle))
+      .harnessActionButtonStyle(variant: .prominent, tint: HarnessTheme.accent)
       .disabled(createTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
     }
-    .harnessCard()
   }
   fileprivate func roleActions(agent: AgentRegistration) -> some View {
     VStack(alignment: .leading, spacing: 12) {
-      harnessActionHeader(
+      HarnessActionHeader(
         title: "Role Actions",
         subtitle: "Change the selected agent role without leaving the inspector."
       )
@@ -200,7 +195,7 @@ extension InspectorActionSections {
       Button("Change Role") {
         Task { await changeSelectedRole() }
       }
-      .harnessActionButtonStyle(variant: .prominent, tint: HarnessTheme.accent(for: themeStyle))
+      .harnessActionButtonStyle(variant: .prominent, tint: HarnessTheme.accent)
       Button("Remove Agent") {
         store.requestRemoveAgentConfirmation(agentID: agent.agentId)
       }
@@ -208,11 +203,10 @@ extension InspectorActionSections {
       .disabled(agent.agentId == detail.session.leaderId)
       .accessibilityIdentifier(HarnessAccessibility.removeAgentButton)
     }
-    .harnessCard()
   }
   fileprivate var leaderActions: some View {
     VStack(alignment: .leading, spacing: 12) {
-      harnessActionHeader(
+      HarnessActionHeader(
         title: "Leader Transfer",
         subtitle: "Promote a live agent to leader when the current leader needs to step away."
       )
@@ -237,7 +231,6 @@ extension InspectorActionSections {
       .harnessActionButtonStyle(variant: .prominent, tint: HarnessTheme.warmAccent)
       .disabled(transferLeaderID.isEmpty || transferLeaderID == detail.session.leaderId)
     }
-    .harnessCard()
   }
   fileprivate func configureDefaults() {
     if let selectedTask {
