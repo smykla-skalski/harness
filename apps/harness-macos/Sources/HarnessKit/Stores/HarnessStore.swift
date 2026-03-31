@@ -212,8 +212,6 @@ public final class HarnessStore {
   @Observable
   public final class UserDataSlice {
     public var bookmarkedSessionIds: Set<String> = []
-    public var notesByTargetKey: [String: [UserNote]] = [:]
-    public var recentSearches: [RecentSearch] = []
 
     public init() {}
   }
@@ -260,7 +258,6 @@ public final class HarnessStore {
     self.modelContext = modelContext
     self.persistenceError = persistenceError
     refreshBookmarkedSessionIds()
-    refreshRecentSearches()
   }
 
   public func bootstrapIfNeeded() async {
@@ -269,7 +266,6 @@ public final class HarnessStore {
     }
     hasBootstrapped = true
     refreshBookmarkedSessionIds()
-    refreshRecentSearches()
     await bootstrap()
   }
 

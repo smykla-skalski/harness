@@ -4,35 +4,9 @@ import SwiftData
 extension HarnessStore {
   private static let maxRecentSearches = 20
 
-  private func noteCacheKey(
-    targetKind: String,
-    targetId: String,
-    sessionId: String
-  ) -> String {
-    "\(sessionId)|\(targetKind)|\(targetId)"
-  }
-
   public var bookmarkedSessionIds: Set<String> {
     get { userData.bookmarkedSessionIds }
     set { userData.bookmarkedSessionIds = newValue }
-  }
-
-  public var recentSearches: [RecentSearch] {
-    userData.recentSearches
-  }
-
-  public func notes(
-    for targetKind: String,
-    targetId: String,
-    sessionId: String
-  ) -> [UserNote] {
-    userData.notesByTargetKey[
-      noteCacheKey(
-        targetKind: targetKind,
-        targetId: targetId,
-        sessionId: sessionId
-      )
-    ] ?? []
   }
 
   public var isPersistenceAvailable: Bool {
@@ -121,7 +95,6 @@ extension HarnessStore {
     do {
       modelContext.insert(note)
       try modelContext.save()
-      refreshNotes(for: sessionId)
       return true
     } catch {
       modelContext.rollback()
@@ -144,7 +117,6 @@ extension HarnessStore {
     do {
       modelContext.delete(note)
       try modelContext.save()
-      refreshNotes(for: note.sessionId)
       return true
     } catch {
       modelContext.rollback()
@@ -157,38 +129,6 @@ extension HarnessStore {
   }
 
   // MARK: - Recent searches
-
-  public func refreshNotes(for sessionID: String?) {
-    guard let sessionID else {
-      userData.notesByTargetKey = [:]
-      return
-    }
-    guard let modelContext, persistenceError == nil else {
-      userData.notesByTargetKey = [:]
-      return
-    }
-
-    do {
-      let descriptor = FetchDescriptor<UserNote>(
-        predicate: #Predicate { $0.sessionId == sessionID },
-        sortBy: [SortDescriptor(\.createdAt, order: .reverse)]
-      )
-      let notes = try modelContext.fetch(descriptor)
-      userData.notesByTargetKey = Dictionary(grouping: notes) { note in
-        noteCacheKey(
-          targetKind: note.targetKind,
-          targetId: note.targetId,
-          sessionId: note.sessionId
-        )
-      }
-    } catch {
-      userData.notesByTargetKey = [:]
-      recordPersistenceFailure(
-        action: "Notes could not be loaded.",
-        underlyingError: error
-      )
-    }
-  }
 
   @discardableResult
   public func recordSearch(_ query: String) -> Bool {
@@ -215,7 +155,6 @@ extension HarnessStore {
 
       try modelContext.save()
       try evictOldSearches(in: modelContext)
-      refreshRecentSearches()
       return true
     } catch {
       modelContext.rollback()
@@ -224,27 +163,6 @@ extension HarnessStore {
         underlyingError: error
       )
       return false
-    }
-  }
-
-  public func refreshRecentSearches() {
-    guard let modelContext, persistenceError == nil else {
-      userData.recentSearches = []
-      return
-    }
-
-    do {
-      var descriptor = FetchDescriptor<RecentSearch>(
-        sortBy: [SortDescriptor(\.lastUsedAt, order: .reverse)]
-      )
-      descriptor.fetchLimit = Self.maxRecentSearches
-      userData.recentSearches = try modelContext.fetch(descriptor)
-    } catch {
-      userData.recentSearches = []
-      recordPersistenceFailure(
-        action: "Search history could not be loaded.",
-        underlyingError: error
-      )
     }
   }
 
@@ -262,7 +180,6 @@ extension HarnessStore {
         modelContext.delete(search)
       }
       try modelContext.save()
-      userData.recentSearches = []
       return true
     } catch {
       modelContext.rollback()
@@ -376,8 +293,6 @@ extension HarnessStore {
     persistenceError = message
     lastError = message
     bookmarkedSessionIds = []
-    userData.notesByTargetKey = [:]
-    userData.recentSearches = []
   }
 
   func unavailablePersistenceContext(
