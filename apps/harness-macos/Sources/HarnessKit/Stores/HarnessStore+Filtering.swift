@@ -1,5 +1,42 @@
 import Foundation
 
+public enum SessionSortOrder: String, CaseIterable, Identifiable {
+  case recentActivity
+  case name
+  case status
+
+  public var id: String { rawValue }
+
+  public var title: String {
+    switch self {
+    case .recentActivity: "Recent Activity"
+    case .name: "Name"
+    case .status: "Status"
+    }
+  }
+
+  func compare(_ lhs: SessionSummary, _ rhs: SessionSummary) -> Bool {
+    switch self {
+    case .recentActivity:
+      lhs.updatedAt > rhs.updatedAt
+    case .name:
+      lhs.context.localizedStandardCompare(rhs.context) == .orderedAscending
+    case .status:
+      lhs.status.sortKey < rhs.status.sortKey
+    }
+  }
+}
+
+private extension SessionStatus {
+  var sortKey: Int {
+    switch self {
+    case .active: 0
+    case .paused: 1
+    case .ended: 2
+    }
+  }
+}
+
 public enum SessionFocusFilter: String, CaseIterable, Identifiable {
   case all
   case openWork
@@ -51,7 +88,7 @@ extension HarnessStore {
       }
       return SessionGroup(
         project: project,
-        sessions: sessions.sorted { $0.updatedAt > $1.updatedAt }
+        sessions: sessions.sorted(by: sessionSortOrder.compare)
       )
     }
   }
