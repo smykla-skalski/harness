@@ -67,6 +67,7 @@ struct ContentView: View {
             Label("Inspector", systemImage: "info.circle")
           }
           .keyboardShortcut("i", modifiers: [.command, .option])
+          .help("Toggle inspector (Cmd+Option+I)")
         }
         ToolbarItem(placement: .primaryAction) {
           Button {

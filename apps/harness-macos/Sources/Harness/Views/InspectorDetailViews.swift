@@ -154,10 +154,11 @@ struct TaskInspectorCard: View {
                 } label: {
                   Image(systemName: "xmark.circle.fill")
                     .font(.caption)
-                    .foregroundStyle(HarnessTheme.secondaryInk)
+                    .foregroundStyle(HarnessTheme.danger)
                 }
                 .accessibilityLabel("Delete Note")
                 .accessibilityHint("Removes this note from the selected task.")
+                .help("Delete note")
                 .buttonStyle(.borderless)
               }
               .padding(.horizontal, 12)
@@ -169,6 +170,7 @@ struct TaskInspectorCard: View {
         HStack(spacing: 8) {
           TextField("Add a note", text: $newNoteText)
             .textFieldStyle(.roundedBorder)
+            .submitLabel(.done)
             .onSubmit { submitNote() }
           Button("Add") { submitNote() }
             .disabled(newNoteText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
@@ -278,9 +280,12 @@ struct AgentInspectorCard: View {
       }
       InspectorSection(title: "Send Signal") {
         TextField("Command", text: $signalCommand)
+          .submitLabel(.send)
         TextField("Message", text: $signalMessage, axis: .vertical)
           .lineLimit(3, reservesSpace: true)
+          .submitLabel(.send)
         TextField("Action Hint", text: $signalActionHint)
+          .submitLabel(.send)
         Button("Send Signal") {
           Task {
             await store.sendSignal(
