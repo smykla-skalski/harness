@@ -268,10 +268,14 @@ struct InspectorObserverSummarySection: View {
 }
 
 extension JSONValue {
-  func prettyPrintedJSONString() -> String {
+  private static let prettyEncoder: JSONEncoder = {
     let encoder = JSONEncoder()
     encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
-    guard let data = try? encoder.encode(self),
+    return encoder
+  }()
+
+  func prettyPrintedJSONString() -> String {
+    guard let data = try? Self.prettyEncoder.encode(self),
       let string = String(data: data, encoding: .utf8)
     else {
       return "null"
