@@ -309,13 +309,29 @@ struct TaskUserNotesSection: View {
   let store: HarnessStore
   let taskID: String
   let sessionID: String
+  @Query private var userNotes: [UserNote]
   @State private var newNoteText = ""
   @FocusState private var isNoteFieldFocused: Bool
-
-  private var userNotes: [UserNote] {
-    store.notes(for: "task", targetId: taskID, sessionId: sessionID)
+  init(
+    store: HarnessStore,
+    taskID: String,
+    sessionID: String
+  ) {
+    self.store = store
+    self.taskID = taskID
+    self.sessionID = sessionID
+    let targetKind = "task"
+    let targetID = taskID
+    let selectedSessionID = sessionID
+    _userNotes = Query(
+      filter: #Predicate<UserNote> { note in
+        note.targetKind == targetKind
+          && note.targetId == targetID
+          && note.sessionId == selectedSessionID
+      },
+      sort: [SortDescriptor(\UserNote.createdAt, order: .reverse)]
+    )
   }
-
   var body: some View {
     VStack(alignment: .leading, spacing: HarnessTheme.itemSpacing) {
       if !userNotes.isEmpty {
@@ -345,7 +361,6 @@ struct TaskUserNotesSection: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
       }
-
       HStack(spacing: HarnessTheme.itemSpacing) {
         TextField("Add a note", text: $newNoteText)
           .focused($isNoteFieldFocused)
