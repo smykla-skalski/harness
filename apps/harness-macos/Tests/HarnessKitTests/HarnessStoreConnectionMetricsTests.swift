@@ -80,12 +80,23 @@ struct HarnessStoreConnectionMetricsTests {
     store.stopAllStreams()
   }
 
-  private func makeEvent(name: String, sessionID: String?) -> StreamEvent {
-    StreamEvent(
-      event: name,
-      recordedAt: "2026-03-31T12:00:00Z",
-      sessionId: sessionID,
-      payload: .object([:])
-    )
+  private func makeEvent(name: String, sessionID: String?) -> DaemonPushEvent {
+    switch name {
+    case "ready":
+      .ready(recordedAt: "2026-03-31T12:00:00Z", sessionId: sessionID)
+    case "sessions_updated":
+      .sessionsUpdated(
+        recordedAt: "2026-03-31T12:00:00Z",
+        projects: PreviewFixtures.projects,
+        sessions: [PreviewFixtures.summary]
+      )
+    default:
+      .sessionUpdated(
+        recordedAt: "2026-03-31T12:00:00Z",
+        sessionId: sessionID ?? PreviewFixtures.summary.sessionId,
+        detail: PreviewFixtures.detail,
+        timeline: PreviewFixtures.timeline
+      )
+    }
   }
 }

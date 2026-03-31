@@ -14,14 +14,14 @@ struct PreferencesRecentEventsSection: View {
           VStack(alignment: .leading, spacing: 4) {
             HStack {
               Text(event.level.uppercased())
-                .font(.caption.bold())
+                .scaledFont(.caption.bold())
                 .tracking(HarnessTheme.uppercaseTracking)
                 .foregroundStyle(
                   eventLevelColor(event.level)
                 )
               Spacer()
               Text(formatTimestamp(event.recordedAt))
-                .font(.caption.monospaced())
+                .scaledFont(.caption.monospaced())
                 .foregroundStyle(.secondary)
             }
             Text(event.message)

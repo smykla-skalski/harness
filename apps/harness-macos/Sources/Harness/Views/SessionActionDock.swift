@@ -19,10 +19,10 @@ struct SessionActionDock: View {
       HStack(alignment: .top) {
         VStack(alignment: .leading, spacing: 4) {
           Text("Action Flow")
-            .font(.system(.headline, design: .rounded, weight: .semibold))
+            .scaledFont(.system(.headline, design: .rounded, weight: .semibold))
             .accessibilityAddTraits(.isHeader)
           Text("Pick a lane, then use the inspector to submit the change.")
-            .font(.system(.subheadline, design: .rounded, weight: .medium))
+            .scaledFont(.system(.subheadline, design: .rounded, weight: .medium))
             .foregroundStyle(HarnessTheme.secondaryInk)
         }
         Spacer()
@@ -32,13 +32,13 @@ struct SessionActionDock: View {
               .transition(.opacity)
           } else if !store.lastAction.isEmpty {
             Text(store.lastAction)
-              .font(.caption.bold())
+              .scaledFont(.caption.bold())
               .foregroundStyle(HarnessTheme.success)
               .accessibilityIdentifier(HarnessAccessibility.actionToast)
               .transition(.opacity)
           }
           Text("\(detail.tasks.count) tasks · \(detail.agents.count) agents")
-            .font(.caption.monospacedDigit())
+            .scaledFont(.caption.monospacedDigit())
             .foregroundStyle(HarnessTheme.secondaryInk)
         }
         .animation(.spring(duration: 0.2), value: store.isSessionActionInFlight)
@@ -99,9 +99,9 @@ struct SessionActionDock: View {
     Button(action: action) {
       VStack(alignment: .leading, spacing: HarnessTheme.itemSpacing) {
         Label(title, systemImage: symbol)
-          .font(.system(.headline, design: .rounded, weight: .semibold))
+          .scaledFont(.system(.headline, design: .rounded, weight: .semibold))
         Text(subtitle)
-          .font(.caption)
+          .scaledFont(.caption)
           .foregroundStyle(HarnessTheme.secondaryInk)
       }
       .frame(maxWidth: .infinity, alignment: .leading)

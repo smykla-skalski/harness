@@ -120,7 +120,7 @@ struct PreferencesPathsSection: View {
   ) -> some View {
     LabeledContent(title) {
       Text(value)
-        .font(.caption.monospaced())
+        .scaledFont(.caption.monospaced())
         .truncationMode(.middle)
         .textSelection(.enabled)
     }
@@ -249,7 +249,7 @@ struct PreferencesDiagnosticsOverview: View {
         }
         if !launchAgent.lifecycleCaption.isEmpty {
           Text(launchAgent.lifecycleCaption)
-            .font(.caption)
+            .scaledFont(.caption)
             .foregroundStyle(.secondary)
         }
       }
@@ -263,7 +263,7 @@ struct PreferencesDiagnosticsOverview: View {
         }
         Text(lastEvent.message)
         Text(formatTimestamp(lastEvent.recordedAt))
-          .font(.caption.monospaced())
+          .scaledFont(.caption.monospaced())
           .foregroundStyle(.secondary)
       }
     }

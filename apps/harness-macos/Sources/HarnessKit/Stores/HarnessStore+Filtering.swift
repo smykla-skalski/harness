@@ -78,39 +78,54 @@ public enum SessionFocusFilter: String, CaseIterable, Identifiable {
 }
 
 extension HarnessStore {
-  public var groupedSessions: [SessionGroup] {
-    let filteredSessions = sessions.filter(matchesCurrentFilters)
-    let sessionsByProject = Dictionary(grouping: filteredSessions, by: \.projectId)
+  public var projects: [ProjectSummary] {
+    get { sessionIndex.projects }
+    set { sessionIndex.projects = newValue }
+  }
 
-    return projects.compactMap { project in
-      guard let sessions = sessionsByProject[project.projectId], !sessions.isEmpty else {
-        return nil
-      }
-      return SessionGroup(
-        project: project,
-        sessions: sessions.sorted(by: sessionSortOrder.compare)
-      )
-    }
+  public var sessions: [SessionSummary] {
+    get { sessionIndex.sessions }
+    set { sessionIndex.sessions = newValue }
+  }
+
+  public var searchText: String {
+    get { sessionIndex.searchText }
+    set { sessionIndex.searchText = newValue }
+  }
+
+  public var sessionFilter: SessionFilter {
+    get { sessionIndex.sessionFilter }
+    set { sessionIndex.sessionFilter = newValue }
+  }
+
+  public var sessionFocusFilter: SessionFocusFilter {
+    get { sessionIndex.sessionFocusFilter }
+    set { sessionIndex.sessionFocusFilter = newValue }
+  }
+
+  public var sessionSortOrder: SessionSortOrder {
+    get { sessionIndex.sessionSortOrder }
+    set { sessionIndex.sessionSortOrder = newValue }
+  }
+
+  public var groupedSessions: [SessionGroup] {
+    sessionIndex.groupedSessions
   }
 
   public var filteredSessionCount: Int {
-    sessions.count(where: matchesCurrentFilters)
+    sessionIndex.filteredSessionCount
   }
 
   public var totalOpenWorkCount: Int {
-    sessions.reduce(0) { $0 + $1.metrics.openTaskCount }
+    sessionIndex.totalOpenWorkCount
   }
 
   public var totalBlockedCount: Int {
-    sessions.reduce(0) { $0 + $1.metrics.blockedTaskCount }
+    sessionIndex.totalBlockedCount
   }
 
   public var selectedSessionSummary: SessionSummary? {
-    guard let selectedSessionID else {
-      return nil
-    }
-
-    return sessions.first(where: { $0.sessionId == selectedSessionID })
+    sessionIndex.sessionSummary(for: selectedSessionID)
   }
 
   public var availableActionActors: [AgentRegistration] {
@@ -143,35 +158,5 @@ extension HarnessStore {
     searchText = ""
     sessionFilter = .active
     sessionFocusFilter = .all
-  }
-
-  private func matchesCurrentFilters(_ summary: SessionSummary) -> Bool {
-    sessionFilter.includes(summary.status)
-      && sessionFocusFilter.includes(summary)
-      && searchMatches(summary)
-  }
-
-  private func searchMatches(_ summary: SessionSummary) -> Bool {
-    let needle = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-    guard !needle.isEmpty else {
-      return true
-    }
-
-    let haystack = [
-      summary.projectName,
-      summary.projectId,
-      summary.sessionId,
-      summary.context,
-      summary.projectDir ?? "",
-      summary.contextRoot,
-      summary.leaderId ?? "",
-      summary.observeId ?? "",
-      summary.status.rawValue,
-    ].joined(separator: " ")
-
-    return
-      needle
-      .split(whereSeparator: \.isWhitespace)
-      .allSatisfy { haystack.localizedStandardContains($0) }
   }
 }

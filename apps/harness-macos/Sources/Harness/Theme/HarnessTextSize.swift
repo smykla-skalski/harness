@@ -1,47 +1,60 @@
 import SwiftUI
 
+// MARK: - Scale levels
+
 enum HarnessTextSize {
   static let storageKey = "harnessTextSize"
   static let defaultIndex = 3
 
-  static let levels: [DynamicTypeSize] = [
-    .xSmall, .small, .medium, .large,
-    .xLarge, .xxLarge, .xxxLarge,
-    .accessibility1, .accessibility2, .accessibility3,
+  static let scales: [(label: String, factor: CGFloat)] = [
+    ("Extra small", 0.78),
+    ("Small", 0.88),
+    ("Medium", 0.94),
+    ("Default", 1.0),
+    ("Large", 1.08),
+    ("Extra large", 1.18),
+    ("Largest", 1.30),
   ]
 
-  private static let labels: [DynamicTypeSize: String] = [
-    .xSmall: "Extra small",
-    .small: "Small",
-    .medium: "Medium",
-    .large: "Default",
-    .xLarge: "Large",
-    .xxLarge: "Extra large",
-    .xxxLarge: "Largest",
-    .accessibility1: "Accessibility 1",
-    .accessibility2: "Accessibility 2",
-    .accessibility3: "Accessibility 3",
-  ]
-
-  static func level(at index: Int) -> DynamicTypeSize {
-    guard levels.indices.contains(index) else { return .large }
-    return levels[index]
+  static func scale(at index: Int) -> CGFloat {
+    guard scales.indices.contains(index) else { return 1.0 }
+    return scales[index].factor
   }
 
   static func label(for index: Int) -> String {
-    guard levels.indices.contains(index) else { return "Default" }
-    return labels[levels[index]] ?? "Default"
-  }
-
-  static func label(for size: DynamicTypeSize) -> String {
-    labels[size] ?? "Default"
+    guard scales.indices.contains(index) else { return "Default" }
+    return scales[index].label
   }
 
   static func canIncrease(_ index: Int) -> Bool {
-    index < levels.count - 1
+    index < scales.count - 1
   }
 
   static func canDecrease(_ index: Int) -> Bool {
     index > 0
+  }
+}
+
+// MARK: - Environment key
+
+extension EnvironmentValues {
+  @Entry var fontScale: CGFloat = 1.0
+}
+
+// MARK: - Scaled font modifier
+
+private struct ScaledFontModifier: ViewModifier {
+  let font: Font
+  @Environment(\.fontScale)
+  private var scale
+
+  func body(content: Content) -> some View {
+    content.font(scale == 1.0 ? font : font.scaled(by: scale))
+  }
+}
+
+extension View {
+  func scaledFont(_ font: Font) -> some View {
+    modifier(ScaledFontModifier(font: font))
   }
 }

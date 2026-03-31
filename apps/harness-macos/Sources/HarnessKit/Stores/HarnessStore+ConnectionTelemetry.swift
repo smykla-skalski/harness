@@ -1,6 +1,80 @@
 import Foundation
 
 extension HarnessStore {
+  public var connectionState: ConnectionState {
+    get { connection.connectionState }
+    set { connection.connectionState = newValue }
+  }
+
+  public var daemonStatus: DaemonStatusReport? {
+    get { connection.daemonStatus }
+    set { connection.daemonStatus = newValue }
+  }
+
+  public var diagnostics: DaemonDiagnosticsReport? {
+    get { connection.diagnostics }
+    set { connection.diagnostics = newValue }
+  }
+
+  public var health: HealthResponse? {
+    get { connection.health }
+    set { connection.health = newValue }
+  }
+
+  public var isRefreshing: Bool {
+    get { connection.isRefreshing }
+    set { connection.isRefreshing = newValue }
+  }
+
+  public var isDiagnosticsRefreshInFlight: Bool {
+    get { connection.isDiagnosticsRefreshInFlight }
+    set { connection.isDiagnosticsRefreshInFlight = newValue }
+  }
+
+  public var isDaemonActionInFlight: Bool {
+    get { connection.isDaemonActionInFlight }
+    set { connection.isDaemonActionInFlight = newValue }
+  }
+
+  public var activeTransport: TransportKind {
+    get { connection.activeTransport }
+    set { connection.activeTransport = newValue }
+  }
+
+  public var connectionMetrics: ConnectionMetrics {
+    get { connection.connectionMetrics }
+    set { connection.connectionMetrics = newValue }
+  }
+
+  public var connectionEvents: [ConnectionEvent] {
+    get { connection.connectionEvents }
+    set { connection.connectionEvents = newValue }
+  }
+
+  public var subscribedSessionIDs: Set<String> {
+    get { connection.subscribedSessionIDs }
+    set { connection.subscribedSessionIDs = newValue }
+  }
+
+  public var isShowingCachedData: Bool {
+    get { connection.isShowingCachedData }
+    set { connection.isShowingCachedData = newValue }
+  }
+
+  public var isBusy: Bool {
+    isDaemonActionInFlight || isSessionActionInFlight
+  }
+
+  public var dataReceivedPulse: Bool {
+    guard connectionState == .online,
+      let lastMessageAt = connectionMetrics.lastMessageAt
+    else {
+      return false
+    }
+
+    return Date.now.timeIntervalSince(lastMessageAt) < 1.5
+  }
+
   private static let maxLatencySamples = 12
   private static let trafficWindow: TimeInterval = 30
 

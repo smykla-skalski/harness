@@ -4,24 +4,74 @@ import SwiftData
 extension HarnessStore {
   private static let maxRecentSearches = 20
 
+  private func noteCacheKey(
+    targetKind: String,
+    targetId: String,
+    sessionId: String
+  ) -> String {
+    "\(sessionId)|\(targetKind)|\(targetId)"
+  }
+
+  public var bookmarkedSessionIds: Set<String> {
+    get { userData.bookmarkedSessionIds }
+    set { userData.bookmarkedSessionIds = newValue }
+  }
+
+  public var recentSearches: [RecentSearch] {
+    userData.recentSearches
+  }
+
+  public func notes(
+    for targetKind: String,
+    targetId: String,
+    sessionId: String
+  ) -> [UserNote] {
+    userData.notesByTargetKey[
+      noteCacheKey(
+        targetKind: targetKind,
+        targetId: targetId,
+        sessionId: sessionId
+      )
+    ] ?? []
+  }
+
+  public var isPersistenceAvailable: Bool {
+    modelContext != nil && persistenceError == nil
+  }
+
   // MARK: - Bookmarks
 
-  public func toggleBookmark(sessionId: String, projectId: String) {
-    guard let modelContext else { return }
-
-    var descriptor = FetchDescriptor<SessionBookmark>(
-      predicate: #Predicate { $0.sessionId == sessionId }
-    )
-    descriptor.fetchLimit = 1
-
-    if let existing = try? modelContext.fetch(descriptor).first {
-      modelContext.delete(existing)
-    } else {
-      modelContext.insert(SessionBookmark(sessionId: sessionId, projectId: projectId))
+  @discardableResult
+  public func toggleBookmark(sessionId: String, projectId: String) -> Bool {
+    guard let modelContext = unavailablePersistenceContext(
+      for: "Bookmark changes could not be saved."
+    ) else {
+      return false
     }
 
-    try? modelContext.save()
-    refreshBookmarkedSessionIds()
+    do {
+      var descriptor = FetchDescriptor<SessionBookmark>(
+        predicate: #Predicate { $0.sessionId == sessionId }
+      )
+      descriptor.fetchLimit = 1
+
+      if let existing = try modelContext.fetch(descriptor).first {
+        modelContext.delete(existing)
+      } else {
+        modelContext.insert(SessionBookmark(sessionId: sessionId, projectId: projectId))
+      }
+
+      try modelContext.save()
+      refreshBookmarkedSessionIds()
+      return true
+    } catch {
+      modelContext.rollback()
+      recordPersistenceFailure(
+        action: "Bookmark changes could not be saved.",
+        underlyingError: error
+      )
+      return false
+    }
   }
 
   public func isBookmarked(sessionId: String) -> Bool {
@@ -29,25 +79,37 @@ extension HarnessStore {
   }
 
   public func refreshBookmarkedSessionIds() {
-    guard let modelContext else {
+    guard let modelContext, persistenceError == nil else {
       bookmarkedSessionIds = []
       return
     }
 
-    let descriptor = FetchDescriptor<SessionBookmark>()
-    let bookmarks = (try? modelContext.fetch(descriptor)) ?? []
-    bookmarkedSessionIds = Set(bookmarks.map(\.sessionId))
+    do {
+      let bookmarks = try modelContext.fetch(FetchDescriptor<SessionBookmark>())
+      bookmarkedSessionIds = Set(bookmarks.map(\.sessionId))
+    } catch {
+      bookmarkedSessionIds = []
+      recordPersistenceFailure(
+        action: "Bookmarks could not be loaded.",
+        underlyingError: error
+      )
+    }
   }
 
   // MARK: - User notes
 
+  @discardableResult
   public func addNote(
     text: String,
     targetKind: String,
     targetId: String,
     sessionId: String
-  ) {
-    guard let modelContext else { return }
+  ) -> Bool {
+    guard let modelContext = unavailablePersistenceContext(
+      for: "Note changes could not be saved."
+    ) else {
+      return false
+    }
 
     let note = UserNote(
       targetKind: targetKind,
@@ -55,133 +117,279 @@ extension HarnessStore {
       sessionId: sessionId,
       text: text
     )
-    modelContext.insert(note)
-    try? modelContext.save()
+
+    do {
+      modelContext.insert(note)
+      try modelContext.save()
+      refreshNotes(for: sessionId)
+      return true
+    } catch {
+      modelContext.rollback()
+      recordPersistenceFailure(
+        action: "Note changes could not be saved.",
+        underlyingError: error
+      )
+      return false
+    }
   }
 
-  public func notes(for targetId: String) -> [UserNote] {
-    guard let modelContext else { return [] }
+  @discardableResult
+  public func deleteNote(_ note: UserNote) -> Bool {
+    guard let modelContext = unavailablePersistenceContext(
+      for: "Note changes could not be saved."
+    ) else {
+      return false
+    }
 
-    let descriptor = FetchDescriptor<UserNote>(
-      predicate: #Predicate { $0.targetId == targetId },
-      sortBy: [SortDescriptor(\.createdAt, order: .reverse)]
-    )
-
-    return (try? modelContext.fetch(descriptor)) ?? []
-  }
-
-  public func deleteNote(_ note: UserNote) {
-    guard let modelContext else { return }
-
-    modelContext.delete(note)
-    try? modelContext.save()
+    do {
+      modelContext.delete(note)
+      try modelContext.save()
+      refreshNotes(for: note.sessionId)
+      return true
+    } catch {
+      modelContext.rollback()
+      recordPersistenceFailure(
+        action: "Note changes could not be saved.",
+        underlyingError: error
+      )
+      return false
+    }
   }
 
   // MARK: - Recent searches
 
-  public func recordSearch(_ query: String) {
-    guard let modelContext else { return }
+  public func refreshNotes(for sessionID: String?) {
+    guard let sessionID else {
+      userData.notesByTargetKey = [:]
+      return
+    }
+    guard let modelContext, persistenceError == nil else {
+      userData.notesByTargetKey = [:]
+      return
+    }
 
+    do {
+      let descriptor = FetchDescriptor<UserNote>(
+        predicate: #Predicate { $0.sessionId == sessionID },
+        sortBy: [SortDescriptor(\.createdAt, order: .reverse)]
+      )
+      let notes = try modelContext.fetch(descriptor)
+      userData.notesByTargetKey = Dictionary(grouping: notes) { note in
+        noteCacheKey(
+          targetKind: note.targetKind,
+          targetId: note.targetId,
+          sessionId: note.sessionId
+        )
+      }
+    } catch {
+      userData.notesByTargetKey = [:]
+      recordPersistenceFailure(
+        action: "Notes could not be loaded.",
+        underlyingError: error
+      )
+    }
+  }
+
+  @discardableResult
+  public func recordSearch(_ query: String) -> Bool {
     let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
-    guard !trimmed.isEmpty else { return }
-
-    var descriptor = FetchDescriptor<RecentSearch>(
-      predicate: #Predicate { $0.query == trimmed }
-    )
-    descriptor.fetchLimit = 1
-
-    if let existing = try? modelContext.fetch(descriptor).first {
-      existing.lastUsedAt = .now
-      existing.useCount += 1
-    } else {
-      modelContext.insert(RecentSearch(query: trimmed))
+    guard !trimmed.isEmpty else { return false }
+    guard let modelContext = unavailablePersistenceContext(
+      for: "Search history could not be updated."
+    ) else {
+      return false
     }
 
-    try? modelContext.save()
-    evictOldSearches(in: modelContext)
-  }
+    do {
+      var descriptor = FetchDescriptor<RecentSearch>(
+        predicate: #Predicate { $0.query == trimmed }
+      )
+      descriptor.fetchLimit = 1
 
-  public var recentSearches: [RecentSearch] {
-    guard let modelContext else { return [] }
+      if let existing = try modelContext.fetch(descriptor).first {
+        existing.lastUsedAt = .now
+        existing.useCount += 1
+      } else {
+        modelContext.insert(RecentSearch(query: trimmed))
+      }
 
-    var descriptor = FetchDescriptor<RecentSearch>(
-      sortBy: [SortDescriptor(\.lastUsedAt, order: .reverse)]
-    )
-    descriptor.fetchLimit = Self.maxRecentSearches
-
-    return (try? modelContext.fetch(descriptor)) ?? []
-  }
-
-  public func clearSearchHistory() {
-    guard let modelContext else { return }
-
-    let descriptor = FetchDescriptor<RecentSearch>()
-    guard let searches = try? modelContext.fetch(descriptor) else { return }
-
-    for search in searches {
-      modelContext.delete(search)
+      try modelContext.save()
+      try evictOldSearches(in: modelContext)
+      refreshRecentSearches()
+      return true
+    } catch {
+      modelContext.rollback()
+      recordPersistenceFailure(
+        action: "Search history could not be updated.",
+        underlyingError: error
+      )
+      return false
     }
-    try? modelContext.save()
+  }
+
+  public func refreshRecentSearches() {
+    guard let modelContext, persistenceError == nil else {
+      userData.recentSearches = []
+      return
+    }
+
+    do {
+      var descriptor = FetchDescriptor<RecentSearch>(
+        sortBy: [SortDescriptor(\.lastUsedAt, order: .reverse)]
+      )
+      descriptor.fetchLimit = Self.maxRecentSearches
+      userData.recentSearches = try modelContext.fetch(descriptor)
+    } catch {
+      userData.recentSearches = []
+      recordPersistenceFailure(
+        action: "Search history could not be loaded.",
+        underlyingError: error
+      )
+    }
+  }
+
+  @discardableResult
+  public func clearSearchHistory() -> Bool {
+    guard let modelContext = unavailablePersistenceContext(
+      for: "Search history could not be cleared."
+    ) else {
+      return false
+    }
+
+    do {
+      let searches = try modelContext.fetch(FetchDescriptor<RecentSearch>())
+      for search in searches {
+        modelContext.delete(search)
+      }
+      try modelContext.save()
+      userData.recentSearches = []
+      return true
+    } catch {
+      modelContext.rollback()
+      recordPersistenceFailure(
+        action: "Search history could not be cleared.",
+        underlyingError: error
+      )
+      return false
+    }
   }
 
   // MARK: - Filter preferences
 
   public func saveFilterPreference(for projectId: String) {
-    guard let modelContext else { return }
+    guard let modelContext, persistenceError == nil else { return }
 
-    var descriptor = FetchDescriptor<ProjectFilterPreference>(
-      predicate: #Predicate { $0.projectId == projectId }
-    )
-    descriptor.fetchLimit = 1
-
-    if let existing = try? modelContext.fetch(descriptor).first {
-      existing.sessionFilterRaw = sessionFilter.rawValue
-      existing.sessionFocusFilterRaw = sessionFocusFilter.rawValue
-    } else {
-      let preference = ProjectFilterPreference(
-        projectId: projectId,
-        sessionFilterRaw: sessionFilter.rawValue,
-        sessionFocusFilterRaw: sessionFocusFilter.rawValue
+    do {
+      var descriptor = FetchDescriptor<ProjectFilterPreference>(
+        predicate: #Predicate { $0.projectId == projectId }
       )
-      modelContext.insert(preference)
-    }
+      descriptor.fetchLimit = 1
 
-    try? modelContext.save()
+      if let existing = try modelContext.fetch(descriptor).first {
+        existing.sessionFilterRaw = sessionFilter.rawValue
+        existing.sessionFocusFilterRaw = sessionFocusFilter.rawValue
+      } else {
+        let preference = ProjectFilterPreference(
+          projectId: projectId,
+          sessionFilterRaw: sessionFilter.rawValue,
+          sessionFocusFilterRaw: sessionFocusFilter.rawValue
+        )
+        modelContext.insert(preference)
+      }
+
+      try modelContext.save()
+    } catch {
+      modelContext.rollback()
+      recordPersistenceFailure(
+        action: "Filter preferences could not be saved.",
+        underlyingError: error
+      )
+    }
   }
 
   public func loadFilterPreference(for projectId: String) {
-    guard let modelContext else { return }
+    guard let modelContext, persistenceError == nil else { return }
 
-    var descriptor = FetchDescriptor<ProjectFilterPreference>(
-      predicate: #Predicate { $0.projectId == projectId }
-    )
-    descriptor.fetchLimit = 1
+    do {
+      var descriptor = FetchDescriptor<ProjectFilterPreference>(
+        predicate: #Predicate { $0.projectId == projectId }
+      )
+      descriptor.fetchLimit = 1
 
-    guard let preference = try? modelContext.fetch(descriptor).first else {
-      return
-    }
+      guard let preference = try modelContext.fetch(descriptor).first else {
+        return
+      }
 
-    if let filter = SessionFilter(rawValue: preference.sessionFilterRaw) {
-      sessionFilter = filter
-    }
-    if let focus = SessionFocusFilter(rawValue: preference.sessionFocusFilterRaw) {
-      sessionFocusFilter = focus
+      if let filter = SessionFilter(rawValue: preference.sessionFilterRaw) {
+        sessionFilter = filter
+      }
+      if let focus = SessionFocusFilter(rawValue: preference.sessionFocusFilterRaw) {
+        sessionFocusFilter = focus
+      }
+    } catch {
+      recordPersistenceFailure(
+        action: "Filter preferences could not be loaded.",
+        underlyingError: error
+      )
     }
   }
 
-  private func evictOldSearches(in context: ModelContext) {
+  private func evictOldSearches(in context: ModelContext) throws {
     var descriptor = FetchDescriptor<RecentSearch>(
       sortBy: [SortDescriptor(\.lastUsedAt, order: .reverse)]
     )
     descriptor.fetchOffset = Self.maxRecentSearches
 
-    guard let stale = try? context.fetch(descriptor), !stale.isEmpty else {
+    let stale = try context.fetch(descriptor)
+    guard !stale.isEmpty else {
       return
     }
 
     for search in stale {
       context.delete(search)
     }
-    try? context.save()
+    try context.save()
+  }
+
+  func persistenceFailureMessage(
+    action: String,
+    underlyingError: (any Error)?
+  ) -> String {
+    let base = """
+      Local persistence is unavailable. Harness will keep running, but bookmarks, notes, and \
+      search history are disabled.
+      """
+    guard let underlyingError else {
+      return "\(base) \(action)"
+    }
+    return "\(base) \(action) Underlying error: \(underlyingError.localizedDescription)"
+  }
+
+  func recordPersistenceFailure(
+    action: String,
+    underlyingError: any Error
+  ) {
+    let message = persistenceFailureMessage(
+      action: action,
+      underlyingError: underlyingError
+    )
+    persistenceError = message
+    lastError = message
+    bookmarkedSessionIds = []
+    userData.notesByTargetKey = [:]
+    userData.recentSearches = []
+  }
+
+  func unavailablePersistenceContext(
+    for action: String
+  ) -> ModelContext? {
+    guard let modelContext, persistenceError == nil else {
+      lastError = persistenceError ?? persistenceFailureMessage(
+        action: action,
+        underlyingError: nil
+      )
+      return nil
+    }
+    return modelContext
   }
 }

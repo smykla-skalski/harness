@@ -24,19 +24,19 @@ struct SessionsBoardOnboardingCard: View {
     HStack(alignment: .top) {
       VStack(alignment: .leading, spacing: HarnessTheme.itemSpacing) {
         Label("Bring Harness Online", systemImage: "dot.radiowaves.left.and.right")
-          .font(.system(.title3, design: .rounded, weight: .bold))
+          .scaledFont(.system(.title3, design: .rounded, weight: .bold))
           .accessibilityAddTraits(.isHeader)
         Text(
           "Harness only reads live state from the local daemon. "
             + "Start the control plane once, then keep it resident with a launch agent."
         )
-        .font(.system(.body, design: .rounded, weight: .medium))
+        .scaledFont(.system(.body, design: .rounded, weight: .medium))
         .foregroundStyle(HarnessTheme.secondaryInk)
         .lineSpacing(2)
       }
       Spacer()
       Text(store.daemonStatus?.launchAgent.installed == true ? "Persistent" : "Manual")
-        .font(.caption.bold())
+        .scaledFont(.caption.bold())
         .harnessPillPadding()
         .background(HarnessTheme.accent, in: Capsule())
         .foregroundStyle(HarnessTheme.onContrast)
@@ -125,17 +125,17 @@ struct SessionsBoardOnboardingCard: View {
             .frame(width: 10, height: 10)
             .accessibilityHidden(true)
           Text(title)
-            .font(.system(.headline, design: .rounded, weight: .semibold))
+            .scaledFont(.system(.headline, design: .rounded, weight: .semibold))
         }
         Spacer()
         Text(isReady ? "Ready" : "Pending")
-          .font(.caption.bold())
+          .scaledFont(.caption.bold())
           .harnessPillPadding()
           .background(isReady ? HarnessTheme.success : HarnessTheme.caution, in: Capsule())
           .foregroundStyle(HarnessTheme.onContrast)
       }
       Text(detail)
-        .font(.system(.footnote, design: .rounded, weight: .medium))
+        .scaledFont(.system(.footnote, design: .rounded, weight: .medium))
         .foregroundStyle(HarnessTheme.secondaryInk)
         .lineLimit(2)
       Spacer(minLength: 0)

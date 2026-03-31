@@ -14,10 +14,10 @@ struct DaemonStatusCard: View {
       HStack(alignment: .top) {
         VStack(alignment: .leading, spacing: 4) {
           Text("Daemon")
-            .font(.system(.title3, design: .rounded, weight: .bold))
+            .scaledFont(.system(.title3, design: .rounded, weight: .bold))
             .accessibilityAddTraits(.isHeader)
           Text(connectionLabel)
-            .font(.system(.subheadline, design: .rounded, weight: .medium))
+            .scaledFont(.system(.subheadline, design: .rounded, weight: .medium))
             .foregroundStyle(HarnessTheme.secondaryInk)
         }
         Spacer()
@@ -33,8 +33,6 @@ struct DaemonStatusCard: View {
             .transition(.move(edge: .top).combined(with: .opacity))
         }
       }
-      .animation(.spring(duration: 0.3), value: store.isRefreshing)
-      .animation(.spring(duration: 0.3), value: store.connectionState)
 
       ViewThatFits(in: .horizontal) {
         HStack(spacing: HarnessTheme.itemSpacing) {
@@ -51,9 +49,6 @@ struct DaemonStatusCard: View {
         }
       }
       .frame(maxWidth: .infinity, alignment: .leading)
-      .animation(.spring(duration: 0.3), value: daemonProjectCount)
-      .animation(.spring(duration: 0.3), value: daemonSessionCount)
-      .animation(.spring(duration: 0.3), value: daemonLaunchdState)
 
       daemonActionButtons
     }
@@ -80,7 +75,7 @@ extension DaemonStatusCard {
       Task { await store.startDaemon() }
     } label: {
       Image(systemName: isDaemonOnline ? "arrow.clockwise" : "power")
-        .font(.system(.body, weight: .semibold))
+        .scaledFont(.system(.body, weight: .semibold))
     }
     .buttonStyle(DaemonRestartButtonStyle(isLoading: isLoading, isOnline: isDaemonOnline))
     .help(isDaemonOnline ? "Restart daemon" : "Start daemon")
@@ -150,7 +145,7 @@ extension DaemonStatusCard {
 
   fileprivate var statusPill: some View {
     Text(statusTitle)
-      .font(.caption.bold())
+      .scaledFont(.caption.bold())
       .harnessPillPadding()
       .background(statusBackground, in: Capsule())
       .foregroundStyle(HarnessTheme.onContrast)
@@ -215,11 +210,11 @@ extension DaemonStatusCard {
   fileprivate func statBadge(title: String, value: String) -> some View {
     VStack(alignment: .leading, spacing: 4) {
       Text(title.uppercased())
-        .font(.caption2.weight(.semibold))
+        .scaledFont(.caption2.weight(.semibold))
         .tracking(HarnessTheme.uppercaseTracking)
         .foregroundStyle(HarnessTheme.secondaryInk)
       Text(value)
-        .font(.system(.callout, design: .rounded, weight: .bold))
+        .scaledFont(.system(.callout, design: .rounded, weight: .bold))
         .lineLimit(1)
         .minimumScaleFactor(0.82)
         .contentTransition(.numericText())

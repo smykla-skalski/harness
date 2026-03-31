@@ -163,9 +163,9 @@ private struct PreferencesGeneralSection: View {
         )
         Picker("Text size", selection: $textSizeIndex) {
           ForEach(
-            Array(HarnessTextSize.levels.enumerated()), id: \.offset
-          ) { index, size in
-            Text(HarnessTextSize.label(for: size)).tag(index)
+            Array(HarnessTextSize.scales.enumerated()), id: \.offset
+          ) { index, level in
+            Text(level.label).tag(index)
           }
         }
         .accessibilityIdentifier(
@@ -201,7 +201,7 @@ private struct PreferencesGeneralSection: View {
           VStack(alignment: .trailing, spacing: 2) {
             Text(launchAgentState)
             Text(launchAgentCaption)
-              .font(.caption)
+              .scaledFont(.caption)
               .foregroundStyle(.secondary)
           }
         }

@@ -63,6 +63,9 @@ struct ContentView: View {
         .navigationSplitViewColumnWidth(min: 220, ideal: 260, max: 380)
     } detail: {
       VStack(spacing: 0) {
+        if let persistenceError = store.persistenceError {
+          PersistenceUnavailableBanner(message: persistenceError)
+        }
         if store.isShowingCachedData {
           CachedDataBanner()
         }
@@ -285,15 +288,34 @@ private struct CachedDataBanner: View {
   var body: some View {
     HStack(spacing: HarnessTheme.itemSpacing) {
       Image(systemName: "cloud.bolt")
-        .font(.caption)
+        .scaledFont(.caption)
         .accessibilityHidden(true)
       Text("Showing cached data - daemon is offline")
-        .font(.caption.weight(.medium))
+        .scaledFont(.caption.weight(.medium))
       Spacer()
     }
     .harnessCellPadding()
     .background(HarnessTheme.caution.opacity(0.12))
     .foregroundStyle(HarnessTheme.caution)
+  }
+}
+
+private struct PersistenceUnavailableBanner: View {
+  let message: String
+
+  var body: some View {
+    HStack(alignment: .top, spacing: HarnessTheme.itemSpacing) {
+      Image(systemName: "externaldrive.badge.exclamationmark")
+        .scaledFont(.caption)
+        .accessibilityHidden(true)
+      Text(message)
+        .scaledFont(.caption.weight(.medium))
+      Spacer(minLength: 0)
+    }
+    .harnessCellPadding()
+    .background(HarnessTheme.caution.opacity(0.18))
+    .foregroundStyle(HarnessTheme.caution)
+    .accessibilityIdentifier(HarnessAccessibility.persistenceBanner)
   }
 }
 
@@ -336,14 +358,14 @@ private struct SessionLoadingView: View {
                   .frame(width: 12, height: 12)
                   .accessibilityHidden(true)
                 Text(summary.status.title)
-                  .font(.caption.weight(.bold))
+                  .scaledFont(.caption.weight(.bold))
                   .foregroundStyle(statusColor(for: summary.status))
                 Text(summary.context)
-                  .font(.system(.largeTitle, design: .rounded, weight: .black))
+                  .scaledFont(.system(.largeTitle, design: .rounded, weight: .black))
                   .lineLimit(2)
               }
               Text("\(summary.projectName) • \(summary.sessionId)")
-                .font(.system(.subheadline, design: .rounded, weight: .medium))
+                .scaledFont(.system(.subheadline, design: .rounded, weight: .medium))
                 .foregroundStyle(HarnessTheme.secondaryInk)
             }
             Spacer()

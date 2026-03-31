@@ -50,6 +50,32 @@ final class HarnessUITests: HarnessUITestCase {
     )
   }
 
+  func testDegradedPersistenceModeShowsWarningAndHidesPersistenceControls() throws {
+    let app = launch(
+      mode: "preview",
+      additionalEnvironment: ["HARNESS_FORCE_PERSISTENCE_FAILURE": "1"]
+    )
+
+    let persistenceBanner = element(in: app, identifier: Accessibility.persistenceBanner)
+    let sessionRow = previewSessionTrigger(in: app)
+    let clearSearchHistoryButton = element(
+      in: app,
+      identifier: Accessibility.sidebarClearSearchHistoryButton
+    )
+
+    XCTAssertTrue(persistenceBanner.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(sessionRow.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertFalse(clearSearchHistoryButton.exists)
+
+    tapPreviewSession(in: app)
+    tapButton(in: app, identifier: Accessibility.taskUICard)
+
+    let notesUnavailable = element(in: app, identifier: Accessibility.taskNotesUnavailable)
+    XCTAssertTrue(notesUnavailable.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertFalse(element(in: app, identifier: Accessibility.taskNoteField).exists)
+    XCTAssertFalse(element(in: app, identifier: Accessibility.taskNoteAddButton).exists)
+  }
+
   func testToolbarOpensSettingsWindow() throws {
     let app = launch(mode: "preview")
 

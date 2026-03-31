@@ -119,28 +119,21 @@ public final class PreviewHarnessClient: HarnessClientProtocol, Sendable {
     fixtures.timeline
   }
 
-  public func globalStream() async -> AsyncThrowingStream<StreamEvent, Error> {
+  public func globalStream() async -> AsyncThrowingStream<DaemonPushEvent, Error> {
     AsyncThrowingStream { continuation in
       continuation.yield(
-        StreamEvent(
-          event: "ready",
-          recordedAt: "2026-03-28T14:00:00Z",
-          sessionId: nil,
-          payload: .object([:])
-        )
+        .ready(recordedAt: "2026-03-28T14:00:00Z")
       )
       continuation.finish()
     }
   }
 
-  public func sessionStream(sessionID _: String) async -> AsyncThrowingStream<StreamEvent, Error> {
+  public func sessionStream(sessionID _: String) async -> AsyncThrowingStream<DaemonPushEvent, Error> {
     AsyncThrowingStream { continuation in
       continuation.yield(
-        StreamEvent(
-          event: "ready",
+        .ready(
           recordedAt: "2026-03-28T14:00:00Z",
-          sessionId: fixtures.readySessionID,
-          payload: .object([:])
+          sessionId: fixtures.readySessionID
         )
       )
       continuation.finish()

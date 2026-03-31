@@ -8,7 +8,7 @@ struct SessionCockpitSignalsSection: View {
   var body: some View {
     VStack(alignment: .leading, spacing: HarnessTheme.sectionSpacing) {
       Text("Signals")
-        .font(.system(.title3, design: .rounded, weight: .semibold))
+        .scaledFont(.system(.title3, design: .rounded, weight: .semibold))
         .accessibilityAddTraits(.isHeader)
       if signals.isEmpty {
         ContentUnavailableView {
@@ -18,7 +18,7 @@ struct SessionCockpitSignalsSection: View {
         }
         .frame(maxWidth: .infinity)
       }
-      VStack(alignment: .leading, spacing: HarnessTheme.sectionSpacing) {
+      LazyVStack(alignment: .leading, spacing: HarnessTheme.sectionSpacing) {
         ForEach(signals) { signal in
           Button {
             store.inspect(signalID: signal.signal.signalId)
@@ -26,19 +26,19 @@ struct SessionCockpitSignalsSection: View {
             HStack(alignment: .top) {
               VStack(alignment: .leading, spacing: HarnessTheme.itemSpacing) {
                 Text(signal.signal.command)
-                  .font(.system(.headline, design: .rounded, weight: .semibold))
+                  .scaledFont(.system(.headline, design: .rounded, weight: .semibold))
                 Text(signal.signal.payload.message)
-                  .font(.subheadline)
+                  .scaledFont(.subheadline)
                   .foregroundStyle(HarnessTheme.secondaryInk)
                   .multilineTextAlignment(.leading)
               }
               Spacer()
               VStack(alignment: .trailing, spacing: HarnessTheme.itemSpacing) {
                 Text(signal.status.title)
-                  .font(.caption.bold())
+                  .scaledFont(.caption.bold())
                   .foregroundStyle(signalStatusColor(for: signal.status))
                 Text(formatTimestamp(signal.signal.createdAt))
-                  .font(.caption.monospaced())
+                  .scaledFont(.caption.monospaced())
                   .foregroundStyle(HarnessTheme.secondaryInk)
               }
             }
@@ -79,7 +79,7 @@ struct SessionCockpitTimelineSection: View {
   var body: some View {
     LazyVStack(alignment: .leading, spacing: HarnessTheme.sectionSpacing) {
       Text("Timeline")
-        .font(.system(.title3, design: .rounded, weight: .semibold))
+        .scaledFont(.system(.title3, design: .rounded, weight: .semibold))
         .accessibilityAddTraits(.isHeader)
       if timeline.isEmpty {
         ContentUnavailableView {
@@ -96,15 +96,15 @@ struct SessionCockpitTimelineSection: View {
             .accessibilityHidden(true)
           VStack(alignment: .leading, spacing: 4) {
             Text(entry.summary)
-              .font(.system(.body, design: .rounded, weight: .semibold))
+              .scaledFont(.system(.body, design: .rounded, weight: .semibold))
             Text("\(entry.kind) • \(formatTimestamp(entry.recordedAt))")
-              .font(.caption.monospaced())
+              .scaledFont(.caption.monospaced())
               .foregroundStyle(HarnessTheme.secondaryInk)
           }
           Spacer()
           if let taskID = entry.taskId {
             Text(taskID)
-              .font(.caption.monospaced())
+              .scaledFont(.caption.monospaced())
               .foregroundStyle(HarnessTheme.secondaryInk)
           }
         }

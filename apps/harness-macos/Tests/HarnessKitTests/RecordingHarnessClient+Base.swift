@@ -89,14 +89,14 @@ extension RecordingHarnessClient {
     return configuredTimeline(for: sessionID) ?? PreviewFixtures.timeline
   }
 
-  nonisolated func globalStream() -> AsyncThrowingStream<StreamEvent, Error> {
+  nonisolated func globalStream() -> AsyncThrowingStream<DaemonPushEvent, Error> {
     makeStream(
       events: configuredGlobalStreamEvents(),
       error: configuredGlobalStreamError()
     )
   }
 
-  nonisolated func sessionStream(sessionID: String) -> AsyncThrowingStream<StreamEvent, Error> {
+  nonisolated func sessionStream(sessionID: String) -> AsyncThrowingStream<DaemonPushEvent, Error> {
     makeStream(
       events: configuredSessionStreamEvents(for: sessionID),
       error: configuredSessionStreamError(for: sessionID)
@@ -168,9 +168,9 @@ extension RecordingHarnessClient {
   }
 
   nonisolated private func makeStream(
-    events: [StreamEvent],
+    events: [DaemonPushEvent],
     error: (any Error)?
-  ) -> AsyncThrowingStream<StreamEvent, Error> {
+  ) -> AsyncThrowingStream<DaemonPushEvent, Error> {
     AsyncThrowingStream { continuation in
       for event in events {
         continuation.yield(event)

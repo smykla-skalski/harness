@@ -2,6 +2,40 @@ import AppKit
 import Foundation
 
 extension HarnessStore {
+  public var selectedSessionID: String? {
+    get { selection.selectedSessionID }
+    set { selection.selectedSessionID = newValue }
+  }
+
+  public var selectedSession: SessionDetail? {
+    get { selection.selectedSession }
+    set { selection.selectedSession = newValue }
+  }
+
+  public var timeline: [TimelineEntry] {
+    get { selection.timeline }
+    set { selection.timeline = newValue }
+  }
+
+  public var inspectorSelection: InspectorSelection {
+    get { selection.inspectorSelection }
+    set { selection.inspectorSelection = newValue }
+  }
+
+  public var actionActorID: String? {
+    get { selection.actionActorID }
+    set { selection.actionActorID = newValue }
+  }
+
+  public var isSelectionLoading: Bool {
+    get { selection.isSelectionLoading }
+    set { selection.isSelectionLoading = newValue }
+  }
+
+  public var isSessionActionInFlight: Bool {
+    get { selection.isSessionActionInFlight }
+    set { selection.isSessionActionInFlight = newValue }
+  }
 
   // MARK: - Navigation history
 
@@ -64,6 +98,7 @@ extension HarnessStore {
 
   public func primeSessionSelection(_ sessionID: String?) {
     recordNavigation(to: sessionID)
+    cancelSessionPushFallback()
     selectedSessionID = sessionID
     inspectorSelection = .none
     lastError = nil
@@ -73,6 +108,7 @@ extension HarnessStore {
       isSelectionLoading = false
       selectedSession = nil
       timeline = []
+      refreshNotes(for: nil)
       stopSessionStream()
       return
     }
@@ -127,6 +163,7 @@ extension HarnessStore {
   }
 
   public var selectedSessionBookmarkTitle: String {
+    guard isPersistenceAvailable else { return "Bookmarks Unavailable" }
     guard let sessionID = selectedSessionID else { return "Bookmark Session" }
     return isBookmarked(sessionId: sessionID) ? "Remove Bookmark" : "Bookmark Session"
   }

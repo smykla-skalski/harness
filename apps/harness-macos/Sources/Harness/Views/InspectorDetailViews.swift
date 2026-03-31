@@ -16,7 +16,7 @@ struct SessionInspectorSummaryCard: View {
   var body: some View {
     VStack(alignment: .leading, spacing: HarnessTheme.sectionSpacing) {
       Text("Inspector")
-        .font(.system(.title3, design: .rounded, weight: .semibold))
+        .scaledFont(.system(.title3, design: .rounded, weight: .semibold))
         .accessibilityAddTraits(.isHeader)
       Text(
         "Pick a task, agent, signal, or observe card from the cockpit to focus actions and detail here."
@@ -30,14 +30,14 @@ struct SessionInspectorSummaryCard: View {
               VStack(alignment: .leading, spacing: 4) {
                 HStack {
                   Text(activity.agentId)
-                    .font(.system(.subheadline, design: .rounded, weight: .semibold))
+                    .scaledFont(.system(.subheadline, design: .rounded, weight: .semibold))
                   Spacer()
                   Text(activity.latestEventAt.map(formatTimestamp) ?? "No events")
-                    .font(.caption.monospaced())
+                    .scaledFont(.caption.monospaced())
                     .foregroundStyle(HarnessTheme.secondaryInk)
                 }
                 Text(activity.recentTools.joined(separator: " · "))
-                  .font(.caption)
+                  .scaledFont(.caption)
                   .foregroundStyle(HarnessTheme.secondaryInk)
                   .lineLimit(2)
               }
@@ -61,12 +61,6 @@ struct SessionInspectorSummaryCard: View {
 struct TaskInspectorCard: View {
   let task: WorkItem
   let store: HarnessStore
-  @State private var newNoteText = ""
-  @FocusState private var isNoteFieldFocused: Bool
-
-  private var userNotes: [UserNote] {
-    store.notes(for: task.taskId)
-  }
 
   private var facts: [InspectorFact] {
     [
@@ -80,7 +74,7 @@ struct TaskInspectorCard: View {
   var body: some View {
     VStack(alignment: .leading, spacing: HarnessTheme.sectionSpacing) {
       Text(task.title)
-        .font(.system(.title3, design: .rounded, weight: .bold))
+        .scaledFont(.system(.title3, design: .rounded, weight: .bold))
       Text(task.context ?? "No task context provided.")
         .foregroundStyle(HarnessTheme.secondaryInk)
       InspectorFactGrid(facts: facts)
@@ -93,7 +87,7 @@ struct TaskInspectorCard: View {
             ]
           )
           Text(checkpoint.summary)
-            .font(.subheadline)
+            .scaledFont(.subheadline)
             .foregroundStyle(HarnessTheme.secondaryInk)
         }
       }
@@ -110,14 +104,14 @@ struct TaskInspectorCard: View {
               VStack(alignment: .leading, spacing: 4) {
                 HStack {
                   Text(note.agentId ?? "system")
-                    .font(.caption.bold())
+                    .scaledFont(.caption.bold())
                   Spacer()
                   Text(formatTimestamp(note.timestamp))
-                    .font(.caption.monospaced())
+                    .scaledFont(.caption.monospaced())
                     .foregroundStyle(HarnessTheme.secondaryInk)
                 }
                 Text(note.text)
-                  .font(.subheadline)
+                  .scaledFont(.subheadline)
                   .foregroundStyle(HarnessTheme.secondaryInk)
               }
               .harnessCellPadding()
@@ -129,54 +123,27 @@ struct TaskInspectorCard: View {
       if let blockedReason = task.blockedReason, !blockedReason.isEmpty {
         InspectorSection(title: "Blocked Reason") {
           Text(blockedReason)
-            .font(.subheadline)
+            .scaledFont(.subheadline)
             .foregroundStyle(HarnessTheme.danger)
         }
       }
       if let completedAt = task.completedAt {
         InspectorSection(title: "Completed") {
           Text(formatTimestamp(completedAt))
-            .font(.subheadline.monospaced())
+            .scaledFont(.subheadline.monospaced())
             .foregroundStyle(HarnessTheme.secondaryInk)
         }
       }
       InspectorSection(title: "Your Notes") {
-        if !userNotes.isEmpty {
-          VStack(alignment: .leading, spacing: HarnessTheme.itemSpacing) {
-            ForEach(userNotes, id: \.persistentModelID) { note in
-              HStack(alignment: .top) {
-                Text(note.text)
-                  .font(.subheadline)
-                  .foregroundStyle(HarnessTheme.secondaryInk)
-                  .frame(maxWidth: .infinity, alignment: .leading)
-                Button {
-                  store.deleteNote(note)
-                } label: {
-                  Image(systemName: "xmark.circle.fill")
-                    .font(.caption)
-                    .foregroundStyle(HarnessTheme.danger)
-                    .frame(minWidth: 24, minHeight: 24)
-                    .contentShape(Rectangle())
-                }
-                .accessibilityLabel("Delete Note")
-                .accessibilityHint("Removes this note from the selected task.")
-                .help("Delete note")
-                .harnessDismissButtonStyle()
-              }
-              .harnessCellPadding()
-            }
-          }
-          .frame(maxWidth: .infinity, alignment: .leading)
-        }
-        HStack(spacing: HarnessTheme.itemSpacing) {
-          TextField("Add a note", text: $newNoteText)
-            .focused($isNoteFieldFocused)
-            .textFieldStyle(.roundedBorder)
-            .submitLabel(.done)
-            .onSubmit { submitNote() }
-          Button("Add") { submitNote() }
-            .harnessActionButtonStyle(variant: .bordered)
-            .disabled(newNoteText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+        if let sessionID = store.selectedSession?.session.sessionId,
+          store.isPersistenceAvailable {
+          TaskUserNotesSection(
+            store: store,
+            taskID: task.taskId,
+            sessionID: sessionID
+          )
+        } else {
+          PersistenceUnavailableNotesState()
         }
       }
     }
@@ -187,14 +154,6 @@ struct TaskInspectorCard: View {
       value: task.taskId
     )
     .accessibilityFrameMarker("\(HarnessAccessibility.taskInspectorCard).frame")
-  }
-
-  private func submitNote() {
-    let text = newNoteText.trimmingCharacters(in: .whitespacesAndNewlines)
-    guard !text.isEmpty else { return }
-    guard let sessionId = store.selectedSession?.session.sessionId else { return }
-    store.addNote(text: text, targetKind: "task", targetId: task.taskId, sessionId: sessionId)
-    newNoteText = ""
   }
 }
 
@@ -225,7 +184,7 @@ struct AgentInspectorCard: View {
   var body: some View {
     VStack(alignment: .leading, spacing: HarnessTheme.sectionSpacing) {
       Text(agent.name)
-        .font(.system(.title3, design: .rounded, weight: .bold))
+        .scaledFont(.system(.title3, design: .rounded, weight: .bold))
       Text("\(agent.runtime) • \(agent.role.title)")
         .foregroundStyle(HarnessTheme.secondaryInk)
       InspectorFactGrid(facts: facts)
@@ -248,12 +207,12 @@ struct AgentInspectorCard: View {
           ]
         )
       }
-      .font(.caption.bold())
+      .scaledFont(.caption.bold())
       .foregroundStyle(HarnessTheme.secondaryInk)
       DisclosureGroup("Declared Capabilities") {
         InspectorBadgeColumn(values: capabilityBadges)
       }
-      .font(.caption.bold())
+      .scaledFont(.caption.bold())
       .foregroundStyle(HarnessTheme.secondaryInk)
       if !agent.runtimeCapabilities.hookPoints.isEmpty {
         DisclosureGroup("Hook Points") {
@@ -264,7 +223,7 @@ struct AgentInspectorCard: View {
             }
           )
         }
-        .font(.caption.bold())
+        .scaledFont(.caption.bold())
         .foregroundStyle(HarnessTheme.secondaryInk)
       }
       if let activity {
@@ -279,14 +238,14 @@ struct AgentInspectorCard: View {
           )
           if !activity.recentTools.isEmpty {
             Text("Recent Tools")
-              .font(.caption.bold())
+              .scaledFont(.caption.bold())
               .foregroundStyle(HarnessTheme.secondaryInk)
             Text(activity.recentTools.joined(separator: " · "))
-              .font(.caption)
+              .scaledFont(.caption)
               .foregroundStyle(HarnessTheme.secondaryInk)
           }
         }
-        .font(.caption.bold())
+        .scaledFont(.caption.bold())
         .foregroundStyle(HarnessTheme.secondaryInk)
       }
       InspectorSection(title: "Send Signal") {
@@ -341,7 +300,7 @@ struct SignalInspectorCard: View {
   var body: some View {
     VStack(alignment: .leading, spacing: HarnessTheme.sectionSpacing) {
       Text(signal.signal.command)
-        .font(.system(.title3, design: .rounded, weight: .bold))
+        .scaledFont(.system(.title3, design: .rounded, weight: .bold))
       Text(signal.signal.payload.message)
         .foregroundStyle(HarnessTheme.secondaryInk)
       InspectorFactGrid(facts: facts)
@@ -357,7 +316,7 @@ struct SignalInspectorCard: View {
           ]
         )
       }
-      .font(.caption.bold())
+      .scaledFont(.caption.bold())
       .foregroundStyle(HarnessTheme.secondaryInk)
       if let actionHint = signal.signal.payload.actionHint, !actionHint.isEmpty {
         InspectorSection(title: "Action Hint") {
@@ -370,23 +329,23 @@ struct SignalInspectorCard: View {
           VStack(alignment: .leading, spacing: HarnessTheme.itemSpacing) {
             ForEach(Array(signal.signal.payload.relatedFiles.enumerated()), id: \.offset) { _, path in
               Text(path)
-                .font(.caption.monospaced())
+                .scaledFont(.caption.monospaced())
                 .truncationMode(.middle)
                 .foregroundStyle(HarnessTheme.secondaryInk)
                 .lineLimit(2)
             }
           }
         }
-        .font(.caption.bold())
+        .scaledFont(.caption.bold())
         .foregroundStyle(HarnessTheme.secondaryInk)
       }
       DisclosureGroup("Metadata") {
         Text(verbatim: signal.signal.payload.metadata.prettyPrintedJSONString())
-          .font(.caption.monospaced())
+          .scaledFont(.caption.monospaced())
           .foregroundStyle(HarnessTheme.secondaryInk)
           .textSelection(.enabled)
       }
-      .font(.caption.bold())
+      .scaledFont(.caption.bold())
       .foregroundStyle(HarnessTheme.secondaryInk)
       if let acknowledgment = signal.acknowledgment {
         InspectorSection(title: "Acknowledgment") {

@@ -67,14 +67,14 @@ extension InspectorActionSections {
     VStack(alignment: .leading, spacing: HarnessTheme.itemSpacing) {
       HStack {
         Label("Action Console", systemImage: "dial.high")
-          .font(.system(.headline, design: .rounded, weight: .semibold))
+          .scaledFont(.system(.headline, design: .rounded, weight: .semibold))
         Spacer()
         if store.isSessionActionInFlight {
           HarnessSpinner()
             .transition(.opacity)
         } else if !store.lastAction.isEmpty {
           Text(store.lastAction)
-            .font(.caption.bold())
+            .scaledFont(.caption.bold())
             .foregroundStyle(HarnessTheme.success)
             .accessibilityIdentifier(HarnessAccessibility.actionToast)
             .transition(.opacity)
@@ -85,7 +85,7 @@ extension InspectorActionSections {
       Text(
         "Task creation, reassignments, checkpoints, and leadership changes flow through the daemon."
       )
-      .font(.system(.footnote, design: .rounded, weight: .medium))
+      .scaledFont(.system(.footnote, design: .rounded, weight: .medium))
       .foregroundStyle(HarnessTheme.secondaryInk)
       .lineLimit(3)
       if !store.availableActionActors.isEmpty {
@@ -101,7 +101,7 @@ extension InspectorActionSections {
       }
       if let error = store.lastError {
         Text("Action failed: \(error)")
-          .font(.system(.footnote, design: .rounded, weight: .semibold))
+          .scaledFont(.system(.footnote, design: .rounded, weight: .semibold))
           .foregroundStyle(HarnessTheme.danger)
           .lineLimit(3)
           .frame(maxWidth: .infinity, alignment: .leading)
@@ -151,7 +151,7 @@ extension InspectorActionSections {
       Divider()
 
       Text("Checkpoint")
-        .font(.headline)
+        .scaledFont(.headline)
       TextField("Summary", text: $checkpointSummary, axis: .vertical)
         .focused($focusedField, equals: .checkpointSummary)
         .lineLimit(3, reservesSpace: true)
@@ -161,7 +161,7 @@ extension InspectorActionSections {
       }
       HStack {
         Text("\(Int(checkpointProgress))%")
-          .font(.caption.bold())
+          .scaledFont(.caption.bold())
           .foregroundStyle(HarnessTheme.secondaryInk)
         Spacer()
         Button("Save Checkpoint") {
@@ -173,7 +173,7 @@ extension InspectorActionSections {
 
       if let checkpoint = task.checkpointSummary {
         Text("Latest: \(checkpoint.progress)% · \(checkpoint.summary)")
-          .font(.caption)
+          .scaledFont(.caption)
           .foregroundStyle(HarnessTheme.secondaryInk)
       }
     }
@@ -214,7 +214,7 @@ extension InspectorActionSections {
         subtitle: "Change the selected agent role without leaving the inspector."
       )
       Text(agent.name)
-        .font(.system(.headline, design: .rounded, weight: .semibold))
+        .scaledFont(.system(.headline, design: .rounded, weight: .semibold))
       Picker("Role", selection: $role) {
         ForEach(SessionRole.allCases.filter { $0 != .leader }, id: \.self) { role in
           Text(role.title).tag(role)
@@ -245,7 +245,7 @@ extension InspectorActionSections {
         Text(
           "\(pendingTransfer.requestedBy) requested \(pendingTransfer.newLeaderId) at \(timestamp)."
         )
-        .font(.caption)
+        .scaledFont(.caption)
         .foregroundStyle(HarnessTheme.secondaryInk)
       }
       Picker("New Leader", selection: $transferLeaderID) {

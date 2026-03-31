@@ -118,9 +118,9 @@ final class RecordingHarnessClient: HarnessClientProtocol, @unchecked Sendable {
   private var _detailDelays: [String: Duration] = [:]
   private var _timelinesBySessionID: [String: [TimelineEntry]] = [:]
   private var _timelineDelays: [String: Duration] = [:]
-  private var _globalStreamEvents: [StreamEvent] = []
+  private var _globalStreamEvents: [DaemonPushEvent] = []
   private var _globalStreamError: (any Error)?
-  private var _sessionStreamEventsByID: [String: [StreamEvent]] = [:]
+  private var _sessionStreamEventsByID: [String: [DaemonPushEvent]] = [:]
   private var _sessionStreamErrorsByID: [String: any Error] = [:]
 
   var calls: [Call] {
@@ -192,7 +192,7 @@ final class RecordingHarnessClient: HarnessClientProtocol, @unchecked Sendable {
   }
 
   func configureGlobalStream(
-    events: [StreamEvent],
+    events: [DaemonPushEvent],
     error: (any Error)? = nil
   ) {
     lock.withLock {
@@ -202,7 +202,7 @@ final class RecordingHarnessClient: HarnessClientProtocol, @unchecked Sendable {
   }
 
   func configureSessionStream(
-    events: [StreamEvent],
+    events: [DaemonPushEvent],
     error: (any Error)? = nil,
     for sessionID: String
   ) {
@@ -248,7 +248,7 @@ final class RecordingHarnessClient: HarnessClientProtocol, @unchecked Sendable {
     lock.withLock { _timelineDelays[sessionID] }
   }
 
-  func configuredGlobalStreamEvents() -> [StreamEvent] {
+  func configuredGlobalStreamEvents() -> [DaemonPushEvent] {
     lock.withLock { _globalStreamEvents }
   }
 
@@ -256,7 +256,7 @@ final class RecordingHarnessClient: HarnessClientProtocol, @unchecked Sendable {
     lock.withLock { _globalStreamError }
   }
 
-  func configuredSessionStreamEvents(for sessionID: String) -> [StreamEvent] {
+  func configuredSessionStreamEvents(for sessionID: String) -> [DaemonPushEvent] {
     lock.withLock { _sessionStreamEventsByID[sessionID] ?? [] }
   }
 
@@ -324,11 +324,11 @@ final class FailingHarnessClient: HarnessClientProtocol, @unchecked Sendable {
   func sessionDetail(id _: String) async throws -> SessionDetail { throw error }
   func timeline(sessionID _: String) async throws -> [TimelineEntry] { throw error }
 
-  nonisolated func globalStream() -> AsyncThrowingStream<StreamEvent, Error> {
+  nonisolated func globalStream() -> AsyncThrowingStream<DaemonPushEvent, Error> {
     AsyncThrowingStream { $0.finish(throwing: self.error) }
   }
 
-  nonisolated func sessionStream(sessionID _: String) -> AsyncThrowingStream<StreamEvent, Error> {
+  nonisolated func sessionStream(sessionID _: String) -> AsyncThrowingStream<DaemonPushEvent, Error> {
     AsyncThrowingStream { $0.finish(throwing: self.error) }
   }
 

@@ -341,18 +341,15 @@ extension HarnessStore {
       let measuredMutation = try await Self.measureOperation {
         try await mutation()
       }
-      let measuredTimeline = try await Self.measureOperation {
-        try await client.timeline(sessionID: sessionID)
-      }
-      selectedSession = measuredMutation.value
-      let updatedTimeline = measuredTimeline.value
-      recordRequestSuccess()
       recordRequestSuccess()
       guard selectedSessionID == sessionID else {
         return true
       }
-      timeline = updatedTimeline
-      await refresh(using: client, preserveSelection: false)
+      selectedSession = measuredMutation.value
+      sessionIndex.applySessionSummary(measuredMutation.value.session)
+      synchronizeActionActor()
+      refreshNotes(for: sessionID)
+      scheduleSessionPushFallback(using: client, sessionID: sessionID)
       lastAction = actionName
       return true
     } catch {

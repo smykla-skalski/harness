@@ -88,33 +88,69 @@ extension WebSocketTransport {
 
     switch frame.kind {
     case .response(let id, let result, let error):
-      if let error {
-        pending.fail(
-          id: id,
-          error: WebSocketTransportError.serverError(
-            code: error.code, message: error.message)
-        )
-      } else if let result {
-        pending.resume(id: id, result: result)
-      } else {
-        pending.resume(id: id, result: .null)
-      }
-
+      handleResponseFrame(id: id, result: result, error: error)
     case .push(let event, let recordedAt, let sessionId, let payload, _):
-      let streamEvent = StreamEvent(
+      handlePushFrame(
         event: event,
         recordedAt: recordedAt,
         sessionId: sessionId,
         payload: payload
       )
-      globalStreamContinuation?.yield(streamEvent)
-      if let sessionId, let continuation = sessionStreamContinuations[sessionId] {
-        continuation.yield(streamEvent)
-      }
-
     case .unknown:
       break
     }
+  }
+
+  private func handleResponseFrame(
+    id: String,
+    result: JSONValue?,
+    error: WsErrorPayload?
+  ) {
+    if let error {
+      pending.fail(
+        id: id,
+        error: WebSocketTransportError.serverError(
+          code: error.code,
+          message: error.message
+        )
+      )
+    } else if let result {
+      pending.resume(id: id, result: result)
+    } else {
+      pending.resume(id: id, result: .null)
+    }
+  }
+
+  private func handlePushFrame(
+    event: String,
+    recordedAt: String,
+    sessionId: String?,
+    payload: JSONValue
+  ) {
+    let streamEvent = StreamEvent(
+      event: event,
+      recordedAt: recordedAt,
+      sessionId: sessionId,
+      payload: payload
+    )
+    do {
+      let pushEvent = try DaemonPushEvent(streamEvent: streamEvent)
+      globalStreamContinuation?.yield(pushEvent)
+      if let sessionId, let continuation = sessionStreamContinuations[sessionId] {
+        continuation.yield(pushEvent)
+      }
+    } catch {
+      finishStreams(with: error)
+    }
+  }
+
+  private func finishStreams(with error: any Error) {
+    globalStreamContinuation?.finish(throwing: error)
+    globalStreamContinuation = nil
+    for (_, continuation) in sessionStreamContinuations {
+      continuation.finish(throwing: error)
+    }
+    sessionStreamContinuations.removeAll()
   }
 
   func startHeartbeat() {

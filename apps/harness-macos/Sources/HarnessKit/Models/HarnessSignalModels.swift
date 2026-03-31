@@ -174,6 +174,16 @@ public struct TimelineEntry: Codable, Equatable, Identifiable, Sendable {
   public var id: String { entryId }
 }
 
+public struct SessionsUpdatedPayload: Codable, Equatable, Sendable {
+  public let projects: [ProjectSummary]
+  public let sessions: [SessionSummary]
+}
+
+public struct SessionUpdatedPayload: Codable, Equatable, Sendable {
+  public let detail: SessionDetail
+  public let timeline: [TimelineEntry]
+}
+
 public struct StreamEvent: Codable, Equatable, Identifiable, Sendable {
   public let event: String
   public let recordedAt: String
@@ -194,5 +204,126 @@ public struct StreamEvent: Codable, Equatable, Identifiable, Sendable {
   public static func == (lhs: Self, rhs: Self) -> Bool {
     lhs.event == rhs.event && lhs.recordedAt == rhs.recordedAt
       && lhs.sessionId == rhs.sessionId && lhs.payload == rhs.payload
+  }
+}
+
+extension StreamEvent {
+  private static let payloadEncoder = JSONEncoder()
+  private static let payloadDecoder: JSONDecoder = {
+    let decoder = JSONDecoder()
+    decoder.keyDecodingStrategy = .convertFromSnakeCase
+    return decoder
+  }()
+
+  public func decodePayload<Payload: Decodable>(as type: Payload.Type) throws -> Payload {
+    let data = try Self.payloadEncoder.encode(payload)
+    return try Self.payloadDecoder.decode(type, from: data)
+  }
+}
+
+public enum HarnessPushEventError: Error, LocalizedError, Equatable {
+  case missingSessionID(String)
+
+  public var errorDescription: String? {
+    switch self {
+    case .missingSessionID(let event):
+      "Missing session ID for daemon push event '\(event)'."
+    }
+  }
+}
+
+public struct DaemonPushEvent: Equatable, Identifiable, Sendable {
+  public enum Kind: Equatable, Sendable {
+    case ready
+    case sessionsUpdated(SessionsUpdatedPayload)
+    case sessionUpdated(SessionUpdatedPayload)
+    case unknown(eventName: String, payload: JSONValue)
+  }
+
+  public let recordedAt: String
+  public let sessionId: String?
+  public let kind: Kind
+  private let stableID = UUID()
+
+  public var id: UUID { stableID }
+
+  public init(recordedAt: String, sessionId: String?, kind: Kind) {
+    self.recordedAt = recordedAt
+    self.sessionId = sessionId
+    self.kind = kind
+  }
+
+  public init(streamEvent: StreamEvent) throws {
+    switch streamEvent.event {
+    case "ready":
+      self.init(
+        recordedAt: streamEvent.recordedAt,
+        sessionId: streamEvent.sessionId,
+        kind: .ready
+      )
+    case "sessions_updated":
+      self.init(
+        recordedAt: streamEvent.recordedAt,
+        sessionId: nil,
+        kind: .sessionsUpdated(try streamEvent.decodePayload(as: SessionsUpdatedPayload.self))
+      )
+    case "session_updated":
+      guard let sessionId = streamEvent.sessionId else {
+        throw HarnessPushEventError.missingSessionID(streamEvent.event)
+      }
+      self.init(
+        recordedAt: streamEvent.recordedAt,
+        sessionId: sessionId,
+        kind: .sessionUpdated(try streamEvent.decodePayload(as: SessionUpdatedPayload.self))
+      )
+    default:
+      self.init(
+        recordedAt: streamEvent.recordedAt,
+        sessionId: streamEvent.sessionId,
+        kind: .unknown(eventName: streamEvent.event, payload: streamEvent.payload)
+      )
+    }
+  }
+
+  public static func ready(
+    recordedAt: String,
+    sessionId: String? = nil
+  ) -> Self {
+    Self(recordedAt: recordedAt, sessionId: sessionId, kind: .ready)
+  }
+
+  public static func sessionsUpdated(
+    recordedAt: String,
+    projects: [ProjectSummary],
+    sessions: [SessionSummary]
+  ) -> Self {
+    Self(
+      recordedAt: recordedAt,
+      sessionId: nil,
+      kind: .sessionsUpdated(
+        SessionsUpdatedPayload(projects: projects, sessions: sessions)
+      )
+    )
+  }
+
+  public static func sessionUpdated(
+    recordedAt: String,
+    sessionId: String,
+    detail: SessionDetail,
+    timeline: [TimelineEntry]
+  ) -> Self {
+    Self(
+      recordedAt: recordedAt,
+      sessionId: sessionId,
+      kind: .sessionUpdated(
+        SessionUpdatedPayload(detail: detail, timeline: timeline)
+      )
+    )
+  }
+
+  public static func == (lhs: Self, rhs: Self) -> Bool {
+    lhs.recordedAt == rhs.recordedAt
+      && lhs.sessionId == rhs.sessionId
+      && lhs.kind == rhs.kind
   }
 }

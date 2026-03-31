@@ -1,6 +1,7 @@
 enum HarnessAccessibility {
   static let appChromeRoot = "harness.app.chrome"
   static let appChromeState = "harness.app.chrome.state"
+  static let persistenceBanner = "harness.persistence.banner"
   static let daemonCard = "harness.sidebar.daemon-card"
   static let daemonCardFrame = "harness.sidebar.daemon-card.frame"
   static let sidebarRoot = "harness.sidebar.root"
@@ -11,6 +12,7 @@ enum HarnessAccessibility {
   static let sidebarFiltersCard = "harness.sidebar.filters"
   static let sidebarFiltersCardFrame = "\(sidebarFiltersCard).frame"
   static let sidebarClearFiltersButton = "harness.sidebar.filters.clear"
+  static let sidebarClearSearchHistoryButton = "harness.sidebar.search.clear-history"
   static let sessionFilterGroup = "harness.sidebar.filter-group"
   static func sidebarFilterChip(_ filter: String) -> String {
     "harness.sidebar.filter-chip.\(slug(filter))"
@@ -26,6 +28,9 @@ enum HarnessAccessibility {
   static let inspectorEmptyState = "harness.inspector.empty-state"
   static let sessionInspectorCard = "harness.inspector.session-card"
   static let taskInspectorCard = "harness.inspector.task-card"
+  static let taskNoteField = "harness.inspector.task-note-field"
+  static let taskNoteAddButton = "harness.inspector.task-note-add"
+  static let taskNotesUnavailable = "harness.inspector.task-notes-unavailable"
   static let agentInspectorCard = "harness.inspector.agent-card"
   static let signalInspectorCard = "harness.inspector.signal-card"
   static let observerInspectorCard = "harness.inspector.observer-card"

@@ -30,10 +30,10 @@ struct SidebarFilterSection: View {
       HStack(alignment: .top) {
         VStack(alignment: .leading, spacing: 4) {
           Text("Search & Filters")
-            .font(.system(.headline, design: .rounded, weight: .semibold))
+            .scaledFont(.system(.headline, design: .rounded, weight: .semibold))
             .accessibilityAddTraits(.isHeader)
           Text(activeFilterSummary)
-            .font(.caption)
+            .scaledFont(.caption)
             .foregroundStyle(HarnessTheme.secondaryInk)
         }
         Spacer()
@@ -41,7 +41,7 @@ struct SidebarFilterSection: View {
           Button("Clear") {
             store.resetFilters()
           }
-          .font(.caption.bold())
+          .scaledFont(.caption.bold())
           .harnessAccessoryButtonStyle()
           .controlSize(.small)
           .accessibilityIdentifier(HarnessAccessibility.sidebarClearFiltersButton)
@@ -65,32 +65,8 @@ struct SidebarFilterSection: View {
         }
 
       if store.searchText.isEmpty {
-        let recent = store.recentSearches
-        if !recent.isEmpty {
-          HStack(spacing: HarnessTheme.itemSpacing) {
-            ForEach(recent.prefix(5), id: \.query) { search in
-              Button(search.query) {
-                store.searchText = search.query
-              }
-              .font(.caption)
-              .lineLimit(1)
-              .harnessAccessoryButtonStyle()
-              .controlSize(.small)
-            }
-            Spacer()
-            Button {
-              store.clearSearchHistory()
-            } label: {
-              Image(systemName: "xmark.circle")
-                .font(.caption2)
-                .foregroundStyle(HarnessTheme.secondaryInk)
-                .frame(minWidth: 24, minHeight: 24)
-                .contentShape(Rectangle())
-            }
-            .harnessAccessoryButtonStyle()
-            .controlSize(.small)
-            .accessibilityLabel("Clear search history")
-          }
+        if store.isPersistenceAvailable {
+          RecentSearchChipsSection(store: store)
         }
       }
 
@@ -139,6 +115,44 @@ struct SidebarFilterSection: View {
   }
 }
 
+private struct RecentSearchChipsSection: View {
+  let store: HarnessStore
+
+  private var visibleSearches: [RecentSearch] {
+    Array(store.recentSearches.prefix(5))
+  }
+
+  var body: some View {
+    if !visibleSearches.isEmpty {
+      HStack(spacing: HarnessTheme.itemSpacing) {
+        ForEach(visibleSearches, id: \.persistentModelID) { search in
+          Button(search.query) {
+            store.searchText = search.query
+          }
+          .scaledFont(.caption)
+          .lineLimit(1)
+          .harnessAccessoryButtonStyle()
+          .controlSize(.small)
+        }
+        Spacer()
+        Button {
+          store.clearSearchHistory()
+        } label: {
+          Image(systemName: "xmark.circle")
+            .scaledFont(.caption2)
+            .foregroundStyle(HarnessTheme.secondaryInk)
+            .frame(minWidth: 24, minHeight: 24)
+            .contentShape(Rectangle())
+        }
+        .harnessAccessoryButtonStyle()
+        .controlSize(.small)
+        .accessibilityIdentifier(HarnessAccessibility.sidebarClearSearchHistoryButton)
+        .accessibilityLabel("Clear search history")
+      }
+    }
+  }
+}
+
 extension SidebarFilterSection {
   fileprivate func filterSection<Content: View>(
     title: String,
@@ -146,7 +160,7 @@ extension SidebarFilterSection {
   ) -> some View {
     VStack(alignment: .leading, spacing: HarnessTheme.itemSpacing) {
       Text(title.uppercased())
-        .font(.caption2.weight(.bold))
+        .scaledFont(.caption2.weight(.bold))
         .tracking(HarnessTheme.uppercaseTracking)
         .foregroundStyle(HarnessTheme.secondaryInk)
       content()
@@ -165,7 +179,7 @@ extension SidebarFilterSection {
       }
     } label: {
       Text(title)
-        .font(.system(.callout, design: .rounded, weight: .semibold))
+        .scaledFont(.system(.callout, design: .rounded, weight: .semibold))
     }
     .buttonBorderShape(.roundedRectangle(radius: 12))
     .harnessFilterChipButtonStyle(isSelected: isSelected)
