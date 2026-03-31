@@ -222,10 +222,8 @@ extension DaemonStatusCard {
     _ identifier: String,
     @ViewBuilder content: () -> Content
   ) -> some View {
-    ZStack(alignment: .topLeading) {
-      content()
-    }
-    .accessibilityElement(children: .contain)
-    .accessibilityIdentifier(identifier)
+    content()
+      .accessibilityElement(children: .contain)
+      .accessibilityIdentifier(identifier)
   }
 }
