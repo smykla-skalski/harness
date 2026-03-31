@@ -92,7 +92,7 @@ struct ContentView: View {
           RefreshToolbarButton(store: store)
             .help("Refresh sessions")
         }
-        ToolbarItem(id: "inspector", placement: .secondaryAction) {
+        ToolbarItem(id: "inspector", placement: .primaryAction) {
           Button {
             showInspector.toggle()
           } label: {
@@ -103,7 +103,8 @@ struct ContentView: View {
           }
           .help(showInspector ? "Hide inspector" : "Show inspector")
         }
-        ToolbarItem(id: "settings", placement: .secondaryAction) {
+        ToolbarSpacer(.fixed)
+        ToolbarItem(id: "settings", placement: .primaryAction) {
           Button {
             openSettings()
           } label: {
