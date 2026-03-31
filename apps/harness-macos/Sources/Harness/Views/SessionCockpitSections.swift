@@ -68,12 +68,20 @@ struct SessionTaskListSection: View {
       Text("Tasks")
         .font(.system(.title3, design: .rounded, weight: .semibold))
         .accessibilityAddTraits(.isHeader)
-      VStack(alignment: .leading, spacing: HarnessTheme.sectionSpacing) {
-        ForEach(tasks) { task in
-          SessionTaskSummaryCard(task: task, store: store)
+      if tasks.isEmpty {
+        ContentUnavailableView {
+          Label("No tasks yet", systemImage: "checklist")
+        } description: {
+          Text("Create a task from the Action Console in the inspector.")
         }
+      } else {
+        VStack(alignment: .leading, spacing: HarnessTheme.sectionSpacing) {
+          ForEach(tasks) { task in
+            SessionTaskSummaryCard(task: task, store: store)
+          }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
       }
-      .frame(maxWidth: .infinity, alignment: .leading)
     }
     .frame(maxWidth: .infinity, alignment: .topLeading)
   }
@@ -118,6 +126,15 @@ struct SessionTaskSummaryCard: View {
       .padding(HarnessTheme.cardPadding)
     }
     .harnessInteractiveCardButtonStyle()
+    .contextMenu {
+      Button { store.inspect(taskID: task.taskId) } label: {
+        Label("Inspect", systemImage: "info.circle")
+      }
+      Divider()
+      Button { copyToClipboard(task.taskId) } label: {
+        Label("Copy Task ID", systemImage: "doc.on.doc")
+      }
+    }
     .accessibilityIdentifier(HarnessAccessibility.sessionTaskCard(task.taskId))
     .accessibilityFrameMarker("\(HarnessAccessibility.sessionTaskCard(task.taskId)).frame")
     .transition(
@@ -137,12 +154,20 @@ struct SessionAgentListSection: View {
       Text("Agents")
         .font(.system(.title3, design: .rounded, weight: .semibold))
         .accessibilityAddTraits(.isHeader)
-      VStack(alignment: .leading, spacing: HarnessTheme.sectionSpacing) {
-        ForEach(agents) { agent in
-          SessionAgentSummaryCard(agent: agent, store: store)
+      if agents.isEmpty {
+        ContentUnavailableView {
+          Label("No agents registered", systemImage: "person.2")
+        } description: {
+          Text("Agents appear here when they join the session.")
         }
+      } else {
+        VStack(alignment: .leading, spacing: HarnessTheme.sectionSpacing) {
+          ForEach(agents) { agent in
+            SessionAgentSummaryCard(agent: agent, store: store)
+          }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
       }
-      .frame(maxWidth: .infinity, alignment: .leading)
     }
     .frame(maxWidth: .infinity, alignment: .topLeading)
   }
@@ -181,6 +206,15 @@ struct SessionAgentSummaryCard: View {
       .padding(HarnessTheme.cardPadding)
     }
     .harnessInteractiveCardButtonStyle()
+    .contextMenu {
+      Button { store.inspect(agentID: agent.agentId) } label: {
+        Label("Inspect", systemImage: "info.circle")
+      }
+      Divider()
+      Button { copyToClipboard(agent.agentId) } label: {
+        Label("Copy Agent ID", systemImage: "doc.on.doc")
+      }
+    }
     .accessibilityIdentifier(HarnessAccessibility.sessionAgentCard(agent.agentId))
     .accessibilityFrameMarker("\(HarnessAccessibility.sessionAgentCard(agent.agentId)).frame")
     .transition(
@@ -197,4 +231,9 @@ struct SessionAgentSummaryCard: View {
       .harnessPillPadding()
       .harnessInfoPill()
   }
+}
+
+private func copyToClipboard(_ text: String) {
+  NSPasteboard.general.clearContents()
+  NSPasteboard.general.setString(text, forType: .string)
 }

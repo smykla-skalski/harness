@@ -32,6 +32,7 @@ struct SessionsBoardOnboardingCard: View {
         )
         .font(.system(.body, design: .rounded, weight: .medium))
         .foregroundStyle(HarnessTheme.secondaryInk)
+        .lineSpacing(2)
       }
       Spacer()
       Text(store.daemonStatus?.launchAgent.installed == true ? "Persistent" : "Manual")

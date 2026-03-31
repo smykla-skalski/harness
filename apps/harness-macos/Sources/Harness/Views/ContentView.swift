@@ -2,6 +2,17 @@ import HarnessKit
 import Observation
 import SwiftUI
 
+struct InspectorVisibilityKey: FocusedValueKey {
+  typealias Value = Binding<Bool>
+}
+
+extension FocusedValues {
+  var inspectorVisibility: Binding<Bool>? {
+    get { self[InspectorVisibilityKey.self] }
+    set { self[InspectorVisibilityKey.self] = newValue }
+  }
+}
+
 struct ContentView: View {
   @Bindable var store: HarnessStore
   @Environment(\.openSettings)
@@ -71,7 +82,6 @@ struct ContentView: View {
           } label: {
             Label("Inspector", systemImage: "info.circle")
           }
-          .keyboardShortcut("i", modifiers: [.command, .option])
           .help("Toggle inspector (Cmd+Option+I)")
         }
         ToolbarItem(placement: .primaryAction) {
@@ -91,6 +101,7 @@ struct ContentView: View {
     .navigationSplitViewStyle(.prominentDetail)
     .toolbarBackgroundVisibility(.visible, for: .windowToolbar)
     .containerBackground(.windowBackground, for: .window)
+    .focusedSceneValue(\.inspectorVisibility, $showInspector)
     .frame(maxWidth: .infinity, maxHeight: .infinity)
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessAccessibility.appChromeRoot)
@@ -128,6 +139,20 @@ struct ContentView: View {
       if !confirmationMessage.isEmpty {
         Text(confirmationMessage)
       }
+    }
+    .onChange(of: store.connectionState) { _, newState in
+      let message: String
+      switch newState {
+      case .online: message = "Connected to daemon"
+      case .connecting: message = "Connecting to daemon"
+      case .offline(let reason): message = "Disconnected: \(reason)"
+      case .idle: return
+      }
+      AccessibilityNotification.Announcement(message).post()
+    }
+    .onChange(of: store.lastAction) { _, action in
+      guard !action.isEmpty else { return }
+      AccessibilityNotification.Announcement(action).post()
     }
   }
 

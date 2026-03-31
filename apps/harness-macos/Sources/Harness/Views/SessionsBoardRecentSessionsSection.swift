@@ -47,6 +47,21 @@ struct SessionsBoardRecentSessionsSection: View {
               .padding(HarnessTheme.cardPadding)
             }
             .harnessInteractiveCardButtonStyle()
+            .contextMenu {
+              Button {
+                store.primeSessionSelection(session.sessionId)
+                Task { await store.selectSession(session.sessionId) }
+              } label: {
+                Label("Inspect", systemImage: "info.circle")
+              }
+              Divider()
+              Button {
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString(session.sessionId, forType: .string)
+              } label: {
+                Label("Copy Session ID", systemImage: "doc.on.doc")
+              }
+            }
           }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
