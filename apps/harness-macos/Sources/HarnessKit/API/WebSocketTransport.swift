@@ -1,6 +1,6 @@
 import Foundation
 
-public final class WebSocketTransport: HarnessClientProtocol, @unchecked Sendable {
+public actor WebSocketTransport: HarnessClientProtocol {
   let connection: HarnessConnection
   let encoder: JSONEncoder
   let decoder: JSONDecoder
@@ -12,7 +12,6 @@ public final class WebSocketTransport: HarnessClientProtocol, @unchecked Sendabl
   var globalStreamContinuation: AsyncThrowingStream<StreamEvent, Error>.Continuation?
   var sessionStreamContinuations: [String: AsyncThrowingStream<StreamEvent, Error>.Continuation] =
     [:]
-  let lock = NSLock()
   var activeSubscriptions: Set<String> = []
   var globalSubscriptionActive = false
 
@@ -93,67 +92,73 @@ extension WebSocketTransport {
 extension WebSocketTransport {
   // MARK: - Streams
 
-  public func globalStream() -> AsyncThrowingStream<StreamEvent, Error> {
-    AsyncThrowingStream { continuation in
-      lock.withLock {
-        globalStreamContinuation = continuation
-        globalSubscriptionActive = true
+  public func globalStream() async -> AsyncThrowingStream<StreamEvent, Error> {
+    let (stream, continuation) = AsyncThrowingStream<StreamEvent, Error>.makeStream()
+    globalStreamContinuation = continuation
+    globalSubscriptionActive = true
+
+    continuation.onTermination = { [weak self] _ in
+      guard let self else { return }
+      Task { await self.cleanupGlobalSubscription() }
+    }
+
+    Task {
+      do {
+        _ = try await self.send(
+          method: "stream.subscribe",
+          params: .object(["scope": .string("global")])
+        )
+      } catch {
+        continuation.finish(throwing: error)
       }
-      continuation.onTermination = { [weak self] _ in
-        guard let self else { return }
-        self.lock.withLock {
-          self.globalStreamContinuation = nil
-          self.globalSubscriptionActive = false
-        }
-        Task {
-          try? await self.send(
-            method: "stream.unsubscribe",
-            params: .object(["scope": .string("global")])
-          )
-        }
-      }
-      Task {
-        do {
-          _ = try await self.send(
-            method: "stream.subscribe",
-            params: .object(["scope": .string("global")])
-          )
-        } catch {
-          continuation.finish(throwing: error)
-        }
-      }
+    }
+
+    return stream
+  }
+
+  private func cleanupGlobalSubscription() {
+    globalStreamContinuation = nil
+    globalSubscriptionActive = false
+    Task {
+      try? await send(
+        method: "stream.unsubscribe",
+        params: .object(["scope": .string("global")])
+      )
     }
   }
 
-  public func sessionStream(sessionID: String) -> AsyncThrowingStream<StreamEvent, Error> {
-    AsyncThrowingStream { continuation in
-      lock.withLock {
-        sessionStreamContinuations[sessionID] = continuation
-        activeSubscriptions.insert(sessionID)
+  public func sessionStream(sessionID: String) async -> AsyncThrowingStream<StreamEvent, Error> {
+    let (stream, continuation) = AsyncThrowingStream<StreamEvent, Error>.makeStream()
+    sessionStreamContinuations[sessionID] = continuation
+    activeSubscriptions.insert(sessionID)
+
+    continuation.onTermination = { [weak self] _ in
+      guard let self else { return }
+      Task { await self.cleanupSessionSubscription(sessionID: sessionID) }
+    }
+
+    Task {
+      do {
+        _ = try await self.send(
+          method: "session.subscribe",
+          params: .object(["session_id": .string(sessionID)])
+        )
+      } catch {
+        continuation.finish(throwing: error)
       }
-      continuation.onTermination = { [weak self] _ in
-        guard let self else { return }
-        self.lock.withLock {
-          self.sessionStreamContinuations[sessionID] = nil
-          self.activeSubscriptions.remove(sessionID)
-        }
-        Task {
-          try? await self.send(
-            method: "session.unsubscribe",
-            params: .object(["session_id": .string(sessionID)])
-          )
-        }
-      }
-      Task {
-        do {
-          _ = try await self.send(
-            method: "session.subscribe",
-            params: .object(["session_id": .string(sessionID)])
-          )
-        } catch {
-          continuation.finish(throwing: error)
-        }
-      }
+    }
+
+    return stream
+  }
+
+  private func cleanupSessionSubscription(sessionID: String) {
+    sessionStreamContinuations[sessionID] = nil
+    activeSubscriptions.remove(sessionID)
+    Task {
+      try? await send(
+        method: "session.unsubscribe",
+        params: .object(["session_id": .string(sessionID)])
+      )
     }
   }
 }

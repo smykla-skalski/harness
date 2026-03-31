@@ -137,7 +137,7 @@ extension HarnessStore {
 
   func startGlobalStream(using client: any HarnessClientProtocol) {
     stopGlobalStream()
-    globalStreamTask = Task { [weak self] in
+    globalStreamTask = Task { @MainActor [weak self] in
       guard let self else {
         return
       }
@@ -148,7 +148,7 @@ extension HarnessStore {
 
       while !Task.isCancelled {
         do {
-          for try await event in client.globalStream() {
+          for try await event in await client.globalStream() {
             attempt = 0
             if event.event == "ready" {
               continue
@@ -180,7 +180,7 @@ extension HarnessStore {
   func startSessionStream(using client: any HarnessClientProtocol, sessionID: String) {
     subscribedSessionIDs = [sessionID]
     stopSessionStream(resetSubscriptions: false)
-    sessionStreamTask = Task { [weak self] in
+    sessionStreamTask = Task { @MainActor [weak self] in
       guard let self else {
         return
       }
@@ -191,7 +191,7 @@ extension HarnessStore {
 
       while !Task.isCancelled {
         do {
-          for try await event in client.sessionStream(sessionID: sessionID) {
+          for try await event in await client.sessionStream(sessionID: sessionID) {
             attempt = 0
             if event.event == "ready" {
               continue

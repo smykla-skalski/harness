@@ -1,6 +1,6 @@
 import Foundation
 
-public final class PreviewHarnessClient: HarnessClientProtocol, @unchecked Sendable {
+public final class PreviewHarnessClient: HarnessClientProtocol, Sendable {
   public struct Fixtures: Sendable {
     let health: HealthResponse
     let projects: [ProjectSummary]
@@ -119,7 +119,7 @@ public final class PreviewHarnessClient: HarnessClientProtocol, @unchecked Senda
     fixtures.timeline
   }
 
-  public func globalStream() -> AsyncThrowingStream<StreamEvent, Error> {
+  public func globalStream() async -> AsyncThrowingStream<StreamEvent, Error> {
     AsyncThrowingStream { continuation in
       continuation.yield(
         StreamEvent(
@@ -133,7 +133,7 @@ public final class PreviewHarnessClient: HarnessClientProtocol, @unchecked Senda
     }
   }
 
-  public func sessionStream(sessionID _: String) -> AsyncThrowingStream<StreamEvent, Error> {
+  public func sessionStream(sessionID _: String) async -> AsyncThrowingStream<StreamEvent, Error> {
     AsyncThrowingStream { continuation in
       continuation.yield(
         StreamEvent(
