@@ -1,29 +1,18 @@
 ---
-name: work
-description: Join a multi-agent session as a worker. Pick up assigned tasks, execute them, report progress, and signal completion.
-argument-hint: '<session-id> [--role worker|reviewer|improver] [--runtime claude|codex|gemini|copilot|opencode] [--capabilities "x,y"]'
+name: join
+description: Join a multi-agent session as a worker (or other role). Pick up assigned tasks, execute them, report progress, and signal completion.
+argument-hint: '[session-id] [--role worker|reviewer|improver] [--runtime claude|codex|gemini|copilot|opencode] [--capabilities "x,y"]'
 allowed-tools: Agent, AskUserQuestion, Bash, Edit, Glob, Grep, Read, Write
 user-invocable: true
 ---
 
-# Session work
+# Session join
 
-Use this skill when the user wants this agent to join an existing multi-agent session and work on assigned tasks. You become a session participant - responsible for joining, picking up tasks, doing the work, and reporting progress.
+Join an existing multi-agent session. You become a participant who executes assigned tasks.
 
 ## Contract
 
 All session state flows through `harness session` commands. Do not read or write orchestration state files directly.
-
-### Commands you will use
-
-```
-harness session join <session-id> --role <role> --runtime <runtime> [--capabilities "x,y"]
-harness session task list <session-id> [--status open] --json
-harness session task update <session-id> <task-id> --status <status> [--note "..."] --actor <your-agent-id>
-harness session task checkpoint <session-id> --summary "..." --progress <0-100> --actor <your-agent-id>
-harness session signal list --session-id <session-id> --json
-harness session status <session-id> --json
-```
 
 ## Arguments
 
@@ -31,10 +20,30 @@ Parse from `$ARGUMENTS`:
 
 | Argument | Default | Purpose |
 | --- | --- | --- |
-| positional | required | Session ID to join |
+| positional | interactive | Session ID to join. If omitted, list active sessions and ask the user to pick one. |
 | `--role` | `worker` | Your role in the session |
 | `--runtime` | auto-detect | Which runtime you are (claude, codex, gemini, copilot, opencode) |
 | `--capabilities` | none | Comma-separated capability tags |
+
+## Session picker
+
+When no session ID is provided in arguments, run:
+
+```bash
+harness session list --json
+```
+
+Filter to active sessions only. If there are none, tell the user no active sessions exist and stop.
+
+If there is exactly one active session, confirm with the user before joining.
+
+If there are multiple, present them using AskUserQuestion with a numbered list showing:
+- session ID (short form)
+- context/goal
+- agent count
+- task counts (open/in-progress/done)
+
+Put the most recently created session first. After the user picks one, proceed with joining.
 
 ## Workflow
 
@@ -64,7 +73,7 @@ harness session task update <session-id> <task-id> --status in-progress --actor 
 
 ### 4. Do the work
 
-Execute the task according to its context and title. Follow the project conventions:
+Execute the task according to its context and title. Follow project conventions:
 
 - Read files before modifying them
 - Run `mise run check` after code changes
@@ -105,13 +114,13 @@ If there are unassigned tasks you can handle, inform the leader or pick them up 
 
 ### 8. Check for signals
 
-The leader or observer may send you signals. These are picked up automatically during hook callbacks, but you can also check manually:
+The leader may send you signals. These are picked up automatically during hook callbacks, but you can also check:
 
 ```bash
 harness session signal list --session-id <session-id> --json
 ```
 
-Act on any pending signals - they may contain corrections, new context, or instructions to pause/abort.
+Act on any pending signals - they may contain corrections, context, or instructions to pause/abort.
 
 ## Role permissions
 
