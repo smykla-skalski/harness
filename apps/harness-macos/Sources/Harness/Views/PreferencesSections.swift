@@ -10,7 +10,7 @@ struct PreferencesActionButtons: View {
       HarnessWrapLayout(spacing: 8, lineSpacing: 8) {
         HarnessAsyncActionButton(
           title: "Reconnect",
-          tint: HarnessTheme.accent,
+          tint: .accentColor,
           variant: .bordered,
           isLoading: isLoading,
           accessibilityIdentifier: HarnessAccessibility.preferencesActionButton("Reconnect"),
@@ -19,7 +19,7 @@ struct PreferencesActionButtons: View {
         )
         HarnessAsyncActionButton(
           title: "Refresh Diagnostics",
-          tint: HarnessTheme.ink,
+          tint: .secondary,
           variant: .bordered,
           isLoading: isLoading,
           accessibilityIdentifier: HarnessAccessibility.preferencesActionButton(
@@ -30,7 +30,7 @@ struct PreferencesActionButtons: View {
         )
         HarnessAsyncActionButton(
           title: "Start Daemon",
-          tint: HarnessTheme.accent,
+          tint: .accentColor,
           variant: .prominent,
           isLoading: isLoading,
           accessibilityIdentifier: HarnessAccessibility.preferencesActionButton("Start Daemon"),
@@ -39,7 +39,7 @@ struct PreferencesActionButtons: View {
         )
         HarnessAsyncActionButton(
           title: "Install Launch Agent",
-          tint: HarnessTheme.ink,
+          tint: .secondary,
           variant: .bordered,
           isLoading: isLoading,
           accessibilityIdentifier: HarnessAccessibility.preferencesActionButton(
@@ -50,7 +50,7 @@ struct PreferencesActionButtons: View {
         )
         HarnessAsyncActionButton(
           title: "Remove Launch Agent",
-          tint: HarnessTheme.danger,
+          tint: .red,
           variant: .bordered,
           isLoading: isLoading,
           accessibilityIdentifier: HarnessAccessibility.preferencesActionButton(
