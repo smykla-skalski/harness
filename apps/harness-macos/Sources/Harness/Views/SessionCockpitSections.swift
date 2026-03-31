@@ -3,6 +3,10 @@ import SwiftUI
 
 struct SessionMetricGrid: View {
   let metrics: SessionMetrics
+  @ScaledMetric(relativeTo: .caption)
+  private var barWidth: CGFloat = 8
+  @ScaledMetric(relativeTo: .title)
+  private var cardMinHeight: CGFloat = 60
 
   var body: some View {
     HarnessAdaptiveGridLayout(
@@ -34,8 +38,8 @@ struct SessionMetricGrid: View {
     HStack(alignment: .top, spacing: HarnessTheme.sectionSpacing) {
       RoundedRectangle(cornerRadius: 999, style: .continuous)
         .fill(tint)
-        .frame(width: 8)
-        .frame(minHeight: 60)
+        .frame(width: barWidth)
+        .frame(minHeight: cardMinHeight)
         .accessibilityHidden(true)
       VStack(alignment: .leading, spacing: HarnessTheme.itemSpacing) {
         Text(title.uppercased())

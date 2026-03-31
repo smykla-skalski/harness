@@ -4,6 +4,10 @@ import SwiftUI
 
 struct SessionsBoardView: View {
   let store: HarnessStore
+  @ScaledMetric(relativeTo: .caption)
+  private var barWidth: CGFloat = 12
+  @ScaledMetric(relativeTo: .largeTitle)
+  private var cardMinHeight: CGFloat = 68
 
   private var isLoading: Bool {
     store.isDaemonActionInFlight || store.isRefreshing || store.connectionState == .connecting
@@ -68,8 +72,8 @@ struct SessionsBoardView: View {
     HStack(alignment: .top, spacing: HarnessTheme.sectionSpacing) {
       RoundedRectangle(cornerRadius: 999, style: .continuous)
         .fill(tint)
-        .frame(width: 12)
-        .frame(minHeight: 68)
+        .frame(width: barWidth)
+        .frame(minHeight: cardMinHeight)
         .accessibilityHidden(true)
       VStack(alignment: .leading, spacing: HarnessTheme.itemSpacing) {
         Text(title.uppercased())

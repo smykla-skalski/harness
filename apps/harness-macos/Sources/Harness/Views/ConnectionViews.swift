@@ -53,17 +53,37 @@ struct LatencyBadge: View {
 
 struct ActivityPulse: View {
   let isActive: Bool
+  private let activeColor: Color
+  private let inactiveColor: Color
+  @ScaledMetric(relativeTo: .caption)
+  private var outerSize: CGFloat = 16
+  @ScaledMetric(relativeTo: .caption)
+  private var innerSize: CGFloat = 7
   @State private var isPulsing = false
 
+  init(
+    isActive: Bool,
+    outerSize: CGFloat = 16,
+    innerSize: CGFloat = 7,
+    activeColor: Color = HarnessTheme.success,
+    inactiveColor: Color = HarnessTheme.secondaryInk.opacity(0.55)
+  ) {
+    self.isActive = isActive
+    self.activeColor = activeColor
+    self.inactiveColor = inactiveColor
+    _outerSize = ScaledMetric(wrappedValue: outerSize, relativeTo: .caption)
+    _innerSize = ScaledMetric(wrappedValue: innerSize, relativeTo: .caption)
+  }
+
   private var baseColor: Color {
-    isActive ? HarnessTheme.success : HarnessTheme.secondaryInk.opacity(0.55)
+    isActive ? activeColor : inactiveColor
   }
 
   var body: some View {
     ZStack {
       Circle()
         .fill(baseColor.opacity(isPulsing ? 0.22 : 0.14))
-        .frame(width: 16, height: 16)
+        .frame(width: outerSize, height: outerSize)
         .scaleEffect(isPulsing ? 1.3 : 1.0)
         .animation(
           isPulsing
@@ -73,14 +93,14 @@ struct ActivityPulse: View {
         )
       Circle()
         .fill(baseColor)
-        .frame(width: 7, height: 7)
+        .frame(width: innerSize, height: innerSize)
         .overlay(
           Circle()
             .stroke(Color.primary.opacity(0.14), lineWidth: 1)
         )
         .animation(.easeOut(duration: 0.3), value: isActive)
     }
-    .frame(width: 16, height: 16)
+    .frame(width: outerSize, height: outerSize)
     .onChange(of: isActive) { _, active in
       isPulsing = active
     }
@@ -105,23 +125,37 @@ struct ConnectionStatusStrip: View {
   }
 
   var body: some View {
-    HStack(spacing: HarnessTheme.itemSpacing) {
-      ActivityPulse(isActive: isActive)
-
-      VStack(alignment: .leading, spacing: 2) {
-        Text(title)
-          .font(.system(.footnote, design: .rounded, weight: .semibold))
-        Text(subtitle)
-          .font(.caption)
-          .foregroundStyle(HarnessTheme.secondaryInk)
-      }
-
-      Spacer(minLength: 8)
-
+    ViewThatFits(in: .horizontal) {
       HStack(spacing: HarnessTheme.itemSpacing) {
-        TransportBadge(kind: metrics.transportKind)
-        LatencyBadge(latencyMs: metrics.latencyMs)
+        ActivityPulse(isActive: isActive)
+        transportInfo
+        Spacer(minLength: HarnessTheme.itemSpacing)
+        transportBadges
       }
+      VStack(alignment: .leading, spacing: HarnessTheme.itemSpacing) {
+        HStack(spacing: HarnessTheme.itemSpacing) {
+          ActivityPulse(isActive: isActive)
+          transportInfo
+        }
+        transportBadges
+      }
+    }
+  }
+
+  private var transportInfo: some View {
+    VStack(alignment: .leading, spacing: 2) {
+      Text(title)
+        .font(.system(.footnote, design: .rounded, weight: .semibold))
+      Text(subtitle)
+        .font(.caption)
+        .foregroundStyle(HarnessTheme.secondaryInk)
+    }
+  }
+
+  private var transportBadges: some View {
+    HStack(spacing: HarnessTheme.itemSpacing) {
+      TransportBadge(kind: metrics.transportKind)
+      LatencyBadge(latencyMs: metrics.latencyMs)
     }
   }
 }
@@ -149,9 +183,12 @@ struct ConnectionToolbarBadge: View {
 
   var body: some View {
     HStack(spacing: 4) {
-      Circle()
-        .fill(qualityColor)
-        .frame(width: 8, height: 8)
+      ActivityPulse(
+        isActive: metrics.connectedSince != nil,
+        outerSize: 14,
+        innerSize: 6,
+        activeColor: qualityColor
+      )
         .accessibilityHidden(true)
       Text(transportLabel)
         .font(.system(.caption, design: .rounded, weight: .semibold).monospacedDigit())

@@ -43,25 +43,47 @@ struct SessionActionDock: View {
         .animation(.spring(duration: 0.2), value: store.isSessionActionInFlight)
       }
 
-      HStack(spacing: HarnessTheme.sectionSpacing) {
-        flowButton(
-          title: "Task Flow",
-          subtitle: "Create, reassign, checkpoint",
-          symbol: "checklist",
-          action: focusFirstTask
-        )
-        flowButton(
-          title: "People Flow",
-          subtitle: "Change roles and leadership",
-          symbol: "person.2",
-          action: focusFirstAgent
-        )
-        flowButton(
-          title: "Observe Flow",
-          subtitle: "Surface and triage issues",
-          symbol: "eye",
-          action: focusObserver
-        )
+      ViewThatFits(in: .horizontal) {
+        HStack(spacing: HarnessTheme.sectionSpacing) {
+          flowButton(
+            title: "Task Flow",
+            subtitle: "Create, reassign, checkpoint",
+            symbol: "checklist",
+            action: focusFirstTask
+          )
+          flowButton(
+            title: "People Flow",
+            subtitle: "Change roles and leadership",
+            symbol: "person.2",
+            action: focusFirstAgent
+          )
+          flowButton(
+            title: "Observe Flow",
+            subtitle: "Surface and triage issues",
+            symbol: "eye",
+            action: focusObserver
+          )
+        }
+        VStack(spacing: HarnessTheme.itemSpacing) {
+          flowButton(
+            title: "Task Flow",
+            subtitle: "Create, reassign, checkpoint",
+            symbol: "checklist",
+            action: focusFirstTask
+          )
+          flowButton(
+            title: "People Flow",
+            subtitle: "Change roles and leadership",
+            symbol: "person.2",
+            action: focusFirstAgent
+          )
+          flowButton(
+            title: "Observe Flow",
+            subtitle: "Surface and triage issues",
+            symbol: "eye",
+            action: focusObserver
+          )
+        }
       }
     }
   }

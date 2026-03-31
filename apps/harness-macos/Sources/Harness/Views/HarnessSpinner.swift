@@ -1,13 +1,13 @@
 import SwiftUI
 
 struct HarnessSpinner: View {
-  let size: CGFloat
+  @ScaledMetric private var scaledSize: CGFloat
   @Environment(\.accessibilityReduceMotion)
   private var reduceMotion
   @State private var isSpinning = false
 
   init(size: CGFloat = 16) {
-    self.size = size
+    _scaledSize = ScaledMetric(wrappedValue: size)
   }
 
   var body: some View {
@@ -22,7 +22,7 @@ struct HarnessSpinner: View {
         ),
         style: StrokeStyle(lineWidth: 2, lineCap: .round)
       )
-      .frame(width: size, height: size)
+      .frame(width: scaledSize, height: scaledSize)
       .rotationEffect(.degrees(reduceMotion ? 0 : (isSpinning ? 360 : 0)))
       .animation(
         reduceMotion ? nil : .linear(duration: 0.8).repeatForever(autoreverses: false),
