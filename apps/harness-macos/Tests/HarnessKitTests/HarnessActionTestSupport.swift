@@ -110,6 +110,7 @@ final class RecordingHarnessClient: HarnessClientProtocol, @unchecked Sendable {
   private let lock = NSLock()
   private var _calls: [Call] = []
   private var _detail: SessionDetail
+  private var _healthDelay: Duration?
   private var _diagnosticsDelay: Duration?
   private var _mutationDelay: Duration?
   private var _sessionSummaries: [SessionSummary]?
@@ -117,6 +118,10 @@ final class RecordingHarnessClient: HarnessClientProtocol, @unchecked Sendable {
   private var _detailDelays: [String: Duration] = [:]
   private var _timelinesBySessionID: [String: [TimelineEntry]] = [:]
   private var _timelineDelays: [String: Duration] = [:]
+  private var _globalStreamEvents: [StreamEvent] = []
+  private var _globalStreamError: (any Error)?
+  private var _sessionStreamEventsByID: [String: [StreamEvent]] = [:]
+  private var _sessionStreamErrorsByID: [String: any Error] = [:]
 
   var calls: [Call] {
     get { lock.withLock { _calls } }
@@ -134,6 +139,12 @@ final class RecordingHarnessClient: HarnessClientProtocol, @unchecked Sendable {
 
   func recordedCalls() -> [Call] {
     calls
+  }
+
+  func configureHealthDelay(_ delay: Duration?) {
+    lock.withLock {
+      _healthDelay = delay
+    }
   }
 
   func configureDiagnosticsDelay(_ delay: Duration?) {
@@ -180,6 +191,35 @@ final class RecordingHarnessClient: HarnessClientProtocol, @unchecked Sendable {
     }
   }
 
+  func configureGlobalStream(
+    events: [StreamEvent],
+    error: (any Error)? = nil
+  ) {
+    lock.withLock {
+      _globalStreamEvents = events
+      _globalStreamError = error
+    }
+  }
+
+  func configureSessionStream(
+    events: [StreamEvent],
+    error: (any Error)? = nil,
+    for sessionID: String
+  ) {
+    lock.withLock {
+      _sessionStreamEventsByID[sessionID] = events
+      if let error {
+        _sessionStreamErrorsByID[sessionID] = error
+      } else {
+        _sessionStreamErrorsByID.removeValue(forKey: sessionID)
+      }
+    }
+  }
+
+  func configuredHealthDelay() -> Duration? {
+    lock.withLock { _healthDelay }
+  }
+
   func configuredDiagnosticsDelay() -> Duration? {
     lock.withLock { _diagnosticsDelay }
   }
@@ -206,6 +246,22 @@ final class RecordingHarnessClient: HarnessClientProtocol, @unchecked Sendable {
 
   func configuredTimelineDelay(for sessionID: String) -> Duration? {
     lock.withLock { _timelineDelays[sessionID] }
+  }
+
+  func configuredGlobalStreamEvents() -> [StreamEvent] {
+    lock.withLock { _globalStreamEvents }
+  }
+
+  func configuredGlobalStreamError() -> (any Error)? {
+    lock.withLock { _globalStreamError }
+  }
+
+  func configuredSessionStreamEvents(for sessionID: String) -> [StreamEvent] {
+    lock.withLock { _sessionStreamEventsByID[sessionID] ?? [] }
+  }
+
+  func configuredSessionStreamError(for sessionID: String) -> (any Error)? {
+    lock.withLock { _sessionStreamErrorsByID[sessionID] }
   }
 }
 

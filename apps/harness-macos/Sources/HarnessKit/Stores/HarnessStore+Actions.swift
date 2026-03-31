@@ -331,15 +331,23 @@ extension HarnessStore {
     actionName: String,
     using client: any HarnessClientProtocol,
     sessionID: String,
-    mutation: () async throws -> SessionDetail
+    mutation: @escaping @Sendable () async throws -> SessionDetail
   ) async -> Bool {
     isSessionActionInFlight = true
     defer { isSessionActionInFlight = false }
     lastError = nil
 
     do {
-      selectedSession = try await mutation()
-      let updatedTimeline = try await client.timeline(sessionID: sessionID)
+      let measuredMutation = try await Self.measureOperation {
+        try await mutation()
+      }
+      let measuredTimeline = try await Self.measureOperation {
+        try await client.timeline(sessionID: sessionID)
+      }
+      selectedSession = measuredMutation.value
+      let updatedTimeline = measuredTimeline.value
+      recordRequestSuccess()
+      recordRequestSuccess()
       guard selectedSessionID == sessionID else {
         return true
       }

@@ -7,13 +7,15 @@ extension HarnessStore {
     connectionState = .online
 
     let transport: TransportKind = client is WebSocketTransport ? .webSocket : .httpSSE
-    activeTransport = transport
-    connectionMetrics.transportKind = transport
-    connectionMetrics.connectedSince = .now
-    connectionMetrics.isFallback = transport == .httpSSE
+    resetConnectionMetrics(for: transport)
     appendConnectionEvent(kind: .connected, detail: "Connected via \(transport.title)")
 
     await refresh(using: client, preserveSelection: true)
+    guard connectionState == .online else {
+      stopAllStreams()
+      return
+    }
+    startConnectionProbe(using: client)
     startGlobalStream(using: client)
     if let selectedSessionID, selectedSession?.session.sessionId == selectedSessionID {
       startSessionStream(using: client, sessionID: selectedSessionID)
@@ -38,17 +40,37 @@ extension HarnessStore {
     defer { isRefreshing = false }
 
     do {
-      async let healthResponse = client.health()
-      async let diagnosticsResponse = client.diagnostics()
-      async let projectResponse = client.projects()
-      async let sessionResponse = client.sessions()
+      async let healthResponse = Self.measureOperation {
+        try await client.health()
+      }
+      async let diagnosticsResponse = Self.measureOperation {
+        try await client.diagnostics()
+      }
+      async let projectResponse = Self.measureOperation {
+        try await client.projects()
+      }
+      async let sessionResponse = Self.measureOperation {
+        try await client.sessions()
+      }
       async let daemonStatusResponse: DaemonStatusReport? = try? daemonController.daemonStatus()
 
-      health = try await healthResponse
-      diagnostics = try await diagnosticsResponse
-      projects = try await projectResponse
-      sessions = try await sessionResponse
+      let measuredHealth = try await healthResponse
+      let measuredDiagnostics = try await diagnosticsResponse
+      let measuredProjects = try await projectResponse
+      let measuredSessions = try await sessionResponse
+
+      health = measuredHealth.value
+      diagnostics = measuredDiagnostics.value
+      projects = measuredProjects.value
+      sessions = measuredSessions.value
       daemonStatus = await daemonStatusResponse
+      recordRequestSuccess(
+        latencyMs: measuredHealth.latencyMs,
+        updatesLatency: true
+      )
+      recordRequestSuccess()
+      recordRequestSuccess()
+      recordRequestSuccess()
       isShowingCachedData = false
       cacheSessionList(sessions, projects: projects)
 
@@ -66,8 +88,7 @@ extension HarnessStore {
         }
       }
     } catch {
-      connectionState = .offline(error.localizedDescription)
-      lastError = error.localizedDescription
+      markConnectionOffline(error.localizedDescription)
 
       if let cached = loadCachedSessionList() {
         sessions = cached.sessions
@@ -87,13 +108,21 @@ extension HarnessStore {
     }
 
     do {
-      async let detail = client.sessionDetail(id: sessionID)
-      async let timeline = client.timeline(sessionID: sessionID)
-      let loadedDetail = try await detail
-      let loadedTimeline = try await timeline
+      async let detail = Self.measureOperation {
+        try await client.sessionDetail(id: sessionID)
+      }
+      async let timeline = Self.measureOperation {
+        try await client.timeline(sessionID: sessionID)
+      }
+      let measuredDetail = try await detail
+      let measuredTimeline = try await timeline
+      let loadedDetail = measuredDetail.value
+      let loadedTimeline = measuredTimeline.value
       guard isCurrentSessionLoad(requestID, sessionID: sessionID) else {
         return
       }
+      recordRequestSuccess()
+      recordRequestSuccess()
       selectedSession = loadedDetail
       self.timeline = loadedTimeline
       isShowingCachedData = false
@@ -150,10 +179,12 @@ extension HarnessStore {
       while !Task.isCancelled {
         do {
           for try await event in await client.globalStream() {
+            recordReconnectRecovery(detail: "Global stream restored")
             attempt = 0
             if event.event == "ready" {
               continue
             }
+            recordStreamEvent(countedInTraffic: true)
             schedulePendingRefresh(&pendingRefresh) { [weak self] in
               guard let self else {
                 return
@@ -165,7 +196,7 @@ extension HarnessStore {
           if Task.isCancelled {
             return
           }
-          lastError = error.localizedDescription
+          recordReconnectAttempt(scope: "global stream", nextAttempt: attempt + 1, error: error)
         }
 
         if Task.isCancelled {
@@ -193,10 +224,13 @@ extension HarnessStore {
       while !Task.isCancelled {
         do {
           for try await event in await client.sessionStream(sessionID: sessionID) {
+            recordReconnectRecovery(detail: "Session stream restored")
             attempt = 0
             if event.event == "ready" {
               continue
             }
+            let countedInTraffic = activeTransport == .httpSSE
+            recordStreamEvent(countedInTraffic: countedInTraffic)
             schedulePendingRefresh(&pendingRefresh) { [weak self] in
               guard let self else {
                 return
@@ -209,7 +243,7 @@ extension HarnessStore {
           if Task.isCancelled {
             return
           }
-          lastError = error.localizedDescription
+          recordReconnectAttempt(scope: "session stream", nextAttempt: attempt + 1, error: error)
         }
 
         if Task.isCancelled {

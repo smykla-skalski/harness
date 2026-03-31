@@ -4,7 +4,8 @@ import Foundation
 
 extension RecordingHarnessClient {
   func health() async throws -> HealthResponse {
-    HealthResponse(
+    try await sleepIfNeeded(configuredHealthDelay())
+    return HealthResponse(
       status: "ok",
       version: "14.5.0",
       pid: 111,
@@ -89,15 +90,17 @@ extension RecordingHarnessClient {
   }
 
   nonisolated func globalStream() -> AsyncThrowingStream<StreamEvent, Error> {
-    AsyncThrowingStream { continuation in
-      continuation.finish()
-    }
+    makeStream(
+      events: configuredGlobalStreamEvents(),
+      error: configuredGlobalStreamError()
+    )
   }
 
-  nonisolated func sessionStream(sessionID _: String) -> AsyncThrowingStream<StreamEvent, Error> {
-    AsyncThrowingStream { continuation in
-      continuation.finish()
-    }
+  nonisolated func sessionStream(sessionID: String) -> AsyncThrowingStream<StreamEvent, Error> {
+    makeStream(
+      events: configuredSessionStreamEvents(for: sessionID),
+      error: configuredSessionStreamError(for: sessionID)
+    )
   }
 
   func observeSession(
@@ -162,5 +165,21 @@ extension RecordingHarnessClient {
       return
     }
     try await Task.sleep(for: delay)
+  }
+
+  nonisolated private func makeStream(
+    events: [StreamEvent],
+    error: (any Error)?
+  ) -> AsyncThrowingStream<StreamEvent, Error> {
+    AsyncThrowingStream { continuation in
+      for event in events {
+        continuation.yield(event)
+      }
+      if let error {
+        continuation.finish(throwing: error)
+      } else {
+        continuation.finish()
+      }
+    }
   }
 }
