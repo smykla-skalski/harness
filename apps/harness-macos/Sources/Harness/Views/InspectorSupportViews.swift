@@ -28,7 +28,7 @@ struct ObserverInspectorCard: View {
       }
       if let openIssues = observer.openIssues, !openIssues.isEmpty {
         InspectorSection(title: "Open Issues") {
-          HarnessGlassContainer(spacing: 8) {
+          VStack(alignment: .leading, spacing: 8) {
             ForEach(openIssues) { issue in
               VStack(alignment: .leading, spacing: 4) {
                 HStack(alignment: .firstTextBaseline) {
@@ -50,14 +50,14 @@ struct ObserverInspectorCard: View {
               }
               .padding(.horizontal, 12)
               .padding(.vertical, 10)
-              .harnessInsetPanel(cornerRadius: 14, fillOpacity: 0.05, strokeOpacity: 0.10)
             }
           }
+          .frame(maxWidth: .infinity, alignment: .leading)
         }
       }
       if let activeWorkers = observer.activeWorkers, !activeWorkers.isEmpty {
         InspectorSection(title: "Active Workers") {
-          HarnessGlassContainer(spacing: 8) {
+          VStack(alignment: .leading, spacing: 8) {
             ForEach(activeWorkers) { worker in
               VStack(alignment: .leading, spacing: 4) {
                 HStack {
@@ -75,14 +75,14 @@ struct ObserverInspectorCard: View {
               }
               .padding(.horizontal, 12)
               .padding(.vertical, 10)
-              .harnessInsetPanel(cornerRadius: 14, fillOpacity: 0.05, strokeOpacity: 0.10)
             }
           }
+          .frame(maxWidth: .infinity, alignment: .leading)
         }
       }
       if let cycleHistory = observer.cycleHistory, !cycleHistory.isEmpty {
         InspectorSection(title: "Cycle History") {
-          HarnessGlassContainer(spacing: 8) {
+          VStack(alignment: .leading, spacing: 8) {
             ForEach(cycleHistory) { cycle in
               VStack(alignment: .leading, spacing: 4) {
                 HStack {
@@ -99,14 +99,14 @@ struct ObserverInspectorCard: View {
               }
               .padding(.horizontal, 12)
               .padding(.vertical, 10)
-              .harnessInsetPanel(cornerRadius: 14, fillOpacity: 0.05, strokeOpacity: 0.10)
             }
           }
+          .frame(maxWidth: .infinity, alignment: .leading)
         }
       }
       if let agentSessions = observer.agentSessions, !agentSessions.isEmpty {
         InspectorSection(title: "Tracked Agent Sessions") {
-          HarnessGlassContainer(spacing: 8) {
+          VStack(alignment: .leading, spacing: 8) {
             ForEach(agentSessions) { session in
               VStack(alignment: .leading, spacing: 4) {
                 HStack {
@@ -133,25 +133,22 @@ struct ObserverInspectorCard: View {
               }
               .padding(.horizontal, 12)
               .padding(.vertical, 10)
-              .harnessInsetPanel(cornerRadius: 14, fillOpacity: 0.05, strokeOpacity: 0.10)
             }
           }
+          .frame(maxWidth: .infinity, alignment: .leading)
         }
       }
     }
     .frame(maxWidth: .infinity, alignment: .leading)
-    .harnessCard()
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessAccessibility.observerInspectorCard)
     .accessibilityFrameMarker("\(HarnessAccessibility.observerInspectorCard).frame")
   }
 }
 
-struct InspectorFact: Identifiable {
+struct InspectorFact {
   let title: String
   let value: String
-
-  var id: String { "\(title):\(value)" }
 }
 
 struct InspectorFactGrid: View {
@@ -159,7 +156,7 @@ struct InspectorFactGrid: View {
 
   var body: some View {
     HarnessAdaptiveGridLayout(minimumColumnWidth: 132, maximumColumns: 2, spacing: 10) {
-      ForEach(facts) { fact in
+      ForEach(Array(facts.enumerated()), id: \.offset) { _, fact in
         VStack(alignment: .leading, spacing: 3) {
           Text(fact.title.uppercased())
             .font(.caption2.weight(.bold))
@@ -171,7 +168,6 @@ struct InspectorFactGrid: View {
         .frame(maxWidth: .infinity, minHeight: 54, alignment: .leading)
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
-        .harnessInsetPanel(cornerRadius: 14, fillOpacity: 0.05, strokeOpacity: 0.10)
       }
     }
   }
@@ -196,7 +192,7 @@ struct InspectorBadgeColumn: View {
 
   var body: some View {
     VStack(alignment: .leading, spacing: 8) {
-      ForEach(values, id: \.self) { value in
+      ForEach(Array(values.enumerated()), id: \.offset) { _, value in
         Text(value)
           .font(.caption.weight(.semibold))
           .padding(.horizontal, 10)
@@ -268,7 +264,6 @@ struct InspectorObserverSummarySection: View {
         }
       }
     }
-    .harnessCard()
   }
 }
 

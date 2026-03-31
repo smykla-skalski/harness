@@ -328,7 +328,7 @@ struct SignalInspectorCard: View {
       if !signal.signal.payload.relatedFiles.isEmpty {
         InspectorSection(title: "Related Files") {
           VStack(alignment: .leading, spacing: 6) {
-            ForEach(signal.signal.payload.relatedFiles, id: \.self) { path in
+            ForEach(Array(signal.signal.payload.relatedFiles.enumerated()), id: \.offset) { _, path in
               Text(path)
                 .font(.caption.monospaced())
                 .foregroundStyle(.secondary)
