@@ -289,7 +289,7 @@ struct AgentInspectorCard: View {
             )
           }
         }
-        .harnessActionButtonStyle(variant: .prominent, tint: .accentColor)
+        .harnessActionButtonStyle(variant: .prominent, tint: nil)
         .disabled(signalCommand.isEmpty || signalMessage.isEmpty)
         .accessibilityIdentifier(HarnessAccessibility.signalSendButton)
       }

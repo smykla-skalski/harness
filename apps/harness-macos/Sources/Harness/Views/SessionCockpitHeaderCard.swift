@@ -57,7 +57,7 @@ struct SessionCockpitHeaderCard: View {
       .font(.system(.subheadline, design: .rounded, weight: .semibold))
       .harnessActionButtonStyle(
         variant: .prominent,
-        tint: .accentColor
+        tint: nil
       )
       .controlSize(HarnessControlMetrics.compactControlSize)
   }

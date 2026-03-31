@@ -57,7 +57,7 @@ struct SessionsBoardOnboardingCard: View {
           title: "Start Daemon",
           tint: store.connectionState == .online
             ? .secondary
-            : .accentColor,
+            : nil,
           variant: store.connectionState == .online
             ? .bordered : .prominent,
           isLoading: isLoading,

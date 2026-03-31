@@ -21,7 +21,7 @@ struct HarnessAsyncActionButton: View {
   }
 
   let title: String
-  let tint: Color
+  let tint: Color?
   let variant: Variant
   let isLoading: Bool
   let accessibilityIdentifier: String
@@ -31,7 +31,7 @@ struct HarnessAsyncActionButton: View {
 
   init(
     title: String,
-    tint: Color,
+    tint: Color? = nil,
     variant: Variant,
     isLoading: Bool,
     accessibilityIdentifier: String,
@@ -97,19 +97,19 @@ struct HarnessAsyncActionButton: View {
 
 private struct HarnessActionButtonStyleModifier: ViewModifier {
   let variant: HarnessAsyncActionButton.Variant
-  let tint: Color
+  let tint: Color?
 
-  @ViewBuilder
   func body(content: Content) -> some View {
-    switch variant {
+    let styled = switch variant {
     case .prominent:
-      content
-        .buttonStyle(.glassProminent)
-        .tint(tint)
+      content.buttonStyle(.glassProminent)
     case .bordered:
-      content
-        .buttonStyle(.glass)
-        .tint(tint)
+      content.buttonStyle(.glass)
+    }
+    if let tint {
+      styled.tint(tint)
+    } else {
+      styled
     }
   }
 }
@@ -130,7 +130,7 @@ private struct HarnessFilterChipButtonStyleModifier: ViewModifier {
   func body(content: Content) -> some View {
     content
       .buttonStyle(.glass)
-      .tint(isSelected ? .accentColor : .secondary)
+      .tint(isSelected ? nil : .secondary)
       .fontWeight(isSelected ? .bold : .semibold)
   }
 }
@@ -156,7 +156,7 @@ private struct InteractiveCardButtonStyle: ButtonStyle {
 extension View {
   func harnessActionButtonStyle(
     variant: HarnessAsyncActionButton.Variant,
-    tint: Color
+    tint: Color? = nil
   ) -> some View {
     modifier(HarnessActionButtonStyleModifier(variant: variant, tint: tint))
   }
