@@ -26,7 +26,7 @@ struct SessionCockpitView: View {
       }
       .frame(maxWidth: .infinity, alignment: .leading)
     }
-    .foregroundStyle(HarnessTheme.ink)
+    .foregroundStyle(.primary)
   }
 }
 
