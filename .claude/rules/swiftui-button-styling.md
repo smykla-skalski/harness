@@ -70,3 +70,30 @@ Button { ... } label: { ... }
 Action buttons use `.glass` or `.glassProminent` via `.harnessActionButtonStyle()`. Don't create custom backgrounds or overlays that replicate what the native glass styles provide.
 
 Thin ViewModifier wrappers that bundle `.buttonStyle(.glass)` + `.tint()` are fine - they add convenience without fighting the system.
+
+## System colors for button tints
+
+Glass buttons derive background appearance and text contrast from the `.tint()` color. Custom asset colors from `HarnessTheme` are not calibrated for glass contrast and produce opaque-looking buttons with unreadable text.
+
+Use system semantic colors for button tints:
+- **Primary action**: `.accentColor` (inherits app-level accent)
+- **Neutral/secondary**: `.secondary` (translucent gray glass)
+- **Destructive**: `.red`
+- **Warning**: `.orange`
+- **Success**: `.green`
+
+`HarnessTheme` colors stay valid for non-button UI: status badges, indicator bars, text foreground, decorative accents.
+
+```swift
+// correct - system colors calibrated for glass
+.tint(.accentColor)
+.tint(.secondary)
+.tint(.red)
+.tint(.orange)
+
+// wrong - custom asset colors fight glass contrast
+.tint(HarnessTheme.accent)
+.tint(HarnessTheme.ink)
+.tint(HarnessTheme.danger)
+.tint(HarnessTheme.warmAccent)
+```
