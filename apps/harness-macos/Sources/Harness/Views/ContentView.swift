@@ -62,6 +62,7 @@ struct ContentView: View {
         )
         .frame(maxWidth: .infinity, maxHeight: .infinity)
       }
+      .backgroundExtensionEffect()
       .accessibilityFrameMarker("\(HarnessAccessibility.contentRoot).frame")
       .onKeyPress(.escape) {
         if store.inspectorSelection != .none {
@@ -75,31 +76,29 @@ struct ContentView: View {
         ToolbarItem(placement: .status) {
           ConnectionToolbarBadge(metrics: store.connectionMetrics)
         }
-        if !showInspector {
-          ToolbarItem(placement: .primaryAction) {
-            RefreshToolbarButton(store: store)
+        ToolbarItem(placement: .primaryAction) {
+          RefreshToolbarButton(store: store)
+        }
+        ToolbarItem(placement: .primaryAction) {
+          Button {
+            showInspector.toggle()
+          } label: {
+            Label("Inspector", systemImage: "info.circle")
           }
-          ToolbarItem(placement: .primaryAction) {
-            Button {
-              showInspector.toggle()
-            } label: {
-              Label("Inspector", systemImage: "info.circle")
-            }
-            .help("Toggle inspector (Cmd+Option+I)")
+          .help("Toggle inspector (Cmd+Option+I)")
+        }
+        ToolbarItem(placement: .primaryAction) {
+          Button {
+            openSettings()
+          } label: {
+            Label("Settings", systemImage: "gearshape")
           }
-          ToolbarItem(placement: .secondaryAction) {
-            Button {
-              openSettings()
-            } label: {
-              Label("Settings", systemImage: "gearshape")
-            }
-            .accessibilityIdentifier(HarnessAccessibility.daemonPreferencesButton)
-          }
+          .accessibilityIdentifier(HarnessAccessibility.daemonPreferencesButton)
         }
       }
     }
     .inspector(isPresented: $showInspector) {
-      InspectorColumnView(store: store, isPresented: $showInspector)
+      InspectorColumnView(store: store)
         .inspectorColumnWidth(min: 320, ideal: 380, max: 500)
     }
     .navigationSplitViewStyle(.prominentDetail)
