@@ -110,30 +110,9 @@ private struct AccessibilityProbe: View {
     Color.clear
       .allowsHitTesting(false)
       .accessibilityElement()
-      .modifier(AccessibilityProbeMetadata(label: label, value: value))
+      .accessibilityLabel(label ?? "")
+      .accessibilityValue(value ?? "")
       .accessibilityIdentifier(identifier)
-  }
-}
-
-private struct AccessibilityProbeMetadata: ViewModifier {
-  let label: String?
-  let value: String?
-
-  @ViewBuilder
-  func body(content: Content) -> some View {
-    if let label, let value {
-      content
-        .accessibilityLabel(label)
-        .accessibilityValue(value)
-    } else if let label {
-      content
-        .accessibilityLabel(label)
-    } else if let value {
-      content
-        .accessibilityValue(value)
-    } else {
-      content
-    }
   }
 }
 
