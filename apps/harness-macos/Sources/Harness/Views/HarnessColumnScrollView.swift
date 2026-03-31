@@ -10,6 +10,7 @@ struct HarnessColumnScrollView<Content: View>: View {
   let horizontalPadding: CGFloat
   let verticalPadding: CGFloat
   let constrainContentWidth: Bool
+  let readableWidth: Bool
   let topScrollEdgeEffect: HarnessColumnTopScrollEdgeEffect
   private let content: Content
 
@@ -20,23 +21,25 @@ struct HarnessColumnScrollView<Content: View>: View {
     horizontalPadding: CGFloat = 24,
     verticalPadding: CGFloat = 24,
     constrainContentWidth: Bool = false,
+    readableWidth: Bool = false,
     topScrollEdgeEffect: HarnessColumnTopScrollEdgeEffect = .none,
     @ViewBuilder content: () -> Content
   ) {
     self.horizontalPadding = horizontalPadding
     self.verticalPadding = verticalPadding
     self.constrainContentWidth = constrainContentWidth
+    self.readableWidth = readableWidth
     self.topScrollEdgeEffect = topScrollEdgeEffect
     self.content = content()
   }
 
   var body: some View {
     Group {
-      if constrainContentWidth {
+      if constrainContentWidth || readableWidth {
         GeometryReader { geometry in
           let available = max(geometry.size.width - (horizontalPadding * 2), 0)
-          let clamped = min(available, Self.readableMaxWidth)
-          scrollBody(contentWidth: clamped)
+          let width = readableWidth ? min(available, Self.readableMaxWidth) : available
+          scrollBody(contentWidth: width)
         }
       } else {
         scrollBody()

@@ -8,7 +8,7 @@ struct SessionCockpitView: View {
   let timeline: [TimelineEntry]
 
   var body: some View {
-    HarnessColumnScrollView(constrainContentWidth: true) {
+    HarnessColumnScrollView(readableWidth: true) {
       VStack(alignment: .leading, spacing: 16) {
         SessionCockpitHeaderCard(store: store, detail: detail)
         SessionMetricGrid(metrics: detail.session.metrics)
