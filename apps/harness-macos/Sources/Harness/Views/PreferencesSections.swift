@@ -13,10 +13,10 @@ struct PreferencesActionButtons: View {
           tint: HarnessTheme.accent,
           variant: .bordered,
           isLoading: isLoading,
-          accessibilityIdentifier: HarnessAccessibility.preferencesActionButton("Reconnect")
-        ) {
-          await store.reconnect()
-        }
+          accessibilityIdentifier: HarnessAccessibility.preferencesActionButton("Reconnect"),
+          store: store,
+          storeAction: .reconnect
+        )
         HarnessAsyncActionButton(
           title: "Refresh Diagnostics",
           tint: HarnessTheme.ink,
@@ -24,19 +24,19 @@ struct PreferencesActionButtons: View {
           isLoading: isLoading,
           accessibilityIdentifier: HarnessAccessibility.preferencesActionButton(
             "Refresh Diagnostics"
-          )
-        ) {
-          await store.refreshDiagnostics()
-        }
+          ),
+          store: store,
+          storeAction: .refreshDiagnostics
+        )
         HarnessAsyncActionButton(
           title: "Start Daemon",
           tint: HarnessTheme.accent,
           variant: .prominent,
           isLoading: isLoading,
-          accessibilityIdentifier: HarnessAccessibility.preferencesActionButton("Start Daemon")
-        ) {
-          await store.startDaemon()
-        }
+          accessibilityIdentifier: HarnessAccessibility.preferencesActionButton("Start Daemon"),
+          store: store,
+          storeAction: .startDaemon
+        )
         HarnessAsyncActionButton(
           title: "Install Launch Agent",
           tint: HarnessTheme.ink,
@@ -44,10 +44,10 @@ struct PreferencesActionButtons: View {
           isLoading: isLoading,
           accessibilityIdentifier: HarnessAccessibility.preferencesActionButton(
             "Install Launch Agent"
-          )
-        ) {
-          await store.installLaunchAgent()
-        }
+          ),
+          store: store,
+          storeAction: .installLaunchAgent
+        )
         HarnessAsyncActionButton(
           title: "Remove Launch Agent",
           tint: HarnessTheme.danger,
@@ -55,12 +55,10 @@ struct PreferencesActionButtons: View {
           isLoading: isLoading,
           accessibilityIdentifier: HarnessAccessibility.preferencesActionButton(
             "Remove Launch Agent"
-          )
-        ) {
-          await MainActor.run {
-            store.requestRemoveLaunchAgentConfirmation()
-          }
-        }
+          ),
+          store: store,
+          storeAction: .removeLaunchAgent
+        )
       }
     }
     .frame(maxWidth: .infinity, alignment: .leading)
@@ -145,10 +143,10 @@ struct PreferencesConnectionSection: View {
               isLoading: store.connectionState == .connecting,
               accessibilityIdentifier: HarnessAccessibility.preferencesActionButton(
                 "Connection Reconnect"
-              )
-            ) {
-              await store.reconnect()
-            }
+              ),
+              store: store,
+              storeAction: .reconnect
+            )
             HarnessAsyncActionButton(
               title: "Refresh Diagnostics",
               tint: HarnessTheme.ink,
@@ -156,10 +154,10 @@ struct PreferencesConnectionSection: View {
               isLoading: store.isDiagnosticsRefreshInFlight,
               accessibilityIdentifier: HarnessAccessibility.preferencesActionButton(
                 "Connection Refresh Diagnostics"
-              )
-            ) {
-              await store.refreshDiagnostics()
-            }
+              ),
+              store: store,
+              storeAction: .refreshDiagnostics
+            )
           }
         }
       }

@@ -62,10 +62,10 @@ struct SessionsBoardOnboardingCard: View {
             ? .bordered : .prominent,
           isLoading: isLoading,
           accessibilityIdentifier: "harness.board.action.start",
-          fillsWidth: false
-        ) {
-          await store.startDaemon()
-        }
+          fillsWidth: false,
+          store: store,
+          storeAction: .startDaemon
+        )
         .disabled(store.connectionState == .online)
         .focusable(store.connectionState != .online)
       }
@@ -80,10 +80,10 @@ struct SessionsBoardOnboardingCard: View {
           variant: .bordered,
           isLoading: isLoading,
           accessibilityIdentifier: "harness.board.action.install",
-          fillsWidth: false
-        ) {
-          await store.installLaunchAgent()
-        }
+          fillsWidth: false,
+          store: store,
+          storeAction: .installLaunchAgent
+        )
         .disabled(store.daemonStatus?.launchAgent.installed == true)
         .focusable(store.daemonStatus?.launchAgent.installed != true)
       }
@@ -98,10 +98,10 @@ struct SessionsBoardOnboardingCard: View {
           variant: .bordered,
           isLoading: store.isRefreshing,
           accessibilityIdentifier: "harness.board.action.refresh",
-          fillsWidth: false
-        ) {
-          await store.refresh()
-        }
+          fillsWidth: false,
+          store: store,
+          storeAction: .refresh
+        )
       }
     }
   }
