@@ -77,6 +77,7 @@ extension InspectorActionSections {
       )
       .font(.system(.footnote, design: .rounded, weight: .medium))
       .foregroundStyle(HarnessTheme.secondaryInk)
+      .lineLimit(3)
       if !store.availableActionActors.isEmpty {
         Picker("Act As", selection: actionActorBinding) {
           ForEach(store.availableActionActors) { agent in
@@ -89,9 +90,21 @@ extension InspectorActionSections {
         .accessibilityIdentifier(HarnessAccessibility.actionActorPicker)
       }
       if let error = store.lastError {
-        Text(error)
-          .font(.system(.footnote, design: .rounded, weight: .semibold))
-          .foregroundStyle(HarnessTheme.danger)
+        HStack {
+          Text("Action failed: \(error)")
+            .font(.system(.footnote, design: .rounded, weight: .semibold))
+            .foregroundStyle(HarnessTheme.danger)
+            .lineLimit(3)
+          Spacer()
+          Button {
+            store.lastError = nil
+          } label: {
+            Image(systemName: "xmark.circle.fill")
+              .foregroundStyle(HarnessTheme.tertiaryInk)
+          }
+          .buttonStyle(.plain)
+          .accessibilityLabel("Dismiss error")
+        }
       }
     }
   }
@@ -131,6 +144,7 @@ extension InspectorActionSections {
         .disabled(store.isSessionActionInFlight)
         TextField("Update note", text: $statusNote, axis: .vertical)
           .lineLimit(2, reservesSpace: true)
+          .submitLabel(.done)
       }
 
       Divider()
@@ -139,6 +153,7 @@ extension InspectorActionSections {
         .font(.headline)
       TextField("Summary", text: $checkpointSummary, axis: .vertical)
         .lineLimit(3, reservesSpace: true)
+        .submitLabel(.done)
       LabeledContent("Progress") {
         Slider(value: $checkpointProgress, in: 0...100, step: 5)
       }
@@ -168,8 +183,10 @@ extension InspectorActionSections {
         subtitle: "Capture new work directly into the active session."
       )
       TextField("Title", text: $createTitle)
+        .submitLabel(.done)
       TextField("Context", text: $createContext, axis: .vertical)
         .lineLimit(4, reservesSpace: true)
+        .submitLabel(.done)
       Picker("Severity", selection: $createSeverity) {
         ForEach(TaskSeverity.allCases, id: \.self) { severity in
           Text(severity.title).tag(severity)
@@ -208,6 +225,7 @@ extension InspectorActionSections {
       }
       .harnessActionButtonStyle(variant: .bordered, tint: .red)
       .disabled(agent.agentId == detail.session.leaderId || store.isSessionActionInFlight)
+      .help(agent.agentId == detail.session.leaderId ? "The session leader cannot be removed" : "")
       .accessibilityIdentifier(HarnessAccessibility.removeAgentButton)
     }
   }
@@ -232,6 +250,7 @@ extension InspectorActionSections {
       }
       TextField("Reason", text: $transferReason, axis: .vertical)
         .lineLimit(3, reservesSpace: true)
+        .submitLabel(.done)
       Button(transferLeaderButtonTitle) {
         Task { await transferLeader() }
       }
@@ -239,6 +258,10 @@ extension InspectorActionSections {
       .disabled(
         transferLeaderID.isEmpty || transferLeaderID == detail.session.leaderId
           || store.isSessionActionInFlight
+      )
+      .help(
+        transferLeaderID == detail.session.leaderId
+          ? "Select a different agent to transfer leadership to" : ""
       )
     }
   }
