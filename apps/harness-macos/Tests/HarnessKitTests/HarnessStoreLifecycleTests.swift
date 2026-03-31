@@ -98,4 +98,95 @@ struct HarnessStoreLifecycleTests {
     #expect(store.subscribedSessionIDs.isEmpty)
     #expect(store.selectedSessionID == nil)
   }
+
+  @Test("Global session update refreshes a non-selected summary without a full refetch")
+  func globalSessionUpdateRefreshesNonSelectedSummaryWithoutRefetch() async {
+    let client = RecordingHarnessClient()
+    let primary = makeSession(.init(
+      sessionId: "sess-primary",
+      context: "Primary cockpit",
+      status: .active,
+      leaderId: "leader-primary",
+      observeId: "observe-primary",
+      openTaskCount: 1,
+      inProgressTaskCount: 0,
+      blockedTaskCount: 0,
+      activeAgentCount: 1
+    ))
+    let secondary = makeSession(.init(
+      sessionId: "sess-secondary",
+      context: "Secondary lane",
+      status: .active,
+      leaderId: "leader-secondary",
+      observeId: nil,
+      openTaskCount: 0,
+      inProgressTaskCount: 0,
+      blockedTaskCount: 0,
+      activeAgentCount: 0
+    ))
+    let updatedSecondary = SessionSummary(
+      projectId: secondary.projectId,
+      projectName: secondary.projectName,
+      projectDir: secondary.projectDir,
+      contextRoot: secondary.contextRoot,
+      sessionId: secondary.sessionId,
+      context: "Secondary lane updated",
+      status: .ended,
+      createdAt: secondary.createdAt,
+      updatedAt: "2026-03-31T12:01:00Z",
+      lastActivityAt: "2026-03-31T12:01:00Z",
+      leaderId: secondary.leaderId,
+      observeId: secondary.observeId,
+      pendingLeaderTransfer: secondary.pendingLeaderTransfer,
+      metrics: secondary.metrics
+    )
+
+    client.configureSessions(
+      summaries: [primary, secondary],
+      detailsByID: [
+        primary.sessionId: makeSessionDetail(
+          summary: primary,
+          workerID: "worker-primary",
+          workerName: "Worker Primary"
+        ),
+        secondary.sessionId: makeSessionDetail(
+          summary: secondary,
+          workerID: "worker-secondary",
+          workerName: "Worker Secondary"
+        ),
+      ]
+    )
+    client.configureGlobalStream(events: [
+      .sessionUpdated(
+        recordedAt: "2026-03-31T12:01:00Z",
+        sessionId: secondary.sessionId,
+        detail: makeSessionDetail(
+          summary: updatedSecondary,
+          workerID: "worker-secondary",
+          workerName: "Worker Secondary"
+        ),
+        timeline: PreviewFixtures.timeline
+      )
+    ])
+
+    let store = HarnessStore(
+      daemonController: RecordingDaemonController(client: client)
+    )
+
+    await store.bootstrap()
+    await store.selectSession(primary.sessionId)
+    let baselineHealthCalls = client.readCallCount(.health)
+    try? await Task.sleep(for: .milliseconds(60))
+
+    let updated = store.sessions.first { $0.sessionId == secondary.sessionId }
+    #expect(updated?.context == "Secondary lane updated")
+    #expect(updated?.status == .ended)
+    #expect(store.selectedSession?.session.sessionId == primary.sessionId)
+    #expect(client.readCallCount(.health) == baselineHealthCalls)
+    #expect(client.readCallCount(.projects) == 1)
+    #expect(client.readCallCount(.sessions) == 1)
+    #expect(client.readCallCount(.sessionDetail(primary.sessionId)) == 1)
+
+    store.stopAllStreams()
+  }
 }

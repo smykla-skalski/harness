@@ -346,9 +346,8 @@ extension HarnessStore {
         return true
       }
       selectedSession = measuredMutation.value
-      sessionIndex.applySessionSummary(measuredMutation.value.session)
+      applySessionSummaryUpdate(measuredMutation.value.session)
       synchronizeActionActor()
-      refreshNotes(for: sessionID)
       scheduleSessionPushFallback(using: client, sessionID: sessionID)
       lastAction = actionName
       return true

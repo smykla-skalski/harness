@@ -1,3 +1,4 @@
+import Foundation
 import SwiftData
 import Testing
 
@@ -27,6 +28,12 @@ struct PersistenceIntegrationTests {
     return notes
       .filter { $0.targetId == targetId && $0.sessionId == sessionId }
       .sorted { $0.createdAt > $1.createdAt }
+  }
+
+  private func fetchRecentSearches() throws -> [RecentSearch] {
+    try container.mainContext.fetch(FetchDescriptor<RecentSearch>(
+      sortBy: [SortDescriptor(\RecentSearch.lastUsedAt, order: .reverse)]
+    ))
   }
 
   @Test("cacheSessionList writes projects and sessions")
@@ -253,13 +260,33 @@ struct PersistenceIntegrationTests {
     store.recordSearch("blocked")
     store.recordSearch("cockpit")
 
-    let searches = store.recentSearches
+    let searches = try fetchRecentSearches()
     #expect(searches.count == 2)
     #expect(searches.first?.query == "cockpit")
     #expect(searches.first?.useCount == 2)
 
     store.clearSearchHistory()
-    #expect(store.recentSearches.isEmpty)
+    #expect(try fetchRecentSearches().isEmpty)
+  }
+
+  @Test("Mutation updates the cached session list summary")
+  func mutationUpdatesCachedSessionListSummary() async throws {
+    let client = RecordingHarnessClient()
+    let store = HarnessStore(
+      daemonController: RecordingDaemonController(client: client),
+      modelContext: container.mainContext
+    )
+    let sessionID = PreviewFixtures.summary.sessionId
+
+    await store.bootstrap()
+    await store.selectSession(sessionID)
+
+    let ended = await store.endSelectedSession()
+    #expect(ended)
+
+    let cached = store.loadCachedSessionList()
+    let summary = cached?.sessions.first { $0.sessionId == sessionID }
+    #expect(summary?.status == .ended)
   }
 
   @Test("Filter preferences save and restore")
@@ -296,7 +323,6 @@ struct PersistenceIntegrationTests {
     ) == false)
     #expect(store.recordSearch("cockpit") == false)
     #expect(store.clearSearchHistory() == false)
-    #expect(store.recentSearches.isEmpty)
     #expect(store.isBookmarked(sessionId: "sess-bm") == false)
     #expect(store.lastError == "Local persistence is unavailable.")
   }

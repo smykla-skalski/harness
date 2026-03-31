@@ -4,6 +4,7 @@ import Foundation
 
 extension RecordingHarnessClient {
   func health() async throws -> HealthResponse {
+    recordReadCall(.health)
     try await sleepIfNeeded(configuredHealthDelay())
     return HealthResponse(
       status: "ok",
@@ -17,6 +18,7 @@ extension RecordingHarnessClient {
   }
 
   func diagnostics() async throws -> DaemonDiagnosticsReport {
+    recordReadCall(.diagnostics)
     try await sleepIfNeeded(configuredDiagnosticsDelay())
     return DaemonDiagnosticsReport(
       health: try await health(),
@@ -63,7 +65,8 @@ extension RecordingHarnessClient {
   }
 
   func projects() async throws -> [ProjectSummary] {
-    [
+    recordReadCall(.projects)
+    return [
       ProjectSummary(
         projectId: detail.session.projectId,
         name: detail.session.projectName,
@@ -76,15 +79,18 @@ extension RecordingHarnessClient {
   }
 
   func sessions() async throws -> [SessionSummary] {
-    configuredSessions() ?? [detail.session]
+    recordReadCall(.sessions)
+    return configuredSessions() ?? [detail.session]
   }
 
   func sessionDetail(id: String) async throws -> SessionDetail {
+    recordReadCall(.sessionDetail(id))
     try await sleepIfNeeded(configuredDetailDelay(for: id))
     return configuredSessionDetail(id: id) ?? detail
   }
 
   func timeline(sessionID: String) async throws -> [TimelineEntry] {
+    recordReadCall(.timeline(sessionID))
     try await sleepIfNeeded(configuredTimelineDelay(for: sessionID))
     return configuredTimeline(for: sessionID) ?? PreviewFixtures.timeline
   }

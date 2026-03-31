@@ -171,6 +171,11 @@ extension HarnessStore {
     }
   }
 
+  func applySessionSummaryUpdate(_ summary: SessionSummary) {
+    sessionIndex.applySessionSummary(summary)
+    cacheSessionList(sessionIndex.sessions, projects: sessionIndex.projects)
+  }
+
   func applySelectedSessionSnapshot(
     sessionID: String,
     detail: SessionDetail,
@@ -183,10 +188,9 @@ extension HarnessStore {
 
     selectedSession = detail
     self.timeline = timeline
-    sessionIndex.applySessionSummary(detail.session)
+    applySessionSummaryUpdate(detail.session)
     isShowingCachedData = showingCachedData
     synchronizeActionActor()
-    refreshNotes(for: sessionID)
     cancelSessionPushFallback(for: sessionID)
   }
 
@@ -200,7 +204,11 @@ extension HarnessStore {
         sessions: payload.sessions
       )
     case .sessionUpdated(let payload):
-      guard let sessionID = event.sessionId, sessionID == selectedSessionID else {
+      guard let sessionID = event.sessionId else {
+        return
+      }
+      guard sessionID == selectedSessionID else {
+        applySessionSummaryUpdate(payload.detail.session)
         return
       }
       applySelectedSessionSnapshot(

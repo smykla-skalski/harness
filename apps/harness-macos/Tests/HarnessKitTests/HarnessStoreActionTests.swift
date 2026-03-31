@@ -226,6 +226,38 @@ struct HarnessStoreActionTests {
     #expect(store.lastAction == "Observe session")
   }
 
+  @Test("Mutation fallback refetches only the timeline")
+  func mutationFallbackRefetchesOnlyTheTimeline() async {
+    let client = RecordingHarnessClient()
+    let store = await selectedStore(client: client)
+    let sessionID = PreviewFixtures.summary.sessionId
+
+    let baselineHealthCalls = client.readCallCount(.health)
+    let baselineDiagnosticsCalls = client.readCallCount(.diagnostics)
+    let baselineProjectsCalls = client.readCallCount(.projects)
+    let baselineSessionsCalls = client.readCallCount(.sessions)
+    let baselineDetailCalls = client.readCallCount(.sessionDetail(sessionID))
+    let baselineTimelineCalls = client.readCallCount(.timeline(sessionID))
+
+    let created = await store.createTask(
+      title: "Fallback-only task",
+      context: "Verify no broad refresh happens",
+      severity: .medium
+    )
+    #expect(created)
+
+    try? await Task.sleep(for: .milliseconds(1_050))
+
+    #expect(client.readCallCount(.health) == baselineHealthCalls)
+    #expect(client.readCallCount(.diagnostics) == baselineDiagnosticsCalls)
+    #expect(client.readCallCount(.projects) == baselineProjectsCalls)
+    #expect(client.readCallCount(.sessions) == baselineSessionsCalls)
+    #expect(client.readCallCount(.sessionDetail(sessionID)) == baselineDetailCalls)
+    #expect(client.readCallCount(.timeline(sessionID)) == baselineTimelineCalls + 1)
+
+    store.stopAllStreams()
+  }
+
   @Test("End selected session tracks the last action and status")
   func endSelectedSessionTracksLastActionAndStatus() async {
     let client = RecordingHarnessClient()
