@@ -182,9 +182,8 @@ public struct DaemonController: DaemonControlling {
     let process = Process()
     process.executableURL = binary
     process.arguments = ["daemon", "serve", "--host", "127.0.0.1", "--port", "0"]
-    let nullSink = try FileHandle(forWritingTo: URL(fileURLWithPath: "/dev/null"))
-    process.standardOutput = nullSink
-    process.standardError = nullSink
+    process.standardOutput = FileHandle.nullDevice
+    process.standardError = FileHandle.nullDevice
     try process.run()
     return process
   }

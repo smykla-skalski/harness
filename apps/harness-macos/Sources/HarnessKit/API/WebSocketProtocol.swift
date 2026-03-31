@@ -1,4 +1,5 @@
 import Foundation
+import Synchronization
 
 struct WsRequest: Codable, Sendable {
   let id: String
@@ -48,28 +49,27 @@ extension WsFrame {
   }
 }
 
-final class PendingRequestStore: @unchecked Sendable {
-  private var continuations: [String: CheckedContinuation<JSONValue, any Error>] = [:]
-  private let lock = NSLock()
+final class PendingRequestStore: Sendable {
+  private let storage = Mutex<[String: CheckedContinuation<JSONValue, any Error>]>([:])
 
   func register(id: String, continuation: CheckedContinuation<JSONValue, any Error>) {
-    lock.withLock { continuations[id] = continuation }
+    storage.withLock { $0[id] = continuation }
   }
 
   func resume(id: String, result: JSONValue) {
-    let continuation = lock.withLock { continuations.removeValue(forKey: id) }
+    let continuation = storage.withLock { $0.removeValue(forKey: id) }
     continuation?.resume(returning: result)
   }
 
   func fail(id: String, error: any Error) {
-    let continuation = lock.withLock { continuations.removeValue(forKey: id) }
+    let continuation = storage.withLock { $0.removeValue(forKey: id) }
     continuation?.resume(throwing: error)
   }
 
   func failAll(error: any Error) {
-    let pending = lock.withLock {
-      let all = continuations
-      continuations.removeAll()
+    let pending = storage.withLock {
+      let all = $0
+      $0.removeAll()
       return all
     }
     for (_, continuation) in pending {
