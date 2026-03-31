@@ -19,6 +19,7 @@ struct ObserverInspectorCard: View {
     VStack(alignment: .leading, spacing: 12) {
       Text("Observe")
         .font(.system(.title3, design: .rounded, weight: .bold))
+        .accessibilityAddTraits(.isHeader)
       InspectorFactGrid(facts: facts)
       if let mutedCodes = observer.mutedCodes, !mutedCodes.isEmpty {
         InspectorSection(title: "Muted Codes") {

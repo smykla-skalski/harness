@@ -59,6 +59,7 @@ struct SessionTaskListSection: View {
     VStack(alignment: .leading, spacing: 12) {
       Text("Tasks")
         .font(.system(.title3, design: .rounded, weight: .semibold))
+        .accessibilityAddTraits(.isHeader)
       VStack(alignment: .leading, spacing: 12) {
         ForEach(tasks) { task in
           SessionTaskSummaryCard(task: task, store: store)
@@ -128,6 +129,7 @@ struct SessionAgentListSection: View {
     VStack(alignment: .leading, spacing: 12) {
       Text("Agents")
         .font(.system(.title3, design: .rounded, weight: .semibold))
+        .accessibilityAddTraits(.isHeader)
       VStack(alignment: .leading, spacing: 12) {
         ForEach(agents) { agent in
           SessionAgentSummaryCard(agent: agent, store: store)

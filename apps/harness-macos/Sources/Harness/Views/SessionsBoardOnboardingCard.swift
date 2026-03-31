@@ -25,6 +25,7 @@ struct SessionsBoardOnboardingCard: View {
       VStack(alignment: .leading, spacing: 6) {
         Label("Bring Harness Online", systemImage: "dot.radiowaves.left.and.right")
           .font(.system(.title3, design: .rounded, weight: .bold))
+          .accessibilityAddTraits(.isHeader)
         Text(
           "Harness only reads live state from the local daemon. "
             + "Start the control plane once, then keep it resident with a launch agent."

@@ -20,6 +20,7 @@ struct SessionActionDock: View {
         VStack(alignment: .leading, spacing: 4) {
           Text("Action Flow")
             .font(.system(.headline, design: .rounded, weight: .semibold))
+            .accessibilityAddTraits(.isHeader)
           Text("Pick a lane, then use the inspector to submit the change.")
             .font(.system(.subheadline, design: .rounded, weight: .medium))
             .foregroundStyle(.secondary)

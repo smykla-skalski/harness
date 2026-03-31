@@ -9,6 +9,7 @@ struct SessionCockpitSignalsSection: View {
     VStack(alignment: .leading, spacing: 12) {
       Text("Signals")
         .font(.system(.title3, design: .rounded, weight: .semibold))
+        .accessibilityAddTraits(.isHeader)
       VStack(alignment: .leading, spacing: 12) {
         ForEach(signals) { signal in
           Button {
@@ -54,9 +55,10 @@ struct SessionCockpitTimelineSection: View {
   let timeline: [TimelineEntry]
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 12) {
+    LazyVStack(alignment: .leading, spacing: 12) {
       Text("Timeline")
         .font(.system(.title3, design: .rounded, weight: .semibold))
+        .accessibilityAddTraits(.isHeader)
       ForEach(timeline) { entry in
         HStack(alignment: .top, spacing: 12) {
           RoundedRectangle(cornerRadius: 999)

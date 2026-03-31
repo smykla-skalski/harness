@@ -1,6 +1,17 @@
 import Foundation
 import SwiftData
 
+enum Codecs {
+  static let encoder: JSONEncoder = {
+    let encoder = JSONEncoder()
+    return encoder
+  }()
+  static let decoder: JSONDecoder = {
+    let decoder = JSONDecoder()
+    return decoder
+  }()
+}
+
 // MARK: - ProjectSummary <-> CachedProject
 
 extension CachedProject {
@@ -42,7 +53,7 @@ extension ProjectSummary {
 
 extension CachedSession {
   public func toSessionSummary() -> SessionSummary {
-    let metrics = (try? JSONDecoder().decode(SessionMetrics.self, from: metricsData))
+    let metrics = (try? Codecs.decoder.decode(SessionMetrics.self, from: metricsData))
       ?? SessionMetrics(
         agentCount: 0,
         activeAgentCount: 0,
@@ -54,7 +65,7 @@ extension CachedSession {
 
     let transfer: PendingLeaderTransfer? =
       if let data = pendingTransferData {
-        try? JSONDecoder().decode(PendingLeaderTransfer.self, from: data)
+        try? Codecs.decoder.decode(PendingLeaderTransfer.self, from: data)
       } else {
         nil
       }
@@ -100,8 +111,8 @@ extension CachedSession {
     lastActivityAt = summary.lastActivityAt
     leaderId = summary.leaderId
     observeId = summary.observeId
-    metricsData = (try? JSONEncoder().encode(summary.metrics)) ?? Data()
-    pendingTransferData = summary.pendingLeaderTransfer.flatMap { try? JSONEncoder().encode($0) }
+    metricsData = (try? Codecs.encoder.encode(summary.metrics)) ?? Data()
+    pendingTransferData = summary.pendingLeaderTransfer.flatMap { try? Codecs.encoder.encode($0) }
     lastCachedAt = .now
   }
 }
@@ -121,8 +132,8 @@ extension SessionSummary {
       lastActivityAt: lastActivityAt,
       leaderId: leaderId,
       observeId: observeId,
-      metricsData: (try? JSONEncoder().encode(metrics)) ?? Data(),
-      pendingTransferData: pendingLeaderTransfer.flatMap { try? JSONEncoder().encode($0) }
+      metricsData: (try? Codecs.encoder.encode(metrics)) ?? Data(),
+      pendingTransferData: pendingLeaderTransfer.flatMap { try? Codecs.encoder.encode($0) }
     )
   }
 }
@@ -131,9 +142,9 @@ extension SessionSummary {
 
 extension CachedAgent {
   public func toAgentRegistration() -> AgentRegistration {
-    let capabilities = (try? JSONDecoder().decode([String].self, from: capabilitiesData)) ?? []
+    let capabilities = (try? Codecs.decoder.decode([String].self, from: capabilitiesData)) ?? []
     let runtimeCapabilities =
-      (try? JSONDecoder().decode(RuntimeCapabilities.self, from: runtimeCapabilitiesData))
+      (try? Codecs.decoder.decode(RuntimeCapabilities.self, from: runtimeCapabilitiesData))
       ?? RuntimeCapabilities(
         runtime: runtime,
         supportsNativeTranscript: false,
@@ -169,9 +180,9 @@ extension CachedAgent {
     agentSessionId = registration.agentSessionId
     lastActivityAt = registration.lastActivityAt
     currentTaskId = registration.currentTaskId
-    capabilitiesData = (try? JSONEncoder().encode(registration.capabilities)) ?? Data()
+    capabilitiesData = (try? Codecs.encoder.encode(registration.capabilities)) ?? Data()
     runtimeCapabilitiesData =
-      (try? JSONEncoder().encode(registration.runtimeCapabilities)) ?? Data()
+      (try? Codecs.encoder.encode(registration.runtimeCapabilities)) ?? Data()
   }
 }
 
@@ -188,8 +199,8 @@ extension AgentRegistration {
       agentSessionId: agentSessionId,
       lastActivityAt: lastActivityAt,
       currentTaskId: currentTaskId,
-      capabilitiesData: (try? JSONEncoder().encode(capabilities)) ?? Data(),
-      runtimeCapabilitiesData: (try? JSONEncoder().encode(runtimeCapabilities)) ?? Data()
+      capabilitiesData: (try? Codecs.encoder.encode(capabilities)) ?? Data(),
+      runtimeCapabilitiesData: (try? Codecs.encoder.encode(runtimeCapabilities)) ?? Data()
     )
   }
 }
@@ -198,10 +209,10 @@ extension AgentRegistration {
 
 extension CachedWorkItem {
   public func toWorkItem() -> WorkItem {
-    let notes = (try? JSONDecoder().decode([TaskNote].self, from: notesData)) ?? []
+    let notes = (try? Codecs.decoder.decode([TaskNote].self, from: notesData)) ?? []
     let checkpoint: TaskCheckpointSummary? =
       if let data = checkpointData {
-        try? JSONDecoder().decode(TaskCheckpointSummary.self, from: data)
+        try? Codecs.decoder.decode(TaskCheckpointSummary.self, from: data)
       } else {
         nil
       }
@@ -238,8 +249,8 @@ extension CachedWorkItem {
     sourceRaw = item.source.rawValue
     blockedReason = item.blockedReason
     completedAt = item.completedAt
-    notesData = (try? JSONEncoder().encode(item.notes)) ?? Data()
-    checkpointData = item.checkpointSummary.flatMap { try? JSONEncoder().encode($0) }
+    notesData = (try? Codecs.encoder.encode(item.notes)) ?? Data()
+    checkpointData = item.checkpointSummary.flatMap { try? Codecs.encoder.encode($0) }
   }
 }
 
@@ -259,8 +270,8 @@ extension WorkItem {
       sourceRaw: source.rawValue,
       blockedReason: blockedReason,
       completedAt: completedAt,
-      notesData: (try? JSONEncoder().encode(notes)) ?? Data(),
-      checkpointData: checkpointSummary.flatMap { try? JSONEncoder().encode($0) }
+      notesData: (try? Codecs.encoder.encode(notes)) ?? Data(),
+      checkpointData: checkpointSummary.flatMap { try? Codecs.encoder.encode($0) }
     )
   }
 }

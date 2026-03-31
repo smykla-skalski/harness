@@ -4,6 +4,7 @@ import SwiftUI
 
 struct SidebarSessionList: View {
   @Bindable var store: HarnessStore
+  @State private var localSearchText = ""
 
   private var activeFilterSummary: String {
     let visibleCount = store.filteredSessionCount
@@ -38,6 +39,7 @@ struct SidebarSessionList: View {
         VStack(alignment: .leading, spacing: 4) {
           Text("Search & Filters")
             .font(.system(.headline, design: .rounded, weight: .semibold))
+            .accessibilityAddTraits(.isHeader)
           Text(activeFilterSummary)
             .font(.caption)
             .foregroundStyle(HarnessTheme.secondaryInk)
@@ -54,12 +56,20 @@ struct SidebarSessionList: View {
         }
       }
 
-      TextField("Search sessions, projects, leaders", text: $store.searchText)
+      TextField("Search sessions, projects, leaders", text: $localSearchText)
         .textFieldStyle(.roundedBorder)
-        .submitLabel(.search)
         .accessibilityIdentifier("harness.sidebar.search")
         .onSubmit {
           store.recordSearch(store.searchText)
+        }
+        .task(id: localSearchText) {
+          try? await Task.sleep(for: .milliseconds(300))
+          guard !Task.isCancelled else { return }
+          store.searchText = localSearchText
+        }
+        .onAppear { localSearchText = store.searchText }
+        .onChange(of: store.searchText) { _, new in
+          if localSearchText != new { localSearchText = new }
         }
 
       if store.searchText.isEmpty {
@@ -84,10 +94,6 @@ struct SidebarSessionList: View {
                   .font(.caption2)
                   .foregroundStyle(HarnessTheme.secondaryInk)
               }
-              .frame(minWidth: 24, minHeight: 24)
-              .accessibilityLabel("Clear Recent Searches")
-              .accessibilityHint("Removes the stored session search history.")
-              .help("Clear search history")
               .harnessAccessoryButtonStyle()
               .controlSize(.small)
             }
@@ -162,13 +168,14 @@ private struct SessionListContent: View {
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier(HarnessAccessibility.sidebarEmptyState)
       } else {
-        VStack(alignment: .leading, spacing: 16) {
+        LazyVStack(alignment: .leading, spacing: 16) {
           ForEach(store.groupedSessions) { group in
             VStack(alignment: .leading, spacing: 10) {
               HStack {
                 Text(group.project.name)
                   .font(.system(.headline, design: .rounded, weight: .semibold))
                   .foregroundStyle(HarnessTheme.ink)
+                  .accessibilityAddTraits(.isHeader)
                 Spacer()
                 Text("\(group.sessions.count)")
                   .font(.caption.monospacedDigit())
@@ -208,10 +215,12 @@ private struct SessionListContent: View {
                     Text(session.sessionId)
                       .font(.caption.monospaced())
                       .foregroundStyle(HarnessTheme.secondaryInk)
-                    HStack(spacing: 12) {
-                      labelChip("\(session.metrics.activeAgentCount) active")
-                      labelChip("\(session.metrics.inProgressTaskCount) moving")
-                      labelChip(formatTimestamp(session.lastActivityAt))
+                    HarnessGlassContainer(spacing: 12) {
+                      HStack(spacing: 12) {
+                        labelChip("\(session.metrics.activeAgentCount) active")
+                        labelChip("\(session.metrics.inProgressTaskCount) moving")
+                        labelChip(formatTimestamp(session.lastActivityAt))
+                      }
                     }
                 }
                 .foregroundStyle(HarnessTheme.ink)
@@ -285,7 +294,7 @@ private struct SessionListContent: View {
       .lineLimit(1)
       .padding(.horizontal, 8)
       .padding(.vertical, 4)
-      .harnessInfoPill()
+      .harnessCapsuleGlass()
   }
 }
 

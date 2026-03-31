@@ -3,6 +3,8 @@ import SwiftUI
 struct HarnessGlassContainer<Content: View>: View {
   let spacing: CGFloat?
   private let content: Content
+  @Environment(\.accessibilityReduceTransparency)
+  private var reduceTransparency
 
   init(spacing: CGFloat? = nil, @ViewBuilder content: () -> Content) {
     self.spacing = spacing
@@ -10,7 +12,12 @@ struct HarnessGlassContainer<Content: View>: View {
   }
 
   var body: some View {
-    if let spacing {
+    if reduceTransparency {
+      VStack {
+        content
+      }
+      .background(.background)
+    } else if let spacing {
       GlassEffectContainer(spacing: spacing) {
         content
       }
