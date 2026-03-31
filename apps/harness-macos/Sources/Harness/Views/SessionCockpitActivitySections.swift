@@ -89,6 +89,10 @@ struct SessionCockpitTimelineSection: View {
       }
       ForEach(timeline) { entry in
         HStack(alignment: .top, spacing: HarnessTheme.sectionSpacing) {
+          RoundedRectangle(cornerRadius: 999)
+            .fill(HarnessTheme.accent.opacity(0.35))
+            .frame(width: 8)
+            .accessibilityHidden(true)
           VStack(alignment: .leading, spacing: 4) {
             Text(entry.summary)
               .font(.system(.body, design: .rounded, weight: .semibold))
@@ -105,11 +109,6 @@ struct SessionCockpitTimelineSection: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.leading, HarnessTheme.spacingLG)
-        .overlay(alignment: .leading) {
-          RoundedRectangle(cornerRadius: 999, style: .continuous)
-            .fill(HarnessTheme.accent.opacity(0.28))
-            .frame(width: 3)
-        }
         .contextMenu {
           Button {
             NSPasteboard.general.clearContents()
