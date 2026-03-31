@@ -143,51 +143,30 @@ struct ConnectionToolbarBadge: View {
   }
 
   var body: some View {
-    ZStack {
-      // Reserve the maximum badge width so live telemetry updates do not churn window constraints.
-      HStack(spacing: 4) {
-        Color.clear
-          .frame(width: 14, height: 14)
-        Text("SSE")
-          .font(Self.badgeFont)
-          .lineLimit(1)
-          .fixedSize()
-        Rectangle()
-          .fill(.clear)
-          .frame(width: 1, height: 12)
-        Text("999ms")
-          .font(Self.badgeFont)
-          .lineLimit(1)
-          .fixedSize()
-      }
-      .hidden()
-
-      HStack(spacing: 4) {
-        ActivityPulse(
-          isActive: metrics.connectedSince != nil,
-          outerSize: 14,
-          innerSize: 6,
-          activeColor: qualityColor
-        )
-          .accessibilityHidden(true)
-        Text(transportLabel)
-          .font(Self.badgeFont)
-          .foregroundStyle(qualityColor)
-          .lineLimit(1)
-          .fixedSize()
-        Rectangle()
-          .fill(qualityColor.opacity(metrics.latencyMs == nil ? 0 : 0.35))
-          .frame(width: 1, height: 12)
-          .accessibilityHidden(true)
-        Text(latencyLabel)
-          .font(Self.badgeFont)
-          .foregroundStyle(qualityColor)
-          .lineLimit(1)
-          .fixedSize()
-          .opacity(metrics.latencyMs == nil ? 0 : 1)
-      }
+    HStack(spacing: 4) {
+      ActivityPulse(
+        isActive: metrics.connectedSince != nil,
+        outerSize: 14,
+        innerSize: 6,
+        activeColor: qualityColor
+      )
+        .accessibilityHidden(true)
+      Text(transportLabel)
+        .font(Self.badgeFont)
+        .foregroundStyle(qualityColor)
+        .lineLimit(1)
+        .fixedSize()
+      Rectangle()
+        .fill(qualityColor.opacity(metrics.latencyMs == nil ? 0 : 0.35))
+        .frame(width: 1, height: 12)
+        .accessibilityHidden(true)
+      Text(latencyLabel)
+        .font(Self.badgeFont)
+        .foregroundStyle(qualityColor)
+        .lineLimit(1)
+        .fixedSize()
+        .opacity(metrics.latencyMs == nil ? 0 : 1)
     }
-    .harnessPillPadding()
     .accessibilityElement(children: .ignore)
     .accessibilityIdentifier(HarnessAccessibility.connectionBadge)
     .accessibilityLabel(accessibilityLabel)

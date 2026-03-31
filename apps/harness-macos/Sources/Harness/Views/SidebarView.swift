@@ -37,12 +37,12 @@ struct SidebarView: View {
     .listStyle(.sidebar)
     .safeAreaInset(edge: .bottom, spacing: 0) {
       ConnectionToolbarBadge(metrics: store.connectionMetrics)
-        .frame(maxWidth: .infinity)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.vertical, HarnessTheme.itemSpacing)
-        .padding(.horizontal, HarnessTheme.sectionSpacing)
+        .padding(.leading, HarnessTheme.spacingXS)
+        .padding(.trailing, HarnessTheme.sectionSpacing)
         .harnessRoundedRectGlass()
-        .padding(.horizontal, HarnessTheme.sectionSpacing)
-        .padding(.bottom, HarnessTheme.itemSpacing)
+        .padding(HarnessTheme.itemSpacing)
     }
     .animation(.snappy(duration: 0.24), value: store.groupedSessions)
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
