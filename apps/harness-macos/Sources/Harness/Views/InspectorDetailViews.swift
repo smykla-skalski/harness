@@ -62,6 +62,7 @@ struct TaskInspectorCard: View {
   let task: WorkItem
   let store: HarnessStore
   @State private var newNoteText = ""
+  @FocusState private var isNoteFieldFocused: Bool
 
   private var userNotes: [UserNote] {
     store.notes(for: task.taskId)
@@ -167,6 +168,7 @@ struct TaskInspectorCard: View {
         }
         HStack(spacing: HarnessTheme.itemSpacing) {
           TextField("Add a note", text: $newNoteText)
+            .focused($isNoteFieldFocused)
             .textFieldStyle(.roundedBorder)
             .submitLabel(.done)
             .onSubmit { submitNote() }

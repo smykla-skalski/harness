@@ -20,6 +20,14 @@ struct InspectorActionSections: View {
   @State private var role: SessionRole = .worker
   @State private var transferLeaderID = ""
   @State private var transferReason = ""
+  @FocusState private var focusedField: ActionField?
+
+  private enum ActionField: Hashable {
+    case createTitle, createContext
+    case statusNote, checkpointSummary
+    case transferReason
+  }
+
   private var selectionKey: String {
     [
       detail.session.sessionId,
@@ -143,6 +151,7 @@ extension InspectorActionSections {
         .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
         .disabled(store.isSessionActionInFlight)
         TextField("Update note", text: $statusNote, axis: .vertical)
+          .focused($focusedField, equals: .statusNote)
           .lineLimit(2, reservesSpace: true)
           .submitLabel(.done)
       }
@@ -152,6 +161,7 @@ extension InspectorActionSections {
       Text("Checkpoint")
         .font(.headline)
       TextField("Summary", text: $checkpointSummary, axis: .vertical)
+        .focused($focusedField, equals: .checkpointSummary)
         .lineLimit(3, reservesSpace: true)
         .submitLabel(.done)
       LabeledContent("Progress") {
@@ -183,8 +193,11 @@ extension InspectorActionSections {
         subtitle: "Capture new work directly into the active session."
       )
       TextField("Title", text: $createTitle)
-        .submitLabel(.done)
+        .focused($focusedField, equals: .createTitle)
+        .submitLabel(.next)
+        .onSubmit { focusedField = .createContext }
       TextField("Context", text: $createContext, axis: .vertical)
+        .focused($focusedField, equals: .createContext)
         .lineLimit(4, reservesSpace: true)
         .submitLabel(.done)
       Picker("Severity", selection: $createSeverity) {
@@ -249,6 +262,7 @@ extension InspectorActionSections {
         }
       }
       TextField("Reason", text: $transferReason, axis: .vertical)
+        .focused($focusedField, equals: .transferReason)
         .lineLimit(3, reservesSpace: true)
         .submitLabel(.done)
       Button(transferLeaderButtonTitle) {
