@@ -155,6 +155,8 @@ struct TaskInspectorCard: View {
                   Image(systemName: "xmark.circle.fill")
                     .font(.caption)
                     .foregroundStyle(HarnessTheme.danger)
+                    .frame(minWidth: 24, minHeight: 24)
+                    .contentShape(Rectangle())
                 }
                 .accessibilityLabel("Delete Note")
                 .accessibilityHint("Removes this note from the selected task.")
@@ -359,6 +361,7 @@ struct SignalInspectorCard: View {
             ForEach(Array(signal.signal.payload.relatedFiles.enumerated()), id: \.offset) { _, path in
               Text(path)
                 .font(.caption.monospaced())
+                .truncationMode(.middle)
                 .foregroundStyle(HarnessTheme.secondaryInk)
                 .lineLimit(2)
             }
