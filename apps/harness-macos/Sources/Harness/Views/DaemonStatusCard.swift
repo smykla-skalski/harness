@@ -23,40 +23,42 @@ struct DaemonStatusCard: View {
         statusPill
       }
 
-      if store.connectionState == .online {
-        ConnectionStatusStrip(
-          metrics: store.connectionMetrics,
-          isActive: store.dataReceivedPulse
-        )
-        .transition(.move(edge: .top).combined(with: .opacity))
-      }
-      if store.isRefreshing || store.connectionState == .connecting {
-        HarnessLoadingStateView(title: loadingTitle)
+      Group {
+        if store.connectionState == .online {
+          ConnectionStatusStrip(
+            metrics: store.connectionMetrics,
+            isActive: store.dataReceivedPulse
+          )
           .transition(.move(edge: .top).combined(with: .opacity))
+        }
       }
+      .animation(.spring(duration: 0.3), value: store.connectionState)
+
+      Group {
+        if store.isRefreshing || store.connectionState == .connecting {
+          HarnessLoadingStateView(title: loadingTitle)
+            .transition(.move(edge: .top).combined(with: .opacity))
+        }
+      }
+      .animation(.spring(duration: 0.3), value: store.isRefreshing)
+      .animation(.spring(duration: 0.3), value: store.connectionState)
 
       HStack(spacing: 8) {
         daemonProjectsBadge
+          .animation(.spring(duration: 0.3), value: daemonProjectCount)
         daemonSessionsBadge
+          .animation(.spring(duration: 0.3), value: daemonSessionCount)
         daemonLaunchdBadge
+          .animation(.spring(duration: 0.3), value: daemonLaunchdState)
       }
       .frame(maxWidth: .infinity, alignment: .leading)
-      .animation(.spring(duration: 0.3), value: daemonProjectCount)
-      .animation(.spring(duration: 0.3), value: daemonSessionCount)
-      .animation(.spring(duration: 0.3), value: daemonLaunchdState)
 
       daemonActionButtons
     }
     .frame(maxWidth: .infinity, alignment: .leading)
     .padding(.bottom, 4)
-    .animation(.spring(duration: 0.3), value: store.connectionState)
-    .animation(.spring(duration: 0.3), value: store.isRefreshing)
     .accessibilityElement(children: .contain)
-    .accessibilityTestProbe(
-      HarnessAccessibility.daemonCard,
-      label: "Harness Daemon",
-      value: statusTitle
-    )
+    .accessibilityIdentifier(HarnessAccessibility.daemonCard)
     .accessibilityFrameMarker(HarnessAccessibility.daemonCardFrame)
   }
 }
