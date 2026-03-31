@@ -131,17 +131,14 @@ struct InspectorColumnView: View {
     .accessibilityIdentifier(HarnessAccessibility.inspectorEmptyState)
   }
 
-  @ViewBuilder
   private func sessionInspector(_ detail: SessionDetail) -> some View {
     SessionInspectorSummaryCard(detail: detail)
   }
 
-  @ViewBuilder
   private func taskInspector(_ task: WorkItem) -> some View {
     TaskInspectorCard(task: task, store: store)
   }
 
-  @ViewBuilder
   private func agentInspector(_ agent: AgentRegistration) -> some View {
     AgentInspectorCard(
       agent: agent,
@@ -153,12 +150,10 @@ struct InspectorColumnView: View {
     )
   }
 
-  @ViewBuilder
   private func signalInspector(_ signal: SessionSignalRecord) -> some View {
     SignalInspectorCard(signal: signal)
   }
 
-  @ViewBuilder
   private func observerInspector(_ observer: ObserverSummary) -> some View {
     ObserverInspectorCard(observer: observer)
   }
