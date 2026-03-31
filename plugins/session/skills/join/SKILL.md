@@ -130,32 +130,67 @@ Act on any pending signals - they may contain corrections, context, or instructi
 
 Use this when `--role observer`.
 
-As an observer you do not execute tasks. You monitor the session, detect issues, and create tasks from findings. You do not edit files or write code.
+As an observer you do not execute tasks. You monitor the session through the `harness observe` pipeline, detect issues, and create session tasks from findings. You do not edit files or write code.
 
-### Run the observe pipeline
+### Verify wiring
 
-Use `harness observe` (not `harness session observe`) for the classifier pipeline:
-
-```bash
-harness observe scan <session-id> --json --summary
-```
-
-For continuous monitoring:
+Before scanning, confirm that harness observe is wired correctly:
 
 ```bash
-harness observe watch <session-id> --poll-interval 3 --timeout 90 --json
+harness observe --observe-id <observe-id> doctor --json
 ```
+
+Add `--agent <runtime>` if you know which agent's session you are observing. Default `--observe-id` is `project-default`.
+
+### Run a baseline scan
+
+```bash
+harness observe --agent <agent> --observe-id <observe-id> scan <session-id> --json --summary
+```
+
+Add `--from-line N` or `--from <timestamp>` to start from a specific point. Add `--focus harness|skills|all` to filter categories.
 
 ### Triage findings
 
-Summarize by severity and category. Focus on:
+Summarize briefly:
+
+- counts by severity and category
+- critical issues first
+- whether the observer state is established for this observe-id
+- which fix target is most likely: skill, hook, suite, or harness code
+
+Focus on:
 
 - agents going off-track or violating contracts
 - blocked tasks that need leader attention
 - stalled agents with no recent activity
 - file conflicts between agents
 
-### Create tasks from findings
+### Continuous monitoring
+
+For ongoing observation use `watch`, not manual polling loops:
+
+```bash
+harness observe --agent <agent> --observe-id <observe-id> watch <session-id> --poll-interval 3 --timeout 90 --json
+```
+
+### Maintenance actions
+
+Manage observer state through `scan --action`:
+
+- `--action cycle` - advance the stored cursor and persist new findings
+- `--action status` - inspect current observer state
+- `--action resume` - continue scanning from the stored cursor
+- `--action verify` - after a fix, check if the same fingerprint still reproduces
+- `--action resolve-from` - resolve a line boundary from prose or timestamp
+- `--action compare` - compare two windows
+- `--action mute` / `--action unmute` - manage muted issue codes
+
+### Use dump when the classifier may be wrong
+
+Use `harness observe dump` when a finding looks suspicious, the issue is `unexpected_behavior`, or you need exact raw context around a line range.
+
+### Create session tasks from findings
 
 When you detect an issue that needs fixing:
 
