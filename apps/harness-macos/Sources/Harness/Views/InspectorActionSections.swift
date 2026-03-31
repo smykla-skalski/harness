@@ -121,12 +121,14 @@ extension InspectorActionSections {
           Task { await assignSelectedTask() }
         }
         .harnessActionButtonStyle(variant: .prominent, tint: nil)
+        .disabled(store.isSessionActionInFlight)
       }
       HStack {
         Button("Update Status") {
           Task { await updateSelectedTask() }
         }
         .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
+        .disabled(store.isSessionActionInFlight)
         TextField("Update note", text: $statusNote, axis: .vertical)
           .lineLimit(2, reservesSpace: true)
       }
@@ -149,6 +151,7 @@ extension InspectorActionSections {
           Task { await checkpointSelectedTask() }
         }
         .harnessActionButtonStyle(variant: .prominent, tint: .orange)
+        .disabled(store.isSessionActionInFlight)
       }
 
       if let checkpoint = task.checkpointSummary {
@@ -176,7 +179,10 @@ extension InspectorActionSections {
         Task { await createTask() }
       }
       .harnessActionButtonStyle(variant: .prominent, tint: nil)
-      .disabled(createTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+      .disabled(
+        createTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+          || store.isSessionActionInFlight
+      )
     }
   }
   fileprivate func roleActions(agent: AgentRegistration) -> some View {
@@ -196,11 +202,12 @@ extension InspectorActionSections {
         Task { await changeSelectedRole() }
       }
       .harnessActionButtonStyle(variant: .prominent, tint: nil)
+      .disabled(store.isSessionActionInFlight)
       Button("Remove Agent") {
         store.requestRemoveAgentConfirmation(agentID: agent.agentId)
       }
       .harnessActionButtonStyle(variant: .bordered, tint: .red)
-      .disabled(agent.agentId == detail.session.leaderId)
+      .disabled(agent.agentId == detail.session.leaderId || store.isSessionActionInFlight)
       .accessibilityIdentifier(HarnessAccessibility.removeAgentButton)
     }
   }
@@ -229,9 +236,13 @@ extension InspectorActionSections {
         Task { await transferLeader() }
       }
       .harnessActionButtonStyle(variant: .prominent, tint: .orange)
-      .disabled(transferLeaderID.isEmpty || transferLeaderID == detail.session.leaderId)
+      .disabled(
+        transferLeaderID.isEmpty || transferLeaderID == detail.session.leaderId
+          || store.isSessionActionInFlight
+      )
     }
   }
+    
   fileprivate func configureDefaults() {
     if let selectedTask {
       taskID = selectedTask.taskId
@@ -258,6 +269,7 @@ extension InspectorActionSections {
         ?? detail.session.leaderId
     }
   }
+    
   fileprivate func createTask() async {
     let title = createTitle.trimmingCharacters(in: .whitespacesAndNewlines)
     let context = createContext.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -265,16 +277,19 @@ extension InspectorActionSections {
       return
     }
 
-    await store.createTask(
+    let success = await store.createTask(
       title: title,
       context: context.isEmpty ? nil : context,
       severity: createSeverity
     )
-    createTitle = ""
-    createContext = ""
-    createSeverity = .medium
+    if success {
+      createTitle = ""
+      createContext = ""
+      createSeverity = .medium
+    }
     configureDefaults()
   }
+    
   fileprivate func assignSelectedTask() async {
     guard !taskID.isEmpty, !assigneeID.isEmpty else {
       return
@@ -283,34 +298,41 @@ extension InspectorActionSections {
     await store.assignTask(taskID: taskID, agentID: assigneeID)
     configureDefaults()
   }
+    
   fileprivate func updateSelectedTask() async {
     guard !taskID.isEmpty else {
       return
     }
 
     let note = statusNote.trimmingCharacters(in: .whitespacesAndNewlines)
-    await store.updateTaskStatus(
+    let success = await store.updateTaskStatus(
       taskID: taskID,
       status: taskStatus,
       note: note.isEmpty ? nil : note
     )
-    statusNote = ""
+    if success {
+      statusNote = ""
+    }
     configureDefaults()
   }
+    
   fileprivate func checkpointSelectedTask() async {
     let summary = checkpointSummary.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !taskID.isEmpty, !summary.isEmpty else {
       return
     }
 
-    await store.checkpointTask(
+    let success = await store.checkpointTask(
       taskID: taskID,
       summary: summary,
       progress: Int(checkpointProgress)
     )
-    checkpointSummary = ""
+    if success {
+      checkpointSummary = ""
+    }
     configureDefaults()
   }
+    
   fileprivate func changeSelectedRole() async {
     guard let agentID = selectedAgent?.agentId else {
       return
@@ -319,17 +341,20 @@ extension InspectorActionSections {
     await store.changeRole(agentID: agentID, role: role)
     configureDefaults()
   }
+    
   fileprivate func transferLeader() async {
     let reason = transferReason.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !transferLeaderID.isEmpty else {
       return
     }
 
-    await store.transferLeader(
+    let success = await store.transferLeader(
       newLeaderID: transferLeaderID,
       reason: reason.isEmpty ? nil : reason
     )
-    transferReason = ""
+    if success {
+      transferReason = ""
+    }
     configureDefaults()
   }
 

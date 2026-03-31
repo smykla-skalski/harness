@@ -58,7 +58,12 @@ struct HarnessApp: App {
       (uiTesting
         ? (try? HarnessModelContainer.preview())
         : (try? HarnessModelContainer.live()))
-      ?? (try? HarnessModelContainer.preview())!
+      ?? {
+        guard let fallback = try? HarnessModelContainer.preview() else {
+          fatalError("Unable to create model container for live or preview store")
+        }
+        return fallback
+      }()
     container = resolvedContainer
     let resolvedStore = HarnessAppStoreFactory.makeStore(
       modelContext: resolvedContainer.mainContext
@@ -98,6 +103,7 @@ struct HarnessApp: App {
 
   @ViewBuilder private var rootContent: some View {
     ContentView(store: store)
+      .frame(minWidth: 900, minHeight: 600)
       .preferredColorScheme(themeMode.colorScheme)
       .tint(HarnessTheme.accent)
       .onAppear { syncThemeFromStorage() }
@@ -110,6 +116,10 @@ struct HarnessApp: App {
 
   @CommandsBuilder private var appCommands: some Commands {
     SidebarCommands()
+    TextEditingCommands()
+    CommandGroup(replacing: .help) {
+      Link("Harness Documentation", destination: URL(string: "https://github.com/smykla-skalski/harness")!)
+    }
     CommandMenu("Harness") {
       Button("Refresh", action: refreshStore)
         .keyboardShortcut("r", modifiers: [.command, .shift])
@@ -151,6 +161,7 @@ struct HarnessApp: App {
       store: store,
       themeMode: $themeMode
     )
+    .frame(minWidth: 600, minHeight: 400)
     .preferredColorScheme(themeMode.colorScheme)
     .tint(HarnessTheme.accent)
   }
