@@ -22,36 +22,46 @@ enum HarnessTheme {
 
 struct LiveActivityBorderModifier: ViewModifier {
   let isActive: Bool
-  @State private var highlight = false
   @State private var flashTrigger = 0
+
+  private enum FlashPhase: CaseIterable {
+    case idle, bright, fade
+
+    var opacity: Double {
+      switch self {
+      case .idle: 0
+      case .bright: 1
+      case .fade: 0
+      }
+    }
+  }
 
   func body(content: Content) -> some View {
     content
-      .overlay(
-        RoundedRectangle(cornerRadius: 22, style: .continuous)
-          .stroke(
-            HarnessTheme.success.opacity(highlight ? 0.18 : 0),
-            lineWidth: 1
-          )
-      )
-      .shadow(
-        color: HarnessTheme.success.opacity(highlight ? 0.08 : 0),
-        radius: highlight ? 12 : 0,
-        x: 0,
-        y: 0
-      )
       .onChange(of: isActive) { _, active in
         guard active else { return }
         flashTrigger += 1
       }
-      .onChange(of: flashTrigger) {
-        highlight = false
-        withAnimation(.easeIn(duration: 0.15)) {
-          highlight = true
-        } completion: {
-          withAnimation(.easeOut(duration: 0.75)) {
-            highlight = false
-          }
+      .phaseAnimator(FlashPhase.allCases, trigger: flashTrigger) { view, phase in
+        view
+          .overlay(
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+              .stroke(
+                HarnessTheme.success.opacity(0.18 * phase.opacity),
+                lineWidth: 1
+              )
+          )
+          .shadow(
+            color: HarnessTheme.success.opacity(0.08 * phase.opacity),
+            radius: 12 * phase.opacity,
+            x: 0,
+            y: 0
+          )
+      } animation: { phase in
+        switch phase {
+        case .idle: .easeOut(duration: 0.75)
+        case .bright: .easeIn(duration: 0.15)
+        case .fade: .easeOut(duration: 0.75)
         }
       }
   }
@@ -69,9 +79,7 @@ struct HarnessLoadingStateView: View {
     }
     .padding(.horizontal, 12)
     .padding(.vertical, 8)
-    .background {
-      HarnessGlassCapsuleBackground()
-    }
+    .harnessCapsuleGlass()
     .opacity(animates ? 1 : 0.62)
     .scaleEffect(animates ? 1 : 0.97)
     .animation(
@@ -79,7 +87,6 @@ struct HarnessLoadingStateView: View {
       value: animates
     )
     .onAppear { animates = true }
-    .onDisappear { animates = false }
   }
 }
 
@@ -255,9 +262,7 @@ struct HarnessBadge: View {
       .font(.caption.bold())
       .padding(.horizontal, 10)
       .padding(.vertical, 5)
-      .background {
-        HarnessGlassCapsuleBackground()
-      }
+      .harnessCapsuleGlass()
   }
 }
 
