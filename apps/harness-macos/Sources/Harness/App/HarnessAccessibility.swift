@@ -9,6 +9,7 @@ enum HarnessAccessibility {
   static let sidebarSessionList = "harness.sidebar.session-list"
   static let sidebarSessionListContent = "harness.sidebar.session-list.content"
   static let sidebarFiltersCard = "harness.sidebar.filters"
+  static let sidebarFiltersCardFrame = "\(sidebarFiltersCard).frame"
   static let sidebarClearFiltersButton = "harness.sidebar.filters.clear"
   static let sessionFilterGroup = "harness.sidebar.filter-group"
   static func sidebarFilterChip(_ filter: String) -> String {

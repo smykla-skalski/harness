@@ -28,6 +28,7 @@ enum HarnessUITestAccessibility {
   static let sidebarSessionList = "harness.sidebar.session-list"
   static let sidebarSessionListContent = "harness.sidebar.session-list.content"
   static let sidebarFiltersCard = "harness.sidebar.filters"
+  static let sidebarFiltersCardFrame = "harness.sidebar.filters.frame"
   static let sidebarSearchField = "harness.sidebar.search"
   static let sidebarClearFiltersButton = "harness.sidebar.filters.clear"
   static let activeFilterButton = "harness.sidebar.filter.active"
