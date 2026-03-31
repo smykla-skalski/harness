@@ -138,7 +138,7 @@ struct PreferencesConnectionSection: View {
           HarnessWrapLayout(spacing: 8, lineSpacing: 8) {
             HarnessAsyncActionButton(
               title: "Reconnect",
-              tint: HarnessTheme.accent,
+              tint: .accentColor,
               variant: .prominent,
               isLoading: store.connectionState == .connecting,
               accessibilityIdentifier: HarnessAccessibility.preferencesActionButton(
@@ -149,7 +149,7 @@ struct PreferencesConnectionSection: View {
             )
             HarnessAsyncActionButton(
               title: "Refresh Diagnostics",
-              tint: HarnessTheme.ink,
+              tint: .secondary,
               variant: .bordered,
               isLoading: store.isDiagnosticsRefreshInFlight,
               accessibilityIdentifier: HarnessAccessibility.preferencesActionButton(
