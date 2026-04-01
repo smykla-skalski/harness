@@ -70,16 +70,16 @@ final class HarnessSidebarLayoutUITests: HarnessUITestCase {
       additionalEnvironment: ["HARNESS_PREVIEW_FIXTURE_SET": "overflow"]
     )
     let sidebarRoot = element(in: app, identifier: Accessibility.sidebarRoot)
-    let scrollView = sidebarRoot.descendants(matching: .scrollView).firstMatch
+    let sessionList = frameElement(in: app, identifier: Accessibility.sidebarSessionListContent)
     let sessionRow = previewSessionTrigger(in: app)
 
     XCTAssertTrue(sidebarRoot.waitForExistence(timeout: Self.uiTimeout))
-    XCTAssertTrue(scrollView.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(sessionList.waitForExistence(timeout: Self.uiTimeout))
     XCTAssertTrue(sessionRow.waitForExistence(timeout: Self.uiTimeout))
     let initialMinY = sessionRow.frame.minY
 
     for _ in 0..<8 {
-      dragUp(in: app, element: scrollView, distanceRatio: 0.44)
+      dragUp(in: app, element: sidebarRoot, distanceRatio: 0.44)
       if sessionRow.frame.minY < initialMinY - 24 {
         break
       }
