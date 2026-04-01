@@ -26,6 +26,7 @@ enum HarnessUITestAccessibility {
   static let overflowSessionRow = "harness.sidebar.session.sess-harness-17"
   static let previewSessionTitle = "Track all live multi-agent harness sessions from a macOS cockpit"
   static let sidebarEmptyState = "harness.sidebar.empty-state"
+  static let sidebarEmptyStateFrame = "harness.sidebar.empty-state.frame"
   static let sidebarEmptyStateTitle = "No sessions indexed yet"
   static let sidebarSessionList = "harness.sidebar.session-list"
   static let sidebarSessionListContent = "harness.sidebar.session-list.content"

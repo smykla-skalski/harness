@@ -10,20 +10,7 @@ struct SidebarView: View {
     }
     .listStyle(.sidebar)
     .safeAreaInset(edge: .top, spacing: 0) {
-      ScrollView {
-        VStack(alignment: .leading, spacing: HarnessTheme.sectionSpacing) {
-          DaemonStatusCard(store: store)
-          SidebarFilterSection(store: store)
-        }
-        .padding(.horizontal, HarnessTheme.sectionSpacing)
-        .padding(.top, HarnessTheme.spacingXL)
-        .padding(.bottom, HarnessTheme.sectionSpacing)
-      }
-      .scrollBounceBehavior(.basedOnSize)
-      .frame(maxHeight: 420)
-      .accessibilityElement(children: .contain)
-      .accessibilityIdentifier(HarnessAccessibility.sidebarFiltersCard)
-      .accessibilityFrameMarker("\(HarnessAccessibility.sidebarFiltersCard).frame")
+      sidebarHeader
     }
     .safeAreaInset(edge: .bottom, spacing: 0) {
       ConnectionToolbarBadge(metrics: store.connectionMetrics)
@@ -43,20 +30,40 @@ struct SidebarView: View {
   @ViewBuilder private var sessionSections: some View {
     if store.sessions.isEmpty {
       Section {
-        ContentUnavailableView {
-          Label("No sessions indexed yet", systemImage: "tray")
-        } description: {
-          Text("Start the daemon or refresh after launching a harness session.")
+        VStack {
+          ContentUnavailableView {
+            Label("No sessions indexed yet", systemImage: "tray")
+          } description: {
+            Text("Start the daemon or refresh after launching a harness session.")
+          }
         }
+        .frame(maxWidth: .infinity)
+        .accessibilityFrameMarker(HarnessAccessibility.sidebarEmptyStateFrame)
       }
+      .listRowInsets(EdgeInsets(
+        top: HarnessTheme.sectionSpacing,
+        leading: HarnessTheme.sectionSpacing,
+        bottom: HarnessTheme.sectionSpacing,
+        trailing: HarnessTheme.sectionSpacing
+      ))
       .listRowBackground(Color.clear)
       .listRowSeparator(.hidden)
       .accessibilityElement(children: .contain)
       .accessibilityIdentifier(HarnessAccessibility.sidebarEmptyState)
     } else if store.groupedSessions.isEmpty {
       Section {
-        ContentUnavailableView.search(text: store.searchText)
+        VStack {
+          ContentUnavailableView.search(text: store.searchText)
+        }
+        .frame(maxWidth: .infinity)
+        .accessibilityFrameMarker(HarnessAccessibility.sidebarEmptyStateFrame)
       }
+      .listRowInsets(EdgeInsets(
+        top: HarnessTheme.sectionSpacing,
+        leading: HarnessTheme.sectionSpacing,
+        bottom: HarnessTheme.sectionSpacing,
+        trailing: HarnessTheme.sectionSpacing
+      ))
       .listRowBackground(Color.clear)
       .listRowSeparator(.hidden)
       .accessibilityElement(children: .contain)
@@ -83,6 +90,16 @@ struct SidebarView: View {
       .accessibilityIdentifier(HarnessAccessibility.sidebarSessionList)
       .accessibilityFrameMarker(HarnessAccessibility.sidebarSessionListContent)
     }
+  }
+
+  private var sidebarHeader: some View {
+    VStack(alignment: .leading, spacing: HarnessTheme.sectionSpacing) {
+      DaemonStatusCard(store: store)
+      SidebarFilterSection(store: store)
+    }
+    .padding(.horizontal, HarnessTheme.sectionSpacing)
+    .padding(.top, HarnessTheme.spacingXL)
+    .padding(.bottom, HarnessTheme.sectionSpacing)
   }
 
   private func sessionProjectRow(for group: HarnessStore.SessionGroup) -> some View {
@@ -113,7 +130,11 @@ struct SidebarView: View {
       Button {
         Task { await store.selectSession(session.sessionId) }
       } label: {
-        SidebarSessionRow(session: session, store: store, isSelected: isSelected)
+        SidebarSessionRow(
+          session: session,
+          isBookmarked: store.isBookmarked(sessionId: session.sessionId),
+          isSelected: isSelected
+        )
           .padding(.horizontal, rowContentPadding)
           .padding(.vertical, HarnessTheme.itemSpacing)
           .frame(maxWidth: .infinity, alignment: .leading)
@@ -190,4 +211,9 @@ struct SidebarView: View {
       baseRow
     }
   }
+}
+
+#Preview("Sidebar overflow") {
+  SidebarView(store: HarnessPreviewStoreFactory.makeStore(for: .sidebarOverflow))
+    .frame(width: 380, height: 900)
 }
