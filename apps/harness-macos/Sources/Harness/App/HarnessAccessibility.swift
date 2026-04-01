@@ -7,6 +7,7 @@ enum HarnessAccessibility {
   static let sidebarRoot = "harness.sidebar.root"
   static let sidebarShellFrame = "harness.sidebar.shell.frame"
   static let sidebarEmptyState = "harness.sidebar.empty-state"
+  static let sidebarEmptyStateFrame = "\(sidebarEmptyState).frame"
   static let sidebarSessionList = "harness.sidebar.session-list"
   static let sidebarSessionListContent = "harness.sidebar.session-list.content"
   static let sidebarFiltersCard = "harness.sidebar.filters"

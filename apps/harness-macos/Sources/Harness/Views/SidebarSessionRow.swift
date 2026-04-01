@@ -3,7 +3,7 @@ import SwiftUI
 
 struct SidebarSessionRow: View {
   let session: SessionSummary
-  let store: HarnessStore
+  let isBookmarked: Bool
   let isSelected: Bool
 
   var body: some View {
@@ -14,7 +14,7 @@ struct SidebarSessionRow: View {
           .multilineTextAlignment(.leading)
           .lineLimit(2)
         Spacer(minLength: 12)
-        if store.isBookmarked(sessionId: session.sessionId) {
+        if isBookmarked {
           Image(systemName: "bookmark.fill")
             .scaledFont(.caption2)
             .foregroundStyle(isSelected ? HarnessTheme.onContrast : HarnessTheme.accent)
@@ -52,4 +52,29 @@ struct SidebarSessionRow: View {
   private var selectedSecondaryTextStyle: Color {
     isSelected ? HarnessTheme.onContrast.opacity(0.82) : HarnessTheme.secondaryInk
   }
+}
+
+#Preview("Sidebar row") {
+  VStack(spacing: HarnessTheme.sectionSpacing) {
+    SidebarSessionRow(
+      session: PreviewFixtures.summary,
+      isBookmarked: true,
+      isSelected: true
+    )
+    .padding()
+    .background(HarnessTheme.accent, in: RoundedRectangle(cornerRadius: HarnessTheme.cornerRadiusLG))
+
+    SidebarSessionRow(
+      session: PreviewFixtures.overflowSessions[3],
+      isBookmarked: false,
+      isSelected: false
+    )
+    .padding()
+    .background(
+      HarnessTheme.ink.opacity(0.08),
+      in: RoundedRectangle(cornerRadius: HarnessTheme.cornerRadiusLG)
+    )
+  }
+  .padding()
+  .frame(width: 360)
 }
