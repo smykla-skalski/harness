@@ -214,4 +214,34 @@ struct HarnessStoreLifecycleTests {
     #expect(store.selectedSession == PreviewFixtures.detail)
     #expect(store.groupedSessions.isEmpty == false)
   }
+
+  @Test("Preview store factory seeds dashboard state without a selected session")
+  func previewStoreFactorySeedsDashboardState() {
+    let store = HarnessPreviewStoreFactory.makeStore(for: .dashboardLoaded)
+
+    #expect(store.connectionState == .online)
+    #expect(store.sessionFilter == .active)
+    #expect(store.sessions == [PreviewFixtures.summary])
+    #expect(store.filteredSessionCount == 1)
+    #expect(store.groupedSessions.count == 1)
+    #expect(store.selectedSessionID == nil)
+    #expect(store.selectedSession == nil)
+    #expect(store.timeline.isEmpty)
+    #expect(store.isBookmarked(sessionId: PreviewFixtures.summary.sessionId))
+  }
+
+  @Test("Preview store factory seeds empty state without stale selection")
+  func previewStoreFactorySeedsEmptyState() {
+    let store = HarnessPreviewStoreFactory.makeStore(for: .empty)
+
+    #expect(store.connectionState == .online)
+    #expect(store.sessionFilter == .active)
+    #expect(store.sessions.isEmpty)
+    #expect(store.filteredSessionCount == 0)
+    #expect(store.groupedSessions.isEmpty)
+    #expect(store.selectedSessionID == nil)
+    #expect(store.selectedSession == nil)
+    #expect(store.timeline.isEmpty)
+    #expect(store.isShowingCachedData == false)
+  }
 }
