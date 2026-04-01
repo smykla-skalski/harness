@@ -6,58 +6,60 @@ struct PreferencesActionButtons: View {
   let isLoading: Bool
 
   var body: some View {
-    HarnessWrapLayout(spacing: HarnessTheme.itemSpacing, lineSpacing: HarnessTheme.itemSpacing) {
-      HarnessAsyncActionButton(
-        title: "Reconnect",
-        tint: nil,
-        variant: .bordered,
-        isLoading: isLoading,
-        accessibilityIdentifier: HarnessAccessibility.preferencesActionButton("Reconnect"),
-        store: store,
-        storeAction: .reconnect
-      )
-      HarnessAsyncActionButton(
-        title: "Refresh Diagnostics",
-        tint: .secondary,
-        variant: .bordered,
-        isLoading: isLoading,
-        accessibilityIdentifier: HarnessAccessibility.preferencesActionButton(
-          "Refresh Diagnostics"
-        ),
-        store: store,
-        storeAction: .refreshDiagnostics
-      )
-      HarnessAsyncActionButton(
-        title: "Start Daemon",
-        tint: nil,
-        variant: .prominent,
-        isLoading: isLoading,
-        accessibilityIdentifier: HarnessAccessibility.preferencesActionButton("Start Daemon"),
-        store: store,
-        storeAction: .startDaemon
-      )
-      HarnessAsyncActionButton(
-        title: "Install Launch Agent",
-        tint: .secondary,
-        variant: .bordered,
-        isLoading: isLoading,
-        accessibilityIdentifier: HarnessAccessibility.preferencesActionButton(
-          "Install Launch Agent"
-        ),
-        store: store,
-        storeAction: .installLaunchAgent
-      )
-      HarnessAsyncActionButton(
-        title: "Remove Launch Agent",
-        tint: .red,
-        variant: .bordered,
-        isLoading: isLoading,
-        accessibilityIdentifier: HarnessAccessibility.preferencesActionButton(
-          "Remove Launch Agent"
-        ),
-        store: store,
-        storeAction: .removeLaunchAgent
-      )
+    HarnessGlassControlGroup(spacing: HarnessTheme.itemSpacing) {
+      HarnessWrapLayout(spacing: HarnessTheme.itemSpacing, lineSpacing: HarnessTheme.itemSpacing) {
+        HarnessAsyncActionButton(
+          title: "Reconnect",
+          tint: nil,
+          variant: .bordered,
+          isLoading: isLoading,
+          accessibilityIdentifier: HarnessAccessibility.preferencesActionButton("Reconnect"),
+          store: store,
+          storeAction: .reconnect
+        )
+        HarnessAsyncActionButton(
+          title: "Refresh Diagnostics",
+          tint: .secondary,
+          variant: .bordered,
+          isLoading: isLoading,
+          accessibilityIdentifier: HarnessAccessibility.preferencesActionButton(
+            "Refresh Diagnostics"
+          ),
+          store: store,
+          storeAction: .refreshDiagnostics
+        )
+        HarnessAsyncActionButton(
+          title: "Start Daemon",
+          tint: nil,
+          variant: .prominent,
+          isLoading: isLoading,
+          accessibilityIdentifier: HarnessAccessibility.preferencesActionButton("Start Daemon"),
+          store: store,
+          storeAction: .startDaemon
+        )
+        HarnessAsyncActionButton(
+          title: "Install Launch Agent",
+          tint: .secondary,
+          variant: .bordered,
+          isLoading: isLoading,
+          accessibilityIdentifier: HarnessAccessibility.preferencesActionButton(
+            "Install Launch Agent"
+          ),
+          store: store,
+          storeAction: .installLaunchAgent
+        )
+        HarnessAsyncActionButton(
+          title: "Remove Launch Agent",
+          tint: .red,
+          variant: .bordered,
+          isLoading: isLoading,
+          accessibilityIdentifier: HarnessAccessibility.preferencesActionButton(
+            "Remove Launch Agent"
+          ),
+          store: store,
+          storeAction: .removeLaunchAgent
+        )
+      }
     }
     .frame(maxWidth: .infinity, alignment: .leading)
   }
@@ -133,29 +135,31 @@ struct PreferencesConnectionSection: View {
   var body: some View {
     Form {
       Section("Actions") {
-        HarnessWrapLayout(spacing: HarnessTheme.itemSpacing, lineSpacing: HarnessTheme.itemSpacing) {
-          HarnessAsyncActionButton(
-            title: "Reconnect",
-            tint: nil,
-            variant: .prominent,
-            isLoading: store.connectionState == .connecting,
-            accessibilityIdentifier: HarnessAccessibility.preferencesActionButton(
-              "Connection Reconnect"
-            ),
-            store: store,
-            storeAction: .reconnect
-          )
-          HarnessAsyncActionButton(
-            title: "Refresh Diagnostics",
-            tint: .secondary,
-            variant: .bordered,
-            isLoading: store.isDiagnosticsRefreshInFlight,
-            accessibilityIdentifier: HarnessAccessibility.preferencesActionButton(
-              "Connection Refresh Diagnostics"
-            ),
-            store: store,
-            storeAction: .refreshDiagnostics
-          )
+        HarnessGlassControlGroup(spacing: HarnessTheme.itemSpacing) {
+          HarnessWrapLayout(spacing: HarnessTheme.itemSpacing, lineSpacing: HarnessTheme.itemSpacing) {
+            HarnessAsyncActionButton(
+              title: "Reconnect",
+              tint: nil,
+              variant: .prominent,
+              isLoading: store.connectionState == .connecting,
+              accessibilityIdentifier: HarnessAccessibility.preferencesActionButton(
+                "Connection Reconnect"
+              ),
+              store: store,
+              storeAction: .reconnect
+            )
+            HarnessAsyncActionButton(
+              title: "Refresh Diagnostics",
+              tint: .secondary,
+              variant: .bordered,
+              isLoading: store.isDiagnosticsRefreshInFlight,
+              accessibilityIdentifier: HarnessAccessibility.preferencesActionButton(
+                "Connection Refresh Diagnostics"
+              ),
+              store: store,
+              storeAction: .refreshDiagnostics
+            )
+          }
         }
       }
       PreferencesConnectionMetrics(
@@ -268,4 +272,91 @@ struct PreferencesDiagnosticsOverview: View {
       }
     }
   }
+}
+
+#Preview("Preferences Actions") {
+  Form {
+    Section("Actions") {
+      PreferencesActionButtons(
+        store: PreferencesPreviewSupport.makeStore(),
+        isLoading: false
+      )
+    }
+  }
+  .preferencesDetailFormStyle()
+  .frame(width: 720)
+}
+
+#Preview("Preferences Status") {
+  Form {
+    PreferencesStatusSection(
+      startedAt: "2026-03-31T11:42:00Z",
+      lastError: nil,
+      lastAction: "Reconnect completed successfully."
+    )
+  }
+  .preferencesDetailFormStyle()
+  .frame(width: 520)
+}
+
+#Preview("Preferences Status Error") {
+  Form {
+    PreferencesStatusSection(
+      startedAt: "2026-03-31T11:42:00Z",
+      lastError: "Launch agent removal requires a manual retry.",
+      lastAction: ""
+    )
+  }
+  .preferencesDetailFormStyle()
+  .frame(width: 520)
+}
+
+#Preview("Preferences Paths") {
+  let store = PreferencesPreviewSupport.makeStore()
+
+  Form {
+    PreferencesPathsSection(
+      launchAgentPath: store.daemonStatus?.launchAgent.path ?? "Unavailable",
+      launchAgentDomain: store.daemonStatus?.launchAgent.domainTarget,
+      launchAgentService: store.daemonStatus?.launchAgent.serviceTarget,
+      manifestPath: store.diagnostics?.workspace.manifestPath ?? "Unavailable",
+      authTokenPath: store.diagnostics?.workspace.authTokenPath ?? "Unavailable",
+      eventsPath: store.diagnostics?.workspace.eventsPath ?? "Unavailable",
+      cacheRoot: store.diagnostics?.workspace.cacheRoot ?? "Unavailable"
+    )
+  }
+  .preferencesDetailFormStyle()
+  .frame(width: 720)
+}
+
+#Preview("Preferences Connection Section") {
+  PreferencesConnectionSection(store: PreferencesPreviewSupport.makeStore())
+    .frame(width: 720)
+}
+
+#Preview("Preferences Diagnostics Overview") {
+  let store = PreferencesPreviewSupport.makeStore()
+
+  Form {
+    PreferencesDiagnosticsOverview(
+      launchAgent: store.daemonStatus?.launchAgent,
+      tokenPresent: store.diagnostics?.workspace.authTokenPresent ?? false,
+      projectCount: store.daemonStatus?.projectCount ?? 0,
+      sessionCount: store.daemonStatus?.sessionCount ?? 0,
+      lastEvent: store.diagnostics?.workspace.lastEvent
+    )
+  }
+  .preferencesDetailFormStyle()
+  .frame(width: 560)
+}
+
+#Preview("Preferences Diagnostics Section") {
+  let store = PreferencesPreviewSupport.makeStore()
+
+  PreferencesDiagnosticsSection(
+    store: store,
+    effectiveTokenPresent: store.diagnostics?.workspace.authTokenPresent ?? false,
+    effectiveLastEvent: store.diagnostics?.workspace.lastEvent
+  )
+  .frame(width: 720)
 }
