@@ -189,4 +189,29 @@ struct HarnessStoreLifecycleTests {
 
     store.stopAllStreams()
   }
+
+  @Test("Preview store factory preloads cockpit state without bootstrap")
+  func previewStoreFactoryPreloadsCockpitState() {
+    let store = HarnessPreviewStoreFactory.makeStore(for: .cockpitLoaded)
+
+    #expect(store.connectionState == .online)
+    #expect(store.selectedSessionID == PreviewFixtures.summary.sessionId)
+    #expect(store.selectedSession == PreviewFixtures.detail)
+    #expect(store.timeline == PreviewFixtures.timeline)
+    #expect(store.sessions == [PreviewFixtures.summary])
+    #expect(store.groupedSessions.count == 1)
+    #expect(store.isBookmarked(sessionId: PreviewFixtures.summary.sessionId))
+  }
+
+  @Test("Preview store factory exposes overflow sidebar data immediately")
+  func previewStoreFactorySeedsOverflowSidebarState() {
+    let store = HarnessPreviewStoreFactory.makeStore(for: .sidebarOverflow)
+
+    #expect(store.sessionFilter == .all)
+    #expect(store.sessions.count == PreviewFixtures.overflowSessions.count)
+    #expect(store.filteredSessionCount == PreviewFixtures.overflowSessions.count)
+    #expect(store.selectedSessionID == PreviewFixtures.summary.sessionId)
+    #expect(store.selectedSession == PreviewFixtures.detail)
+    #expect(store.groupedSessions.isEmpty == false)
+  }
 }
