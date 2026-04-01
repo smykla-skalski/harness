@@ -156,168 +156,63 @@ final class HarnessGlassContrastUITests: HarnessUITestCase {
     )
   }
 
-  // MARK: - Pixel analysis
+  func testInactiveFilterChipMatchesSortSegmentBackground() throws {
+    let app = launch(mode: "preview")
 
-  private enum SampleRegion {
-    case top
-    case center
-  }
+    // "Ended" is an unselected status filter chip (.bordered + .secondary tint).
+    let endedChip = button(in: app, title: "Ended")
+    // "Status" is an unselected sort segment in the segmented picker.
+    let statusSegment = button(in: app, title: "Status")
 
-  private func edgeLuminance(
-    of element: XCUIElement,
-    region: SampleRegion
-  ) -> Double {
-    let screenshot = element.screenshot()
-    guard let cgImage = screenshot.image.cgImage(
-      forProposedRect: nil,
-      context: nil,
-      hints: nil
-    ) else {
-      return 0
-    }
-
-    let width = cgImage.width
-    let height = cgImage.height
-    guard width > 4, height > 4 else { return 0 }
-
-    let bytesPerPixel = 4
-    let bytesPerRow = width * bytesPerPixel
-    var pixels = [UInt8](repeating: 0, count: height * bytesPerRow)
-
-    guard let context = CGContext(
-      data: &pixels,
-      width: width,
-      height: height,
-      bitsPerComponent: 8,
-      bytesPerRow: bytesPerRow,
-      space: CGColorSpaceCreateDeviceRGB(),
-      bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
-    ) else {
-      return 0
-    }
-
-    context.draw(
-      cgImage,
-      in: CGRect(x: 0, y: 0, width: width, height: height)
+    XCTAssertTrue(
+      endedChip.waitForExistence(timeout: Self.uiTimeout),
+      "Ended chip must exist"
+    )
+    XCTAssertTrue(
+      statusSegment.waitForExistence(timeout: Self.uiTimeout),
+      "Status sort segment must exist"
     )
 
-    // Sample a horizontal strip in the requested region.
-    let stripHeight: Int
-    let startRow: Int
-    switch region {
-    case .top:
-      // Top 25% of the element - above any centered text.
-      stripHeight = max(height / 4, 2)
-      startRow = 2
-    case .center:
-      stripHeight = max(height / 4, 2)
-      startRow = height / 2 - stripHeight / 2
-    }
+    // Use the 1x1 downscale technique: Core Graphics averages all
+    // pixels when drawing into a 1x1 context, giving us the true
+    // average RGBA of the element's rendered appearance.
+    let chipColor = averageColor(of: endedChip)
+    let segmentColor = averageColor(of: statusSegment)
 
-    let edgeSkip = 4
-    var samples: [Double] = []
-    for row in startRow..<min(startRow + stripHeight, height - 2) {
-      for col in stride(from: edgeSkip, to: width - edgeSkip, by: 2) {
-        let offset = row * bytesPerRow + col * bytesPerPixel
-        let red = Double(pixels[offset]) / 255.0
-        let green = Double(pixels[offset + 1]) / 255.0
-        let blue = Double(pixels[offset + 2]) / 255.0
-        samples.append(
-          0.2126 * red + 0.7152 * green + 0.0722 * blue
-        )
-      }
-    }
+    let chipShot = XCTAttachment(screenshot: endedChip.screenshot())
+    chipShot.name = "inactive-ended-chip"
+    chipShot.lifetime = .keepAlways
+    add(chipShot)
 
-    guard !samples.isEmpty else { return 0 }
-    return samples.reduce(0, +) / Double(samples.count)
-  }
+    let segmentShot = XCTAttachment(screenshot: statusSegment.screenshot())
+    segmentShot.name = "inactive-status-segment"
+    segmentShot.lifetime = .keepAlways
+    add(segmentShot)
 
-  private struct LuminanceStats {
-    let min: Double
-    let max: Double
-    let mean: Double
-    let stddev: Double
-    let count: Int
-  }
-
-  private func luminanceStats(of element: XCUIElement) -> LuminanceStats {
-    let screenshot = element.screenshot()
-    guard let cgImage = screenshot.image.cgImage(
-      forProposedRect: nil,
-      context: nil,
-      hints: nil
-    ) else {
-      return LuminanceStats(
-        min: 0, max: 0, mean: 0, stddev: 0, count: 0
-      )
-    }
-
-    let width = cgImage.width
-    let height = cgImage.height
-    guard width > 10, height > 10 else {
-      return LuminanceStats(
-        min: 0, max: 0, mean: 0, stddev: 0, count: 0
-      )
-    }
-
-    let bytesPerPixel = 4
-    let bytesPerRow = width * bytesPerPixel
-    var pixels = [UInt8](repeating: 0, count: height * bytesPerRow)
-
-    guard let context = CGContext(
-      data: &pixels,
-      width: width,
-      height: height,
-      bitsPerComponent: 8,
-      bytesPerRow: bytesPerRow,
-      space: CGColorSpaceCreateDeviceRGB(),
-      bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
-    ) else {
-      return LuminanceStats(
-        min: 0, max: 0, mean: 0, stddev: 0, count: 0
-      )
-    }
-
-    context.draw(
-      cgImage,
-      in: CGRect(x: 0, y: 0, width: width, height: height)
+    print(
+      "CHIP_VS_SEGMENT chip=(\(chipColor.red),\(chipColor.green),\(chipColor.blue)) "
+        + "segment=(\(segmentColor.red),\(segmentColor.green),\(segmentColor.blue))"
     )
 
-    let edgeSkip = 8
-    let step = max(1, min(width, height) / 50)
-    var samples: [Double] = []
+    // Compare each RGB channel. The inactive filter chip and the
+    // inactive sort segment should render with the same background
+    // tone. A per-channel delta above 0.06 (out of 0-1) means the
+    // controls look visually different.
+    let maxDelta = max(
+      abs(chipColor.red - segmentColor.red),
+      abs(chipColor.green - segmentColor.green),
+      abs(chipColor.blue - segmentColor.blue)
+    )
 
-    for row in stride(from: edgeSkip, to: height - edgeSkip, by: step) {
-      for col in stride(from: edgeSkip, to: width - edgeSkip, by: step) {
-        let offset = row * bytesPerRow + col * bytesPerPixel
-        let red = Double(pixels[offset]) / 255.0
-        let green = Double(pixels[offset + 1]) / 255.0
-        let blue = Double(pixels[offset + 2]) / 255.0
-        samples.append(
-          0.2126 * red + 0.7152 * green + 0.0722 * blue
-        )
-      }
-    }
-
-    guard samples.count > 1 else {
-      return LuminanceStats(
-        min: 0, max: 0, mean: 0, stddev: 0, count: 0
-      )
-    }
-
-    let sampleMin = samples.min() ?? 0
-    let sampleMax = samples.max() ?? 0
-    let mean = samples.reduce(0, +) / Double(samples.count)
-    let variance = samples.reduce(0) {
-      $0 + ($1 - mean) * ($1 - mean)
-    } / Double(samples.count - 1)
-
-    return LuminanceStats(
-      min: sampleMin,
-      max: sampleMax,
-      mean: mean,
-      stddev: variance.squareRoot(),
-      count: samples.count
+    XCTAssertLessThan(
+      maxDelta,
+      0.06,
+      "Inactive filter chip and sort segment backgrounds don't match: "
+        + "chip=(\(chipColor.red),\(chipColor.green),\(chipColor.blue)), "
+        + "segment=(\(segmentColor.red),\(segmentColor.green),\(segmentColor.blue)), "
+        + "maxChannelDelta=\(maxDelta). "
+        + "These controls should have consistent inactive backgrounds."
     )
   }
+
 }
