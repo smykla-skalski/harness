@@ -193,3 +193,177 @@ extension PreviewFixtures {
     )
   ]
 }
+
+@MainActor
+public enum HarnessPreviewStoreFactory {
+  public enum Scenario: Sendable {
+    case dashboardLoaded
+    case cockpitLoaded
+    case sidebarOverflow
+    case empty
+  }
+
+  public static func makeStore(for scenario: Scenario) -> HarnessStore {
+    let configuration = configuration(for: scenario)
+    let store = HarnessStore(daemonController: PreviewDaemonController(mode: configuration.mode))
+    store.connectionState = .online
+    store.health = configuration.fixtures.health
+    store.daemonStatus = configuration.statusReport
+    store.connectionMetrics = configuration.connectionMetrics
+    store.connectionEvents = [
+      ConnectionEvent(
+        kind: .connected,
+        detail: "Connected via \(configuration.connectionMetrics.transportKind.title)",
+        transportKind: configuration.connectionMetrics.transportKind
+      )
+    ]
+    store.sessionIndex.replaceSnapshot(
+      projects: configuration.fixtures.projects,
+      sessions: configuration.fixtures.sessions
+    )
+    store.bookmarkedSessionIds = configuration.bookmarkedSessionIDs
+    store.sessionFilter = configuration.sessionFilter
+    store.selectedSessionID = configuration.selectedSessionID
+    store.selectedSession = configuration.selectedDetail
+    store.timeline = configuration.timeline
+    store.isSelectionLoading = false
+    store.isShowingCachedData = false
+    store.synchronizeActionActor()
+    return store
+  }
+}
+
+private struct PreviewStoreConfiguration {
+  let mode: PreviewDaemonController.Mode
+  let fixtures: PreviewHarnessClient.Fixtures
+  let statusReport: DaemonStatusReport
+  let connectionMetrics: ConnectionMetrics
+  let bookmarkedSessionIDs: Set<String>
+  let sessionFilter: HarnessStore.SessionFilter
+  let selectedSessionID: String?
+  let selectedDetail: SessionDetail?
+  let timeline: [TimelineEntry]
+}
+
+private extension HarnessPreviewStoreFactory {
+  static func configuration(for scenario: Scenario) -> PreviewStoreConfiguration {
+    switch scenario {
+    case .dashboardLoaded:
+      let fixtures = PreviewHarnessClient.Fixtures.populated
+      return PreviewStoreConfiguration(
+        mode: .populated,
+        fixtures: fixtures,
+        statusReport: makeStatusReport(fixtures: fixtures),
+        connectionMetrics: makeConnectionMetrics(latencyMs: 24, messagesPerSecond: 7.2),
+        bookmarkedSessionIDs: [PreviewFixtures.summary.sessionId],
+        sessionFilter: .active,
+        selectedSessionID: nil,
+        selectedDetail: nil,
+        timeline: []
+      )
+    case .cockpitLoaded:
+      let fixtures = PreviewHarnessClient.Fixtures.populated
+      return PreviewStoreConfiguration(
+        mode: .populated,
+        fixtures: fixtures,
+        statusReport: makeStatusReport(fixtures: fixtures),
+        connectionMetrics: makeConnectionMetrics(latencyMs: 24, messagesPerSecond: 7.2),
+        bookmarkedSessionIDs: [PreviewFixtures.summary.sessionId],
+        sessionFilter: .active,
+        selectedSessionID: PreviewFixtures.summary.sessionId,
+        selectedDetail: PreviewFixtures.detail,
+        timeline: PreviewFixtures.timeline
+      )
+    case .sidebarOverflow:
+      let fixtures = PreviewHarnessClient.Fixtures.overflow
+      return PreviewStoreConfiguration(
+        mode: .overflow,
+        fixtures: fixtures,
+        statusReport: makeStatusReport(fixtures: fixtures),
+        connectionMetrics: makeConnectionMetrics(latencyMs: 38, messagesPerSecond: 12.4),
+        bookmarkedSessionIDs: [
+          PreviewFixtures.summary.sessionId,
+          PreviewFixtures.overflowSessions[4].sessionId,
+        ],
+        sessionFilter: .all,
+        selectedSessionID: PreviewFixtures.summary.sessionId,
+        selectedDetail: PreviewFixtures.detail,
+        timeline: PreviewFixtures.timeline
+      )
+    case .empty:
+      let fixtures = PreviewHarnessClient.Fixtures.empty
+      return PreviewStoreConfiguration(
+        mode: .empty,
+        fixtures: fixtures,
+        statusReport: makeStatusReport(fixtures: fixtures),
+        connectionMetrics: makeConnectionMetrics(latencyMs: 42, messagesPerSecond: 0),
+        bookmarkedSessionIDs: [],
+        sessionFilter: .active,
+        selectedSessionID: nil,
+        selectedDetail: nil,
+        timeline: []
+      )
+    }
+  }
+
+  static func makeStatusReport(fixtures: PreviewHarnessClient.Fixtures) -> DaemonStatusReport {
+    let hasSessions = !fixtures.sessions.isEmpty
+    return DaemonStatusReport(
+      manifest: DaemonManifest(
+        version: fixtures.health.version,
+        pid: fixtures.health.pid,
+        endpoint: fixtures.health.endpoint,
+        startedAt: fixtures.health.startedAt,
+        tokenPath: "/Users/example/Library/Application Support/harness/daemon/auth-token"
+      ),
+      launchAgent: LaunchAgentStatus(
+        installed: hasSessions,
+        loaded: hasSessions,
+        label: "io.harness.daemon",
+        path: "/Users/example/Library/LaunchAgents/io.harness.daemon.plist",
+        domainTarget: "gui/501",
+        serviceTarget: "gui/501/io.harness.daemon",
+        state: hasSessions ? "running" : nil,
+        pid: hasSessions ? fixtures.health.pid : nil,
+        lastExitStatus: hasSessions ? 0 : nil
+      ),
+      projectCount: fixtures.projects.count,
+      sessionCount: fixtures.sessions.count,
+      diagnostics: DaemonDiagnostics(
+        daemonRoot: "/Users/example/Library/Application Support/harness/daemon",
+        manifestPath: "/Users/example/Library/Application Support/harness/daemon/manifest.json",
+        authTokenPath: "/Users/example/Library/Application Support/harness/daemon/auth-token",
+        authTokenPresent: true,
+        eventsPath: "/Users/example/Library/Application Support/harness/daemon/events.jsonl",
+        cacheRoot: "/Users/example/Library/Application Support/harness/daemon/cache/projects",
+        cacheEntryCount: hasSessions ? max(4, fixtures.sessions.count) : 0,
+        lastEvent: hasSessions
+          ? DaemonAuditEvent(
+            recordedAt: "2026-03-28T14:18:00Z",
+            level: "info",
+            message: "indexed session \(fixtures.sessions[0].sessionId)"
+          ) : nil
+      )
+    )
+  }
+
+  static func makeConnectionMetrics(
+    latencyMs: Int,
+    messagesPerSecond: Double
+  ) -> ConnectionMetrics {
+    ConnectionMetrics(
+      transportKind: .webSocket,
+      latencyMs: latencyMs,
+      averageLatencyMs: latencyMs + 4,
+      messagesReceived: 64,
+      messagesSent: 64,
+      messagesPerSecond: messagesPerSecond,
+      connectedSince: .now.addingTimeInterval(-900),
+      lastMessageAt: .now,
+      reconnectAttempt: 0,
+      reconnectCount: 0,
+      isFallback: false,
+      fallbackReason: nil
+    )
+  }
+}
