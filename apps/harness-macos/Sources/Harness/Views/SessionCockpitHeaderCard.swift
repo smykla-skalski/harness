@@ -2,8 +2,12 @@ import HarnessKit
 import SwiftUI
 
 struct SessionCockpitHeaderCard: View {
-  let store: HarnessStore
   let detail: SessionDetail
+  let isSessionActionInFlight: Bool
+  let isSelectionLoading: Bool
+  let observeSelectedSession: () -> Void
+  let requestEndSessionConfirmation: () -> Void
+  let inspectObserver: () -> Void
 
   var body: some View {
     VStack(alignment: .leading, spacing: HarnessTheme.sectionSpacing) {
@@ -34,13 +38,13 @@ struct SessionCockpitHeaderCard: View {
       }
 
       Group {
-        if store.isSessionActionInFlight || store.isSelectionLoading {
+        if isSessionActionInFlight || isSelectionLoading {
           HarnessLoadingStateView(title: "Refreshing live session detail")
             .transition(.move(edge: .top).combined(with: .opacity))
         }
       }
-      .animation(.spring(duration: 0.3), value: store.isSessionActionInFlight)
-      .animation(.spring(duration: 0.3), value: store.isSelectionLoading)
+      .animation(.spring(duration: 0.3), value: isSessionActionInFlight)
+      .animation(.spring(duration: 0.3), value: isSelectionLoading)
 
       if let observer = detail.observer {
         observerSummary(observer)
@@ -65,11 +69,11 @@ struct SessionCockpitHeaderCard: View {
         tint: nil
       )
       .controlSize(HarnessControlMetrics.compactControlSize)
-      .disabled(store.isSessionActionInFlight)
+      .disabled(isSessionActionInFlight)
   }
 
   private var endSessionButton: some View {
-    Button("End Session", action: store.requestEndSelectedSessionConfirmation)
+    Button("End Session", action: requestEndSessionConfirmation)
       .scaledFont(.system(.subheadline, design: .rounded, weight: .semibold))
       .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
       .controlSize(HarnessControlMetrics.compactControlSize)
@@ -77,9 +81,7 @@ struct SessionCockpitHeaderCard: View {
   }
 
   private func observerSummary(_ observer: ObserverSummary) -> some View {
-    Button {
-      store.inspectObserver()
-    } label: {
+    Button(action: inspectObserver) {
       VStack(alignment: .leading, spacing: HarnessTheme.itemSpacing) {
         ViewThatFits(in: .horizontal) {
           HStack(spacing: HarnessTheme.spacingLG) {
@@ -166,10 +168,17 @@ struct SessionCockpitHeaderCard: View {
         .scaledFont(.system(.callout, design: .rounded, weight: .semibold))
     }
   }
+}
 
-  private func observeSelectedSession() {
-    Task {
-      await store.observeSelectedSession()
-    }
-  }
+#Preview("Cockpit header") {
+  SessionCockpitHeaderCard(
+    detail: PreviewFixtures.detail,
+    isSessionActionInFlight: false,
+    isSelectionLoading: false,
+    observeSelectedSession: {},
+    requestEndSessionConfirmation: {},
+    inspectObserver: {}
+  )
+  .padding()
+  .frame(width: 960)
 }

@@ -328,7 +328,19 @@ private struct SessionContentContainer: View {
   var body: some View {
     Group {
       if let detail {
-        SessionCockpitView(store: store, detail: detail, timeline: timeline)
+        SessionCockpitView(
+          detail: detail,
+          timeline: timeline,
+          isSessionActionInFlight: store.isSessionActionInFlight,
+          isSelectionLoading: store.isSelectionLoading,
+          lastAction: store.lastAction,
+          observeSelectedSession: observeSelectedSession,
+          requestEndSessionConfirmation: store.requestEndSelectedSessionConfirmation,
+          inspectTask: store.inspect(taskID:),
+          inspectAgent: store.inspect(agentID:),
+          inspectSignal: store.inspect(signalID:),
+          inspectObserver: store.inspectObserver
+        )
           .transition(.opacity)
       } else if let summary {
         SessionLoadingView(summary: summary)
@@ -340,6 +352,12 @@ private struct SessionContentContainer: View {
     }
     .animation(.spring(duration: 0.3), value: detail?.session.sessionId)
     .animation(.spring(duration: 0.3), value: summary?.sessionId)
+  }
+
+  private func observeSelectedSession() {
+    Task {
+      await store.observeSelectedSession()
+    }
   }
 }
 
@@ -382,5 +400,9 @@ private struct SessionLoadingView: View {
 }
 
 #Preview("Dashboard") {
-  ContentView(store: HarnessStore(daemonController: PreviewDaemonController()))
+  ContentView(store: HarnessPreviewStoreFactory.makeStore(for: .dashboardLoaded))
+}
+
+#Preview("Cockpit shell") {
+  ContentView(store: HarnessPreviewStoreFactory.makeStore(for: .cockpitLoaded))
 }

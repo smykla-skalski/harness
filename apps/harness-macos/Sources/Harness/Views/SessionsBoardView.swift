@@ -20,7 +20,10 @@ struct SessionsBoardView: View {
           SessionsBoardOnboardingCard(store: store, isLoading: isLoading)
         }
         metricsSection
-        SessionsBoardRecentSessionsSection(sessions: store.sessions, store: store)
+        SessionsBoardRecentSessionsSection(
+          sessions: store.sessions,
+          selectSession: selectSession
+        )
       }
       .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -90,5 +93,12 @@ struct SessionsBoardView: View {
       label: title,
       value: value
     )
+  }
+
+  private func selectSession(_ sessionID: String) {
+    store.primeSessionSelection(sessionID)
+    Task {
+      await store.selectSession(sessionID)
+    }
   }
 }
