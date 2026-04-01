@@ -1,10 +1,13 @@
 import HarnessKit
-import Observation
 import SwiftUI
 
 struct SessionActionDock: View {
-  let store: HarnessStore
   let detail: SessionDetail
+  let isSessionActionInFlight: Bool
+  let lastAction: String
+  let inspectTask: (String) -> Void
+  let inspectAgent: (String) -> Void
+  let inspectObserver: () -> Void
 
   private var firstTaskID: String? {
     detail.tasks.first?.taskId
@@ -27,11 +30,11 @@ struct SessionActionDock: View {
         }
         Spacer()
         VStack(alignment: .trailing, spacing: 4) {
-          if store.isSessionActionInFlight {
+          if isSessionActionInFlight {
             HarnessSpinner()
               .transition(.opacity)
-          } else if !store.lastAction.isEmpty {
-            Text(store.lastAction)
+          } else if !lastAction.isEmpty {
+            Text(lastAction)
               .scaledFont(.caption.bold())
               .foregroundStyle(HarnessTheme.success)
               .accessibilityIdentifier(HarnessAccessibility.actionToast)
@@ -41,8 +44,8 @@ struct SessionActionDock: View {
             .scaledFont(.caption.monospacedDigit())
             .foregroundStyle(HarnessTheme.secondaryInk)
         }
-        .animation(.spring(duration: 0.2), value: store.isSessionActionInFlight)
-        .animation(.spring(duration: 0.2), value: store.lastAction.isEmpty)
+        .animation(.spring(duration: 0.2), value: isSessionActionInFlight)
+        .animation(.spring(duration: 0.2), value: lastAction.isEmpty)
       }
 
       ViewThatFits(in: .horizontal) {
@@ -114,17 +117,30 @@ struct SessionActionDock: View {
     guard let taskID = firstTaskID else {
       return
     }
-    store.inspect(taskID: taskID)
+    inspectTask(taskID)
   }
 
   private func focusFirstAgent() {
     guard let agentID = firstAgentID else {
       return
     }
-    store.inspect(agentID: agentID)
+    inspectAgent(agentID)
   }
 
   private func focusObserver() {
-    store.inspectObserver()
+    inspectObserver()
   }
+}
+
+#Preview("Action flow") {
+  SessionActionDock(
+    detail: PreviewFixtures.detail,
+    isSessionActionInFlight: false,
+    lastAction: "Observe action queued",
+    inspectTask: { _ in },
+    inspectAgent: { _ in },
+    inspectObserver: {}
+  )
+  .padding()
+  .frame(width: 960)
 }

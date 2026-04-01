@@ -61,7 +61,7 @@ private let sessionLaneCardHeight: CGFloat = 116
 
 struct SessionTaskListSection: View {
   let tasks: [WorkItem]
-  let store: HarnessStore
+  let inspectTask: (String) -> Void
 
   var body: some View {
     VStack(alignment: .leading, spacing: HarnessTheme.sectionSpacing) {
@@ -77,7 +77,7 @@ struct SessionTaskListSection: View {
       } else {
         LazyVStack(alignment: .leading, spacing: HarnessTheme.sectionSpacing) {
           ForEach(tasks) { task in
-            SessionTaskSummaryCard(task: task, store: store)
+            SessionTaskSummaryCard(task: task, inspectTask: inspectTask)
           }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -89,10 +89,10 @@ struct SessionTaskListSection: View {
 
 struct SessionTaskSummaryCard: View {
   let task: WorkItem
-  let store: HarnessStore
+  let inspectTask: (String) -> Void
 
   var body: some View {
-    Button { store.inspect(taskID: task.taskId) } label: {
+    Button { inspectTask(task.taskId) } label: {
       VStack(alignment: .leading, spacing: HarnessTheme.itemSpacing) {
         HStack(alignment: .top) {
           Text(task.title)
@@ -127,7 +127,7 @@ struct SessionTaskSummaryCard: View {
     }
     .harnessInteractiveCardButtonStyle()
     .contextMenu {
-      Button { store.inspect(taskID: task.taskId) } label: {
+      Button { inspectTask(task.taskId) } label: {
         Label("Inspect", systemImage: "info.circle")
       }
       Divider()
@@ -147,7 +147,7 @@ struct SessionTaskSummaryCard: View {
 
 struct SessionAgentListSection: View {
   let agents: [AgentRegistration]
-  let store: HarnessStore
+  let inspectAgent: (String) -> Void
 
   var body: some View {
     VStack(alignment: .leading, spacing: HarnessTheme.sectionSpacing) {
@@ -163,7 +163,7 @@ struct SessionAgentListSection: View {
       } else {
         LazyVStack(alignment: .leading, spacing: HarnessTheme.sectionSpacing) {
           ForEach(agents) { agent in
-            SessionAgentSummaryCard(agent: agent, store: store)
+            SessionAgentSummaryCard(agent: agent, inspectAgent: inspectAgent)
           }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -175,10 +175,10 @@ struct SessionAgentListSection: View {
 
 struct SessionAgentSummaryCard: View {
   let agent: AgentRegistration
-  let store: HarnessStore
+  let inspectAgent: (String) -> Void
 
   var body: some View {
-    Button { store.inspect(agentID: agent.agentId) } label: {
+    Button { inspectAgent(agent.agentId) } label: {
       VStack(alignment: .leading, spacing: HarnessTheme.itemSpacing) {
         HStack(alignment: .top) {
           Text(agent.name)
@@ -207,7 +207,7 @@ struct SessionAgentSummaryCard: View {
     }
     .harnessInteractiveCardButtonStyle()
     .contextMenu {
-      Button { store.inspect(agentID: agent.agentId) } label: {
+      Button { inspectAgent(agent.agentId) } label: {
         Label("Inspect", systemImage: "info.circle")
       }
       Divider()
@@ -236,4 +236,22 @@ struct SessionAgentSummaryCard: View {
 private func copyToClipboard(_ text: String) {
   NSPasteboard.general.clearContents()
   NSPasteboard.general.setString(text, forType: .string)
+}
+
+#Preview("Metrics") {
+  SessionMetricGrid(metrics: PreviewFixtures.summary.metrics)
+    .padding()
+    .frame(width: 960)
+}
+
+#Preview("Task summary") {
+  SessionTaskSummaryCard(task: PreviewFixtures.tasks[0], inspectTask: { _ in })
+    .padding()
+    .frame(width: 320)
+}
+
+#Preview("Agent summary") {
+  SessionAgentSummaryCard(agent: PreviewFixtures.agents[1], inspectAgent: { _ in })
+    .padding()
+    .frame(width: 320)
 }

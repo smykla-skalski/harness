@@ -3,7 +3,7 @@ import SwiftUI
 
 struct SessionsBoardRecentSessionsSection: View {
   let sessions: [SessionSummary]
-  let store: HarnessStore
+  let selectSession: (String) -> Void
 
   var body: some View {
     VStack(alignment: .leading, spacing: HarnessTheme.sectionSpacing) {
@@ -21,8 +21,7 @@ struct SessionsBoardRecentSessionsSection: View {
         VStack(alignment: .leading, spacing: HarnessTheme.sectionSpacing) {
           ForEach(sessions.prefix(8)) { session in
             Button {
-              store.primeSessionSelection(session.sessionId)
-              Task { await store.selectSession(session.sessionId) }
+              selectSession(session.sessionId)
             } label: {
               HStack(alignment: .top, spacing: HarnessTheme.sectionSpacing) {
                 RoundedRectangle(cornerRadius: HarnessTheme.cornerRadiusSM, style: .continuous)
@@ -55,8 +54,7 @@ struct SessionsBoardRecentSessionsSection: View {
             .harnessInteractiveCardButtonStyle()
             .contextMenu {
               Button {
-                store.primeSessionSelection(session.sessionId)
-                Task { await store.selectSession(session.sessionId) }
+                selectSession(session.sessionId)
               } label: {
                 Label("Inspect", systemImage: "info.circle")
               }
@@ -81,4 +79,13 @@ struct SessionsBoardRecentSessionsSection: View {
     )
     .accessibilityFrameMarker("\(HarnessAccessibility.recentSessionsCard).frame")
   }
+}
+
+#Preview("Recent sessions") {
+  SessionsBoardRecentSessionsSection(
+    sessions: PreviewFixtures.overflowSessions,
+    selectSession: { _ in }
+  )
+  .padding()
+  .frame(width: 960)
 }
