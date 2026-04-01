@@ -6,34 +6,25 @@ struct SidebarView: View {
 
   var body: some View {
     List {
-      Section {
-        DaemonStatusCard(store: store)
-      }
-      .listRowInsets(EdgeInsets(
-        top: HarnessTheme.spacingXL,
-        leading: HarnessTheme.sectionSpacing,
-        bottom: 0,
-        trailing: HarnessTheme.sectionSpacing
-      ))
-      .listRowSeparator(.hidden)
-      .listRowBackground(Color.clear)
-
-      Section {
-        SidebarFilterSection(store: store)
-          .compositingGroup()
-      }
-      .listRowInsets(EdgeInsets(
-        top: HarnessTheme.sectionSpacing,
-        leading: HarnessTheme.sectionSpacing,
-        bottom: HarnessTheme.sectionSpacing,
-        trailing: HarnessTheme.sectionSpacing
-      ))
-      .listRowSeparator(.hidden)
-      .listRowBackground(Color.clear)
-
       sessionSections
     }
     .listStyle(.sidebar)
+    .safeAreaInset(edge: .top, spacing: 0) {
+      ScrollView {
+        VStack(alignment: .leading, spacing: HarnessTheme.sectionSpacing) {
+          DaemonStatusCard(store: store)
+          SidebarFilterSection(store: store)
+        }
+        .padding(.horizontal, HarnessTheme.sectionSpacing)
+        .padding(.top, HarnessTheme.spacingXL)
+        .padding(.bottom, HarnessTheme.sectionSpacing)
+      }
+      .scrollBounceBehavior(.basedOnSize)
+      .frame(maxHeight: 420)
+      .accessibilityElement(children: .contain)
+      .accessibilityIdentifier(HarnessAccessibility.sidebarFiltersCard)
+      .accessibilityFrameMarker("\(HarnessAccessibility.sidebarFiltersCard).frame")
+    }
     .safeAreaInset(edge: .bottom, spacing: 0) {
       ConnectionToolbarBadge(metrics: store.connectionMetrics)
         .frame(maxWidth: .infinity, alignment: .leading)
