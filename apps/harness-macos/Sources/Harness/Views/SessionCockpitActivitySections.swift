@@ -3,7 +3,7 @@ import SwiftUI
 
 struct SessionCockpitSignalsSection: View {
   let signals: [SessionSignalRecord]
-  let store: HarnessStore
+  let inspectSignal: (String) -> Void
 
   var body: some View {
     VStack(alignment: .leading, spacing: HarnessTheme.sectionSpacing) {
@@ -21,7 +21,7 @@ struct SessionCockpitSignalsSection: View {
       LazyVStack(alignment: .leading, spacing: HarnessTheme.sectionSpacing) {
         ForEach(signals) { signal in
           Button {
-            store.inspect(signalID: signal.signal.signalId)
+            inspectSignal(signal.signal.signalId)
           } label: {
             HStack(alignment: .top) {
               VStack(alignment: .leading, spacing: HarnessTheme.itemSpacing) {
@@ -48,7 +48,7 @@ struct SessionCockpitSignalsSection: View {
           .harnessInteractiveCardButtonStyle()
           .contextMenu {
             Button {
-              store.inspect(signalID: signal.signal.signalId)
+              inspectSignal(signal.signal.signalId)
             } label: {
               Label("Inspect", systemImage: "info.circle")
             }
@@ -71,6 +71,12 @@ struct SessionCockpitSignalsSection: View {
     }
     .frame(maxWidth: .infinity, alignment: .leading)
   }
+}
+
+#Preview("Signals") {
+  SessionCockpitSignalsSection(signals: PreviewFixtures.signals, inspectSignal: { _ in })
+    .padding()
+    .frame(width: 960)
 }
 
 struct SessionCockpitTimelineSection: View {
