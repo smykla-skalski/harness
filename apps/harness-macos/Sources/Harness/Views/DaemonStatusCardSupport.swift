@@ -144,15 +144,29 @@ private struct DaemonRestartButton: View {
 private struct DaemonStatusPill: View {
   let statusTitle: String
   let statusBackground: Color
+  @Environment(\.accessibilityReduceTransparency)
+  private var reduceTransparency
+  @Environment(\.colorSchemeContrast)
+  private var colorSchemeContrast
 
   var body: some View {
     Text(statusTitle)
       .scaledFont(.caption.bold())
       .harnessPillPadding()
-      .harnessContentPill(tint: statusBackground)
+      .background {
+        Capsule()
+          .fill(statusBackground.opacity(fillOpacity))
+      }
       .foregroundStyle(HarnessTheme.onContrast)
       .accessibilityIdentifier(HarnessAccessibility.sidebarDaemonStatusBadge)
-      .harnessUITestValue("chrome=content-pill")
+      .harnessUITestValue("chrome=flat-status-pill")
+  }
+
+  private var fillOpacity: Double {
+    if reduceTransparency {
+      return colorSchemeContrast == .increased ? 0.72 : 0.62
+    }
+    return colorSchemeContrast == .increased ? 0.58 : 0.48
   }
 }
 
