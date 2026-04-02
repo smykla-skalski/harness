@@ -1,24 +1,20 @@
 import AppKit
 import HarnessKit
 import SwiftUI
-
 private struct ProminentButtonForegroundKey: EnvironmentKey {
   static let defaultValue: Color? = nil
 }
-
 extension EnvironmentValues {
   var prominentButtonForeground: Color? {
     get { self[ProminentButtonForegroundKey.self] }
     set { self[ProminentButtonForegroundKey.self] = newValue }
   }
 }
-
 enum HarnessControlMetrics {
   static let compactControlSize: ControlSize = .small
   fileprivate static let disabledButtonChromeBehavior: HarnessDisabledButtonChromeBehavior =
     .regularize
 }
-
 private enum HarnessDisabledButtonChromeBehavior {
   case regularize
   case preserveConfiguredStyle
@@ -237,9 +233,6 @@ private struct HarnessSystemButtonChromeModifier: ViewModifier {
       }
     case .borderedProminent:
       if let effectiveTint {
-        // Glass prominent buttons ignore .foregroundStyle() on the container.
-        // Apply contrast-safe foreground via .tint() on the label environment
-        // and override the label text color with a LabelStyle or environment.
         content
           .buttonStyle(.borderedProminent)
           .tint(effectiveTint)
@@ -270,8 +263,6 @@ private enum HarnessProminentButtonContrast {
       blue: rgbColor.blueComponent
     )
 
-    // WCAG contrast ratio: pick whichever foreground has better contrast.
-    // White luminance ~1.0, dark foreground luminance ~0.03.
     let contrastWithWhite = (1.0 + 0.05) / (bgLuminance + 0.05)
     let contrastWithDark = (bgLuminance + 0.05) / (0.03 + 0.05)
 
@@ -335,6 +326,54 @@ private struct InteractiveCardHoverModifier: ViewModifier {
           }
         }
       }
+      .harnessUITestValue("chrome=content-card")
+  }
+}
+
+private struct SidebarRowButtonStyle: ButtonStyle {
+  let cornerRadius: CGFloat
+  let tint: Color
+  let isHovered: Bool
+  @Environment(\.isEnabled)
+  private var isEnabled
+
+  func makeBody(configuration: Configuration) -> some View {
+    let fillOpacity = configuration.isPressed ? 0.14 : isHovered ? 0.09 : 0.04
+    configuration.label
+      .background {
+        RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+          .fill(tint.opacity(fillOpacity))
+      }
+      .contentShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+      .opacity(isEnabled ? 1 : 0.4)
+      .animation(.easeOut(duration: 0.1), value: configuration.isPressed)
+  }
+}
+
+private struct SidebarRowHoverModifier: ViewModifier {
+  let cornerRadius: CGFloat
+  let tint: Color
+  @State private var isHovered = false
+
+  func body(content: Content) -> some View {
+    content
+      .buttonStyle(
+        SidebarRowButtonStyle(
+          cornerRadius: cornerRadius,
+          tint: tint,
+          isHovered: isHovered
+        )
+      )
+      .onContinuousHover { phase in
+        withAnimation(.easeOut(duration: 0.15)) {
+          switch phase {
+          case .active:
+            isHovered = true
+          case .ended:
+            isHovered = false
+          }
+        }
+      }
   }
 }
 
@@ -370,5 +409,12 @@ extension View {
         tint: tint
       )
     )
+  }
+
+  func harnessSidebarRowButtonStyle(
+    cornerRadius: CGFloat = HarnessTheme.cornerRadiusLG,
+    tint: Color = HarnessTheme.accent
+  ) -> some View {
+    modifier(SidebarRowHoverModifier(cornerRadius: cornerRadius, tint: tint))
   }
 }

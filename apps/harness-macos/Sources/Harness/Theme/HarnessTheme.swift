@@ -1,8 +1,6 @@
 import HarnessKit
 import SwiftUI
 
-private let isHarnessUITesting = ProcessInfo.processInfo.environment["HARNESS_UI_TESTS"] == "1"
-
 private func harnessColor(_ name: String) -> Color {
   Color(name, bundle: .main)
 }
@@ -111,10 +109,25 @@ struct LiveActivityBorderModifier: ViewModifier {
 }
 
 struct HarnessLoadingStateView: View {
+  enum Chrome {
+    case content
+    case control
+  }
+
   let title: String
+  let chrome: Chrome
   @Environment(\.accessibilityReduceMotion)
   private var reduceMotion
   @State private var animates = false
+
+  init(title: String) {
+    self.init(title: title, chrome: .content)
+  }
+
+  init(title: String, chrome: Chrome) {
+    self.title = title
+    self.chrome = chrome
+  }
 
   var body: some View {
     HStack(spacing: HarnessTheme.itemSpacing) {
@@ -123,7 +136,7 @@ struct HarnessLoadingStateView: View {
         .scaledFont(.system(.footnote, design: .rounded, weight: .semibold))
     }
     .harnessCellPadding()
-    .harnessInfoPill(tint: HarnessTheme.accent)
+    .modifier(HarnessStatusPillChromeModifier(chrome: chrome, tint: HarnessTheme.accent))
     .opacity(animates ? 1 : 0.62)
     .scaleEffect(reduceMotion ? 1 : (animates ? 1 : 0.97))
     .animation(
@@ -136,7 +149,7 @@ struct HarnessLoadingStateView: View {
   }
 }
 
-private struct HarnessInfoPillModifier: ViewModifier {
+private struct HarnessContentPillModifier: ViewModifier {
   let tint: Color
   @Environment(\.accessibilityReduceTransparency)
   private var reduceTransparency
@@ -171,42 +184,25 @@ private struct HarnessInfoPillModifier: ViewModifier {
   }
 }
 
-private struct AccessibilityFrameMarker: View {
-  let identifier: String
+private struct HarnessControlPillModifier: ViewModifier {
+  let tint: Color
 
-  var body: some View {
-    Color.clear
-      .allowsHitTesting(false)
-      .accessibilityElement()
-      .accessibilityIdentifier(identifier)
+  func body(content: Content) -> some View {
+    content.harnessControlPillGlass(tint: tint)
   }
 }
 
-private struct AccessibilityProbe: View {
-  let identifier: String
-  let label: String?
-  let value: String?
+private struct HarnessStatusPillChromeModifier: ViewModifier {
+  let chrome: HarnessLoadingStateView.Chrome
+  let tint: Color
 
-  var body: some View {
-    Color.clear
-      .allowsHitTesting(false)
-      .accessibilityElement()
-      .accessibilityLabel(label ?? "")
-      .accessibilityValue(value ?? "")
-      .accessibilityIdentifier(identifier)
-  }
-}
-
-struct AccessibilityTextMarker: View {
-  let identifier: String
-  let text: String
-
-  var body: some View {
-    Color.clear
-      .allowsHitTesting(false)
-      .accessibilityElement()
-      .accessibilityLabel(text)
-      .accessibilityIdentifier(identifier)
+  func body(content: Content) -> some View {
+    switch chrome {
+    case .content:
+      content.modifier(HarnessContentPillModifier(tint: tint))
+    case .control:
+      content.modifier(HarnessControlPillModifier(tint: tint))
+    }
   }
 }
 
@@ -225,63 +221,9 @@ private struct HarnessSelectionOutlineModifier: ViewModifier {
   }
 }
 
-private struct AccessibilityFrameMarkerModifier: ViewModifier {
-  let identifier: String
-
-  @ViewBuilder
-  func body(content: Content) -> some View {
-    if isHarnessUITesting {
-      content.overlay {
-        AccessibilityFrameMarker(identifier: identifier)
-      }
-    } else {
-      content
-    }
-  }
-}
-
-private struct AccessibilityProbeModifier: ViewModifier {
-  let identifier: String
-  let label: String?
-  let value: String?
-
-  @ViewBuilder
-  func body(content: Content) -> some View {
-    if isHarnessUITesting {
-      content.overlay {
-        AccessibilityProbe(
-          identifier: identifier,
-          label: label,
-          value: value
-        )
-      }
-    } else {
-      content
-    }
-  }
-}
-
 extension View {
   func liveActivityBorder(isActive: Bool) -> some View {
     modifier(LiveActivityBorderModifier(isActive: isActive))
-  }
-
-  func accessibilityFrameMarker(_ identifier: String) -> some View {
-    modifier(AccessibilityFrameMarkerModifier(identifier: identifier))
-  }
-
-  func accessibilityTestProbe(
-    _ identifier: String,
-    label: String? = nil,
-    value: String? = nil
-  ) -> some View {
-    modifier(
-      AccessibilityProbeModifier(
-        identifier: identifier,
-        label: label,
-        value: value
-      )
-    )
   }
 
   func harnessSelectionOutline(
@@ -298,8 +240,12 @@ extension View {
     )
   }
 
-  func harnessInfoPill(tint: Color = HarnessTheme.ink) -> some View {
-    modifier(HarnessInfoPillModifier(tint: tint))
+  func harnessContentPill(tint: Color = HarnessTheme.ink) -> some View {
+    modifier(HarnessContentPillModifier(tint: tint))
+  }
+
+  func harnessControlPill(tint: Color = HarnessTheme.ink) -> some View {
+    modifier(HarnessControlPillModifier(tint: tint))
   }
 
   func harnessPillPadding() -> some View {
@@ -338,7 +284,7 @@ struct HarnessBadge: View {
     Text(value)
       .scaledFont(.caption.bold())
       .harnessPillPadding()
-      .harnessInfoPill(tint: HarnessTheme.accent)
+      .harnessContentPill(tint: HarnessTheme.accent)
   }
 }
 

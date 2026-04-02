@@ -23,7 +23,8 @@ struct TransportBadge: View {
     }
     .foregroundStyle(tint)
     .harnessPillPadding()
-    .harnessInfoPill(tint: tint)
+    .harnessControlPill(tint: tint)
+    .harnessUITestValue("chrome=glass-static")
     .fixedSize()
     .accessibilityElement(children: .combine)
   }
@@ -47,7 +48,8 @@ struct LatencyBadge: View {
       .lineLimit(1)
       .fixedSize()
       .harnessPillPadding()
-      .harnessInfoPill(tint: tint)
+      .harnessControlPill(tint: tint)
+      .harnessUITestValue("chrome=glass-static")
   }
 }
 
@@ -166,6 +168,7 @@ struct ConnectionToolbarBadge: View {
     .accessibilityElement(children: .ignore)
     .accessibilityIdentifier(HarnessAccessibility.connectionBadge)
     .accessibilityLabel(accessibilityLabel)
+    .harnessUITestValue("chrome=glass-static")
     .help(accessibilityLabel)
   }
 }

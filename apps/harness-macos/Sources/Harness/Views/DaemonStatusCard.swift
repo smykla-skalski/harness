@@ -21,31 +21,35 @@ struct DaemonStatusCard: View {
             .foregroundStyle(HarnessTheme.secondaryInk)
         }
         Spacer()
-        HStack(spacing: HarnessTheme.itemSpacing) {
-          restartButton
-          statusPill
+        HarnessGlassControlGroup(spacing: HarnessTheme.itemSpacing) {
+          HStack(spacing: HarnessTheme.itemSpacing) {
+            restartButton
+            statusPill
+          }
         }
       }
 
       Group {
         if store.isRefreshing || store.connectionState == .connecting {
-          HarnessLoadingStateView(title: loadingTitle)
+          HarnessLoadingStateView(title: loadingTitle, chrome: .control)
             .transition(.move(edge: .top).combined(with: .opacity))
         }
       }
 
-      ViewThatFits(in: .horizontal) {
-        HStack(spacing: HarnessTheme.itemSpacing) {
-          daemonProjectsBadge
-          daemonSessionsBadge
-          daemonLaunchdBadge
-        }
-        VStack(alignment: .leading, spacing: HarnessTheme.itemSpacing) {
+      HarnessGlassControlGroup(spacing: HarnessTheme.itemSpacing) {
+        ViewThatFits(in: .horizontal) {
           HStack(spacing: HarnessTheme.itemSpacing) {
             daemonProjectsBadge
             daemonSessionsBadge
+            daemonLaunchdBadge
           }
-          daemonLaunchdBadge
+          VStack(alignment: .leading, spacing: HarnessTheme.itemSpacing) {
+            HStack(spacing: HarnessTheme.itemSpacing) {
+              daemonProjectsBadge
+              daemonSessionsBadge
+            }
+            daemonLaunchdBadge
+          }
         }
       }
       .frame(maxWidth: .infinity, alignment: .leading)
@@ -147,8 +151,9 @@ extension DaemonStatusCard {
     Text(statusTitle)
       .scaledFont(.caption.bold())
       .harnessPillPadding()
-      .background(statusBackground, in: Capsule())
+      .harnessControlPill(tint: statusBackground)
       .foregroundStyle(HarnessTheme.onContrast)
+      .harnessUITestValue("chrome=glass-static")
   }
 
   fileprivate var statusTitle: String {
@@ -221,6 +226,8 @@ extension DaemonStatusCard {
     }
     .frame(maxWidth: .infinity, alignment: .topLeading)
     .frame(minHeight: 36, alignment: .topLeading)
+    .harnessPillPadding()
+    .harnessControlPill(tint: HarnessTheme.ink)
     .accessibilityElement(children: .ignore)
     .accessibilityLabel(title)
     .accessibilityValue(value)
@@ -256,7 +263,6 @@ private struct DaemonRestartButtonStyle: ButtonStyle {
       .opacity(iconOpacity(pressed: pressed))
       .animation(.easeOut(duration: 0.15), value: isHovered)
       .animation(.easeOut(duration: 0.15), value: isLoading)
-      // Online: rotate on hover/spin on loading. Offline: scale pulse on hover.
       .rotationEffect(isOnline ? rotationAngle : .zero)
       .animation(isOnline ? rotationAnimation : nil, value: isHovered)
       .animation(isOnline ? rotationAnimation : nil, value: isSpinning)
@@ -280,7 +286,6 @@ private struct DaemonRestartButtonStyle: ButtonStyle {
 
   private func pressScale(pressed: Bool) -> CGFloat {
     if pressed { return 0.78 }
-    // Offline power icon: subtle scale-up on hover as a "ready to activate" cue.
     if !isOnline && isHovered && !reduceMotion { return 1.12 }
     return 1
   }

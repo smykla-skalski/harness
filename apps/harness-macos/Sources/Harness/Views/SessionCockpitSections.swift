@@ -229,7 +229,7 @@ struct SessionAgentSummaryCard: View {
       .scaledFont(.caption.weight(.semibold))
       .lineLimit(1)
       .harnessPillPadding()
-      .harnessInfoPill()
+      .harnessContentPill()
   }
 }
 

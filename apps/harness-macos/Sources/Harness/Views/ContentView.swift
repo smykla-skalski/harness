@@ -53,7 +53,7 @@ struct ContentView: View {
     [
       "contentChrome=native",
       "interactiveRows=button",
-      "controlGlass=none",
+      "controlGlass=native",
     ].joined(separator: ", ")
   }
 
