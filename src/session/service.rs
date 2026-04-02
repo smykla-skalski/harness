@@ -1,7 +1,7 @@
 use std::cmp::Reverse;
 use std::collections::BTreeMap;
 use std::env;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use chrono::{Duration, Utc};
 use serde_json::Value;
@@ -1034,6 +1034,51 @@ pub fn list_sessions(project_dir: &Path, include_all: bool) -> Result<Vec<Sessio
     }
     sessions.sort_by(|left, right| right.updated_at.cmp(&left.updated_at));
     Ok(sessions)
+}
+
+/// List sessions across all known project contexts.
+///
+/// Uses daemon index discovery to find sessions regardless of which project
+/// directory the caller is running from.
+///
+/// # Errors
+/// Returns `CliError` on discovery failures.
+pub fn list_sessions_global(include_all: bool) -> Result<Vec<SessionState>, CliError> {
+    let resolved = crate::daemon::index::discover_sessions(include_all)?;
+    let mut sessions: Vec<SessionState> = resolved
+        .into_iter()
+        .map(|entry| {
+            let mut state = entry.state;
+            state.metrics = SessionMetrics::recalculate(&state);
+            state
+        })
+        .collect();
+    sessions.sort_by(|left, right| right.updated_at.cmp(&left.updated_at));
+    Ok(sessions)
+}
+
+/// Resolve the effective project directory for a session command.
+///
+/// Checks the local project directory first (fast path). If the session is
+/// not found there, searches across all project contexts using the daemon
+/// index. Returns `context_root` when the original project directory is
+/// unavailable - this works because `project_context_dir` is idempotent
+/// for paths already under the projects root.
+///
+/// # Errors
+/// Returns `CliError` if the session cannot be found in any project.
+pub fn resolve_session_project_dir(
+    session_id: &str,
+    local_project_dir: &Path,
+) -> Result<PathBuf, CliError> {
+    if storage::load_state(local_project_dir, session_id)?.is_some() {
+        return Ok(local_project_dir.to_path_buf());
+    }
+    let resolved = crate::daemon::index::resolve_session(session_id)?;
+    Ok(resolved
+        .project
+        .project_dir
+        .unwrap_or(resolved.project.context_root))
 }
 
 fn create_initial_session(
