@@ -135,7 +135,7 @@ struct AgentInspectorCard: View {
       Text("\(agent.runtime) • \(agent.role.title)")
         .foregroundStyle(HarnessTheme.secondaryInk)
       InspectorFactGrid(facts: facts)
-      DisclosureGroup("Runtime Capabilities") {
+      InspectorSection(title: "Runtime Capabilities") {
         InspectorFactGrid(
           facts: [
             .init(
@@ -154,15 +154,11 @@ struct AgentInspectorCard: View {
           ]
         )
       }
-      .scaledFont(.caption.bold())
-      .foregroundStyle(HarnessTheme.secondaryInk)
-      DisclosureGroup("Declared Capabilities") {
+      InspectorSection(title: "Declared Capabilities") {
         InspectorBadgeColumn(values: capabilityBadges)
       }
-      .scaledFont(.caption.bold())
-      .foregroundStyle(HarnessTheme.secondaryInk)
       if !agent.runtimeCapabilities.hookPoints.isEmpty {
-        DisclosureGroup("Hook Points") {
+        InspectorSection(title: "Hook Points") {
           InspectorBadgeColumn(
             values: agent.runtimeCapabilities.hookPoints.map { hook in
               let context = hook.supportsContextInjection ? "context" : "no-context"
@@ -170,11 +166,9 @@ struct AgentInspectorCard: View {
             }
           )
         }
-        .scaledFont(.caption.bold())
-        .foregroundStyle(HarnessTheme.secondaryInk)
       }
       if let activity {
-        DisclosureGroup("Tool Activity") {
+        InspectorSection(title: "Tool Activity") {
           InspectorFactGrid(
             facts: [
               .init(title: "Invocations", value: "\(activity.toolInvocationCount)"),
@@ -192,8 +186,6 @@ struct AgentInspectorCard: View {
               .foregroundStyle(HarnessTheme.secondaryInk)
           }
         }
-        .scaledFont(.caption.bold())
-        .foregroundStyle(HarnessTheme.secondaryInk)
       }
       InspectorSection(title: "Send Signal") {
         TextField("Command", text: $signalCommand)
