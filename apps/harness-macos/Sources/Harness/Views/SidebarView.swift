@@ -138,61 +138,7 @@ struct SidebarView: View {
   @ViewBuilder
   private func sessionRow(_ session: SessionSummary) -> some View {
     let isSelected = store.selectedSessionID == session.sessionId
-    let rowContentPadding = HarnessTheme.itemSpacing
-    let rowOuterInset = HarnessTheme.sectionSpacing
-    let baseRow =
-      Button {
-        Task { await store.selectSession(session.sessionId) }
-      } label: {
-        SidebarSessionRow(
-          session: session,
-          isBookmarked: store.isBookmarked(sessionId: session.sessionId),
-          isSelected: isSelected
-        )
-          .padding(.horizontal, rowContentPadding)
-          .padding(.vertical, HarnessTheme.itemSpacing)
-          .frame(maxWidth: .infinity, alignment: .leading)
-          .background {
-            if isSelected {
-              RoundedRectangle(cornerRadius: HarnessTheme.cornerRadiusLG, style: .continuous)
-                .fill(HarnessTheme.accent.opacity(0.16))
-            }
-          }
-          .overlay {
-            if isSelected {
-              RoundedRectangle(cornerRadius: HarnessTheme.cornerRadiusLG, style: .continuous)
-                .strokeBorder(HarnessTheme.accent.opacity(0.24), lineWidth: 1)
-            }
-          }
-          .contentShape(RoundedRectangle(cornerRadius: HarnessTheme.cornerRadiusLG, style: .continuous))
-          .animation(.snappy(duration: 0.2), value: isSelected)
-      }
-      .harnessSidebarRowButtonStyle(
-        cornerRadius: HarnessTheme.cornerRadiusLG,
-        tint: HarnessTheme.accent
-      )
-      .accessibilityFrameMarker(HarnessAccessibility.sessionRowFrame(session.sessionId))
-      .listRowInsets(EdgeInsets(
-        top: HarnessTheme.itemSpacing,
-        leading: rowOuterInset,
-        bottom: HarnessTheme.itemSpacing,
-        trailing: rowOuterInset
-      ))
-      .listRowSeparator(.hidden)
-      .listRowBackground(Color.clear)
-      .accessibilityLabel(
-        sessionAccessibilityLabel(for: session)
-      )
-      .accessibilityValue(
-        sessionAccessibilityValue(
-          for: session,
-          selectedSessionID: store.selectedSessionID
-        )
-      )
-      .accessibilityElement(children: .combine)
-      .accessibilityIdentifier(
-        HarnessAccessibility.sessionRow(session.sessionId)
-      )
+    let baseRow = sessionBaseRow(session, isSelected: isSelected)
 
     if store.isPersistenceAvailable {
       baseRow
@@ -219,6 +165,85 @@ struct SidebarView: View {
     } else {
       baseRow
     }
+  }
+
+  private func sessionBaseRow(
+    _ session: SessionSummary,
+    isSelected: Bool
+  ) -> some View {
+    let sessionCard = sessionCardSurface(session, isSelected: isSelected)
+
+    return ZStack(alignment: .leading) {
+      Button {
+        Task { await store.selectSession(session.sessionId) }
+      } label: {
+        sessionCard
+      }
+        .harnessSidebarRowButtonStyle(
+          cornerRadius: HarnessTheme.cornerRadiusLG,
+          tint: HarnessTheme.accent
+        )
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityLabel(
+          sessionAccessibilityLabel(for: session)
+        )
+      .accessibilityValue(
+        sessionAccessibilityValue(
+          for: session,
+          selectedSessionID: store.selectedSessionID
+        )
+      )
+      .accessibilityElement(children: .combine)
+      .accessibilityIdentifier(
+        HarnessAccessibility.sessionRow(session.sessionId)
+      )
+
+      if HarnessUITestEnvironment.isEnabled {
+        sessionCard
+          .frame(maxWidth: .infinity, alignment: .leading)
+          .opacity(0.001)
+          .allowsHitTesting(false)
+          .accessibilityElement(children: .ignore)
+          .accessibilityIdentifier(HarnessAccessibility.sessionRowFrame(session.sessionId))
+      }
+    }
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .listRowInsets(EdgeInsets(
+      top: HarnessTheme.itemSpacing,
+      leading: 0,
+      bottom: HarnessTheme.itemSpacing,
+      trailing: 0
+    ))
+    .listRowSeparator(.hidden)
+    .listRowBackground(Color.clear)
+  }
+
+  private func sessionCardSurface(
+    _ session: SessionSummary,
+    isSelected: Bool
+  ) -> some View {
+    SidebarSessionRow(
+      session: session,
+      isBookmarked: store.isBookmarked(sessionId: session.sessionId),
+      isSelected: isSelected
+    )
+    .padding(.horizontal, HarnessTheme.itemSpacing)
+    .padding(.vertical, HarnessTheme.itemSpacing)
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .background {
+      if isSelected {
+        RoundedRectangle(cornerRadius: HarnessTheme.cornerRadiusLG, style: .continuous)
+          .fill(HarnessTheme.accent.opacity(0.16))
+      }
+    }
+    .overlay {
+      if isSelected {
+        RoundedRectangle(cornerRadius: HarnessTheme.cornerRadiusLG, style: .continuous)
+          .strokeBorder(HarnessTheme.accent.opacity(0.24), lineWidth: 1)
+      }
+    }
+    .contentShape(RoundedRectangle(cornerRadius: HarnessTheme.cornerRadiusLG, style: .continuous))
+    .animation(.snappy(duration: 0.2), value: isSelected)
   }
 
   private func startDaemon() async {
