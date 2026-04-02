@@ -128,7 +128,7 @@ struct PersistenceUnavailableBanner: View {
 
 struct ContentAnnouncementsModifier: ViewModifier {
   let connectionState: HarnessStore.ConnectionState
-  @Binding var lastAction: String
+  let lastAction: String
 
   func body(content: Content) -> some View {
     content
@@ -139,12 +139,6 @@ struct ContentAnnouncementsModifier: ViewModifier {
       .onChange(of: lastAction) { _, action in
         guard !action.isEmpty else { return }
         AccessibilityNotification.Announcement(action).post()
-      }
-      .task(id: lastAction) {
-        guard !lastAction.isEmpty else { return }
-        try? await Task.sleep(for: .seconds(4))
-        guard !Task.isCancelled else { return }
-        lastAction = ""
       }
   }
 

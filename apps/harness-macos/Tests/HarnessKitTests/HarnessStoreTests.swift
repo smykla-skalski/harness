@@ -179,6 +179,19 @@ struct HarnessStoreTests {
     #expect(store.lastAction == "Remove launch agent")
   }
 
+  @Test("Last action auto-dismisses from the store")
+  func lastActionAutoDismissesFromTheStore() async {
+    let store = HarnessStore(daemonController: RecordingDaemonController())
+    store.lastActionDismissDelay = .milliseconds(10)
+
+    store.showLastAction("Install launch agent")
+    #expect(store.lastAction == "Install launch agent")
+
+    try? await Task.sleep(for: .milliseconds(40))
+
+    #expect(store.lastAction.isEmpty)
+  }
+
   @Test("Reconnect refreshes health and status")
   func reconnectRefreshesHealthAndStatus() async {
     let store = await makeBootstrappedStore()
