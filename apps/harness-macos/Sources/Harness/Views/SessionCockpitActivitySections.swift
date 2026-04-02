@@ -54,8 +54,7 @@ struct SessionCockpitSignalsSection: View {
             }
             Divider()
             Button {
-              NSPasteboard.general.clearContents()
-              NSPasteboard.general.setString(signal.signal.signalId, forType: .string)
+              HarnessClipboard.copy(signal.signal.signalId)
             } label: {
               Label("Copy Signal ID", systemImage: "doc.on.doc")
             }
@@ -117,15 +116,13 @@ struct SessionCockpitTimelineSection: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .contextMenu {
           Button {
-            NSPasteboard.general.clearContents()
-            NSPasteboard.general.setString(entry.summary, forType: .string)
+            HarnessClipboard.copy(entry.summary)
           } label: {
             Label("Copy Summary", systemImage: "doc.on.doc")
           }
           if let taskID = entry.taskId {
             Button {
-              NSPasteboard.general.clearContents()
-              NSPasteboard.general.setString(taskID, forType: .string)
+              HarnessClipboard.copy(taskID)
             } label: {
               Label("Copy Task ID", systemImage: "doc.on.doc")
             }
