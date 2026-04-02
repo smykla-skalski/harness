@@ -51,6 +51,49 @@ final class HarnessGlassContrastUITests: HarnessUITestCase {
     )
   }
 
+  func testSidebarDaemonStatusBadgeUsesFlatTintedFill() throws {
+    let app = launch(mode: "preview")
+
+    let badge = element(in: app, identifier: Accessibility.sidebarDaemonStatusBadge)
+    XCTAssertTrue(badge.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertEqual(badge.label, "Online")
+
+    let topSample = sampleRegion(of: badge, region: .top)
+    let screenshot = XCTAttachment(screenshot: badge.screenshot())
+    screenshot.name = "daemon-status-badge"
+    screenshot.lifetime = .keepAlways
+    add(screenshot)
+
+    let greenDominance =
+      topSample.averageColor.green
+      - max(topSample.averageColor.red, topSample.averageColor.blue)
+
+    print(
+      "DAEMON_STATUS_BADGE topRGB=(\(topSample.averageColor.red),"
+        + "\(topSample.averageColor.green),\(topSample.averageColor.blue)) "
+        + "stddev=\(topSample.luminanceStats.stddev)"
+    )
+
+    XCTAssertGreaterThan(
+      greenDominance,
+      0.08,
+      "Daemon status badge is not visibly tinted enough to read as a flat status fill: "
+        + "red=\(topSample.averageColor.red), "
+        + "green=\(topSample.averageColor.green), "
+        + "blue=\(topSample.averageColor.blue), "
+        + "dominance=\(greenDominance)"
+    )
+    XCTAssertLessThan(
+      topSample.luminanceStats.stddev,
+      0.025,
+      "Daemon status badge top fill is too reflective or non-uniform to count as flat chrome: "
+        + "stddev=\(topSample.luminanceStats.stddev), "
+        + "min=\(topSample.luminanceStats.min), "
+        + "max=\(topSample.luminanceStats.max), "
+        + "mean=\(topSample.luminanceStats.mean)"
+    )
+  }
+
   func testInspectorEmptyStateIsReadable() throws {
     let app = launch(mode: "empty")
 

@@ -15,12 +15,123 @@ struct LuminanceStats {
   let count: Int
 }
 
+struct RegionSample {
+  let averageColor: RGBColor
+  let luminanceStats: LuminanceStats
+}
+
 enum SampleRegion {
   case top
   case center
 }
 
 extension HarnessUITestCase {
+
+  func sampleRegion(
+    of element: XCUIElement,
+    region: SampleRegion
+  ) -> RegionSample {
+    let screenshot = element.screenshot()
+    guard let cgImage = screenshot.image.cgImage(
+      forProposedRect: nil,
+      context: nil,
+      hints: nil
+    ) else {
+      return RegionSample(
+        averageColor: RGBColor(red: 0, green: 0, blue: 0),
+        luminanceStats: LuminanceStats(min: 0, max: 0, mean: 0, stddev: 0, count: 0)
+      )
+    }
+
+    let width = cgImage.width
+    let height = cgImage.height
+    guard width > 8, height > 8 else {
+      return RegionSample(
+        averageColor: RGBColor(red: 0, green: 0, blue: 0),
+        luminanceStats: LuminanceStats(min: 0, max: 0, mean: 0, stddev: 0, count: 0)
+      )
+    }
+
+    let bytesPerPixel = 4
+    let bytesPerRow = width * bytesPerPixel
+    var pixels = [UInt8](repeating: 0, count: height * bytesPerRow)
+
+    guard let context = CGContext(
+      data: &pixels,
+      width: width,
+      height: height,
+      bitsPerComponent: 8,
+      bytesPerRow: bytesPerRow,
+      space: CGColorSpaceCreateDeviceRGB(),
+      bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+    ) else {
+      return RegionSample(
+        averageColor: RGBColor(red: 0, green: 0, blue: 0),
+        luminanceStats: LuminanceStats(min: 0, max: 0, mean: 0, stddev: 0, count: 0)
+      )
+    }
+
+    context.draw(cgImage, in: CGRect(x: 0, y: 0, width: width, height: height))
+
+    let stripHeight = max(height / 4, 2)
+    let startRow =
+      switch region {
+      case .top:
+        2
+      case .center:
+        max((height / 2) - (stripHeight / 2), 2)
+      }
+    let endRow = min(startRow + stripHeight, height - 2)
+    let horizontalInset = max(width / 6, 4)
+    let startColumn = horizontalInset
+    let endColumn = max(width - horizontalInset, startColumn + 1)
+
+    var redSamples: [Double] = []
+    var greenSamples: [Double] = []
+    var blueSamples: [Double] = []
+    var luminanceSamples: [Double] = []
+
+    for row in startRow..<endRow {
+      for col in startColumn..<endColumn {
+        let offset = row * bytesPerRow + col * bytesPerPixel
+        let red = Double(pixels[offset]) / 255.0
+        let green = Double(pixels[offset + 1]) / 255.0
+        let blue = Double(pixels[offset + 2]) / 255.0
+        redSamples.append(red)
+        greenSamples.append(green)
+        blueSamples.append(blue)
+        luminanceSamples.append((0.2126 * red) + (0.7152 * green) + (0.0722 * blue))
+      }
+    }
+
+    guard luminanceSamples.count > 1 else {
+      return RegionSample(
+        averageColor: RGBColor(red: 0, green: 0, blue: 0),
+        luminanceStats: LuminanceStats(min: 0, max: 0, mean: 0, stddev: 0, count: 0)
+      )
+    }
+
+    let meanRed = redSamples.reduce(0, +) / Double(redSamples.count)
+    let meanGreen = greenSamples.reduce(0, +) / Double(greenSamples.count)
+    let meanBlue = blueSamples.reduce(0, +) / Double(blueSamples.count)
+    let luminanceMin = luminanceSamples.min() ?? 0
+    let luminanceMax = luminanceSamples.max() ?? 0
+    let meanLuminance = luminanceSamples.reduce(0, +) / Double(luminanceSamples.count)
+    let variance = luminanceSamples.reduce(0) {
+      $0 + ($1 - meanLuminance) * ($1 - meanLuminance)
+    } / Double(luminanceSamples.count - 1)
+
+    return RegionSample(
+      averageColor: RGBColor(red: meanRed, green: meanGreen, blue: meanBlue),
+      luminanceStats: LuminanceStats(
+        min: luminanceMin,
+        max: luminanceMax,
+        mean: meanLuminance,
+        stddev: variance.squareRoot(),
+        count: luminanceSamples.count
+      )
+    )
+  }
 
   /// Capture the element's screenshot and downscale it to a single pixel
   /// using CGContext. Core Graphics averages all pixels during the draw,
