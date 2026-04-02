@@ -281,6 +281,7 @@ fn dispatch(
         "ping" => ok_response(&request.id, serde_json::json!({ "pong": true })),
         "health" => dispatch_query(&request.id, || service::health_response(&state.manifest)),
         "diagnostics" => dispatch_query(&request.id, service::diagnostics_report),
+        "daemon.stop" => dispatch_query(&request.id, service::request_shutdown),
         "projects" => dispatch_query(&request.id, service::list_projects),
         "sessions" => dispatch_query(&request.id, || service::list_sessions(true)),
         "session.detail" => {

@@ -3,6 +3,7 @@ import Foundation
 public protocol HarnessClientProtocol: Sendable {
   func health() async throws -> HealthResponse
   func diagnostics() async throws -> DaemonDiagnosticsReport
+  func stopDaemon() async throws -> DaemonControlResponse
   func projects() async throws -> [ProjectSummary]
   func sessions() async throws -> [SessionSummary]
   func sessionDetail(id: String) async throws -> SessionDetail
@@ -105,6 +106,10 @@ public final class HarnessAPIClient: HarnessClientProtocol {
 
   public func diagnostics() async throws -> DaemonDiagnosticsReport {
     try await get("/v1/diagnostics")
+  }
+
+  public func stopDaemon() async throws -> DaemonControlResponse {
+    try await post("/v1/daemon/stop", body: EmptyBody())
   }
 
   public func projects() async throws -> [ProjectSummary] {
@@ -296,6 +301,8 @@ public final class HarnessAPIClient: HarnessClientProtocol {
     return .server(code: statusCode, message: message)
   }
 }
+
+private struct EmptyBody: Encodable {}
 
 private struct AnyEncodable: Encodable {
   private let encodeClosure: (Encoder) throws -> Void

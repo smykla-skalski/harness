@@ -1,6 +1,5 @@
 import HarnessKit
 import Observation
-import SwiftData
 import SwiftUI
 
 struct SidebarView: View {
@@ -58,7 +57,11 @@ struct SidebarView: View {
     } else if store.groupedSessions.isEmpty {
       Section {
         VStack {
-          ContentUnavailableView.search(text: store.searchText)
+          ContentUnavailableView {
+            Label("No sessions match", systemImage: "magnifyingglass")
+          } description: {
+            Text("Try a broader search or clear filters.")
+          }
         }
         .frame(maxWidth: .infinity)
         .accessibilityFrameMarker(HarnessAccessibility.sidebarEmptyStateFrame)
@@ -73,15 +76,44 @@ struct SidebarView: View {
       .listRowSeparator(.hidden)
       .accessibilityElement(children: .contain)
       .accessibilityIdentifier(HarnessAccessibility.sidebarEmptyState)
-    } else {
-      ForEach(store.groupedSessions) { group in
-        Section {
+    } else if let firstGroup = store.groupedSessions.first {
+      Group {
+        sessionsSectionHeader
+          .listRowInsets(EdgeInsets(
+            top: HarnessTheme.spacingLG,
+            leading: 0,
+            bottom: HarnessTheme.itemSpacing,
+            trailing: 0
+          ))
+          .listRowSeparator(.hidden)
+          .listRowBackground(Color.clear)
+
+        sessionProjectRow(for: firstGroup)
+          .listRowInsets(EdgeInsets(
+            top: 0,
+            leading: 0,
+            bottom: 0,
+            trailing: 0
+          ))
+          .listRowSeparator(.hidden)
+          .listRowBackground(Color.clear)
+
+        ForEach(firstGroup.sessions) { session in
+          sessionRow(session)
+        }
+      }
+      .accessibilityElement(children: .contain)
+      .accessibilityIdentifier(HarnessAccessibility.sidebarSessionList)
+      .accessibilityFrameMarker(HarnessAccessibility.sidebarSessionListContent)
+
+      ForEach(Array(store.groupedSessions.dropFirst())) { group in
+        Group {
           sessionProjectRow(for: group)
             .listRowInsets(EdgeInsets(
               top: HarnessTheme.sectionSpacing,
-              leading: HarnessTheme.sectionSpacing,
+              leading: 0,
               bottom: 0,
-              trailing: HarnessTheme.sectionSpacing
+              trailing: 0
             ))
             .listRowSeparator(.hidden)
             .listRowBackground(Color.clear)
@@ -91,9 +123,6 @@ struct SidebarView: View {
           }
         }
       }
-      .accessibilityElement(children: .contain)
-      .accessibilityIdentifier(HarnessAccessibility.sidebarSessionList)
-      .accessibilityFrameMarker(HarnessAccessibility.sidebarSessionListContent)
     }
   }
 
@@ -107,6 +136,7 @@ struct SidebarView: View {
         sessionCount: store.daemonStatus?.sessionCount ?? store.sessions.count,
         isLaunchAgentInstalled: store.daemonStatus?.launchAgent.installed == true,
         startDaemon: startDaemon,
+        stopDaemon: stopDaemon,
         installLaunchAgent: installLaunchAgent
       )
       SidebarFilterContainer(store: store)
@@ -127,12 +157,32 @@ struct SidebarView: View {
         .scaledFont(.caption.monospacedDigit())
         .foregroundStyle(HarnessTheme.secondaryInk)
     }
+    .frame(maxWidth: .infinity, alignment: .leading)
     .accessibilityIdentifier(
       HarnessAccessibility.projectHeader(group.project.projectId)
     )
     .accessibilityFrameMarker(
       HarnessAccessibility.projectHeaderFrame(group.project.projectId)
     )
+  }
+
+  private var sessionsSectionHeader: some View {
+    VStack(alignment: .leading, spacing: HarnessTheme.itemSpacing) {
+      HStack(alignment: .firstTextBaseline, spacing: HarnessTheme.itemSpacing) {
+            EmptyView()
+          .scaledFont(.caption2.weight(.bold))
+          .tracking(HarnessTheme.uppercaseTracking)
+          .foregroundStyle(HarnessTheme.secondaryInk)
+        Spacer()
+            EmptyView()
+          .scaledFont(.caption.monospacedDigit())
+          .foregroundStyle(HarnessTheme.tertiaryInk)
+      }
+    }
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .accessibilityElement(children: .combine)
+    .accessibilityIdentifier(HarnessAccessibility.sidebarSessionsSection)
+    .accessibilityFrameMarker(HarnessAccessibility.sidebarSessionsSectionFrame)
   }
 
   @ViewBuilder
@@ -179,14 +229,14 @@ struct SidebarView: View {
       } label: {
         sessionCard
       }
-        .harnessSidebarRowButtonStyle(
-          cornerRadius: HarnessTheme.cornerRadiusLG,
-          tint: HarnessTheme.accent
-        )
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .accessibilityLabel(
-          sessionAccessibilityLabel(for: session)
-        )
+      .harnessSidebarRowButtonStyle(
+        cornerRadius: HarnessTheme.cornerRadiusLG,
+        tint: HarnessTheme.accent
+      )
+      .frame(maxWidth: .infinity, alignment: .leading)
+      .accessibilityLabel(
+        sessionAccessibilityLabel(for: session)
+      )
       .accessibilityValue(
         sessionAccessibilityValue(
           for: session,
@@ -250,93 +300,12 @@ struct SidebarView: View {
     await store.startDaemon()
   }
 
+  private func stopDaemon() async {
+    await store.stopDaemon()
+  }
+
   private func installLaunchAgent() async {
     await store.installLaunchAgent()
-  }
-
-  private func setSessionFilter(_ filter: HarnessStore.SessionFilter) {
-    store.sessionFilter = filter
-  }
-
-  private func setSessionFocusFilter(_ filter: SessionFocusFilter) {
-    store.sessionFocusFilter = filter
-  }
-
-  private func applyRecentSearch(_ query: String) {
-    store.searchText = query
-  }
-
-  private func clearSearchHistory() {
-    _ = store.clearSearchHistory()
-  }
-}
-
-private struct SidebarFilterContainer: View {
-  @Bindable var store: HarnessStore
-  @Query(sort: \RecentSearch.lastUsedAt, order: .reverse)
-  private var recentSearches: [RecentSearch]
-  @State private var draftSearchText = ""
-
-  init(store: HarnessStore) {
-    self.store = store
-  }
-
-  private var recentSearchQueries: [String] {
-    Array(recentSearches.prefix(5).map(\.query))
-  }
-
-  var body: some View {
-    SidebarFilterSection(
-      filteredSessionCount: store.filteredSessionCount,
-      totalSessionCount: store.sessions.count,
-      searchText: store.searchText,
-      draftSearchText: $draftSearchText,
-      sessionFilter: store.sessionFilter,
-      sessionFocusFilter: store.sessionFocusFilter,
-      sessionSortOrder: $store.sessionSortOrder,
-      isPersistenceAvailable: store.isPersistenceAvailable,
-      recentSearchQueries: recentSearchQueries,
-      resetFilters: store.resetFilters,
-      submitSearch: submitSearch,
-      setSessionFilter: setSessionFilter(_:),
-      setSessionFocusFilter: setSessionFocusFilter(_:),
-      applyRecentSearch: applyRecentSearch(_:),
-      clearSearchHistory: clearSearchHistory
-    )
-    .task(id: draftSearchText) {
-      try? await Task.sleep(for: .milliseconds(300))
-      guard !Task.isCancelled else { return }
-      store.searchText = draftSearchText
-    }
-    .onAppear {
-      draftSearchText = store.searchText
-    }
-    .onChange(of: store.searchText) { _, newValue in
-      if draftSearchText != newValue {
-        draftSearchText = newValue
-      }
-    }
-  }
-
-  private func submitSearch() {
-    _ = store.recordSearch(draftSearchText)
-  }
-
-  private func setSessionFilter(_ filter: HarnessStore.SessionFilter) {
-    store.sessionFilter = filter
-  }
-
-  private func setSessionFocusFilter(_ filter: SessionFocusFilter) {
-    store.sessionFocusFilter = filter
-  }
-
-  private func applyRecentSearch(_ query: String) {
-    draftSearchText = query
-    store.searchText = query
-  }
-
-  private func clearSearchHistory() {
-    _ = store.clearSearchHistory()
   }
 }
 

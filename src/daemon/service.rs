@@ -7,7 +7,7 @@ use std::time::Duration;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tokio::net::TcpListener;
-use tokio::sync::broadcast;
+use tokio::sync::{broadcast, watch as tokio_watch};
 use tokio::task::spawn_blocking;
 
 use crate::errors::{CliError, CliErrorKind};
@@ -19,11 +19,11 @@ use super::http::{self, DaemonHttpState};
 use super::index::{self, ResolvedSession};
 use super::launchd::{self, LaunchAgentStatus};
 use super::protocol::{
-    AgentRemoveRequest, DaemonDiagnosticsReport, HealthResponse, LeaderTransferRequest,
-    ObserveSessionRequest, ProjectSummary, ReadyEventPayload, RoleChangeRequest, SessionDetail,
-    SessionEndRequest, SessionSummary, SessionUpdatedPayload, SessionsUpdatedPayload,
-    SignalSendRequest, StreamEvent, TaskAssignRequest, TaskCheckpointRequest, TaskCreateRequest,
-    TaskUpdateRequest, TimelineEntry,
+    AgentRemoveRequest, DaemonControlResponse, DaemonDiagnosticsReport, HealthResponse,
+    LeaderTransferRequest, ObserveSessionRequest, ProjectSummary, ReadyEventPayload,
+    RoleChangeRequest, SessionDetail, SessionEndRequest, SessionSummary, SessionUpdatedPayload,
+    SessionsUpdatedPayload, SignalSendRequest, StreamEvent, TaskAssignRequest,
+    TaskCheckpointRequest, TaskCreateRequest, TaskUpdateRequest, TimelineEntry,
 };
 use super::snapshot;
 use super::state::{self, DaemonDiagnostics, DaemonManifest};
@@ -39,6 +39,7 @@ struct DaemonObserveRuntime {
 }
 
 static OBSERVE_RUNTIME: OnceLock<DaemonObserveRuntime> = OnceLock::new();
+static SHUTDOWN_SIGNAL: OnceLock<tokio_watch::Sender<bool>> = OnceLock::new();
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DaemonStatusReport {
@@ -95,11 +96,13 @@ pub async fn serve(config: DaemonServeConfig) -> Result<(), CliError> {
     state::append_event("info", &format!("daemon listening on {endpoint}"))?;
 
     let (sender, _) = broadcast::channel(64);
+    let (shutdown_tx, shutdown_rx) = tokio_watch::channel(false);
     let _ = OBSERVE_RUNTIME.set(DaemonObserveRuntime {
         sender: sender.clone(),
         poll_interval: config.observe_interval,
         running_sessions: Arc::default(),
     });
+    let _ = SHUTDOWN_SIGNAL.set(shutdown_tx.clone());
     let replay_buffer = Arc::new(Mutex::new(ReplayBuffer::new(512)));
     let _watch = watch::spawn_watch_loop(sender.clone(), config.poll_interval);
     let daemon_epoch = manifest.started_at.clone();
@@ -111,7 +114,7 @@ pub async fn serve(config: DaemonServeConfig) -> Result<(), CliError> {
         replay_buffer,
     };
 
-    http::serve(listener, app_state).await
+    http::serve(listener, app_state, shutdown_rx).await
 }
 
 /// Build a point-in-time daemon status report.
@@ -161,6 +164,24 @@ pub fn diagnostics_report() -> Result<DaemonDiagnosticsReport, CliError> {
         launch_agent: launchd::launch_agent_status(),
         workspace: state::diagnostics()?,
         recent_events: state::read_recent_events(16)?,
+    })
+}
+
+/// Request graceful daemon shutdown.
+///
+/// # Errors
+/// Returns `CliError` when the shutdown signal is unavailable.
+pub fn request_shutdown() -> Result<DaemonControlResponse, CliError> {
+    let Some(shutdown_tx) = SHUTDOWN_SIGNAL.get() else {
+        return Err(CliErrorKind::workflow_io("daemon shutdown channel unavailable").into());
+    };
+
+    shutdown_tx
+        .send(true)
+        .map_err(|error| CliErrorKind::workflow_io(format!("signal daemon shutdown: {error}")))?;
+    state::append_event("info", "daemon shutdown requested")?;
+    Ok(DaemonControlResponse {
+        status: "stopping".into(),
     })
 }
 
