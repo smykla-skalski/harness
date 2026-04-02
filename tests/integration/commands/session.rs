@@ -477,12 +477,12 @@ fn transfer_leader_and_role_reassignment() {
                 .unwrap()
                 .clone();
 
-            // Observer initiates transfer
+            // Leader transfers to observer
             service::transfer_leader(
                 "xfer-1",
                 &observer_id,
-                Some("leader unresponsive"),
-                &observer_id,
+                Some("stepping down"),
+                &leader_id,
                 &project,
             )
             .unwrap();

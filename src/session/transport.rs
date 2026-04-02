@@ -288,12 +288,7 @@ impl Execute for SessionRemoveArgs {
         let local_project = resolve_project_dir(self.project_dir.as_deref());
         let project =
             service::resolve_session_project_dir(&self.session_id, local_project.as_ref())?;
-        service::remove_agent(
-            &self.session_id,
-            &self.agent_id,
-            &self.actor,
-            &project,
-        )?;
+        service::remove_agent(&self.session_id, &self.agent_id, &self.actor, &project)?;
         Ok(0)
     }
 }
@@ -360,17 +355,16 @@ impl Execute for TaskCreateArgs {
         let local_project = resolve_project_dir(self.project_dir.as_deref());
         let project =
             service::resolve_session_project_dir(&self.session_id, local_project.as_ref())?;
-        let item = service::create_task_with_source(
-            &self.session_id,
-            &self.title,
-            self.context.as_deref(),
-            self.severity,
-            self.suggested_fix.as_deref(),
-            super::types::TaskSource::Manual,
-            None,
-            &self.actor,
-            &project,
-        )?;
+        let spec = service::TaskSpec {
+            title: &self.title,
+            context: self.context.as_deref(),
+            severity: self.severity,
+            suggested_fix: self.suggested_fix.as_deref(),
+            source: super::types::TaskSource::Manual,
+            observe_issue_id: None,
+        };
+        let item =
+            service::create_task_with_source(&self.session_id, &spec, &self.actor, &project)?;
         print_json(&item)?;
         Ok(0)
     }
@@ -587,8 +581,7 @@ impl Execute for SignalListArgs {
         let local_project = resolve_project_dir(self.project_dir.as_deref());
         let project =
             service::resolve_session_project_dir(&self.session_id, local_project.as_ref())?;
-        let signals =
-            service::list_signals(&self.session_id, self.agent.as_deref(), &project)?;
+        let signals = service::list_signals(&self.session_id, self.agent.as_deref(), &project)?;
         if self.json {
             print_json(&signals)?;
         } else {
