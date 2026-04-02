@@ -1,16 +1,6 @@
 import HarnessKit
 import SwiftUI
 
-struct PreferencesDiagnosticsPaths {
-  let launchAgentPath: String
-  let launchAgentDomain: String?
-  let launchAgentService: String?
-  let manifestPath: String
-  let authTokenPath: String
-  let eventsPath: String
-  let cacheRoot: String
-}
-
 struct PreferencesDiagnosticsSection: View {
   let launchAgent: LaunchAgentStatus?
   let tokenPresent: Bool
