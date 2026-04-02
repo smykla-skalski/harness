@@ -37,8 +37,19 @@ private struct HarnessSceneAppearanceModifier: ViewModifier {
   private var textSizeIndex = HarnessTextSize.defaultIndex
 
   func body(content: Content) -> some View {
+    let normalizedTextSizeIndex = HarnessTextSize.normalizedIndex(textSizeIndex)
+
     content
-      .environment(\.fontScale, HarnessTextSize.scale(at: textSizeIndex))
+      .environment(\.harnessTextSizeIndex, normalizedTextSizeIndex)
+      .environment(\.fontScale, HarnessTextSize.scale(at: normalizedTextSizeIndex))
+      .environment(
+        \.harnessNativeFormControlFont,
+        HarnessTextSize.nativeFormControlFont(at: normalizedTextSizeIndex)
+      )
+      .environment(
+        \.harnessNativeFormControlSize,
+        HarnessTextSize.controlSize(at: normalizedTextSizeIndex)
+      )
       .preferredColorScheme(themeMode.colorScheme)
       .tint(HarnessTheme.accent)
       .onAppear(perform: syncThemeFromStorage)

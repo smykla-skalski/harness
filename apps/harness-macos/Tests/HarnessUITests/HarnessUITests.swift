@@ -227,11 +227,13 @@ final class HarnessUITests: HarnessUITestCase {
     tapButton(in: app, identifier: Accessibility.workerAgentCard)
 
     let appChromeState = element(in: app, identifier: Accessibility.appChromeState)
-    let actorPicker = element(in: app, identifier: Accessibility.actionActorPicker)
-    let commandField = element(in: app, identifier: Accessibility.signalCommandField)
-    let messageField = element(in: app, identifier: Accessibility.signalMessageField)
+    let inspectorRoot = element(in: app, identifier: Accessibility.inspectorRoot)
+    let actorPicker = popUpButton(in: app, identifier: Accessibility.actionActorPicker)
+    let commandField = editableField(in: app, identifier: Accessibility.signalCommandField)
+    let messageField = editableField(in: app, identifier: Accessibility.signalMessageField)
 
     XCTAssertTrue(appChromeState.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(inspectorRoot.waitForExistence(timeout: Self.uiTimeout))
     XCTAssertTrue(actorPicker.waitForExistence(timeout: Self.uiTimeout))
     XCTAssertTrue(commandField.waitForExistence(timeout: Self.uiTimeout))
     XCTAssertTrue(messageField.waitForExistence(timeout: Self.uiTimeout))
@@ -239,6 +241,11 @@ final class HarnessUITests: HarnessUITestCase {
       appChromeState.label,
       "contentChrome=native, interactiveRows=button, controlGlass=native"
     )
+
+    for _ in 0..<4 where !(actorPicker.isHittable && commandField.isHittable && messageField.isHittable) {
+      dragUp(in: app, element: inspectorRoot, distanceRatio: 0.18)
+    }
+
     XCTAssertTrue(
       waitUntil(timeout: Self.uiTimeout) {
         actorPicker.isHittable && commandField.isHittable && messageField.isHittable

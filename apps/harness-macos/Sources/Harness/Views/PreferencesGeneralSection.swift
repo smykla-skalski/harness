@@ -60,12 +60,14 @@ struct PreferencesGeneralSection: View {
             Text($0.label).tag($0)
           }
         }
+        .harnessNativeFormControl()
         .accessibilityIdentifier(HarnessAccessibility.preferencesThemeModePicker)
         Picker("Text size", selection: $textSizeIndex) {
           ForEach(Array(HarnessTextSize.scales.enumerated()), id: \.offset) { index, level in
             Text(level.label).tag(index)
           }
         }
+        .harnessNativeFormControl()
         .accessibilityIdentifier(HarnessAccessibility.preferencesTextSizePicker)
       } header: {
         Text("Appearance")
