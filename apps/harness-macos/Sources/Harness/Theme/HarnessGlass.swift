@@ -1,6 +1,6 @@
 import SwiftUI
 
-struct HarnessGlassContainer<Content: View>: View {
+struct HarnessGlassControlGroup<Content: View>: View {
   let spacing: CGFloat?
   private let content: Content
   @Environment(\.accessibilityReduceTransparency)
@@ -13,10 +13,7 @@ struct HarnessGlassContainer<Content: View>: View {
 
   var body: some View {
     if reduceTransparency {
-      VStack {
-        content
-      }
-      .background(.background)
+      content
     } else if let spacing {
       GlassEffectContainer(spacing: spacing) {
         content
@@ -29,28 +26,105 @@ struct HarnessGlassContainer<Content: View>: View {
   }
 }
 
-private struct HarnessCapsuleGlassModifier: ViewModifier {
-  func body(content: Content) -> some View {
-    content
-      .glassEffect(.regular, in: .capsule)
-  }
-}
-
-private struct HarnessRoundedRectGlassModifier: ViewModifier {
+private struct HarnessFloatingControlGlassModifier: ViewModifier {
   let cornerRadius: CGFloat
+  let tint: Color
+  @Environment(\.accessibilityReduceTransparency)
+  private var reduceTransparency
+  @Environment(\.colorSchemeContrast)
+  private var colorSchemeContrast
+
+  private var fallbackFillOpacity: Double {
+    if reduceTransparency {
+      return colorSchemeContrast == .increased ? 0.42 : 0.32
+    }
+    return colorSchemeContrast == .increased ? 0.26 : 0.18
+  }
+
+  private var fallbackStrokeOpacity: Double {
+    colorSchemeContrast == .increased ? 0.42 : 0.24
+  }
+
+  private var fallbackStrokeWidth: CGFloat {
+    colorSchemeContrast == .increased ? 1.5 : 1
+  }
 
   func body(content: Content) -> some View {
-    content
-      .glassEffect(.regular, in: .rect(cornerRadius: cornerRadius, style: .continuous))
+    let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+    if reduceTransparency {
+      content
+        .background {
+          shape
+            .fill(tint.opacity(fallbackFillOpacity))
+        }
+        .overlay {
+          shape
+            .strokeBorder(tint.opacity(fallbackStrokeOpacity), lineWidth: fallbackStrokeWidth)
+        }
+    } else {
+      content
+        .glassEffect(
+          .regular.tint(tint.opacity(colorSchemeContrast == .increased ? 0.24 : 0.16)),
+          in: .rect(cornerRadius: cornerRadius, style: .continuous)
+        )
+    }
   }
 }
 
 extension View {
-  func harnessCapsuleGlass() -> some View {
-    modifier(HarnessCapsuleGlassModifier())
+  func harnessFloatingControlGlass(
+    cornerRadius: CGFloat = HarnessTheme.cornerRadiusSM,
+    tint: Color = HarnessTheme.ink
+  ) -> some View {
+    modifier(HarnessFloatingControlGlassModifier(cornerRadius: cornerRadius, tint: tint))
+  }
+}
+
+private struct HarnessControlPillGlassModifier: ViewModifier {
+  let tint: Color
+  @Environment(\.accessibilityReduceTransparency)
+  private var reduceTransparency
+  @Environment(\.colorSchemeContrast)
+  private var colorSchemeContrast
+
+  private var fallbackFillOpacity: Double {
+    if reduceTransparency {
+      return colorSchemeContrast == .increased ? 0.4 : 0.3
+    }
+    return colorSchemeContrast == .increased ? 0.26 : 0.16
   }
 
-  func harnessRoundedRectGlass(cornerRadius: CGFloat = HarnessTheme.cornerRadiusSM) -> some View {
-    modifier(HarnessRoundedRectGlassModifier(cornerRadius: cornerRadius))
+  private var fallbackStrokeOpacity: Double {
+    colorSchemeContrast == .increased ? 0.42 : 0.24
+  }
+
+  private var fallbackStrokeWidth: CGFloat {
+    colorSchemeContrast == .increased ? 1.5 : 1
+  }
+
+  func body(content: Content) -> some View {
+    if reduceTransparency {
+      content
+        .background {
+          Capsule()
+            .fill(tint.opacity(fallbackFillOpacity))
+        }
+        .overlay {
+          Capsule()
+            .strokeBorder(tint.opacity(fallbackStrokeOpacity), lineWidth: fallbackStrokeWidth)
+        }
+    } else {
+      content
+        .glassEffect(
+          .regular.tint(tint.opacity(colorSchemeContrast == .increased ? 0.24 : 0.16)),
+          in: .capsule
+        )
+    }
+  }
+}
+
+extension View {
+  func harnessControlPillGlass(tint: Color = HarnessTheme.ink) -> some View {
+    modifier(HarnessControlPillGlassModifier(tint: tint))
   }
 }

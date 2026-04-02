@@ -31,9 +31,11 @@ struct SessionCockpitHeaderCard: View {
             .foregroundStyle(HarnessTheme.secondaryInk)
         }
         Spacer()
-        HStack(spacing: HarnessTheme.itemSpacing) {
-          observeButton
-          endSessionButton
+        HarnessGlassControlGroup(spacing: HarnessTheme.itemSpacing) {
+          HStack(spacing: HarnessTheme.itemSpacing) {
+            observeButton
+            endSessionButton
+          }
         }
       }
 
@@ -123,7 +125,7 @@ struct SessionCockpitHeaderCard: View {
     }
     .harnessInteractiveCardButtonStyle()
     .accessibilityIdentifier("harness.session.observe.summary")
-    .accessibilityValue("interactive=plain")
+    .accessibilityValue("interactive=button, chrome=content-card")
   }
 
   private func pendingTransferSummary(_ pendingTransfer: PendingLeaderTransfer) -> some View {
