@@ -349,7 +349,7 @@ extension HarnessStore {
       applySessionSummaryUpdate(measuredMutation.value.session)
       synchronizeActionActor()
       scheduleSessionPushFallback(using: client, sessionID: sessionID)
-      lastAction = actionName
+      showLastAction(actionName)
       return true
     } catch {
       lastError = error.localizedDescription
