@@ -74,13 +74,18 @@ public final class PreviewHarnessClient: HarnessClientProtocol, Sendable {
   }
 
   private let fixtures: Fixtures
+  private let isLaunchAgentInstalled: Bool
 
-  public init(fixtures: Fixtures) {
+  public init(
+    fixtures: Fixtures,
+    isLaunchAgentInstalled: Bool
+  ) {
     self.fixtures = fixtures
+    self.isLaunchAgentInstalled = isLaunchAgentInstalled
   }
 
   public convenience init() {
-    self.init(fixtures: .populated)
+    self.init(fixtures: .populated, isLaunchAgentInstalled: true)
   }
 
   public func health() async throws -> HealthResponse {
@@ -111,7 +116,7 @@ public final class PreviewHarnessClient: HarnessClientProtocol, Sendable {
       health: fixtures.health,
       manifest: manifest,
       launchAgent: LaunchAgentStatus(
-        installed: !fixtures.sessions.isEmpty,
+        installed: isLaunchAgentInstalled,
         label: "io.harness.daemon",
         path: "/Users/example/Library/LaunchAgents/io.harness.daemon.plist"
       ),
@@ -252,8 +257,9 @@ public actor PreviewDaemonController: DaemonControlling {
     case empty
   }
 
-  private let client: PreviewHarnessClient
-  private let statusReport: DaemonStatusReport
+  private let fixtures: PreviewHarnessClient.Fixtures
+  private var isDaemonRunning: Bool
+  private var isLaunchAgentInstalled: Bool
 
   public init(mode: Mode = .populated) {
     let fixtures =
@@ -266,26 +272,63 @@ public actor PreviewDaemonController: DaemonControlling {
         PreviewHarnessClient.Fixtures.empty
       }
 
-    let hasSessions = !fixtures.sessions.isEmpty
-    self.client = PreviewHarnessClient(fixtures: fixtures)
-    self.statusReport = DaemonStatusReport(
+    self.fixtures = fixtures
+    self.isDaemonRunning = mode != .empty
+    self.isLaunchAgentInstalled = mode != .empty
+  }
+
+  public func bootstrapClient() async throws -> any HarnessClientProtocol {
+    guard isDaemonRunning else {
+      throw DaemonControlError.daemonOffline
+    }
+    return makeClient()
+  }
+
+  public func startDaemonClient() async throws -> any HarnessClientProtocol {
+    isDaemonRunning = true
+    return makeClient()
+  }
+
+  public func daemonStatus() async throws -> DaemonStatusReport {
+    makeStatusReport()
+  }
+
+  public func installLaunchAgent() async throws -> String {
+    isLaunchAgentInstalled = true
+    return Self.launchAgentPath
+  }
+
+  public func removeLaunchAgent() async throws -> String {
+    isLaunchAgentInstalled = false
+    return "removed"
+  }
+
+  private func makeClient() -> PreviewHarnessClient {
+    PreviewHarnessClient(
+      fixtures: fixtures,
+      isLaunchAgentInstalled: isLaunchAgentInstalled
+    )
+  }
+
+  private func makeStatusReport() -> DaemonStatusReport {
+    DaemonStatusReport(
       manifest: DaemonManifest(
-        version: "14.5.0",
-        pid: 4242,
-        endpoint: "http://127.0.0.1:9999",
-        startedAt: "2026-03-28T14:00:00Z",
+        version: fixtures.health.version,
+        pid: fixtures.health.pid,
+        endpoint: fixtures.health.endpoint,
+        startedAt: fixtures.health.startedAt,
         tokenPath: "/Users/example/Library/Application Support/harness/daemon/auth-token"
       ),
       launchAgent: LaunchAgentStatus(
-        installed: hasSessions,
-        loaded: hasSessions,
+        installed: isLaunchAgentInstalled,
+        loaded: isDaemonRunning && isLaunchAgentInstalled,
         label: "io.harness.daemon",
-        path: "/Users/example/Library/LaunchAgents/io.harness.daemon.plist",
+        path: Self.launchAgentPath,
         domainTarget: "gui/501",
         serviceTarget: "gui/501/io.harness.daemon",
-        state: hasSessions ? "running" : nil,
-        pid: hasSessions ? 4_242 : nil,
-        lastExitStatus: hasSessions ? 0 : nil
+        state: isDaemonRunning ? "running" : nil,
+        pid: isDaemonRunning ? fixtures.health.pid : nil,
+        lastExitStatus: isDaemonRunning ? 0 : nil
       ),
       projectCount: fixtures.projects.count,
       sessionCount: fixtures.sessions.count,
@@ -296,34 +339,25 @@ public actor PreviewDaemonController: DaemonControlling {
         authTokenPresent: true,
         eventsPath: "/Users/example/Library/Application Support/harness/daemon/events.jsonl",
         cacheRoot: "/Users/example/Library/Application Support/harness/daemon/cache/projects",
-        cacheEntryCount: hasSessions ? max(4, fixtures.sessions.count) : 0,
-        lastEvent: hasSessions
-          ? DaemonAuditEvent(
-            recordedAt: "2026-03-28T14:18:00Z",
-            level: "info",
-            message: "indexed session \(fixtures.sessions[0].sessionId)"
-          ) : nil
+        cacheEntryCount: isDaemonRunning ? max(4, fixtures.sessions.count) : 0,
+        lastEvent: makeLastEvent()
       )
     )
   }
 
-  public func bootstrapClient() async throws -> any HarnessClientProtocol {
-    client
-  }
+  private func makeLastEvent() -> DaemonAuditEvent? {
+    guard isDaemonRunning, let firstSession = fixtures.sessions.first else {
+      return nil
+    }
 
-  public func startDaemonClient() async throws -> any HarnessClientProtocol {
-    client
+    return DaemonAuditEvent(
+      recordedAt: "2026-03-28T14:18:00Z",
+      level: "info",
+      message: "indexed session \(firstSession.sessionId)"
+    )
   }
+}
 
-  public func daemonStatus() async throws -> DaemonStatusReport {
-    statusReport
-  }
-
-  public func installLaunchAgent() async throws -> String {
-    "/Users/example/Library/LaunchAgents/io.harness.daemon.plist"
-  }
-
-  public func removeLaunchAgent() async throws -> String {
-    "removed"
-  }
+private extension PreviewDaemonController {
+  static let launchAgentPath = "/Users/example/Library/LaunchAgents/io.harness.daemon.plist"
 }

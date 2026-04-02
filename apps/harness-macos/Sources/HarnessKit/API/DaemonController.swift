@@ -12,6 +12,7 @@ public enum DaemonControlError: Error, LocalizedError, Equatable {
   case harnessBinaryNotFound
   case manifestMissing
   case manifestUnreadable
+  case daemonOffline
   case daemonDidNotStart
   case commandFailed(String)
 
@@ -23,6 +24,8 @@ public enum DaemonControlError: Error, LocalizedError, Equatable {
       "The harness daemon manifest is missing."
     case .manifestUnreadable:
       "The harness daemon manifest could not be read."
+    case .daemonOffline:
+      "The harness daemon is offline. Start the daemon to load live sessions."
     case .daemonDidNotStart:
       "The harness daemon did not become healthy before the timeout."
     case .commandFailed(let message):

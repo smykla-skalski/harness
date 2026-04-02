@@ -96,6 +96,7 @@ private struct SessionsBoardOnboardingStepsGrid: View {
         .disabled(connectionState == .online)
         .help(connectionState == .online ? "Daemon is already running" : "")
         .focusable(connectionState != .online)
+        .accessibilityFrameMarker(HarnessAccessibility.onboardingStartButtonFrame)
       }
       SessionsBoardOnboardingStepCard(
         title: "2. Install launchd",
@@ -116,6 +117,7 @@ private struct SessionsBoardOnboardingStepsGrid: View {
           isLaunchAgentInstalled ? "Launch agent is already installed" : ""
         )
         .focusable(!isLaunchAgentInstalled)
+        .accessibilityFrameMarker(HarnessAccessibility.onboardingInstallButtonFrame)
       }
       SessionsBoardOnboardingStepCard(
         title: "3. Start a harness session",
@@ -131,6 +133,7 @@ private struct SessionsBoardOnboardingStepsGrid: View {
           fillsWidth: false,
           action: refresh
         )
+        .accessibilityFrameMarker(HarnessAccessibility.onboardingRefreshButtonFrame)
       }
     }
   }
