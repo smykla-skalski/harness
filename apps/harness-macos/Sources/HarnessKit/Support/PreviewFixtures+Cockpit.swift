@@ -206,17 +206,11 @@ public enum HarnessPreviewStoreFactory {
   public static func makeStore(for scenario: Scenario) -> HarnessStore {
     let configuration = configuration(for: scenario)
     let store = HarnessStore(daemonController: PreviewDaemonController(mode: configuration.mode))
-    store.connectionState = .online
+    store.connectionState = configuration.connectionState
     store.health = configuration.fixtures.health
     store.daemonStatus = configuration.statusReport
     store.connectionMetrics = configuration.connectionMetrics
-    store.connectionEvents = [
-      ConnectionEvent(
-        kind: .connected,
-        detail: "Connected via \(configuration.connectionMetrics.transportKind.title)",
-        transportKind: configuration.connectionMetrics.transportKind
-      )
-    ]
+    store.connectionEvents = configuration.connectionEvents
     store.sessionIndex.replaceSnapshot(
       projects: configuration.fixtures.projects,
       sessions: configuration.fixtures.sessions
@@ -236,8 +230,10 @@ public enum HarnessPreviewStoreFactory {
 private struct PreviewStoreConfiguration {
   let mode: PreviewDaemonController.Mode
   let fixtures: PreviewHarnessClient.Fixtures
+  let connectionState: HarnessStore.ConnectionState
   let statusReport: DaemonStatusReport
   let connectionMetrics: ConnectionMetrics
+  let connectionEvents: [ConnectionEvent]
   let bookmarkedSessionIDs: Set<String>
   let sessionFilter: HarnessStore.SessionFilter
   let selectedSessionID: String?
@@ -250,11 +246,14 @@ private extension HarnessPreviewStoreFactory {
     switch scenario {
     case .dashboardLoaded:
       let fixtures = PreviewHarnessClient.Fixtures.populated
+      let metrics = makeConnectionMetrics(latencyMs: 24, messagesPerSecond: 7.2)
       return PreviewStoreConfiguration(
         mode: .populated,
         fixtures: fixtures,
+        connectionState: .online,
         statusReport: makeStatusReport(fixtures: fixtures),
-        connectionMetrics: makeConnectionMetrics(latencyMs: 24, messagesPerSecond: 7.2),
+        connectionMetrics: metrics,
+        connectionEvents: makeConnectionEvents(using: metrics),
         bookmarkedSessionIDs: [PreviewFixtures.summary.sessionId],
         sessionFilter: .active,
         selectedSessionID: nil,
@@ -263,11 +262,14 @@ private extension HarnessPreviewStoreFactory {
       )
     case .cockpitLoaded:
       let fixtures = PreviewHarnessClient.Fixtures.populated
+      let metrics = makeConnectionMetrics(latencyMs: 24, messagesPerSecond: 7.2)
       return PreviewStoreConfiguration(
         mode: .populated,
         fixtures: fixtures,
+        connectionState: .online,
         statusReport: makeStatusReport(fixtures: fixtures),
-        connectionMetrics: makeConnectionMetrics(latencyMs: 24, messagesPerSecond: 7.2),
+        connectionMetrics: metrics,
+        connectionEvents: makeConnectionEvents(using: metrics),
         bookmarkedSessionIDs: [PreviewFixtures.summary.sessionId],
         sessionFilter: .active,
         selectedSessionID: PreviewFixtures.summary.sessionId,
@@ -276,11 +278,14 @@ private extension HarnessPreviewStoreFactory {
       )
     case .sidebarOverflow:
       let fixtures = PreviewHarnessClient.Fixtures.overflow
+      let metrics = makeConnectionMetrics(latencyMs: 38, messagesPerSecond: 12.4)
       return PreviewStoreConfiguration(
         mode: .overflow,
         fixtures: fixtures,
+        connectionState: .online,
         statusReport: makeStatusReport(fixtures: fixtures),
-        connectionMetrics: makeConnectionMetrics(latencyMs: 38, messagesPerSecond: 12.4),
+        connectionMetrics: metrics,
+        connectionEvents: makeConnectionEvents(using: metrics),
         bookmarkedSessionIDs: [
           PreviewFixtures.summary.sessionId,
           PreviewFixtures.overflowSessions[4].sessionId,
@@ -295,8 +300,10 @@ private extension HarnessPreviewStoreFactory {
       return PreviewStoreConfiguration(
         mode: .empty,
         fixtures: fixtures,
+        connectionState: .offline(DaemonControlError.daemonOffline.localizedDescription),
         statusReport: makeStatusReport(fixtures: fixtures),
-        connectionMetrics: makeConnectionMetrics(latencyMs: 42, messagesPerSecond: 0),
+        connectionMetrics: .initial,
+        connectionEvents: [],
         bookmarkedSessionIDs: [],
         sessionFilter: .active,
         selectedSessionID: nil,
@@ -365,5 +372,15 @@ private extension HarnessPreviewStoreFactory {
       isFallback: false,
       fallbackReason: nil
     )
+  }
+
+  static func makeConnectionEvents(using metrics: ConnectionMetrics) -> [ConnectionEvent] {
+    [
+      ConnectionEvent(
+        kind: .connected,
+        detail: "Connected via \(metrics.transportKind.title)",
+        transportKind: metrics.transportKind
+      )
+    ]
   }
 }

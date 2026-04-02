@@ -34,18 +34,14 @@ struct ObserverInspectorCard: View {
         ObserverWorkersSection(workers: activeWorkers)
       }
       if let cycleHistory = observer.cycleHistory, !cycleHistory.isEmpty {
-        DisclosureGroup("Cycle History") {
+        InspectorSection(title: "Cycle History") {
           ObserverCycleHistoryContent(cycles: cycleHistory)
         }
-        .scaledFont(.caption.bold())
-        .foregroundStyle(HarnessTheme.secondaryInk)
       }
       if let agentSessions = observer.agentSessions, !agentSessions.isEmpty {
-        DisclosureGroup("Tracked Agent Sessions") {
+        InspectorSection(title: "Tracked Agent Sessions") {
           ObserverAgentSessionsContent(sessions: agentSessions)
         }
-        .scaledFont(.caption.bold())
-        .foregroundStyle(HarnessTheme.secondaryInk)
       }
     }
     .frame(maxWidth: .infinity, alignment: .leading)

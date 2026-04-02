@@ -20,18 +20,16 @@ struct DaemonCardHeader: View {
           .foregroundStyle(HarnessTheme.secondaryInk)
       }
       Spacer()
-      HarnessGlassControlGroup(spacing: HarnessTheme.itemSpacing) {
-        HStack(spacing: HarnessTheme.itemSpacing) {
-          DaemonRestartButton(
-            isLoading: isLoading,
-            isDaemonOnline: isDaemonOnline,
-            startDaemon: startDaemon
-          )
-          DaemonStatusPill(
-            statusTitle: statusTitle,
-            statusBackground: statusBackground
-          )
-        }
+      HStack(spacing: HarnessTheme.itemSpacing) {
+        DaemonRestartButton(
+          isLoading: isLoading,
+          isDaemonOnline: isDaemonOnline,
+          startDaemon: startDaemon
+        )
+        DaemonStatusPill(
+          statusTitle: statusTitle,
+          statusBackground: statusBackground
+        )
       }
     }
   }
@@ -151,9 +149,10 @@ private struct DaemonStatusPill: View {
     Text(statusTitle)
       .scaledFont(.caption.bold())
       .harnessPillPadding()
-      .harnessControlPill(tint: statusBackground)
+      .harnessContentPill(tint: statusBackground)
       .foregroundStyle(HarnessTheme.onContrast)
-      .harnessUITestValue("chrome=glass-static")
+      .accessibilityIdentifier(HarnessAccessibility.sidebarDaemonStatusBadge)
+      .harnessUITestValue("chrome=content-pill")
   }
 }
 

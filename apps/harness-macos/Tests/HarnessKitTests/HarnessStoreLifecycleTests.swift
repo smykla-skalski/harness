@@ -234,7 +234,9 @@ struct HarnessStoreLifecycleTests {
   func previewStoreFactorySeedsEmptyState() {
     let store = HarnessPreviewStoreFactory.makeStore(for: .empty)
 
-    #expect(store.connectionState == .online)
+    #expect(
+      store.connectionState == .offline(DaemonControlError.daemonOffline.localizedDescription)
+    )
     #expect(store.sessionFilter == .active)
     #expect(store.sessions.isEmpty)
     #expect(store.filteredSessionCount == 0)
@@ -243,5 +245,25 @@ struct HarnessStoreLifecycleTests {
     #expect(store.selectedSession == nil)
     #expect(store.timeline.isEmpty)
     #expect(store.isShowingCachedData == false)
+  }
+
+  @Test("Empty preview daemon starts offline and start daemon connects")
+  func emptyPreviewDaemonTransitionsOnlineAfterStart() async {
+    let store = HarnessStore(daemonController: PreviewDaemonController(mode: .empty))
+
+    await store.bootstrap()
+
+    #expect(
+      store.connectionState == .offline(DaemonControlError.daemonOffline.localizedDescription)
+    )
+    #expect(store.daemonStatus?.launchAgent.installed == false)
+    #expect(store.sessions.isEmpty)
+
+    await store.startDaemon()
+
+    #expect(store.connectionState == .online)
+    #expect(store.daemonStatus?.launchAgent.installed == false)
+    #expect(store.sessions.isEmpty)
+    #expect(store.health?.status == "ok")
   }
 }
