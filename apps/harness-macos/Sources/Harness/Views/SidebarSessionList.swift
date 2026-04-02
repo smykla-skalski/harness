@@ -74,46 +74,47 @@ struct SidebarFilterSection: View {
       }
 
       filterSection(title: "Status") {
-        HarnessGlassControlGroup(spacing: HarnessTheme.itemSpacing) {
-          HarnessWrapLayout(spacing: HarnessTheme.itemSpacing, lineSpacing: HarnessTheme.itemSpacing) {
-            ForEach(HarnessStore.SessionFilter.allCases) { filter in
-              filterChip(
-                title: filter.title,
-                isSelected: sessionFilter == filter,
-                identifier: HarnessAccessibility.sessionFilterButton(filter.rawValue)
-              ) {
-                setSessionFilter(filter)
+        SidebarSegmentedPicker(
+          title: "Status",
+          options: HarnessStore.SessionFilter.allCases,
+          selection: Binding(
+            get: { sessionFilter },
+            set: { newValue in
+              withAnimation(.spring(duration: 0.2)) {
+                setSessionFilter(newValue)
               }
             }
-          }
-        }
+          ),
+          optionTitle: \.title,
+          optionIdentifier: { HarnessAccessibility.sessionFilterButton($0.rawValue) }
+        )
       }
 
       filterSection(title: "Sort") {
-        Picker("Sort", selection: $sessionSortOrder) {
-          ForEach(SessionSortOrder.allCases) { order in
-            Text(order.title).tag(order)
-          }
-        }
-        .pickerStyle(.segmented)
-        .labelsHidden()
-        .controlSize(.small)
+        SidebarSegmentedPicker(
+          title: "Sort",
+          options: SessionSortOrder.allCases,
+          selection: $sessionSortOrder,
+          optionTitle: \.title,
+          optionIdentifier: { HarnessAccessibility.sidebarSortSegment($0.rawValue) }
+        )
       }
 
       filterSection(title: "Focus") {
-        HarnessGlassControlGroup(spacing: HarnessTheme.itemSpacing) {
-          HarnessWrapLayout(spacing: HarnessTheme.itemSpacing, lineSpacing: HarnessTheme.itemSpacing) {
-            ForEach(SessionFocusFilter.allCases) { filter in
-              filterChip(
-                title: filter.title,
-                isSelected: sessionFocusFilter == filter,
-                identifier: HarnessAccessibility.sidebarFocusChip(filter.rawValue)
-              ) {
-                setSessionFocusFilter(filter)
+        SidebarSegmentedPicker(
+          title: "Focus",
+          options: SessionFocusFilter.allCases,
+          selection: Binding(
+            get: { sessionFocusFilter },
+            set: { newValue in
+              withAnimation(.spring(duration: 0.2)) {
+                setSessionFocusFilter(newValue)
               }
             }
-          }
-        }
+          ),
+          optionTitle: \.title,
+          optionIdentifier: { HarnessAccessibility.sidebarFocusChip($0.rawValue) }
+        )
       }
     }
     .accessibilityElement(children: .contain)
@@ -166,6 +167,7 @@ private struct SidebarSearchField: View {
 
   var body: some View {
     TextField("Search sessions, projects, leaders", text: $searchText)
+      .harnessNativeFormControl()
       .textFieldStyle(.roundedBorder)
       .accessibilityIdentifier("harness.sidebar.search")
       .onSubmit(submitSearch)
@@ -186,28 +188,32 @@ extension SidebarFilterSection {
     }
   }
 
-  fileprivate func filterChip(
-    title: String,
-    isSelected: Bool,
-    identifier: String,
-    action: @escaping () -> Void
-  ) -> some View {
-    Button {
-      withAnimation(.spring(duration: 0.2)) {
-        action()
+}
+
+private struct SidebarSegmentedPicker<Option: Hashable & Identifiable>: View {
+  let title: String
+  let options: [Option]
+  @Binding var selection: Option
+  let optionTitle: (Option) -> String
+  let optionIdentifier: (Option) -> String
+
+  var body: some View {
+    Picker(title, selection: $selection) {
+      ForEach(options) { option in
+        let title = optionTitle(option)
+        Text(title)
+          .lineLimit(1)
+          .minimumScaleFactor(0.8)
+          .accessibilityLabel(title)
+          .accessibilityValue(selection == option ? "selected" : "not selected")
+          .accessibilityAddTraits(selection == option ? .isSelected : [])
+          .accessibilityIdentifier(optionIdentifier(option))
+          .tag(option)
       }
-    } label: {
-      Text(title)
-        .scaledFont(.system(.callout, design: .rounded, weight: .semibold))
     }
-    .buttonBorderShape(.roundedRectangle(radius: 12))
-    .harnessFilterChipButtonStyle(isSelected: isSelected)
-    .controlSize(HarnessControlMetrics.compactControlSize)
-    .accessibilityLabel(title)
-    .accessibilityValue(isSelected ? "selected" : "not selected")
-    .accessibilityAddTraits(isSelected ? .isSelected : [])
-    .accessibilityIdentifier(identifier)
-    .accessibilityFrameMarker("\(identifier).frame")
+    .pickerStyle(.segmented)
+    .labelsHidden()
+    .harnessNativeFormControl()
   }
 }
 

@@ -40,6 +40,7 @@ struct InspectorActionStatusBanner: View {
           }
         }
         .pickerStyle(.menu)
+        .harnessNativeFormControl()
         .labelsHidden()
         .accessibilityLabel("Act As")
         .accessibilityIdentifier(HarnessAccessibility.actionActorPicker)
@@ -75,10 +76,12 @@ struct InspectorCreateTaskSection: View {
         subtitle: "Capture new work directly into the active session."
       )
       TextField("Title", text: $createTitle)
+        .harnessNativeFormControl()
         .focused($focusedField, equals: .createTitle)
         .submitLabel(.next)
         .onSubmit { focusedField = .createContext }
       TextField("Context", text: $createContext, axis: .vertical)
+        .harnessNativeFormControl()
         .focused($focusedField, equals: .createContext)
         .lineLimit(4, reservesSpace: true)
         .submitLabel(.done)
@@ -87,6 +90,7 @@ struct InspectorCreateTaskSection: View {
           Text(severity.title).tag(severity)
         }
       }
+      .harnessNativeFormControl()
       Button("Create Task", action: submitCreateTask)
         .harnessActionButtonStyle(variant: .prominent, tint: nil)
         .disabled(
@@ -129,16 +133,19 @@ struct InspectorTaskActionsSection: View {
           Text(item.title).tag(item.taskId)
         }
       }
+      .harnessNativeFormControl()
       Picker("Assignee", selection: $assigneeID) {
         ForEach(agents) { agent in
           Text(agent.name).tag(agent.agentId)
         }
       }
+      .harnessNativeFormControl()
       Picker("Status", selection: $taskStatus) {
         ForEach(TaskStatus.allCases, id: \.self) { status in
           Text(status.title).tag(status)
         }
       }
+      .harnessNativeFormControl()
       HStack {
         Button("Assign", action: assignSelectedTask)
           .harnessActionButtonStyle(variant: .prominent, tint: nil)
@@ -149,6 +156,7 @@ struct InspectorTaskActionsSection: View {
           .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
           .disabled(isSessionActionInFlight)
         TextField("Update note", text: $statusNote, axis: .vertical)
+          .harnessNativeFormControl()
           .focused($focusedField, equals: .statusNote)
           .lineLimit(2, reservesSpace: true)
           .submitLabel(.done)
@@ -159,11 +167,13 @@ struct InspectorTaskActionsSection: View {
       Text("Checkpoint")
         .scaledFont(.headline)
       TextField("Summary", text: $checkpointSummary, axis: .vertical)
+        .harnessNativeFormControl()
         .focused($focusedField, equals: .checkpointSummary)
         .lineLimit(3, reservesSpace: true)
         .submitLabel(.done)
       LabeledContent("Progress") {
         Slider(value: $checkpointProgress, in: 0...100, step: 5)
+          .harnessNativeFormControl()
       }
       HStack {
         Text("\(Int(checkpointProgress))%")
@@ -205,6 +215,7 @@ struct InspectorRoleActionsSection: View {
           Text(role.title).tag(role)
         }
       }
+      .harnessNativeFormControl()
       Button("Change Role", action: changeSelectedRole)
         .harnessActionButtonStyle(variant: .prominent, tint: nil)
         .disabled(isSessionActionInFlight)
@@ -248,7 +259,9 @@ struct InspectorLeaderTransferSection: View {
           Text(agent.name).tag(agent.agentId)
         }
       }
+      .harnessNativeFormControl()
       TextField("Reason", text: $transferReason, axis: .vertical)
+        .harnessNativeFormControl()
         .focused($isReasonFocused)
         .lineLimit(3, reservesSpace: true)
         .submitLabel(.done)

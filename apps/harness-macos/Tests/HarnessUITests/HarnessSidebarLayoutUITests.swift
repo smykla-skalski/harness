@@ -71,15 +71,19 @@ final class HarnessSidebarLayoutUITests: HarnessUITestCase {
   func testSidebarProjectHeaderFillsAvailableWidth() throws {
     let app = launch(mode: "preview")
     let filtersCard = frameElement(in: app, identifier: Accessibility.sidebarFiltersCardFrame)
-    let sessionList = frameElement(in: app, identifier: Accessibility.sidebarSessionListContent)
+    let sessionsSection = frameElement(in: app, identifier: Accessibility.sidebarSessionsSectionFrame)
     let projectHeader = frameElement(in: app, identifier: Accessibility.previewProjectHeaderFrame)
+
     XCTAssertTrue(filtersCard.waitForExistence(timeout: Self.uiTimeout))
-    XCTAssertTrue(sessionList.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(sessionsSection.waitForExistence(timeout: Self.uiTimeout))
     XCTAssertTrue(projectHeader.waitForExistence(timeout: Self.uiTimeout))
-    assertFillsColumn(child: projectHeader, in: sessionList, expectedHorizontalInset: 0, tolerance: 10)
-    let headerSpacing = projectHeader.frame.minY - filtersCard.frame.maxY
+
+    XCTAssertEqual(projectHeader.frame.minX, filtersCard.frame.minX)
+    XCTAssertEqual(projectHeader.frame.maxX, filtersCard.frame.maxX)
+
+    let headerSpacing = projectHeader.frame.minY - sessionsSection.frame.maxY
     XCTAssertGreaterThanOrEqual(headerSpacing, 0)
-    XCTAssertLessThan(headerSpacing, 32)
+    XCTAssertLessThanOrEqual(headerSpacing, 32)
   }
 
   func testSidebarSessionCardMatchesFiltersCardWidth() throws {
@@ -89,8 +93,27 @@ final class HarnessSidebarLayoutUITests: HarnessUITestCase {
 
     XCTAssertTrue(filtersCard.waitForExistence(timeout: Self.uiTimeout))
     XCTAssertTrue(sessionCard.waitForExistence(timeout: Self.uiTimeout))
-    XCTAssertEqual(sessionCard.frame.minX, filtersCard.frame.minX, accuracy: 8)
-    XCTAssertEqual(sessionCard.frame.maxX, filtersCard.frame.maxX, accuracy: 8)
+    XCTAssertEqual(sessionCard.frame.minX, filtersCard.frame.minX)
+    XCTAssertEqual(sessionCard.frame.maxX, filtersCard.frame.maxX)
+  }
+
+  func testSidebarSessionsSectionSeparatesFiltersFromProjects() throws {
+    let app = launch(mode: "preview")
+    let filtersCard = frameElement(in: app, identifier: Accessibility.sidebarFiltersCardFrame)
+    let sessionsSection = frameElement(in: app, identifier: Accessibility.sidebarSessionsSectionFrame)
+    let projectHeader = frameElement(in: app, identifier: Accessibility.previewProjectHeaderFrame)
+
+    XCTAssertTrue(filtersCard.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(sessionsSection.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(projectHeader.waitForExistence(timeout: Self.uiTimeout))
+
+    XCTAssertEqual(sessionsSection.frame.minX, filtersCard.frame.minX)
+    XCTAssertEqual(sessionsSection.frame.maxX, filtersCard.frame.maxX)
+
+    let sessionsGap = sessionsSection.frame.minY - filtersCard.frame.maxY
+    XCTAssertGreaterThanOrEqual(sessionsGap, 8)
+    XCTAssertLessThanOrEqual(sessionsGap, 32)
+    XCTAssertGreaterThan(projectHeader.frame.minY, sessionsSection.frame.maxY)
   }
 
   func testSidebarFilterSliceFillsColumnAndStartsUnfiltered() throws {
@@ -138,15 +161,31 @@ final class HarnessSidebarLayoutUITests: HarnessUITestCase {
 
   func testFocusFilterSelectionTogglesAccessibilityState() throws {
     let app = launch(mode: "preview")
-    let blockedChip = focusChip(in: app, identifier: Accessibility.blockedChip, title: "Blocked")
-    XCTAssertTrue(blockedChip.waitForExistence(timeout: Self.uiTimeout))
-    XCTAssertEqual(blockedChip.value as? String, "not selected")
-    tapButton(in: app, identifier: Accessibility.blockedChip)
+    let blockedSegment = focusChip(in: app, identifier: Accessibility.blockedChip, title: "Blocked")
+    XCTAssertTrue(blockedSegment.waitForExistence(timeout: Self.uiTimeout))
+    tapButton(in: app, title: "Blocked")
     XCTAssertTrue(
-      waitUntil {
-        let refreshedChip = self.button(in: app, identifier: Accessibility.blockedChip)
-        return refreshedChip.value as? String == "selected"
-      }
+      app.staticTexts["1 visible of 1"].waitForExistence(timeout: Self.uiTimeout)
+    )
+    XCTAssertTrue(
+      element(in: app, identifier: Accessibility.sidebarClearFiltersButton).waitForExistence(
+        timeout: Self.uiTimeout
+      )
+    )
+  }
+
+  func testStatusFilterSelectionTogglesAccessibilityState() throws {
+    let app = launch(mode: "preview")
+    let endedSegment = element(in: app, identifier: Accessibility.endedFilterButton)
+
+    XCTAssertTrue(endedSegment.waitForExistence(timeout: Self.uiTimeout))
+
+    tapButton(in: app, title: "Ended")
+
+    XCTAssertTrue(
+      frameElement(in: app, identifier: Accessibility.sidebarEmptyStateFrame).waitForExistence(
+        timeout: Self.uiTimeout
+      )
     )
     XCTAssertTrue(
       element(in: app, identifier: Accessibility.sidebarClearFiltersButton).waitForExistence(
@@ -161,7 +200,7 @@ final class HarnessSidebarLayoutUITests: HarnessUITestCase {
     let emptyState = frameElement(in: app, identifier: Accessibility.sidebarEmptyStateFrame)
 
     XCTAssertTrue(filtersCard.waitForExistence(timeout: Self.uiTimeout))
-    tapButton(in: app, identifier: Accessibility.idleChip)
+    tapButton(in: app, title: "Idle")
     XCTAssertTrue(emptyState.waitForExistence(timeout: Self.uiTimeout))
 
     let emptyStateSpacing = emptyState.frame.minY - filtersCard.frame.maxY

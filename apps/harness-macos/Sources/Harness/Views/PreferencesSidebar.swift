@@ -33,9 +33,7 @@ enum PreferencesChromeMetrics {
 
 struct PreferencesDetailFormModifier: ViewModifier {
   func body(content: Content) -> some View {
-    content
-      .formStyle(.grouped)
-      .scrollIndicators(.automatic)
+    content.harnessNativeFormContainer()
   }
 }
 
