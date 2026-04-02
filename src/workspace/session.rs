@@ -115,8 +115,15 @@ pub fn current_run_context_path_for_project(project_dir: &Path) -> PathBuf {
 }
 
 /// Project context directory (hashed from project path).
+///
+/// If the input path is already under `harness_data_root()/projects/project-{hex16}`,
+/// it is returned as-is (idempotent). This allows storage functions to accept
+/// a `context_root` directly when the original project path is unavailable.
 #[must_use]
 pub fn project_context_dir(project_dir: &Path) -> PathBuf {
+    if let Some(existing) = as_existing_context_root(project_dir) {
+        return existing;
+    }
     let resolved = project_dir
         .canonicalize()
         .unwrap_or_else(|_| project_dir.to_path_buf());
@@ -128,6 +135,40 @@ pub fn project_context_dir(project_dir: &Path) -> PathBuf {
     harness_data_root()
         .join("projects")
         .join(format!("project-{digest}"))
+}
+
+/// Check whether a path is already a context root (or a subdirectory of one)
+/// under `harness_data_root()/projects/project-{hex16}`.
+///
+/// Returns the non-canonicalized form (`harness_data_root()/projects/{name}`)
+/// so the result is consistent with the normal hashing path.
+fn as_existing_context_root(path: &Path) -> Option<PathBuf> {
+    let projects_dir = harness_data_root().join("projects");
+    // Canonicalize both sides so symlinks (e.g. /var -> /private/var on macOS)
+    // don't break prefix matching.
+    let canonical_projects = projects_dir
+        .canonicalize()
+        .unwrap_or_else(|_| projects_dir.clone());
+    let resolved = path
+        .canonicalize()
+        .unwrap_or_else(|_| path.to_path_buf());
+    let suffix = resolved.strip_prefix(&canonical_projects).ok()?;
+    let first_component = suffix.components().next()?;
+    let dir_name = first_component.as_os_str().to_str()?;
+    if is_project_context_dir_name(dir_name) {
+        // Return using the non-canonicalized prefix for consistency with the
+        // normal hashing path which also uses harness_data_root() directly.
+        return Some(projects_dir.join(dir_name));
+    }
+    None
+}
+
+/// Returns `true` if the name matches `project-{16 hex chars}`.
+fn is_project_context_dir_name(name: &str) -> bool {
+    let Some(hex_part) = name.strip_prefix("project-") else {
+        return false;
+    };
+    hex_part.len() == 16 && hex_part.bytes().all(|byte| byte.is_ascii_hexdigit())
 }
 
 #[cfg(test)]

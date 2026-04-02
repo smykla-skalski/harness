@@ -28,3 +28,62 @@ fn explicit_project_context_path_uses_project_scope() {
         assert_eq!(pointer, context_dir.join("current-run.json"));
     });
 }
+
+#[test]
+fn project_context_dir_is_idempotent() {
+    let tmp = tempfile::tempdir().unwrap();
+    let xdg_data = tmp.path().join("xdg-data");
+    let project_dir = tmp.path().join("myproject");
+    fs::create_dir_all(&project_dir).unwrap();
+
+    temp_env::with_var("XDG_DATA_HOME", Some(&xdg_data), || {
+        let first = project_context_dir(&project_dir);
+        // Create the context root on disk so canonicalize works.
+        fs::create_dir_all(&first).unwrap();
+        let second = project_context_dir(&first);
+        assert_eq!(first, second, "passing context_root back in should return the same path");
+    });
+}
+
+#[test]
+fn project_context_dir_recognizes_subdirectory() {
+    let tmp = tempfile::tempdir().unwrap();
+    let xdg_data = tmp.path().join("xdg-data");
+    let project_dir = tmp.path().join("myproject");
+    fs::create_dir_all(&project_dir).unwrap();
+
+    temp_env::with_var("XDG_DATA_HOME", Some(&xdg_data), || {
+        let context_root = project_context_dir(&project_dir);
+        let sub = context_root.join("orchestration").join("sessions");
+        fs::create_dir_all(&sub).unwrap();
+        let result = project_context_dir(&sub);
+        assert_eq!(result, context_root, "subdirectory should resolve to the context root");
+    });
+}
+
+#[test]
+fn project_context_dir_rejects_non_hex_project_name() {
+    let tmp = tempfile::tempdir().unwrap();
+    let xdg_data = tmp.path().join("xdg-data");
+    let fake_project = xdg_data
+        .join("harness")
+        .join("projects")
+        .join("project-not-hex-at-all!");
+    fs::create_dir_all(&fake_project).unwrap();
+
+    temp_env::with_var("XDG_DATA_HOME", Some(&xdg_data), || {
+        let result = project_context_dir(&fake_project);
+        // Should NOT be idempotent - the name doesn't match project-{16hex}.
+        assert_ne!(result, fake_project);
+    });
+}
+
+#[test]
+fn is_project_context_dir_name_validates_format() {
+    assert!(is_project_context_dir_name("project-9fe5ce4237976a0a"));
+    assert!(is_project_context_dir_name("project-b72ed763e074d381"));
+    assert!(!is_project_context_dir_name("project-short"));
+    assert!(!is_project_context_dir_name("project-ZZZZZZZZZZZZZZZZ"));
+    assert!(!is_project_context_dir_name("notaproject-9fe5ce4237976a0a"));
+    assert!(!is_project_context_dir_name("project-9fe5ce4237976a0a0")); // 17 chars
+}
