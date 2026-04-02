@@ -350,6 +350,14 @@ pub fn observe_snapshot_path(context_root: &Path, observe_id: &str) -> PathBuf {
 }
 
 fn infer_project_dir(context_root: &Path) -> Option<PathBuf> {
+    // Prefer the explicit origin file written at session creation.
+    if let Some(origin) = storage::load_project_origin(context_root) {
+        if origin.is_dir() {
+            return Some(origin);
+        }
+    }
+
+    // Fall back to ledger-based cwd inference.
     let ledger_path = context_root
         .join("agents")
         .join("ledger")
