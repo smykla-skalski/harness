@@ -79,7 +79,13 @@ extension HarnessStore {
 
   private func loadSessionWithoutHistory(_ sessionID: String?) async {
     primeSessionSelection(sessionID)
-    guard let client, let sessionID else {
+    guard let sessionID else {
+      stopSessionStream()
+      return
+    }
+
+    guard connectionState == .online, let client else {
+      restorePersistedSessionSelection(sessionID: sessionID)
       stopSessionStream()
       return
     }
@@ -129,7 +135,13 @@ extension HarnessStore {
   public func selectSession(_ sessionID: String?) async {
     let previousProjectId = selectedSessionSummary?.projectId
     primeSessionSelection(sessionID)
-    guard let client, let sessionID else {
+    guard let sessionID else {
+      stopSessionStream()
+      return
+    }
+
+    guard connectionState == .online, let client else {
+      restorePersistedSessionSelection(sessionID: sessionID)
       stopSessionStream()
       return
     }
@@ -233,5 +245,107 @@ extension HarnessStore {
 
   func isCurrentSessionLoad(_ requestID: UInt64, sessionID: String) -> Bool {
     activeSessionLoadRequest == requestID && selectedSessionID == sessionID
+  }
+
+  func restorePersistedSessionSelection(sessionID: String) {
+    if let cached = loadCachedSessionDetail(sessionID: sessionID) {
+      applySelectedSessionSnapshot(
+        sessionID: sessionID,
+        detail: cached.detail,
+        timeline: cached.timeline,
+        showingCachedData: true
+      )
+    } else {
+      isShowingCachedData = persistedSessionCount > 0 || !sessions.isEmpty
+    }
+
+    activeSessionLoadRequest = 0
+    isSelectionLoading = false
+  }
+
+  func restorePersistedSessionState() {
+    refreshPersistedSessionMetadata()
+
+    if sessions.isEmpty, let cached = loadCachedSessionList() {
+      sessionIndex.replaceSnapshot(
+        projects: cached.projects,
+        sessions: cached.sessions
+      )
+    }
+
+    if case .offline = connectionState {
+      isShowingCachedData = persistedSessionCount > 0 || !sessions.isEmpty
+    }
+
+    if let selectedSessionID, selectedSession?.session.sessionId != selectedSessionID {
+      restorePersistedSessionSelection(sessionID: selectedSessionID)
+    } else {
+      activeSessionLoadRequest = 0
+      isSelectionLoading = false
+    }
+
+    synchronizeActionActor()
+  }
+
+  func schedulePersistedSnapshotHydration(
+    using client: any HarnessClientProtocol,
+    sessions: [SessionSummary]
+  ) {
+    guard modelContext != nil, persistenceError == nil else {
+      sessionSnapshotHydrationTask?.cancel()
+      sessionSnapshotHydrationTask = nil
+      return
+    }
+
+    let hydrationQueue = Array(sessions.filter(persistedSnapshotNeedsHydration))
+    guard !hydrationQueue.isEmpty else {
+      sessionSnapshotHydrationTask?.cancel()
+      sessionSnapshotHydrationTask = nil
+      return
+    }
+
+    sessionSnapshotHydrationTask?.cancel()
+    sessionSnapshotHydrationTask = Task { @MainActor [weak self] in
+      guard let self else {
+        return
+      }
+
+      defer { self.sessionSnapshotHydrationTask = nil }
+
+      for summary in hydrationQueue {
+        guard !Task.isCancelled else {
+          return
+        }
+        guard self.connectionState == .online else {
+          return
+        }
+
+        do {
+          async let detailResponse = Self.measureOperation {
+            try await client.sessionDetail(id: summary.sessionId)
+          }
+          async let timelineResponse = Self.measureOperation {
+            try await client.timeline(sessionID: summary.sessionId)
+          }
+          let measuredDetail = try await detailResponse
+          let measuredTimeline = try await timelineResponse
+          self.recordRequestSuccess()
+          self.recordRequestSuccess()
+          self.cacheSessionDetail(
+            measuredDetail.value,
+            timeline: measuredTimeline.value,
+            markViewed: false
+          )
+        } catch {
+          guard !Task.isCancelled else {
+            return
+          }
+          self.appendConnectionEvent(
+            kind: .error,
+            detail: "Persisted snapshot refresh failed for \(summary.sessionId)"
+          )
+        }
+      }
+    }
   }
 }

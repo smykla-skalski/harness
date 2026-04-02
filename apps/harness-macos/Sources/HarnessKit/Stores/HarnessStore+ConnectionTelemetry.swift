@@ -1,6 +1,21 @@
 import Foundation
 
 extension HarnessStore {
+  public enum PersistedSessionReason: Equatable {
+    case daemonOffline(String)
+    case liveDataUnavailable
+  }
+
+  public enum SessionDataAvailability: Equatable {
+    case live
+    case persisted(
+      reason: PersistedSessionReason,
+      sessionCount: Int,
+      lastSnapshotAt: Date?
+    )
+    case unavailable(reason: PersistedSessionReason)
+  }
+
   public var connectionState: ConnectionState {
     get { connection.connectionState }
     set { connection.connectionState = newValue }
@@ -61,8 +76,45 @@ extension HarnessStore {
     set { connection.isShowingCachedData = newValue }
   }
 
+  public var persistedSessionCount: Int {
+    get { connection.persistedSessionCount }
+    set { connection.persistedSessionCount = newValue }
+  }
+
+  public var lastPersistedSnapshotAt: Date? {
+    get { connection.lastPersistedSnapshotAt }
+    set { connection.lastPersistedSnapshotAt = newValue }
+  }
+
   public var isBusy: Bool {
     isDaemonActionInFlight || isSessionActionInFlight
+  }
+
+  public var isSessionReadOnly: Bool {
+    connectionState != .online
+  }
+
+  public var sessionDataAvailability: SessionDataAvailability {
+    if case .offline(let reason) = connectionState {
+      if persistedSessionCount > 0 || !sessions.isEmpty {
+        return .persisted(
+          reason: .daemonOffline(reason),
+          sessionCount: max(persistedSessionCount, sessions.count),
+          lastSnapshotAt: lastPersistedSnapshotAt
+        )
+      }
+      return .unavailable(reason: .daemonOffline(reason))
+    }
+
+    if isShowingCachedData {
+      return .persisted(
+        reason: .liveDataUnavailable,
+        sessionCount: max(persistedSessionCount, sessions.count),
+        lastSnapshotAt: lastPersistedSnapshotAt
+      )
+    }
+
+    return .live
   }
 
   public var dataReceivedPulse: Bool {
