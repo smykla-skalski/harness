@@ -28,6 +28,9 @@ extension HarnessUITestCase {
     // Fall back to button lookup for forwards/backwards compatibility.
     let identifiedButton = button(in: app, identifier: identifier)
     if identifiedButton.exists { return identifiedButton }
+    // Prefer the explicit frame probe when SwiftUI changes row accessibility roles.
+    let frameProbe = element(in: app, identifier: "\(identifier).frame")
+    if frameProbe.exists { return frameProbe }
     // Last resort: any element with the identifier.
     return element(in: app, identifier: identifier)
   }
