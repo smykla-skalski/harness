@@ -51,17 +51,6 @@ enum PreferencesPreviewSupport {
     return store
   }
 
-  static func launchAgentCaption(for store: HarnessStore) -> String {
-    let fallback = store.daemonStatus?.launchAgent.label ?? "Launch agent"
-    let caption = store.daemonStatus?.launchAgent.lifecycleCaption ?? fallback
-    return caption.isEmpty ? fallback : caption
-  }
-
-  static func cacheEntryCount(for store: HarnessStore) -> Int {
-    store.diagnostics?.workspace.cacheEntryCount
-      ?? store.daemonStatus?.diagnostics.cacheEntryCount
-      ?? 0
-  }
 }
 
 private extension PreferencesPreviewSupport {
