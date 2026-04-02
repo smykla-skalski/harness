@@ -27,6 +27,12 @@ enum HarnessAccessibility {
   }
 
   static let onboardingCard = "harness.board.onboarding-card"
+  static let onboardingStartButton = "harness.board.action.start"
+  static let onboardingInstallButton = "harness.board.action.install"
+  static let onboardingRefreshButton = "harness.board.action.refresh"
+  static let onboardingStartButtonFrame = "harness.board.action.start.frame"
+  static let onboardingInstallButtonFrame = "harness.board.action.install.frame"
+  static let onboardingRefreshButtonFrame = "harness.board.action.refresh.frame"
   static let sessionsBoardRoot = "harness.board.root"
   static let recentSessionsCard = "harness.board.recent-sessions-card"
   static let contentRoot = "harness.content.root"
@@ -62,6 +68,7 @@ enum HarnessAccessibility {
   static let sidebarInstallLaunchAgentButton = "harness.sidebar.action.install"
   static let sidebarStartDaemonButtonFrame = "harness.sidebar.action.start.frame"
   static let sidebarInstallLaunchAgentButtonFrame = "harness.sidebar.action.install.frame"
+  static let sidebarDaemonStatusBadge = "harness.sidebar.daemon-status-badge"
   static let connectionBadge = "harness.toolbar.connection-badge"
   static let transportBadge = "harness.sidebar.transport-badge"
   static let latencyBadge = "harness.sidebar.latency-badge"
@@ -72,6 +79,10 @@ enum HarnessAccessibility {
 
   static func sessionRow(_ sessionID: String) -> String {
     "harness.sidebar.session.\(sessionID)"
+  }
+
+  static func sessionRowFrame(_ sessionID: String) -> String {
+    "\(sessionRow(sessionID)).frame"
   }
 
   static func projectHeader(_ projectID: String) -> String {

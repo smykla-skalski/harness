@@ -138,7 +138,7 @@ struct SidebarView: View {
   @ViewBuilder
   private func sessionRow(_ session: SessionSummary) -> some View {
     let isSelected = store.selectedSessionID == session.sessionId
-    let rowContentPadding = HarnessTheme.spacingLG
+    let rowContentPadding = HarnessTheme.itemSpacing
     let rowOuterInset = HarnessTheme.sectionSpacing
     let baseRow =
       Button {
@@ -166,6 +166,7 @@ struct SidebarView: View {
           }
           .contentShape(RoundedRectangle(cornerRadius: HarnessTheme.cornerRadiusLG, style: .continuous))
           .animation(.snappy(duration: 0.2), value: isSelected)
+          .accessibilityFrameMarker(HarnessAccessibility.sessionRowFrame(session.sessionId))
       }
       .harnessSidebarRowButtonStyle(
         cornerRadius: HarnessTheme.cornerRadiusLG,

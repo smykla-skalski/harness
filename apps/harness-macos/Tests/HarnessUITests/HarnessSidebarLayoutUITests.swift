@@ -63,6 +63,17 @@ final class HarnessSidebarLayoutUITests: HarnessUITestCase {
     XCTAssertLessThan(headerSpacing, 32)
   }
 
+  func testSidebarSessionCardMatchesFiltersCardWidth() throws {
+    let app = launch(mode: "preview")
+    let filtersCard = frameElement(in: app, identifier: Accessibility.sidebarFiltersCardFrame)
+    let sessionCard = frameElement(in: app, identifier: Accessibility.previewSessionRowFrame)
+
+    XCTAssertTrue(filtersCard.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(sessionCard.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertEqual(sessionCard.frame.minX, filtersCard.frame.minX, accuracy: 8)
+    XCTAssertEqual(sessionCard.frame.maxX, filtersCard.frame.maxX, accuracy: 8)
+  }
+
   func testSidebarFilterSliceFillsColumnAndStartsUnfiltered() throws {
     let app = launch(mode: "preview")
     let sidebarRoot = element(in: app, identifier: Accessibility.sidebarRoot)
