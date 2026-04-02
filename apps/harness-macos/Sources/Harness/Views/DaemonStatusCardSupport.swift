@@ -167,16 +167,16 @@ private struct DaemonStateToggleControl: View {
         .accessibilityIdentifier(HarnessAccessibility.sidebarDaemonStatusBadge)
     }
     .harnessUITestValue(isHovered ? "chrome=power" : "chrome=status-dot")
-    .task(id: idleHintEnabled) {
-      if !idleHintEnabled {
+    .task(id: idleHintTaskID) {
+      guard let cycleSeconds = idleHintCycleSeconds else {
         resetIdleHintState()
         return
       }
 
       while !Task.isCancelled {
-        try? await Task.sleep(for: .seconds(10))
+        try? await Task.sleep(for: .seconds(cycleSeconds))
         if Task.isCancelled { break }
-        guard idleHintEnabled, !isHovered else { continue }
+        guard idleHintCycleSeconds != nil, !isHovered else { continue }
         await runIdleHintAnimation()
       }
     }
@@ -227,8 +227,14 @@ private struct DaemonStateToggleControl: View {
     return .interactiveSpring(response: 0.42, dampingFraction: 0.78, blendDuration: 0.18)
   }
 
-  private var idleHintEnabled: Bool {
-    !isDaemonOnline && !isLoading
+  private var idleHintCycleSeconds: Double? {
+    guard !isLoading else { return nil }
+    return isDaemonOnline ? 30 : 10
+  }
+
+  private var idleHintTaskID: String {
+    if isLoading { return "disabled" }
+    return isDaemonOnline ? "online-30" : "offline-10"
   }
 
   private var morphProgress: CGFloat {
@@ -247,19 +253,19 @@ private struct DaemonStateToggleControl: View {
       idleHintScale = 1.14
     }
     try? await Task.sleep(for: .milliseconds(120))
-    if !idleHintEnabled || isHovered { resetIdleHintState(); return }
+    if idleHintCycleSeconds == nil || isHovered { resetIdleHintState(); return }
 
     withAnimation(.interpolatingSpring(stiffness: 340, damping: 20)) {
       idleHintScale = 0.95
     }
     try? await Task.sleep(for: .milliseconds(110))
-    if !idleHintEnabled || isHovered { resetIdleHintState(); return }
+    if idleHintCycleSeconds == nil || isHovered { resetIdleHintState(); return }
 
     withAnimation(.interpolatingSpring(stiffness: 280, damping: 18)) {
       idleHintScale = 1
     }
     try? await Task.sleep(for: .milliseconds(280))
-    if !idleHintEnabled || isHovered { resetIdleHintState(); return }
+    if idleHintCycleSeconds == nil || isHovered { resetIdleHintState(); return }
 
     idleHintReturningToDot = true
     withAnimation(.interpolatingSpring(stiffness: 260, damping: 15)) {
@@ -267,13 +273,13 @@ private struct DaemonStateToggleControl: View {
       idleHintScale = 1.14
     }
     try? await Task.sleep(for: .milliseconds(120))
-    if !idleHintEnabled || isHovered { resetIdleHintState(); return }
+    if idleHintCycleSeconds == nil || isHovered { resetIdleHintState(); return }
 
     withAnimation(.interpolatingSpring(stiffness: 340, damping: 20)) {
       idleHintScale = 0.95
     }
     try? await Task.sleep(for: .milliseconds(110))
-    if !idleHintEnabled || isHovered { resetIdleHintState(); return }
+    if idleHintCycleSeconds == nil || isHovered { resetIdleHintState(); return }
 
     withAnimation(.interpolatingSpring(stiffness: 280, damping: 18)) {
       idleHintScale = 1
