@@ -72,6 +72,8 @@ enum HarnessAccessibility {
   static let navigateBackButton = "harness.toolbar.navigate-back"
   static let navigateForwardButton = "harness.toolbar.navigate-forward"
   static let toolbarCenterpiece = "harness.toolbar.centerpiece"
+  static let toolbarCenterpieceState = "harness.toolbar.centerpiece.state"
+  static let toolbarCenterpieceMode = "harness.toolbar.centerpiece.mode"
   static let refreshButton = "harness.toolbar.refresh"
   static let daemonPreferencesButton = "harness.toolbar.preferences"
   static let endSessionButton = "harness.session.action.end"
@@ -107,10 +109,6 @@ enum HarnessAccessibility {
 
   static func sessionFilterButton(_ filter: String) -> String {
     "harness.sidebar.filter.\(filter)"
-  }
-
-  static func boardMetricCard(_ key: String) -> String {
-    "harness.board.metric.\(slug(key))"
   }
 
   static func sidebarDaemonBadge(_ key: String) -> String {
