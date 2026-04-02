@@ -2,24 +2,55 @@ import HarnessKit
 import SwiftUI
 
 struct PreferencesGeneralSection: View {
+  let store: HarnessStore
   @Binding var themeMode: HarnessThemeMode
   @AppStorage(HarnessTextSize.storageKey)
   private var textSizeIndex = HarnessTextSize.defaultIndex
-  let endpoint: String
-  let version: String
-  let launchAgentState: String
-  let launchAgentCaption: String
-  let cacheEntryCount: Int
-  let sessionCount: Int
-  let startedAt: String?
-  let lastError: String?
-  let lastAction: String
-  let isLoading: Bool
-  let reconnect: HarnessAsyncActionButton.Action
-  let refreshDiagnostics: HarnessAsyncActionButton.Action
-  let startDaemon: HarnessAsyncActionButton.Action
-  let installLaunchAgent: HarnessAsyncActionButton.Action
-  let removeLaunchAgent: HarnessAsyncActionButton.Action
+  @State private var isRemoveLaunchAgentConfirmationPresented = false
+
+  private var effectiveHealth: HealthResponse? {
+    store.diagnostics?.health ?? store.health
+  }
+
+  private var endpoint: String {
+    effectiveHealth?.endpoint
+      ?? store.daemonStatus?.manifest?.endpoint ?? "Unavailable"
+  }
+
+  private var version: String {
+    effectiveHealth?.version
+      ?? store.daemonStatus?.manifest?.version ?? "Unavailable"
+  }
+
+  private var launchAgentState: String {
+    store.daemonStatus?.launchAgent.lifecycleTitle ?? "Manual"
+  }
+
+  private var launchAgentCaption: String {
+    let agent = store.daemonStatus?.launchAgent
+    let fallback = agent?.label ?? "Launch agent"
+    let caption = agent?.lifecycleCaption ?? fallback
+    return caption.isEmpty ? fallback : caption
+  }
+
+  private var cacheEntryCount: Int {
+    store.diagnostics?.workspace.cacheEntryCount
+      ?? store.daemonStatus?.diagnostics.cacheEntryCount ?? 0
+  }
+
+  private var sessionCount: Int {
+    store.daemonStatus?.sessionCount ?? store.sessions.count
+  }
+
+  private var startedAt: String? {
+    effectiveHealth?.startedAt ?? store.daemonStatus?.manifest?.startedAt
+  }
+
+  private var isLoading: Bool {
+    store.isDaemonActionInFlight
+      || store.isDiagnosticsRefreshInFlight
+      || store.connectionState == .connecting
+  }
 
   var body: some View {
     Form {
@@ -44,12 +75,9 @@ struct PreferencesGeneralSection: View {
 
       Section("Actions") {
         PreferencesActionButtons(
+          store: store,
           isLoading: isLoading,
-          reconnect: reconnect,
-          refreshDiagnostics: refreshDiagnostics,
-          startDaemon: startDaemon,
-          installLaunchAgent: installLaunchAgent,
-          removeLaunchAgent: removeLaunchAgent
+          isRemoveLaunchAgentConfirmationPresented: $isRemoveLaunchAgentConfirmationPresented
         )
       }
 
@@ -76,39 +104,37 @@ struct PreferencesGeneralSection: View {
         LabeledContent("Live Sessions") {
           Text("\(sessionCount)")
         }
+        .accessibilityIdentifier(HarnessAccessibility.preferencesMetricCard("Live Sessions"))
       }
 
       PreferencesStatusSection(
         startedAt: startedAt,
-        lastError: lastError,
-        lastAction: lastAction
+        lastError: store.lastError,
+        lastAction: store.lastAction
       )
     }
     .preferencesDetailFormStyle()
+    .confirmationDialog(
+      "Remove Launch Agent?",
+      isPresented: $isRemoveLaunchAgentConfirmationPresented,
+      titleVisibility: .visible
+    ) {
+      Button("Remove Launch Agent Now", role: .destructive) {
+        Task { await store.removeLaunchAgent() }
+      }
+      Button("Cancel", role: .cancel) {}
+    } message: {
+      Text("This disables launchd residency for the harness daemon on this Mac.")
+    }
   }
 }
 
 #Preview("Preferences General Section") {
   @Previewable @State var themeMode: HarnessThemeMode = .dark
-  let store = PreferencesPreviewSupport.makeStore()
 
   PreferencesGeneralSection(
-    themeMode: $themeMode,
-    endpoint: store.diagnostics?.health?.endpoint ?? store.health?.endpoint ?? "Unavailable",
-    version: store.diagnostics?.health?.version ?? store.health?.version ?? "Unavailable",
-    launchAgentState: store.daemonStatus?.launchAgent.lifecycleTitle ?? "Manual",
-    launchAgentCaption: PreferencesPreviewSupport.launchAgentCaption(for: store),
-    cacheEntryCount: PreferencesPreviewSupport.cacheEntryCount(for: store),
-    sessionCount: store.daemonStatus?.sessionCount ?? store.sessions.count,
-    startedAt: store.diagnostics?.health?.startedAt ?? store.health?.startedAt,
-    lastError: store.lastError,
-    lastAction: store.lastAction,
-    isLoading: false,
-    reconnect: { await store.reconnect() },
-    refreshDiagnostics: { await store.refreshDiagnostics() },
-    startDaemon: { await store.startDaemon() },
-    installLaunchAgent: { await store.installLaunchAgent() },
-    removeLaunchAgent: { store.requestRemoveLaunchAgentConfirmation() }
+    store: PreferencesPreviewSupport.makeStore(),
+    themeMode: $themeMode
   )
   .frame(width: 720)
 }

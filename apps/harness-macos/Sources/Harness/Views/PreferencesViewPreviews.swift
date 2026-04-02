@@ -5,10 +5,9 @@ import SwiftUI
 
   PreferencesView(
     store: PreferencesPreviewSupport.makeStore(),
-    themeMode: $themeMode,
-    selectedSection: .general
+    themeMode: $themeMode
   )
-  .frame(width: 980, height: 680)
+  .frame(width: 780, height: 560)
 }
 
 #Preview("Preferences Window - Connection") {
@@ -16,10 +15,9 @@ import SwiftUI
 
   PreferencesView(
     store: PreferencesPreviewSupport.makeStore(),
-    themeMode: $themeMode,
-    selectedSection: .connection
+    themeMode: $themeMode
   )
-  .frame(width: 980, height: 680)
+  .frame(width: 780, height: 560)
 }
 
 #Preview("Preferences Window - Diagnostics") {
@@ -27,8 +25,7 @@ import SwiftUI
 
   PreferencesView(
     store: PreferencesPreviewSupport.makeStore(),
-    themeMode: $themeMode,
-    selectedSection: .diagnostics
+    themeMode: $themeMode
   )
-  .frame(width: 980, height: 680)
+  .frame(width: 780, height: 560)
 }

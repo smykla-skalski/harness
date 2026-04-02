@@ -29,16 +29,17 @@ enum PreferencesChromeMetrics {
   static let sidebarIdealWidth: CGFloat = 210
   static let sidebarMaxWidth: CGFloat = 240
   static let sidebarMinRowHeight: CGFloat = 30
-  static let detailContentHorizontalInset: CGFloat = -16
+  static let detailContentTopInset: CGFloat = -22
 }
 
 struct PreferencesDetailFormModifier: ViewModifier {
   func body(content: Content) -> some View {
     content
       .formStyle(.grouped)
+      .scrollIndicators(.automatic)
       .contentMargins(
-        .horizontal,
-        PreferencesChromeMetrics.detailContentHorizontalInset,
+        .top,
+        PreferencesChromeMetrics.detailContentTopInset,
         for: .scrollContent
       )
   }

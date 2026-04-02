@@ -2,6 +2,10 @@ import HarnessKit
 import SwiftData
 import SwiftUI
 
+enum HarnessWindowID {
+  static let preferences = "preferences"
+}
+
 @main
 @MainActor
 struct HarnessApp: App {
@@ -48,16 +52,14 @@ struct HarnessApp: App {
       )
     }
 
-    Settings {
+    Window("Preferences", id: HarnessWindowID.preferences) {
       HarnessSettingsRootView(
         store: store,
         themeMode: $themeMode
       )
     }
     .windowStyle(.titleBar)
-    .windowToolbarStyle(.unifiedCompact(showsTitle: false))
-    .defaultSize(width: 640, height: 480)
-    .windowResizability(.contentSize)
+    .defaultSize(width: 860, height: 620)
     .restorationBehavior(isUITesting ? .disabled : .automatic)
   }
 

@@ -2,44 +2,42 @@ import HarnessKit
 import SwiftUI
 
 struct PreferencesConnectionSection: View {
-  let isConnecting: Bool
-  let isDiagnosticsRefreshInFlight: Bool
-  let reconnect: HarnessAsyncActionButton.Action
-  let refreshDiagnostics: HarnessAsyncActionButton.Action
-  let metrics: ConnectionMetrics
-  let events: [ConnectionEvent]
+  let store: HarnessStore
 
   var body: some View {
     Form {
       Section("Actions") {
         HarnessGlassControlGroup(spacing: HarnessTheme.itemSpacing) {
-          HarnessWrapLayout(spacing: HarnessTheme.itemSpacing, lineSpacing: HarnessTheme.itemSpacing) {
+          HarnessWrapLayout(
+            spacing: HarnessTheme.itemSpacing,
+            lineSpacing: HarnessTheme.itemSpacing
+          ) {
             HarnessAsyncActionButton(
               title: "Reconnect",
               tint: nil,
               variant: .prominent,
-              isLoading: isConnecting,
+              isLoading: store.connectionState == .connecting,
               accessibilityIdentifier: HarnessAccessibility.preferencesActionButton(
                 "Connection Reconnect"
               ),
-              action: reconnect
+              action: { await store.reconnect() }
             )
             HarnessAsyncActionButton(
               title: "Refresh Diagnostics",
               tint: .secondary,
               variant: .bordered,
-              isLoading: isDiagnosticsRefreshInFlight,
+              isLoading: store.isDiagnosticsRefreshInFlight,
               accessibilityIdentifier: HarnessAccessibility.preferencesActionButton(
                 "Connection Refresh Diagnostics"
               ),
-              action: refreshDiagnostics
+              action: { await store.refreshDiagnostics() }
             )
           }
         }
       }
       PreferencesConnectionMetrics(
-        metrics: metrics,
-        events: events
+        metrics: store.connectionMetrics,
+        events: store.connectionEvents
       )
     }
     .preferencesDetailFormStyle()
@@ -47,15 +45,8 @@ struct PreferencesConnectionSection: View {
 }
 
 #Preview("Preferences Connection Section") {
-  let store = PreferencesPreviewSupport.makeStore()
-
   PreferencesConnectionSection(
-    isConnecting: store.connectionState == .connecting,
-    isDiagnosticsRefreshInFlight: store.isDiagnosticsRefreshInFlight,
-    reconnect: { await store.reconnect() },
-    refreshDiagnostics: { await store.refreshDiagnostics() },
-    metrics: store.connectionMetrics,
-    events: store.connectionEvents
+    store: PreferencesPreviewSupport.makeStore()
   )
   .frame(width: 720)
 }

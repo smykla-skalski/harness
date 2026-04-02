@@ -1,5 +1,51 @@
 import SwiftUI
 
+struct HarnessActionButton: View {
+  typealias Action = @MainActor () -> Void
+  typealias Variant = HarnessAsyncActionButton.Variant
+
+  let title: String
+  let tint: Color?
+  let variant: Variant
+  let accessibilityIdentifier: String
+  let fillsWidth: Bool
+  let action: Action
+
+  init(
+    title: String,
+    tint: Color? = nil,
+    variant: Variant,
+    accessibilityIdentifier: String,
+    fillsWidth: Bool = false,
+    action: @escaping Action
+  ) {
+    self.title = title
+    self.tint = tint
+    self.variant = variant
+    self.accessibilityIdentifier = accessibilityIdentifier
+    self.fillsWidth = fillsWidth
+    self.action = action
+  }
+
+  var body: some View {
+    Button {
+      action()
+    } label: {
+      ProminentAwareLabel {
+        Text(title)
+          .lineLimit(1)
+          .scaledFont(.system(.callout, design: .rounded, weight: .semibold))
+          .frame(maxWidth: fillsWidth ? .infinity : nil)
+      }
+    }
+    .frame(maxWidth: fillsWidth ? .infinity : nil)
+    .harnessActionButtonStyle(variant: variant, tint: tint)
+    .controlSize(HarnessControlMetrics.compactControlSize)
+    .accessibilityIdentifier(accessibilityIdentifier)
+    .accessibilityFrameMarker("\(accessibilityIdentifier).frame")
+  }
+}
+
 struct HarnessAsyncActionButton: View {
   typealias Action = @MainActor () async -> Void
 
@@ -16,6 +62,8 @@ struct HarnessAsyncActionButton: View {
   let fillsWidth: Bool
   let action: Action
   @State private var runningTask: Task<Void, Never>?
+  @Environment(\.accessibilityReduceMotion)
+  private var reduceMotion
 
   init(
     title: String,
@@ -58,6 +106,10 @@ struct HarnessAsyncActionButton: View {
     .controlSize(HarnessControlMetrics.compactControlSize)
     .accessibilityIdentifier(accessibilityIdentifier)
     .accessibilityFrameMarker("\(accessibilityIdentifier).frame")
+    .onDisappear {
+      runningTask?.cancel()
+      runningTask = nil
+    }
   }
 
   private var label: some View {
@@ -72,7 +124,7 @@ struct HarnessAsyncActionButton: View {
       }
       .scaledFont(.system(.callout, design: .rounded, weight: .semibold))
       .frame(maxWidth: fillsWidth ? .infinity : nil)
-      .animation(.spring(duration: 0.2), value: isLoading)
+      .animation(reduceMotion ? nil : .spring(duration: 0.2), value: isLoading)
     }
   }
 

@@ -24,7 +24,7 @@ struct HarnessSettingsRootView: View {
       store: store,
       themeMode: $themeMode
     )
-    .frame(minWidth: 600, minHeight: 400)
+    .frame(minWidth: 680, minHeight: 440)
     .modifier(HarnessSceneAppearanceModifier(themeMode: $themeMode))
   }
 }

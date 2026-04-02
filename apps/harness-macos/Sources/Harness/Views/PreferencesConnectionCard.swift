@@ -8,9 +8,9 @@ struct PreferencesConnectionMetrics: View {
   private var latencyText: String {
     metrics.latencyMs.map { "\($0)ms" } ?? "--"
   }
-  private var uptimeText: String {
-    guard let since = metrics.connectedSince else { return "--" }
-    let seconds = Int(Date.now.timeIntervalSince(since))
+  private static func formatUptime(since: Date?, now: Date) -> String {
+    guard let since else { return "--" }
+    let seconds = Int(now.timeIntervalSince(since))
     if seconds < 60 { return "\(seconds)s" }
     if seconds < 3600 { return "\(seconds / 60)m" }
     return "\(seconds / 3600)h \((seconds % 3600) / 60)m"
@@ -36,7 +36,11 @@ struct PreferencesConnectionMetrics: View {
       LabeledContent(
         "Messages Out", value: "\(metrics.messagesSent)"
       )
-      LabeledContent("Uptime", value: uptimeText)
+      LabeledContent("Uptime") {
+        TimelineView(.periodic(from: .now, by: 1)) { context in
+          Text(Self.formatUptime(since: metrics.connectedSince, now: context.date))
+        }
+      }
       LabeledContent("Reconnects") {
         Text("\(metrics.reconnectCount)")
           .foregroundStyle(reconnectTint)
@@ -62,6 +66,7 @@ struct PreferencesConnectionMetrics: View {
               .scaledFont(.caption.monospaced())
               .foregroundStyle(.secondary)
           }
+          .accessibilityElement(children: .combine)
         }
       }
     }

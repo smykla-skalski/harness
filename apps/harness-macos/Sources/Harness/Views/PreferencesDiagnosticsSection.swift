@@ -2,58 +2,46 @@ import HarnessKit
 import SwiftUI
 
 struct PreferencesDiagnosticsSection: View {
-  let launchAgent: LaunchAgentStatus?
-  let tokenPresent: Bool
-  let projectCount: Int
-  let sessionCount: Int
-  let lastEvent: DaemonAuditEvent?
-  let paths: PreferencesDiagnosticsPaths
-  let recentEvents: [DaemonAuditEvent]
+  let store: HarnessStore
+
+  private var workspaceDiagnostics: DaemonDiagnostics? {
+    store.diagnostics?.workspace ?? store.daemonStatus?.diagnostics
+  }
+
+  private var paths: PreferencesDiagnosticsPaths {
+    let agent = store.daemonStatus?.launchAgent
+    return PreferencesDiagnosticsPaths(
+      launchAgentPath: agent?.path ?? "Unavailable",
+      launchAgentDomain: agent?.domainTarget,
+      launchAgentService: agent?.serviceTarget,
+      manifestPath: workspaceDiagnostics?.manifestPath ?? "Unavailable",
+      authTokenPath: workspaceDiagnostics?.authTokenPath ?? "Unavailable",
+      eventsPath: workspaceDiagnostics?.eventsPath ?? "Unavailable",
+      cacheRoot: workspaceDiagnostics?.cacheRoot ?? "Unavailable"
+    )
+  }
 
   var body: some View {
     Form {
       PreferencesDiagnosticsOverview(
-        launchAgent: launchAgent,
-        tokenPresent: tokenPresent,
-        projectCount: projectCount,
-        sessionCount: sessionCount,
-        lastEvent: lastEvent
+        launchAgent: store.daemonStatus?.launchAgent,
+        tokenPresent: workspaceDiagnostics?.authTokenPresent ?? false,
+        projectCount: store.daemonStatus?.projectCount ?? store.projects.count,
+        sessionCount: store.daemonStatus?.sessionCount ?? store.sessions.count,
+        lastEvent: workspaceDiagnostics?.lastEvent
       )
-      PreferencesPathsSection(
-        launchAgentPath: paths.launchAgentPath,
-        launchAgentDomain: paths.launchAgentDomain,
-        launchAgentService: paths.launchAgentService,
-        manifestPath: paths.manifestPath,
-        authTokenPath: paths.authTokenPath,
-        eventsPath: paths.eventsPath,
-        cacheRoot: paths.cacheRoot
+      PreferencesPathsSection(paths: paths)
+      PreferencesRecentEventsSection(
+        events: Array((store.diagnostics?.recentEvents ?? []).prefix(10))
       )
-      PreferencesRecentEventsSection(events: recentEvents)
     }
     .preferencesDetailFormStyle()
   }
 }
 
 #Preview("Preferences Diagnostics Section") {
-  let store = PreferencesPreviewSupport.makeStore()
-  let paths = PreferencesDiagnosticsPaths(
-    launchAgentPath: store.daemonStatus?.launchAgent.path ?? "Unavailable",
-    launchAgentDomain: store.daemonStatus?.launchAgent.domainTarget,
-    launchAgentService: store.daemonStatus?.launchAgent.serviceTarget,
-    manifestPath: store.diagnostics?.workspace.manifestPath ?? "Unavailable",
-    authTokenPath: store.diagnostics?.workspace.authTokenPath ?? "Unavailable",
-    eventsPath: store.diagnostics?.workspace.eventsPath ?? "Unavailable",
-    cacheRoot: store.diagnostics?.workspace.cacheRoot ?? "Unavailable"
-  )
-
   PreferencesDiagnosticsSection(
-    launchAgent: store.daemonStatus?.launchAgent,
-    tokenPresent: store.diagnostics?.workspace.authTokenPresent ?? false,
-    projectCount: store.daemonStatus?.projectCount ?? 0,
-    sessionCount: store.daemonStatus?.sessionCount ?? 0,
-    lastEvent: store.diagnostics?.workspace.lastEvent,
-    paths: paths,
-    recentEvents: Array((store.diagnostics?.recentEvents ?? []).prefix(10))
+    store: PreferencesPreviewSupport.makeStore()
   )
   .frame(width: 720)
 }
