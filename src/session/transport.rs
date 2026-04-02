@@ -181,7 +181,9 @@ pub struct SessionJoinArgs {
 
 impl Execute for SessionJoinArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
-        let project = resolve_project_dir(self.project_dir.as_deref());
+        let local_project = resolve_project_dir(self.project_dir.as_deref());
+        let project =
+            service::resolve_session_project_dir(&self.session_id, local_project.as_ref())?;
         let capabilities: Vec<String> = self
             .capabilities
             .as_deref()
@@ -200,7 +202,7 @@ impl Execute for SessionJoinArgs {
             agent_to_str(self.runtime),
             &capabilities,
             self.name.as_deref(),
-            project.as_ref(),
+            &project,
         )?;
         print_json(&state)?;
         Ok(0)
@@ -221,8 +223,10 @@ pub struct SessionEndArgs {
 
 impl Execute for SessionEndArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
-        let project = resolve_project_dir(self.project_dir.as_deref());
-        service::end_session(&self.session_id, &self.actor, project.as_ref())?;
+        let local_project = resolve_project_dir(self.project_dir.as_deref());
+        let project =
+            service::resolve_session_project_dir(&self.session_id, local_project.as_ref())?;
+        service::end_session(&self.session_id, &self.actor, &project)?;
         println!("session '{}' ended", self.session_id);
         Ok(0)
     }
@@ -250,14 +254,16 @@ pub struct SessionAssignArgs {
 
 impl Execute for SessionAssignArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
-        let project = resolve_project_dir(self.project_dir.as_deref());
+        let local_project = resolve_project_dir(self.project_dir.as_deref());
+        let project =
+            service::resolve_session_project_dir(&self.session_id, local_project.as_ref())?;
         service::assign_role(
             &self.session_id,
             &self.agent_id,
             self.role,
             self.reason.as_deref(),
             &self.actor,
-            project.as_ref(),
+            &project,
         )?;
         Ok(0)
     }
@@ -279,12 +285,14 @@ pub struct SessionRemoveArgs {
 
 impl Execute for SessionRemoveArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
-        let project = resolve_project_dir(self.project_dir.as_deref());
+        let local_project = resolve_project_dir(self.project_dir.as_deref());
+        let project =
+            service::resolve_session_project_dir(&self.session_id, local_project.as_ref())?;
         service::remove_agent(
             &self.session_id,
             &self.agent_id,
             &self.actor,
-            project.as_ref(),
+            &project,
         )?;
         Ok(0)
     }
@@ -309,13 +317,15 @@ pub struct SessionTransferLeaderArgs {
 
 impl Execute for SessionTransferLeaderArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
-        let project = resolve_project_dir(self.project_dir.as_deref());
+        let local_project = resolve_project_dir(self.project_dir.as_deref());
+        let project =
+            service::resolve_session_project_dir(&self.session_id, local_project.as_ref())?;
         service::transfer_leader(
             &self.session_id,
             &self.new_leader_id,
             self.reason.as_deref(),
             &self.actor,
-            project.as_ref(),
+            &project,
         )?;
         Ok(0)
     }
@@ -347,7 +357,9 @@ pub struct TaskCreateArgs {
 
 impl Execute for TaskCreateArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
-        let project = resolve_project_dir(self.project_dir.as_deref());
+        let local_project = resolve_project_dir(self.project_dir.as_deref());
+        let project =
+            service::resolve_session_project_dir(&self.session_id, local_project.as_ref())?;
         let item = service::create_task_with_source(
             &self.session_id,
             &self.title,
@@ -357,7 +369,7 @@ impl Execute for TaskCreateArgs {
             super::types::TaskSource::Manual,
             None,
             &self.actor,
-            project.as_ref(),
+            &project,
         )?;
         print_json(&item)?;
         Ok(0)
@@ -382,13 +394,15 @@ pub struct TaskAssignArgs {
 
 impl Execute for TaskAssignArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
-        let project = resolve_project_dir(self.project_dir.as_deref());
+        let local_project = resolve_project_dir(self.project_dir.as_deref());
+        let project =
+            service::resolve_session_project_dir(&self.session_id, local_project.as_ref())?;
         service::assign_task(
             &self.session_id,
             &self.task_id,
             &self.agent_id,
             &self.actor,
-            project.as_ref(),
+            &project,
         )?;
         Ok(0)
     }
@@ -411,8 +425,10 @@ pub struct TaskListArgs {
 
 impl Execute for TaskListArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
-        let project = resolve_project_dir(self.project_dir.as_deref());
-        let items = service::list_tasks(&self.session_id, self.status, project.as_ref())?;
+        let local_project = resolve_project_dir(self.project_dir.as_deref());
+        let project =
+            service::resolve_session_project_dir(&self.session_id, local_project.as_ref())?;
+        let items = service::list_tasks(&self.session_id, self.status, &project)?;
         if self.json {
             print_json(&items)?;
         } else {
@@ -456,14 +472,16 @@ pub struct TaskUpdateArgs {
 
 impl Execute for TaskUpdateArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
-        let project = resolve_project_dir(self.project_dir.as_deref());
+        let local_project = resolve_project_dir(self.project_dir.as_deref());
+        let project =
+            service::resolve_session_project_dir(&self.session_id, local_project.as_ref())?;
         service::update_task(
             &self.session_id,
             &self.task_id,
             self.status,
             self.note.as_deref(),
             &self.actor,
-            project.as_ref(),
+            &project,
         )?;
         Ok(0)
     }
@@ -491,14 +509,16 @@ pub struct TaskCheckpointArgs {
 
 impl Execute for TaskCheckpointArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
-        let project = resolve_project_dir(self.project_dir.as_deref());
+        let local_project = resolve_project_dir(self.project_dir.as_deref());
+        let project =
+            service::resolve_session_project_dir(&self.session_id, local_project.as_ref())?;
         let checkpoint = service::record_task_checkpoint(
             &self.session_id,
             &self.task_id,
             &self.actor,
             &self.summary,
             self.progress,
-            project.as_ref(),
+            &project,
         )?;
         print_json(&checkpoint)?;
         Ok(0)
@@ -530,7 +550,9 @@ pub struct SignalSendArgs {
 
 impl Execute for SignalSendArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
-        let project = resolve_project_dir(self.project_dir.as_deref());
+        let local_project = resolve_project_dir(self.project_dir.as_deref());
+        let project =
+            service::resolve_session_project_dir(&self.session_id, local_project.as_ref())?;
         let signal = service::send_signal(
             &self.session_id,
             &self.agent_id,
@@ -538,7 +560,7 @@ impl Execute for SignalSendArgs {
             &self.message,
             self.action_hint.as_deref(),
             &self.actor,
-            project.as_ref(),
+            &project,
         )?;
         print_json(&signal)?;
         Ok(0)
@@ -562,9 +584,11 @@ pub struct SignalListArgs {
 
 impl Execute for SignalListArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
-        let project = resolve_project_dir(self.project_dir.as_deref());
+        let local_project = resolve_project_dir(self.project_dir.as_deref());
+        let project =
+            service::resolve_session_project_dir(&self.session_id, local_project.as_ref())?;
         let signals =
-            service::list_signals(&self.session_id, self.agent.as_deref(), project.as_ref())?;
+            service::list_signals(&self.session_id, self.agent.as_deref(), &project)?;
         if self.json {
             print_json(&signals)?;
         } else {
@@ -603,11 +627,13 @@ pub struct SessionObserveArgs {
 
 impl Execute for SessionObserveArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
-        let project = resolve_project_dir(self.project_dir.as_deref());
+        let local_project = resolve_project_dir(self.project_dir.as_deref());
+        let project =
+            service::resolve_session_project_dir(&self.session_id, local_project.as_ref())?;
         if self.poll_interval > 0 {
             super::observe::execute_session_watch(
                 &self.session_id,
-                project.as_ref(),
+                &project,
                 self.poll_interval,
                 self.json,
                 self.actor.as_deref(),
@@ -615,7 +641,7 @@ impl Execute for SessionObserveArgs {
         } else {
             super::observe::execute_session_observe(
                 &self.session_id,
-                project.as_ref(),
+                &project,
                 self.json,
                 self.actor.as_deref(),
             )
@@ -637,8 +663,10 @@ pub struct SessionStatusArgs {
 
 impl Execute for SessionStatusArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
-        let project = resolve_project_dir(self.project_dir.as_deref());
-        let state = service::session_status(&self.session_id, project.as_ref())?;
+        let local_project = resolve_project_dir(self.project_dir.as_deref());
+        let project =
+            service::resolve_session_project_dir(&self.session_id, local_project.as_ref())?;
+        let state = service::session_status(&self.session_id, &project)?;
         if self.json {
             print_json(&state)?;
         } else {
@@ -673,8 +701,12 @@ pub struct SessionListArgs {
 
 impl Execute for SessionListArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
-        let project = resolve_project_dir(self.project_dir.as_deref());
-        let sessions = service::list_sessions(project.as_ref(), self.all)?;
+        let sessions = if self.project_dir.is_some() {
+            let project = resolve_project_dir(self.project_dir.as_deref());
+            service::list_sessions(project.as_ref(), self.all)?
+        } else {
+            service::list_sessions_global(self.all)?
+        };
         if self.json {
             print_json(&sessions)?;
         } else {
