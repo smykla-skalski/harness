@@ -23,6 +23,11 @@ actor RecordingDaemonController: DaemonControlling {
     client
   }
 
+  func stopDaemon() async throws -> String {
+    lastEventMessage = "daemon stopped"
+    return "stopped"
+  }
+
   func daemonStatus() async throws -> DaemonStatusReport {
     DaemonStatusReport(
       manifest: DaemonManifest(
@@ -309,6 +314,13 @@ actor FailingDaemonController: DaemonControlling {
     return PreviewHarnessClient()
   }
 
+  func stopDaemon() async throws -> String {
+    if let actionError {
+      throw actionError
+    }
+    return "stopped"
+  }
+
   func daemonStatus() async throws -> DaemonStatusReport {
     throw DaemonControlError.manifestMissing
   }
@@ -337,6 +349,7 @@ final class FailingHarnessClient: HarnessClientProtocol, @unchecked Sendable {
 
   func health() async throws -> HealthResponse { throw error }
   func diagnostics() async throws -> DaemonDiagnosticsReport { throw error }
+  func stopDaemon() async throws -> DaemonControlResponse { throw error }
   func projects() async throws -> [ProjectSummary] { throw error }
   func sessions() async throws -> [SessionSummary] { throw error }
   func sessionDetail(id _: String) async throws -> SessionDetail { throw error }

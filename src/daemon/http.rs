@@ -9,7 +9,7 @@ use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use axum::{Json, Router};
 use tokio::net::TcpListener;
-use tokio::sync::broadcast;
+use tokio::sync::{broadcast, watch};
 
 use crate::errors::{CliError, CliErrorKind};
 
@@ -35,10 +35,15 @@ pub struct DaemonHttpState {
 ///
 /// # Errors
 /// Returns `CliError` on listener failures.
-pub async fn serve(listener: TcpListener, state: DaemonHttpState) -> Result<(), CliError> {
+pub async fn serve(
+    listener: TcpListener,
+    state: DaemonHttpState,
+    mut shutdown_rx: watch::Receiver<bool>,
+) -> Result<(), CliError> {
     let app = Router::new()
         .route("/v1/health", get(get_health))
         .route("/v1/diagnostics", get(get_diagnostics))
+        .route("/v1/daemon/stop", post(post_stop_daemon))
         .route("/v1/projects", get(get_projects))
         .route("/v1/sessions", get(get_sessions))
         .route("/v1/sessions/{session_id}", get(get_session))
@@ -79,11 +84,19 @@ pub async fn serve(listener: TcpListener, state: DaemonHttpState) -> Result<(), 
         )
         .with_state(state);
 
-    axum::serve(listener, app).await.map_err(|error| {
-        CliError::from(CliErrorKind::workflow_io(format!(
-            "serve daemon http api: {error}"
-        )))
-    })
+    axum::serve(listener, app)
+        .with_graceful_shutdown(async move {
+            if *shutdown_rx.borrow() {
+                return;
+            }
+            while shutdown_rx.changed().await.is_ok() {
+                if *shutdown_rx.borrow() {
+                    break;
+                }
+            }
+        })
+        .await
+        .map_err(|error| CliError::from(CliErrorKind::workflow_io(format!("serve daemon http api: {error}"))))
 }
 
 async fn get_health(State(state): State<DaemonHttpState>) -> Response {
@@ -95,6 +108,13 @@ async fn get_diagnostics(headers: HeaderMap, State(state): State<DaemonHttpState
         return *response;
     }
     map_json(service::diagnostics_report())
+}
+
+async fn post_stop_daemon(headers: HeaderMap, State(state): State<DaemonHttpState>) -> Response {
+    if let Err(response) = require_auth(&headers, &state) {
+        return *response;
+    }
+    map_json(service::request_shutdown())
 }
 
 async fn get_projects(headers: HeaderMap, State(state): State<DaemonHttpState>) -> Response {

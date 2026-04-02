@@ -195,6 +195,10 @@ public struct HealthResponse: Codable, Equatable, Sendable {
   public let sessionCount: Int
 }
 
+public struct DaemonControlResponse: Codable, Equatable, Sendable {
+  public let status: String
+}
+
 public struct DaemonDiagnosticsReport: Codable, Equatable, Sendable {
   public let health: HealthResponse?
   public let manifest: DaemonManifest?

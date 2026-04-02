@@ -151,6 +151,28 @@ final class HarnessLayoutUITests: HarnessUITestCase {
     XCTAssertLessThan(cardOffset, 120, "Inspector content too far below toolbar")
   }
 
+  func testInspectorToolbarControlsStayWithinInspectorColumn() throws {
+    let app = launch(mode: "empty")
+
+    let inspectorRoot = element(in: app, identifier: Accessibility.inspectorRoot)
+    let inspectorEmptyState = element(in: app, identifier: Accessibility.inspectorEmptyState)
+    let refreshButton = toolbarButton(in: app, identifier: Accessibility.refreshButton)
+    let preferencesButton = toolbarButton(in: app, identifier: Accessibility.preferencesButton)
+    let hideInspectorButton = button(in: app, title: "Hide Inspector")
+
+    XCTAssertTrue(inspectorRoot.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(inspectorEmptyState.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(refreshButton.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(preferencesButton.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(hideInspectorButton.waitForExistence(timeout: Self.uiTimeout))
+
+    for control in [refreshButton, preferencesButton, hideInspectorButton] {
+      XCTAssertGreaterThanOrEqual(control.frame.minX, inspectorRoot.frame.minX - 6)
+      XCTAssertLessThanOrEqual(control.frame.maxX, inspectorRoot.frame.maxX + 6)
+      XCTAssertLessThan(control.frame.maxY, inspectorEmptyState.frame.minY)
+    }
+  }
+
   func testSessionCockpitTaskAndAgentCardsShareHeight() throws {
     let app = launch(mode: "preview")
 
@@ -302,9 +324,9 @@ final class HarnessLayoutUITests: HarnessUITestCase {
     XCTAssertTrue(boardInstall.waitForExistence(timeout: Self.uiTimeout))
     XCTAssertTrue(boardRefresh.waitForExistence(timeout: Self.uiTimeout))
 
-    assertEqualHeights([sidebarStart, sidebarInstall], tolerance: 10)
     assertEqualHeights([boardStart, boardInstall, boardRefresh], tolerance: 10)
-    XCTAssertLessThan(sidebarStart.frame.height, 62)
+    XCTAssertLessThan(sidebarStart.frame.height, 40)
+    XCTAssertLessThan(sidebarStart.frame.width, 40)
     XCTAssertLessThan(boardStart.frame.height, 62)
   }
 }

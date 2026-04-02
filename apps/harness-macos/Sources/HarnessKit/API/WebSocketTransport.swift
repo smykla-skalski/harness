@@ -63,6 +63,11 @@ extension WebSocketTransport {
     return try decode(value)
   }
 
+  public func stopDaemon() async throws -> DaemonControlResponse {
+    let value = try await send(method: "daemon.stop")
+    return try decode(value)
+  }
+
   public func projects() async throws -> [ProjectSummary] {
     let value = try await send(method: "projects")
     return try decode(value)

@@ -3,6 +3,7 @@ import Foundation
 public protocol DaemonControlling: Sendable {
   func bootstrapClient() async throws -> any HarnessClientProtocol
   func startDaemonClient() async throws -> any HarnessClientProtocol
+  func stopDaemon() async throws -> String
   func daemonStatus() async throws -> DaemonStatusReport
   func installLaunchAgent() async throws -> String
   func removeLaunchAgent() async throws -> String
@@ -92,6 +93,12 @@ public struct DaemonController: DaemonControlling {
     let binary = try harnessBinaryURL()
     try startDetachedDaemon(binary: binary)
     return try await waitForHealthyClient()
+  }
+
+  public func stopDaemon() async throws -> String {
+    let client = try await bootstrapClient()
+    let response = try await client.stopDaemon()
+    return response.status
   }
 
   public func daemonStatus() async throws -> DaemonStatusReport {

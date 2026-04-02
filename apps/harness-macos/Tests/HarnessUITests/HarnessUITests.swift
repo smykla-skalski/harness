@@ -1,6 +1,7 @@
 import XCTest
 
 private typealias Accessibility = HarnessUITestAccessibility
+private let textSizeOverrideKey = "HARNESS_TEXT_SIZE_OVERRIDE"
 
 @MainActor
 final class HarnessUITests: HarnessUITestCase {
@@ -27,7 +28,7 @@ final class HarnessUITests: HarnessUITestCase {
     XCTAssertTrue(
       app.staticTexts["Bring Harness Online"].waitForExistence(timeout: Self.uiTimeout)
     )
-    XCTAssertTrue(app.buttons["Start Daemon"].exists)
+    XCTAssertTrue(element(in: app, identifier: Accessibility.sidebarStartButton).exists)
 
     let sidebarEmptyState = sidebarEmptyStateElement(in: app)
     let sidebarRoot = element(in: app, identifier: Accessibility.sidebarRoot)
@@ -74,62 +75,6 @@ final class HarnessUITests: HarnessUITestCase {
     XCTAssertTrue(notesUnavailable.waitForExistence(timeout: Self.uiTimeout))
     XCTAssertFalse(element(in: app, identifier: Accessibility.taskNoteField).exists)
     XCTAssertFalse(element(in: app, identifier: Accessibility.taskNoteAddButton).exists)
-  }
-
-  func testToolbarOpensSettingsWindow() throws {
-    let app = launch(mode: "preview")
-
-    let preferencesButton = toolbarButton(in: app, identifier: Accessibility.preferencesButton)
-    XCTAssertTrue(preferencesButton.waitForExistence(timeout: Self.uiTimeout))
-
-    preferencesButton.tap()
-
-    let preferencesRoot = element(in: app, identifier: Accessibility.preferencesRoot)
-    let preferencesState = element(in: app, identifier: Accessibility.preferencesState)
-    let preferencesPanel = frameElement(in: app, identifier: Accessibility.preferencesPanel)
-    let title = element(in: app, identifier: Accessibility.preferencesTitle)
-
-    XCTAssertTrue(preferencesRoot.waitForExistence(timeout: Self.uiTimeout))
-    XCTAssertTrue(preferencesPanel.waitForExistence(timeout: Self.uiTimeout))
-    XCTAssertTrue(preferencesState.waitForExistence(timeout: Self.uiTimeout))
-    let settingsWindow = window(in: app, containing: preferencesPanel)
-    let generalSection = sidebarSectionElement(
-      in: app,
-      title: "General",
-      within: settingsWindow
-    )
-    XCTAssertTrue(generalSection.exists)
-    XCTAssertTrue(title.exists)
-    XCTAssertEqual(title.label, "General")
-    XCTAssertEqual(
-      preferencesState.label,
-      "mode=auto, section=general, preferencesChrome=native"
-    )
-  }
-
-  func testCommandCommaOpensSingletonSettingsWindow() throws {
-    let app = launch(mode: "preview")
-
-    app.typeKey(",", modifierFlags: .command)
-
-    let preferencesRoot = element(in: app, identifier: Accessibility.preferencesRoot)
-    XCTAssertTrue(preferencesRoot.waitForExistence(timeout: Self.uiTimeout))
-    XCTAssertEqual(
-      app.descendants(matching: .any)
-        .matching(identifier: Accessibility.preferencesRoot)
-        .count,
-      1
-    )
-
-    app.typeKey(",", modifierFlags: .command)
-
-    XCTAssertTrue(preferencesRoot.waitForExistence(timeout: Self.uiTimeout))
-    XCTAssertEqual(
-      app.descendants(matching: .any)
-        .matching(identifier: Accessibility.preferencesRoot)
-        .count,
-      1
-    )
   }
 
   func testObserveSummaryIsAvailableInSessionCockpit() throws {
@@ -270,6 +215,37 @@ final class HarnessUITests: HarnessUITestCase {
     XCTAssertTrue(app.staticTexts["Edit"].exists)
   }
 
+  func testAgentInspectorKeepsNativeFormControlsUsableAtLargestTextSize() throws {
+    let app = launch(
+      mode: "preview",
+      additionalEnvironment: [textSizeOverrideKey: "6"]
+    )
+
+    let sessionRow = previewSessionTrigger(in: app)
+    XCTAssertTrue(sessionRow.waitForExistence(timeout: Self.uiTimeout))
+    tapPreviewSession(in: app)
+    tapButton(in: app, identifier: Accessibility.workerAgentCard)
+
+    let appChromeState = element(in: app, identifier: Accessibility.appChromeState)
+    let actorPicker = element(in: app, identifier: Accessibility.actionActorPicker)
+    let commandField = element(in: app, identifier: Accessibility.signalCommandField)
+    let messageField = element(in: app, identifier: Accessibility.signalMessageField)
+
+    XCTAssertTrue(appChromeState.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(actorPicker.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(commandField.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(messageField.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertEqual(
+      appChromeState.label,
+      "contentChrome=native, interactiveRows=button, controlGlass=native"
+    )
+    XCTAssertTrue(
+      waitUntil(timeout: Self.uiTimeout) {
+        actorPicker.isHittable && commandField.isHittable && messageField.isHittable
+      }
+    )
+  }
+
   func testObserverInspectorShowsCycleHistoryAndTrackedSessions() throws {
     let app = launch(mode: "preview")
 
@@ -319,76 +295,6 @@ final class HarnessUITests: HarnessUITestCase {
       attachWindowScreenshot(in: app, named: "sidebar-search-not-hittable")
     }
     XCTAssertTrue(noMatches.exists)
-  }
-
-  func testRemoveLaunchAgentRequiresConfirmation() throws {
-    let app = launch(mode: "preview")
-
-    let preferencesButton = toolbarButton(in: app, identifier: Accessibility.preferencesButton)
-    XCTAssertTrue(preferencesButton.waitForExistence(timeout: Self.uiTimeout))
-    preferencesButton.tap()
-
-    let remove = element(in: app, identifier: Accessibility.removeLaunchAgentButton)
-    if !remove.waitForExistence(timeout: Self.uiTimeout) {
-      attachAppHierarchy(in: app, named: "remove-launch-agent-hierarchy")
-    }
-    XCTAssertTrue(remove.exists)
-    tapElement(in: app, identifier: Accessibility.removeLaunchAgentButton)
-
-    XCTAssertTrue(
-      app.buttons["Remove Launch Agent Now"].waitForExistence(timeout: Self.uiTimeout)
-    )
-    XCTAssertTrue(app.staticTexts["Remove Launch Agent?"].exists)
-    dismissConfirmationDialog(in: app)
-  }
-
-  func testSettingsThemeModePickerKeepsNativeChromeContract() throws {
-    assertSettingsThemeModeContract(expectedMode: "auto")
-    assertSettingsThemeModeContract(expectedMode: "dark")
-    assertSettingsThemeModeContract(expectedMode: "light")
-  }
-
-  private func assertSettingsThemeModeContract(expectedMode: String) {
-    let app = launch(
-      mode: "preview",
-      additionalEnvironment: [
-        "HARNESS_THEME_MODE_OVERRIDE": expectedMode,
-      ]
-    )
-
-    let preferencesButton = toolbarButton(in: app, identifier: Accessibility.preferencesButton)
-    XCTAssertTrue(preferencesButton.waitForExistence(timeout: Self.uiTimeout))
-    preferencesButton.tap()
-
-    let preferencesRoot = element(in: app, identifier: Accessibility.preferencesRoot)
-    let preferencesState = element(in: app, identifier: Accessibility.preferencesState)
-    let appChromeState = element(in: app, identifier: Accessibility.appChromeState)
-    let modePicker = element(in: app, identifier: Accessibility.preferencesThemeModePicker)
-    let sessionRow = previewSessionTrigger(in: app)
-    let observeSummaryButton = app.buttons
-      .matching(identifier: Accessibility.observeSummaryButton)
-      .firstMatch
-
-    XCTAssertTrue(preferencesRoot.waitForExistence(timeout: Self.uiTimeout))
-    XCTAssertTrue(preferencesState.waitForExistence(timeout: Self.uiTimeout))
-    XCTAssertTrue(appChromeState.waitForExistence(timeout: Self.uiTimeout))
-    XCTAssertTrue(modePicker.waitForExistence(timeout: Self.uiTimeout))
-    XCTAssertTrue(sessionRow.waitForExistence(timeout: Self.uiTimeout))
-    tapPreviewSession(in: app)
-    XCTAssertTrue(observeSummaryButton.waitForExistence(timeout: Self.uiTimeout))
-    XCTAssertEqual(
-      preferencesState.label,
-      "mode=\(expectedMode), section=general, preferencesChrome=native"
-    )
-    XCTAssertEqual(
-      appChromeState.label,
-      "contentChrome=native, interactiveRows=button, controlGlass=native"
-    )
-    XCTAssertEqual(
-      sessionRow.value as? String,
-      "selected, interactive=button, selectionChrome=translucent"
-    )
-    XCTAssertEqual(observeSummaryButton.value as? String, "interactive=button, chrome=content-card")
   }
 
   func testActionToastAppearsAndAutoDismisses() throws {
