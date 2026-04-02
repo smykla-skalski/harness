@@ -12,8 +12,16 @@ struct SessionsBoardOnboardingCard: View {
 
   var body: some View {
     VStack(alignment: .leading, spacing: 16) {
-      header
-      onboardingStepsSection
+      SessionsBoardOnboardingHeader(isLaunchAgentInstalled: isLaunchAgentInstalled)
+      SessionsBoardOnboardingStepsGrid(
+        connectionState: connectionState,
+        isLaunchAgentInstalled: isLaunchAgentInstalled,
+        hasSessions: hasSessions,
+        isLoading: isLoading,
+        startDaemon: startDaemon,
+        installLaunchAgent: installLaunchAgent,
+        refresh: refresh
+      )
     }
     .frame(maxWidth: .infinity, alignment: .leading)
     .accessibilityTestProbe(
@@ -24,7 +32,12 @@ struct SessionsBoardOnboardingCard: View {
     .accessibilityFrameMarker("\(HarnessAccessibility.onboardingCard).frame")
   }
 
-  private var header: some View {
+}
+
+private struct SessionsBoardOnboardingHeader: View {
+  let isLaunchAgentInstalled: Bool
+
+  var body: some View {
     HStack(alignment: .top) {
       VStack(alignment: .leading, spacing: HarnessTheme.itemSpacing) {
         Label("Bring Harness Online", systemImage: "dot.radiowaves.left.and.right")
@@ -46,14 +59,24 @@ struct SessionsBoardOnboardingCard: View {
         .foregroundStyle(HarnessTheme.onContrast)
     }
   }
+}
 
-  private var onboardingStepsSection: some View {
+private struct SessionsBoardOnboardingStepsGrid: View {
+  let connectionState: HarnessStore.ConnectionState
+  let isLaunchAgentInstalled: Bool
+  let hasSessions: Bool
+  let isLoading: Bool
+  let startDaemon: HarnessAsyncActionButton.Action
+  let installLaunchAgent: HarnessAsyncActionButton.Action
+  let refresh: HarnessAsyncActionButton.Action
+
+  var body: some View {
     HarnessAdaptiveGridLayout(
       minimumColumnWidth: 200,
       maximumColumns: 3,
       spacing: HarnessTheme.sectionSpacing
     ) {
-      onboardingStep(
+      SessionsBoardOnboardingStepCard(
         title: "1. Start the daemon",
         detail: "Boot the local HTTP and SSE bridge.",
         isReady: connectionState == .online
@@ -74,7 +97,7 @@ struct SessionsBoardOnboardingCard: View {
         .help(connectionState == .online ? "Daemon is already running" : "")
         .focusable(connectionState != .online)
       }
-      onboardingStep(
+      SessionsBoardOnboardingStepCard(
         title: "2. Install launchd",
         detail: "Keep the daemon available across app restarts.",
         isReady: isLaunchAgentInstalled
@@ -94,7 +117,7 @@ struct SessionsBoardOnboardingCard: View {
         )
         .focusable(!isLaunchAgentInstalled)
       }
-      onboardingStep(
+      SessionsBoardOnboardingStepCard(
         title: "3. Start a harness session",
         detail: "Sessions appear here as soon as the daemon indexes them.",
         isReady: hasSessions
@@ -111,13 +134,27 @@ struct SessionsBoardOnboardingCard: View {
       }
     }
   }
+}
 
-  private func onboardingStep<Action: View>(
+private struct SessionsBoardOnboardingStepCard<Action: View>: View {
+  let title: String
+  let detail: String
+  let isReady: Bool
+  let action: Action
+
+  init(
     title: String,
     detail: String,
     isReady: Bool,
     @ViewBuilder action: () -> Action
-  ) -> some View {
+  ) {
+    self.title = title
+    self.detail = detail
+    self.isReady = isReady
+    self.action = action()
+  }
+
+  var body: some View {
     VStack(alignment: .leading, spacing: HarnessTheme.itemSpacing) {
       HStack(alignment: .top) {
         HStack {
@@ -140,7 +177,7 @@ struct SessionsBoardOnboardingCard: View {
         .foregroundStyle(HarnessTheme.secondaryInk)
         .lineLimit(2)
       Spacer(minLength: 0)
-      action()
+      action
         .frame(maxWidth: .infinity, alignment: .trailing)
     }
     .frame(maxWidth: .infinity, minHeight: 72, alignment: .topLeading)
