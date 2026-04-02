@@ -79,11 +79,6 @@ struct ContentView: View {
     .inspector(isPresented: $showInspector) {
       InspectorColumnView(
         store: store,
-        isVisible: showInspector,
-        isRefreshing: store.isRefreshing,
-        refresh: refresh,
-        openSettings: { openSettings() },
-        hideInspector: toggleInspector
       )
         .inspectorColumnWidth(min: 320, ideal: 380, max: 500)
     }
@@ -129,30 +124,31 @@ private extension ContentView {
   }
 
   @ToolbarContentBuilder var primaryToolbar: some CustomizableToolbarContent {
-    if !showInspector {
-      ToolbarItem(id: "refresh", placement: .primaryAction) {
-        RefreshToolbarButton(isRefreshing: store.isRefreshing, refresh: refresh)
-          .help("Refresh sessions")
-      }
+    ToolbarItem(id: "refresh", placement: .primaryAction) {
+      RefreshToolbarButton(isRefreshing: store.isRefreshing, refresh: refresh)
+        .help("Refresh sessions")
+    }
 
-      ToolbarItem(id: "settings", placement: .primaryAction) {
-        Button {
-          openSettings()
-        } label: {
-          Label("Settings", systemImage: "gearshape")
-        }
-        .help("Open settings")
-        .accessibilityIdentifier(HarnessAccessibility.daemonPreferencesButton)
+    ToolbarItem(id: "settings", placement: .primaryAction) {
+      Button {
+        openSettings()
+      } label: {
+        Label("Settings", systemImage: "gearshape")
       }
+      .help("Open settings")
+      .accessibilityIdentifier(HarnessAccessibility.daemonPreferencesButton)
+    }
 
-      ToolbarSpacer(.fixed)
+    ToolbarSpacer(.fixed)
 
-      ToolbarItem(id: "inspector", placement: .primaryAction) {
-        Button(action: toggleInspector) {
-          Label("Show Inspector", systemImage: "sidebar.trailing")
-        }
-        .help("Show inspector")
+    ToolbarItem(id: "inspector", placement: .primaryAction) {
+      Button(action: toggleInspector) {
+        Label(
+          showInspector ? "Hide Inspector" : "Show Inspector",
+          systemImage: "sidebar.trailing"
+        )
       }
+      .help(showInspector ? "Hide inspector" : "Show inspector")
     }
   }
 
