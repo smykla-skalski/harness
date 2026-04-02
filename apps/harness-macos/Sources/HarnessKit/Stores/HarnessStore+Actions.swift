@@ -1,6 +1,21 @@
 import Foundation
 
 extension HarnessStore {
+  private var readOnlySessionAccessMessage: String {
+    """
+    The harness daemon is offline. Persisted session data is available in
+    read-only mode until live connection returns.
+    """
+  }
+
+  func guardSessionActionsAvailable() -> Bool {
+    guard !isSessionReadOnly else {
+      lastError = readOnlySessionAccessMessage
+      return false
+    }
+    return true
+  }
+
   @discardableResult
   public func createTask(
     title: String,
@@ -8,6 +23,9 @@ extension HarnessStore {
     severity: TaskSeverity,
     actor: String = "harness-app"
   ) async -> Bool {
+    guard guardSessionActionsAvailable() else {
+      return false
+    }
     guard let client, let sessionID = selectedSessionID else {
       return false
     }
@@ -39,6 +57,9 @@ extension HarnessStore {
     agentID: String,
     actor: String = "harness-app"
   ) async -> Bool {
+    guard guardSessionActionsAvailable() else {
+      return false
+    }
     guard let client, let sessionID = selectedSessionID else {
       return false
     }
@@ -67,6 +88,9 @@ extension HarnessStore {
     note: String? = nil,
     actor: String = "harness-app"
   ) async -> Bool {
+    guard guardSessionActionsAvailable() else {
+      return false
+    }
     guard let client, let sessionID = selectedSessionID else {
       return false
     }
@@ -95,6 +119,9 @@ extension HarnessStore {
     progress: Int,
     actor: String = "harness-app"
   ) async -> Bool {
+    guard guardSessionActionsAvailable() else {
+      return false
+    }
     guard let client, let sessionID = selectedSessionID else {
       return false
     }
@@ -126,6 +153,9 @@ extension HarnessStore {
     role: SessionRole,
     actor: String = "harness-app"
   ) async -> Bool {
+    guard guardSessionActionsAvailable() else {
+      return false
+    }
     guard let client, let sessionID = selectedSessionID else {
       return false
     }
@@ -152,6 +182,9 @@ extension HarnessStore {
     agentID: String,
     actor: String = "harness-app"
   ) async -> Bool {
+    guard guardSessionActionsAvailable() else {
+      return false
+    }
     guard let client, let sessionID = selectedSessionID else {
       return false
     }
@@ -179,6 +212,9 @@ extension HarnessStore {
     reason: String? = nil,
     actor: String = "harness-app"
   ) async -> Bool {
+    guard guardSessionActionsAvailable() else {
+      return false
+    }
     guard let client, let sessionID = selectedSessionID else {
       return false
     }
@@ -205,6 +241,9 @@ extension HarnessStore {
 
   @discardableResult
   public func observeSelectedSession(actor: String = "harness-app") async -> Bool {
+    guard guardSessionActionsAvailable() else {
+      return false
+    }
     guard let client, let sessionID = selectedSessionID else {
       return false
     }
@@ -227,6 +266,9 @@ extension HarnessStore {
 
   @discardableResult
   public func endSelectedSession(actor: String = "harness-app") async -> Bool {
+    guard guardSessionActionsAvailable() else {
+      return false
+    }
     guard let client, let sessionID = selectedSessionID else {
       return false
     }
@@ -255,6 +297,9 @@ extension HarnessStore {
     actionHint: String?,
     actor: String = "harness-app"
   ) async -> Bool {
+    guard guardSessionActionsAvailable() else {
+      return false
+    }
     guard let client, let sessionID = selectedSessionID else {
       return false
     }
@@ -282,6 +327,10 @@ extension HarnessStore {
   }
 
   public func requestEndSelectedSessionConfirmation() {
+    guard !isSessionReadOnly else {
+      lastError = readOnlySessionAccessMessage
+      return
+    }
     guard let sessionID = selectedSessionID, let actorID = resolvedActionActor() else {
       return
     }
@@ -289,14 +338,14 @@ extension HarnessStore {
   }
 
   public func requestRemoveAgentConfirmation(agentID: String) {
+    guard !isSessionReadOnly else {
+      lastError = readOnlySessionAccessMessage
+      return
+    }
     guard let sessionID = selectedSessionID, let actorID = resolvedActionActor() else {
       return
     }
     pendingConfirmation = .removeAgent(sessionID: sessionID, agentID: agentID, actorID: actorID)
-  }
-
-  public func requestRemoveLaunchAgentConfirmation() {
-    pendingConfirmation = .removeLaunchAgent
   }
 
   public func cancelConfirmation() {
@@ -304,6 +353,11 @@ extension HarnessStore {
   }
 
   public func confirmPendingAction() async {
+    guard !isSessionReadOnly else {
+      pendingConfirmation = nil
+      lastError = readOnlySessionAccessMessage
+      return
+    }
     guard let pendingConfirmation else {
       return
     }
@@ -314,8 +368,6 @@ extension HarnessStore {
       await endSelectedSession(actor: actorID)
     case .removeAgent(_, let agentID, let actorID):
       await removeAgent(agentID: agentID, actor: actorID)
-    case .removeLaunchAgent:
-      await removeLaunchAgent()
     }
   }
 

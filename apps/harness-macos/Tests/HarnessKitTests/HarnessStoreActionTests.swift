@@ -304,6 +304,26 @@ struct HarnessStoreActionTests {
     #expect(store.lastAction == "Send signal")
   }
 
+  @Test("Offline session actions fail in read-only mode without sending daemon mutations")
+  func offlineSessionActionsFailInReadOnlyMode() async {
+    let client = RecordingHarnessClient()
+    let store = await selectedStore(client: client)
+    store.connectionState = .offline("daemon down")
+
+    let created = await store.createTask(
+      title: "Should not send",
+      context: "Offline mode must stay read-only",
+      severity: .low
+    )
+
+    #expect(created == false)
+    #expect(client.recordedCalls().isEmpty)
+    #expect(store.lastError?.contains("read-only mode") == true)
+
+    store.requestEndSelectedSessionConfirmation()
+    #expect(store.pendingConfirmation == nil)
+  }
+
   @Test("Default action actor falls back to the session leader")
   func defaultActionActorFallsBackToSessionLeader() async {
     let client = RecordingHarnessClient()

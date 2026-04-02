@@ -2,6 +2,7 @@ import HarnessKit
 import SwiftUI
 
 struct InspectorCreateTaskConsole: View {
+  let isSessionReadOnly: Bool
   let isSessionActionInFlight: Bool
   let createTaskAction: (String, String?, TaskSeverity) async -> Bool
 
@@ -14,6 +15,7 @@ struct InspectorCreateTaskConsole: View {
       createTitle: $createTitle,
       createContext: $createContext,
       createSeverity: $createSeverity,
+      isSessionReadOnly: isSessionReadOnly,
       isSessionActionInFlight: isSessionActionInFlight,
       submitCreateTask: submitCreateTask
     )
@@ -47,6 +49,7 @@ struct InspectorTaskMutationConsole: View {
   let selectedTask: WorkItem
   let tasks: [WorkItem]
   let agents: [AgentRegistration]
+  let isSessionReadOnly: Bool
   let isSessionActionInFlight: Bool
   let assignTaskAction: (String, String) async -> Bool
   let updateTaskStatusAction: (String, TaskStatus, String?) async -> Bool
@@ -78,6 +81,7 @@ struct InspectorTaskMutationConsole: View {
       statusNote: $statusNote,
       checkpointSummary: $checkpointSummary,
       checkpointProgress: $checkpointProgress,
+      isSessionReadOnly: isSessionReadOnly,
       isSessionActionInFlight: isSessionActionInFlight,
       assignSelectedTask: submitAssignSelectedTask,
       updateSelectedTask: submitUpdateSelectedTask,
@@ -159,6 +163,7 @@ struct InspectorTaskMutationConsole: View {
 struct InspectorRoleMutationConsole: View {
   let selectedAgent: AgentRegistration
   let leaderID: String?
+  let isSessionReadOnly: Bool
   let isSessionActionInFlight: Bool
   let changeRoleAction: (String, SessionRole) async -> Bool
   let requestRemoveAgentConfirmation: (String) -> Void
@@ -174,6 +179,7 @@ struct InspectorRoleMutationConsole: View {
       agent: selectedAgent,
       leaderID: leaderID,
       role: $role,
+      isSessionReadOnly: isSessionReadOnly,
       isSessionActionInFlight: isSessionActionInFlight,
       changeSelectedRole: submitChangeSelectedRole,
       requestRemoveAgentConfirmation: requestRemoveAgentConfirmation
@@ -196,6 +202,7 @@ struct InspectorRoleMutationConsole: View {
 struct InspectorLeaderTransferConsole: View {
   let detail: SessionDetail
   let actionActorID: String
+  let isSessionReadOnly: Bool
   let isSessionActionInFlight: Bool
   let transferLeaderAction: (String, String?) async -> Bool
 
@@ -226,6 +233,7 @@ struct InspectorLeaderTransferConsole: View {
       transferReason: $transferReason,
       transferLeaderButtonTitle: transferLeaderButtonTitle,
       actionActorID: actionActorID,
+      isSessionReadOnly: isSessionReadOnly,
       isSessionActionInFlight: isSessionActionInFlight,
       submitTransferLeader: submitTransferLeader
     )

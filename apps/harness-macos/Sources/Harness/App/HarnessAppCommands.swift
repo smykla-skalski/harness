@@ -77,11 +77,11 @@ struct HarnessAppCommands: Commands {
 
       Button("Observe Selected Session", action: observeSelectedSession)
         .keyboardShortcut("o", modifiers: [.command, .shift])
-        .disabled(store.selectedSessionID == nil)
+        .disabled(store.selectedSessionID == nil || store.isSessionReadOnly)
 
       Button("End Selected Session", action: endSelectedSession)
         .keyboardShortcut("e", modifiers: [.command, .shift])
-        .disabled(store.selectedSessionID == nil)
+        .disabled(store.selectedSessionID == nil || store.isSessionReadOnly)
 
       Divider()
 

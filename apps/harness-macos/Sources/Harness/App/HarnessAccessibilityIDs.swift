@@ -6,6 +6,7 @@ enum HarnessAccessibility {
   static let toolbarChromeState = "harness.toolbar.chrome.state"
   static let toolbarBaselineDivider = "harness.toolbar.baseline-divider"
   static let persistenceBanner = "harness.persistence.banner"
+  static let persistedDataBanner = "harness.persisted-data.banner"
   static let daemonCard = "harness.sidebar.daemon-card"
   static let daemonCardFrame = "harness.sidebar.daemon-card.frame"
   static let sidebarRoot = "harness.sidebar.root"

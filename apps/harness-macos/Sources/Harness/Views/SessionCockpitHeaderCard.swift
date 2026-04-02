@@ -3,6 +3,7 @@ import SwiftUI
 
 struct SessionCockpitHeaderCard: View {
   let detail: SessionDetail
+  let isSessionReadOnly: Bool
   let isSessionActionInFlight: Bool
   let isSelectionLoading: Bool
   let observeSelectedSession: () -> Void
@@ -71,7 +72,8 @@ struct SessionCockpitHeaderCard: View {
         tint: nil
       )
       .controlSize(HarnessControlMetrics.compactControlSize)
-      .disabled(isSessionActionInFlight)
+      .disabled(isSessionActionInFlight || isSessionReadOnly)
+      .help(isSessionReadOnly ? "Unavailable while the daemon is offline." : "")
   }
 
   private var endSessionButton: some View {
@@ -79,6 +81,8 @@ struct SessionCockpitHeaderCard: View {
       .scaledFont(.system(.subheadline, design: .rounded, weight: .semibold))
       .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
       .controlSize(HarnessControlMetrics.compactControlSize)
+      .disabled(isSessionActionInFlight || isSessionReadOnly)
+      .help(isSessionReadOnly ? "Unavailable while the daemon is offline." : "")
       .accessibilityIdentifier(HarnessAccessibility.endSessionButton)
   }
 
@@ -175,6 +179,7 @@ struct SessionCockpitHeaderCard: View {
 #Preview("Cockpit header") {
   SessionCockpitHeaderCard(
     detail: PreviewFixtures.detail,
+    isSessionReadOnly: false,
     isSessionActionInFlight: false,
     isSelectionLoading: false,
     observeSelectedSession: {},

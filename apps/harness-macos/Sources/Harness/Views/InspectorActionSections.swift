@@ -6,6 +6,7 @@ struct InspectorActionSections: View {
   let selectedTask: WorkItem?
   let selectedAgent: AgentRegistration?
   let selectedObserver: ObserverSummary?
+  let isSessionReadOnly: Bool
   let isSessionActionInFlight: Bool
   let lastAction: String
   let lastError: String?
@@ -22,6 +23,7 @@ struct InspectorActionSections: View {
   var body: some View {
     VStack(alignment: .leading, spacing: 16) {
       InspectorActionStatusBanner(
+        isSessionReadOnly: isSessionReadOnly,
         isSessionActionInFlight: isSessionActionInFlight,
         lastAction: lastAction,
         lastError: lastError,
@@ -29,6 +31,7 @@ struct InspectorActionSections: View {
         actionActorID: $actionActorID
       )
       InspectorCreateTaskConsole(
+        isSessionReadOnly: isSessionReadOnly,
         isSessionActionInFlight: isSessionActionInFlight,
         createTaskAction: createTaskAction
       )
@@ -38,6 +41,7 @@ struct InspectorActionSections: View {
           selectedTask: selectedTask,
           tasks: detail.tasks,
           agents: detail.agents,
+          isSessionReadOnly: isSessionReadOnly,
           isSessionActionInFlight: isSessionActionInFlight,
           assignTaskAction: assignTaskAction,
           updateTaskStatusAction: updateTaskStatusAction,
@@ -49,6 +53,7 @@ struct InspectorActionSections: View {
         InspectorRoleMutationConsole(
           selectedAgent: selectedAgent,
           leaderID: detail.session.leaderId,
+          isSessionReadOnly: isSessionReadOnly,
           isSessionActionInFlight: isSessionActionInFlight,
           changeRoleAction: changeRoleAction,
           requestRemoveAgentConfirmation: requestRemoveAgentConfirmation
@@ -58,6 +63,7 @@ struct InspectorActionSections: View {
       InspectorLeaderTransferConsole(
         detail: detail,
         actionActorID: actionActorID,
+        isSessionReadOnly: isSessionReadOnly,
         isSessionActionInFlight: isSessionActionInFlight,
         transferLeaderAction: transferLeaderAction
       )

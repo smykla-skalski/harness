@@ -32,6 +32,7 @@ struct SessionContentContainer: View {
           SessionCockpitView(
             detail: detail,
             timeline: timeline,
+            isSessionReadOnly: store.isSessionReadOnly,
             isSessionActionInFlight: store.isSessionActionInFlight,
             isSelectionLoading: store.isSelectionLoading,
             lastAction: store.lastAction,
