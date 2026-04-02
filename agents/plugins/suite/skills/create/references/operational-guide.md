@@ -24,15 +24,15 @@ Hooks emit these codes during suite create:
 
 | Code | Hook | Meaning |
 | --- | --- | --- |
-| KSA001 | guard-write | Write path is outside the suite:create surface |
-| KSA002 | guard-question / verify-question / guard-write / verify-write / guard-stop | Approval state is missing, malformed, or the canonical approval prompt shape is wrong |
-| KSA003 | guard-write / guard-stop | Approval is required before writing suite files or stopping after saved-suite edits |
-| KSA004 | verify-write / guard-stop | Suite validation: authored manifests must pass local repo-backed validation, groups/baselines must be lists, and the suite must be complete |
+| KSA001 | tool-guard | Write path is outside the suite:create surface |
+| KSA002 | tool-guard / tool-result / guard-stop | Approval state is missing, malformed, or the canonical approval prompt shape is wrong |
+| KSA003 | tool-guard / guard-stop | Approval is required before writing suite files or stopping after saved-suite edits |
+| KSA004 | tool-result / guard-stop | Suite validation: authored manifests must pass local repo-backed validation, groups/baselines must be lists, and the suite must be complete |
 | KSA006 | worker contract | Workers must save structured payloads through `harness create save` |
 | KSA007 | worker contract | Worker reply must stay short and acknowledge the saved result |
-| KSA008 | audit | Suites must stay user-story-first with concrete variant evidence |
-| KSA009 | guard-question / verify-question / guard-bash / guard-write | The suite:create local validator decision must be resolved before real work starts |
-| KSA010 | verify-question | Automatic `kubectl-validate` installation failed |
+| KSA008 | tool-result | Suites must stay user-story-first with concrete variant evidence |
+| KSA009 | tool-guard / tool-result | The suite:create local validator decision must be resolved before real work starts |
+| KSA010 | tool-result | Automatic `kubectl-validate` installation failed |
 
 ## Error recovery
 

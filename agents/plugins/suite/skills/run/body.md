@@ -67,7 +67,7 @@ Read [references/agent-contract.md](references/agent-contract.md) in full before
 - **Hard gate after each group** via `harness run report group`.
 - **No autonomous deviations.** AskUserQuestion before any unplanned change.
 - **Never create manifests during a run.** All manifests must exist in the suite before the run starts. If a missing manifest is discovered, this is a suite:create defect - use the bug-found gate with classification "suite bug" and do not create the file.
-- **Preflight before apply.** Never run `harness run apply` until preflight has completed. Preflight materializes baselines and group YAML into prepared manifests. The verify-bash hook enforces this - `harness run apply` during bootstrap or before preflight completion is denied with KSR014.
+- **Preflight before apply.** Never run `harness run apply` until preflight has completed. Preflight materializes baselines and group YAML into prepared manifests. The tool-result hook enforces this - `harness run apply` during bootstrap or before preflight completion is denied with KSR014.
 - **Stop and triage every failure.** On any unexpected result, failure, or mismatch, stop. Classify as suite bug, product bug, harness bug, or environment issue. Present classification to user via AskUserQuestion before continuing because unclassified failures corrupt the audit trail. See bug-found gate in Phase 4.
 - **Commit code fixes before continuing.** After editing product code during a run, commit before re-deploying or re-testing. Use `git add <files> && git commit -m 'fix: description'`. Never iterate on uncommitted edits.
 - **Never truncate verification output.** Do not pipe `make test`, `make check`, `cargo test`, `cargo clippy`, harness commands, or any verification command through `tail -N` or `head -N`. Use full output or `grep` for specific markers (`FAIL`, `error`, `PASS`). Drawing conclusions from truncated output is unreliable - failures can be hidden above the truncation point.
@@ -290,14 +290,14 @@ Hook codes:
 
 | Code | Hook | Meaning |
 | --- | --- | --- |
-| KSR005 | guard-bash | Cluster binaries and Envoy admin calls must go through harness wrappers |
-| KSR006 | verify-bash | Expected artifact missing after command |
+| KSR005 | tool-guard | Cluster binaries and Envoy admin calls must go through harness wrappers |
+| KSR006 | tool-result | Expected artifact missing after command |
 | KSR007 | guard-stop | Run closeout incomplete: missing state capture or pending verdict |
-| KSR008 | guard-write | Write path is outside the tracked run surface |
+| KSR008 | tool-guard | Write path is outside the tracked run surface |
 | KSR011 | audit | Suite-runner runs must stay user-story-first and tracked |
-| KSR012 | enrich-failure | Current run verdict status |
+| KSR012 | tool-failure | Current run verdict status |
 | KSR013 | runner state hooks | Runner state is missing or invalid |
-| KSR014 | guard-question/guard-bash/context-agent | Required runner phase or approval is missing |
+| KSR014 | tool-guard/tool-result/context-agent | Required runner phase or approval is missing |
 | KSR015 | validate-agent | Preflight worker reply or saved artifacts are invalid |
 
 ## Bundled resources

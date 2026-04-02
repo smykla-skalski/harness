@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use crate::hooks::protocol::hook_result::Decision;
 
 use super::adapters::HookAgent;
-use super::catalog::{GUARD_BASH_HOOK, VERIFY_BASH_HOOK, all_hooks};
+use super::catalog::{TOOL_GUARD_HOOK, TOOL_RESULT_HOOK, all_hooks};
 use super::*;
 
 #[test]
@@ -96,16 +96,11 @@ fn hook_names_are_unique() {
 #[test]
 fn hook_command_types_are_exhaustive() {
     for hook in [
-        HookCommand::GuardBash,
-        HookCommand::GuardWrite,
-        HookCommand::GuardQuestion,
+        HookCommand::ToolGuard,
         HookCommand::GuardStop,
-        HookCommand::VerifyBash,
-        HookCommand::VerifyWrite,
-        HookCommand::VerifyQuestion,
-        HookCommand::Audit,
+        HookCommand::ToolResult,
         HookCommand::AuditTurn(AuditTurnArgs { payload: None }),
-        HookCommand::EnrichFailure,
+        HookCommand::ToolFailure,
         HookCommand::ContextAgent,
         HookCommand::ValidateAgent,
     ] {
@@ -127,13 +122,13 @@ fn hook_command_types_are_exhaustive() {
 
 #[test]
 fn hook_runtime_result_guard_is_deny() {
-    let result = super::runtime::hook_runtime_result(GUARD_BASH_HOOK, "KSH002", "error");
+    let result = super::runtime::hook_runtime_result(TOOL_GUARD_HOOK, "KSH002", "error");
     assert_eq!(result.decision, Decision::Deny);
 }
 
 #[test]
 fn hook_runtime_result_verify_is_warn() {
-    let result = super::runtime::hook_runtime_result(VERIFY_BASH_HOOK, "KSH002", "error");
+    let result = super::runtime::hook_runtime_result(TOOL_RESULT_HOOK, "KSH002", "error");
     assert_eq!(result.decision, Decision::Warn);
 }
 

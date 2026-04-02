@@ -8,6 +8,7 @@ use crate::errors::CliError;
 use crate::hooks::adapters::HookAgent;
 use crate::infra::io::read_json_typed;
 use crate::run::context::CurrentRunPointer;
+use crate::setup::wrapper::planned_agent_bootstrap_files;
 use crate::workspace::compact::{
     compact_latest_path, handoff_version, load_latest_compact_handoff,
 };
@@ -93,6 +94,7 @@ fn build_report(project_dir: &Path) -> DoctorReport {
     checks.push(check_project_plugin_root(project_dir));
     checks.push(check_project_plugin_wrapper(project_dir));
     checks.extend(check_lifecycle_contract(project_dir));
+    checks.extend(check_runtime_bootstrap_contract(project_dir));
     checks.extend(check_repo_provider_contract(repo_root.as_deref()));
     checks.push(check_current_run_pointer(&pointer_path));
     checks.push(check_compact_handoff(project_dir, &compact_path));
@@ -389,52 +391,17 @@ fn file_contains_all(path: &Path, needles: &[&str]) -> bool {
 }
 
 fn check_lifecycle_contract(project_dir: &Path) -> Vec<DoctorCheck> {
-    let mut checks = vec![];
     let hooks_path = project_dir
         .join(".claude")
         .join("plugins")
         .join("suite")
         .join("hooks")
         .join("hooks.json");
-    checks.push(check_lifecycle_file(
+    vec![check_lifecycle_file(
         &hooks_path,
         "observe_lifecycle_hooks",
         "project",
-    ));
-
-    let settings_path = project_dir.join(".claude").join("settings.json");
-    if settings_path.exists() {
-        checks.push(check_lifecycle_file(
-            &settings_path,
-            "observe_lifecycle_settings",
-            "project",
-        ));
-    } else {
-        checks.push(ok_check(
-            "observe_lifecycle_settings_absent",
-            "project",
-            "Project settings.json is absent. No local lifecycle drift was detected there.",
-            Some(&settings_path),
-        ));
-    }
-
-    let codex_config_path = project_dir.join(".codex").join("config.toml");
-    if codex_config_path.exists() {
-        checks.push(check_codex_lifecycle_file(
-            &codex_config_path,
-            "observe_lifecycle_codex_config",
-            "project",
-        ));
-    } else {
-        checks.push(ok_check(
-            "observe_lifecycle_codex_config_absent",
-            "project",
-            "Project .codex/config.toml is absent. No Codex lifecycle drift was detected there.",
-            Some(&codex_config_path),
-        ));
-    }
-
-    checks
+    )]
 }
 
 fn check_lifecycle_file(path: &Path, code: &'static str, kind: &'static str) -> DoctorCheck {
@@ -513,50 +480,92 @@ fn legacy_lifecycle_needles() -> [String; 3] {
     ]
 }
 
-fn check_codex_lifecycle_file(path: &Path, code: &'static str, kind: &'static str) -> DoctorCheck {
-    let expected = [
-        r#"session_start = ["harness", "agents", "session-start", "--agent", "codex"]"#,
-        r#"pre_compact = ["harness", "pre-compact"]"#,
-        r#"session_end = ["harness", "agents", "session-stop", "--agent", "codex"]"#,
+fn check_runtime_bootstrap_contract(project_dir: &Path) -> Vec<DoctorCheck> {
+    let agents = [
+        HookAgent::Claude,
+        HookAgent::Codex,
+        HookAgent::Gemini,
+        HookAgent::Copilot,
+        HookAgent::OpenCode,
     ];
+    let mut checks = Vec::new();
 
-    match fs::read_to_string(path) {
-        Ok(text) => {
-            let missing: Vec<&str> = expected
-                .into_iter()
-                .filter(|needle| !text.contains(needle))
-                .collect();
-            if !missing.is_empty() {
-                return error_check(
+    for agent in agents {
+        for (path, expected) in planned_agent_bootstrap_files(project_dir, agent) {
+            let code = runtime_bootstrap_code(agent, &path);
+            let summary_name = runtime_bootstrap_label(agent, &path);
+            if !path.exists() {
+                checks.push(skipped_check(
                     code,
-                    kind,
+                    "project",
                     format!(
-                        "Codex lifecycle configuration is missing expected commands: {}.",
-                        missing.join(", ")
+                        "{summary_name} is absent. Runtime drift check skipped for this optional agent install."
                     ),
-                    Some(path),
+                    Some(&path),
+                    Some(
+                        "Run `harness setup bootstrap --project-dir <repo>` for all agents or `harness setup bootstrap --project-dir <repo> --agents <agent>` for a subset.",
+                    ),
+                ));
+                continue;
+            }
+
+            match fs::read_to_string(&path) {
+                Ok(actual) if actual == expected => checks.push(ok_check(
+                    code,
+                    "project",
+                    format!("{summary_name} matches the current bootstrap contract."),
+                    Some(&path),
+                )),
+                Ok(_) => checks.push(error_check(
+                    code,
+                    "project",
+                    format!("{summary_name} has drifted from the current bootstrap contract."),
+                    Some(&path),
                     true,
                     Some(
-                        "Run `harness setup bootstrap --agent codex` to regenerate the current Codex lifecycle hooks.",
+                        "Run `harness setup bootstrap --project-dir <repo>` for all agents or `harness setup bootstrap --project-dir <repo> --agents <agent>` for a subset.",
                     ),
-                );
+                )),
+                Err(error) => checks.push(error_check(
+                    code,
+                    "project",
+                    format!("{summary_name} cannot be read: {error}"),
+                    Some(&path),
+                    false,
+                    None,
+                )),
             }
-            ok_check(
-                code,
-                kind,
-                "Codex lifecycle configuration matches the current CLI contract.",
-                Some(path),
-            )
         }
-        Err(error) => error_check(
-            code,
-            kind,
-            format!("Codex lifecycle configuration cannot be read: {error}"),
-            Some(path),
-            false,
-            None,
-        ),
     }
+
+    checks
+}
+
+fn runtime_bootstrap_code(agent: HookAgent, path: &Path) -> &'static str {
+    match (agent, path.file_name().and_then(|name| name.to_str())) {
+        (HookAgent::Claude, Some("settings.json")) => "observe_runtime_claude_settings",
+        (HookAgent::Codex, Some("hooks.json")) => "observe_runtime_codex_hooks",
+        (HookAgent::Codex, Some("config.toml")) => "observe_runtime_codex_config",
+        (HookAgent::Gemini, Some("settings.json")) => "observe_runtime_gemini_settings",
+        (HookAgent::Copilot, Some("harness.json")) => "observe_runtime_copilot_hooks",
+        (HookAgent::OpenCode, Some("hooks.json")) => "observe_runtime_opencode_hooks",
+        _ => "observe_runtime_bootstrap",
+    }
+}
+
+fn runtime_bootstrap_label(agent: HookAgent, path: &Path) -> String {
+    let runtime = match agent {
+        HookAgent::Claude => "Claude",
+        HookAgent::Codex => "Codex",
+        HookAgent::Gemini => "Gemini",
+        HookAgent::Copilot => "Copilot",
+        HookAgent::OpenCode => "OpenCode",
+    };
+    let relative = path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or("runtime config");
+    format!("{runtime} bootstrap file `{relative}`")
 }
 
 fn check_current_run_pointer(pointer_path: &Path) -> DoctorCheck {

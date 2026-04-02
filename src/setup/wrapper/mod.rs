@@ -1,5 +1,6 @@
 use std::path::{Path, PathBuf};
 
+use crate::agents::assets::write_suite_plugin_outputs;
 use crate::errors::{CliError, CliErrorKind};
 use crate::hooks::adapters::{HookAgent, adapter_for};
 use crate::infra::io::write_text;
@@ -62,6 +63,7 @@ pub fn main(project_dir: &Path, path_env: &str) -> Result<i32, CliError> {
 /// # Errors
 /// Returns `CliError` on failure.
 pub fn main_with_home(project_dir: &Path, path_env: &str, home: &Path) -> Result<i32, CliError> {
+    let _ = write_suite_plugin_outputs(project_dir)?;
     let plugin_dir = project_dir.join(".claude").join("plugins").join("suite");
     let plugin_path = plugin_dir.join("harness");
 

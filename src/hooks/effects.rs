@@ -48,6 +48,16 @@ impl HookOutcome {
     }
 
     #[must_use]
+    pub fn append_non_decision_effects(mut self, effects: &[HookEffect]) -> Self {
+        self.effects
+            .extend(effects.iter().filter_map(|effect| match effect {
+                HookEffect::Decide(_) => None,
+                other => Some(other.clone()),
+            }));
+        self
+    }
+
+    #[must_use]
     pub fn effects(&self) -> &[HookEffect] {
         &self.effects
     }

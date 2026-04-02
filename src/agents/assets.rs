@@ -102,6 +102,31 @@ pub fn generate_agent_assets(target: AgentAssetTarget, check: bool) -> Result<i3
     Ok(0)
 }
 
+/// Materialize the current suite plugin payload into a project directory.
+///
+/// # Errors
+/// Returns `CliError` when the source assets cannot be rendered or written.
+pub fn write_suite_plugin_outputs(project_root: &Path) -> Result<Vec<PathBuf>, CliError> {
+    let source_root = repo_root();
+    let skills = load_skill_sources(&source_root)?;
+    let plugins = load_plugin_sources(&source_root, &skills)?;
+    let plugin = plugins
+        .iter()
+        .find(|plugin| plugin.source.name == "suite")
+        .ok_or_else(|| CliErrorKind::usage_error("missing suite plugin source".to_string()))?;
+
+    let mut files = BTreeMap::new();
+    render_claude_plugin_outputs(project_root, &source_root, plugin, &mut files)?;
+
+    let planned = PlannedOutput {
+        managed_root: project_root.join(".claude").join("plugins"),
+        files,
+    };
+    let written = planned.files.keys().cloned().collect::<Vec<_>>();
+    write_outputs(&[planned])?;
+    Ok(written)
+}
+
 fn repo_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
 }
@@ -341,7 +366,9 @@ fn render_plugin_outputs(
 ) -> Result<BTreeMap<PathBuf, String>, CliError> {
     let mut files = BTreeMap::new();
     match target {
-        RenderTarget::Claude => render_claude_plugin_outputs(repo_root, plugin, &mut files)?,
+        RenderTarget::Claude => {
+            render_claude_plugin_outputs(repo_root, repo_root, plugin, &mut files)?;
+        }
         RenderTarget::Codex => render_codex_plugin_outputs(repo_root, plugin, &mut files)?,
         RenderTarget::Gemini => render_gemini_plugin_outputs(repo_root, plugin, &mut files),
         RenderTarget::Copilot => render_copilot_plugin_outputs(repo_root, plugin, &mut files)?,
@@ -356,11 +383,12 @@ fn render_plugin_outputs(
 }
 
 fn render_claude_plugin_outputs(
-    repo_root: &Path,
+    output_root: &Path,
+    source_root: &Path,
     plugin: &PluginDefinition,
     files: &mut BTreeMap<PathBuf, String>,
 ) -> Result<(), CliError> {
-    let base = repo_root
+    let base = output_root
         .join(".claude")
         .join("plugins")
         .join(&plugin.source.name);
@@ -377,12 +405,12 @@ fn render_claude_plugin_outputs(
     copy_plugin_assets(plugin, &base, files, RenderTarget::Claude)?;
     render_plugin_skill_markdown(RenderTarget::Claude, plugin, &base, files)?;
     files.insert(
-        repo_root
+        output_root
             .join(".claude")
             .join("plugins")
             .join(".claude-plugin")
             .join("marketplace.json"),
-        render_claude_marketplace(repo_root, plugin.source.name.as_str())?,
+        render_claude_marketplace(source_root, plugin.source.name.as_str())?,
     );
     Ok(())
 }
@@ -993,22 +1021,22 @@ mod tests {
                 hooks: Some(json!({
                     "PreToolUse": [
                         {
-                            "matcher": "Bash",
+                            "matcher": ".*",
                             "hooks": [
                                 {
                                     "type": "command",
-                                    "command": "harness hook --skill suite:run guard-bash"
+                                    "command": "harness hook --skill suite:run tool-guard"
                                 }
                             ]
                         }
                     ],
                     "PostToolUse": [
                         {
-                            "matcher": "Read",
+                            "matcher": ".*",
                             "hooks": [
                                 {
                                     "type": "command",
-                                    "command": "harness hook --skill suite:run audit"
+                                    "command": "harness hook --skill suite:run tool-result"
                                 }
                             ]
                         }

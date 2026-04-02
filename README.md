@@ -17,14 +17,14 @@ Builds a release binary and installs `harness` to `~/.local/bin`. Requires Rust 
 ### setup - environment and cluster preparation
 
 ```
-harness setup bootstrap --agent <claude|codex|gemini|copilot>
+harness setup bootstrap [--agents <claude,codex,gemini,copilot,opencode>]
 harness setup agents generate [--check]
 harness setup kuma <topology> <name> [flags]
 harness setup gateway [--kubeconfig <path>] [--repo-root <path>]
 harness setup capabilities
 ```
 
-`bootstrap` wires a specific agent runtime into the project. `agents generate` renders shared assets from `agents/` into host-specific directories. `kuma` creates or attaches to a cluster. `gateway` installs Gateway API CRDs. `capabilities` reports what features and providers are available and ready on this machine right now.
+`bootstrap` wires agent runtimes into the project. Without `--agents`, it installs every supported runtime. With `--agents`, it narrows to the listed subset. `agents generate` renders shared assets from `agents/` into host-specific directories. `kuma` creates or attaches to a cluster. `gateway` installs Gateway API CRDs. `capabilities` reports what features and providers are available and ready on this machine right now.
 
 ### create - suite authoring
 
@@ -213,7 +213,8 @@ Treat those rendered directories as generated output. The source of truth is `ag
 ```bash
 harness setup agents generate        # render agents/ into host directories
 harness setup agents generate --check  # verify they are in sync
-harness setup bootstrap --agent claude  # wire one agent runtime
+harness setup bootstrap                # wire every supported agent runtime
+harness setup bootstrap --agents codex # narrow to one runtime
 ```
 
 ### Runtime
@@ -244,11 +245,11 @@ The session system coordinates multiple agents with role-based access control. F
 
 Harness intercepts agent tool use through hook guards that enforce tracked workflows.
 
-`guard-bash` denies direct use of cluster binaries: `kubectl`, `kubectl-validate`, `docker`, `k3d`, `helm`, `kumactl`. It also blocks `gh` during active runs, inline Python, and legacy wrapper scripts. All cluster access must go through harness commands. The one exception is `harness run record -- kubectl ...` which routes through the tracked runner.
+`tool-guard` denies direct use of cluster binaries: `kubectl`, `kubectl-validate`, `docker`, `k3d`, `helm`, `kumactl`. It also blocks `gh` during active runs, inline Python, legacy wrapper scripts, out-of-surface writes, and off-workflow user prompts. All cluster access must go through harness commands. The one exception is `harness run record -- kubectl ...` which routes through the tracked runner.
 
-`guard-write` restricts file writes to the run surface area during active runs.
+`tool-result` validates tool outcomes, runner-state transitions, and tracked audit writes after each tool completes.
 
-`guard-question` intercepts agent questions to keep them inside the tracked workflow.
+`tool-failure` enriches failed tool executions with current run-verdict context and appends the same audit trail once.
 
 ## Runtime backends
 

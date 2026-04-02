@@ -54,4 +54,4 @@ Runs the observe classifier pipeline across all registered agents in the session
 
 Supported: `claude`, `codex`, `gemini`, `copilot`, `opencode`.
 
-Each runtime has a bootstrap command: `harness setup bootstrap --agent <runtime>`.
+Bootstrap all runtimes with `harness setup bootstrap`. Narrow to a subset with `harness setup bootstrap --agents <runtime[,runtime...]>`.

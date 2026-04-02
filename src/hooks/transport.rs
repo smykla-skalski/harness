@@ -4,9 +4,8 @@ use crate::kernel::skills::SKILL_NAMES;
 
 use super::adapters::HookAgent;
 use super::catalog::{
-    AUDIT_HOOK, CONTEXT_AGENT_HOOK, ENRICH_FAILURE_HOOK, GUARD_BASH_HOOK, GUARD_QUESTION_HOOK,
-    GUARD_STOP_HOOK, GUARD_WRITE_HOOK, VALIDATE_AGENT_HOOK, VERIFY_BASH_HOOK, VERIFY_QUESTION_HOOK,
-    VERIFY_WRITE_HOOK,
+    CONTEXT_AGENT_HOOK, GUARD_STOP_HOOK, TOOL_FAILURE_HOOK, TOOL_GUARD_HOOK, TOOL_RESULT_HOOK,
+    VALIDATE_AGENT_HOOK,
 };
 use super::registry::Hook;
 
@@ -32,26 +31,16 @@ impl HookType {
 #[derive(Debug, Clone, Subcommand)]
 #[non_exhaustive]
 pub enum HookCommand {
-    /// Guard Bash tool usage.
-    GuardBash,
-    /// Guard file write operations.
-    GuardWrite,
-    /// Guard `AskUserQuestion` prompts.
-    GuardQuestion,
+    /// Guard tool usage before execution.
+    ToolGuard,
     /// Guard stop and session end.
     GuardStop,
-    /// Verify Bash tool results.
-    VerifyBash,
-    /// Verify file write results.
-    VerifyWrite,
-    /// Verify question answers.
-    VerifyQuestion,
-    /// Audit hook events.
-    Audit,
+    /// Process tool results after execution.
+    ToolResult,
     /// Audit a Codex turn-complete notification.
     AuditTurn(AuditTurnArgs),
-    /// Enrich failure context.
-    EnrichFailure,
+    /// Process tool failures after execution errors.
+    ToolFailure,
     /// Validate subagent startup context.
     ContextAgent,
     /// Validate subagent results.
@@ -70,15 +59,10 @@ impl HookCommand {
     #[must_use]
     pub fn hook(&self) -> &'static dyn Hook {
         match self {
-            Self::GuardBash => GUARD_BASH_HOOK,
-            Self::GuardWrite => GUARD_WRITE_HOOK,
-            Self::GuardQuestion => GUARD_QUESTION_HOOK,
+            Self::ToolGuard => TOOL_GUARD_HOOK,
             Self::GuardStop => GUARD_STOP_HOOK,
-            Self::VerifyBash => VERIFY_BASH_HOOK,
-            Self::VerifyWrite => VERIFY_WRITE_HOOK,
-            Self::VerifyQuestion => VERIFY_QUESTION_HOOK,
-            Self::Audit | Self::AuditTurn(_) => AUDIT_HOOK,
-            Self::EnrichFailure => ENRICH_FAILURE_HOOK,
+            Self::ToolResult | Self::AuditTurn(_) => TOOL_RESULT_HOOK,
+            Self::ToolFailure => TOOL_FAILURE_HOOK,
             Self::ContextAgent => CONTEXT_AGENT_HOOK,
             Self::ValidateAgent => VALIDATE_AGENT_HOOK,
         }

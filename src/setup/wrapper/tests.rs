@@ -88,24 +88,8 @@ fn install_wrapper_preserves_existing_file() {
 }
 
 #[test]
-fn main_fails_when_source_wrapper_missing() {
+fn main_materializes_plugin_when_missing() {
     let dir = tempfile::tempdir().unwrap();
-    let err = main(dir.path(), "").unwrap_err();
-    assert!(err.message().contains("missing source wrapper"));
-}
-
-#[test]
-fn main_succeeds_with_plugin_path() {
-    let dir = tempfile::tempdir().unwrap();
-    let source = dir
-        .path()
-        .join(".claude")
-        .join("plugins")
-        .join("suite")
-        .join("harness");
-    fs::create_dir_all(source.parent().unwrap()).unwrap();
-    fs::write(&source, "#!/bin/sh\necho ok\n").unwrap();
-
     let bin_dir = dir.path().join(".local").join("bin");
     fs::create_dir_all(&bin_dir).unwrap();
 
@@ -114,6 +98,14 @@ fn main_succeeds_with_plugin_path() {
 
     assert_eq!(result.unwrap(), 0);
     assert!(bin_dir.join("harness").exists());
+    assert!(
+        dir.path()
+            .join(".claude")
+            .join("plugins")
+            .join("suite")
+            .join("harness")
+            .exists()
+    );
 }
 
 #[test]
@@ -406,7 +398,8 @@ fn assert_codex_hooks(hooks: &str) {
     assert!(hooks.contains("\"PostToolUse\""));
     assert!(hooks.contains("\"SubagentStart\""));
     assert!(hooks.contains("\"SubagentStop\""));
-    assert!(hooks.contains("guard-bash"));
+    assert!(hooks.contains("tool-guard"));
+    assert!(hooks.contains("tool-result"));
 }
 
 #[test]
