@@ -203,7 +203,7 @@ pub fn create_task(
     request: &TaskCreateRequest,
 ) -> Result<SessionDetail, CliError> {
     let resolved = index::resolve_session(session_id)?;
-    let project_dir = require_project_dir(&resolved)?;
+    let project_dir = effective_project_dir(&resolved);
     let _ = session_service::create_task_with_source(
         session_id,
         &request.title,
@@ -228,7 +228,7 @@ pub fn assign_task(
     request: &TaskAssignRequest,
 ) -> Result<SessionDetail, CliError> {
     let resolved = index::resolve_session(session_id)?;
-    let project_dir = require_project_dir(&resolved)?;
+    let project_dir = effective_project_dir(&resolved);
     session_service::assign_task(
         session_id,
         task_id,
@@ -249,7 +249,7 @@ pub fn update_task(
     request: &TaskUpdateRequest,
 ) -> Result<SessionDetail, CliError> {
     let resolved = index::resolve_session(session_id)?;
-    let project_dir = require_project_dir(&resolved)?;
+    let project_dir = effective_project_dir(&resolved);
     session_service::update_task(
         session_id,
         task_id,
@@ -271,7 +271,7 @@ pub fn checkpoint_task(
     request: &TaskCheckpointRequest,
 ) -> Result<SessionDetail, CliError> {
     let resolved = index::resolve_session(session_id)?;
-    let project_dir = require_project_dir(&resolved)?;
+    let project_dir = effective_project_dir(&resolved);
     let _ = session_service::record_task_checkpoint(
         session_id,
         task_id,
@@ -293,7 +293,7 @@ pub fn change_role(
     request: &RoleChangeRequest,
 ) -> Result<SessionDetail, CliError> {
     let resolved = index::resolve_session(session_id)?;
-    let project_dir = require_project_dir(&resolved)?;
+    let project_dir = effective_project_dir(&resolved);
     session_service::assign_role(
         session_id,
         agent_id,
@@ -315,7 +315,7 @@ pub fn remove_agent(
     request: &AgentRemoveRequest,
 ) -> Result<SessionDetail, CliError> {
     let resolved = index::resolve_session(session_id)?;
-    let project_dir = require_project_dir(&resolved)?;
+    let project_dir = effective_project_dir(&resolved);
     session_service::remove_agent(session_id, agent_id, &request.actor, project_dir)?;
     snapshot::session_detail(session_id)
 }
@@ -329,7 +329,7 @@ pub fn transfer_leader(
     request: &LeaderTransferRequest,
 ) -> Result<SessionDetail, CliError> {
     let resolved = index::resolve_session(session_id)?;
-    let project_dir = require_project_dir(&resolved)?;
+    let project_dir = effective_project_dir(&resolved);
     session_service::transfer_leader(
         session_id,
         &request.new_leader_id,
@@ -349,7 +349,7 @@ pub fn end_session(
     request: &SessionEndRequest,
 ) -> Result<SessionDetail, CliError> {
     let resolved = index::resolve_session(session_id)?;
-    let project_dir = require_project_dir(&resolved)?;
+    let project_dir = effective_project_dir(&resolved);
     session_service::end_session(session_id, &request.actor, project_dir)?;
     snapshot::session_detail(session_id)
 }
@@ -363,7 +363,7 @@ pub fn send_signal(
     request: &SignalSendRequest,
 ) -> Result<SessionDetail, CliError> {
     let resolved = index::resolve_session(session_id)?;
-    let project_dir = require_project_dir(&resolved)?;
+    let project_dir = effective_project_dir(&resolved);
     let _ = session_service::send_signal(
         session_id,
         &request.agent_id,
@@ -385,7 +385,7 @@ pub fn observe_session(
     request: Option<&ObserveSessionRequest>,
 ) -> Result<SessionDetail, CliError> {
     let resolved = index::resolve_session(session_id)?;
-    let project_dir = require_project_dir(&resolved)?;
+    let project_dir = effective_project_dir(&resolved);
     let actor_id = request.and_then(|request| request.actor.as_deref());
     if !start_daemon_observe_loop(session_id, project_dir, actor_id) {
         let _ = session_observe::run_session_observe(session_id, project_dir, actor_id)?;
@@ -477,13 +477,15 @@ fn broadcast_event(
     }
 }
 
-fn require_project_dir(resolved: &ResolvedSession) -> Result<&Path, CliError> {
-    resolved.project.project_dir.as_deref().ok_or_else(|| {
-        CliError::from(CliErrorKind::session_agent_conflict(format!(
-            "project path unavailable for session '{}' in project '{}'",
-            resolved.state.session_id, resolved.project.project_id
-        )))
-    })
+/// Return the original project directory when available, falling back to the
+/// context root. This is safe because `project_context_dir` is idempotent
+/// for paths already under the projects root.
+fn effective_project_dir(resolved: &ResolvedSession) -> &Path {
+    resolved
+        .project
+        .project_dir
+        .as_deref()
+        .unwrap_or(&resolved.project.context_root)
 }
 
 fn start_daemon_observe_loop(session_id: &str, project_dir: &Path, actor_id: Option<&str>) -> bool {
