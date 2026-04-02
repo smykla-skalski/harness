@@ -25,14 +25,11 @@ struct ContentView: View {
     store.selectedSessionSummary
   }
 
-  private var navigationTitle: String {
-    if let detail = selectedDetail {
-      return detail.session.context
+  private var windowTitle: String {
+    if selectedDetail != nil || selectedSessionSummary != nil {
+      return "Cockpit"
     }
-    if let summary = selectedSessionSummary {
-      return summary.context
-    }
-    return "Harness"
+    return "Dashboard"
   }
 
   private var chromeAccessibilityValue: String {
@@ -40,7 +37,8 @@ struct ContentView: View {
       "contentChrome=native",
       "interactiveRows=button",
       "controlGlass=native",
-      "toolbarTitle=detail-scoped",
+      "toolbarTitle=native-window",
+      "windowTitle=\(windowTitle)",
     ].joined(separator: ", ")
   }
 
@@ -70,19 +68,18 @@ struct ContentView: View {
         }
         return .ignored
       }
-      .navigationTitle(navigationTitle)
+      .navigationTitle(windowTitle)
       .toolbar {
         navigationToolbar
-        titleToolbar
       }
       .toolbar(id: "harness.main") {
         primaryToolbar
       }
-      .toolbar(removing: .title)
     }
     .inspector(isPresented: $showInspector) {
       InspectorColumnView(
         store: store,
+        isVisible: showInspector,
         isRefreshing: store.isRefreshing,
         refresh: refresh,
         openSettings: { openSettings() },
@@ -131,12 +128,6 @@ private extension ContentView {
     )
   }
 
-  @ToolbarContentBuilder var titleToolbar: some ToolbarContent {
-    ToolbarItem(placement: .principal) {
-      ToolbarTitleLabel(title: navigationTitle)
-    }
-  }
-
   @ToolbarContentBuilder var primaryToolbar: some CustomizableToolbarContent {
     if !showInspector {
       ToolbarItem(id: "refresh", placement: .primaryAction) {
@@ -179,19 +170,6 @@ private extension ContentView {
 
   func toggleInspector() {
     showInspector.toggle()
-  }
-}
-
-private struct ToolbarTitleLabel: View {
-  let title: String
-
-  var body: some View {
-    Text(title)
-      .scaledFont(.system(.headline, design: .rounded, weight: .semibold))
-      .lineLimit(1)
-      .truncationMode(.tail)
-      .help(title)
-      .accessibilityIdentifier(HarnessAccessibility.toolbarTitle)
   }
 }
 

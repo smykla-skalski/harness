@@ -4,25 +4,72 @@ private typealias Accessibility = HarnessUITestAccessibility
 
 @MainActor
 final class HarnessToolbarUITests: HarnessUITestCase {
-  func testToolbarKeepsSelectedSessionTitleInsideDetailToolbar() throws {
-    let app = launch(mode: "preview")
-    let sessionRow = previewSessionTrigger(in: app)
+  func testHiddenInspectorUsesSingleToolbarActionSet() throws {
+    let app = launch(mode: "empty")
+    let hideInspectorButton = button(in: app, title: "Hide Inspector")
+
+    XCTAssertTrue(hideInspectorButton.waitForExistence(timeout: Self.uiTimeout))
+    hideInspectorButton.tap()
+
+    let showInspectorButtons = app.toolbars.buttons.matching(
+      NSPredicate(format: "label == %@", "Show Inspector")
+    )
+    let refreshButtons = app.toolbars.buttons.matching(identifier: Accessibility.refreshButton)
+    let preferencesButtons = app.toolbars.buttons.matching(
+      identifier: Accessibility.preferencesButton
+    )
+
+    func visibleCount(for query: XCUIElementQuery) -> Int {
+      query.allElementsBoundByIndex.filter { element in
+        element.exists && element.isHittable
+      }.count
+    }
+
+    XCTAssertTrue(
+      waitUntil(timeout: Self.uiTimeout) {
+        visibleCount(for: refreshButtons) == 1
+          && visibleCount(for: preferencesButtons) == 1
+          && visibleCount(for: showInspectorButtons) == 1
+      },
+      "Expected exactly one visible refresh/settings/show-inspector control set"
+    )
+  }
+
+  func testToolbarUsesNativeConciseWindowTitle() throws {
+    let app = launch(
+      mode: "preview",
+      additionalEnvironment: ["HARNESS_PREVIEW_SCENARIO": "cockpit"]
+    )
+    let window = mainWindow(in: app)
     let chromeState = element(in: app, identifier: Accessibility.appChromeState)
     let inspectorRoot = element(in: app, identifier: Accessibility.inspectorRoot)
+    let detailTitle = app.staticTexts[Accessibility.previewSessionTitle]
 
-    XCTAssertTrue(sessionRow.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(window.waitForExistence(timeout: Self.uiTimeout))
     XCTAssertTrue(chromeState.waitForExistence(timeout: Self.uiTimeout))
     XCTAssertTrue(inspectorRoot.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(detailTitle.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(
+      waitUntil(timeout: Self.uiTimeout) {
+        chromeState.label.contains("windowTitle=Cockpit")
+      },
+      "Expected the preview scenario override to launch directly into cockpit state"
+    )
 
-    tapPreviewSession(in: app)
+    let toolbar = window.toolbars.firstMatch
+    let longToolbarTitle = toolbar.staticTexts[Accessibility.previewSessionTitle]
 
-    let toolbarTitle = element(in: app, identifier: Accessibility.toolbarTitle)
-    XCTAssertTrue(toolbarTitle.waitForExistence(timeout: Self.uiTimeout))
-    XCTAssertTrue(chromeState.label.contains("toolbarTitle=detail-scoped"))
+    XCTAssertTrue(toolbar.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(chromeState.label.contains("toolbarTitle=native-window"))
+    XCTAssertTrue(chromeState.label.contains("windowTitle=Cockpit"))
+    XCTAssertFalse(
+      longToolbarTitle.exists,
+      "Expected the long session context to stay in detail content, not the toolbar"
+    )
     XCTAssertLessThanOrEqual(
-      toolbarTitle.frame.maxX,
+      detailTitle.frame.maxX,
       inspectorRoot.frame.minX + 12,
-      "Toolbar title overlaps the inspector toolbar region"
+      "Session context title should stay inside the detail column"
     )
   }
 

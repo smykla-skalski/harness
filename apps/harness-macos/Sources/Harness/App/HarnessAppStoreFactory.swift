@@ -15,11 +15,45 @@ enum HarnessAppStoreFactory {
     }
   }
 
+  private enum PreviewScenarioOverride: String {
+    case dashboard
+    case cockpit
+    case overflow
+    case empty
+
+    init?(environment: HarnessEnvironment) {
+      let rawValue = environment.values["HARNESS_PREVIEW_SCENARIO"]?
+        .trimmingCharacters(in: .whitespacesAndNewlines)
+        .lowercased()
+      guard let rawValue, !rawValue.isEmpty else {
+        return nil
+      }
+      self.init(rawValue: rawValue)
+    }
+
+    var scenario: HarnessPreviewStoreFactory.Scenario {
+      switch self {
+      case .dashboard:
+        .dashboardLoaded
+      case .cockpit:
+        .cockpitLoaded
+      case .overflow:
+        .sidebarOverflow
+      case .empty:
+        .empty
+      }
+    }
+  }
+
   static func makeStore(
     environment: HarnessEnvironment = .current,
     modelContext: ModelContext? = nil,
     persistenceError: String? = nil
   ) -> HarnessStore {
+    if let previewScenario = PreviewScenarioOverride(environment: environment) {
+      return HarnessPreviewStoreFactory.makeStore(for: previewScenario.scenario)
+    }
+
     let controller: any DaemonControlling
 
     switch HarnessLaunchMode(environment: environment) {
