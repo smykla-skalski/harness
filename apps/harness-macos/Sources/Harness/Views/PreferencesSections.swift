@@ -72,9 +72,7 @@ struct PreferencesStatusSection: View {
   var body: some View {
     Section("Status") {
       if let startedAt {
-        LabeledContent(
-          "Started", value: formatTimestamp(startedAt)
-        )
+        LabeledContent("Started", value: formatTimestamp(startedAt))
       }
       if let lastError, !lastError.isEmpty {
         LabeledContent("Latest Error") {
@@ -116,112 +114,13 @@ struct PreferencesPathsSection: View {
     }
   }
 
-  private func pathRow(
-    _ title: String, value: String
-  ) -> some View {
+  private func pathRow(_ title: String, value: String) -> some View {
     LabeledContent(title) {
       Text(value)
         .scaledFont(.caption.monospaced())
         .truncationMode(.middle)
         .textSelection(.enabled)
     }
-  }
-}
-
-struct PreferencesConnectionSection: View {
-  let store: HarnessStore
-
-  var body: some View {
-    Form {
-      Section("Actions") {
-        HarnessGlassControlGroup(spacing: HarnessTheme.itemSpacing) {
-          HarnessWrapLayout(spacing: HarnessTheme.itemSpacing, lineSpacing: HarnessTheme.itemSpacing) {
-            HarnessAsyncActionButton(
-              title: "Reconnect",
-              tint: nil,
-              variant: .prominent,
-              isLoading: store.connectionState == .connecting,
-              accessibilityIdentifier: HarnessAccessibility.preferencesActionButton(
-                "Connection Reconnect"
-              ),
-              action: reconnect
-            )
-            HarnessAsyncActionButton(
-              title: "Refresh Diagnostics",
-              tint: .secondary,
-              variant: .bordered,
-              isLoading: store.isDiagnosticsRefreshInFlight,
-              accessibilityIdentifier: HarnessAccessibility.preferencesActionButton(
-                "Connection Refresh Diagnostics"
-              ),
-              action: refreshDiagnostics
-            )
-          }
-        }
-      }
-      PreferencesConnectionMetrics(
-        metrics: store.connectionMetrics,
-        events: store.connectionEvents
-      )
-    }
-    .preferencesDetailFormStyle()
-  }
-
-  private func reconnect() async {
-    await store.reconnect()
-  }
-
-  private func refreshDiagnostics() async {
-    await store.refreshDiagnostics()
-  }
-}
-
-struct PreferencesDiagnosticsSection: View {
-  let store: HarnessStore
-  let effectiveTokenPresent: Bool
-  let effectiveLastEvent: DaemonAuditEvent?
-
-  var body: some View {
-    Form {
-      PreferencesDiagnosticsOverview(
-        launchAgent: store.daemonStatus?.launchAgent,
-        tokenPresent: effectiveTokenPresent,
-        projectCount: store.daemonStatus?.projectCount ?? 0,
-        sessionCount: store.daemonStatus?.sessionCount ?? 0,
-        lastEvent: effectiveLastEvent
-      )
-      PreferencesPathsSection(
-        launchAgentPath:
-          store.daemonStatus?.launchAgent.path
-          ?? "Unavailable",
-        launchAgentDomain:
-          store.daemonStatus?.launchAgent.domainTarget,
-        launchAgentService:
-          store.daemonStatus?.launchAgent.serviceTarget,
-        manifestPath:
-          store.diagnostics?.workspace.manifestPath
-          ?? store.daemonStatus?.diagnostics.manifestPath
-          ?? "Unavailable",
-        authTokenPath:
-          store.diagnostics?.workspace.authTokenPath
-          ?? store.daemonStatus?.diagnostics.authTokenPath
-          ?? "Unavailable",
-        eventsPath:
-          store.diagnostics?.workspace.eventsPath
-          ?? store.daemonStatus?.diagnostics.eventsPath
-          ?? "Unavailable",
-        cacheRoot:
-          store.diagnostics?.workspace.cacheRoot
-          ?? store.daemonStatus?.diagnostics.cacheRoot
-          ?? "Unavailable"
-      )
-      PreferencesRecentEventsSection(
-        events: Array(
-          (store.diagnostics?.recentEvents ?? []).prefix(10)
-        )
-      )
-    }
-    .preferencesDetailFormStyle()
   }
 }
 
@@ -239,9 +138,7 @@ struct PreferencesDiagnosticsOverview: View {
           tokenPresent ? "Present" : "Missing",
           systemImage: tokenPresent ? "checkmark.circle.fill" : "xmark.circle.fill"
         )
-        .foregroundStyle(
-          tokenPresent ? HarnessTheme.success : HarnessTheme.danger
-        )
+        .foregroundStyle(tokenPresent ? HarnessTheme.success : HarnessTheme.danger)
       }
       LabeledContent("Projects", value: "\(projectCount)")
       LabeledContent("Sessions", value: "\(sessionCount)")
@@ -340,11 +237,6 @@ struct PreferencesDiagnosticsOverview: View {
   .frame(width: 720)
 }
 
-#Preview("Preferences Connection Section") {
-  PreferencesConnectionSection(store: PreferencesPreviewSupport.makeStore())
-    .frame(width: 720)
-}
-
 #Preview("Preferences Diagnostics Overview") {
   let store = PreferencesPreviewSupport.makeStore()
 
@@ -359,15 +251,4 @@ struct PreferencesDiagnosticsOverview: View {
   }
   .preferencesDetailFormStyle()
   .frame(width: 560)
-}
-
-#Preview("Preferences Diagnostics Section") {
-  let store = PreferencesPreviewSupport.makeStore()
-
-  PreferencesDiagnosticsSection(
-    store: store,
-    effectiveTokenPresent: store.diagnostics?.workspace.authTokenPresent ?? false,
-    effectiveLastEvent: store.diagnostics?.workspace.lastEvent
-  )
-  .frame(width: 720)
 }
