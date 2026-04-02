@@ -8,15 +8,24 @@ final class HarnessSidebarLayoutUITests: HarnessUITestCase {
     let app = launch(mode: "empty")
     let sidebarRoot = element(in: app, identifier: Accessibility.sidebarRoot)
     let daemonCard = frameElement(in: app, identifier: Accessibility.daemonCardFrame)
+    let projectsBadge = frameElement(in: app, identifier: Accessibility.sidebarProjectsBadgeFrame)
+    let sessionsBadge = frameElement(in: app, identifier: Accessibility.sidebarSessionsBadgeFrame)
+    let launchdBadge = frameElement(in: app, identifier: Accessibility.sidebarLaunchdBadgeFrame)
 
     XCTAssertTrue(sidebarRoot.waitForExistence(timeout: Self.uiTimeout))
     XCTAssertTrue(daemonCard.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(projectsBadge.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(sessionsBadge.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(launchdBadge.waitForExistence(timeout: Self.uiTimeout))
     assertFillsColumn(
       child: daemonCard,
       in: sidebarRoot,
       expectedHorizontalInset: 22,
       tolerance: 12
     )
+    XCTAssertLessThan(projectsBadge.frame.height, 60)
+    XCTAssertLessThan(sessionsBadge.frame.height, 60)
+    XCTAssertLessThan(launchdBadge.frame.height, 60)
     XCTAssertLessThan(daemonCard.frame.height, 360)
   }
 

@@ -43,20 +43,18 @@ struct DaemonMetricsStrip: View {
   let launchdState: String
 
   var body: some View {
-    HarnessGlassControlGroup(spacing: HarnessTheme.itemSpacing) {
-      ViewThatFits(in: .horizontal) {
+    ViewThatFits(in: .horizontal) {
+      HStack(spacing: HarnessTheme.itemSpacing) {
+        projectsBadge
+        sessionsBadge
+        launchdBadge
+      }
+      VStack(alignment: .leading, spacing: HarnessTheme.itemSpacing) {
         HStack(spacing: HarnessTheme.itemSpacing) {
           projectsBadge
           sessionsBadge
-          launchdBadge
         }
-        VStack(alignment: .leading, spacing: HarnessTheme.itemSpacing) {
-          HStack(spacing: HarnessTheme.itemSpacing) {
-            projectsBadge
-            sessionsBadge
-          }
-          launchdBadge
-        }
+        launchdBadge
       }
     }
     .frame(maxWidth: .infinity, alignment: .leading)
@@ -99,7 +97,7 @@ struct DaemonActionButtons: View {
                 tint: nil,
                 variant: .prominent,
                 isLoading: isLoading,
-                accessibilityIdentifier: "harness.sidebar.action.start.full",
+                accessibilityIdentifier: HarnessAccessibility.sidebarStartDaemonButton,
                 fillsWidth: false,
                 action: startDaemon
               )
@@ -162,6 +160,10 @@ private struct DaemonStatusPill: View {
 private struct DaemonStatBadge: View {
   let title: String
   let value: String
+  @Environment(\.accessibilityReduceTransparency)
+  private var reduceTransparency
+  @Environment(\.colorSchemeContrast)
+  private var colorSchemeContrast
 
   var body: some View {
     VStack(alignment: .leading, spacing: 4) {
@@ -176,13 +178,23 @@ private struct DaemonStatBadge: View {
         .contentTransition(.numericText())
     }
     .frame(maxWidth: .infinity, alignment: .topLeading)
-    .frame(minHeight: 36, alignment: .topLeading)
-    .harnessPillPadding()
-    .harnessControlPill(tint: HarnessTheme.ink)
+    .padding(.horizontal, HarnessTheme.cardPadding)
+    .padding(.vertical, HarnessTheme.itemSpacing)
+    .background {
+      RoundedRectangle(cornerRadius: HarnessTheme.cornerRadiusMD, style: .continuous)
+        .fill(.primary.opacity(backgroundFillOpacity))
+    }
     .accessibilityElement(children: .ignore)
     .accessibilityLabel(title)
     .accessibilityValue(value)
     .accessibilityIdentifier(HarnessAccessibility.sidebarDaemonBadge(title))
+  }
+
+  private var backgroundFillOpacity: Double {
+    if reduceTransparency {
+      return colorSchemeContrast == .increased ? 0.18 : 0.14
+    }
+    return colorSchemeContrast == .increased ? 0.09 : 0.05
   }
 }
 
@@ -197,8 +209,7 @@ private struct DaemonSidebarLayoutProbe<Content: View>: View {
 
   var body: some View {
     content
-      .accessibilityElement(children: .contain)
-      .accessibilityIdentifier(identifier)
+      .accessibilityFrameMarker(identifier)
   }
 }
 
