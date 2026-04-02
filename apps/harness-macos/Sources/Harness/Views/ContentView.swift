@@ -46,6 +46,7 @@ struct ContentView: View {
     NavigationSplitView(columnVisibility: $columnVisibility) {
       SidebarView(store: store)
         .navigationSplitViewColumnWidth(min: 220, ideal: 260, max: 380)
+        .toolbarBaselineFrame(.sidebar)
     } detail: {
       ContentDetailChrome(
         persistenceError: store.persistenceError,
@@ -83,6 +84,7 @@ struct ContentView: View {
         .inspectorColumnWidth(min: 320, ideal: 380, max: 500)
     }
     .navigationSplitViewStyle(.prominentDetail)
+    .toolbarBaselineOverlay()
     .toolbarBackgroundVisibility(.automatic, for: .windowToolbar)
     .containerBackground(.windowBackground, for: .window)
     .focusedSceneValue(\.inspectorVisibility, $showInspector)
