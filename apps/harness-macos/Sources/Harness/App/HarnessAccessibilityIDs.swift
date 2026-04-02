@@ -60,6 +60,7 @@ enum HarnessAccessibility {
   static let preferencesTextSizePicker = "harness.preferences.text-size"
   static let navigateBackButton = "harness.toolbar.navigate-back"
   static let navigateForwardButton = "harness.toolbar.navigate-forward"
+  static let toolbarTitle = "harness.toolbar.title"
   static let refreshButton = "harness.toolbar.refresh"
   static let daemonPreferencesButton = "harness.toolbar.preferences"
   static let endSessionButton = "harness.session.action.end"

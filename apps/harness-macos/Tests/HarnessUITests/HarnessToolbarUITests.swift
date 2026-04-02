@@ -4,6 +4,28 @@ private typealias Accessibility = HarnessUITestAccessibility
 
 @MainActor
 final class HarnessToolbarUITests: HarnessUITestCase {
+  func testToolbarKeepsSelectedSessionTitleInsideDetailToolbar() throws {
+    let app = launch(mode: "preview")
+    let sessionRow = previewSessionTrigger(in: app)
+    let chromeState = element(in: app, identifier: Accessibility.appChromeState)
+    let inspectorRoot = element(in: app, identifier: Accessibility.inspectorRoot)
+
+    XCTAssertTrue(sessionRow.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(chromeState.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(inspectorRoot.waitForExistence(timeout: Self.uiTimeout))
+
+    tapPreviewSession(in: app)
+
+    let toolbarTitle = element(in: app, identifier: Accessibility.toolbarTitle)
+    XCTAssertTrue(toolbarTitle.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(chromeState.label.contains("toolbarTitle=detail-scoped"))
+    XCTAssertLessThanOrEqual(
+      toolbarTitle.frame.maxX,
+      inspectorRoot.frame.minX + 12,
+      "Toolbar title overlaps the inspector toolbar region"
+    )
+  }
+
   func testToolbarCoversInspectorColumn() throws {
     let app = launch(mode: "empty")
 

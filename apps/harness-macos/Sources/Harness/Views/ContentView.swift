@@ -40,6 +40,7 @@ struct ContentView: View {
       "contentChrome=native",
       "interactiveRows=button",
       "controlGlass=native",
+      "toolbarTitle=detail-scoped",
     ].joined(separator: ", ")
   }
 
@@ -72,13 +73,21 @@ struct ContentView: View {
       .navigationTitle(navigationTitle)
       .toolbar {
         navigationToolbar
+        titleToolbar
       }
       .toolbar(id: "harness.main") {
         primaryToolbar
       }
+      .toolbar(removing: .title)
     }
     .inspector(isPresented: $showInspector) {
-      InspectorColumnView(store: store)
+      InspectorColumnView(
+        store: store,
+        isRefreshing: store.isRefreshing,
+        refresh: refresh,
+        openSettings: { openSettings() },
+        hideInspector: toggleInspector
+      )
         .inspectorColumnWidth(min: 320, ideal: 380, max: 500)
     }
     .navigationSplitViewStyle(.prominentDetail)
@@ -122,32 +131,37 @@ private extension ContentView {
     )
   }
 
+  @ToolbarContentBuilder var titleToolbar: some ToolbarContent {
+    ToolbarItem(placement: .principal) {
+      ToolbarTitleLabel(title: navigationTitle)
+    }
+  }
+
   @ToolbarContentBuilder var primaryToolbar: some CustomizableToolbarContent {
-    ToolbarItem(id: "refresh", placement: .primaryAction) {
-      RefreshToolbarButton(isRefreshing: store.isRefreshing, refresh: refresh)
-        .help("Refresh sessions")
-    }
-
-    ToolbarItem(id: "settings", placement: .primaryAction) {
-      Button {
-        openSettings()
-      } label: {
-        Label("Settings", systemImage: "gearshape")
+    if !showInspector {
+      ToolbarItem(id: "refresh", placement: .primaryAction) {
+        RefreshToolbarButton(isRefreshing: store.isRefreshing, refresh: refresh)
+          .help("Refresh sessions")
       }
-      .help("Open settings")
-      .accessibilityIdentifier(HarnessAccessibility.daemonPreferencesButton)
-    }
 
-    ToolbarSpacer(.fixed)
-
-    ToolbarItem(id: "inspector", placement: .primaryAction) {
-      Button(action: toggleInspector) {
-        Label(
-          showInspector ? "Hide Inspector" : "Show Inspector",
-          systemImage: "sidebar.trailing"
-        )
+      ToolbarItem(id: "settings", placement: .primaryAction) {
+        Button {
+          openSettings()
+        } label: {
+          Label("Settings", systemImage: "gearshape")
+        }
+        .help("Open settings")
+        .accessibilityIdentifier(HarnessAccessibility.daemonPreferencesButton)
       }
-      .help(showInspector ? "Hide inspector" : "Show inspector")
+
+      ToolbarSpacer(.fixed)
+
+      ToolbarItem(id: "inspector", placement: .primaryAction) {
+        Button(action: toggleInspector) {
+          Label("Show Inspector", systemImage: "sidebar.trailing")
+        }
+        .help("Show inspector")
+      }
     }
   }
 
@@ -165,6 +179,19 @@ private extension ContentView {
 
   func toggleInspector() {
     showInspector.toggle()
+  }
+}
+
+private struct ToolbarTitleLabel: View {
+  let title: String
+
+  var body: some View {
+    Text(title)
+      .scaledFont(.system(.headline, design: .rounded, weight: .semibold))
+      .lineLimit(1)
+      .truncationMode(.tail)
+      .help(title)
+      .accessibilityIdentifier(HarnessAccessibility.toolbarTitle)
   }
 }
 
