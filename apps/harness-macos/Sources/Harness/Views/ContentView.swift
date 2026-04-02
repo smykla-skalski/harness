@@ -22,8 +22,6 @@ struct ContentView: View {
   private var showInspector = true
   @SceneStorage("selectedSessionID")
   private var restoredSessionID: String?
-  @State private var canGoBack = false
-  @State private var canGoForward = false
 
   private var selectedDetail: SessionDetail? {
     guard let sessionID = store.selectedSessionID,
@@ -62,13 +60,10 @@ struct ContentView: View {
       SidebarView(store: store)
         .navigationSplitViewColumnWidth(min: 220, ideal: 260, max: 380)
     } detail: {
-      VStack(spacing: 0) {
-        if let persistenceError = store.persistenceError {
-          PersistenceUnavailableBanner(message: persistenceError)
-        }
-        if store.isShowingCachedData {
-          CachedDataBanner()
-        }
+      ContentDetailChrome(
+        persistenceError: store.persistenceError,
+        isShowingCachedData: store.isShowingCachedData
+      ) {
         SessionContentContainer(
           store: store,
           detail: selectedDetail,
@@ -88,53 +83,10 @@ struct ContentView: View {
       }
       .navigationTitle(navigationTitle)
       .toolbar {
-        ToolbarItem(placement: .navigation) {
-          Button {
-            Task { await store.navigateBack() }
-          } label: {
-            Label("Back", systemImage: "chevron.backward")
-          }
-          .disabled(!canGoBack)
-          .help("Go back")
-          .accessibilityIdentifier(HarnessAccessibility.navigateBackButton)
-        }
-        ToolbarItem(placement: .navigation) {
-          Button {
-            Task { await store.navigateForward() }
-          } label: {
-            Label("Forward", systemImage: "chevron.forward")
-          }
-          .disabled(!canGoForward)
-          .help("Go forward")
-          .accessibilityIdentifier(HarnessAccessibility.navigateForwardButton)
-        }
+        navigationToolbar
       }
       .toolbar(id: "harness.main") {
-        ToolbarItem(id: "refresh", placement: .primaryAction) {
-          RefreshToolbarButton(store: store)
-            .help("Refresh sessions")
-        }
-        ToolbarItem(id: "settings", placement: .primaryAction) {
-          Button {
-            openSettings()
-          } label: {
-            Label("Settings", systemImage: "gearshape")
-          }
-          .help("Open settings")
-          .accessibilityIdentifier(HarnessAccessibility.daemonPreferencesButton)
-        }
-        ToolbarSpacer(.fixed)
-        ToolbarItem(id: "inspector", placement: .primaryAction) {
-          Button {
-            showInspector.toggle()
-          } label: {
-            Label(
-              showInspector ? "Hide Inspector" : "Show Inspector",
-              systemImage: showInspector ? "sidebar.trailing" : "sidebar.trailing"
-            )
-          }
-          .help(showInspector ? "Hide inspector" : "Show inspector")
-        }
+        primaryToolbar
       }
     }
     .inspector(isPresented: $showInspector) {
@@ -152,14 +104,6 @@ struct ContentView: View {
     }
     .onChange(of: store.selectedSessionID) { _, newID in
       restoredSessionID = newID
-      canGoBack = !store.navigationBackStack.isEmpty
-      canGoForward = !store.navigationForwardStack.isEmpty
-    }
-    .onChange(of: store.navigationBackStack.count) { _, _ in
-      canGoBack = !store.navigationBackStack.isEmpty
-    }
-    .onChange(of: store.navigationForwardStack.count) { _, _ in
-      canGoForward = !store.navigationForwardStack.isEmpty
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity)
     .accessibilityElement(children: .contain)
@@ -171,28 +115,69 @@ struct ContentView: View {
       )
     }
     .modifier(HarnessConfirmationDialogModifier(store: store))
-    .onChange(of: store.connectionState) { _, newState in
-      let message: String
-      switch newState {
-      case .online: message = "Connected to daemon"
-      case .connecting: message = "Connecting to daemon"
-      case .offline(let reason): message = "Disconnected: \(reason)"
-      case .idle: return
+    .modifier(
+      ContentAnnouncementsModifier(
+        connectionState: store.connectionState,
+        lastAction: $store.lastAction
+      )
+    )
+  }
+}
+
+private extension ContentView {
+  @ToolbarContentBuilder var navigationToolbar: some ToolbarContent {
+    ContentNavigationToolbar(
+      canNavigateBack: store.canNavigateBack,
+      canNavigateForward: store.canNavigateForward,
+      navigateBack: navigateBack,
+      navigateForward: navigateForward
+    )
+  }
+
+  @ToolbarContentBuilder var primaryToolbar: some CustomizableToolbarContent {
+    ToolbarItem(id: "refresh", placement: .primaryAction) {
+      RefreshToolbarButton(isRefreshing: store.isRefreshing, refresh: refresh)
+        .help("Refresh sessions")
+    }
+
+    ToolbarItem(id: "settings", placement: .primaryAction) {
+      Button {
+        openSettings()
+      } label: {
+        Label("Settings", systemImage: "gearshape")
       }
-      AccessibilityNotification.Announcement(message).post()
+      .help("Open settings")
+      .accessibilityIdentifier(HarnessAccessibility.daemonPreferencesButton)
     }
-    .onChange(of: store.lastAction) { _, action in
-      guard !action.isEmpty else { return }
-      AccessibilityNotification.Announcement(action).post()
-    }
-    .task(id: store.lastAction) {
-      guard !store.lastAction.isEmpty else { return }
-      try? await Task.sleep(for: .seconds(4))
-      guard !Task.isCancelled else { return }
-      store.lastAction = ""
+
+    ToolbarSpacer(.fixed)
+
+    ToolbarItem(id: "inspector", placement: .primaryAction) {
+      Button(action: toggleInspector) {
+        Label(
+          showInspector ? "Hide Inspector" : "Show Inspector",
+          systemImage: "sidebar.trailing"
+        )
+      }
+      .help(showInspector ? "Hide inspector" : "Show inspector")
     }
   }
 
+  func navigateBack() {
+    Task { await store.navigateBack() }
+  }
+
+  func navigateForward() {
+    Task { await store.navigateForward() }
+  }
+
+  func refresh() {
+    Task { await store.refresh() }
+  }
+
+  func toggleInspector() {
+    showInspector.toggle()
+  }
 }
 
 private struct HarnessConfirmationDialogModifier: ViewModifier {
@@ -254,32 +239,21 @@ private struct HarnessConfirmationDialogModifier: ViewModifier {
   }
 }
 
-struct RefreshToolbarButton: View {
-  let store: HarnessStore
-  @Environment(\.accessibilityReduceMotion)
-  private var reduceMotion
-  @State private var isSpinning = false
+private struct ContentDetailChrome<Content: View>: View {
+  let persistenceError: String?
+  let isShowingCachedData: Bool
+  @ViewBuilder let content: Content
 
   var body: some View {
-    Button { Task { await store.refresh() } } label: {
-      Label {
-        Text("Refresh")
-      } icon: {
-        Image(systemName: "arrow.clockwise")
-          .rotationEffect(.degrees(reduceMotion ? 0 : (isSpinning ? 360 : 0)))
-          .animation(
-            reduceMotion
-              ? nil
-              : isSpinning
-              ? .linear(duration: 0.9).repeatForever(autoreverses: false)
-              : .easeOut(duration: 0.4),
-            value: isSpinning
-          )
+    VStack(spacing: 0) {
+      if let persistenceError {
+        PersistenceUnavailableBanner(message: persistenceError)
       }
-    }
-    .accessibilityIdentifier(HarnessAccessibility.refreshButton)
-    .onChange(of: store.isRefreshing) { _, refreshing in
-      isSpinning = refreshing
+      if isShowingCachedData {
+        CachedDataBanner()
+      }
+      content
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
   }
 }
@@ -319,83 +293,97 @@ private struct PersistenceUnavailableBanner: View {
   }
 }
 
-private struct SessionContentContainer: View {
-  let store: HarnessStore
-  let detail: SessionDetail?
-  let summary: SessionSummary?
-  let timeline: [TimelineEntry]
+private struct ContentAnnouncementsModifier: ViewModifier {
+  let connectionState: HarnessStore.ConnectionState
+  @Binding var lastAction: String
 
-  var body: some View {
-    Group {
-      if let detail {
-        SessionCockpitView(
-          detail: detail,
-          timeline: timeline,
-          isSessionActionInFlight: store.isSessionActionInFlight,
-          isSelectionLoading: store.isSelectionLoading,
-          lastAction: store.lastAction,
-          observeSelectedSession: observeSelectedSession,
-          requestEndSessionConfirmation: store.requestEndSelectedSessionConfirmation,
-          inspectTask: store.inspect(taskID:),
-          inspectAgent: store.inspect(agentID:),
-          inspectSignal: store.inspect(signalID:),
-          inspectObserver: store.inspectObserver
-        )
-          .transition(.opacity)
-      } else if let summary {
-        SessionLoadingView(summary: summary)
-          .transition(.opacity)
-      } else {
-        SessionsBoardView(store: store)
-          .transition(.opacity)
+  func body(content: Content) -> some View {
+    content
+      .onChange(of: connectionState) { _, newState in
+        guard let message = message(for: newState) else { return }
+        AccessibilityNotification.Announcement(message).post()
       }
-    }
-    .animation(.spring(duration: 0.3), value: detail?.session.sessionId)
-    .animation(.spring(duration: 0.3), value: summary?.sessionId)
+      .onChange(of: lastAction) { _, action in
+        guard !action.isEmpty else { return }
+        AccessibilityNotification.Announcement(action).post()
+      }
+      .task(id: lastAction) {
+        guard !lastAction.isEmpty else { return }
+        try? await Task.sleep(for: .seconds(4))
+        guard !Task.isCancelled else { return }
+        lastAction = ""
+      }
   }
 
-  private func observeSelectedSession() {
-    Task {
-      await store.observeSelectedSession()
+  private func message(for state: HarnessStore.ConnectionState) -> String? {
+    switch state {
+    case .online:
+      "Connected to daemon"
+    case .connecting:
+      "Connecting to daemon"
+    case .offline(let reason):
+      "Disconnected: \(reason)"
+    case .idle:
+      nil
     }
   }
 }
 
-private struct SessionLoadingView: View {
-  let summary: SessionSummary
+private struct ContentNavigationToolbar: ToolbarContent {
+  let canNavigateBack: Bool
+  let canNavigateForward: Bool
+  let navigateBack: () -> Void
+  let navigateForward: () -> Void
+
+  var body: some ToolbarContent {
+    ToolbarItem(placement: .navigation) {
+      Button(action: navigateBack) {
+        Label("Back", systemImage: "chevron.backward")
+      }
+      .disabled(!canNavigateBack)
+      .help("Go back")
+      .accessibilityIdentifier(HarnessAccessibility.navigateBackButton)
+    }
+
+    ToolbarItem(placement: .navigation) {
+      Button(action: navigateForward) {
+        Label("Forward", systemImage: "chevron.forward")
+      }
+      .disabled(!canNavigateForward)
+      .help("Go forward")
+      .accessibilityIdentifier(HarnessAccessibility.navigateForwardButton)
+    }
+  }
+}
+
+struct RefreshToolbarButton: View {
+  let isRefreshing: Bool
+  let refresh: () -> Void
+  @Environment(\.accessibilityReduceMotion)
+  private var reduceMotion
+  @State private var isSpinning = false
 
   var body: some View {
-    HarnessColumnScrollView {
-      VStack(alignment: .leading, spacing: 16) {
-        VStack(alignment: .leading, spacing: HarnessTheme.sectionSpacing) {
-          HStack(alignment: .top) {
-            VStack(alignment: .leading, spacing: HarnessTheme.itemSpacing) {
-              HStack(spacing: HarnessTheme.itemSpacing) {
-                Circle()
-                  .fill(statusColor(for: summary.status))
-                  .frame(width: 12, height: 12)
-                  .accessibilityHidden(true)
-                Text(summary.status.title)
-                  .scaledFont(.caption.weight(.bold))
-                  .foregroundStyle(statusColor(for: summary.status))
-                Text(summary.context)
-                  .scaledFont(.system(.largeTitle, design: .rounded, weight: .black))
-                  .lineLimit(2)
-              }
-              Text("\(summary.projectName) • \(summary.sessionId)")
-                .scaledFont(.system(.subheadline, design: .rounded, weight: .medium))
-                .foregroundStyle(HarnessTheme.secondaryInk)
-            }
-            Spacer()
-          }
-
-          HarnessLoadingStateView(title: "Loading live session detail")
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
+    Button(action: refresh) {
+      Label {
+        Text("Refresh")
+      } icon: {
+        Image(systemName: "arrow.clockwise")
+          .rotationEffect(.degrees(reduceMotion ? 0 : (isSpinning ? 360 : 0)))
+          .animation(
+            reduceMotion
+              ? nil
+              : isSpinning
+              ? .linear(duration: 0.9).repeatForever(autoreverses: false)
+              : .easeOut(duration: 0.4),
+            value: isSpinning
+          )
       }
-      .frame(maxWidth: .infinity, alignment: .leading)
     }
-    .foregroundStyle(HarnessTheme.ink)
+    .accessibilityIdentifier(HarnessAccessibility.refreshButton)
+    .onChange(of: isRefreshing) { _, refreshing in
+      isSpinning = refreshing
+    }
   }
 }
 

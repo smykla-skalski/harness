@@ -38,6 +38,7 @@
 		2D285C7BC4027C9C940F3902 /* HarnessKit.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 4374719F8DCC16C95C5B2E2E /* HarnessKit.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		2D530BEF1D122EE64826E47F /* PersistenceIntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E24C47B941FF4D85E826D90A /* PersistenceIntegrationTests.swift */; };
 		2EAAFC19DD7C3B4FB20FEE6B /* HarnessKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4374719F8DCC16C95C5B2E2E /* HarnessKit.framework */; };
+		2F0A241266DB2A7F50F22EFE /* ContentSessionSurface.swift in Sources */ = {isa = PBXBuildFile; fileRef = F110E55B97B9183E6AF90F59 /* ContentSessionSurface.swift */; };
 		2F27BD8B2B3268781DFCD85A /* HarnessStore+Actions.swift in Sources */ = {isa = PBXBuildFile; fileRef = B031D618E459C9C3A3102382 /* HarnessStore+Actions.swift */; };
 		3306ACB9F2088B21EF0AD843 /* CachedModelsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04027AC283E664B98932551F /* CachedModelsTests.swift */; };
 		3854DC755AE843CBF2E92EAE /* HarnessStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 70C79D72EA5AB7EA5EEC94DD /* HarnessStore.swift */; };
@@ -129,6 +130,7 @@
 		E14D4CA1F2A60B75A3FF491F /* SessionCockpitActivitySections.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCDE7B6C154033AF1CF627DC /* SessionCockpitActivitySections.swift */; };
 		E1AE1F634F6EEA61CC0DA765 /* HarnessAdaptiveGridLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D44FD74945DB93AAA68A740 /* HarnessAdaptiveGridLayout.swift */; };
 		E29E5313489EEACC85F636D9 /* PreferencesSidebar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C8C0154D4D72E006102BE21 /* PreferencesSidebar.swift */; };
+		E5159E39CD5A9D574F4F1725 /* ContentSessionSurface.swift in Sources */ = {isa = PBXBuildFile; fileRef = F110E55B97B9183E6AF90F59 /* ContentSessionSurface.swift */; };
 		E5FF8D1D767B4136E53604A7 /* SessionsBoardRecentSessionsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEA42BE2636FC97FC00738F6 /* SessionsBoardRecentSessionsSection.swift */; };
 		E7815252100E93A2213A9536 /* SidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7AD9E7386C4C61747C1EC3B3 /* SidebarView.swift */; };
 		E8BA568037765497971C47D4 /* HarnessSidebarLayoutUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D65C51E1956B59CB8705876C /* HarnessSidebarLayoutUITests.swift */; };
@@ -320,6 +322,7 @@
 		E24C47B941FF4D85E826D90A /* PersistenceIntegrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersistenceIntegrationTests.swift; sourceTree = "<group>"; };
 		E415E72596CC984D3DFEBCF7 /* HarnessStoreTestFixtures.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HarnessStoreTestFixtures.swift; sourceTree = "<group>"; };
 		E90C65B82956326E40FD0C97 /* HarnessWrapLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HarnessWrapLayout.swift; sourceTree = "<group>"; };
+		F110E55B97B9183E6AF90F59 /* ContentSessionSurface.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentSessionSurface.swift; sourceTree = "<group>"; };
 		F4FFB9D6E2B1A61A65341DEF /* DaemonStatusCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DaemonStatusCard.swift; sourceTree = "<group>"; };
 		F61F42B1737B0D9A86E6E1FC /* WebSocketTransportInternal.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebSocketTransportInternal.swift; sourceTree = "<group>"; };
 		FB55092F5E9979C33573B969 /* HarnessNavigationUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HarnessNavigationUITests.swift; sourceTree = "<group>"; };
@@ -508,6 +511,7 @@
 			isa = PBXGroup;
 			children = (
 				A3DFA9160004A175AACFC8E3 /* ConnectionViews.swift */,
+				F110E55B97B9183E6AF90F59 /* ContentSessionSurface.swift */,
 				A928853A647AF778A4D217A8 /* ContentView.swift */,
 				F4FFB9D6E2B1A61A65341DEF /* DaemonStatusCard.swift */,
 				5D44FD74945DB93AAA68A740 /* HarnessAdaptiveGridLayout.swift */,
@@ -907,6 +911,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				9AE72B23AA033ABFD66DB014 /* ConnectionViews.swift in Sources */,
+				2F0A241266DB2A7F50F22EFE /* ContentSessionSurface.swift in Sources */,
 				17133077F1DD805C568E8010 /* ContentView.swift in Sources */,
 				09727B95A46CA6667C21161D /* DaemonStatusCard.swift in Sources */,
 				03178A0A7A720414E6D88DBB /* HarnessAccessibility.swift in Sources */,
@@ -979,6 +984,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				FDCD53DE71BFF7CFE59B81B1 /* ConnectionViews.swift in Sources */,
+				E5159E39CD5A9D574F4F1725 /* ContentSessionSurface.swift in Sources */,
 				1E914153D0842393D23A209E /* ContentView.swift in Sources */,
 				952B77F0949ABA3067BBC8DD /* DaemonStatusCard.swift in Sources */,
 				A5626778D3BB15F0FBEE02E6 /* HarnessAccessibility.swift in Sources */,
