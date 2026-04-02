@@ -184,23 +184,9 @@ fn runtime_session_target_from_transcript(path: &Path) -> Option<(PathBuf, Strin
     if path.file_name().and_then(|name| name.to_str()) != Some("raw.jsonl") {
         return None;
     }
-    let runtime_session_id = path.parent()?.file_name()?.to_string_lossy().to_string();
-    let runtime_name = path
-        .parent()?
-        .parent()?
-        .file_name()?
-        .to_string_lossy()
-        .to_string();
-    if path.parent()?.parent()?.parent()?.file_name()?.to_str() != Some("sessions")
-        || path
-            .parent()?
-            .parent()?
-            .parent()?
-            .parent()?
-            .file_name()?
-            .to_str()
-            != Some("agents")
-    {
+    let runtime_session_id = ancestor_name(path, 1)?;
+    let runtime_name = ancestor_name(path, 2)?;
+    if !has_ancestor_names(path, 3, "sessions", "agents") {
         return None;
     }
     Some((
@@ -211,41 +197,12 @@ fn runtime_session_target_from_transcript(path: &Path) -> Option<(PathBuf, Strin
 }
 
 fn runtime_session_target_from_signal(path: &Path) -> Option<(PathBuf, String, String)> {
-    let signal_bucket = path.parent()?.file_name()?.to_str()?;
-    if !matches!(signal_bucket, "pending" | "acknowledged") {
+    if !is_signal_bucket_path(path) {
         return None;
     }
-    let runtime_session_id = path
-        .parent()?
-        .parent()?
-        .file_name()?
-        .to_string_lossy()
-        .to_string();
-    let runtime_name = path
-        .parent()?
-        .parent()?
-        .parent()?
-        .file_name()?
-        .to_string_lossy()
-        .to_string();
-    if path
-        .parent()?
-        .parent()?
-        .parent()?
-        .parent()?
-        .file_name()?
-        .to_str()
-        != Some("signals")
-        || path
-            .parent()?
-            .parent()?
-            .parent()?
-            .parent()?
-            .parent()?
-            .file_name()?
-            .to_str()
-            != Some("agents")
-    {
+    let runtime_session_id = ancestor_name(path, 2)?;
+    let runtime_name = ancestor_name(path, 3)?;
+    if !has_ancestor_names(path, 4, "signals", "agents") {
         return None;
     }
     Some((
@@ -253,6 +210,38 @@ fn runtime_session_target_from_signal(path: &Path) -> Option<(PathBuf, String, S
         runtime_name,
         runtime_session_id,
     ))
+}
+
+fn is_signal_bucket_path(path: &Path) -> bool {
+    path.parent()
+        .and_then(|parent| parent.file_name())
+        .and_then(|name| name.to_str())
+        .is_some_and(|bucket| matches!(bucket, "pending" | "acknowledged"))
+}
+
+fn ancestor_name(path: &Path, depth: usize) -> Option<String> {
+    path.ancestors()
+        .nth(depth)
+        .and_then(|ancestor| ancestor.file_name())
+        .map(|name| name.to_string_lossy().to_string())
+}
+
+/// Check whether `path.ancestors().nth(depth)` has the given file name and
+/// `path.ancestors().nth(depth + 1)` has `outer_name`.
+fn has_ancestor_names(path: &Path, depth: usize, inner_name: &str, outer_name: &str) -> bool {
+    let inner_match = path
+        .ancestors()
+        .nth(depth)
+        .and_then(|ancestor| ancestor.file_name())
+        .and_then(|name| name.to_str())
+        == Some(inner_name);
+    let outer_match = path
+        .ancestors()
+        .nth(depth + 1)
+        .and_then(|ancestor| ancestor.file_name())
+        .and_then(|name| name.to_str())
+        == Some(outer_name);
+    inner_match && outer_match
 }
 
 fn refresh_watch_snapshot(

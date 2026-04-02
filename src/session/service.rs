@@ -8,10 +8,11 @@ use serde_json::Value;
 
 use crate::agents::runtime;
 use crate::agents::runtime::signal::{
-    DeliveryConfig, Signal, SignalPayload, SignalPriority, read_acknowledged_signals,
+    AckResult, DeliveryConfig, Signal, SignalPayload, SignalPriority, read_acknowledged_signals,
     read_acknowledgments, read_pending_signals,
 };
 use crate::agents::service as agents_service;
+use crate::daemon::index as daemon_index;
 use crate::errors::{CliError, CliErrorKind};
 use crate::hooks::adapters::HookAgent;
 use crate::workspace::utc_now;
@@ -26,6 +27,16 @@ use super::types::{
 };
 
 const DEFAULT_LEADER_UNRESPONSIVE_TIMEOUT_SECONDS: i64 = 300;
+
+/// Task-specific fields for `create_task_with_source`.
+pub struct TaskSpec<'a> {
+    pub title: &'a str,
+    pub context: Option<&'a str>,
+    pub severity: TaskSeverity,
+    pub suggested_fix: Option<&'a str>,
+    pub source: TaskSource,
+    pub observe_issue_id: Option<&'a str>,
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ResolvedRuntimeSessionAgent {
@@ -401,32 +412,24 @@ pub fn create_task(
     actor_id: &str,
     project_dir: &Path,
 ) -> Result<WorkItem, CliError> {
-    create_task_with_source(
-        session_id,
+    let spec = TaskSpec {
         title,
         context,
         severity,
-        None,
-        TaskSource::Manual,
-        None,
-        actor_id,
-        project_dir,
-    )
+        suggested_fix: None,
+        source: TaskSource::Manual,
+        observe_issue_id: None,
+    };
+    create_task_with_source(session_id, &spec, actor_id, project_dir)
 }
 
 /// Create a task with explicit source metadata.
 ///
 /// # Errors
 /// Returns `CliError` if the caller lacks permission or on storage failures.
-#[allow(clippy::too_many_arguments)]
 pub fn create_task_with_source(
     session_id: &str,
-    title: &str,
-    context: Option<&str>,
-    severity: TaskSeverity,
-    suggested_fix: Option<&str>,
-    source: TaskSource,
-    observe_issue_id: Option<&str>,
+    spec: &TaskSpec<'_>,
     actor_id: &str,
     project_dir: &Path,
 ) -> Result<WorkItem, CliError> {
@@ -441,17 +444,17 @@ pub fn create_task_with_source(
         let item_timestamps = now.clone();
         let item = WorkItem {
             task_id: task_id.clone(),
-            title: title.to_string(),
-            context: context.map(ToString::to_string),
-            severity,
+            title: spec.title.to_string(),
+            context: spec.context.map(ToString::to_string),
+            severity: spec.severity,
             status: TaskStatus::Open,
             assigned_to: None,
             created_at: item_timestamps.clone(),
             updated_at: item_timestamps,
             created_by: Some(actor_id.to_string()),
             notes: Vec::new(),
-            suggested_fix: suggested_fix.map(ToString::to_string),
-            source,
+            suggested_fix: spec.suggested_fix.map(ToString::to_string),
+            source: spec.source,
             blocked_reason: None,
             completed_at: None,
             checkpoint_summary: None,
@@ -468,18 +471,18 @@ pub fn create_task_with_source(
             "task creation did not persist state".to_string(),
         ))
     })?;
-    let transition = if source == TaskSource::Observe {
+    let transition = if spec.source == TaskSource::Observe {
         SessionTransition::ObserveTaskCreated {
             task_id: item.task_id.clone(),
             title: item.title.clone(),
-            severity,
-            issue_id: observe_issue_id.map(ToString::to_string),
+            severity: spec.severity,
+            issue_id: spec.observe_issue_id.map(ToString::to_string),
         }
     } else {
         SessionTransition::TaskCreated {
             task_id: item.task_id.clone(),
             title: item.title.clone(),
-            severity,
+            severity: spec.severity,
         }
     };
     storage::append_log_entry(project_dir, session_id, transition, Some(actor_id), None)?;
@@ -922,7 +925,7 @@ pub fn record_signal_acknowledgment(
     session_id: &str,
     agent_id: &str,
     signal_id: &str,
-    result: crate::agents::runtime::signal::AckResult,
+    result: AckResult,
     project_dir: &Path,
 ) -> Result<(), CliError> {
     let already_logged = storage::load_log_entries(project_dir, session_id)?
@@ -955,7 +958,7 @@ fn signal_records_for_dirs(
     runtime_name: &str,
     agent_id: &str,
     session_id: &str,
-    signal_dirs: &[std::path::PathBuf],
+    signal_dirs: &[PathBuf],
 ) -> Result<Vec<SessionSignalRecord>, CliError> {
     let mut signals_by_id = BTreeMap::new();
     let mut acknowledgments_by_id = BTreeMap::new();
@@ -1045,7 +1048,7 @@ pub fn list_sessions(project_dir: &Path, include_all: bool) -> Result<Vec<Sessio
 /// # Errors
 /// Returns `CliError` on discovery failures.
 pub fn list_sessions_global(include_all: bool) -> Result<Vec<SessionState>, CliError> {
-    let resolved = crate::daemon::index::discover_sessions(include_all)?;
+    let resolved = daemon_index::discover_sessions(include_all)?;
     let mut sessions: Vec<SessionState> = resolved
         .into_iter()
         .map(|entry| {
@@ -1075,7 +1078,7 @@ pub fn resolve_session_project_dir(
     if storage::load_state(local_project_dir, session_id)?.is_some() {
         return Ok(local_project_dir.to_path_buf());
     }
-    let resolved = crate::daemon::index::resolve_session(session_id)?;
+    let resolved = daemon_index::resolve_session(session_id)?;
     Ok(resolved
         .project
         .project_dir

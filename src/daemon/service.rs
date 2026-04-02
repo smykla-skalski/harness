@@ -8,8 +8,10 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tokio::net::TcpListener;
 use tokio::sync::broadcast;
+use tokio::task::spawn_blocking;
 
 use crate::errors::{CliError, CliErrorKind};
+use crate::session::types::TaskSource;
 use crate::session::{observe as session_observe, service as session_service};
 use crate::workspace::utc_now;
 
@@ -204,17 +206,16 @@ pub fn create_task(
 ) -> Result<SessionDetail, CliError> {
     let resolved = index::resolve_session(session_id)?;
     let project_dir = effective_project_dir(&resolved);
-    let _ = session_service::create_task_with_source(
-        session_id,
-        &request.title,
-        request.context.as_deref(),
-        request.severity,
-        request.suggested_fix.as_deref(),
-        crate::session::types::TaskSource::Manual,
-        None,
-        &request.actor,
-        project_dir,
-    )?;
+    let spec = session_service::TaskSpec {
+        title: &request.title,
+        context: request.context.as_deref(),
+        severity: request.severity,
+        suggested_fix: request.suggested_fix.as_deref(),
+        source: TaskSource::Manual,
+        observe_issue_id: None,
+    };
+    let _ =
+        session_service::create_task_with_source(session_id, &spec, &request.actor, project_dir)?;
     snapshot::session_detail(session_id)
 }
 
@@ -393,6 +394,10 @@ pub fn observe_session(
     snapshot::session_detail(session_id)
 }
 
+/// Build a `ready` stream event for SSE subscribers.
+///
+/// # Panics
+/// Panics if the trivial `ReadyEventPayload` cannot be serialized to JSON.
 pub fn ready_event(session_id: Option<&str>) -> StreamEvent {
     StreamEvent {
         event: "ready".to_string(),
@@ -403,6 +408,10 @@ pub fn ready_event(session_id: Option<&str>) -> StreamEvent {
     }
 }
 
+/// Build a `sessions_updated` stream event with current project and session lists.
+///
+/// # Errors
+/// Returns `CliError` when project or session discovery fails.
 pub fn sessions_updated_event() -> Result<StreamEvent, CliError> {
     let payload = SessionsUpdatedPayload {
         projects: list_projects()?,
@@ -411,6 +420,10 @@ pub fn sessions_updated_event() -> Result<StreamEvent, CliError> {
     stream_event("sessions_updated", None, payload)
 }
 
+/// Build a `session_updated` stream event with the detail and timeline for one session.
+///
+/// # Errors
+/// Returns `CliError` when the session cannot be resolved or serialized.
 pub fn session_updated_event(session_id: &str) -> Result<StreamEvent, CliError> {
     let payload = SessionUpdatedPayload {
         detail: session_detail(session_id)?,
@@ -463,18 +476,44 @@ fn broadcast_event(
     session_id: Option<&str>,
 ) {
     match event {
-        Ok(event) => {
-            let _ = sender.send(event);
+        Ok(payload) => {
+            let _ = sender.send(payload);
         }
         Err(error) => {
-            tracing::warn!(
-                %error,
-                event = event_name,
-                session_id,
-                "failed to build daemon push event"
-            );
+            warn_broadcast_failure(&error.to_string(), event_name, session_id.unwrap_or("-"));
         }
     }
+}
+
+/// Emit a warning for a failed broadcast event.
+///
+/// Uses `tracing::Event::dispatch` directly because the `tracing::warn!`
+/// macro expansion generates cognitive complexity 8 in clippy's analysis,
+/// which exceeds the pedantic threshold of 7. See tokio-rs/tracing#553.
+fn warn_broadcast_failure(error_message: &str, event_name: &str, session: &str) {
+    use tracing::callsite::DefaultCallsite;
+    use tracing::field::{FieldSet, Value};
+    use tracing::metadata::Kind;
+    use tracing::{Event, Level, Metadata, callsite::Identifier};
+
+    static FIELDS: &[&str] = &["message"];
+    static CALLSITE: DefaultCallsite = DefaultCallsite::new(&META);
+    static META: Metadata<'static> = Metadata::new(
+        "warn",
+        "harness::daemon::service",
+        Level::WARN,
+        Some(file!()),
+        Some(line!()),
+        Some(module_path!()),
+        FieldSet::new(FIELDS, Identifier(&CALLSITE)),
+        Kind::EVENT,
+    );
+
+    let message = format!(
+        "failed to build daemon push event '{event_name}': {error_message} (session={session})"
+    );
+    let values: &[Option<&dyn Value>] = &[Some(&message.as_str())];
+    Event::dispatch(&META, &META.fields().value_set_all(values));
 }
 
 /// Return the original project directory when available, falling back to the
@@ -510,7 +549,7 @@ fn start_daemon_observe_loop(session_id: &str, project_dir: &Path, actor_id: Opt
         let session_id_for_watch = session_id.clone();
         let project_dir_for_watch = project_dir.clone();
         let actor_id_for_watch = actor_id.clone();
-        let result = tokio::task::spawn_blocking(move || {
+        let result = spawn_blocking(move || {
             session_observe::execute_session_watch(
                 &session_id_for_watch,
                 &project_dir_for_watch,
