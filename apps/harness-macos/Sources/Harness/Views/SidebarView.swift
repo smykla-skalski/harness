@@ -166,12 +166,12 @@ struct SidebarView: View {
           }
           .contentShape(RoundedRectangle(cornerRadius: HarnessTheme.cornerRadiusLG, style: .continuous))
           .animation(.snappy(duration: 0.2), value: isSelected)
-          .accessibilityFrameMarker(HarnessAccessibility.sessionRowFrame(session.sessionId))
       }
       .harnessSidebarRowButtonStyle(
         cornerRadius: HarnessTheme.cornerRadiusLG,
         tint: HarnessTheme.accent
       )
+      .accessibilityFrameMarker(HarnessAccessibility.sessionRowFrame(session.sessionId))
       .listRowInsets(EdgeInsets(
         top: HarnessTheme.itemSpacing,
         leading: rowOuterInset,

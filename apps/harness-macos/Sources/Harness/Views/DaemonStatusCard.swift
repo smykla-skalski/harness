@@ -28,7 +28,7 @@ struct DaemonStatusCard: View {
 
       Group {
         if isRefreshing || connectionState == .connecting {
-          HarnessLoadingStateView(title: loadingTitle, chrome: .control)
+          HarnessLoadingStateView(title: loadingTitle, chrome: .content)
             .transition(.move(edge: .top).combined(with: .opacity))
         }
       }
