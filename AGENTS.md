@@ -48,11 +48,9 @@ Harness is a test orchestration framework for Kubernetes/Kuma. It enforces track
 
 Hooks intercept Codex tool usage. Classified in `cli.rs` as constants:
 
-- **Pre-tool-use guards**: `guard-bash` (blocks direct cluster binary access), `guard-write` (blocks writes outside run surface), `guard-question`
-- **Post-tool-use verifies**: `verify-bash`, `verify-write`, `verify-question`, `audit`
+- **Unified tool lifecycle**: `tool-guard` (pre-tool policy dispatch), `tool-result` (post-tool verification and audit), `tool-failure` (failure enrichment and audit)
 - **Blocking**: `guard-stop` (prevents session end if run incomplete)
 - **Subagent gates**: `context-agent` (start), `validate-agent` (stop)
-- **Failure enrichment**: `enrich-failure`
 
 ### Key modules
 
@@ -113,7 +111,7 @@ All diagnostic output uses `tracing` macros. Never use `eprintln!` for new diagn
 
 ## Gotchas
 
-- `guard-bash` denies direct use of `kubectl`, `kumactl`, `helm`, `docker`, `k3d` - all cluster access must go through harness commands (see `rules.rs:26`)
+- `tool-guard` denies direct use of `kubectl`, `kumactl`, `helm`, `docker`, `k3d` and routes write/question policy through the same combined pre-tool hook (see `rules.rs:26`)
 - `VersionedJsonRepository` saves atomically via tmp-file rename - don't read state files by path while a save is in progress, use the repository's `load()` method
 - If using XcodeBuildMCP, use the installed XcodeBuildMCP skill before calling XcodeBuildMCP tools.
 - `apps/harness-macos/AI Harness.xcodeproj` is repo-owned metadata; keep `project.pbxproj`, shared workspace/scheme files, and Swift source membership in sync.

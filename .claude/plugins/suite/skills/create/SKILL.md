@@ -8,49 +8,19 @@ user-invocable: true
 hooks:
   PostToolUse:
   - hooks:
-    - command: harness hook --agent claude suite:create verify-question
+    - command: harness hook --agent claude suite:create tool-result
       type: command
-    - command: harness hook --agent claude suite:create audit
-      type: command
-    matcher: AskUserQuestion
-  - hooks:
-    - command: harness hook --agent claude suite:create audit
-      type: command
-    matcher: Bash
-  - hooks:
-    - command: harness hook --agent claude suite:create verify-write
-      type: command
-    - command: harness hook --agent claude suite:create audit
-      type: command
-    matcher: Edit
-  - hooks:
-    - command: harness hook --agent claude suite:create verify-write
-      type: command
-    - command: harness hook --agent claude suite:create audit
-      type: command
-    matcher: Write
+    matcher: '.*'
   PostToolUseFailure:
   - hooks:
-    - command: harness hook --agent claude suite:create audit
+    - command: harness hook --agent claude suite:create tool-failure
       type: command
-    matcher: Bash
+    matcher: '.*'
   PreToolUse:
   - hooks:
-    - command: harness hook --agent claude suite:create guard-question
+    - command: harness hook --agent claude suite:create tool-guard
       type: command
-    matcher: AskUserQuestion
-  - hooks:
-    - command: harness hook --agent claude suite:create guard-bash
-      type: command
-    matcher: Bash
-  - hooks:
-    - command: harness hook --agent claude suite:create guard-write
-      type: command
-    matcher: Edit
-  - hooks:
-    - command: harness hook --agent claude suite:create guard-write
-      type: command
-    matcher: Write
+    matcher: '.*'
   Stop:
   - hooks:
     - command: harness hook --agent claude suite:create guard-stop

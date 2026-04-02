@@ -84,15 +84,10 @@ fn hook_subcommand_lists_all_hooks() {
         .map(clap::Command::get_name)
         .collect();
     for expected in [
-        "guard-bash",
-        "guard-write",
-        "guard-question",
+        "tool-guard",
         "guard-stop",
-        "verify-bash",
-        "verify-write",
-        "verify-question",
-        "audit",
-        "enrich-failure",
+        "tool-result",
+        "tool-failure",
         "context-agent",
         "validate-agent",
     ] {
@@ -102,14 +97,39 @@ fn hook_subcommand_lists_all_hooks() {
 
 #[test]
 fn parse_hook_command() {
-    let cli = Cli::try_parse_from(["harness", "hook", "suite:run", "guard-bash"]).unwrap();
+    let cli = Cli::try_parse_from(["harness", "hook", "suite:run", "tool-guard"]).unwrap();
     match cli.command {
         Command::Hook(HookArgs { skill, hook, .. }) => {
             assert_eq!(skill, "suite:run");
-            assert_eq!(hook.name(), "guard-bash");
+            assert_eq!(hook.name(), "tool-guard");
         }
         _ => panic!("expected Hook command"),
     }
+}
+
+#[test]
+fn parse_bootstrap_defaults_to_all_agents() {
+    let cli = Cli::try_parse_from(["harness", "setup", "bootstrap"]).unwrap();
+    let Command::Setup {
+        command: SetupCommand::Bootstrap(args),
+    } = cli.command
+    else {
+        panic!("expected bootstrap command");
+    };
+    assert!(args.agents.is_empty());
+}
+
+#[test]
+fn parse_bootstrap_agents_csv() {
+    let cli =
+        Cli::try_parse_from(["harness", "setup", "bootstrap", "--agents", "claude,codex"]).unwrap();
+    let Command::Setup {
+        command: SetupCommand::Bootstrap(args),
+    } = cli.command
+    else {
+        panic!("expected bootstrap command");
+    };
+    assert_eq!(args.agents, vec![HookAgent::Claude, HookAgent::Codex]);
 }
 
 #[test]

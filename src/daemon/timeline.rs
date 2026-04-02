@@ -922,7 +922,7 @@ mod tests {
                         "session_id": "copilot-session-1",
                         "skill": "suite",
                         "event": "before_tool_use",
-                        "hook": "guard-write",
+                        "hook": "tool-guard",
                         "decision": "allow",
                         "payload": {
                             "timestamp": "2026-03-28T14:04:45Z",
@@ -947,7 +947,7 @@ mod tests {
                         "session_id": "copilot-session-1",
                         "skill": "suite",
                         "event": "after_tool_use",
-                        "hook": "verify-write",
+                        "hook": "tool-result",
                         "decision": "allow",
                         "payload": {
                             "timestamp": "2026-03-28T14:04:46Z",

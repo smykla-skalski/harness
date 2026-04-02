@@ -113,7 +113,7 @@ pub(crate) static TEXT_RULES: &[TextRule] = &[
         guidance: RuleGuidance::Fix {
             target: None,
             hint: Some(
-                "Command attempted cluster auth. Block the binary in guard-bash or use local-only validation",
+                "Command attempted cluster auth. Block the binary in tool-guard or use local-only validation",
             ),
         },
         skip_if_matched: &[],

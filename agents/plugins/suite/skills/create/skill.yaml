@@ -12,50 +12,20 @@ user-invocable: true
 disable-model-invocation: true
 hooks:
   PreToolUse:
-    - matcher: "AskUserQuestion"
+    - matcher: ".*"
       hooks:
         - type: command
-          command: "harness hook --skill suite:create guard-question"
-    - matcher: "Bash"
-      hooks:
-        - type: command
-          command: "harness hook --skill suite:create guard-bash"
-    - matcher: "Edit"
-      hooks:
-        - type: command
-          command: "harness hook --skill suite:create guard-write"
-    - matcher: "Write"
-      hooks:
-        - type: command
-          command: "harness hook --skill suite:create guard-write"
+          command: "harness hook --skill suite:create tool-guard"
   PostToolUse:
-    - matcher: "AskUserQuestion"
+    - matcher: ".*"
       hooks:
         - type: command
-          command: "harness hook --skill suite:create verify-question"
-        - type: command
-          command: "harness hook --skill suite:create audit"
-    - matcher: "Bash"
-      hooks:
-        - type: command
-          command: "harness hook --skill suite:create audit"
-    - matcher: "Edit"
-      hooks:
-        - type: command
-          command: "harness hook --skill suite:create verify-write"
-        - type: command
-          command: "harness hook --skill suite:create audit"
-    - matcher: "Write"
-      hooks:
-        - type: command
-          command: "harness hook --skill suite:create verify-write"
-        - type: command
-          command: "harness hook --skill suite:create audit"
+          command: "harness hook --skill suite:create tool-result"
   PostToolUseFailure:
-    - matcher: "Bash"
+    - matcher: ".*"
       hooks:
         - type: command
-          command: "harness hook --skill suite:create audit"
+          command: "harness hook --skill suite:create tool-failure"
   Stop:
     - hooks:
         - type: command

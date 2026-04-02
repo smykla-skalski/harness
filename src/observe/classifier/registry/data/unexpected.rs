@@ -44,7 +44,7 @@ pub(super) static ISSUE_CODE_METAS: &[IssueCodeMeta] = &[
         default_severity: IssueSeverity::Critical,
         default_confidence: Confidence::High,
         default_fix_safety: FixSafety::TriageRequired,
-        description: "Python invoked in Bash tool_use command - guard-bash bypass",
+        description: "Python invoked in Bash tool_use command - tool-guard bypass",
         owner: IssueOwner::Harness,
     },
     IssueCodeMeta {

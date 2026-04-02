@@ -4,7 +4,7 @@
     "errorOccurred": [
       {
         "type": "command",
-        "bash": "harness hook --agent copilot suite:run enrich-failure",
+        "bash": "harness hook --agent copilot suite:run tool-failure",
         "cwd": ".",
         "timeoutSec": 30
       }
@@ -12,25 +12,7 @@
     "postToolUse": [
       {
         "type": "command",
-        "bash": "harness hook --agent copilot suite:run verify-bash",
-        "cwd": ".",
-        "timeoutSec": 30
-      },
-      {
-        "type": "command",
-        "bash": "harness hook --agent copilot suite:run verify-write",
-        "cwd": ".",
-        "timeoutSec": 30
-      },
-      {
-        "type": "command",
-        "bash": "harness hook --agent copilot suite:run verify-question",
-        "cwd": ".",
-        "timeoutSec": 30
-      },
-      {
-        "type": "command",
-        "bash": "harness hook --agent copilot suite:run audit",
+        "bash": "harness hook --agent copilot suite:run tool-result",
         "cwd": ".",
         "timeoutSec": 30
       }
@@ -38,19 +20,7 @@
     "preToolUse": [
       {
         "type": "command",
-        "bash": "harness hook --agent copilot suite:run guard-bash",
-        "cwd": ".",
-        "timeoutSec": 30
-      },
-      {
-        "type": "command",
-        "bash": "harness hook --agent copilot suite:run guard-write",
-        "cwd": ".",
-        "timeoutSec": 30
-      },
-      {
-        "type": "command",
-        "bash": "harness hook --agent copilot suite:run guard-question",
+        "bash": "harness hook --agent copilot suite:run tool-guard",
         "cwd": ".",
         "timeoutSec": 30
       }

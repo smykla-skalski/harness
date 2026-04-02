@@ -13,11 +13,6 @@
       "description": "Harness suite workflow",
       "name": "suite",
       "source": "./suite"
-    },
-    {
-      "description": "Harness multi-agent session orchestration",
-      "name": "session",
-      "source": "./session"
     }
   ]
 }

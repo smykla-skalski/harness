@@ -54,44 +54,22 @@ impl Hook for StaticHook {
     }
 }
 
-pub(crate) static GUARD_BASH_HOOK: &dyn Hook = &StaticHook::legacy(
-    "guard-bash",
+pub(crate) static TOOL_GUARD_HOOK: &dyn Hook = &StaticHook::effect(
+    "tool-guard",
     HookType::PreToolUse,
-    super::guard_bash::execute,
-);
-pub(crate) static GUARD_WRITE_HOOK: &dyn Hook = &StaticHook::legacy(
-    "guard-write",
-    HookType::PreToolUse,
-    super::guard_write::execute,
-);
-pub(crate) static GUARD_QUESTION_HOOK: &dyn Hook = &StaticHook::legacy(
-    "guard-question",
-    HookType::PreToolUse,
-    super::guard_question::execute,
+    super::tool_guard::execute,
 );
 pub(crate) static GUARD_STOP_HOOK: &dyn Hook =
     &StaticHook::legacy("guard-stop", HookType::Blocking, super::guard_stop::execute);
-pub(crate) static VERIFY_BASH_HOOK: &dyn Hook = &StaticHook::legacy(
-    "verify-bash",
+pub(crate) static TOOL_RESULT_HOOK: &dyn Hook = &StaticHook::effect(
+    "tool-result",
     HookType::PostToolUse,
-    super::verify_bash::execute,
+    super::tool_result::execute,
 );
-pub(crate) static VERIFY_WRITE_HOOK: &dyn Hook = &StaticHook::effect(
-    "verify-write",
-    HookType::PostToolUse,
-    super::verify_write::execute,
-);
-pub(crate) static VERIFY_QUESTION_HOOK: &dyn Hook = &StaticHook::legacy(
-    "verify-question",
-    HookType::PostToolUse,
-    super::verify_question::execute,
-);
-pub(crate) static AUDIT_HOOK: &dyn Hook =
-    &StaticHook::effect("audit", HookType::PostToolUse, super::audit::execute);
-pub(crate) static ENRICH_FAILURE_HOOK: &dyn Hook = &StaticHook::effect(
-    "enrich-failure",
+pub(crate) static TOOL_FAILURE_HOOK: &dyn Hook = &StaticHook::effect(
+    "tool-failure",
     HookType::PostToolUseFailure,
-    super::enrich_failure::execute,
+    super::tool_failure::execute,
 );
 pub(crate) static CONTEXT_AGENT_HOOK: &dyn Hook = &StaticHook::effect(
     "context-agent",
@@ -105,17 +83,12 @@ pub(crate) static VALIDATE_AGENT_HOOK: &dyn Hook = &StaticHook::effect(
 );
 
 #[cfg(test)]
-pub(crate) fn all_hooks() -> [&'static dyn Hook; 11] {
+pub(crate) fn all_hooks() -> [&'static dyn Hook; 6] {
     [
-        GUARD_BASH_HOOK,
-        GUARD_WRITE_HOOK,
-        GUARD_QUESTION_HOOK,
+        TOOL_GUARD_HOOK,
         GUARD_STOP_HOOK,
-        VERIFY_BASH_HOOK,
-        VERIFY_WRITE_HOOK,
-        VERIFY_QUESTION_HOOK,
-        AUDIT_HOOK,
-        ENRICH_FAILURE_HOOK,
+        TOOL_RESULT_HOOK,
+        TOOL_FAILURE_HOOK,
         CONTEXT_AGENT_HOOK,
         VALIDATE_AGENT_HOOK,
     ]

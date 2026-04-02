@@ -502,7 +502,7 @@ mod tests {
                 "session_id": "copilot-session-1",
                 "skill": "suite",
                 "event": "before_tool_use",
-                "hook": "guard-write",
+                "hook": "tool-guard",
                 "decision": "allow",
                 "cwd": "/tmp/project",
                 "payload": make_payload(
@@ -522,7 +522,7 @@ mod tests {
                 "session_id": "copilot-session-1",
                 "skill": "suite",
                 "event": "after_tool_use",
-                "hook": "verify-write",
+                "hook": "tool-result",
                 "decision": "allow",
                 "cwd": "/tmp/project",
                 "payload": make_payload(
