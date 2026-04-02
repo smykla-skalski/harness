@@ -459,6 +459,40 @@ fn load_active_registry(path: &Path) -> ActiveRegistry {
     read_json_typed::<ActiveRegistry>(path).unwrap_or_default()
 }
 
+/// Filename for recording the originating project directory.
+const PROJECT_ORIGIN_FILE: &str = "project-origin.json";
+
+/// Record the originating project directory in the context root so
+/// cross-project discovery can recover it later.
+///
+/// No-op if the file already exists.
+///
+/// # Errors
+/// Returns `CliError` on I/O failures.
+pub(crate) fn record_project_origin(project_dir: &Path) -> Result<(), CliError> {
+    let context_root = project_context_dir(project_dir);
+    let path = context_root.join(PROJECT_ORIGIN_FILE);
+    if path.is_file() {
+        return Ok(());
+    }
+    let origin = serde_json::json!({
+        "project_dir": project_dir.to_string_lossy(),
+        "recorded_at": utc_now(),
+    });
+    write_json_pretty(&path, &origin)
+}
+
+/// Load the recorded project origin for a context root.
+#[must_use]
+pub(crate) fn load_project_origin(context_root: &Path) -> Option<PathBuf> {
+    let path = context_root.join(PROJECT_ORIGIN_FILE);
+    let value = read_json_typed::<serde_json::Value>(&path).ok()?;
+    value
+        .get("project_dir")
+        .and_then(serde_json::Value::as_str)
+        .map(PathBuf::from)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
