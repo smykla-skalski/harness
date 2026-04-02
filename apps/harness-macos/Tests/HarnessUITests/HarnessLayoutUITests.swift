@@ -55,21 +55,30 @@ final class HarnessLayoutUITests: HarnessUITestCase {
     )
   }
 
-  func testEmptyModeDashboardMetricsStayOnSingleRow() throws {
-    let app = launch(mode: "empty")
-    let trackedProjects = element(in: app, identifier: Accessibility.trackedProjectsCard)
-    let indexedSessions = element(in: app, identifier: Accessibility.indexedSessionsCard)
-    let openWork = element(in: app, identifier: Accessibility.openWorkCard)
-    let blocked = element(in: app, identifier: Accessibility.blockedCard)
+  func testDashboardUsesToolbarSummaryInsteadOfMetricCards() throws {
+    let app = launch(
+      mode: "preview",
+      additionalEnvironment: ["HARNESS_PREVIEW_SCENARIO": "dashboard"]
+    )
+    let boardRoot = element(in: app, identifier: Accessibility.sessionsBoardRoot)
+    let centerpiece = element(in: app, identifier: Accessibility.toolbarCenterpiece)
+    let centerpieceState = element(in: app, identifier: Accessibility.toolbarCenterpieceState)
+    let boardMetricElements = app.descendants(matching: .any).matching(
+      NSPredicate(format: "identifier BEGINSWITH %@", "harness.board.metric.")
+    )
 
-    XCTAssertTrue(trackedProjects.waitForExistence(timeout: Self.uiTimeout))
-    XCTAssertTrue(indexedSessions.waitForExistence(timeout: Self.uiTimeout))
-    XCTAssertTrue(openWork.waitForExistence(timeout: Self.uiTimeout))
-    XCTAssertTrue(blocked.waitForExistence(timeout: Self.uiTimeout))
-
-    assertSameRow([trackedProjects, indexedSessions, openWork, blocked], tolerance: 10)
-    assertEqualHeights([trackedProjects, indexedSessions, openWork, blocked], tolerance: 10)
-    XCTAssertLessThan(trackedProjects.frame.height, 112)
+    XCTAssertTrue(boardRoot.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(centerpiece.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(centerpieceState.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertEqual(
+      centerpieceState.label,
+      "projects=1, sessions=1, openWork=2, blocked=1"
+    )
+    XCTAssertEqual(
+      boardMetricElements.count,
+      0,
+      "Expected dashboard summary metrics to render only in the toolbar centerpiece"
+    )
   }
 
   func testOfflineCachedScenarioKeepsSessionsReadableButActionsDisabled() throws {

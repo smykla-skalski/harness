@@ -7,6 +7,7 @@ struct HarnessAppConfiguration {
   let store: HarnessStore
   let initialThemeMode: HarnessThemeMode
   let isUITesting: Bool
+  let mainWindowDefaultSize: CGSize
 
   @MainActor
   static func resolve() -> Self {
@@ -54,8 +55,47 @@ struct HarnessAppConfiguration {
       container: persistenceSetup.container,
       store: store,
       initialThemeMode: initialThemeMode,
-      isUITesting: isUITesting
+      isUITesting: isUITesting,
+      mainWindowDefaultSize: HarnessUITestWindowDefaults.mainWindowSize(
+        environment: environment,
+        isUITesting: isUITesting
+      )
     )
+  }
+}
+
+private enum HarnessUITestWindowDefaults {
+  private static let mainWindowWidthKey = "HARNESS_UI_MAIN_WINDOW_WIDTH"
+  private static let mainWindowHeightKey = "HARNESS_UI_MAIN_WINDOW_HEIGHT"
+  private static let standardMainWindowSize = CGSize(width: 1640, height: 980)
+
+  static func mainWindowSize(environment: HarnessEnvironment, isUITesting: Bool) -> CGSize {
+    guard isUITesting else {
+      return standardMainWindowSize
+    }
+
+    let width = clampedDimension(
+      rawValue: environment.values[mainWindowWidthKey],
+      fallback: standardMainWindowSize.width
+    )
+    let height = clampedDimension(
+      rawValue: environment.values[mainWindowHeightKey],
+      fallback: standardMainWindowSize.height
+    )
+
+    return CGSize(width: width, height: height)
+  }
+
+  private static func clampedDimension(rawValue: String?, fallback: CGFloat) -> CGFloat {
+    guard
+      let rawValue,
+      let value = Double(rawValue.trimmingCharacters(in: .whitespacesAndNewlines)),
+      value.isFinite
+    else {
+      return fallback
+    }
+
+    return CGFloat(max(value, 640))
   }
 }
 

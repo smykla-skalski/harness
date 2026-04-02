@@ -125,6 +125,7 @@
 		8BAB18B7D99A1CDC499B9217 /* PreferencesDiagnosticsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D63A1414AA9EDAB43463701 /* PreferencesDiagnosticsSection.swift */; };
 		93D9189745B9B4FEE7963C22 /* PreferencesDiagnosticsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D63A1414AA9EDAB43463701 /* PreferencesDiagnosticsSection.swift */; };
 		93E10119D55E965CD41D261D /* ContentChromeSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6992242AB2EB18D13B7706C0 /* ContentChromeSupport.swift */; };
+		93E10219D55E965CD41D261D /* ToolbarCenterpieceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 93E10319D55E965CD41D261D /* ToolbarCenterpieceView.swift */; };
 		952B77F0949ABA3067BBC8DD /* DaemonStatusCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4FFB9D6E2B1A61A65341DEF /* DaemonStatusCard.swift */; };
 		95C6608755E2A3781104213B /* HarnessStoreSelectionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 316509CF0D8EF69C2ABE6C90 /* HarnessStoreSelectionTests.swift */; };
 		9886DAEC397CC7C60D23BF73 /* HarnessTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = ACDEFEB6A14B32143E436643 /* HarnessTheme.swift */; };
@@ -187,6 +188,7 @@
 		DD4BB24E06722A387BDC0682 /* SwiftData.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 97AF81AA23491748D21BE3CE /* SwiftData.framework */; };
 		DE2E8B571CDA0D8034A9E96B /* InspectorActionFormSections.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF6989587124F9F654E77CB8 /* InspectorActionFormSections.swift */; };
 		DE615D02A65317A9F6F682A4 /* ContentChromeSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6992242AB2EB18D13B7706C0 /* ContentChromeSupport.swift */; };
+		DE615E02A65317A9F6F682A4 /* ToolbarCenterpieceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 93E10319D55E965CD41D261D /* ToolbarCenterpieceView.swift */; };
 		DEAB058D198A3D2F98167C0F /* SessionMetricGrid.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1847F667F4DBF29EF67EA409 /* SessionMetricGrid.swift */; };
 		DFB22096E9EC966527136F6C /* HarnessKit.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 4374719F8DCC16C95C5B2E2E /* HarnessKit.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		E14D4CA1F2A60B75A3FF491F /* SessionCockpitActivitySections.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCDE7B6C154033AF1CF627DC /* SessionCockpitActivitySections.swift */; };
@@ -347,6 +349,7 @@
 		649E0E0917E414FA3334A87B /* PreviewServices.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreviewServices.swift; sourceTree = "<group>"; };
 		69418E1189319E7111C26B6A /* PreviewFixtures.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreviewFixtures.swift; sourceTree = "<group>"; };
 		6992242AB2EB18D13B7706C0 /* ContentChromeSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentChromeSupport.swift; sourceTree = "<group>"; };
+		93E10319D55E965CD41D261D /* ToolbarCenterpieceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToolbarCenterpieceView.swift; sourceTree = "<group>"; };
 		6A3B410E043E5A4DD15ABAB3 /* ObserverSummaryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ObserverSummaryTests.swift; sourceTree = "<group>"; };
 		6B27C51116FA17FE08575C93 /* HarnessStoreNavigationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HarnessStoreNavigationTests.swift; sourceTree = "<group>"; };
 		6D485A89FA04846FAD1BC0AC /* HarnessRequests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HarnessRequests.swift; sourceTree = "<group>"; };
@@ -622,6 +625,7 @@
 				6992242AB2EB18D13B7706C0 /* ContentChromeSupport.swift */,
 				F110E55B97B9183E6AF90F59 /* ContentSessionSurface.swift */,
 				A928853A647AF778A4D217A8 /* ContentView.swift */,
+				93E10319D55E965CD41D261D /* ToolbarCenterpieceView.swift */,
 				F4FFB9D6E2B1A61A65341DEF /* DaemonStatusCard.swift */,
 				37C81A72D3C3C91652E5BD5C /* DaemonStatusCardSupport.swift */,
 				86EE69FF72E15B889FC627DF /* HarnessActionControls.swift */,
@@ -1053,6 +1057,7 @@
 				DE615D02A65317A9F6F682A4 /* ContentChromeSupport.swift in Sources */,
 				2F0A241266DB2A7F50F22EFE /* ContentSessionSurface.swift in Sources */,
 				17133077F1DD805C568E8010 /* ContentView.swift in Sources */,
+				DE615E02A65317A9F6F682A4 /* ToolbarCenterpieceView.swift in Sources */,
 				09727B95A46CA6667C21161D /* DaemonStatusCard.swift in Sources */,
 				2105B6D8C22F67AB45E68DDE /* DaemonStatusCardSupport.swift in Sources */,
 				28FB4D445EB2C9601EBE4929 /* HarnessAccessibilityIDs.swift in Sources */,
@@ -1158,6 +1163,7 @@
 				93E10119D55E965CD41D261D /* ContentChromeSupport.swift in Sources */,
 				E5159E39CD5A9D574F4F1725 /* ContentSessionSurface.swift in Sources */,
 				1E914153D0842393D23A209E /* ContentView.swift in Sources */,
+				93E10219D55E965CD41D261D /* ToolbarCenterpieceView.swift in Sources */,
 				952B77F0949ABA3067BBC8DD /* DaemonStatusCard.swift in Sources */,
 				824F591DE933589C4EBA6164 /* DaemonStatusCardSupport.swift in Sources */,
 				2ED696C18A495BEA2000874E /* HarnessAccessibilityIDs.swift in Sources */,

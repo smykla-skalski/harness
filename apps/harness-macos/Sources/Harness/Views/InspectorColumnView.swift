@@ -2,6 +2,12 @@ import HarnessKit
 import Observation
 import SwiftUI
 
+private enum InspectorChromeMetrics {
+  static let horizontalPadding: CGFloat = 16
+  static let verticalPadding: CGFloat = 20
+  static let contentSpacing: CGFloat = 16
+}
+
 struct InspectorColumnView: View {
   @Bindable var store: HarnessStore
 
@@ -19,8 +25,12 @@ struct InspectorColumnView: View {
   }
 
   var body: some View {
-    HarnessColumnScrollView(horizontalPadding: 16, verticalPadding: 20) {
-      VStack(alignment: .leading, spacing: 16) {
+    HarnessColumnScrollView(
+      horizontalPadding: InspectorChromeMetrics.horizontalPadding,
+      verticalPadding: InspectorChromeMetrics.verticalPadding,
+      topScrollEdgeEffect: .hard
+    ) {
+      VStack(alignment: .leading, spacing: InspectorChromeMetrics.contentSpacing) {
         InspectorPrimaryContentHost(
           content: resolvedPrimaryContent,
           isSessionReadOnly: store.isSessionReadOnly,

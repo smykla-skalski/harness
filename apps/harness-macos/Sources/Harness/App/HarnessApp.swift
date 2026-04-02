@@ -12,6 +12,7 @@ struct HarnessApp: App {
   @NSApplicationDelegateAdaptor private var delegate: HarnessAppDelegate
   private let container: ModelContainer?
   private let isUITesting: Bool
+  private let mainWindowDefaultSize: CGSize
   @State private var store: HarnessStore
   @State private var themeMode: HarnessThemeMode
   @AppStorage(HarnessTextSize.storageKey)
@@ -23,6 +24,7 @@ struct HarnessApp: App {
     let configuration = HarnessAppConfiguration.resolve()
     container = configuration.container
     isUITesting = configuration.isUITesting
+    mainWindowDefaultSize = configuration.mainWindowDefaultSize
     _store = State(initialValue: configuration.store)
     _themeMode = State(initialValue: configuration.initialThemeMode)
   }
@@ -32,7 +34,7 @@ struct HarnessApp: App {
       mainWindowContent
     }
     .windowToolbarStyle(.unified)
-    .defaultSize(width: 1640, height: 980)
+    .defaultSize(width: mainWindowDefaultSize.width, height: mainWindowDefaultSize.height)
     .restorationBehavior(isUITesting ? .disabled : .automatic)
     .commands {
       HarnessAppCommands(
