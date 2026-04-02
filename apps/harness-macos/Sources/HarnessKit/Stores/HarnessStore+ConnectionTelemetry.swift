@@ -65,6 +65,10 @@ extension HarnessStore {
     isDaemonActionInFlight || isSessionActionInFlight
   }
 
+  public var showsConnectionToolbarBadge: Bool {
+    connectionState == .online && connectionMetrics.connectedSince != nil
+  }
+
   public var dataReceivedPulse: Bool {
     guard connectionState == .online,
       let lastMessageAt = connectionMetrics.lastMessageAt

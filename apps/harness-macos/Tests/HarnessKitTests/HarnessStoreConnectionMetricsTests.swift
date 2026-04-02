@@ -80,6 +80,25 @@ struct HarnessStoreConnectionMetricsTests {
     store.stopAllStreams()
   }
 
+  @Test("Sidebar connection footer stays hidden until a live daemon connection exists")
+  func sidebarConnectionFooterVisibilityTracksLiveConnection() {
+    let store = HarnessStore(daemonController: RecordingDaemonController())
+
+    #expect(store.showsConnectionToolbarBadge == false)
+
+    store.connectionState = .connecting
+    #expect(store.showsConnectionToolbarBadge == false)
+
+    store.connectionState = .online
+    #expect(store.showsConnectionToolbarBadge == false)
+
+    store.resetConnectionMetrics(for: .webSocket)
+    #expect(store.showsConnectionToolbarBadge == true)
+
+    store.markConnectionOffline("daemon offline")
+    #expect(store.showsConnectionToolbarBadge == false)
+  }
+
   private func makeEvent(name: String, sessionID: String?) -> DaemonPushEvent {
     switch name {
     case "ready":
