@@ -146,17 +146,15 @@ fn run_periodic_sweep(
 
         // Work item 1: the issue itself
         let title = format!("[{}] {}", issue.code, issue.summary);
-        let _ = service::create_task_with_source(
-            session_id,
-            &title,
-            Some(&issue.details),
+        let spec = service::TaskSpec {
+            title: &title,
+            context: Some(&issue.details),
             severity,
-            issue.fix_hint.as_deref(),
-            TaskSource::Observe,
-            Some(&issue.id),
-            actor,
-            project_dir,
-        );
+            suggested_fix: issue.fix_hint.as_deref(),
+            source: TaskSource::Observe,
+            observe_issue_id: Some(&issue.id),
+        };
+        let _ = service::create_task_with_source(session_id, &spec, actor, project_dir);
 
         // Work item 2: improve the heuristic that missed it
         let heuristic_title = format!(
@@ -169,17 +167,15 @@ fn run_periodic_sweep(
              classification path missed this pattern and add a rule or check.",
             issue.summary, issue.code, issue.line,
         );
-        let _ = service::create_task_with_source(
-            session_id,
-            &heuristic_title,
-            Some(&heuristic_context),
-            TaskSeverity::Low,
-            None,
-            TaskSource::Observe,
-            None,
-            actor,
-            project_dir,
-        );
+        let heuristic_spec = service::TaskSpec {
+            title: &heuristic_title,
+            context: Some(&heuristic_context),
+            severity: TaskSeverity::Low,
+            suggested_fix: None,
+            source: TaskSource::Observe,
+            observe_issue_id: None,
+        };
+        let _ = service::create_task_with_source(session_id, &heuristic_spec, actor, project_dir);
     }
 
     emit_watch_issues(&missed.iter().copied().cloned().collect::<Vec<_>>(), json);
@@ -332,17 +328,15 @@ fn create_work_items_for_issues(
             IssueSeverity::Medium => TaskSeverity::Medium,
             IssueSeverity::Low => TaskSeverity::Low,
         };
-        let _ = service::create_task_with_source(
-            session_id,
-            &title,
-            Some(&issue.details),
+        let spec = service::TaskSpec {
+            title: &title,
+            context: Some(&issue.details),
             severity,
-            issue.fix_hint.as_deref(),
-            TaskSource::Observe,
-            Some(&issue.id),
-            actor_id,
-            project_dir,
-        )?;
+            suggested_fix: issue.fix_hint.as_deref(),
+            source: TaskSource::Observe,
+            observe_issue_id: Some(&issue.id),
+        };
+        let _ = service::create_task_with_source(session_id, &spec, actor_id, project_dir)?;
     }
     Ok(())
 }

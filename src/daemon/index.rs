@@ -6,7 +6,7 @@ use serde::de::DeserializeOwned;
 use serde_json::Value;
 
 use crate::agents::runtime::{
-    event::ConversationEvent, parse_canonical_conversation_line, runtime_for_name,
+    AgentRuntime, event::ConversationEvent, parse_canonical_conversation_line, runtime_for_name,
 };
 use crate::errors::{CliError, CliErrorKind};
 use crate::infra::io::read_json_typed;
@@ -208,7 +208,7 @@ pub fn load_conversation_events(
 
 fn load_native_conversation_events(
     project: &DiscoveredProject,
-    adapter: &dyn crate::agents::runtime::AgentRuntime,
+    adapter: &dyn AgentRuntime,
     runtime: &str,
     session_id: &str,
     agent_id: &str,
@@ -320,12 +320,12 @@ pub fn resolve_session_id_for_runtime_session(
         let Some(state) = load_session_state(&project, &session_id)? else {
             continue;
         };
-        let matched = state.agents.values().any(|agent| {
+        let agent_found = state.agents.values().any(|agent| {
             agent.runtime == runtime_name
                 && (agent.agent_session_id.as_deref() == Some(runtime_session_id)
                     || (agent.agent_session_id.is_none() && state.session_id == runtime_session_id))
         });
-        if matched {
+        if agent_found {
             matches.push(state.session_id);
         }
     }
@@ -351,10 +351,10 @@ pub fn observe_snapshot_path(context_root: &Path, observe_id: &str) -> PathBuf {
 
 fn infer_project_dir(context_root: &Path) -> Option<PathBuf> {
     // Prefer the explicit origin file written at session creation.
-    if let Some(origin) = storage::load_project_origin(context_root) {
-        if origin.is_dir() {
-            return Some(origin);
-        }
+    if let Some(origin) = storage::load_project_origin(context_root)
+        && origin.is_dir()
+    {
+        return Some(origin);
     }
 
     // Fall back to ledger-based cwd inference.

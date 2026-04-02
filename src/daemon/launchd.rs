@@ -322,7 +322,7 @@ fn ensure_launchctl_success(action: &str, output: &CommandOutput) -> Result<(), 
     }
     Err(CliError::from(CliErrorKind::workflow_io(format!(
         "{action}: {}",
-        command_message(&output)
+        command_message(output)
     ))))
 }
 
