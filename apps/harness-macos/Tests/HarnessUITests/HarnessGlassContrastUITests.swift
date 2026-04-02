@@ -51,16 +51,16 @@ final class HarnessGlassContrastUITests: HarnessUITestCase {
     )
   }
 
-  func testSidebarDaemonStatusBadgeUsesFlatTintedFill() throws {
+  func testSidebarDaemonStatusDotUsesGreenTintWhenOnline() throws {
     let app = launch(mode: "preview")
 
     let badge = element(in: app, identifier: Accessibility.sidebarDaemonStatusBadge)
     XCTAssertTrue(badge.waitForExistence(timeout: Self.uiTimeout))
-    XCTAssertEqual(badge.label, "Online")
+    XCTAssertEqual(badge.value as? String, "Online")
 
     let topSample = sampleRegion(of: badge, region: .top)
     let screenshot = XCTAttachment(screenshot: badge.screenshot())
-    screenshot.name = "daemon-status-badge"
+    screenshot.name = "daemon-status-dot"
     screenshot.lifetime = .keepAlways
     add(screenshot)
 
@@ -76,8 +76,8 @@ final class HarnessGlassContrastUITests: HarnessUITestCase {
 
     XCTAssertGreaterThan(
       greenDominance,
-      0.08,
-      "Daemon status badge is not visibly tinted enough to read as a flat status fill: "
+      0.05,
+      "Daemon status dot is not visibly tinted enough for an online state: "
         + "red=\(topSample.averageColor.red), "
         + "green=\(topSample.averageColor.green), "
         + "blue=\(topSample.averageColor.blue), "
@@ -85,8 +85,8 @@ final class HarnessGlassContrastUITests: HarnessUITestCase {
     )
     XCTAssertLessThan(
       topSample.luminanceStats.stddev,
-      0.025,
-      "Daemon status badge top fill is too reflective or non-uniform to count as flat chrome: "
+      0.2,
+      "Daemon status dot fill is too noisy to read as a solid state indicator: "
         + "stddev=\(topSample.luminanceStats.stddev), "
         + "min=\(topSample.luminanceStats.min), "
         + "max=\(topSample.luminanceStats.max), "

@@ -9,6 +9,7 @@ struct DaemonStatusCard: View {
   let sessionCount: Int
   let isLaunchAgentInstalled: Bool
   let startDaemon: HarnessAsyncActionButton.Action
+  let stopDaemon: HarnessAsyncActionButton.Action
   let installLaunchAgent: HarnessAsyncActionButton.Action
 
   private var isLoading: Bool {
@@ -22,8 +23,9 @@ struct DaemonStatusCard: View {
         isLoading: isLoading,
         isDaemonOnline: isDaemonOnline,
         startDaemon: startDaemon,
+        stopDaemon: stopDaemon,
         statusTitle: statusTitle,
-        statusBackground: statusBackground
+        statusColor: statusColor
       )
 
       Group {
@@ -40,10 +42,8 @@ struct DaemonStatusCard: View {
       )
 
       DaemonActionButtons(
-        isDaemonOnline: isDaemonOnline,
         isLaunchAgentInstalled: isLaunchAgentInstalled,
         isLoading: isLoading,
-        startDaemon: startDaemon,
         installLaunchAgent: installLaunchAgent
       )
     }
@@ -95,7 +95,7 @@ extension DaemonStatusCard {
     }
   }
 
-  fileprivate var statusBackground: Color {
+  fileprivate var statusColor: Color {
     switch connectionState {
     case .online:
       HarnessTheme.success
@@ -110,5 +110,105 @@ extension DaemonStatusCard {
 
   fileprivate var daemonLaunchdState: String {
     isLaunchAgentInstalled ? "Installed" : "Manual"
+  }
+}
+
+struct DaemonStatBadge: View {
+  let title: String
+  let value: String
+  @Environment(\.accessibilityReduceTransparency)
+  private var reduceTransparency
+  @Environment(\.colorSchemeContrast)
+  private var colorSchemeContrast
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 4) {
+      Text(title.uppercased())
+        .scaledFont(.caption2.weight(.semibold))
+        .tracking(HarnessTheme.uppercaseTracking)
+        .foregroundStyle(HarnessTheme.secondaryInk)
+      Text(value)
+        .scaledFont(.system(.callout, design: .rounded, weight: .bold))
+        .lineLimit(1)
+        .minimumScaleFactor(0.82)
+        .contentTransition(.numericText())
+    }
+    .frame(maxWidth: .infinity, alignment: .topLeading)
+    .padding(.horizontal, HarnessTheme.cardPadding)
+    .padding(.vertical, HarnessTheme.itemSpacing)
+    .background {
+      RoundedRectangle(cornerRadius: HarnessTheme.cornerRadiusMD, style: .continuous)
+        .fill(.primary.opacity(backgroundFillOpacity))
+    }
+    .accessibilityElement(children: .ignore)
+    .accessibilityLabel(title)
+    .accessibilityValue(value)
+    .accessibilityIdentifier(HarnessAccessibility.sidebarDaemonBadge(title))
+  }
+
+  private var backgroundFillOpacity: Double {
+    if reduceTransparency {
+      return colorSchemeContrast == .increased ? 0.18 : 0.14
+    }
+    return colorSchemeContrast == .increased ? 0.09 : 0.05
+  }
+}
+
+struct DaemonSidebarLayoutProbe<Content: View>: View {
+  let identifier: String
+  @ViewBuilder let content: Content
+
+  init(_ identifier: String, @ViewBuilder content: () -> Content) {
+    self.identifier = identifier
+    self.content = content()
+  }
+
+  var body: some View {
+    content
+      .accessibilityFrameMarker(identifier)
+  }
+}
+
+struct DaemonToggleButtonStyle: ButtonStyle {
+  let isLoading: Bool
+  let isOnline: Bool
+  @State private var isHovered = false
+
+  private static let iconSize: CGFloat = 22
+
+  func makeBody(configuration: Configuration) -> some View {
+    let pressed = configuration.isPressed
+
+    configuration.label
+      .frame(width: Self.iconSize, height: Self.iconSize)
+      .foregroundStyle(iconColor(pressed: pressed))
+      .opacity(iconOpacity(pressed: pressed))
+      .scaleEffect(pressScale(pressed: pressed))
+      .animation(.easeOut(duration: 0.15), value: isHovered)
+      .animation(.easeOut(duration: 0.15), value: isLoading)
+      .animation(.spring(duration: 0.2, bounce: 0.3), value: pressed)
+      .contentShape(Circle())
+      .onContinuousHover { phase in
+        switch phase {
+        case .active: isHovered = true
+        case .ended: isHovered = false
+        }
+      }
+  }
+
+  private func pressScale(pressed: Bool) -> CGFloat {
+    pressed ? 0.8 : 1
+  }
+
+  private func iconColor(pressed: Bool) -> Color {
+    if isLoading { return HarnessTheme.secondaryInk }
+    if pressed || isHovered { return isOnline ? HarnessTheme.danger : HarnessTheme.success }
+    return HarnessTheme.secondaryInk
+  }
+
+  private func iconOpacity(pressed: Bool) -> Double {
+    if isLoading { return 0.5 }
+    if pressed || isHovered { return 1 }
+    return 0.8
   }
 }

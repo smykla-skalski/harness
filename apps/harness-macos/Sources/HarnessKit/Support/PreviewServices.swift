@@ -134,6 +134,10 @@ public final class PreviewHarnessClient: HarnessClientProtocol, Sendable {
     )
   }
 
+  public func stopDaemon() async throws -> DaemonControlResponse {
+    DaemonControlResponse(status: "stopping")
+  }
+
   public func projects() async throws -> [ProjectSummary] {
     fixtures.projects
   }
@@ -287,6 +291,11 @@ public actor PreviewDaemonController: DaemonControlling {
   public func startDaemonClient() async throws -> any HarnessClientProtocol {
     isDaemonRunning = true
     return makeClient()
+  }
+
+  public func stopDaemon() async throws -> String {
+    isDaemonRunning = false
+    return "stopped"
   }
 
   public func daemonStatus() async throws -> DaemonStatusReport {

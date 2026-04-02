@@ -46,7 +46,6 @@ public final class HarnessStore {
   public enum PendingConfirmation: Equatable {
     case endSession(sessionID: String, actorID: String)
     case removeAgent(sessionID: String, agentID: String, actorID: String)
-    case removeLaunchAgent
   }
 
   public struct SessionGroup: Identifiable, Equatable {
@@ -71,129 +70,6 @@ public final class HarnessStore {
     public var connectionEvents: [ConnectionEvent] = []
     public var subscribedSessionIDs: Set<String> = []
     public var isShowingCachedData = false
-  }
-
-  @MainActor
-  @Observable
-  public final class SessionIndexSlice {
-    public var projects: [ProjectSummary] = [] {
-      didSet { refreshDerivedStateIfNeeded(oldValue != projects) }
-    }
-    public var sessions: [SessionSummary] = [] {
-      didSet { refreshDerivedStateIfNeeded(oldValue != sessions) }
-    }
-    public var searchText = "" {
-      didSet { refreshDerivedStateIfNeeded(oldValue != searchText) }
-    }
-    public var sessionFilter: SessionFilter = .active {
-      didSet { refreshDerivedStateIfNeeded(oldValue != sessionFilter) }
-    }
-    public var sessionFocusFilter: SessionFocusFilter = .all {
-      didSet { refreshDerivedStateIfNeeded(oldValue != sessionFocusFilter) }
-    }
-    public var sessionSortOrder: SessionSortOrder = .recentActivity {
-      didSet { refreshDerivedStateIfNeeded(oldValue != sessionSortOrder) }
-    }
-    public private(set) var groupedSessions: [SessionGroup] = []
-    public private(set) var filteredSessionCount = 0
-    public private(set) var totalOpenWorkCount = 0
-    public private(set) var totalBlockedCount = 0
-    public private(set) var sessionSummariesByID: [String: SessionSummary] = [:]
-
-    private var suppressDerivedStateRefresh = false
-
-    public init() {}
-
-    public func replaceSnapshot(
-      projects: [ProjectSummary],
-      sessions: [SessionSummary]
-    ) {
-      guard self.projects != projects || self.sessions != sessions else {
-        return
-      }
-
-      suppressDerivedStateRefresh = true
-      self.projects = projects
-      self.sessions = sessions
-      suppressDerivedStateRefresh = false
-      rebuildDerivedState()
-    }
-
-    public func applySessionSummary(_ summary: SessionSummary) {
-      var updated = sessions
-      if let index = updated.firstIndex(where: { $0.sessionId == summary.sessionId }) {
-        guard updated[index] != summary else {
-          return
-        }
-        updated[index] = summary
-      } else {
-        updated.append(summary)
-      }
-      sessions = updated
-    }
-
-    public func sessionSummary(for sessionID: String?) -> SessionSummary? {
-      guard let sessionID else {
-        return nil
-      }
-      return sessionSummariesByID[sessionID]
-    }
-
-    private func refreshDerivedStateIfNeeded(_ changed: Bool) {
-      guard changed, !suppressDerivedStateRefresh else {
-        return
-      }
-      rebuildDerivedState()
-    }
-
-    private func rebuildDerivedState() {
-      totalOpenWorkCount = sessions.reduce(0) { $0 + $1.metrics.openTaskCount }
-      totalBlockedCount = sessions.reduce(0) { $0 + $1.metrics.blockedTaskCount }
-      sessionSummariesByID = Dictionary(uniqueKeysWithValues: sessions.map { ($0.sessionId, $0) })
-
-      let filteredSessions = sessions.filter(matchesCurrentFilters)
-      filteredSessionCount = filteredSessions.count
-      let sessionsByProject = Dictionary(grouping: filteredSessions, by: \.projectId)
-
-      groupedSessions = projects.compactMap { project in
-        guard let sessions = sessionsByProject[project.projectId], !sessions.isEmpty else {
-          return nil
-        }
-        return SessionGroup(
-          project: project,
-          sessions: sessions.sorted(by: sessionSortOrder.compare)
-        )
-      }
-    }
-
-    private func matchesCurrentFilters(_ summary: SessionSummary) -> Bool {
-      sessionFilter.includes(summary.status)
-        && sessionFocusFilter.includes(summary)
-        && searchMatches(summary)
-    }
-
-    private func searchMatches(_ summary: SessionSummary) -> Bool {
-      let needle = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-      guard !needle.isEmpty else {
-        return true
-      }
-
-      let haystack = [
-        summary.projectName,
-        summary.projectId,
-        summary.sessionId,
-        summary.context,
-        summary.projectDir ?? "",
-        summary.contextRoot,
-        summary.leaderId ?? "",
-        summary.observeId ?? "",
-        summary.status.rawValue,
-      ].joined(separator: " ")
-
-      return needle
-        .split(whereSeparator: \.isWhitespace)
-        .allSatisfy { haystack.localizedStandardContains($0) }
-    }
   }
 
   @MainActor
@@ -297,6 +173,22 @@ public final class HarnessStore {
       await connect(using: client)
     } catch {
       markConnectionOffline(error.localizedDescription)
+    }
+  }
+
+  public func stopDaemon() async {
+    isDaemonActionInFlight = true
+    defer { isDaemonActionInFlight = false }
+
+    do {
+      _ = try await daemonController.stopDaemon()
+      stopAllStreams()
+      client = nil
+      markConnectionOffline("Daemon stopped")
+      await refreshDaemonStatus()
+      showLastAction("Stop daemon")
+    } catch {
+      lastError = error.localizedDescription
     }
   }
 
