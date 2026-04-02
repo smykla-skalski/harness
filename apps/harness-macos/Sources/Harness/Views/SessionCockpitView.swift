@@ -4,6 +4,7 @@ import SwiftUI
 struct SessionCockpitView: View {
   let detail: SessionDetail
   let timeline: [TimelineEntry]
+  let isSessionReadOnly: Bool
   let isSessionActionInFlight: Bool
   let isSelectionLoading: Bool
   let lastAction: String
@@ -19,6 +20,7 @@ struct SessionCockpitView: View {
       VStack(alignment: .leading, spacing: 16) {
         SessionCockpitHeaderCard(
           detail: detail,
+          isSessionReadOnly: isSessionReadOnly,
           isSessionActionInFlight: isSessionActionInFlight,
           isSelectionLoading: isSelectionLoading,
           observeSelectedSession: observeSelectedSession,
@@ -51,6 +53,7 @@ struct SessionCockpitView: View {
   SessionCockpitView(
     detail: PreviewFixtures.detail,
     timeline: PreviewFixtures.timeline,
+    isSessionReadOnly: false,
     isSessionActionInFlight: false,
     isSelectionLoading: false,
     lastAction: "Observe action queued",

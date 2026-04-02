@@ -23,6 +23,7 @@ struct InspectorColumnView: View {
       VStack(alignment: .leading, spacing: 16) {
         InspectorPrimaryContentHost(
           content: resolvedPrimaryContent,
+          isSessionReadOnly: store.isSessionReadOnly,
           isSessionActionInFlight: store.isSessionActionInFlight,
           addNote: addTaskNote,
           deleteNote: deleteNote,
@@ -36,6 +37,7 @@ struct InspectorColumnView: View {
             selectedTask: store.selectedTask,
             selectedAgent: store.selectedAgent,
             selectedObserver: selectedObserver,
+            isSessionReadOnly: store.isSessionReadOnly,
             isSessionActionInFlight: store.isSessionActionInFlight,
             lastAction: store.lastAction,
             lastError: store.lastError,
@@ -102,6 +104,7 @@ struct InspectorColumnView: View {
 
 private struct InspectorPrimaryContentHost: View {
   let content: InspectorPrimaryContent
+  let isSessionReadOnly: Bool
   let isSessionActionInFlight: Bool
   let addNote: @MainActor (String, String, String) -> Bool
   let deleteNote: @MainActor (UserNote) -> Void
@@ -140,6 +143,7 @@ private struct InspectorPrimaryContentHost: View {
           AgentInspectorCard(
             agent: agentSelection.agent,
             activity: agentSelection.activity,
+            isSessionReadOnly: isSessionReadOnly,
             isSessionActionInFlight: isSessionActionInFlight
           ) { command, message, actionHint in
             await sendSignal(agentSelection.agent.agentId, command, message, actionHint)

@@ -72,6 +72,38 @@ final class HarnessLayoutUITests: HarnessUITestCase {
     XCTAssertLessThan(trackedProjects.frame.height, 112)
   }
 
+  func testOfflineCachedScenarioKeepsSessionsReadableButActionsDisabled() throws {
+    let app = launch(
+      mode: "preview",
+      additionalEnvironment: ["HARNESS_PREVIEW_SCENARIO": "offline-cached"]
+    )
+    let persistedBanner = element(in: app, identifier: Accessibility.persistedDataBanner)
+    let sessionRow = previewSessionTrigger(in: app)
+    let observeButton = button(in: app, title: "Observe")
+    let endSessionButton = element(in: app, identifier: Accessibility.endSessionButton)
+    let createTaskButton = button(in: app, title: "Create Task")
+
+    XCTAssertTrue(persistedBanner.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(sessionRow.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(observeButton.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(endSessionButton.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(createTaskButton.waitForExistence(timeout: Self.uiTimeout))
+
+    XCTAssertTrue(persistedBanner.label.contains("Daemon is off"))
+    XCTAssertFalse(observeButton.isEnabled)
+    XCTAssertFalse(endSessionButton.isEnabled)
+    XCTAssertFalse(createTaskButton.isEnabled)
+
+    tapButton(in: app, identifier: Accessibility.taskUICard)
+    let taskInspector = element(in: app, identifier: Accessibility.taskInspectorCard)
+    XCTAssertTrue(taskInspector.waitForExistence(timeout: Self.uiTimeout))
+
+    tapButton(in: app, identifier: Accessibility.workerAgentCard)
+    let signalSendButton = element(in: app, identifier: Accessibility.signalSendButton)
+    XCTAssertTrue(signalSendButton.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertFalse(signalSendButton.isEnabled)
+  }
+
   func testInspectorCardsFillTheirColumn() throws {
     let app = launch(mode: "preview")
     let inspectorRoot = element(in: app, identifier: Accessibility.inspectorRoot)

@@ -10,14 +10,18 @@ struct HarnessStoreConfirmationTests {
     let store = HarnessStore(daemonController: RecordingDaemonController())
     #expect(store.showConfirmation == false)
 
-    store.pendingConfirmation = .removeLaunchAgent
+    store.pendingConfirmation = .endSession(sessionID: "sess-1", actorID: "agent-1")
     #expect(store.showConfirmation == true)
   }
 
   @Test("Setting showConfirmation to false cancels pending confirmation")
   func showConfirmationSetFalseCancels() {
     let store = HarnessStore(daemonController: RecordingDaemonController())
-    store.pendingConfirmation = .removeLaunchAgent
+    store.pendingConfirmation = .removeAgent(
+      sessionID: "sess-1",
+      agentID: "agent-2",
+      actorID: "agent-1"
+    )
 
     store.showConfirmation = false
 
@@ -35,27 +39,20 @@ struct HarnessStoreConfirmationTests {
     #expect(store.pendingConfirmation == nil)
   }
 
-  @Test("Remove launch agent confirmation sets pending and confirm executes")
-  func removeLaunchAgentConfirmationFlow() async {
-    let controller = RecordingDaemonController(launchAgentInstalled: true)
-    let store = HarnessStore(daemonController: controller)
-    await store.bootstrap()
-
-    store.requestRemoveLaunchAgentConfirmation()
-
-    #expect(store.pendingConfirmation == .removeLaunchAgent)
+  @Test("Confirm pending end-session action clears the pending state")
+  func confirmPendingEndSessionClearsPendingState() async {
+    let store = HarnessStore(daemonController: RecordingDaemonController())
+    store.pendingConfirmation = .endSession(sessionID: "sess-1", actorID: "agent-1")
 
     await store.confirmPendingAction()
 
     #expect(store.pendingConfirmation == nil)
-    #expect(store.daemonStatus?.launchAgent.installed == false)
-    #expect(store.lastAction == "Remove launch agent")
   }
 
   @Test("Cancel confirmation clears the pending state")
   func cancelConfirmationClearsPendingState() {
     let store = HarnessStore(daemonController: RecordingDaemonController())
-    store.pendingConfirmation = .removeLaunchAgent
+    store.pendingConfirmation = .endSession(sessionID: "sess-1", actorID: "agent-1")
 
     store.cancelConfirmation()
 

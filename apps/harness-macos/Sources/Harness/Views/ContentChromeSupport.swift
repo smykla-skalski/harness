@@ -32,10 +32,6 @@ struct HarnessConfirmationDialogModifier: ViewModifier {
           Button("Remove Agent Now", role: .destructive) {
             Task { await store.confirmPendingAction() }
           }
-        case .removeLaunchAgent:
-          Button("Remove Launch Agent Now", role: .destructive) {
-            Task { await store.confirmPendingAction() }
-          }
         case nil:
           EmptyView()
         }
@@ -53,7 +49,6 @@ struct HarnessConfirmationDialogModifier: ViewModifier {
     switch store.pendingConfirmation {
     case .endSession: "End Session?"
     case .removeAgent: "Remove Agent?"
-    case .removeLaunchAgent: "Remove Launch Agent?"
     case nil: ""
     }
   }
@@ -64,8 +59,6 @@ struct HarnessConfirmationDialogModifier: ViewModifier {
       "This ends \(sessionID) using \(actorID). Active task work must already be closed."
     case .removeAgent(_, let agentID, let actorID):
       "This removes \(agentID) using \(actorID) and returns any active work to the queue."
-    case .removeLaunchAgent:
-      "This disables launchd residency for the harness daemon on this Mac."
     case nil:
       ""
     }
@@ -74,7 +67,7 @@ struct HarnessConfirmationDialogModifier: ViewModifier {
 
 struct ContentDetailChrome<Content: View>: View {
   let persistenceError: String?
-  let cachedDataMessage: String?
+  let sessionDataAvailability: HarnessStore.SessionDataAvailability
   @ViewBuilder let content: Content
 
   var body: some View {
@@ -82,8 +75,8 @@ struct ContentDetailChrome<Content: View>: View {
       if let persistenceError {
         PersistenceUnavailableBanner(message: persistenceError)
       }
-      if let cachedDataMessage {
-        CachedDataBanner(message: cachedDataMessage)
+      if sessionDataAvailability != .live {
+        SessionDataAvailabilityBanner(availability: sessionDataAvailability)
       }
       content
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -159,21 +152,70 @@ private struct ToolbarBaselineDivider: View {
   }
 }
 
-struct CachedDataBanner: View {
-  let message: String
+struct SessionDataAvailabilityBanner: View {
+  let availability: HarnessStore.SessionDataAvailability
 
   var body: some View {
-    HStack(spacing: HarnessTheme.itemSpacing) {
-      Image(systemName: "cloud.bolt")
+    HStack(alignment: .top, spacing: HarnessTheme.itemSpacing) {
+      Image(systemName: symbolName)
         .scaledFont(.caption)
         .accessibilityHidden(true)
       Text(message)
         .scaledFont(.caption.weight(.medium))
-      Spacer()
+      Spacer(minLength: 0)
     }
     .harnessCellPadding()
     .background(HarnessTheme.caution.opacity(0.12))
     .foregroundStyle(HarnessTheme.caution)
+    .accessibilityElement(children: .ignore)
+    .accessibilityLabel(Text(message))
+    .accessibilityValue(Text(message))
+    .accessibilityIdentifier(HarnessAccessibility.persistedDataBanner)
+  }
+
+  private var symbolName: String {
+    switch availability {
+    case .live:
+      return "externaldrive"
+    case .persisted:
+      return "externaldrive.badge.wifi"
+    case .unavailable:
+      return "externaldrive.badge.exclamationmark"
+    }
+  }
+
+  private var message: String {
+    switch availability {
+    case .live:
+      return ""
+    case .persisted(let reason, _, let lastSnapshotAt):
+      return baseMessage(for: reason) + savedMessageSuffix(lastSnapshotAt)
+    case .unavailable(let reason):
+      switch reason {
+      case .daemonOffline:
+        return "Daemon is off. No persisted session snapshot is available yet."
+      case .liveDataUnavailable:
+        return "Live session detail is unavailable and no persisted session snapshot is available."
+      }
+    }
+  }
+
+  private func baseMessage(
+    for reason: HarnessStore.PersistedSessionReason
+  ) -> String {
+    switch reason {
+    case .daemonOffline:
+      return "Daemon is off. Visible sessions are persisted snapshots and may be stale."
+    case .liveDataUnavailable:
+      return "Showing persisted session data because live session detail is unavailable."
+    }
+  }
+
+  private func savedMessageSuffix(_ lastSnapshotAt: Date?) -> String {
+    guard let lastSnapshotAt else {
+      return ""
+    }
+    return " Last saved \(lastSnapshotAt.formatted(date: .abbreviated, time: .shortened))."
   }
 }
 
@@ -192,6 +234,9 @@ struct PersistenceUnavailableBanner: View {
     .harnessCellPadding()
     .background(HarnessTheme.caution.opacity(0.18))
     .foregroundStyle(HarnessTheme.caution)
+    .accessibilityElement(children: .ignore)
+    .accessibilityLabel(Text(message))
+    .accessibilityValue(Text(message))
     .accessibilityIdentifier(HarnessAccessibility.persistenceBanner)
   }
 }
@@ -233,7 +278,7 @@ struct ContentNavigationToolbar: ToolbarContent {
   let navigateForward: () -> Void
 
   var body: some ToolbarContent {
-    ToolbarItem(placement: .navigation) {
+    ToolbarItem(placement: .topBarLeading) {
       Button(action: navigateBack) {
         Label("Back", systemImage: "chevron.backward")
       }
@@ -242,7 +287,7 @@ struct ContentNavigationToolbar: ToolbarContent {
       .accessibilityIdentifier(HarnessAccessibility.navigateBackButton)
     }
 
-    ToolbarItem(placement: .navigation) {
+    ToolbarItem(placement: .topBarLeading) {
       Button(action: navigateForward) {
         Label("Forward", systemImage: "chevron.forward")
       }
