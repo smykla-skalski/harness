@@ -19,18 +19,49 @@ final class HarnessToolbarUITests: HarnessUITestCase {
       identifier: Accessibility.preferencesButton
     )
 
-    func visibleCount(for query: XCUIElementQuery) -> Int {
-      query.allElementsBoundByIndex.filter { element in
-        element.exists && element.isHittable
-      }.count
+    func distinctVisibleFrames(for query: XCUIElementQuery) -> Set<String> {
+      Set(query.allElementsBoundByIndex.compactMap { element in
+        guard element.exists else {
+          return nil
+        }
+        let frame = element.frame
+        // macOS toolbars expose an inner icon button inside the outer
+        // toolbar control. We only want the outer control frame when
+        // checking for duplicated visible buttons.
+        guard frame.width >= 40, frame.height >= 40 else {
+          return nil
+        }
+        return
+          "\(Int(frame.minX.rounded())):"
+          + "\(Int(frame.minY.rounded())):"
+          + "\(Int(frame.width.rounded())):"
+          + "\(Int(frame.height.rounded()))"
+      })
+    }
+
+    let hasSingleToolbarSet = waitUntil(timeout: Self.uiTimeout) {
+      distinctVisibleFrames(for: refreshButtons).count == 1
+        && distinctVisibleFrames(for: preferencesButtons).count == 1
+        && distinctVisibleFrames(for: showInspectorButtons).count == 1
+    }
+
+    if !hasSingleToolbarSet {
+      attachWindowScreenshot(in: app, named: "hidden-inspector-toolbar")
+      attachAppHierarchy(in: app, named: "hidden-inspector-toolbar-hierarchy")
+
+      let diagnostics = """
+        refresh: \(distinctVisibleFrames(for: refreshButtons).sorted())
+        settings: \(distinctVisibleFrames(for: preferencesButtons).sorted())
+        inspector: \(distinctVisibleFrames(for: showInspectorButtons).sorted())
+        """
+      let attachment = XCTAttachment(string: diagnostics)
+      attachment.name = "hidden-inspector-toolbar-diagnostics"
+      attachment.lifetime = .keepAlways
+      add(attachment)
     }
 
     XCTAssertTrue(
-      waitUntil(timeout: Self.uiTimeout) {
-        visibleCount(for: refreshButtons) == 1
-          && visibleCount(for: preferencesButtons) == 1
-          && visibleCount(for: showInspectorButtons) == 1
-      },
+      hasSingleToolbarSet,
       "Expected exactly one visible refresh/settings/show-inspector control set"
     )
   }

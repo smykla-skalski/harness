@@ -4,10 +4,6 @@ import SwiftUI
 
 struct InspectorColumnView: View {
   @Bindable var store: HarnessStore
-  let isRefreshing: Bool
-  let refresh: () -> Void
-  let openSettings: () -> Void
-  let hideInspector: () -> Void
 
   private var resolvedPrimaryContent: InspectorPrimaryContent {
     InspectorPrimaryContent(
@@ -72,33 +68,8 @@ struct InspectorColumnView: View {
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     .foregroundStyle(HarnessTheme.ink)
     .textFieldStyle(.roundedBorder)
-    .toolbar {
-      inspectorToolbar
-    }
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessAccessibility.inspectorRoot)
-  }
-
-  @ToolbarContentBuilder private var inspectorToolbar: some ToolbarContent {
-    ToolbarItem(placement: .primaryAction) {
-      RefreshToolbarButton(isRefreshing: isRefreshing, refresh: refresh)
-        .help("Refresh sessions")
-    }
-
-    ToolbarItem(placement: .primaryAction) {
-      Button(action: openSettings) {
-        Label("Settings", systemImage: "gearshape")
-      }
-      .help("Open settings")
-      .accessibilityIdentifier(HarnessAccessibility.daemonPreferencesButton)
-    }
-
-    ToolbarItem(placement: .primaryAction) {
-      Button(action: hideInspector) {
-        Label("Hide Inspector", systemImage: "sidebar.trailing")
-      }
-      .help("Hide inspector")
-    }
   }
 
   private func addTaskNote(_ text: String, targetID: String, sessionID: String) -> Bool {
