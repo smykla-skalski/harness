@@ -1,10 +1,14 @@
 import HarnessKit
-import Observation
 import SwiftUI
 
 struct SessionsBoardOnboardingCard: View {
-  let store: HarnessStore
+  let connectionState: HarnessStore.ConnectionState
+  let isLaunchAgentInstalled: Bool
+  let hasSessions: Bool
   let isLoading: Bool
+  let startDaemon: HarnessAsyncActionButton.Action
+  let installLaunchAgent: HarnessAsyncActionButton.Action
+  let refresh: HarnessAsyncActionButton.Action
 
   var body: some View {
     VStack(alignment: .leading, spacing: 16) {
@@ -15,7 +19,7 @@ struct SessionsBoardOnboardingCard: View {
     .accessibilityTestProbe(
       HarnessAccessibility.onboardingCard,
       label: "Bring Harness Online",
-      value: store.daemonStatus?.launchAgent.installed == true ? "persistent" : "manual"
+      value: isLaunchAgentInstalled ? "persistent" : "manual"
     )
     .accessibilityFrameMarker("\(HarnessAccessibility.onboardingCard).frame")
   }
@@ -35,7 +39,7 @@ struct SessionsBoardOnboardingCard: View {
         .lineSpacing(2)
       }
       Spacer()
-      Text(store.daemonStatus?.launchAgent.installed == true ? "Persistent" : "Manual")
+      Text(isLaunchAgentInstalled ? "Persistent" : "Manual")
         .scaledFont(.caption.bold())
         .harnessPillPadding()
         .background(HarnessTheme.accent, in: Capsule())
@@ -52,28 +56,28 @@ struct SessionsBoardOnboardingCard: View {
       onboardingStep(
         title: "1. Start the daemon",
         detail: "Boot the local HTTP and SSE bridge.",
-        isReady: store.connectionState == .online
+        isReady: connectionState == .online
       ) {
         HarnessAsyncActionButton(
           title: "Start Daemon",
-          tint: store.connectionState == .online
+          tint: connectionState == .online
             ? .secondary
             : nil,
-          variant: store.connectionState == .online
+          variant: connectionState == .online
             ? .bordered : .prominent,
           isLoading: isLoading,
           accessibilityIdentifier: "harness.board.action.start",
           fillsWidth: false,
           action: startDaemon
         )
-        .disabled(store.connectionState == .online)
-        .help(store.connectionState == .online ? "Daemon is already running" : "")
-        .focusable(store.connectionState != .online)
+        .disabled(connectionState == .online)
+        .help(connectionState == .online ? "Daemon is already running" : "")
+        .focusable(connectionState != .online)
       }
       onboardingStep(
         title: "2. Install launchd",
         detail: "Keep the daemon available across app restarts.",
-        isReady: store.daemonStatus?.launchAgent.installed == true
+        isReady: isLaunchAgentInstalled
       ) {
         HarnessAsyncActionButton(
           title: "Install Launch Agent",
@@ -84,22 +88,22 @@ struct SessionsBoardOnboardingCard: View {
           fillsWidth: false,
           action: installLaunchAgent
         )
-        .disabled(store.daemonStatus?.launchAgent.installed == true)
+        .disabled(isLaunchAgentInstalled)
         .help(
-          store.daemonStatus?.launchAgent.installed == true ? "Launch agent is already installed" : ""
+          isLaunchAgentInstalled ? "Launch agent is already installed" : ""
         )
-        .focusable(store.daemonStatus?.launchAgent.installed != true)
+        .focusable(!isLaunchAgentInstalled)
       }
       onboardingStep(
         title: "3. Start a harness session",
         detail: "Sessions appear here as soon as the daemon indexes them.",
-        isReady: !store.sessions.isEmpty
+        isReady: hasSessions
       ) {
         HarnessAsyncActionButton(
           title: "Refresh Index",
           tint: .secondary,
           variant: .bordered,
-          isLoading: store.isRefreshing,
+          isLoading: isLoading,
           accessibilityIdentifier: "harness.board.action.refresh",
           fillsWidth: false,
           action: refresh
@@ -147,17 +151,5 @@ struct SessionsBoardOnboardingCard: View {
         .frame(width: 4)
     }
     .animation(.spring(duration: 0.3), value: isReady)
-  }
-
-  private func startDaemon() async {
-    await store.startDaemon()
-  }
-
-  private func installLaunchAgent() async {
-    await store.installLaunchAgent()
-  }
-
-  private func refresh() async {
-    await store.refresh()
   }
 }

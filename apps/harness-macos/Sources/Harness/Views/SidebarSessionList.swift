@@ -4,26 +4,36 @@ import SwiftData
 import SwiftUI
 
 struct SidebarFilterSection: View {
-  @Bindable var store: HarnessStore
-  @State private var localSearchText = ""
+  let filteredSessionCount: Int
+  let totalSessionCount: Int
+  let searchText: String
+  let sessionFilter: HarnessStore.SessionFilter
+  let sessionFocusFilter: SessionFocusFilter
+  @Binding var sessionSortOrder: SessionSortOrder
+  let isPersistenceAvailable: Bool
+  let resetFilters: () -> Void
+  let recordSearch: (String) -> Void
+  let updateSearchText: (String) -> Void
+  let setSessionFilter: (HarnessStore.SessionFilter) -> Void
+  let setSessionFocusFilter: (SessionFocusFilter) -> Void
+  let applyRecentSearch: (String) -> Void
+  let clearSearchHistory: () -> Void
 
   private var activeFilterSummary: String {
-    let visibleCount = store.filteredSessionCount
-    let totalCount = store.sessions.count
     let isAnyFilterActive =
-      !store.searchText.isEmpty
-      || store.sessionFilter != .active
-      || store.sessionFocusFilter != .all
+      !searchText.isEmpty
+      || sessionFilter != .active
+      || sessionFocusFilter != .all
     if isAnyFilterActive {
-      return "\(visibleCount) visible of \(totalCount)"
+      return "\(filteredSessionCount) visible of \(totalSessionCount)"
     }
-    return "\(totalCount) indexed"
+    return "\(totalSessionCount) indexed"
   }
 
   private var isFiltered: Bool {
-    !store.searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-      || store.sessionFilter != .active
-      || store.sessionFocusFilter != .all
+    !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+      || sessionFilter != .active
+      || sessionFocusFilter != .all
   }
 
   var body: some View {
@@ -40,7 +50,7 @@ struct SidebarFilterSection: View {
         Spacer()
         if isFiltered {
           Button("Clear") {
-            store.resetFilters()
+            resetFilters()
           }
           .scaledFont(.caption.bold())
           .harnessAccessoryButtonStyle()
@@ -49,26 +59,17 @@ struct SidebarFilterSection: View {
         }
       }
 
-      TextField("Search sessions, projects, leaders", text: $localSearchText)
-        .textFieldStyle(.roundedBorder)
-        .accessibilityIdentifier("harness.sidebar.search")
-        .onSubmit {
-          store.recordSearch(store.searchText)
-        }
-        .task(id: localSearchText) {
-          try? await Task.sleep(for: .milliseconds(300))
-          guard !Task.isCancelled else { return }
-          store.searchText = localSearchText
-        }
-        .onAppear { localSearchText = store.searchText }
-        .onChange(of: store.searchText) { _, new in
-          if localSearchText != new { localSearchText = new }
-        }
+      SidebarSearchField(
+        searchText: searchText,
+        recordSearch: recordSearch,
+        updateSearchText: updateSearchText
+      )
 
-      if store.searchText.isEmpty {
-        if store.isPersistenceAvailable {
-          RecentSearchChipsSection(store: store)
-        }
+      if searchText.isEmpty, isPersistenceAvailable {
+        RecentSearchChipsSection(
+          applyRecentSearch: applyRecentSearch,
+          clearSearchHistory: clearSearchHistory
+        )
       }
 
       filterSection(title: "Status") {
@@ -77,10 +78,10 @@ struct SidebarFilterSection: View {
             ForEach(HarnessStore.SessionFilter.allCases) { filter in
               filterChip(
                 title: filter.title,
-                isSelected: store.sessionFilter == filter,
+                isSelected: sessionFilter == filter,
                 identifier: HarnessAccessibility.sessionFilterButton(filter.rawValue)
               ) {
-                store.sessionFilter = filter
+                setSessionFilter(filter)
               }
             }
           }
@@ -88,7 +89,7 @@ struct SidebarFilterSection: View {
       }
 
       filterSection(title: "Sort") {
-        Picker("Sort", selection: $store.sessionSortOrder) {
+        Picker("Sort", selection: $sessionSortOrder) {
           ForEach(SessionSortOrder.allCases) { order in
             Text(order.title).tag(order)
           }
@@ -104,10 +105,10 @@ struct SidebarFilterSection: View {
             ForEach(SessionFocusFilter.allCases) { filter in
               filterChip(
                 title: filter.title,
-                isSelected: store.sessionFocusFilter == filter,
+                isSelected: sessionFocusFilter == filter,
                 identifier: HarnessAccessibility.sidebarFocusChip(filter.rawValue)
               ) {
-                store.sessionFocusFilter = filter
+                setSessionFocusFilter(filter)
               }
             }
           }
@@ -121,7 +122,8 @@ struct SidebarFilterSection: View {
 }
 
 private struct RecentSearchChipsSection: View {
-  let store: HarnessStore
+  let applyRecentSearch: (String) -> Void
+  let clearSearchHistory: () -> Void
   @Query(sort: \RecentSearch.lastUsedAt, order: .reverse)
   private var recentSearches: [RecentSearch]
 
@@ -135,7 +137,7 @@ private struct RecentSearchChipsSection: View {
         HStack(spacing: HarnessTheme.itemSpacing) {
           ForEach(visibleSearches, id: \.persistentModelID) { search in
             Button(search.query) {
-              store.searchText = search.query
+              applyRecentSearch(search.query)
             }
             .scaledFont(.caption)
             .lineLimit(1)
@@ -144,7 +146,7 @@ private struct RecentSearchChipsSection: View {
           }
           Spacer()
           Button {
-            store.clearSearchHistory()
+            clearSearchHistory()
           } label: {
             Image(systemName: "xmark.circle")
               .scaledFont(.caption2)
@@ -159,6 +161,35 @@ private struct RecentSearchChipsSection: View {
         }
       }
     }
+  }
+}
+
+private struct SidebarSearchField: View {
+  let searchText: String
+  let recordSearch: (String) -> Void
+  let updateSearchText: (String) -> Void
+  @State private var draftSearchText = ""
+
+  var body: some View {
+    TextField("Search sessions, projects, leaders", text: $draftSearchText)
+      .textFieldStyle(.roundedBorder)
+      .accessibilityIdentifier("harness.sidebar.search")
+      .onSubmit {
+        recordSearch(draftSearchText)
+      }
+      .task(id: draftSearchText) {
+        try? await Task.sleep(for: .milliseconds(300))
+        guard !Task.isCancelled else { return }
+        updateSearchText(draftSearchText)
+      }
+      .onAppear {
+        draftSearchText = searchText
+      }
+      .onChange(of: searchText) { _, newValue in
+        if draftSearchText != newValue {
+          draftSearchText = newValue
+        }
+      }
   }
 }
 
