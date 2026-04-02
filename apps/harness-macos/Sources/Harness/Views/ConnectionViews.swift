@@ -212,25 +212,21 @@ struct ReconnectionProgressView: View {
 }
 
 struct SparklineView: View {
-  let data: [Double]
   let tint: Color
+  private let series: SparklineSeries?
+
+  init(data: [Double], tint: Color) {
+    self.tint = tint
+    series = SparklineSeries(data: data)
+  }
 
   var body: some View {
     GeometryReader { proxy in
-      if data.count > 1, let maxValue = data.max(), maxValue > 0 {
-        let size = proxy.size
-        let stepX = size.width / Double(data.count - 1)
+      if let series {
+        let geometry = SparklineGeometry(sampleCount: series.sampleCount, size: proxy.size)
 
         ZStack {
-          Path { path in
-            path.move(to: point(index: 0, stepX: stepX, size: size, maxValue: maxValue))
-            for index in 1..<data.count {
-              path.addLine(to: point(index: index, stepX: stepX, size: size, maxValue: maxValue))
-            }
-            path.addLine(to: CGPoint(x: size.width, y: size.height))
-            path.addLine(to: CGPoint(x: 0, y: size.height))
-            path.closeSubpath()
-          }
+          series.areaPath(in: geometry)
           .fill(
             LinearGradient(
               colors: [tint.opacity(0.15), .clear],
@@ -239,23 +235,69 @@ struct SparklineView: View {
             )
           )
 
-          Path { path in
-            path.move(to: point(index: 0, stepX: stepX, size: size, maxValue: maxValue))
-            for index in 1..<data.count {
-              path.addLine(to: point(index: index, stepX: stepX, size: size, maxValue: maxValue))
-            }
-          }
+          series.linePath(in: geometry)
           .stroke(tint, lineWidth: 1.5)
         }
       }
     }
   }
+}
 
-  private func point(index: Int, stepX: Double, size: CGSize, maxValue: Double) -> CGPoint {
+private struct SparklineSeries {
+  let normalizedSamples: [Double]
+
+  init?(data: [Double]) {
+    guard
+      data.count > 1,
+      let peakValue = data.max(),
+      peakValue > 0
+    else {
+      return nil
+    }
+
+    normalizedSamples = data.map { $0 / peakValue }
+  }
+
+  var sampleCount: Int {
+    normalizedSamples.count
+  }
+
+  func linePath(in geometry: SparklineGeometry) -> Path {
+    Path { path in
+      path.move(to: point(at: 0, in: geometry))
+      for index in normalizedSamples.indices.dropFirst() {
+        path.addLine(to: point(at: index, in: geometry))
+      }
+    }
+  }
+
+  func areaPath(in geometry: SparklineGeometry) -> Path {
+    Path { path in
+      path.move(to: point(at: 0, in: geometry))
+      for index in normalizedSamples.indices.dropFirst() {
+        path.addLine(to: point(at: index, in: geometry))
+      }
+      path.addLine(to: CGPoint(x: geometry.size.width, y: geometry.size.height))
+      path.addLine(to: CGPoint(x: 0, y: geometry.size.height))
+      path.closeSubpath()
+    }
+  }
+
+  private func point(at index: Int, in geometry: SparklineGeometry) -> CGPoint {
     CGPoint(
-      x: Double(index) * stepX,
-      y: size.height - (data[index] / maxValue) * size.height
+      x: Double(index) * geometry.stepX,
+      y: geometry.size.height - normalizedSamples[index] * geometry.size.height
     )
+  }
+}
+
+private struct SparklineGeometry {
+  let sampleCount: Int
+  let size: CGSize
+
+  var stepX: Double {
+    guard sampleCount > 1 else { return 0 }
+    return size.width / Double(sampleCount - 1)
   }
 }
 
