@@ -100,8 +100,7 @@ extension DaemonStatusCard {
                 isLoading: isLoading,
                 accessibilityIdentifier: "harness.sidebar.action.start.full",
                 fillsWidth: false,
-                store: store,
-                storeAction: .startDaemon
+                action: startDaemon
               )
             }
           }
@@ -114,8 +113,7 @@ extension DaemonStatusCard {
                 isLoading: isLoading,
                 accessibilityIdentifier: HarnessAccessibility.sidebarInstallLaunchAgentButton,
                 fillsWidth: false,
-                store: store,
-                storeAction: .installLaunchAgent
+                action: installLaunchAgent
               )
             }
           }
@@ -241,6 +239,14 @@ extension DaemonStatusCard {
     content()
       .accessibilityElement(children: .contain)
       .accessibilityIdentifier(identifier)
+  }
+
+  fileprivate func startDaemon() async {
+    await store.startDaemon()
+  }
+
+  fileprivate func installLaunchAgent() async {
+    await store.installLaunchAgent()
   }
 }
 

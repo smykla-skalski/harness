@@ -64,8 +64,7 @@ struct SessionsBoardOnboardingCard: View {
           isLoading: isLoading,
           accessibilityIdentifier: "harness.board.action.start",
           fillsWidth: false,
-          store: store,
-          storeAction: .startDaemon
+          action: startDaemon
         )
         .disabled(store.connectionState == .online)
         .help(store.connectionState == .online ? "Daemon is already running" : "")
@@ -83,8 +82,7 @@ struct SessionsBoardOnboardingCard: View {
           isLoading: isLoading,
           accessibilityIdentifier: "harness.board.action.install",
           fillsWidth: false,
-          store: store,
-          storeAction: .installLaunchAgent
+          action: installLaunchAgent
         )
         .disabled(store.daemonStatus?.launchAgent.installed == true)
         .help(
@@ -104,8 +102,7 @@ struct SessionsBoardOnboardingCard: View {
           isLoading: store.isRefreshing,
           accessibilityIdentifier: "harness.board.action.refresh",
           fillsWidth: false,
-          store: store,
-          storeAction: .refresh
+          action: refresh
         )
       }
     }
@@ -150,5 +147,17 @@ struct SessionsBoardOnboardingCard: View {
         .frame(width: 4)
     }
     .animation(.spring(duration: 0.3), value: isReady)
+  }
+
+  private func startDaemon() async {
+    await store.startDaemon()
+  }
+
+  private func installLaunchAgent() async {
+    await store.installLaunchAgent()
+  }
+
+  private func refresh() async {
+    await store.refresh()
   }
 }

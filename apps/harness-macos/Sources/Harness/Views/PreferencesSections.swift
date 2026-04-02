@@ -2,8 +2,12 @@ import HarnessKit
 import SwiftUI
 
 struct PreferencesActionButtons: View {
-  let store: HarnessStore
   let isLoading: Bool
+  let reconnect: HarnessAsyncActionButton.Action
+  let refreshDiagnostics: HarnessAsyncActionButton.Action
+  let startDaemon: HarnessAsyncActionButton.Action
+  let installLaunchAgent: HarnessAsyncActionButton.Action
+  let removeLaunchAgent: HarnessAsyncActionButton.Action
 
   var body: some View {
     HarnessGlassControlGroup(spacing: HarnessTheme.itemSpacing) {
@@ -14,8 +18,7 @@ struct PreferencesActionButtons: View {
           variant: .bordered,
           isLoading: isLoading,
           accessibilityIdentifier: HarnessAccessibility.preferencesActionButton("Reconnect"),
-          store: store,
-          storeAction: .reconnect
+          action: reconnect
         )
         HarnessAsyncActionButton(
           title: "Refresh Diagnostics",
@@ -25,8 +28,7 @@ struct PreferencesActionButtons: View {
           accessibilityIdentifier: HarnessAccessibility.preferencesActionButton(
             "Refresh Diagnostics"
           ),
-          store: store,
-          storeAction: .refreshDiagnostics
+          action: refreshDiagnostics
         )
         HarnessAsyncActionButton(
           title: "Start Daemon",
@@ -34,8 +36,7 @@ struct PreferencesActionButtons: View {
           variant: .prominent,
           isLoading: isLoading,
           accessibilityIdentifier: HarnessAccessibility.preferencesActionButton("Start Daemon"),
-          store: store,
-          storeAction: .startDaemon
+          action: startDaemon
         )
         HarnessAsyncActionButton(
           title: "Install Launch Agent",
@@ -45,8 +46,7 @@ struct PreferencesActionButtons: View {
           accessibilityIdentifier: HarnessAccessibility.preferencesActionButton(
             "Install Launch Agent"
           ),
-          store: store,
-          storeAction: .installLaunchAgent
+          action: installLaunchAgent
         )
         HarnessAsyncActionButton(
           title: "Remove Launch Agent",
@@ -56,8 +56,7 @@ struct PreferencesActionButtons: View {
           accessibilityIdentifier: HarnessAccessibility.preferencesActionButton(
             "Remove Launch Agent"
           ),
-          store: store,
-          storeAction: .removeLaunchAgent
+          action: removeLaunchAgent
         )
       }
     }
@@ -145,8 +144,7 @@ struct PreferencesConnectionSection: View {
               accessibilityIdentifier: HarnessAccessibility.preferencesActionButton(
                 "Connection Reconnect"
               ),
-              store: store,
-              storeAction: .reconnect
+              action: reconnect
             )
             HarnessAsyncActionButton(
               title: "Refresh Diagnostics",
@@ -156,8 +154,7 @@ struct PreferencesConnectionSection: View {
               accessibilityIdentifier: HarnessAccessibility.preferencesActionButton(
                 "Connection Refresh Diagnostics"
               ),
-              store: store,
-              storeAction: .refreshDiagnostics
+              action: refreshDiagnostics
             )
           }
         }
@@ -168,6 +165,14 @@ struct PreferencesConnectionSection: View {
       )
     }
     .preferencesDetailFormStyle()
+  }
+
+  private func reconnect() async {
+    await store.reconnect()
+  }
+
+  private func refreshDiagnostics() async {
+    await store.refreshDiagnostics()
   }
 }
 
@@ -275,11 +280,17 @@ struct PreferencesDiagnosticsOverview: View {
 }
 
 #Preview("Preferences Actions") {
+  let store = PreferencesPreviewSupport.makeStore()
+
   Form {
     Section("Actions") {
       PreferencesActionButtons(
-        store: PreferencesPreviewSupport.makeStore(),
-        isLoading: false
+        isLoading: false,
+        reconnect: { await store.reconnect() },
+        refreshDiagnostics: { await store.refreshDiagnostics() },
+        startDaemon: { await store.startDaemon() },
+        installLaunchAgent: { await store.installLaunchAgent() },
+        removeLaunchAgent: { store.requestRemoveLaunchAgentConfirmation() }
       )
     }
   }

@@ -284,8 +284,12 @@ private struct PreferencesGeneralSection: View {
 
       Section("Actions") {
         PreferencesActionButtons(
-          store: store,
-          isLoading: isLoading
+          isLoading: isLoading,
+          reconnect: reconnect,
+          refreshDiagnostics: refreshDiagnostics,
+          startDaemon: startDaemon,
+          installLaunchAgent: installLaunchAgent,
+          removeLaunchAgent: removeLaunchAgent
         )
       }
 
@@ -334,6 +338,26 @@ private struct PreferencesGeneralSection: View {
       )
     }
     .preferencesDetailFormStyle()
+  }
+
+  private func reconnect() async {
+    await store.reconnect()
+  }
+
+  private func refreshDiagnostics() async {
+    await store.refreshDiagnostics()
+  }
+
+  private func startDaemon() async {
+    await store.startDaemon()
+  }
+
+  private func installLaunchAgent() async {
+    await store.installLaunchAgent()
+  }
+
+  private func removeLaunchAgent() async {
+    store.requestRemoveLaunchAgentConfirmation()
   }
 }
 
