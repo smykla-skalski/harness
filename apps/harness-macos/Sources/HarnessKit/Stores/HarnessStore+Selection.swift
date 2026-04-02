@@ -27,6 +27,11 @@ extension HarnessStore {
     set { selection.actionActorID = newValue }
   }
 
+  public var selectedActionActorID: String {
+    get { resolvedActionActor() ?? "" }
+    set { actionActorID = newValue.isEmpty ? nil : newValue }
+  }
+
   public var isSelectionLoading: Bool {
     get { selection.isSelectionLoading }
     set { selection.isSelectionLoading = newValue }
