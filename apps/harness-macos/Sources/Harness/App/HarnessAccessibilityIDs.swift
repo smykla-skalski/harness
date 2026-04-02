@@ -3,6 +3,7 @@ import SwiftUI
 enum HarnessAccessibility {
   static let appChromeRoot = "harness.app.chrome"
   static let appChromeState = "harness.app.chrome.state"
+  static let toolbarChromeState = "harness.toolbar.chrome.state"
   static let toolbarBaselineDivider = "harness.toolbar.baseline-divider"
   static let persistenceBanner = "harness.persistence.banner"
   static let daemonCard = "harness.sidebar.daemon-card"
@@ -15,6 +16,8 @@ enum HarnessAccessibility {
   static let sidebarSessionListContent = "harness.sidebar.session-list.content"
   static let sidebarFiltersCard = "harness.sidebar.filters"
   static let sidebarFiltersCardFrame = "\(sidebarFiltersCard).frame"
+  static let sidebarSessionsSection = "harness.sidebar.sessions"
+  static let sidebarSessionsSectionFrame = "\(sidebarSessionsSection).frame"
   static let sidebarClearFiltersButton = "harness.sidebar.filters.clear"
   static let sidebarClearSearchHistoryButton = "harness.sidebar.search.clear-history"
   static let sessionFilterGroup = "harness.sidebar.filter-group"
@@ -25,6 +28,10 @@ enum HarnessAccessibility {
 
   static func sidebarFocusChip(_ filter: String) -> String {
     "harness.sidebar.focus-chip.\(slug(filter))"
+  }
+
+  static func sidebarSortSegment(_ order: String) -> String {
+    "harness.sidebar.sort.\(slug(order))"
   }
 
   static let onboardingCard = "harness.board.onboarding-card"
@@ -48,6 +55,8 @@ enum HarnessAccessibility {
   static let signalInspectorCard = "harness.inspector.signal-card"
   static let observerInspectorCard = "harness.inspector.observer-card"
   static let actionActorPicker = "harness.inspector.action-actor"
+  static let signalCommandField = "harness.inspector.signal-command"
+  static let signalMessageField = "harness.inspector.signal-message"
   static let removeAgentButton = "harness.inspector.remove-agent"
   static let signalSendButton = "harness.inspector.signal-send"
   static let preferencesRoot = "harness.preferences.root"
@@ -61,6 +70,7 @@ enum HarnessAccessibility {
   static let preferencesTextSizePicker = "harness.preferences.text-size"
   static let navigateBackButton = "harness.toolbar.navigate-back"
   static let navigateForwardButton = "harness.toolbar.navigate-forward"
+  static let toolbarCenterpiece = "harness.toolbar.centerpiece"
   static let refreshButton = "harness.toolbar.refresh"
   static let daemonPreferencesButton = "harness.toolbar.preferences"
   static let endSessionButton = "harness.session.action.end"

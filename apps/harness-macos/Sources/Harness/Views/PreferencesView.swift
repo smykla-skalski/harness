@@ -32,7 +32,10 @@ struct PreferencesView: View {
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessAccessibility.preferencesRoot)
     .overlay {
-      PreferencesOverlayMarkers(themeMode: themeMode)
+      PreferencesOverlayMarkers(
+        themeMode: themeMode,
+        selectedSection: selectedSection
+      )
     }
     .accessibilityFrameMarker(HarnessAccessibility.preferencesPanel)
   }

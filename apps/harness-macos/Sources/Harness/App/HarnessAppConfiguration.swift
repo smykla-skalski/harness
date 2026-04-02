@@ -22,6 +22,12 @@ struct HarnessAppConfiguration {
       ? (HarnessThemeMode(rawValue: environment.values["HARNESS_THEME_MODE_OVERRIDE"] ?? "")
         ?? .auto)
       : .auto
+    let initialTextSizeIndex =
+      isUITesting
+      ? (HarnessTextSize.uiTestOverrideIndex(
+        from: environment.values[HarnessTextSize.uiTestOverrideKey]
+      ) ?? HarnessTextSize.defaultIndex)
+      : HarnessTextSize.defaultIndex
     let persistenceSetup = HarnessPersistenceSetup.resolve(
       environment: environment,
       launchMode: launchMode
@@ -37,6 +43,10 @@ struct HarnessAppConfiguration {
       UserDefaults.standard.set(
         initialThemeMode.rawValue,
         forKey: HarnessThemeDefaults.modeKey
+      )
+      UserDefaults.standard.set(
+        initialTextSizeIndex,
+        forKey: HarnessTextSize.storageKey
       )
     }
 

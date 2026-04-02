@@ -4,6 +4,7 @@ import SwiftUI
 
 enum HarnessTextSize {
   static let storageKey = "harnessTextSize"
+  static let uiTestOverrideKey = "HARNESS_TEXT_SIZE_OVERRIDE"
   static let defaultIndex = 3
 
   static let scales: [(label: String, factor: CGFloat)] = [
@@ -16,14 +17,49 @@ enum HarnessTextSize {
     ("Largest", 1.30),
   ]
 
+  static func normalizedIndex(_ index: Int) -> Int {
+    min(max(index, scales.startIndex), scales.index(before: scales.endIndex))
+  }
+
   static func scale(at index: Int) -> CGFloat {
-    guard scales.indices.contains(index) else { return 1.0 }
-    return scales[index].factor
+    scales[normalizedIndex(index)].factor
   }
 
   static func label(for index: Int) -> String {
-    guard scales.indices.contains(index) else { return "Default" }
-    return scales[index].label
+    scales[normalizedIndex(index)].label
+  }
+
+  static func nativeFormControlFont(at index: Int) -> Font {
+    let font = Font.body
+    let scale = scale(at: index)
+    return scale == 1.0 ? font : font.scaled(by: scale)
+  }
+
+  static func controlSize(at index: Int) -> ControlSize {
+    switch normalizedIndex(index) {
+    case ...3:
+      .small
+    case 4...5:
+      .regular
+    default:
+      .large
+    }
+  }
+
+  static func controlSizeLabel(at index: Int) -> String {
+    switch normalizedIndex(index) {
+    case ...3:
+      "small"
+    case 4...5:
+      "regular"
+    default:
+      "large"
+    }
+  }
+
+  static func uiTestOverrideIndex(from rawValue: String?) -> Int? {
+    guard let rawValue, let parsedIndex = Int(rawValue) else { return nil }
+    return normalizedIndex(parsedIndex)
   }
 
   static func canIncrease(_ index: Int) -> Bool {
@@ -39,6 +75,9 @@ enum HarnessTextSize {
 
 extension EnvironmentValues {
   @Entry var fontScale: CGFloat = 1.0
+  @Entry var harnessTextSizeIndex: Int = HarnessTextSize.defaultIndex
+  @Entry var harnessNativeFormControlFont: Font = .body
+  @Entry var harnessNativeFormControlSize: ControlSize = .small
 }
 
 // MARK: - Scaled font modifier
@@ -53,8 +92,37 @@ private struct ScaledFontModifier: ViewModifier {
   }
 }
 
+private struct HarnessNativeFormControlModifier: ViewModifier {
+  @Environment(\.harnessNativeFormControlFont)
+  private var font
+  @Environment(\.harnessNativeFormControlSize)
+  private var controlSize
+
+  func body(content: Content) -> some View {
+    content
+      .font(font)
+      .controlSize(controlSize)
+  }
+}
+
+private struct HarnessNativeFormContainerModifier: ViewModifier {
+  func body(content: Content) -> some View {
+    content
+      .formStyle(.grouped)
+      .scrollIndicators(.automatic)
+  }
+}
+
 extension View {
   func scaledFont(_ font: Font) -> some View {
     modifier(ScaledFontModifier(font: font))
+  }
+
+  func harnessNativeFormControl() -> some View {
+    modifier(HarnessNativeFormControlModifier())
+  }
+
+  func harnessNativeFormContainer() -> some View {
+    modifier(HarnessNativeFormContainerModifier())
   }
 }

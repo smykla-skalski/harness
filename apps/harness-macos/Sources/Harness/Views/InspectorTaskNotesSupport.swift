@@ -65,6 +65,7 @@ struct TaskUserNotesSection: View {
       }
       HStack(spacing: HarnessTheme.itemSpacing) {
         TextField("Add a note", text: $newNoteText)
+          .harnessNativeFormControl()
           .focused($isNoteFieldFocused)
           .textFieldStyle(.roundedBorder)
           .submitLabel(.done)

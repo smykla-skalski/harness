@@ -22,15 +22,14 @@ extension HarnessUITestCase {
   }
 
   func sessionTrigger(in app: XCUIApplication, identifier: String) -> XCUIElement {
-    // List rows appear as cells in the accessibility tree.
-    let cell = app.cells.matching(identifier: identifier).firstMatch
-    if cell.exists { return cell }
-    // Fall back to button lookup for forwards/backwards compatibility.
+    // Prefer the interactive button when SwiftUI exposes both a row cell and
+    // the underlying button. Tapping the button is more stable than tapping
+    // the container cell directly.
     let identifiedButton = button(in: app, identifier: identifier)
     if identifiedButton.exists { return identifiedButton }
-    // Prefer the explicit frame probe when SwiftUI changes row accessibility roles.
-    let frameProbe = element(in: app, identifier: "\(identifier).frame")
-    if frameProbe.exists { return frameProbe }
+    // List rows can still appear as cells in the accessibility tree.
+    let cell = app.cells.matching(identifier: identifier).firstMatch
+    if cell.exists { return cell }
     // Last resort: any element with the identifier.
     return element(in: app, identifier: identifier)
   }
@@ -38,8 +37,8 @@ extension HarnessUITestCase {
   func sidebarEmptyStateElement(in app: XCUIApplication) -> XCUIElement { app.staticTexts[HarnessUITestAccessibility.sidebarEmptyStateTitle] }
 
   func focusChip(in app: XCUIApplication, identifier: String, title: String) -> XCUIElement {
-    let identifiedButton = button(in: app, identifier: identifier)
-    return identifiedButton.exists ? identifiedButton : button(in: app, title: title)
+    let identifiedElement = element(in: app, identifier: identifier)
+    return identifiedElement.exists ? identifiedElement : button(in: app, title: title)
   }
 
   func tapPreviewSession(in app: XCUIApplication) {
@@ -140,6 +139,31 @@ extension HarnessUITestCase {
     }
 
     XCTFail("Failed to tap button \(identifier)")
+  }
+
+  func tapButton(in app: XCUIApplication, title: String) {
+    let deadline = Date.now.addingTimeInterval(Self.uiTimeout)
+
+    while Date.now < deadline {
+      app.activate()
+
+      let target = button(in: app, title: title)
+      if target.waitForExistence(timeout: 0.5) {
+        if target.isHittable {
+          target.tap()
+          return
+        }
+
+        if let coordinate = centerCoordinate(in: app, for: target) {
+          coordinate.tap()
+          return
+        }
+      }
+
+      RunLoop.current.run(until: Date.now.addingTimeInterval(0.2))
+    }
+
+    XCTFail("Failed to tap button titled \(title)")
   }
 
   func tapElement(in app: XCUIApplication, identifier: String) {
@@ -290,6 +314,20 @@ extension HarnessUITestCase {
       : app.descendants(matching: .popUpButton).matching(identifier: identifier).firstMatch
   }
 
+  func editableField(in app: XCUIApplication, identifier: String) -> XCUIElement {
+    let textField = app.textFields.matching(identifier: identifier).firstMatch
+    if textField.exists {
+      return textField
+    }
+
+    let textView = app.textViews.matching(identifier: identifier).firstMatch
+    if textView.exists {
+      return textView
+    }
+
+    return app.descendants(matching: .textField).matching(identifier: identifier).firstMatch
+  }
+
   func toolbarButton(in app: XCUIApplication, index: Int) -> XCUIElement {
     let windowToolbarButtons = mainWindow(in: app).toolbars.buttons
     return
@@ -326,17 +364,6 @@ extension HarnessUITestCase {
 
     let end = start.withOffset(CGVector(dx: 0, dy: -scrollDistance))
     start.press(forDuration: 0.01, thenDragTo: end)
-  }
-
-  func confirmationDialogButton(in app: XCUIApplication, title: String) -> XCUIElement {
-    let alertButton = app.sheets.buttons[title]
-    return alertButton.exists ? alertButton : app.dialogs.buttons[title]
-  }
-
-  func dismissConfirmationDialog(in app: XCUIApplication) {
-    let cancelButton = confirmationDialogButton(in: app, title: "Cancel")
-    XCTAssertTrue(cancelButton.waitForExistence(timeout: Self.uiTimeout))
-    cancelButton.tap()
   }
 
   func attachWindowScreenshot(
@@ -387,5 +414,4 @@ extension HarnessUITestCase {
     let dy = element.frame.midY - window.frame.minY
     return origin.withOffset(CGVector(dx: dx, dy: dy))
   }
-
 }

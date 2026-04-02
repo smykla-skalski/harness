@@ -189,11 +189,16 @@ struct AgentInspectorCard: View {
       }
       InspectorSection(title: "Send Signal") {
         TextField("Command", text: $signalCommand)
+          .harnessNativeFormControl()
+          .accessibilityIdentifier(HarnessAccessibility.signalCommandField)
           .submitLabel(.send)
         TextField("Message", text: $signalMessage, axis: .vertical)
+          .harnessNativeFormControl()
           .lineLimit(3, reservesSpace: true)
+          .accessibilityIdentifier(HarnessAccessibility.signalMessageField)
           .submitLabel(.send)
         TextField("Action Hint", text: $signalActionHint)
+          .harnessNativeFormControl()
           .submitLabel(.send)
         Button("Send Signal") {
           Task {
