@@ -46,6 +46,28 @@ final class HarnessSidebarLayoutUITests: HarnessUITestCase {
     XCTAssertLessThan(daemonCard.frame.minY - sidebarContent.frame.minY, 28)
   }
 
+  func testToolbarBaselineDividerStartsAtSidebarBoundary() throws {
+    let app = launch(mode: "preview")
+    let window = mainWindow(in: app)
+    let sidebarContent = frameElement(in: app, identifier: Accessibility.sidebarShellFrame)
+    let toolbarDivider = frameElement(in: app, identifier: Accessibility.toolbarBaselineDivider)
+    let toolbar = window.toolbars.firstMatch
+
+    XCTAssertTrue(window.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(sidebarContent.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(toolbarDivider.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(toolbar.waitForExistence(timeout: Self.uiTimeout))
+
+    XCTAssertEqual(toolbarDivider.frame.minX, sidebarContent.frame.maxX, accuracy: 6)
+    XCTAssertEqual(toolbarDivider.frame.maxX, window.frame.maxX, accuracy: 6)
+
+    let dividerTopOffset = toolbarDivider.frame.minY - window.frame.minY
+    let toolbarBottomOffset = toolbar.frame.maxY - window.frame.minY
+
+    XCTAssertGreaterThanOrEqual(dividerTopOffset, toolbarBottomOffset - 4)
+    XCTAssertLessThanOrEqual(dividerTopOffset, toolbarBottomOffset + 12)
+  }
+
   func testSidebarProjectHeaderFillsAvailableWidth() throws {
     let app = launch(mode: "preview")
     let filtersCard = frameElement(in: app, identifier: Accessibility.sidebarFiltersCardFrame)

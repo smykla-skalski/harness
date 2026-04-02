@@ -1,6 +1,7 @@
 enum HarnessUITestAccessibility {
   static let appChromeRoot = "harness.app.chrome"
   static let appChromeState = "harness.app.chrome.state"
+  static let toolbarBaselineDivider = "harness.toolbar.baseline-divider"
   static let persistenceBanner = "harness.persistence.banner"
   static let daemonCard = "harness.sidebar.daemon-card"
   static let daemonCardFrame = "harness.sidebar.daemon-card.frame"
