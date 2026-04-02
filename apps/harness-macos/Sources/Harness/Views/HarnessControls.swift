@@ -1,15 +1,10 @@
 import AppKit
-import HarnessKit
 import SwiftUI
-private struct ProminentButtonForegroundKey: EnvironmentKey {
-  static let defaultValue: Color? = nil
-}
+
 extension EnvironmentValues {
-  var prominentButtonForeground: Color? {
-    get { self[ProminentButtonForegroundKey.self] }
-    set { self[ProminentButtonForegroundKey.self] = newValue }
-  }
+  @Entry var prominentButtonForeground: Color?
 }
+
 enum HarnessControlMetrics {
   static let compactControlSize: ControlSize = .small
   fileprivate static let disabledButtonChromeBehavior: HarnessDisabledButtonChromeBehavior =
@@ -27,18 +22,11 @@ private enum HarnessSystemButtonChromeStyle {
 }
 
 struct HarnessAsyncActionButton: View {
+  typealias Action = @MainActor () async -> Void
+
   enum Variant: Equatable {
     case prominent
     case bordered
-  }
-
-  enum StoreAction: Equatable {
-    case startDaemon
-    case installLaunchAgent
-    case removeLaunchAgent
-    case refresh
-    case reconnect
-    case refreshDiagnostics
   }
 
   let title: String
@@ -47,8 +35,7 @@ struct HarnessAsyncActionButton: View {
   let isLoading: Bool
   let accessibilityIdentifier: String
   let fillsWidth: Bool
-  let store: HarnessStore
-  let storeAction: StoreAction
+  let action: Action
   @State private var runningTask: Task<Void, Never>?
 
   init(
@@ -58,8 +45,7 @@ struct HarnessAsyncActionButton: View {
     isLoading: Bool,
     accessibilityIdentifier: String,
     fillsWidth: Bool = false,
-    store: HarnessStore,
-    storeAction: StoreAction
+    action: @escaping Action
   ) {
     self.title = title
     self.tint = tint
@@ -67,8 +53,7 @@ struct HarnessAsyncActionButton: View {
     self.isLoading = isLoading
     self.accessibilityIdentifier = accessibilityIdentifier
     self.fillsWidth = fillsWidth
-    self.store = store
-    self.storeAction = storeAction
+    self.action = action
   }
 
   private var effectiveVariant: Variant {
@@ -113,21 +98,9 @@ struct HarnessAsyncActionButton: View {
   }
 
   private func performAction() {
-    runningTask = Task {
-      switch storeAction {
-      case .startDaemon:
-        await store.startDaemon()
-      case .installLaunchAgent:
-        await store.installLaunchAgent()
-      case .removeLaunchAgent:
-        store.requestRemoveLaunchAgentConfirmation()
-      case .refresh:
-        await store.refresh()
-      case .reconnect:
-        await store.reconnect()
-      case .refreshDiagnostics:
-        await store.refreshDiagnostics()
-      }
+    let action = action
+    runningTask = Task { @MainActor in
+      await action()
       runningTask = nil
     }
   }
