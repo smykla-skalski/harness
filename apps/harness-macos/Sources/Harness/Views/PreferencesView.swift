@@ -14,6 +14,7 @@ struct PreferencesView: View {
           ideal: PreferencesChromeMetrics.sidebarIdealWidth,
           max: PreferencesChromeMetrics.sidebarMaxWidth
         )
+        .toolbarBaselineFrame(.sidebar)
     } detail: {
       switch selectedSection {
       case .general:
@@ -25,7 +26,8 @@ struct PreferencesView: View {
       }
     }
     .navigationSplitViewStyle(.balanced)
-    .toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
+    .toolbarBaselineOverlay()
+    .toolbarBackgroundVisibility(.automatic, for: .windowToolbar)
     .containerBackground(.windowBackground, for: .window)
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessAccessibility.preferencesRoot)
