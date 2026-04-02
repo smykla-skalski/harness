@@ -91,12 +91,11 @@ fn default_event_for_command(hook: &HookCommand) -> NormalizedEvent {
 fn should_record_hook_event(hook: &HookCommand) -> bool {
     matches!(
         hook,
-        HookCommand::GuardBash
-            | HookCommand::GuardWrite
-            | HookCommand::GuardQuestion
+        HookCommand::ToolGuard
             | HookCommand::GuardStop
-            | HookCommand::Audit
+            | HookCommand::ToolResult
             | HookCommand::AuditTurn(_)
+            | HookCommand::ToolFailure
             | HookCommand::ContextAgent
             | HookCommand::ValidateAgent
     )

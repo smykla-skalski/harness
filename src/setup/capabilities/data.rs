@@ -271,9 +271,9 @@ fn operational_features() -> BTreeMap<Feature, FeatureInfo> {
         (
             Feature::HookSystem,
             FeatureInfo::new(
-                "11 hook types intercepting tool usage: guard-bash, guard-write, guard-question, \
-                 guard-stop, verify-bash, verify-write, verify-question, audit, enrich-failure, \
-                 context-agent, validate-agent",
+                "7 hook commands intercepting tool and agent lifecycle: tool-guard, \
+                 tool-result, tool-failure, guard-stop, audit-turn, context-agent, \
+                 validate-agent",
             )
             .command("harness hook"),
         ),

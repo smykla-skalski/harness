@@ -8,66 +8,20 @@ allowed-tools: Agent, AskUserQuestion, Bash, Edit, Glob, Read, Write
 user-invocable: true
 hooks:
   PreToolUse:
-    - matcher: "Bash"
+    - matcher: ".*"
       hooks:
         - type: command
-          command: "harness hook --skill suite:run guard-bash"
-    - matcher: "AskUserQuestion"
-      hooks:
-        - type: command
-          command: "harness hook --skill suite:run guard-question"
-    - matcher: "Write"
-      hooks:
-        - type: command
-          command: "harness hook --skill suite:run guard-write"
-    - matcher: "Edit"
-      hooks:
-        - type: command
-          command: "harness hook --skill suite:run guard-write"
+          command: "harness hook --skill suite:run tool-guard"
   PostToolUse:
-    - matcher: "Bash"
+    - matcher: ".*"
       hooks:
         - type: command
-          command: "harness hook --skill suite:run verify-bash"
-        - type: command
-          command: "harness hook --skill suite:run audit"
-    - matcher: "AskUserQuestion"
-      hooks:
-        - type: command
-          command: "harness hook --skill suite:run verify-question"
-        - type: command
-          command: "harness hook --skill suite:run audit"
-    - matcher: "Write"
-      hooks:
-        - type: command
-          command: "harness hook --skill suite:run verify-write"
-        - type: command
-          command: "harness hook --skill suite:run audit"
-    - matcher: "Edit"
-      hooks:
-        - type: command
-          command: "harness hook --skill suite:run verify-write"
-        - type: command
-          command: "harness hook --skill suite:run audit"
-    - matcher: "Read"
-      hooks:
-        - type: command
-          command: "harness hook --skill suite:run audit"
-    - matcher: "Glob"
-      hooks:
-        - type: command
-          command: "harness hook --skill suite:run audit"
-    - matcher: "Agent"
-      hooks:
-        - type: command
-          command: "harness hook --skill suite:run audit"
+          command: "harness hook --skill suite:run tool-result"
   PostToolUseFailure:
-    - matcher: "Bash"
+    - matcher: ".*"
       hooks:
         - type: command
-          command: "harness hook --skill suite:run enrich-failure"
-        - type: command
-          command: "harness hook --skill suite:run audit"
+          command: "harness hook --skill suite:run tool-failure"
   SubagentStart:
     - matcher: "preflight-worker"
       hooks:

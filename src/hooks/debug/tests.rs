@@ -88,7 +88,7 @@ fn log_and_exit_writes_jsonl_debug_file() {
             let outcome = HookOutcome::error(2)
                 .with_message("blocked")
                 .with_gate("prebash");
-            let code = outcome.log_and_exit("guard-bash", &event);
+            let code = outcome.log_and_exit("tool-guard", &event);
             assert_eq!(code, 2);
 
             let ctx_dir = session_context_dir().unwrap();
@@ -113,7 +113,7 @@ fn parse_last_debug_line(content: &str) -> serde_json::Value {
 }
 
 fn assert_debug_line_fields(line: &serde_json::Value) {
-    assert_eq!(line["hook_name"], "guard-bash");
+    assert_eq!(line["hook_name"], "tool-guard");
     assert_eq!(line["exit_code"], 2);
     assert_eq!(line["outcome"], "error");
     assert_eq!(line["message"], "blocked");
