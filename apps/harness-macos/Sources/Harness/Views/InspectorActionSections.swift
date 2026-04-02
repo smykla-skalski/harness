@@ -2,11 +2,22 @@ import HarnessKit
 import SwiftUI
 
 struct InspectorActionSections: View {
-  let store: HarnessStore
   let detail: SessionDetail
   let selectedTask: WorkItem?
   let selectedAgent: AgentRegistration?
   let selectedObserver: ObserverSummary?
+  let isSessionActionInFlight: Bool
+  let lastAction: String
+  let lastError: String?
+  let availableActionActors: [AgentRegistration]
+  @Binding var actionActorID: String
+  let requestRemoveAgentConfirmation: (String) -> Void
+  let createTaskAction: (String, String?, TaskSeverity) async -> Bool
+  let assignTaskAction: (String, String) async -> Bool
+  let updateTaskStatusAction: (String, TaskStatus, String?) async -> Bool
+  let checkpointTaskAction: (String, String, Int) async -> Bool
+  let changeRoleAction: (String, SessionRole) async -> Bool
+  let transferLeaderAction: (String, String?) async -> Bool
 
   @State private var createTitle = ""
   @State private var createContext = ""
@@ -20,13 +31,6 @@ struct InspectorActionSections: View {
   @State private var role: SessionRole = .worker
   @State private var transferLeaderID = ""
   @State private var transferReason = ""
-  @FocusState private var focusedField: ActionField?
-
-  private enum ActionField: Hashable {
-    case createTitle, createContext
-    case statusNote, checkpointSummary
-    case transferReason
-  }
 
   private var selectionKey: String {
     [
@@ -37,20 +41,69 @@ struct InspectorActionSections: View {
     ].joined(separator: "|")
   }
 
+  private var transferLeaderButtonTitle: String {
+    if detail.session.pendingLeaderTransfer != nil,
+      actionActorID == detail.session.leaderId {
+      return "Confirm Leadership Transfer"
+    }
+    return "Transfer Leadership"
+  }
+
   var body: some View {
     VStack(alignment: .leading, spacing: 16) {
-      statusBanner
-      sessionTaskActions
+      InspectorActionStatusBanner(
+        isSessionActionInFlight: isSessionActionInFlight,
+        lastAction: lastAction,
+        lastError: lastError,
+        availableActionActors: availableActionActors,
+        actionActorID: $actionActorID
+      )
+      InspectorCreateTaskSection(
+        createTitle: $createTitle,
+        createContext: $createContext,
+        createSeverity: $createSeverity,
+        isSessionActionInFlight: isSessionActionInFlight,
+        submitCreateTask: submitCreateTask
+      )
 
       if let selectedTask {
-        taskActions(task: selectedTask)
+        InspectorTaskActionsSection(
+          task: selectedTask,
+          tasks: detail.tasks,
+          agents: detail.agents,
+          taskID: $taskID,
+          assigneeID: $assigneeID,
+          taskStatus: $taskStatus,
+          statusNote: $statusNote,
+          checkpointSummary: $checkpointSummary,
+          checkpointProgress: $checkpointProgress,
+          isSessionActionInFlight: isSessionActionInFlight,
+          assignSelectedTask: submitAssignSelectedTask,
+          updateSelectedTask: submitUpdateSelectedTask,
+          checkpointSelectedTask: submitCheckpointSelectedTask
+        )
       }
 
       if let selectedAgent {
-        roleActions(agent: selectedAgent)
+        InspectorRoleActionsSection(
+          agent: selectedAgent,
+          leaderID: detail.session.leaderId,
+          role: $role,
+          isSessionActionInFlight: isSessionActionInFlight,
+          changeSelectedRole: submitChangeSelectedRole,
+          requestRemoveAgentConfirmation: requestRemoveAgentConfirmation
+        )
       }
 
-      leaderActions
+      InspectorLeaderTransferSection(
+        detail: detail,
+        transferLeaderID: $transferLeaderID,
+        transferReason: $transferReason,
+        transferLeaderButtonTitle: transferLeaderButtonTitle,
+        actionActorID: actionActorID,
+        isSessionActionInFlight: isSessionActionInFlight,
+        submitTransferLeader: submitTransferLeader
+      )
 
       if let selectedObserver {
         InspectorObserverSummarySection(observer: selectedObserver)
@@ -62,217 +115,9 @@ struct InspectorActionSections: View {
     }
   }
 }
-extension InspectorActionSections {
-  fileprivate var statusBanner: some View {
-    VStack(alignment: .leading, spacing: HarnessTheme.itemSpacing) {
-      HStack {
-        Label("Action Console", systemImage: "dial.high")
-          .scaledFont(.system(.headline, design: .rounded, weight: .semibold))
-        Spacer()
-        if store.isSessionActionInFlight {
-          HarnessSpinner()
-            .transition(.opacity)
-        } else if !store.lastAction.isEmpty {
-          Text(store.lastAction)
-            .scaledFont(.caption.bold())
-            .foregroundStyle(HarnessTheme.success)
-            .accessibilityIdentifier(HarnessAccessibility.actionToast)
-            .transition(.opacity)
-        }
-      }
-      .animation(.spring(duration: 0.2), value: store.isSessionActionInFlight)
-      .animation(.spring(duration: 0.2), value: store.lastAction.isEmpty)
-      Text(
-        "Task creation, reassignments, checkpoints, and leadership changes flow through the daemon."
-      )
-      .scaledFont(.system(.footnote, design: .rounded, weight: .medium))
-      .foregroundStyle(HarnessTheme.secondaryInk)
-      .lineLimit(3)
-      if !store.availableActionActors.isEmpty {
-        Picker("Act As", selection: actionActorBinding) {
-          ForEach(store.availableActionActors) { agent in
-            Text(agent.name).tag(agent.agentId)
-          }
-        }
-        .pickerStyle(.menu)
-        .labelsHidden()
-        .accessibilityLabel("Act As")
-        .accessibilityIdentifier(HarnessAccessibility.actionActorPicker)
-      }
-      if let error = store.lastError {
-        Text("Action failed: \(error)")
-          .scaledFont(.system(.footnote, design: .rounded, weight: .semibold))
-          .foregroundStyle(HarnessTheme.danger)
-          .lineLimit(3)
-          .frame(maxWidth: .infinity, alignment: .leading)
-      }
-    }
-  }
-  fileprivate func taskActions(task: WorkItem) -> some View {
-    VStack(alignment: .leading, spacing: HarnessTheme.sectionSpacing) {
-      HarnessActionHeader(
-        title: "Task Actions",
-        subtitle: "Reassign, update status, or checkpoint the selected task."
-      )
-      Picker("Task", selection: $taskID) {
-        ForEach(detail.tasks) { item in
-          Text(item.title).tag(item.taskId)
-        }
-      }
-      Picker("Assignee", selection: $assigneeID) {
-        ForEach(detail.agents) { agent in
-          Text(agent.name).tag(agent.agentId)
-        }
-      }
-      Picker("Status", selection: $taskStatus) {
-        ForEach(TaskStatus.allCases, id: \.self) { status in
-          Text(status.title).tag(status)
-        }
-      }
-      HStack {
-        Button("Assign") {
-          Task { await assignSelectedTask() }
-        }
-        .harnessActionButtonStyle(variant: .prominent, tint: nil)
-        .disabled(store.isSessionActionInFlight)
-      }
-      HStack {
-        Button("Update Status") {
-          Task { await updateSelectedTask() }
-        }
-        .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
-        .disabled(store.isSessionActionInFlight)
-        TextField("Update note", text: $statusNote, axis: .vertical)
-          .focused($focusedField, equals: .statusNote)
-          .lineLimit(2, reservesSpace: true)
-          .submitLabel(.done)
-      }
 
-      Divider()
-
-      Text("Checkpoint")
-        .scaledFont(.headline)
-      TextField("Summary", text: $checkpointSummary, axis: .vertical)
-        .focused($focusedField, equals: .checkpointSummary)
-        .lineLimit(3, reservesSpace: true)
-        .submitLabel(.done)
-      LabeledContent("Progress") {
-        Slider(value: $checkpointProgress, in: 0...100, step: 5)
-      }
-      HStack {
-        Text("\(Int(checkpointProgress))%")
-          .scaledFont(.caption.bold())
-          .foregroundStyle(HarnessTheme.secondaryInk)
-        Spacer()
-        Button("Save Checkpoint") {
-          Task { await checkpointSelectedTask() }
-        }
-        .harnessActionButtonStyle(variant: .prominent, tint: HarnessTheme.caution)
-        .disabled(store.isSessionActionInFlight)
-      }
-
-      if let checkpoint = task.checkpointSummary {
-        Text("Latest: \(checkpoint.progress)% · \(checkpoint.summary)")
-          .scaledFont(.caption)
-          .foregroundStyle(HarnessTheme.secondaryInk)
-      }
-    }
-  }
-  fileprivate var sessionTaskActions: some View {
-    VStack(alignment: .leading, spacing: HarnessTheme.sectionSpacing) {
-      HarnessActionHeader(
-        title: "Create Task",
-        subtitle: "Capture new work directly into the active session."
-      )
-      TextField("Title", text: $createTitle)
-        .focused($focusedField, equals: .createTitle)
-        .submitLabel(.next)
-        .onSubmit { focusedField = .createContext }
-      TextField("Context", text: $createContext, axis: .vertical)
-        .focused($focusedField, equals: .createContext)
-        .lineLimit(4, reservesSpace: true)
-        .submitLabel(.done)
-      Picker("Severity", selection: $createSeverity) {
-        ForEach(TaskSeverity.allCases, id: \.self) { severity in
-          Text(severity.title).tag(severity)
-        }
-      }
-      Button("Create Task") {
-        Task { await createTask() }
-      }
-      .harnessActionButtonStyle(variant: .prominent, tint: nil)
-      .disabled(
-        createTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-          || store.isSessionActionInFlight
-      )
-    }
-  }
-  fileprivate func roleActions(agent: AgentRegistration) -> some View {
-    VStack(alignment: .leading, spacing: HarnessTheme.sectionSpacing) {
-      HarnessActionHeader(
-        title: "Role Actions",
-        subtitle: "Change the selected agent role without leaving the inspector."
-      )
-      Text(agent.name)
-        .scaledFont(.system(.headline, design: .rounded, weight: .semibold))
-      Picker("Role", selection: $role) {
-        ForEach(SessionRole.allCases.filter { $0 != .leader }, id: \.self) { role in
-          Text(role.title).tag(role)
-        }
-      }
-      Button("Change Role") {
-        Task { await changeSelectedRole() }
-      }
-      .harnessActionButtonStyle(variant: .prominent, tint: nil)
-      .disabled(store.isSessionActionInFlight)
-      Button("Remove Agent") {
-        store.requestRemoveAgentConfirmation(agentID: agent.agentId)
-      }
-      .harnessActionButtonStyle(variant: .bordered, tint: .red)
-      .disabled(agent.agentId == detail.session.leaderId || store.isSessionActionInFlight)
-      .help(agent.agentId == detail.session.leaderId ? "The session leader cannot be removed" : "")
-      .accessibilityIdentifier(HarnessAccessibility.removeAgentButton)
-    }
-  }
-  fileprivate var leaderActions: some View {
-    VStack(alignment: .leading, spacing: HarnessTheme.sectionSpacing) {
-      HarnessActionHeader(
-        title: "Leader Transfer",
-        subtitle: "Promote a live agent to leader when the current leader needs to step away."
-      )
-      if let pendingTransfer = detail.session.pendingLeaderTransfer {
-        let timestamp = formatTimestamp(pendingTransfer.requestedAt)
-        Text(
-          "\(pendingTransfer.requestedBy) requested \(pendingTransfer.newLeaderId) at \(timestamp)."
-        )
-        .scaledFont(.caption)
-        .foregroundStyle(HarnessTheme.secondaryInk)
-      }
-      Picker("New Leader", selection: $transferLeaderID) {
-        ForEach(detail.agents) { agent in
-          Text(agent.name).tag(agent.agentId)
-        }
-      }
-      TextField("Reason", text: $transferReason, axis: .vertical)
-        .focused($focusedField, equals: .transferReason)
-        .lineLimit(3, reservesSpace: true)
-        .submitLabel(.done)
-      Button(transferLeaderButtonTitle) {
-        Task { await transferLeader() }
-      }
-      .harnessActionButtonStyle(variant: .prominent, tint: HarnessTheme.caution)
-      .disabled(
-        transferLeaderID.isEmpty || transferLeaderID == detail.session.leaderId
-          || store.isSessionActionInFlight
-      )
-      .help(
-        transferLeaderID == detail.session.leaderId
-          ? "Select a different agent to transfer leadership to" : ""
-      )
-    }
-  }
-    
-  fileprivate func configureDefaults() {
+private extension InspectorActionSections {
+  func configureDefaults() {
     if let selectedTask {
       taskID = selectedTask.taskId
     } else if taskID.isEmpty || !detail.tasks.contains(where: { $0.taskId == taskID }) {
@@ -291,25 +136,47 @@ extension InspectorActionSections {
       transferLeaderID = detail.agents.first?.agentId ?? ""
     }
 
-    let currentActor = store.actionActorID ?? ""
-    let actorValid = store.availableActionActors.contains(where: { $0.agentId == currentActor })
-    if currentActor.isEmpty || !actorValid {
-      store.actionActorID = store.availableActionActors.first?.agentId
-        ?? detail.session.leaderId
+    let actorValid = availableActionActors.contains(where: { $0.agentId == actionActorID })
+    if actionActorID.isEmpty || !actorValid {
+      actionActorID = availableActionActors.first?.agentId ?? detail.session.leaderId ?? ""
     }
   }
-    
-  fileprivate func createTask() async {
+
+  func submitCreateTask() {
+    Task { await createTask() }
+  }
+
+  func submitAssignSelectedTask() {
+    Task { await assignSelectedTask() }
+  }
+
+  func submitUpdateSelectedTask() {
+    Task { await updateSelectedTask() }
+  }
+
+  func submitCheckpointSelectedTask() {
+    Task { await checkpointSelectedTask() }
+  }
+
+  func submitChangeSelectedRole() {
+    Task { await changeSelectedRole() }
+  }
+
+  func submitTransferLeader() {
+    Task { await transferLeader() }
+  }
+
+  func createTask() async {
     let title = createTitle.trimmingCharacters(in: .whitespacesAndNewlines)
     let context = createContext.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !title.isEmpty else {
       return
     }
 
-    let success = await store.createTask(
-      title: title,
-      context: context.isEmpty ? nil : context,
-      severity: createSeverity
+    let success = await createTaskAction(
+      title,
+      context.isEmpty ? nil : context,
+      createSeverity
     )
     if success {
       createTitle = ""
@@ -318,87 +185,68 @@ extension InspectorActionSections {
     }
     configureDefaults()
   }
-    
-  fileprivate func assignSelectedTask() async {
+
+  func assignSelectedTask() async {
     guard !taskID.isEmpty, !assigneeID.isEmpty else {
       return
     }
 
-    await store.assignTask(taskID: taskID, agentID: assigneeID)
+    _ = await assignTaskAction(taskID, assigneeID)
     configureDefaults()
   }
-    
-  fileprivate func updateSelectedTask() async {
+
+  func updateSelectedTask() async {
     guard !taskID.isEmpty else {
       return
     }
 
     let note = statusNote.trimmingCharacters(in: .whitespacesAndNewlines)
-    let success = await store.updateTaskStatus(
-      taskID: taskID,
-      status: taskStatus,
-      note: note.isEmpty ? nil : note
+    let success = await updateTaskStatusAction(
+      taskID,
+      taskStatus,
+      note.isEmpty ? nil : note
     )
     if success {
       statusNote = ""
     }
     configureDefaults()
   }
-    
-  fileprivate func checkpointSelectedTask() async {
+
+  func checkpointSelectedTask() async {
     let summary = checkpointSummary.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !taskID.isEmpty, !summary.isEmpty else {
       return
     }
 
-    let success = await store.checkpointTask(
-      taskID: taskID,
-      summary: summary,
-      progress: Int(checkpointProgress)
-    )
+    let success = await checkpointTaskAction(taskID, summary, Int(checkpointProgress))
     if success {
       checkpointSummary = ""
     }
     configureDefaults()
   }
-    
-  fileprivate func changeSelectedRole() async {
+
+  func changeSelectedRole() async {
     guard let agentID = selectedAgent?.agentId else {
       return
     }
 
-    await store.changeRole(agentID: agentID, role: role)
+    _ = await changeRoleAction(agentID, role)
     configureDefaults()
   }
-    
-  fileprivate func transferLeader() async {
+
+  func transferLeader() async {
     let reason = transferReason.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !transferLeaderID.isEmpty else {
       return
     }
 
-    let success = await store.transferLeader(
-      newLeaderID: transferLeaderID,
-      reason: reason.isEmpty ? nil : reason
+    let success = await transferLeaderAction(
+      transferLeaderID,
+      reason.isEmpty ? nil : reason
     )
     if success {
       transferReason = ""
     }
     configureDefaults()
-  }
-
-  fileprivate var actionActorBinding: Binding<String> {
-    Binding(
-      get: { store.actionActorID ?? "" },
-      set: { store.actionActorID = $0 }
-    )
-  }
-
-  fileprivate var transferLeaderButtonTitle: String {
-    let actingAgentID = store.actionActorID ?? detail.session.leaderId
-    if detail.session.pendingLeaderTransfer != nil && actingAgentID == detail.session.leaderId {
-      return "Confirm Leadership Transfer"
-    }
-    return "Transfer Leadership"
   }
 }
