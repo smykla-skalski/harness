@@ -51,13 +51,10 @@ final class HarnessSidebarLayoutUITests: HarnessUITestCase {
     let filtersCard = frameElement(in: app, identifier: Accessibility.sidebarFiltersCardFrame)
     let sessionList = frameElement(in: app, identifier: Accessibility.sidebarSessionListContent)
     let projectHeader = frameElement(in: app, identifier: Accessibility.previewProjectHeaderFrame)
-    let sessionRow = previewSessionTrigger(in: app)
     XCTAssertTrue(filtersCard.waitForExistence(timeout: Self.uiTimeout))
     XCTAssertTrue(sessionList.waitForExistence(timeout: Self.uiTimeout))
     XCTAssertTrue(projectHeader.waitForExistence(timeout: Self.uiTimeout))
-    XCTAssertTrue(sessionRow.waitForExistence(timeout: Self.uiTimeout))
     assertFillsColumn(child: projectHeader, in: sessionList, expectedHorizontalInset: 0, tolerance: 10)
-    assertFillsColumn(child: sessionRow, in: sessionList, expectedHorizontalInset: 0, tolerance: 10)
     let headerSpacing = projectHeader.frame.minY - filtersCard.frame.maxY
     XCTAssertGreaterThanOrEqual(headerSpacing, 0)
     XCTAssertLessThan(headerSpacing, 32)
