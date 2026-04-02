@@ -203,6 +203,35 @@ struct HarnessStoreLifecycleTests {
     #expect(store.isBookmarked(sessionId: PreviewFixtures.summary.sessionId))
   }
 
+  @Test("Preview store factory seeds offline cached state")
+  func previewStoreFactorySeedsOfflineCachedState() {
+    let store = HarnessPreviewStoreFactory.makeStore(for: .offlineCached)
+
+    #expect(
+      store.connectionState == .offline(DaemonControlError.daemonOffline.localizedDescription)
+    )
+    #expect(store.selectedSessionID == PreviewFixtures.summary.sessionId)
+    #expect(store.selectedSession == PreviewFixtures.detail)
+    #expect(store.timeline == PreviewFixtures.timeline)
+    #expect(store.sessions == [PreviewFixtures.summary])
+    #expect(store.isShowingCachedData)
+    #expect(store.persistedSessionCount == 1)
+
+    switch store.sessionDataAvailability {
+    case .persisted(let reason, let sessionCount, let lastSnapshotAt):
+      #expect(sessionCount == 1)
+      #expect(lastSnapshotAt != nil)
+      switch reason {
+      case .daemonOffline(let message):
+        #expect(message == DaemonControlError.daemonOffline.localizedDescription)
+      case .liveDataUnavailable:
+        Issue.record("Expected offline cached preview to report daemonOffline reason")
+      }
+    case .live, .unavailable:
+      Issue.record("Expected offline cached preview to expose persisted availability")
+    }
+  }
+
   @Test("Preview store factory exposes overflow sidebar data immediately")
   func previewStoreFactorySeedsOverflowSidebarState() {
     let store = HarnessPreviewStoreFactory.makeStore(for: .sidebarOverflow)

@@ -106,6 +106,7 @@ struct TaskInspectorCard: View {
 struct AgentInspectorCard: View {
   let agent: AgentRegistration
   let activity: AgentToolActivitySummary?
+  let isSessionReadOnly: Bool
   let isSessionActionInFlight: Bool
   let sendSignal: @MainActor (String, String, String?) async -> Void
   @State private var signalCommand = "inject_context"
@@ -213,9 +214,11 @@ struct AgentInspectorCard: View {
         .harnessActionButtonStyle(variant: .prominent, tint: nil)
         .disabled(
           signalCommand.isEmpty || signalMessage.isEmpty || isSessionActionInFlight
+            || isSessionReadOnly
         )
         .accessibilityIdentifier(HarnessAccessibility.signalSendButton)
       }
+      .disabled(isSessionReadOnly || isSessionActionInFlight)
     }
     .frame(maxWidth: .infinity, alignment: .leading)
     .accessibilityTestProbe(

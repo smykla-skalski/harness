@@ -2,6 +2,7 @@ import HarnessKit
 import SwiftUI
 
 struct InspectorActionStatusBanner: View {
+  let isSessionReadOnly: Bool
   let isSessionActionInFlight: Bool
   let lastAction: String
   let lastError: String?
@@ -27,9 +28,7 @@ struct InspectorActionStatusBanner: View {
       }
       .animation(.spring(duration: 0.2), value: isSessionActionInFlight)
       .animation(.spring(duration: 0.2), value: lastAction.isEmpty)
-      Text(
-        "Task creation, reassignments, checkpoints, and leadership changes flow through the daemon."
-      )
+      Text(statusMessage)
       .scaledFont(.system(.footnote, design: .rounded, weight: .medium))
       .foregroundStyle(HarnessTheme.secondaryInk)
       .lineLimit(3)
@@ -54,12 +53,26 @@ struct InspectorActionStatusBanner: View {
       }
     }
   }
+
+  private var statusMessage: String {
+    if isSessionReadOnly {
+      return """
+      The daemon is offline. Persisted session data remains visible, but daemon-backed
+      actions are read-only.
+      """
+    }
+    return """
+    Task creation, reassignments, checkpoints, and leadership changes flow through
+    the daemon.
+    """
+  }
 }
 
 struct InspectorCreateTaskSection: View {
   @Binding var createTitle: String
   @Binding var createContext: String
   @Binding var createSeverity: TaskSeverity
+  let isSessionReadOnly: Bool
   let isSessionActionInFlight: Bool
   let submitCreateTask: () -> Void
   @FocusState private var focusedField: ActionField?
@@ -96,8 +109,10 @@ struct InspectorCreateTaskSection: View {
         .disabled(
           createTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             || isSessionActionInFlight
+            || isSessionReadOnly
         )
     }
+    .disabled(isSessionReadOnly || isSessionActionInFlight)
   }
 }
 
@@ -111,6 +126,7 @@ struct InspectorTaskActionsSection: View {
   @Binding var statusNote: String
   @Binding var checkpointSummary: String
   @Binding var checkpointProgress: Double
+  let isSessionReadOnly: Bool
   let isSessionActionInFlight: Bool
   let assignSelectedTask: () -> Void
   let updateSelectedTask: () -> Void
@@ -149,12 +165,12 @@ struct InspectorTaskActionsSection: View {
       HStack {
         Button("Assign", action: assignSelectedTask)
           .harnessActionButtonStyle(variant: .prominent, tint: nil)
-          .disabled(isSessionActionInFlight)
+          .disabled(isSessionActionInFlight || isSessionReadOnly)
       }
       HStack {
         Button("Update Status", action: updateSelectedTask)
           .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
-          .disabled(isSessionActionInFlight)
+          .disabled(isSessionActionInFlight || isSessionReadOnly)
         TextField("Update note", text: $statusNote, axis: .vertical)
           .harnessNativeFormControl()
           .focused($focusedField, equals: .statusNote)
@@ -182,7 +198,7 @@ struct InspectorTaskActionsSection: View {
         Spacer()
         Button("Save Checkpoint", action: checkpointSelectedTask)
           .harnessActionButtonStyle(variant: .prominent, tint: HarnessTheme.caution)
-          .disabled(isSessionActionInFlight)
+          .disabled(isSessionActionInFlight || isSessionReadOnly)
       }
 
       if let checkpoint = task.checkpointSummary {
@@ -191,6 +207,7 @@ struct InspectorTaskActionsSection: View {
           .foregroundStyle(HarnessTheme.secondaryInk)
       }
     }
+    .disabled(isSessionReadOnly || isSessionActionInFlight)
   }
 }
 
@@ -198,6 +215,7 @@ struct InspectorRoleActionsSection: View {
   let agent: AgentRegistration
   let leaderID: String?
   @Binding var role: SessionRole
+  let isSessionReadOnly: Bool
   let isSessionActionInFlight: Bool
   let changeSelectedRole: () -> Void
   let requestRemoveAgentConfirmation: (String) -> Void
@@ -218,15 +236,16 @@ struct InspectorRoleActionsSection: View {
       .harnessNativeFormControl()
       Button("Change Role", action: changeSelectedRole)
         .harnessActionButtonStyle(variant: .prominent, tint: nil)
-        .disabled(isSessionActionInFlight)
+        .disabled(isSessionActionInFlight || isSessionReadOnly)
       Button("Remove Agent") {
         requestRemoveAgentConfirmation(agent.agentId)
       }
       .harnessActionButtonStyle(variant: .bordered, tint: .red)
-      .disabled(agent.agentId == leaderID || isSessionActionInFlight)
+      .disabled(agent.agentId == leaderID || isSessionActionInFlight || isSessionReadOnly)
       .help(agent.agentId == leaderID ? "The session leader cannot be removed" : "")
       .accessibilityIdentifier(HarnessAccessibility.removeAgentButton)
     }
+    .disabled(isSessionReadOnly || isSessionActionInFlight)
   }
 }
 
@@ -236,6 +255,7 @@ struct InspectorLeaderTransferSection: View {
   @Binding var transferReason: String
   let transferLeaderButtonTitle: String
   let actionActorID: String
+  let isSessionReadOnly: Bool
   let isSessionActionInFlight: Bool
   let submitTransferLeader: () -> Void
   @FocusState private var isReasonFocused: Bool
@@ -270,11 +290,13 @@ struct InspectorLeaderTransferSection: View {
         .disabled(
           transferLeaderID.isEmpty || transferLeaderID == detail.session.leaderId
             || isSessionActionInFlight
+            || isSessionReadOnly
         )
         .help(
           transferLeaderID == detail.session.leaderId
             ? "Select a different agent to transfer leadership to" : ""
         )
     }
+    .disabled(isSessionReadOnly || isSessionActionInFlight)
   }
 }

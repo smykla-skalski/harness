@@ -70,6 +70,8 @@ public final class HarnessStore {
     public var connectionEvents: [ConnectionEvent] = []
     public var subscribedSessionIDs: Set<String> = []
     public var isShowingCachedData = false
+    public var persistedSessionCount = 0
+    public var lastPersistedSnapshotAt: Date?
   }
 
   @MainActor
@@ -117,6 +119,7 @@ public final class HarnessStore {
   var sessionStreamTask: Task<Void, Never>?
   var connectionProbeTask: Task<Void, Never>?
   var sessionPushFallbackTask: Task<Void, Never>?
+  var sessionSnapshotHydrationTask: Task<Void, Never>?
   var latencySamplesMs: [Int] = []
   var trafficSampleTimes: [Date] = []
   var activeSessionLoadRequest: UInt64 = 0
@@ -136,6 +139,7 @@ public final class HarnessStore {
     self.modelContext = modelContext
     self.persistenceError = persistenceError
     refreshBookmarkedSessionIds()
+    refreshPersistedSessionMetadata()
   }
 
   public func bootstrapIfNeeded() async {
@@ -160,6 +164,7 @@ public final class HarnessStore {
     } catch {
       daemonStatus = await daemonStatusResponse
       markConnectionOffline(error.localizedDescription)
+      restorePersistedSessionState()
     }
   }
 
@@ -173,6 +178,7 @@ public final class HarnessStore {
       await connect(using: client)
     } catch {
       markConnectionOffline(error.localizedDescription)
+      restorePersistedSessionState()
     }
   }
 
@@ -186,6 +192,7 @@ public final class HarnessStore {
       client = nil
       markConnectionOffline("Daemon stopped")
       await refreshDaemonStatus()
+      restorePersistedSessionState()
       showLastAction("Stop daemon")
     } catch {
       lastError = error.localizedDescription
@@ -308,5 +315,7 @@ public final class HarnessStore {
     stopSessionStream(resetSubscriptions: resetSubscriptions)
     stopConnectionProbe()
     cancelSessionPushFallback()
+    sessionSnapshotHydrationTask?.cancel()
+    sessionSnapshotHydrationTask = nil
   }
 }

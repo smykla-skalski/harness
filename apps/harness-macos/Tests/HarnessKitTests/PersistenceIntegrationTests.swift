@@ -140,8 +140,8 @@ struct PersistenceIntegrationTests {
     #expect(cached?.detail.agents.count == 2)
   }
 
-  @Test("Eviction keeps only 50 most recently viewed sessions")
-  func evictionRemovesOldSessions() throws {
+  @Test("Persistence keeps all cached sessions instead of evicting older snapshots")
+  func persistenceKeepsAllCachedSessions() throws {
     let store = makeStore()
 
     for index in 0..<55 {
@@ -167,7 +167,7 @@ struct PersistenceIntegrationTests {
 
     let descriptor = FetchDescriptor<CachedSession>()
     let remaining = try container.mainContext.fetch(descriptor)
-    #expect(remaining.count <= 50)
+    #expect(remaining.count == 55)
   }
 
   @Test("loadCachedSessionList returns nil on empty store")
@@ -176,21 +176,96 @@ struct PersistenceIntegrationTests {
     #expect(store.loadCachedSessionList() == nil)
   }
 
-  @Test("loadCachedSessionDetail returns nil for unviewed session")
-  func loadCachedDetailReturnsNilForUnviewed() {
+  @Test("Persisted detail stays loadable even when it was hydrated without manual viewing")
+  func loadCachedDetailReturnsHydratedSnapshotWithoutManualViewing() {
     let store = makeStore()
     let session = makeSession(.init(
-      sessionId: "never-viewed",
-      context: "Never viewed",
+      sessionId: "hydrated-offline",
+      context: "Hydrated offline",
       status: .active,
+      leaderId: "leader-offline",
       openTaskCount: 0,
       inProgressTaskCount: 0,
       blockedTaskCount: 0,
-      activeAgentCount: 0
+      activeAgentCount: 1
     ))
-    store.cacheSessionList([session], projects: [])
+    let detail = makeSessionDetail(
+      summary: session,
+      workerID: "worker-offline",
+      workerName: "Offline Worker"
+    )
 
-    #expect(store.loadCachedSessionDetail(sessionID: "never-viewed") == nil)
+    store.cacheSessionDetail(detail, timeline: [], markViewed: false)
+
+    let cached = store.loadCachedSessionDetail(sessionID: "hydrated-offline")
+    #expect(cached?.detail.session.sessionId == "hydrated-offline")
+    #expect(store.persistedSessionCount == 1)
+    #expect(store.lastPersistedSnapshotAt != nil)
+  }
+
+  @Test("Selecting a persisted session offline restores cached detail and timeline")
+  func selectingPersistedSessionOfflineRestoresCachedSnapshot() async {
+    let store = makeStore()
+    let project = makeProject(totalSessionCount: 1, activeSessionCount: 1)
+    let session = makeSession(.init(
+      sessionId: "sess-offline-select",
+      context: "Offline selection",
+      status: .active,
+      leaderId: "leader-offline-select",
+      openTaskCount: 1,
+      inProgressTaskCount: 0,
+      blockedTaskCount: 0,
+      activeAgentCount: 1
+    ))
+    let detail = makeSessionDetail(
+      summary: session,
+      workerID: "worker-select",
+      workerName: "Offline Select Worker"
+    )
+    let timeline = makeTimelineEntries(
+      sessionID: session.sessionId,
+      agentID: detail.agents[0].agentId,
+      summary: "Offline timeline snapshot"
+    )
+
+    store.cacheSessionList([session], projects: [project])
+    store.cacheSessionDetail(detail, timeline: timeline, markViewed: false)
+    store.connectionState = .offline("daemon down")
+
+    await store.selectSession(session.sessionId)
+
+    #expect(store.selectedSessionID == session.sessionId)
+    #expect(store.selectedSession?.session.sessionId == session.sessionId)
+    #expect(store.timeline == timeline)
+    #expect(store.isShowingCachedData)
+    #expect(store.sessionDataAvailability != .live)
+  }
+
+  @Test("Hydration helper detects when a persisted detail snapshot is missing")
+  func persistedSnapshotNeedsHydrationReflectsSnapshotState() {
+    let store = makeStore()
+    let project = makeProject(totalSessionCount: 1, activeSessionCount: 1)
+    let session = makeSession(.init(
+      sessionId: "sess-hydration",
+      context: "Hydration needed",
+      status: .active,
+      leaderId: "leader-hydration",
+      openTaskCount: 0,
+      inProgressTaskCount: 0,
+      blockedTaskCount: 0,
+      activeAgentCount: 1
+    ))
+    let detail = makeSessionDetail(
+      summary: session,
+      workerID: "worker-hydration",
+      workerName: "Hydration Worker"
+    )
+
+    store.cacheSessionList([session], projects: [project])
+    #expect(store.persistedSnapshotNeedsHydration(for: session))
+
+    store.cacheSessionDetail(detail, timeline: [], markViewed: false)
+    #expect(store.persistedSnapshotNeedsHydration(for: session) == false)
   }
 
   @Test("Bookmark toggle persists and refreshes ID set")
