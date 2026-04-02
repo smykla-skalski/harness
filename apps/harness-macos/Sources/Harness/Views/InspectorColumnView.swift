@@ -3,7 +3,7 @@ import Observation
 import SwiftUI
 
 struct InspectorColumnView: View {
-  let store: HarnessStore
+  @Bindable var store: HarnessStore
 
   private var selectedObserver: ObserverSummary? {
     guard case .observer = store.inspectorSelection else { return nil }
@@ -27,11 +27,34 @@ struct InspectorColumnView: View {
 
         if let detail = store.selectedSession {
           InspectorActionSections(
-            store: store,
             detail: detail,
             selectedTask: store.selectedTask,
             selectedAgent: store.selectedAgent,
-            selectedObserver: selectedObserver
+            selectedObserver: selectedObserver,
+            isSessionActionInFlight: store.isSessionActionInFlight,
+            lastAction: store.lastAction,
+            lastError: store.lastError,
+            availableActionActors: store.availableActionActors,
+            actionActorID: $store.selectedActionActorID,
+            requestRemoveAgentConfirmation: store.requestRemoveAgentConfirmation(agentID:),
+            createTaskAction: { title, context, severity in
+              await store.createTask(title: title, context: context, severity: severity)
+            },
+            assignTaskAction: { taskID, agentID in
+              await store.assignTask(taskID: taskID, agentID: agentID)
+            },
+            updateTaskStatusAction: { taskID, status, note in
+              await store.updateTaskStatus(taskID: taskID, status: status, note: note)
+            },
+            checkpointTaskAction: { taskID, summary, progress in
+              await store.checkpointTask(taskID: taskID, summary: summary, progress: progress)
+            },
+            changeRoleAction: { agentID, role in
+              await store.changeRole(agentID: agentID, role: role)
+            },
+            transferLeaderAction: { newLeaderID, reason in
+              await store.transferLeader(newLeaderID: newLeaderID, reason: reason)
+            }
           )
         }
       }
@@ -122,15 +145,35 @@ struct InspectorColumnView: View {
   }
 
   private func taskInspector(_ task: WorkItem) -> some View {
-    TaskInspectorCard(task: task, store: store)
+    TaskInspectorCard(
+      task: task,
+      notesSessionID: store.selectedSession?.session.sessionId,
+      isPersistenceAvailable: store.isPersistenceAvailable,
+      addNote: { text, targetID, sessionID in
+        store.addNote(
+          text: text,
+          targetKind: "task",
+          targetId: targetID,
+          sessionId: sessionID
+        )
+      },
+      deleteNote: { _ = store.deleteNote($0) }
+    )
   }
 
   private func agentInspector(_ agent: AgentRegistration) -> some View {
     AgentInspectorCard(
       agent: agent,
       activity: selectedAgentActivity,
-      store: store
-    )
+      isSessionActionInFlight: store.isSessionActionInFlight
+    ) { command, message, actionHint in
+      await store.sendSignal(
+        agentID: agent.agentId,
+        command: command,
+        message: message,
+        actionHint: actionHint
+      )
+    }
   }
 
   private func signalInspector(_ signal: SessionSignalRecord) -> some View {
@@ -140,5 +183,4 @@ struct InspectorColumnView: View {
   private func observerInspector(_ observer: ObserverSummary) -> some View {
     ObserverInspectorCard(observer: observer)
   }
-
 }
