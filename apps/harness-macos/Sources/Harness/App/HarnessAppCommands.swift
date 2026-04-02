@@ -2,6 +2,8 @@ import HarnessKit
 import SwiftUI
 
 struct HarnessAppCommands: Commands {
+  @Environment(\.openWindow)
+  private var openWindow
   let store: HarnessStore
   let textSizeIndex: Int
   let inspectorVisibility: Binding<Bool>?
@@ -31,6 +33,12 @@ struct HarnessAppCommands: Commands {
   var body: some Commands {
     SidebarCommands()
     TextEditingCommands()
+    CommandGroup(replacing: .appSettings) {
+      Button("Settings…") {
+        openWindow(id: HarnessWindowID.preferences)
+      }
+      .keyboardShortcut(",", modifiers: .command)
+    }
     CommandGroup(after: .toolbar) {
       Button("Increase Text Size", action: increaseTextSize)
         .keyboardShortcut("+", modifiers: .command)

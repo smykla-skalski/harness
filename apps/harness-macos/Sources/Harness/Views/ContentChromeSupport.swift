@@ -278,16 +278,14 @@ struct ContentNavigationToolbar: ToolbarContent {
   let navigateForward: () -> Void
 
   var body: some ToolbarContent {
-    ToolbarItem(placement: .topBarLeading) {
+    ToolbarItemGroup(placement: .navigation) {
       Button(action: navigateBack) {
         Label("Back", systemImage: "chevron.backward")
       }
       .disabled(!canNavigateBack)
       .help("Go back")
       .accessibilityIdentifier(HarnessAccessibility.navigateBackButton)
-    }
 
-    ToolbarItem(placement: .topBarLeading) {
       Button(action: navigateForward) {
         Label("Forward", systemImage: "chevron.forward")
       }

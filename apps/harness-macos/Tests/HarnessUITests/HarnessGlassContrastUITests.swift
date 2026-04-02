@@ -6,18 +6,18 @@ private typealias Accessibility = HarnessUITestAccessibility
 @MainActor
 final class HarnessGlassContrastUITests: HarnessUITestCase {
 
-  func testBoardMetricCardContentIsReadable() throws {
-    let app = launch(mode: "empty")
-
-    let card = element(
-      in: app,
-      identifier: Accessibility.trackedProjectsCard
+  func testToolbarCenterpieceContentIsReadable() throws {
+    let app = launch(
+      mode: "preview",
+      additionalEnvironment: ["HARNESS_PREVIEW_SCENARIO": "dashboard"]
     )
-    XCTAssertTrue(card.waitForExistence(timeout: Self.uiTimeout))
 
-    let stats = luminanceStats(of: card)
-    let screenshot = XCTAttachment(screenshot: card.screenshot())
-    screenshot.name = "board-metric-section"
+    let centerpiece = element(in: app, identifier: Accessibility.toolbarCenterpiece)
+    XCTAssertTrue(centerpiece.waitForExistence(timeout: Self.uiTimeout))
+
+    let stats = luminanceStats(of: centerpiece)
+    let screenshot = XCTAttachment(screenshot: centerpiece.screenshot())
+    screenshot.name = "toolbar-centerpiece"
     screenshot.lifetime = .keepAlways
     add(screenshot)
 
