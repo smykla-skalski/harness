@@ -60,8 +60,7 @@ struct SessionsBoardRecentSessionsSection: View {
               }
               Divider()
               Button {
-                NSPasteboard.general.clearContents()
-                NSPasteboard.general.setString(session.sessionId, forType: .string)
+                HarnessClipboard.copy(session.sessionId)
               } label: {
                 Label("Copy Session ID", systemImage: "doc.on.doc")
               }
