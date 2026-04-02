@@ -247,6 +247,80 @@ public struct WorkItem: Codable, Equatable, Identifiable, Sendable {
   public let checkpointSummary: TaskCheckpointSummary?
 
   public var id: String { taskId }
+
+  enum CodingKeys: String, CodingKey {
+    case taskId
+    case title
+    case context
+    case severity
+    case status
+    case assignedTo
+    case createdAt
+    case updatedAt
+    case createdBy
+    case notes
+    case suggestedFix
+    case source
+    case blockedReason
+    case completedAt
+    case checkpointSummary
+  }
+
+  public init(
+    taskId: String,
+    title: String,
+    context: String?,
+    severity: TaskSeverity,
+    status: TaskStatus,
+    assignedTo: String?,
+    createdAt: String,
+    updatedAt: String,
+    createdBy: String?,
+    notes: [TaskNote],
+    suggestedFix: String?,
+    source: TaskSource,
+    blockedReason: String?,
+    completedAt: String?,
+    checkpointSummary: TaskCheckpointSummary?
+  ) {
+    self.taskId = taskId
+    self.title = title
+    self.context = context
+    self.severity = severity
+    self.status = status
+    self.assignedTo = assignedTo
+    self.createdAt = createdAt
+    self.updatedAt = updatedAt
+    self.createdBy = createdBy
+    self.notes = notes
+    self.suggestedFix = suggestedFix
+    self.source = source
+    self.blockedReason = blockedReason
+    self.completedAt = completedAt
+    self.checkpointSummary = checkpointSummary
+  }
+
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    taskId = try container.decode(String.self, forKey: .taskId)
+    title = try container.decode(String.self, forKey: .title)
+    context = try container.decodeIfPresent(String.self, forKey: .context)
+    severity = try container.decode(TaskSeverity.self, forKey: .severity)
+    status = try container.decode(TaskStatus.self, forKey: .status)
+    assignedTo = try container.decodeIfPresent(String.self, forKey: .assignedTo)
+    createdAt = try container.decode(String.self, forKey: .createdAt)
+    updatedAt = try container.decode(String.self, forKey: .updatedAt)
+    createdBy = try container.decodeIfPresent(String.self, forKey: .createdBy)
+    notes = try container.decodeIfPresent([TaskNote].self, forKey: .notes) ?? []
+    suggestedFix = try container.decodeIfPresent(String.self, forKey: .suggestedFix)
+    source = try container.decodeIfPresent(TaskSource.self, forKey: .source) ?? .manual
+    blockedReason = try container.decodeIfPresent(String.self, forKey: .blockedReason)
+    completedAt = try container.decodeIfPresent(String.self, forKey: .completedAt)
+    checkpointSummary = try container.decodeIfPresent(
+      TaskCheckpointSummary.self,
+      forKey: .checkpointSummary
+    )
+  }
 }
 
 public struct ObserverIssueSummary: Codable, Equatable, Identifiable, Sendable {
