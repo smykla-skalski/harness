@@ -50,7 +50,7 @@ struct ContentView: View {
     } detail: {
       ContentDetailChrome(
         persistenceError: store.persistenceError,
-        isShowingCachedData: store.isShowingCachedData
+        cachedDataMessage: store.isShowingCachedData ? store.cachedDataStatusMessage : nil
       ) {
         SessionContentContainer(
           store: store,

@@ -74,7 +74,7 @@ struct HarnessConfirmationDialogModifier: ViewModifier {
 
 struct ContentDetailChrome<Content: View>: View {
   let persistenceError: String?
-  let isShowingCachedData: Bool
+  let cachedDataMessage: String?
   @ViewBuilder let content: Content
 
   var body: some View {
@@ -82,8 +82,8 @@ struct ContentDetailChrome<Content: View>: View {
       if let persistenceError {
         PersistenceUnavailableBanner(message: persistenceError)
       }
-      if isShowingCachedData {
-        CachedDataBanner()
+      if let cachedDataMessage {
+        CachedDataBanner(message: cachedDataMessage)
       }
       content
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -92,12 +92,14 @@ struct ContentDetailChrome<Content: View>: View {
 }
 
 struct CachedDataBanner: View {
+  let message: String
+
   var body: some View {
     HStack(spacing: HarnessTheme.itemSpacing) {
       Image(systemName: "cloud.bolt")
         .scaledFont(.caption)
         .accessibilityHidden(true)
-      Text("Showing cached data - daemon is offline")
+      Text(message)
         .scaledFont(.caption.weight(.medium))
       Spacer()
     }

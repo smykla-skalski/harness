@@ -208,6 +208,20 @@ struct HarnessStoreTests {
     #expect(store.diagnostics?.workspace.cacheEntryCount == 2)
   }
 
+  @Test("Cached data status message reflects connection state")
+  func cachedDataStatusMessageReflectsConnectionState() {
+    let store = HarnessStore(daemonController: RecordingDaemonController())
+
+    store.connectionState = .online
+    #expect(
+      store.cachedDataStatusMessage
+        == "Showing cached data - live session detail is unavailable"
+    )
+
+    store.connectionState = .offline("daemon down")
+    #expect(store.cachedDataStatusMessage == "Showing cached data - daemon is offline")
+  }
+
   @Test("Refreshing diagnostics loads live daemon diagnostics")
   func refreshDiagnosticsLoadsLiveDaemonDiagnostics() async {
     let store = await makeBootstrappedStore()
