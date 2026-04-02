@@ -75,6 +75,13 @@ extension HarnessStore {
     return Date.now.timeIntervalSince(lastMessageAt) < 1.5
   }
 
+  public var cachedDataStatusMessage: String {
+    if case .offline = connectionState {
+      return "Showing cached data - daemon is offline"
+    }
+    return "Showing cached data - live session detail is unavailable"
+  }
+
   private static let maxLatencySamples = 12
   private static let trafficWindow: TimeInterval = 30
 
