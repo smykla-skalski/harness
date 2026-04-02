@@ -1,0 +1,109 @@
+import SwiftUI
+
+struct HarnessAsyncActionButton: View {
+  typealias Action = @MainActor () async -> Void
+
+  enum Variant: Equatable {
+    case prominent
+    case bordered
+  }
+
+  let title: String
+  let tint: Color?
+  let variant: Variant
+  let isLoading: Bool
+  let accessibilityIdentifier: String
+  let fillsWidth: Bool
+  let action: Action
+  @State private var runningTask: Task<Void, Never>?
+
+  init(
+    title: String,
+    tint: Color? = nil,
+    variant: Variant,
+    isLoading: Bool,
+    accessibilityIdentifier: String,
+    fillsWidth: Bool = false,
+    action: @escaping Action
+  ) {
+    self.title = title
+    self.tint = tint
+    self.variant = variant
+    self.isLoading = isLoading
+    self.accessibilityIdentifier = accessibilityIdentifier
+    self.fillsWidth = fillsWidth
+    self.action = action
+  }
+
+  private var effectiveVariant: Variant {
+    isLoading ? .bordered : variant
+  }
+
+  private var effectiveTint: Color? {
+    isLoading ? .secondary : tint
+  }
+
+  var body: some View {
+    Button {
+      if isLoading {
+        cancelAction()
+      } else {
+        performAction()
+      }
+    } label: {
+      label
+    }
+    .frame(maxWidth: fillsWidth ? .infinity : nil)
+    .harnessActionButtonStyle(variant: effectiveVariant, tint: effectiveTint)
+    .controlSize(HarnessControlMetrics.compactControlSize)
+    .accessibilityIdentifier(accessibilityIdentifier)
+    .accessibilityFrameMarker("\(accessibilityIdentifier).frame")
+  }
+
+  private var label: some View {
+    ProminentAwareLabel {
+      HStack(spacing: HarnessTheme.itemSpacing) {
+        if isLoading {
+          HarnessSpinner()
+            .transition(.opacity)
+        }
+        Text(isLoading ? "Cancel" : title)
+          .lineLimit(1)
+      }
+      .scaledFont(.system(.callout, design: .rounded, weight: .semibold))
+      .frame(maxWidth: fillsWidth ? .infinity : nil)
+      .animation(.spring(duration: 0.2), value: isLoading)
+    }
+  }
+
+  private func performAction() {
+    let action = action
+    runningTask = Task { @MainActor in
+      await action()
+      runningTask = nil
+    }
+  }
+
+  private func cancelAction() {
+    runningTask?.cancel()
+    runningTask = nil
+  }
+}
+
+private struct ProminentAwareLabel<Content: View>: View {
+  @Environment(\.prominentButtonForeground)
+  private var prominentForeground
+  private let content: Content
+
+  init(@ViewBuilder content: () -> Content) {
+    self.content = content()
+  }
+
+  var body: some View {
+    if let prominentForeground {
+      content.foregroundStyle(prominentForeground)
+    } else {
+      content
+    }
+  }
+}
