@@ -97,8 +97,35 @@ struct SidebarView: View {
 
   private var sidebarHeader: some View {
     VStack(alignment: .leading, spacing: HarnessTheme.sectionSpacing) {
-      DaemonStatusCard(store: store)
-      SidebarFilterSection(store: store)
+      DaemonStatusCard(
+        connectionState: store.connectionState,
+        isBusy: store.isBusy,
+        isRefreshing: store.isRefreshing,
+        projectCount: store.daemonStatus?.projectCount ?? store.projects.count,
+        sessionCount: store.daemonStatus?.sessionCount ?? store.sessions.count,
+        isLaunchAgentInstalled: store.daemonStatus?.launchAgent.installed == true,
+        startDaemon: startDaemon,
+        installLaunchAgent: installLaunchAgent
+      )
+      SidebarFilterSection(
+        filteredSessionCount: store.filteredSessionCount,
+        totalSessionCount: store.sessions.count,
+        searchText: store.searchText,
+        sessionFilter: store.sessionFilter,
+        sessionFocusFilter: store.sessionFocusFilter,
+        sessionSortOrder: Binding(
+          get: { store.sessionSortOrder },
+          set: { store.sessionSortOrder = $0 }
+        ),
+        isPersistenceAvailable: store.isPersistenceAvailable,
+        resetFilters: store.resetFilters,
+        recordSearch: recordSearch(_:),
+        updateSearchText: updateSearchText,
+        setSessionFilter: setSessionFilter,
+        setSessionFocusFilter: setSessionFocusFilter,
+        applyRecentSearch: applyRecentSearch,
+        clearSearchHistory: clearSearchHistory
+      )
     }
     .padding(.horizontal, HarnessTheme.sectionSpacing)
     .padding(.top, HarnessTheme.spacingXL)
@@ -207,6 +234,38 @@ struct SidebarView: View {
     } else {
       baseRow
     }
+  }
+
+  private func startDaemon() async {
+    await store.startDaemon()
+  }
+
+  private func installLaunchAgent() async {
+    await store.installLaunchAgent()
+  }
+
+  private func updateSearchText(_ query: String) {
+    store.searchText = query
+  }
+
+  private func recordSearch(_ query: String) {
+    _ = store.recordSearch(query)
+  }
+
+  private func setSessionFilter(_ filter: HarnessStore.SessionFilter) {
+    store.sessionFilter = filter
+  }
+
+  private func setSessionFocusFilter(_ filter: SessionFocusFilter) {
+    store.sessionFocusFilter = filter
+  }
+
+  private func applyRecentSearch(_ query: String) {
+    store.searchText = query
+  }
+
+  private func clearSearchHistory() {
+    _ = store.clearSearchHistory()
   }
 }
 

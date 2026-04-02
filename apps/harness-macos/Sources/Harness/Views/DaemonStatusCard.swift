@@ -1,12 +1,18 @@
 import HarnessKit
-import Observation
 import SwiftUI
 
 struct DaemonStatusCard: View {
-  let store: HarnessStore
+  let connectionState: HarnessStore.ConnectionState
+  let isBusy: Bool
+  let isRefreshing: Bool
+  let projectCount: Int
+  let sessionCount: Int
+  let isLaunchAgentInstalled: Bool
+  let startDaemon: HarnessAsyncActionButton.Action
+  let installLaunchAgent: HarnessAsyncActionButton.Action
 
   private var isLoading: Bool {
-    store.isBusy || store.isRefreshing || store.connectionState == .connecting
+    isBusy || isRefreshing || connectionState == .connecting
   }
 
   var body: some View {
@@ -30,7 +36,7 @@ struct DaemonStatusCard: View {
       }
 
       Group {
-        if store.isRefreshing || store.connectionState == .connecting {
+        if isRefreshing || connectionState == .connecting {
           HarnessLoadingStateView(title: loadingTitle, chrome: .control)
             .transition(.move(edge: .top).combined(with: .opacity))
         }
@@ -66,17 +72,13 @@ struct DaemonStatusCard: View {
 
 extension DaemonStatusCard {
   fileprivate var isDaemonOnline: Bool {
-    store.connectionState == .online
-  }
-
-  fileprivate var isLaunchAgentInstalled: Bool {
-    store.daemonStatus?.launchAgent.installed == true
+    connectionState == .online
   }
 
   fileprivate var restartButton: some View {
     Button {
       guard !isLoading else { return }
-      Task { await store.startDaemon() }
+      Task { await startDaemon() }
     } label: {
       Image(systemName: isDaemonOnline ? "arrow.clockwise" : "power")
         .scaledFont(.system(.body, weight: .semibold))
@@ -124,7 +126,7 @@ extension DaemonStatusCard {
   }
 
   fileprivate var connectionLabel: String {
-    switch store.connectionState {
+    switch connectionState {
     case .idle:
       "Waiting for bootstrap"
     case .connecting:
@@ -137,7 +139,7 @@ extension DaemonStatusCard {
   }
 
   fileprivate var loadingTitle: String {
-    switch store.connectionState {
+    switch connectionState {
     case .connecting:
       "Connecting to the control plane"
     default:
@@ -155,7 +157,7 @@ extension DaemonStatusCard {
   }
 
   fileprivate var statusTitle: String {
-    switch store.connectionState {
+    switch connectionState {
     case .online:
       "Online"
     case .connecting:
@@ -168,7 +170,7 @@ extension DaemonStatusCard {
   }
 
   fileprivate var statusBackground: Color {
-    switch store.connectionState {
+    switch connectionState {
     case .online:
       HarnessTheme.success
     case .connecting:
@@ -181,15 +183,15 @@ extension DaemonStatusCard {
   }
 
   fileprivate var daemonProjectCount: Int {
-    store.daemonStatus?.projectCount ?? store.projects.count
+    projectCount
   }
 
   fileprivate var daemonSessionCount: Int {
-    store.daemonStatus?.sessionCount ?? store.sessions.count
+    sessionCount
   }
 
   fileprivate var daemonLaunchdState: String {
-    store.daemonStatus?.launchAgent.installed == true ? "Installed" : "Manual"
+    isLaunchAgentInstalled ? "Installed" : "Manual"
   }
 
   fileprivate var daemonProjectsBadge: some View {
@@ -239,14 +241,6 @@ extension DaemonStatusCard {
     content()
       .accessibilityElement(children: .contain)
       .accessibilityIdentifier(identifier)
-  }
-
-  fileprivate func startDaemon() async {
-    await store.startDaemon()
-  }
-
-  fileprivate func installLaunchAgent() async {
-    await store.installLaunchAgent()
   }
 }
 

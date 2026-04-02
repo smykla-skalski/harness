@@ -1,5 +1,4 @@
 import HarnessKit
-import Observation
 import SwiftUI
 
 struct SessionsBoardView: View {
@@ -17,7 +16,15 @@ struct SessionsBoardView: View {
     HarnessColumnScrollView(constrainContentWidth: true) {
       VStack(alignment: .leading, spacing: 24) {
         if store.sessions.isEmpty {
-          SessionsBoardOnboardingCard(store: store, isLoading: isLoading)
+          SessionsBoardOnboardingCard(
+            connectionState: store.connectionState,
+            isLaunchAgentInstalled: store.daemonStatus?.launchAgent.installed == true,
+            hasSessions: !store.sessions.isEmpty,
+            isLoading: isLoading,
+            startDaemon: startDaemon,
+            installLaunchAgent: installLaunchAgent,
+            refresh: refresh
+          )
         }
         metricsSection
         SessionsBoardRecentSessionsSection(
@@ -100,5 +107,17 @@ struct SessionsBoardView: View {
     Task {
       await store.selectSession(sessionID)
     }
+  }
+
+  private func startDaemon() async {
+    await store.startDaemon()
+  }
+
+  private func installLaunchAgent() async {
+    await store.installLaunchAgent()
+  }
+
+  private func refresh() async {
+    await store.refresh()
   }
 }
