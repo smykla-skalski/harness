@@ -73,6 +73,7 @@ pub fn start_session(
         .expect("new session always has a leader");
 
     storage::register_active(project_dir, &state.session_id)?;
+    let _ = storage::record_project_origin(project_dir);
     storage::append_log_entry(
         project_dir,
         &state.session_id,
