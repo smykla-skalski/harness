@@ -2,8 +2,6 @@ import Foundation
 import SwiftData
 
 extension HarnessStore {
-  private static let maxCachedSessions = 50
-
   func cacheSessionList(
     _ sessions: [SessionSummary],
     projects: [ProjectSummary]
@@ -40,6 +38,7 @@ extension HarnessStore {
       }
 
       try modelContext.save()
+      refreshPersistedSessionMetadata()
     } catch {
       modelContext.rollback()
       recordPersistenceFailure(
@@ -51,7 +50,8 @@ extension HarnessStore {
 
   func cacheSessionDetail(
     _ detail: SessionDetail,
-    timeline: [TimelineEntry]
+    timeline: [TimelineEntry],
+    markViewed: Bool = true
   ) {
     guard let modelContext, persistenceError == nil else { return }
 
@@ -71,7 +71,9 @@ extension HarnessStore {
         modelContext.insert(cached)
       }
 
-      cached.lastViewedAt = .now
+      if markViewed {
+        cached.lastViewedAt = .now
+      }
 
       syncAgents(detail.agents, on: cached, in: modelContext)
       syncTasks(detail.tasks, on: cached, in: modelContext)
@@ -81,7 +83,7 @@ extension HarnessStore {
       syncObserver(detail.observer, on: cached, in: modelContext)
 
       try modelContext.save()
-      try evictStaleSessions(in: modelContext)
+      refreshPersistedSessionMetadata()
     } catch {
       modelContext.rollback()
       recordPersistenceFailure(
@@ -135,9 +137,7 @@ extension HarnessStore {
       )
       descriptor.fetchLimit = 1
 
-      guard let cached = try modelContext.fetch(descriptor).first,
-        cached.lastViewedAt != nil
-      else {
+      guard let cached = try modelContext.fetch(descriptor).first else {
         return nil
       }
 
@@ -152,6 +152,68 @@ extension HarnessStore {
       )
       return nil
     }
+  }
+
+  func refreshPersistedSessionMetadata() {
+    guard let modelContext, persistenceError == nil else {
+      persistedSessionCount = 0
+      lastPersistedSnapshotAt = nil
+      return
+    }
+
+    do {
+      let count = try modelContext.fetchCount(FetchDescriptor<CachedSession>())
+      var latestDescriptor = FetchDescriptor<CachedSession>(
+        sortBy: [SortDescriptor(\.lastCachedAt, order: .reverse)]
+      )
+      latestDescriptor.fetchLimit = 1
+      let latest = try modelContext.fetch(latestDescriptor).first
+
+      persistedSessionCount = count
+      lastPersistedSnapshotAt = latest?.lastCachedAt
+    } catch {
+      recordPersistenceFailure(
+        action: "Persisted session metadata could not be loaded.",
+        underlyingError: error
+      )
+      persistedSessionCount = 0
+      lastPersistedSnapshotAt = nil
+    }
+  }
+
+  func persistedSnapshotNeedsHydration(for summary: SessionSummary) -> Bool {
+    guard let modelContext, persistenceError == nil else {
+      return false
+    }
+
+    do {
+      let sessionID = summary.sessionId
+      var descriptor = FetchDescriptor<CachedSession>(
+        predicate: #Predicate { $0.sessionId == sessionID }
+      )
+      descriptor.fetchLimit = 1
+
+      guard let cached = try modelContext.fetch(descriptor).first else {
+        return true
+      }
+
+      return cached.updatedAt != summary.updatedAt || !hasPersistedDetailSnapshot(cached)
+    } catch {
+      recordPersistenceFailure(
+        action: "Persisted session hydration state could not be evaluated.",
+        underlyingError: error
+      )
+      return true
+    }
+  }
+
+  private func hasPersistedDetailSnapshot(_ session: CachedSession) -> Bool {
+    session.observer != nil
+      || !session.agents.isEmpty
+      || !session.tasks.isEmpty
+      || !session.signals.isEmpty
+      || !session.timelineEntries.isEmpty
+      || !session.agentActivity.isEmpty
   }
 }
 
@@ -285,50 +347,5 @@ extension HarnessStore {
     } else if let observer {
       session.observer = observer.toCachedObserver()
     }
-  }
-
-  private func evictStaleSessions(in context: ModelContext) throws {
-    var descriptor = FetchDescriptor<CachedSession>(
-      sortBy: [SortDescriptor(\.lastViewedAt, order: .reverse)]
-    )
-    descriptor.fetchOffset = Self.maxCachedSessions
-
-    let stale = try context.fetch(descriptor)
-    guard !stale.isEmpty else {
-      return
-    }
-
-    let evictedProjectIds = Set(stale.map(\.projectId))
-    for session in stale {
-      context.delete(session)
-    }
-
-    try context.save()
-    try evictOrphanedProjects(candidateIds: evictedProjectIds, in: context)
-  }
-
-  private func evictOrphanedProjects(
-    candidateIds: Set<String>,
-    in context: ModelContext
-  ) throws {
-    for projectId in candidateIds {
-      var descriptor = FetchDescriptor<CachedSession>(
-        predicate: #Predicate { $0.projectId == projectId }
-      )
-      descriptor.fetchLimit = 1
-
-      let hasRemaining = try context.fetchCount(descriptor)
-      if hasRemaining == 0 {
-        let projectDescriptor = FetchDescriptor<CachedProject>(
-          predicate: #Predicate { $0.projectId == projectId }
-        )
-        let orphaned = try context.fetch(projectDescriptor)
-        for project in orphaned {
-          context.delete(project)
-        }
-      }
-    }
-
-    try context.save()
   }
 }

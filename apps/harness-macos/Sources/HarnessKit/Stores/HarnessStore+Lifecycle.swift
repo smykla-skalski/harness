@@ -9,6 +9,7 @@ extension HarnessStore {
   func connect(using client: any HarnessClientProtocol) async {
     self.client = client
     connectionState = .online
+    refreshPersistedSessionMetadata()
 
     let transport: TransportKind = client is WebSocketTransport ? .webSocket : .httpSSE
     resetConnectionMetrics(for: transport)
@@ -16,7 +17,9 @@ extension HarnessStore {
 
     await refresh(using: client, preserveSelection: true)
     guard connectionState == .online else {
+      self.client = nil
       stopAllStreams()
+      restorePersistedSessionState()
       return
     }
     startConnectionProbe(using: client)
@@ -78,6 +81,10 @@ extension HarnessStore {
         projects: measuredProjects.value,
         sessions: measuredSessions.value
       )
+      schedulePersistedSnapshotHydration(
+        using: client,
+        sessions: measuredSessions.value
+      )
 
       if preserveSelection, let selectedSessionID, selectedSessionSummary != nil {
         let requestID = beginSessionLoad()
@@ -97,15 +104,9 @@ extension HarnessStore {
         }
       }
     } catch {
+      self.client = nil
       markConnectionOffline(error.localizedDescription)
-
-      if let cached = loadCachedSessionList() {
-        sessionIndex.replaceSnapshot(
-          projects: cached.projects,
-          sessions: cached.sessions
-        )
-        isShowingCachedData = true
-      }
+      restorePersistedSessionState()
     }
   }
 
@@ -153,6 +154,8 @@ extension HarnessStore {
           timeline: cached.timeline,
           showingCachedData: true
         )
+      } else {
+        isShowingCachedData = persistedSessionCount > 0 || !sessions.isEmpty
       }
     }
   }
@@ -209,6 +212,11 @@ extension HarnessStore {
       }
       guard sessionID == selectedSessionID else {
         applySessionSummaryUpdate(payload.detail.session)
+        cacheSessionDetail(
+          payload.detail,
+          timeline: payload.timeline,
+          markViewed: false
+        )
         return
       }
       applySelectedSessionSnapshot(
