@@ -237,7 +237,7 @@ struct InspectorBadgeColumn: View {
         Text(value)
           .scaledFont(.caption.weight(.semibold))
           .harnessPillPadding()
-          .harnessInfoPill()
+          .harnessContentPill()
       }
     }
   }

@@ -382,10 +382,13 @@ final class HarnessUITests: HarnessUITestCase {
     )
     XCTAssertEqual(
       appChromeState.label,
-      "contentChrome=native, interactiveRows=button, controlGlass=none"
+      "contentChrome=native, interactiveRows=button, controlGlass=native"
     )
-    XCTAssertEqual(sessionRow.value as? String, "selected, interactive=button")
-    XCTAssertEqual(observeSummaryButton.value as? String, "interactive=plain")
+    XCTAssertEqual(
+      sessionRow.value as? String,
+      "selected, interactive=button, selectionChrome=translucent"
+    )
+    XCTAssertEqual(observeSummaryButton.value as? String, "interactive=button, chrome=content-card")
   }
 
   func testActionToastAppearsAndAutoDismisses() throws {

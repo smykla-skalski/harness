@@ -46,7 +46,7 @@ struct SidebarSessionRow: View {
       .lineLimit(1)
       .harnessPillPadding()
       .foregroundStyle(isSelected ? HarnessTheme.onContrast : HarnessTheme.ink)
-      .harnessInfoPill(tint: isSelected ? HarnessTheme.onContrast : HarnessTheme.ink)
+      .harnessContentPill(tint: isSelected ? HarnessTheme.onContrast : HarnessTheme.ink)
   }
 
   private var selectedSecondaryTextStyle: Color {

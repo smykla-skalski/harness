@@ -201,4 +201,18 @@ public struct DaemonDiagnosticsReport: Codable, Equatable, Sendable {
   public let launchAgent: LaunchAgentStatus
   public let workspace: DaemonDiagnostics
   public let recentEvents: [DaemonAuditEvent]
+
+  public init(
+    health: HealthResponse?,
+    manifest: DaemonManifest?,
+    launchAgent: LaunchAgentStatus,
+    workspace: DaemonDiagnostics,
+    recentEvents: [DaemonAuditEvent]
+  ) {
+    self.health = health
+    self.manifest = manifest
+    self.launchAgent = launchAgent
+    self.workspace = workspace
+    self.recentEvents = recentEvents
+  }
 }

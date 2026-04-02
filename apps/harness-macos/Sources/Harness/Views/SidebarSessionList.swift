@@ -72,14 +72,16 @@ struct SidebarFilterSection: View {
       }
 
       filterSection(title: "Status") {
-        HarnessWrapLayout(spacing: HarnessTheme.itemSpacing, lineSpacing: HarnessTheme.itemSpacing) {
-          ForEach(HarnessStore.SessionFilter.allCases) { filter in
-            filterChip(
-              title: filter.title,
-              isSelected: store.sessionFilter == filter,
-              identifier: HarnessAccessibility.sessionFilterButton(filter.rawValue)
-            ) {
-              store.sessionFilter = filter
+        HarnessGlassControlGroup(spacing: HarnessTheme.itemSpacing) {
+          HarnessWrapLayout(spacing: HarnessTheme.itemSpacing, lineSpacing: HarnessTheme.itemSpacing) {
+            ForEach(HarnessStore.SessionFilter.allCases) { filter in
+              filterChip(
+                title: filter.title,
+                isSelected: store.sessionFilter == filter,
+                identifier: HarnessAccessibility.sessionFilterButton(filter.rawValue)
+              ) {
+                store.sessionFilter = filter
+              }
             }
           }
         }
@@ -97,14 +99,16 @@ struct SidebarFilterSection: View {
       }
 
       filterSection(title: "Focus") {
-        HarnessWrapLayout(spacing: HarnessTheme.itemSpacing, lineSpacing: HarnessTheme.itemSpacing) {
-          ForEach(SessionFocusFilter.allCases) { filter in
-            filterChip(
-              title: filter.title,
-              isSelected: store.sessionFocusFilter == filter,
-              identifier: HarnessAccessibility.sidebarFocusChip(filter.rawValue)
-            ) {
-              store.sessionFocusFilter = filter
+        HarnessGlassControlGroup(spacing: HarnessTheme.itemSpacing) {
+          HarnessWrapLayout(spacing: HarnessTheme.itemSpacing, lineSpacing: HarnessTheme.itemSpacing) {
+            ForEach(SessionFocusFilter.allCases) { filter in
+              filterChip(
+                title: filter.title,
+                isSelected: store.sessionFocusFilter == filter,
+                identifier: HarnessAccessibility.sidebarFocusChip(filter.rawValue)
+              ) {
+                store.sessionFocusFilter = filter
+              }
             }
           }
         }
@@ -127,30 +131,32 @@ private struct RecentSearchChipsSection: View {
 
   var body: some View {
     if !visibleSearches.isEmpty {
-      HStack(spacing: HarnessTheme.itemSpacing) {
-        ForEach(visibleSearches, id: \.persistentModelID) { search in
-          Button(search.query) {
-            store.searchText = search.query
+      HarnessGlassControlGroup(spacing: HarnessTheme.itemSpacing) {
+        HStack(spacing: HarnessTheme.itemSpacing) {
+          ForEach(visibleSearches, id: \.persistentModelID) { search in
+            Button(search.query) {
+              store.searchText = search.query
+            }
+            .scaledFont(.caption)
+            .lineLimit(1)
+            .harnessAccessoryButtonStyle()
+            .controlSize(.small)
           }
-          .scaledFont(.caption)
-          .lineLimit(1)
+          Spacer()
+          Button {
+            store.clearSearchHistory()
+          } label: {
+            Image(systemName: "xmark.circle")
+              .scaledFont(.caption2)
+              .foregroundStyle(HarnessTheme.secondaryInk)
+              .frame(minWidth: 24, minHeight: 24)
+              .contentShape(Rectangle())
+          }
           .harnessAccessoryButtonStyle()
           .controlSize(.small)
+          .accessibilityIdentifier(HarnessAccessibility.sidebarClearSearchHistoryButton)
+          .accessibilityLabel("Clear search history")
         }
-        Spacer()
-        Button {
-          store.clearSearchHistory()
-        } label: {
-          Image(systemName: "xmark.circle")
-            .scaledFont(.caption2)
-            .foregroundStyle(HarnessTheme.secondaryInk)
-            .frame(minWidth: 24, minHeight: 24)
-            .contentShape(Rectangle())
-        }
-        .harnessAccessoryButtonStyle()
-        .controlSize(.small)
-        .accessibilityIdentifier(HarnessAccessibility.sidebarClearSearchHistoryButton)
-        .accessibilityLabel("Clear search history")
       }
     }
   }
@@ -208,7 +214,7 @@ func sessionAccessibilityValue(
   let interactionStyle = "button"
   let selected = selectedSessionID == session.sessionId
   if selected {
-    return "selected, interactive=\(interactionStyle)"
+    return "selected, interactive=\(interactionStyle), selectionChrome=translucent"
   }
   return "interactive=\(interactionStyle)"
 }

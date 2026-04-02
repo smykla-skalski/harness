@@ -17,7 +17,10 @@ struct SidebarView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.vertical, HarnessTheme.itemSpacing)
         .padding(.horizontal, HarnessTheme.itemSpacing)
-        .harnessRoundedRectGlass()
+        .harnessFloatingControlGlass(
+          cornerRadius: HarnessTheme.cornerRadiusMD,
+          tint: HarnessTheme.ink
+        )
         .padding(HarnessTheme.itemSpacing)
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -141,27 +144,21 @@ struct SidebarView: View {
           .background {
             if isSelected {
               RoundedRectangle(cornerRadius: HarnessTheme.cornerRadiusLG, style: .continuous)
-                .fill(
-                  LinearGradient(
-                    colors: [HarnessTheme.accent.opacity(0.96), HarnessTheme.accent.opacity(0.84)],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                  )
-                )
+                .fill(HarnessTheme.accent.opacity(0.16))
             }
           }
           .overlay {
             if isSelected {
               RoundedRectangle(cornerRadius: HarnessTheme.cornerRadiusLG, style: .continuous)
-                .strokeBorder(HarnessTheme.onContrast.opacity(0.18), lineWidth: 1)
+                .strokeBorder(HarnessTheme.accent.opacity(0.24), lineWidth: 1)
             }
           }
           .contentShape(RoundedRectangle(cornerRadius: HarnessTheme.cornerRadiusLG, style: .continuous))
           .animation(.snappy(duration: 0.2), value: isSelected)
       }
-      .harnessInteractiveCardButtonStyle(
+      .harnessSidebarRowButtonStyle(
         cornerRadius: HarnessTheme.cornerRadiusLG,
-        tint: .clear
+        tint: HarnessTheme.accent
       )
       .listRowInsets(EdgeInsets(
         top: HarnessTheme.itemSpacing,
