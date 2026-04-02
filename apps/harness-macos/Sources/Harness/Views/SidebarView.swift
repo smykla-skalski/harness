@@ -15,17 +15,15 @@ struct SidebarView: View {
       sidebarHeader
     }
     .safeAreaInset(edge: .bottom, spacing: 0) {
-      if store.showsConnectionToolbarBadge {
-        ConnectionToolbarBadge(metrics: store.connectionMetrics)
-          .frame(maxWidth: .infinity, alignment: .leading)
-          .padding(.vertical, HarnessTheme.itemSpacing)
-          .padding(.horizontal, HarnessTheme.itemSpacing)
-          .harnessFloatingControlGlass(
-            cornerRadius: HarnessTheme.cornerRadiusMD,
-            tint: HarnessTheme.ink
-          )
-          .padding(HarnessTheme.itemSpacing)
-      }
+      ConnectionToolbarBadge(metrics: store.connectionMetrics)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.vertical, HarnessTheme.itemSpacing)
+        .padding(.horizontal, HarnessTheme.itemSpacing)
+        .harnessFloatingControlGlass(
+          cornerRadius: HarnessTheme.cornerRadiusMD,
+          tint: HarnessTheme.ink
+        )
+        .padding(HarnessTheme.itemSpacing)
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     .foregroundStyle(HarnessTheme.ink)

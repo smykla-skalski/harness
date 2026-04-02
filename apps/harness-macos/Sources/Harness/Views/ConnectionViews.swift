@@ -122,6 +122,10 @@ struct ConnectionToolbarBadge: View {
   private static let badgeFont = Font.system(.caption, design: .rounded, weight: .semibold)
     .monospacedDigit()
 
+  private var showsConnectionDetails: Bool {
+    metrics.connectedSince != nil
+  }
+
   private var transportLabel: String {
     metrics.transportKind.shortTitle
   }
@@ -131,6 +135,9 @@ struct ConnectionToolbarBadge: View {
   }
 
   private var accessibilityLabel: String {
+    guard showsConnectionDetails else {
+      return "Connection unavailable"
+    }
     if let latency = metrics.latencyMs {
       return "Connection: \(metrics.transportKind.shortTitle), latency \(latency) milliseconds"
     }
@@ -147,23 +154,25 @@ struct ConnectionToolbarBadge: View {
   var body: some View {
     HStack(spacing: 4) {
       ActivityPulse(
-        isActive: metrics.connectedSince != nil,
+        isActive: showsConnectionDetails,
         outerSize: 14,
         innerSize: 6,
         activeColor: qualityColor
       )
         .accessibilityHidden(true)
-      Text(transportLabel)
-        .scaledFont(Self.badgeFont)
-        .foregroundStyle(qualityColor)
-        .lineLimit(1)
-        .fixedSize()
-      Text(latencyLabel)
-        .scaledFont(Self.badgeFont)
-        .foregroundStyle(qualityColor.opacity(0.5))
-        .lineLimit(1)
-        .fixedSize()
-        .opacity(metrics.latencyMs == nil ? 0 : 1)
+      if showsConnectionDetails {
+        Text(transportLabel)
+          .scaledFont(Self.badgeFont)
+          .foregroundStyle(qualityColor)
+          .lineLimit(1)
+          .fixedSize()
+        Text(latencyLabel)
+          .scaledFont(Self.badgeFont)
+          .foregroundStyle(qualityColor.opacity(0.5))
+          .lineLimit(1)
+          .fixedSize()
+          .opacity(metrics.latencyMs == nil ? 0 : 1)
+      }
     }
     .accessibilityElement(children: .ignore)
     .accessibilityIdentifier(HarnessAccessibility.connectionBadge)
