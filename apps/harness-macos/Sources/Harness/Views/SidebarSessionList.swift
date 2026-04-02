@@ -7,13 +7,14 @@ struct SidebarFilterSection: View {
   let filteredSessionCount: Int
   let totalSessionCount: Int
   let searchText: String
+  @Binding var draftSearchText: String
   let sessionFilter: HarnessStore.SessionFilter
   let sessionFocusFilter: SessionFocusFilter
   @Binding var sessionSortOrder: SessionSortOrder
   let isPersistenceAvailable: Bool
+  let recentSearchQueries: [String]
   let resetFilters: () -> Void
-  let recordSearch: (String) -> Void
-  let updateSearchText: (String) -> Void
+  let submitSearch: () -> Void
   let setSessionFilter: (HarnessStore.SessionFilter) -> Void
   let setSessionFocusFilter: (SessionFocusFilter) -> Void
   let applyRecentSearch: (String) -> Void
@@ -60,13 +61,13 @@ struct SidebarFilterSection: View {
       }
 
       SidebarSearchField(
-        searchText: searchText,
-        recordSearch: recordSearch,
-        updateSearchText: updateSearchText
+        searchText: $draftSearchText,
+        submitSearch: submitSearch
       )
 
       if searchText.isEmpty, isPersistenceAvailable {
         RecentSearchChipsSection(
+          recentSearchQueries: recentSearchQueries,
           applyRecentSearch: applyRecentSearch,
           clearSearchHistory: clearSearchHistory
         )
@@ -122,22 +123,17 @@ struct SidebarFilterSection: View {
 }
 
 private struct RecentSearchChipsSection: View {
+  let recentSearchQueries: [String]
   let applyRecentSearch: (String) -> Void
   let clearSearchHistory: () -> Void
-  @Query(sort: \RecentSearch.lastUsedAt, order: .reverse)
-  private var recentSearches: [RecentSearch]
-
-  private var visibleSearches: [RecentSearch] {
-    Array(recentSearches.prefix(5))
-  }
 
   var body: some View {
-    if !visibleSearches.isEmpty {
+    if !recentSearchQueries.isEmpty {
       HarnessGlassControlGroup(spacing: HarnessTheme.itemSpacing) {
         HStack(spacing: HarnessTheme.itemSpacing) {
-          ForEach(visibleSearches, id: \.persistentModelID) { search in
-            Button(search.query) {
-              applyRecentSearch(search.query)
+          ForEach(recentSearchQueries, id: \.self) { query in
+            Button(query) {
+              applyRecentSearch(query)
             }
             .scaledFont(.caption)
             .lineLimit(1)
@@ -165,31 +161,14 @@ private struct RecentSearchChipsSection: View {
 }
 
 private struct SidebarSearchField: View {
-  let searchText: String
-  let recordSearch: (String) -> Void
-  let updateSearchText: (String) -> Void
-  @State private var draftSearchText = ""
+  @Binding var searchText: String
+  let submitSearch: () -> Void
 
   var body: some View {
-    TextField("Search sessions, projects, leaders", text: $draftSearchText)
+    TextField("Search sessions, projects, leaders", text: $searchText)
       .textFieldStyle(.roundedBorder)
       .accessibilityIdentifier("harness.sidebar.search")
-      .onSubmit {
-        recordSearch(draftSearchText)
-      }
-      .task(id: draftSearchText) {
-        try? await Task.sleep(for: .milliseconds(300))
-        guard !Task.isCancelled else { return }
-        updateSearchText(draftSearchText)
-      }
-      .onAppear {
-        draftSearchText = searchText
-      }
-      .onChange(of: searchText) { _, newValue in
-        if draftSearchText != newValue {
-          draftSearchText = newValue
-        }
-      }
+      .onSubmit(submitSearch)
   }
 }
 

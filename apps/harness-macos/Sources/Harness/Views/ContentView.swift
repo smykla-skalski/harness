@@ -103,12 +103,12 @@ struct ContentView: View {
       )
     }
     .modifier(HarnessConfirmationDialogModifier(store: store))
-    .modifier(
-      ContentAnnouncementsModifier(
-        connectionState: store.connectionState,
-        lastAction: $store.lastAction
+      .modifier(
+        ContentAnnouncementsModifier(
+          connectionState: store.connectionState,
+          lastAction: store.lastAction
+        )
       )
-    )
   }
 }
 

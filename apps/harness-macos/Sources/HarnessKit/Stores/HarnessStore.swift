@@ -232,6 +232,7 @@ public final class HarnessStore {
   public var navigationBackStack: [String?] = []
   public var navigationForwardStack: [String?] = []
   var connectionProbeInterval: Duration = .seconds(10)
+  var lastActionDismissDelay: Duration = .seconds(4)
 
   let daemonController: any DaemonControlling
   public let modelContext: ModelContext?
@@ -248,6 +249,7 @@ public final class HarnessStore {
   var pendingSessionPushFallback: (sessionID: String, token: UInt64)?
   var isNavigatingHistory = false
   private var hasBootstrapped = false
+  private var lastActionDismissTask: Task<Void, Never>?
 
   public init(
     daemonController: any DaemonControlling,
@@ -305,7 +307,7 @@ public final class HarnessStore {
     do {
       _ = try await daemonController.installLaunchAgent()
       await refreshDaemonStatus()
-      lastAction = "Install launch agent"
+      showLastAction("Install launch agent")
     } catch {
       lastError = error.localizedDescription
     }
@@ -318,7 +320,7 @@ public final class HarnessStore {
     do {
       _ = try await daemonController.removeLaunchAgent()
       await refreshDaemonStatus()
-      lastAction = "Remove launch agent"
+      showLastAction("Remove launch agent")
     } catch {
       lastError = error.localizedDescription
     }
@@ -371,6 +373,31 @@ public final class HarnessStore {
     await refresh(using: client, preserveSelection: true)
   }
 
+  public func showLastAction(_ action: String) {
+    lastActionDismissTask?.cancel()
+    lastAction = action
+
+    guard !action.isEmpty else {
+      lastActionDismissTask = nil
+      return
+    }
+
+    let delay = lastActionDismissDelay
+    lastActionDismissTask = Task { @MainActor [weak self] in
+      try? await Task.sleep(for: delay)
+      guard let self, !Task.isCancelled, self.lastAction == action else {
+        return
+      }
+      self.lastAction = ""
+      self.lastActionDismissTask = nil
+    }
+  }
+
+  public func clearLastAction() {
+    lastActionDismissTask?.cancel()
+    lastActionDismissTask = nil
+    lastAction = ""
+  }
   func stopGlobalStream() {
     globalStreamTask?.cancel()
     globalStreamTask = nil

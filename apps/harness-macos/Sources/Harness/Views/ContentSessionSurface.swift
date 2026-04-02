@@ -7,39 +7,101 @@ struct SessionContentContainer: View {
   let summary: SessionSummary?
   let timeline: [TimelineEntry]
 
+  private var mode: SessionContentMode {
+    if let detail {
+      return .cockpit(detail)
+    }
+    if let summary {
+      return .loading(summary)
+    }
+    return .dashboard
+  }
+
   var body: some View {
-    Group {
-      if let detail {
-        SessionCockpitView(
-          detail: detail,
-          timeline: timeline,
-          isSessionActionInFlight: store.isSessionActionInFlight,
-          isSelectionLoading: store.isSelectionLoading,
-          lastAction: store.lastAction,
-          observeSelectedSession: observeSelectedSession,
-          requestEndSessionConfirmation: store.requestEndSelectedSessionConfirmation,
-          inspectTask: store.inspect(taskID:),
-          inspectAgent: store.inspect(agentID:),
-          inspectSignal: store.inspect(signalID:),
-          inspectObserver: store.inspectObserver
-        )
-          .transition(.opacity)
-      } else if let summary {
-        SessionLoadingView(summary: summary)
-          .transition(.opacity)
-      } else {
+    ZStack(alignment: .topLeading) {
+      SessionContentLayer(isActive: mode.isDashboard) {
         SessionsBoardView(store: store)
-          .transition(.opacity)
+      }
+      SessionContentLayer(isActive: mode.loadingSummary != nil) {
+        if let loadingSummary = mode.loadingSummary {
+          SessionLoadingView(summary: loadingSummary)
+        }
+      }
+      SessionContentLayer(isActive: mode.detail != nil) {
+        if let detail = mode.detail {
+          SessionCockpitView(
+            detail: detail,
+            timeline: timeline,
+            isSessionActionInFlight: store.isSessionActionInFlight,
+            isSelectionLoading: store.isSelectionLoading,
+            lastAction: store.lastAction,
+            observeSelectedSession: observeSelectedSession,
+            requestEndSessionConfirmation: store.requestEndSelectedSessionConfirmation,
+            inspectTask: store.inspect(taskID:),
+            inspectAgent: store.inspect(agentID:),
+            inspectSignal: store.inspect(signalID:),
+            inspectObserver: store.inspectObserver
+          )
+        }
       }
     }
-    .animation(.spring(duration: 0.3), value: detail?.session.sessionId)
-    .animation(.spring(duration: 0.3), value: summary?.sessionId)
+    .animation(.spring(duration: 0.3), value: mode.identity)
   }
 
   private func observeSelectedSession() {
     Task {
       await store.observeSelectedSession()
     }
+  }
+}
+
+private enum SessionContentMode {
+  case dashboard
+  case loading(SessionSummary)
+  case cockpit(SessionDetail)
+
+  var identity: String {
+    switch self {
+    case .dashboard:
+      return "dashboard"
+    case .loading(let summary):
+      return "loading:\(summary.sessionId)"
+    case .cockpit(let detail):
+      return "cockpit:\(detail.session.sessionId)"
+    }
+  }
+
+  var isDashboard: Bool {
+    if case .dashboard = self {
+      return true
+    }
+    return false
+  }
+
+  var loadingSummary: SessionSummary? {
+    if case .loading(let summary) = self {
+      return summary
+    }
+    return nil
+  }
+
+  var detail: SessionDetail? {
+    if case .cockpit(let detail) = self {
+      return detail
+    }
+    return nil
+  }
+}
+
+private struct SessionContentLayer<Content: View>: View {
+  let isActive: Bool
+  @ViewBuilder let content: Content
+
+  var body: some View {
+    content
+      .opacity(isActive ? 1 : 0)
+      .allowsHitTesting(isActive)
+      .accessibilityHidden(!isActive)
   }
 }
 
