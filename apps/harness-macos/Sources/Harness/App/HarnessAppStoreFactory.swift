@@ -18,6 +18,7 @@ enum HarnessAppStoreFactory {
   private enum PreviewScenarioOverride: String {
     case dashboard
     case cockpit
+    case offlineCached = "offline-cached"
     case overflow
     case empty
 
@@ -37,6 +38,8 @@ enum HarnessAppStoreFactory {
         .dashboardLoaded
       case .cockpit:
         .cockpitLoaded
+      case .offlineCached:
+        .offlineCached
       case .overflow:
         .sidebarOverflow
       case .empty:
