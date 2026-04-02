@@ -64,6 +64,84 @@ extension HarnessUITestCase {
     )
   }
 
+  /// Sample the brightest pixels in the center horizontal strip of an
+  /// element to isolate the text color from the background. On a dark
+  /// background, text pixels are the brightest; we take the top 20%
+  /// by luminance and average their RGB to get the rendered text color.
+  func brightestCenterColor(of element: XCUIElement) -> RGBColor {
+    let screenshot = element.screenshot()
+    guard let cgImage = screenshot.image.cgImage(
+      forProposedRect: nil,
+      context: nil,
+      hints: nil
+    ) else {
+      return RGBColor(red: 0, green: 0, blue: 0)
+    }
+
+    let width = cgImage.width
+    let height = cgImage.height
+    guard width > 4, height > 4 else {
+      return RGBColor(red: 0, green: 0, blue: 0)
+    }
+
+    let bytesPerPixel = 4
+    let bytesPerRow = width * bytesPerPixel
+    var pixels = [UInt8](repeating: 0, count: height * bytesPerRow)
+
+    guard let context = CGContext(
+      data: &pixels,
+      width: width,
+      height: height,
+      bitsPerComponent: 8,
+      bytesPerRow: bytesPerRow,
+      space: CGColorSpaceCreateDeviceRGB(),
+      bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+    ) else {
+      return RGBColor(red: 0, green: 0, blue: 0)
+    }
+
+    context.draw(cgImage, in: CGRect(x: 0, y: 0, width: width, height: height))
+
+    // Sample the center 50% horizontal strip.
+    let startRow = height / 4
+    let endRow = height * 3 / 4
+    let edgeSkip = 4
+
+    struct PixelSample {
+      let red: Double
+      let green: Double
+      let blue: Double
+      let luminance: Double
+    }
+
+    var samples: [PixelSample] = []
+    for row in stride(from: startRow, to: endRow, by: 1) {
+      for col in stride(from: edgeSkip, to: width - edgeSkip, by: 2) {
+        let offset = row * bytesPerRow + col * bytesPerPixel
+        let red = Double(pixels[offset]) / 255.0
+        let green = Double(pixels[offset + 1]) / 255.0
+        let blue = Double(pixels[offset + 2]) / 255.0
+        let luminance = 0.2126 * red + 0.7152 * green + 0.0722 * blue
+        samples.append(PixelSample(red: red, green: green, blue: blue, luminance: luminance))
+      }
+    }
+
+    guard !samples.isEmpty else {
+      return RGBColor(red: 0, green: 0, blue: 0)
+    }
+
+    // Sort by luminance descending, take top 20% as "text" pixels.
+    let sorted = samples.sorted { $0.luminance > $1.luminance }
+    let topCount = max(sorted.count / 5, 1)
+    let topSlice = sorted.prefix(topCount)
+
+    let avgRed = topSlice.reduce(0.0) { $0 + $1.red } / Double(topCount)
+    let avgGreen = topSlice.reduce(0.0) { $0 + $1.green } / Double(topCount)
+    let avgBlue = topSlice.reduce(0.0) { $0 + $1.blue } / Double(topCount)
+
+    return RGBColor(red: avgRed, green: avgGreen, blue: avgBlue)
+  }
+
   func edgeLuminance(
     of element: XCUIElement,
     region: SampleRegion
