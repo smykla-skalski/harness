@@ -98,8 +98,7 @@ fn build_timeline(
     )?);
 
     for task_id in resolved.state.tasks.keys() {
-        let checkpoints =
-            load_checkpoints_hybrid(db, &resolved.project, session_id, task_id)?;
+        let checkpoints = load_checkpoints_hybrid(db, &resolved.project, session_id, task_id)?;
         for checkpoint in checkpoints {
             entries.push(checkpoint_entry(session_id, &checkpoint)?);
         }

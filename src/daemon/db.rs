@@ -4,7 +4,6 @@ use std::path::{Path, PathBuf};
 
 use rusqlite::Connection;
 
-use crate::workspace::utc_now;
 use crate::agents::runtime::event::ConversationEvent;
 use crate::daemon::index::DiscoveredProject;
 use crate::errors::{CliError, CliErrorKind};
@@ -12,6 +11,7 @@ use crate::session::types::{
     AgentRegistration, SessionLogEntry, SessionSignalRecord, SessionSignalStatus, SessionState,
     SessionStatus, TaskCheckpoint, WorkItem,
 };
+use crate::workspace::utc_now;
 
 /// `SQLite`-backed storage for the harness daemon. Replaces the file-based
 /// discovery layer with indexed queries while keeping file writes for
@@ -106,8 +106,14 @@ impl DaemonDb {
                 rusqlite::params![
                     project.project_id,
                     project.name,
-                    project.project_dir.as_ref().map(|path| path.display().to_string()),
-                    project.repository_root.as_ref().map(|path| path.display().to_string()),
+                    project
+                        .project_dir
+                        .as_ref()
+                        .map(|path| path.display().to_string()),
+                    project
+                        .repository_root
+                        .as_ref()
+                        .map(|path| path.display().to_string()),
                     project.checkout_id,
                     project.checkout_name,
                     project.context_root.display().to_string(),
@@ -126,11 +132,7 @@ impl DaemonDb {
     ///
     /// # Errors
     /// Returns [`CliError`] on SQL failures.
-    pub fn sync_session(
-        &self,
-        project_id: &str,
-        state: &SessionState,
-    ) -> Result<(), CliError> {
+    pub fn sync_session(&self, project_id: &str, state: &SessionState) -> Result<(), CliError> {
         let state_json = serde_json::to_string(state)
             .map_err(|error| db_error(format!("serialize session state: {error}")))?;
         let metrics_json = serde_json::to_string(&state.metrics)
@@ -141,7 +143,9 @@ impl DaemonDb {
             .and_then(|transfer| serde_json::to_string(transfer).ok());
         let is_active = i32::from(state.status == SessionStatus::Active);
 
-        let transaction = self.conn.unchecked_transaction()
+        let transaction = self
+            .conn
+            .unchecked_transaction()
             .map_err(|error| db_error(format!("begin session sync transaction: {error}")))?;
 
         transaction
@@ -307,10 +311,7 @@ impl DaemonDb {
         }
 
         for resolved in &sessions {
-            self.sync_session(
-                &resolved.project.project_id,
-                &resolved.state,
-            )?;
+            self.sync_session(&resolved.project.project_id, &resolved.state)?;
             result.sessions += 1;
 
             import_session_log(self, &resolved.project, &resolved.state.session_id)?;
@@ -375,9 +376,7 @@ impl DaemonDb {
     ///
     /// # Errors
     /// Returns [`CliError`] on query failure.
-    pub fn list_project_summaries(
-        &self,
-    ) -> Result<Vec<super::protocol::ProjectSummary>, CliError> {
+    pub fn list_project_summaries(&self) -> Result<Vec<super::protocol::ProjectSummary>, CliError> {
         use super::protocol::{ProjectSummary, WorktreeSummary};
 
         let mut statement = self
@@ -419,8 +418,9 @@ impl DaemonDb {
         let mut grouped: BTreeMap<String, ProjectSummary> = BTreeMap::new();
 
         for row in all_rows {
-            let entry = grouped.entry(row.project_id.clone()).or_insert_with(|| {
-                ProjectSummary {
+            let entry = grouped
+                .entry(row.project_id.clone())
+                .or_insert_with(|| ProjectSummary {
                     project_id: row.project_id.clone(),
                     name: row.name.clone(),
                     project_dir: row.project_dir.clone(),
@@ -428,8 +428,7 @@ impl DaemonDb {
                     active_session_count: 0,
                     total_session_count: 0,
                     worktrees: Vec::new(),
-                }
-            });
+                });
 
             if row.is_worktree {
                 entry.worktrees.push(WorktreeSummary {
@@ -732,8 +731,7 @@ impl DaemonDb {
 
         let now = utc_now();
         for record in signals {
-            let signal_json =
-                serde_json::to_string(&record.signal).unwrap_or_default();
+            let signal_json = serde_json::to_string(&record.signal).unwrap_or_default();
             let ack_json = record
                 .acknowledgment
                 .as_ref()
@@ -767,11 +765,7 @@ impl DaemonDb {
     ///
     /// # Errors
     /// Returns [`CliError`] on query failure.
-    pub fn load_signals(
-        &self,
-        session_id: &str,
-    ) -> Result<Vec<SessionSignalRecord>, CliError> {
-
+    pub fn load_signals(&self, session_id: &str) -> Result<Vec<SessionSignalRecord>, CliError> {
         let mut statement = self
             .conn
             .prepare(
@@ -1101,10 +1095,7 @@ fn import_session_signals(
     db: &DaemonDb,
     resolved: &super::index::ResolvedSession,
 ) -> Result<(), CliError> {
-    let signals = super::snapshot::load_signals_for(
-        &resolved.project,
-        &resolved.state,
-    )?;
+    let signals = super::snapshot::load_signals_for(&resolved.project, &resolved.state)?;
     db.sync_signal_index(&resolved.state.session_id, &signals)
 }
 
@@ -1112,10 +1103,7 @@ fn import_session_activity(
     db: &DaemonDb,
     resolved: &super::index::ResolvedSession,
 ) -> Result<(), CliError> {
-    let activities = super::snapshot::load_agent_activity_for(
-        &resolved.project,
-        &resolved.state,
-    )?;
+    let activities = super::snapshot::load_agent_activity_for(&resolved.project, &resolved.state)?;
     db.sync_agent_activity(&resolved.state.session_id, &activities)
 }
 
@@ -1259,8 +1247,7 @@ impl SessionSummaryRow {
         let pending_leader_transfer = self
             .pending_leader_transfer_json
             .and_then(|json| serde_json::from_str(&json).ok());
-        let metrics = serde_json::from_str(&self.metrics_json)
-            .unwrap_or_default();
+        let metrics = serde_json::from_str(&self.metrics_json).unwrap_or_default();
         let checkout_root = self.project_dir.clone().unwrap_or_default();
 
         SessionSummary {
@@ -1293,9 +1280,10 @@ fn extract_transition_kind(json: &str) -> String {
         .ok()
         .and_then(|value| {
             // Tagged enum serializes as {"VariantName": {...}} or "VariantName"
-            value.as_object().and_then(|object| {
-                object.keys().next().cloned()
-            }).or_else(|| value.as_str().map(String::from))
+            value
+                .as_object()
+                .and_then(|object| object.keys().next().cloned())
+                .or_else(|| value.as_str().map(String::from))
         })
         .unwrap_or_default()
 }
@@ -1715,11 +1703,11 @@ mod tests {
     }
 
     fn sample_session_state() -> SessionState {
-        use crate::session::types::{
-            AgentRegistration, AgentStatus, SessionRole, SessionMetrics,
-            TaskSeverity, TaskSource, TaskStatus,
-        };
         use crate::agents::runtime::RuntimeCapabilities;
+        use crate::session::types::{
+            AgentRegistration, AgentStatus, SessionMetrics, SessionRole, TaskSeverity, TaskSource,
+            TaskStatus,
+        };
 
         let mut agents = BTreeMap::new();
         agents.insert(
