@@ -5,6 +5,7 @@ public actor WebSocketTransport: HarnessMonitorClientProtocol {
   let encoder: JSONEncoder
   let decoder: JSONDecoder
   let session: URLSession
+  let httpFallbackClient: HarnessMonitorAPIClient
   let pending = PendingRequestStore()
   var webSocketTask: URLSessionWebSocketTask?
   var receiveTask: Task<Void, Never>?
@@ -27,6 +28,10 @@ public actor WebSocketTransport: HarnessMonitorClientProtocol {
     decoder = JSONDecoder()
     decoder.keyDecodingStrategy = .convertFromSnakeCase
     session = URLSession(configuration: .default)
+    httpFallbackClient = HarnessMonitorAPIClient(
+      connection: connection,
+      session: session
+    )
   }
 
   public func connect() async throws {
@@ -87,19 +92,11 @@ extension WebSocketTransport {
   }
 
   public func sessionDetail(id: String) async throws -> SessionDetail {
-    let value = try await send(
-      method: "session.detail",
-      params: .object(["session_id": .string(id)])
-    )
-    return try decode(value)
+    try await httpFallbackClient.sessionDetail(id: id)
   }
 
   public func timeline(sessionID: String) async throws -> [TimelineEntry] {
-    let value = try await send(
-      method: "session.timeline",
-      params: .object(["session_id": .string(sessionID)])
-    )
-    return try decode(value)
+    try await httpFallbackClient.timeline(sessionID: sessionID)
   }
 }
 

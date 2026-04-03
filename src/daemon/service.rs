@@ -46,6 +46,7 @@ pub struct DaemonStatusReport {
     pub manifest: Option<DaemonManifest>,
     pub launch_agent: LaunchAgentStatus,
     pub project_count: usize,
+    pub worktree_count: usize,
     pub session_count: usize,
     pub diagnostics: DaemonDiagnostics,
 }
@@ -124,10 +125,12 @@ pub async fn serve(config: DaemonServeConfig) -> Result<(), CliError> {
 pub fn status_report() -> Result<DaemonStatusReport, CliError> {
     let projects = snapshot::project_summaries()?;
     let sessions = snapshot::session_summaries(true)?;
+    let worktree_count = projects.iter().map(|project| project.worktrees.len()).sum();
     Ok(DaemonStatusReport {
         manifest: state::load_manifest()?,
         launch_agent: launchd::launch_agent_status(),
         project_count: projects.len(),
+        worktree_count,
         session_count: sessions.len(),
         diagnostics: state::diagnostics()?,
     })
@@ -140,6 +143,7 @@ pub fn status_report() -> Result<DaemonStatusReport, CliError> {
 pub fn health_response(manifest: &DaemonManifest) -> Result<HealthResponse, CliError> {
     let projects = snapshot::project_summaries()?;
     let sessions = snapshot::session_summaries(true)?;
+    let worktree_count = projects.iter().map(|project| project.worktrees.len()).sum();
     Ok(HealthResponse {
         status: "ok".into(),
         version: manifest.version.clone(),
@@ -147,6 +151,7 @@ pub fn health_response(manifest: &DaemonManifest) -> Result<HealthResponse, CliE
         endpoint: manifest.endpoint.clone(),
         started_at: manifest.started_at.clone(),
         project_count: projects.len(),
+        worktree_count,
         session_count: sessions.len(),
     })
 }
@@ -441,14 +446,14 @@ pub fn sessions_updated_event() -> Result<StreamEvent, CliError> {
     stream_event("sessions_updated", None, payload)
 }
 
-/// Build a `session_updated` stream event with the detail and timeline for one session.
+/// Build a `session_updated` stream event with live session detail only.
 ///
 /// # Errors
 /// Returns `CliError` when the session cannot be resolved or serialized.
 pub fn session_updated_event(session_id: &str) -> Result<StreamEvent, CliError> {
     let payload = SessionUpdatedPayload {
         detail: session_detail(session_id)?,
-        timeline: session_timeline(session_id)?,
+        timeline: None,
     };
     stream_event("session_updated", Some(session_id), payload)
 }
@@ -598,6 +603,7 @@ mod tests {
     use super::*;
 
     use std::path::Path;
+    use std::process::Command;
 
     use fs_err as fs;
     use tempfile::tempdir;
@@ -605,7 +611,10 @@ mod tests {
     use crate::agents::runtime;
     use crate::daemon::protocol::{SessionUpdatedPayload, SessionsUpdatedPayload};
     use crate::hooks::adapters::HookAgent;
-    use crate::session::{service as session_service, types::SessionRole};
+    use crate::session::{
+        service as session_service,
+        types::{SessionRole, SessionSignalStatus},
+    };
     use crate::workspace::project_context_dir;
 
     fn with_temp_project<F: FnOnce(&Path)>(test_fn: F) {
@@ -621,6 +630,13 @@ mod tests {
             || {
                 let project = tmp.path().join("project");
                 fs::create_dir_all(&project).expect("create project dir");
+                let status = Command::new("git")
+                    .arg("init")
+                    .arg("-q")
+                    .arg(&project)
+                    .status()
+                    .expect("git init");
+                assert!(status.success(), "git init should succeed");
                 test_fn(&project);
             },
         );
@@ -751,7 +767,7 @@ mod tests {
     }
 
     #[test]
-    fn session_updated_event_includes_detail_and_timeline() {
+    fn session_updated_event_includes_detail_without_timeline() {
         with_temp_project(|project| {
             let state = session_service::start_session(
                 "daemon stream session payload",
@@ -779,7 +795,7 @@ mod tests {
             assert_eq!(event.event, "session_updated");
             assert_eq!(event.session_id.as_deref(), Some(state.session_id.as_str()));
             assert_eq!(payload.detail.session.session_id, state.session_id);
-            assert!(!payload.timeline.is_empty());
+            assert!(payload.timeline.is_none());
         });
     }
 
@@ -838,6 +854,64 @@ mod tests {
                             if agent_id == &worker_id
                     )
             }));
+        });
+    }
+
+    #[test]
+    fn send_signal_returns_detail_with_pending_signal() {
+        with_temp_project(|project| {
+            let state = session_service::start_session(
+                "daemon signal request",
+                project,
+                Some("claude"),
+                Some("daemon-signal"),
+            )
+            .expect("start session");
+            let leader_id = state.leader_id.expect("leader id");
+            let joined =
+                temp_env::with_vars([("CODEX_SESSION_ID", Some("daemon-signal-worker"))], || {
+                    session_service::join_session(
+                        "daemon-signal",
+                        SessionRole::Worker,
+                        "codex",
+                        &[],
+                        None,
+                        project,
+                    )
+                    .expect("join worker")
+                });
+            let worker_id = joined
+                .agents
+                .keys()
+                .find(|agent_id| agent_id.starts_with("codex-"))
+                .expect("worker id")
+                .clone();
+
+            let detail = send_signal(
+                "daemon-signal",
+                &SignalSendRequest {
+                    actor: leader_id,
+                    agent_id: worker_id.clone(),
+                    command: "inject_context".into(),
+                    message: "Investigate the stuck signal lane".into(),
+                    action_hint: Some("task:signal".into()),
+                },
+            )
+            .expect("send signal");
+
+            assert_eq!(detail.session.session_id, "daemon-signal");
+            assert_eq!(detail.signals.len(), 1);
+            assert_eq!(detail.signals[0].agent_id, worker_id);
+            assert_eq!(detail.signals[0].status, SessionSignalStatus::Pending);
+            assert_eq!(detail.signals[0].signal.command, "inject_context");
+            assert_eq!(
+                detail.signals[0].signal.payload.message,
+                "Investigate the stuck signal lane"
+            );
+            assert_eq!(
+                detail.signals[0].signal.payload.action_hint.as_deref(),
+                Some("task:signal")
+            );
         });
     }
 
