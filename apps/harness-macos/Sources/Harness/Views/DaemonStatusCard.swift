@@ -22,6 +22,7 @@ struct DaemonStatusCard: View {
         connectionLabel: connectionLabel,
         isLoading: isLoading,
         isDaemonOnline: isDaemonOnline,
+        isLaunchAgentInstalled: isLaunchAgentInstalled,
         startDaemon: startDaemon,
         stopDaemon: stopDaemon,
         statusTitle: statusTitle,

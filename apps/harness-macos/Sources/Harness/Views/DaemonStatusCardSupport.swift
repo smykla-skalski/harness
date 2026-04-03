@@ -5,6 +5,7 @@ struct DaemonCardHeader: View {
   let connectionLabel: String
   let isLoading: Bool
   let isDaemonOnline: Bool
+  let isLaunchAgentInstalled: Bool
   let startDaemon: HarnessAsyncActionButton.Action
   let stopDaemon: HarnessAsyncActionButton.Action
   let statusTitle: String
@@ -21,15 +22,23 @@ struct DaemonCardHeader: View {
           .foregroundStyle(HarnessTheme.secondaryInk)
       }
       Spacer()
-      DaemonSidebarLayoutProbe(HarnessAccessibility.sidebarStartDaemonButtonFrame) {
-        DaemonStateToggleControl(
-          isLoading: isLoading,
-          isDaemonOnline: isDaemonOnline,
-          startDaemon: startDaemon,
-          stopDaemon: stopDaemon,
-          statusTitle: statusTitle,
-          statusColor: statusColor
-        )
+      HStack(spacing: 8) {
+        Image(systemName: isLaunchAgentInstalled ? "autostartstop" : "person.fill")
+          .scaledFont(.system(.callout, weight: .semibold))
+          .foregroundStyle(HarnessTheme.secondaryInk)
+          .help(isLaunchAgentInstalled ? "Launchd managed daemon" : "Manually started daemon")
+          .accessibilityLabel(isLaunchAgentInstalled ? "Launchd mode" : "Manual mode")
+
+        DaemonSidebarLayoutProbe(HarnessAccessibility.sidebarStartDaemonButtonFrame) {
+          DaemonStateToggleControl(
+            isLoading: isLoading,
+            isDaemonOnline: isDaemonOnline,
+            startDaemon: startDaemon,
+            stopDaemon: stopDaemon,
+            statusTitle: statusTitle,
+            statusColor: statusColor
+          )
+        }
       }
     }
   }
