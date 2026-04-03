@@ -1,5 +1,5 @@
 ---
-name: start
+name: session:start
 description: Start a new multi-agent orchestration session. You become the leader - you plan, delegate, and coordinate. You never execute tasks yourself.
 argument-hint: '--context "goal" [--session-id ID]'
 allowed-tools: Agent, Bash, Glob, Grep, Read

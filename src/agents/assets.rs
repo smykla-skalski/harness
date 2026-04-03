@@ -52,6 +52,8 @@ struct SkillSource {
     disable_model_invocation: Option<bool>,
     #[serde(rename = "user-invocable")]
     user_invocable: Option<bool>,
+    #[serde(rename = "codex-skill-name")]
+    codex_skill_name: Option<String>,
     #[serde(default)]
     hooks: Option<Value>,
 }
@@ -100,6 +102,28 @@ pub fn generate_agent_assets(target: AgentAssetTarget, check: bool) -> Result<i3
         write_outputs(&planned)?;
     }
     Ok(0)
+}
+
+/// Materialize the generated target outputs into a project directory.
+///
+/// # Errors
+/// Returns `CliError` when the source assets cannot be rendered or written.
+pub fn write_agent_target_outputs(
+    project_root: &Path,
+    target: AgentAssetTarget,
+) -> Result<Vec<PathBuf>, CliError> {
+    let source_root = repo_root();
+    let planned = rebase_planned_outputs(
+        &source_root,
+        project_root,
+        plan_outputs(&source_root, target)?,
+    )?;
+    let written = planned
+        .iter()
+        .flat_map(|output| output.files.keys().cloned())
+        .collect::<Vec<_>>();
+    write_outputs(&planned)?;
+    Ok(written)
 }
 
 /// Materialize the current suite plugin payload into a project directory.
@@ -192,6 +216,48 @@ fn plan_outputs(
             files,
         })
         .collect())
+}
+
+fn rebase_planned_outputs(
+    source_root: &Path,
+    output_root: &Path,
+    planned: Vec<PlannedOutput>,
+) -> Result<Vec<PlannedOutput>, CliError> {
+    planned
+        .into_iter()
+        .map(|output| {
+            let managed_root = rebase_output_path(source_root, output_root, &output.managed_root)?;
+            let files = output
+                .files
+                .into_iter()
+                .map(|(path, content)| {
+                    Ok((
+                        rebase_output_path(source_root, output_root, &path)?,
+                        content,
+                    ))
+                })
+                .collect::<Result<BTreeMap<_, _>, CliError>>()?;
+            Ok(PlannedOutput {
+                managed_root,
+                files,
+            })
+        })
+        .collect()
+}
+
+fn rebase_output_path(
+    source_root: &Path,
+    output_root: &Path,
+    path: &Path,
+) -> Result<PathBuf, CliError> {
+    let relative = path.strip_prefix(source_root).map_err(|error| {
+        CliErrorKind::usage_error(format!(
+            "generated path {} is outside source root {}: {error}",
+            path.display(),
+            source_root.display()
+        ))
+    })?;
+    Ok(output_root.join(relative))
 }
 
 fn render_runtime_outputs(repo_root: &Path, target: RenderTarget) -> Vec<(PathBuf, String)> {
@@ -307,7 +373,10 @@ fn render_skill_outputs(
                 .join(".claude")
                 .join("skills")
                 .join(&skill.source.name);
-            files.insert(base.join("SKILL.md"), render_skill_markdown(target, skill)?);
+            files.insert(
+                base.join("SKILL.md"),
+                render_skill_markdown(target, skill, None)?,
+            );
             copy_extra_text_files(
                 &skill.root,
                 &base,
@@ -322,7 +391,10 @@ fn render_skill_outputs(
                 .join(".agents")
                 .join("skills")
                 .join(&skill.source.name);
-            files.insert(base.join("SKILL.md"), render_skill_markdown(target, skill)?);
+            files.insert(
+                base.join("SKILL.md"),
+                render_skill_markdown(target, skill, None)?,
+            );
             copy_extra_text_files(
                 &skill.root,
                 &base,
@@ -344,7 +416,10 @@ fn render_skill_outputs(
                 .join(".opencode")
                 .join("skills")
                 .join(&skill.source.name);
-            files.insert(base.join("SKILL.md"), render_skill_markdown(target, skill)?);
+            files.insert(
+                base.join("SKILL.md"),
+                render_skill_markdown(target, skill, None)?,
+            );
             copy_extra_text_files(
                 &skill.root,
                 &base,
@@ -369,7 +444,10 @@ fn render_plugin_outputs(
         RenderTarget::Claude => {
             render_claude_plugin_outputs(repo_root, repo_root, plugin, &mut files)?;
         }
-        RenderTarget::Codex => render_codex_plugin_outputs(repo_root, plugin, &mut files)?,
+        RenderTarget::Codex => {
+            render_codex_plugin_outputs(repo_root, plugin, &mut files)?;
+            render_codex_skill_alias_outputs(repo_root, plugin, &mut files)?;
+        }
         RenderTarget::Gemini => render_gemini_plugin_outputs(repo_root, plugin, &mut files),
         RenderTarget::Copilot => render_copilot_plugin_outputs(repo_root, plugin, &mut files)?,
         RenderTarget::OpenCode => {
@@ -489,7 +567,7 @@ fn render_plugin_skill_markdown(
         let skill_base = base.join("skills").join(&skill.source.name);
         files.insert(
             skill_base.join("SKILL.md"),
-            render_skill_markdown(target, skill)?,
+            render_skill_markdown(target, skill, None)?,
         );
         copy_extra_text_files(
             &skill.root,
@@ -503,11 +581,39 @@ fn render_plugin_skill_markdown(
     Ok(())
 }
 
+fn render_codex_skill_alias_outputs(
+    repo_root: &Path,
+    plugin: &PluginDefinition,
+    files: &mut BTreeMap<PathBuf, String>,
+) -> Result<(), CliError> {
+    for skill in &plugin.skills {
+        let Some(alias_name) = skill.source.codex_skill_name.as_deref() else {
+            continue;
+        };
+        let alias_dir = codex_skill_alias_dir(alias_name)?;
+        let alias_base = repo_root.join(".agents").join("skills").join(alias_dir);
+        files.insert(
+            alias_base.join("SKILL.md"),
+            render_skill_markdown(RenderTarget::Codex, skill, Some(alias_name))?,
+        );
+        copy_extra_text_files(
+            &skill.root,
+            &alias_base,
+            files,
+            &["skill.yaml", "body.md"],
+            RenderTarget::Codex,
+            &skill.source.name,
+        )?;
+    }
+    Ok(())
+}
+
 fn render_skill_markdown(
     target: RenderTarget,
     skill: &SkillDefinition,
+    name_override: Option<&str>,
 ) -> Result<String, CliError> {
-    let mut out = render_skill_frontmatter(target, skill)?;
+    let mut out = render_skill_frontmatter(target, skill, name_override)?;
     out.push_str(&rewrite_text_for_target(
         &skill.body,
         target,
@@ -519,6 +625,7 @@ fn render_skill_markdown(
 fn render_skill_frontmatter(
     target: RenderTarget,
     skill: &SkillDefinition,
+    name_override: Option<&str>,
 ) -> Result<String, CliError> {
     let hooks = if matches!(target, RenderTarget::Portable) {
         None
@@ -531,7 +638,11 @@ fn render_skill_frontmatter(
             .transpose()?
     };
     let mut out = String::from("---\n");
-    append_yaml_line(&mut out, "name", &skill.source.name);
+    append_yaml_line(
+        &mut out,
+        "name",
+        name_override.unwrap_or(skill.source.name.as_str()),
+    );
     append_yaml_line(&mut out, "description", &skill.source.description);
     append_optional_yaml_line(
         &mut out,
@@ -758,6 +869,12 @@ fn rewrite_non_claude_text(mut text: String) -> String {
         text = text.replace(from, to);
     }
     text
+}
+
+fn codex_skill_alias_dir(alias_name: &str) -> Result<String, CliError> {
+    let alias_dir = alias_name.replace(':', "-");
+    validate_safe_segment(&alias_dir)?;
+    Ok(alias_dir)
 }
 
 fn target_label(target: RenderTarget) -> &'static str {
@@ -1018,6 +1135,7 @@ mod tests {
                 ),
                 disable_model_invocation: Some(true),
                 user_invocable: Some(true),
+                codex_skill_name: None,
                 hooks: Some(json!({
                     "PreToolUse": [
                         {
@@ -1049,8 +1167,8 @@ mod tests {
 
     #[test]
     fn render_skill_markdown_keeps_first_scalar_and_hook_entries() {
-        let rendered =
-            render_skill_markdown(RenderTarget::Claude, &sample_skill()).expect("skill renders");
+        let rendered = render_skill_markdown(RenderTarget::Claude, &sample_skill(), None)
+            .expect("skill renders");
 
         assert!(rendered.starts_with("---\nname: run\n"));
         assert!(rendered.contains("description: Execute suite runs through harness.\n"));
@@ -1075,8 +1193,8 @@ mod tests {
 
     #[test]
     fn portable_plugin_skill_omits_host_specific_hooks_and_question_tool() {
-        let rendered =
-            render_skill_markdown(RenderTarget::Portable, &sample_skill()).expect("skill renders");
+        let rendered = render_skill_markdown(RenderTarget::Portable, &sample_skill(), None)
+            .expect("skill renders");
 
         assert!(rendered.starts_with("---\nname: run\n"));
         assert!(rendered.contains("allowed-tools: Agent, Bash, Edit, Glob, Read, Write\n"));
@@ -1125,5 +1243,41 @@ mod tests {
         assert!(!rendered.contains("--agent copilot"));
         assert!(!rendered.contains("matcher: AskUserQuestion"));
         assert!(rendered.contains("user approval prompt"));
+    }
+
+    #[test]
+    fn session_plugin_is_in_codex_marketplace() {
+        let planned =
+            plan_outputs(&repo_root(), AgentAssetTarget::Codex).expect("assets plan succeeds");
+        let marketplace = repo_root()
+            .join(".agents")
+            .join("plugins")
+            .join("marketplace.json");
+        let rendered = planned
+            .iter()
+            .find_map(|output| output.files.get(&marketplace))
+            .expect("codex marketplace should be planned");
+
+        assert!(rendered.contains("\"name\": \"session\""));
+        assert!(rendered.contains("\"source\": \"./session\""));
+    }
+
+    #[test]
+    fn codex_session_skill_aliases_are_planned() {
+        let planned =
+            plan_outputs(&repo_root(), AgentAssetTarget::Codex).expect("assets plan succeeds");
+        let alias = repo_root()
+            .join(".agents")
+            .join("skills")
+            .join("session-start")
+            .join("SKILL.md");
+        let rendered = planned
+            .iter()
+            .find_map(|output| output.files.get(&alias))
+            .expect("session:start alias should be planned");
+
+        assert!(rendered.contains("name: session:start"));
+        assert!(!rendered.contains("AskUserQuestion"));
+        assert!(rendered.contains("ask the user first"));
     }
 }

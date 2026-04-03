@@ -407,12 +407,21 @@ fn write_agent_bootstrap_writes_codex_notify_config() {
     let dir = tempfile::tempdir().unwrap();
     let written = write_agent_bootstrap(dir.path(), HookAgent::Codex).unwrap();
 
+    let session_start_skill = dir
+        .path()
+        .join(".agents")
+        .join("skills")
+        .join("session-start")
+        .join("SKILL.md");
     let hooks_path = dir.path().join(".codex").join("hooks.json");
     let config_path = dir.path().join(".codex").join("config.toml");
 
+    assert!(written.contains(&session_start_skill));
     assert!(written.contains(&hooks_path));
     assert!(written.contains(&config_path));
 
+    let skill = fs::read_to_string(session_start_skill).unwrap();
+    assert!(skill.contains("name: session:start"));
     assert_codex_hooks(&fs::read_to_string(hooks_path).unwrap());
     let config = fs::read_to_string(config_path).unwrap();
     assert!(config.contains("\"audit-turn\""));
