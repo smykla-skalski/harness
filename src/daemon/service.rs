@@ -9,7 +9,6 @@ use serde_json::Value;
 use tokio::net::TcpListener;
 use tokio::sync::{broadcast, watch as tokio_watch};
 use tokio::task::spawn_blocking;
-
 use crate::errors::{CliError, CliErrorKind};
 use crate::session::types::TaskSource;
 use crate::session::{observe as session_observe, service as session_service};
@@ -107,15 +106,56 @@ pub async fn serve(config: DaemonServeConfig) -> Result<(), CliError> {
     let replay_buffer = Arc::new(Mutex::new(ReplayBuffer::new(512)));
     let _watch = watch::spawn_watch_loop(sender.clone(), config.poll_interval);
     let daemon_epoch = manifest.started_at.clone();
+
+    let db = initialize_daemon_db();
+
     let app_state = DaemonHttpState {
         token,
         sender,
         manifest,
         daemon_epoch,
         replay_buffer,
+        db,
     };
 
     http::serve(listener, app_state, shutdown_rx).await
+}
+
+fn initialize_daemon_db() -> Option<Arc<Mutex<super::db::DaemonDb>>> {
+    let db_path = state::daemon_root().join("harness.db");
+    let is_new = !db_path.exists();
+    let db = open_daemon_db(&db_path)?;
+
+    if is_new {
+        run_initial_import(&db);
+    }
+
+    Some(Arc::new(Mutex::new(db)))
+}
+
+fn open_daemon_db(path: &Path) -> Option<super::db::DaemonDb> {
+    super::db::DaemonDb::open(path)
+        .inspect_err(|error| {
+            let message = format!("failed to open daemon database: {error}");
+            let _ = state::append_event("warn", &message);
+        })
+        .ok()
+}
+
+fn run_initial_import(db: &super::db::DaemonDb) {
+    match db.import_from_files() {
+        Ok(result) => {
+            let message = format!(
+                "imported {} projects and {} sessions into daemon database",
+                result.projects, result.sessions
+            );
+            let _ = state::append_event("info", &message);
+        }
+        Err(error) => {
+            let message = format!("failed to import file data: {error}");
+            let _ = state::append_event("warn", &message);
+        }
+    }
 }
 
 /// Build a point-in-time daemon status report.
