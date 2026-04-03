@@ -71,3 +71,48 @@ struct SidebarFilterContainer: View {
     _ = store.clearSearchHistory()
   }
 }
+
+#Preview("Sidebar Filters - Observed Search") {
+  let store = sidebarFilterPreviewStore(
+    searchText: "observer",
+    sessionFilter: .all,
+    sessionFocusFilter: .observed,
+    scenario: .sidebarOverflow
+  )
+
+  SidebarFilterContainer(store: store)
+    .modelContainer(HarnessMonitorPreviewStoreFactory.previewContainer)
+    .padding(16)
+    .frame(width: 340)
+}
+
+#Preview("Sidebar Filters - Default") {
+  let store = sidebarFilterPreviewStore(
+    searchText: "",
+    sessionFilter: .active,
+    sessionFocusFilter: .all,
+    scenario: .dashboardLoaded
+  )
+
+  SidebarFilterContainer(store: store)
+    .modelContainer(HarnessMonitorPreviewStoreFactory.previewContainer)
+    .padding(16)
+    .frame(width: 340)
+}
+
+@MainActor
+private func sidebarFilterPreviewStore(
+  searchText: String,
+  sessionFilter: HarnessMonitorStore.SessionFilter,
+  sessionFocusFilter: SessionFocusFilter,
+  scenario: HarnessMonitorPreviewStoreFactory.Scenario
+) -> HarnessMonitorStore {
+  let store = HarnessMonitorPreviewStoreFactory.makeStore(
+    for: scenario,
+    modelContext: HarnessMonitorPreviewStoreFactory.previewContainer.mainContext
+  )
+  store.searchText = searchText
+  store.sessionFilter = sessionFilter
+  store.sessionFocusFilter = sessionFocusFilter
+  return store
+}

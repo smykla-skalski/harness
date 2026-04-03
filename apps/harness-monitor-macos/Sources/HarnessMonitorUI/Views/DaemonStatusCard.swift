@@ -213,3 +213,60 @@ struct DaemonToggleButtonStyle: ButtonStyle {
     return 0.8
   }
 }
+
+#Preview("Daemon Status - Online") {
+  daemonStatusCardPreview(
+    connectionState: .online,
+    isBusy: false,
+    isRefreshing: false,
+    projectCount: 4,
+    sessionCount: 18,
+    isLaunchAgentInstalled: true
+  )
+}
+
+#Preview("Daemon Status - Connecting") {
+  daemonStatusCardPreview(
+    connectionState: .connecting,
+    isBusy: true,
+    isRefreshing: false,
+    projectCount: 4,
+    sessionCount: 18,
+    isLaunchAgentInstalled: true
+  )
+}
+
+#Preview("Daemon Status - Offline") {
+  daemonStatusCardPreview(
+    connectionState: .offline("Daemon is offline. Launch it from the control deck."),
+    isBusy: false,
+    isRefreshing: false,
+    projectCount: 0,
+    sessionCount: 0,
+    isLaunchAgentInstalled: false
+  )
+}
+
+@MainActor
+private func daemonStatusCardPreview(
+  connectionState: HarnessMonitorStore.ConnectionState,
+  isBusy: Bool,
+  isRefreshing: Bool,
+  projectCount: Int,
+  sessionCount: Int,
+  isLaunchAgentInstalled: Bool
+) -> some View {
+  DaemonStatusCard(
+    connectionState: connectionState,
+    isBusy: isBusy,
+    isRefreshing: isRefreshing,
+    projectCount: projectCount,
+    sessionCount: sessionCount,
+    isLaunchAgentInstalled: isLaunchAgentInstalled,
+    startDaemon: {},
+    stopDaemon: {},
+    installLaunchAgent: {}
+  )
+  .padding(20)
+  .frame(width: 360)
+}

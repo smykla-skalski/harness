@@ -1,5 +1,6 @@
 import HarnessMonitorKit
 import Observation
+import SwiftData
 import SwiftUI
 
 private enum InspectorChromeMetrics {
@@ -379,4 +380,59 @@ private enum InspectorPrimaryContent {
       return .session(selectedSession)
     }
   }
+}
+
+#Preview("Inspector - Session") {
+  let store = inspectorPreviewStore(selection: .none)
+
+  InspectorColumnView(store: store)
+    .modelContainer(HarnessMonitorPreviewStoreFactory.previewContainer)
+    .frame(width: 420, height: 860)
+}
+
+#Preview("Inspector - Task") {
+  let store = inspectorPreviewStore(selection: .task(PreviewFixtures.tasks[0].taskId))
+
+  InspectorColumnView(store: store)
+    .modelContainer(HarnessMonitorPreviewStoreFactory.previewContainer)
+    .frame(width: 420, height: 860)
+}
+
+#Preview("Inspector - Agent") {
+  let store = inspectorPreviewStore(selection: .agent(PreviewFixtures.agents[0].agentId))
+
+  InspectorColumnView(store: store)
+    .modelContainer(HarnessMonitorPreviewStoreFactory.previewContainer)
+    .frame(width: 420, height: 860)
+}
+
+#Preview("Inspector - Observer") {
+  let store = inspectorPreviewStore(selection: .observer)
+
+  InspectorColumnView(store: store)
+    .modelContainer(HarnessMonitorPreviewStoreFactory.previewContainer)
+    .frame(width: 420, height: 860)
+}
+
+#Preview("Inspector - Empty") {
+  let store = HarnessMonitorPreviewStoreFactory.makeStore(
+    for: .dashboardLoaded,
+    modelContext: HarnessMonitorPreviewStoreFactory.previewContainer.mainContext
+  )
+
+  InspectorColumnView(store: store)
+    .modelContainer(HarnessMonitorPreviewStoreFactory.previewContainer)
+    .frame(width: 420, height: 860)
+}
+
+@MainActor
+private func inspectorPreviewStore(
+  selection: HarnessMonitorStore.InspectorSelection
+) -> HarnessMonitorStore {
+  let store = HarnessMonitorPreviewStoreFactory.makeStore(
+    for: .cockpitLoaded,
+    modelContext: HarnessMonitorPreviewStoreFactory.previewContainer.mainContext
+  )
+  store.inspectorSelection = selection
+  return store
 }

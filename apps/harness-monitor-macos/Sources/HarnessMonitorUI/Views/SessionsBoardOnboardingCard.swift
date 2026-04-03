@@ -193,3 +193,41 @@ private struct SessionsBoardOnboardingStepCard<Action: View>: View {
     .animation(.spring(duration: 0.3), value: isReady)
   }
 }
+
+#Preview("Onboarding - Manual Setup") {
+  sessionsBoardOnboardingPreview(
+    connectionState: .offline("Daemon offline"),
+    isLaunchAgentInstalled: false,
+    hasSessions: false,
+    isLoading: false
+  )
+}
+
+#Preview("Onboarding - Ready") {
+  sessionsBoardOnboardingPreview(
+    connectionState: .online,
+    isLaunchAgentInstalled: true,
+    hasSessions: true,
+    isLoading: false
+  )
+}
+
+@MainActor
+private func sessionsBoardOnboardingPreview(
+  connectionState: HarnessMonitorStore.ConnectionState,
+  isLaunchAgentInstalled: Bool,
+  hasSessions: Bool,
+  isLoading: Bool
+) -> some View {
+  SessionsBoardOnboardingCard(
+    connectionState: connectionState,
+    isLaunchAgentInstalled: isLaunchAgentInstalled,
+    hasSessions: hasSessions,
+    isLoading: isLoading,
+    startDaemon: {},
+    installLaunchAgent: {},
+    refresh: {}
+  )
+  .padding(24)
+  .frame(width: 920)
+}
