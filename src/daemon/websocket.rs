@@ -279,7 +279,12 @@ fn dispatch(
 ) -> WsResponse {
     match request.method.as_str() {
         "ping" => ok_response(&request.id, serde_json::json!({ "pong": true })),
-        "health" => dispatch_query(&request.id, || service::health_response(&state.manifest)),
+        "health" => {
+            let db_guard = state.db.as_ref().map(|db| db.lock().expect("db lock"));
+            dispatch_query(&request.id, || {
+                service::health_response(&state.manifest, db_guard.as_deref())
+            })
+        }
         "diagnostics" => dispatch_query(&request.id, service::diagnostics_report),
         "daemon.stop" => dispatch_query(&request.id, service::request_shutdown),
         "projects" => dispatch_query(&request.id, service::list_projects),

@@ -179,9 +179,16 @@ pub fn status_report() -> Result<DaemonStatusReport, CliError> {
 /// Build the daemon health response exposed on `/v1/health`.
 ///
 /// # Errors
-/// Returns `CliError` on discovery failures.
-pub fn health_response(manifest: &DaemonManifest) -> Result<HealthResponse, CliError> {
-    let (project_count, worktree_count, session_count) = index::fast_counts();
+/// Returns [`CliError`] on discovery failures.
+pub fn health_response(
+    manifest: &DaemonManifest,
+    db: Option<&super::db::DaemonDb>,
+) -> Result<HealthResponse, CliError> {
+    let (project_count, worktree_count, session_count) = if let Some(db) = db {
+        db.health_counts()?
+    } else {
+        index::fast_counts()
+    };
     Ok(HealthResponse {
         status: "ok".into(),
         version: manifest.version.clone(),
@@ -200,7 +207,10 @@ pub fn health_response(manifest: &DaemonManifest) -> Result<HealthResponse, CliE
 /// Returns `CliError` when daemon state cannot be loaded.
 pub fn diagnostics_report() -> Result<DaemonDiagnosticsReport, CliError> {
     let manifest = state::load_manifest()?;
-    let health = manifest.as_ref().map(health_response).transpose()?;
+    let health = manifest
+        .as_ref()
+        .map(|manifest| health_response(manifest, None))
+        .transpose()?;
     Ok(DaemonDiagnosticsReport {
         health,
         manifest,
