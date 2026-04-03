@@ -1,8 +1,8 @@
 name: HarnessMonitor
-packages:
-  SwiftLintPlugins:
-    url: https://github.com/SimplyDanny/SwiftLintPlugins
-    from: "0.58.0"
+configs:
+  Debug: debug
+  Preview: debug
+  Release: release
 options:
   bundleIdPrefix: io.harnessmonitor
   createIntermediateGroups: true
@@ -17,10 +17,16 @@ settings:
     GENERATE_INFOPLIST_FILE: YES
     MACOSX_DEPLOYMENT_TARGET: "26.0"
     SWIFT_EMIT_LOC_STRINGS: YES
+    SWIFT_ENABLE_EAGER_LINKING: YES
     SWIFT_STRICT_CONCURRENCY: complete
     SWIFT_TREAT_WARNINGS_AS_ERRORS: YES
     SWIFT_VERSION: "6.0"
     HARNESS_MONITOR_APP_BUNDLE_ID: io.harnessmonitor.app
+  configs:
+    Preview:
+      COMPILER_INDEX_STORE_ENABLE: NO
+      ENABLE_TESTABILITY: NO
+      SWIFT_EMIT_LOC_STRINGS: NO
 targets:
   HarnessMonitorKit:
     type: framework
@@ -30,9 +36,6 @@ targets:
       - Sources/HarnessMonitorKit
     dependencies:
       - sdk: SwiftData.framework
-    buildToolPlugins:
-      - plugin: SwiftLintBuildToolPlugin
-        package: SwiftLintPlugins
     settings:
       base:
         CODE_SIGN_STYLE: Automatic
@@ -41,6 +44,28 @@ targets:
         ENABLE_MODULE_VERIFIER: YES
         MODULE_VERIFIER_SUPPORTED_LANGUAGES: "objective-c objective-c++"
         PRODUCT_BUNDLE_IDENTIFIER: io.harnessmonitor.kit
+      configs:
+        Preview:
+          ENABLE_MODULE_VERIFIER: NO
+  HarnessMonitorUI:
+    type: framework
+    platform: macOS
+    deploymentTarget: "26.0"
+    sources:
+      - Sources/HarnessMonitorUI
+    dependencies:
+      - target: HarnessMonitorKit
+    settings:
+      base:
+        CODE_SIGN_STYLE: Automatic
+        CODE_SIGNING_ALLOWED: YES
+        DEVELOPMENT_TEAM: Q498EB36N4
+        ENABLE_MODULE_VERIFIER: YES
+        MODULE_VERIFIER_SUPPORTED_LANGUAGES: "objective-c objective-c++"
+        PRODUCT_BUNDLE_IDENTIFIER: io.harnessmonitor.ui
+      configs:
+        Preview:
+          ENABLE_MODULE_VERIFIER: NO
   HarnessMonitor:
     type: application
     platform: macOS
@@ -49,19 +74,21 @@ targets:
       - Sources/HarnessMonitor
     dependencies:
       - target: HarnessMonitorKit
+      - target: HarnessMonitorUI
     entitlements:
       path: HarnessMonitor.entitlements
       properties:
         com.apple.security.network.client: true
         com.apple.security.network.server: true
         com.apple.security.cs.disable-library-validation: true
-    buildToolPlugins:
-      - plugin: SwiftLintBuildToolPlugin
-        package: SwiftLintPlugins
     postBuildScripts:
       - name: Clear Gatekeeper Metadata
         basedOnDependencyAnalysis: false
         script: |
+          if [ "${XCODE_RUNNING_FOR_PREVIEWS:-}" = "1" ] || [[ "${BUILD_DIR:-}" == *"/Previews/"* ]]; then
+            exit 0
+          fi
+
           strip_attrs() {
             local target_path="$1"
             if [ -e "$target_path" ]; then
@@ -89,19 +116,21 @@ targets:
       - Sources/HarnessMonitor
     dependencies:
       - target: HarnessMonitorKit
+      - target: HarnessMonitorUI
     entitlements:
       path: HarnessMonitor.entitlements
       properties:
         com.apple.security.network.client: true
         com.apple.security.network.server: true
         com.apple.security.cs.disable-library-validation: true
-    buildToolPlugins:
-      - plugin: SwiftLintBuildToolPlugin
-        package: SwiftLintPlugins
     postBuildScripts:
       - name: Clear Gatekeeper Metadata
         basedOnDependencyAnalysis: false
         script: |
+          if [ "${XCODE_RUNNING_FOR_PREVIEWS:-}" = "1" ] || [[ "${BUILD_DIR:-}" == *"/Previews/"* ]]; then
+            exit 0
+          fi
+
           strip_attrs() {
             local target_path="$1"
             if [ -e "$target_path" ]; then
@@ -129,9 +158,6 @@ targets:
       - Tests/HarnessMonitorKitTests
     dependencies:
       - target: HarnessMonitorKit
-    buildToolPlugins:
-      - plugin: SwiftLintBuildToolPlugin
-        package: SwiftLintPlugins
     settings:
       base:
         CODE_SIGN_STYLE: Automatic
@@ -145,13 +171,14 @@ targets:
       - Tests/HarnessMonitorUITests
     dependencies:
       - target: HarnessMonitorUITestHost
-    buildToolPlugins:
-      - plugin: SwiftLintBuildToolPlugin
-        package: SwiftLintPlugins
     postBuildScripts:
       - name: Clear Gatekeeper Metadata
         basedOnDependencyAnalysis: false
         script: |
+          if [ "${XCODE_RUNNING_FOR_PREVIEWS:-}" = "1" ] || [[ "${BUILD_DIR:-}" == *"/Previews/"* ]]; then
+            exit 0
+          fi
+
           strip_attrs() {
             local target_path="$1"
             if [ -e "$target_path" ]; then
@@ -179,9 +206,20 @@ schemes:
       targets:
         HarnessMonitor: all
         HarnessMonitorKit: all
-        HarnessMonitorUITestHost: all
+        HarnessMonitorUI: all
     test:
       gatherCoverageData: true
       targets:
         - name: HarnessMonitorKitTests
         - name: HarnessMonitorUITests
+  HarnessMonitorUIPreviews:
+    build:
+      config: Preview
+      targets:
+        HarnessMonitorUI: all
+    run:
+      config: Preview
+    test:
+      config: Preview
+    analyze:
+      config: Preview

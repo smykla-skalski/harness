@@ -22,11 +22,12 @@ Direct scripts:
 
 ```bash
 apps/harness-monitor-macos/Scripts/generate-project.sh
+apps/harness-monitor-macos/Scripts/measure-preview-latency.sh
 apps/harness-monitor-macos/Scripts/run-quality-gates.sh
 apps/harness-monitor-macos/Scripts/test-swift.sh
 ```
 
-`harness-monitor:macos:lint` regenerates the project, runs strict `swift format` over Sources and Tests, then runs `xcodebuild build-for-testing` against `tmp/xcode-derived` so the sandboxed `SwiftLintBuildToolPlugin` enforces the in-build lint rules without reusing stale local app caches.
+`harness-monitor:macos:lint` regenerates the project, runs strict `swift format` over Sources and Tests, runs `swiftlint lint` with a cache rooted in `tmp/swiftlint-cache/harness-monitor-macos`, then runs `xcodebuild build-for-testing` against `tmp/xcode-derived`.
 
 `harness-monitor:macos:test` runs the same quality gates first, then executes:
 
@@ -44,4 +45,10 @@ Example targeted UI regression:
 xcodebuild -project 'apps/harness-monitor-macos/HarnessMonitor.xcodeproj' -scheme "HarnessMonitor" -configuration Debug -derivedDataPath tmp/xcode-derived -destination 'platform=macOS' test -only-testing:HarnessMonitorUITests/HarnessMonitorUITests/testToolbarOpensSettingsWindow
 ```
 
-The generated project uses `SwiftLintBuildToolPlugin`, so the SwiftLint rules also run inside local Xcode builds and CI without restoring the older shell-wrapper lint path.
+The generated project intentionally keeps SwiftLint out of the Xcode build graph so SwiftUI previews and routine local builds stay responsive. Lint enforcement lives in the monitor quality-gate scripts and CI instead.
+
+For the fastest SwiftUI canvas refreshes, use the shared `HarnessMonitorUIPreviews` scheme while editing files under `Sources/HarnessMonitorUI`. That lets previews resolve from the UI framework target instead of launching the full `Harness Monitor.app` host. To measure the current preview host and JIT latency from unified logging, run:
+
+```bash
+apps/harness-monitor-macos/Scripts/measure-preview-latency.sh 15m
+```

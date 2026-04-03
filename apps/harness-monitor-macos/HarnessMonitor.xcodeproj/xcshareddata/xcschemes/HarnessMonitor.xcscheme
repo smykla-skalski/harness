@@ -42,9 +42,9 @@
             buildForAnalyzing = "YES">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "099EE9962C22A9770B773C0D"
-               BuildableName = "Harness Monitor UI Testing.app"
-               BlueprintName = "HarnessMonitorUITestHost"
+               BlueprintIdentifier = "5BAE209C0B17ED30E7953ED3"
+               BuildableName = "HarnessMonitorUI.framework"
+               BlueprintName = "HarnessMonitorUI"
                ReferencedContainer = "container:HarnessMonitor.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
