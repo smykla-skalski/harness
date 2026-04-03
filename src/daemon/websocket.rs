@@ -374,7 +374,7 @@ fn handle_session_subscribe(
 
     {
         let mut state = connection.lock().expect("connection lock");
-        state.session_subscriptions.insert(session_id.clone());
+        state.session_subscriptions.insert(session_id);
     }
 
     ok_response(&request.id, serde_json::json!({ "ok": true }))

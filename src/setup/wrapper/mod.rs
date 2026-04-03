@@ -111,10 +111,7 @@ fn write_process_agent_bootstrap(
     project_dir: &Path,
     agent: HookAgent,
 ) -> Result<Vec<PathBuf>, CliError> {
-    let mut written = match agent_asset_target(agent) {
-        Some(target) => write_agent_target_outputs(project_dir, target)?,
-        None => Vec::new(),
-    };
+    let mut written = write_agent_target_outputs(project_dir, agent_asset_target(agent))?;
     let existing = written.iter().cloned().collect::<BTreeSet<_>>();
     let planned = planned_agent_bootstrap_files(project_dir, agent);
     for (path, content) in planned {
@@ -128,13 +125,13 @@ fn write_process_agent_bootstrap(
     Ok(written)
 }
 
-fn agent_asset_target(agent: HookAgent) -> Option<AgentAssetTarget> {
+fn agent_asset_target(agent: HookAgent) -> AgentAssetTarget {
     match agent {
-        HookAgent::Claude => Some(AgentAssetTarget::Claude),
-        HookAgent::Codex => Some(AgentAssetTarget::Codex),
-        HookAgent::Gemini => Some(AgentAssetTarget::Gemini),
-        HookAgent::Copilot => Some(AgentAssetTarget::Copilot),
-        HookAgent::OpenCode => Some(AgentAssetTarget::OpenCode),
+        HookAgent::Claude => AgentAssetTarget::Claude,
+        HookAgent::Codex => AgentAssetTarget::Codex,
+        HookAgent::Gemini => AgentAssetTarget::Gemini,
+        HookAgent::Copilot => AgentAssetTarget::Copilot,
+        HookAgent::OpenCode => AgentAssetTarget::OpenCode,
     }
 }
 
