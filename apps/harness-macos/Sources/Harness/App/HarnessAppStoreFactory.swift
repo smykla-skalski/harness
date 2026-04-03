@@ -54,7 +54,11 @@ enum HarnessAppStoreFactory {
     persistenceError: String? = nil
   ) -> HarnessStore {
     if let previewScenario = PreviewScenarioOverride(environment: environment) {
-      return HarnessPreviewStoreFactory.makeStore(for: previewScenario.scenario)
+      return HarnessPreviewStoreFactory.makeStore(
+        for: previewScenario.scenario,
+        modelContext: modelContext,
+        persistenceError: persistenceError
+      )
     }
 
     let controller: any DaemonControlling
