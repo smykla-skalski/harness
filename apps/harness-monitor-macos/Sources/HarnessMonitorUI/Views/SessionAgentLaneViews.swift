@@ -1,3 +1,4 @@
+import AppKit
 import HarnessMonitorKit
 import SwiftUI
 
@@ -59,6 +60,39 @@ struct SessionAgentSummaryCard: View {
     return "\(agent.runtime.uppercased()) • \(agent.agentId)"
   }
 
+  private var roleTint: Color {
+    switch agent.role {
+    case .leader:
+      Color(red: 0.35, green: 0.61, blue: 0.96)
+    case .worker:
+      Color(red: 0.16, green: 0.73, blue: 0.63)
+    case .observer:
+      Color(red: 0.52, green: 0.56, blue: 0.94)
+    case .reviewer:
+      Color(red: 0.95, green: 0.50, blue: 0.33)
+    case .improver:
+      Color(red: 0.78, green: 0.41, blue: 0.84)
+    }
+  }
+
+  private var roleForeground: Color {
+    guard let rgbColor = NSColor(roleTint).usingColorSpace(.deviceRGB) else {
+      return HarnessMonitorTheme.onContrast
+    }
+
+    let luminance = relativeLuminance(
+      red: rgbColor.redComponent,
+      green: rgbColor.greenComponent,
+      blue: rgbColor.blueComponent
+    )
+    let contrastWithWhite = (1.0 + 0.05) / (luminance + 0.05)
+    let contrastWithDark = (luminance + 0.05) / (0.03 + 0.05)
+
+    return contrastWithDark >= contrastWithWhite
+      ? Color.black.opacity(0.82)
+      : HarnessMonitorTheme.onContrast
+  }
+
   var body: some View {
     Button { inspectAgent(agent.agentId) } label: {
       VStack(alignment: .leading, spacing: HarnessMonitorTheme.itemSpacing) {
@@ -70,8 +104,8 @@ struct SessionAgentSummaryCard: View {
           Text(agent.role.title)
             .scaledFont(.caption.bold())
             .harnessPillPadding()
-            .background(HarnessMonitorTheme.accent, in: Capsule())
-            .foregroundStyle(HarnessMonitorTheme.onContrast)
+            .background(roleTint, in: Capsule())
+            .foregroundStyle(roleForeground)
         }
         Text(metadataLine)
           .scaledFont(.caption.monospaced())
@@ -132,6 +166,17 @@ struct SessionAgentSummaryCard: View {
       .lineLimit(1)
       .harnessPillPadding()
       .harnessContentPill()
+  }
+
+  private func relativeLuminance(red: CGFloat, green: CGFloat, blue: CGFloat) -> CGFloat {
+    (0.2126 * linearized(red)) + (0.7152 * linearized(green)) + (0.0722 * linearized(blue))
+  }
+
+  private func linearized(_ component: CGFloat) -> CGFloat {
+    if component <= 0.04045 {
+      return component / 12.92
+    }
+    return pow((component + 0.055) / 1.055, 2.4)
   }
 }
 
