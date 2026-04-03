@@ -19,6 +19,26 @@ extension WebSocketTransport {
     }
   }
 
+  func pingLatencyMs() async throws -> Int {
+    guard let webSocketTask else {
+      throw WebSocketTransportError.connectionClosed
+    }
+    let task = webSocketTask
+    let startedAt = ContinuousClock.now
+    return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Int, any Error>) in
+      task.sendPing { error in
+        let duration = startedAt.duration(to: ContinuousClock.now)
+        let ms = max(0, Int(duration.components.seconds * 1_000))
+          + Int(duration.components.attoseconds / 1_000_000_000_000_000)
+        if let error {
+          continuation.resume(throwing: error)
+        } else {
+          continuation.resume(returning: ms)
+        }
+      }
+    }
+  }
+
   @discardableResult
   func send(method: String, params: JSONValue? = nil) async throws -> JSONValue {
     guard let webSocketTask else {

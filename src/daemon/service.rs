@@ -141,18 +141,16 @@ pub fn status_report() -> Result<DaemonStatusReport, CliError> {
 /// # Errors
 /// Returns `CliError` on discovery failures.
 pub fn health_response(manifest: &DaemonManifest) -> Result<HealthResponse, CliError> {
-    let projects = snapshot::project_summaries()?;
-    let sessions = snapshot::session_summaries(true)?;
-    let worktree_count = projects.iter().map(|project| project.worktrees.len()).sum();
+    let (project_count, worktree_count, session_count) = index::fast_counts();
     Ok(HealthResponse {
         status: "ok".into(),
         version: manifest.version.clone(),
         pid: manifest.pid,
         endpoint: manifest.endpoint.clone(),
         started_at: manifest.started_at.clone(),
-        project_count: projects.len(),
+        project_count,
         worktree_count,
-        session_count: sessions.len(),
+        session_count,
     })
 }
 

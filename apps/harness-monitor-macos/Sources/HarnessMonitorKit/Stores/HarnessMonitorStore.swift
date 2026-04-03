@@ -48,9 +48,22 @@ public final class HarnessMonitorStore {
     case removeAgent(sessionID: String, agentID: String, actorID: String)
   }
 
+  public struct CheckoutGroup: Identifiable, Equatable {
+    public let checkoutId: String
+    public let title: String
+    public let isWorktree: Bool
+    public let sessions: [SessionSummary]
+
+    public var id: String { checkoutId }
+  }
+
   public struct SessionGroup: Identifiable, Equatable {
     public let project: ProjectSummary
-    public let sessions: [SessionSummary]
+    public let checkoutGroups: [CheckoutGroup]
+
+    public var sessions: [SessionSummary] {
+      checkoutGroups.flatMap(\.sessions)
+    }
 
     public var id: String { project.id }
   }
@@ -159,8 +172,8 @@ public final class HarnessMonitorStore {
 
     do {
       let client = try await daemonController.bootstrapClient()
-      daemonStatus = await daemonStatusResponse
       await connect(using: client)
+      daemonStatus = await daemonStatusResponse
     } catch {
       daemonStatus = await daemonStatusResponse
       markConnectionOffline(error.localizedDescription)
@@ -270,6 +283,10 @@ public final class HarnessMonitorStore {
       return
     }
     await refresh(using: client, preserveSelection: true)
+    Task { @MainActor [weak self] in
+      guard let self else { return }
+      self.daemonStatus = try? await self.daemonController.daemonStatus()
+    }
   }
 
   public func showLastAction(_ action: String) {

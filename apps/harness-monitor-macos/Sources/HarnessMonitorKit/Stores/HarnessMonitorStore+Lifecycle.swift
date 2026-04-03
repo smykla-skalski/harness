@@ -47,9 +47,6 @@ extension HarnessMonitorStore {
     defer { isRefreshing = false }
 
     do {
-      async let healthResponse = Self.measureOperation {
-        try await client.health()
-      }
       async let transportLatencyResponse = client.transportLatencyMs()
       async let diagnosticsResponse = Self.measureOperation {
         try await client.diagnostics()
@@ -60,22 +57,17 @@ extension HarnessMonitorStore {
       async let sessionResponse = Self.measureOperation {
         try await client.sessions()
       }
-      async let daemonStatusResponse: DaemonStatusReport? = try? daemonController.daemonStatus()
 
-      let measuredHealth = try await healthResponse
       let transportLatencyMs = try await transportLatencyResponse
       let measuredDiagnostics = try await diagnosticsResponse
       let measuredProjects = try await projectResponse
       let measuredSessions = try await sessionResponse
 
-      health = measuredHealth.value
       diagnostics = measuredDiagnostics.value
-      daemonStatus = await daemonStatusResponse
       recordRequestSuccess(
-        latencyMs: transportLatencyMs ?? measuredHealth.latencyMs,
+        latencyMs: transportLatencyMs ?? measuredDiagnostics.latencyMs,
         updatesLatency: true
       )
-      recordRequestSuccess()
       recordRequestSuccess()
       recordRequestSuccess()
 
@@ -90,7 +82,9 @@ extension HarnessMonitorStore {
 
       if preserveSelection, let selectedSessionID, selectedSessionSummary != nil {
         let requestID = beginSessionLoad()
-        await loadSession(using: client, sessionID: selectedSessionID, requestID: requestID)
+        Task { @MainActor [weak self] in
+          await self?.loadSession(using: client, sessionID: selectedSessionID, requestID: requestID)
+        }
       } else {
         synchronizeActionActor()
         if shouldAutoSelectPreviewSession(
@@ -98,11 +92,13 @@ extension HarnessMonitorStore {
           sessions: measuredSessions.value
         ) {
           let requestID = beginSessionLoad()
-          await loadSession(
-            using: client,
-            sessionID: measuredSessions.value[0].sessionId,
-            requestID: requestID
-          )
+          Task { @MainActor [weak self] in
+            await self?.loadSession(
+              using: client,
+              sessionID: measuredSessions.value[0].sessionId,
+              requestID: requestID
+            )
+          }
         }
       }
     } catch {
@@ -248,8 +244,9 @@ extension HarnessMonitorStore {
         showingCachedData: false,
         cancelPendingTimelineRefresh: payload.timeline != nil
       )
-      cacheSessionDetail(payload.detail, timeline: timeline)
-      if payload.timeline == nil, let client {
+      if let freshTimeline = payload.timeline {
+        cacheSessionDetail(payload.detail, timeline: freshTimeline)
+      } else if let client {
         scheduleSessionPushFallback(using: client, sessionID: sessionID)
       }
     case .unknown:
@@ -273,8 +270,9 @@ extension HarnessMonitorStore {
         showingCachedData: false,
         cancelPendingTimelineRefresh: payload.timeline != nil
       )
-      cacheSessionDetail(payload.detail, timeline: timeline)
-      if payload.timeline == nil, let client {
+      if let freshTimeline = payload.timeline {
+        cacheSessionDetail(payload.detail, timeline: freshTimeline)
+      } else if let client {
         scheduleSessionPushFallback(using: client, sessionID: sessionID)
       }
     }
