@@ -3,7 +3,15 @@ import SwiftUI
 
 struct SessionTaskListSection: View {
   let tasks: [WorkItem]
+  let companionAgentCount: Int
   let inspectTask: (String) -> Void
+
+  private var emptyStateMinHeight: CGFloat {
+    let visibleAgentCards = max(companionAgentCount, 1)
+    let cardHeights = CGFloat(visibleAgentCards) * SessionCockpitLayout.laneCardFootprint
+    let interCardSpacing = CGFloat(max(visibleAgentCards - 1, 0)) * HarnessMonitorTheme.sectionSpacing
+    return cardHeights + interCardSpacing
+  }
 
   var body: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
@@ -16,6 +24,11 @@ struct SessionTaskListSection: View {
         } description: {
           Text("Create a task from the Action Console in the inspector.")
         }
+        .frame(
+          maxWidth: .infinity,
+          minHeight: emptyStateMinHeight,
+          alignment: .center
+        )
       } else {
         LazyVStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
           ForEach(tasks) { task in
