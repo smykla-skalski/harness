@@ -24,6 +24,17 @@ use super::protocol::TimelineEntry;
 /// Returns `CliError` on discovery or parse failures.
 pub fn session_timeline(session_id: &str) -> Result<Vec<TimelineEntry>, CliError> {
     let resolved = index::resolve_session(session_id)?;
+    session_timeline_from_resolved(&resolved)
+}
+
+/// Build a timeline from a pre-resolved session (avoids full discovery).
+///
+/// # Errors
+/// Returns [`CliError`] on parse failures.
+pub fn session_timeline_from_resolved(
+    resolved: &index::ResolvedSession,
+) -> Result<Vec<TimelineEntry>, CliError> {
+    let session_id = &resolved.state.session_id;
     let mut entries = Vec::new();
     let mut logged_signal_acks = HashSet::new();
     let mut sent_signals = BTreeMap::new();

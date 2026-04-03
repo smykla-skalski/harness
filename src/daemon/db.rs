@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 use std::collections::BTreeMap;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use rusqlite::Connection;
 
@@ -529,6 +529,71 @@ impl DaemonDb {
             sessions.push(state);
         }
         Ok(sessions)
+    }
+
+    /// Resolve a session into a `ResolvedSession` using the DB instead of
+    /// filesystem discovery.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on query or parse failure.
+    pub fn resolve_session(
+        &self,
+        session_id: &str,
+    ) -> Result<Option<super::index::ResolvedSession>, CliError> {
+        let result = self.conn.query_row(
+            "SELECT s.state_json, p.project_id, p.name, p.project_dir, p.repository_root,
+                    p.checkout_id, p.checkout_name, p.context_root, p.is_worktree, p.worktree_name
+             FROM sessions s
+             JOIN projects p ON p.project_id = s.project_id
+             WHERE s.session_id = ?1",
+            [session_id],
+            |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, String>(2)?,
+                    row.get::<_, Option<String>>(3)?,
+                    row.get::<_, Option<String>>(4)?,
+                    row.get::<_, String>(5)?,
+                    row.get::<_, String>(6)?,
+                    row.get::<_, String>(7)?,
+                    row.get::<_, bool>(8)?,
+                    row.get::<_, Option<String>>(9)?,
+                ))
+            },
+        );
+
+        match result {
+            Ok((
+                state_json,
+                project_id,
+                name,
+                project_dir,
+                repository_root,
+                checkout_id,
+                checkout_name,
+                context_root,
+                is_worktree,
+                worktree_name,
+            )) => {
+                let state: SessionState = serde_json::from_str(&state_json)
+                    .map_err(|error| db_error(format!("parse session state: {error}")))?;
+                let project = DiscoveredProject {
+                    project_id,
+                    name,
+                    project_dir: project_dir.map(PathBuf::from),
+                    repository_root: repository_root.map(PathBuf::from),
+                    checkout_id,
+                    checkout_name,
+                    context_root: PathBuf::from(context_root),
+                    is_worktree,
+                    worktree_name,
+                };
+                Ok(Some(super::index::ResolvedSession { project, state }))
+            }
+            Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+            Err(error) => Err(db_error(format!("resolve session: {error}"))),
+        }
     }
 
     /// Load a single session state by ID.
