@@ -91,7 +91,11 @@ fn build_timeline(
         });
     }
 
-    entries.extend(conversation_entries(&resolved.project, &resolved.state)?);
+    entries.extend(load_conversation_entries_hybrid(
+        db,
+        &resolved.project,
+        &resolved.state,
+    )?);
 
     for task_id in resolved.state.tasks.keys() {
         let checkpoints =
@@ -139,6 +143,35 @@ fn load_checkpoints_hybrid(
         return db.load_task_checkpoints(session_id, task_id);
     }
     index::load_task_checkpoints(project, session_id, task_id)
+}
+
+fn load_conversation_entries_hybrid(
+    db: Option<&super::db::DaemonDb>,
+    project: &index::DiscoveredProject,
+    state: &SessionState,
+) -> Result<Vec<TimelineEntry>, CliError> {
+    if let Some(db) = db {
+        return conversation_entries_from_db(db, state);
+    }
+    conversation_entries(project, state)
+}
+
+fn conversation_entries_from_db(
+    db: &super::db::DaemonDb,
+    state: &SessionState,
+) -> Result<Vec<TimelineEntry>, CliError> {
+    let mut entries = Vec::new();
+    for (agent_id, agent) in &state.agents {
+        let events = db.load_conversation_events(&state.session_id, agent_id)?;
+        for event in events {
+            if let Some(entry) =
+                conversation_entry(&state.session_id, agent_id, &agent.runtime, &event)?
+            {
+                entries.push(entry);
+            }
+        }
+    }
+    Ok(entries)
 }
 
 fn conversation_entries(

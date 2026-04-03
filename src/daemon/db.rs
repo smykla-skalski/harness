@@ -5,6 +5,7 @@ use std::path::{Path, PathBuf};
 use rusqlite::Connection;
 
 use crate::workspace::utc_now;
+use crate::agents::runtime::event::ConversationEvent;
 use crate::daemon::index::DiscoveredProject;
 use crate::errors::{CliError, CliErrorKind};
 use crate::session::types::{
@@ -316,6 +317,7 @@ impl DaemonDb {
             import_session_checkpoints(self, &resolved.project, &resolved.state)?;
             import_session_signals(self, resolved)?;
             import_session_activity(self, resolved)?;
+            import_conversation_events(self, resolved)?;
         }
 
         import_daemon_events(self)?;
@@ -820,6 +822,79 @@ impl DaemonDb {
         Ok(signals)
     }
 
+    /// Index conversation events for a session agent.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on SQL failures.
+    pub fn sync_conversation_events(
+        &self,
+        session_id: &str,
+        agent_id: &str,
+        runtime: &str,
+        events: &[ConversationEvent],
+    ) -> Result<(), CliError> {
+        let mut statement = self
+            .conn
+            .prepare(
+                "INSERT INTO conversation_events
+                    (session_id, agent_id, runtime, timestamp, sequence, kind, event_json)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+            )
+            .map_err(|error| db_error(format!("prepare event insert: {error}")))?;
+
+        for event in events {
+            let kind_json = serde_json::to_string(&event.kind).unwrap_or_default();
+            let kind = extract_transition_kind(&kind_json);
+            let json = serde_json::to_string(event).unwrap_or_default();
+            statement
+                .execute(rusqlite::params![
+                    session_id,
+                    agent_id,
+                    runtime,
+                    event.timestamp,
+                    event.sequence,
+                    kind,
+                    json,
+                ])
+                .map_err(|error| db_error(format!("insert conversation event: {error}")))?;
+        }
+        Ok(())
+    }
+
+    /// Load conversation events for a session agent from the index.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on query failure.
+    pub fn load_conversation_events(
+        &self,
+        session_id: &str,
+        agent_id: &str,
+    ) -> Result<Vec<ConversationEvent>, CliError> {
+        let mut statement = self
+            .conn
+            .prepare(
+                "SELECT event_json FROM conversation_events
+                 WHERE session_id = ?1 AND agent_id = ?2
+                 ORDER BY id",
+            )
+            .map_err(|error| db_error(format!("prepare event load: {error}")))?;
+
+        let rows = statement
+            .query_map(rusqlite::params![session_id, agent_id], |row| {
+                row.get::<_, String>(0)
+            })
+            .map_err(|error| db_error(format!("query events: {error}")))?;
+
+        let mut events = Vec::new();
+        for row in rows {
+            let json = row.map_err(|error| db_error(format!("read event row: {error}")))?;
+            if let Ok(event) = serde_json::from_str(&json) {
+                events.push(event);
+            }
+        }
+        Ok(events)
+    }
+
     /// Cache agent activity summaries for a session.
     ///
     /// # Errors
@@ -974,6 +1049,33 @@ fn import_session_activity(
         &resolved.state,
     )?;
     db.sync_agent_activity(&resolved.state.session_id, &activities)
+}
+
+fn import_conversation_events(
+    db: &DaemonDb,
+    resolved: &super::index::ResolvedSession,
+) -> Result<(), CliError> {
+    for (agent_id, agent) in &resolved.state.agents {
+        let session_key = agent
+            .agent_session_id
+            .as_deref()
+            .unwrap_or(&resolved.state.session_id);
+        let events = super::index::load_conversation_events(
+            &resolved.project,
+            &agent.runtime,
+            session_key,
+            agent_id,
+        )?;
+        if !events.is_empty() {
+            db.sync_conversation_events(
+                &resolved.state.session_id,
+                agent_id,
+                &agent.runtime,
+                &events,
+            )?;
+        }
+    }
+    Ok(())
 }
 
 fn import_daemon_events(db: &DaemonDb) -> Result<(), CliError> {
@@ -1385,6 +1487,21 @@ CREATE TABLE daemon_events (
 );
 
 CREATE INDEX idx_daemon_events_time ON daemon_events(recorded_at DESC);
+
+-- Indexed conversation events from agent transcripts
+CREATE TABLE conversation_events (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id   TEXT NOT NULL,
+    agent_id     TEXT NOT NULL,
+    runtime      TEXT NOT NULL,
+    timestamp    TEXT,
+    sequence     INTEGER NOT NULL DEFAULT 0,
+    kind         TEXT NOT NULL,
+    event_json   TEXT NOT NULL
+);
+
+CREATE INDEX idx_conv_events_session ON conversation_events(session_id);
+CREATE INDEX idx_conv_events_agent ON conversation_events(session_id, agent_id);
 
 -- Cached agent activity summaries (computed from transcript files)
 CREATE TABLE agent_activity_cache (
