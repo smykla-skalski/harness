@@ -148,7 +148,8 @@ async fn get_session(
     if let Err(response) = require_auth(&headers, &state) {
         return *response;
     }
-    map_json(service::session_detail(&session_id))
+    let db_guard = state.db.as_ref().map(|db| db.lock().expect("db lock"));
+    map_json(service::session_detail(&session_id, db_guard.as_deref()))
 }
 
 async fn get_timeline(
@@ -159,7 +160,8 @@ async fn get_timeline(
     if let Err(response) = require_auth(&headers, &state) {
         return *response;
     }
-    map_json(service::session_timeline(&session_id))
+    let db_guard = state.db.as_ref().map(|db| db.lock().expect("db lock"));
+    map_json(service::session_timeline(&session_id, db_guard.as_deref()))
 }
 
 async fn post_task_create(

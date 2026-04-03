@@ -279,41 +279,9 @@ fn dispatch(
 ) -> WsResponse {
     match request.method.as_str() {
         "ping" => ok_response(&request.id, serde_json::json!({ "pong": true })),
-        "health" => {
-            let db_guard = state.db.as_ref().map(|db| db.lock().expect("db lock"));
-            dispatch_query(&request.id, || {
-                service::health_response(&state.manifest, db_guard.as_deref())
-            })
-        }
-        "diagnostics" => dispatch_query(&request.id, service::diagnostics_report),
-        "daemon.stop" => dispatch_query(&request.id, service::request_shutdown),
-        "projects" => {
-            let db_guard = state.db.as_ref().map(|db| db.lock().expect("db lock"));
-            dispatch_query(&request.id, || service::list_projects(db_guard.as_deref()))
-        }
-        "sessions" => {
-            let db_guard = state.db.as_ref().map(|db| db.lock().expect("db lock"));
-            dispatch_query(&request.id, || {
-                service::list_sessions(true, db_guard.as_deref())
-            })
-        }
-        "session.detail" => {
-            let session_id = extract_session_id(&request.params);
-            match session_id {
-                Some(session_id) => {
-                    dispatch_query(&request.id, || service::session_detail(&session_id))
-                }
-                None => error_response(&request.id, "MISSING_PARAM", "missing session_id"),
-            }
-        }
-        "session.timeline" => {
-            let session_id = extract_session_id(&request.params);
-            match session_id {
-                Some(session_id) => {
-                    dispatch_query(&request.id, || service::session_timeline(&session_id))
-                }
-                None => error_response(&request.id, "MISSING_PARAM", "missing session_id"),
-            }
+        "health" | "diagnostics" | "daemon.stop" | "projects" | "sessions"
+        | "session.detail" | "session.timeline" => {
+            dispatch_read_query(request, state)
         }
         "session.subscribe" => handle_session_subscribe(request, connection),
         "session.unsubscribe" => handle_session_unsubscribe(request, connection),
@@ -374,6 +342,34 @@ fn dispatch(
             "UNKNOWN_METHOD",
             &format!("unknown method: {unknown}"),
         ),
+    }
+}
+
+fn dispatch_read_query(request: &WsRequest, state: &DaemonHttpState) -> WsResponse {
+    let db_guard = state.db.as_ref().map(|db| db.lock().expect("db lock"));
+    let db_ref = db_guard.as_deref();
+
+    match request.method.as_str() {
+        "health" => dispatch_query(&request.id, || {
+            service::health_response(&state.manifest, db_ref)
+        }),
+        "diagnostics" => dispatch_query(&request.id, service::diagnostics_report),
+        "daemon.stop" => dispatch_query(&request.id, service::request_shutdown),
+        "projects" => dispatch_query(&request.id, || service::list_projects(db_ref)),
+        "sessions" => dispatch_query(&request.id, || service::list_sessions(true, db_ref)),
+        "session.detail" => match extract_session_id(&request.params) {
+            Some(session_id) => dispatch_query(&request.id, || {
+                service::session_detail(&session_id, db_ref)
+            }),
+            None => error_response(&request.id, "MISSING_PARAM", "missing session_id"),
+        },
+        "session.timeline" => match extract_session_id(&request.params) {
+            Some(session_id) => dispatch_query(&request.id, || {
+                service::session_timeline(&session_id, db_ref)
+            }),
+            None => error_response(&request.id, "MISSING_PARAM", "missing session_id"),
+        },
+        _ => error_response(&request.id, "UNKNOWN_METHOD", "unexpected read method"),
     }
 }
 

@@ -266,16 +266,30 @@ pub fn list_sessions(
 /// Load a single session detail snapshot.
 ///
 /// # Errors
-/// Returns `CliError` when the session cannot be resolved or loaded.
-pub fn session_detail(session_id: &str) -> Result<SessionDetail, CliError> {
+/// Returns [`CliError`] when the session cannot be resolved or loaded.
+pub fn session_detail(
+    session_id: &str,
+    db: Option<&super::db::DaemonDb>,
+) -> Result<SessionDetail, CliError> {
+    if let Some(db) = db
+        && let Some(resolved) = db.resolve_session(session_id)? {
+            return snapshot::session_detail_from_resolved(&resolved);
+        }
     snapshot::session_detail(session_id)
 }
 
 /// Load a merged session timeline.
 ///
 /// # Errors
-/// Returns `CliError` when the session cannot be resolved or timeline sources fail.
-pub fn session_timeline(session_id: &str) -> Result<Vec<TimelineEntry>, CliError> {
+/// Returns [`CliError`] when the session cannot be resolved or timeline sources fail.
+pub fn session_timeline(
+    session_id: &str,
+    db: Option<&super::db::DaemonDb>,
+) -> Result<Vec<TimelineEntry>, CliError> {
+    if let Some(db) = db
+        && let Some(resolved) = db.resolve_session(session_id)? {
+            return timeline::session_timeline_from_resolved(&resolved);
+        }
     timeline::session_timeline(session_id)
 }
 
@@ -509,7 +523,7 @@ pub fn sessions_updated_event() -> Result<StreamEvent, CliError> {
 /// Returns `CliError` when the session cannot be resolved or serialized.
 pub fn session_updated_event(session_id: &str) -> Result<StreamEvent, CliError> {
     let payload = SessionUpdatedPayload {
-        detail: session_detail(session_id)?,
+        detail: session_detail(session_id, None)?,
         timeline: None,
     };
     stream_event("session_updated", Some(session_id), payload)
