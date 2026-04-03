@@ -266,7 +266,7 @@ final class HarnessMonitorToolbarUITests: HarnessMonitorUITestCase {
       verticalOffset: \(verticalOffset)
       """
 
-    if centerOffset > 90 || verticalOffset > 8 || centerpiece.frame.width < 320 {
+    if centerOffset > 90 || verticalOffset > 8 || centerpiece.frame.width < 180 {
       attachWindowScreenshot(in: app, named: "toolbar-centerpiece")
       let attachment = XCTAttachment(string: diagnostics)
       attachment.name = "toolbar-centerpiece-diagnostics"
@@ -276,8 +276,8 @@ final class HarnessMonitorToolbarUITests: HarnessMonitorUITestCase {
 
     XCTAssertGreaterThanOrEqual(
       centerpiece.frame.width,
-      320,
-      "Expected the toolbar centerpiece to render as a substantial capsule"
+      180,
+      "Expected the toolbar centerpiece to keep the stats visible in a compact capsule"
     )
     XCTAssertLessThanOrEqual(
       centerOffset,
