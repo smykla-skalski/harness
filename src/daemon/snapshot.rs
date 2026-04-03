@@ -130,8 +130,22 @@ pub fn session_summaries(include_all: bool) -> Result<Vec<SessionSummary>, CliEr
 /// Returns `CliError` on discovery or parse failures.
 pub fn session_detail(session_id: &str) -> Result<SessionDetail, CliError> {
     let resolved = index::resolve_session(session_id)?;
-    let detail = build_session_detail(&resolved)?;
-    let _ = state::write_session_cache(&detail.session.project_id, session_id, &detail);
+    session_detail_from_resolved(&resolved)
+}
+
+/// Build session detail from a pre-resolved session (avoids full discovery).
+///
+/// # Errors
+/// Returns [`CliError`] on parse failures.
+pub fn session_detail_from_resolved(
+    resolved: &index::ResolvedSession,
+) -> Result<SessionDetail, CliError> {
+    let detail = build_session_detail(resolved)?;
+    let _ = state::write_session_cache(
+        &detail.session.project_id,
+        &resolved.state.session_id,
+        &detail,
+    );
     Ok(detail)
 }
 
