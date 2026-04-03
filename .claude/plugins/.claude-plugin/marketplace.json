@@ -10,6 +10,11 @@
       "source": "./observe"
     },
     {
+      "description": "Harness session workflow",
+      "name": "session",
+      "source": "./session"
+    },
+    {
       "description": "Harness suite workflow",
       "name": "suite",
       "source": "./suite"

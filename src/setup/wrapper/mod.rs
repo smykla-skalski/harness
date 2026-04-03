@@ -1,6 +1,8 @@
 use std::path::{Path, PathBuf};
 
-use crate::agents::assets::write_suite_plugin_outputs;
+use crate::agents::assets::{
+    AgentAssetTarget, write_agent_target_outputs, write_suite_plugin_outputs,
+};
 use crate::errors::{CliError, CliErrorKind};
 use crate::hooks::adapters::{HookAgent, adapter_for};
 use crate::infra::io::write_text;
@@ -108,8 +110,11 @@ fn write_process_agent_bootstrap(
     project_dir: &Path,
     agent: HookAgent,
 ) -> Result<Vec<PathBuf>, CliError> {
+    let mut written = match agent {
+        HookAgent::Codex => write_agent_target_outputs(project_dir, AgentAssetTarget::Codex)?,
+        _ => Vec::new(),
+    };
     let planned = planned_agent_bootstrap_files(project_dir, agent);
-    let mut written = Vec::with_capacity(planned.len());
     for (path, content) in planned {
         write_text(&path, &content)?;
         written.push(path);
