@@ -11,12 +11,13 @@ use crate::observe::types::ObserverState;
 use crate::session::types::{
     SessionSignalRecord, SessionSignalStatus, SessionState, SessionStatus,
 };
+use crate::workspace::project_context_dir;
 
 use super::index::{self, DiscoveredProject, ResolvedSession};
 use super::protocol::{
     AgentToolActivitySummary, ObserverActiveWorker, ObserverAgentSessionSummary,
     ObserverCycleSummary, ObserverOpenIssue, ObserverSummary, ProjectSummary, SessionDetail,
-    SessionSummary,
+    SessionSummary, WorktreeSummary,
 };
 use super::state;
 
@@ -26,33 +27,88 @@ use super::state;
 /// Returns `CliError` on discovery or parse failures.
 pub fn project_summaries() -> Result<Vec<ProjectSummary>, CliError> {
     let projects = index::discover_projects()?;
-    let sessions = index::discover_sessions(true)?;
-    let mut counts: BTreeMap<String, (usize, usize)> = BTreeMap::new();
+    let sessions = index::discover_sessions_for(&projects, true)?;
+    let mut project_counts: BTreeMap<String, (usize, usize)> = BTreeMap::new();
+    let mut worktree_counts: BTreeMap<String, (usize, usize)> = BTreeMap::new();
     for session in sessions {
-        let entry = counts
+        let entry = project_counts
             .entry(session.project.project_id.clone())
             .or_insert((0, 0));
         entry.1 += 1;
         if session.state.status == SessionStatus::Active {
             entry.0 += 1;
         }
+        if session.project.is_worktree {
+            let entry = worktree_counts
+                .entry(session.project.checkout_id.clone())
+                .or_insert((0, 0));
+            entry.1 += 1;
+            if session.state.status == SessionStatus::Active {
+                entry.0 += 1;
+            }
+        }
     }
 
-    Ok(projects
-        .into_iter()
-        .map(|project| {
-            let (active_session_count, total_session_count) =
-                counts.get(&project.project_id).copied().unwrap_or((0, 0));
-            ProjectSummary {
-                project_id: project.project_id,
-                name: project.name,
-                project_dir: project.project_dir.map(|path| path.display().to_string()),
+    let mut grouped = BTreeMap::<String, ProjectSummary>::new();
+    for project in projects {
+        let repository_root = project
+            .repository_root
+            .clone()
+            .or_else(|| project.project_dir.clone());
+        let project_dir = repository_root
+            .as_ref()
+            .map(|path| path.display().to_string());
+        let context_root = repository_root.as_ref().map_or_else(
+            || project.context_root.display().to_string(),
+            |path| project_context_dir(path).display().to_string(),
+        );
+        let entry = grouped
+            .entry(project.project_id.clone())
+            .or_insert_with(|| ProjectSummary {
+                project_id: project.project_id.clone(),
+                name: project.name.clone(),
+                project_dir,
+                context_root,
+                active_session_count: 0,
+                total_session_count: 0,
+                worktrees: Vec::new(),
+            });
+        if project.is_worktree {
+            let (active_session_count, total_session_count) = worktree_counts
+                .get(&project.checkout_id)
+                .copied()
+                .unwrap_or((0, 0));
+            entry.worktrees.push(WorktreeSummary {
+                checkout_id: project.checkout_id,
+                name: project.checkout_name,
+                checkout_root: project
+                    .project_dir
+                    .as_ref()
+                    .map_or_else(String::new, |path| path.display().to_string()),
                 context_root: project.context_root.display().to_string(),
                 active_session_count,
                 total_session_count,
-            }
+            });
+        }
+    }
+
+    let mut summaries: Vec<_> = grouped
+        .into_values()
+        .map(|mut summary| {
+            let (active_session_count, total_session_count) = project_counts
+                .get(&summary.project_id)
+                .copied()
+                .unwrap_or((0, 0));
+            summary.active_session_count = active_session_count;
+            summary.total_session_count = total_session_count;
+            summary
+                .worktrees
+                .sort_by(|left, right| left.name.cmp(&right.name));
+            summary
         })
-        .collect())
+        .collect();
+    summaries.sort_by(|left, right| left.name.cmp(&right.name));
+    Ok(summaries)
 }
 
 /// Build summaries for all sessions across discovered projects.
@@ -102,10 +158,18 @@ fn summary_from_resolved(resolved: &ResolvedSession) -> SessionSummary {
         project_name: resolved.project.name.clone(),
         project_dir: resolved
             .project
-            .project_dir
+            .repository_root
             .as_ref()
             .map(|path| path.display().to_string()),
         context_root: resolved.project.context_root.display().to_string(),
+        checkout_id: resolved.project.checkout_id.clone(),
+        checkout_root: resolved
+            .project
+            .project_dir
+            .as_ref()
+            .map_or_else(String::new, |path| path.display().to_string()),
+        is_worktree: resolved.project.is_worktree,
+        worktree_name: resolved.project.worktree_name.clone(),
         session_id: resolved.state.session_id.clone(),
         context: resolved.state.context.clone(),
         status: resolved.state.status,
