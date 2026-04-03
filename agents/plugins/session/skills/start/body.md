@@ -64,7 +64,7 @@ Tell the user which agents are needed and give them the join command. Example:
 ```
 To start workers, open new terminals and run:
 
-  /session:join <session-id> --role worker
+  /harness:session:join <session-id> --role worker
 ```
 
 If the user specified agents via context, include the runtime flag in your instructions.

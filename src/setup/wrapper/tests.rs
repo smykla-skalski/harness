@@ -411,17 +411,27 @@ fn write_agent_bootstrap_writes_codex_notify_config() {
         .path()
         .join(".agents")
         .join("skills")
-        .join("session-start")
+        .join("harness-session-start")
+        .join("SKILL.md");
+    let plugin_skill = dir
+        .path()
+        .join("plugins")
+        .join("harness")
+        .join("skills")
+        .join("start")
         .join("SKILL.md");
     let hooks_path = dir.path().join(".codex").join("hooks.json");
     let config_path = dir.path().join(".codex").join("config.toml");
 
     assert!(written.contains(&session_start_skill));
+    assert!(written.contains(&plugin_skill));
     assert!(written.contains(&hooks_path));
     assert!(written.contains(&config_path));
 
     let skill = fs::read_to_string(session_start_skill).unwrap();
-    assert!(skill.contains("name: session:start"));
+    assert!(skill.contains("name: harness:session:start"));
+    let plugin_skill = fs::read_to_string(plugin_skill).unwrap();
+    assert!(plugin_skill.contains("name: session:start"));
     assert_codex_hooks(&fs::read_to_string(hooks_path).unwrap());
     let config = fs::read_to_string(config_path).unwrap();
     assert!(config.contains("\"audit-turn\""));
@@ -430,7 +440,69 @@ fn write_agent_bootstrap_writes_codex_notify_config() {
 }
 
 #[test]
-fn write_agent_bootstrap_writes_copilot_hook_config() {
+fn write_agent_bootstrap_writes_claude_plugin_assets() {
+    let dir = tempfile::tempdir().unwrap();
+    let written = write_agent_bootstrap(dir.path(), HookAgent::Claude).unwrap();
+
+    let settings_path = dir.path().join(".claude").join("settings.json");
+    let plugin_skill = dir
+        .path()
+        .join(".claude")
+        .join("plugins")
+        .join("harness")
+        .join("skills")
+        .join("start")
+        .join("SKILL.md");
+
+    assert!(written.contains(&settings_path));
+    assert!(written.contains(&plugin_skill));
+    let skill = fs::read_to_string(plugin_skill).unwrap();
+    assert!(skill.contains("name: session:start"));
+}
+
+#[test]
+fn write_agent_bootstrap_writes_gemini_session_command() {
+    let dir = tempfile::tempdir().unwrap();
+    let written = write_agent_bootstrap(dir.path(), HookAgent::Gemini).unwrap();
+
+    let settings_path = dir.path().join(".gemini").join("settings.json");
+    let command_path = dir
+        .path()
+        .join(".gemini")
+        .join("commands")
+        .join("harness")
+        .join("session")
+        .join("start.toml");
+
+    assert!(written.contains(&settings_path));
+    assert!(written.contains(&command_path));
+    let command = fs::read_to_string(command_path).unwrap();
+    assert!(command.contains("harness session start"));
+}
+
+#[test]
+fn write_agent_bootstrap_writes_opencode_plugin_assets() {
+    let dir = tempfile::tempdir().unwrap();
+    let written = write_agent_bootstrap(dir.path(), HookAgent::OpenCode).unwrap();
+
+    let hooks_path = dir.path().join(".opencode").join("hooks.json");
+    let plugin_skill = dir
+        .path()
+        .join(".opencode")
+        .join("plugins")
+        .join("harness")
+        .join("skills")
+        .join("start")
+        .join("SKILL.md");
+
+    assert!(written.contains(&hooks_path));
+    assert!(written.contains(&plugin_skill));
+    let skill = fs::read_to_string(plugin_skill).unwrap();
+    assert!(skill.contains("name: session:start"));
+}
+
+#[test]
+fn write_agent_bootstrap_writes_copilot_hook_config_and_plugin_assets() {
     let dir = tempfile::tempdir().unwrap();
     let written = write_agent_bootstrap(dir.path(), HookAgent::Copilot).unwrap();
 
@@ -439,8 +511,16 @@ fn write_agent_bootstrap_writes_copilot_hook_config() {
         .join(".github")
         .join("hooks")
         .join("harness.json");
+    let plugin_skill = dir
+        .path()
+        .join("plugins")
+        .join("harness")
+        .join("skills")
+        .join("start")
+        .join("SKILL.md");
 
     assert!(written.contains(&config_path));
+    assert!(written.contains(&plugin_skill));
     let config = fs::read_to_string(config_path).unwrap();
     assert!(config.contains("\"version\": 1"));
     assert!(config.contains("\"preToolUse\""));
@@ -450,4 +530,6 @@ fn write_agent_bootstrap_writes_copilot_hook_config() {
             "\"harness agents session-start --agent copilot --project-dir \\\"$PWD\\\"\""
         )
     );
+    let skill = fs::read_to_string(plugin_skill).unwrap();
+    assert!(skill.contains("name: session:start"));
 }

@@ -52,8 +52,8 @@ struct SkillSource {
     disable_model_invocation: Option<bool>,
     #[serde(rename = "user-invocable")]
     user_invocable: Option<bool>,
-    #[serde(rename = "codex-skill-name")]
-    codex_skill_name: Option<String>,
+    #[serde(rename = "direct-skill-name", alias = "codex-skill-name")]
+    direct_skill_name: Option<String>,
     #[serde(default)]
     hooks: Option<Value>,
 }
@@ -297,13 +297,7 @@ fn load_plugin_sources(
             continue;
         }
         let plugin_root = entry.path();
-        let source: PluginSource = serde_yml::from_str(&read_text(
-            &plugin_root.join("plugin.yaml"),
-        )?)
-        .map_err(|error| {
-            CliErrorKind::invalid_json(plugin_root.join("plugin.yaml").display().to_string())
-                .with_details(error.to_string())
-        })?;
+        let source = load_plugin_source(&plugin_root)?;
         let hooks = {
             let path = plugin_root.join("hooks.yaml");
             path.exists().then(|| read_text(&path)).transpose()?
@@ -351,6 +345,15 @@ fn load_plugin_sources(
     Ok(plugins)
 }
 
+fn load_plugin_source(plugin_root: &Path) -> Result<PluginSource, CliError> {
+    let path = plugin_root.join("plugin.yaml");
+    let source: PluginSource = serde_yml::from_str(&read_text(&path)?).map_err(|error| {
+        CliErrorKind::invalid_json(path.display().to_string()).with_details(error.to_string())
+    })?;
+    validate_safe_segment(&source.name)?;
+    Ok(source)
+}
+
 fn load_skill_definition(root: PathBuf) -> Result<SkillDefinition, CliError> {
     let source: SkillSource =
         serde_yml::from_str(&read_text(&root.join("skill.yaml"))?).map_err(|error| {
@@ -367,12 +370,10 @@ fn render_skill_outputs(
     skill: &SkillDefinition,
 ) -> Result<BTreeMap<PathBuf, String>, CliError> {
     let mut files = BTreeMap::new();
+    let skill_dir = skill_dir_name(skill)?;
     match target {
         RenderTarget::Claude => {
-            let base = repo_root
-                .join(".claude")
-                .join("skills")
-                .join(&skill.source.name);
+            let base = repo_root.join(".claude").join("skills").join(&skill_dir);
             files.insert(
                 base.join("SKILL.md"),
                 render_skill_markdown(target, skill, None)?,
@@ -387,10 +388,7 @@ fn render_skill_outputs(
             )?;
         }
         RenderTarget::Codex => {
-            let base = repo_root
-                .join(".agents")
-                .join("skills")
-                .join(&skill.source.name);
+            let base = repo_root.join(".agents").join("skills").join(&skill_dir);
             files.insert(
                 base.join("SKILL.md"),
                 render_skill_markdown(target, skill, None)?,
@@ -412,10 +410,7 @@ fn render_skill_outputs(
             files.insert(path, render_gemini_command(skill));
         }
         RenderTarget::OpenCode => {
-            let base = repo_root
-                .join(".opencode")
-                .join("skills")
-                .join(&skill.source.name);
+            let base = repo_root.join(".opencode").join("skills").join(&skill_dir);
             files.insert(
                 base.join("SKILL.md"),
                 render_skill_markdown(target, skill, None)?,
@@ -525,7 +520,7 @@ fn render_gemini_plugin_outputs(
             .join(".gemini")
             .join("commands")
             .join(plugin.source.name.as_str())
-            .join(format!("{}.toml", skill.source.name));
+            .join(format!("{}.toml", gemini_command_name(&skill.source.name)));
         files.insert(path, render_gemini_command(skill));
     }
 }
@@ -564,7 +559,7 @@ fn render_plugin_skill_markdown(
     files: &mut BTreeMap<PathBuf, String>,
 ) -> Result<(), CliError> {
     for skill in &plugin.skills {
-        let skill_base = base.join("skills").join(&skill.source.name);
+        let skill_base = base.join("skills").join(skill_dir_name(skill)?);
         files.insert(
             skill_base.join("SKILL.md"),
             render_skill_markdown(target, skill, None)?,
@@ -587,10 +582,10 @@ fn render_codex_skill_alias_outputs(
     files: &mut BTreeMap<PathBuf, String>,
 ) -> Result<(), CliError> {
     for skill in &plugin.skills {
-        let Some(alias_name) = skill.source.codex_skill_name.as_deref() else {
+        let Some(alias_name) = skill.source.direct_skill_name.as_deref() else {
             continue;
         };
-        let alias_dir = codex_skill_alias_dir(alias_name)?;
+        let alias_dir = skill_alias_dir(alias_name)?;
         let alias_base = repo_root.join(".agents").join("skills").join(alias_dir);
         files.insert(
             alias_base.join("SKILL.md"),
@@ -687,13 +682,12 @@ fn render_plugin_manifest(plugin: &PluginSource) -> String {
 }
 
 fn render_codex_marketplace(repo_root: &Path) -> Result<String, CliError> {
-    let plugin_names = discover_plugin_names(&repo_root.join(PLUGINS_ROOT))?;
-    let plugins: Vec<Value> = plugin_names
+    let plugins: Vec<Value> = discover_plugin_sources(&repo_root.join(PLUGINS_ROOT))?
         .into_iter()
-        .map(|name| {
+        .map(|plugin| {
             serde_json::json!({
-                "name": name,
-                "source": format!("./{name}"),
+                "name": plugin.name,
+                "source": format!("./{}", plugin.name),
             })
         })
         .collect();
@@ -705,14 +699,13 @@ fn render_codex_marketplace(repo_root: &Path) -> Result<String, CliError> {
 }
 
 fn render_claude_marketplace(repo_root: &Path, _current_plugin: &str) -> Result<String, CliError> {
-    let plugin_names = discover_plugin_names(&repo_root.join(PLUGINS_ROOT))?;
-    let plugins: Vec<Value> = plugin_names
+    let plugins: Vec<Value> = discover_plugin_sources(&repo_root.join(PLUGINS_ROOT))?
         .into_iter()
-        .map(|name| {
+        .map(|plugin| {
             serde_json::json!({
-                "name": name,
-                "source": format!("./{name}"),
-                "description": format!("Harness {name} workflow"),
+                "name": plugin.name,
+                "source": format!("./{}", plugin.name),
+                "description": plugin.description,
             })
         })
         .collect();
@@ -724,18 +717,17 @@ fn render_claude_marketplace(repo_root: &Path, _current_plugin: &str) -> Result<
     .expect("typed claude marketplace serializes"))
 }
 
-fn discover_plugin_names(root: &Path) -> Result<Vec<String>, CliError> {
-    let mut names = Vec::new();
+fn discover_plugin_sources(root: &Path) -> Result<Vec<PluginSource>, CliError> {
+    let mut plugins = Vec::new();
     for entry in root.read_dir().map_err(|error| io_err(&error))? {
         let entry = entry.map_err(|error| io_err(&error))?;
         if entry.file_type().map_err(|error| io_err(&error))?.is_dir() {
-            let name = entry.file_name().to_string_lossy().to_string();
-            validate_safe_segment(&name)?;
-            names.push(name);
+            plugins.push(load_plugin_source(&entry.path())?);
         }
     }
-    names.sort();
-    Ok(names)
+    plugins.sort_by(|a, b| a.name.cmp(&b.name));
+    plugins.dedup_by(|a, b| a.name == b.name);
+    Ok(plugins)
 }
 
 fn rewrite_allowed_tools(value: &str, target: RenderTarget) -> String {
@@ -871,10 +863,26 @@ fn rewrite_non_claude_text(mut text: String) -> String {
     text
 }
 
-fn codex_skill_alias_dir(alias_name: &str) -> Result<String, CliError> {
+fn skill_alias_dir(alias_name: &str) -> Result<String, CliError> {
     let alias_dir = alias_name.replace(':', "-");
     validate_safe_segment(&alias_dir)?;
     Ok(alias_dir)
+}
+
+fn skill_dir_name(skill: &SkillDefinition) -> Result<String, CliError> {
+    let dir_name = skill
+        .root
+        .file_name()
+        .and_then(OsStr::to_str)
+        .ok_or_else(|| {
+            CliErrorKind::usage_error(format!(
+                "skill source path {} has no directory name",
+                skill.root.display()
+            ))
+        })?
+        .to_string();
+    validate_safe_segment(&dir_name)?;
+    Ok(dir_name)
 }
 
 fn target_label(target: RenderTarget) -> &'static str {
@@ -1135,7 +1143,7 @@ mod tests {
                 ),
                 disable_model_invocation: Some(true),
                 user_invocable: Some(true),
-                codex_skill_name: None,
+                direct_skill_name: None,
                 hooks: Some(json!({
                     "PreToolUse": [
                         {
@@ -1246,7 +1254,7 @@ mod tests {
     }
 
     #[test]
-    fn session_plugin_is_in_codex_marketplace() {
+    fn harness_plugin_is_in_codex_marketplace() {
         let planned =
             plan_outputs(&repo_root(), AgentAssetTarget::Codex).expect("assets plan succeeds");
         let marketplace = repo_root()
@@ -1258,8 +1266,8 @@ mod tests {
             .find_map(|output| output.files.get(&marketplace))
             .expect("codex marketplace should be planned");
 
-        assert!(rendered.contains("\"name\": \"session\""));
-        assert!(rendered.contains("\"source\": \"./session\""));
+        assert!(rendered.contains("\"name\": \"harness\""));
+        assert!(rendered.contains("\"source\": \"./harness\""));
     }
 
     #[test]
@@ -1269,15 +1277,54 @@ mod tests {
         let alias = repo_root()
             .join(".agents")
             .join("skills")
-            .join("session-start")
+            .join("harness-session-start")
             .join("SKILL.md");
         let rendered = planned
             .iter()
             .find_map(|output| output.files.get(&alias))
-            .expect("session:start alias should be planned");
+            .expect("harness:session:start alias should be planned");
 
-        assert!(rendered.contains("name: session:start"));
+        assert!(rendered.contains("name: harness:session:start"));
         assert!(!rendered.contains("AskUserQuestion"));
         assert!(rendered.contains("ask the user first"));
+    }
+
+    #[test]
+    fn claude_session_plugin_skill_is_namespaced_under_harness() {
+        let planned =
+            plan_outputs(&repo_root(), AgentAssetTarget::Claude).expect("assets plan succeeds");
+        let skill = repo_root()
+            .join(".claude")
+            .join("plugins")
+            .join("harness")
+            .join("skills")
+            .join("start")
+            .join("SKILL.md");
+        let rendered = planned
+            .iter()
+            .find_map(|output| output.files.get(&skill))
+            .expect("Claude harness session skill should be planned");
+
+        assert!(rendered.contains("name: session:start"));
+        assert!(rendered.contains("AskUserQuestion"));
+    }
+
+    #[test]
+    fn gemini_session_plugin_command_is_namespaced_under_harness() {
+        let planned =
+            plan_outputs(&repo_root(), AgentAssetTarget::Gemini).expect("assets plan succeeds");
+        let command = repo_root()
+            .join(".gemini")
+            .join("commands")
+            .join("harness")
+            .join("session")
+            .join("start.toml");
+        let rendered = planned
+            .iter()
+            .find_map(|output| output.files.get(&command))
+            .expect("Gemini harness session command should be planned");
+
+        assert!(rendered.contains("Start a new multi-agent orchestration session."));
+        assert!(rendered.contains("harness session start"));
     }
 }
