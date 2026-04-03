@@ -8,7 +8,8 @@ use crate::workspace::utc_now;
 use crate::daemon::index::DiscoveredProject;
 use crate::errors::{CliError, CliErrorKind};
 use crate::session::types::{
-    AgentRegistration, SessionLogEntry, SessionState, SessionStatus, TaskCheckpoint, WorkItem,
+    AgentRegistration, SessionLogEntry, SessionSignalRecord, SessionSignalStatus, SessionState,
+    SessionStatus, TaskCheckpoint, WorkItem,
 };
 
 /// `SQLite`-backed storage for the harness daemon. Replaces the file-based
@@ -313,6 +314,7 @@ impl DaemonDb {
 
             import_session_log(self, &resolved.project, &resolved.state.session_id)?;
             import_session_checkpoints(self, &resolved.project, &resolved.state)?;
+            import_session_signals(self, resolved)?;
         }
 
         import_daemon_events(self)?;
@@ -698,6 +700,125 @@ impl DaemonDb {
             .map_err(|error| db_error(format!("read checkpoint row: {error}")))
     }
 
+    /// Replace all signal index entries for a session.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on SQL failures.
+    pub fn sync_signal_index(
+        &self,
+        session_id: &str,
+        signals: &[SessionSignalRecord],
+    ) -> Result<(), CliError> {
+        self.conn
+            .execute(
+                "DELETE FROM signal_index WHERE session_id = ?1",
+                [session_id],
+            )
+            .map_err(|error| db_error(format!("delete signals: {error}")))?;
+
+        let mut statement = self
+            .conn
+            .prepare(
+                "INSERT INTO signal_index (
+                    signal_id, session_id, agent_id, runtime, command, priority,
+                    status, created_at, source_agent, message, action_hint,
+                    signal_json, ack_json, file_path, indexed_at
+                ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)",
+            )
+            .map_err(|error| db_error(format!("prepare signal insert: {error}")))?;
+
+        let now = utc_now();
+        for record in signals {
+            let signal_json =
+                serde_json::to_string(&record.signal).unwrap_or_default();
+            let ack_json = record
+                .acknowledgment
+                .as_ref()
+                .and_then(|ack| serde_json::to_string(ack).ok());
+            let status = format!("{:?}", record.status).to_lowercase();
+
+            statement
+                .execute(rusqlite::params![
+                    record.signal.signal_id,
+                    record.session_id,
+                    record.agent_id,
+                    record.runtime,
+                    record.signal.command,
+                    format!("{:?}", record.signal.priority).to_lowercase(),
+                    status,
+                    record.signal.created_at,
+                    record.signal.source_agent,
+                    record.signal.payload.message,
+                    record.signal.payload.action_hint,
+                    signal_json,
+                    ack_json,
+                    "",
+                    now,
+                ])
+                .map_err(|error| db_error(format!("insert signal: {error}")))?;
+        }
+        Ok(())
+    }
+
+    /// Load signals for a session from the index.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on query failure.
+    pub fn load_signals(
+        &self,
+        session_id: &str,
+    ) -> Result<Vec<SessionSignalRecord>, CliError> {
+
+        let mut statement = self
+            .conn
+            .prepare(
+                "SELECT signal_json, ack_json, runtime, agent_id, session_id, status
+                 FROM signal_index WHERE session_id = ?1
+                 ORDER BY created_at DESC",
+            )
+            .map_err(|error| db_error(format!("prepare signal load: {error}")))?;
+
+        let rows = statement
+            .query_map([session_id], |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, Option<String>>(1)?,
+                    row.get::<_, String>(2)?,
+                    row.get::<_, String>(3)?,
+                    row.get::<_, String>(4)?,
+                    row.get::<_, String>(5)?,
+                ))
+            })
+            .map_err(|error| db_error(format!("query signals: {error}")))?;
+
+        let mut signals = Vec::new();
+        for row in rows {
+            let (signal_json, ack_json, runtime, agent_id, sid, status_str) =
+                row.map_err(|error| db_error(format!("read signal row: {error}")))?;
+            let signal = serde_json::from_str(&signal_json)
+                .map_err(|error| db_error(format!("parse signal: {error}")))?;
+            let acknowledgment = ack_json
+                .as_deref()
+                .and_then(|json| serde_json::from_str(json).ok());
+            let status = match status_str.as_str() {
+                "pending" => SessionSignalStatus::Pending,
+                "acknowledged" => SessionSignalStatus::Acknowledged,
+                "rejected" => SessionSignalStatus::Rejected,
+                "deferred" => SessionSignalStatus::Deferred,
+                _ => SessionSignalStatus::Expired,
+            };
+            signals.push(SessionSignalRecord {
+                runtime,
+                agent_id,
+                session_id: sid,
+                status,
+                signal,
+                acknowledgment,
+            });
+        }
+        Ok(signals)
+    }
+
     /// Load recent daemon events, ordered by most recent first.
     ///
     /// # Errors
@@ -760,6 +881,17 @@ fn import_session_checkpoints(
         }
     }
     Ok(())
+}
+
+fn import_session_signals(
+    db: &DaemonDb,
+    resolved: &super::index::ResolvedSession,
+) -> Result<(), CliError> {
+    let signals = super::snapshot::load_signals_for(
+        &resolved.project,
+        &resolved.state,
+    )?;
+    db.sync_signal_index(&resolved.state.session_id, &signals)
 }
 
 fn import_daemon_events(db: &DaemonDb) -> Result<(), CliError> {

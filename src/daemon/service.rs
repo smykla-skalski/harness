@@ -273,7 +273,7 @@ pub fn session_detail(
 ) -> Result<SessionDetail, CliError> {
     if let Some(db) = db
         && let Some(resolved) = db.resolve_session(session_id)? {
-            return snapshot::session_detail_from_resolved(&resolved);
+            return snapshot::session_detail_from_resolved_with_db(&resolved, db);
         }
     snapshot::session_detail(session_id)
 }
