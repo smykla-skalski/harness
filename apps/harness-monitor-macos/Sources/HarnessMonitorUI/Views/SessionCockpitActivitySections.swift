@@ -4,6 +4,8 @@ import SwiftUI
 struct SessionCockpitSignalsSection: View {
   let signals: [SessionSignalRecord]
   let inspectSignal: (String) -> Void
+  @Environment(\.harnessDateTimeConfiguration)
+  private var dateTimeConfiguration
 
   var body: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
@@ -37,7 +39,7 @@ struct SessionCockpitSignalsSection: View {
                 Text(signal.status.title)
                   .scaledFont(.caption.bold())
                   .foregroundStyle(signalStatusColor(for: signal.status))
-                Text(formatTimestamp(signal.signal.createdAt))
+                Text(formatTimestamp(signal.signal.createdAt, configuration: dateTimeConfiguration))
                   .scaledFont(.caption.monospaced())
                   .foregroundStyle(HarnessMonitorTheme.secondaryInk)
               }
@@ -80,9 +82,11 @@ struct SessionCockpitSignalsSection: View {
 
 struct SessionCockpitTimelineSection: View {
   let timeline: [TimelineEntry]
+  @Environment(\.harnessDateTimeConfiguration)
+  private var dateTimeConfiguration
 
   var body: some View {
-    LazyVStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
+    VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
       Text("Timeline")
         .scaledFont(.system(.title3, design: .rounded, weight: .semibold))
         .accessibilityAddTraits(.isHeader)
@@ -92,47 +96,62 @@ struct SessionCockpitTimelineSection: View {
         } description: {
           Text("Timeline entries appear as agents work on tasks.")
         }
-      }
-      ForEach(timeline) { entry in
-        HStack(alignment: .top, spacing: HarnessMonitorTheme.sectionSpacing) {
-          RoundedRectangle(cornerRadius: 999)
-            .fill(HarnessMonitorTheme.accent.opacity(0.35))
-            .frame(width: 8)
-            .accessibilityHidden(true)
-          VStack(alignment: .leading, spacing: 4) {
-            Text(entry.summary)
-              .scaledFont(.system(.body, design: .rounded, weight: .semibold))
-            Text("\(entry.kind) • \(formatTimestamp(entry.recordedAt))")
-              .scaledFont(.caption.monospaced())
-              .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-          }
-          Spacer()
-          if let taskID = entry.taskId {
-            Text(taskID)
-              .scaledFont(.caption.monospaced())
-              .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-          }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .contextMenu {
-          Button {
-            HarnessMonitorClipboard.copy(entry.summary)
-          } label: {
-            Label("Copy Summary", systemImage: "doc.on.doc")
-          }
-          if let taskID = entry.taskId {
-            Button {
-              HarnessMonitorClipboard.copy(taskID)
-            } label: {
-              Label("Copy Task ID", systemImage: "doc.on.doc")
+        .frame(maxWidth: .infinity)
+      } else {
+        ScrollView {
+          LazyVStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
+            ForEach(timeline) { entry in
+              HStack(alignment: .top, spacing: HarnessMonitorTheme.sectionSpacing) {
+                RoundedRectangle(cornerRadius: 999)
+                  .fill(HarnessMonitorTheme.accent.opacity(0.35))
+                  .frame(width: 8)
+                  .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 4) {
+                  Text(entry.summary)
+                    .scaledFont(.system(.body, design: .rounded, weight: .semibold))
+                  Text(
+                    "\(entry.kind) • "
+                      + "\(formatTimestamp(entry.recordedAt, configuration: dateTimeConfiguration))"
+                  )
+                    .scaledFont(.caption.monospaced())
+                    .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+                }
+                Spacer()
+                if let taskID = entry.taskId {
+                  Text(taskID)
+                    .scaledFont(.caption.monospaced())
+                    .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+                }
+              }
+              .frame(maxWidth: .infinity, alignment: .leading)
+              .contextMenu {
+                Button {
+                  HarnessMonitorClipboard.copy(entry.summary)
+                } label: {
+                  Label("Copy Summary", systemImage: "doc.on.doc")
+                }
+                if let taskID = entry.taskId {
+                  Button {
+                    HarnessMonitorClipboard.copy(taskID)
+                  } label: {
+                    Label("Copy Task ID", systemImage: "doc.on.doc")
+                  }
+                }
+              }
+              .transition(
+                .asymmetric(
+                  insertion: .scale(scale: 0.95).combined(with: .opacity),
+                  removal: .opacity
+                ))
             }
           }
         }
-        .transition(
-          .asymmetric(
-            insertion: .scale(scale: 0.95).combined(with: .opacity),
-            removal: .opacity
-          ))
+        .scrollIndicators(.automatic)
+        .frame(
+          minHeight: SessionCockpitLayout.timelineSectionMinHeight,
+          maxHeight: SessionCockpitLayout.timelineSectionMaxHeight,
+          alignment: .top
+        )
       }
     }
     .frame(maxWidth: .infinity, alignment: .leading)
