@@ -1,8 +1,8 @@
 ---
-name: join
+name: harness:session:join
 description: Join a multi-agent session. Default role is worker. Use --role observer to monitor and triage, or --role reviewer/improver for review work.
 argument-hint: '[session-id] [--role worker|observer|reviewer|improver] [--runtime claude|codex|gemini|copilot|opencode] [--capabilities "x,y"]'
-allowed-tools: Agent, AskUserQuestion, Bash, Edit, Glob, Grep, Read, Write
+allowed-tools: Agent, Bash, Edit, Glob, Grep, Read, Write
 user-invocable: true
 ---
 
@@ -37,7 +37,7 @@ Filter to active sessions only. If there are none, tell the user no active sessi
 
 If there is exactly one active session, confirm with the user before joining.
 
-If there are multiple, present them using AskUserQuestion with a numbered list showing:
+If there are multiple, present them using user approval prompt with a numbered list showing:
 - session ID (short form)
 - context/goal
 - agent count

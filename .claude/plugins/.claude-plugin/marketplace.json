@@ -5,17 +5,17 @@
   },
   "plugins": [
     {
-      "description": "Harness observe workflow",
+      "description": "Harness multi-agent session orchestration",
+      "name": "harness",
+      "source": "./harness"
+    },
+    {
+      "description": "Harness session observer and classifier",
       "name": "observe",
       "source": "./observe"
     },
     {
-      "description": "Harness session workflow",
-      "name": "session",
-      "source": "./session"
-    },
-    {
-      "description": "Harness suite workflow",
+      "description": "Harness suite create and execution",
       "name": "suite",
       "source": "./suite"
     }
