@@ -4,15 +4,15 @@ use std::process::id as process_id;
 use std::sync::{Arc, Mutex, OnceLock};
 use std::time::Duration;
 
+use crate::errors::{CliError, CliErrorKind};
+use crate::session::types::TaskSource;
+use crate::session::{observe as session_observe, service as session_service};
+use crate::workspace::utc_now;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tokio::net::TcpListener;
 use tokio::sync::{broadcast, watch as tokio_watch};
 use tokio::task::spawn_blocking;
-use crate::errors::{CliError, CliErrorKind};
-use crate::session::types::TaskSource;
-use crate::session::{observe as session_observe, service as session_service};
-use crate::workspace::utc_now;
 
 use super::http::{self, DaemonHttpState};
 use super::index::{self, ResolvedSession};
@@ -304,9 +304,10 @@ pub fn session_detail(
     db: Option<&super::db::DaemonDb>,
 ) -> Result<SessionDetail, CliError> {
     if let Some(db) = db
-        && let Some(resolved) = db.resolve_session(session_id)? {
-            return snapshot::session_detail_from_resolved_with_db(&resolved, db);
-        }
+        && let Some(resolved) = db.resolve_session(session_id)?
+    {
+        return snapshot::session_detail_from_resolved_with_db(&resolved, db);
+    }
     snapshot::session_detail(session_id)
 }
 
@@ -319,9 +320,10 @@ pub fn session_timeline(
     db: Option<&super::db::DaemonDb>,
 ) -> Result<Vec<TimelineEntry>, CliError> {
     if let Some(db) = db
-        && let Some(resolved) = db.resolve_session(session_id)? {
-            return timeline::session_timeline_from_resolved_with_db(&resolved, db);
-        }
+        && let Some(resolved) = db.resolve_session(session_id)?
+    {
+        return timeline::session_timeline_from_resolved_with_db(&resolved, db);
+    }
     timeline::session_timeline(session_id)
 }
 

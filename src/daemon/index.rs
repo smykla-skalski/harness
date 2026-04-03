@@ -474,9 +474,10 @@ struct InferredCheckout {
 
 fn fallback_project(context_root: &Path) -> DiscoveredProject {
     let project_id = project_context_dir_name(context_root).unwrap_or_default();
-    let name = context_root
-        .file_name()
-        .map_or_else(|| project_id.clone(), |name| name.to_string_lossy().to_string());
+    let name = context_root.file_name().map_or_else(
+        || project_id.clone(),
+        |name| name.to_string_lossy().to_string(),
+    );
     DiscoveredProject {
         project_id: project_id.clone(),
         name,

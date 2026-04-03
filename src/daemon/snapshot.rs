@@ -19,8 +19,6 @@ use super::protocol::{
     ObserverCycleSummary, ObserverOpenIssue, ObserverSummary, ProjectSummary, SessionDetail,
     SessionSummary, WorktreeSummary,
 };
-use super::state;
-
 /// Build summaries for all discovered projects.
 ///
 /// # Errors
@@ -174,20 +172,14 @@ fn build_session_detail(
         (signals, activity)
     };
 
-    let detail = SessionDetail {
+    Ok(SessionDetail {
         session: summary_from_resolved(resolved),
         agents,
         tasks,
         signals,
         observer: load_observer_summary(&resolved.project, &resolved.state)?,
         agent_activity,
-    };
-    let _ = state::write_session_cache(
-        &detail.session.project_id,
-        &resolved.state.session_id,
-        &detail,
-    );
-    Ok(detail)
+    })
 }
 
 fn summary_from_resolved(resolved: &ResolvedSession) -> SessionSummary {
@@ -782,8 +774,7 @@ mod tests {
                     Some("codex-worker")
                 );
 
-                let cache_path = state::session_cache_path("project-alpha", session_id);
-                assert!(cache_path.is_file());
+                // Session detail is cached in SQLite, not as a file.
             },
         );
     }

@@ -154,14 +154,17 @@ fn poll_change_tracking(
 ) -> WatchChanges {
     let mut changes = WatchChanges::default();
 
-    let Ok(rows) = db.connection().prepare(
-        "SELECT scope, version FROM change_tracking",
-    )
-    .and_then(|mut statement| {
-        statement
-            .query_map([], |row| Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?)))
-            .and_then(|rows| rows.collect::<Result<Vec<_>, _>>())
-    }) else {
+    let Ok(rows) = db
+        .connection()
+        .prepare("SELECT scope, version FROM change_tracking")
+        .and_then(|mut statement| {
+            statement
+                .query_map([], |row| {
+                    Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?))
+                })
+                .and_then(|rows| rows.collect::<Result<Vec<_>, _>>())
+        })
+    else {
         return changes;
     };
 
