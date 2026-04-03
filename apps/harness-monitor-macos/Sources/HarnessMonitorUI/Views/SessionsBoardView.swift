@@ -53,3 +53,17 @@ struct SessionsBoardView: View {
     await store.refresh()
   }
 }
+
+#Preview("Sessions Board - Dashboard") {
+  let store = HarnessMonitorPreviewStoreFactory.makeStore(for: .dashboardLoaded)
+
+  SessionsBoardView(store: store)
+    .frame(width: 980, height: 720)
+}
+
+#Preview("Sessions Board - Empty") {
+  let store = HarnessMonitorPreviewStoreFactory.makeStore(for: .empty)
+
+  SessionsBoardView(store: store)
+    .frame(width: 980, height: 720)
+}

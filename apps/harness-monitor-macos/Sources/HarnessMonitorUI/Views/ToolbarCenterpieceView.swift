@@ -346,3 +346,37 @@ private struct ToolbarCenterpieceMetricToken: View {
     metric.kind.title.uppercased()
   }
 }
+
+#Preview("Toolbar Centerpiece - Standard") {
+  toolbarCenterpiecePreview(displayMode: .standard)
+}
+
+#Preview("Toolbar Centerpiece - Compact") {
+  toolbarCenterpiecePreview(displayMode: .compact)
+}
+
+#Preview("Toolbar Centerpiece - Compressed") {
+  toolbarCenterpiecePreview(displayMode: .compressed)
+}
+
+private func toolbarCenterpiecePreview(
+  displayMode: ToolbarCenterpieceDisplayMode
+) -> some View {
+  ToolbarCenterpieceView(
+    model: ToolbarCenterpieceModel(
+      workspaceName: "Harness Monitor",
+      destinationName: "My Mac",
+      destinationSystemImage: "laptopcomputer",
+      metrics: [
+        .init(kind: .projects, value: 6),
+        .init(kind: .sessions, value: 24),
+        .init(kind: .openWork, value: 13),
+        .init(kind: .blocked, value: 3),
+      ]
+    ),
+    displayMode: displayMode
+  )
+  .padding(.horizontal, 16)
+  .padding(.vertical, 12)
+  .frame(width: displayMode.maximumWidth + 32)
+}

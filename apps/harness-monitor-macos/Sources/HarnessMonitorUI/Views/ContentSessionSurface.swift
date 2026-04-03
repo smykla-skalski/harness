@@ -90,3 +90,27 @@ private enum SessionContentMode {
     }
   }
 }
+
+#Preview("Session Content - Dashboard") {
+  let store = HarnessMonitorPreviewStoreFactory.makeStore(for: .dashboardLoaded)
+
+  SessionContentContainer(
+    store: store,
+    detail: nil,
+    summary: nil,
+    timeline: []
+  )
+  .frame(width: 980, height: 720)
+}
+
+#Preview("Session Content - Cockpit") {
+  let store = HarnessMonitorPreviewStoreFactory.makeStore(for: .cockpitLoaded)
+
+  SessionContentContainer(
+    store: store,
+    detail: store.selectedSession,
+    summary: store.selectedSessionSummary,
+    timeline: store.timeline
+  )
+  .frame(width: 980, height: 720)
+}
