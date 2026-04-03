@@ -317,10 +317,10 @@ If `harness run repair` still leaves blocking findings, start a fresh tracked ru
 ```bash
 mise run check    # type-check + clippy
 mise run test     # unit + integration
-mise run harness:macos:test  # generate + lint + test the macOS AI Harness app
+mise run harness-monitor:macos:test  # generate + lint + test the macOS Harness Monitor app
 ```
 
-The macOS AI Harness app lives under `apps/harness-macos/`. `project.yml` is the generator input and the generated `AI Harness.xcodeproj` is checked in; use `mise run harness:macos:generate` if you need to refresh it for Xcode.
+The macOS Harness Monitor app lives under `apps/harness-monitor-macos/`. `project.yml` is the generator input and the generated `HarnessMonitor.xcodeproj` is checked in; use `mise run harness-monitor:macos:generate` if you need to refresh it for Xcode.
 Its strict style gate runs `swift format` directly and uses `SwiftLintBuildToolPlugin` during `xcodebuild`, so local builds and CI share the same sandbox-safe lint path.
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for the internal module map.
