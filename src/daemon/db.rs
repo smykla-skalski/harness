@@ -284,6 +284,109 @@ impl DaemonDb {
             .map_err(|error| db_error(format!("bump change: {error}")))?;
         Ok(())
     }
+
+    // -- Import from existing file-based storage --
+
+    /// Import all existing file-based project and session data into the
+    /// database. Reuses the existing discovery code so all edge cases
+    /// (migrations, worktrees, schema versioning) are handled.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on discovery or insert failures.
+    pub fn import_from_files(&self) -> Result<ImportResult, CliError> {
+        let projects = super::index::discover_projects()?;
+        let sessions = super::index::discover_sessions_for(&projects, true)?;
+
+        let mut result = ImportResult::default();
+
+        for project in &projects {
+            self.sync_project(project)?;
+            result.projects += 1;
+        }
+
+        for resolved in &sessions {
+            self.sync_session(
+                &resolved.project.project_id,
+                &resolved.state,
+            )?;
+            result.sessions += 1;
+
+            import_session_log(self, &resolved.project, &resolved.state.session_id)?;
+            import_session_checkpoints(self, &resolved.project, &resolved.state)?;
+        }
+
+        import_daemon_events(self)?;
+        self.bump_change("global")?;
+
+        Ok(result)
+    }
+
+    /// Return the number of rows in the sessions table.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on query failure.
+    pub fn session_count(&self) -> Result<i64, CliError> {
+        self.conn
+            .query_row("SELECT COUNT(*) FROM sessions", [], |row| row.get(0))
+            .map_err(|error| db_error(format!("count sessions: {error}")))
+    }
+
+    /// Return the number of rows in the projects table.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on query failure.
+    pub fn project_count(&self) -> Result<i64, CliError> {
+        self.conn
+            .query_row("SELECT COUNT(*) FROM projects", [], |row| row.get(0))
+            .map_err(|error| db_error(format!("count projects: {error}")))
+    }
+}
+
+/// Summary of what was imported from file-based storage.
+#[derive(Debug, Default)]
+pub struct ImportResult {
+    pub projects: usize,
+    pub sessions: usize,
+}
+
+fn import_session_log(
+    db: &DaemonDb,
+    project: &DiscoveredProject,
+    session_id: &str,
+) -> Result<(), CliError> {
+    let entries = super::index::load_log_entries(project, session_id)?;
+    for entry in &entries {
+        db.append_log_entry(entry)?;
+    }
+    Ok(())
+}
+
+fn import_session_checkpoints(
+    db: &DaemonDb,
+    project: &DiscoveredProject,
+    state: &SessionState,
+) -> Result<(), CliError> {
+    for task_id in state.tasks.keys() {
+        let checkpoints = super::index::load_task_checkpoints(project, &state.session_id, task_id)?;
+        for checkpoint in &checkpoints {
+            db.append_checkpoint(&state.session_id, checkpoint)?;
+        }
+    }
+    Ok(())
+}
+
+fn import_daemon_events(db: &DaemonDb) -> Result<(), CliError> {
+    let events = super::state::read_recent_events(1000)?;
+    for event in &events {
+        db.conn
+            .execute(
+                "INSERT OR IGNORE INTO daemon_events (recorded_at, level, message)
+                 VALUES (?1, ?2, ?3)",
+                rusqlite::params![event.recorded_at, event.level, event.message],
+            )
+            .map_err(|error| db_error(format!("import daemon event: {error}")))?;
+    }
+    Ok(())
 }
 
 fn schema_exists(conn: &Connection) -> Result<bool, CliError> {
