@@ -1,4 +1,5 @@
 import HarnessMonitorKit
+import HarnessMonitorUI
 import SwiftUI
 
 struct HarnessMonitorAppCommands: Commands {
