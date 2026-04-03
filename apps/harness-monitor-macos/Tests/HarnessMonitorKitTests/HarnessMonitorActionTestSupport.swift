@@ -114,6 +114,7 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
 
   enum ReadCall {
     case health
+    case transportLatency
     case diagnostics
     case projects
     case sessions
@@ -125,6 +126,7 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
   private var _calls: [Call] = []
   private var _detail: SessionDetail
   private var _healthDelay: Duration?
+  private var _transportLatencyMs: Int?
   private var _diagnosticsDelay: Duration?
   private var _mutationDelay: Duration?
   private var _sessionSummaries: [SessionSummary]?
@@ -137,6 +139,7 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
   private var _sessionStreamEventsByID: [String: [DaemonPushEvent]] = [:]
   private var _sessionStreamErrorsByID: [String: any Error] = [:]
   private var _healthCallCount = 0
+  private var _transportLatencyCallCount = 0
   private var _diagnosticsCallCount = 0
   private var _projectsCallCount = 0
   private var _sessionsCallCount = 0
@@ -164,6 +167,12 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
   func configureHealthDelay(_ delay: Duration?) {
     lock.withLock {
       _healthDelay = delay
+    }
+  }
+
+  func configureTransportLatencyMs(_ latencyMs: Int?) {
+    lock.withLock {
+      _transportLatencyMs = latencyMs
     }
   }
 
@@ -237,6 +246,7 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
   }
 
   func configuredHealthDelay() -> Duration? { lock.withLock { _healthDelay } }
+  func configuredTransportLatencyMs() -> Int? { lock.withLock { _transportLatencyMs } }
   func configuredDiagnosticsDelay() -> Duration? { lock.withLock { _diagnosticsDelay } }
   func configuredMutationDelay() -> Duration? { lock.withLock { _mutationDelay } }
   func configuredSessions() -> [SessionSummary]? { lock.withLock { _sessionSummaries } }
@@ -254,6 +264,8 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
       switch call {
       case .health:
         _healthCallCount += 1
+      case .transportLatency:
+        _transportLatencyCallCount += 1
       case .diagnostics:
         _diagnosticsCallCount += 1
       case .projects:
@@ -273,6 +285,8 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
       switch call {
       case .health:
         _healthCallCount
+      case .transportLatency:
+        _transportLatencyCallCount
       case .diagnostics:
         _diagnosticsCallCount
       case .projects:

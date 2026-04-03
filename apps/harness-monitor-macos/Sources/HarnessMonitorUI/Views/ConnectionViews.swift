@@ -151,24 +151,28 @@ struct ConnectionToolbarBadge: View {
     return metrics.quality.themeColor
   }
 
+  private var statusTint: Color {
+    metrics.latencyTint
+  }
+
   var body: some View {
     HStack(spacing: 4) {
       ActivityPulse(
         isActive: showsConnectionDetails,
         outerSize: 14,
         innerSize: 6,
-        activeColor: qualityColor
+        activeColor: statusTint
       )
         .accessibilityHidden(true)
       if showsConnectionDetails {
         Text(transportLabel)
           .scaledFont(Self.badgeFont)
-          .foregroundStyle(qualityColor)
+          .foregroundStyle(statusTint)
           .lineLimit(1)
           .fixedSize()
         Text(latencyLabel)
           .scaledFont(Self.badgeFont)
-          .foregroundStyle(qualityColor.opacity(0.5))
+          .foregroundStyle(statusTint.opacity(0.5))
           .lineLimit(1)
           .fixedSize()
           .opacity(metrics.latencyMs == nil ? 0 : 1)
@@ -320,6 +324,15 @@ extension ConnectionQuality {
     case .poor, .disconnected:
       HarnessMonitorTheme.danger
     }
+  }
+}
+
+extension ConnectionMetrics {
+  var latencyTint: Color {
+    guard latencyMs != nil else {
+      return HarnessMonitorTheme.ink
+    }
+    return quality.themeColor
   }
 }
 

@@ -9,12 +9,14 @@ struct HarnessMonitorStoreMetricsTests {
   func bootstrapRecordsLatencySample() async {
     let client = RecordingHarnessClient()
     client.configureHealthDelay(.milliseconds(25))
+    client.configureTransportLatencyMs(87)
 
     let store = await makeBootstrappedStore(client: client)
 
-    #expect((store.connectionMetrics.latencyMs ?? 0) > 0)
-    #expect((store.connectionMetrics.averageLatencyMs ?? 0) > 0)
+    #expect(store.connectionMetrics.latencyMs == 87)
+    #expect(store.connectionMetrics.averageLatencyMs == 87)
     #expect(store.connectionMetrics.connectedSince != nil)
+    #expect(client.readCallCount(.transportLatency) > 0)
 
     store.stopAllStreams()
   }
@@ -23,6 +25,7 @@ struct HarnessMonitorStoreMetricsTests {
   func latencyProbeRestoresMissingSample() async {
     let client = RecordingHarnessClient()
     client.configureHealthDelay(.milliseconds(20))
+    client.configureTransportLatencyMs(143)
 
     let store = HarnessMonitorStore(
       daemonController: RecordingDaemonController(client: client)
@@ -35,8 +38,9 @@ struct HarnessMonitorStoreMetricsTests {
 
     try? await Task.sleep(for: .milliseconds(120))
 
-    #expect((store.connectionMetrics.latencyMs ?? 0) > 0)
-    #expect((store.connectionMetrics.averageLatencyMs ?? 0) > 0)
+    #expect(store.connectionMetrics.latencyMs == 143)
+    #expect(store.connectionMetrics.averageLatencyMs == 143)
+    #expect(client.readCallCount(.transportLatency) > 1)
 
     store.stopAllStreams()
   }

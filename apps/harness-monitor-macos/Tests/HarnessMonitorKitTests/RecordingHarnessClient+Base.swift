@@ -3,6 +3,11 @@ import Foundation
 @testable import HarnessMonitorKit
 
 extension RecordingHarnessClient {
+  func transportLatencyMs() async throws -> Int? {
+    recordReadCall(.transportLatency)
+    return configuredTransportLatencyMs()
+  }
+
   func health() async throws -> HealthResponse {
     recordReadCall(.health)
     try await sleepIfNeeded(configuredHealthDelay())
