@@ -17,6 +17,7 @@ pub struct HealthResponse {
     pub endpoint: String,
     pub started_at: String,
     pub project_count: usize,
+    pub worktree_count: usize,
     pub session_count: usize,
 }
 
@@ -35,6 +36,16 @@ pub struct DaemonDiagnosticsReport {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WorktreeSummary {
+    pub checkout_id: String,
+    pub name: String,
+    pub checkout_root: String,
+    pub context_root: String,
+    pub active_session_count: usize,
+    pub total_session_count: usize,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProjectSummary {
     pub project_id: String,
     pub name: String,
@@ -42,6 +53,7 @@ pub struct ProjectSummary {
     pub context_root: String,
     pub active_session_count: usize,
     pub total_session_count: usize,
+    pub worktrees: Vec<WorktreeSummary>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -50,6 +62,10 @@ pub struct SessionSummary {
     pub project_name: String,
     pub project_dir: Option<String>,
     pub context_root: String,
+    pub checkout_id: String,
+    pub checkout_root: String,
+    pub is_worktree: bool,
+    pub worktree_name: Option<String>,
     pub session_id: String,
     pub context: String,
     pub status: SessionStatus,
@@ -166,7 +182,8 @@ pub struct SessionsUpdatedPayload {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SessionUpdatedPayload {
     pub detail: SessionDetail,
-    pub timeline: Vec<TimelineEntry>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub timeline: Option<Vec<TimelineEntry>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

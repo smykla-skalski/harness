@@ -87,6 +87,48 @@ struct WebSocketProtocolTests {
     }
   }
 
+  @Test("SessionUpdatedPayload decodes when timeline is omitted")
+  func sessionUpdatedPayloadWithoutTimeline() throws {
+    let json = """
+      {
+        "detail": {
+          "session": {
+            "project_id": "project-1",
+            "project_name": "Harness",
+            "project_dir": "/tmp/harness",
+            "context_root": "/tmp/context",
+            "session_id": "sess-1",
+            "context": "Demo session",
+            "status": "active",
+            "created_at": "2026-03-29T12:00:00Z",
+            "updated_at": "2026-03-29T12:00:00Z",
+            "last_activity_at": "2026-03-29T12:00:00Z",
+            "leader_id": "leader-1",
+            "observe_id": null,
+            "pending_leader_transfer": null,
+            "metrics": {
+              "agent_count": 1,
+              "active_agent_count": 1,
+              "open_task_count": 0,
+              "in_progress_task_count": 0,
+              "blocked_task_count": 0,
+              "completed_task_count": 0
+            }
+          },
+          "agents": [],
+          "tasks": [],
+          "signals": [],
+          "observer": null,
+          "agent_activity": []
+        }
+      }
+      """
+    let payload = try decoder.decode(SessionUpdatedPayload.self, from: Data(json.utf8))
+
+    #expect(payload.detail.session.sessionId == "sess-1")
+    #expect(payload.timeline == nil)
+  }
+
   @Test("PendingRequestStore resume delivers result")
   func pendingStoreResume() async throws {
     let store = PendingRequestStore()
