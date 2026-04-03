@@ -128,14 +128,16 @@ async fn get_projects(headers: HeaderMap, State(state): State<DaemonHttpState>) 
     if let Err(response) = require_auth(&headers, &state) {
         return *response;
     }
-    map_json(service::list_projects())
+    let db_guard = state.db.as_ref().map(|db| db.lock().expect("db lock"));
+    map_json(service::list_projects(db_guard.as_deref()))
 }
 
 async fn get_sessions(headers: HeaderMap, State(state): State<DaemonHttpState>) -> Response {
     if let Err(response) = require_auth(&headers, &state) {
         return *response;
     }
-    map_json(service::list_sessions(true))
+    let db_guard = state.db.as_ref().map(|db| db.lock().expect("db lock"));
+    map_json(service::list_sessions(true, db_guard.as_deref()))
 }
 
 async fn get_session(

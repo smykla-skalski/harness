@@ -241,16 +241,25 @@ pub fn request_shutdown() -> Result<DaemonControlResponse, CliError> {
 /// List discovered projects known to the daemon.
 ///
 /// # Errors
-/// Returns `CliError` on project discovery failures.
-pub fn list_projects() -> Result<Vec<ProjectSummary>, CliError> {
+/// Returns [`CliError`] on project discovery failures.
+pub fn list_projects(db: Option<&super::db::DaemonDb>) -> Result<Vec<ProjectSummary>, CliError> {
+    if let Some(db) = db {
+        return db.list_project_summaries();
+    }
     snapshot::project_summaries()
 }
 
 /// List discovered sessions across all indexed projects.
 ///
 /// # Errors
-/// Returns `CliError` on project or session discovery failures.
-pub fn list_sessions(include_all: bool) -> Result<Vec<SessionSummary>, CliError> {
+/// Returns [`CliError`] on session discovery failures.
+pub fn list_sessions(
+    include_all: bool,
+    db: Option<&super::db::DaemonDb>,
+) -> Result<Vec<SessionSummary>, CliError> {
+    if let Some(db) = db {
+        return db.list_session_summaries_full();
+    }
     snapshot::session_summaries(include_all)
 }
 
@@ -488,8 +497,8 @@ pub fn ready_event(session_id: Option<&str>) -> StreamEvent {
 /// Returns `CliError` when project or session discovery fails.
 pub fn sessions_updated_event() -> Result<StreamEvent, CliError> {
     let payload = SessionsUpdatedPayload {
-        projects: list_projects()?,
-        sessions: list_sessions(true)?,
+        projects: list_projects(None)?,
+        sessions: list_sessions(true, None)?,
     };
     stream_event("sessions_updated", None, payload)
 }

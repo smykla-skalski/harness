@@ -366,6 +366,143 @@ impl DaemonDb {
             .map_err(|error| db_error(format!("health counts: {error}")))
     }
 
+    /// Load all project summaries with session counts and worktree info.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on query failure.
+    pub fn list_project_summaries(
+        &self,
+    ) -> Result<Vec<super::protocol::ProjectSummary>, CliError> {
+        use super::protocol::{ProjectSummary, WorktreeSummary};
+
+        let mut statement = self
+            .conn
+            .prepare(
+                "SELECT
+                    p.project_id, p.name, p.project_dir, p.context_root,
+                    p.checkout_id, p.checkout_name, p.is_worktree, p.worktree_name,
+                    COUNT(CASE WHEN s.is_active = 1 THEN 1 END) AS active_count,
+                    COUNT(s.session_id) AS total_count
+                 FROM projects p
+                 LEFT JOIN sessions s ON s.project_id = p.project_id
+                 GROUP BY p.project_id, p.checkout_id
+                 ORDER BY p.name, p.checkout_name",
+            )
+            .map_err(|error| db_error(format!("prepare project summaries: {error}")))?;
+
+        let rows = statement
+            .query_map([], |row| {
+                Ok(ProjectRow {
+                    project_id: row.get(0)?,
+                    name: row.get(1)?,
+                    project_dir: row.get(2)?,
+                    context_root: row.get(3)?,
+                    checkout_id: row.get(4)?,
+                    checkout_name: row.get(5)?,
+                    is_worktree: row.get(6)?,
+                    worktree_name: row.get(7)?,
+                    active_session_count: row.get(8)?,
+                    total_session_count: row.get(9)?,
+                })
+            })
+            .map_err(|error| db_error(format!("query project summaries: {error}")))?;
+
+        let all_rows: Vec<ProjectRow> = rows
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|error| db_error(format!("read project row: {error}")))?;
+
+        let mut grouped: BTreeMap<String, ProjectSummary> = BTreeMap::new();
+
+        for row in all_rows {
+            let entry = grouped.entry(row.project_id.clone()).or_insert_with(|| {
+                ProjectSummary {
+                    project_id: row.project_id.clone(),
+                    name: row.name.clone(),
+                    project_dir: row.project_dir.clone(),
+                    context_root: row.context_root.clone(),
+                    active_session_count: 0,
+                    total_session_count: 0,
+                    worktrees: Vec::new(),
+                }
+            });
+
+            if row.is_worktree {
+                entry.worktrees.push(WorktreeSummary {
+                    checkout_id: row.checkout_id,
+                    name: row.worktree_name.unwrap_or(row.checkout_name),
+                    checkout_root: row.project_dir.unwrap_or_default(),
+                    context_root: row.context_root,
+                    active_session_count: row.active_session_count,
+                    total_session_count: row.total_session_count,
+                });
+            }
+
+            entry.active_session_count += row.active_session_count;
+            entry.total_session_count += row.total_session_count;
+        }
+
+        let mut summaries: Vec<_> = grouped.into_values().collect();
+        for summary in &mut summaries {
+            summary.worktrees.sort_by(|a, b| a.name.cmp(&b.name));
+        }
+        Ok(summaries)
+    }
+
+    /// Load all session summaries for the sessions list endpoint.
+    /// Joins session state with project data to produce protocol-level summaries.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on query failure.
+    pub fn list_session_summaries_full(
+        &self,
+    ) -> Result<Vec<super::protocol::SessionSummary>, CliError> {
+        let mut statement = self
+            .conn
+            .prepare(
+                "SELECT
+                    s.session_id, s.context, s.status, s.created_at, s.updated_at,
+                    s.last_activity_at, s.leader_id, s.observe_id,
+                    s.pending_leader_transfer, s.metrics_json,
+                    p.project_id, p.name, p.project_dir, p.context_root,
+                    p.checkout_id, p.is_worktree, p.worktree_name
+                 FROM sessions s
+                 JOIN projects p ON p.project_id = s.project_id
+                 ORDER BY s.updated_at DESC",
+            )
+            .map_err(|error| db_error(format!("prepare session summaries: {error}")))?;
+
+        let rows = statement
+            .query_map([], |row| {
+                Ok(SessionSummaryRow {
+                    session_id: row.get(0)?,
+                    context: row.get(1)?,
+                    status: row.get(2)?,
+                    created_at: row.get(3)?,
+                    updated_at: row.get(4)?,
+                    last_activity_at: row.get(5)?,
+                    leader_id: row.get(6)?,
+                    observe_id: row.get(7)?,
+                    pending_leader_transfer_json: row.get(8)?,
+                    metrics_json: row.get(9)?,
+                    project_id: row.get(10)?,
+                    project_name: row.get(11)?,
+                    project_dir: row.get(12)?,
+                    context_root: row.get(13)?,
+                    checkout_id: row.get(14)?,
+                    is_worktree: row.get(15)?,
+                    worktree_name: row.get(16)?,
+                })
+            })
+            .map_err(|error| db_error(format!("query session summaries: {error}")))?;
+
+        let mut summaries = Vec::new();
+        for row in rows {
+            let row = row.map_err(|error| db_error(format!("read session row: {error}")))?;
+            summaries.push(row.into_summary());
+        }
+        Ok(summaries)
+    }
+
     /// Load all session states for the sessions list endpoint.
     ///
     /// # Errors
@@ -626,6 +763,78 @@ fn apply_pragmas(conn: &Connection) -> Result<(), CliError> {
          PRAGMA cache_size = -8000;",
     )
     .map_err(|error| db_error(format!("set database pragmas: {error}")))
+}
+
+struct ProjectRow {
+    project_id: String,
+    name: String,
+    project_dir: Option<String>,
+    context_root: String,
+    checkout_id: String,
+    checkout_name: String,
+    is_worktree: bool,
+    worktree_name: Option<String>,
+    active_session_count: usize,
+    total_session_count: usize,
+}
+
+struct SessionSummaryRow {
+    session_id: String,
+    context: String,
+    status: String,
+    created_at: String,
+    updated_at: String,
+    last_activity_at: Option<String>,
+    leader_id: Option<String>,
+    observe_id: Option<String>,
+    pending_leader_transfer_json: Option<String>,
+    metrics_json: String,
+    project_id: String,
+    project_name: String,
+    project_dir: Option<String>,
+    context_root: String,
+    checkout_id: String,
+    is_worktree: bool,
+    worktree_name: Option<String>,
+}
+
+impl SessionSummaryRow {
+    fn into_summary(self) -> super::protocol::SessionSummary {
+        use super::protocol::SessionSummary;
+
+        let status = match self.status.as_str() {
+            "active" => SessionStatus::Active,
+            "paused" => SessionStatus::Paused,
+            _ => SessionStatus::Ended,
+        };
+        let pending_leader_transfer = self
+            .pending_leader_transfer_json
+            .and_then(|json| serde_json::from_str(&json).ok());
+        let metrics = serde_json::from_str(&self.metrics_json)
+            .unwrap_or_default();
+        let checkout_root = self.project_dir.clone().unwrap_or_default();
+
+        SessionSummary {
+            project_id: self.project_id,
+            project_name: self.project_name,
+            project_dir: self.project_dir,
+            context_root: self.context_root,
+            checkout_id: self.checkout_id,
+            checkout_root,
+            is_worktree: self.is_worktree,
+            worktree_name: self.worktree_name,
+            session_id: self.session_id,
+            context: self.context,
+            status,
+            created_at: self.created_at,
+            updated_at: self.updated_at,
+            last_activity_at: self.last_activity_at,
+            leader_id: self.leader_id,
+            observe_id: self.observe_id,
+            pending_leader_transfer,
+            metrics,
+        }
+    }
 }
 
 /// Extract the serde tag from a serialized `SessionTransition` JSON string.
