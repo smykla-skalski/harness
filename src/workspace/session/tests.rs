@@ -41,7 +41,10 @@ fn project_context_dir_is_idempotent() {
         // Create the context root on disk so canonicalize works.
         fs::create_dir_all(&first).unwrap();
         let second = project_context_dir(&first);
-        assert_eq!(first, second, "passing context_root back in should return the same path");
+        assert_eq!(
+            first, second,
+            "passing context_root back in should return the same path"
+        );
     });
 }
 
@@ -57,7 +60,10 @@ fn project_context_dir_recognizes_subdirectory() {
         let sub = context_root.join("orchestration").join("sessions");
         fs::create_dir_all(&sub).unwrap();
         let result = project_context_dir(&sub);
-        assert_eq!(result, context_root, "subdirectory should resolve to the context root");
+        assert_eq!(
+            result, context_root,
+            "subdirectory should resolve to the context root"
+        );
     });
 }
 

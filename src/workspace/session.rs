@@ -149,9 +149,7 @@ fn as_existing_context_root(path: &Path) -> Option<PathBuf> {
     let canonical_projects = projects_dir
         .canonicalize()
         .unwrap_or_else(|_| projects_dir.clone());
-    let resolved = path
-        .canonicalize()
-        .unwrap_or_else(|_| path.to_path_buf());
+    let resolved = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
     let suffix = resolved.strip_prefix(&canonical_projects).ok()?;
     let first_component = suffix.components().next()?;
     let dir_name = first_component.as_os_str().to_str()?;
