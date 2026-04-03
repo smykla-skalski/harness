@@ -22,13 +22,14 @@ use super::service;
 use super::state::DaemonManifest;
 use super::websocket::ReplayBuffer;
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct DaemonHttpState {
     pub token: String,
     pub sender: broadcast::Sender<StreamEvent>,
     pub manifest: DaemonManifest,
     pub daemon_epoch: String,
     pub replay_buffer: Arc<Mutex<ReplayBuffer>>,
+    pub db: Option<Arc<Mutex<super::db::DaemonDb>>>,
 }
 
 /// Serve the daemon's HTTP API.
@@ -96,7 +97,11 @@ pub async fn serve(
             }
         })
         .await
-        .map_err(|error| CliError::from(CliErrorKind::workflow_io(format!("serve daemon http api: {error}"))))
+        .map_err(|error| {
+            CliError::from(CliErrorKind::workflow_io(format!(
+                "serve daemon http api: {error}"
+            )))
+        })
 }
 
 async fn get_health(State(state): State<DaemonHttpState>) -> Response {
