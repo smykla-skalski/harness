@@ -12,7 +12,8 @@ use crate::errors::{CliError, CliErrorKind};
 use crate::infra::io::read_json_typed;
 use crate::observe::types::ObserverState;
 use crate::session::types::{
-    SessionRole, SessionState, SessionTransition, TaskCheckpoint, TaskSeverity, TaskStatus,
+    SessionLogEntry, SessionRole, SessionState, SessionTransition, TaskCheckpoint, TaskSeverity,
+    TaskStatus,
 };
 
 use super::index;
@@ -34,12 +35,31 @@ pub fn session_timeline(session_id: &str) -> Result<Vec<TimelineEntry>, CliError
 pub fn session_timeline_from_resolved(
     resolved: &index::ResolvedSession,
 ) -> Result<Vec<TimelineEntry>, CliError> {
+    build_timeline(resolved, None)
+}
+
+/// Build timeline using the DB for log entries and checkpoints when available.
+///
+/// # Errors
+/// Returns [`CliError`] on parse failures.
+pub fn session_timeline_from_resolved_with_db(
+    resolved: &index::ResolvedSession,
+    db: &super::db::DaemonDb,
+) -> Result<Vec<TimelineEntry>, CliError> {
+    build_timeline(resolved, Some(db))
+}
+
+fn build_timeline(
+    resolved: &index::ResolvedSession,
+    db: Option<&super::db::DaemonDb>,
+) -> Result<Vec<TimelineEntry>, CliError> {
     let session_id = &resolved.state.session_id;
     let mut entries = Vec::new();
     let mut logged_signal_acks = HashSet::new();
     let mut sent_signals = BTreeMap::new();
 
-    for log_entry in index::load_log_entries(&resolved.project, session_id)? {
+    let log_entries = load_log_entries_hybrid(db, &resolved.project, session_id)?;
+    for log_entry in log_entries {
         if let SessionTransition::SignalAcknowledged { signal_id, .. } = &log_entry.transition {
             logged_signal_acks.insert(signal_id.clone());
         }
@@ -74,7 +94,9 @@ pub fn session_timeline_from_resolved(
     entries.extend(conversation_entries(&resolved.project, &resolved.state)?);
 
     for task_id in resolved.state.tasks.keys() {
-        for checkpoint in index::load_task_checkpoints(&resolved.project, session_id, task_id)? {
+        let checkpoints =
+            load_checkpoints_hybrid(db, &resolved.project, session_id, task_id)?;
+        for checkpoint in checkpoints {
             entries.push(checkpoint_entry(session_id, &checkpoint)?);
         }
     }
@@ -94,6 +116,29 @@ pub fn session_timeline_from_resolved(
 
     entries.sort_by(|left, right| right.recorded_at.cmp(&left.recorded_at));
     Ok(entries)
+}
+
+fn load_log_entries_hybrid(
+    db: Option<&super::db::DaemonDb>,
+    project: &index::DiscoveredProject,
+    session_id: &str,
+) -> Result<Vec<SessionLogEntry>, CliError> {
+    if let Some(db) = db {
+        return db.load_session_log(session_id);
+    }
+    index::load_log_entries(project, session_id)
+}
+
+fn load_checkpoints_hybrid(
+    db: Option<&super::db::DaemonDb>,
+    project: &index::DiscoveredProject,
+    session_id: &str,
+    task_id: &str,
+) -> Result<Vec<TaskCheckpoint>, CliError> {
+    if let Some(db) = db {
+        return db.load_task_checkpoints(session_id, task_id);
+    }
+    index::load_task_checkpoints(project, session_id, task_id)
 }
 
 fn conversation_entries(
