@@ -7,8 +7,21 @@ public struct PreferencesView: View {
   @State private var selectedSection: PreferencesSection = .general
 
   public init(store: HarnessMonitorStore, themeMode: Binding<HarnessMonitorThemeMode>) {
+    self.init(
+      store: store,
+      themeMode: themeMode,
+      initialSection: .general
+    )
+  }
+
+  init(
+    store: HarnessMonitorStore,
+    themeMode: Binding<HarnessMonitorThemeMode>,
+    initialSection: PreferencesSection
+  ) {
     self.store = store
     _themeMode = themeMode
+    _selectedSection = State(initialValue: initialSection)
   }
 
   public var body: some View {
