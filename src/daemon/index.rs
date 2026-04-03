@@ -1,9 +1,13 @@
+use std::collections::BTreeSet;
+use std::fs::OpenOptions;
+use std::io::Write as _;
 use std::path::{Path, PathBuf};
 
 use fs_err as fs;
 use serde::Deserialize;
 use serde::de::DeserializeOwned;
 use serde_json::Value;
+use tracing::info;
 
 use crate::agents::runtime::{
     AgentRuntime, event::ConversationEvent, parse_canonical_conversation_line, runtime_for_name,
@@ -12,7 +16,7 @@ use crate::errors::{CliError, CliErrorKind};
 use crate::infra::io::read_json_typed;
 use crate::session::storage;
 use crate::session::types::{SessionLogEntry, SessionState, TaskCheckpoint};
-use crate::workspace::harness_data_root;
+use crate::workspace::{harness_data_root, project_context_dir, resolve_git_checkout_identity};
 
 #[derive(Debug, Deserialize)]
 struct LedgerEventLine {
@@ -28,7 +32,12 @@ pub struct DiscoveredProject {
     pub project_id: String,
     pub name: String,
     pub project_dir: Option<PathBuf>,
+    pub repository_root: Option<PathBuf>,
+    pub checkout_id: String,
+    pub checkout_name: String,
     pub context_root: PathBuf,
+    pub is_worktree: bool,
+    pub worktree_name: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -42,6 +51,42 @@ pub fn projects_root() -> PathBuf {
     harness_data_root().join("projects")
 }
 
+/// Fast counts for the health endpoint. Reads directory entries only - no git
+/// operations, no JSON parsing, no state loading.
+pub fn fast_counts() -> (usize, usize, usize) {
+    let root = projects_root();
+    if !root.is_dir() {
+        return (0, 0, 0);
+    }
+    let Ok(entries) = std::fs::read_dir(&root) else {
+        return (0, 0, 0);
+    };
+    let context_roots: Vec<_> = entries
+        .filter_map(|entry| entry.ok())
+        .filter(|entry| entry.file_type().ok().is_some_and(|kind| kind.is_dir()))
+        .map(|entry| entry.path())
+        .collect();
+    let project_count = context_roots.len();
+    let mut session_count = 0;
+    let mut worktree_count = 0;
+    for context_root in &context_roots {
+        let sessions_dir = context_root.join("orchestration").join("sessions");
+        if let Ok(sessions) = std::fs::read_dir(sessions_dir) {
+            session_count += sessions
+                .filter_map(|entry| entry.ok())
+                .filter(|entry| entry.file_type().ok().is_some_and(|kind| kind.is_dir()))
+                .count();
+        }
+        let origin_path = context_root.join("origin.json");
+        if let Ok(data) = std::fs::read_to_string(&origin_path) {
+            if data.contains("\"is_worktree\":true") || data.contains("\"is_worktree\": true") {
+                worktree_count += 1;
+            }
+        }
+    }
+    (project_count, worktree_count, session_count)
+}
+
 /// Discover harness project context roots on disk.
 ///
 /// # Errors
@@ -52,40 +97,32 @@ pub fn discover_projects() -> Result<Vec<DiscoveredProject>, CliError> {
         return Ok(Vec::new());
     }
 
-    let mut projects = Vec::new();
-    for entry in fs::read_dir(root)
+    let raw_context_roots: Vec<_> = fs::read_dir(&root)
         .map_err(|error| CliErrorKind::workflow_io(format!("read daemon projects root: {error}")))?
-    {
-        let Ok(entry) = entry else {
+        .filter_map(|entry| entry.ok())
+        .filter(|entry| entry.file_type().ok().is_some_and(|kind| kind.is_dir()))
+        .map(|entry| entry.path())
+        .collect();
+
+    let mut projects = Vec::new();
+    let mut seen_context_roots = BTreeSet::new();
+    for raw_context_root in raw_context_roots {
+        let Some(context_root) = repair_context_root(&raw_context_root)? else {
             continue;
         };
-        let Ok(file_type) = entry.file_type() else {
-            continue;
-        };
-        if !file_type.is_dir() {
+        if !seen_context_roots.insert(context_root.clone()) {
             continue;
         }
-
-        let context_root = entry.path();
-        let project_id = entry.file_name().to_string_lossy().to_string();
-        let project_dir = infer_project_dir(&context_root);
-        let name = project_dir
-            .as_ref()
-            .and_then(|path| path.file_name())
-            .map_or_else(
-                || project_id.clone(),
-                |name| name.to_string_lossy().to_string(),
-            );
-
-        projects.push(DiscoveredProject {
-            project_id,
-            name,
-            project_dir,
-            context_root,
-        });
+        if let Some(project) = build_discovered_project(&context_root)? {
+            projects.push(project);
+        }
     }
 
-    projects.sort_by(|left, right| left.name.cmp(&right.name));
+    projects.sort_by(|left, right| {
+        left.name
+            .cmp(&right.name)
+            .then(left.checkout_name.cmp(&right.checkout_name))
+    });
     Ok(projects)
 }
 
@@ -94,10 +131,21 @@ pub fn discover_projects() -> Result<Vec<DiscoveredProject>, CliError> {
 /// # Errors
 /// Returns `CliError` on filesystem failures.
 pub fn discover_sessions(include_all: bool) -> Result<Vec<ResolvedSession>, CliError> {
+    discover_sessions_for(&discover_projects()?, include_all)
+}
+
+/// Discover sessions for a pre-discovered set of projects.
+///
+/// # Errors
+/// Returns `CliError` on filesystem failures.
+pub fn discover_sessions_for(
+    projects: &[DiscoveredProject],
+    include_all: bool,
+) -> Result<Vec<ResolvedSession>, CliError> {
     let mut sessions = Vec::new();
-    for project in discover_projects()? {
-        for session_id in list_session_ids(&project, include_all)? {
-            if let Some(state) = load_session_state(&project, &session_id)? {
+    for project in projects {
+        for session_id in list_session_ids(project, include_all)? {
+            if let Some(state) = load_session_state(project, &session_id)? {
                 sessions.push(ResolvedSession {
                     project: project.clone(),
                     state,
@@ -140,7 +188,9 @@ pub fn load_session_state(
     session_id: &str,
 ) -> Result<Option<SessionState>, CliError> {
     if let Some(project_dir) = project.project_dir.as_deref() {
-        return storage::load_state(project_dir, session_id);
+        if let Some(state) = storage::load_state(project_dir, session_id)? {
+            return Ok(Some(state));
+        }
     }
 
     let path = session_state_path(&project.context_root, session_id);
@@ -159,7 +209,10 @@ pub fn load_log_entries(
     session_id: &str,
 ) -> Result<Vec<SessionLogEntry>, CliError> {
     if let Some(project_dir) = project.project_dir.as_deref() {
-        return storage::load_log_entries(project_dir, session_id);
+        let entries = storage::load_log_entries(project_dir, session_id)?;
+        if !entries.is_empty() {
+            return Ok(entries);
+        }
     }
     read_json_lines(
         &session_log_path(&project.context_root, session_id),
@@ -177,7 +230,10 @@ pub fn load_task_checkpoints(
     task_id: &str,
 ) -> Result<Vec<TaskCheckpoint>, CliError> {
     if let Some(project_dir) = project.project_dir.as_deref() {
-        return storage::load_task_checkpoints(project_dir, session_id, task_id);
+        let checkpoints = storage::load_task_checkpoints(project_dir, session_id, task_id)?;
+        if !checkpoints.is_empty() {
+            return Ok(checkpoints);
+        }
     }
     read_json_lines(
         &task_checkpoints_path(&project.context_root, session_id, task_id),
@@ -311,8 +367,15 @@ pub fn resolve_session_id_for_runtime_session(
         name: context_root
             .file_name()
             .map_or_else(String::new, |name| name.to_string_lossy().to_string()),
-        project_dir: infer_project_dir(context_root),
+        project_dir: infer_checkout_identity(context_root).map(|identity| identity.checkout_root),
+        repository_root: None,
+        checkout_id: context_root
+            .file_name()
+            .map_or_else(String::new, |name| name.to_string_lossy().to_string()),
+        checkout_name: "Repository".to_string(),
         context_root: context_root.to_path_buf(),
+        is_worktree: false,
+        worktree_name: None,
     };
     let mut matches = Vec::new();
 
@@ -349,41 +412,22 @@ pub fn observe_snapshot_path(context_root: &Path, observe_id: &str) -> PathBuf {
         .join("snapshot.json")
 }
 
-fn infer_project_dir(context_root: &Path) -> Option<PathBuf> {
-    // Prefer the explicit origin file written at session creation.
-    if let Some(origin) = storage::load_project_origin(context_root)
-        && origin.is_dir()
-    {
-        return Some(origin);
-    }
-
-    // Fall back to ledger-based cwd inference.
-    let ledger_path = context_root
-        .join("agents")
-        .join("ledger")
-        .join("events.jsonl");
-    let content = fs::read_to_string(ledger_path).ok()?;
-    content
-        .lines()
-        .rev()
-        .find(|line| !line.trim().is_empty())
-        .and_then(|line| serde_json::from_str::<Value>(line).ok())
-        .and_then(|entry| entry.get("cwd").and_then(Value::as_str).map(PathBuf::from))
-}
-
 fn list_session_ids(
     project: &DiscoveredProject,
     include_all: bool,
 ) -> Result<Vec<String>, CliError> {
     if let Some(project_dir) = project.project_dir.as_deref() {
-        return if include_all {
+        let session_ids = if include_all {
             storage::list_known_session_ids(project_dir)
         } else {
             Ok(storage::load_active_registry_for(project_dir)
                 .sessions
                 .into_keys()
                 .collect())
-        };
+        }?;
+        if !session_ids.is_empty() || project_context_dir(project_dir) == project.context_root {
+            return Ok(session_ids);
+        }
     }
 
     if include_all {
@@ -419,6 +463,341 @@ fn list_active_session_ids_from_context_root(context_root: &Path) -> Result<Vec<
     }
     let registry = read_json_typed::<storage::ActiveRegistry>(&path)?;
     Ok(registry.sessions.into_keys().collect())
+}
+
+#[derive(Debug, Clone)]
+struct InferredCheckout {
+    repository_root: PathBuf,
+    checkout_root: PathBuf,
+    is_worktree: bool,
+    worktree_name: Option<String>,
+}
+
+fn build_discovered_project(context_root: &Path) -> Result<Option<DiscoveredProject>, CliError> {
+    let Some(identity) = infer_checkout_identity(context_root) else {
+        return Ok(None);
+    };
+    let project_id = project_context_dir_name(&project_context_dir(&identity.repository_root))
+        .unwrap_or_default();
+    let name = identity.repository_root.file_name().map_or_else(
+        || project_id.clone(),
+        |name| name.to_string_lossy().to_string(),
+    );
+    let checkout_name = if identity.is_worktree {
+        identity.worktree_name.clone().unwrap_or_else(|| {
+            identity
+                .checkout_root
+                .file_name()
+                .map_or_else(String::new, |name| name.to_string_lossy().to_string())
+        })
+    } else {
+        "Repository".to_string()
+    };
+
+    Ok(Some(DiscoveredProject {
+        project_id,
+        name,
+        project_dir: Some(identity.checkout_root),
+        repository_root: Some(identity.repository_root),
+        checkout_id: project_context_dir_name(context_root).unwrap_or_default(),
+        checkout_name,
+        context_root: context_root.to_path_buf(),
+        is_worktree: identity.is_worktree,
+        worktree_name: identity.worktree_name,
+    }))
+}
+
+fn repair_context_root(context_root: &Path) -> Result<Option<PathBuf>, CliError> {
+    if !context_root.is_dir() {
+        return Ok(None);
+    }
+
+    let Some(identity) = infer_checkout_identity(context_root) else {
+        prune_context_root(context_root, "pruned non-git project context")?;
+        return Ok(None);
+    };
+    let canonical_context_root = project_context_dir(&identity.checkout_root);
+    if canonical_context_root != context_root {
+        if context_has_sessions(context_root)? {
+            migrate_context_root(context_root, &canonical_context_root)?;
+            info!(
+                from = %context_root.display(),
+                to = %canonical_context_root.display(),
+                "migrated legacy project context to canonical checkout root"
+            );
+        } else {
+            prune_context_root(context_root, "pruned legacy project alias")?;
+        }
+    }
+
+    if canonical_context_root.is_dir() {
+        storage::record_project_origin(&identity.checkout_root)?;
+        return Ok(Some(canonical_context_root));
+    }
+    Ok(None)
+}
+
+fn infer_checkout_identity(context_root: &Path) -> Option<InferredCheckout> {
+    if let Some(origin) = storage::load_project_origin(context_root)
+        && let Some(checkout_root) = origin.checkout_root.as_deref().map(PathBuf::from)
+    {
+        if let Some(identity) = resolve_git_checkout_identity(&checkout_root) {
+            let is_worktree = identity.is_worktree();
+            let worktree_name = identity.worktree_name().map(ToString::to_string);
+            return Some(InferredCheckout {
+                repository_root: identity.repository_root,
+                checkout_root: identity.checkout_root,
+                is_worktree,
+                worktree_name,
+            });
+        }
+        let repository_root = origin
+            .repository_root
+            .as_deref()
+            .map(PathBuf::from)
+            .unwrap_or_else(|| checkout_root.clone());
+        return Some(InferredCheckout {
+            repository_root,
+            checkout_root,
+            is_worktree: origin.is_worktree,
+            worktree_name: origin.worktree_name,
+        });
+    }
+
+    let cwd = infer_ledger_cwd(context_root)?;
+    let identity = resolve_git_checkout_identity(&cwd)?;
+    let is_worktree = identity.is_worktree();
+    let worktree_name = identity.worktree_name().map(ToString::to_string);
+    Some(InferredCheckout {
+        repository_root: identity.repository_root,
+        checkout_root: identity.checkout_root,
+        is_worktree,
+        worktree_name,
+    })
+}
+
+fn infer_ledger_cwd(context_root: &Path) -> Option<PathBuf> {
+    let ledger_path = context_root
+        .join("agents")
+        .join("ledger")
+        .join("events.jsonl");
+    let content = fs::read_to_string(ledger_path).ok()?;
+    content
+        .lines()
+        .rev()
+        .find(|line| !line.trim().is_empty())
+        .and_then(|line| serde_json::from_str::<Value>(line).ok())
+        .and_then(|entry| entry.get("cwd").and_then(Value::as_str).map(PathBuf::from))
+}
+
+fn context_has_sessions(context_root: &Path) -> Result<bool, CliError> {
+    Ok(!list_session_ids_from_context_root(context_root)?.is_empty())
+}
+
+fn prune_context_root(context_root: &Path, reason: &str) -> Result<(), CliError> {
+    if !context_root.exists() {
+        return Ok(());
+    }
+    fs::remove_dir_all(context_root).map_err(|error| {
+        CliErrorKind::workflow_io(format!(
+            "remove project context {}: {error}",
+            context_root.display()
+        ))
+    })?;
+    info!(path = %context_root.display(), "{reason}");
+    Ok(())
+}
+
+fn migrate_context_root(source: &Path, target: &Path) -> Result<(), CliError> {
+    if source == target || !source.is_dir() {
+        return Ok(());
+    }
+    if !target.exists() {
+        if let Some(parent) = target.parent() {
+            fs::create_dir_all(parent).map_err(|error| {
+                CliErrorKind::workflow_io(format!(
+                    "create canonical project context parent {}: {error}",
+                    parent.display()
+                ))
+            })?;
+        }
+        fs::rename(source, target).map_err(|error| {
+            CliErrorKind::workflow_io(format!(
+                "move project context {} -> {}: {error}",
+                source.display(),
+                target.display()
+            ))
+        })?;
+        return Ok(());
+    }
+
+    merge_context_roots(source, target)?;
+    fs::remove_dir_all(source).map_err(|error| {
+        CliErrorKind::workflow_io(format!(
+            "remove migrated project context {}: {error}",
+            source.display()
+        ))
+    })?;
+    Ok(())
+}
+
+fn merge_context_roots(source: &Path, target: &Path) -> Result<(), CliError> {
+    merge_active_registries(source, target)?;
+    merge_append_only_file(
+        &source.join("agents").join("ledger").join("events.jsonl"),
+        &target.join("agents").join("ledger").join("events.jsonl"),
+    )?;
+
+    let mut pending = vec![source.to_path_buf()];
+    while let Some(current) = pending.pop() {
+        for entry in fs::read_dir(&current).map_err(|error| {
+            CliErrorKind::workflow_io(format!(
+                "read project context merge directory {}: {error}",
+                current.display()
+            ))
+        })? {
+            let entry = match entry {
+                Ok(entry) => entry,
+                Err(_) => continue,
+            };
+            let path = entry.path();
+            let relative = match path.strip_prefix(source) {
+                Ok(relative) => relative,
+                Err(_) => continue,
+            };
+            if skip_merged_path(relative) {
+                continue;
+            }
+            let target_path = target.join(relative);
+            let file_type = match entry.file_type() {
+                Ok(file_type) => file_type,
+                Err(_) => continue,
+            };
+            if file_type.is_dir() {
+                fs::create_dir_all(&target_path).map_err(|error| {
+                    CliErrorKind::workflow_io(format!(
+                        "create merged project directory {}: {error}",
+                        target_path.display()
+                    ))
+                })?;
+                pending.push(path);
+                continue;
+            }
+            if target_path.exists() {
+                continue;
+            }
+            if let Some(parent) = target_path.parent() {
+                fs::create_dir_all(parent).map_err(|error| {
+                    CliErrorKind::workflow_io(format!(
+                        "create merged project file parent {}: {error}",
+                        parent.display()
+                    ))
+                })?;
+            }
+            fs::copy(&path, &target_path).map_err(|error| {
+                CliErrorKind::workflow_io(format!(
+                    "copy merged project file {} -> {}: {error}",
+                    path.display(),
+                    target_path.display()
+                ))
+            })?;
+        }
+    }
+
+    Ok(())
+}
+
+fn merge_active_registries(source: &Path, target: &Path) -> Result<(), CliError> {
+    let source_path = source.join("orchestration").join("active.json");
+    if !source_path.is_file() {
+        return Ok(());
+    }
+
+    let target_path = target.join("orchestration").join("active.json");
+    let source_registry =
+        read_json_typed::<storage::ActiveRegistry>(&source_path).unwrap_or_default();
+    let mut target_registry =
+        read_json_typed::<storage::ActiveRegistry>(&target_path).unwrap_or_default();
+    for (session_id, timestamp) in source_registry.sessions {
+        target_registry
+            .sessions
+            .entry(session_id)
+            .and_modify(|current| {
+                if timestamp > *current {
+                    *current = timestamp.clone();
+                }
+            })
+            .or_insert(timestamp);
+    }
+    if let Some(parent) = target_path.parent() {
+        fs::create_dir_all(parent).map_err(|error| {
+            CliErrorKind::workflow_io(format!(
+                "create active registry parent {}: {error}",
+                parent.display()
+            ))
+        })?;
+    }
+    crate::infra::io::write_json_pretty(&target_path, &target_registry)
+}
+
+fn merge_append_only_file(source: &Path, target: &Path) -> Result<(), CliError> {
+    if !source.is_file() {
+        return Ok(());
+    }
+    let contents = fs::read_to_string(source).map_err(|error| {
+        CliErrorKind::workflow_io(format!(
+            "read append-only file {}: {error}",
+            source.display()
+        ))
+    })?;
+    if contents.trim().is_empty() {
+        return Ok(());
+    }
+    if let Some(parent) = target.parent() {
+        fs::create_dir_all(parent).map_err(|error| {
+            CliErrorKind::workflow_io(format!(
+                "create append-only file parent {}: {error}",
+                parent.display()
+            ))
+        })?;
+    }
+    let mut file = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(target)
+        .map_err(|error| {
+            CliErrorKind::workflow_io(format!(
+                "open append-only file {}: {error}",
+                target.display()
+            ))
+        })?;
+    file.write_all(contents.as_bytes()).map_err(|error| {
+        CliErrorKind::workflow_io(format!("append file {}: {error}", target.display()))
+    })?;
+    if !contents.ends_with('\n') {
+        writeln!(file).map_err(|error| {
+            CliErrorKind::workflow_io(format!("terminate file {}: {error}", target.display()))
+        })?;
+    }
+    Ok(())
+}
+
+fn skip_merged_path(relative: &Path) -> bool {
+    if relative
+        .components()
+        .any(|component| component.as_os_str() == ".locks")
+    {
+        return true;
+    }
+    matches!(
+        relative.to_string_lossy().as_ref(),
+        "project-origin.json" | "orchestration/active.json" | "agents/ledger/events.jsonl"
+    )
+}
+
+fn project_context_dir_name(path: &Path) -> Option<String> {
+    path.file_name()
+        .map(|name| name.to_string_lossy().to_string())
 }
 
 fn session_state_path(context_root: &Path, session_id: &str) -> PathBuf {
@@ -548,7 +927,12 @@ mod tests {
             project_id: "project-alpha".into(),
             name: "project-alpha".into(),
             project_dir: None,
+            repository_root: None,
+            checkout_id: "project-alpha".into(),
+            checkout_name: "Repository".into(),
             context_root,
+            is_worktree: false,
+            worktree_name: None,
         };
 
         let events =
