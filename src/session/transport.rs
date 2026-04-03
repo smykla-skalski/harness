@@ -1,9 +1,12 @@
 use std::env;
+use std::path::PathBuf;
 
 use clap::{Args, Subcommand};
 use serde::Serialize;
 
-use crate::app::command_context::{AppContext, Execute};
+use crate::app::command_context::{
+    AppContext, Execute, resolve_project_dir as resolve_project_path,
+};
 use crate::errors::{CliError, CliErrorKind};
 use crate::hooks::adapters::HookAgent;
 
@@ -110,15 +113,13 @@ impl Execute for SessionSignalCommand {
 }
 
 fn resolve_project_dir(hint: Option<&str>) -> String {
-    hint.filter(|value| !value.trim().is_empty()).map_or_else(
-        || {
-            env::current_dir().map_or_else(
-                |_| ".".to_string(),
-                |path| path.to_string_lossy().to_string(),
-            )
-        },
-        ToString::to_string,
-    )
+    let path = hint.filter(|value| !value.trim().is_empty()).map_or_else(
+        || env::current_dir().unwrap_or_else(|_| ".".into()),
+        PathBuf::from,
+    );
+    resolve_project_path(path.to_str())
+        .to_string_lossy()
+        .to_string()
 }
 
 fn print_json<T: Serialize>(value: &T) -> Result<(), CliError> {
