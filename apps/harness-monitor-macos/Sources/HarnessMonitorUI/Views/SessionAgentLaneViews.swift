@@ -52,6 +52,13 @@ struct SessionAgentSummaryCard: View {
     }
   }
 
+  private var metadataLine: String {
+    guard runtimeSymbol == nil else {
+      return agent.agentId
+    }
+    return "\(agent.runtime.uppercased()) • \(agent.agentId)"
+  }
+
   var body: some View {
     Button { inspectAgent(agent.agentId) } label: {
       VStack(alignment: .leading, spacing: HarnessMonitorTheme.itemSpacing) {
@@ -66,26 +73,10 @@ struct SessionAgentSummaryCard: View {
             .background(HarnessMonitorTheme.accent, in: Capsule())
             .foregroundStyle(HarnessMonitorTheme.onContrast)
         }
-        HStack(spacing: 8) {
-          if let runtimeSymbol {
-            ProviderBrandSymbolView(
-              symbol: runtimeSymbol,
-              colorMode: .automaticContrast,
-              size: 14
-            )
-            .accessibilityHidden(true)
-          } else {
-            Text(agent.runtime.uppercased())
-              .scaledFont(.caption2.weight(.semibold))
-              .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-              .lineLimit(1)
-          }
-
-          Text(agent.agentId)
-            .scaledFont(.caption.monospaced())
-            .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-            .lineLimit(1)
-        }
+        Text(metadataLine)
+          .scaledFont(.caption.monospaced())
+          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+          .lineLimit(1)
         Spacer(minLength: 0)
         HStack(spacing: HarnessMonitorTheme.itemSpacing) {
           badge(agent.runtimeCapabilities.supportsContextInjection ? "Context" : "Watch")
@@ -99,6 +90,20 @@ struct SessionAgentSummaryCard: View {
         alignment: .topLeading
       )
       .padding(HarnessMonitorTheme.cardPadding)
+      .overlay(alignment: .bottomTrailing) {
+        if let runtimeSymbol {
+          ProviderBrandSymbolView(
+            symbol: runtimeSymbol,
+            colorMode: .automaticContrast,
+            size: 110
+          )
+          .opacity(0.12)
+          .offset(x: 18, y: 22)
+          .accessibilityHidden(true)
+          .allowsHitTesting(false)
+        }
+      }
+      .clipped()
     }
     .harnessInteractiveCardButtonStyle()
     .contextMenu {
