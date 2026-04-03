@@ -21,19 +21,19 @@ Unit tests are in-crate `#[test]` blocks. Integration tests live in `tests/integ
 
 Pre-commit: `cargo fmt --check && cargo clippy --lib && mise run test`
 
-For `apps/harness-macos`, the Xcode project is generated from `project.yml` via XcodeGen. If you add, remove, or rename Swift files, update `project.yml` and regenerate with `Scripts/generate-project.sh`. Treat the generated `AI Harness.xcodeproj` as tracked source.
+For `apps/harness-monitor-macos`, the Xcode project is generated from `project.yml` via XcodeGen. If you add, remove, or rename Swift files, update `project.yml` and regenerate with `Scripts/generate-project.sh`. Treat the generated `HarnessMonitor.xcodeproj` as tracked source.
 
-AI Harness app validation expectations:
+Harness Monitor app validation expectations:
 
-- `xcodebuild -project 'apps/harness-macos/AI Harness.xcodeproj' -scheme "AI Harness" -configuration Debug -destination 'platform=macOS' -derivedDataPath tmp/xcode-derived -skipPackagePluginValidation build`
-- `xcodebuild -project 'apps/harness-macos/AI Harness.xcodeproj' -scheme "AI Harness" -configuration Debug -destination 'platform=macOS' -derivedDataPath tmp/xcode-derived -skipPackagePluginValidation test -skip-testing:HarnessUITests`
+- `xcodebuild -project 'apps/harness-monitor-macos/HarnessMonitor.xcodeproj' -scheme "HarnessMonitor" -configuration Debug -destination 'platform=macOS' -derivedDataPath tmp/xcode-derived -skipPackagePluginValidation build`
+- `xcodebuild -project 'apps/harness-monitor-macos/HarnessMonitor.xcodeproj' -scheme "HarnessMonitor" -configuration Debug -destination 'platform=macOS' -derivedDataPath tmp/xcode-derived -skipPackagePluginValidation test -skip-testing:HarnessMonitorUITests`
 - All xcodebuild invocations must use `-derivedDataPath tmp/xcode-derived` so build artifacts land in a single, known location inside `tmp/`. Never create variant-named directories like `tmp/xcode-derived-foo` - one directory, reused across builds.
 - Hard requirement: do not run the full macOS UI suite by default. Run only the smallest targeted build/test command needed for the current change, such as a single XCTest case, a single XCTest class, or a non-UI build lane.
-- Only run the full macOS app validation lane or the full `HarnessUITests` suite after the user explicitly asks for the full suite.
-- Targeted `HarnessUITests` runs must use the isolated `AI Harness UI Testing` host (`io.aiharness.app.ui-testing`) instead of the shipping `AI Harness.app` bundle so local manual app usage is not interrupted.
+- Only run the full macOS app validation lane or the full `HarnessMonitorUITests` suite after the user explicitly asks for the full suite.
+- Targeted `HarnessMonitorUITests` runs must use the isolated `Harness Monitor UI Testing` host (`io.harnessmonitor.app.ui-testing`) instead of the shipping `Harness Monitor.app` bundle so local manual app usage is not interrupted.
 - Keep the `-ApplePersistenceIgnoreState YES` UI-test launch argument in place for the isolated host so macOS window restoration does not make targeted UI runs flaky.
 - SwiftLint runs as an SPM build tool plugin (SwiftLintPlugins) on every target. Config lives in `.swiftlint.yml`. No shell script build phases - the plugin works within Xcode's user script sandbox.
-- Prefer shared layout and control primitives for AI Harness UI density/readability work so button sizing and glass treatment stay consistent across screens.
+- Prefer shared layout and control primitives for Harness Monitor UI density/readability work so button sizing and glass treatment stay consistent across screens.
 - Liquid Glass (macOS 26): NavigationSplitView sidebar gets automatic Liquid Glass treatment. Use `.backgroundExtensionEffect()` on content columns so detail content extends behind the glass sidebar. Don't paint opaque backgrounds on the sidebar - use translucent tints so the system glass shows through. Use `.glassEffect(.regular.tint(color), in: shape)` for floating controls (tint takes `Color`, not `LinearGradient`). Never stack glass on glass. Glass belongs on the navigation/control layer, not on content. SwiftUI materials (`.ultraThinMaterial` etc.) blur behind the window, not sibling views. `GlassEffectContainer` groups glass elements with shared sampling; `spacing` controls morph threshold.
 
 ## Architecture
@@ -118,7 +118,7 @@ All diagnostic output uses `tracing` macros. Never use `eprintln!` for new diagn
 - Subscriber is initialized in `main.rs` only - tests run without one (silent no-op)
 - Default filter: `RUST_LOG=harness=info`
 
-## SwiftUI rules (AI Harness macOS app)
+## SwiftUI rules (Harness Monitor macOS app)
 
 Glob-scoped rules in `.claude/rules/` enforce patterns learned from three review passes:
 
@@ -127,7 +127,7 @@ Glob-scoped rules in `.claude/rules/` enforce patterns learned from three review
 - `.claude/rules/swiftui-performance.md` - no object creation in body, @MainActor formatters, animation scoping
 - `.claude/rules/swiftui-button-styling.md` - no .plain, ButtonStyle over ViewModifier, no redundant .contentShape, native glass styles
 
-These rules auto-activate when editing `apps/harness-macos/Sources/**/*.swift`.
+These rules auto-activate when editing `apps/harness-monitor-macos/Sources/**/*.swift`.
 
 ## UX rules (macOS and iOS apps)
 
@@ -140,11 +140,11 @@ Enforceable UX requirements live in `.claude/rules/` and are automatically loade
 | [ux-interaction.md](.claude/rules/ux-interaction.md) | `**/*.swift` | Feedback, errors, loading states, destructive actions, forms, data display |
 | [ux-swiftui.md](.claude/rules/ux-swiftui.md) | `**/*.swift` | State management, navigation, performance, animations, anti-patterns |
 | [ux-performance.md](.claude/rules/ux-performance.md) | `**/*.swift` | Response times, 60fps, launch time, scroll, memory, network UI, auto-save |
-| [ux-platform-macos.md](.claude/rules/ux-platform-macos.md) | `apps/harness-macos/**/*.swift` | Menu bar, windows, toolbar, settings, dock, keyboard shortcuts |
+| [ux-platform-macos.md](.claude/rules/ux-platform-macos.md) | `apps/harness-monitor-macos/**/*.swift` | Menu bar, windows, toolbar, settings, dock, keyboard shortcuts |
 | [ux-platform-ios.md](.claude/rules/ux-platform-ios.md) | `apps/*-ios/**/*.swift` | Tab bar, safe areas, gestures, navigation bar, permissions |
-| [swiftui-state-management.md](.claude/rules/swiftui-state-management.md) | `apps/harness-macos/Sources/**` | @Bindable vs let, @State privacy, no closures in views |
-| [swiftui-view-structure.md](.claude/rules/swiftui-view-structure.md) | `apps/harness-macos/Sources/**` | View composition, ForEach identity, modifier branches |
-| [swiftui-performance.md](.claude/rules/swiftui-performance.md) | `apps/harness-macos/Sources/**` | Formatter allocation, thread safety, animation scoping |
+| [swiftui-state-management.md](.claude/rules/swiftui-state-management.md) | `apps/harness-monitor-macos/Sources/**` | @Bindable vs let, @State privacy, no closures in views |
+| [swiftui-view-structure.md](.claude/rules/swiftui-view-structure.md) | `apps/harness-monitor-macos/Sources/**` | View composition, ForEach identity, modifier branches |
+| [swiftui-performance.md](.claude/rules/swiftui-performance.md) | `apps/harness-monitor-macos/Sources/**` | Formatter allocation, thread safety, animation scoping |
 
 Detailed research backing these rules is in `tmp/investigations/ux-research/` (10 documents, ~4900 lines). Consult for rationale or edge cases.
 
@@ -152,4 +152,4 @@ Detailed research backing these rules is in `tmp/investigations/ux-research/` (1
 
 - `guard-bash` denies direct use of `kubectl`, `kumactl`, `helm`, `docker`, `k3d` - all cluster access must go through harness commands (see `rules.rs:26`)
 - `VersionedJsonRepository` saves atomically via tmp-file rename - don't read state files by path while a save is in progress, use the repository's `load()` method
-- `apps/harness-macos/AI Harness.xcodeproj` is repo-owned metadata; keep `project.pbxproj`, shared workspace/scheme files, and Swift source membership in sync.
+- `apps/harness-monitor-macos/HarnessMonitor.xcodeproj` is repo-owned metadata; keep `project.pbxproj`, shared workspace/scheme files, and Swift source membership in sync.

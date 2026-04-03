@@ -1,5 +1,5 @@
 ---
-globs: "apps/harness-macos/**/*.swift"
+globs: "apps/harness-monitor-macos/**/*.swift"
 description: "macOS-specific UX conventions: menu bar, windows, toolbar, settings, dock, notifications."
 ---
 

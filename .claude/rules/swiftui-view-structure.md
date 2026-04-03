@@ -1,6 +1,6 @@
 ---
-description: SwiftUI view composition and structure rules for the AI Harness macOS app
-globs: apps/harness-macos/Sources/**/*.swift
+description: SwiftUI view composition and structure rules for the Harness Monitor macOS app
+globs: apps/harness-monitor-macos/Sources/**/*.swift
 ---
 
 # SwiftUI view structure

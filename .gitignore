@@ -22,13 +22,13 @@
 .sourcekit-lsp/
 buildServer.json
 
-# macOS app (harness-macos)
-apps/harness-macos/.build/
-apps/harness-macos/build/
-apps/harness-macos/DerivedData/
-apps/harness-macos/DerivedData*
-apps/harness-macos/*.xcodeproj/xcuserdata/
-apps/harness-macos/*.xcodeproj/project.xcworkspace/xcuserdata/
+# macOS app (harness-monitor-macos)
+apps/harness-monitor-macos/.build/
+apps/harness-monitor-macos/build/
+apps/harness-monitor-macos/DerivedData/
+apps/harness-monitor-macos/DerivedData*
+apps/harness-monitor-macos/*.xcodeproj/xcuserdata/
+apps/harness-monitor-macos/*.xcodeproj/project.xcworkspace/xcuserdata/
 
 .claude/skills/swift*
 .agents/skills/swift*

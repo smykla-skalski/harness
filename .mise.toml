@@ -35,14 +35,14 @@ run = [
   "chmod 555 ~/.local/bin/harness",
 ]
 
-[tasks."harness:macos:generate"]
-description = "Generate the AI Harness macOS Xcode project"
-run = "apps/harness-macos/Scripts/generate-project.sh"
+[tasks."harness-monitor:macos:generate"]
+description = "Generate the Harness Monitor macOS Xcode project"
+run = "apps/harness-monitor-macos/Scripts/generate-project.sh"
 
-[tasks."harness:macos:lint"]
-description = "Run the strict Swift format and build-tool-plugin quality gates for the AI Harness macOS app"
-run = "apps/harness-macos/Scripts/run-quality-gates.sh"
+[tasks."harness-monitor:macos:lint"]
+description = "Run the strict Swift format and build-tool-plugin quality gates for the Harness Monitor macOS app"
+run = "apps/harness-monitor-macos/Scripts/run-quality-gates.sh"
 
-[tasks."harness:macos:test"]
-description = "Generate, lint, and test the AI Harness macOS app"
-run = "apps/harness-macos/Scripts/test-swift.sh"
+[tasks."harness-monitor:macos:test"]
+description = "Generate, lint, and test the Harness Monitor macOS app"
+run = "apps/harness-monitor-macos/Scripts/test-swift.sh"
