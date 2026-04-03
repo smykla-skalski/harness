@@ -71,17 +71,15 @@ final class HarnessSidebarLayoutUITests: HarnessUITestCase {
   func testSidebarProjectHeaderFillsAvailableWidth() throws {
     let app = launch(mode: "preview")
     let filtersCard = frameElement(in: app, identifier: Accessibility.sidebarFiltersCardFrame)
-    let sessionsSection = frameElement(in: app, identifier: Accessibility.sidebarSessionsSectionFrame)
     let projectHeader = frameElement(in: app, identifier: Accessibility.previewProjectHeaderFrame)
 
     XCTAssertTrue(filtersCard.waitForExistence(timeout: Self.uiTimeout))
-    XCTAssertTrue(sessionsSection.waitForExistence(timeout: Self.uiTimeout))
     XCTAssertTrue(projectHeader.waitForExistence(timeout: Self.uiTimeout))
 
     XCTAssertEqual(projectHeader.frame.minX, filtersCard.frame.minX)
     XCTAssertEqual(projectHeader.frame.maxX, filtersCard.frame.maxX)
 
-    let headerSpacing = projectHeader.frame.minY - sessionsSection.frame.maxY
+    let headerSpacing = projectHeader.frame.minY - filtersCard.frame.maxY
     XCTAssertGreaterThanOrEqual(headerSpacing, 0)
     XCTAssertLessThanOrEqual(headerSpacing, 32)
   }
@@ -97,24 +95,6 @@ final class HarnessSidebarLayoutUITests: HarnessUITestCase {
     XCTAssertEqual(sessionCard.frame.maxX, filtersCard.frame.maxX)
   }
 
-  func testSidebarSessionsSectionSeparatesFiltersFromProjects() throws {
-    let app = launch(mode: "preview")
-    let filtersCard = frameElement(in: app, identifier: Accessibility.sidebarFiltersCardFrame)
-    let sessionsSection = frameElement(in: app, identifier: Accessibility.sidebarSessionsSectionFrame)
-    let projectHeader = frameElement(in: app, identifier: Accessibility.previewProjectHeaderFrame)
-
-    XCTAssertTrue(filtersCard.waitForExistence(timeout: Self.uiTimeout))
-    XCTAssertTrue(sessionsSection.waitForExistence(timeout: Self.uiTimeout))
-    XCTAssertTrue(projectHeader.waitForExistence(timeout: Self.uiTimeout))
-
-    XCTAssertEqual(sessionsSection.frame.minX, filtersCard.frame.minX)
-    XCTAssertEqual(sessionsSection.frame.maxX, filtersCard.frame.maxX)
-
-    let sessionsGap = sessionsSection.frame.minY - filtersCard.frame.maxY
-    XCTAssertGreaterThanOrEqual(sessionsGap, 8)
-    XCTAssertLessThanOrEqual(sessionsGap, 32)
-    XCTAssertGreaterThan(projectHeader.frame.minY, sessionsSection.frame.maxY)
-  }
 
   func testSidebarFilterSliceFillsColumnAndStartsUnfiltered() throws {
     let app = launch(mode: "preview")

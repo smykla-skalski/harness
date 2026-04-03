@@ -78,16 +78,6 @@ struct SidebarView: View {
       .accessibilityIdentifier(HarnessAccessibility.sidebarEmptyState)
     } else if let firstGroup = store.groupedSessions.first {
       Group {
-        sessionsSectionHeader
-          .listRowInsets(EdgeInsets(
-            top: HarnessTheme.spacingLG,
-            leading: 0,
-            bottom: HarnessTheme.itemSpacing,
-            trailing: 0
-          ))
-          .listRowSeparator(.hidden)
-          .listRowBackground(Color.clear)
-
         sessionProjectRow(for: firstGroup)
           .listRowInsets(EdgeInsets(
             top: 0,
@@ -164,25 +154,6 @@ struct SidebarView: View {
     .accessibilityFrameMarker(
       HarnessAccessibility.projectHeaderFrame(group.project.projectId)
     )
-  }
-
-  private var sessionsSectionHeader: some View {
-    VStack(alignment: .leading, spacing: HarnessTheme.itemSpacing) {
-      HStack(alignment: .firstTextBaseline, spacing: HarnessTheme.itemSpacing) {
-            EmptyView()
-          .scaledFont(.caption2.weight(.bold))
-          .tracking(HarnessTheme.uppercaseTracking)
-          .foregroundStyle(HarnessTheme.secondaryInk)
-        Spacer()
-            EmptyView()
-          .scaledFont(.caption.monospacedDigit())
-          .foregroundStyle(HarnessTheme.tertiaryInk)
-      }
-    }
-    .frame(maxWidth: .infinity, alignment: .leading)
-    .accessibilityElement(children: .combine)
-    .accessibilityIdentifier(HarnessAccessibility.sidebarSessionsSection)
-    .accessibilityFrameMarker(HarnessAccessibility.sidebarSessionsSectionFrame)
   }
 
   @ViewBuilder
