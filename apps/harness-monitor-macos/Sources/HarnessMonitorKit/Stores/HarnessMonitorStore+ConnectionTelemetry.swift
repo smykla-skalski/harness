@@ -243,6 +243,14 @@ extension HarnessMonitorStore {
         }
 
         do {
+          if let transportLatencyMs = try await client.transportLatencyMs() {
+            recordRequestSuccess(
+              latencyMs: transportLatencyMs,
+              updatesLatency: true,
+              countsTowardsTraffic: false
+            )
+            continue
+          }
           let sample = try await Self.measureOperation {
             try await client.health()
           }

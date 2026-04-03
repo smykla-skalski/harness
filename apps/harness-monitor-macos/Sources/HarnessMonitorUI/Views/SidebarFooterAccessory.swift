@@ -4,6 +4,10 @@ import SwiftUI
 struct SidebarFooterAccessory: View {
   let metrics: ConnectionMetrics
 
+  private var tint: Color {
+    metrics.latencyTint
+  }
+
   var body: some View {
     ConnectionToolbarBadge(metrics: metrics)
       .frame(maxWidth: .infinity, alignment: .leading)
@@ -11,9 +15,10 @@ struct SidebarFooterAccessory: View {
       .padding(.horizontal, HarnessMonitorTheme.itemSpacing)
       .harnessFloatingControlGlass(
         cornerRadius: HarnessMonitorTheme.cornerRadiusMD,
-        tint: HarnessMonitorTheme.ink
+        tint: tint
       )
       .padding(HarnessMonitorTheme.itemSpacing)
+      .accessibilityIdentifier("harness.sidebar.connection-pill")
   }
 }
 
