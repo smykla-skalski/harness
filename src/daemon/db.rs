@@ -315,6 +315,7 @@ impl DaemonDb {
             import_session_log(self, &resolved.project, &resolved.state.session_id)?;
             import_session_checkpoints(self, &resolved.project, &resolved.state)?;
             import_session_signals(self, resolved)?;
+            import_session_activity(self, resolved)?;
         }
 
         import_daemon_events(self)?;
@@ -819,6 +820,76 @@ impl DaemonDb {
         Ok(signals)
     }
 
+    /// Cache agent activity summaries for a session.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on SQL failures.
+    pub fn sync_agent_activity(
+        &self,
+        session_id: &str,
+        activities: &[super::protocol::AgentToolActivitySummary],
+    ) -> Result<(), CliError> {
+        self.conn
+            .execute(
+                "DELETE FROM agent_activity_cache WHERE session_id = ?1",
+                [session_id],
+            )
+            .map_err(|error| db_error(format!("delete activity cache: {error}")))?;
+
+        let now = utc_now();
+        let mut statement = self
+            .conn
+            .prepare(
+                "INSERT INTO agent_activity_cache (agent_id, session_id, runtime, activity_json, cached_at)
+                 VALUES (?1, ?2, ?3, ?4, ?5)",
+            )
+            .map_err(|error| db_error(format!("prepare activity insert: {error}")))?;
+
+        for activity in activities {
+            let json = serde_json::to_string(activity).unwrap_or_default();
+            statement
+                .execute(rusqlite::params![
+                    activity.agent_id,
+                    session_id,
+                    activity.runtime,
+                    json,
+                    now,
+                ])
+                .map_err(|error| db_error(format!("insert activity: {error}")))?;
+        }
+        Ok(())
+    }
+
+    /// Load cached agent activity summaries for a session.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on query failure.
+    pub fn load_agent_activity(
+        &self,
+        session_id: &str,
+    ) -> Result<Vec<super::protocol::AgentToolActivitySummary>, CliError> {
+        let mut statement = self
+            .conn
+            .prepare(
+                "SELECT activity_json FROM agent_activity_cache
+                 WHERE session_id = ?1 ORDER BY agent_id",
+            )
+            .map_err(|error| db_error(format!("prepare activity load: {error}")))?;
+
+        let rows = statement
+            .query_map([session_id], |row| row.get::<_, String>(0))
+            .map_err(|error| db_error(format!("query activity: {error}")))?;
+
+        let mut activities = Vec::new();
+        for row in rows {
+            let json = row.map_err(|error| db_error(format!("read activity row: {error}")))?;
+            if let Ok(activity) = serde_json::from_str(&json) {
+                activities.push(activity);
+            }
+        }
+        Ok(activities)
+    }
+
     /// Load recent daemon events, ordered by most recent first.
     ///
     /// # Errors
@@ -892,6 +963,17 @@ fn import_session_signals(
         &resolved.state,
     )?;
     db.sync_signal_index(&resolved.state.session_id, &signals)
+}
+
+fn import_session_activity(
+    db: &DaemonDb,
+    resolved: &super::index::ResolvedSession,
+) -> Result<(), CliError> {
+    let activities = super::snapshot::load_agent_activity_for(
+        &resolved.project,
+        &resolved.state,
+    )?;
+    db.sync_agent_activity(&resolved.state.session_id, &activities)
 }
 
 fn import_daemon_events(db: &DaemonDb) -> Result<(), CliError> {
@@ -1303,6 +1385,16 @@ CREATE TABLE daemon_events (
 );
 
 CREATE INDEX idx_daemon_events_time ON daemon_events(recorded_at DESC);
+
+-- Cached agent activity summaries (computed from transcript files)
+CREATE TABLE agent_activity_cache (
+    agent_id     TEXT NOT NULL,
+    session_id   TEXT NOT NULL,
+    runtime      TEXT NOT NULL,
+    activity_json TEXT NOT NULL,
+    cached_at    TEXT NOT NULL,
+    PRIMARY KEY (session_id, agent_id)
+) WITHOUT ROWID;
 
 -- Change tracking for the watch loop
 CREATE TABLE change_tracking (

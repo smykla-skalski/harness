@@ -164,10 +164,14 @@ fn build_session_detail(
     let mut tasks: Vec<_> = resolved.state.tasks.values().cloned().collect();
     tasks.sort_by(|left, right| right.updated_at.cmp(&left.updated_at));
 
-    let signals = if let Some(db) = db {
-        db.load_signals(&resolved.state.session_id)?
+    let (signals, agent_activity) = if let Some(db) = db {
+        let signals = db.load_signals(&resolved.state.session_id)?;
+        let activity = db.load_agent_activity(&resolved.state.session_id)?;
+        (signals, activity)
     } else {
-        load_signals_for(&resolved.project, &resolved.state)?
+        let signals = load_signals_for(&resolved.project, &resolved.state)?;
+        let activity = load_agent_activity_for(&resolved.project, &resolved.state)?;
+        (signals, activity)
     };
 
     let detail = SessionDetail {
@@ -176,7 +180,7 @@ fn build_session_detail(
         tasks,
         signals,
         observer: load_observer_summary(&resolved.project, &resolved.state)?,
-        agent_activity: load_agent_activity(&resolved.project, &resolved.state)?,
+        agent_activity,
     };
     let _ = state::write_session_cache(
         &detail.session.project_id,
@@ -298,7 +302,11 @@ fn load_observer_summary(
     }))
 }
 
-fn load_agent_activity(
+/// Load agent activity summaries from transcript files.
+///
+/// # Errors
+/// Returns [`CliError`] on filesystem read failures.
+pub fn load_agent_activity_for(
     project: &DiscoveredProject,
     state: &SessionState,
 ) -> Result<Vec<AgentToolActivitySummary>, CliError> {
