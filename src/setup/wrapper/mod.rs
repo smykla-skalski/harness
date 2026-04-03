@@ -1,3 +1,4 @@
+use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
 use crate::agents::assets::{
@@ -110,17 +111,31 @@ fn write_process_agent_bootstrap(
     project_dir: &Path,
     agent: HookAgent,
 ) -> Result<Vec<PathBuf>, CliError> {
-    let mut written = match agent {
-        HookAgent::Codex => write_agent_target_outputs(project_dir, AgentAssetTarget::Codex)?,
-        _ => Vec::new(),
+    let mut written = match agent_asset_target(agent) {
+        Some(target) => write_agent_target_outputs(project_dir, target)?,
+        None => Vec::new(),
     };
+    let existing = written.iter().cloned().collect::<BTreeSet<_>>();
     let planned = planned_agent_bootstrap_files(project_dir, agent);
     for (path, content) in planned {
+        if existing.contains(&path) {
+            continue;
+        }
         write_text(&path, &content)?;
         written.push(path);
     }
 
     Ok(written)
+}
+
+fn agent_asset_target(agent: HookAgent) -> Option<AgentAssetTarget> {
+    match agent {
+        HookAgent::Claude => Some(AgentAssetTarget::Claude),
+        HookAgent::Codex => Some(AgentAssetTarget::Codex),
+        HookAgent::Gemini => Some(AgentAssetTarget::Gemini),
+        HookAgent::Copilot => Some(AgentAssetTarget::Copilot),
+        HookAgent::OpenCode => Some(AgentAssetTarget::OpenCode),
+    }
 }
 
 pub(crate) fn planned_agent_bootstrap_files(

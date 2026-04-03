@@ -26,7 +26,7 @@ harness setup capabilities
 
 `bootstrap` wires agent runtimes into the project. Without `--agents`, it installs every supported runtime. With `--agents`, it narrows to the listed subset. `agents generate` renders shared assets from `agents/` into host-specific directories. `kuma` creates or attaches to a cluster. `gateway` installs Gateway API CRDs. `capabilities` reports what features and providers are available and ready on this machine right now.
 
-For Codex, generation and bootstrap also export Codex-discoverable session entrypoints under `.agents/skills/` as `session:start` and `session:join`, because repo-local plugin bundles alone are not enough for direct skill discovery.
+Generation and bootstrap expose the session entrypoints as `harness:session:start` and `harness:session:join` across the supported agent surfaces. Codex also gets direct mirrors under `.agents/skills/`, because repo-local plugin bundles alone are not enough for Codex skill discovery.
 
 ### create - suite authoring
 
