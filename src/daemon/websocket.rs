@@ -287,8 +287,16 @@ fn dispatch(
         }
         "diagnostics" => dispatch_query(&request.id, service::diagnostics_report),
         "daemon.stop" => dispatch_query(&request.id, service::request_shutdown),
-        "projects" => dispatch_query(&request.id, service::list_projects),
-        "sessions" => dispatch_query(&request.id, || service::list_sessions(true)),
+        "projects" => {
+            let db_guard = state.db.as_ref().map(|db| db.lock().expect("db lock"));
+            dispatch_query(&request.id, || service::list_projects(db_guard.as_deref()))
+        }
+        "sessions" => {
+            let db_guard = state.db.as_ref().map(|db| db.lock().expect("db lock"));
+            dispatch_query(&request.id, || {
+                service::list_sessions(true, db_guard.as_deref())
+            })
+        }
         "session.detail" => {
             let session_id = extract_session_id(&request.params);
             match session_id {
