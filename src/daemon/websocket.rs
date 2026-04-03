@@ -353,7 +353,7 @@ fn dispatch_read_query(request: &WsRequest, state: &DaemonHttpState) -> WsRespon
         "health" => dispatch_query(&request.id, || {
             service::health_response(&state.manifest, db_ref)
         }),
-        "diagnostics" => dispatch_query(&request.id, service::diagnostics_report),
+        "diagnostics" => dispatch_query(&request.id, || service::diagnostics_report(db_ref)),
         "daemon.stop" => dispatch_query(&request.id, service::request_shutdown),
         "projects" => dispatch_query(&request.id, || service::list_projects(db_ref)),
         "sessions" => dispatch_query(&request.id, || service::list_sessions(true, db_ref)),

@@ -40,7 +40,7 @@ impl Execute for DaemonCommand {
                 Ok(0)
             }
             Self::Doctor => {
-                let report = service::diagnostics_report()?;
+                let report = service::diagnostics_report(None)?;
                 print_json(&report)?;
                 Ok(0)
             }
