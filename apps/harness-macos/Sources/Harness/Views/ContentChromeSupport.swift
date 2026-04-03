@@ -79,8 +79,25 @@ struct ContentDetailChrome<Content: View>: View {
         SessionDataAvailabilityBanner(availability: sessionDataAvailability)
       }
       content
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
+    .frame(maxWidth: .infinity, maxHeight: .infinity)
+  }
+}
+
+private struct DetailBannerDividerModifier: ViewModifier {
+  func body(content: Content) -> some View {
+    content.overlay(alignment: .bottom) {
+      Rectangle()
+        .fill(HarnessTheme.controlBorder.opacity(0.9))
+        .frame(height: 1)
+        .accessibilityHidden(true)
+    }
+  }
+}
+
+private extension View {
+  func detailBannerDivider() -> some View {
+    modifier(DetailBannerDividerModifier())
   }
 }
 
@@ -171,6 +188,8 @@ struct SessionDataAvailabilityBanner: View {
     .accessibilityLabel(Text(message))
     .accessibilityValue(Text(message))
     .accessibilityIdentifier(HarnessAccessibility.persistedDataBanner)
+    .accessibilityFrameMarker(HarnessAccessibility.persistedDataBannerFrame)
+    .detailBannerDivider()
   }
 
   private var symbolName: String {
@@ -238,6 +257,7 @@ struct PersistenceUnavailableBanner: View {
     .accessibilityLabel(Text(message))
     .accessibilityValue(Text(message))
     .accessibilityIdentifier(HarnessAccessibility.persistenceBanner)
+    .detailBannerDivider()
   }
 }
 

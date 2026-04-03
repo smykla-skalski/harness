@@ -1,4 +1,5 @@
 import Foundation
+import SwiftData
 
 @MainActor
 public enum HarnessPreviewStoreFactory {
@@ -10,9 +11,17 @@ public enum HarnessPreviewStoreFactory {
     case empty
   }
 
-  public static func makeStore(for scenario: Scenario) -> HarnessStore {
+  public static func makeStore(
+    for scenario: Scenario,
+    modelContext: ModelContext? = nil,
+    persistenceError: String? = nil
+  ) -> HarnessStore {
     let configuration = configuration(for: scenario)
-    let store = HarnessStore(daemonController: PreviewDaemonController(mode: configuration.mode))
+    let store = HarnessStore(
+      daemonController: PreviewDaemonController(mode: configuration.mode),
+      modelContext: modelContext,
+      persistenceError: persistenceError
+    )
     store.connectionState = configuration.connectionState
     store.health = configuration.fixtures.health
     store.daemonStatus = configuration.statusReport

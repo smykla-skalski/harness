@@ -86,26 +86,73 @@ final class HarnessLayoutUITests: HarnessUITestCase {
       mode: "preview",
       additionalEnvironment: ["HARNESS_PREVIEW_SCENARIO": "offline-cached"]
     )
+    let window = mainWindow(in: app)
     let persistedBanner = element(in: app, identifier: Accessibility.persistedDataBanner)
+    let persistedBannerFrame = frameElement(in: app, identifier: Accessibility.persistedDataBannerFrame)
+    let sidebarRoot = element(in: app, identifier: Accessibility.sidebarRoot)
+    let sidebarContent = frameElement(in: app, identifier: Accessibility.sidebarShellFrame)
+    let inspectorRoot = element(in: app, identifier: Accessibility.inspectorRoot)
     let sessionRow = previewSessionTrigger(in: app)
+    let searchField = editableField(in: app, identifier: Accessibility.sidebarSearchField)
+    let clearFiltersButton = element(
+      in: app,
+      identifier: Accessibility.sidebarClearFiltersButton
+    )
     let observeButton = button(in: app, title: "Observe")
     let endSessionButton = element(in: app, identifier: Accessibility.endSessionButton)
     let createTaskButton = button(in: app, title: "Create Task")
 
+    XCTAssertTrue(window.waitForExistence(timeout: Self.uiTimeout))
     XCTAssertTrue(persistedBanner.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(persistedBannerFrame.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(sidebarRoot.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(sidebarContent.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(inspectorRoot.waitForExistence(timeout: Self.uiTimeout))
     XCTAssertTrue(sessionRow.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(searchField.waitForExistence(timeout: Self.uiTimeout))
     XCTAssertTrue(observeButton.waitForExistence(timeout: Self.uiTimeout))
     XCTAssertTrue(endSessionButton.waitForExistence(timeout: Self.uiTimeout))
     XCTAssertTrue(createTaskButton.waitForExistence(timeout: Self.uiTimeout))
 
     XCTAssertTrue(persistedBanner.label.contains("Daemon is off"))
+    XCTAssertTrue(persistedBanner.label.contains("may be stale"))
+    XCTAssertEqual(persistedBannerFrame.frame.minX, sidebarContent.frame.maxX, accuracy: 8)
+    XCTAssertEqual(persistedBannerFrame.frame.maxX, inspectorRoot.frame.minX, accuracy: 12)
     XCTAssertFalse(observeButton.isEnabled)
     XCTAssertFalse(endSessionButton.isEnabled)
     XCTAssertFalse(createTaskButton.isEnabled)
 
+    tapElement(in: app, identifier: Accessibility.sidebarSearchField)
+    app.typeText("offline cockpit\n")
+    XCTAssertTrue(clearFiltersButton.waitForExistence(timeout: Self.uiTimeout))
+    tapElement(in: app, identifier: Accessibility.sidebarClearFiltersButton)
+
+    let recentSearchChip = button(in: app, title: "offline cockpit")
+    let clearSearchHistoryButton = element(
+      in: app,
+      identifier: Accessibility.sidebarClearSearchHistoryButton
+    )
+    XCTAssertTrue(recentSearchChip.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(clearSearchHistoryButton.waitForExistence(timeout: Self.uiTimeout))
+    tapElement(in: app, identifier: Accessibility.sidebarClearSearchHistoryButton)
+    XCTAssertTrue(
+      waitUntil(timeout: Self.uiTimeout) {
+        !recentSearchChip.exists && !clearSearchHistoryButton.exists
+      }
+    )
+
     tapButton(in: app, identifier: Accessibility.taskUICard)
     let taskInspector = element(in: app, identifier: Accessibility.taskInspectorCard)
+    let noteField = editableField(in: app, identifier: Accessibility.taskNoteField)
+    let addNoteButton = element(in: app, identifier: Accessibility.taskNoteAddButton)
     XCTAssertTrue(taskInspector.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(noteField.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(addNoteButton.waitForExistence(timeout: Self.uiTimeout))
+
+    tapElement(in: app, identifier: Accessibility.taskNoteField)
+    app.typeText("Offline note")
+    tapElement(in: app, identifier: Accessibility.taskNoteAddButton)
+    XCTAssertTrue(app.staticTexts["Offline note"].waitForExistence(timeout: Self.uiTimeout))
 
     tapButton(in: app, identifier: Accessibility.workerAgentCard)
     let signalSendButton = element(in: app, identifier: Accessibility.signalSendButton)
