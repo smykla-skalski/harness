@@ -32,6 +32,25 @@ struct SessionAgentListSection: View {
 struct SessionAgentSummaryCard: View {
   let agent: AgentRegistration
   let inspectAgent: (String) -> Void
+  @Environment(\.harnessDateTimeConfiguration)
+  private var dateTimeConfiguration
+
+  private var runtimeSymbol: ProviderBrandSymbol? {
+    switch agent.runtime.lowercased() {
+    case "claude", "anthropic":
+      .claude
+    case "codex", "openai":
+      .openAI
+    case "gemini":
+      .gemini
+    case "copilot":
+      .copilot
+    case "mistral":
+      .mistral
+    default:
+      nil
+    }
+  }
 
   var body: some View {
     Button { inspectAgent(agent.agentId) } label: {
@@ -47,15 +66,31 @@ struct SessionAgentSummaryCard: View {
             .background(HarnessMonitorTheme.accent, in: Capsule())
             .foregroundStyle(HarnessMonitorTheme.onContrast)
         }
-        Text("\(agent.runtime) • \(agent.agentId)")
-          .scaledFont(.caption.monospaced())
-          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-          .lineLimit(1)
+        HStack(spacing: 8) {
+          if let runtimeSymbol {
+            ProviderBrandSymbolView(
+              symbol: runtimeSymbol,
+              colorMode: .automaticContrast,
+              size: 14
+            )
+            .accessibilityHidden(true)
+          } else {
+            Text(agent.runtime.uppercased())
+              .scaledFont(.caption2.weight(.semibold))
+              .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+              .lineLimit(1)
+          }
+
+          Text(agent.agentId)
+            .scaledFont(.caption.monospaced())
+            .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+            .lineLimit(1)
+        }
         Spacer(minLength: 0)
         HStack(spacing: HarnessMonitorTheme.itemSpacing) {
           badge(agent.runtimeCapabilities.supportsContextInjection ? "Context" : "Watch")
           badge("\(agent.runtimeCapabilities.typicalSignalLatencySeconds)s")
-          badge(formatTimestamp(agent.lastActivityAt))
+          badge(formatTimestamp(agent.lastActivityAt, configuration: dateTimeConfiguration))
         }
       }
       .frame(
