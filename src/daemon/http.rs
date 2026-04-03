@@ -114,7 +114,8 @@ async fn get_diagnostics(headers: HeaderMap, State(state): State<DaemonHttpState
     if let Err(response) = require_auth(&headers, &state) {
         return *response;
     }
-    map_json(service::diagnostics_report())
+    let db_guard = state.db.as_ref().map(|db| db.lock().expect("db lock"));
+    map_json(service::diagnostics_report(db_guard.as_deref()))
 }
 
 async fn post_stop_daemon(headers: HeaderMap, State(state): State<DaemonHttpState>) -> Response {

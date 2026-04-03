@@ -205,18 +205,25 @@ pub fn health_response(
 ///
 /// # Errors
 /// Returns `CliError` when daemon state cannot be loaded.
-pub fn diagnostics_report() -> Result<DaemonDiagnosticsReport, CliError> {
+pub fn diagnostics_report(
+    db: Option<&super::db::DaemonDb>,
+) -> Result<DaemonDiagnosticsReport, CliError> {
     let manifest = state::load_manifest()?;
     let health = manifest
         .as_ref()
-        .map(|manifest| health_response(manifest, None))
+        .map(|manifest| health_response(manifest, db))
         .transpose()?;
+    let recent_events = if let Some(db) = db {
+        db.load_recent_daemon_events(16)?
+    } else {
+        state::read_recent_events(16)?
+    };
     Ok(DaemonDiagnosticsReport {
         health,
         manifest,
         launch_agent: launchd::launch_agent_status(),
         workspace: state::diagnostics()?,
-        recent_events: state::read_recent_events(16)?,
+        recent_events,
     })
 }
 
@@ -768,7 +775,7 @@ mod tests {
                 state::write_manifest(&manifest).expect("manifest");
                 state::append_event("info", "daemon booted").expect("append event");
 
-                let report = diagnostics_report().expect("diagnostics");
+                let report = diagnostics_report(None).expect("diagnostics");
 
                 assert_eq!(
                     report.manifest.expect("manifest").endpoint,
