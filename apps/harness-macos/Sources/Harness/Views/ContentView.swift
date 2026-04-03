@@ -79,23 +79,23 @@ struct ContentView: View {
           timeline: store.timeline
         )
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-      }
-      .backgroundExtensionEffect()
-      .accessibilityFrameMarker("\(HarnessAccessibility.contentRoot).frame")
-      .onKeyPress(.escape) {
-        if store.inspectorSelection != .none {
-          store.inspectorSelection = .none
-          return .handled
+        .backgroundExtensionEffect()
+        .accessibilityFrameMarker("\(HarnessAccessibility.contentRoot).frame")
+        .onKeyPress(.escape) {
+          if store.inspectorSelection != .none {
+            store.inspectorSelection = .none
+            return .handled
+          }
+          return .ignored
         }
-        return .ignored
-      }
-      .navigationTitle(windowTitle)
-      .toolbar {
-        navigationToolbar
-        centerpieceToolbar
-      }
-      .toolbar(id: "harness.main") {
-        primaryToolbar
+        .navigationTitle(windowTitle)
+        .toolbar {
+          navigationToolbar
+          centerpieceToolbar
+        }
+        .toolbar(id: "harness.main") {
+          primaryToolbar
+        }
       }
     }
     .inspector(isPresented: $showInspector) {
@@ -106,7 +106,6 @@ struct ContentView: View {
         }
     }
     .navigationSplitViewStyle(.prominentDetail)
-    .toolbarBaselineOverlay()
     .toolbarBackgroundVisibility(.automatic, for: .windowToolbar)
     .containerBackground(.windowBackground, for: .window)
     .background {
@@ -133,7 +132,6 @@ struct ContentView: View {
     .onChange(of: store.selectedSessionID) { _, newID in
       restoredSessionID = newID
     }
-    .frame(maxWidth: .infinity, maxHeight: .infinity)
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessAccessibility.appChromeRoot)
     .overlay {
@@ -156,13 +154,15 @@ struct ContentView: View {
         )
       }
     }
+    .toolbarBaselineOverlay()
+    .frame(maxWidth: .infinity, maxHeight: .infinity)
     .modifier(HarnessConfirmationDialogModifier(store: store))
-      .modifier(
-        ContentAnnouncementsModifier(
-          connectionState: store.connectionState,
-          lastAction: store.lastAction
-        )
+    .modifier(
+      ContentAnnouncementsModifier(
+        connectionState: store.connectionState,
+        lastAction: store.lastAction
       )
+    )
   }
 }
 
