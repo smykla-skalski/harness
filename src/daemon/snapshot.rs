@@ -140,30 +140,50 @@ pub fn session_detail(session_id: &str) -> Result<SessionDetail, CliError> {
 pub fn session_detail_from_resolved(
     resolved: &index::ResolvedSession,
 ) -> Result<SessionDetail, CliError> {
-    let detail = build_session_detail(resolved)?;
-    let _ = state::write_session_cache(
-        &detail.session.project_id,
-        &resolved.state.session_id,
-        &detail,
-    );
-    Ok(detail)
+    build_session_detail(resolved, None)
 }
 
-fn build_session_detail(resolved: &ResolvedSession) -> Result<SessionDetail, CliError> {
+/// Build session detail using the DB for signal reads when available.
+///
+/// # Errors
+/// Returns [`CliError`] on parse failures.
+pub fn session_detail_from_resolved_with_db(
+    resolved: &index::ResolvedSession,
+    db: &super::db::DaemonDb,
+) -> Result<SessionDetail, CliError> {
+    build_session_detail(resolved, Some(db))
+}
+
+fn build_session_detail(
+    resolved: &ResolvedSession,
+    db: Option<&super::db::DaemonDb>,
+) -> Result<SessionDetail, CliError> {
     let mut agents: Vec<_> = resolved.state.agents.values().cloned().collect();
     agents.sort_by(|left, right| left.agent_id.cmp(&right.agent_id));
 
     let mut tasks: Vec<_> = resolved.state.tasks.values().cloned().collect();
     tasks.sort_by(|left, right| right.updated_at.cmp(&left.updated_at));
 
-    Ok(SessionDetail {
+    let signals = if let Some(db) = db {
+        db.load_signals(&resolved.state.session_id)?
+    } else {
+        load_signals_for(&resolved.project, &resolved.state)?
+    };
+
+    let detail = SessionDetail {
         session: summary_from_resolved(resolved),
         agents,
         tasks,
-        signals: load_signals(&resolved.project, &resolved.state)?,
+        signals,
         observer: load_observer_summary(&resolved.project, &resolved.state)?,
         agent_activity: load_agent_activity(&resolved.project, &resolved.state)?,
-    })
+    };
+    let _ = state::write_session_cache(
+        &detail.session.project_id,
+        &resolved.state.session_id,
+        &detail,
+    );
+    Ok(detail)
 }
 
 fn summary_from_resolved(resolved: &ResolvedSession) -> SessionSummary {
@@ -356,7 +376,11 @@ fn record_tool_event(
     }
 }
 
-fn load_signals(
+/// Load signal records for a session from filesystem directories.
+///
+/// # Errors
+/// Returns [`CliError`] on filesystem read failures.
+pub fn load_signals_for(
     project: &DiscoveredProject,
     state: &SessionState,
 ) -> Result<Vec<SessionSignalRecord>, CliError> {
