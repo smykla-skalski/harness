@@ -1,4 +1,3 @@
-import AppKit
 import SwiftUI
 
 struct ContentCenterpieceToolbar: ToolbarContent {
@@ -139,33 +138,33 @@ enum ToolbarCenterpieceDisplayMode: String {
   var idealWidth: CGFloat {
     switch self {
     case .standard:
-      640
+      268
     case .compact:
-      332
+      228
     case .compressed:
-      220
+      182
     }
   }
 
   var maximumWidth: CGFloat {
     switch self {
     case .standard:
-      780
+      324
     case .compact:
-      420
+      268
     case .compressed:
-      280
+      212
     }
   }
 
   var horizontalInset: CGFloat {
     switch self {
     case .standard:
-      10
+      2
     case .compact:
-      7
+      2
     case .compressed:
-      6
+      1
     }
   }
 
@@ -183,34 +182,15 @@ enum ToolbarCenterpieceDisplayMode: String {
   var metricSpacing: CGFloat {
     switch self {
     case .standard:
-      HarnessMonitorTheme.spacingMD
+      8
     case .compact:
-      HarnessMonitorTheme.spacingSM
+      6
     case .compressed:
-      HarnessMonitorTheme.spacingXS
+      4
     }
   }
 
   var showsMetricLabels: Bool { self == .standard }
-
-  var showsWorkspaceName: Bool { self != .compressed }
-
-  var showsChevron: Bool { self != .compressed }
-
-  var showsDestinationSymbol: Bool { self != .compressed }
-
-  var showsDestinationName: Bool { self == .standard }
-
-  var leadingSpacing: CGFloat {
-    switch self {
-    case .standard:
-      HarnessMonitorTheme.spacingSM
-    case .compact:
-      HarnessMonitorTheme.spacingXS
-    case .compressed:
-      0
-    }
-  }
 }
 
 private struct ToolbarCenterpieceView: View {
@@ -237,67 +217,9 @@ private struct ToolbarCenterpieceView: View {
   }
 
   private var content: some View {
-    HStack(spacing: 0) {
-      leadingSection
-      Spacer(minLength: displayMode.interSectionSpacing)
-      ToolbarCenterpieceMetricsRow(metrics: model.metrics, displayMode: displayMode)
-        .layoutPriority(1)
-    }
+    ToolbarCenterpieceMetricsRow(metrics: model.metrics, displayMode: displayMode)
+      .layoutPriority(1)
     .padding(.horizontal, displayMode.horizontalInset)
-  }
-
-  private var leadingSection: some View {
-    HStack(spacing: displayMode.leadingSpacing) {
-      ToolbarCenterpieceAppGlyph()
-
-      if displayMode.showsWorkspaceName {
-        Text(model.workspaceName)
-          .scaledFont(.system(.subheadline, design: .rounded, weight: .semibold))
-          .lineLimit(1)
-          .minimumScaleFactor(0.85)
-          .allowsTightening(true)
-          .layoutPriority(1)
-      }
-
-      if displayMode.showsChevron {
-        Image(systemName: "chevron.right")
-          .scaledFont(.caption.weight(.bold))
-          .foregroundStyle(HarnessMonitorTheme.tertiaryInk)
-          .accessibilityHidden(true)
-      }
-
-      if displayMode.showsDestinationName {
-        HStack(spacing: HarnessMonitorTheme.spacingXS) {
-          Image(systemName: model.destinationSystemImage)
-            .scaledFont(.caption.weight(.semibold))
-            .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-            .accessibilityHidden(true)
-          Text(model.destinationName)
-            .scaledFont(.system(.subheadline, design: .rounded, weight: .semibold))
-            .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-            .lineLimit(1)
-            .allowsTightening(true)
-        }
-        .layoutPriority(1)
-      } else if displayMode.showsDestinationSymbol {
-        Image(systemName: model.destinationSystemImage)
-          .scaledFont(.caption.weight(.semibold))
-          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-          .accessibilityHidden(true)
-      }
-    }
-    .foregroundStyle(HarnessMonitorTheme.ink)
-  }
-}
-
-private struct ToolbarCenterpieceAppGlyph: View {
-  var body: some View {
-    Image(nsImage: NSApplication.shared.applicationIconImage)
-      .resizable()
-      .interpolation(.high)
-      .frame(width: 20, height: 20)
-      .clipShape(.rect(cornerRadius: 5, style: .continuous))
-    .accessibilityHidden(true)
   }
 }
 
