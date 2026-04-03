@@ -25,8 +25,9 @@ For `apps/harness-macos`, the Xcode project is generated from `project.yml` via 
 
 AI Harness app validation expectations:
 
-- `xcodebuild -project 'apps/harness-macos/AI Harness.xcodeproj' -scheme "AI Harness" -configuration Debug -destination 'platform=macOS' -skipPackagePluginValidation build`
-- `xcodebuild -project 'apps/harness-macos/AI Harness.xcodeproj' -scheme "AI Harness" -configuration Debug -destination 'platform=macOS' -skipPackagePluginValidation test -skip-testing:HarnessUITests`
+- `xcodebuild -project 'apps/harness-macos/AI Harness.xcodeproj' -scheme "AI Harness" -configuration Debug -destination 'platform=macOS' -derivedDataPath tmp/xcode-derived -skipPackagePluginValidation build`
+- `xcodebuild -project 'apps/harness-macos/AI Harness.xcodeproj' -scheme "AI Harness" -configuration Debug -destination 'platform=macOS' -derivedDataPath tmp/xcode-derived -skipPackagePluginValidation test -skip-testing:HarnessUITests`
+- All xcodebuild invocations must use `-derivedDataPath tmp/xcode-derived` so build artifacts land in a single, known location inside `tmp/`. Never create variant-named directories like `tmp/xcode-derived-foo` - one directory, reused across builds.
 - Hard requirement: do not run the full macOS UI suite by default. Run only the smallest targeted build/test command needed for the current change, such as a single XCTest case, a single XCTest class, or a non-UI build lane.
 - Only run the full macOS app validation lane or the full `HarnessUITests` suite after the user explicitly asks for the full suite.
 - Targeted `HarnessUITests` runs must use the isolated `AI Harness UI Testing` host (`io.aiharness.app.ui-testing`) instead of the shipping `AI Harness.app` bundle so local manual app usage is not interrupted.
@@ -145,7 +146,7 @@ Enforceable UX requirements live in `.claude/rules/` and are automatically loade
 | [swiftui-view-structure.md](.claude/rules/swiftui-view-structure.md) | `apps/harness-macos/Sources/**` | View composition, ForEach identity, modifier branches |
 | [swiftui-performance.md](.claude/rules/swiftui-performance.md) | `apps/harness-macos/Sources/**` | Formatter allocation, thread safety, animation scoping |
 
-Detailed research backing these rules is in `tmp/ux-research/` (10 documents, ~4900 lines). Consult for rationale or edge cases.
+Detailed research backing these rules is in `tmp/investigations/ux-research/` (10 documents, ~4900 lines). Consult for rationale or edge cases.
 
 ## Gotchas
 
