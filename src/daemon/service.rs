@@ -288,7 +288,7 @@ pub fn session_timeline(
 ) -> Result<Vec<TimelineEntry>, CliError> {
     if let Some(db) = db
         && let Some(resolved) = db.resolve_session(session_id)? {
-            return timeline::session_timeline_from_resolved(&resolved);
+            return timeline::session_timeline_from_resolved_with_db(&resolved, db);
         }
     timeline::session_timeline(session_id)
 }
