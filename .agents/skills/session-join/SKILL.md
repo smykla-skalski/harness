@@ -1,5 +1,5 @@
 ---
-name: join
+name: session:join
 description: Join a multi-agent session. Default role is worker. Use --role observer to monitor and triage, or --role reviewer/improver for review work.
 argument-hint: '[session-id] [--role worker|observer|reviewer|improver] [--runtime claude|codex|gemini|copilot|opencode] [--capabilities "x,y"]'
 allowed-tools: Agent, Bash, Edit, Glob, Grep, Read, Write

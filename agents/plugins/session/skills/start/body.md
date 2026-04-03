@@ -1,11 +1,3 @@
----
-name: start
-description: Start a new multi-agent orchestration session. You become the leader - you plan, delegate, and coordinate. You never execute tasks yourself.
-argument-hint: '--context "goal" [--session-id ID]'
-allowed-tools: Agent, Bash, Glob, Grep, Read
-user-invocable: true
----
-
 # Session start
 
 Start a new multi-agent orchestration session. You are the leader.
@@ -144,4 +136,4 @@ This fails if any tasks are still in progress. Wait for completion or update stu
 - Use `--json` for machine-readable output when parsing results
 - Do not read orchestration state files directly, use harness commands
 - If you catch yourself about to edit a file or run code to implement something: stop. Create a task for it instead.
-- You may spawn subagents (workers, observers) but NEVER automatically. Always ask the user first with a user approval prompt before spawning any agent.
+- You may spawn subagents (workers, observers) but NEVER automatically. Always ask the user first with AskUserQuestion before spawning any agent.
