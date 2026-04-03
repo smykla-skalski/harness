@@ -340,6 +340,191 @@ impl DaemonDb {
             .query_row("SELECT COUNT(*) FROM projects", [], |row| row.get(0))
             .map_err(|error| db_error(format!("count projects: {error}")))
     }
+
+    // -- Read query methods for API endpoints --
+
+    /// Fast counts for the health endpoint.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on query failure.
+    pub fn health_counts(&self) -> Result<(usize, usize, usize), CliError> {
+        self.conn
+            .query_row(
+                "SELECT
+                    (SELECT COUNT(DISTINCT project_id) FROM projects WHERE is_worktree = 0) AS project_count,
+                    (SELECT COUNT(*) FROM projects WHERE is_worktree = 1) AS worktree_count,
+                    (SELECT COUNT(*) FROM sessions) AS session_count",
+                [],
+                |row| {
+                    Ok((
+                        row.get::<_, usize>(0)?,
+                        row.get::<_, usize>(1)?,
+                        row.get::<_, usize>(2)?,
+                    ))
+                },
+            )
+            .map_err(|error| db_error(format!("health counts: {error}")))
+    }
+
+    /// Load all session states for the sessions list endpoint.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on query failure.
+    pub fn list_session_summaries(&self) -> Result<Vec<SessionState>, CliError> {
+        let mut statement = self
+            .conn
+            .prepare(
+                "SELECT s.state_json FROM sessions s
+                 JOIN projects p ON p.project_id = s.project_id
+                 ORDER BY s.updated_at DESC",
+            )
+            .map_err(|error| db_error(format!("prepare session list: {error}")))?;
+
+        let rows = statement
+            .query_map([], |row| row.get::<_, String>(0))
+            .map_err(|error| db_error(format!("query session list: {error}")))?;
+
+        let mut sessions = Vec::new();
+        for row in rows {
+            let json = row.map_err(|error| db_error(format!("read session row: {error}")))?;
+            let state: SessionState = serde_json::from_str(&json)
+                .map_err(|error| db_error(format!("parse session state: {error}")))?;
+            sessions.push(state);
+        }
+        Ok(sessions)
+    }
+
+    /// Load a single session state by ID.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on query failure.
+    pub fn load_session_state(&self, session_id: &str) -> Result<Option<SessionState>, CliError> {
+        let result = self.conn.query_row(
+            "SELECT state_json FROM sessions WHERE session_id = ?1",
+            [session_id],
+            |row| row.get::<_, String>(0),
+        );
+
+        match result {
+            Ok(json) => {
+                let state: SessionState = serde_json::from_str(&json)
+                    .map_err(|error| db_error(format!("parse session state: {error}")))?;
+                Ok(Some(state))
+            }
+            Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+            Err(error) => Err(db_error(format!("load session state: {error}"))),
+        }
+    }
+
+    /// Load session log entries for a session, ordered by sequence.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on query failure.
+    pub fn load_session_log(&self, session_id: &str) -> Result<Vec<SessionLogEntry>, CliError> {
+        let mut statement = self
+            .conn
+            .prepare(
+                "SELECT session_id, sequence, recorded_at, transition_json, actor_id, reason
+                 FROM session_log WHERE session_id = ?1 ORDER BY sequence",
+            )
+            .map_err(|error| db_error(format!("prepare session log: {error}")))?;
+
+        let rows = statement
+            .query_map([session_id], |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, u64>(1)?,
+                    row.get::<_, String>(2)?,
+                    row.get::<_, String>(3)?,
+                    row.get::<_, Option<String>>(4)?,
+                    row.get::<_, Option<String>>(5)?,
+                ))
+            })
+            .map_err(|error| db_error(format!("query session log: {error}")))?;
+
+        let mut entries = Vec::new();
+        for row in rows {
+            let (sid, sequence, recorded_at, transition_json, actor_id, reason) =
+                row.map_err(|error| db_error(format!("read log row: {error}")))?;
+            let transition = serde_json::from_str(&transition_json)
+                .map_err(|error| db_error(format!("parse log transition: {error}")))?;
+            entries.push(SessionLogEntry {
+                sequence,
+                recorded_at,
+                session_id: sid,
+                transition,
+                actor_id,
+                reason,
+            });
+        }
+        Ok(entries)
+    }
+
+    /// Load task checkpoints for a session and task.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on query failure.
+    pub fn load_task_checkpoints(
+        &self,
+        session_id: &str,
+        task_id: &str,
+    ) -> Result<Vec<TaskCheckpoint>, CliError> {
+        let mut statement = self
+            .conn
+            .prepare(
+                "SELECT checkpoint_id, task_id, recorded_at, actor_id, summary, progress
+                 FROM task_checkpoints
+                 WHERE session_id = ?1 AND task_id = ?2
+                 ORDER BY recorded_at",
+            )
+            .map_err(|error| db_error(format!("prepare checkpoints: {error}")))?;
+
+        let rows = statement
+            .query_map(rusqlite::params![session_id, task_id], |row| {
+                Ok(TaskCheckpoint {
+                    checkpoint_id: row.get(0)?,
+                    task_id: row.get(1)?,
+                    recorded_at: row.get(2)?,
+                    actor_id: row.get(3)?,
+                    summary: row.get(4)?,
+                    progress: row.get(5)?,
+                })
+            })
+            .map_err(|error| db_error(format!("query checkpoints: {error}")))?;
+
+        rows.collect::<Result<Vec<_>, _>>()
+            .map_err(|error| db_error(format!("read checkpoint row: {error}")))
+    }
+
+    /// Load recent daemon events, ordered by most recent first.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on query failure.
+    pub fn load_recent_daemon_events(
+        &self,
+        limit: usize,
+    ) -> Result<Vec<super::state::DaemonAuditEvent>, CliError> {
+        let mut statement = self
+            .conn
+            .prepare(
+                "SELECT recorded_at, level, message FROM daemon_events
+                 ORDER BY id DESC LIMIT ?1",
+            )
+            .map_err(|error| db_error(format!("prepare daemon events: {error}")))?;
+
+        let rows = statement
+            .query_map([limit], |row| {
+                Ok(super::state::DaemonAuditEvent {
+                    recorded_at: row.get(0)?,
+                    level: row.get(1)?,
+                    message: row.get(2)?,
+                })
+            })
+            .map_err(|error| db_error(format!("query daemon events: {error}")))?;
+
+        rows.collect::<Result<Vec<_>, _>>()
+            .map_err(|error| db_error(format!("read event row: {error}")))
+    }
 }
 
 /// Summary of what was imported from file-based storage.

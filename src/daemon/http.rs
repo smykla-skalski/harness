@@ -105,7 +105,9 @@ pub async fn serve(
 }
 
 async fn get_health(State(state): State<DaemonHttpState>) -> Response {
-    map_json(service::health_response(&state.manifest))
+    let db_guard = state.db.as_ref().map(|db| db.lock().expect("db lock"));
+    let db_ref = db_guard.as_deref();
+    map_json(service::health_response(&state.manifest, db_ref))
 }
 
 async fn get_diagnostics(headers: HeaderMap, State(state): State<DaemonHttpState>) -> Response {
