@@ -112,9 +112,9 @@ pub fn discover_projects() -> Result<Vec<DiscoveredProject>, CliError> {
         if !seen_context_roots.insert(context_root.clone()) {
             continue;
         }
-        if let Some(project) = build_discovered_project(&context_root) {
-            projects.push(project);
-        }
+        let project = build_discovered_project(&context_root)
+            .unwrap_or_else(|| fallback_project(&context_root));
+        projects.push(project);
     }
 
     projects.sort_by(|left, right| {
@@ -472,6 +472,24 @@ struct InferredCheckout {
     worktree_name: Option<String>,
 }
 
+fn fallback_project(context_root: &Path) -> DiscoveredProject {
+    let project_id = project_context_dir_name(context_root).unwrap_or_default();
+    let name = context_root
+        .file_name()
+        .map_or_else(|| project_id.clone(), |name| name.to_string_lossy().to_string());
+    DiscoveredProject {
+        project_id: project_id.clone(),
+        name,
+        project_dir: None,
+        repository_root: None,
+        checkout_id: project_id,
+        checkout_name: "Unknown".to_string(),
+        context_root: context_root.to_path_buf(),
+        is_worktree: false,
+        worktree_name: None,
+    }
+}
+
 fn build_discovered_project(context_root: &Path) -> Option<DiscoveredProject> {
     let identity = infer_checkout_identity(context_root)?;
     let project_id = project_context_dir_name(&project_context_dir(&identity.repository_root))
@@ -510,6 +528,9 @@ fn repair_context_root(context_root: &Path) -> Result<Option<PathBuf>, CliError>
     }
 
     let Some(identity) = infer_checkout_identity(context_root) else {
+        if context_has_sessions(context_root)? {
+            return Ok(Some(context_root.to_path_buf()));
+        }
         prune_context_root(context_root, "pruned non-git project context")?;
         return Ok(None);
     };

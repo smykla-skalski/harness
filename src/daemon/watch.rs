@@ -1,5 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Component, Path, PathBuf};
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use notify::{RecommendedWatcher, RecursiveMode, Watcher};
@@ -7,8 +8,8 @@ use tokio::spawn;
 use tokio::sync::{broadcast, mpsc};
 use tokio::task::JoinHandle;
 use tokio::time::interval as tokio_interval;
-use tracing::warn;
 
+use super::db::DaemonDb;
 use super::index;
 use super::protocol::{SessionSummary, StreamEvent};
 use super::service;
@@ -39,27 +40,76 @@ enum RefreshScope {
     Full,
 }
 
-/// Spawn the daemon's file-driven refresh loop for SSE subscribers.
+/// Spawn the daemon's refresh loop for SSE/WS subscribers. When a database
+/// is available, uses `change_tracking` versions instead of full filesystem
+/// discovery. Falls back to the legacy JSON-diff approach otherwise.
 #[must_use]
 pub fn spawn_watch_loop(
+    sender: broadcast::Sender<StreamEvent>,
+    interval: Duration,
+    db: Option<Arc<Mutex<DaemonDb>>>,
+) -> JoinHandle<()> {
+    match db {
+        Some(db) => spawn_db_watch_loop(sender, interval, db),
+        None => spawn_legacy_watch_loop(sender, interval),
+    }
+}
+
+fn spawn_db_watch_loop(
+    sender: broadcast::Sender<StreamEvent>,
+    interval: Duration,
+    db: Arc<Mutex<DaemonDb>>,
+) -> JoinHandle<()> {
+    spawn(async move {
+        let root = index::projects_root();
+        let _ = fs_err::create_dir_all(&root);
+
+        let (event_tx, mut event_rx) = mpsc::channel::<notify::Result<notify::Event>>(128);
+        let _watcher = create_watcher(event_tx);
+
+        let mut ticker = tokio_interval(interval);
+        let mut last_global_version: i64 = 0;
+        let mut last_session_versions: BTreeMap<String, i64> = BTreeMap::new();
+
+        loop {
+            tokio::select! {
+                Some(_result) = event_rx.recv() => {
+                    // File event: drain all pending events, then re-index affected files
+                    while event_rx.try_recv().is_ok() {}
+                    reindex_from_files(&db);
+                }
+                _ = ticker.tick() => {}
+            }
+
+            let Ok(db_guard) = db.lock() else {
+                continue;
+            };
+
+            let changes = poll_change_tracking(
+                &db_guard,
+                &mut last_global_version,
+                &mut last_session_versions,
+            );
+            drop(db_guard);
+
+            emit_watch_changes(&sender, changes);
+        }
+    })
+}
+
+fn spawn_legacy_watch_loop(
     sender: broadcast::Sender<StreamEvent>,
     interval: Duration,
 ) -> JoinHandle<()> {
     spawn(async move {
         let root = index::projects_root();
-        if let Err(error) = fs_err::create_dir_all(&root) {
-            warn!(%error, path = %root.display(), "failed to create daemon watch root");
-        }
+        let _ = fs_err::create_dir_all(&root);
 
         let (event_tx, mut event_rx) = mpsc::channel::<notify::Result<notify::Event>>(128);
         let mut watcher = create_watcher(event_tx);
-        if watcher.is_none() {
-            warn!("failed to create daemon watcher");
-        }
         if let Some(watcher_ref) = watcher.as_mut()
-            && let Err(error) = watcher_ref.watch(&root, RecursiveMode::Recursive)
+            && let Err(_error) = watcher_ref.watch(&root, RecursiveMode::Recursive)
         {
-            warn!(%error, path = %root.display(), "failed to watch daemon project root");
             watcher = None;
         }
 
@@ -95,6 +145,52 @@ pub fn spawn_watch_loop(
             emit_watch_changes(&sender, changes);
         }
     })
+}
+
+fn poll_change_tracking(
+    db: &DaemonDb,
+    last_global_version: &mut i64,
+    last_session_versions: &mut BTreeMap<String, i64>,
+) -> WatchChanges {
+    let mut changes = WatchChanges::default();
+
+    let Ok(rows) = db.connection().prepare(
+        "SELECT scope, version FROM change_tracking",
+    )
+    .and_then(|mut statement| {
+        statement
+            .query_map([], |row| Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?)))
+            .and_then(|rows| rows.collect::<Result<Vec<_>, _>>())
+    }) else {
+        return changes;
+    };
+
+    for (scope, version) in rows {
+        if scope == "global" {
+            if version > *last_global_version {
+                changes.sessions_updated = true;
+                *last_global_version = version;
+            }
+        } else if let Some(session_id) = scope.strip_prefix("session:") {
+            let last = last_session_versions.get(session_id).copied().unwrap_or(0);
+            if version > last {
+                changes.session_ids.insert(session_id.to_string());
+                last_session_versions.insert(session_id.to_string(), version);
+            }
+        }
+    }
+
+    changes
+}
+
+fn reindex_from_files(db: &Arc<Mutex<DaemonDb>>) {
+    let Ok(db_guard) = db.lock() else {
+        return;
+    };
+    // Re-run the import for all sessions to pick up file changes.
+    // This is cheaper than the legacy approach since it writes to SQLite
+    // rather than serializing full snapshots to JSON strings.
+    let _ = db_guard.import_from_files();
 }
 
 fn create_watcher(

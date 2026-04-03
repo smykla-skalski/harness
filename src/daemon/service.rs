@@ -104,10 +104,10 @@ pub async fn serve(config: DaemonServeConfig) -> Result<(), CliError> {
     });
     let _ = SHUTDOWN_SIGNAL.set(shutdown_tx.clone());
     let replay_buffer = Arc::new(Mutex::new(ReplayBuffer::new(512)));
-    let _watch = watch::spawn_watch_loop(sender.clone(), config.poll_interval);
     let daemon_epoch = manifest.started_at.clone();
 
     let db = initialize_daemon_db();
+    let _watch = watch::spawn_watch_loop(sender.clone(), config.poll_interval, db.clone());
 
     let app_state = DaemonHttpState {
         token,
