@@ -80,6 +80,33 @@ public struct SignalPayload: Codable, Equatable, Sendable {
   public let actionHint: String?
   public let relatedFiles: [String]
   public let metadata: JSONValue
+
+  public init(
+    message: String,
+    actionHint: String?,
+    relatedFiles: [String],
+    metadata: JSONValue
+  ) {
+    self.message = message
+    self.actionHint = actionHint
+    self.relatedFiles = relatedFiles
+    self.metadata = metadata
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case message
+    case actionHint
+    case relatedFiles
+    case metadata
+  }
+
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    message = try container.decode(String.self, forKey: .message)
+    actionHint = try container.decodeIfPresent(String.self, forKey: .actionHint)
+    relatedFiles = try container.decodeIfPresent([String].self, forKey: .relatedFiles) ?? []
+    metadata = try container.decodeIfPresent(JSONValue.self, forKey: .metadata) ?? .object([:])
+  }
 }
 
 public struct Signal: Codable, Equatable, Identifiable, Sendable {
@@ -181,7 +208,7 @@ public struct SessionsUpdatedPayload: Codable, Equatable, Sendable {
 
 public struct SessionUpdatedPayload: Codable, Equatable, Sendable {
   public let detail: SessionDetail
-  public let timeline: [TimelineEntry]
+  public let timeline: [TimelineEntry]?
 }
 
 public struct StreamEvent: Codable, Equatable, Identifiable, Sendable {
@@ -310,7 +337,7 @@ public struct DaemonPushEvent: Equatable, Identifiable, Sendable {
     recordedAt: String,
     sessionId: String,
     detail: SessionDetail,
-    timeline: [TimelineEntry]
+    timeline: [TimelineEntry]? = nil
   ) -> Self {
     Self(
       recordedAt: recordedAt,

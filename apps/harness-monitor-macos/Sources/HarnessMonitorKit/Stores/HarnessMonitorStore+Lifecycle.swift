@@ -156,13 +156,27 @@ extension HarnessMonitorStore {
           timeline: cached.timeline,
           showingCachedData: true
         )
+      } else if let summary = sessionIndex.sessionSummary(for: sessionID) {
+        applySelectedSessionSnapshot(
+          sessionID: sessionID,
+          detail: SessionDetail(
+            session: summary,
+            agents: [],
+            tasks: [],
+            signals: [],
+            observer: nil,
+            agentActivity: []
+          ),
+          timeline: [],
+          showingCachedData: true
+        )
       } else {
         isShowingCachedData = persistedSessionCount > 0 || !sessions.isEmpty
       }
     }
   }
 
-  private func applySessionIndexSnapshot(
+  func applySessionIndexSnapshot(
     projects: [ProjectSummary],
     sessions: [SessionSummary]
   ) {
@@ -185,7 +199,8 @@ extension HarnessMonitorStore {
     sessionID: String,
     detail: SessionDetail,
     timeline: [TimelineEntry],
-    showingCachedData: Bool
+    showingCachedData: Bool,
+    cancelPendingTimelineRefresh: Bool = true
   ) {
     guard selectedSessionID == sessionID else {
       return
@@ -196,7 +211,9 @@ extension HarnessMonitorStore {
     applySessionSummaryUpdate(detail.session)
     isShowingCachedData = showingCachedData
     synchronizeActionActor()
-    cancelSessionPushFallback(for: sessionID)
+    if cancelPendingTimelineRefresh {
+      cancelSessionPushFallback(for: sessionID)
+    }
   }
 
   private func applyGlobalPushEvent(_ event: DaemonPushEvent) {
@@ -214,20 +231,27 @@ extension HarnessMonitorStore {
       }
       guard sessionID == selectedSessionID else {
         applySessionSummaryUpdate(payload.detail.session)
-        cacheSessionDetail(
-          payload.detail,
-          timeline: payload.timeline,
-          markViewed: false
-        )
+        if let timeline = payload.timeline {
+          cacheSessionDetail(
+            payload.detail,
+            timeline: timeline,
+            markViewed: false
+          )
+        }
         return
       }
+      let timeline = payload.timeline ?? self.timeline
       applySelectedSessionSnapshot(
         sessionID: sessionID,
         detail: payload.detail,
-        timeline: payload.timeline,
-        showingCachedData: false
+        timeline: timeline,
+        showingCachedData: false,
+        cancelPendingTimelineRefresh: payload.timeline != nil
       )
-      cacheSessionDetail(payload.detail, timeline: payload.timeline)
+      cacheSessionDetail(payload.detail, timeline: timeline)
+      if payload.timeline == nil, let client {
+        scheduleSessionPushFallback(using: client, sessionID: sessionID)
+      }
     case .unknown:
       break
     }
@@ -241,13 +265,18 @@ extension HarnessMonitorStore {
       guard let sessionID = event.sessionId else {
         return
       }
+      let timeline = payload.timeline ?? self.timeline
       applySelectedSessionSnapshot(
         sessionID: sessionID,
         detail: payload.detail,
-        timeline: payload.timeline,
-        showingCachedData: false
+        timeline: timeline,
+        showingCachedData: false,
+        cancelPendingTimelineRefresh: payload.timeline != nil
       )
-      cacheSessionDetail(payload.detail, timeline: payload.timeline)
+      cacheSessionDetail(payload.detail, timeline: timeline)
+      if payload.timeline == nil, let client {
+        scheduleSessionPushFallback(using: client, sessionID: sessionID)
+      }
     }
   }
 
@@ -333,6 +362,12 @@ extension HarnessMonitorStore {
     using client: any HarnessMonitorClientProtocol,
     sessionID: String
   ) {
+    // Repeated updates for the same selected session should coalesce into one
+    // follow-up timeline refresh instead of continually restarting the timer.
+    if pendingSessionPushFallback?.sessionID == sessionID {
+      return
+    }
+
     sessionPushFallbackSequence &+= 1
     let token = sessionPushFallbackSequence
     pendingSessionPushFallback = (sessionID: sessionID, token: token)

@@ -377,20 +377,7 @@ fn handle_session_subscribe(
         state.session_subscriptions.insert(session_id.clone());
     }
 
-    let detail = service::session_detail(&session_id);
-    let timeline = service::session_timeline(&session_id);
-    match (detail, timeline) {
-        (Ok(detail), Ok(timeline)) => ok_response(
-            &request.id,
-            serde_json::json!({
-                "session_detail": detail,
-                "timeline": timeline,
-            }),
-        ),
-        (Err(error), _) | (_, Err(error)) => {
-            error_response(&request.id, error.code(), &error.message())
-        }
-    }
+    ok_response(&request.id, serde_json::json!({ "ok": true }))
 }
 
 fn handle_session_unsubscribe(
