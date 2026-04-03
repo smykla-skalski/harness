@@ -1,0 +1,187 @@
+name: HarnessMonitor
+packages:
+  SwiftLintPlugins:
+    url: https://github.com/SimplyDanny/SwiftLintPlugins
+    from: "0.58.0"
+options:
+  bundleIdPrefix: io.harnessmonitor
+  createIntermediateGroups: true
+settings:
+  base:
+    CLANG_TREAT_WARNINGS_AS_ERRORS: YES
+    CODE_SIGN_ALLOW_ENTITLEMENTS_MODIFICATION: YES
+    CODE_SIGNING_ALLOWED: YES
+    DEAD_CODE_STRIPPING: YES
+    ENABLE_HARDENED_RUNTIME: YES
+    GCC_TREAT_WARNINGS_AS_ERRORS: YES
+    GENERATE_INFOPLIST_FILE: YES
+    MACOSX_DEPLOYMENT_TARGET: "26.0"
+    SWIFT_EMIT_LOC_STRINGS: YES
+    SWIFT_STRICT_CONCURRENCY: complete
+    SWIFT_TREAT_WARNINGS_AS_ERRORS: YES
+    SWIFT_VERSION: "6.0"
+    HARNESS_MONITOR_APP_BUNDLE_ID: io.harnessmonitor.app
+targets:
+  HarnessMonitorKit:
+    type: framework
+    platform: macOS
+    deploymentTarget: "26.0"
+    sources:
+      - Sources/HarnessMonitorKit
+    dependencies:
+      - sdk: SwiftData.framework
+    buildToolPlugins:
+      - plugin: SwiftLintBuildToolPlugin
+        package: SwiftLintPlugins
+    settings:
+      base:
+        CODE_SIGN_STYLE: Automatic
+        CODE_SIGNING_ALLOWED: YES
+        DEVELOPMENT_TEAM: Q498EB36N4
+        ENABLE_MODULE_VERIFIER: YES
+        MODULE_VERIFIER_SUPPORTED_LANGUAGES: "objective-c objective-c++"
+        PRODUCT_BUNDLE_IDENTIFIER: io.harnessmonitor.kit
+  HarnessMonitor:
+    type: application
+    platform: macOS
+    deploymentTarget: "26.0"
+    sources:
+      - Sources/HarnessMonitor
+    dependencies:
+      - target: HarnessMonitorKit
+    entitlements:
+      path: HarnessMonitor.entitlements
+      properties:
+        com.apple.security.network.client: true
+        com.apple.security.network.server: true
+        com.apple.security.cs.disable-library-validation: true
+    buildToolPlugins:
+      - plugin: SwiftLintBuildToolPlugin
+        package: SwiftLintPlugins
+    postBuildScripts:
+      - name: Clear Gatekeeper Metadata
+        basedOnDependencyAnalysis: false
+        script: |
+          strip_attrs() {
+            local target_path="$1"
+            if [ -e "$target_path" ]; then
+              /usr/bin/xattr -dr com.apple.provenance "$target_path" 2>/dev/null || true
+              /usr/bin/xattr -dr com.apple.quarantine "$target_path" 2>/dev/null || true
+            fi
+          }
+
+          strip_attrs "$TARGET_BUILD_DIR/$FULL_PRODUCT_NAME"
+    settings:
+      base:
+        CODE_SIGN_ENTITLEMENTS: HarnessMonitor.entitlements
+        CODE_SIGN_STYLE: Automatic
+        DEVELOPMENT_TEAM: Q498EB36N4
+        INFOPLIST_KEY_CFBundleDisplayName: Harness Monitor
+        INFOPLIST_KEY_CFBundleName: Harness Monitor
+        INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.developer-tools
+        PRODUCT_BUNDLE_IDENTIFIER: $(HARNESS_MONITOR_APP_BUNDLE_ID)
+        PRODUCT_NAME: Harness Monitor
+  HarnessMonitorUITestHost:
+    type: application
+    platform: macOS
+    deploymentTarget: "26.0"
+    sources:
+      - Sources/HarnessMonitor
+    dependencies:
+      - target: HarnessMonitorKit
+    entitlements:
+      path: HarnessMonitor.entitlements
+      properties:
+        com.apple.security.network.client: true
+        com.apple.security.network.server: true
+        com.apple.security.cs.disable-library-validation: true
+    buildToolPlugins:
+      - plugin: SwiftLintBuildToolPlugin
+        package: SwiftLintPlugins
+    postBuildScripts:
+      - name: Clear Gatekeeper Metadata
+        basedOnDependencyAnalysis: false
+        script: |
+          strip_attrs() {
+            local target_path="$1"
+            if [ -e "$target_path" ]; then
+              /usr/bin/xattr -dr com.apple.provenance "$target_path" 2>/dev/null || true
+              /usr/bin/xattr -dr com.apple.quarantine "$target_path" 2>/dev/null || true
+            fi
+          }
+
+          strip_attrs "$TARGET_BUILD_DIR/$FULL_PRODUCT_NAME"
+    settings:
+      base:
+        CODE_SIGN_ENTITLEMENTS: HarnessMonitor.entitlements
+        CODE_SIGN_STYLE: Automatic
+        DEVELOPMENT_TEAM: Q498EB36N4
+        INFOPLIST_KEY_CFBundleDisplayName: Harness Monitor UI Testing
+        INFOPLIST_KEY_CFBundleName: Harness Monitor UI Testing
+        INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.developer-tools
+        PRODUCT_BUNDLE_IDENTIFIER: io.harnessmonitor.app.ui-testing
+        PRODUCT_NAME: Harness Monitor UI Testing
+  HarnessMonitorKitTests:
+    type: bundle.unit-test
+    platform: macOS
+    deploymentTarget: "26.0"
+    sources:
+      - Tests/HarnessMonitorKitTests
+    dependencies:
+      - target: HarnessMonitorKit
+    buildToolPlugins:
+      - plugin: SwiftLintBuildToolPlugin
+        package: SwiftLintPlugins
+    settings:
+      base:
+        CODE_SIGN_STYLE: Automatic
+        DEVELOPMENT_TEAM: Q498EB36N4
+        PRODUCT_BUNDLE_IDENTIFIER: io.harnessmonitor.kit-tests
+  HarnessMonitorUITests:
+    type: bundle.ui-testing
+    platform: macOS
+    deploymentTarget: "26.0"
+    sources:
+      - Tests/HarnessMonitorUITests
+    dependencies:
+      - target: HarnessMonitorUITestHost
+    buildToolPlugins:
+      - plugin: SwiftLintBuildToolPlugin
+        package: SwiftLintPlugins
+    postBuildScripts:
+      - name: Clear Gatekeeper Metadata
+        basedOnDependencyAnalysis: false
+        script: |
+          strip_attrs() {
+            local target_path="$1"
+            if [ -e "$target_path" ]; then
+              /usr/bin/xattr -dr com.apple.provenance "$target_path" 2>/dev/null || true
+              /usr/bin/xattr -dr com.apple.quarantine "$target_path" 2>/dev/null || true
+            fi
+          }
+
+          strip_attrs "$TARGET_BUILD_DIR/$FULL_PRODUCT_NAME"
+
+          for runner in "$BUILT_PRODUCTS_DIR"/*-Runner.app; do
+            if [ -e "$runner" ]; then
+              strip_attrs "$runner"
+            fi
+          done
+    settings:
+      base:
+        CODE_SIGN_STYLE: Automatic
+        DEVELOPMENT_TEAM: Q498EB36N4
+        PRODUCT_BUNDLE_IDENTIFIER: io.harnessmonitor.ui-tests
+        TEST_TARGET_NAME: HarnessMonitorUITestHost
+schemes:
+  HarnessMonitor:
+    build:
+      targets:
+        HarnessMonitor: all
+        HarnessMonitorKit: all
+        HarnessMonitorUITestHost: all
+    test:
+      gatherCoverageData: true
+      targets:
+        - name: HarnessMonitorKitTests
+        - name: HarnessMonitorUITests

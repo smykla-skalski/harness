@@ -1,6 +1,6 @@
 ---
-description: SwiftUI state management rules for the AI Harness macOS app
-globs: apps/harness-macos/Sources/**/*.swift
+description: SwiftUI state management rules for the Harness Monitor macOS app
+globs: apps/harness-monitor-macos/Sources/**/*.swift
 ---
 
 # SwiftUI state management
