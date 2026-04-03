@@ -130,6 +130,8 @@ fn initialize_daemon_db() -> Option<Arc<Mutex<super::db::DaemonDb>>> {
         run_initial_import(&db);
     }
 
+    let _ = db.cache_startup_diagnostics();
+
     Some(Arc::new(Mutex::new(db)))
 }
 
@@ -213,16 +215,39 @@ pub fn diagnostics_report(
         .as_ref()
         .map(|manifest| health_response(manifest, db))
         .transpose()?;
-    let recent_events = if let Some(db) = db {
-        db.load_recent_daemon_events(16)?
-    } else {
-        state::read_recent_events(16)?
-    };
+
+    if let Some(db) = db {
+        return diagnostics_from_db(db, manifest, health);
+    }
+
     Ok(DaemonDiagnosticsReport {
         health,
         manifest,
         launch_agent: launchd::launch_agent_status(),
         workspace: state::diagnostics()?,
+        recent_events: state::read_recent_events(16)?,
+    })
+}
+
+fn diagnostics_from_db(
+    db: &super::db::DaemonDb,
+    manifest: Option<DaemonManifest>,
+    health: Option<HealthResponse>,
+) -> Result<DaemonDiagnosticsReport, CliError> {
+    let launch_agent = db
+        .load_cached_launch_agent_status()?
+        .unwrap_or_else(launchd::launch_agent_status);
+    let workspace = match db.load_cached_workspace_diagnostics()? {
+        Some(cached) => cached,
+        None => state::diagnostics()?,
+    };
+    let recent_events = db.load_recent_daemon_events(16)?;
+
+    Ok(DaemonDiagnosticsReport {
+        health,
+        manifest,
+        launch_agent,
+        workspace,
         recent_events,
     })
 }

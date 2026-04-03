@@ -965,6 +965,74 @@ impl DaemonDb {
         Ok(activities)
     }
 
+    /// Store a diagnostics cache entry.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on SQL failures.
+    pub fn set_diagnostics_cache(&self, key: &str, value: &str) -> Result<(), CliError> {
+        self.conn
+            .execute(
+                "INSERT OR REPLACE INTO diagnostics_cache (key, value) VALUES (?1, ?2)",
+                rusqlite::params![key, value],
+            )
+            .map_err(|error| db_error(format!("set diagnostics cache: {error}")))?;
+        Ok(())
+    }
+
+    /// Load a diagnostics cache entry.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on SQL failures.
+    pub fn get_diagnostics_cache(&self, key: &str) -> Result<Option<String>, CliError> {
+        match self.conn.query_row(
+            "SELECT value FROM diagnostics_cache WHERE key = ?1",
+            [key],
+            |row| row.get(0),
+        ) {
+            Ok(value) => Ok(Some(value)),
+            Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+            Err(error) => Err(db_error(format!("get diagnostics cache: {error}"))),
+        }
+    }
+
+    /// Cache the launch agent status and workspace diagnostics at daemon startup.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on SQL failures.
+    pub fn cache_startup_diagnostics(&self) -> Result<(), CliError> {
+        let launch_agent = super::launchd::launch_agent_status();
+        let launch_agent_json = serde_json::to_string(&launch_agent).unwrap_or_default();
+        self.set_diagnostics_cache("launch_agent", &launch_agent_json)?;
+
+        let workspace = super::state::diagnostics()?;
+        let workspace_json = serde_json::to_string(&workspace).unwrap_or_default();
+        self.set_diagnostics_cache("workspace", &workspace_json)?;
+
+        Ok(())
+    }
+
+    /// Load cached launch agent status.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on SQL failures.
+    pub fn load_cached_launch_agent_status(
+        &self,
+    ) -> Result<Option<super::launchd::LaunchAgentStatus>, CliError> {
+        let json = self.get_diagnostics_cache("launch_agent")?;
+        Ok(json.and_then(|json| serde_json::from_str(&json).ok()))
+    }
+
+    /// Load cached workspace diagnostics.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on SQL failures.
+    pub fn load_cached_workspace_diagnostics(
+        &self,
+    ) -> Result<Option<super::state::DaemonDiagnostics>, CliError> {
+        let json = self.get_diagnostics_cache("workspace")?;
+        Ok(json.and_then(|json| serde_json::from_str(&json).ok()))
+    }
+
     /// Load recent daemon events, ordered by most recent first.
     ///
     /// # Errors
@@ -1518,6 +1586,12 @@ CREATE TABLE change_tracking (
     scope      TEXT PRIMARY KEY,
     version    INTEGER NOT NULL DEFAULT 0,
     updated_at TEXT NOT NULL
+) WITHOUT ROWID;
+
+-- Cached diagnostics metadata (avoids process spawns and directory walks)
+CREATE TABLE diagnostics_cache (
+    key   TEXT PRIMARY KEY,
+    value TEXT NOT NULL
 ) WITHOUT ROWID;
 
 INSERT INTO change_tracking (scope, version, updated_at)
