@@ -53,6 +53,14 @@ public actor WebSocketTransport: HarnessMonitorClientProtocol {
 extension WebSocketTransport {
   // MARK: - HarnessMonitorClientProtocol queries
 
+  public func transportLatencyMs() async throws -> Int? {
+    let startedAt = ContinuousClock.now
+    try await sendPing()
+    let duration = startedAt.duration(to: ContinuousClock.now)
+    return max(0, Int(duration.components.seconds * 1_000))
+      + Int(duration.components.attoseconds / 1_000_000_000_000_000)
+  }
+
   public func health() async throws -> HealthResponse {
     let value = try await send(method: "health")
     return try decode(value)

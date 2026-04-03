@@ -3,6 +3,22 @@ import Foundation
 // MARK: - Internal transport mechanics
 
 extension WebSocketTransport {
+  func sendPing() async throws {
+    guard let webSocketTask else {
+      throw WebSocketTransportError.connectionClosed
+    }
+    let task = webSocketTask
+    try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, any Error>) in
+      task.sendPing { error in
+        if let error {
+          continuation.resume(throwing: error)
+        } else {
+          continuation.resume()
+        }
+      }
+    }
+  }
+
   @discardableResult
   func send(method: String, params: JSONValue? = nil) async throws -> JSONValue {
     guard let webSocketTask else {
@@ -159,7 +175,7 @@ extension WebSocketTransport {
       while !Task.isCancelled {
         try? await Task.sleep(for: .seconds(15))
         guard !Task.isCancelled, let self else { break }
-        _ = try? await self.send(method: "ping")
+        try? await self.sendPing()
       }
     }
   }

@@ -2,6 +2,7 @@ import Foundation
 
 public protocol HarnessMonitorClientProtocol: Sendable {
   func health() async throws -> HealthResponse
+  func transportLatencyMs() async throws -> Int?
   func diagnostics() async throws -> DaemonDiagnosticsReport
   func stopDaemon() async throws -> DaemonControlResponse
   func projects() async throws -> [ProjectSummary]
@@ -52,6 +53,12 @@ public protocol HarnessMonitorClientProtocol: Sendable {
     sessionID: String,
     request: ObserveSessionRequest
   ) async throws -> SessionDetail
+}
+
+public extension HarnessMonitorClientProtocol {
+  func transportLatencyMs() async throws -> Int? {
+    nil
+  }
 }
 
 public struct HarnessMonitorConnection: Equatable, Sendable {

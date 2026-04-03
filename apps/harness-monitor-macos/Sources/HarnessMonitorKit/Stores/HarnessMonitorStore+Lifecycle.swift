@@ -50,6 +50,7 @@ extension HarnessMonitorStore {
       async let healthResponse = Self.measureOperation {
         try await client.health()
       }
+      async let transportLatencyResponse = client.transportLatencyMs()
       async let diagnosticsResponse = Self.measureOperation {
         try await client.diagnostics()
       }
@@ -62,6 +63,7 @@ extension HarnessMonitorStore {
       async let daemonStatusResponse: DaemonStatusReport? = try? daemonController.daemonStatus()
 
       let measuredHealth = try await healthResponse
+      let transportLatencyMs = try await transportLatencyResponse
       let measuredDiagnostics = try await diagnosticsResponse
       let measuredProjects = try await projectResponse
       let measuredSessions = try await sessionResponse
@@ -70,7 +72,7 @@ extension HarnessMonitorStore {
       diagnostics = measuredDiagnostics.value
       daemonStatus = await daemonStatusResponse
       recordRequestSuccess(
-        latencyMs: measuredHealth.latencyMs,
+        latencyMs: transportLatencyMs ?? measuredHealth.latencyMs,
         updatesLatency: true
       )
       recordRequestSuccess()
