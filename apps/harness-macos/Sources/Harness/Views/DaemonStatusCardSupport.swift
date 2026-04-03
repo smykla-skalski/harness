@@ -26,6 +26,7 @@ struct DaemonCardHeader: View {
         Image(systemName: isLaunchAgentInstalled ? "autostartstop" : "person.fill")
           .scaledFont(.system(.callout, weight: .semibold))
           .foregroundStyle(HarnessTheme.secondaryInk)
+          .opacity(0.55)
           .help(isLaunchAgentInstalled ? "Launchd managed daemon" : "Manually started daemon")
           .accessibilityLabel(isLaunchAgentInstalled ? "Launchd mode" : "Manual mode")
 
