@@ -95,7 +95,6 @@ final class HarnessSidebarLayoutUITests: HarnessUITestCase {
     XCTAssertEqual(sessionCard.frame.maxX, filtersCard.frame.maxX)
   }
 
-
   func testSidebarFilterSliceFillsColumnAndStartsUnfiltered() throws {
     let app = launch(mode: "preview")
     let sidebarRoot = element(in: app, identifier: Accessibility.sidebarRoot)

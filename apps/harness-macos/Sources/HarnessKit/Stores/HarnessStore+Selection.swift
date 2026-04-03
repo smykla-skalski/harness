@@ -78,6 +78,7 @@ extension HarnessStore {
   }
 
   private func loadSessionWithoutHistory(_ sessionID: String?) async {
+    let previousProjectId = selectedSessionSummary?.projectId
     primeSessionSelection(sessionID)
     guard let sessionID else {
       stopSessionStream()
@@ -91,11 +92,8 @@ extension HarnessStore {
     }
 
     let newProjectId = sessions.first(where: { $0.sessionId == sessionID })?.projectId
-    let previousProjectId = selectedSessionSummary?.projectId
-    if let previousProjectId, newProjectId != previousProjectId {
+    if let previousProjectId, let newProjectId, newProjectId != previousProjectId {
       saveFilterPreference(for: previousProjectId)
-    }
-    if let newProjectId, newProjectId != previousProjectId {
       loadFilterPreference(for: newProjectId)
     }
 
@@ -147,10 +145,8 @@ extension HarnessStore {
     }
 
     let newProjectId = sessions.first(where: { $0.sessionId == sessionID })?.projectId
-    if let previousProjectId, newProjectId != previousProjectId {
+    if let previousProjectId, let newProjectId, newProjectId != previousProjectId {
       saveFilterPreference(for: previousProjectId)
-    }
-    if let newProjectId, newProjectId != previousProjectId {
       loadFilterPreference(for: newProjectId)
     }
 
