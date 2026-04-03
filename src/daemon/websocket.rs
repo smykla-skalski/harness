@@ -279,10 +279,8 @@ fn dispatch(
 ) -> WsResponse {
     match request.method.as_str() {
         "ping" => ok_response(&request.id, serde_json::json!({ "pong": true })),
-        "health" | "diagnostics" | "daemon.stop" | "projects" | "sessions"
-        | "session.detail" | "session.timeline" => {
-            dispatch_read_query(request, state)
-        }
+        "health" | "diagnostics" | "daemon.stop" | "projects" | "sessions" | "session.detail"
+        | "session.timeline" => dispatch_read_query(request, state),
         "session.subscribe" => handle_session_subscribe(request, connection),
         "session.unsubscribe" => handle_session_unsubscribe(request, connection),
         "stream.subscribe" => handle_stream_subscribe(request, connection),
@@ -358,9 +356,9 @@ fn dispatch_read_query(request: &WsRequest, state: &DaemonHttpState) -> WsRespon
         "projects" => dispatch_query(&request.id, || service::list_projects(db_ref)),
         "sessions" => dispatch_query(&request.id, || service::list_sessions(true, db_ref)),
         "session.detail" => match extract_session_id(&request.params) {
-            Some(session_id) => dispatch_query(&request.id, || {
-                service::session_detail(&session_id, db_ref)
-            }),
+            Some(session_id) => {
+                dispatch_query(&request.id, || service::session_detail(&session_id, db_ref))
+            }
             None => error_response(&request.id, "MISSING_PARAM", "missing session_id"),
         },
         "session.timeline" => match extract_session_id(&request.params) {
