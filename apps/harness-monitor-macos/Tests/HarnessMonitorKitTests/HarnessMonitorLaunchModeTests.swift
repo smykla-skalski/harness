@@ -9,6 +9,22 @@ struct HarnessMonitorLaunchModeTests {
     #expect(HarnessMonitorLaunchMode(environment: [:]) == .live)
   }
 
+  @Test("Xcode preview sessions default to preview mode when launch mode is unset")
+  func defaultsToPreviewForXcodeCanvas() {
+    #expect(
+      HarnessMonitorLaunchMode(environment: [HarnessMonitorLaunchMode.xcodePreviewEnvironmentKey: "1"])
+        == .preview
+    )
+  }
+
+  @Test("Xcode preview JIT executor sessions default to preview mode")
+  func defaultsToPreviewForXcodePlaygroundExecutor() {
+    #expect(
+      HarnessMonitorLaunchMode(environment: [HarnessMonitorLaunchMode.xcodePlaygroundsEnvironmentKey: "1"])
+        == .preview
+    )
+  }
+
   @Test("Preview environment value maps to preview mode")
   func parsesPreviewMode() {
     #expect(
@@ -27,6 +43,16 @@ struct HarnessMonitorLaunchModeTests {
   func fallsBackToLiveForUnknownMode() {
     #expect(
       HarnessMonitorLaunchMode(environment: [HarnessMonitorLaunchMode.environmentKey: "mystery"]) == .live
+    )
+  }
+
+  @Test("Explicit launch mode overrides the Xcode preview fallback")
+  func explicitLaunchModeWinsOverXcodePreviewEnvironment() {
+    #expect(
+      HarnessMonitorLaunchMode(environment: [
+        HarnessMonitorLaunchMode.environmentKey: "empty",
+        HarnessMonitorLaunchMode.xcodePreviewEnvironmentKey: "1",
+      ]) == .empty
     )
   }
 }
