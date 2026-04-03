@@ -7,9 +7,16 @@ DESTINATION="${XCODEBUILD_DESTINATION:-platform=macOS}"
 DERIVED_DATA_PATH="${XCODEBUILD_DERIVED_DATA_PATH:-$REPO_ROOT/tmp/xcode-derived}"
 FORMAT_CONFIG="$ROOT/.swift-format"
 SWIFT_BIN="${SWIFT_BIN:-$(command -v swift || true)}"
+SWIFTLINT_BIN="${SWIFTLINT_BIN:-$(command -v swiftlint || true)}"
+SWIFTLINT_CACHE_PATH="${SWIFTLINT_CACHE_PATH:-$REPO_ROOT/tmp/swiftlint-cache/harness-monitor-macos}"
 
 if [ -z "${SWIFT_BIN}" ]; then
   echo "swift is required on PATH" >&2
+  exit 1
+fi
+
+if [ -z "${SWIFTLINT_BIN}" ]; then
+  echo "swiftlint is required on PATH" >&2
   exit 1
 fi
 
@@ -20,6 +27,19 @@ fi
   --recursive \
   --parallel \
   --strict \
+  "$ROOT/Sources" \
+  "$ROOT/Tests/HarnessMonitorKitTests" \
+  "$ROOT/Tests/HarnessMonitorUITests"
+
+mkdir -p "$SWIFTLINT_CACHE_PATH"
+
+"$SWIFTLINT_BIN" lint \
+  --config "$ROOT/.swiftlint.yml" \
+  --working-directory "$ROOT" \
+  --cache-path "$SWIFTLINT_CACHE_PATH" \
+  --strict \
+  --force-exclude \
+  --quiet \
   "$ROOT/Sources" \
   "$ROOT/Tests/HarnessMonitorKitTests" \
   "$ROOT/Tests/HarnessMonitorUITests"

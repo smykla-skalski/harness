@@ -1,5 +1,6 @@
 import Foundation
 import HarnessMonitorKit
+import HarnessMonitorUI
 import SwiftData
 
 struct HarnessMonitorAppConfiguration {

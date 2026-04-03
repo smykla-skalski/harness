@@ -3,6 +3,10 @@ import SwiftData
 
 @MainActor
 public enum HarnessMonitorPreviewStoreFactory {
+  public static let previewContainer: ModelContainer = {
+    try! HarnessMonitorModelContainer.preview()
+  }()
+
   public enum Scenario: Sendable {
     case dashboardLoaded
     case cockpitLoaded

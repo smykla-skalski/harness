@@ -1,10 +1,7 @@
 import HarnessMonitorKit
+import HarnessMonitorUI
 import SwiftData
 import SwiftUI
-
-enum HarnessMonitorWindowID {
-  static let preferences = "preferences"
-}
 
 @main
 @MainActor
