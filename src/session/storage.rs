@@ -14,7 +14,9 @@ use serde_json::{Value, json};
 use crate::errors::{CliError, CliErrorKind};
 use crate::infra::io::{read_json_typed, validate_safe_segment, write_json_pretty};
 use crate::infra::persistence::versioned_json::VersionedJsonRepository;
-use crate::workspace::{project_context_dir, utc_now};
+use crate::workspace::{
+    GitCheckoutIdentity, project_context_dir, resolve_git_checkout_identity, utc_now,
+};
 
 use super::types::{
     CURRENT_VERSION, SessionLogEntry, SessionMetrics, SessionState, SessionTransition,
@@ -422,6 +424,17 @@ pub(crate) struct ActiveRegistry {
     pub(crate) sessions: BTreeMap<String, String>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub(crate) struct ProjectOriginRecord {
+    pub(crate) recorded_from_dir: String,
+    pub(crate) repository_root: Option<String>,
+    pub(crate) checkout_root: Option<String>,
+    #[serde(default)]
+    pub(crate) is_worktree: bool,
+    pub(crate) worktree_name: Option<String>,
+    pub(crate) recorded_at: String,
+}
+
 /// Register a session ID in the active registry.
 ///
 /// # Errors
@@ -465,32 +478,34 @@ const PROJECT_ORIGIN_FILE: &str = "project-origin.json";
 /// Record the originating project directory in the context root so
 /// cross-project discovery can recover it later.
 ///
-/// No-op if the file already exists.
-///
 /// # Errors
 /// Returns `CliError` on I/O failures.
 pub(crate) fn record_project_origin(project_dir: &Path) -> Result<(), CliError> {
     let context_root = project_context_dir(project_dir);
     let path = context_root.join(PROJECT_ORIGIN_FILE);
-    if path.is_file() {
-        return Ok(());
-    }
-    let origin = serde_json::json!({
-        "project_dir": project_dir.to_string_lossy(),
-        "recorded_at": utc_now(),
-    });
+    let identity = resolve_git_checkout_identity(project_dir);
+    let origin = ProjectOriginRecord {
+        recorded_from_dir: project_dir.to_string_lossy().to_string(),
+        repository_root: identity
+            .as_ref()
+            .map(|value| value.repository_root.display().to_string()),
+        checkout_root: identity
+            .as_ref()
+            .map(|value| value.checkout_root.display().to_string()),
+        is_worktree: identity
+            .as_ref()
+            .is_some_and(GitCheckoutIdentity::is_worktree),
+        worktree_name: identity.and_then(|value| value.worktree_name().map(ToString::to_string)),
+        recorded_at: utc_now(),
+    };
     write_json_pretty(&path, &origin)
 }
 
 /// Load the recorded project origin for a context root.
 #[must_use]
-pub(crate) fn load_project_origin(context_root: &Path) -> Option<PathBuf> {
+pub(crate) fn load_project_origin(context_root: &Path) -> Option<ProjectOriginRecord> {
     let path = context_root.join(PROJECT_ORIGIN_FILE);
-    let value = read_json_typed::<serde_json::Value>(&path).ok()?;
-    value
-        .get("project_dir")
-        .and_then(serde_json::Value::as_str)
-        .map(PathBuf::from)
+    read_json_typed::<ProjectOriginRecord>(&path).ok()
 }
 
 #[cfg(test)]
