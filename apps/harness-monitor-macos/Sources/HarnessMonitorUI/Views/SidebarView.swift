@@ -183,7 +183,11 @@ struct SidebarView: View {
     _ session: SessionSummary,
     isSelected: Bool
   ) -> some View {
-    let sessionCard = sessionCardSurface(session, isSelected: isSelected)
+    let sessionCard = SidebarSessionCardSurface(
+      session: session,
+      isBookmarked: store.isBookmarked(sessionId: session.sessionId),
+      isSelected: isSelected
+    )
 
     return ZStack(alignment: .leading) {
       Button {
@@ -222,14 +226,31 @@ struct SidebarView: View {
     .padding(.vertical, HarnessMonitorTheme.itemSpacing)
   }
 
-  private func sessionCardSurface(
-    _ session: SessionSummary,
-    isSelected: Bool
-  ) -> some View {
+  private func startDaemon() async {
+    await store.startDaemon()
+  }
+
+  private func stopDaemon() async {
+    await store.stopDaemon()
+  }
+
+  private func installLaunchAgent() async {
+    await store.installLaunchAgent()
+  }
+}
+
+private struct SidebarSessionCardSurface: View {
+  let session: SessionSummary
+  let isBookmarked: Bool
+  let isSelected: Bool
+  @State private var isHovered = false
+
+  var body: some View {
     SidebarSessionRow(
       session: session,
-      isBookmarked: store.isBookmarked(sessionId: session.sessionId),
-      isSelected: isSelected
+      isBookmarked: isBookmarked,
+      isSelected: isSelected,
+      isHovered: isHovered
     )
     .padding(HarnessMonitorTheme.cardPadding)
     .frame(maxWidth: .infinity, alignment: .leading)
@@ -246,19 +267,8 @@ struct SidebarView: View {
       }
     }
     .contentShape(RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusLG, style: .continuous))
+    .onHover { isHovered = $0 }
     .animation(.snappy(duration: 0.2), value: isSelected)
-  }
-
-  private func startDaemon() async {
-    await store.startDaemon()
-  }
-
-  private func stopDaemon() async {
-    await store.stopDaemon()
-  }
-
-  private func installLaunchAgent() async {
-    await store.installLaunchAgent()
   }
 }
 
