@@ -848,6 +848,7 @@ pub fn start_session_direct(
 
     let state = session_service::build_new_session(
         &request.context,
+        &request.title,
         &session_id,
         runtime_name,
         leader_agent_session_id.as_deref(),
@@ -860,7 +861,7 @@ pub fn start_session_direct(
         let leader_id = state.leader_id.as_deref().unwrap_or("");
         db.append_log_entry(&build_log_entry(
             &session_id,
-            session_service::log_session_started(&request.context),
+            session_service::log_session_started(&request.title, &request.context),
             Some(leader_id),
             None,
         ))?;
@@ -872,6 +873,7 @@ pub fn start_session_direct(
     // File-based fallback
     session_service::start_session(
         &request.context,
+        &request.title,
         project_dir,
         Some(runtime_name),
         Some(&session_id),
@@ -1401,6 +1403,7 @@ mod tests {
         with_temp_project(|project| {
             let state = session_service::start_session(
                 "daemon task request",
+                "",
                 project,
                 Some("claude"),
                 Some("daemon-task"),
@@ -1435,6 +1438,7 @@ mod tests {
         with_temp_project(|project| {
             let state = session_service::start_session(
                 "daemon stream index payload",
+                "",
                 project,
                 Some("claude"),
                 Some("daemon-stream-index"),
@@ -1458,6 +1462,7 @@ mod tests {
         with_temp_project(|project| {
             let state = session_service::start_session(
                 "daemon stream session payload",
+                "",
                 project,
                 Some("claude"),
                 Some("daemon-stream-session"),
@@ -1492,6 +1497,7 @@ mod tests {
         with_temp_project(|project| {
             let state = session_service::start_session(
                 "daemon role request",
+                "",
                 project,
                 Some("claude"),
                 Some("daemon-role"),
@@ -1551,6 +1557,7 @@ mod tests {
         with_temp_project(|project| {
             let state = session_service::start_session(
                 "daemon signal request",
+                "",
                 project,
                 Some("claude"),
                 Some("daemon-signal"),
@@ -1652,6 +1659,7 @@ mod tests {
 
         let state = build_new_session(
             "db-only test",
+            "",
             "db-only-sess",
             "claude",
             Some("test-session"),
@@ -1725,6 +1733,7 @@ mod tests {
         with_temp_project(|project| {
             let state = session_service::start_session(
                 "observe test",
+                "",
                 project,
                 Some("claude"),
                 Some("daemon-observe"),
@@ -1796,6 +1805,7 @@ mod tests {
 
             let state = start_session_direct(
                 &SessionStartRequest {
+                    title: "db-direct start session".into(),
                     context: "db-direct start".into(),
                     runtime: "claude".into(),
                     session_id: Some("daemon-start-1".into()),
@@ -1826,6 +1836,7 @@ mod tests {
 
             start_session_direct(
                 &SessionStartRequest {
+                    title: "join test session".into(),
                     context: "join test".into(),
                     runtime: "claude".into(),
                     session_id: Some("daemon-join-1".into()),

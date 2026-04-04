@@ -537,6 +537,7 @@ mod tests {
         with_temp_project(|project| {
             let state = session_service::start_session(
                 "watch mapping",
+                "",
                 project,
                 Some("claude"),
                 Some("watch-map"),
@@ -606,6 +607,7 @@ mod tests {
         with_temp_project(|project| {
             let state = session_service::start_session(
                 "watch test",
+                "",
                 project,
                 Some("claude"),
                 Some("watch-sess"),
