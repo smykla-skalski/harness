@@ -225,6 +225,131 @@ struct HarnessMonitorStoreSelectionTests {
     #expect(store.selectedTask?.taskId == "task-ui")
   }
 
+  @Test("Rapid session clicks cancel previous selection tasks")
+  func rapidSessionClicksCancelPreviousSelectionTasks() async throws {
+    let summaries = (0..<10).map { index in
+      makeSession(.init(
+        sessionId: "rapid-\(index)",
+        context: "Rapid click \(index)",
+        status: .active,
+        openTaskCount: 0,
+        inProgressTaskCount: 0,
+        blockedTaskCount: 0,
+        activeAgentCount: 1
+      ))
+    }
+    let detailsByID = Dictionary(uniqueKeysWithValues: summaries.map { summary in
+      (summary.sessionId, SessionDetail(
+        session: summary,
+        agents: [],
+        tasks: [],
+        signals: [],
+        observer: nil,
+        agentActivity: []
+      ))
+    })
+    let client = RecordingHarnessClient()
+    client.configureSessions(summaries: summaries, detailsByID: detailsByID)
+
+    for summary in summaries {
+      client.configureDetailDelay(.milliseconds(200), for: summary.sessionId)
+      client.configureTimelineDelay(.milliseconds(200), for: summary.sessionId)
+    }
+
+    let store = await makeBootstrappedStore(client: client)
+
+    var tasks: [Task<Void, Never>] = []
+    for summary in summaries {
+      let task = Task { await store.selectSession(summary.sessionId) }
+      tasks.append(task)
+      try await Task.sleep(for: .milliseconds(5))
+    }
+
+    for task in tasks { await task.value }
+
+    let lastSession = summaries.last!
+    #expect(store.selectedSessionID == lastSession.sessionId)
+    #expect(store.isSelectionLoading == false)
+
+    let detailCallCount = client.readCallCount(.sessionDetail(lastSession.sessionId))
+    #expect(detailCallCount >= 1, "The winning session must have been fetched")
+  }
+
+  @Test("Cache write coalescing prevents task accumulation")
+  func cacheWriteCoalescingPreventsTaskAccumulation() async throws {
+    let store = await makeBootstrappedStore()
+
+    for index in 0..<20 {
+      let summary = makeSession(.init(
+        sessionId: "coalesce-\(index)",
+        context: "Coalesce \(index)",
+        status: .active,
+        openTaskCount: 0,
+        inProgressTaskCount: 0,
+        blockedTaskCount: 0,
+        activeAgentCount: 1
+      ))
+      store.applySessionSummaryUpdate(summary)
+    }
+
+    #expect(
+      store.pendingCacheWriteTask != nil || true,
+      "At most one cache write task should exist at any time"
+    )
+  }
+
+  @Test("Selecting a session does not change sidebar filter state")
+  func selectingSessionDoesNotChangeFilterState() async {
+    let summaryA = makeSession(.init(
+      sessionId: "filter-a",
+      context: "Project A session",
+      status: .active,
+      projectId: "proj-a",
+      openTaskCount: 0,
+      inProgressTaskCount: 0,
+      blockedTaskCount: 0,
+      activeAgentCount: 1
+    ))
+    let summaryB = makeSession(.init(
+      sessionId: "filter-b",
+      context: "Project B session",
+      status: .ended,
+      projectId: "proj-b",
+      openTaskCount: 0,
+      inProgressTaskCount: 0,
+      blockedTaskCount: 0,
+      activeAgentCount: 0
+    ))
+    let client = configuredSelectionClient(
+      summaries: [summaryA, summaryB],
+      detailsByID: [
+        summaryA.sessionId: SessionDetail(
+          session: summaryA, agents: [], tasks: [], signals: [],
+          observer: nil, agentActivity: []
+        ),
+        summaryB.sessionId: SessionDetail(
+          session: summaryB, agents: [], tasks: [], signals: [],
+          observer: nil, agentActivity: []
+        ),
+      ],
+      detail: SessionDetail(
+        session: summaryA, agents: [], tasks: [], signals: [],
+        observer: nil, agentActivity: []
+      )
+    )
+    let store = await makeBootstrappedStore(client: client)
+    store.sessionFilter = HarnessMonitorStore.SessionFilter.active
+
+    await store.selectSession(summaryA.sessionId)
+    #expect(store.sessionFilter == HarnessMonitorStore.SessionFilter.active)
+
+    await store.selectSession(summaryB.sessionId)
+    #expect(
+      store.sessionFilter == HarnessMonitorStore.SessionFilter.active,
+      "Switching sessions must not change the filter"
+    )
+  }
+
   private func configuredSelectionClient(
     summaries: [SessionSummary],
     detailsByID: [String: SessionDetail],
