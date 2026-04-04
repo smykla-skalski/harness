@@ -235,7 +235,7 @@ struct SidebarView: View {
       }
     }
     .frame(maxWidth: .infinity, alignment: .leading)
-    .padding(.vertical, HarnessMonitorTheme.itemSpacing)
+    .padding(.vertical, HarnessMonitorTheme.spacingXS)
   }
 
   private func startDaemon() async {
