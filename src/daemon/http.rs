@@ -1,5 +1,5 @@
 use std::convert::Infallible;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, OnceLock};
 use std::time::Instant;
 
 use async_stream::stream;
@@ -31,7 +31,7 @@ pub struct DaemonHttpState {
     pub manifest: DaemonManifest,
     pub daemon_epoch: String,
     pub replay_buffer: Arc<Mutex<ReplayBuffer>>,
-    pub db: Option<Arc<Mutex<super::db::DaemonDb>>>,
+    pub db: Arc<OnceLock<Arc<Mutex<super::db::DaemonDb>>>>,
 }
 
 /// Serve the daemon's HTTP API.
@@ -114,7 +114,7 @@ pub async fn serve(
 async fn get_health(headers: HeaderMap, State(state): State<DaemonHttpState>) -> Response {
     let start = Instant::now();
     let request_id = extract_request_id(&headers);
-    let db_guard = state.db.as_ref().map(|db| db.lock().expect("db lock"));
+    let db_guard = state.db.get().map(|db| db.lock().expect("db lock"));
     let db_ref = db_guard.as_deref();
     timed_json(
         "GET",
@@ -131,7 +131,7 @@ async fn get_diagnostics(headers: HeaderMap, State(state): State<DaemonHttpState
     if let Err(response) = require_auth(&headers, &state) {
         return *response;
     }
-    let db_guard = state.db.as_ref().map(|db| db.lock().expect("db lock"));
+    let db_guard = state.db.get().map(|db| db.lock().expect("db lock"));
     timed_json(
         "GET",
         "/v1/diagnostics",
@@ -162,7 +162,7 @@ async fn get_projects(headers: HeaderMap, State(state): State<DaemonHttpState>) 
     if let Err(response) = require_auth(&headers, &state) {
         return *response;
     }
-    let db_guard = state.db.as_ref().map(|db| db.lock().expect("db lock"));
+    let db_guard = state.db.get().map(|db| db.lock().expect("db lock"));
     timed_json(
         "GET",
         "/v1/projects",
@@ -178,7 +178,7 @@ async fn get_sessions(headers: HeaderMap, State(state): State<DaemonHttpState>) 
     if let Err(response) = require_auth(&headers, &state) {
         return *response;
     }
-    let db_guard = state.db.as_ref().map(|db| db.lock().expect("db lock"));
+    let db_guard = state.db.get().map(|db| db.lock().expect("db lock"));
     timed_json(
         "GET",
         "/v1/sessions",
@@ -198,7 +198,7 @@ async fn get_session(
     if let Err(response) = require_auth(&headers, &state) {
         return *response;
     }
-    let db_guard = state.db.as_ref().map(|db| db.lock().expect("db lock"));
+    let db_guard = state.db.get().map(|db| db.lock().expect("db lock"));
     timed_json(
         "GET",
         "/v1/sessions/{id}",
@@ -218,7 +218,7 @@ async fn get_timeline(
     if let Err(response) = require_auth(&headers, &state) {
         return *response;
     }
-    let db_guard = state.db.as_ref().map(|db| db.lock().expect("db lock"));
+    let db_guard = state.db.get().map(|db| db.lock().expect("db lock"));
     timed_json(
         "GET",
         "/v1/sessions/{id}/timeline",
@@ -239,7 +239,7 @@ async fn post_task_create(
     if let Err(response) = require_auth(&headers, &state) {
         return *response;
     }
-    let db_guard = state.db.as_ref().map(|db| db.lock().expect("db lock"));
+    let db_guard = state.db.get().map(|db| db.lock().expect("db lock"));
     let db_ref = db_guard.as_deref();
     let result = service::create_task(&session_id, &request, db_ref);
     if result.is_ok() {
@@ -259,7 +259,7 @@ async fn post_task_assign(
     if let Err(response) = require_auth(&headers, &state) {
         return *response;
     }
-    let db_guard = state.db.as_ref().map(|db| db.lock().expect("db lock"));
+    let db_guard = state.db.get().map(|db| db.lock().expect("db lock"));
     let db_ref = db_guard.as_deref();
     let result = service::assign_task(&session_id, &task_id, &request, db_ref);
     if result.is_ok() {
@@ -285,7 +285,7 @@ async fn post_task_update(
     if let Err(response) = require_auth(&headers, &state) {
         return *response;
     }
-    let db_guard = state.db.as_ref().map(|db| db.lock().expect("db lock"));
+    let db_guard = state.db.get().map(|db| db.lock().expect("db lock"));
     let db_ref = db_guard.as_deref();
     let result = service::update_task(&session_id, &task_id, &request, db_ref);
     if result.is_ok() {
@@ -311,7 +311,7 @@ async fn post_task_checkpoint(
     if let Err(response) = require_auth(&headers, &state) {
         return *response;
     }
-    let db_guard = state.db.as_ref().map(|db| db.lock().expect("db lock"));
+    let db_guard = state.db.get().map(|db| db.lock().expect("db lock"));
     let db_ref = db_guard.as_deref();
     let result = service::checkpoint_task(&session_id, &task_id, &request, db_ref);
     if result.is_ok() {
@@ -337,7 +337,7 @@ async fn post_role_change(
     if let Err(response) = require_auth(&headers, &state) {
         return *response;
     }
-    let db_guard = state.db.as_ref().map(|db| db.lock().expect("db lock"));
+    let db_guard = state.db.get().map(|db| db.lock().expect("db lock"));
     let db_ref = db_guard.as_deref();
     let result = service::change_role(&session_id, &agent_id, &request, db_ref);
     if result.is_ok() {
@@ -363,7 +363,7 @@ async fn post_remove_agent(
     if let Err(response) = require_auth(&headers, &state) {
         return *response;
     }
-    let db_guard = state.db.as_ref().map(|db| db.lock().expect("db lock"));
+    let db_guard = state.db.get().map(|db| db.lock().expect("db lock"));
     let db_ref = db_guard.as_deref();
     let result = service::remove_agent(&session_id, &agent_id, &request, db_ref);
     if result.is_ok() {
@@ -389,7 +389,7 @@ async fn post_transfer_leader(
     if let Err(response) = require_auth(&headers, &state) {
         return *response;
     }
-    let db_guard = state.db.as_ref().map(|db| db.lock().expect("db lock"));
+    let db_guard = state.db.get().map(|db| db.lock().expect("db lock"));
     let db_ref = db_guard.as_deref();
     let result = service::transfer_leader(&session_id, &request, db_ref);
     if result.is_ok() {
@@ -415,7 +415,7 @@ async fn post_end_session(
     if let Err(response) = require_auth(&headers, &state) {
         return *response;
     }
-    let db_guard = state.db.as_ref().map(|db| db.lock().expect("db lock"));
+    let db_guard = state.db.get().map(|db| db.lock().expect("db lock"));
     let db_ref = db_guard.as_deref();
     let result = service::end_session(&session_id, &request, db_ref);
     if result.is_ok() {
@@ -435,7 +435,7 @@ async fn post_send_signal(
     if let Err(response) = require_auth(&headers, &state) {
         return *response;
     }
-    let db_guard = state.db.as_ref().map(|db| db.lock().expect("db lock"));
+    let db_guard = state.db.get().map(|db| db.lock().expect("db lock"));
     let db_ref = db_guard.as_deref();
     let result = service::send_signal(&session_id, &request, db_ref);
     if result.is_ok() {
@@ -461,7 +461,7 @@ async fn post_observe_session(
     if let Err(response) = require_auth(&headers, &state) {
         return *response;
     }
-    let db_guard = state.db.as_ref().map(|db| db.lock().expect("db lock"));
+    let db_guard = state.db.get().map(|db| db.lock().expect("db lock"));
     let db_ref = db_guard.as_deref();
     let request = request.map(|Json(request)| request);
     let result = service::observe_session(&session_id, request.as_ref(), db_ref);
@@ -535,7 +535,7 @@ async fn post_session_start(
     if let Err(response) = require_auth(&headers, &state) {
         return *response;
     }
-    let db_guard = state.db.as_ref().map(|db| db.lock().expect("db lock"));
+    let db_guard = state.db.get().map(|db| db.lock().expect("db lock"));
     let db_ref = db_guard.as_deref();
     let result = service::start_session_direct(&request, db_ref).map(|session_state| {
         SessionMutationResponse {
@@ -559,7 +559,7 @@ async fn post_session_join(
     if let Err(response) = require_auth(&headers, &state) {
         return *response;
     }
-    let db_guard = state.db.as_ref().map(|db| db.lock().expect("db lock"));
+    let db_guard = state.db.get().map(|db| db.lock().expect("db lock"));
     let db_ref = db_guard.as_deref();
     let result = service::join_session_direct(&session_id, &request, db_ref).map(|session_state| {
         SessionMutationResponse {
@@ -583,7 +583,7 @@ async fn post_signal_ack(
     if let Err(response) = require_auth(&headers, &state) {
         return *response;
     }
-    let db_guard = state.db.as_ref().map(|db| db.lock().expect("db lock"));
+    let db_guard = state.db.get().map(|db| db.lock().expect("db lock"));
     let db_ref = db_guard.as_deref();
     let result = service::record_signal_ack_direct(&session_id, &request);
     if let Some(db) = db_ref {
