@@ -143,6 +143,11 @@ extension HarnessMonitorStore {
       guard isCurrentSessionLoad(requestID, sessionID: sessionID) else {
         return
       }
+
+      if selectedSession?.session.sessionId == sessionID {
+        return
+      }
+
       lastError = error.localizedDescription
 
       if let cached = await loadCachedSessionDetail(sessionID: sessionID) {
