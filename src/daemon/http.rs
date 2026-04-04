@@ -633,47 +633,19 @@ fn timed_json<T: serde::Serialize>(
     map_json(result)
 }
 
-/// Log an HTTP request using the manual `tracing::Event::dispatch` API.
-///
-/// The standard `info!` macro with 5+ structured fields expands to
-/// cognitive complexity 8, exceeding the pedantic threshold of 7. This
-/// function builds the event directly so the caller stays under budget.
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion; tokio-rs/tracing#553"
+)]
 fn log_request(method: &str, path: &str, status: u16, duration_ms: u64, request_id: &str) {
-    use tracing::callsite::DefaultCallsite;
-    use tracing::field::{FieldSet, Value};
-    use tracing::metadata::Kind;
-    use tracing::{Event, Level, Metadata, callsite::Identifier};
-
-    static FIELDS: &[&str] = &[
-        "message",
-        "method",
-        "path",
-        "status",
-        "duration_ms",
-        "request_id",
-    ];
-    static CALLSITE: DefaultCallsite = DefaultCallsite::new(&META);
-    static META: Metadata<'static> = Metadata::new(
-        "info",
-        "harness::daemon::http",
-        Level::INFO,
-        Some(file!()),
-        Some(line!()),
-        Some(module_path!()),
-        FieldSet::new(FIELDS, Identifier(&CALLSITE)),
-        Kind::EVENT,
+    tracing::info!(
+        method,
+        path,
+        status,
+        duration_ms,
+        request_id,
+        "daemon request"
     );
-
-    let message = "daemon request";
-    let values: &[Option<&dyn Value>] = &[
-        Some(&message),
-        Some(&method),
-        Some(&path),
-        Some(&status),
-        Some(&duration_ms),
-        Some(&request_id),
-    ];
-    Event::dispatch(&META, &META.fields().value_set_all(values));
 }
 
 fn extract_request_id(headers: &HeaderMap) -> String {
