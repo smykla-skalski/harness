@@ -277,6 +277,37 @@ struct HarnessMonitorStoreTests {
     #expect(store.lastError != nil)
   }
 
+  @Test("Manual refresh completes even when transport ping would stall")
+  func manualRefreshCompletesWithoutTransportPing() async {
+    let client = RecordingHarnessClient()
+    client.configureDiagnosticsDelay(.milliseconds(80))
+    client.configureTransportLatencyError(
+      HarnessMonitorAPIError.server(code: 599, message: "ping stalled")
+    )
+    let store = HarnessMonitorStore(
+      daemonController: RecordingDaemonController(client: client)
+    )
+    store.connectionProbeInterval = .seconds(30)
+
+    await store.bootstrap()
+
+    let refreshTask = Task {
+      await store.refresh()
+    }
+    await Task.yield()
+
+    #expect(store.isRefreshing)
+
+    await refreshTask.value
+
+    #expect(store.isRefreshing == false)
+    #expect(store.connectionState == .online)
+    #expect(store.health?.status == "ok")
+    #expect(client.readCallCount(.transportLatency) == 0)
+
+    store.stopAllStreams()
+  }
+
   @Test("Install launch agent failure sets the last error")
   func installLaunchAgentFailureSetsLastError() async {
     let daemon = FailingDaemonController(
