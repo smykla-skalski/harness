@@ -233,6 +233,7 @@ extension HarnessMonitorStore {
         return
       }
 
+      var consecutiveFailures = 0
       while !Task.isCancelled {
         try? await Task.sleep(for: connectionProbeInterval)
         guard !Task.isCancelled else {
@@ -244,6 +245,7 @@ extension HarnessMonitorStore {
 
         do {
           if let transportLatencyMs = try await client.transportLatencyMs() {
+            consecutiveFailures = 0
             recordRequestSuccess(
               latencyMs: transportLatencyMs,
               updatesLatency: true,
@@ -254,6 +256,7 @@ extension HarnessMonitorStore {
           let sample = try await Self.measureOperation {
             try await client.health()
           }
+          consecutiveFailures = 0
           recordRequestSuccess(
             latencyMs: sample.latencyMs,
             updatesLatency: true,
@@ -263,10 +266,20 @@ extension HarnessMonitorStore {
           if Task.isCancelled {
             return
           }
+          consecutiveFailures += 1
           appendConnectionEvent(
             kind: .error,
             detail: "Latency probe failed: \(error.localizedDescription)"
           )
+
+          if consecutiveFailures >= 2 {
+            appendConnectionEvent(
+              kind: .reconnecting,
+              detail: "Probe failed \(consecutiveFailures) times, re-bootstrapping"
+            )
+            await reconnect()
+            return
+          }
         }
       }
     }
