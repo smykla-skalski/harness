@@ -2186,4 +2186,32 @@ mod tests {
             assert_eq!(signals[0].signal.command, "inject_context");
         });
     }
+
+    #[test]
+    fn send_signal_denies_worker_actor() {
+        with_temp_project(|project| {
+            start_session("test", project, Some("claude"), Some("s7")).expect("start");
+            let joined =
+                join_session("s7", SessionRole::Worker, "codex", &[], None, project).expect("join");
+            let worker_id = joined
+                .agents
+                .keys()
+                .find(|id| id.starts_with("codex"))
+                .expect("worker id")
+                .clone();
+
+            let error = send_signal(
+                "s7",
+                &worker_id,
+                "inject_context",
+                "workers should not send signals",
+                None,
+                &worker_id,
+                project,
+            )
+            .expect_err("permission denied");
+
+            assert_eq!(error.code(), "KSRCLI091");
+        });
+    }
 }
