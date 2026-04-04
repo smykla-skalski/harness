@@ -6,10 +6,12 @@ struct SidebarView: View {
   @Bindable var store: HarnessMonitorStore
 
   var body: some View {
-    List {
-      sessionSections
+    ScrollView {
+      LazyVStack(alignment: .leading, spacing: 0) {
+        sessionSections
+      }
+      .padding(.horizontal, HarnessMonitorTheme.sectionSpacing)
     }
-    .listStyle(.sidebar)
     .scrollEdgeEffectStyle(.soft, for: .top)
     .safeAreaInset(edge: .top, spacing: 0) {
       sidebarHeader
@@ -26,60 +28,34 @@ struct SidebarView: View {
 
   @ViewBuilder private var sessionSections: some View {
     if store.sessions.isEmpty {
-      Section {
-        VStack {
-          ContentUnavailableView {
-            Label("No sessions indexed yet", systemImage: "tray")
-          } description: {
-            Text("Start the daemon or refresh after launching a harness session.")
-          }
+      VStack {
+        ContentUnavailableView {
+          Label("No sessions indexed yet", systemImage: "tray")
+        } description: {
+          Text("Start the daemon or refresh after launching a harness session.")
         }
-        .frame(maxWidth: .infinity)
-        .accessibilityFrameMarker(HarnessMonitorAccessibility.sidebarEmptyStateFrame)
       }
-      .listRowInsets(EdgeInsets(
-        top: HarnessMonitorTheme.sectionSpacing,
-        leading: HarnessMonitorTheme.sectionSpacing,
-        bottom: HarnessMonitorTheme.sectionSpacing,
-        trailing: HarnessMonitorTheme.sectionSpacing
-      ))
-      .listRowBackground(Color.clear)
-      .listRowSeparator(.hidden)
+      .frame(maxWidth: .infinity)
+      .padding(HarnessMonitorTheme.sectionSpacing)
+      .accessibilityFrameMarker(HarnessMonitorAccessibility.sidebarEmptyStateFrame)
       .accessibilityElement(children: .contain)
       .accessibilityIdentifier(HarnessMonitorAccessibility.sidebarEmptyState)
     } else if store.groupedSessions.isEmpty {
-      Section {
-        VStack {
-          ContentUnavailableView {
-            Label("No sessions match", systemImage: "magnifyingglass")
-          } description: {
-            Text("Try a broader search or clear filters.")
-          }
+      VStack {
+        ContentUnavailableView {
+          Label("No sessions match", systemImage: "magnifyingglass")
+        } description: {
+          Text("Try a broader search or clear filters.")
         }
-        .frame(maxWidth: .infinity)
-        .accessibilityFrameMarker(HarnessMonitorAccessibility.sidebarEmptyStateFrame)
       }
-      .listRowInsets(EdgeInsets(
-        top: HarnessMonitorTheme.sectionSpacing,
-        leading: HarnessMonitorTheme.sectionSpacing,
-        bottom: HarnessMonitorTheme.sectionSpacing,
-        trailing: HarnessMonitorTheme.sectionSpacing
-      ))
-      .listRowBackground(Color.clear)
-      .listRowSeparator(.hidden)
+      .frame(maxWidth: .infinity)
+      .padding(HarnessMonitorTheme.sectionSpacing)
+      .accessibilityFrameMarker(HarnessMonitorAccessibility.sidebarEmptyStateFrame)
       .accessibilityElement(children: .contain)
       .accessibilityIdentifier(HarnessMonitorAccessibility.sidebarEmptyState)
     } else if let firstGroup = store.groupedSessions.first {
       Group {
         sessionProjectRow(for: firstGroup)
-          .listRowInsets(EdgeInsets(
-            top: 0,
-            leading: 0,
-            bottom: 0,
-            trailing: 0
-          ))
-          .listRowSeparator(.hidden)
-          .listRowBackground(Color.clear)
 
         ForEach(firstGroup.checkoutGroups) { checkoutGroup in
           sessionCheckoutRow(for: checkoutGroup)
@@ -95,14 +71,7 @@ struct SidebarView: View {
       ForEach(Array(store.groupedSessions.dropFirst())) { group in
         Group {
           sessionProjectRow(for: group)
-            .listRowInsets(EdgeInsets(
-              top: HarnessMonitorTheme.sectionSpacing,
-              leading: 0,
-              bottom: 0,
-              trailing: 0
-            ))
-            .listRowSeparator(.hidden)
-            .listRowBackground(Color.clear)
+            .padding(.top, HarnessMonitorTheme.sectionSpacing)
 
           ForEach(group.checkoutGroups) { checkoutGroup in
             sessionCheckoutRow(for: checkoutGroup)
@@ -226,7 +195,6 @@ struct SidebarView: View {
         cornerRadius: HarnessMonitorTheme.cornerRadiusLG,
         tint: HarnessMonitorTheme.accent
       )
-      .frame(maxWidth: .infinity, alignment: .leading)
       .accessibilityLabel(
         sessionAccessibilityLabel(for: session)
       )
@@ -251,14 +219,7 @@ struct SidebarView: View {
       }
     }
     .frame(maxWidth: .infinity, alignment: .leading)
-    .listRowInsets(EdgeInsets(
-      top: HarnessMonitorTheme.itemSpacing,
-      leading: 0,
-      bottom: HarnessMonitorTheme.itemSpacing,
-      trailing: 0
-    ))
-    .listRowSeparator(.hidden)
-    .listRowBackground(Color.clear)
+    .padding(.vertical, HarnessMonitorTheme.itemSpacing)
   }
 
   private func sessionCardSurface(

@@ -10,7 +10,6 @@ private struct SidebarRowButtonStyle: ButtonStyle {
   func makeBody(configuration: Configuration) -> some View {
     let fillOpacity = configuration.isPressed ? 0.14 : isHovered ? 0.09 : 0.04
     configuration.label
-      .frame(maxWidth: .infinity, alignment: .leading)
       .background {
         RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
           .fill(tint.opacity(fillOpacity))
