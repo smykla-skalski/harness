@@ -41,6 +41,8 @@ pub enum SessionCommand {
     },
     /// Observe all agents in a session.
     Observe(SessionObserveArgs),
+    /// Set or update a session title.
+    Title(SessionTitleArgs),
     /// Show current session status.
     Status(SessionStatusArgs),
     /// List sessions.
@@ -85,6 +87,7 @@ impl Execute for SessionCommand {
             Self::Task { command } => command.execute(context),
             Self::Signal { command } => command.execute(context),
             Self::Observe(args) => args.execute(context),
+            Self::Title(args) => args.execute(context),
             Self::Status(args) => args.execute(context),
             Self::List(args) => args.execute(context),
         }
@@ -134,6 +137,9 @@ pub struct SessionStartArgs {
     /// Human-readable context or goal for this session.
     #[arg(long)]
     pub context: String,
+    /// Short human-readable session name.
+    #[arg(long, default_value = "")]
+    pub title: String,
     /// Project directory (defaults to cwd).
     #[arg(long, env = "CLAUDE_PROJECT_DIR")]
     pub project_dir: Option<String>,
@@ -150,6 +156,7 @@ impl Execute for SessionStartArgs {
         let project = resolve_project_dir(self.project_dir.as_deref());
         let state = service::start_session(
             &self.context,
+            &self.title,
             project.as_ref(),
             self.runtime.map(agent_to_str),
             self.session_id.as_deref(),
@@ -644,6 +651,32 @@ impl Execute for SessionObserveArgs {
 }
 
 #[derive(Debug, Clone, Args)]
+pub struct SessionTitleArgs {
+    /// Session ID.
+    pub session_id: String,
+    /// New session title.
+    #[arg(long)]
+    pub title: String,
+    /// Project directory.
+    #[arg(long, env = "CLAUDE_PROJECT_DIR")]
+    pub project_dir: Option<String>,
+}
+
+impl Execute for SessionTitleArgs {
+    fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
+        let local_project = resolve_project_dir(self.project_dir.as_deref());
+        let project =
+            service::resolve_session_project_dir(&self.session_id, local_project.as_ref())?;
+        let state = super::storage::update_state(&project, &self.session_id, |state| {
+            state.title.clone_from(&self.title);
+            Ok(())
+        })?;
+        print_json(&state)?;
+        Ok(0)
+    }
+}
+
+#[derive(Debug, Clone, Args)]
 pub struct SessionStatusArgs {
     /// Session ID.
     pub session_id: String,
@@ -664,9 +697,15 @@ impl Execute for SessionStatusArgs {
         if self.json {
             print_json(&state)?;
         } else {
+            let title_display = if state.title.is_empty() {
+                "(untitled)"
+            } else {
+                &state.title
+            };
             println!(
-                "{} [{:?}] - {} (agents: {}, active: {}, tasks: {} open / {} in flight / {} done)",
+                "{} \"{}\" [{:?}] - {} (agents: {}, active: {}, tasks: {} open / {} in flight / {} done)",
                 state.session_id,
+                title_display,
                 state.status,
                 state.context,
                 state.metrics.agent_count,
@@ -705,9 +744,15 @@ impl Execute for SessionListArgs {
             print_json(&sessions)?;
         } else {
             for session in &sessions {
+                let title_display = if session.title.is_empty() {
+                    "(untitled)"
+                } else {
+                    &session.title
+                };
                 println!(
-                    "{} [{:?}] - {} (agents: {}, active: {}, tasks: {} open / {} in flight / {} done)",
+                    "{} \"{}\" [{:?}] - {} (agents: {}, active: {}, tasks: {} open / {} in flight / {} done)",
                     session.session_id,
+                    title_display,
                     session.status,
                     session.context,
                     session.metrics.agent_count,
