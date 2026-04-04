@@ -179,18 +179,30 @@ fn run_initial_import(db: &super::db::DaemonDb) {
 
 /// Build a point-in-time daemon status report.
 ///
+/// Uses the daemon `SQLite` database (WAL mode, safe for concurrent offline
+/// reads) when available, falling back to file-based discovery.
+///
 /// # Errors
 /// Returns `CliError` on discovery failures.
 pub fn status_report() -> Result<DaemonStatusReport, CliError> {
-    let projects = snapshot::project_summaries()?;
-    let sessions = snapshot::session_summaries(true)?;
-    let worktree_count = projects.iter().map(|project| project.worktrees.len()).sum();
+    let db_path = state::daemon_root().join("harness.db");
+    let db = super::db::DaemonDb::open(&db_path).ok();
+
+    let (project_count, worktree_count, session_count) = if let Some(ref db) = db {
+        db.health_counts()?
+    } else {
+        let projects = snapshot::project_summaries()?;
+        let sessions = snapshot::session_summaries(true)?;
+        let worktree_count = projects.iter().map(|project| project.worktrees.len()).sum();
+        (projects.len(), worktree_count, sessions.len())
+    };
+
     Ok(DaemonStatusReport {
         manifest: state::load_manifest()?,
         launch_agent: launchd::launch_agent_status(),
-        project_count: projects.len(),
+        project_count,
         worktree_count,
-        session_count: sessions.len(),
+        session_count,
         diagnostics: state::diagnostics()?,
     })
 }
