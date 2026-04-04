@@ -68,6 +68,7 @@ pub struct SessionSummary {
     pub is_worktree: bool,
     pub worktree_name: Option<String>,
     pub session_id: String,
+    pub title: String,
     pub context: String,
     pub status: SessionStatus,
     pub created_at: String,
@@ -266,6 +267,8 @@ pub struct ObserveSessionRequest {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SessionStartRequest {
+    #[serde(default)]
+    pub title: String,
     pub context: String,
     pub runtime: String,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -342,18 +345,21 @@ mod tests {
     #[test]
     fn session_start_request_round_trips() {
         let request = SessionStartRequest {
+            title: "auth fix session".into(),
             context: "fix auth bug".into(),
             runtime: "claude".into(),
             session_id: Some("my-session".into()),
             project_dir: "/tmp/project".into(),
         };
         let json = serde_json::to_value(&request).expect("serialize");
+        assert_eq!(json["title"], "auth fix session");
         assert_eq!(json["context"], "fix auth bug");
         assert_eq!(json["runtime"], "claude");
         assert_eq!(json["session_id"], "my-session");
         assert_eq!(json["project_dir"], "/tmp/project");
 
         let back: SessionStartRequest = serde_json::from_value(json).expect("deserialize");
+        assert_eq!(back.title, "auth fix session");
         assert_eq!(back.context, "fix auth bug");
         assert_eq!(back.session_id.as_deref(), Some("my-session"));
     }

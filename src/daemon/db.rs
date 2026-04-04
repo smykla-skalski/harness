@@ -28,7 +28,7 @@ impl fmt::Debug for DaemonDb {
 }
 
 #[cfg(test)]
-const SCHEMA_VERSION: &str = "1";
+const SCHEMA_VERSION: &str = "2";
 
 impl DaemonDb {
     /// Open (or create) the daemon database at the given path with WAL mode
@@ -80,6 +80,28 @@ impl DaemonDb {
     fn ensure_schema(&self) -> Result<(), CliError> {
         if !schema_exists(&self.conn)? {
             create_schema(&self.conn)?;
+            return Ok(());
+        }
+        self.run_migrations()
+    }
+
+    fn run_migrations(&self) -> Result<(), CliError> {
+        let version: String = self
+            .conn
+            .query_row(
+                "SELECT value FROM schema_meta WHERE key = 'version'",
+                [],
+                |row| row.get(0),
+            )
+            .map_err(|error| db_error(format!("read schema version: {error}")))?;
+
+        if version == "1" {
+            self.conn
+                .execute_batch(
+                    "ALTER TABLE sessions ADD COLUMN title TEXT NOT NULL DEFAULT '';
+                     UPDATE schema_meta SET value = '2' WHERE key = 'version';",
+                )
+                .map_err(|error| db_error(format!("migrate v1 -> v2: {error}")))?;
         }
         Ok(())
     }
@@ -158,14 +180,16 @@ impl DaemonDb {
         transaction
             .execute(
                 "INSERT INTO sessions (
-                    session_id, project_id, schema_version, state_version, context,
+                    session_id, project_id, schema_version, state_version,
+                    title, context,
                     status, leader_id, observe_id, created_at, updated_at,
                     last_activity_at, archived_at, pending_leader_transfer,
                     metrics_json, state_json, is_active
-                ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)
+                ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17)
                 ON CONFLICT(session_id) DO UPDATE SET
                     schema_version = excluded.schema_version,
                     state_version = excluded.state_version,
+                    title = excluded.title,
                     context = excluded.context,
                     status = excluded.status,
                     leader_id = excluded.leader_id,
@@ -182,6 +206,7 @@ impl DaemonDb {
                     project_id,
                     state.schema_version,
                     state.state_version,
+                    state.title,
                     state.context,
                     format!("{:?}", state.status).to_lowercase(),
                     state.leader_id,
@@ -528,7 +553,7 @@ impl DaemonDb {
             .conn
             .prepare(
                 "SELECT
-                    s.session_id, s.context, s.status, s.created_at, s.updated_at,
+                    s.session_id, s.title, s.context, s.status, s.created_at, s.updated_at,
                     s.last_activity_at, s.leader_id, s.observe_id,
                     s.pending_leader_transfer, s.metrics_json,
                     p.project_id, p.name, p.project_dir, p.context_root,
@@ -543,22 +568,23 @@ impl DaemonDb {
             .query_map([], |row| {
                 Ok(SessionSummaryRow {
                     session_id: row.get(0)?,
-                    context: row.get(1)?,
-                    status: row.get(2)?,
-                    created_at: row.get(3)?,
-                    updated_at: row.get(4)?,
-                    last_activity_at: row.get(5)?,
-                    leader_id: row.get(6)?,
-                    observe_id: row.get(7)?,
-                    pending_leader_transfer_json: row.get(8)?,
-                    metrics_json: row.get(9)?,
-                    project_id: row.get(10)?,
-                    project_name: row.get(11)?,
-                    project_dir: row.get(12)?,
-                    context_root: row.get(13)?,
-                    checkout_id: row.get(14)?,
-                    is_worktree: row.get(15)?,
-                    worktree_name: row.get(16)?,
+                    title: row.get(1)?,
+                    context: row.get(2)?,
+                    status: row.get(3)?,
+                    created_at: row.get(4)?,
+                    updated_at: row.get(5)?,
+                    last_activity_at: row.get(6)?,
+                    leader_id: row.get(7)?,
+                    observe_id: row.get(8)?,
+                    pending_leader_transfer_json: row.get(9)?,
+                    metrics_json: row.get(10)?,
+                    project_id: row.get(11)?,
+                    project_name: row.get(12)?,
+                    project_dir: row.get(13)?,
+                    context_root: row.get(14)?,
+                    checkout_id: row.get(15)?,
+                    is_worktree: row.get(16)?,
+                    worktree_name: row.get(17)?,
                 })
             })
             .map_err(|error| db_error(format!("query session summaries: {error}")))?;
@@ -1466,6 +1492,7 @@ struct ProjectRow {
 
 struct SessionSummaryRow {
     session_id: String,
+    title: String,
     context: String,
     status: String,
     created_at: String,
@@ -1509,6 +1536,7 @@ impl SessionSummaryRow {
             is_worktree: self.is_worktree,
             worktree_name: self.worktree_name,
             session_id: self.session_id,
+            title: self.title,
             context: self.context,
             status,
             created_at: self.created_at,
@@ -1644,7 +1672,7 @@ CREATE TABLE schema_meta (
     value TEXT NOT NULL
 ) WITHOUT ROWID;
 
-INSERT INTO schema_meta (key, value) VALUES ('version', '1');
+INSERT INTO schema_meta (key, value) VALUES ('version', '2');
 
 -- Discovered projects
 CREATE TABLE projects (
@@ -1670,6 +1698,7 @@ CREATE TABLE sessions (
     project_id              TEXT NOT NULL REFERENCES projects(project_id),
     schema_version          INTEGER NOT NULL,
     state_version           INTEGER NOT NULL DEFAULT 0,
+    title                   TEXT NOT NULL DEFAULT '',
     context                 TEXT NOT NULL,
     status                  TEXT NOT NULL,
     leader_id               TEXT,
@@ -2004,6 +2033,7 @@ mod tests {
             schema_version: 3,
             state_version: 1,
             session_id: "sess-test-1".into(),
+            title: "test title".into(),
             context: "test session".into(),
             status: SessionStatus::Active,
             created_at: "2026-04-03T12:00:00Z".into(),
@@ -2100,6 +2130,7 @@ mod tests {
             schema_version: 3,
             state_version: 1,
             session_id: session_id.clone(),
+            title: format!("perf {project_index}-{session_index}"),
             context: format!("performance lane {project_index}-{session_index}"),
             status: if token % 6 == 0 {
                 SessionStatus::Ended
@@ -2290,6 +2321,7 @@ mod tests {
             recorded_at: "2026-04-03T12:00:00Z".into(),
             session_id: state.session_id.clone(),
             transition: SessionTransition::SessionStarted {
+                title: "test title".into(),
                 context: "test".into(),
             },
             actor_id: Some("claude-leader".into()),
