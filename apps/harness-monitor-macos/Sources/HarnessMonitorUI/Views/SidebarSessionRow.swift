@@ -13,8 +13,8 @@ struct SidebarSessionRow: View {
       HStack(alignment: .top, spacing: HarnessMonitorTheme.itemSpacing) {
         Text(session.context)
           .scaledFont(.system(.body, design: .rounded, weight: .semibold))
-          .multilineTextAlignment(.leading)
-          .lineLimit(2)
+          .lineLimit(1)
+          .truncationMode(.tail)
         Spacer(minLength: 12)
         if isBookmarked {
           Image(systemName: "bookmark.fill")
@@ -32,23 +32,22 @@ struct SidebarSessionRow: View {
         .truncationMode(.middle)
         .foregroundStyle(selectedSecondaryTextStyle)
       HStack(spacing: HarnessMonitorTheme.sectionSpacing) {
-        labelChip("\(session.metrics.activeAgentCount) active")
-        labelChip("\(session.metrics.inProgressTaskCount) moving")
-        labelChip(formatTimestamp(session.lastActivityAt, configuration: dateTimeConfiguration))
+        footerLabel("\(session.metrics.activeAgentCount) active")
+        footerLabel("\(session.metrics.inProgressTaskCount) moving")
+        Spacer(minLength: 0)
+        footerLabel(formatTimestamp(session.lastActivityAt, configuration: dateTimeConfiguration))
       }
-      .frame(maxWidth: .infinity, alignment: .leading)
+      .frame(maxWidth: .infinity)
     }
     .foregroundStyle(isSelected ? HarnessMonitorTheme.onContrast : HarnessMonitorTheme.ink)
     .frame(maxWidth: .infinity, alignment: .leading)
   }
 
-  private func labelChip(_ value: String) -> some View {
+  private func footerLabel(_ value: String) -> some View {
     Text(value)
-      .scaledFont(.caption.weight(.semibold))
+      .scaledFont(.caption.weight(.medium))
       .lineLimit(1)
-      .harnessPillPadding()
-      .foregroundStyle(isSelected ? HarnessMonitorTheme.onContrast : HarnessMonitorTheme.ink)
-      .harnessContentPill(tint: isSelected ? HarnessMonitorTheme.onContrast : HarnessMonitorTheme.ink)
+      .foregroundStyle(selectedSecondaryTextStyle)
   }
 
   private var selectedSecondaryTextStyle: Color {
