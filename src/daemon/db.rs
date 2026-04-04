@@ -334,6 +334,63 @@ impl DaemonDb {
         Ok(result)
     }
 
+    /// Reconcile file-discovered sessions into the database, only
+    /// importing sessions that are new or have a higher `state_version`
+    /// than the DB copy. Daemon-first sessions (only in `SQLite`) are
+    /// never touched.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on discovery or SQL failures.
+    pub fn reconcile_sessions(
+        &self,
+        projects: &[super::index::DiscoveredProject],
+        sessions: &[super::index::ResolvedSession],
+    ) -> Result<ReconcileResult, CliError> {
+        let mut result = ReconcileResult::default();
+
+        for project in projects {
+            self.sync_project(project)?;
+            result.projects += 1;
+        }
+
+        for resolved in sessions {
+            let db_version = self.session_state_version(&resolved.state.session_id)?;
+            let file_version = i64::try_from(resolved.state.state_version).unwrap_or(i64::MAX);
+
+            if db_version.is_some_and(|version| version >= file_version) {
+                result.sessions_skipped += 1;
+                continue;
+            }
+
+            self.sync_session(&resolved.project.project_id, &resolved.state)?;
+            import_session_log(self, &resolved.project, &resolved.state.session_id)?;
+            import_session_checkpoints(self, &resolved.project, &resolved.state)?;
+            import_session_signals(self, resolved)?;
+            import_session_activity(self, resolved)?;
+            import_conversation_events(self, resolved)?;
+            result.sessions_imported += 1;
+        }
+
+        if result.sessions_imported > 0 {
+            self.bump_change("global")?;
+        }
+
+        Ok(result)
+    }
+
+    /// Discover projects and sessions from files, then reconcile into
+    /// the database. Only imports sessions that are new or have a higher
+    /// `state_version` than existing DB records. Safe to call while the
+    /// daemon is serving - daemon-first sessions are never overwritten.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on discovery or SQL failures.
+    pub fn reconcile_from_files(&self) -> Result<ReconcileResult, CliError> {
+        let projects = super::index::discover_projects()?;
+        let sessions = super::index::discover_sessions_for(&projects, true)?;
+        self.reconcile_sessions(&projects, &sessions)
+    }
+
     /// Return the number of rows in the sessions table.
     ///
     /// # Errors
@@ -1164,6 +1221,24 @@ impl DaemonDb {
         Ok(())
     }
 
+    /// Return the `state_version` for a session, or `None` if the session
+    /// does not exist in the database.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on SQL failures.
+    pub fn session_state_version(&self, session_id: &str) -> Result<Option<i64>, CliError> {
+        let result = self.conn.query_row(
+            "SELECT state_version FROM sessions WHERE session_id = ?1",
+            [session_id],
+            |row| row.get::<_, i64>(0),
+        );
+        match result {
+            Ok(version) => Ok(Some(version)),
+            Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+            Err(error) => Err(db_error(format!("session_state_version: {error}"))),
+        }
+    }
+
     /// Look up the project that owns a session.
     ///
     /// # Errors
@@ -1229,6 +1304,14 @@ impl DaemonDb {
 pub struct ImportResult {
     pub projects: usize,
     pub sessions: usize,
+}
+
+/// Summary of background file reconciliation.
+#[derive(Debug, Default)]
+pub struct ReconcileResult {
+    pub projects: usize,
+    pub sessions_imported: usize,
+    pub sessions_skipped: usize,
 }
 
 fn import_session_log(
@@ -2487,5 +2570,188 @@ mod tests {
             )
             .expect("query active");
         assert_eq!(is_active, 1);
+    }
+
+    fn sample_resolved_session(
+        project: &DiscoveredProject,
+        session_id: &str,
+        state_version: u64,
+    ) -> super::super::index::ResolvedSession {
+        let mut state = sample_session_state();
+        state.session_id = session_id.into();
+        state.state_version = state_version;
+        super::super::index::ResolvedSession {
+            project: project.clone(),
+            state,
+        }
+    }
+
+    #[test]
+    fn reconcile_imports_new_session() {
+        let db = DaemonDb::open_in_memory().expect("open db");
+        let project = sample_project();
+        let resolved = sample_resolved_session(&project, "new-sess", 1);
+
+        let result = db
+            .reconcile_sessions(&[project], &[resolved])
+            .expect("reconcile");
+        assert_eq!(result.projects, 1);
+        assert_eq!(result.sessions_imported, 1);
+        assert_eq!(result.sessions_skipped, 0);
+
+        let loaded = db
+            .load_session_state("new-sess")
+            .expect("load")
+            .expect("present");
+        assert_eq!(loaded.state_version, 1);
+    }
+
+    #[test]
+    fn reconcile_skips_session_with_equal_db_version() {
+        let db = DaemonDb::open_in_memory().expect("open db");
+        let project = sample_project();
+        db.sync_project(&project).expect("sync project");
+
+        let mut state = sample_session_state();
+        state.state_version = 3;
+        state.context = "daemon version".into();
+        db.sync_session(&project.project_id, &state).expect("sync");
+
+        let mut file_state = sample_session_state();
+        file_state.state_version = 3;
+        file_state.context = "file version".into();
+        let resolved = super::super::index::ResolvedSession {
+            project: project.clone(),
+            state: file_state,
+        };
+
+        let result = db
+            .reconcile_sessions(&[project], &[resolved])
+            .expect("reconcile");
+        assert_eq!(result.sessions_imported, 0);
+        assert_eq!(result.sessions_skipped, 1);
+
+        let loaded = db
+            .load_session_state("sess-test-1")
+            .expect("load")
+            .expect("present");
+        assert_eq!(loaded.context, "daemon version");
+    }
+
+    #[test]
+    fn reconcile_skips_session_with_higher_db_version() {
+        let db = DaemonDb::open_in_memory().expect("open db");
+        let project = sample_project();
+        db.sync_project(&project).expect("sync project");
+
+        let mut state = sample_session_state();
+        state.state_version = 5;
+        state.context = "daemon mutated".into();
+        db.sync_session(&project.project_id, &state).expect("sync");
+
+        let mut file_state = sample_session_state();
+        file_state.state_version = 2;
+        file_state.context = "stale file".into();
+        let resolved = super::super::index::ResolvedSession {
+            project: project.clone(),
+            state: file_state,
+        };
+
+        let result = db
+            .reconcile_sessions(&[project], &[resolved])
+            .expect("reconcile");
+        assert_eq!(result.sessions_imported, 0);
+        assert_eq!(result.sessions_skipped, 1);
+
+        let loaded = db
+            .load_session_state("sess-test-1")
+            .expect("load")
+            .expect("present");
+        assert_eq!(loaded.context, "daemon mutated");
+        assert_eq!(loaded.state_version, 5);
+    }
+
+    #[test]
+    fn reconcile_imports_session_with_higher_file_version() {
+        let db = DaemonDb::open_in_memory().expect("open db");
+        let project = sample_project();
+        db.sync_project(&project).expect("sync project");
+
+        let mut state = sample_session_state();
+        state.state_version = 2;
+        state.context = "old db".into();
+        db.sync_session(&project.project_id, &state).expect("sync");
+
+        let mut file_state = sample_session_state();
+        file_state.state_version = 5;
+        file_state.context = "updated file".into();
+        let resolved = super::super::index::ResolvedSession {
+            project: project.clone(),
+            state: file_state,
+        };
+
+        let result = db
+            .reconcile_sessions(&[project], &[resolved])
+            .expect("reconcile");
+        assert_eq!(result.sessions_imported, 1);
+        assert_eq!(result.sessions_skipped, 0);
+
+        let loaded = db
+            .load_session_state("sess-test-1")
+            .expect("load")
+            .expect("present");
+        assert_eq!(loaded.context, "updated file");
+        assert_eq!(loaded.state_version, 5);
+    }
+
+    #[test]
+    fn reconcile_preserves_daemon_only_sessions() {
+        let db = DaemonDb::open_in_memory().expect("open db");
+        let project = sample_project();
+        db.sync_project(&project).expect("sync project");
+
+        let mut daemon_session = sample_session_state();
+        daemon_session.session_id = "daemon-only".into();
+        daemon_session.state_version = 3;
+        daemon_session.context = "daemon created".into();
+        db.sync_session(&project.project_id, &daemon_session)
+            .expect("sync daemon session");
+
+        // Reconcile with a file that has a DIFFERENT session (not daemon-only)
+        let file_session = sample_resolved_session(&project, "file-only", 1);
+
+        let result = db
+            .reconcile_sessions(&[project], &[file_session])
+            .expect("reconcile");
+        assert_eq!(result.sessions_imported, 1);
+
+        // daemon-only session must still exist
+        let loaded = db
+            .load_session_state("daemon-only")
+            .expect("load")
+            .expect("present");
+        assert_eq!(loaded.context, "daemon created");
+    }
+
+    #[test]
+    fn session_state_version_returns_none_when_missing() {
+        let db = DaemonDb::open_in_memory().expect("open db");
+        let version = db.session_state_version("nonexistent").expect("query");
+        assert_eq!(version, None);
+    }
+
+    #[test]
+    fn session_state_version_returns_version_when_present() {
+        let db = DaemonDb::open_in_memory().expect("open db");
+        let project = sample_project();
+        db.sync_project(&project).expect("sync project");
+
+        let mut state = sample_session_state();
+        state.state_version = 7;
+        db.sync_session(&project.project_id, &state)
+            .expect("sync session");
+
+        let version = db.session_state_version(&state.session_id).expect("query");
+        assert_eq!(version, Some(7));
     }
 }
