@@ -110,6 +110,7 @@ public struct SessionSummary: Codable, Equatable, Identifiable, Sendable {
   public let isWorktree: Bool
   public let worktreeName: String?
   public let sessionId: String
+  public let title: String
   public let context: String
   public let status: SessionStatus
   public let createdAt: String
@@ -122,6 +123,8 @@ public struct SessionSummary: Codable, Equatable, Identifiable, Sendable {
 
   public var id: String { sessionId }
 
+  public var displayTitle: String { title.isEmpty ? "(untitled)" : title }
+
   public init(
     projectId: String,
     projectName: String,
@@ -132,6 +135,7 @@ public struct SessionSummary: Codable, Equatable, Identifiable, Sendable {
     isWorktree: Bool = false,
     worktreeName: String? = nil,
     sessionId: String,
+    title: String = "",
     context: String,
     status: SessionStatus,
     createdAt: String,
@@ -151,6 +155,7 @@ public struct SessionSummary: Codable, Equatable, Identifiable, Sendable {
     self.isWorktree = isWorktree
     self.worktreeName = worktreeName
     self.sessionId = sessionId
+    self.title = title
     self.context = context
     self.status = status
     self.createdAt = createdAt
@@ -172,7 +177,7 @@ public struct SessionSummary: Codable, Equatable, Identifiable, Sendable {
   enum CodingKeys: String, CodingKey {
     case projectId, projectName, projectDir, contextRoot
     case checkoutId, checkoutRoot, isWorktree, worktreeName
-    case sessionId, context, status, createdAt, updatedAt, lastActivityAt
+    case sessionId, title, context, status, createdAt, updatedAt, lastActivityAt
     case leaderId, observeId, pendingLeaderTransfer, metrics
   }
 
@@ -192,6 +197,7 @@ public struct SessionSummary: Codable, Equatable, Identifiable, Sendable {
       isWorktree: try container.decodeIfPresent(Bool.self, forKey: .isWorktree) ?? false,
       worktreeName: try container.decodeIfPresent(String.self, forKey: .worktreeName),
       sessionId: try container.decode(String.self, forKey: .sessionId),
+      title: try container.decodeIfPresent(String.self, forKey: .title) ?? "",
       context: try container.decode(String.self, forKey: .context),
       status: try container.decode(SessionStatus.self, forKey: .status),
       createdAt: try container.decode(String.self, forKey: .createdAt),

@@ -1,7 +1,7 @@
 import Foundation
 import SwiftData
 
-extension HarnessMonitorSchemaV2 {
+extension HarnessMonitorSchemaV3 {
   @Model
   final class CachedProject {
     #Unique<CachedProject>([\.projectId])
@@ -51,6 +51,7 @@ extension HarnessMonitorSchemaV2 {
     var checkoutRoot: String = ""
     var isWorktree: Bool = false
     var worktreeName: String?
+    var title: String = ""
     var context: String
     var statusRaw: String
     var createdAt: String
@@ -91,6 +92,7 @@ extension HarnessMonitorSchemaV2 {
       checkoutRoot: String,
       isWorktree: Bool,
       worktreeName: String?,
+      title: String = "",
       context: String,
       statusRaw: String,
       createdAt: String,
@@ -112,6 +114,7 @@ extension HarnessMonitorSchemaV2 {
       self.checkoutRoot = checkoutRoot
       self.isWorktree = isWorktree
       self.worktreeName = worktreeName
+      self.title = title
       self.context = context
       self.statusRaw = statusRaw
       self.createdAt = createdAt
@@ -372,11 +375,11 @@ extension HarnessMonitorSchemaV2 {
   }
 }
 
-typealias CachedProject = HarnessMonitorSchemaV2.CachedProject
-typealias CachedSession = HarnessMonitorSchemaV2.CachedSession
-typealias CachedAgent = HarnessMonitorSchemaV2.CachedAgent
-typealias CachedWorkItem = HarnessMonitorSchemaV2.CachedWorkItem
-typealias CachedSignalRecord = HarnessMonitorSchemaV2.CachedSignalRecord
-typealias CachedTimelineEntry = HarnessMonitorSchemaV2.CachedTimelineEntry
-typealias CachedObserver = HarnessMonitorSchemaV2.CachedObserver
-typealias CachedAgentActivity = HarnessMonitorSchemaV2.CachedAgentActivity
+typealias CachedProject = HarnessMonitorSchemaV3.CachedProject
+typealias CachedSession = HarnessMonitorSchemaV3.CachedSession
+typealias CachedAgent = HarnessMonitorSchemaV3.CachedAgent
+typealias CachedWorkItem = HarnessMonitorSchemaV3.CachedWorkItem
+typealias CachedSignalRecord = HarnessMonitorSchemaV3.CachedSignalRecord
+typealias CachedTimelineEntry = HarnessMonitorSchemaV3.CachedTimelineEntry
+typealias CachedObserver = HarnessMonitorSchemaV3.CachedObserver
+typealias CachedAgentActivity = HarnessMonitorSchemaV3.CachedAgentActivity
