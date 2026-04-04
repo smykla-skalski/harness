@@ -113,7 +113,11 @@ pub(crate) fn state_repository(
 ) -> Result<VersionedJsonRepository<SessionState>, CliError> {
     Ok(
         VersionedJsonRepository::new(state_path(project_dir, session_id)?, CURRENT_VERSION)
-            .with_migrations(vec![Box::new(migrate_v1_to_v2), Box::new(migrate_v2_to_v3)]),
+            .with_migrations(vec![
+                Box::new(migrate_v1_to_v2),
+                Box::new(migrate_v2_to_v3),
+                Box::new(migrate_v3_to_v4),
+            ]),
     )
 }
 
@@ -335,7 +339,7 @@ fn migrate_v1_to_v2(mut value: Value) -> Result<Value, CliError> {
         return Err(CliErrorKind::workflow_version("session state is not a JSON object").into());
     };
 
-    object.insert("schema_version".to_string(), json!(CURRENT_VERSION));
+    object.insert("schema_version".to_string(), json!(2));
     object
         .entry("archived_at".to_string())
         .or_insert(Value::Null);
@@ -409,10 +413,25 @@ fn migrate_v2_to_v3(mut value: Value) -> Result<Value, CliError> {
         return Err(CliErrorKind::workflow_version("session state is not a JSON object").into());
     };
 
-    object.insert("schema_version".to_string(), json!(CURRENT_VERSION));
+    object.insert("schema_version".to_string(), json!(3));
     object
         .entry("pending_leader_transfer".to_string())
         .or_insert(Value::Null);
+
+    Ok(value)
+}
+
+fn migrate_v3_to_v4(mut value: Value) -> Result<Value, CliError> {
+    let Some(object) = value.as_object_mut() else {
+        return Err(CliErrorKind::workflow_version("session state is not a JSON object").into());
+    };
+
+    let title = object
+        .get("title")
+        .cloned()
+        .unwrap_or_else(|| object.get("context").cloned().unwrap_or_else(|| json!("")));
+    object.insert("schema_version".to_string(), json!(4));
+    object.insert("title".to_string(), title);
 
     Ok(value)
 }
@@ -590,6 +609,127 @@ mod tests {
                     .expect("state");
                 assert_eq!(loaded.session_id, "sess-1");
                 assert_eq!(loaded.observe_id.as_deref(), Some("observe-sess-1"));
+            },
+        );
+    }
+
+    #[test]
+    fn migrate_v1_and_v2_stamp_expected_schema_versions() {
+        let v1 = json!({
+            "schema_version": 1,
+            "session_id": "sess-1",
+            "context": "test",
+            "status": "active",
+            "created_at": "2026-01-01T00:00:00Z",
+            "updated_at": "2026-01-01T00:00:00Z",
+            "agents": {},
+            "tasks": {},
+        });
+        let migrated_v2 = migrate_v1_to_v2(v1).expect("migrate v1");
+        assert_eq!(migrated_v2["schema_version"], json!(2));
+
+        let v2 = json!({
+            "schema_version": 2,
+            "session_id": "sess-1",
+            "context": "test",
+            "status": "active",
+            "created_at": "2026-01-01T00:00:00Z",
+            "updated_at": "2026-01-01T00:00:00Z",
+            "agents": {},
+            "tasks": {},
+        });
+        let migrated_v3 = migrate_v2_to_v3(v2).expect("migrate v2");
+        assert_eq!(migrated_v3["schema_version"], json!(3));
+    }
+
+    #[test]
+    fn migrate_v3_to_v4_backfills_title_from_context() {
+        let migrated = migrate_v3_to_v4(json!({
+            "schema_version": 3,
+            "state_version": 2,
+            "session_id": "sess-1",
+            "context": "session goal",
+            "status": "active",
+            "created_at": "2026-01-01T00:00:00Z",
+            "updated_at": "2026-01-01T00:00:00Z",
+            "agents": {},
+            "tasks": {},
+            "leader_id": null,
+            "archived_at": null,
+            "last_activity_at": null,
+            "observe_id": null,
+            "pending_leader_transfer": null,
+            "metrics": {
+                "agent_count": 0,
+                "active_agent_count": 0,
+                "open_task_count": 0,
+                "in_progress_task_count": 0,
+                "blocked_task_count": 0,
+                "completed_task_count": 0
+            }
+        }))
+        .expect("migrate v3");
+
+        assert_eq!(migrated["schema_version"], json!(4));
+        assert_eq!(migrated["title"], json!("session goal"));
+    }
+
+    #[test]
+    fn load_state_migrates_v3_state_and_persists_v4() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        temp_env::with_vars(
+            [
+                (
+                    "XDG_DATA_HOME",
+                    Some(tmp.path().to_str().expect("utf8 path")),
+                ),
+                ("CLAUDE_SESSION_ID", Some("test-session-migration")),
+            ],
+            || {
+                let project = tmp.path().join("project");
+                let session_id = "sess-legacy";
+                let state_file = state_path(&project, session_id).expect("state path");
+                if let Some(parent) = state_file.parent() {
+                    fs::create_dir_all(parent).expect("create session dir");
+                }
+                write_json_pretty(
+                    &state_file,
+                    &json!({
+                        "schema_version": 3,
+                        "state_version": 7,
+                        "session_id": session_id,
+                        "context": "legacy context",
+                        "status": "active",
+                        "created_at": "2026-01-01T00:00:00Z",
+                        "updated_at": "2026-01-01T00:00:00Z",
+                        "agents": {},
+                        "tasks": {},
+                        "leader_id": null,
+                        "archived_at": null,
+                        "last_activity_at": null,
+                        "observe_id": null,
+                        "pending_leader_transfer": null,
+                        "metrics": {
+                            "agent_count": 0,
+                            "active_agent_count": 0,
+                            "open_task_count": 0,
+                            "in_progress_task_count": 0,
+                            "blocked_task_count": 0,
+                            "completed_task_count": 0
+                        }
+                    }),
+                )
+                .expect("write legacy state");
+
+                let loaded = load_state(&project, session_id)
+                    .expect("load state")
+                    .expect("state present");
+                assert_eq!(loaded.schema_version, CURRENT_VERSION);
+                assert_eq!(loaded.title, "legacy context");
+
+                let persisted: Value = read_json_typed(&state_file).expect("read migrated state");
+                assert_eq!(persisted["schema_version"], json!(CURRENT_VERSION));
+                assert_eq!(persisted["title"], json!("legacy context"));
             },
         );
     }
