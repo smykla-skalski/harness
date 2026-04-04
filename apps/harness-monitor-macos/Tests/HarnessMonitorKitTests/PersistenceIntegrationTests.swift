@@ -352,6 +352,82 @@ struct PersistenceIntegrationTests {
     #expect(store.sessionDataAvailability != .live)
   }
 
+  @Test("Selecting an offline persisted session with only a cached summary restores a summary-backed cockpit")
+  func selectingPersistedSessionOfflineRestoresSummaryBackedCockpit() async {
+    let store = makeStore()
+    let project = makeProject(totalSessionCount: 1, activeSessionCount: 1)
+    let session = makeSession(.init(
+      sessionId: "sess-summary-only",
+      context: "Summary only selection",
+      status: .active,
+      leaderId: "leader-summary-only",
+      openTaskCount: 2,
+      inProgressTaskCount: 1,
+      blockedTaskCount: 0,
+      activeAgentCount: 1
+    ))
+
+    store.applySessionIndexSnapshot(projects: [project], sessions: [session])
+    store.connectionState = .offline("daemon down")
+
+    await store.selectSession(session.sessionId)
+
+    #expect(store.selectedSessionID == session.sessionId)
+    #expect(store.selectedSession?.session == session)
+    #expect(store.selectedSession?.agents.isEmpty == true)
+    #expect(store.selectedSession?.tasks.isEmpty == true)
+    #expect(store.timeline.isEmpty)
+    #expect(store.isShowingCachedData)
+  }
+
+  @Test("Hydration upgrades the selected summary-backed cockpit when live detail arrives")
+  func hydrationUpgradesSelectedSummaryBackedCockpit() async throws {
+    let session = makeSession(.init(
+      sessionId: "sess-hydrate-selected",
+      context: "Hydrate selected",
+      status: .active,
+      leaderId: "leader-hydrate-selected",
+      openTaskCount: 1,
+      inProgressTaskCount: 0,
+      blockedTaskCount: 0,
+      activeAgentCount: 1
+    ))
+    let project = makeProject(totalSessionCount: 1, activeSessionCount: 1)
+    let detail = makeSessionDetail(
+      summary: session,
+      workerID: "worker-hydrate-selected",
+      workerName: "Hydration Worker"
+    )
+    let timeline = makeTimelineEntries(
+      sessionID: session.sessionId,
+      agentID: detail.agents[0].agentId,
+      summary: "Hydrated timeline"
+    )
+    let client = RecordingHarnessClient()
+    client.configureSessions(
+      summaries: [session],
+      detailsByID: [session.sessionId: detail],
+      timelinesBySessionID: [session.sessionId: timeline]
+    )
+
+    let store = makeStore()
+    store.applySessionIndexSnapshot(projects: [project], sessions: [session])
+    store.connectionState = .online
+    store.primeSessionSelection(session.sessionId)
+    store.restorePersistedSessionSelection(sessionID: session.sessionId)
+
+    #expect(store.selectedSession?.session == session)
+    #expect(store.selectedSession?.agents.isEmpty == true)
+    #expect(store.isShowingCachedData)
+
+    store.schedulePersistedSnapshotHydration(using: client, sessions: [session])
+    try await Task.sleep(for: .milliseconds(100))
+
+    #expect(store.selectedSession == detail)
+    #expect(store.timeline == timeline)
+    #expect(store.isShowingCachedData == false)
+  }
+
   @Test("Hydration helper detects when a persisted detail snapshot is missing")
   func persistedSnapshotNeedsHydrationReflectsSnapshotState() {
     let store = makeStore()
@@ -449,6 +525,53 @@ struct PersistenceIntegrationTests {
     }
 
     #expect(medianMs <= 45)
+  }
+
+  @Test("Performance budget: refreshing an unchanged 72-session snapshot stays under 12 ms median")
+  func unchangedSnapshotRefreshStaysWithinPerformanceBudget() async throws {
+    let fixture = largeSnapshotFixture()
+    let container = try HarnessMonitorModelContainer.preview()
+    let store = HarnessMonitorStore(
+      daemonController: RecordingDaemonController(),
+      modelContext: container.mainContext
+    )
+    store.applySessionIndexSnapshot(
+      projects: fixture.projects,
+      sessions: fixture.sessions
+    )
+
+    let medianMs = await medianRuntimeMs {
+      store.applySessionIndexSnapshot(
+        projects: fixture.projects,
+        sessions: fixture.sessions
+      )
+      #expect(store.sessions.count == fixture.sessions.count)
+      #expect(store.projects.count == fixture.projects.count)
+    }
+
+    #expect(medianMs <= 12)
+  }
+
+  @Test("Performance budget: reapplying an unchanged session summary stays under 8 ms median")
+  func unchangedSessionSummaryUpdateStaysWithinPerformanceBudget() async throws {
+    let fixture = largeSnapshotFixture()
+    let container = try HarnessMonitorModelContainer.preview()
+    let store = HarnessMonitorStore(
+      daemonController: RecordingDaemonController(),
+      modelContext: container.mainContext
+    )
+    store.applySessionIndexSnapshot(
+      projects: fixture.projects,
+      sessions: fixture.sessions
+    )
+    let baseline = fixture.sessions[0]
+
+    let medianMs = await medianRuntimeMs {
+      store.applySessionSummaryUpdate(baseline)
+      #expect(store.sessions.first(where: { $0.sessionId == baseline.sessionId }) == baseline)
+    }
+
+    #expect(medianMs <= 8)
   }
 
   @Test("Performance budget: refreshing a 72-session live snapshot stays under 160 ms median")

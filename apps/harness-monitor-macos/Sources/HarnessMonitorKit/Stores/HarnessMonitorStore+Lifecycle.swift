@@ -176,9 +176,11 @@ extension HarnessMonitorStore {
     projects: [ProjectSummary],
     sessions: [SessionSummary]
   ) {
-    sessionIndex.replaceSnapshot(projects: projects, sessions: sessions)
+    let didChange = sessionIndex.replaceSnapshot(projects: projects, sessions: sessions)
     isShowingCachedData = false
-    cacheSessionList(sessions, projects: projects)
+    if didChange {
+      cacheSessionList(sessions, projects: projects)
+    }
 
     if let selectedSessionID, sessionIndex.sessionSummary(for: selectedSessionID) == nil {
       primeSessionSelection(nil)
@@ -187,7 +189,10 @@ extension HarnessMonitorStore {
   }
 
   func applySessionSummaryUpdate(_ summary: SessionSummary) {
-    sessionIndex.applySessionSummary(summary)
+    let didChange = sessionIndex.applySessionSummary(summary)
+    guard didChange else {
+      return
+    }
     cacheSessionSummary(
       summary,
       project: sessionIndex.projects.first { $0.projectId == summary.projectId }

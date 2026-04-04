@@ -110,12 +110,13 @@ extension HarnessMonitorStore {
 
     public init() {}
 
+    @discardableResult
     public func replaceSnapshot(
       projects: [ProjectSummary],
       sessions: [SessionSummary]
-    ) {
+    ) -> Bool {
       guard self.projects != projects || self.sessions != sessions else {
-        return
+        return false
       }
 
       suppressDerivedStateRefresh = true
@@ -123,19 +124,25 @@ extension HarnessMonitorStore {
       self.sessions = sessions
       suppressDerivedStateRefresh = false
       rebuildDerivedState()
+      return true
     }
 
-    public func applySessionSummary(_ summary: SessionSummary) {
-      var updated = sessions
-      if let index = updated.firstIndex(where: { $0.sessionId == summary.sessionId }) {
-        guard updated[index] != summary else {
-          return
+    @discardableResult
+    public func applySessionSummary(_ summary: SessionSummary) -> Bool {
+      if let index = sessions.firstIndex(where: { $0.sessionId == summary.sessionId }) {
+        guard sessions[index] != summary else {
+          return false
         }
+        var updated = sessions
         updated[index] = summary
+        sessions = updated
+        return true
       } else {
+        var updated = sessions
         updated.append(summary)
+        sessions = updated
+        return true
       }
-      sessions = updated
     }
 
     public func sessionSummary(for sessionID: String?) -> SessionSummary? {

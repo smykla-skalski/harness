@@ -251,6 +251,13 @@ extension HarnessMonitorStore {
         timeline: cached.timeline,
         showingCachedData: true
       )
+    } else if let summary = sessionIndex.sessionSummary(for: sessionID) {
+      applySelectedSessionSnapshot(
+        sessionID: sessionID,
+        detail: summaryOnlySessionDetail(for: summary),
+        timeline: [],
+        showingCachedData: true
+      )
     } else {
       isShowingCachedData = persistedSessionCount > 0 || !sessions.isEmpty
     }
@@ -293,7 +300,7 @@ extension HarnessMonitorStore {
       return
     }
 
-    let hydrationQueue = Array(sessions.filter(persistedSnapshotNeedsHydration))
+    let hydrationQueue = persistedSnapshotHydrationQueue(for: sessions)
     guard !hydrationQueue.isEmpty else {
       sessionSnapshotHydrationTask?.cancel()
       sessionSnapshotHydrationTask = nil
@@ -332,6 +339,14 @@ extension HarnessMonitorStore {
             timeline: measuredTimeline.value,
             markViewed: false
           )
+          if self.selectedSessionID == summary.sessionId && (self.selectedSession == nil || self.isShowingCachedData) {
+            self.applySelectedSessionSnapshot(
+              sessionID: summary.sessionId,
+              detail: measuredDetail.value,
+              timeline: measuredTimeline.value,
+              showingCachedData: false
+            )
+          }
         } catch {
           guard !Task.isCancelled else {
             return
@@ -343,5 +358,16 @@ extension HarnessMonitorStore {
         }
       }
     }
+  }
+
+  private func summaryOnlySessionDetail(for summary: SessionSummary) -> SessionDetail {
+    SessionDetail(
+      session: summary,
+      agents: [],
+      tasks: [],
+      signals: [],
+      observer: nil,
+      agentActivity: []
+    )
   }
 }
