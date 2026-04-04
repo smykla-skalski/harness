@@ -1405,6 +1405,7 @@ fn import_conversation_events(
     db: &DaemonDb,
     resolved: &super::index::ResolvedSession,
 ) -> Result<(), CliError> {
+    clear_session_conversation_events(&db.conn, &resolved.state.session_id)?;
     for (agent_id, agent) in &resolved.state.agents {
         let session_key = agent
             .agent_session_id
@@ -1423,6 +1424,15 @@ fn import_conversation_events(
             &events,
         )?;
     }
+    Ok(())
+}
+
+fn clear_session_conversation_events(conn: &Connection, session_id: &str) -> Result<(), CliError> {
+    conn.execute(
+        "DELETE FROM conversation_events WHERE session_id = ?1",
+        [session_id],
+    )
+    .map_err(|error| db_error(format!("clear session conversation events: {error}")))?;
     Ok(())
 }
 
@@ -2536,6 +2546,56 @@ mod tests {
             )
             .expect("count cleared conversation events");
         assert_eq!(cleared_count, 0);
+    }
+
+    #[test]
+    fn clear_session_conversation_events_removes_rows_for_removed_agents() {
+        let db = DaemonDb::open_in_memory().expect("open db");
+        db.sync_conversation_events(
+            "sess-test-1",
+            "claude-leader",
+            "claude",
+            &[sample_conversation_event(1, "leader")],
+        )
+        .expect("sync leader events");
+
+        let other_agent_events = vec![ConversationEvent {
+            agent: "codex-worker".into(),
+            ..sample_conversation_event(1, "worker")
+        }];
+        db.sync_conversation_events("sess-test-1", "codex-worker", "codex", &other_agent_events)
+            .expect("sync worker events");
+
+        clear_session_conversation_events(db.connection(), "sess-test-1")
+            .expect("clear session events");
+        db.sync_conversation_events(
+            "sess-test-1",
+            "claude-leader",
+            "claude",
+            &[sample_conversation_event(1, "leader")],
+        )
+        .expect("resync current agent");
+
+        let total_count: i64 = db
+            .conn
+            .query_row(
+                "SELECT COUNT(*) FROM conversation_events WHERE session_id = ?1",
+                ["sess-test-1"],
+                |row| row.get(0),
+            )
+            .expect("count session conversation events");
+        assert_eq!(total_count, 1);
+
+        let worker_count: i64 = db
+            .conn
+            .query_row(
+                "SELECT COUNT(*) FROM conversation_events
+                 WHERE session_id = ?1 AND agent_id = ?2",
+                ["sess-test-1", "codex-worker"],
+                |row| row.get(0),
+            )
+            .expect("count worker conversation events");
+        assert_eq!(worker_count, 0);
     }
 
     #[test]
