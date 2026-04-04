@@ -121,6 +121,12 @@ struct SidebarFilterSection: View {
         )
       }
     }
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .padding(HarnessMonitorTheme.cardPadding)
+    .harnessFloatingControlGlass(
+      cornerRadius: HarnessMonitorTheme.cornerRadiusLG,
+      tint: HarnessMonitorTheme.ink
+    )
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessMonitorAccessibility.sidebarFiltersCard)
     .accessibilityFrameMarker("\(HarnessMonitorAccessibility.sidebarFiltersCard).frame")
