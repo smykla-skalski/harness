@@ -21,6 +21,8 @@ enum HarnessMonitorAccessibility {
   static let sidebarClearFiltersButton = "harness.sidebar.filters.clear"
   static let sidebarClearSearchHistoryButton = "harness.sidebar.search.clear-history"
   static let sessionFilterGroup = "harness.sidebar.filter-group"
+  static let sidebarSortPicker = "harness.sidebar.picker.sort"
+  static let sidebarFocusPicker = "harness.sidebar.picker.focus"
 
   static func sidebarFilterChip(_ filter: String) -> String {
     "harness.sidebar.filter-chip.\(slug(filter))"

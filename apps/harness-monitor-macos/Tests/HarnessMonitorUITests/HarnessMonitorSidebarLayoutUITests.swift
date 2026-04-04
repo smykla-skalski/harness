@@ -140,9 +140,9 @@ final class HarnessMonitorSidebarLayoutUITests: HarnessMonitorUITestCase {
 
   func testFocusFilterSelectionTogglesAccessibilityState() throws {
     let app = launch(mode: "preview")
-    let blockedSegment = focusChip(in: app, identifier: Accessibility.blockedChip, title: "Blocked")
+    let blockedSegment = button(in: app, identifier: Accessibility.blockedChip)
     XCTAssertTrue(blockedSegment.waitForExistence(timeout: Self.uiTimeout))
-    tapButton(in: app, title: "Blocked")
+    tapButton(in: app, identifier: Accessibility.blockedChip)
     XCTAssertTrue(
       app.staticTexts["1 visible of 1"].waitForExistence(timeout: Self.uiTimeout)
     )
@@ -177,9 +177,8 @@ final class HarnessMonitorSidebarLayoutUITests: HarnessMonitorUITestCase {
     let app = launch(mode: "preview")
     let filtersCard = frameElement(in: app, identifier: Accessibility.sidebarFiltersCardFrame)
     let emptyState = frameElement(in: app, identifier: Accessibility.sidebarEmptyStateFrame)
-
     XCTAssertTrue(filtersCard.waitForExistence(timeout: Self.uiTimeout))
-    tapButton(in: app, title: "Idle")
+    tapButton(in: app, identifier: Accessibility.idleChip)
     XCTAssertTrue(emptyState.waitForExistence(timeout: Self.uiTimeout))
 
     let emptyStateSpacing = emptyState.frame.minY - filtersCard.frame.maxY

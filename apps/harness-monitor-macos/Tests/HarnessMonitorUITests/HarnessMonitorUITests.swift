@@ -30,7 +30,7 @@ final class HarnessMonitorUITests: HarnessMonitorUITestCase {
     )
     XCTAssertTrue(element(in: app, identifier: Accessibility.sidebarStartButton).exists)
 
-    let sidebarEmptyState = sidebarEmptyStateElement(in: app)
+    let sidebarEmptyState = app.staticTexts[Accessibility.sidebarEmptyStateTitle]
     let sidebarRoot = element(in: app, identifier: Accessibility.sidebarRoot)
     XCTAssertTrue(sidebarEmptyState.waitForExistence(timeout: Self.uiTimeout))
     XCTAssertTrue(sidebarRoot.waitForExistence(timeout: Self.uiTimeout))
@@ -38,14 +38,24 @@ final class HarnessMonitorUITests: HarnessMonitorUITestCase {
     XCTAssertGreaterThanOrEqual(sidebarRoot.descendants(matching: .scrollView).count, 1)
     XCTAssertEqual(sidebarRoot.descendants(matching: .scrollBar).count, 0)
 
-    let activeFilter = button(in: app, title: "Active")
-    let allFilter = button(in: app, title: "All")
-    let endedFilter = button(in: app, title: "Ended")
+    let activeFilter = button(in: app, identifier: Accessibility.activeFilterButton)
+    let allFilter = button(in: app, identifier: Accessibility.allFilterButton)
+    let endedFilter = button(in: app, identifier: Accessibility.endedFilterButton)
+    let sortSegment = button(
+      in: app,
+      identifier: Accessibility.sidebarSortSegment("recentActivity")
+    )
+    let focusSegment = button(
+      in: app,
+      identifier: Accessibility.sidebarFocusChip("all")
+    )
     let sessionFilterGroup = element(in: app, identifier: Accessibility.sessionFilterGroup)
 
     XCTAssertTrue(activeFilter.waitForExistence(timeout: Self.uiTimeout))
     XCTAssertTrue(allFilter.waitForExistence(timeout: Self.uiTimeout))
     XCTAssertTrue(endedFilter.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(sortSegment.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(focusSegment.waitForExistence(timeout: Self.uiTimeout))
     XCTAssertTrue(sessionFilterGroup.waitForExistence(timeout: Self.uiTimeout))
     XCTAssertEqual(sessionFilterGroup.label, "status=active")
   }
@@ -241,7 +251,10 @@ final class HarnessMonitorUITests: HarnessMonitorUITestCase {
       "contentChrome=native, interactiveRows=button, controlGlass=native"
     )
 
-    for _ in 0..<4 where !(actorPicker.isHittable && commandField.isHittable && messageField.isHittable) {
+    for _ in 0..<4 {
+      if actorPicker.isHittable, commandField.isHittable, messageField.isHittable {
+        break
+      }
       dragUp(in: app, element: inspectorRoot, distanceRatio: 0.18)
     }
 
