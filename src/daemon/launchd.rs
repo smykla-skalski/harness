@@ -619,6 +619,45 @@ mod tests {
     }
 
     #[test]
+    fn best_effort_bootout_returns_true_on_success() {
+        let calls = Arc::new(Mutex::new(Vec::<Vec<String>>::new()));
+        let runner = {
+            let calls = Arc::clone(&calls);
+            move |args: &[String]| -> Result<CommandOutput, CliError> {
+                calls.lock().expect("lock").push(args.to_vec());
+                Ok(CommandOutput {
+                    exit_code: 0,
+                    stdout: String::new(),
+                    stderr: String::new(),
+                })
+            }
+        };
+
+        let booted_out = best_effort_bootout(&runner).expect("bootout launch agent");
+
+        assert!(booted_out);
+        assert_eq!(
+            calls.lock().expect("lock").as_slice(),
+            &[vec!["bootout".to_string(), launchd_service_target()]]
+        );
+    }
+
+    #[test]
+    fn best_effort_bootout_returns_false_when_service_is_missing() {
+        let booted_out = best_effort_bootout(&|args| {
+            assert_eq!(args, &["bootout".to_string(), launchd_service_target()]);
+            Ok(CommandOutput {
+                exit_code: 1,
+                stdout: String::new(),
+                stderr: "Could not find service".to_string(),
+            })
+        })
+        .expect("bootout should treat a missing service as success");
+
+        assert!(!booted_out);
+    }
+
+    #[test]
     fn restart_launch_agent_requires_installed_plist() {
         let tmp = tempdir().expect("tempdir");
         temp_env::with_vars(

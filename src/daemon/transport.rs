@@ -140,15 +140,39 @@ impl Execute for DaemonServeArgs {
 
 fn stop_daemon() -> Result<DaemonControlResponse, CliError> {
     let launch_agent = launchd::launch_agent_status();
-    if cfg!(target_os = "macos") && (launch_agent.installed || launch_agent.loaded) {
-        let manifest = try_load_manifest()?;
-        let booted_out = launchd::bootout_launch_agent()?;
+    stop_daemon_with(
+        cfg!(target_os = "macos"),
+        &launch_agent,
+        try_load_manifest,
+        launchd::bootout_launch_agent,
+        request_shutdown_if_running,
+        wait_for_daemon_shutdown,
+    )
+}
+
+fn stop_daemon_with<LoadManifest, Bootout, RequestShutdown, WaitShutdown>(
+    launchd_enabled: bool,
+    launch_agent: &launchd::LaunchAgentStatus,
+    mut load_manifest: LoadManifest,
+    mut bootout: Bootout,
+    mut request_shutdown: RequestShutdown,
+    mut wait_for_shutdown: WaitShutdown,
+) -> Result<DaemonControlResponse, CliError>
+where
+    LoadManifest: FnMut() -> Result<Option<super::state::DaemonManifest>, CliError>,
+    Bootout: FnMut() -> Result<bool, CliError>,
+    RequestShutdown: FnMut() -> Result<bool, CliError>,
+    WaitShutdown: FnMut(&str) -> Result<(), CliError>,
+{
+    if launchd_enabled && (launch_agent.installed || launch_agent.loaded) {
+        let manifest = load_manifest()?;
+        let booted_out = bootout()?;
         if booted_out && let Some(manifest) = manifest.as_ref() {
-            wait_for_daemon_shutdown(&manifest.endpoint)?;
+            wait_for_shutdown(&manifest.endpoint)?;
         }
     }
 
-    let _ = request_shutdown_if_running()?;
+    let _ = request_shutdown()?;
     Ok(DaemonControlResponse {
         status: "stopped".into(),
     })
@@ -156,22 +180,71 @@ fn stop_daemon() -> Result<DaemonControlResponse, CliError> {
 
 fn restart_daemon(binary: &Path) -> Result<DaemonControlResponse, CliError> {
     let launch_agent = launchd::launch_agent_status();
-    if cfg!(target_os = "macos") && launch_agent.loaded {
-        let manifest = try_load_manifest()?;
-        let booted_out = launchd::bootout_launch_agent()?;
+    restart_daemon_with(
+        cfg!(target_os = "macos"),
+        &launch_agent,
+        binary,
+        try_load_manifest,
+        launchd::bootout_launch_agent,
+        request_shutdown_if_running,
+        wait_for_daemon_shutdown,
+        launchd::restart_launch_agent,
+        |binary| {
+            let mut child = spawn_daemon(binary)?;
+            let _ = wait_for_healthy_daemon(Some(&mut child))?;
+            Ok(())
+        },
+        || {
+            let _ = wait_for_healthy_daemon(None)?;
+            Ok(())
+        },
+    )
+}
+
+fn restart_daemon_with<
+    LoadManifest,
+    Bootout,
+    RequestShutdown,
+    WaitShutdown,
+    RestartLaunchAgent,
+    StartManualDaemon,
+    WaitForLaunchdHealth,
+>(
+    launchd_enabled: bool,
+    launch_agent: &launchd::LaunchAgentStatus,
+    binary: &Path,
+    mut load_manifest: LoadManifest,
+    mut bootout: Bootout,
+    mut request_shutdown: RequestShutdown,
+    mut wait_for_shutdown: WaitShutdown,
+    mut restart_launch_agent: RestartLaunchAgent,
+    mut start_manual_daemon: StartManualDaemon,
+    mut wait_for_launchd_health: WaitForLaunchdHealth,
+) -> Result<DaemonControlResponse, CliError>
+where
+    LoadManifest: FnMut() -> Result<Option<super::state::DaemonManifest>, CliError>,
+    Bootout: FnMut() -> Result<bool, CliError>,
+    RequestShutdown: FnMut() -> Result<bool, CliError>,
+    WaitShutdown: FnMut(&str) -> Result<(), CliError>,
+    RestartLaunchAgent: FnMut() -> Result<(), CliError>,
+    StartManualDaemon: FnMut(&Path) -> Result<(), CliError>,
+    WaitForLaunchdHealth: FnMut() -> Result<(), CliError>,
+{
+    if launchd_enabled && launch_agent.loaded {
+        let manifest = load_manifest()?;
+        let booted_out = bootout()?;
         if booted_out && let Some(manifest) = manifest.as_ref() {
-            wait_for_daemon_shutdown(&manifest.endpoint)?;
+            wait_for_shutdown(&manifest.endpoint)?;
         }
     }
 
-    let _ = request_shutdown_if_running()?;
+    let _ = request_shutdown()?;
 
-    if cfg!(target_os = "macos") && launch_agent.installed {
-        launchd::restart_launch_agent()?;
-        let _ = wait_for_healthy_daemon(None)?;
+    if launchd_enabled && launch_agent.installed {
+        restart_launch_agent()?;
+        wait_for_launchd_health()?;
     } else {
-        let mut child = spawn_daemon(binary)?;
-        let _ = wait_for_healthy_daemon(Some(&mut child))?;
+        start_manual_daemon(binary)?;
     }
 
     Ok(DaemonControlResponse {
@@ -455,4 +528,298 @@ fn print_json<T: serde::Serialize>(value: &T) -> Result<(), CliError> {
         .map_err(|error| CliErrorKind::workflow_serialize(error.to_string()))?;
     println!("{json}");
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::daemon::state;
+    use std::cell::RefCell;
+    use std::rc::Rc;
+
+    fn sample_launch_agent_status(installed: bool, loaded: bool) -> launchd::LaunchAgentStatus {
+        launchd::LaunchAgentStatus {
+            installed,
+            loaded,
+            label: "io.harness.daemon".to_string(),
+            path: "/tmp/io.harness.daemon.plist".to_string(),
+            domain_target: "gui/501".to_string(),
+            service_target: "gui/501/io.harness.daemon".to_string(),
+            state: None,
+            pid: None,
+            last_exit_status: None,
+            status_error: None,
+        }
+    }
+
+    fn sample_manifest(endpoint: &str) -> state::DaemonManifest {
+        state::DaemonManifest {
+            version: "18.3.0".to_string(),
+            pid: 42,
+            endpoint: endpoint.to_string(),
+            started_at: "2026-04-04T00:00:00Z".to_string(),
+            token_path: "/tmp/auth-token".to_string(),
+        }
+    }
+
+    #[test]
+    fn stop_launchd_boots_out_then_reports_stopped() {
+        let calls = Rc::new(RefCell::new(Vec::<String>::new()));
+        let response = stop_daemon_with(
+            true,
+            &sample_launch_agent_status(true, true),
+            {
+                let calls = Rc::clone(&calls);
+                move || {
+                    calls.borrow_mut().push("load_manifest".to_string());
+                    Ok(Some(sample_manifest("http://127.0.0.1:7000")))
+                }
+            },
+            {
+                let calls = Rc::clone(&calls);
+                move || {
+                    calls.borrow_mut().push("bootout".to_string());
+                    Ok(true)
+                }
+            },
+            {
+                let calls = Rc::clone(&calls);
+                move || {
+                    calls.borrow_mut().push("request_shutdown".to_string());
+                    Ok(false)
+                }
+            },
+            {
+                let calls = Rc::clone(&calls);
+                move |endpoint| {
+                    calls.borrow_mut().push(format!("wait_shutdown:{endpoint}"));
+                    Ok(())
+                }
+            },
+        )
+        .expect("stop daemon");
+
+        assert_eq!(response.status, "stopped");
+        assert_eq!(
+            calls.borrow().as_slice(),
+            [
+                "load_manifest",
+                "bootout",
+                "wait_shutdown:http://127.0.0.1:7000",
+                "request_shutdown",
+            ]
+        );
+    }
+
+    #[test]
+    fn stop_launchd_missing_runtime_is_still_success() {
+        let calls = Rc::new(RefCell::new(Vec::<String>::new()));
+        let response = stop_daemon_with(
+            true,
+            &sample_launch_agent_status(true, false),
+            {
+                let calls = Rc::clone(&calls);
+                move || {
+                    calls.borrow_mut().push("load_manifest".to_string());
+                    Ok(Some(sample_manifest("http://127.0.0.1:7001")))
+                }
+            },
+            {
+                let calls = Rc::clone(&calls);
+                move || {
+                    calls.borrow_mut().push("bootout".to_string());
+                    Ok(false)
+                }
+            },
+            {
+                let calls = Rc::clone(&calls);
+                move || {
+                    calls.borrow_mut().push("request_shutdown".to_string());
+                    Ok(false)
+                }
+            },
+            |_endpoint| panic!("shutdown wait should be skipped when bootout reports no runtime"),
+        )
+        .expect("stop daemon");
+
+        assert_eq!(response.status, "stopped");
+        assert_eq!(
+            calls.borrow().as_slice(),
+            ["load_manifest", "bootout", "request_shutdown"]
+        );
+    }
+
+    #[test]
+    fn stop_without_manifest_returns_success() {
+        let calls = Rc::new(RefCell::new(Vec::<String>::new()));
+        let response = stop_daemon_with(
+            false,
+            &sample_launch_agent_status(false, false),
+            || panic!("manual stop should not read launchd manifest when launchd is disabled"),
+            || panic!("manual stop should not call launchd bootout when launchd is disabled"),
+            {
+                let calls = Rc::clone(&calls);
+                move || {
+                    calls.borrow_mut().push("request_shutdown".to_string());
+                    Ok(false)
+                }
+            },
+            |_endpoint| panic!("no shutdown wait expected when nothing is running"),
+        )
+        .expect("stop daemon");
+
+        assert_eq!(response.status, "stopped");
+        assert_eq!(calls.borrow().as_slice(), ["request_shutdown"]);
+    }
+
+    #[test]
+    fn restart_loaded_launch_agent_boots_out_then_uses_launchd_path() {
+        let calls = Rc::new(RefCell::new(Vec::<String>::new()));
+        let response = restart_daemon_with(
+            true,
+            &sample_launch_agent_status(true, true),
+            Path::new("/tmp/harness"),
+            {
+                let calls = Rc::clone(&calls);
+                move || {
+                    calls.borrow_mut().push("load_manifest".to_string());
+                    Ok(Some(sample_manifest("http://127.0.0.1:7002")))
+                }
+            },
+            {
+                let calls = Rc::clone(&calls);
+                move || {
+                    calls.borrow_mut().push("bootout".to_string());
+                    Ok(true)
+                }
+            },
+            {
+                let calls = Rc::clone(&calls);
+                move || {
+                    calls.borrow_mut().push("request_shutdown".to_string());
+                    Ok(false)
+                }
+            },
+            {
+                let calls = Rc::clone(&calls);
+                move |endpoint| {
+                    calls.borrow_mut().push(format!("wait_shutdown:{endpoint}"));
+                    Ok(())
+                }
+            },
+            {
+                let calls = Rc::clone(&calls);
+                move || {
+                    calls.borrow_mut().push("restart_launch_agent".to_string());
+                    Ok(())
+                }
+            },
+            |_binary| panic!("manual daemon path should not run when a launch agent is installed"),
+            {
+                let calls = Rc::clone(&calls);
+                move || {
+                    calls.borrow_mut().push("wait_launchd_health".to_string());
+                    Ok(())
+                }
+            },
+        )
+        .expect("restart daemon");
+
+        assert_eq!(response.status, "restarted");
+        assert_eq!(
+            calls.borrow().as_slice(),
+            [
+                "load_manifest",
+                "bootout",
+                "wait_shutdown:http://127.0.0.1:7002",
+                "request_shutdown",
+                "restart_launch_agent",
+                "wait_launchd_health",
+            ]
+        );
+    }
+
+    #[test]
+    fn restart_installed_but_offline_launch_agent_skips_manual_spawn() {
+        let calls = Rc::new(RefCell::new(Vec::<String>::new()));
+        let response = restart_daemon_with(
+            true,
+            &sample_launch_agent_status(true, false),
+            Path::new("/tmp/harness"),
+            || panic!("offline launch agent restart should not read the manifest"),
+            || panic!("offline launch agent restart should not boot out a missing runtime"),
+            {
+                let calls = Rc::clone(&calls);
+                move || {
+                    calls.borrow_mut().push("request_shutdown".to_string());
+                    Ok(false)
+                }
+            },
+            |_endpoint| panic!("offline launch agent restart should not wait for shutdown"),
+            {
+                let calls = Rc::clone(&calls);
+                move || {
+                    calls.borrow_mut().push("restart_launch_agent".to_string());
+                    Ok(())
+                }
+            },
+            |_binary| panic!("manual daemon path should not run when a launch agent is installed"),
+            {
+                let calls = Rc::clone(&calls);
+                move || {
+                    calls.borrow_mut().push("wait_launchd_health".to_string());
+                    Ok(())
+                }
+            },
+        )
+        .expect("restart daemon");
+
+        assert_eq!(response.status, "restarted");
+        assert_eq!(
+            calls.borrow().as_slice(),
+            [
+                "request_shutdown",
+                "restart_launch_agent",
+                "wait_launchd_health"
+            ]
+        );
+    }
+
+    #[test]
+    fn restart_manual_path_stops_then_spawns_replacement() {
+        let calls = Rc::new(RefCell::new(Vec::<String>::new()));
+        let response = restart_daemon_with(
+            false,
+            &sample_launch_agent_status(false, false),
+            Path::new("/tmp/harness"),
+            || panic!("manual restart should not read a launchd manifest"),
+            || panic!("manual restart should not call launchd bootout"),
+            {
+                let calls = Rc::clone(&calls);
+                move || {
+                    calls.borrow_mut().push("request_shutdown".to_string());
+                    Ok(true)
+                }
+            },
+            |_endpoint| panic!("manual restart should not use launchd shutdown waiting"),
+            || panic!("manual restart should not restart launchd"),
+            {
+                let calls = Rc::clone(&calls);
+                move |binary| {
+                    calls
+                        .borrow_mut()
+                        .push(format!("start_manual:{}", binary.display()));
+                    Ok(())
+                }
+            },
+            || panic!("manual restart should not wait on launchd health"),
+        )
+        .expect("restart daemon");
+
+        assert_eq!(response.status, "restarted");
+        assert_eq!(
+            calls.borrow().as_slice(),
+            ["request_shutdown", "start_manual:/tmp/harness"]
+        );
+    }
 }
