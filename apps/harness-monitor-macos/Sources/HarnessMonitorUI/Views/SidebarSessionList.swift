@@ -13,7 +13,9 @@ struct SidebarFilterSection: View {
   @Binding var sessionSortOrder: SessionSortOrder
   let isPersistenceAvailable: Bool
   let recentSearchQueries: [String]
+  let isExpanded: Bool
   let resetFilters: () -> Void
+  let toggleExpanded: () -> Void
   let submitSearch: () -> Void
   let setSessionFilter: (HarnessMonitorStore.SessionFilter) -> Void
   let setSessionFocusFilter: (SessionFocusFilter) -> Void
@@ -42,46 +44,54 @@ struct SidebarFilterSection: View {
       SidebarFilterHeader(
         activeFilterSummary: activeFilterSummary,
         isFiltered: isFiltered,
-        resetFilters: resetFilters
+        isExpanded: isExpanded,
+        resetFilters: resetFilters,
+        toggleExpanded: toggleExpanded
       )
 
-      VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
-        VStack(alignment: .leading, spacing: HarnessMonitorTheme.itemSpacing) {
-          SidebarSearchField(
-            searchText: $draftSearchText,
-            submitSearch: submitSearch
-          )
-
-          if searchText.isEmpty, isPersistenceAvailable {
-            RecentSearchChipsSection(
-              recentSearchQueries: recentSearchQueries,
-              applyRecentSearch: applyRecentSearch,
-              clearSearchHistory: clearSearchHistory
+      if isExpanded {
+        VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
+          VStack(alignment: .leading, spacing: HarnessMonitorTheme.itemSpacing) {
+            SidebarSearchField(
+              searchText: $draftSearchText,
+              submitSearch: submitSearch
             )
-          }
-        }
 
-        SidebarFilterControlsBar(
-          sessionFilter: Binding(
-            get: { sessionFilter },
-            set: { newValue in
-              withAnimation(.spring(duration: 0.2)) {
-                setSessionFilter(newValue)
-              }
+            if searchText.isEmpty, isPersistenceAvailable {
+              RecentSearchChipsSection(
+                recentSearchQueries: recentSearchQueries,
+                applyRecentSearch: applyRecentSearch,
+                clearSearchHistory: clearSearchHistory
+              )
             }
-          ),
-          sessionSortOrder: $sessionSortOrder,
-          sessionFocusFilter: Binding(
-            get: { sessionFocusFilter },
-            set: { newValue in
-              withAnimation(.spring(duration: 0.2)) {
-                setSessionFocusFilter(newValue)
+          }
+
+          SidebarFilterControlsBar(
+            sessionFilter: Binding(
+              get: { sessionFilter },
+              set: { newValue in
+                withAnimation(.spring(duration: 0.2)) {
+                  setSessionFilter(newValue)
+                }
               }
-            }
+            ),
+            sessionSortOrder: $sessionSortOrder,
+            sessionFocusFilter: Binding(
+              get: { sessionFocusFilter },
+              set: { newValue in
+                withAnimation(.spring(duration: 0.2)) {
+                  setSessionFocusFilter(newValue)
+                }
+              }
+            )
           )
-        )
+        }
+        .transition(FilterContentTransition())
       }
     }
+    .animation(.spring(duration: 0.38, bounce: 0.18), value: isExpanded)
+    .clipped()
+    .sensoryFeedback(.selection, trigger: isExpanded)
     .frame(maxWidth: .infinity, alignment: .leading)
     .padding(HarnessMonitorTheme.cardPadding)
     .harnessFloatingControlGlass(
@@ -100,7 +110,9 @@ private struct SidebarFilterHeader: View {
 
   let activeFilterSummary: String
   let isFiltered: Bool
+  let isExpanded: Bool
   let resetFilters: () -> Void
+  let toggleExpanded: () -> Void
 
   var body: some View {
     HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.itemSpacing) {
@@ -117,9 +129,24 @@ private struct SidebarFilterHeader: View {
   }
 
   private var title: some View {
-    Text("Search & Filters")
-      .scaledFont(.system(.headline, design: .rounded, weight: .semibold))
-      .accessibilityAddTraits(.isHeader)
+    Button {
+      toggleExpanded()
+    } label: {
+      HStack(spacing: 4) {
+        Text("Search & Filters")
+          .scaledFont(.system(.headline, design: .rounded, weight: .semibold))
+        Image(systemName: "chevron.down")
+          .scaledFont(.caption.weight(.semibold))
+          .rotationEffect(isExpanded ? .zero : .degrees(-90))
+          .animation(.spring(duration: 0.28, bounce: 0.2), value: isExpanded)
+          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+      }
+    }
+    .buttonStyle(FilterToggleButtonStyle())
+    .accessibilityAddTraits(.isHeader)
+    .accessibilityLabel("Search & Filters")
+    .accessibilityHint(isExpanded ? "Collapse filters" : "Expand filters")
+    .accessibilityIdentifier(HarnessMonitorAccessibility.sidebarFiltersToggle)
   }
 
   private var summary: some View {
@@ -140,6 +167,40 @@ private struct SidebarFilterHeader: View {
     .accessibilityIdentifier(HarnessMonitorAccessibility.sidebarClearFiltersButton)
   }
 
+}
+
+// Collapses content toward the header: scale from top + fade.
+// Stays within the VStack layout frame — no overflow past card edges.
+private struct FilterContentTransition: Transition {
+  func body(content: Content, phase: TransitionPhase) -> some View {
+    content
+      .opacity(phase.isIdentity ? 1 : 0)
+      .scaleEffect(x: 1, y: phase.isIdentity ? 1 : 0.88, anchor: .top)
+  }
+}
+
+private struct FilterToggleButtonStyle: ButtonStyle {
+  @State private var isHovered = false
+
+  func makeBody(configuration: Configuration) -> some View {
+    configuration.label
+      .padding(.vertical, 2)
+      .padding(.horizontal, 4)
+      .background {
+        RoundedRectangle(cornerRadius: 5, style: .continuous)
+          .fill(
+            configuration.isPressed
+              ? HarnessMonitorTheme.ink.opacity(0.14)
+              : isHovered
+                ? HarnessMonitorTheme.ink.opacity(0.08)
+                : Color.clear
+          )
+      }
+      .scaleEffect(configuration.isPressed ? 0.96 : 1, anchor: .leading)
+      .animation(.easeOut(duration: 0.08), value: configuration.isPressed)
+      .animation(.easeOut(duration: 0.15), value: isHovered)
+      .onHover { isHovered = $0 }
+  }
 }
 
 private struct RecentSearchChipsSection: View {
@@ -181,54 +242,13 @@ private struct RecentSearchChipsSection: View {
 }
 
 private struct SidebarSearchField: View {
-  @ScaledMetric(relativeTo: .body) private var horizontalPadding = 10
-  @ScaledMetric(relativeTo: .body) private var verticalPadding = 7
-
-  @Environment(\.accessibilityReduceTransparency)
-  private var reduceTransparency
-  @Environment(\.colorSchemeContrast)
-  private var colorSchemeContrast
-
   @Binding var searchText: String
   let submitSearch: () -> Void
-
-  private var fillOpacity: Double {
-    if reduceTransparency {
-      return colorSchemeContrast == .increased ? 0.18 : 0.12
-    }
-    return colorSchemeContrast == .increased ? 0.12 : 0.06
-  }
-
-  private var strokeOpacity: Double {
-    if reduceTransparency {
-      return colorSchemeContrast == .increased ? 0.26 : 0.18
-    }
-    return colorSchemeContrast == .increased ? 0.18 : 0.1
-  }
 
   var body: some View {
     TextField("Search sessions, projects, leaders", text: $searchText)
       .harnessNativeFormControl()
-      .textFieldStyle(.plain)
-      .padding(.horizontal, horizontalPadding)
-      .padding(.vertical, verticalPadding)
-      .background {
-        RoundedRectangle(
-          cornerRadius: HarnessMonitorTheme.cornerRadiusSM,
-          style: .continuous
-        )
-        .fill(HarnessMonitorTheme.ink.opacity(fillOpacity))
-      }
-      .overlay {
-        RoundedRectangle(
-          cornerRadius: HarnessMonitorTheme.cornerRadiusSM,
-          style: .continuous
-        )
-        .strokeBorder(
-          HarnessMonitorTheme.controlBorder.opacity(strokeOpacity),
-          lineWidth: colorSchemeContrast == .increased ? 1 : 0.75
-        )
-      }
+      .textFieldStyle(.roundedBorder)
       .accessibilityIdentifier("harness.sidebar.search")
       .onSubmit(submitSearch)
   }
