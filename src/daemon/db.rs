@@ -1090,6 +1090,65 @@ impl DaemonDb {
     // Daemon-first direct mutation helpers
     // -----------------------------------------------------------------------
 
+    /// Load a session's state for in-memory mutation. Returns `None`
+    /// when the session does not exist.
+    ///
+    /// This is the read side of the daemon-first mutation pattern:
+    /// load state, apply business logic, save back via
+    /// [`save_session_state`].
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on SQL or deserialization failures.
+    pub fn load_session_state_for_mutation(
+        &self,
+        session_id: &str,
+    ) -> Result<Option<SessionState>, CliError> {
+        self.load_session_state(session_id)
+    }
+
+    /// Persist a mutated session state back to `SQLite`. This is the
+    /// write side of the daemon-first mutation pattern after
+    /// [`load_session_state_for_mutation`] and an `apply_*` call.
+    ///
+    /// Delegates to [`sync_session`] which performs a full upsert of
+    /// the session row plus denormalized agents and tasks.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on SQL failures.
+    pub fn save_session_state(
+        &self,
+        project_id: &str,
+        state: &SessionState,
+    ) -> Result<(), CliError> {
+        self.sync_session(project_id, state)
+    }
+
+    /// Insert a new session record with `is_active = 1`. Use this for
+    /// the daemon-first `start_session` path where the session is
+    /// created directly in `SQLite` without touching files.
+    ///
+    /// Delegates to [`sync_session`] (which is an upsert) and then
+    /// explicitly ensures the active flag is set.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on SQL failures.
+    pub fn create_session_record(
+        &self,
+        project_id: &str,
+        state: &SessionState,
+    ) -> Result<(), CliError> {
+        self.sync_session(project_id, state)?;
+        // sync_session sets is_active based on status, but be explicit
+        // for clarity: a newly created session is always active.
+        self.conn
+            .execute(
+                "UPDATE sessions SET is_active = 1 WHERE session_id = ?1",
+                [&state.session_id],
+            )
+            .map_err(|error| db_error(format!("mark new session active: {error}")))?;
+        Ok(())
+    }
+
     /// Clear the active flag for a session (replaces file-based
     /// `storage::deregister_active`).
     ///
@@ -1109,10 +1168,7 @@ impl DaemonDb {
     ///
     /// # Errors
     /// Returns [`CliError`] on SQL failures.
-    pub fn project_id_for_session(
-        &self,
-        session_id: &str,
-    ) -> Result<Option<String>, CliError> {
+    pub fn project_id_for_session(&self, session_id: &str) -> Result<Option<String>, CliError> {
         let result = self.conn.query_row(
             "SELECT project_id FROM sessions WHERE session_id = ?1",
             [session_id],
@@ -2335,5 +2391,81 @@ mod tests {
         let db = DaemonDb::open_in_memory().expect("open db");
         let result = db.ensure_project_for_dir("/nonexistent/path");
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn load_session_state_for_mutation_returns_mutable_state() {
+        let db = DaemonDb::open_in_memory().expect("open db");
+        let project = sample_project();
+        db.sync_project(&project).expect("sync project");
+        let state = sample_session_state();
+        db.sync_session(&project.project_id, &state)
+            .expect("sync session");
+
+        let loaded = db
+            .load_session_state_for_mutation(&state.session_id)
+            .expect("load")
+            .expect("present");
+        assert_eq!(loaded.session_id, "sess-test-1");
+        assert_eq!(loaded.agents.len(), 1);
+        assert_eq!(loaded.tasks.len(), 1);
+    }
+
+    #[test]
+    fn load_session_state_for_mutation_returns_none_for_missing() {
+        let db = DaemonDb::open_in_memory().expect("open db");
+        let loaded = db
+            .load_session_state_for_mutation("nonexistent")
+            .expect("load");
+        assert!(loaded.is_none());
+    }
+
+    #[test]
+    fn save_session_state_persists_changes() {
+        let db = DaemonDb::open_in_memory().expect("open db");
+        let project = sample_project();
+        db.sync_project(&project).expect("sync project");
+        let mut state = sample_session_state();
+        db.sync_session(&project.project_id, &state)
+            .expect("initial sync");
+
+        state.context = "updated context".into();
+        state.state_version = 2;
+        db.save_session_state(&project.project_id, &state)
+            .expect("save");
+
+        let reloaded = db
+            .load_session_state(&state.session_id)
+            .expect("load")
+            .expect("present");
+        assert_eq!(reloaded.context, "updated context");
+        assert_eq!(reloaded.state_version, 2);
+    }
+
+    #[test]
+    fn create_session_record_inserts_active_session() {
+        let db = DaemonDb::open_in_memory().expect("open db");
+        let project = sample_project();
+        db.sync_project(&project).expect("sync project");
+
+        let state = sample_session_state();
+        db.create_session_record(&project.project_id, &state)
+            .expect("create");
+
+        let loaded = db
+            .load_session_state(&state.session_id)
+            .expect("load")
+            .expect("present");
+        assert_eq!(loaded.session_id, "sess-test-1");
+
+        let is_active: i32 = db
+            .conn
+            .query_row(
+                "SELECT is_active FROM sessions WHERE session_id = ?1",
+                [&state.session_id],
+                |row| row.get(0),
+            )
+            .expect("query active");
+        assert_eq!(is_active, 1);
     }
 }

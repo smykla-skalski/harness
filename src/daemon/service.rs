@@ -376,21 +376,23 @@ pub fn create_task(
     };
 
     if let Some(db) = db
-        && let Some(mut state) = db.load_session_state(session_id)?
+        && let Some(mut state) = db.load_session_state_for_mutation(session_id)?
     {
-            let item = session_service::apply_create_task(&mut state, &spec, &request.actor, &utc_now())?;
-            let project_id = db.project_id_for_session(session_id)?
-                .ok_or_else(|| session_not_found(session_id))?;
-            db.sync_session(&project_id, &state)?;
-            db.append_log_entry(&build_log_entry(
-                session_id,
-                session_service::log_task_created(&spec, &item),
-                Some(&request.actor),
-                None,
-            ))?;
-            db.bump_change(session_id)?;
-            db.bump_change("global")?;
-            return session_detail(session_id, Some(db));
+        let item =
+            session_service::apply_create_task(&mut state, &spec, &request.actor, &utc_now())?;
+        let project_id = db
+            .project_id_for_session(session_id)?
+            .ok_or_else(|| session_not_found(session_id))?;
+        db.save_session_state(&project_id, &state)?;
+        db.append_log_entry(&build_log_entry(
+            session_id,
+            session_service::log_task_created(&spec, &item),
+            Some(&request.actor),
+            None,
+        ))?;
+        db.bump_change(session_id)?;
+        db.bump_change("global")?;
+        return session_detail(session_id, Some(db));
     }
 
     let resolved = index::resolve_session(session_id)?;
@@ -412,20 +414,39 @@ pub fn assign_task(
     db: Option<&super::db::DaemonDb>,
 ) -> Result<SessionDetail, CliError> {
     if let Some(db) = db
-        && let Some(mut state) = db.load_session_state(session_id)?
+        && let Some(mut state) = db.load_session_state_for_mutation(session_id)?
     {
-            session_service::apply_assign_task(&mut state, task_id, &request.agent_id, &request.actor, &utc_now())?;
-            let project_id = db.project_id_for_session(session_id)?.ok_or_else(|| session_not_found(session_id))?;
-            db.sync_session(&project_id, &state)?;
-            db.append_log_entry(&build_log_entry(session_id, session_service::log_task_assigned(task_id, &request.agent_id), Some(&request.actor), None))?;
-            db.bump_change(session_id)?;
-            db.bump_change("global")?;
-            return session_detail(session_id, Some(db));
+        session_service::apply_assign_task(
+            &mut state,
+            task_id,
+            &request.agent_id,
+            &request.actor,
+            &utc_now(),
+        )?;
+        let project_id = db
+            .project_id_for_session(session_id)?
+            .ok_or_else(|| session_not_found(session_id))?;
+        db.save_session_state(&project_id, &state)?;
+        db.append_log_entry(&build_log_entry(
+            session_id,
+            session_service::log_task_assigned(task_id, &request.agent_id),
+            Some(&request.actor),
+            None,
+        ))?;
+        db.bump_change(session_id)?;
+        db.bump_change("global")?;
+        return session_detail(session_id, Some(db));
     }
 
     let resolved = index::resolve_session(session_id)?;
     let project_dir = effective_project_dir(&resolved);
-    session_service::assign_task(session_id, task_id, &request.agent_id, &request.actor, project_dir)?;
+    session_service::assign_task(
+        session_id,
+        task_id,
+        &request.agent_id,
+        &request.actor,
+        project_dir,
+    )?;
     sync_after_mutation(db, session_id);
     session_detail(session_id, db)
 }
@@ -441,20 +462,41 @@ pub fn update_task(
     db: Option<&super::db::DaemonDb>,
 ) -> Result<SessionDetail, CliError> {
     if let Some(db) = db
-        && let Some(mut state) = db.load_session_state(session_id)?
+        && let Some(mut state) = db.load_session_state_for_mutation(session_id)?
     {
-            let from_status = session_service::apply_update_task(&mut state, task_id, request.status, request.note.as_deref(), &request.actor, &utc_now())?;
-            let project_id = db.project_id_for_session(session_id)?.ok_or_else(|| session_not_found(session_id))?;
-            db.sync_session(&project_id, &state)?;
-            db.append_log_entry(&build_log_entry(session_id, session_service::log_task_status_changed(task_id, from_status, request.status), Some(&request.actor), None))?;
-            db.bump_change(session_id)?;
-            db.bump_change("global")?;
-            return session_detail(session_id, Some(db));
+        let from_status = session_service::apply_update_task(
+            &mut state,
+            task_id,
+            request.status,
+            request.note.as_deref(),
+            &request.actor,
+            &utc_now(),
+        )?;
+        let project_id = db
+            .project_id_for_session(session_id)?
+            .ok_or_else(|| session_not_found(session_id))?;
+        db.save_session_state(&project_id, &state)?;
+        db.append_log_entry(&build_log_entry(
+            session_id,
+            session_service::log_task_status_changed(task_id, from_status, request.status),
+            Some(&request.actor),
+            None,
+        ))?;
+        db.bump_change(session_id)?;
+        db.bump_change("global")?;
+        return session_detail(session_id, Some(db));
     }
 
     let resolved = index::resolve_session(session_id)?;
     let project_dir = effective_project_dir(&resolved);
-    session_service::update_task(session_id, task_id, request.status, request.note.as_deref(), &request.actor, project_dir)?;
+    session_service::update_task(
+        session_id,
+        task_id,
+        request.status,
+        request.note.as_deref(),
+        &request.actor,
+        project_dir,
+    )?;
     sync_after_mutation(db, session_id);
     session_detail(session_id, db)
 }
@@ -470,21 +512,46 @@ pub fn checkpoint_task(
     db: Option<&super::db::DaemonDb>,
 ) -> Result<SessionDetail, CliError> {
     if let Some(db) = db
-        && let Some(mut state) = db.load_session_state(session_id)?
+        && let Some(mut state) = db.load_session_state_for_mutation(session_id)?
     {
-            let checkpoint = session_service::apply_record_checkpoint(&mut state, task_id, &request.actor, &request.summary, request.progress, &utc_now())?;
-            let project_id = db.project_id_for_session(session_id)?.ok_or_else(|| session_not_found(session_id))?;
-            db.sync_session(&project_id, &state)?;
-            db.append_checkpoint(session_id, &checkpoint)?;
-            db.append_log_entry(&build_log_entry(session_id, session_service::log_checkpoint_recorded(task_id, &checkpoint.checkpoint_id, request.progress), Some(&request.actor), None))?;
-            db.bump_change(session_id)?;
-            db.bump_change("global")?;
-            return session_detail(session_id, Some(db));
+        let checkpoint = session_service::apply_record_checkpoint(
+            &mut state,
+            task_id,
+            &request.actor,
+            &request.summary,
+            request.progress,
+            &utc_now(),
+        )?;
+        let project_id = db
+            .project_id_for_session(session_id)?
+            .ok_or_else(|| session_not_found(session_id))?;
+        db.save_session_state(&project_id, &state)?;
+        db.append_checkpoint(session_id, &checkpoint)?;
+        db.append_log_entry(&build_log_entry(
+            session_id,
+            session_service::log_checkpoint_recorded(
+                task_id,
+                &checkpoint.checkpoint_id,
+                request.progress,
+            ),
+            Some(&request.actor),
+            None,
+        ))?;
+        db.bump_change(session_id)?;
+        db.bump_change("global")?;
+        return session_detail(session_id, Some(db));
     }
 
     let resolved = index::resolve_session(session_id)?;
     let project_dir = effective_project_dir(&resolved);
-    let _ = session_service::record_task_checkpoint(session_id, task_id, &request.actor, &request.summary, request.progress, project_dir)?;
+    let _ = session_service::record_task_checkpoint(
+        session_id,
+        task_id,
+        &request.actor,
+        &request.summary,
+        request.progress,
+        project_dir,
+    )?;
     sync_after_mutation(db, session_id);
     session_detail(session_id, db)
 }
@@ -500,20 +567,40 @@ pub fn change_role(
     db: Option<&super::db::DaemonDb>,
 ) -> Result<SessionDetail, CliError> {
     if let Some(db) = db
-        && let Some(mut state) = db.load_session_state(session_id)?
+        && let Some(mut state) = db.load_session_state_for_mutation(session_id)?
     {
-            let from_role = session_service::apply_assign_role(&mut state, agent_id, request.role, &request.actor, &utc_now())?;
-            let project_id = db.project_id_for_session(session_id)?.ok_or_else(|| session_not_found(session_id))?;
-            db.sync_session(&project_id, &state)?;
-            db.append_log_entry(&build_log_entry(session_id, session_service::log_role_changed(agent_id, from_role, request.role), Some(&request.actor), request.reason.as_deref()))?;
-            db.bump_change(session_id)?;
-            db.bump_change("global")?;
-            return session_detail(session_id, Some(db));
+        let from_role = session_service::apply_assign_role(
+            &mut state,
+            agent_id,
+            request.role,
+            &request.actor,
+            &utc_now(),
+        )?;
+        let project_id = db
+            .project_id_for_session(session_id)?
+            .ok_or_else(|| session_not_found(session_id))?;
+        db.save_session_state(&project_id, &state)?;
+        db.append_log_entry(&build_log_entry(
+            session_id,
+            session_service::log_role_changed(agent_id, from_role, request.role),
+            Some(&request.actor),
+            request.reason.as_deref(),
+        ))?;
+        db.bump_change(session_id)?;
+        db.bump_change("global")?;
+        return session_detail(session_id, Some(db));
     }
 
     let resolved = index::resolve_session(session_id)?;
     let project_dir = effective_project_dir(&resolved);
-    session_service::assign_role(session_id, agent_id, request.role, request.reason.as_deref(), &request.actor, project_dir)?;
+    session_service::assign_role(
+        session_id,
+        agent_id,
+        request.role,
+        request.reason.as_deref(),
+        &request.actor,
+        project_dir,
+    )?;
     sync_after_mutation(db, session_id);
     session_detail(session_id, db)
 }
@@ -529,15 +616,22 @@ pub fn remove_agent(
     db: Option<&super::db::DaemonDb>,
 ) -> Result<SessionDetail, CliError> {
     if let Some(db) = db
-        && let Some(mut state) = db.load_session_state(session_id)?
+        && let Some(mut state) = db.load_session_state_for_mutation(session_id)?
     {
-            session_service::apply_remove_agent(&mut state, agent_id, &request.actor, &utc_now())?;
-            let project_id = db.project_id_for_session(session_id)?.ok_or_else(|| session_not_found(session_id))?;
-            db.sync_session(&project_id, &state)?;
-            db.append_log_entry(&build_log_entry(session_id, session_service::log_agent_removed(agent_id), Some(&request.actor), None))?;
-            db.bump_change(session_id)?;
-            db.bump_change("global")?;
-            return session_detail(session_id, Some(db));
+        session_service::apply_remove_agent(&mut state, agent_id, &request.actor, &utc_now())?;
+        let project_id = db
+            .project_id_for_session(session_id)?
+            .ok_or_else(|| session_not_found(session_id))?;
+        db.save_session_state(&project_id, &state)?;
+        db.append_log_entry(&build_log_entry(
+            session_id,
+            session_service::log_agent_removed(agent_id),
+            Some(&request.actor),
+            None,
+        ))?;
+        db.bump_change(session_id)?;
+        db.bump_change("global")?;
+        return session_detail(session_id, Some(db));
     }
 
     let resolved = index::resolve_session(session_id)?;
@@ -557,20 +651,34 @@ pub fn transfer_leader(
     db: Option<&super::db::DaemonDb>,
 ) -> Result<SessionDetail, CliError> {
     if let Some(db) = db
-        && let Some(mut state) = db.load_session_state(session_id)?
+        && let Some(mut state) = db.load_session_state_for_mutation(session_id)?
     {
-            let plan = session_service::apply_transfer_leader(&mut state, &request.new_leader_id, &request.actor, request.reason.as_deref(), &utc_now())?;
-            let project_id = db.project_id_for_session(session_id)?.ok_or_else(|| session_not_found(session_id))?;
-            db.sync_session(&project_id, &state)?;
-            append_transfer_logs_to_db(db, session_id, &request.actor, &plan)?;
-            db.bump_change(session_id)?;
-            db.bump_change("global")?;
-            return session_detail(session_id, Some(db));
+        let plan = session_service::apply_transfer_leader(
+            &mut state,
+            &request.new_leader_id,
+            &request.actor,
+            request.reason.as_deref(),
+            &utc_now(),
+        )?;
+        let project_id = db
+            .project_id_for_session(session_id)?
+            .ok_or_else(|| session_not_found(session_id))?;
+        db.save_session_state(&project_id, &state)?;
+        append_transfer_logs_to_db(db, session_id, &request.actor, &plan)?;
+        db.bump_change(session_id)?;
+        db.bump_change("global")?;
+        return session_detail(session_id, Some(db));
     }
 
     let resolved = index::resolve_session(session_id)?;
     let project_dir = effective_project_dir(&resolved);
-    session_service::transfer_leader(session_id, &request.new_leader_id, request.reason.as_deref(), &request.actor, project_dir)?;
+    session_service::transfer_leader(
+        session_id,
+        &request.new_leader_id,
+        request.reason.as_deref(),
+        &request.actor,
+        project_dir,
+    )?;
     sync_after_mutation(db, session_id);
     session_detail(session_id, db)
 }
@@ -585,16 +693,23 @@ pub fn end_session(
     db: Option<&super::db::DaemonDb>,
 ) -> Result<SessionDetail, CliError> {
     if let Some(db) = db
-        && let Some(mut state) = db.load_session_state(session_id)?
+        && let Some(mut state) = db.load_session_state_for_mutation(session_id)?
     {
-            session_service::apply_end_session(&mut state, &request.actor, &utc_now())?;
-            let project_id = db.project_id_for_session(session_id)?.ok_or_else(|| session_not_found(session_id))?;
-            db.sync_session(&project_id, &state)?;
-            db.mark_session_inactive(session_id)?;
-            db.append_log_entry(&build_log_entry(session_id, session_service::log_session_ended(), Some(&request.actor), None))?;
-            db.bump_change(session_id)?;
-            db.bump_change("global")?;
-            return session_detail(session_id, Some(db));
+        session_service::apply_end_session(&mut state, &request.actor, &utc_now())?;
+        let project_id = db
+            .project_id_for_session(session_id)?
+            .ok_or_else(|| session_not_found(session_id))?;
+        db.save_session_state(&project_id, &state)?;
+        db.mark_session_inactive(session_id)?;
+        db.append_log_entry(&build_log_entry(
+            session_id,
+            session_service::log_session_ended(),
+            Some(&request.actor),
+            None,
+        ))?;
+        db.bump_change(session_id)?;
+        db.bump_change("global")?;
+        return session_detail(session_id, Some(db));
     }
 
     let resolved = index::resolve_session(session_id)?;
@@ -645,8 +760,7 @@ pub fn start_session_direct(
     db: Option<&super::db::DaemonDb>,
 ) -> Result<SessionState, CliError> {
     let runtime_name = &request.runtime;
-    let leader_runtime = resolve_hook_agent(runtime_name)
-    .ok_or_else(|| {
+    let leader_runtime = resolve_hook_agent(runtime_name).ok_or_else(|| {
         CliError::from(CliErrorKind::session_agent_conflict(format!(
             "session start requires a known runtime, got '{runtime_name}'"
         )))
@@ -671,7 +785,7 @@ pub fn start_session_direct(
 
     if let Some(db) = db {
         let project_id = db.ensure_project_for_dir(&request.project_dir)?;
-        db.sync_session(&project_id, &state)?;
+        db.create_session_record(&project_id, &state)?;
         let leader_id = state.leader_id.as_deref().unwrap_or("");
         db.append_log_entry(&build_log_entry(
             &session_id,
@@ -713,7 +827,7 @@ pub fn join_session_direct(
         .flatten();
 
     if let Some(db) = db
-        && let Some(mut state) = db.load_session_state(session_id)?
+        && let Some(mut state) = db.load_session_state_for_mutation(session_id)?
     {
         let now = utc_now();
         let agent_id = session_service::apply_join_session(
@@ -728,7 +842,7 @@ pub fn join_session_direct(
         let project_id = db
             .project_id_for_session(session_id)?
             .ok_or_else(|| session_not_found(session_id))?;
-        db.sync_session(&project_id, &state)?;
+        db.save_session_state(&project_id, &state)?;
         db.append_log_entry(&build_log_entry(
             session_id,
             session_service::log_agent_joined(&agent_id, request.role, &request.runtime),
@@ -1400,7 +1514,10 @@ mod tests {
     }
 
     /// Build an in-memory DB with a project and session loaded from files.
-    #[expect(dead_code, reason = "used by future DB-direct tests that also need file state")]
+    #[expect(
+        dead_code,
+        reason = "used by future DB-direct tests that also need file state"
+    )]
     fn setup_db_with_session(project: &Path, session_id: &str) -> crate::daemon::db::DaemonDb {
         let db = crate::daemon::db::DaemonDb::open_in_memory().expect("open in-memory db");
         let projects = index::discover_projects().expect("discover projects");
@@ -1418,7 +1535,10 @@ mod tests {
     /// SQLite (no files for that session). The session only exists in the DB.
     fn setup_db_only_session(
         project: &Path,
-    ) -> (crate::daemon::db::DaemonDb, crate::session::types::SessionState) {
+    ) -> (
+        crate::daemon::db::DaemonDb,
+        crate::session::types::SessionState,
+    ) {
         use crate::session::service::build_new_session;
         use crate::workspace::project_context_dir;
 
@@ -1438,8 +1558,13 @@ mod tests {
         };
         db.sync_project(&project_record).expect("sync project");
 
-        let state =
-            build_new_session("db-only test", "db-only-sess", "claude", Some("test-session"), &utc_now());
+        let state = build_new_session(
+            "db-only test",
+            "db-only-sess",
+            "claude",
+            Some("test-session"),
+            &utc_now(),
+        );
         db.sync_session(&project_record.project_id, &state)
             .expect("sync session");
         (db, state)
@@ -1490,9 +1615,7 @@ mod tests {
 
             let _ = end_session(
                 &state.session_id,
-                &SessionEndRequest {
-                    actor: leader_id,
-                },
+                &SessionEndRequest { actor: leader_id },
                 Some(&db),
             )
             .expect("end session via db");
