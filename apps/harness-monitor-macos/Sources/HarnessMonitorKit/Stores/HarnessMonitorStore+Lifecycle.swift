@@ -24,6 +24,7 @@ extension HarnessMonitorStore {
       return
     }
     startConnectionProbe(using: client)
+    startManifestWatcher()
     startGlobalStream(using: client)
     if let selectedSessionID {
       startSessionStream(using: client, sessionID: selectedSessionID)
@@ -479,5 +480,36 @@ extension HarnessMonitorStore {
     sessions: [SessionSummary]
   ) -> Bool {
     selectedSessionID == nil && client is PreviewHarnessClient && !sessions.isEmpty
+  }
+
+  func startManifestWatcher() {
+    stopManifestWatcher()
+    let manifestURL = HarnessMonitorPaths.manifestURL()
+    let decoder = JSONDecoder()
+    decoder.keyDecodingStrategy = .convertFromSnakeCase
+    guard let data = FileManager.default.contents(atPath: manifestURL.path),
+          let manifest = try? decoder.decode(DaemonManifest.self, from: data)
+    else {
+      return
+    }
+    let watcher = ManifestWatcher(currentEndpoint: manifest.endpoint) { [weak self] in
+      Task { @MainActor [weak self] in
+        guard let self else { return }
+        // Skip if already reconnecting or offline (user stopped daemon)
+        guard self.connectionState == .online else { return }
+        self.appendConnectionEvent(
+          kind: .reconnecting,
+          detail: "Daemon manifest changed, re-bootstrapping"
+        )
+        await self.reconnect()
+      }
+    }
+    manifestWatcher = watcher
+    watcher.start()
+  }
+
+  func stopManifestWatcher() {
+    manifestWatcher?.stop()
+    manifestWatcher = nil
   }
 }
