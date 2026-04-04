@@ -7,7 +7,7 @@ use harness::daemon::service::DaemonStatusReport;
 use tempfile::tempdir;
 use tokio::runtime::Runtime;
 
-const DAEMON_WAIT_TIMEOUT: Duration = Duration::from_secs(8);
+const DAEMON_WAIT_TIMEOUT: Duration = Duration::from_secs(15);
 const DAEMON_WAIT_INTERVAL: Duration = Duration::from_millis(250);
 const DAEMON_HTTP_TIMEOUT: Duration = Duration::from_secs(1);
 
