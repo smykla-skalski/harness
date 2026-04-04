@@ -49,6 +49,15 @@ private struct HarnessMonitorAccessoryButtonStyle: ViewModifier {
   }
 }
 
+private struct HarnessMonitorTextActionButtonStyle: ViewModifier {
+  let tint: Color
+
+  func body(content: Content) -> some View {
+    content
+      .modifier(HarnessMonitorSystemButtonChromeModifier(style: .borderless, tint: tint))
+  }
+}
+
 private struct HarnessMonitorFilterChipStyle: ViewModifier {
   let isSelected: Bool
 
@@ -159,6 +168,12 @@ extension View {
     tint: Color = .secondary
   ) -> some View {
     modifier(HarnessMonitorAccessoryButtonStyle(tint: tint))
+  }
+
+  func harnessTextActionButtonStyle(
+    tint: Color = HarnessMonitorTheme.secondaryInk
+  ) -> some View {
+    modifier(HarnessMonitorTextActionButtonStyle(tint: tint))
   }
 
   func harnessFilterChipButtonStyle(isSelected: Bool) -> some View {
