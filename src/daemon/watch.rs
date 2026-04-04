@@ -78,15 +78,19 @@ fn spawn_db_watch_loop(
 
         loop {
             tokio::select! {
-                Some(_result) = event_rx.recv() => {
-                    // File event: drain all pending events, then re-index affected files
-                    while event_rx.try_recv().is_ok() {}
-                    reindex_from_files(&db);
+                Some(result) = event_rx.recv() => {
+                    // Collect all pending file events and extract affected session IDs
+                    let mut paths: Vec<_> = result
+                        .map(|event| event.paths)
+                        .unwrap_or_default();
+                    while let Ok(result) = event_rx.try_recv() {
+                        if let Ok(event) = result {
+                            paths.extend(event.paths);
+                        }
+                    }
+                    reindex_sessions_from_paths(&db, &paths);
                 }
-                _ = ticker.tick() => {
-                    // Periodic fallback: re-index in case file events were missed
-                    reindex_from_files(&db);
-                }
+                _ = ticker.tick() => {}
             }
 
             let Ok(db_guard) = db.lock() else {
@@ -194,14 +198,17 @@ fn poll_change_tracking(
     changes
 }
 
-fn reindex_from_files(db: &Arc<Mutex<DaemonDb>>) {
+fn reindex_sessions_from_paths(db: &Arc<Mutex<DaemonDb>>, paths: &[PathBuf]) {
+    let session_ids = extract_session_ids(paths);
+    if session_ids.is_empty() {
+        return;
+    }
     let Ok(db_guard) = db.lock() else {
         return;
     };
-    // Re-run the import for all sessions to pick up file changes.
-    // This is cheaper than the legacy approach since it writes to SQLite
-    // rather than serializing full snapshots to JSON strings.
-    let _ = db_guard.import_from_files();
+    for session_id in &session_ids {
+        let _ = db_guard.resync_session(session_id);
+    }
 }
 
 fn create_watcher(
