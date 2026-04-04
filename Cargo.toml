@@ -34,7 +34,7 @@ rayon = "1.11.0"
 base64 = "0.22.1"
 futures-util = "0.3.31"
 tracing = "0.1.44"
-tracing-subscriber = { version = "0.3.23", features = ["chrono", "env-filter"] }
+tracing-subscriber = { version = "0.3.23", features = ["chrono", "env-filter", "json"] }
 fs2 = "0.4.3"
 fs-err = "3.3.0"
 gray_matter = { version = "0.3.2", default-features = false, features = ["yaml"] }
