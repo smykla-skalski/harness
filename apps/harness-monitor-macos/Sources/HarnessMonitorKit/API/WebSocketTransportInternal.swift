@@ -60,6 +60,11 @@ extension WebSocketTransport {
     }
   }
 
+  /// Maximum internal WS reconnection attempts before giving up and
+  /// letting the store-level retry escalate to a full re-bootstrap
+  /// (which re-reads the daemon manifest and discovers the new port).
+  private static let maxReconnectAttempts = reconnectDelays.count
+
   func startReceiveLoop() {
     receiveTask?.cancel()
     receiveTask = Task { [weak self] in
@@ -75,6 +80,12 @@ extension WebSocketTransport {
           if Task.isCancelled { return }
           self.pending.failAll(error: error)
           await self.terminateAllStreams()
+          if attempt >= Self.maxReconnectAttempts {
+            HarnessMonitorLogger.websocket.warning(
+              "WebSocket reconnection exhausted after \(attempt) attempts, yielding to store"
+            )
+            break
+          }
           let delay = Self.reconnectDelays[
             min(attempt, Self.reconnectDelays.count - 1)
           ]

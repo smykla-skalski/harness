@@ -273,6 +273,10 @@ async fn recv_broadcast_event(
     }
 }
 
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion; tokio-rs/tracing#553"
+)]
 fn prepare_push_frame(
     event: &StreamEvent,
     connection: &Arc<Mutex<ConnectionState>>,
@@ -299,7 +303,16 @@ fn prepare_push_frame(
         payload: event.payload.clone(),
         seq,
     };
-    serde_json::to_string(&push).ok()
+    let json = serde_json::to_string(&push).ok();
+    if json.is_some() {
+        tracing::info!(
+            event = %event.event,
+            session_id = event.session_id.as_deref().unwrap_or("-"),
+            seq,
+            "ws push"
+        );
+    }
+    json
 }
 
 fn handle_message(
@@ -341,7 +354,7 @@ fn dispatch(
     let response = dispatch_inner(request, state, connection);
     let duration_ms = u64::try_from(start.elapsed().as_millis()).unwrap_or(u64::MAX);
     let is_error = response.error.is_some();
-    tracing::debug!(
+    tracing::info!(
         method = %request.method,
         request_id = %request.id,
         duration_ms,
