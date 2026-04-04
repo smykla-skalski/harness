@@ -9,6 +9,7 @@ use tokio::sync::{broadcast, watch};
 use harness::daemon::db::DaemonDb;
 use harness::daemon::http::{DaemonHttpState, serve};
 use harness::daemon::protocol::StreamEvent;
+use harness::daemon::service;
 use harness::daemon::state::{self, DaemonManifest};
 use harness::daemon::websocket::ReplayBuffer;
 use harness::session::service as session_service;
@@ -234,4 +235,63 @@ async fn daemon_http_endpoint_performance_budgets() {
     }
 
     assert!(all_passed, "one or more endpoints exceeded performance budget");
+}
+
+/// Measure `status_report()` which is the CLI `daemon status` code path.
+/// Uses SQLite when the DB exists, file-based discovery otherwise.
+#[ignore]
+#[test]
+fn daemon_status_report_within_budget() {
+    let tmp = tempdir().expect("tempdir");
+    let xdg = tmp.path().to_str().expect("utf8").to_string();
+
+    temp_env::with_vars(
+        [
+            ("XDG_DATA_HOME", Some(xdg.as_str())),
+            ("CLAUDE_SESSION_ID", Some("status-perf-session")),
+        ],
+        || {
+            state::ensure_daemon_dirs().expect("dirs");
+            let project = tmp.path().join("project");
+            fs_err::create_dir_all(&project).expect("create project");
+            std::process::Command::new("git")
+                .arg("-C")
+                .arg(&project)
+                .args(["init"])
+                .status()
+                .expect("git init");
+            session_service::start_session("status-perf", &project, Some("claude"), Some("sp1"))
+                .expect("start session");
+        },
+    );
+
+    // Import into DB so status_report uses SQLite path.
+    let db_path = tmp.path().join("harness/daemon/harness.db");
+    let db = DaemonDb::open(&db_path).expect("open db");
+    temp_env::with_vars(
+        [("XDG_DATA_HOME", Some(xdg.as_str()))],
+        || db.import_from_files(),
+    )
+    .expect("import");
+    drop(db);
+
+    let target_ms = 100.0;
+    let mut samples = Vec::with_capacity(SAMPLE_COUNT);
+
+    for _ in 0..SAMPLE_COUNT {
+        let start = Instant::now();
+        temp_env::with_vars(
+            [("XDG_DATA_HOME", Some(xdg.as_str()))],
+            || service::status_report(),
+        )
+        .expect("status report");
+        samples.push(start.elapsed().as_secs_f64() * 1000.0);
+    }
+
+    let med = median(&mut samples);
+    println!("status_report: median {med:.2}ms (target <{target_ms:.0}ms)");
+    assert!(
+        med <= target_ms,
+        "status_report median {med:.2}ms exceeds {target_ms:.0}ms budget"
+    );
 }
