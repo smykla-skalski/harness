@@ -99,6 +99,8 @@ impl DaemonDb {
             self.conn
                 .execute_batch(
                     "ALTER TABLE sessions ADD COLUMN title TEXT NOT NULL DEFAULT '';
+                     UPDATE sessions SET title = context;
+                     UPDATE sessions SET state_json = json_set(state_json, '$.title', context);
                      UPDATE schema_meta SET value = '2' WHERE key = 'version';",
                 )
                 .map_err(|error| db_error(format!("migrate v1 -> v2: {error}")))?;
