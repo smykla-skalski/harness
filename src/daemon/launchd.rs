@@ -105,6 +105,10 @@ pub fn install_launch_agent(binary_path: &Path) -> Result<PathBuf, CliError> {
     install_launch_agent_with(binary_path, &run_launchctl)
 }
 
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion; tokio-rs/tracing#553"
+)]
 fn restart_launch_agent_with<F>(runner: &F) -> Result<(), CliError>
 where
     F: Fn(&[String]) -> Result<CommandOutput, CliError>,
@@ -123,9 +127,14 @@ where
         ))));
     }
 
+    tracing::info!("launchd: bootout");
     best_effort_bootout(runner)?;
+    tracing::info!("launchd: bootstrap");
     bootstrap_launch_agent(&path, runner)?;
-    kickstart_launch_agent(runner)
+    // RunAtLoad=true in the plist starts the daemon automatically after
+    // bootstrap. kickstart -k is not needed and adds 10s blocking wait.
+    tracing::info!("launchd: restart complete");
+    Ok(())
 }
 
 fn install_launch_agent_with<F>(binary_path: &Path, runner: &F) -> Result<PathBuf, CliError>
@@ -606,14 +615,7 @@ mod tests {
                         path.display().to_string(),
                     ]
                 );
-                assert_eq!(
-                    calls[2],
-                    vec![
-                        "kickstart".to_string(),
-                        "-k".to_string(),
-                        launchd_service_target(),
-                    ]
-                );
+                assert_eq!(calls.len(), 2, "bootout + bootstrap only, no kickstart");
             },
         );
     }
