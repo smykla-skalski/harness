@@ -43,13 +43,34 @@ public enum HarnessMonitorSchemaV2: VersionedSchema {
   }
 }
 
+public enum HarnessMonitorSchemaV3: VersionedSchema {
+  public static var versionIdentifier: Schema.Version { Schema.Version(3, 0, 0) }
+
+  public static var models: [any PersistentModel.Type] {
+    [
+      HarnessMonitorSchemaV3.CachedProject.self,
+      HarnessMonitorSchemaV3.CachedSession.self,
+      HarnessMonitorSchemaV3.CachedAgent.self,
+      HarnessMonitorSchemaV3.CachedWorkItem.self,
+      HarnessMonitorSchemaV3.CachedSignalRecord.self,
+      HarnessMonitorSchemaV3.CachedTimelineEntry.self,
+      HarnessMonitorSchemaV3.CachedObserver.self,
+      HarnessMonitorSchemaV3.CachedAgentActivity.self,
+      SessionBookmark.self,
+      UserNote.self,
+      RecentSearch.self,
+      ProjectFilterPreference.self,
+    ]
+  }
+}
+
 public enum HarnessMonitorMigrationPlan: SchemaMigrationPlan {
   public static var schemas: [any VersionedSchema.Type] {
-    [HarnessMonitorSchemaV1.self, HarnessMonitorSchemaV2.self]
+    [HarnessMonitorSchemaV1.self, HarnessMonitorSchemaV2.self, HarnessMonitorSchemaV3.self]
   }
 
   public static var stages: [MigrationStage] {
-    [migrateV1toV2]
+    [migrateV1toV2, migrateV2toV3]
   }
 
   static let migrateV1toV2 = MigrationStage.custom(
@@ -68,6 +89,20 @@ public enum HarnessMonitorMigrationPlan: SchemaMigrationPlan {
         session.checkoutRoot = session.projectDir ?? session.contextRoot
         session.isWorktree = false
         session.worktreeName = nil
+      }
+
+      try context.save()
+    }
+  )
+
+  static let migrateV2toV3 = MigrationStage.custom(
+    fromVersion: HarnessMonitorSchemaV2.self,
+    toVersion: HarnessMonitorSchemaV3.self,
+    willMigrate: nil,
+    didMigrate: { context in
+      let sessions = try context.fetch(FetchDescriptor<HarnessMonitorSchemaV3.CachedSession>())
+      for session in sessions {
+        session.title = ""
       }
 
       try context.save()

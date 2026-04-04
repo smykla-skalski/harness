@@ -84,6 +84,7 @@ extension CachedSession {
       isWorktree: isWorktree,
       worktreeName: worktreeName,
       sessionId: sessionId,
+      title: title,
       context: context,
       status: SessionStatus(rawValue: statusRaw) ?? .active,
       createdAt: createdAt,
@@ -116,6 +117,7 @@ extension CachedSession {
     checkoutRoot = summary.checkoutRoot
     isWorktree = summary.isWorktree
     worktreeName = summary.worktreeName
+    title = summary.title
     context = summary.context
     statusRaw = summary.status.rawValue
     createdAt = summary.createdAt
@@ -141,6 +143,7 @@ extension SessionSummary {
       checkoutRoot: checkoutRoot,
       isWorktree: isWorktree,
       worktreeName: worktreeName,
+      title: title,
       context: context,
       statusRaw: status.rawValue,
       createdAt: createdAt,
