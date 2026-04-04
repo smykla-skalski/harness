@@ -20,7 +20,7 @@ use super::snapshot;
 use super::state;
 
 const DAEMON_CONTROL_TIMEOUT: Duration = Duration::from_secs(8);
-const DAEMON_CONTROL_POLL_INTERVAL: Duration = Duration::from_millis(250);
+const DAEMON_CONTROL_POLL_INTERVAL: Duration = Duration::from_millis(50);
 const DAEMON_HTTP_TIMEOUT: Duration = Duration::from_secs(2);
 
 static DAEMON_HTTP_CLIENT: LazyLock<reqwest::Client> = LazyLock::new(reqwest::Client::new);
@@ -203,6 +203,10 @@ fn restart_daemon(binary: &Path) -> Result<DaemonControlResponse, CliError> {
     )
 }
 
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion; tokio-rs/tracing#553"
+)]
 fn restart_daemon_with<
     LoadManifest,
     Bootout,
@@ -327,25 +331,32 @@ fn post_stop_request(endpoint: &str, token: &str) -> Result<(), CliError> {
     Ok(())
 }
 
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion; tokio-rs/tracing#553"
+)]
 fn wait_for_daemon_shutdown(endpoint: &str) -> Result<(), CliError> {
+    tracing::info!(%endpoint, "waiting for daemon shutdown");
     wait_for_flag(&format!("wait for daemon shutdown at {endpoint}"), || {
-        // flock probe: the kernel releases the lock when the process dies
-        // (even on SIGKILL), so this is immune to PID reuse and stale
-        // manifests. No need to check the manifest or PID at all.
         if state::daemon_lock_is_held() {
             return Ok(false);
         }
-        // Daemon is confirmed dead. Clean up stale manifest if present.
         if let Ok(Some(manifest)) = try_load_manifest()
             && manifest.endpoint == endpoint
         {
             let _ = state::clear_manifest_for_pid(manifest.pid);
         }
+        tracing::info!("daemon shutdown confirmed (flock released)");
         Ok(true)
     })
 }
 
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion; tokio-rs/tracing#553"
+)]
 fn wait_for_healthy_daemon(mut child: Option<&mut Child>) -> Result<String, CliError> {
+    tracing::info!("waiting for daemon health");
     wait_for_value("wait for daemon health", || {
         if let Some(child) = child.as_deref_mut()
             && let Some(status) = child.try_wait().map_err(|error| {
@@ -363,6 +374,7 @@ fn wait_for_healthy_daemon(mut child: Option<&mut Child>) -> Result<String, CliE
             return Ok(None);
         };
         if daemon_is_healthy(&manifest.endpoint) {
+            tracing::info!(endpoint = %manifest.endpoint, "daemon healthy");
             return Ok(Some(manifest.endpoint));
         }
         Ok(None)

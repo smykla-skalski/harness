@@ -1,4 +1,6 @@
 use std::collections::{HashSet, VecDeque};
+#[cfg(test)]
+use std::sync::OnceLock;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -436,7 +438,7 @@ fn dispatch_inner(
 }
 
 fn dispatch_read_query(request: &WsRequest, state: &DaemonHttpState) -> WsResponse {
-    let db_guard = state.db.as_ref().map(|db| db.lock().expect("db lock"));
+    let db_guard = state.db.get().map(|db| db.lock().expect("db lock"));
     let db_ref = db_guard.as_deref();
 
     match request.method.as_str() {
@@ -543,7 +545,7 @@ fn dispatch_mutation(
         Option<&super::db::DaemonDb>,
     ) -> Result<super::protocol::SessionDetail, MutationError>,
 ) -> WsResponse {
-    let db_guard = state.db.as_ref().map(|db| db.lock().expect("db lock"));
+    let db_guard = state.db.get().map(|db| db.lock().expect("db lock"));
     let db_ref = db_guard.as_deref();
     let Some(session_id) = extract_session_id(&request.params) else {
         return error_response(&request.id, "MISSING_PARAM", "missing session_id");
@@ -575,7 +577,7 @@ fn dispatch_mutation_with_task(
         Option<&super::db::DaemonDb>,
     ) -> Result<super::protocol::SessionDetail, MutationError>,
 ) -> WsResponse {
-    let db_guard = state.db.as_ref().map(|db| db.lock().expect("db lock"));
+    let db_guard = state.db.get().map(|db| db.lock().expect("db lock"));
     let db_ref = db_guard.as_deref();
     let Some(session_id) = extract_session_id(&request.params) else {
         return error_response(&request.id, "MISSING_PARAM", "missing session_id");
@@ -610,7 +612,7 @@ fn dispatch_mutation_with_agent(
         Option<&super::db::DaemonDb>,
     ) -> Result<super::protocol::SessionDetail, MutationError>,
 ) -> WsResponse {
-    let db_guard = state.db.as_ref().map(|db| db.lock().expect("db lock"));
+    let db_guard = state.db.get().map(|db| db.lock().expect("db lock"));
     let db_ref = db_guard.as_deref();
     let Some(session_id) = extract_session_id(&request.params) else {
         return error_response(&request.id, "MISSING_PARAM", "missing session_id");
@@ -844,7 +846,7 @@ mod tests {
             },
             daemon_epoch: "epoch".into(),
             replay_buffer: Arc::new(Mutex::new(ReplayBuffer::new(8))),
-            db: None,
+            db: Arc::new(OnceLock::new()),
         }
     }
 }

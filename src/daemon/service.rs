@@ -38,7 +38,7 @@ struct DaemonObserveRuntime {
     sender: broadcast::Sender<StreamEvent>,
     poll_interval: Duration,
     running_sessions: Arc<Mutex<BTreeSet<String>>>,
-    db: Option<Arc<Mutex<super::db::DaemonDb>>>,
+    db: Arc<OnceLock<Arc<Mutex<super::db::DaemonDb>>>>,
 }
 
 static OBSERVE_RUNTIME: OnceLock<DaemonObserveRuntime> = OnceLock::new();
@@ -102,7 +102,7 @@ pub async fn serve(config: DaemonServeConfig) -> Result<(), CliError> {
 
     let (sender, _) = broadcast::channel(64);
     let (shutdown_tx, shutdown_rx) = tokio_watch::channel(false);
-    let db = initialize_daemon_db();
+    let db: Arc<OnceLock<Arc<Mutex<super::db::DaemonDb>>>> = Arc::new(OnceLock::new());
     let _ = OBSERVE_RUNTIME.set(DaemonObserveRuntime {
         sender: sender.clone(),
         poll_interval: config.observe_interval,
@@ -113,8 +113,7 @@ pub async fn serve(config: DaemonServeConfig) -> Result<(), CliError> {
     let replay_buffer = Arc::new(Mutex::new(ReplayBuffer::new(512)));
     let daemon_epoch = manifest.started_at.clone();
 
-    let _watch = watch::spawn_watch_loop(sender.clone(), config.poll_interval, db.clone());
-    spawn_background_reconciliation(db.clone());
+    spawn_background_db_init(db.clone(), sender.clone(), config.poll_interval);
 
     let app_state = DaemonHttpState {
         token,
@@ -140,13 +139,41 @@ pub async fn serve(config: DaemonServeConfig) -> Result<(), CliError> {
     }
 }
 
-fn initialize_daemon_db() -> Option<Arc<Mutex<super::db::DaemonDb>>> {
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion; tokio-rs/tracing#553"
+)]
+fn open_and_publish_db(
+    db_slot: &Arc<OnceLock<Arc<Mutex<super::db::DaemonDb>>>>,
+) -> Option<Arc<Mutex<super::db::DaemonDb>>> {
     let db_path = state::daemon_root().join("harness.db");
     let db = open_daemon_db(&db_path)?;
+    let db = Arc::new(Mutex::new(db));
+    let _ = db_slot.set(Arc::clone(&db));
+    tracing::info!("database ready");
+    Some(db)
+}
 
-    let _ = db.cache_startup_diagnostics();
+fn spawn_background_db_init(
+    db_slot: Arc<OnceLock<Arc<Mutex<super::db::DaemonDb>>>>,
+    sender: broadcast::Sender<super::protocol::StreamEvent>,
+    poll_interval: Duration,
+) {
+    tokio::spawn(async move {
+        let db = spawn_blocking(move || open_and_publish_db(&db_slot))
+            .await
+            .ok()
+            .flatten();
 
-    Some(Arc::new(Mutex::new(db)))
+        let Some(db) = db else {
+            return;
+        };
+
+        let db_option = Some(Arc::clone(&db));
+        let _watch = watch::spawn_watch_loop(sender, poll_interval, db_option.clone());
+        spawn_background_reconciliation(db_option.clone());
+        spawn_background_diagnostics(db_option);
+    });
 }
 
 fn spawn_background_reconciliation(db: Option<Arc<Mutex<super::db::DaemonDb>>>) {
@@ -183,6 +210,21 @@ fn run_background_reconciliation(db: &Arc<Mutex<super::db::DaemonDb>>) {
             );
         }
     }
+}
+
+fn spawn_background_diagnostics(db: Option<Arc<Mutex<super::db::DaemonDb>>>) {
+    let Some(db) = db else {
+        return;
+    };
+    tokio::spawn(async move {
+        let _ = spawn_blocking(move || {
+            let Ok(db_guard) = db.lock() else {
+                return;
+            };
+            let _ = db_guard.cache_startup_diagnostics();
+        })
+        .await;
+    });
 }
 
 fn open_daemon_db(path: &Path) -> Option<super::db::DaemonDb> {
@@ -1278,7 +1320,7 @@ fn start_daemon_observe_loop(session_id: &str, project_dir: &Path, actor_id: Opt
         if let Ok(mut running_sessions) = runtime.running_sessions.lock() {
             running_sessions.remove(&session_id);
         }
-        let db_guard = runtime.db.as_ref().and_then(|db| db.lock().ok());
+        let db_guard = runtime.db.get().and_then(|db| db.lock().ok());
         let db_ref = db_guard.as_deref();
         sync_after_mutation(db_ref, &session_id);
         broadcast_session_snapshot(&runtime.sender, &session_id, db_ref);
