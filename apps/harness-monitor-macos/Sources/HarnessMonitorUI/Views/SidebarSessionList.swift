@@ -106,7 +106,7 @@ private struct SidebarFilterHeader: View {
     HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.itemSpacing) {
       title
       Spacer(minLength: HarnessMonitorTheme.itemSpacing)
-      HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.spacingXS) {
+      HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.itemSpacing) {
         summary
         if isFiltered {
           clearButton
@@ -135,7 +135,7 @@ private struct SidebarFilterHeader: View {
       resetFilters()
     }
     .scaledFont(.caption.bold())
-    .harnessTextActionButtonStyle(tint: HarnessMonitorTheme.ink.opacity(0.94))
+    .harnessFlatActionButtonStyle()
     .controlSize(.small)
     .accessibilityIdentifier(HarnessMonitorAccessibility.sidebarClearFiltersButton)
   }
