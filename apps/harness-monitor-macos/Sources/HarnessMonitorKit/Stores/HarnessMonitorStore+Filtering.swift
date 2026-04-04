@@ -21,7 +21,7 @@ public enum SessionSortOrder: String, CaseIterable, Identifiable {
     case .recentActivity:
       lhs.updatedAt > rhs.updatedAt
     case .name:
-      lhs.context.localizedStandardCompare(rhs.context) == .orderedAscending
+      lhs.displayTitle.localizedStandardCompare(rhs.displayTitle) == .orderedAscending
     case .status:
       lhs.status.sortKey < rhs.status.sortKey
     }
@@ -213,6 +213,7 @@ extension HarnessMonitorStore {
         summary.checkoutId,
         summary.checkoutDisplayName,
         summary.sessionId,
+        summary.title,
         summary.context,
         summary.projectDir ?? "",
         summary.checkoutRoot,
