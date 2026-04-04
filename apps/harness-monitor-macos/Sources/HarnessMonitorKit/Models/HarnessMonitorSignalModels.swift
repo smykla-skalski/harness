@@ -209,6 +209,7 @@ public struct SessionsUpdatedPayload: Codable, Equatable, Sendable {
 public struct SessionUpdatedPayload: Codable, Equatable, Sendable {
   public let detail: SessionDetail
   public let timeline: [TimelineEntry]?
+  public let extensionsPending: Bool?
 }
 
 public struct StreamEvent: Codable, Equatable, Identifiable, Sendable {
@@ -264,6 +265,7 @@ public struct DaemonPushEvent: Equatable, Identifiable, Sendable {
     case ready
     case sessionsUpdated(SessionsUpdatedPayload)
     case sessionUpdated(SessionUpdatedPayload)
+    case sessionExtensions(SessionExtensionsPayload)
     case unknown(eventName: String, payload: JSONValue)
   }
 
@@ -303,6 +305,17 @@ public struct DaemonPushEvent: Equatable, Identifiable, Sendable {
         sessionId: sessionId,
         kind: .sessionUpdated(try streamEvent.decodePayload(as: SessionUpdatedPayload.self))
       )
+    case "session_extensions":
+      guard let sessionId = streamEvent.sessionId else {
+        throw HarnessMonitorPushEventError.missingSessionID(streamEvent.event)
+      }
+      self.init(
+        recordedAt: streamEvent.recordedAt,
+        sessionId: sessionId,
+        kind: .sessionExtensions(
+          try streamEvent.decodePayload(as: SessionExtensionsPayload.self)
+        )
+      )
     default:
       self.init(
         recordedAt: streamEvent.recordedAt,
@@ -337,13 +350,18 @@ public struct DaemonPushEvent: Equatable, Identifiable, Sendable {
     recordedAt: String,
     sessionId: String,
     detail: SessionDetail,
-    timeline: [TimelineEntry]? = nil
+    timeline: [TimelineEntry]? = nil,
+    extensionsPending: Bool? = nil
   ) -> Self {
     Self(
       recordedAt: recordedAt,
       sessionId: sessionId,
       kind: .sessionUpdated(
-        SessionUpdatedPayload(detail: detail, timeline: timeline)
+        SessionUpdatedPayload(
+          detail: detail,
+          timeline: timeline,
+          extensionsPending: extensionsPending
+        )
       )
     )
   }

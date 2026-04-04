@@ -431,7 +431,7 @@ final class FailingHarnessClient: HarnessMonitorClientProtocol, @unchecked Senda
   func stopDaemon() async throws -> DaemonControlResponse { throw error }
   func projects() async throws -> [ProjectSummary] { throw error }
   func sessions() async throws -> [SessionSummary] { throw error }
-  func sessionDetail(id _: String) async throws -> SessionDetail { throw error }
+  func sessionDetail(id _: String, scope _: String?) async throws -> SessionDetail { throw error }
   func timeline(sessionID _: String) async throws -> [TimelineEntry] { throw error }
 
   nonisolated func globalStream() -> AsyncThrowingStream<DaemonPushEvent, Error> {

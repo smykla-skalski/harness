@@ -126,9 +126,11 @@ extension HarnessMonitorStore {
       completeSessionLoad(requestID)
     }
 
+    isExtensionsLoading = true
+
     do {
       async let detailResponse = Self.measureOperation {
-        try await client.sessionDetail(id: sessionID)
+        try await client.sessionDetail(id: sessionID, scope: "core")
       }
       async let timelineResponse = Self.measureOperation {
         try await client.timeline(sessionID: sessionID)
@@ -141,15 +143,25 @@ extension HarnessMonitorStore {
 
       recordRequestSuccess()
       recordRequestSuccess()
+
+      var detail = measuredDetail.value
+      if let buffered = pendingExtensions, buffered.sessionId == sessionID {
+        detail = detail.merging(extensions: buffered)
+        pendingExtensions = nil
+        isExtensionsLoading = false
+      }
+
       applySelectedSessionSnapshot(
         sessionID: sessionID,
-        detail: measuredDetail.value,
+        detail: detail,
         timeline: measuredTimeline.value,
         showingCachedData: false
       )
-      scheduleCacheWrite { service in
-        let insertedCount = await service.cacheSessionDetail(measuredDetail.value, timeline: measuredTimeline.value)
-        self.updatePersistedSessionMetadataAfterSave(insertedSessionCount: insertedCount)
+      if !isExtensionsLoading {
+        scheduleCacheWrite { service in
+          let insertedCount = await service.cacheSessionDetail(detail, timeline: measuredTimeline.value)
+          self.updatePersistedSessionMetadataAfterSave(insertedSessionCount: insertedCount)
+        }
       }
     } catch {
       guard isCurrentSessionLoad(requestID, sessionID: sessionID) else {
@@ -161,6 +173,7 @@ extension HarnessMonitorStore {
       }
 
       lastError = error.localizedDescription
+      isExtensionsLoading = false
 
       if let cached = await loadCachedSessionDetail(sessionID: sessionID) {
         applySelectedSessionSnapshot(
@@ -256,6 +269,9 @@ extension HarnessMonitorStore {
       guard let sessionID = event.sessionId else {
         return
       }
+      if payload.extensionsPending != true {
+        isExtensionsLoading = false
+      }
       guard sessionID == selectedSessionID else {
         applySessionSummaryUpdate(payload.detail.session)
         if let timeline = payload.timeline {
@@ -282,6 +298,8 @@ extension HarnessMonitorStore {
       } else if let client {
         scheduleSessionPushFallback(using: client, sessionID: sessionID)
       }
+    case .sessionExtensions(let payload):
+      applySessionExtensions(payload)
     case .unknown:
       break
     }
@@ -294,6 +312,9 @@ extension HarnessMonitorStore {
     case .sessionUpdated(let payload):
       guard let sessionID = event.sessionId else {
         return
+      }
+      if payload.extensionsPending != true {
+        isExtensionsLoading = false
       }
       let timeline = payload.timeline ?? self.timeline
       applySelectedSessionSnapshot(
@@ -311,6 +332,32 @@ extension HarnessMonitorStore {
       } else if let client {
         scheduleSessionPushFallback(using: client, sessionID: sessionID)
       }
+    case .sessionExtensions(let payload):
+      applySessionExtensions(payload)
+    }
+  }
+
+  func applySessionExtensions(_ extensions: SessionExtensionsPayload) {
+    guard let sessionID = selectedSessionID,
+          sessionID == extensions.sessionId
+    else {
+      return
+    }
+
+    guard let detail = selectedSession else {
+      pendingExtensions = extensions
+      return
+    }
+
+    let merged = detail.merging(extensions: extensions)
+    selectedSession = merged
+    isExtensionsLoading = false
+    pendingExtensions = nil
+
+    let currentTimeline = timeline
+    scheduleCacheWrite { service in
+      let insertedCount = await service.cacheSessionDetail(merged, timeline: currentTimeline)
+      self.updatePersistedSessionMetadataAfterSave(insertedSessionCount: insertedCount)
     }
   }
 

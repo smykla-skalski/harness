@@ -186,6 +186,23 @@ pub struct SessionUpdatedPayload {
     pub detail: SessionDetail,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub timeline: Option<Vec<TimelineEntry>>,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub extensions_pending: bool,
+}
+
+/// Deferred session detail extensions pushed after a `scope: "core"` request.
+///
+/// Contains the expensive-to-compute fields that are omitted from the core
+/// session detail response: signals, observer snapshot, and agent activity.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SessionExtensionsPayload {
+    pub session_id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub signals: Option<Vec<SessionSignalRecord>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub observer: Option<ObserverSummary>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub agent_activity: Option<Vec<AgentToolActivitySummary>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

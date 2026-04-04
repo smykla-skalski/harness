@@ -146,7 +146,7 @@ public final class PreviewHarnessClient: HarnessMonitorClientProtocol, Sendable 
     fixtures.sessions
   }
 
-  public func sessionDetail(id _: String) async throws -> SessionDetail {
+  public func sessionDetail(id _: String, scope _: String?) async throws -> SessionDetail {
     guard let detail = fixtures.detail else {
       throw HarnessMonitorAPIError.server(code: 404, message: "No preview session detail available.")
     }
