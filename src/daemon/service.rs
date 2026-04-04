@@ -1,5 +1,5 @@
 use std::collections::BTreeSet;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::id as process_id;
 use std::sync::{Arc, Mutex, OnceLock};
 use std::time::Duration;
@@ -892,11 +892,21 @@ pub fn observe_session(
     request: Option<&ObserveSessionRequest>,
     db: Option<&super::db::DaemonDb>,
 ) -> Result<SessionDetail, CliError> {
-    let resolved = index::resolve_session(session_id)?;
-    let project_dir = effective_project_dir(&resolved);
     let actor_id = request.and_then(|request| request.actor.as_deref());
-    if !start_daemon_observe_loop(session_id, project_dir, actor_id) {
-        let _ = session_observe::run_session_observe(session_id, project_dir, actor_id)?;
+
+    // Resolve project_dir from the DB when available, falling back to
+    // file-based discovery.
+    let project_dir = if let Some(db) = db
+        && let Some(dir) = db.project_dir_for_session(session_id)?
+    {
+        PathBuf::from(dir)
+    } else {
+        let resolved = index::resolve_session(session_id)?;
+        effective_project_dir(&resolved).to_path_buf()
+    };
+
+    if !start_daemon_observe_loop(session_id, &project_dir, actor_id) {
+        let _ = session_observe::run_session_observe(session_id, &project_dir, actor_id)?;
     }
     sync_after_mutation(db, session_id);
     session_detail(session_id, db)

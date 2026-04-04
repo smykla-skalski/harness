@@ -1181,6 +1181,26 @@ impl DaemonDb {
         }
     }
 
+    /// Look up the project directory for a session by joining sessions
+    /// and projects.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on SQL failures.
+    pub fn project_dir_for_session(&self, session_id: &str) -> Result<Option<String>, CliError> {
+        let result = self.conn.query_row(
+            "SELECT p.project_dir FROM sessions s
+             JOIN projects p ON s.project_id = p.project_id
+             WHERE s.session_id = ?1",
+            [session_id],
+            |row| row.get::<_, Option<String>>(0),
+        );
+        match result {
+            Ok(project_dir) => Ok(project_dir),
+            Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+            Err(error) => Err(db_error(format!("project_dir_for_session: {error}"))),
+        }
+    }
+
     /// Find the project ID for a given directory path. Matches against
     /// `project_dir` first, then `context_root`.
     ///
