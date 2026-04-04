@@ -4,6 +4,7 @@
 mod integration {
     mod architecture;
     mod daemon_comparison;
+    mod daemon_control;
     mod daemon_perf;
     pub mod helpers;
 

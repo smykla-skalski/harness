@@ -80,12 +80,52 @@ pub fn render_launch_agent_plist(binary_path: &Path) -> String {
     )
 }
 
+/// Boot out the user `LaunchAgent` runtime if it is currently loaded.
+///
+/// # Errors
+/// Returns `CliError` when `launchctl bootout` fails for a reason other than a
+/// missing service.
+pub fn bootout_launch_agent() -> Result<bool, CliError> {
+    best_effort_bootout(&run_launchctl)
+}
+
+/// Restart the installed user `LaunchAgent` without rewriting the plist.
+///
+/// # Errors
+/// Returns `CliError` when the plist is missing or `launchctl` operations fail.
+pub fn restart_launch_agent() -> Result<(), CliError> {
+    restart_launch_agent_with(&run_launchctl)
+}
+
 /// Install the user `LaunchAgent` plist for the harness daemon.
 ///
 /// # Errors
 /// Returns `CliError` on filesystem failures.
 pub fn install_launch_agent(binary_path: &Path) -> Result<PathBuf, CliError> {
     install_launch_agent_with(binary_path, &run_launchctl)
+}
+
+fn restart_launch_agent_with<F>(runner: &F) -> Result<(), CliError>
+where
+    F: Fn(&[String]) -> Result<CommandOutput, CliError>,
+{
+    if !cfg!(target_os = "macos") {
+        return Err(CliError::from(CliErrorKind::workflow_io(
+            "launchd is only supported on macOS",
+        )));
+    }
+
+    let path = state::launch_agent_path();
+    if !path.is_file() {
+        return Err(CliError::from(CliErrorKind::workflow_io(format!(
+            "launch agent plist not installed: {}",
+            path.display()
+        ))));
+    }
+
+    best_effort_bootout(runner)?;
+    bootstrap_launch_agent(&path, runner)?;
+    kickstart_launch_agent(runner)
 }
 
 fn install_launch_agent_with<F>(binary_path: &Path, runner: &F) -> Result<PathBuf, CliError>
@@ -517,6 +557,88 @@ mod tests {
                         launchd_service_target_for(LEGACY_LAUNCH_AGENT_LABEL),
                     ]
                 }));
+            },
+        );
+    }
+
+    #[test]
+    fn restart_launch_agent_uses_existing_plist() {
+        let tmp = tempdir().expect("tempdir");
+        let calls = Arc::new(Mutex::new(Vec::<Vec<String>>::new()));
+        let runner = {
+            let calls = Arc::clone(&calls);
+            move |args: &[String]| -> Result<CommandOutput, CliError> {
+                calls.lock().expect("lock").push(args.to_vec());
+                Ok(CommandOutput {
+                    exit_code: 0,
+                    stdout: String::new(),
+                    stderr: String::new(),
+                })
+            }
+        };
+
+        temp_env::with_vars(
+            [
+                ("HOME", Some(tmp.path().to_str().expect("utf8 path"))),
+                (
+                    "XDG_DATA_HOME",
+                    Some(tmp.path().to_str().expect("utf8 path")),
+                ),
+            ],
+            || {
+                let path = state::launch_agent_path();
+                fs::create_dir_all(path.parent().expect("launch agent dir"))
+                    .expect("create launch agent dir");
+                fs::write(&path, "plist").expect("write plist");
+
+                restart_launch_agent_with(&runner).expect("restart launch agent");
+
+                let calls = calls.lock().expect("lock");
+                assert_eq!(
+                    calls[0],
+                    vec!["bootout".to_string(), launchd_service_target()]
+                );
+                assert_eq!(
+                    calls[1],
+                    vec![
+                        "bootstrap".to_string(),
+                        launchd_domain_target(),
+                        path.display().to_string(),
+                    ]
+                );
+                assert_eq!(
+                    calls[2],
+                    vec![
+                        "kickstart".to_string(),
+                        "-k".to_string(),
+                        launchd_service_target(),
+                    ]
+                );
+            },
+        );
+    }
+
+    #[test]
+    fn restart_launch_agent_requires_installed_plist() {
+        let tmp = tempdir().expect("tempdir");
+        temp_env::with_vars(
+            [
+                ("HOME", Some(tmp.path().to_str().expect("utf8 path"))),
+                (
+                    "XDG_DATA_HOME",
+                    Some(tmp.path().to_str().expect("utf8 path")),
+                ),
+            ],
+            || {
+                let error = restart_launch_agent_with(&|_args| {
+                    panic!("runner should not be called when plist is missing");
+                })
+                .expect_err("restart should fail without a plist");
+                assert!(
+                    error
+                        .to_string()
+                        .contains("launch agent plist not installed")
+                );
             },
         );
     }
