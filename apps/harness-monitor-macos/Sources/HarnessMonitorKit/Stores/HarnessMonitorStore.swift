@@ -136,6 +136,7 @@ public final class HarnessMonitorStore {
   var sessionSnapshotHydrationTask: Task<Void, Never>?
   var selectionTask: Task<Void, Never>?
   var pendingCacheWriteTask: Task<Void, Never>?
+  var manifestWatcher: ManifestWatcher?
   var latencySamplesMs: [Int] = []
   var trafficSampleTimes: [Date] = []
   var activeSessionLoadRequest: UInt64 = 0
@@ -212,6 +213,7 @@ public final class HarnessMonitorStore {
     do {
       _ = try await daemonController.stopDaemon()
       stopAllStreams()
+      stopManifestWatcher()
       client = nil
       markConnectionOffline("Daemon stopped")
       await refreshDaemonStatus()
@@ -266,6 +268,7 @@ public final class HarnessMonitorStore {
   public func prepareForTermination() async {
     clearLastAction()
     stopAllStreams()
+    stopManifestWatcher()
 
     guard let client else {
       return
