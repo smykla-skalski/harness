@@ -27,7 +27,12 @@ public actor WebSocketTransport: HarnessMonitorClientProtocol {
     encoder.keyEncodingStrategy = .convertToSnakeCase
     decoder = JSONDecoder()
     decoder.keyDecodingStrategy = .convertFromSnakeCase
-    session = URLSession(configuration: .default)
+
+    let configuration = URLSessionConfiguration.default
+    configuration.timeoutIntervalForRequest = 15
+    configuration.timeoutIntervalForResource = 30
+    session = URLSession(configuration: configuration)
+
     httpFallbackClient = HarnessMonitorAPIClient(
       connection: connection,
       session: session

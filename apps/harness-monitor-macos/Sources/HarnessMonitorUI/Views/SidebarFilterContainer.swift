@@ -109,7 +109,7 @@ private func sidebarFilterPreviewStore(
 ) -> HarnessMonitorStore {
   let store = HarnessMonitorPreviewStoreFactory.makeStore(
     for: scenario,
-    modelContext: HarnessMonitorPreviewStoreFactory.previewContainer.mainContext
+    modelContainer: HarnessMonitorPreviewStoreFactory.previewContainer
   )
   store.searchText = searchText
   store.sessionFilter = sessionFilter

@@ -20,7 +20,7 @@ settings:
     SWIFT_ENABLE_EAGER_LINKING: YES
     SWIFT_STRICT_CONCURRENCY: complete
     SWIFT_TREAT_WARNINGS_AS_ERRORS: YES
-    SWIFT_VERSION: "6.0"
+    SWIFT_VERSION: "6.2"
     HARNESS_MONITOR_APP_BUNDLE_ID: io.harnessmonitor.app
   configs:
     Preview:

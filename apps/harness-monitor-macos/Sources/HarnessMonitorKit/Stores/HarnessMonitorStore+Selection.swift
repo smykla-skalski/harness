@@ -85,8 +85,10 @@ extension HarnessMonitorStore {
       return
     }
 
+    await applyCachedSessionIfAvailable(sessionID: sessionID)
+
     guard connectionState == .online, let client else {
-      restorePersistedSessionSelection(sessionID: sessionID)
+      await restorePersistedSessionSelection(sessionID: sessionID)
       stopSessionStream()
       return
     }
@@ -138,8 +140,10 @@ extension HarnessMonitorStore {
       return
     }
 
+    await applyCachedSessionIfAvailable(sessionID: sessionID)
+
     guard connectionState == .online, let client else {
-      restorePersistedSessionSelection(sessionID: sessionID)
+      await restorePersistedSessionSelection(sessionID: sessionID)
       stopSessionStream()
       return
     }
@@ -243,8 +247,19 @@ extension HarnessMonitorStore {
     activeSessionLoadRequest == requestID && selectedSessionID == sessionID
   }
 
-  func restorePersistedSessionSelection(sessionID: String) {
-    if let cached = loadCachedSessionDetail(sessionID: sessionID) {
+  private func applyCachedSessionIfAvailable(sessionID: String) async {
+    guard selectedSessionID == sessionID, selectedSession == nil else { return }
+
+    if let cached = await loadCachedSessionDetail(sessionID: sessionID) {
+      guard selectedSessionID == sessionID else { return }
+      selectedSession = cached.detail
+      timeline = cached.timeline
+      isShowingCachedData = true
+    }
+  }
+
+  func restorePersistedSessionSelection(sessionID: String) async {
+    if let cached = await loadCachedSessionDetail(sessionID: sessionID) {
       applySelectedSessionSnapshot(
         sessionID: sessionID,
         detail: cached.detail,
@@ -266,10 +281,10 @@ extension HarnessMonitorStore {
     isSelectionLoading = false
   }
 
-  func restorePersistedSessionState() {
-    refreshPersistedSessionMetadata()
+  func restorePersistedSessionState() async {
+    await refreshPersistedSessionMetadata()
 
-    if sessions.isEmpty, let cached = loadCachedSessionList() {
+    if sessions.isEmpty, let cached = await loadCachedSessionList() {
       sessionIndex.replaceSnapshot(
         projects: cached.projects,
         sessions: cached.sessions
@@ -281,7 +296,7 @@ extension HarnessMonitorStore {
     }
 
     if let selectedSessionID, selectedSession?.session.sessionId != selectedSessionID {
-      restorePersistedSessionSelection(sessionID: selectedSessionID)
+      await restorePersistedSessionSelection(sessionID: selectedSessionID)
     } else {
       activeSessionLoadRequest = 0
       isSelectionLoading = false
@@ -294,14 +309,7 @@ extension HarnessMonitorStore {
     using client: any HarnessMonitorClientProtocol,
     sessions: [SessionSummary]
   ) {
-    guard modelContext != nil, persistenceError == nil else {
-      sessionSnapshotHydrationTask?.cancel()
-      sessionSnapshotHydrationTask = nil
-      return
-    }
-
-    let hydrationQueue = persistedSnapshotHydrationQueue(for: sessions)
-    guard !hydrationQueue.isEmpty else {
+    guard cacheService != nil, persistenceError == nil else {
       sessionSnapshotHydrationTask?.cancel()
       sessionSnapshotHydrationTask = nil
       return
@@ -314,6 +322,9 @@ extension HarnessMonitorStore {
       }
 
       defer { self.sessionSnapshotHydrationTask = nil }
+
+      let hydrationQueue = await self.persistedSnapshotHydrationQueue(for: sessions)
+      guard !hydrationQueue.isEmpty else { return }
 
       for summary in hydrationQueue {
         guard !Task.isCancelled else {
@@ -334,7 +345,7 @@ extension HarnessMonitorStore {
           let measuredTimeline = try await timelineResponse
           self.recordRequestSuccess()
           self.recordRequestSuccess()
-          self.cacheSessionDetail(
+          await self.cacheSessionDetail(
             measuredDetail.value,
             timeline: measuredTimeline.value,
             markViewed: false
