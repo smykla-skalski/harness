@@ -65,12 +65,14 @@ struct HarnessMonitorApp: App {
   @ViewBuilder private var mainWindowContent: some View {
     if let container {
       HarnessMonitorWindowRootView(
+        delegate: delegate,
         store: store,
         themeMode: $themeMode
       )
       .modelContainer(container)
     } else {
       HarnessMonitorWindowRootView(
+        delegate: delegate,
         store: store,
         themeMode: $themeMode
       )
