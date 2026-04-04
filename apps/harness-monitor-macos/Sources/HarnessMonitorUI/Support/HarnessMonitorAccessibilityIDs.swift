@@ -18,6 +18,7 @@ enum HarnessMonitorAccessibility {
   static let sidebarSessionListContent = "harness.sidebar.session-list.content"
   static let sidebarFiltersCard = "harness.sidebar.filters"
   static let sidebarFiltersCardFrame = "\(sidebarFiltersCard).frame"
+  static let sidebarFiltersToggle = "harness.sidebar.filters.toggle"
   static let sidebarClearFiltersButton = "harness.sidebar.filters.clear"
   static let sidebarClearSearchHistoryButton = "harness.sidebar.search.clear-history"
   static let sessionFilterGroup = "harness.sidebar.filter-group"

@@ -8,6 +8,8 @@ struct SidebarFilterContainer: View {
   @Query(sort: \RecentSearch.lastUsedAt, order: .reverse)
   private var recentSearches: [RecentSearch]
   @State private var draftSearchText = ""
+  @AppStorage("harnessMonitor.sidebar.filtersExpanded")
+  private var isExpanded = true
 
   init(store: HarnessMonitorStore) {
     self.store = store
@@ -28,7 +30,9 @@ struct SidebarFilterContainer: View {
       sessionSortOrder: $store.sessionSortOrder,
       isPersistenceAvailable: store.isPersistenceAvailable,
       recentSearchQueries: recentSearchQueries,
+      isExpanded: isExpanded,
       resetFilters: store.resetFilters,
+      toggleExpanded: { isExpanded.toggle() },
       submitSearch: submitSearch,
       setSessionFilter: setSessionFilter(_:),
       setSessionFocusFilter: setSessionFocusFilter(_:),
@@ -51,6 +55,7 @@ struct SidebarFilterContainer: View {
   }
 
   private func submitSearch() {
+    store.searchText = draftSearchText
     _ = store.recordSearch(draftSearchText)
   }
 
