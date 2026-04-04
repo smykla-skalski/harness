@@ -65,7 +65,12 @@ fn spawn_db_watch_loop(
         let _ = fs_err::create_dir_all(&root);
 
         let (event_tx, mut event_rx) = mpsc::channel::<notify::Result<notify::Event>>(128);
-        let _watcher = create_watcher(event_tx);
+        let _watcher = create_watcher(event_tx).and_then(|mut watcher| {
+            watcher
+                .watch(&root, RecursiveMode::Recursive)
+                .ok()
+                .map(|()| watcher)
+        });
 
         let mut ticker = tokio_interval(interval);
         let mut last_global_version: i64 = 0;
@@ -78,7 +83,10 @@ fn spawn_db_watch_loop(
                     while event_rx.try_recv().is_ok() {}
                     reindex_from_files(&db);
                 }
-                _ = ticker.tick() => {}
+                _ = ticker.tick() => {
+                    // Periodic fallback: re-index in case file events were missed
+                    reindex_from_files(&db);
+                }
             }
 
             let Ok(db_guard) = db.lock() else {
@@ -106,12 +114,12 @@ fn spawn_legacy_watch_loop(
         let _ = fs_err::create_dir_all(&root);
 
         let (event_tx, mut event_rx) = mpsc::channel::<notify::Result<notify::Event>>(128);
-        let mut watcher = create_watcher(event_tx);
-        if let Some(watcher_ref) = watcher.as_mut()
-            && let Err(_error) = watcher_ref.watch(&root, RecursiveMode::Recursive)
-        {
-            watcher = None;
-        }
+        let watcher = create_watcher(event_tx).and_then(|mut watcher| {
+            watcher
+                .watch(&root, RecursiveMode::Recursive)
+                .ok()
+                .map(|()| watcher)
+        });
 
         let mut ticker = tokio_interval(interval);
         let mut snapshot = WatchSnapshot::default();

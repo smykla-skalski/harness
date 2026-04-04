@@ -438,10 +438,23 @@ fn render_plugin_outputs(
     match target {
         RenderTarget::Claude => {
             render_claude_plugin_outputs(repo_root, repo_root, plugin, &mut files)?;
+            render_skill_alias_outputs(
+                repo_root,
+                plugin,
+                RenderTarget::Claude,
+                ".claude",
+                &mut files,
+            )?;
         }
         RenderTarget::Codex => {
             render_codex_plugin_outputs(repo_root, plugin, &mut files)?;
-            render_codex_skill_alias_outputs(repo_root, plugin, &mut files)?;
+            render_skill_alias_outputs(
+                repo_root,
+                plugin,
+                RenderTarget::Codex,
+                ".agents",
+                &mut files,
+            )?;
         }
         RenderTarget::Gemini => render_gemini_plugin_outputs(repo_root, plugin, &mut files),
         RenderTarget::Copilot => render_copilot_plugin_outputs(repo_root, plugin, &mut files)?,
@@ -576,9 +589,11 @@ fn render_plugin_skill_markdown(
     Ok(())
 }
 
-fn render_codex_skill_alias_outputs(
+fn render_skill_alias_outputs(
     repo_root: &Path,
     plugin: &PluginDefinition,
+    target: RenderTarget,
+    host_dir: &str,
     files: &mut BTreeMap<PathBuf, String>,
 ) -> Result<(), CliError> {
     for skill in &plugin.skills {
@@ -586,17 +601,17 @@ fn render_codex_skill_alias_outputs(
             continue;
         };
         let alias_dir = skill_alias_dir(alias_name)?;
-        let alias_base = repo_root.join(".agents").join("skills").join(alias_dir);
+        let alias_base = repo_root.join(host_dir).join("skills").join(alias_dir);
         files.insert(
             alias_base.join("SKILL.md"),
-            render_skill_markdown(RenderTarget::Codex, skill, Some(alias_name))?,
+            render_skill_markdown(target, skill, Some(alias_name))?,
         );
         copy_extra_text_files(
             &skill.root,
             &alias_base,
             files,
             &["skill.yaml", "body.md"],
-            RenderTarget::Codex,
+            target,
             &skill.source.name,
         )?;
     }
@@ -1306,6 +1321,24 @@ mod tests {
             .expect("Claude harness session skill should be planned");
 
         assert!(rendered.contains("name: session:start"));
+        assert!(rendered.contains("AskUserQuestion"));
+    }
+
+    #[test]
+    fn claude_session_skill_aliases_are_planned() {
+        let planned =
+            plan_outputs(&repo_root(), AgentAssetTarget::Claude).expect("assets plan succeeds");
+        let alias = repo_root()
+            .join(".claude")
+            .join("skills")
+            .join("harness-session-start")
+            .join("SKILL.md");
+        let rendered = planned
+            .iter()
+            .find_map(|output| output.files.get(&alias))
+            .expect("harness:session:start alias should be planned for Claude");
+
+        assert!(rendered.contains("name: harness:session:start"));
         assert!(rendered.contains("AskUserQuestion"));
     }
 
