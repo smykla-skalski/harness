@@ -10,13 +10,32 @@ extension HarnessMonitorStore {
 
     do {
       var insertedSessionCount = 0
+      let existingProjectsByID = Dictionary(
+        uniqueKeysWithValues: try modelContext.fetch(FetchDescriptor<CachedProject>()).map {
+          ($0.projectId, $0)
+        }
+      )
+      let existingSessionsByID = Dictionary(
+        uniqueKeysWithValues: try modelContext.fetch(FetchDescriptor<CachedSession>()).map {
+          ($0.sessionId, $0)
+        }
+      )
 
       for project in projects {
-        try upsertCachedProject(project, in: modelContext)
+        if let existing = existingProjectsByID[project.projectId] {
+          existing.update(from: project)
+        } else {
+          modelContext.insert(project.toCachedProject())
+        }
       }
 
       for session in sessions {
-        insertedSessionCount += try upsertCachedSession(session, in: modelContext) ? 1 : 0
+        if let existing = existingSessionsByID[session.sessionId] {
+          existing.update(from: session)
+        } else {
+          modelContext.insert(session.toCachedSession())
+          insertedSessionCount += 1
+        }
       }
 
       try modelContext.save()
@@ -209,6 +228,36 @@ extension HarnessMonitorStore {
         underlyingError: error
       )
       return true
+    }
+  }
+
+  func persistedSnapshotHydrationQueue(for summaries: [SessionSummary]) -> [SessionSummary] {
+    guard let modelContext, persistenceError == nil else {
+      return []
+    }
+    guard !summaries.isEmpty else {
+      return []
+    }
+
+    do {
+      let cachedBySessionID = Dictionary(
+        uniqueKeysWithValues: try modelContext.fetch(FetchDescriptor<CachedSession>()).map {
+          ($0.sessionId, $0)
+        }
+      )
+
+      return summaries.filter { summary in
+        guard let cached = cachedBySessionID[summary.sessionId] else {
+          return true
+        }
+        return cached.updatedAt != summary.updatedAt || !hasPersistedDetailSnapshot(cached)
+      }
+    } catch {
+      recordPersistenceFailure(
+        action: "Persisted session hydration queue could not be prepared.",
+        underlyingError: error
+      )
+      return summaries
     }
   }
 
