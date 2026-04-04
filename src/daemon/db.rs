@@ -27,8 +27,7 @@ impl fmt::Debug for DaemonDb {
     }
 }
 
-#[cfg(test)]
-const SCHEMA_VERSION: &str = "2";
+const SCHEMA_VERSION: &str = "3";
 
 impl DaemonDb {
     /// Open (or create) the daemon database at the given path with WAL mode
@@ -86,24 +85,25 @@ impl DaemonDb {
     }
 
     fn run_migrations(&self) -> Result<(), CliError> {
-        let version: String = self
-            .conn
-            .query_row(
-                "SELECT value FROM schema_meta WHERE key = 'version'",
-                [],
-                |row| row.get(0),
-            )
-            .map_err(|error| db_error(format!("read schema version: {error}")))?;
+        let version = self.schema_version()?;
+        let should_reclaim_space = match version.as_str() {
+            "1" => {
+                self.conn
+                    .execute_batch(
+                        "ALTER TABLE sessions ADD COLUMN title TEXT NOT NULL DEFAULT '';
+                         UPDATE sessions SET title = context;
+                         UPDATE sessions SET state_json = json_set(state_json, '$.title', context);
+                         UPDATE schema_meta SET value = '2' WHERE key = 'version';",
+                    )
+                    .map_err(|error| db_error(format!("migrate v1 -> v2: {error}")))?;
+                migrate_v2_to_v3(&self.conn)?
+            }
+            "2" => migrate_v2_to_v3(&self.conn)?,
+            _ => false,
+        };
 
-        if version == "1" {
-            self.conn
-                .execute_batch(
-                    "ALTER TABLE sessions ADD COLUMN title TEXT NOT NULL DEFAULT '';
-                     UPDATE sessions SET title = context;
-                     UPDATE sessions SET state_json = json_set(state_json, '$.title', context);
-                     UPDATE schema_meta SET value = '2' WHERE key = 'version';",
-                )
-                .map_err(|error| db_error(format!("migrate v1 -> v2: {error}")))?;
+        if should_reclaim_space {
+            reclaim_unused_pages(&self.conn)?;
         }
         Ok(())
     }
@@ -919,31 +919,48 @@ impl DaemonDb {
         runtime: &str,
         events: &[ConversationEvent],
     ) -> Result<(), CliError> {
-        let mut statement = self
+        let transaction = self
             .conn
-            .prepare(
-                "INSERT INTO conversation_events
-                    (session_id, agent_id, runtime, timestamp, sequence, kind, event_json)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
-            )
-            .map_err(|error| db_error(format!("prepare event insert: {error}")))?;
+            .unchecked_transaction()
+            .map_err(|error| db_error(format!("begin conversation event sync: {error}")))?;
 
-        for event in events {
-            let kind_json = serde_json::to_string(&event.kind).unwrap_or_default();
-            let kind = extract_transition_kind(&kind_json);
-            let json = serde_json::to_string(event).unwrap_or_default();
-            statement
-                .execute(rusqlite::params![
-                    session_id,
-                    agent_id,
-                    runtime,
-                    event.timestamp,
-                    event.sequence,
-                    kind,
-                    json,
-                ])
-                .map_err(|error| db_error(format!("insert conversation event: {error}")))?;
+        transaction
+            .execute(
+                "DELETE FROM conversation_events WHERE session_id = ?1 AND agent_id = ?2",
+                rusqlite::params![session_id, agent_id],
+            )
+            .map_err(|error| db_error(format!("clear conversation events: {error}")))?;
+
+        {
+            let mut statement = transaction
+                .prepare(
+                    "INSERT INTO conversation_events
+                        (session_id, agent_id, runtime, timestamp, sequence, kind, event_json)
+                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+                )
+                .map_err(|error| db_error(format!("prepare event insert: {error}")))?;
+
+            for event in events {
+                let kind_json = serde_json::to_string(&event.kind).unwrap_or_default();
+                let kind = extract_transition_kind(&kind_json);
+                let json = serde_json::to_string(event).unwrap_or_default();
+                statement
+                    .execute(rusqlite::params![
+                        session_id,
+                        agent_id,
+                        runtime,
+                        event.timestamp,
+                        event.sequence,
+                        kind,
+                        json,
+                    ])
+                    .map_err(|error| db_error(format!("insert conversation event: {error}")))?;
+            }
         }
+
+        transaction
+            .commit()
+            .map_err(|error| db_error(format!("commit conversation event sync: {error}")))?;
         Ok(())
     }
 
@@ -961,7 +978,7 @@ impl DaemonDb {
             .prepare(
                 "SELECT event_json FROM conversation_events
                  WHERE session_id = ?1 AND agent_id = ?2
-                 ORDER BY id",
+                 ORDER BY sequence, id",
             )
             .map_err(|error| db_error(format!("prepare event load: {error}")))?;
 
@@ -1399,14 +1416,12 @@ fn import_conversation_events(
             session_key,
             agent_id,
         )?;
-        if !events.is_empty() {
-            db.sync_conversation_events(
-                &resolved.state.session_id,
-                agent_id,
-                &agent.runtime,
-                &events,
-            )?;
-        }
+        db.sync_conversation_events(
+            &resolved.state.session_id,
+            agent_id,
+            &agent.runtime,
+            &events,
+        )?;
     }
     Ok(())
 }
@@ -1439,6 +1454,68 @@ fn create_schema(conn: &Connection) -> Result<(), CliError> {
     emit_schema_init_info();
     conn.execute_batch(CREATE_SCHEMA)
         .map_err(|error| db_error(format!("create daemon database schema: {error}")))
+}
+
+fn migrate_v2_to_v3(conn: &Connection) -> Result<bool, CliError> {
+    let transaction = conn
+        .unchecked_transaction()
+        .map_err(|error| db_error(format!("begin v2 -> v3 migration: {error}")))?;
+
+    let removed_conversation_duplicates = transaction
+        .execute(
+            "DELETE FROM conversation_events
+             WHERE id NOT IN (
+                 SELECT MIN(id)
+                 FROM conversation_events
+                 GROUP BY session_id, agent_id, sequence
+             )",
+            [],
+        )
+        .map_err(|error| db_error(format!("dedupe conversation events: {error}")))?;
+    transaction
+        .execute(
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_conv_events_identity
+             ON conversation_events(session_id, agent_id, sequence)",
+            [],
+        )
+        .map_err(|error| db_error(format!("create conversation event identity index: {error}")))?;
+
+    let removed_daemon_duplicates = transaction
+        .execute(
+            "DELETE FROM daemon_events
+             WHERE id NOT IN (
+                 SELECT MIN(id)
+                 FROM daemon_events
+                 GROUP BY recorded_at, level, message
+             )",
+            [],
+        )
+        .map_err(|error| db_error(format!("dedupe daemon events: {error}")))?;
+    transaction
+        .execute(
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_daemon_events_identity
+             ON daemon_events(recorded_at, level, message)",
+            [],
+        )
+        .map_err(|error| db_error(format!("create daemon event identity index: {error}")))?;
+
+    transaction
+        .execute(
+            "UPDATE schema_meta SET value = ?1 WHERE key = 'version'",
+            [SCHEMA_VERSION],
+        )
+        .map_err(|error| db_error(format!("bump schema version to v3: {error}")))?;
+
+    transaction
+        .commit()
+        .map_err(|error| db_error(format!("commit v2 -> v3 migration: {error}")))?;
+
+    Ok(removed_conversation_duplicates > 0 || removed_daemon_duplicates > 0)
+}
+
+fn reclaim_unused_pages(conn: &Connection) -> Result<(), CliError> {
+    conn.execute_batch("PRAGMA wal_checkpoint(TRUNCATE); VACUUM;")
+        .map_err(|error| db_error(format!("reclaim unused database pages: {error}")))
 }
 
 /// Manual tracing event dispatch. The `info!` macro has inherent cognitive
@@ -1674,7 +1751,7 @@ CREATE TABLE schema_meta (
     value TEXT NOT NULL
 ) WITHOUT ROWID;
 
-INSERT INTO schema_meta (key, value) VALUES ('version', '2');
+INSERT INTO schema_meta (key, value) VALUES ('version', '3');
 
 -- Discovered projects
 CREATE TABLE projects (
@@ -1823,6 +1900,8 @@ CREATE TABLE daemon_events (
 );
 
 CREATE INDEX idx_daemon_events_time ON daemon_events(recorded_at DESC);
+CREATE UNIQUE INDEX idx_daemon_events_identity
+    ON daemon_events(recorded_at, level, message);
 
 -- Indexed conversation events from agent transcripts
 CREATE TABLE conversation_events (
@@ -1838,6 +1917,8 @@ CREATE TABLE conversation_events (
 
 CREATE INDEX idx_conv_events_session ON conversation_events(session_id);
 CREATE INDEX idx_conv_events_agent ON conversation_events(session_id, agent_id);
+CREATE UNIQUE INDEX idx_conv_events_identity
+    ON conversation_events(session_id, agent_id, sequence);
 
 -- Cached agent activity summaries (computed from transcript files)
 CREATE TABLE agent_activity_cache (
@@ -1869,6 +1950,7 @@ VALUES ('global', 0, datetime('now'));
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::agents::runtime::event::ConversationEventKind;
     use std::time::{Duration, Instant};
 
     #[test]
@@ -1914,9 +1996,12 @@ mod tests {
             .collect();
 
         let expected = [
+            "agent_activity_cache",
             "agents",
             "change_tracking",
+            "conversation_events",
             "daemon_events",
+            "diagnostics_cache",
             "projects",
             "schema_meta",
             "session_log",
@@ -2062,6 +2147,18 @@ mod tests {
             context_root: format!("/tmp/data/projects/project-{index}").into(),
             is_worktree: false,
             worktree_name: None,
+        }
+    }
+
+    fn sample_conversation_event(sequence: u64, content: &str) -> ConversationEvent {
+        ConversationEvent {
+            timestamp: Some(format!("2026-04-03T12:00:{sequence:02}Z")),
+            sequence,
+            kind: ConversationEventKind::AssistantText {
+                content: content.to_string(),
+            },
+            agent: "claude-leader".into(),
+            session_id: "sess-test-1".into(),
         }
     }
 
@@ -2386,6 +2483,140 @@ mod tests {
             .query_row("SELECT COUNT(*) FROM daemon_events", [], |row| row.get(0))
             .expect("count events");
         assert_eq!(count, 1);
+    }
+
+    #[test]
+    fn sync_conversation_events_replaces_existing_rows() {
+        let db = DaemonDb::open_in_memory().expect("open db");
+        let first = vec![
+            sample_conversation_event(1, "first"),
+            sample_conversation_event(2, "second"),
+        ];
+        db.sync_conversation_events("sess-test-1", "claude-leader", "claude", &first)
+            .expect("first sync");
+
+        let replacement = vec![
+            sample_conversation_event(1, "updated"),
+            sample_conversation_event(3, "third"),
+        ];
+        db.sync_conversation_events("sess-test-1", "claude-leader", "claude", &replacement)
+            .expect("replacement sync");
+
+        let count: i64 = db
+            .conn
+            .query_row(
+                "SELECT COUNT(*) FROM conversation_events
+                 WHERE session_id = ?1 AND agent_id = ?2",
+                ["sess-test-1", "claude-leader"],
+                |row| row.get(0),
+            )
+            .expect("count conversation events");
+        assert_eq!(count, 2);
+
+        let loaded = db
+            .load_conversation_events("sess-test-1", "claude-leader")
+            .expect("load events");
+        assert_eq!(loaded.len(), 2);
+        assert_eq!(loaded[0].sequence, 1);
+        assert_eq!(loaded[1].sequence, 3);
+        match &loaded[0].kind {
+            ConversationEventKind::AssistantText { content } => assert_eq!(content, "updated"),
+            other => panic!("unexpected event kind: {other:?}"),
+        }
+
+        db.sync_conversation_events("sess-test-1", "claude-leader", "claude", &[])
+            .expect("clear events");
+        let cleared_count: i64 = db
+            .conn
+            .query_row(
+                "SELECT COUNT(*) FROM conversation_events
+                 WHERE session_id = ?1 AND agent_id = ?2",
+                ["sess-test-1", "claude-leader"],
+                |row| row.get(0),
+            )
+            .expect("count cleared conversation events");
+        assert_eq!(cleared_count, 0);
+    }
+
+    #[test]
+    fn open_migrates_v2_db_and_deduplicates_event_indexes() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let path = tmp.path().join("harness.db");
+        let conn = Connection::open(&path).expect("open raw db");
+        conn.execute_batch(
+            "
+            CREATE TABLE schema_meta (
+                key   TEXT PRIMARY KEY,
+                value TEXT NOT NULL
+            ) WITHOUT ROWID;
+            INSERT INTO schema_meta (key, value) VALUES ('version', '2');
+
+            CREATE TABLE daemon_events (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                recorded_at TEXT NOT NULL,
+                level       TEXT NOT NULL,
+                message     TEXT NOT NULL
+            );
+
+            CREATE TABLE conversation_events (
+                id           INTEGER PRIMARY KEY AUTOINCREMENT,
+                session_id   TEXT NOT NULL,
+                agent_id     TEXT NOT NULL,
+                runtime      TEXT NOT NULL,
+                timestamp    TEXT,
+                sequence     INTEGER NOT NULL DEFAULT 0,
+                kind         TEXT NOT NULL,
+                event_json   TEXT NOT NULL
+            );
+            ",
+        )
+        .expect("create v2 schema");
+
+        let event = sample_conversation_event(1, "duplicate");
+        let event_json = serde_json::to_string(&event).expect("serialize conversation event");
+        for _ in 0..3 {
+            conn.execute(
+                "INSERT INTO conversation_events
+                    (session_id, agent_id, runtime, timestamp, sequence, kind, event_json)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+                rusqlite::params![
+                    "sess-test-1",
+                    "claude-leader",
+                    "claude",
+                    event.timestamp.clone(),
+                    event.sequence,
+                    "AssistantText",
+                    event_json.clone(),
+                ],
+            )
+            .expect("insert duplicate conversation event");
+        }
+        for _ in 0..4 {
+            conn.execute(
+                "INSERT INTO daemon_events (recorded_at, level, message)
+                 VALUES (?1, ?2, ?3)",
+                rusqlite::params!["2026-04-03T12:00:00Z", "info", "duplicate"],
+            )
+            .expect("insert duplicate daemon event");
+        }
+        drop(conn);
+
+        let db = DaemonDb::open(&path).expect("open migrated db");
+        assert_eq!(db.schema_version().expect("schema version"), SCHEMA_VERSION);
+
+        let conversation_count: i64 = db
+            .conn
+            .query_row("SELECT COUNT(*) FROM conversation_events", [], |row| {
+                row.get(0)
+            })
+            .expect("count migrated conversation events");
+        assert_eq!(conversation_count, 1);
+
+        let daemon_count: i64 = db
+            .conn
+            .query_row("SELECT COUNT(*) FROM daemon_events", [], |row| row.get(0))
+            .expect("count migrated daemon events");
+        assert_eq!(daemon_count, 1);
     }
 
     #[test]
