@@ -271,7 +271,7 @@ pub fn read_recent_events(limit: usize) -> Result<Vec<DaemonAuditEvent>, CliErro
 /// Returns `CliError` on filesystem or parse failures.
 pub fn diagnostics() -> Result<DaemonDiagnostics, CliError> {
     let db_path = daemon_root().join("harness.db");
-    let db_size = db_path.metadata().map(|m| m.len()).unwrap_or(0);
+    let db_size = db_path.metadata().map_or(0, |metadata| metadata.len());
     Ok(DaemonDiagnostics {
         daemon_root: daemon_root().display().to_string(),
         manifest_path: manifest_path().display().to_string(),
