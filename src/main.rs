@@ -8,14 +8,23 @@ use harness::app::cli;
 use harness::errors;
 
 fn main() -> ExitCode {
-    tracing_subscriber::fmt()
-        .with_writer(io::stderr)
-        .with_env_filter(
-            EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("harness=info")),
-        )
-        .with_target(false)
-        .with_timer(ChronoUtc::rfc_3339())
-        .init();
+    let filter =
+        EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("harness=info"));
+
+    if std::env::var("HARNESS_LOG_FORMAT").ok().as_deref() == Some("json") {
+        tracing_subscriber::fmt()
+            .json()
+            .with_writer(io::stderr)
+            .with_env_filter(filter)
+            .init();
+    } else {
+        tracing_subscriber::fmt()
+            .with_writer(io::stderr)
+            .with_env_filter(filter)
+            .with_target(false)
+            .with_timer(ChronoUtc::rfc_3339())
+            .init();
+    }
 
     match cli::run() {
         Ok(code) => ExitCode::from(u8::try_from(code).unwrap_or(1)),
