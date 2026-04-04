@@ -114,6 +114,7 @@ pub async fn serve(config: DaemonServeConfig) -> Result<(), CliError> {
     let daemon_epoch = manifest.started_at.clone();
 
     let _watch = watch::spawn_watch_loop(sender.clone(), config.poll_interval, db.clone());
+    spawn_background_reconciliation(db.clone());
 
     let app_state = DaemonHttpState {
         token,
@@ -143,15 +144,45 @@ fn initialize_daemon_db() -> Option<Arc<Mutex<super::db::DaemonDb>>> {
     let db_path = state::daemon_root().join("harness.db");
     let db = open_daemon_db(&db_path)?;
 
-    // Always import from files on startup so the database reflects the
-    // current filesystem state - sessions created while the daemon was
-    // offline would otherwise be invisible until the watch loop detects
-    // a new file event.
-    run_initial_import(&db);
-
     let _ = db.cache_startup_diagnostics();
 
     Some(Arc::new(Mutex::new(db)))
+}
+
+fn spawn_background_reconciliation(db: Option<Arc<Mutex<super::db::DaemonDb>>>) {
+    let Some(db) = db else {
+        return;
+    };
+    tokio::spawn(async move {
+        let _ = spawn_blocking(move || run_background_reconciliation(&db)).await;
+    });
+}
+
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion; tokio-rs/tracing#553"
+)]
+fn run_background_reconciliation(db: &Arc<Mutex<super::db::DaemonDb>>) {
+    let Ok(db_guard) = db.lock() else {
+        return;
+    };
+    match db_guard.reconcile_from_files() {
+        Ok(result) => {
+            let message = format!(
+                "background reconciliation: {} projects, {} sessions imported, {} skipped",
+                result.projects, result.sessions_imported, result.sessions_skipped
+            );
+            tracing::info!("{message}");
+            let _ = state::append_event("info", &message);
+        }
+        Err(error) => {
+            tracing::warn!(%error, "background file reconciliation failed");
+            let _ = state::append_event(
+                "warn",
+                &format!("background file reconciliation failed: {error}"),
+            );
+        }
+    }
 }
 
 fn open_daemon_db(path: &Path) -> Option<super::db::DaemonDb> {
@@ -161,22 +192,6 @@ fn open_daemon_db(path: &Path) -> Option<super::db::DaemonDb> {
             let _ = state::append_event("warn", &message);
         })
         .ok()
-}
-
-fn run_initial_import(db: &super::db::DaemonDb) {
-    match db.import_from_files() {
-        Ok(result) => {
-            let message = format!(
-                "imported {} projects and {} sessions into daemon database",
-                result.projects, result.sessions
-            );
-            let _ = state::append_event("info", &message);
-        }
-        Err(error) => {
-            let message = format!("failed to import file data: {error}");
-            let _ = state::append_event("warn", &message);
-        }
-    }
 }
 
 /// Build a point-in-time daemon status report.
