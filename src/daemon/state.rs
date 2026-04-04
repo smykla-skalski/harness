@@ -133,7 +133,9 @@ pub fn acquire_singleton_lock() -> Result<DaemonLockGuard, CliError> {
             );
             Err(CliErrorKind::workflow_io(detail).into())
         }
-        Err(error) => Err(CliErrorKind::workflow_io(format!("lock daemon singleton: {error}")).into()),
+        Err(error) => {
+            Err(CliErrorKind::workflow_io(format!("lock daemon singleton: {error}")).into())
+        }
     }
 }
 
@@ -269,10 +271,7 @@ pub fn read_recent_events(limit: usize) -> Result<Vec<DaemonAuditEvent>, CliErro
 /// Returns `CliError` on filesystem or parse failures.
 pub fn diagnostics() -> Result<DaemonDiagnostics, CliError> {
     let db_path = daemon_root().join("harness.db");
-    let db_size = db_path
-        .metadata()
-        .map(|m| m.len())
-        .unwrap_or(0);
+    let db_size = db_path.metadata().map(|m| m.len()).unwrap_or(0);
     Ok(DaemonDiagnostics {
         daemon_root: daemon_root().display().to_string(),
         manifest_path: manifest_path().display().to_string(),
@@ -382,7 +381,10 @@ mod tests {
                 .expect("manifest");
 
                 clear_manifest_for_pid(778).expect("skip foreign pid");
-                assert!(manifest_path().exists(), "foreign pid should not clear manifest");
+                assert!(
+                    manifest_path().exists(),
+                    "foreign pid should not clear manifest"
+                );
 
                 clear_manifest_for_pid(777).expect("clear owned manifest");
                 assert!(!manifest_path().exists(), "owned pid should clear manifest");
