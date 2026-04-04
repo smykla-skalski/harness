@@ -351,7 +351,7 @@ private struct SidebarSegmentedPicker<Option: Hashable & Identifiable>: View {
 
 func sessionAccessibilityLabel(for session: SessionSummary) -> String {
   [
-    session.context,
+    session.displayTitle,
     session.projectName,
     session.checkoutDisplayName,
     session.status.title,
