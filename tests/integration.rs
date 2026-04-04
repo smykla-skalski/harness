@@ -3,6 +3,7 @@
 
 mod integration {
     mod architecture;
+    mod daemon_comparison;
     mod daemon_perf;
     pub mod helpers;
 
