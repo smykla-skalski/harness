@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 
 @testable import HarnessMonitorKit
@@ -103,5 +104,39 @@ struct DaemonModelsTests {
     )
     #expect(status.lifecycleCaption.contains("io.harness.daemon"))
     #expect(status.lifecycleCaption.contains("waiting"))
+  }
+
+  @Test("Daemon diagnostics decode legacy cache payloads")
+  func daemonDiagnosticsDecodeLegacyCachePayloads() throws {
+    let json = #"""
+    {
+      "daemon_root": "/Users/example/Library/Application Support/harness/daemon",
+      "manifest_path": "/Users/example/Library/Application Support/harness/daemon/manifest.json",
+      "auth_token_path": "/Users/example/Library/Application Support/harness/daemon/auth-token",
+      "auth_token_present": true,
+      "events_path": "/Users/example/Library/Application Support/harness/daemon/events.jsonl",
+      "cache_root": "/Users/example/Library/Application Support/harness/daemon/cache/projects",
+      "cache_entry_count": 7,
+      "last_event": {
+        "recorded_at": "2026-04-04T06:39:30Z",
+        "level": "info",
+        "message": "daemon listening on http://127.0.0.1:63438"
+      }
+    }
+    """#
+
+    let decoder = JSONDecoder()
+    decoder.keyDecodingStrategy = .convertFromSnakeCase
+    let diagnostics = try decoder.decode(
+      DaemonDiagnostics.self,
+      from: Data(json.utf8)
+    )
+
+    #expect(
+      diagnostics.databasePath
+        == "/Users/example/Library/Application Support/harness/daemon/harness.db"
+    )
+    #expect(diagnostics.databaseSizeBytes == 0)
+    #expect(diagnostics.lastEvent?.message == "daemon listening on http://127.0.0.1:63438")
   }
 }

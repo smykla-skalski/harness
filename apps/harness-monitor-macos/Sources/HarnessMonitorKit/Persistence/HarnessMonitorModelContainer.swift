@@ -5,7 +5,7 @@ public enum HarnessMonitorModelContainer {
   public static func live(
     using environment: HarnessMonitorEnvironment = .current
   ) throws -> ModelContainer {
-    let schema = Schema(versionedSchema: HarnessMonitorSchemaV1.self)
+    let schema = Schema(versionedSchema: HarnessMonitorSchemaV2.self)
     let root = HarnessMonitorPaths.harnessRoot(using: environment)
     try FileManager.default.createDirectory(
       at: root,
@@ -15,16 +15,23 @@ public enum HarnessMonitorModelContainer {
     let url = root.appendingPathComponent("harness-cache.store")
     let config = ModelConfiguration("HarnessMonitorStore", schema: schema, url: url)
 
-    return try ModelContainer(
+    return try makeContainer(schema: schema, config: config)
+  }
+
+  public static func preview() throws -> ModelContainer {
+    let schema = Schema(versionedSchema: HarnessMonitorSchemaV2.self)
+    let config = ModelConfiguration("HarnessMonitorPreview", schema: schema, isStoredInMemoryOnly: true)
+    return try ModelContainer(for: schema, configurations: [config])
+  }
+
+  private static func makeContainer(
+    schema: Schema,
+    config: ModelConfiguration
+  ) throws -> ModelContainer {
+    try ModelContainer(
       for: schema,
       migrationPlan: HarnessMonitorMigrationPlan.self,
       configurations: [config]
     )
-  }
-
-  public static func preview() throws -> ModelContainer {
-    let schema = Schema(versionedSchema: HarnessMonitorSchemaV1.self)
-    let config = ModelConfiguration("HarnessMonitorPreview", schema: schema, isStoredInMemoryOnly: true)
-    return try ModelContainer(for: schema, configurations: [config])
   }
 }

@@ -55,6 +55,7 @@ struct ToolbarCenterpieceMetric: Equatable {
 
 enum ToolbarCenterpieceMetricKind: String, CaseIterable {
   case projects
+  case worktrees
   case sessions
   case openWork
   case blocked
@@ -63,6 +64,8 @@ enum ToolbarCenterpieceMetricKind: String, CaseIterable {
     switch self {
     case .projects:
       "projects"
+    case .worktrees:
+      "worktrees"
     case .sessions:
       "sessions"
     case .openWork:
@@ -76,6 +79,8 @@ enum ToolbarCenterpieceMetricKind: String, CaseIterable {
     switch self {
     case .projects:
       "Projects"
+    case .worktrees:
+      "Worktrees"
     case .sessions:
       "Sessions"
     case .openWork:
@@ -89,6 +94,8 @@ enum ToolbarCenterpieceMetricKind: String, CaseIterable {
     switch self {
     case .projects:
       HarnessMonitorTheme.accent
+    case .worktrees:
+      HarnessMonitorTheme.warmAccent
     case .sessions:
       HarnessMonitorTheme.success
     case .openWork:
@@ -102,6 +109,8 @@ enum ToolbarCenterpieceMetricKind: String, CaseIterable {
     switch self {
     case .projects:
       "folder.fill"
+    case .worktrees:
+      "square.3.layers.3d.down.right"
     case .sessions:
       "rectangle.stack.fill"
     case .openWork:
@@ -131,54 +140,6 @@ enum ToolbarCenterpieceDisplayMode: String {
     }
   }
 
-  var minimumWidth: CGFloat {
-    0
-  }
-
-  var idealWidth: CGFloat {
-    switch self {
-    case .standard:
-      268
-    case .compact:
-      228
-    case .compressed:
-      182
-    }
-  }
-
-  var maximumWidth: CGFloat {
-    switch self {
-    case .standard:
-      324
-    case .compact:
-      268
-    case .compressed:
-      212
-    }
-  }
-
-  var horizontalInset: CGFloat {
-    switch self {
-    case .standard:
-      2
-    case .compact:
-      2
-    case .compressed:
-      1
-    }
-  }
-
-  var interSectionSpacing: CGFloat {
-    switch self {
-    case .standard:
-      HarnessMonitorTheme.spacingLG
-    case .compact:
-      6
-    case .compressed:
-      HarnessMonitorTheme.spacingXS
-    }
-  }
-
   var metricSpacing: CGFloat {
     switch self {
     case .standard:
@@ -199,27 +160,16 @@ private struct ToolbarCenterpieceView: View {
   private static let toolbarHeight: CGFloat = 32
 
   var body: some View {
-    content
-    .frame(
-      minWidth: displayMode.minimumWidth,
-      idealWidth: displayMode.idealWidth,
-      maxWidth: displayMode.maximumWidth,
-      minHeight: Self.toolbarHeight,
-      idealHeight: Self.toolbarHeight,
-      maxHeight: Self.toolbarHeight,
-      alignment: .center
-    )
-    .accessibilityElement(children: .ignore)
-    .accessibilityIdentifier(HarnessMonitorAccessibility.toolbarCenterpiece)
-    .accessibilityLabel(model.accessibilityLabel)
-    .accessibilityValue(model.accessibilityValue)
-    .help("Live harness summary")
-  }
-
-  private var content: some View {
     ToolbarCenterpieceMetricsRow(metrics: model.metrics, displayMode: displayMode)
       .layoutPriority(1)
-    .padding(.horizontal, displayMode.horizontalInset)
+      .padding(.horizontal, 12)
+      .fixedSize(horizontal: true, vertical: false)
+      .frame(height: Self.toolbarHeight)
+      .accessibilityElement(children: .ignore)
+      .accessibilityIdentifier(HarnessMonitorAccessibility.toolbarCenterpiece)
+      .accessibilityLabel(model.accessibilityLabel)
+      .accessibilityValue(model.accessibilityValue)
+      .help("Live harness summary")
   }
 }
 
@@ -269,36 +219,104 @@ private struct ToolbarCenterpieceMetricToken: View {
   }
 }
 
-#Preview("Toolbar Centerpiece - Standard") {
-  toolbarCenterpiecePreview(displayMode: .standard)
+#Preview("Centerpiece - In Toolbar") {
+  NavigationSplitView {
+    List { Text("Sidebar") }
+      .navigationSplitViewColumnWidth(min: 200, ideal: 220, max: 280)
+  } detail: {
+    Text("Detail content")
+      .frame(maxWidth: .infinity, maxHeight: .infinity)
+  }
+  .toolbar {
+    ContentCenterpieceToolbar(
+      model: ToolbarCenterpieceModel(
+        workspaceName: "Harness Monitor",
+        destinationName: "My Mac",
+        destinationSystemImage: "laptopcomputer",
+        metrics: [
+          .init(kind: .projects, value: 11),
+          .init(kind: .sessions, value: 1),
+          .init(kind: .openWork, value: 4),
+          .init(kind: .blocked, value: 1),
+        ]
+      ),
+      displayMode: .compact
+    )
+  }
+  .frame(width: 900, height: 400)
 }
 
-#Preview("Toolbar Centerpiece - Compact") {
-  toolbarCenterpiecePreview(displayMode: .compact)
+#Preview("Centerpiece - All Modes") {
+  VStack(spacing: 24) {
+    ForEach(
+      Array(
+        [
+          ("Standard", ToolbarCenterpieceDisplayMode.standard),
+          ("Compact", ToolbarCenterpieceDisplayMode.compact),
+          ("Compressed", ToolbarCenterpieceDisplayMode.compressed),
+        ].enumerated()
+      ),
+      id: \.offset
+    ) { _, pair in
+      VStack(spacing: 4) {
+        Text(pair.0)
+          .font(.caption)
+          .foregroundStyle(.secondary)
+        ToolbarCenterpieceView(
+          model: .preview,
+          displayMode: pair.1
+        )
+        .background(.quaternary, in: Capsule())
+      }
+    }
+  }
+  .padding(24)
 }
 
-#Preview("Toolbar Centerpiece - Compressed") {
-  toolbarCenterpiecePreview(displayMode: .compressed)
-}
+#Preview("Centerpiece - Varying Metrics") {
+  VStack(spacing: 16) {
+    ToolbarCenterpieceView(
+      model: ToolbarCenterpieceModel(
+        workspaceName: "Harness Monitor",
+        destinationName: "My Mac",
+        destinationSystemImage: "laptopcomputer",
+        metrics: [
+          .init(kind: .projects, value: 1),
+          .init(kind: .blocked, value: 0),
+        ]
+      ),
+      displayMode: .compact
+    )
+    .background(.quaternary, in: Capsule())
 
-private func toolbarCenterpiecePreview(
-  displayMode: ToolbarCenterpieceDisplayMode
-) -> some View {
-  ToolbarCenterpieceView(
-    model: ToolbarCenterpieceModel(
-      workspaceName: "Harness Monitor",
-      destinationName: "My Mac",
-      destinationSystemImage: "laptopcomputer",
-      metrics: [
-        .init(kind: .projects, value: 6),
-        .init(kind: .sessions, value: 24),
-        .init(kind: .openWork, value: 13),
-        .init(kind: .blocked, value: 3),
-      ]
-    ),
-    displayMode: displayMode
-  )
-  .padding(.horizontal, 16)
-  .padding(.vertical, 12)
-  .frame(width: displayMode.maximumWidth + 32)
+    ToolbarCenterpieceView(
+      model: ToolbarCenterpieceModel(
+        workspaceName: "Harness Monitor",
+        destinationName: "My Mac",
+        destinationSystemImage: "laptopcomputer",
+        metrics: [
+          .init(kind: .projects, value: 11),
+          .init(kind: .sessions, value: 1),
+          .init(kind: .openWork, value: 4),
+          .init(kind: .blocked, value: 1),
+        ]
+      ),
+      displayMode: .compact
+    )
+    .background(.quaternary, in: Capsule())
+
+    ToolbarCenterpieceView(
+      model: ToolbarCenterpieceModel(
+        workspaceName: "Harness Monitor",
+        destinationName: "My Mac",
+        destinationSystemImage: "laptopcomputer",
+        metrics: ToolbarCenterpieceMetricKind.allCases.map {
+          .init(kind: $0, value: 999)
+        }
+      ),
+      displayMode: .compact
+    )
+    .background(.quaternary, in: Capsule())
+  }
+  .padding(24)
 }

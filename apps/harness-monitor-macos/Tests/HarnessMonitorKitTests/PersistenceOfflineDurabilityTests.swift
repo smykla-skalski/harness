@@ -36,6 +36,12 @@ struct PersistenceOfflineDurabilityTests {
     ))
   }
 
+  private func makeV1Container(at url: URL) throws -> ModelContainer {
+    let schema = Schema(versionedSchema: HarnessMonitorSchemaV1.self)
+    let config = ModelConfiguration("HarnessMonitorStore", schema: schema, url: url)
+    return try ModelContainer(for: schema, configurations: [config])
+  }
+
   @Test("Stopping the daemon keeps the selected persisted snapshot readable")
   func stopDaemonKeepsSelectedPersistedSnapshotReadable() async throws {
     let client = RecordingHarnessClient()
@@ -183,5 +189,80 @@ struct PersistenceOfflineDurabilityTests {
     )
     #expect(reopenedStore.persistedSessionCount == 1)
     #expect(reopenedStore.lastPersistedSnapshotAt != nil)
+  }
+
+  @Test("Live SwiftData store migrates V1 cache records into the V2 repo and worktree schema")
+  func liveStoreMigratesV1CacheRecords() throws {
+    let root = FileManager.default.temporaryDirectory
+      .appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+
+    let environment = HarnessMonitorEnvironment(
+      values: ["XDG_DATA_HOME": root.path],
+      homeDirectory: root
+    )
+    let harnessRoot = HarnessMonitorPaths.harnessRoot(using: environment)
+    try FileManager.default.createDirectory(
+      at: harnessRoot,
+      withIntermediateDirectories: true,
+      attributes: nil
+    )
+
+    let storeURL = harnessRoot.appendingPathComponent("harness-cache.store")
+    let metricsData = try JSONEncoder().encode(SessionMetrics(
+      agentCount: 2,
+      activeAgentCount: 1,
+      openTaskCount: 3,
+      inProgressTaskCount: 1,
+      blockedTaskCount: 0,
+      completedTaskCount: 4
+    ))
+
+    do {
+      let v1Container = try makeV1Container(at: storeURL)
+      let project = HarnessMonitorSchemaV1.CachedProject(
+        projectId: "proj-1",
+        name: "Harness",
+        projectDir: "/tmp/harness",
+        contextRoot: "/tmp/harness-context",
+        activeSessionCount: 1,
+        totalSessionCount: 1
+      )
+      let session = HarnessMonitorSchemaV1.CachedSession(
+        sessionId: "sess-1",
+        projectId: "proj-1",
+        projectName: "Harness",
+        projectDir: "/tmp/harness",
+        contextRoot: "/tmp/harness-context",
+        context: "Migrated session",
+        statusRaw: SessionStatus.active.rawValue,
+        createdAt: "2026-04-03T12:00:00Z",
+        updatedAt: "2026-04-03T12:05:00Z",
+        lastActivityAt: "2026-04-03T12:05:00Z",
+        leaderId: "leader-1",
+        observeId: "observe-1",
+        metricsData: metricsData
+      )
+
+      v1Container.mainContext.insert(project)
+      v1Container.mainContext.insert(session)
+      try v1Container.mainContext.save()
+    }
+
+    let container = try HarnessMonitorModelContainer.live(using: environment)
+    let projects = try container.mainContext.fetch(FetchDescriptor<CachedProject>())
+    let sessions = try container.mainContext.fetch(FetchDescriptor<CachedSession>())
+
+    #expect(projects.count == 1)
+    #expect(projects.first?.projectId == "proj-1")
+    #expect(projects.first?.worktreesData == Data())
+
+    #expect(sessions.count == 1)
+    #expect(sessions.first?.sessionId == "sess-1")
+    #expect(sessions.first?.checkoutId == "proj-1")
+    #expect(sessions.first?.checkoutRoot == "/tmp/harness")
+    #expect(sessions.first?.isWorktree == false)
+    #expect(sessions.first?.worktreeName == nil)
+    #expect(sessions.first?.metricsData == metricsData)
   }
 }

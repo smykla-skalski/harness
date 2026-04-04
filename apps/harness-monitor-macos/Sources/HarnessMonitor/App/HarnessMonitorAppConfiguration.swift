@@ -14,6 +14,10 @@ struct HarnessMonitorAppConfiguration {
   static func resolve() -> Self {
     UserDefaults.standard.register(defaults: [
       HarnessMonitorTextSize.storageKey: HarnessMonitorTextSize.defaultIndex,
+      HarnessMonitorDateTimeConfiguration.timeZoneModeKey:
+        HarnessMonitorDateTimeConfiguration.defaultTimeZoneModeRawValue,
+      HarnessMonitorDateTimeConfiguration.customTimeZoneIdentifierKey:
+        HarnessMonitorDateTimeConfiguration.defaultCustomTimeZoneIdentifier,
     ])
 
     let environment = HarnessMonitorEnvironment.current
@@ -50,6 +54,25 @@ struct HarnessMonitorAppConfiguration {
         initialTextSizeIndex,
         forKey: HarnessMonitorTextSize.storageKey
       )
+      if let timeZoneModeOverride =
+        HarnessMonitorDateTimeZoneMode(
+          rawValue: environment.values[HarnessMonitorDateTimeConfiguration.uiTestTimeZoneModeOverrideKey]
+            ?? ""
+        )
+      {
+        UserDefaults.standard.set(
+          timeZoneModeOverride.rawValue,
+          forKey: HarnessMonitorDateTimeConfiguration.timeZoneModeKey
+        )
+      }
+      if let customTimeZoneOverride =
+        environment.values[HarnessMonitorDateTimeConfiguration.uiTestCustomTimeZoneOverrideKey]
+      {
+        UserDefaults.standard.set(
+          customTimeZoneOverride,
+          forKey: HarnessMonitorDateTimeConfiguration.customTimeZoneIdentifierKey
+        )
+      }
     }
 
     return Self(

@@ -6,6 +6,7 @@ struct DaemonStatusCard: View {
   let isBusy: Bool
   let isRefreshing: Bool
   let projectCount: Int
+  let worktreeCount: Int
   let sessionCount: Int
   let isLaunchAgentInstalled: Bool
   let startDaemon: HarnessMonitorAsyncActionButton.Action
@@ -38,6 +39,7 @@ struct DaemonStatusCard: View {
 
       DaemonMetricsStrip(
         projectCount: projectCount,
+        worktreeCount: worktreeCount,
         sessionCount: sessionCount,
         launchdState: daemonLaunchdState
       )
@@ -220,6 +222,7 @@ struct DaemonToggleButtonStyle: ButtonStyle {
     isBusy: false,
     isRefreshing: false,
     projectCount: 4,
+    worktreeCount: 6,
     sessionCount: 18,
     isLaunchAgentInstalled: true
   )
@@ -231,6 +234,7 @@ struct DaemonToggleButtonStyle: ButtonStyle {
     isBusy: true,
     isRefreshing: false,
     projectCount: 4,
+    worktreeCount: 6,
     sessionCount: 18,
     isLaunchAgentInstalled: true
   )
@@ -242,6 +246,7 @@ struct DaemonToggleButtonStyle: ButtonStyle {
     isBusy: false,
     isRefreshing: false,
     projectCount: 0,
+    worktreeCount: 0,
     sessionCount: 0,
     isLaunchAgentInstalled: false
   )
@@ -253,6 +258,7 @@ private func daemonStatusCardPreview(
   isBusy: Bool,
   isRefreshing: Bool,
   projectCount: Int,
+  worktreeCount: Int,
   sessionCount: Int,
   isLaunchAgentInstalled: Bool
 ) -> some View {
@@ -261,6 +267,7 @@ private func daemonStatusCardPreview(
     isBusy: isBusy,
     isRefreshing: isRefreshing,
     projectCount: projectCount,
+    worktreeCount: worktreeCount,
     sessionCount: sessionCount,
     isLaunchAgentInstalled: isLaunchAgentInstalled,
     startDaemon: {},

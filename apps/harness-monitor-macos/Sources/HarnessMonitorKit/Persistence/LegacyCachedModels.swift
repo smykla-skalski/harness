@@ -1,7 +1,7 @@
 import Foundation
 import SwiftData
 
-extension HarnessMonitorSchemaV2 {
+extension HarnessMonitorSchemaV1 {
   @Model
   final class CachedProject {
     #Unique<CachedProject>([\.projectId])
@@ -13,7 +13,6 @@ extension HarnessMonitorSchemaV2 {
     var contextRoot: String
     var activeSessionCount: Int
     var totalSessionCount: Int
-    var worktreesData: Data = Data()
     var lastCachedAt: Date
 
     init(
@@ -23,7 +22,6 @@ extension HarnessMonitorSchemaV2 {
       contextRoot: String,
       activeSessionCount: Int,
       totalSessionCount: Int,
-      worktreesData: Data = Data(),
       lastCachedAt: Date = .now
     ) {
       self.projectId = projectId
@@ -32,7 +30,6 @@ extension HarnessMonitorSchemaV2 {
       self.contextRoot = contextRoot
       self.activeSessionCount = activeSessionCount
       self.totalSessionCount = totalSessionCount
-      self.worktreesData = worktreesData
       self.lastCachedAt = lastCachedAt
     }
   }
@@ -47,10 +44,6 @@ extension HarnessMonitorSchemaV2 {
     var projectName: String
     var projectDir: String?
     var contextRoot: String
-    var checkoutId: String = ""
-    var checkoutRoot: String = ""
-    var isWorktree: Bool = false
-    var worktreeName: String?
     var context: String
     var statusRaw: String
     var createdAt: String
@@ -87,10 +80,6 @@ extension HarnessMonitorSchemaV2 {
       projectName: String,
       projectDir: String?,
       contextRoot: String,
-      checkoutId: String,
-      checkoutRoot: String,
-      isWorktree: Bool,
-      worktreeName: String?,
       context: String,
       statusRaw: String,
       createdAt: String,
@@ -108,10 +97,6 @@ extension HarnessMonitorSchemaV2 {
       self.projectName = projectName
       self.projectDir = projectDir
       self.contextRoot = contextRoot
-      self.checkoutId = checkoutId
-      self.checkoutRoot = checkoutRoot
-      self.isWorktree = isWorktree
-      self.worktreeName = worktreeName
       self.context = context
       self.statusRaw = statusRaw
       self.createdAt = createdAt
@@ -371,12 +356,3 @@ extension HarnessMonitorSchemaV2 {
     }
   }
 }
-
-typealias CachedProject = HarnessMonitorSchemaV2.CachedProject
-typealias CachedSession = HarnessMonitorSchemaV2.CachedSession
-typealias CachedAgent = HarnessMonitorSchemaV2.CachedAgent
-typealias CachedWorkItem = HarnessMonitorSchemaV2.CachedWorkItem
-typealias CachedSignalRecord = HarnessMonitorSchemaV2.CachedSignalRecord
-typealias CachedTimelineEntry = HarnessMonitorSchemaV2.CachedTimelineEntry
-typealias CachedObserver = HarnessMonitorSchemaV2.CachedObserver
-typealias CachedAgentActivity = HarnessMonitorSchemaV2.CachedAgentActivity

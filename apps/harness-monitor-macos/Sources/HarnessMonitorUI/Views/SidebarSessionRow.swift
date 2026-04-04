@@ -5,6 +5,8 @@ struct SidebarSessionRow: View {
   let session: SessionSummary
   let isBookmarked: Bool
   let isSelected: Bool
+  @Environment(\.harnessDateTimeConfiguration)
+  private var dateTimeConfiguration
 
   var body: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.itemSpacing) {
@@ -32,7 +34,7 @@ struct SidebarSessionRow: View {
       HStack(spacing: HarnessMonitorTheme.sectionSpacing) {
         labelChip("\(session.metrics.activeAgentCount) active")
         labelChip("\(session.metrics.inProgressTaskCount) moving")
-        labelChip(formatTimestamp(session.lastActivityAt))
+        labelChip(formatTimestamp(session.lastActivityAt, configuration: dateTimeConfiguration))
       }
       .frame(maxWidth: .infinity, alignment: .leading)
     }

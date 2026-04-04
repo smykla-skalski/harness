@@ -36,6 +36,17 @@ private struct HarnessMonitorSceneAppearanceModifier: ViewModifier {
   private var storedThemeMode = HarnessMonitorThemeMode.auto.rawValue
   @AppStorage(HarnessMonitorTextSize.storageKey)
   private var textSizeIndex = HarnessMonitorTextSize.defaultIndex
+  @AppStorage(HarnessMonitorDateTimeConfiguration.timeZoneModeKey)
+  private var timeZoneModeRawValue = HarnessMonitorDateTimeConfiguration.defaultTimeZoneModeRawValue
+  @AppStorage(HarnessMonitorDateTimeConfiguration.customTimeZoneIdentifierKey)
+  private var customTimeZoneIdentifier = HarnessMonitorDateTimeConfiguration.defaultCustomTimeZoneIdentifier
+
+  private var dateTimeConfiguration: HarnessMonitorDateTimeConfiguration {
+    HarnessMonitorDateTimeConfiguration(
+      timeZoneModeRawValue: timeZoneModeRawValue,
+      customTimeZoneIdentifier: customTimeZoneIdentifier
+    )
+  }
 
   func body(content: Content) -> some View {
     let normalizedTextSizeIndex = HarnessMonitorTextSize.normalizedIndex(textSizeIndex)
@@ -51,6 +62,7 @@ private struct HarnessMonitorSceneAppearanceModifier: ViewModifier {
         \.harnessNativeFormControlSize,
         HarnessMonitorTextSize.controlSize(at: normalizedTextSizeIndex)
       )
+      .environment(\.harnessDateTimeConfiguration, dateTimeConfiguration)
       .preferredColorScheme(themeMode.colorScheme)
       .tint(HarnessMonitorTheme.accent)
       .onAppear(perform: syncThemeFromStorage)
