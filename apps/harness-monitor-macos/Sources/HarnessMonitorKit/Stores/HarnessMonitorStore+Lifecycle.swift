@@ -5,6 +5,7 @@ extension HarnessMonitorStore {
   private static let streamReconnectDelays: [Duration] = [
     .milliseconds(500), .seconds(1), .seconds(2), .seconds(4), .seconds(8),
   ]
+  private static let streamReconnectMaxAttempts = 6
 
   func connect(using client: any HarnessMonitorClientProtocol) async {
     self.client = client
@@ -318,6 +319,16 @@ extension HarnessMonitorStore {
         if Task.isCancelled {
           return
         }
+
+        if attempt >= Self.streamReconnectMaxAttempts {
+          appendConnectionEvent(
+            kind: .reconnecting,
+            detail: "Global stream failed \(attempt) times, re-bootstrapping"
+          )
+          await reconnect()
+          return
+        }
+
         let delay = reconnectDelay(for: attempt)
         attempt += 1
         try? await Task.sleep(for: delay)
@@ -356,6 +367,16 @@ extension HarnessMonitorStore {
         if Task.isCancelled {
           return
         }
+
+        if attempt >= Self.streamReconnectMaxAttempts {
+          appendConnectionEvent(
+            kind: .reconnecting,
+            detail: "Session stream failed \(attempt) times, re-bootstrapping"
+          )
+          await reconnect()
+          return
+        }
+
         let delay = reconnectDelay(for: attempt)
         attempt += 1
         try? await Task.sleep(for: delay)

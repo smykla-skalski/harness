@@ -138,12 +138,13 @@ pub async fn serve(config: DaemonServeConfig) -> Result<(), CliError> {
 
 fn initialize_daemon_db() -> Option<Arc<Mutex<super::db::DaemonDb>>> {
     let db_path = state::daemon_root().join("harness.db");
-    let is_new = !db_path.exists();
     let db = open_daemon_db(&db_path)?;
 
-    if is_new {
-        run_initial_import(&db);
-    }
+    // Always import from files on startup so the database reflects the
+    // current filesystem state - sessions created while the daemon was
+    // offline would otherwise be invisible until the watch loop detects
+    // a new file event.
+    run_initial_import(&db);
 
     let _ = db.cache_startup_diagnostics();
 

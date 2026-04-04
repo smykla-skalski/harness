@@ -728,7 +728,7 @@ impl DaemonDb {
         let mut statement = self
             .conn
             .prepare(
-                "INSERT INTO signal_index (
+                "INSERT OR REPLACE INTO signal_index (
                     signal_id, session_id, agent_id, runtime, command, priority,
                     status, created_at, source_agent, message, action_hint,
                     signal_json, ack_json, file_path, indexed_at
