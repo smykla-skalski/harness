@@ -59,9 +59,10 @@ private struct DashboardSessionCard: View {
           .accessibilityHidden(true)
         VStack(alignment: .leading, spacing: 4) {
           HStack(alignment: .top, spacing: HarnessMonitorTheme.itemSpacing) {
-            Text(session.context)
+            Text(session.displayTitle)
               .scaledFont(.system(.headline, design: .rounded, weight: .semibold))
-              .foregroundStyle(HarnessMonitorTheme.ink)
+              .italic(session.title.isEmpty)
+              .foregroundStyle(session.title.isEmpty ? HarnessMonitorTheme.tertiaryInk : HarnessMonitorTheme.ink)
               .multilineTextAlignment(.leading)
             Spacer(minLength: 12)
             Text(session.status.title)
@@ -94,10 +95,11 @@ private struct DashboardSessionCard: View {
       }
       Divider()
       Button {
-        HarnessMonitorClipboard.copy(session.context)
+        HarnessMonitorClipboard.copy(session.title)
       } label: {
         Label("Copy Title", systemImage: "doc.on.doc")
       }
+      .disabled(session.title.isEmpty)
       Button {
         HarnessMonitorClipboard.copy(session.sessionId)
       } label: {

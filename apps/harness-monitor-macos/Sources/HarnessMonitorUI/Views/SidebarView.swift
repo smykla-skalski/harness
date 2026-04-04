@@ -175,10 +175,11 @@ struct SidebarView: View {
           }
           Divider()
           Button {
-            HarnessMonitorClipboard.copy(session.context)
+            HarnessMonitorClipboard.copy(session.title)
           } label: {
             Label("Copy Title", systemImage: "doc.on.doc")
           }
+          .disabled(session.title.isEmpty)
           Button {
             HarnessMonitorClipboard.copy(session.sessionId)
           } label: {

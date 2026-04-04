@@ -25,8 +25,10 @@ struct SessionCockpitHeaderCard: View {
               .scaledFont(.caption.weight(.bold))
               .tracking(HarnessMonitorTheme.uppercaseTracking)
               .foregroundStyle(statusColor(for: detail.session.status))
-            Text(detail.session.context)
+            Text(detail.session.displayTitle)
               .scaledFont(.system(.largeTitle, design: .rounded, weight: .black))
+              .italic(detail.session.title.isEmpty)
+              .foregroundStyle(detail.session.title.isEmpty ? HarnessMonitorTheme.tertiaryInk : HarnessMonitorTheme.ink)
               .lineLimit(2)
           }
           Text(sessionHeaderMetadata(detail.session))
