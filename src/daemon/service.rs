@@ -76,6 +76,7 @@ impl Default for DaemonServeConfig {
 /// Returns `CliError` on bind or filesystem failures.
 pub async fn serve(config: DaemonServeConfig) -> Result<(), CliError> {
     state::ensure_daemon_dirs()?;
+    let daemon_lock = state::acquire_singleton_lock()?;
     let token = state::ensure_auth_token()?;
 
     let listener = TcpListener::bind((config.host.as_str(), config.port))
@@ -120,7 +121,21 @@ pub async fn serve(config: DaemonServeConfig) -> Result<(), CliError> {
         db,
     };
 
-    http::serve(listener, app_state, shutdown_rx).await
+    let serve_result = http::serve(listener, app_state, shutdown_rx).await;
+    let cleanup_result = state::clear_manifest_for_pid(process_id());
+    let stop_event_result = if serve_result.is_ok() {
+        state::append_event("info", "daemon stopped")
+    } else {
+        Ok(())
+    };
+    drop(daemon_lock);
+
+    match (serve_result, cleanup_result, stop_event_result) {
+        (Err(error), _, _)
+        | (Ok(()), Err(error), _)
+        | (Ok(()), Ok(()), Err(error)) => Err(error),
+        (Ok(()), Ok(()), Ok(())) => Ok(()),
+    }
 }
 
 fn initialize_daemon_db() -> Option<Arc<Mutex<super::db::DaemonDb>>> {
