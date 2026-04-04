@@ -1,5 +1,6 @@
 use std::borrow::Cow;
 use std::collections::BTreeMap;
+use std::fmt;
 use std::path::{Path, PathBuf};
 
 use rusqlite::Connection;
@@ -18,6 +19,12 @@ use crate::workspace::utc_now;
 /// backward compatibility with CLI offline access and agent runtimes.
 pub struct DaemonDb {
     conn: Connection,
+}
+
+impl fmt::Debug for DaemonDb {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("DaemonDb").finish_non_exhaustive()
+    }
 }
 
 #[cfg(test)]
@@ -1056,6 +1063,28 @@ impl DaemonDb {
         rows.collect::<Result<Vec<_>, _>>()
             .map_err(|error| db_error(format!("read event row: {error}")))
     }
+
+    /// Re-sync a single session from file-based storage into `SQLite`.
+    ///
+    /// Resolves the session from files, upserts session/agents/tasks, and
+    /// re-imports log entries, checkpoints, signals, activity, and
+    /// conversation events. Bumps change tracking for the session and
+    /// global scopes.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on resolution, I/O, or SQL failures.
+    pub fn resync_session(&self, session_id: &str) -> Result<(), CliError> {
+        let resolved = super::index::resolve_session(session_id)?;
+        self.sync_session(&resolved.project.project_id, &resolved.state)?;
+        import_session_log(self, &resolved.project, &resolved.state.session_id)?;
+        import_session_checkpoints(self, &resolved.project, &resolved.state)?;
+        import_session_signals(self, &resolved)?;
+        import_session_activity(self, &resolved)?;
+        import_conversation_events(self, &resolved)?;
+        self.bump_change(&resolved.state.session_id)?;
+        self.bump_change("global")?;
+        Ok(())
+    }
 }
 
 /// Summary of what was imported from file-based storage.
@@ -1589,6 +1618,7 @@ VALUES ('global', 0, datetime('now'));
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::time::{Duration, Instant};
 
     #[test]
     fn open_in_memory_creates_schema() {
@@ -1767,6 +1797,157 @@ mod tests {
             pending_leader_transfer: None,
             metrics: SessionMetrics::default(),
         }
+    }
+
+    fn performance_project(index: usize) -> DiscoveredProject {
+        DiscoveredProject {
+            project_id: format!("project-{index}"),
+            name: format!("harness-{index}"),
+            project_dir: Some(format!("/tmp/harness-{index}").into()),
+            repository_root: Some(format!("/tmp/harness-{index}").into()),
+            checkout_id: format!("checkout-{index}"),
+            checkout_name: "Repository".into(),
+            context_root: format!("/tmp/data/projects/project-{index}").into(),
+            is_worktree: false,
+            worktree_name: None,
+        }
+    }
+
+    fn performance_session_state(project_index: usize, session_index: usize) -> SessionState {
+        use crate::agents::runtime::RuntimeCapabilities;
+        use crate::session::types::{
+            AgentRegistration, AgentStatus, SessionMetrics, SessionRole, TaskSeverity, TaskSource,
+            TaskStatus,
+        };
+
+        let token = project_index * 100 + session_index;
+        let session_id = format!("sess-{project_index}-{session_index}");
+        let leader_id = format!("leader-{project_index}-{session_index}");
+        let task_id = format!("task-{project_index}-{session_index}");
+        let timestamp = format!(
+            "2026-04-{day:02}T12:{minute:02}:{second:02}Z",
+            day = 1 + (token % 27),
+            minute = (token * 3) % 60,
+            second = (token * 7) % 60,
+        );
+
+        let mut agents = BTreeMap::new();
+        agents.insert(
+            leader_id.clone(),
+            AgentRegistration {
+                agent_id: leader_id.clone(),
+                name: format!("Leader {session_id}"),
+                runtime: "claude".into(),
+                role: SessionRole::Leader,
+                capabilities: vec!["general".into()],
+                joined_at: timestamp.clone(),
+                updated_at: timestamp.clone(),
+                status: AgentStatus::Active,
+                agent_session_id: Some(format!("{leader_id}-session")),
+                last_activity_at: Some(timestamp.clone()),
+                current_task_id: Some(task_id.clone()),
+                runtime_capabilities: RuntimeCapabilities::default(),
+            },
+        );
+
+        let mut tasks = BTreeMap::new();
+        tasks.insert(
+            task_id.clone(),
+            WorkItem {
+                task_id,
+                title: format!("Performance task {session_id}"),
+                context: Some(format!("Regression guard {project_index}-{session_index}")),
+                severity: TaskSeverity::Medium,
+                status: if token % 5 == 0 {
+                    TaskStatus::Done
+                } else {
+                    TaskStatus::Open
+                },
+                assigned_to: Some(leader_id.clone()),
+                created_at: timestamp.clone(),
+                updated_at: timestamp.clone(),
+                created_by: Some(leader_id.clone()),
+                notes: Vec::new(),
+                suggested_fix: None,
+                source: TaskSource::Manual,
+                blocked_reason: None,
+                completed_at: None,
+                checkpoint_summary: None,
+            },
+        );
+
+        SessionState {
+            schema_version: 3,
+            state_version: 1,
+            session_id: session_id.clone(),
+            context: format!("performance lane {project_index}-{session_index}"),
+            status: if token % 6 == 0 {
+                SessionStatus::Ended
+            } else {
+                SessionStatus::Active
+            },
+            created_at: timestamp.clone(),
+            updated_at: timestamp.clone(),
+            agents,
+            tasks,
+            leader_id: Some(leader_id),
+            archived_at: None,
+            last_activity_at: Some(timestamp),
+            observe_id: None,
+            pending_leader_transfer: None,
+            metrics: SessionMetrics {
+                agent_count: 1,
+                active_agent_count: 1,
+                open_task_count: 1,
+                in_progress_task_count: (token % 3) as u32,
+                blocked_task_count: (token % 2) as u32,
+                completed_task_count: (token % 4) as u32,
+            },
+        }
+    }
+
+    fn seeded_performance_db(project_count: usize, sessions_per_project: usize) -> DaemonDb {
+        let db = DaemonDb::open_in_memory().expect("open db");
+
+        for project_index in 0..project_count {
+            let project = performance_project(project_index);
+            db.sync_project(&project).expect("sync project");
+            for session_index in 0..sessions_per_project {
+                let state = performance_session_state(project_index, session_index);
+                db.sync_session(&project.project_id, &state)
+                    .expect("sync session");
+            }
+        }
+
+        db
+    }
+
+    fn median_runtime_budget_ms(
+        label: &str,
+        iterations: usize,
+        budget_ms: u64,
+        mut operation: impl FnMut(),
+    ) {
+        for _ in 0..3 {
+            operation();
+        }
+
+        let mut samples = Vec::with_capacity(iterations);
+        for _ in 0..iterations {
+            let started_at = Instant::now();
+            operation();
+            samples.push(started_at.elapsed());
+        }
+        samples.sort_unstable();
+        let median = samples[samples.len() / 2];
+        let budget = Duration::from_millis(budget_ms);
+
+        assert!(
+            median <= budget,
+            "{label} median runtime {:?} exceeded {:?}",
+            median,
+            budget
+        );
     }
 
     #[test]
@@ -1951,6 +2132,52 @@ mod tests {
             .query_row("SELECT COUNT(*) FROM daemon_events", [], |row| row.get(0))
             .expect("count events");
         assert_eq!(count, 1);
+    }
+
+    #[test]
+    fn health_counts_meets_performance_budget() {
+        let db = seeded_performance_db(16, 8);
+
+        median_runtime_budget_ms("health_counts", 31, 5, || {
+            let counts = db.health_counts().expect("health counts");
+            assert_eq!(counts.0, 16);
+            assert_eq!(counts.2, 128);
+        });
+    }
+
+    #[test]
+    fn list_project_summaries_meets_performance_budget() {
+        let db = seeded_performance_db(16, 8);
+
+        median_runtime_budget_ms("list_project_summaries", 21, 20, || {
+            let summaries = db.list_project_summaries().expect("project summaries");
+            assert_eq!(summaries.len(), 16);
+        });
+    }
+
+    #[test]
+    fn list_session_summaries_full_meets_performance_budget() {
+        let db = seeded_performance_db(16, 8);
+
+        median_runtime_budget_ms("list_session_summaries_full", 21, 35, || {
+            let summaries = db
+                .list_session_summaries_full()
+                .expect("session summaries");
+            assert_eq!(summaries.len(), 128);
+        });
+    }
+
+    #[test]
+    fn resolve_session_meets_performance_budget() {
+        let db = seeded_performance_db(16, 8);
+
+        median_runtime_budget_ms("resolve_session", 31, 10, || {
+            let resolved = db
+                .resolve_session("sess-7-5")
+                .expect("resolve session")
+                .expect("session present");
+            assert_eq!(resolved.state.session_id, "sess-7-5");
+        });
     }
 
     #[test]
