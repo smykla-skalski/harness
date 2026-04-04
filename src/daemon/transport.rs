@@ -141,7 +141,7 @@ impl Execute for DaemonServeArgs {
 fn stop_daemon() -> Result<DaemonControlResponse, CliError> {
     let launch_agent = launchd::launch_agent_status();
     if cfg!(target_os = "macos") && (launch_agent.installed || launch_agent.loaded) {
-        let manifest = super::state::load_manifest()?;
+        let manifest = try_load_manifest()?;
         let booted_out = launchd::bootout_launch_agent()?;
         if booted_out && let Some(manifest) = manifest.as_ref() {
             wait_for_daemon_shutdown(&manifest.endpoint)?;
@@ -157,7 +157,7 @@ fn stop_daemon() -> Result<DaemonControlResponse, CliError> {
 fn restart_daemon(binary: &Path) -> Result<DaemonControlResponse, CliError> {
     let launch_agent = launchd::launch_agent_status();
     if cfg!(target_os = "macos") && launch_agent.loaded {
-        let manifest = super::state::load_manifest()?;
+        let manifest = try_load_manifest()?;
         let booted_out = launchd::bootout_launch_agent()?;
         if booted_out && let Some(manifest) = manifest.as_ref() {
             wait_for_daemon_shutdown(&manifest.endpoint)?;
@@ -180,7 +180,7 @@ fn restart_daemon(binary: &Path) -> Result<DaemonControlResponse, CliError> {
 }
 
 fn request_shutdown_if_running() -> Result<bool, CliError> {
-    let Some(manifest) = super::state::load_manifest()? else {
+    let Some(manifest) = try_load_manifest()? else {
         return Ok(false);
     };
     if !daemon_is_healthy(&manifest.endpoint) {
@@ -254,7 +254,7 @@ fn post_stop_request(endpoint: &str, token: &str) -> Result<(), CliError> {
 
 fn wait_for_daemon_shutdown(endpoint: &str) -> Result<(), CliError> {
     wait_for_flag(&format!("wait for daemon shutdown at {endpoint}"), || {
-        let manifest_cleared = match super::state::load_manifest()? {
+        let manifest_cleared = match try_load_manifest()? {
             Some(manifest) => manifest.endpoint != endpoint,
             None => true,
         };
@@ -276,7 +276,7 @@ fn wait_for_healthy_daemon(mut child: Option<&mut Child>) -> Result<String, CliE
             ))));
         }
 
-        let Some(manifest) = super::state::load_manifest()? else {
+        let Some(manifest) = try_load_manifest()? else {
             return Ok(None);
         };
         if daemon_is_healthy(&manifest.endpoint) {
@@ -334,6 +334,14 @@ fn daemon_is_healthy(endpoint: &str) -> bool {
             .await
             .is_ok_and(|response| response.status().is_success())
     })
+}
+
+fn try_load_manifest() -> Result<Option<super::state::DaemonManifest>, CliError> {
+    match super::state::load_manifest() {
+        Ok(manifest) => Ok(manifest),
+        Err(error) if error.code() == "KSRCLI014" => Ok(None),
+        Err(error) => Err(error),
+    }
 }
 
 fn daemon_url(endpoint: &str, path: &str) -> String {
