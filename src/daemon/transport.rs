@@ -19,7 +19,7 @@ use super::service::{self, DaemonServeConfig};
 use super::snapshot;
 use super::state;
 
-const DAEMON_CONTROL_TIMEOUT: Duration = Duration::from_secs(8);
+const DAEMON_CONTROL_TIMEOUT: Duration = Duration::from_secs(15);
 const DAEMON_CONTROL_POLL_INTERVAL: Duration = Duration::from_millis(50);
 const DAEMON_HTTP_TIMEOUT: Duration = Duration::from_secs(2);
 
