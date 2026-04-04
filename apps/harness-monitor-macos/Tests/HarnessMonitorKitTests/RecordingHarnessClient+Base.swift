@@ -75,7 +75,7 @@ extension RecordingHarnessClient {
 
   func projects() async throws -> [ProjectSummary] {
     recordReadCall(.projects)
-    return [
+    return configuredProjects() ?? [
       ProjectSummary(
         projectId: detail.session.projectId,
         name: detail.session.projectName,

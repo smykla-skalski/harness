@@ -129,6 +129,7 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
   private var _transportLatencyMs: Int?
   private var _diagnosticsDelay: Duration?
   private var _mutationDelay: Duration?
+  private var _projectSummaries: [ProjectSummary]?
   private var _sessionSummaries: [SessionSummary]?
   private var _sessionDetailsByID: [String: SessionDetail] = [:]
   private var _detailDelays: [String: Duration] = [:]
@@ -194,6 +195,53 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
     timelinesBySessionID: [String: [TimelineEntry]] = [:]
   ) {
     lock.withLock {
+      typealias ProjectFixture = (
+        name: String,
+        projectDir: String?,
+        contextRoot: String,
+        activeSessionCount: Int,
+        totalSessionCount: Int
+      )
+
+      var projectsByID: [String: ProjectFixture] = [:]
+      var orderedProjectIDs: [String] = []
+
+      for summary in summaries {
+        if projectsByID[summary.projectId] == nil {
+          orderedProjectIDs.append(summary.projectId)
+          projectsByID[summary.projectId] = (
+            name: summary.projectName,
+            projectDir: summary.projectDir,
+            contextRoot: summary.contextRoot,
+            activeSessionCount: 0,
+            totalSessionCount: 0
+          )
+        }
+
+        guard var project = projectsByID[summary.projectId] else {
+          continue
+        }
+        project.totalSessionCount += 1
+        if summary.status != .ended {
+          project.activeSessionCount += 1
+        }
+        projectsByID[summary.projectId] = project
+      }
+
+      _projectSummaries = orderedProjectIDs.compactMap { projectID in
+        guard let project = projectsByID[projectID] else {
+          return nil
+        }
+
+        return ProjectSummary(
+          projectId: projectID,
+          name: project.name,
+          projectDir: project.projectDir,
+          contextRoot: project.contextRoot,
+          activeSessionCount: project.activeSessionCount,
+          totalSessionCount: project.totalSessionCount
+        )
+      }
       _sessionSummaries = summaries
       _sessionDetailsByID = detailsByID
       _timelinesBySessionID = timelinesBySessionID
@@ -249,6 +297,7 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
   func configuredTransportLatencyMs() -> Int? { lock.withLock { _transportLatencyMs } }
   func configuredDiagnosticsDelay() -> Duration? { lock.withLock { _diagnosticsDelay } }
   func configuredMutationDelay() -> Duration? { lock.withLock { _mutationDelay } }
+  func configuredProjects() -> [ProjectSummary]? { lock.withLock { _projectSummaries } }
   func configuredSessions() -> [SessionSummary]? { lock.withLock { _sessionSummaries } }
   func configuredSessionDetail(id: String) -> SessionDetail? { lock.withLock { _sessionDetailsByID[id] } }
   func configuredDetailDelay(for sessionID: String) -> Duration? { lock.withLock { _detailDelays[sessionID] } }
