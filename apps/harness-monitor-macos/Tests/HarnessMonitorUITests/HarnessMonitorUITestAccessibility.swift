@@ -21,6 +21,7 @@ enum HarnessMonitorUITestAccessibility {
   static let sidebarStartButtonFrame = "harness.sidebar.action.start.frame"
   static let sidebarInstallButtonFrame = "harness.sidebar.action.install.frame"
   static let sidebarDaemonStatusBadge = "harness.sidebar.daemon-status-badge"
+  static let sidebarLaunchdStatusIcon = "harness.sidebar.daemon-launchd-icon"
   static let sidebarRoot = "harness.sidebar.root"
   static let sidebarProjectsBadge = "harness.sidebar.daemon-badge.projects"
   static let sidebarSessionsBadge = "harness.sidebar.daemon-badge.sessions"

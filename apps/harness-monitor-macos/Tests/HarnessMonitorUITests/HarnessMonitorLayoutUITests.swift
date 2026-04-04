@@ -81,6 +81,17 @@ final class HarnessMonitorLayoutUITests: HarnessMonitorUITestCase {
     )
   }
 
+  func testSidebarLaunchdIconRendersWhenInstalled() throws {
+    let app = launch(mode: "preview")
+    let daemonCard = element(in: app, identifier: Accessibility.daemonCard)
+    let launchdIcon = element(in: app, identifier: Accessibility.sidebarLaunchdStatusIcon)
+
+    XCTAssertTrue(daemonCard.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(launchdIcon.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertGreaterThan(launchdIcon.frame.width, 4)
+    XCTAssertGreaterThan(launchdIcon.frame.height, 4)
+  }
+
   func testOfflineCachedScenarioKeepsSessionsReadableButActionsDisabled() throws {
     let app = launch(
       mode: "preview",
