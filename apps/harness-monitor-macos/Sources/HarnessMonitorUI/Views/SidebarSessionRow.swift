@@ -9,7 +9,12 @@ struct SidebarSessionRow: View {
   private var dateTimeConfiguration
 
   var body: some View {
-    VStack(alignment: .leading, spacing: HarnessMonitorTheme.itemSpacing) {
+    HStack(alignment: .top, spacing: HarnessMonitorTheme.sectionSpacing) {
+      RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusSM, style: .continuous)
+        .fill(statusColor(for: session.status))
+        .frame(width: 8)
+        .accessibilityHidden(true)
+      VStack(alignment: .leading, spacing: HarnessMonitorTheme.itemSpacing) {
       HStack(alignment: .top, spacing: HarnessMonitorTheme.itemSpacing) {
         Text(session.context)
           .scaledFont(.system(.body, design: .rounded, weight: .semibold))
@@ -38,6 +43,7 @@ struct SidebarSessionRow: View {
         footerLabel(formatTimestamp(session.lastActivityAt, configuration: dateTimeConfiguration))
       }
       .frame(maxWidth: .infinity)
+      }
     }
     .foregroundStyle(isSelected ? HarnessMonitorTheme.onContrast : HarnessMonitorTheme.ink)
     .frame(maxWidth: .infinity, alignment: .leading)
