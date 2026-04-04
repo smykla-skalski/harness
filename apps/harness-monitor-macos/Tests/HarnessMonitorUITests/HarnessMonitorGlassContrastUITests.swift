@@ -56,7 +56,12 @@ final class HarnessMonitorGlassContrastUITests: HarnessMonitorUITestCase {
 
     let badge = element(in: app, identifier: Accessibility.sidebarDaemonStatusBadge)
     XCTAssertTrue(badge.waitForExistence(timeout: Self.uiTimeout))
-    XCTAssertEqual(badge.value as? String, "Online")
+    XCTAssertTrue(
+      waitUntil(timeout: Self.uiTimeout) {
+        badge.label == "Online"
+      },
+      "Expected badge label 'Online' but got '\(badge.label)'"
+    )
 
     let topSample = sampleRegion(of: badge, region: .top)
     let screenshot = XCTAttachment(screenshot: badge.screenshot())

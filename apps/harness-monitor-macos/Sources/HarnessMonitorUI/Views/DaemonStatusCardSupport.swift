@@ -197,13 +197,12 @@ private struct DaemonStateToggleControl: View {
     .accessibilityLabel(isDaemonOnline ? "Stop Daemon" : "Start Daemon")
     .accessibilityValue(statusTitle)
     .accessibilityIdentifier(HarnessMonitorAccessibility.sidebarStartDaemonButton)
-    .background {
-      Color.clear
-        .frame(width: 1, height: 1)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Daemon Status")
-        .accessibilityValue(statusTitle)
-        .accessibilityIdentifier(HarnessMonitorAccessibility.sidebarDaemonStatusBadge)
+    .overlay {
+      AccessibilityTextMarker(
+        identifier: HarnessMonitorAccessibility.sidebarDaemonStatusBadge,
+        text: statusTitle
+      )
+      .frame(width: 12, height: 12)
     }
     .harnessUITestValue(isHovered ? "chrome=power" : "chrome=status-dot")
     .task(id: idleHintTaskID) {

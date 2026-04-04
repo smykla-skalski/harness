@@ -60,7 +60,10 @@ final class HarnessMonitorSettingsUITests: HarnessMonitorUITestCase {
   }
 
   func testRemoveLaunchAgentRequiresConfirmation() throws {
-    let app = launch(mode: "preview")
+    let app = launch(
+      mode: "preview",
+      additionalEnvironment: ["HARNESS_MONITOR_PREVIEW_SCENARIO": "dashboard"]
+    )
 
     openSettings(in: app)
 
@@ -72,7 +75,12 @@ final class HarnessMonitorSettingsUITests: HarnessMonitorUITestCase {
 
     XCTAssertTrue(removeButton.exists)
     XCTAssertTrue(launchdCard.waitForExistence(timeout: Self.uiTimeout))
-    XCTAssertTrue(preferencesMetricValue(in: launchdCard, label: "Running").exists)
+    XCTAssertTrue(
+      waitUntil(timeout: Self.uiTimeout) {
+        (launchdCard.value as? String)?.contains("Running") == true
+      },
+      "Launchd card value should contain 'Running' but got '\(launchdCard.value ?? "nil")'"
+    )
 
     tapElement(in: app, identifier: Accessibility.removeLaunchAgentButton)
 
@@ -86,7 +94,7 @@ final class HarnessMonitorSettingsUITests: HarnessMonitorUITestCase {
     confirmButton.tap()
     XCTAssertTrue(
       waitUntil(timeout: Self.uiTimeout) {
-        self.preferencesMetricValue(in: launchdCard, label: "Manual").exists
+        (launchdCard.value as? String)?.contains("Manual") == true
       }
     )
   }
