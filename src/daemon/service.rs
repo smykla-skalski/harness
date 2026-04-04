@@ -4,6 +4,7 @@ use std::process::id as process_id;
 use std::sync::{Arc, Mutex, OnceLock};
 use std::time::Duration;
 
+use crate::agents::runtime as agents_runtime;
 use crate::agents::service as agents_service;
 use crate::errors::{CliError, CliErrorKind};
 use crate::hooks::adapters::HookAgent;
@@ -731,11 +732,66 @@ pub fn send_signal(
     request: &SignalSendRequest,
     db: Option<&super::db::DaemonDb>,
 ) -> Result<SessionDetail, CliError> {
-    // send_signal always needs the project directory for writing signal
-    // files that agent runtimes poll. We always use the file-based path
-    // here because the signal file I/O needs a real directory.
-    let resolved = index::resolve_session(session_id)?;
-    let project_dir = effective_project_dir(&resolved);
+    // Resolve project_dir (needed for signal file writes regardless of path).
+    let project_dir = if let Some(db) = db
+        && let Some(dir) = db.project_dir_for_session(session_id)?
+    {
+        PathBuf::from(dir)
+    } else {
+        let resolved = index::resolve_session(session_id)?;
+        effective_project_dir(&resolved).to_path_buf()
+    };
+
+    if let Some(db) = db
+        && let Some(mut state) = db.load_session_state_for_mutation(session_id)?
+    {
+        // DB-direct: apply state mutation to SQLite, then write signal file.
+        let now = utc_now();
+        let (runtime_name, target_agent_session_id) = session_service::apply_send_signal_state(
+            &mut state,
+            &request.agent_id,
+            &request.actor,
+            &now,
+        )?;
+        let project_id = db
+            .project_id_for_session(session_id)?
+            .ok_or_else(|| session_not_found(session_id))?;
+        db.save_session_state(&project_id, &state)?;
+
+        // Write signal file for runtime pickup (always file-based).
+        let signal = session_service::build_signal(
+            &request.actor,
+            &request.command,
+            &request.message,
+            request.action_hint.as_deref(),
+            session_id,
+            &request.agent_id,
+            &now,
+        );
+        let runtime = agents_runtime::runtime_for_name(&runtime_name).ok_or_else(|| {
+            CliError::from(CliErrorKind::session_agent_conflict(format!(
+                "unknown runtime '{runtime_name}'"
+            )))
+        })?;
+        let signal_session_id = target_agent_session_id.as_deref().unwrap_or(session_id);
+        runtime.write_signal(&project_dir, signal_session_id, &signal)?;
+
+        db.append_log_entry(&build_log_entry(
+            session_id,
+            session_service::log_signal_sent(
+                &signal.signal_id,
+                &request.agent_id,
+                &request.command,
+            ),
+            Some(&request.actor),
+            None,
+        ))?;
+        db.bump_change(session_id)?;
+        db.bump_change("global")?;
+        return session_detail(session_id, Some(db));
+    }
+
+    // File-based fallback
     let _ = session_service::send_signal(
         session_id,
         &request.agent_id,
@@ -743,7 +799,7 @@ pub fn send_signal(
         &request.message,
         request.action_hint.as_deref(),
         &request.actor,
-        project_dir,
+        &project_dir,
     )?;
     sync_after_mutation(db, session_id);
     session_detail(session_id, db)

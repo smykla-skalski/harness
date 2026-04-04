@@ -611,6 +611,29 @@ pub fn send_signal(
     actor_id: &str,
     project_dir: &Path,
 ) -> Result<SessionSignalRecord, CliError> {
+    if let Some(client) = DaemonClient::try_connect() {
+        let detail = client.send_signal(
+            session_id,
+            &protocol::SignalSendRequest {
+                actor: actor_id.to_string(),
+                agent_id: agent_id.to_string(),
+                command: command.to_string(),
+                message: message.to_string(),
+                action_hint: action_hint.map(ToString::to_string),
+            },
+        )?;
+        return detail
+            .signals
+            .into_iter()
+            .find(|signal| signal.signal.command == command && signal.agent_id == agent_id)
+            .ok_or_else(|| {
+                CliErrorKind::workflow_io(
+                    "daemon sent signal but returned no matching signal record",
+                )
+                .into()
+            });
+    }
+
     let now = utc_now();
     let mut runtime_name = String::new();
     let mut target_agent_session_id = None;
@@ -628,28 +651,15 @@ pub fn send_signal(
         )))
     })?;
 
-    let signal = Signal {
-        signal_id: generate_signal_id(),
-        version: 1,
-        created_at: now,
-        expires_at: (Utc::now() + Duration::minutes(15))
-            .format("%Y-%m-%dT%H:%M:%SZ")
-            .to_string(),
-        source_agent: actor_id.to_string(),
-        command: command.to_string(),
-        priority: SignalPriority::Normal,
-        payload: SignalPayload {
-            message: message.to_string(),
-            action_hint: action_hint.map(ToString::to_string),
-            related_files: Vec::new(),
-            metadata: Value::Null,
-        },
-        delivery: DeliveryConfig {
-            max_retries: 3,
-            retry_count: 0,
-            idempotency_key: Some(format!("{session_id}:{agent_id}:{command}")),
-        },
-    };
+    let signal = build_signal(
+        actor_id,
+        command,
+        message,
+        action_hint,
+        session_id,
+        agent_id,
+        &now,
+    );
 
     let signal_session_id = target_agent_session_id.as_deref().unwrap_or(session_id);
     runtime.write_signal(project_dir, signal_session_id, &signal)?;
@@ -1335,6 +1345,41 @@ pub(crate) fn apply_send_signal_state(
     touch_agent(state, actor_id, now);
     refresh_session(state, now);
     Ok((runtime_name, target_agent_session_id))
+}
+
+/// Build a signal payload without writing it to disk. Used by the daemon
+/// handler which writes to `SQLite` first, then writes the signal file.
+pub(crate) fn build_signal(
+    actor_id: &str,
+    command: &str,
+    message: &str,
+    action_hint: Option<&str>,
+    session_id: &str,
+    agent_id: &str,
+    now: &str,
+) -> Signal {
+    Signal {
+        signal_id: generate_signal_id(),
+        version: 1,
+        created_at: now.to_string(),
+        expires_at: (Utc::now() + Duration::minutes(15))
+            .format("%Y-%m-%dT%H:%M:%SZ")
+            .to_string(),
+        source_agent: actor_id.to_string(),
+        command: command.to_string(),
+        priority: SignalPriority::Normal,
+        payload: SignalPayload {
+            message: message.to_string(),
+            action_hint: action_hint.map(ToString::to_string),
+            related_files: Vec::new(),
+            metadata: Value::Null,
+        },
+        delivery: DeliveryConfig {
+            max_retries: 3,
+            retry_count: 0,
+            idempotency_key: Some(format!("{session_id}:{agent_id}:{command}")),
+        },
+    }
 }
 
 // ---------------------------------------------------------------------------
