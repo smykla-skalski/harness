@@ -329,11 +329,19 @@ fn post_stop_request(endpoint: &str, token: &str) -> Result<(), CliError> {
 
 fn wait_for_daemon_shutdown(endpoint: &str) -> Result<(), CliError> {
     wait_for_flag(&format!("wait for daemon shutdown at {endpoint}"), || {
-        let manifest_cleared = match try_load_manifest()? {
-            Some(manifest) => manifest.endpoint != endpoint,
-            None => true,
-        };
-        Ok(!daemon_is_healthy(endpoint) && manifest_cleared)
+        // flock probe: the kernel releases the lock when the process dies
+        // (even on SIGKILL), so this is immune to PID reuse and stale
+        // manifests. No need to check the manifest or PID at all.
+        if state::daemon_lock_is_held() {
+            return Ok(false);
+        }
+        // Daemon is confirmed dead. Clean up stale manifest if present.
+        if let Ok(Some(manifest)) = try_load_manifest()
+            && manifest.endpoint == endpoint
+        {
+            let _ = state::clear_manifest_for_pid(manifest.pid);
+        }
+        Ok(true)
     })
 }
 
