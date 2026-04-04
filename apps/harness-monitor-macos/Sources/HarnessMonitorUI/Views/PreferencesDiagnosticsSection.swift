@@ -17,7 +17,7 @@ struct PreferencesDiagnosticsSection: View {
       manifestPath: workspaceDiagnostics?.manifestPath ?? "Unavailable",
       authTokenPath: workspaceDiagnostics?.authTokenPath ?? "Unavailable",
       eventsPath: workspaceDiagnostics?.eventsPath ?? "Unavailable",
-      cacheRoot: workspaceDiagnostics?.cacheRoot ?? "Unavailable"
+      databasePath: workspaceDiagnostics?.databasePath ?? "Unavailable"
     )
   }
 
@@ -27,6 +27,7 @@ struct PreferencesDiagnosticsSection: View {
         launchAgent: store.daemonStatus?.launchAgent,
         tokenPresent: workspaceDiagnostics?.authTokenPresent ?? false,
         projectCount: store.daemonStatus?.projectCount ?? store.projects.count,
+        worktreeCount: store.daemonStatus?.worktreeCount ?? store.projects.reduce(0) { $0 + $1.worktrees.count },
         sessionCount: store.daemonStatus?.sessionCount ?? store.sessions.count,
         lastEvent: workspaceDiagnostics?.lastEvent
       )

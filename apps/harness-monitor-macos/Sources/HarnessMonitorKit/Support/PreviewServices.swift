@@ -126,8 +126,8 @@ public final class PreviewHarnessClient: HarnessMonitorClientProtocol, Sendable 
         authTokenPath: "/Users/example/Library/Application Support/harness/daemon/auth-token",
         authTokenPresent: true,
         eventsPath: "/Users/example/Library/Application Support/harness/daemon/events.jsonl",
-        cacheRoot: "/Users/example/Library/Application Support/harness/daemon/cache/projects",
-        cacheEntryCount: fixtures.sessions.isEmpty ? 0 : 4,
+        databasePath: "/Users/example/Library/Application Support/harness/daemon/harness.db",
+        databaseSizeBytes: fixtures.sessions.isEmpty ? 0 : 1_740_800,
         lastEvent: lastEvent
       ),
       recentEvents: recentEvents
@@ -347,8 +347,8 @@ public actor PreviewDaemonController: DaemonControlling {
         authTokenPath: "/Users/example/Library/Application Support/harness/daemon/auth-token",
         authTokenPresent: true,
         eventsPath: "/Users/example/Library/Application Support/harness/daemon/events.jsonl",
-        cacheRoot: "/Users/example/Library/Application Support/harness/daemon/cache/projects",
-        cacheEntryCount: isDaemonRunning ? max(4, fixtures.sessions.count) : 0,
+        databasePath: "/Users/example/Library/Application Support/harness/daemon/harness.db",
+        databaseSizeBytes: isDaemonRunning ? 1_740_800 : 0,
         lastEvent: makeLastEvent()
       )
     )

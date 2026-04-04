@@ -56,8 +56,8 @@ actor RecordingDaemonController: DaemonControlling {
         authTokenPath: "/tmp/token",
         authTokenPresent: true,
         eventsPath: "/tmp/harness/daemon/events.jsonl",
-        cacheRoot: "/tmp/harness/daemon/cache/projects",
-        cacheEntryCount: 2,
+        databasePath: "/tmp/harness/daemon/harness.db",
+        databaseSizeBytes: 1_740_800,
         lastEvent: DaemonAuditEvent(
           recordedAt: "2026-03-28T14:00:00Z",
           level: "info",
