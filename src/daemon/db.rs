@@ -1085,6 +1085,67 @@ impl DaemonDb {
         self.bump_change("global")?;
         Ok(())
     }
+
+    // -----------------------------------------------------------------------
+    // Daemon-first direct mutation helpers
+    // -----------------------------------------------------------------------
+
+    /// Clear the active flag for a session (replaces file-based
+    /// `storage::deregister_active`).
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on SQL failures.
+    pub fn mark_session_inactive(&self, session_id: &str) -> Result<(), CliError> {
+        self.conn
+            .execute(
+                "UPDATE sessions SET is_active = 0 WHERE session_id = ?1",
+                [session_id],
+            )
+            .map_err(|error| db_error(format!("mark session inactive: {error}")))?;
+        Ok(())
+    }
+
+    /// Look up the project that owns a session.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on SQL failures.
+    pub fn project_id_for_session(
+        &self,
+        session_id: &str,
+    ) -> Result<Option<String>, CliError> {
+        let result = self.conn.query_row(
+            "SELECT project_id FROM sessions WHERE session_id = ?1",
+            [session_id],
+            |row| row.get::<_, String>(0),
+        );
+        match result {
+            Ok(project_id) => Ok(Some(project_id)),
+            Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+            Err(error) => Err(db_error(format!("project_id_for_session: {error}"))),
+        }
+    }
+
+    /// Find the project ID for a given directory path. Matches against
+    /// `project_dir` first, then `context_root`.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] if the project is not found or on SQL failures.
+    pub fn ensure_project_for_dir(&self, project_dir: &str) -> Result<String, CliError> {
+        let result = self.conn.query_row(
+            "SELECT project_id FROM projects
+             WHERE project_dir = ?1 OR context_root = ?1
+             LIMIT 1",
+            [project_dir],
+            |row| row.get::<_, String>(0),
+        );
+        match result {
+            Ok(project_id) => Ok(project_id),
+            Err(rusqlite::Error::QueryReturnedNoRows) => Err(db_error(format!(
+                "no project found for directory '{project_dir}'"
+            ))),
+            Err(error) => Err(db_error(format!("ensure_project_for_dir: {error}"))),
+        }
+    }
 }
 
 /// Summary of what was imported from file-based storage.
@@ -2188,5 +2249,91 @@ mod tests {
     fn extract_transition_kind_parses_unit_variant() {
         let json = r#""SessionEnded""#;
         assert_eq!(extract_transition_kind(json), "SessionEnded");
+    }
+
+    #[test]
+    fn mark_session_inactive_clears_active_flag() {
+        let db = DaemonDb::open_in_memory().expect("open db");
+        let project = sample_project();
+        db.sync_project(&project).expect("sync project");
+        let state = sample_session_state();
+        db.sync_session(&project.project_id, &state)
+            .expect("sync session");
+
+        let active_before: i32 = db
+            .conn
+            .query_row(
+                "SELECT is_active FROM sessions WHERE session_id = ?1",
+                [&state.session_id],
+                |row| row.get(0),
+            )
+            .expect("query active");
+        assert_eq!(active_before, 1);
+
+        db.mark_session_inactive(&state.session_id)
+            .expect("mark inactive");
+
+        let active_after: i32 = db
+            .conn
+            .query_row(
+                "SELECT is_active FROM sessions WHERE session_id = ?1",
+                [&state.session_id],
+                |row| row.get(0),
+            )
+            .expect("query active");
+        assert_eq!(active_after, 0);
+    }
+
+    #[test]
+    fn project_id_for_session_returns_correct_id() {
+        let db = DaemonDb::open_in_memory().expect("open db");
+        let project = sample_project();
+        db.sync_project(&project).expect("sync project");
+        let state = sample_session_state();
+        db.sync_session(&project.project_id, &state)
+            .expect("sync session");
+
+        let found = db
+            .project_id_for_session(&state.session_id)
+            .expect("lookup");
+        assert_eq!(found.as_deref(), Some("project-abc123"));
+    }
+
+    #[test]
+    fn project_id_for_session_returns_none_for_missing() {
+        let db = DaemonDb::open_in_memory().expect("open db");
+        let found = db.project_id_for_session("nonexistent").expect("lookup");
+        assert!(found.is_none());
+    }
+
+    #[test]
+    fn ensure_project_for_dir_creates_and_returns_id() {
+        let db = DaemonDb::open_in_memory().expect("open db");
+        let project = sample_project();
+        db.sync_project(&project).expect("sync project");
+
+        let found = db
+            .ensure_project_for_dir("/tmp/harness")
+            .expect("ensure project");
+        assert_eq!(found, "project-abc123");
+    }
+
+    #[test]
+    fn ensure_project_for_dir_matches_context_root() {
+        let db = DaemonDb::open_in_memory().expect("open db");
+        let project = sample_project();
+        db.sync_project(&project).expect("sync project");
+
+        let found = db
+            .ensure_project_for_dir("/tmp/data/projects/project-abc123")
+            .expect("ensure by context root");
+        assert_eq!(found, "project-abc123");
+    }
+
+    #[test]
+    fn ensure_project_for_dir_returns_error_for_unknown() {
+        let db = DaemonDb::open_in_memory().expect("open db");
+        let result = db.ensure_project_for_dir("/nonexistent/path");
+        assert!(result.is_err());
     }
 }
