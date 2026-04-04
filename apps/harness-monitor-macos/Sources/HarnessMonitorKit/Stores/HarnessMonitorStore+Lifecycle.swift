@@ -38,6 +38,14 @@ extension HarnessMonitorStore {
     if connectionEvents.count > 50 {
       connectionEvents.removeFirst(connectionEvents.count - 50)
     }
+    switch kind {
+    case .connected:
+      HarnessMonitorLogger.store.info("\(detail, privacy: .public)")
+    case .disconnected, .error:
+      HarnessMonitorLogger.store.warning("\(detail, privacy: .public)")
+    case .reconnecting, .fallback:
+      HarnessMonitorLogger.store.debug("\(detail, privacy: .public)")
+    }
   }
 
   func refresh(

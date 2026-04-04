@@ -250,10 +250,19 @@ public final class HarnessMonitorAPIClient: HarnessMonitorClientProtocol {
   }
 
   private func send<Response: Decodable>(_ request: URLRequest) async throws -> Response {
+    let start = ContinuousClock.now
     let (data, response) = try await session.data(for: request)
+    let elapsed = start.duration(to: .now)
+    let durationMs = elapsed.components.seconds * 1000
+      + Int64(elapsed.components.attoseconds / 1_000_000_000_000_000)
     guard let httpResponse = response as? HTTPURLResponse else {
+      HarnessMonitorLogger.api.error(
+        "Invalid response for \(request.httpMethod ?? "?", privacy: .public) \(request.url?.path ?? "?", privacy: .public)")
       throw HarnessMonitorAPIError.invalidResponse
     }
+
+    HarnessMonitorLogger.api.debug(
+      "\(request.httpMethod ?? "?", privacy: .public) \(request.url?.path ?? "?", privacy: .public) -> \(httpResponse.statusCode) (\(durationMs)ms)")
 
     guard (200..<300).contains(httpResponse.statusCode) else {
       throw try decodeError(statusCode: httpResponse.statusCode, data: data)
