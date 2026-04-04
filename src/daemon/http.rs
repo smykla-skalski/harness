@@ -15,7 +15,8 @@ use crate::errors::{CliError, CliErrorKind};
 
 use super::protocol::{
     AgentRemoveRequest, LeaderTransferRequest, ObserveSessionRequest, RoleChangeRequest,
-    SessionEndRequest, SignalSendRequest, StreamEvent, TaskAssignRequest, TaskCheckpointRequest,
+    SessionEndRequest, SessionJoinRequest, SessionMutationResponse, SessionStartRequest,
+    SignalAckRequest, SignalSendRequest, StreamEvent, TaskAssignRequest, TaskCheckpointRequest,
     TaskCreateRequest, TaskUpdateRequest,
 };
 use super::service;
@@ -46,7 +47,7 @@ pub async fn serve(
         .route("/v1/diagnostics", get(get_diagnostics))
         .route("/v1/daemon/stop", post(post_stop_daemon))
         .route("/v1/projects", get(get_projects))
-        .route("/v1/sessions", get(get_sessions))
+        .route("/v1/sessions", get(get_sessions).post(post_session_start))
         .route("/v1/sessions/{session_id}", get(get_session))
         .route("/v1/sessions/{session_id}/timeline", get(get_timeline))
         .route("/v1/ws", get(super::websocket::ws_upgrade_handler))
@@ -77,8 +78,13 @@ pub async fn serve(
             "/v1/sessions/{session_id}/leader",
             post(post_transfer_leader),
         )
+        .route("/v1/sessions/{session_id}/join", post(post_session_join))
         .route("/v1/sessions/{session_id}/end", post(post_end_session))
         .route("/v1/sessions/{session_id}/signal", post(post_send_signal))
+        .route(
+            "/v1/sessions/{session_id}/signal-ack",
+            post(post_signal_ack),
+        )
         .route(
             "/v1/sessions/{session_id}/observe",
             post(post_observe_session),
@@ -392,6 +398,68 @@ async fn stream_session(
         }
     };
     Ok(Sse::new(stream).keep_alive(KeepAlive::default()))
+}
+
+async fn post_session_start(
+    headers: HeaderMap,
+    State(state): State<DaemonHttpState>,
+    Json(request): Json<SessionStartRequest>,
+) -> Response {
+    if let Err(response) = require_auth(&headers, &state) {
+        return *response;
+    }
+    let db_guard = state.db.as_ref().map(|db| db.lock().expect("db lock"));
+    let db_ref = db_guard.as_deref();
+    let result = service::start_session_direct(&request, db_ref)
+        .map(|session_state| SessionMutationResponse { state: session_state });
+    if result.is_ok() {
+        service::broadcast_sessions_updated(&state.sender, db_ref);
+    }
+    map_json(result)
+}
+
+async fn post_session_join(
+    Path(session_id): Path<String>,
+    headers: HeaderMap,
+    State(state): State<DaemonHttpState>,
+    Json(request): Json<SessionJoinRequest>,
+) -> Response {
+    if let Err(response) = require_auth(&headers, &state) {
+        return *response;
+    }
+    let db_guard = state.db.as_ref().map(|db| db.lock().expect("db lock"));
+    let db_ref = db_guard.as_deref();
+    let result = service::join_session_direct(&session_id, &request, db_ref)
+        .map(|session_state| SessionMutationResponse { state: session_state });
+    if result.is_ok() {
+        service::broadcast_session_snapshot(&state.sender, &session_id, db_ref);
+    }
+    map_json(result)
+}
+
+async fn post_signal_ack(
+    Path(session_id): Path<String>,
+    headers: HeaderMap,
+    State(state): State<DaemonHttpState>,
+    Json(request): Json<SignalAckRequest>,
+) -> Response {
+    if let Err(response) = require_auth(&headers, &state) {
+        return *response;
+    }
+    let db_guard = state.db.as_ref().map(|db| db.lock().expect("db lock"));
+    let db_ref = db_guard.as_deref();
+    let result = service::record_signal_ack_direct(
+        &session_id,
+        &request,
+    );
+    if let Some(db) = db_ref {
+        let _ = db.bump_change(&session_id);
+        let _ = db.bump_change("global");
+    }
+    if result.is_ok() {
+        service::broadcast_session_snapshot(&state.sender, &session_id, db_ref);
+    }
+    map_json(result.map(|()| serde_json::json!({"ok": true})))
 }
 
 fn map_json<T: serde::Serialize>(result: Result<T, CliError>) -> Response {
