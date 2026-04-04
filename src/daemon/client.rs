@@ -9,9 +9,9 @@ use crate::infra::exec::RUNTIME;
 
 use super::protocol::{
     AgentRemoveRequest, LeaderTransferRequest, RoleChangeRequest, SessionDetail, SessionEndRequest,
-    SessionJoinRequest, SessionMutationResponse, SessionStartRequest, SignalAckRequest,
-    SignalSendRequest, TaskAssignRequest, TaskCheckpointRequest, TaskCreateRequest,
-    TaskUpdateRequest,
+    SessionJoinRequest, SessionMutationResponse, SessionStartRequest, SessionSummary,
+    SignalAckRequest, SignalSendRequest, TaskAssignRequest, TaskCheckpointRequest,
+    TaskCreateRequest, TaskUpdateRequest,
 };
 use super::state;
 use crate::session::types::SessionState;
@@ -159,6 +159,47 @@ impl DaemonClient {
     ) -> Result<(), CliError> {
         let _: Value = self.post(&format!("/v1/sessions/{session_id}/signal-ack"), request)?;
         Ok(())
+    }
+
+    // --- Read operations ---
+
+    pub fn get_session_detail(&self, session_id: &str) -> Result<SessionDetail, CliError> {
+        self.get(&format!("/v1/sessions/{session_id}"))
+    }
+
+    pub fn list_sessions(&self) -> Result<Vec<SessionSummary>, CliError> {
+        self.get("/v1/sessions")
+    }
+
+    // --- HTTP helpers ---
+
+    fn get<Res: DeserializeOwned>(&self, path: &str) -> Result<Res, CliError> {
+        let url = format!("{}{path}", self.endpoint);
+        let response = RUNTIME.block_on(async {
+            self.http
+                .get(&url)
+                .bearer_auth(&self.token)
+                .timeout(MUTATION_TIMEOUT)
+                .send()
+                .await
+        });
+
+        let response = response.map_err(|error| {
+            CliErrorKind::workflow_io(format!("daemon HTTP request failed: {error}"))
+        })?;
+
+        let status = response.status();
+        let body_text = RUNTIME.block_on(response.text()).map_err(|error| {
+            CliErrorKind::workflow_io(format!("daemon HTTP read body: {error}"))
+        })?;
+
+        if !status.is_success() {
+            return Err(parse_error_response(&body_text, status.as_u16()));
+        }
+
+        serde_json::from_str(&body_text).map_err(|error| {
+            CliErrorKind::workflow_io(format!("daemon HTTP parse response: {error}")).into()
+        })
     }
 
     fn post<Req: serde::Serialize, Res: DeserializeOwned>(

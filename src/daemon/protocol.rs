@@ -440,8 +440,7 @@ mod tests {
                 }
             }
         });
-        let response: SessionMutationResponse =
-            serde_json::from_value(json).expect("deserialize");
+        let response: SessionMutationResponse = serde_json::from_value(json).expect("deserialize");
         assert_eq!(response.state.session_id, "sess-1");
     }
 }

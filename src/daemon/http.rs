@@ -410,8 +410,11 @@ async fn post_session_start(
     }
     let db_guard = state.db.as_ref().map(|db| db.lock().expect("db lock"));
     let db_ref = db_guard.as_deref();
-    let result = service::start_session_direct(&request, db_ref)
-        .map(|session_state| SessionMutationResponse { state: session_state });
+    let result = service::start_session_direct(&request, db_ref).map(|session_state| {
+        SessionMutationResponse {
+            state: session_state,
+        }
+    });
     if result.is_ok() {
         service::broadcast_sessions_updated(&state.sender, db_ref);
     }
@@ -429,8 +432,11 @@ async fn post_session_join(
     }
     let db_guard = state.db.as_ref().map(|db| db.lock().expect("db lock"));
     let db_ref = db_guard.as_deref();
-    let result = service::join_session_direct(&session_id, &request, db_ref)
-        .map(|session_state| SessionMutationResponse { state: session_state });
+    let result = service::join_session_direct(&session_id, &request, db_ref).map(|session_state| {
+        SessionMutationResponse {
+            state: session_state,
+        }
+    });
     if result.is_ok() {
         service::broadcast_session_snapshot(&state.sender, &session_id, db_ref);
     }
@@ -448,10 +454,7 @@ async fn post_signal_ack(
     }
     let db_guard = state.db.as_ref().map(|db| db.lock().expect("db lock"));
     let db_ref = db_guard.as_deref();
-    let result = service::record_signal_ack_direct(
-        &session_id,
-        &request,
-    );
+    let result = service::record_signal_ack_direct(&session_id, &request);
     if let Some(db) = db_ref {
         let _ = db.bump_change(&session_id);
         let _ = db.bump_change("global");
