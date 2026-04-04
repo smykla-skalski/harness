@@ -114,20 +114,25 @@ async fn handle_connection(socket: WebSocket, state: DaemonHttpState) {
     tracing::info!("websocket connection opened");
     let (mut sender, mut receiver) = socket.split();
     let connection = Arc::new(Mutex::new(ConnectionState::new()));
-    let (outbound_tx, mut outbound_rx) = mpsc::channel::<Message>(256);
+
+    // Two outbound channels: priority for pings/dispatch responses (latency-
+    // sensitive), bulk for broadcast relay events. The writer task drains the
+    // priority channel first so pong frames are never blocked behind large
+    // broadcast payloads.
+    let (priority_tx, mut priority_rx) = mpsc::channel::<Message>(64);
+    let (bulk_tx, mut bulk_rx) = mpsc::channel::<Message>(256);
     let broadcast_rx = state.sender.subscribe();
 
-    let outbound_tx_relay = outbound_tx.clone();
     let connection_relay = Arc::clone(&connection);
     let replay_buffer = Arc::clone(&state.replay_buffer);
     let relay_task = tokio::spawn(relay_broadcast(
         broadcast_rx,
-        outbound_tx_relay,
+        bulk_tx,
         connection_relay,
         replay_buffer,
     ));
 
-    let outbound_tx_dispatch = outbound_tx.clone();
+    let priority_tx_dispatch = priority_tx.clone();
     let connection_dispatch = Arc::clone(&connection);
     let inbound_task = tokio::spawn(async move {
         let mut last_client_message = Instant::now();
@@ -149,7 +154,7 @@ async fn handle_connection(socket: WebSocket, state: DaemonHttpState) {
                                 IncomingMessageAction::ContinueLoop => {}
                                 IncomingMessageAction::CloseConnection => break,
                                 IncomingMessageAction::Respond(frame) => {
-                                    if outbound_tx_dispatch.send(frame).await.is_err() {
+                                    if priority_tx_dispatch.send(frame).await.is_err() {
                                         break;
                                     }
                                 }
@@ -172,8 +177,19 @@ async fn handle_connection(socket: WebSocket, state: DaemonHttpState) {
         }
     });
 
+    // Writer task: drain priority channel first (pong, dispatch responses),
+    // then bulk channel (broadcast events). Uses biased select so priority
+    // frames are always sent before broadcast frames when both are ready.
     let writer_task = tokio::spawn(async move {
-        while let Some(message) = outbound_rx.recv().await {
+        loop {
+            let message = tokio::select! {
+                biased;
+                msg = priority_rx.recv() => msg,
+                msg = bulk_rx.recv() => msg,
+            };
+            let Some(message) = message else {
+                break;
+            };
             if sender.send(message).await.is_err() {
                 break;
             }
