@@ -64,6 +64,7 @@ extension HarnessMonitorStore {
       let measuredSessions = try await sessionResponse
 
       diagnostics = measuredDiagnostics.value
+      health = measuredDiagnostics.value.health
       recordRequestSuccess(
         latencyMs: transportLatencyMs ?? measuredDiagnostics.latencyMs,
         updatesLatency: true
@@ -303,10 +304,10 @@ extension HarnessMonitorStore {
           for try await event in await client.globalStream() {
             recordReconnectRecovery(detail: "Global stream restored")
             attempt = 0
+            recordStreamEvent(countedInTraffic: true)
             if case .ready = event.kind {
               continue
             }
-            recordStreamEvent(countedInTraffic: true)
             applyGlobalPushEvent(event)
           }
         } catch {
@@ -340,11 +341,11 @@ extension HarnessMonitorStore {
           for try await event in await client.sessionStream(sessionID: sessionID) {
             recordReconnectRecovery(detail: "Session stream restored")
             attempt = 0
+            let countedInTraffic = activeTransport == .httpSSE
+            recordStreamEvent(countedInTraffic: countedInTraffic)
             if case .ready = event.kind {
               continue
             }
-            let countedInTraffic = activeTransport == .httpSSE
-            recordStreamEvent(countedInTraffic: countedInTraffic)
             applySessionPushEvent(event)
           }
         } catch {

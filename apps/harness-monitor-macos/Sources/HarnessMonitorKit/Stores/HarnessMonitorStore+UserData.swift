@@ -28,15 +28,18 @@ extension HarnessMonitorStore {
         predicate: #Predicate { $0.sessionId == sessionId }
       )
       descriptor.fetchLimit = 1
+      let isAddingBookmark: Bool
 
       if let existing = try modelContext.fetch(descriptor).first {
         modelContext.delete(existing)
+        isAddingBookmark = false
       } else {
         modelContext.insert(SessionBookmark(sessionId: sessionId, projectId: projectId))
+        isAddingBookmark = true
       }
 
       try modelContext.save()
-      refreshBookmarkedSessionIds()
+      updateBookmarkedSessionIds(sessionId: sessionId, isBookmarked: isAddingBookmark)
       return true
     } catch {
       modelContext.rollback()
@@ -67,6 +70,14 @@ extension HarnessMonitorStore {
         action: "Bookmarks could not be loaded.",
         underlyingError: error
       )
+    }
+  }
+
+  private func updateBookmarkedSessionIds(sessionId: String, isBookmarked: Bool) {
+    if isBookmarked {
+      bookmarkedSessionIds.insert(sessionId)
+    } else {
+      bookmarkedSessionIds.remove(sessionId)
     }
   }
 

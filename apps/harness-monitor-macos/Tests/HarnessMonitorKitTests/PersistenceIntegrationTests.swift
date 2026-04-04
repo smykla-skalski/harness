@@ -611,6 +611,31 @@ struct PersistenceIntegrationTests {
     #expect(!store.isBookmarked(sessionId: "sess-bm"))
   }
 
+  @Test("Performance budget: bookmark toggles stay under 10 ms median with 80 saved bookmarks")
+  func bookmarkToggleStaysWithinPerformanceBudget() async throws {
+    let store = makeStore()
+
+    for index in 0..<80 {
+      container.mainContext.insert(
+        SessionBookmark(
+          sessionId: "sess-bm-\(index)",
+          projectId: "proj-\(index % 6)"
+        )
+      )
+    }
+    try container.mainContext.save()
+    store.refreshBookmarkedSessionIds()
+
+    let medianMs = await medianRuntimeMs {
+      #expect(store.toggleBookmark(sessionId: "sess-bm-40", projectId: "proj-4"))
+      #expect(store.isBookmarked(sessionId: "sess-bm-40") == false)
+      #expect(store.toggleBookmark(sessionId: "sess-bm-40", projectId: "proj-4"))
+      #expect(store.isBookmarked(sessionId: "sess-bm-40"))
+    }
+
+    #expect(medianMs <= 10)
+  }
+
   @Test("User notes CRUD persists through fetch")
   func userNotesCRUD() throws {
     let store = makeStore()
