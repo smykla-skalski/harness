@@ -134,6 +134,8 @@ public final class HarnessMonitorStore {
   var connectionProbeTask: Task<Void, Never>?
   var sessionPushFallbackTask: Task<Void, Never>?
   var sessionSnapshotHydrationTask: Task<Void, Never>?
+  var selectionTask: Task<Void, Never>?
+  var pendingCacheWriteTask: Task<Void, Never>?
   var latencySamplesMs: [Int] = []
   var trafficSampleTimes: [Date] = []
   var activeSessionLoadRequest: UInt64 = 0
