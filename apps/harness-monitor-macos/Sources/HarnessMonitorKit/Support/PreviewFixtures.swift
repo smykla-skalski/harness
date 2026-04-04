@@ -7,6 +7,7 @@ public enum PreviewFixtures {
     projectDir: "/Users/example/Projects/harness",
     contextRoot: "/Users/example/Library/Application Support/harness/projects/project-6ccf8d0a",
     sessionId: "sess-harness",
+    title: "Harness Monitor Cockpit",
     context: "Track all live multi-agent harness sessions from a macOS cockpit",
     status: .active,
     createdAt: "2026-03-28T14:05:00Z",
@@ -166,6 +167,27 @@ public enum PreviewFixtures {
   ]
 
   public static let overflowSessions: [SessionSummary] = {
+    let titles = [
+      "Sidebar live updates",
+      "Timeline diff verification",
+      "",
+      "Observer text scaling",
+      "Filter chip stress test",
+      "Diagnostics reconnect",
+      "",
+      "Bookmark persistence",
+      "Cockpit lazy sections",
+      "Inspector card density",
+      "",
+      "Search grouping stability",
+      "Sidebar scroll benchmark",
+      "Filter reachability",
+      "",
+      "Idle vs active rendering",
+      "Activity sort order",
+      "Focus filter mixtures",
+    ]
+
     let contexts = [
       "Track sidebar live updates without invalidating the whole window",
       "Verify task timeline diffs stay incremental under daemon push traffic",
@@ -187,7 +209,8 @@ public enum PreviewFixtures {
       "Review session focus filters with mixed observed and idle fixtures",
     ]
 
-    return [summary] + contexts.enumerated().map { offset, context in
+    return [summary] + zip(titles, contexts).enumerated().map { offset, pair in
+      let (title, context) = pair
       let index = offset + 1
       let minute = 17 - min(offset, 15)
       let status: SessionStatus =
@@ -212,6 +235,7 @@ public enum PreviewFixtures {
         projectDir: summary.projectDir,
         contextRoot: summary.contextRoot,
         sessionId: String(format: "sess-harness-%02d", index),
+        title: title,
         context: context,
         status: status,
         createdAt: "2026-03-28T14:\(String(format: "%02d", max(minute - 1, 0))):00Z",
