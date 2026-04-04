@@ -17,8 +17,10 @@ struct SidebarSessionRow: View {
         .accessibilityHidden(true)
       VStack(alignment: .leading, spacing: HarnessMonitorTheme.itemSpacing) {
       HStack(alignment: .top, spacing: HarnessMonitorTheme.itemSpacing) {
-        Text(session.context)
+        Text(session.displayTitle)
           .scaledFont(.system(.body, design: .rounded, weight: .semibold))
+          .italic(session.title.isEmpty)
+          .foregroundStyle(session.title.isEmpty ? selectedSecondaryTextStyle : (isSelected ? HarnessMonitorTheme.onContrast : HarnessMonitorTheme.ink))
           .lineLimit(1)
           .truncationMode(.tail)
         Spacer(minLength: 12)
