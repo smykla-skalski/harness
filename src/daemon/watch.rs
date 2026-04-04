@@ -92,7 +92,7 @@ fn spawn_db_watch_loop(
             );
             drop(db_guard);
 
-            emit_watch_changes(&sender, changes);
+            emit_watch_changes(&sender, changes, Some(&db));
         }
     })
 }
@@ -142,7 +142,7 @@ fn spawn_legacy_watch_loop(
             else {
                 continue;
             };
-            emit_watch_changes(&sender, changes);
+            emit_watch_changes(&sender, changes, None);
         }
     })
 }
@@ -442,13 +442,19 @@ fn prune_removed_sessions(
     }
 }
 
-fn emit_watch_changes(sender: &broadcast::Sender<StreamEvent>, changes: WatchChanges) {
+fn emit_watch_changes(
+    sender: &broadcast::Sender<StreamEvent>,
+    changes: WatchChanges,
+    db: Option<&Arc<Mutex<DaemonDb>>>,
+) {
+    let db_guard = db.and_then(|db| db.lock().ok());
+    let db_ref = db_guard.as_deref();
     if changes.sessions_updated {
-        service::broadcast_sessions_updated(sender);
+        service::broadcast_sessions_updated(sender, db_ref);
     }
 
     for session_id in changes.session_ids {
-        service::broadcast_session_updated(sender, &session_id);
+        service::broadcast_session_updated(sender, &session_id, db_ref);
     }
 }
 

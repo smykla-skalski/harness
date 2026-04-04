@@ -35,6 +35,7 @@ struct DaemonObserveRuntime {
     sender: broadcast::Sender<StreamEvent>,
     poll_interval: Duration,
     running_sessions: Arc<Mutex<BTreeSet<String>>>,
+    db: Option<Arc<Mutex<super::db::DaemonDb>>>,
 }
 
 static OBSERVE_RUNTIME: OnceLock<DaemonObserveRuntime> = OnceLock::new();
@@ -97,16 +98,17 @@ pub async fn serve(config: DaemonServeConfig) -> Result<(), CliError> {
 
     let (sender, _) = broadcast::channel(64);
     let (shutdown_tx, shutdown_rx) = tokio_watch::channel(false);
+    let db = initialize_daemon_db();
     let _ = OBSERVE_RUNTIME.set(DaemonObserveRuntime {
         sender: sender.clone(),
         poll_interval: config.observe_interval,
         running_sessions: Arc::default(),
+        db: db.clone(),
     });
     let _ = SHUTDOWN_SIGNAL.set(shutdown_tx.clone());
     let replay_buffer = Arc::new(Mutex::new(ReplayBuffer::new(512)));
     let daemon_epoch = manifest.started_at.clone();
 
-    let db = initialize_daemon_db();
     let _watch = watch::spawn_watch_loop(sender.clone(), config.poll_interval, db.clone());
 
     let app_state = DaemonHttpState {
@@ -334,6 +336,7 @@ pub fn session_timeline(
 pub fn create_task(
     session_id: &str,
     request: &TaskCreateRequest,
+    db: Option<&super::db::DaemonDb>,
 ) -> Result<SessionDetail, CliError> {
     let resolved = index::resolve_session(session_id)?;
     let project_dir = effective_project_dir(&resolved);
@@ -347,7 +350,8 @@ pub fn create_task(
     };
     let _ =
         session_service::create_task_with_source(session_id, &spec, &request.actor, project_dir)?;
-    snapshot::session_detail(session_id)
+    sync_after_mutation(db, session_id);
+    session_detail(session_id, db)
 }
 
 /// Assign a task through the shared session service.
@@ -358,6 +362,7 @@ pub fn assign_task(
     session_id: &str,
     task_id: &str,
     request: &TaskAssignRequest,
+    db: Option<&super::db::DaemonDb>,
 ) -> Result<SessionDetail, CliError> {
     let resolved = index::resolve_session(session_id)?;
     let project_dir = effective_project_dir(&resolved);
@@ -368,7 +373,8 @@ pub fn assign_task(
         &request.actor,
         project_dir,
     )?;
-    snapshot::session_detail(session_id)
+    sync_after_mutation(db, session_id);
+    session_detail(session_id, db)
 }
 
 /// Update a task status through the shared session service.
@@ -379,6 +385,7 @@ pub fn update_task(
     session_id: &str,
     task_id: &str,
     request: &TaskUpdateRequest,
+    db: Option<&super::db::DaemonDb>,
 ) -> Result<SessionDetail, CliError> {
     let resolved = index::resolve_session(session_id)?;
     let project_dir = effective_project_dir(&resolved);
@@ -390,7 +397,8 @@ pub fn update_task(
         &request.actor,
         project_dir,
     )?;
-    snapshot::session_detail(session_id)
+    sync_after_mutation(db, session_id);
+    session_detail(session_id, db)
 }
 
 /// Record a task checkpoint through the shared session service.
@@ -401,6 +409,7 @@ pub fn checkpoint_task(
     session_id: &str,
     task_id: &str,
     request: &TaskCheckpointRequest,
+    db: Option<&super::db::DaemonDb>,
 ) -> Result<SessionDetail, CliError> {
     let resolved = index::resolve_session(session_id)?;
     let project_dir = effective_project_dir(&resolved);
@@ -412,7 +421,8 @@ pub fn checkpoint_task(
         request.progress,
         project_dir,
     )?;
-    snapshot::session_detail(session_id)
+    sync_after_mutation(db, session_id);
+    session_detail(session_id, db)
 }
 
 /// Change an agent role through the shared session service.
@@ -423,6 +433,7 @@ pub fn change_role(
     session_id: &str,
     agent_id: &str,
     request: &RoleChangeRequest,
+    db: Option<&super::db::DaemonDb>,
 ) -> Result<SessionDetail, CliError> {
     let resolved = index::resolve_session(session_id)?;
     let project_dir = effective_project_dir(&resolved);
@@ -434,7 +445,8 @@ pub fn change_role(
         &request.actor,
         project_dir,
     )?;
-    snapshot::session_detail(session_id)
+    sync_after_mutation(db, session_id);
+    session_detail(session_id, db)
 }
 
 /// Remove an agent through the shared session service.
@@ -445,11 +457,13 @@ pub fn remove_agent(
     session_id: &str,
     agent_id: &str,
     request: &AgentRemoveRequest,
+    db: Option<&super::db::DaemonDb>,
 ) -> Result<SessionDetail, CliError> {
     let resolved = index::resolve_session(session_id)?;
     let project_dir = effective_project_dir(&resolved);
     session_service::remove_agent(session_id, agent_id, &request.actor, project_dir)?;
-    snapshot::session_detail(session_id)
+    sync_after_mutation(db, session_id);
+    session_detail(session_id, db)
 }
 
 /// Transfer session leadership through the shared session service.
@@ -459,6 +473,7 @@ pub fn remove_agent(
 pub fn transfer_leader(
     session_id: &str,
     request: &LeaderTransferRequest,
+    db: Option<&super::db::DaemonDb>,
 ) -> Result<SessionDetail, CliError> {
     let resolved = index::resolve_session(session_id)?;
     let project_dir = effective_project_dir(&resolved);
@@ -469,7 +484,8 @@ pub fn transfer_leader(
         &request.actor,
         project_dir,
     )?;
-    snapshot::session_detail(session_id)
+    sync_after_mutation(db, session_id);
+    session_detail(session_id, db)
 }
 
 /// End a session through the shared session service.
@@ -479,11 +495,13 @@ pub fn transfer_leader(
 pub fn end_session(
     session_id: &str,
     request: &SessionEndRequest,
+    db: Option<&super::db::DaemonDb>,
 ) -> Result<SessionDetail, CliError> {
     let resolved = index::resolve_session(session_id)?;
     let project_dir = effective_project_dir(&resolved);
     session_service::end_session(session_id, &request.actor, project_dir)?;
-    snapshot::session_detail(session_id)
+    sync_after_mutation(db, session_id);
+    session_detail(session_id, db)
 }
 
 /// Send a signal through the shared session service.
@@ -493,6 +511,7 @@ pub fn end_session(
 pub fn send_signal(
     session_id: &str,
     request: &SignalSendRequest,
+    db: Option<&super::db::DaemonDb>,
 ) -> Result<SessionDetail, CliError> {
     let resolved = index::resolve_session(session_id)?;
     let project_dir = effective_project_dir(&resolved);
@@ -505,7 +524,8 @@ pub fn send_signal(
         &request.actor,
         project_dir,
     )?;
-    snapshot::session_detail(session_id)
+    sync_after_mutation(db, session_id);
+    session_detail(session_id, db)
 }
 
 /// Start or refresh the daemon-owned session observation loop.
@@ -515,6 +535,7 @@ pub fn send_signal(
 pub fn observe_session(
     session_id: &str,
     request: Option<&ObserveSessionRequest>,
+    db: Option<&super::db::DaemonDb>,
 ) -> Result<SessionDetail, CliError> {
     let resolved = index::resolve_session(session_id)?;
     let project_dir = effective_project_dir(&resolved);
@@ -522,7 +543,8 @@ pub fn observe_session(
     if !start_daemon_observe_loop(session_id, project_dir, actor_id) {
         let _ = session_observe::run_session_observe(session_id, project_dir, actor_id)?;
     }
-    snapshot::session_detail(session_id)
+    sync_after_mutation(db, session_id);
+    session_detail(session_id, db)
 }
 
 /// Build a `ready` stream event for SSE subscribers.
@@ -543,10 +565,12 @@ pub fn ready_event(session_id: Option<&str>) -> StreamEvent {
 ///
 /// # Errors
 /// Returns `CliError` when project or session discovery fails.
-pub fn sessions_updated_event() -> Result<StreamEvent, CliError> {
+pub fn sessions_updated_event(
+    db: Option<&super::db::DaemonDb>,
+) -> Result<StreamEvent, CliError> {
     let payload = SessionsUpdatedPayload {
-        projects: list_projects(None)?,
-        sessions: list_sessions(true, None)?,
+        projects: list_projects(db)?,
+        sessions: list_sessions(true, db)?,
     };
     stream_event("sessions_updated", None, payload)
 }
@@ -555,30 +579,44 @@ pub fn sessions_updated_event() -> Result<StreamEvent, CliError> {
 ///
 /// # Errors
 /// Returns `CliError` when the session cannot be resolved or serialized.
-pub fn session_updated_event(session_id: &str) -> Result<StreamEvent, CliError> {
+pub fn session_updated_event(
+    session_id: &str,
+    db: Option<&super::db::DaemonDb>,
+) -> Result<StreamEvent, CliError> {
     let payload = SessionUpdatedPayload {
-        detail: session_detail(session_id, None)?,
+        detail: session_detail(session_id, db)?,
         timeline: None,
     };
     stream_event("session_updated", Some(session_id), payload)
 }
 
-pub fn broadcast_sessions_updated(sender: &broadcast::Sender<StreamEvent>) {
-    broadcast_event(sender, sessions_updated_event(), "sessions_updated", None);
+pub fn broadcast_sessions_updated(
+    sender: &broadcast::Sender<StreamEvent>,
+    db: Option<&super::db::DaemonDb>,
+) {
+    broadcast_event(sender, sessions_updated_event(db), "sessions_updated", None);
 }
 
-pub fn broadcast_session_updated(sender: &broadcast::Sender<StreamEvent>, session_id: &str) {
+pub fn broadcast_session_updated(
+    sender: &broadcast::Sender<StreamEvent>,
+    session_id: &str,
+    db: Option<&super::db::DaemonDb>,
+) {
     broadcast_event(
         sender,
-        session_updated_event(session_id),
+        session_updated_event(session_id, db),
         "session_updated",
         Some(session_id),
     );
 }
 
-pub fn broadcast_session_snapshot(sender: &broadcast::Sender<StreamEvent>, session_id: &str) {
-    broadcast_sessions_updated(sender);
-    broadcast_session_updated(sender, session_id);
+pub fn broadcast_session_snapshot(
+    sender: &broadcast::Sender<StreamEvent>,
+    session_id: &str,
+    db: Option<&super::db::DaemonDb>,
+) {
+    broadcast_sessions_updated(sender, db);
+    broadcast_session_updated(sender, session_id, db);
 }
 
 fn stream_event<T: Serialize>(
@@ -647,6 +685,15 @@ fn warn_broadcast_failure(error_message: &str, event_name: &str, session: &str) 
     Event::dispatch(&META, &META.fields().value_set_all(values));
 }
 
+/// Re-sync a session from files into `SQLite` after a file-based mutation.
+/// Silently ignores errors since the file write already succeeded and the
+/// watch loop will eventually catch up.
+fn sync_after_mutation(db: Option<&super::db::DaemonDb>, session_id: &str) {
+    if let Some(db) = db {
+        let _ = db.resync_session(session_id);
+    }
+}
+
 /// Return the original project directory when available, falling back to the
 /// context root. This is safe because `project_context_dir` is idempotent
 /// for paths already under the projects root.
@@ -698,7 +745,10 @@ fn start_daemon_observe_loop(session_id: &str, project_dir: &Path, actor_id: Opt
         if let Ok(mut running_sessions) = runtime.running_sessions.lock() {
             running_sessions.remove(&session_id);
         }
-        broadcast_session_snapshot(&runtime.sender, &session_id);
+        let db_guard = runtime.db.as_ref().and_then(|db| db.lock().ok());
+        let db_ref = db_guard.as_deref();
+        sync_after_mutation(db_ref, &session_id);
+        broadcast_session_snapshot(&runtime.sender, &session_id, db_ref);
     });
     true
 }
@@ -837,6 +887,7 @@ mod tests {
                     severity: crate::session::types::TaskSeverity::High,
                     suggested_fix: Some("resolve runtime-session ids through daemon index".into()),
                 },
+                None,
             )
             .expect("create task");
 
@@ -859,7 +910,7 @@ mod tests {
             )
             .expect("start session");
 
-            let event = sessions_updated_event().expect("sessions updated event");
+            let event = sessions_updated_event(None).expect("sessions updated event");
             let payload: SessionsUpdatedPayload =
                 serde_json::from_value(event.payload).expect("deserialize payload");
 
@@ -893,7 +944,7 @@ mod tests {
             )
             .expect("create task");
 
-            let event = session_updated_event(&state.session_id).expect("session updated event");
+            let event = session_updated_event(&state.session_id, None).expect("session updated event");
             let payload: SessionUpdatedPayload =
                 serde_json::from_value(event.payload).expect("deserialize payload");
 
@@ -942,6 +993,7 @@ mod tests {
                     role: SessionRole::Reviewer,
                     reason: Some("route triage through a reviewer".into()),
                 },
+                None,
             )
             .expect("change role");
 
@@ -1001,6 +1053,7 @@ mod tests {
                     message: "Investigate the stuck signal lane".into(),
                     action_hint: Some("task:signal".into()),
                 },
+                None,
             )
             .expect("send signal");
 
@@ -1057,6 +1110,7 @@ mod tests {
                 Some(&ObserveSessionRequest {
                     actor: Some(leader_id),
                 }),
+                None,
             )
             .expect("observe session");
 

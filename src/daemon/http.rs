@@ -174,9 +174,11 @@ async fn post_task_create(
     if let Err(response) = require_auth(&headers, &state) {
         return *response;
     }
-    let result = service::create_task(&session_id, &request);
+    let db_guard = state.db.as_ref().map(|db| db.lock().expect("db lock"));
+    let db_ref = db_guard.as_deref();
+    let result = service::create_task(&session_id, &request, db_ref);
     if result.is_ok() {
-        service::broadcast_session_snapshot(&state.sender, &session_id);
+        service::broadcast_session_snapshot(&state.sender, &session_id, db_ref);
     }
     map_json(result)
 }
@@ -190,9 +192,11 @@ async fn post_task_assign(
     if let Err(response) = require_auth(&headers, &state) {
         return *response;
     }
-    let result = service::assign_task(&session_id, &task_id, &request);
+    let db_guard = state.db.as_ref().map(|db| db.lock().expect("db lock"));
+    let db_ref = db_guard.as_deref();
+    let result = service::assign_task(&session_id, &task_id, &request, db_ref);
     if result.is_ok() {
-        service::broadcast_session_snapshot(&state.sender, &session_id);
+        service::broadcast_session_snapshot(&state.sender, &session_id, db_ref);
     }
     map_json(result)
 }
@@ -206,9 +210,11 @@ async fn post_task_update(
     if let Err(response) = require_auth(&headers, &state) {
         return *response;
     }
-    let result = service::update_task(&session_id, &task_id, &request);
+    let db_guard = state.db.as_ref().map(|db| db.lock().expect("db lock"));
+    let db_ref = db_guard.as_deref();
+    let result = service::update_task(&session_id, &task_id, &request, db_ref);
     if result.is_ok() {
-        service::broadcast_session_snapshot(&state.sender, &session_id);
+        service::broadcast_session_snapshot(&state.sender, &session_id, db_ref);
     }
     map_json(result)
 }
@@ -222,9 +228,11 @@ async fn post_task_checkpoint(
     if let Err(response) = require_auth(&headers, &state) {
         return *response;
     }
-    let result = service::checkpoint_task(&session_id, &task_id, &request);
+    let db_guard = state.db.as_ref().map(|db| db.lock().expect("db lock"));
+    let db_ref = db_guard.as_deref();
+    let result = service::checkpoint_task(&session_id, &task_id, &request, db_ref);
     if result.is_ok() {
-        service::broadcast_session_snapshot(&state.sender, &session_id);
+        service::broadcast_session_snapshot(&state.sender, &session_id, db_ref);
     }
     map_json(result)
 }
@@ -238,9 +246,11 @@ async fn post_role_change(
     if let Err(response) = require_auth(&headers, &state) {
         return *response;
     }
-    let result = service::change_role(&session_id, &agent_id, &request);
+    let db_guard = state.db.as_ref().map(|db| db.lock().expect("db lock"));
+    let db_ref = db_guard.as_deref();
+    let result = service::change_role(&session_id, &agent_id, &request, db_ref);
     if result.is_ok() {
-        service::broadcast_session_snapshot(&state.sender, &session_id);
+        service::broadcast_session_snapshot(&state.sender, &session_id, db_ref);
     }
     map_json(result)
 }
@@ -254,9 +264,11 @@ async fn post_remove_agent(
     if let Err(response) = require_auth(&headers, &state) {
         return *response;
     }
-    let result = service::remove_agent(&session_id, &agent_id, &request);
+    let db_guard = state.db.as_ref().map(|db| db.lock().expect("db lock"));
+    let db_ref = db_guard.as_deref();
+    let result = service::remove_agent(&session_id, &agent_id, &request, db_ref);
     if result.is_ok() {
-        service::broadcast_session_snapshot(&state.sender, &session_id);
+        service::broadcast_session_snapshot(&state.sender, &session_id, db_ref);
     }
     map_json(result)
 }
@@ -270,9 +282,11 @@ async fn post_transfer_leader(
     if let Err(response) = require_auth(&headers, &state) {
         return *response;
     }
-    let result = service::transfer_leader(&session_id, &request);
+    let db_guard = state.db.as_ref().map(|db| db.lock().expect("db lock"));
+    let db_ref = db_guard.as_deref();
+    let result = service::transfer_leader(&session_id, &request, db_ref);
     if result.is_ok() {
-        service::broadcast_session_snapshot(&state.sender, &session_id);
+        service::broadcast_session_snapshot(&state.sender, &session_id, db_ref);
     }
     map_json(result)
 }
@@ -286,9 +300,11 @@ async fn post_end_session(
     if let Err(response) = require_auth(&headers, &state) {
         return *response;
     }
-    let result = service::end_session(&session_id, &request);
+    let db_guard = state.db.as_ref().map(|db| db.lock().expect("db lock"));
+    let db_ref = db_guard.as_deref();
+    let result = service::end_session(&session_id, &request, db_ref);
     if result.is_ok() {
-        service::broadcast_session_snapshot(&state.sender, &session_id);
+        service::broadcast_session_snapshot(&state.sender, &session_id, db_ref);
     }
     map_json(result)
 }
@@ -302,9 +318,11 @@ async fn post_send_signal(
     if let Err(response) = require_auth(&headers, &state) {
         return *response;
     }
-    let result = service::send_signal(&session_id, &request);
+    let db_guard = state.db.as_ref().map(|db| db.lock().expect("db lock"));
+    let db_ref = db_guard.as_deref();
+    let result = service::send_signal(&session_id, &request, db_ref);
     if result.is_ok() {
-        service::broadcast_session_snapshot(&state.sender, &session_id);
+        service::broadcast_session_snapshot(&state.sender, &session_id, db_ref);
     }
     map_json(result)
 }
@@ -318,10 +336,12 @@ async fn post_observe_session(
     if let Err(response) = require_auth(&headers, &state) {
         return *response;
     }
+    let db_guard = state.db.as_ref().map(|db| db.lock().expect("db lock"));
+    let db_ref = db_guard.as_deref();
     let request = request.map(|Json(request)| request);
-    let result = service::observe_session(&session_id, request.as_ref());
+    let result = service::observe_session(&session_id, request.as_ref(), db_ref);
     if result.is_ok() {
-        service::broadcast_session_snapshot(&state.sender, &session_id);
+        service::broadcast_session_snapshot(&state.sender, &session_id, db_ref);
     }
     map_json(result)
 }
