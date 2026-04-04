@@ -158,11 +158,14 @@ private struct ToolbarCenterpieceView: View {
   let model: ToolbarCenterpieceModel
   let displayMode: ToolbarCenterpieceDisplayMode
   private static let toolbarHeight: CGFloat = 32
+  private static let baseHorizontalPadding: CGFloat = 12
+  @Environment(\.fontScale)
+  private var fontScale
 
   var body: some View {
     ToolbarCenterpieceMetricsRow(metrics: model.metrics, displayMode: displayMode)
       .layoutPriority(1)
-      .padding(.horizontal, 12)
+      .padding(.horizontal, Self.baseHorizontalPadding / fontScale)
       .fixedSize(horizontal: true, vertical: false)
       .frame(height: Self.toolbarHeight)
       .accessibilityElement(children: .ignore)
