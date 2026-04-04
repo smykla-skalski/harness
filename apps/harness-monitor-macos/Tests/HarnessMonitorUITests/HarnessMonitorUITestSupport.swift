@@ -34,8 +34,6 @@ extension HarnessMonitorUITestCase {
     return element(in: app, identifier: identifier)
   }
 
-  func sidebarEmptyStateElement(in app: XCUIApplication) -> XCUIElement { app.staticTexts[HarnessMonitorUITestAccessibility.sidebarEmptyStateTitle] }
-
   func focusChip(in app: XCUIApplication, identifier: String, title: String) -> XCUIElement {
     let identifiedElement = element(in: app, identifier: identifier)
     return identifiedElement.exists ? identifiedElement : button(in: app, title: title)
@@ -191,27 +189,6 @@ extension HarnessMonitorUITestCase {
     XCTFail("Failed to tap element \(identifier)")
   }
 
-  func selectMenuOption(in app: XCUIApplication, controlIdentifier: String, optionTitle: String) {
-    let control = popUpButton(in: app, identifier: controlIdentifier)
-    XCTAssertTrue(control.waitForExistence(timeout: Self.uiTimeout))
-
-    app.activate()
-    if control.isHittable {
-      control.tap()
-    } else if let coordinate = centerCoordinate(in: app, for: control) {
-      coordinate.tap()
-    } else {
-      XCTFail("Failed to open pop-up button \(controlIdentifier)")
-      return
-    }
-
-    let menuItem = app.descendants(matching: .menuItem).matching(
-      NSPredicate(format: "label == %@ OR title == %@", optionTitle, optionTitle)
-    ).firstMatch
-    XCTAssertTrue(menuItem.waitForExistence(timeout: Self.uiTimeout))
-    menuItem.tap()
-  }
-
   func element(in app: XCUIApplication, identifier: String) -> XCUIElement {
     app.descendants(matching: .any)
       .matching(identifier: identifier)
@@ -307,13 +284,6 @@ extension HarnessMonitorUITestCase {
     return app.toolbars.buttons.matching(identifier: identifier).firstMatch
   }
 
-  func popUpButton(in app: XCUIApplication, identifier: String) -> XCUIElement {
-    let appMatch = app.popUpButtons.matching(identifier: identifier).firstMatch
-    return appMatch.exists
-      ? appMatch
-      : app.descendants(matching: .popUpButton).matching(identifier: identifier).firstMatch
-  }
-
   func editableField(in app: XCUIApplication, identifier: String) -> XCUIElement {
     let textField = app.textFields.matching(identifier: identifier).firstMatch
     if textField.exists {
@@ -390,7 +360,11 @@ extension HarnessMonitorUITestCase {
     add(attachment)
   }
 
-  func waitUntil(timeout: TimeInterval = 5, pollInterval: TimeInterval = 0.1, condition: @escaping () -> Bool) -> Bool {
+  func waitUntil(
+    timeout: TimeInterval = 5,
+    pollInterval: TimeInterval = 0.1,
+    condition: @escaping () -> Bool
+  ) -> Bool {
     let deadline = Date.now.addingTimeInterval(timeout)
     while Date.now < deadline {
       if condition() {
@@ -401,7 +375,7 @@ extension HarnessMonitorUITestCase {
     return condition()
   }
 
-  private func centerCoordinate(
+  func centerCoordinate(
     in app: XCUIApplication,
     for element: XCUIElement
   ) -> XCUICoordinate? {

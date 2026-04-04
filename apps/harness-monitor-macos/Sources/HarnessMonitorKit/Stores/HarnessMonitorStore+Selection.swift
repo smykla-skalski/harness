@@ -232,7 +232,9 @@ extension HarnessMonitorStore {
   func beginSessionLoad() -> UInt64 {
     sessionLoadSequence &+= 1
     activeSessionLoadRequest = sessionLoadSequence
-    isSelectionLoading = true
+    if selectedSession == nil {
+      isSelectionLoading = true
+    }
     return sessionLoadSequence
   }
 
@@ -254,7 +256,7 @@ extension HarnessMonitorStore {
       guard selectedSessionID == sessionID else { return }
       selectedSession = cached.detail
       timeline = cached.timeline
-      isShowingCachedData = true
+      isSelectionLoading = false
     }
   }
 
