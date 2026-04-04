@@ -285,55 +285,55 @@ fn dispatch(
         "session.unsubscribe" => handle_session_unsubscribe(request, connection),
         "stream.subscribe" => handle_stream_subscribe(request, connection),
         "stream.unsubscribe" => handle_stream_unsubscribe(request, connection),
-        "task.create" => dispatch_mutation(request, state, |session_id, params| {
+        "task.create" => dispatch_mutation(request, state, |session_id, params, db| {
             let body: TaskCreateRequest = serde_json::from_value(params)?;
-            service::create_task(&session_id, &body).map_err(Into::into)
+            service::create_task(&session_id, &body, db).map_err(Into::into)
         }),
         "task.assign" => {
-            dispatch_mutation_with_task(request, state, |session_id, task_id, params| {
+            dispatch_mutation_with_task(request, state, |session_id, task_id, params, db| {
                 let body: TaskAssignRequest = serde_json::from_value(params)?;
-                service::assign_task(&session_id, &task_id, &body).map_err(Into::into)
+                service::assign_task(&session_id, &task_id, &body, db).map_err(Into::into)
             })
         }
         "task.update" => {
-            dispatch_mutation_with_task(request, state, |session_id, task_id, params| {
+            dispatch_mutation_with_task(request, state, |session_id, task_id, params, db| {
                 let body: TaskUpdateRequest = serde_json::from_value(params)?;
-                service::update_task(&session_id, &task_id, &body).map_err(Into::into)
+                service::update_task(&session_id, &task_id, &body, db).map_err(Into::into)
             })
         }
         "task.checkpoint" => {
-            dispatch_mutation_with_task(request, state, |session_id, task_id, params| {
+            dispatch_mutation_with_task(request, state, |session_id, task_id, params, db| {
                 let body: TaskCheckpointRequest = serde_json::from_value(params)?;
-                service::checkpoint_task(&session_id, &task_id, &body).map_err(Into::into)
+                service::checkpoint_task(&session_id, &task_id, &body, db).map_err(Into::into)
             })
         }
         "agent.change_role" => {
-            dispatch_mutation_with_agent(request, state, |session_id, agent_id, params| {
+            dispatch_mutation_with_agent(request, state, |session_id, agent_id, params, db| {
                 let body: RoleChangeRequest = serde_json::from_value(params)?;
-                service::change_role(&session_id, &agent_id, &body).map_err(Into::into)
+                service::change_role(&session_id, &agent_id, &body, db).map_err(Into::into)
             })
         }
         "agent.remove" => {
-            dispatch_mutation_with_agent(request, state, |session_id, agent_id, params| {
+            dispatch_mutation_with_agent(request, state, |session_id, agent_id, params, db| {
                 let body: AgentRemoveRequest = serde_json::from_value(params)?;
-                service::remove_agent(&session_id, &agent_id, &body).map_err(Into::into)
+                service::remove_agent(&session_id, &agent_id, &body, db).map_err(Into::into)
             })
         }
-        "leader.transfer" => dispatch_mutation(request, state, |session_id, params| {
+        "leader.transfer" => dispatch_mutation(request, state, |session_id, params, db| {
             let body: LeaderTransferRequest = serde_json::from_value(params)?;
-            service::transfer_leader(&session_id, &body).map_err(Into::into)
+            service::transfer_leader(&session_id, &body, db).map_err(Into::into)
         }),
-        "session.end" => dispatch_mutation(request, state, |session_id, params| {
+        "session.end" => dispatch_mutation(request, state, |session_id, params, db| {
             let body: SessionEndRequest = serde_json::from_value(params)?;
-            service::end_session(&session_id, &body).map_err(Into::into)
+            service::end_session(&session_id, &body, db).map_err(Into::into)
         }),
-        "signal.send" => dispatch_mutation(request, state, |session_id, params| {
+        "signal.send" => dispatch_mutation(request, state, |session_id, params, db| {
             let body: SignalSendRequest = serde_json::from_value(params)?;
-            service::send_signal(&session_id, &body).map_err(Into::into)
+            service::send_signal(&session_id, &body, db).map_err(Into::into)
         }),
-        "session.observe" => dispatch_mutation(request, state, |session_id, params| {
+        "session.observe" => dispatch_mutation(request, state, |session_id, params, db| {
             let body: ObserveSessionRequest = serde_json::from_value(params)?;
-            service::observe_session(&session_id, Some(&body)).map_err(Into::into)
+            service::observe_session(&session_id, Some(&body), db).map_err(Into::into)
         }),
         unknown => error_response(
             &request.id,
@@ -445,15 +445,17 @@ fn dispatch_query<T: serde::Serialize>(
 fn dispatch_mutation(
     request: &WsRequest,
     state: &DaemonHttpState,
-    handler: impl FnOnce(String, Value) -> Result<super::protocol::SessionDetail, MutationError>,
+    handler: impl FnOnce(String, Value, Option<&super::db::DaemonDb>) -> Result<super::protocol::SessionDetail, MutationError>,
 ) -> WsResponse {
+    let db_guard = state.db.as_ref().map(|db| db.lock().expect("db lock"));
+    let db_ref = db_guard.as_deref();
     let Some(session_id) = extract_session_id(&request.params) else {
         return error_response(&request.id, "MISSING_PARAM", "missing session_id");
     };
 
-    match handler(session_id.clone(), request.params.clone()) {
+    match handler(session_id.clone(), request.params.clone(), db_ref) {
         Ok(detail) => {
-            service::broadcast_session_snapshot(&state.sender, &session_id);
+            service::broadcast_session_snapshot(&state.sender, &session_id, db_ref);
             match serde_json::to_value(detail) {
                 Ok(json) => ok_response(&request.id, json),
                 Err(error) => error_response(
@@ -470,8 +472,10 @@ fn dispatch_mutation(
 fn dispatch_mutation_with_task(
     request: &WsRequest,
     state: &DaemonHttpState,
-    handler: impl FnOnce(String, String, Value) -> Result<super::protocol::SessionDetail, MutationError>,
+    handler: impl FnOnce(String, String, Value, Option<&super::db::DaemonDb>) -> Result<super::protocol::SessionDetail, MutationError>,
 ) -> WsResponse {
+    let db_guard = state.db.as_ref().map(|db| db.lock().expect("db lock"));
+    let db_ref = db_guard.as_deref();
     let Some(session_id) = extract_session_id(&request.params) else {
         return error_response(&request.id, "MISSING_PARAM", "missing session_id");
     };
@@ -479,9 +483,9 @@ fn dispatch_mutation_with_task(
         return error_response(&request.id, "MISSING_PARAM", "missing task_id");
     };
 
-    match handler(session_id.clone(), task_id, request.params.clone()) {
+    match handler(session_id.clone(), task_id, request.params.clone(), db_ref) {
         Ok(detail) => {
-            service::broadcast_session_snapshot(&state.sender, &session_id);
+            service::broadcast_session_snapshot(&state.sender, &session_id, db_ref);
             match serde_json::to_value(detail) {
                 Ok(json) => ok_response(&request.id, json),
                 Err(error) => error_response(
@@ -498,8 +502,10 @@ fn dispatch_mutation_with_task(
 fn dispatch_mutation_with_agent(
     request: &WsRequest,
     state: &DaemonHttpState,
-    handler: impl FnOnce(String, String, Value) -> Result<super::protocol::SessionDetail, MutationError>,
+    handler: impl FnOnce(String, String, Value, Option<&super::db::DaemonDb>) -> Result<super::protocol::SessionDetail, MutationError>,
 ) -> WsResponse {
+    let db_guard = state.db.as_ref().map(|db| db.lock().expect("db lock"));
+    let db_ref = db_guard.as_deref();
     let Some(session_id) = extract_session_id(&request.params) else {
         return error_response(&request.id, "MISSING_PARAM", "missing session_id");
     };
@@ -507,9 +513,9 @@ fn dispatch_mutation_with_agent(
         return error_response(&request.id, "MISSING_PARAM", "missing agent_id");
     };
 
-    match handler(session_id.clone(), agent_id, request.params.clone()) {
+    match handler(session_id.clone(), agent_id, request.params.clone(), db_ref) {
         Ok(detail) => {
-            service::broadcast_session_snapshot(&state.sender, &session_id);
+            service::broadcast_session_snapshot(&state.sender, &session_id, db_ref);
             match serde_json::to_value(detail) {
                 Ok(json) => ok_response(&request.id, json),
                 Err(error) => error_response(
