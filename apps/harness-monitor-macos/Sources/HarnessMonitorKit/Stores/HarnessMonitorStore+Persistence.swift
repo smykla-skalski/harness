@@ -73,6 +73,16 @@ extension HarnessMonitorStore {
     return await cacheService.hydrationQueue(for: summaries)
   }
 
+  func scheduleCacheWrite(_ work: @escaping @MainActor (SessionCacheService) async -> Void) {
+    guard let cacheService, persistenceError == nil else { return }
+    pendingCacheWriteTask?.cancel()
+    pendingCacheWriteTask = Task { @MainActor [weak self] in
+      guard let self else { return }
+      await work(cacheService)
+      self.pendingCacheWriteTask = nil
+    }
+  }
+
   func updatePersistedSessionMetadataAfterSave(insertedSessionCount: Int) {
     persistedSessionCount += insertedSessionCount
     lastPersistedSnapshotAt = .now

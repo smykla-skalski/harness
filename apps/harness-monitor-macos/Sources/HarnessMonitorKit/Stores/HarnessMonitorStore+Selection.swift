@@ -78,31 +78,21 @@ extension HarnessMonitorStore {
   }
 
   private func loadSessionWithoutHistory(_ sessionID: String?) async {
-    let previousProjectId = selectedSessionSummary?.projectId
+    selectionTask?.cancel()
     primeSessionSelection(sessionID)
+
     guard let sessionID else {
+      selectionTask = nil
       stopSessionStream()
       return
     }
 
-    await applyCachedSessionIfAvailable(sessionID: sessionID)
-
-    guard connectionState == .online, let client else {
-      await restorePersistedSessionSelection(sessionID: sessionID)
-      stopSessionStream()
-      return
+    let task = Task { @MainActor [weak self] in
+      guard let self else { return }
+      await self.performSessionSelection(sessionID: sessionID)
     }
-
-    let newProjectId = sessions.first(where: { $0.sessionId == sessionID })?.projectId
-    if let previousProjectId, let newProjectId, newProjectId != previousProjectId {
-      saveFilterPreference(for: previousProjectId)
-      loadFilterPreference(for: newProjectId)
-    }
-
-    let requestID = beginSessionLoad()
-    await loadSession(using: client, sessionID: sessionID, requestID: requestID)
-    guard isCurrentSessionLoad(requestID, sessionID: sessionID) else { return }
-    startSessionStream(using: client, sessionID: sessionID)
+    selectionTask = task
+    await task.value
   }
 
   // MARK: - Selection
@@ -133,14 +123,27 @@ extension HarnessMonitorStore {
   }
 
   public func selectSession(_ sessionID: String?) async {
-    let previousProjectId = selectedSessionSummary?.projectId
+    selectionTask?.cancel()
     primeSessionSelection(sessionID)
+
     guard let sessionID else {
+      selectionTask = nil
       stopSessionStream()
       return
     }
 
+    let task = Task { @MainActor [weak self] in
+      guard let self else { return }
+      await self.performSessionSelection(sessionID: sessionID)
+    }
+    selectionTask = task
+    await task.value
+  }
+
+  private func performSessionSelection(sessionID: String) async {
     await applyCachedSessionIfAvailable(sessionID: sessionID)
+
+    guard !Task.isCancelled else { return }
 
     guard connectionState == .online, let client else {
       await restorePersistedSessionSelection(sessionID: sessionID)
@@ -148,17 +151,13 @@ extension HarnessMonitorStore {
       return
     }
 
-    let newProjectId = sessions.first(where: { $0.sessionId == sessionID })?.projectId
-    if let previousProjectId, let newProjectId, newProjectId != previousProjectId {
-      saveFilterPreference(for: previousProjectId)
-      loadFilterPreference(for: newProjectId)
-    }
+    guard !Task.isCancelled else { return }
 
     let requestID = beginSessionLoad()
     await loadSession(using: client, sessionID: sessionID, requestID: requestID)
-    guard isCurrentSessionLoad(requestID, sessionID: sessionID) else {
-      return
-    }
+
+    guard !Task.isCancelled else { return }
+    guard isCurrentSessionLoad(requestID, sessionID: sessionID) else { return }
     startSessionStream(using: client, sessionID: sessionID)
   }
 
