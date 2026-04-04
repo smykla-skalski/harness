@@ -29,10 +29,8 @@ run = ["cargo fmt", "cargo clippy --fix --allow-dirty --allow-staged"]
 description = "Build release binary, sign with hardened runtime, and install to ~/.local/bin"
 run = [
   "cargo build --release",
-  "codesign --force --options=runtime -s 'Developer ID Application: Bartlomiej Smykla (Q498EB36N4)' target/release/harness",
-  "chmod 755 ~/.local/bin/harness 2>/dev/null || true",
-  "cp target/release/harness ~/.local/bin/harness",
-  "chmod 555 ~/.local/bin/harness",
+  "mkdir -p ~/.local/bin",
+  "tmp=\"$HOME/.local/bin/harness.new\"; rm -f \"$tmp\"; cp target/release/harness \"$tmp\"; chmod 755 \"$tmp\"; codesign --force --options=runtime -s 'Developer ID Application: Bartlomiej Smykla (Q498EB36N4)' \"$tmp\"; chmod 555 \"$tmp\"; mv -f \"$tmp\" \"$HOME/.local/bin/harness\"",
 ]
 
 [tasks."harness-monitor:macos:generate"]
