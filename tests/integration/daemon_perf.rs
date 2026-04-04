@@ -1,4 +1,4 @@
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, OnceLock};
 use std::time::{Duration, Instant};
 
 use reqwest::Client;
@@ -60,13 +60,20 @@ async fn start_test_daemon(db: Option<DaemonDb>) -> TestDaemon {
         token_path: String::new(),
     };
 
+    let db_slot = Arc::new(OnceLock::new());
+    if let Some(db) = db {
+        db_slot
+            .set(Arc::new(Mutex::new(db)))
+            .expect("seed daemon db");
+    }
+
     let state = DaemonHttpState {
         token: token.clone(),
         sender,
         manifest,
         daemon_epoch: harness::workspace::utc_now(),
         replay_buffer: Arc::new(Mutex::new(ReplayBuffer::new(64))),
-        db: db.map(|d| Arc::new(Mutex::new(d))),
+        db: db_slot,
     };
 
     tokio::spawn(async move {
