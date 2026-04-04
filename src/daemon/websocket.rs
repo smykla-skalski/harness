@@ -109,7 +109,7 @@ pub async fn ws_upgrade_handler(
 async fn handle_connection(socket: WebSocket, state: DaemonHttpState) {
     let (mut sender, mut receiver) = socket.split();
     let connection = Arc::new(Mutex::new(ConnectionState::new()));
-    let (outbound_tx, mut outbound_rx) = mpsc::channel::<String>(256);
+    let (outbound_tx, mut outbound_rx) = mpsc::channel::<Message>(256);
     let broadcast_rx = state.sender.subscribe();
 
     let outbound_tx_relay = outbound_tx.clone();
@@ -132,23 +132,29 @@ async fn handle_connection(socket: WebSocket, state: DaemonHttpState) {
             tokio::select! {
                 message = receiver.next() => {
                     match message {
-                        Some(Ok(Message::Text(text))) => {
-                            last_client_message = Instant::now();
-                            let response = handle_message(
-                                &text,
+                        Some(Ok(message)) => {
+                            if incoming_message_counts_as_activity(&message) {
+                                last_client_message = Instant::now();
+                            }
+                            match handle_incoming_message(
+                                message,
                                 &state,
                                 &connection_dispatch,
-                            );
-                            if outbound_tx_dispatch.send(response).await.is_err() {
-                                break;
+                            ) {
+                                IncomingMessageAction::ContinueLoop => {}
+                                IncomingMessageAction::CloseConnection => break,
+                                IncomingMessageAction::Respond(frame) => {
+                                    if outbound_tx_dispatch.send(frame).await.is_err() {
+                                        break;
+                                    }
+                                }
                             }
                         }
-                        Some(Ok(Message::Close(_))) | None => break,
+                        None => break,
                         Some(Err(error)) => {
                             debug!(%error, "websocket receive error");
                             break;
                         }
-                        _ => {}
                     }
                 }
                 _ = idle_check.tick() => {
@@ -162,8 +168,8 @@ async fn handle_connection(socket: WebSocket, state: DaemonHttpState) {
     });
 
     let writer_task = tokio::spawn(async move {
-        while let Some(text) = outbound_rx.recv().await {
-            if sender.send(Message::text(text)).await.is_err() {
+        while let Some(message) = outbound_rx.recv().await {
+            if sender.send(message).await.is_err() {
                 break;
             }
         }
@@ -177,9 +183,37 @@ async fn handle_connection(socket: WebSocket, state: DaemonHttpState) {
     }
 }
 
+enum IncomingMessageAction {
+    ContinueLoop,
+    CloseConnection,
+    Respond(Message),
+}
+
+fn incoming_message_counts_as_activity(message: &Message) -> bool {
+    matches!(
+        message,
+        Message::Text(_) | Message::Binary(_) | Message::Ping(_) | Message::Pong(_)
+    )
+}
+
+fn handle_incoming_message(
+    message: Message,
+    state: &DaemonHttpState,
+    connection: &Arc<Mutex<ConnectionState>>,
+) -> IncomingMessageAction {
+    match message {
+        Message::Text(text) => {
+            IncomingMessageAction::Respond(Message::text(handle_message(&text, state, connection)))
+        }
+        Message::Ping(payload) => IncomingMessageAction::Respond(Message::Pong(payload)),
+        Message::Close(_) => IncomingMessageAction::CloseConnection,
+        Message::Binary(_) | Message::Pong(_) => IncomingMessageAction::ContinueLoop,
+    }
+}
+
 async fn relay_broadcast(
     mut broadcast_rx: broadcast::Receiver<StreamEvent>,
-    outbound_tx: mpsc::Sender<String>,
+    outbound_tx: mpsc::Sender<Message>,
     connection: Arc<Mutex<ConnectionState>>,
     replay_buffer: Arc<Mutex<ReplayBuffer>>,
 ) {
@@ -194,11 +228,11 @@ async fn next_relay_frame(
     broadcast_rx: &mut broadcast::Receiver<StreamEvent>,
     connection: &Arc<Mutex<ConnectionState>>,
     replay_buffer: &Arc<Mutex<ReplayBuffer>>,
-) -> Option<String> {
+) -> Option<Message> {
     loop {
         let event = recv_broadcast_event(broadcast_rx).await?;
         if let Some(text) = prepare_push_frame(&event, connection, replay_buffer) {
-            return Some(text);
+            return Some(Message::text(text));
         }
     }
 }
@@ -709,5 +743,50 @@ mod tests {
         let json = serde_json::to_string(&response).expect("serialize");
         assert!(json.contains(r#""code":"NOT_FOUND""#));
         assert!(!json.contains("result"));
+    }
+
+    #[test]
+    fn incoming_ping_frames_count_as_activity() {
+        assert!(incoming_message_counts_as_activity(&Message::Ping(
+            vec![1, 2, 3].into(),
+        )));
+        assert!(incoming_message_counts_as_activity(&Message::Pong(
+            vec![1, 2, 3].into(),
+        )));
+        assert!(!incoming_message_counts_as_activity(&Message::Close(None)));
+    }
+
+    #[test]
+    fn incoming_ping_frames_reply_with_matching_pong() {
+        let state = test_http_state();
+        let connection = Arc::new(Mutex::new(ConnectionState::new()));
+
+        let action =
+            handle_incoming_message(Message::Ping(vec![4, 5, 6].into()), &state, &connection);
+
+        match action {
+            IncomingMessageAction::Respond(Message::Pong(payload)) => {
+                assert_eq!(payload.as_ref(), [4, 5, 6]);
+            }
+            _ => panic!("expected pong response"),
+        }
+    }
+
+    fn test_http_state() -> DaemonHttpState {
+        let (sender, _) = broadcast::channel(8);
+        DaemonHttpState {
+            token: "token".into(),
+            sender,
+            manifest: super::super::state::DaemonManifest {
+                version: "18.2.3".into(),
+                pid: 1,
+                endpoint: "http://127.0.0.1:0".into(),
+                started_at: "2026-04-04T00:00:00Z".into(),
+                token_path: "/tmp/token".into(),
+            },
+            daemon_epoch: "epoch".into(),
+            replay_buffer: Arc::new(Mutex::new(ReplayBuffer::new(8))),
+            db: None,
+        }
     }
 }
