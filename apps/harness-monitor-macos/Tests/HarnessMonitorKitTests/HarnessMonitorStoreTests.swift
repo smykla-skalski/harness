@@ -204,8 +204,8 @@ struct HarnessMonitorStoreTests {
 
     #expect(store.connectionState == .online)
     #expect(store.health?.status == "ok")
-    #expect(store.daemonStatus?.diagnostics.cacheEntryCount == 2)
-    #expect(store.diagnostics?.workspace.cacheEntryCount == 2)
+    #expect(store.daemonStatus?.diagnostics.databaseSizeBytes == 1_740_800)
+    #expect(store.diagnostics?.workspace.databaseSizeBytes == 1_740_800)
   }
 
   @Test("Cached data status message reflects connection state")
@@ -230,7 +230,7 @@ struct HarnessMonitorStoreTests {
 
     await store.refreshDiagnostics()
 
-    #expect(store.diagnostics?.workspace.cacheEntryCount == 2)
+    #expect(store.diagnostics?.workspace.databaseSizeBytes == 1_740_800)
     #expect(store.diagnostics?.recentEvents.count == 1)
   }
 

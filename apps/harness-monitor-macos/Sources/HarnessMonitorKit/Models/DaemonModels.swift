@@ -42,8 +42,8 @@ public struct DaemonDiagnostics: Codable, Equatable, Sendable {
   public let authTokenPath: String
   public let authTokenPresent: Bool
   public let eventsPath: String
-  public let cacheRoot: String
-  public let cacheEntryCount: Int
+  public let databasePath: String
+  public let databaseSizeBytes: Int
   public let lastEvent: DaemonAuditEvent?
 
   public init(
@@ -52,8 +52,8 @@ public struct DaemonDiagnostics: Codable, Equatable, Sendable {
     authTokenPath: String,
     authTokenPresent: Bool,
     eventsPath: String,
-    cacheRoot: String,
-    cacheEntryCount: Int,
+    databasePath: String,
+    databaseSizeBytes: Int,
     lastEvent: DaemonAuditEvent?
   ) {
     self.daemonRoot = daemonRoot
@@ -61,8 +61,8 @@ public struct DaemonDiagnostics: Codable, Equatable, Sendable {
     self.authTokenPath = authTokenPath
     self.authTokenPresent = authTokenPresent
     self.eventsPath = eventsPath
-    self.cacheRoot = cacheRoot
-    self.cacheEntryCount = cacheEntryCount
+    self.databasePath = databasePath
+    self.databaseSizeBytes = databaseSizeBytes
     self.lastEvent = lastEvent
   }
 }
@@ -167,6 +167,7 @@ public struct DaemonStatusReport: Codable, Equatable, Sendable {
   public let manifest: DaemonManifest?
   public let launchAgent: LaunchAgentStatus
   public let projectCount: Int
+  public let worktreeCount: Int
   public let sessionCount: Int
   public let diagnostics: DaemonDiagnostics
 
@@ -174,14 +175,32 @@ public struct DaemonStatusReport: Codable, Equatable, Sendable {
     manifest: DaemonManifest?,
     launchAgent: LaunchAgentStatus,
     projectCount: Int,
+    worktreeCount: Int = 0,
     sessionCount: Int,
     diagnostics: DaemonDiagnostics
   ) {
     self.manifest = manifest
     self.launchAgent = launchAgent
     self.projectCount = projectCount
+    self.worktreeCount = worktreeCount
     self.sessionCount = sessionCount
     self.diagnostics = diagnostics
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case manifest, launchAgent, projectCount, worktreeCount, sessionCount, diagnostics
+  }
+
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    self.init(
+      manifest: try container.decodeIfPresent(DaemonManifest.self, forKey: .manifest),
+      launchAgent: try container.decode(LaunchAgentStatus.self, forKey: .launchAgent),
+      projectCount: try container.decode(Int.self, forKey: .projectCount),
+      worktreeCount: try container.decodeIfPresent(Int.self, forKey: .worktreeCount) ?? 0,
+      sessionCount: try container.decode(Int.self, forKey: .sessionCount),
+      diagnostics: try container.decode(DaemonDiagnostics.self, forKey: .diagnostics)
+    )
   }
 }
 
@@ -192,7 +211,46 @@ public struct HealthResponse: Codable, Equatable, Sendable {
   public let endpoint: String
   public let startedAt: String
   public let projectCount: Int
+  public let worktreeCount: Int
   public let sessionCount: Int
+
+  public init(
+    status: String,
+    version: String,
+    pid: Int,
+    endpoint: String,
+    startedAt: String,
+    projectCount: Int,
+    worktreeCount: Int = 0,
+    sessionCount: Int
+  ) {
+    self.status = status
+    self.version = version
+    self.pid = pid
+    self.endpoint = endpoint
+    self.startedAt = startedAt
+    self.projectCount = projectCount
+    self.worktreeCount = worktreeCount
+    self.sessionCount = sessionCount
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case status, version, pid, endpoint, startedAt, projectCount, worktreeCount, sessionCount
+  }
+
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    self.init(
+      status: try container.decode(String.self, forKey: .status),
+      version: try container.decode(String.self, forKey: .version),
+      pid: try container.decode(Int.self, forKey: .pid),
+      endpoint: try container.decode(String.self, forKey: .endpoint),
+      startedAt: try container.decode(String.self, forKey: .startedAt),
+      projectCount: try container.decode(Int.self, forKey: .projectCount),
+      worktreeCount: try container.decodeIfPresent(Int.self, forKey: .worktreeCount) ?? 0,
+      sessionCount: try container.decode(Int.self, forKey: .sessionCount)
+    )
+  }
 }
 
 public struct DaemonControlResponse: Codable, Equatable, Sendable {

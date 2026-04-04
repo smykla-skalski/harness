@@ -7,7 +7,7 @@ struct PreferencesDiagnosticsPaths {
   let manifestPath: String
   let authTokenPath: String
   let eventsPath: String
-  let cacheRoot: String
+  let databasePath: String
 }
 
 struct PreferencesPathsSection: View {
@@ -25,7 +25,7 @@ struct PreferencesPathsSection: View {
       pathRow("Manifest", value: paths.manifestPath)
       pathRow("Auth Token", value: paths.authTokenPath)
       pathRow("Events Log", value: paths.eventsPath)
-      pathRow("Cache Root", value: paths.cacheRoot)
+      pathRow("Database", value: paths.databasePath)
     }
   }
 
@@ -49,7 +49,7 @@ struct PreferencesPathsSection: View {
         manifestPath: "/Users/example/Library/Application Support/harness/daemon/manifest.json",
         authTokenPath: "/Users/example/Library/Application Support/harness/daemon/auth-token",
         eventsPath: "/Users/example/Library/Application Support/harness/daemon/events.jsonl",
-        cacheRoot: "/Users/example/Library/Application Support/harness/daemon/cache/projects"
+        databasePath: "/Users/example/Library/Application Support/harness/daemon/harness.db"
       )
     )
   }

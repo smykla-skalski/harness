@@ -37,8 +37,8 @@ pub struct DaemonDiagnostics {
     pub auth_token_path: String,
     pub auth_token_present: bool,
     pub events_path: String,
-    pub cache_root: String,
-    pub cache_entry_count: usize,
+    pub database_path: String,
+    pub database_size_bytes: u64,
     pub last_event: Option<DaemonAuditEvent>,
 }
 
@@ -63,21 +63,6 @@ pub fn events_path() -> PathBuf {
 }
 
 #[must_use]
-pub fn cache_root() -> PathBuf {
-    daemon_root().join("cache").join("projects")
-}
-
-#[must_use]
-pub fn project_cache_dir(project_id: &str) -> PathBuf {
-    cache_root().join(project_id)
-}
-
-#[must_use]
-pub fn session_cache_path(project_id: &str, session_id: &str) -> PathBuf {
-    project_cache_dir(project_id).join(format!("{session_id}.json"))
-}
-
-#[must_use]
 pub fn launch_agent_path() -> PathBuf {
     launch_agents_dir().join(CURRENT_LAUNCH_AGENT_PLIST)
 }
@@ -96,8 +81,8 @@ fn launch_agents_dir() -> PathBuf {
 /// # Errors
 /// Returns `CliError` on filesystem failures.
 pub fn ensure_daemon_dirs() -> Result<(), CliError> {
-    fs_err::create_dir_all(cache_root())
-        .map_err(|error| CliErrorKind::workflow_io(format!("create daemon cache root: {error}")))?;
+    fs_err::create_dir_all(daemon_root())
+        .map_err(|error| CliErrorKind::workflow_io(format!("create daemon root: {error}")))?;
     Ok(())
 }
 
@@ -210,72 +195,26 @@ pub fn read_recent_events(limit: usize) -> Result<Vec<DaemonAuditEvent>, CliErro
     Ok(events)
 }
 
-/// Write a cached session snapshot for faster UI bootstrap.
-///
-/// # Errors
-/// Returns `CliError` on filesystem failures.
-pub fn write_session_cache<T: Serialize>(
-    project_id: &str,
-    session_id: &str,
-    snapshot: &T,
-) -> Result<PathBuf, CliError> {
-    ensure_daemon_dirs()?;
-    let path = session_cache_path(project_id, session_id);
-    if let Some(parent) = path.parent() {
-        fs_err::create_dir_all(parent).map_err(|error| {
-            CliErrorKind::workflow_io(format!("create session cache dir: {error}"))
-        })?;
-    }
-    write_json_pretty(&path, snapshot)?;
-    Ok(path)
-}
-
 /// Build a derived diagnostics snapshot for the local daemon workspace.
 ///
 /// # Errors
 /// Returns `CliError` on filesystem or parse failures.
 pub fn diagnostics() -> Result<DaemonDiagnostics, CliError> {
+    let db_path = daemon_root().join("harness.db");
+    let db_size = db_path
+        .metadata()
+        .map(|m| m.len())
+        .unwrap_or(0);
     Ok(DaemonDiagnostics {
         daemon_root: daemon_root().display().to_string(),
         manifest_path: manifest_path().display().to_string(),
         auth_token_path: auth_token_path().display().to_string(),
         auth_token_present: auth_token_path().is_file(),
         events_path: events_path().display().to_string(),
-        cache_root: cache_root().display().to_string(),
-        cache_entry_count: cache_entry_count()?,
+        database_path: db_path.display().to_string(),
+        database_size_bytes: db_size,
         last_event: latest_event()?,
     })
-}
-
-fn cache_entry_count() -> Result<usize, CliError> {
-    if !cache_root().is_dir() {
-        return Ok(0);
-    }
-
-    let mut pending = vec![cache_root()];
-    let mut count = 0usize;
-    while let Some(path) = pending.pop() {
-        for entry in fs_err::read_dir(&path).map_err(|error| {
-            CliError::from(CliErrorKind::workflow_io(format!(
-                "read daemon cache directory {}: {error}",
-                path.display()
-            )))
-        })? {
-            let entry = entry.map_err(|error| {
-                CliError::from(CliErrorKind::workflow_io(format!(
-                    "read daemon cache entry {}: {error}",
-                    path.display()
-                )))
-            })?;
-            let entry_path = entry.path();
-            if entry.file_type().is_ok_and(|kind| kind.is_dir()) {
-                pending.push(entry_path);
-            } else if entry.file_type().is_ok_and(|kind| kind.is_file()) {
-                count += 1;
-            }
-        }
-    }
-    Ok(count)
 }
 
 fn latest_event() -> Result<Option<DaemonAuditEvent>, CliError> {
@@ -329,27 +268,7 @@ mod tests {
     }
 
     #[test]
-    fn write_session_cache_creates_project_path() {
-        let tmp = tempdir().expect("tempdir");
-        temp_env::with_vars(
-            [(
-                "XDG_DATA_HOME",
-                Some(tmp.path().to_str().expect("utf8 path")),
-            )],
-            || {
-                let path = write_session_cache(
-                    "project-abc",
-                    "sess-1",
-                    &serde_json::json!({"session_id":"sess-1"}),
-                )
-                .expect("cache");
-                assert!(path.is_file());
-            },
-        );
-    }
-
-    #[test]
-    fn diagnostics_include_latest_event_and_cache_count() {
+    fn diagnostics_include_latest_event_and_database_path() {
         let tmp = tempdir().expect("tempdir");
         temp_env::with_vars(
             [(
@@ -358,16 +277,11 @@ mod tests {
             )],
             || {
                 append_event("info", "daemon booted").expect("append event");
-                write_session_cache(
-                    "project-abc",
-                    "sess-1",
-                    &serde_json::json!({"session_id":"sess-1"}),
-                )
-                .expect("cache");
 
                 let diagnostics = diagnostics().expect("diagnostics");
                 assert!(diagnostics.auth_token_path.ends_with("auth-token"));
-                assert_eq!(diagnostics.cache_entry_count, 1);
+                assert!(diagnostics.database_path.ends_with("harness.db"));
+                assert_eq!(diagnostics.database_size_bytes, 0);
                 assert_eq!(
                     diagnostics.last_event.expect("latest event").message,
                     "daemon booted"

@@ -6,6 +6,10 @@ struct PreferencesGeneralSection: View {
   @Binding var themeMode: HarnessMonitorThemeMode
   @AppStorage(HarnessMonitorTextSize.storageKey)
   private var textSizeIndex = HarnessMonitorTextSize.defaultIndex
+  @AppStorage(HarnessMonitorDateTimeConfiguration.timeZoneModeKey)
+  private var timeZoneModeRawValue = HarnessMonitorDateTimeConfiguration.defaultTimeZoneModeRawValue
+  @AppStorage(HarnessMonitorDateTimeConfiguration.customTimeZoneIdentifierKey)
+  private var customTimeZoneIdentifier = HarnessMonitorDateTimeConfiguration.defaultCustomTimeZoneIdentifier
   @State private var isRemoveLaunchAgentConfirmationPresented = false
 
   private var effectiveHealth: HealthResponse? {
@@ -33,9 +37,10 @@ struct PreferencesGeneralSection: View {
     return caption.isEmpty ? fallback : caption
   }
 
-  private var cacheEntryCount: Int {
-    store.diagnostics?.workspace.cacheEntryCount
-      ?? store.daemonStatus?.diagnostics.cacheEntryCount ?? 0
+  private var databaseSize: String {
+    let bytes = store.diagnostics?.workspace.databaseSizeBytes
+      ?? store.daemonStatus?.diagnostics.databaseSizeBytes ?? 0
+    return ByteCountFormatter.string(fromByteCount: Int64(bytes), countStyle: .file)
   }
 
   private var sessionCount: Int {
@@ -50,6 +55,13 @@ struct PreferencesGeneralSection: View {
     store.isDaemonActionInFlight
       || store.isDiagnosticsRefreshInFlight
       || store.connectionState == .connecting
+  }
+
+  private var dateTimeConfiguration: HarnessMonitorDateTimeConfiguration {
+    HarnessMonitorDateTimeConfiguration(
+      timeZoneModeRawValue: timeZoneModeRawValue,
+      customTimeZoneIdentifier: customTimeZoneIdentifier
+    )
   }
 
   var body: some View {
@@ -75,15 +87,51 @@ struct PreferencesGeneralSection: View {
         Text("Applies to every Harness Monitor window on this Mac.")
       }
 
-      Section("Actions") {
+      Section {
+        Picker("Time zone", selection: $timeZoneModeRawValue) {
+          ForEach(HarnessMonitorDateTimeZoneMode.allCases) { mode in
+            Text(mode.label).tag(mode.rawValue)
+          }
+        }
+        .harnessNativeFormControl()
+        .accessibilityIdentifier(HarnessMonitorAccessibility.preferencesTimeZoneModePicker)
+
+        if dateTimeConfiguration.showsCustomTimeZoneField {
+          Picker("Custom zone", selection: $customTimeZoneIdentifier) {
+            ForEach(HarnessMonitorDateTimeConfiguration.knownTimeZoneIdentifiers, id: \.self) {
+              identifier in
+              Text(identifier).tag(identifier)
+            }
+          }
+            .harnessNativeFormControl()
+            .accessibilityIdentifier(HarnessMonitorAccessibility.preferencesCustomTimeZonePicker)
+        }
+
+        LabeledContent("Resolved Zone", value: dateTimeConfiguration.effectiveTimeZoneDisplayName)
+        LabeledContent(
+          "Preview",
+          value: formatTimestamp(
+            HarnessMonitorDateTimeConfiguration.previewTimestampValue,
+            configuration: dateTimeConfiguration
+          )
+        )
+      } header: {
+        Text("Date & Time")
+      } footer: {
+        Text("Every timestamp in Harness Monitor uses this timezone-aware display format.")
+      }
+
+      Section {
         PreferencesActionButtons(
           store: store,
           isLoading: isLoading,
           isRemoveLaunchAgentConfirmationPresented: $isRemoveLaunchAgentConfirmationPresented
         )
+      } header: {
+        Text("Actions")
       }
 
-      Section("Overview") {
+      Section {
         LabeledContent("Endpoint", value: endpoint)
           .textSelection(.enabled)
           .accessibilityIdentifier(HarnessMonitorAccessibility.preferencesMetricCard("Endpoint"))
@@ -99,14 +147,16 @@ struct PreferencesGeneralSection: View {
           }
         }
         .accessibilityIdentifier(HarnessMonitorAccessibility.preferencesMetricCard("Launchd"))
-        LabeledContent("Cached Sessions") {
-          Text("\(cacheEntryCount)")
+        LabeledContent("Database Size") {
+          Text(databaseSize)
         }
-        .accessibilityIdentifier(HarnessMonitorAccessibility.preferencesMetricCard("Cached Sessions"))
+        .accessibilityIdentifier(HarnessMonitorAccessibility.preferencesMetricCard("Database Size"))
         LabeledContent("Live Sessions") {
           Text("\(sessionCount)")
         }
         .accessibilityIdentifier(HarnessMonitorAccessibility.preferencesMetricCard("Live Sessions"))
+      } header: {
+        Text("Overview")
       }
 
       PreferencesStatusSection(

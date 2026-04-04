@@ -272,8 +272,8 @@ private extension HarnessMonitorPreviewStoreFactory {
         authTokenPath: "/Users/example/Library/Application Support/harness/daemon/auth-token",
         authTokenPresent: true,
         eventsPath: "/Users/example/Library/Application Support/harness/daemon/events.jsonl",
-        cacheRoot: "/Users/example/Library/Application Support/harness/daemon/cache/projects",
-        cacheEntryCount: hasSessions ? max(4, fixtures.sessions.count) : 0,
+        databasePath: "/Users/example/Library/Application Support/harness/daemon/harness.db",
+        databaseSizeBytes: hasSessions ? 1_740_800 : 0,
         lastEvent: hasSessions
           ? DaemonAuditEvent(
             recordedAt: "2026-03-28T14:18:00Z",
