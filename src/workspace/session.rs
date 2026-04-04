@@ -5,6 +5,7 @@ use sha2::{Digest, Sha256};
 
 use crate::errors::CliError;
 
+use super::canonical_checkout_root;
 use super::paths::{dirs_home, harness_data_root};
 
 /// XDG data root (`XDG_DATA_HOME` or `~/.local/share`).
@@ -57,9 +58,7 @@ fn hex_encode_prefix(bytes: &[u8], n: usize) -> String {
 }
 
 fn project_scope_key_for(project_dir: &Path) -> String {
-    let resolved = project_dir
-        .canonicalize()
-        .unwrap_or_else(|_| project_dir.to_path_buf());
+    let resolved = canonical_checkout_root(project_dir);
     let scope = format!("project:{}", resolved.display());
     format!("project-{}", scope_digest(&scope))
 }
@@ -124,9 +123,7 @@ pub fn project_context_dir(project_dir: &Path) -> PathBuf {
     if let Some(existing) = as_existing_context_root(project_dir) {
         return existing;
     }
-    let resolved = project_dir
-        .canonicalize()
-        .unwrap_or_else(|_| project_dir.to_path_buf());
+    let resolved = canonical_checkout_root(project_dir);
     let scope = resolved.to_string_lossy();
     let mut hasher = Sha256::new();
     hasher.update(scope.as_bytes());
