@@ -173,6 +173,17 @@ struct SidebarView: View {
               Label("Bookmark", systemImage: "bookmark")
             }
           }
+          Divider()
+          Button {
+            HarnessMonitorClipboard.copy(session.context)
+          } label: {
+            Label("Copy Title", systemImage: "doc.on.doc")
+          }
+          Button {
+            HarnessMonitorClipboard.copy(session.sessionId)
+          } label: {
+            Label("Copy Session ID", systemImage: "doc.on.doc")
+          }
         }
     } else {
       baseRow
