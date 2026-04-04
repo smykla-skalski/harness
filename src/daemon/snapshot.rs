@@ -17,7 +17,7 @@ use super::index::{self, DiscoveredProject, ResolvedSession};
 use super::protocol::{
     AgentToolActivitySummary, ObserverActiveWorker, ObserverAgentSessionSummary,
     ObserverCycleSummary, ObserverOpenIssue, ObserverSummary, ProjectSummary, SessionDetail,
-    SessionSummary, WorktreeSummary,
+    SessionExtensionsPayload, SessionSummary, WorktreeSummary,
 };
 /// Build summaries for all discovered projects.
 ///
@@ -179,6 +179,56 @@ fn build_session_detail(
         signals,
         observer: load_observer_summary(&resolved.project, &resolved.state)?,
         agent_activity,
+    })
+}
+
+/// Build a lightweight session detail with only in-memory fields.
+///
+/// Agents and tasks are taken directly from the resolved session state
+/// without any database queries or filesystem I/O. Signals, observer,
+/// and agent activity are left empty for deferred loading.
+#[must_use]
+pub fn build_session_detail_core(resolved: &ResolvedSession) -> SessionDetail {
+    let mut agents: Vec<_> = resolved.state.agents.values().cloned().collect();
+    agents.sort_by(|left, right| left.agent_id.cmp(&right.agent_id));
+
+    let mut tasks: Vec<_> = resolved.state.tasks.values().cloned().collect();
+    tasks.sort_by(|left, right| right.updated_at.cmp(&left.updated_at));
+
+    SessionDetail {
+        session: summary_from_resolved(resolved),
+        agents,
+        tasks,
+        signals: vec![],
+        observer: None,
+        agent_activity: vec![],
+    }
+}
+
+/// Build the expensive session detail extensions (signals, observer, activity).
+///
+/// # Errors
+/// Returns [`CliError`] on filesystem or database read failures.
+pub fn build_session_extensions(
+    resolved: &ResolvedSession,
+    db: Option<&super::db::DaemonDb>,
+) -> Result<SessionExtensionsPayload, CliError> {
+    let (signals, agent_activity) = if let Some(db) = db {
+        let signals = db.load_signals(&resolved.state.session_id)?;
+        let activity = db.load_agent_activity(&resolved.state.session_id)?;
+        (signals, activity)
+    } else {
+        let signals = load_signals_for(&resolved.project, &resolved.state)?;
+        let activity = load_agent_activity_for(&resolved.project, &resolved.state)?;
+        (signals, activity)
+    };
+    let observer = load_observer_summary(&resolved.project, &resolved.state)?;
+
+    Ok(SessionExtensionsPayload {
+        session_id: resolved.state.session_id.clone(),
+        signals: Some(signals),
+        observer,
+        agent_activity: Some(agent_activity),
     })
 }
 

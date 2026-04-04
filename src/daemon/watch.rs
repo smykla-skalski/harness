@@ -479,8 +479,14 @@ fn emit_watch_changes(
         service::broadcast_sessions_updated(sender, db_ref);
     }
 
+    for session_id in &changes.session_ids {
+        service::broadcast_session_updated_core(sender, session_id, db_ref);
+    }
+
+    // Extensions are computed after releasing the DB lock used for core
+    // broadcasts, reducing contention on the hot polling path.
     for session_id in changes.session_ids {
-        service::broadcast_session_updated(sender, &session_id, db_ref);
+        service::broadcast_session_extensions(sender, &session_id, db_ref);
     }
 }
 

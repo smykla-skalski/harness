@@ -43,6 +43,7 @@ struct SessionContentContainer: View {
           isSessionReadOnly: store.isSessionReadOnly,
           isSessionActionInFlight: store.isSessionActionInFlight,
           isSelectionLoading: store.isSelectionLoading,
+          isExtensionsLoading: store.isExtensionsLoading,
           lastAction: store.lastAction,
           observeSelectedSession: observeSelectedSession,
           requestEndSessionConfirmation: store.requestEndSelectedSessionConfirmation,

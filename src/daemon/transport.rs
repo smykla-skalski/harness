@@ -204,8 +204,8 @@ fn restart_daemon(binary: &Path) -> Result<DaemonControlResponse, CliError> {
 }
 
 #[expect(
-    clippy::cognitive_complexity,
-    reason = "tracing macro expansion; tokio-rs/tracing#553"
+    clippy::too_many_arguments,
+    reason = "dependency-injected test seams require one parameter per collaborator"
 )]
 fn restart_daemon_with<
     LoadManifest,

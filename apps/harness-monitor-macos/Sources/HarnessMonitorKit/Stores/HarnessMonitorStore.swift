@@ -96,6 +96,7 @@ public final class HarnessMonitorStore {
     public var inspectorSelection: InspectorSelection = .none
     public var actionActorID: String?
     public var isSelectionLoading = false
+    public var isExtensionsLoading = false
     public var isSessionActionInFlight = false
   }
 
@@ -143,6 +144,7 @@ public final class HarnessMonitorStore {
   var sessionLoadSequence: UInt64 = 0
   var sessionPushFallbackSequence: UInt64 = 0
   var pendingSessionPushFallback: (sessionID: String, token: UInt64)?
+  var pendingExtensions: SessionExtensionsPayload?
   var isNavigatingHistory = false
   private var hasBootstrapped = false
   private var lastActionDismissTask: Task<Void, Never>?

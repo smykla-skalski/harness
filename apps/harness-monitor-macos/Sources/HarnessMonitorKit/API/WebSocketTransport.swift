@@ -106,8 +106,13 @@ extension WebSocketTransport {
     return try decode(value)
   }
 
-  public func sessionDetail(id: String) async throws -> SessionDetail {
-    try await httpFallbackClient.sessionDetail(id: id)
+  public func sessionDetail(id: String, scope: String?) async throws -> SessionDetail {
+    if let scope {
+      let params: [String: JSONValue] = ["session_id": .string(id), "scope": .string(scope)]
+      let value = try await send(method: "session.detail", params: .object(params))
+      return try decode(value)
+    }
+    return try await httpFallbackClient.sessionDetail(id: id, scope: nil)
   }
 
   public func timeline(sessionID: String) async throws -> [TimelineEntry] {
