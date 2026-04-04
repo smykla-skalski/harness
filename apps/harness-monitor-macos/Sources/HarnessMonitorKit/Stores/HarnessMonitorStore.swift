@@ -255,6 +255,18 @@ public final class HarnessMonitorStore {
     await bootstrap()
   }
 
+  public func prepareForTermination() async {
+    clearLastAction()
+    stopAllStreams()
+
+    guard let client else {
+      return
+    }
+
+    self.client = nil
+    await client.shutdown()
+  }
+
   public func refreshDiagnostics() async {
     isDiagnosticsRefreshInFlight = true
     defer { isDiagnosticsRefreshInFlight = false }

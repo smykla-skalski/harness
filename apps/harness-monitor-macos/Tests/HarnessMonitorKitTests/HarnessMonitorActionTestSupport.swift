@@ -140,6 +140,7 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
   private var _globalStreamError: (any Error)?
   private var _sessionStreamEventsByID: [String: [DaemonPushEvent]] = [:]
   private var _sessionStreamErrorsByID: [String: any Error] = [:]
+  private var _shutdownCallCount = 0
   private var _healthCallCount = 0
   private var _transportLatencyCallCount = 0
   private var _diagnosticsCallCount = 0
@@ -315,6 +316,7 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
   func configuredGlobalStreamError() -> (any Error)? { lock.withLock { _globalStreamError } }
   func configuredSessionStreamEvents(for sessionID: String) -> [DaemonPushEvent] { lock.withLock { _sessionStreamEventsByID[sessionID] ?? [] } }
   func configuredSessionStreamError(for sessionID: String) -> (any Error)? { lock.withLock { _sessionStreamErrorsByID[sessionID] } }
+  func shutdownCallCount() -> Int { lock.withLock { _shutdownCallCount } }
 
   func recordReadCall(_ call: ReadCall) {
     lock.withLock {
@@ -355,6 +357,12 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
       case .timeline(let sessionID):
         _timelineCallCounts[sessionID, default: 0]
       }
+    }
+  }
+
+  func shutdown() async {
+    lock.withLock {
+      _shutdownCallCount += 1
     }
   }
 }

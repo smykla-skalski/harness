@@ -99,6 +99,28 @@ struct HarnessMonitorStoreLifecycleTests {
     #expect(store.selectedSessionID == nil)
   }
 
+  @Test("Prepare for termination cancels background work and shuts down the client")
+  func prepareForTerminationCancelsBackgroundWorkAndShutsDownClient() async {
+    let client = RecordingHarnessClient()
+    let store = await makeBootstrappedStore(client: client)
+    await store.selectSession(PreviewFixtures.summary.sessionId)
+    store.showLastAction("Refresh")
+
+    #expect(store.globalStreamTask != nil)
+    #expect(store.sessionStreamTask != nil)
+    #expect(store.connectionProbeTask != nil)
+    #expect(store.lastAction == "Refresh")
+
+    await store.prepareForTermination()
+
+    #expect(store.client == nil)
+    #expect(store.globalStreamTask == nil)
+    #expect(store.sessionStreamTask == nil)
+    #expect(store.connectionProbeTask == nil)
+    #expect(store.lastAction.isEmpty)
+    #expect(client.shutdownCallCount() == 1)
+  }
+
   @Test("Global session update refreshes a non-selected summary without a full refetch")
   func globalSessionUpdateRefreshesNonSelectedSummaryWithoutRefetch() async {
     let client = RecordingHarnessClient()

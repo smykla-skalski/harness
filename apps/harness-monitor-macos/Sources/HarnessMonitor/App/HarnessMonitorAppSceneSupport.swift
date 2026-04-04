@@ -3,6 +3,7 @@ import HarnessMonitorUI
 import SwiftUI
 
 struct HarnessMonitorWindowRootView: View {
+  let delegate: HarnessMonitorAppDelegate
   let store: HarnessMonitorStore
   @Binding var themeMode: HarnessMonitorThemeMode
 
@@ -11,6 +12,7 @@ struct HarnessMonitorWindowRootView: View {
       .frame(minWidth: 900, minHeight: 600)
       .modifier(HarnessMonitorSceneAppearanceModifier(themeMode: $themeMode))
       .task {
+        delegate.bind(store: store)
         await store.bootstrapIfNeeded()
       }
   }

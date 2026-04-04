@@ -53,6 +53,11 @@ public actor WebSocketTransport: HarnessMonitorClientProtocol {
     pending.failAll(error: WebSocketTransportError.connectionClosed)
     terminateAllStreams()
   }
+
+  public func shutdown() async {
+    disconnect()
+    session.invalidateAndCancel()
+  }
 }
 
 extension WebSocketTransport {
