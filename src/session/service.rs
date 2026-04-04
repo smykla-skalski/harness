@@ -796,7 +796,6 @@ pub fn resolve_session_project_dir(
 // ---------------------------------------------------------------------------
 
 /// Build the initial state for a new session (leader + metadata).
-#[expect(dead_code, reason = "used by daemon start_session handler and tests")]
 pub(crate) fn build_new_session(
     context: &str,
     session_id: &str,

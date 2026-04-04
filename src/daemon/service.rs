@@ -4,8 +4,10 @@ use std::process::id as process_id;
 use std::sync::{Arc, Mutex, OnceLock};
 use std::time::Duration;
 
+use crate::agents::service as agents_service;
 use crate::errors::{CliError, CliErrorKind};
-use crate::session::types::{SessionLogEntry, SessionTransition, TaskSource};
+use crate::hooks::adapters::HookAgent;
+use crate::session::types::{SessionLogEntry, SessionState, SessionTransition, TaskSource};
 use crate::session::{observe as session_observe, service as session_service};
 use crate::workspace::utc_now;
 use serde::{Deserialize, Serialize};
@@ -632,6 +634,141 @@ pub fn send_signal(
     session_detail(session_id, db)
 }
 
+/// Start a new session, writing directly to `SQLite` when a DB is available.
+///
+/// Falls back to file-based session creation when `db` is `None`.
+///
+/// # Errors
+/// Returns `CliError` when the runtime is unknown or DB operations fail.
+pub fn start_session_direct(
+    request: &super::protocol::SessionStartRequest,
+    db: Option<&super::db::DaemonDb>,
+) -> Result<SessionState, CliError> {
+    let runtime_name = &request.runtime;
+    let leader_runtime = resolve_hook_agent(runtime_name)
+    .ok_or_else(|| {
+        CliError::from(CliErrorKind::session_agent_conflict(format!(
+            "session start requires a known runtime, got '{runtime_name}'"
+        )))
+    })?;
+
+    let project_dir = Path::new(&request.project_dir);
+    let leader_agent_session_id =
+        agents_service::resolve_known_session_id(leader_runtime, project_dir, None)?;
+    let now = utc_now();
+    let session_id = request
+        .session_id
+        .clone()
+        .unwrap_or_else(|| format!("sess-{}", chrono::Utc::now().format("%Y%m%d%H%M%S%f")));
+
+    let state = session_service::build_new_session(
+        &request.context,
+        &session_id,
+        runtime_name,
+        leader_agent_session_id.as_deref(),
+        &now,
+    );
+
+    if let Some(db) = db {
+        let project_id = db.ensure_project_for_dir(&request.project_dir)?;
+        db.sync_session(&project_id, &state)?;
+        let leader_id = state.leader_id.as_deref().unwrap_or("");
+        db.append_log_entry(&build_log_entry(
+            &session_id,
+            session_service::log_session_started(&request.context),
+            Some(leader_id),
+            None,
+        ))?;
+        db.bump_change(&session_id)?;
+        db.bump_change("global")?;
+        return Ok(state);
+    }
+
+    // File-based fallback
+    session_service::start_session(
+        &request.context,
+        project_dir,
+        Some(runtime_name),
+        Some(&session_id),
+    )
+}
+
+/// Join an existing session, writing directly to `SQLite` when a DB is available.
+///
+/// # Errors
+/// Returns `CliError` when the session or runtime is unknown, or DB operations fail.
+pub fn join_session_direct(
+    session_id: &str,
+    request: &super::protocol::SessionJoinRequest,
+    db: Option<&super::db::DaemonDb>,
+) -> Result<SessionState, CliError> {
+    let display_name = request
+        .name
+        .clone()
+        .unwrap_or_else(|| format!("{} {:?}", request.runtime, request.role).to_lowercase());
+
+    let project_dir = Path::new(&request.project_dir);
+    let agent_session_id = resolve_hook_agent(&request.runtime)
+        .and_then(|rt| agents_service::resolve_known_session_id(rt, project_dir, None).ok())
+        .flatten();
+
+    if let Some(db) = db
+        && let Some(mut state) = db.load_session_state(session_id)?
+    {
+        let now = utc_now();
+        let agent_id = session_service::apply_join_session(
+            &mut state,
+            &display_name,
+            &request.runtime,
+            request.role,
+            &request.capabilities,
+            agent_session_id.as_deref(),
+            &now,
+        )?;
+        let project_id = db
+            .project_id_for_session(session_id)?
+            .ok_or_else(|| session_not_found(session_id))?;
+        db.sync_session(&project_id, &state)?;
+        db.append_log_entry(&build_log_entry(
+            session_id,
+            session_service::log_agent_joined(&agent_id, request.role, &request.runtime),
+            None,
+            None,
+        ))?;
+        db.bump_change(session_id)?;
+        db.bump_change("global")?;
+        return Ok(state);
+    }
+
+    // File-based fallback
+    session_service::join_session(
+        session_id,
+        request.role,
+        &request.runtime,
+        &request.capabilities,
+        request.name.as_deref(),
+        project_dir,
+    )
+}
+
+/// Record a signal acknowledgment, delegating to the session service.
+///
+/// # Errors
+/// Returns `CliError` on log read/write failures.
+pub fn record_signal_ack_direct(
+    session_id: &str,
+    request: &super::protocol::SignalAckRequest,
+) -> Result<(), CliError> {
+    let project_dir = Path::new(&request.project_dir);
+    session_service::record_signal_acknowledgment(
+        session_id,
+        &request.agent_id,
+        &request.signal_id,
+        request.result,
+        project_dir,
+    )
+}
+
 /// Start or refresh the daemon-owned session observation loop.
 ///
 /// # Errors
@@ -849,6 +986,17 @@ fn append_transfer_logs_to_db(
         ))?;
     }
     Ok(())
+}
+
+fn resolve_hook_agent(runtime_name: &str) -> Option<HookAgent> {
+    match runtime_name {
+        "claude" => Some(HookAgent::Claude),
+        "copilot" => Some(HookAgent::Copilot),
+        "codex" => Some(HookAgent::Codex),
+        "gemini" => Some(HookAgent::Gemini),
+        "opencode" => Some(HookAgent::OpenCode),
+        _ => None,
+    }
 }
 
 fn session_not_found(session_id: &str) -> CliError {
@@ -1403,6 +1551,95 @@ mod tests {
                 detail.tasks[0].source,
                 crate::session::types::TaskSource::Observe
             );
+        });
+    }
+
+    fn setup_db_with_project(project: &Path) -> crate::daemon::db::DaemonDb {
+        let db = crate::daemon::db::DaemonDb::open_in_memory().expect("open db");
+        let context_root = project_context_dir(project);
+        let project_record = index::DiscoveredProject {
+            project_id: format!("project-{}", hex_digest(project)),
+            name: "test".into(),
+            project_dir: Some(project.to_path_buf()),
+            repository_root: Some(project.to_path_buf()),
+            checkout_id: "checkout-test".into(),
+            checkout_name: "test".into(),
+            context_root,
+            is_worktree: false,
+            worktree_name: None,
+        };
+        db.sync_project(&project_record).expect("sync project");
+        db
+    }
+
+    #[test]
+    fn start_session_db_direct_creates_in_sqlite() {
+        with_temp_project(|project| {
+            use crate::daemon::protocol::SessionStartRequest;
+
+            let db = setup_db_with_project(project);
+
+            let state = start_session_direct(
+                &SessionStartRequest {
+                    context: "db-direct start".into(),
+                    runtime: "claude".into(),
+                    session_id: Some("daemon-start-1".into()),
+                    project_dir: project.to_string_lossy().into(),
+                },
+                Some(&db),
+            )
+            .expect("start session via db");
+
+            assert_eq!(state.context, "db-direct start");
+            assert!(state.leader_id.is_some());
+            assert_eq!(state.agents.len(), 1);
+
+            let db_state = db
+                .load_session_state("daemon-start-1")
+                .expect("load")
+                .expect("present");
+            assert_eq!(db_state.context, "db-direct start");
+        });
+    }
+
+    #[test]
+    fn join_session_db_direct_adds_agent() {
+        with_temp_project(|project| {
+            use crate::daemon::protocol::{SessionJoinRequest, SessionStartRequest};
+
+            let db = setup_db_with_project(project);
+
+            start_session_direct(
+                &SessionStartRequest {
+                    context: "join test".into(),
+                    runtime: "claude".into(),
+                    session_id: Some("daemon-join-1".into()),
+                    project_dir: project.to_string_lossy().into(),
+                },
+                Some(&db),
+            )
+            .expect("start session");
+
+            let joined = join_session_direct(
+                "daemon-join-1",
+                &SessionJoinRequest {
+                    runtime: "codex".into(),
+                    role: SessionRole::Worker,
+                    capabilities: vec![],
+                    name: None,
+                    project_dir: project.to_string_lossy().into(),
+                },
+                Some(&db),
+            )
+            .expect("join session via db");
+
+            assert_eq!(joined.agents.len(), 2);
+
+            let db_state = db
+                .load_session_state("daemon-join-1")
+                .expect("load")
+                .expect("present");
+            assert_eq!(db_state.agents.len(), 2);
         });
     }
 }
