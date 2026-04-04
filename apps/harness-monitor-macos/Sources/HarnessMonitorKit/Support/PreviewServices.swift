@@ -335,9 +335,9 @@ public actor PreviewDaemonController: DaemonControlling {
         path: Self.launchAgentPath,
         domainTarget: "gui/501",
         serviceTarget: "gui/501/io.harness.daemon",
-        state: isDaemonRunning ? "running" : nil,
-        pid: isDaemonRunning ? fixtures.health.pid : nil,
-        lastExitStatus: isDaemonRunning ? 0 : nil
+        state: isDaemonRunning && isLaunchAgentInstalled ? "running" : nil,
+        pid: isDaemonRunning && isLaunchAgentInstalled ? fixtures.health.pid : nil,
+        lastExitStatus: isDaemonRunning && isLaunchAgentInstalled ? 0 : nil
       ),
       projectCount: fixtures.projects.count,
       sessionCount: fixtures.sessions.count,

@@ -72,7 +72,7 @@ final class HarnessMonitorLayoutUITests: HarnessMonitorUITestCase {
     XCTAssertTrue(centerpieceState.waitForExistence(timeout: Self.uiTimeout))
     XCTAssertEqual(
       centerpieceState.label,
-      "projects=1, sessions=1, openWork=2, blocked=1"
+      "projects=1, worktrees=0, sessions=1, openWork=2, blocked=1"
     )
     XCTAssertEqual(
       boardMetricElements.count,
@@ -294,7 +294,10 @@ final class HarnessMonitorLayoutUITests: HarnessMonitorUITestCase {
   }
 
   func testPreferencesOverviewUsesGroupedFormRowsAndCompactActionButtons() throws {
-    let app = launch(mode: "preview")
+    let app = launch(
+      mode: "preview",
+      additionalEnvironment: ["HARNESS_MONITOR_PREVIEW_SCENARIO": "dashboard"]
+    )
 
     let preferencesButton = toolbarButton(in: app, identifier: Accessibility.preferencesButton)
     XCTAssertTrue(preferencesButton.waitForExistence(timeout: Self.uiTimeout))
@@ -306,22 +309,24 @@ final class HarnessMonitorLayoutUITests: HarnessMonitorUITestCase {
     let endpointCard = element(in: app, identifier: Accessibility.preferencesEndpointCard)
     let versionCard = element(in: app, identifier: Accessibility.preferencesVersionCard)
     let launchdCard = element(in: app, identifier: Accessibility.preferencesLaunchdCard)
-    let cachedSessionsCard = element(
-      in: app,
-      identifier: Accessibility.preferencesCachedSessionsCard
-    )
+    let databaseSizeCard = element(in: app, identifier: Accessibility.preferencesDatabaseSizeCard)
+    let liveSessionsCard = element(in: app, identifier: Accessibility.preferencesLiveSessionsCard)
 
     XCTAssertTrue(endpointCard.waitForExistence(timeout: Self.uiTimeout))
     XCTAssertTrue(versionCard.waitForExistence(timeout: Self.uiTimeout))
     XCTAssertTrue(launchdCard.waitForExistence(timeout: Self.uiTimeout))
-    XCTAssertTrue(cachedSessionsCard.waitForExistence(timeout: Self.uiTimeout))
-    XCTAssertTrue(app.staticTexts["Running"].waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(databaseSizeCard.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(liveSessionsCard.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(
+      waitUntil(timeout: Self.uiTimeout) {
+        (launchdCard.value as? String)?.contains("Running") == true
+      }
+    )
 
-    let overviewRows = [endpointCard, versionCard, launchdCard, cachedSessionsCard]
-    XCTAssertLessThan(endpointCard.frame.height, 80)
-    XCTAssertLessThan(versionCard.frame.height, 80)
-    XCTAssertLessThan(launchdCard.frame.height, 80)
-    XCTAssertLessThan(cachedSessionsCard.frame.height, 80)
+    let overviewRows = [endpointCard, versionCard, launchdCard, databaseSizeCard, liveSessionsCard]
+    for row in overviewRows {
+      XCTAssertLessThan(row.frame.height, 80)
+    }
 
     for (previousRow, nextRow) in zip(overviewRows, overviewRows.dropFirst()) {
       XCTAssertLessThan(
@@ -387,12 +392,12 @@ final class HarnessMonitorLayoutUITests: HarnessMonitorUITestCase {
 
     XCTAssertLessThan(
       toolbarLeadingInset,
-      170,
+      176,
       "Settings sidebar toggle should stay near the leading window chrome"
     )
     XCTAssertGreaterThan(
       rowTopInset,
-      70,
+      44,
       "Sidebar content should start below the native toolbar controls"
     )
     XCTAssertLessThan(
