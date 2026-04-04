@@ -12,7 +12,9 @@ use crate::agents::runtime::signal::{
     read_acknowledgments, read_pending_signals,
 };
 use crate::agents::service as agents_service;
+use crate::daemon::client::DaemonClient;
 use crate::daemon::index as daemon_index;
+use crate::daemon::protocol;
 use crate::errors::{CliError, CliErrorKind};
 use crate::hooks::adapters::HookAgent;
 use crate::workspace::utc_now;
@@ -57,12 +59,22 @@ pub fn start_session(
     runtime_name: Option<&str>,
     session_id: Option<&str>,
 ) -> Result<SessionState, CliError> {
-    let now = utc_now();
     let runtime_name = runtime_name.ok_or_else(|| {
         CliError::from(CliErrorKind::session_agent_conflict(
             "session start requires --runtime for leader session tracking".to_string(),
         ))
     })?;
+
+    if let Some(client) = DaemonClient::try_connect() {
+        return client.start_session(&protocol::SessionStartRequest {
+            context: context.to_string(),
+            runtime: runtime_name.to_string(),
+            session_id: session_id.map(ToString::to_string),
+            project_dir: project_dir.to_string_lossy().into_owned(),
+        });
+    }
+
+    let now = utc_now();
     let leader_runtime = resolve_registered_runtime(runtime_name).ok_or_else(|| {
         CliError::from(CliErrorKind::session_agent_conflict(format!(
             "session start requires a known runtime, got '{runtime_name}'"
@@ -111,6 +123,19 @@ pub fn join_session(
     name: Option<&str>,
     project_dir: &Path,
 ) -> Result<SessionState, CliError> {
+    if let Some(client) = DaemonClient::try_connect() {
+        return client.join_session(
+            session_id,
+            &protocol::SessionJoinRequest {
+                runtime: runtime_name.to_string(),
+                role,
+                capabilities: capabilities.to_vec(),
+                name: name.map(ToString::to_string),
+                project_dir: project_dir.to_string_lossy().into_owned(),
+            },
+        );
+    }
+
     let display_name = name.map_or_else(
         || format!("{runtime_name} {role:?}").to_lowercase(),
         ToString::to_string,
@@ -157,6 +182,16 @@ pub fn join_session(
 /// Returns `CliError` if the caller lacks permission, workers have active tasks,
 /// or on storage failures.
 pub fn end_session(session_id: &str, actor_id: &str, project_dir: &Path) -> Result<(), CliError> {
+    if let Some(client) = DaemonClient::try_connect() {
+        let _ = client.end_session(
+            session_id,
+            &protocol::SessionEndRequest {
+                actor: actor_id.to_string(),
+            },
+        )?;
+        return Ok(());
+    }
+
     let now = utc_now();
 
     storage::update_state(project_dir, session_id, |state| {
@@ -187,6 +222,19 @@ pub fn assign_role(
     actor_id: &str,
     project_dir: &Path,
 ) -> Result<(), CliError> {
+    if let Some(client) = DaemonClient::try_connect() {
+        let _ = client.assign_role(
+            session_id,
+            agent_id,
+            &protocol::RoleChangeRequest {
+                actor: actor_id.to_string(),
+                role,
+                reason: reason.map(ToString::to_string),
+            },
+        )?;
+        return Ok(());
+    }
+
     let now = utc_now();
     let mut from_role = SessionRole::Worker;
 
@@ -216,6 +264,17 @@ pub fn remove_agent(
     actor_id: &str,
     project_dir: &Path,
 ) -> Result<(), CliError> {
+    if let Some(client) = DaemonClient::try_connect() {
+        let _ = client.remove_agent(
+            session_id,
+            agent_id,
+            &protocol::AgentRemoveRequest {
+                actor: actor_id.to_string(),
+            },
+        )?;
+        return Ok(());
+    }
+
     let now = utc_now();
 
     storage::update_state(project_dir, session_id, |state| {
@@ -244,6 +303,18 @@ pub fn transfer_leader(
     actor_id: &str,
     project_dir: &Path,
 ) -> Result<(), CliError> {
+    if let Some(client) = DaemonClient::try_connect() {
+        let _ = client.transfer_leader(
+            session_id,
+            &protocol::LeaderTransferRequest {
+                actor: actor_id.to_string(),
+                new_leader_id: new_leader_id.to_string(),
+                reason: reason.map(ToString::to_string),
+            },
+        )?;
+        return Ok(());
+    }
+
     let now = utc_now();
     let mut transfer = None;
 
@@ -323,6 +394,22 @@ pub fn create_task_with_source(
     actor_id: &str,
     project_dir: &Path,
 ) -> Result<WorkItem, CliError> {
+    if let Some(client) = DaemonClient::try_connect() {
+        let detail = client.create_task(
+            session_id,
+            &protocol::TaskCreateRequest {
+                actor: actor_id.to_string(),
+                title: spec.title.to_string(),
+                context: spec.context.map(ToString::to_string),
+                severity: spec.severity,
+                suggested_fix: spec.suggested_fix.map(ToString::to_string),
+            },
+        )?;
+        return detail.tasks.into_iter().last().ok_or_else(|| {
+            CliErrorKind::workflow_io("daemon created task but returned empty task list").into()
+        });
+    }
+
     let now = utc_now();
     let mut created_item = None;
 
@@ -358,6 +445,18 @@ pub fn assign_task(
     actor_id: &str,
     project_dir: &Path,
 ) -> Result<(), CliError> {
+    if let Some(client) = DaemonClient::try_connect() {
+        let _ = client.assign_task(
+            session_id,
+            task_id,
+            &protocol::TaskAssignRequest {
+                actor: actor_id.to_string(),
+                agent_id: agent_id.to_string(),
+            },
+        )?;
+        return Ok(());
+    }
+
     let now = utc_now();
 
     storage::update_state(project_dir, session_id, |state| {
@@ -406,6 +505,19 @@ pub fn update_task(
     actor_id: &str,
     project_dir: &Path,
 ) -> Result<(), CliError> {
+    if let Some(client) = DaemonClient::try_connect() {
+        let _ = client.update_task(
+            session_id,
+            task_id,
+            &protocol::TaskUpdateRequest {
+                actor: actor_id.to_string(),
+                status,
+                note: note.map(ToString::to_string),
+            },
+        )?;
+        return Ok(());
+    }
+
     let now = utc_now();
     let mut from_status = TaskStatus::Open;
 
@@ -438,6 +550,26 @@ pub fn record_task_checkpoint(
     project_dir: &Path,
 ) -> Result<TaskCheckpoint, CliError> {
     ensure_valid_progress(progress)?;
+
+    if let Some(client) = DaemonClient::try_connect() {
+        let _ = client.checkpoint_task(
+            session_id,
+            task_id,
+            &protocol::TaskCheckpointRequest {
+                actor: actor_id.to_string(),
+                summary: summary.to_string(),
+                progress,
+            },
+        )?;
+        return Ok(TaskCheckpoint {
+            checkpoint_id: generate_checkpoint_id(task_id),
+            task_id: task_id.to_string(),
+            recorded_at: utc_now(),
+            actor_id: Some(actor_id.to_string()),
+            summary: summary.to_string(),
+            progress,
+        });
+    }
 
     let now = utc_now();
     let mut checkpoint = None;
@@ -633,6 +765,18 @@ pub fn record_signal_acknowledgment(
     result: AckResult,
     project_dir: &Path,
 ) -> Result<(), CliError> {
+    if let Some(client) = DaemonClient::try_connect() {
+        return client.record_signal_ack(
+            session_id,
+            &protocol::SignalAckRequest {
+                agent_id: agent_id.to_string(),
+                signal_id: signal_id.to_string(),
+                result,
+                project_dir: project_dir.to_string_lossy().into_owned(),
+            },
+        );
+    }
+
     let already_logged = storage::load_log_entries(project_dir, session_id)?
         .into_iter()
         .any(|entry| {
@@ -856,10 +1000,10 @@ pub(crate) fn apply_end_session(
         )
     });
     if active_tasks {
-        return Err(
-            CliErrorKind::session_agent_conflict("cannot end session with in-progress tasks")
-                .into(),
-        );
+        return Err(CliErrorKind::session_agent_conflict(
+            "cannot end session with in-progress tasks",
+        )
+        .into());
     }
 
     touch_agent(state, actor_id, now);
@@ -1285,11 +1429,7 @@ pub(crate) fn log_checkpoint_recorded(
     }
 }
 
-pub(crate) fn log_signal_sent(
-    signal_id: &str,
-    agent_id: &str,
-    command: &str,
-) -> SessionTransition {
+pub(crate) fn log_signal_sent(signal_id: &str, agent_id: &str, command: &str) -> SessionTransition {
     SessionTransition::SignalSent {
         signal_id: signal_id.to_string(),
         agent_id: agent_id.to_string(),
