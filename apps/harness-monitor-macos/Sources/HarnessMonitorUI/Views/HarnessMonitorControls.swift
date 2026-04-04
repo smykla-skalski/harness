@@ -49,12 +49,50 @@ private struct HarnessMonitorAccessoryButtonStyle: ViewModifier {
   }
 }
 
-private struct HarnessMonitorTextActionButtonStyle: ViewModifier {
-  let tint: Color
+private struct HarnessMonitorFlatActionButtonStyle: ButtonStyle {
+  @ScaledMetric(relativeTo: .caption) private var cornerRadius = 9.0
+  @ScaledMetric(relativeTo: .caption) private var horizontalPadding = 10.0
+  @ScaledMetric(relativeTo: .caption) private var verticalPadding = 4.0
 
-  func body(content: Content) -> some View {
-    content
-      .modifier(HarnessMonitorSystemButtonChromeModifier(style: .borderless, tint: tint))
+  let tint: Color
+  @Environment(\.isEnabled)
+  private var isEnabled
+  @Environment(\.colorSchemeContrast)
+  private var colorSchemeContrast
+
+  private var lineWidth: CGFloat {
+    colorSchemeContrast == .increased ? 1.25 : 1
+  }
+
+  func makeBody(configuration: Configuration) -> some View {
+    let shape = RoundedRectangle(
+      cornerRadius: cornerRadius,
+      style: .continuous
+    )
+    let fillOpacity: Double
+    let strokeOpacity: Double
+
+    if isEnabled {
+      fillOpacity = configuration.isPressed ? 0.34 : 0.26
+      strokeOpacity = configuration.isPressed ? 0.68 : 0.5
+    } else {
+      fillOpacity = 0.14
+      strokeOpacity = 0.24
+    }
+
+    return configuration.label
+      .foregroundStyle(HarnessMonitorTheme.ink.opacity(isEnabled ? 0.98 : 0.55))
+      .padding(.horizontal, horizontalPadding)
+      .padding(.vertical, verticalPadding)
+      .background {
+        shape.fill(tint.opacity(fillOpacity))
+      }
+      .overlay {
+        shape.strokeBorder(tint.opacity(strokeOpacity), lineWidth: lineWidth)
+      }
+      .contentShape(shape)
+      .scaleEffect(configuration.isPressed ? 0.98 : 1)
+      .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
   }
 }
 
@@ -170,10 +208,10 @@ extension View {
     modifier(HarnessMonitorAccessoryButtonStyle(tint: tint))
   }
 
-  func harnessTextActionButtonStyle(
-    tint: Color = HarnessMonitorTheme.secondaryInk
+  func harnessFlatActionButtonStyle(
+    tint: Color = HarnessMonitorTheme.controlBorder
   ) -> some View {
-    modifier(HarnessMonitorTextActionButtonStyle(tint: tint))
+    buttonStyle(HarnessMonitorFlatActionButtonStyle(tint: tint))
   }
 
   func harnessFilterChipButtonStyle(isSelected: Bool) -> some View {
