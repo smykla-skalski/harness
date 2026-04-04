@@ -568,4 +568,54 @@ public struct SessionDetail: Codable, Equatable, Sendable {
   public let signals: [SessionSignalRecord]
   public let observer: ObserverSummary?
   public let agentActivity: [AgentToolActivitySummary]
+
+  public init(
+    session: SessionSummary,
+    agents: [AgentRegistration],
+    tasks: [WorkItem],
+    signals: [SessionSignalRecord],
+    observer: ObserverSummary?,
+    agentActivity: [AgentToolActivitySummary]
+  ) {
+    self.session = session
+    self.agents = agents
+    self.tasks = tasks
+    self.signals = signals
+    self.observer = observer
+    self.agentActivity = agentActivity
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case session, agents, tasks, signals, observer, agentActivity
+  }
+
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    session = try container.decode(SessionSummary.self, forKey: .session)
+    agents = try container.decode([AgentRegistration].self, forKey: .agents)
+    tasks = try container.decode([WorkItem].self, forKey: .tasks)
+    signals = try container.decodeIfPresent([SessionSignalRecord].self, forKey: .signals) ?? []
+    observer = try container.decodeIfPresent(ObserverSummary.self, forKey: .observer)
+    agentActivity = try container.decodeIfPresent(
+      [AgentToolActivitySummary].self, forKey: .agentActivity
+    ) ?? []
+  }
+
+  public func merging(extensions: SessionExtensionsPayload) -> SessionDetail {
+    SessionDetail(
+      session: session,
+      agents: agents,
+      tasks: tasks,
+      signals: extensions.signals ?? signals,
+      observer: extensions.observer ?? observer,
+      agentActivity: extensions.agentActivity ?? agentActivity
+    )
+  }
+}
+
+public struct SessionExtensionsPayload: Codable, Equatable, Sendable {
+  public let sessionId: String
+  public let signals: [SessionSignalRecord]?
+  public let observer: ObserverSummary?
+  public let agentActivity: [AgentToolActivitySummary]?
 }

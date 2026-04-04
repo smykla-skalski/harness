@@ -7,6 +7,7 @@ struct SessionCockpitView: View {
   let isSessionReadOnly: Bool
   let isSessionActionInFlight: Bool
   let isSelectionLoading: Bool
+  let isExtensionsLoading: Bool
   let lastAction: String
   let observeSelectedSession: () -> Void
   let requestEndSessionConfirmation: () -> Void
@@ -23,6 +24,7 @@ struct SessionCockpitView: View {
           isSessionReadOnly: isSessionReadOnly,
           isSessionActionInFlight: isSessionActionInFlight,
           isSelectionLoading: isSelectionLoading,
+          isExtensionsLoading: isExtensionsLoading,
           observeSelectedSession: observeSelectedSession,
           requestEndSessionConfirmation: requestEndSessionConfirmation,
           inspectObserver: inspectObserver
@@ -44,7 +46,11 @@ struct SessionCockpitView: View {
           )
           SessionAgentListSection(agents: detail.agents, inspectAgent: inspectAgent)
         }
-        SessionCockpitSignalsSection(signals: detail.signals, inspectSignal: inspectSignal)
+        SessionCockpitSignalsSection(
+          signals: detail.signals,
+          isExtensionsLoading: isExtensionsLoading,
+          inspectSignal: inspectSignal
+        )
         SessionCockpitTimelineSection(timeline: timeline)
       }
       .frame(maxWidth: .infinity, alignment: .leading)
@@ -60,6 +66,7 @@ struct SessionCockpitView: View {
     isSessionReadOnly: false,
     isSessionActionInFlight: false,
     isSelectionLoading: false,
+    isExtensionsLoading: false,
     lastAction: "Observe action queued",
     observeSelectedSession: {},
     requestEndSessionConfirmation: {},

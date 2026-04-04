@@ -6,6 +6,7 @@ struct SessionCockpitHeaderCard: View {
   let isSessionReadOnly: Bool
   let isSessionActionInFlight: Bool
   let isSelectionLoading: Bool
+  let isExtensionsLoading: Bool
   let observeSelectedSession: () -> Void
   let requestEndSessionConfirmation: () -> Void
   let inspectObserver: () -> Void
@@ -61,6 +62,9 @@ struct SessionCockpitHeaderCard: View {
 
       if let observer = detail.observer {
         observerSummary(observer)
+          .transition(.opacity)
+      } else if isExtensionsLoading && detail.session.observeId != nil {
+        HarnessMonitorLoadingStateView(title: "Loading observer")
           .transition(.opacity)
       }
 
@@ -205,6 +209,7 @@ private func sessionHeaderMetadata(_ session: SessionSummary) -> String {
     isSessionReadOnly: false,
     isSessionActionInFlight: false,
     isSelectionLoading: false,
+    isExtensionsLoading: false,
     observeSelectedSession: {},
     requestEndSessionConfirmation: {},
     inspectObserver: {}

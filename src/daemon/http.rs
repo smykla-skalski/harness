@@ -3,7 +3,7 @@ use std::sync::{Arc, Mutex, OnceLock};
 use std::time::Instant;
 
 use async_stream::stream;
-use axum::extract::{Path, State};
+use axum::extract::{Path, Query, State};
 use axum::http::{HeaderMap, StatusCode, header::AUTHORIZATION};
 use axum::response::sse::{Event, KeepAlive, Sse};
 use axum::response::{IntoResponse, Response};
@@ -188,8 +188,15 @@ async fn get_sessions(headers: HeaderMap, State(state): State<DaemonHttpState>) 
     )
 }
 
+#[derive(Debug, serde::Deserialize)]
+struct SessionDetailQuery {
+    #[serde(default)]
+    scope: Option<String>,
+}
+
 async fn get_session(
     Path(session_id): Path<String>,
+    query: Query<SessionDetailQuery>,
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
 ) -> Response {
@@ -199,12 +206,22 @@ async fn get_session(
         return *response;
     }
     let db_guard = state.db.get().map(|db| db.lock().expect("db lock"));
+    let db_ref = db_guard.as_deref();
+    if query.scope.as_deref() == Some("core") {
+        return timed_json(
+            "GET",
+            "/v1/sessions/{id}?scope=core",
+            &request_id,
+            start,
+            service::session_detail_core(&session_id, db_ref),
+        );
+    }
     timed_json(
         "GET",
         "/v1/sessions/{id}",
         &request_id,
         start,
-        service::session_detail(&session_id, db_guard.as_deref()),
+        service::session_detail(&session_id, db_ref),
     )
 }
 

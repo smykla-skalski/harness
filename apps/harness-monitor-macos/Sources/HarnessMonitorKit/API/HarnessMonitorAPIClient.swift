@@ -8,7 +8,7 @@ public protocol HarnessMonitorClientProtocol: Sendable {
   func stopDaemon() async throws -> DaemonControlResponse
   func projects() async throws -> [ProjectSummary]
   func sessions() async throws -> [SessionSummary]
-  func sessionDetail(id: String) async throws -> SessionDetail
+  func sessionDetail(id: String, scope: String?) async throws -> SessionDetail
   func timeline(sessionID: String) async throws -> [TimelineEntry]
   func globalStream() async -> AsyncThrowingStream<DaemonPushEvent, Error>
   func sessionStream(sessionID: String) async -> AsyncThrowingStream<DaemonPushEvent, Error>
@@ -62,6 +62,10 @@ public extension HarnessMonitorClientProtocol {
   }
 
   func shutdown() async {}
+
+  func sessionDetail(id: String) async throws -> SessionDetail {
+    try await sessionDetail(id: id, scope: nil)
+  }
 }
 
 public struct HarnessMonitorConnection: Equatable, Sendable {
@@ -141,8 +145,11 @@ public final class HarnessMonitorAPIClient: HarnessMonitorClientProtocol {
     try await get("/v1/sessions")
   }
 
-  public func sessionDetail(id: String) async throws -> SessionDetail {
-    try await get("/v1/sessions/\(id)")
+  public func sessionDetail(id: String, scope: String?) async throws -> SessionDetail {
+    if let scope {
+      return try await get("/v1/sessions/\(id)?scope=\(scope)")
+    }
+    return try await get("/v1/sessions/\(id)")
   }
 
   public func timeline(sessionID: String) async throws -> [TimelineEntry] {

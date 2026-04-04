@@ -1,7 +1,5 @@
 use std::collections::{HashSet, VecDeque};
-#[cfg(test)]
-use std::sync::OnceLock;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, OnceLock};
 use std::time::Duration;
 
 use axum::extract::State;
@@ -451,7 +449,16 @@ fn dispatch_read_query(request: &WsRequest, state: &DaemonHttpState) -> WsRespon
         "sessions" => dispatch_query(&request.id, || service::list_sessions(true, db_ref)),
         "session.detail" => match extract_session_id(&request.params) {
             Some(session_id) => {
-                dispatch_query(&request.id, || service::session_detail(&session_id, db_ref))
+                let scope = extract_string_param(&request.params, "scope");
+                if scope.as_deref() == Some("core") {
+                    let response = dispatch_query(&request.id, || {
+                        service::session_detail_core(&session_id, db_ref)
+                    });
+                    schedule_extensions_push(&state.sender, &state.db, &session_id);
+                    response
+                } else {
+                    dispatch_query(&request.id, || service::session_detail(&session_id, db_ref))
+                }
             }
             None => error_response(&request.id, "MISSING_PARAM", "missing session_id"),
         },
@@ -463,6 +470,33 @@ fn dispatch_read_query(request: &WsRequest, state: &DaemonHttpState) -> WsRespon
         },
         _ => error_response(&request.id, "UNKNOWN_METHOD", "unexpected read method"),
     }
+}
+
+/// Schedule an asynchronous push of session extensions through the broadcast channel.
+///
+/// The extensions (signals, observer, agent activity) are computed on a blocking
+/// thread pool task, acquiring the DB lock independently from the request path.
+fn schedule_extensions_push(
+    sender: &broadcast::Sender<super::protocol::StreamEvent>,
+    db: &Arc<OnceLock<Arc<Mutex<super::db::DaemonDb>>>>,
+    session_id: &str,
+) {
+    use tokio::task::{spawn, spawn_blocking};
+
+    let sender = sender.clone();
+    let db = db.clone();
+    let session_id = session_id.to_string();
+    spawn(async move {
+        let result = spawn_blocking(move || {
+            let db_guard = db.get().map(|db| db.lock().expect("db lock"));
+            let db_ref = db_guard.as_deref();
+            service::session_extensions_event(&session_id, db_ref)
+        })
+        .await;
+        if let Ok(Ok(event)) = result {
+            let _ = sender.send(event);
+        }
+    });
 }
 
 fn handle_session_subscribe(

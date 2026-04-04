@@ -37,6 +37,11 @@ extension HarnessMonitorStore {
     set { selection.isSelectionLoading = newValue }
   }
 
+  public var isExtensionsLoading: Bool {
+    get { selection.isExtensionsLoading }
+    set { selection.isExtensionsLoading = newValue }
+  }
+
   public var isSessionActionInFlight: Bool {
     get { selection.isSessionActionInFlight }
     set { selection.isSessionActionInFlight = newValue }
@@ -103,6 +108,8 @@ extension HarnessMonitorStore {
     selectedSessionID = sessionID
     inspectorSelection = .none
     lastError = nil
+    isExtensionsLoading = false
+    pendingExtensions = nil
 
     guard let sessionID else {
       activeSessionLoadRequest = 0

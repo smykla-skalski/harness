@@ -23,9 +23,9 @@ use super::launchd::{self, LaunchAgentStatus};
 use super::protocol::{
     AgentRemoveRequest, DaemonControlResponse, DaemonDiagnosticsReport, HealthResponse,
     LeaderTransferRequest, ObserveSessionRequest, ProjectSummary, ReadyEventPayload,
-    RoleChangeRequest, SessionDetail, SessionEndRequest, SessionSummary, SessionUpdatedPayload,
-    SessionsUpdatedPayload, SignalSendRequest, StreamEvent, TaskAssignRequest,
-    TaskCheckpointRequest, TaskCreateRequest, TaskUpdateRequest, TimelineEntry,
+    RoleChangeRequest, SessionDetail, SessionEndRequest, SessionExtensionsPayload, SessionSummary,
+    SessionUpdatedPayload, SessionsUpdatedPayload, SignalSendRequest, StreamEvent,
+    TaskAssignRequest, TaskCheckpointRequest, TaskCreateRequest, TaskUpdateRequest, TimelineEntry,
 };
 use super::snapshot;
 use super::state::{self, DaemonDiagnostics, DaemonManifest};
@@ -413,6 +413,43 @@ pub fn session_timeline(
         return timeline::session_timeline_from_resolved_with_db(&resolved, db);
     }
     timeline::session_timeline(session_id)
+}
+
+/// Load a lightweight session detail with only in-memory fields.
+///
+/// Returns agents and tasks from the resolved session state without any
+/// database queries or filesystem I/O for signals, observer, or activity.
+///
+/// # Errors
+/// Returns [`CliError`] when the session cannot be resolved.
+pub fn session_detail_core(
+    session_id: &str,
+    db: Option<&super::db::DaemonDb>,
+) -> Result<SessionDetail, CliError> {
+    if let Some(db) = db
+        && let Some(resolved) = db.resolve_session(session_id)?
+    {
+        return Ok(snapshot::build_session_detail_core(&resolved));
+    }
+    let resolved = index::resolve_session(session_id)?;
+    Ok(snapshot::build_session_detail_core(&resolved))
+}
+
+/// Load the expensive session detail extensions (signals, observer, activity).
+///
+/// # Errors
+/// Returns [`CliError`] when the session cannot be resolved or extension loading fails.
+pub fn session_extensions(
+    session_id: &str,
+    db: Option<&super::db::DaemonDb>,
+) -> Result<SessionExtensionsPayload, CliError> {
+    if let Some(db) = db
+        && let Some(resolved) = db.resolve_session(session_id)?
+    {
+        return snapshot::build_session_extensions(&resolved, Some(db));
+    }
+    let resolved = index::resolve_session(session_id)?;
+    snapshot::build_session_extensions(&resolved, None)
 }
 
 /// Create a task through the shared session service.
@@ -1064,8 +1101,40 @@ pub fn session_updated_event(
     let payload = SessionUpdatedPayload {
         detail: session_detail(session_id, db)?,
         timeline: None,
+        extensions_pending: false,
     };
     stream_event("session_updated", Some(session_id), payload)
+}
+
+/// Build a lightweight `session_updated` stream event using core-only detail.
+///
+/// Signals, observer, and agent activity are omitted. The `extensions_pending`
+/// flag tells the client that a follow-up `session_extensions` event will arrive.
+///
+/// # Errors
+/// Returns `CliError` when the session cannot be resolved or serialized.
+pub fn session_updated_core_event(
+    session_id: &str,
+    db: Option<&super::db::DaemonDb>,
+) -> Result<StreamEvent, CliError> {
+    let payload = SessionUpdatedPayload {
+        detail: session_detail_core(session_id, db)?,
+        timeline: None,
+        extensions_pending: true,
+    };
+    stream_event("session_updated", Some(session_id), payload)
+}
+
+/// Build a `session_extensions` stream event with the expensive detail fields.
+///
+/// # Errors
+/// Returns `CliError` when the session cannot be resolved or extensions fail to load.
+pub fn session_extensions_event(
+    session_id: &str,
+    db: Option<&super::db::DaemonDb>,
+) -> Result<StreamEvent, CliError> {
+    let payload = session_extensions(session_id, db)?;
+    stream_event("session_extensions", Some(session_id), payload)
 }
 
 pub fn broadcast_sessions_updated(
@@ -1088,13 +1157,45 @@ pub fn broadcast_session_updated(
     );
 }
 
+/// Broadcast a lightweight session update with core-only detail.
+///
+/// The `extensions_pending` flag tells clients that a follow-up
+/// `session_extensions` event will arrive with signals, observer, and activity.
+pub fn broadcast_session_updated_core(
+    sender: &broadcast::Sender<StreamEvent>,
+    session_id: &str,
+    db: Option<&super::db::DaemonDb>,
+) {
+    broadcast_event(
+        sender,
+        session_updated_core_event(session_id, db),
+        "session_updated",
+        Some(session_id),
+    );
+}
+
+/// Broadcast the expensive session detail extensions.
+pub fn broadcast_session_extensions(
+    sender: &broadcast::Sender<StreamEvent>,
+    session_id: &str,
+    db: Option<&super::db::DaemonDb>,
+) {
+    broadcast_event(
+        sender,
+        session_extensions_event(session_id, db),
+        "session_extensions",
+        Some(session_id),
+    );
+}
+
 pub fn broadcast_session_snapshot(
     sender: &broadcast::Sender<StreamEvent>,
     session_id: &str,
     db: Option<&super::db::DaemonDb>,
 ) {
     broadcast_sessions_updated(sender, db);
-    broadcast_session_updated(sender, session_id, db);
+    broadcast_session_updated_core(sender, session_id, db);
+    broadcast_session_extensions(sender, session_id, db);
 }
 
 fn stream_event<T: Serialize>(

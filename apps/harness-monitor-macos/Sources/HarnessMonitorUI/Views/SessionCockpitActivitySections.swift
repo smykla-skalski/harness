@@ -3,6 +3,7 @@ import SwiftUI
 
 struct SessionCockpitSignalsSection: View {
   let signals: [SessionSignalRecord]
+  let isExtensionsLoading: Bool
   let inspectSignal: (String) -> Void
   @Environment(\.harnessDateTimeConfiguration)
   private var dateTimeConfiguration
@@ -12,7 +13,11 @@ struct SessionCockpitSignalsSection: View {
       Text("Signals")
         .scaledFont(.system(.title3, design: .rounded, weight: .semibold))
         .accessibilityAddTraits(.isHeader)
-      if signals.isEmpty {
+      if signals.isEmpty && isExtensionsLoading {
+        HarnessMonitorLoadingStateView(title: "Loading signals")
+          .frame(maxWidth: .infinity)
+          .transition(.opacity)
+      } else if signals.isEmpty {
         ContentUnavailableView {
           Label("No signals", systemImage: "antenna.radiowaves.left.and.right")
         } description: {
@@ -75,7 +80,7 @@ struct SessionCockpitSignalsSection: View {
 }
 
 #Preview("Signals") {
-  SessionCockpitSignalsSection(signals: PreviewFixtures.signals, inspectSignal: { _ in })
+  SessionCockpitSignalsSection(signals: PreviewFixtures.signals, isExtensionsLoading: false, inspectSignal: { _ in })
     .padding()
     .frame(width: 960)
 }
