@@ -40,7 +40,9 @@ impl Execute for DaemonCommand {
                 Ok(0)
             }
             Self::Doctor => {
-                let report = service::diagnostics_report(None)?;
+                let db_path = super::state::daemon_root().join("harness.db");
+                let db = super::db::DaemonDb::open(&db_path).ok();
+                let report = service::diagnostics_report(db.as_ref())?;
                 print_json(&report)?;
                 Ok(0)
             }
