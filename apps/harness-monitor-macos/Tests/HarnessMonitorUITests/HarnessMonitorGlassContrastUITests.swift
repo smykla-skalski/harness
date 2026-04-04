@@ -140,41 +140,35 @@ final class HarnessMonitorGlassContrastUITests: HarnessMonitorUITestCase {
     )
   }
 
-  func testSidebarFilterChipBackgroundIsVisible() throws {
+  func testSidebarStatusSegmentBackgroundIsVisible() throws {
     let app = launch(mode: "preview")
 
-    // "Blocked" is unselected by default (default focus = .all).
-    // Its .bordered style should render a visible button background.
-    let chip = button(in: app, title: "Blocked")
+    let chip = button(in: app, title: "Ended")
     let filtersCard = element(
       in: app,
       identifier: Accessibility.sidebarFiltersCard
     )
     XCTAssertTrue(
       chip.waitForExistence(timeout: Self.uiTimeout),
-      "Blocked focus chip must exist"
+      "Ended status segment must exist"
     )
     XCTAssertTrue(filtersCard.exists, "Filters card must exist")
 
-    // Sample the chip's EDGE luminance (top 25% strip, above the text)
-    // and compare against the filter card background. If the button
-    // background is invisible (vibrancy washed out), the edge strip
-    // will have the same luminance as the sidebar card background.
-    let chipEdge = edgeLuminance(of: chip, region: .top)
+    let pickerEdge = edgeLuminance(of: chip, region: .top)
     let cardBg = edgeLuminance(of: filtersCard, region: .top)
 
-    let chipShot = XCTAttachment(screenshot: chip.screenshot())
-    chipShot.name = "filter-chip-blocked"
-    chipShot.lifetime = .keepAlways
-    add(chipShot)
+    let pickerShot = XCTAttachment(screenshot: chip.screenshot())
+    pickerShot.name = "status-segment-ended"
+    pickerShot.lifetime = .keepAlways
+    add(pickerShot)
 
     let cardShot = XCTAttachment(screenshot: filtersCard.screenshot())
     cardShot.name = "filter-card-background"
     cardShot.lifetime = .keepAlways
     add(cardShot)
 
-    let delta = abs(chipEdge - cardBg)
-    print("CHIP_CONTRAST chipEdge=\(chipEdge) cardBg=\(cardBg) delta=\(delta)")
+    let delta = abs(pickerEdge - cardBg)
+    print("SELECT_CONTRAST pickerEdge=\(pickerEdge) cardBg=\(cardBg) delta=\(delta)")
 
     // A bordered button with a visible fill should differ from
     // the surrounding area by at least 0.06 luminance. Under
@@ -194,67 +188,60 @@ final class HarnessMonitorGlassContrastUITests: HarnessMonitorUITestCase {
     XCTAssertGreaterThan(
       delta,
       0.03,
-      "Unselected chip has no visible contrast against sidebar: "
-        + "chipEdge=\(chipEdge), cardBg=\(cardBg), delta=\(delta)."
+      "Status segmented control has no visible contrast against sidebar: "
+        + "pickerEdge=\(pickerEdge), cardBg=\(cardBg), delta=\(delta)."
     )
   }
 
-  func testInactiveFilterChipMatchesSortSegmentBackground() throws {
+  func testSidebarSecondarySegmentsShareConsistentBackground() throws {
     let app = launch(mode: "preview")
 
-    // "Ended" is an unselected status filter chip (.bordered + .secondary tint).
-    let endedChip = button(in: app, title: "Ended")
-    // "Status" is an unselected sort segment in the segmented picker.
-    let statusSegment = button(in: app, title: "Status")
+    let sortSegment = button(
+      in: app,
+      identifier: Accessibility.sidebarSortSegment("name")
+    )
+    let focusSegment = button(in: app, identifier: Accessibility.blockedChip)
 
     XCTAssertTrue(
-      endedChip.waitForExistence(timeout: Self.uiTimeout),
-      "Ended chip must exist"
+      sortSegment.waitForExistence(timeout: Self.uiTimeout),
+      "Name sort segment must exist"
     )
     XCTAssertTrue(
-      statusSegment.waitForExistence(timeout: Self.uiTimeout),
-      "Status sort segment must exist"
+      focusSegment.waitForExistence(timeout: Self.uiTimeout),
+      "Blocked focus segment must exist"
     )
 
-    // Use the 1x1 downscale technique: Core Graphics averages all
-    // pixels when drawing into a 1x1 context, giving us the true
-    // average RGBA of the element's rendered appearance.
-    let chipColor = averageColor(of: endedChip)
-    let segmentColor = averageColor(of: statusSegment)
+    let sortColor = averageColor(of: sortSegment)
+    let focusColor = averageColor(of: focusSegment)
 
-    let chipShot = XCTAttachment(screenshot: endedChip.screenshot())
-    chipShot.name = "inactive-ended-chip"
-    chipShot.lifetime = .keepAlways
-    add(chipShot)
+    let sortShot = XCTAttachment(screenshot: sortSegment.screenshot())
+    sortShot.name = "sort-segment-name"
+    sortShot.lifetime = .keepAlways
+    add(sortShot)
 
-    let segmentShot = XCTAttachment(screenshot: statusSegment.screenshot())
-    segmentShot.name = "inactive-status-segment"
-    segmentShot.lifetime = .keepAlways
-    add(segmentShot)
+    let focusShot = XCTAttachment(screenshot: focusSegment.screenshot())
+    focusShot.name = "focus-segment-blocked"
+    focusShot.lifetime = .keepAlways
+    add(focusShot)
 
     print(
-      "CHIP_VS_SEGMENT chip=(\(chipColor.red),\(chipColor.green),\(chipColor.blue)) "
-        + "segment=(\(segmentColor.red),\(segmentColor.green),\(segmentColor.blue))"
+      "SEGMENT_RGB sort=(\(sortColor.red),\(sortColor.green),\(sortColor.blue)) "
+        + "focus=(\(focusColor.red),\(focusColor.green),\(focusColor.blue))"
     )
 
-    // Compare each RGB channel. The inactive filter chip and the
-    // inactive sort segment should render with the same background
-    // tone. A per-channel delta above 0.06 (out of 0-1) means the
-    // controls look visually different.
     let maxDelta = max(
-      abs(chipColor.red - segmentColor.red),
-      abs(chipColor.green - segmentColor.green),
-      abs(chipColor.blue - segmentColor.blue)
+      abs(sortColor.red - focusColor.red),
+      abs(sortColor.green - focusColor.green),
+      abs(sortColor.blue - focusColor.blue)
     )
 
     XCTAssertLessThan(
       maxDelta,
       0.06,
-      "Inactive filter chip and sort segment backgrounds don't match: "
-        + "chip=(\(chipColor.red),\(chipColor.green),\(chipColor.blue)), "
-        + "segment=(\(segmentColor.red),\(segmentColor.green),\(segmentColor.blue)), "
-        + "maxChannelDelta=\(maxDelta). "
-        + "These controls should have consistent inactive backgrounds."
+      "Sidebar secondary segmented controls do not share a consistent background tone: "
+        + "sort=(\(sortColor.red),\(sortColor.green),\(sortColor.blue)), "
+        + "focus=(\(focusColor.red),\(focusColor.green),\(focusColor.blue)), "
+        + "maxChannelDelta=\(maxDelta)."
     )
   }
 

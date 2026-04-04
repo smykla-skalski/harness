@@ -38,27 +38,12 @@ struct SidebarFilterSection: View {
   }
 
   var body: some View {
-    VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
-      HStack(alignment: .top) {
-        VStack(alignment: .leading, spacing: 4) {
-          Text("Search & Filters")
-            .scaledFont(.system(.headline, design: .rounded, weight: .semibold))
-            .accessibilityAddTraits(.isHeader)
-          Text(activeFilterSummary)
-            .scaledFont(.caption)
-            .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-        }
-        Spacer()
-        if isFiltered {
-          Button("Clear") {
-            resetFilters()
-          }
-          .scaledFont(.caption.bold())
-          .harnessAccessoryButtonStyle()
-          .controlSize(.small)
-          .accessibilityIdentifier(HarnessMonitorAccessibility.sidebarClearFiltersButton)
-        }
-      }
+    VStack(alignment: .leading, spacing: HarnessMonitorTheme.itemSpacing) {
+      SidebarFilterHeader(
+        activeFilterSummary: activeFilterSummary,
+        isFiltered: isFiltered,
+        resetFilters: resetFilters
+      )
 
       SidebarSearchField(
         searchText: $draftSearchText,
@@ -73,53 +58,25 @@ struct SidebarFilterSection: View {
         )
       }
 
-      filterSection(title: "Status") {
-        SidebarSegmentedPicker(
-          title: "Status",
-          options: HarnessMonitorStore.SessionFilter.allCases,
-          selection: Binding(
-            get: { sessionFilter },
-            set: { newValue in
-              withAnimation(.spring(duration: 0.2)) {
-                setSessionFilter(newValue)
-              }
+      SidebarFilterControlsBar(
+        sessionFilter: Binding(
+          get: { sessionFilter },
+          set: { newValue in
+            withAnimation(.spring(duration: 0.2)) {
+              setSessionFilter(newValue)
             }
-          ),
-          optionTitle: \.title,
-          optionIdentifier: { HarnessMonitorAccessibility.sessionFilterButton($0.rawValue) }
+          }
+        ),
+        sessionSortOrder: $sessionSortOrder,
+        sessionFocusFilter: Binding(
+          get: { sessionFocusFilter },
+          set: { newValue in
+            withAnimation(.spring(duration: 0.2)) {
+              setSessionFocusFilter(newValue)
+            }
+          }
         )
-      }
-      .accessibilityTestProbe(
-        HarnessMonitorAccessibility.sessionFilterGroup,
-        label: "status=\(sessionFilter.rawValue)"
       )
-
-      filterSection(title: "Sort") {
-        SidebarSegmentedPicker(
-          title: "Sort",
-          options: SessionSortOrder.allCases,
-          selection: $sessionSortOrder,
-          optionTitle: \.title,
-          optionIdentifier: { HarnessMonitorAccessibility.sidebarSortSegment($0.rawValue) }
-        )
-      }
-
-      filterSection(title: "Focus") {
-        SidebarSegmentedPicker(
-          title: "Focus",
-          options: SessionFocusFilter.allCases,
-          selection: Binding(
-            get: { sessionFocusFilter },
-            set: { newValue in
-              withAnimation(.spring(duration: 0.2)) {
-                setSessionFocusFilter(newValue)
-              }
-            }
-          ),
-          optionTitle: \.title,
-          optionIdentifier: { HarnessMonitorAccessibility.sidebarFocusChip($0.rawValue) }
-        )
-      }
     }
     .frame(maxWidth: .infinity, alignment: .leading)
     .padding(HarnessMonitorTheme.cardPadding)
@@ -130,6 +87,54 @@ struct SidebarFilterSection: View {
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessMonitorAccessibility.sidebarFiltersCard)
     .accessibilityFrameMarker("\(HarnessMonitorAccessibility.sidebarFiltersCard).frame")
+  }
+}
+
+private struct SidebarFilterHeader: View {
+  let activeFilterSummary: String
+  let isFiltered: Bool
+  let resetFilters: () -> Void
+
+  var body: some View {
+    HStack(alignment: .top, spacing: HarnessMonitorTheme.itemSpacing) {
+      title
+      Spacer(minLength: HarnessMonitorTheme.itemSpacing)
+      VStack(alignment: .trailing, spacing: HarnessMonitorTheme.spacingXS) {
+        summary
+        clearButtonSlot
+      }
+    }
+  }
+
+  private var title: some View {
+    Text("Search & Filters")
+      .scaledFont(.system(.headline, design: .rounded, weight: .semibold))
+      .accessibilityAddTraits(.isHeader)
+  }
+
+  private var summary: some View {
+    Text(activeFilterSummary)
+      .scaledFont(.caption.weight(.medium))
+      .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+      .lineLimit(1)
+      .multilineTextAlignment(.trailing)
+  }
+
+  private var clearButton: some View {
+    Button("Clear") {
+      resetFilters()
+    }
+    .scaledFont(.caption.bold())
+    .harnessAccessoryButtonStyle()
+    .controlSize(.small)
+    .accessibilityIdentifier(HarnessMonitorAccessibility.sidebarClearFiltersButton)
+  }
+
+  private var clearButtonSlot: some View {
+    clearButton
+      .opacity(isFiltered ? 1 : 0)
+      .allowsHitTesting(isFiltered)
+      .accessibilityHidden(!isFiltered)
   }
 }
 
@@ -184,20 +189,68 @@ private struct SidebarSearchField: View {
   }
 }
 
-extension SidebarFilterSection {
-  fileprivate func filterSection<Content: View>(
-    title: String,
-    @ViewBuilder content: () -> Content
-  ) -> some View {
-    VStack(alignment: .leading, spacing: HarnessMonitorTheme.itemSpacing) {
+private struct SidebarFilterControlsBar: View {
+  @Binding var sessionFilter: HarnessMonitorStore.SessionFilter
+  @Binding var sessionSortOrder: SessionSortOrder
+  @Binding var sessionFocusFilter: SessionFocusFilter
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
+      SidebarLabeledSegmentedField(
+        title: "Status",
+        options: HarnessMonitorStore.SessionFilter.allCases,
+        selection: $sessionFilter,
+        optionTitle: \.title,
+        optionIdentifier: { HarnessMonitorAccessibility.sessionFilterButton($0.rawValue) }
+      )
+      .accessibilityTestProbe(
+        HarnessMonitorAccessibility.sessionFilterGroup,
+        label: "status=\(sessionFilter.rawValue)"
+      )
+
+      SidebarLabeledSegmentedField(
+        title: "Sort",
+        options: SessionSortOrder.allCases,
+        selection: $sessionSortOrder,
+        optionTitle: \.title,
+        optionIdentifier: { HarnessMonitorAccessibility.sidebarSortSegment($0.rawValue) }
+      )
+
+      SidebarLabeledSegmentedField(
+        title: "Focus",
+        options: SessionFocusFilter.allCases,
+        selection: $sessionFocusFilter,
+        optionTitle: \.title,
+        optionIdentifier: { HarnessMonitorAccessibility.sidebarFocusChip($0.rawValue) }
+      )
+    }
+  }
+}
+
+private struct SidebarLabeledSegmentedField<Option: Hashable & Identifiable>: View {
+  let title: String
+  let options: [Option]
+  @Binding var selection: Option
+  let optionTitle: (Option) -> String
+  let optionIdentifier: (Option) -> String
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
       Text(title.uppercased())
         .scaledFont(.caption2.weight(.bold))
         .tracking(HarnessMonitorTheme.uppercaseTracking)
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-      content()
-    }
-  }
 
+      SidebarSegmentedPicker(
+        title: title,
+        options: options,
+        selection: $selection,
+        optionTitle: optionTitle,
+        optionIdentifier: optionIdentifier
+      )
+    }
+    .frame(maxWidth: .infinity, alignment: .leading)
+  }
 }
 
 private struct SidebarSegmentedPicker<Option: Hashable & Identifiable>: View {
@@ -224,13 +277,21 @@ private struct SidebarSegmentedPicker<Option: Hashable & Identifiable>: View {
     .pickerStyle(.segmented)
     .labelsHidden()
     .harnessNativeFormControl()
+    .accessibilityLabel(title)
+    .accessibilityValue(optionTitle(selection))
   }
 }
 
 // MARK: - Accessibility helpers used by SidebarView
 
 func sessionAccessibilityLabel(for session: SessionSummary) -> String {
-  "\(session.context), \(session.projectName), \(session.checkoutDisplayName), \(session.status.title), \(session.sessionId)"
+  [
+    session.context,
+    session.projectName,
+    session.checkoutDisplayName,
+    session.status.title,
+    session.sessionId,
+  ].joined(separator: ", ")
 }
 
 func sessionAccessibilityValue(

@@ -1,6 +1,27 @@
 import XCTest
 
 extension HarnessMonitorUITestCase {
+  func selectMenuOption(in app: XCUIApplication, controlIdentifier: String, optionTitle: String) {
+    let control = popUpButton(in: app, identifier: controlIdentifier)
+    XCTAssertTrue(control.waitForExistence(timeout: Self.uiTimeout))
+
+    app.activate()
+    if control.isHittable {
+      control.tap()
+    } else if let coordinate = centerCoordinate(in: app, for: control) {
+      coordinate.tap()
+    } else {
+      XCTFail("Failed to open pop-up button \(controlIdentifier)")
+      return
+    }
+
+    let menuItem = app.descendants(matching: .menuItem).matching(
+      NSPredicate(format: "label == %@ OR title == %@", optionTitle, optionTitle)
+    ).firstMatch
+    XCTAssertTrue(menuItem.waitForExistence(timeout: Self.uiTimeout))
+    menuItem.tap()
+  }
+
   func element(in app: XCUIApplication, title: String) -> XCUIElement {
     nativePresentationElement(in: app, title: title)
   }
@@ -13,6 +34,20 @@ extension HarnessMonitorUITestCase {
     let cancelButton = confirmationDialogButton(in: app, title: "Cancel")
     XCTAssertTrue(cancelButton.waitForExistence(timeout: Self.uiTimeout))
     cancelButton.tap()
+  }
+
+  func popUpButton(in app: XCUIApplication, identifier: String) -> XCUIElement {
+    let appMatch = app.popUpButtons.matching(identifier: identifier).firstMatch
+    if appMatch.exists {
+      return appMatch
+    }
+
+    let descendantMatch = app.descendants(matching: .popUpButton)
+      .matching(identifier: identifier)
+      .firstMatch
+    return descendantMatch.exists
+      ? descendantMatch
+      : button(in: app, identifier: identifier)
   }
 
   private func nativePresentationElement(

@@ -34,7 +34,8 @@ enum HarnessMonitorUITestAccessibility {
   static let previewSessionRow = "harness.sidebar.session.sess-harness"
   static let previewSessionRowFrame = "harness.sidebar.session.sess-harness.frame"
   static let overflowSessionRow = "harness.sidebar.session.sess-harness-17"
-  static let previewSessionTitle = "Track all live multi-agent harness sessions from a macOS cockpit"
+  static let previewSessionTitle =
+    "Track all live multi-agent harness sessions from a macOS cockpit"
   static let sidebarEmptyState = "harness.sidebar.empty-state"
   static let sidebarEmptyStateFrame = "harness.sidebar.empty-state.frame"
   static let sidebarEmptyStateTitle = "No sessions indexed yet"
@@ -46,6 +47,8 @@ enum HarnessMonitorUITestAccessibility {
   static let sidebarSearchField = "harness.sidebar.search"
   static let sidebarClearFiltersButton = "harness.sidebar.filters.clear"
   static let sidebarClearSearchHistoryButton = "harness.sidebar.search.clear-history"
+  static let sidebarSortPicker = "harness.sidebar.picker.sort"
+  static let sidebarFocusPicker = "harness.sidebar.picker.focus"
   static let activeFilterButton = "harness.sidebar.filter.active"
   static let allFilterButton = "harness.sidebar.filter.all"
   static let endedFilterButton = "harness.sidebar.filter.ended"
@@ -110,4 +113,21 @@ enum HarnessMonitorUITestAccessibility {
   static let installLaunchAgentButton = "harness.preferences.action.install-launch-agent"
   static let removeLaunchAgentButton = "harness.preferences.action.remove-launch-agent"
   static let actionToast = "harness.action-toast"
+
+  static func sidebarSortSegment(_ order: String) -> String {
+    "harness.sidebar.sort.\(slug(order))"
+  }
+
+  static func sidebarFocusChip(_ filter: String) -> String {
+    "harness.sidebar.focus-chip.\(slug(filter))"
+  }
+
+  private static func slug(_ value: String) -> String {
+    let lowercased = value.lowercased()
+    return
+      lowercased
+      .replacing(" ", with: "-")
+      .replacing("_", with: "-")
+      .replacing(".", with: "")
+  }
 }
