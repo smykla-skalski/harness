@@ -173,7 +173,7 @@ struct SessionDataAvailabilityBanner: View {
   let availability: HarnessMonitorStore.SessionDataAvailability
 
   var body: some View {
-    HStack(alignment: .top, spacing: HarnessMonitorTheme.itemSpacing) {
+    HStack(alignment: .center, spacing: HarnessMonitorTheme.itemSpacing) {
       Image(systemName: symbolName)
         .scaledFont(.caption)
         .accessibilityHidden(true)
@@ -242,7 +242,7 @@ struct PersistenceUnavailableBanner: View {
   let message: String
 
   var body: some View {
-    HStack(alignment: .top, spacing: HarnessMonitorTheme.itemSpacing) {
+    HStack(alignment: .center, spacing: HarnessMonitorTheme.itemSpacing) {
       Image(systemName: "externaldrive.badge.exclamationmark")
         .scaledFont(.caption)
         .accessibilityHidden(true)
