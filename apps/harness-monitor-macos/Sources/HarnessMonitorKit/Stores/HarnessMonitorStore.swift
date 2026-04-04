@@ -187,8 +187,10 @@ public final class HarnessMonitorStore {
 
     do {
       let client = try await daemonController.startDaemonClient()
+      async let daemonStatusResponse: DaemonStatusReport? = try? daemonController.daemonStatus()
       try? await Task.sleep(for: .milliseconds(300))
       await connect(using: client)
+      daemonStatus = await daemonStatusResponse
     } catch {
       markConnectionOffline(error.localizedDescription)
       restorePersistedSessionState()
@@ -270,6 +272,7 @@ public final class HarnessMonitorStore {
       async let daemonStatusResponse: DaemonStatusReport? = try? daemonController.daemonStatus()
       let measuredDiagnostics = try await diagnosticsResponse
       diagnostics = measuredDiagnostics.value
+      health = measuredDiagnostics.value.health
       recordRequestSuccess()
       daemonStatus = await daemonStatusResponse
     } catch {
