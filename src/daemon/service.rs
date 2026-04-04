@@ -5,7 +5,7 @@ use std::sync::{Arc, Mutex, OnceLock};
 use std::time::Duration;
 
 use crate::errors::{CliError, CliErrorKind};
-use crate::session::types::TaskSource;
+use crate::session::types::{SessionLogEntry, SessionTransition, TaskSource};
 use crate::session::{observe as session_observe, service as session_service};
 use crate::workspace::utc_now;
 use serde::{Deserialize, Serialize};
@@ -364,8 +364,6 @@ pub fn create_task(
     request: &TaskCreateRequest,
     db: Option<&super::db::DaemonDb>,
 ) -> Result<SessionDetail, CliError> {
-    let resolved = index::resolve_session(session_id)?;
-    let project_dir = effective_project_dir(&resolved);
     let spec = session_service::TaskSpec {
         title: &request.title,
         context: request.context.as_deref(),
@@ -374,6 +372,27 @@ pub fn create_task(
         source: TaskSource::Manual,
         observe_issue_id: None,
     };
+
+    if let Some(db) = db
+        && let Some(mut state) = db.load_session_state(session_id)?
+    {
+            let item = session_service::apply_create_task(&mut state, &spec, &request.actor, &utc_now())?;
+            let project_id = db.project_id_for_session(session_id)?
+                .ok_or_else(|| session_not_found(session_id))?;
+            db.sync_session(&project_id, &state)?;
+            db.append_log_entry(&build_log_entry(
+                session_id,
+                session_service::log_task_created(&spec, &item),
+                Some(&request.actor),
+                None,
+            ))?;
+            db.bump_change(session_id)?;
+            db.bump_change("global")?;
+            return session_detail(session_id, Some(db));
+    }
+
+    let resolved = index::resolve_session(session_id)?;
+    let project_dir = effective_project_dir(&resolved);
     let _ =
         session_service::create_task_with_source(session_id, &spec, &request.actor, project_dir)?;
     sync_after_mutation(db, session_id);
@@ -390,15 +409,21 @@ pub fn assign_task(
     request: &TaskAssignRequest,
     db: Option<&super::db::DaemonDb>,
 ) -> Result<SessionDetail, CliError> {
+    if let Some(db) = db
+        && let Some(mut state) = db.load_session_state(session_id)?
+    {
+            session_service::apply_assign_task(&mut state, task_id, &request.agent_id, &request.actor, &utc_now())?;
+            let project_id = db.project_id_for_session(session_id)?.ok_or_else(|| session_not_found(session_id))?;
+            db.sync_session(&project_id, &state)?;
+            db.append_log_entry(&build_log_entry(session_id, session_service::log_task_assigned(task_id, &request.agent_id), Some(&request.actor), None))?;
+            db.bump_change(session_id)?;
+            db.bump_change("global")?;
+            return session_detail(session_id, Some(db));
+    }
+
     let resolved = index::resolve_session(session_id)?;
     let project_dir = effective_project_dir(&resolved);
-    session_service::assign_task(
-        session_id,
-        task_id,
-        &request.agent_id,
-        &request.actor,
-        project_dir,
-    )?;
+    session_service::assign_task(session_id, task_id, &request.agent_id, &request.actor, project_dir)?;
     sync_after_mutation(db, session_id);
     session_detail(session_id, db)
 }
@@ -413,16 +438,21 @@ pub fn update_task(
     request: &TaskUpdateRequest,
     db: Option<&super::db::DaemonDb>,
 ) -> Result<SessionDetail, CliError> {
+    if let Some(db) = db
+        && let Some(mut state) = db.load_session_state(session_id)?
+    {
+            let from_status = session_service::apply_update_task(&mut state, task_id, request.status, request.note.as_deref(), &request.actor, &utc_now())?;
+            let project_id = db.project_id_for_session(session_id)?.ok_or_else(|| session_not_found(session_id))?;
+            db.sync_session(&project_id, &state)?;
+            db.append_log_entry(&build_log_entry(session_id, session_service::log_task_status_changed(task_id, from_status, request.status), Some(&request.actor), None))?;
+            db.bump_change(session_id)?;
+            db.bump_change("global")?;
+            return session_detail(session_id, Some(db));
+    }
+
     let resolved = index::resolve_session(session_id)?;
     let project_dir = effective_project_dir(&resolved);
-    session_service::update_task(
-        session_id,
-        task_id,
-        request.status,
-        request.note.as_deref(),
-        &request.actor,
-        project_dir,
-    )?;
+    session_service::update_task(session_id, task_id, request.status, request.note.as_deref(), &request.actor, project_dir)?;
     sync_after_mutation(db, session_id);
     session_detail(session_id, db)
 }
@@ -437,16 +467,22 @@ pub fn checkpoint_task(
     request: &TaskCheckpointRequest,
     db: Option<&super::db::DaemonDb>,
 ) -> Result<SessionDetail, CliError> {
+    if let Some(db) = db
+        && let Some(mut state) = db.load_session_state(session_id)?
+    {
+            let checkpoint = session_service::apply_record_checkpoint(&mut state, task_id, &request.actor, &request.summary, request.progress, &utc_now())?;
+            let project_id = db.project_id_for_session(session_id)?.ok_or_else(|| session_not_found(session_id))?;
+            db.sync_session(&project_id, &state)?;
+            db.append_checkpoint(session_id, &checkpoint)?;
+            db.append_log_entry(&build_log_entry(session_id, session_service::log_checkpoint_recorded(task_id, &checkpoint.checkpoint_id, request.progress), Some(&request.actor), None))?;
+            db.bump_change(session_id)?;
+            db.bump_change("global")?;
+            return session_detail(session_id, Some(db));
+    }
+
     let resolved = index::resolve_session(session_id)?;
     let project_dir = effective_project_dir(&resolved);
-    let _ = session_service::record_task_checkpoint(
-        session_id,
-        task_id,
-        &request.actor,
-        &request.summary,
-        request.progress,
-        project_dir,
-    )?;
+    let _ = session_service::record_task_checkpoint(session_id, task_id, &request.actor, &request.summary, request.progress, project_dir)?;
     sync_after_mutation(db, session_id);
     session_detail(session_id, db)
 }
@@ -461,16 +497,21 @@ pub fn change_role(
     request: &RoleChangeRequest,
     db: Option<&super::db::DaemonDb>,
 ) -> Result<SessionDetail, CliError> {
+    if let Some(db) = db
+        && let Some(mut state) = db.load_session_state(session_id)?
+    {
+            let from_role = session_service::apply_assign_role(&mut state, agent_id, request.role, &request.actor, &utc_now())?;
+            let project_id = db.project_id_for_session(session_id)?.ok_or_else(|| session_not_found(session_id))?;
+            db.sync_session(&project_id, &state)?;
+            db.append_log_entry(&build_log_entry(session_id, session_service::log_role_changed(agent_id, from_role, request.role), Some(&request.actor), request.reason.as_deref()))?;
+            db.bump_change(session_id)?;
+            db.bump_change("global")?;
+            return session_detail(session_id, Some(db));
+    }
+
     let resolved = index::resolve_session(session_id)?;
     let project_dir = effective_project_dir(&resolved);
-    session_service::assign_role(
-        session_id,
-        agent_id,
-        request.role,
-        request.reason.as_deref(),
-        &request.actor,
-        project_dir,
-    )?;
+    session_service::assign_role(session_id, agent_id, request.role, request.reason.as_deref(), &request.actor, project_dir)?;
     sync_after_mutation(db, session_id);
     session_detail(session_id, db)
 }
@@ -485,6 +526,18 @@ pub fn remove_agent(
     request: &AgentRemoveRequest,
     db: Option<&super::db::DaemonDb>,
 ) -> Result<SessionDetail, CliError> {
+    if let Some(db) = db
+        && let Some(mut state) = db.load_session_state(session_id)?
+    {
+            session_service::apply_remove_agent(&mut state, agent_id, &request.actor, &utc_now())?;
+            let project_id = db.project_id_for_session(session_id)?.ok_or_else(|| session_not_found(session_id))?;
+            db.sync_session(&project_id, &state)?;
+            db.append_log_entry(&build_log_entry(session_id, session_service::log_agent_removed(agent_id), Some(&request.actor), None))?;
+            db.bump_change(session_id)?;
+            db.bump_change("global")?;
+            return session_detail(session_id, Some(db));
+    }
+
     let resolved = index::resolve_session(session_id)?;
     let project_dir = effective_project_dir(&resolved);
     session_service::remove_agent(session_id, agent_id, &request.actor, project_dir)?;
@@ -501,15 +554,21 @@ pub fn transfer_leader(
     request: &LeaderTransferRequest,
     db: Option<&super::db::DaemonDb>,
 ) -> Result<SessionDetail, CliError> {
+    if let Some(db) = db
+        && let Some(mut state) = db.load_session_state(session_id)?
+    {
+            let plan = session_service::apply_transfer_leader(&mut state, &request.new_leader_id, &request.actor, request.reason.as_deref(), &utc_now())?;
+            let project_id = db.project_id_for_session(session_id)?.ok_or_else(|| session_not_found(session_id))?;
+            db.sync_session(&project_id, &state)?;
+            append_transfer_logs_to_db(db, session_id, &request.actor, &plan)?;
+            db.bump_change(session_id)?;
+            db.bump_change("global")?;
+            return session_detail(session_id, Some(db));
+    }
+
     let resolved = index::resolve_session(session_id)?;
     let project_dir = effective_project_dir(&resolved);
-    session_service::transfer_leader(
-        session_id,
-        &request.new_leader_id,
-        request.reason.as_deref(),
-        &request.actor,
-        project_dir,
-    )?;
+    session_service::transfer_leader(session_id, &request.new_leader_id, request.reason.as_deref(), &request.actor, project_dir)?;
     sync_after_mutation(db, session_id);
     session_detail(session_id, db)
 }
@@ -523,6 +582,19 @@ pub fn end_session(
     request: &SessionEndRequest,
     db: Option<&super::db::DaemonDb>,
 ) -> Result<SessionDetail, CliError> {
+    if let Some(db) = db
+        && let Some(mut state) = db.load_session_state(session_id)?
+    {
+            session_service::apply_end_session(&mut state, &request.actor, &utc_now())?;
+            let project_id = db.project_id_for_session(session_id)?.ok_or_else(|| session_not_found(session_id))?;
+            db.sync_session(&project_id, &state)?;
+            db.mark_session_inactive(session_id)?;
+            db.append_log_entry(&build_log_entry(session_id, session_service::log_session_ended(), Some(&request.actor), None))?;
+            db.bump_change(session_id)?;
+            db.bump_change("global")?;
+            return session_detail(session_id, Some(db));
+    }
+
     let resolved = index::resolve_session(session_id)?;
     let project_dir = effective_project_dir(&resolved);
     session_service::end_session(session_id, &request.actor, project_dir)?;
@@ -532,6 +604,9 @@ pub fn end_session(
 
 /// Send a signal through the shared session service.
 ///
+/// Signal files are always written to disk for runtime pickup, even in
+/// the DB-direct path, because agent runtimes poll the filesystem.
+///
 /// # Errors
 /// Returns `CliError` when the session cannot be resolved or signal delivery setup fails.
 pub fn send_signal(
@@ -539,6 +614,9 @@ pub fn send_signal(
     request: &SignalSendRequest,
     db: Option<&super::db::DaemonDb>,
 ) -> Result<SessionDetail, CliError> {
+    // send_signal always needs the project directory for writing signal
+    // files that agent runtimes poll. We always use the file-based path
+    // here because the signal file I/O needs a real directory.
     let resolved = index::resolve_session(session_id)?;
     let project_dir = effective_project_dir(&resolved);
     let _ = session_service::send_signal(
@@ -715,6 +793,81 @@ fn warn_broadcast_failure(error_message: &str, event_name: &str, session: &str) 
 fn sync_after_mutation(db: Option<&super::db::DaemonDb>, session_id: &str) {
     if let Some(db) = db {
         let _ = db.resync_session(session_id);
+    }
+}
+
+fn append_transfer_logs_to_db(
+    db: &super::db::DaemonDb,
+    session_id: &str,
+    actor_id: &str,
+    plan: &session_service::LeaderTransferPlan,
+) -> Result<(), CliError> {
+    if let Some(ref request) = plan.pending_request {
+        db.append_log_entry(&build_log_entry(
+            session_id,
+            SessionTransition::LeaderTransferRequested {
+                from: request.current_leader_id.clone(),
+                to: request.new_leader_id.clone(),
+            },
+            Some(actor_id),
+            request.reason.as_deref(),
+        ))?;
+        return Ok(());
+    }
+    if let Some(ref outcome) = plan.outcome {
+        if outcome.log_request_before_transfer {
+            db.append_log_entry(&build_log_entry(
+                session_id,
+                SessionTransition::LeaderTransferRequested {
+                    from: outcome.old_leader.clone(),
+                    to: outcome.new_leader_id.clone(),
+                },
+                Some(actor_id),
+                outcome.reason.as_deref(),
+            ))?;
+        }
+        if let Some(ref confirmed_by) = outcome.confirmed_by {
+            db.append_log_entry(&build_log_entry(
+                session_id,
+                SessionTransition::LeaderTransferConfirmed {
+                    from: outcome.old_leader.clone(),
+                    to: outcome.new_leader_id.clone(),
+                    confirmed_by: confirmed_by.clone(),
+                },
+                Some(confirmed_by),
+                outcome.reason.as_deref(),
+            ))?;
+        }
+        db.append_log_entry(&build_log_entry(
+            session_id,
+            SessionTransition::LeaderTransferred {
+                from: outcome.old_leader.clone(),
+                to: outcome.new_leader_id.clone(),
+            },
+            Some(actor_id),
+            outcome.reason.as_deref(),
+        ))?;
+    }
+    Ok(())
+}
+
+fn session_not_found(session_id: &str) -> CliError {
+    CliErrorKind::session_not_active(format!("session '{session_id}' not found")).into()
+}
+
+fn build_log_entry(
+    session_id: &str,
+    transition: SessionTransition,
+    actor_id: Option<&str>,
+    reason: Option<&str>,
+) -> SessionLogEntry {
+    SessionLogEntry {
+        sequence: 0,
+        recorded_at: utc_now(),
+        session_id: session_id.to_string(),
+        transition,
+        actor_id: actor_id.map(ToString::to_string),
+        reason: reason.map(ToString::to_string),
     }
 }
 
@@ -1095,6 +1248,112 @@ mod tests {
                 detail.signals[0].signal.payload.action_hint.as_deref(),
                 Some("task:signal")
             );
+        });
+    }
+
+    /// Build an in-memory DB with a project and session loaded from files.
+    #[expect(dead_code, reason = "used by future DB-direct tests that also need file state")]
+    fn setup_db_with_session(project: &Path, session_id: &str) -> crate::daemon::db::DaemonDb {
+        let db = crate::daemon::db::DaemonDb::open_in_memory().expect("open in-memory db");
+        let projects = index::discover_projects().expect("discover projects");
+        for p in &projects {
+            db.sync_project(p).expect("sync project");
+        }
+        let resolved = index::resolve_session(session_id).expect("resolve session");
+        db.sync_session(&resolved.project.project_id, &resolved.state)
+            .expect("sync session");
+        append_project_ledger_entry(project);
+        db
+    }
+
+    /// Build an in-memory DB with a project and session loaded only into
+    /// SQLite (no files for that session). The session only exists in the DB.
+    fn setup_db_only_session(
+        project: &Path,
+    ) -> (crate::daemon::db::DaemonDb, crate::session::types::SessionState) {
+        use crate::session::service::build_new_session;
+        use crate::workspace::project_context_dir;
+
+        let db = crate::daemon::db::DaemonDb::open_in_memory().expect("open in-memory db");
+
+        let context_root = project_context_dir(project);
+        let project_record = super::index::DiscoveredProject {
+            project_id: format!("project-{}", hex_digest(project)),
+            name: "test".into(),
+            project_dir: Some(project.to_path_buf()),
+            repository_root: Some(project.to_path_buf()),
+            checkout_id: "checkout-test".into(),
+            checkout_name: "test".into(),
+            context_root,
+            is_worktree: false,
+            worktree_name: None,
+        };
+        db.sync_project(&project_record).expect("sync project");
+
+        let state =
+            build_new_session("db-only test", "db-only-sess", "claude", Some("test-session"), &utc_now());
+        db.sync_session(&project_record.project_id, &state)
+            .expect("sync session");
+        (db, state)
+    }
+
+    fn hex_digest(path: &Path) -> String {
+        use std::hash::{DefaultHasher, Hash, Hasher};
+        let mut hasher = DefaultHasher::new();
+        path.hash(&mut hasher);
+        format!("{:016x}", hasher.finish())
+    }
+
+    #[test]
+    fn create_task_db_direct_writes_to_sqlite() {
+        with_temp_project(|project| {
+            let (db, state) = setup_db_only_session(project);
+            let leader_id = state.leader_id.expect("leader id");
+
+            let detail = create_task(
+                &state.session_id,
+                &TaskCreateRequest {
+                    actor: leader_id,
+                    title: "db-direct task".into(),
+                    context: None,
+                    severity: crate::session::types::TaskSeverity::Medium,
+                    suggested_fix: None,
+                },
+                Some(&db),
+            )
+            .expect("create task via db");
+
+            assert_eq!(detail.tasks.len(), 1);
+            assert_eq!(detail.tasks[0].title, "db-direct task");
+
+            let db_state = db
+                .load_session_state(&state.session_id)
+                .expect("load state")
+                .expect("state present");
+            assert_eq!(db_state.tasks.len(), 1);
+        });
+    }
+
+    #[test]
+    fn end_session_db_direct_marks_inactive() {
+        with_temp_project(|project| {
+            let (db, state) = setup_db_only_session(project);
+            let leader_id = state.leader_id.expect("leader id");
+
+            let _ = end_session(
+                &state.session_id,
+                &SessionEndRequest {
+                    actor: leader_id,
+                },
+                Some(&db),
+            )
+            .expect("end session via db");
+
+            let db_state = db
+                .load_session_state(&state.session_id)
+                .expect("load state")
+                .expect("state present");
+            assert_eq!(db_state.status, crate::session::types::SessionStatus::Ended);
         });
     }
 
