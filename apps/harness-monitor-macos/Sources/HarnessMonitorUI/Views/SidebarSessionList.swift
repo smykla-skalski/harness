@@ -45,44 +45,49 @@ struct SidebarFilterSection: View {
         resetFilters: resetFilters
       )
 
-      SidebarSearchField(
-        searchText: $draftSearchText,
-        submitSearch: submitSearch
-      )
+      VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
+        VStack(alignment: .leading, spacing: HarnessMonitorTheme.itemSpacing) {
+          SidebarSearchField(
+            searchText: $draftSearchText,
+            submitSearch: submitSearch
+          )
 
-      if searchText.isEmpty, isPersistenceAvailable {
-        RecentSearchChipsSection(
-          recentSearchQueries: recentSearchQueries,
-          applyRecentSearch: applyRecentSearch,
-          clearSearchHistory: clearSearchHistory
+          if searchText.isEmpty, isPersistenceAvailable {
+            RecentSearchChipsSection(
+              recentSearchQueries: recentSearchQueries,
+              applyRecentSearch: applyRecentSearch,
+              clearSearchHistory: clearSearchHistory
+            )
+          }
+        }
+
+        SidebarFilterControlsBar(
+          sessionFilter: Binding(
+            get: { sessionFilter },
+            set: { newValue in
+              withAnimation(.spring(duration: 0.2)) {
+                setSessionFilter(newValue)
+              }
+            }
+          ),
+          sessionSortOrder: $sessionSortOrder,
+          sessionFocusFilter: Binding(
+            get: { sessionFocusFilter },
+            set: { newValue in
+              withAnimation(.spring(duration: 0.2)) {
+                setSessionFocusFilter(newValue)
+              }
+            }
+          )
         )
       }
-
-      SidebarFilterControlsBar(
-        sessionFilter: Binding(
-          get: { sessionFilter },
-          set: { newValue in
-            withAnimation(.spring(duration: 0.2)) {
-              setSessionFilter(newValue)
-            }
-          }
-        ),
-        sessionSortOrder: $sessionSortOrder,
-        sessionFocusFilter: Binding(
-          get: { sessionFocusFilter },
-          set: { newValue in
-            withAnimation(.spring(duration: 0.2)) {
-              setSessionFocusFilter(newValue)
-            }
-          }
-        )
-      )
     }
     .frame(maxWidth: .infinity, alignment: .leading)
     .padding(HarnessMonitorTheme.cardPadding)
     .harnessFloatingControlGlass(
       cornerRadius: HarnessMonitorTheme.cornerRadiusLG,
-      tint: HarnessMonitorTheme.ink
+      tint: HarnessMonitorTheme.ink,
+      prominence: .subdued
     )
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessMonitorAccessibility.sidebarFiltersCard)
@@ -176,13 +181,54 @@ private struct RecentSearchChipsSection: View {
 }
 
 private struct SidebarSearchField: View {
+  @ScaledMetric(relativeTo: .body) private var horizontalPadding = 10
+  @ScaledMetric(relativeTo: .body) private var verticalPadding = 7
+
+  @Environment(\.accessibilityReduceTransparency)
+  private var reduceTransparency
+  @Environment(\.colorSchemeContrast)
+  private var colorSchemeContrast
+
   @Binding var searchText: String
   let submitSearch: () -> Void
+
+  private var fillOpacity: Double {
+    if reduceTransparency {
+      return colorSchemeContrast == .increased ? 0.18 : 0.12
+    }
+    return colorSchemeContrast == .increased ? 0.12 : 0.06
+  }
+
+  private var strokeOpacity: Double {
+    if reduceTransparency {
+      return colorSchemeContrast == .increased ? 0.26 : 0.18
+    }
+    return colorSchemeContrast == .increased ? 0.18 : 0.1
+  }
 
   var body: some View {
     TextField("Search sessions, projects, leaders", text: $searchText)
       .harnessNativeFormControl()
-      .textFieldStyle(.roundedBorder)
+      .textFieldStyle(.plain)
+      .padding(.horizontal, horizontalPadding)
+      .padding(.vertical, verticalPadding)
+      .background {
+        RoundedRectangle(
+          cornerRadius: HarnessMonitorTheme.cornerRadiusSM,
+          style: .continuous
+        )
+        .fill(HarnessMonitorTheme.ink.opacity(fillOpacity))
+      }
+      .overlay {
+        RoundedRectangle(
+          cornerRadius: HarnessMonitorTheme.cornerRadiusSM,
+          style: .continuous
+        )
+        .strokeBorder(
+          HarnessMonitorTheme.controlBorder.opacity(strokeOpacity),
+          lineWidth: colorSchemeContrast == .increased ? 1 : 0.75
+        )
+      }
       .accessibilityIdentifier("harness.sidebar.search")
       .onSubmit(submitSearch)
   }
