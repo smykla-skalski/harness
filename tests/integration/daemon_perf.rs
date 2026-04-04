@@ -94,12 +94,7 @@ async fn start_test_daemon(db: Option<DaemonDb>) -> TestDaemon {
     }
 }
 
-async fn measure_endpoint(
-    client: &Client,
-    url: &str,
-    token: &str,
-    samples: usize,
-) -> Vec<f64> {
+async fn measure_endpoint(client: &Client, url: &str, token: &str, samples: usize) -> Vec<f64> {
     let mut timings = Vec::with_capacity(samples);
     for _ in 0..samples {
         let start = Instant::now();
@@ -183,10 +178,9 @@ async fn daemon_http_endpoint_performance_budgets() {
 
     let db_path = tmp.path().join("harness/daemon/harness.db");
     let db = DaemonDb::open(&db_path).expect("open db");
-    temp_env::with_vars(
-        [("XDG_DATA_HOME", Some(xdg.as_str()))],
-        || db.import_from_files(),
-    )
+    temp_env::with_vars([("XDG_DATA_HOME", Some(xdg.as_str()))], || {
+        db.import_from_files()
+    })
     .expect("import");
 
     let daemon = start_test_daemon(Some(db)).await;
@@ -234,7 +228,10 @@ async fn daemon_http_endpoint_performance_budgets() {
         );
     }
 
-    assert!(all_passed, "one or more endpoints exceeded performance budget");
+    assert!(
+        all_passed,
+        "one or more endpoints exceeded performance budget"
+    );
 }
 
 /// Measure `status_report()` which is the CLI `daemon status` code path.
@@ -268,10 +265,9 @@ fn daemon_status_report_within_budget() {
     // Import into DB so status_report uses SQLite path.
     let db_path = tmp.path().join("harness/daemon/harness.db");
     let db = DaemonDb::open(&db_path).expect("open db");
-    temp_env::with_vars(
-        [("XDG_DATA_HOME", Some(xdg.as_str()))],
-        || db.import_from_files(),
-    )
+    temp_env::with_vars([("XDG_DATA_HOME", Some(xdg.as_str()))], || {
+        db.import_from_files()
+    })
     .expect("import");
     drop(db);
 
@@ -280,10 +276,9 @@ fn daemon_status_report_within_budget() {
 
     for _ in 0..SAMPLE_COUNT {
         let start = Instant::now();
-        temp_env::with_vars(
-            [("XDG_DATA_HOME", Some(xdg.as_str()))],
-            || service::status_report(),
-        )
+        temp_env::with_vars([("XDG_DATA_HOME", Some(xdg.as_str()))], || {
+            service::status_report()
+        })
         .expect("status report");
         samples.push(start.elapsed().as_secs_f64() * 1000.0);
     }

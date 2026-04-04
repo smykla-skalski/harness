@@ -109,10 +109,9 @@ fn file_and_db_reads_produce_identical_output() {
 
     let db_path = tmp.path().join("harness/daemon/harness.db");
     let db = DaemonDb::open(&db_path).expect("open db");
-    temp_env::with_vars(
-        [("XDG_DATA_HOME", Some(xdg.as_str()))],
-        || db.import_from_files(),
-    )
+    temp_env::with_vars([("XDG_DATA_HOME", Some(xdg.as_str()))], || {
+        db.import_from_files()
+    })
     .expect("import");
 
     temp_env::with_vars(
@@ -175,10 +174,8 @@ fn file_and_db_reads_produce_identical_output() {
             );
 
             // --- session_timeline ---
-            let file_timeline =
-                service::session_timeline("cmp1", None).expect("file timeline");
-            let db_timeline =
-                service::session_timeline("cmp1", Some(&db)).expect("db timeline");
+            let file_timeline = service::session_timeline("cmp1", None).expect("file timeline");
+            let db_timeline = service::session_timeline("cmp1", Some(&db)).expect("db timeline");
             assert_eq!(
                 file_timeline.len(),
                 db_timeline.len(),

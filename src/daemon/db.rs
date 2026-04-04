@@ -2160,9 +2160,7 @@ mod tests {
         let db = seeded_performance_db(16, 8);
 
         median_runtime_budget_ms("list_session_summaries_full", 21, 35, || {
-            let summaries = db
-                .list_session_summaries_full()
-                .expect("session summaries");
+            let summaries = db.list_session_summaries_full().expect("session summaries");
             assert_eq!(summaries.len(), 128);
         });
     }

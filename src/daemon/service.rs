@@ -131,9 +131,7 @@ pub async fn serve(config: DaemonServeConfig) -> Result<(), CliError> {
     drop(daemon_lock);
 
     match (serve_result, cleanup_result, stop_event_result) {
-        (Err(error), _, _)
-        | (Ok(()), Err(error), _)
-        | (Ok(()), Ok(()), Err(error)) => Err(error),
+        (Err(error), _, _) | (Ok(()), Err(error), _) | (Ok(()), Ok(()), Err(error)) => Err(error),
         (Ok(()), Ok(()), Ok(())) => Ok(()),
     }
 }
@@ -592,9 +590,7 @@ pub fn ready_event(session_id: Option<&str>) -> StreamEvent {
 ///
 /// # Errors
 /// Returns `CliError` when project or session discovery fails.
-pub fn sessions_updated_event(
-    db: Option<&super::db::DaemonDb>,
-) -> Result<StreamEvent, CliError> {
+pub fn sessions_updated_event(db: Option<&super::db::DaemonDb>) -> Result<StreamEvent, CliError> {
     let payload = SessionsUpdatedPayload {
         projects: list_projects(db)?,
         sessions: list_sessions(true, db)?,
@@ -971,7 +967,8 @@ mod tests {
             )
             .expect("create task");
 
-            let event = session_updated_event(&state.session_id, None).expect("session updated event");
+            let event =
+                session_updated_event(&state.session_id, None).expect("session updated event");
             let payload: SessionUpdatedPayload =
                 serde_json::from_value(event.payload).expect("deserialize payload");
 

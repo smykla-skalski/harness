@@ -52,12 +52,8 @@ pub fn resolve_git_checkout_identity(path: &Path) -> Option<GitCheckoutIdentity>
     let raw_checkout = PathBuf::from(lines.next()?);
     let git_common_dir = PathBuf::from(lines.next()?);
     let raw_repository = git_common_dir.parent()?.to_path_buf();
-    let checkout_root = raw_checkout
-        .canonicalize()
-        .unwrap_or(raw_checkout);
-    let repository_root = raw_repository
-        .canonicalize()
-        .unwrap_or(raw_repository);
+    let checkout_root = raw_checkout.canonicalize().unwrap_or(raw_checkout);
+    let repository_root = raw_repository.canonicalize().unwrap_or(raw_repository);
     let kind = if checkout_root == repository_root {
         GitCheckoutKind::Repository
     } else {
@@ -170,6 +166,9 @@ mod tests {
         fs::create_dir_all(&path).expect("create plain dir");
 
         assert!(resolve_git_checkout_identity(&path).is_none());
-        assert_eq!(canonical_checkout_root(&path), path.canonicalize().expect("canonicalize"));
+        assert_eq!(
+            canonical_checkout_root(&path),
+            path.canonicalize().expect("canonicalize")
+        );
     }
 }

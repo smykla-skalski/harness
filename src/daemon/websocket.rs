@@ -445,7 +445,11 @@ fn dispatch_query<T: serde::Serialize>(
 fn dispatch_mutation(
     request: &WsRequest,
     state: &DaemonHttpState,
-    handler: impl FnOnce(String, Value, Option<&super::db::DaemonDb>) -> Result<super::protocol::SessionDetail, MutationError>,
+    handler: impl FnOnce(
+        String,
+        Value,
+        Option<&super::db::DaemonDb>,
+    ) -> Result<super::protocol::SessionDetail, MutationError>,
 ) -> WsResponse {
     let db_guard = state.db.as_ref().map(|db| db.lock().expect("db lock"));
     let db_ref = db_guard.as_deref();
@@ -472,7 +476,12 @@ fn dispatch_mutation(
 fn dispatch_mutation_with_task(
     request: &WsRequest,
     state: &DaemonHttpState,
-    handler: impl FnOnce(String, String, Value, Option<&super::db::DaemonDb>) -> Result<super::protocol::SessionDetail, MutationError>,
+    handler: impl FnOnce(
+        String,
+        String,
+        Value,
+        Option<&super::db::DaemonDb>,
+    ) -> Result<super::protocol::SessionDetail, MutationError>,
 ) -> WsResponse {
     let db_guard = state.db.as_ref().map(|db| db.lock().expect("db lock"));
     let db_ref = db_guard.as_deref();
@@ -502,7 +511,12 @@ fn dispatch_mutation_with_task(
 fn dispatch_mutation_with_agent(
     request: &WsRequest,
     state: &DaemonHttpState,
-    handler: impl FnOnce(String, String, Value, Option<&super::db::DaemonDb>) -> Result<super::protocol::SessionDetail, MutationError>,
+    handler: impl FnOnce(
+        String,
+        String,
+        Value,
+        Option<&super::db::DaemonDb>,
+    ) -> Result<super::protocol::SessionDetail, MutationError>,
 ) -> WsResponse {
     let db_guard = state.db.as_ref().map(|db| db.lock().expect("db lock"));
     let db_ref = db_guard.as_deref();
