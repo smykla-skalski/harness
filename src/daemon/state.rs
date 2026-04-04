@@ -1,8 +1,9 @@
 use std::fs;
-use std::io::Write as _;
+use std::io::{self, Write as _};
 use std::os::unix::fs::PermissionsExt;
 use std::path::PathBuf;
 
+use fs2::FileExt;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -13,6 +14,7 @@ use crate::workspace::{dirs_home, harness_data_root, utc_now};
 const LAUNCH_AGENTS_DIR: &str = "LaunchAgents";
 const CURRENT_LAUNCH_AGENT_PLIST: &str = "io.harness.daemon.plist";
 const LEGACY_LAUNCH_AGENT_PLIST: &str = "io.harness.monitor.daemon.plist";
+const DAEMON_LOCK_FILE: &str = "daemon.lock";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DaemonManifest {
@@ -40,6 +42,17 @@ pub struct DaemonDiagnostics {
     pub database_path: String,
     pub database_size_bytes: u64,
     pub last_event: Option<DaemonAuditEvent>,
+}
+
+#[derive(Debug)]
+pub struct DaemonLockGuard {
+    file: fs::File,
+}
+
+impl Drop for DaemonLockGuard {
+    fn drop(&mut self) {
+        let _ = self.file.unlock();
+    }
 }
 
 #[must_use]
@@ -72,6 +85,11 @@ pub fn legacy_launch_agent_path() -> PathBuf {
     launch_agents_dir().join(LEGACY_LAUNCH_AGENT_PLIST)
 }
 
+#[must_use]
+pub fn lock_path() -> PathBuf {
+    daemon_root().join(DAEMON_LOCK_FILE)
+}
+
 fn launch_agents_dir() -> PathBuf {
     dirs_home().join("Library").join(LAUNCH_AGENTS_DIR)
 }
@@ -84,6 +102,39 @@ pub fn ensure_daemon_dirs() -> Result<(), CliError> {
     fs_err::create_dir_all(daemon_root())
         .map_err(|error| CliErrorKind::workflow_io(format!("create daemon root: {error}")))?;
     Ok(())
+}
+
+/// Acquire the daemon singleton lock for the current process lifetime.
+///
+/// # Errors
+/// Returns `CliError` when another daemon already owns the lock or the lock
+/// file cannot be opened.
+pub fn acquire_singleton_lock() -> Result<DaemonLockGuard, CliError> {
+    ensure_daemon_dirs()?;
+    let path = lock_path();
+    let file = fs::OpenOptions::new()
+        .create(true)
+        .read(true)
+        .write(true)
+        .truncate(false)
+        .open(&path)
+        .map_err(|error| CliErrorKind::workflow_io(format!("open daemon lock: {error}")))?;
+    match file.try_lock_exclusive() {
+        Ok(()) => Ok(DaemonLockGuard { file }),
+        Err(error) if error.kind() == io::ErrorKind::WouldBlock => {
+            let detail = load_manifest()?.map_or_else(
+                || "daemon already running".to_string(),
+                |manifest| {
+                    format!(
+                        "daemon already running (pid {}, endpoint {})",
+                        manifest.pid, manifest.endpoint
+                    )
+                },
+            );
+            Err(CliErrorKind::workflow_io(detail).into())
+        }
+        Err(error) => Err(CliErrorKind::workflow_io(format!("lock daemon singleton: {error}")).into()),
+    }
 }
 
 /// Load the persisted daemon manifest, if present.
@@ -104,6 +155,23 @@ pub fn load_manifest() -> Result<Option<DaemonManifest>, CliError> {
 pub fn write_manifest(manifest: &DaemonManifest) -> Result<(), CliError> {
     ensure_daemon_dirs()?;
     write_json_pretty(&manifest_path(), manifest)
+}
+
+/// Remove the daemon manifest when it still belongs to `pid`.
+///
+/// # Errors
+/// Returns `CliError` on filesystem failures.
+pub fn clear_manifest_for_pid(pid: u32) -> Result<(), CliError> {
+    let path = manifest_path();
+    let Some(manifest) = load_manifest()? else {
+        return Ok(());
+    };
+    if manifest.pid != pid || !path.exists() {
+        return Ok(());
+    }
+    fs::remove_file(&path)
+        .map_err(|error| CliErrorKind::workflow_io(format!("remove daemon manifest: {error}")))?;
+    Ok(())
 }
 
 /// Generate and persist a local bearer token with 0600 permissions.
@@ -263,6 +331,61 @@ mod tests {
                 let loaded = load_manifest().expect("load").expect("manifest");
                 assert_eq!(loaded.endpoint, manifest.endpoint);
                 assert_eq!(loaded.pid, 42);
+            },
+        );
+    }
+
+    #[test]
+    fn singleton_lock_rejects_second_holder() {
+        let tmp = tempdir().expect("tempdir");
+        temp_env::with_vars(
+            [(
+                "XDG_DATA_HOME",
+                Some(tmp.path().to_str().expect("utf8 path")),
+            )],
+            || {
+                let _guard = acquire_singleton_lock().expect("first lock");
+                write_manifest(&DaemonManifest {
+                    version: env!("CARGO_PKG_VERSION").into(),
+                    pid: 4242,
+                    endpoint: "http://127.0.0.1:9999".into(),
+                    started_at: "2026-04-04T07:00:00Z".into(),
+                    token_path: auth_token_path().display().to_string(),
+                })
+                .expect("manifest");
+
+                let error = acquire_singleton_lock().expect_err("second lock should fail");
+                let message = error.to_string();
+                assert!(message.contains("daemon already running"));
+                assert!(message.contains("4242"));
+                assert!(message.contains("127.0.0.1:9999"));
+            },
+        );
+    }
+
+    #[test]
+    fn clear_manifest_for_pid_only_removes_owned_manifest() {
+        let tmp = tempdir().expect("tempdir");
+        temp_env::with_vars(
+            [(
+                "XDG_DATA_HOME",
+                Some(tmp.path().to_str().expect("utf8 path")),
+            )],
+            || {
+                write_manifest(&DaemonManifest {
+                    version: env!("CARGO_PKG_VERSION").into(),
+                    pid: 777,
+                    endpoint: "http://127.0.0.1:7777".into(),
+                    started_at: "2026-04-04T07:05:00Z".into(),
+                    token_path: auth_token_path().display().to_string(),
+                })
+                .expect("manifest");
+
+                clear_manifest_for_pid(778).expect("skip foreign pid");
+                assert!(manifest_path().exists(), "foreign pid should not clear manifest");
+
+                clear_manifest_for_pid(777).expect("clear owned manifest");
+                assert!(!manifest_path().exists(), "owned pid should clear manifest");
             },
         );
     }
