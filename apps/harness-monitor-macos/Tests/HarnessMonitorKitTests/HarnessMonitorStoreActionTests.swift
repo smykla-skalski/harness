@@ -301,6 +301,16 @@ struct HarnessMonitorStoreActionTests {
           )
         ]
     )
+    #expect(store.selectedSession?.signals.count == PreviewFixtures.signals.count + 1)
+    #expect(store.selectedSession?.signals.last?.agentId == PreviewFixtures.agents[0].agentId)
+    #expect(store.selectedSession?.signals.last?.status == .pending)
+    #expect(
+      store.selectedSession?.signals.last?.signal.payload.message
+        == "Focus on the stalled review lane."
+    )
+    #expect(
+      store.selectedSession?.signals.last?.signal.payload.actionHint == "task:review"
+    )
     #expect(store.lastAction == "Send signal")
   }
 

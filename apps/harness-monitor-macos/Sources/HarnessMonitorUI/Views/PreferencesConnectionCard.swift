@@ -4,6 +4,8 @@ import SwiftUI
 struct PreferencesConnectionMetrics: View {
   let metrics: ConnectionMetrics
   let events: [ConnectionEvent]
+  @Environment(\.harnessDateTimeConfiguration)
+  private var dateTimeConfiguration
 
   private var latencyText: String {
     metrics.latencyMs.map { "\($0)ms" } ?? "--"
@@ -62,7 +64,7 @@ struct PreferencesConnectionMetrics: View {
             Text(event.detail)
               .lineLimit(1)
             Spacer()
-            Text(formatTimestamp(event.timestamp))
+            Text(formatTimestamp(event.timestamp, configuration: dateTimeConfiguration))
               .scaledFont(.caption.monospaced())
               .foregroundStyle(.secondary)
           }

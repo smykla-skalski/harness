@@ -55,6 +55,7 @@ public struct ContentView: View {
       destinationSystemImage: "laptopcomputer",
       metrics: [
         .init(kind: .projects, value: store.daemonStatus?.projectCount ?? store.projects.count),
+        .init(kind: .worktrees, value: store.daemonStatus?.worktreeCount ?? store.projects.reduce(0) { $0 + $1.worktrees.count }),
         .init(kind: .sessions, value: store.daemonStatus?.sessionCount ?? store.sessions.count),
         .init(kind: .openWork, value: store.totalOpenWorkCount),
         .init(kind: .blocked, value: store.totalBlockedCount),

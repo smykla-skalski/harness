@@ -80,8 +80,11 @@ struct SidebarView: View {
           .listRowSeparator(.hidden)
           .listRowBackground(Color.clear)
 
-        ForEach(firstGroup.sessions) { session in
-          sessionRow(session)
+        ForEach(firstGroup.checkoutGroups) { checkoutGroup in
+          sessionCheckoutRow(for: checkoutGroup)
+          ForEach(checkoutGroup.sessions) { session in
+            sessionRow(session)
+          }
         }
       }
       .accessibilityElement(children: .contain)
@@ -100,8 +103,11 @@ struct SidebarView: View {
             .listRowSeparator(.hidden)
             .listRowBackground(Color.clear)
 
-          ForEach(group.sessions) { session in
-            sessionRow(session)
+          ForEach(group.checkoutGroups) { checkoutGroup in
+            sessionCheckoutRow(for: checkoutGroup)
+            ForEach(checkoutGroup.sessions) { session in
+              sessionRow(session)
+            }
           }
         }
       }
@@ -115,6 +121,7 @@ struct SidebarView: View {
         isBusy: store.isBusy,
         isRefreshing: store.isRefreshing,
         projectCount: store.daemonStatus?.projectCount ?? store.projects.count,
+        worktreeCount: store.daemonStatus?.worktreeCount ?? store.projects.reduce(0) { $0 + $1.worktrees.count },
         sessionCount: store.daemonStatus?.sessionCount ?? store.sessions.count,
         isLaunchAgentInstalled: store.daemonStatus?.launchAgent.installed == true,
         startDaemon: startDaemon,
@@ -145,6 +152,28 @@ struct SidebarView: View {
     )
     .accessibilityFrameMarker(
       HarnessMonitorAccessibility.projectHeaderFrame(group.project.projectId)
+    )
+  }
+
+  private func sessionCheckoutRow(
+    for group: HarnessMonitorStore.CheckoutGroup
+  ) -> some View {
+    HStack(spacing: HarnessMonitorTheme.itemSpacing) {
+      Image(systemName: group.isWorktree ? "square.3.layers.3d.down.right" : "folder")
+        .scaledFont(.caption.weight(.semibold))
+        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+      Text(group.title)
+        .scaledFont(.caption.weight(.semibold))
+        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+      Spacer()
+      Text("\(group.sessions.count)")
+        .scaledFont(.caption2.monospacedDigit())
+        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+    }
+    .padding(.top, HarnessMonitorTheme.itemSpacing)
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .accessibilityIdentifier(
+      HarnessMonitorAccessibility.worktreeHeader(group.checkoutId)
     )
   }
 

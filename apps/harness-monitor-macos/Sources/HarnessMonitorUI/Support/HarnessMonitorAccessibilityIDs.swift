@@ -68,6 +68,8 @@ enum HarnessMonitorAccessibility {
   static let preferencesTitle = "harness.preferences.title"
   static let preferencesThemeModePicker = "harness.preferences.theme-mode"
   static let preferencesTextSizePicker = "harness.preferences.text-size"
+  static let preferencesTimeZoneModePicker = "harness.preferences.time-zone-mode"
+  static let preferencesCustomTimeZonePicker = "harness.preferences.custom-time-zone"
   static let navigateBackButton = "harness.toolbar.navigate-back"
   static let navigateForwardButton = "harness.toolbar.navigate-forward"
   static let toolbarCenterpiece = "harness.toolbar.centerpiece"
@@ -104,6 +106,10 @@ enum HarnessMonitorAccessibility {
 
   static func projectHeaderFrame(_ projectID: String) -> String {
     "\(projectHeader(projectID)).frame"
+  }
+
+  static func worktreeHeader(_ checkoutID: String) -> String {
+    "harness.sidebar.worktree-header.\(slug(checkoutID))"
   }
 
   static func sessionFilterButton(_ filter: String) -> String {

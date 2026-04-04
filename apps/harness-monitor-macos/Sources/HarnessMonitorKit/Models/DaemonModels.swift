@@ -65,6 +65,42 @@ public struct DaemonDiagnostics: Codable, Equatable, Sendable {
     self.databaseSizeBytes = databaseSizeBytes
     self.lastEvent = lastEvent
   }
+
+  enum CodingKeys: String, CodingKey {
+    case daemonRoot, manifestPath, authTokenPath, authTokenPresent
+    case eventsPath, databasePath, databaseSizeBytes, lastEvent
+    case cacheRoot, cacheEntryCount
+  }
+
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    let daemonRoot = try container.decode(String.self, forKey: .daemonRoot)
+    let defaultDatabasePath = URL(fileURLWithPath: daemonRoot).appendingPathComponent("harness.db").path
+
+    self.init(
+      daemonRoot: daemonRoot,
+      manifestPath: try container.decode(String.self, forKey: .manifestPath),
+      authTokenPath: try container.decode(String.self, forKey: .authTokenPath),
+      authTokenPresent: try container.decode(Bool.self, forKey: .authTokenPresent),
+      eventsPath: try container.decode(String.self, forKey: .eventsPath),
+      databasePath: try container.decodeIfPresent(String.self, forKey: .databasePath)
+        ?? defaultDatabasePath,
+      databaseSizeBytes: try container.decodeIfPresent(Int.self, forKey: .databaseSizeBytes) ?? 0,
+      lastEvent: try container.decodeIfPresent(DaemonAuditEvent.self, forKey: .lastEvent)
+    )
+  }
+
+  public func encode(to encoder: Encoder) throws {
+    var container = encoder.container(keyedBy: CodingKeys.self)
+    try container.encode(daemonRoot, forKey: .daemonRoot)
+    try container.encode(manifestPath, forKey: .manifestPath)
+    try container.encode(authTokenPath, forKey: .authTokenPath)
+    try container.encode(authTokenPresent, forKey: .authTokenPresent)
+    try container.encode(eventsPath, forKey: .eventsPath)
+    try container.encode(databasePath, forKey: .databasePath)
+    try container.encode(databaseSizeBytes, forKey: .databaseSizeBytes)
+    try container.encodeIfPresent(lastEvent, forKey: .lastEvent)
+  }
 }
 
 public struct LaunchAgentStatus: Codable, Equatable, Sendable {

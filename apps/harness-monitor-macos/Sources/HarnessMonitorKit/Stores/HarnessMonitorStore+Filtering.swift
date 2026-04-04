@@ -172,9 +172,25 @@ extension HarnessMonitorStore {
         guard let sessions = sessionsByProject[project.projectId], !sessions.isEmpty else {
           return nil
         }
+        let sessionsByCheckout = Dictionary(grouping: sessions, by: \.checkoutId)
+        let checkoutGroups = sessionsByCheckout
+          .map { checkoutID, checkoutSessions in
+            HarnessMonitorStore.CheckoutGroup(
+              checkoutId: checkoutID,
+              title: checkoutSessions.first?.checkoutDisplayName ?? "Repository",
+              isWorktree: checkoutSessions.first?.isWorktree ?? false,
+              sessions: checkoutSessions.sorted(by: sessionSortOrder.compare)
+            )
+          }
+          .sorted { lhs, rhs in
+            if lhs.isWorktree != rhs.isWorktree {
+              return lhs.isWorktree == false
+            }
+            return lhs.title.localizedStandardCompare(rhs.title) == .orderedAscending
+          }
         return SessionGroup(
           project: project,
-          sessions: sessions.sorted(by: sessionSortOrder.compare)
+          checkoutGroups: checkoutGroups
         )
       }
     }
@@ -194,9 +210,12 @@ extension HarnessMonitorStore {
       let haystack = [
         summary.projectName,
         summary.projectId,
+        summary.checkoutId,
+        summary.checkoutDisplayName,
         summary.sessionId,
         summary.context,
         summary.projectDir ?? "",
+        summary.checkoutRoot,
         summary.contextRoot,
         summary.leaderId ?? "",
         summary.observeId ?? "",

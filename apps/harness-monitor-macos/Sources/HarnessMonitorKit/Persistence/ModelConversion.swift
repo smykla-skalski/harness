@@ -15,36 +15,40 @@ enum Codecs {
 // MARK: - ProjectSummary <-> CachedProject
 
 extension CachedProject {
-  public func toProjectSummary() -> ProjectSummary {
-    ProjectSummary(
+  func toProjectSummary() -> ProjectSummary {
+    let worktrees = (try? Codecs.decoder.decode([WorktreeSummary].self, from: worktreesData)) ?? []
+    return ProjectSummary(
       projectId: projectId,
       name: name,
       projectDir: projectDir,
       contextRoot: contextRoot,
       activeSessionCount: activeSessionCount,
-      totalSessionCount: totalSessionCount
+      totalSessionCount: totalSessionCount,
+      worktrees: worktrees
     )
   }
 
-  public func update(from summary: ProjectSummary) {
+  func update(from summary: ProjectSummary) {
     name = summary.name
     projectDir = summary.projectDir
     contextRoot = summary.contextRoot
     activeSessionCount = summary.activeSessionCount
     totalSessionCount = summary.totalSessionCount
+    worktreesData = (try? Codecs.encoder.encode(summary.worktrees)) ?? Data()
     lastCachedAt = .now
   }
 }
 
 extension ProjectSummary {
-  public func toCachedProject() -> CachedProject {
-    CachedProject(
+  func toCachedProject() -> CachedProject {
+    return CachedProject(
       projectId: projectId,
       name: name,
       projectDir: projectDir,
       contextRoot: contextRoot,
       activeSessionCount: activeSessionCount,
-      totalSessionCount: totalSessionCount
+      totalSessionCount: totalSessionCount,
+      worktreesData: (try? Codecs.encoder.encode(worktrees)) ?? Data()
     )
   }
 }
@@ -52,7 +56,7 @@ extension ProjectSummary {
 // MARK: - SessionSummary <-> CachedSession
 
 extension CachedSession {
-  public func toSessionSummary() -> SessionSummary {
+  func toSessionSummary() -> SessionSummary {
     let metrics = (try? Codecs.decoder.decode(SessionMetrics.self, from: metricsData))
       ?? SessionMetrics(
         agentCount: 0,
@@ -75,6 +79,10 @@ extension CachedSession {
       projectName: projectName,
       projectDir: projectDir,
       contextRoot: contextRoot,
+      checkoutId: checkoutId,
+      checkoutRoot: checkoutRoot,
+      isWorktree: isWorktree,
+      worktreeName: worktreeName,
       sessionId: sessionId,
       context: context,
       status: SessionStatus(rawValue: statusRaw) ?? .active,
@@ -88,7 +96,7 @@ extension CachedSession {
     )
   }
 
-  public func toSessionDetail() -> SessionDetail {
+  func toSessionDetail() -> SessionDetail {
     SessionDetail(
       session: toSessionSummary(),
       agents: agents.map { $0.toAgentRegistration() },
@@ -99,11 +107,15 @@ extension CachedSession {
     )
   }
 
-  public func update(from summary: SessionSummary) {
+  func update(from summary: SessionSummary) {
     projectId = summary.projectId
     projectName = summary.projectName
     projectDir = summary.projectDir
     contextRoot = summary.contextRoot
+    checkoutId = summary.checkoutId
+    checkoutRoot = summary.checkoutRoot
+    isWorktree = summary.isWorktree
+    worktreeName = summary.worktreeName
     context = summary.context
     statusRaw = summary.status.rawValue
     createdAt = summary.createdAt
@@ -118,13 +130,17 @@ extension CachedSession {
 }
 
 extension SessionSummary {
-  public func toCachedSession() -> CachedSession {
+  func toCachedSession() -> CachedSession {
     CachedSession(
       sessionId: sessionId,
       projectId: projectId,
       projectName: projectName,
       projectDir: projectDir,
       contextRoot: contextRoot,
+      checkoutId: checkoutId,
+      checkoutRoot: checkoutRoot,
+      isWorktree: isWorktree,
+      worktreeName: worktreeName,
       context: context,
       statusRaw: status.rawValue,
       createdAt: createdAt,
@@ -141,7 +157,7 @@ extension SessionSummary {
 // MARK: - AgentRegistration <-> CachedAgent
 
 extension CachedAgent {
-  public func toAgentRegistration() -> AgentRegistration {
+  func toAgentRegistration() -> AgentRegistration {
     let capabilities = (try? Codecs.decoder.decode([String].self, from: capabilitiesData)) ?? []
     let runtimeCapabilities =
       (try? Codecs.decoder.decode(RuntimeCapabilities.self, from: runtimeCapabilitiesData))
@@ -170,7 +186,7 @@ extension CachedAgent {
     )
   }
 
-  public func update(from registration: AgentRegistration) {
+  func update(from registration: AgentRegistration) {
     name = registration.name
     runtime = registration.runtime
     roleRaw = registration.role.rawValue
@@ -187,7 +203,7 @@ extension CachedAgent {
 }
 
 extension AgentRegistration {
-  public func toCachedAgent() -> CachedAgent {
+  func toCachedAgent() -> CachedAgent {
     CachedAgent(
       agentId: agentId,
       name: name,
@@ -208,7 +224,7 @@ extension AgentRegistration {
 // MARK: - WorkItem <-> CachedWorkItem
 
 extension CachedWorkItem {
-  public func toWorkItem() -> WorkItem {
+  func toWorkItem() -> WorkItem {
     let notes = (try? Codecs.decoder.decode([TaskNote].self, from: notesData)) ?? []
     let checkpoint: TaskCheckpointSummary? =
       if let data = checkpointData {
@@ -236,7 +252,7 @@ extension CachedWorkItem {
     )
   }
 
-  public func update(from item: WorkItem) {
+  func update(from item: WorkItem) {
     title = item.title
     context = item.context
     severityRaw = item.severity.rawValue
@@ -255,7 +271,7 @@ extension CachedWorkItem {
 }
 
 extension WorkItem {
-  public func toCachedWorkItem() -> CachedWorkItem {
+  func toCachedWorkItem() -> CachedWorkItem {
     CachedWorkItem(
       taskId: taskId,
       title: title,

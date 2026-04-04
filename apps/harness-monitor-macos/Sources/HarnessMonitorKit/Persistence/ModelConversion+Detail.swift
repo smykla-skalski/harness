@@ -4,7 +4,7 @@ import SwiftData
 // MARK: - SessionSignalRecord <-> CachedSignalRecord
 
 extension CachedSignalRecord {
-  public func toSessionSignalRecord() -> SessionSignalRecord {
+  func toSessionSignalRecord() -> SessionSignalRecord {
     let signal = (try? Codecs.decoder.decode(Signal.self, from: signalData))
       ?? Signal(
         signalId: signalId,
@@ -44,7 +44,7 @@ extension CachedSignalRecord {
     )
   }
 
-  public func update(from record: SessionSignalRecord) {
+  func update(from record: SessionSignalRecord) {
     runtime = record.runtime
     agentId = record.agentId
     sessionId = record.sessionId
@@ -57,7 +57,7 @@ extension CachedSignalRecord {
 }
 
 extension SessionSignalRecord {
-  public func toCachedSignalRecord() -> CachedSignalRecord {
+  func toCachedSignalRecord() -> CachedSignalRecord {
     CachedSignalRecord(
       signalId: signal.signalId,
       runtime: runtime,
@@ -75,7 +75,7 @@ extension SessionSignalRecord {
 // MARK: - TimelineEntry <-> CachedTimelineEntry
 
 extension CachedTimelineEntry {
-  public func toTimelineEntry() -> TimelineEntry {
+  func toTimelineEntry() -> TimelineEntry {
     let payload = (try? Codecs.decoder.decode(
       JSONValue.self,
       from: payloadData
@@ -93,7 +93,7 @@ extension CachedTimelineEntry {
     )
   }
 
-  public func update(from entry: TimelineEntry) {
+  func update(from entry: TimelineEntry) {
     recordedAt = entry.recordedAt
     kind = entry.kind
     sessionId = entry.sessionId
@@ -105,7 +105,7 @@ extension CachedTimelineEntry {
 }
 
 extension TimelineEntry {
-  public func toCachedTimelineEntry() -> CachedTimelineEntry {
+  func toCachedTimelineEntry() -> CachedTimelineEntry {
     CachedTimelineEntry(
       entryId: entryId,
       recordedAt: recordedAt,
@@ -130,7 +130,7 @@ struct ObserverDetailBlob: Codable {
 }
 
 extension CachedObserver {
-  public func toObserverSummary() -> ObserverSummary {
+  func toObserverSummary() -> ObserverSummary {
     let detail = (try? Codecs.decoder.decode(
       ObserverDetailBlob.self,
       from: detailData
@@ -151,7 +151,7 @@ extension CachedObserver {
     )
   }
 
-  public func update(from summary: ObserverSummary) {
+  func update(from summary: ObserverSummary) {
     observeId = summary.observeId
     lastScanTime = summary.lastScanTime
     openIssueCount = summary.openIssueCount
@@ -170,7 +170,7 @@ extension CachedObserver {
 }
 
 extension ObserverSummary {
-  public func toCachedObserver() -> CachedObserver {
+  func toCachedObserver() -> CachedObserver {
     let blob = ObserverDetailBlob(
       openIssues: openIssues,
       mutedCodes: mutedCodes,
@@ -193,7 +193,7 @@ extension ObserverSummary {
 // MARK: - AgentToolActivitySummary <-> CachedAgentActivity
 
 extension CachedAgentActivity {
-  public func toAgentToolActivitySummary() -> AgentToolActivitySummary {
+  func toAgentToolActivitySummary() -> AgentToolActivitySummary {
     let recentTools = (try? Codecs.decoder.decode(
       [String].self,
       from: recentToolsData
@@ -211,7 +211,7 @@ extension CachedAgentActivity {
     )
   }
 
-  public func update(from activity: AgentToolActivitySummary) {
+  func update(from activity: AgentToolActivitySummary) {
     runtime = activity.runtime
     toolInvocationCount = activity.toolInvocationCount
     toolResultCount = activity.toolResultCount
@@ -225,7 +225,7 @@ extension CachedAgentActivity {
 }
 
 extension AgentToolActivitySummary {
-  public func toCachedAgentActivity() -> CachedAgentActivity {
+  func toCachedAgentActivity() -> CachedAgentActivity {
     CachedAgentActivity(
       agentId: agentId,
       runtime: runtime,
