@@ -106,7 +106,12 @@ pub async fn ws_upgrade_handler(
     ws.on_upgrade(move |socket| handle_connection(socket, state))
 }
 
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion; tokio-rs/tracing#553"
+)]
 async fn handle_connection(socket: WebSocket, state: DaemonHttpState) {
+    tracing::info!("websocket connection opened");
     let (mut sender, mut receiver) = socket.split();
     let connection = Arc::new(Mutex::new(ConnectionState::new()));
     let (outbound_tx, mut outbound_rx) = mpsc::channel::<Message>(256);
@@ -181,6 +186,7 @@ async fn handle_connection(socket: WebSocket, state: DaemonHttpState) {
         _ = inbound_task => {}
         _ = writer_task => {}
     }
+    tracing::info!("websocket connection closed");
 }
 
 enum IncomingMessageAction {
@@ -306,7 +312,30 @@ fn handle_message(
     })
 }
 
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion; tokio-rs/tracing#553"
+)]
 fn dispatch(
+    request: &WsRequest,
+    state: &DaemonHttpState,
+    connection: &Arc<Mutex<ConnectionState>>,
+) -> WsResponse {
+    let start = Instant::now();
+    let response = dispatch_inner(request, state, connection);
+    let duration_ms = u64::try_from(start.elapsed().as_millis()).unwrap_or(u64::MAX);
+    let is_error = response.error.is_some();
+    tracing::debug!(
+        method = %request.method,
+        request_id = %request.id,
+        duration_ms,
+        is_error,
+        "ws dispatch"
+    );
+    response
+}
+
+fn dispatch_inner(
     request: &WsRequest,
     state: &DaemonHttpState,
     connection: &Arc<Mutex<ConnectionState>>,
