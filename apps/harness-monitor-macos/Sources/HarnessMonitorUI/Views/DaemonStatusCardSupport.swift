@@ -47,6 +47,7 @@ struct DaemonCardHeader: View {
 
 struct DaemonMetricsStrip: View {
   let projectCount: Int
+  let worktreeCount: Int
   let sessionCount: Int
   let launchdState: String
 
@@ -54,12 +55,14 @@ struct DaemonMetricsStrip: View {
     ViewThatFits(in: .horizontal) {
       HStack(spacing: HarnessMonitorTheme.itemSpacing) {
         projectsBadge
+        worktreesBadge
         sessionsBadge
         launchdBadge
       }
       VStack(alignment: .leading, spacing: HarnessMonitorTheme.itemSpacing) {
         HStack(spacing: HarnessMonitorTheme.itemSpacing) {
           projectsBadge
+          worktreesBadge
           sessionsBadge
         }
         launchdBadge
@@ -77,6 +80,12 @@ struct DaemonMetricsStrip: View {
   private var sessionsBadge: some View {
     DaemonSidebarLayoutProbe(HarnessMonitorAccessibility.sidebarDaemonBadgeFrame("Sessions")) {
       DaemonStatBadge(title: "Sessions", value: "\(sessionCount)")
+    }
+  }
+
+  private var worktreesBadge: some View {
+    DaemonSidebarLayoutProbe(HarnessMonitorAccessibility.sidebarDaemonBadgeFrame("Worktrees")) {
+      DaemonStatBadge(title: "Worktrees", value: "\(worktreeCount)")
     }
   }
 

@@ -4,11 +4,16 @@ struct PreferencesStatusSection: View {
   let startedAt: String?
   let lastError: String?
   let lastAction: String
+  @Environment(\.harnessDateTimeConfiguration)
+  private var dateTimeConfiguration
 
   var body: some View {
     Section("Status") {
       if let startedAt {
-        LabeledContent("Started", value: formatTimestamp(startedAt))
+        LabeledContent(
+          "Started",
+          value: formatTimestamp(startedAt, configuration: dateTimeConfiguration)
+        )
       }
       if let lastError, !lastError.isEmpty {
         LabeledContent("Latest Error") {

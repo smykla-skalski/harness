@@ -224,7 +224,7 @@ private struct SidebarSegmentedPicker<Option: Hashable & Identifiable>: View {
 // MARK: - Accessibility helpers used by SidebarView
 
 func sessionAccessibilityLabel(for session: SessionSummary) -> String {
-  "\(session.context), \(session.projectName), \(session.status.title), \(session.sessionId)"
+  "\(session.context), \(session.projectName), \(session.checkoutDisplayName), \(session.status.title), \(session.sessionId)"
 }
 
 func sessionAccessibilityValue(

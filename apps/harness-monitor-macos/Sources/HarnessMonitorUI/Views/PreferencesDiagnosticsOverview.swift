@@ -5,8 +5,11 @@ struct PreferencesDiagnosticsOverview: View {
   let launchAgent: LaunchAgentStatus?
   let tokenPresent: Bool
   let projectCount: Int
+  let worktreeCount: Int
   let sessionCount: Int
   let lastEvent: DaemonAuditEvent?
+  @Environment(\.harnessDateTimeConfiguration)
+  private var dateTimeConfiguration
 
   var body: some View {
     Section("Overview") {
@@ -18,6 +21,7 @@ struct PreferencesDiagnosticsOverview: View {
         .foregroundStyle(tokenPresent ? HarnessMonitorTheme.success : HarnessMonitorTheme.danger)
       }
       LabeledContent("Projects", value: "\(projectCount)")
+      LabeledContent("Worktrees", value: "\(worktreeCount)")
       LabeledContent("Sessions", value: "\(sessionCount)")
     }
 
@@ -45,7 +49,7 @@ struct PreferencesDiagnosticsOverview: View {
             .tracking(HarnessMonitorTheme.uppercaseTracking)
         }
         Text(lastEvent.message)
-        Text(formatTimestamp(lastEvent.recordedAt))
+        Text(formatTimestamp(lastEvent.recordedAt, configuration: dateTimeConfiguration))
           .scaledFont(.caption.monospaced())
           .foregroundStyle(.secondary)
       }
@@ -61,6 +65,7 @@ struct PreferencesDiagnosticsOverview: View {
       launchAgent: store.daemonStatus?.launchAgent,
       tokenPresent: store.diagnostics?.workspace.authTokenPresent ?? false,
       projectCount: store.daemonStatus?.projectCount ?? 0,
+      worktreeCount: store.daemonStatus?.worktreeCount ?? 0,
       sessionCount: store.daemonStatus?.sessionCount ?? 0,
       lastEvent: store.diagnostics?.workspace.lastEvent
     )

@@ -2,6 +2,8 @@ import XCTest
 
 private typealias Accessibility = HarnessMonitorUITestAccessibility
 private let textSizeOverrideKey = "HARNESS_MONITOR_TEXT_SIZE_OVERRIDE"
+private let timeZoneModeOverrideKey = "HARNESS_MONITOR_TIME_ZONE_MODE_OVERRIDE"
+private let customTimeZoneOverrideKey = "HARNESS_MONITOR_CUSTOM_TIME_ZONE_OVERRIDE"
 
 @MainActor
 final class HarnessMonitorSettingsUITests: HarnessMonitorUITestCase {
@@ -35,7 +37,9 @@ final class HarnessMonitorSettingsUITests: HarnessMonitorUITestCase {
         mode: "auto",
         section: "general",
         textSize: "Default",
-        controlSize: "small"
+        controlSize: "small",
+        timeZoneMode: "local",
+        timeZone: "local"
       )
     )
   }
@@ -107,6 +111,16 @@ final class HarnessMonitorSettingsUITests: HarnessMonitorUITestCase {
       expectedControlSize: "large"
     )
   }
+
+  func testSettingsTimeZonePickerSupportsCustomZoneContract() throws {
+    assertSettingsThemeModeContract(
+      expectedMode: "auto",
+      timeZoneModeOverride: "custom",
+      customTimeZoneOverride: "Europe/Warsaw",
+      expectedTimeZoneMode: "custom",
+      expectedTimeZone: "Europe/Warsaw"
+    )
+  }
 }
 
 private extension HarnessMonitorSettingsUITests {
@@ -114,11 +128,21 @@ private extension HarnessMonitorSettingsUITests {
     expectedMode: String,
     textSizeOverride: String? = nil,
     expectedTextSize: String = "Default",
-    expectedControlSize: String = "small"
+    expectedControlSize: String = "small",
+    timeZoneModeOverride: String? = nil,
+    customTimeZoneOverride: String? = nil,
+    expectedTimeZoneMode: String = "local",
+    expectedTimeZone: String = "local"
   ) {
     var additionalEnvironment = ["HARNESS_MONITOR_THEME_MODE_OVERRIDE": expectedMode]
     if let textSizeOverride {
       additionalEnvironment[textSizeOverrideKey] = textSizeOverride
+    }
+    if let timeZoneModeOverride {
+      additionalEnvironment[timeZoneModeOverrideKey] = timeZoneModeOverride
+    }
+    if let customTimeZoneOverride {
+      additionalEnvironment[customTimeZoneOverrideKey] = customTimeZoneOverride
     }
 
     let app = launch(
@@ -133,21 +157,30 @@ private extension HarnessMonitorSettingsUITests {
     let appChromeState = element(in: app, identifier: Accessibility.appChromeState)
     let modePicker = element(in: app, identifier: Accessibility.preferencesThemeModePicker)
     let textSizePicker = element(in: app, identifier: Accessibility.preferencesTextSizePicker)
+    let timeZonePicker = element(in: app, identifier: Accessibility.preferencesTimeZoneModePicker)
+    let customTimeZonePicker = element(
+      in: app,
+      identifier: Accessibility.preferencesCustomTimeZonePicker
+    )
 
     XCTAssertTrue(preferencesRoot.waitForExistence(timeout: Self.uiTimeout))
     XCTAssertTrue(preferencesState.waitForExistence(timeout: Self.uiTimeout))
     XCTAssertTrue(appChromeState.waitForExistence(timeout: Self.uiTimeout))
     XCTAssertTrue(modePicker.waitForExistence(timeout: Self.uiTimeout))
     XCTAssertTrue(textSizePicker.waitForExistence(timeout: Self.uiTimeout))
+    XCTAssertTrue(timeZonePicker.waitForExistence(timeout: Self.uiTimeout))
     XCTAssertEqual(
       preferencesState.label,
       preferencesStateLabel(
         mode: expectedMode,
         section: "general",
         textSize: expectedTextSize,
-        controlSize: expectedControlSize
+        controlSize: expectedControlSize,
+        timeZoneMode: expectedTimeZoneMode,
+        timeZone: expectedTimeZone
       )
     )
+    XCTAssertEqual(customTimeZonePicker.exists, expectedTimeZoneMode == "custom")
     XCTAssertEqual(
       appChromeState.label,
       "contentChrome=native, interactiveRows=button, controlGlass=native"
@@ -180,13 +213,17 @@ private extension HarnessMonitorSettingsUITests {
     mode: String,
     section: String,
     textSize: String,
-    controlSize: String
+    controlSize: String,
+    timeZoneMode: String,
+    timeZone: String
   ) -> String {
     [
       "mode=\(mode)",
       "section=\(section)",
       "textSize=\(textSize)",
       "controlSize=\(controlSize)",
+      "timeZoneMode=\(timeZoneMode)",
+      "timeZone=\(timeZone)",
       "preferencesChrome=native",
     ].joined(separator: ", ")
   }

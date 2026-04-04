@@ -3,6 +3,8 @@ import SwiftUI
 
 struct PreferencesRecentEventsSection: View {
   let events: [DaemonAuditEvent]
+  @Environment(\.harnessDateTimeConfiguration)
+  private var dateTimeConfiguration
 
   var body: some View {
     Section("Recent Events") {
@@ -20,7 +22,7 @@ struct PreferencesRecentEventsSection: View {
                   eventLevelColor(event.level)
                 )
               Spacer()
-              Text(formatTimestamp(event.recordedAt))
+              Text(formatTimestamp(event.recordedAt, configuration: dateTimeConfiguration))
                 .scaledFont(.caption.monospaced())
                 .foregroundStyle(.secondary)
             }

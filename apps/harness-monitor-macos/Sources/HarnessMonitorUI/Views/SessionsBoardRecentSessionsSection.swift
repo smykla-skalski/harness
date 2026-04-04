@@ -4,6 +4,8 @@ import SwiftUI
 struct SessionsBoardRecentSessionsSection: View {
   let sessions: [SessionSummary]
   let selectSession: (String) -> Void
+  @Environment(\.harnessDateTimeConfiguration)
+  private var dateTimeConfiguration
 
   var body: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
@@ -38,13 +40,13 @@ struct SessionsBoardRecentSessionsSection: View {
                       .scaledFont(.caption2.weight(.bold))
                       .foregroundStyle(statusColor(for: session.status))
                   }
-                  Text("\(session.projectName) • \(session.sessionId)")
+                  Text(sessionMetadata(session))
                     .scaledFont(.caption.monospaced())
                     .truncationMode(.middle)
                     .foregroundStyle(HarnessMonitorTheme.secondaryInk)
                 }
                 Spacer()
-                Text(formatTimestamp(session.updatedAt))
+                Text(formatTimestamp(session.updatedAt, configuration: dateTimeConfiguration))
                   .scaledFont(.caption.weight(.semibold))
                   .foregroundStyle(HarnessMonitorTheme.secondaryInk)
               }
@@ -78,6 +80,13 @@ struct SessionsBoardRecentSessionsSection: View {
     )
     .accessibilityFrameMarker("\(HarnessMonitorAccessibility.recentSessionsCard).frame")
   }
+}
+
+private func sessionMetadata(_ session: SessionSummary) -> String {
+  if session.isWorktree {
+    return "\(session.projectName) • \(session.checkoutDisplayName) • \(session.sessionId)"
+  }
+  return "\(session.projectName) • \(session.sessionId)"
 }
 
 #Preview("Recent sessions") {

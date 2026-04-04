@@ -9,6 +9,8 @@ struct SessionCockpitHeaderCard: View {
   let observeSelectedSession: () -> Void
   let requestEndSessionConfirmation: () -> Void
   let inspectObserver: () -> Void
+  @Environment(\.harnessDateTimeConfiguration)
+  private var dateTimeConfiguration
 
   var body: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
@@ -27,7 +29,7 @@ struct SessionCockpitHeaderCard: View {
               .scaledFont(.system(.largeTitle, design: .rounded, weight: .black))
               .lineLimit(2)
           }
-          Text("\(detail.session.projectName) • \(detail.session.sessionId)")
+          Text(sessionHeaderMetadata(detail.session))
             .scaledFont(.system(.subheadline, design: .rounded, weight: .medium))
             .foregroundStyle(HarnessMonitorTheme.secondaryInk)
         }
@@ -96,7 +98,10 @@ struct SessionCockpitHeaderCard: View {
             summaryLabel("Muted", value: "\(observer.mutedCodeCount)")
             summaryLabel("Workers", value: "\(observer.activeWorkerCount)")
             Spacer()
-            summaryLabel("Last Sweep", value: formatTimestamp(observer.lastScanTime))
+            summaryLabel(
+              "Last Sweep",
+              value: formatTimestamp(observer.lastScanTime, configuration: dateTimeConfiguration)
+            )
           }
           VStack(alignment: .leading, spacing: HarnessMonitorTheme.itemSpacing) {
             HStack(spacing: HarnessMonitorTheme.spacingLG) {
@@ -106,7 +111,10 @@ struct SessionCockpitHeaderCard: View {
             HStack(spacing: HarnessMonitorTheme.spacingLG) {
               summaryLabel("Muted", value: "\(observer.mutedCodeCount)")
               summaryLabel("Workers", value: "\(observer.activeWorkerCount)")
-              summaryLabel("Last Sweep", value: formatTimestamp(observer.lastScanTime))
+              summaryLabel(
+                "Last Sweep",
+                value: formatTimestamp(observer.lastScanTime, configuration: dateTimeConfiguration)
+              )
             }
           }
         }
@@ -138,7 +146,7 @@ struct SessionCockpitHeaderCard: View {
         Label("Pending Leader Transfer", systemImage: "arrow.left.arrow.right")
           .scaledFont(.system(.headline, design: .rounded, weight: .semibold))
         Spacer()
-        Text(formatTimestamp(pendingTransfer.requestedAt))
+        Text(formatTimestamp(pendingTransfer.requestedAt, configuration: dateTimeConfiguration))
           .scaledFont(.caption.monospaced())
           .foregroundStyle(HarnessMonitorTheme.secondaryInk)
       }
@@ -174,6 +182,13 @@ struct SessionCockpitHeaderCard: View {
         .scaledFont(.system(.callout, design: .rounded, weight: .semibold))
     }
   }
+}
+
+private func sessionHeaderMetadata(_ session: SessionSummary) -> String {
+  if session.isWorktree {
+    return "\(session.projectName) • \(session.checkoutDisplayName) • \(session.sessionId)"
+  }
+  return "\(session.projectName) • \(session.sessionId)"
 }
 
 #Preview("Cockpit header") {
