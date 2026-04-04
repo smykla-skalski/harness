@@ -127,6 +127,7 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
   private var _detail: SessionDetail
   private var _healthDelay: Duration?
   private var _transportLatencyMs: Int?
+  private var _transportLatencyError: (any Error)?
   private var _diagnosticsDelay: Duration?
   private var _mutationDelay: Duration?
   private var _projectSummaries: [ProjectSummary]?
@@ -174,6 +175,12 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
   func configureTransportLatencyMs(_ latencyMs: Int?) {
     lock.withLock {
       _transportLatencyMs = latencyMs
+    }
+  }
+
+  func configureTransportLatencyError(_ error: (any Error)?) {
+    lock.withLock {
+      _transportLatencyError = error
     }
   }
 
@@ -295,6 +302,7 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
 
   func configuredHealthDelay() -> Duration? { lock.withLock { _healthDelay } }
   func configuredTransportLatencyMs() -> Int? { lock.withLock { _transportLatencyMs } }
+  func configuredTransportLatencyError() -> (any Error)? { lock.withLock { _transportLatencyError } }
   func configuredDiagnosticsDelay() -> Duration? { lock.withLock { _diagnosticsDelay } }
   func configuredMutationDelay() -> Duration? { lock.withLock { _mutationDelay } }
   func configuredProjects() -> [ProjectSummary]? { lock.withLock { _projectSummaries } }

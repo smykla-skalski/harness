@@ -5,6 +5,9 @@ import Foundation
 extension RecordingHarnessClient {
   func transportLatencyMs() async throws -> Int? {
     recordReadCall(.transportLatency)
+    if let error = configuredTransportLatencyError() {
+      throw error
+    }
     return configuredTransportLatencyMs()
   }
 

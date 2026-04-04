@@ -47,7 +47,6 @@ extension HarnessMonitorStore {
     defer { isRefreshing = false }
 
     do {
-      async let transportLatencyResponse = client.transportLatencyMs()
       async let diagnosticsResponse = Self.measureOperation {
         try await client.diagnostics()
       }
@@ -58,7 +57,6 @@ extension HarnessMonitorStore {
         try await client.sessions()
       }
 
-      let transportLatencyMs = try await transportLatencyResponse
       let measuredDiagnostics = try await diagnosticsResponse
       let measuredProjects = try await projectResponse
       let measuredSessions = try await sessionResponse
@@ -66,7 +64,7 @@ extension HarnessMonitorStore {
       diagnostics = measuredDiagnostics.value
       health = measuredDiagnostics.value.health
       recordRequestSuccess(
-        latencyMs: transportLatencyMs ?? measuredDiagnostics.latencyMs,
+        latencyMs: measuredDiagnostics.latencyMs,
         updatesLatency: true
       )
       recordRequestSuccess()

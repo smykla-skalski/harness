@@ -5,18 +5,20 @@ import Testing
 @MainActor
 @Suite("Harness Monitor store connection metrics")
 struct HarnessMonitorStoreMetricsTests {
-  @Test("Bootstrap records a real latency sample")
+  @Test("Bootstrap records a latency sample without relying on transport ping")
   func bootstrapRecordsLatencySample() async {
     let client = RecordingHarnessClient()
-    client.configureHealthDelay(.milliseconds(25))
-    client.configureTransportLatencyMs(87)
+    client.configureDiagnosticsDelay(.milliseconds(25))
+    client.configureTransportLatencyError(
+      HarnessMonitorAPIError.server(code: 599, message: "ping stalled")
+    )
 
     let store = await makeBootstrappedStore(client: client)
 
-    #expect(store.connectionMetrics.latencyMs == 87)
-    #expect(store.connectionMetrics.averageLatencyMs == 87)
+    #expect((store.connectionMetrics.latencyMs ?? 0) >= 20)
+    #expect((store.connectionMetrics.averageLatencyMs ?? 0) >= 20)
     #expect(store.connectionMetrics.connectedSince != nil)
-    #expect(client.readCallCount(.transportLatency) > 0)
+    #expect(client.readCallCount(.transportLatency) == 0)
 
     store.stopAllStreams()
   }
@@ -39,7 +41,8 @@ struct HarnessMonitorStoreMetricsTests {
     try? await Task.sleep(for: .milliseconds(120))
 
     #expect(store.connectionMetrics.latencyMs == 143)
-    #expect(store.connectionMetrics.averageLatencyMs == 143)
+    #expect((store.connectionMetrics.averageLatencyMs ?? 0) > 0)
+    #expect((store.connectionMetrics.averageLatencyMs ?? 0) <= 143)
     #expect(client.readCallCount(.transportLatency) > 1)
 
     store.stopAllStreams()
