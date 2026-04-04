@@ -1,16 +1,27 @@
 use std::env::current_exe;
-use std::path::PathBuf;
-use std::time::Duration;
+use std::path::{Path, PathBuf};
+use std::process::{Child, Command, Stdio};
+use std::sync::LazyLock;
+use std::thread;
+use std::time::{Duration, Instant};
 
 use clap::{Args, Subcommand};
 use tokio::runtime::Runtime;
 
 use crate::app::command_context::{AppContext, Execute};
 use crate::errors::{CliError, CliErrorKind};
+use crate::infra::exec::RUNTIME;
 
 use super::launchd;
+use super::protocol::DaemonControlResponse;
 use super::service::{self, DaemonServeConfig};
 use super::snapshot;
+
+const DAEMON_CONTROL_TIMEOUT: Duration = Duration::from_secs(8);
+const DAEMON_CONTROL_POLL_INTERVAL: Duration = Duration::from_millis(250);
+const DAEMON_HTTP_TIMEOUT: Duration = Duration::from_secs(2);
+
+static DAEMON_HTTP_CLIENT: LazyLock<reqwest::Client> = LazyLock::new(reqwest::Client::new);
 
 /// Local daemon commands used by the macOS Harness app.
 #[derive(Debug, Clone, Subcommand)]
@@ -20,6 +31,10 @@ pub enum DaemonCommand {
     Serve(DaemonServeArgs),
     /// Show daemon manifest and project/session counts.
     Status,
+    /// Stop the local daemon.
+    Stop(DaemonStopArgs),
+    /// Restart the local daemon.
+    Restart(DaemonRestartArgs),
     /// Install the per-user `LaunchAgent` plist.
     InstallLaunchAgent(DaemonInstallLaunchAgentArgs),
     /// Remove the per-user `LaunchAgent` plist.
@@ -39,6 +54,8 @@ impl Execute for DaemonCommand {
                 print_json(&report)?;
                 Ok(0)
             }
+            Self::Stop(args) => args.execute(context),
+            Self::Restart(args) => args.execute(context),
             Self::Doctor => {
                 let db_path = super::state::daemon_root().join("harness.db");
                 let db = super::db::DaemonDb::open(&db_path).ok();
@@ -50,6 +67,41 @@ impl Execute for DaemonCommand {
             Self::RemoveLaunchAgent(args) => args.execute(context),
             Self::Snapshot(args) => args.execute(context),
         }
+    }
+}
+
+#[derive(Debug, Clone, Args)]
+pub struct DaemonStopArgs {
+    /// Output as JSON.
+    #[arg(long)]
+    pub json: bool,
+}
+
+impl Execute for DaemonStopArgs {
+    fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
+        let response = stop_daemon()?;
+        print_daemon_control_response(&response, self.json)?;
+        Ok(0)
+    }
+}
+
+#[derive(Debug, Clone, Args)]
+pub struct DaemonRestartArgs {
+    /// Output as JSON.
+    #[arg(long)]
+    pub json: bool,
+}
+
+impl Execute for DaemonRestartArgs {
+    fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
+        let binary = current_exe().map_err(|error| {
+            CliError::from(CliErrorKind::workflow_io(format!(
+                "resolve current harness binary: {error}"
+            )))
+        })?;
+        let response = restart_daemon(&binary)?;
+        print_daemon_control_response(&response, self.json)?;
+        Ok(0)
     }
 }
 
@@ -83,6 +135,235 @@ impl Execute for DaemonServeArgs {
             observe_interval: Duration::from_secs(self.observe_seconds.max(1)),
         }))?;
         Ok(0)
+    }
+}
+
+fn stop_daemon() -> Result<DaemonControlResponse, CliError> {
+    let launch_agent = launchd::launch_agent_status();
+    if cfg!(target_os = "macos") && (launch_agent.installed || launch_agent.loaded) {
+        let manifest = super::state::load_manifest()?;
+        let booted_out = launchd::bootout_launch_agent()?;
+        if booted_out && let Some(manifest) = manifest.as_ref() {
+            wait_for_daemon_shutdown(&manifest.endpoint)?;
+        }
+    }
+
+    let _ = request_shutdown_if_running()?;
+    Ok(DaemonControlResponse {
+        status: "stopped".into(),
+    })
+}
+
+fn restart_daemon(binary: &Path) -> Result<DaemonControlResponse, CliError> {
+    let launch_agent = launchd::launch_agent_status();
+    if cfg!(target_os = "macos") && launch_agent.loaded {
+        let manifest = super::state::load_manifest()?;
+        let booted_out = launchd::bootout_launch_agent()?;
+        if booted_out && let Some(manifest) = manifest.as_ref() {
+            wait_for_daemon_shutdown(&manifest.endpoint)?;
+        }
+    }
+
+    let _ = request_shutdown_if_running()?;
+
+    if cfg!(target_os = "macos") && launch_agent.installed {
+        launchd::restart_launch_agent()?;
+        let _ = wait_for_healthy_daemon(None)?;
+    } else {
+        let mut child = spawn_daemon(binary)?;
+        let _ = wait_for_healthy_daemon(Some(&mut child))?;
+    }
+
+    Ok(DaemonControlResponse {
+        status: "restarted".into(),
+    })
+}
+
+fn request_shutdown_if_running() -> Result<bool, CliError> {
+    let Some(manifest) = super::state::load_manifest()? else {
+        return Ok(false);
+    };
+    if !daemon_is_healthy(&manifest.endpoint) {
+        return Ok(false);
+    }
+
+    let token = fs_err::read_to_string(&manifest.token_path)
+        .map(|value| value.trim().to_string())
+        .map_err(|error| {
+            CliError::from(CliErrorKind::workflow_io(format!(
+                "read daemon token {}: {error}",
+                manifest.token_path
+            )))
+        })?;
+
+    match post_stop_request(&manifest.endpoint, &token) {
+        Ok(()) => {
+            wait_for_daemon_shutdown(&manifest.endpoint)?;
+            Ok(true)
+        }
+        Err(_error) if !daemon_is_healthy(&manifest.endpoint) => {
+            wait_for_daemon_shutdown(&manifest.endpoint)?;
+            Ok(true)
+        }
+        Err(error) => Err(error),
+    }
+}
+
+fn post_stop_request(endpoint: &str, token: &str) -> Result<(), CliError> {
+    let url = daemon_url(endpoint, "/v1/daemon/stop");
+    let (status, body) = RUNTIME.block_on(async {
+        let response = DAEMON_HTTP_CLIENT
+            .post(&url)
+            .bearer_auth(token)
+            .json(&serde_json::json!({}))
+            .timeout(DAEMON_HTTP_TIMEOUT)
+            .send()
+            .await
+            .map_err(|error| {
+                CliError::from(CliErrorKind::workflow_io(format!(
+                    "request daemon stop {url}: {error}"
+                )))
+            })?;
+        let status = response.status();
+        let body = response.text().await.map_err(|error| {
+            CliError::from(CliErrorKind::workflow_io(format!(
+                "read daemon stop response {url}: {error}"
+            )))
+        })?;
+        Ok::<_, CliError>((status, body))
+    })?;
+
+    if !status.is_success() {
+        let detail = if body.trim().is_empty() {
+            format!("HTTP {status}")
+        } else {
+            format!("HTTP {status}: {}", body.trim())
+        };
+        return Err(CliError::from(CliErrorKind::workflow_io(format!(
+            "request daemon stop {url}: {detail}"
+        ))));
+    }
+
+    let _response: DaemonControlResponse = serde_json::from_str(&body).map_err(|error| {
+        CliError::from(CliErrorKind::workflow_parse(format!(
+            "parse daemon stop response {url}: {error}"
+        )))
+    })?;
+    Ok(())
+}
+
+fn wait_for_daemon_shutdown(endpoint: &str) -> Result<(), CliError> {
+    wait_for_flag(&format!("wait for daemon shutdown at {endpoint}"), || {
+        let manifest_cleared = match super::state::load_manifest()? {
+            Some(manifest) => manifest.endpoint != endpoint,
+            None => true,
+        };
+        Ok(!daemon_is_healthy(endpoint) && manifest_cleared)
+    })
+}
+
+fn wait_for_healthy_daemon(mut child: Option<&mut Child>) -> Result<String, CliError> {
+    wait_for_value("wait for daemon health", || {
+        if let Some(child) = child.as_deref_mut()
+            && let Some(status) = child.try_wait().map_err(|error| {
+                CliError::from(CliErrorKind::workflow_io(format!(
+                    "wait for daemon child process: {error}"
+                )))
+            })?
+        {
+            return Err(CliError::from(CliErrorKind::workflow_io(format!(
+                "daemon process exited before becoming healthy: {status}"
+            ))));
+        }
+
+        let Some(manifest) = super::state::load_manifest()? else {
+            return Ok(None);
+        };
+        if daemon_is_healthy(&manifest.endpoint) {
+            return Ok(Some(manifest.endpoint));
+        }
+        Ok(None)
+    })
+}
+
+fn wait_for_flag(
+    label: &str,
+    mut condition: impl FnMut() -> Result<bool, CliError>,
+) -> Result<(), CliError> {
+    let start = Instant::now();
+    loop {
+        if condition()? {
+            return Ok(());
+        }
+        if start.elapsed() >= DAEMON_CONTROL_TIMEOUT {
+            return Err(CliError::from(CliErrorKind::workflow_io(format!(
+                "{label} timed out after {}s",
+                DAEMON_CONTROL_TIMEOUT.as_secs()
+            ))));
+        }
+        thread::sleep(DAEMON_CONTROL_POLL_INTERVAL);
+    }
+}
+
+fn wait_for_value(
+    label: &str,
+    mut condition: impl FnMut() -> Result<Option<String>, CliError>,
+) -> Result<String, CliError> {
+    let start = Instant::now();
+    loop {
+        if let Some(value) = condition()? {
+            return Ok(value);
+        }
+        if start.elapsed() >= DAEMON_CONTROL_TIMEOUT {
+            return Err(CliError::from(CliErrorKind::workflow_io(format!(
+                "{label} timed out after {}s",
+                DAEMON_CONTROL_TIMEOUT.as_secs()
+            ))));
+        }
+        thread::sleep(DAEMON_CONTROL_POLL_INTERVAL);
+    }
+}
+
+fn daemon_is_healthy(endpoint: &str) -> bool {
+    let url = daemon_url(endpoint, "/v1/health");
+    RUNTIME.block_on(async {
+        DAEMON_HTTP_CLIENT
+            .get(&url)
+            .timeout(DAEMON_HTTP_TIMEOUT)
+            .send()
+            .await
+            .is_ok_and(|response| response.status().is_success())
+    })
+}
+
+fn daemon_url(endpoint: &str, path: &str) -> String {
+    format!("{}{path}", endpoint.trim_end_matches('/'))
+}
+
+fn spawn_daemon(binary: &Path) -> Result<Child, CliError> {
+    Command::new(binary)
+        .args(["daemon", "serve", "--host", "127.0.0.1", "--port", "0"])
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()
+        .map_err(|error| {
+            CliError::from(CliErrorKind::workflow_io(format!(
+                "spawn daemon process {}: {error}",
+                binary.display()
+            )))
+        })
+}
+
+fn print_daemon_control_response(
+    response: &DaemonControlResponse,
+    json: bool,
+) -> Result<(), CliError> {
+    if json {
+        print_json(response)
+    } else {
+        println!("{}", response.status);
+        Ok(())
     }
 }
 

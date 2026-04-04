@@ -1,5 +1,6 @@
 use super::*;
 use crate::agents::transport::AgentPromptSubmitArgs;
+use crate::daemon::transport::DaemonCommand;
 use crate::hooks::adapters::HookAgent;
 use crate::observe::{ObserveArgs, ObserveMode};
 use crate::run::{
@@ -544,6 +545,28 @@ fn parse_top_level_pre_compact() {
             assert_eq!(project_dir.as_deref(), Some("/tmp/project"));
         }
         _ => panic!("expected top-level PreCompact command"),
+    }
+}
+
+#[test]
+fn parse_daemon_stop() {
+    let cli = Cli::try_parse_from(["harness", "daemon", "stop"]).unwrap();
+    match cli.command {
+        Command::Daemon {
+            command: DaemonCommand::Stop(args),
+        } => assert!(!args.json),
+        _ => panic!("expected daemon stop command"),
+    }
+}
+
+#[test]
+fn parse_daemon_restart_json() {
+    let cli = Cli::try_parse_from(["harness", "daemon", "restart", "--json"]).unwrap();
+    match cli.command {
+        Command::Daemon {
+            command: DaemonCommand::Restart(args),
+        } => assert!(args.json),
+        _ => panic!("expected daemon restart command"),
     }
 }
 
