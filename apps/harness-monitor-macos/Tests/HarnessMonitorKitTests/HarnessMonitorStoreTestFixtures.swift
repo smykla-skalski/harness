@@ -2,6 +2,7 @@
 
 struct SessionFixture {
   var sessionId: String
+  var title: String = ""
   var context: String
   var status: SessionStatus
   var projectName: String = "harness"
@@ -98,6 +99,7 @@ func makeSession(_ fixture: SessionFixture) -> SessionSummary {
     projectDir: "/Users/example/Projects/harness",
     contextRoot: "/Users/example/Library/Application Support/harness/projects/\(fixture.projectId)",
     sessionId: fixture.sessionId,
+    title: fixture.title,
     context: fixture.context,
     status: fixture.status,
     createdAt: "2026-03-28T14:00:00Z",

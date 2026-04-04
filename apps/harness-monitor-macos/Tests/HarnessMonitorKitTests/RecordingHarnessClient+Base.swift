@@ -143,6 +143,7 @@ extension RecordingHarnessClient {
         projectDir: detail.session.projectDir,
         contextRoot: detail.session.contextRoot,
         sessionId: detail.session.sessionId,
+        title: detail.session.title,
         context: detail.session.context,
         status: .ended,
         createdAt: detail.session.createdAt,
