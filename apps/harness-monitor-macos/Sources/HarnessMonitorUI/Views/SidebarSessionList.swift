@@ -135,7 +135,7 @@ private struct SidebarFilterHeader: View {
       resetFilters()
     }
     .scaledFont(.caption.bold())
-    .harnessAccessoryButtonStyle()
+    .harnessTextActionButtonStyle(tint: HarnessMonitorTheme.ink.opacity(0.94))
     .controlSize(.small)
     .accessibilityIdentifier(HarnessMonitorAccessibility.sidebarClearFiltersButton)
   }
