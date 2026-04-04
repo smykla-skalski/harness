@@ -560,6 +560,28 @@ fn parse_daemon_stop() {
 }
 
 #[test]
+fn parse_daemon_stop_json() {
+    let cli = Cli::try_parse_from(["harness", "daemon", "stop", "--json"]).unwrap();
+    match cli.command {
+        Command::Daemon {
+            command: DaemonCommand::Stop(args),
+        } => assert!(args.json),
+        _ => panic!("expected daemon stop command"),
+    }
+}
+
+#[test]
+fn parse_daemon_restart() {
+    let cli = Cli::try_parse_from(["harness", "daemon", "restart"]).unwrap();
+    match cli.command {
+        Command::Daemon {
+            command: DaemonCommand::Restart(args),
+        } => assert!(!args.json),
+        _ => panic!("expected daemon restart command"),
+    }
+}
+
+#[test]
 fn parse_daemon_restart_json() {
     let cli = Cli::try_parse_from(["harness", "daemon", "restart", "--json"]).unwrap();
     match cli.command {

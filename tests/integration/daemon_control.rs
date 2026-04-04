@@ -35,6 +35,23 @@ fn daemon_stop_stops_running_manual_daemon() {
 }
 
 #[test]
+fn daemon_stop_succeeds_when_offline() {
+    let tmp = tempdir().expect("tempdir");
+    let home = tmp.path().join("home");
+    let xdg = tmp.path().join("xdg");
+    std::fs::create_dir_all(&home).expect("create home");
+    std::fs::create_dir_all(&xdg).expect("create xdg");
+
+    let output = run_harness(&home, &xdg, &["daemon", "stop"]);
+    assert!(
+        output.status.success(),
+        "stop failed: {}",
+        output_text(&output)
+    );
+    assert_eq!(String::from_utf8_lossy(&output.stdout), "stopped\n");
+}
+
+#[test]
 fn daemon_restart_starts_manual_daemon_when_offline() {
     let tmp = tempdir().expect("tempdir");
     let home = tmp.path().join("home");
@@ -132,15 +149,21 @@ fn run_harness(home: &Path, xdg: &Path, args: &[&str]) -> Output {
 fn wait_for_daemon_ready(home: &Path, xdg: &Path) -> DaemonStatusReport {
     let deadline = Instant::now() + DAEMON_WAIT_TIMEOUT;
     loop {
-        let status = daemon_status(home, xdg);
-        if let Some(manifest) = status.manifest.as_ref()
-            && endpoint_is_healthy(&manifest.endpoint)
-        {
-            return status;
-        }
+        let retry_reason = match try_daemon_status(home, xdg) {
+            Ok(status) => {
+                if let Some(manifest) = status.manifest.as_ref()
+                    && endpoint_is_healthy(&manifest.endpoint)
+                {
+                    return status;
+                }
+                "daemon status did not report a healthy manifest yet".to_string()
+            }
+            Err(error) => error,
+        };
         assert!(
             Instant::now() < deadline,
-            "daemon did not become healthy before timeout"
+            "daemon did not become healthy before timeout: {}",
+            retry_reason
         );
         thread::sleep(DAEMON_WAIT_INTERVAL);
     }
@@ -149,13 +172,19 @@ fn wait_for_daemon_ready(home: &Path, xdg: &Path) -> DaemonStatusReport {
 fn wait_for_daemon_stopped(home: &Path, xdg: &Path) {
     let deadline = Instant::now() + DAEMON_WAIT_TIMEOUT;
     loop {
-        let status = daemon_status(home, xdg);
-        if status.manifest.is_none() {
-            return;
-        }
+        let retry_reason = match try_daemon_status(home, xdg) {
+            Ok(status) => {
+                if status.manifest.is_none() {
+                    return;
+                }
+                "daemon status still reports a manifest".to_string()
+            }
+            Err(error) => error,
+        };
         assert!(
             Instant::now() < deadline,
-            "daemon did not stop before timeout"
+            "daemon did not stop before timeout: {}",
+            retry_reason
         );
         thread::sleep(DAEMON_WAIT_INTERVAL);
     }
@@ -175,14 +204,17 @@ fn wait_for_child_exit(child: &mut Child) {
     }
 }
 
-fn daemon_status(home: &Path, xdg: &Path) -> DaemonStatusReport {
+fn try_daemon_status(home: &Path, xdg: &Path) -> Result<DaemonStatusReport, String> {
     let output = run_harness(home, xdg, &["daemon", "status"]);
-    assert!(
-        output.status.success(),
-        "daemon status failed: {}",
-        output_text(&output)
-    );
-    serde_json::from_slice(&output.stdout).expect("parse daemon status")
+    if !output.status.success() {
+        return Err(output_text(&output));
+    }
+    serde_json::from_slice(&output.stdout).map_err(|error| {
+        format!(
+            "parse daemon status: {error}; raw={}",
+            String::from_utf8_lossy(&output.stdout)
+        )
+    })
 }
 
 fn endpoint_is_healthy(endpoint: &str) -> bool {
