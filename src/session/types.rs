@@ -7,7 +7,7 @@ use crate::agents::runtime::RuntimeCapabilities;
 use crate::agents::runtime::signal::{AckResult, Signal, SignalAck};
 
 /// Current schema version for session state files.
-pub const CURRENT_VERSION: u32 = 3;
+pub const CURRENT_VERSION: u32 = 4;
 
 /// Main versioned state document for a multi-agent orchestration session.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -17,6 +17,9 @@ pub struct SessionState {
     #[serde(default)]
     pub state_version: u64,
     pub session_id: String,
+    /// Short human-readable session name.
+    #[serde(default)]
+    pub title: String,
     /// Human-readable session goal.
     pub context: String,
     pub status: SessionStatus,
@@ -328,6 +331,8 @@ pub struct SessionLogEntry {
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum SessionTransition {
     SessionStarted {
+        #[serde(default)]
+        title: String,
         context: String,
     },
     SessionEnded,
@@ -409,6 +414,7 @@ mod tests {
             schema_version: CURRENT_VERSION,
             state_version: 1,
             session_id: "sess-test".into(),
+            title: "test session".into(),
             context: "test goal".into(),
             status: SessionStatus::Active,
             created_at: "2026-03-28T12:00:00Z".into(),
@@ -428,6 +434,22 @@ mod tests {
         assert_eq!(parsed.status, SessionStatus::Active);
         assert_eq!(parsed.leader_id, Some("agent-1".into()));
         assert_eq!(parsed.observe_id.as_deref(), Some("observe-sess-test"));
+    }
+
+    #[test]
+    fn session_state_without_title_deserializes_with_empty_default() {
+        let json = r#"{
+            "schema_version": 3,
+            "session_id": "old-sess",
+            "context": "legacy goal",
+            "status": "active",
+            "created_at": "2026-01-01T00:00:00Z",
+            "updated_at": "2026-01-01T00:00:00Z"
+        }"#;
+        let state: SessionState = serde_json::from_str(json).expect("deserializes");
+        assert_eq!(state.session_id, "old-sess");
+        assert_eq!(state.title, "");
+        assert_eq!(state.context, "legacy goal");
     }
 
     #[test]
@@ -552,6 +574,7 @@ mod tests {
             schema_version: CURRENT_VERSION,
             state_version: 1,
             session_id: "sess-1".into(),
+            title: "test title".into(),
             context: "ctx".into(),
             status: SessionStatus::Active,
             created_at: "2026-03-28T12:00:00Z".into(),

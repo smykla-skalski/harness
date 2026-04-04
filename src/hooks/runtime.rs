@@ -439,6 +439,7 @@ mod tests {
         with_temp_project(|project| {
             let state = session_service::start_session(
                 "signal hook test",
+                "",
                 project,
                 Some("claude"),
                 Some("hook-sess"),

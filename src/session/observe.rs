@@ -434,7 +434,7 @@ mod tests {
     fn observe_scans_logs_via_runtime_session_id() {
         with_temp_project(|project| {
             let state =
-                service::start_session("observe test", project, Some("claude"), Some("sess-1"))
+                service::start_session("observe test", "", project, Some("claude"), Some("sess-1"))
                     .expect("start session");
 
             temp_env::with_vars([("CODEX_SESSION_ID", Some("worker-session"))], || {
@@ -475,7 +475,7 @@ mod tests {
     #[test]
     fn observe_without_actor_stays_read_only() {
         with_temp_project(|project| {
-            service::start_session("observe test", project, Some("claude"), Some("sess-2"))
+            service::start_session("observe test", "", project, Some("claude"), Some("sess-2"))
                 .expect("start session");
             write_agent_log(
                 project,
@@ -501,7 +501,7 @@ mod tests {
     fn observe_deduplicates_titles_created_in_same_pass() {
         with_temp_project(|project| {
             let state =
-                service::start_session("observe test", project, Some("claude"), Some("sess-3"))
+                service::start_session("observe test", "", project, Some("claude"), Some("sess-3"))
                     .expect("start session");
             let leader_id = state.leader_id.clone().expect("leader id");
             let issues = vec![
@@ -526,7 +526,7 @@ mod tests {
     fn observe_detects_cross_agent_file_conflicts_across_agents() {
         with_temp_project(|project| {
             let state =
-                service::start_session("observe test", project, Some("claude"), Some("sess-4"))
+                service::start_session("observe test", "", project, Some("claude"), Some("sess-4"))
                     .expect("start session");
 
             temp_env::with_vars([("CODEX_SESSION_ID", Some("worker-session"))], || {
