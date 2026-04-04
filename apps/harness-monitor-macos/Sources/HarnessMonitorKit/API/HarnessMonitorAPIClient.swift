@@ -3,6 +3,7 @@ import Foundation
 public protocol HarnessMonitorClientProtocol: Sendable {
   func health() async throws -> HealthResponse
   func transportLatencyMs() async throws -> Int?
+  func shutdown() async
   func diagnostics() async throws -> DaemonDiagnosticsReport
   func stopDaemon() async throws -> DaemonControlResponse
   func projects() async throws -> [ProjectSummary]
@@ -59,6 +60,8 @@ public extension HarnessMonitorClientProtocol {
   func transportLatencyMs() async throws -> Int? {
     nil
   }
+
+  func shutdown() async {}
 }
 
 public struct HarnessMonitorConnection: Equatable, Sendable {
