@@ -28,14 +28,21 @@ public actor WebSocketTransport: HarnessMonitorClientProtocol {
     decoder = JSONDecoder()
     decoder.keyDecodingStrategy = .convertFromSnakeCase
 
+    // WebSocket sessions must not have a resource timeout - the 30s
+    // default kills long-lived connections. Request timeout covers
+    // individual frame sends; heartbeat handles liveness detection.
     let configuration = URLSessionConfiguration.default
     configuration.timeoutIntervalForRequest = 15
-    configuration.timeoutIntervalForResource = 30
+    configuration.timeoutIntervalForResource = 0
     session = URLSession(configuration: configuration)
 
+    let httpConfiguration = URLSessionConfiguration.default
+    httpConfiguration.timeoutIntervalForRequest = 15
+    httpConfiguration.timeoutIntervalForResource = 30
+    let httpSession = URLSession(configuration: httpConfiguration)
     httpFallbackClient = HarnessMonitorAPIClient(
       connection: connection,
-      session: session
+      session: httpSession
     )
   }
 

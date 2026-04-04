@@ -139,6 +139,29 @@ pub fn acquire_singleton_lock() -> Result<DaemonLockGuard, CliError> {
     }
 }
 
+/// Probe whether the daemon singleton lock is held by another process.
+///
+/// Returns `true` when another process holds the exclusive `flock` on
+/// `daemon.lock`, meaning the daemon is running. Returns `false` when
+/// the lock file is missing or the lock can be acquired (daemon is dead
+/// or was never started). The kernel releases `flock` on process death
+/// (even `SIGKILL`), so this is immune to PID reuse and stale manifests.
+#[must_use]
+pub fn daemon_lock_is_held() -> bool {
+    let path = lock_path();
+    let Ok(file) = fs::OpenOptions::new().read(true).write(true).open(&path) else {
+        return false;
+    };
+    match file.try_lock_exclusive() {
+        Ok(()) => {
+            let _ = file.unlock();
+            false
+        }
+        Err(error) if error.kind() == io::ErrorKind::WouldBlock => true,
+        Err(_) => false,
+    }
+}
+
 /// Load the persisted daemon manifest, if present.
 ///
 /// # Errors
