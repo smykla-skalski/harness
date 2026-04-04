@@ -91,18 +91,23 @@ struct SidebarFilterSection: View {
 }
 
 private struct SidebarFilterHeader: View {
+  @ScaledMetric(relativeTo: .caption) private var trailingControlsMinHeight = 24
+
   let activeFilterSummary: String
   let isFiltered: Bool
   let resetFilters: () -> Void
 
   var body: some View {
-    HStack(alignment: .top, spacing: HarnessMonitorTheme.itemSpacing) {
+    HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.itemSpacing) {
       title
       Spacer(minLength: HarnessMonitorTheme.itemSpacing)
-      VStack(alignment: .trailing, spacing: HarnessMonitorTheme.spacingXS) {
+      HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.spacingXS) {
         summary
-        clearButtonSlot
+        if isFiltered {
+          clearButton
+        }
       }
+      .frame(minHeight: trailingControlsMinHeight, alignment: .trailing)
     }
   }
 
@@ -130,12 +135,6 @@ private struct SidebarFilterHeader: View {
     .accessibilityIdentifier(HarnessMonitorAccessibility.sidebarClearFiltersButton)
   }
 
-  private var clearButtonSlot: some View {
-    clearButton
-      .opacity(isFiltered ? 1 : 0)
-      .allowsHitTesting(isFiltered)
-      .accessibilityHidden(!isFiltered)
-  }
 }
 
 private struct RecentSearchChipsSection: View {
