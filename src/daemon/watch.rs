@@ -1,7 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Component, Path, PathBuf};
 use std::sync::{Arc, Mutex};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use notify::{RecommendedWatcher, RecursiveMode, Watcher};
 use tokio::spawn;
@@ -198,17 +198,28 @@ fn poll_change_tracking(
     changes
 }
 
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion; tokio-rs/tracing#553"
+)]
 fn reindex_sessions_from_paths(db: &Arc<Mutex<DaemonDb>>, paths: &[PathBuf]) {
     let session_ids = extract_session_ids(paths);
     if session_ids.is_empty() {
         return;
     }
+    tracing::debug!(
+        count = session_ids.len(),
+        "reindexing sessions from file events"
+    );
+    let start = Instant::now();
     let Ok(db_guard) = db.lock() else {
         return;
     };
     for session_id in &session_ids {
         let _ = db_guard.resync_session(session_id);
     }
+    let duration_ms = u64::try_from(start.elapsed().as_millis()).unwrap_or(u64::MAX);
+    tracing::debug!(duration_ms, count = session_ids.len(), "reindex complete");
 }
 
 fn create_watcher(

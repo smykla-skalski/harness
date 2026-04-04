@@ -1057,6 +1057,10 @@ fn serialize_event_payload<T: Serialize>(payload: T, event: &str) -> Result<Valu
     })
 }
 
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion; tokio-rs/tracing#553"
+)]
 fn broadcast_event(
     sender: &broadcast::Sender<StreamEvent>,
     event: Result<StreamEvent, CliError>,
@@ -1065,7 +1069,14 @@ fn broadcast_event(
 ) {
     match event {
         Ok(payload) => {
+            let receiver_count = sender.receiver_count();
             let _ = sender.send(payload);
+            tracing::debug!(
+                event = event_name,
+                session_id = session_id.unwrap_or("-"),
+                receiver_count,
+                "broadcast event sent"
+            );
         }
         Err(error) => {
             warn_broadcast_failure(&error.to_string(), event_name, session_id.unwrap_or("-"));
