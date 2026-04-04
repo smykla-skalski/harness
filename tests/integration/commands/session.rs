@@ -24,6 +24,7 @@ fn session_lifecycle_start_join_task_end() {
 
             let state = service::start_session(
                 "integration test",
+                "",
                 &project,
                 Some("claude"),
                 Some("lifecycle-1"),
@@ -104,6 +105,7 @@ fn session_task_list_via_cli_command() {
 
             let state = service::start_session(
                 "task list test",
+                "",
                 &project,
                 Some("claude"),
                 Some("tasklist-1"),
@@ -156,8 +158,10 @@ fn session_list_shows_active_sessions() {
         || {
             let project = tmp.path().join("project");
 
-            service::start_session("goal one", &project, Some("claude"), Some("list-a")).unwrap();
-            service::start_session("goal two", &project, Some("codex"), Some("list-b")).unwrap();
+            service::start_session("goal one", "", &project, Some("claude"), Some("list-a"))
+                .unwrap();
+            service::start_session("goal two", "", &project, Some("codex"), Some("list-b"))
+                .unwrap();
 
             let sessions = service::list_sessions(&project, false).unwrap();
             assert_eq!(sessions.len(), 2);
@@ -178,6 +182,7 @@ fn session_task_create_supports_suggested_fix_via_cli_command() {
             let project_str = project.to_string_lossy().to_string();
             let state = service::start_session(
                 "suggested fix test",
+                "",
                 &project,
                 Some("claude"),
                 Some("task-fix-1"),
@@ -223,6 +228,7 @@ fn session_assign_supports_reason_via_cli_command() {
             let project_str = project.to_string_lossy().to_string();
             let state = service::start_session(
                 "role reason test",
+                "",
                 &project,
                 Some("claude"),
                 Some("role-reason-1"),
@@ -281,6 +287,7 @@ fn cannot_end_session_with_active_tasks() {
 
             let state = service::start_session(
                 "active task test",
+                "",
                 &project,
                 Some("claude"),
                 Some("active-1"),
@@ -336,6 +343,7 @@ fn concurrent_task_creation_from_multiple_agents() {
             let project = tmp.path().join("project");
             let state = service::start_session(
                 "concurrency test",
+                "",
                 &project,
                 Some("claude"),
                 Some("conc-1"),
@@ -428,7 +436,7 @@ fn multi_agent_observation_merges_issues() {
         || {
             let project = tmp.path().join("project");
             let state =
-                service::start_session("observe test", &project, Some("claude"), Some("obs-1"))
+                service::start_session("observe test", "", &project, Some("claude"), Some("obs-1"))
                     .unwrap();
             let _leader_id = state.leader_id.unwrap();
 
@@ -456,9 +464,14 @@ fn transfer_leader_and_role_reassignment() {
         ],
         || {
             let project = tmp.path().join("project");
-            let state =
-                service::start_session("transfer test", &project, Some("claude"), Some("xfer-1"))
-                    .unwrap();
+            let state = service::start_session(
+                "transfer test",
+                "",
+                &project,
+                Some("claude"),
+                Some("xfer-1"),
+            )
+            .unwrap();
             let leader_id = state.leader_id.unwrap();
 
             let joined = service::join_session(
