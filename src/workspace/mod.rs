@@ -1,8 +1,12 @@
 pub mod compact;
+mod git;
 mod paths;
 mod remote_kubernetes;
 mod session;
 
+pub use git::{
+    GitCheckoutIdentity, GitCheckoutKind, canonical_checkout_root, resolve_git_checkout_identity,
+};
 pub use paths::{HARNESS_PREFIX, dirs_home, harness_data_root, shorten_path, utc_now};
 pub(crate) use remote_kubernetes::{
     RemoteKubernetesInstallMemberState, RemoteKubernetesInstallState, cleanup_remote_install_state,
