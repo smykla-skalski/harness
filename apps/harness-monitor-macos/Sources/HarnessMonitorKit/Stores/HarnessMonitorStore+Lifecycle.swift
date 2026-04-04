@@ -10,7 +10,7 @@ extension HarnessMonitorStore {
   func connect(using client: any HarnessMonitorClientProtocol) async {
     self.client = client
     connectionState = .online
-    refreshPersistedSessionMetadata()
+    await refreshPersistedSessionMetadata()
 
     let transport: TransportKind = client is WebSocketTransport ? .webSocket : .httpSSE
     resetConnectionMetrics(for: transport)
@@ -20,7 +20,7 @@ extension HarnessMonitorStore {
     guard connectionState == .online else {
       self.client = nil
       stopAllStreams()
-      restorePersistedSessionState()
+      await restorePersistedSessionState()
       return
     }
     startConnectionProbe(using: client)
@@ -104,7 +104,7 @@ extension HarnessMonitorStore {
     } catch {
       self.client = nil
       markConnectionOffline(error.localizedDescription)
-      restorePersistedSessionState()
+      await restorePersistedSessionState()
     }
   }
 
@@ -138,14 +138,14 @@ extension HarnessMonitorStore {
         timeline: measuredTimeline.value,
         showingCachedData: false
       )
-      cacheSessionDetail(measuredDetail.value, timeline: measuredTimeline.value)
+      Task { await self.cacheSessionDetail(measuredDetail.value, timeline: measuredTimeline.value) }
     } catch {
       guard isCurrentSessionLoad(requestID, sessionID: sessionID) else {
         return
       }
       lastError = error.localizedDescription
 
-      if let cached = loadCachedSessionDetail(sessionID: sessionID) {
+      if let cached = await loadCachedSessionDetail(sessionID: sessionID) {
         applySelectedSessionSnapshot(
           sessionID: sessionID,
           detail: cached.detail,
@@ -179,7 +179,7 @@ extension HarnessMonitorStore {
     let didChange = sessionIndex.replaceSnapshot(projects: projects, sessions: sessions)
     isShowingCachedData = false
     if didChange {
-      cacheSessionList(sessions, projects: projects)
+      Task { await self.cacheSessionList(sessions, projects: projects) }
     }
 
     if let selectedSessionID, sessionIndex.sessionSummary(for: selectedSessionID) == nil {
@@ -193,10 +193,8 @@ extension HarnessMonitorStore {
     guard didChange else {
       return
     }
-    cacheSessionSummary(
-      summary,
-      project: sessionIndex.projects.first { $0.projectId == summary.projectId }
-    )
+    let project = sessionIndex.projects.first { $0.projectId == summary.projectId }
+    Task { await self.cacheSessionSummary(summary, project: project) }
   }
 
   func applySelectedSessionSnapshot(
@@ -236,11 +234,7 @@ extension HarnessMonitorStore {
       guard sessionID == selectedSessionID else {
         applySessionSummaryUpdate(payload.detail.session)
         if let timeline = payload.timeline {
-          cacheSessionDetail(
-            payload.detail,
-            timeline: timeline,
-            markViewed: false
-          )
+          Task { await self.cacheSessionDetail(payload.detail, timeline: timeline, markViewed: false) }
         }
         return
       }
@@ -253,7 +247,7 @@ extension HarnessMonitorStore {
         cancelPendingTimelineRefresh: payload.timeline != nil
       )
       if let freshTimeline = payload.timeline {
-        cacheSessionDetail(payload.detail, timeline: freshTimeline)
+        Task { await self.cacheSessionDetail(payload.detail, timeline: freshTimeline) }
       } else if let client {
         scheduleSessionPushFallback(using: client, sessionID: sessionID)
       }
@@ -279,7 +273,7 @@ extension HarnessMonitorStore {
         cancelPendingTimelineRefresh: payload.timeline != nil
       )
       if let freshTimeline = payload.timeline {
-        cacheSessionDetail(payload.detail, timeline: freshTimeline)
+        Task { await self.cacheSessionDetail(payload.detail, timeline: freshTimeline) }
       } else if let client {
         scheduleSessionPushFallback(using: client, sessionID: sessionID)
       }
@@ -426,7 +420,7 @@ extension HarnessMonitorStore {
         }
         timeline = measuredTimeline.value
         if let selectedSession {
-          cacheSessionDetail(selectedSession, timeline: measuredTimeline.value)
+          Task { await self.cacheSessionDetail(selectedSession, timeline: measuredTimeline.value) }
         }
       } catch {
         lastError = error.localizedDescription
