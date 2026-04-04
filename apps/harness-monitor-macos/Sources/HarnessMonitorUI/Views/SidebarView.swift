@@ -10,6 +10,7 @@ struct SidebarView: View {
       sessionSections
     }
     .listStyle(.sidebar)
+    .scrollEdgeEffectStyle(.soft, for: .top)
     .safeAreaInset(edge: .top, spacing: 0) {
       sidebarHeader
     }
