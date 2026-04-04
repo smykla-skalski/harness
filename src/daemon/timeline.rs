@@ -442,10 +442,14 @@ fn timeline_payload(
 
 fn transition_summary(transition: &SessionTransition) -> (&'static str, Option<String>, String) {
     match transition {
-        SessionTransition::SessionStarted { context } => (
+        SessionTransition::SessionStarted { title, context } => (
             "session_started",
             None,
-            format!("Session started: {context}"),
+            if title.is_empty() {
+                format!("Session started: {context}")
+            } else {
+                format!("Session started: {title} - {context}")
+            },
         ),
         SessionTransition::SessionEnded => ("session_ended", None, "Session ended".into()),
         SessionTransition::AgentJoined {
@@ -743,6 +747,7 @@ mod tests {
             schema_version: CURRENT_VERSION,
             state_version: 0,
             session_id: session_id.into(),
+            title: "test session".into(),
             context: "test goal".into(),
             status: SessionStatus::Active,
             created_at: "2026-03-28T14:00:00Z".into(),
