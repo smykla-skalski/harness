@@ -1,5 +1,10 @@
 import SwiftUI
 
+enum HarnessMonitorFloatingGlassProminence {
+  case subdued
+  case regular
+}
+
 struct HarnessMonitorGlassControlGroup<Content: View>: View {
   let spacing: CGFloat?
   private let content: Content
@@ -24,12 +29,19 @@ struct HarnessMonitorGlassControlGroup<Content: View>: View {
 private struct HarnessMonitorFloatingGlassModifier: ViewModifier {
   let cornerRadius: CGFloat
   let tint: Color
+  let prominence: HarnessMonitorFloatingGlassProminence
   @Environment(\.accessibilityReduceTransparency)
   private var reduceTransparency
   @Environment(\.colorSchemeContrast)
   private var colorSchemeContrast
 
   private var fallbackFillOpacity: Double {
+    if prominence == .subdued {
+      if reduceTransparency {
+        return colorSchemeContrast == .increased ? 0.26 : 0.18
+      }
+      return colorSchemeContrast == .increased ? 0.14 : 0.08
+    }
     if reduceTransparency {
       return colorSchemeContrast == .increased ? 0.42 : 0.32
     }
@@ -37,11 +49,21 @@ private struct HarnessMonitorFloatingGlassModifier: ViewModifier {
   }
 
   private var fallbackStrokeOpacity: Double {
-    colorSchemeContrast == .increased ? 0.42 : 0.24
+    if prominence == .subdued {
+      return colorSchemeContrast == .increased ? 0.28 : 0.16
+    }
+    return colorSchemeContrast == .increased ? 0.42 : 0.24
   }
 
   private var fallbackStrokeWidth: CGFloat {
     colorSchemeContrast == .increased ? 1.5 : 1
+  }
+
+  private var glassTintOpacity: Double {
+    if prominence == .subdued {
+      return colorSchemeContrast == .increased ? 0.14 : 0.08
+    }
+    return colorSchemeContrast == .increased ? 0.24 : 0.16
   }
 
   func body(content: Content) -> some View {
@@ -59,7 +81,7 @@ private struct HarnessMonitorFloatingGlassModifier: ViewModifier {
     } else {
       content
         .glassEffect(
-          .regular.tint(tint.opacity(colorSchemeContrast == .increased ? 0.24 : 0.16)),
+          .regular.tint(tint.opacity(glassTintOpacity)),
           in: .rect(cornerRadius: cornerRadius, style: .continuous)
         )
     }
@@ -69,9 +91,16 @@ private struct HarnessMonitorFloatingGlassModifier: ViewModifier {
 extension View {
   func harnessFloatingControlGlass(
     cornerRadius: CGFloat = HarnessMonitorTheme.cornerRadiusSM,
-    tint: Color = HarnessMonitorTheme.ink
+    tint: Color = HarnessMonitorTheme.ink,
+    prominence: HarnessMonitorFloatingGlassProminence = .regular
   ) -> some View {
-    modifier(HarnessMonitorFloatingGlassModifier(cornerRadius: cornerRadius, tint: tint))
+    modifier(
+      HarnessMonitorFloatingGlassModifier(
+        cornerRadius: cornerRadius,
+        tint: tint,
+        prominence: prominence
+      )
+    )
   }
 }
 
