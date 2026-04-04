@@ -417,7 +417,7 @@ private enum InspectorPrimaryContent {
 #Preview("Inspector - Empty") {
   let store = HarnessMonitorPreviewStoreFactory.makeStore(
     for: .dashboardLoaded,
-    modelContext: HarnessMonitorPreviewStoreFactory.previewContainer.mainContext
+    modelContainer: HarnessMonitorPreviewStoreFactory.previewContainer
   )
 
   InspectorColumnView(store: store)
@@ -431,7 +431,7 @@ private func inspectorPreviewStore(
 ) -> HarnessMonitorStore {
   let store = HarnessMonitorPreviewStoreFactory.makeStore(
     for: .cockpitLoaded,
-    modelContext: HarnessMonitorPreviewStoreFactory.previewContainer.mainContext
+    modelContainer: HarnessMonitorPreviewStoreFactory.previewContainer
   )
   store.inspectorSelection = selection
   return store

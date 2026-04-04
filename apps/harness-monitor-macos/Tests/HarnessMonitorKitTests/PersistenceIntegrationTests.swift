@@ -16,7 +16,7 @@ struct PersistenceIntegrationTests {
   private func makeStore() -> HarnessMonitorStore {
     HarnessMonitorStore(
       daemonController: RecordingDaemonController(),
-      modelContext: container.mainContext
+      modelContainer: container
     )
   }
 
@@ -148,7 +148,7 @@ struct PersistenceIntegrationTests {
   }
 
   @Test("cacheSessionList writes projects and sessions")
-  func cacheSessionListWritesThenReads() throws {
+  func cacheSessionListWritesThenReads() async throws {
     let store = makeStore()
     let project = makeProject(totalSessionCount: 1, activeSessionCount: 1)
     let session = makeSession(.init(
@@ -161,9 +161,9 @@ struct PersistenceIntegrationTests {
       activeAgentCount: 1
     ))
 
-    store.cacheSessionList([session], projects: [project])
+    await store.cacheSessionList([session], projects: [project])
 
-    let cached = store.loadCachedSessionList()
+    let cached = await store.loadCachedSessionList()
     #expect(cached != nil)
     #expect(cached?.sessions.count == 1)
     #expect(cached?.sessions.first?.sessionId == "sess-1")
@@ -172,7 +172,7 @@ struct PersistenceIntegrationTests {
   }
 
   @Test("cacheSessionDetail stores full detail and timeline")
-  func cacheSessionDetailWritesThenReads() throws {
+  func cacheSessionDetailWritesThenReads() async throws {
     let store = makeStore()
     let session = makeSession(.init(
       sessionId: "sess-detail",
@@ -196,9 +196,9 @@ struct PersistenceIntegrationTests {
       summary: "Test checkpoint"
     )
 
-    store.cacheSessionDetail(detail, timeline: timeline)
+    await store.cacheSessionDetail(detail, timeline: timeline)
 
-    let cached = store.loadCachedSessionDetail(sessionID: "sess-detail")
+    let cached = await store.loadCachedSessionDetail(sessionID: "sess-detail")
     #expect(cached != nil)
     #expect(cached?.detail.session.sessionId == "sess-detail")
     #expect(cached?.detail.agents.count == 2)
@@ -207,7 +207,7 @@ struct PersistenceIntegrationTests {
   }
 
   @Test("cacheSessionDetail updates existing session in place")
-  func cacheSessionDetailUpdatesInPlace() throws {
+  func cacheSessionDetailUpdatesInPlace() async throws {
     let store = makeStore()
     let session = makeSession(.init(
       sessionId: "sess-update",
@@ -224,7 +224,7 @@ struct PersistenceIntegrationTests {
       workerID: "w-1",
       workerName: "Worker"
     )
-    store.cacheSessionDetail(detail, timeline: [])
+    await store.cacheSessionDetail(detail, timeline: [])
 
     let updated = makeSession(.init(
       sessionId: "sess-update",
@@ -240,19 +240,19 @@ struct PersistenceIntegrationTests {
       workerID: "w-2",
       workerName: "New Worker"
     )
-    store.cacheSessionDetail(updatedDetail, timeline: [])
+    await store.cacheSessionDetail(updatedDetail, timeline: [])
 
     let descriptor = FetchDescriptor<CachedSession>()
     let all = try container.mainContext.fetch(descriptor)
     #expect(all.count == 1)
 
-    let cached = store.loadCachedSessionDetail(sessionID: "sess-update")
+    let cached = await store.loadCachedSessionDetail(sessionID: "sess-update")
     #expect(cached?.detail.session.context == "Updated")
     #expect(cached?.detail.agents.count == 2)
   }
 
   @Test("Persistence keeps all cached sessions instead of evicting older snapshots")
-  func persistenceKeepsAllCachedSessions() throws {
+  func persistenceKeepsAllCachedSessions() async throws {
     let store = makeStore()
 
     for index in 0..<55 {
@@ -273,7 +273,7 @@ struct PersistenceIntegrationTests {
         observer: nil,
         agentActivity: []
       )
-      store.cacheSessionDetail(detail, timeline: [])
+      await store.cacheSessionDetail(detail, timeline: [])
     }
 
     let descriptor = FetchDescriptor<CachedSession>()
@@ -282,13 +282,13 @@ struct PersistenceIntegrationTests {
   }
 
   @Test("loadCachedSessionList returns nil on empty store")
-  func loadCachedSessionListReturnsNilWhenEmpty() {
+  func loadCachedSessionListReturnsNilWhenEmpty() async {
     let store = makeStore()
-    #expect(store.loadCachedSessionList() == nil)
+    #expect(await store.loadCachedSessionList() == nil)
   }
 
   @Test("Persisted detail stays loadable even when it was hydrated without manual viewing")
-  func loadCachedDetailReturnsHydratedSnapshotWithoutManualViewing() {
+  func loadCachedDetailReturnsHydratedSnapshotWithoutManualViewing() async {
     let store = makeStore()
     let session = makeSession(.init(
       sessionId: "hydrated-offline",
@@ -306,9 +306,9 @@ struct PersistenceIntegrationTests {
       workerName: "Offline Worker"
     )
 
-    store.cacheSessionDetail(detail, timeline: [], markViewed: false)
+    await store.cacheSessionDetail(detail, timeline: [], markViewed: false)
 
-    let cached = store.loadCachedSessionDetail(sessionID: "hydrated-offline")
+    let cached = await store.loadCachedSessionDetail(sessionID: "hydrated-offline")
     #expect(cached?.detail.session.sessionId == "hydrated-offline")
     #expect(store.persistedSessionCount == 1)
     #expect(store.lastPersistedSnapshotAt != nil)
@@ -339,8 +339,8 @@ struct PersistenceIntegrationTests {
       summary: "Offline timeline snapshot"
     )
 
-    store.cacheSessionList([session], projects: [project])
-    store.cacheSessionDetail(detail, timeline: timeline, markViewed: false)
+    await store.cacheSessionList([session], projects: [project])
+    await store.cacheSessionDetail(detail, timeline: timeline, markViewed: false)
     store.connectionState = .offline("daemon down")
 
     await store.selectSession(session.sessionId)
@@ -414,7 +414,7 @@ struct PersistenceIntegrationTests {
     store.applySessionIndexSnapshot(projects: [project], sessions: [session])
     store.connectionState = .online
     store.primeSessionSelection(session.sessionId)
-    store.restorePersistedSessionSelection(sessionID: session.sessionId)
+    await store.restorePersistedSessionSelection(sessionID: session.sessionId)
 
     #expect(store.selectedSession?.session == session)
     #expect(store.selectedSession?.agents.isEmpty == true)
@@ -429,7 +429,7 @@ struct PersistenceIntegrationTests {
   }
 
   @Test("Hydration helper detects when a persisted detail snapshot is missing")
-  func persistedSnapshotNeedsHydrationReflectsSnapshotState() {
+  func persistedSnapshotNeedsHydrationReflectsSnapshotState() async {
     let store = makeStore()
     let project = makeProject(totalSessionCount: 1, activeSessionCount: 1)
     let session = makeSession(.init(
@@ -448,11 +448,11 @@ struct PersistenceIntegrationTests {
       workerName: "Hydration Worker"
     )
 
-    store.cacheSessionList([session], projects: [project])
-    #expect(store.persistedSnapshotNeedsHydration(for: session))
+    await store.cacheSessionList([session], projects: [project])
+    #expect(await store.persistedSnapshotHydrationQueue(for: [session]).isEmpty == false)
 
-    store.cacheSessionDetail(detail, timeline: [], markViewed: false)
-    #expect(store.persistedSnapshotNeedsHydration(for: session) == false)
+    await store.cacheSessionDetail(detail, timeline: [], markViewed: false)
+    #expect(await store.persistedSnapshotHydrationQueue(for: [session]).isEmpty)
   }
 
   @Test("Performance budget: caching a 72-session snapshot stays under 90 ms median")
@@ -462,10 +462,10 @@ struct PersistenceIntegrationTests {
       let container = try HarnessMonitorModelContainer.preview()
       let store = HarnessMonitorStore(
         daemonController: RecordingDaemonController(),
-        modelContext: container.mainContext
+        modelContainer: container
       )
-      store.cacheSessionList(fixture.sessions, projects: fixture.projects)
-      let cached = store.loadCachedSessionList()
+      await store.cacheSessionList(fixture.sessions, projects: fixture.projects)
+      let cached = await store.loadCachedSessionList()
       #expect(cached?.sessions.count == fixture.sessions.count)
       #expect(cached?.projects.count == fixture.projects.count)
     }
@@ -479,13 +479,13 @@ struct PersistenceIntegrationTests {
     let container = try HarnessMonitorModelContainer.preview()
     let store = HarnessMonitorStore(
       daemonController: RecordingDaemonController(),
-      modelContext: container.mainContext
+      modelContainer: container
     )
     store.applySessionIndexSnapshot(
       projects: fixture.projects,
       sessions: fixture.sessions
     )
-    store.cacheSessionList(fixture.sessions, projects: fixture.projects)
+    await store.cacheSessionList(fixture.sessions, projects: fixture.projects)
 
     var iteration = 0
     let medianMs = await medianRuntimeMs {
@@ -518,8 +518,10 @@ struct PersistenceIntegrationTests {
           completedTaskCount: baseline.metrics.completedTaskCount + iteration
         )
       )
-      store.applySessionSummaryUpdate(updated)
-      let cached = store.loadCachedSessionList()
+      store.sessionIndex.applySessionSummary(updated)
+      let project = store.sessionIndex.projects.first { $0.projectId == updated.projectId }
+      await store.cacheSessionSummary(updated, project: project)
+      let cached = await store.loadCachedSessionList()
       let summary = cached?.sessions.first { $0.sessionId == updated.sessionId }
       #expect(summary?.updatedAt == updated.updatedAt)
     }
@@ -533,7 +535,7 @@ struct PersistenceIntegrationTests {
     let container = try HarnessMonitorModelContainer.preview()
     let store = HarnessMonitorStore(
       daemonController: RecordingDaemonController(),
-      modelContext: container.mainContext
+      modelContainer: container
     )
     store.applySessionIndexSnapshot(
       projects: fixture.projects,
@@ -558,7 +560,7 @@ struct PersistenceIntegrationTests {
     let container = try HarnessMonitorModelContainer.preview()
     let store = HarnessMonitorStore(
       daemonController: RecordingDaemonController(),
-      modelContext: container.mainContext
+      modelContainer: container
     )
     store.applySessionIndexSnapshot(
       projects: fixture.projects,
@@ -586,7 +588,7 @@ struct PersistenceIntegrationTests {
       )
       let store = HarnessMonitorStore(
         daemonController: RecordingDaemonController(client: client),
-        modelContext: container.mainContext
+        modelContainer: container
       )
       store.connectionState = .online
       await store.refresh(using: client, preserveSelection: true)
@@ -705,7 +707,7 @@ struct PersistenceIntegrationTests {
     let client = RecordingHarnessClient()
     let store = HarnessMonitorStore(
       daemonController: RecordingDaemonController(client: client),
-      modelContext: container.mainContext
+      modelContainer: container
     )
     let sessionID = PreviewFixtures.summary.sessionId
 
@@ -715,7 +717,8 @@ struct PersistenceIntegrationTests {
     let ended = await store.endSelectedSession()
     #expect(ended)
 
-    let cached = store.loadCachedSessionList()
+    try await Task.sleep(for: .milliseconds(50))
+    let cached = await store.loadCachedSessionList()
     let summary = cached?.sessions.first { $0.sessionId == sessionID }
     #expect(summary?.status == .ended)
   }

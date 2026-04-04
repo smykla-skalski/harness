@@ -41,7 +41,7 @@ struct HarnessMonitorAppConfiguration {
 
     let store = HarnessMonitorAppStoreFactory.makeStore(
       environment: environment,
-      modelContext: persistenceSetup.container?.mainContext,
+      modelContainer: persistenceSetup.container,
       persistenceError: persistenceSetup.error
     )
 

@@ -92,14 +92,25 @@ public enum HarnessMonitorAPIError: Error, LocalizedError, Equatable {
 }
 
 public final class HarnessMonitorAPIClient: HarnessMonitorClientProtocol {
+  private static let requestTimeoutInterval: TimeInterval = 15
+  private static let resourceTimeoutInterval: TimeInterval = 30
+
   private let connection: HarnessMonitorConnection
   private let decoder: JSONDecoder
   private let encoder: JSONEncoder
   private let session: URLSession
 
-  public init(connection: HarnessMonitorConnection, session: URLSession = .shared) {
+  public init(connection: HarnessMonitorConnection, session: URLSession? = nil) {
     self.connection = connection
-    self.session = session
+
+    if let session {
+      self.session = session
+    } else {
+      let configuration = URLSessionConfiguration.default
+      configuration.timeoutIntervalForRequest = Self.requestTimeoutInterval
+      configuration.timeoutIntervalForResource = Self.resourceTimeoutInterval
+      self.session = URLSession(configuration: configuration)
+    }
 
     let decoder = JSONDecoder()
     decoder.keyDecodingStrategy = .convertFromSnakeCase

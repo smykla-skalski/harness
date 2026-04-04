@@ -17,13 +17,13 @@ public enum HarnessMonitorPreviewStoreFactory {
 
   public static func makeStore(
     for scenario: Scenario,
-    modelContext: ModelContext? = nil,
+    modelContainer: ModelContainer? = nil,
     persistenceError: String? = nil
   ) -> HarnessMonitorStore {
     let configuration = configuration(for: scenario)
     let store = HarnessMonitorStore(
       daemonController: PreviewDaemonController(mode: configuration.mode),
-      modelContext: modelContext,
+      modelContainer: modelContainer,
       persistenceError: persistenceError
     )
     store.connectionState = configuration.connectionState

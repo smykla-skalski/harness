@@ -127,6 +127,7 @@ public final class HarnessMonitorStore {
 
   let daemonController: any DaemonControlling
   public let modelContext: ModelContext?
+  let cacheService: SessionCacheService?
   var client: (any HarnessMonitorClientProtocol)?
   var globalStreamTask: Task<Void, Never>?
   var sessionStreamTask: Task<Void, Never>?
@@ -145,14 +146,18 @@ public final class HarnessMonitorStore {
 
   public init(
     daemonController: any DaemonControlling,
-    modelContext: ModelContext? = nil,
+    modelContainer: ModelContainer? = nil,
     persistenceError: String? = nil
   ) {
     self.daemonController = daemonController
-    self.modelContext = modelContext
+    self.modelContext = modelContainer?.mainContext
+    if let modelContainer {
+      self.cacheService = SessionCacheService(modelContainer: modelContainer)
+    } else {
+      self.cacheService = nil
+    }
     self.persistenceError = persistenceError
     refreshBookmarkedSessionIds()
-    refreshPersistedSessionMetadata()
   }
 
   public func bootstrapIfNeeded() async {
@@ -161,6 +166,7 @@ public final class HarnessMonitorStore {
     }
     hasBootstrapped = true
     refreshBookmarkedSessionIds()
+    await refreshPersistedSessionMetadata()
     await bootstrap()
   }
 
@@ -177,7 +183,7 @@ public final class HarnessMonitorStore {
     } catch {
       daemonStatus = await daemonStatusResponse
       markConnectionOffline(error.localizedDescription)
-      restorePersistedSessionState()
+      await restorePersistedSessionState()
     }
   }
 
@@ -193,7 +199,7 @@ public final class HarnessMonitorStore {
       daemonStatus = await daemonStatusResponse
     } catch {
       markConnectionOffline(error.localizedDescription)
-      restorePersistedSessionState()
+      await restorePersistedSessionState()
     }
   }
 
@@ -207,7 +213,7 @@ public final class HarnessMonitorStore {
       client = nil
       markConnectionOffline("Daemon stopped")
       await refreshDaemonStatus()
-      restorePersistedSessionState()
+      await restorePersistedSessionState()
       showLastAction("Stop daemon")
     } catch {
       lastError = error.localizedDescription

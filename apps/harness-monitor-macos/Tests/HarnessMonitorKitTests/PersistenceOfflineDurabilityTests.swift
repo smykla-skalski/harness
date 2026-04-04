@@ -16,7 +16,7 @@ struct PersistenceOfflineDurabilityTests {
   private func makeStore() -> HarnessMonitorStore {
     HarnessMonitorStore(
       daemonController: RecordingDaemonController(),
-      modelContext: previewContainer.mainContext
+      modelContainer: previewContainer
     )
   }
 
@@ -47,7 +47,7 @@ struct PersistenceOfflineDurabilityTests {
     let client = RecordingHarnessClient()
     let store = HarnessMonitorStore(
       daemonController: RecordingDaemonController(client: client),
-      modelContext: previewContainer.mainContext
+      modelContainer: previewContainer
     )
 
     await store.bootstrap()
@@ -85,17 +85,17 @@ struct PersistenceOfflineDurabilityTests {
     do {
       let liveStore = HarnessMonitorStore(
         daemonController: RecordingDaemonController(),
-        modelContext: previewContainer.mainContext
+        modelContainer: previewContainer
       )
-      liveStore.cacheSessionList([session], projects: PreviewFixtures.projects)
-      liveStore.cacheSessionDetail(detail, timeline: timeline, markViewed: false)
+      await liveStore.cacheSessionList([session], projects: PreviewFixtures.projects)
+      await liveStore.cacheSessionDetail(detail, timeline: timeline, markViewed: false)
     }
 
     let relaunchedStore = HarnessMonitorStore(
       daemonController: FailingDaemonController(
         bootstrapError: DaemonControlError.daemonOffline
       ),
-      modelContext: previewContainer.mainContext
+      modelContainer: previewContainer
     )
     relaunchedStore.selectedSessionID = session.sessionId
 
@@ -150,7 +150,7 @@ struct PersistenceOfflineDurabilityTests {
   }
 
   @Test("Live SwiftData store reopens persisted sessions across store recreation")
-  func liveStoreReopensPersistedSessionsAcrossStoreRecreation() throws {
+  func liveStoreReopensPersistedSessionsAcrossStoreRecreation() async throws {
     let root = FileManager.default.temporaryDirectory
       .appendingPathComponent(UUID().uuidString, isDirectory: true)
     defer { try? FileManager.default.removeItem(at: root) }
@@ -164,20 +164,20 @@ struct PersistenceOfflineDurabilityTests {
       let firstContainer = try HarnessMonitorModelContainer.live(using: environment)
       let firstStore = HarnessMonitorStore(
         daemonController: RecordingDaemonController(),
-        modelContext: firstContainer.mainContext
+        modelContainer: firstContainer
       )
-      firstStore.cacheSessionList([PreviewFixtures.summary], projects: PreviewFixtures.projects)
-      firstStore.cacheSessionDetail(PreviewFixtures.detail, timeline: PreviewFixtures.timeline)
+      await firstStore.cacheSessionList([PreviewFixtures.summary], projects: PreviewFixtures.projects)
+      await firstStore.cacheSessionDetail(PreviewFixtures.detail, timeline: PreviewFixtures.timeline)
     }
 
     let reopenedContainer = try HarnessMonitorModelContainer.live(using: environment)
     let reopenedStore = HarnessMonitorStore(
       daemonController: RecordingDaemonController(),
-      modelContext: reopenedContainer.mainContext
+      modelContainer: reopenedContainer
     )
 
-    let cachedList = reopenedStore.loadCachedSessionList()
-    let cachedDetail = reopenedStore.loadCachedSessionDetail(
+    let cachedList = await reopenedStore.loadCachedSessionList()
+    let cachedDetail = await reopenedStore.loadCachedSessionDetail(
       sessionID: PreviewFixtures.summary.sessionId
     )
 
@@ -187,6 +187,7 @@ struct PersistenceOfflineDurabilityTests {
       cachedDetail?.timeline.map(\.entryId).sorted()
         == PreviewFixtures.timeline.map(\.entryId).sorted()
     )
+    await reopenedStore.refreshPersistedSessionMetadata()
     #expect(reopenedStore.persistedSessionCount == 1)
     #expect(reopenedStore.lastPersistedSnapshotAt != nil)
   }

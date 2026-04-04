@@ -50,13 +50,13 @@ enum HarnessMonitorAppStoreFactory {
 
   static func makeStore(
     environment: HarnessMonitorEnvironment = .current,
-    modelContext: ModelContext? = nil,
+    modelContainer: ModelContainer? = nil,
     persistenceError: String? = nil
   ) -> HarnessMonitorStore {
     if let previewScenario = PreviewScenarioOverride(environment: environment) {
       return HarnessMonitorPreviewStoreFactory.makeStore(
         for: previewScenario.scenario,
-        modelContext: modelContext,
+        modelContainer: modelContainer,
         persistenceError: persistenceError
       )
     }
@@ -80,7 +80,7 @@ enum HarnessMonitorAppStoreFactory {
 
     return HarnessMonitorStore(
       daemonController: controller,
-      modelContext: modelContext,
+      modelContainer: modelContainer,
       persistenceError: persistenceError
     )
   }
