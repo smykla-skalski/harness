@@ -3,7 +3,8 @@
 ## Lifecycle
 
 ```
-harness session start --context "<goal>"
+harness session start --title "<name>" --context "<goal>"
+harness session title <session-id> --title "<name>"
 harness session join <session-id> --role <role> --runtime <runtime> [--capabilities "x,y"]
 harness session end <session-id> --actor <agent-id>
 harness session status <session-id> [--json]
